@@ -74,6 +74,12 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
   }
   const dispatch = (userId: string, issueId: string, botId: string) => steps.dispatchRun(userId, { issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, botId)
   const count = async (sql: string, values: unknown[]) => (await pool.query(sql, values)).rows[0].n as number
+  // Another numbered task of the same person: a task has one thread (lib/thread-dispatch.ts), so reuse is shown on a second task.
+  const anotherTask = async (userId: string, number: number) => {
+    const issueId = await seedIssue(pool, userId)
+    await pool.query(`UPDATE issues SET content=$2::jsonb WHERE id=$1`, [issueId, JSON.stringify({ type: 'doc', attrs: { mikka: { number } } })])
+    return issueId
+  }
 
   await t.test('no runtime yet: the run goes to the cloud and the runtime is created; a second dispatch reuses it', async () => {
     const a = await person('auto-runtime')
@@ -88,7 +94,7 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     assert.deepEqual(run, { agentId: runtime[0].agentId, status: 'queued', kind: 'cloud', botId: a.botId }, 'queued on the bot cloud computer')
     assert.equal(await count('SELECT count(*)::int AS n FROM byos_bindings WHERE "consumerId"=$1', [runtime[0].agentId]), 1, 'the owner\'s own Codex subscription is bound to the runtime')
 
-    const second = await dispatch(a.id, a.issueId, a.botId) as unknown as { runId: string; status: string }
+    const second = await dispatch(a.id, await anotherTask(a.id, 8), a.botId) as unknown as { runId: string; status: string }
     assert.equal(second.status, 'queued')
     assert.notEqual(second.runId, first.runId)
     assert.equal(provisioned, 1, 'the computer is woken once')
@@ -124,7 +130,7 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     const { coordinatorBot } = await import('../lib/coordinator/coordinator-bot')
     // Dispatched from the web in c's workspace: that workspace's Coordinator.
     const coordinator = (await coordinatorBot(c.id, c.workspaceId)).botId
-    const dispatchAsCoordinator = () => steps.dispatchRun(c.id, { issueId: c.issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, coordinator)
+    const dispatchAsCoordinator = (issueId = c.issueId) => steps.dispatchRun(c.id, { issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, coordinator)
     const first = await dispatchAsCoordinator() as unknown as { runId: string; status: string }
     assert.equal(first.status, 'queued', JSON.stringify(first))
     const mapped = (await pool.query(`SELECT cb."botId",b.name FROM coordinator_bots cb JOIN bots b ON b.id=cb."botId" WHERE cb."ownerId"=$1 AND cb."workspaceId"=$2`, [c.id, c.workspaceId])).rows
@@ -135,7 +141,7 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     assert.equal(mapped[0].botId, coordinator)
     assert.deepEqual(run, { runBotId: coordinator, botId: coordinator }, 'the runtime and the run are the Coordinator bot\'s, so the run reports to its chat')
     assert.equal(await count('SELECT count(*)::int AS n FROM bot_cloud_runtimes WHERE "botId" = ANY($1)', [[c.botId, theirs]]), 0, 'no other bot\'s runtime is created or borrowed')
-    const second = await dispatchAsCoordinator() as unknown as { status: string }
+    const second = await dispatchAsCoordinator(await anotherTask(c.id, 8)) as unknown as { status: string }
     assert.equal(second.status, 'queued')
     assert.equal(provisioned, before + 1, 'woken once')
     assert.equal(await count('SELECT count(*)::int AS n FROM coordinator_bots WHERE "ownerId"=$1', [c.id]), 1, 'no duplicate Coordinator bot')

@@ -22,6 +22,7 @@ import { mcpResourceURL } from '@/lib/mcp/resource'
 import { issueRunToken } from '@/lib/mcp/worker'
 import { issueForUser } from '@/lib/issue-access'
 import { latestCheckpoint } from '@/lib/run-leases'
+import { continuationFollowUp } from '@/lib/thread-continuation'
 import { checkpointRecoveryError, quotaContinuationNote, retryNote } from '@/lib/run-retry'
 import { constrainedAssignmentPolicy } from '@/lib/run-assignment-policy'
 import { localComputerAuthority } from '@/lib/computer/local-authority'
@@ -259,6 +260,15 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
       ...(requireWorktreeContinuation ? { requireWorktreeContinuation: true as const } : {}),
     }
     : {}
+  // The next run of a thread after a new dispatch (lib/thread-dispatch.ts) goes on in the thread's last worktree and,
+  // on the same device, its session, sent only the new note; elsewhere it starts fresh with the full brief.
+  const [earlier] = !run.retryOf && run.continuesRunId
+    ? await db.select({ sessionId: agentRuns.sessionId, deviceId: agentRuns.deviceId }).from(agentRuns).where(and(eq(agentRuns.id, run.continuesRunId), eq(agentRuns.userId, caller.userId))).limit(1)
+    : []
+  const followUp = earlier ? continuationFollowUp(run.prompt) : null
+  const threadContinuation = earlier && run.continuesRunId
+    ? { continuesRunId: run.continuesRunId, ...(followUp ? { followUp } : {}), ...(earlier.sessionId && earlier.deviceId === deviceId ? { resumeSessionId: earlier.sessionId } : {}) }
+    : {}
   const settings = device.kind === 'local' && repo.remoteUrl ? await readRepositorySettings(caller.userId, repo.remoteUrl) : null
   // A repository grant resolves its push approval, while an explicit CLI deny
   // or read-only ceiling remains authoritative for every execution tool.
@@ -303,6 +313,7 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
     ...(localComputer ? { localComputer } : {}),
     ...(Object.keys(taskEnv).length ? { taskEnv } : {}),
     ...(taskSecretNames.length ? { taskSecretNames } : {}),
+    ...threadContinuation,
     ...retry,
     ...factoryClaim,
     ...skillAssignment,

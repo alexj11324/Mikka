@@ -1184,6 +1184,7 @@
     "accountEmailMismatch": "输入的邮箱与当前账户不一致。",
     "accountSoleAdmin": "你是工作区「{workspaces}」唯一的管理员。先把管理员身份转给其他成员，再删除账户。",
     "runChainEnded": "此线程的所有尝试都已结束，没有可停止的运行。",
+    "threadStopping": "线程正在停止",
     "secretNotFound": "该密钥或环境变量已不存在。",
     "secretNameReserved": "该名称为运行环境保留（例如 PATH、HOME、代理、TLS、加载器、git、E2B 或 MIKKA 相关变量），请换一个名称。",
     "secretPermissionDenied": "只有工作区管理员可以执行此操作。成员可以添加和编辑仓库级的密钥与环境变量。",

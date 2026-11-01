@@ -2,10 +2,11 @@ import { UNFINISHED_RUN_STATUSES } from './agent-run-statuses'
 
 /**
  * Run chains (BE-18), the GitHub Actions run_id + run_attempt model. A run's parent is
- * the run it resumes after an answered Factory question ("questionContinuation"->>'originRunId')
- * or the run it reruns ("retryOf"); a chain is a root and every run reachable from it.
+ * the run it resumes after an answered Factory question ("questionContinuation"->>'originRunId'),
+ * the run it reruns ("retryOf") or the run of the same thread it goes on from after a new
+ * dispatch ("continuesRunId", lib/thread-dispatch.ts); a chain is a root and every run reachable from it.
  *
- * No column and no migration: chains are resolved on the read path with a recursive CTE
+ * No chain column: chains are resolved on the read path with a recursive CTE
  * over those two links. A link counts only between runs of the same owner on the same
  * issue (an issue belongs to exactly one personal or workspace scope, so this also keeps a
  * chain inside one workspace). Recursion has a depth limit of 64. Chains that
@@ -50,10 +51,10 @@ const ORIGIN = (alias: string) => `(CASE WHEN ${alias}."questionContinuation"->>
 function chainSql(scope: string, depth: string) {
   return `
     runs AS (
-      SELECT r.id, r."userId", r."issueId", r."createdAt", ${ORIGIN('r')} AS origin, r."retryOf" FROM agent_runs r WHERE ${scope}
+      SELECT r.id, r."userId", r."issueId", r."createdAt", ${ORIGIN('r')} AS origin, r."retryOf", r."continuesRunId" FROM agent_runs r WHERE ${scope}
     ), edges AS (
       SELECT DISTINCT c.id AS child, p.id AS parent FROM runs c JOIN runs p
-        ON p.id IN (c.origin, c."retryOf")
+        ON p.id IN (c.origin, c."retryOf", c."continuesRunId")
         AND p."userId" = c."userId" AND p."issueId" IS NOT DISTINCT FROM c."issueId"
     ), up AS (
       SELECT id AS start, id AS node, 0 AS depth FROM runs

@@ -228,6 +228,14 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   opens the thread conversation: on desktop the centre column switches to it
   with 「‹ Coordinator」 to go back, on a phone it pushes in full screen.
   Figma: page 「线程卡片 · 聊天里派出线程」.
+- **R-81** A task has one thread at a time (Alex, 2026-11-01). Dispatching a
+  task that already has a thread gives that thread the work: while it works
+  the note goes in as a message; once it ended (done, failed, stopped) it runs
+  again in the same thread, resuming the agent's session where it can. The
+  thread's id does not change. Only the person's explicit request for a new
+  session or thread, or another agent, starts a new one; the old thread is
+  stopped and marked replaced. The server enforces this at every dispatch
+  entry, not the prompt ([decision](decisions/2026-11-01-1330-one-thread-per-task.md)).
 
 ## Right panel, 建议, Artifact and browser
 

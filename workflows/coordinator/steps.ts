@@ -363,11 +363,36 @@ export async function listAgents(userId: string, scope?: NativeToolScope) {
   return (await import('@/lib/mcp/actions')).listAgents(userId)
 }
 
-/** The run belongs to the bot that dispatched it, the Coordinator included, so its events come back to that bot's chat. */
-export async function dispatchRun(userId: string, input: { issueId: string; agentId?: string; repo: string; note?: string; requestKey?:string; readOnly?: boolean }, scope: NativeToolScope | undefined, botId: string, execution?: AgentExecution, requestEventId?: string, approvedRepositoryKey?: string) {
+/**
+ * The run belongs to the bot that dispatched it, the Coordinator included, so its events come back to that bot's chat.
+ * One task, one thread (lib/thread-dispatch.ts): a task with a thread gets the dispatch as that thread's work; only
+ * `newThread`, when the person's own message (`sourceEventId`, host-supplied) explicitly asked for it, starts another.
+ */
+export async function dispatchRun(userId: string, input: { issueId: string; agentId?: string; repo: string; note?: string; requestKey?:string; readOnly?: boolean; newThread?: boolean; sourceEventId?: string }, scope: NativeToolScope | undefined, botId: string, execution?: AgentExecution, requestEventId?: string, approvedRepositoryKey?: string) {
   'use step'
   await assertNativeToolScope(userId,scope)
-  return asToolResult(async () => {
+  const { newThread, sourceEventId, ...request } = input
+  const { dispatchToTask, explicitNewThread } = await import('@/lib/thread-dispatch')
+  return asToolResult(() => dispatchToTask(userId, request.issueId, {
+    note: request.note, newThread,
+    explicit: () => explicitNewThread(userId, botId, sourceEventId),
+    start: async (previous, note) => {
+      // The thread's next run goes where the thread ran, so its session can be resumed; elsewhere it starts fresh with the note's context.
+      if (previous?.cloud && (previous.harness === 'codex' || previous.harness === 'claude_code')) {
+        const cloud = await dispatchComputerTask(userId, { botId: previous.cloud.botId, issueId: request.issueId, harness: previous.harness, note, ...(previous.remoteUrl ? { repo: previous.remoteUrl } : {}) }, `thread:${previous.id}:${request.requestKey ?? requestEventId ?? crypto.randomUUID()}`, scope, execution)
+        if (!('error' in cloud)) return cloud
+      } else if (previous?.remoteUrl) {
+        const result = await queueRun(userId, { issueId: request.issueId, agentId: previous.agentId, repo: previous.remoteUrl, note, readOnly: previous.readOnly, requestKey: `thread:${previous.id}:${request.requestKey ?? crypto.randomUUID()}`.slice(0, 200) }, botId, execution, requestEventId, null, approvedRepositoryKey).catch(() => null)
+        if (result) return { ...result, status: 'queued' as const }
+      }
+      return dispatchByRules(userId, { ...request, note }, scope, botId, execution, requestEventId, approvedRepositoryKey)
+    },
+  }))
+}
+
+/** Where a new run goes by the saved label execution rules: the workspace's cloud, else an online device. */
+async function dispatchByRules(userId: string, input: { issueId: string; agentId?: string; repo: string; note?: string; requestKey?:string; readOnly?: boolean }, scope: NativeToolScope | undefined, botId: string, execution?: AgentExecution, requestEventId?: string, approvedRepositoryKey?: string) {
+  {
     const target = await (await import('@/lib/rule-dispatch')).resolveIssueExecution(userId,botId,input.issueId)
     // No machine can take it (decision 2026-10-31-2200-run-machine-fallback): an error the person can act on.
     const noMachine = async () => {
@@ -396,7 +421,7 @@ export async function dispatchRun(userId: string, input: { issueId: string; agen
       return target.fallback ? queueOnDevice(target.fallback) : noMachine()
     }
     return queueOnDevice(target)
-  })
+  }
 }
 
 /** Only the person's own Bots in workspaces they still belong to are listed. */
@@ -438,6 +463,19 @@ export async function listComputerBots(userId: string, scope?: NativeToolScope) 
     catch { return null }
   }))
   return visible.filter(item => item !== null)
+}
+
+/** `dispatch_bot_computer`: on a task that has a thread, that thread's next work (lib/thread-dispatch.ts), on this Bot's computer. */
+export async function dispatchComputerThread(userId: string, input: { botId: string; issueId: string; harness: 'codex' | 'claude_code'; note?: string; suggestionId?: string; newThread?: boolean; sourceEventId?: string }, toolCallId: string, scope?: NativeToolScope, execution?: AgentExecution, chatBotId?: string) {
+  'use step'
+  await assertNativeToolScope(userId, scope)
+  const { newThread, sourceEventId, ...request } = input
+  const { dispatchToTask, explicitNewThread } = await import('@/lib/thread-dispatch')
+  return asToolResult(() => dispatchToTask(userId, request.issueId, {
+    note: request.note, newThread,
+    explicit: () => explicitNewThread(userId, chatBotId ?? request.botId, sourceEventId),
+    start: (previous, note) => dispatchComputerTask(userId, { ...request, note }, previous ? `thread:${previous.id}:${toolCallId}` : toolCallId, scope, execution),
+  }))
 }
 
 /** Queue and bind atomically, with a stable tool-call id for workflow retries. */
