@@ -24,7 +24,7 @@
     "test:migrations": "node --test scripts/activity-actor-validation.test.mjs scripts/check-migrations.test.mjs scripts/migration-order.test.mjs scripts/migrate-mode.test.mjs scripts/migration-guard.test.mjs scripts/migration-steps.test.mjs scripts/migration-targets.test.mjs scripts/scope-migration-history.test.mjs scripts/integration-migration-history.test.mjs",
     "dev": "node scripts/dev-preview.mjs",
     "dev:local": "node scripts/dev-local.mjs",
-    "test:dev-local": "node --test scripts/dev-local/transport.test.mjs scripts/dev-local/services.test.mjs",
+    "test:dev-local": "node --test scripts/dev-local/transport.test.mjs scripts/dev-local/services.test.mjs && node --import tsx --test scripts/dev-local/seed-model-keys.test.ts",
     "test:preview": "node --test tests/preview-ready.test.mjs",
     "format": "prettier --write \"**/*.{ts,tsx}\"",
     "lint": "pnpm lint:code && pnpm lint:ui",
