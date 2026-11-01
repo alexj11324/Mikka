@@ -1,6 +1,5 @@
 import { and, eq } from 'drizzle-orm'
-import { chatBotId } from '@/lib/coordinator/coordinator-bot'
-import { loadWorkspaceContext } from '@/lib/workspace-access'
+import { openChatBotId } from '@/lib/coordinator/coordinator-bot'
 import { z } from 'zod'
 import { getRun } from 'workflow/api'
 import { auth, apiWorkspaceAllowed } from '@/lib/api-auth'
@@ -23,7 +22,7 @@ async function handleGET(request: Request) {
   const bot = z.uuid().nullable().safeParse(params.get('botId'))
   if (!bot.success) return Response.json({ error: 'validationGeneric' }, { status: 400 })
   // No bot named: the Coordinator of the workspace this request is in (a token's own workspace).
-  const botId = bot.data ?? await chatBotId(session.user.id, null, (await loadWorkspaceContext(undefined, session.user)).workspace.id)
+  const botId = await openChatBotId(session.user, bot.data)
   if (bot.data) {
     const [owned] = await db.select({ workspaceId: bots.workspaceId }).from(bots)
       .where(and(eq(bots.id, bot.data), eq(bots.ownerId, session.user.id))).limit(1)

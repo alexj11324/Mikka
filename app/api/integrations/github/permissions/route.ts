@@ -2,7 +2,6 @@ import { auth } from '@/lib/auth'
 import { pool } from '@/lib/db'
 import { GitHubPermissionsError, githubPermissionsPatchSchema, readGitHubPermissions, setGitHubPermissions } from '@/lib/github/plugin-permissions'
 import { noteLogUser, withRequestLog } from '@/lib/request-log'
-import { loadWorkspaceContext } from '@/lib/workspace-access'
 
 const headers = { 'Cache-Control': 'private, no-store' }
 const fail = (error: string, status: number, viewerId?: string) => Response.json({ ...(viewerId ? { viewerId } : {}), error }, { status, headers })
@@ -15,7 +14,7 @@ async function viewer(request: Request) {
 }
 
 /** The Coordinator of the workspace the person has open. */
-const openWorkspace = async (user: NonNullable<Awaited<ReturnType<typeof viewer>>>) => (await loadWorkspaceContext(undefined, user)).workspace.id
+const openWorkspace = async (user: NonNullable<Awaited<ReturnType<typeof viewer>>>) => (await (await import('@/lib/workspace-access')).loadWorkspaceContext(undefined, user)).workspace.id
 
 function failure(error: unknown, viewerId: string) {
   if (error instanceof GitHubPermissionsError) return fail(error.code, 409, viewerId)
