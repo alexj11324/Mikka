@@ -6,7 +6,7 @@ import { execFile, execFileSync } from "node:child_process";
 import { request } from "node:http";
 import { promisify } from "node:util";
 import { afterEach, expect, it, vi } from "vitest";
-import { defaultRunPolicy, type RunAssignment } from "@mikka/protocol";
+import { defaultRunPolicy, HOSTED_NATIVE_IMAGE, type RunAssignment } from "@mikka/protocol";
 import { createHostedBotRunner } from "../src/subscription-hosted-runner";
 import { MemoryServer } from "../src/server-link";
 import { createLogger } from "../src/log";
@@ -205,7 +205,7 @@ const dockerExec = promisify(execFile)
 // protocol only. The trusted command wrapper forwards every Docker operation;
 // it can withhold a *real successful create's stdout* to expose the ownership
 // race deterministically. No production liveness or container result is faked.
-async function revocationFixture(holdCreate = false) {
+async function revocationFixture(holdCreate = false, failCreate = false) {
   // Keep audit files outside the shared disposable-directory helper. Its
   // independent owner may recycle fixtures; these records must stay retained.
   const root = mkdtempSync(join(tmpdir(),'mikka-hosted-approval-')), stateDir = join(root, 'adapters')
@@ -220,6 +220,7 @@ import { appendFileSync, existsSync, writeFileSync } from 'node:fs';
 const args = process.argv.slice(2);
 appendFileSync(${JSON.stringify(calls)}, JSON.stringify({at:new Date().toISOString(),args})+'\\n');
 const creating = args[0] === 'create';
+if (creating && ${failCreate}) { process.stderr.write('Error response from daemon: fixture create refused: no space left on device\\n'); process.exit(125) }
 const child = spawn(${JSON.stringify(realDocker)}, args, { stdio: ['inherit', creating ? 'pipe' : 'inherit', 'inherit'] });
 let output = '';
 if (creating) child.stdout.on('data', part => { output += part });
@@ -244,14 +245,17 @@ child.on('close', async code => {
   const binary = resolve(import.meta.dirname, 'fakes/fake-claude-subscription.mjs')
   chmodSync(binary, 0o700)
   const previousPath = process.env.PATH
-  let runner: Awaited<ReturnType<typeof createHostedBotRunner>>
-  try {
-    process.env.PATH = `${bin}:${previousPath ?? '/usr/bin:/bin'}`
-    runner = await createHostedBotRunner({ stateDir, link, binaries: { claude_code: binary }, ...(process.env.MIKKA_E2B_TEST_DOCKER === '1' ? { dockerSocket: 'unix:///run/mikka-container/docker.sock' as const } : {}) })
-  } finally {
-    if (previousPath === undefined) delete process.env.PATH
-    else process.env.PATH = previousPath
+  // A runner on this state directory, as a restarted daemon would open it.
+  const open = async () => {
+    try {
+      process.env.PATH = `${bin}:${previousPath ?? '/usr/bin:/bin'}`
+      return await createHostedBotRunner({ stateDir, link, binaries: { claude_code: binary }, ...(process.env.MIKKA_E2B_TEST_DOCKER === '1' ? { dockerSocket: 'unix:///run/mikka-container/docker.sock' as const } : {}) })
+    } finally {
+      if (previousPath === undefined) delete process.env.PATH
+      else process.env.PATH = previousPath
+    }
   }
+  const runner = await open()
   const assignment = { runId, deviceId, issueId: randomUUID(), repoId: randomUUID(), baseBranch: 'main', harness: 'claude_code', prompt: 'HANG', model: 'fixture-model',
     subscriptionBinding: { bindingId: randomUUID(), ownerId: 'fixture-owner', workspaceId: randomUUID(), consumerId: randomUUID(), route: 'claude_code_cli' },
   } as RunAssignment
@@ -277,7 +281,7 @@ child.on('close', async code => {
       }
     })
   }
-  return { root, stateDir, runId, runner, link, assignment, options, gate, contextValue, binary, created, release, commands, socket, resource, gone,
+  return { root, stateDir, runId, runner, open, realDocker, dockerEnv, link, assignment, options, gate, contextValue, binary, created, release, commands, socket, resource, gone,
     revokePolicy: () => { policyLive = false },
     inspect: async (id: string) => JSON.parse((await dockerExec(realDocker, ['inspect', id], { env: dockerEnv })).stdout)[0],
   }
@@ -338,6 +342,51 @@ it.each(['context', 'broker', 'create'] as const)('fences hosted startup revoked
     fixture.gate.revoke(); resume.resolve()
     writeFileSync(fixture.release, 'release on fixture teardown')
     await starting.catch(() => undefined)
+  }
+}, 60000)
+
+it('a failed Docker create keeps its reason, leaves no resource record, and the next runner starts', async () => {
+  const fixture = await revocationFixture(false, true)
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+  try {
+    const error = await fixture.runner.start(fixture.assignment, fixture.options).then(() => undefined, (e: Error) => e)
+    expect(error?.message).toBe('subscription_hosted_runtime_unavailable')
+    expect(String((error?.cause as Error | undefined)?.message)).toContain('fixture create refused: no space left on device')
+    expect(warn.mock.calls.some(call => String(call[0]).includes('fixture create refused'))).toBe(true)
+    expect(fixture.commands().filter(args => args[0] === 'create')).toHaveLength(1)
+    expect(fixture.commands().some(args => args[0] === 'start' || args[0] === 'rm')).toBe(false)
+    expect(fixture.resource()).toBeUndefined()
+    expect(fixture.socket()).toBeUndefined()
+    // A restarted daemon on the same machine is not blocked by this run.
+    await expect(fixture.open()).resolves.toBeDefined()
+  } finally {
+    warn.mockRestore()
+    fixture.gate.revoke()
+  }
+}, 60000)
+
+it('startup clears creating records a stopped daemon left, removing a container only by its nonce label', async () => {
+  const fixture = await revocationFixture()
+  const resources = join(fixture.stateDir, 'native-resources')
+  // Left by a daemon that stopped before or during its create: nothing exists.
+  const absent = { name: `mikka-native-${randomUUID()}`, nonce: randomUUID(), state: 'creating' }
+  // Left by a daemon that stopped after its create landed but before it
+  // recorded the id; the container has another name but carries the nonce.
+  const landed = { name: `mikka-native-${randomUUID()}`, nonce: randomUUID(), state: 'creating' }
+  const { stdout } = await dockerExec(fixture.realDocker, ['create', '--pull=never', '--name', `mikka-fixture-${randomUUID()}`, '--label', `com.mikka.native.resource=${landed.nonce}`, HOSTED_NATIVE_IMAGE, 'true'], { env: fixture.dockerEnv })
+  const landedId = stdout.trim()
+  // Somebody else's container, without our nonce, is never touched.
+  const other = (await dockerExec(fixture.realDocker, ['create', '--pull=never', '--label', `com.mikka.native.resource=${randomUUID()}`, HOSTED_NATIVE_IMAGE, 'true'], { env: fixture.dockerEnv })).stdout.trim()
+  try {
+    writeFileSync(join(resources, `${absent.name}.json`), JSON.stringify(absent))
+    writeFileSync(join(resources, `${landed.name}.json`), JSON.stringify(landed))
+    await expect(fixture.open()).resolves.toBeDefined()
+    expect(readdirSync(resources)).toEqual([])
+    await fixture.gone(landedId)
+    expect((await fixture.inspect(other)).Id).toBe(other)
+  } finally {
+    await dockerExec(fixture.realDocker, ['rm', '-f', other], { env: fixture.dockerEnv }).catch(() => undefined)
+    await dockerExec(fixture.realDocker, ['rm', '-f', landedId], { env: fixture.dockerEnv }).catch(() => undefined)
   }
 }, 60000)
 

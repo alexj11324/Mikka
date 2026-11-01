@@ -24,8 +24,8 @@ const clarify = 'root = Stack([intro, q])\nintro = TextContent("好的。")\nq =
 const dispatchFailed = (task: string, noKey = false) => `root = Stack([q])\nq = BeQuestions("派发失败：设备不在线", [{id:"route", title:"派不出去：Alex 的 MacBook 不在线。等它上线，还是在 Mikka Cloud 上运行？", options:[{value:"wait", label:"Wait for it"}, {value:"cloud", label:"Run on Mikka Cloud"${noKey ? ', action:"cloudKeySettings"' : ''}}]}], "${task}")`
 
 // What the bot draws from dispatch_run's machineUnavailable result (lib/rule-dispatch.ts machineUnavailableCard).
-const needsMachine = 'root = Stack([q])\nq = BeQuestions("没有电脑能跑这个任务", [{id:"machine", title:"这个任务需要一台电脑来跑", options:[{value:"computer", label:"在这台电脑上启用", action:"enableThisMac"}, {value:"e2b", label:"填入 E2B Key", action:"e2bKey"}, {value:"server", label:"连接我的服务器", action:"connectServer"}]}])'
-const allowMachine = (deviceId: string) => `root = Stack([q])\nq = BeQuestions("没有电脑能跑这个任务", [{id:"machine", title:"这个任务需要一台电脑来跑", options:[{value:"${deviceId}", label:"允许这台电脑自动调度", action:"allowAutoSchedule"}, {value:"e2b", label:"填入 E2B Key", action:"e2bKey"}, {value:"server", label:"让服务器重新上线", action:"serverOnline"}]}])`
+const needsMachine = 'root = Stack([q])\nq = BeQuestions("没有电脑能跑这个任务", [{id:"machine", title:"没有可用的电脑", description:"先连接或开启一台电脑，或者填入你的 E2B API Key 用云端运行。", options:[{value:"computer", label:"连接电脑", action:"connectServer"}, {value:"e2b", label:"填入 E2B Key", action:"e2bKey"}]}])'
+const allowMachine = (deviceId: string) => `root = Stack([q])\nq = BeQuestions("没有电脑能跑这个任务", [{id:"machine", title:"没有可用的电脑", description:"先连接或开启一台电脑，或者填入你的 E2B API Key 用云端运行。", options:[{value:"${deviceId}", label:"允许这台电脑自动调度", action:"allowAutoSchedule"}, {value:"e2b", label:"填入 E2B Key", action:"e2bKey"}, {value:"server", label:"让服务器重新上线", action:"serverOnline"}]}])`
 
 // Dispatch option labels are English on purpose: the card localizes them by value.
 // Visual and interaction coverage of stored replies; the Factory clarify answer itself is the person's next message.
@@ -116,20 +116,19 @@ for (const viewport of [{ name: 'desktop', width: 1280, height: 800 }, { name: '
     await expect(card.getByText('去设置 E2B 密钥', { exact: true }).locator('xpath=ancestor::*[@data-slot="item"][1]')).toHaveAttribute('aria-disabled', 'true')
   })
 
-  test(`no machine: the card opens this computer's setup, the server settings and the E2B key dialog (${viewport.name})`, async ({ page }, testInfo) => {
+  test(`no machine: 连接电脑 opens Settings › 电脑 and 填入 E2B Key opens the key dialog (${viewport.name})`, async ({ page }, testInfo) => {
     await page.setViewportSize(viewport)
     const { email } = await register(page)
     await seed(email, [{ role: 'user', content: '把首页压到 2 秒以内' }, { role: 'assistant', content: needsMachine }])
     await page.goto(app('/?section=coordinator'))
-    const card = page.getByRole('region', { name: 'Coordinator', exact: true }).getByRole('group', { name: '这个任务需要一台电脑来跑' })
-    await expect(card.getByRole('link', { name: /连接我的服务器/ })).toHaveAttribute('href', /\/settings\?section=computers$/)
+    const card = page.getByRole('region', { name: 'Coordinator', exact: true }).getByRole('group', { name: '没有可用的电脑' })
+    await expect(card.getByRole('link', { name: /连接电脑/ })).toHaveAttribute('href', /\/settings\?section=computers$/)
+    await expect(card.getByText('先连接或开启一台电脑，或者填入你的 E2B API Key 用云端运行。')).toBeVisible()
+    // Two rows only: no row offers Mikka's own cloud.
+    await expect(card.getByRole('button')).toHaveCount(1)
+    await expect(card.getByRole('link')).toHaveCount(1)
     await shoot(page, testInfo, `machine-${viewport.name}-open`)
     // Rows open setup, they never answer: nothing is sent to the bot.
-    await card.getByRole('button', { name: /在这台电脑上启用/ }).click()
-    const mac = page.getByRole('dialog', { name: '添加设备' })
-    await expect(mac).toBeVisible()
-    await mac.getByRole('button', { name: '完成' }).click()
-    await expect(mac).toHaveCount(0)
     await card.getByRole('button', { name: /填入 E2B Key/ }).click()
     await expect(page.getByRole('dialog', { name: 'E2B API Key' })).toBeVisible()
     await shoot(page, testInfo, `machine-${viewport.name}-e2b`)
@@ -137,7 +136,6 @@ for (const viewport of [{ name: 'desktop', width: 1280, height: 800 }, { name: '
     await expect(page.getByRole('dialog', { name: 'E2B API Key' })).toHaveCount(0)
     // Nothing was answered, so every row is still open.
     await expect(card.getByRole('button', { name: /填入 E2B Key/ })).toBeEnabled()
-    await expect(card.getByRole('button', { name: /在这台电脑上启用/ })).toBeEnabled()
   })
 
   test(`no machine with a personal computer online: 允许这台电脑自动调度 switches it on and answers (${viewport.name})`, async ({ page }) => {
@@ -152,7 +150,7 @@ for (const viewport of [{ name: 'desktop', width: 1280, height: 800 }, { name: '
     await seed(email, [{ role: 'user', content: '把首页压到 2 秒以内' }, { role: 'assistant', content: allowMachine(deviceId) }])
     await page.goto(app('/?section=coordinator'))
     const chat = page.getByRole('region', { name: 'Coordinator', exact: true })
-    const card = chat.getByRole('group', { name: '这个任务需要一台电脑来跑' })
+    const card = chat.getByRole('group', { name: '没有可用的电脑' })
     await expect(card.getByRole('link', { name: /让服务器重新上线/ })).toHaveAttribute('href', /\/settings\?section=computers$/)
     const allow = card.getByRole('button', { name: /允许这台电脑自动调度/ })
     await allow.click()

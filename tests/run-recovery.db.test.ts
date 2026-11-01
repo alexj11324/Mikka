@@ -137,8 +137,8 @@ test('independent run recovery: concurrency, STOP, renewed leases and attempt fe
     await reclaimLostRuns(run.userId, now)
     assert.equal((await pool.query('SELECT status FROM agent_runs WHERE id=$1', [retryId])).rows[0].status, 'failed', 'nothing waits on an offline device')
     const event = (await pool.query('SELECT payload FROM coordinator_events WHERE "runId"=$1 AND kind=\'run_finished\'', [retryId])).rows[0]
-    assert.deepEqual(event.payload.noMachine.options.map((option: { action: string }) => option.action), ['allowAutoSchedule', 'e2bKey', 'connectServer'])
-    assert.equal(event.payload.noMachine.options[0].value, run.otherDeviceId)
+    // 没有可用的电脑 is the same two rows whatever devices there are (Alex): 连接电脑 and 填入 E2B Key.
+    assert.deepEqual(event.payload.noMachine.options.map((option: { action: string }) => option.action), ['connectServer', 'e2bKey'])
   })
 
   await t.test('a lost run with no cloud and no auto-schedule device ends with the card instead of a retry', async () => {

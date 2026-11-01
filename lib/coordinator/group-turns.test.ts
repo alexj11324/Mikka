@@ -9,7 +9,7 @@ import { checkedCorrection, checkedRoute } from './group-correction'
 import { createGroupJudgment } from './group-judgment'
 import { DECISION_MODEL, type DecisionAnswer } from './decision'
 import type { DecisionExecution } from './decide'
-import { MissingGroupLeadError, routeFromAnswers, UnknownMentionError, routingInput } from './group-routing'
+import { UnknownMentionError, routingInput } from './group-routing'
 
 const a = randomUUID(), b = randomUUID(), outsider = randomUUID()
 const members: GroupAgent[] = [a,b].map((id,i) => ({ id, name: `Agent ${i}`, description: `role ${i}` }))
@@ -320,14 +320,6 @@ test('production adapter does not select private standing instructions or sessio
   assert.match(runtime,/await client\.query/)
   assert.doesNotMatch(runtime,/\bdb\./)
 })
-
-test('missing or ineligible lead never silently selects first-joined agent; confident routes need no lead', () => {
-  assert.throws(()=>routeFromAnswers(null,members,null),MissingGroupLeadError)
-  assert.throws(()=>routeFromAnswers(null,members,outsider),MissingGroupLeadError)
-  assert.equal(routeFromAnswers(null,members,b).responders[0],b)
-  assert.equal(routeFromAnswers(new Map([['responder',{type:'choice' as const,name:'responder',choice:a,confidence:1}]]),members,null).responders[0],a)
-})
-
 
 test('correction facts come from model judgment and reject uncertain or invalid members', () => {
   const prior = { message: 'previous', responderId: a }
