@@ -60,18 +60,18 @@ async function lockHead(tx: PoolClient, userId: string, coordinator: Coordinator
   return row
 }
 
-/** `userId` is the authenticated session's; nothing here is read from the request. */
-export async function readGitHubPermissions(pool: Pick<Pool, 'connect'>, userId: string): Promise<GitHubPermissions> {
-  const coordinator = await coordinatorBot(userId)
+/** `userId` is the authenticated session's and `workspaceId` the one it has open (its Coordinator's); nothing here is read from the request body. */
+export async function readGitHubPermissions(pool: Pick<Pool, 'connect'>, userId: string, workspaceId: string): Promise<GitHubPermissions> {
+  const coordinator = await coordinatorBot(userId, workspaceId)
   return writeTransaction(pool, async tx => {
     const { push, pullRequest, version } = view(await lockHead(tx, userId, coordinator, false))
     return { push, pullRequest, version }
   })
 }
 
-export async function setGitHubPermissions(pool: Pick<Pool, 'connect'>, userId: string, raw: unknown): Promise<GitHubPermissions> {
+export async function setGitHubPermissions(pool: Pick<Pool, 'connect'>, userId: string, workspaceId: string, raw: unknown): Promise<GitHubPermissions> {
   const input = githubPermissionsPatchSchema.parse(raw)
-  const coordinator = await coordinatorBot(userId)
+  const coordinator = await coordinatorBot(userId, workspaceId)
   return writeTransaction(pool, async tx => {
     const current = view(await lockHead(tx, userId, coordinator, true))
     if (current.version !== input.version) throw new GitHubPermissionsError('githubPermissionsChanged')

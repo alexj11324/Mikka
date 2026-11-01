@@ -31,7 +31,12 @@ mock.module(new URL('../../../../../lib/auth.ts', import.meta.url).href, { named
 mock.module(new URL('../../../../../lib/db/index.ts', import.meta.url).href, { namedExports: { pool: {}, db: {} } })
 // Each person's Coordinator is an ordinary bot row (lib/coordinator/coordinator-bot.ts).
 const coordinatorOf = (owner: string) => ({ botId: `coordinator-bot-of-${owner}`, workspaceId: `workspace-of-${owner}` })
-mock.module(new URL('../../../../../lib/coordinator/coordinator-bot.ts', import.meta.url).href, { namedExports: { coordinatorBot: async (owner: string) => coordinatorOf(owner) } })
+// The settings are the Coordinator's of the workspace the person has open.
+mock.module(new URL('../../../../../lib/workspace-access.ts', import.meta.url).href, { namedExports: { loadWorkspaceContext: async (_id: undefined, user: { id: string }) => ({ workspace: { id: `workspace-of-${user.id}` } }) } })
+mock.module(new URL('../../../../../lib/coordinator/coordinator-bot.ts', import.meta.url).href, { namedExports: { coordinatorBot: async (owner: string, workspaceId: string) => {
+  if (workspaceId !== coordinatorOf(owner).workspaceId) throw new Error('settings must use the open workspace\'s Coordinator')
+  return coordinatorOf(owner)
+} } })
 mock.module(new URL('../../../../../lib/request-log.ts', import.meta.url).href, { namedExports: { withRequestLog: (_route: string, handler: unknown) => handler, noteLogUser: () => {} } })
 mock.module(new URL('../../../../../lib/operations/write-transaction.ts', import.meta.url).href, { namedExports: { writeTransaction: async (_pool: unknown, work: (tx: typeof client) => Promise<unknown>) => work(client) } })
 

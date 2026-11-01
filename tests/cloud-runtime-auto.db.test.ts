@@ -60,6 +60,8 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     users.push(id)
     await pool.query('INSERT INTO repository_settings ("userId","remoteKey",push) VALUES ($1,$2,$3)', [id, normalizeRepository('octo/repo').key, JSON.stringify({ approved: true, remote: 'origin', approvedByUserId: id, approvedAt: new Date().toISOString() })])
     const ws = await seedWorkspace(pool, id, [{ userId: id, role: 'admin' }])
+    // Their own workspace: the personal one, where work with no workspace of its own goes.
+    await pool.query(`UPDATE mikka_workspaces SET kind='personal' WHERE id=$1`, [ws.id])
     const issueId = await seedIssue(pool, id)
     await pool.query(`UPDATE issues SET content='{"type":"doc","attrs":{"mikka":{"number":7}}}' WHERE id=$1`, [issueId])
     const botId = await seedBot(pool, ws.id, id)
@@ -120,7 +122,8 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     await pool.query(`INSERT INTO bots (id,"workspaceId","ownerId",name) VALUES ($1,$2,$3,'Coordinator')`, [theirs, c.workspaceId, c.id])
     const before = provisioned
     const { coordinatorBot } = await import('../lib/coordinator/coordinator-bot')
-    const coordinator = (await coordinatorBot(c.id)).botId
+    // Dispatched from the web in c's workspace: that workspace's Coordinator.
+    const coordinator = (await coordinatorBot(c.id, c.workspaceId)).botId
     const dispatchAsCoordinator = () => steps.dispatchRun(c.id, { issueId: c.issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, coordinator)
     const first = await dispatchAsCoordinator() as unknown as { runId: string; status: string }
     assert.equal(first.status, 'queued', JSON.stringify(first))

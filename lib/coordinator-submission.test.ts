@@ -196,7 +196,7 @@ before(async () => {
       return suggestion
     },
   } })
-  mock.module('@/lib/coordinator/coordinator-bot', { namedExports: { coordinatorBot: async () => ({ botId: COORDINATOR_BOT, workspaceId: 'a4000000-0000-4000-8000-0000000c0de2' }), chatBotId: async (_owner: string, botId: string | null | undefined) => botId ?? COORDINATOR_BOT } })
+  mock.module('@/lib/coordinator/coordinator-bot', { namedExports: { coordinatorBot: async () => ({ botId: COORDINATOR_BOT, workspaceId: 'a4000000-0000-4000-8000-0000000c0de2' }), chatBotId: async (_owner: string, botId: string | null | undefined) => botId ?? COORDINATOR_BOT, openChatBotId: async (_user: unknown, botId: string | null | undefined) => botId ?? COORDINATOR_BOT } })
   mock.module('@/lib/request-log', { namedExports: { noteLogUser: () => undefined, withRequestLog: (_path: string, handler: unknown) => handler } })
   mock.module('@/lib/coordinator/store', { namedExports: { chatView: async () => ({}), botChats: async () => ({}), retryFailedTurn: async () => false } })
   mock.module('@/lib/coordinator/wake', { namedExports: { coordinatorEnabled: () => enabled, wakeCoordinator: () => { throw new Error('test must not execute wake') } } })
