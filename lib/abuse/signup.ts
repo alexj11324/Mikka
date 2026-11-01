@@ -95,6 +95,15 @@ export function localTestSignups(env: Record<string, string | undefined> = proce
       && target.pathname.slice(1).endsWith('_e2e')
   } catch { return false }
 }
+/**
+ * Better Auth's own sign-up limit (its default special rule: 3 a window of 10
+ * seconds per client, https://www.better-auth.com/docs/concepts/rate-limit).
+ * Locally every request shares one bucket, so in local test mode sign-up gets
+ * Better Auth's general limit of 100 a window instead; production keeps the default.
+ */
+export function localSignUpRateRules(env: Record<string, string | undefined> = process.env): Record<string, { window: number; max: number }> {
+  return localTestSignups(env) ? { '/sign-up/email': { window: 10, max: 100 } } : {}
+}
 export function signupLimits(
   env: Record<string, string | undefined> = process.env,
 ) {

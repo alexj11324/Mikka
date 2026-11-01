@@ -9,6 +9,7 @@ import {
 import {
   signupClientIP,
   signupLimits,
+  localSignUpRateRules,
   normalizedEmail,
   disposableEmail,
   verifyTurnstile,
@@ -118,5 +119,10 @@ test('local test mode defaults to CI\'s limits; production, Vercel and other dat
     { ...local, MIKKA_DATABASE_URL: 'postgresql://e2e@db.example.com:5432/mikka_e2e' },
     { ...local, MIKKA_DATABASE_URL: 'postgresql://e2e@127.0.0.1:5432/mikka' },
     {},
-  ]) assert.deepEqual(signupLimits(env), { signupIp: 5, signupGlobal: 100, verificationIp: 15, verificationGlobal: 300 }, JSON.stringify(env))
+  ]) {
+    assert.deepEqual(signupLimits(env), { signupIp: 5, signupGlobal: 100, verificationIp: 15, verificationGlobal: 300 }, JSON.stringify(env))
+    assert.deepEqual(localSignUpRateRules(env), {}, 'Better Auth keeps its default sign-up rule')
+  }
+  // Better Auth's sign-up rule: its default 3 per 10 seconds, raised only locally.
+  assert.deepEqual(localSignUpRateRules(local), { '/sign-up/email': { window: 10, max: 100 } })
 })
