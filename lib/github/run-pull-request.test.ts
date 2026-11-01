@@ -225,3 +225,15 @@ test('transport errors become safe retryable codes without leaking request bodie
     assert.equal(result.title, title)
   }
 })
+
+test('GitHub rejecting the App credentials reads as a configuration problem, other refusals keep their status', async () => {
+  const rejected = (status: number) => (async () => Response.json({ message: 'synthetic-secret' }, { status })) as unknown as typeof fetch
+  await assert.rejects(verifyGitHubRepositoryAccess({ ...input, fetcher: rejected(401) }), { code: 'github_not_configured', retryable: false })
+  await assert.rejects(verifyGitHubRepositoryAccess({ ...input, fetcher: rejected(400) }), error => {
+    assert.ok(error instanceof PublicationError)
+    assert.equal(error.code, 'github_request_failed')
+    assert.equal(error.status, 400)
+    assert.doesNotMatch(error.message, /synthetic-secret/)
+    return true
+  })
+})
