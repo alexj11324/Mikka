@@ -206,17 +206,17 @@ async function reclaimLostRun(run: Run, now: Date) {
 
 type CloudTarget = { botId: string; workspaceId: string; harness: 'codex' | 'claude_code'; agentId: string; repoId: string; deviceId: string; remoteUrl: string }
 
-/** The person's own E2B cloud for a lost run: an E2B key and a bot cloud runtime, the run's bot first. */
+/** The person's own E2B cloud for a lost run: an E2B key and the run's own bot's cloud runtime (never another bot's). */
 async function cloudTarget(run: Run): Promise<CloudTarget | null> {
   if (process.env.MIKKA_CLOUD_COMPUTER_TASKS !== '1' || process.env.MIKKA_BYOS_ENABLED !== '1') return null
-  if (run.agentDefinition?.repositoryAdmission || !run.deviceRepoId) return null
+  if (run.agentDefinition?.repositoryAdmission || !run.deviceRepoId || !run.botId) return null
   const [repo] = await db.select({ remoteUrl: deviceRepos.remoteUrl }).from(deviceRepos).where(eq(deviceRepos.id, run.deviceRepoId)).limit(1)
   if (!repo?.remoteUrl) return null
   const harness = run.agentDefinition?.harness ?? null
   const { rows: [row] } = await pool.query(`SELECT r."botId",r."workspaceId",r.harness,r."agentId",r."repoId",a."deviceId" FROM bot_cloud_runtimes r
       JOIN workspace_e2b_keys k ON k."workspaceId"=r."workspaceId" JOIN agents a ON a.id=r."agentId" AND a."userId"=r."ownerId"
-      WHERE r."ownerId"=$1 AND a."deviceId" IS NOT NULL
-      ORDER BY (r."botId"=$2::uuid) DESC NULLS LAST,(r.harness=$3) DESC NULLS LAST,r."botId" LIMIT 1`, [run.userId, run.botId, harness])
+      WHERE r."ownerId"=$1 AND r."botId"=$2 AND a."deviceId" IS NOT NULL
+      ORDER BY (r.harness=$3) DESC NULLS LAST LIMIT 1`, [run.userId, run.botId, harness])
   return row ? { ...row, remoteUrl: repo.remoteUrl } : null
 }
 
