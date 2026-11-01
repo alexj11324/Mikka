@@ -4,9 +4,12 @@ import { db } from '@/lib/db'
 import { githubRepositoryInstallations } from '@/lib/db/schema'
 import type { GitHubRepositoryBinding } from './run-pull-request'
 
-/** Better Auth owns account. Read the durable provider subject, never OAuth tokens. */
+/** The Plugins → GitHub connection, else the GitHub sign-in account (Better Auth owns account). Durable provider subject only, never OAuth tokens. */
 export async function linkedGitHubAccountId(userId: string): Promise<string | null> {
-  const result = await db.execute<{ accountId: string }>(sql`select "accountId" from account where "userId" = ${userId} and "providerId" = 'github' order by "createdAt" limit 1`)
+  const result = await db.execute<{ accountId: string }>(sql`select "accountId" from (
+    select 0 as rank, "githubAccountId" as "accountId" from github_connections where "userId" = ${userId}
+    union all (select 1, "accountId" from account where "userId" = ${userId} and "providerId" = 'github' order by "createdAt" limit 1)
+  ) linked order by rank limit 1`)
   return result.rows[0]?.accountId ?? null
 }
 

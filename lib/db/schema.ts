@@ -370,6 +370,15 @@ export const agentRuns = pgTable('agent_runs', {
 }, table => [index('agent_runs_device_status_idx').on(table.deviceId, table.status), index('agent_runs_issue_idx').on(table.issueId, table.createdAt), index('agent_runs_bot_created_idx').on(table.botId, table.createdAt.desc()).where(sql`${table.botId} is not null`), uniqueIndex('agent_runs_user_dispatch_key').on(table.userId, table.dispatchKey).where(sql`${table.dispatchKey} is not null`), index('agent_runs_retry_of_idx').on(table.retryOf).where(sql`${table.retryOf} is not null`)])
 
 /** A verified owner/repository binding. Installation tokens are never stored. */
+/** Plugins → GitHub connection, separate from the login identity; one GitHub account may serve many users. Tokens are sealed like Better Auth's. */
+export const githubConnections = pgTable('github_connections', {
+  userId: text('userId').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
+  githubAccountId: text('githubAccountId').notNull(), githubLogin: text('githubLogin').notNull(),
+  accessToken: text('accessToken').notNull(), refreshToken: text('refreshToken'),
+  accessTokenExpiresAt: timestamp('accessTokenExpiresAt', { withTimezone: true }), refreshTokenExpiresAt: timestamp('refreshTokenExpiresAt', { withTimezone: true }),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(), updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+})
+
 export const githubRepositoryInstallations = pgTable('github_repository_installations', {
   userId: text('userId').notNull().references(() => users.id, { onDelete: 'cascade' }),
   remoteKey: text('remoteKey').notNull(),

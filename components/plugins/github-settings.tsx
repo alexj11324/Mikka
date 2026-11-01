@@ -11,7 +11,7 @@ import { authClient } from '@/lib/auth-client'
 import { openSettingsInBrowser } from '@/lib/platform/open-settings'
 import { FieldError } from '@/components/ui/field'
 
-type GitHubState = { viewerId: string; configured: boolean; connected: boolean; installed: boolean; repositories: { id: string; fullName: string; installationId: string; htmlUrl: string; private: boolean }[] }
+type GitHubState = { viewerId: string; configured: boolean; connected: boolean; login?: string | null; installed: boolean; repositories: { id: string; fullName: string; installationId: string; htmlUrl: string; private: boolean }[] }
 /** A readable state, or an account link GitHub no longer accepts. */
 type GitHubRead = { state: GitHubState; reconnect: false } | { state: null; reconnect: true }
 
@@ -78,15 +78,23 @@ function ViewerGitHubSettings({ userId, isPending }: { userId: string | undefine
       const handoff = await openSettingsInBrowser('integrations')
       if (handoff === 'desktop') return
       if (handoff === 'unsupported') { setGithubLinkError(t('browserUpdateRequired')); return }
-      const callbackURL = new URL(window.location.href)
-      callbackURL.searchParams.delete('github')
-      const errorURL = new URL(callbackURL)
-      errorURL.searchParams.set('github', 'link-failed')
-      const result = await authClient.linkSocial({ provider: 'github', callbackURL: callbackURL.href, errorCallbackURL: errorURL.href })
-      if (result.error || !result.data?.url) throw new Error()
-      window.location.assign(result.data.url)
+      // A plugin connection, not a sign-in link: it never touches the login identity.
+      window.location.assign(withBasePath('/api/integrations/github/connect'))
     } catch {
       setGithubLinkError(t('githubLinkFailed'))
+    } finally {
+      setGithubLinking(false)
+    }
+  }
+
+  async function disconnectGitHub() {
+    setGithubLinking(true); setGithubLinkError('')
+    try {
+      const response = await fetch(withBasePath('/api/integrations/github'), { method: 'DELETE' })
+      if (!response.ok) throw new Error(String(response.status))
+      await mutate()
+    } catch {
+      setGithubLinkError(t('githubDisconnectFailed'))
     } finally {
       setGithubLinking(false)
     }
@@ -100,6 +108,10 @@ function ViewerGitHubSettings({ userId, isPending }: { userId: string | undefine
         </Button> : <Button type="button" variant="outline" size="sm" disabled={githubLinking} onClick={() => void linkGitHub()}>
           {githubLinking ? t('working') : t('githubLink')}
         </Button>)}
+        {githubState?.connected && githubState.login && <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">{t('githubLogin', { login: githubState.login })}</span>
+          <Button type="button" variant="ghost" size="sm" disabled={githubLinking} onClick={() => void disconnectGitHub()}>{t('disconnect')}</Button>
+        </div>}
         {githubState?.configured && githubState.connected && githubState.installed && githubState.repositories.length > 0 && <ScrollArea className="h-32 w-64 max-w-full">
           <ul aria-label={t('githubRepositoryList')} className="flex flex-col gap-1 pr-3 text-xs text-muted-foreground">
             {githubState.repositories.map(repository => <li key={repository.id} className="break-all">{repository.fullName}</li>)}
