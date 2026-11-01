@@ -80,6 +80,21 @@ export function signupClientIP(
 ) {
   return auditRequestContext(headers, env).ip ?? 'local'
 }
+/**
+ * Local test mode: a developer's own disposable database, where every signup
+ * comes from one 'local' IP. Off in production and on Vercel; on only with
+ * MIKKA_LOCAL_TEST_ACCOUNTS=1 and an app database that is a loopback *_e2e one
+ * (the rule scripts/test-accounts uses for local mode).
+ */
+export function localTestSignups(env: Record<string, string | undefined> = process.env) {
+  if (env.NODE_ENV === 'production' || env.VERCEL || env.VERCEL_ENV || env.MIKKA_LOCAL_TEST_ACCOUNTS !== '1') return false
+  try {
+    const target = new URL(env.MIKKA_DATABASE_URL ?? '')
+    return ['postgres:', 'postgresql:'].includes(target.protocol)
+      && ['127.0.0.1', 'localhost', '[::1]'].includes(target.hostname)
+      && target.pathname.slice(1).endsWith('_e2e')
+  } catch { return false }
+}
 export function signupLimits(
   env: Record<string, string | undefined> = process.env,
 ) {
@@ -87,11 +102,13 @@ export function signupLimits(
     const n = Number(value)
     return Number.isSafeInteger(n) && n > 0 ? n : fallback
   }
+  // Locally, CI's limits (.github/workflows/browser-tests.yml) unless set explicitly.
+  const local = localTestSignups(env)
   return {
-    signupIp: positive(env.MIKKA_SIGNUP_IP_HOURLY, 5),
-    signupGlobal: positive(env.MIKKA_SIGNUP_GLOBAL_HOURLY, 100),
-    verificationIp: positive(env.MIKKA_VERIFICATION_IP_HOURLY, 15),
-    verificationGlobal: positive(env.MIKKA_VERIFICATION_GLOBAL_HOURLY, 300),
+    signupIp: positive(env.MIKKA_SIGNUP_IP_HOURLY, local ? 1000 : 5),
+    signupGlobal: positive(env.MIKKA_SIGNUP_GLOBAL_HOURLY, local ? 10000 : 100),
+    verificationIp: positive(env.MIKKA_VERIFICATION_IP_HOURLY, local ? 1000 : 15),
+    verificationGlobal: positive(env.MIKKA_VERIFICATION_GLOBAL_HOURLY, local ? 10000 : 300),
   }
 }
 /** Atomic fixed-hour counters in Better Auth's rateLimit storage. */

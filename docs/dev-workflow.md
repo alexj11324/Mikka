@@ -37,7 +37,8 @@ start `next start`, so those specs need a build until they move to `next dev`.
 
 ## 3. Environment
 
-One command sets up a container: `scripts/dev/bootstrap-local.sh`. Put it in
+One command sets up a container: `eval "$(scripts/dev/bootstrap-local.sh)"`
+([local-bootstrap.md](local-bootstrap.md)). Put it in
 the cloud environment's setup script so every session starts ready. It
 provides:
 
@@ -51,6 +52,14 @@ provides:
   `executablePath: '/opt/pw-browsers/chromium'`. Never run
   `playwright install`.
 
+Signup limits never block local work: outside production and Vercel, with
+`MIKKA_LOCAL_TEST_ACCOUNTS=1` and a loopback `*_e2e` app database, the signup
+and verification limits default to CI's (1000 per IP, 10000 overall, each hour)
+instead of 5 per IP; an explicitly set `MIKKA_SIGNUP_*_HOURLY` or
+`MIKKA_VERIFICATION_*_HOURLY` still wins (`lib/abuse/signup.ts`). `next start`
+runs with `NODE_ENV=production`, so a production build keeps the production
+defaults unless those variables are set, as the bootstrap's export line does.
+
 ## 4. CI variables
 
 Never set `GITHUB_ACTIONS`, `RUNNER_ENVIRONMENT`, `GITHUB_RUN_ID` or any other
@@ -62,9 +71,9 @@ pool (`scripts/test-accounts/bootstrap.mjs`), refuse to run unless
 `GITHUB_ACTIONS` and related variables are set, and several hard-code port
 5432. Until those guards learn the local environment, those suites run in CI.
 
-Local test accounts: _to be filled in when the local test-account mode lands
-(session `session_01XDndLRHw24esXi2pKyHX5A`)._ Until then, use the existing
-helpers as [`acceptance.md`](acceptance.md) describes.
+Local test accounts: the local mode (`MIKKA_LOCAL_TEST_ACCOUNTS=1` with a
+loopback `*_e2e` database) is described in
+[`test-accounts.md`](test-accounts.md#local-mode-a-developers-own-disposable-database).
 
 ## 5. Merge batches
 
@@ -78,6 +87,10 @@ Pull requests waiting to merge go in batches of five:
 4. A UI change goes in only after its screenshots are reviewed.
 5. The coordinator squash-merges the integration PR into `main`, then closes
    the original PRs with a link to it.
+
+A documentation conflict is resolved by the integration session, which merges
+the documents' content itself; it is not sent back to the authors and not
+deferred to another batch.
 
 Several small fixes go to an integration branch together and are pushed once,
 instead of a full CI round for each fix.
