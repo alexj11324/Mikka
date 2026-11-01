@@ -22,22 +22,22 @@ export class RepositoryCache {
   }
 
   /** Serialize clone/fetch against the same cache, including other processes. */
-  async prepare(remoteUrl: string, signal?: AbortSignal): Promise<string> {
+  async prepare(remoteUrl: string, signal?: AbortSignal, env: Record<string, string> = {}): Promise<string> {
     signal?.throwIfAborted()
     const { remoteUrl: remote } = normalizeRepository(remoteUrl, { allowFile: this.allowFile })
     const path = this.pathFor(remote)
     this.ensureParents(dirname(path))
     const release = await this.lock(path, signal)
     try {
-      return await withRepoConfig(path, () => this.update(path, remote, signal))
+      return await withRepoConfig(path, () => this.update(path, remote, signal, env))
     } finally { await release() }
   }
 
-  private async update(path: string, remote: string, signal?: AbortSignal): Promise<string> {
+  private async update(path: string, remote: string, signal?: AbortSignal, env: Record<string, string> = {}): Promise<string> {
     signal?.throwIfAborted()
     const git = (args: string[], cwd?: string) => execa('git', [
       ...FETCH_GIT, '-c', `protocol.file.allow=${this.allowFile ? 'always' : 'never'}`, ...args,
-    ], { cwd, env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }, stdin: 'ignore', timeout: FETCH_TIMEOUT_MS, cancelSignal: signal, killDescendants: true })
+    ], { cwd, env: { ...process.env, ...env, GIT_TERMINAL_PROMPT: '0' }, stdin: 'ignore', timeout: FETCH_TIMEOUT_MS, cancelSignal: signal, killDescendants: true })
     if (!existsSync(path)) {
       const temporary = `${path}.clone-${randomUUID()}`
       try {
