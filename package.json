@@ -49,7 +49,7 @@
     "test:settings-activity-db": "node --test-force-exit --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test tests/settings-activity.db.test.ts",
     "test:desktop-auth": "node --import tsx --test lib/desktop-auth.test.ts && node --experimental-test-module-mocks --import tsx --test tests/desktop-oauth-sign-in.test.tsx && node --test-force-exit --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test tests/desktop-auth-handoff.db.test.ts",
     "test:auth-return": "node --import tsx --test lib/auth-return.test.ts",
-    "test:agent": "node --import tsx --test tests/agent-ui.test.mjs tests/legacy-chat-retirement.test.mjs tests/legacy-chat-content.test.tsx tests/bot-web-tools.test.mjs lib/agent-ui-source.test.ts lib/search/search.test.ts lib/search/firecrawl.test.ts lib/agent-rounds.test.ts && node --import ./tests/support/server-only.mjs --import tsx --test tests/agent-ui-report.test.tsx",
+    "test:agent": "node --import tsx --test scripts/demo-data/chats.test.mts tests/agent-ui.test.mjs tests/legacy-chat-retirement.test.mjs tests/legacy-chat-content.test.tsx tests/bot-web-tools.test.mjs lib/agent-ui-source.test.ts lib/search/search.test.ts lib/search/firecrawl.test.ts lib/agent-rounds.test.ts && node --import ./tests/support/server-only.mjs --import tsx --test tests/agent-ui-report.test.tsx",
     "test:mobile-push": "NODE_ENV=test node --import ./tests/support/server-only.mjs --import tsx --test lib/mobile-push.test.ts",
     "test:relation-cycle": "NODE_ENV=test node --import ./tests/support/server-only.mjs --import tsx --test lib/issue-relation-cycle.db.test.ts",
     "test:acceptance": "node --import tsx --test tests/acceptance.test.mjs",
