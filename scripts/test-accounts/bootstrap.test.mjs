@@ -8,11 +8,10 @@ import { localDatabaseTarget } from './bootstrap.mjs'
 
 const url = (host, name = 'mikka_e2e') => `postgresql://e2e:e2e-local-only@${host}:5432/${name}`
 
-test('local mode binds only a loopback *_e2e database', () => {
-  for (const host of ['127.0.0.1', 'localhost', '[::1]']) assert.equal(localDatabaseTarget(url(host)).name, 'mikka_e2e')
-  for (const remote of [url('db.example.com'), url('10.0.0.5'), url('ep-autumn-fire.neon.tech'), url('127.0.0.1.example.com'), url('host.docker.internal')])
-    assert.throws(() => localDatabaseTarget(remote), { code: 'LOCAL_DATABASE_REQUIRED' })
-  assert.throws(() => localDatabaseTarget(url('127.0.0.1', 'orvilo_mvp')), { code: 'LOCAL_DATABASE_REQUIRED' })
+test('local mode binds only a loopback *_e2e database (the rule: local-test-mode.test.mjs)', () => {
+  assert.equal(localDatabaseTarget(url('127.0.0.1')).name, 'mikka_e2e')
+  assert.throws(() => localDatabaseTarget(url('db.example.com')), { code: 'LOCAL_DATABASE_REQUIRED' })
+  // The harness also needs credentials it can bind, which the rule does not check.
   assert.throws(() => localDatabaseTarget('postgresql:///mikka_e2e'), { code: 'DATABASE_URL_INVALID' })
 })
 

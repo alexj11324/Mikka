@@ -1,4 +1,4 @@
-import { localTestAccountsMode } from '@/scripts/test-accounts/database-target.mjs'
+import { localTestMode } from '@mikka/protocol/local-test-mode'
 
 type AuthEnvironment = Record<string, string | undefined>
 
@@ -24,7 +24,7 @@ function httpsOrigin(value: string, allowLoopback = false) {
  * is on and every configured database is a loopback *_e2e database.
  */
 function loopbackAllowed(env: AuthEnvironment) {
-  return env.NODE_ENV === 'development' || env.CI === 'true' || localTestAccountsMode(env)
+  return env.NODE_ENV === 'development' || env.CI === 'true' || localTestMode(env)
 }
 
 export function authTrustedOrigins(env: AuthEnvironment) {

@@ -64,8 +64,11 @@ remote URL.
 ## Isolated verification
 
 Normal operation needs no new environment variable. `MIKKA_TEST_MODE=1`
-enables `mock` and `file://` only with `NODE_ENV=test`, `CI=true`, or
-`VERCEL_ENV=preview`. `VERCEL_ENV=production` always disables them. Production
+enables `mock` and `file://` only with `NODE_ENV=test`, `CI=true`,
+`VERCEL_ENV=preview`, or local test mode
+([test-accounts.md](test-accounts.md#local-mode-a-developers-own-disposable-database));
+do not set `CI=true` for a local server. `VERCEL_ENV=production` always
+disables them. Production
 deployments must not set this test switch. Vitest sets it for its disposable
 Git fixtures; the Preview E2E job must set it explicitly on both server and
 daemon. A production Next build alone does not enable test behavior.

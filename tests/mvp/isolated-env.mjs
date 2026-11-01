@@ -1,6 +1,13 @@
-/** These fixtures must never be pointed at a Preview, a shared DB or production. */
+import { localTestMode } from '../../packages/protocol/src/local-test-mode.ts'
+
+/**
+ * These fixtures must never be pointed at a Preview, a shared DB or production.
+ * They run in the disposable GitHub Actions job, or in local test mode; both
+ * then need the same loopback mikka_e2e checks below.
+ */
 export function assertMvpEnvironment(env = process.env) {
-  if (env.CI !== 'true' || env.GITHUB_ACTIONS !== 'true' || env.MIKKA_MVP_E2E !== '1' || env.MIKKA_TEST_MODE !== '1') throw new Error('MVP fixture requires the explicit disposable GitHub Actions job')
+  const ci = env.CI === 'true' && env.GITHUB_ACTIONS === 'true'
+  if (!(ci || localTestMode(env)) || env.MIKKA_MVP_E2E !== '1' || env.MIKKA_TEST_MODE !== '1') throw new Error('MVP fixture requires the explicit disposable GitHub Actions job or local test mode')
   if (env.VERCEL || env.VERCEL_ENV || env.MIKKA_NATIVE_COORDINATOR) throw new Error('MVP fixture cannot run on a deployment or native Coordinator')
   const urls = [env.E2E_DATABASE_URL, env.MIKKA_DATABASE_URL, env.DATABASE_URL].map(value => new URL(value ?? ''))
   if (urls.some(url => !['postgres:', 'postgresql:'].includes(url.protocol) || !['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname) || url.pathname !== '/mikka_e2e' || url.search || url.hash) || urls.some(url => url.href !== urls[0].href)) throw new Error('MVP fixture requires the same disposable loopback mikka_e2e database for all targets')

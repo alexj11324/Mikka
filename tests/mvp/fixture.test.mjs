@@ -19,6 +19,15 @@ test('fixture refuses remote targets, split databases, native runtime and every 
   }
 })
 
+test('local test mode replaces only the GitHub Actions requirement (the rule: scripts/test-accounts/local-test-mode.test.mjs)', () => {
+  const local = { ...isolated, CI: undefined, GITHUB_ACTIONS: undefined, MIKKA_LOCAL_TEST_ACCOUNTS: '1' }
+  assert.doesNotThrow(() => assertMvpEnvironment(local))
+  const remote = 'postgresql://u:p@db.example.com:5432/mikka_e2e'
+  for (const patch of [{ MIKKA_LOCAL_TEST_ACCOUNTS: undefined }, { MIKKA_TEST_MODE: '' }, { VERCEL_ENV: 'preview' }, { E2E_DATABASE_URL: remote, MIKKA_DATABASE_URL: remote, DATABASE_URL: remote },
+    { E2E_DATABASE_URL: 'postgresql://ci:fixture@127.0.0.1:5432/other_e2e', MIKKA_DATABASE_URL: 'postgresql://ci:fixture@127.0.0.1:5432/other_e2e', DATABASE_URL: 'postgresql://ci:fixture@127.0.0.1:5432/other_e2e' }])
+    assert.throws(() => assertMvpEnvironment({ ...local, ...patch }))
+})
+
 test('synthetic MVP transport binds the active fetch path, preserves requests and refuses other external services', async () => {
   const env = { ...isolated, AI_GATEWAY_API_KEY: MVP_DECISION_KEY }
   const requests = []

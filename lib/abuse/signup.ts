@@ -1,3 +1,4 @@
+import { localTestMode } from '@mikka/protocol/local-test-mode'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { createHash, randomUUID } from 'node:crypto'
@@ -84,16 +85,10 @@ export function signupClientIP(
  * Local test mode: a developer's own disposable database, where every signup
  * comes from one 'local' IP. Off in production and on Vercel; on only with
  * MIKKA_LOCAL_TEST_ACCOUNTS=1 and an app database that is a loopback *_e2e one
- * (the rule scripts/test-accounts uses for local mode).
+ * (packages/protocol/src/local-test-mode.ts).
  */
 export function localTestSignups(env: Record<string, string | undefined> = process.env) {
-  if (env.NODE_ENV === 'production' || env.VERCEL || env.VERCEL_ENV || env.MIKKA_LOCAL_TEST_ACCOUNTS !== '1') return false
-  try {
-    const target = new URL(env.MIKKA_DATABASE_URL ?? '')
-    return ['postgres:', 'postgresql:'].includes(target.protocol)
-      && ['127.0.0.1', 'localhost', '[::1]'].includes(target.hostname)
-      && target.pathname.slice(1).endsWith('_e2e')
-  } catch { return false }
+  return env.NODE_ENV !== 'production' && localTestMode(env)
 }
 export function signupLimits(
   env: Record<string, string | undefined> = process.env,
