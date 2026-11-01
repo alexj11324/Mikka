@@ -12,7 +12,7 @@ import { press, tap } from '@/lib/haptics'
 import { splitQuoted } from '@/lib/quote'
 import { authHeaders } from '@/lib/api'
 import { API_URL } from '@/lib/config'
-import type { ThreadStatus } from '@/lib/types'
+import type { Reaction, ThreadStatus } from '@/lib/types'
 import { colors } from '@/lib/theme'
 
 /** The bot's words sit in the grey bubble (R-14). */
@@ -188,7 +188,26 @@ export function CopyButton({ text }: { text: string }) {
   )
 }
 
+/** Reactions under a message, as in Messages and Slack: each emoji with its count past one; tapping the person's own removes it. */
+export function Reactions({ reactions, align = 'left', onToggle }: { reactions?: Reaction[]; align?: 'left' | 'right'; onToggle: (emoji: string) => void }) {
+  if (!reactions?.length) return null
+  return (
+    <View style={[styles.reactions, align === 'right' && { alignSelf: 'flex-end' }]}>
+      {reactions.map(reaction => (
+        <Pressable key={reaction.emoji} accessibilityRole="button" accessibilityState={{ selected: reaction.mine }} accessibilityLabel={`${reaction.emoji} ${reaction.count}`}
+          onPress={() => { tap(); onToggle(reaction.emoji) }} style={[styles.reaction, reaction.mine && styles.reactionMine]}>
+          <Text style={styles.reactionText}>{reaction.emoji}{reaction.count > 1 ? ` ${reaction.count}` : ''}</Text>
+        </Pressable>
+      ))}
+    </View>
+  )
+}
+
 const styles = StyleSheet.create({
+  reactions: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 },
+  reaction: { height: 28, paddingHorizontal: 9, borderRadius: 14, justifyContent: 'center', backgroundColor: colors.bubble },
+  reactionMine: { backgroundColor: '#E3EEFD' },
+  reactionText: { fontSize: 14 },
   body: { fontSize: 16, lineHeight: 25 },
   botBubble: { alignSelf: 'flex-start', maxWidth: '86%', backgroundColor: colors.bubble, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 11 },
   myBubble: { alignSelf: 'flex-end', maxWidth: '78%', backgroundColor: colors.accent, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 10 },

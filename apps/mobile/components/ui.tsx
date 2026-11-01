@@ -158,7 +158,7 @@ export function Composer({ placeholder, onSend, initial = '', disabled = false, 
           <TextInput ref={input} value={text} onChangeText={setText} placeholder={placeholder} editable={!blocked} multiline autoFocus={autoFocus}
             placeholderTextColor={colors.tertiary} style={[styles.input, sending && { color: colors.secondary }]} />
           <View style={styles.fieldRow}>
-            {attach ? <AttachMenu images={images < MAX_IMAGES} onPick={source => void pick(source)} /> : null}
+            {attach ? <AttachMenu images={images < MAX_IMAGES} onPick={pick} /> : null}
             {accessory}
             <View style={{ flex: 1 }} />
             <Pressable accessibilityRole="button" accessibilityLabel="发送" accessibilityState={{ disabled: blocked || empty }} onPress={() => void send()} disabled={blocked}

@@ -796,6 +796,17 @@ export const conversationMessages = pgTable('conversation_messages', {
   authorId: text('authorId').notNull(), body: text('body').notNull(), mentions: jsonb('mentions').notNull().default([]),
   replyToId: uuid('replyToId'), createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, t => [unique('conversation_messages_position_key').on(t.conversationId, t.position), index('conversation_messages_timeline_idx').on(t.conversationId, t.position.desc())])
+/** A person's 置顶 and 通知 for one chat: a bot's id or 'coordinator' (drizzle/20261101020600). */
+export const chatPreferences = pgTable('chat_preferences', {
+  userId: text('userId').notNull().references(() => users.id, { onDelete: 'cascade' }), chatKey: text('chatKey').notNull(),
+  pinned: boolean('pinned').notNull().default(false), muted: boolean('muted').notNull().default(false),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+}, t => [primaryKey({ columns: [t.userId, t.chatKey] })])
+/** A person's reaction to a bot-chat or group-chat message: one emoji each (drizzle/20261101020500). No FK: the message is in either table. */
+export const messageReactions = pgTable('message_reactions', {
+  userId: text('userId').notNull().references(() => users.id, { onDelete: 'cascade' }), messageId: uuid('messageId').notNull(),
+  emoji: text('emoji').notNull(), createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+}, t => [primaryKey({ columns: [t.userId, t.messageId] }), index('message_reactions_message_idx').on(t.messageId)])
 // Same names/types as unmerged MIK-8 (#69); deliberately no FK: 'coordinator' is also a valid id.
 export const conversationReads = pgTable('conversation_reads', {
   userId: text('userId').notNull(), conversationId: text('conversationId').notNull(),

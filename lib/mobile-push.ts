@@ -5,6 +5,7 @@ import { bots, mobilePushTokens } from '@/lib/db/schema'
 import { readPreferences } from '@/lib/preferences'
 import { pushAllowed } from '@/lib/push-allowed'
 import type { PushReason } from '@/lib/push-reasons'
+import { chatMuted } from '@/lib/chat-preferences'
 import { openUIText, parseOpenUI } from '@/lib/openui-lang'
 import type { ActionLocale } from '@/lib/suggestions/action-title'
 import { personLocale } from '@/lib/suggestions/action-title-server'
@@ -47,7 +48,7 @@ export function pushBody(text: string): string {
 
 /**
  * Sends a Coordinator (or bot) reply to every phone the person signed in on,
- * when their settings allow it. Tapping the push opens that chat. `text` null
+ * when their settings allow it and the chat's 通知 is on. Tapping the push opens that chat. `text` null
  * is a reply about a verification code: the push only says one came, the code
  * stays in the app chat. Tokens Expo reports as gone are removed. Never throws.
  */
@@ -55,6 +56,8 @@ export async function pushReply(userId: string, botId: string | null, text: stri
   try {
     if (!reasons.length || text?.trim() === '') return
     if (!pushAllowed(await readPreferences(userId), reasons)) return
+    // 通知 off for this chat, on its page.
+    if (await chatMuted(userId, botId)) return
     const tokens = await db.select({ token: mobilePushTokens.token }).from(mobilePushTokens).where(eq(mobilePushTokens.userId, userId))
     if (!tokens.length) return
     const [bot] = botId ? await db.select({ name: bots.name }).from(bots).where(eq(bots.id, botId)).limit(1) : []
