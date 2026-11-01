@@ -124,6 +124,14 @@ is printed in the Changed files job and its summary. The browser environment
 remains an isolated PostgreSQL service and the built application on the GitHub
 Linux runner's localhost; this workflow does not test a Vercel Preview.
 
+### UI changes: Figma, then skill review, then code
+
+A change a person can see is drawn in Figma first, reviewed with the
+`interface-design:design-review` and `unslop` skills until nothing blocking
+remains, confirmed by Alex, and only then implemented. The PR shows the built
+screen next to the confirmed frames; green CI alone does not make it
+mergeable. Details: `docs/design/decisions/2026-11-01-0330-ui-figma-and-skill-review-before-code.md`.
+
 ### Test logins: never ask for a password
 
 Sessions never ask Alex for an account, password or login step. To test

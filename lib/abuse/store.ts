@@ -29,6 +29,31 @@ export class HostedUsageStore {
       `hosted:${workspaceId}`,
     ])
   }
+  /**
+   * Fail reservations that can no longer settle, so one stuck row never blocks
+   * the workspace forever (the one-pending-per-workspace index would refuse
+   * every later call with usage_in_progress). A real call settles within
+   * HOSTED_CALL_TIMEOUT_MS (60s); the 10-minute margin is far wider so a live
+   * stream is never cut. A pending row past it crashed before settling; an
+   * unknown row with no generationId can never be reconciled (the cost lookup
+   * needs the id). Any reserved free allowance is refunded; no money was charged.
+   * The caller already holds the workspace lock.
+   */
+  private async releaseAbandoned(tx: Query, workspaceId: string) {
+    const reaped = await tx.query<{ reservedFree: string }>(
+      `UPDATE hosted_usage SET state='failed',"settledAt"=now()
+       WHERE "workspaceId"=$1 AND "settledAt" IS NULL AND "createdAt" < now() - interval '10 minutes'
+         AND (state='pending' OR (state='unknown' AND "generationId" IS NULL))
+       RETURNING "reservedFree"`,
+      [workspaceId],
+    )
+    const refund = reaped.rows.reduce((sum, row) => sum + Number(row.reservedFree), 0)
+    if (refund > 0)
+      await tx.query(
+        'UPDATE hosted_allowances SET remaining=remaining+$2 WHERE "workspaceId"=$1',
+        [workspaceId, refund],
+      )
+  }
   async verify(
     workspaceId: string,
     customerId: string | null,
@@ -113,6 +138,11 @@ export class HostedUsageStore {
         "SELECT pg_advisory_xact_lock(hashtextextended('hosted-free-budget',0))",
       )
       await this.lock(tx, workspaceId)
+      // Release an abandoned reservation so one stuck call never bricks the
+      // workspace. A hosted call runs at most HOSTED_CALL_TIMEOUT_MS; a pending
+      // row past a wide margin crashed before settling, and an unknown row with
+      // no generationId can never be reconciled (the cost lookup needs it).
+      await this.releaseAbandoned(tx, workspaceId)
       const prior = (
         await tx.query('SELECT state FROM hosted_usage WHERE id=$1', [id])
       ).rows[0]

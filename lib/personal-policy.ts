@@ -108,7 +108,7 @@ export async function sharedNativeBinding(query: Query, runOwnerId: string, agen
   for (const ownerId of await pooledOwners(query, runOwnerId, workspaceId)) {
     const { rows: [template] } = await query.query<{ connectionId: string; epoch: string; modelId: string }>(
       `SELECT b."connectionId",c.epoch,b."modelId" FROM byos_bindings b
-        JOIN byos_connections c ON c.id=b."connectionId" AND c."ownerId"=b."ownerId" AND c.state='connected' AND c.epoch=b."connectionRevision" AND c.provider=$3
+        JOIN byos_connections c ON c.id=b."connectionId" AND c."ownerId"=b."ownerId" AND c.state='connected' AND c.paused=false AND c.epoch=b."connectionRevision" AND c.provider=$3
         WHERE b."ownerId"=$1 AND b."workspaceId"=$2 AND ${runMayUseCredentialSql('$1', '$4', '$2')}
         ORDER BY (b.route=$5) DESC, b."createdAt" DESC, b.id DESC LIMIT 1`,
       [ownerId, workspaceId, provider, runOwnerId, route])

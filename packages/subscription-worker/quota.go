@@ -43,6 +43,7 @@ type UsageResult struct {
 	Status  int            `json:"status"`
 	Body    map[string]any `json:"body"`
 	Account string         `json:"account,omitempty"`
+	Plan    string         `json:"plan,omitempty"`
 }
 
 var emailPattern = regexp.MustCompile(`^[^\s@<>"\x00-\x1f\x7f]{1,64}@[^\s@<>"\x00-\x1f\x7f]{1,190}$`)
@@ -65,6 +66,9 @@ func (w *Worker) Usage(ctx context.Context, epoch int64) (UsageResult, error) {
 	if quota, err := w.fetchQuota(ctx, auth); err == nil {
 		result.Status, result.Body = quota.Status, quota.Body
 	}
+	if w.Scope.Provider == "claude" && result.Status == http.StatusOK {
+		result.Plan = w.fetchClaudePlan(ctx, auth)
+	}
 	if current, err := w.Repo.Lookup(ctx, w.Scope); err != nil || current.Epoch != epoch || current.State != "connected" {
 		return UsageResult{}, ErrUnavailable
 	}
@@ -74,6 +78,52 @@ func (w *Worker) Usage(ctx context.Context, epoch int64) (UsageResult, error) {
 func accountEmail(auth *core.Auth) string {
 	if email, ok := auth.Metadata["email"].(string); ok && emailPattern.MatchString(email) {
 		return email
+	}
+	return ""
+}
+
+// fetchClaudePlan names the Claude plan from the account profile. Only known
+// labels leave this function; any failure leaves the plan unnamed, never the row.
+func (w *Worker) fetchClaudePlan(ctx context.Context, auth *core.Auth) string {
+	// Short, so a slow profile can't use up the row's read after the quota took its own 10s.
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.anthropic.com/api/oauth/profile", nil)
+	if err != nil {
+		return ""
+	}
+	token, _ := auth.Metadata["access_token"].(string)
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", "Mikka/1.0")
+	req.Header.Set("anthropic-beta", "oauth-2025-04-20")
+	client := http.Client{}
+	if w.QuotaClient != nil {
+		client = *w.QuotaClient
+	}
+	client.Timeout = 3 * time.Second
+	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	response, err := client.Do(req)
+	if err != nil {
+		return ""
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		return ""
+	}
+	var body map[string]any
+	if json.NewDecoder(io.LimitReader(response.Body, 131072)).Decode(&body) != nil {
+		return ""
+	}
+	switch objectMap(body["organization"])["organization_type"] {
+	case "claude_pro":
+		return "Pro"
+	case "claude_max":
+		return "Max"
+	case "claude_team":
+		return "Team"
+	case "claude_enterprise":
+		return "Enterprise"
 	}
 	return ""
 }
