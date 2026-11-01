@@ -20,6 +20,7 @@ import { BotLookEditor } from './bot-look-editor'
 import { BotNameEditor } from './bot-name-editor'
 import { GroupHeader } from './group-header'
 import { ThreadList, TWO_LINE_ROW } from './thread-list'
+import { PullRequestIcon } from '@/components/workspace/pull-request-icon'
 import { useCloudComputer, useComputerTab } from '@/hooks/use-feature-availability'
 import { RESIZE_EDGE, useResizableWidth } from '@/hooks/use-resizable-width'
 
@@ -69,7 +70,7 @@ function PullRequests({ threads, issues }: { threads: Thread[]; issues: Issue[] 
           return <li key={row.url}>
             <Button variant="ghost" className={TWO_LINE_ROW} render={<a href={row.url} target="_blank" rel="noreferrer" />} nativeButton={false}>
               <span className="truncate text-sm">{issue?.title}</span>
-              <span className="truncate text-xs text-muted-foreground"><span className={cn(group === 'review' && 'text-success', group === 'merged' && 'text-label-violet')}>#{row.number}</span>{issue?.identifier && ` · ${issue.identifier}`}</span>
+              <span className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground"><span className="flex shrink-0 [&_svg]:size-3.5"><PullRequestIcon state={row.state} /></span><span className="truncate">#{row.number}{issue?.identifier && ` · ${issue.identifier}`}</span></span>
             </Button>
           </li>
         })}</ul>
