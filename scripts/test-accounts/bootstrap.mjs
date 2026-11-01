@@ -7,6 +7,7 @@ import { pathToFileURL } from 'node:url'
 import { Pool } from 'pg'
 import { assertDatabaseIdentity, databaseTarget, environmentFingerprint, EnvironmentError, validateEnvironment } from './environment.mjs'
 import { recordAuthenticationSecrets } from './session.mjs'
+import { localDatabaseTarget } from './database-target.mjs'
 
 /** Capture the runner's existing secrets before a server or account can start. */
 export async function recordRunnerEvidenceSecrets(environment) {
@@ -77,8 +78,6 @@ export async function bootstrapEnvironment({ connectionString, origin, deploymen
   } finally { await pool.end() }
 }
 
-const LOCAL_DATABASE_HOSTS = new Set(['127.0.0.1', 'localhost', '[::1]'])
-
 /**
  * Local mode (MIKKA_LOCAL_TEST_ACCOUNTS=1): the developer's own disposable
  * PostgreSQL on this machine stands in for the workflow-owned service. It binds
@@ -87,11 +86,7 @@ const LOCAL_DATABASE_HOSTS = new Set(['127.0.0.1', 'localhost', '[::1]'])
  * CI variable. Everything after this check is the CI path's: a fresh database
  * with no users, the exact checked-out SHA, no external mail or service keys.
  */
-export function localDatabaseTarget(connectionString) {
-  const target = databaseTarget(connectionString)
-  if (!LOCAL_DATABASE_HOSTS.has(target.host) || !target.name.endsWith('_e2e')) throw new EnvironmentError('LOCAL_DATABASE_REQUIRED')
-  return target
-}
+export { localDatabaseTarget }
 
 async function bootstrapLocal(env, outputFile) {
   localDatabaseTarget(env.E2E_DATABASE_URL)
