@@ -52,7 +52,23 @@ async function recentNotion(userId: string, since: Date): Promise<ExternalNotifi
   return pages.filter(page => !knownPages.has(pageId(page.externalId)))
 }
 
-export interface ReconcileResult { people: number; read: Record<string, number>; failed: Record<string, number>; deferred: number; linear: { deliveries: number; notifications: number }; github: RedeliveryResult | null }
+/**
+ * Whether a provider refused the person's own authorization (a revoked or
+ * expired token), as opposed to Mikka or the provider failing. Only the person
+ * can fix that by reconnecting the app, so the run skips them and carries on.
+ */
+export function needsReconnect(message: string): boolean {
+  if (/\b(?:token_invalid|invalid_token|invalid_grant|token_expired|unauthorized|unauthenticated)\b/i.test(message)) return true
+  if (/"status"\s*:\s*401\b/.test(message) || /\b401\b.*\b(?:unauthori[sz]ed|token)\b/i.test(message)) return true
+  return false
+}
+
+export interface ReconcileResult {
+  people: number; read: Record<string, number>; failed: Record<string, number>
+  /** Connections whose provider refused the person's authorization: theirs to reconnect, not a failed run. */
+  reconnect: Record<string, number>
+  deferred: number; linear: { deliveries: number; notifications: number }; github: RedeliveryResult | null
+}
 
 async function reconcilePerson(userId: string, toolkits: readonly string[], since: Date, result: ReconcileResult) {
   // A lost subscription is the likeliest reason deliveries stopped; re-create it (at most hourly).
@@ -67,8 +83,15 @@ async function reconcilePerson(userId: string, toolkits: readonly string[], sinc
       await ingestNotifications(notifications)
       result.read[toolkit] = (result.read[toolkit] ?? 0) + notifications.length
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      if (needsReconnect(message)) {
+        // The provider's answer is not logged: it is about the person's credentials.
+        result.reconnect[toolkit] = (result.reconnect[toolkit] ?? 0) + 1
+        console.warn(`Suggestions backfill skipped ${toolkit}: the connection needs reconnecting`)
+        continue
+      }
       result.failed[toolkit] = (result.failed[toolkit] ?? 0) + 1
-      console.error(`Suggestions backfill could not read ${toolkit}`, error instanceof Error ? error.message : error)
+      console.error(`Suggestions backfill could not read ${toolkit}`, message)
     }
   }
 }
@@ -98,7 +121,7 @@ async function reconcileLinear(since: Date, result: ReconcileResult) {
  */
 export async function reconcileSuggestions({ now = new Date(), deadline = Infinity }: { now?: Date; deadline?: number } = {}): Promise<ReconcileResult> {
   const since = new Date(now.getTime() - RECONCILE_WINDOW_MS)
-  const result: ReconcileResult = { people: 0, read: {}, failed: {}, deferred: 0, linear: { deliveries: 0, notifications: 0 }, github: null }
+  const result: ReconcileResult = { people: 0, read: {}, failed: {}, reconnect: {}, deferred: 0, linear: { deliveries: 0, notifications: 0 }, github: null }
   try { result.github = await redeliverFailedGitHubWebhooks({ now }) }
   catch (error) {
     result.failed.github = 1
