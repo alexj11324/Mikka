@@ -36,7 +36,7 @@ export function ArtifactLibrary({ onOpenIssue }: { onOpenIssue: (id: string) => 
   const now = useNow({ updateInterval: 60_000 })
   const { data, error, mutate } = useSWR('artifacts', () => listArtifacts(), { revalidateOnFocus: false })
   const [category, setCategory] = useState<Category>('all')
-  const [open, setOpen] = useState<Pick<ArtifactListItem, 'id' | 'runId' | 'issueId'> | null>(null)
+  const [open, setOpen] = useState<Pick<ArtifactListItem, 'id' | 'runId' | 'issueId' | 'botId'> | null>(null)
   const rows = (data ?? []).filter(item => category === 'all' || item.kind === category)
   const current = CATEGORIES.find(item => item.id === category)!
   const source = (item: ArtifactListItem) => [item.authorName, item.issueKey].filter(Boolean).join(' · ') || '—'
@@ -79,6 +79,6 @@ export function ArtifactLibrary({ onOpenIssue }: { onOpenIssue: (id: string) => 
         </div>}
     </section>
     {open && <ArtifactWindow artifact={open} onClose={() => setOpen(null)} onOpenIssue={onOpenIssue}
-      onChange={id => setOpen(data?.find(item => item.id === id) ?? { id, runId: null, issueId: null })} />}
+      onChange={id => setOpen(data?.find(item => item.id === id) ?? { id, runId: null, issueId: null, botId: null })} />}
   </div>
 }
