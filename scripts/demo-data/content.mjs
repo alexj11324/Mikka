@@ -102,15 +102,12 @@ export const ISSUES = [
   { key: 'i-sub-migration', status: 'done', priority: 'high', title: '多币种账户的数据迁移演练', labels: [L.release, L.db], assignee: 'chen', parent: 'i-release-parent', body: ['在 staging 上用生产快照演练两次，均在 4 分钟内完成。'] },
   { key: 'i-sub-regression', status: 'todo', priority: 'high', title: 'v2.4 回归测试', labels: [L.release], assignee: 'liu', parent: 'i-release-parent', body: ['Web、iOS 各跑一遍核心流程。'] },
 
+  { key: 'i-okr', status: 'todo', priority: 'normal', title: '写 Q4 技术 OKR 复盘', labels: [], assignee: 'me', due: 5,
+    body: ['稳定性（P1 事故数、Sentry 错误率）、交付（发版频率）、成本（云账单）。'] },
+
   // —— Canceled / duplicate
   { key: 'i-miniprogram', status: 'canceled', priority: 'low', title: '微信小程序版本', labels: [], assignee: null, body: ['Q4 不做，先把 iOS 和 Web 打磨好。'] },
   { key: 'i-safari-dup', status: 'duplicate', priority: 'normal', title: 'Mac 上打开登录页一片空白', labels: [L.bug], assignee: null, duplicateOf: 'i-safari-blank', body: ['客户来信，与「登录页在 Safari 17 上白屏」相同。'] },
-]
-
-/** Personal tasks (lock on the card). They show on every board of the owner, so keep this short. */
-export const PERSONAL_ISSUES = [
-  { key: 'p-okr', status: 'todo', priority: 'normal', title: '写 Q4 技术 OKR 复盘', labels: [], assignee: 'me', due: 5,
-    body: ['稳定性（P1 事故数、Sentry 错误率）、交付（发版频率）、成本（云账单）。'] },
 ]
 
 /** Computers in Settings › 设备. All disabled with no token, so nothing is ever dispatched to them. */
@@ -191,14 +188,6 @@ export const ARTIFACTS = [
   { key: 'a-lcp-compare', kind: 'html', title: '首页 LCP 优化前后对比', author: '前端助手', versions: [
     '<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>首页 LCP 优化前后对比</title><style>body{font:14px system-ui;margin:24px;color:#222}table{border-collapse:collapse}td,th{border:1px solid #ddd;padding:6px 12px;text-align:right}th:first-child,td:first-child{text-align:left}</style><h1>首页 LCP 优化前后对比</h1><table><tr><th>指标</th><th>优化前</th><th>优化后</th></tr><tr><td>LCP</td><td>3.4s</td><td>1.6s</td></tr><tr><td>首屏图片</td><td>1.2MB JPEG</td><td>180KB AVIF</td></tr><tr><td>字体</td><td>4.1MB</td><td>320KB（子集）</td></tr><tr><td>Lighthouse 性能分</td><td>62</td><td>94</td></tr></table></html>',
   ] },
-]
-
-/** Profile facts for the 记忆 page; personal by design, so only a few. */
-export const FACTS = [
-  { key: 'f-small-prs', kind: 'preference', subject: '喜欢小而单一的 PR', value: { note: '一个 PR 只改一件事，数据库迁移单独提' }, confidence: 0.86 },
-  { key: 'f-pnpm', kind: 'tool', subject: 'pnpm', value: { version: '9' }, confidence: 0.92 },
-  { key: 'f-review-time', kind: 'routine', subject: '上午集中 review PR', value: { window: '09:30–11:00' }, confidence: 0.7 },
-  { key: 'f-release', kind: 'deadline', subject: 'v2.4 周五上线', value: { date: 'friday' }, confidence: 0.8 },
 ]
 
 /** 建议 rows, dated more than a day back so the 08:00 briefing never picks them up. */
