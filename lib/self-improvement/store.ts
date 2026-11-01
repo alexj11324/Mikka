@@ -5,6 +5,7 @@ import { SCORER, SCORER_DIGEST, score } from './scorer'
 import { createGenerationRequest, failureQuality, type FailureQualityProvider, SKILL_PATH, BASELINE } from './regression'
 import { BASELINE_ARTIFACT, BASELINE_MARKDOWN } from './builtin-skill'
 import { assignedSkillForRun } from './assignments'
+import { decisionProposalJudge, PROPOSAL_CAP_HOURS, PROPOSAL_QUESTION, proposalInput, readProposalAnswer, type ProposalJudge } from './proposal-judgment'
 
 type Authorize = (userId: string, issueId: string, tx: PoolClient) => Promise<boolean>
 interface Run {
@@ -18,7 +19,7 @@ function sameSource(snapshot: Record<string, unknown>, run: Run) {
     snapshot.deviceRepoId === run.deviceRepoId && snapshot.repository === run.repository
 }
 
-export function createImprovementStore(pool: Pool, authorize: Authorize, qualityProvider?: FailureQualityProvider) {
+export function createImprovementStore(pool: Pool, authorize: Authorize, qualityProvider?: FailureQualityProvider, proposalJudge: ProposalJudge = decisionProposalJudge) {
   async function withRun<T>(userId: string, runId: string, work: (tx: PoolClient, run: Run, bucket: string) => Promise<T>) {
     if (!userId || !commandSchema.options[1].shape.runId.safeParse(runId).success) throw new ImprovementError('notFound')
     const tx = await pool.connect()
@@ -90,33 +91,54 @@ export function createImprovementStore(pool: Pool, authorize: Authorize, quality
     })
   }
 
+  /** The bucket's current eligible failures and its latest proposal, under the bucket lock and source-run locks. */
+  async function collectFailures(tx: PoolClient, userId: string, run: Run, bucket: string) {
+    await ensureScorer(tx)
+    await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`improvement-bucket:${userId}:${bucket}`])
+    // One immutable source per distinct run, not per feedback delivery. A
+    // previously proposed run cannot repeatedly fund new proposals.
+    const { rows: failures } = await tx.query(`SELECT DISTINCT ON (s."runId") s.id,s."runId",s."createdAt",s.reason,s.snapshot
+      FROM improvement_scores s JOIN agent_runs r ON r.id=s."runId"
+      WHERE s."userId"=$1 AND s.bucket=$2 AND s.outcome='failure'
+      AND r."userId"=$1 AND r."issueId"=$3 AND r."agentId"=$4 AND r."deviceRepoId"=$5
+      AND r.status IN ('succeeded','failed') AND r."stopRequestedAt" IS NULL
+      AND NOT EXISTS (SELECT 1 FROM improvement_proposal_sources p WHERE p."userId"=$1 AND p.bucket=$2 AND p."runId"=s."runId")
+      ORDER BY s."runId",s."createdAt",s.id`, [userId, bucket, run.issueId, run.agentId, run.deviceRepoId])
+    // Lock all source runs and recheck cancellation/binding after any writer
+    // that raced the discovery query commits. Lock order is stable by run ID.
+    const { rows: sources } = await tx.query(`SELECT id,report FROM agent_runs
+      WHERE id=ANY($1::uuid[]) AND "userId"=$2 AND "issueId"=$3 AND "agentId"=$4 AND "deviceRepoId"=$5
+      AND status IN ('succeeded','failed') AND "stopRequestedAt" IS NULL
+      ORDER BY id FOR SHARE`, [failures.map(row => row.runId), userId, run.issueId, run.agentId, run.deviceRepoId])
+    const eligible = new Map(sources.map(row => [row.id, row.report]))
+    const current = failures.filter(row => eligible.has(row.runId)).map(row => ({ ...row, report: eligible.get(row.runId) }))
+    const { rows: [latest] } = await tx.query('SELECT * FROM improvement_proposals WHERE "userId"=$1 AND bucket=$2 ORDER BY "createdAt" DESC,id DESC LIMIT 1', [userId, bucket])
+    // Database time, so the cap and the ages do not depend on this host's clock.
+    const { rows: [clock] } = await tx.query(`SELECT now() AS now, coalesce($1::timestamptz > now()-($2 * interval '1 hour'), false) AS capped`, [latest?.createdAt ?? null, PROPOSAL_CAP_HOURS])
+    return { failures: current, latest: latest ?? null, now: clock.now as Date, capped: clock.capped as boolean }
+  }
+
+  /**
+   * Proposes an improvement when the Decision API judges the bucket's failures
+   * enough. Read under the locks and commit, ask outside any transaction, then
+   * re-read under the same locks before writing. No answer is "ask again
+   * later": nothing is written. Runaway cap: one new proposal per bucket per
+   * PROPOSAL_CAP_HOURS, whatever the answer.
+   */
   async function propose(userId: string, runId: string) {
+    const first = await withRun(userId, runId, (tx, run, bucket) => collectFailures(tx, userId, run, bucket))
+    if (!first.failures.length) return { proposal: first.latest, pendingDistinctFailures: 0, trigger: 'no_pending_failures' }
+    if (first.capped) return { proposal: first.latest, pendingDistinctFailures: first.failures.length, trigger: 'proposal_cap' }
+    const answer = readProposalAnswer(await proposalJudge(userId, proposalInput({
+      now: first.now, lastProposalAt: first.latest?.createdAt ?? null,
+      failures: first.failures.map(row => ({ reason: row.reason, createdAt: row.createdAt, report: row.report ?? null })),
+    }), [PROPOSAL_QUESTION]))
+    if (answer !== true) return { proposal: first.latest, pendingDistinctFailures: first.failures.length, trigger: answer === null ? 'decision_unavailable' : 'decision_not_ready' }
     return withRun(userId, runId, async (tx, run, bucket) => {
-      await ensureScorer(tx)
-      await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`improvement-bucket:${userId}:${bucket}`])
-      // One immutable source per distinct run, not per feedback delivery. A
-      // previously proposed run cannot repeatedly fund new proposals.
-      const { rows: failures } = await tx.query(`SELECT DISTINCT ON (s."runId") s.id,s."runId",s."createdAt",s.reason,s.snapshot
-        FROM improvement_scores s JOIN agent_runs r ON r.id=s."runId"
-        WHERE s."userId"=$1 AND s.bucket=$2 AND s.outcome='failure'
-        AND r."userId"=$1 AND r."issueId"=$3 AND r."agentId"=$4 AND r."deviceRepoId"=$5
-        AND r.status IN ('succeeded','failed') AND r."stopRequestedAt" IS NULL
-        AND NOT EXISTS (SELECT 1 FROM improvement_proposal_sources p WHERE p."userId"=$1 AND p.bucket=$2 AND p."runId"=s."runId")
-        ORDER BY s."runId",s."createdAt",s.id`, [userId, bucket, run.issueId, run.agentId, run.deviceRepoId])
-      // Lock all source runs and recheck cancellation/binding after any writer
-      // that raced the discovery query commits. Lock order is stable by run ID.
-      const { rows: sources } = await tx.query(`SELECT id,report FROM agent_runs
-        WHERE id=ANY($1::uuid[]) AND "userId"=$2 AND "issueId"=$3 AND "agentId"=$4 AND "deviceRepoId"=$5
-        AND status IN ('succeeded','failed') AND "stopRequestedAt" IS NULL
-        ORDER BY id FOR SHARE`, [failures.map(row => row.runId), userId, run.issueId, run.agentId, run.deviceRepoId])
-      const eligible = new Map(sources.map(row => [row.id, row.report]))
-      const currentFailures = failures.filter(row => eligible.has(row.runId)).map(row => ({ ...row, report: eligible.get(row.runId) }))
-      const { rows: [age] } = await tx.query(`SELECT min("createdAt") <= now()-($3 * interval '1 day') AS aged
-        FROM improvement_scores WHERE "userId"=$1 AND bucket=$2 AND id=ANY($4::uuid[])`, [userId, bucket, SCORER.oldestFailureDays, currentFailures.map(row => row.id)])
-      if (currentFailures.length < SCORER.distinctFailures && !age.aged) {
-        const { rows: [existing] } = await tx.query('SELECT * FROM improvement_proposals WHERE "userId"=$1 AND bucket=$2 ORDER BY "createdAt" DESC,id DESC LIMIT 1', [userId, bucket])
-        return { proposal: existing ?? null, pendingDistinctFailures: currentFailures.length, trigger: 'below_fixed_trigger' }
-      }
+      const { failures: currentFailures, latest, capped } = await collectFailures(tx, userId, run, bucket)
+      // A concurrent call may have proposed these sources meanwhile.
+      if (!currentFailures.length) return { proposal: latest, pendingDistinctFailures: 0, trigger: 'no_pending_failures' }
+      if (capped) return { proposal: latest, pendingDistinctFailures: currentFailures.length, trigger: 'proposal_cap' }
       const { candidate, result } = createGenerationRequest(currentFailures, BASELINE_MARKDOWN, BASELINE_ARTIFACT, await failureQuality(qualityProvider, tx, userId, currentFailures))
       const fingerprint = digest({ bucket, kind: candidate.kind, sourceIds: candidate.sourceIds, baselineDigest: candidate.baselineDigest })
       const { rows: [existing] } = await tx.query('SELECT * FROM improvement_proposals WHERE "userId"=$1 AND fingerprint=$2', [userId, fingerprint])
@@ -126,7 +148,7 @@ export function createImprovementStore(pool: Pool, authorize: Authorize, quality
         VALUES($1,$2,$3,$4,$5,$6,$7,$8,'awaiting_model_candidate') RETURNING *`,
       [id, userId, bucket, fingerprint, run.issueId, SCORER_DIGEST, JSON.stringify(candidate), JSON.stringify(result)])
       for (const source of currentFailures) await tx.query(`INSERT INTO improvement_proposal_sources("proposalId","scoreId","userId",bucket,"runId") VALUES($1,$2,$3,$4,$5)`, [id, source.id, userId, bucket, source.runId])
-      return { proposal, pendingDistinctFailures: 0, trigger: currentFailures.length >= SCORER.distinctFailures ? 'distinct_failures' : 'oldest_failure' }
+      return { proposal, pendingDistinctFailures: 0, trigger: 'decision' }
     })
   }
 

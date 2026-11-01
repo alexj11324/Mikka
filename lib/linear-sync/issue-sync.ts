@@ -11,7 +11,7 @@ import { hashValue } from './crypto'
 import { linearAccessToken } from './tokens'
 import { readIssueMetadata, withIssueMetadata } from '@/lib/issue-metadata'
 import { allocateIssueNumbers } from '@/lib/issue-numbering'
-import { issueDoneEvent } from '@/lib/coordinator-events'
+import { issueStatusEvent } from '@/lib/coordinator-events'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { linearCommentSync } from './comment-sync'
 import { encodedIssueDocument, loadIssueDocument, replaceIssueDescription } from './document'
@@ -97,10 +97,10 @@ export async function applyLinearIssueToApp(team: TeamRow, remote: LinearIssueSn
   if (remote.labels.length > 12) throw new LinearSyncConflictError('Linear issue has more than 12 labels; Mikka supports up to 12')
   const assignee = await localAssigneeForRemote(team.ownerId, link.issue.id, remote, false)
   const nextPriority = issuePriorityForLinear(remote.priority)
-  let doneEvent = false
-  // A task Linear marks done tells its owner's Coordinator; its bot row is resolved here, before the transaction.
-  // A Linear team sync belongs to its owner and names no workspace: the personal workspace's Coordinator.
-  const coordinator = link.issue.status !== 'done' && issueStatusForLinearType(remote.state?.type ?? '', link.issue.status as Parameters<typeof issueStatusForLinearType>[1], remote.state?.name) === 'done'
+  let statusEvent = false
+  // A status change from Linear is recorded for its owner's Coordinator (triage decides whether it matters); its bot row
+  // is resolved here, before the transaction. A Linear team sync belongs to its owner: the personal workspace's Coordinator.
+  const coordinator = link.issue.status !== issueStatusForLinearType(remote.state?.type ?? '', link.issue.status as Parameters<typeof issueStatusForLinearType>[1], remote.state?.name)
     ? (await (await import('@/lib/coordinator/coordinator-bot')).coordinatorBot(team.ownerId, null, { backfill: false })).botId : null
   const saved = await db.transaction(async tx => {
     await tx.execute(sql`select set_config('mikka.linear_sync_source', 'linear', true)`)
@@ -123,10 +123,10 @@ export async function applyLinearIssueToApp(team: TeamRow, remote: LinearIssueSn
       title: remote.title, content: latestIncoming, status: nextStatus, priority: nextPriority,
       revision: nextRevision, updatedAt: new Date(),
     }).where(eq(issues.id, latest.id)).returning()
-    const completionEvent = saved && coordinator && issueDoneEvent(latest, saved, coordinator)
-    if (completionEvent) {
-      await recordCoordinatorEvent(tx, completionEvent)
-      doneEvent = true
+    const changeEvent = saved && coordinator && issueStatusEvent(latest, saved, coordinator)
+    if (changeEvent) {
+      await recordCoordinatorEvent(tx, changeEvent)
+      statusEvent = true
     }
 
     if (descriptionChanged) {
@@ -144,7 +144,7 @@ export async function applyLinearIssueToApp(team: TeamRow, remote: LinearIssueSn
     await tx.update(linearIssueLinks).set({ appSyncedAt: saved.updatedAt, linearUpdatedAt: new Date(remote.updatedAt), linearDescriptionHash: hashValue(remote.description ?? ''), syncStatus: 'synced', lastError: null, updatedAt: new Date() }).where(eq(linearIssueLinks.id, link.link.id))
     return saved
   })
-  if (doneEvent && (process.env.VERCEL === '1' || process.env.AI_GATEWAY_API_KEY)) {
+  if (statusEvent && (process.env.VERCEL === '1' || process.env.AI_GATEWAY_API_KEY)) {
     const { wakeCoordinator } = await import('@/lib/coordinator/wake')
     await wakeCoordinator(team.ownerId)
   }

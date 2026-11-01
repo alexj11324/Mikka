@@ -32,6 +32,7 @@ import { IssueList } from './issue-list'
 import { AgentSphere } from './issue-assignee-menu'
 import { LabelDot } from './issue-metadata-controls'
 import { ISSUE_PRIORITIES, ISSUE_STATUSES, type IssueStatus } from './issue-properties'
+import { ResizablePane } from '@/components/ui/resizable-pane'
 
 type Issue = Awaited<ReturnType<typeof listIssues>>[number]
 type Scope = 'all' | 'workspace' | 'personal'
@@ -104,6 +105,7 @@ export function BoardPage({ issues, userId, onOpen, onUpdated, onBusyChange }: {
   const t = useTranslations('Shell.board')
   const tNav = useTranslations('Nav')
   const tIssue = useTranslations('Issue')
+  const tCommon = useTranslations('Common')
   const titleId = useId()
   const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value
   const priorityLabel = (value: string) => tIssue.has(`priority.${value}` as never) ? tIssue(`priority.${value}` as never) : value
@@ -251,13 +253,13 @@ export function BoardPage({ issues, userId, onOpen, onUpdated, onBusyChange }: {
         ? <div className="flex min-h-0 flex-1 flex-col px-5"><IssueBoard issues={shown} columns={columns} hidden={hidden} sidebarOpen={sidebarShown} context={{ properties: new Set(display.properties), agentStates, subtasks, owners }} onOpen={id => { onOpen(id) }} onDiscuss={issue => { openPanel(); setPrefill({ text: t('discussPrefill', { id: issue.identifier ?? '', title: issue.title }), nonce: Date.now() }) }} onHideColumn={status => setDisplay({ hidden: [...display.hidden, status] })} onShowColumn={status => setDisplay({ hidden: display.hidden.filter(item => item !== status) })} onUpdated={onUpdated} onBusyChange={onBusyChange} /></div>
         : <div className="min-h-0 flex-1 overflow-y-auto"><IssueList issues={shown} properties={new Set(display.properties)} owners={owners} searching={activeFilters.length > 0 || scope !== 'all'} onOpen={id => { onOpen(id) }} onCreate={() => setNewTask(true)} /></div>}
     </section>
-    {sidebar && <aside aria-label={tNav('coordinator')} className="relative hidden w-90 shrink-0 flex-col border-l xl:flex">
+    {sidebar && <ResizablePane render="aside" aria-label={tNav('coordinator')} storageKey="mikka:board-sidebar-width" defaultWidth={360} min={280} max={560} edge="start" from="xl" label={tCommon('resize.boardSidebar')} className="hidden shrink-0 flex-col border-l xl:flex">
       {/* Same centered pill as the Coordinator page, so the two read as one conversation. */}
       <ConversationPill name={tNav('coordinator')} avatar={<CoordinatorAvatar size="pill" />} />
       <div className="absolute top-3.5 right-3 z-20"><Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label={t('collapse')} aria-expanded onClick={() => setSidebar(false)} />}><PanelRightClose data-icon="inline-start" /></TooltipTrigger><TooltipContent side="left">{t('collapse')}</TooltipContent></Tooltip></div>
       <div aria-hidden="true" className="h-14 shrink-0" />
       <CoordinatorChat compact prefill={prefill} onOpenIssue={id => { onOpen(id) }} />
-    </aside>}
+    </ResizablePane>}
     <Sheet open={sheet} onOpenChange={setSheet}>
       <SheetContent side="right" className="w-full gap-0 p-0 sm:max-w-sm">
         <SheetHeader className="sr-only"><SheetTitle>{tNav('coordinator')}</SheetTitle></SheetHeader>

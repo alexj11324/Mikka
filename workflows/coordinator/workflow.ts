@@ -78,9 +78,9 @@ export async function coordinatorTurn(userId: string, botId: string) {
       } else through = await steps.appendMessages(userId,holder,result.responseMessages,quiet ? null : turnWarning(result.finishReason,result.text),botId,streamId)
       if (inbox.handoffMatterIds.length) await steps.settleAttention(userId,inbox.handoffMatterIds,inbox.handoffOnly && !quiet)
       await kit.finishAgentExecution(userId,botId,execution?.id,!quiet && !result.text.trim() ? 'empty_reply' : result.finishReason === 'error' ? 'turn_failed' : undefined)
-      // A reply to Mikka's own events (not to the person) also goes to their phones, unless the Coordinator stayed quiet; pushReply never throws.
-      if (inbox.pushReasons?.length && !quiet && result.text.trim() && result.text.trim() !== QUIET_REPLY) {
-        await steps.pushToPhones(userId, botId, inbox.pushHidesText ? null : result.text, inbox.pushReasons)
+      // Whether the reply also goes to the person's phones is the Decisions API's answer (lib/push-reasons.ts); pushToPhones never throws.
+      if (inbox.pushEvents?.length && !quiet && result.text.trim() && result.text.trim() !== QUIET_REPLY) {
+        await steps.pushToPhones(userId, botId, inbox.pushHidesText ? null : result.text, inbox.pushEvents)
       }
       if (inbox.telegramTargets.length && !quiet) {
         const reply = result.text.trim() ? result.text : '没有生成回复，请再试一次'

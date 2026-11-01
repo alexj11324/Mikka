@@ -153,13 +153,12 @@ export async function callAppTool(deps: AppToolDeps, raw: unknown) {
   if (!tool.version || tool.version === 'latest') return { error: 'integrationActionVersionUnavailable' }
   const call: AppToolCall = { toolkit, tool: tool.slug, name: tool.name.slice(0, 200), version: tool.version, arguments: args }
 
-  if (!isReadOnlyTool(tool)) {
-    const setting = await deps.setting(toolSettingKey(tool.slug), toolkit)
-    if (setting === 'deny') return { error: 'integrationActionDenied' }
-    const card = setting === 'ask' || (setting === null && await deps.judge({ action: toolSettingKey(tool.slug), tool: tool.slug, annotations: tool.tags, input: args }) === 'ask')
-    if (card) return deps.propose(call, ready.accountId)
-    return runRecorded(deps, call, ready.accountId)
-  }
+  // The person's explicit setting wins; otherwise the Decisions API judges every call, reads included (readOnlyHint is one of its inputs).
+  const setting = await deps.setting(toolSettingKey(tool.slug), toolkit)
+  if (setting === 'deny') return { error: 'integrationActionDenied' }
+  const card = setting === 'ask' || (setting === null && await deps.judge({ action: toolSettingKey(tool.slug), tool: tool.slug, annotations: tool.tags, input: args }) === 'ask')
+  if (card) return deps.propose(call, ready.accountId)
+  if (!isReadOnlyTool(tool)) return runRecorded(deps, call, ready.accountId)
   try {
     const result = await deps.execute(call, ready.accountId)
     return result.successful ? { data: bounded(result.data) } : { error: result.error?.slice(0, 500) || 'integrationActionFailed' }

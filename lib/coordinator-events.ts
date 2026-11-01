@@ -49,11 +49,12 @@ export function userMessageEvent(
 }
 
 /** OAuth delegates access to an Agent; it does not turn Agent prose into a
- * human decision. Result tier preserves the existing wake-on-send behaviour.
+ * human decision. No preset tier: triage (the Decisions API) decides whether
+ * it needs the person, is a result, or is background, like any runtime event.
  */
-export function peerCoordinatorMessageEvent(userId: string, botId: string, text: string): CoordinatorEventInput & { tier: 'result' } {
+export function peerCoordinatorMessageEvent(userId: string, botId: string, text: string): CoordinatorEventInput {
   return { userId, botId, kind: 'run_report', dedupeKey: 'peer_message:' + crypto.randomUUID(), issueId: null, runId: null,
-    payload: { text, source: 'oauth_agent_mcp' }, tier: 'result' }
+    payload: { text, source: 'oauth_agent_mcp' } }
 }
 
 /** Unique Telegram destinations for the user messages in one claimed batch. */
@@ -141,20 +142,23 @@ export function runQuotaPausedEvent(run: { id: string; userId: string; botId?: s
 }
 
 /**
- * An issue moved to done, or null when this save is not that move. Keyed by
- * the revision that made the move, so reopening and finishing again is a new
- * event.
+ * An issue changed status, or null when this save did not change it. A move
+ * to done is `issue_done`; any other move (canceled, blocked, review, reopened…)
+ * is `issue_status_changed`. Neither carries a tier: whether the person's
+ * Coordinator should act on it is triage's call on the Decisions API, not a
+ * done-only filter. Keyed by the revision that made the move.
  */
-export function issueDoneEvent(before: { status: string }, after: { id: string; userId: string; title: string; status: string; revision: number }, botId: string): CoordinatorEventInput | null {
-  if (before.status === 'done' || after.status !== 'done') return null
+export function issueStatusEvent(before: { status: string }, after: { id: string; userId: string; title: string; status: string; revision: number }, botId: string): CoordinatorEventInput | null {
+  if (before.status === after.status) return null
+  const done = after.status === 'done'
   return {
     userId: after.userId,
     botId,
-    kind: 'issue_done',
-    dedupeKey: `issue_done:${after.id}:${after.revision}`,
+    kind: done ? 'issue_done' : 'issue_status_changed',
+    dedupeKey: `${done ? 'issue_done' : 'issue_status'}:${after.id}:${after.revision}`,
     issueId: after.id,
     runId: null,
-    payload: { title: after.title, previousStatus: before.status },
+    payload: { title: after.title, previousStatus: before.status, ...(done ? {} : { status: after.status }) },
   }
 }
 

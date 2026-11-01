@@ -51,10 +51,11 @@ a live owned run and current issue access. No deletion is performed here;
 retention and any later privileged erasure path belong to #210 and require
 separate coordination. Notes remain private, bounded, and untrusted.
 
-The fixed trigger is 25 distinct, not previously proposed failed runs per
-owner/issue/agent/repository/scorer/target, or oldest failure aged seven days.
-It is not an evaluation threshold and is not editable through the API or a
-candidate. Transaction locks and source claims make replays/concurrency
+Whether to propose is the Decision API's `propose` answer over the distinct,
+not previously proposed failed runs per owner/issue/agent/repository/scorer/
+target (scorer v2, decision 2026-11-01-1500); the one code rule left is a
+runaway cap of one new proposal per bucket per 24 hours. The trigger is not an
+evaluation threshold and is not editable through the API or a candidate. Transaction locks and source claims make replays/concurrency
 idempotent. Every operation rechecks existing issue access and current run
 stop state. Cancellation/deletion/revocation prevents further writes/reads.
 

@@ -31,6 +31,7 @@
     "global-search-scope.spec.ts",
     "bot-list-groups.spec.ts",
     "group-chat-send.spec.ts",
+    "group-chat-stop.spec.ts",
     "invalid-issue-content.spec.ts",
     "issue-threads.spec.ts",
     "issue-page-overlap.spec.ts",
@@ -81,6 +82,7 @@
     "browser-pane.spec.ts",
     "desktop-translucent.spec.ts",
     "desktop-update.spec.ts",
+    "rail-tooltips.spec.ts",
     "issue-header-breadcrumb.spec.ts",
     "side-panel-resize.spec.ts",
     "issue-menu-collision.spec.ts",
@@ -301,8 +303,15 @@
     {
       "area": "side panels",
       "paths": [
-        "^components\\/nav\\/(?:bot-list|context-panel)\\.tsx$",
-        "^hooks\\/use-resizable-width\\.ts$"
+        "^components\\/nav\\/(?:bot-list|context-panel|group-panel)\\.tsx$",
+        "^hooks\\/use-resizable-width\\.ts$",
+        "^components\\/ui\\/resizable-pane\\.tsx$",
+        "^components\\/suggestions\\/suggestion-feed\\.tsx$",
+        "^components\\/artifacts\\/artifact-library\\.tsx$",
+        "^components\\/workspace\\/(?:board-page|task-detail|issue-editor|project-detail)\\.tsx$",
+        "^components\\/settings\\/settings-sidebar\\.tsx$",
+        "^components\\/browser\\/browser-pane\\.tsx$",
+        "^scripts\\/split-pane-policy\\.mjs$"
       ],
       "specs": [
         "side-panel-resize.spec.ts"
@@ -347,6 +356,7 @@
       "specs": [
         "workspace-menu.spec.ts",
         "desktop-update.spec.ts",
+        "rail-tooltips.spec.ts",
         "workspace.spec.ts",
         "sign-out.spec.ts",
         "workspace-shortcuts.spec.ts"
@@ -376,7 +386,8 @@
       ],
       "specs": [
         "group-chat-send.spec.ts",
-        "bot-list-groups.spec.ts"
+        "bot-list-groups.spec.ts",
+        "group-chat-stop.spec.ts"
       ]
     }
   ]

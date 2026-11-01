@@ -27,3 +27,10 @@ test('login continuation resumes observation, never turns guarded or unknown res
  assert.equal(browserLoginContinuation('guarded'),'guarded')
  for(const status of ['needs_login','outcome_unknown','failed','authenticated']) assert.equal(browserLoginContinuation(status),'needs_login')
 })
+test('the browser ask migration turns stored ask into allow and touches nothing else',async()=>{
+ const {readFile}=await import('node:fs/promises')
+ const sql=await readFile(new URL('../../drizzle/20261101191000_browser_ask_retired.sql',import.meta.url),'utf8')
+ for(const table of ['agent_kit_heads','workspace_computer_policies']) assert.match(sql,new RegExp(`UPDATE ${table}`))
+ assert.match(sql,/key LIKE 'browser\\_%' AND e\.value = '"ask"'::jsonb THEN '"allow"'::jsonb ELSE e\.value END/)
+ assert.doesNotMatch(sql,/'"deny"'/)
+})

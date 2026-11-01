@@ -51,7 +51,9 @@ test('PG17/HTTP assignment provenance and existing Factory gates', {skip:!databa
   await pool.query(`INSERT INTO device_repos(id,"deviceId","userId","repoPath","verifyCommand") VALUES($1,$2,$3,'/synthetic/mikka','node acceptance.mjs')`,[repoId,deviceId,userId])
   let allowed=true
   const authorize=async(u:string,i:string)=>allowed&&u===userId&&i===issueId
-  const assignments=createSkillAssignments(pool,authorize),scores=createImprovementStore(pool,authorize,qualityProvider)
+  // The Decision API is mocked to answer yes to `propose`: no network in tests.
+  const proposeYes=async()=>new Map([['propose',{type:'predicate' as const,name:'propose',probability:0.9}]])
+  const assignments=createSkillAssignments(pool,authorize),scores=createImprovementStore(pool,authorize,qualityProvider,proposeYes)
   const factory=createFactoryStore(pool,authorize,null,{...factoryTestLifecycle,gates:{...factoryCheckGates,approval:approvalGate,publish:publishGate}})
   const dispatch=createFactoryDispatch(pool,factory,(tx,u,input)=>insertRunOnce(factoryDispatchDatabase(tx),u,input,{deviceId,baseBranch:'main',prompt:input.note??'Synthetic actual queue gate'}))
   const bridge=createImprovementFactoryBridge(pool,factory,dispatch,assignments,qualityProvider)
@@ -131,7 +133,7 @@ test('PG17/HTTP assignment provenance and existing Factory gates', {skip:!databa
     assert.equal(score.snapshot.skillArtifact.sha256,BASELINE_ARTIFACT.sha256)
     assert.equal((await post({action:'select_baseline',runId:firstRun,skillReceipt:prepared.skillReceipt})).status,422)
   })
-  await t.test('25 distinct assigned failures feed one proposal and existing Factory dispatch atomically',async()=>{
+  await t.test('25 distinct assigned failures the Decision API judges enough feed one proposal and existing Factory dispatch atomically',async()=>{
     for(let i=1;i<25;i++){const p=await prepare();await claim(p.result.runId);await finish(p.result.runId)}
     const proposal=await scores.propose(userId,firstRun);assert.ok(proposal.proposal);proposalId=proposal.proposal.id
     const task=await route(),req={action:'handoff' as const,proposalId,binding:binding(task),agentId,deviceRepoId:repoId}

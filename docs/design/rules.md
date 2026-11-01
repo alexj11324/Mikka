@@ -71,7 +71,14 @@ source wins in a conflict is in [`README.md`](README.md).
   instruction under it is a blue bubble (R-55). This holds in every one-to-one
   chat, the board's Coordinator sidebar and the AI sidebar included.
 - **R-15** A task or thread mentioned in chat is an inline chip, not a large
-  card (a task chip carries the board's status icon). A thread the reply
+  card (a task chip carries the board's status icon). Internal object chips
+  are boxed: a faint accent fill (`--object-chip`), small radius, the status or
+  type icon, then the title in the accent with no underline; the chip never
+  breaks across lines and a long title truncates. The task number is in the
+  hover card, not the chip. A thread chip leads with the thread's status icon
+  (the same marks and colours as the thread card and Threads list) and opens
+  the thread's own conversation, as a thread card does (R-66); only a task chip
+  opens the task. Web sources and links keep the unboxed source chip (R-14). A thread the reply
   dispatches is different: it is a thread card under that reply (R-66). An
   Artifact waiting for acceptance is a bordered card under the reply (icon,
   name, state such as 待你确认); clicking it opens the Artifact window (R-56).
@@ -88,23 +95,28 @@ source wins in a conflict is in [`README.md`](README.md).
   Slack, GitHub, Linear…) are rated by the decision model (OpenAI Decisions
   API) after Comma's attention model: first the cost if the person does
   nothing, when it lands and whether it can be undone; then one level,
-  critical, high, ask, normal or low (unclear rereads the source). Code floors
-  the level: any cost is at least high; a cost due within 48 hours, or an
-  irreversible one due within a week, is critical. Only the Coordinator speaks to the person about events: no
-  push, chat message or Telegram/Slack message is sent around it. Critical,
-  high and ask go to the Coordinator at once. The daily briefing is posted
+  critical, high, ask, normal or low (unclear rereads the source), and
+  whether the Coordinator takes it up now. The level's guidance (any cost is
+  at least high; a cost due within 48 hours, or an irreversible one due within
+  a week, is critical) is in the question; no code floor, cutoff or rule before
+  the call changes the answer (decision 2026-11-01-1300). Only the Coordinator speaks to the person about events: no
+  push, chat message or Telegram/Slack message is sent around it. What the
+  model says to take up goes to the Coordinator at once. The daily briefing is posted
   by the Coordinator in its chat every day at 08:00 local time (and pushed),
   whatever the bar below says. It tells the person only when they must act before the next
   08:00 briefing, or when a cost that cannot be undone lands within a week;
   everything else waits in 建议 for the briefing. When unsure, it stays
   quiet. It also stays quiet when fresh evidence shows the matter resolved,
-  owned by someone else, or already covered in the chat. When the daily cap
-  is spent, a matter the person must still act on is snoozed until the cap
-  reopens, never dropped. Telling the person is a card in its
+  owned by someone else, or already covered in the chat. When the Decisions
+  API says not now, a matter the person must still act on is snoozed until
+  the time it names, never dropped. Telling the person is a card in its
   own chat that says what happens if nothing is done and offers one next
-  step, pushed on mobile. Normal stays in 建议; low is not shown. Telling the
-  person is capped at 5 a day, 30 minutes apart (critical skips the spacing,
-  not the cap); held items wait, they are not dropped. The Coordinator never
+  step, pushed on mobile. Normal stays in 建议; low is not shown. Whether to
+  interrupt the person now, which waiting matter the Coordinator takes up
+  next, and what happens to a matter it left undecided are Decisions API
+  answers that read how often the person was told today; only runaway caps
+  (24 tellings, 48 handoffs a day) stay in code. Held items wait, they are not
+  dropped. The Coordinator never
   acts on an event before the person says yes. Its own ideas also go in its
   chat.
 - **R-21** 建议 is its own rail page (R-55), not part of the right panel; the
@@ -172,6 +184,12 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   line before the properties column or an open thread. Nothing else gets a
   line; sections are separated by space. The content column is centred in
   the main area, up to 680px wide.
+- **R-79** No breadcrumb, title bar or page header shows the workspace's
+  name. There is one workspace on screen, the name cannot be clicked there,
+  and it is shown and switched only from the avatar menu at the bottom left.
+  The task page's breadcrumb starts at 看板. A group heading that names the
+  workspace its settings apply to (设置's workspace group) is not a crumb and
+  stays.
 - **R-62** 线程 lists the threads working on the issue, grouped as R-52:
   status icon (never the bot's avatar, `glossary.md`), thread name, time, and
   the opening of its last reply (R-53). Someone who cannot open the thread
@@ -436,11 +454,27 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   `99:75`), shared by devices, threads and tasks.
 - **R-35** Shell (Comma): grey window background, 44px top bar (back,
   forward, centred search pill that opens ⌘K, the 浏览器 globe toggle at the
-  right, R-57), 72px icon rail with a text label under each icon, in this
-  order: 主页, 建议, 看板, 插件, Artifact; and one rounded content card. Build on
+  right, R-57), 68px icon rail, in this order: 主页, 建议, 看板, 插件,
+  Artifact; and one rounded content card. Rail items are icons only: no text
+  under the icon; the name shows as a tooltip on hover and stays the item's
+  accessible name (Alex, #580; restored 2026-11-01 after #747 brought the
+  labels back). Build on
   `components/app-shell.tsx`; no reUI App Shell blocks. Standing rule: a
   skill audit (unslop, interface-design) never changes the shell layout;
   Alex keeps it as it is (2026-10-31).
+- **R-80** Every vertical line between two columns can be dragged to resize
+  them (Alex: 「只要是这种竖线都可以 resizable」, decision 2026-11-01-1310):
+  the bot list, the right panel, 建议's two halves, Artifact's list, the
+  board's Coordinator sidebar, a task's right panel, the editor's side
+  panel, a project's details, the settings list, the browser. The line is a
+  `ResizablePane` or a `ResizeHandle` (`components/ui/resizable-pane.tsx`,
+  on `hooks/use-resizable-width.ts`): drag it, use the arrow keys on it
+  (Shift for bigger steps, Home and End for the limits), double-click it for
+  the default width; it shows `col-resize` on hover, stays between a minimum
+  and a maximum, and the width is remembered per place on this device. No
+  second way to resize a column. `scripts/split-pane-policy.mjs` fails a
+  fixed-width column with its own side border and no handle; a line that is
+  not between columns says why with `split-pane-exempt: <reason>`.
 - **R-36** Bots use bloub avatars (`BotAvatar`, Figma `196:3571`, all 16
   shapes kept); people use letter avatars. A person without an uploaded
   picture gets a generated gradient avatar (`public/avatars/*.webp`): after

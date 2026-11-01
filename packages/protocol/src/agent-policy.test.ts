@@ -52,7 +52,7 @@ describe("agent policy table (ADR 0009)", () => {
       install_dependency: "allow",
       write_outside_repo: "ask",
       git_push: "deny",
-      network: "ask",
+      network: "allow",
       computer_use: "ask",
     })
   })
@@ -90,7 +90,7 @@ describe("agent policy table (ADR 0009)", () => {
       install_dependency: "allow",
       write_outside_repo: "ask",
       git_push: "deny",
-      network: "ask",
+      network: "allow",
       computer_use: "ask",
     })
     expect(resolvePermissions({ computer_use: "unknown" }).computer_use).toBe("ask")
@@ -305,11 +305,11 @@ it("canonicalizes resolved execution policy independent of object key order", ()
   expect(runPolicyDigestInput({ ...policy, readOnly: true })).not.toBe(runPolicyDigestInput(policy))
 })
 
-it('uses unattended cloud networking only for a trusted cloud environment and keeps explicit choices', () => {
+it('opens the network by default everywhere and keeps the choices a person made', () => {
   expect(resolveAgentSettings(null, undefined, 'cloud').policy.permissions.network).toBe('allow')
-  expect(resolveAgentSettings(null).policy.permissions.network).toBe('ask')
-  for (const network of ['allow','ask','deny'] as const) {
-    expect(resolveAgentSettings({ permissions:{network} },undefined,'cloud').policy.permissions.network).toBe(network)
+  expect(resolveAgentSettings(null).policy.permissions.network).toBe('allow')
+  for (const environment of ['cloud', 'local'] as const) for (const network of ['allow','ask','deny'] as const) {
+    expect(resolveAgentSettings({ permissions:{network} },undefined,environment).policy.permissions.network).toBe(network)
   }
   expect(resolveAgentSettings({permissions:{install_dependency:'deny',git_push:'deny'}},undefined,'cloud').policy.permissions).toMatchObject({install_dependency:'deny',git_push:'deny'})
 })

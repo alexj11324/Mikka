@@ -100,7 +100,7 @@ export async function reclaimLostRuns(userId: string, now = new Date()): Promise
         .where(and(eq(agentRuns.id, run.id), eq(agentRuns.status, 'queued'), isNull(agentRuns.stopRequestedAt)))
       continue
     }
-    const ended = await endRun(run.id, ['queued'], { status: 'failed', error: DEVICE_STAYED_OFFLINE }, now, false, await noMachineCard(run.userId))
+    const ended = await endRun(run.id, ['queued'], { status: 'failed', error: DEVICE_STAYED_OFFLINE }, now, false, await noMachineCard())
     if (ended) await announceEnd({ ...run, status: 'failed' })
   }
 }
@@ -169,7 +169,7 @@ async function reclaimLostRun(run: Run, now: Date) {
   const cloud = bound ? null : await cloudTarget(run)
   const target = bound || cloud ? null : await takeoverTarget(run, now)
   if (!bound && !cloud && !target) {
-    const ended = await endRun(run.id, LEASED_RUN_STATUSES, { status: 'failed', error: DEVICE_STAYED_OFFLINE }, now, true, await noMachineCard(run.userId))
+    const ended = await endRun(run.id, LEASED_RUN_STATUSES, { status: 'failed', error: DEVICE_STAYED_OFFLINE }, now, true, await noMachineCard())
     if (ended) await announceEnd({ ...run, status: 'failed' })
     return
   }
@@ -242,7 +242,7 @@ async function moveToCloud(run: Run, cloud: CloudTarget, attempt: number, now: D
     await startThreadMachine(actor, runId)
   } catch {
     // The cloud refused before a retry existed: the lost run already ended, so tell the person what they can do.
-    await recordCoordinatorEvent(db, { ...runFinishedEvent({ ...run, status: 'failed', stopReason: 'device_lost', report: null }), payload: { status: 'failed', stopReason: 'device_lost', runKind: run.kind, summary: null, noMachine: await noMachineCard(run.userId) } })
+    await recordCoordinatorEvent(db, { ...runFinishedEvent({ ...run, status: 'failed', stopReason: 'device_lost', report: null }), payload: { status: 'failed', stopReason: 'device_lost', runKind: run.kind, summary: null, noMachine: await noMachineCard() } })
     await wakeCoordinator(run.userId).catch(() => undefined)
   }
 }
@@ -260,15 +260,15 @@ export async function startThreadMachine(actor: { userId: string; workspaceId: s
     const [run] = await db.update(agentRuns).set({ status: 'failed', stopReason: 'device_lost', error: DEVICE_STAYED_OFFLINE, updatedAt: new Date() })
       .where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, actor.userId), inArray(agentRuns.status, ['queued', 'stopped']))).returning()
     if (run) {
-      await recordCoordinatorEvent(db, { ...runFinishedEvent({ ...run, stopReason: 'device_lost', report: null }), payload: { status: 'failed', stopReason: 'device_lost', runKind: run.kind, summary: null, noMachine: await noMachineCard(actor.userId) } })
+      await recordCoordinatorEvent(db, { ...runFinishedEvent({ ...run, stopReason: 'device_lost', report: null }), payload: { status: 'failed', stopReason: 'device_lost', runKind: run.kind, summary: null, noMachine: await noMachineCard() } })
       await wakeCoordinator(actor.userId).catch(() => undefined)
     }
   }
 }
 
 /** The card of what the person can do when no machine can continue a run. */
-async function noMachineCard(userId: string) {
-  return (await import('@/lib/rule-dispatch')).machineUnavailableCardFor(userId)
+async function noMachineCard() {
+  return (await import('@/lib/rule-dispatch')).machineUnavailableCard()
 }
 
 /** Ends a run that is still in one of `from`; false when something else ended it first. */

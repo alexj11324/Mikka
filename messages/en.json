@@ -14,7 +14,18 @@
     "propertyValue": "{label}: {value}",
     "avatarLabel": "Avatar for {email}",
     "scrollToEnd": "Scroll to end",
-    "scrollToStart": "Scroll to start"
+    "scrollToStart": "Scroll to start",
+    "resize": {
+      "suggestionsChat": "Resize Coordinator chat",
+      "artifactList": "Resize Artifact list",
+      "boardSidebar": "Resize Coordinator sidebar",
+      "taskPanel": "Resize right panel",
+      "editorPanel": "Resize side panel",
+      "projectDetails": "Resize details",
+      "settingsList": "Resize settings list",
+      "groupPanel": "Resize right panel",
+      "browser": "Resize browser"
+    }
   },
   "Issue": {
     "scope": {
@@ -2876,7 +2887,7 @@
       "run": "Thread",
       "runOf": "{agent} thread",
       "openIssue": "Open task: {title}",
-      "openRunIssue": "{agent} thread, open task: {title}",
+      "openThread": "Open thread: {name}",
       "noIssue": "No linked task",
       "runStatus": {
         "queued": "Queued",
@@ -3154,7 +3165,9 @@
     "cloudKeySetup": "Set up your E2B key",
     "dispatchWait": "Wait for it",
     "dispatchCloud": "Run on Mikka Cloud",
-    "needsMachineTitle": "This task needs a computer to run on",
+    "needsMachineTitle": "No computer available",
+    "needsMachineDescription": "Connect or turn on a computer first, or add your E2B API key to run in the cloud.",
+    "needsMachineConnect": "Connect a computer",
     "needsMachineAuto": "Let this computer be picked automatically",
     "needsMachineServerOnline": "Bring the server back online",
     "needsMachineMac": "Enable on this computer",
@@ -3689,7 +3702,8 @@
     "loadingOlder": "Loading…",
     "notSent": "Not sent",
     "answering": "Replying",
-    "noTaker": "No bot took this. @ one by name"
+    "noTaker": "No bot took this. @ one by name",
+    "stopped": "Stopped"
   },
   "DeviceSetup": {
     "title": "Set up {device}",

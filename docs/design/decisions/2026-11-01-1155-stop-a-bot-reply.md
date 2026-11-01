@@ -18,3 +18,8 @@ flight is aborted. What the reply had already said stays in the chat, with
 「已停止」 under it; the next message is answered as usual. A dispatched
 thread keeps running; it has its own stop. A scheduled read is not stopped
 from the chat.
+
+Group chats stop the same way (coordinator follow-up, same day): while a
+bot answers in a group, any member's send button is stop. The reply in
+flight is dropped (group replies are not streamed), replies already posted
+stay, and the chat says 「已停止」.

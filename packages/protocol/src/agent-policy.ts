@@ -65,7 +65,9 @@ export const PERMISSION_DEFAULTS: Readonly<
   // A run pushes only when the server sends allow for an admitted GitHub App
   // grant (decision 2026-11-01-1215); a policy that does not say so never pushes.
   git_push: "deny",
-  network: "ask",
+  // Agents reach the open internet unless a person restricts it in settings
+  // (decision 2026-11-01-1230-network-open-by-default).
+  network: "allow",
   computer_use: "ask",
 }
 
@@ -383,7 +385,7 @@ export function resolvePermissions(stored: unknown, environment: ExecutionEnviro
     out[action] =
       typeof value === "string" && permissionChoiceAllowed(action, value)
         ? value
-        : (environment === 'cloud' && action === 'network' ? 'allow' : PERMISSION_DEFAULTS[action] as PermissionDecision)
+        : PERMISSION_DEFAULTS[action] as PermissionDecision
   }
   // git_push offers only allow / deny (permissionChoiceAllowed), so it is never ask here.
   return out as RunPermissions

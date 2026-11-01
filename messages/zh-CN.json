@@ -14,7 +14,18 @@
     "propertyValue": "{label}：{value}",
     "avatarLabel": "{email} 的头像",
     "scrollToEnd": "滚动到底部",
-    "scrollToStart": "滚动到顶部"
+    "scrollToStart": "滚动到顶部",
+    "resize": {
+      "suggestionsChat": "调整 Coordinator 对话宽度",
+      "artifactList": "调整 Artifact 列表宽度",
+      "boardSidebar": "调整 Coordinator 侧栏宽度",
+      "taskPanel": "调整右栏宽度",
+      "editorPanel": "调整侧栏宽度",
+      "projectDetails": "调整详情栏宽度",
+      "settingsList": "调整设置列表宽度",
+      "groupPanel": "调整右栏宽度",
+      "browser": "调整浏览器宽度"
+    }
   },
   "Issue": {
     "scope": {
@@ -2876,7 +2887,7 @@
       "run": "线程",
       "runOf": "{agent} 的线程",
       "openIssue": "打开任务：{title}",
-      "openRunIssue": "{agent} 的线程，打开任务：{title}",
+      "openThread": "打开线程：{name}",
       "noIssue": "没有关联的任务",
       "runStatus": {
         "queued": "排队中",
@@ -3154,7 +3165,9 @@
     "cloudKeySetup": "去设置 E2B 密钥",
     "dispatchWait": "等它上线",
     "dispatchCloud": "在 Mikka Cloud 上运行",
-    "needsMachineTitle": "这个任务需要一台电脑来跑",
+    "needsMachineTitle": "没有可用的电脑",
+    "needsMachineDescription": "先连接或开启一台电脑，或者填入你的 E2B API Key 用云端运行。",
+    "needsMachineConnect": "连接电脑",
     "needsMachineAuto": "允许这台电脑自动调度",
     "needsMachineServerOnline": "让服务器重新上线",
     "needsMachineMac": "在这台电脑上启用",
@@ -3689,7 +3702,8 @@
     "loadingOlder": "正在加载…",
     "notSent": "未发送",
     "answering": "正在回复",
-    "noTaker": "没有 Bot 接这条，@ 它的名字"
+    "noTaker": "没有 Bot 接这条，@ 它的名字",
+    "stopped": "已停止"
   },
   "DeviceSetup": {
     "title": "设置 {device}",

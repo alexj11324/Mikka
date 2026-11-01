@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router'
 import { ChatRowView, rowKey, useChatRows } from '@/components/ChatList'
 import { NavBar, underBar } from '@/components/NavBar'
 import { Text } from '@/components/Text'
-import { chatPath } from '@/lib/navigate'
+import { botPath } from '@/lib/pins'
 import { colors } from '@/lib/theme'
 
 /**
@@ -27,7 +27,7 @@ export default function SearchScreen() {
         keyboardDismissMode="on-drag"
         keyboardShouldPersistTaps="handled"
         ListEmptyComponent={needle ? <Text style={styles.note}>没有找到「{query.trim()}」</Text> : undefined}
-        renderItem={({ item }) => <ChatRowView row={item} onPress={() => router.push(item.kind === 'bot' ? chatPath(item.bot.id) : `/groups/${item.group.id}`)} />}
+        renderItem={({ item }) => <ChatRowView row={item} onPress={() => router.push(item.kind === 'bot' ? botPath(item.bot) : `/groups/${item.group.id}`)} />}
       />
     </View>
   )

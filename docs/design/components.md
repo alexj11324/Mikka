@@ -8,8 +8,9 @@ PR. `pnpm lint:ui` blocks hand-built UI that a library component covers.
 
 | Job | Use | Notes |
 | --- | --- | --- |
-| App shell (window, top bar, rail, content card) | `components/app-shell.tsx`, `components/nav/icon-rail.tsx` | Comma structure, R-35 |
+| App shell (window, top bar, rail, content card) | `components/app-shell.tsx`, `components/nav/icon-rail.tsx` | Comma structure, R-35. Rail items are icon buttons with a tooltip (`Tooltip` + `Button size="icon"`), never a label under the icon |
 | Bot list (left) | `components/nav/bot-list.tsx` | Coordinator and bots, R-01 |
+| A column beside another, resizable from the line between them | `components/ui/resizable-pane.tsx` (`ResizablePane`, or `ResizeHandle` alone for a column that animates its own width), on `hooks/use-resizable-width.ts` | Every vertical divider between columns, R-80; `components/ui/resizable.tsx` is not used for this |
 | Centre chat title | `components/nav/conversation-pill.tsx` | Borderless, centred |
 | Right panel | `components/nav/context-panel.tsx` | No input box in the thread list or under a screen; an open thread ends in the composer, R-10 |
 | A bot's shape and colour picker | `BotLookPicker` (`components/nav/bot-look-picker.tsx`) | One picker for 新建 Bot and the right panel's avatar (`BotLookEditor`); the panel's name edits in place with `BotNameEditor`, R-51 |
