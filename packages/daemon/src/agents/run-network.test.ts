@@ -1,6 +1,8 @@
 import { expect, it, vi } from 'vitest'
 import { ToolApprovalGate } from './tool-approval'
 import { runNetworkApproval } from './run-network'
+import { judgeNetworkDestination } from '../decision-judgments'
+import type { ServerDecide } from '../server-decision'
 
 it('keeps decisions within the immutable maximum and the exact run', async () => {
   const ask = vi.fn(async () => 'allow' as const)
@@ -117,4 +119,48 @@ it('reaches the run\'s Mikka app host without a network ask, inside the ceiling 
   expect(await runNetworkApproval('run-a','claude_code',gate,[],undefined,'mikka.example')({host:'mikka.example',port:443},signal)).toBe(false)
   expect(await runNetworkApproval('run-a','claude_code',gate,['mikka.example','other.example'],undefined,'mikka.example')({host:'other.example',port:443},signal)).toBe(false)
   expect(ask).not.toHaveBeenCalled()
+})
+
+it('under ask, the Decisions API preauthorizes a destination inside the ceiling; no answer goes ahead, logged', async () => {
+  const answering = (probability: number | null) => vi.fn<ServerDecide>(async () =>
+    probability === null ? null : new Map([['preauthorize', { type: 'predicate' as const, name: 'preauthorize', probability }]]))
+  const gateWith = (decideFn: ServerDecide, decision: 'allow' | 'ask' | 'deny' = 'ask') => {
+    const ask = vi.fn(async () => 'deny' as const)
+    const gate = new ToolApprovalGate('run-a', { permission: () => decision, ask, isLive: () => true,
+      preauthorizeNetwork: (request, signal) => {
+        const { host, port } = request.input as { host: string; port: number }
+        return judgeNetworkDestination(decideFn, 'run-a', { host, port, repo: 'o/r', task: 'Fix the build', allow: ['example.org'] }, signal)
+      } })
+    return { gate, ask }
+  }
+  const signal = new AbortController().signal
+  // Yes: allowed without a card, and the answer is reused for that host:port.
+  const yes = answering(0.9)
+  const allowed = gateWith(yes)
+  const network = runNetworkApproval('run-a', 'codex', allowed.gate, ['*'])
+  expect(await network({ host: 'registry.npmjs.org', port: 443 }, signal)).toBe(true)
+  expect(await network({ host: 'registry.npmjs.org', port: 443 }, signal)).toBe(true)
+  expect(yes).toHaveBeenCalledOnce()
+  expect(yes.mock.calls[0][1]).toMatchObject({ purpose: 'network-destination' })
+  expect(yes.mock.calls[0][1].input).toContain('registry.npmjs.org:443')
+  expect(allowed.ask).not.toHaveBeenCalled()
+  // No: the existing card asks the person.
+  const asked = gateWith(answering(0.1))
+  expect(await runNetworkApproval('run-a', 'codex', asked.gate, ['*'])({ host: 'paste.invalid', port: 443 }, signal)).toBe(false)
+  expect(asked.ask).toHaveBeenCalledOnce()
+  // Null: goes ahead with a fallback line.
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+  try {
+    const unanswered = gateWith(answering(null))
+    expect(await runNetworkApproval('run-a', 'codex', unanswered.gate, ['*'])({ host: 'example.invalid', port: 443 }, signal)).toBe(true)
+    expect(unanswered.ask).not.toHaveBeenCalled()
+    expect(warn).toHaveBeenCalledWith(expect.stringMatching(/^Decision fallback: network example\.invalid:443/))
+  } finally { warn.mockRestore() }
+  // The ceiling and an explicit deny are never asked.
+  const never = answering(0.9)
+  const ceiling = gateWith(never)
+  expect(await runNetworkApproval('run-a', 'codex', ceiling.gate, ['example.org'])({ host: 'example.invalid', port: 443 }, signal)).toBe(false)
+  const denied = gateWith(never, 'deny')
+  expect(await runNetworkApproval('run-a', 'codex', denied.gate, ['*'])({ host: 'example.invalid', port: 443 }, signal)).toBe(false)
+  expect(never).not.toHaveBeenCalled()
 })

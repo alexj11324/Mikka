@@ -23,8 +23,19 @@ export class ComputerBroker {
     capture,
     now = Date.now,
     ttl = 300000,
+    needsPerson,
   }) {
-    Object.assign(this, { driver, socketPath, permitted, execute, capture, now, ttl, transport });
+    Object.assign(this, { driver, socketPath, permitted, execute, capture, now, ttl, transport, needsPerson });
+  }
+  // runId → the last few action kinds, evidence for the Decisions API.
+  recent = new Map();
+  noteKind(runId, call) {
+    const kinds = this.recent.get(runId) ?? [];
+    const before = [...kinds];
+    kinds.push(call.name);
+    if (kinds.length > 8) kinds.shift();
+    this.recent.set(runId, kinds);
+    return before;
   }
   spec(runId, permission, { display } = {}) {
     // A new policy or session invalidates every previous grant for this run,
@@ -121,6 +132,30 @@ export class ComputerBroker {
         return this.execute(this.driver, call, grant.display, grant.runId, { actionId, assertLive });
       });
     }
+    // Under `ask`, the Decisions API says whether this action needs the
+    // person; no goes ahead, yes is reviewed, no answer goes ahead (logged).
+    if (this.needsPerson) {
+      const recent = this.noteKind(grant.runId, call);
+      return Promise.resolve()
+        .then(() => {
+          assertLive();
+          return this.needsPerson(grant.runId, { call, recent }, signal);
+        })
+        .catch((error) => {
+          assertLive();
+          if (signal?.aborted) throw error;
+          return null;
+        })
+        .then((needsPerson) => {
+          if (needsPerson === true) return this.review(token, grant, call, actionId, assertLive, signal);
+          if (needsPerson !== false) console.warn(`Decision fallback: computer action ${call.name} executed without a judgment`);
+          assertLive();
+          return this.execute(this.driver, call, grant.display, grant.runId, { actionId, assertLive });
+        });
+    }
+    return this.review(token, grant, call, actionId, assertLive, signal);
+  }
+  review(token, grant, call, actionId, assertLive, signal) {
     if (this.pending.size >= 20) return Promise.reject(new Error("Not permitted"));
     const request = {
       id: actionId,
@@ -181,6 +216,8 @@ export class ComputerBroker {
     return [...this.pending.values()].map((p) => structuredClone(p.request));
   }
   revoke(token) {
+    const revoked = this.grants.get(token);
+    if (revoked) this.recent.delete(revoked.runId);
     this.grants.delete(token);
     for (const [id, row] of this.pending) {
       if (row.token !== token) continue;
