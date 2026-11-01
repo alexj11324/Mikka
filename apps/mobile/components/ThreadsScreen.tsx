@@ -7,36 +7,36 @@ import { MachineIcon, Spinner, StatusIcon } from '@/components/icons'
 import { Text } from '@/components/Text'
 import { NavBar, underBar } from '@/components/NavBar'
 import { Dot } from '@/components/ui'
-import type { BotPage, Thread, Threads } from '@/lib/types'
+import type { BotPage, Thread, ThreadGroup, Threads } from '@/lib/types'
 import { openChat } from '@/lib/navigate'
 import { useApi, useRefresh } from '@/lib/useApi'
 import { colors, lift } from '@/lib/theme'
 import { HARNESS } from '@/lib/harness'
 
 // 待审阅 and 已归档 (Figma 03b) wait for the server to track reviews and archiving.
-type Filter = 'all' | 'waiting' | 'running' | 'done'
+type Filter = 'all' | 'waiting' | 'running' | 'resolved'
 const filters: { id: Filter; label: string; icon: ComponentType<{ size?: number; color?: string; strokeWidth?: number }>; symbol: 'list.bullet' | 'hand.raised' | 'arrow.triangle.2.circlepath' | 'checkmark.circle' }[] = [
   { id: 'all', label: '全部', icon: List, symbol: 'list.bullet' },
-  { id: 'waiting', label: '等你回复', icon: Hand, symbol: 'hand.raised' },
+  { id: 'waiting', label: '等待你', icon: Hand, symbol: 'hand.raised' },
   { id: 'running', label: '进行中', icon: LoaderCircle, symbol: 'arrow.triangle.2.circlepath' },
-  { id: 'done', label: '已完成', icon: CircleCheck, symbol: 'checkmark.circle' },
+  { id: 'resolved', label: '已解决', icon: CircleCheck, symbol: 'checkmark.circle' },
 ]
 
-const matches = (thread: Thread, filter: Filter) => {
-  if (filter === 'all') return true
-  if (filter === 'done') return thread.status === 'done' || thread.status === 'stopped'
-  return thread.status === filter
-}
+/** The server's group (R-52); an older server sends none, so its status stands in, never as resolved. */
+export const groupOf = (thread: Thread): ThreadGroup => thread.group ?? (thread.status === 'running' ? 'running' : thread.status === 'failed' ? 'blocked' : 'waiting')
 
-const STATES: { title: string; match: (status: Thread['status']) => boolean }[] = [
-  { title: '等你回复', match: status => status === 'waiting' },
-  { title: '进行中', match: status => status === 'running' },
-  { title: '失败', match: status => status === 'failed' },
-  { title: '已完成', match: status => status === 'done' || status === 'stopped' },
+const matches = (thread: Thread, filter: Filter) => filter === 'all' || groupOf(thread) === filter
+
+/** The web's order and names (R-52); 已解决 last. */
+const GROUPS: { id: ThreadGroup; title: string }[] = [
+  { id: 'running', title: '进行中' },
+  { id: 'blocked', title: '受阻' },
+  { id: 'waiting', title: '等待你' },
+  { id: 'idle', title: '空闲' },
+  { id: 'resolved', title: '已解决' },
 ]
 
-/** Threads waiting on the person sort first (mobile.md). */
-const rank = (thread: Thread) => (thread.status === 'waiting' ? 0 : thread.status === 'running' ? 1 : 2)
+const rank = (thread: Thread) => GROUPS.findIndex(group => group.id === groupOf(thread))
 
 /** 线程, like the Claude app's Code screen: 设备 chips, filter menu, 新线程 pill (mobile.md). */
 export function ThreadsScreen({ bot }: { bot?: { id: string; name: string } }) {
@@ -54,10 +54,10 @@ export function ThreadsScreen({ bot }: { bot?: { id: string; name: string } }) {
   const list = useMemo(() => (data?.threads ?? [])
     .filter(t => matches(t, filter) && (!machine || t.device?.id === machine))
     .sort((a, b) => rank(a) - rank(b)), [data, filter, machine])
-  // 全部: grouped by state, waiting on the person first (mobile.md 线程).
-  const rows: (Thread | { title: string })[] = filter !== 'all' ? list : STATES.flatMap(state => {
-    const items = list.filter(thread => state.match(thread.status))
-    return items.length ? [{ title: state.title }, ...items] : []
+  // 全部: grouped as on the web (R-52).
+  const rows: (Thread | { title: string })[] = filter !== 'all' ? list : GROUPS.flatMap(group => {
+    const items = list.filter(thread => groupOf(thread) === group.id)
+    return items.length ? [{ title: group.title }, ...items] : []
   })
 
   return (
@@ -113,7 +113,7 @@ export function ThreadsScreen({ bot }: { bot?: { id: string; name: string } }) {
   )
 }
 
-/** Status icon, name, one grey line: the Agent running it (R-78) and the machine icon. Only 等你回复 adds a word (mobile.md). */
+/** Status icon, name, one grey line: the Agent running it (R-78) and the machine icon. Only 等你回复 adds a word (mobile.md), and a task's later attempt its number. */
 export function ThreadRow({ thread, onPress }: { thread: Thread; onPress: () => void }) {
   return (
     <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.pressed }]}>
@@ -121,7 +121,7 @@ export function ThreadRow({ thread, onPress }: { thread: Thread; onPress: () => 
       <View style={{ flex: 1 }}>
         <Text style={styles.rowTitle} numberOfLines={1}>{thread.name}</Text>
         <View style={styles.rowMeta}>
-          <Text style={styles.rowMetaText}>{thread.status === 'waiting' ? '等你回复 · ' : ''}{HARNESS[thread.harness] ?? thread.harness}</Text>
+          <Text style={styles.rowMetaText}>{thread.status === 'waiting' ? '等你回复 · ' : ''}{(thread.attempts ?? 1) > 1 ? `第 ${thread.attempts} 次尝试 · ` : ''}{HARNESS[thread.harness] ?? thread.harness}</Text>
           {thread.device ? <MachineIcon machine={thread.device.kind} size={13} /> : null}
         </View>
       </View>

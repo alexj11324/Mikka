@@ -5,7 +5,7 @@ import { and, desc, eq, inArray, isNotNull, sql } from 'drizzle-orm'
 import { ActionFailureError } from '@/lib/action-error'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
-import { agents, agentRuns, bots, devices, issues, type RunStatus } from '@/lib/db/schema'
+import { agents, agentRuns, bots, devices, issues, type RunOutcome, type RunStatus } from '@/lib/db/schema'
 import { reclaimLostRuns } from '@/lib/run-leases'
 import { runAgentName, runBotId, runBotName } from '@/lib/run-bot-name'
 import { replyLine } from '@/lib/thread-groups'
@@ -65,8 +65,8 @@ export interface Thread {
   lastReply: string | null
   /** When that reply was last written; with updatedAt, the row's last activity. */
   lastReplyAt: string | null
-  /** A retry of this run exists (it went offline and was queued again), so it no longer waits on anyone. */
-  superseded: boolean
+  /** How it came out once it ended, as the decision model judged it; null while running or not judged yet (R-52). */
+  outcome: RunOutcome | null
   /** The coding agent running it (claude_code, codex…); its mark is the thread's icon (R-78). */
   harness: string | null
   waitingFor?: { deviceId: string; deviceName: string; deviceType: 'laptop' | 'server'; harness: string }
@@ -83,7 +83,7 @@ export async function listThreads(): Promise<Thread[]> {
     ownerId: agentRuns.userId, deviceId: devices.id, deviceName: devices.name, deviceType: devices.deviceType,
     deviceEnabled: devices.enabled, lastSeenAt: devices.lastSeenAt,
     harness: sql<string>`coalesce(${agentRuns.agentDefinition}->>'harness', ${agents.harness})`,
-    superseded: sql<boolean>`exists (select 1 from agent_runs retry where retry."retryOf" = ${agentRuns.id})`,
+    outcome: agentRuns.outcome,
   }).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(devices, eq(devices.id, agentRuns.deviceId))
     .where(and(eq(agentRuns.userId, session.user.id), sql`${agentRuns.createdAt} > now() - interval '30 days'`))
     .orderBy(desc(sql`greatest(${agentRuns.lastReplyAt}, ${agentRuns.updatedAt})`), desc(agentRuns.createdAt)).limit(200)
@@ -91,6 +91,6 @@ export async function listThreads(): Promise<Thread[]> {
     ...(runWaitingDeviceId(session.user.id, { ownerId, status: row.status, deviceId, deviceEnabled, lastSeenAt }) && deviceId && deviceName !== null && deviceType
       ? { waitingFor: { deviceId, deviceName, deviceType, harness } } : {}),
     ...row, harness: harness ?? null, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(),
-    lastReply: replyLine(row.lastReply), lastReplyAt: row.lastReplyAt?.toISOString() ?? null, superseded: Boolean(row.superseded),
+    lastReply: replyLine(row.lastReply), lastReplyAt: row.lastReplyAt?.toISOString() ?? null,
   }))
 }

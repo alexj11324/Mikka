@@ -3261,11 +3261,13 @@
       "justNow": "刚刚",
       "yesterday": "昨天",
       "group": {
-        "waiting": "等待回复（{count}）",
         "running": "进行中（{count}）",
+        "blocked": "受阻（{count}）",
+        "waiting": "等待你（{count}）",
         "idle": "空闲（{count}）",
         "resolved": "已解决（{count}）"
       },
+      "attempt": "第 {count} 次尝试",
       "waitingFor": "等待 {device} 上线"
     },
     "newBot": {

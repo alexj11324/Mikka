@@ -229,11 +229,30 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   (2026-10-31). The Coordinator's header stays read-only. 详情 holds two lists, 例行 (routines)
   and 资料库 (library). The bot creates routines when asked in chat; files are
   uploaded with the composer's 「+」.
-- **R-52** Every thread list groups its rows in this order: 等待回复（N）,
-  进行中（N）, 空闲（N）, 已解决（N）. A group header is muted text
-  (「等待回复（2）」) followed by a thin rule filling the rest of the row.
-  已解决 is collapsed by default behind a chevron. A failed thread sits under
-  等待回复. Never a 「今天」 or 「今天完成」 group.
+- **R-52** Every thread list, web and phone, groups its rows in this order:
+  进行中（N）, 受阻（N）, 等待你（N）, 空闲（N）, 已解决（N）
+  (Running, Blocked, Waiting for you, Idle, Resolved). A group header is
+  muted text (「等待你（2）」) followed by a thin rule filling the rest of
+  the row. 已解决 is collapsed by default behind a chevron. Never a 「今天」
+  or 「今天完成」 group
+  ([decision](decisions/2026-11-01-1250-five-thread-groups.md)).
+  - 进行中 follows the run's state: queued, preparing, running or finishing.
+  - Every other group follows how the run came out (`agent_runs.outcome`:
+    done, blocked, needs_input, failed, idle), judged by the decision model
+    when the run ends from its last reply, status, task and PRs, and by the
+    agent model when the decision model gives no answer
+    (`lib/run-outcome-judge.ts`). Code never guesses it from the status: a
+    run that "finished" saying it could not log in is 受阻.
+  - 受阻: blocked or failed, or paused on its quota: it needs something
+    outside the work fixed (login, credentials, proxy, permission) or nobody
+    took over after it failed. 等待你: needs_input, a run asking a question,
+    or a task with a PR to review. 空闲: idle, its task still open.
+  - 已解决 only when the outcome is done, or its task is done, cancelled or a
+    duplicate, or its PR is merged. A run nobody could judge sits under 受阻
+    (failed) or 等待你, never 已解决.
+  - A task's threads fold into its newest one, which carries
+    「第 N 次尝试」 past the first and stays out of 已解决 until the task is
+    resolved; the task's own 线程 tab lists every attempt.
 - **R-53** A thread row has two lines: the thread's title, then the opening of
   its last reply quoted verbatim, cut to one line. No generated description,
   no status word and no bot-name prefix (generating them costs compute).

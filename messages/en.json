@@ -3261,11 +3261,13 @@
       "justNow": "just now",
       "yesterday": "yesterday",
       "group": {
-        "waiting": "Waiting on you ({count})",
-        "running": "In progress ({count})",
+        "running": "Running ({count})",
+        "blocked": "Blocked ({count})",
+        "waiting": "Waiting for you ({count})",
         "idle": "Idle ({count})",
         "resolved": "Resolved ({count})"
       },
+      "attempt": "Attempt {count}",
       "waitingFor": "Waiting for {device} to come online"
     },
     "newBot": {
