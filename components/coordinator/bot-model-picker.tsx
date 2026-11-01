@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
 import { ChevronDown, ChevronRight, RefreshCw } from 'lucide-react'
@@ -47,7 +47,21 @@ function tag(t: T, group: BotModelMenuGroup) {
   }
 }
 
-function OptionLabel({ t, option }: { t: T; option: Pick<BotModelMenuOption, 'id' | 'modelId' | 'provider'> }) {
+type ChipModel = Pick<BotModelMenuOption, 'id' | 'modelId' | 'provider'>
+
+/** Where this browser keeps the model a chat's chip showed last; someone else's bot or a failed menu clears it. */
+const lastChipKey = (botId: string | null) => `mikka:model-chip:${botId ?? 'coordinator'}`
+
+function readChip(value: string | null): ChipModel | null {
+  try {
+    const chip: unknown = value ? JSON.parse(value) : null
+    if (!chip || typeof chip !== 'object') return null
+    const { id, modelId, provider } = chip as Record<string, unknown>
+    return typeof id === 'string' && typeof modelId === 'string' && typeof provider === 'string' ? { id, modelId, provider } : null
+  } catch { return null }
+}
+
+function OptionLabel({ t, option }: { t: T; option: ChipModel }) {
   return option.id === HOSTED_CHOICE ? <HostedModelLabel name={t('hosted')} /> : <ModelLabel model={option.modelId || t('unknownModel')} source={option.provider} />
 }
 
@@ -63,8 +77,23 @@ export function BotModelPicker({ botId }: { botId: string | null }) {
   const [failed, setFailed] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [refreshFailed, setRefreshFailed] = useState(false)
-  // Someone else's bot, or no menu yet: the chip is left out rather than shown wrong.
-  if (!menu.data) return null
+  const [last, setLast] = useState<ChipModel | null>(null)
+  const shown = menu.data?.current
+  useEffect(() => {
+    const key = lastChipKey(botId)
+    try {
+      if (shown) window.localStorage.setItem(key, JSON.stringify({ id: shown.id, modelId: shown.modelId, provider: shown.provider }))
+      else if (menu.error) window.localStorage.removeItem(key)
+      else setLast(readChip(window.localStorage.getItem(key)))
+    } catch { /* storage unavailable: the chip waits for the menu */ }
+  }, [botId, shown, menu.error])
+  // While the menu loads, the chip keeps the model it showed last time instead of popping in later (state completeness).
+  // It is the chip's look only, not a control, until the menu it opens has arrived.
+  if (!menu.data) return last && !menu.error ? <span role="status" aria-busy="true" data-testid="bot-model-chip-pending" aria-label={t('label', { name: last.id === HOSTED_CHOICE ? t('hosted') : last.modelId || t('unknownModel') })}
+    className="inline-flex h-6 max-w-56 shrink-0 items-center gap-1 rounded-full bg-control px-2 text-sm whitespace-nowrap text-foreground [&_svg]:shrink-0 [&>svg]:size-3.5">
+    <span className="flex min-w-0"><OptionLabel t={t} option={last} /></span>
+    <ChevronDown className="text-muted-foreground" />
+  </span> : null
   const { current, groups } = menu.data
   const value = current.available ? current.id : ''
 

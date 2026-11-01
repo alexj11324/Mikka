@@ -17,6 +17,7 @@ import { cn } from '@/lib/utils'
 import { RESIZE_EDGE, useResizableWidth } from '@/hooks/use-resizable-width'
 import { SPRING_SIDEBAR } from '@/lib/ease'
 import { markdownLine, sessionPreview } from '@/lib/agent-history'
+import { namedCitations } from '@/lib/coordinator/citations'
 import { RAIL_ITEMS, type RailDestination } from './icon-rail'
 import { BotAvatar, CoordinatorAvatar, type BotMood } from './bot-avatar'
 
@@ -93,8 +94,11 @@ function coordinatorLine(text: string) {
 /** Green while the bot is working, orange while it waits on you; otherwise no dot. */
 type RowStatus = 'working' | 'waiting'
 
+/** Hover is one overlay step, the current bot the next one up, so a hovered row never looks selected (R-38). */
+const ROW_FILL = 'hover:bg-control active:bg-control data-active:bg-control-hover data-active:hover:bg-control-hover'
+
 function Row({ name, preview, avatar, status, current, unread, onClick, label }: { name: string; preview: ReactNode; avatar: ReactNode; status?: RowStatus; current: boolean; unread: boolean; onClick: () => void; label: string }) {
-  return <SidebarMenuItem><SidebarMenuButton size="lg" isActive={current} aria-current={current ? 'page' : undefined} aria-label={label} onClick={onClick} className="h-13 gap-2.5 rounded-xl px-2.5">
+  return <SidebarMenuItem><SidebarMenuButton size="lg" isActive={current} aria-current={current ? 'page' : undefined} aria-label={label} onClick={onClick} className={cn('h-13 gap-2.5 rounded-xl px-2.5', ROW_FILL)}>
     <span className="relative shrink-0">
       {avatar}
       {status && <span aria-hidden="true" className={cn('absolute -right-0.5 -bottom-0.5 size-2.5 rounded-full ring-2 ring-sidebar', status === 'working' ? 'bg-success' : 'bg-attention')} />}
@@ -156,7 +160,7 @@ export function BotList({ bots, threads, active, onOpen, onNewBot, rail, onRail,
         <Row name={i18nText('Nav.coordinator')} label={coordinator?.working ? i18nText('Nav.coordinatorWorking') : i18nText('Nav.coordinator')} current={active?.kind === 'coordinator'} unread={unread('coordinator')} onClick={() => choose({ kind: 'coordinator' })}
           avatar={<CoordinatorAvatar mood={coordinator?.working ? 'thinking' : 'idle'} />}
           status={coordinator?.working ? 'working' : undefined}
-          preview={lastReply ? <span className="truncate">{coordinatorLine(lastReply.text)}</span> : null} />
+          preview={lastReply ? <span className="truncate">{coordinatorLine(lastReply.from === 'coordinator' ? namedCitations(lastReply.text, coordinator?.sources ?? {}) : lastReply.text)}</span> : null} />
         {ordered.map(bot => {
           const chat = chats[bot.id]
           const mood = botMood(threads, bot.id, chat?.working ?? false)

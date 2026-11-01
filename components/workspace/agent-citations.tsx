@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, type ComponentProps } from 'react'
 import useSWR from 'swr'
 import { Globe } from 'lucide-react'
+import { GitHubIcon } from '@/components/icons/brand-icons'
 import { useFormatter, useTranslations } from 'next-intl'
 import { getLinkPreview } from '@/app/actions/link-preview'
 import { CITATION_HREF, splitCitations, type CitationKind, type CitationSource, type IssueSource, type RunSource } from '@/lib/coordinator/citations'
@@ -185,17 +186,26 @@ function describeLink(url: string, label: string | null, preview: LinkPreview | 
   }
 }
 
+/**
+ * GitHub's favicon is its black mark, which vanished on the dark page; its mark in the text colour holds in both
+ * themes, as GitHub's own light mark does on dark (R-74). Other sites keep their favicon.
+ */
+function linkIcon(host: string | undefined, preview: LinkPreview | null | undefined) {
+  return host === 'github.com' ? { image: undefined, icon: <GitHubIcon /> } : { image: preview?.icon, icon: <Globe /> }
+}
+
 function linkSource(url: string, label: string | null, preview: LinkPreview | null | undefined): StreamingSource {
   const link = describeLink(url, label, preview)
-  return { name: preview?.title ?? link?.name ?? url, domain: link?.host ?? url, href: url, image: preview?.icon }
+  return { name: preview?.title ?? link?.name ?? url, domain: link?.host ?? url, href: url, ...linkIcon(link?.host, preview) }
 }
 
 export function LinkCitation({ url, label, preview }: { url: string; label: string | null; preview: LinkPreview | null | undefined }) {
   const link = describeLink(url, label, preview)
   if (!link) return <>{url}</>
+  const mark = linkIcon(link.host, preview)
   return <InlineCitation>
     <InlineCitationTrigger render={<a href={url} target="_blank" rel="noopener noreferrer" />}>
-      <SourceAvatar source={{ name: link.name, domain: link.host, image: preview?.icon, icon: <Globe /> }} className={sourceTileClassName} />
+      <SourceAvatar source={{ name: link.name, domain: link.host, ...mark }} className={sourceTileClassName} />
       <InlineCitationLabel>{link.name}</InlineCitationLabel>
     </InlineCitationTrigger>
     <InlineCitationContent>
@@ -204,7 +214,7 @@ export function LinkCitation({ url, label, preview }: { url: string; label: stri
         <InlineCitationTitle>{preview?.title ?? label ?? link.address}</InlineCitationTitle>
         {preview?.description && <InlineCitationDescription>{preview.description}</InlineCitationDescription>}
       </InlineCitationBody>
-      <InlineCitationFooter><InlineCitationFavicon src={preview?.icon} /><span className="min-w-0 truncate">{link.address}</span></InlineCitationFooter>
+      <InlineCitationFooter>{mark.image ? <InlineCitationFavicon src={mark.image} /> : mark.icon}<span className="min-w-0 truncate">{link.address}</span></InlineCitationFooter>
     </InlineCitationContent>
   </InlineCitation>
 }

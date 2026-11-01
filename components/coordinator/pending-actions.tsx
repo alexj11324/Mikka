@@ -11,6 +11,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { withBasePath } from '@/lib/base-path'
 import type { PendingActionView } from '@/lib/pending-action-view'
 import { useActionError } from '@/lib/use-action-error'
+import { InlineLoadError } from '@/components/load-error'
 import { ApprovedWriteActions } from './approved-write-actions'
 
 /** "2026-10-27T10:00:00-07:00" → "2026-10-27 10:00 -07:00": exactly what will be sent, only easier to read. */
@@ -41,8 +42,9 @@ async function fetchPendingActions(): Promise<PendingActionView[]> {
  */
 export function PendingActions() {
   const t = useTranslations('Coordinator.pendingActions')
+  const tCommon = useTranslations('Common')
   const actionError = useActionError()
-  const { data, mutate } = useSWR('pending-actions', fetchPendingActions, { refreshInterval: 10000 })
+  const { data, error, mutate } = useSWR('pending-actions', fetchPendingActions, { refreshInterval: 10000 })
   const [busy, setBusy] = useState<string | null>(null)
 
   async function decide(item: PendingActionView, approve: boolean) {
@@ -57,6 +59,8 @@ export function PendingActions() {
   }
 
   return <ul aria-label={t('label')} className="flex max-h-[50vh] flex-col gap-2 overflow-y-auto empty:hidden">
+    {/* A failed load says so instead of looking like nothing waits on the person, or that the list is current. */}
+    {error && <li className="px-4 py-2"><InlineLoadError message={t('approvalLoadFailed')} retryLabel={tCommon('retry')} onRetry={() => { void mutate() }} /></li>}
     {data?.map(item => {
       const input = item.input
       const email = item.action === 'send_email'
