@@ -3335,12 +3335,11 @@
         "dueDate": "Due date",
         "createdAt": "Created"
       },
-      "hiddenColumns": "Hidden columns",
+      "columns": "Board columns",
       "hiddenLane": "Hidden",
       "expandColumn": "Expand the {status} column",
       "foldColumn": "Fold to a strip",
       "hideColumn": "Hide column",
-      "hideColumnNamed": "Hide {status} column",
       "showColumn": "Show {status} column",
       "columnMenu": "{status} column options",
       "newTask": "New task",
