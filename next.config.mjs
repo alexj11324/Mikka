@@ -9,6 +9,9 @@ const withNextIntl = createNextIntlPlugin('./i18n/request.ts')
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // next dev would rewrite AGENTS.md with its own block; the file is the project's
+  // (https://nextjs.org/docs/app/api-reference/config/next-config-js/agentRules).
+  agentRules: false,
   outputFileTracingIncludes: {
     '/*': ['./lib/abuse/data/disposable-email-domains.txt'],
     '/api/bots/*/subagents/**': ['./scripts/e2b/*.py', './scripts/e2b/*.mjs', './scripts/e2b/*.sh'],
