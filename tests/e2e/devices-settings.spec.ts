@@ -56,7 +56,7 @@ test('设备：本机与 Remote control 分组，Agent 图标，重命名、重�
   // A CLI the sandbox cannot run is named, never reported as absent.
   await expect(row(page, 'no-sandbox')).toContainText('已检测到 Claude Code，但沙箱不可用')
   await row(page, 'no-sandbox').getByRole('button', { name: '修复方法' }).click()
-  await expect(page.getByText('daemon 没能自动装好 socat, ripgrep', { exact: false })).toBeVisible()
+  await expect(page.getByText('daemon 无法安装 socat, ripgrep', { exact: false })).toBeVisible()
   await page.keyboard.press('Escape')
   await expect(row(page, 'gpu-box').getByRole('button', { name: '重新连接' })).toBeVisible()
   await expect(row(page, 'gpu-box').getByRole('switch', { name: '允许调度到 gpu-box' })).not.toBeChecked()
