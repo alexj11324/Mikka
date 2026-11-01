@@ -62,18 +62,29 @@ test('通知设置可以关闭主动消息，刷新后保持', async ({ page }) 
 // S-O: a refused save puts the switch back and offers a retry that sends the same change.
 test.describe('通知保存失败', () => {
   // The test aborts the save itself; Chromium logs that aborted server-action POST once.
+  // Only that save is aborted: Settings also prefetches other sections' data through server actions while idle.
   test.use({ expectedConsoleErrors: [{ path: '/mikka/settings?section=notifications', message: 'Failed to load resource: net::ERR_FAILED' }] })
 
 test('通知保存失败时开关恢复原值，重试后保存成功', async ({ page }) => {
   await register(page, '/settings?section=notifications')
   const proactive = page.getByRole('switch', { name: '主动消息', exact: true })
   await expect(proactive).toBeChecked()
-  // Server actions POST with a Next-Action header; drop exactly those.
-  await page.route('**/*', route => route.request().headers()['next-action'] ? route.abort() : route.continue())
+  // A server action POSTs its arguments as JSON with a Next-Action header; drop exactly the save of this switch.
+  let aborted = 0
+  const dropSave = async (route: import('@playwright/test').Route) => {
+    const request = route.request()
+    let args: unknown
+    try { args = request.headers()['next-action'] ? JSON.parse(request.postData() ?? '') : undefined } catch { args = undefined }
+    if (JSON.stringify(args) !== JSON.stringify([{ proactive: false }])) return route.fallback()
+    aborted += 1
+    return route.abort()
+  }
+  await page.route('**/*', dropSave)
   await proactive.click()
   await expect(page.locator('[data-slot="alert"]')).toContainText('这项设置没有保存，已恢复为原来的值。')
   await expect(proactive).toBeChecked()
-  await page.unroute('**/*')
+  expect(aborted).toBe(1)
+  await page.unroute('**/*', dropSave)
   await page.getByRole('button', { name: '重试', exact: true }).click()
   await expect(page.locator('[data-slot="alert"]')).toHaveCount(0)
   await expect(proactive).not.toBeChecked()
