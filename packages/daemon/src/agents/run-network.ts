@@ -5,13 +5,14 @@ import type { ToolApprovalGate } from './tool-approval'
 
 /** Only trusted adapter code creates this closure. Neither the CLI nor IPC
  * request payload can choose a run, permission layer, or network ceiling. */
-export function runNetworkApproval(runId: string, harness: Exclude<Harness, 'mock' | 'cursor'>, gate: ToolApprovalGate, maximum: readonly string[], localComputerEndpoint?: string, appHost?: string) {
+export function runNetworkApproval(runId: string, harness: Exclude<Harness, 'mock' | 'cursor'>, gate: ToolApprovalGate, maximum: readonly string[], localComputerEndpoint?: string, appHost?: string, modelEndpoint?: string) {
   if (gate.runId !== runId) throw new Error('Run approval scope mismatch')
   if (localComputerEndpoint !== undefined && (!/^127\.0\.0\.1:[0-9]+$/.test(localComputerEndpoint) || Number(localComputerEndpoint.split(':')[1]) < 1 || Number(localComputerEndpoint.split(':')[1]) > 65535)) throw new Error('Invalid local computer endpoint')
   const ceiling = [...maximum]
   // The run's app entries reach only the Mikka server, which checks the run
   // token and owns each app call's allow/ask/deny; no second network ask.
-  const model = [...HARNESS_DOMAINS[harness], ...(appHost ? [appHost] : [])]
+  // A device run's local subscription broker (subscription-local-runner.ts) is its model endpoint.
+  const model = [...HARNESS_DOMAINS[harness], ...(appHost ? [appHost] : []), ...(modelEndpoint ? [modelEndpoint] : [])]
   return async (request: { host: string; port: number }, signal: AbortSignal): Promise<boolean> => {
     if (signal.aborted || gate.revoked || !matchesRunSandboxDomain(request, ceiling)) return false
     // Existing model endpoints are an explicit capability shared by the CLI

@@ -18,6 +18,7 @@ import {
 } from "node:fs"
 import { join } from "node:path"
 
+import { RUN_CREDENTIAL_PATHS } from "../credential-globs"
 import type { Logger } from "../log"
 
 export interface CodexHome {
@@ -34,15 +35,6 @@ export const CODEX_CONFIG = [
   "",
 ].join("\n")
 
-/** Credential files a CLI may write inside its run home. */
-const RUN_CREDENTIAL_FILES = [
-  ["codex-home", "auth.json"],
-  ["native-home", ".claude", ".credentials.json"],
-  ["native-home", ".codex", "auth.json"],
-  ["runtime-home", ".claude", ".credentials.json"],
-  ["runtime-home", ".codex", "auth.json"],
-]
-
 export function prepareCodexHome(dir: string, log: Logger): CodexHome {
   ownDir(dir)
   writeOwnFile(join(dir, "config.toml"), CODEX_CONFIG)
@@ -53,11 +45,9 @@ export function prepareCodexHome(dir: string, log: Logger): CodexHome {
   return { home: dir }
 }
 
-/** Removes every credential file from one run dir; keeps its history. */
+/** Removes every credential path (credential-globs.ts) from one run dir; keeps its history. */
 export function wipeRunCredentials(runDir: string) {
-  for (const parts of RUN_CREDENTIAL_FILES) {
-    rmSync(join(runDir, ...parts), { force: true, recursive: true })
-  }
+  for (const path of RUN_CREDENTIAL_PATHS) rmSync(join(runDir, path), { force: true, recursive: true })
 }
 
 /**

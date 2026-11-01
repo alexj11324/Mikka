@@ -12,11 +12,13 @@ says which source wins when two disagree, and where each kind of rule lives.
    the old components that must not come back.
 4. [`copy.md`](copy.md): how every visible string is written (C-01…C-08), and
    which products set the precedent.
-5. [`decisions/`](decisions/README.md) (one file per decision) and the frozen
+5. [`orchestration.md`](orchestration.md): models, Agents, machines,
+   scheduling, credentials in runs and who pays.
+6. [`decisions/`](decisions/README.md) (one file per decision) and the frozen
    [`decisions.md`](decisions.md): what Alex decided, when, and what it
    replaced. Check it before you reopen a question.
-6. The accepted Figma frames for your feature (listed in `decisions/` or `decisions.md`).
-7. [`../review-checklist.md`](../review-checklist.md): run it before you show UI
+7. The accepted Figma frames for your feature (listed in `decisions/` or `decisions.md`).
+8. [`../review-checklist.md`](../review-checklist.md): run it before you show UI
    to anyone.
 
 New feature? Copy [`spec-template.md`](spec-template.md) first.

@@ -88,6 +88,12 @@ export interface ClaudeAdapterOptions {
   ensureBinary?: () => Promise<string>
   /** Docker mode (run-container.ts): set by the daemon when this device runs harnesses in containers. */
   openContainer?: (run: Omit<RunContainerOptions, "image" | "owner">) => Promise<RunContainer>
+  /**
+   * The run's local subscription broker (`http://127.0.0.1:<port>`, from
+   * subscription-local-runner.ts): model requests go there and the server
+   * adds the owner's credential; the CLI holds only a placeholder.
+   */
+  modelEndpoint?: string
   /** Trusted host-only restriction; never widens the run's network ceiling. */
   networkCeiling?: readonly string[]
   /** Trusted hosted transport; ordinary local sessions retain SDK spawning. */
@@ -433,7 +439,7 @@ export class ClaudeAdapter implements AgentAdapter {
     let nativeToken: string | undefined
     let expiresAt = 0
     if (externalAuth) {
-      if(externalAuth.brokered && !this.options.spawnHosted)throw new Error(SUBSCRIPTION_ERROR)
+      if(externalAuth.brokered && !this.options.spawnHosted && !this.options.modelEndpoint)throw new Error(SUBSCRIPTION_ERROR)
       const clean = buildChildEnv({
         host: options.env,
         runId:
@@ -477,14 +483,16 @@ export class ClaudeAdapter implements AgentAdapter {
     if (externalAuth && options.credential) throw new Error(SUBSCRIPTION_ERROR)
     const credentialEnv = claudeCredentialEnv(options.credential)
     const providerDomain = credentialDomain(options.credential)
+    const modelEndpoint = this.options.modelEndpoint ? new URL(this.options.modelEndpoint).host : undefined
     const outerLocal = !this.options.spawnHosted && this.options.sandbox?.kind !== 'none'
     const assignedComputer = this.options.computerMcp ?? this.options.computerProvider?.(options.runId, options.policy)
-    // Docker mode: the CLI runs in a disposable container of the runner image.
-    const inContainer = outerLocal && !assignedComputer && Boolean(this.options.openContainer)
+    // Docker mode: the CLI runs in a disposable container of the runner image
+    // (not for a loopback model endpoint, which a container cannot reach).
+    const inContainer = outerLocal && !assignedComputer && !modelEndpoint && Boolean(this.options.openContainer)
     const binary = this.options.binary ?? (inContainer ? undefined : await this.options.ensureBinary?.())
     const ctx = new RunContext({
       ...(inContainer ? { nodeBinary: "node" } : {}),
-      harnessDomains: providerDomain ? [providerDomain] : undefined,
+      harnessDomains: [...(providerDomain ? [providerDomain] : []), ...(modelEndpoint ? [modelEndpoint] : [])],
       github: options.github,
       apps: options.apps,
       githubRuntime: options.githubRuntime,
@@ -568,7 +576,7 @@ export class ClaudeAdapter implements AgentAdapter {
         return child.process
       }
       const { policy, maximum } = outerPolicy()
-      const child = spawnRunSandbox({ command:binary ?? config.command, args:config.args, cwd:config.cwd ?? ctx.worktree, env:config.env, policy, maxAllowDomains:maximum, onNetwork:runNetworkApproval(options.runId,'claude_code',options.toolApproval!,maximum,computerDomain(computerMcp),runAppsHost(options.apps)), signal:config.signal, ...(nativeToken ? {authToken:nativeToken} : {}) })
+      const child = spawnRunSandbox({ command:binary ?? config.command, args:config.args, cwd:config.cwd ?? ctx.worktree, env:config.env, policy, maxAllowDomains:maximum, onNetwork:runNetworkApproval(options.runId,'claude_code',options.toolApproval!,maximum,computerDomain(computerMcp),runAppsHost(options.apps),modelEndpoint), signal:config.signal, ...(nativeToken ? {authToken:nativeToken} : {}) })
       const off = options.toolApproval!.onRevoke(() => { void child.revoke().catch(() => undefined) })
       void child.exited.finally(off)
       return child.process
@@ -584,6 +592,7 @@ export class ClaudeAdapter implements AgentAdapter {
           ...CLAUDE_RUN_ENV,
           CLAUDE_CODE_TMPDIR: ctx.tmpDir,
           ...credentialEnv,
+          ...(this.options.modelEndpoint ? { ANTHROPIC_BASE_URL: this.options.modelEndpoint } : {}),
           HOME: nativeHome,
           CLAUDE_CONFIG_DIR: configDir,
         },

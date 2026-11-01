@@ -23,20 +23,20 @@ export function Markdown({ text, sources = {}, onOpen, color = colors.text }: {
     <View style={{ gap: 8 }}>
       {blocks.map((block, index) => {
         switch (block.type) {
-          case 'heading': return <Text key={index} style={[styles.heading, { color }]}>{inline(block.text, sources, onOpen, color)}</Text>
-          case 'code': return <View key={index} style={styles.codeBlock}><Text style={styles.codeText}>{block.text}</Text></View>
+          case 'heading': return <Text selectable key={index} style={[styles.heading, { color }]}>{inline(block.text, sources, onOpen, color)}</Text>
+          case 'code': return <View key={index} style={styles.codeBlock}><Text selectable style={styles.codeText}>{block.text}</Text></View>
           case 'list':
             return (
               <View key={index} style={{ gap: 4 }}>
                 {block.items.map((item, i) => (
                   <View key={i} style={styles.listItem}>
                     <Text style={[styles.body, { color }]}>{block.ordered ? `${i + 1}.` : '•'}</Text>
-                    <Text style={[styles.body, { color, flex: 1 }]}>{inline(item, sources, onOpen, color)}</Text>
+                    <Text selectable style={[styles.body, { color, flex: 1 }]}>{inline(item, sources, onOpen, color)}</Text>
                   </View>
                 ))}
               </View>
             )
-          case 'paragraph': return <Text key={index} style={[styles.body, { color }]}>{inline(block.text, sources, onOpen, color)}</Text>
+          case 'paragraph': return <Text selectable key={index} style={[styles.body, { color }]}>{inline(block.text, sources, onOpen, color)}</Text>
         }
       })}
     </View>

@@ -1,6 +1,7 @@
 import { Linking } from 'react-native'
 import { BellOff, BellRing } from 'lucide-react-native'
 import { Row } from '@/components/settings'
+import { Symbol } from '@/components/Symbol'
 import { Group } from '@/components/ui'
 import { askForPush, pushUndeliverable, retryPush, usePushState } from '@/lib/push-state'
 import { colors } from '@/lib/theme'
@@ -18,7 +19,7 @@ export function PushRow({ proactive, ask = false }: { proactive: boolean; ask?: 
     const denied = push === 'denied'
     return (
       <Group>
-        <Row icon={<BellOff size={21} color={colors.danger} strokeWidth={1.8} />} label="推送无法送达" value={denied ? '打开设置' : '重试'}
+        <Row icon={<Symbol name="bell.slash" size={19} color={colors.danger} web={<BellOff size={21} color={colors.danger} strokeWidth={1.8} />} />} label="推送无法送达" value={denied ? '打开设置' : '重试'}
           onPress={() => void (denied ? Linking.openSettings() : retryPush())} />
       </Group>
     )
@@ -26,7 +27,7 @@ export function PushRow({ proactive, ask = false }: { proactive: boolean; ask?: 
   if (ask && push === 'undetermined') {
     return (
       <Group>
-        <Row icon={<BellRing size={21} color={colors.ink} strokeWidth={1.8} />} label="允许推送" onPress={() => void askForPush()} />
+        <Row icon={<Symbol name="bell.badge" size={19} web={<BellRing size={21} color={colors.ink} strokeWidth={1.8} />} />} label="允许推送" onPress={() => void askForPush()} />
       </Group>
     )
   }
