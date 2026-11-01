@@ -107,6 +107,11 @@ test(
         [billingWorkspaceId,`factory-${billingWorkspaceId}`]);
       await db.query(`INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role,status)
         VALUES($1,'owner','Fixture','check@example.invalid','admin','active')`,[billingWorkspaceId]);
+      // The person's Coordinator is an ordinary bot row; its chat, runs and
+      // factory tasks carry that bot's id from the entry point on.
+      const coordinatorBot = randomUUID();
+      await db.query(`INSERT INTO bots(id,"workspaceId","ownerId",name) VALUES($1,$2,'owner','Coordinator')`,[coordinatorBot,billingWorkspaceId]);
+      await db.query(`INSERT INTO coordinator_bots("ownerId","workspaceId","botId") VALUES('owner',$1,$2)`,[billingWorkspaceId,coordinatorBot]);
       const usage = new HostedUsageStore(db);
       await usage.verify(billingWorkspaceId, "synthetic-factory-customer", `factory-${billingWorkspaceId}`);
       // Bind the runtime to this test's actual accounting store, never a fake
@@ -143,7 +148,7 @@ test(
         `INSERT INTO device_repos(id,"deviceId","userId","repoPath","verifyCommand") VALUES ($1,$2,'owner','/fixture/repo',$3)`,
         [repoId, deviceId, command],
       );
-      const store = createFactoryStore(db, authorize, null, {
+      const store = createFactoryStore(db, authorize, coordinatorBot, {
         independent: factoryCheckIndependent,
         gates: factoryCheckGates,
       });
@@ -324,7 +329,7 @@ test(
       const reconcile = createFactoryReconciler(db, store, questions, {
         review: reconcileFactoryCheck,
         verify: reconcileFactoryCheck,
-      });
+      }, coordinatorBot);
       async function pendingReview() {
         const issueId = randomUUID(),
           sourceEventId = randomUUID();
@@ -333,8 +338,8 @@ test(
           [issueId],
         );
         await db.query(
-          `INSERT INTO coordinator_events(id,"userId",kind,"dedupeKey",payload) VALUES ($1,'owner','user_message',$2,'{"text":"Check original request"}')`,
-          [sourceEventId, sourceEventId],
+          `INSERT INTO coordinator_events(id,"userId","botId",kind,"dedupeKey",payload) VALUES ($1,'owner',$3,'user_message',$2,'{"text":"Check original request"}')`,
+          [sourceEventId, sourceEventId, coordinatorBot],
         );
         let state = await store.route("owner", {
           issueId,
@@ -1626,7 +1631,7 @@ test(
         assert.equal((await usage.balance(billingWorkspaceId)).free,Number(allowance.remaining)-1);
       });
       await exerciseFactoryRecoveryEntry(t, {
-        db, failedReview, png, sha, modelInvoke,
+        db, botId: coordinatorBot, failedReview, png, sha, modelInvoke,
         callCount: () => modelCalls,
         chooseRetry: () => { chosenAction = "retry_check"; },
         latestRequest: () => networkRequests.at(-1),

@@ -16,7 +16,7 @@ const denied = () => new Error('telegramReplySourceUnavailable')
 /** Public reply custody only. Reuses current owner/task/workspace access and
  * the existing APP transaction; no organization policy, quota or audit module. */
 export function createTelegramReplies(app: Pick<Pool, 'connect'>, workspace: Pick<Pool, 'connect'>) {
-  async function guarded<T>(userId: string, botId: string | null, holder: string, raw: PendingTelegramTarget, work: (tx: PoolClient, target: PendingTelegramTarget) => Promise<T>): Promise<T> {
+  async function guarded<T>(userId: string, botId: string, holder: string, raw: PendingTelegramTarget, work: (tx: PoolClient, target: PendingTelegramTarget) => Promise<T>): Promise<T> {
     const target = receipt.parse(raw)
     target.sourceEventIds = [...new Set(target.sourceEventIds)].sort()
     return writeTransaction(app, async tx => {
@@ -28,13 +28,13 @@ export function createTelegramReplies(app: Pick<Pool, 'connect'>, workspace: Pic
           b.id AS "knownBotId",b."workspaceId" AS "botWorkspace"
         FROM coordinator_events e LEFT JOIN issues i ON i.id=e."issueId"
         LEFT JOIN bots b ON b.id=$3::uuid AND b."ownerId"=$2
-        WHERE e.id=ANY($1::uuid[]) AND e."userId"=$2 AND e."botId" IS NOT DISTINCT FROM $3::uuid
+        WHERE e.id=ANY($1::uuid[]) AND e."userId"=$2 AND e."botId"=$3::uuid
           AND e."deliveredAt" IS NOT NULL
-          AND EXISTS (SELECT 1 FROM coordinator_sessions s WHERE s."userId"=$2 AND s."botId" IS NOT DISTINCT FROM $3::uuid
+          AND EXISTS (SELECT 1 FROM coordinator_sessions s WHERE s."userId"=$2 AND s."botId"=$3::uuid
             AND s."leaseHolder"=$4 AND s."leaseUntil">clock_timestamp())
           AND EXISTS (SELECT 1 FROM telegram_links l WHERE l."userId"=$2 AND l."telegramUserId"=$5)
         ORDER BY e.id`, [target.sourceEventIds, userId, botId, holder, target.telegramUserId])
-      if (events.length !== target.sourceEventIds.length || (botId && events[0].knownBotId !== botId)) throw denied()
+      if (events.length !== target.sourceEventIds.length || events[0].knownBotId !== botId) throw denied()
       if (events.some(event => event.issueId && (!event.issueOwnerId || readIssueMetadata(event.issueContent).deletedAt))) throw denied()
       const current = pendingTelegramTargets(events)
       if (current.length !== 1 || current[0].threadId !== target.threadId || current[0].telegramUserId !== target.telegramUserId
@@ -64,10 +64,10 @@ export function createTelegramReplies(app: Pick<Pool, 'connect'>, workspace: Pic
     })
   }
   return {
-    async send(userId: string, botId: string | null, holder: string, target: PendingTelegramTarget, send: (tx: PoolClient) => Promise<void>) {
+    async send(userId: string, botId: string, holder: string, target: PendingTelegramTarget, send: (tx: PoolClient) => Promise<void>) {
       await guarded(userId, botId, holder, target, send)
     },
-    async acknowledge(userId: string, botId: string | null, holder: string, target: PendingTelegramTarget) {
+    async acknowledge(userId: string, botId: string, holder: string, target: PendingTelegramTarget) {
       await guarded(userId, botId, holder, target, async (tx, bound) => {
         // Exact source IDs form the watermark: a new event, even for the same
         // Telegram destination, cannot be acknowledged by an older turn.

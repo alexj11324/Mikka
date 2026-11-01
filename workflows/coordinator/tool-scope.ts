@@ -4,7 +4,7 @@ import { FatalError } from 'workflow'
 import type { ScheduledRead } from '@/lib/schedules/contract'
 
 /** Host-owned execution identity, never part of a model's tool arguments. */
-type ScheduledAuthority = { botId: string | null; occurrence: ScheduledRead }
+type ScheduledAuthority = { botId: string; occurrence: ScheduledRead }
 export type NativeToolScope = {
   holder: string
   turnId: string

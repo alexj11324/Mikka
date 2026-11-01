@@ -73,6 +73,12 @@ stub('../db/index.ts', { db: database, pool: {
 }, withDatabaseClient: () => { throw Error('Factory dispatch is outside handler regression') } })
 stub('./store.ts', { editMemory: () => { throw Error('Unrelated tool outside test') } })
 stub('./wake.ts', { coordinatorEnabled: () => false, wakeCoordinator: async () => {} })
+// The person's Coordinator is an ordinary bot row; MCP resolves it for the authenticated owner.
+const coordinator = '28700000-0000-4000-8000-0000000c0de1'
+stub('./coordinator-bot.ts', {
+  coordinatorBot: async (user: string) => { assert.equal(user, owner); return { botId: coordinator, workspaceId: '28700000-0000-4000-8000-0000000000a1' } },
+  chatBotId: async (user: string, chosen: string | null | undefined) => { assert.equal(user, owner); return chosen ?? coordinator },
+})
 stub('../issue-visibility.ts', { issueVisibility: () => { throw Error('Unrelated tool outside test') } })
 stub('../issue-access.ts', { issueForUser: () => {} })
 stub('../acting-user.ts', { actAs: () => { throw Error('Unrelated tool outside test') } })
@@ -125,6 +131,7 @@ test('real POST MCP schema and producer keep forged owner/source data inside pee
   assert.equal(reply.isError, undefined); assert.equal(value(reply).queued, true)
   assert.equal(events.length, 1)
   assert.equal(events[0].userId, owner); assert.equal(events[0].kind, 'run_report')
+  assert.equal(events[0].botId, coordinator)
   assert.equal(events[0].tier, 'result')
   assert.equal((events[0].payload as { text: string }).text, text)
 })

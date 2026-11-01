@@ -130,8 +130,9 @@ export function Onboarding({ computer = 'none', saveKey, onDone }: { computer?: 
   useEffect(() => {
     if (opened.current || bots === undefined) return
     opened.current = true
-    // listBots is the person's own Bots in this workspace, oldest first: a replay uses the first and creates none (onboarding.md §3).
-    const existing = bots[0]
+    // listBots is the person's own Bots in this workspace, oldest first, with their Coordinator marked:
+    // a replay uses the first one they made and creates none (onboarding.md §3).
+    const existing = bots.find(bot => !bot.coordinator)
     if (existing) {
       setBot(existing); setColor(existing.color as BotColor); setShape(existing.shape as BotShape); setStage('chat')
       void run(() => afterName(existing))

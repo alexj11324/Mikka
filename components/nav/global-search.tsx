@@ -78,7 +78,8 @@ export function GlobalSearch({ open, onOpenChange, onOpenChangeComplete, bots, s
   const shown = (value: string) => !text || matchesQuery(value, text)
 
   const coordinatorValue = `coordinator ${tNav('coordinator')} ${coordinatorLine ?? ''}`
-  const botRows = bots.filter(bot => shown(bot.name))
+  // The Coordinator has its own entry above; its bot row is not listed again.
+  const botRows = bots.filter(bot => !bot.coordinator && shown(bot.name))
   const historyRows = mergeById(
     sessions.filter(session => shown(`${sessionName(session.title)} ${session.preview ?? ''}`)),
     search.state.history.items.filter((item): item is HistoryHit => item.type === 'history'),

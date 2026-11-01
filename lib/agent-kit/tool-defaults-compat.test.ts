@@ -6,6 +6,8 @@ import { COMPUTER_TOOL_IDS, FACTORY_TOOL_IDS } from './registry'
 import { makeSnapshot, parseDefinition, exportDefinition, importDefinition, digest } from './definition'
 import { AgentKitStore, type AgentExecution } from './store'
 import { skillEvaluationCommandSchema } from '../self-improvement/schema'
+/** The person's Coordinator: an ordinary bot row, marked as the Coordinator. */
+const COORDINATOR_BOT = '00000000-0000-4000-8000-0000000c0de1'
 
 const stub = (path: string, namedExports: Record<string, unknown>) => mock.module(new URL(path, import.meta.url).href, { namedExports })
 const calls: {name: string; args: unknown[]}[] = []
@@ -20,10 +22,10 @@ let service: typeof import('./service')
 before(async () => { registry = await import('../../workflows/coordinator/tools'); service = await import('./service') })
 
 test('a new builtin execution retains every existing core tool from the real integration factories', () => {
-  const previous = registry.coordinatorTools('synthetic-owner', null)
+  const previous = registry.coordinatorTools('synthetic-owner', COORDINATOR_BOT, undefined, { coordinator: true })
   assert.ok(previous.read_gmail_message, 'the existing host exposes Gmail full reads')
   const execution: AgentExecution = { id: '10000000-0000-4000-8000-000000000001', status: 'running', snapshot: makeSnapshot('10000000-0000-4000-8000-000000000002', 1, DEFAULT_AGENT_DEFINITION, 'host', { harness: 'ai_sdk', model: 'existing' }) }
-  const versioned = registry.coordinatorTools('synthetic-owner', null, undefined, { execution })
+  const versioned = registry.coordinatorTools('synthetic-owner', COORDINATOR_BOT, undefined, { coordinator: true,  execution })
   assert.deepEqual(Object.keys(versioned).sort(), [...Object.keys(previous), 'load_skill'].sort())
 })
 
@@ -43,7 +45,7 @@ test('all exposed tool schemas have object roots and skill evaluation retains st
     for (const key of factoryGateKeys) process.env[key] = '1'
     const run = execution()
     run.snapshot.runtime = { harness: 'ai_sdk', model: 'openai/gpt-6-luna' }
-    const tools = registry.createCoordinatorRegistry(owner, null, scope, { execution: run, computerEnabled: true, mailboxEnabled: true, writeEnabled: true })
+    const tools = registry.createCoordinatorRegistry(owner, COORDINATOR_BOT, scope, { coordinator: true,  execution: run, computerEnabled: true, mailboxEnabled: true, writeEnabled: true })
     assert.ok(tools.skill_evaluation)
     assert.ok(tools.append_notion_paragraph)
     for (const [name, tool] of Object.entries(tools)) assert.equal((await asSchema(tool.inputSchema).jsonSchema).type, 'object', name)
@@ -165,14 +167,15 @@ test('Factory gates narrow frozen grants, preserve ordinary tools and keep named
       process.env.MIKKA_ISSUE_TOOLS_ENABLED = issues ? '1' : '0'
       process.env.MIKKA_FACTORY_ROUTING_ENABLED = routing ? '1' : '0'
       process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED = lifecycle ? '1' : '0'
-      for (const botId of [null, bot]) for (const definition of definitions) {
+      for (const botId of [COORDINATOR_BOT, bot]) for (const definition of definitions) {
         calls.length = 0
+        const coordinator = botId === COORDINATOR_BOT
         const run = execution(definition), snapshot = JSON.stringify(run.snapshot)
-        const tools = registry.coordinatorTools(owner, botId, scope, {execution: run})
+        const tools = registry.coordinatorTools(owner, botId, scope, {coordinator, execution: run})
         const availableFactoryTools = new Set<string>(issues && routing ? [
           ...scopedRoutingFactoryTools,
           ...(lifecycle ? scopedLifecycleFactoryTools : []),
-          ...(lifecycle && botId === null ? FACTORY_TOOL_IDS : []),
+          ...(lifecycle && coordinator ? FACTORY_TOOL_IDS : []),
         ] : [])
         const expected = definition.tools.filter(name =>
           (issues || (name !== 'create_issue' && name !== 'update_issue')) &&
@@ -181,7 +184,7 @@ test('Factory gates narrow frozen grants, preserve ordinary tools and keep named
         assert.ok(tools.web_search)
         assert.ok(tools.dispatch_run)
         for (const name of Object.keys(tools)) assert.ok(run.snapshot.effectiveTools.includes(name), `${name} was not granted by the snapshot`)
-        if (botId !== null) for (const name of coordinatorOnly) assert.equal(tools[name], undefined, `${name} cannot use a builtin-only step for a named Bot`)
+        if (!coordinator) for (const name of coordinatorOnly) assert.equal(tools[name], undefined, `${name} cannot use a builtin-only step for a named Bot`)
         if (tools.list_factory_requests) {
           await invoke(tools, 'list_factory_requests', {})
           assert.deepEqual(calls, [{name: 'factory-read-scoped', args: [owner, scope, botId]}])
@@ -191,7 +194,7 @@ test('Factory gates narrow frozen grants, preserve ordinary tools and keep named
     }
     const unknown = execution()
     unknown.snapshot.effectiveTools = [...unknown.snapshot.effectiveTools, 'unknown_factory_capability']
-    assert.throws(() => registry.coordinatorTools(owner, null, scope, {execution: unknown}), /agentToolUnavailable:unknown_factory_capability/)
+    assert.throws(() => registry.coordinatorTools(owner, COORDINATOR_BOT, scope, { coordinator: true, execution: unknown}), /agentToolUnavailable:unknown_factory_capability/)
   } finally {
     factoryGateKeys.forEach((key, i) => { if (saved[i] === undefined) delete process.env[key]; else process.env[key] = saved[i] })
   }
@@ -229,7 +232,7 @@ test('Factory dispatch and ordinary dispatch keep separate host entry points and
   try {
   for (const key of factoryGateKeys) process.env[key] = '1'
   calls.length = 0
-  const tools = registry.coordinatorTools(owner, null, scope, {execution: execution()})
+  const tools = registry.coordinatorTools(owner, COORDINATOR_BOT, scope, { coordinator: true, execution: execution()})
   const ordinary = {agentId: bot, repo: 'https://github.com/synthetic-owner/synthetic-repository.git', issueId: bot}
   const factory = {agentId: bot, deviceRepoId: bot, binding: {taskId: bot, issueId: bot, attemptId: bot, revision: 1, candidateId: null}}
   assert.equal((await asSchema(tools.dispatch_run.inputSchema).validate!(ordinary)).success, true)
@@ -237,12 +240,12 @@ test('Factory dispatch and ordinary dispatch keep separate host entry points and
   await invoke(tools, 'dispatch_run', ordinary)
   await invoke(tools, 'dispatch_factory_run', factory)
   assert.deepEqual(calls, [
-    {name: 'ordinary-dispatch', args: [owner, {...ordinary,requestKey:'dispatch:synthetic-call'}, scope, null, execution()]},
+    {name: 'ordinary-dispatch', args: [owner, {...ordinary,requestKey:'dispatch:synthetic-call'}, scope, COORDINATOR_BOT, execution()]},
     {name: 'factory-dispatch', args: [owner, factory, scope]},
   ])
   const saved = execution(parseDefinition({...DEFAULT_AGENT_DEFINITION, tools: DEFAULT_AGENT_DEFINITION.tools.filter(name => !(FACTORY_TOOL_IDS as readonly string[]).includes(name))}))
   const snapshot = JSON.stringify(saved)
-  const replayed = registry.coordinatorTools(owner, null, scope, {execution: saved})
+  const replayed = registry.coordinatorTools(owner, COORDINATOR_BOT, scope, { coordinator: true, execution: saved})
   assert.ok(replayed.dispatch_run)
   for (const name of FACTORY_TOOL_IDS) assert.equal(replayed[name], undefined)
   assert.equal(JSON.stringify(saved), snapshot)

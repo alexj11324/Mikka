@@ -235,7 +235,7 @@ async function moveToCloud(run: Run, cloud: CloudTarget, attempt: number, now: D
     const { queueCloudRun } = await import('@/lib/computer/queue-run')
     const repo = await ensureDeviceRepository(run.userId, cloud.deviceId, cloud.remoteUrl)
     const { runId } = await queueCloudRun(pool, actor, { botId: cloud.botId, issueId: run.issueId, agentId: cloud.agentId, deviceRepoId: repo.id, title: issue.title, body: tiptapToText(issue.content),
-      note: retryNote(attempt), reportToCoordinator: run.botId === null, idempotencyKey: `retry:${run.id}`,
+      note: retryNote(attempt), withoutBot: run.botId === null, idempotencyKey: `retry:${run.id}`,
       ...(run.agentDefinition?.harness === cloud.harness && run.agentDefinition?.model ? { model: run.agentDefinition.model } : {}) })
     await db.update(agentRuns).set({ retryOf: run.id, attempt, updatedAt: now }).where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, run.userId)))
     await recordCoordinatorEvent(db, runRetriedEvent(run, { runId, attempt, maxAttempts: MAX_RUN_ATTEMPTS, movedTo: { kind: 'cloud' } }))

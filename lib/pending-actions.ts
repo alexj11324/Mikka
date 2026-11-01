@@ -57,7 +57,7 @@ export async function decidePendingAction(userId: string, id: string, approve: b
       const action = { id: request.id, userId, action: request.action, input: request.input }
       if (tasks.length) {
         for (const task of tasks) await recordCoordinatorEvent(tx, actionDecidedEvent(action, { status, error: null, outcome: {} }, task))
-      } else await recordCoordinatorEvent(tx, actionDecidedEvent(action, { status, error: null, outcome: {} }))
+      } else await recordCoordinatorEvent(tx, actionDecidedEvent(action, { status, error: null, outcome: {} }, { botId: request.botId }))
     })
     const status = approve ? 'done' as const : 'declined' as const
     await wakeCoordinator(userId)
@@ -97,7 +97,7 @@ export async function decidePendingAction(userId: string, id: string, approve: b
     }
     await db.update(pendingActions).set({ status, error, result: outcome }).where(eq(pendingActions.id, row.id))
   }
-  await recordCoordinatorEvent(db, actionDecidedEvent({ id: row.id, userId, action: row.action, input: row.action === 'credential_operation' || row.action === 'browser_operation' ? { summary: (row.input as Record<string, unknown>).summary } : row.input }, { status, error, outcome }))
+  await recordCoordinatorEvent(db, actionDecidedEvent({ id: row.id, userId, action: row.action, input: row.action === 'credential_operation' || row.action === 'browser_operation' ? { summary: (row.input as Record<string, unknown>).summary } : row.input }, { status, error, outcome }, { botId: row.botId }))
   await wakeCoordinator(userId)
   return { status, error }
 }
@@ -138,7 +138,7 @@ async function decidePullRequest(userId: string, id: string, approve: boolean, r
     if (!request || !input.success) throw new ActionFailureError('pendingActionUnavailable')
     await tx.update(runPublications).set({ status: 'pending', workflowRunId: null, updatedAt: new Date() })
       .where(and(eq(runPublications.runId, input.data.runId), eq(runPublications.userId, userId), eq(runPublications.status, 'awaiting_approval')))
-    await recordCoordinatorEvent(tx, actionDecidedEvent({ id: request.id, userId, action: request.action, input: request.input }, { status, error: null, outcome: {} }))
+    await recordCoordinatorEvent(tx, actionDecidedEvent({ id: request.id, userId, action: request.action, input: request.input }, { status, error: null, outcome: {} }, { botId: request.botId }))
     return input.data.runId
   })
   // A publication that is not waiting (already settled) is left alone.

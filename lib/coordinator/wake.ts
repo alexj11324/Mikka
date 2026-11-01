@@ -9,6 +9,7 @@ import { runTestFixture } from '@/lib/run-test-fixture'
 import { runTriageBatch, TRIAGE_BATCH_BUDGET_MS } from './triage-batch'
 import { pool } from '@/lib/db'
 import { createWakeRecovery, deliverWake, type WakeScope } from './wake-recovery'
+import { coordinatorBot } from './coordinator-bot'
 
 const recovery = createWakeRecovery(pool)
 
@@ -23,7 +24,7 @@ export function coordinatorEnabled(): boolean {
 }
 
 /** No answer leaves the event pending; it does not become background, result or a request for human approval. */
-export async function triageInbox(userId: string, botId: string | null = null): Promise<void> {
+export async function triageInbox(userId: string, botId: string): Promise<void> {
   'use step'
   const { hostedBillingScope } = await import('@/lib/abuse/context')
   const { executionWorkspace } = await import('@/lib/execution-settings')
@@ -53,6 +54,9 @@ export async function triageInbox(userId: string, botId: string | null = null): 
 export async function wakeCoordinator(userId: string): Promise<void> {
   if (!coordinatorEnabled()) return
   try {
+    // Resolving the Coordinator first moves any of its chat still stored the old way onto its bot row.
+    // A person with no workspace to resolve has no Coordinator turn to start; their bots still wake.
+    await coordinatorBot(userId).catch(() => undefined)
     await releaseAttention(userId)
     for (const botId of await wakingChats(userId)) {
       await wakeChat({ userId, botId })
@@ -87,7 +91,8 @@ export async function retryCoordinatorWakes(deadline = Date.now() + 45_000) {
   counts.due = scopes.length
   for (const scope of scopes) {
     if (Date.now() >= deadline) { counts.deferred++; continue }
-    counts[await wakeChat(scope)]++
+    try { counts[await wakeChat({ userId: scope.userId, botId: scope.botId ?? (await coordinatorBot(scope.userId)).botId })]++ }
+    catch { counts.failed++ }
   }
   counts.exhausted = await recovery.exhausted()
   return counts

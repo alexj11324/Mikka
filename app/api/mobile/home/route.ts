@@ -1,7 +1,8 @@
 import { and, eq, inArray, sql } from 'drizzle-orm'
+import { listOwnerBots } from '@/lib/coordinator/coordinator-bot'
 import { withRequestLog, noteLogUser } from '@/lib/request-log'
 import { db } from '@/lib/db'
-import { agentRuns, bots } from '@/lib/db/schema'
+import { agentRuns } from '@/lib/db/schema'
 import { botChats } from '@/lib/coordinator/store'
 import { chatPreview } from '@/lib/agent-history'
 import { chatPreferences } from '@/lib/chat-preferences'
@@ -19,7 +20,7 @@ const RUNNING = ['queued', 'preparing', 'running', 'finishing'] as const
 /**
  * `GET /api/mobile/home`: what the app's drawer shows: the person, their
  * workspace, their bots with each chat's latest line as plain text (an empty
- * string for a card with no words), and the counts beside
+ * string for a card with no words; the Coordinator first, marked `coordinator`), and the counts beside
  * 建议 and 线程 (docs/design/mobile.md, "Where it lives").
  */
 async function handleGET(request: Request) {
@@ -28,8 +29,8 @@ async function handleGET(request: Request) {
   if (!user) return unauthorized()
   const context = await loadWorkspaceContext(undefined, user)
   const [botRows, chats, suggestions, [counts], preferences] = await Promise.all([
-    db.select({ id: bots.id, name: bots.name, color: bots.color, shape: bots.shape }).from(bots)
-      .where(and(eq(bots.ownerId, user.id), eq(bots.workspaceId, context.workspace.id), sql`not exists (select 1 from coordinator_bots cb where cb."botId" = ${bots.id})`)).orderBy(bots.createdAt),
+    // The Coordinator first, marked `coordinator` (lib/coordinator/coordinator-bot.ts listOwnerBots).
+    listOwnerBots(user.id, context.workspace.id),
     botChats(user.id),
     listSuggestions(user.id),
     db.select({

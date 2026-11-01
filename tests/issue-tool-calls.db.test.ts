@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
+import { seedCoordinator } from './support/coordinator-bot'
 import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
 import { normalizeRepository } from '@mikka/protocol/repository'
 
@@ -37,6 +38,8 @@ test('actual issue actions commit one issue per tool call, roll back partial wri
   try {
     assert.equal((await pool.query('show server_version_num')).rows[0].server_version_num.slice(0, 2), '17')
     for (const id of [owner, stranger]) await pool.query('insert into "user"(id,name,email,"emailVerified","createdAt","updatedAt") values($1,$1,$2,false,now(),now())', [id, `${id}@example.invalid`])
+    // The owner's Coordinator is an ordinary bot row; its tools write as that bot.
+    const coordinator = (await seedCoordinator(owner)).botId
     await pool.query('insert into agents (id,"userId",harness,name) values ($1,$2,\'codex\',\'Legacy fixture\')', [legacyAgent, stranger])
     process.env.MIKKA_ISSUE_TOOLS_ENABLED = '0'
     const legacy = await createIssue(stranger, { title: 'Existing MCP path without rollout', assigneeAgentId: null }, actor)
@@ -57,7 +60,7 @@ test('actual issue actions commit one issue per tool call, roll back partial wri
     process.env.MIKKA_ISSUE_TOOLS_ENABLED = '1'
     // The actual registered Workflow tool invokes its scoped step and shared
     // actions. No test-only issue writer stands in for the Coordinator.
-    const tools = createCoordinatorRegistry(owner, null)
+    const tools = createCoordinatorRegistry(owner, coordinator, undefined, { coordinator: true })
     const create = () => tools.create_issue!.execute!(input, { toolCallId: callId, messages: [], context: {} })
     const results = await Promise.all([create(), create()])
     assert.ok('id' in results[0], JSON.stringify(results[0]))
@@ -130,14 +133,16 @@ test('actual issue actions commit one issue per tool call, roll back partial wri
     assert.equal((await pool.query('select title from issues where id=$1', [id])).rows[0].title, 'Later user request')
     assert.deepEqual(await updateIssue(stranger, { issueId: id, title: 'Unauthorized' }, actor, `foreign-${randomUUID()}`), { error: 'issueNotFound' })
     assert.ok('id' in await createIssue(stranger, { title: 'Separate owner' }, actor, callId), 'same tool call id is scoped to owner')
-    assert.equal((await pool.query('select count(*) from issue_versions where "userId"=$1 and actor_type=\'system\' and actor_id=\'coordinator\'', [owner])).rows[0].count, String(await count('issue_versions') - 1))
+    // MCP writes name the Coordinator by its old system actor; the registered tools write as its bot row.
+    assert.equal((await pool.query('select count(*) from issue_versions where "userId"=$1 and actor_type=\'system\' and actor_id in (\'coordinator\', $2)', [owner, coordinator])).rows[0].count, String(await count('issue_versions') - 1))
+    assert.ok(Number((await pool.query('select count(*) from issue_versions where "userId"=$1 and actor_type=\'system\' and actor_id=$2', [owner, coordinator])).rows[0].count) > 0, 'the registered tools write as the Coordinator bot')
     assert.deepEqual((await pool.query('SELECT id FROM issue_versions WHERE "userId"=$1 AND actor_type=\'user\' AND actor_id=$1', [owner])).rows, [{ id: humanVersion.id }], 'only the explicit human promotion differs from the Coordinator actor matrix')
     // Exercise the actual Factory tool -> scoped Workflow step -> existing issue
     // actions -> durable receipt -> Factory store, without a model/provider.
     process.env.MIKKA_FACTORY_ROUTING_ENABLED = '1'
     const sourceId=randomUUID()
-    await pool.query(`INSERT INTO coordinator_events(id,"userId",kind,"dedupeKey",payload) VALUES($1,$2,'user_message',$3,'{"text":"Create a task to keep the API compatible"}')`,[sourceId,owner,sourceId])
-    const factoryTools=createCoordinatorRegistry(owner,null)
+    await pool.query(`INSERT INTO coordinator_events(id,"userId","botId",kind,"dedupeKey",payload) VALUES($1,$2,$4,'user_message',$3,'{"text":"Create a task to keep the API compatible"}')`,[sourceId,owner,sourceId,coordinator])
+    const factoryTools=createCoordinatorRegistry(owner,coordinator,undefined,{coordinator:true})
     const request={sourceEventId:sourceId,title:'Factory intake fixture',body:'Keep the API compatible',rationale:'Actual personal source fixture',missingInformation:[],missingPermissions:[],needsSpec:false}
     type Snapshot=import('../lib/factory/store').FactorySnapshot
     const invoke=factoryTools.intake_factory_request!.execute! as unknown as (input:unknown,options:{toolCallId:string;messages:never[];context:object})=>Promise<Snapshot|{error:string}>
@@ -158,7 +163,7 @@ test('actual issue actions commit one issue per tool call, roll back partial wri
     // Only this disposable owner's repository has a synthetic persisted grant.
     // The real dispatch still executes the ordinary admission transaction.
     await pool.query('INSERT INTO repository_settings("userId","remoteKey",push) VALUES($1,$2,$3)',[owner,repository.key,JSON.stringify({approved:true,remote:'origin',approvedByUserId:owner,approvedAt:new Date().toISOString()})])
-    const lifecycleTools=createCoordinatorRegistry(owner,null)
+    const lifecycleTools=createCoordinatorRegistry(owner,coordinator,undefined,{coordinator:true})
     const first=routed[0];assert.ok('task' in first)
     const {factoryBinding}=await import('../lib/factory/dispatch')
     const dispatch=lifecycleTools.dispatch_factory_task!.execute! as unknown as (input:unknown,options:{toolCallId:string;messages:never[];context:object})=>Promise<import('../lib/factory/dispatch').FactoryDispatchResult|{error:string}>

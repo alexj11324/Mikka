@@ -102,7 +102,7 @@ async function queueCloudContinuation(run: Run, cloud: CloudBinding, key: RunApi
   const { queueCloudRun } = await import('@/lib/computer/queue-run')
   const actor = { userId: run.userId, workspaceId: cloud.workspaceId }
   const { runId } = await queueCloudRun(pool, actor, { botId: cloud.botId, issueId: run.issueId, agentId: run.agentId, deviceRepoId: run.deviceRepoId, title: issue.title, body: tiptapToText(issue.content),
-    note: quotaContinuationNote(), reportToCoordinator: run.botId === null, idempotencyKey: `quota:${run.id}:${key ? 'api_key' : 'original'}`,
+    note: quotaContinuationNote(), withoutBot: run.botId === null, idempotencyKey: `quota:${run.id}:${key ? 'api_key' : 'original'}`,
     ...(key ? { apiKey: key } : run.agentDefinition?.model ? { model: run.agentDefinition.model } : {}) })
   await db.update(agentRuns).set({ retryOf: run.id, attempt: run.attempt, updatedAt: new Date() }).where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, run.userId)))
   await (await import('@/lib/run-leases')).startThreadMachine(actor, runId)

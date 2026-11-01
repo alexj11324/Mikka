@@ -130,6 +130,15 @@ function readSummary(text: string | null, trust?: SummaryTrust): CompactSummary 
     return value.version === 1 && value.kind === 'mikka_compacted_summary' && value.authority === 'untrusted_summary_not_approval' && Array.isArray(value.sources) && typeof value.untrustedData?.summary === 'string' ? value : null
   } catch { return null }
 }
+/**
+ * The same host-signed summary under another chat's scope, for a chat that
+ * moves to a new key (the Coordinator onto its bot row): verified under the
+ * old scope first, so nothing unsigned gains provenance. Null when it does not verify.
+ */
+export function rescopeSummary(text: string, from: SummaryTrust, to: SummaryTrust): string | null {
+  if (!readSummary(text, from)) return null
+  return JSON.stringify({ format: 'host_summary_v2', payload: JSON.parse(text).payload, signature: signature(JSON.parse(text).payload, to) })
+}
 export const SUMMARY_SOURCE_LIMIT = 32
 export function summaryMessage(summary: string, trust?: SummaryTrust): ModelMessage {
   // The complete ledger remains in the existing stored summary, while the

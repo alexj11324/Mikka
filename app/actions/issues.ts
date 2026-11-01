@@ -22,6 +22,7 @@ import { createTeamIssueForUser } from '@/lib/team-issue-create'
 import { promoteExistingIssueForUser } from '@/lib/team-issue-promotion'
 import { scheduleIssueEffect } from '@/lib/issue-effects'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
+import { coordinatorBot } from '@/lib/coordinator/coordinator-bot'
 import { issueDoneEvent } from '@/lib/coordinator-events'
 import { changeIssueScopeLocally, previewPersonalScope } from '@/lib/issue-scope-store'
 import { TASK_SCOPES } from '@/lib/task-identifier'
@@ -111,6 +112,8 @@ export async function saveIssue(input: { id?: string; revision?: number; title: 
     const observedScopeVersion = existing?.scopeVersion ?? null
     if (input.id && (!Number.isInteger(input.revision) || (input.revision ?? 0) < 1)) return { error: 'issueRevisionInvalid' }
     let doneEvent = false
+    // Marking a task done tells its owner's Coordinator; its bot row is resolved here, before the transaction.
+    const coordinator = existing && existing.status !== 'done' && parsed.data.status === 'done' ? (await coordinatorBot(ownerId, { backfill: false })).botId : null
     try {
       const result = await db.transaction(async tx => {
         if (!id) {
@@ -122,7 +125,7 @@ export async function saveIssue(input: { id?: string; revision?: number; title: 
         if (!latest) return { error: 'issueNotFound' }
         requireLockedIssueScope(latest, userId, observedScopeVersion!)
         ;[issue] = await tx.update(issues).set({ ...parsed.data, content: latest.content, revision: input.revision! + 1, updatedAt: new Date() }).where(and(eq(issues.id, id), eq(issues.userId, ownerId), eq(issues.revision, input.revision!))).returning()
-        const done = issue && issueDoneEvent(latest, issue)
+        const done = issue && coordinator && issueDoneEvent(latest, issue, coordinator)
         if (done) {
           await recordCoordinatorEvent(tx, done)
           doneEvent = true

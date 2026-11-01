@@ -113,13 +113,15 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     assert.equal(await count('SELECT count(*)::int AS n FROM bot_cloud_runtimes WHERE "botId"=$1', [n.botId]), 0)
   })
 
-  await t.test('the Coordinator (no bot): its own bot row gets the runtime, once, and never borrows a bot\'s', async () => {
+  await t.test('the Coordinator: its own bot row gets the runtime, once, and never borrows a bot\'s', async () => {
     const c = await person('coordinator')
     // The person already has a bot named Coordinator: it keeps its name and stays theirs.
     const theirs = randomUUID()
     await pool.query(`INSERT INTO bots (id,"workspaceId","ownerId",name) VALUES ($1,$2,$3,'Coordinator')`, [theirs, c.workspaceId, c.id])
     const before = provisioned
-    const dispatchAsCoordinator = () => steps.dispatchRun(c.id, { issueId: c.issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, null)
+    const { coordinatorBot } = await import('../lib/coordinator/coordinator-bot')
+    const coordinator = (await coordinatorBot(c.id)).botId
+    const dispatchAsCoordinator = () => steps.dispatchRun(c.id, { issueId: c.issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, coordinator)
     const first = await dispatchAsCoordinator() as unknown as { runId: string; status: string }
     assert.equal(first.status, 'queued', JSON.stringify(first))
     const mapped = (await pool.query(`SELECT cb."botId",b.name FROM coordinator_bots cb JOIN bots b ON b.id=cb."botId" WHERE cb."ownerId"=$1 AND cb."workspaceId"=$2`, [c.id, c.workspaceId])).rows
@@ -127,7 +129,8 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     assert.equal(mapped[0].name, 'Coordinator 2')
     assert.notEqual(mapped[0].botId, theirs)
     const run = (await pool.query(`SELECT r."botId" AS "runBotId",b."botId" FROM agent_runs r JOIN computer_run_bindings b ON b."runId"=r.id WHERE r.id=$1`, [first.runId])).rows[0]
-    assert.deepEqual(run, { runBotId: null, botId: mapped[0].botId }, 'the runtime is the Coordinator bot\'s; the run still reports to the Coordinator chat')
+    assert.equal(mapped[0].botId, coordinator)
+    assert.deepEqual(run, { runBotId: coordinator, botId: coordinator }, 'the runtime and the run are the Coordinator bot\'s, so the run reports to its chat')
     assert.equal(await count('SELECT count(*)::int AS n FROM bot_cloud_runtimes WHERE "botId" = ANY($1)', [[c.botId, theirs]]), 0, 'no other bot\'s runtime is created or borrowed')
     const second = await dispatchAsCoordinator() as unknown as { status: string }
     assert.equal(second.status, 'queued')
@@ -142,7 +145,7 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     const { db } = await import('../lib/db')
     const { eq } = await import('drizzle-orm')
     const [row] = await db.select({ botId: runBotId }).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).where(eq(agentRuns.id, first.runId))
-    assert.equal(row.botId, null, 'the thread opens in the Coordinator chat')
+    assert.equal(row.botId, coordinator, 'the thread belongs to the Coordinator bot row, which the left column opens as the Coordinator chat')
   })
 
   await t.test('MIKKA_CLOUD_COMPUTER_TASKS=0: no runtime is created and the bot shows the card', async () => {

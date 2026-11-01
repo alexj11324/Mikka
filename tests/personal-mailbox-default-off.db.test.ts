@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import test from 'node:test'
+import { seedCoordinator } from './support/coordinator-bot'
 import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
 import { REPO_ORIGIN_HEADER } from '@mikka/protocol/device'
 import { normalizeRepository } from '@mikka/protocol/repository'
@@ -97,11 +98,12 @@ test('default-off claim, MCP and Coordinator work on the tracked schema with the
       assert.equal((await mailbox(request('/v1/mailbox', runToken, { action: 'inbox' }))).status, 503)
     })
     await t.test('real Coordinator catalogue and callback do not load mailbox schema when off', async () => {
-      const registry = createCoordinatorRegistry(owner, null)
+      const coordinator = (await seedCoordinator(owner)).botId
+      const registry = createCoordinatorRegistry(owner, coordinator, undefined, { coordinator: true })
       assert.ok('dispatch_run' in registry && 'send_to_run' in registry)
       assert.equal(Object.keys(registry).some(name => name.startsWith('mailbox_')), false)
-      assert.deepEqual(await mailboxCatalogue(owner, null, randomUUID()), [])
-      assert.deepEqual(await personalMailbox(owner, null, { action: 'inbox' }), { error: 'personal_mailbox_unavailable' })
+      assert.deepEqual(await mailboxCatalogue(owner, coordinator, randomUUID()), [])
+      assert.deepEqual(await personalMailbox(owner, coordinator, { action: 'inbox' }), { error: 'personal_mailbox_unavailable' })
     })
     await t.test('actual revoked-run bearer fails authentication without querying new schema', async () => {
       assert.ok(runToken)
