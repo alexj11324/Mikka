@@ -194,6 +194,11 @@ export function loadDeviceFile(raw: unknown): DeviceFile {
 }
 
 const HARNESS_RESCAN_MS = 5 * 60_000
+
+/** Whose model credential a cloud run uses: the subscription binding's owner, or for an API-key run the run owner the server assigned the computer to. */
+function credentialOwner(assignment: RunAssignment): string | undefined {
+  return assignment.subscriptionBinding?.ownerId ?? (assignment.modelCredential ? assignment.computer?.ownerId : undefined)
+}
 const SANDBOX_REPAIR_RETRY_MS = 60 * 60_000
 
 /** A person may install a missing tool themselves; that alone is worth a new attempt. */
@@ -343,7 +348,7 @@ export class Daemon {
       const liveComputer = (runId: string, display: string | undefined) => {
         const entry = this.journal.get(runId)
         const computer = entry?.assignment.computer
-        if (this.stopped || !this.registered || !computer || computer.display !== display || computer.ownerId !== entry?.assignment.subscriptionBinding?.ownerId || !this.supervisor.computerRunAllowed(runId)) throw new Error('Cloud computer run unavailable')
+        if (this.stopped || !this.registered || !computer || computer.display !== display || !entry || computer.ownerId !== credentialOwner(entry.assignment) || !this.supervisor.computerRunAllowed(runId)) throw new Error('Cloud computer run unavailable')
         return computer
       }
       const executeOrdinary = async (current: typeof driver, call: import('./computer/driver.mjs').ComputerCall, display: string | undefined, runId: string, assertLive: () => void) => {
@@ -426,6 +431,7 @@ export class Daemon {
       worktrees: this.worktrees,
       adapters,
       startSubscription: hosted?.start ?? this.localSubscriptions()?.start,
+      startCredential: hosted?.start,
       prepareRunMailbox: this.options.link.prepareRunMailbox?.bind(this.options.link),
       prepareRunToolApproval: this.options.link.prepareRunToolApproval?.bind(this.options.link),
       verifyRunPolicy: this.options.link.verifyRunPolicy ? async (assignment,signal) => {
@@ -1228,7 +1234,7 @@ export class Daemon {
         throw new DaemonError(DAEMON_RPC_ERRORS.unauthorized, message)
       }
     }
-    if (assignment.computer && (!this.cloudComputerBroker || !assignment.subscriptionBinding || assignment.computer.ownerId !== assignment.subscriptionBinding.ownerId)) throw new Error('Cloud computer runtime unavailable')
+    if (assignment.computer && (!this.cloudComputerBroker || assignment.computer.ownerId !== credentialOwner(assignment))) throw new Error('Cloud computer runtime unavailable')
     return await this.supervisor.start(assignment)
   }
 

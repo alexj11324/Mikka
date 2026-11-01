@@ -242,6 +242,26 @@ export type SetupRecipe = z.infer<typeof setupRecipeSchema>
 
 export const REPO_ORIGIN_HEADER = "x-mikka-repo-origin-check"
 
+/** Sent by a daemon that injects `modelCredential`; a run frozen on an API key is handed only to one. */
+export const MODEL_CREDENTIAL_HEADER = "x-mikka-model-credential"
+
+const credentialKey = z.string().min(1).max(4_096).refine(value => !/[\r\n\0]/.test(value))
+const credentialBaseUrl = z.url().max(500).refine(value => {
+  const url = new URL(value)
+  return url.protocol === "https:" && !url.username && !url.password && !url.search && !url.hash
+})
+
+/**
+ * The model credential a run is given at claim (orchestration.md § 6): an
+ * API key, or a provider's base URL, protocol and key. The daemon's
+ * `RunCredential` (packages/daemon/src/agents/run-credential.ts).
+ */
+export const runModelCredentialSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("api_key"), key: credentialKey }).strict(),
+  z.object({ kind: z.literal("provider"), protocol: z.enum(["anthropic", "openai"]), baseUrl: credentialBaseUrl, key: credentialKey }).strict(),
+])
+export type RunModelCredential = z.infer<typeof runModelCredentialSchema>
+
 /** A repository record and its identity-scoped settings. */
 export const deviceRepoSchema = z.object({
   repoId: id,
@@ -304,6 +324,12 @@ export const runAssignmentSchema = z.object({
     bindingId: z.uuid(), ownerId: z.string().min(1).max(128), workspaceId: z.uuid(),
     consumerId: z.uuid(), route: z.enum(['codex_cli', 'claude_code_cli']),
   }).strict().optional(),
+  /**
+   * The run's own API key, opened for this claim only. Never with
+   * `subscriptionBinding`. The daemon keeps it in memory and hands it only
+   * to the run's Agent process or container; it is never journaled.
+   */
+  modelCredential: runModelCredentialSchema.optional(),
   /** Local host authority comes only from the server's owner-bound Bot run. */
   localComputer: z.object({
     botId: z.uuid(), ownerId: z.string().min(1).max(128), workspaceId: z.uuid(),
@@ -415,7 +441,7 @@ export const runAssignmentSchema = z.object({
   skillReceipt: skillAssignmentReceiptSchema.optional(),
   /** Frozen by the server benchmark ledger; never extracted from model output. */
   benchmark: runBenchmarkContext.optional(),
-})
+}).refine(value => !(value.modelCredential && value.subscriptionBinding), { message: "A run has one model credential", path: ["modelCredential"] })
 export type RunAssignment = z.infer<typeof runAssignmentSchema>
 
 /**

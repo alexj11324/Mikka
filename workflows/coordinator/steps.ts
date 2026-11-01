@@ -346,10 +346,11 @@ export async function dispatchRun(userId: string, input: { issueId: string; agen
         if (!event || event.userId!==userId || event.botId!==botId || event.payload?.taskDestination) throw new ActionFailureError('runInvalid')
       }
       if (approvedRepositoryKey) throw new ActionFailureError('runInvalid')
-      // The bot's own runtime, created on first use; the Coordinator's lives on its own hidden bot.
+      // The bot's own runtime, created on first use; the Coordinator's lives on its own bot row.
+      // An API-key model binds no subscription to it.
       const autoRuntime=await import('@/lib/computer/auto-runtime')
       const actor={userId,workspaceId:target.workspaceId}
-      const runtime=await autoRuntime.ensureBotCloudRuntime(pool,actor,botId ?? await autoRuntime.ensureCoordinatorBot(pool,actor),{harness:target.harness,model:target.model})
+      const runtime=await autoRuntime.ensureBotCloudRuntime(pool,actor,botId ?? await autoRuntime.ensureCoordinatorBot(pool,actor),{harness:target.harness,model:'apiKey' in target ? undefined : target.model})
       const cloud = runtime ? await dispatchComputerTask(userId,{botId:runtime.botId,issueId:input.issueId,harness:runtime.harness,note:input.note,model:target.model,repo:input.repo,reportToCoordinator:botId===null},`rule:${input.requestKey ?? requestEventId ?? crypto.randomUUID()}`,scope,execution) : { error: 'cloudComputerUnavailable' as const }
       // The person's own E2B refused (capacity, quota, key): same as no cloud.
       if (!('error' in cloud) || cloud.error !== 'cloudComputerUnavailable') return cloud
