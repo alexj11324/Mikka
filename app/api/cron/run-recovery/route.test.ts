@@ -11,6 +11,10 @@ let reconciled = 0
 mock.module(new URL('../../../../lib/computer/reconcile.ts', import.meta.url).href, { namedExports: {
   reconcileCloudMachines: async () => { reconciled++; return 2 },
 } })
+let swept = 0
+mock.module(new URL('../../../../lib/cloud-computer/thread-machines.ts', import.meta.url).href, { namedExports: {
+  endClosedTaskMachines: async () => { swept++; return { ended: 1, pending: 0 } },
+} })
 mock.module(new URL('../../../../lib/db/index.ts', import.meta.url).href, { namedExports: { pool: {}, db: {} } })
 let GET: typeof import('./route')['GET']
 before(async () => { ({ GET } = await import('./route')) })
@@ -30,9 +34,10 @@ test('recovery returns bounded counts and no private database error or cached re
   const response = await call()
   assert.equal(response.status, 200)
   assert.equal(response.headers.get('cache-control'), 'no-store')
-  // Stale Bot computers are reconciled in the same pass.
-  assert.deepEqual(await response.json(), { owners: 3, failed: 1, machines: 2 })
+  // Stale Bot computers are reconciled, and closed tasks' paused sandboxes ended, in the same pass.
+  assert.deepEqual(await response.json(), { owners: 3, failed: 1, machines: 2, taskMachines: { ended: 1, pending: 0 } })
   assert.equal(reconciled, 1)
+  assert.equal(swept, 1)
   fail = true
   const failed = await call()
   assert.equal(failed.status, 502)
