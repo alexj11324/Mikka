@@ -48,7 +48,7 @@ export function QuotaSwitchLine({ notice, botId }: { notice: QuotaSwitchNotice; 
   return <p data-quota-switch className="mx-auto max-w-full text-center text-xs text-muted-foreground wrap-break-word">
     {t('switched', { name: subscriptionName(notice.subscription, notice.plan), key: keyName(notice.keyProvider, notice.keyName) })}
     {' · '}
-    <Button variant="link" size="xs" className="h-auto px-0 text-xs text-muted-foreground hover:text-foreground" onClick={() => openModelPicker(botId)}>{t('revert')}</Button>
+    <Button variant="link" size="xs" className="-my-1 h-auto px-0 py-1 text-xs text-foreground underline" onClick={() => openModelPicker(botId)}>{t('revert')}</Button>
   </p>
 }
 
