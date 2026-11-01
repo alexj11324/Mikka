@@ -48,8 +48,8 @@ provides:
 - **Node 24**, the same as CI. Node 22's `mock.module` ignores `{ exports }`
   and gives false test failures.
 - **PostgreSQL 17** at `127.0.0.1:5432`, database `mikka_e2e`; migrations with
-  `MIGRATE=1 pnpm migrate` (without `MIGRATE=1` the script skips everywhere
-  but Vercel Production).
+  `pnpm migrate` (it runs by itself when every target is a loopback database;
+  a remote database off Vercel still needs `MIGRATE=1` and `--allow-remote`).
 - **bubblewrap, socat and ripgrep** for the daemon's sandbox and tools.
 - **Playwright** on the container's Chromium: set
   `executablePath: '/opt/pw-browsers/chromium'`. Never run
