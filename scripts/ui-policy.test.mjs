@@ -362,3 +362,15 @@ test('Chinese takes the system font, as in Comma: no self-hosted text font draws
   const stack = readFileSync(new URL('app/globals.css', root), 'utf8').match(/--font-sans:\s*([^;]+);/)[1].split(',').map(family => family.trim().replaceAll('"', ''))
   assert.deepEqual(stack, ['var(--font-inter)', 'SF Pro Display', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Open Sans', 'Helvetica Neue', 'sans-serif'])
 })
+
+test('the type scale is Comma\'s: size tokens in globals.css match the pinned values', () => {
+  const css = readFileSync(new URL('../app/globals.css', import.meta.url), 'utf8')
+  const comma = { xs: ['0.75rem', '1.125rem'], sm: ['0.8125rem', '1.25rem'], md: ['0.9375rem', '1.5rem'], lg: ['1.125rem', '1.75rem', '-0.01em'], xl: ['1.25rem', '1.875rem', '-0.01em'], '2xl': ['1.5rem', '2rem'] }
+  const token = name => css.match(new RegExp(`\\n${name}:\\s*([^;]+);`))?.[1].trim()
+  for (const [step, [size, leading, tracking]] of Object.entries(comma)) {
+    assert.equal(token(`--text-${step}`), size, `text-${step} size`)
+    assert.equal(token(`--text-${step}--line-height`), leading, `text-${step} line height`)
+    assert.equal(token(`--text-${step}--letter-spacing`), tracking, `text-${step} letter spacing`)
+  }
+  assert.equal(token('--font-weight-normal'), '450')
+})

@@ -23,9 +23,21 @@
 /* Comma's regular weight: Inter at 450 (`font-normal`). */
 --font-weight-normal: 450;
 --font-serif: var(--font-serif);
-/* R-32 document body: 15/24, between UI body (13/20) and the 18/28 section heading; `text-md`. */
+/* R-32 type scale, Comma's values: 12/18, 13/20, 15/24 (`text-md`, documents), 18/28 and 20/30 at -0.01em, 24/32. */
+--text-xs: 0.75rem;
+--text-xs--line-height: 1.125rem;
+--text-sm: 0.8125rem;
+--text-sm--line-height: 1.25rem;
 --text-md: 0.9375rem;
 --text-md--line-height: 1.5rem;
+--text-lg: 1.125rem;
+--text-lg--line-height: 1.75rem;
+--text-lg--letter-spacing: -0.01em;
+--text-xl: 1.25rem;
+--text-xl--line-height: 1.875rem;
+--text-xl--letter-spacing: -0.01em;
+--text-2xl: 1.5rem;
+--text-2xl--line-height: 2rem;
 --color-background: var(--background);
 --color-foreground: var(--foreground);
 --color-card: var(--card);

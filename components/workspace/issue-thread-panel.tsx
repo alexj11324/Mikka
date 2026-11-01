@@ -33,8 +33,8 @@ import { ThreadFeedback } from './self-improvement'
 import { InlineLoadError } from '@/components/load-error'
 import { FieldError } from '@/components/ui/field'
 
-// R-32 chat: 14/22, also for the agent's Markdown inside a bubble.
-const BUBBLE = 'max-w-[85%] rounded-2xl bg-muted px-3.5 py-2 text-sm/5.5 whitespace-pre-wrap break-words [&_[data-agent-markdown]]:leading-5.5'
+// R-32 chat: 13/21 as in Comma, also for the agent's Markdown inside a bubble.
+const BUBBLE = 'max-w-[85%] rounded-2xl bg-muted px-3.5 py-2 text-sm/5.25 whitespace-pre-wrap break-words [&_[data-agent-markdown]]:leading-5.25'
 
 /**
  * An open thread: a conversation between people and the agent running it (R-62, R-10).

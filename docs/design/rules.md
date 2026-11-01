@@ -409,17 +409,16 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   `text-rendering: optimizeLegibility`, `-webkit-font-smoothing: antialiased`.
   A local font is only allowed after
   its file and CSS variable are registered in `ui-policy.json` →
-  `typography.localFonts`. Only these text
-  styles: 20/28 SemiBold, 15/22 SemiBold, 14/22 Regular (chat), 13/20 Regular
-  (body), 13/20 Medium (list title), 12/16 Regular (meta), 12/16 Medium
-  (group title), 11/14 Medium (badge), and 24/32 SemiBold for the 建议 page
-  title only (R-55). Documents people read (a task's title and description,
-  the Artifact reader, comments) use four steps, as Linear and Notion do:
-  24/32 SemiBold title (`text-2xl`), 18/28 SemiBold section heading
-  (`text-lg`), 15/24 Regular body (`text-md`, the one theme token, pinned in
-  `ui-policy.json`), 12/16 meta (`text-xs`); a smaller heading is the body
-  size in SemiBold. Chat, the thread pane included, stays 14/22 (Alex,
-  2026-11-01, decision `2026-11-01-0140-document-type-scale`). Nothing is smaller than 11px. Labels are sentence case:
+  `typography.localFonts`. The size tokens are Comma's, set in
+  `app/globals.css` and pinned in `ui-policy.json`: `text-xs` 12/18,
+  `text-sm` 13/20, `text-md` 15/24, `text-lg` 18/28 and `text-xl` 20/30 at
+  -0.01em, `text-2xl` 24/32. UI body is 13/20 (list titles in Medium), meta
+  and group titles 12/18, badges 11/14 Medium, and 24/32 SemiBold for the
+  建议 page title only (R-55). Documents people read (a task's title and
+  description, the Artifact reader, comments) use 24/32 SemiBold title,
+  18/28 SemiBold section heading, 15/24 Regular body and 12/18 meta; a
+  smaller heading is the body size in SemiBold. Chat, the thread pane
+  included, is 13/21 (`text-sm leading-5.25`, Comma's message text). Nothing is smaller than 11px. Labels are sentence case:
   no uppercase label with wide tracking (unslop; ui-policy
   `typography/uppercase-label`). Weights stop at SemiBold, never Bold.
 - **R-33** Radii: 6 tag, 8 button and input, 9 rail item, 12 card and shell,
