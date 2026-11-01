@@ -46,6 +46,7 @@ test('pending, owner decision, exactly one consumer, and scope isolation', async
   await assert.rejects(store.decide(actor.userId, runId, proposal.id, proposal.digest, 'approve'))
   await assert.rejects(store.propose(actor, { ...payload('one'), input: { command: 'different' } }))
   await assert.rejects(store.take({ ...actor, deviceId: randomUUID() }, runId, proposal.id, proposal.digest))
+  await assert.rejects(store.checkState({ ...actor, deviceId: randomUUID() }, runId, initialRevision))
 })
 test('#438 E: the same requestId with a different original input is rejected even when both mask alike', async () => {
   const masked = { ...payload('masked-replay'), input: { command: 'echo [secret:API_TOKEN]' } }
@@ -68,6 +69,7 @@ test('deny, cancellation and stopped run never authorize', async () => {
   await pool.query('UPDATE agent_runs SET "stopRequestedAt"=now() WHERE id=$1', [runId])
   await assert.rejects(store.decide(actor.userId, runId, stopped.id, stopped.digest, 'approve'))
   await assert.rejects(store.take(actor, runId, stopped.id, stopped.digest))
+  await assert.rejects(store.checkState(actor, runId, initialRevision))
 })
 
 test('a changed worker policy revokes an approved but unconsumed request', async () => {
@@ -115,6 +117,7 @@ test('workspace may narrow agent policy, rejects forged generations, and invalid
   const pending = await scopedStore.propose(actor, { ...payload('workspace-revocation'), runId:scopedRun, policyRevision:recreated.revision })
   await pool.query(`UPDATE mikka_workspace_members SET status='removed' WHERE "workspaceId"=$1 AND "userId"=$2`, [wid,actor.userId])
   await assert.rejects(scopedStore.decide(actor.userId,scopedRun,pending.id,pending.digest,'approve'))
+  await assert.rejects(scopedStore.checkState(actor,scopedRun,recreated.revision))
   assert.equal((await pool.query('SELECT status FROM agent_tool_approvals WHERE id=$1',[pending.id])).rows[0].status,'pending')
 })
 
@@ -199,14 +202,36 @@ test('human control preserves pending approval and existing lease, then expires 
   await pool.query(`INSERT INTO bot_desktops VALUES ($1,$2,$3,'user',now()+interval '5 minutes')`, [bot,actor.userId,workspace])
   await pool.query(`UPDATE agent_runs SET status='running',"stopRequestedAt"=NULL,"leaseExpiresAt"=now()+interval '1 hour' WHERE id=$1`, [runId])
   const revision = (await readCliRunPolicy(pool,runId,actor.userId)).revision
+  let statusReads = 0
+  const observed = new AgentToolApprovalStore({ query: pool.query.bind(pool), connect: async () => {
+    const client = await pool.connect()
+    return new Proxy(client, { get(target, key) {
+      if (key === 'query') return (...args: unknown[]) => {
+        if (String(args[0]).startsWith('SELECT status FROM agent_runs')) statusReads++
+        return Reflect.apply(target.query, target, args)
+      }
+      const value = Reflect.get(target, key, target)
+      return typeof value === 'function' ? value.bind(target) : value
+    } })
+  } })
+  const checkState = async (reads: number) => {
+    statusReads = 0
+    const result = await observed.checkState(actor,runId,revision)
+    assert.equal(statusReads, reads, 'unpaused checks reuse the locked status; paused checks reread after their update')
+    return result
+  }
+  assert.deepEqual(await checkState(1),{live:true,paused:false})
   const approval = await store.propose(actor,{ ...payload('pause-boundary'),policyRevision:revision })
   await pool.query(`UPDATE agent_runs SET status='paused',"pauseReason"='human_control',"resumeStatus"='running' WHERE id=$1`, [runId])
   const lease = (await pool.query('SELECT "leaseExpiresAt" FROM agent_runs WHERE id=$1',[runId])).rows[0].leaseExpiresAt
-  assert.deepEqual(await store.checkState(actor,runId,revision),{live:true,paused:true})
+  assert.deepEqual(await checkState(2),{live:true,paused:true})
+  await pool.query(`UPDATE agent_runs SET "leaseExpiresAt"=now()-interval '1 second' WHERE id=$1`, [runId])
+  await assert.rejects(observed.checkState(actor,runId,revision))
+  await pool.query('UPDATE agent_runs SET "leaseExpiresAt"=$2 WHERE id=$1', [runId,lease])
   assert.equal(await store.take(actor,runId,approval.id,approval.digest),'pending')
   assert.equal((await pool.query('SELECT status FROM agent_tool_approvals WHERE id=$1',[approval.id])).rows[0].status,'pending')
   await pool.query(`UPDATE bot_desktops SET "controlUntil"=now()-interval '1 second' WHERE "botId"=$1`, [bot])
-  assert.deepEqual(await store.checkState(actor,runId,revision),{live:true,paused:false})
+  assert.deepEqual(await checkState(2),{live:true,paused:false})
   const resumed = (await pool.query('SELECT status,"pauseReason","resumeStatus","leaseExpiresAt" FROM agent_runs WHERE id=$1',[runId])).rows[0]
   assert.deepEqual(resumed,{status:'running',pauseReason:null,resumeStatus:null,leaseExpiresAt:lease})
   await store.decide(actor.userId,runId,approval.id,approval.digest,'approve')
