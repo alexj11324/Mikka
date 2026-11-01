@@ -6,7 +6,7 @@ export type ThreadStatus = 'running' | 'waiting' | 'failed' | 'done' | 'stopped'
 export interface Person { id: string; name: string; email: string; image: string | null }
 export interface Workspace { id: string; name: string }
 
-export interface HomeBot { id: string; name: string; color: string; shape: string; line: string | null; at: string | null; working: boolean }
+export interface HomeBot { id: string; name: string; color: string; shape: string; line: string | null; at: string | null; working: boolean; pinned?: boolean }
 
 export interface Home {
   user: Person
@@ -85,11 +85,15 @@ export interface Thread {
   finishedAt: string | null
 }
 
-/** A bot's page (GET /api/mobile/bots/<id>): its threads, its tasks' PRs and its scheduled tasks. */
+/** A bot's page (GET /api/mobile/bots/<id>): its threads, its tasks' PRs, its scheduled tasks, its 资料库 and the person's 置顶 / 通知. */
 export interface BotPage {
   threads: Thread[]
   pullRequests: { url: string; number: number; title: string; group: 'review' | 'running' | 'merged' }[]
   schedules: { id: string; title: string; status: 'active' | 'paused'; nextAt: string | null }[]
+  /** 资料库: what its threads handed over, newest first. */
+  library: { id: string; title: string; kind: 'markdown' | 'html'; version: number; updatedAt: string }[]
+  pinned: boolean
+  muted: boolean
 }
 
 /** A bot's cloud computer (GET /api/bots/<id>/computer), as far as the app shows it. */

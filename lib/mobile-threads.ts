@@ -109,14 +109,16 @@ export async function mobileThread(userId: string, runId: string): Promise<Mobil
 
 export type MobilePullRequest = { url: string; number: number; title: string; group: PrGroup }
 export type MobileSchedule = { id: string; title: string; status: 'active' | 'paused'; nextAt: string | null }
+export type MobileArtifact = { id: string; title: string; kind: 'markdown' | 'html'; version: number; updatedAt: string }
 
 /**
  * A bot's page (docs/design/mobile.md, 资料): its threads, the pull requests
- * of the tasks they worked on, and its scheduled tasks, as the web's right
+ * of the tasks they worked on, its scheduled tasks, its 资料库 (what those
+ * threads handed over) and the person's 置顶 / 通知 for it, as the web's right
  * panel shows them. `botId` null is the Coordinator, whose threads are the
  * ones it dispatched: no bot on the run, and not from an MCP client.
  */
-export async function mobileBot(userId: string, workspaceId: string, botId: string | null): Promise<{ threads: MobileThread[]; pullRequests: MobilePullRequest[]; schedules: MobileSchedule[] }> {
+export async function mobileBot(userId: string, workspaceId: string, botId: string | null): Promise<{ threads: MobileThread[]; pullRequests: MobilePullRequest[]; schedules: MobileSchedule[]; library: MobileArtifact[]; pinned: boolean; muted: boolean }> {
   const own = botId ? eq(agentRuns.botId, botId) : and(isNull(agentRuns.botId), sql`${agentRuns.source} IS DISTINCT FROM 'mcp'`)
   const [rows, schedules] = await Promise.all([
     runRows(userId, own, 60),
@@ -124,6 +126,14 @@ export async function mobileBot(userId: string, workspaceId: string, botId: stri
       `SELECT id, definition->>'title' AS title, status, next_at FROM user_schedules
        WHERE owner_id=$1 AND workspace_id IS NOT DISTINCT FROM $2::uuid AND bot_id IS NOT DISTINCT FROM $3::uuid AND status IN ('active','paused')
        ORDER BY next_at ASC NULLS LAST LIMIT 50`, [userId, workspaceId, botId]),
+  ])
+  // 资料库: what its threads handed over, newest first; and the person's 置顶 / 通知 for this chat.
+  const runIds = rows.map(row => row.thread.id)
+  const [library, preference] = await Promise.all([
+    runIds.length ? pool.query<{ id: string; title: string; kind: 'markdown' | 'html'; version: number; updated_at: Date }>(
+      `SELECT id, title, kind, "latestVersion" AS version, "updatedAt" AS updated_at FROM artifacts
+       WHERE "userId"=$1 AND "runId" = ANY($2::uuid[]) ORDER BY "updatedAt" DESC LIMIT 30`, [userId, runIds]) : { rows: [] },
+    pool.query<{ pinned: boolean; muted: boolean }>('SELECT pinned, muted FROM chat_preferences WHERE "userId"=$1 AND "chatKey"=$2', [userId, botId ?? 'coordinator']),
   ])
   // A PR's own title when it was published with one, else its task's.
   const titles = new Map(rows.flatMap(row => row.pullRequests.map(pr => [pr.url, pr.title ?? row.issue?.title ?? ''] as const)))
@@ -135,5 +145,8 @@ export async function mobileBot(userId: string, workspaceId: string, botId: stri
     threads: rows.map(row => row.thread),
     pullRequests,
     schedules: schedules.rows.map(row => ({ id: row.id, title: row.title, status: row.status, nextAt: row.next_at?.toISOString() ?? null })),
+    library: library.rows.map(row => ({ id: row.id, title: row.title, kind: row.kind, version: row.version, updatedAt: row.updated_at.toISOString() })),
+    pinned: preference.rows[0]?.pinned ?? false,
+    muted: preference.rows[0]?.muted ?? false,
   }
 }

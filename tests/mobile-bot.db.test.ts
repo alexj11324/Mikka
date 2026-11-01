@@ -86,4 +86,26 @@ test('mobile bot page', { skip: !dbUrl }, async t => {
     assert.deepEqual(await visibleGroupMessages(other, [groupMessage]), [])
     assert.deepEqual(await visibleGroupMessages(owner, [groupMessage, chatMessage]), [groupMessage])
   })
+
+  await t.test("置顶 and 通知 per chat, only for the person's own bots; 资料库 from the bot's threads", async () => {
+    const { chatMuted, chatPreferences, setChatPreference } = await import('../lib/chat-preferences')
+    assert.equal(await setChatPreference(owner, bot, { pinned: true }), true)
+    assert.equal(await setChatPreference(owner, bot, { muted: true }), true, 'a second change keeps the first')
+    assert.equal(await setChatPreference(owner, null, { muted: true }), true, 'the Coordinator')
+    assert.equal(await setChatPreference(other, bot, { pinned: true }), false, "someone else's bot")
+    assert.deepEqual(await chatPreferences(owner), { [bot]: { pinned: true, muted: true }, coordinator: { pinned: false, muted: true } })
+    assert.deepEqual(await chatPreferences(other), {})
+    assert.equal(await chatMuted(owner, bot), true)
+    assert.equal(await chatMuted(owner, sibling), false)
+    await setChatPreference(owner, bot, { muted: false })
+    assert.equal(await chatMuted(owner, bot), false)
+
+    const artifact = randomUUID()
+    await pool.query(`insert into artifacts (id,"userId",kind,title,"runId") values ($1,$2,'markdown','Release notes',$3),($4,$2,'html','Other bot page',$5)`,
+      [artifact, owner, mine, randomUUID(), dispatched])
+    const page = await mobileBot(owner, ws.id, bot)
+    assert.deepEqual(page.library.map(item => [item.id, item.title, item.kind, item.version]), [[artifact, 'Release notes', 'markdown', 1]])
+    assert.deepEqual([page.pinned, page.muted], [true, false])
+    assert.deepEqual((await mobileBot(other, ws.id, bot)).library, [])
+  })
 })

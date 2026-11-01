@@ -11,10 +11,11 @@ test('the app may open the Coordinator chat, a bot chat, a task or Settings', ()
   assert.equal(mobileWebTarget('/settings'), '/settings')
   assert.equal(mobileWebTarget('/?section=plugins'), '/?section=plugins')
   assert.equal(mobileWebTarget('/?section=plugins&app=gmail'), '/?section=plugins&app=gmail')
+  assert.equal(mobileWebTarget(`/api/artifacts/${BOT.toUpperCase()}/versions/3/frame`), `/api/artifacts/${BOT}/versions/3/frame`)
 })
 
 test('anything else is the home page', () => {
-  for (const value of [null, '', 'https://evil.dev', '//evil.dev', '/api/auth/sign-out', '/settings?next=//evil.dev', '/?section=plugins&app=Gmail', '/?section=plugins&app=../x', '/?section=plugins&app=gmail&x=1', '/?section=plugins#x', '/settings/members', '/settings#x', '/?section=coordinator&bot=nope', `/?section=coordinator&bot=${BOT}&x=1`, '/?section=coordinator#x', '/\\evil.dev']) {
+  for (const value of [null, '', 'https://evil.dev', '//evil.dev', '/api/auth/sign-out', '/settings?next=//evil.dev', '/?section=plugins&app=Gmail', '/?section=plugins&app=../x', '/?section=plugins&app=gmail&x=1', '/?section=plugins#x', '/settings/members', '/settings#x', '/?section=coordinator&bot=nope', `/?section=coordinator&bot=${BOT}&x=1`, '/?section=coordinator#x', '/\\evil.dev', `/api/artifacts/${BOT}/versions/3/download`, `/api/artifacts/${BOT}/versions/0/frame`, `/api/artifacts/${BOT}/versions/3/frame?x=1`, '/api/artifacts/nope/versions/1/frame']) {
     assert.equal(mobileWebTarget(value), '/', String(value))
   }
 })

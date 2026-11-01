@@ -3,12 +3,13 @@ import { useLocalSearchParams, useRouter } from 'expo-router'
 import * as WebBrowser from 'expo-web-browser'
 import { BotAvatar, Spinner } from '@/components/icons'
 import { NavBar, underBar } from '@/components/NavBar'
-import { Row } from '@/components/settings'
+import { Row, ToggleRow } from '@/components/settings'
 import { Symbol } from '@/components/Symbol'
 import { Text } from '@/components/Text'
 import { ThreadRow } from '@/components/ThreadsScreen'
 import { Group } from '@/components/ui'
-import { nextWhen } from '@/lib/clock'
+import { api } from '@/lib/api'
+import { nextWhen, shortWhen } from '@/lib/clock'
 import { useHome } from '@/lib/home'
 import type { BotPage, ComputerStatus } from '@/lib/types'
 import { useApi, useRefresh } from '@/lib/useApi'
@@ -28,8 +29,9 @@ function computerLabel(state: ComputerStatus) {
  * A bot's page, opened from its name at the top of its chat (as in Grok and
  * WhatsApp): the avatar and name, then what the web's right panel shows beside
  * the chat (components/nav/context-panel.tsx): its latest threads, its
- * computer, its tasks' PRs and its 例行. A section with nothing in it is left
- * out. The computer's screen opens on the web, where it is drawn.
+ * computer, its tasks' PRs, its 资料库 and its 例行, with the person's 置顶
+ * and 通知 for it. A section with nothing in it is left out. The computer's
+ * screen and an HTML document open on the web, where they are drawn.
  */
 export default function BotInfo() {
   const { id } = useLocalSearchParams<{ id: string }>()
@@ -44,6 +46,19 @@ export default function BotInfo() {
   const threads = page.data?.threads ?? []
   const pullRequests = page.data?.pullRequests ?? []
   const schedules = page.data?.schedules ?? []
+  const library = page.data?.library ?? []
+  const home = useHome()
+  // 置顶 and 通知 change at once, then save; the next load has the server's word.
+  const setPreference = async (change: { pinned?: boolean; muted?: boolean }) => {
+    page.setData(current => current && { ...current, ...change })
+    try {
+      await api(`/api/mobile/bots/${id}`, { method: 'PATCH', body: change })
+      if (change.pinned !== undefined) await home.reload()
+    } finally { void page.reload() }
+  }
+  const openArtifact = (item: BotPage['library'][number]) => item.kind === 'html'
+    ? void openOnWeb(`/api/artifacts/${item.id}/versions/${item.version}/frame`)
+    : router.push({ pathname: '/artifact/[id]', params: { id: item.id, v: String(item.version), title: item.title } })
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.grouped }}>
@@ -54,6 +69,13 @@ export default function BotInfo() {
           <Text style={styles.name}>{name}</Text>
         </View>
         {page.loading && !page.data ? <View style={styles.center}><Spinner /></View> : null}
+        {page.data ? (
+          <Group>
+            {/* The Coordinator is always pinned. */}
+            {coordinator ? null : <ToggleRow label="置顶" value={page.data.pinned} onChange={pinned => void setPreference({ pinned })} />}
+            <ToggleRow label="通知" value={!page.data.muted} onChange={on => void setPreference({ muted: !on })} />
+          </Group>
+        ) : null}
         {threads.length ? (
           <Group label="线程">
             {threads.slice(0, SHOWN).map(thread => <ThreadRow key={thread.id} thread={thread} onPress={() => router.push(`/thread/${thread.id}`)} />)}
@@ -70,6 +92,13 @@ export default function BotInfo() {
             {pullRequests.map(pr => (
               <Row key={pr.url} label={`#${pr.number}${pr.title ? ` ${pr.title}` : ''}`} value={PR_GROUP[pr.group]}
                 onPress={() => void WebBrowser.openBrowserAsync(pr.url)} trailing={<Symbol name="arrow.up.right" size={12} color={colors.tertiary} />} />
+            ))}
+          </Group>
+        ) : null}
+        {library.length ? (
+          <Group label="资料库">
+            {library.map(item => (
+              <Row key={item.id} icon={<Symbol name={item.kind === 'html' ? 'globe' : 'doc.text'} size={19} />} label={item.title} value={shortWhen(item.updatedAt)} onPress={() => openArtifact(item)} />
             ))}
           </Group>
         ) : null}
