@@ -3,9 +3,7 @@
 import { Circle, CircleAlert, CircleCheck, CircleSlash2 } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { Spinner } from '@/components/ui/spinner'
-import { statusIconTints } from '@/lib/status-appearance'
 import { threadGroup, type ThreadGroup, type ThreadOutcome } from '@/lib/thread-groups'
-import { cn } from '@/lib/utils'
 
 /**
  * A thread's status as an icon and colour, the phone's set (mobile.md): 进行中
@@ -14,14 +12,16 @@ import { cn } from '@/lib/utils'
  * status, so a run that finished blocked never shows the check. Shared by the
  * thread list and the thread chip.
  */
-export function ThreadStatusIcon({ group, className }: { group: ThreadGroup; className?: string }) {
+export function ThreadStatusIcon({ group }: { group: ThreadGroup }) {
   const t = useTranslations('Shell.threads.state')
   const label = t(group)
-  const icon = cn('size-3.5 shrink-0', className)
-  if (group === 'running') return <Spinner role="img" aria-label={label} className={cn(icon, statusIconTints.neutral)} />
-  const Icon = group === 'blocked' ? CircleAlert : group === 'resolved' ? CircleCheck : group === 'idle' ? CircleSlash2 : Circle
-  const tint = group === 'blocked' ? statusIconTints.destructive : group === 'resolved' ? statusIconTints.success : statusIconTints.neutral
-  return <span role="img" aria-label={label} className="inline-flex"><Icon aria-hidden="true" className={cn(icon, tint)} /></span>
+  if (group === 'running') return <Spinner role="img" aria-label={label} className="size-3.5 shrink-0 text-muted-foreground" />
+  return <span role="img" aria-label={label} className="inline-flex">
+    {group === 'blocked' ? <CircleAlert aria-hidden="true" className="size-3.5 shrink-0 text-destructive" />
+      : group === 'resolved' ? <CircleCheck aria-hidden="true" className="size-3.5 shrink-0 text-success-foreground" />
+        : group === 'idle' ? <CircleSlash2 aria-hidden="true" className="size-3.5 shrink-0 text-muted-foreground" />
+          : <Circle aria-hidden="true" className="size-3.5 shrink-0 text-muted-foreground" />}
+  </span>
 }
 
 /** The group of one run seen alone (a chip, with no task or PR at hand): an unjudged failed run is 受阻, never 已解决. */
