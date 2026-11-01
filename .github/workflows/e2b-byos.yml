@@ -57,14 +57,15 @@ jobs:
           apt_options=(-o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30)
           sudo apt-get "${apt_options[@]}" update
           sudo apt-get "${apt_options[@]}" install -y bubblewrap socat ripgrep
-      - name: "Diagnose (temporary): user namespaces for sandbox-runtime on this runner"
-        # sandbox-runtime README, Ubuntu 24.04+ note: apparmor_restrict_unprivileged_userns
-        # strips capabilities from new user namespaces, which bubblewrap and the seccomp
-        # layer need. Record the setting and a minimal bwrap run before the tests.
+      - name: Let bubblewrap create capability-bearing user namespaces, as on the E2B machine
+        # Ubuntu 24.04 runners set kernel.apparmor_restrict_unprivileged_userns=1
+        # (recorded on run 41313960870), and bwrap then fails with "loopback: Failed
+        # RTM_NEWADDR: Operation not permitted". sandbox-runtime's README (Ubuntu 24.04+
+        # note) says to disable the restriction with this sysctl. Hosted runs execute on
+        # E2B machines, which do not set it; this job reproduces that machine.
         run: |
-          sysctl kernel.apparmor_restrict_unprivileged_userns || true
-          bwrap --ro-bind / / --dev /dev --proc /proc --unshare-user --unshare-pid --unshare-net -- /bin/true && echo "bwrap userns: ok" || echo "bwrap userns: FAILED ($?)"
-          bwrap --ro-bind / / --dev /dev --proc /proc --unshare-user --unshare-pid --unshare-net -- bwrap --ro-bind / / --unshare-user -- /bin/true && echo "nested userns: ok" || echo "nested userns: FAILED ($?)"
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          bwrap --ro-bind / / --dev /dev --proc /proc --unshare-user --unshare-pid --unshare-net -- /bin/true
       - run: pnpm --filter @mikka/daemon exec vitest run test/subscription-hosted-runner.test.ts
       - run: docker pull node@sha256:6449e19d8184d84062525b6a7524def03146c2cb04a7f08b076680d0e8e4240a
       # Docker mode on devices: the runner image (harness/Dockerfile) and one disposable run container.
