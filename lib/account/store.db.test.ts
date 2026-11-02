@@ -159,6 +159,10 @@ dbTest('deleting an account removes what the person owns, keeps what their team 
     // Her bot in her own workspace and her Coordinator in the shared one are hers alone.
     await pool.query(`insert into bots (id, "workspaceId", "ownerId", name) values ($1, $2, $3, 'Mine'), ($4, $5, $3, 'Coordinator')`, [soloBot, solo, alice, coordinator, shared])
     await pool.query(`insert into coordinator_bots ("ownerId", "workspaceId", "botId") values ($1, $2, $3)`, [alice, shared, coordinator])
+    // Owner-bound rows on the kept bot, through the composite (id, workspaceId, ownerId) foreign keys: they go before its owner is cleared.
+    await pool.query(`insert into cloud_machines ("workspaceId", "ownerId", "operationId") values ($1, $2, $3)`, [shared, alice, randomUUID()])
+    await pool.query(`insert into bot_desktops ("botId", "workspaceId", "ownerId", display) values ($1, $2, $3, 1)`, [bot, shared, alice])
+    await pool.query(`insert into bot_subagents (id, "workspaceId", "ownerId", "botId", task, status) values ($1, $2, $3, $4, 'look', 'done')`, [randomUUID(), shared, alice, bot])
     await pool.query(`insert into devices (id, "ownerId", name) values ($1, $2, 'Laptop')`, [device, alice])
     await pool.query(`insert into agents (id, "userId", harness, name, "deviceId") values ($1, $2, 'codex', 'Agent', $3)`, [agent, alice, device])
     const issue = (iid: string, owner: string, scope: string) => pool.query(`insert into issues (id, "userId", title, content, status, priority, scope) values ($1, $2, 'T', '{}'::jsonb, 'todo', 'normal', $3)`, [iid, owner, scope])
@@ -216,25 +220,49 @@ dbTest('deleting an account removes what the person owns, keeps what their team 
     assert.equal((await pool.query('select 1 from issue_members where "memberId" = $1', [alice])).rowCount, 0)
     assert.equal((await pool.query('select 1 from artifact_shares where "createdBy" = $1', [alice])).rowCount, 0)
 
-    // Her bot in the shared workspace stays, paused, with its threads, their messages and Artifacts and the agent they ran on.
-    const [kept] = (await pool.query<{ ownerId: string; archivedAt: Date | null }>('select "ownerId", "archivedAt" from bots where id = $1', [bot])).rows
-    assert.equal(kept.ownerId, alice); assert.ok(kept.archivedAt, 'paused for an admin to take over')
+    // Her bot in the shared workspace stays, paused with no owner (「待接管」), with its threads, their messages and Artifacts and the agent they ran on.
+    const [kept] = (await pool.query<{ ownerId: string | null; archivedAt: Date | null }>('select "ownerId", "archivedAt" from bots where id = $1', [bot])).rows
+    assert.equal(kept.ownerId, null); assert.ok(kept.archivedAt, 'paused for an admin to take over')
     assert.deepEqual((await pool.query('select id, status from agent_runs where "botId" = $1 order by id', [bot])).rows,
       [{ id: run, status: 'done' }, { id: liveRun, status: 'stopped' }].sort((a, b) => a.id.localeCompare(b.id)))
     assert.equal((await pool.query('select 1 from run_messages where "runId" = $1', [run])).rowCount, 1)
     assert.equal((await pool.query('select 1 from artifacts where id = $1', [artifact])).rowCount, 1)
     assert.equal((await pool.query('select 1 from agents where id = $1', [agent])).rowCount, 1)
     assert.equal((await pool.query('select 1 from run_tokens where "runId" = $1', [liveRun])).rowCount, 0, 'credentials of a kept thread still go')
+    assert.equal((await pool.query('select 1 from bot_desktops where "botId" = $1 union all select 1 from bot_subagents where "botId" = $1', [bot])).rowCount, 0, 'rows bound to the old owner go')
     // Her bot in her own workspace and her Coordinator go with their threads.
     assert.equal((await pool.query('select 1 from bots where id = any($1::uuid[])', [[soloBot, coordinator]])).rowCount, 0)
     assert.equal((await pool.query('select 1 from agent_runs where id = any($1::uuid[])', [[soloRun, coordinatorRun]])).rowCount, 0)
     assert.equal((await pool.query('select 1 from run_messages where "runId" = $1', [soloRun])).rowCount, 0)
-    // Bob, an admin there, takes it over as from any member who left: it runs again, as his, with its threads.
+
+    // The bot list shows it with no owner, and 用量 groups it under 「待接管」.
+    const { workspaceBots } = await import('../workspace-admin/bots')
+    const listed = (await workspaceBots(shared)).find(row => row.id === bot)
+    assert.deepEqual(listed && { ownerId: listed.ownerId, ownerName: listed.ownerName }, { ownerId: null, ownerName: null })
+    const { workspaceUsage } = await import('../usage/read')
+    const month = new Date().toISOString().slice(0, 7)
+    const usage = await workspaceUsage(bob, shared, month)
+    assert.ok(usage.bots.some(row => row.id === bot && row.ownerId === null))
+    assert.deepEqual(usage.members.filter(row => row.awaitingTakeover).map(row => [row.id, row.name]), [['', '']])
+
+    // A null owner matches nobody: no one, member or admin, can use or edit it as its owner.
+    const { updateOwnedBot } = await import('../bot-update')
+    for (const actor of [bob, dave]) await assert.rejects(updateOwnedBot({ ownerId: actor, workspaceId: shared }, { botId: bot, name: 'Mine now' }), /botNotFound/)
+    const { botInstructions } = await import('../coordinator/bot-instructions')
+    assert.equal(await botInstructions(bob, bot, 'base'), 'base', 'not treated as Bob\'s bot')
     const { takeOverBot, archivedBots } = await import('../workspace-admin/members')
-    assert.deepEqual((await archivedBots(bob, shared)).map(row => row.id), [bot])
+    const { WorkspaceError } = await import('../workspace-access')
+    // Dave is a plain member of the shared workspace: he can neither list paused bots nor take one over.
+    await pool.query(`insert into mikka_workspace_members ("workspaceId", "userId", name, email, role) values ($1, $2, $2, $3, 'member')`, [shared, dave, `${dave}@example.com`])
+    await assert.rejects(archivedBots(dave, shared), (error: unknown) => error instanceof WorkspaceError)
+    await assert.rejects(takeOverBot(dave, shared, bot), (error: unknown) => error instanceof WorkspaceError)
+    await pool.query('delete from mikka_workspace_members where "workspaceId" = $1 and "userId" = $2', [shared, dave])
+    // Bob, an admin there, takes it over as from any member who left: it runs again, as his, with its threads.
+    assert.deepEqual((await archivedBots(bob, shared)).map(row => [row.id, row.ownerId]), [[bot, null]])
     assert.deepEqual(await takeOverBot(bob, shared, bot), { bots: 1 })
     assert.deepEqual((await pool.query('select "ownerId", "archivedAt" from bots where id = $1', [bot])).rows, [{ ownerId: bob, archivedAt: null }])
     assert.equal((await pool.query('select 1 from agent_runs where "botId" = $1', [bot])).rowCount, 2)
+    await updateOwnedBot({ ownerId: bob, workspaceId: shared }, { botId: bot, name: 'Helper 2' })
 
     // Her solo workspace went; the shared one, its team issue and group chat stay for Bob.
     assert.equal((await pool.query('select 1 from mikka_workspaces where id = $1', [solo])).rowCount, 0)

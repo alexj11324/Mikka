@@ -96,10 +96,10 @@ export const bots = pgTable('bots', {
   id: uuid('id').primaryKey(),
   /**
    * Who made it, in which workspace: the identity the cloud computer (bot_desktops, #317) keys on too.
-   * No foreign key: when the owner deletes their account, a bot in a shared workspace stays,
-   * paused under their old id until an admin takes it over (lib/account/delete.ts).
+   * Null when the owner deleted their account: the bot stays in the shared workspace, paused,
+   * 「待接管」 until an admin takes it over (lib/account/delete.ts, takeOverBot). A null owner matches nobody.
    */
-  ownerId: text('ownerId').notNull(),
+  ownerId: text('ownerId').references(() => users.id, { onDelete: 'set null' }),
   workspaceId: uuid('workspaceId').notNull(),
   name: text('name').notNull(),
   /** A bloub colour id, see components/nav/bot-avatar.tsx. */

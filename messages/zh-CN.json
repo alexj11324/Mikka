@@ -2386,7 +2386,8 @@
       "minutes": "{count} 分钟",
       "hours": "{count} 小时",
       "balance": "余额",
-      "points": "{points} 点"
+      "points": "{points} 点",
+      "awaitingTakeover": "待接管"
     },
     "billing": {
       "loading": "正在加载计费",

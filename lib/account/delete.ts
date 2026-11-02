@@ -30,7 +30,9 @@ const { projects, projectEvents } = projectSchema
  * - Their bots in a shared workspace are handled as when a member leaves
  *   (releaseDepartingMember, decision 2026-11-02-0230): each is paused for an
  *   admin to take over (已暂停的 Bot), and its threads stay with it (KEPT_THREAD_TABLES).
- *   `bots.ownerId` keeps the departed id until then; it has no foreign key.
+ *   Its owner becomes NULL, 「待接管」, which matches nobody until takeOverBot
+ *   writes the new owner. The rows bound to the old owner (desktops, cloud
+ *   runtimes, run bindings, agent kit, background tasks) go first, as on a transfer.
  * - Uploaded files in R2 are removed after the database commits, except those
  *   of the threads that stay.
  */
@@ -183,14 +185,13 @@ export async function accountStorageKeys(client: Pick<PoolClient, 'query'>, user
 
 export async function deleteMainAccountData(client: PoolClient, userId: string, plan: Plan): Promise<void> {
   const kept = await keptThreads(client, userId, plan)
-  if (kept.bots.length) {
-    // As when a member leaves (releaseDepartingMember): paused until an admin takes the bot over. Their shares and card designation go with their other rows below.
-    await client.query('update bots set "archivedAt" = now(), "updatedAt" = now() where id = any($1::uuid[]) and "archivedAt" is null', [kept.bots])
-    // Nobody is left to run their unfinished threads; they stay as stopped.
-    await client.query(`update agent_runs set status = 'stopped', "stopRequestedAt" = coalesce("stopRequestedAt", now()), "finishedAt" = coalesce("finishedAt", now()), "updatedAt" = now()
-      where id = any($1::uuid[]) and "userId" = $2 and status = any($3::text[])`, [kept.runs, userId, [...UNFINISHED_RUN_STATUSES]])
-  }
+  // Nobody is left to run their unfinished threads; they stay as stopped.
+  if (kept.runs.length) await client.query(`update agent_runs set status = 'stopped', "stopRequestedAt" = coalesce("stopRequestedAt", now()), "finishedAt" = coalesce("finishedAt", now()), "updatedAt" = now()
+    where id = any($1::uuid[]) and "userId" = $2 and status = any($3::text[])`, [kept.runs, userId, [...UNFINISHED_RUN_STATUSES]])
   await runToFixpoint(client, await deletionStatements(client, userId, plan, kept))
+  // As when a member leaves (releaseDepartingMember): paused until an admin takes the bot over, now with no owner (「待接管」).
+  // After the sweep: the owner-bound rows that reference (id, workspaceId, ownerId) are gone. Their shares and card designation went with it.
+  if (kept.bots.length) await client.query('update bots set "ownerId" = null, "archivedAt" = coalesce("archivedAt", now()), "updatedAt" = now() where id = any($1::uuid[])', [kept.bots])
   await client.query('delete from "user" where id=$1', [userId])
 }
 
