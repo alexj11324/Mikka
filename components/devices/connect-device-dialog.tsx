@@ -15,10 +15,12 @@ import { FieldError } from '@/components/ui/field'
 /** The public name is confirmed with the release; no workspace checkout is needed. */
 const packageName = process.env.NEXT_PUBLIC_MIKKA_DAEMON_PACKAGE_NAME ?? '@aspectlylabs/mikka'
 
-export function ConnectDeviceDialog({ open: controlledOpen, onOpenChange, hideTrigger = false }: {
+export function ConnectDeviceDialog({ open: controlledOpen, onOpenChange, hideTrigger = false, reconnect = false }: {
   open?: boolean
   onOpenChange?: (open: boolean) => void
   hideTrigger?: boolean
+  /** A device paired before: only the command that starts its client again, titled 重新连接 (review C11). */
+  reconnect?: boolean
 } = {}) {
   const t = useTranslations('Devices.connect')
   const commonT = useTranslations('Common')
@@ -41,10 +43,10 @@ export function ConnectDeviceDialog({ open: controlledOpen, onOpenChange, hideTr
       <DialogHeader>
         <DialogTitle className="flex items-center gap-2">
           <IconTile variant="frame" aria-hidden="true"><TerminalSquare /></IconTile>
-          {t('title')}
+          {reconnect ? t('reconnectTitle') : t('title')}
         </DialogTitle>
       </DialogHeader>
-      <DaemonCommandList open={open} />
+      <DaemonCommandList open={open} reconnect={reconnect} />
       <DialogFooter>
         <Button size="sm" onClick={() => changeOpen(false)}>{t('done')}</Button>
       </DialogFooter>
@@ -55,8 +57,9 @@ export function ConnectDeviceDialog({ open: controlledOpen, onOpenChange, hideTr
 /**
  * The three commands that install the Mikka client, sign it in and start it on
  * a computer by hand: the web's 添加设备, and the desktop's 手动连接 fallback.
+ * A device paired before needs only the start command (review C11).
  */
-export function DaemonCommandList({ open = true }: { open?: boolean }) {
+export function DaemonCommandList({ open = true, reconnect = false }: { open?: boolean; reconnect?: boolean }) {
   const t = useTranslations('Devices.connect')
   const [commands, setCommands] = useState<ReturnType<typeof daemonCommands> | null>(null)
   useEffect(() => {
@@ -66,9 +69,9 @@ export function DaemonCommandList({ open = true }: { open?: boolean }) {
   }, [open])
   return commands ? <div className="flex min-w-0 flex-col gap-4">
     {/* R-39: the dialog is the only container, so each command is a grey block with no border of its own. */}
-    {(['install', 'login', 'start'] as const).map(key => <CodeBlock key={key} code={commands[key]} language="bash" defaultWrap className="border-0 bg-muted [--code-block-bg:var(--muted)]">
+    {(reconnect ? ['start'] as const : ['install', 'login', 'start'] as const).map(key => <CodeBlock key={key} code={commands[key]} language="bash" defaultWrap className="border-0 bg-muted [--code-block-bg:var(--muted)]">
       <CodeBlockHeader className="border-b-0">
-        <CodeBlockTitle>{t(`commands.${key}`)}</CodeBlockTitle>
+        <CodeBlockTitle>{reconnect ? t('commands.startAlone') : t(`commands.${key}`)}</CodeBlockTitle>
         <CodeBlockCopyButton className="ml-auto" labels={{ copy: t('copyCommand'), copied: t('copied') }} />
       </CodeBlockHeader>
     </CodeBlock>)}

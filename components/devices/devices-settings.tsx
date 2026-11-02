@@ -1,5 +1,6 @@
 'use client'
 
+import { SettingsLoading } from '@/components/settings/primitives'
 import { Fragment, useEffect, useState } from 'react'
 import useSWR from 'swr'
 import { Check, Copy, Laptop, MoreHorizontal, Plus, Server } from 'lucide-react'
@@ -251,7 +252,8 @@ function DeviceGroup({ title, devices, deviceModels, onChanged, onReconnect }: {
  */
 export function DevicesSettings({ workspaceId }: { workspaceId?: string }) {
   const t = useTranslations('Devices')
-  const { data: devices = [], error, mutate } = useSWR('devices', listDevices, { refreshInterval: 5000 })
+  const { data, error, mutate } = useSWR('devices', listDevices, { refreshInterval: 5000 })
+  const devices = data ?? []
   // The same read as 模型与订阅, so both pages agree on what each device can run.
   const order = useSWR(workspaceId ? modelOrderKey(workspaceId) : null, () => readModelOrder(workspaceId!))
   const deviceModels = order.data && !order.data.error ? order.data.deviceModels : undefined
@@ -271,10 +273,13 @@ export function DevicesSettings({ workspaceId }: { workspaceId?: string }) {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
   const changed = () => { void mutate() }
-  // This computer restarts its own daemon; any other offline device opens 添加设备.
+  // 重新连接: this computer restarts its own daemon; another device opens 添加设备 on the desktop,
+  // and on the web only the command that starts its client again (review C11).
+  const [reconnecting, setReconnecting] = useState(false)
   const reconnect = (device: DeviceView) => {
     const ssh = bridgeFromWindow(window as MikkaWindow)?.ssh
-    if (device.id === thisDevice && ssh?.restartLocal) void ssh.restartLocal().catch(() => {})
+    if (!ssh) return setReconnecting(true)
+    if (device.id === thisDevice && ssh.restartLocal) void ssh.restartLocal().catch(() => {})
     setAdding(true)
   }
   return <div className="flex flex-col gap-6">
@@ -284,12 +289,15 @@ export function DevicesSettings({ workspaceId }: { workspaceId?: string }) {
     </div>
     {desktopSsh && <LocalSetupStatus onOnline={changed} />}
     {error && <FieldError className="text-xs">{t('listError')}</FieldError>}
-    {devices.length === 0 ? <Empty className="rounded-xl border"><EmptyHeader><EmptyTitle>{t('emptyTitle')}</EmptyTitle></EmptyHeader></Empty> : <>
+    {/* Not read yet: rows' shapes, never 还没有设备 (review C6, R-39). A failed first read says only that. */}
+    {!data ? !error && <div className="overflow-hidden rounded-xl border bg-card"><SettingsLoading bare label={t('loading')} /></div>
+      : devices.length === 0 ? <Empty className="rounded-xl border"><EmptyHeader><EmptyTitle>{t('emptyTitle')}</EmptyTitle></EmptyHeader></Empty> : <>
       <DeviceGroup title={t('thisMachine')} devices={devices.filter(device => device.deviceType !== 'server')} deviceModels={deviceModels} onChanged={changed} onReconnect={reconnect} />
       <DeviceGroup title={t('otherDevices')} devices={devices.filter(device => device.deviceType === 'server')} deviceModels={deviceModels} onChanged={changed} onReconnect={reconnect} />
     </>}
     {desktopSsh
       ? <SshAddDialog open={adding} onOpenChange={setAdding} devices={devices} onAdded={changed} />
       : <ConnectDeviceDialog open={adding} onOpenChange={setAdding} hideTrigger />}
+    {!desktopSsh && <ConnectDeviceDialog open={reconnecting} onOpenChange={setReconnecting} hideTrigger reconnect />}
   </div>
 }

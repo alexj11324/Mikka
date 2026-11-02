@@ -17,7 +17,7 @@ import { withBasePath } from '@/lib/base-path'
 type ClientInfo = { name: string | null; platform: string | null; version: string | null }
 const PLATFORMS: Record<string, string> = { darwin: 'macOS', linux: 'Linux', win32: 'Windows' }
 
-type State = 'entry' | 'loading' | 'review' | 'approving' | 'denying' | 'approved' | 'denied' | 'invalid' | 'error'
+type State = 'entry' | 'loading' | 'review' | 'approving' | 'denying' | 'approved' | 'denied' | 'invalid' | 'rateLimited' | 'error'
 const primary = 'bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90'
 
 export function DeviceAuthorization({ account, initialCode }: { account: string; initialCode: string }) {
@@ -41,7 +41,8 @@ export function DeviceAuthorization({ account, initialCode }: { account: string;
         credentials: 'same-origin', cache: 'no-store', signal,
       })
       if (signal?.aborted) return
-      if (!response.ok) { setState(response.status < 500 ? 'invalid' : 'error'); return }
+      // Better Auth allows 5 lookups per 30 minutes from one address (its expiresIn): 429 is that, not a bad code (review C3).
+      if (!response.ok) { setState(response.status === 429 ? 'rateLimited' : response.status < 500 ? 'invalid' : 'error'); return }
       const data = await response.json() as { client_id?: string; status?: string; device_name?: string | null; device_platform?: string | null; client_version?: string | null }
       if (signal?.aborted) return
       // Better Auth binds review to the signed-in owner. A grant owned by
@@ -114,6 +115,7 @@ export function DeviceAuthorization({ account, initialCode }: { account: string;
         </>}
         {state === 'approved' && <p className="text-sm">{t('returnToTerminal')}</p>}
         {(state === 'approved' || state === 'denied') && <Button size="sm" className={primary + ' self-start'} render={<Link href="/settings?section=computers" />}>{t('done')}</Button>}
+        {state === 'rateLimited' && <FieldError>{t('rateLimited')}</FieldError>}
         {(state === 'invalid' || state === 'error') && <>
           <FieldError>{state === 'invalid' ? t('invalid') : t('failed')}</FieldError>
           <Button size="sm" variant="outline" className="self-start" onClick={() => {
