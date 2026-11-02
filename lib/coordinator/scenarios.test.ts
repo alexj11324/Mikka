@@ -131,3 +131,13 @@ test('no rule left that asks for what is already known', () => {
     /Without a connected subscription the run uses Mikka's default model/,
   ]) assert.doesNotMatch(text, stale)
 })
+
+test('how to draw a card is said once, in the prompt; tools and events only point at it', async () => {
+  const tools = registry.createCoordinatorRegistry(OWNER, COORDINATOR_BOT, undefined, { coordinator: true, computerEnabled: true })
+  assert.match(instructions, /A card in a tool result or event .* is drawn as one BeQuestions choice question exactly as given/)
+  for (const [name, entry] of Object.entries(tools)) assert.doesNotMatch(String(entry.description ?? ''), /each option keeps its value and action/, `${name} repeats the card recipe`)
+  const { eventPrompt } = await import('./context')
+  const offline = eventPrompt({ kind: 'run_finished', issueId: null, runId: 'run-1', payload: { status: 'failed', stopReason: 'machine', noMachine: { title: 't', options: [] } } })
+  assert.match(offline, /Draw this card and dispatch the issue again/)
+  assert.equal((instructions.match(/R-46/g) ?? []).length, 1, 'the secretary tone rule is stated once')
+})
