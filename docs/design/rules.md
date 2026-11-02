@@ -317,6 +317,10 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   - Every row leads with its group's status icon and colour, the phone's set
     (`ThreadStatusIcon`): 进行中 spins, 受阻 a red alert, 等待你 a raised
     hand, 空闲 a slashed circle, 已解决 a green check.
+  - A thread's state badge (an open thread, a task's 线程, a thread chip's
+    card) shows the same icon and the group's word, never the run's raw
+    status: a finished run nobody judged reads 等待你, not 已完成. Only a stop
+    on its way reads 正在停止….
   - A task's existing threads fold into its newest one, which carries
     「第 N 次尝试」 past the first and stays out of 已解决 until the task is
     resolved; the task's own 线程 tab lists every attempt. (New work keeps one
@@ -367,8 +371,10 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   in the right column beside what is in the centre (the chat, or a task with
   its properties), a thread of another bot included, its header naming the
   bot that dispatched it; a task as its own page in the centre, as Linear; an
-  Artifact in its window over the page (R-56); PRs and web pages in a new
-  tab. Projects and teams live under 看板, with no rail item of their own. On
+  Artifact in its window over the page (R-56), which a move from inside it
+  closes; PRs and web pages in a new tab. Projects and teams live under 看板,
+  with no rail item of their own: on them 看板 is the current rail item and no
+  bot list sits beside the page. On
   a phone the right column is a page pushed over the chat. A task page knows
   where it was opened from: its address names that chat or page (`bot=`,
   `section=`, `section=coordinator` for the Coordinator's chat), its first
