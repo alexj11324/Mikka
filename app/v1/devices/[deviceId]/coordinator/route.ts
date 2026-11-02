@@ -2,7 +2,7 @@ import { withDeviceRoute } from '@/lib/device-route'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { nativeCoordinatorCommandSchema } from '@mikka/protocol/coordinator'
-import { authenticateDevice, ownedDevice } from '@/lib/device-link'
+import { authenticateDevice, ownsDevice } from '@/lib/device-link'
 import { nativeCoordinatorEnabled, nativeCoordinatorStore } from '@/lib/coordinator/native'
 import { NativeCoordinatorError } from '@/lib/coordinator/native-store'
 import { maskForWorkspace } from '@/lib/secrets/runtime'
@@ -19,7 +19,7 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
   const caller = await authenticateDevice(request)
   if (!caller) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { deviceId } = await params
-  if (!await ownedDevice(deviceId, caller.userId)) return NextResponse.json({ error: 'Unknown device.' }, { status: 404 })
+  if (!await ownsDevice(deviceId, caller.userId)) return NextResponse.json({ error: 'Unknown device.' }, { status: 404 })
   const raw = await request.text()
   if (raw.length > 550_000) return NextResponse.json({ error: 'payloadTooLarge' }, { status: 413 })
   let json: unknown

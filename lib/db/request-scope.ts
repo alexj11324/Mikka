@@ -4,11 +4,14 @@ import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres'
 import * as schema from './schema'
 import { mikkaDatabaseURL } from './config'
 import { deviceScopedPool } from './device-scope'
+import { sampleClient } from './egress-sample'
 
 const defaultConnectionString = mikkaDatabaseURL(process.env)
 
 function createPool(connectionString = defaultConnectionString) {
-  return new Pool({ connectionString, max: 5, connectionTimeoutMillis: 10000, idleTimeoutMillis: 20000 })
+  const pool = new Pool({ connectionString, max: 5, connectionTimeoutMillis: 10000, idleTimeoutMillis: 20000 })
+  pool.on('connect', client => sampleClient(client))
+  return pool
 }
 
 function createDatabase(client: Pool) {

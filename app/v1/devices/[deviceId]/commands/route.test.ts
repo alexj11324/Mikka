@@ -9,9 +9,9 @@ mock.module(new URL('../../../../../lib/db/index.ts', import.meta.url).href, {
 })
 let actual: typeof import('../../../../../lib/device-link')
 const authenticateDevice = mock.fn(async () => ({ userId: 'owner', tokenId: 'token' }) as object | null)
-const ownedDevice = mock.fn(async () => ({ id: 'device-1', enabled: true }) as object | null)
-const pendingCommands = mock.fn(async (_deviceId: string, _skip: readonly string[], _mailboxNotices?: boolean) => [] as unknown[])
-const queuedRuns = mock.fn(async (_deviceId: string, _skip: readonly string[]) => [] as string[])
+const ownsDevice = mock.fn(async () => ({ id: 'device-1', enabled: true }) as object | null)
+type Work = { commands: unknown[]; queuedRuns: string[] }
+const deviceWork = mock.fn(async (_deviceId: string, _skip: readonly string[], _options?: { mailboxNotices?: boolean; queued?: boolean }): Promise<Work> => ({ commands: [], queuedRuns: [] }))
 const sleep = mock.fn(async (ms: number, signal?: AbortSignal) => actual.sleep(ms, signal))
 const logs: RequestLogEntry[] = []
 for (const method of ['log', 'warn', 'error'] as const) {
@@ -30,7 +30,7 @@ let GET: typeof import('./route')['GET']
 before(async () => {
   actual = await import('../../../../../lib/device-link')
   mock.module(new URL('../../../../../lib/device-link.ts', import.meta.url).href, {
-    namedExports: { authenticateDevice, ownedDevice, pendingCommands, queuedRuns, sleep, waitSeconds: actual.waitSeconds },
+    namedExports: { authenticateDevice, deviceWork, ownsDevice, sleep, waitSeconds: actual.waitSeconds },
   })
   GET = (await import('./route')).GET
 })
@@ -38,12 +38,10 @@ after(() => mock.restoreAll())
 beforeEach(() => {
   authenticateDevice.mock.resetCalls()
   authenticateDevice.mock.mockImplementation(async () => ({ userId: 'owner', tokenId: 'token' }))
-  ownedDevice.mock.resetCalls()
-  ownedDevice.mock.mockImplementation(async () => ({ id: 'device-1', enabled: true }))
-  queuedRuns.mock.resetCalls()
-  queuedRuns.mock.mockImplementation(async () => [])
-  pendingCommands.mock.resetCalls()
-  pendingCommands.mock.mockImplementation(async () => [])
+  ownsDevice.mock.resetCalls()
+  ownsDevice.mock.mockImplementation(async () => ({ id: 'device-1', enabled: true }))
+  deviceWork.mock.resetCalls()
+  deviceWork.mock.mockImplementation(async () => ({ commands: [], queuedRuns: [] }))
   sleep.mock.resetCalls()
   sleep.mock.mockImplementation(actual.sleep)
   logs.length = 0
@@ -59,7 +57,7 @@ test('an already disconnected client never queries pending commands', async () =
   const controller = new AbortController()
   controller.abort()
   assert.equal((await GET(request(controller.signal), params)).status, 204)
-  assert.equal(pendingCommands.mock.callCount(), 0)
+  assert.equal(deviceWork.mock.callCount(), 0)
   assert.equal(sleep.mock.callCount(), 0)
   assert.equal(logs[0].outcome, 'ignored')
 })
@@ -72,27 +70,28 @@ test('disconnect during the idle wait cancels the timer and prevents the next da
     await waiting
   })
   assert.equal((await GET(request(controller.signal), params)).status, 204)
-  assert.equal(pendingCommands.mock.callCount(), 1)
+  assert.equal(deviceWork.mock.callCount(), 1)
   assert.equal(sleep.mock.callCount(), 1)
+  assert.equal(sleep.mock.calls[0].arguments[0], 2_000, 'an idle device is checked every 2 s')
   assert.equal(sleep.mock.calls[0].arguments[1]?.aborted, true)
   assert.equal(logs[0].outcome, 'ignored')
 })
 
 test('disconnect while a query is in flight prevents waiting or another query', async () => {
   const controller = new AbortController()
-  pendingCommands.mock.mockImplementation(async () => { controller.abort(); return [] })
+  deviceWork.mock.mockImplementation(async () => { controller.abort(); return { commands: [], queuedRuns: [] } })
   assert.equal((await GET(request(controller.signal), params)).status, 204)
-  assert.equal(pendingCommands.mock.callCount(), 1)
+  assert.equal(deviceWork.mock.callCount(), 1)
   assert.equal(sleep.mock.callCount(), 0)
 })
 
 test('work returns immediately and a zero-wait empty queue is recorded separately', async () => {
   const commands = [{ kind: 'stop', runId: 'run-1' }]
-  pendingCommands.mock.mockImplementation(async () => commands)
+  deviceWork.mock.mockImplementation(async () => ({ commands, queuedRuns: [] }))
   assert.deepEqual(await (await GET(request(), params)).json(), { commands })
   assert.equal(sleep.mock.callCount(), 0)
   assert.equal(logs[0].outcome, 'work')
-  pendingCommands.mock.mockImplementation(async () => [])
+  deviceWork.mock.mockImplementation(async () => ({ commands: [], queuedRuns: [] }))
   assert.deepEqual(await (await GET(request(undefined, 0), params)).json(), { commands: [] })
   assert.equal(logs[1].outcome, 'empty')
   assert.ok(logs.every(entry => entry.route === '/v1/devices/[deviceId]/commands'))
@@ -103,9 +102,9 @@ test('authentication and ownership failures do not query the queue or label an e
   authenticateDevice.mock.mockImplementation(async () => null)
   assert.equal((await GET(request(), params)).status, 401)
   authenticateDevice.mock.mockImplementation(async () => ({ userId: 'owner', tokenId: 'token' }))
-  ownedDevice.mock.mockImplementation(async () => null)
+  ownsDevice.mock.mockImplementation(async () => null)
   assert.equal((await GET(request(), params)).status, 404)
-  assert.equal(pendingCommands.mock.callCount(), 0)
+  assert.equal(deviceWork.mock.callCount(), 0)
   assert.ok(logs.every(entry => entry.outcome === undefined))
 })
 
@@ -119,23 +118,23 @@ test('sleep accepts an already aborted signal and still supports ordinary waits'
 
 test('a queued run ends the long-poll at once so the device claims it without waiting for a heartbeat', async () => {
   let polls = 0
-  queuedRuns.mock.mockImplementation(async () => (++polls >= 2 ? ['run-new'] : []))
+  deviceWork.mock.mockImplementation(async () => ({ commands: [], queuedRuns: ++polls >= 2 ? ['run-new'] : [] }))
   sleep.mock.mockImplementation(async () => {})
   assert.deepEqual(await (await GET(request(undefined, 25, 'run-old'), params)).json(), { commands: [], queuedRuns: ['run-new'] })
   assert.equal(sleep.mock.callCount(), 1)
-  assert.deepEqual(queuedRuns.mock.calls[0].arguments, ['device-1', ['run-old']])
+  assert.deepEqual(deviceWork.mock.calls[0].arguments, ['device-1', ['run-old'], { mailboxNotices: false, queued: true }], 'one read per check finds both commands and queued runs')
   assert.equal(logs[0].outcome, 'work')
 })
 
 test('a device with scheduling off is never offered queued runs', async () => {
-  ownedDevice.mock.mockImplementation(async () => ({ id: 'device-1', enabled: false }))
+  ownsDevice.mock.mockImplementation(async () => ({ id: 'device-1', enabled: false }))
   assert.deepEqual(await (await GET(request(undefined, 0), params)).json(), { commands: [] })
-  assert.equal(queuedRuns.mock.callCount(), 0)
+  assert.equal(deviceWork.mock.calls[0].arguments[2]?.queued, false)
 })
 
 test('mailbox notice commands require a capable daemon so older clients keep receiving stop and input', async () => {
   await GET(request(undefined, 0), params)
-  assert.equal(pendingCommands.mock.calls[0].arguments[2], false)
+  assert.equal(deviceWork.mock.calls[0].arguments[2]?.mailboxNotices, false)
   await GET(request(undefined, 0, '', true), params)
-  assert.equal(pendingCommands.mock.calls[1].arguments[2], true)
+  assert.equal(deviceWork.mock.calls[1].arguments[2]?.mailboxNotices, true)
 })
