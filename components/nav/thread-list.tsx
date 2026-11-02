@@ -91,7 +91,7 @@ function ThreadRow({ thread, group, issues, all, now, onOpenThread }: { thread: 
 }
 
 /**
- * The right column's thread list (R-52): 进行中 → 受阻 → 等待你 → 空闲 →
+ * The right column's thread list (R-52): 等待你 → 进行中 → 受阻 → 空闲 →
  * 已解决, each with its count; 已解决 starts collapsed. Outside 进行中 the
  * judged outcome places a thread, so a failed or blocked run never reads as
  * resolved. Picking a thread opens it beside the chat, as a thread card does;
