@@ -34,16 +34,15 @@ its existing protected status names and real acceptance coverage.
 
 ## Cloud worker template release
 
-Being replaced: cloud machines move to E2B's own desktop, Codex and Claude Code
-templates ([decision 2026-11-01-2335](../../docs/design/decisions/2026-11-01-2335-e2b-official-templates.md)).
-Until then this workflow keeps releasing the current template.
+Cloud machines start from E2B's own `desktop`, `claude` and `codex` templates
+with the Mikka worker added ([decision 2026-11-01-2335](../../docs/design/decisions/2026-11-01-2335-e2b-official-templates.md)).
 
-- `e2b-template.yml` builds the E2B worker template from `main`, makes it
-  public and points Vercel Production at it (template id and worker hash in one
-  request), then redeploys Production. A `check` job first compares the worker
+- `e2b-template.yml` builds the three templates from `main`, makes them
+  public and points Vercel Production at them (all three template ids and the
+  worker hash in one request), then redeploys Production. A `check` job first compares the worker
   hash with Production's and stops when it is unchanged. Pull requests run only
-  its unit tests. Branch testing uses a `-dev` template built from the branch,
-  never the production template or Vercel's production variables
+  its unit tests. Branch testing uses `-dev` templates built from the branch,
+  never the production templates or Vercel's production variables
   (`docs/dev-workflow.md` § 7).
   The build job holds only `E2B_API_KEY` (Infisical `prod:/vercel`) and the
   check and publish jobs only `VERCEL_TEAM_TOKEN` (`prod:/platform`), both read through the
