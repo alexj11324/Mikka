@@ -30,6 +30,7 @@ import { ChatComposer } from './chat-composer'
 import { BotModelPicker } from './bot-model-picker'
 import { useCoordinatorSubmit } from './use-coordinator-submit'
 import { useCoordinatorStream } from './use-coordinator-stream'
+import { useLiveCitations } from './use-live-citations'
 import { ThreadCard } from './thread-card'
 import { ToolsUsed } from './tools-used'
 import { MessageReactions, useMessageReactions } from '@/components/workspace/message-reactions'
@@ -220,6 +221,8 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   const previews = useLinkPreviews(items.filter(item => item.from === 'coordinator').map(item => item.text))
   const sources = data?.sources
   const citations = useMemo<AgentCitations>(() => ({ sources: sources ?? {}, previews, onOpenIssue }), [sources, previews, onOpenIssue])
+  // A live reply cites tasks and threads the stored chat may not know yet; they are looked up as it streams.
+  const live = useLiveCitations(stream.replies.map(reply => reply.text), citations)
   // What the person said next after each reply, so a choice card shows its answer after a reload.
   const answers = useMemo(() => {
     const next = new Map<number, string>()
@@ -358,7 +361,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
             </Fragment>)}
             {stream.replies.map(reply => <MessageScrollerItem key={reply.id} messageId={reply.id} data-coordinator-stream-id={reply.id} data-streaming={reply.committedThrough === undefined} className={cn('[content-visibility:visible]', arriving(`stream-${reply.id}`) && ENTER)}>
               <Message align="start"><MessageContent>
-                <CoordinatorReply text={reply.text} citations={citations} isStreaming={reply.committedThrough === undefined} />
+                <CoordinatorReply text={reply.text} citations={reply.committedThrough === undefined ? live.streaming : live.settled} isStreaming={reply.committedThrough === undefined} />
               </MessageContent></Message>
             </MessageScrollerItem>)}
             {failed && <MessageScrollerItem messageId="failed" data-testid="failed-message" className="[content-visibility:visible]">
