@@ -290,8 +290,9 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   and 资料库 (library). The bot creates routines when asked in chat; files are
   uploaded with the composer's 「+」.
 - **R-52** Every thread list, web and phone, groups its rows in this order:
-  进行中（N）, 受阻（N）, 等待你（N）, 空闲（N）, 已解决（N）
-  (Running, Blocked, Waiting for you, Idle, Resolved). A group header is
+  等待你（N）, 进行中（N）, 受阻（N）, 空闲（N）, 已解决（N）
+  (Waiting for you, Running, Blocked, Idle, Resolved;
+  [order](decisions/2026-11-02-0300-waiting-for-you-first.md)). A group header is
   muted text (「等待你（2）」) followed by a thin rule filling the rest of
   the row. 已解决 is collapsed by default behind a chevron. Never a 「今天」
   or 「今天完成」 group
