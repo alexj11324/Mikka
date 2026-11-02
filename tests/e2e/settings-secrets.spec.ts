@@ -5,7 +5,7 @@ import { attachLightDark } from './settings-v4-shots'
 // 密钥与登录 › 工作区 (was N5 密钥与环境) against the real secrets store (ephemeral WORKSPACE_SECRETS_KEY).
 test('管理员添加、批量添加、改说明和删除密钥，值不回显，顶部切换回我的', async ({ page }, testInfo) => {
   await registerInTeam(page, '/settings?section=secrets')
-  await expect(page.getByRole('heading', { level: 1, name: '密钥与登录' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: '密钥与环境' })).toBeVisible()
   const side = page.getByRole('group', { name: '密钥归属' })
   await expect(side.getByRole('button', { name: 'E2E 团队' })).toHaveAttribute('aria-pressed', 'true')
   await expect(page.getByText('还没有密钥。')).toBeVisible()
@@ -79,6 +79,7 @@ test('管理员添加、批量添加、改说明和删除密钥，值不回显�
   await side.getByRole('button', { name: '我的', exact: true }).click()
   await expect(page.getByRole('region', { name: '网站登录' })).toBeVisible()
   await expect(page.getByRole('heading', { level: 1, name: '密钥与登录' })).toBeVisible()
+  await expect(side.getByRole('button', { name: '我的', exact: true })).toHaveAttribute('aria-pressed', 'true')
   await side.getByRole('button', { name: 'E2E 团队', exact: true }).click()
   await expect(table.getByText('TURBO_TOKEN')).toBeVisible()
 })
