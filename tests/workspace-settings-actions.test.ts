@@ -32,7 +32,7 @@ before(async () => {
   mock.module('@/lib/issue-access', { namedExports: { requireUser: async () => ({ id: actor.userId, email: actor.email, name: actor.name }) } })
   mock.module('@/lib/workspace-admin/general', { namedExports: {
     updateWorkspaceGeneral: respond('updateWorkspaceGeneral', { id: actor.workspaceId, name: 'New', slug: 'new', icon: null }),
-    readWorkspaceGeneral: async (...args: unknown[]) => { calls.push(['readWorkspaceGeneral', ...args]); return { id: args[1], name: 'Old', slug: 'old', icon: null, canEdit: true, canTransfer: true } },
+    readWorkspaceGeneral: async (...args: unknown[]) => { calls.push(['readWorkspaceGeneral', ...args]); return { id: args[1], name: 'Old', slug: 'old', icon: null, canEdit: true, canTransfer: true, personal: false } },
     workspaceDeletionImpact: respond('workspaceDeletionImpact', { bots: 3, tasks: 128, teams: 3, purchasedPoints: 1200 }),
     workspaceTransferTargets: respond('workspaceTransferTargets', [{ userId: 'm-1', name: 'Mia', email: 'm@example.invalid' }]),
     transferWorkspaceOwnership: respond('transferWorkspaceOwnership', { owner: { userId: 'm-1', name: 'Mia', email: 'm@example.invalid' }, previousRole: 'member' }),
@@ -79,7 +79,7 @@ test('updateWorkspace targets the workspace the settings page shows; a rename al
 
 test('general and deletion impact reads go through the same actor', async () => {
   reset()
-  assert.deepEqual(await actions.getWorkspaceGeneral(), { id: actor.workspaceId, name: 'Old', slug: 'old', icon: null, canEdit: true, canTransfer: true })
+  assert.deepEqual(await actions.getWorkspaceGeneral(), { id: actor.workspaceId, name: 'Old', slug: 'old', icon: null, canEdit: true, canTransfer: true, personal: false })
   assert.deepEqual(await actions.getWorkspaceDeletionImpact(actor.workspaceId), { bots: 3, tasks: 128, teams: 3, purchasedPoints: 1200 })
   assert.deepEqual(relevant(), [['readWorkspaceGeneral', actor.userId, actor.workspaceId], ['workspaceDeletionImpact', actor.userId, actor.workspaceId]])
 })

@@ -121,6 +121,7 @@ export const ACTION_ERROR_CODES = [
   'workspaceMemberExists',
   'workspacePaymentTaken',
   'workspacePersonal',
+  'workspacePersonalDelete',
   'workspaceMemberNotFound',
   'workspaceLastAdmin',
   'inviteInvalid',
