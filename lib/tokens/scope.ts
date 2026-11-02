@@ -14,14 +14,19 @@ type ApiUser = { id: string; [tokenWorkspace]?: string }
 
 type Scope = { workspaceId: string; personal: () => Promise<boolean> }
 
+/** Whether this workspace is the user's own personal workspace. */
+export async function isPersonalWorkspace(userId: string, workspaceId: string) {
+  const result = await workspacePool.query(`SELECT 1 FROM mikka_workspaces WHERE id=$1 AND "userId"=$2 AND kind='personal'`, [workspaceId, userId])
+  return Boolean(result.rowCount)
+}
+
 function tokenScope(user: ApiUser): Scope | null {
   const workspaceId = user[tokenWorkspace]
   if (!workspaceId) return null
   let personal: Promise<boolean> | undefined
   return {
     workspaceId,
-    personal: () => personal ??= workspacePool.query(`SELECT 1 FROM mikka_workspaces WHERE id=$1 AND "userId"=$2 AND kind='personal'`, [workspaceId, user.id])
-      .then(result => Boolean(result.rowCount)),
+    personal: () => personal ??= isPersonalWorkspace(user.id, workspaceId),
   }
 }
 

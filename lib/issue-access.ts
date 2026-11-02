@@ -7,12 +7,9 @@ import { actingContext } from '@/lib/activity-actor'
 import { db } from '@/lib/db'
 import { issues } from '@/lib/db/schema'
 import { issueTeamAccess } from '@/lib/issue-team-access'
-import { issueVisibility } from '@/lib/issue-visibility'
+import { issueVisibility, type IssueReader } from '@/lib/issue-visibility'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 import { tokenWorkspace } from '@/lib/tokens/principal'
-
-/** A user id, or an API user whose access token is scoped to one workspace. */
-type IssueReader = string | { id: string; [tokenWorkspace]?: string }
 
 export async function requireUser() {
   const user = await currentUser()
@@ -34,7 +31,7 @@ async function findIssueForUser(reader: IssueReader, id: string, includeDeleted:
   const acting = actingContext.getStore()
   const workspaceId = typeof reader === 'string' ? (acting?.userId === reader ? acting.tokenWorkspaceId : undefined) : reader[tokenWorkspace]
   const access = await issueTeamAccess(id, userId)
-  const visibility = await issueVisibility(userId, includeDeleted, workspaceId, executor)
+  const visibility = await issueVisibility(reader, includeDeleted, workspaceId, executor)
   const [row] = await executor.select({ issue: issues }).from(issues)
     .where(and(eq(issues.id, id), visibility.predicate)).limit(1)
   if (!row || (!includeDeleted && readIssueMetadata(row.issue.content).deletedAt)) return null

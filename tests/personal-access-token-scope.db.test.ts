@@ -221,6 +221,39 @@ test('a workspace token stays in its workspace on thread, evidence, proposal and
     // A bare id, as the Coordinator and MCP pass, keeps the owner's reach.
     assert.equal((await actAs(owner, () => requireIssueAccess(otherIssue))).issue.id, otherIssue)
   })
+  await t.test('tasks: a team token reaches only its workspace tasks; the personal token keeps personal and unlinked ones', async () => {
+    const [{ actAs }, { requireIssueAccess, issueForUser }, { getApiSession }] = await Promise.all([import('../lib/acting-user'), import('../lib/issue-access'), import('../lib/api-auth')])
+    const tasks = await import('../app/api/mobile/tasks/route')
+    const search = await import('../app/api/issues/search/route')
+    const personalTask = randomUUID(), unlinkedTask = randomUUID()
+    await pool.query(`INSERT INTO issues (id,"userId",title,content,status,priority) VALUES ($1,$2,'Mine','{"type":"doc"}','todo','normal')`, [personalTask, owner])
+    await pool.query(`INSERT INTO issues (id,"userId",title,content,status,priority,scope) VALUES ($1,$2,'Loose','{"type":"doc"}','todo','normal','workspace')`, [unlinkedTask, owner])
+    const ids = [ownIssue, personalTask, unlinkedTask]
+    const reach = async () => {
+      const listed = (await call(tasks.GET, '/api/mobile/tasks', {})).body.tasks.map((item: { id: string }) => item.id)
+      const found = (await call(search.GET, '/api/issues/search?q=', {})).body.items.map((item: { id: string }) => item.id)
+      const session = bearer ? await getApiSession({ headers: new Headers({ authorization: `Bearer ${bearer}` }) }) : null
+      const user = session?.user ?? owner
+      const read = await Promise.all(ids.map(async id => Boolean(await issueForUser(user, id))))
+      const acted = await Promise.all(ids.map(id => actAs(user, () => requireIssueAccess(id)).then(() => true, () => false)))
+      return { listed: ids.map(id => listed.includes(id)), searched: ids.map(id => found.includes(id)), read, acted }
+    }
+    try {
+      // [W-linked task, personal task, unlinked task]
+      assert.deepEqual(await reach(), { listed: [true, false, false], searched: [true, false, false], read: [true, false, false], acted: [true, false, false] })
+      bearer = personalToken.token
+      assert.deepEqual(await reach(), { listed: [false, true, true], searched: [false, true, true], read: [false, true, true], acted: [false, true, true] })
+      // A browser session: unchanged, the owner's tasks wherever they are.
+      bearer = null; browser = true
+      const read = await Promise.all(ids.map(async id => Boolean(await issueForUser(owner, id))))
+      assert.deepEqual(read, [true, true, true])
+      const found = (await call(search.GET, `/api/issues/search?q=&workspaceId=${ws.id}`, {})).body.items.map((item: { id: string }) => item.id)
+      assert.deepEqual(ids.map(id => found.includes(id)), [true, true, true])
+    } finally {
+      bearer = token.token; browser = false
+      await pool.query('DELETE FROM issues WHERE id=ANY($1::uuid[])', [[personalTask, unlinkedTask]])
+    }
+  })
   await t.test('self-improvement reads a run of the token workspace only', async () => {
     const route = await import('../app/api/self-improvement/route')
     assert.equal((await call(route.GET, `/api/self-improvement?runId=${ownRun}`, {})).status, 200)
