@@ -113,6 +113,8 @@
 --color-shell-chrome: var(--shell-chrome);
 --color-shell-panel: var(--shell-panel);
 --color-shell-raised: var(--shell-raised);
+/* macOS translucent window: the veil over the window's material behind the bar, rail and list (docs/design/platforms.md). */
+--color-shell-material: var(--shell-material);
 --color-avatar-1: var(--avatar-1);
 --color-avatar-2: var(--avatar-2);
 --color-avatar-3: var(--avatar-3);
@@ -200,6 +202,7 @@
 --shell-chrome: oklch(0.97 0 0);
 --shell-panel: oklch(0.982 0 0);
 --shell-raised: oklch(1 0 0);
+--shell-material: oklch(0.95 0 0 / 75%);
 --avatar-1: var(--color-blue-500);
 --avatar-2: var(--color-pink-500);
 --avatar-3: var(--color-emerald-500);
@@ -287,6 +290,7 @@
 --shell-chrome: oklch(0.12 0 0);
 --shell-panel: oklch(0.185 0 0);
 --shell-raised: oklch(0.255 0 0);
+--shell-material: oklch(0.22 0 0 / 82%);
 --avatar-1: var(--color-blue-500);
 --avatar-2: var(--color-pink-500);
 --avatar-3: var(--color-emerald-500);
