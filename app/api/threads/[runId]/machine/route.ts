@@ -14,7 +14,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ run
     if (!session?.user) return respond({ error: 'authRequired' }, 401)
     if (request.headers.get('origin') !== new URL(request.url).origin) return respond({ error: 'Invalid origin' }, 403)
     const runId = z.uuid().parse((await params).runId)
-    const { action } = z.object({ action: z.enum(['pause', 'resume', 'end', 'desktop']) }).strict().parse(await request.json())
+    const { action } = z.object({ action: z.enum(['pause', 'resume', 'end']) }).strict().parse(await request.json())
     const context = await loadWorkspaceContext(undefined, session.user)
     return respond(await threadMachineAction(pool, { userId: session.user.id, workspaceId: context.workspace.id }, runId, action), 200)
   } catch (error) {

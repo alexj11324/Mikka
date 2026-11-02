@@ -393,6 +393,14 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     assert.equal((await pool.query('SELECT status FROM agent_runs WHERE id=$1', [deniedRepository.runId])).rows[0].status, 'queued', 'a deny workspace still queues a repository task')
     await store.operate(actor, bot.id, 'wake')
     assert.equal(computerAllowed, false, 'waking a denied desktop cannot re-enable the driver')
+    // The 电脑 policy binds Agents, not people (#959): under deny the owner still views and takes
+    // over the Bot's desktop, and every lease it publishes keeps refusing agent actions.
+    assert.ok(await store.operate(actor, bot.id, 'viewer'), 'the owner can view a denied Bot desktop')
+    assert.ok(await store.operate(actor, bot.id, 'takeover'), 'the owner can take over a denied Bot desktop')
+    const deniedHold = syncedLeases.at(-1) as unknown as { controlledBy: string | null; computerAllowed: boolean }
+    assert.deepEqual({ controlledBy: deniedHold.controlledBy, computerAllowed: deniedHold.computerAllowed }, { controlledBy: actor.userId, computerAllowed: false })
+    await store.operate(actor, bot.id, 'handback')
+    assert.equal(computerAllowed, false, 'handing back under deny leaves agent actions refused')
     await store.setPolicy(actor.workspaceId, 'allow')
     assert.equal(computerAllowed, true)
     assert.equal((await pool.query('SELECT version FROM workspace_computer_policies WHERE "workspaceId"=$1', [actor.workspaceId])).rows[0].version, 2)
