@@ -33,7 +33,7 @@ test('hosted controls on isolated PostgreSQL', { skip: !url }, async (t) => {
   await pool.query(`CREATE TABLE "user" (id text primary key,email text not null);
     CREATE TABLE workspace_credit_grants (id uuid primary key,"workspaceId" uuid not null,points integer not null,bucket text not null);
     CREATE TABLE workspace_audit_events (id uuid primary key,"workspaceId" uuid,"actorType" text,"actorName" text,action text,category text,metadata jsonb);
-    CREATE TABLE mikka_workspaces(id uuid primary key);
+    CREATE TABLE mikka_workspaces(id uuid primary key,"userId" text);
     CREATE TABLE bots (id uuid primary key,"workspaceId" uuid);
     CREATE TABLE coordinator_events (id uuid primary key,"botId" uuid,kind text,payload jsonb)`)
   const old = randomUUID()
@@ -47,8 +47,9 @@ test('hosted controls on isolated PostgreSQL', { skip: !url }, async (t) => {
   )
   await pool.query(readFileSync('drizzle/20261101130000_hosted_usage_concurrent.sql', 'utf8'))
   const store = new HostedUsageStore(pool)
-  /** `n` messages the people sent in this workspace's chats, plus a 重试 and a welcome request that never count. */
-  const sent = async (workspaceId: string, n: number) => {
+  /** `n` messages sent in this workspace's chats (created by `creator`), plus a 重试 and a welcome request that never count. */
+  const sent = async (workspaceId: string, n: number, creator = `creator-${workspaceId}`) => {
+    await pool.query('INSERT INTO mikka_workspaces VALUES ($1,$2) ON CONFLICT (id) DO NOTHING', [workspaceId, creator])
     const bot = randomUUID()
     await pool.query('INSERT INTO bots VALUES ($1,$2)', [bot, workspaceId])
     for (let i = 0; i < n; i++) await pool.query(`INSERT INTO coordinator_events VALUES ($1,$2,'user_message',$3)`, [randomUUID(), bot, JSON.stringify({ text: `message ${i}` })])
@@ -59,7 +60,7 @@ test('hosted controls on isolated PostgreSQL', { skip: !url }, async (t) => {
     await store.verify(id, 'cus_fixture', `card_${id}`)
     return id
   }
-  await t.test('no card: the first 20 messages are answered, paid by the platform, once per workspace; the 21st needs a card', async () => {
+  await t.test('no card: the first 20 messages are answered, paid by the platform, once per person; the 21st needs a card', async () => {
     const fresh = randomUUID()
     // Nothing sent yet (the welcome turn): admitted, 20 left.
     assert.deepEqual([(await store.status(fresh)).state, (await store.status(fresh)).trialLeft], ['ready', 20])
@@ -83,6 +84,19 @@ test('hosted controls on isolated PostgreSQL', { skip: !url }, async (t) => {
     await store.verify(fresh, 'cus_trial', `card_${fresh}`)
     assert.equal((await store.balance(fresh)).free, 1e6)
     assert.equal((await store.status(fresh)).trialLeft, null)
+  })
+  await t.test('the free messages are the person\'s: a second workspace they create shares the same 20', async () => {
+    const first = randomUUID(), second = randomUUID(), someoneElse = randomUUID()
+    await sent(first, 15, 'pat')
+    await sent(second, 0, 'pat')
+    assert.equal((await store.status(second)).trialLeft, 5, 'a new workspace starts where the person is')
+    await sent(second, 5, 'pat')
+    await store.reserve(second, 'fixture', randomUUID())
+    await sent(second, 1, 'pat')
+    await assert.rejects(store.reserve(second, 'fixture', randomUUID()), /verification_required/)
+    await assert.rejects(store.reserve(first, 'fixture', randomUUID()), /verification_required/, 'the first one is used up too')
+    await sent(someoneElse, 0, 'sam')
+    assert.equal((await store.status(someoneElse)).trialLeft, 20, 'another person keeps their own')
   })
   await t.test(
     'legacy snapshot contains existing workspaces only',
