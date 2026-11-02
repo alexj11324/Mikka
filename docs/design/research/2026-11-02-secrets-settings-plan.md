@@ -3,7 +3,7 @@
 基线：main `ffeb5b1`（#1056）。
 
 - Devin 调研：[`2026-11-02-devin-secrets.md`](2026-11-02-devin-secrets.md)
-- 设计稿：Figma https://www.figma.com/design/kVQC1aa6P0tPI1SQ0PjC6V （页「密钥与登录 v1」，10 屏 + 说明）；同样的稿子在 [`assets/secrets/`](assets/secrets/)（`screens.html` 和 `01.png`…`11.png`）
+- 设计稿：Figma https://www.figma.com/design/kVQC1aa6P0tPI1SQ0PjC6V （页「密钥与登录 v3」，10 屏 + 说明；v1、v2 已废弃）；同样的稿子在 [`assets/secrets/`](assets/secrets/)（`screens.html` 和 `01.png`…`11.png`）
 - 顺序：先调研，再画稿，最后才是数据模型和拆 PR（Alex 定的）。§2 按调研结果改过。
 
 ## 1. 现状核实
@@ -93,7 +93,7 @@ user_secrets(id uuid pk, userId text → user(id) ON DELETE CASCADE, name text, 
 3. **个人密钥给 Agent run 和本人 Bot 自己的工具**（见 §8）。
 4. **一个页面加顶部切换**：同意。
 5. **「环境变量」改成「在输出里遮住」开关，默认打开**：同意（Alex，2026-11-02）。放在 PR2。
-6. **不再“只写不读”**：已存的值可以查看和复制，网站登录的密码也一样（Alex，2026-11-02）。见 §10。
+6. **只写不读，和 Devin 一致**（Alex，2026-11-02，撤回了之前「可以查看和复制」的说法）：存进去后能用、能替换、能删除，但不能查看或复制，网站登录密码也一样。服务端任何接口都不返回值。
 
 ## 8. 个人密钥进 Bot 自己的工具（PR3）
 
@@ -108,24 +108,10 @@ user_secrets(id uuid pk, userId text → user(id) ON DELETE CASCADE, name text, 
 - 不做「每次使用前问我」（Alex 的决定）。
 - 网站登录的「说明」和「两步验证密钥」不在 PR1：前者要给 `credentials` 加列、后者要给 `credential_secrets` 加密文，按范围控制放到后面的 PR。
 
-## 10. 查看和复制已存的值（Alex ⑥）
+## 10. 查看和复制（已取消）
 
-**接口**：列表接口仍然不返回值。点 👁 或「复制」时，单独发一个 `reveal` 请求（server action，带会话），服务端校验权限后只返回这一个值，不缓存（`Cache-Control: no-store`），前端用完不写进 SWR 缓存。
+Alex 一度要求已存的值能查看和复制（含网站登录密码），当天又撤回，改为只写不读，和 Devin 一致。原先这里的 reveal 接口、权限、限频方案，以及 PR4（broker reveal），全部不做。保留的约束：列表和任何接口都不返回值、last4 或密文；界面上的 👁 只用来看自己正在输入的内容。
 
-**谁能取**（建议规则，Mikka 没有 ManageOrgSecrets）：
-- 个人密钥、网站登录密码：只有本人。
-- 工作区密钥：和「能不能改」用同一条规则（`secretActionAllowed(role, 'secret.replace')`）。也就是管理员可以取所有的；成员只能取仓库范围的，因为成员本来就能写这些。成员看得到工作区范围的名字，但取不到值。
-
-**审计和频率**：每次查看或复制都记一条，只记名字和动作，不记值。工作区密钥用 `recordAudit`（`secret.revealed`），进团队审计日志；个人密钥和网站登录记进本人的使用记录（网站登录用 `credential_access_events`，decision 记为 `revealed_to_owner`）。频率限制按人计：每 10 分钟最多 20 次，超过返回 `secretRevealRateLimited`；计数直接用上面这些记录，不另建表。
-
-**网站登录密码是难点**：现在的设计是主应用（Vercel `mikka`）只有 KMS GenerateDataKey 权限，**不能解密**；解密只在单独部署的 `mikka-credential-broker`（`kms.ts`：`decrypt` 要求 `role === 'broker'`；`open()` 的注释是 “Main app never calls decrypt”）。要让本人看到密码，有两种做法：
-- A（推荐）：broker 加一个 `reveal` 接口。主应用校验会话和频率后，签一个 30 秒、一次性、绑定 (userId, credentialId) 的租约（沿用 fill lease 的做法），broker 解密后把明文返回给主应用，主应用再返回给浏览器。主应用仍然拿不到 KMS 解密权限，只是明文会经过一次内存。
-- B：给主应用的 AWS 角色加 kms:Decrypt。改动小，但等于放弃“主应用不能解密”这条隔离，不建议。
-A 要改 broker 服务并重新部署、改它的 IAM 策略，所以单独作为 PR4，需要 Alex 确认用 A。
-
-**排期**：
-- PR2：「在输出里遮住」开关；工作区密钥的查看和复制（主应用本来就能用 `WORKSPACE_SECRETS_KEY` 解密）；行上加 👁 和复制按钮；审计；频率限制。
-- PR3：个人密钥的查看和复制（跟 `user_secrets` 一起做）。
-- PR4：网站登录密码的查看和复制（broker `reveal`，做法 A）。
-
-**界面**：列表行默认显示 `••••••••`；👁 切换成明文并在 30 秒后自动收起；「复制」直接复制，不先显示；离开页面就清掉。取不到值的行（成员看工作区范围）不显示这两个按钮。
+**排期（更新后）**：
+- PR2：顶部「我的 / 工作区」切换；成员可见工作区密钥；表格列；`note` 列；批量 .env；「环境变量」改成「在输出里遮住」开关，默认打开（⑤）。
+- PR3：个人密钥（`user_secrets`）、注入 Agent run 和本人 Bot 工具、同名提示与覆盖、打码（§8）。
