@@ -17,7 +17,7 @@ export function Segmented<T extends string>({ options, value, onChange }: { opti
 }
 
 const styles = StyleSheet.create({
-  track: { flexDirection: 'row', padding: 2, borderRadius: 9, backgroundColor: '#E4E4E6' },
+  track: { flexDirection: 'row', padding: 2, borderRadius: 9, backgroundColor: colors.chip },
   segment: { flex: 1, height: 30, borderRadius: 7, alignItems: 'center', justifyContent: 'center' },
   selected: { backgroundColor: colors.surface },
   label: { fontSize: 13, fontWeight: '600' },

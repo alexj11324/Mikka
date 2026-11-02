@@ -67,7 +67,7 @@ export default function ChatsScreen() {
                 <Pressable key={bot.id} accessibilityRole="button" accessibilityLabel={bot.name} onPress={() => router.push(botPath(bot))} style={({ pressed }) => [styles.pin, pressed && { opacity: 0.6 }]}>
                   <View>
                     <BotAvatar color={bot.color} shape={bot.shape} size={96} />
-                    <View style={styles.star}><Symbol name="star.fill" size={12} color="#fff" web={<Text style={styles.starText}>★</Text>} /></View>
+                    <View style={styles.star}><Symbol name="star.fill" size={12} color={colors.onAccent} web={<Text style={styles.starText}>★</Text>} /></View>
                   </View>
                   <Text style={styles.pinName} numberOfLines={1}>{bot.name}</Text>
                 </Pressable>
@@ -89,7 +89,7 @@ const styles = StyleSheet.create({
   pinned: { flexDirection: 'row', paddingHorizontal: 20, paddingTop: 24, paddingBottom: 20, gap: 28 },
   pin: { alignItems: 'center', width: 120, gap: 10 },
   star: { position: 'absolute', right: 2, bottom: 2, width: 28, height: 28, borderRadius: 14, backgroundColor: colors.orange, borderWidth: 3, borderColor: colors.page, alignItems: 'center', justifyContent: 'center' },
-  starText: { color: '#fff', fontSize: 12 },
+  starText: { color: colors.onAccent, fontSize: 12 },
   pinName: { fontSize: 15 },
   center: { paddingTop: 40, alignItems: 'center' },
 })

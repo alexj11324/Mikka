@@ -58,7 +58,7 @@ const styles = StyleSheet.create({
   body: { flex: 1, minWidth: 0, gap: 3 },
   top: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   name: { flex: 1, fontSize: 17, fontWeight: '600' },
-  when: { fontSize: 13, color: colors.tertiary },
+  when: { fontSize: 13, color: colors.secondary },
   line: { fontSize: 15, color: colors.secondary },
   groupIcon: { width: 52, height: 52, borderRadius: 26, backgroundColor: colors.bubble, alignItems: 'center', justifyContent: 'center' },
   groupGlyph: { fontSize: 18, color: colors.secondary },

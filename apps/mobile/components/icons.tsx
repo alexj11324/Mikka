@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { Animated, Easing, View } from 'react-native'
+import { Animated, Easing, useColorScheme, View } from 'react-native'
 import Svg, { Circle, Ellipse, Path, Rect } from 'react-native-svg'
 import { Circle as CircleIcon, CircleAlert, CircleCheck, CircleSlash, Cloud, LoaderCircle, Laptop, Server } from 'lucide-react-native'
 import type { MachineKind, Source, ThreadStatus } from '@/lib/types'
@@ -63,7 +63,7 @@ export function SourceIcon({ source, size = 20 }: { source: Source | 'google'; s
     case 'github':
       return (
         <Svg {...props}>
-          <Path fill="#111" d="M12 .3a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2c-3.3.7-4-1.6-4-1.6-.6-1.4-1.4-1.8-1.4-1.8-1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1.1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-5.9 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C17.3 4.7 18.3 5 18.3 5c.7 1.7.2 2.9.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .3" />
+          <Path fill={colors.ink} d="M12 .3a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2c-3.3.7-4-1.6-4-1.6-.6-1.4-1.4-1.8-1.4-1.8-1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1.1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-5.9 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C17.3 4.7 18.3 5 18.3 5c.7 1.7.2 2.9.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .3" />
         </Svg>
       )
     case 'slack':
@@ -77,7 +77,7 @@ export function SourceIcon({ source, size = 20 }: { source: Source | 'google'; s
       )
     case 'notion':
       return (
-        <Svg {...props} fill="none" stroke="#111" strokeWidth={1.8} strokeLinejoin="round">
+        <Svg {...props} fill="none" stroke={colors.ink} strokeWidth={1.8} strokeLinejoin="round">
           <Rect x={3.5} y={3.5} width={17} height={17} rx={3} />
           <Path d="M8.5 16.5v-9l7 9v-9" strokeLinecap="round" />
         </Svg>
@@ -128,9 +128,11 @@ const SHAPES: Record<string, Shape> = {
 /** The shapes 新建 Bot offers: one per drawing the app has, as the web names them. */
 export const BOT_PICKER_SHAPES = ['cercle', 'squircle', 'nuage', 'goutte', 'fleur', 'chat'] as const
 
-/** A bot's avatar: its blob in its colour and shape, with one bright eye (a still bloub, R-36). The Coordinator is the ink circle. */
+/** A bot's avatar: its blob in its colour and shape, with one bright eye (a still bloub, R-36). The Coordinator is the ink circle; in dark mode ink is drawn crème, as on the web (bot-avatar.tsx). */
 export function BotAvatar({ color = 'encre', shape = 'cercle', size = 24 }: { color?: string; shape?: string; size?: number }) {
-  const c = BOT_COLORS[color] ?? BOT_COLORS.encre
+  const dark = useColorScheme() === 'dark'
+  const known = BOT_COLORS[color] ? color : 'encre'
+  const c = BOT_COLORS[known === 'encre' && dark ? 'creme' : known]
   const body = (() => {
     switch (SHAPES[shape] ?? 'circle') {
       case 'circle': return <Circle cx={12} cy={12} r={10} fill={c} />

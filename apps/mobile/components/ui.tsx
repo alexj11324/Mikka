@@ -1,5 +1,5 @@
 import { type ReactNode, useEffect, useRef, useState } from 'react'
-import { Image, Platform, Pressable, StyleSheet, TextInput, View, type StyleProp, type TextInputInstance, type ViewStyle } from 'react-native'
+import { Image, Platform, Pressable, StyleSheet, TextInput, useColorScheme, View, type StyleProp, type TextInputInstance, type ViewStyle } from 'react-native'
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect'
 import { KeyboardStickyView } from 'react-native-keyboard-controller'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -8,7 +8,7 @@ import { AttachMenu, type AttachSource } from '@/components/AttachMenu'
 import { Text } from '@/components/Text'
 import { MAX_IMAGES, pickImages, pickText, type Attachment } from '@/lib/attachments'
 import { tap } from '@/lib/haptics'
-import { colors, font, lift } from '@/lib/theme'
+import { colors, font, lift, plainColor } from '@/lib/theme'
 
 const glass = Platform.OS === 'ios' && isLiquidGlassAvailable()
 
@@ -90,6 +90,7 @@ export function Composer({ placeholder, onSend, initial = '', disabled = false, 
   /** While the bot answers: send turns into stop until something is typed. */
   onStop?: () => void
 }) {
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light'
   const input = useRef<TextInputInstance>(null)
   // A new quote is something to answer: the keyboard comes up.
   useEffect(() => { if (quote) input.current?.focus() }, [quote])
@@ -133,7 +134,7 @@ export function Composer({ placeholder, onSend, initial = '', disabled = false, 
   }
   return (
     <KeyboardStickyView offset={{ opened: Math.max(insets.bottom, 12) - 8 }} style={overlay ? styles.overlay : undefined}>
-      <View onLayout={event => onHeight?.(event.nativeEvent.layout.height)} style={[styles.composerWrap, overlay && styles.fade, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+      <View onLayout={event => onHeight?.(event.nativeEvent.layout.height)} style={[styles.composerWrap, overlay && fade(scheme), { paddingBottom: Math.max(insets.bottom, 12) }]}>
         {files.length || problem ? (
           <View style={styles.tray}>
             {files.map(file => (
@@ -142,7 +143,7 @@ export function Composer({ placeholder, onSend, initial = '', disabled = false, 
                   ? <Image source={{ uri: file.uri }} style={styles.thumbImage} accessibilityLabel="照片" />
                   : <><FileText size={16} color={colors.ink} strokeWidth={1.8} /><Text style={styles.fileName} numberOfLines={1}>{file.name}</Text></>}
                 <Pressable accessibilityRole="button" accessibilityLabel="移除" hitSlop={8} onPress={() => setFiles(list => list.filter(item => item.key !== file.key))} style={styles.remove}>
-                  <X size={12} color="#fff" strokeWidth={3} />
+                  <X size={12} color={colors.onInk} strokeWidth={3} />
                 </Pressable>
               </View>
             ))}
@@ -161,19 +162,19 @@ export function Composer({ placeholder, onSend, initial = '', disabled = false, 
             </View>
           ) : null}
           <TextInput ref={input} value={text} onChangeText={setText} placeholder={placeholder} editable={!blocked} multiline autoFocus={autoFocus}
-            placeholderTextColor={colors.tertiary} style={[styles.input, sending && { color: colors.secondary }]} />
+            placeholderTextColor={colors.secondary} style={[styles.input, sending && { color: colors.secondary }]} />
           <View style={styles.fieldRow}>
             {attach ? <AttachMenu images={images < MAX_IMAGES} onPick={pick} /> : null}
             {accessory}
             <View style={{ flex: 1 }} />
             {onStop && empty && !sending ? (
               <Pressable accessibilityRole="button" accessibilityLabel="停止" onPress={() => { tap(); onStop() }} style={styles.send}>
-                <Square size={14} color="#fff" fill="#fff" strokeWidth={2.4} />
+                <Square size={14} color={colors.onAccent} fill={colors.onAccent} strokeWidth={2.4} />
               </Pressable>
             ) : (
               <Pressable accessibilityRole="button" accessibilityLabel="发送" accessibilityState={{ disabled: blocked || empty }} onPress={() => void send()} disabled={blocked}
                 style={[styles.send, (blocked || empty) && { backgroundColor: colors.tertiary }]}>
-                <ArrowUp size={20} color="#fff" strokeWidth={2.4} />
+                <ArrowUp size={20} color={colors.onAccent} strokeWidth={2.4} />
               </Pressable>
             )}
           </View>
@@ -187,7 +188,7 @@ export function Composer({ placeholder, onSend, initial = '', disabled = false, 
 export function Capsule({ children }: { children: ReactNode }) {
   return glass
     ? <GlassView style={styles.capsule}>{children}</GlassView>
-    : <View style={[styles.capsule, { backgroundColor: '#fff' }, lift]}>{children}</View>
+    : <View style={[styles.capsule, { backgroundColor: colors.surface }, lift]}>{children}</View>
 }
 
 /** A field's surface (the composer, the drawer's search): Liquid Glass on iOS 26, white with a lift elsewhere. */
@@ -217,9 +218,15 @@ export function Dot({ color = colors.unread }: { color?: string }) {
   return <View style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: color }} />
 }
 
+/** The composer's fade over the end of the list, in the page's colour for the scheme (a CSS gradient takes no system colour). */
+function fade(scheme: 'light' | 'dark') {
+  const page = plainColor('page', scheme)
+  return { paddingTop: 28, backgroundImage: `linear-gradient(to bottom, ${page}00 0%, ${page}D9 45%, ${page}F7 100%)` }
+}
+
 const styles = StyleSheet.create({
-  round: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', ...lift },
-  dot: { position: 'absolute', top: 8, right: 9, width: 8, height: 8, borderRadius: 4, backgroundColor: colors.unread, borderWidth: 1.5, borderColor: '#fff' },
+  round: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', ...lift },
+  dot: { position: 'absolute', top: 8, right: 9, width: 8, height: 8, borderRadius: 4, backgroundColor: colors.unread, borderWidth: 1.5, borderColor: colors.surface },
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 8, zIndex: 10 },
   side: { width: 64 },
   titleBox: { flex: 1, alignItems: 'center' },
@@ -229,9 +236,8 @@ const styles = StyleSheet.create({
   composerWrap: { paddingHorizontal: 16, paddingTop: 10, gap: 8 },
   overlay: { position: 'absolute', left: 0, right: 0, bottom: 0 },
   // What scrolls under the composer fades out, as under the iOS bar at the top.
-  fade: { paddingTop: 28, backgroundImage: 'linear-gradient(to bottom, rgba(255,255,255,0) 0%, rgba(255,255,255,0.85) 45%, rgba(255,255,255,0.97) 100%)' },
   capsule: { flexDirection: 'row', alignItems: 'center', gap: 8, height: 40, paddingHorizontal: 16, borderRadius: 20, maxWidth: 220 },
-  field: { borderRadius: 26, backgroundColor: '#fff', paddingHorizontal: 8, paddingTop: 8, paddingBottom: 8, gap: 4 },
+  field: { borderRadius: 26, backgroundColor: colors.surface, paddingHorizontal: 8, paddingTop: 8, paddingBottom: 8, gap: 4 },
   fieldRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   quote: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 4, paddingLeft: 14, paddingRight: 10, height: 36, borderRadius: 18, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.separator },
   quoteText: { flex: 1, minWidth: 0, fontSize: 14, color: colors.secondary },
@@ -244,7 +250,7 @@ const styles = StyleSheet.create({
   fileName: { fontSize: 14, flexShrink: 1 },
   remove: { position: 'absolute', top: -6, right: -6, width: 20, height: 20, borderRadius: 10, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center' },
   problem: { fontSize: 13, color: colors.danger },
-  send: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
+  send: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.accentFill, alignItems: 'center', justifyContent: 'center' },
   groupLabel: { fontSize: 13, color: colors.secondary, marginLeft: 16, marginBottom: 7 },
   group: { backgroundColor: colors.surface, borderRadius: 14, overflow: 'hidden' },
   separator: { height: StyleSheet.hairlineWidth, backgroundColor: colors.separator, marginLeft: 16 },

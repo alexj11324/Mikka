@@ -53,7 +53,7 @@ export default function NewGroup() {
         right={{ icon: 'checkmark', label: '创建', web: <Check size={20} color={colors.ink} />, onPress: () => void create() }} />
       <ScrollView {...underBar} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.body}>
         <Field style={styles.field}>
-          <TextInput value={title} onChangeText={setTitle} placeholder="群名" placeholderTextColor={colors.tertiary} maxLength={200} autoFocus
+          <TextInput value={title} onChangeText={setTitle} placeholder="群名" placeholderTextColor={colors.secondary} maxLength={200} autoFocus
             style={styles.input} accessibilityLabel="群名" />
         </Field>
         {failed ? <Text style={styles.problem}>没能创建</Text> : null}

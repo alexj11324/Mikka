@@ -56,8 +56,8 @@ export function SignIn() {
       </View>
       <Text style={styles.or}>或</Text>
       <View style={{ gap: 10 }}>
-        <TextInput value={email} onChangeText={setEmail} placeholder="邮箱" placeholderTextColor={colors.tertiary} autoCapitalize="none" autoComplete="email" keyboardType="email-address" textContentType="emailAddress" style={styles.input} />
-        <TextInput value={password} onChangeText={setPassword} placeholder="密码" placeholderTextColor={colors.tertiary} secureTextEntry autoComplete="current-password" textContentType="password" style={styles.input} onSubmitEditing={submit} />
+        <TextInput value={email} onChangeText={setEmail} placeholder="邮箱" placeholderTextColor={colors.secondary} autoCapitalize="none" autoComplete="email" keyboardType="email-address" textContentType="emailAddress" style={styles.input} />
+        <TextInput value={password} onChangeText={setPassword} placeholder="密码" placeholderTextColor={colors.secondary} secureTextEntry autoComplete="current-password" textContentType="password" style={styles.input} onSubmitEditing={submit} />
         <Pressable accessibilityRole="button" disabled={busy || !email.trim() || !password} onPress={submit} style={({ pressed }) => [styles.submit, (busy || !email.trim() || !password) && { opacity: 0.4 }, pressed && { opacity: 0.85 }]}>
           <Text style={styles.submitText}>登录</Text>
         </Pressable>
@@ -77,6 +77,6 @@ const styles = StyleSheet.create({
   or: { alignSelf: 'center', color: colors.secondary, fontSize: 13 },
   input: { height: 52, borderRadius: 14, backgroundColor: colors.bubble, paddingHorizontal: 16, fontSize: 16, fontFamily: font, color: colors.text, outlineStyle: 'none' } as never,
   submit: { height: 52, borderRadius: 26, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
-  submitText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  submitText: { color: colors.onInk, fontSize: 16, fontWeight: '600' },
   error: { color: colors.danger, fontSize: 13, textAlign: 'center' },
 })
