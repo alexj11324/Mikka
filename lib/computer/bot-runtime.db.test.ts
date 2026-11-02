@@ -60,6 +60,20 @@ test('a bot runtime follows its computer to a new device and survives an unbound
     const moved = await agents()
     assert.deepEqual(moved.map(r => [r.harness, r.agentId, r.deviceId, r.repoDevice]), before.map(r => [r.harness, r.agentId, second, second]))
     assert.equal(Number((await pool.query('SELECT count(*) FROM agents WHERE "userId"=$1', [owner])).rows[0].count), 2, 'no extra agent is created')
+
+    // A runtime row removed without its agents (a bot handed over and back, production 2026-11-02): the wake takes
+    // this owner's hidden agents back instead of failing on their name (23505).
+    await pool.query('DELETE FROM bot_cloud_runtimes WHERE "botId"=$1', [botId])
+    await ensureBotRuntime(pool, actor, botId, sandbox, second)
+    assert.deepEqual((await agents()).map(r => [r.harness, r.agentId]), before.map(r => [r.harness, r.agentId]), 'the same agents again')
+
+    // Only this owner's hidden agent on this device: an ordinary agent with that name, or one on another device, is never taken.
+    await pool.query('DELETE FROM bot_cloud_runtimes WHERE "botId"=$1', [botId])
+    const [claude, codex] = before
+    await pool.query('UPDATE agents SET instructions=$2 WHERE id=$1', [claude.agentId, 'Ordinary agent the person wrote'])
+    await pool.query('UPDATE agents SET "deviceId"=$2 WHERE id=$1', [codex.agentId, first])
+    await assert.rejects(ensureBotRuntime(pool, actor, botId, sandbox, second), (error: { code?: string }) => error.code === '23505')
+    assert.equal((await agents()).length, 0, 'nothing taken over, nothing half-made')
   } finally {
     // Not pool.end() then a FORCE drop: the drop could kill a still-closing client (57P01, uncaught).
     await dropTestDatabase(admin, database, pool)

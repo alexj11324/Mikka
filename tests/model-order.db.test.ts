@@ -200,7 +200,18 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
     // The thread's model is the only one tried; it never falls back to the list, which has a model that runs (opus).
     const notOffered = await resolveModelDispatch(pool, ctx, { harness: 'codex', model: 'acct-opus-c' })
     assert.deepEqual([notOffered.kind, notOffered.kind === 'none' && notOffered.reason, notOffered.kind === 'none' && notOffered.card.description], ['none', 'notOffered', '没有订阅或 Key 能用 Codex 跑 acct-opus-c'])
+    // Only the Agent named (「派给 Codex」): nothing offers Codex yet, so the card names the Agent alone.
+    const noCodex = await resolveModelDispatch(pool, ctx, { harness: 'codex' })
+    assert.deepEqual([noCodex.kind === 'none' && noCodex.reason, noCodex.kind === 'none' && noCodex.card.description], ['notOffered', '没有订阅或 Key 能用 Codex'])
+    // Only Claude Code named: its first model in the list, the same one the list would run.
+    const claudeOnly = await resolveModelDispatch(pool, ctx, { harness: 'claude_code' })
+    assert.equal(claudeOnly.kind === 'device' && claudeOnly.entry.harness, 'claude_code')
+    const byList = await resolveModelDispatch(pool, ctx)
+    assert.equal(claudeOnly.kind === 'device' && claudeOnly.model, byList.kind === 'device' && byList.model)
     await subscribe(scope, 'codex', ['acct-codex-z'])
+    // Codex connected but not in the list: its first offered model, and the card says what keeps it from running.
+    const codexOnly = await resolveModelDispatch(pool, ctx, { harness: 'codex' })
+    assert.deepEqual([codexOnly.kind === 'none' && codexOnly.reason, codexOnly.kind === 'none' && codexOnly.card.description], ['pickedNoDevice', '没有电脑能用 Codex 跑 acct-codex-z'])
     const noComputer = await resolveModelDispatch(pool, ctx, { harness: 'codex', model: 'acct-codex-z' })
     assert.deepEqual([noComputer.kind === 'none' && noComputer.reason, noComputer.kind === 'none' && noComputer.card.description, noComputer.kind === 'none' && noComputer.card.options.map(option => option.action)],
       ['pickedNoDevice', '没有电脑能用 Codex 跑 acct-codex-z', ['connectServer', 'modelSettings']])

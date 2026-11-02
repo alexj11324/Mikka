@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { Animated, Easing, useColorScheme, View } from 'react-native'
 import Svg, { Circle, Ellipse, Path, Rect } from 'react-native-svg'
-import { Circle as CircleIcon, CircleAlert, CircleCheck, CircleSlash, Cloud, LoaderCircle, Laptop, Server } from 'lucide-react-native'
+import { Circle as CircleIcon, CircleAlert, CircleCheck, CirclePause, CircleSlash, Cloud, LoaderCircle, Laptop, Server } from 'lucide-react-native'
 import type { MachineKind, Source, ThreadStatus } from '@/lib/types'
 import { colors } from '@/lib/theme'
 
@@ -35,6 +35,7 @@ export function StatusIcon({ status, size = 18 }: { status: ThreadStatus; size?:
   switch (status) {
     case 'running': return <Spinner size={size} />
     case 'waiting': return <CircleIcon size={size} color={colors.secondary} strokeWidth={2} />
+    case 'paused': return <CirclePause size={size} color={colors.secondary} strokeWidth={2} />
     case 'failed': return <CircleAlert size={size} color={colors.danger} strokeWidth={2} />
     case 'done': return <CircleCheck size={size} color={colors.success} strokeWidth={2} />
     case 'stopped': return <CircleSlash size={size} color={colors.secondary} strokeWidth={2} />
