@@ -38,9 +38,9 @@ export function freezeWorkerDefinition(input: { harness: Harness; instructions: 
   const subscription = input.subscription ? { bindingId:z.uuid().parse(input.subscription.id),modelId:z.string().regex(/^[A-Za-z0-9._:-]{1,128}$/).parse(input.subscription.modelId),route:input.subscription.route } : undefined
   if (subscription && subscription.route !== (input.harness === 'codex' ? 'codex_cli' : input.harness === 'claude_code' ? 'claude_code_cli' : null)) throw new Error('agentWorkerSubscriptionMismatch')
   if (subscription && input.model && input.model !== subscription.modelId) throw new Error('agentWorkerSubscriptionMismatch')
-  // Managed credentials pin the provider's full model id. Device slot aliases
-  // cannot replace the identity checked by native leases and model requests.
-  const model = apiKey?.model ?? subscription?.modelId ?? input.model
+  // Explicit dispatches already carry the provider model from their exact
+  // binding. A subscription alone preserves the existing CLI auto selection.
+  const model = apiKey?.model ?? input.model
   const tools = input.mailboxEnabled ? snapshotMailboxTools(input.parent) : []
   const mailbox = tools.length && input.mailboxScope && ['claude_code', 'codex'].includes(input.harness)
     ? { version: 2 as const, tools, scope: workerMailboxScope.parse(input.mailboxScope) } : undefined

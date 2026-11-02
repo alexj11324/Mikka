@@ -231,7 +231,7 @@ test('quota exhausted mid-run: continue on the person\'s key, else pause with th
     const p = await person('quota-same-model')
     await subscribe(p)
     const runId = await running(p, 'claude_code')
-    assert.equal((await row(runId)).agentDefinition.model, 'subscription-model', 'the default preference still pins its provider model at execution')
+    assert.equal((await row(runId)).agentDefinition.cliModelSelection, 'auto', 'a subscription without an explicit dispatch model retains CLI auto')
     const chatKey = await keys.addApiKey(pool, p.id, { provider: 'deepseek', apiKey: `fixture-chat-${randomUUID()}` }, { fetch: models(['deepseek-chat']) })
     await keys.setBotApiKeyChoice(pool, { ownerId: p.id, workspaceId: p.workspaceId }, p.botId, chatKey.id, 'deepseek-chat')
     await quotaEnd(p, runId, resetsAt)
