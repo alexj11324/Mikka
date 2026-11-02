@@ -350,8 +350,7 @@ export async function openThreadDesktop(pool: Pool, actor: Actor, runId: string,
     await client.query('BEGIN')
     await client.query("SET LOCAL lock_timeout = '5s'")
     await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`computer-policy:${actor.workspaceId}`])
-    const run = (await client.query(`SELECT r."deviceId",repo."remoteUrl" FROM agent_runs r LEFT JOIN device_repos repo ON repo.id=r."deviceRepoId" AND repo."userId"=r."userId"
-      WHERE r.id=$1 AND r."userId"=$2 FOR SHARE OF r`, [runId, actor.userId])).rows[0]
+    const run = (await client.query('SELECT "deviceId" FROM agent_runs WHERE id=$1 AND "userId"=$2 FOR SHARE', [runId, actor.userId])).rows[0]
     if (!run?.deviceId) throw new ComputerError(404, 'Thread unavailable')
     const machine = (await client.query(`SELECT t.* FROM thread_machines t
       JOIN computer_run_bindings bnd ON bnd."runId"=t."runId" AND bnd."botId"=t."botId" AND bnd."workspaceId"=t."workspaceId" AND bnd."ownerId"=t."ownerId"
@@ -360,8 +359,6 @@ export async function openThreadDesktop(pool: Pool, actor: Actor, runId: string,
       WHERE t."runId"=$1 AND t."ownerId"=$2 AND t."workspaceId"=$3 AND t."deviceId"=$4 AND t.state<>'ended' AND t."sandboxId" IS NOT NULL
       FOR UPDATE OF t FOR SHARE OF d`, [runId, actor.userId, actor.workspaceId, run.deviceId])).rows[0]
     if (!machine) throw new ComputerError(404, 'Thread unavailable')
-    // A repository task runs on E2B's claude or codex template, which has no desktop (decision 2026-11-01-2335).
-    if (run.remoteUrl) throw new ComputerError(409, 'No desktop on this thread')
     const policy = (await client.query('SELECT permission,version FROM workspace_computer_policies WHERE "workspaceId"=$1', [actor.workspaceId])).rows[0]
     const permission = computerPermission(policy?.permission), policyVersion = Number(policy?.version ?? 0)
     if (permission === 'deny') throw new ComputerError(403, 'Computer use is disabled')
