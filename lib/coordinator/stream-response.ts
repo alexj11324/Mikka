@@ -3,7 +3,7 @@ import { QUIET_REPLY } from '@/lib/attention/handoff'
 import { credentialMasker, maskDeep } from '@/lib/secrets/mask'
 import type { CoordinatorStreamEvent, CoordinatorWorkflowStreamPart } from './stream'
 import { TOOL_PREVIEW_CHARS } from './chat-projection'
-import { HIDDEN_TOOLS } from './context'
+import { HIDDEN_TOOLS, jsonbText } from './context'
 
 /**
  * The start of a tool's input or output as text, masked as stored messages are; nothing when it would still
@@ -12,7 +12,8 @@ import { HIDDEN_TOOLS } from './context'
 function preview(userId: string, value: unknown, fingerprints: SecretFingerprint[]): string | undefined {
   if (value === undefined || value === null) return undefined
   const masked = maskDeep(value, credentialMasker)
-  const text = (typeof masked === 'string' ? masked : JSON.stringify(masked) ?? '').slice(0, TOOL_PREVIEW_CHARS)
+  // As the stored chat prints it (jsonb), so a preview cut at the limit reads the same live and stored.
+  const text = (typeof masked === 'string' ? masked : jsonbText(masked)).slice(0, TOOL_PREVIEW_CHARS)
   if (!text) return undefined
   try { assertNoSecret(userId, text, fingerprints) } catch { return undefined }
   return text

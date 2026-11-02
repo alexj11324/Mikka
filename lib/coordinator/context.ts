@@ -297,14 +297,25 @@ function toolPreview(compact: unknown, value: unknown): string | undefined {
   return (typeof value === 'string' ? value : jsonbText(value)).slice(0, 200) || undefined
 }
 
+const utf8 = new TextEncoder()
+/** jsonb's key order: shorter keys first (in UTF-8 bytes), then bytewise. */
+function jsonbKeyOrder(a: string, b: string): number {
+  const left = utf8.encode(a), right = utf8.encode(b)
+  if (left.length !== right.length) return left.length - right.length
+  for (let i = 0; i < left.length; i++) if (left[i] !== right[i]) return left[i] - right[i]
+  return 0
+}
+
 /**
- * A value as Postgres prints jsonb (`{"a": 1, "b": [1, 2]}`), so a preview built from the full message reads
- * the same as the compact projection's `left(p->>'input', 200)`. Stored rows come back in jsonb's key order.
+ * A value as Postgres prints jsonb (`{"a": 1, "b": [1, 2]}`, keys in jsonb's order), so a preview built from the
+ * full message or the live stream reads the same as the compact projection's `left(p->>'input', 200)`, cut at the
+ * same character.
  */
-function jsonbText(value: unknown): string {
+export function jsonbText(value: unknown): string {
   if (value === null || typeof value !== 'object') return JSON.stringify(value) ?? ''
   if (Array.isArray(value)) return `[${value.map(item => item === undefined ? 'null' : jsonbText(item)).join(', ')}]`
-  return `{${Object.entries(value).filter(([, item]) => item !== undefined).map(([key, item]) => `${JSON.stringify(key)}: ${jsonbText(item)}`).join(', ')}}`
+  return `{${Object.entries(value).filter(([, item]) => item !== undefined).sort(([a], [b]) => jsonbKeyOrder(a, b))
+    .map(([key, item]) => `${JSON.stringify(key)}: ${jsonbText(item)}`).join(', ')}}`
 }
 
 export interface ChatItem {

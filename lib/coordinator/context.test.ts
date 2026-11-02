@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { ModelMessage } from 'ai'
-import { chatItems, compactionCut, COMPACT_AT_TOKENS, estimateTokens, eventPrompt, forgetNotes, instructionsWithMemory, KEEP_RECENT_TOKENS, MEMORY_MAX_CHARS, promptMessages, rememberNote, type StoredMessage } from './context'
+import { chatItems, jsonbText, compactionCut, COMPACT_AT_TOKENS, estimateTokens, eventPrompt, forgetNotes, instructionsWithMemory, KEEP_RECENT_TOKENS, MEMORY_MAX_CHARS, promptMessages, rememberNote, type StoredMessage } from './context'
 import { modelMessage, pointsSwitchMessage, quotaSwitchMessage, sourcedEventMessage } from './message-safety'
 
 function stored(messages: ModelMessage[]): StoredMessage[] {
@@ -339,4 +339,9 @@ test('a run ended because its daemon is too old tells the Bot to have the person
   const prompt = eventPrompt({ kind: 'run_finished', issueId: 'i1', runId: 'r1', payload: { status: 'failed', stopReason: 'error', daemonUpgradeRequired: true } })
   assert.match(prompt, /Mikka on that device needs an update/)
   assert.match(prompt, /Nothing is wrong with their GitHub/)
+})
+
+test('a preview prints a value as Postgres prints jsonb: its key order, ", " and ": "', () => {
+  assert.equal(jsonbText({ title: 'Fix', id: 2, aa: [1, { é: null, z: true }], skipped: undefined }), '{"aa": [1, {"z": true, "é": null}], "id": 2, "title": "Fix"}')
+  assert.equal(jsonbText('text'), '"text"')
 })
