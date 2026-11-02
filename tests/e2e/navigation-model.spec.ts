@@ -89,10 +89,13 @@ test('a task opened from the chat is its own page; back returns to the chat, for
   await page.goForward()
   await expect(taskTitle(page)).toHaveValue(title)
 
-  // Closing the task is a step too, and back reopens it.
+  // Closing a task opened from the chat is the same step as back: no new entry, and forward reopens it.
+  const entries = await page.evaluate(() => window.history.length)
   await page.getByRole('button', { name: '关闭任务详情', exact: true }).click()
   await expect(chat(page)).toBeVisible()
-  await back(page)
+  await expect(taskTitle(page)).toHaveCount(0)
+  expect(await page.evaluate(() => window.history.length)).toBe(entries)
+  await page.goForward()
   await expect(taskTitle(page)).toHaveValue(title)
 })
 
@@ -284,4 +287,13 @@ test('全部线程: another bot\'s thread opens beside the current chat, naming 
   await expectThreadBesideChat(page, runId)
   await expect(conversationPill(page)).toHaveText('Coordinator')
   await expect(threadIn(page)).toContainText('写作助手 派出线程')
+
+  // Closing it returns to 全部线程, and it is the same step as back: back does not reopen it.
+  const entries = await page.evaluate(() => window.history.length)
+  await threadIn(page).getByRole('button', { name: '关闭线程', exact: true }).click()
+  await expect(column(page)).toHaveCount(0)
+  await expect(panel.getByRole('tab', { name: '全部线程', exact: true })).toHaveAttribute('aria-selected', 'true')
+  await expect(panel.getByRole('button').filter({ hasText: /别的 Bot 任务/ }).first()).toBeVisible()
+  expect(await page.evaluate(() => window.history.length)).toBe(entries)
+  expect(query(page).get('thread')).toBeNull()
 })

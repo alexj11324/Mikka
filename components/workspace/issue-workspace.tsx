@@ -54,7 +54,7 @@ import { WorkspaceContentLoading, WorkspaceLoading } from './workspace-loading'
 import { PluginsPage } from '@/components/plugins/plugins-view'
 import { SuggestionFeed } from '@/components/suggestions/suggestion-feed'
 import { ArtifactLibrary } from '@/components/artifacts/artifact-library'
-import { dropQueryKeys, goTo, NAVIGATE_EVENT, openThread, queryMoved, readLocation, sameLocation, type WorkspaceLocation, type WorkspaceSection } from './workspace-navigation'
+import { closeTo, dropQueryKeys, goTo, NAVIGATE_EVENT, openThread, queryMoved, readLocation, sameLocation, type WorkspaceLocation, type WorkspaceSection } from './workspace-navigation'
 import { pushSettingsHistory, requestShellSearch, takeShellSearchRequest } from '@/lib/settings-navigation'
 import { resolveSettingsSection, type SettingsSectionId } from '@/lib/settings-sections'
 import { bufferTypeAhead, typingOrDialog } from '@/lib/shortcut-guard'
@@ -335,6 +335,13 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
       // A directly opened/reloaded detail has no remembered in-memory section.
       // Its Board breadcrumb must still return to issues, not the default Projects page.
       const back = id === null && directDetail.current ? changeSection(teamId ? 'team-issues' : 'all-issues') : {}
+      // Closing a task is back when it was opened from here; popstate then shows the place (M11).
+      if (id === null) {
+        if (closeTo({ ...back, issue: null })) return
+        applySelection(null)
+        setThreadId(readLocation(new URL(window.location.href).searchParams).thread)
+        return
+      }
       applySelection(id)
       move({ ...back, issue: id })
     }).finally(() => setPendingSelection(undefined))

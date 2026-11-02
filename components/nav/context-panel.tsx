@@ -28,6 +28,12 @@ type Issue = Awaited<ReturnType<typeof listIssues>>[number]
 type PanelView = 'overview' | 'all'
 export type PanelTab = 'details' | 'threads' | 'prs' | 'computer'
 const TABS: readonly PanelTab[] = ['details', 'threads', 'prs', 'computer']
+/**
+ * The view and tab the panel last showed. A thread takes the column and the
+ * panel unmounts; closing the thread mounts it again on the list the thread
+ * was opened from (全部线程 or 概览 › 线程), not on 概览.
+ */
+const lastShown: { view: PanelView; tab: PanelTab } = { view: 'overview', tab: 'threads' }
 /** The right column's width, shared by 概览 and an open thread (R-82): one column, one remembered width. */
 export const PANEL_WIDTH = { storageKey: 'mikka:context-panel-width', min: 320, max: 'half', initial: 360, edge: 'start' } as const
 const WIDE = 520
@@ -119,8 +125,10 @@ export function ContextPanel({ issues, threads, conversation, workspaceId, onOpe
   sheet?: boolean
 }) {
   const t = useTranslations('Shell.panel')
-  const [view, setView] = useState<PanelView>('overview')
-  const [tab, setTab] = useState<PanelTab>('threads')
+  const [view, setShownView] = useState<PanelView>(lastShown.view)
+  const [tab, setShownTab] = useState<PanelTab>(lastShown.tab)
+  const setView = (next: PanelView) => { lastShown.view = next; setShownView(next) }
+  const setTab = (next: PanelTab) => { lastShown.tab = next; setShownTab(next) }
   // The header's search filters this column's lists in place (R-50); null while it is closed.
   const [query, setQuery] = useState<string | null>(null)
   const filter = (list: Thread[]) => query ? list.filter(thread => matches(query, threadName(thread, issues, ''), thread.lastReply)) : list
@@ -151,7 +159,7 @@ export function ContextPanel({ issues, threads, conversation, workspaceId, onOpe
   const computerTab = useComputerTab()
   const computer = (computerTab ? chatBotId : null) ?? (cloudComputer ? registered?.botId : undefined)
   // A conversation whose bot works on its computer opens on its screen (Figma 103:64).
-  useEffect(() => { if (registered?.runId) { setView('overview'); setTab('computer') } }, [registered?.runId])
+  useEffect(() => { if (registered?.runId) { Object.assign(lastShown, { view: 'overview', tab: 'computer' }); setShownView('overview'); setShownTab('computer') } }, [registered?.runId])
   // No computer here (the kill switch is on): no 电脑 tab.
   const tabs = computer ? TABS : TABS.filter(item => item !== 'computer')
   const shown = tabs.includes(tab) ? tab : 'threads'

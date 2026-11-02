@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { readLocation, sameLocation, sectionFromQuery, workspaceHref, workspaceLink, workspaceSearch, writeSectionQuery } from './workspace-navigation'
+import { closeTo, goTo, readLocation, sameLocation, sectionFromQuery, workspaceHref, workspaceLink, workspaceSearch, writeSectionQuery } from './workspace-navigation'
 
 const BOT = '3f0c9d2e-5b1a-4c7e-9f00-1a2b3c4d5e6f'
 const ISSUE = 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d'
@@ -78,4 +78,56 @@ test('a thread sits beside its centre: a new centre closes it unless the move na
   assert.equal(workspaceHref(chatWithThread, { thread: null }), `/mikka?bot=${BOT}`)
   assert.equal(workspaceHref(at('/mikka'), { thread: RUN }), `/mikka?thread=${RUN}`)
   assert.equal(readLocation(new URLSearchParams('thread=nope')).thread, null)
+})
+
+/** A browser history of its own: entries with state, back moves the index. */
+function fakeBrowser(path: string, state: unknown = { __NA: true }) {
+  const entries = [{ href: path, state }]
+  let index = 0
+  const location = { get href() { return `https://app.example${entries[index].href}` }, get pathname() { return new URL(this.href).pathname }, get search() { return new URL(this.href).search }, hash: '' }
+  const history = {
+    get state() { return entries[index].state },
+    get length() { return entries.length },
+    pushState(next: unknown, _: string, href: string) { entries.splice(index + 1, Infinity, { href, state: next }); index++ },
+    replaceState(next: unknown, _: string, href: string) { entries[index] = { href, state: next } },
+    back() { if (index > 0) index-- },
+  }
+  Object.assign(globalThis, { window: { location, history } })
+  return { history, path: () => entries[index].href }
+}
+
+test('closing a thread or task opened from here is back: no new entry, and back does not reopen it', () => {
+  const browser = fakeBrowser(`/?bot=${BOT}`)
+  goTo({ thread: RUN })
+  assert.equal(browser.history.length, 2)
+  assert.equal(closeTo({ thread: null }), true)
+  assert.equal(browser.path(), `/?bot=${BOT}`)
+  assert.equal(browser.history.length, 2)
+
+  goTo({ issue: ISSUE })
+  assert.equal(closeTo({ issue: null }), true)
+  assert.equal(browser.path(), `/?bot=${BOT}`)
+})
+
+test('closing what a link opened replaces the entry, so back does not reopen it either', () => {
+  const browser = fakeBrowser(`/?thread=${RUN}`)
+  assert.equal(closeTo({ thread: null }), false)
+  assert.equal(browser.path(), '/')
+  assert.equal(browser.history.length, 1)
+})
+
+test('a close that lands somewhere else than the pushed-from place replaces, and Next\'s state is kept', () => {
+  const browser = fakeBrowser('/?section=all-issues')
+  goTo({ issue: ISSUE })
+  assert.equal((browser.history.state as { __NA?: boolean }).__NA, true)
+  assert.equal(closeTo({ section: 'coordinator', issue: null }), false)
+  assert.equal(browser.path(), '/')
+  assert.equal(browser.history.length, 2)
+})
+
+test('a null history state stays null on push', () => {
+  const browser = fakeBrowser('/', null)
+  goTo({ thread: RUN })
+  assert.equal(browser.history.state, null)
+  assert.equal(closeTo({ thread: null }), false)
 })

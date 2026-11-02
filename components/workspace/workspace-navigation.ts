@@ -107,13 +107,36 @@ export function workspaceLink(place: Partial<WorkspaceLocation>): string {
 /** The query the workspace last wrote or showed; see queryMoved. */
 let seenQuery: string | null = null
 
+/** History-state key on an entry the workspace pushed: the address it was pushed from. */
+const PUSHED_FROM = 'mikkaPushedFrom'
+
 function write(href: string, mode: 'push' | 'replace') {
   const current = `${window.location.pathname}${window.location.search}${window.location.hash}`
   if (href !== current) {
-    if (mode === 'push') window.history.pushState(window.history.state, '', href)
-    else window.history.replaceState(window.history.state, '', href)
+    const state: unknown = window.history.state
+    // Next keeps its own keys in the state; ours rides along, and a null state stays null.
+    if (mode === 'push') window.history.pushState(state && typeof state === 'object' ? { ...state, [PUSHED_FROM]: current } : state, '', href)
+    else window.history.replaceState(state, '', href)
   }
   seenQuery = window.location.search
+}
+
+/**
+ * Closing what a move opened (a thread, a task) is the same step as back: when
+ * this entry was pushed from exactly where closing lands, go back, so back
+ * afterwards does not reopen what was just closed. Otherwise (a link or a
+ * reload opened it) the close replaces the entry. True when it went back; the
+ * popstate that follows shows the place.
+ */
+export function closeTo(change: Partial<WorkspaceLocation>): boolean {
+  const href = workspaceHref(new URL(window.location.href), change)
+  const state: unknown = window.history.state
+  if (state && typeof state === 'object' && (state as Record<string, unknown>)[PUSHED_FROM] === href) {
+    window.history.back()
+    return true
+  }
+  write(href, 'replace')
+  return false
 }
 
 /**
@@ -182,7 +205,7 @@ export function openThread(runId: string) {
   navigate({ thread: runId })
 }
 
-/** Closes the open thread; the right column shows 概览 again. */
+/** Closes the open thread; the right column shows the list it was opened from again. */
 export function closeThread() {
-  navigate({ thread: null })
+  if (!closeTo({ thread: null })) window.dispatchEvent(new Event(NAVIGATE_EVENT))
 }
