@@ -79,8 +79,9 @@ export function SuggestionFeed({ onOpenIssue, onConnect, onSent }: { onOpenIssue
   // min-w-0 on both halves: one long unbroken line in a card must not widen its half and push the chat off screen.
   return <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-clip md:flex-row">
     <section aria-labelledby="suggestions-title" className="flex min-h-0 min-w-0 flex-1 flex-col md:basis-1/2">
-      <header className="flex items-center justify-between gap-3 px-6 pt-6 pb-4">
-        <h1 id="suggestions-title" className="text-2xl font-semibold">{t('title')}</h1>
+      <header className="flex items-center justify-between gap-3 px-6 pt-6 pb-4 max-md:justify-end">
+        {/* Phones name the page in the header bar above (R-40). */}
+        <h1 id="suggestions-title" className="text-2xl font-semibold max-md:sr-only">{t('title')}</h1>
         <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label={t('refresh')} disabled={isValidating} onClick={() => { void mutate().then(() => toast.success(t('refreshed')), () => toast.error(t('refreshFailed'))) }} />}><RotateCw data-icon="inline-start" className={cn(isValidating && 'animate-spin')} /></TooltipTrigger><TooltipContent>{t('refresh')}</TooltipContent></Tooltip>
       </header>
       <div className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto px-6 pb-6">

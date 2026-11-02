@@ -6,7 +6,7 @@ import { Globe } from 'lucide-react'
 import { GitHubIcon } from '@/components/icons/brand-icons'
 import { useFormatter, useTranslations } from 'next-intl'
 import { getLinkPreview } from '@/app/actions/link-preview'
-import { CITATION_HREF, splitCitations, type CitationKind, type CitationSource, type IssueSource, type RunSource } from '@/lib/coordinator/citations'
+import { CITATION_HREF, splitCitations, type CitationKind, type CitationSource, type IssueSource, type RunSource, runThreadName } from '@/lib/coordinator/citations'
 import type { LinkPreview } from '@/lib/link-preview-parse'
 import { cn } from 'cn'
 import { HarnessMark } from '@/components/labels/entity-labels'
@@ -145,15 +145,16 @@ export function RunCitation({ run }: { run: RunSource }) {
   const harness = run.harness === 'claude_code' ? 'Claude Code' : 'Codex'
   // The chip shows the thread's state, as the thread card and the Threads list do; the coding agent's mark is in the hover card (R-78).
   const issue = run.issue
+  const name = runThreadName(run)
   const status = t.has(`runStatus.${run.status}` as never) ? t(`runStatus.${run.status}` as never) : run.status
   return <InlineCitation>
     <InlineCitationTrigger
       variant="object"
-      aria-label={issue ? t('openThread', { name: run.name }) : t('runOf', { agent: run.agentName })}
+      aria-label={issue ? t('openThread', { name }) : t('runOf', { agent: run.agentName })}
       onClick={issue ? () => openThread(run.id) : undefined}
     >
       <ThreadStatusIcon status={run.status} outcome={run.outcome} small />
-      <InlineCitationLabel>{run.name}</InlineCitationLabel>
+      <InlineCitationLabel>{name}</InlineCitationLabel>
     </InlineCitationTrigger>
     <InlineCitationContent>
       <InlineCitationBody>

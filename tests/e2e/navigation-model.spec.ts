@@ -183,7 +183,9 @@ async function seedThread(email: string, issueTitle: string, { otherBot }: { oth
 }
 
 const column = (page: Page) => page.locator('[data-slot="thread-column"]')
-const threadIn = (page: Page) => column(page).getByRole('region', { name: THREAD, exact: true })
+// Beside a chat the thread is named for its task, as its row in the thread list (glossary, D9).
+const threadIn = (page: Page) => column(page).getByRole('region', { name: /^(?:\S+ )?(?:线程任务|别的 Bot 任务) [0-9a-f-]{36}$/ })
+const threadCard = (page: Page, title: string) => page.getByRole('button', { name: new RegExp(`^打开线程 (?:\\S+ )?${title}$`) }).first()
 
 async function chatWithThread(page: Page) {
   const { email } = await register(page)
@@ -204,8 +206,8 @@ async function expectThreadBesideChat(page: Page, runId: string) {
 
 test('a thread card opens the thread beside the chat; back closes it, forward and reload keep it', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 960 })
-  const { runId } = await chatWithThread(page)
-  await page.getByRole('button', { name: `打开线程 ${THREAD}`, exact: true }).first().click()
+  const { title, runId } = await chatWithThread(page)
+  await threadCard(page, title).click()
   await expectThreadBesideChat(page, runId)
   // The bot that dispatched it is named in the thread (R-78, R-82).
   await expect(threadIn(page)).toContainText('Coordinator 派出线程')
@@ -225,10 +227,10 @@ test('a thread card opens the thread beside the chat; back closes it, forward an
 
 test('the thread chip and the right panel\'s 线程 row open the same thread column', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 960 })
-  const { runId } = await chatWithThread(page)
+  const { title, runId } = await chatWithThread(page)
   const reply = page.getByRole('region', { name: 'Coordinator', exact: true })
 
-  await reply.getByRole('button', { name: `打开线程：${THREAD}`, exact: true }).click()
+  await reply.getByRole('button', { name: new RegExp(`^打开线程：(?:\\S+ )?${title}$`) }).click()
   await expectThreadBesideChat(page, runId)
   await threadIn(page).getByRole('button', { name: '关闭线程', exact: true }).click()
   await expect(column(page)).toHaveCount(0)
@@ -244,7 +246,7 @@ test('the thread chip and the right panel\'s 线程 row open the same thread col
 test('打开任务 from a thread opens the task page with the thread still beside it; back returns to the chat and thread', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 960 })
   const { title, issueId, runId } = await chatWithThread(page)
-  await page.getByRole('button', { name: `打开线程 ${THREAD}`, exact: true }).first().click()
+  await threadCard(page, title).click()
   await expectThreadBesideChat(page, runId)
   await threadIn(page).getByRole('button', { name: '打开任务', exact: true }).click()
   await expect(taskTitle(page)).toHaveValue(title)

@@ -31,7 +31,9 @@ test('移动端设置菜单和工作区切换保持一致', async ({ page }) => 
     await openSidebar()
     await switcher.click()
     await page.getByRole('menuitem', { name: '设置', exact: true }).click()
-    await expect(page.getByRole('heading', { name: '偏好设置', exact: true })).toBeVisible()
+    // On a phone the header bar names the page; the H1 stays for screen readers only (M15, R-40).
+    await expect(page.getByRole('navigation', { name: '当前位置', exact: true }).getByText('偏好设置', { exact: true })).toBeVisible()
+    await expect(page.getByRole('heading', { name: '偏好设置', exact: true })).toBeAttached()
     await expect(sidebar).not.toBeVisible()
   }
   async function workspaces() {
@@ -54,7 +56,9 @@ test('移动端设置菜单和工作区切换保持一致', async ({ page }) => 
   await settings()
   await openSidebar()
   await page.getByRole('link', { name: '成员', exact: true }).click()
-  await expect(page.getByRole('heading', { name: '成员', exact: true })).toBeVisible()
+  // On a phone the header bar names the page; the H1 stays for screen readers only (M15, R-40).
+  await expect(page.getByRole('navigation', { name: '当前位置', exact: true }).getByText('成员', { exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '成员', exact: true })).toBeAttached()
   await openSidebar()
   await page.getByRole('link', { name: '常规', exact: true }).click()
   await expect(page.getByLabel('名称', { exact: true })).toHaveValue(name)

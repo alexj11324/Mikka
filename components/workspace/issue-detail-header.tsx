@@ -10,7 +10,7 @@ import { Separator } from '@/components/ui/separator'
 import { SidebarTrigger, useSidebar } from '@/components/ui/sidebar'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
-export type IssueDetailNavigation = { index: number; total: number; onOpen: (offset: -1 | 1) => void }
+export type IssueDetailNavigation = { index: number; total: number; onOpen: (offset: -1 | 1) => void; /** The first crumb, where closing returns: the chat it was opened from; 看板 when absent. */ parent?: string }
 
 export function IssueDetailHeader({ identifier, title, saveLabel, saved, pending, navigation, actions, onClose }: {
   identifier: string | null; title: string; saveLabel: string; saved: boolean; pending: boolean
@@ -36,13 +36,13 @@ export function IssueDetailHeader({ identifier, title, saveLabel, saved, pending
             <DropdownMenuTrigger render={<Button variant="ghost" size="icon-xs" aria-label={tDetail('breadcrumbMore')} />}><BreadcrumbEllipsis /></DropdownMenuTrigger>
             <DropdownMenuContent align="start">
               <DropdownMenuGroup>
-                <DropdownMenuItem disabled={pending} onClick={onClose}>{tDetail('breadcrumbBoard')}</DropdownMenuItem>
+                <DropdownMenuItem disabled={pending} onClick={onClose}>{navigation.parent ?? tDetail('breadcrumbBoard')}</DropdownMenuItem>
               </DropdownMenuGroup>
             </DropdownMenuContent>
           </DropdownMenu>
         </BreadcrumbItem>
         {/* At the list's own size, colour and weight like the crumbs beside it: no button size of its own shrinks the text. */}
-        <BreadcrumbItem className="hidden @2xl/header:inline-flex"><Button variant="ghost" className="h-6 px-2 font-normal" disabled={pending} onClick={onClose}>{tDetail('breadcrumbBoard')}</Button></BreadcrumbItem>
+        <BreadcrumbItem className="hidden @2xl/header:inline-flex"><Button variant="ghost" className="h-6 px-2 font-normal" disabled={pending} onClick={onClose}>{navigation.parent ?? tDetail('breadcrumbBoard')}</Button></BreadcrumbItem>
         <BreadcrumbSeparator />
         <BreadcrumbItem className="min-w-0">
           {identifier ? <><BreadcrumbPage className="shrink-0">{identifier}</BreadcrumbPage>

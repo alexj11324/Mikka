@@ -3520,8 +3520,8 @@
         "discuss": "讨论",
         "delete": "删除",
         "agent": {
-          "running": "运行中",
-          "waiting": "等你处理",
+          "running": "进行中",
+          "waiting": "等待你",
           "blocked": "受阻"
         }
       },
