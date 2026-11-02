@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { STALE_BUILD_EVENT, isStaleBuild, reloadOnce, watchRemovedActions } from './app-build'
+import { STALE_BUILD_EVENT, desktopBelowMinimum, isStaleBuild, minDesktopVersion, reloadOnce, watchRemovedActions } from './app-build'
 
 test('a page is stale only when both builds are known and differ', () => {
   assert.equal(isStaleBuild('dpl_old', 'dpl_new'), true)
@@ -46,3 +46,21 @@ test('a removed server action reloads the page; a second miss within the minute 
   assert.equal(reloads, 1)
   assert.deepEqual(events, [STALE_BUILD_EVENT])
 })
+
+test('the server minimum desktop version is a valid version or nothing', () => {
+  assert.equal(minDesktopVersion('2026.10000.300'), '2026.10000.300')
+  assert.equal(minDesktopVersion(' 1.2.3 '), '1.2.3')
+  assert.equal(minDesktopVersion(''), null)
+  assert.equal(minDesktopVersion(undefined), null)
+  assert.equal(minDesktopVersion('latest'), null)
+})
+
+test('a desktop build below the minimum must update; at or above it, or without one, it need not', () => {
+  assert.equal(desktopBelowMinimum('2026.10000.294', '2026.10000.300'), true)
+  assert.equal(desktopBelowMinimum('2026.10000.300', '2026.10000.300'), false)
+  assert.equal(desktopBelowMinimum('2026.10000.301', '2026.10000.300'), false)
+  assert.equal(desktopBelowMinimum('2026.10000.294', null), false)
+  assert.equal(desktopBelowMinimum('2026.10000.294', 'not-a-version'), false)
+  assert.equal(desktopBelowMinimum(undefined, '2026.10000.300'), false)
+})
+
