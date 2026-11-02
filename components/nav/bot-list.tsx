@@ -152,7 +152,8 @@ function BotListBody({ bots, workspaceId, threads, issues, active, onOpen, onNew
   }
   const listRef = useRef<HTMLDivElement>(null)
   // The inner list keeps its full width while the column folds, so rows never squeeze.
-  useLayoutEffect(() => { listRef.current?.style.setProperty('--bot-list-width', `${width}px`) }, [width])
+  // The desktop column mounts again after the window was phone-sized, so it takes the width again then too.
+  useLayoutEffect(() => { listRef.current?.style.setProperty('--bot-list-width', `${width}px`) }, [width, isMobile])
   function choose(target: ChatTarget) { onOpen(target); setOpenMobile(false) }
   const body = <>
     <SidebarHeader className="px-3 pt-3 pb-1">

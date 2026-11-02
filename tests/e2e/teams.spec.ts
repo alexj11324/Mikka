@@ -116,8 +116,11 @@ test('公开团队创建、搜索、编辑、负责人保护、任务归属和�
   await picker.getByRole('button', { name: '保存关联', exact: true }).click()
   await expect(picker).not.toBeVisible()
   await expect(page.locator('[aria-label="任务列表"]').getByText(publicTitle, { exact: true })).toBeVisible()
+  // A project has its own address (?project=, R-82, #919): the reload reopens it, and the saved relation reads back.
   await page.reload()
-  await page.getByRole('button', { name: '跨团队交付项目', exact: true }).click()
+  await expect(page).toHaveURL(url => url.searchParams.get('section') === 'projects' && Boolean(url.searchParams.get('project')))
+  await expect(page.getByRole('button', { name: '返回项目列表', exact: true })).toBeVisible()
+  await expect(page.getByRole('textbox', { name: '项目名称', exact: true })).toHaveText('跨团队交付项目')
   await expect(page.getByText('工程团队 · 主责', { exact: true })).toBeVisible()
 })
 
