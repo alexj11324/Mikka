@@ -69,7 +69,11 @@ cannot.
 3. **No browser tests**, in CI or locally. Acceptance runs locally through
    the API and the CLI (`pnpm test:local-loop`), and UI changes are checked
    with screenshots of a local production build (`next build`, `next start`). `browser-gate.yml` only keeps the protected
-   check name "Browser tests (before merge)" and passes at once. Decision:
+   check name "Browser tests (before merge)" and passes at once. The specs
+   under `tests/e2e/` and the `test:e2e*` scripts stay in the repository but do
+   not run in CI and are not an acceptance entry point; the one exception,
+   `site-search.yml`, runs `tests/e2e/site-search.spec.ts` as an HTTP API test
+   (Playwright's request client, no browser). Decision:
    [`design/decisions/2026-11-01-1520-no-browser-tests-in-ci.md`](docs/design/decisions/2026-11-01-1520-no-browser-tests-in-ci.md),
    [`design/decisions/2026-11-01-2225-api-cli-acceptance-and-backend-owner.md`](docs/design/decisions/2026-11-01-2225-api-cli-acceptance-and-backend-owner.md).
 
