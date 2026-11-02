@@ -1,4 +1,4 @@
-import { afterEach, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -79,6 +79,7 @@ function maintenanceDaemon() {
     startMaintenance(work: () => Promise<void>): void; checkAutoUpdate(): void
     claimAndStart(id: string): Promise<unknown>; claimAndStartInternal(id: string): Promise<unknown>; offerUpdate(latest: string | undefined): void
     updateCheck: Promise<void> | null; paths: { dataDir: string }
+    handlers(): { 'daemon.update'(params: object): Promise<{ state: string }> }
   }
   internal.supervisor = { heartbeatRuns: () => [] }
   return { daemon, internal, log }
@@ -208,4 +209,60 @@ it('a newer release named by the server installs once, when idle; a failure keep
   internal.checkAutoUpdate()
   await internal.maintenance
   expect(install).toHaveBeenCalledOnce()
+})
+
+describe('daemon.update: the desktop app on this computer asks after it starts', () => {
+  const ask = (internal: ReturnType<typeof maintenanceDaemon>['internal']) => internal.handlers()['daemon.update']({})
+  it('checks the release now and installs a newer one when idle', async () => {
+    const restart = vi.spyOn(service, 'restartService').mockResolvedValue(undefined)
+    const { internal } = maintenanceDaemon()
+    // An hourly check ran 10 minutes ago; the desktop's request does not wait for the next one.
+    writeFileSync(join(internal.paths.dataDir, 'auto-update.json'), JSON.stringify({ lastAttemptAt: Date.now() - 10 * 60_000 }))
+    const install = vi.fn(async () => {})
+    internal.options.autoUpdate = { latest: vi.fn(async () => '999.0.0'), install }
+    expect(await ask(internal)).toEqual({ state: 'installing' })
+    await internal.maintenance
+    expect(install).toHaveBeenCalledWith('999.0.0')
+    expect(restart).toHaveBeenCalledOnce()
+  })
+  it('does nothing when this daemon is already the latest release', async () => {
+    const restart = vi.spyOn(service, 'restartService').mockResolvedValue(undefined)
+    const { internal } = maintenanceDaemon()
+    const install = vi.fn(async () => {})
+    internal.options.autoUpdate = { latest: vi.fn(async () => '0.0.1'), install }
+    expect(await ask(internal)).toEqual({ state: 'current' })
+    expect(internal.maintenance).toBeNull()
+    expect(install).not.toHaveBeenCalled()
+    expect(restart).not.toHaveBeenCalled()
+  })
+  it('waits for a running run, then installs on the next idle pass', async () => {
+    vi.spyOn(service, 'restartService').mockResolvedValue(undefined)
+    const { internal } = maintenanceDaemon()
+    const install = vi.fn(async () => {})
+    internal.options.autoUpdate = { latest: vi.fn(async () => '999.0.0'), install }
+    internal.supervisor.heartbeatRuns = () => [{}]
+    expect(await ask(internal)).toEqual({ state: 'waiting' })
+    expect(install).not.toHaveBeenCalled()
+    expect(internal.updating).toBe(false)
+    internal.supervisor.heartbeatRuns = () => []
+    internal.checkAutoUpdate()
+    await internal.maintenance
+    expect(install).toHaveBeenCalledWith('999.0.0')
+  })
+  it('a development, foreground or source daemon is not updated and never asks the registry', async () => {
+    const { internal } = maintenanceDaemon()
+    internal.options.autoUpdate = undefined
+    expect(await ask(internal)).toEqual({ state: 'unmanaged' })
+  })
+  it('a failed install keeps this version running and is reported to Settings › Devices', async () => {
+    const restart = vi.spyOn(service, 'restartService').mockResolvedValue(undefined)
+    const { internal } = maintenanceDaemon()
+    const file = join(internal.paths.dataDir, 'auto-update.json')
+    internal.options.autoUpdate = { latest: vi.fn(async () => '999.0.0'), install: vi.fn(async () => { throw new Error('npm failure') }) }
+    expect(await ask(internal)).toEqual({ state: 'installing' })
+    await internal.maintenance
+    expect(restart).not.toHaveBeenCalled()
+    expect(internal.updating).toBe(false)
+    expect(reportedUpdateFailure(file, '0.0.1')).toMatchObject({ version: '999.0.0', code: 'install_failed' })
+  })
 })
