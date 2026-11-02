@@ -448,7 +448,7 @@ test('a team page keeps its address: its 项目 page survives a reload and back 
 test('chat → thread → 打开任务: the first crumb names the chat; ✕ brings back the chat with its thread, no ↑↓', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 960 })
   const { title, runId } = await chatWithThread(page)
-  await page.getByRole('button', { name: `打开线程 ${THREAD}`, exact: true }).first().click()
+  await threadCard(page, title).click()
   await expectThreadBesideChat(page, runId)
   await threadIn(page).getByRole('button', { name: '打开任务', exact: true }).click()
   await expect(taskTitle(page)).toHaveValue(title)
