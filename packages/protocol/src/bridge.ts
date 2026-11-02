@@ -237,6 +237,12 @@ export interface MikkaBridge {
     onUpdateReady?(listener: (version: string) => void): () => void
     /** Quits and installs the downloaded update. */
     installUpdate?(): Promise<void>
+    /**
+     * The server requires a newer desktop than this one (/api/version's
+     * minDesktopVersion). Main reads the server itself and, when it agrees,
+     * installs the update before the person can go on.
+     */
+    requireUpdate?(): Promise<void>
   }
   /**
    * Login. The long-lived session token stays in the main process (macOS

@@ -44,6 +44,7 @@ if (appOrigin && window.location.origin === appOrigin) {
         return () => { ipcRenderer.removeListener(IPC.appUpdateReady, handler) }
       },
       installUpdate: () => ipcRenderer.invoke(IPC.appInstallUpdate),
+      requireUpdate: () => ipcRenderer.invoke(IPC.appRequireUpdate),
     },
     notifications: {
       show: (notification: unknown) => ipcRenderer.invoke(IPC.notificationsShow, notification),

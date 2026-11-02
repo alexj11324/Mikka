@@ -16,6 +16,8 @@ import { catchClaudeCallback } from './subscription-callback'
 import { NotificationCenter } from './notification-center'
 import { appExternalUrl, desktopAuthState, externalUrl, isTrustedFrame, navigationDecision } from './security'
 import { UPDATE_CHECK_INTERVAL_MS, Updates, updateCopy } from './updates'
+import { UpdateGate, gateCopy, gateView, type GateState } from './launch-update'
+import { meetsMinimumVersion } from '@mikka/protocol/version'
 import { TRANSLUCENT_ARGUMENT, windowAppearance } from './window-appearance'
 
 const APP_URL = __MIKKA_APP_URL__
@@ -274,6 +276,87 @@ const updates = new Updates(autoUpdater, {
   }
 })
 
+let gateWindow: BrowserWindow | null = null
+let gate: UpdateGate | null = null
+
+/**
+ * The launch gate (launch-update.ts): a small window that checks for an update
+ * and, when there is one, installs it before `open` lets the person in.
+ * Closing the window while it holds the door quits the app; there is no way
+ * in on the old version.
+ */
+function runUpdateGate(open: () => void): void {
+  if (gate) return
+  const copy = gateCopy(app.getLocale())
+  const win = new BrowserWindow({
+    width: 360,
+    height: 200,
+    resizable: false,
+    minimizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    show: false,
+    title: copy.title,
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#171717' : '#f5f5f4',
+    autoHideMenuBar: true,
+    webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false, devTools: !app.isPackaged },
+  })
+  gateWindow = win
+  let loaded = false
+  let pending: GateState | null = null
+  let opened = false
+  const render = (state: GateState) => {
+    if (win.isDestroyed()) return
+    if (!loaded) { pending = state; return }
+    void win.webContents.executeJavaScript(`window.render(${JSON.stringify(gateView(state, copy))}, ${JSON.stringify(copy.lang)})`).catch(() => {})
+  }
+  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+  win.webContents.on('will-navigate', event => event.preventDefault())
+  win.webContents.on('did-navigate-in-page', (_event, url) => { if (new URL(url).hash === '#retry') gate?.retry() })
+  win.webContents.once('did-finish-load', () => {
+    loaded = true
+    if (pending) render(pending)
+    if (!win.isDestroyed()) win.show()
+  })
+  win.on('closed', () => {
+    gateWindow = null
+    if (!opened) app.quit()
+  })
+  gate = new UpdateGate(autoUpdater, {
+    onState: render,
+    onProceed: () => {
+      opened = true
+      gate = null
+      if (!win.isDestroyed()) win.close()
+      open()
+    },
+  })
+  void win.loadFile(join(__dirname, 'update.html'))
+  gate.start()
+}
+
+/**
+ * The server's minimum desktop version (/api/version, MIN_CLIENT_VERSION, ADR
+ * 0011). The page asks when it sees one above this build; main reads it again
+ * itself, so a page cannot force an update the server does not require.
+ */
+async function enforceMinimumVersion(): Promise<void> {
+  if (!app.isPackaged || gate) return
+  try {
+    const response = await session.fromPartition(PARTITION).fetch(`${APP_URL.replace(/\/$/, '')}/api/version`, { headers: { origin: APP_ORIGIN }, redirect: 'error', cache: 'no-store' })
+    if (!response.ok) return
+    const { minDesktopVersion } = await response.json() as { minDesktopVersion?: unknown }
+    if (typeof minDesktopVersion !== 'string' || meetsMinimumVersion(APP_VERSION, minDesktopVersion)) return
+  } catch {
+    return
+  }
+  mainWindow?.hide()
+  runUpdateGate(() => {
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.show()
+    else createMainWindow()
+  })
+}
+
 async function checkForUpdates(interactive: boolean): Promise<void> {
   if (!app.isPackaged) {
     if (interactive) await messageBox({ type: 'info', message: copy().notInstalled, buttons: [copy().ok] })
@@ -376,15 +459,21 @@ function start(): void {
       return href
     },
     updates,
+    requireUpdate: enforceMinimumVersion,
   })
-  createMainWindow()
   installMenu()
-  if (app.isPackaged) {
+  const open = () => {
+    createMainWindow()
+    if (!app.isPackaged) return
+    // Background checks start once the app is open, so they never race the launch gate.
     setTimeout(() => { void checkForUpdates(false) }, 15_000)
     setInterval(() => { void checkForUpdates(false) }, UPDATE_CHECK_INTERVAL_MS)
   }
+  // A cold start of the installed app installs any newer version first (launch-update.ts).
+  if (app.isPackaged) runUpdateGate(open)
+  else open()
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createMainWindow()
+    if (BrowserWindow.getAllWindows().length === 0 && !gate) createMainWindow()
   })
 }
 
@@ -392,6 +481,7 @@ if (!app.requestSingleInstanceLock()) {
   app.quit()
 } else {
   app.on('second-instance', () => {
+    if (gateWindow && !gateWindow.isDestroyed()) { gateWindow.show(); gateWindow.focus(); return }
     if (!mainWindow) return
     if (mainWindow.isMinimized()) mainWindow.restore()
     mainWindow.show()
