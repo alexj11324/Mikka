@@ -3105,13 +3105,6 @@
       "thought": "Thought for {seconds, plural, one {# second} other {# seconds}}",
       "thoughtStored": "Thought",
       "tool": "Use a tool",
-      "input": "Input",
-      "output": "Result",
-      "state": {
-        "running": "Running",
-        "done": "Done",
-        "error": "Failed"
-      },
       "tools": {
         "create_issue": "Create task",
         "create_issue_from_request": "Create task",
@@ -4375,5 +4368,18 @@
   },
   "PullRequestsBadge": {
     "label": "{count, plural, one {# pull request} other {# pull requests}}"
+  },
+  "AiElements": {
+    "tool": {
+      "pending": "Pending",
+      "running": "Running",
+      "awaitingApproval": "Awaiting approval",
+      "responded": "Responded",
+      "completed": "Done",
+      "error": "Failed",
+      "denied": "Denied",
+      "parameters": "Input",
+      "result": "Result"
+    }
   }
 }

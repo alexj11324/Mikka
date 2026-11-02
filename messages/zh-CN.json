@@ -3105,13 +3105,6 @@
       "thought": "思考了 {seconds} 秒",
       "thoughtStored": "已思考",
       "tool": "使用工具",
-      "input": "输入",
-      "output": "结果",
-      "state": {
-        "running": "进行中",
-        "done": "完成",
-        "error": "失败"
-      },
       "tools": {
         "create_issue": "建任务",
         "create_issue_from_request": "建任务",
@@ -4375,5 +4368,18 @@
   },
   "PullRequestsBadge": {
     "label": "{count} 个 PR"
+  },
+  "AiElements": {
+    "tool": {
+      "pending": "等待中",
+      "running": "进行中",
+      "awaitingApproval": "等待批准",
+      "responded": "已回应",
+      "completed": "完成",
+      "error": "失败",
+      "denied": "已拒绝",
+      "parameters": "输入",
+      "result": "结果"
+    }
   }
 }

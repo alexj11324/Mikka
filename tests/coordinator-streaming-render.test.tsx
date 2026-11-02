@@ -131,27 +131,28 @@ test('the streaming reply keeps its earlier chips mounted as new tokens arrive',
   } finally { await view.unmount() }
 })
 
-test('a reply shows its thinking and each tool by name and state; previews open on demand', async () => {
+test('a reply shows its thinking and each tool by name and state with AI Elements; previews open on demand', async () => {
   const { ReplyActivity } = await import('../components/coordinator/reply-activity')
   const view = await mount()
   try {
     const tools = [
       { call: 'c1', name: 'create_issue', state: 'done' as const, input: '{"title":"Fix login"}', output: '{"id":"i1"}' },
       { call: 'c2', name: 'dispatch_run', state: 'running' as const },
-      { call: 'c3', name: 'some_internal_tool', state: 'error' as const },
+      { call: 'c3', name: 'some_internal_tool', state: 'error' as const, output: 'no device' },
     ]
     await view.render(<ReplyActivity tools={tools} thinking={{ active: true, seconds: 1 }} />)
-    // What reads on screen: the shimmer's own <style> is not text.
-    const visible = (node: Element) => { const copy = node.cloneNode(true) as Element; copy.querySelectorAll('style').forEach(style => style.remove()); return copy.textContent ?? '' }
-    const text = () => visible(view.container)
-    assert.match(text(), /^Thinking/)
-    assert.deepEqual([...view.container.querySelectorAll('[data-activity-tool]')].map(row => [row.getAttribute('data-activity-tool'), visible(row)]),
-      [['done', 'Create task'], ['running', 'Start thread'], ['error', 'Use a tool']], 'internal names never show; an unknown tool gets the generic label')
-    assert.deepEqual([...view.container.querySelectorAll('[aria-label]')].map(node => node.getAttribute('aria-label')), ['Done', 'Running', 'Failed'])
-    assert.doesNotMatch(text(), /Fix login/, 'previews start closed')
+    const text = () => view.container.textContent ?? ''
+    assert.equal(view.container.querySelector('[data-activity-thinking]')?.getAttribute('data-activity-thinking'), 'active')
+    assert.match(view.container.querySelector('[data-activity-thinking]')?.textContent ?? '', /^Thinking$/)
+    // AI Elements Tool: our label as its title, the AI SDK state as its badge; internal names never show.
+    assert.deepEqual([...view.container.querySelectorAll('[data-activity-tool]')].map(row => [row.getAttribute('data-activity-tool'), row.querySelector('[data-slot="collapsible-trigger"], button')?.textContent]),
+      [['done', 'Create taskDone'], ['running', 'Start threadRunning'], ['error', 'Use a toolFailed']])
+    assert.doesNotMatch(text(), /some_internal_tool|Fix login/, 'previews start closed')
     await act(async () => { (view.container.querySelector('[data-activity-tool="done"] button') as HTMLButtonElement).click() })
-    assert.match(text(), /Input\{"title":"Fix login"\}Result\{"id":"i1"\}/)
-    assert.equal(view.container.querySelectorAll('[data-activity-tool] button').length, 1, 'a tool with nothing to open is not a button')
+    for (let tries = 0; tries < 100 && !/i1/.test(text()); tries++) await act(() => new Promise(resolve => setTimeout(resolve, 20)))
+    assert.match(text(), /Input[\s\S]*Fix login[\s\S]*Result[\s\S]*i1/)
+    const thinkingTrigger = view.container.querySelector('[data-activity-thinking] button') as HTMLButtonElement
+    assert.ok(thinkingTrigger.disabled, 'reasoning text is never shown, so thinking does not open')
 
     await view.render(<ReplyActivity tools={[]} thinking={{ active: false, seconds: 3 }} />)
     assert.equal(text(), 'Thought for 3 seconds')

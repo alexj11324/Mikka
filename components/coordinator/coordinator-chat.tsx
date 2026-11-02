@@ -36,7 +36,7 @@ import { useLiveCitations } from './use-live-citations'
 import type { CoordinatorLiveReply } from '@/lib/coordinator-stream-client'
 import { ThreadCard } from './thread-card'
 import { ReplyActivity } from './reply-activity'
-import { TextShimmer } from '@/components/motion/text-shimmer'
+import { Shimmer } from '@/components/ai-elements/shimmer'
 import { MessageReactions, useMessageReactions } from '@/components/workspace/message-reactions'
 import { PendingActions } from './pending-actions'
 import { SubagentLoginNeeds } from './subagent-login-needs'
@@ -403,7 +403,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
             </MessageScrollerItem>}
             {/* The working line fades in (R-37: opacity on a duration). It leaves at once: an exit would keep its height
                 after the reply lands and pull the scroll position back (coordinator-scroll.spec). */}
-            {data?.working && items.length > 0 && <p role="status" className={cn('flex items-center gap-2 text-sm text-muted-foreground', workingEnter && ENTER)}><TextShimmer>{t('working')}</TextShimmer></p>}
+            {data?.working && items.length > 0 && <p role="status" className={cn('flex items-center gap-2 text-sm text-muted-foreground', workingEnter && ENTER)}><Shimmer as="span">{t('working')}</Shimmer></p>}
           </MessageScrollerContent>
         </MessageScrollerViewport>
         <AnimatePresence initial={false}>
