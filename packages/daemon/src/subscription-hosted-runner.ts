@@ -25,7 +25,7 @@ import type {
   SpawnedProcess,
 } from "@anthropic-ai/claude-agent-sdk";
 import { nativeBrokerContextSchema, type RunAssignment } from "@mikka/protocol";
-import { ClaudeAdapter } from "./adapters/claude";
+import { ClaudeAdapter, ClaudeInitializationError } from "./adapters/claude";
 import { CodexAdapter } from "./adapters/codex";
 import type { AgentSession, StartOptions } from "./adapters/types";
 import { runPaths } from "./agents/run-context";
@@ -50,9 +50,10 @@ const bootstrap = fileURLToPath(
 const computerProxy = fileURLToPath(new URL("./computer/proxy.mjs", import.meta.url));
 const placeholder = "mikka-native-broker-placeholder";
 const unavailable = (cause?: unknown) =>
-  new Error("subscription_hosted_runtime_unavailable", cause === undefined ? undefined : { cause });
+  new Error(cause instanceof ClaudeInitializationError ? cause.code : "subscription_hosted_runtime_unavailable", cause === undefined ? undefined : { cause });
 /** Why a start failed, in words a person can act on; never argv or env. */
 const startFailure = (error: unknown) => {
+  if (error instanceof ClaudeInitializationError) return error;
   const value = error as { stderr?: unknown; message?: unknown };
   const stderr = String(value.stderr ?? "").trim();
   return new Error((stderr || (error instanceof Error ? error.message : String(error))).slice(-500));

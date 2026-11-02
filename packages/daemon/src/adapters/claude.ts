@@ -105,6 +105,17 @@ export interface ClaudeAdapterOptions {
 }
 
 const SUBSCRIPTION_ERROR = "Claude subscription authentication unavailable"
+const INITIALIZATION_TIMEOUT_MS = 30_000
+
+/** CLI initialization includes local cold startup; it is not a credential check. */
+export class ClaudeInitializationError extends Error {
+  readonly code: "claude_code_initialization_timeout" | "claude_code_initialization_failed"
+  constructor(timeout: boolean) {
+    super(timeout ? "Claude Code initialization timed out" : "Claude Code initialization failed")
+    this.name = "ClaudeInitializationError"
+    this.code = timeout ? "claude_code_initialization_timeout" : "claude_code_initialization_failed"
+  }
+}
 
 /** In-process SDK MCP travels over the existing query control stream. No
  * socket, endpoint, platform bearer or extra filesystem permission in child. */
@@ -660,18 +671,31 @@ export class ClaudeAdapter implements AgentAdapter {
     authTimer?.unref()
     if (externalAuth) {
       let timer: NodeJS.Timeout | undefined
-      let authPhase: 'account_info' | 'external_verify' = 'account_info'
-      let authReason: 'account_info_failed' | 'timeout' | 'session_closed' | 'provider_refused' | 'source_refused' | 'verify_refused' = 'account_info_failed'
+      let offRevoke: (() => void) | undefined
+      let authPhase: 'initialization' | 'account_info' | 'external_verify' = 'initialization'
+      let authReason: 'initialization_failed' | 'timeout' | 'revoked' | 'session_closed' | 'provider_refused' | 'source_refused' | 'verify_refused' = 'initialization_failed'
       try {
-        const account = await Promise.race([
-          session.accountInfo(),
+        // accountInfo waits for this same SDK initialization promise. Give the
+        // cold CLI an explicit bounded startup budget before checking its
+        // account; no prompt is released until all checks below pass.
+        await Promise.race([
+          session.initializationResult(),
           new Promise<never>((_, reject) => {
             timer = setTimeout(
-              () => { authReason = 'timeout'; reject(new Error(SUBSCRIPTION_ERROR)) },
-              10_000
+              () => { authReason = 'timeout'; reject(new ClaudeInitializationError(true)) },
+              INITIALIZATION_TIMEOUT_MS
             )
-          })
+          }),
+          new Promise<never>((_, reject) => {
+            offRevoke = approval.onRevoke(() => {
+              authReason = 'revoked'
+              reject(new ClaudeInitializationError(false))
+            })
+          }),
         ])
+        clearTimeout(timer)
+        authPhase = 'account_info'
+        const account = await session.accountInfo()
         authReason = ending ? 'session_closed' : account.apiProvider !== 'firstParty' ? 'provider_refused' : 'source_refused'
         if (
           ending ||
@@ -686,12 +710,17 @@ export class ClaudeAdapter implements AgentAdapter {
         authPhase = 'external_verify'
         authReason = 'verify_refused'
         await externalAuth.verify?.()
-      } catch {
+        if (ending || approval.revoked) throw new Error(SUBSCRIPTION_ERROR)
+      } catch (error) {
+        // Cleanup revokes the gate too; detach before preserving the failure.
+        offRevoke?.()
         try { log.warn({ event: 'claude_subscription_startup_failed', phase: authPhase, reason: authReason }, 'Subscription startup failed') } catch { /* Keep the original refusal. */ }
         await end(null)
+        if (authPhase === 'initialization') throw error instanceof ClaudeInitializationError ? error : new ClaudeInitializationError(false)
         throw new Error(SUBSCRIPTION_ERROR)
       } finally {
         clearTimeout(timer)
+        offRevoke?.()
       }
     }
     prompts.push(firstMessage)

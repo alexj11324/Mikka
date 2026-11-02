@@ -1,22 +1,22 @@
 import { ToolApprovalGate } from "../src/agents/tool-approval"
-import { chmodSync, mkdirSync, writeFileSync } from "node:fs"
+import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { join, resolve } from "node:path"
 import { afterEach, expect, it, vi } from "vitest"
 import {
   ClaudeAdapter,
+  ClaudeInitializationError,
   type ClaudeAdapterOptions
 } from "../src/adapters/claude"
 import { buildChildEnv } from "../src/env"
 import { createLogger } from "../src/log"
 import { NoSandbox } from "../src/agents/sandbox"
-import { cleanupTempDirs, makeRepo, tempDir } from "./helpers"
+import { cleanupTempDirs, makeRepo, tempDir, waitFor } from "./helpers"
 
 afterEach(cleanupTempDirs)
 
 it.each([
   ['fixture-gateway', 'account_info', 'provider_refused'],
   ['fixture-unknown', 'account_info', 'source_refused'],
-  ['fixture-timeout', 'account_info', 'timeout'],
   ['fixture-access', 'external_verify', 'verify_refused'],
 ] as const)('reports only a finite startup reason for %s', async (accessToken, phase, reason) => {
   const { adapter, options } = await fixture({ accountId: 'fixture-account',
@@ -31,6 +31,48 @@ it.each([
     expect(JSON.stringify(warn.mock.calls)).not.toMatch(/fixture-account|fixture-access|private-verify-detail/)
   } finally { warn.mockRestore(); child.mockRestore() }
 })
+
+it('bounds hung CLI initialization and closes its process without delivering a prompt', async () => {
+  const { adapter, options, processReceipt } = await fixture({ accountId: 'fixture-account',
+    token: async () => ({ accountId: 'fixture-account', accessToken: 'fixture-timeout', expiresAt: new Date(Date.now() + 60_000).toISOString() }) })
+  const started = Date.now()
+  const starting = adapter.start(options)
+  const refused = expect(starting).rejects.toMatchObject({ name: 'ClaudeInitializationError', code: 'claude_code_initialization_timeout', message: 'Claude Code initialization timed out' })
+  await waitFor(() => existsSync(processReceipt))
+  const receipt = () => JSON.parse(readFileSync(processReceipt, 'utf8')) as { pid: number; prompts: number }
+  const pid = receipt().pid
+  await refused
+  expect(Date.now() - started).toBeGreaterThanOrEqual(29_000)
+  expect(Date.now() - started).toBeLessThan(40_000)
+  expect(receipt().prompts).toBe(0)
+  expect(() => process.kill(pid, 0)).toThrow()
+})
+
+it('revokes a hung initializer promptly instead of waiting for its startup budget', async () => {
+  const verify = vi.fn(async () => {})
+  const { adapter, options, processReceipt } = await fixture({ accountId: 'fixture-account', verify,
+    token: async () => ({ accountId: 'fixture-account', accessToken: 'fixture-timeout', expiresAt: new Date(Date.now() + 60_000).toISOString() }) })
+  const refused = expect(adapter.start(options)).rejects.toBeInstanceOf(ClaudeInitializationError)
+  await waitFor(() => existsSync(processReceipt))
+  const receipt = JSON.parse(readFileSync(processReceipt, 'utf8')) as { pid: number; prompts: number }
+  const revoked = Date.now()
+  options.toolApproval.revoke()
+  await refused
+  expect(Date.now() - revoked).toBeLessThan(5_000)
+  expect(verify).not.toHaveBeenCalled()
+  expect(JSON.parse(readFileSync(processReceipt, 'utf8')).prompts).toBe(0)
+  expect(() => process.kill(receipt.pid, 0)).toThrow()
+})
+
+it.each(['fixture-delayed-gateway','fixture-delayed-paid','fixture-delayed-unknown'])(
+  'keeps the provider/source guard after delayed initialization: %s', async accessToken => {
+    const verify = vi.fn(async () => {})
+    const { adapter, options, processReceipt } = await fixture({ accountId: 'fixture-account', verify,
+      token: async () => ({ accountId: 'fixture-account', accessToken, expiresAt: new Date(Date.now() + 60_000).toISOString() }) })
+    await expect(adapter.start(options)).rejects.toThrow('Claude subscription authentication unavailable')
+    expect(verify).not.toHaveBeenCalled()
+    expect(JSON.parse(readFileSync(processReceipt, 'utf8')).prompts).toBe(0)
+  })
 
 it('rechecks revocation after native initialization before delivering the first prompt', async () => {
   const verify = vi.fn(async () => { throw new Error('fixture-access revoked') })
@@ -61,9 +103,10 @@ async function fixture(
       expiresAt: new Date(Date.now() + 60_000).toISOString()
     }))
   }
+  const stateDir = tempDir()
   const adapter = new ClaudeAdapter({
     sandbox: new NoSandbox(),
-    stateDir: tempDir(),
+    stateDir,
     binary,
     configDir: join(home, ".claude"),
     subscriptionAuth: source
@@ -76,7 +119,7 @@ async function fixture(
     env: buildChildEnv({ host: { PATH: process.env.PATH, HOME: home } }),
     log: createLogger({ level: "silent" })
   }
-  return { adapter, options, source }
+  return { adapter, options, source, processReceipt: join(stateDir, 'runs', options.runId, 'native-home', '.claude', 'fixture-process.json') }
 }
 
 it("delivers an access-only lease through the native input without reading host login", async () => {

@@ -27,12 +27,16 @@ if (
 )
   process.exit(2)
 const sessionId = flag("--session-id") ?? flag("--resume")
+const processReceipt = join(config, 'fixture-process.json')
+let prompts = 0
+writeFileSync(processReceipt, JSON.stringify({ pid: process.pid, prompts }))
 const out = (value) => process.stdout.write(`${JSON.stringify(value)}\n`)
 const lines = createInterface({ input: process.stdin })
 lines.on("line", async (line) => {
   const frame = JSON.parse(line)
   if (frame.type === "control_request") {
     if (token === 'fixture-timeout') return
+    if (token.startsWith('fixture-delayed')) await new Promise(resolve => setTimeout(resolve, 12_000))
     out({
       type: "control_response",
       response: {
@@ -43,10 +47,10 @@ lines.on("line", async (line) => {
           agents: [],
           models: [],
           account: {
-            apiProvider: token === "fixture-gateway" ? "gateway" : "firstParty",
+            apiProvider: ["fixture-gateway", "fixture-delayed-gateway"].includes(token) ? "gateway" : "firstParty",
             // Official 2.1.309 omits apiKeySource for descriptor-delivered OAuth.
-            ...(token === "fixture-paid" ? { apiKeySource: "ANTHROPIC_API_KEY" } : token === "fixture-legacy" ? { apiKeySource: "none" } : {}),
-            ...(token === "fixture-unknown" ? {} : { tokenSource: token === "fixture-environment" ? "CLAUDE_CODE_OAUTH_TOKEN" : "CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR" })
+            ...(["fixture-paid", "fixture-delayed-paid"].includes(token) ? { apiKeySource: "ANTHROPIC_API_KEY" } : token === "fixture-legacy" ? { apiKeySource: "none" } : {}),
+            ...(["fixture-unknown", "fixture-delayed-unknown"].includes(token) ? {} : { tokenSource: token === "fixture-environment" ? "CLAUDE_CODE_OAUTH_TOKEN" : "CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR" })
           }
         }
       }
@@ -55,6 +59,8 @@ lines.on("line", async (line) => {
   }
   const text = frame.message?.content?.[0]?.text
   if (typeof text !== "string") return
+  prompts++
+  writeFileSync(processReceipt, JSON.stringify({ pid: process.pid, prompts }))
   if (text === 'COMPUTER') {
     const config = JSON.parse(flag('--mcp-config') ?? '{}').mcpServers?.mikka_computer
     if (!config || !/(^|\/)node$/.test(config.command)) process.exit(2)
