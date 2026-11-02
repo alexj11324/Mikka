@@ -4071,6 +4071,7 @@
       }
     },
     "refusal": {
+      "verificationRequiredPlain": "Mikka Default needs a verified card",
       "verification_required": "<model><mark></mark> Mikka Default</model> needs a verified card",
       "free_allowance_used": "Free allowance used up",
       "points_exhausted": "Points used up",
