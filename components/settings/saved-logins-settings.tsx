@@ -18,10 +18,11 @@ import { Input } from '@/components/ui/input'
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@/components/ui/input-group'
 import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Spinner } from '@/components/ui/spinner'
-import { SettingRow, SettingsLoading, SettingsSection, settingsSectionAction } from '@/components/settings/primitives'
+import { SettingsLoading, SettingsSection, settingsSectionAction } from '@/components/settings/primitives'
 import { relativeTime } from '@/lib/relative-time'
 import { useActionError } from '@/lib/use-action-error'
 import { usePresence } from '@/lib/use-presence'
+import { cn } from '@/lib/utils'
 
 type Editing = { kind: 'new' } | { kind: 'password'; login: SavedLogin }
 
@@ -64,7 +65,13 @@ export function SavedLoginsSettings() {
       </div>}
       {logins.length > 0 && <div role="list" className="divide-y divide-border">
         {logins.map(login => <div role="listitem" key={login.id}>
-          <SettingRow icon={<SiteIcon origin={login.site} className="size-5" />} title={withoutScheme(login.site)} description={[login.account, login.lastUsedAt ? t('lastUsedBy', { when: relativeTime(login.lastUsedAt, locale), bot: login.lastUsedBy ?? t('unknownBot') }) : t('never')].join(' · ')}>
+          {/* Not SettingRow: that stacks its control under the text on phones, and ⋯ belongs on the row. */}
+          <div className="flex items-center gap-3 px-5 py-4">
+            <SiteIcon origin={login.site} className="size-5 shrink-0" />
+            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+              <span className="truncate text-sm leading-snug font-medium text-foreground">{withoutScheme(login.site)}</span>
+              <p className="truncate text-sm text-muted-foreground">{[login.account, login.lastUsedAt ? t('lastUsedBy', { when: relativeTime(login.lastUsedAt, locale), bot: login.lastUsedBy ?? t('unknownBot') }) : t('never')].join(' · ')}</p>
+            </div>
             <DropdownMenu>
               <DropdownMenuTrigger render={<Button type="button" variant="ghost" size="icon-sm" aria-label={t('actions', { site: withoutScheme(login.site) })} />}><Ellipsis data-icon="inline-start" /></DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-40">
@@ -75,7 +82,7 @@ export function SavedLoginsSettings() {
                 </DropdownMenuGroup>
               </DropdownMenuContent>
             </DropdownMenu>
-          </SettingRow>
+          </div>
         </div>)}
       </div>}
       {deleteError && <FieldError className="px-5 py-3">{deleteError}</FieldError>}
@@ -145,11 +152,11 @@ function LoginSheet({ editing, open, onOpenChangeComplete, onClose }: { editing:
         <FieldGroup className="px-4">
           <Field>
             <FieldLabel htmlFor="saved-login-site">{t('site')}</FieldLabel>
-            <Input id="saved-login-site" value={site} readOnly={login !== null} className={login ? 'text-muted-foreground' : undefined} autoComplete="off" spellCheck={false} inputMode="url" placeholder="https://" onChange={event => setSite(event.target.value)} disabled={pending} />
+            <Input id="saved-login-site" value={site} readOnly={login !== null} className={cn(login && 'text-muted-foreground')} autoComplete="off" spellCheck={false} inputMode="url" placeholder="https://" onChange={event => setSite(event.target.value)} disabled={pending} />
           </Field>
           <Field>
             <FieldLabel htmlFor="saved-login-account">{t('account')}</FieldLabel>
-            <Input id="saved-login-account" value={account} readOnly={login !== null} className={login ? 'text-muted-foreground' : undefined} autoComplete="off" spellCheck={false} onChange={event => setAccount(event.target.value)} disabled={pending} />
+            <Input id="saved-login-account" value={account} readOnly={login !== null} className={cn(login && 'text-muted-foreground')} autoComplete="off" spellCheck={false} onChange={event => setAccount(event.target.value)} disabled={pending} />
           </Field>
           <Field data-invalid={error ? true : undefined}>
             <FieldLabel htmlFor="saved-login-password">{login ? t('newPassword') : t('password')}</FieldLabel>
