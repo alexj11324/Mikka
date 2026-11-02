@@ -1,10 +1,10 @@
 'use client'
 
 import { PersonAvatar } from '@/components/person-avatar'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import useSWR, { useSWRConfig } from 'swr'
 import { useFormatter, useTranslations } from 'next-intl'
-import { SquareKanban, X } from 'lucide-react'
+import { ArrowLeft, SquareKanban, X } from 'lucide-react'
 import { getIssueThread, sendIssueThreadMessage, stopRun } from '@/app/actions/agents'
 import { runFailureText, runIsActive, runStopTimeoutRemaining, threadItems } from '@/lib/issue-run-conversation'
 import { ThreadSteps } from './thread-steps'
@@ -16,7 +16,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { AgentMarkdown } from './agent-markdown'
 import { ComputerCard } from '@/components/computer/computer-card'
 import { harnessLabel } from './issue-threads'
-import { ThreadStatus, ThreadStatusIcon } from './thread-status-icon'
+import { ThreadStatus } from './thread-status-icon'
 import { ThreadQuotaPausedCard, ThreadQuotaSwitchLine } from './thread-quota'
 import { cn } from '@/lib/utils'
 import { listRunArtifacts } from '@/app/actions/artifacts'
@@ -37,18 +37,20 @@ const BUBBLE = 'max-w-[85%] rounded-2xl bg-muted px-3.5 py-2 text-sm/5.25 whites
 
 /**
  * An open thread: a conversation between people and the agent running it (R-62, R-10).
- * It sits in the right column beside the chat or the task with a close button, wherever it
- * was opened from (R-82); the header names the bot that dispatched it.
+ * It sits in the right column beside the chat or the task, wherever it was opened from
+ * (R-82). Its header leads with ←, back to the list it came from (Esc does the same);
+ * the state is the badge under it, so the header has no status icon. The byline names
+ * the bot that dispatched it.
  */
 type ThreadTab = 'chat' | 'acceptance'
-type IssueThreadPanelProps = { /** The task it works on; null for a thread with no task. */ issueId: string | null; runId: string; onClose: () => void; /** Inside the Artifact window: no header, the window has its own. */ bare?: boolean; /** Open on 验收 when this thread produced a candidate waiting for acceptance. */ initialTab?: ThreadTab; /** Open another thread (an independent review or verify) from 验收. */ onOpenThread?: (runId: string) => void; /** Beside a chat: the task it works on, as a header link. */ onOpenTask?: () => void }
+type IssueThreadPanelProps = { /** The task it works on; null for a thread with no task. */ issueId: string | null; runId: string; /** ← and Esc: back to the list it was opened from. */ onBack?: () => void; /** ✕, only where it closes more than ← does (全部线程 under it). */ onClose?: () => void; /** Inside the Artifact window: no header, the window has its own. */ bare?: boolean; /** Open on 验收 when this thread produced a candidate waiting for acceptance. */ initialTab?: ThreadTab; /** Open another thread (an independent review or verify) from 验收. */ onOpenThread?: (runId: string) => void; /** Beside a chat: the task it works on, as a header link. */ onOpenTask?: () => void }
 
 export function IssueThreadPanel(props: IssueThreadPanelProps) {
   // Drafts, in-flight callbacks and retry deadlines belong to exactly one run.
   return <ThreadPanel key={props.runId} {...props} />
 }
 
-function ThreadPanel({ issueId, runId, onClose, bare = false, initialTab = 'chat', onOpenThread, onOpenTask }: IssueThreadPanelProps) {
+function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab = 'chat', onOpenThread, onOpenTask }: IssueThreadPanelProps) {
   const t = useTranslations('IssueThreads')
   const format = useFormatter()
   const { mutate: mutateCache } = useSWRConfig()
@@ -119,9 +121,16 @@ function ThreadPanel({ issueId, runId, onClose, bare = false, initialTab = 'chat
       }
     }
   }
-  return <section aria-label={detail?.name ?? t('title')} className="flex h-full min-h-0 flex-col">
-    {!bare && <header className={cn('flex h-12 shrink-0 items-center gap-2 border-b border-rule px-4', acceptance && 'max-sm:h-auto max-sm:flex-wrap max-sm:py-2')}>
-      {detail && view && <ThreadStatusIcon status={view.status} outcome={view.outcome} waiting={view.waiting} />}
+  // Esc inside the thread is ←, unless a field it was typed into still holds text, or a window opened from it (portalled, still a React child) has the key.
+  function escape(event: KeyboardEvent<HTMLElement>) {
+    if (event.key !== 'Escape' || event.defaultPrevented || !onBack || !event.currentTarget.contains(event.target as Node)) return
+    const target = event.target as HTMLElement
+    if ((target instanceof HTMLTextAreaElement || target instanceof HTMLInputElement) && target.value) return
+    event.preventDefault(); onBack()
+  }
+  return <section aria-label={detail?.name ?? t('title')} className="flex h-full min-h-0 flex-col" onKeyDown={bare ? undefined : escape}>
+    {!bare && <header className={cn('flex h-12 shrink-0 items-center gap-2 border-b border-rule px-4', onBack && 'pl-2', acceptance && 'max-sm:h-auto max-sm:flex-wrap max-sm:py-2')}>
+      {onBack && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className="shrink-0" aria-label={t('back')} aria-keyshortcuts="Escape" onClick={onBack} />}><ArrowLeft data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{t('back')}</TooltipContent></Tooltip>}
       <h2 className={cn('min-w-0 truncate text-sm font-semibold', !acceptance && 'flex-1')}>{detail?.name ?? t('title')}</h2>
       {acceptance && <><AcceptanceStateBadge task={acceptance} /><span className="flex-1" /></>}
       <ThreadArtifacts runId={runId} status={data?.thread.status ?? ''} />
@@ -130,7 +139,7 @@ function ThreadPanel({ issueId, runId, onClose, bare = false, initialTab = 'chat
       {acceptance && <Tabs value={tab} onValueChange={value => setTab(value as ThreadTab)} className="shrink-0 max-sm:order-last max-sm:w-full">
         <TabsList className="max-sm:w-full"><TabsTrigger value="chat">{t('chatTab')}</TabsTrigger><TabsTrigger value="acceptance">{t('acceptanceTab')}</TabsTrigger></TabsList>
       </Tabs>}
-      <Button variant="ghost" size="icon-sm" aria-label={t('close')} onClick={onClose}><X data-icon="inline-start" /></Button>
+      {onClose && <Button variant="ghost" size="icon-sm" aria-label={t('close')} onClick={onClose}><X data-icon="inline-start" /></Button>}
     </header>}
     {accepting && acceptance ? <div className="flex min-h-0 flex-1 flex-col"><FactoryAcceptancePane task={acceptance} onOpenThread={onOpenThread} /></div> : <>
     <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-4">

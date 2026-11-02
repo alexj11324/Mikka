@@ -3245,7 +3245,8 @@
     "runInfo": {
       "paidBy": "{owner}'s {plan}",
       "movedTo": "Moved to {machine} to continue"
-    }
+    },
+    "back": "Back"
   },
   "Computer": {
     "status": {
@@ -3322,7 +3323,8 @@
         "idle": "Idle",
         "resolved": "Resolved"
       },
-      "waitingFor": "Waiting for {device} to come online"
+      "waitingFor": "Waiting for {device} to come online",
+      "dispatchedBy": "Dispatched by {bot}"
     },
     "newBot": {
       "title": "New bot",
@@ -3389,8 +3391,6 @@
     "coordinatorPlaceholder": "Ask the Coordinator or hand it a task…",
     "panel": {
       "label": "Right panel",
-      "views": "Right panel views",
-      "overview": "Overview",
       "allThreads": "All threads",
       "tabs": "Right panel content",
       "details": "Details",
@@ -3428,7 +3428,10 @@
       "nameTooLong": "Name can be at most {max} characters",
       "changeAvatar": "Change {name}’s avatar",
       "close": "Close panel",
-      "open": "Open panel"
+      "open": "Open panel",
+      "filterBot": "Filter by dispatcher",
+      "allBots": "All dispatchers",
+      "closeAllThreads": "Close all threads"
     },
     "suggestions": {
       "title": "Suggestions",

@@ -3245,7 +3245,8 @@
     "runInfo": {
       "paidBy": "{owner} 的 {plan}",
       "movedTo": "已换到 {machine} 继续"
-    }
+    },
+    "back": "返回"
   },
   "Computer": {
     "status": {
@@ -3322,7 +3323,8 @@
         "idle": "空闲",
         "resolved": "已解决"
       },
-      "waitingFor": "等待 {device} 上线"
+      "waitingFor": "等待 {device} 上线",
+      "dispatchedBy": "{bot} 派出"
     },
     "newBot": {
       "title": "新建 Bot",
@@ -3389,8 +3391,6 @@
     "coordinatorPlaceholder": "问 Coordinator 或布置任务…",
     "panel": {
       "label": "右栏",
-      "views": "右栏视图",
-      "overview": "概览",
       "allThreads": "全部线程",
       "tabs": "右栏内容",
       "details": "详情",
@@ -3428,7 +3428,10 @@
       "nameTooLong": "名字最多 {max} 个字",
       "changeAvatar": "更换 {name} 的头像",
       "close": "关闭右栏",
-      "open": "打开右栏"
+      "open": "打开右栏",
+      "filterBot": "按派出者筛选",
+      "allBots": "全部派出者",
+      "closeAllThreads": "关闭全部线程"
     },
     "suggestions": {
       "title": "建议",

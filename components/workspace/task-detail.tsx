@@ -246,7 +246,7 @@ function TaskForm({ initial, thread: openThread, origin, user, onSaved, onDirty,
 
   const properties = <IssueDetailProperties task={saved} onMetadataSaved={adopt} metadataDisabled={false} onMetadataBusy={setMetadataSaving} status={status} priority={priority} pending={false} onStatus={value => { changed({ status: value }); void save() }} onPriority={value => { changed({ priority: value }); void save() }} request={propertyRequest} onDate={() => requestAction('dueDate')} onEstimate={() => requestAction('estimate')} relations={<IssueRelations viewerId={user.id} mode="sidebar" task={saved} onOpen={onOpen} onCreate={() => requestAction('createChild')} onPick={requestAction} getCurrent={getCurrent} onSaved={adopt} disabled={false} />} />
   const threadPanel = openThread
-    ? <IssueThreadPanel key={`${openThread}:${threadTab}`} issueId={saved.id} runId={openThread} initialTab={threadTab} onOpenThread={showThread} onClose={() => showThread(null)} />
+    ? <IssueThreadPanel key={`${openThread}:${threadTab}`} issueId={saved.id} runId={openThread} initialTab={threadTab} onOpenThread={showThread} onBack={() => showThread(null)} />
     : openAcceptance && <FactoryAcceptancePanel key={openAcceptance.id} task={openAcceptance} onOpenThread={showThread} onClose={() => setOpenAcceptance(null)} />
 
   // R-61: one line under the header, one before the properties or an open thread; the page scrolls, the right column stays.

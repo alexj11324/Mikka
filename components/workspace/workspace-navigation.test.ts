@@ -13,7 +13,7 @@ const PROJECT = '9e8d7c6b-5a49-4382-9716-05f4e3d2c1b0'
 const ARTIFACT = '2b3c4d5e-6f70-4182-93a4-b5c6d7e8f901'
 const SESSION = '4e5f6a7b-8c9d-4e0f-a1b2-c3d4e5f6a7b8'
 const at = (path: string) => new URL(`https://app.example${path}`)
-const NOWHERE = { bot: null, group: null, session: null, team: null, project: null, issue: null, thread: null, artifact: null }
+const NOWHERE = { bot: null, group: null, session: null, team: null, project: null, issue: null, thread: null, artifact: null, threads: null }
 /** A full place from the keys that are set. */
 const place = (keys: Partial<WorkspaceLocation> & Pick<WorkspaceLocation, 'section'>): WorkspaceLocation => ({ ...NOWHERE, ...keys })
 
@@ -58,6 +58,8 @@ test('an address reads back as the place it was written for', () => {
     place({ section: 'team-projects', team: TEAM, project: PROJECT }),
     place({ section: 'coordinator', bot: BOT, artifact: ARTIFACT }),
     place({ section: 'artifacts', artifact: ARTIFACT }),
+    place({ section: 'coordinator', threads: 'all' }),
+    place({ section: 'all-issues', issue: ISSUE, thread: RUN, threads: BOT }),
   ]) {
     const href = workspaceHref(at('/mikka/zh-CN'), where)
     assert.ok(href.startsWith('/mikka/zh-CN'), href)
@@ -96,6 +98,16 @@ test('a thread sits beside its centre: a new centre closes it unless the move na
   assert.equal(workspaceHref(chatWithThread, { thread: null }), `/mikka?bot=${BOT}`)
   assert.equal(workspaceHref(at('/mikka'), { thread: RUN }), `/mikka?thread=${RUN}`)
   assert.equal(readLocation(new URLSearchParams('thread=nope')).thread, null)
+})
+
+test('全部线程 stays open as the centre changes; a thread opened over it closes with a new centre', () => {
+  const list = at(`/mikka?threads=all&thread=${RUN}`)
+  assert.equal(workspaceHref(list, { section: 'all-issues' }), '/mikka?threads=all&section=all-issues')
+  assert.equal(workspaceHref(list, { thread: null }), '/mikka?threads=all')
+  assert.equal(workspaceHref(at('/mikka?threads=all'), { threads: BOT }), `/mikka?threads=${BOT}`)
+  assert.equal(workspaceHref(list, { threads: null, thread: null }), '/mikka')
+  assert.equal(readLocation(new URLSearchParams('threads=../x')).threads, null)
+  assert.equal(readLocation(new URLSearchParams('threads=all')).threads, 'all')
 })
 
 test('an Artifact opens over the page: the centre and the thread stay, and closing it leaves them', () => {
