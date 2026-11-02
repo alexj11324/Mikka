@@ -169,7 +169,8 @@ export function ApiKeyFallbackSetting({ workspaceId }: { workspaceId: string }) 
   }
   if (!data) return null
   return <>
-    <SettingsSection>
+    {/* Its own policy, apart from the order of 允许使用的模型 (decision 2026-11-02 R, item 1). */}
+    <SettingsSection id="after-quota-heading" title={t('afterQuotaSection')}>
       <SettingRow title={t('afterQuota')} description={t('afterQuotaBilling')}>
         <Switch aria-label={t('afterQuota')} checked={data.apiKeyAfterQuota} onCheckedChange={on => void save(on)} />
       </SettingRow>
