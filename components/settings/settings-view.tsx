@@ -90,8 +90,7 @@ export function SettingsView({ user, userKey, googleEnabled = false, onRail, onS
     if (preview || !roleKnown || !resolvedWorkspaceId) return
     return prefetchAllSettings(resolvedWorkspaceId, admin, cache, personal)
   }, [preview, roleKnown, resolvedWorkspaceId, admin, personal, cache])
-  // 密钥与环境 opens 密钥与登录 on its workspace side: one page, one title (decision 2026-11-02-2120).
-  const title = t(`sections.${section === 'secrets' ? 'logins' : section}.title`)
+  const title = t(`sections.${section}.title`)
   const routedBody = section === 'members' || section === 'teams'
   // Switching sections fades the new one in briefly; the section the page opened on does not (docs/design/decisions/2026-10-31-1814-segmented-control-motion.md).
   const firstSection = useRef(section)
