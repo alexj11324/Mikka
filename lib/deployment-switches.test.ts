@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { beforeEach, test } from 'node:test'
-import { DEPLOYMENT_DISTINCT_ID, DEPLOYMENT_SWITCHES, deploymentSwitch, refreshDeploymentSwitches, resetDeploymentSwitches } from './deployment-switches'
+import { DEPLOYMENT_DISTINCT_ID, DEPLOYMENT_SWITCHES, deploymentSwitch, refreshDeploymentSwitches, resetDeploymentSwitches, SWITCH_REFRESH_MS, switchForPerson, type Switch } from './deployment-switches'
 
 const posthog = (flags: Record<string, unknown>, extra: Record<string, unknown> = {}) => {
   const requests: unknown[] = []
@@ -64,4 +64,24 @@ test('every kill flag ends in -off and ships on; every gate ships off', () => {
     assert.equal(entry.fallback, entry.kind === 'kill', name)
     assert.match(entry.flag, /^mikka-[a-z0-9-]+$/, name)
   }
+})
+
+test('a person switch is evaluated for that person, cached, and falls back the same way', async () => {
+  const entry: Switch = { flag: 'mikka-example-person', kind: 'gate', legacy: env => env.EXAMPLE === undefined ? undefined : env.EXAMPLE === '1', fallback: false }
+  const asked: string[] = []
+  const fetcher = (async (_url: string, init: RequestInit) => {
+    const body = JSON.parse(String(init.body)) as { distinct_id: string }
+    asked.push(body.distinct_id)
+    return Response.json({ errorsWhileComputingFlags: false, flags: body.distinct_id === 'alex' ? { 'mikka-example-person': flag(true) } : {} })
+  }) as unknown as typeof fetch
+  const lookup = { token: 'phc_test', fetcher, env: {}, now: 1_000 }
+  assert.equal(await switchForPerson(entry, 'alex', lookup), true, 'on for the person it targets')
+  assert.equal(await switchForPerson(entry, 'someone', lookup), false, 'no answer for others: the default')
+  assert.equal(await switchForPerson(entry, 'someone', { ...lookup, env: { EXAMPLE: '1' } }), true, 'or the old variable')
+  assert.deepEqual(asked, ['alex', 'someone'], 'cached per person')
+  const down = (async () => { throw new Error('network') }) as unknown as typeof fetch
+  assert.equal(await switchForPerson(entry, 'alex', { ...lookup, fetcher: down, now: 1_000 + SWITCH_REFRESH_MS }), true, 'an outage keeps what was known')
+  assert.equal(await switchForPerson(entry, 'alex', { ...lookup, token: '' , now: 1_000 }), true)
+  resetDeploymentSwitches()
+  assert.equal(await switchForPerson(entry, 'alex', { ...lookup, fetcher: down }), false, 'never answered: the default')
 })

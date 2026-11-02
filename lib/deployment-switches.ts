@@ -2,9 +2,10 @@
  * Deployment-wide feature switches, decided in PostHog (Alex, 2026-11-02:
  * every feature switch goes through a PostHog feature flag).
  *
- * Each switch is one PostHog flag evaluated against one fixed distinct id, as
- * the Linear sync flag is (lib/linear-sync/flags.ts): never against a person or
- * a team. A switch reads, in order:
+ * A deployment switch is one PostHog flag evaluated against one fixed distinct
+ * id, as the Linear sync flag is (lib/linear-sync/flags.ts). A person switch
+ * (PERSON_SWITCHES, personSwitch) is evaluated for the person's user id, so it
+ * can be on for some people first. Either reads, in order:
  *
  * 1. PostHog's explicit answer for its flag (true or false);
  * 2. while PostHog is unreachable, still loading, or the flag does not exist:
@@ -25,7 +26,7 @@
 
 type Env = Record<string, string | undefined>
 
-interface Switch {
+export interface Switch {
   /** The PostHog flag. */
   flag: string
   /** kill: true turns a shipped feature off. gate: true turns a feature on. */
@@ -107,34 +108,84 @@ function scheduleRefresh(now: number) {
 }
 
 /**
- * Asks PostHog for every switch's flag in one request and keeps the explicit
- * answers. A failed or partial evaluation keeps the previous answers: an
- * outage never flips a switch. Exported for tests and for callers that want
+ * PostHog's explicit answers for `flags`, evaluated for one distinct id, or
+ * null when it gave none: an error, a partial evaluation or the quota limit.
+ * A flag it does not have, or a multivariate one, gets no answer.
+ */
+async function evaluate(token: string, distinctId: string, flags: readonly string[], fetcher: typeof fetch, timeoutMs: number): Promise<Answers | null> {
+  const response = await fetcher('https://us.i.posthog.com/flags?v=2', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'user-agent': 'posthog-node/mikka-deployment-switches' },
+    body: JSON.stringify({ api_key: token, distinct_id: distinctId, flag_keys_to_evaluate: flags }),
+    // Never follow a redirect with the project token.
+    cache: 'no-store', redirect: 'manual', signal: AbortSignal.timeout(timeoutMs),
+  })
+  if (!response.ok) return null
+  const result = await response.json() as { errorsWhileComputingFlags?: boolean; quotaLimited?: string[]; flags?: Record<string, { enabled?: unknown; variant?: unknown }> }
+  if (result.errorsWhileComputingFlags !== false || result.quotaLimited?.includes('feature_flags') || !result.flags || typeof result.flags !== 'object' || Array.isArray(result.flags)) return null
+  const answers: Answers = {}
+  for (const flag of flags) {
+    const value = result.flags[flag]
+    if (value && typeof value === 'object' && !Array.isArray(value) && value.variant == null && typeof value.enabled === 'boolean') answers[flag] = value.enabled
+  }
+  return answers
+}
+
+/**
+ * Asks PostHog for every deployment switch in one request and keeps the
+ * explicit answers. A failed or partial evaluation keeps the previous answers:
+ * an outage never flips a switch. Exported for tests and for callers that want
  * the answers before their first read.
  */
 export async function refreshDeploymentSwitches(token: string | undefined = process.env.NEXT_PUBLIC_POSTHOG_KEY, fetcher: typeof fetch = fetch, timeoutMs = SWITCH_TIMEOUT_MS): Promise<void> {
   if (!token) return
-  const response = await fetcher('https://us.i.posthog.com/flags?v=2', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', 'user-agent': 'posthog-node/mikka-deployment-switches' },
-    body: JSON.stringify({ api_key: token, distinct_id: DEPLOYMENT_DISTINCT_ID, flag_keys_to_evaluate: Object.values(DEPLOYMENT_SWITCHES).map(entry => entry.flag) }),
-    // Never follow a redirect with the project token.
-    cache: 'no-store', redirect: 'manual', signal: AbortSignal.timeout(timeoutMs),
-  })
-  if (!response.ok) return
-  const result = await response.json() as { errorsWhileComputingFlags?: boolean; quotaLimited?: string[]; flags?: Record<string, { enabled?: unknown; variant?: unknown }> }
-  if (result.errorsWhileComputingFlags !== false || result.quotaLimited?.includes('feature_flags') || !result.flags || typeof result.flags !== 'object' || Array.isArray(result.flags)) return
-  const answers: Answers = {}
-  for (const entry of Object.values(DEPLOYMENT_SWITCHES) as Switch[]) {
-    const flag = result.flags[entry.flag]
-    // A multivariate flag is not a switch: no answer.
-    if (flag && typeof flag === 'object' && !Array.isArray(flag) && flag.variant == null && typeof flag.enabled === 'boolean') answers[entry.flag] = flag.enabled
+  const answers = await evaluate(token, DEPLOYMENT_DISTINCT_ID, Object.values(DEPLOYMENT_SWITCHES).map(entry => entry.flag), fetcher, timeoutMs)
+  if (answers) state.answers = answers
+}
+
+/**
+ * Switches decided per person: the flag is evaluated for the person's Mikka
+ * user id (the distinct id the browser uses), so it can be on for some people
+ * and not others. The same order applies: PostHog's explicit answer, else the
+ * old variable, else the default.
+ */
+export const PERSON_SWITCHES = {} as const satisfies Record<string, Switch>
+
+export type PersonSwitch = keyof typeof PERSON_SWITCHES
+
+const PERSON_CACHE_MAX = 5_000
+const personAnswers = new Map<string, { value: boolean | undefined; at: number }>()
+
+/** Whether the switch's feature is on for this person. Never throws; waits at most SWITCH_TIMEOUT_MS. */
+export async function personSwitch(name: PersonSwitch, userId: string, options: SwitchLookup = {}): Promise<boolean> {
+  return switchForPerson(PERSON_SWITCHES[name], userId, options)
+}
+
+export interface SwitchLookup { env?: Env; token?: string; fetcher?: typeof fetch; now?: number; timeoutMs?: number }
+
+/** The lookup behind personSwitch, for any switch entry; exported for tests. */
+export async function switchForPerson(entry: Switch, userId: string, { env = process.env, token = process.env.NEXT_PUBLIC_POSTHOG_KEY, fetcher = fetch, now = Date.now(), timeoutMs = SWITCH_TIMEOUT_MS }: SwitchLookup = {}): Promise<boolean> {
+  const key = `${entry.flag}|${userId}`
+  let cached = personAnswers.get(key)
+  if (!cached || now - cached.at >= SWITCH_REFRESH_MS) {
+    let value: boolean | undefined = cached?.value
+    if (token) {
+      try {
+        const answers = await evaluate(token, userId, [entry.flag], fetcher, timeoutMs)
+        // An outage keeps what was known for this person.
+        if (answers) value = answers[entry.flag]
+      } catch { /* keeps the previous answer */ }
+    }
+    if (personAnswers.size >= PERSON_CACHE_MAX) personAnswers.clear()
+    cached = { value, at: now }
+    personAnswers.set(key, cached)
   }
-  state.answers = answers
+  return answered(entry, cached.value === undefined ? {} : { [entry.flag]: cached.value }) ?? entry.legacy(env) ?? entry.fallback
 }
 
 /** Forgets PostHog's answers; for tests. */
 export function resetDeploymentSwitches() {
+  personAnswers.clear()
   state.answers = {}
   state.at = 0
   state.pending = null
