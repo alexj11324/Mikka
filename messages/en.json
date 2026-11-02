@@ -3015,7 +3015,39 @@
       "refresh": "Refresh models",
       "refreshFailed": "Refresh failed. Try again"
     },
-    "empty": "Tell {name} what you need"
+    "empty": "Tell {name} what you need",
+    "events": {
+      "aThread": "A thread",
+      "aTask": "A task",
+      "quoted": "“{title}”",
+      "runEnded": {
+        "succeeded": "finished",
+        "failed": "failed",
+        "stopped": "stopped",
+        "cancelled": "was cancelled",
+        "other": "ended"
+      },
+      "runRetried": "moved to another machine",
+      "runSwitched": "ran out of subscription quota and continues on an API key",
+      "runPaused": "ran out of subscription quota and is paused",
+      "runWaitingDevice": "starts when its computer is back online",
+      "runDeviceBack": "starts now: its computer is back online",
+      "issueMoved": "moved to {status}",
+      "issueChanged": "changed status",
+      "runReport": "reported progress",
+      "runQuestion": "is waiting for your answer",
+      "runBlocked": "is blocked",
+      "artifact": "An Artifact was handed over",
+      "artifactTitled": "“{title}” was handed over",
+      "action": {
+        "done": "Action done",
+        "failed": "Action failed",
+        "declined": "Action declined",
+        "other": "Action updated"
+      },
+      "other": "Something new happened"
+    },
+    "resend": "Send again"
   },
   "AgentCopy": {
     "pleaseSignInFirst": "Please sign in first.",

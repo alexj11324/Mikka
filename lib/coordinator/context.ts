@@ -9,6 +9,7 @@ import { pullRequestSchema } from '@/lib/issue-metadata'
 import { splitBrowserNotes, type BrowserNote } from '@/lib/browser/note'
 import { splitSuggestion, type SuggestionCard } from '@/lib/suggestions/card'
 import { chatFailure, type ChatFailure } from '@/lib/chat-failure'
+import { eventLine, type EventLine } from './event-line'
 
 // What the Coordinator's model sees. Everything here depends only on the
 // stored conversation, never on time or on how long the person was away, so
@@ -304,6 +305,8 @@ export interface ChatItem {
   artifacts: string[]
   /** An event line the chat draws in the person's language: the turn moved to their API key after the subscription ran out. */
   notice?: SwitchNotice
+  /** Any other event, as the line the chat draws in the person's language; its `text` is for the model only (review C1). */
+  line?: EventLine
   /** The person stopped this reply (停止); it keeps what it had said. */
   stopped?: true
   /** Why the turn answering this message of the person's failed; it stays after later turns and reloads. */
@@ -377,7 +380,8 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
       flush()
       const base = { ...(id ? { id } : {}), position, tools: [], threads: [], createdAt: createdAt.toISOString(), artifacts: [], ...(pending ? { pending } : {}) }
       // The triage line is for the Coordinator, not the person.
-      if (event) items.push({ ...base, from: 'event', text: raw.split('\n').filter(line => !line.startsWith('Triage:')).join('\n'), ...(source.mikkaEvent?.notice ? { notice: source.mikkaEvent.notice } : {}) })
+      if (event) items.push({ ...base, from: 'event', text: raw.split('\n').filter(line => !line.startsWith('Triage:')).join('\n'),
+        ...(source.mikkaEvent?.notice ? { notice: source.mikkaEvent.notice } : { line: eventLine(source.mikkaEvent?.eventKind, raw, source.mikkaEvent?.observedState ?? null) }) })
       else {
         const { quote, text: unquoted } = splitQuote(raw)
         const { notes, text: rest } = splitBrowserNotes(unquoted)
