@@ -8,7 +8,6 @@ import { BotBubble, CopyButton, MyBubble, Reactions, TimedRow, useTimeReveal } f
 import { Markdown } from '@/components/Markdown'
 import { NavBar, underBar } from '@/components/NavBar'
 import { Text } from '@/components/Text'
-import { TopScrim } from '@/components/TopScrim'
 import { Composer } from '@/components/ui'
 import { api } from '@/lib/api'
 import { clockTime } from '@/lib/clock'
@@ -91,7 +90,7 @@ export default function GroupChat() {
 
   return (
     <View style={styles.screen}>
-      <NavBar title={title} />
+      <NavBar title={title} material />
       <View style={{ flex: 1, overflow: 'hidden' }} {...handlers}>
         <KeyboardChatScrollView ref={scroll} {...underBar} offset={Math.max(insets.bottom, 12) - 8} keyboardDismissMode="interactive" keyboardLiftBehavior="whenAtEnd"
           contentContainerStyle={[styles.list, { paddingBottom: composerHeight + 16 }]} onContentSizeChange={() => scroll.current?.scrollToEnd({ animated: false })}>
@@ -130,7 +129,6 @@ export default function GroupChat() {
           {sendFailed ? <Text style={styles.error}>没发出去</Text> : null}
         </KeyboardChatScrollView>
       </View>
-      <TopScrim />
       <Composer value={text} onChangeText={setText} placeholder={`发到 ${title || '群聊'}`} onSend={words => send(words)} overlay onHeight={setComposerHeight}
         quote={quote} onClearQuote={() => setQuote(null)} onStop={working && !stopping ? () => void stop() : undefined} />
     </View>

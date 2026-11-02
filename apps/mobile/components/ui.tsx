@@ -67,7 +67,7 @@ export function Header({ left, title, right, subtitle, style }: { left?: ReactNo
  * them), so a failed send loses nothing. Controlled when `value` and
  * `onChangeText` are passed.
  */
-export function Composer({ placeholder, onSend, initial = '', disabled = false, value, onChangeText, attach = false, overlay = false, onHeight, autoFocus = false, quote, onClearQuote, accessory, onStop }: {
+export function Composer({ placeholder, onSend, initial = '', disabled = false, value, onChangeText, attach = false, overlay = false, onHeight, autoFocus = false, quote, onClearQuote, accessory, notice, onStop }: {
   placeholder: string
   onSend?: (text: string, attachments: Attachment[]) => boolean | void | Promise<boolean | void>
   initial?: string
@@ -85,6 +85,8 @@ export function Composer({ placeholder, onSend, initial = '', disabled = false, 
   onClearQuote?: () => void
   /** Beside 「+」 in the field's bottom row (the model menu). */
   accessory?: ReactNode
+  /** A line above the field, e.g. a model pick that did not save (ModelNotice). */
+  notice?: ReactNode
   /** While the bot answers: send turns into stop until something is typed. */
   onStop?: () => void
 }) {
@@ -147,6 +149,7 @@ export function Composer({ placeholder, onSend, initial = '', disabled = false, 
             {problem ? <Text style={styles.problem}>{problem}</Text> : null}
           </View>
         ) : null}
+        {notice}
         {/* One field, as in the Claude app: the quote, the words, then 「+」 and send. */}
         <Field style={styles.field}>
           {quote ? (

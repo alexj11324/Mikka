@@ -11,7 +11,6 @@ import { BotBubble, CopyButton, EventLine, MyBubble, OutgoingBubble, Reactions, 
 import { myReaction, toggled, withMine } from '@/lib/reactions'
 import { Markdown } from '@/components/Markdown'
 import { OfflineBanner } from '@/components/OfflineBanner'
-import { TopScrim } from '@/components/TopScrim'
 import { OpenUIReply } from '@/components/OpenUI'
 import { PendingActions } from '@/components/PendingActions'
 import { Text } from '@/components/Text'
@@ -27,6 +26,7 @@ import { delivered, inFlight, marked, outgoingKey, queued, type Outgoing, type O
 import { askForPush, usePushState } from '@/lib/push-state'
 import { runTitle, type Chat, type ChatFailure, type CitationSource, type PendingAction } from '@/lib/types'
 import { failureLine } from '@/lib/chat-failure'
+import { waitingLabel } from '@/lib/waiting'
 import { useApi } from '@/lib/useApi'
 import { runInfoLine } from '@/lib/run-info'
 import { openOnWeb, webChatPath } from '@/lib/web'
@@ -50,7 +50,7 @@ function eventText(text: string, sources: Record<string, CitationSource>) {
  * person (approve or decline, as on the web); `focus` marks the one a push
  * was about. OpenUI cards are drawn natively (components/OpenUI.tsx).
  */
-export function ChatScreen({ botId, name, color, shape, draft, focus, compose, composerAccessory }: { botId: string | null; name: string; color?: string; shape?: string; draft?: string; focus?: string; compose?: boolean; composerAccessory?: ReactNode }) {
+export function ChatScreen({ botId, name, color, shape, draft, focus, compose, composerAccessory, composerNotice }: { botId: string | null; name: string; color?: string; shape?: string; draft?: string; focus?: string; compose?: boolean; composerAccessory?: ReactNode; composerNotice?: ReactNode }) {
   const [quote, setQuote] = useState<string | null>(null)
   const self = botId ?? 'coordinator'
   const router = useRouter()
@@ -124,13 +124,12 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, c
 
   const answer = async (message: string) => send(message)
 
-  // 停止: the turn ends on the server, keeping what it had said; stop stays away until the chat stops working.
+  // 停止: the turn ends on the server, keeping what it had said. Stop is away only while its request is out, so a chat still working can always be stopped again.
   const [stopping, setStopping] = useState(false)
-  useEffect(() => { if (!working) setStopping(false) }, [working])
   const stop = async () => {
     setStopping(true)
-    try { await api('/api/mobile/chat/stop', { method: 'POST', body: { botId } }) } catch { setStopping(false) }
-    await reload()
+    try { await api('/api/mobile/chat/stop', { method: 'POST', body: { botId } }) } catch { /* the button comes back */ }
+    try { await reload() } finally { setStopping(false) }
   }
 
   const reactions = data?.reactions ?? {}
@@ -153,7 +152,7 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, c
   return (
     <View style={styles.screen}>
       {/* Back is the system's (and its edge swipe); the bot's name opens the bot's page. */}
-      <NavBar
+      <NavBar material
         titleView={
           <Pressable accessibilityRole="button" accessibilityLabel={`${name} 的资料`} onPress={() => router.push(`/bots/${self}/info`)}>
             <Capsule>
@@ -197,7 +196,7 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, c
             )
           })}
           {outbox.map(item => <OutgoingBubble key={item.key} text={item.text} photos={item.images.map(image => image.uri)} failed={item.state === 'failed'} onRetry={() => void retry(item)} />)}
-          {working ? <View style={styles.working}><Spinner size={16} /></View> : null}
+          {working ? <WaitingLine since={outbox.length ? null : waitingSince(items)} /> : null}
           {!data && !error ? <View style={styles.loading}><Spinner /></View> : null}
           {data && !items.length && !working ? <Text style={styles.empty}>有什么要我做的，直接说。</Text> : null}
           {error && !data ? (
@@ -214,10 +213,33 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, c
           ) : null}
         </KeyboardChatScrollView>
       </View>
-      <TopScrim />
       <OfflineBanner top={insets.top + 66} />
       <Composer value={text} onChangeText={setText} placeholder={`给 ${name} 发消息`} onSend={send} attach overlay onHeight={setComposerHeight} autoFocus={compose || Boolean(draft)}
-        quote={quote} onClearQuote={() => setQuote(null)} accessory={composerAccessory} onStop={Boolean(data?.working) && !stopping ? () => void stop() : undefined} />
+        quote={quote} onClearQuote={() => setQuote(null)} accessory={composerAccessory} notice={composerNotice} onStop={Boolean(data?.working) && !stopping ? () => void stop() : undefined} />
+    </View>
+  )
+}
+
+/** When the person's unanswered message was sent; a reply is counted from there. Otherwise (an event woke the bot) from when the screen saw it start. */
+function waitingSince(items: Chat['items']) {
+  const last = [...items].reverse().find(item => item.from !== 'event')
+  const at = last?.from === 'person' ? Date.parse(last.createdAt) : NaN
+  return Number.isFinite(at) ? at : null
+}
+
+/** The reply on its way: the spinner, and after 30 seconds what it waits for and for how long (Figma 843:2 #1). */
+function WaitingLine({ since }: { since: number | null }) {
+  const [start] = useState(() => since ?? Date.now())
+  const [now, setNow] = useState(Date.now)
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(timer)
+  }, [])
+  const label = waitingLabel(Math.min(since ?? start, now), now)
+  return (
+    <View style={[styles.working, label ? styles.waiting : null]}>
+      <Spinner size={16} />
+      {label ? <Text style={styles.waitingText}>{label}</Text> : null}
     </View>
   )
 }
@@ -262,7 +284,9 @@ const styles = StyleSheet.create({
   list: { paddingHorizontal: 16, gap: 12 },
   loading: { paddingTop: 120, alignItems: 'center' },
   stopped: { alignSelf: 'flex-start', fontSize: 12, lineHeight: 17, color: colors.secondary, marginLeft: 4, marginTop: -6 },
-  working: { alignSelf: 'flex-start', backgroundColor: colors.bubble, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 12 },
+  working: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.bubble, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 12 },
+  waiting: { paddingLeft: 14, paddingVertical: 10 },
+  waitingText: { fontSize: 14, lineHeight: 20, color: colors.secondary },
   failed: { alignItems: 'center', gap: 10, marginTop: 24 },
   failedActions: { flexDirection: 'row', gap: 8 },
   empty: { alignSelf: 'center', color: colors.secondary, marginTop: 40, fontSize: 15 },
