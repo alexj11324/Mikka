@@ -30,13 +30,13 @@ const database = {
   },
   transaction: async (fn: (transaction: typeof tx) => Promise<unknown>) => fn(tx),
 }
-mock.module(new URL('./db/index.ts', import.meta.url).href, { exports: { db: database, pool: { query: () => { throw Error('Unexpected raw database query in per-owner retry fixture') } } } })
-mock.module(new URL('./coordinator-event-store.ts', import.meta.url).href, { exports: {
+mock.module(new URL('./db/index.ts', import.meta.url).href, { namedExports: { db: database, pool: { query: () => { throw Error('Unexpected raw database query in per-owner retry fixture') } } } })
+mock.module(new URL('./coordinator-event-store.ts', import.meta.url).href, { namedExports: {
   recordCoordinatorEvent: async (_tx: unknown, event: { botId?: string | null }) => { events.push(event) },
 } })
-mock.module(new URL('./coordinator/wake.ts', import.meta.url).href, { exports: { wakeCoordinator: () => { throw Error('Unexpected wake') } } })
-mock.module(new URL('./mcp/worker.ts', import.meta.url).href, { exports: { revokeRunTokens: async (id: string) => { revoked.push(id) } } })
-mock.module(new URL('./device-repositories.ts', import.meta.url).href, { exports: { ensureDeviceRepository: async () => ({ id: 'other-repository' }) } })
+mock.module(new URL('./coordinator/wake.ts', import.meta.url).href, { namedExports: { wakeCoordinator: () => { throw Error('Unexpected wake') } } })
+mock.module(new URL('./mcp/worker.ts', import.meta.url).href, { namedExports: { revokeRunTokens: async (id: string) => { revoked.push(id) } } })
+mock.module(new URL('./device-repositories.ts', import.meta.url).href, { namedExports: { ensureDeviceRepository: async () => ({ id: 'other-repository' }) } })
 
 test('actual reclaim writer carries the trusted private Bot into a new attempt instead of falling back to default namespace', async () => {
   const { reclaimLostRuns } = await import('./run-leases')

@@ -43,8 +43,9 @@ One command sets up a container: `eval "$(scripts/dev/bootstrap-local.sh)"`
 the cloud environment's setup script so every session starts ready. It
 provides:
 
-- **Node 24**, the same as CI. Node 22's `mock.module` ignores `{ exports }`
-  and gives false test failures.
+- **Node 24**, the same as CI. The unit tests also pass on Node 22: mock a
+  module with `namedExports`/`defaultExport` (Node 22 ignores `{ exports }`)
+  and use `--experimental-test-isolation` (Node 22 has no `--test-isolation`).
 - **PostgreSQL 17** at `127.0.0.1:5432`, database `mikka_e2e`; migrations with
   `pnpm migrate` (it runs by itself when every target is a loopback database;
   a remote database off Vercel still needs `MIGRATE=1` and `--allow-remote`).

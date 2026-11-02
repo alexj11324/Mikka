@@ -7,7 +7,7 @@ import { DEFAULT_AGENT_DEFINITION } from '@/lib/agent-kit/builtin'
 const COORDINATOR_BOT = '00000000-0000-4000-8000-0000000c0de1'
 
 const dispatch=mock.fn(async () => ({ status:'awaiting_approval',actionId:'fixture' }))
-const stub=(path:string,exports:Record<string,unknown>)=>mock.module(new URL(path,import.meta.url).href,{exports})
+const stub=(path:string,exports:Record<string,unknown>)=>mock.module(new URL(path,import.meta.url).href, { namedExports: exports })
 stub('../../workflows/coordinator/steps.ts',{personalWrite:dispatch})
 stub('../../workflows/coordinator/agent-kit-steps.ts',{beforeAgentTool:async()=>{},afterAgentTool:async()=>{}})
 stub('../composio-actions.ts',{createComposioAITools:()=>({}),createGoogleAITools:()=>({})})

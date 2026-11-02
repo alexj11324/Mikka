@@ -6,7 +6,7 @@ const oldEnabled = process.env.CREDENTIAL_VAULT_ENABLED, oldAuth = process.env.B
 const calls: { sql: string; values?: string[] }[] = []
 let present = true, unavailable = false
 const entries = new Map<string, SecretFingerprint[]>()
-mock.module(new URL('../db/index.ts', import.meta.url).href, { exports: { pool: {
+mock.module(new URL('../db/index.ts', import.meta.url).href, { namedExports: { pool: {
   async query(sql: string, values?: string[]) {
     calls.push({ sql, values })
     if (unavailable) throw new Error('database unavailable')

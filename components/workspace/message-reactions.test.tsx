@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { IntlProvider } from 'next-intl'
 
 const messages = JSON.parse(readFileSync(new URL('../../messages/en.json', import.meta.url), 'utf8'))
-mock.module('swr', { exports: { default: () => ({ data: undefined }) } })
+mock.module('swr', { defaultExport: () => ({ data: undefined }) })
 
 let MessageReactions: typeof import('./message-reactions')['MessageReactions']
 before(async () => { ({ MessageReactions } = await import('./message-reactions')) })

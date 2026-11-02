@@ -24,7 +24,7 @@ const reconcileRun = mock.fn(async (_userId: string, _runId: string) => {})
 const runtime = mock.fn((_botId: string | null) => ({ questions: scopedQuestions, reconcile: { run: reconcileRun } }))
 const dbRows: { botId: string | null }[] = []
 const dbPool = { query: mock.fn(async (_q: string, _p?: unknown[]) => ({ rows: dbRows })) }
-const stub = (path: string, exports: Record<string, unknown>) => mock.module(new URL(path, import.meta.url).href, { exports })
+const stub = (path: string, exports: Record<string, unknown>) => mock.module(new URL(path, import.meta.url).href, { namedExports: exports })
 stub('./self-improvement/registry.ts', { lockSkillScope: async () => {} })
 stub('./self-improvement/skill-mounts.ts', { recordCompletionSkillMount: mount })
 stub('./self-improvement/server.ts', { skillEvaluations: { authorizeEvaluation, validateExecution } })
