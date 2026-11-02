@@ -8,9 +8,14 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Field, FieldGroup, FieldLabel, FieldError } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Spinner } from '@/components/ui/spinner'
 import { Link } from '@/i18n/navigation'
 import { withBasePath } from '@/lib/base-path'
+
+/** What the machine asking to connect reports about itself (lib/daemon-authorization.ts). */
+type ClientInfo = { name: string | null; platform: string | null; version: string | null }
+const PLATFORMS: Record<string, string> = { darwin: 'macOS', linux: 'Linux', win32: 'Windows' }
 
 type State = 'entry' | 'loading' | 'review' | 'approving' | 'denying' | 'approved' | 'denied' | 'invalid' | 'error'
 const primary = 'bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90'
@@ -19,6 +24,11 @@ export function DeviceAuthorization({ account, initialCode }: { account: string;
   const t = useTranslations('DeviceAuthorization')
   const [code, setCode] = useState(initialCode)
   const [state, setState] = useState<State>(initialCode ? 'loading' : 'entry')
+  const [client, setClient] = useState<ClientInfo | null>(null)
+  // Opened from a link that already carries the code: approve only once the person has checked it against the
+  // terminal, so a link sent by someone else cannot connect their machine (RFC 8628 §5.4). A code typed in was read off the terminal.
+  const [fromLink, setFromLink] = useState(Boolean(initialCode))
+  const [matched, setMatched] = useState(false)
   const pending = state === 'loading' || state === 'approving' || state === 'denying'
 
   const review = useCallback(async (value: string, signal?: AbortSignal) => {
@@ -32,11 +42,13 @@ export function DeviceAuthorization({ account, initialCode }: { account: string;
       })
       if (signal?.aborted) return
       if (!response.ok) { setState(response.status < 500 ? 'invalid' : 'error'); return }
-      const data = await response.json() as { client_id?: string; status?: string }
+      const data = await response.json() as { client_id?: string; status?: string; device_name?: string | null; device_platform?: string | null; client_version?: string | null }
       if (signal?.aborted) return
       // Better Auth binds review to the signed-in owner. A grant owned by
       // someone else does not disclose client_id and cannot be approved here.
       if (data.client_id !== DAEMON_CLIENT_ID) { setState('invalid'); return }
+      setClient({ name: data.device_name ?? null, platform: data.device_platform ?? null, version: data.client_version ?? null })
+      setMatched(false)
       setState(data.status === 'pending' ? 'review' : data.status === 'approved' ? 'approved' : data.status === 'denied' ? 'denied' : 'invalid')
     } catch {
       if (!signal?.aborted) setState('error')
@@ -51,7 +63,7 @@ export function DeviceAuthorization({ account, initialCode }: { account: string;
   }, [initialCode, review])
 
   async function answer(allow: boolean) {
-    if (state !== 'review') return
+    if (state !== 'review' || (allow && fromLink && !matched)) return
     setState(allow ? 'approving' : 'denying')
     try {
       const response = await fetch(withBasePath('/api/auth/device/' + (allow ? 'approve' : 'deny')), {
@@ -72,7 +84,7 @@ export function DeviceAuthorization({ account, initialCode }: { account: string;
           <p className="break-all text-sm text-muted-foreground">{account}</p>
         </CardHeader>
         <CardContent className="flex flex-col gap-4 p-0">
-        {state === 'entry' && <form className="flex flex-col gap-4" onSubmit={event => { event.preventDefault(); void review(code) }}>
+        {state === 'entry' && <form className="flex flex-col gap-4" onSubmit={event => { event.preventDefault(); setFromLink(false); void review(code) }}>
           <FieldGroup><Field>
             <FieldLabel htmlFor="device-code">{t('code')}</FieldLabel>
             <Input id="device-code" autoFocus autoComplete="off" autoCapitalize="characters" spellCheck={false} maxLength={32} value={code} placeholder="ABCD-EFGH" onChange={event => setCode(event.target.value)} />
@@ -81,14 +93,23 @@ export function DeviceAuthorization({ account, initialCode }: { account: string;
         </form>}
         {state === 'loading' && <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground"><Spinner aria-hidden="true" />{t('loading')}</p>}
         {(state === 'review' || state === 'approving' || state === 'denying') && <>
-          <div className="flex flex-col gap-4">
-            <p className="text-xs text-muted-foreground">{t('code')}</p>
-            <p className="font-mono text-2xl">{code}</p>
-            <p className="text-sm">{t('scope')}</p>
-          </div>
+          <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-3 text-sm" data-slot="device-request">
+            <dt className="text-muted-foreground">{t('device')}</dt>
+            <dd className="min-w-0 break-words">{client?.name
+              ? <><span className="font-medium">{client.name}</span>{[client.platform && (PLATFORMS[client.platform] ?? client.platform), client.version && t('clientVersion', { version: client.version })].filter(Boolean).map(part => <span key={part} className="text-muted-foreground"> · {part}</span>)}</>
+              : <span className="text-muted-foreground">{t('deviceUnreported')}</span>}</dd>
+            <dt className="text-muted-foreground">{t('code')}</dt>
+            <dd className="font-mono text-2xl leading-none">{code}</dd>
+            <dt className="text-muted-foreground">{t('access')}</dt>
+            <dd>{t('scope')}</dd>
+          </dl>
+          {fromLink && <FieldGroup><Field orientation="horizontal">
+            <Checkbox id="device-code-matches" checked={matched} disabled={pending} onCheckedChange={checked => setMatched(Boolean(checked))} />
+            <FieldLabel htmlFor="device-code-matches">{t('codeMatches')}</FieldLabel>
+          </Field></FieldGroup>}
           <div className="flex gap-3">
             <Button size="sm" variant="outline" disabled={pending} onClick={() => { void answer(false) }}>{state === 'denying' && <Spinner aria-hidden="true" data-icon="inline-start" />}{t('deny')}</Button>
-            <Button size="sm" className={primary} disabled={pending} onClick={() => { void answer(true) }}>{state === 'approving' && <Spinner aria-hidden="true" data-icon="inline-start" />}{state === 'approving' ? t('approving') : t('allow')}</Button>
+            <Button size="sm" className={primary} disabled={pending || (fromLink && !matched)} onClick={() => { void answer(true) }}>{state === 'approving' && <Spinner aria-hidden="true" data-icon="inline-start" />}{state === 'approving' ? t('approving') : t('allow')}</Button>
           </div>
         </>}
         {state === 'approved' && <p className="text-sm">{t('returnToTerminal')}</p>}
@@ -96,7 +117,7 @@ export function DeviceAuthorization({ account, initialCode }: { account: string;
         {(state === 'invalid' || state === 'error') && <>
           <FieldError>{state === 'invalid' ? t('invalid') : t('failed')}</FieldError>
           <Button size="sm" variant="outline" className="self-start" onClick={() => {
-            if (state === 'invalid') { setCode(''); setState('entry') }
+            if (state === 'invalid') { setCode(''); setFromLink(false); setState('entry') }
             else void review(code)
           }}>{state === 'invalid' ? t('enterAgain') : t('retry')}</Button>
         </>}

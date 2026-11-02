@@ -43,7 +43,7 @@ import type { PendingTelegramTarget } from '@/lib/coordinator/telegram-pending'
 import { createTelegramReplies } from '@/lib/coordinator/telegram-replies'
 import { workspacePool } from '@/lib/workspace-db'
 import { postTelegramText } from '@/lib/telegram/client'
-import { pushInput, pushQuestions, readPush, type InboxEvent } from '@/lib/push-reasons'
+import type { InboxEvent } from '@/lib/push-reasons'
 import { queueCloudRun } from '@/lib/computer/queue-run'
 import { ComputerStore } from '@/lib/computer/store'
 import { bindBotSubscription } from '@/lib/computer/bot-subscription'
@@ -172,27 +172,20 @@ export async function acknowledgeTelegramReply(userId: string, botId: string, ho
 /** Pushes a reply the Coordinator raised on its own to the person's phones, as their 通知 settings allow (lib/mobile-push.ts). */
 export async function pushToPhones(userId: string, botId: string, text: string | null, events: InboxEvent[]) {
   'use step'
-  // Loaded here, not at the top: only this step needs the push sender, its settings and the Decisions call.
-  const [{ pushReply }, { decide }, { hostedBillingScope }, { executionWorkspace }] = await Promise.all([import('@/lib/mobile-push'), import('@/lib/coordinator/decide'), import('@/lib/abuse/context'), import('@/lib/execution-settings')])
-  let answers = null
-  try { answers = await hostedBillingScope.run({ workspaceId: await executionWorkspace(userId, botId), ownerId: userId }, () => decide('push-reply', pushInput(events, text), pushQuestions())) } catch { answers = null }
-  const reason = readPush(answers)
-  // No answer pushes nothing: the reply is in the chat either way.
-  if (reason === null) { console.warn('Phone push skipped: no Decisions answer'); return }
-  if (reason !== 'none') await pushReply(userId, botId, text, [reason])
+  await (await import('@/lib/coordinator/push-decision')).pushByDecision(userId, botId, text, events)
 }
 
 /**
- * Mikka 默认 refused the turn (points used up, a card to verify, …): the web
- * draws that on the chat, but Telegram and the phone would hear nothing. They
- * get the same status line instead (lib/coordinator/refusal-line.ts). Any
- * other failure, and a scheduled read, sends nothing here. Never throws: the
- * turn's own failure is what the caller records.
+ * The turn failed for a reason the person can act on (Mikka 默认 or their
+ * subscription refused it): the web keeps that under their message, but
+ * Telegram and the phone would hear nothing. They get the same words instead
+ * (lib/coordinator/refusal-line.ts). Any other failure, and a scheduled read,
+ * sends nothing here. Never throws: the turn's own failure is what the caller records.
  */
-export async function noticeHostedRefusal(userId: string, botId: string, holder: string, error: string, telegramTargets: readonly PendingTelegramTarget[], pushEvents: readonly InboxEvent[]) {
+export async function noticeTurnFailure(userId: string, botId: string, holder: string, error: string, telegramTargets: readonly PendingTelegramTarget[], pushEvents: readonly InboxEvent[]) {
   'use step'
-  const { hostedRefusalLine, deliverRefusalLine } = await import('@/lib/coordinator/refusal-line')
-  const line = hostedRefusalLine(error)
+  const { failureLine, deliverRefusalLine } = await import('@/lib/coordinator/refusal-line')
+  const line = failureLine(error)
   if (!line) return false
   const replies = createTelegramReplies(pool, workspacePool)
   const { failed } = await deliverRefusalLine(line, telegramTargets, pushEvents, {
@@ -202,11 +195,11 @@ export async function noticeHostedRefusal(userId: string, botId: string, holder:
     },
     push: (text, events) => pushToPhones(userId, botId, text, events),
   })
-  if (failed.length) console.error('Refusal notice failed:', failed.join(', '))
+  if (failed.length) console.error('Failure notice failed:', failed.join(', '))
   return true
 }
 // A sent Telegram line has no idempotency key: never replay it.
-noticeHostedRefusal.maxRetries = 0
+noticeTurnFailure.maxRetries = 0
 
 /**
  * Folds older messages into the summary once the conversation passes the

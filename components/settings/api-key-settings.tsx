@@ -13,16 +13,24 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { Claude } from '@/components/ui/svgs/claude'
 import { OpenAI } from '@/components/ui/svgs/openai'
-import { API_KEY_PRESETS, type ApiKeyProtocol, type ApiKeyProvider, type ApiKeyView } from '@/lib/model-api-key-providers'
+import { API_KEY_PRESETS, apiKeyProtocols, protocolHarness, type ApiKeyProtocol, type ApiKeyProvider, type ApiKeyView } from '@/lib/model-api-key-providers'
+import { harnessName } from '@/components/labels/entity-labels'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { useActionError } from '@/lib/use-action-error'
 import { modelOrderKey } from '@/components/settings/model-order-settings'
 
 type Key = ApiKeyView & { shared: boolean }
 const providers = [...API_KEY_PRESETS, 'custom'] as const
+
+type ApiKeysT = ReturnType<typeof useTranslations<'Settings.apiKeys'>>
+/** 「Anthropic、OpenAI 协议 · 可用 Claude Code、Codex」: what a key speaks and which Agents can run it (Harness draft, Alex 2026-11-02). */
+function protocolAgents(t: ApiKeysT, protocols: readonly ApiKeyProtocol[]) {
+  return t('protocolAgents', { protocols: protocols.map(item => t(`protocolName.${item}`)).join('、'), agents: protocols.map(item => harnessName(protocolHarness(item))).join('、') })
+}
 
 export const apiKeysKey = (workspaceId: string) => ['settings:api-keys', workspaceId] as const
 /** A GET, like the other settings reads: it never waits in front of a save in the server-action queue. */
@@ -93,7 +101,7 @@ export function useApiKeyList(workspaceId: string) {
     return <span role="status" className="flex flex-wrap items-center gap-2 text-xs">{key.models.length ? t('modelCount', { count: key.models.length }) : t('noModels')}{refetchButton}</span>
   }
   const rows: ReactNode[] = (data?.keys ?? []).map(key => <SettingRow key={key.id} icon={<ProviderIcon provider={key.provider} />} title={title(key)}
-    description={<><span className="block">{`${key.baseUrl ? new URL(key.baseUrl).host : t('apiKey')} · ••••${key.last4}`}</span>{modelsLine(key)}</>}>
+    description={<><span className="block">{`${key.baseUrl ? new URL(key.baseUrl).host : t('apiKey')} · ••••${key.last4} · ${protocolAgents(t, apiKeyProtocols(key))}`}</span>{modelsLine(key)}</>}>
     <span className="flex items-center gap-4">
       {data?.canShare && <Label className="flex items-center gap-2 font-normal text-muted-foreground">
         {shareT('others')}
@@ -184,8 +192,6 @@ function AddApiKeyDialog({ workspaceId, onClose }: { workspaceId: string; onClos
   const [error, setError] = useState<string | null>(null)
   const custom = provider === 'custom'
   const ready = apiKey.trim() && (!custom || (name.trim() && baseUrl.trim()))
-  const providerItems = providers.map(value => ({ value, label: t(`provider.${value}`) }))
-  const protocolItems = (['openai', 'anthropic'] as const).map(value => ({ value, label: t(`protocol.${value}`) }))
 
   async function save() {
     setPending(true); setError(null)
@@ -200,16 +206,23 @@ function AddApiKeyDialog({ workspaceId, onClose }: { workspaceId: string; onClos
   }
 
   return <Dialog open onOpenChange={open => { if (!open && !pending) onClose(false) }}>
-    <DialogContent>
+    <DialogContent className="sm:max-w-lg">
       <DialogHeader><DialogTitle>{t('add')}</DialogTitle></DialogHeader>
       <form onSubmit={event => { event.preventDefault(); if (ready && !pending) void save() }}>
         <FieldGroup>
+          {/* A preset only takes its key: it speaks its own protocols, so each row says which Agents it runs on. */}
           <Field>
-            <FieldLabel htmlFor="api-key-provider">{t('providerLabel')}</FieldLabel>
-            <Select value={provider} items={providerItems} onValueChange={next => { if (providers.includes(next as never)) setProvider(next as ApiKeyProvider) }}>
-              <SelectTrigger id="api-key-provider" aria-label={t('providerLabel')} className="w-full"><SelectValue /></SelectTrigger>
-              <SelectContent><SelectGroup>{providerItems.map(item => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectGroup></SelectContent>
-            </Select>
+            <FieldLabel id="api-key-provider-label">{t('providerLabel')}</FieldLabel>
+            <RadioGroup aria-labelledby="api-key-provider-label" value={provider} onValueChange={next => { if (providers.includes(next as never)) setProvider(next as ApiKeyProvider) }}
+              className="w-full min-w-0 gap-0 overflow-hidden rounded-xl border">
+              {providers.map(value => <Label key={value} className="flex w-full min-w-0 items-center gap-3 px-3 py-2 font-normal hover:bg-muted has-data-checked:bg-muted">
+                <RadioGroupItem value={value} />
+                <span className="shrink-0">{t(`provider.${value}`)}</span>
+                <span className="min-w-0 flex-1 truncate text-right text-xs text-muted-foreground">
+                  {value === 'custom' ? t('customAgents') : protocolAgents(t, apiKeyProtocols({ provider: value, protocol: 'anthropic' }))}
+                </span>
+              </Label>)}
+            </RadioGroup>
           </Field>
           {custom && <>
             <Field>
@@ -220,12 +233,13 @@ function AddApiKeyDialog({ workspaceId, onClose }: { workspaceId: string; onClos
               <FieldLabel htmlFor="api-key-base-url">Base URL</FieldLabel>
               <Input id="api-key-base-url" value={baseUrl} maxLength={500} autoComplete="off" spellCheck={false} placeholder="https://api.example.com/v1" onChange={event => setBaseUrl(event.target.value)} />
             </Field>
+            {/* Only a custom provider picks its protocol; each option names the Agent it runs on. */}
             <Field>
-              <FieldLabel htmlFor="api-key-protocol">{t('protocolLabel')}</FieldLabel>
-              <Select value={protocol} items={protocolItems} onValueChange={next => { if (next === 'openai' || next === 'anthropic') setProtocol(next) }}>
-                <SelectTrigger id="api-key-protocol" aria-label={t('protocolLabel')} className="w-full"><SelectValue /></SelectTrigger>
-                <SelectContent><SelectGroup>{protocolItems.map(item => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectGroup></SelectContent>
-              </Select>
+              <FieldLabel id="api-key-protocol-label">{t('protocolLabel')}</FieldLabel>
+              <ToggleGroup aria-labelledby="api-key-protocol-label" variant="segment" spacing={0.5} className="grid w-full grid-cols-2" value={[protocol]}
+                onValueChange={values => { const next = values[0]; if (next === 'openai' || next === 'anthropic') setProtocol(next) }}>
+                {(['openai', 'anthropic'] as const).map(value => <ToggleGroupItem key={value} value={value} className="min-w-0 text-xs">{protocolAgents(t, [value])}</ToggleGroupItem>)}
+              </ToggleGroup>
             </Field>
             <Field>
               <FieldLabel htmlFor="api-key-models">{t('models')}</FieldLabel>
