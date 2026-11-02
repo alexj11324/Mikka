@@ -63,11 +63,12 @@ export function extractActionErrorCodes(source) {
 /**
  * A bot never owns or runs a thread: an Agent runs it and the bot only
  * dispatches it (Alex, 2026-11-02). Copy says 「<Bot> 派出的线程」,
- * never 「<Bot> 的线程」 or 「所属 Bot」, nor "a bot's threads".
+ * never 「<Bot> 的线程」 or 「所属 Bot」, nor "a bot's threads"; and an
+ * Agent never dispatches, so 「{agent} 派出」 fails too.
  */
 const THREAD_OWNER = {
-  'zh-CN': [/所属\s*Bot/i, /(?:Bot|Coordinator|\{(?:agent|bot|botName)\})\s*的线程/i, /它们的线程/],
-  en: [/\bbots?(?:['’]s?)?\s+threads?\b/i, /\{(?:agent|bot|botName)\}(?:['’]s)?\s+threads?\b/, /\bbots?\b[^.]*\btheir threads\b/i],
+  'zh-CN': [/所属\s*Bot/i, /(?:Bot|Coordinator|\{(?:agent|bot|botName)\})\s*的线程/i, /它们的线程/, /\{agent\}\s*派出/],
+  en: [/\bbots?(?:['’]s?)?\s+threads?\b/i, /\{(?:agent|bot|botName)\}(?:['’]s)?\s+threads?\b/, /\bbots?\b[^.]*\btheir threads\b/i, /\{agent\}\s+dispatched|dispatched by \{agent\}/i],
 }
 
 export function findThreadOwnership(messages) {
