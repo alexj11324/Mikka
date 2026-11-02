@@ -1,7 +1,7 @@
 import 'server-only'
 import { createHash, randomBytes } from 'node:crypto'
 import { setTimeout as delay } from 'node:timers/promises'
-import { and, asc, eq, inArray, isNull } from 'drizzle-orm'
+import { and, asc, eq, getTableColumns, inArray, isNull } from 'drizzle-orm'
 import { db, pool } from '@/lib/db'
 import { cloudDeviceScopeAllows } from '@/lib/device-token-scope'
 import { z } from 'zod'
@@ -97,8 +97,24 @@ export async function authenticateDevice(request: Request): Promise<DeviceCaller
   return { userId: row.userId, tokenId: row.id, ...(row.boundDeviceId && row.boundWorkspaceId ? { scopeDeviceId: row.boundDeviceId, scopeWorkspaceId: row.boundWorkspaceId } : {}), ...(removingDeviceId ? { removingDeviceId } : {}) }
 }
 
-/** A removed device (a tombstone kept for run history) is no longer owned. */
+const { harnesses: _harnesses, computerUse: _computerUse, updateFailure: _updateFailure, ...deviceColumns } = getTableColumns(devices)
+
+/**
+ * A removed device (a tombstone kept for run history) is no longer owned.
+ * Almost every daemon request asks, so the large report columns (harnesses,
+ * computerUse, updateFailure) are left out; ownedDeviceWithReport reads them.
+ */
 export async function ownedDevice(deviceId: string, userId: string) {
+  const [row] = await db
+    .select(deviceColumns)
+    .from(devices)
+    .where(and(eq(devices.id, deviceId), eq(devices.ownerId, userId), isNull(devices.removedAt)))
+    .limit(1)
+  return row ?? null
+}
+
+/** ownedDevice with the daemon's whole report, for the routes that check its harnesses. */
+export async function ownedDeviceWithReport(deviceId: string, userId: string) {
   const [row] = await db
     .select()
     .from(devices)
