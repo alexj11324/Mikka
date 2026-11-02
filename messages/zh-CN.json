@@ -3233,6 +3233,8 @@
     "needsModelDeviceAgent": "这台电脑没装 {agent}",
     "needsModelDeviceModel": "这台电脑的 {agent} 没有报告 {model}",
     "needsModelNotOffered": "没有订阅或 Key 能用 {agent} 跑 {model}",
+    "needsModelPickedNoDevice": "没有电脑能用 {agent} 跑 {model}",
+    "needsModelPickedUnavailable": "{agent} 的 {model} 暂时不可用",
     "needsModelSettings": "打开模型与订阅"
   },
   "IssueThreads": {

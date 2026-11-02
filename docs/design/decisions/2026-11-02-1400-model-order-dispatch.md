@@ -56,13 +56,17 @@ names (`DEFAULT_ORDER_PREFERENCE` in `lib/model-order-plan.ts`, the one
 allowlisted exception in `lib/model-options-source.test.ts`); no model name
 is written in code.
 
-**A computer the person names** (coordinator, 2026-11-02) fixes only where the
-run goes. The model is chosen by the same rule: the thread's own model, else
-允许使用的模型 in order, the first this computer can run (its Agent installed
-and, for a subscription, the model reported). On a named computer the thread's
-own model is the only one tried. Nothing it can run: the card says what it
-lacks (这台电脑没装 Codex; 这台电脑的 Codex 没有报告 <model>; 没有订阅或 Key
-能用 Codex 跑 <model>), and no other Agent is put in its place.
+**A model the thread names** (coordinator, 2026-11-02) is the only one tried;
+it never falls back to the list. No subscription or key offers it on that
+Agent: 没有订阅或 Key 能用 <Agent> 跑 <model>. Offered but nothing can run it now:
+没有电脑能用 <Agent> 跑 <model>, or <Agent> 的 <model> 暂时不可用.
+
+**A computer the person names** fixes only where the run goes. The model is
+chosen by the same rule: the thread's own model, else 允许使用的模型 in order,
+the first this computer can run (its Agent installed and, for a subscription,
+the model reported). Nothing it can run: the card says what it lacks
+(这台电脑没装 Codex; 这台电脑的 Codex 没有报告 <model>), and no other Agent is
+put in its place.
 
 **运行位置**: 云端 or 本地, one choice per list.
 
