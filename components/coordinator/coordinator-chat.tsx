@@ -257,6 +257,8 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
     const notes = withNotes && browser?.notes.length ? [...browser.notes] : undefined
     const fail = (message: string | null) => {
       if (!message) return 'skipped' as const
+      // Offline, the message never left: say that, not a generic failure (usability review N3). 重试 stays beside it.
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) message = t('sendOffline')
       setFailed({ text, withNotes, message, after: items.at(-1)?.position ?? 0 })
       return 'failed' as const
     }

@@ -304,6 +304,11 @@
       "turnstileUnavailable": "人机验证暂不可用，请稍后重试。",
       "emailRegistered": "该邮箱已注册，请直接登录。"
     },
+    "signInRefusal": {
+      "invalidCredentials": "邮箱或密码不正确",
+      "emailNotVerified": "邮箱还没有验证",
+      "signInRateLimited": "尝试次数过多，请稍后再试"
+    },
     "nameRequired": "称呼不能为空",
     "emailRequired": "邮箱不能为空",
     "emailInvalid": "邮箱格式无效",
@@ -2967,6 +2972,7 @@
       "sources": "{count} 个来源"
     },
     "sendUncertain": "未确认送达",
+    "sendOffline": "没有网络，未发送",
     "lengthCount": "{count} / {max}",
     "modelPicker": {
       "label": "模型：{name}",
