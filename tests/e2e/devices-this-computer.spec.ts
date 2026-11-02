@@ -87,7 +87,7 @@ test('首次启动：这台电脑还不是设备，App 在后台装好 daemon �
 
   await emit(page, { id: 'auto', target: 'this-computer', step: 'install', status: 'running' })
   await expect(card(page)).toContainText('正在添加这台电脑')
-  await expect(card(page)).toContainText('安装 Mikka 客户端')
+  await expect(card(page)).toContainText('安装 daemon')
   await shot(page, card(page), testInfo, 'local-installing')
 
   await emit(page, { id: 'auto', target: 'this-computer', step: 'connect', status: 'online', deviceId: mac })

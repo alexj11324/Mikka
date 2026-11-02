@@ -51,6 +51,8 @@ export class HostedWorkflowModel implements Model {
     )
     const { stepIdentity, timedModelStream } = await import('../model-call-timing')
     const requestedAt = Date.now()
-    return timedModelStream(await model.doStream(options), { route: 'hosted', model: this.modelId, tools: options.tools?.length ?? 0, startedAt, requestedAt, ...await stepIdentity() })
+    // An Anthropic model caches only at explicit breakpoints; other providers ignore the option (lib/prompt-cache.ts).
+    const { withCacheBreakpoints } = await import('../prompt-cache')
+    return timedModelStream(await model.doStream({ ...options, prompt: withCacheBreakpoints(options.prompt, 'anthropic') }), { route: 'hosted', model: this.modelId, tools: options.tools?.length ?? 0, startedAt, requestedAt, ...await stepIdentity() })
   }
 }

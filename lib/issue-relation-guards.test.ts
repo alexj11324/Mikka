@@ -90,13 +90,12 @@ before(async () => {
     return fn(tx)
   } } } })
   // Access was granted at lookup time; the transaction re-checks ownership and membership.
-  mock.module(file('./issue-access.ts'), { namedExports: {
-    requireIssueAccess: async (issueId: string) => {
-      const issue = rows.find(r => r.id === issueId)
-      if (!issue) throw new ActionFailureError('issueNotFound' as never)
-      return { issue, user: { id: actor } }
-    },
-  } })
+  const access = async (issueId: string) => {
+    const issue = rows.find(r => r.id === issueId)
+    if (!issue) throw new ActionFailureError('issueNotFound' as never)
+    return { issue, user: { id: actor } }
+  }
+  mock.module(file('./issue-access.ts'), { namedExports: { requireIssueAccess: access, requireIssueAccessWithoutBody: access } })
   mock.module(file('./issue-numbering.ts'), { namedExports: { allocateIssueNumbers: async () => 1 } })
   // Identifier formatting reads account data in current main; relation guards do not.
   mock.module(file('./task-identifier-server.ts'), { namedExports: {

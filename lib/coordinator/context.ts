@@ -308,6 +308,8 @@ export interface ChatItem {
   notice?: SwitchNotice
   /** Any other event, as the line the chat draws in the person's language; its `text` is for the model only (review C1). */
   line?: EventLine
+  /** The live stream this reply was first shown from, so the chat keeps that row in place when it is stored. */
+  streamId?: string
   /** The person stopped this reply (停止); it keeps what it had said. */
   stopped?: true
   /** Why the turn answering this message of the person's failed; it stays after later turns and reloads. */
@@ -403,13 +405,17 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
       const shown = [...waiting.ids, ...cited.ids]
       // 停止 cut this reply short (lib/coordinator/stop.ts); the mark may sit on an empty message.
       const stopped = (message as { mikkaStopped?: unknown }).mikkaStopped === true
+      // The stream that first showed this reply's text; a tool step before it has none to show.
+      const stream = (message as { mikkaStreamId?: unknown }).mikkaStreamId
+      const streamId = typeof stream === 'string' ? stream : undefined
       if (last?.from === 'coordinator' && !waiting.ids.length && !briefingBoundary) {
+        if (!last.text && cited.text && streamId) last.streamId = streamId
         last.text = [last.text, cited.text].filter(Boolean).join('\n\n')
         last.tools.push(...tools)
         last.artifacts = [...new Set([...last.artifacts, ...cited.ids])]
         if (stopped) last.stopped = true
       } else if (cited.text || tools.length || shown.length || stopped) {
-        items.push({ ...(id ? { id } : {}), position, from: 'coordinator', text: cited.text, tools, threads: [], createdAt: createdAt.toISOString(), artifacts: [...new Set(shown)], ...(stopped ? { stopped } : {}) })
+        items.push({ ...(id ? { id } : {}), position, from: 'coordinator', text: cited.text, tools, threads: [], createdAt: createdAt.toISOString(), artifacts: [...new Set(shown)], ...(stopped ? { stopped } : {}), ...(streamId && cited.text ? { streamId } : {}) })
         waiting.ids = []
         // Only a reply that shows ends the boundary; hidden tool-only steps do not.
         briefingBoundary = false

@@ -16,6 +16,7 @@ export const focusListenerAllowlist = {
   'lib/hooks/use-check-on-return.ts': 'one check, armed only by a hand-off to the browser or Telegram, never by plain focus',
   'apps/mobile/lib/push.ts': 'refreshes the push token registration; the screen is not re-read',
   'apps/mobile/lib/updates.ts': 'prefetches an OTA bundle in the background; the screen is not re-read',
+  'lib/computer/event-stream.ts': 'closes the computer event stream while hidden; on show it resumes after the last event received, never re-reading what it has',
   'apps/mobile/lib/useApi.ts': 'pauses polling in the background; on return one silent read only past FRESH_FOR_MS',
 }
 

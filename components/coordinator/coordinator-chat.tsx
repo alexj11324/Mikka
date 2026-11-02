@@ -6,7 +6,8 @@ import { AnimatePresence } from 'motion/react'
 import { withBasePath } from '@/lib/base-path'
 import { checkPageBuildBeforeAction } from '@/lib/app-build'
 import { useTranslations } from 'next-intl'
-import { getCoordinatorChat, stopCoordinatorTurn, welcomeCoordinator, type CoordinatorChat as Chat } from '@/app/actions/coordinator'
+import { pollCoordinatorChat, stopCoordinatorTurn, welcomeCoordinator, type CoordinatorChat as Chat } from '@/app/actions/coordinator'
+import { knownVersion, mergeChat } from '@/lib/coordinator/chat-poll'
 import type { BotView } from '@/app/actions/bots'
 import { BotAvatar, COORDINATOR_AVATAR } from '@/components/nav/bot-avatar'
 import { cn } from '@/lib/utils'
@@ -32,6 +33,8 @@ import { BotModelPicker } from './bot-model-picker'
 import { useCoordinatorSubmit } from './use-coordinator-submit'
 import { useCoordinatorStream } from './use-coordinator-stream'
 import { chatPollInterval } from '@/lib/coordinator/chat-poll-interval'
+import { useLiveCitations } from './use-live-citations'
+import type { CoordinatorLiveReply } from '@/lib/coordinator-stream-client'
 import { ThreadCard } from './thread-card'
 import { ToolsUsed } from './tools-used'
 import { MessageReactions, useMessageReactions } from '@/components/workspace/message-reactions'
@@ -84,6 +87,11 @@ function footerTools(item: Chat['items'][number]) {
   return [...new Set(item.tools.filter(tool => !((tool === 'dispatch_run' || tool === 'dispatch_bot_computer') && item.threads.length)))]
 }
 
+/** A reply still streaming, drawn by the same row as a stored one. */
+function streamedItem(reply: CoordinatorLiveReply): Chat['items'][number] {
+  return { position: -1, from: 'coordinator', text: reply.text, tools: [], threads: [], artifacts: [], createdAt: '' }
+}
+
 /** A message the person just sent brings the chat back to its end, wherever they had scrolled. */
 function FollowSentMessages({ count }: { count: number | null }) {
   const { scrollToEnd } = useMessageScroller()
@@ -117,10 +125,18 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const actionError = useActionError()
   const reconnectStream = useRef<() => void>(() => {})
-  const { data, mutate, error: loadError } = useSWR<Chat>(coordinatorChatKey(botId), () => botId ? getCoordinatorChat(botId) : getCoordinatorChat(), {
+  // A poll names the version it shows; an unchanged chat comes back as its live state only (lib/coordinator/chat-poll.ts).
+  const shown = useRef<{ chat?: Chat; fullReadAt: number }>({ fullReadAt: 0 })
+  const { data, mutate, error: loadError } = useSWR<Chat>(coordinatorChatKey(botId), async () => {
+    const known = knownVersion(shown.current.chat, shown.current.fullReadAt, Date.now())
+    const next = await (botId || known ? pollCoordinatorChat(botId, known) : pollCoordinatorChat())
+    if (!('unchanged' in next)) shown.current.fullReadAt = Date.now()
+    return mergeChat(shown.current.chat, next)
+  }, {
     refreshInterval: chatPollInterval,
     onSuccess: () => reconnectStream.current(),
   })
+  useEffect(() => { shown.current.chat = data }, [data])
   const stream = useCoordinatorStream({ botId, runId: data?.streamRunId, cursor: data?.cursor, persistedStreamIds: data?.persistedStreamIds, revalidate: mutate })
   useEffect(() => { reconnectStream.current = stream.reconnect }, [stream.reconnect])
   const [draft, setDraft] = useState('')
@@ -226,6 +242,8 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   const previews = useLinkPreviews(items.filter(item => item.from === 'coordinator').map(item => item.text))
   const sources = data?.sources
   const citations = useMemo<AgentCitations>(() => ({ sources: sources ?? {}, previews, onOpenIssue }), [sources, previews, onOpenIssue])
+  // A live reply cites tasks and threads the stored chat may not know yet; they are looked up as it streams.
+  const liveCitations = useLiveCitations(stream.replies.map(reply => reply.text), citations)
   // What the person said next after each reply, so a choice card shows its answer after a reload.
   const answers = useMemo(() => {
     const next = new Map<number, string>()
@@ -334,9 +352,13 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
             {data && !items.length && !stream.replies.length && !data.error && (data.enabled
               ? <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground">{avatar('pill', 'thinking')}{tNav('writingWelcome')}</p>
               : <p className="m-auto text-sm text-muted-foreground">{t('empty', { name })}</p>)}
-            {items.map(item => <Fragment key={item.pending ? `pending-${item.position}` : item.position}>
-              {unread.divider === item.position && <UnreadDivider />}
-              <MessageScrollerItem messageId={String(item.position)} className={cn('[content-visibility:visible]', entering(item) && ENTER)} {...(item.from === 'event' ? {} : { [MESSAGE_POSITION_ATTR]: item.position })}>
+            {/* Stored and streamed replies are one list: a stored reply takes the key of the stream it was shown from, so
+                storing it keeps its row, text and chips in place instead of mounting them again (the chat flashed). */}
+            {[...items.map(item => ({ item, live: undefined, key: item.pending ? `pending-${item.position}` : item.streamId ?? item.position })),
+              ...stream.replies.map(reply => ({ item: streamedItem(reply), live: reply, key: reply.id }))].map(({ item, live, key }) => <Fragment key={key}>
+              {!live && unread.divider === item.position && <UnreadDivider />}
+              <MessageScrollerItem messageId={live ? live.id : String(item.position)} className={cn('[content-visibility:visible]', (live ? arriving(`stream-${live.id}`) : entering(item)) && ENTER)}
+                {...(live ? { 'data-coordinator-stream-id': live.id, 'data-streaming': live.committedThrough === undefined } : item.from === 'event' ? {} : { [MESSAGE_POSITION_ATTR]: item.position })}>
               {item.from === 'event'
                 ? item.notice
                   ? <QuotaSwitchLine notice={item.notice} botId={botId} />
@@ -345,7 +367,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
                     {/* A tapped 建议 card: the same card, then only what it adds (R-21, R-40). */}
                     {item.suggestion && <SentSuggestion card={item.suggestion} compact={compact} />}
                     {item.text && (item.from === 'coordinator'
-                      ? <ReplyAnswer value={answers.get(item.position) ?? null}><CoordinatorReply text={item.text} citations={citations} /></ReplyAnswer>
+                      ? <ReplyAnswer value={live ? null : answers.get(item.position) ?? null}><CoordinatorReply text={item.text} citations={live ? live.committedThrough === undefined ? liveCitations.streaming : liveCitations.settled : citations} isStreaming={Boolean(live && live.committedThrough === undefined)} /></ReplyAnswer>
                       : <Bubble variant="secondary" align="end" className={personBubble}><BubbleContent className="flex flex-col gap-1.5 rounded-2xl px-4 py-3 whitespace-pre-wrap">{item.quote && <ArtifactQuoteLine quote={item.quote} />}{item.notes?.map(note => <BrowserNoteLine key={note.n} note={note} />)}<UserMessageText text={item.text} /></BubbleContent></Bubble>)}
                     {item.artifacts.length > 0 && <div className={cn('flex flex-col gap-2', embedded ? 'items-start gap-1.5' : 'w-full')}>
                       {item.artifacts.flatMap(id => { const artifact = data?.artifacts[id]; return artifact ? [embedded
@@ -365,11 +387,6 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
                   </MessageContent></Message>}
             </MessageScrollerItem>
             </Fragment>)}
-            {stream.replies.map(reply => <MessageScrollerItem key={reply.id} messageId={reply.id} data-coordinator-stream-id={reply.id} data-streaming={reply.committedThrough === undefined} className={cn('[content-visibility:visible]', arriving(`stream-${reply.id}`) && ENTER)}>
-              <Message align="start"><MessageContent>
-                <CoordinatorReply text={reply.text} citations={citations} isStreaming={reply.committedThrough === undefined} />
-              </MessageContent></Message>
-            </MessageScrollerItem>)}
             {failed && <MessageScrollerItem messageId="failed" data-testid="failed-message" className="[content-visibility:visible]">
               <Message align="end"><MessageContent>
                 <span className="flex w-full min-w-0 items-center justify-end gap-2">

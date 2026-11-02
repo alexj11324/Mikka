@@ -57,6 +57,9 @@ test('actual SDK preparePrompt and native enqueue preserve real user input and d
     assert.equal(packet.source.replyToSessionId, null)
     assert.equal(packet.authority, 'coordination_data_only')
     assert.ok(prompt.instructions.includes(PERSONAL_MESSAGE_INSTRUCTIONS))
+    // The rules come first and stay the same from turn to turn; what changes (memory, GitHub, computers) follows `stable`.
+    assert.ok(prompt.stable > 0 && prompt.stable < prompt.instructions.length)
+    assert.ok(prompt.instructions.slice(0, prompt.stable).includes(PERSONAL_MESSAGE_INSTRUCTIONS))
     await native.enqueue('owner', 'holder', 0, { harness: 'codex', deviceId: 'synthetic-device' }, [], 'private-bot')
     const input = enqueued.at(-1)![4] as { context: string; instructions: string }
     assert.deepEqual(JSON.parse(input.context).messages, prompt.messages)

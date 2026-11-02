@@ -15,7 +15,7 @@ test('a model call logs when its first token, first text and end came, its token
     { type: 'tool-input-start', id: 't1', toolName: 'create_issue' },
     { type: 'tool-call', toolCallId: 't1', toolName: 'create_issue', input: '{"title":"secret plan"}' },
     { type: 'text-delta', id: 'x', delta: '已经派出去了' },
-    { type: 'finish', finishReason: { unified: 'tool-calls', raw: 'tool_use' }, usage: { inputTokens: { total: 18_000 }, outputTokens: { total: 120 } } },
+    { type: 'finish', finishReason: { unified: 'tool-calls', raw: 'tool_use' }, usage: { inputTokens: { total: 18_000, cacheRead: 17_500, cacheWrite: 300 }, outputTokens: { total: 120 } } },
   ]
   // Times: tool-input-start, text-delta, end.
   const timed = timedModelStream({ stream: streamOf(parts), request: { body: 'kept' } }, { route: 'subscription', model: 'claude-haiku-5-5', tools: 76, startedAt: 1_000, requestedAt: 1_300, workflowRunId: 'wrun_x', stepId: 'step_1', attempt: 1 }, clock(4_300, 9_300, 9_800), line => lines.push(line))
@@ -23,7 +23,7 @@ test('a model call logs when its first token, first text and end came, its token
   assert.deepEqual(await drain(timed.stream), parts, 'the stream passes through unchanged')
   assert.deepEqual(lines, [{
     msg: 'model_call_timing', route: 'subscription', model: 'claude-haiku-5-5', workflowRunId: 'wrun_x', stepId: 'step_1', attempt: 1, tools: 76,
-    setupMs: 300, firstTokenMs: 3_000, firstTextMs: 8_000, durationMs: 8_500, inputTokens: 18_000, outputTokens: 120, toolCalls: 1, finishReason: 'tool-calls', interrupted: false,
+    setupMs: 300, firstTokenMs: 3_000, firstTextMs: 8_000, durationMs: 8_500, inputTokens: 18_000, cacheReadTokens: 17_500, cacheWriteTokens: 300, outputTokens: 120, toolCalls: 1, finishReason: 'tool-calls', interrupted: false,
   }])
   assert.doesNotMatch(JSON.stringify(lines), /secret plan|已经派出去了|create_issue/, 'no prompt, reply or tool content')
 })
@@ -34,7 +34,7 @@ test('a call with no text and a failing stream still logs once, marked interrupt
   const timed = timedModelStream({ stream: failing }, { route: 'hosted', model: 'm', tools: 0, startedAt: 0, requestedAt: 10 }, clock(50), line => lines.push(line))
   await assert.rejects(drain(timed.stream), /upstream reset/)
   assert.equal(lines.length, 1)
-  assert.deepEqual([lines[0].interrupted, lines[0].firstTokenMs, lines[0].firstTextMs, lines[0].inputTokens, lines[0].workflowRunId], [true, null, null, null, null])
+  assert.deepEqual([lines[0].interrupted, lines[0].firstTokenMs, lines[0].firstTextMs, lines[0].inputTokens, lines[0].cacheReadTokens, lines[0].cacheWriteTokens, lines[0].workflowRunId], [true, null, null, null, null, null, null])
   const silent = timedModelStream({ stream: streamOf([{ type: 'finish', usage: {} }]) }, { route: 'hosted', model: 'm', tools: 0, startedAt: 0, requestedAt: 0 }, clock(5), () => { throw new Error('log sink down') })
   assert.equal((await drain(silent.stream)).length, 1, 'a failing log never fails the call')
 })

@@ -1,0 +1,132 @@
+import assert from 'node:assert/strict'
+import { after, before, test } from 'node:test'
+import { act, type ReactNode } from 'react'
+import { Window } from 'happy-dom'
+import { NextIntlClientProvider } from 'next-intl'
+import messages from '../messages/en.json'
+import { withoutPartialCitation, type CitationSource } from '../lib/coordinator/citations'
+import type { AgentCitations } from '../components/workspace/agent-citations'
+
+// Streaming a Coordinator reply: a token redraws only the reply that is arriving, and a task or thread chip never
+// shows its marker or id on the way, however the tokens are cut.
+const browser = new Window({ url: 'https://mikka.example/' })
+let createRoot: typeof import('react-dom/client')['createRoot']
+let CoordinatorReply: typeof import('../components/coordinator/coordinator-reply')['CoordinatorReply']
+before(async () => {
+  for (const [key, value] of Object.entries({ window: browser, document: browser.document, navigator: browser.navigator, location: browser.location, IS_REACT_ACT_ENVIRONMENT: true, Element: browser.Element, HTMLElement: browser.HTMLElement, Node: browser.Node, ShadowRoot: browser.ShadowRoot, MutationObserver: browser.MutationObserver, getComputedStyle: browser.getComputedStyle.bind(browser), requestAnimationFrame: browser.requestAnimationFrame.bind(browser), cancelAnimationFrame: browser.cancelAnimationFrame.bind(browser) })) {
+    Object.defineProperty(globalThis, key, { configurable: true, writable: true, value })
+  }
+  ;({ createRoot } = await import('react-dom/client'))
+  ;({ CoordinatorReply } = await import('../components/coordinator/coordinator-reply'))
+})
+after(() => browser.happyDOM.close())
+
+const TASK = '0a5c49d1-0d4d-489c-8f9e-0000000000a1'
+const NEW_TASK = '1a1ee505-dba6-4a00-9100-0000000000b2'
+const THREAD = '2b2ff606-ecb7-4b11-a211-0000000000c3'
+const issue = (id: string, title: string): CitationSource => ({ kind: 'issue', id, number: 1, identifier: 'MIK-1', title, status: 'doing', priority: 'normal' })
+const thread: CitationSource = { kind: 'run', id: THREAD, agentName: 'Worker', harness: 'claude_code', status: 'running', issue: null, name: 'Fix sign-in redirect', summary: null, steps: 1, createdAt: '2026-11-01T00:00:00.000Z', finishedAt: null }
+const known = { [TASK]: issue(TASK, 'Release checklist') }
+const base: AgentCitations = { sources: known, previews: {}, onOpenIssue: () => {} }
+const MARKUP = /\[\[|\]\]|issue:|run:|[0-9a-f]{8}-[0-9a-f]{4}/
+
+async function mount() {
+  const container = browser.document.createElement('div') as unknown as HTMLElement
+  document.body.append(container)
+  const root = createRoot(container)
+  const render = (children: ReactNode) => act(async () => { root.render(<NextIntlClientProvider locale="en" timeZone="UTC" messages={messages}>{children}</NextIntlClientProvider>) })
+  return { container, render, unmount: () => act(async () => root.unmount()) }
+}
+
+/** Every prefix of `text` as tokens of the given sizes, cycling. */
+function batches(text: string, sizes: number[]) {
+  const out: string[] = []
+  for (let at = 0, n = 0; at < text.length; n++) { at = Math.min(text.length, at + sizes[n % sizes.length]); out.push(text.slice(0, at)) }
+  return out
+}
+
+test('a citation still arriving is left out of streamed text, whatever its cut', () => {
+  const marker = `[[issue:${TASK}]]`
+  for (let cut = 1; cut < marker.length; cut++) assert.equal(withoutPartialCitation(`Working on ${marker.slice(0, cut)}`), 'Working on ', marker.slice(0, cut))
+  assert.equal(withoutPartialCitation(`Working on ${marker}`), `Working on ${marker}`, 'a whole marker stays for its chip')
+  assert.equal(withoutPartialCitation(`[[run:${THREAD.slice(0, 9)}`), '')
+  assert.equal(withoutPartialCitation('Done.'), 'Done.')
+  assert.equal(withoutPartialCitation('a [[note]] here'), 'a [[note]] here', 'only a marker at the end is held back')
+})
+
+test('streamed tokens, in any batches, never show a chip marker or id; each chip shows once complete', async () => {
+  const reply = `Looked at it. [[issue:${TASK}]] is building, [[issue:${NEW_TASK}]] is new and [[run:${THREAD}]] is on it.`
+  for (const sizes of [[1], [3], [2, 5, 1, 7], [11, 4]]) {
+    const view = await mount()
+    try {
+      for (const text of batches(reply, sizes)) {
+        await view.render(<CoordinatorReply text={text} citations={{ ...base, pending: true }} isStreaming />)
+        assert.doesNotMatch(view.container.textContent ?? '', MARKUP, `sizes ${sizes}: ${text}`)
+      }
+      // The task already in the chat shows as its chip; the ones not looked up yet hold their place.
+      assert.equal(view.container.querySelectorAll('[data-slot="inline-citation-trigger"]').length, 1)
+      assert.equal(view.container.querySelectorAll('[data-citation-pending]').length, 2)
+      // Looked up: every chip shows, still mid-stream.
+      const found = { ...base, pending: true, sources: { ...known, [NEW_TASK]: issue(NEW_TASK, 'Sign-in redirect'), [THREAD]: thread } }
+      await view.render(<CoordinatorReply text={reply} citations={found} isStreaming />)
+      assert.equal(view.container.querySelectorAll('[data-slot="inline-citation-trigger"]').length, 3)
+      assert.equal(view.container.querySelectorAll('[data-citation-pending]').length, 0)
+      assert.doesNotMatch(view.container.textContent ?? '', MARKUP)
+    } finally { await view.unmount() }
+  }
+})
+
+test('an OpenUI chip whose id is still arriving or unknown holds its place instead of showing the id', async () => {
+  const program = `root = Stack([TextContent("On it"), TaskChip("${NEW_TASK}")])`
+  const view = await mount()
+  try {
+    for (const text of batches(program, [4, 9])) {
+      await view.render(<CoordinatorReply text={text} citations={{ ...base, pending: true }} isStreaming />)
+      assert.doesNotMatch(view.container.textContent ?? '', MARKUP, text)
+    }
+  } finally { await view.unmount() }
+})
+
+// Bounded: remounting on every redraw ran away here (memory grew to the container's limit) before the fix.
+test('a token for the streaming reply leaves finished replies and their chips mounted', { timeout: 20_000 }, async () => {
+  const done = [`First: [[issue:${TASK}]].\n\n| Step | State |\n| --- | --- |\n| Build | done |`, `Then [[issue:${TASK}]] again.`]
+  const view = await mount()
+  // Where nodes were taken out: a remount inside a finished reply removes nodes under it.
+  const removedFrom: Element[] = []
+  const observer = new browser.MutationObserver(records => { for (const record of records) if (record.removedNodes.length) removedFrom.push(record.target as unknown as Element) })
+  try {
+    const chat = (text: string, citations: AgentCitations) => <>
+      {done.map((text, index) => <div key={index} data-done=""><CoordinatorReply text={text} citations={citations} /></div>)}
+      <div data-live=""><CoordinatorReply text={text} citations={{ ...citations, pending: true }} isStreaming /></div>
+    </>
+    await view.render(chat('Looking', base))
+    const chips = [...view.container.querySelectorAll('[data-done] [data-slot="inline-citation-trigger"]')]
+    const tables = [...view.container.querySelectorAll('[data-done] table')]
+    assert.equal(chips.length, 2)
+    assert.equal(tables.length, 1)
+    observer.observe(view.container as unknown as import('happy-dom').Node, { subtree: true, childList: true })
+    for (const text of batches(`Looking into [[issue:${TASK}]] and the build now.`, [2, 3, 1])) {
+      // Even redrawn with a fresh citations object (so the memo does not skip it), a finished reply keeps its elements.
+      await view.render(chat(text, { ...base }))
+    }
+    const stillThere = [...view.container.querySelectorAll('[data-done] [data-slot="inline-citation-trigger"]')]
+    assert.equal(stillThere.length, 2)
+    stillThere.forEach((chip, index) => assert.equal(chip, chips[index], 'a finished reply keeps its chip element'))
+    assert.equal(view.container.querySelector('[data-done] table'), tables[0], 'a finished reply keeps its table element')
+    assert.equal(removedFrom.filter(target => target.closest?.('[data-done]')).length, 0, 'nothing in a finished reply was removed')
+  } finally { observer.disconnect(); await view.unmount() }
+})
+
+test('the streaming reply keeps its earlier chips mounted as new tokens arrive', { timeout: 20_000 }, async () => {
+  const view = await mount()
+  try {
+    const reply = `Started on [[issue:${TASK}]]. The build is running and should finish in a few minutes.`
+    const steps = batches(reply, [3, 2, 5])
+    const at = steps.findIndex(text => text.includes(']]'))
+    await view.render(<CoordinatorReply text={steps[at]} citations={{ ...base, pending: true }} isStreaming />)
+    const chip = view.container.querySelector('[data-slot="inline-citation-trigger"]')
+    assert.ok(chip)
+    for (const text of steps.slice(at + 1)) await view.render(<CoordinatorReply text={text} citations={{ ...base, pending: true }} isStreaming />)
+    assert.equal(view.container.querySelector('[data-slot="inline-citation-trigger"]'), chip, 'the chip is the same element after more tokens')
+  } finally { await view.unmount() }
+})
