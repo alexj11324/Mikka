@@ -1,6 +1,6 @@
 # Live thinking and tool activity in the Bot chat (feat/coordinator-live-activity)
 
-Local production build of 32976a1 at http://localhost:3000/mikka, isolated PostgreSQL 17 `mikka_e2e` on 127.0.0.1, owner from the test-account lease helper.
+Superseded by ../pr2-ai-elements/. Local production build of 32976a1 at http://localhost:3000/mikka, isolated PostgreSQL 17 `mikka_e2e` on 127.0.0.1, owner from the test-account lease helper.
 A scripted source streams the events the server now sends: `thinking` start/end, then `tool` events (running → done/error, with masked previews), then text. The runner then stores the turn as the workflow does (reasoning, tool calls and results, text, each with `mikkaStreamId`) and commits it. `repro-activity.mjs` is the runner.
 
 `states.png`, left to right:

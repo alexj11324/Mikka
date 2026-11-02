@@ -1,24 +1,25 @@
 {
-  "label": "activity-ae",
+  "label": "activity-ae2",
   "revision": "e3b20135ab51104df8a94b383adb008207f21c41",
   "origin": "http://localhost:3000",
   "database": "mikka_e2e (127.0.0.1, isolated)",
-  "run": "wrun_activitya3387e713157",
-  "at": "2026-11-02T23:06:15.847Z",
+  "run": "wrun_activityca368657e89b",
+  "at": "2026-11-02T23:11:33.824Z",
   "shots": {
-    "0-waiting": 49,
-    "1-thinking": 105,
-    "2-tool-running": 225,
-    "3-next-tool": 320,
-    "4-reply-streamed": 448,
-    "5-tool-opened": 471,
-    "6-stored": 515
+    "0-waiting": 74,
+    "1-thinking": 128,
+    "2-tool-running": 238,
+    "3-next-tool": 331,
+    "4-reply-streamed": 606,
+    "5-tool-opened": 636,
+    "6-stored": 682
   },
-  "commitFrame": 479,
-  "castFrames": 516,
+  "commitFrame": 639,
+  "castFrames": 682,
   "handedOver": true,
   "sameRow": true,
   "storedToolStates": [
+    "done",
     "done",
     "error"
   ]

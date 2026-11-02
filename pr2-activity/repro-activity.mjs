@@ -37,14 +37,16 @@ try {
   await db.query(`INSERT INTO coordinator_sessions ("userId", "botId", "leaseHolder", "leaseUntil") VALUES ($1,$2,$3, now() + interval '10 minutes')
     ON CONFLICT ON CONSTRAINT coordinator_sessions_chat_key DO UPDATE SET "leaseHolder"=EXCLUDED."leaseHolder", "leaseUntil"=EXCLUDED."leaseUntil", "lastError"=NULL`, [owner, botId, run])
 
-  const reply = `建好了 [[issue:${issue}]]。线程派不出去：这个工作区没有在线的电脑。打开一台电脑后我再派。`
+  const reply = `建好了 [[issue:${issue}]]，已派到云端（E2B）开始做。日历暂时读不到，开会时间我稍后再看。`
   // The events the server sends for this turn, with the pauses between them (ms).
   const script = [
     [{ type: 'thinking', state: 'start' }, 2600], [{ type: 'thinking', state: 'end' }, 300],
     [{ type: 'tool', call: 'c1', name: 'create_issue', state: 'running', input: '{"title":"修复登录跳转","description":"登录后会跳回首页"}' }, 1800],
     [{ type: 'tool', call: 'c1', name: 'create_issue', state: 'done', output: `{"id":"${issue}","identifier":"MIK-12"}` }, 300],
     [{ type: 'tool', call: 'c2', name: 'dispatch_run', state: 'running', input: `{"issueId":"${issue}"}` }, 1800],
-    [{ type: 'tool', call: 'c2', name: 'dispatch_run', state: 'error' }, 300],
+    [{ type: 'tool', call: 'c2', name: 'dispatch_run', state: 'done', output: '{"runId":"r1","status":"queued","place":"cloud"}' }, 300],
+    [{ type: 'tool', call: 'c3', name: 'list_calendar_events', state: 'running', input: '{"days":1}' }, 1500],
+    [{ type: 'tool', call: 'c3', name: 'list_calendar_events', state: 'error', output: 'Google Calendar 未连接' }, 300],
   ]
   await page.addInitScript(({ run, reply, script }) => {
     const original = window.fetch
@@ -101,7 +103,9 @@ try {
     { role: 'assistant', content: [{ type: 'reasoning', text: '先建任务再派线程。' }, { type: 'tool-call', toolCallId: 'c1', toolName: 'create_issue', input: { title: '修复登录跳转', description: '登录后会跳回首页' } }], mikkaStreamId: streamId },
     { role: 'tool', content: [{ type: 'tool-result', toolCallId: 'c1', toolName: 'create_issue', output: { type: 'json', value: { id: issue, identifier: 'MIK-12' } } }], mikkaStreamId: streamId },
     { role: 'assistant', content: [{ type: 'tool-call', toolCallId: 'c2', toolName: 'dispatch_run', input: { issueId: issue } }], mikkaStreamId: streamId },
-    { role: 'tool', content: [{ type: 'tool-result', toolCallId: 'c2', toolName: 'dispatch_run', output: { type: 'error-text', value: 'no online computer' } }], mikkaStreamId: streamId },
+    { role: 'tool', content: [{ type: 'tool-result', toolCallId: 'c2', toolName: 'dispatch_run', output: { type: 'json', value: { runId: 'r1', status: 'queued', place: 'cloud' } } }], mikkaStreamId: streamId },
+    { role: 'assistant', content: [{ type: 'tool-call', toolCallId: 'c3', toolName: 'list_calendar_events', input: { days: 1 } }], mikkaStreamId: streamId },
+    { role: 'tool', content: [{ type: 'tool-result', toolCallId: 'c3', toolName: 'list_calendar_events', output: { type: 'error-text', value: 'Google Calendar 未连接' } }], mikkaStreamId: streamId },
     { role: 'assistant', content: [{ type: 'text', text: reply }], mikkaStreamId: streamId },
   ]
   for (const [index, message] of rows.entries()) await db.query('INSERT INTO coordinator_messages (id, "userId", "botId", position, message) VALUES ($1,$2,$3,$4,$5)', [randomUUID(), owner, botId, position + index, message])
