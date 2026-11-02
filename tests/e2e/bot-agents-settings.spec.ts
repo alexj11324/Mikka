@@ -14,7 +14,9 @@ async function seed(page: Page) {
   const cookie = (await page.context().cookies()).find(item => item.name.endsWith('session_token'))
   if (!cookie) throw new Error('需要已登录的页面。')
   const { rows: [session] } = await db().query<{ userId: string }>('SELECT "userId" FROM session WHERE token = $1', [decodeURIComponent(cookie.value).split('.')[0]])
-  const { rows: [member] } = await db().query<{ workspaceId: string }>('SELECT "workspaceId" FROM mikka_workspace_members WHERE "userId" = $1 AND status = $2 LIMIT 1', [session.userId, 'active'])
+  // registerInTeam leaves the person in a personal and a team workspace; the page shows the team.
+  const { rows: [member] } = await db().query<{ workspaceId: string }>(`SELECT m."workspaceId" FROM mikka_workspace_members m JOIN mikka_workspaces w ON w.id = m."workspaceId"
+    WHERE m."userId" = $1 AND m.status = 'active' AND w.kind = 'team' LIMIT 1`, [session.userId])
   // A heartbeat in the future keeps the device online for the whole test. Claude Code reports its
   // slots with what they resolve to; the screen shows only the resolved name.
   // 允许自动调度 is off by default on a personal computer (#703); this one has it on, so the default may place on it.
@@ -118,7 +120,9 @@ test('Bot 与 Agents：规则标签从工作区已有标签中选，标签带颜
   await expect(page.getByRole('button', { name: '添加规则', exact: true })).toBeVisible()
   const cookie = (await page.context().cookies()).find(item => item.name.endsWith('session_token'))
   const { rows: [session] } = await db().query<{ userId: string }>('SELECT "userId" FROM session WHERE token = $1', [decodeURIComponent(cookie!.value).split('.')[0]])
-  const { rows: [member] } = await db().query<{ workspaceId: string }>('SELECT "workspaceId" FROM mikka_workspace_members WHERE "userId" = $1 AND status = $2 LIMIT 1', [session.userId, 'active'])
+  // registerInTeam leaves the person in a personal and a team workspace; the page shows the team.
+  const { rows: [member] } = await db().query<{ workspaceId: string }>(`SELECT m."workspaceId" FROM mikka_workspace_members m JOIN mikka_workspaces w ON w.id = m."workspaceId"
+    WHERE m."userId" = $1 AND m.status = 'active' AND w.kind = 'team' LIMIT 1`, [session.userId])
   // Workspace labels come from the workspace's team tasks.
   const content = { type: 'doc', attrs: { mikka: { labels: [{ name: '前端', color: 'blue' }, { name: '后端', color: 'green' }] } }, content: [] }
   const [issue, team] = [randomUUID(), randomUUID()]
