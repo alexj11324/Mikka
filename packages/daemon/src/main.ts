@@ -65,6 +65,7 @@ import { restartService, uninstallService } from "./service"
 import { detectDeviceType } from "./device-type"
 import { detectHarnesses, deviceCapabilities, dockerAvailable, harnessFingerprint } from "./harnesses"
 import { ensureHarness, type HarnessStore } from "./harness-install"
+import { probeHarnessModels, type ModelReport } from "./model-probe"
 import { sweepRunCredentials } from "./agents/harness-home"
 import { createLocalSubscriptionRunner } from "./subscription-local-runner"
 import { isSafeId } from "./ids"
@@ -134,6 +135,11 @@ export interface DaemonOptions {
   agentSandbox?: AgentSandbox | null
   /** Override a harness CLI binary (tests use fake CLIs). */
   harnessBinaries?: Partial<Record<"claude_code" | "codex" | "cursor", string>>
+  /**
+   * Ask each harness CLI which models it offers (model-probe.ts). On by default
+   * for a device's own harnesses; tests that set `harnesses` turn it on with `true`.
+   */
+  modelProbe?: boolean
   /** Linux-only operator mode; no native/local credential source is opened. */
   hostedSubscriptions?: boolean
   /** Only the trusted E2B runner is allowed to select its isolated socket. */
@@ -192,6 +198,8 @@ export function loadDeviceFile(raw: unknown): DeviceFile {
 }
 
 const HARNESS_RESCAN_MS = 5 * 60_000
+/** How often the CLIs are asked again for their models; 重新检测 asks at once. */
+const MODEL_PROBE_MS = 6 * 60 * 60_000
 
 /** Whose model credential a cloud run uses: the subscription binding's owner, or for an API-key run the run owner the server assigned the computer to. */
 function credentialOwner(assignment: RunAssignment): string | undefined {
@@ -544,6 +552,7 @@ export class Daemon {
     if (!hosted && !this.options.harnesses) this.harnessPrint = harnessFingerprint(this.harnessStore())
     this.harnesses = [...detected.filter((info) => this.adapters.has(info.harness)).map(info => ({
       ...info,
+      ...this.modelReports.get(info.harness),
       // The run's live gate stops a revoked run; Codex also verifies its
       // pinned interface at initialize.
       toolApproval: this.supportsToolApproval(info),
@@ -573,6 +582,8 @@ export class Daemon {
     )
     this.schedule(0)
     this.commandsLoop = this.pollCommands()
+    // The CLIs' own model lists, in the background: a first install downloads the pinned CLI.
+    if (this.modelProbeOn()) void this.probeModels().then(changed => { if (changed) return this.syncWithServer() }).catch((err: unknown) => { this.log.warn({ err }, "model probe failed") })
     this.fsLoop = this.pollFolderRequests()
     return this
   }
@@ -823,14 +834,54 @@ export class Daemon {
     this.harnessPrint = harnessFingerprint(this.harnessStore())
     this.docker = await dockerAvailable()
     this.harnesses = [...detected.filter(info => this.adapters.has(info.harness)).map(info => {
-      return { ...info, toolApproval: this.supportsToolApproval(info), coordinator: coordinatorCapable(info),
+      return { ...info, ...this.modelReports.get(info.harness), toolApproval: this.supportsToolApproval(info), coordinator: coordinatorCapable(info),
         ...(this.localSubscriptionCapable(info) ? { subscriptionBroker: true as const } : {}) }
     })]
+    // 重新检测 asks the CLIs for their models again too.
+    if (this.modelProbeOn()) await this.probeModels().catch((err: unknown) => { this.log.warn({ err }, "model probe failed") })
+  }
+
+  /** The models each harness CLI reported, by harness (model-probe.ts). */
+  private modelReports = new Map<string, ModelReport>()
+  private lastModelProbe = 0
+  private probingModels: Promise<boolean> | null = null
+
+  private modelProbeOn() {
+    if (this.options.hostedSubscriptions) return false
+    return this.options.modelProbe ?? (!this.options.harnesses && !daemonTestMode(process.env))
+  }
+
+  /**
+   * Ask each installed Codex and Claude Code CLI which models it offers and
+   * put them on its report. Returns whether a report changed. A CLI that does
+   * not answer keeps what it reported last; nothing is ever made up for it.
+   */
+  private probeModels(): Promise<boolean> {
+    if (this.probingModels) return this.probingModels
+    this.probingModels = (async () => {
+      this.lastModelProbe = Date.now()
+      let changed = false
+      for (const harness of ["codex", "claude_code"] as const) {
+        if (!this.harnesses.some(info => info.harness === harness && info.installed)) continue
+        const binary = this.options.harnessBinaries?.[harness] ?? await ensureHarness(this.harnessStore(), harness)
+        const report = await probeHarnessModels(harness, binary, { scratchDir: this.paths.dataDir })
+        if (!report) { this.log.warn({ harness }, "harness reported no models"); continue }
+        if (JSON.stringify(this.modelReports.get(harness)) === JSON.stringify(report)) continue
+        this.modelReports.set(harness, report)
+        changed = true
+      }
+      if (changed) this.harnesses = this.harnesses.map(info => ({ ...info, ...this.modelReports.get(info.harness) }))
+      return changed
+    })().finally(() => { this.probingModels = null })
+    return this.probingModels
   }
 
   /** Notice an agent installed after startup without spawning anything per tick. */
   private rescanHarnesses() {
     const now = Date.now()
+    if (this.modelProbeOn() && !this.probingModels && now - this.lastModelProbe >= MODEL_PROBE_MS) {
+      void this.probeModels().then(changed => { if (changed) return this.syncWithServer() }).catch((err: unknown) => { this.log.warn({ err }, "model probe failed") })
+    }
     if (this.options.hostedSubscriptions || this.options.harnesses || this.rescanning || now - this.lastHarnessScan < HARNESS_RESCAN_MS) return
     this.lastHarnessScan = now
     if (harnessFingerprint(this.harnessStore()) === this.harnessPrint) return
