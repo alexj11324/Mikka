@@ -200,7 +200,8 @@ do what Linear does. Figma: `220:5022` (MIK-25).
 - **R-79** No breadcrumb, title bar or page header shows the workspace's
   name. There is one workspace on screen, the name cannot be clicked there,
   and it is shown and switched only from the avatar menu at the bottom left.
-  The task page's breadcrumb starts at 看板. A group heading that names the
+  The task page's breadcrumb starts at the place it was opened from (R-82).
+  A group heading that names the
   workspace its settings apply to (设置's workspace group) is not a crumb and
   stays.
 - **R-62** 线程 lists the threads working on the issue, grouped as R-52:
@@ -365,15 +366,25 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   bot that dispatched it; a task as its own page in the centre, as Linear; an
   Artifact in its window over the page (R-56); PRs and web pages in a new
   tab. Projects and teams live under 看板, with no rail item of their own. On
-  a phone the right column is a page pushed over the chat. 全部线程, every
+  a phone the right column is a page pushed over the chat. A task page knows
+  where it was opened from: its address names that chat or page (`bot=`,
+  `section=`, `section=coordinator` for the Coordinator's chat), its first
+  crumb names it, and ✕ returns there. Opened by a move in the same page
+  load, ✕ is a step back, so the chat comes back as it was, its open thread
+  included; opened from a link, a reload or a notification at launch, ✕ goes
+  to the place the address names, and to 看板 when it names none. Its ↑↓ show
+  only when the board, a list or a project opened it. A notification or an
+  admin link to a thread opens it beside its task where the viewer can read
+  it. An address with an unknown section or a bot that is not the person's
+  rewrites itself to what is shown, without a new entry. 全部线程, every
   bot's threads in R-52's groups, each row naming its bot, opens in the right
   column from the window bar's button beside the globe (on a phone, the page
   header's) on any page (`?threads=all`, `?threads=<bot>` filtered); a bot's
   panel keeps only that bot's 线程. An open thread's header leads with ←, back
   to the list it was opened from (全部线程, the bot's 线程, the task's 线程, the
   chat); Esc and the browser's back do the same; it has no status icon, the
-  badge under it says the state. Source: Alex, 2026-11-01
-  ([decision](decisions/2026-11-01-1320-navigation-model.md)), 2026-11-02
+  badge under it says the state. Source: Alex,
+  2026-11-01 ([decision](decisions/2026-11-01-1320-navigation-model.md)), 2026-11-02
   ([decision](decisions/2026-11-02-0310-all-threads-from-the-window-bar.md)).
 
 ## Settings

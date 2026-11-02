@@ -10,19 +10,22 @@ import { readWriteSettingLayers } from '@/lib/operations/write-setting-layers'
 import { pendingActions } from '@/lib/db/schema'
 import { proposeAppToolCall } from '@/lib/pending-action-store'
 import { isToolkitSlug, OWN_INTEGRATIONS } from '@/lib/composio-accounts'
+import { composioToolkitLister, isNoAuthToolkit } from '@/lib/plugins/catalog'
 import { MAX_RUN_APP_TOOLS, runAppTool, type RunAppScope } from '@/lib/run-app-mcp'
 
 type Client = NonNullable<ReturnType<typeof getComposio>>
 
-/** Runs a pinned call in one connected account. */
-export async function executeAppToolCall(client: Client, userId: string, call: AppToolCall, accountId: string): Promise<AppToolExecution> {
-  const result = await client.tools.execute(call.tool, { userId, connectedAccountId: accountId, version: call.version, arguments: call.arguments })
+/** Runs a pinned call in one connected account, or with no account for an app that needs none. */
+export async function executeAppToolCall(client: Client, userId: string, call: AppToolCall, accountId: string | null): Promise<AppToolExecution> {
+  // A no-auth app's tools run with the person's id alone; every other call names its account.
+  const result = await client.tools.execute(call.tool, { userId, ...(accountId ? { connectedAccountId: accountId } : {}), version: call.version, arguments: call.arguments })
   return { successful: result.successful, data: result.data, error: result.error, ...(result.logId ? { logId: result.logId } : {}) }
 }
 
 export function appToolDeps(userId: string, botId: string | null, client: Client): AppToolDeps {
   return {
     appAllowed: async toolkit => (await import('@/lib/app-policy/store')).botMayUseApp(botId, toolkit),
+    noAuth: toolkit => isNoAuthToolkit(composioToolkitLister(client), toolkit).catch(() => false),
     resolveAccount: (toolkit, selected) => resolveComposioAccount(userId, toolkit, client, kit => chosenComposioDefault(userId, kit), selected),
     listTools: (toolkit, query) => client.tools.getRawComposioTools(query ? { toolkits: [toolkit], search: query, limit: 15 } : { toolkits: [toolkit], limit: 15 }) as Promise<AppTool[]>,
     getTool: slug => client.tools.getRawComposioToolBySlug(slug) as Promise<AppTool>,
