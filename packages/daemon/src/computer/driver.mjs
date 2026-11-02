@@ -264,6 +264,8 @@ export async function executeDriver(driver, input, display, leaseGuard, assertLi
   });
   child.stderr.resume(); // Never forward desktop/process content to daemon logs.
   child.on("error", fail);
+  // A driver that exits or closes its input mid-request: fail this action, never the worker.
+  child.stdin.on("error", fail);
   child.on("exit", () =>
     fail(
       new Error(
