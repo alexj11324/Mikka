@@ -4,6 +4,7 @@ import { pool } from '@/lib/db'
 import { PaidResourceError } from '@/lib/abuse/policy'
 import { requireWorkspace, WorkspaceError } from '@/lib/workspace-access'
 import { workspaceDb, workspacePool } from '@/lib/workspace-db'
+import { workspaceSoloMember } from '@/lib/workspace-solo'
 
 /**
  * 我的点数也可用于这个团队 (decision 2026-10-31-2300 item 4, orchestration.md
@@ -17,8 +18,10 @@ type Query = Pick<Pool | PoolClient, 'query'>
 export interface CreditShareView {
   /** The signed-in member shares their credits with this team. */
   mine: boolean
-  /** A team workspace: the switch shows. */
+  /** A team workspace with more than one member: the switch shows. */
   canShare: boolean
+  /** A team with one member: their credits pay without the switch (decision 2026-11-02-1500). */
+  solo: boolean
   /** Admins: who shares, by name, oldest first. Empty for members. */
   sharers: string[]
   admin: boolean
@@ -28,13 +31,15 @@ export async function creditShareView(actorId: string, workspaceId: string): Pro
   const { workspace, membership } = await workspaceDb.transaction(tx => requireWorkspace(tx, workspaceId, actorId))
   const admin = membership.role === 'admin'
   const team = workspace.kind === 'team'
+  const solo = team && await workspaceSoloMember(workspaceId) === actorId
   const { rows } = team
     ? await pool.query<{ userId: string; name: string | null }>(
       `SELECT s."userId",u.name FROM workspace_credit_shares s LEFT JOIN "user" u ON u.id=s."userId" WHERE s."workspaceId"=$1 ORDER BY s."sharedAt",s."userId"`, [workspaceId])
     : { rows: [] }
   return {
     mine: rows.some(row => row.userId === actorId),
-    canShare: team,
+    canShare: team && !solo,
+    solo,
     sharers: admin ? rows.flatMap(row => row.name ? [row.name] : []) : [],
     admin,
   }
@@ -57,9 +62,15 @@ export async function removeCreditShare(query: Query, workspaceId: string, userI
 /**
  * The personal workspaces whose credits a team may spend, oldest share first:
  * only sharers who are still active members of the team. Never the team itself.
+ * A team with one member spends that member's credits without a share
+ * (decision 2026-11-02-1500, `workspaceSoloMember`).
  */
 export async function sharedCreditWorkspaces(workspaceId: string): Promise<string[]> {
-  const { rows: shares } = await pool.query<{ userId: string }>('SELECT "userId" FROM workspace_credit_shares WHERE "workspaceId"=$1 ORDER BY "sharedAt","userId"', [workspaceId])
+  const [{ rows: shared }, solo] = await Promise.all([
+    pool.query<{ userId: string }>('SELECT "userId" FROM workspace_credit_shares WHERE "workspaceId"=$1 ORDER BY "sharedAt","userId"', [workspaceId]),
+    workspaceSoloMember(workspaceId),
+  ])
+  const shares = solo && !shared.some(share => share.userId === solo) ? [{ userId: solo }, ...shared] : shared
   if (!shares.length) return []
   const { rows } = await workspacePool.query<{ userId: string; personalId: string }>(
     `SELECT m."userId",p.id AS "personalId" FROM mikka_workspace_members m

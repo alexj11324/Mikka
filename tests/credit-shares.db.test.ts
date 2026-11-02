@@ -36,7 +36,7 @@ test('credit shares: opt in, pay order, leave, scope', { skip: !dbUrl }, async t
 
   await t.test('without a share the team\'s own refusal stands', async () => {
     await assert.rejects(admit(team.id), { code: 'verification_required' })
-    assert.deepEqual(await shares.creditShareView(member, team.id), { mine: false, canShare: true, sharers: [], admin: false })
+    assert.deepEqual(await shares.creditShareView(member, team.id), { mine: false, canShare: true, solo: false, sharers: [], admin: false })
   })
 
   await t.test('a member opts in: the team spends their personal balance; admins see who', async () => {
@@ -72,6 +72,32 @@ test('credit shares: opt in, pay order, leave, scope', { skip: !dbUrl }, async t
     await releaseDepartingMember(team.id, member)
     assert.equal((await pool.query('SELECT count(*)::int AS n FROM workspace_credit_shares WHERE "workspaceId"=$1 AND "userId"=$2', [team.id, member])).rows[0].n, 0)
     await assert.rejects(admit(team.id), { code: 'free_allowance_used' })
+  })
+
+  await t.test('a team with one member spends that member\'s credits without the switch, until a second member joins', async () => {
+    const { workspaceSoloMember } = await import('../lib/workspace-solo')
+    const founder = await seedUser(pool, 'share-founder'), joiner = await seedUser(pool, 'share-joiner')
+    const founderOwn = await personal(founder)
+    await hostedUsage.verify(founderOwn, null, null)
+    const solo = await seedWorkspace(pool, founder, [{ userId: founder, role: 'admin' }])
+    assert.equal(await workspaceSoloMember(solo.id), founder)
+    assert.equal(await workspaceSoloMember(founderOwn), founder, 'a personal workspace is one person')
+    assert.equal(await workspaceSoloMember(team.id), null)
+    assert.deepEqual(await shares.sharedCreditWorkspaces(solo.id), [founderOwn], 'no share row needed')
+    assert.equal(await admit(solo.id), founderOwn)
+    assert.deepEqual(await shares.creditShareView(founder, solo.id), { mine: false, canShare: false, solo: true, sharers: [], admin: true }, 'no switch while alone')
+    await pool.query(`INSERT INTO mikka_workspace_invitations (id,"workspaceId","userId",email,role,"tokenHash","expiresAt") VALUES ($1,$2,$3,'invitee@example.invalid','member',$4,now()+interval '1 day')`, [randomUUID(), solo.id, founder, randomUUID().replaceAll('-', '')])
+    assert.equal(await workspaceSoloMember(solo.id), founder, 'a pending invitation is not a member')
+    await pool.query(`INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,role) VALUES ($1,$2,$2,$3,'member')`, [solo.id, joiner, `${joiner}@example.invalid`])
+    assert.equal(await workspaceSoloMember(solo.id), null)
+    assert.deepEqual(await shares.sharedCreditWorkspaces(solo.id), [], 'the switch applies again, off by default')
+    await assert.rejects(admit(solo.id), { code: 'verification_required' })
+    assert.equal((await shares.creditShareView(founder, solo.id)).canShare, true)
+    await shares.setOwnCreditShare(founder, solo.id, true)
+    assert.equal(await admit(solo.id), founderOwn)
+    await pool.query(`UPDATE mikka_workspace_members SET status='suspended' WHERE "workspaceId"=$1 AND "userId"=$2`, [solo.id, joiner])
+    await shares.setOwnCreditShare(founder, solo.id, false)
+    assert.equal(await admit(solo.id), founderOwn, 'a suspended member does not count: alone again')
   })
 
   await t.test('a personal workspace takes no shares; an outsider sees nothing', async () => {
