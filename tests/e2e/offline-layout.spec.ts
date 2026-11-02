@@ -1,4 +1,4 @@
-import { test, expect, register, app, seedTask } from './fixtures'
+import { test, expect, register, app, seedTask, showCreatedByMe } from './fixtures'
 
 // Network failure is the action under test, not an ignored application exception.
 test.use({ expectedConsoleErrors: [{ path: app('/'), message: 'Failed to load resource: net::ERR_INTERNET_DISCONNECTED' }] })
@@ -20,6 +20,9 @@ for (const width of [1280, 402]) {
         await page.getByRole('navigation', { name: '主导航', exact: true }).getByRole('button', { name: '看板', exact: true }).click()
       }
       await expect(page.getByRole('region', { name: '任务看板', exact: true })).toBeVisible()
+      // Nobody is on the seeded task: 负责人 我 leaves it out, 我创建的 shows it (decision 2026-11-02-0302).
+      await expect(page.getByRole('region', { name: '任务看板', exact: true }).getByRole('group', { name: title, exact: true })).toHaveCount(0)
+      await showCreatedByMe(page)
       await expect(page.getByRole('region', { name: '任务看板', exact: true }).getByRole('group', { name: title, exact: true })).toBeVisible()
       // The toolbar and content fill the same bounds in empty and populated views.
       const toolbar = page.getByRole('toolbar', { name: '看板工具栏', exact: true })

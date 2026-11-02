@@ -3489,6 +3489,7 @@
         "status": "Status",
         "priority": "Priority",
         "assignee": "Assignee",
+        "creator": "Created by me",
         "labels": "Labels",
         "project": "Project",
         "agentState": "Thread status"
