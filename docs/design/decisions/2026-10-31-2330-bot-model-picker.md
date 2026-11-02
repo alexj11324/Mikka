@@ -32,8 +32,8 @@ running app on main is the only design source); this file fixes the content.
   the bot's next runs; a run already going keeps its frozen model.
 - **Nothing picked:** the chip shows what § 2 gives the next run.
 - **Models only.** The Coordinator runs on Mikka's own harness, so its picker
-  chooses a model and nothing else. A bot's threads take the Agent from the
-  model (§ 3). The menu has no Agent picker.
+  chooses a model and nothing else. Threads a bot dispatches take the Agent from
+  the model (§ 3). The menu has no Agent picker.
 - **A credential that disappears** (removed, unshared, out of quota) stays in
   the chip under its name, marked 不可用. The next run follows § 2's rules for
   quota and for a credential that disappears.
