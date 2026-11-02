@@ -41,3 +41,12 @@ test('metadata enforces collection and field bounds', () => {
   assert.equal(metadataSchema.safeParse({ ...metadata, number: -1 }).success, false)
   assert.equal(metadataSchema.safeParse({ ...metadata, project: 'x'.repeat(101) }).success, false)
 })
+
+test('a PR keeps its line counts when GitHub reported them; they are optional, whole and never negative', () => {
+  const url = 'https://github.com/alexj11324/Mikka/pull/92'
+  assert.deepEqual(pullRequestSchema.parse({ url, state: 'merged', additions: 18, deletions: 0 }), { url, state: 'merged', additions: 18, deletions: 0 })
+  assert.deepEqual(pullRequestSchema.parse({ url, state: 'open' }), { url, state: 'open' })
+  for (const bad of [{ additions: -1 }, { deletions: 1.5 }, { additions: '3' }]) assert.equal(pullRequestSchema.safeParse({ url, state: 'open', ...bad }).success, false)
+  const saved = JSON.parse(JSON.stringify(withIssueMetadata({ type: 'doc' }, metadataSchema.parse({ pullRequests: [{ url, state: 'open', additions: 7, deletions: 2 }] }))))
+  assert.deepEqual(readIssueMetadata(saved).pullRequests, [{ url, state: 'open', additions: 7, deletions: 2 }])
+})
