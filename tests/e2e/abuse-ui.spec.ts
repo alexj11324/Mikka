@@ -1,5 +1,10 @@
 import { test, expect, app, register, registerInTeam, seedCoordinatorError, seedHostedVerification } from './fixtures'
+import { Pool } from 'pg'
 import { attachLightDark } from './settings-v4-shots'
+
+let pool: Pool | null = null
+const coordinatorDb = () => pool ??= new Pool({ connectionString: process.env.E2E_DATABASE_URL, max: 1 })
+test.afterAll(async () => { await pool?.end() })
 
 // No Stripe keys: real actions report unavailable and cannot contact Stripe.
 // Verification and its allowance are seeded as the webhook would leave them.
@@ -71,18 +76,23 @@ test('对话：已验证的工作区额度用完时不再提供验证银行卡',
   await expect(notice.getByRole('link', { name: '验证银行卡', exact: true })).toHaveCount(0)
 })
 
-test('对话：团队没有点数时说明原因并打开计费', async ({ page }, testInfo) => {
+test('对话：团队没有点数时说明原因，并就地把我的点数用于这个团队再重试', async ({ page }, testInfo) => {
   const { workspaceId } = await registerInTeam(page)
   await expect(page.getByRole('textbox', { name: '给 Coordinator 发消息', exact: true })).toBeVisible()
   await seedCoordinatorError(page, 'PaidResourceError: verification_required', workspaceId)
   await page.reload()
   const notice = page.locator('[data-hosted-refusal="verification_required"]')
   await expect(notice).toContainText('这个团队没有可用点数')
-  await expect(notice.getByRole('link', { name: '打开计费', exact: true })).toBeVisible()
+  const share = notice.getByRole('button', { name: '把我的点数用于这个团队', exact: true })
+  await expect(share).toBeVisible()
   await expect(notice.getByRole('link', { name: '验证银行卡', exact: true })).toHaveCount(0)
   await attachLightDark(page, testInfo, 'chat-team-no-points')
-  await notice.getByRole('link', { name: '打开计费', exact: true }).click()
-  await expect(page).toHaveURL(/section=billing/)
+  // One click, same page: the share is on, and the refused turn is asked to run again (decision 2026-11-02-1450).
+  await share.click()
+  await expect(share).toHaveCount(0)
+  await expect.poll(async () => (await coordinatorDb().query('SELECT count(*)::int AS n FROM workspace_credit_shares WHERE "workspaceId"=$1', [workspaceId])).rows[0].n).toBe(1)
+  // The retry then runs the turn again (retryFailedTurn, lib/coordinator/bot-chats.db.test.ts); this environment has no Coordinator to queue it.
+  expect(page.url()).not.toMatch(/section=billing/)
 })
 
 test('对话：Mikka 默认被拒绝的说明留在那条消息下面，下一轮之后仍在', async ({ page }, testInfo) => {

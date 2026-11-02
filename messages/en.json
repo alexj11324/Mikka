@@ -4097,6 +4097,7 @@
       "unavailable": "Mikka Default is unavailable",
       "verifyCard": "Verify card",
       "teamNoPoints": "This team has no points to use",
+      "useMyPoints": "Use my points for this team",
       "openBilling": "Open billing",
       "useSubscription": "Use my {name} subscription",
       "connect": "Connect <claude></claude> Claude / <openai></openai> ChatGPT subscription"
