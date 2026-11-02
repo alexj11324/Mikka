@@ -444,7 +444,9 @@ export async function chatView(userId: string, limit = 200, botId: string): Prom
     persistedStreamIds: [...new Set(rows.flatMap(({message}) => message.role === 'assistant' && typeof message.mikkaStreamId === 'string' ? [message.mikkaStreamId] : []))],
     ...(coordinatorLeaseActive(session) && session?.leaseHolder?.startsWith('wrun_') ? { streamRunId: session.leaseHolder } : {}),
     ...coordinatorChatState(session, waiting),
-    sources: await citationSources(userId, items.filter(item => item.from === 'coordinator').map(item => item.text), items.flatMap(item => item.threads)),
+    // An event line names its thread or task as a chip (C1); its stored text is the model's, never shown.
+    sources: await citationSources(userId, [...items.filter(item => item.from === 'coordinator').map(item => item.text),
+      ...items.flatMap(item => item.line ? [item.line.runId && `[[run:${item.line.runId}]]`, item.line.issueId && `[[issue:${item.line.issueId}]]`].filter((text): text is string => !!text) : [])], items.flatMap(item => item.threads)),
     artifacts: await artifactSummaries(userId, items.flatMap(item => [...item.artifacts, ...(item.quote ? [item.quote.artifactId] : [])])),
   }
 }
@@ -476,7 +478,8 @@ export async function botChats(userId: string): Promise<Record<string, BotChatSu
   const lines = latest.flatMap(row => {
     if (!row.botId) return []
     const [item] = chatItems([{ position: 0, message: row.message as unknown as ModelMessage, createdAt: row.createdAt }])
-    return [{ botId: row.botId, text: item?.text || null, from: item?.from, at: row.createdAt.toISOString() }]
+    // An event's stored text is the model's (English, ids): the preview leaves it out (C1).
+    return [{ botId: row.botId, text: item?.from === 'event' ? null : item?.text || null, from: item?.from, at: row.createdAt.toISOString() }]
   })
   // A reply cites threads and tasks by id; the preview names them as the chat's chips do (R-15).
   const sources = await citationSources(userId, lines.flatMap(line => line.from === 'coordinator' && line.text ? [line.text] : []))

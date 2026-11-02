@@ -167,7 +167,10 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
   const { data: botList } = useSWR('bots', listBots, { ...whileSettings })
   const bots = botList ?? []
   const [onboardingOpen, setOnboardingOpen] = useState(Boolean(onboarding))
-  const { data: threads = [], mutate: refreshThreads } = useSWR('threads', () => listThreads(), { ...whileSettings, refreshInterval: boardBusy || settingsShown ? 0 : 15000 })
+  const { data: threadsData, mutate: refreshThreads } = useSWR('threads', () => listThreads(), { ...whileSettings, refreshInterval: boardBusy || settingsShown ? 0 : 15000 })
+  const threads = useMemo(() => threadsData ?? [], [threadsData])
+  // Not read yet: the thread lists show rows' shapes instead of 还没有线程 (review C7).
+  const threadsLoading = threadsData === undefined
   const settingsWereShown = useRef(settingsShown)
   useEffect(() => {
     if (settingsWereShown.current && !settingsShown) {
@@ -516,9 +519,9 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
     </AppShellContent>
     {browserShown && !threadShown && !threadsView && <BrowserPane onClose={() => showBrowser(false)} />}
     {threadShown && <ThreadColumn runId={threadShown} issueId={shownThread?.issueId} overList={!!threadsView} name={shownThread ? threadName(shownThread, tasks, '') : undefined} />}
-    {threadsView && !threadShown && <AllThreadsColumn view={threadsView} threads={threads} issues={tasks} />}
+    {threadsView && !threadShown && <AllThreadsColumn view={threadsView} threads={threads} issues={tasks} loading={threadsLoading} />}
     {/* Opening, closing and handing the column to a thread are instant (R-37). */}
-    {isConversation && panelOpen && !rightTaken && <ContextPanel key="context-panel" workspaceId={workspaceData?.workspace.id} issues={tasks} threads={threads} onOpenThread={thread => openThread(thread.runId)} onClose={() => showPanel(false)}
+    {isConversation && panelOpen && !rightTaken && <ContextPanel key="context-panel" workspaceId={workspaceData?.workspace.id} issues={tasks} threads={threads} threadsLoading={threadsLoading} onOpenThread={thread => openThread(thread.runId)} onClose={() => showPanel(false)}
       conversation={activeBot ? { id: activeBot.id, name: activeBot.name, color: activeBot.color, shape: activeBot.shape, kind: 'bot' } : { id: coordinatorBot?.id ?? coordinatorChat?.botId, name: i18nText('Nav.coordinator'), kind: 'coordinator', updatedAt: lastCoordinatorItem?.createdAt }} />}
     {groupPanel && panelOpen && !rightTaken && <GroupPanel key={`group-panel:${groupPanel.id}`} group={groupPanel} onClose={() => showPanel(false)} />}
     {groupPanel && !rightTaken && <Sheet open={panelSheet} onOpenChange={setPanelSheet}>
@@ -530,7 +533,7 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
     {isConversation && !rightTaken && <Sheet open={panelSheet} onOpenChange={setPanelSheet}>
       <SheetContent side="right" instant showCloseButton={false} className="gap-0 p-0 data-[side=right]:w-full sm:max-w-sm">
         <SheetHeader className="sr-only"><SheetTitle>{i18nText('Shell.panel.label')}</SheetTitle></SheetHeader>
-        <ContextPanel sheet workspaceId={workspaceData?.workspace.id} issues={tasks} threads={threads} onOpenThread={thread => { setPanelSheet(false); openThread(thread.runId) }} onClose={() => setPanelSheet(false)}
+        <ContextPanel sheet workspaceId={workspaceData?.workspace.id} issues={tasks} threads={threads} threadsLoading={threadsLoading} onOpenThread={thread => { setPanelSheet(false); openThread(thread.runId) }} onClose={() => setPanelSheet(false)}
       conversation={activeBot ? { id: activeBot.id, name: activeBot.name, color: activeBot.color, shape: activeBot.shape, kind: 'bot' } : { id: coordinatorBot?.id ?? coordinatorChat?.botId, name: i18nText('Nav.coordinator'), kind: 'coordinator', updatedAt: lastCoordinatorItem?.createdAt }} />
       </SheetContent>
     </Sheet>}
