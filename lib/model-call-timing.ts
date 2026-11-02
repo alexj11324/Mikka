@@ -25,6 +25,10 @@ export interface ModelCallTiming {
   /** From the request to the end of the stream. */
   durationMs: number
   inputTokens: number | null
+  /** Input tokens read from the provider's prompt cache. */
+  cacheReadTokens: number | null
+  /** Input tokens written to the cache (reported by Anthropic routes only). */
+  cacheWriteTokens: number | null
   outputTokens: number | null
   toolCalls: number
   finishReason: string | null
@@ -55,6 +59,14 @@ function total(value: unknown): number | null {
   return null
 }
 
+function cache(usage: unknown, field: 'cacheRead' | 'cacheWrite'): number | null {
+  if (!usage || typeof usage !== 'object' || !('inputTokens' in usage)) return null
+  const input = usage.inputTokens
+  if (!input || typeof input !== 'object' || !(field in input)) return null
+  const value = (input as Record<string, unknown>)[field]
+  return typeof value === 'number' ? value : null
+}
+
 function reason(value: unknown): string | null {
   if (typeof value === 'string') return value
   if (value && typeof value === 'object' && 'unified' in value && typeof value.unified === 'string') return value.unified
@@ -82,6 +94,8 @@ export function timedModelStream<P extends Part, Result extends { stream: Readab
         firstTextMs: firstText === null ? null : firstText - start.requestedAt,
         durationMs: at - start.requestedAt,
         inputTokens: usage && typeof usage === 'object' && 'inputTokens' in usage ? total(usage.inputTokens) : null,
+        cacheReadTokens: cache(usage, 'cacheRead'),
+        cacheWriteTokens: cache(usage, 'cacheWrite'),
         outputTokens: usage && typeof usage === 'object' && 'outputTokens' in usage ? total(usage.outputTokens) : null,
         toolCalls, finishReason, interrupted,
       })
