@@ -1916,11 +1916,12 @@
       "copied": "已复制",
       "rowMenu": "{label} 的更多操作",
       "callbackPlaceholder": "http://localhost:54545/callback?code=…",
-      "paused": "已暂停",
+      "paused": "已停用",
       "useSubscription": "使用 {label}",
       "pauseFailed": "无法更改这个订阅。",
       "claudePlan": "Claude {plan}",
-      "disconnectTitle": "断开 {label}？"
+      "disconnectTitle": "断开 {label}？",
+      "enabled": "启用"
     },
     "integrations": {
       "googleSignInTitle": "Google 登录",
@@ -2492,7 +2493,7 @@
       "blocked": {
         "quota": "额度用完",
         "expired": "需要重新连接",
-        "paused": "已暂停",
+        "paused": "订阅已停用",
         "missing": "已不可用",
         "keyRefused": "Key 无效或已被撤销"
       },

@@ -120,6 +120,11 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
     const spent = await resolveModelDispatch(pool, ctx)
     assert.deepEqual([spent.kind, spent.kind === 'none' && spent.reason], ['none', 'unavailable'], 'one account for both: both used up')
     await pool.query('UPDATE byos_connections SET quota=NULL WHERE id=$1', [claude])
+    // The subscription switched off (启用 off): its models read 订阅已停用 and nothing runs on them.
+    await pool.query('UPDATE byos_connections SET paused=true WHERE id=$1', [claude])
+    assert.deepEqual((await order.orderView(pool, scope)).entries.map(entry => entry.block?.reason), ['paused', 'paused'])
+    assert.equal((await resolveModelDispatch(pool, ctx)).kind, 'none')
+    await pool.query('UPDATE byos_connections SET paused=false WHERE id=$1', [claude])
     // A key model on Claude Code: any installed Claude Code runs it.
     const key = await keys.addApiKey(pool, scope.ownerId, { provider: 'deepseek', apiKey: `sk-${randomBytes(12).toString('hex')}` }, { fetch: (async () => Response.json({ data: [{ id: 'key-model-c' }] })) as unknown as typeof fetch })
     // The thread's own model goes first.

@@ -7,6 +7,7 @@ import { Check, Copy, MoreHorizontal, TriangleAlert } from 'lucide-react'
 import { useFormatter, useTranslations } from 'next-intl'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { Field, FieldGroup, FieldLabel, FieldError } from '@/components/ui/field'
@@ -254,14 +255,18 @@ export function SubscriptionSettings({ workspaceId }: { workspaceId: string }) {
                       </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-2 sm:justify-end">
-                      {/* A healthy row's switch already says it is on; the label speaks only for other states. */}
-                      {!healthy && <span className="flex items-center gap-1.5 text-xs whitespace-nowrap text-muted-foreground">
+                      {/* The 启用 switch says on or off; the label speaks only for other states. */}
+                      {!healthy && !(paused && live && !reauth && !signingIn) && <span className="flex items-center gap-1.5 text-xs whitespace-nowrap text-muted-foreground">
                         {(reauth || (refused && !paused)) && <span aria-hidden="true" className="size-1.5 rounded-full bg-warning" />}
                         {reauth ? t('reauth') : paused ? t('paused') : refused ? t('notInUse') : t('notConnected')}
                       </span>}
                       {mine?.connectionId === connection.id && catching && <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={cancel}>{t('cancel')}</Button>}
                       {(reauth || !live || signingIn) && <SignInButton busy={signingIn} disabled={!canReconnect} label={t('reconnect')} busyLabel={t('connecting')} onClick={() => { void connect(provider, connection) }} />}
-                      {live && !reauth && !signingIn && <Switch checked={!paused} disabled={pending || !!attempt} aria-label={t('useSubscription', { label: account ?? product })} onCheckedChange={checked => { void setPaused(connection, !checked) }} />}
+                      {/* 启用, labelled like 设备's 参与调度: off, its models in 允许使用的模型 read 订阅已停用 and no run or chat uses it. */}
+                      {live && !reauth && !signingIn && <Label className="flex items-center gap-2 font-normal text-muted-foreground">
+                        <span aria-hidden="true" className="max-sm:hidden">{t('enabled')}</span>
+                        <Switch checked={!paused} disabled={pending || !!attempt} aria-label={t('useSubscription', { label: account ?? product })} onCheckedChange={checked => { void setPaused(connection, !checked) }} />
+                      </Label>}
                       <DropdownMenu>
                         <DropdownMenuTrigger disabled={pending || !!attempt} render={<Button variant="ghost" size="icon-sm" aria-label={t('rowMenu', { label: account ?? product })} />}><MoreHorizontal aria-hidden="true" /></DropdownMenuTrigger>
                         <DropdownMenuContent align="end">

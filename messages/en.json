@@ -1916,11 +1916,12 @@
       "copied": "Copied",
       "rowMenu": "More for {label}",
       "callbackPlaceholder": "http://localhost:54545/callback?code=…",
-      "paused": "Paused",
+      "paused": "Off",
       "useSubscription": "Use {label}",
       "pauseFailed": "The subscription could not be changed.",
       "claudePlan": "Claude {plan}",
-      "disconnectTitle": "Disconnect {label}?"
+      "disconnectTitle": "Disconnect {label}?",
+      "enabled": "On"
     },
     "integrations": {
       "googleSignInTitle": "Google sign-in",
@@ -2492,7 +2493,7 @@
       "blocked": {
         "quota": "Quota used up",
         "expired": "Needs reconnecting",
-        "paused": "Paused",
+        "paused": "Subscription turned off",
         "missing": "No longer available",
         "keyRefused": "Key invalid or revoked"
       },
