@@ -10,7 +10,7 @@ import { workspaceMembers } from '@/lib/db/workspace-schema'
 import { stopRunsUsingApiKeys } from '@/lib/model-api-key-runs'
 import { memberSubscriptionsAllowed, pooledOwners, setSubscriptionShare, stopRunsUsingSubscriptions } from '@/lib/personal-policy'
 
-/** 团队权限 › 允许成员使用个人订阅. */
+/** 团队权限 › 订阅与 API Key: may members share theirs with teammates (decision 2026-11-01-2240). */
 export interface MemberSubscriptionPolicy { allowed: boolean; canEdit: boolean }
 
 /** Any member reads; `canEdit` for admins of a team workspace (a personal workspace has no switch). */
@@ -32,8 +32,8 @@ export async function setMemberSubscriptionPolicy(actor: { id: string; name: str
       ON CONFLICT ("workspaceId") DO UPDATE SET subscriptions=EXCLUDED.subscriptions,"updatedBy"=EXCLUDED."updatedBy","updatedAt"=now()`)
     await recordAudit(tx, { workspaceId, actor: { type: 'user', id: actor.id, name: actor.name }, action: 'integration.permission_changed', target: { type: 'personal', id: 'subscriptions', label: 'subscriptions' }, metadata: { integration: 'personal_subscriptions', capability: 'use', from: previous ? 'allow' : 'deny', to: allowed ? 'allow' : 'deny' } , ...request })
   })
-  // Off: every run here on a member's own subscription stops now.
-  if (!allowed) { await stopRunsUsingSubscriptions(pool, { workspaceId }); await stopRunsUsingApiKeys(pool, { workspaceId }) }
+  // Off: runs here on another member's shared subscription or API key stop now. A member's own runs on their own credentials go on (decision 2026-11-01-2240).
+  if (!allowed) { await stopRunsUsingSubscriptions(pool, { workspaceId, othersOnly: true }); await stopRunsUsingApiKeys(pool, { workspaceId, othersOnly: true }) }
   return getMemberSubscriptionPolicy(actor.id, workspaceId)
 }
 

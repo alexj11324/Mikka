@@ -69,7 +69,7 @@ export class ComputerStore {
           for (const desktop of desktops.filter(d => d.ownerId === machine.ownerId)) await this.runtime.syncDesktopLease(sandbox, this.lease(desktop, permission !== 'deny', policy.version))
         }
         // Dedicated threads have their own driver lease. Updating only the
-        // Bot machine leaves an already issued thread grant on an old policy.
+        // Bot machine leaves a thread's agent on an old policy.
         const threads = (await client.query(`SELECT t."sandboxId",t."botId",t."ownerId",t.epoch FROM thread_machines t
           JOIN bots b ON b.id=t."botId" AND b."workspaceId"=t."workspaceId" AND b."ownerId"=t."ownerId"
           WHERE t."workspaceId"=$1 AND t."sandboxId" IS NOT NULL AND t.state IN ('starting','running') ORDER BY t."runId"`, [workspaceId])).rows
@@ -164,11 +164,10 @@ export class ComputerStore {
       const policy = (await client.query('SELECT permission,version FROM workspace_computer_policies WHERE "workspaceId"=$1', [actor.workspaceId])).rows[0]
       const lease = this.lease(desktop, policy?.permission !== 'deny', policy?.version ?? 0)
       await client.query('UPDATE bot_desktops SET control=$2,"controlledBy"=$3,"controlUntil"=$4,epoch=$5 WHERE "botId"=$1', [botId, desktop.control, desktop.controlledBy, desktop.controlUntil, desktop.epoch])
-      if (action === 'takeover') {
-        await client.query(`UPDATE agent_runs r SET "resumeStatus"=r.status,status='paused',"pauseReason"='human_control',"updatedAt"=now()
-          FROM computer_run_bindings b WHERE b."runId"=r.id AND b."botId"=$1 AND b."workspaceId"=$2 AND b."ownerId"=$3
-          AND r."userId"=$3 AND r.status IN ('preparing','running','waiting_input','finishing')`, [botId, actor.workspaceId, actor.userId])
-      } else if (action === 'handback') {
+      // Holding the Bot's desktop holds only work on that desktop, and no run executes there: every
+      // run is claimed on its own thread machine (decision 0251), so a takeover pauses no run.
+      // Handback still resumes a run that an earlier takeover paused.
+      if (action === 'handback') {
         await client.query(`UPDATE agent_runs r SET status=COALESCE(r."resumeStatus",'running'),"resumeStatus"=NULL,"pauseReason"=NULL,"updatedAt"=now()
           FROM computer_run_bindings b WHERE b."runId"=r.id AND b."botId"=$1 AND b."workspaceId"=$2 AND b."ownerId"=$3
           AND r."userId"=$3 AND r.status='paused' AND r."pauseReason"='human_control'`, [botId, actor.workspaceId, actor.userId])

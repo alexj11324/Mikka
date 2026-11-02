@@ -32,7 +32,7 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
       CREATE TABLE bots (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" uuid);
       CREATE TABLE byos_connections (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" text,epoch bigint,state text,provider text,"accountLabel" text,quota jsonb,"removedAt" timestamptz,paused boolean NOT NULL DEFAULT false);
       CREATE TABLE byos_bindings (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" text,"consumerId" text,"connectionId" uuid,"connectionRevision" bigint,"modelId" text,route text,"createdAt" timestamptz DEFAULT now())`);
-    for (const file of ["20261030193000_device_enrollment_management.sql", "20261030200610_execution_rules.sql", "20261030233002_byos_model_catalog.sql", "20261101001200_bot_model_hosted_choice.sql", "20261101001200_bot_model_hosted_choice.sql", "20261101020201_workspace_personal_policies.sql", "20261101020202_bot_archive.sql", "20261101021000_model_api_keys.sql", "20261101021100_bot_api_key_choice.sql"])
+    for (const file of ["20261030193000_device_enrollment_management.sql", "20261030200610_execution_rules.sql", "20261030233002_byos_model_catalog.sql", "20261101001200_bot_model_hosted_choice.sql", "20261101001200_bot_model_hosted_choice.sql", "20261101020201_workspace_personal_policies.sql", "20261101020202_bot_archive.sql", "20261101021000_model_api_keys.sql", "20261101021100_bot_api_key_choice.sql", "20261102120000_model_api_key_models_error.sql"])
       await pool.query(await readFile(new URL(`../drizzle/${file}`, import.meta.url), "utf8"));
 
     mock.module(new URL("./db/index.ts", import.meta.url).href, { namedExports: { pool } });
@@ -136,15 +136,17 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
     await pool.query(`UPDATE byos_connections SET quota=$2::jsonb WHERE id=$1`, [claude, quota(1, PAST)]);
     assert.equal((await botModelMenu(pool, settings, alice, botA)).current.available, true);
 
-    // 6. 刷新模型列表: a subscription connected since the menu was read, and a model its provider now offers, show at once.
+    // 6. 刷新模型列表: a subscription connected since the menu was read, never asked for its models (no catalogue,
+    // no binding: production, 2026-11-02), and a model its provider now offers, show at once.
     const { refreshBotModelMenu } = await import("./bot-model-menu");
     const fresh = await connection("alice", workspace, "claude", "connected");
-    await binding("alice", workspace, fresh, "claude-fresh-fixture", "claude_cpa");
+    assert.ok(!(await botModelMenu(pool, settings, alice, botA)).groups.some((group) => group.options.some((option) => option.modelId === "claude-fresh-fixture")));
     const discovering = {
       botModels: settings.botModels.bind(settings),
       botBinding: settings.botBinding.bind(settings),
+      connectedSubscriptions: settings.connectedSubscriptions.bind(settings),
       refreshBotModels: (scope: typeof alice, connectionId: string) =>
-        settings.refreshBotModels(scope, connectionId, async () => connectionId === claude ? [{ id: "claude-sonnet-fixture" }, { id: "claude-opus-fixture" }, { id: "claude-new-fixture" }] : [{ id: "claude-fresh-fixture" }]),
+        settings.refreshBotModels(scope, connectionId, async () => connectionId === claude ? [{ id: "claude-sonnet-fixture" }, { id: "claude-opus-fixture" }, { id: "claude-new-fixture" }] : connectionId === fresh ? [{ id: "claude-fresh-fixture" }] : []),
     };
     const refreshed = await refreshBotModelMenu(pool, discovering, alice, botA);
     const models = refreshed.groups.flatMap((group) => group.options.map((option) => option.modelId));
@@ -159,8 +161,24 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
     const refusing = { ...discovering, refreshBotModels: async () => { throw new Error("provider down"); } };
     assert.ok((await refreshBotModelMenu(pool, refusing, alice, botA)).groups.length > 1);
 
+    // 7. Opening the menu asks a connected subscription that was never asked for its models (no 刷新 needed),
+    // once per revision; a paused one is not asked.
+    const unasked = await connection("alice", workspace, "claude", "connected");
+    const pausedOne = await connection("alice", workspace, "claude", "connected");
+    await pool.query("UPDATE byos_connections SET paused=true WHERE id=$1", [pausedOne]);
+    const asked: string[] = [];
+    await settings.ensureCatalogues(alice, 1000, async (_owner, connectionId) => { asked.push(connectionId); return connectionId === unasked ? [{ id: "claude-unasked-fixture" }] : []; });
+    assert.ok(asked.includes(unasked));
+    assert.ok(!asked.includes(pausedOne));
+    assert.ok((await botModelMenu(pool, settings, alice, botA)).groups.some((group) => group.options.some((option) => option.modelId === "claude-unasked-fixture")));
+    await settings.ensureCatalogues(alice, 1000, async (_owner, connectionId) => { throw new Error(`asked again: ${connectionId}`); });
+    await pool.query("UPDATE byos_connections SET epoch=epoch+1 WHERE id=$1", [unasked]);
+    const again: string[] = [];
+    await settings.ensureCatalogues(alice, 1000, async (_owner, connectionId) => { again.push(connectionId); return []; });
+    assert.deepEqual(again, [unasked], "a reconnect (new revision) is asked again");
+
     // C22: an API key's models are a menu group, and the Coordinator saved on one runs on it.
-    const { addApiKey, setBotApiKeyChoice } = await import("./model-api-keys");
+    const { addApiKey } = await import("./model-api-keys");
     const { apiKeyOptionId } = await import("./bot-model-menu-view");
     const env = { WORKSPACE_SECRETS_KEY: randomBytes(32).toString("hex") };
     const listing = (async () => new Response(JSON.stringify({ data: [{ id: "deepseek-chat" }] }), { status: 200 })) as unknown as typeof fetch;
@@ -168,13 +186,23 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
     const keyOption = apiKeyOptionId(key.id, "deepseek-chat");
     let keyMenu = await botModelMenu(pool, settings, alice, null);
     assert.deepEqual(keyMenu.groups.find((group) => group.kind === "apiKey")?.options, [{ id: keyOption, modelId: "deepseek-chat", provider: "deepseek" }]);
-    await setBotApiKeyChoice(pool, alice, null, key.id, "deepseek-chat");
-    keyMenu = await botModelMenu(pool, settings, alice, null);
+    // Picked by its option id, as the web's action and the iOS app's PUT /api/mobile/model both send it.
+    const { chooseBotModel } = await import("./bot-model-menu");
+    keyMenu = await chooseBotModel(pool, settings, alice, null, keyOption);
     assert.deepEqual([keyMenu.current.id, keyMenu.current.kind, keyMenu.current.chosen, keyMenu.current.available], [keyOption, "apiKey", true, true]);
     assert.deepEqual(await freezeBotModel({ ownerId: "alice", botId: null, workspaceId: workspace }, dependencies), {
       harness: "ai_sdk", model: "deepseek-chat",
       modelSelection: { coordinator: true, type: "api_key", keyId: key.id, ownerId: "alice", workspaceId: workspace, modelId: "deepseek-chat" },
     });
+    // Mikka 默认 picked after a key model: it is what the chip shows and what the next turn runs on, not the key
+    // (production, 2026-11-02: the pick saved, but the old key choice won on read and the chip went back to the key).
+    const { HOSTED_CHOICE: hostedChoice } = await import("./bot-model-menu-view");
+    const hostedMenu = await chooseBotModel(pool, settings, alice, null, hostedChoice);
+    assert.deepEqual([hostedMenu.current.id, hostedMenu.current.kind, hostedMenu.current.chosen, hostedMenu.current.available], [hostedChoice, "hosted", true, true]);
+    assert.notEqual((await freezeBotModel({ ownerId: "alice", botId: null, workspaceId: workspace }, dependencies)).modelSelection?.type, "api_key");
+    // Picking the key again moves back to it.
+    keyMenu = await chooseBotModel(pool, settings, alice, null, keyOption);
+    assert.equal(keyMenu.current.id, keyOption);
     // 订阅额度用完后，自动改用 API Key: bot A's Claude subscription is out of quota. The composer names the reset and
     // the key the next turn moves to; that turn is frozen on Alice's own key, marked, and a frozen one never changes.
     await pool.query(`UPDATE byos_connections SET quota=$2::jsonb WHERE id=$1`, [claude, quota(1, FUTURE)]);

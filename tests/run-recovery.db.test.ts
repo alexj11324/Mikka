@@ -25,15 +25,15 @@ test('independent run recovery: concurrency, STOP, renewed leases and attempt fe
     await (await import('../lib/db')).pool.end()
   })
   const now = new Date()
-  // The other device has 允许自动调度 on unless a test says otherwise (decision 2026-10-31-2200-run-machine-fallback).
-  async function fixture(attempt = 1, definition: unknown = null, otherAutoSchedule = true) {
+  // The other device takes part in dispatch (参与调度) unless a test says otherwise (decision 2026-11-02-1400).
+  async function fixture(attempt = 1, definition: unknown = null, otherTakesPart = true) {
     const userId = `recovery-${randomUUID()}`, issueId = randomUUID(), agentId = randomUUID()
     const deviceId = randomUUID(), otherDeviceId = randomUUID(), repoId = randomUUID(), id = randomUUID()
     const remote = 'https://github.com/isolated/recovery-fixture.git'
     await pool.query('INSERT INTO "user" (id,name,email,"emailVerified","createdAt","updatedAt") VALUES ($1,$1,$2,true,now(),now())', [userId, `${userId}@example.invalid`])
     await pool.query('INSERT INTO issues (id,"userId",title,content,status,priority) VALUES ($1,$2,\'Recovery fixture\',\'{}\',\'todo\',\'normal\')', [issueId, userId])
-    await pool.query('INSERT INTO devices (id,"ownerId",name,kind,enabled,harnesses,"lastSeenAt","protocolVersion","autoSchedule") VALUES ($1,$3,\'Old device\',\'local\',true,$4,$5,$6,NULL),($2,$3,\'New device\',\'local\',true,$4,$7,$6,$8)',
-      [deviceId, otherDeviceId, userId, JSON.stringify([{ harness: 'codex', installed: true }]), new Date(now.getTime() - 600_000), DAEMON_PROTOCOL_VERSION, now, otherAutoSchedule])
+    await pool.query('INSERT INTO devices (id,"ownerId",name,kind,enabled,harnesses,"lastSeenAt","protocolVersion") VALUES ($1,$3,\'Old device\',\'local\',true,$4,$5,$6),($2,$3,\'New device\',\'local\',$8,$4,$7,$6)',
+      [deviceId, otherDeviceId, userId, JSON.stringify([{ harness: 'codex', installed: true }]), new Date(now.getTime() - 600_000), DAEMON_PROTOCOL_VERSION, now, otherTakesPart])
     await pool.query('INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,\'codex\',\'Recovery worker\')', [agentId, userId, deviceId])
     await pool.query('INSERT INTO device_repos (id,"deviceId","userId","repoPath","remoteUrl") VALUES ($1,$2,$3,$4,$5)', [repoId, deviceId, userId, remoteKey(remote), remote])
     await pool.query('INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId",status,prompt,attempt,"leaseExpiresAt","agentDefinition") VALUES ($1,$2,$3,$4,$5,$6,\'running\',\'Controlled recovery fixture\',$7,$8,$9)',
@@ -141,7 +141,7 @@ test('independent run recovery: concurrency, STOP, renewed leases and attempt fe
     assert.deepEqual(event.payload.noMachine.options.map((option: { action: string }) => option.action), ['connectServer', 'e2bKey'])
   })
 
-  await t.test('a lost run with no cloud and no auto-schedule device ends with the card instead of a retry', async () => {
+  await t.test('a lost run with no cloud and no other computer that takes part ends with the card instead of a retry', async () => {
     const run = await fixture(1, null, false)
     await reclaimLostRuns(run.userId, now)
     assert.equal((await pool.query('SELECT count(*)::int AS n FROM agent_runs WHERE "retryOf"=$1', [run.id])).rows[0].n, 0)

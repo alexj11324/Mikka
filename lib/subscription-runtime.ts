@@ -1,11 +1,12 @@
 import 'server-only'
-import { othersMayUse, subscriptionsUsable } from './personal-policy'
+import { othersMayUse } from './personal-policy'
 import { z } from 'zod'
 import { retainEnrollmentSourcesForAcceptance } from './subscription-enrollment-policy'
 import { SubscriptionRefusal, type SubscriptionRoute } from '@mikka/protocol/subscription'
 import { workspaceDb } from './workspace-db'
 import { requireWorkspace } from './workspace-access'
 import { pool } from './db'
+import { byosEnabled, byosEnrollmentEnabled } from './cloud-computer-flag'
 import { SubscriptionRepository } from './subscription-repository'
 import { SubscriptionService } from './subscription-service'
 import { SubscriptionWorkerClient } from '../packages/daemon/src/subscription-worker-client'
@@ -16,19 +17,19 @@ import { join } from 'node:path'
 export async function authorizeSubscriptionWorkspace(userId: string, workspaceId: string) {
   await workspaceDb.transaction(tx => requireWorkspace(tx, workspaceId, userId))
 }
-/** A subscription runs in a workspace only for a member who shared it there, and only while that
- * workspace's admin allows it; otherwise a frozen run stops, never falls back (decision 2026-10-31-2225). */
+/** A subscription runs its owner's own bots in every workspace the owner belongs to (decision 2026-11-01-2240);
+ * another member's bot only while the owner shares it there with 分享给团队成员 and the admin allows it. */
 export async function authorizeSubscriptionUse(userId: string, workspaceId: string, consumerId?: string) {
   await authorizeSubscriptionWorkspace(userId, workspaceId)
-  if (!(await subscriptionsUsable(pool, userId, workspaceId))) throw new SubscriptionRefusal('account_unavailable')
   // Another member's bot needs 分享给团队成员 on, checked on every call: un-sharing or leaving stops it at once.
   if (consumerId && z.uuid().safeParse(consumerId).success) {
-    const { rows: [bot] } = await pool.query<{ ownerId: string }>('SELECT "ownerId" FROM bots WHERE id=$1 AND "workspaceId"=$2', [consumerId, workspaceId])
-    if (bot && bot.ownerId !== userId && !(await othersMayUse(pool, userId, workspaceId))) throw new SubscriptionRefusal('account_unavailable')
+    const { rows: [bot] } = await pool.query<{ ownerId: string | null }>('SELECT "ownerId" FROM bots WHERE id=$1 AND "workspaceId"=$2', [consumerId, workspaceId])
+    // A bot awaiting takeover (null owner) runs on nobody's subscription.
+    if (bot && (bot.ownerId === null || (bot.ownerId !== userId && !(await othersMayUse(pool, userId, workspaceId))))) throw new SubscriptionRefusal('account_unavailable')
   }
 }
 export function subscriptionRuntime(nativeBroker = false, custodyOnly = false, options: { exportAccessLease?: boolean } = {}): SubscriptionService {
-  if (process.env.MIKKA_BYOS_ENABLED !== '1' && !(custodyOnly && process.env.MIKKA_BYOS_ENROLLMENT_ENABLED === '1')) throw new SubscriptionRefusal('backend_unavailable')
+  if (!byosEnabled() && !(custodyOnly && byosEnrollmentEnabled())) throw new SubscriptionRefusal('backend_unavailable')
   const binary = process.env.MIKKA_BYOS_WORKER_BINARY ?? join(process.cwd(), 'packages/subscription-worker/bin/mikka-subscription-worker')
   // pool is request-scoped; never send a preview worker to the production DB.
   const databaseUrl = pool.options.connectionString

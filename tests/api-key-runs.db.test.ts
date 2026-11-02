@@ -29,8 +29,6 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
   const { queueRun } = await import('../lib/agent-runs')
   const { queueCloudRun } = await import('../lib/computer/queue-run')
   const { hashDeviceToken } = await import('../lib/device-link')
-  const { threadModel } = await import('../lib/rule-dispatch')
-  const { ExecutionSettings } = await import('../lib/execution-settings')
   const claimRoute = await import('../app/v1/devices/[deviceId]/runs/[runId]/claim/route')
   const users: string[] = []
   t.after(async () => {
@@ -215,8 +213,22 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
     const chosen = await queue()
     assert.deepEqual(chosen.apiKey, { keyId: key.id, model: 'subscription-model' }, 'the bot\'s saved choice wins (§ 2)')
     assert.equal(chosen.subscription, undefined)
-    const thread = await threadModel(new ExecutionSettings(pool), { ownerId: p.id, workspaceId: p.workspaceId }, p.botId)
-    assert.deepEqual(thread, { model: 'subscription-model', subscription: false, apiKey: true, harness: 'claude_code' }, 'a saved API-key model is the thread\'s model, not Mikka 默认')
+  })
+
+  await t.test('a rule\'s model only an API key lists runs on that key, beside a usable subscription; one the subscription lists stays on it', async () => {
+    const p = await person('key-rule-model')
+    const key = await addKey(p.id, 'anthropic', `sk-ant-${randomBytes(16).toString('hex')}`, ['key-only-model', 'shared-model'])
+    const { connection, binding } = await subscribe(p)
+    await pool.query('UPDATE byos_connections SET "modelCatalog"=$2 WHERE id=$1', [connection, JSON.stringify({ revision: '1', models: ['subscription-model', 'shared-model'] })])
+    const queue = async (model: string) => definition((await queueRun(p.id, { issueId: await task(p.id), agentId: p.agents.claude_code, repo: p.remote, model }, p.botId)).runId)
+    const keyed = await queue('key-only-model')
+    assert.deepEqual(keyed.apiKey, { keyId: key.id, model: 'key-only-model' }, 'a model the subscription does not offer is never asked of it')
+    assert.equal(keyed.subscription, undefined)
+    for (const model of ['shared-model', 'subscription-model']) {
+      const kept = await queue(model)
+      assert.equal(kept.subscription?.bindingId, binding, `${model}: the subscription goes first (§ 2)`)
+      assert.equal(kept.apiKey, undefined)
+    }
   })
 
   await t.test('cloud computer: queued with no subscription, the claim returns the key', async () => {
@@ -277,6 +289,17 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
       const assignment = JSON.parse(text)
       assert.equal(assignment.modelCredential.key, secret)
       assert.equal(assignment.computer, undefined, 'a machine with no desktop gets no desktop')
+      assert.equal(await status(runId), 'preparing')
+
+      // Nor a computer task on its own thread machine's desktop: it is claimed with that desktop.
+      const desktopRun = (await queueCloudRun(pool, actor, { botId: p.botId, issueId: await task(p.id), agentId, deviceRepoId: computerRepo, title: 'Task', body: '', model: 'auto' })).runId
+      const desktops = await fakeThreadMachines(pool, desktopMachine)
+      const desktopThread = await desktops.start(actor, desktopRun).finally(() => desktops.restore())
+      const desktopResponse = await claim(desktopThread.deviceId, desktopRun, desktopThread.token)
+      const desktopText = await desktopResponse.text()
+      assert.equal(desktopResponse.status, 200, desktopText)
+      assert.equal(JSON.parse(desktopText).computer.botId, p.botId, 'the thread machine\'s own desktop')
+      assert.equal(await status(desktopRun), 'preparing')
     } finally { machines.restore() }
   })
 

@@ -161,6 +161,13 @@ export class SubscriptionService {
     }
     return selectedModel
   }
+  /**
+   * In-process native launch, used only by the BYOS custody test
+   * (tests/byos-application.test.mjs) to drive synthetic CLIs through
+   * disconnect and reconnect. No production path calls it: a device run gets
+   * native credentials through `nativeRun`, which needs a runId and checks
+   * `runMayUseCredentialSql` and membership on both sides.
+   */
   async launchNative<T>(ownerId: string, consumerId: string, bindingId: string, run: (context: { use: SubscriptionUse; modelId: string; worker: Pick<SubscriptionWorkerClient, 'call'>; access(): Promise<SubscriptionAccess> }) => Promise<T>) {
     const binding = await this.repository.binding(ownerId, bindingId)
     // This legacy in-process launcher hands credentials to its adapter. It is

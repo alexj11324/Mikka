@@ -1,10 +1,13 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import useSWR from 'swr'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import useSWR, { useSWRConfig } from 'swr'
+import { modelOrderKey } from '@/components/settings/model-order-settings'
 import { Check, Copy, MoreHorizontal, TriangleAlert } from 'lucide-react'
 import { useFormatter, useTranslations } from 'next-intl'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { Field, FieldGroup, FieldLabel, FieldError } from '@/components/ui/field'
@@ -46,10 +49,10 @@ async function post(body: unknown, signal?: AbortSignal) {
 
 /**
  * The provider ceremony stays in this page's memory, never chat or storage.
- * `extraRows` (the API keys and custom providers) and `action` (添加 API Key)
- * join the same list (「API 与订阅」, orchestration.md § 1).
+ * The subscriptions are their own group on 「API 与订阅」; API keys are the
+ * next one (decision 2026-11-02-1200).
  */
-export function SubscriptionSettings({ workspaceId, extraRows, action }: { workspaceId: string; extraRows?: ReactNode[]; action?: ReactNode }) {
+export function SubscriptionSettings({ workspaceId }: { workspaceId: string }) {
   const t = useTranslations('Settings.subscriptions')
   // Cached per workspace: a return to the page shows the last list at once and re-reads it behind.
   const list = useSWR(subscriptionsKey(workspaceId), () => readSubscriptions(workspaceId), { revalidateOnFocus: false })
@@ -64,10 +67,15 @@ export function SubscriptionSettings({ workspaceId, extraRows, action }: { works
   const [starting, setStarting] = useState<{ provider: Provider; id?: string } | null>(null)
   const [error, setError] = useState<Failure | null>(null)
   const [notice, setNotice] = useState('')
+  // 断开连接 asks first, like deleting an API key (A1).
+  const [disconnecting, setDisconnecting] = useState<{ id: string; provider: Provider; revision: number; label: string } | null>(null)
   const [now, setNow] = useState(() => Date.now())
   const connectedKey = state?.connections.filter(item => item.state === 'connected').map(item => `${item.id}:${item.revision}`).join(',') ?? ''
   const { mutate } = list
-  const refresh = useCallback(async () => { await mutate() }, [mutate])
+  // The allowed models' candidates follow the connected accounts.
+  // The workspace's own SWR cache (workspace-app.tsx), not swr's global one: 启用 and a disconnect re-read 允许使用的模型.
+  const { mutate: mutateCached } = useSWRConfig()
+  const refresh = useCallback(async () => { await mutate(); void mutateCached(modelOrderKey(workspaceId)) }, [mutate, mutateCached, workspaceId])
   const failureMessage = useCallback((failure: unknown, key: 'startFailed' | 'finishFailed', provider: Provider) => {
     if (failure instanceof InvalidAuthorization) return t('refusedPage', { provider: t(provider) })
     const code = failure instanceof RequestError ? failure.code : ''
@@ -188,21 +196,19 @@ export function SubscriptionSettings({ workspaceId, extraRows, action }: { works
     void connect(failure.provider, existing)
   }
 
-  // Without the subscription service the API keys still form the list.
   const status = loadFailed ? <FieldError className="px-1">{t('loadFailed')}</FieldError>
     : !state ? null
       : !state.enabled ? <p role="status" className="px-1 text-sm text-muted-foreground">{t('serviceOff')}</p> : null
   // First visit only: rows the size of the provider rows, so nothing moves when the list arrives.
   if (!state && !loadFailed) return <div role="status" aria-label={t('loading')} className="flex flex-col gap-1">
-    <SettingsSection action={action}>
+    <SettingsSection id="subscriptions-heading" title={t('heading')}>
       {(['codex', 'claude'] as const).map(provider => <SubscriptionRowSkeleton key={provider} provider={provider} label={t(provider)} />)}
-      {extraRows}
     </SettingsSection>
   </div>
-  if (status || !state) return <div className="flex flex-col gap-3">
-    {extraRows?.length ? <SettingsSection action={action}>{extraRows}</SettingsSection> : action && <div className="flex justify-end">{action}</div>}
+  if (status || !state) return <section className="flex flex-col gap-1" aria-labelledby="subscriptions-heading">
+    <h2 id="subscriptions-heading" className="pl-1 text-sm font-medium">{t('heading')}</h2>
     {status}
-  </div>
+  </section>
   // The oldest read on screen, so the line never overstates how fresh a meter is.
   const reads = usage && usage !== 'failed' ? state.connections.flatMap(connection => {
     const read = connection.state === 'connected' ? usage.get(connection.id) : undefined
@@ -210,7 +216,7 @@ export function SubscriptionSettings({ workspaceId, extraRows, action }: { works
   }) : []
   const updated = reads.length > 0 ? Math.max(0, Math.floor((now - Math.min(...reads)) / 60_000)) : null
   return <div className="flex flex-col gap-1">
-    <SettingsSection action={action}>
+    <SettingsSection id="subscriptions-heading" title={t('heading')}>
       {(['codex', 'claude'] as const).map(provider => {
         const available = state.providers.some(item => item.provider === provider && item.available)
         const connections = state.connections.filter(item => item.provider === provider)
@@ -251,20 +257,24 @@ export function SubscriptionSettings({ workspaceId, extraRows, action }: { works
                       </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-2 sm:justify-end">
-                      {/* A healthy row's switch already says it is on; the label speaks only for other states. */}
-                      {!healthy && <span className="flex items-center gap-1.5 text-xs whitespace-nowrap text-muted-foreground">
+                      {/* The 启用 switch says on or off; the label speaks only for other states. */}
+                      {!healthy && !(paused && live && !reauth && !signingIn) && <span className="flex items-center gap-1.5 text-xs whitespace-nowrap text-muted-foreground">
                         {(reauth || (refused && !paused)) && <span aria-hidden="true" className="size-1.5 rounded-full bg-warning" />}
                         {reauth ? t('reauth') : paused ? t('paused') : refused ? t('notInUse') : t('notConnected')}
                       </span>}
                       {mine?.connectionId === connection.id && catching && <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={cancel}>{t('cancel')}</Button>}
                       {(reauth || !live || signingIn) && <SignInButton busy={signingIn} disabled={!canReconnect} label={t('reconnect')} busyLabel={t('connecting')} onClick={() => { void connect(provider, connection) }} />}
-                      {live && !reauth && !signingIn && <Switch checked={!paused} disabled={pending || !!attempt} aria-label={t('useSubscription', { label: account ?? product })} onCheckedChange={checked => { void setPaused(connection, !checked) }} />}
+                      {/* 启用, labelled like 设备's 参与调度: off, its models in 允许使用的模型 read 订阅已停用 and no run or chat uses it. */}
+                      {live && !reauth && !signingIn && <Label className="flex items-center gap-2 font-normal text-muted-foreground">
+                        <span aria-hidden="true" className="max-sm:hidden">{t('enabled')}</span>
+                        <Switch checked={!paused} disabled={pending || !!attempt} aria-label={t('useSubscription', { label: account ?? product })} onCheckedChange={checked => { void setPaused(connection, !checked) }} />
+                      </Label>}
                       <DropdownMenu>
                         <DropdownMenuTrigger disabled={pending || !!attempt} render={<Button variant="ghost" size="icon-sm" aria-label={t('rowMenu', { label: account ?? product })} />}><MoreHorizontal aria-hidden="true" /></DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuGroup>
                             {live
-                              ? <DropdownMenuItem variant="destructive" onClick={() => { void disconnect(connection) }}>{t('disconnect')}</DropdownMenuItem>
+                              ? <DropdownMenuItem variant="destructive" onClick={() => setDisconnecting({ ...connection, label: account ?? product })}>{t('disconnect')}</DropdownMenuItem>
                               : <DropdownMenuItem variant="destructive" onClick={() => { void remove(connection) }}>{t('remove')}</DropdownMenuItem>}
                           </DropdownMenuGroup>
                         </DropdownMenuContent>
@@ -293,10 +303,18 @@ export function SubscriptionSettings({ workspaceId, extraRows, action }: { works
           </div>}
         </div>
       })}
-      {extraRows}
     </SettingsSection>
     {updated !== null && <p className="pt-1 pl-1 text-xs text-muted-foreground">{updated < 1 ? t('updatedJustNow') : t('updatedAgo', { minutes: updated })}</p>}
     {notice && <p role="status" className="pt-1 pl-1 text-xs text-muted-foreground">{notice}</p>}
+    <AlertDialog open={disconnecting !== null} onOpenChange={open => { if (!open && !pending) setDisconnecting(null) }}>
+      <AlertDialogContent>
+        <AlertDialogHeader><AlertDialogTitle>{t('disconnectTitle', { label: disconnecting?.label ?? '' })}</AlertDialogTitle></AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={pending}>{t('cancel')}</AlertDialogCancel>
+          <AlertDialogAction variant="destructive" disabled={pending} onClick={() => { const target = disconnecting; setDisconnecting(null); if (target) void disconnect(target) }}>{t('disconnect')}</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   </div>
 }
 

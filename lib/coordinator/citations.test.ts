@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { citedIds, namedCitations, remarkCitations, splitCitations, type CitationSource } from './citations'
+import { citedIds, namedCitations, remarkCitations, runThreadName, splitCitations, type CitationSource } from './citations'
 
 const ISSUE = '3f6c1a52-8d0e-4b7a-9c3e-1f2a3b4c5d6e'
 const RUN = 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d'
@@ -82,4 +82,10 @@ test('remarkCitations cuts a GFM autolink glued to Chinese text', () => {
   assert.deepEqual(transform(text('看'), link('https://example.com/a。后面', 'https://example.com/a。后面')), [
     text('看'), link('https://example.com/a', 'https://example.com/a'), text('。后面'),
   ])
+})
+
+test('runThreadName names a thread for its task, as the thread list does, else for what it was asked', () => {
+  assert.equal(runThreadName({ name: 'Speed up the home page', issue: { id: ISSUE, number: 12, identifier: 'MIK-12', title: '首页提速' } }), 'MIK-12 首页提速')
+  assert.equal(runThreadName({ name: 'Speed up the home page', issue: { id: ISSUE, number: null, identifier: null, title: '首页提速' } }), '首页提速')
+  assert.equal(runThreadName({ name: 'Speed up the home page', issue: null }), 'Speed up the home page')
 })

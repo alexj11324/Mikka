@@ -23,18 +23,19 @@ function readerTokenWorkspace(reader: IssueReader) {
 export async function issueVisibility(reader: IssueReader, includeDeleted = false, workspaceId?: string, executor: Pick<typeof db, 'select'> = db) {
   const userId = typeof reader === 'string' ? reader : reader.id
   const token = readerTokenWorkspace(reader)
+  const allowed = await issueTeamScope(userId)
+  const scopeWorkspace = token ?? workspaceId
+  const allowedIds = allowed.filter(link => !scopeWorkspace || link.workspaceId === scopeWorkspace).map(link => link.issueId)
+  const predicate = issueVisibilityPredicate(userId, { allowedIds }, includeDeleted)
+  if (!token) return { predicate, allowedIds }
+  // Only a token's workspace scoping reads the reader's own and shared tasks' links; a browser session skips the lookup.
   const candidates = await executor.select({ id: issues.id }).from(issues).where(or(
     eq(issues.userId, userId),
     sql`exists (select 1 from ${issueMembers} where ${issueMembers.issueId} = ${issues.id} and ${issueMembers.userId} = ${issues.userId} and ${issueMembers.memberId} = ${userId})`,
   ))
-  const links = await issueTeamScope(userId, candidates.map(row => row.id))
   // issueTeamScope includes candidate links even when membership is revoked.
-  const allowed = await issueTeamScope(userId)
-  const scopeWorkspace = token ?? workspaceId
-  const allowedIds = allowed.filter(link => !scopeWorkspace || link.workspaceId === scopeWorkspace).map(link => link.issueId)
-  const predicate = issueVisibilityPredicate(userId, { linkedIds: links.map(link => link.issueId), allowedIds }, includeDeleted)
-  if (!token) return { predicate, allowedIds }
-  // The workspace is the tenant (decision 0230): a token for a team workspace reaches only tasks linked to it,
+  const links = await issueTeamScope(userId, candidates.map(row => row.id))
+  // The workspace is the tenant (decision 0231): a token for a team workspace reaches only tasks linked to it,
   // never the owner's personal or unlinked tasks. The personal workspace's token keeps those, but not a
   // workspace task linked elsewhere (as lib/issue-access.ts). Browser sessions are unchanged.
   const ids = (match: (workspaceId: string) => boolean) => [...new Set([...links, ...allowed].filter(link => match(link.workspaceId)).map(link => link.issueId))]

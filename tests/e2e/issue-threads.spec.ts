@@ -62,7 +62,7 @@ test('Issue threads open on the right as a conversation; comments are cards with
   await expect(panel.getByRole('list', { name: '线程对话' })).toContainText('Check the fallback timer')
   expect(feedbackRequests).toEqual([])
   await testInfo.attach('thread-open', { body: await page.screenshot(), contentType: 'image/png' })
-  await panel.getByRole('button', { name: '关闭线程', exact: true }).click()
+  await panel.getByRole('button', { name: '返回', exact: true }).click()
   await expect(panel).toHaveCount(0)
 
   // Comments are cards; a reply is written inside the card.
@@ -134,7 +134,7 @@ test(`The owner stops a live thread from its composer; it reads 正在停止… 
   await threads.getByRole('button', { name: '打开线程 Pick a cache key', exact: true }).click()
   let panel = page.getByRole('region', { name: 'Pick a cache key', exact: true })
   await expect(panel.getByRole('button', { name: '停止', exact: true })).toBeVisible()
-  await panel.getByRole('button', { name: '关闭线程', exact: true }).click()
+  await panel.getByRole('button', { name: '返回', exact: true }).click()
 
   await threads.getByRole('button', { name: '打开线程 Trim the bundle', exact: true }).click()
   panel = page.getByRole('region', { name: 'Trim the bundle', exact: true })

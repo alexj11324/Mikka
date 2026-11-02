@@ -9,7 +9,7 @@ import { HIGHLIGHT_COLORS } from "./rich-text-highlight"
 /** Document typography from host tokens, scoped to .tiptap so getHTML() stays
  * class free and floating menus mounted beside the text stay unstyled. */
 export const RICH_TEXT_PROSE = cn(
-  "text-foreground flex min-h-full flex-col text-md",
+  "text-foreground flex min-h-full flex-col text-base md:text-md", // 16px on phones: iOS Safari zooms into a smaller field
   "[&_.tiptap]:flex-1 [&_.tiptap]:break-words [&_.tiptap]:outline-none",
   "[&_.tiptap>*+*]:mt-3",
   "[&_.tiptap_h1]:text-lg [&_.tiptap_h1]:font-semibold [&_.tiptap>h1:not(:first-child)]:mt-8",

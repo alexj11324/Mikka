@@ -7,7 +7,7 @@ test('管理员添加、编辑和删除密钥，值不回显', async ({ page }, 
   await registerInTeam(page, '/settings?section=secrets')
   await expect(page.getByRole('heading', { level: 1, name: '密钥与环境' })).toBeVisible()
   await expect(page.getByText('还没有密钥。')).toBeVisible()
-  // The E2B key is personal now: it is under 账号 › API 与订阅, not the workspace's 密钥与环境.
+  // The E2B key is personal now: it is under 账号 › 模型与订阅, not the workspace's 密钥与环境.
   await expect(page.getByRole('region', { name: '云电脑' })).toHaveCount(0)
   await attachLightDark(page, testInfo, 'secrets-empty')
 
@@ -42,13 +42,56 @@ test('管理员添加、编辑和删除密钥，值不回显', async ({ page }, 
   dialog = page.getByRole('dialog')
   await expect(dialog.getByLabel('新的值')).toHaveValue('')
   await attachLightDark(page, testInfo, 'secrets-edit')
+  // Deleting can't be undone, so it asks first (settings evaluation S1); 取消 keeps the entry.
   await dialog.getByRole('button', { name: '删除', exact: true }).click()
+  let confirm = page.getByRole('alertdialog', { name: '删除 VERCEL_TOKEN？' })
+  await expect(confirm).toBeVisible()
+  await attachLightDark(page, testInfo, 'secrets-delete-confirm')
+  await confirm.getByRole('button', { name: '取消', exact: true }).click()
+  await expect(confirm).toHaveCount(0)
+  await expect(dialog).toBeVisible()
+  await dialog.getByRole('button', { name: '删除', exact: true }).click()
+  confirm = page.getByRole('alertdialog', { name: '删除 VERCEL_TOKEN？' })
+  await confirm.getByRole('button', { name: '删除', exact: true }).click()
   await expect(page.getByText('VERCEL_TOKEN')).toHaveCount(0)
 })
 
+// Members write repository entries only and never delete (lib/secrets/permissions.ts), so the page
+// offers only that: no 范围 to pick, no 编辑 on workspace entries, no 删除 (settings evaluation S2).
+test('成员只能添加和编辑仓库级的密钥', async ({ page }, testInfo) => {
+  const { workspaceId } = await registerInTeam(page, '/settings?section=secrets')
+  let dialog = page.getByRole('dialog')
+  await page.getByRole('button', { name: '添加', exact: true }).click()
+  await dialog.getByRole('textbox', { name: '名称' }).fill('VERCEL_TOKEN')
+  await dialog.getByLabel('值').fill(`e2e-${Date.now()}-admin`)
+  await dialog.getByRole('button', { name: '保存', exact: true }).click()
+  await expect(dialog).toHaveCount(0)
+  const pool = new Pool({ connectionString: process.env.E2E_DATABASE_URL })
+  try { await pool.query(`UPDATE mikka_workspace_members SET role='member' WHERE "workspaceId"=$1`, [workspaceId]) } finally { await pool.end() }
+  await page.reload()
+
+  await expect(page.getByRole('group', { name: '工作区' }).getByText('VERCEL_TOKEN')).toBeVisible()
+  await expect(page.getByRole('button', { name: '编辑 VERCEL_TOKEN', exact: true })).toHaveCount(0)
+  await page.getByRole('button', { name: '添加', exact: true }).click()
+  dialog = page.getByRole('dialog')
+  await expect(dialog.getByRole('combobox', { name: '范围' })).toHaveCount(0)
+  await dialog.getByRole('textbox', { name: '名称' }).fill('SENTRY_DSN')
+  await dialog.getByLabel('值').fill(`e2e-${Date.now()}-member`)
+  await dialog.getByRole('textbox', { name: '仓库' }).fill('alexj11324/mikka')
+  await attachLightDark(page, testInfo, 'secrets-member-add')
+  await dialog.getByRole('button', { name: '保存', exact: true }).click()
+  await expect(dialog).toHaveCount(0)
+  await expect(page.getByRole('group', { name: '仓库 alexj11324/mikka' }).getByText('SENTRY_DSN')).toBeVisible()
+
+  await page.getByRole('button', { name: '编辑 SENTRY_DSN', exact: true }).click()
+  dialog = page.getByRole('dialog')
+  await expect(dialog.getByLabel('新的值')).toBeVisible()
+  await expect(dialog.getByRole('button', { name: '删除', exact: true })).toHaveCount(0)
+})
+
 // Keys are personal (orchestration § 2): every member, admin or not, sets their own E2B key
-// under 账号 › API 与订阅, and the team's 密钥与环境 no longer holds one.
-test('团队成员在 API 与订阅 里设置自己的 E2B Key', async ({ page }, testInfo) => {
+// under 账号 › 模型与订阅, and the team's 密钥与环境 no longer holds one.
+test('团队成员在模型与订阅里设置自己的 E2B Key', async ({ page }, testInfo) => {
   const { workspaceId } = await registerInTeam(page, '/settings?section=models')
   // A plain member, not an admin, still edits their own key.
   const pool = new Pool({ connectionString: process.env.E2E_DATABASE_URL })

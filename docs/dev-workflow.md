@@ -32,9 +32,26 @@ Debugging and pipeline runs use source, not builds:
 | Server | `pnpm dev` (`next dev`, via `scripts/dev-preview.mjs`) |
 | Daemon | `pnpm daemon` (`tsx` on `packages/daemon` source) |
 
+A `pnpm dev` server peaks near 7 GB RSS while compiling the first pages
+(`/[locale]/page`, settings): the root page alone is ~14k server and ~10k
+client modules, and the OpenUI chat library brings every `lucide-react` icon.
+Dev keeps webpack's cache in memory; the default filesystem cache added ~2.4 GB
+and saved about 15 s on a restart. Cloud containers cap memory at about 14 GB,
+so run one dev server at a time and no build beside it. If `next dev` exits with no
+error and esbuild then prints `fatal error: all goroutines are asleep -
+deadlock!`, the kernel killed `next-server` for memory; `dmesg | grep -i oom`
+shows it. The esbuild message follows the kill; it is not the cause.
+
 Use a production build (`next build` then `next start`) only for production
 screenshots of a UI change. Run `next build`
 directly (`pnpm exec next build`): `pnpm build` also runs lint and migrations.
+
+Vercel builds on a Standard machine: 4 cores, 8 GB. `next build` peaks at
+"Collecting page data", while Turbopack's ~5 GB is still held in the
+`next-build` process. So production builds emit no source maps and stop
+esbuild once the workflow bundles are built (`next.config.mjs`). To check a
+change against the limit, run `next build` in an 8 GB cgroup and read
+`memory.max_usage_in_bytes`.
 
 ## 3. Environment
 

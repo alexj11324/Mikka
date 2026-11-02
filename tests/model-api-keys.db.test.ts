@@ -39,6 +39,9 @@ test('API keys: migration replay, sealed storage, shares, picker order and run i
     const choiceMigration = await readFile(new URL('../drizzle/20261101021100_bot_api_key_choice.sql', import.meta.url), 'utf8')
     await pool.query(choiceMigration)
     await pool.query(choiceMigration)
+    const errorMigration = await readFile(new URL('../drizzle/20261102120000_model_api_key_models_error.sql', import.meta.url), 'utf8')
+    await pool.query(errorMigration)
+    await pool.query(errorMigration)
     assert.equal(await store.apiKeyAfterQuota(pool, 'alice'), true, 'on by default')
 
     const personal = { id: randomUUID(), kind: 'personal' as const }
@@ -62,7 +65,7 @@ test('API keys: migration replay, sealed storage, shares, picker order and run i
     const secret = firstKey
     const anthropic = await store.addApiKey(pool, 'alice', { provider: 'anthropic', apiKey: secret }, { env, fetch: fetchWith(() => models(['claude-opus-5-5', 'claude-sonnet-5-5'])) })
     assert.equal(calls.at(-1)!.headers['x-api-key'], secret)
-    assert.deepEqual({ ...anthropic, id: undefined }, { id: undefined, provider: 'anthropic', name: null, baseUrl: null, protocol: 'anthropic', last4: firstKey.slice(-4), models: ['claude-opus-5-5', 'claude-sonnet-5-5'] })
+    assert.deepEqual({ ...anthropic, id: undefined }, { id: undefined, provider: 'anthropic', name: null, baseUrl: null, protocol: 'anthropic', last4: firstKey.slice(-4), models: ['claude-opus-5-5', 'claude-sonnet-5-5'], modelsError: null })
     const raw = (await pool.query('SELECT * FROM model_api_keys WHERE id=$1', [anthropic.id])).rows[0]
     assert.ok(!JSON.stringify(raw).includes(secret), 'stored sealed')
     // Adding the same preset again replaces the key in place.
@@ -81,6 +84,27 @@ test('API keys: migration replay, sealed storage, shares, picker order and run i
     const local = await store.addApiKey(pool, 'bob', { provider: 'custom', name: 'Local', baseUrl: 'http://127.0.0.1:8787', protocol: 'anthropic', apiKey: localKey }, { env: { ...env, MIKKA_MODEL_KEY_LOOPBACK: '1' }, fetch: fetchWith(() => models(['glm-5'])) })
     assert.equal(calls.at(-1)!.url, 'http://127.0.0.1:8787/v1/models')
 
+    // 重新获取模型 (decision 2026-11-02-1200): the stored key asks the provider again; its answer is the list.
+    const refetched = await store.refreshApiKeyModels(pool, 'alice', anthropic.id, { env, fetch: fetchWith(() => models(['claude-opus-5-5', 'claude-haiku-5-5'])) })
+    assert.deepEqual([calls.at(-1)!.url, calls.at(-1)!.headers['x-api-key']], ['https://api.anthropic.com/v1/models?limit=1000', newKey])
+    assert.deepEqual([refetched.models, refetched.modelsError], [['claude-opus-5-5', 'claude-haiku-5-5'], null])
+    // A failed answer keeps the last list and says why, for the key's row; a good one clears the reason.
+    const refused = await store.refreshApiKeyModels(pool, 'alice', anthropic.id, { env, fetch: fetchWith(() => new Response('{}', { status: 401 })) })
+    assert.deepEqual([refused.models, refused.modelsError], [['claude-opus-5-5', 'claude-haiku-5-5'], 'invalid'])
+    assert.equal((await store.refreshApiKeyModels(pool, 'alice', anthropic.id, { env, fetch: fetchWith(() => new Response('', { status: 503 })) })).modelsError, 'unavailable')
+    assert.equal((await store.listApiKeys(pool, 'alice', personal)).keys[0].modelsError, 'unavailable', 'the page reads the reason')
+    assert.equal((await store.refreshApiKeyModels(pool, 'alice', anthropic.id, { env, fetch: fetchWith(() => models(['claude-opus-5-5'])) })).modelsError, null)
+    // Only the owner asks; a custom provider that lists nothing keeps the models it was added with.
+    await assert.rejects(store.refreshApiKeyModels(pool, 'bob', anthropic.id, { env, fetch: fetchWith(() => models(['x'])) }), { code: 'apiKeyNotFound' })
+    assert.deepEqual((await store.refreshApiKeyModels(pool, 'bob', gateway.id, { env, fetch: fetchWith(() => models([])), resolve: async () => ['93.184.216.34'] })).models, ['qwen-max'])
+    // DNS rebinding: the custom provider's name now points inside; the refetch asks nothing and keeps the list.
+    let asked = false
+    const rebound = await store.refreshApiKeyModels(pool, 'bob', gateway.id, { env, fetch: fetchWith(() => { asked = true; return models(['x']) }), resolve: async () => ['10.0.0.8'] })
+    assert.equal(asked, false, 'a provider whose host resolves to a private address is not asked')
+    assert.deepEqual([rebound.models, rebound.modelsError], [['qwen-max'], 'unavailable'])
+    assert.deepEqual((await store.refreshApiKeyModels(pool, 'alice', anthropic.id, { env, fetch: fetchWith(() => models([])) })).models, [], 'a preset that lists nothing has nothing')
+    await store.refreshApiKeyModels(pool, 'alice', anthropic.id, { env, fetch: fetchWith(() => models(['claude-opus-5-5'])) })
+
     // Sharing: team workspaces only, the admin switch gates turning it on, others' keys only.
     await assert.rejects(store.setApiKeyShare(pool, 'bob', personal, gateway.id, true), { code: 'validationGeneric' })
     await assert.rejects(store.setApiKeyShare(pool, 'carol', team, gateway.id, true), { code: 'apiKeyNotFound' })
@@ -95,12 +119,12 @@ test('API keys: migration replay, sealed storage, shares, picker order and run i
     assert.equal(bobPage.canShare, true)
     assert.ok(!JSON.stringify(bobPage).includes('test-'), 'views never carry the key')
 
-    // The picker: own keys first when allowed here, then teammates' shared keys.
+    // The picker: own keys first, always (decision 2026-11-01-2240), then teammates' shared keys.
     assert.deepEqual((await store.usableApiKeys(pool, 'alice', team.id)).map(key => [key.provider, key.mine]), [['anthropic', true], ['custom', false]])
-    assert.deepEqual((await store.usableApiKeys(pool, 'bob', team.id)).map(key => key.name), [], 'Bob did not share his own credentials here, and nobody shared with him')
+    assert.deepEqual((await store.usableApiKeys(pool, 'bob', team.id)).map(key => [key.name, key.mine]), [['Gateway', true], ['Local', true]], 'Bob\'s own keys are his here without sharing; nobody shared with him')
     assert.deepEqual((await store.usableApiKeys(pool, 'alice', personal.id)).map(key => key.provider), ['anthropic'])
     await pool.query('UPDATE workspace_personal_policies SET subscriptions=false WHERE "workspaceId"=$1', [team.id])
-    assert.deepEqual(await store.usableApiKeys(pool, 'alice', team.id), [], 'the admin switch turns off members\' credentials')
+    assert.deepEqual((await store.usableApiKeys(pool, 'alice', team.id)).map(key => [key.provider, key.mine]), [['anthropic', true]], 'the admin switch turns off teammates\' shared keys, never her own')
     await pool.query('UPDATE workspace_personal_policies SET subscriptions=true WHERE "workspaceId"=$1', [team.id])
 
     // A bot's saved model can be an API key's: usable here, reaching bot chats, a model the key lists.

@@ -11,13 +11,16 @@ import { OfflineBanner } from '@/components/OfflineBanner'
 import { Text } from '@/components/Text'
 import { NavBar, underBar } from '@/components/NavBar'
 import { Composer } from '@/components/ui'
-import { api } from '@/lib/api'
+import { api, ApiError } from '@/lib/api'
+import { CardButton } from '@/components/cards'
+import { StopFailed } from '@/components/StopFailed'
+import { useStop } from '@/lib/useStop'
 import type { ThreadDetail } from '@/lib/types'
 import { useApi } from '@/lib/useApi'
 import { colors } from '@/lib/theme'
 import { HARNESS } from '@/lib/harness'
 
-const STATUS_WORD = { running: '运行中', waiting: '等你回复', failed: '失败', done: '完成', stopped: '已停止' } as const
+const STATUS_WORD = { running: '运行中', waiting: '等待你', failed: '失败', done: '完成', stopped: '已停止' } as const
 
 /** A thread's own page, pushed from a thread card or the 线程 list; back returns (mobile.md). */
 export default function ThreadScreen() {
@@ -28,6 +31,10 @@ export default function ThreadScreen() {
   const [sending, setSending] = useState(false)
   const [sendFailed, setSendFailed] = useState(false)
   const thread = data?.thread
+  // 停止 a working thread, as on the web; a thread that ended meanwhile (409) has nothing left to stop.
+  const stopper = useStop(() => api(`/api/mobile/threads/${id}/stop`, { method: 'POST' }).catch(failure => {
+    if (!(failure instanceof ApiError && failure.status === 409)) throw failure
+  }), Boolean(data?.active), reload)
 
   const send = async (text: string) => {
     setSending(true)
@@ -64,7 +71,12 @@ export default function ThreadScreen() {
       />
       <KeyboardChatScrollView {...underBar} offset={Math.max(insets.bottom, 12) - 8} keyboardDismissMode="interactive" keyboardLiftBehavior="whenAtEnd" contentContainerStyle={styles.body}>
         {!data && !error ? <View style={{ paddingTop: 40, alignItems: 'center' }}><Spinner /></View> : null}
-        {error && !data ? <Text style={styles.error}>线程加载失败。</Text> : null}
+        {error && !data ? (
+          <View style={styles.failed}>
+            <Text style={styles.error}>线程加载失败。</Text>
+            <CardButton label="重试" onPress={() => void reload()} />
+          </View>
+        ) : null}
         {data?.items.map((item, index) => {
           switch (item.kind) {
             case 'steps': {
@@ -82,11 +94,12 @@ export default function ThreadScreen() {
           }
         })}
         {sendFailed ? <Text style={styles.error}>没发出去，再试一次。</Text> : null}
+        {stopper.stuck ? <StopFailed busy={stopper.sending} onRetry={() => void stopper.stop()} /> : null}
         {data && !data.active && data.error && !data.items.some(item => item.kind === 'error') ? <Text style={styles.error}>{data.error}</Text> : null}
       </KeyboardChatScrollView>
       <OfflineBanner top={insets.top + 66} />
       {/* R-10: a thread ends in the composer, finished or not; a message to an ended thread runs it again (R-81). */}
-      {data ? <Composer placeholder="给这个线程发消息" onSend={send} disabled={sending} /> : null}
+      {data ? <Composer placeholder="给这个线程发消息" onSend={send} disabled={sending} onStop={data.active && !stopper.sending ? () => void stopper.stop() : undefined} /> : null}
     </View>
   )
 }
@@ -101,4 +114,5 @@ const styles = StyleSheet.create({
   step: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 26 },
   stepText: { fontSize: 14, color: colors.secondary },
   error: { fontSize: 14, color: colors.danger, marginVertical: 4 },
+  failed: { alignItems: 'center', gap: 10, marginTop: 24 },
 })

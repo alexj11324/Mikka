@@ -69,8 +69,8 @@ export function activityLabel(at: Date, now: Date): 'justNow' | 'yesterday' | 'r
 }
 
 export type ThreadGroup = 'running' | 'blocked' | 'waiting' | 'idle' | 'resolved'
-/** The order everywhere: 进行中 → 受阻 → 等待你 → 空闲 → 已解决 (R-52). */
-export const THREAD_GROUPS: readonly ThreadGroup[] = ['running', 'blocked', 'waiting', 'idle', 'resolved']
+/** The order everywhere: 等待你 → 进行中 → 受阻 → 空闲 → 已解决; what needs the person comes first (R-52). */
+export const THREAD_GROUPS: readonly ThreadGroup[] = ['waiting', 'running', 'blocked', 'idle', 'resolved']
 
 const ACTIVE = new Set(['queued', 'preparing', 'running', 'finishing'])
 const CLOSED_ISSUE = new Set(['done', 'canceled', 'duplicate'])

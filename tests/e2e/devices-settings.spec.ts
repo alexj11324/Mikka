@@ -25,7 +25,8 @@ async function seed(page: Page) {
     ($4, $5, 'gpu-box', 'local', false, 'server', now() - interval '3 days', '[]'),
     ($8, $5, 'no-sandbox', 'local', true, 'server', now() + interval '1 hour', $9),
     ($10, $5, 'ubuntu-2404', 'local', true, 'server', now() + interval '1 hour', $11)`, [ids.laptop, ids.server, ids.bare, ids.offline, session.userId,
-    JSON.stringify([{ harness: 'claude_code', installed: true, version: '1.0.0' }, { harness: 'codex', installed: true, version: '1.0.0' }]),
+    // The version lines the two CLIs print; the row shows the number only.
+    JSON.stringify([{ harness: 'claude_code', installed: true, version: '2.1.3 (Claude Code)' }, { harness: 'codex', installed: true, version: 'codex-cli 0.46.0' }]),
     JSON.stringify([{ harness: 'claude_code', installed: true, version: '1.0.0' }, { harness: 'cursor', installed: false, version: null }]),
     ids.blocked,
     JSON.stringify([{ harness: 'claude_code', installed: false, version: '1.0.0', sandboxBlocked: { missing: ['socat', 'ripgrep'] } }]),
@@ -37,22 +38,26 @@ async function seed(page: Page) {
 
 const row = (page: Page, name: string) => page.getByRole('listitem').filter({ has: page.getByText(name, { exact: true }) })
 
-test('设备：本机与 Remote control 分组，Agent 图标，重命名、重新检测、移除', async ({ page }) => {
+test('设备：本机与服务器分组，Agent 图标，重命名、重新检测、移除', async ({ page }) => {
   await register(page, '/settings?section=devices')
   await expect(page.getByRole('heading', { level: 1, name: '设备' })).toBeVisible()
   const ids = await seed(page)
   await page.reload()
 
   const local = page.getByRole('region', { name: '本机' })
-  const remote = page.getByRole('region', { name: 'Remote control' })
+  const remote = page.getByRole('region', { name: '服务器' })
   await expect(local.getByText('E2E MacBook', { exact: true })).toBeVisible()
   await expect(remote.getByText('build-01', { exact: true })).toBeVisible()
   await expect(page.getByText('这个分区还在设计中', { exact: false })).toHaveCount(0)
 
-  // R-74: the reported agents are their marks, named for screen readers; uninstalled ones are not shown.
-  await expect(row(page, 'E2E MacBook').getByRole('img', { name: 'Claude Code' })).toBeVisible()
-  await expect(row(page, 'E2E MacBook').getByRole('img', { name: 'Codex' })).toBeVisible()
-  await expect(row(page, 'build-01').getByRole('img', { name: 'Cursor' })).toHaveCount(0)
+  // R-74: each reported agent shows its mark, name and version (settings evaluation D2); uninstalled ones are not shown.
+  await expect(row(page, 'E2E MacBook')).toContainText(/Claude Code\s*2\.1\.3/)
+  await expect(row(page, 'E2E MacBook')).toContainText(/Codex\s*0\.46\.0/)
+  await expect(row(page, 'build-01')).not.toContainText('Cursor')
+  // On a phone the switch keeps its label on a line of its own (D1).
+  await page.setViewportSize({ width: 390, height: 844 })
+  await expect(row(page, 'E2E MacBook').getByText('参与调度', { exact: true })).toBeVisible()
+  await page.setViewportSize({ width: 1280, height: 800 })
   await expect(row(page, 'dev-vps')).toContainText('未检测到 Agent')
   await row(page, 'dev-vps').getByRole('button', { name: '安装方法' }).click()
   await expect(page.getByText('npm install -g @openai/codex')).toBeVisible()
@@ -72,17 +77,14 @@ test('设备：本机与 Remote control 分组，Agent 图标，重命名、重�
   await expect(page.getByText('需要管理员开启 user namespace', { exact: false })).toHaveCount(0)
   await page.keyboard.press('Escape')
   await expect(row(page, 'gpu-box').getByRole('button', { name: '重新连接' })).toBeVisible()
-  await expect(row(page, 'gpu-box').getByRole('switch', { name: '允许调度到 gpu-box' })).not.toBeChecked()
-  // 自动调度 needs 允许调度: a server defaults to auto, but with scheduling off it reads off and is locked.
-  await expect(row(page, 'gpu-box').getByRole('switch', { name: '允许 gpu-box 自动调度' })).not.toBeChecked()
-  await expect(row(page, 'gpu-box').getByRole('switch', { name: '允许 gpu-box 自动调度' })).toBeDisabled()
-  // 允许自动调度: servers on and personal computers off by default; turning it on is saved.
-  await expect(row(page, 'build-01').getByRole('switch', { name: '允许 build-01 自动调度' })).toBeChecked()
-  const auto = row(page, 'E2E MacBook').getByRole('switch', { name: '允许 E2E MacBook 自动调度' })
-  await expect(auto).not.toBeChecked()
-  await auto.click()
-  await expect(auto).toBeChecked()
-  await expect.poll(async () => (await db().query('SELECT "autoSchedule" FROM devices WHERE id = $1', [ids.laptop])).rows[0].autoSchedule).toBe(true)
+  // 参与调度 is each computer's one switch (decision 2026-11-02-1400); turning it off is saved and nothing else is offered.
+  await expect(row(page, 'gpu-box').getByRole('switch', { name: 'gpu-box 参与调度' })).not.toBeChecked()
+  await expect(row(page, 'build-01').getByRole('switch')).toHaveCount(1)
+  const scheduling = row(page, 'E2E MacBook').getByRole('switch', { name: 'E2E MacBook 参与调度' })
+  await expect(scheduling).toBeChecked()
+  await scheduling.click()
+  await expect(scheduling).not.toBeChecked()
+  await expect.poll(async () => (await db().query('SELECT enabled FROM devices WHERE id = $1', [ids.laptop])).rows[0].enabled).toBe(false)
 
   await row(page, 'build-01').getByRole('button', { name: 'build-01 的更多操作' }).click()
   await page.getByRole('menuitem', { name: '重新检测 Agent' }).click()
@@ -158,7 +160,7 @@ test('设备（桌面版）：从 SSH 配置选主机，确认指纹，看安装
   await expect(dialog.getByRole('heading', { name: '添加「build-02」' })).toBeVisible()
   await expect(dialog).toContainText('npm 权限不足（EACCES）')
   await dialog.getByRole('button', { name: '重试' }).click()
-  await expect(dialog.getByRole('listitem').filter({ hasText: '已上线' }).getByRole('img', { name: 'Claude Code' })).toBeVisible()
+  await expect(dialog.getByRole('listitem').filter({ hasText: '已上线' })).toContainText('Claude Code')
   await dialog.getByRole('button', { name: '完成' }).click()
   await expect(dialog).toBeHidden()
 })

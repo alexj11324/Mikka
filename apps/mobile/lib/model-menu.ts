@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react'
-import { api } from '@/lib/api'
+import { api, ApiError } from '@/lib/api'
+import { choiceFailureLine } from '@/lib/model-choice'
 import { useApi } from '@/lib/useApi'
 
 /** The shapes `GET/PUT /api/mobile/model` return (lib/bot-model-menu-view.ts on the server). */
@@ -33,19 +34,27 @@ export function optionName(option: Pick<ModelOption, 'id' | 'modelId'>) {
   return option.id === HOSTED_CHOICE ? 'Mikka 默认' : option.modelId || '未知模型'
 }
 
-/** The composer's model menu for a bot, or the Coordinator (`botId` null); `choose` saves for the bot's next runs. */
+/** A pick that did not save: which one, and the line naming it and why. */
+export interface ChoiceFailure { id: string; line: string }
+
+/**
+ * The composer's model menu for a bot, or the Coordinator (`botId` null);
+ * `choose` saves for the bot's next runs. A pick that does not save leaves the
+ * chip on the saved model and sets `failure` (shown above the composer, with 重试).
+ */
 export function useModelMenu(botId: string | null) {
   const path = `/api/mobile/model${botId ? `?bot=${botId}` : ''}`
   const { data, setData } = useApi<ModelMenu>(path)
-  const [failed, setFailed] = useState(false)
+  const [failure, setFailure] = useState<ChoiceFailure | null>(null)
   const choose = useCallback(async (id: string) => {
-    setFailed(false)
+    setFailure(null)
     try {
       setData(await api<ModelMenu>('/api/mobile/model', { method: 'PUT', body: { bot: botId, id } }))
-    } catch {
-      setFailed(true)
+    } catch (error) {
+      const option = data?.groups.flatMap(group => group.options).find(item => item.id === id)
+      setFailure({ id, line: choiceFailureLine(option ? optionName(option) : optionName({ id, modelId: '' }), error instanceof ApiError ? error.code : null) })
     }
-  }, [botId, setData])
+  }, [botId, data, setData])
   const [refreshing, setRefreshing] = useState(false)
   const [refreshFailed, setRefreshFailed] = useState(false)
   /** 刷新: asks each subscription for its models, then reads the menu again. */
@@ -60,5 +69,7 @@ export function useModelMenu(botId: string | null) {
       setRefreshing(false)
     }
   }, [botId, setData])
-  return { menu: data, choose, failed, refresh, refreshing, refreshFailed }
+  return { menu: data, choose, failure, refresh, refreshing, refreshFailed }
 }
+
+export type ModelMenuState = ReturnType<typeof useModelMenu>

@@ -6,21 +6,22 @@ test('管理员可以禁止某个应用，刷新后保持', async ({ page }, tes
   await registerInTeam(page, '/settings?section=permissions')
   await expect(page.getByRole('heading', { level: 1, name: '团队权限' })).toBeVisible()
   await expect(page.getByRole('heading', { level: 2, name: '允许使用的应用' })).toBeVisible()
-  const slack = page.getByRole('combobox', { name: 'Slack', exact: true })
-  await expect(slack).toContainText('允许')
+  // The same 允许 / 禁止 segmented control as 电脑操作 (settings evaluation P2).
+  const slack = page.getByRole('group', { name: 'Slack', exact: true })
+  await expect(slack.getByRole('button', { name: '允许', exact: true })).toHaveAttribute('aria-pressed', 'true')
   await attachLightDark(page, testInfo, 'team-permissions')
 
-  await slack.click()
-  await page.getByRole('option', { name: '禁止', exact: true }).click()
-  await expect(slack).toContainText('禁止')
+  await slack.getByRole('button', { name: '禁止', exact: true }).click()
+  await expect(slack.getByRole('button', { name: '禁止', exact: true })).toHaveAttribute('aria-pressed', 'true')
   await page.reload()
-  await expect(slack).toContainText('禁止')
-  await expect(page.getByRole('combobox', { name: 'Gmail', exact: true })).toContainText('允许')
+  await expect(slack.getByRole('button', { name: '禁止', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByRole('group', { name: 'Gmail', exact: true }).getByRole('button', { name: '允许', exact: true })).toHaveAttribute('aria-pressed', 'true')
   await attachLightDark(page, testInfo, 'team-permissions-slack-blocked')
 })
 
-// Decision 2026-10-31-2225: members share their own subscriptions into a team; an admin has one switch, on by default.
-test('团队管理员可以不允许成员使用个人订阅，成员自己的共享开关随之关闭', async ({ page }) => {
+// Decision 2026-11-01-2240: a member's own subscriptions always serve them; the one thing an admin can turn off
+// is sharing with teammates (团队权限 › 订阅与 API Key), 允许 by default.
+test('管理员可以禁止成员把订阅分享给队友，自己的照常能用', async ({ page }) => {
   await register(page, '/')
   const workspace = await seedTeamWorkspace(page)
   await page.goto(app(`/settings?section=models&workspace=${workspace}`))
@@ -31,14 +32,19 @@ test('团队管理员可以不允许成员使用个人订阅，成员自己的�
   await share.click()
   await page.getByRole('alertdialog').getByRole('button', { name: '分享', exact: true }).click()
   await expect(share).toBeChecked()
+
   await page.goto(app(`/settings?section=permissions&workspace=${workspace}`))
-  await expect(page.getByRole('heading', { level: 2, name: '个人订阅' })).toBeVisible()
-  const allowed = page.getByRole('switch', { name: '允许成员使用个人订阅和 API Key', exact: true })
-  await expect(allowed).toBeChecked()
-  await allowed.click()
-  await expect(allowed).not.toBeChecked()
+  await expect(page.getByRole('heading', { level: 2, name: '订阅与 API Key' })).toBeVisible()
+  await expect(page.getByText('禁止后只停用分享给别人的部分，每个人自己照常能用')).toBeVisible()
+  // The old switch over a member's own use is gone (#966).
+  await expect(page.getByRole('switch', { name: '允许成员使用个人订阅和 API Key', exact: true })).toHaveCount(0)
+  const sharing = page.getByRole('group', { name: '成员把自己的订阅和 API Key 分享给队友', exact: true })
+  await expect(sharing.getByRole('button', { name: '允许', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  await sharing.getByRole('button', { name: '禁止', exact: true }).click()
+  await expect(sharing.getByRole('button', { name: '禁止', exact: true })).toHaveAttribute('aria-pressed', 'true')
   await page.reload()
-  await expect(page.getByRole('switch', { name: '允许成员使用个人订阅和 API Key', exact: true })).not.toBeChecked()
+  await expect(sharing.getByRole('button', { name: '禁止', exact: true })).toHaveAttribute('aria-pressed', 'true')
+
   await page.goto(app(`/settings?section=models&workspace=${workspace}`))
   await expect(page.getByText('管理员已关闭', { exact: true })).toBeVisible()
   await expect(page.getByRole('switch', { name: '分享给团队成员', exact: true })).toHaveCount(0)

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { canonicalHref, nextMark, readLocation, readMark, sameLocation, sectionFor, sectionFromQuery, stepsToOrigin, taskOrigin, workspaceHref, workspaceLink, workspaceSearch, writeSectionQuery, type EntryMark } from './workspace-navigation'
+import { canonicalHref, closeThread, goTo, nextMark, openThread, readLocation, readMark, sameLocation, sectionFor, sectionFromQuery, stepsToOrigin, taskOrigin, workspaceHref, workspaceLink, workspaceSearch, writeSectionQuery, type EntryMark } from './workspace-navigation'
 import type { WorkspaceLocation } from './workspace-navigation'
 
 const BOT = '3f0c9d2e-5b1a-4c7e-9f00-1a2b3c4d5e6f'
@@ -13,7 +13,7 @@ const PROJECT = '9e8d7c6b-5a49-4382-9716-05f4e3d2c1b0'
 const ARTIFACT = '2b3c4d5e-6f70-4182-93a4-b5c6d7e8f901'
 const SESSION = '4e5f6a7b-8c9d-4e0f-a1b2-c3d4e5f6a7b8'
 const at = (path: string) => new URL(`https://app.example${path}`)
-const NOWHERE = { bot: null, group: null, session: null, team: null, project: null, issue: null, thread: null, artifact: null }
+const NOWHERE = { bot: null, group: null, session: null, team: null, project: null, issue: null, thread: null, artifact: null, threads: null }
 /** A full place from the keys that are set. */
 const place = (keys: Partial<WorkspaceLocation> & Pick<WorkspaceLocation, 'section'>): WorkspaceLocation => ({ ...NOWHERE, ...keys })
 
@@ -58,6 +58,8 @@ test('an address reads back as the place it was written for', () => {
     place({ section: 'team-projects', team: TEAM, project: PROJECT }),
     place({ section: 'coordinator', bot: BOT, artifact: ARTIFACT }),
     place({ section: 'artifacts', artifact: ARTIFACT }),
+    place({ section: 'coordinator', threads: 'all' }),
+    place({ section: 'all-issues', issue: ISSUE, thread: RUN, threads: BOT }),
   ]) {
     const href = workspaceHref(at('/mikka/zh-CN'), where)
     assert.ok(href.startsWith('/mikka/zh-CN'), href)
@@ -96,6 +98,16 @@ test('a thread sits beside its centre: a new centre closes it unless the move na
   assert.equal(workspaceHref(chatWithThread, { thread: null }), `/mikka?bot=${BOT}`)
   assert.equal(workspaceHref(at('/mikka'), { thread: RUN }), `/mikka?thread=${RUN}`)
   assert.equal(readLocation(new URLSearchParams('thread=nope')).thread, null)
+})
+
+test('全部线程 stays open as the centre changes; a thread opened over it closes with a new centre', () => {
+  const list = at(`/mikka?threads=all&thread=${RUN}`)
+  assert.equal(workspaceHref(list, { section: 'all-issues' }), '/mikka?threads=all&section=all-issues')
+  assert.equal(workspaceHref(list, { thread: null }), '/mikka?threads=all')
+  assert.equal(workspaceHref(at('/mikka?threads=all'), { threads: BOT }), `/mikka?threads=${BOT}`)
+  assert.equal(workspaceHref(list, { threads: null, thread: null }), '/mikka')
+  assert.equal(readLocation(new URLSearchParams('threads=../x')).threads, null)
+  assert.equal(readLocation(new URLSearchParams('threads=all')).threads, 'all')
 })
 
 test('an Artifact opens over the page: the centre and the thread stay, and closing it leaves them', () => {
@@ -199,4 +211,65 @@ test('history marks: ✕ steps back to the entry that opened the task, in this p
   // Next's keys sit beside the mark; anything malformed reads as none.
   assert.deepEqual(readMark({ __NA: true, mikkaEntry: { index: 2, task: { start: 2, doc, list: true } } }), { index: 2, task: { start: 2, doc, list: true } })
   for (const state of [null, 'x', {}, { mikkaEntry: { index: 'a' } }]) assert.equal(readMark(state), null)
+})
+
+/** A browser history of its own: entries with state, back moves the index. */
+function fakeBrowser(path: string, state: unknown = { __NA: true }) {
+  const entries = [{ href: path, state }]
+  let index = 0
+  const location = { get href() { return `https://app.example${entries[index].href}` }, get pathname() { return new URL(this.href).pathname }, get search() { return new URL(this.href).search }, hash: '' }
+  const history = {
+    get state() { return entries[index].state },
+    get length() { return entries.length },
+    pushState(next: unknown, _: string, href: string) { entries.splice(index + 1, Infinity, { href, state: next }); index++ },
+    replaceState(next: unknown, _: string, href: string) { entries[index] = { href, state: next } },
+    back() { if (index > 0) index-- },
+  }
+  Object.assign(globalThis, { window: { location, history, dispatchEvent() { return true } } })
+  return { history, path: () => entries[index].href }
+}
+
+// ← in an open thread is the thread model's close (decision 0301, R-82): openThread records where it came from; closeThread goes back there.
+test('closing a thread opened from here is back: no new entry, and back does not reopen it', () => {
+  const browser = fakeBrowser(`/?bot=${BOT}`)
+  openThread(RUN)
+  assert.equal(browser.history.length, 2)
+  closeThread()
+  assert.equal(browser.path(), `/?bot=${BOT}`)
+  assert.equal(browser.history.length, 2)
+})
+
+test('an Artifact opened and closed over a thread does not come back when the thread closes', () => {
+  const browser = fakeBrowser(`/?bot=${BOT}`)
+  openThread(RUN)
+  goTo({ artifact: ARTIFACT })
+  goTo({ artifact: null })
+  closeThread()
+  assert.equal(new URL(`https://app.example${browser.path()}`).searchParams.get('artifact'), null)
+  assert.equal(new URL(`https://app.example${browser.path()}`).searchParams.get('thread'), null)
+})
+
+test('closing what a link opened replaces the entry, so back does not reopen it either', () => {
+  const browser = fakeBrowser(`/?thread=${RUN}`)
+  closeThread()
+  assert.equal(browser.path(), '/')
+  assert.equal(browser.history.length, 1)
+})
+
+test('a close after the address moved elsewhere replaces, and Next\'s state is kept', () => {
+  const browser = fakeBrowser('/?section=all-issues')
+  openThread(RUN)
+  assert.equal((browser.history.state as { __NA?: boolean }).__NA, true)
+  goTo({ issue: ISSUE, thread: RUN }, 'replace')
+  closeThread()
+  assert.equal(browser.path(), `/?section=all-issues&issue=${ISSUE}`)
+  assert.equal(browser.history.length, 2)
+})
+
+test('a thread opened from a null history state still records where it came from', () => {
+  const browser = fakeBrowser('/', null)
+  openThread(RUN)
+  assert.notEqual(browser.history.state, null)
+  closeThread()
+  assert.equal(browser.path(), '/')
 })

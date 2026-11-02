@@ -94,8 +94,12 @@ export const issueToolCalls = pgTable('issue_tool_calls', {
  */
 export const bots = pgTable('bots', {
   id: uuid('id').primaryKey(),
-  /** Who made it, in which workspace: the identity the cloud computer (bot_desktops, #317) keys on too. */
-  ownerId: text('ownerId').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  /**
+   * Who made it, in which workspace: the identity the cloud computer (bot_desktops, #317) keys on too.
+   * Null when the owner deleted their account: the bot stays in the shared workspace, paused,
+   * 「待接管」 until an admin takes it over (lib/account/delete.ts, takeOverBot). A null owner matches nobody.
+   */
+  ownerId: text('ownerId').references(() => users.id, { onDelete: 'set null' }),
   workspaceId: uuid('workspaceId').notNull(),
   name: text('name').notNull(),
   /** A bloub colour id, see components/nav/bot-avatar.tsx. */
@@ -256,7 +260,7 @@ export const devices = pgTable('devices', {
   computerUse: jsonb('computerUse').$type<{ installed: boolean; version: string | null }>().notNull().default({ installed: false, version: null }),
   /** Off: the device stays registered but the orchestrator gives it no runs. */
   enabled: boolean('enabled').notNull().default(true),
-  /** 「允许自动调度」: null is the type default (servers on, personal computers off); see lib/device-auto-schedule.ts. */
+  /** Retired 「允许自动调度」 (decision 2026-11-02-1400 merged it into enabled, 参与调度); kept for old rows, no longer read. */
   autoSchedule: boolean('autoSchedule'),
   /** The person renamed it; a daemon re-register keeps this name. */
   nameLocked: boolean('nameLocked').notNull().default(false),

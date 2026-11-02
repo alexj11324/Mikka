@@ -6,6 +6,7 @@
   「为什么没有办法终止？按照道理来说，聊天过程中我可以直接终止掉。」
 - Rule: —
 - Replaces: —
+- Superseded in part by: [2026-11-02-0301](2026-11-02-0301-esc-in-a-thread-composer.md) (Esc in a thread composer does not stop the thread)
 
 While a bot (the Coordinator included) is answering, the composer's send
 button is the stop button, in the same place, as threads already have it

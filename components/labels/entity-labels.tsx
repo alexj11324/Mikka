@@ -1,15 +1,15 @@
 'use client'
 
 import type { ComponentType, ReactNode, SVGProps } from 'react'
-import { Box, Cloud, Laptop, Monitor, Server, type LucideIcon } from 'lucide-react'
-import { useTranslations } from 'next-intl'
+import { Box, type LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { modelProvider, type DeviceKind, type ModelProvider } from '@/lib/execution-settings-view'
+import { modelProvider, type ModelProvider } from '@/lib/execution-settings-view'
+
 import { MikkaMarkSmall } from '@/components/brand/mikka-mark'
 import { ClaudeCodeMark, ClaudeMark, CodexMark, CursorMark, OpenAIMark } from './brand-marks'
 
 /*
- * R-74 shared labels: wherever a device, coding agent (harness) or model is
+ * R-74 shared labels: wherever a coding agent (harness) or model is
  * named, its icon comes first, then the name. Build rows, triggers and menu
  * items from these instead of drawing icon + text by hand.
  */
@@ -23,22 +23,6 @@ function EntityLabel({ icon: Icon, children, muted }: { icon: Mark; children: Re
   </span>
 }
 
-const DEVICE_ICONS: Record<DeviceKind, LucideIcon> = { laptop: Laptop, server: Server, cloud: Cloud, unknown: Monitor }
-
-/**
- * A device: its type (laptop, server, Mikka Cloud), the online dot, then its name.
- * For Mikka Cloud `online` means it can run (the person has their own E2B key); its live
- * state is not known here, so it shows only the grey dot when it cannot run.
- */
-export function DeviceLabel({ kind, name, online }: { kind: DeviceKind; name: string; online: boolean }) {
-  const t = useTranslations('Settings.botAgents')
-  return <EntityLabel icon={DEVICE_ICONS[kind]} muted={!online}>
-    {(kind !== 'cloud' || !online) && <span aria-hidden="true" className={cn('-ml-0.5 size-1.5 shrink-0 rounded-full', online ? 'bg-success' : 'bg-muted-foreground/50')} />}
-    <span className="truncate">{name}</span>
-    {(kind !== 'cloud' || !online) && <span className="sr-only">{online ? t('online') : t('offline')}</span>}
-  </EntityLabel>
-}
-
 const HARNESS_MARKS: Record<string, Mark> = { claude_code: ClaudeCodeMark, codex: CodexMark, cursor: CursorMark }
 const HARNESS_NAMES: Record<string, string> = { claude_code: 'Claude Code', codex: 'Codex', cursor: 'Cursor' }
 
@@ -50,6 +34,16 @@ export function harnessName(harness: string): string {
 export function HarnessMark({ harness }: { harness: string }) {
   const Icon = HARNESS_MARKS[harness] ?? Box
   return <span role="img" aria-label={harnessName(harness)} className="inline-flex"><Icon aria-hidden="true" className="size-3.5 shrink-0" /></span>
+}
+
+/** A coding agent in a status line: its mark, its name, then the version its CLI reported (R-74). */
+export function HarnessVersion({ harness, version }: { harness: string; version?: string | null }) {
+  const Icon = HARNESS_MARKS[harness] ?? Box
+  return <span className="inline-flex shrink-0 items-center gap-1">
+    <Icon aria-hidden="true" className="size-3.5 shrink-0" />
+    <span>{harnessName(harness)}</span>
+    {version && <span className="tabular-nums">{version}</span>}
+  </span>
 }
 
 /** A coding agent: its own coloured brand mark, then its product name. */

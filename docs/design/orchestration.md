@@ -19,11 +19,11 @@
 | --- | --- |
 | **Account** | A person. Owns their sign-in, devices, app connections, cards, credits they verified, model credentials and E2B key. |
 | **Personal workspace** | One per account, with exactly one member. Every account has one. Only that person's bots, chats, tasks and threads; personal billing; no team settings ([2310](decisions/2026-11-01-2310-personal-and-team-workspaces-apart.md)). |
-| **Team workspace** | Several members, with the team's policies, secrets, credits and payment method. It has no E2B key of its own. Nothing moves between it and a personal workspace; a personal workspace is never upgraded into one. |
+| **Team workspace** | Several members, with the team's members, policies, shared credits and payment method. Secrets belong to every workspace, personal or team ([0231](decisions/2026-11-02-0231-workspace-is-the-tenant.md)). It has no E2B key of its own. Nothing moves between it and a personal workspace; a personal workspace is never upgraded into one. |
 | **Bot** | Lives in one workspace and has one owner. Runs on Mikka's own AI SDK on Vercel; when it has work to do, it sends a thread through the daemon to Claude Code or Codex (R-05). |
 | **Thread** | The work a bot dispatched (`agent_runs`). Each turn of it is a **run**. |
 | **Agent** | The coding worker that runs a thread: Claude Code or Codex. Code may say `harness`; the UI says Agent (R-43). |
-| **Model credential** | A Claude or ChatGPT/Codex subscription login, an API key, or a custom provider. Bound to the account and managed on the page 「API 与订阅」. |
+| **Model credential** | A Claude or ChatGPT/Codex subscription login, an API key, or a custom provider. Bound to the account and managed on the page 「模型与订阅」 ([1400](decisions/2026-11-02-1400-model-order-dispatch.md)). |
 | **Share** | 「分享给团队成员」: a member's opt-in, in one team workspace, to let other members' bots use one of their credentials. Off by default. The owner's own bots need no share ([2240](decisions/2026-11-01-2240-own-credentials-always-usable.md)). |
 | **Mikka 默认** | The hosted model, paid from the workspace's credits. It is a **model**, never a machine. |
 | **Machine (电脑)** | Where an Agent runs: **Mikka Cloud** (a sandbox on the run owner's own E2B key) or a **device** (a personal computer running the desktop app, or a server running the daemon). Both are **runners** with one contract (§3). |
@@ -81,16 +81,20 @@ Rules that hold everywhere:
     重试 never re-resolves on its own.
 - Conversation compaction uses the same frozen model and credential as the
   turn.
-- The same order serves bot chats and threads. The bot itself runs on
-  Mikka's own AI SDK on Vercel; a thread goes through the daemon to the Agent
-  mapped to the model (§3).
+- This order serves bot chats. A thread takes the person's 允许使用的模型 in
+  their order instead (§4,
+  [1400](decisions/2026-11-02-1400-model-order-dispatch.md)). The bot itself
+  runs on Mikka's own AI SDK on Vercel; a thread goes through the daemon to
+  the entry's Agent (§3).
 
 ## 3. Agents and runners
 
-**Model → Agent.** GPT/OpenAI models run on **Codex**. Every other model runs
-on **Claude Code**, including Mikka 默认 and models reached through an API
-key or a custom provider. In 「API 与订阅」 a person can override which Agent
-runs each model; the override is a per-model setting.
+**Model → Agent.** Each entry of 允许使用的模型 names its Agent: a
+subscription model runs on the Agent of its account (Claude → Claude Code,
+ChatGPT → Codex); an API key's model runs on the Agent its protocol can talk
+to (OpenAI-compatible → Codex, Anthropic-compatible → Claude Code). Nothing
+picks an Agent from a model's name
+([1400](decisions/2026-11-02-1400-model-order-dispatch.md)).
 
 「Bot 本身走我们自己的 AI SDK，跑在 Vercel 上。Bot 需要干活时，通过 daemon 把任务派给
 Claude Code 或 Codex。」 (Alex, R-05)
@@ -113,7 +117,7 @@ end.
   the person's own Claude Code or Codex installs, logins or config.
 - **Device capability check.** This replaces Agent detection. A device
   reports its OS, architecture, free disk, whether Docker is available, and
-  its 「允许自动调度」 switch (§4). A sandbox runs only a boot self-check; a
+  its 参与调度 switch (§4). A sandbox runs only a boot self-check; a
   failed check marks the runner unhealthy, and its runs are placed again.
 - **Model slots** come from the daemon's own Agent copies, never from the
   person's CLI settings.
@@ -130,28 +134,25 @@ always the run owner's own: Mikka Cloud on **their** E2B key, or one of
 sandbox carries its owner's credentials and app access. A member never runs
 on another member's E2B. In a team, each member brings their own key.
 
-**Automatic scheduling.** Each device has a 「允许自动调度」 switch. It is on
-by default for servers and off by default for personal computers (Mac,
-Windows). Automatic placement uses only devices that have it on. A person can
-still pick any of their own devices by hand.
+**Scheduling.** Each device has one switch, 参与调度 (Settings › 设备). Off:
+Mikka never sends that device a run. Every device that has a model's Agent
+installed and (for a subscription model) reported that model joins the pool
+for it ([1400](decisions/2026-11-02-1400-model-order-dispatch.md)).
 
-**Placing a new run:**
+**Placing a new run** (decision
+[1400](decisions/2026-11-02-1400-model-order-dispatch.md)):
 
-1. A machine the run asks for is used as asked. That means a label rule, a
-   thread continuing in its environment, a device-only source event, or a
-   device the person picked.
-2. Otherwise Mikka Cloud, when the owner has an E2B key. Cloud is the default
-   (R-23).
-3. Otherwise the owner's online device that has 「允许自动调度」 on and
-   passes the capability check, servers first.
-4. Otherwise 立即警告: no run is created and the bot at once warns that no
-   computer is available, in one action card 「没有可用的电脑」 that says
-   先连接或开启一台电脑，或者填入你的 E2B API Key 用云端运行。 It has two rows:
-   连接电脑 (Settings › 电脑) and 填入 E2B Key (the person's own key; no row
-   offers Mikka's cloud). Answering a row (a computer switched on, the key
-   saved) makes the bot dispatch again
-   ([run machine fallback](decisions/2026-10-31-2200-run-machine-fallback.md),
-   [two rows](decisions/2026-11-01-1215-star-is-the-pin.md)).
+1. A machine the run asks for is used as asked: a thread continuing in its
+   environment, a device-only source event, or a device the person picked.
+2. Otherwise the thread's own model, when the person picked one, then
+   允许使用的模型 in the person's order: the first entry that can run now.
+   运行位置 decides where: 本地 picks at random one of the devices with
+   参与调度 on that can run the entry; 云端 runs on the owner's own E2B key.
+3. Otherwise 立即警告: no run is created and the bot at once shows the action
+   card 「没有能跑这个任务的模型」 with the reason (no allowed model, no
+   device can run any, no E2B key for 云端, every model unavailable now) and
+   rows that fix it: 打开模型与订阅, 连接电脑, 填入 E2B Key. Answering a row makes
+   the bot dispatch again.
 
 **When a machine goes away during a thread:**
 
@@ -159,8 +160,7 @@ still pick any of their own devices by hand.
   the thread from its branch.
 - **A server goes offline:**
   1. Move the run to E2B, when the owner has a key.
-  2. Otherwise move it to the owner's personal computer that has
-     「允许自动调度」 on.
+  2. Otherwise move it to the owner's computer that has 参与调度 on.
   3. Otherwise end the run and 立即警告 with the same action card.
 - **A personal computer goes offline:** apply the same three steps.
 
@@ -273,12 +273,12 @@ The workspace where the work happens pays.
 | MVP | Later |
 | --- | --- |
 | A personal workspace for everyone; team workspaces beside it | — |
-| Account-level subscriptions, API keys and custom providers on 「API 与订阅」; own credentials usable in every workspace with no switch; 「分享给团队成员」, which an admin can switch off | Per-member spend caps |
+| Account-level subscriptions, API keys and custom providers on 「模型与订阅」; own credentials usable in every workspace with no switch; 「分享给团队成员」, which an admin can switch off | Per-member spend caps |
 | Model order of §2; Mikka 默认 when there is nothing else; no mid-run switch; 「订阅额度用完后，自动改用 API Key」; a popup when nothing is left | — |
 | Model → Agent mapping with a per-model override | — |
 | Mikka Cloud on each person's own E2B key, with no Mikka caps | — |
 | Personal computers and daemon servers as runners with the same contract: daemon-managed Agents, a container where Docker exists, otherwise a worktree plus a temporary config dir, one multi-arch image | — |
-| A device capability check and 「允许自动调度」 instead of Agent detection and 「设备离线时」 | — |
+| A device capability check and 参与调度 instead of Agent detection and 「设备离线时」; 允许使用的模型 in order instead of label rules and 任务默认 | — |
 | 立即警告 (the action card) when there is no machine; the offline flow of §4 | — |
 | One environment per thread; leases and heartbeats; credentials injected each run and absent while paused | — |
 | Card verification per person; credit and card shares per workspace | — |

@@ -5,7 +5,8 @@ import { auditRequestContext } from '@/lib/audit/events'
 import { secretAuditHook } from '@/lib/secrets/audit'
 import type { SettingsActionResult } from '@/lib/workspace-admin/settings-action'
 import { getE2BKeyCapabilityForUser, getE2BKeyStatus, removeE2BKey, setE2BKey, type E2BKeyStatus } from '@/lib/secrets/e2b'
-import { createWorkspaceSecret, deleteWorkspaceSecret, listWorkspaceSecrets, replaceWorkspaceSecret, type SavedSecretView, type SecretAuditHook, type WorkspaceSecretView } from '@/lib/secrets/store'
+import { createWorkspaceSecret, deleteWorkspaceSecret, listWorkspaceSecrets, replaceWorkspaceSecret, workspaceRole, type SavedSecretView, type SecretAuditHook, type WorkspaceSecretView } from '@/lib/secrets/store'
+import type { WorkspaceRole } from '@/lib/secrets/permissions'
 import { settingsWorkspaceAction } from '@/lib/workspace-admin/settings-action'
 import { currentWorkspaceActor } from '@/lib/workspace-admin/current'
 
@@ -17,8 +18,9 @@ const withActor = <T>(fn: (userId: string, workspaceId: string, audit: SecretAud
   return fn(actor.userId, actor.workspaceId, secretAuditHook({ id: actor.userId, name: actor.name }, auditRequestContext(await headers())))
 })
 
-export async function listSecrets(workspaceId?: string): Promise<SettingsActionResult<{ secrets: WorkspaceSecretView[] }>> {
-  return withActor(async (u, w) => ({ secrets: await listWorkspaceSecrets(u, w) }), workspaceId)
+/** `role` lets the page offer only what the reader may do (members: repository entries, no delete). */
+export async function listSecrets(workspaceId?: string): Promise<SettingsActionResult<{ secrets: WorkspaceSecretView[]; role: WorkspaceRole }>> {
+  return withActor(async (u, w) => { const [secrets, role] = await Promise.all([listWorkspaceSecrets(u, w), workspaceRole(u, w)]); return { secrets, role } }, workspaceId)
 }
 export async function createSecret(input: { name: string; kind: 'secret' | 'env'; value: string; scope?: { type: 'workspace' } | { type: 'repository'; repository: string } }, workspaceId?: string): Promise<SettingsActionResult<SavedSecretView>> {
   return withActor((u, w, audit) => createWorkspaceSecret(u, w, input, audit), workspaceId)

@@ -1,4 +1,4 @@
-import { test, expect, app, register, seedCoordinatorError, seedHostedVerification } from './fixtures'
+import { test, expect, app, register, registerInTeam, seedCoordinatorError, seedHostedVerification } from './fixtures'
 import { attachLightDark } from './settings-v4-shots'
 
 // No Stripe keys: real actions report unavailable and cannot contact Stripe.
@@ -69,4 +69,17 @@ test('对话：已验证的工作区额度用完时不再提供验证银行卡',
   await expect(notice).toContainText('免费额度已用完')
   await expect(notice.getByRole('link', { name: '连接 Claude / ChatGPT 订阅' })).toBeVisible()
   await expect(notice.getByRole('link', { name: '验证银行卡', exact: true })).toHaveCount(0)
+})
+
+test('对话：团队没有点数时说明原因并打开计费', async ({ page }, testInfo) => {
+  const { workspaceId } = await registerInTeam(page)
+  await expect(page.getByRole('textbox', { name: '给 Coordinator 发消息', exact: true })).toBeVisible()
+  await seedCoordinatorError(page, 'PaidResourceError: verification_required', workspaceId)
+  await page.reload()
+  const notice = page.locator('[data-hosted-refusal="verification_required"]')
+  await expect(notice).toContainText('这个团队没有可用点数')
+  await expect(notice.getByRole('link', { name: '验证银行卡', exact: true })).toHaveCount(0)
+  await attachLightDark(page, testInfo, 'chat-team-no-points')
+  await notice.getByRole('link', { name: '打开计费', exact: true }).click()
+  await expect(page).toHaveURL(/section=billing/)
 })

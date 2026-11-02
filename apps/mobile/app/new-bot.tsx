@@ -48,7 +48,7 @@ export default function NewBot() {
       <ScrollView {...underBar} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.body}>
         <View style={styles.hero}><BotAvatar color={color} shape={shape} size={96} /></View>
         <Field style={styles.field}>
-          <TextInput value={name} onChangeText={setName} placeholder="名字" placeholderTextColor={colors.tertiary} maxLength={60} autoFocus
+          <TextInput value={name} onChangeText={setName} placeholder="名字" placeholderTextColor={colors.secondary} maxLength={60} autoFocus
             returnKeyType="done" onSubmitEditing={() => void create()} style={styles.input} accessibilityLabel="名字" />
         </Field>
         {problem ? <Text style={styles.problem}>{problem}</Text> : null}

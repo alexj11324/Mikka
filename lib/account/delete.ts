@@ -6,6 +6,7 @@ import { workspaceDb } from '@/lib/workspace-db'
 import * as workspaceSchema from '@/lib/db/workspace-schema'
 import * as teamSchema from '@/lib/db/team-schema'
 import * as projectSchema from '@/lib/db/project-schema'
+import { UNFINISHED_RUN_STATUSES } from '@/lib/agent-run-statuses'
 
 const { workspaces, workspaceMembers, workspaceInvitations } = workspaceSchema
 const { teams, teamMembers, teamIssues, teamProjects, teamIssueCreateReceipts, teamIssuePromotionReceipts } = teamSchema
@@ -16,16 +17,25 @@ const { projects, projectEvents } = projectSchema
  *
  * - Every row the person owns in the main database goes: found by its owner
  *   column (OWNER_COLUMNS) in every table, so a table added later is covered
- *   without touching this file. That is their Bots and threads, chats, tasks,
- *   memory, saved logins, model subscriptions, connections, devices, artifacts
- *   and captures, then the user row, whose foreign keys take sessions, sign-in
+ *   without touching this file. That is their chats, tasks, memory, saved
+ *   logins, model subscriptions, connections, devices, artifacts and captures,
+ *   their Coordinator and every bot outside a shared workspace with its
+ *   threads, then the user row, whose foreign keys take sessions, sign-in
  *   accounts, OAuth grants, avatar and export links with it.
- * - A workspace only they belong to goes with them. In a workspace shared with
+ * - A workspace only they belong to goes with them, with every main-database
+ *   row keyed by it (lib/workspace-rows.ts). In a workspace shared with
  *   others they lose their membership; the team's issues, projects and group
  *   chats stay for the team (their past group messages stay in those chats).
  *   If they are its only active admin, nothing is deleted: someone else has to
  *   be made admin first.
- * - Uploaded files in R2 are removed after the database commits.
+ * - Their bots in a shared workspace are handled as when a member leaves
+ *   (releaseDepartingMember, decision 2026-11-02-0231): each is paused for an
+ *   admin to take over (已暂停的 Bot), and its threads stay with it (KEPT_THREAD_TABLES).
+ *   Its owner becomes NULL, 「待接管」, which matches nobody until takeOverBot
+ *   writes the new owner. The rows bound to the old owner (desktops, cloud
+ *   runtimes, run bindings, agent kit, background tasks) go first, as on a transfer.
+ * - Uploaded files in R2 are removed after the database commits, except those
+ *   of the threads that stay.
  */
 
 /** Columns that name the row's owner, in any table. */
@@ -50,6 +60,35 @@ const SKIPPED = new Map<string, string>([
  * evidence, not the person's content, and cannot be removed here.
  */
 const IMMUTABLE_PREFIX = 'improvement_'
+
+/**
+ * A kept thread's own rows, which stay with it. Any other row the person owns
+ * that points at a kept thread still goes: run tokens, computer bindings and
+ * thread machines are their credentials and machines, not the thread.
+ */
+const KEPT_THREAD_TABLES = ['run_messages', 'run_checkpoints', 'run_captures', 'artifacts', 'agent_tool_approvals', 'coordinator_events'] as const
+
+/** What stays in the person's shared workspaces: their bots there (not the Coordinator, which is personal), their threads and the agents those threads ran on. */
+export interface KeptThreads { bots: string[]; runs: string[]; agents: string[] }
+
+export async function keptThreads(client: Pick<PoolClient, 'query'>, userId: string, plan: Pick<Plan, 'shared'>): Promise<KeptThreads> {
+  if (!plan.shared.length) return { bots: [], runs: [], agents: [] }
+  const bots = (await client.query<{ id: string }>(
+    `select b.id from bots b where b."ownerId" = $1 and b."workspaceId" = any($2::uuid[])
+     and not exists (select 1 from coordinator_bots cb where cb."botId" = b.id) order by b.id`, [userId, plan.shared])).rows.map(row => row.id)
+  if (!bots.length) return { bots, runs: [], agents: [] }
+  const runs = (await client.query<{ id: string; agentId: string }>('select id, "agentId" from agent_runs where "botId" = any($1::uuid[]) order by id', [bots])).rows
+  return { bots, runs: runs.map(row => row.id), agents: [...new Set(runs.map(row => row.agentId))] }
+}
+
+/** The rows of `table` that stay, as a condition on $2. */
+function keptCondition(table: string, kept: KeptThreads): { sql: string; ids: string[] } | null {
+  if (table === 'bots') return { sql: 'id = any($2::uuid[])', ids: kept.bots }
+  if (table === 'agent_runs') return { sql: 'id = any($2::uuid[])', ids: kept.runs }
+  if (table === 'agents') return { sql: 'id = any($2::uuid[])', ids: kept.agents }
+  if ((KEPT_THREAD_TABLES as readonly string[]).includes(table)) return { sql: '"runId" is not null and "runId" = any($2::uuid[])', ids: kept.runs }
+  return null
+}
 
 export type AccountDeletion =
   | { ok: true; receipt?: { id: string; warnings: string[] } }
@@ -131,25 +170,45 @@ const ident = (name: string) => `"${name.replaceAll('"', '""')}"`
 interface Statement { table: string; text: string; values: unknown[] }
 
 /** Object references are captured in the same transaction that removes their rows. */
-export async function accountStorageKeys(client: Pick<PoolClient, 'query'>, userId: string): Promise<{ keys: string[]; notBefore: Date }> {
+export async function accountStorageKeys(client: Pick<PoolClient, 'query'>, userId: string, plan: Pick<Plan, 'shared'> = { shared: [] }): Promise<{ keys: string[]; notBefore: Date }> {
+  // Files of the threads that stay in a shared workspace stay with them.
+  const { runs } = await keptThreads(client, userId, plan)
   const { rows } = await client.query<{ key: string; expiresAt: Date | null }>(
-    `select v."storageKey" as key,NULL::timestamptz as "expiresAt" from artifact_versions v join artifacts a on a.id=v."artifactId" where a."userId"=$1 and v."storageKey" is not null
-     union all select "storageKey","expiresAt" from run_captures where "userId"=$1 and "storageKey" is not null
+    `select v."storageKey" as key,NULL::timestamptz as "expiresAt" from artifact_versions v join artifacts a on a.id=v."artifactId" where a."userId"=$1 and v."storageKey" is not null and not (a."runId" is not null and a."runId" = any($2::uuid[]))
+     union all select "storageKey","expiresAt" from run_captures where "userId"=$1 and "storageKey" is not null and not ("runId" is not null and "runId" = any($2::uuid[]))
      union all select 'capture-uploads/' || "userId" || '/runs/' || "runId" || '/captures/' || id || '.' ||
        CASE "contentType" WHEN 'image/png' THEN 'png' WHEN 'image/jpeg' THEN 'jpg' WHEN 'image/webp' THEN 'webp' WHEN 'video/mp4' THEN 'mp4' WHEN 'video/webm' THEN 'webm' END,"expiresAt"
-       from run_captures where "userId"=$1 AND source='local' AND "expiresAt" IS NOT NULL
+       from run_captures where "userId"=$1 AND source='local' AND "expiresAt" IS NOT NULL and not ("runId" is not null and "runId" = any($2::uuid[]))
      union all select "storageKey",NULL from user_avatars where "userId"=$1 and "storageKey" is not null
-     union all select "storageKey",NULL from account_storage_retirements where "userId"=$1`, [userId])
+     union all select "storageKey",NULL from account_storage_retirements where "userId"=$1`, [userId, runs])
   return { keys: [...new Set(rows.map(row => row.key).filter((key): key is string => Boolean(key)))], notBefore: new Date(Math.max(Date.now(), ...rows.map(row => row.expiresAt?.getTime() ?? 0))) }
 }
 
 export async function deleteMainAccountData(client: PoolClient, userId: string, plan: Plan): Promise<void> {
-  await runToFixpoint(client, await deletionStatements(client, userId, plan))
+  const kept = await keptThreads(client, userId, plan)
+  // Nobody is left to run their unfinished threads; they stay as stopped.
+  if (kept.runs.length) await client.query(`update agent_runs set status = 'stopped', "stopRequestedAt" = coalesce("stopRequestedAt", now()), "finishedAt" = coalesce("finishedAt", now()), "updatedAt" = now()
+    where id = any($1::uuid[]) and "userId" = $2 and status = any($3::text[])`, [kept.runs, userId, [...UNFINISHED_RUN_STATUSES]])
+  await runToFixpoint(client, await deletionStatements(client, userId, plan, kept))
+  // As when a member leaves (releaseDepartingMember): paused until an admin takes the bot over, now with no owner (「待接管」).
+  // After the sweep: the owner-bound rows that reference (id, workspaceId, ownerId) are gone. Their shares and card designation went with it.
+  if (kept.bots.length) await client.query('update bots set "ownerId" = null, "archivedAt" = coalesce("archivedAt", now()), "updatedAt" = now() where id = any($1::uuid[])', [kept.bots])
+  // A workspace only they belong to goes with them: every row keyed by it, whoever wrote it.
+  const { deleteWorkspaceRows } = await import('@/lib/workspace-rows')
+  for (const workspaceId of plan.solo) await deleteWorkspaceRows(client, workspaceId)
   await client.query('delete from "user" where id=$1', [userId])
 }
 
 /** Every delete the account needs in the main database, in no particular order. */
-export async function deletionStatements(client: Pick<PoolClient, 'query'>, userId: string, plan: Pick<Plan, 'shared' | 'keptIssueIds'>): Promise<Statement[]> {
+export async function deletionStatements(client: Pick<PoolClient, 'query'>, userId: string, plan: Pick<Plan, 'shared' | 'keptIssueIds'>, threads?: KeptThreads): Promise<Statement[]> {
+  const keptRows = threads ?? await keptThreads(client, userId, plan)
+  /** The person's rows of `table`, minus those that stay; `$1` is the person. */
+  const ownedRows = (table: string, column: string) => {
+    const keep = keptCondition(table, keptRows)
+    return keep
+      ? { where: `${ident(column)} = $1 and not (${keep.sql})`, values: [userId, keep.ids] }
+      : { where: `${ident(column)} = $1`, values: [userId] }
+  }
   const { rows: owned } = await client.query<{ table: string; column: string }>(
     `select c.table_name as "table", c.column_name as "column" from information_schema.columns c
      join information_schema.tables t on t.table_schema = c.table_schema and t.table_name = c.table_name
@@ -172,18 +231,25 @@ export async function deletionStatements(client: Pick<PoolClient, 'query'>, user
   for (const ref of references) {
     const parentOwner = ownerColumn.get(ref.parent)
     if (!parentOwner || ownerColumn.has(ref.child) || SKIPPED.has(ref.child) || ref.child.startsWith(IMMUTABLE_PREFIX)) continue
+    const parentRows = ownedRows(ref.parent, parentOwner)
     statements.push({
-      table: ref.child, values: [userId],
-      text: `delete from ${ident(ref.child)} where ${ident(ref.childColumn)} in (select ${ident(ref.parentColumn)} from ${ident(ref.parent)} where ${ident(parentOwner)} = $1)`,
+      table: ref.child, values: parentRows.values,
+      text: `delete from ${ident(ref.child)} where ${ident(ref.childColumn)} in (select ${ident(ref.parentColumn)} from ${ident(ref.parent)} where ${parentRows.where})`,
     })
   }
-  for (const { table, column } of ownedTables) statements.push({ table, values: [userId], text: `delete from ${ident(table)} where ${ident(column)} = $1` })
+  for (const { table, column } of ownedTables) {
+    const rows = ownedRows(table, column)
+    statements.push({ table, values: rows.values, text: `delete from ${ident(table)} where ${rows.where}` })
+  }
   const kept = plan.keptIssueIds
   statements.push(
     { table: 'issue_documents', values: [userId, kept], text: 'delete from issue_documents where "userId" = $1 and not ("issueId" = any($2::uuid[]))' },
     { table: 'issue_versions', values: [userId, kept], text: 'delete from issue_versions where "userId" = $1 and not ("issueId" = any($2::uuid[]))' },
     { table: 'issue_members', values: [userId, kept], text: 'delete from issue_members where ("userId" = $1 and not ("issueId" = any($2::uuid[]))) or "memberId" = $1' },
     { table: 'issues', values: [userId, kept], text: 'delete from issues where "userId" = $1 and not (id = any($2::uuid[]))' },
+    // Public links the person made to a kept thread's files close with their account.
+    { table: 'artifact_shares', values: [userId], text: 'delete from artifact_shares where "createdBy" = $1' },
+    { table: 'run_capture_shares', values: [userId], text: 'delete from run_capture_shares where "createdBy" = $1' },
     { table: 'conversation_members', values: [userId], text: `delete from conversation_members where "memberType" = 'user' and "memberId" = $1` },
     {
       // A group chat in a shared workspace stays while anyone else is in it.

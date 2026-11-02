@@ -1,5 +1,7 @@
 {
   "Common": {
+    "appUpdated": "Mikka has been updated",
+    "refresh": "Refresh",
     "close": "Close",
     "cancel": "Cancel",
     "save": "Save",
@@ -747,7 +749,7 @@
     "editorAria": "{label} editor"
   },
   "Devices": {
-    "otherDevices": "Remote control",
+    "otherDevices": "Servers",
     "menu": "More for {name}",
     "add": {
       "title": "Add device",
@@ -783,10 +785,8 @@
     "online": "Online",
     "offline": "Offline",
     "thisMachine": "This machine",
-    "allowScheduling": "Allow scheduling",
-    "allowSchedulingTo": "Allow scheduling to {name}",
-    "autoSchedule": "Auto-schedule",
-    "autoScheduleTo": "Let Mikka pick {name} automatically",
+    "allowScheduling": "Scheduling",
+    "allowSchedulingTo": "Schedule runs on {name}",
     "recheck": "Check again",
     "agent": "Available tools",
     "toggleSidebar": "Expand or collapse the sidebar",
@@ -926,8 +926,7 @@
       "retry": "Retry",
       "done": "Done",
       "cancelled": "Cancelled"
-    },
-    "autoScheduleNeedsAllow": "Turn on Allow scheduling first"
+    }
   },
   "Workspace": {
     "loadingEditor": "Loading task editor",
@@ -1704,8 +1703,8 @@
         "title": "Connections"
       },
       "models": {
-        "title": "API and subscriptions",
-        "keywords": "model subscriptions subscription quota usage API key provider models"
+        "title": "Models and subscriptions",
+        "keywords": "model subscriptions quota API key provider models allowed order dispatch run location cloud local bots agents"
       },
       "logins": {
         "title": "Logins and keys"
@@ -1721,10 +1720,6 @@
       },
       "general": {
         "title": "General"
-      },
-      "bots": {
-        "title": "Bots & Agents",
-        "keywords": "bots agents model location rules labels"
       },
       "permissions": {
         "title": "Team permissions"
@@ -1923,10 +1918,12 @@
       "copied": "Copied",
       "rowMenu": "More for {label}",
       "callbackPlaceholder": "http://localhost:54545/callback?code=…",
-      "paused": "Paused",
+      "paused": "Off",
       "useSubscription": "Use {label}",
       "pauseFailed": "The subscription could not be changed.",
-      "claudePlan": "Claude {plan}"
+      "claudePlan": "Claude {plan}",
+      "disconnectTitle": "Disconnect {label}?",
+      "enabled": "On"
     },
     "integrations": {
       "googleSignInTitle": "Google sign-in",
@@ -2199,6 +2196,7 @@
       "newValue": "New value",
       "scope": "Scope",
       "deleting": "Deleting…",
+      "removeTitle": "Delete {name}?",
       "shortValueNotMasked": "{name} is shorter than 8 characters and is not masked in output.",
       "e2b": {
         "heading": "Cloud computer",
@@ -2371,10 +2369,11 @@
       "mine": "My credits also pay for this team",
       "sharers": "Members sharing credits"
     },
-    "personalPolicy": {
-      "loading": "Loading personal subscription settings",
-      "heading": "Personal subscriptions",
-      "subscriptions": "Let members use their own subscriptions and API keys"
+    "sharePolicy": {
+      "loading": "Loading sharing settings",
+      "heading": "Subscriptions and API keys",
+      "label": "Members share their own subscriptions and API keys with teammates",
+      "detail": "Deny stops only what is shared with others; everyone keeps using their own"
     },
     "appPolicy": {
       "loading": "Loading app permissions",
@@ -2409,7 +2408,8 @@
       "minutes": "{count} min",
       "hours": "{count} h",
       "balance": "Balance",
-      "points": "{points} points"
+      "points": "{points} points",
+      "awaitingTakeover": "Awaiting takeover"
     },
     "billing": {
       "loading": "Loading billing",
@@ -2440,44 +2440,6 @@
         "incomplete": "Payment pending"
       }
     },
-    "botAgents": {
-      "bots": "Bots",
-      "addRule": "Add rule",
-      "default": "Default",
-      "cloud": "Mikka Cloud",
-      "online": "Online",
-      "offline": "Offline",
-      "removedDevice": "Removed device",
-      "redetect": "Detect again",
-      "searchModels": "Search models",
-      "claudeAccount": "Claude",
-      "openaiAccount": "ChatGPT",
-      "add": "Add",
-      "save": "Save",
-      "delete": "Delete",
-      "rowMenu": "More for {label}",
-      "cell": "{row} {column}: {value}",
-      "loading": "Loading bots and agents",
-      "loadFailed": "Couldn't load bots and agents",
-      "notSaved": "Not saved",
-      "retry": "Retry",
-      "columns": {
-        "label": "Label",
-        "place": "Runs on",
-        "harness": "Agent",
-        "model": "Model",
-        "actions": "Actions"
-      },
-      "hostedDefault": "Mikka Default",
-      "defaults": "Task defaults",
-      "fallbacks": "When something goes wrong",
-      "setting": "{name}: {value}",
-      "whenDeviceOffline": "When the device is offline",
-      "offlineWait": "Wait for it",
-      "offlineCloud": "Run in the cloud",
-      "labels": "By label",
-      "pickModel": "Choose a model"
-    },
     "searchEmpty": "No matching settings",
     "apiKeys": {
       "add": "Add API key",
@@ -2504,7 +2466,63 @@
       "removeTitle": "Delete {name}?",
       "othersUsage": "Team members can use it to run their own bots. Usage is billed to your API account.",
       "afterQuota": "Use an API key when subscription quota runs out",
-      "afterQuotaBilling": "Billed at the API provider's prices"
+      "afterQuotaBilling": "Billed at the API provider's prices",
+      "sectionTitle": "API keys",
+      "none": "No API keys yet",
+      "loading": "Loading API keys…",
+      "modelCount": "{count, plural, one {# model} other {# models}}",
+      "noModels": "The provider listed no models",
+      "modelsInvalid": "Couldn't fetch models · Key invalid or revoked",
+      "modelsUnavailable": "Couldn't fetch models · Provider didn't respond",
+      "refetch": "Fetch models again",
+      "refetchLabel": "Fetch models for {name} again"
+    },
+    "modelOrder": {
+      "title": "Allowed models",
+      "loading": "Loading allowed models…",
+      "location": "Run location",
+      "local": "Local",
+      "cloud": "Cloud",
+      "localDevices": "{count, plural, one {# computer takes runs} other {# computers take runs}}",
+      "cloudNoKey": "No E2B key",
+      "add": "Add models",
+      "addCount": "{count, plural, one {Add # model} other {Add # models}}",
+      "empty": "No allowed models yet",
+      "noCandidates": "No models to add",
+      "removeTitle": "Remove {model}?",
+      "remove": "Remove",
+      "ready": "Available",
+      "quotaUntil": "Quota used up · back {time}",
+      "noDevice": "No computer can run {harness}",
+      "blocked": {
+        "quota": "Quota used up",
+        "expired": "Needs reconnecting",
+        "paused": "Subscription turned off",
+        "missing": "No longer available",
+        "keyRefused": "Key invalid or revoked"
+      },
+      "handle": "Drag {model} (position {position})",
+      "rowMenu": "More actions for {model}",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
+      "dragInstructions": "Press Space to pick up, use the up and down arrow keys to move, press Space again to drop, Esc to cancel.",
+      "dragStart": "Picked up {model}, position {position}",
+      "dragOver": "{model} moved to position {position}",
+      "dragEnd": "{model} dropped at position {position}",
+      "dragCancel": "Moving {model} cancelled",
+      "source": {
+        "claude": "Claude subscription",
+        "codex": "ChatGPT subscription",
+        "apiKey": "{provider} API key"
+      },
+      "added": "Added",
+      "provider": {
+        "anthropic": "Anthropic",
+        "openai": "OpenAI",
+        "deepseek": "DeepSeek",
+        "kimi": "Kimi",
+        "custom": "Custom provider"
+      }
     }
   },
   "TelegramBot": {
@@ -2757,7 +2775,6 @@
     "c_c6492461": "View all tasks ·",
     "c_30108106": "View all teams",
     "c_4090a5db": "View all projects",
-    "c_37ee9ddc": "View team hierarchy documentation (opens in a new window)",
     "c_c4c23eda": "View project ·",
     "c_95c35444": "Use 2–12 uppercase letters or digits, starting with a letter.",
     "c_62e51561": "Loading",
@@ -2951,7 +2968,7 @@
       "metered": "Pay as you go",
       "shared": "Shared by teammates",
       "sharedKey": "{name}'s key",
-      "manage": "Manage API and subscriptions",
+      "manage": "Manage models and subscriptions",
       "unavailable": "Unavailable",
       "notSaved": "Not saved",
       "unknownModel": "Unknown model",
@@ -3205,11 +3222,22 @@
     "needsMachineTitle": "No computer available",
     "needsMachineDescription": "Connect or turn on a computer first, or add your E2B API key to run in the cloud.",
     "needsMachineConnect": "Connect a computer",
-    "needsMachineAuto": "Let this computer be picked automatically",
+    "needsMachineAuto": "Schedule runs on this computer",
     "needsMachineServerOnline": "Bring the server back online",
     "needsMachineMac": "Enable on this computer",
     "needsMachineServer": "Connect my server",
-    "needsMachineE2B": "Add E2B key"
+    "needsMachineE2B": "Add E2B key",
+    "needsModelTitle": "No model can run this task",
+    "needsModelNoModels": "No allowed models yet",
+    "needsModelCloud": "Cloud has no E2B key yet",
+    "needsModelNoDevice": "No computer can run any allowed model",
+    "needsModelUnavailable": "Every allowed model is unavailable right now",
+    "needsModelDeviceAgent": "This computer doesn't have {agent}",
+    "needsModelDeviceModel": "This computer's {agent} didn't report {model}",
+    "needsModelNotOffered": "No subscription or key runs {model} on {agent}",
+    "needsModelPickedNoDevice": "No computer can run {model} on {agent}",
+    "needsModelPickedUnavailable": "{model} on {agent} is unavailable right now",
+    "needsModelSettings": "Open Models and subscriptions"
   },
   "IssueThreads": {
     "title": "Threads",
@@ -3257,7 +3285,8 @@
     "runInfo": {
       "paidBy": "{owner}'s {plan}",
       "movedTo": "Moved to {machine} to continue"
-    }
+    },
+    "back": "Back"
   },
   "Computer": {
     "status": {
@@ -3334,7 +3363,8 @@
         "idle": "Idle",
         "resolved": "Resolved"
       },
-      "waitingFor": "Waiting for {device} to come online"
+      "waitingFor": "Waiting for {device} to come online",
+      "dispatchedBy": "Dispatched by {bot}"
     },
     "newBot": {
       "title": "New bot",
@@ -3401,9 +3431,8 @@
     "coordinatorPlaceholder": "Ask the Coordinator or hand it a task…",
     "panel": {
       "label": "Right panel",
-      "views": "Right panel views",
-      "overview": "Overview",
       "allThreads": "All threads",
+      "allThreadsWaiting": "All threads, {count} waiting on you",
       "tabs": "Right panel content",
       "details": "Details",
       "threads": "Threads",
@@ -3440,7 +3469,10 @@
       "nameTooLong": "Name can be at most {max} characters",
       "changeAvatar": "Change {name}’s avatar",
       "close": "Close panel",
-      "open": "Open panel"
+      "open": "Open panel",
+      "filterBot": "Filter by dispatcher",
+      "allBots": "All dispatchers",
+      "closeAllThreads": "Close all threads"
     },
     "suggestions": {
       "title": "Suggestions",
@@ -3502,6 +3534,7 @@
         "status": "Status",
         "priority": "Priority",
         "assignee": "Assignee",
+        "creator": "Created by me",
         "labels": "Labels",
         "project": "Project",
         "agentState": "Thread status"
@@ -3562,7 +3595,7 @@
         "delete": "Delete",
         "agent": {
           "running": "Running",
-          "waiting": "Waiting on you",
+          "waiting": "Waiting for you",
           "blocked": "Blocked"
         }
       },
@@ -3956,35 +3989,11 @@
     "accessibleToAll": "Accessible to all workspace members",
     "teamOverview": "Team overview",
     "memberCount": "{count, plural, one {# member} other {# members}}",
-    "hierarchy": "Team hierarchy",
-    "docs": "Docs",
     "dangerZone": "Danger zone",
     "rows": {
       "general": "General",
       "members": "Members",
-      "slack": "Slack notifications",
-      "issuesSection": "Issues, projects, and documents",
-      "issueLabels": "Issue labels",
-      "projectLabels": "Project labels",
-      "templates": "Templates",
-      "recurringIssues": "Recurring issues",
-      "workflowSection": "Workflow",
-      "issueStatuses": "Issue statuses",
-      "projectStatuses": "Project statuses",
-      "workflows": "Workflows & automations",
-      "triage": "Triage",
-      "cycles": "Cycles",
-      "agentsSection": "AI & bots",
-      "teamAgents": "Team bots",
-      "agentSkills": "Bot skills",
-      "agentConnectors": "Bot connectors",
-      "projectUpdates": "Project updates",
-      "threadSummaries": "Resolved thread summaries",
-      "parentTeam": "Parent team",
-      "none": "None",
-      "leaveTeam": "Leave team",
-      "retireTeam": "Retire team",
-      "deleteTeam": "Delete team"
+      "leaveTeam": "Leave team"
     }
   },
   "CredentialLogin": {
@@ -4066,6 +4075,8 @@
       "platform_paused": "Free allowance paused",
       "unavailable": "Mikka Default is unavailable",
       "verifyCard": "Verify card",
+      "teamNoPoints": "This team has no points to use",
+      "openBilling": "Open billing",
       "useSubscription": "Use my {name} subscription",
       "connect": "Connect <claude></claude> Claude / <openai></openai> ChatGPT subscription"
     }

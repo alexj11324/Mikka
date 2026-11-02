@@ -7,9 +7,8 @@ import { repositoryBindingMatches } from '@mikka/protocol/repository'
 import { matchesRepositoryAdmission } from '@/lib/repository-admission'
 import { ComputerError } from '@/lib/computer/store'
 import { computerPermission } from '@/lib/computer/permission'
-import { connectComputer, installComputerRuntime, startDesktop, syncDesktopLease, viewerGrant } from '@/lib/computer/e2b-provider'
+import { connectComputer, installComputerRuntime, startDesktop, syncDesktopLease } from '@/lib/computer/e2b-provider'
 import { CLOUD_WORKER_COMMAND } from '@/lib/computer/worker-command'
-import { installSubagentRuntime, runtimeRequest } from './runtime'
 import { e2bApiKey, taskTemplate, withE2BErrors } from '@/lib/secrets/e2b-runtime'
 import type { Actor } from './subagents'
 import { afterRunEnded } from '@/lib/run-completion-effects'
@@ -175,9 +174,29 @@ export async function endClosedTaskMachines(pool: Pool, end: (actor: Actor, runI
   return { ended, pending: rows.length - ended }
 }
 
+const threadDesktop = { startDesktop, syncDesktopLease }
+/** Display :1 and its driver lease, published under the workspace policy lock so a
+ * concurrent policy change (ComputerStore.setPolicy) cannot be overwritten with an older version.
+ * No person can watch or take over a thread desktop (decision 1050): the lease is never controlled. */
+async function startThreadDesktop(pool: Pool, actor: Actor, runId: string, leaseId: string, sandbox: Sandbox, runtime: typeof threadDesktop) {
+  await runtime.startDesktop(sandbox, 1, true)
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    await client.query("SET LOCAL lock_timeout = '5s'")
+    await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`computer-policy:${actor.workspaceId}`])
+    const machine = (await client.query('SELECT "botId",epoch FROM thread_machines WHERE "runId"=$1 AND "workerLeaseId"=$2 AND state<>\'ended\'', [runId, leaseId])).rows[0]
+    if (!machine) throw new ComputerError(409, 'Thread provisioning cancelled')
+    const policy = (await client.query('SELECT permission,version FROM workspace_computer_policies WHERE "workspaceId"=$1', [actor.workspaceId])).rows[0]
+    const policyVersion = Number(policy?.version ?? 0)
+    await runtime.syncDesktopLease(sandbox, { botId: machine.botId, ownerId: actor.userId, display: 1, epoch: machine.epoch, controlledBy: null, controlUntil: 0, computerAllowed: computerPermission(policy?.permission) === 'allow', policyVersion })
+    await client.query('COMMIT')
+  } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
+}
+
 /** The queued run is moved to a dedicated device before any worker can claim
  * it. Bot workers are denied these runs by claimCloudRun. */
-export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: string, provider = threadMachineProvider) {
+export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: string, provider = threadMachineProvider, desktop = threadDesktop) {
   z.uuid().parse(runId)
   const client = await pool.connect()
   const leaseId = randomUUID()
@@ -292,8 +311,11 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
       repositoryTask ? undefined : installComputerRuntime(sandbox),
     ])
     if (!expectedSha || sourceSha !== expectedSha) throw new Error('Worker version mismatch')
+    // Every computer action runs through lease-driver.py, which needs display :1 and its lease.
+    // A snapshot boots with neither, and a resumed one may hold a lease from an older policy.
+    if (!repositoryTask) await startThreadDesktop(pool, actor, runId, leaseId, sandbox, desktop)
     await client.query('BEGIN')
-    // Provision, end and desktop all lock the parent run before its machine.
+    // Provision and end both lock the parent run before its machine.
     const current = (await client.query('SELECT * FROM agent_runs WHERE id=$1 AND "userId"=$2 FOR UPDATE', [runId, actor.userId])).rows[0]
     const activeLease = await client.query('SELECT 1 FROM thread_machines WHERE "runId"=$1 AND "workerLeaseId"=$2 AND state<>\'ended\' FOR UPDATE', [runId, leaseId])
     if (!activeLease.rowCount) throw new ComputerError(409, 'Thread provisioning cancelled')
@@ -341,42 +363,7 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
   } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
 }
 
-const desktopRuntime = { connectComputer, startDesktop, syncDesktopLease, installSubagentRuntime, runtimeRequest, viewerGrant }
-/** A thread's desktop keeps the same current workspace policy as the Bot
- * desktop. The policy lock also fences concurrent administrative revocation. */
-export async function openThreadDesktop(pool: Pool, actor: Actor, runId: string, runtime = desktopRuntime) {
-  const client = await pool.connect()
-  try {
-    await client.query('BEGIN')
-    await client.query("SET LOCAL lock_timeout = '5s'")
-    await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`computer-policy:${actor.workspaceId}`])
-    const run = (await client.query('SELECT "deviceId" FROM agent_runs WHERE id=$1 AND "userId"=$2 FOR SHARE', [runId, actor.userId])).rows[0]
-    if (!run?.deviceId) throw new ComputerError(404, 'Thread unavailable')
-    const machine = (await client.query(`SELECT t.* FROM thread_machines t
-      JOIN computer_run_bindings bnd ON bnd."runId"=t."runId" AND bnd."botId"=t."botId" AND bnd."workspaceId"=t."workspaceId" AND bnd."ownerId"=t."ownerId"
-      JOIN devices d ON d.id=t."deviceId" AND d."ownerId"=t."ownerId" AND d.kind='cloud' AND d.enabled=true
-      JOIN bots b ON b.id=t."botId" AND b."ownerId"=t."ownerId" AND b."workspaceId"=t."workspaceId"
-      WHERE t."runId"=$1 AND t."ownerId"=$2 AND t."workspaceId"=$3 AND t."deviceId"=$4 AND t.state<>'ended' AND t."sandboxId" IS NOT NULL
-      FOR UPDATE OF t FOR SHARE OF d`, [runId, actor.userId, actor.workspaceId, run.deviceId])).rows[0]
-    if (!machine) throw new ComputerError(404, 'Thread unavailable')
-    const policy = (await client.query('SELECT permission,version FROM workspace_computer_policies WHERE "workspaceId"=$1', [actor.workspaceId])).rows[0]
-    const permission = computerPermission(policy?.permission), policyVersion = Number(policy?.version ?? 0)
-    if (permission === 'deny') throw new ComputerError(403, 'Computer use is disabled')
-    if (permission !== 'allow' || !Number.isSafeInteger(policyVersion) || policyVersion < 0) throw new ComputerError(409, 'Computer policy unavailable')
-    const sandbox = await runtime.connectComputer(actor.workspaceId, machine.sandboxId)
-    const lease = { botId: machine.botId, ownerId: actor.userId, display: 1, epoch: machine.epoch, controlledBy: null, controlUntil: 0, computerAllowed: true, policyVersion }
-    await runtime.startDesktop(sandbox, 1, true)
-    await runtime.syncDesktopLease(sandbox, lease)
-    await runtime.installSubagentRuntime(sandbox, actor.userId)
-    const browser = await runtime.runtimeRequest(machine.sandboxId, { id: runId, ownerId: actor.userId, workspaceId: actor.workspaceId, botId: machine.botId, epoch: machine.epoch, display: 1 }, '/start', {})
-    await client.query('UPDATE thread_machines SET "targetId"=$2 WHERE "runId"=$1', [runId, browser.targetId])
-    const viewer = await runtime.viewerGrant(sandbox, lease, actor.userId, 'view')
-    await client.query('COMMIT')
-    return { runId, state: machine.state, ...viewer }
-  } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
-}
-
-export async function threadMachineAction(pool: Pool, actor: Actor, runId: string, action: 'pause' | 'resume' | 'end' | 'desktop') {
+export async function threadMachineAction(pool: Pool, actor: Actor, runId: string, action: 'pause' | 'resume' | 'end') {
   const machine = (await pool.query('SELECT * FROM thread_machines WHERE "runId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3', [runId, actor.userId, actor.workspaceId])).rows[0]
   if (!machine || (machine.state === 'ended' && action !== 'end')) throw new ComputerError(404, 'Thread unavailable')
   if (action === 'end') {
@@ -415,7 +402,6 @@ export async function threadMachineAction(pool: Pool, actor: Actor, runId: strin
     return { runId, state: 'ended' }
   }
   if (action === 'resume') return ensureThreadMachine(pool, actor, runId)
-  if (action === 'desktop') return openThreadDesktop(pool, actor, runId)
   if (!machine.sandboxId) throw new ComputerError(409, 'Thread machine has not started')
   const sandbox = await connectComputer(actor.workspaceId, machine.sandboxId)
   if (action === 'pause') {

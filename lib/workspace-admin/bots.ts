@@ -76,7 +76,8 @@ export interface WorkspaceBotView {
   name: string
   color: string
   shape: string
-  ownerId: string
+  /** Null while the bot awaits takeover: its owner deleted their account. */
+  ownerId: string | null
   ownerName: string | null
   model: WorkspaceBotModel | null
   repository: string | null
@@ -99,7 +100,7 @@ export async function workspaceBots(workspaceId: string): Promise<WorkspaceBotVi
   const owners = new Map(names.map(row => [row.userId, row.name]))
   return rows.map(row => {
     const runningThreads = threads.get(row.id) ?? 0
-    return { ...row, ownerName: owners.get(row.ownerId) ?? null, status: runningThreads ? 'running' : 'idle', runningThreads }
+    return { ...row, ownerName: row.ownerId === null ? null : owners.get(row.ownerId) ?? null, status: runningThreads ? 'running' : 'idle', runningThreads }
   })
 }
 

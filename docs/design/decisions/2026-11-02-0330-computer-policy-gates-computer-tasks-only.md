@@ -3,7 +3,7 @@
 - Date: 2026-11-02
 - Source: the coordinating Claude session's decision, relayed in the E2B
   templates session on 2026-11-02: 「工作区电脑策略只限制电脑/桌面任务，代码任务不受它约束（领取和排队两处都一样）」. Based on
-  [2026-11-02-0230 workspace is the tenant](2026-11-02-0230-workspace-is-the-tenant.md)
+  [2026-11-02-0231 workspace is the tenant](2026-11-02-0231-workspace-is-the-tenant.md)
   (on branch `claude/information-architecture`, not yet on main) and
   [2026-11-02-0251](2026-11-02-0251-desktop-runs-get-their-own-machine.md).
 - Rule: —
@@ -24,5 +24,6 @@ may run code.
   claimed, and its claim never carries a computer grant (permission `deny`,
   #918).
 
-Gates on actual computer use stay on the policy: opening a thread desktop, the
+Gates on actual computer use stay on the policy: ~~opening a thread desktop~~
+(removed, [1232](2026-11-02-1232-computer-policy-binds-agents-not-people.md)), the
 cloud computer's driver and browser, and the credential broker.

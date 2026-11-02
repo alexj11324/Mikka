@@ -4,14 +4,15 @@ import { forbiddenOrigin, json, mobileUser, unauthorized, writeAllowed } from '@
 import { ActionFailureError } from '@/lib/action-error'
 import { pool } from '@/lib/db'
 import { ExecutionSettings } from '@/lib/execution-settings'
-import { botModelMenu, botModelScope, refreshBotModelMenu } from '@/lib/bot-model-menu'
+import { botModelMenu, botModelScope, chooseBotModel, refreshBotModelMenu } from '@/lib/bot-model-menu'
 import { tokenWorkspace } from '@/lib/tokens/principal'
 import { openChatBotId } from '@/lib/coordinator/coordinator-bot'
 
 export const dynamic = 'force-dynamic'
 
 const botParam = z.uuid().nullable()
-const choice = z.strictObject({ bot: botParam, id: z.uuid() })
+// An option id as the menu lists it: a binding uuid, Mikka 默认, or `apikey:<keyId>:<model>` (lib/bot-model-menu-view.ts).
+const choice = z.strictObject({ bot: botParam, id: z.string().min(1).max(300) })
 
 function failed(error: unknown) {
   if (error instanceof ActionFailureError && (error.code === 'botNotFound' || error.code === 'workspaceAccessDenied')) return json({ error: 'botNotFound' }, 404)
@@ -48,9 +49,7 @@ async function handlePUT(request: Request) {
   try {
     const botId = await openChatBotId(user, body.data.bot)
     const scope = await botModelScope(user.id, botId, user[tokenWorkspace])
-    const settings = new ExecutionSettings(pool)
-    await settings.setBotModel(scope, botId, body.data.id)
-    return json(await botModelMenu(pool, settings, scope, botId))
+    return json(await chooseBotModel(pool, new ExecutionSettings(pool), scope, botId, body.data.id))
   } catch (error) { return failed(error) }
 }
 

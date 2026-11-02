@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { Pool } from 'pg'
-import { test, expect, register, seedTask, rail, app } from './fixtures'
+import { test, expect, register, seedTask, rail, app, showCreatedByMe } from './fixtures'
 
 function isolatedPool() {
   const connectionString = process.env.E2E_DATABASE_URL
@@ -51,6 +51,9 @@ for (const width of [1280, 1440]) {
     // 已完成 is a full column beside the sidebar, never a strip (decisions/2026-11-01-1144-board-done-keeps-its-width.md).
     await expect(board.getByRole('region', { name: '已完成任务列', exact: true })).toBeVisible()
     const done = board.locator('[data-slot="kanban-column"]').last()
+    // Nobody is on the seeded tasks: 负责人 我 leaves them out, 我创建的 shows them (decision 2026-11-02-0302).
+    await expect(board.getByText('已完成里的任务', { exact: true })).toHaveCount(0)
+    await showCreatedByMe(page)
 
     // Every column is 300px (R-25); the board scrolls instead of squeezing or folding them.
     const columns = await board.locator('[data-slot="kanban-column"]').evaluateAll(items => items.map(item => Math.round(item.getBoundingClientRect().width)))
@@ -84,6 +87,10 @@ test('1024px：Coordinator 侧栏默认收起，展开时浮在看板上；无�
 
   // Below 1280 the 360px panel would squeeze the board (R-65): it starts folded.
   const card = page.getByRole('group', { name: '窄窗口里的任务', exact: true })
+  // Nobody is on it: 负责人 我 leaves it out, 我创建的 shows it (decision 2026-11-02-0302).
+  await expect(page.getByRole('toolbar', { name: '看板工具栏', exact: true })).toBeVisible()
+  await expect(card).toHaveCount(0)
+  await showCreatedByMe(page)
   await expect(card).toBeVisible()
   await expect(page.getByRole('complementary', { name: 'Coordinator', exact: true })).toBeHidden()
   await page.getByRole('button', { name: '展开对话', exact: true }).click()
@@ -119,6 +126,18 @@ test('看板工具栏：范围切换、筛选和筛选条同高', async ({ page 
 
   const heights = await Promise.all([scope, filter, chip].map(async item => (await item.boundingBox())!.height))
   expect(heights).toEqual([28, 28, 28])
+
+  // 我创建的 is its own filter, one checkbox right after 负责人 (decision 2026-11-02-0302).
+  await filter.click()
+  const menu = page.getByRole('menu')
+  await expect(menu.getByRole('menuitem').or(menu.getByRole('menuitemcheckbox'))).toHaveText(['状态', '优先级', '负责人', '我创建的', '标签', '项目', '线程状态'])
+  await menu.getByRole('menuitemcheckbox', { name: '我创建的', exact: true }).click()
+  await page.keyboard.press('Escape')
+  const created = toolbar.getByRole('group', { name: '我创建的', exact: true })
+  await expect(created).toHaveText('我创建的')
+  await expect(chip).toBeVisible()
+  await created.getByRole('button', { name: '移除我创建的筛选', exact: true }).click()
+  await expect(created).toHaveCount(0)
 })
 
 // A due date is a calendar day: it reads the same on either side of UTC (seeded 10-30, never 「10月29日」).
@@ -142,6 +161,10 @@ for (const timezoneId of ['America/Los_Angeles', 'Asia/Shanghai']) test.describe
 
     const botCard = page.getByRole('group', { name: 'Bot 负责的看板任务', exact: true })
     const prCard = page.getByRole('group', { name: '只有 PR 的看板任务', exact: true })
+    // 负责人 我 shows the task assigned to the person and held by their bot, not the one they only created (decision 2026-11-02-0302).
+    await expect(botCard).toBeVisible()
+    await expect(prCard).toHaveCount(0)
+    await showCreatedByMe(page)
     await expect(botCard).toBeVisible()
 
     // Row 1: the Bot's own blob on top, the person's letter avatar, two agent marks, then +1.

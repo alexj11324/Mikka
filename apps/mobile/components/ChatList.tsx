@@ -23,7 +23,8 @@ export function useChatRows(needle = '') {
       .map(group => ({ kind: 'group' as const, group, at: group.lastMessage?.createdAt ?? group.createdAt })),
   ].sort((a, b) => b.at.localeCompare(a.at))
   const reload = async () => { await Promise.all([home.reload(), groups.reload()]) }
-  return { rows, loading: home.loading, reload }
+  // Only a list with nothing to show fails; a later poll that fails keeps what was drawn.
+  return { rows, loading: home.loading, error: home.data ? null : home.error, reload }
 }
 
 export const rowKey = (row: ChatRow) => row.kind === 'bot' ? row.bot.id : row.group.id
@@ -58,7 +59,7 @@ const styles = StyleSheet.create({
   body: { flex: 1, minWidth: 0, gap: 3 },
   top: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   name: { flex: 1, fontSize: 17, fontWeight: '600' },
-  when: { fontSize: 13, color: colors.tertiary },
+  when: { fontSize: 13, color: colors.secondary },
   line: { fontSize: 15, color: colors.secondary },
   groupIcon: { width: 52, height: 52, borderRadius: 26, backgroundColor: colors.bubble, alignItems: 'center', justifyContent: 'center' },
   groupGlyph: { fontSize: 18, color: colors.secondary },

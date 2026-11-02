@@ -5,7 +5,7 @@ import useSWR from 'swr'
 import { Check, Copy, Laptop, MoreHorizontal, Plus, Server } from 'lucide-react'
 import { useFormatter, useNow, useTranslations } from 'next-intl'
 import { toast } from 'sonner'
-import { listDevices, removeDevice, renameDevice, sendDeviceCommand, setDeviceAutoSchedule, setDeviceEnabled, type DeviceView } from '@/app/actions/agents'
+import { listDevices, removeDevice, renameDevice, sendDeviceCommand, setDeviceEnabled, type DeviceView } from '@/app/actions/agents'
 import { HarnessLabel, harnessName } from '@/components/labels/entity-labels'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
@@ -17,7 +17,6 @@ import { Field, FieldGroup, FieldLabel, FieldError } from '@/components/ui/field
 import { Input } from '@/components/ui/input'
 import { Item, ItemGroup, ItemSeparator } from '@/components/ui/item'
 import { Switch } from '@/components/ui/switch'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { bridgeFromWindow, type MikkaWindow } from '@/lib/platform/detect'
 import { useActionError } from '@/lib/use-action-error'
 import { cn } from '@/lib/utils'
@@ -132,32 +131,26 @@ function DeviceRow({ device, onChanged, onReconnect }: { device: DeviceView; onC
     ? t('online')
     : device.lastSeenAt ? t('offlineSince', { time: format.relativeTime(new Date(device.lastSeenAt), now) }) : t('neverOnline')
 
-  return <Item role="listitem" className="gap-3 rounded-none px-3.5 py-3">
+  // On a phone the two switches move to their own line under the name, keeping their labels (D1).
+  return <Item role="listitem" className="flex-wrap gap-3 rounded-none px-3.5 py-3">
     <DeviceTypeIcon device={device} />
     <span className={cn('flex min-w-0 flex-1 flex-col gap-0.5', !device.online && 'text-muted-foreground')}>
       <span className="truncate text-sm font-medium">{device.name}</span>
-      <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+      <span className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-muted-foreground">
         <span className="truncate">{device.online && agents.length === 0
           ? `${status} · ${blocked.agents.length > 0 ? t('sandboxBlocked', { agents: blocked.agents.map(harnessName).join(', ') }) : t('noAgent')}`
           : status}</span>
         {device.online && (agents.length > 0
-          ? <AgentMarks harnesses={agents} />
+          ? <AgentMarks agents={agents} />
           : blocked.agents.length > 0 ? <SandboxBlocked missing={blocked.missing} reason={blocked.reason} detail={blocked.detail} /> : <InstallAgents />)}
       </span>
     </span>
     {!device.online && <Button variant="secondary" size="sm" onClick={onReconnect}>{t('reconnect')}</Button>}
-    <span className="flex items-center gap-2 text-sm text-muted-foreground">
-      <span aria-hidden="true" className="max-sm:hidden">{t('allowScheduling')}</span>
+    {/* 参与调度: the device's one switch (decision 2026-11-02-1400); on a phone it keeps its label on its own line. */}
+    <span className="flex items-center gap-2 text-sm text-muted-foreground max-sm:order-last max-sm:basis-full max-sm:pl-8">
+      <span aria-hidden="true">{t('allowScheduling')}</span>
       <Switch checked={device.enabled} aria-label={t('allowSchedulingTo', { name: device.name })} onCheckedChange={enabled => { void run(() => setDeviceEnabled({ deviceId: device.id, enabled })) }} />
     </span>
-    {/* 自动调度 depends on 允许调度: while that is off this one reads off too, and its tooltip says why it is locked. */}
-    <Tooltip>
-      <TooltipTrigger render={<span className="flex items-center gap-2 text-sm text-muted-foreground" />}>
-        <span aria-hidden="true" className="max-sm:hidden">{t('autoSchedule')}</span>
-        <Switch checked={device.enabled && device.autoSchedule} disabled={!device.enabled} aria-label={t('autoScheduleTo', { name: device.name })} onCheckedChange={autoSchedule => { void run(() => setDeviceAutoSchedule({ deviceId: device.id, autoSchedule })) }} />
-      </TooltipTrigger>
-      {!device.enabled && <TooltipContent>{t('autoScheduleNeedsAllow')}</TooltipContent>}
-    </Tooltip>
     <DropdownMenu>
       <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label={t('menu', { name: device.name })} />}><MoreHorizontal data-icon="inline-start" /></DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-48">

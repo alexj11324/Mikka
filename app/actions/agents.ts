@@ -30,7 +30,6 @@ import { ISSUE_THREAD_LIMIT, canReadThread, projectIssueThreads, taskFreeThreadM
 import { threadQuestionStates } from '@/lib/issue-thread-questions'
 import { listIssueRunChains, readRunChain } from '@/lib/run-chain'
 import type { HarnessInfo } from '@mikka/protocol/harness'
-import { autoScheduleOn } from '@/lib/device-auto-schedule'
 import { parseUnifiedDiff, type ThreadChangesResult } from '@/lib/thread-changes'
 
 async function getUserId(): Promise<string> {
@@ -55,10 +54,8 @@ export interface DeviceView {
   arch: string | null
   harnesses: HarnessInfo[]
   online: boolean
-  /** Off: the orchestrator gives this device no runs. */
+  /** 参与调度 (decision 2026-11-02-1400): off, Mikka never sends this device a run. */
   enabled: boolean
-  /** 「允许自动调度」, the stored choice or the type default (servers on, personal computers off). */
-  autoSchedule: boolean
   lastSeenAt: Date | null
   repos: DeviceRepoView[]
 }
@@ -82,7 +79,7 @@ export async function listDevices(): Promise<DeviceView[]> {
     : []
   return rows.map(device => ({
     id: device.id, name: device.name, deviceType: device.deviceType, hostname: device.hostname, platform: device.platform, arch: device.arch,
-    harnesses: device.harnesses, lastSeenAt: device.lastSeenAt, enabled: device.enabled, autoSchedule: autoScheduleOn(device),
+    harnesses: device.harnesses, lastSeenAt: device.lastSeenAt, enabled: device.enabled,
     online: device.lastSeenAt ? Date.now() - device.lastSeenAt.getTime() < DEVICE_ONLINE_WINDOW_MS : false,
     repos: repos.filter(repo => repo.deviceId === device.id).map(repo => ({
       id: repo.id, repoPath: repo.repoPath, baseBranch: repo.baseBranch, verifyCommand: repo.verifyCommand,
@@ -119,21 +116,6 @@ export async function setDeviceEnabled(input: { deviceId: string; enabled: boole
     await db.update(devices)
       .set({ enabled: parsed.data.enabled, updatedAt: new Date() })
       .where(and(eq(devices.id, parsed.data.deviceId), eq(devices.ownerId, userId), isNull(devices.removedAt)))
-    return { success: true }
-  })
-}
-
-/** 「允许自动调度」: whether Mikka may pick this device on its own for new runs. */
-export async function setDeviceAutoSchedule(input: { deviceId: string; autoSchedule: boolean }): Promise<ActionResult<{ success: true }>> {
-  return runAction(async () => {
-    const userId = await getUserId()
-    const parsed = z.object({ deviceId: z.uuid(), autoSchedule: z.boolean() }).safeParse(input)
-    if (!parsed.success) return { error: 'deviceNotFound' }
-    const updated = await db.update(devices)
-      .set({ autoSchedule: parsed.data.autoSchedule, updatedAt: new Date() })
-      .where(and(eq(devices.id, parsed.data.deviceId), eq(devices.ownerId, userId), eq(devices.kind, 'local'), isNull(devices.removedAt)))
-      .returning({ id: devices.id })
-    if (!updated.length) return { error: 'deviceNotFound' }
     return { success: true }
   })
 }

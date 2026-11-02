@@ -57,11 +57,13 @@ test(
       await pool.query(
         await readFile(new URL("../drizzle/20261101021100_bot_api_key_choice.sql", import.meta.url), "utf8"),
       );
+      await pool.query(
+        await readFile(new URL("../drizzle/20261102120000_model_api_key_models_error.sql", import.meta.url), "utf8"),
+      );
       const catalogueMigration = await readFile(new URL('../drizzle/20261030233002_byos_model_catalog.sql',import.meta.url),'utf8');
       await pool.query(catalogueMigration); await pool.query(catalogueMigration);
       const personalPolicyMigration = await readFile(new URL("../drizzle/20261101020201_workspace_personal_policies.sql",import.meta.url),"utf8");
       await pool.query(personalPolicyMigration); await pool.query(personalPolicyMigration);
-      const explicitMigration = await readFile(new URL("../drizzle/20261031054017_explicit_execution.sql",import.meta.url),"utf8");
       const settings = new ExecutionSettings(pool),
         alice = { ownerId: "alice", workspaceId: randomUUID() },
         bob = { ...alice, ownerId: "bob" },
@@ -77,143 +79,6 @@ test(
         `INSERT INTO devices (id,"ownerId",kind,enabled,"autoSchedule","lastSeenAt",harnesses) VALUES ($1,'alice','local',true,true,now(),'[{"harness":"codex","installed":true,"models":["explicit-model"],"defaultModelSlot":"default","modelSlots":[{"slot":"default","model":"explicit-model","name":"Explicit model"}]}]'),($2,'bob','local',true,true,now(),'[]')`,
         [own, foreign],
       );
-      const legacyId = randomUUID();
-      await pool.query(
-        `INSERT INTO execution_rules (id,"ownerId","workspaceId",label,place,harness,model,position) VALUES ($1,'alice',$2,'legacy','auto','auto','auto',0)`,
-        [legacyId, alice.workspaceId],
-      );
-      await pool.query(explicitMigration);
-      await pool.query(explicitMigration);
-      assert.equal((await pool.query('SELECT model FROM execution_rules WHERE id=$1',[legacyId])).rows[0].model,'default');
-      const migrated = await settings.list(alice);
-      assert.equal(
-        migrated.find((r) => r.id === legacyId)?.model,
-        "default",
-      );
-      assert.equal(migrated.find((r) => r.id === legacyId)?.place, own);
-      await settings.mutate(alice, { kind: "delete", id: legacyId });
-      const value = {
-        label: "backend",
-        place: own,
-        harness: "codex" as const,
-        model: "explicit-model",
-      };
-      assert.deepEqual(
-        (await settings.list(alice)).map((r) => r.id),
-        ["default"],
-      );
-      await settings.mutate(alice, { kind: "save", value });
-      await settings.mutate(alice, {
-        kind: "save",
-        value: { ...value, label: "frontend" },
-      });
-      await pool.query('DELETE FROM execution_rules WHERE label IS NULL AND "ownerId"=$1 AND "workspaceId"=$2',[alice.ownerId,alice.workspaceId]);
-      await Promise.all(Array.from({ length: 12 }, () => settings.list(alice)));
-      await settings.mutate(alice, {
-        kind: "save",
-        id: "default",
-        value: { ...value, model: "explicit-model" },
-      });
-      assert.equal(
-        (await settings.list(alice)).find((r) => r.id === "default")?.place,
-        own,
-      );
-      assert.equal(
-        (
-          await pool.query(
-            'SELECT count(*)::int AS n FROM execution_rules WHERE label IS NULL AND "ownerId"=$1 AND "workspaceId"=$2',
-            [alice.ownerId, alice.workspaceId],
-          )
-        ).rows[0].n,
-        1,
-      );
-      assert.deepEqual(await settings.fallbacks("alice"), {
-        whenDeviceOffline: "wait",
-      });
-      await settings.setFallbacks("alice", {
-        whenDeviceOffline: "cloud",
-      });
-      assert.equal(
-        (await settings.fallbacks("alice")).whenDeviceOffline,
-        "cloud",
-      );
-      for (const field of ["place", "harness", "model"])
-        await assert.rejects(
-          settings.mutate(alice, {
-            kind: "save",
-            value: { ...value, [field]: "auto" },
-          }),
-          { code: "executionAutoNotAllowed" },
-        );
-      const rules = await settings.list(alice),
-        ids = rules.filter((r) => r.label !== null).map((r) => r.id);
-      await assert.rejects(settings.list(bob),{code:"executionModelUnknown"});
-      assert.equal((await settings.list(other)).length, 1);
-      await assert.rejects(
-        settings.mutate(alice, {
-          kind: "save",
-          value: { ...value, place: foreign },
-        }),
-      );
-      await assert.rejects(
-        settings.mutate(bob, { kind: "save", id: ids[0], value }),
-      );
-      await assert.rejects(
-        settings.mutate(other, { kind: "delete", id: ids[0] }),
-      );
-      await assert.rejects(
-        settings.mutate(alice, { kind: "delete", id: "default" }),
-      );
-      await assert.rejects(
-        settings.mutate(alice, { kind: "reorder", ids: [ids[0], ids[0]] }),
-      );
-      await settings.mutate(alice, {
-        kind: "reorder",
-        ids: [...ids].reverse(),
-      });
-      assert.deepEqual(
-        (await settings.list(alice)).slice(0, 2).map((r) => r.id),
-        [...ids].reverse(),
-      );
-      await settings.mutate(alice, {
-        kind: "save",
-        id: ids[0],
-        value: { ...value, model: "explicit-model" },
-      });
-      assert.equal(
-        (await settings.list(alice)).find((r) => r.id === ids[0])?.model,
-        "explicit-model",
-      );
-      await settings.mutate(alice, { kind: "delete", id: ids[1] });
-      assert.equal((await settings.list(alice))[0].position, 0);
-      await assert.rejects(settings.redetect(bob, own));
-      const receipt = await settings.redetect(alice, own);
-      assert.equal((await settings.redetectStatus(alice, receipt.commandId)).status, 'pending');
-      await assert.rejects(settings.redetectStatus(bob, receipt.commandId), { code: 'executionCommandNotFound' });
-      await pool.query('UPDATE device_management_commands SET "completedAt"=now() WHERE id=$1', [receipt.commandId]);
-      assert.equal((await settings.redetectStatus(alice, receipt.commandId)).status, 'completed');
-      await pool.query('UPDATE device_management_commands SET error=$2 WHERE id=$1', [receipt.commandId, 'detection_failed']);
-      assert.equal((await settings.redetectStatus(alice, receipt.commandId)).status, 'failed');
-      assert.ok(
-        (
-          await pool.query(
-            'SELECT id FROM device_management_commands WHERE "deviceId"=$1',
-            [own],
-          )
-        ).rows[0].id,
-      );
-      await pool.query('UPDATE devices SET "removedAt"=now() WHERE id=$1', [
-        own,
-      ]);
-      await assert.rejects(settings.redetect(alice, own));
-      assert.equal(
-        (await settings.places(alice)).some((place) => place.id === own),
-        false,
-      );
-      await assert.rejects(settings.mutate(alice, { kind: "save", value }));
-      await pool.query('UPDATE devices SET "removedAt"=NULL WHERE id=$1', [
-        own,
-      ]);
       await pool.query("INSERT INTO bots VALUES ($1,$2,$3)", [
         bot,
         alice.ownerId,
@@ -232,27 +97,6 @@ test(
         "dynamic-model",
       );
       assert.equal((await settings.botModels(bob)).length, 0);
-      const server = randomUUID(),claudeConnection=randomUUID(),claudeBinding=randomUUID();
-      await pool.query(`INSERT INTO devices (id,"ownerId",kind,enabled,"lastSeenAt","deviceType",harnesses) VALUES ($1,'alice','local',true,now(),'server',$2)`,[server,JSON.stringify([{harness:'claude_code',installed:true,models:['opus'],defaultModelSlot:'opus',modelSlots:[{slot:'opus',model:'reported-opus',name:'Reported opus'}]}])]);
-      await pool.query(`INSERT INTO byos_connections (id,"ownerId","workspaceId",epoch,state,provider) VALUES ($1,'alice',$2,1,'connected','claude')`,[claudeConnection,alice.workspaceId]);
-      await pool.query(`INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision","modelId",route) VALUES ($1,'alice',$2,$3,$4,1,'reported-opus','claude_cpa')`,[claudeBinding,alice.workspaceId,bot,claudeConnection]);
-      assert.deepEqual(await settings.suggested(alice),{id:'default',label:null,place:server,harness:'claude_code',model:'opus',position:2147483647});
-      // A teammate's E2B key is theirs alone: it never puts Alice's cloud first (keys are personal).
-      await pool.query('INSERT INTO user_e2b_keys ("userId") VALUES ($1)',['bob']);
-      assert.equal((await settings.suggested(alice)).place,server);
-      // Alice's own E2B key puts the cloud ahead of the online device, and so does one she saved
-      // for the workspace before keys were personal, until it is adopted.
-      for (const key of ['INSERT INTO user_e2b_keys ("userId") VALUES ($1)', 'INSERT INTO workspace_e2b_keys ("workspaceId","createdBy") VALUES (gen_random_uuid(),$1)']) {
-        await pool.query(key,['alice']);
-        assert.deepEqual(await settings.suggested(alice),{id:'default',label:null,place:'cloud',harness:'claude_code',model:'reported-opus',position:2147483647});
-        await pool.query('DELETE FROM user_e2b_keys WHERE "userId"=$1',['alice']);
-        await pool.query('DELETE FROM workspace_e2b_keys');
-      }
-      await pool.query('DELETE FROM user_e2b_keys');
-      await pool.query(`UPDATE byos_connections SET state='disconnected' WHERE id=$1`,[claudeConnection]);
-      assert.equal((await settings.suggested(alice)).harness,'codex');
-      assert.equal((await settings.suggested(alice)).model,'default');
-      await pool.query('DELETE FROM devices WHERE id=$1',[server]);
 
       await assert.rejects(settings.setBotModel(bob, bot, binding));
       await assert.rejects(settings.setBotModel(other, bot, binding));
@@ -309,28 +153,6 @@ test(
       }), {code:'executionAccountUnavailable'});
       assert.equal((await pool.query(`SELECT count(*)::int AS count FROM byos_bindings WHERE "modelId"='stale-provider-model'`)).rows[0].count,0);
       await pool.query(`UPDATE byos_connections SET epoch=1 WHERE id=$1`,[connection]);
-      const ruleValue = {label:'typed', place:own,harness:'codex' as const,model:'explicit-model'};
-      for (const [patch,code] of [[{place:'invalid'},'executionPlaceInvalid'],[{harness:'missing'},'executionHarnessUnavailable'],[{harness:'mock'},'executionHarnessUnavailable'],[{model:'missing'},'executionModelUnknown']] as const) {
-        await assert.rejects(settings.mutate(alice, {kind:'save',value:{...ruleValue,...patch} as typeof ruleValue}), {code});
-      }
-      await assert.rejects(settings.mutate(alice,{kind:'delete',id:randomUUID()}), {code:'executionRuleNotFound'});
-      const fixtureScope = {...alice,workspaceId:randomUUID()};
-      await pool.query(`INSERT INTO execution_rules (id,"ownerId","workspaceId",label,place,harness,model,position) VALUES ($1,$2,$3,NULL,$4,'mock','fixture-model',2147483647)`,[randomUUID(),alice.ownerId,fixtureScope.workspaceId,own]);
-      const fixtureRules = await settings.list(fixtureScope);
-      const {resolveExecution}=await import('./execution-rules');
-      assert.deepEqual(resolveExecution([],fixtureRules,[{id:own,enabled:true,online:true,harnesses:[{harness:'mock',installed:true,version:null}]}]),{place:own,harness:'mock',model:'fixture-model'});
-      const labelled = randomUUID(), otherLabelled = randomUUID(), deletedLabelled = randomUUID(), personalLabelled = randomUUID();
-      await pool.query('CREATE TABLE issues (id uuid PRIMARY KEY,content jsonb,scope text,"updatedAt" timestamptz DEFAULT now())');
-      const labelledContent = (name: string, deletedAt: string | null = null) => ({type:'doc',attrs:{mikka:{labels:[{name,color:'blue'}],deletedAt}}});
-      for (const [id,name,kind,deletedAt] of [[labelled,'backend','workspace',null],[otherLabelled,'foreign','workspace',null],[deletedLabelled,'deleted','workspace',new Date().toISOString()],[personalLabelled,'private','personal',null]]) {
-        await pool.query('INSERT INTO issues (id,content,scope) VALUES ($1,$2,$3)', [id,JSON.stringify(labelledContent(name!,deletedAt)),kind]);
-      }
-      mock.module(new URL('./issue-team-access.ts',import.meta.url).href,{namedExports:{issueTeamScope:async () => [
-        {issueId:labelled,workspaceId:alice.workspaceId},{issueId:otherLabelled,workspaceId:other.workspaceId},
-        {issueId:deletedLabelled,workspaceId:alice.workspaceId},{issueId:personalLabelled,workspaceId:alice.workspaceId}
-      ]}});
-      assert.deepEqual(await settings.labels(alice), [{name:'backend',color:'blue'}]);
-      assert.deepEqual(await settings.labels(other), [{name:'foreign',color:'blue'}]);
       let sessionOwner: string | null = "alice";
       const stub = (path: string, exports: Record<string, unknown>) =>
         mock.module(new URL(path, import.meta.url).href, {
@@ -377,40 +199,40 @@ test(
       assert.deepEqual(await freezeBotModel({ownerId:alice.ownerId,workspaceId:alice.workspaceId,botId:null},dependencies),{harness:'ai_sdk',model:COORDINATOR_MODEL},'the Coordinator with no bound subscription replies on Mikka 默认');
       await pool.query(`UPDATE byos_connections SET state='connected' WHERE id=ANY($1::uuid[])`,[[revoked.id,...others.rows.map(row=>row.id)]]);
 
-      // Decision 2026-10-31-2225: a subscription connected once, in alice's first workspace, runs her Bot in team B only after she shares it there.
+      // Decision 2026-11-01-2240: a subscription connected once, in alice's first workspace, runs her own bots in team B
+      // with no share row and no switch; 分享给团队成员 and the admin switch decide only other members' use.
       const teamB = { ownerId: alice.ownerId, workspaceId: randomUUID() };
       const teamBot = randomUUID(), bobBot = randomUUID();
       await pool.query('INSERT INTO bots (id,"ownerId","workspaceId") VALUES ($1,$2,$3),($4,$5,$3)',[teamBot,alice.ownerId,teamB.workspaceId,bobBot,'bob']);
-      assert.deepEqual(await freezeBotModel({ownerId:alice.ownerId,workspaceId:teamB.workspaceId,botId:teamBot},dependencies),{harness:'ai_sdk',model:COORDINATOR_MODEL},'not shared yet: Mikka 默认');
-      assert.deepEqual(await settings.botModels(teamB),[],'not shared yet: Bot 与 Agents in team B offers no personal subscription');
-      const { setSubscriptionShare } = await import('./personal-policy');
-      await setSubscriptionShare(pool, alice.ownerId, teamB.workspaceId, true);
+      assert.equal((await pool.query('SELECT 1 FROM workspace_subscription_shares WHERE "ownerId"=$1 AND "workspaceId"=$2',[alice.ownerId,teamB.workspaceId])).rowCount,0,'nothing shared into team B');
       const inTeam = await freezeBotModel({ownerId:alice.ownerId,workspaceId:teamB.workspaceId,botId:teamBot},dependencies);
-      assert.equal(inTeam.modelSelection?.workspaceId,teamB.workspaceId,'the run and its binding belong to team B');
+      assert.equal(inTeam.modelSelection?.workspaceId,teamB.workspaceId,'her own bot uses her subscription without sharing; the run and its binding belong to team B');
       assert.equal(inTeam.modelSelection?.consumerId,teamBot);
+      assert.ok((await settings.botModels(teamB)).length > 0,'Bot 与 Agents in team B offers her own subscription without sharing');
+      const teamMenu = await (await import('./bot-model-menu')).botModelMenu(pool,settings,teamB,null);
+      assert.ok(teamMenu.groups.some(group => group.kind === 'subscription' && group.options.length > 0),'her Coordinator\'s model menu in team B lists her subscription, not only Mikka 默认');
       const { rows: [teamBinding] } = await pool.query('SELECT b."workspaceId",c."workspaceId" AS "connectionWorkspace" FROM byos_bindings b JOIN byos_connections c ON c.id=b."connectionId" WHERE b.id=$1',[(inTeam.modelSelection as { bindingId: string }).bindingId]);
       assert.deepEqual(teamBinding,{workspaceId:teamB.workspaceId,connectionWorkspace:alice.workspaceId},'the connection keeps the workspace it was made in; nothing is re-issued');
       const teamCoordinator = await freezeBotModel({ownerId:alice.ownerId,workspaceId:teamB.workspaceId,botId:null},dependencies);
-      assert.equal(teamCoordinator.modelSelection?.workspaceId,teamB.workspaceId,'her Coordinator in team B uses her shared subscription too');
-      // Shared means for her own bots only.
+      assert.equal(teamCoordinator.modelSelection?.workspaceId,teamB.workspaceId,'her Coordinator in team B uses her subscription too');
+      // Unshared, it is hers alone.
       assert.equal((await settings.botModels({ownerId:'bob',workspaceId:teamB.workspaceId})).length,0,'another member of team B never sees or uses it');
       assert.deepEqual(await freezeBotModel({ownerId:'bob',workspaceId:teamB.workspaceId,botId:bobBot},dependencies),{harness:'ai_sdk',model:COORDINATOR_MODEL},'another member\'s bot replies on Mikka 默认');
       await assert.rejects(settings.bindingForBot({ownerId:'bob',workspaceId:teamB.workspaceId},null,catalogue.bindingId),{code:'executionModelUnknown'});
       await assert.rejects(settings.setBotModel({ownerId:'bob',workspaceId:teamB.workspaceId},bobBot,catalogue.bindingId),{code:'executionModelUnknown'});
-      // Team B's admin blocks members' subscriptions: her Bot and Coordinator reply on Mikka 默认.
+      // Team B's admin turns off members' subscriptions: that limits sharing only, never her own use.
       await pool.query('INSERT INTO workspace_personal_policies ("workspaceId",subscriptions) VALUES ($1,false)',[teamB.workspaceId]);
-      assert.deepEqual(await freezeBotModel({ownerId:alice.ownerId,workspaceId:teamB.workspaceId,botId:teamBot},dependencies),{harness:'ai_sdk',model:COORDINATOR_MODEL},'blocked: Mikka 默认, not her subscription');
-      assert.deepEqual(await freezeBotModel({ownerId:alice.ownerId,workspaceId:teamB.workspaceId,botId:null},dependencies),{harness:'ai_sdk',model:COORDINATOR_MODEL});
-      assert.deepEqual(await settings.botModels(teamB),[]);
-      assert.ok((await freezeBotModel({ownerId:alice.ownerId,workspaceId:alice.workspaceId,botId:null},dependencies)).modelSelection,'the block is per workspace');
+      assert.ok((await freezeBotModel({ownerId:alice.ownerId,workspaceId:teamB.workspaceId,botId:teamBot},dependencies)).modelSelection,'admin switch off: her own bot still uses her subscription');
+      assert.ok((await freezeBotModel({ownerId:alice.ownerId,workspaceId:teamB.workspaceId,botId:null},dependencies)).modelSelection,'admin switch off: her Coordinator too');
+      assert.ok((await settings.botModels(teamB)).length > 0,'admin switch off: her menu still offers it');
       await pool.query('UPDATE workspace_personal_policies SET subscriptions=true WHERE "workspaceId"=$1',[teamB.workspaceId]);
-      assert.ok((await freezeBotModel({ownerId:alice.ownerId,workspaceId:teamB.workspaceId,botId:teamBot},dependencies)).modelSelection,'unblocked: her shared subscription');
-      // Un-sharing takes it out of team B at once.
-      await setSubscriptionShare(pool, alice.ownerId, teamB.workspaceId, false);
-      assert.deepEqual(await freezeBotModel({ownerId:alice.ownerId,workspaceId:teamB.workspaceId,botId:teamBot},dependencies),{harness:'ai_sdk',model:COORDINATOR_MODEL},'un-shared: Mikka 默认');
-      // Alex 「B」: with 分享给团队成员, other members' bots may use her shared subscription too.
+      // A share row without 分享给团队成员 changes nothing for anyone; un-sharing never takes it from her.
+      const { setSubscriptionShare } = await import('./personal-policy');
       await setSubscriptionShare(pool, alice.ownerId, teamB.workspaceId, true);
-      assert.deepEqual(await freezeBotModel({ownerId:'bob',workspaceId:teamB.workspaceId,botId:bobBot},dependencies),{harness:'ai_sdk',model:COORDINATOR_MODEL},'shared for her own bots only: bob\'s bot replies on Mikka 默认');
+      assert.deepEqual(await freezeBotModel({ownerId:'bob',workspaceId:teamB.workspaceId,botId:bobBot},dependencies),{harness:'ai_sdk',model:COORDINATOR_MODEL},'shared without 分享给团队成员: bob\'s bot replies on Mikka 默认');
+      await setSubscriptionShare(pool, alice.ownerId, teamB.workspaceId, false);
+      assert.ok((await freezeBotModel({ownerId:alice.ownerId,workspaceId:teamB.workspaceId,botId:teamBot},dependencies)).modelSelection,'un-shared: her own bot still uses her subscription');
+      // Alex 「B」: with 分享给团队成员, other members' bots may use her subscription too.
       await setSubscriptionShare(pool, alice.ownerId, teamB.workspaceId, true, true);
       const pooled = await freezeBotModel({ownerId:'bob',workspaceId:teamB.workspaceId,botId:bobBot},dependencies);
       assert.equal(pooled.modelSelection?.ownerId,alice.ownerId,'the subscription is hers');
@@ -420,26 +242,19 @@ test(
       assert.deepEqual(await freezeBotModel({ownerId:'bob',workspaceId:teamB.workspaceId,botId:null},dependencies),{harness:'ai_sdk',model:COORDINATOR_MODEL},'bob\'s Coordinator never uses another member\'s subscription');
       assert.equal((await settings.botModels({ownerId:'bob',workspaceId:teamB.workspaceId})).length,0,'bob is never offered her credential as his own choice');
       await assert.rejects(settings.bindingForOthersBot({ownerId:'bob',workspaceId:teamB.workspaceId},teamBot,alice.ownerId,catalogue.bindingId),{code:'executionModelUnknown'},'only for a bot of the run\'s own owner');
-      // The admin block disables both.
+      // The admin block stops bob's use, not hers.
       await pool.query('UPDATE workspace_personal_policies SET subscriptions=false WHERE "workspaceId"=$1',[teamB.workspaceId]);
-      assert.deepEqual(await freezeBotModel({ownerId:'bob',workspaceId:teamB.workspaceId,botId:bobBot},dependencies),{harness:'ai_sdk',model:COORDINATOR_MODEL},'blocked: Mikka 默认');
+      assert.deepEqual(await freezeBotModel({ownerId:'bob',workspaceId:teamB.workspaceId,botId:bobBot},dependencies),{harness:'ai_sdk',model:COORDINATOR_MODEL},'blocked: bob\'s bot replies on Mikka 默认');
       await assert.rejects(settings.bindingForOthersBot({ownerId:'bob',workspaceId:teamB.workspaceId},bobBot,alice.ownerId,catalogue.bindingId),{code:'executionModelUnknown'});
+      assert.ok((await freezeBotModel({ownerId:alice.ownerId,workspaceId:teamB.workspaceId,botId:teamBot},dependencies)).modelSelection,'blocked for others: hers still works');
       await pool.query('UPDATE workspace_personal_policies SET subscriptions=true WHERE "workspaceId"=$1',[teamB.workspaceId]);
-      // Un-sharing takes it from everyone at once.
+      // Un-sharing takes it from everyone else at once; she keeps it.
       await setSubscriptionShare(pool, alice.ownerId, teamB.workspaceId, false);
       assert.deepEqual(await freezeBotModel({ownerId:'bob',workspaceId:teamB.workspaceId,botId:bobBot},dependencies),{harness:'ai_sdk',model:COORDINATOR_MODEL},'un-shared: bob\'s bot replies on Mikka 默认');
+      assert.ok((await freezeBotModel({ownerId:alice.ownerId,workspaceId:teamB.workspaceId,botId:teamBot},dependencies)).modelSelection,'un-shared: hers still works');
       sessionOwner = null;
-      await assert.rejects(actions.listExecutionRules());
-      sessionOwner = "bob";
-      await assert.rejects(actions.deleteExecutionRule(ids[0]));
-      await assert.rejects(actions.redetectDevice(own));
+      await assert.rejects(actions.listBotModels());
       sessionOwner = "alice";
-      await actions.createExecutionRule({ ...value, label: "actions" });
-      assert.ok(
-        (await actions.listExecutionRules()).some(
-          (rule) => rule.label === "actions",
-        ),
-      );
       await pool.query(
         `UPDATE byos_connections SET state='disconnected' WHERE id=$1`,
         [connection],

@@ -27,6 +27,6 @@ export function OfflineBanner({ top }: { top: number }) {
 
 const styles = StyleSheet.create({
   wrap: { position: 'absolute', left: 0, right: 0, alignItems: 'center', zIndex: 20 },
-  pill: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 30, paddingHorizontal: 12, borderRadius: 15, backgroundColor: '#fff', ...lift },
+  pill: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 30, paddingHorizontal: 12, borderRadius: 15, backgroundColor: colors.surface, ...lift },
   text: { fontSize: 13, color: colors.secondary },
 })

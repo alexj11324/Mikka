@@ -52,6 +52,21 @@ function database() {
 }
 
 /**
+ * On the open board, swaps the default 负责人 我 filter for 我创建的 through the
+ * toolbar. A seeded task has nobody on it, so only 我创建的 shows it
+ * (decision 2026-11-02-0302).
+ */
+export async function showCreatedByMe(page: Page) {
+  const toolbar = page.getByRole('toolbar', { name: '看板工具栏', exact: true })
+  await toolbar.getByRole('button', { name: '移除负责人筛选', exact: true }).click()
+  await toolbar.getByRole('button', { name: '筛选', exact: true }).click()
+  await page.getByRole('menu').getByRole('menuitemcheckbox', { name: '我创建的', exact: true }).click()
+  await page.keyboard.press('Escape')
+  await expect(toolbar.getByRole('group', { name: '我创建的', exact: true })).toBeVisible()
+  await expect(toolbar.getByRole('group', { name: '负责人', exact: true })).toHaveCount(0)
+}
+
+/**
  * Unrelated browser tests seed tasks directly to stay focused. The separate
  * tests/mvp suite runs the actual Coordinator workflow and must not use this.
  */
@@ -82,7 +97,7 @@ export async function seedSuggestion(page: Page, { source = 'gmail', action = 'r
 }
 
 /** The Coordinator's last turn failed with `error`, as a refused hosted-model call leaves it. */
-export async function seedCoordinatorError(page: Page, error: string) {
+export async function seedCoordinatorError(page: Page, error: string, workspaceId?: string) {
   const cookie = (await page.context().cookies()).find(item => item.name.endsWith('session_token'))
   if (!cookie) throw new Error('seedCoordinatorError 需要已登录的页面。')
   const db = database()
@@ -90,7 +105,11 @@ export async function seedCoordinatorError(page: Page, error: string) {
   if (!session) throw new Error('找不到当前登录会话。')
   // The Coordinator's chat lives on its own bot row (coordinator_bots), created when the app first opens. Before
   // that the error goes on the older bot-less session, which that first open moves onto the Coordinator.
-  const { rows: [coordinator] } = await db.query<{ botId: string }>('SELECT "botId" FROM coordinator_bots WHERE "ownerId" = $1 LIMIT 1', [session.userId])
+  const find = async () => (await db.query<{ botId: string }>('SELECT "botId" FROM coordinator_bots WHERE "ownerId" = $1 AND ($2::uuid IS NULL OR "workspaceId" = $2) LIMIT 1', [session.userId, workspaceId ?? null])).rows[0]
+  let coordinator = await find()
+  // A team's Coordinator is made on its first read, which may still be running.
+  for (let tries = 0; workspaceId && !coordinator && tries < 50; tries++) coordinator = await new Promise(resolve => setTimeout(resolve, 200)).then(find)
+  if (workspaceId && !coordinator) throw new Error('这个团队还没有 Coordinator。')
   await db.query('INSERT INTO coordinator_sessions ("userId", "botId", "lastError", "lastErrorAt") VALUES ($1, $2, $3, now()) ON CONFLICT ON CONSTRAINT coordinator_sessions_chat_key DO UPDATE SET "lastError" = $3, "lastErrorAt" = now()', [session.userId, coordinator?.botId ?? null, error])
 }
 

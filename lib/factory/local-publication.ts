@@ -5,6 +5,7 @@ import { z } from "zod";
 import { FactoryError, candidateSchema } from "./approval-contract";
 import type { PublicationAdapter } from "./approval";
 import { digest } from "./evidence";
+import { isLoopbackHost } from "../loopback";
 
 const configSchema = z
   .object({
@@ -118,7 +119,7 @@ export function configuredLocalPublicationAdapters(
     env.VERCEL ||
     env.VERCEL_ENV ||
     origin.protocol !== "http:" ||
-    !["127.0.0.1", "localhost", "[::1]"].includes(origin.hostname)
+    !isLoopbackHost(origin.hostname)
   )
     throw new FactoryError("factoryLocalTargetInvalid");
   return [

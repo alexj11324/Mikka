@@ -41,7 +41,7 @@ async function seedDispatch(email: string, title: string) {
   } finally { await pool.end() }
 }
 
-type ResultCardFixture = { issueId: string; name: string; pullRequests: { url: string; state: 'open' | 'draft' | 'merged' | 'closed' }[] }
+type ResultCardFixture = { issueId: string; name: string; title: string; pullRequests: { url: string; state: 'open' | 'draft' | 'merged' | 'closed' }[] }
 
 // Visual coverage only: these stored output states are not daemon/publication
 // acceptance. tests/mvp/core-loop.spec.ts must produce its result through the
@@ -82,10 +82,14 @@ test('A dispatched thread is a card under the reply that opens its conversation 
   await page.reload()
 
   const chat = page.getByRole('region', { name: 'Coordinator', exact: true })
-  const card = chat.getByRole('button', { name: '打开线程 Speed up the home page', exact: true })
+  // A thread is named for its task (glossary), on its card and in its header alike (D9).
+  const threadName = new RegExp(`^(?:\\S+ )?${title}$`)
+  const cardName = new RegExp(`^打开线程 (?:\\S+ )?${title}$`)
+  const card = chat.getByRole('button', { name: cardName })
   await expect(card).toBeVisible()
-  const surface = chat.locator('[data-slot="thread-card"]').filter({ has: page.getByRole('button', { name: '打开线程 Speed up the home page', exact: true }) })
-  await expect(surface).toContainText('Speed up the home page')
+  // filter({ has }) searches inside each card, so its locator starts from the page, not from the chat region.
+  const surface = chat.locator('[data-slot="thread-card"]').filter({ has: page.getByRole('button', { name: cardName }) })
+  await expect(surface).toContainText(title)
   await expect(surface.getByRole('img', { name: '进行中', exact: true })).toBeVisible()
   // R-66: status icon + title + the PR badge; no avatar or progress row.
   await expect(surface).not.toContainText('交给 Codex')
@@ -93,7 +97,7 @@ test('A dispatched thread is a card under the reply that opens its conversation 
   await testInfo.attach('thread-card', { body: await page.screenshot(), contentType: 'image/png' })
 
   await card.click()
-  const thread = page.getByRole('region', { name: 'Speed up the home page', exact: true })
+  const thread = page.getByRole('region', { name: threadName })
   await expect(thread.getByRole('list', { name: '线程对话' })).toContainText('Home page loads in 3.8s.')
   await expect(thread.getByRole('textbox', { name: '告诉 Codex 下一步做什么…' })).toBeVisible()
   // The chat stays in the centre and the thread has its own address (R-82).
@@ -122,10 +126,10 @@ test('A dispatched thread is a card under the reply that opens its conversation 
   await artifactWindow.getByRole('button', { name: '关闭', exact: true }).click()
   await expect(artifactWindow).toHaveCount(0)
 
-  await thread.getByRole('button', { name: '关闭线程', exact: true }).click()
+  await thread.getByRole('button', { name: '返回', exact: true }).click()
   await expect(thread).toHaveCount(0)
   await expect(page).toHaveURL(url => !url.searchParams.has('thread'))
-  await expect(chat.getByRole('button', { name: '打开线程 Speed up the home page', exact: true })).toBeVisible()
+  await expect(card).toBeVisible()
 
   // Review frame 356:4750. Seed only this visual test's state matrix; the MVP
   // daemon loop has its own separate evidence and never uses this helper.
@@ -134,28 +138,30 @@ test('A dispatched thread is a card under the reply that opens its conversation 
   const fixtures: ResultCardFixture[] = []
   for (const pr of outputs) {
     const name = `PR ${pr.state} fixture`
-    fixtures.push({ name, issueId: await seedTask(page, `${name} ${randomUUID()}`), pullRequests: [pr] })
+    const title = `${name} ${randomUUID()}`
+    fixtures.push({ name, title, issueId: await seedTask(page, title), pullRequests: [pr] })
   }
-  fixtures.push({ name: 'More PR outputs fixture', issueId: await seedTask(page, `PR overflow ${randomUUID()}`), pullRequests: outputs })
+  const overflow = `PR overflow ${randomUUID()}`
+  fixtures.push({ name: 'More PR outputs fixture', title: overflow, issueId: await seedTask(page, overflow), pullRequests: outputs })
   await seedResultCards(email, fixtures)
   await page.reload()
-  const resultCard = (name: string) => chat.locator('[data-slot="thread-card"]').filter({ has: page.getByRole('button', { name: `打开线程 ${name}`, exact: true }) })
+  const resultCard = (title: string) => chat.locator('[data-slot="thread-card"]').filter({ has: page.getByRole('button', { name: new RegExp(`^打开线程 (?:\\S+ )?${title}$`) }) })
 
   // The badge opens its list without bubbling into the card's thread; a row opens its PR.
   await page.context().route('https://github.com/**', route => route.fulfill({ contentType: 'text/html', body: '<title>PR visual fixture destination</title>' }))
-  await resultCard(fixtures[0].name).getByRole('button', { name: '1 个 PR', exact: true }).click()
+  await resultCard(fixtures[0].title).getByRole('button', { name: '1 个 PR', exact: true }).click()
   const list = page.locator('[data-slot="pull-requests-list"]')
   await expect(list.getByRole('link')).toHaveCount(1)
   await expect(list.getByRole('link')).toContainText('打开')
   await expect(list.getByRole('link')).toContainText('cards #101')
-  await expect(page.getByRole('region', { name: fixtures[0].name, exact: true })).toHaveCount(0)
+  await expect(page.getByRole('region', { name: new RegExp(`^(?:\\S+ )?${fixtures[0].title}$`) })).toHaveCount(0)
   const popupOpened = page.waitForEvent('popup')
   await list.getByRole('link').click()
   const popup = await popupOpened
   try { await expect(popup).toHaveURL(outputs[0].url) } finally { await popup.close() }
   await expect(chat).toBeVisible()
   await expect(chat.locator('[data-slot="thread-card"]')).toHaveCount(6)
-  await expect(page.getByRole('region', { name: fixtures[0].name, exact: true })).toHaveCount(0)
+  await expect(page.getByRole('region', { name: new RegExp(`^(?:\\S+ )?${fixtures[0].title}$`) })).toHaveCount(0)
 
   const measurements = []
   for (const view of [
@@ -168,7 +174,7 @@ test('A dispatched thread is a card under the reply that opens its conversation 
     await page.emulateMedia({ colorScheme: view.colorScheme })
     await expect(page.locator('html')).toHaveClass(new RegExp(`\\b${view.colorScheme}\\b`))
     for (const [index, fixture] of fixtures.entries()) {
-      const outputCard = resultCard(fixture.name)
+      const outputCard = resultCard(fixture.title)
       await expect(outputCard).toBeVisible()
       await expect(outputCard).not.toContainText('执行了')
       await expect(outputCard).not.toContainText('交给 Codex')

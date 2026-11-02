@@ -1,5 +1,7 @@
 {
   "Common": {
+    "appUpdated": "Mikka 已更新",
+    "refresh": "刷新",
     "close": "关闭",
     "cancel": "取消",
     "save": "保存",
@@ -747,7 +749,7 @@
     "editorAria": "{label}编辑器"
   },
   "Devices": {
-    "otherDevices": "Remote control",
+    "otherDevices": "服务器",
     "menu": "{name} 的更多操作",
     "add": {
       "title": "添加设备",
@@ -783,10 +785,8 @@
     "online": "在线",
     "offline": "离线",
     "thisMachine": "本机",
-    "allowScheduling": "允许调度",
-    "allowSchedulingTo": "允许调度到 {name}",
-    "autoSchedule": "自动调度",
-    "autoScheduleTo": "允许 {name} 自动调度",
+    "allowScheduling": "参与调度",
+    "allowSchedulingTo": "{name} 参与调度",
     "recheck": "重新检查",
     "agent": "可用工具",
     "toggleSidebar": "展开或收起侧栏",
@@ -926,8 +926,7 @@
       "retry": "重试",
       "done": "完成",
       "cancelled": "已取消"
-    },
-    "autoScheduleNeedsAllow": "需先开启「允许调度」"
+    }
   },
   "Workspace": {
     "loadingEditor": "正在加载任务编辑器",
@@ -1704,8 +1703,8 @@
         "title": "连接"
       },
       "models": {
-        "title": "API 与订阅",
-        "keywords": "模型订阅 订阅 额度 用量 API Key 服务商 模型"
+        "title": "模型与订阅",
+        "keywords": "模型订阅 订阅 额度 API Key 服务商 模型 允许使用的模型 顺序 派发 运行位置 云端 本地 Bot Agent"
       },
       "logins": {
         "title": "登录与密钥"
@@ -1721,10 +1720,6 @@
       },
       "general": {
         "title": "常规"
-      },
-      "bots": {
-        "title": "Bot 与 Agents",
-        "keywords": "Bot Agent 模型 运行位置 规则 标签"
       },
       "permissions": {
         "title": "团队权限"
@@ -1923,10 +1918,12 @@
       "copied": "已复制",
       "rowMenu": "{label} 的更多操作",
       "callbackPlaceholder": "http://localhost:54545/callback?code=…",
-      "paused": "已暂停",
+      "paused": "已停用",
       "useSubscription": "使用 {label}",
       "pauseFailed": "无法更改这个订阅。",
-      "claudePlan": "Claude {plan}"
+      "claudePlan": "Claude {plan}",
+      "disconnectTitle": "断开 {label}？",
+      "enabled": "启用"
     },
     "integrations": {
       "googleSignInTitle": "Google 登录",
@@ -2199,6 +2196,7 @@
       "newValue": "新的值",
       "scope": "范围",
       "deleting": "正在删除…",
+      "removeTitle": "删除 {name}？",
       "shortValueNotMasked": "{name} 少于 8 个字符，输出里不会遮住。",
       "e2b": {
         "heading": "云电脑",
@@ -2371,10 +2369,11 @@
       "mine": "我的点数也可用于这个团队",
       "sharers": "分享点数的成员"
     },
-    "personalPolicy": {
-      "loading": "正在加载个人订阅设置",
-      "heading": "个人订阅",
-      "subscriptions": "允许成员使用个人订阅和 API Key"
+    "sharePolicy": {
+      "loading": "正在加载分享设置",
+      "heading": "订阅与 API Key",
+      "label": "成员把自己的订阅和 API Key 分享给队友",
+      "detail": "禁止后只停用分享给别人的部分，每个人自己照常能用"
     },
     "appPolicy": {
       "loading": "正在加载应用权限",
@@ -2409,7 +2408,8 @@
       "minutes": "{count} 分钟",
       "hours": "{count} 小时",
       "balance": "余额",
-      "points": "{points} 点"
+      "points": "{points} 点",
+      "awaitingTakeover": "待接管"
     },
     "billing": {
       "loading": "正在加载计费",
@@ -2440,44 +2440,6 @@
         "incomplete": "待完成付款"
       }
     },
-    "botAgents": {
-      "bots": "Bot",
-      "addRule": "添加规则",
-      "default": "默认",
-      "cloud": "Mikka Cloud",
-      "online": "在线",
-      "offline": "离线",
-      "removedDevice": "已移除的设备",
-      "redetect": "重新检测",
-      "searchModels": "搜索模型",
-      "claudeAccount": "Claude",
-      "openaiAccount": "ChatGPT",
-      "add": "添加",
-      "save": "保存",
-      "delete": "删除",
-      "rowMenu": "{label} 的更多操作",
-      "cell": "{row} {column}：{value}",
-      "loading": "正在读取 Bot 与 Agents",
-      "loadFailed": "无法读取 Bot 与 Agents",
-      "notSaved": "未保存",
-      "retry": "重试",
-      "columns": {
-        "label": "标签",
-        "place": "运行位置",
-        "harness": "Agent",
-        "model": "模型",
-        "actions": "操作"
-      },
-      "hostedDefault": "Mikka 默认",
-      "defaults": "任务默认",
-      "fallbacks": "出问题时",
-      "setting": "{name}：{value}",
-      "whenDeviceOffline": "设备离线时",
-      "offlineWait": "等它上线",
-      "offlineCloud": "改到云端运行",
-      "labels": "按标签",
-      "pickModel": "选择模型"
-    },
     "searchEmpty": "没有匹配的设置",
     "apiKeys": {
       "add": "添加 API Key",
@@ -2504,7 +2466,63 @@
       "removeTitle": "删除 {name}？",
       "othersUsage": "团队成员可以用它跑自己的 Bot，用量算在你的 API 账单上。",
       "afterQuota": "订阅额度用完后，自动改用 API Key",
-      "afterQuotaBilling": "会按 API 服务商的价格计费"
+      "afterQuotaBilling": "会按 API 服务商的价格计费",
+      "sectionTitle": "API Key",
+      "none": "还没有 API Key",
+      "loading": "正在读取 API Key…",
+      "modelCount": "{count} 个模型",
+      "noModels": "服务商没有返回模型",
+      "modelsInvalid": "无法获取模型 · Key 无效或已被撤销",
+      "modelsUnavailable": "无法获取模型 · 服务商没有响应",
+      "refetch": "重新获取模型",
+      "refetchLabel": "重新获取 {name} 的模型"
+    },
+    "modelOrder": {
+      "title": "允许使用的模型",
+      "loading": "正在读取允许使用的模型…",
+      "location": "运行位置",
+      "local": "本地",
+      "cloud": "云端",
+      "localDevices": "{count} 台电脑参与调度",
+      "cloudNoKey": "E2B Key 未设置",
+      "add": "添加模型",
+      "addCount": "添加 {count} 个",
+      "empty": "还没有允许使用的模型",
+      "noCandidates": "没有可添加的模型",
+      "removeTitle": "移除 {model}？",
+      "remove": "移除",
+      "ready": "可用",
+      "quotaUntil": "额度用完 · {time}恢复",
+      "noDevice": "没有电脑能跑 {harness}",
+      "blocked": {
+        "quota": "额度用完",
+        "expired": "需要重新连接",
+        "paused": "订阅已停用",
+        "missing": "已不可用",
+        "keyRefused": "Key 无效或已被撤销"
+      },
+      "handle": "拖动 {model}（第 {position} 个）",
+      "rowMenu": "{model} 的更多操作",
+      "moveUp": "上移",
+      "moveDown": "下移",
+      "dragInstructions": "按空格拿起，用上下方向键移动，再按空格放下，按 Esc 取消。",
+      "dragStart": "拿起 {model}，第 {position} 个",
+      "dragOver": "{model} 移到第 {position} 个",
+      "dragEnd": "{model} 放在第 {position} 个",
+      "dragCancel": "取消移动 {model}",
+      "source": {
+        "claude": "Claude 订阅",
+        "codex": "ChatGPT 订阅",
+        "apiKey": "{provider} API Key"
+      },
+      "added": "已添加",
+      "provider": {
+        "anthropic": "Anthropic",
+        "openai": "OpenAI",
+        "deepseek": "DeepSeek",
+        "kimi": "Kimi",
+        "custom": "自定义服务商"
+      }
     }
   },
   "TelegramBot": {
@@ -2757,7 +2775,6 @@
     "c_c6492461": "查看全部任务 ·",
     "c_30108106": "查看全部团队",
     "c_4090a5db": "查看全部项目",
-    "c_37ee9ddc": "查看团队层级文档（新窗口）",
     "c_c4c23eda": "查看项目 ·",
     "c_95c35444": "标识须为 2–12 位大写字母或数字，并以字母开头。",
     "c_62e51561": "正在读取",
@@ -2951,7 +2968,7 @@
       "metered": "按量",
       "shared": "团队成员分享的",
       "sharedKey": "{name}的 Key",
-      "manage": "管理 API 与订阅",
+      "manage": "管理模型与订阅",
       "unavailable": "不可用",
       "notSaved": "未保存",
       "unknownModel": "未知模型",
@@ -3205,11 +3222,22 @@
     "needsMachineTitle": "没有可用的电脑",
     "needsMachineDescription": "先连接或开启一台电脑，或者填入你的 E2B API Key 用云端运行。",
     "needsMachineConnect": "连接电脑",
-    "needsMachineAuto": "允许这台电脑自动调度",
+    "needsMachineAuto": "让这台电脑参与调度",
     "needsMachineServerOnline": "让服务器重新上线",
     "needsMachineMac": "在这台电脑上启用",
     "needsMachineServer": "连接我的服务器",
-    "needsMachineE2B": "填入 E2B Key"
+    "needsMachineE2B": "填入 E2B Key",
+    "needsModelTitle": "没有能跑这个任务的模型",
+    "needsModelNoModels": "还没有允许使用的模型",
+    "needsModelCloud": "云端还没有 E2B Key",
+    "needsModelNoDevice": "允许使用的模型都没有电脑能跑",
+    "needsModelUnavailable": "允许使用的模型都暂时不可用",
+    "needsModelDeviceAgent": "这台电脑没装 {agent}",
+    "needsModelDeviceModel": "这台电脑的 {agent} 没有报告 {model}",
+    "needsModelNotOffered": "没有订阅或 Key 能用 {agent} 跑 {model}",
+    "needsModelPickedNoDevice": "没有电脑能用 {agent} 跑 {model}",
+    "needsModelPickedUnavailable": "{agent} 的 {model} 暂时不可用",
+    "needsModelSettings": "打开模型与订阅"
   },
   "IssueThreads": {
     "title": "线程",
@@ -3257,7 +3285,8 @@
     "runInfo": {
       "paidBy": "{owner} 的 {plan}",
       "movedTo": "已换到 {machine} 继续"
-    }
+    },
+    "back": "返回"
   },
   "Computer": {
     "status": {
@@ -3334,7 +3363,8 @@
         "idle": "空闲",
         "resolved": "已解决"
       },
-      "waitingFor": "等待 {device} 上线"
+      "waitingFor": "等待 {device} 上线",
+      "dispatchedBy": "{bot} 派出"
     },
     "newBot": {
       "title": "新建 Bot",
@@ -3401,9 +3431,8 @@
     "coordinatorPlaceholder": "问 Coordinator 或布置任务…",
     "panel": {
       "label": "右栏",
-      "views": "右栏视图",
-      "overview": "概览",
       "allThreads": "全部线程",
+      "allThreadsWaiting": "全部线程，{count} 条等你",
       "tabs": "右栏内容",
       "details": "详情",
       "threads": "线程",
@@ -3440,7 +3469,10 @@
       "nameTooLong": "名字最多 {max} 个字",
       "changeAvatar": "更换 {name} 的头像",
       "close": "关闭右栏",
-      "open": "打开右栏"
+      "open": "打开右栏",
+      "filterBot": "按派出者筛选",
+      "allBots": "全部派出者",
+      "closeAllThreads": "关闭全部线程"
     },
     "suggestions": {
       "title": "建议",
@@ -3502,6 +3534,7 @@
         "status": "状态",
         "priority": "优先级",
         "assignee": "负责人",
+        "creator": "我创建的",
         "labels": "标签",
         "project": "项目",
         "agentState": "线程状态"
@@ -3561,8 +3594,8 @@
         "discuss": "讨论",
         "delete": "删除",
         "agent": {
-          "running": "运行中",
-          "waiting": "等你处理",
+          "running": "进行中",
+          "waiting": "等待你",
           "blocked": "受阻"
         }
       },
@@ -3956,35 +3989,11 @@
     "accessibleToAll": "工作区所有成员都可以访问",
     "teamOverview": "团队概览",
     "memberCount": "{count} 名成员",
-    "hierarchy": "团队层级",
-    "docs": "文档",
     "dangerZone": "危险操作",
     "rows": {
       "general": "常规",
       "members": "成员",
-      "slack": "Slack 通知",
-      "issuesSection": "任务、项目和文档",
-      "issueLabels": "任务标签",
-      "projectLabels": "项目标签",
-      "templates": "模板",
-      "recurringIssues": "周期任务",
-      "workflowSection": "工作流",
-      "issueStatuses": "任务状态",
-      "projectStatuses": "项目状态",
-      "workflows": "工作流与自动化",
-      "triage": "分诊",
-      "cycles": "周期",
-      "agentsSection": "AI 与 Bot",
-      "teamAgents": "团队 Bot",
-      "agentSkills": "Bot 技能",
-      "agentConnectors": "Bot 连接器",
-      "projectUpdates": "项目进展",
-      "threadSummaries": "已解决讨论摘要",
-      "parentTeam": "上级团队",
-      "none": "无",
-      "leaveTeam": "退出团队",
-      "retireTeam": "停用团队",
-      "deleteTeam": "删除团队"
+      "leaveTeam": "退出团队"
     }
   },
   "CredentialLogin": {
@@ -4066,6 +4075,8 @@
       "platform_paused": "免费额度暂时停用",
       "unavailable": "Mikka 默认暂时不可用",
       "verifyCard": "验证银行卡",
+      "teamNoPoints": "这个团队没有可用点数",
+      "openBilling": "打开计费",
       "useSubscription": "改用我的 {name} 订阅",
       "connect": "连接 <claude></claude> Claude / <openai></openai> ChatGPT 订阅"
     }

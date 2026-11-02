@@ -7,6 +7,7 @@ import {
   type PublicationInput,
 } from "./publication-operation";
 import { MIKKA_VERCEL, vercelTarget } from "./vercel-target";
+import { isLoopbackHost } from "../loopback";
 
 // Re-exported for the existing tests and server composition.
 export { MIKKA_VERCEL, vercelTarget } from "./vercel-target";
@@ -43,7 +44,7 @@ export function createVercelClient(
     const u = new URL(origin);
     if (
       u.protocol !== "http:" ||
-      !["127.0.0.1", "localhost", "[::1]"].includes(u.hostname) ||
+      !isLoopbackHost(u.hostname) ||
       u.origin !== origin
     )
       throw new FactoryError("factoryVercelOriginInvalid");
