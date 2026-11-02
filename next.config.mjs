@@ -94,4 +94,16 @@ const nextConfig = {
   },
 }
 
-export default withWorkflow(withNextIntl(nextConfig))
+const workflowConfig = withWorkflow(withNextIntl(nextConfig))
+
+export default async function config(phase, context) {
+  const resolved = await workflowConfig(phase, context)
+  if (phase !== 'phase-production-build') return resolved
+  // The 8 GB Vercel build machine runs out of memory at "Collecting page data"
+  // (docs/dev-workflow.md). Nothing reads production source maps, which cost
+  // ~750 MB to generate, and the workflow bundles are built by now, so the
+  // esbuild service need not stay up for the rest of the build.
+  const esbuild = await import('esbuild')
+  esbuild.stop()
+  return { ...resolved, experimental: { ...resolved.experimental, turbopackSourceMaps: false } }
+}
