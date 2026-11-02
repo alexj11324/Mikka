@@ -6,8 +6,9 @@
 // row (2026-11-02) failed there with stapler error 68 / NSURLErrorDomain -1005
 // while fetching the new ticket from api.apple-cloudkit.com. Here the staple
 // waits and retries for about five minutes. Nothing is skipped: the signature
-// is verified first, notarization must be Accepted, and the stapled app must
-// pass `stapler validate`.
+// is verified first, notarization must be Accepted, the stapled app must pass
+// `stapler validate`, and on CI missing credentials fail the build. A failed
+// tool reports only its exit code and last stderr line, never its arguments.
 
 import { execFile } from 'node:child_process'
 import { mkdtemp, rm } from 'node:fs/promises'
@@ -39,6 +40,41 @@ export function notaryAuth(env) {
   return null
 }
 
+/**
+ * The credentials, or null for a local build without any. On CI (CI or
+ * GITHUB_ACTIONS set) a missing credential fails the build instead of
+ * shipping an app that is signed but not notarized.
+ */
+export function requireNotaryAuth(env) {
+  const auth = notaryAuth(env)
+  if (!auth && (env.CI || env.GITHUB_ACTIONS)) throw new Error('Notarization credentials are missing on CI; a release must be notarized')
+  return auth
+}
+
+/** The values of `--password`, `--key` and friends, which must never reach a log. */
+export function secretValues(auth) {
+  const values = []
+  for (let index = 0; index < (auth?.length ?? 0); index += 1) {
+    if (['--password', '--key', '--key-id', '--issuer', '--apple-id'].includes(auth[index]) && auth[index + 1]) values.push(auth[index + 1])
+  }
+  return values
+}
+
+/**
+ * Runs a tool and, when it fails, throws only its exit code and the last line
+ * of its stderr, with any credential value masked. execFile's own error
+ * message carries the whole command line, credentials included.
+ */
+export async function runQuietly(exec, label, file, args, secrets = [], options = {}) {
+  try {
+    return await exec(file, args, options)
+  } catch (error) {
+    const lastLine = String(error?.stderr ?? '').trim().split('\n').at(-1) ?? ''
+    const masked = secrets.filter(Boolean).reduce((text, secret) => text.split(secret).join('***'), lastLine)
+    throw new Error(`${label} failed (exit ${error?.code ?? 'unknown'})${masked ? `: ${masked}` : ''}`)
+  }
+}
+
 /** Staples, retrying with STAPLE_RETRY_DELAYS; throws the last error once they run out. */
 export async function stapleWithRetry(staple, { delays = STAPLE_RETRY_DELAYS, sleep = seconds => new Promise(resolve => setTimeout(resolve, seconds * 1000)), log = console.log } = {}) {
   for (let attempt = 0; ; attempt += 1) {
@@ -47,7 +83,7 @@ export async function stapleWithRetry(staple, { delays = STAPLE_RETRY_DELAYS, sl
       return attempt + 1
     } catch (error) {
       if (attempt >= delays.length) throw error
-      log(`staple attempt ${attempt + 1} failed (${String(error?.stderr || error?.message || error).trim().split('\n').at(-1)}); retrying in ${delays[attempt]}s`)
+      log(`staple attempt ${attempt + 1} failed (${error?.message ?? 'unknown error'}); retrying in ${delays[attempt]}s`)
       await sleep(delays[attempt])
     }
   }
@@ -56,27 +92,29 @@ export async function stapleWithRetry(staple, { delays = STAPLE_RETRY_DELAYS, sl
 export default async function afterSign(context) {
   if (context.electronPlatformName !== 'darwin') return
   const appPath = join(context.appOutDir, `${context.packager.appInfo.productFilename}.app`)
-  const auth = notaryAuth(process.env)
+  const auth = requireNotaryAuth(process.env)
   if (!auth) {
-    console.warn('No notarization credentials; the app is signed but not notarized')
+    console.warn('No notarization credentials; this local build is signed but not notarized')
     return
   }
-  await run('codesign', ['--verify', '--deep', '--strict', '--verbose=2', appPath])
+  const secrets = secretValues(auth)
+  const quiet = (label, file, args, options) => runQuietly(run, label, file, args, secrets, options)
+  await quiet('codesign --verify', 'codesign', ['--verify', '--deep', '--strict', '--verbose=2', appPath])
   const dir = await mkdtemp(join(tmpdir(), 'mikka-notarize-'))
   try {
     const zip = join(dir, 'Mikka.zip')
-    await run('ditto', ['-c', '-k', '--sequesterRsrc', '--keepParent', appPath, zip])
-    const { stdout } = await run('xcrun', ['notarytool', 'submit', zip, ...auth, '--wait', '--output-format', 'json'], { maxBuffer: 16 * 1024 * 1024 })
+    await quiet('ditto', 'ditto', ['-c', '-k', '--sequesterRsrc', '--keepParent', appPath, zip])
+    const { stdout } = await quiet('notarytool submit', 'xcrun', ['notarytool', 'submit', zip, ...auth, '--wait', '--output-format', 'json'], { maxBuffer: 16 * 1024 * 1024 })
     const result = JSON.parse(stdout)
     if (result.status !== 'Accepted') {
-      const details = await run('xcrun', ['notarytool', 'log', result.id, ...auth]).then(({ stdout: log }) => log, () => '')
+      const details = await quiet('notarytool log', 'xcrun', ['notarytool', 'log', result.id, ...auth]).then(({ stdout: log }) => log, () => '')
       throw new Error(`Notarization ${result.status} (${result.id})\n${details}`)
     }
     console.log(`Notarization accepted (${result.id})`)
   } finally {
     await rm(dir, { recursive: true, force: true })
   }
-  const attempts = await stapleWithRetry(() => run('xcrun', ['stapler', 'staple', appPath]))
-  await run('xcrun', ['stapler', 'validate', appPath])
+  const attempts = await stapleWithRetry(() => quiet('stapler staple', 'xcrun', ['stapler', 'staple', appPath]))
+  await quiet('stapler validate', 'xcrun', ['stapler', 'validate', appPath])
   console.log(`Stapled and validated after ${attempts} attempt(s)`)
 }
