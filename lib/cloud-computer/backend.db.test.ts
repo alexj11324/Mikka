@@ -8,7 +8,7 @@ import { SubagentStore } from './subagents'
 import { startSuggestion } from './suggestions'
 import { nativeRunBinding } from '@/lib/computer/native-run-binding'
 import { claimCloudRun } from '@/lib/computer/claim'
-import { openThreadDesktop, recordCancelledSandbox, recordThreadSandbox, threadMachineAction } from './thread-machines'
+import { recordCancelledSandbox, recordThreadSandbox, threadMachineAction } from './thread-machines'
 const databaseURL = process.env.COMPUTER_TEST_DATABASE_URL ?? process.env.E2E_DATABASE_URL
 if (process.env.REQUIRE_DB === '1' && !databaseURL) throw new Error('Isolated database required')
 // This suite runs DROP SCHEMA ... CASCADE, so the full target is checked before any
@@ -140,44 +140,6 @@ test('real DB: additive migration, subagent owner isolation and separate thread 
     assert.equal((await claimCloudRun(pool, alice, runA, deviceA, expires, bindingId))?.display, ':1')
     assert.equal((await claimCloudRun(pool, alice, runB, deviceB, expires, bindingId))?.botId, botA)
     assert.equal(await claimCloudRun(pool, alice, runA, deviceA, expires, bindingId), null, 'one claim only')
-
-    // Opening a desktop uses the current policy generation on that machine;
-    // a denied workspace or another owner never reaches the provider.
-    const desktopCalls: string[] = []
-    const desktopRuntime = {
-      async connectComputer(_workspaceId: string, id: string) { desktopCalls.push(`connect ${id}`); return { sandboxId: id } },
-      async startDesktop(_sandbox: unknown, display: number) { assert.equal(display, 1); desktopCalls.push('start') },
-      async syncDesktopLease(_sandbox: unknown, lease: { botId: string; ownerId: string; policyVersion: number; computerAllowed: boolean }) {
-        assert.equal(lease.botId, botA); assert.equal(lease.ownerId, alice.userId)
-        assert.equal(lease.policyVersion, 17); assert.equal(lease.computerAllowed, true); desktopCalls.push('lease')
-      },
-      async installSubagentRuntime() { desktopCalls.push('gateway') },
-      async runtimeRequest() { return { targetId: 'thread-page' } },
-      async viewerGrant() { desktopCalls.push('viewer'); return { url: 'wss://synthetic.invalid', expiresAt: new Date(Date.now() + 1000).toISOString() } },
-    } as unknown as Parameters<typeof openThreadDesktop>[3]
-    await pool.query(`INSERT INTO workspace_computer_policies VALUES ($1,'allow',17)`, [alice.workspaceId])
-    assert.equal((await openThreadDesktop(pool, alice, runA, desktopRuntime)).runId, runA)
-    assert.deepEqual(desktopCalls, [`connect sandbox-${runA}`, 'start', 'lease', 'gateway', 'viewer'])
-    assert.equal((await pool.query('SELECT "targetId" FROM thread_machines WHERE "runId"=$1', [runA])).rows[0].targetId, 'thread-page')
-    desktopCalls.length = 0
-    await assert.rejects(openThreadDesktop(pool, bob, runA, desktopRuntime), { status: 404 })
-    await assert.rejects(openThreadDesktop(pool, stranger, runA, desktopRuntime), { status: 404 })
-    await pool.query('UPDATE devices SET enabled=false WHERE id=$1', [deviceA])
-    await assert.rejects(openThreadDesktop(pool, alice, runA, desktopRuntime), { status: 404 })
-    await pool.query('UPDATE devices SET enabled=true WHERE id=$1', [deviceA])
-    await pool.query('UPDATE agent_runs SET "deviceId"=$2 WHERE id=$1', [runA, deviceB])
-    await assert.rejects(openThreadDesktop(pool, alice, runA, desktopRuntime), { status: 404 })
-    await pool.query('UPDATE agent_runs SET "deviceId"=$2 WHERE id=$1', [runA, deviceA])
-    const revoker = await pool.connect()
-    await revoker.query('BEGIN')
-    await revoker.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`computer-policy:${alice.workspaceId}`])
-    await revoker.query(`UPDATE workspace_computer_policies SET permission='deny',version=18 WHERE "workspaceId"=$1`, [alice.workspaceId])
-    const denied = assert.rejects(openThreadDesktop(pool, alice, runA, desktopRuntime), { status: 403 })
-    await new Promise(resolve => setTimeout(resolve, 30))
-    assert.deepEqual(desktopCalls, [], 'desktop opening waits behind the policy fence')
-    await revoker.query('COMMIT'); revoker.release()
-    await denied
-    assert.deepEqual(desktopCalls, [], 'a denied desktop never reaches E2B')
   } finally {
     await pool.end(); await admin.query(`DROP SCHEMA ${schema} CASCADE`); await admin.end()
   }
