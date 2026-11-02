@@ -24,10 +24,13 @@ export function groupTag(group: ModelGroup) {
 export function optionName(option: Pick<ModelOption, 'id' | 'modelId'>) {
   return option.id === HOSTED_CHOICE ? 'Mikka 默认' : option.modelId || '未知模型'
 }
-export function modelMenuLabel(current: BotModelCurrent, running = false) {
+export function modelMenuLabel(current: BotModelCurrent, _running = false) {
+  return optionName(current)
+}
+function modelSourceLabel(current: BotModelCurrent) {
   const metered = current.kind === 'apiKey' || current.kind === 'shared'
   const status = current.availability === 'checking' ? '待检查' : !current.available ? '不可用' : null
-  return [running ? '下一条' : null, optionName(current), current.credentialLabel, metered ? '按量' : null, current.fallback ? '已切换' : null, status].filter(Boolean).join(' · ')
+  return [optionName(current), current.credentialLabel, metered ? '按量' : null, current.fallback ? '已切换' : null, status].filter(Boolean).join(' · ')
 }
 export const modelMenuReadLabel = (busy: boolean) => busy ? '正在读取模型' : '模型加载失败，重试'
 export function modelStatusLine(current: BotModelCurrent): string | null {
@@ -39,5 +42,5 @@ export function modelStatusLine(current: BotModelCurrent): string | null {
     const reset = quota.resetsAt ? new Date(quota.resetsAt) : null
     return reset && Number.isFinite(reset.getTime()) ? `${exhausted} · ${reset.toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })} 恢复` : exhausted
   }
-  return current.fallback ? `下一条使用 ${modelMenuLabel(current)}` : null
+  return current.fallback ? `下一条使用 ${modelSourceLabel(current)}` : null
 }

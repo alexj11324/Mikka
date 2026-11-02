@@ -1,7 +1,66 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { STALE_BUILD_EVENT, desktopBelowMinimum, isStaleBuild, minDesktopVersion, reloadOnce, watchRemovedActions } from './app-build'
+import { STALE_BUILD_EVENT, createAppVersionReader, desktopBelowMinimum, isStaleBuild, minDesktopVersion, reloadOnce, watchRemovedActions } from './app-build'
+
+test('navigation and action probes share one public read, then reuse it until stale', async () => {
+  let calls = 0, now = 1_000
+  let finish!: (response: Response) => void
+  const read = createAppVersionReader({ now: () => now, fetch: async (input, init) => {
+    calls++
+    assert.match(input, /\/api\/version$/)
+    assert.equal(init.cache, 'no-store')
+    assert.equal(init.credentials, 'omit')
+    assert.equal(new Headers(init.headers).get('x-deployment-id'), null)
+    if (calls === 1) return new Promise(resolve => { finish = resolve })
+    return Response.json({ build: 'newer' })
+  } })
+  const navigation = read(), action = read()
+  assert.equal(navigation, action)
+  await Promise.resolve()
+  assert.equal(calls, 1)
+  finish(Response.json({ build: 'current', minDesktopVersion: '2026.10000.335' }))
+  assert.deepEqual(await action, { build: 'current', minDesktopVersion: '2026.10000.335' })
+  now += 59_999
+  assert.equal((await read())?.build, 'current')
+  assert.equal(calls, 1)
+  now += 1
+  assert.equal((await read())?.build, 'newer')
+  assert.equal(calls, 2)
+})
+
+test('failed version reads stay unknown and do not turn into a known stale build', async () => {
+  let calls = 0
+  const read = createAppVersionReader({ fetch: async () => { calls++; throw new Error('fixture-private-network-detail') } })
+  assert.equal(await read(), null)
+  assert.equal(await read(), null)
+  assert.equal(calls, 1)
+})
+
+test('a known stale action asks for refresh before any action runs', async () => {
+  const priorBuild = process.env.NEXT_PUBLIC_MIKKA_BUILD
+  const priorWindow = Object.getOwnPropertyDescriptor(globalThis, 'window')
+  const priorFetch = globalThis.fetch
+  const events: string[] = []
+  let reads = 0, actions = 0
+  try {
+    process.env.NEXT_PUBLIC_MIKKA_BUILD = 'fixture-old'
+    Object.defineProperty(globalThis, 'window', { configurable: true, value: { dispatchEvent: (event: Event) => { events.push(event.type); return true } } })
+    globalThis.fetch = async () => { reads++; return Response.json({ build: 'fixture-new' }) }
+    const { checkPageBuildBeforeAction } = await import(new URL('./app-build.ts?stale-action-fixture', import.meta.url).href)
+    if (await checkPageBuildBeforeAction()) actions++
+    if (await checkPageBuildBeforeAction()) actions++
+    assert.equal(actions, 0)
+    assert.equal(reads, 1)
+    assert.deepEqual(events, [STALE_BUILD_EVENT, STALE_BUILD_EVENT])
+  } finally {
+    if (priorBuild === undefined) delete process.env.NEXT_PUBLIC_MIKKA_BUILD
+    else process.env.NEXT_PUBLIC_MIKKA_BUILD = priorBuild
+    if (priorWindow) Object.defineProperty(globalThis, 'window', priorWindow)
+    else Reflect.deleteProperty(globalThis, 'window')
+    globalThis.fetch = priorFetch
+  }
+})
 
 test('a page is stale only when both builds are known and differ', () => {
   assert.equal(isStaleBuild('dpl_old', 'dpl_new'), true)

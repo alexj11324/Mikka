@@ -660,16 +660,19 @@ export class ClaudeAdapter implements AgentAdapter {
     authTimer?.unref()
     if (externalAuth) {
       let timer: NodeJS.Timeout | undefined
+      let authPhase: 'account_info' | 'external_verify' = 'account_info'
+      let authReason: 'account_info_failed' | 'timeout' | 'session_closed' | 'provider_refused' | 'source_refused' | 'verify_refused' = 'account_info_failed'
       try {
         const account = await Promise.race([
           session.accountInfo(),
           new Promise<never>((_, reject) => {
             timer = setTimeout(
-              () => reject(new Error(SUBSCRIPTION_ERROR)),
+              () => { authReason = 'timeout'; reject(new Error(SUBSCRIPTION_ERROR)) },
               10_000
             )
           })
         ])
+        authReason = ending ? 'session_closed' : account.apiProvider !== 'firstParty' ? 'provider_refused' : 'source_refused'
         if (
           ending ||
           account.apiProvider !== "firstParty" ||
@@ -680,8 +683,11 @@ export class ClaudeAdapter implements AgentAdapter {
             (account.apiKeySource === undefined && account.tokenSource === "CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR"))
         )
           throw new Error(SUBSCRIPTION_ERROR)
+        authPhase = 'external_verify'
+        authReason = 'verify_refused'
         await externalAuth.verify?.()
       } catch {
+        try { log.warn({ event: 'claude_subscription_startup_failed', phase: authPhase, reason: authReason }, 'Subscription startup failed') } catch { /* Keep the original refusal. */ }
         await end(null)
         throw new Error(SUBSCRIPTION_ERROR)
       } finally {

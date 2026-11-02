@@ -134,9 +134,9 @@ async function start(config, remainder) {
       "-c",
       `chatgpt_base_url=${JSON.stringify(base + "/backend-api/")}`,
     );
+    // Built-in provider ids cannot be overridden by current Codex. These
+    // transport feature switches also apply to the run's custom provider.
     args.push(
-      "-c",
-      "model_providers.openai.supports_websockets=false",
       "-c",
       "features.responses_websockets=false",
       "-c",

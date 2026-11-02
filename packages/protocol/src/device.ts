@@ -163,6 +163,21 @@ export const heartbeatRunSchema = z.object({
 })
 export type HeartbeatRun = z.infer<typeof heartbeatRunSchema>
 
+/**
+ * Oldest local daemon the server still serves. Raise it only with a change older
+ * daemons cannot handle; a claim from an older one is refused (daemonUpgradeRequired).
+ */
+export const MIN_DAEMON_VERSION = '0.0.299'
+/** packages/daemon/package.json's version: a daemon run from source (dev, E2E). Releases are 0.0.<run number>. */
+export const SOURCE_DAEMON_VERSION = '0.0.1'
+const stableVersion = z.string().regex(/^(0|[1-9]\d{0,8})\.(0|[1-9]\d{0,8})\.(0|[1-9]\d{0,8})$/)
+/** What the server tells a daemon about releases: it updates when idle if `latest` is newer. */
+export const daemonVersionsSchema = z.object({ min: stableVersion, latest: stableVersion.optional() })
+export type DaemonVersions = z.infer<typeof daemonVersionsSchema>
+/** The daemon's last failed automatic update; the old version keeps running. Codes only, never npm output. */
+export const daemonUpdateFailureSchema = z.object({ version: stableVersion, code: z.enum(['install_failed', 'restart_failed']), at: isoTime })
+export type DaemonUpdateFailure = z.infer<typeof daemonUpdateFailureSchema>
+
 /** `POST /v1/devices/:deviceId/heartbeat` */
 export const deviceManagementCommand = z.object({ id: z.uuid(), kind: z.enum(['redetect', 'restart', 'update', 'uninstall']) })
 export const deviceHeartbeatSchema = z.object({
@@ -179,6 +194,8 @@ export const deviceHeartbeatSchema = z.object({
    * polling. Numbers only, never a vendor credential (ADR 0027).
    */
   quotas: z.array(quotaSnapshotSchema).max(6).optional(),
+  /** Null once no automatic update has failed since the last success. */
+  updateFailure: daemonUpdateFailureSchema.nullable().optional(),
 })
 export type DeviceHeartbeat = z.input<typeof deviceHeartbeatSchema>
 
@@ -194,6 +211,8 @@ export const heartbeatResultSchema = z.object({
   revoked: z.array(id).max(500).optional(),
   /** Short-lived cloud device token, returned only over its authenticated link. */
   cloudCredential: z.string().regex(/^orv_[A-Za-z0-9_-]{43}$/).optional(),
+  /** A malformed value is dropped, never a failed heartbeat. */
+  daemonVersions: daemonVersionsSchema.optional().catch(undefined),
 })
 export type HeartbeatResult = z.input<typeof heartbeatResultSchema>
 

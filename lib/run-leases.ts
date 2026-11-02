@@ -286,6 +286,29 @@ async function endRun(runId: string, from: readonly Run['status'][], end: { stat
   })
 }
 
+/**
+ * A queued run whose device's daemon is too old to claim it ends now, so the Bot
+ * says the device needs an update instead of the run waiting for a lease that never comes.
+ */
+export async function failRunForDaemonUpgrade(runId: string, deviceId: string, userId: string, now = new Date()): Promise<boolean> {
+  const ended = await db.transaction(async tx => {
+    const [run] = await tx.update(agentRuns)
+      .set({ status: 'failed', pauseReason: null, resumeStatus: null, stopReason: 'error', error: DAEMON_UPGRADE_REQUIRED, finishedAt: now, updatedAt: now })
+      .where(and(eq(agentRuns.id, runId), eq(agentRuns.deviceId, deviceId), eq(agentRuns.userId, userId), eq(agentRuns.status, 'queued'), isNull(agentRuns.stopRequestedAt)))
+      .returning()
+    if (!run) return null
+    const event = runFinishedEvent({ ...run, stopReason: 'error', report: null })
+    await recordCoordinatorEvent(tx, { ...event, payload: { ...event.payload, daemonUpgradeRequired: true } })
+    return run
+  })
+  if (!ended) return false
+  await announceEnd({ ...ended, status: 'failed' })
+  return true
+}
+
+/** The run error a too-old daemon leaves (lib/coordinator/context.ts tells the person to update). */
+export const DAEMON_UPGRADE_REQUIRED = 'Mikka on this device needs an update.'
+
 /** Same as a completion from the daemon: tokens off, and the Coordinator hears it. A failure lands in 等你. */
 async function announceEnd(run: Run & { status: 'failed' | 'stopped' }) {
   await revokeRunTokens(run.id)
