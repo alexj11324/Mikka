@@ -24,6 +24,7 @@ import { cn } from '@/lib/utils'
 import { defaultMachine, machineDot, type PickerMachine } from '@/lib/machine-picker'
 import { E2BKeyDialog, useOwnE2BKey } from '@/components/settings/e2b-key-dialog'
 import { usePresence } from '@/lib/use-presence'
+import { useOpenerFocus } from '@/hooks/use-focus-return'
 
 const MAX_LENGTH = 8000
 
@@ -68,6 +69,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, initialText
   const { mutate } = useSWRConfig()
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
+  const openerFocus = useOpenerFocus(open)
   const [coordinatorUnavailable, setCoordinatorUnavailable] = useState(false)
   const tCoordinator = useTranslations('Coordinator')
   const { data: available = true } = useSWR(open ? 'issue-creation-available' : null, () => issueCreationAvailable())
@@ -137,7 +139,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, initialText
   }
 
   return <Dialog open={open} onOpenChange={onOpenChange}>
-    <DialogContent className="gap-3 p-5 sm:max-w-2xl" closeLabel={tCommon('close')}>
+    <DialogContent className="gap-3 p-5 sm:max-w-2xl" closeLabel={tCommon('close')} finalFocus={openerFocus}>
       <div className="flex items-center gap-2 pr-8 text-sm">
         {device
           ? <Select value={device.value} onValueChange={value => { if (value) pick(value) }} items={machines.map(({ value, label }) => ({ value, label }))}>

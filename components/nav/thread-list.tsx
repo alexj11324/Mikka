@@ -73,7 +73,7 @@ function ThreadRow({ thread, group, issues, all, now, onOpenThread }: { thread: 
   // The PRs its task carries, as on the chat's card (R-66).
   const pullRequests = thread.issueId ? issues.find(issue => issue.id === thread.issueId)?.metadata.pullRequests : undefined
   return <li data-slot="thread-card" className={THREAD_CARD}>
-    <Button variant="ghost" className={THREAD_CARD_BUTTON} aria-label={name} onClick={() => onOpenThread({ issueId: thread.issueId ?? null, runId: thread.id })} />
+    <Button variant="ghost" className={THREAD_CARD_BUTTON} aria-label={name} data-focus-id={thread.id} onClick={() => onOpenThread({ issueId: thread.issueId ?? null, runId: thread.id })} />
     <span data-slot="thread-status" className="pointer-events-none relative flex shrink-0 items-center justify-center"><ThreadStatusIcon group={group} /></span>
     <span className="pointer-events-none relative flex min-w-0 flex-1 flex-col gap-0.5">
       <span className="flex w-full min-w-0 items-center gap-2">

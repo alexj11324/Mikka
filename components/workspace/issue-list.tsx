@@ -52,7 +52,7 @@ export function IssueList({ issues, properties = LIST_COLUMNS, owners, searching
         </header>
         <ul>
           {group.map(issue => <li key={issue.id}>
-            <Button type="button" variant="ghost" onClick={() => onOpen(issue.id)} className="h-auto min-h-13 w-full justify-start p-0">
+            <Button type="button" variant="ghost" data-focus-id={issue.id} onClick={() => onOpen(issue.id)} className="h-auto min-h-13 w-full justify-start p-0">
               <span className="flex w-full items-center gap-3 px-4 py-3 text-left sm:px-6">
                 {/* Linear's row order: priority, number, status, title. */}
                 {properties.has('priority') && <PriorityIcon priority={issue.priority} label={priorityLabel(issue.priority)} />}
