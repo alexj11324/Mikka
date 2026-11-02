@@ -25,15 +25,26 @@ export const secretScope = z.discriminatedUnion('type', [
 export type SecretScope = z.infer<typeof secretScope>
 export type SecretScopeType = SecretScope['type']
 
+export const SECRET_NOTE_MAX = 500
+const note = z.string().trim().max(SECRET_NOTE_MAX)
 /** D6 新建: kind is chosen here only; edits (SEC-15～17) cannot change it. */
 export const createSecretInput = z.object({
   name: z.string().trim().regex(SECRET_NAME),
   kind: z.enum(['secret', 'env']),
   value,
+  note: note.default(''),
   scope: secretScope.default({ type: 'workspace' }),
 }).strict()
-/** SEC-15～17 编辑: new value; scope may move too (omitted = unchanged). Kind and name are fixed. */
-export const replaceSecretInput = z.object({ id: z.uuid(), value, scope: secretScope.optional() }).strict()
+/** SEC-15～17 编辑: a new value, note or scope, each optional but at least one. Kind and name are fixed. */
+export const replaceSecretInput = z.object({ id: z.uuid(), value: value.optional(), note: note.optional(), scope: secretScope.optional() }).strict()
+  .refine(input => input.value !== undefined || input.note !== undefined || input.scope !== undefined, 'nothing to change')
+/** Bulk add: a pasted or uploaded .env (parsed by ./dotenv), one kind and scope for all of it. */
+export const importSecretsInput = z.object({
+  text: z.string(),
+  masked: z.boolean(),
+  scope: secretScope,
+  onConflict: z.enum(['replace', 'skip']),
+}).strict()
 export const deleteSecretInput = z.object({ id: z.uuid() }).strict()
 
 export const scopeColumns = (scope: SecretScope) => scope.type === 'workspace'

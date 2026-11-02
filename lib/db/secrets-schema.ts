@@ -13,6 +13,8 @@ export const workspaceSecrets = pgTable('workspace_secrets', {
   scopeType: text('scopeType').$type<(typeof WORKSPACE_SECRET_SCOPES)[number]>().notNull(),
   /** '' for workspace scope, owner/repo for repository scope. */
   scopeRef: text('scopeRef').notNull().default(''),
+  /** Shown to members and readable by Agents; never part of the value (drizzle/20261102220000_workspace_secret_notes.sql). */
+  note: text('note').notNull().default(''),
   ciphertext: text('ciphertext').notNull(),
   iv: text('iv').notNull(),
   keyVersion: integer('keyVersion').notNull(),
