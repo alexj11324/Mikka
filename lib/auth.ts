@@ -154,10 +154,15 @@ export const auth = betterAuth({
   // Polls read the session from a signed cookie for up to 5 minutes instead of two queries each time (Alex
   // 2026-11-02). Money, permissions, credentials and deletion read it fresh (lib/fresh-session.ts).
   session: SESSION_OPTIONS,
-  ...(process.env.NODE_ENV === 'development' && authBaseURL?.startsWith('https://') ? { advanced: {
+  advanced: {
+    // Migrations own the schema (scripts/migrate.mjs on every deploy). Better Auth's own check reads
+    // every column of every table from the catalog on each cold start, about 225 KB a time.
+    database: { validateSchema: false },
     // Partition preview sessions by top-level site when third-party cookies are blocked.
-    defaultCookieAttributes: { sameSite: 'none' as const, secure: true, partitioned: true },
-  } } : {}),
+    ...(process.env.NODE_ENV === 'development' && authBaseURL?.startsWith('https://') ? {
+      defaultCookieAttributes: { sameSite: 'none' as const, secure: true, partitioned: true },
+    } : {}),
+  },
 })
 
 // Inside withFreshSession (money, permissions, credentials, deletion) a session read skips the cookie cache.
