@@ -170,4 +170,40 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
     const none = await resolveModelDispatch(pool, ctx)
     assert.deepEqual([none.kind, none.kind === 'none' && none.reason], ['none', 'noModels'])
   })
+
+  await t.test('a named computer fixes where, not which model: the thread\'s own model, else the list in order, among what it runs; else it says what it lacks', async () => {
+    const scope = await person('order-named')
+    await subscribe(scope, 'claude', ['acct-opus-n'])
+    const chatgpt = await subscribe(scope, 'codex', ['acct-codex-n'])
+    const ctx = { ...scope, botId: null }
+    // The list (untouched): Claude Code's opus, then Codex.
+    assert.deepEqual((await order.orderView(pool, scope)).entries.map(entry => [entry.harness, entry.model]), [['claude_code', 'acct-opus-n'], ['codex', 'acct-codex-n']])
+    const both = await device(scope.ownerId, [
+      { harness: 'claude_code', installed: true, modelSlots: [{ slot: 'top', model: 'acct-opus-n', name: 'Top' }] },
+      { harness: 'codex', installed: true, modelSlots: [{ slot: 'acct-codex-n', model: 'acct-codex-n', name: 'acct-codex-n' }] },
+    ])
+    const codexOnly = await device(scope.ownerId, [{ harness: 'codex', installed: true, modelSlots: [{ slot: 'acct-codex-n', model: 'acct-codex-n', name: 'acct-codex-n' }] }])
+    const claudeOnly = await device(scope.ownerId, [{ harness: 'claude_code', installed: true, modelSlots: [{ slot: 'top', model: 'acct-opus-n', name: 'Top' }] }])
+    // Named computer and the thread's own Codex model: Codex runs it there, though the list starts with Claude Code.
+    const asked = await resolveModelDispatch(pool, ctx, { harness: 'codex', model: 'acct-codex-n' }, undefined, undefined, both.id)
+    assert.deepEqual(asked.kind === 'device' && [asked.deviceId, asked.agentId, asked.entry.harness, asked.entry.source], [both.id, both.agents.codex, 'codex', { kind: 'subscription', connectionId: chatgpt }])
+    // Named computer that lacks Codex: refused with what it lacks; Claude Code is never put in its place.
+    const lacking = await resolveModelDispatch(pool, ctx, { harness: 'codex', model: 'acct-codex-n' }, undefined, undefined, claudeOnly.id)
+    assert.deepEqual([lacking.kind, lacking.kind === 'none' && lacking.reason, lacking.kind === 'none' && lacking.card.description], ['none', 'namedDevice', '这台电脑没装 Codex'])
+    // No model of the thread's own: the list in order, the first this computer runs (Codex here; opus first elsewhere).
+    const listed = await resolveModelDispatch(pool, ctx, null, undefined, undefined, codexOnly.id)
+    assert.deepEqual(listed.kind === 'device' && [listed.deviceId, listed.entry.harness, listed.model], [codexOnly.id, 'codex', 'acct-codex-n'])
+    const first = await resolveModelDispatch(pool, ctx, null, undefined, undefined, both.id)
+    assert.deepEqual(first.kind === 'device' && [first.deviceId, first.entry.harness], [both.id, 'claude_code'])
+    // Its Codex installed but the model not reported: it says so.
+    const stale = await device(scope.ownerId, [{ harness: 'codex', installed: true, modelSlots: [{ slot: 'other', model: 'other-model', name: 'other' }] }])
+    const unreported = await resolveModelDispatch(pool, ctx, { harness: 'codex', model: 'acct-codex-n' }, undefined, undefined, stale.id)
+    assert.equal(unreported.kind === 'none' && unreported.card.description, '这台电脑的 Codex 没有报告 acct-codex-n')
+    // A model of the thread's own that no subscription or key offers on that Agent (a DeepSeek key runs on Claude Code): refused, not swapped.
+    const notOffered = await resolveModelDispatch(pool, ctx, { harness: 'codex', model: 'deepseek-flash' }, undefined, undefined, both.id)
+    assert.deepEqual([notOffered.kind, notOffered.kind === 'none' && notOffered.card.description], ['none', '没有订阅或 Key 能用 Codex 跑 deepseek-flash'])
+    // 运行位置 云端 does not move a run the person pinned to a computer.
+    await order.changeOrder(pool, scope, { kind: 'location', location: 'cloud' })
+    assert.equal((await resolveModelDispatch(pool, ctx, null, undefined, undefined, codexOnly.id)).kind, 'device')
+  })
 })

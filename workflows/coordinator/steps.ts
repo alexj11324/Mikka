@@ -393,7 +393,7 @@ export async function dispatchRun(userId: string, input: { issueId: string; agen
   })))
 }
 
-/** Where a new run goes by the saved label execution rules: the workspace's cloud, else an online device. */
+/** Where a new run goes and on which model (decision 2026-11-02-1400): a named computer, else 运行位置; the model by the same rule either way. */
 async function dispatchByRules(userId: string, input: { issueId: string; agentId?: string; repo: string; note?: string; requestKey?:string; readOnly?: boolean; model?: { harness: 'claude_code' | 'codex'; model: string } }, scope: NativeToolScope | undefined, botId: string, execution?: AgentExecution, requestEventId?: string, approvedRepositoryKey?: string, place?: import('@/lib/dispatch-target').DispatchTarget) {
   // A computer the person named: theirs, not removed, online; otherwise refused or the card at once, never another computer.
   if (place && place !== 'cloud') {
@@ -402,7 +402,14 @@ async function dispatchByRules(userId: string, input: { issueId: string; agentId
     if ('error' in device) return device.error === 'notFound'
       ? { error: 'deviceNotFound' as const }
       : { error: 'machineUnavailable' as const, issueId: input.issueId, card: (await import('@/lib/rule-dispatch')).machineUnavailableCard() }
-    const result = await queueRun(userId, { ...input, agentId: device.agentId, model: device.model, pinnedDeviceId: device.deviceId }, botId, execution, requestEventId, null, approvedRepositoryKey)
+    // The named computer fixes where; the model is chosen as for any run (the thread's own, else 允许使用的模型 in order), among what this computer runs.
+    const { issueForUser } = await import('@/lib/issue-access')
+    if (!await issueForUser(userId, input.issueId)) throw new ActionFailureError('issueNotFound')
+    const { executionWorkspace } = await import('@/lib/execution-settings')
+    const { resolveModelDispatch } = await import('@/lib/model-dispatch')
+    const target = await resolveModelDispatch(pool, { ownerId: userId, workspaceId: await executionWorkspace(userId, botId), botId }, input.model ?? null, undefined, 'local', device.deviceId)
+    if (target.kind !== 'device') return { error: 'machineUnavailable' as const, issueId: input.issueId, ...(target.kind === 'none' ? { reason: target.reason, card: target.card } : {}) }
+    const result = await queueRun(userId, { ...input, agentId: target.agentId, model: target.model, pinnedDeviceId: target.deviceId, ...(target.entry.source.kind === 'api_key' ? { apiKeyId: target.entry.source.keyId } : {}) }, botId, execution, requestEventId, null, approvedRepositoryKey)
     return { ...result, status: 'queued' as const }
   }
   {

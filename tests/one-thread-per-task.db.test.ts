@@ -73,16 +73,17 @@ test('one task, one thread: dispatch continues the task\'s thread unless the per
     return { id, issueId, botId, deviceId }
   }
   /** One of the person's computers; `takesPart: false` is 参与调度 off. */
-  async function computer(userId: string, name: string, state: { online?: boolean; takesPart?: boolean; removed?: boolean; reports?: string } = {}) {
+  async function computer(userId: string, name: string, state: { online?: boolean; takesPart?: boolean; removed?: boolean; reports?: string; agent?: 'codex' | 'claude_code' } = {}) {
     const deviceId = randomUUID()
-    const harnesses = state.reports ? [{ harness: 'codex', installed: true, modelSlots: [{ slot: state.reports, model: state.reports, name: state.reports }] }] : mac
+    const agent = state.agent ?? 'codex'
+    const harnesses = state.reports || agent !== 'codex' ? [{ harness: agent, installed: true, modelSlots: [{ slot: state.reports ?? 'gpt-5', model: state.reports ?? 'gpt-5', name: state.reports ?? 'gpt-5' }] }] : mac
     await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,"deviceType",enabled,"lastSeenAt",harnesses,"removedAt") VALUES ($1,$2,$3,'local','laptop',$4,$5,$6,$7)`,
       [deviceId, userId, name, state.takesPart ?? true, state.online === false ? new Date(Date.now() - 3_600_000) : new Date(), JSON.stringify(harnesses), state.removed ? new Date() : null])
-    await pool.query(`INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,'codex',$4)`, [randomUUID(), userId, deviceId, `codex-${deviceId.slice(0, 8)}`])
+    await pool.query(`INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,$4,$5)`, [randomUUID(), userId, deviceId, agent, `${agent}-${deviceId.slice(0, 8)}`])
     return deviceId
   }
-  type Dispatched = { runId: string; thread: string; threadId: string; status?: string; continuesRunId?: string; replacedThreadId?: string; error?: string; placement?: unknown; card?: { title: string } }
-  const dispatch = async (who: { id: string; issueId: string; botId: string }, extra: { note?: string; readOnly?: boolean; newThread?: boolean; sourceEventId?: string; target?: 'cloud' | { deviceId: string } } = {}) =>
+  type Dispatched = { runId: string; thread: string; threadId: string; status?: string; continuesRunId?: string; replacedThreadId?: string; error?: string; placement?: unknown; card?: { title: string; description?: string } }
+  const dispatch = async (who: { id: string; issueId: string; botId: string }, extra: { note?: string; readOnly?: boolean; newThread?: boolean; sourceEventId?: string; target?: 'cloud' | { deviceId: string }; model?: { harness: 'claude_code' | 'codex'; model: string } } = {}) =>
     await steps.dispatchRun(who.id, { issueId: who.issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}`, ...extra }, undefined, who.botId) as unknown as Dispatched
   const runs = async (userId: string) => (await pool.query('SELECT id,status,"continuesRunId","threadReplacedBy" FROM agent_runs WHERE "userId"=$1 ORDER BY "createdAt"', [userId])).rows
   const said = async (who: { id: string; botId: string }, text: string) => {
@@ -177,18 +178,32 @@ test('one task, one thread: dispatch continues the task\'s thread unless the per
 
   await t.test('a named computer: the run is pinned there and the result says so; offline, not theirs or removed is refused', async () => {
     const a = await person()
-    // Never picked by dispatch (its Codex did not report the allowed model), but the person named it.
-    const studio = await computer(a.id, 'Mac Studio', { reports: 'other-model' })
+    // Two computers can run the allowed model and dispatch would pick either; the person named this one.
+    const studio = await computer(a.id, 'Mac Studio')
     const pinned = await dispatch(a, { target: { deviceId: studio } })
     assert.equal(pinned.thread, 'new')
     assert.deepEqual(pinned.placement, { kind: 'device', deviceId: studio, name: 'Mac Studio' })
     assert.equal((await pool.query('SELECT "deviceId","agentDefinition"->>\'pinnedDeviceId\' AS pinned FROM agent_runs WHERE id=$1', [pinned.runId])).rows[0].pinned, studio)
+    // The named computer and the thread's own Codex model: Codex runs it there, on that model.
+    const c = await person()
+    const box = await computer(c.id, 'Codex box')
+    const codex = await dispatch(c, { target: { deviceId: box }, model: { harness: 'codex', model: 'gpt-5' } })
+    const frozen = (await pool.query(`SELECT r."deviceId",r."agentDefinition"->>'harness' AS harness,r."agentDefinition"->>'model' AS model FROM agent_runs r WHERE r.id=$1`, [codex.runId])).rows[0]
+    assert.deepEqual(frozen, { deviceId: box, harness: 'codex', model: 'gpt-5' })
     // Offline: the card at once, nothing queued, no other computer used.
     const b = await person()
     const asleep = await computer(b.id, 'Old Mac', { online: false })
     const offline = await dispatch(b, { target: { deviceId: asleep } })
     assert.equal(offline.error, 'machineUnavailable')
     assert.ok(offline.card?.title)
+    assert.equal((await runs(b.id)).length, 0)
+    // A named computer fixes where, not which model: asked for Codex, a Claude Code-only computer says it lacks Codex and runs nothing.
+    const claudeBox = await computer(b.id, 'Claude box', { agent: 'claude_code' })
+    const lacking = await dispatch(b, { target: { deviceId: claudeBox }, model: { harness: 'codex', model: 'gpt-5' } })
+    assert.deepEqual([lacking.error, lacking.card?.description], ['machineUnavailable', '这台电脑没装 Codex'])
+    // Its Codex did not report the allowed model: it says so, and nothing else is used in its place.
+    const stale = await dispatch(b, { target: { deviceId: await computer(b.id, 'Stale', { reports: 'other-model' }) } })
+    assert.deepEqual([stale.error, stale.card?.description], ['machineUnavailable', '这台电脑的 Codex 没有报告 gpt-5'])
     assert.equal((await runs(b.id)).length, 0)
     // 参与调度 off: Mikka never sends it a run, even when named (decision 2026-11-02-1400).
     const kept = await dispatch(b, { target: { deviceId: await computer(b.id, 'Kept out', { takesPart: false }) } })
