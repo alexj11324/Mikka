@@ -246,7 +246,7 @@ export async function appendMessages(userId: string, holder: string, unmasked: M
     const first = await nextPosition(tx, userId, botId)
     if (messages.length) {
       await tx.insert(coordinatorMessages).values(messages.map((message, index) => {
-        const { mikkaStreamId: _untrusted, mikkaStopped: _unmarked, mikkaFailure: _unfailed, ...plain } = message as unknown as Record<string, unknown>
+        const { mikkaStreamId: _untrusted, mikkaStopped: _unmarked, mikkaFailure: _unfailed, mikkaRetried: _unretried, ...plain } = message as unknown as Record<string, unknown>
         // 停止: the turn's last message carries the mark; the chat shows 已停止 under the reply.
         const stop = stopped && index === messages.length - 1 && message.role === 'assistant'
         return { id: crypto.randomUUID(), userId, botId, position: first + index,
@@ -309,6 +309,26 @@ export async function failTurn(userId: string, holder: string, error: string, bo
   })
 }
 
+/**
+ * 重新发送 on a failed message: marks it retried (`mikkaRetried`) and sends its
+ * text again in one transaction, so the chat and the model's history keep only
+ * the new attempt. The mark is set only on this person's own user message in
+ * this chat that carries a failure; any other position is ignored and the send
+ * goes ahead as an ordinary message, saying nothing about what that position
+ * holds. The message and its failure stay stored. A message already retried
+ * (a double click, two sends at once) sends nothing more: null.
+ */
+export async function sendRetryOf<T>(userId: string, botId: string, position: number, send: (tx: Parameters<Parameters<typeof db.transaction>[0]>[0]) => Promise<T>): Promise<T | null> {
+  return db.transaction(async tx => {
+    const target = sql`"userId"=${userId} AND "botId"=${botId}::uuid AND position=${position} AND message->>'role'='user' AND message ? 'mikkaFailure'`
+    // The row lock makes a second send wait, then find the mark and stop.
+    const marked = await tx.execute(sql`UPDATE coordinator_messages SET message = message || '{"mikkaRetried":true}'::jsonb
+      WHERE ${target} AND NOT message ? 'mikkaRetried' RETURNING position`)
+    if (!marked.rows.length && (await tx.execute(sql`SELECT 1 FROM coordinator_messages WHERE ${target} AND message ? 'mikkaRetried'`)).rows.length) return null
+    return send(tx)
+  })
+}
+
 /** The summary so far, the memory, and every message after the summary, oldest first. */
 export async function loadConversation(userId: string, botId: string): Promise<{ summary: string | null; memory: string; messages: StoredMessage[] }> {
   const [session] = await db.select().from(coordinatorSessions).where(sessionOf(userId, botId)).limit(1)
@@ -319,8 +339,9 @@ export async function loadConversation(userId: string, botId: string): Promise<{
     .orderBy(asc(coordinatorMessages.position))
   // 使用记忆 off (the app's 记忆 setting): the prompt leaves the memory out; it stays saved.
   const memory = (await readPreferences(userId)).memoryEnabled ? session?.memory ?? '' : ''
-  return { summary: session?.summary ?? null, memory, messages: rows.map(row => {
-    const { mikkaStreamId: _streamId, mikkaStopped: _stopped, mikkaFailure: _failure, ...message } = row.message
+  // A failed message retried with 重新发送 is not said twice: the new attempt stands for it.
+  return { summary: session?.summary ?? null, memory, messages: rows.filter(row => (row.message as { mikkaRetried?: unknown }).mikkaRetried !== true).map(row => {
+    const { mikkaStreamId: _streamId, mikkaStopped: _stopped, mikkaFailure: _failure, mikkaRetried: _retried, ...message } = row.message
     return { position: row.position, message: message as unknown as ModelMessage }
   }) }
 }
@@ -420,6 +441,7 @@ export async function chatView(userId: string, limit = 200, botId: string): Prom
     .where(and(eventsOf(userId, botId), isNull(coordinatorEvents.deliveredAt)))
     .orderBy(asc(coordinatorEvents.createdAt)).limit(INBOX_BATCH)
   const last = rows[0]?.position ?? 0
+  const lastMessage = rows[0] && { role: String(rows[0].message.role), ...(typeof rows[0].message.mikkaStreamId === 'string' ? { streamId: rows[0].message.mikkaStreamId } : {}) }
   const pending = waiting.filter(event => event.kind === 'user_message' && !String(event.payload.text ?? '').startsWith(COORDINATOR_WELCOME_MARK)).map((event, index) => ({
     position: last + index + 1, createdAt: event.createdAt, message: { role: 'user', content: withImages(eventPrompt(event), event.payload.images) } as ModelMessage, pending: true as const,
   }))
@@ -429,7 +451,7 @@ export async function chatView(userId: string, limit = 200, botId: string): Prom
     cursor: last,
     persistedStreamIds: [...new Set(rows.flatMap(({message}) => message.role === 'assistant' && typeof message.mikkaStreamId === 'string' ? [message.mikkaStreamId] : []))],
     ...(coordinatorLeaseActive(session) && session?.leaseHolder?.startsWith('wrun_') ? { streamRunId: session.leaseHolder } : {}),
-    ...coordinatorChatState(session, waiting),
+    ...coordinatorChatState(session, waiting, new Date(), lastMessage),
     // An event line names its thread or task as a chip (C1); its stored text is the model's, never shown.
     sources: await citationSources(userId, [...items.filter(item => item.from === 'coordinator').map(item => item.text),
       ...items.flatMap(item => item.line ? [item.line.runId && `[[run:${item.line.runId}]]`, item.line.issueId && `[[issue:${item.line.issueId}]]`].filter((text): text is string => !!text) : [])], items.flatMap(item => item.threads)),

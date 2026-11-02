@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { createServer } from 'node:https'
 import { afterEach, describe, expect, it } from 'vitest'
 import lockfile from 'proper-lockfile'
 import { daemonTestMode, normalizeRepository, remoteKey, repositoryBindingMatches } from '@mikka/protocol/repository'
@@ -68,6 +69,67 @@ describe('repository URL boundary', () => {
 })
 
 describe('daemon-owned clone cache', () => {
+  it('reports an empty remote after successful clone and fetch without inventing a first commit', async () => {
+    const bare = join(tempDir(), 'empty.git')
+    git(tempDir(), 'init', '--bare', '--initial-branch=main', bare)
+    const remote = pathToFileURL(bare).href
+    const cache = new RepositoryCache(join(tempDir(), 'repos'), true)
+    for (let attempt = 0; attempt < 2; attempt++) {
+      await expect(cache.prepare(remote)).rejects.toMatchObject({ name: 'EmptyRepositoryError', message: 'Repository is empty. Create the first commit before running an Agent.' })
+      expect(git(cache.pathFor(remote), 'for-each-ref')).toBe('')
+      expect(git(bare, 'for-each-ref')).toBe('')
+      expect(git(bare, 'symbolic-ref', 'HEAD')).toBe('refs/heads/main')
+    }
+  })
+
+  it('preserves a broken remote HEAD failure when the remote has a real branch', async () => {
+    const source = await makeRepo()
+    const bare = join(tempDir(), 'bad-head.git')
+    git(source, 'clone', '--bare', source, bare)
+    git(bare, 'symbolic-ref', 'HEAD', 'refs/heads/missing')
+    const cache = new RepositoryCache(join(tempDir(), 'repos'), true)
+    const failure = await cache.prepare(pathToFileURL(bare).href).catch(error => error)
+    expect(failure).toMatchObject({ exitCode: 1 })
+    expect(failure.stderr).toContain('Cannot determine remote HEAD')
+    expect(failure.name).not.toBe('EmptyRepositoryError')
+    expect(git(bare, 'show-ref', '--verify', 'refs/heads/main')).not.toBe('')
+    expect(git(bare, 'symbolic-ref', 'HEAD')).toBe('refs/heads/missing')
+  })
+
+  it('does not describe clone authentication or network failures as empty repositories', async () => {
+    const tls = tempDir()
+    const key = join(tls, 'key.pem'), cert = join(tls, 'cert.pem')
+    execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', key, '-out', cert, '-subj', '/CN=localhost', '-days', '1'], { stdio: 'ignore' })
+    let requests = 0
+    const server = createServer({ key: readFileSync(key), cert: readFileSync(cert) }, (_request, response) => {
+      requests++
+      response.writeHead(401, { 'www-authenticate': 'Basic realm="Mikka fixture"' }).end()
+    })
+    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
+    const address = server.address()
+    if (!address || typeof address === 'string') throw new Error('Local HTTPS fixture unavailable')
+    const remote = `https://127.0.0.1:${address.port}/owner/private.git`
+    const cache = new RepositoryCache(join(tempDir(), 'repos'), true)
+    // This synthetic loopback endpoint is the only child whose TLS check is
+    // disabled. No global credentials or configured proxy reach the fixture.
+    const env = { GIT_SSL_NO_VERIFY: '1', GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_SYSTEM: '/dev/null',
+      GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'credential.helper', GIT_CONFIG_VALUE_0: '', GIT_ASKPASS: '', SSH_ASKPASS: '',
+      HTTPS_PROXY: '', https_proxy: '', HTTP_PROXY: '', http_proxy: '', ALL_PROXY: '', all_proxy: '', NO_PROXY: '127.0.0.1', no_proxy: '127.0.0.1' }
+    try {
+      const failure = await cache.prepare(remote, undefined, env).catch(error => error)
+      expect(failure).toMatchObject({ exitCode: 128 })
+      expect(failure.stderr).toMatch(/Username|Authentication|terminal prompts/)
+      expect(failure.name).not.toBe('EmptyRepositoryError')
+      expect(requests).toBeGreaterThan(0)
+    } finally {
+      server.closeAllConnections()
+      await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()))
+    }
+    const failure = await cache.prepare(remote, undefined, env).catch(error => error)
+    expect(failure).toMatchObject({ exitCode: 128 })
+    expect(failure.name).not.toBe('EmptyRepositoryError')
+  })
+
   it('prepares and adds worktrees for concurrent runs of one cache without a config lock failure', async () => {
     const origin = await makeRepo()
     const remote = pathToFileURL(origin).href

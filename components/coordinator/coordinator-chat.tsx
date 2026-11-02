@@ -4,6 +4,7 @@ import { Fragment, useEffect, useMemo, useRef, useState, type FormEvent } from '
 import useSWR, { useSWRConfig } from 'swr'
 import { AnimatePresence } from 'motion/react'
 import { withBasePath } from '@/lib/base-path'
+import { checkPageBuildBeforeAction } from '@/lib/app-build'
 import { useTranslations } from 'next-intl'
 import { getCoordinatorChat, stopCoordinatorTurn, welcomeCoordinator, type CoordinatorChat as Chat } from '@/app/actions/coordinator'
 import type { BotView } from '@/app/actions/bots'
@@ -144,10 +145,13 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
     } catch { /* storage may be unavailable */ }
   }
   const [sending, setSending] = useState(false)
+  const deliveryInFlight = useRef(false)
   // A message that did not go stays in the chat as a failed bubble with 重试, as in iMessage and Slack. Retrying here
   // resends the same submission (same id), so it is stored once.
   // `after`: the last stored position when it failed.
-  const [failed, setFailed] = useState<{ text: string; withNotes: boolean; message: string; after: number } | null>(null)
+  // `retryOf`: the stored failed message this send retries in place (重新发送); it stays hidden from then on.
+  const [failed, setFailed] = useState<{ text: string; withNotes: boolean; message: string; after: number; retryOf?: number } | null>(null)
+  const [retrying, setRetrying] = useState<ReadonlySet<number>>(() => new Set())
   const { submit, failureMessage } = useCoordinatorSubmit()
   const { mutate: mutateAll } = useSWRConfig()
   // Notes pinned in the browser wait in this composer while it is the chat on screen (not inside the reader).
@@ -164,7 +168,8 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
     const input = inputRef.current
     if (input) { input.focus(); input.setSelectionRange(prefill.text.length, prefill.text.length) }
   }, [prefill])
-  const items = useMemo(() => data?.items ?? [], [data])
+  // A failed message sent again is retried in place: it goes at once, and the server leaves it out from then on.
+  const items = useMemo(() => (data?.items ?? []).filter(item => !(item.from === 'person' && retrying.has(item.position))), [data, retrying])
   // A send whose result was unknown may have been stored after all: once it shows up in the chat, the failed bubble goes.
   useEffect(() => {
     if (failed && items.some(item => item.from === 'person' && item.position > failed.after && item.text === failed.text)) setFailed(null)
@@ -258,26 +263,29 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   }
 
   /** Sends `text` to the Coordinator or bot, with the browser's notes when `withNotes`: sent, failed (now a failed bubble), or skipped. */
-  async function deliver(text: string, withNotes = false): Promise<'sent' | 'failed' | 'skipped'> {
-    if (!text || sending) return 'skipped'
-    setSending(true)
+  async function deliver(text: string, withNotes = false, retryOf?: number): Promise<'sent' | 'failed' | 'skipped'> {
+    if (!text || sending || deliveryInFlight.current) return 'skipped'
+    deliveryInFlight.current = true
     const notes = withNotes && browser?.notes.length ? [...browser.notes] : undefined
     const fail = (message: string | null) => {
       if (!message) return 'skipped' as const
       // Offline, the message never left: say that, not a generic failure (usability review N3). 重试 stays beside it.
       if (typeof navigator !== 'undefined' && navigator.onLine === false) message = t('sendOffline')
-      setFailed({ text, withNotes, message, after: items.at(-1)?.position ?? 0 })
+      setFailed({ text, withNotes, message, after: items.at(-1)?.position ?? 0, ...(retryOf !== undefined ? { retryOf } : {}) })
       return 'failed' as const
     }
     try {
-      const outcome = await submit(text, { quote: embedded?.quote, botId, notes })
+      if (!await checkPageBuildBeforeAction()) return 'skipped'
+      setSending(true)
+      if (retryOf !== undefined) setRetrying(current => new Set(current).add(retryOf))
+      const outcome = await submit(text, { quote: embedded?.quote, botId, notes, ...(retryOf !== undefined ? { retryOf } : {}) })
       if (outcome.kind !== 'accepted') return fail(failureMessage(outcome))
       setFailed(current => current?.text === text ? null : current)
       embedded?.clearQuote()
       if (notes) browser?.removeMany(notes.map(note => note.n))
       await mutate()
       return 'sent'
-    } catch { return fail(actionError()) } finally { setSending(false) }
+    } catch { return fail(actionError()) } finally { deliveryInFlight.current = false; setSending(false) }
   }
   /** Sends `text`; false if it did not go. */
   async function post(text: string, withNotes = false) {
@@ -354,7 +362,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
                     {item.stopped && <MessageFooter><p role="status">{t('stopped')}</p></MessageFooter>}
                     {item.failure && (item.position === failedAt
                       ? <div data-message-failure="live" className="flex w-full max-w-md flex-col gap-2 self-end">{failureNotice}</div>
-                      : <MessageFooter className="self-end"><FailureReason failure={item.failure} botId={botId} sending={sending} onResend={() => { void post(item.text) }} /></MessageFooter>)}
+                      : <MessageFooter className="self-end"><FailureReason failure={item.failure} botId={botId} sending={sending} onResend={() => { void deliver(item.text, false, item.position) }} /></MessageFooter>)}
                     {footerTools(item).length > 0 && <MessageFooter><ToolsUsed tools={footerTools(item)} /></MessageFooter>}
                   </MessageContent></Message>}
             </MessageScrollerItem>
@@ -372,7 +380,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
                 </span>
                 <span role="alert" className="flex items-center justify-end gap-1 self-end text-xs text-destructive">
                   {failed.message}
-                  <Button variant="ghost" size="xs" className="text-foreground" disabled={sending} onClick={() => { void deliver(failed.text, failed.withNotes) }}>{tCommon('retry')}</Button>
+                  <Button variant="ghost" size="xs" className="text-foreground" disabled={sending} onClick={() => { void deliver(failed.text, failed.withNotes, failed.retryOf) }}>{tCommon('retry')}</Button>
                 </span>
               </MessageContent></Message>
             </MessageScrollerItem>}

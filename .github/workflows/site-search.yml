@@ -1,4 +1,8 @@
 name: Site search read contract
+# An HTTP API test, not a browser test (decisions 2026-11-01-1520 and 2225 run
+# none): tests/e2e/site-search.spec.ts uses Playwright's request client only,
+# against a real `next start`, Better Auth and two PostgreSQL services. No
+# browser is installed or launched.
 on:
   push:
     branches: ['codex/131-title-search', 'codex/batch-owner-title-search']
@@ -71,7 +75,7 @@ jobs:
         env:
           E2E_DATABASE_URL: ${{ env.SITE_SEARCH_WORKSPACE_DATABASE_URL }}
       - run: pnpm build
-      - name: Real Next HTTP, Better Auth and PG title read regression (no providers)
+      - name: Real Next HTTP, Better Auth and PG title read regression (HTTP API only, no browser, no providers)
         run: pnpm exec playwright test tests/e2e/site-search.spec.ts
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()

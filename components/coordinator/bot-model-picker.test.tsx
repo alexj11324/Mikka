@@ -18,22 +18,23 @@ beforeEach(() => {
 })
 const render = (running = false) => renderToStaticMarkup(<BotModelPicker botId={null} running={running} />)
 
-test('the next model names its credential before sending, including an automatic replacement', () => {
+test('the collapsed chip keeps the model name without account details, including an automatic replacement', () => {
   data.current = { id: 'apikey:fixture', modelId: 'deepseek-chat', provider: 'deepseek', kind: 'apiKey', chosen: false, available: true, availability: 'available', credentialLabel: '····1234', fallback: 'preference' }
   const html = render()
   assert.match(html, /deepseek-chat/)
-  assert.match(html, /····1234/)
+  assert.doesNotMatch(html, /····1234|fixture@example\.test/)
   assert.match(html, /fallback/)
   assert.doesNotMatch(html, /nextMessage|data-unavailable/)
 })
 
-test('while a reply runs, a new selection is explicitly for the next message', () => {
+test('changing the selected model while a reply runs does not add a Next label or account to the chip', () => {
   let html = render(true)
   assert.match(html, /data-next-message="true"/)
-  assert.match(html, /nextMessage/)
+  assert.doesNotMatch(html, /nextMessage|fixture@example\.test/)
   data.current = { ...data.current, id: 'new-subscription', modelId: 'gpt-fixture', provider: 'codex' }
   html = render(true)
-  assert.match(html, /nextMessage.*gpt-fixture/)
+  assert.match(html, /gpt-fixture/)
+  assert.doesNotMatch(html, /nextMessage|fixture@example\.test/)
   assert.doesNotMatch(render(), /nextMessage|data-next-message/)
 })
 

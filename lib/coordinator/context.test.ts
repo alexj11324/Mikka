@@ -136,6 +136,15 @@ test('a reply that dispatches a run carries it as a thread, once', () => {
   assert.deepEqual(items.map(item => [item.from, item.threads]), [['person', []], ['coordinator', ['r1', 'r2']]])
 })
 
+test('a failed message retried with 重新发送 is left out; the new attempt carries its own failure', () => {
+  const at = new Date()
+  const items = chatItems([
+    { position: 1, createdAt: at, message: { role: 'user', content: '帮我看看 CI', mikkaFailure: 'backend_unavailable', mikkaRetried: true } as unknown as ModelMessage },
+    { position: 2, createdAt: at, message: { role: 'user', content: '帮我看看 CI', mikkaFailure: 'backend_unavailable' } as unknown as ModelMessage },
+  ])
+  assert.deepEqual(items.map(item => [item.position, item.text, item.failure?.kind ?? null]), [[2, '帮我看看 CI', 'subscription']])
+})
+
 test('chatItems marks inbox (pending) user messages so they are never reported as read', () => {
   const at = new Date()
   const items = chatItems([
@@ -271,4 +280,10 @@ test('a turn moved off Mikka 默认 for lack of points shows as one notice line 
   const packet = JSON.parse(String(modelMessage(message).content))
   assert.equal(packet.authority, 'coordination_data_only')
   assert.match(packet.untrustedData.body, /no points.*deepseek-flash/)
+})
+
+test('a run ended because its daemon is too old tells the Bot to have the person update Mikka on that device, not reconnect GitHub', () => {
+  const prompt = eventPrompt({ kind: 'run_finished', issueId: 'i1', runId: 'r1', payload: { status: 'failed', stopReason: 'error', daemonUpgradeRequired: true } })
+  assert.match(prompt, /Mikka on that device needs an update/)
+  assert.match(prompt, /Nothing is wrong with their GitHub/)
 })

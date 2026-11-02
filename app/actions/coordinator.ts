@@ -11,7 +11,7 @@ import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { userMessageEvent } from '@/lib/coordinator-events'
 import type { UserImageInput } from '@/lib/coordinator/user-attachments'
 import { personalSubmissionInput, personalSubmissionRecorded, recordPersonalSubmission, SubmissionConflictError } from '@/lib/coordinator-submission'
-import { botChats, chatView, citationSources, retryFailedTurn, type BotChatSummary, type ChatView } from '@/lib/coordinator/store'
+import { botChats, chatView, citationSources, retryFailedTurn, sendRetryOf, type BotChatSummary, type ChatView } from '@/lib/coordinator/store'
 import type { CitationSource } from '@/lib/coordinator/citations'
 import { and, eq, sql } from 'drizzle-orm'
 import { openChatBotId } from '@/lib/coordinator/coordinator-bot'
@@ -98,7 +98,7 @@ export async function botChatSummaries(): Promise<Record<string, BotChatSummary>
 }
 
 /** Sends a message to the Coordinator or one of the person's bots, with a quote from an artifact and notes from the browser in front if given; the reply shows up in the chat. */
-export async function sendCoordinatorMessage(text: string, quote?: ArtifactQuote | null, botId: string | null = null, submissionId?: string, taskDestination?: TaskDestination, notes?: readonly BrowserNote[] | null, images?: readonly UserImageInput[]): Promise<ActionResult<{ queued: true }>> {
+export async function sendCoordinatorMessage(text: string, quote?: ArtifactQuote | null, botId: string | null = null, submissionId?: string, taskDestination?: TaskDestination, notes?: readonly BrowserNote[] | null, images?: readonly UserImageInput[], retryOf?: number): Promise<ActionResult<{ queued: true }>> {
   return runAction(async () => {
     const requestHeaders=await headers()
     const session=await auth.api.getSession({headers:requestHeaders})
@@ -130,7 +130,15 @@ export async function sendCoordinatorMessage(text: string, quote?: ArtifactQuote
         .where(and(eq(devices.id, destination.data.deviceId), eq(devices.ownerId, userId), eq(devices.kind, 'local'), eq(devices.enabled, true))).limit(1)
       if (!device) throw new ActionFailureError('deviceNotFound')
     }
-    try { await recordPersonalSubmission(db, userId, withQuote(withNotes, quoted?.data), { botId: bot.id, submissionId: parsed.data.submissionId, images: parsed.data.images, taskDestination: destination.data, ...(humanSessionId ? { humanSessionId } : {}) }) }
+    // 重新发送 on a failed message (retryOf: its position) retries it in place: that message is marked and the
+    // new attempt stands for it (store.sendRetryOf). A position that does not qualify is ignored.
+    const retried = z.number().int().positive().optional().safeParse(retryOf)
+    const record = (executor: Parameters<typeof recordPersonalSubmission>[0]) => recordPersonalSubmission(executor, userId, withQuote(withNotes, quoted?.data), { botId: bot.id, submissionId: parsed.data.submissionId, images: parsed.data.images, taskDestination: destination.data, ...(humanSessionId ? { humanSessionId } : {}) })
+    try {
+      // Already retried (a double click, two sends at once): nothing more is sent.
+      if (retried.success && retried.data !== undefined) { if (await sendRetryOf(userId, bot.id, retried.data, record) === null) return { queued: true as const } }
+      else await record(db)
+    }
     catch (error) {
       if (error instanceof SubmissionConflictError) throw new ActionFailureError('submissionConflict')
       throw error

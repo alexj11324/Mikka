@@ -1,15 +1,12 @@
 'use client'
 
-import { useCallback, useEffect, useRef } from 'react'
-import { usePathname } from 'next/navigation'
+import { Suspense, useCallback, useEffect, useRef } from 'react'
+import { usePathname, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 
-import { APP_BUILD, STALE_BUILD_EVENT, desktopBelowMinimum, isStaleBuild } from '@/lib/app-build'
-import { withBasePath } from '@/lib/base-path'
+import { APP_BUILD, STALE_BUILD_EVENT, desktopBelowMinimum, isStaleBuild, readAppVersion } from '@/lib/app-build'
 import { bridgeFromWindow } from '@/lib/platform/detect'
-
-const CHECK_GAP_MS = 60_000
 
 /**
  * Keeps a page from outliving its deployment (web and desktop alike). On page
@@ -21,10 +18,14 @@ const CHECK_GAP_MS = 60_000
  * a build older than the server's minDesktopVersion asks main to update first.
  */
 export function VersionGuard() {
+  return <Suspense fallback={null}><VersionGuardContent /></Suspense>
+}
+
+function VersionGuardContent() {
   const t = useTranslations('Common')
   const pathname = usePathname()
+  const search = useSearchParams()?.toString()
   const shown = useRef(false)
-  const checkedAt = useRef(0)
   const offer = useCallback(() => {
     if (shown.current) return
     shown.current = true
@@ -33,16 +34,14 @@ export function VersionGuard() {
 
   useEffect(() => {
     const desktop = bridgeFromWindow(window)?.app
-    if ((!APP_BUILD && !desktop?.requireUpdate) || Date.now() - checkedAt.current < CHECK_GAP_MS) return
-    checkedAt.current = Date.now()
-    void fetch(withBasePath('/api/version'), { cache: 'no-store' })
-      .then(response => response.ok ? response.json() as Promise<{ build?: unknown; minDesktopVersion?: unknown }> : null)
+    if (!APP_BUILD && !desktop?.requireUpdate) return
+    void readAppVersion()
       .then(body => {
         if (desktop?.requireUpdate && desktopBelowMinimum(desktop.version, body?.minDesktopVersion)) void desktop.requireUpdate().catch(() => {})
         if (isStaleBuild(APP_BUILD, body?.build)) offer()
       })
       .catch(() => {})
-  }, [pathname, offer])
+  }, [pathname, search, offer])
 
   // lib/app-build.ts watchRemovedActions raises this when it could not reload.
   useEffect(() => {

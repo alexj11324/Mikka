@@ -126,6 +126,7 @@ export function eventPrompt(event: { kind: CoordinatorEventKind; issueId: string
         payload.summary ? `The agent's summary: ${payload.summary}` : null,
         ...publicationPrompt(payload.publication),
         payload.verification === 'not_run' ? 'Verification was not run: no verification command is configured. Never say the changes passed verification. Mention a draft PR only when the server-confirmed publication includes one.' : null,
+        payload.daemonUpgradeRequired ? 'Mikka on its device is too old to run it. Tell the person that Mikka on that device needs an update, then dispatch the issue again. Nothing is wrong with their GitHub or other connections.' : null,
         payload.noMachine ? `Its machine went offline and no other machine can continue it. Draw this card and dispatch the issue again after the person answers: ${JSON.stringify(payload.noMachine)}` : null,
         note,
       ].filter(Boolean).join('\n')
@@ -356,6 +357,8 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
         briefingBoundary = true
         continue
       }
+      // 重新发送 retried this failed message in place (store.sendRetryOf): the new attempt stands for it.
+      if ((message as { mikkaRetried?: unknown }).mikkaRetried === true) continue
       const raw = typeof message.content === 'string' ? message.content : message.content.flatMap(part => part.type === 'text' ? [part.text] : []).join('\n')
       // The request for its welcome is for the Coordinator only.
       if (raw.startsWith(COORDINATOR_WELCOME_MARK)) continue
