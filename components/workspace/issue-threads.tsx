@@ -28,7 +28,8 @@ export function ThreadStatus({ status, stopping = false, waiting = false }: { st
   const key = runStatusKey(status)
   if (waiting) return <Badge variant="warning-light" size="sm"><Hand aria-hidden="true" />{t('waiting')}</Badge>
   if (stopping) return <Badge variant="secondary" size="sm">{t('stopping')}</Badge>
-  return <Badge variant={RUN_BADGES[status] ?? 'secondary'} size="sm">{key ? statusLabel(key) : status}</Badge>
+  // A run waiting on input is 等待你 (R-52): it raises the same hand.
+  return <Badge variant={RUN_BADGES[status] ?? 'secondary'} size="sm">{status === 'waiting_input' && <Hand aria-hidden="true" />}{key ? statusLabel(key) : status}</Badge>
 }
 
 /** 线程: the agent runs working on this issue (R-62). A readable one opens on the right. */
