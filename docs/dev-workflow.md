@@ -32,6 +32,12 @@ Debugging and pipeline runs use source, not builds:
 | Server | `pnpm dev` (`next dev`, via `scripts/dev-preview.mjs`) |
 | Daemon | `pnpm daemon` (`tsx` on `packages/daemon` source) |
 
+To run the dev server in the background, give it an open stdin:
+`pnpm dev < /dev/null > dev.log 2>&1 &`. If stdin is closed outright (`0<&-`,
+as some agent runners do), the esbuild service that the workflow builder
+starts dies with `fatal error: all goroutines are asleep - deadlock!` and
+`next dev` exits with it. A normal terminal is not affected.
+
 Use a production build (`next build` then `next start`) only for production
 screenshots of a UI change. Run `next build`
 directly (`pnpm exec next build`): `pnpm build` also runs lint and migrations.
