@@ -931,7 +931,11 @@
       "retry": "Retry",
       "done": "Done",
       "cancelled": "Cancelled"
-    }
+    },
+    "runsModels": "Runs {models}",
+    "runsCount": "{count, plural, one {Runs # allowed model} other {Runs # allowed models}}",
+    "runsNone": "Runs no allowed model",
+    "offlineNoRuns": "Offline · gets no runs"
   },
   "Workspace": {
     "loadingEditor": "Loading task editor",
@@ -2491,13 +2495,12 @@
       "cloud": "Cloud",
       "localDevices": "{count, plural, one {# computer takes runs} other {# computers take runs}}",
       "localFirst": "{count, plural, one {# computer takes runs} other {# computers take runs}} · {device} first",
-      "cloudNoKey": "No E2B key",
+      "cloudNoKey": "No E2B key yet",
       "add": "Add models",
       "addCount": "{count, plural, one {Add # model} other {Add # models}}",
       "empty": "No allowed models yet",
       "noCandidates": "No models to add",
-      "removeTitle": "Remove {model}?",
-      "remove": "Remove",
+      "remove": "Remove from list",
       "ready": "Available",
       "quotaUntil": "Quota used up · back {time}",
       "noDevice": {
@@ -2535,7 +2538,18 @@
         "deepseek": "DeepSeek",
         "kimi": "Kimi",
         "custom": "Custom provider"
-      }
+      },
+      "setE2BKey": "Add E2B key",
+      "openDevices": "Open devices",
+      "moveFirst": "Move to top",
+      "removed": "Removed {model}",
+      "undo": "Undo",
+      "orderUnsaved": "Order not saved",
+      "e2bKey": "E2B key",
+      "e2bKeySet": "Added",
+      "e2bKeyMissing": "Not added",
+      "e2bKeyFill": "Add",
+      "e2bKeyReplace": "Replace"
     }
   },
   "TelegramBot": {

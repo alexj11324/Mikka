@@ -43,6 +43,11 @@ export interface OrderView {
   devices: number
   /** 本地: the device a new run would go to now (会先用), by the same plan as dispatch; null when none. */
   firstDevice: string | null
+  /**
+   * 设备 › 能跑: per local device, the allowed models it can run, whatever its
+   * 参与调度 or whether it is online (those have their own lines there).
+   */
+  deviceModels: Record<string, string[]>
 }
 
 interface EntryRow { id: string; harness: OrderHarness; model: string; sourceKind: 'subscription' | 'api_key'; sourceId: string }
@@ -159,6 +164,8 @@ export async function orderView(query: Query, scope: OrderScope): Promise<OrderV
     customized: order.customized,
     devices: devices.filter(device => device.enabled).length,
     firstDevice: plan?.kind === 'device' ? devices.find(device => device.id === plan.deviceId)?.name ?? null : null,
+    deviceModels: Object.fromEntries(devices.map(device => [device.id,
+      [...new Set(order.entries.filter(entry => deviceModel({ ...device, enabled: true, online: true }, entry)).map(entry => entry.model))]])),
     entries: order.entries.map(entry => {
       const state = states.get(entry.id)!
       const block: OrderRow['block'] = !state.credential.usable ? { reason: state.credential.reason, ...(state.credential.resetsAt ? { resetsAt: state.credential.resetsAt } : {}) }
@@ -178,7 +185,8 @@ const candidateInput = z.object({
   ]),
 })
 export type OrderChange =
-  | { kind: 'add'; entries: z.infer<typeof candidateInput>[] }
+  /** `at`: where the first added entry goes (undo of 移出列表 puts it back); the end by default. */
+  | { kind: 'add'; entries: z.infer<typeof candidateInput>[]; at?: number }
   | { kind: 'remove'; id: string }
   | { kind: 'reorder'; ids: string[] }
   | { kind: 'location'; location: RunLocation }
@@ -213,11 +221,14 @@ export async function changeOrder(pool: Pool, scope: OrderScope, change: OrderCh
     if (change.kind === 'add') {
       const available = new Map(candidates.map(candidate => [entryKey(candidate), candidate]))
       const have = new Set(entries.map(entryKey))
+      const added: OrderEntry[] = []
       for (const raw of z.array(candidateInput).min(1).max(100).parse(change.entries)) {
         const key = entryKey(raw)
         if (!available.has(key)) throw new ActionFailureError('executionModelUnknown')
-        if (!have.has(key)) { entries = [...entries, { id: randomUUID(), harness: raw.harness, model: raw.model, source: raw.source }]; have.add(key) }
+        if (!have.has(key)) { added.push({ id: randomUUID(), harness: raw.harness, model: raw.model, source: raw.source }); have.add(key) }
       }
+      const at = change.at === undefined ? entries.length : Math.min(entries.length, z.number().int().min(0).parse(change.at))
+      entries = [...entries.slice(0, at), ...added, ...entries.slice(at)]
     } else if (change.kind === 'remove') {
       const before = entries.length, removed = change.id
       entries = entries.filter(entry => entry.id !== removed)

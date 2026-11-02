@@ -42,7 +42,10 @@ async function addServer(device: string) {
     [randomUUID(), device, JSON.stringify([{ harness: 'claude_code', installed: true, version: '2.1.309', subscriptionBroker: true }])])
 }
 
-test('模型与订阅：默认顺序来自已有订阅，添加、键盘排序、移除确认、运行位置都会保存', async ({ page }, testInfo) => {
+// The one reorder the test refuses on purpose (R3) is the only failed request.
+test.use({ expectedConsoleErrors: [{ path: '/mikka/settings?section=models', message: 'Failed to load resource: net::ERR_FAILED' }] })
+
+test('模型与订阅：默认顺序来自已有订阅，添加、键盘与菜单排序、未保存重试、移出撤销、运行位置都会保存', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 1440, height: 1000 })
   await registerInTeam(page, '/settings?section=models')
   await expect(page.getByRole('heading', { level: 1, name: '模型与订阅' })).toBeVisible()
@@ -67,6 +70,11 @@ test('模型与订阅：默认顺序来自已有订阅，添加、键盘排序�
   await addServer(device)
   await page.reload()
   await expect(page.getByText('2 台电脑参与调度 · 会先用 E2E Server', { exact: true })).toBeVisible()
+
+  // The E2B key row is there with 本地 selected too (the bot's own cloud computer uses the key).
+  await expect(page.getByRole('region', { name: '运行位置' }).getByRole('status').filter({ hasText: '未填' })).toBeVisible()
+  await expect(page.getByRole('region', { name: '运行位置' }).getByRole('button', { name: '填入', exact: true })).toBeVisible()
+  await attachLightDark(page, testInfo, 'model-order-local-key')
 
   // 添加模型: only what the account lists; the one in the list is marked 已添加.
   await page.getByRole('button', { name: '添加模型', exact: true }).click()
@@ -104,18 +112,63 @@ test('模型与订阅：默认顺序来自已有订阅，添加、键盘排序�
   await page.getByRole('menuitem', { name: '下移' }).click()
   await expect(list.getByRole('listitem').first()).toContainText('e2e-opus-reported')
 
-  // 移除 asks first.
+  // 移到最前 from the row menu (R2), saved.
   await list.getByRole('listitem').last().getByRole('button', { name: 'e2e-sonnet-reported 的更多操作' }).click()
-  await page.getByRole('menuitem', { name: '移除' }).click()
-  const confirm = page.getByRole('alertdialog', { name: '移除 e2e-sonnet-reported？' })
-  await confirm.getByRole('button', { name: '移除', exact: true }).click()
-  await expect(list.getByRole('listitem')).toHaveCount(1)
+  await expect(page.getByRole('menuitem', { name: '下移' })).toBeDisabled()
+  await page.getByRole('menuitem', { name: '移到最前' }).click()
+  await expect(list.getByRole('listitem').first()).toContainText('e2e-sonnet-reported')
+  await expect.poll(async () => (await db().query(`SELECT model FROM model_order_entries WHERE "ownerId" = (SELECT "ownerId" FROM devices WHERE id = $1) ORDER BY position`, [device])).rows.map(row => row.model))
+    .toEqual(['e2e-sonnet-reported', 'e2e-opus-reported'])
 
-  // 运行位置 云端 saves; without an E2B key the line says so.
+  // A reorder that does not reach the server: the list goes back as saved and the moved row says 顺序未保存 with 重试 (R3).
+  let refused = false
+  await page.route('**/*', route => {
+    if (!refused && route.request().method() === 'POST' && route.request().headers()['next-action']) { refused = true; return route.abort() }
+    return route.fallback()
+  })
+  await list.getByRole('listitem').last().getByRole('button', { name: 'e2e-opus-reported 的更多操作' }).click()
+  await page.getByRole('menuitem', { name: '移到最前' }).click()
+  const unsaved = list.getByRole('listitem').filter({ hasText: 'e2e-opus-reported' })
+  await expect(unsaved.getByRole('status')).toHaveText('顺序未保存')
+  await expect(list.getByRole('listitem').first()).toContainText('e2e-sonnet-reported')
+  await expect(page.getByRole('alert').filter({ hasText: '重试' })).toHaveCount(0)
+  await attachLightDark(page, testInfo, 'model-order-unsaved')
+  await page.unrouteAll({ behavior: 'wait' })
+  // 重试 saves the same move.
+  await unsaved.getByRole('button', { name: '重试', exact: true }).click()
+  await expect(list.getByRole('listitem').first()).toContainText('e2e-opus-reported')
+  await expect(unsaved.getByRole('status')).toHaveText('可用')
+  await expect.poll(async () => (await db().query(`SELECT model FROM model_order_entries WHERE "ownerId" = (SELECT "ownerId" FROM devices WHERE id = $1) ORDER BY position`, [device])).rows.map(row => row.model))
+    .toEqual(['e2e-opus-reported', 'e2e-sonnet-reported'])
+
+  // 移出列表 takes effect at once; 撤销 in the toast puts it back where it was (R2).
+  await list.getByRole('listitem').first().getByRole('button', { name: 'e2e-opus-reported 的更多操作' }).click()
+  await page.getByRole('menuitem', { name: '移出列表' }).click()
+  await expect(page.getByRole('alertdialog')).toHaveCount(0)
+  await expect(list.getByRole('listitem')).toHaveCount(1)
+  const toast = page.getByText('已移出 e2e-opus-reported', { exact: true })
+  await expect(toast).toBeVisible()
+  await attachLightDark(page, testInfo, 'model-order-removed')
+  await page.getByRole('button', { name: '撤销', exact: true }).click()
+  await expect(list.getByRole('listitem')).toHaveCount(2)
+  await expect(list.getByRole('listitem').first()).toContainText('e2e-opus-reported')
+
+  // 本地: 打开设备 opens 设置 › 设备, where each computer says which allowed models it runs (R1, R5).
+  await page.getByRole('link', { name: '打开设备', exact: true }).click()
+  await expect(page).toHaveURL(/section=computers/)
+  const macRow = page.getByRole('listitem').filter({ has: page.getByText('E2E MacBook', { exact: true }) })
+  await expect(macRow).toContainText('能跑 e2e-opus-reported、e2e-sonnet-reported')
+  await attachLightDark(page, testInfo, 'devices-runs')
+  await page.goBack()
+
+  // 运行位置 云端 saves; without an E2B key the row says so and offers it there (R1); no separate 云电脑 section.
   await page.getByRole('radio', { name: '云端' }).or(page.getByRole('button', { name: '云端' })).click()
-  await expect(page.getByText('E2B Key 未设置', { exact: true })).toBeVisible()
+  await expect(page.getByText('还没有 E2B Key', { exact: true })).toBeVisible()
+  await expect(page.getByRole('region', { name: '云电脑' })).toHaveCount(0)
   await page.reload()
   await expect(page.getByRole('radio', { name: '云端' }).or(page.getByRole('button', { name: '云端' }))).toHaveAttribute('aria-pressed', 'true')
   await expect(page.getByRole('alert').filter({ hasText: '重试' })).toHaveCount(0)
   await attachLightDark(page, testInfo, 'model-order-cloud')
+  await page.getByRole('button', { name: '填入 E2B Key', exact: true }).click()
+  await expect(page.getByRole('dialog', { name: 'E2B API Key' })).toBeVisible()
 })
