@@ -30,9 +30,9 @@ export const KEPT_WITH_WORKSPACE = new Map<string, string>([
   ['hosted_card_claims', 'card claim'],
   // Unpaid hosted model usage and the free-usage window it counts towards.
   ['hosted_usage', 'billing and abuse evidence'],
-  // No retention period has been chosen for audit events (drizzle/20261031050734_audit_retention_policy.sql).
-  ['workspace_audit_events', 'audit evidence'],
-  ['workspace_audit_retention', 'audit evidence'],
+  // Audit evidence: kept 90 days after deletion; the audit-retention job removes them (lib/audit/retention.ts, DELETED_WORKSPACE_RETENTION_DAYS).
+  ['workspace_audit_events', 'kept 90 days after deletion; the audit-retention job removes them'],
+  ['workspace_audit_retention', 'kept 90 days after deletion; the audit-retention job removes them'],
   // Append-only skill ledgers: triggers reject every DELETE.
   ['improvement_team_skill_metadata', 'append-only'],
   ['improvement_team_skill_reviews', 'append-only'],

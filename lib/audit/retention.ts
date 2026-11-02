@@ -42,7 +42,14 @@ export async function configureAuditRetention(actorId: string, workspaceId: stri
   finally { app.release(); ws.release() }
 }
 
-/** Explicitly configured event expiry. Active export receipts and a legal hold block deletion. */
+/**
+ * A deleted workspace's audit events are kept this long, then expire as under
+ * an explicit policy (decision 2026-11-02-0230, lib/workspace-rows.ts). A
+ * retention the admin chose before deleting still applies, and so does a legal hold.
+ */
+export const DELETED_WORKSPACE_RETENTION_DAYS = 90
+
+/** Explicitly configured event expiry, or the deleted-workspace default. Active export receipts and a legal hold block deletion. */
 export async function applyAuditRetention(workspaceId: string, now = new Date(), database = targets()) {
   const ws = await database.workspace.connect(), app = await database.main.connect()
   try {
@@ -51,19 +58,29 @@ export async function applyAuditRetention(workspaceId: string, now = new Date(),
     await ws.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`mikka-audit-retention:${workspaceId}`])
     await app.query('BEGIN')
     const policy = (await app.query<Policy>('SELECT "retentionDays","legalHold",revision,"updatedAt" FROM workspace_audit_retention WHERE "workspaceId"=$1 FOR UPDATE', [workspaceId])).rows[0]
-    let skipped: 'retain' | 'legal_hold' | 'active_export' | null = !policy || policy.retentionDays === null ? 'retain' : policy.legalHold ? 'legal_hold' : null
+    const deletedWorkspace = !(await ws.query('SELECT 1 FROM mikka_workspaces WHERE id=$1', [workspaceId])).rowCount
+    const retentionDays = policy?.retentionDays ?? (deletedWorkspace ? DELETED_WORKSPACE_RETENTION_DAYS : null)
+    let skipped: 'retain' | 'legal_hold' | 'active_export' | null = retentionDays === null ? 'retain' : policy?.legalHold ? 'legal_hold' : null
     if (!skipped && (await ws.query('SELECT 1 FROM workspace_audit_exports WHERE "workspaceId"=$1 AND "expiresAt">$2 LIMIT 1', [workspaceId, now])).rowCount) skipped = 'active_export'
     if (skipped) { await app.query('COMMIT'); await ws.query('COMMIT'); return { deleted: 0, skipped } }
-    const cutoff = new Date(now.getTime() - policy.retentionDays! * 86_400_000)
+    const cutoff = new Date(now.getTime() - retentionDays! * 86_400_000)
     const removed = await app.query('DELETE FROM workspace_audit_events WHERE "workspaceId"=$1 AND "createdAt"<$2', [workspaceId, cutoff])
     const deleted = removed.rowCount ?? 0
-    if (deleted) await recordAudit(drizzle(app), { workspaceId, actor: { type: 'system' }, action: 'audit.retention_applied', metadata: { retentionDays: policy.retentionDays!, count: deleted } })
+    if (deletedWorkspace) {
+      // Nobody can read a deleted workspace's log, so the cleanup is not logged into it; its policy goes with its last event.
+      if (!(await app.query('SELECT 1 FROM workspace_audit_events WHERE "workspaceId"=$1 LIMIT 1', [workspaceId])).rowCount) await app.query('DELETE FROM workspace_audit_retention WHERE "workspaceId"=$1', [workspaceId])
+    } else if (deleted) await recordAudit(drizzle(app), { workspaceId, actor: { type: 'system' }, action: 'audit.retention_applied', metadata: { retentionDays: retentionDays!, count: deleted } })
     await app.query('COMMIT'); await ws.query('COMMIT'); return { deleted, skipped: null }
   } catch (error) { await Promise.allSettled([app.query('ROLLBACK'), ws.query('ROLLBACK')]); throw error }
   finally { app.release(); ws.release() }
 }
 export async function sweepAuditRetention(database = targets()) {
-  const policies = (await database.main.query<{ workspaceId: string }>('SELECT "workspaceId" FROM workspace_audit_retention WHERE "retentionDays" IS NOT NULL AND "legalHold"=false ORDER BY "workspaceId"')).rows
+  const configured = (await database.main.query<{ workspaceId: string }>('SELECT "workspaceId" FROM workspace_audit_retention WHERE "retentionDays" IS NOT NULL AND "legalHold"=false ORDER BY "workspaceId"')).rows
+  // Workspaces with events and no expiry of their own: those that no longer exist expire on the deleted-workspace default.
+  const unconfigured = (await database.main.query<{ workspaceId: string }>(`SELECT DISTINCT e."workspaceId" FROM workspace_audit_events e
+    LEFT JOIN workspace_audit_retention p ON p."workspaceId"=e."workspaceId" WHERE p."workspaceId" IS NULL OR (p."retentionDays" IS NULL AND p."legalHold"=false)`)).rows.map(row => row.workspaceId)
+  const existing = unconfigured.length ? new Set((await database.workspace.query<{ id: string }>('SELECT id FROM mikka_workspaces WHERE id=ANY($1::uuid[])', [unconfigured])).rows.map(row => row.id)) : new Set<string>()
+  const policies = [...configured, ...unconfigured.filter(id => !existing.has(id)).sort().map(workspaceId => ({ workspaceId }))]
   let deleted = 0, pending = 0
   for (const policy of policies) {
     try { deleted += (await applyAuditRetention(policy.workspaceId, new Date(), database)).deleted }
