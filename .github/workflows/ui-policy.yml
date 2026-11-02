@@ -169,6 +169,7 @@ jobs:
       - run: pnpm test:factory-config
       - run: pnpm test:user-message-text
       - run: pnpm test:run-info
+      - run: pnpm test:thread-changes
       - run: pnpm check:agent-ui
       - run: pnpm test:dev-local
       - run: pnpm test:lib-units

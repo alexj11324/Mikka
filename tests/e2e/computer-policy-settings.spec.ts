@@ -43,6 +43,7 @@ test('电脑操作默认允许，可以禁止再允许，非管理员只看到�
   const section = page.getByRole('region', { name: '电脑操作', exact: true })
   await expect(section.getByText('允许', { exact: true })).toBeVisible()
   await expect(controls).toHaveCount(0)
-  await expect(page.getByRole('button', { name: /^(允许|禁止)$/ })).toHaveCount(0)
+  // Only this section is faked as read-only; the other 团队权限 sections read the real server, where this person is the admin.
+  await expect(section.getByRole('button', { name: /^(允许|禁止)$/ })).toHaveCount(0)
   expect(writes).toEqual(['deny', 'allow'])
 })
