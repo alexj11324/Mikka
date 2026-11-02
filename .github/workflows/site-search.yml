@@ -3,11 +3,14 @@ name: Site search read contract
 # none): tests/e2e/site-search.spec.ts uses Playwright's request client only,
 # against a real `next start`, Better Auth and two PostgreSQL services. No
 # browser is installed or launched.
+# Runs only when search changes: on every pull request (this repository's and
+# forks') and on pushes to main that touch these paths.
 on:
   push:
-    branches: ['codex/131-title-search', 'codex/batch-owner-title-search']
+    branches: [main]
+    paths: ['lib/search/**', 'lib/federated-search/**', 'app/api/search/**', 'tests/e2e/site-search.spec.ts', '.github/workflows/site-search.yml']
   pull_request:
-    paths: ['lib/federated-search/**', 'app/api/search/**', 'tests/e2e/site-search.spec.ts', '.github/workflows/site-search.yml']
+    paths: ['lib/search/**', 'lib/federated-search/**', 'app/api/search/**', 'tests/e2e/site-search.spec.ts', '.github/workflows/site-search.yml']
 permissions:
   contents: read
 concurrency:
@@ -21,7 +24,6 @@ env:
 
 jobs:
   site-search:
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 25
     services:
