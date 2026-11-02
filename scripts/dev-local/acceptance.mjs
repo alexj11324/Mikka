@@ -127,7 +127,6 @@ async function setup() {
     // The cloud leg is explicitly selected. Enable its existing host gates
     // before starting the owned server, keeping all targets on the local DB.
     process.env.MIKKA_BYOS_ENABLED = '1'
-    process.env.MIKKA_CLOUD_THREAD_MACHINES = '1'
   }
   const origin = process.env.LOCAL_LOOP_ORIGIN ?? `http://localhost:${process.env.MIKKA_DEV_PORT ?? '3110'}`
   assert.ok(['localhost', '127.0.0.1'].includes(new URL(origin).hostname), 'Only loopback app targets are allowed')
@@ -267,8 +266,6 @@ async function accept(device) {
     assert.ok(!done.report?.publish?.pushed && !done.pullRequest, 'Read-only run published')
     assert.equal(execFileSync('git', ['--git-dir', runtime.scenario.barePath, 'show-ref'], { encoding: 'utf8' }), refs, 'Read-only run changed remote refs')
     assert.equal((await observations()).pullRequests.length, before.pullRequests.length)
-    const daemonDir = process.argv.includes('--existing') ? join(directory, 'daemon') : runtime.daemonDataDir
-    await command(['--import', 'tsx', 'scripts/dev-local/readonly-push.mjs', id, daemonDir, runtime.scenario.barePath, join(directory, 'readonly-push-evidence.json')])
     await progress('item2-read-only', 'evidence', id)
   })
   if (only.includes('3')) await check('item3-failure-stage', 240_000, async signal => {

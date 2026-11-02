@@ -7,8 +7,13 @@ import type { createSkillRegistry } from './registry'
 import type { createSkillEvaluations } from './evaluations'
 import { FactoryError } from '../factory/contract'
 
+/** A self-improvement record a command or read names: a run, or a proposal, benchmark instance or evaluation made from runs. */
+export type ImprovementRecord = { kind: 'run' | 'proposal' | 'instance' | 'evaluation'; id: string }
+
 export async function handleImprovement(store: ReturnType<typeof createImprovementStore>, request: Request, userId: string | null,
-  assignments?: ReturnType<typeof createSkillAssignments>, bridge?: ReturnType<typeof createImprovementFactoryBridge>, registry?: Pick<ReturnType<typeof createSkillRegistry>, 'registerCandidate'>, evaluations?: Pick<ReturnType<typeof createSkillEvaluations>, 'freezeBenchmark' | 'dispatchNext' | 'beginEvaluation' | 'compare'>): Promise<Response> {
+  assignments?: ReturnType<typeof createSkillAssignments>, bridge?: ReturnType<typeof createImprovementFactoryBridge>, registry?: Pick<ReturnType<typeof createSkillRegistry>, 'registerCandidate'>, evaluations?: Pick<ReturnType<typeof createSkillEvaluations>, 'freezeBenchmark' | 'dispatchNext' | 'beginEvaluation' | 'compare'>,
+  /** True for a record the caller may not reach (a workspace token's other workspaces); reads as not found. */
+  outside: (record: ImprovementRecord) => Promise<boolean> = async () => false): Promise<Response> {
   const respond = (body: unknown, status = 200) => Response.json(body, { status, headers: { 'Cache-Control': 'private, no-store' } })
   if (!userId) return respond({ error: 'authRequired' }, 401)
   if (!['GET', 'POST'].includes(request.method)) return respond({ error: 'methodNotAllowed' }, 405)
@@ -17,10 +22,12 @@ export async function handleImprovement(store: ReturnType<typeof createImproveme
       const proposalId = new URL(request.url).searchParams.get('proposalId')
       if (proposalId && bridge) {
         if (!z.uuid().safeParse(proposalId).success) return respond({ error:'invalid' },422)
+        if (await outside({ kind: 'proposal', id: proposalId })) return respond({ error: 'notFound' }, 404)
         return respond(await bridge.status(userId,proposalId))
       }
       const runId = new URL(request.url).searchParams.get('runId')
       if (!z.uuid().safeParse(runId).success) return respond({ error: 'invalid' }, 422)
+      if (await outside({ kind: 'run', id: runId! })) return respond({ error: 'notFound' }, 404)
       return respond(await store.read(userId, runId!))
     }
     if (request.headers.get('origin') !== new URL(request.url).origin) return respond({ error: 'originRejected' }, 403)
@@ -40,6 +47,15 @@ export async function handleImprovement(store: ReturnType<typeof createImproveme
     try { body = JSON.parse(Buffer.concat(chunks).toString('utf8')) } catch { return respond({ error: 'invalid' }, 422) }
     const parsed = commandSchema.safeParse(body)
     if (!parsed.success) return respond({ error: 'invalid' }, 422)
+    const command = parsed.data
+    const records: ImprovementRecord[] = [
+      ...'runId' in command ? [{ kind: 'run' as const, id: command.runId }] : [],
+      ...'sourceRunId' in command ? [{ kind: 'run' as const, id: command.sourceRunId }] : [],
+      ...'proposalId' in command ? [{ kind: 'proposal' as const, id: command.proposalId }] : [],
+      ...'instanceId' in command ? [{ kind: 'instance' as const, id: command.instanceId }] : [],
+      ...'evaluationId' in command ? [{ kind: 'evaluation' as const, id: command.evaluationId }] : [],
+    ]
+    for (const record of records) if (await outside(record)) return respond({ error: 'notFound' }, 404)
     if (parsed.data.action === 'freeze_benchmark' || parsed.data.action === 'dispatch_training' || parsed.data.action === 'begin_evaluation' ||
       parsed.data.action === 'dispatch_evaluation' || parsed.data.action === 'compare_evaluation') {
       if (!evaluations) return respond({ error: 'sourceRequired' }, 409)

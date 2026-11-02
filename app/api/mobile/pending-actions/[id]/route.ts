@@ -3,6 +3,7 @@ import { withRequestLog, noteLogUser } from '@/lib/request-log'
 import { ActionFailureError } from '@/lib/action-error'
 import { forbiddenOrigin, json, mobileUser, unauthorized, writeAllowed } from '@/lib/mobile-api'
 import { decidePendingAction } from '@/lib/pending-actions'
+import { pendingActionsOutsideToken } from '@/lib/tokens/scope'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,7 +22,7 @@ async function handlePOST(request: Request, { params }: Params) {
   if (!writeAllowed(request)) return forbiddenOrigin()
   const id = z.uuid().safeParse((await params).id)
   const body = z.object({ approve: z.boolean() }).safeParse(await request.json().catch(() => null))
-  if (!id.success) return json({ error: 'pendingActionUnavailable' }, 409)
+  if (!id.success || (await pendingActionsOutsideToken(user, [id.data])).size) return json({ error: 'pendingActionUnavailable' }, 409)
   if (!body.success) return json({ error: 'invalidInput' }, 400)
   try {
     const { status, error } = await decidePendingAction(user.id, id.data, body.data.approve)

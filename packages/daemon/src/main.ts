@@ -20,7 +20,6 @@ import {
   realpathSync,
 } from "node:fs"
 import { arch, hostname, platform } from "node:os"
-import { classifySandboxFailure, type SandboxFailure } from "./sandbox-issue"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -51,8 +50,7 @@ import { agentPublishedReceipt, githubReceiptEnvironment, withRunGitCredentials 
 import { runPaths } from "./agents/run-context"
 import { CAPTURES_DIR, CaptureUploader } from "./captures"
 import { runVerify } from "./agents/verify"
-import { SandboxRuntime, type AgentSandbox } from "./agents/sandbox"
-import { SandboxManager } from '@anthropic-ai/sandbox-runtime'
+import { NoSandbox, type AgentSandbox } from "./agents/sandbox"
 import { buildChildEnv } from "./env"
 import { browseFolder, verifyExpectedOrigin } from "./fs-browse"
 import {
@@ -68,10 +66,7 @@ import { detectDeviceType } from "./device-type"
 import { detectHarnesses, deviceCapabilities, dockerAvailable, harnessFingerprint } from "./harnesses"
 import { ensureHarness, type HarnessStore } from "./harness-install"
 import { sweepRunCredentials } from "./agents/harness-home"
-import { containerOwner, ensureRunnerImage, openRunContainer, selectIsolation, sweepRunContainers, type RunContainerOptions } from "./run-container"
 import { createLocalSubscriptionRunner } from "./subscription-local-runner"
-import { codexSupportsRunApproval } from "./adapters/codex-version"
-import { ensureSandboxTools, missingSandboxTools } from "./sandbox-tools"
 import { isSafeId } from "./ids"
 import { acquireLock } from "./lock"
 import { closeLogger, createLogger, type Logger } from "./log"
@@ -133,8 +128,8 @@ export interface DaemonOptions {
   /** Ignored when it is below the poller's minimum interval. */
   quotaPollMs?: number
   /**
-   * Isolation for real agent CLIs; sandbox-runtime by default. Without a
-   * sandbox (unsupported platform) only the mock harness is offered.
+   * How real agent CLIs start; they run directly by default (decision
+   * 2026-11-01-2335). `null` offers only the mock harness.
    */
   agentSandbox?: AgentSandbox | null
   /** Override a harness CLI binary (tests use fake CLIs). */
@@ -201,14 +196,6 @@ const HARNESS_RESCAN_MS = 5 * 60_000
 /** Whose model credential a cloud run uses: the subscription binding's owner, or for an API-key run the run owner the server assigned the computer to. */
 function credentialOwner(assignment: RunAssignment): string | undefined {
   return assignment.subscriptionBinding?.ownerId ?? (assignment.modelCredential ? assignment.computer?.ownerId : undefined)
-}
-const SANDBOX_REPAIR_RETRY_MS = 60 * 60_000
-
-/** A person may install a missing tool themselves; that alone is worth a new attempt. */
-type SandboxIssue = { missing: string[] } & SandboxFailure
-
-function missingToolsUnchanged(issue: SandboxIssue | null) {
-  return !issue?.missing.length || missingSandboxTools().length === issue.missing.length
 }
 
 export class Daemon {
@@ -312,8 +299,7 @@ export class Daemon {
     )
     this.worktrees = new WorktreeManager(paths.worktrees, this.options.retainResources)
     this.repositories = new RepositoryCache(paths.repos, undefined, this.options.retainResources)
-    // Hosted subscriptions use their dedicated container sandbox. Local
-    // adapters require the separately probed sandbox-runtime from main.
+    // Hosted subscriptions start their CLIs through the hosted runner.
     this.sandbox = this.options.hostedSubscriptions ? null : await this.createAgentSandbox()
     if (this.stopped) throw new Error("daemon stopped during startup")
     if (!this.options.hostedSubscriptions && this.sandbox) this.localComputerDriver = await detectComputerDriver()
@@ -384,11 +370,9 @@ export class Daemon {
         },
       })
     }
-    // Docker decides the run isolation (run-container.ts), so probe it before the adapters exist.
-    // Tests drive fake CLIs on the host.
+    // Reported in the device's capabilities only; runs never use Docker.
     if (!this.options.hostedSubscriptions && !this.options.harnesses && !this.options.harnessBinaries && !daemonTestMode(process.env)) {
       this.docker = await dockerAvailable()
-      if (this.docker) await sweepRunContainers(containerOwner(paths.dataDir)).catch(() => undefined)
     }
     const hosted = this.options.hostedSubscriptions
       ? await createHostedBotRunner({
@@ -560,14 +544,12 @@ export class Daemon {
     if (!hosted && !this.options.harnesses) this.harnessPrint = harnessFingerprint(this.harnessStore())
     this.harnesses = [...detected.filter((info) => this.adapters.has(info.harness)).map(info => ({
       ...info,
-      // Local enforcement requires the successful owned SRT probe. Hosted
-      // enforcement uses its existing network-none/read-only Docker boundary
-      // and gate-bound broker/container teardown; general egress stays outside
-      // that ceiling. Codex also verifies its pinned interface at initialize.
+      // The run's live gate stops a revoked run; Codex also verifies its
+      // pinned interface at initialize.
       toolApproval: this.supportsToolApproval(info),
       coordinator: hosted ? false : coordinatorCapable(info),
       ...(!hosted && this.localSubscriptionCapable(info) ? { subscriptionBroker: true as const } : {}),
-    })), ...this.sandboxBlockedHarnesses(detected)]
+    }))]
     // A crash or kill skipped the run-end wipe; resumed runs get fresh credentials.
     sweepRunCredentials(paths.adapterState)
     // Runs survive restarts: pick up what the journal says was active.
@@ -826,8 +808,8 @@ export class Daemon {
     // boundary and bind its lifetime to the run's authenticated gate.
     if (typeof this.options.link.prepareRunToolApproval !== 'function') return undefined
     if (this.options.hostedSubscriptions) return true
-    if (this.ownedSandbox === null || this.sandbox !== this.ownedSandbox) return undefined
-    return info.harness === 'claude_code' || (info.harness === 'codex' && codexSupportsRunApproval(info.version)) ? true : undefined
+    if (!this.sandbox) return undefined
+    return info.harness === 'claude_code' || info.harness === 'codex' ? true : undefined
   }
 
   /** A subscription run here takes a per-run access lease (subscription-local-runner.ts). */
@@ -836,42 +818,22 @@ export class Daemon {
       this.supportsToolApproval(info) === true && Boolean(this.options.link.nativeLease)
   }
 
-  /** Report a CLI the daemon cannot run as present but not installed, so no run is pinned here. */
-  private sandboxBlockedHarnesses(detected: HarnessInfo[]): HarnessInfo[] {
-    const issue = this.sandboxIssue
-    if (!issue) return []
-    return detected.filter(info => info.installed && !this.adapters.has(info.harness)).map(info => ({
-      harness: info.harness, installed: false, version: info.version,
-      sandboxBlocked: { missing: issue.missing, ...(issue.reason ? { reason: issue.reason } : {}), ...(issue.detail ? { detail: issue.detail } : {}) },
-    }))
-  }
-
   private async redetectHarnesses() {
-    const repairing = this.sandboxIssue?.missing.length
-    if (this.sandboxIssue && repairing) {
-      this.lastSandboxRepair = Date.now()
-      this.sandboxIssue = { missing: await ensureSandboxTools({ dataDir: this.paths.dataDir, log: this.log }) }
-    }
     const detected = detectHarnesses(this.harnessStore())
     this.harnessPrint = harnessFingerprint(this.harnessStore())
     this.docker = await dockerAvailable()
     this.harnesses = [...detected.filter(info => this.adapters.has(info.harness)).map(info => {
       return { ...info, toolApproval: this.supportsToolApproval(info), coordinator: coordinatorCapable(info),
         ...(this.localSubscriptionCapable(info) ? { subscriptionBroker: true as const } : {}) }
-    }), ...this.sandboxBlockedHarnesses(detected)]
-    // Adapters and verification are wired at startup, so a repaired sandbox needs a fresh start.
-    if (repairing && this.sandboxIssue?.missing.length === 0) {
-      this.startMaintenance(() => restartService(false, () => {}, undefined, () => !this.stopped))
-    }
+    })]
   }
 
-  /** Notice an agent installed after startup, or retry a failed tool download, without spawning anything per tick. */
+  /** Notice an agent installed after startup without spawning anything per tick. */
   private rescanHarnesses() {
     const now = Date.now()
     if (this.options.hostedSubscriptions || this.options.harnesses || this.rescanning || now - this.lastHarnessScan < HARNESS_RESCAN_MS) return
     this.lastHarnessScan = now
-    const retryRepair = Boolean(this.sandboxIssue?.missing.length) && now - this.lastSandboxRepair >= SANDBOX_REPAIR_RETRY_MS
-    if (harnessFingerprint(this.harnessStore()) === this.harnessPrint && !retryRepair && missingToolsUnchanged(this.sandboxIssue)) return
+    if (harnessFingerprint(this.harnessStore()) === this.harnessPrint) return
     this.rescanning = true
     void this.redetectHarnesses()
       .then(() => this.syncWithServer())
@@ -893,11 +855,8 @@ export class Daemon {
     return deviceCapabilities(this.harnessStore(), this.paths.dataDir, async () => this.docker)
   }
   private lastHarnessScan = Date.now()
-  private lastSandboxRepair = Date.now()
   private rescanning = false
-  private sandboxIssue: SandboxIssue | null = null
   private sandbox: AgentSandbox | null = null
-  private ownedSandbox: SandboxRuntime | null = null
 
   /** The agent sandbox (one per daemon), or null where there is none. */
   private agentSandbox(): AgentSandbox | null {
@@ -906,40 +865,10 @@ export class Daemon {
 
   private async createAgentSandbox(): Promise<AgentSandbox | null> {
     if (this.options.agentSandbox !== undefined) return this.options.agentSandbox
-    // Tests use the host's tools as they are; fetching them with apt would
-    // make every test daemon's start depend on the network.
-    const missing = daemonTestMode(process.env)
-      ? missingSandboxTools()
-      : await ensureSandboxTools({ dataDir: this.paths.dataDir, log: this.log })
-    if (!SandboxRuntime.supported()) {
-      this.log.warn({ missing }, "agent sandbox unavailable: platform or dependencies unsupported")
-      this.sandboxIssue = { missing }
-      return null
-    }
-    const sandbox = new SandboxRuntime(async ({ host }) => {
-      this.log.warn({ host }, "agent network request denied")
-      return false
-    })
-    try {
-      if (process.platform === 'linux') {
-        const dependencies = SandboxManager.checkDependencies()
-        if (dependencies.warnings.length) throw new Error(`Run sandbox isolation unavailable: ${dependencies.warnings.join('; ')}`)
-      }
-      await sandbox.probe()
-      this.ownedSandbox = sandbox
-      return sandbox
-    } catch (err) {
-      this.log.warn({ err }, "agent sandbox unavailable")
-      // The device page says why and what the person can do (sandbox-issue.ts).
-      this.sandboxIssue = { missing: [], ...classifySandboxFailure(err) }
-      if (!this.options.retainResources) await sandbox.reset().catch((resetError: unknown) => {
-        this.log.warn({ err: resetError }, "agent sandbox cleanup failed")
-      })
-      return null
-    }
+    return new NoSandbox()
   }
 
-  /** Verify inside the agent's sandbox; without one, only mock runs exist. */
+  /** Run the repository's verify command; without a CLI starter, only mock runs exist. */
   private verifier(): SupervisorDeps["verify"] {
     const sandbox = this.agentSandbox()
     if (!sandbox) return undefined
@@ -968,10 +897,6 @@ export class Daemon {
     }
   }
 
-  /**
-   * Claude Code and Codex enclose the whole CLI in a run-owned official
-   * sandbox. Cursor retains the existing daemon AgentSandbox boundary.
-   */
   private realAdapters(): [Harness, AgentAdapter][] {
     const options = this.adapterOptions()
     if (!options) return []
@@ -1000,10 +925,6 @@ export class Daemon {
     if (!sandbox) return undefined
     const stateDir = this.paths.adapterState
     const bin = this.options.harnessBinaries ?? {}
-    const openContainer = selectIsolation(process.platform, this.docker)
-      === "container" ? async (run: Omit<RunContainerOptions, "image" | "owner">) =>
-        openRunContainer({ ...run, image: await ensureRunnerImage(), owner: containerOwner(this.paths.dataDir) })
-      : undefined
     const computerProvider = (runId: string) => {
       const assignment = this.journal.get(runId)?.assignment
       if (!assignment?.localComputer || assignment.computer || !assignment.policy?.permissions.computer_use) return undefined
@@ -1012,9 +933,9 @@ export class Daemon {
         proxyPath: fileURLToPath(new URL('./computer/proxy.mjs', import.meta.url)), nodeBinary: process.execPath })
     }
     return {
-      claude: { sandbox, stateDir, binary: bin.claude_code, ensureBinary: () => ensureHarness(this.harnessStore(), "claude_code"), openContainer, computerProvider },
-      codex: { sandbox, stateDir, binary: bin.codex, ensureBinary: () => ensureHarness(this.harnessStore(), "codex"), openContainer, computerProvider },
-      cursor: { sandbox, stateDir, binary: bin.cursor, computerProvider, decide: this.serverDecide() },
+      claude: { sandbox, stateDir, binary: bin.claude_code, ensureBinary: () => ensureHarness(this.harnessStore(), "claude_code"), computerProvider },
+      codex: { sandbox, stateDir, binary: bin.codex, ensureBinary: () => ensureHarness(this.harnessStore(), "codex"), computerProvider },
+      cursor: { sandbox, stateDir, binary: bin.cursor, computerProvider },
     }
   }
 
@@ -1598,16 +1519,8 @@ export class Daemon {
     try {
       await this.supervisor?.stop()
     } finally {
-      try {
-        await this.localComputerBroker?.close()
-        await this.cloudComputerBroker?.close()
-      } finally {
-        const sandbox = this.ownedSandbox
-        this.ownedSandbox = null
-        if (!this.options.retainResources) await sandbox?.reset().catch((err: unknown) => {
-          this.log.warn({ err }, "agent sandbox cleanup failed")
-        })
-      }
+      await this.localComputerBroker?.close()
+      await this.cloudComputerBroker?.close()
     }
     await this.outbox?.close()
     const release = this.releaseLock

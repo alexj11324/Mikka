@@ -20,7 +20,7 @@ before(async () => { route = await import('../app/v1/runs/[runId]/decision/route
 beforeEach(() => { caller = { userId: 'owner', scopeDeviceId: 'device' }; liveRun = { botId: 'bot' }; answers = null; queries.length = 0; scopes.length = 0; decide.mock.resetCalls() })
 const runId = '10000000-0000-4000-8000-000000000001'
 const questions = [{ type: 'predicate', name: 'safe', instructions: 'Is it safe?' }, { type: 'choice', name: 'level', instructions: 'Pick', choices: [{ value: 'low' }, { value: 'high' }] }]
-const body = { purpose: 'command-action', input: 'rm -rf build', questions }
+const body = { purpose: 'computer-action', input: 'click Delete', questions }
 const post = (value: unknown = body) => route.POST(new Request(`https://example.test/mikka/v1/runs/${runId}/decision`, { method: 'POST', body: JSON.stringify(value) }), { params: Promise.resolve({ runId }) })
 
 test('rejects an unauthenticated caller and a run that is not the caller\'s live run', async () => {
@@ -34,7 +34,7 @@ test('rejects an unauthenticated caller and a run that is not the caller\'s live
 })
 
 test('rejects a malformed body before any lookup', async () => {
-  for (const value of [{ ...body, purpose: 'other' }, { ...body, questions: [] }, { ...body, input: 'x'.repeat(16001) },
+  for (const value of [{ ...body, purpose: 'other' }, { ...body, purpose: 'command-action' }, { ...body, questions: [] }, { ...body, input: 'x'.repeat(16001) },
     { ...body, questions: [{ type: 'predicate', name: '1bad', instructions: 'x' }] }, null]) assert.equal((await post(value)).status, 400)
   assert.equal(queries.length, 0)
   assert.equal(decide.mock.callCount(), 0)
@@ -45,7 +45,7 @@ test('asks decide in the run\'s billing scope and returns its answers', async ()
   const response = await post()
   assert.equal(response.status, 200)
   assert.deepEqual(await response.json(), { answers: [{ type: 'predicate', name: 'safe', probability: 0.9 }, { type: 'choice', name: 'level', choice: 'low' }] })
-  assert.deepEqual(decide.mock.calls[0]?.arguments.slice(0, 3), ['daemon-command-action', 'rm -rf build', questions])
+  assert.deepEqual(decide.mock.calls[0]?.arguments.slice(0, 3), ['daemon-computer-action', 'click Delete', questions])
   assert.deepEqual(scopes, [{ workspaceId: 'ws:owner:bot', ownerId: 'owner' }])
 })
 

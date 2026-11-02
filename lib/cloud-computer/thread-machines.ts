@@ -10,7 +10,7 @@ import { computerPermission } from '@/lib/computer/permission'
 import { connectComputer, installComputerRuntime, startDesktop, syncDesktopLease, viewerGrant } from '@/lib/computer/e2b-provider'
 import { CLOUD_WORKER_COMMAND } from '@/lib/computer/worker-command'
 import { installSubagentRuntime, runtimeRequest } from './runtime'
-import { computerTemplate, e2bApiKey, withE2BErrors } from '@/lib/secrets/e2b-runtime'
+import { e2bApiKey, taskTemplate, withE2BErrors } from '@/lib/secrets/e2b-runtime'
 import type { Actor } from './subagents'
 import { afterRunEnded } from '@/lib/run-completion-effects'
 import { workspaceSecretMasker } from '@/lib/secrets/runtime'
@@ -34,9 +34,9 @@ export async function recordCancelledSandbox(pool: Pick<Pool, 'query'>, runId: s
  * bot machine (a coding-CLI login, a run's GitHub token, a live broker), the
  * last clean snapshot is reused, or the thread waits with a refusal. */
 export async function workspaceSnapshot(pool: Pick<Pool, 'query'>, actor: Actor, source: Pick<Sandbox, 'commands' | 'createSnapshot'>, repoPath: string) {
-  const revision = (await source.commands.run(`git -C ${quote(repoPath)} rev-parse HEAD`, { user: 'mikka-runner', timeoutMs: 10_000 })).stdout.trim()
+  const revision = (await source.commands.run(`git -C ${quote(repoPath)} rev-parse HEAD`, { user: 'user', timeoutMs: 10_000 })).stdout.trim()
   if (!/^[a-f0-9]{40}$/.test(revision)) throw new ComputerError(409, 'Workspace source unavailable')
-  const lock = (await source.commands.run(`cd ${quote(repoPath)} && for f in pnpm-lock.yaml package-lock.json yarn.lock; do if test -f "$f"; then sha256sum "$f"; fi; done`, { user: 'mikka-runner', timeoutMs: 10_000 })).stdout
+  const lock = (await source.commands.run(`cd ${quote(repoPath)} && for f in pnpm-lock.yaml package-lock.json yarn.lock; do if test -f "$f"; then sha256sum "$f"; fi; done`, { user: 'user', timeoutMs: 10_000 })).stdout
   const lockDigest = createHash('sha256').update(lock).digest('hex')
   const old = (await pool.query('SELECT * FROM workspace_snapshots WHERE "workspaceId"=$1 AND "ownerId"=$2', [actor.workspaceId, actor.userId])).rows[0]
   if (old && old.sourceRevision === revision && old.lockDigest === lockDigest && Date.now() - new Date(old.createdAt).getTime() < 24 * 60 * 60_000) return old.snapshotId as string
@@ -109,8 +109,10 @@ async function endStopRequestedRun(client: PoolClient, actor: Actor, runId: stri
  * the worker survive. No other task's machine can match. Caller holds BEGIN
  * and the new run's lock.
  */
-async function adoptTaskMachine(client: PoolClient, actor: Actor, runId: string, run: { issueId: string; runtimeBotId: string; repoPath: string; remoteUrl: string | null }) {
+async function adoptTaskMachine(client: PoolClient, actor: Actor, runId: string, run: { issueId: string; runtimeBotId: string; repoPath: string; remoteUrl: string | null }, template: string | null) {
   // The run's bot runtime is recorded on the new row; the old row's bot does not have to match.
+  // A repository task's machine holds only its harness's CLI: a run on another harness (or a
+  // since-released template) starts its own machine, and the old one stays parked for the task.
   const previous = (await client.query(`SELECT m.* FROM thread_machines m
       JOIN agent_runs r ON r.id=m."runId" AND r."userId"=m."ownerId"
       JOIN device_repos repo ON repo.id=m."repoId" AND repo."userId"=m."ownerId"
@@ -118,7 +120,8 @@ async function adoptTaskMachine(client: PoolClient, actor: Actor, runId: string,
       AND m.state='paused' AND m."sandboxId" IS NOT NULL AND m."deviceId" IS NOT NULL
       AND r.status IN ('succeeded','failed','stopped','cancelled')
       AND repo."repoPath"=$5 AND repo."remoteUrl" IS NOT DISTINCT FROM $6
-    ORDER BY m."lastActiveAt" DESC LIMIT 1 FOR UPDATE OF m`, [actor.userId, actor.workspaceId, run.issueId, runId, run.repoPath, run.remoteUrl])).rows[0]
+      AND ($7::text IS NULL OR m."snapshotId"=$7)
+    ORDER BY m."lastActiveAt" DESC LIMIT 1 FOR UPDATE OF m`, [actor.userId, actor.workspaceId, run.issueId, runId, run.repoPath, run.remoteUrl, template])).rows[0]
   if (!previous) return null
   await client.query(`UPDATE thread_machines SET state='ended',"endedAt"=COALESCE("endedAt",now()),"sandboxId"=NULL WHERE "runId"=$1`, [previous.runId])
   return (await client.query(`INSERT INTO thread_machines ("runId","workspaceId","ownerId","botId","issueId","snapshotId","operationId",state,"sandboxId","deviceId","repoId")
@@ -181,8 +184,9 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
   try {
     await client.query('BEGIN')
     await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`thread-machine:${runId}`])
-    const run = (await client.query(`SELECT r.*,b."workspaceId",b."botId" AS "runtimeBotId",repo."repoPath",repo."remoteUrl",repo."baseBranch",repo."verifyCommand",COALESCE(source_repo."repoPath",repo."repoPath") AS "snapshotRepoPath",m."sandboxId" AS "botSandboxId"
+    const run = (await client.query(`SELECT r.*,COALESCE(r."agentDefinition"->>'harness',agent.harness) AS "runHarness",b."workspaceId",b."botId" AS "runtimeBotId",repo."repoPath",repo."remoteUrl",repo."baseBranch",repo."verifyCommand",COALESCE(source_repo."repoPath",repo."repoPath") AS "snapshotRepoPath",m."sandboxId" AS "botSandboxId"
       FROM agent_runs r JOIN computer_run_bindings b ON b."runId"=r.id AND b."ownerId"=r."userId"
+      LEFT JOIN agents agent ON agent.id=r."agentId"
       JOIN device_repos repo ON repo.id=r."deviceRepoId" AND repo."userId"=r."userId"
       JOIN cloud_machines m ON m."workspaceId"=b."workspaceId" AND m."ownerId"=b."ownerId"
       LEFT JOIN bot_cloud_runtimes runtime ON runtime."botId"=b."botId" AND runtime."ownerId"=b."ownerId" AND runtime."workspaceId"=b."workspaceId" AND runtime."agentId"=r."agentId"
@@ -219,13 +223,15 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
     // No Mikka caps: the person's own E2B account sets the limit (orchestration.md § 5).
     if (!machine || machine.snapshotId === 'pending') {
       // A follow-up keeps this task's own machine. A new repository task starts
-      // from the anonymous ready template: the daemon clones its admitted
+      // from the anonymous ready template of its harness (E2B's claude or codex
+      // with Mikka's worker, decision 2026-11-01-2335): the daemon clones its admitted
       // remote and creates the task worktree from the configured base branch.
       // Only non-repository computer work retains the existing desktop snapshot.
-      const adopted = run.issueId ? await adoptTaskMachine(client, actor, runId, run) : null
+      const template = repositoryTask ? taskTemplate(run.runHarness) : null
+      const adopted = run.issueId ? await adoptTaskMachine(client, actor, runId, run, template) : null
       if (adopted) machine = adopted
       else {
-        const snapshotId = repositoryTask ? computerTemplate() : await provider.snapshot(client, actor, run.botSandboxId, run.snapshotRepoPath)
+        const snapshotId = template ?? await provider.snapshot(client, actor, run.botSandboxId, run.snapshotRepoPath)
         machine = (await client.query(`INSERT INTO thread_machines ("runId","workspaceId","ownerId","botId","issueId","snapshotId","operationId",state)
           VALUES ($1,$2,$3,$4,$5,$6,$7,'starting') ON CONFLICT ("runId") DO UPDATE SET "snapshotId"=EXCLUDED."snapshotId","issueId"=EXCLUDED."issueId" RETURNING *`, [runId, actor.workspaceId, actor.userId, run.runtimeBotId, run.issueId ?? null, snapshotId, randomUUID()])).rows[0]
       }
@@ -270,7 +276,7 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
       // Filesystem snapshots start no old worker process. Remove copied device
       // identity/capabilities before a new worker can make any network call.
       // A snapshot never holds a credential; scrub the same list again in case an older snapshot did.
-      await sandbox.commands.run(`rm -rf /home/mikka-runner/.mikka/worker /home/mikka-runner/.mikka/bootstrap.json /run/mikka-viewer /run/mikka-subagents; ${credentialScrubCommand()}; install -d -m 700 /run/mikka-viewer`, { user: 'root', timeoutMs: 10_000 })
+      await sandbox.commands.run(`rm -rf /home/user/.mikka/worker /home/user/.mikka/bootstrap.json /run/mikka-viewer /run/mikka-subagents; ${credentialScrubCommand()}; install -d -m 700 /run/mikka-viewer`, { user: 'root', timeoutMs: 10_000 })
     }
     const deviceId = machine.deviceId ?? randomUUID()
     const repoId = machine.repoId ?? randomUUID()
@@ -280,9 +286,10 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
     const expectedSha = process.env.MIKKA_CLOUD_WORKER_SHA
     // Version verification and viewer startup are independent. Hosted runs no
     // longer use Docker; never pull its obsolete image on the critical path.
+    // A repository task's machine (claude or codex template) has no desktop.
     const [sourceSha] = await Promise.all([
       sandbox.files.read('/opt/mikka/worker-source-sha', { user: 'root' }).then(value => value.trim()),
-      installComputerRuntime(sandbox),
+      repositoryTask ? undefined : installComputerRuntime(sandbox),
     ])
     if (!expectedSha || sourceSha !== expectedSha) throw new Error('Worker version mismatch')
     await client.query('BEGIN')
@@ -312,11 +319,11 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
     await client.query('COMMIT')
     const handoff = `/run/mikka-viewer/thread-${leaseId}.json`
     await sandbox.files.write(handoff, JSON.stringify({ deviceId, workspaceId: actor.workspaceId, credential, server: origin.toString(), ...(process.env.VERCEL_ENV === 'preview' && process.env.MIKKA_CLOUD_PREVIEW_BYPASS ? { protectionBypass: process.env.MIKKA_CLOUD_PREVIEW_BYPASS } : {}) }), { user: 'root' })
-    await sandbox.commands.run(`install -d -o mikka-runner -g mikka-runner -m 700 /home/mikka-runner/.mikka; install -o mikka-runner -g mikka-runner -m 600 ${handoff} /home/mikka-runner/.mikka/bootstrap.next; mv /home/mikka-runner/.mikka/bootstrap.next /home/mikka-runner/.mikka/bootstrap.json; unlink ${handoff}`, { user: 'root', timeoutMs: 10_000 })
+    await sandbox.commands.run(`install -d -o user -g user -m 700 /home/user/.mikka; install -o user -g user -m 600 ${handoff} /home/user/.mikka/bootstrap.next; mv /home/user/.mikka/bootstrap.next /home/user/.mikka/bootstrap.json; unlink ${handoff}`, { user: 'root', timeoutMs: 10_000 })
     // The worker's output streams into the server logs only while this invocation lives;
     // the tee'd file in the sandbox keeps it for later reads (park, failure, end).
     const mask = await workspaceSecretMasker(actor.workspaceId)
-    await sandbox.commands.run(workerCommand(CLOUD_WORKER_COMMAND), { user: 'mikka-runner', background: true, timeoutMs: 0, ...workerOutputForwarder(runId, mask) })
+    await sandbox.commands.run(workerCommand(CLOUD_WORKER_COMMAND), { user: 'user', background: true, timeoutMs: 0, ...workerOutputForwarder(runId, mask) })
     const deadline = Date.now() + 30_000
     let ready = false
     do {

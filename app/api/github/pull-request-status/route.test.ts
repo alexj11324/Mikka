@@ -7,7 +7,7 @@ const url = 'https://github.com/private/repo/pull/81'
 const content = withIssueMetadata({ type: 'doc' }, metadataSchema.parse({ pullRequests: [{ url, state: 'open' }] }))
 let userId: string | null = 'viewer'
 let canReadIssue = true
-const issueLookup = mock.fn(async (_userId: string, _issueId: string) => canReadIssue ? { content } : null)
+const issueLookup = mock.fn(async (_user: { id: string }, _issueId: string) => canReadIssue ? { content } : null)
 class GitHubAccessError extends Error {
   constructor(readonly code: string, readonly status: number) { super(code) }
 }
@@ -48,7 +48,7 @@ test('rejects invalid, arbitrary and unlinked URLs before GitHub access', async 
 test('issue visibility is checked for the current viewer before GitHub', async () => {
   canReadIssue = false
   assert.equal((await call()).status, 404)
-  assert.deepEqual(issueLookup.mock.calls[0].arguments, ['viewer', issueId])
+  assert.deepEqual(issueLookup.mock.calls[0].arguments, [{ id: 'viewer' }, issueId])
   assert.equal(readPr.mock.callCount(), 0)
 })
 

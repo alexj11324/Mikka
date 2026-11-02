@@ -11,13 +11,13 @@ import { MODEL_CREDENTIAL_HEADER, REPO_ORIGIN_HEADER } from '@mikka/protocol/dev
 import { normalizeRepository } from '@mikka/protocol/repository'
 import { dbUrl, seedBot, seedIssue, seedUser, seedWorkspace } from './support/workspace-admin-db'
 import { recordPushGrant } from './support/github-app-stub'
+import { fakeThreadMachines } from './support/thread-machine-fake'
 
 test('API-key runs: frozen by id at dispatch, opened only at claim, subscription first, withdrawn key refused', { skip: !dbUrl }, async t => {
   const saved = { key: process.env.WORKSPACE_SECRETS_KEY, byos: process.env.MIKKA_BYOS_ENABLED }
   process.env.WORKSPACE_SECRETS_KEY = randomBytes(32).toString('hex')
   process.env.MIKKA_BYOS_ENABLED = '1'
   delete process.env.MIKKA_CLOUD_COMPUTER_TASKS
-  delete process.env.MIKKA_CLOUD_THREAD_MACHINES
   delete process.env.MIKKA_FACTORY_ROUTING_ENABLED
   const next = await import('next/server')
   mock.module('next/server', { namedExports: { NextRequest: next.NextRequest, NextResponse: next.NextResponse, after: () => {} } })
@@ -38,6 +38,7 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
     await pool.query('DELETE FROM model_api_key_runs m USING agent_runs r WHERE r.id=m."runId" AND r."userId" = ANY($1)', [users])
     await pool.query('DELETE FROM byos_native_runs n USING agent_runs r WHERE r.id=n."runId" AND r."userId" = ANY($1)', [users])
     await pool.query('DELETE FROM computer_run_bindings WHERE "ownerId" = ANY($1)', [users])
+    await pool.query('DELETE FROM thread_machines WHERE "ownerId" = ANY($1)', [users])
     await pool.query('DELETE FROM run_tokens t USING agent_runs r WHERE r.id=t."runId" AND r."userId" = ANY($1)', [users]).catch(() => undefined)
     await pool.query('DELETE FROM agent_runs WHERE "userId" = ANY($1)', [users])
     await pool.query('DELETE FROM bot_model_choices WHERE "ownerId" = ANY($1)', [users])
@@ -96,6 +97,20 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
     const binding = randomUUID()
     await pool.query(`INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId") VALUES ($1,$2,$3,$4,$5,1,'claude_code_cli','subscription-model')`, [binding, p.id, p.workspaceId, p.agents.claude_code, connection])
     return { connection, binding }
+  }
+
+  /** A worker on E2B's claude or codex template (no desktop), and one with the desktop's computer broker. */
+  const taskMachine = [{ harness: 'claude_code', installed: true, toolApproval: true, subscriptionBroker: true }]
+  const desktopMachine = [{ ...taskMachine[0], computerBroker: true }]
+  /** The Bot's own computer, which dispatch queues against; each cloud thread then runs on its own thread machine. */
+  const botComputer = async (p: Awaited<ReturnType<typeof person>>) => {
+    const cloudDevice = randomUUID(), agentId = randomUUID(), repoId = randomUUID()
+    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,harnesses) VALUES ($1,$2,'Cloud computer','cloud',true,$3)`, [cloudDevice, p.id, JSON.stringify(desktopMachine)])
+    await pool.query(`INSERT INTO cloud_machines ("workspaceId","ownerId","operationId","sandboxId","deviceId",state,"runtimeReady") VALUES ($1,$2,$3,$4,$5,'running',true)`, [p.workspaceId, p.id, randomUUID(), `sbx-${randomUUID()}`, cloudDevice])
+    await pool.query(`INSERT INTO bot_desktops ("botId","workspaceId","ownerId",display) VALUES ($1,$2,$3,1)`, [p.botId, p.workspaceId, p.id])
+    await pool.query('INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,\'claude_code\',$4)', [agentId, p.id, cloudDevice, `cloud-${agentId.slice(0, 8)}`])
+    await pool.query('INSERT INTO device_repos (id,"deviceId","userId","repoPath","remoteUrl") VALUES ($1,$2,$3,$4,$5)', [repoId, cloudDevice, p.id, normalizeRepository(p.remote).key, p.remote])
+    return { cloudDevice, agentId, repoId }
   }
 
   await t.test('own device: a bot saved on a key model is frozen on the key by id; the claim opens it for that run', async () => {
@@ -208,15 +223,7 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
     const p = await person('key-cloud')
     const secret = `sk-ant-${randomBytes(16).toString('hex')}`
     const key = await addKey(p.id, 'anthropic', secret, ['key-model-a'])
-    const cloudDevice = randomUUID(), agentId = randomUUID(), repoId = randomUUID()
-    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,harnesses) VALUES ($1,$2,'Cloud computer','cloud',true,$3)`,
-      [cloudDevice, p.id, JSON.stringify([{ harness: 'claude_code', installed: true, toolApproval: true, subscriptionBroker: true, computerBroker: true }])])
-    await pool.query(`INSERT INTO cloud_machines ("workspaceId","ownerId","operationId","sandboxId","deviceId",state,"runtimeReady") VALUES ($1,$2,$3,$4,$5,'running',true)`, [p.workspaceId, p.id, randomUUID(), `sbx-${randomUUID()}`, cloudDevice])
-    await pool.query(`INSERT INTO bot_desktops ("botId","workspaceId","ownerId",display) VALUES ($1,$2,$3,1)`, [p.botId, p.workspaceId, p.id])
-    await pool.query('INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,\'claude_code\',$4)', [agentId, p.id, cloudDevice, `cloud-${agentId.slice(0, 8)}`])
-    await pool.query('INSERT INTO device_repos (id,"deviceId","userId","repoPath","remoteUrl") VALUES ($1,$2,$3,$4,$5)', [repoId, cloudDevice, p.id, normalizeRepository(p.remote).key, p.remote])
-    const token = `cloud-${randomUUID()}`
-    await pool.query(`INSERT INTO device_tokens (id,"userId","tokenHash","boundDeviceId","boundWorkspaceId","expiresAt") VALUES ($1,$2,$3,$4,$5,now()+interval '1 hour')`, [randomUUID(), p.id, hashDeviceToken(token), cloudDevice, p.workspaceId])
+    const { cloudDevice, agentId, repoId } = await botComputer(p)
 
     const { runId } = await queueCloudRun(pool, { userId: p.id, workspaceId: p.workspaceId }, { botId: p.botId, issueId: p.issueId, agentId, deviceRepoId: repoId, title: 'Task', body: '', model: 'auto' })
     const frozen = await definition(runId)
@@ -224,7 +231,11 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
     assert.equal(frozen.subscription, undefined, 'no subscription is needed for a cloud run')
     assert.equal(await recorded(runId), null)
 
-    const response = await claim(cloudDevice, runId, token)
+    // The run's own thread machine, with a desktop, takes it; the Bot's computer never does.
+    const machines = await fakeThreadMachines(pool, desktopMachine)
+    const thread = await machines.start({ userId: p.id, workspaceId: p.workspaceId }, runId).finally(() => machines.restore())
+    assert.notEqual(thread.deviceId, cloudDevice)
+    const response = await claim(thread.deviceId, runId, thread.token)
     const text = await response.text()
     assert.equal(response.status, 200, text)
     const assignment = JSON.parse(text)
@@ -233,5 +244,71 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
     assert.equal(assignment.computer.botId, p.botId)
     assert.equal(await recorded(runId), key.id)
     assert.equal((await pool.query('SELECT count(*)::int AS n FROM byos_native_runs WHERE "runId"=$1', [runId])).rows[0].n, 0)
+  })
+
+  await t.test('task machine without a desktop: the claim succeeds and hands out no desktop', async () => {
+    // A worker on E2B's claude or codex template reports its harness with no computer broker.
+    const p = await person('key-task-machine')
+    const secret = `sk-ant-${randomBytes(16).toString('hex')}`
+    await addKey(p.id, 'anthropic', secret, ['key-model-a'])
+    const { cloudDevice, agentId, repoId } = await botComputer(p)
+    const actor = { userId: p.id, workspaceId: p.workspaceId }
+    const queue = (deviceRepoId: string) => queueCloudRun(pool, actor, { botId: p.botId, issueId: p.issueId, agentId, deviceRepoId, title: 'Task', body: '', model: 'auto' })
+    const status = async (id: string) => (await pool.query('SELECT status FROM agent_runs WHERE id=$1', [id])).rows[0].status
+    const machines = await fakeThreadMachines(pool, taskMachine)
+    try {
+      // A computer task (no remote) needs a desktop: refused at claim, the run stays queued.
+      const computerRepo = randomUUID()
+      await pool.query('INSERT INTO device_repos (id,"deviceId","userId","repoPath") VALUES ($1,$2,$3,$4)', [computerRepo, cloudDevice, p.id, '/home/user/.mikka/bot-workspaces/fixture'])
+      const computerRun = (await queue(computerRepo)).runId
+      const computerThread = await machines.start(actor, computerRun)
+      const refused = await claim(computerThread.deviceId, computerRun, computerThread.token)
+      assert.equal(refused.status, 409, await refused.text())
+      assert.equal(await status(computerRun), 'queued')
+      await pool.query("UPDATE agent_runs SET status='cancelled' WHERE id=$1", [computerRun])
+
+      // A person holding the Bot's desktop does not hold a run on a machine without one.
+      await pool.query(`UPDATE bot_desktops SET control='user',"controlledBy"=$2,"controlUntil"=now()+interval '5 minutes' WHERE "botId"=$1`, [p.botId, p.id])
+      const { runId } = await queue(repoId)
+      const thread = await machines.start(actor, runId)
+      const response = await claim(thread.deviceId, runId, thread.token)
+      const text = await response.text()
+      assert.equal(response.status, 200, text)
+      const assignment = JSON.parse(text)
+      assert.equal(assignment.modelCredential.key, secret)
+      assert.equal(assignment.computer, undefined, 'a machine with no desktop gets no desktop')
+    } finally { machines.restore() }
+  })
+
+  await t.test('a workspace that denies computer use: a repository task on a task machine is claimed with no computer; a computer task is refused', async () => {
+    const p = await person('key-deny')
+    const secret = `sk-ant-${randomBytes(16).toString('hex')}`
+    await addKey(p.id, 'anthropic', secret, ['key-model-a'])
+    const { cloudDevice, agentId, repoId } = await botComputer(p)
+    const actor = { userId: p.id, workspaceId: p.workspaceId }
+    const queue = async (deviceRepoId: string, harnesses: Record<string, unknown>[]) => {
+      const { runId } = await queueCloudRun(pool, actor, { botId: p.botId, issueId: await task(p.id), agentId, deviceRepoId, title: 'Task', body: '', model: 'auto' })
+      const machines = await fakeThreadMachines(pool, harnesses)
+      try { return { runId, ...(await machines.start(actor, runId)) } } finally { machines.restore() }
+    }
+    const computerRepo = randomUUID()
+    await pool.query('INSERT INTO device_repos (id,"deviceId","userId","repoPath") VALUES ($1,$2,$3,$4)', [computerRepo, cloudDevice, p.id, '/home/user/.mikka/bot-workspaces/fixture'])
+    const repository = await queue(repoId, taskMachine)
+    const computerTask = await queue(computerRepo, desktopMachine)
+    // An admin denies computer use once both threads are queued on their own machines.
+    await pool.query(`INSERT INTO workspace_computer_policies ("workspaceId",permission,version) VALUES ($1,'deny',3)`, [p.workspaceId])
+    try {
+      const response = await claim(repository.deviceId, repository.runId, repository.token)
+      const text = await response.text()
+      assert.equal(response.status, 200, text)
+      const assignment = JSON.parse(text)
+      assert.equal(assignment.modelCredential.key, secret)
+      assert.equal(assignment.computer, undefined, 'a repository task gets no computer')
+      assert.notEqual(assignment.policy.permissions.computer_use, 'allow', 'a deny workspace grants no computer use')
+
+      const refused = await claim(computerTask.deviceId, computerTask.runId, computerTask.token)
+      assert.equal(refused.status, 409, await refused.text())
+      assert.equal((await pool.query('SELECT status FROM agent_runs WHERE id=$1', [computerTask.runId])).rows[0].status, 'queued', 'a computer task stays queued under deny')
+    } finally { await pool.query('DELETE FROM workspace_computer_policies WHERE "workspaceId"=$1', [p.workspaceId]) }
   })
 })

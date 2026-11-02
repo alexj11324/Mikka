@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { withRequestLog, noteLogUser } from '@/lib/request-log'
 import { forbiddenOrigin, json, mobileUser, unauthorized, writeAllowed } from '@/lib/mobile-api'
 import { reactionsFor, visibleGroupMessages, REACTIONS, setReaction } from '@/lib/reactions'
+import { messagesOutsideToken } from '@/lib/tokens/scope'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,7 +16,7 @@ async function handlePOST(request: Request) {
   if (!user) return unauthorized()
   const parsed = input.safeParse(await request.json().catch(() => null))
   if (!parsed.success) return json({ error: 'invalidReaction' }, 400)
-  if (!await setReaction(user.id, parsed.data.messageId, parsed.data.emoji)) return json({ error: 'notFound' }, 404)
+  if ((await messagesOutsideToken(user, [parsed.data.messageId])).size || !await setReaction(user.id, parsed.data.messageId, parsed.data.emoji)) return json({ error: 'notFound' }, 404)
   return json({ ok: true })
 }
 
@@ -30,7 +31,8 @@ async function handleGET(request: Request) {
   if (!user) return unauthorized()
   const ids = z.array(z.uuid()).max(100).safeParse((new URL(request.url).searchParams.get('ids') ?? '').split(',').filter(Boolean))
   if (!ids.success) return json({ error: 'invalidIds' }, 400)
-  return json({ reactions: await reactionsFor(user.id, await visibleGroupMessages(user.id, ids.data)) })
+  const outside = await messagesOutsideToken(user, ids.data)
+  return json({ reactions: await reactionsFor(user.id, await visibleGroupMessages(user.id, ids.data.filter(id => !outside.has(id)))) })
 }
 
 export const GET = withRequestLog('/api/mobile/reactions', handleGET)

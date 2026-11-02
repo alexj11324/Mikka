@@ -201,7 +201,30 @@
     "storeLoadFailed": "Couldn't load the app directory.",
     "loadingApps": "Loading apps…",
     "noConnections": "No connected apps yet",
-    "openStore": "Open Plugins"
+    "openStore": "Open Plugins",
+    "connectKind": {
+      "managed": "One-click",
+      "credentials": "API key",
+      "none": "No setup"
+    },
+    "key": {
+      "title": "Connect {name}",
+      "replaceTitle": "Change {name} key",
+      "replace": "Change key",
+      "where": "Get a key",
+      "scheme": "Method",
+      "schemes": {
+        "API_KEY": "API key",
+        "BEARER_TOKEN": "Bearer token",
+        "BASIC": "Username and password"
+      },
+      "submit": "Connect",
+      "incomplete": "Fill in the required fields",
+      "failed": "Could not connect. Check and try again",
+      "connected": "Connected {name}",
+      "replaced": "Changed {name} key",
+      "securedBy": "Secured by"
+    }
   },
   "Auth": {
     "haveAccount": "Already have an account?",
@@ -1128,6 +1151,7 @@
     "workspaceNotFound": "No accessible workspace.",
     "workspacePaymentTaken": "Another member's card already pays for this team.",
     "workspacePersonal": "A personal workspace has only you. To invite people, create a team workspace.",
+    "workspacePersonalDelete": "A personal workspace cannot be deleted.",
     "workspaceMemberExists": "One of these emails is already a workspace member. Manage or restore them in the member list.",
     "workspaceMemberNotFound": "This member does not exist.",
     "workspaceLastAdmin": "A workspace must keep at least one active admin.",
@@ -1150,6 +1174,8 @@
     "runAlreadyActive": "This task already has an active run.",
     "runDispatchKeyConflict": "This request key was already used for different run parameters.",
     "runNotActive": "This run has ended and has no answerable question.",
+    "threadReplaced": "A newer thread took this task over. Send it there.",
+    "threadCannotContinue": "This thread works on no task, so it can’t run again.",
     "factoryQuestionNeedsAnswerTool": "Use the Factory question answer tool to provide a verifiable response.",
     "savedLoginNotFound": "This login does not exist or was already deleted.",
     "deviceHasActiveRuns": "Threads are running on this device. Stop them before removing it.",
@@ -1779,6 +1805,7 @@
       "address": "Address",
       "danger": "Danger zone",
       "deleteWorkspace": "Delete workspace",
+      "personalUndeletable": "A personal workspace cannot be deleted",
       "deleting": "Deleting…",
       "deleteTitle": "Delete “{name}”?",
       "deleteLead": "Permanently deleted, with no way back:",
@@ -3204,9 +3231,6 @@
     "sendFailed": "Not sent. Draft kept",
     "stopping": "Stopping…",
     "stopFailed": "Stop not confirmed",
-    "pullRequest": "PR #{number}",
-    "moreOutputs": "+{count}",
-    "moreOutputsAria": "{count, plural, one {# more output} other {# more outputs}}",
     "send": "Send",
     "retryStop": "Try stopping again",
     "waiting": "Waiting for you",
@@ -4115,5 +4139,8 @@
     "appsLater": "OK. You can connect them in Settings later.",
     "welcome": "Your first Bot",
     "enter": "Open Mikka"
+  },
+  "PullRequestsBadge": {
+    "label": "{count, plural, one {# pull request} other {# pull requests}}"
   }
 }

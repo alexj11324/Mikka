@@ -30,8 +30,9 @@ export type DeviceTarget = {
  * Cloud means the person's own E2B key (keys are personal) on the dispatching bot's own cloud
  * runtime (MVP: no Mikka-hosted sandboxes). The key is enough: a bot with no
  * runtime yet gets one when the run is dispatched (`ensureBotCloudRuntime`).
- * The kill switch and a workspace's 「电脑」 policy set to deny turn it off. A
- * run with no bot (the Coordinator) uses the owner's hidden Coordinator bot
+ * The kill switch turns it off. The workspace's 「电脑」 policy does not: every
+ * run dispatched here names a repository with a remote (a repository task), and
+ * `queueCloudRun` still refuses a computer task under deny. A run with no bot (the Coordinator) uses the owner's hidden Coordinator bot
  * (`ensureCoordinatorBot`) and never borrows another bot's runtime.
  */
 export async function cloudReady(
@@ -41,8 +42,7 @@ export async function cloudReady(
   if (!cloudComputerTasksEnabled() || process.env.MIKKA_BYOS_ENABLED !== "1") return false;
   const { rowCount } = await query.query(
     `SELECT 1 WHERE ${ownE2BKeySql('$3::text')}
-        AND ($2::uuid IS NULL OR EXISTS (SELECT 1 FROM bots b WHERE b.id=$2 AND b."workspaceId"=$1::uuid AND b."ownerId"=$3 AND b."archivedAt" IS NULL))
-        AND NOT EXISTS (SELECT 1 FROM workspace_computer_policies p WHERE p."workspaceId"=$1::uuid AND p.permission='deny')`,
+        AND ($2::uuid IS NULL OR EXISTS (SELECT 1 FROM bots b WHERE b.id=$2 AND b."workspaceId"=$1::uuid AND b."ownerId"=$3 AND b."archivedAt" IS NULL))`,
     [scope.workspaceId, scope.botId, scope.ownerId],
   );
   return Boolean(rowCount);

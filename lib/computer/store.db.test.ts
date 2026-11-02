@@ -58,7 +58,7 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     await pool.query(reviewMigration); await pool.query(reviewMigration)
     const runApprovalMigration = await readFile(new URL('../../drizzle/20261027164513_computer_run_approvals.sql', import.meta.url), 'utf8')
     await pool.query(runApprovalMigration); await pool.query(runApprovalMigration)
-    await pool.query('CREATE TABLE byos_connections (id uuid PRIMARY KEY, "ownerId" text, "workspaceId" text, state text, epoch bigint, provider text, "removedAt" timestamptz, paused boolean NOT NULL DEFAULT false); CREATE TABLE byos_bindings (id uuid PRIMARY KEY, "ownerId" text, "workspaceId" text, "consumerId" text, "connectionId" uuid, "connectionRevision" bigint, route text, "modelId" text, "createdAt" timestamptz NOT NULL DEFAULT now()); CREATE TABLE byos_native_runs ("runId" uuid PRIMARY KEY REFERENCES agent_runs(id), "bindingId" uuid NOT NULL REFERENCES byos_bindings(id)); CREATE TABLE agents (id uuid PRIMARY KEY, "userId" text NOT NULL, "deviceId" uuid, harness text, name text NOT NULL, instructions text NOT NULL DEFAULT \'\'); CREATE UNIQUE INDEX agent_name_test ON agents ("userId",lower(name)); CREATE TABLE device_repos (id uuid PRIMARY KEY, "userId" text NOT NULL, "deviceId" uuid, "repoPath" text NOT NULL, "baseBranch" text, UNIQUE ("deviceId","repoPath"))')
+    await pool.query('CREATE TABLE byos_connections (id uuid PRIMARY KEY, "ownerId" text, "workspaceId" text, state text, epoch bigint, provider text, "removedAt" timestamptz, paused boolean NOT NULL DEFAULT false); CREATE TABLE byos_bindings (id uuid PRIMARY KEY, "ownerId" text, "workspaceId" text, "consumerId" text, "connectionId" uuid, "connectionRevision" bigint, route text, "modelId" text, "createdAt" timestamptz NOT NULL DEFAULT now()); CREATE TABLE byos_native_runs ("runId" uuid PRIMARY KEY REFERENCES agent_runs(id), "bindingId" uuid NOT NULL REFERENCES byos_bindings(id)); CREATE TABLE agents (id uuid PRIMARY KEY, "userId" text NOT NULL, "deviceId" uuid, harness text, name text NOT NULL, instructions text NOT NULL DEFAULT \'\'); CREATE UNIQUE INDEX agent_name_test ON agents ("userId",lower(name)); CREATE TABLE device_repos (id uuid PRIMARY KEY, "userId" text NOT NULL, "deviceId" uuid, "repoPath" text NOT NULL, "remoteUrl" text, "baseBranch" text, UNIQUE ("deviceId","repoPath"))')
     await pool.query('ALTER TABLE byos_connections ADD COLUMN "accessSecretName" text')
     const botRuntimeMigration = await readFile(new URL('../../drizzle/20261027164514_bot_cloud_runtimes.sql', import.meta.url), 'utf8')
     await pool.query(botRuntimeMigration); await pool.query(botRuntimeMigration)
@@ -130,7 +130,7 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
         await pool.query('UPDATE device_tokens SET "lastUsedAt"=now() WHERE "tokenHash"=$1', [createHash('sha256').update(handoff.credential).digest('hex')])
       }
     } } } as unknown as import('e2b').Sandbox
-    const workerRuntime = { ...runtime, ensureHostedRunnerImage: async () => { assert.fail('hosted workers must not pull the obsolete Docker image') } } as typeof provider
+    const workerRuntime = runtime
     await assert.rejects(startCloudWorker(pool, bob, sandbox, 'https://mikka.example/mikka', sha, workerRuntime), /busy or unavailable/)
     await assert.rejects(startCloudWorker(pool, actor, sandbox, 'https://mikka.example/mikka', 'b'.repeat(40), workerRuntime), /worker_version_mismatch/)
     const worker = await startCloudWorker(pool, actor, sandbox, 'https://mikka.example/mikka', sha, workerRuntime)
@@ -163,13 +163,24 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     const bobBot = await store.createBot(bob, 'Other owner')
     await pool.query('UPDATE devices SET harnesses=$2 WHERE id=$1', [worker.deviceId, JSON.stringify([{ harness: 'codex', installed: true, computerBroker: true, subscriptionBroker: true }, { harness: 'claude_code', installed: true, computerBroker: true, subscriptionBroker: true }])])
     let repoSetupCalls = 0
-    const botSandbox = { sandboxId: 'sandbox-test', commands: { run: async (_command: string, options: { user: string }) => { assert.equal(options.user, 'mikka-runner'); repoSetupCalls++ } } } as unknown as import('e2b').Sandbox
+    const botSandbox = { sandboxId: 'sandbox-test', commands: { run: async (_command: string, options: { user: string }) => { assert.equal(options.user, 'user'); repoSetupCalls++ } } } as unknown as import('e2b').Sandbox
     await assert.rejects(ensureBotRuntime(pool, bob, bot.id, botSandbox, worker.deviceId), /unavailable/)
     const setups = await Promise.all([ensureBotRuntime(pool, actor, bot.id, botSandbox, worker.deviceId), ensureBotRuntime(pool, actor, bot.id, botSandbox, worker.deviceId)])
     assert.deepEqual(setups[0], setups[1])
     assert.deepEqual(setups[0].map(row => row.harness), ['claude_code', 'codex'])
     assert.equal(new Set(setups[0].map(row => row.repoId)).size, 1)
     assert.equal(repoSetupCalls, 2, 'repeated setup reuses the Bot working tree')
+    // What provisioning leaves (ensureThreadMachine): the run's own thread machine, running on its
+    // own cloud device. Every cloud thread runs there; the Bot's computer serves only the Bot.
+    const onThreadMachine = async (runId: string) => {
+      const deviceId = randomUUID()
+      await pool.query(`INSERT INTO devices(id,"ownerId",kind) VALUES ($1,$2,'cloud')`, [deviceId, actor.userId])
+      await pool.query(`INSERT INTO thread_machines("runId","workspaceId","ownerId","botId","sandboxId","snapshotId","operationId",state,"deviceId")
+        SELECT "runId","workspaceId","ownerId","botId",$2,'snapshot-thread',$3,'running',$4 FROM computer_run_bindings WHERE "runId"=$1
+        ON CONFLICT ("runId") DO UPDATE SET "sandboxId"=EXCLUDED."sandboxId",state='running',"deviceId"=EXCLUDED."deviceId"`, [runId, `sandbox-${runId}`, randomUUID(), deviceId])
+      await pool.query('UPDATE agent_runs SET "deviceId"=$2 WHERE id=$1', [runId, deviceId])
+      return deviceId
+    }
     const cloudRun = randomUUID(), consumer = randomUUID(), cloudSubscription = randomUUID(), wrongSubscription = randomUUID()
     await pool.query('INSERT INTO agent_runs (id,"userId","agentId",status,"deviceId") VALUES ($1,$2,$3,$4,$5)', [cloudRun, actor.userId, consumer, 'queued', worker.deviceId])
     await bindComputerRun(pool, actor, cloudRun, bot.id)
@@ -211,6 +222,12 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     await pool.query('INSERT INTO agents (id,"userId","deviceId",harness,instructions,name) VALUES ($1,$2,$3,$4,$5,$6)', [consumer, actor.userId, worker.deviceId, 'codex', 'Follow the task', 'Fixture'])
     await pool.query('INSERT INTO device_repos (id,"userId","deviceId","baseBranch","repoPath") VALUES ($1,$2,$3,$4,$5)', [cloudRepo, actor.userId, worker.deviceId, 'main', '/tmp/cloud-repo'])
     const cloudInput = { botId: bot.id, issueId: randomUUID(), agentId: consumer, deviceRepoId: cloudRepo, title: 'Task', body: 'Use the desktop' }
+    // A repository task: its repository has a remote, so it runs on a task machine and the 电脑 policy does not gate it.
+    const remoteRepo = randomUUID()
+    await pool.query('INSERT INTO device_repos (id,"userId","deviceId","baseBranch","repoPath","remoteUrl") VALUES ($1,$2,$3,$4,$5,$6)', [remoteRepo, actor.userId, worker.deviceId, 'main', 'v2/example.test/octo/repo', 'https://example.test/octo/repo.git'])
+    const repositoryInput = { ...cloudInput, issueId: randomUUID(), deviceRepoId: remoteRepo, body: 'Fix the bug' }
+    const allowedRepository = await queueCloudRun(pool, actor, repositoryInput)
+    assert.equal((await pool.query('SELECT status FROM agent_runs WHERE id=$1', [allowedRepository.runId])).rows[0].status, 'queued', 'an allow workspace queues a repository task')
     await assert.rejects(queueCloudRun(pool, otherWorkspace, cloudInput), { status: 409 })
     await assert.rejects(queueCloudRun(pool, bob, cloudInput), { status: 409 })
     await assert.rejects(queueCloudRun(pool, actor, { ...cloudInput, deviceRepoId: randomUUID() }), { status: 409 })
@@ -228,22 +245,28 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     assert.equal(queuedBinding.status, 'queued')
     assert.match(queuedBinding.prompt, /Use the desktop/)
     assert.equal(await claimLocalRun(pool, queued.runId, worker.deviceId, new Date(Date.now() + 30000)), 'cloud-required')
+    assert.equal((await pool.query('SELECT state FROM thread_machines WHERE "runId"=$1', [queued.runId])).rows[0].state, 'starting', 'enqueue writes the run\'s own thread machine')
+    const queuedThread = await onThreadMachine(queued.runId)
     await store.operate(actor, bot.id, 'takeover')
-    assert.equal(await claimCloudRun(pool, actor, queued.runId, worker.deviceId, new Date(Date.now() + 30000), cloudSubscription), null, 'a queued run cannot claim while its desktop is controlled')
+    assert.equal(await claimCloudRun(pool, actor, queued.runId, queuedThread, new Date(Date.now() + 30000), cloudSubscription), null, 'a queued run cannot claim while its desktop is controlled')
     await store.operate(actor, bot.id, 'handback')
-    assert.deepEqual(await claimCloudRun(pool, actor, queued.runId, worker.deviceId, new Date(Date.now() + 30000), cloudSubscription), { botId: bot.id, ownerId: actor.userId, display: ':1', policyVersion: 0, permission: 'allow' })
+    assert.deepEqual(await claimCloudRun(pool, actor, queued.runId, queuedThread, new Date(Date.now() + 30000), cloudSubscription), { botId: bot.id, ownerId: actor.userId, display: ':1', policyVersion: 0, permission: 'allow' })
     const idempotent = { ...cloudInput, idempotencyKey: 'durable-tool-call-1' }
     const [first, retry] = await Promise.all([queueCloudRun(pool, actor, idempotent), queueCloudRun(pool, actor, idempotent)])
     assert.equal(first.runId, retry.runId, 'a retried tool call queues exactly one task')
     await assert.rejects(queueCloudRun(pool, actor, { ...idempotent, note: 'changed' }), { status: 409 })
     const deadline = new Date(Date.now() + 30000)
-    assert.equal(await claimCloudRun(pool, otherWorkspace, cloudRun, worker.deviceId, deadline, cloudSubscription), null)
-    assert.equal(await claimCloudRun(pool, actor, cloudRun, worker.deviceId, deadline, wrongSubscription), null)
+    const cloudThread = await onThreadMachine(cloudRun)
+    assert.equal(await claimCloudRun(pool, otherWorkspace, cloudRun, cloudThread, deadline, cloudSubscription), null)
+    assert.equal(await claimCloudRun(pool, actor, cloudRun, cloudThread, deadline, wrongSubscription), null)
     assert.equal(await claimCloudRun(pool, actor, cloudRun, randomUUID(), deadline, cloudSubscription), null)
-    await pool.query('UPDATE devices SET enabled=false WHERE id=$1', [worker.deviceId])
-    assert.equal(await claimCloudRun(pool, actor, cloudRun, worker.deviceId, deadline, cloudSubscription), null)
-    await pool.query('UPDATE devices SET enabled=true WHERE id=$1', [worker.deviceId])
-    const cloudClaims = await Promise.all([claimCloudRun(pool, actor, cloudRun, worker.deviceId, deadline, cloudSubscription), claimCloudRun(pool, actor, cloudRun, worker.deviceId, deadline, cloudSubscription)])
+    await pool.query('UPDATE agent_runs SET "deviceId"=$2 WHERE id=$1', [cloudRun, worker.deviceId])
+    assert.equal(await claimCloudRun(pool, actor, cloudRun, worker.deviceId, deadline, cloudSubscription), null, 'the Bot\'s computer never claims a thread')
+    await pool.query('UPDATE agent_runs SET "deviceId"=$2 WHERE id=$1', [cloudRun, cloudThread])
+    await pool.query('UPDATE devices SET enabled=false WHERE id=$1', [cloudThread])
+    assert.equal(await claimCloudRun(pool, actor, cloudRun, cloudThread, deadline, cloudSubscription), null)
+    await pool.query('UPDATE devices SET enabled=true WHERE id=$1', [cloudThread])
+    const cloudClaims = await Promise.all([claimCloudRun(pool, actor, cloudRun, cloudThread, deadline, cloudSubscription), claimCloudRun(pool, actor, cloudRun, cloudThread, deadline, cloudSubscription)])
     assert.equal(cloudClaims.filter(Boolean).length, 1)
     assert.deepEqual(cloudClaims.find(Boolean), { botId: bot.id, ownerId: actor.userId, display: ':1', policyVersion: 0, permission: 'allow' })
     const runId = randomUUID()
@@ -345,6 +368,8 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     assert.equal(await decideComputerReview(pool, actor, laterReview.id, laterReview.digest, true), false)
     await assert.rejects(syncComputerReviews(pool, deviceId, actor.userId, [makeReview(runId, 20)]), /Run or desktop unavailable/)
     await assert.rejects(queueCloudRun(pool, actor, cloudInput), { status: 409 })
+    const deniedRepository = await queueCloudRun(pool, actor, { ...repositoryInput, issueId: randomUUID() })
+    assert.equal((await pool.query('SELECT status FROM agent_runs WHERE id=$1', [deniedRepository.runId])).rows[0].status, 'queued', 'a deny workspace still queues a repository task')
     await store.operate(actor, bot.id, 'wake')
     assert.equal(computerAllowed, false, 'waking a denied desktop cannot re-enable the driver')
     await store.setPolicy(actor.workspaceId, 'allow')
@@ -431,7 +456,7 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     const allowedRun = randomUUID()
     await pool.query('INSERT INTO agent_runs (id,"userId","agentId",status,"deviceId") VALUES ($1,$2,$3,$4,$5)', [allowedRun, actor.userId, consumer, 'queued', worker.deviceId])
     await bindComputerRun(pool, actor, allowedRun, bot.id)
-    assert.deepEqual(await claimCloudRun(pool, actor, allowedRun, worker.deviceId, new Date(Date.now() + 30000), cloudSubscription), { botId: bot.id, ownerId: actor.userId, display: ':1', policyVersion: 4, permission: 'allow' })
+    assert.deepEqual(await claimCloudRun(pool, actor, allowedRun, await onThreadMachine(allowedRun), new Date(Date.now() + 30000), cloudSubscription), { botId: bot.id, ownerId: actor.userId, display: ':1', policyVersion: 4, permission: 'allow' })
     await store.setPolicy(actor.workspaceId, 'deny')
     assert.equal(computerPolicyVersion, 5, 'the driver guard fences grants from the previous policy version')
     await store.setPolicy(actor.workspaceId, 'allow')

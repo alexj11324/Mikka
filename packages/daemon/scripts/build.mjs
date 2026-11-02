@@ -29,7 +29,7 @@ await build({
   external: Object.keys(dependencies).flatMap(name => [name, `${name}/*`]),
   logLevel: 'warning',
 })
-for (const path of ['agents/native-container.mjs', 'agents/native-egress.mjs', 'agents/run-container-entry.mjs', 'computer/proxy.mjs', 'computer/driver.mjs']) {
+for (const path of ['agents/native-container.mjs', 'computer/proxy.mjs', 'computer/driver.mjs']) {
   await mkdir(dirname(resolve(out, path)), { recursive: true })
   await copyFile(resolve(root, 'src', path), resolve(out, path))
 }
@@ -37,11 +37,9 @@ for (const path of ['agents/native-container.mjs', 'agents/native-egress.mjs', '
 await copyFile(resolve(root, 'src/agents/mikka-mcp.mjs'), resolve(out, 'mikka-mcp.mjs'))
 await copyFile(resolve(root, 'src/agents/capture-copy.mjs'), resolve(out, 'capture-copy.mjs'))
 await copyFile(resolve(root, 'src/agents/github-credentials.mjs'), resolve(out, 'github-credentials.mjs'))
-// The run sandbox launcher (bundled into each entry) spawns this worker beside it.
-await copyFile(resolve(root, 'src/agents/run-sandbox-worker.mjs'), resolve(out, 'run-sandbox-worker.mjs'))
 await cp(resolve(root, 'fixtures'), resolve(out, 'fixtures'), { recursive: true })
-// The runner image's sources (run-container.ts builds it on a device with Docker).
-for (const path of ['harness/Dockerfile', 'harness/pins.json', 'harness/install.mjs', 'harness/cli.mjs']) {
+// The daemon's harness pins and installer (harness-install.ts).
+for (const path of ['harness/pins.json', 'harness/install.mjs', 'harness/cli.mjs']) {
   await mkdir(dirname(resolve(out, path)), { recursive: true })
   await copyFile(resolve(root, path), resolve(out, path))
 }

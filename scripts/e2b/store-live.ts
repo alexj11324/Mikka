@@ -9,7 +9,6 @@ import { readFile } from 'node:fs/promises'
 import { Pool } from 'pg'
 import { Sandbox } from 'e2b'
 import { ComputerStore } from '../../lib/computer/store'
-import { ensureContainerRuntime } from '../../lib/computer/e2b-provider'
 import { bindComputerRun } from '../../lib/computer/run-binding'
 import { decideComputerReview, syncComputerReviews } from '../../lib/computer/reviews'
 import { ComputerBroker } from '../../packages/daemon/src/computer/broker.mjs'
@@ -44,15 +43,6 @@ async function main() {
     const ingress = await fetch(`https://${sandbox.getHost(6080)}/vnc`, { signal: AbortSignal.timeout(15_000) })
     assert.equal(ingress.status, 401, 'public viewer requires a grant')
     console.log('live stage: public viewer denies anonymous traffic')
-    if (process.env.E2B_TEST_CONTAINERS === '1') {
-      await ensureContainerRuntime(sandbox)
-      await ensureContainerRuntime(sandbox)
-      const runner = await sandbox.commands.run('docker --host=unix:///run/mikka-container/docker.sock info >/dev/null 2>&1', { user: 'mikka-runner' })
-      assert.equal(runner.exitCode, 0)
-      const access = await sandbox.commands.run('if test -r /run/mikka-container/docker.sock || test -w /run/mikka-container/docker.sock; then exit 1; fi', { user: 'user' })
-      assert.equal(access.exitCode, 0)
-      console.log('live stage: trusted non-root runner and isolated task account verified')
-    }
     const rawCDP = await fetch(`https://${sandbox.getHost(9201)}/json/version`, { signal: AbortSignal.timeout(15_000) })
     assert.ok([502, 503].includes(rawCDP.status), 'no public CDP listener')
     console.log('live stage: public CDP unavailable')
@@ -108,7 +98,6 @@ async function main() {
     await new ComputerStore(pool).operate(actor, bot.id, 'wake')
     console.log('live stage: resumed through store')
     sandbox = await Sandbox.connect(id, connection)
-    if (process.env.E2B_TEST_CONTAINERS === '1') { await ensureContainerRuntime(sandbox); console.log('live stage: container runtime survives pause/resume') }
     assert.equal(await sandbox.files.read('/workspace/acceptance-marker'), 'preserved')
     console.log('live stage: persisted file verified')
     try {
@@ -120,7 +109,8 @@ async function main() {
       throw error
     }
     console.log('live stage: resumed viewer verified')
-    const privilege = await sandbox.commands.run('if sudo -n true >/dev/null 2>&1; then exit 1; fi; if cat /run/mikka-viewer/key >/dev/null 2>&1; then exit 1; fi', { user: 'user' })
+    // The default user keeps the template's sudo (decision 2026-11-01-2335); the key is still root-only on disk.
+    const privilege = await sandbox.commands.run('if cat /run/mikka-viewer/key >/dev/null 2>&1; then exit 1; fi', { user: 'user' })
     assert.equal(privilege.exitCode, 0)
     console.log(JSON.stringify({ provision: true, persistentBot: true, viewer: true, publicIngressProtected: true, unixVncPixels: true, takeover: true, handback: true, ownerDenial: true, sleepResume: true, diskPreserved: true, keyIsolated: true }))
   } finally {

@@ -33,7 +33,7 @@ test('the tail is read back bounded; a failing or hanging read gives null withou
   const commands: string[] = []
   const box = (stdout: string) => async () => ({ commands: { run: async (cmd: string) => { commands.push(cmd); return { stdout } } } })
   assert.equal(await readWorkerTail(box('worker said hi\n')), 'worker said hi')
-  assert.match(commands[0], /tail -n 200 \/home\/mikka-runner\/\.mikka\/thread-bootstrap\.log/)
+  assert.match(commands[0], /tail -n 200 \/home\/user\/\.mikka\/thread-bootstrap\.log/)
   assert.equal((await readWorkerTail(box('y'.repeat(TAIL_MAX * 2))))!.length, TAIL_MAX)
   assert.equal(await readWorkerTail(box('   \n')), null)
   assert.equal(await readWorkerTail(async () => { throw new Error('sandbox gone') }), null)

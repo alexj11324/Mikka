@@ -10,6 +10,7 @@ test('a template with current runtime files starts without transferring files', 
       commands++
       assert.equal(options.user, 'root')
       assert.match(command, /sha256sum --check --status/)
+      assert.doesNotMatch(command, /start-desktop\.sh/)
       assert.match(command, /head -c 32 \/dev\/urandom/)
       return { stdout: '' }
     } },
@@ -18,13 +19,13 @@ test('a template with current runtime files starts without transferring files', 
   assert.equal(commands, 1)
 })
 
-test('an older task snapshot gets all guards in one transfer before the service starts', async () => {
+test('an older task snapshot updates guards without replacing its baked desktop', async () => {
   let current = false, commands = 0, transfers = 0
   const sandbox = {
     files: { write: async (files: { path: string; data: string }[], options: { user: string }) => {
       assert.equal(options.user, 'root')
       assert.equal(commands, 1)
-      assert.deepEqual(files.map(file => file.path.split('/').at(-1)), ['start-desktop.sh', 'viewer-gateway.py', 'lease-driver.py'])
+      assert.deepEqual(files.map(file => file.path.split('/').at(-1)), ['viewer-gateway.py', 'lease-driver.py'])
       assert.ok(files.every(file => file.data.length > 0))
       transfers++; current = true
     } },

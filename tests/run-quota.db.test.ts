@@ -19,7 +19,6 @@ test('quota exhausted mid-run: continue on the person\'s key, else pause with th
   process.env.WORKSPACE_SECRETS_KEY = randomBytes(32).toString('hex')
   process.env.MIKKA_BYOS_ENABLED = '1'
   delete process.env.MIKKA_CLOUD_COMPUTER_TASKS
-  delete process.env.MIKKA_CLOUD_THREAD_MACHINES
   delete process.env.MIKKA_FACTORY_ROUTING_ENABLED
   const next = await import('next/server')
   mock.module('next/server', { namedExports: { NextRequest: next.NextRequest, NextResponse: next.NextResponse, after: () => {} } })

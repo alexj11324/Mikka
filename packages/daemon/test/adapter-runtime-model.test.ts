@@ -15,8 +15,6 @@ afterEach(cleanupTempDirs)
 // while binding the required live host approval bridge to this test's run.
 function modelObservationGate(runId: string) {
   return new ToolApprovalGate(runId, {
-    permission: () => 'deny',
-    ask: async () => 'deny',
     isLive: id => id === runId,
   })
 }

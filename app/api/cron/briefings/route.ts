@@ -1,5 +1,5 @@
 import { withRequestLog } from '@/lib/request-log'
-import { verifyBearer } from '@/lib/linear-sync/webhook'
+import { cronUnauthorized } from '@/lib/cron-auth'
 import { wakeCoordinator } from '@/lib/coordinator/wake'
 import { writeDueBriefings } from '@/lib/suggestions/store'
 
@@ -13,9 +13,7 @@ const WAKE_CONCURRENCY = 8
 
 // Called every 15 minutes by the Cloudflare Worker in cloudflare/suggestions-cron.
 async function handleGET(request: Request) {
-  const secret = process.env.CRON_SECRET
-  if (!secret) return Response.json({ error: 'Cron is not configured' }, { status: 503 })
-  if (!await verifyBearer(request.headers.get('authorization'), secret)) return new Response(null, { status: 401 })
+  const refused = await cronUnauthorized(request); if (refused) return refused
   const { result, pushed } = await writeDueBriefings({ deadline: Date.now() + BUDGET_MS })
   // Each written briefing waits in the person's Coordinator inbox; waking it has the Coordinator write it to them.
   for (let index = 0; index < pushed.length; index += WAKE_CONCURRENCY) {

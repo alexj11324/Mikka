@@ -18,9 +18,6 @@ import { ToolApprovalGate } from "./agents/tool-approval"
 import type { ServerDecide, ServerDecisionAnswer } from "./server-decision"
 import { POLICY_SNAPSHOT_HEADER, POLICY_SNAPSHOT_VERSION, POLICY_SNAPSHOT_REFRESH_MS, policyDistributionContextSchema, policyIssuer, signedPolicySnapshotSchema } from '@mikka/protocol/policy-snapshot'
 import { verifyPolicySnapshot } from '@mikka/protocol/node-policy-snapshot'
-import { toolApprovalDecision } from "./agents/tool-approval-policy"
-import { judgeNetworkDestination } from "./decision-judgments"
-import { runApps } from "./agents/run-apps"
 import { SKILL_ARTIFACT_HEADER, TEAM_SKILL_HEADER, skillReceiptRevalidationSchema } from '@mikka/protocol/skill'
 import { nativeBrokerContextSchema, nativeLeaseSchema, type NativeBrokerRequest } from '@mikka/protocol/subscription'
 import { computerSyncPath, computerSyncResponse, type LocalComputerRequest } from '@mikka/protocol/computer'
@@ -112,10 +109,6 @@ export function serverUrl(base: string, path: string): URL {
 }
 
 export class HttpServerLink implements ServerLink {
-  /** The run-scoped Decisions API (POST /v1/runs/:runId/decision). */
-  private serverDecide(): ServerDecide {
-    return this.decide
-  }
   /** Run entry and resume both call this before repository/setup execution. */
   async verifyRunPolicy(assignment: RunAssignment, signal: AbortSignal) {
     if (signal.aborted) throw Error('Run policy cancelled')
@@ -157,26 +150,14 @@ export class HttpServerLink implements ServerLink {
     } catch { return null }
   }
 
-  async prepareRunToolApproval(assignment: RunAssignment, signal: AbortSignal, check: () => void, worktree?: string) {
+  async prepareRunToolApproval(assignment: RunAssignment, signal: AbortSignal, check: () => void) {
     if (!assignment.policy || !assignment.policyRevision) throw new Error('Run policy unavailable')
     let context = signal.aborted ? null : await this.verifyRunPolicy(assignment,signal)
     const policyRevision = assignment.policyRevision
     const path = `/v1/runs/${seg(assignment.runId)}/tool-approval`
-    const proposal = z.object({ id: z.uuid(), digest: z.string().regex(/^[a-f0-9]{64}$/), status: z.string() })
-    const response = z.object({ decision: z.enum(['pending', 'allow', 'deny']) })
     const liveness = new AbortController()
     const gate = new ToolApprovalGate(assignment.runId, {
-      permission: request => toolApprovalDecision(request, assignment.policy, worktree, runApps(assignment.mcp)?.apps.map(app => app.name),
-        assignment.github ? [new URL(assignment.github.endpoint).host] : [], assignment.mcp?.mailbox === true),
-      preauthorizeNetwork: (request, signal) => {
-        const { host, port } = request.input as { host: string; port: number }
-        return judgeNetworkDestination(this.serverDecide(), assignment.runId, {
-          host, port, repo: assignment.expectedRepoRemote ?? assignment.repoId,
-          task: assignment.prompt, allow: assignment.policy?.networkAllow ?? [],
-        }, signal)
-      },
-      // Keep the callback pending at the tool boundary. The adapter's current
-      // session and checkpoint remain intact; handback resolves this same call.
+      // A paused run stays pending here; its session and checkpoint remain intact.
       isLive: async () => {
         try {
           for (;;) {
@@ -198,34 +179,7 @@ export class HttpServerLink implements ServerLink {
             })
           }
         } catch { return false }
-      },
-      ask: async (request, signal) => {
-        const delay = () => new Promise<void>((resolve, reject) => {
-          const done = () => { signal.removeEventListener('abort', stop); resolve() }
-          const timer = setTimeout(done, 1000)
-          const stop = () => { clearTimeout(timer); reject(new Error('cancelled')) }
-          signal.addEventListener('abort', stop, { once: true })
-          if (signal.aborted) stop()
-        })
-        const retry = async <T>(operation: () => Promise<T>): Promise<T> => {
-          for (;;) {
-            try { return await operation() }
-            catch (error) { if (signal.aborted || !(error instanceof ServerUnreachableError)) throw error; await delay() }
-          }
-        }
-        if (!await gate.checkLive()) return 'deny'
-        const created = await retry(() => this.call('POST', path, { body: { operation: 'propose', deviceId: assignment.deviceId, policyRevision, requestId: request.requestId, harness: request.harness, method: request.method, input: request.input }, schema: proposal, signal }))
-        try {
-          for (;;) {
-            if (!await gate.checkLive()) return 'deny'
-            const result = await retry(() => this.call('POST', path, { body: { operation: 'take', deviceId: assignment.deviceId, id: created.id, digest: created.digest }, schema: response, signal }))
-            if (result.decision !== 'pending') return result.decision
-            await delay()
-          }
-        } finally {
-          void this.call('POST', path, { body: { operation: 'cancel', deviceId: assignment.deviceId, id: created.id, digest: created.digest } }).catch(() => undefined)
-        }
-      },
+      }
     })
     let checking = false
     const monitor = setInterval(() => {

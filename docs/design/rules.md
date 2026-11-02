@@ -48,7 +48,11 @@ source wins in a conflict is in [`README.md`](README.md).
   button). Views that are not a conversation never get one: the thread list
   and a bot's computer screen send instructions through the centre composer.
   An open thread is a conversation with the agent running it, so its detail
-  ends in that composer and what is typed there goes to that agent.
+  ends in that composer and what is typed there goes to that agent, whether
+  the thread is running or has ended (an ended one runs again, R-81), wherever
+  it opens: task page, thread column, Artifact window, phone. Only the legacy
+  agent archive is read-only
+  ([decision](decisions/2026-11-02-0220-every-thread-ends-in-the-composer.md)).
 - **R-11** A bot's composer, the Coordinator's included, has one model chip
   (`BotModelPicker`) beside 「+」, saved per bot; it picks a model only, never
   an Agent. Settings has no per-bot model rows
@@ -196,7 +200,8 @@ do what Linear does. Figma: `220:5022` (MIK-25).
 - **R-79** No breadcrumb, title bar or page header shows the workspace's
   name. There is one workspace on screen, the name cannot be clicked there,
   and it is shown and switched only from the avatar menu at the bottom left.
-  The task page's breadcrumb starts at 看板. A group heading that names the
+  The task page's breadcrumb starts at the place it was opened from (R-82).
+  A group heading that names the
   workspace its settings apply to (设置's workspace group) is not a crumb and
   stays.
 - **R-62** 线程 lists the threads working on the issue, grouped as R-52:
@@ -235,10 +240,17 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   Figma: page 「AI 侧栏 · 全局」.
 - **R-66** When the Coordinator dispatches a thread, the chat shows one
   thread card under its reply: status icon (never the bot's avatar), thread
-  name, then its outputs as chips such as a PR, folding extras into +N. No
-  step or progress line under the name (Alex, 2026-10-27). The card updates in place, so a thread has one
+  name, then on the right one PR badge for the PRs it produced: the summary
+  state's git mark in its GitHub colour (any open: green; else any draft:
+  grey; else any merged: purple; else closed: red) and the count. Hovering
+  the badge, or tapping it on a phone, lists each PR (title; state mark,
+  state, repository #number, and +added −removed lines when known); a row
+  opens the PR. Every thread card carries it, in the chat and in the thread
+  lists ([decision](decisions/2026-11-02-0230-pr-badge-on-thread-cards.md)).
+  No step or progress line under the name (Alex, 2026-10-27). The card updates in place, so a thread has one
   card in a chat; a later change of state is a sentence from the Coordinator,
-  not a second card. The card has no log, input box or buttons. Clicking it
+  not a second card. The card has no log, input box or buttons besides the
+  PR badge. Clicking it
   opens the thread conversation as R-82 says for every thread: on desktop in
   the right column beside the chat, which stays; on a phone it pushes in full
   screen ([decision](decisions/2026-11-01-1320-navigation-model.md)).
@@ -303,8 +315,8 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
     duplicate, or its PR is merged. A run nobody could judge sits under 受阻
     (failed) or 等待你, never 已解决.
   - Every row leads with its group's status icon and colour, the phone's set
-    (`ThreadStatusIcon`): 进行中 spins, 受阻 a red alert, 等待你 a hollow
-    circle, 空闲 a slashed circle, 已解决 a green check.
+    (`ThreadStatusIcon`): 进行中 spins, 受阻 a red alert, 等待你 a raised
+    hand, 空闲 a slashed circle, 已解决 a green check.
   - A task's existing threads fold into its newest one, which carries
     「第 N 次尝试」 past the first and stays out of 已解决 until the task is
     resolved; the task's own 线程 tab lists every attempt. (New work keeps one
@@ -357,7 +369,17 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   bot that dispatched it; a task as its own page in the centre, as Linear; an
   Artifact in its window over the page (R-56); PRs and web pages in a new
   tab. Projects and teams live under 看板, with no rail item of their own. On
-  a phone the right column is a page pushed over the chat. Source: Alex,
+  a phone the right column is a page pushed over the chat. A task page knows
+  where it was opened from: its address names that chat or page (`bot=`,
+  `section=`, `section=coordinator` for the Coordinator's chat), its first
+  crumb names it, and ✕ returns there. Opened by a move in the same page
+  load, ✕ is a step back, so the chat comes back as it was, its open thread
+  included; opened from a link, a reload or a notification at launch, ✕ goes
+  to the place the address names, and to 看板 when it names none. Its ↑↓ show
+  only when the board, a list or a project opened it. A notification or an
+  admin link to a thread opens it beside its task where the viewer can read
+  it. An address with an unknown section or a bot that is not the person's
+  rewrites itself to what is shown, without a new entry. Source: Alex,
   2026-11-01 ([decision](decisions/2026-11-01-1320-navigation-model.md)).
 
 ## Settings

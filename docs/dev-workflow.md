@@ -48,7 +48,6 @@ provides:
 - **PostgreSQL 17** at `127.0.0.1:5432`, database `mikka_e2e`; migrations with
   `pnpm migrate` (it runs by itself when every target is a loopback database;
   a remote database off Vercel still needs `MIGRATE=1` and `--allow-remote`).
-- **bubblewrap, socat and ripgrep** for the daemon's sandbox and tools.
 - **Chromium** for UI screenshots: the container's
   `/opt/pw-browsers/chromium`. Never run `playwright install`.
 
@@ -114,10 +113,15 @@ of order, whoever merges the later one renames it.
 
 ## 7. E2B templates
 
-To test worker changes, build a `-dev` template from the branch. Do not wait
+Cloud machines start from E2B's own `desktop`, `claude` and `codex` templates
+with the Mikka worker added
+([decision 2026-11-01-2335](design/decisions/2026-11-01-2335-e2b-official-templates.md)).
+
+To test worker changes, build `-dev` templates from the branch
+(`python3 scripts/e2b/build-template.py --name <prefix>-dev [--kind claude]`). Do not wait
 for the automatic publish that follows a merge to `main`
 ([`e2b-template.yml`](../.github/workflows/README.md#cloud-worker-template-release)).
-Never overwrite the production template or Vercel's production environment.
+Never overwrite the production templates or Vercel's production environment.
 
 ## 8. Reaching a local service from outside
 

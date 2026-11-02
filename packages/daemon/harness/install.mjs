@@ -5,8 +5,8 @@
 // `<root>/<harness>/<version>/bin/<command>`. A daemon release that bumps a
 // pin installs the new version on its next run and removes the old.
 //
-// Plain JavaScript with no local imports beyond the pins: the runner image
-// (Dockerfile) and the E2B template run it through `cli.mjs`.
+// Plain JavaScript with no local imports beyond the pins: the E2B templates
+// run it through `cli.mjs`.
 import { createHash, randomBytes } from 'node:crypto'
 import { execFile } from 'node:child_process'
 import { createWriteStream, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'

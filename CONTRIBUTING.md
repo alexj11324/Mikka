@@ -107,13 +107,16 @@ under Alex's identity (a GitHub App install, an OAuth consent) or a session
 permission prompt may be asked of him. The named accounts set up outside the
 pool: `docs/design/decisions/2026-11-01-0300-agents-inject-test-logins.md`.
 
-The cloud worker's E2B template is released by CI, not by hand: a push to `main` that
-changes a path the template packages (`WORKER_PATHS` in `scripts/e2b/build-template.py`)
-or `scripts/e2b/` runs `.github/workflows/e2b-template.yml`, which builds the template,
-makes it public, sets `E2B_BYO_COMPUTER_TEMPLATE` and `MIKKA_CLOUD_WORKER_SHA` together
-in Vercel Production and redeploys. To test worker changes before that, build a
-`-dev` template from the branch with the same script and point only your local
-or test environment at it; never overwrite the production template or Vercel's
+Cloud machines start from E2B's own `desktop`, `claude` and `codex` templates with the
+Mikka worker added ([decision 2026-11-01-2335](docs/design/decisions/2026-11-01-2335-e2b-official-templates.md)).
+The three templates are released by CI, not by hand: a push to `main` that
+changes a path the templates package (`WORKER_PATHS` in `scripts/e2b/build-template.py`)
+or `scripts/e2b/` runs `.github/workflows/e2b-template.yml`, which builds them,
+makes them public, sets `E2B_BYO_COMPUTER_TEMPLATE`, `E2B_CLAUDE_TEMPLATE`,
+`E2B_CODEX_TEMPLATE` and `MIKKA_CLOUD_WORKER_SHA` together
+in Vercel Production and redeploys. To test worker changes before that, build
+`-dev` templates from the branch with the same script and point only your local
+or test environment at them; never overwrite the production templates or Vercel's
 production variables ([`docs/dev-workflow.md`](docs/dev-workflow.md) § 7).
 
 ## License

@@ -13,7 +13,6 @@ const mac = [{ harness: 'codex', installed: true, models: ['gpt-5'], defaultMode
 test('run machine fallback: own E2B, own auto-schedule device, else an actionable error', { skip: !dbUrl }, async t => {
   process.env.MIKKA_CLOUD_COMPUTER_TASKS = '1'
   process.env.MIKKA_BYOS_ENABLED = '1'
-  process.env.MIKKA_CLOUD_THREAD_MACHINES = '1'
   const { Pool } = await import('pg')
   const pool = new Pool({ connectionString: dbUrl, max: 3 })
   const steps = await import('../workflows/coordinator/steps')
@@ -168,7 +167,7 @@ test('run machine fallback: own E2B, own auto-schedule device, else an actionabl
     await pool.query(`INSERT INTO cloud_machines ("workspaceId","ownerId","operationId","sandboxId","deviceId",state,"runtimeReady") VALUES ($1,$2,$3,$4,$5,'running',true)`, [c.workspaceId, c.id, randomUUID(), `sbx-${randomUUID()}`, cloudDevice])
     await pool.query(`INSERT INTO bot_desktops ("botId","workspaceId","ownerId",display) VALUES ($1,$2,$3,1)`, [botId, c.workspaceId, c.id])
     await pool.query(`INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,'codex',$4)`, [cloudAgent, c.id, cloudDevice, `cloud-${cloudAgent.slice(0, 8)}`])
-    await pool.query(`INSERT INTO device_repos (id,"deviceId","userId","repoPath","baseBranch") VALUES ($1,$2,$3,'/home/mikka-runner/w','main')`, [repoId, cloudDevice, c.id])
+    await pool.query(`INSERT INTO device_repos (id,"deviceId","userId","repoPath","baseBranch") VALUES ($1,$2,$3,'/home/user/w','main')`, [repoId, cloudDevice, c.id])
     await pool.query(`INSERT INTO bot_cloud_runtimes ("botId","workspaceId","ownerId",harness,"agentId","repoId") VALUES ($1,$2,$3,'codex',$4,$5)`, [botId, c.workspaceId, c.id, cloudAgent, repoId])
     await pool.query(`INSERT INTO byos_connections (id,"ownerId","workspaceId",provider,state,epoch,"secretName","secretDigest","providerSubject") VALUES ($1,$2,$3,'codex','connected',1,$5,$4,'synthetic-subject')`, [connection, c.id, c.workspaceId, 'a'.repeat(64), `synthetic-${connection}`])
     await pool.query(`INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId") VALUES ($1,$2,$3,$4,$5,1,'codex_cli','gpt-5')`, [randomUUID(), c.id, c.workspaceId, cloudAgent, connection])
