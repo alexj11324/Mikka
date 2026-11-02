@@ -1,3 +1,4 @@
+import { deploymentSwitch } from '@/lib/deployment-switches'
 import { cloudComputerTasksEnabled } from '@/lib/cloud-computer-flag'
 import { withDeviceRoute } from '@/lib/device-route'
 import { after, NextResponse } from 'next/server'
@@ -118,7 +119,7 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
   if ((harness === 'codex' || harness === 'claude_code') && !device.harnesses.some(info => info.harness === harness && info.installed && info.toolApproval === true)) return NextResponse.json({ error: 'Run approval capability unavailable.' }, { status: 409 })
   const pinned = run.agentDefinition?.subscription
   let subscription: Awaited<ReturnType<ReturnType<typeof subscriptionRuntime>['repository']['nativeBinding']>>
-  try { subscription = process.env.MIKKA_BYOS_ENABLED === '1'
+  try { subscription = deploymentSwitch('byos')
     ? run.agentDefinition && !pinned ? null : device.kind === 'cloud'
       ? await nativeRunBinding(pool, caller.userId, agent.id, harness, caller.scopeWorkspaceId, pinned?.bindingId)
       : pinned ? await subscriptionRuntime().repository.binding(caller.userId,pinned.bindingId) : await localRunBinding(caller.userId, agent.id, harness, run.botId ?? null) : null
@@ -151,7 +152,7 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
   let factoryClaim: Record<string, unknown> = {}
   let factoryToken: Awaited<ReturnType<typeof issueRunToken>> | undefined
   const beforeClaim = async (tx: import('pg').PoolClient) => {
-    if (process.env.MIKKA_FACTORY_ROUTING_ENABLED !== '1' || process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED !== '1') return true
+    if (!deploymentSwitch('factoryRouting') || !deploymentSwitch('factoryLifecycle')) return true
     const { guardFactoryClaim } = await import('@/lib/factory/runtime')
     try { factoryClaim = await guardFactoryClaim(tx,caller.userId,deviceId,runId,leaseExpiresAt); return true }
     catch (error) { if (error instanceof FactoryError) return false; throw error }

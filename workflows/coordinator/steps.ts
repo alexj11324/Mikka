@@ -1,3 +1,4 @@
+import { deploymentSwitch } from '@/lib/deployment-switches'
 import { cloudComputerRunsEnabled } from '@/lib/cloud-computer-flag'
 import { runInvalidDetail } from '@/lib/run-invalid-reason'
 import { FatalError } from 'workflow'
@@ -56,6 +57,12 @@ import { systemActor } from '@/lib/activity-actor'
 // expected failures instead of throwing, so a bad id is not retried.
 
 type ToolResult<T> = T | { error: string; reason?: string; detail?: string }
+
+/** The deployment switches the Coordinator's tools depend on, read here because a workflow body never reads one (lib/deployment-switches.ts). */
+export async function coordinatorSwitches() {
+  'use step'
+  return (await import('./tools')).readCoordinatorSwitches()
+}
 
 export async function computerToolsEnabled() {
   'use step'
@@ -210,7 +217,7 @@ export async function preparePrompt(userId: string, botId: string, snapshot?: De
   'use step'
   // Fallback only: run completion already reconciles (lib/run-completion-effects.ts
   // reconcileFactoryAfterCompletion). This catches completions whose hook failed.
-  if (process.env.MIKKA_FACTORY_ROUTING_ENABLED === '1' && process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED === '1') {
+  if (deploymentSwitch('factoryRouting') && deploymentSwitch('factoryLifecycle')) {
     const { factoryRuntimeForBot } = await import('@/lib/factory/runtime')
     await factoryRuntimeForBot(botId).reconcile(userId)
   }
@@ -236,7 +243,7 @@ export async function preparePrompt(userId: string, botId: string, snapshot?: De
   // The hosted Coordinator renders OpenUI like the native one, so it gets the same presentation rules and catalog.
   const base = withCoordinatorPresentation(snapshot ? executionInstructions(snapshot) : await botInstructions(userId, botId, COORDINATOR_INSTRUCTIONS))
   const instructions = personalMailboxEnabled() && snapshot ? personalMailboxInstructions(base, snapshotMailboxTools(snapshot).filter(name => mailboxTools.includes(name))) : base
-  const factoryPolicy = process.env.MIKKA_FACTORY_ROUTING_ENABLED === '1' && process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED === '1' ? FACTORY_QUESTION_INSTRUCTIONS + FACTORY_CHECK_RECOVERY_INSTRUCTIONS : ''
+  const factoryPolicy = deploymentSwitch('factoryRouting') && deploymentSwitch('factoryLifecycle') ? FACTORY_QUESTION_INSTRUCTIONS + FACTORY_CHECK_RECOVERY_INSTRUCTIONS : ''
   // The person's 个人指令 sit after the rules and before the memory, marked as theirs.
   // The person's own GitHub account, so the Bot looks a repository up instead of asking which account it is under.
   const { githubContext } = await import('@/lib/coordinator/github-context')
@@ -316,6 +323,18 @@ export async function personalMcp(userId: string, botId: string, executionId: st
 // preserve the first uncertain outcome rather than replaying this step.
 personalMcp.maxRetries = 0
 
+/** GitHub's hosted MCP server as the caller, with the caller's own token only (decision 2026-11-02-1730). */
+export async function githubMcp(userId: string, input: import('@/lib/plugins/mcp').McpCommand, scope?: NativeToolScope) {
+  'use step'
+  await assertNativeToolScope(userId, scope)
+  if (scope?.scheduledRead) return { error: 'mcpNotAllowedForScheduledRead' }
+  const { createGitHubMcpRuntime, GITHUB_MCP_MIN_VALIDITY_MS } = await import('@/lib/github/mcp')
+  const { githubTokenForUser } = await import('@/lib/github/user-access')
+  return createGitHubMcpRuntime(owner => githubTokenForUser(owner, { minValidityMs: GITHUB_MCP_MIN_VALIDITY_MS }))(userId, input)
+}
+// A GitHub write has no idempotency key; never replay an uncertain call.
+githubMcp.maxRetries = 0
+
 /** Apps connected from the 插件 store, through the tools Composio lists for them (lib/app-tools.ts). */
 export async function appTools(userId: string, botId: string, operation: 'list' | 'call', input: unknown, scope?: NativeToolScope) {
   'use step'
@@ -361,7 +380,7 @@ export async function getIssue(userId: string, input: { issueId: string }, scope
     status: issue.status, priority: issue.priority, body: tiptapToText(issue.content).slice(0, 8000),
     runs: runs.map(run => ({ id: run.id, agent: run.agentName, status: run.status, createdAt: run.createdAt.toISOString() })),
     thread: latest ? { runId: latest.id, status: latest.status, repository: latest.remoteUrl } : null,
-    ...(process.env.MIKKA_FACTORY_ROUTING_ENABLED === '1' ? { factory: await (await import('@/lib/factory/server')).factoryForBot(botId).listForIssue(userId,issue.id) } : {}),
+    ...(deploymentSwitch('factoryRouting') ? { factory: await (await import('@/lib/factory/server')).factoryForBot(botId).listForIssue(userId,issue.id) } : {}),
   }
 }
 

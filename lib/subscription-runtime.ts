@@ -1,4 +1,5 @@
 import 'server-only'
+import { deploymentSwitch } from '@/lib/deployment-switches'
 import { othersMayUse } from './personal-policy'
 import { z } from 'zod'
 import { retainEnrollmentSourcesForAcceptance } from './subscription-enrollment-policy'
@@ -67,10 +68,10 @@ export function subscriptionRuntime(nativeBroker = false, custodyOnly = false, o
       return { accessSnapshot: await subscriptionAccessSnapshot({ origin: infisicalOrigin, clientId: custodyId!, clientSecret: custodySecret!, project: accessProject ?? project, environment, path: accessPath, name, signal }) }
     } : resolveIdentity
     return new SubscriptionWorkerClient({ binary }, { scope, databaseUrl, infisicalOrigin, project, environment, path, workloadToken: sharedCustodyIdentity ? '' : workloadToken ?? '', accessPath, accessProject, accessToken: custodyOnly || sharedCustodyIdentity ? undefined : accessToken, retainEnrollmentSources: retainEnrollmentSourcesForAcceptance(), enrollmentAttemptPath: process.env.MIKKA_BYOS_ENROLLMENT_ATTEMPT_PATH, enrollmentClaimPath: process.env.MIKKA_BYOS_ENROLLMENT_CLAIM_PATH, enrollmentGrantPath: process.env.MIKKA_BYOS_ENROLLMENT_GRANT_PATH, enableRuntime: !custodyOnly, // Plain model calls run only after access() found the route ready for this owner (subscriptionRouteReady).
-      enablePlainModels: !custodyOnly, enableCodexOAuth: process.env.MIKKA_BYOS_CODEX_OAUTH === '1', enableClaudeOAuth: process.env.MIKKA_BYOS_CLAUDE_OAUTH === '1', ...(options.exportAccessLease && !custodyOnly ? { exportAccessLease: true } : {}) }, resolve)
+      enablePlainModels: !custodyOnly, enableCodexOAuth: deploymentSwitch('byosCodexOAuth'), enableClaudeOAuth: deploymentSwitch('byosClaudeOAuth'), ...(options.exportAccessLease && !custodyOnly ? { exportAccessLease: true } : {}) }, resolve)
   }, {
     ready: async (route: SubscriptionRoute, ownerId: string) => !custodyOnly && await subscriptionRouteReady(route, ownerId),
-    oauth: { codex: process.env.MIKKA_BYOS_CODEX_OAUTH === '1', claude: process.env.MIKKA_BYOS_CLAUDE_OAUTH === '1' },
+    oauth: { codex: deploymentSwitch('byosCodexOAuth'), claude: deploymentSwitch('byosClaudeOAuth') },
     // Only a verified runner supplies native isolation; Vercel is not the runner.
     // The private device route also requires a server allow-list and the hosted
     // runner capability. This never enables raw nativeAuth credential export.

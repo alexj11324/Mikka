@@ -25,3 +25,7 @@ test('cloud device token reaches only its own run\'s capture routes', async () =
   for (const path of [`/v1/runs/${run}/screen`, `/v1/runs/${run}/captures`, `/v1/runs/${run}/captures/${capture}`, `/mikka/v1/runs/${run}/captures/${capture}/complete`]) assert.equal(await cloudDeviceScopeAllows(req(path), own, belongs), true)
   for (const path of [`/v1/runs/${other}/screen`, `/v1/runs/${other}/captures`, `/v1/runs/${run}/captures/${capture}/share`, `/v1/runs/${run}/captures/not-a-capture-id`, `/v1/runs/${run}/screen/extra`]) assert.equal(await cloudDeviceScopeAllows(req(path), own, belongs), false)
 })
+test('a cloud desktop token reaches the GitHub credential route of its own device only', async () => {
+  assert.equal(await cloudDeviceScopeAllows(req(`/mikka/v1/devices/${own}/github-token`, { method: 'POST' }), own, belongs), true)
+  for (const path of [`/v1/devices/${other}/github-token`, `/v1/devices/${own}/github-token/extra`]) assert.equal(await cloudDeviceScopeAllows(req(path), own, belongs), false)
+})

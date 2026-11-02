@@ -1,3 +1,4 @@
+import { deploymentSwitch } from '@/lib/deployment-switches'
 import { createHash } from 'node:crypto'
 import type { invokeDecision } from '../coordinator/decide'
 import type { RegisteredComparisonRequest, RegisteredSkillComparison } from './comparison-collector'
@@ -21,7 +22,7 @@ export type RegisteredSkillEvaluator=(userId:string,proposal:RegisteredEvaluatio
  * not dispatch benchmark runs, change their frozen evidence or grant activation. */
 export function createConfiguredSkillEvaluator(dependencies:Omit<Dependencies,'modelEvaluationEnabled'>,
   env:Readonly<Record<string,string|undefined>>=process.env):RegisteredSkillEvaluator {
-  return createRegisteredSkillEvaluator({...dependencies,modelEvaluationEnabled:env.MIKKA_SKILL_MODEL_EVALUATION==='1'})
+  return createRegisteredSkillEvaluator({...dependencies,modelEvaluationEnabled:deploymentSwitch('skillModelEvaluation',env)})
 }
 export function createRegisteredSkillEvaluator(dependencies:Dependencies):RegisteredSkillEvaluator {
   return async(userId:string,proposal:RegisteredEvaluationProposal)=>{

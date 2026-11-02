@@ -1,4 +1,5 @@
 import 'server-only'
+import { deploymentSwitch } from '@/lib/deployment-switches'
 import { invokeDecision } from '../coordinator/decide'
 import type { DecisionQuestion } from '../coordinator/decision'
 import type { SemanticJudgeInput, SemanticVerdict } from './evals'
@@ -12,7 +13,7 @@ const questions: DecisionQuestion[] = [{
 /** Called only behind the existing live-eval gate. Uses the shared vision-capable
  * model route, not a regex judge, a new provider or a model-authored receipt. */
 export async function judgeLiveTrace(input: SemanticJudgeInput, signal: AbortSignal): Promise<SemanticVerdict | null> {
-  if (process.env.MIKKA_AGENT_KIT_LIVE_EVAL !== '1') return null
+  if (!deploymentSwitch('agentKitLiveEval')) return null
   const { images, ...trace } = input.trace
   const text = JSON.stringify({
     hostContract: { testCase: input.testCase, hostInstructions: input.hostInstructions, definitionDigest: input.definitionDigest, hostInstructionsDigest: input.hostInstructionsDigest, suiteDigest: input.suiteDigest },

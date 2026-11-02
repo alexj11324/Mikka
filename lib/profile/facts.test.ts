@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { ExternalNotification } from '@/lib/suggestions/notification'
-import { profileEnabled, researchEnabled } from './flags'
+import { profileEnabled } from './flags'
 import type { DecisionAnswer, DecisionQuestion } from '@/lib/coordinator/decision'
 import { CONSOLIDATION_QUESTIONS_PER_CALL, consolidationInput, consolidationCandidates, extractionPrompt, factInput, FIRST_SIGHT_MAX, mergedEvidence, mergedValue, parseFacts, planConsolidation, purchaseMerchant, raisedConfidence, subjectKey, type ConsolidationDecider, type StoredFact } from './facts'
 
@@ -194,17 +194,15 @@ test('questions go in batches of 40, at most three calls a night; the rest wait'
 })
 
 test('proactive deployment switches are off unless set to 1 or true', t => {
-  const saved = { profile: process.env.PROACTIVE_PROFILE_ENABLED, research: process.env.PROACTIVE_RESEARCH_ENABLED }
+  const saved = { profile: process.env.PROACTIVE_PROFILE_ENABLED }
   t.after(() => {
-    for (const [name, value] of [['PROACTIVE_PROFILE_ENABLED', saved.profile], ['PROACTIVE_RESEARCH_ENABLED', saved.research]] as const) {
+    for (const [name, value] of [['PROACTIVE_PROFILE_ENABLED', saved.profile]] as const) {
       if (value === undefined) delete process.env[name]
       else process.env[name] = value
     }
   })
   delete process.env.PROACTIVE_PROFILE_ENABLED
-  delete process.env.PROACTIVE_RESEARCH_ENABLED
   assert.equal(profileEnabled(), false)
-  assert.equal(researchEnabled(), false)
   for (const value of ['0', 'false', 'yes', '']) {
     process.env.PROACTIVE_PROFILE_ENABLED = value
     assert.equal(profileEnabled(), false, value)
@@ -213,5 +211,4 @@ test('proactive deployment switches are off unless set to 1 or true', t => {
     process.env.PROACTIVE_PROFILE_ENABLED = value
     assert.equal(profileEnabled(), true, value)
   }
-  assert.equal(researchEnabled(), false, 'the two switches are separate')
 })
