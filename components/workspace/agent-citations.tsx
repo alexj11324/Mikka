@@ -13,7 +13,7 @@ import { HarnessMark } from '@/components/labels/entity-labels'
 import { InlineCitation, InlineCitationBody, InlineCitationContent, InlineCitationDescription, InlineCitationFavicon, InlineCitationFooter, InlineCitationImage, InlineCitationLabel, InlineCitationMeta, InlineCitationSource, InlineCitationTitle, InlineCitationTrigger } from '@/components/ui/inline-citation'
 import { SourceAvatar, SourcesList, SourcesSummary, sourceTileClassName, type StreamingSource } from '@/components/ui/streaming-text'
 import { Claude } from '@/components/ui/svgs/claude'
-import { Mikka } from '@/components/ui/svgs/mikka'
+import { MikkaMarkSmall } from '@/components/brand/mikka-mark'
 import { OpenAI } from '@/components/ui/svgs/openai'
 import { statusIconTints } from '@/lib/status-appearance'
 import { ISSUE_PRIORITIES, ISSUE_STATUSES, issueIdentifier } from '@/components/workspace/issue-properties'
@@ -81,7 +81,7 @@ export function CitationSources({ text }: { text: string }) {
     else if (part.type === 'citation') {
       const source = sources[part.id]
       if (!source || (part.kind && part.kind !== source.kind)) continue
-      if (source.kind === 'issue') listed.set(source.id, { name: source.title, domain: issueIdentifier(source, 'Mikka'), icon: <Mikka />, onSelect: () => onOpenIssue(source.id) })
+      if (source.kind === 'issue') listed.set(source.id, { name: source.title, domain: issueIdentifier(source, 'Mikka'), icon: <MikkaMarkSmall />, onSelect: () => onOpenIssue(source.id) })
       else {
         const issue = source.issue
         listed.set(source.id, { name: source.name, domain: source.agentName, icon: <HarnessMark harness={source.harness} />, onSelect: issue ? () => openThread(source.id) : undefined })
@@ -114,7 +114,7 @@ export function IssueCitation({ issue, onOpen }: { issue: IssueSource; onOpen: (
     </InlineCitationTrigger>
     <InlineCitationContent>
       <InlineCitationBody>
-        <InlineCitationSource><Mikka />{identifier ? `Mikka · ${identifier}` : 'Mikka'}</InlineCitationSource>
+        <InlineCitationSource><MikkaMarkSmall />{identifier ? `Mikka · ${identifier}` : 'Mikka'}</InlineCitationSource>
         <InlineCitationTitle>{issue.title}</InlineCitationTitle>
         <InlineCitationMeta>
           <span><status.icon className={cn(statusIconTints[status.tone])} />{tIssue(`status.${status.value}`)}</span>

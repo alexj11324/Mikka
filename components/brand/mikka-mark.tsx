@@ -10,9 +10,12 @@ export function MikkaMark() {
   </svg>
 }
 
-/** Under 16px the ghost dots blur into a grey square (docs/design/brand.md): solid dots only. */
+/**
+ * Under 16px (docs/design/brand.md): no ghost dots, which blur into a grey square, and dots that touch (r 6 on the
+ * 12 pitch), so the solid dots join into one M. Separate dots that small break into a stray glyph (⁞⋈⁞).
+ */
 export function MikkaMarkSmall() {
-  return <svg viewBox="19.2 19.2 61.6 61.6" aria-hidden="true" focusable="false" className="size-3 shrink-0" fill="currentColor">
-    {SOLID.map(([cx, cy]) => <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r="4.8" />)}
+  return <svg viewBox="19.2 19.2 61.6 61.6" aria-hidden="true" focusable="false" className="size-3 shrink-0" fill="currentColor" data-mikka-mark="small">
+    {SOLID.map(([cx, cy]) => <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r="6" />)}
   </svg>
 }

@@ -39,7 +39,11 @@ Sizes are the visible size of the dot grid, not the `<img>` box.
 | Browser tab | 16 / 32px | `app/icon.svg`. |
 
 Below 16px the ghost dots blur into a grey square, so drop them and draw only
-the solid dots.
+the solid dots, with each dot's radius at half the dot pitch (6 on the 12 pitch)
+so they touch and read as one M. Separate dots that small break into a stray
+glyph. In code this is `MikkaMarkSmall` (`components/brand/mikka-mark.tsx`);
+source chips, 「安全保护 Mikka」 and other inline marks use it, never the
+full mark scaled down.
 
 ## Clear space
 
