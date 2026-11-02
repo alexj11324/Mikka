@@ -1,4 +1,5 @@
 import { localTestAccountsMode } from '@/scripts/test-accounts/database-target.mjs'
+import { isLoopbackHost } from '@/lib/loopback'
 
 type AuthEnvironment = Record<string, string | undefined>
 
@@ -11,7 +12,7 @@ export function resolveAppOrigin(env: AuthEnvironment) {
 
 function httpsOrigin(value: string, allowLoopback = false) {
   const url = new URL(value)
-  const loopback = allowLoopback && url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)
+  const loopback = allowLoopback && url.protocol === 'http:' && isLoopbackHost(url.hostname)
   if ((url.protocol !== 'https:' && !loopback) || url.username || url.password || url.pathname !== '/' || url.search || url.hash || url.hostname === '*') {
     throw new Error('Auth origins must be HTTPS (or HTTP loopback in development/CI) without credentials, paths, queries or fragments')
   }

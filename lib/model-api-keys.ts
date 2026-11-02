@@ -5,6 +5,7 @@ import { isIP } from 'node:net'
 import type { Pool, PoolClient } from 'pg'
 import { z } from 'zod'
 import { isPrivateAddress } from '@/lib/link-preview-parse'
+import { isLoopbackHost } from '@/lib/loopback'
 import { memberSubscriptionsAllowed, subscriptionsUsable } from '@/lib/personal-policy'
 import { stopRunsUsingApiKeys } from '@/lib/model-api-key-runs'
 import { openSecret, sealSecret, SecretsKeyMissingError } from '@/lib/secrets/crypto'
@@ -57,7 +58,7 @@ export async function checkBaseUrl(raw: string, env: Env = process.env, resolve:
   if (url.username || url.password || url.search || url.hash) throw new WorkspaceError('apiKeyBaseUrlInvalid')
   const host = url.hostname.replace(/^\[|\]$/g, '')
   const loopbackTest = env.MIKKA_MODEL_KEY_LOOPBACK === '1' && !env.VERCEL && !env.VERCEL_ENV
-    && url.protocol === 'http:' && (host === '127.0.0.1' || host === 'localhost')
+    && url.protocol === 'http:' && isLoopbackHost(host)
   if (loopbackTest) return url.href.replace(/\/+$/, '')
   if (url.protocol !== 'https:') throw new WorkspaceError('apiKeyBaseUrlInvalid')
   const addresses = isIP(host) ? [host] : await resolve(host)
