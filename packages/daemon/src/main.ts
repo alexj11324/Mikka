@@ -586,7 +586,8 @@ export class Daemon {
     this.commandsLoop = this.pollCommands()
     // The CLIs' own model lists, in the background: a first install downloads the pinned CLI.
     if (this.modelProbeOn()) void this.probeModels().then(changed => { if (changed) return this.syncWithServer() }).catch((err: unknown) => { this.log.warn({ err }, "model probe failed") })
-    this.fsLoop = this.pollFolderRequests()
+    // No folder-request poll: the app adds repositories by path and never queues one
+    // (app/v1/devices/[deviceId]/fs/requests), and each idle poll was a database read.
     return this
   }
 
