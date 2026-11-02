@@ -6,16 +6,25 @@
 // database, a device or GitHub.
 //
 //   COORDINATOR_EVAL_MODEL=<gateway model id> AI_GATEWAY_API_KEY=… pnpm eval:coordinator
+//   COORDINATOR_EVAL_MODEL=<DeepSeek model id> DEEPSEEK_API_KEY=… pnpm eval:coordinator
 //
-// Without both variables every scenario is skipped. Read the transcripts it
+// A DeepSeek key goes to DeepSeek's OpenAI-compatible chat endpoint (the one a
+// bot chat on that key uses, lib/model-api-key-providers.ts); otherwise the AI
+// Gateway. Without a model and one of the keys every scenario is skipped. Read the transcripts it
 // prints for a failing trial before changing the prompt.
 import assert from 'node:assert/strict'
 import { before, mock, test } from 'node:test'
-import { gateway, generateText, stepCountIs, type ToolSet } from 'ai'
+import { gateway, generateText, stepCountIs, type LanguageModel, type ToolSet } from 'ai'
+import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
+import { API_KEY_PRESET_ENDPOINTS } from '../lib/model-api-key-providers.ts'
 
 const MODEL = process.env.COORDINATOR_EVAL_MODEL
 const TRIALS = Number(process.env.EVAL_TRIALS ?? 3)
-const skip = !MODEL || !process.env.AI_GATEWAY_API_KEY ? 'set COORDINATOR_EVAL_MODEL and AI_GATEWAY_API_KEY to run' : false
+const DEEPSEEK = process.env.DEEPSEEK_API_KEY
+const skip = !MODEL || !(DEEPSEEK || process.env.AI_GATEWAY_API_KEY) ? 'set COORDINATOR_EVAL_MODEL and DEEPSEEK_API_KEY or AI_GATEWAY_API_KEY to run' : false
+const evalModel = (): LanguageModel => DEEPSEEK
+  ? createOpenAICompatible({ name: 'deepseek', baseURL: API_KEY_PRESET_ENDPOINTS.deepseek.chatBaseUrl, apiKey: DEEPSEEK })(MODEL!)
+  : gateway(MODEL!)
 
 const OWNER = 'alex'
 const BOT = '00000000-0000-4000-8000-0000000c0de1'
@@ -58,7 +67,7 @@ async function facts(overrides: Partial<import('../lib/coordinator/execution-con
 async function trial(text: string, context: string, options: { computerEnabled?: boolean } = {}) {
   log.length = 0
   const tools: ToolSet = createRegistry(OWNER, BOT, undefined, { coordinator: true, ...options })
-  const result = await generateText({ model: gateway(MODEL!), system: `${base}\n${context}`, prompt: `This chat is linked to issue ${ISSUE}.\n\n${text}`, tools, stopWhen: stepCountIs(8) })
+  const result = await generateText({ model: evalModel(), system: `${base}\n${context}`, prompt: `This chat is linked to issue ${ISSUE}.\n\n${text}`, tools, stopWhen: stepCountIs(8) })
   return { reply: result.text, calls: [...log] }
 }
 
