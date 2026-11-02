@@ -21,6 +21,7 @@ import { artifactSummaries, type ArtifactSummary } from '@/lib/artifacts/store'
 import { runSummaryText } from '@/lib/issue-run-conversation'
 import { threadName } from '@/lib/issue-threads'
 import { coordinatorChatState } from './chat-state'
+import { compactChatMessage } from './chat-projection'
 import { coordinatorLeaseActive } from './lease'
 import { readPreferences } from '@/lib/preferences'
 import type { InboxEvent } from '@/lib/push-reasons'
@@ -433,7 +434,8 @@ function withImages(text: string, images: unknown): ModelMessage['content'] {
 /** The latest of the conversation for the chat, oldest first. */
 export async function chatView(userId: string, limit = 200, botId: string): Promise<ChatView> {
   const [session] = await db.select().from(coordinatorSessions).where(sessionOf(userId, botId)).limit(1)
-  const rows = await db.select({ id: coordinatorMessages.id, position: coordinatorMessages.position, message: coordinatorMessages.message, createdAt: coordinatorMessages.createdAt })
+  // Compact parts: the chat never shows reasoning text or whole tool inputs and outputs (chat-projection.ts).
+  const rows = await db.select({ id: coordinatorMessages.id, position: coordinatorMessages.position, message: compactChatMessage, createdAt: coordinatorMessages.createdAt })
     .from(coordinatorMessages).where(messagesOf(userId, botId))
     .orderBy(desc(coordinatorMessages.position)).limit(limit)
   // Events still in the inbox: the person's own messages show at once, ahead of the turn that takes them.
