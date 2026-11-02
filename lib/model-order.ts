@@ -5,7 +5,7 @@ import { z } from 'zod'
 import { isDeviceOnline } from '@mikka/protocol/device'
 import type { HarnessInfo } from '@mikka/protocol/harness'
 import { ActionFailureError } from './action-error'
-import { apiKeyHarness } from './model-api-key-providers'
+import { apiKeyHarnesses } from './model-api-key-providers'
 import { quotaExhausted, quotaResetsAt } from './subscription-quota'
 import {
   defaultOrder, deviceModel, entryKey, planDispatch, whyNoDevice,
@@ -74,10 +74,11 @@ export async function orderCandidates(query: Query, scope: OrderScope): Promise<
   })).map((item, at) => ({ item, at })).sort((a, b) => a.item.source.connectionId === b.item.source.connectionId
     ? rank(a.item.source.connectionId, a.item.model) - rank(b.item.source.connectionId, b.item.model) || a.at - b.at
     : a.at - b.at).map(({ item }) => item)
-  const keys = (await usableApiKeys(query, scope.ownerId, scope.workspaceId)).flatMap(key => key.models.map(model => ({
-    harness: apiKeyHarness(key.protocol) as OrderHarness, model, name: model,
+  // A key serves each Agent of each protocol it speaks: a DeepSeek or Kimi model is a candidate on both (model · Agent).
+  const keys = (await usableApiKeys(query, scope.ownerId, scope.workspaceId)).flatMap(key => key.models.flatMap(model => apiKeyHarnesses(key).map(harness => ({
+    harness: harness as OrderHarness, model, name: model,
     source: { kind: 'api_key' as const, keyId: key.id }, provider: key.provider,
-  })))
+  }))))
   // Claude first, then ChatGPT/Codex, then keys (orchestration.md § 2).
   const ordered = [...subscriptions.filter(item => item.provider === 'claude'), ...subscriptions.filter(item => item.provider !== 'claude'), ...keys]
   return [...new Map(ordered.map(item => [entryKey(item), item])).values()]

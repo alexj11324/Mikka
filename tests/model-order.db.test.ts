@@ -200,9 +200,15 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
     // The thread's model is the only one tried; it never falls back to the list, which has a model that runs (opus).
     const notOffered = await resolveModelDispatch(pool, ctx, { harness: 'codex', model: 'acct-opus-c' })
     assert.deepEqual([notOffered.kind, notOffered.kind === 'none' && notOffered.reason, notOffered.kind === 'none' && notOffered.card.description], ['none', 'notOffered', '没有订阅或 Key 能用 Codex 跑 acct-opus-c'])
-    // Only the Agent named (「派给 Codex」): nothing offers Codex yet, so the card names the Agent alone.
+    // Only the Agent named (「派给 Codex」): the DeepSeek key speaks the OpenAI protocol too, so it offers its model on Codex
+    // (decision 2026-11-02-1620); no computer here has Codex, so the card says so for that model.
     const noCodex = await resolveModelDispatch(pool, ctx, { harness: 'codex' })
-    assert.deepEqual([noCodex.kind === 'none' && noCodex.reason, noCodex.kind === 'none' && noCodex.card.description], ['notOffered', '没有订阅或 Key 能用 Codex'])
+    assert.deepEqual([noCodex.kind === 'none' && noCodex.reason, noCodex.kind === 'none' && noCodex.card.description], ['pickedNoDevice', '没有电脑能用 Codex 跑 key-model-c'])
+    // With only a Claude subscription nothing offers Codex at all, so the card names the Agent alone.
+    const claudeOnlyPerson = await person('order-dispatch-claude-only')
+    await subscribe(claudeOnlyPerson, 'claude', ['acct-opus-d'])
+    const nothingOnCodex = await resolveModelDispatch(pool, { ...claudeOnlyPerson, botId: null }, { harness: 'codex' })
+    assert.deepEqual([nothingOnCodex.kind === 'none' && nothingOnCodex.reason, nothingOnCodex.kind === 'none' && nothingOnCodex.card.description], ['notOffered', '没有订阅或 Key 能用 Codex'])
     // Only Claude Code named: its first model in the list, the same one the list would run.
     const claudeOnly = await resolveModelDispatch(pool, ctx, { harness: 'claude_code' })
     assert.equal(claudeOnly.kind === 'device' && claudeOnly.entry.harness, 'claude_code')

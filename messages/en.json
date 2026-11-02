@@ -2467,10 +2467,6 @@
         "kimi": "Kimi",
         "custom": "Custom provider"
       },
-      "protocol": {
-        "openai": "OpenAI-compatible",
-        "anthropic": "Anthropic-compatible"
-      },
       "shareLabel": "Share {name} with team members",
       "removeLabel": "Delete {name}",
       "removeTitle": "Delete {name}?",
@@ -2485,7 +2481,13 @@
       "modelsInvalid": "Couldn't fetch models · Key invalid or revoked",
       "modelsUnavailable": "Couldn't fetch models · Provider didn't respond",
       "refetch": "Fetch models again",
-      "refetchLabel": "Fetch models for {name} again"
+      "refetchLabel": "Fetch models for {name} again",
+      "protocolName": {
+        "anthropic": "Anthropic",
+        "openai": "OpenAI"
+      },
+      "protocolAgents": "{protocols} protocol · runs on {agents}",
+      "customAgents": "Pick a protocol to see which Agent runs it"
     },
     "modelOrder": {
       "title": "Allowed models",

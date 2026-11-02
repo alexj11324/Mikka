@@ -176,7 +176,9 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
       return NextResponse.json({ error: 'API key unavailable.', code: 'apiKeyUnavailable' }, { status: 409 })
     }
     let opened: Awaited<ReturnType<typeof apiKeyForRun>>
-    try { opened = await apiKeyForRun(pool, runId, frozenKey.keyId) }
+    // The run's Agent picks the key's endpoint; a key that does not serve it ends the run.
+    if (harness !== 'claude_code' && harness !== 'codex') return refuse()
+    try { opened = await apiKeyForRun(pool, runId, frozenKey.keyId, harness) }
     catch (error) {
       // Secrets briefly unreadable: the run stays queued. A key that is gone, or no longer usable here: the run ends.
       if (!(error instanceof WorkspaceError) || error.code !== 'apiKeyNotFound') return NextResponse.json({ error: 'API key unavailable.' }, { status: 409 })
