@@ -40,7 +40,8 @@ test('a task\'s failed and blocked attempts fold into one 受阻 row; only done 
 
   await page.goto(app('/?section=coordinator'))
   const panel = page.getByRole('complementary', { name: '右栏', exact: true })
-  await panel.getByRole('tab', { name: '全部线程', exact: true }).click()
+  // 全部线程 opens from the window bar into the right column (decision 2026-11-02-0310).
+  await page.getByRole('button', { name: /^全部线程/ }).click()
   const blocked = panel.getByRole('region', { name: '受阻（1）', exact: true })
   await expect(blocked.getByRole('listitem')).toHaveCount(1)
   await expect(blocked).toContainText(`README ${marker}`)

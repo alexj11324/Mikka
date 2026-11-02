@@ -245,7 +245,7 @@ test('the thread chip and the right panel\'s 线程 row open the same thread col
 
   await reply.getByRole('button', { name: new RegExp(`^打开线程：(?:\\S+ )?${title}$`) }).click()
   await expectThreadBesideChat(page, runId)
-  await threadIn(page).getByRole('button', { name: '关闭线程', exact: true }).click()
+  await threadIn(page).getByRole('button', { name: '返回', exact: true }).click()
   await expect(column(page)).toHaveCount(0)
 
   const panel = page.getByRole('complementary', { name: '右栏', exact: true })
@@ -296,7 +296,8 @@ test('全部线程: another bot\'s thread opens beside the current chat, naming 
   await page.reload()
   await hydrated(chat(page))
   const panel = page.getByRole('complementary', { name: '右栏', exact: true })
-  await panel.getByRole('tab', { name: '全部线程', exact: true }).click()
+  // 全部线程 opens from the window bar into the right column (decision 2026-11-02-0310).
+  await page.getByRole('button', { name: /^全部线程/ }).click()
   await panel.getByRole('button', { name: /别的 Bot 任务/ }).first().click()
   await expectThreadBesideChat(page, runId)
   await expect(conversationPill(page)).toHaveText('Coordinator')
@@ -304,10 +305,10 @@ test('全部线程: another bot\'s thread opens beside the current chat, naming 
 
   // Closing it returns to 全部线程, and it is the same step as back: back does not reopen it.
   const entries = await page.evaluate(() => window.history.length)
-  await threadIn(page).getByRole('button', { name: '关闭线程', exact: true }).click()
+  await threadIn(page).getByRole('button', { name: '返回', exact: true }).click()
   await expect(column(page)).toHaveCount(0)
-  await expect(panel.getByRole('tab', { name: '全部线程', exact: true })).toHaveAttribute('aria-selected', 'true')
-  await expect(panel.getByRole('button').filter({ hasText: /别的 Bot 任务/ }).first()).toBeVisible()
+  await expect(panel.getByRole('region', { name: '全部线程', exact: true })).toBeVisible()
+  await expect(panel.getByRole('button', { name: /别的 Bot 任务/ }).first()).toBeVisible()
   expect(await page.evaluate(() => window.history.length)).toBe(entries)
   expect(query(page).get('thread')).toBeNull()
 })
@@ -365,7 +366,7 @@ test('phone: the chat\'s pill opens 概览 as a page; its 线程 row pushes the 
   expect(query(page).get('thread')).toBe(runId)
   // The thread is the whole screen, its close in reach.
   expect(await column(page).boundingBox()).toEqual({ x: 0, y: 0, width: pageWidth, height: PHONE.height })
-  await expect(threadIn(page).getByRole('button', { name: '关闭线程', exact: true })).toBeInViewport()
+  await expect(threadIn(page).getByRole('button', { name: '返回', exact: true })).toBeInViewport()
 
   await back(page)
   await expect(column(page)).toHaveCount(0)

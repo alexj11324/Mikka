@@ -100,7 +100,7 @@ function LibraryList({ botId }: { botId: string | null }) {
 }
 
 /** Whether `text` contains the panel search's query, ignoring case. An empty query matches everything. */
-function matches(query: string, ...texts: (string | null | undefined)[]) {
+export function matches(query: string, ...texts: (string | null | undefined)[]) {
   const needle = query.trim().toLocaleLowerCase()
   return !needle || texts.some(text => text?.toLocaleLowerCase().includes(needle))
 }
@@ -136,7 +136,7 @@ function PullRequests({ threads, issues, query }: { threads: Thread[]; issues: I
 }
 
 /** A thread list under the panel search: 无匹配结果 when the query hides every thread, else the list as usual. */
-function ThreadResults({ threads, shown, ...props }: Omit<Parameters<typeof ThreadList>[0], 'threads'> & { threads: Thread[]; shown: Thread[] }) {
+export function ThreadResults({ threads, shown, ...props }: Omit<Parameters<typeof ThreadList>[0], 'threads'> & { threads: Thread[]; shown: Thread[] }) {
   const t = useTranslations('Shell.panel')
   if (threads.length && !shown.length) return <p className="px-2 py-6 text-center text-xs text-muted-foreground">{t('noMatches')}</p>
   return <ThreadList threads={shown} {...props} />

@@ -218,12 +218,18 @@ const DOC = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
 /** The query the workspace last wrote or showed; see queryMoved. */
 let seenQuery: string | null = null
 
+/** The entry openThread pushed: the thread it opened and the address it was opened from. */
+type OpenedThread = { runId: string; from: string }
+const OPENED = 'mikkaOpenedThread'
+
 function write(href: string, mode: 'push' | 'replace', list = false) {
   const current = `${window.location.pathname}${window.location.search}${window.location.hash}`
   if (href !== current) {
     const issue = (url: URL) => readLocation(url.searchParams).issue
     const mark = nextMark(readMark(window.history.state), issue(new URL(window.location.href)), issue(new URL(href, window.location.href)), mode, DOC, list)
-    const state = { ...window.history.state, [MARK]: mark }
+    const state: Record<string, unknown> = { ...window.history.state, [MARK]: mark }
+    // Only the entry openThread wrote says where its thread came from; a later entry (an Artifact over it) must not inherit it, or ← would step back onto that entry.
+    if (mode === 'push') delete state[OPENED]
     if (mode === 'push') window.history.pushState(state, '', href)
     else window.history.replaceState(state, '', href)
   }
@@ -312,10 +318,6 @@ export function navigate(change: Partial<WorkspaceLocation>, mode: 'push' | 'rep
   goTo(change, mode)
   window.dispatchEvent(new Event(NAVIGATE_EVENT))
 }
-
-/** The entry openThread pushed: the thread it opened and the address it was opened from. */
-type OpenedThread = { runId: string; from: string }
-const OPENED = 'mikkaOpenedThread'
 
 function here() {
   return `${window.location.pathname}${window.location.search}${window.location.hash}`

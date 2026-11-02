@@ -126,7 +126,7 @@ test('A dispatched thread is a card under the reply that opens its conversation 
   await artifactWindow.getByRole('button', { name: '关闭', exact: true }).click()
   await expect(artifactWindow).toHaveCount(0)
 
-  await thread.getByRole('button', { name: '关闭线程', exact: true }).click()
+  await thread.getByRole('button', { name: '返回', exact: true }).click()
   await expect(thread).toHaveCount(0)
   await expect(page).toHaveURL(url => !url.searchParams.has('thread'))
   await expect(card).toBeVisible()

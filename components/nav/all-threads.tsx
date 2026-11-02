@@ -1,18 +1,21 @@
 'use client'
 
-import { Hand, MessagesSquare, X } from 'lucide-react'
+import { Hand, MessagesSquare, Search, X } from 'lucide-react'
+import { useState } from 'react'
 import { useTranslations } from 'next-intl'
 import type { listIssues } from '@/app/actions/issues'
 import type { Thread } from '@/app/actions/task-runs'
 import { Badge } from '@/components/reui/badge'
 import { Button } from '@/components/ui/button'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
+import { SearchInput } from '@/components/ui/search-input'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { RightColumn } from '@/components/workspace/thread-column'
 import { navigate, openThread, toggleAllThreads } from '@/components/workspace/workspace-navigation'
 import { groupThreads } from '@/lib/thread-groups'
 import { cn } from '@/lib/utils'
-import { ThreadList } from './thread-list'
+import { threadName } from './thread-list'
+import { matches, ThreadResults } from './context-panel'
 
 type Issue = Awaited<ReturnType<typeof listIssues>>[number]
 
@@ -54,7 +57,10 @@ export function AllThreadsColumn({ view, threads, issues }: { view: string; thre
   const t = useTranslations('Shell.panel')
   const bots = threadBots(threads)
   const bot = view === 'all' ? null : view
-  const shown = bot ? threads.filter(thread => thread.botId === bot) : threads
+  const dispatched = bot ? threads.filter(thread => thread.botId === bot) : threads
+  // The header's search filters this column in place (R-50); null while it is closed.
+  const [query, setQuery] = useState<string | null>(null)
+  const shown = query ? dispatched.filter(thread => matches(query, threadName(thread, issues, ''), thread.lastReply)) : dispatched
   return <RightColumn slot="all-threads">
     <section aria-labelledby="all-threads-title" className="flex min-h-0 flex-1 flex-col">
       <header className="flex h-12 shrink-0 items-center gap-2 px-4 pr-2">
@@ -64,10 +70,14 @@ export function AllThreadsColumn({ view, threads, issues }: { view: string; thre
           <NativeSelectOption value="all">{t('allBots')}</NativeSelectOption>
           {bots.map(item => <NativeSelectOption key={item.id} value={item.id}>{item.name}</NativeSelectOption>)}
         </NativeSelect>}
+        <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label={t('search')} aria-pressed={query !== null} onClick={() => setQuery(query === null ? '' : null)} />}><Search data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{t('search')}</TooltipContent></Tooltip>
         <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label={t('closeAllThreads')} onClick={() => toggleAllThreads(false)} />}><X data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{t('closeAllThreads')}</TooltipContent></Tooltip>
       </header>
+      {query !== null && <div className="shrink-0 px-3 pb-2">
+        <SearchInput autoFocus aria-label={t('search')} placeholder={t('search')} value={query} onChange={event => setQuery(event.target.value)} onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); setQuery(null) } }} />
+      </div>}
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
-        <ThreadList threads={shown} issues={issues} all onOpenThread={thread => openThread(thread.runId)} />
+        <ThreadResults threads={dispatched} shown={shown} issues={issues} all onOpenThread={thread => openThread(thread.runId)} />
       </div>
     </section>
   </RightColumn>

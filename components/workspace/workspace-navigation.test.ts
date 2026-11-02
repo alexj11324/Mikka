@@ -239,6 +239,16 @@ test('closing a thread opened from here is back: no new entry, and back does not
   assert.equal(browser.history.length, 2)
 })
 
+test('an Artifact opened and closed over a thread does not come back when the thread closes', () => {
+  const browser = fakeBrowser(`/?bot=${BOT}`)
+  openThread(RUN)
+  goTo({ artifact: ARTIFACT })
+  goTo({ artifact: null })
+  closeThread()
+  assert.equal(new URL(`https://app.example${browser.path()}`).searchParams.get('artifact'), null)
+  assert.equal(new URL(`https://app.example${browser.path()}`).searchParams.get('thread'), null)
+})
+
 test('closing what a link opened replaces the entry, so back does not reopen it either', () => {
   const browser = fakeBrowser(`/?thread=${RUN}`)
   closeThread()
