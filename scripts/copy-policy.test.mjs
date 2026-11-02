@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
-import { bannedHits, allowedPaths, machineNameKeys, machineNameProblems } from './copy-policy.mjs'
+import { bannedHits, allowedPaths, machineNameKeys, machineNameProblems, daemonNameHits, daemonAllowedPaths } from './copy-policy.mjs'
 
 const lookupIn = messages => key => key.split('.').reduce((node, part) => node?.[part], messages)
 
@@ -47,4 +47,17 @@ test('the brand, identifiers and the decision log stay allowed', () => {
   for (const sample of ['Mikka Cloud', 'Agents on Mikka Cloud', '在 Mikka Cloud 上运行', 'MIKKA_CLOUD_COMPUTER_TASKS=1', "cloudComputer: 'mikka-cloud-computer',", '--name mikka-cloud-desktop-NEW_VERSION'])
     assert.deepEqual(bannedHits(sample), [], sample)
   assert.ok(allowedPaths.includes('docs/design/decisions.md'))
+})
+
+test('the device background service is 「daemon」, never 「Mikka 客户端」 / "Mikka client"', () => {
+  let files = ''
+  try {
+    files = execFileSync('git', ['grep', '-l', '-i', '-P', 'mikka\\s*(客户端|client)', '--', '.', ...daemonAllowedPaths.map(path => `:!${path}`)], { encoding: 'utf8' })
+  } catch (error) { if (error.status !== 1) throw error }
+  const hits = files.split('\n').filter(Boolean).flatMap(file => daemonNameHits(readFileSync(file, 'utf8')).map(hit => `${file}:${hit.line}: ${hit.text}`))
+  assert.deepEqual(hits, [], 'call it daemon: 「重启 daemon」, "Restart daemon"')
+  for (const sample of ['重启 Mikka 客户端', 'Restart Mikka client', 'the Mikkaclient'])
+    assert.equal(daemonNameHits(sample).length, 1, sample)
+  for (const sample of ['重启 daemon', 'Update daemon', 'MCP 客户端', 'Mikka desktop app', "headers['x-mikka-client']"])
+    assert.deepEqual(daemonNameHits(sample), [], sample)
 })

@@ -19,6 +19,8 @@ export class DocumentSync {
   private seed: string
   private version = 0
   private acknowledged = 0
+  /** The stored document's version from the last answer; with no local edits, a poll sends only this. */
+  private known: string | undefined
   private flight: Promise<void> | undefined
   private listeners = new Set<() => void>()
   private snapshot: SyncSnapshot
@@ -53,11 +55,14 @@ export class DocumentSync {
     this.id = id
     const sentVersion = this.version
     const initialized = this.snapshot.ready
+    // Local edits, or no version to compare yet, upload the whole state; otherwise the server compares versions only.
+    const upload = initialized && (sentVersion !== this.acknowledged || !this.known)
     this.publish({ syncing: true })
     this.flight = (async () => {
       try {
-        const result = await exchangeDocument({ id, seed: this.seed, vector: encode(Y.encodeStateVector(this.doc)), update: initialized ? encode(Y.encodeStateAsUpdate(this.doc)) : undefined })
-        Y.applyUpdate(this.doc, decode(result.update), 'server')
+        const result = await exchangeDocument({ id, seed: this.seed, vector: encode(Y.encodeStateVector(this.doc)), update: upload ? encode(Y.encodeStateAsUpdate(this.doc)) : undefined, known: upload ? undefined : this.known })
+        if (result.update) Y.applyUpdate(this.doc, decode(result.update), 'server')
+        this.known = result.version
         this.acknowledged = sentVersion
         this.publish({ ready: true, pending: this.version !== this.acknowledged, error: false })
       } catch (error) {

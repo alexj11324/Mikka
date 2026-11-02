@@ -13,7 +13,8 @@ const tx = {
   update: () => ({ set: () => ({ where: async () => { state.writes.push('issues.content') } }) }),
 }
 mock.module(new URL('./db/index.ts', import.meta.url).href, { namedExports: { db: { transaction: (fn: (t: typeof tx) => unknown) => fn(tx) }, pool: {} } })
-mock.module(new URL('./issue-access.ts', import.meta.url).href, { namedExports: { requireIssueAccess: async () => ({ issue: { id: ISSUE, userId: 'owner', scopeVersion: 1 }, user: { id: 'owner', name: 'Owner', email: 'o@example.invalid' } }) } })
+const access = async () => ({ issue: { id: ISSUE, userId: 'owner', scopeVersion: 1 }, user: { id: 'owner', name: 'Owner', email: 'o@example.invalid' } })
+mock.module(new URL('./issue-access.ts', import.meta.url).href, { namedExports: { requireIssueAccess: access, requireIssueAccessWithoutBody: access } })
 mock.module(new URL('./issue-scope-authorization.ts', import.meta.url).href, { namedExports: { requireLockedIssueScope: () => {} } })
 mock.module(new URL('./issue-numbering.ts', import.meta.url).href, { namedExports: { allocateIssueNumbers: async () => { throw new Error('not reached') } } })
 mock.module(new URL('./task-identifier-server.ts', import.meta.url).href, { namedExports: { issueView: () => { throw new Error('not reached') } } })

@@ -46,7 +46,7 @@ test('a device grant is reviewed in the browser and exchanged for a daemon crede
   await expect(page.getByRole('heading', { name: '连接这台电脑', exact: true })).toBeVisible()
   await expect(page.getByText(grant.user_code, { exact: true })).toBeVisible()
   // RFC 8628 §5.4: the page names the machine asking, and a code that came in the link is checked against the terminal first.
-  await expect(page.locator('[data-slot="device-request"]')).toContainText('build-box · Linux · 客户端 0.9.1')
+  await expect(page.locator('[data-slot="device-request"]')).toContainText('build-box · Linux · daemon 0.9.1')
   await expect(page.getByRole('button', { name: '允许', exact: true })).toBeDisabled()
   await page.getByRole('checkbox', { name: '终端里显示的也是这个验证码', exact: true }).check()
   await expect(page.getByRole('button', { name: '允许', exact: true })).toBeEnabled()

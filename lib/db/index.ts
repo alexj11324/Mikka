@@ -1,2 +1,2 @@
 import 'server-only'
-export { createRequestDatabaseScope, withDatabaseTransaction, withDatabaseClient, db, pool } from './request-scope'
+export { createRequestDatabaseScope, readUnderDeviceAuthority, withDatabaseTransaction, withDatabaseClient, db, pool } from './request-scope'

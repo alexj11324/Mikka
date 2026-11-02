@@ -11,7 +11,9 @@ import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { userMessageEvent } from '@/lib/coordinator-events'
 import type { UserImageInput } from '@/lib/coordinator/user-attachments'
 import { personalSubmissionInput, personalSubmissionRecorded, recordPersonalSubmission, SubmissionConflictError } from '@/lib/coordinator-submission'
-import { botChats, chatView, retryFailedTurn, sendRetryOf, type BotChatSummary, type ChatView } from '@/lib/coordinator/store'
+import { botChats, chatVersion, chatView, citationSources, retryFailedTurn, sendRetryOf, type BotChatSummary, type ChatView } from '@/lib/coordinator/store'
+import type { UnchangedChat } from '@/lib/coordinator/chat-poll'
+import type { CitationSource } from '@/lib/coordinator/citations'
 import { and, eq, sql } from 'drizzle-orm'
 import { openChatBotId } from '@/lib/coordinator/coordinator-bot'
 import { bots, devices } from '@/lib/db/schema'
@@ -35,7 +37,7 @@ async function getUserId(): Promise<string> {
 }
 
 /** `botId` is the chat's bot row, the Coordinator's included. */
-export type CoordinatorChat = ChatView & { botId: string; enabled: boolean }
+export type CoordinatorChat = ChatView & { botId: string; enabled: boolean; version?: string }
 
 const botIdSchema = z.uuid().nullable()
 
@@ -67,6 +69,24 @@ export async function getCoordinatorChat(botId: string | null = null): Promise<C
   return { ...chat, botId: bot.id, enabled, working: enabled && chat.working }
 }
 
+const versionSchema = z.string().regex(/^[0-9a-f]{32}$/).optional()
+
+/**
+ * The chat for a poll that already shows version `known`: only its live state
+ * when nothing in the conversation changed, the whole chat otherwise.
+ */
+export async function pollCoordinatorChat(botId: string | null = null, known?: string): Promise<CoordinatorChat | UnchangedChat> {
+  const user = await getUser()
+  const bot = await ownBot(user, botId)
+  const enabled = coordinatorEnabled()
+  const parsed = versionSchema.safeParse(known)
+  const current = await chatVersion(user.id, 200, bot.id)
+  if (parsed.success && parsed.data === current.version) return { unchanged: true, ...current, botId: bot.id, enabled, working: enabled && current.working }
+  const chat = await chatView(user.id, 200, bot.id)
+  // The version read first: a message stored in between makes the next poll read again, never miss it.
+  return { ...chat, version: current.version, botId: bot.id, enabled, working: enabled && chat.working }
+}
+
 const quoteSchema = z.object({
   artifactId: z.uuid(), version: z.number().int().min(1), kind: z.enum(['text', 'element']),
   text: z.string().trim().min(1).max(QUOTE_TEXT_MAX), label: z.string().max(200).optional(), selector: z.string().max(1000).optional(),
@@ -78,6 +98,18 @@ const notesSchema = z.array(z.object({
   selector: z.string().max(1000).optional(),
   rect: z.object({ x: z.number(), y: z.number(), width: z.number().min(0), height: z.number().min(0), viewportWidth: z.number().min(0), viewportHeight: z.number().min(0) }).optional(),
 }).strict()).max(NOTES_MAX)
+
+const citedIdsSchema = z.array(z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/)).min(1).max(50)
+
+/**
+ * The issues and runs a reply still streaming cites, that this person can see: the chat's own sources come
+ * from stored replies only, so a task or thread the reply has just made would otherwise show as its marker.
+ */
+export async function coordinatorCitationSources(ids: readonly string[]): Promise<Record<string, CitationSource>> {
+  const parsed = citedIdsSchema.safeParse(ids)
+  if (!parsed.success) return {}
+  return citationSources(await getUserId(), [parsed.data.join(' ')])
+}
 
 /** Each bot's latest line and whether it is answering, for the bot list. */
 export async function botChatSummaries(): Promise<Record<string, BotChatSummary>> {

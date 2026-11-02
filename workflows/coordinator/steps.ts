@@ -257,7 +257,7 @@ noticeTurnFailure.maxRetries = 0
  * token budget, then returns the prompt for this turn: the instructions with
  * the person's memory, and the messages.
  */
-export async function preparePrompt(userId: string, botId: string, snapshot?: DefinitionSnapshot, mailboxTools: readonly MailboxToolName[] = []): Promise<{ instructions: string; messages: ModelMessage[] }> {
+export async function preparePrompt(userId: string, botId: string, snapshot?: DefinitionSnapshot, mailboxTools: readonly MailboxToolName[] = []): Promise<{ instructions: string; stable: number; messages: ModelMessage[] }> {
   'use step'
   // Fallback only: run completion already reconciles (lib/run-completion-effects.ts
   // reconcileFactoryAfterCompletion). This catches completions whose hook failed.
@@ -293,7 +293,9 @@ export async function preparePrompt(userId: string, botId: string, snapshot?: De
   const { githubContext } = await import('@/lib/coordinator/github-context')
   const { executionContext } = await import('@/lib/coordinator/execution-context')
   const executionContextBlock = async (owner: string, bot: string) => { const text = await executionContext(owner, bot); return text ? '\n' + text : '' }
-  return { instructions: instructionsWithMemory(await withPersonalInstructions(userId, instructions, snapshot ? snapshot.personalPlugins ?? { servers: [], skills: [] } : undefined), memory) + factoryPolicy + '\n' + SCHEDULE_INSTRUCTIONS + '\n' + await githubContext(userId) + await executionContextBlock(userId, botId), messages: promptMessages(summary, messages, summaryTrust) }
+  // Everything up to the memory is the same on every turn; `stable` is where it ends, so a provider can cache it (lib/prompt-cache.ts).
+  const rules = await withPersonalInstructions(userId, instructions, snapshot ? snapshot.personalPlugins ?? { servers: [], skills: [] } : undefined)
+  return { stable: rules.length, instructions: instructionsWithMemory(rules, memory) + factoryPolicy + '\n' + SCHEDULE_INSTRUCTIONS + '\n' + await githubContext(userId) + await executionContextBlock(userId, botId), messages: promptMessages(summary, messages, summaryTrust) }
 }
 
 export async function personalWriteToolsEnabled() { 'use step'; const { personalWritesEnabled } = await import('@/lib/operations/write-feature'); return personalWritesEnabled() }

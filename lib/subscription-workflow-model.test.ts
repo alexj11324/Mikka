@@ -7,7 +7,7 @@ const streamResult = {stream: new ReadableStream({start(controller) {controller.
 mock.module(new URL('./subscription-workflow-model-runtime.ts', import.meta.url).href, {namedExports: {
   resolveSubscriptionWorkflowModel: async (selection: unknown, signal: unknown) => {
     const call = {selection, signal, options: undefined as unknown}; calls.push(call)
-    return {specificationVersion: 'v4', doStream: async (options: unknown) => {call.options = options; return streamResult}}
+    return {specificationVersion: 'v4', doStream: async (options: unknown) => {call.options = options; return {...streamResult, stream: new ReadableStream({start(controller) {controller.close()}})}}}
   },
 }})
 const id=(n:number)=>`10000000-0000-4000-8000-${String(n).padStart(12,'0')}`
@@ -34,5 +34,17 @@ test('the Node model method resolves the fixed descriptor and forwards cancellat
   assert.equal(calls.length, 1)
   assert.deepEqual(calls[0].selection, selection)
   assert.equal(calls[0].signal, controller.signal)
-  assert.equal(calls[0].options, options)
+  // A Claude subscription gets the same request with cache breakpoints added (lib/prompt-cache.ts); nothing else changes.
+  assert.deepEqual(calls[0].options, { ...options, prompt: [] })
+  assert.equal((calls[0].options as { abortSignal: unknown }).abortSignal, controller.signal)
+})
+
+test('the same model marks Claude cache breakpoints and leaves a Codex request as it is', async () => {
+  const prompt = [{ role: 'system' as const, content: 'rules' }, { role: 'user' as const, content: [{ type: 'text' as const, text: 'hi' }] }]
+  await new SubscriptionWorkflowModel(selection).doStream({ prompt })
+  const claude = (calls.at(-1)!.options as { prompt: { providerOptions?: unknown }[] }).prompt
+  assert.deepEqual(claude.map(message => message.providerOptions), [{ openaiCompatible: { cache_control: { type: 'ephemeral' } } }, { openaiCompatible: { cache_control: { type: 'ephemeral' } } }])
+  const codexOptions = { prompt }
+  await new SubscriptionWorkflowModel({ ...selection, route: 'codex_cpa' }).doStream(codexOptions)
+  assert.equal(calls.at(-1)!.options, codexOptions)
 })
