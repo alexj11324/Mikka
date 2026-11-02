@@ -2492,7 +2492,8 @@
       },
       "protocolAgents": "{protocols} protocol · runs on {agents}",
       "customAgents": "Pick a protocol to see which Agent runs it",
-      "noResponsesApi": "{protocol} protocol · No Responses API · Codex can't use it"
+      "noResponsesApi": "{protocol} protocol · No Responses API · Codex can't use it",
+      "afterQuotaSection": "When quota runs out"
     },
     "modelOrder": {
       "title": "Allowed models",
@@ -2506,7 +2507,6 @@
       "add": "Add models",
       "addCount": "{count, plural, one {Add # model} other {Add # models}}",
       "empty": "No allowed models yet",
-      "noCandidates": "No models to add",
       "remove": "Remove from list",
       "ready": "Available",
       "quotaUntil": "Quota used up · back {time}",
@@ -2556,7 +2556,18 @@
       "e2bKeySet": "Added",
       "e2bKeyMissing": "Not added",
       "e2bKeyFill": "Add",
-      "e2bKeyReplace": "Replace"
+      "e2bKeyReplace": "Replace",
+      "agentSection": "Agent",
+      "preferredAgent": "Preferred Agent",
+      "preferredAgentHint": "Models both Agents can run use it first",
+      "preferredMark": "Preferred",
+      "onlyAgent": "{agent} only",
+      "bothAgents": "Both Agents",
+      "agentMenu": "Agent for {model}: {agent}",
+      "emptyNoCredential": "No subscription or API key yet",
+      "emptyNoModels": "Subscriptions and API keys have reported no models yet",
+      "connectCredential": "Connect a subscription or add an API key",
+      "openCredentials": "Go to subscriptions and API keys"
     },
     "loadingPage": "Loading settings"
   },

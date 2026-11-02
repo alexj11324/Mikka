@@ -190,5 +190,41 @@ test('模型与订阅：DeepSeek 的 Key 两种 Agent 都能用', async ({ page 
   await expect(rows.nth(0)).toContainText('已添加')
   await expect(rows.nth(1)).toContainText('Codex')
   await expect(rows.nth(1).getByRole('checkbox')).toBeEnabled()
+  await expect(addModels.getByText('DeepSeek API Key · 两种 Agent 都能跑', { exact: true })).toBeVisible()
   await attachLightDark(page, testInfo, 'api-keys-deepseek-models')
+  await page.keyboard.press('Escape')
+
+  // The row says both Agents run it and offers the Agent, 优先 marking the preferred one (Harness draft).
+  const list = page.getByRole('list', { name: '允许使用的模型' })
+  const row = list.getByRole('listitem').filter({ hasText: 'e2e-deepseek-flash' })
+  await expect(row).toContainText('DeepSeek API Key · 两种 Agent 都能跑')
+  await row.getByRole('button', { name: 'e2e-deepseek-flash 的 Agent：Claude Code' }).click()
+  const codex = page.getByRole('menuitemradio', { name: /Codex/ })
+  await expect(page.getByRole('menuitemradio', { name: /Claude Code/ })).toContainText('优先')
+  await attachLightDark(page, testInfo, 'model-order-agent-menu')
+  await codex.click()
+  await expect(row.getByRole('button', { name: 'e2e-deepseek-flash 的 Agent：Codex' })).toBeVisible()
+  await page.reload()
+  await expect(list.getByRole('listitem').filter({ hasText: 'e2e-deepseek-flash' }).getByRole('button', { name: 'e2e-deepseek-flash 的 Agent：Codex' })).toBeVisible()
+
+  // 优先使用的 Agent saves; 额度用完时 is its own section.
+  const agent = page.getByRole('region', { name: 'Agent', exact: true })
+  await expect(agent.getByRole('button', { name: 'Claude Code' }).or(agent.getByRole('radio', { name: 'Claude Code' }))).toHaveAttribute('aria-pressed', 'true')
+  await agent.getByRole('button', { name: 'Codex' }).or(agent.getByRole('radio', { name: 'Codex' })).click()
+  await page.reload()
+  await expect(page.getByRole('region', { name: 'Agent', exact: true }).getByRole('button', { name: 'Codex' }).or(page.getByRole('region', { name: 'Agent', exact: true }).getByRole('radio', { name: 'Codex' }))).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByRole('region', { name: '额度用完时' }).getByRole('switch', { name: '订阅额度用完后，自动改用 API Key' })).toBeVisible()
+  await attachLightDark(page, testInfo, 'model-order-agent')
+})
+
+// C8: nothing connected yet, so 允许使用的模型 says what is missing and links to it, instead of a greyed 添加模型.
+test('模型与订阅：没有订阅或 Key 时，允许使用的模型写明缺什么', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await registerInTeam(page, '/settings?section=models')
+  const models = page.getByRole('region', { name: '允许使用的模型' })
+  await expect(models.getByText('还没有订阅或 API Key', { exact: true })).toBeVisible()
+  const connect = models.getByRole('link', { name: '连接订阅或添加 API Key' })
+  await expect(connect).toHaveAttribute('href', '#subscriptions-heading')
+  await expect(models.getByRole('button', { name: '添加模型', exact: true })).toHaveCount(0)
+  await attachLightDark(page, testInfo, 'model-order-empty')
 })

@@ -355,4 +355,39 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
     assert.deepEqual([view.deviceModels[mac.id], view.deviceModels[codexBox.id], view.deviceModels[old.id]],
       [['acct-opus-u2', 'acct-sonnet-u2', 'acct-haiku-u2'], [], []])
   })
+
+  await t.test('优先使用的 Agent and a row\'s Agent: a DeepSeek model both Agents run goes on the preferred one; a row switches; 0 credentials for the empty state', async () => {
+    const empty = await person('order-agent-empty')
+    assert.equal((await order.orderView(pool, empty)).credentials, 0, 'nothing connected: the empty state asks to connect one (C8)')
+    const scope = await person('order-agent')
+    await subscribe(scope, 'claude', ['acct-opus-p'])
+    const deepseek = await keys.addApiKey(pool, scope.ownerId, { provider: 'deepseek', apiKey: `sk-${randomBytes(12).toString('hex')}` }, { fetch: (async () => Response.json({ data: [{ id: 'ds-a' }, { id: 'ds-b' }] })) as unknown as typeof fetch })
+    const key = { kind: 'api_key' as const, keyId: deepseek.id }
+    let view = await order.orderView(pool, scope)
+    assert.deepEqual([view.preferredHarness, view.credentials], ['claude_code', 2])
+    assert.deepEqual(view.entries.map(entry => [entry.model, entry.harness, entry.agents]), [['acct-opus-p', 'claude_code', ['claude_code']]], 'a two-Agent key adds no Codex model to the default')
+    // An untouched list follows the preferred Agent at read time: Codex has the DeepSeek model now.
+    await order.changeOrder(pool, scope, { kind: 'preferred', harness: 'codex' })
+    view = await order.orderView(pool, scope)
+    assert.deepEqual([view.preferredHarness, view.customized, view.entries.map(entry => [entry.model, entry.harness])], ['codex', false, [['acct-opus-p', 'claude_code'], ['ds-a', 'codex']]])
+    // A stored list: rows of two-Agent models on the old preferred Agent move with it; one-Agent rows stay.
+    await order.changeOrder(pool, scope, { kind: 'add', entries: [{ harness: 'codex', model: 'ds-b', source: key }] })
+    await order.changeOrder(pool, scope, { kind: 'preferred', harness: 'claude_code' })
+    view = await order.orderView(pool, scope)
+    assert.deepEqual(view.entries.map(entry => [entry.model, entry.harness, entry.agents.length]), [['acct-opus-p', 'claude_code', 1], ['ds-a', 'claude_code', 2], ['ds-b', 'claude_code', 2]])
+    // One row's Agent: switched, then refused where the model is not offered or would be listed twice.
+    const dsA = view.entries[1]
+    await order.changeOrder(pool, scope, { kind: 'harness', id: dsA.id, harness: 'codex' })
+    view = await order.orderView(pool, scope)
+    assert.deepEqual(view.entries.map(entry => [entry.model, entry.harness]), [['acct-opus-p', 'claude_code'], ['ds-a', 'codex'], ['ds-b', 'claude_code']], 'same place in the list')
+    await assert.rejects(order.changeOrder(pool, scope, { kind: 'harness', id: view.entries[0].id, harness: 'codex' }), { code: 'executionModelUnknown' }, 'a Claude subscription model has no Codex')
+    await order.changeOrder(pool, scope, { kind: 'add', entries: [{ harness: 'claude_code', model: 'ds-a', source: key }] })
+    view = await order.orderView(pool, scope)
+    await assert.rejects(order.changeOrder(pool, scope, { kind: 'harness', id: view.entries[1].id, harness: 'claude_code' }), { code: 'executionRuleOrderInvalid' }, 'already listed on that Agent')
+    // Dispatch takes the row's own Agent.
+    await device(scope.ownerId, [{ harness: 'codex', installed: true }], true, { name: 'codex-only' })
+    await order.changeOrder(pool, scope, { kind: 'reorder', ids: [view.entries[1].id, view.entries[0].id, view.entries[2].id, view.entries[3].id] })
+    const run = await resolveModelDispatch(pool, { ...scope, botId: null })
+    assert.deepEqual(run.kind === 'device' && [run.entry.model, run.entry.harness, run.entry.source], ['ds-a', 'codex', key])
+  })
 })

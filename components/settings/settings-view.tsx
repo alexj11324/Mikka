@@ -150,8 +150,8 @@ function ApiAndSubscriptions({ workspaceId, team }: { workspaceId: string; team:
     <SubscriptionSettings workspaceId={workspaceId} />
     {apiKeys.section}
     {apiKeys.dialogs}
-    <ApiKeyFallbackSetting workspaceId={workspaceId} />
     <ModelOrderSettings key={`order-${workspaceId}`} workspaceId={workspaceId} />
+    <ApiKeyFallbackSetting workspaceId={workspaceId} />
     {team && <SubscriptionShareSettings key={`share-${workspaceId}`} workspaceId={workspaceId} />}
   </>
 }

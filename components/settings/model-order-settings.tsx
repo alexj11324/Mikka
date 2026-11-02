@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { toast } from 'sonner'
 import useSWR from 'swr'
 import { useFormatter, useTranslations } from 'next-intl'
-import { GripVertical, KeyRound, MoreHorizontal } from 'lucide-react'
+import { ChevronDown, GripVertical, KeyRound, MoreHorizontal } from 'lucide-react'
 import { arrayMove } from '@dnd-kit/sortable'
 import { Kanban, KanbanColumnContent, KanbanItem, KanbanItemHandle } from '@/components/reui/kanban'
 import { changeModelOrder, type getModelOrder } from '@/app/actions/model-order'
@@ -14,13 +14,13 @@ import { SettingRow, SettingsSaveError, SettingsSection, settingsSectionAction }
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { FieldError, FieldLegend, FieldSet } from '@/components/ui/field'
 import { Label } from '@/components/ui/label'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { E2BKeyDialog, useOwnE2BKey } from '@/components/settings/e2b-key-dialog'
 import type { OrderRow, OrderView } from '@/lib/model-order'
-import type { OrderCandidate } from '@/lib/model-order-plan'
+import type { OrderCandidate, OrderHarness } from '@/lib/model-order-plan'
 import { settingsRead } from '@/lib/settings-read'
 import { settingsHref } from '@/lib/settings-sections'
 import { usePresence } from '@/lib/use-presence'
@@ -123,15 +123,29 @@ export function ModelOrderSettings({ workspaceId }: { workspaceId: string }) {
         </span>
       </SettingRow>}
     </SettingsSection>
+    {/* 优先使用的 Agent (Harness draft): where a model both Agents run goes by default. */}
+    <SettingsSection id="agent-heading" title={t('agentSection')}>
+      <SettingRow title={t('preferredAgent')} description={t('preferredAgentHint')}>
+        <ToggleGroup aria-label={t('preferredAgent')} variant="segment" spacing={0.5} value={[data.preferredHarness]} disabled={pending}
+          onValueChange={values => { const next = values[0]; if ((next === 'claude_code' || next === 'codex') && next !== data.preferredHarness) void save({ kind: 'preferred', harness: next }, { ...data, preferredHarness: next }) }}>
+          <ToggleGroupItem value="claude_code">{harnessName('claude_code')}</ToggleGroupItem>
+          <ToggleGroupItem value="codex">{harnessName('codex')}</ToggleGroupItem>
+        </ToggleGroup>
+      </SettingRow>
+    </SettingsSection>
     <SettingsSection id="model-order-heading" title={t('title')}
       action={data.entries.length > 0 && <Button type="button" {...settingsSectionAction} disabled={pending} onClick={() => setAdding(true)}>{t('add')}</Button>}>
       {data.entries.length === 0
         ? <div className="flex flex-col items-center gap-3 px-5 py-7">
-          <p className="text-sm text-muted-foreground">{t('empty')}</p>
-          <Button type="button" disabled={pending || data.candidates.length === 0} onClick={() => setAdding(true)}>{t('add')}</Button>
-          {data.candidates.length === 0 && <p className="text-xs text-muted-foreground">{t('noCandidates')}</p>}
+          {/* C8: one line naming what is missing, and the one button that gets it (R-41). */}
+          {data.candidates.length > 0
+            ? <><p className="text-sm text-muted-foreground">{t('empty')}</p>
+              <Button type="button" disabled={pending} onClick={() => setAdding(true)}>{t('add')}</Button></>
+            : <><p className="text-sm text-muted-foreground">{data.credentials === 0 ? t('emptyNoCredential') : t('emptyNoModels')}</p>
+              <Button type="button" variant="secondary" render={<a href="#subscriptions-heading" />}>{data.credentials === 0 ? t('connectCredential') : t('openCredentials')}</Button></>}
         </div>
-        : <OrderList rows={data.entries} pending={pending} unsaved={unsaved} onMove={move} onRemove={row => { void remove(row) }} />}
+        : <OrderList rows={data.entries} pending={pending} unsaved={unsaved} preferred={data.preferredHarness} onMove={move} onRemove={row => { void remove(row) }}
+          onAgent={(row, harness) => void save({ kind: 'harness', id: row.id, harness }, { ...data, entries: data.entries.map(entry => entry.id === row.id ? { ...entry, harness } : entry) })} />}
     </SettingsSection>
     {failed && <SettingsSaveError message={failed.message} retryLabel={commonT('retry')} onRetry={failed.retry} />}
     {adding && <AddModelsDialog candidates={data.candidates} onClose={async picked => {
@@ -143,7 +157,7 @@ export function ModelOrderSettings({ workspaceId }: { workspaceId: string }) {
   </>
 }
 
-function OrderList({ rows, pending, unsaved, onMove, onRemove }: { rows: OrderRow[]; pending: boolean; unsaved: { id: string; to: number } | null; onMove: (from: number, to: number) => void; onRemove: (row: OrderRow) => void }) {
+function OrderList({ rows, pending, unsaved, preferred, onMove, onRemove, onAgent }: { rows: OrderRow[]; pending: boolean; unsaved: { id: string; to: number } | null; preferred: OrderHarness; onMove: (from: number, to: number) => void; onRemove: (row: OrderRow) => void; onAgent: (row: OrderRow, harness: OrderHarness) => void }) {
   const t = useTranslations('Settings.modelOrder')
   // The list as dragged; the saved order comes back from the server.
   const [dragged, setDragged] = useState<OrderRow[] | null>(null)
@@ -170,14 +184,14 @@ function OrderList({ rows, pending, unsaved, onMove, onRemove }: { rows: OrderRo
       },
     }}>
     <KanbanColumnContent value="models" aria-label={t('title')} className="gap-0 divide-y divide-border" render={<ol />}>
-      {items.map((row, index) => <OrderItem key={row.id} row={row} index={index} last={index === items.length - 1} pending={pending}
+      {items.map((row, index) => <OrderItem key={row.id} row={row} index={index} last={index === items.length - 1} pending={pending} preferred={preferred} onAgent={harness => onAgent(row, harness)}
         retry={unsaved?.id === row.id ? () => onMove(index, Math.min(unsaved.to, items.length - 1)) : undefined}
         onFirst={() => onMove(index, 0)} onUp={() => onMove(index, index - 1)} onDown={() => onMove(index, index + 1)} onRemove={() => onRemove(row)} />)}
     </KanbanColumnContent>
   </Kanban>
 }
 
-function OrderItem({ row, index, last, pending, retry, onFirst, onUp, onDown, onRemove }: { row: OrderRow; index: number; last: boolean; pending: boolean; retry?: () => void; onFirst: () => void; onUp: () => void; onDown: () => void; onRemove: () => void }) {
+function OrderItem({ row, index, last, pending, preferred, retry, onAgent, onFirst, onUp, onDown, onRemove }: { row: OrderRow; index: number; last: boolean; pending: boolean; preferred: OrderHarness; retry?: () => void; onAgent: (harness: OrderHarness) => void; onFirst: () => void; onUp: () => void; onDown: () => void; onRemove: () => void }) {
   const t = useTranslations('Settings.modelOrder')
   const commonT = useTranslations('Common')
   const format = useFormatter()
@@ -199,8 +213,24 @@ function OrderItem({ row, index, last, pending, retry, onFirst, onUp, onDown, on
         {row.source.kind === 'api_key' ? <span className="inline-flex min-w-0 items-center gap-1.5"><KeyRound aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" /><span className="truncate">{row.model}</span></span>
           : <ModelLabel model={row.model} source={row.harness} />}
       </span>
-      <span className="truncate text-xs text-muted-foreground">{`${harnessName(row.harness)} · ${sourceName(t, row)}`}</span>
+      <span className="truncate text-xs text-muted-foreground">{`${sourceName(t, row)} · ${agentsLine(t, row.agents)}`}</span>
     </span>
+    {/* A model both Agents run: its Agent here, 优先 marking the preferred one (Harness draft). */}
+    {row.agents.length > 1 && <DropdownMenu>
+      <DropdownMenuTrigger disabled={pending} render={<Button variant="secondary" size="sm" aria-label={t('agentMenu', { model: row.model, agent: harnessName(row.harness) })} />}>
+        {harnessName(row.harness)}<ChevronDown aria-hidden="true" data-icon="inline-end" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-48">
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>{t('agentSection')}</DropdownMenuLabel>
+          <DropdownMenuRadioGroup value={row.harness} onValueChange={value => { if ((value === 'claude_code' || value === 'codex') && value !== row.harness) onAgent(value) }}>
+            {row.agents.map(agent => <DropdownMenuRadioItem key={agent} value={agent}>
+              <span className="flex-1">{harnessName(agent)}</span>{agent === preferred && <span className="text-xs text-muted-foreground">{t('preferredMark')}</span>}
+            </DropdownMenuRadioItem>)}
+          </DropdownMenuRadioGroup>
+        </DropdownMenuGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>}
     <span role="status" className={cn('flex shrink-0 items-center gap-1.5 text-xs', retry ? 'text-destructive' : warn ? 'text-warning-foreground' : 'text-muted-foreground')}>
       <span aria-hidden="true" className={cn('size-1.5 rounded-full', retry ? 'bg-destructive' : warn ? 'bg-warning' : 'bg-success')} />{status}
     </span>
@@ -223,6 +253,11 @@ function OrderItem({ row, index, last, pending, retry, onFirst, onUp, onDown, on
 }
 
 type T = ReturnType<typeof useTranslations<'Settings.modelOrder'>>
+/** 「只能用 Claude Code」 or 「两种 Agent 都能跑」: which Agents a credential's model runs on. */
+function agentsLine(t: T, agents: readonly OrderHarness[]) {
+  return agents.length > 1 ? t('bothAgents') : t('onlyAgent', { agent: harnessName(agents[0] ?? 'claude_code') })
+}
+
 /** Which credential a model comes from: the subscription's product, or the key's provider. */
 function sourceName(t: T, item: { source: OrderCandidate['source']; provider: string }) {
   if (item.source.kind === 'subscription') return item.provider === 'codex' ? t('source.codex') : t('source.claude')
@@ -241,7 +276,7 @@ function AddModelsDialog({ candidates, onClose }: { candidates: Candidate[]; onC
       <DialogHeader><DialogTitle>{t('add')}</DialogTitle></DialogHeader>
       <div className="flex max-h-[60vh] flex-col gap-4 overflow-y-auto">
         {groups.map(group => <FieldSet key={sourceKey(group.head)} className="gap-1">
-          <FieldLegend variant="label" className="text-xs font-normal text-muted-foreground">{sourceName(t, group.head)}</FieldLegend>
+          <FieldLegend variant="label" className="text-xs font-normal text-muted-foreground">{`${sourceName(t, group.head)} · ${agentsLine(t, [...new Set(group.items.map(item => item.harness))])}`}</FieldLegend>
           {group.items.map(item => {
             const key = sourceKey(item)
             return <Label key={key} className={cn('flex items-center gap-2.5 rounded-lg px-2 py-1.5 font-normal', item.added ? 'text-muted-foreground' : 'hover:bg-muted')}>
