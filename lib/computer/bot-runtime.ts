@@ -38,8 +38,16 @@ export async function ensureBotRuntime(pool: Pool, actor: { userId: string; work
         if (existing.repoId !== repo.id) await client.query('UPDATE bot_cloud_runtimes SET "repoId"=$4 WHERE "botId"=$1 AND harness=$2 AND "ownerId"=$3', [botId, info.harness, actor.userId, repo.id])
         continue
       }
-      const agentId = randomUUID()
-      await client.query('INSERT INTO agents (id,"userId",harness,name,"deviceId") VALUES ($1,$2,$3,$4,$5)', [agentId, actor.userId, info.harness, `Cloud ${info.harness} ${botId}`, deviceId])
+      const name = `Cloud ${info.harness} ${botId}`
+      // A runtime row removed without its agent (a bot handed over and back, production 2026-11-02) leaves the
+      // name taken, so inserting again fails on agents_user_name_key (23505). Take that agent back only when it is
+      // this owner's hidden runtime agent for this bot on this machine's device, and no other runtime holds it.
+      const orphan = (await client.query<{ id: string }>(`SELECT a.id FROM agents a
+        WHERE a."userId"=$1 AND a.name=$2 AND a.harness=$3 AND a."deviceId"=$4 AND a.description='' AND a.instructions=''
+          AND NOT EXISTS (SELECT 1 FROM bot_cloud_runtimes x WHERE x."agentId"=a.id) FOR UPDATE OF a`,
+      [actor.userId, name, info.harness, deviceId])).rows[0]
+      const agentId = orphan?.id ?? randomUUID()
+      if (!orphan) await client.query('INSERT INTO agents (id,"userId",harness,name,"deviceId") VALUES ($1,$2,$3,$4,$5)', [agentId, actor.userId, info.harness, name, deviceId])
       await client.query('INSERT INTO bot_cloud_runtimes ("botId","workspaceId","ownerId",harness,"agentId","repoId") VALUES ($1,$2,$3,$4,$5,$6)', [botId, actor.workspaceId, actor.userId, info.harness, agentId, repo.id])
     }
     const rows = (await client.query('SELECT harness,"agentId","repoId" FROM bot_cloud_runtimes WHERE "botId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 ORDER BY harness', [botId, actor.userId, actor.workspaceId])).rows
