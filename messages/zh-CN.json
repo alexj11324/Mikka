@@ -3237,7 +3237,10 @@
     "needsModelNotOffered": "没有订阅或 Key 能用 {agent} 跑 {model}",
     "needsModelPickedNoDevice": "没有电脑能用 {agent} 跑 {model}",
     "needsModelPickedUnavailable": "{agent} 的 {model} 暂时不可用",
-    "needsModelSettings": "打开模型与订阅"
+    "needsModelSettings": "打开模型与订阅",
+    "repositoryAmbiguousTitle": "多个仓库匹配 {name}",
+    "repositoryNotFoundTitle": "已授权的仓库里没有叫 {name} 的",
+    "githubInstallMore": "在 GitHub 上授权更多仓库"
   },
   "IssueThreads": {
     "title": "线程",

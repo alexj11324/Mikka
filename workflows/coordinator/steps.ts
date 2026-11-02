@@ -216,7 +216,9 @@ export async function preparePrompt(userId: string, botId: string, snapshot?: De
   const instructions = personalMailboxEnabled() && snapshot ? personalMailboxInstructions(base, snapshotMailboxTools(snapshot).filter(name => mailboxTools.includes(name))) : base
   const factoryPolicy = process.env.MIKKA_FACTORY_ROUTING_ENABLED === '1' && process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED === '1' ? FACTORY_QUESTION_INSTRUCTIONS + FACTORY_CHECK_RECOVERY_INSTRUCTIONS : ''
   // The person's 个人指令 sit after the rules and before the memory, marked as theirs.
-  return { instructions: instructionsWithMemory(await withPersonalInstructions(userId, instructions, snapshot ? snapshot.personalPlugins ?? { servers: [], skills: [] } : undefined), memory) + factoryPolicy + '\n' + SCHEDULE_INSTRUCTIONS, messages: promptMessages(summary, messages, summaryTrust) }
+  // The person's own GitHub account, so the Bot looks a repository up instead of asking which account it is under.
+  const { githubContext } = await import('@/lib/coordinator/github-context')
+  return { instructions: instructionsWithMemory(await withPersonalInstructions(userId, instructions, snapshot ? snapshot.personalPlugins ?? { servers: [], skills: [] } : undefined), memory) + factoryPolicy + '\n' + SCHEDULE_INSTRUCTIONS + '\n' + await githubContext(userId), messages: promptMessages(summary, messages, summaryTrust) }
 }
 
 export async function personalWriteToolsEnabled() { 'use step'; const { personalWritesEnabled } = await import('@/lib/operations/write-feature'); return personalWritesEnabled() }
@@ -356,6 +358,13 @@ export async function listAgents(userId: string, scope?: NativeToolScope) {
   return (await import('@/lib/mcp/actions')).listAgents(userId)
 }
 
+/** The host's user only: their own GitHub token's authorized repositories, never another person's. */
+export async function findRepository(userId: string, input: { name?: string }, scope?: NativeToolScope) {
+  'use step'
+  await assertNativeToolScope(userId,scope)
+  return (await import('@/lib/coordinator/repository-resolution')).findRepository(userId, input.name)
+}
+
 /**
  * The run belongs to the bot that dispatched it, the Coordinator included, so its events come back to that bot's chat.
  * One task, one thread (lib/thread-dispatch.ts): a task with a thread gets the dispatch as that thread's work; only
@@ -372,13 +381,17 @@ export async function dispatchRun(userId: string, input: { issueId: string; agen
     if (!result || typeof result !== 'object' || !('runId' in result) || typeof result.runId !== 'string') return result
     return { ...result, placement: await runPlacement(pool, userId, result.runId) }
   }
+  // A bare name ("Mikka_test") becomes the one repository this user authorized by that name, or a card; only a new run needs it.
+  const { withResolvedRepository } = await import('@/lib/coordinator/repository-resolution')
+  const byRules = (note: string | undefined, place?: import('@/lib/dispatch-target').DispatchTarget) =>
+    withResolvedRepository(userId, request.issueId, request.repo, repo => dispatchByRules(userId, { ...request, repo, note }, scope, botId, execution, requestEventId, approvedRepositoryKey, place))
   return asToolResult(async () => placed(await dispatchToTask(userId, request.issueId, {
     note: request.note, newThread,
     // A named place other than the thread's own is a move, which only the person's explicit request grants.
     moves: async previous => movesThread(target, await runPlacement(pool, userId, previous.id)),
     explicit: () => explicitNewThread(userId, botId, sourceEventId),
     start: async (previous, note) => {
-      if (!previous) return dispatchByRules(userId, { ...request, note }, scope, botId, execution, requestEventId, approvedRepositoryKey, target)
+      if (!previous) return byRules(note, target)
       // The thread's next run goes where the thread ran, so its session can be resumed; elsewhere it starts fresh with the note's context.
       if (previous?.cloud && (previous.harness === 'codex' || previous.harness === 'claude_code')) {
         const cloud = await dispatchComputerTask(userId, { botId: previous.cloud.botId, issueId: request.issueId, harness: previous.harness, note, ...(previous.remoteUrl ? { repo: previous.remoteUrl } : {}), ...(request.readOnly || previous.readOnly ? { readOnly: true } : {}) }, `thread:${previous.id}:${request.requestKey ?? requestEventId ?? crypto.randomUUID()}`, scope, execution)
@@ -388,7 +401,7 @@ export async function dispatchRun(userId: string, input: { issueId: string; agen
         const result = await queueRun(userId, { issueId: request.issueId, agentId: previous.agentId, repo: previous.remoteUrl, note, readOnly: Boolean(request.readOnly || previous.readOnly), requestKey: `thread:${previous.id}:${request.requestKey ?? crypto.randomUUID()}`.slice(0, 200) }, botId, execution, requestEventId, null, approvedRepositoryKey).catch(() => null)
         if (result) return { ...result, status: 'queued' as const }
       }
-      return dispatchByRules(userId, { ...request, note }, scope, botId, execution, requestEventId, approvedRepositoryKey)
+      return byRules(note)
     },
   })))
 }

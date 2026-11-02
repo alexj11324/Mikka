@@ -3237,7 +3237,10 @@
     "needsModelNotOffered": "No subscription or key runs {model} on {agent}",
     "needsModelPickedNoDevice": "No computer can run {model} on {agent}",
     "needsModelPickedUnavailable": "{model} on {agent} is unavailable right now",
-    "needsModelSettings": "Open Models and subscriptions"
+    "needsModelSettings": "Open Models and subscriptions",
+    "repositoryAmbiguousTitle": "Several repositories match {name}",
+    "repositoryNotFoundTitle": "No authorized repository named {name}",
+    "githubInstallMore": "Authorize more repositories on GitHub"
   },
   "IssueThreads": {
     "title": "Threads",
