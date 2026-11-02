@@ -71,6 +71,11 @@ test('模型与订阅：默认顺序来自已有订阅，添加、键盘与菜�
   await page.reload()
   await expect(page.getByText('2 台电脑参与调度 · 会先用 E2E Server', { exact: true })).toBeVisible()
 
+  // The E2B key row is there with 本地 selected too (the bot's own cloud computer uses the key).
+  await expect(page.getByRole('region', { name: '运行位置' }).getByRole('status').filter({ hasText: '未填' })).toBeVisible()
+  await expect(page.getByRole('region', { name: '运行位置' }).getByRole('button', { name: '填入', exact: true })).toBeVisible()
+  await attachLightDark(page, testInfo, 'model-order-local-key')
+
   // 添加模型: only what the account lists; the one in the list is marked 已添加.
   await page.getByRole('button', { name: '添加模型', exact: true }).click()
   const dialog = page.getByRole('dialog', { name: '添加模型' })

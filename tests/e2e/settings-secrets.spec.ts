@@ -97,12 +97,13 @@ test('团队成员在模型与订阅里设置自己的 E2B Key', async ({ page }
   const pool = new Pool({ connectionString: process.env.E2E_DATABASE_URL })
   try { await pool.query(`UPDATE mikka_workspace_members SET role='member' WHERE "workspaceId"=$1`, [workspaceId]) } finally { await pool.end() }
   await page.reload()
-  // The key sits on the 云端 row of 运行位置 (R1).
+  // The key has its own row under 运行位置, shown with 本地 selected too: the bot's own cloud computer uses it as well.
   const location = page.getByRole('region', { name: '运行位置' })
-  await location.getByRole('radio', { name: '云端' }).or(location.getByRole('button', { name: '云端' })).click()
-  await expect(location.getByText('还没有 E2B Key', { exact: true })).toBeVisible()
+  await expect(location.getByRole('button', { name: '本地' }).or(location.getByRole('radio', { name: '本地' }))).toHaveAttribute('aria-pressed', 'true')
+  await expect(location.getByText('E2B Key', { exact: true })).toBeVisible()
+  await expect(location.getByRole('status').filter({ hasText: '未填' })).toBeVisible()
   await attachLightDark(page, testInfo, 'models-e2b')
-  await location.getByRole('button', { name: '填入 E2B Key', exact: true }).click()
+  await location.getByRole('button', { name: '填入', exact: true }).click()
   await expect(page.getByRole('dialog', { name: 'E2B API Key' }).getByLabel('API Key')).toHaveValue('')
   await attachLightDark(page, testInfo, 'models-e2b-dialog')
 })

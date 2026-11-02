@@ -2540,12 +2540,16 @@
         "custom": "自定义服务商"
       },
       "setE2BKey": "填入 E2B Key",
-      "replaceE2BKey": "更换 E2B Key",
       "openDevices": "打开设备",
       "moveFirst": "移到最前",
       "removed": "已移出 {model}",
       "undo": "撤销",
-      "orderUnsaved": "顺序未保存"
+      "orderUnsaved": "顺序未保存",
+      "e2bKey": "E2B Key",
+      "e2bKeySet": "已填",
+      "e2bKeyMissing": "未填",
+      "e2bKeyFill": "填入",
+      "e2bKeyReplace": "更换"
     }
   },
   "TelegramBot": {

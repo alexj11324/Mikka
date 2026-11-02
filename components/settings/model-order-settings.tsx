@@ -99,10 +99,10 @@ export function ModelOrderSettings({ workspaceId }: { workspaceId: string }) {
   const locationLine = data.location === 'local'
     ? data.firstDevice ? t('localFirst', { count: data.devices, device: data.firstDevice }) : t('localDevices', { count: data.devices })
     : e2b.configured === false ? t('cloudNoKey') : null
-  // R1: what fixes or explains the location sits on its row: 打开设备 for 本地; the E2B key for 云端 (no separate 云电脑 section).
+  // R1: what fixes or explains the location sits on its row: 打开设备 for 本地; 填入 E2B Key for 云端 without one.
   const locationAction = data.location === 'local'
     ? <Button type="button" variant="secondary" size="sm" render={<Link href={settingsHref('computers', workspaceId)} />}>{t('openDevices')}</Button>
-    : e2b.configured !== undefined && <Button type="button" variant="secondary" size="sm" onClick={() => setKeyOpen(true)}>{e2b.configured ? t('replaceE2BKey') : t('setE2BKey')}</Button>
+    : e2b.configured === false && <Button type="button" variant="secondary" size="sm" onClick={() => setKeyOpen(true)}>{t('setE2BKey')}</Button>
   return <>
     <SettingsSection id="run-location-heading" title={t('location')}>
       <SettingRow title={data.location === 'local' ? t('local') : t('cloud')} description={locationLine ?? undefined}>
@@ -115,6 +115,13 @@ export function ModelOrderSettings({ workspaceId }: { workspaceId: string }) {
           </ToggleGroup>
         </span>
       </SettingRow>
+      {/* The person's own E2B key, whatever the location: 云端 runs and the bot's own cloud computer both use it (coordinator, 2026-11-02). */}
+      {e2b.configured !== undefined && <SettingRow title={t('e2bKey')}>
+        <span className="flex items-center gap-3">
+          <span role="status" className="text-sm text-muted-foreground">{e2b.configured ? t('e2bKeySet') : t('e2bKeyMissing')}</span>
+          <Button type="button" variant="secondary" size="sm" onClick={() => setKeyOpen(true)}>{e2b.configured ? t('e2bKeyReplace') : t('e2bKeyFill')}</Button>
+        </span>
+      </SettingRow>}
     </SettingsSection>
     <SettingsSection id="model-order-heading" title={t('title')}
       action={data.entries.length > 0 && <Button type="button" {...settingsSectionAction} disabled={pending} onClick={() => setAdding(true)}>{t('add')}</Button>}>

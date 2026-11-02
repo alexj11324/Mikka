@@ -2540,12 +2540,16 @@
         "custom": "Custom provider"
       },
       "setE2BKey": "Add E2B key",
-      "replaceE2BKey": "Replace E2B key",
       "openDevices": "Open devices",
       "moveFirst": "Move to top",
       "removed": "Removed {model}",
       "undo": "Undo",
-      "orderUnsaved": "Order not saved"
+      "orderUnsaved": "Order not saved",
+      "e2bKey": "E2B key",
+      "e2bKeySet": "Added",
+      "e2bKeyMissing": "Not added",
+      "e2bKeyFill": "Add",
+      "e2bKeyReplace": "Replace"
     }
   },
   "TelegramBot": {
