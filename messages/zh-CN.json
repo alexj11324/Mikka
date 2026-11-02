@@ -2484,6 +2484,7 @@
       "local": "本地",
       "cloud": "云端",
       "localDevices": "{count} 台电脑参与调度",
+      "localFirst": "{count} 台电脑参与调度 · 会先用 {device}",
       "cloudNoKey": "E2B Key 未设置",
       "add": "添加模型",
       "addCount": "添加 {count} 个",

@@ -75,7 +75,7 @@ export function ModelOrderSettings({ workspaceId }: { workspaceId: string }) {
   if (!data) return <SettingsSection id="model-order-heading" title={t('title')}><p role="status" className="px-5 py-4 text-sm text-muted-foreground">{t('loading')}</p></SettingsSection>
 
   const locationLine = data.location === 'local'
-    ? t('localDevices', { count: data.devices })
+    ? data.firstDevice ? t('localFirst', { count: data.devices, device: data.firstDevice }) : t('localDevices', { count: data.devices })
     : e2b.configured === false ? t('cloudNoKey') : null
   return <>
     <SettingsSection id="run-location-heading" title={t('location')}>

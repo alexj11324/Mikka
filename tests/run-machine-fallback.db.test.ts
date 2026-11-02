@@ -260,7 +260,7 @@ test('run machine fallback: 本地 a computer that takes part, 云端 own E2B, e
     assert.deepEqual(retried.payload.movedTo, { kind: 'cloud' })
   })
 
-  await t.test('own devices: 本地 picks one that takes part; a computer with 参与调度 off is never picked, even when named', async () => {
+  await t.test('own devices: 本地 picks the server that takes part; a computer with 参与调度 off is never picked, even when named', async () => {
     const d = await person('devices')
     const mac = await onlineMac(d.id)
     const server = await onlineMac(d.id, true, 'server')
@@ -272,8 +272,9 @@ test('run machine fallback: 本地 a computer that takes part, 云端 own E2B, e
       const result = await dispatch(d.id, issueId) as unknown as { runId: string }
       used.add((await runOf(result.runId)).deviceId)
     }
-    assert.ok([...used].every(deviceId => deviceId === mac || deviceId === server), 'only computers that take part')
-    assert.ok(!used.has(off))
+    // The server goes first, every time (decision 2026-11-02-1530); the computer and the one with 参与调度 off are not used.
+    assert.deepEqual([...used], [server])
+    assert.ok(!used.has(off) && !used.has(mac))
     const e = await person('manual')
     const kept = await onlineMac(e.id, false)
     const none = await dispatch(e.id, e.issueId) as unknown as NoMachine
