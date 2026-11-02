@@ -132,7 +132,7 @@ export interface BotThreadPage {
 const iso = (column: ReturnType<typeof sql>) => sql<string>`to_char(${column} at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`
 
 /**
- * WS-07 线程列表: the threads one bot dispatched, most recently active first. Runs are
+ * WS-07 线程列表: one bot's threads, most recently active first. Runs are
  * grouped per thread (a task, or one person's chat with the bot), so several
  * runs show as one row with the latest run's status. Any active member of the
  * bot's workspace may read the list; titles follow botThreadHref, botThreadTitle, and a
