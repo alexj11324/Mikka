@@ -2,7 +2,7 @@ import 'server-only'
 import type { PoolClient } from 'pg'
 import { and, asc, eq, inArray, ne, sql } from 'drizzle-orm'
 import { z } from 'zod'
-import { db } from '@/lib/db'
+import { db, pool } from '@/lib/db'
 import { agentRuns, bots, conversations, issues, teamIssueCreateRequests, teamIssuePromotions, workspaceBilling, workspaceCreditGrants, workspaceSettings } from '@/lib/db/schema'
 import { projectEvents, projects } from '@/lib/db/project-schema'
 import { teamIssueCreateReceipts, teamIssuePromotionReceipts, teamIssues, teamMembers, teamProjects, teams } from '@/lib/db/team-schema'
@@ -11,6 +11,7 @@ import { workspaceDb } from '@/lib/workspace-db'
 import { requireWorkspace, WorkspaceError, type WorkspaceTransaction } from '@/lib/workspace-access'
 import { enqueueWorkspaceAudit, type AuditRequestContext } from '@/lib/audit/delivery'
 import { deleteWorkspaceRows } from '@/lib/workspace-rows'
+import { teardownWorkspaceMachines } from '@/lib/cloud-computer/workspace-teardown'
 import { parseWorkspaceIcon } from './icon'
 
 export type MainTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
@@ -240,6 +241,10 @@ export async function deleteWorkspaceData(actorId: string, workspaceId: string, 
     const issueRows = await tx.select({ id: teamIssues.issueId }).from(teamIssues).where(eq(teamIssues.workspaceId, workspaceId))
     const projectRows = await tx.select({ id: teamProjects.projectId }).from(teamProjects).where(eq(teamProjects.workspaceId, workspaceId))
     const projectIds = [...new Set(projectRows.map(row => row.id))]
+    // The machines' sandboxes are killed before their rows go, so no refused deletion may follow: the billing check runs first too.
+    const [billing] = await db.select({ status: workspaceBilling.status }).from(workspaceBilling).where(eq(workspaceBilling.workspaceId, workspaceId)).limit(1)
+    if (billing?.status && (BILLING_LIVE_STATUSES as readonly string[]).includes(billing.status)) throw new WorkspaceError('workspaceHasActiveSubscription')
+    await teardownWorkspaceMachines(pool, workspaceId)
     const app = await db.transaction(main => deleteAppData(main, workspaceId, teamIds, issueRows.map(row => row.id)))
 
     await tx.delete(teamIssueCreateReceipts).where(eq(teamIssueCreateReceipts.workspaceId, workspaceId))

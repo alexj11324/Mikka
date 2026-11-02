@@ -46,6 +46,7 @@ deleteWorkspace(id: string, confirmName: string): Promise<ActionResult<{
 - 权限：该工作区的管理员。
 - `confirmName` 去掉首尾空白后必须和工作区名称完全一致（区分大小写），否则返回 `workspaceDeleteNameMismatch`。
 - 如果 `workspace_billing.status` 还在 `active / trialing / past_due / unpaid / incomplete` 之一，返回 `workspaceHasActiveSubscription`，要先取消订阅才能删除。
+- 删行之前先关机器（`lib/cloud-computer/workspace-teardown.ts` `teardownWorkspaceMachines`）：工作区里每个人的 Bot 电脑（`cloud_machines`）和线程机器（`thread_machines`）。一个事务里停掉这些机器上的运行、吊销 worker 凭证（`device_tokens.boundDeviceId`，它按 `boundWorkspaceId` 记，不会随工作区的行删掉）、移除设备，并为每个沙箱写一行 `sandbox_kill_retries`（只有 `sandboxId` 和 `ownerId`，不存密钥）；提交后用各自主人的 E2B 密钥 kill。kill 成功或 E2B 已没有这个沙箱就删掉那一行；失败不挡删除，由 `run-recovery` cron（`retrySandboxKills`）重试。主人删除账户时先重试他自己的这些行，没清完就挡住账户删除（他的密钥随账户删除）。删除账户时，只有他一人的工作区里别人留下的机器（例如已移除成员的）也这样处理。
 - 删除范围，应用库（一个事务）：
   - 工作区的 Bot（`bots.workspaceId`），以及这些 Bot 派出的线程（`agent_runs.botId`）。删除 Bot 时会级联删掉它的对话（coordinator_sessions/messages/events）、云桌面、云运行时、计算机运行绑定、agent kit 和后台任务（bot_subagents）。
   - 没有 `ON DELETE CASCADE`、会挡住删除的表要先删：`suggestion_executions`、`thread_machines`（同时按 workspaceId 和 botId 删）。

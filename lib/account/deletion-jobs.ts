@@ -9,6 +9,7 @@ import { auditDigest } from '@/lib/audit/integrity'
 import { accountStorageKeys, deleteMainAccountData, deleteWorkspaceData, planWorkspaces, type Plan } from './delete'
 import type { AccountCleanupReport } from './cleanup-result'
 import { cleanupAccountConnections } from './external-cleanup'
+import { teardownWorkspaceMachines } from '@/lib/cloud-computer/workspace-teardown'
 
 export type DeletionStage = 'preparing' | 'requested' | 'external_pending' | 'main_deleted' | 'workspace_deleted' | 'storage_pending' | 'completed' | 'cancelled'
 export interface AccountDeletionJob {
@@ -141,6 +142,10 @@ export async function resumeAccountDeletion(id: string, options: AccountDeletion
         await lease.query('UPDATE account_deletion_jobs SET "blockedReasons"=\'["sole_workspace_admin"]\',"updatedAt"=now() WHERE id=$1', [id])
         return load(lease, id)
       }
+      // Machines of anyone else left in a workspace that goes (a former member's Bot computer or thread
+      // machines) are fenced and killed before their rows go; the person's own went in the external step.
+      // A restore replay never reaches a provider.
+      if (!options.replayPlan) for (const workspaceId of frozen.solo) await teardownWorkspaceMachines(main, workspaceId, { exceptOwner: job.subjectUserId })
       await transaction(workspace, async workspaceClient => {
         const checked = await planWorkspaces(drizzle(workspaceClient), job.subjectUserId)
         if (!options.replayPlan && ('soleAdminOf' in checked || auditDigest(checked) !== auditDigest(frozen))) throw new Error('accountDeletionWorkspaceChanged')
