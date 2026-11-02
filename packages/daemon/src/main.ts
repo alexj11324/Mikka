@@ -57,10 +57,11 @@ import {
   DaemonError,
   InvalidIdError,
   RunNotFoundError,
+  RunNotPinnedHereError,
   ServerUnreachableError,
 } from "./errors"
 import { readJson, writeFileAtomic, writeJsonAtomic } from "./fs-util"
-import { checkLatestVersion, type AutoUpdateRuntime } from "./auto-update"
+import { checkLatestVersion, newerStableVersion, recordUpdateFailure, reportedUpdateFailure, updateAllowed, type AutoUpdateRuntime } from "./auto-update"
 import { restartService, uninstallService } from "./service"
 import { detectDeviceType } from "./device-type"
 import { detectHarnesses, deviceCapabilities, dockerAvailable, harnessFingerprint } from "./harnesses"
@@ -1123,8 +1124,10 @@ export class Daemon {
         runs: this.supervisor.heartbeatRuns(),
         worktreeDiskBytes: await this.worktrees.diskUsage(),
         ...(quotas ? { quotas } : {}),
+        ...(this.options.autoUpdate ? { updateFailure: reportedUpdateFailure(this.updateStateFile, DAEMON_VERSION) } : {}),
       }
-      const { leases, revoked, cloudCredential, deviceCommands } = await link.heartbeat(deviceId, heartbeat)
+      const { leases, revoked, cloudCredential, deviceCommands, daemonVersions } = await link.heartbeat(deviceId, heartbeat)
+      this.offerUpdate(daemonVersions?.latest)
       this.supervisor.renewLeases(leases)
       if (revoked) this.supervisor.revokeLeases(revoked)
       if (this.options.cloudComputer && cloudCredential && this.device.credential === credential) {
@@ -1241,6 +1244,13 @@ export class Daemon {
     const claim = this.claimAndStartInternal(runId)
     this.claims.set(runId, claim)
     try { return await claim }
+    catch (error) {
+      if (error instanceof RunNotPinnedHereError && error.upgradeRequired) {
+        this.log.warn({ run_id: runId }, 'server requires a newer daemon; checking for an update')
+        this.checkAutoUpdate(true)
+      }
+      throw error
+    }
     finally {
       this.claims.delete(runId)
       this.claimsInFlight--
@@ -1528,19 +1538,30 @@ export class Daemon {
     }).finally(() => { this.maintenance = null })
   }
 
-  private checkAutoUpdate() {
+  private get updateStateFile() { return join(this.paths.dataDir, 'auto-update.json') }
+
+  /** The server names a newer release: install it when idle (checkAutoUpdate), unless that version is backing off. */
+  private offerUpdate(latest: string | undefined) {
+    if (!this.options.autoUpdate || this.updating || this.updateVersion || !newerStableVersion(latest, DAEMON_VERSION)) return
+    if (updateAllowed(this.updateStateFile, latest)) this.updateVersion = latest
+  }
+
+  private checkAutoUpdate(urgent = false) {
     const runtime = this.options.autoUpdate
     if (!runtime || this.draining || this.updating) return
     if (this.updateVersion && this.maintenanceIdle()) {
       const version = this.updateVersion
       this.updateVersion = undefined
+      if (!updateAllowed(this.updateStateFile, version)) return
+      let code: 'install_failed' | 'restart_failed' = 'install_failed'
       this.startMaintenance(async () => {
         await runtime.install(version)
         if (this.stopped) return
+        code = 'restart_failed'
         await restartService(false, () => {}, undefined, () => !this.stopped)
-      })
+      }, () => { recordUpdateFailure(this.updateStateFile, version, code) })
     } else if (!this.updateCheck && !this.updateVersion) {
-      this.updateCheck = checkLatestVersion(join(this.paths.dataDir, 'auto-update.json'), DAEMON_VERSION, runtime)
+      this.updateCheck = checkLatestVersion(this.updateStateFile, DAEMON_VERSION, runtime, Date.now(), urgent)
         .then(version => { this.updateVersion = version })
         .catch(() => { this.log.warn('Daemon automatic update check failed') })
         .finally(() => { this.updateCheck = null })
