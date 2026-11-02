@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react'
 import useSWR, { useSWRConfig } from 'swr'
 import { useFormatter, useTranslations } from 'next-intl'
 import { SquareKanban, X } from 'lucide-react'
-import { getIssueThread, sendIssueThreadMessage, stopRun } from '@/app/actions/agents'
+import { getIssueThread, getThreadChanges, sendIssueThreadMessage, stopRun } from '@/app/actions/agents'
 import { runFailureText, runIsActive, runStopTimeoutRemaining, threadItems } from '@/lib/issue-run-conversation'
 import { ThreadSteps } from './thread-steps'
 import { threadQuestionView, type IssueThread } from '@/lib/issue-threads'
@@ -26,6 +26,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem,
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { AcceptanceStateBadge, useThreadAcceptance } from './factory-acceptance'
 import { FactoryAcceptancePane } from './factory-acceptance-pane'
+import { ChangesTabLabel, ThreadChangesPane } from './thread-changes'
 
 import { openArtifact } from './workspace-navigation'
 import { ThreadFeedback } from './self-improvement'
@@ -40,7 +41,7 @@ const BUBBLE = 'max-w-[85%] rounded-2xl bg-muted px-3.5 py-2 text-sm/5.25 whites
  * It sits in the right column beside the chat or the task with a close button, wherever it
  * was opened from (R-82); the header names the bot that dispatched it.
  */
-type ThreadTab = 'chat' | 'acceptance'
+type ThreadTab = 'chat' | 'changes' | 'acceptance'
 type IssueThreadPanelProps = { /** The task it works on; null for a thread with no task. */ issueId: string | null; runId: string; onClose: () => void; /** Inside the Artifact window: no header, the window has its own. */ bare?: boolean; /** Open on 验收 when this thread produced a candidate waiting for acceptance. */ initialTab?: ThreadTab; /** Open another thread (an independent review or verify) from 验收. */ onOpenThread?: (runId: string) => void; /** Beside a chat: the task it works on, as a header link. */ onOpenTask?: () => void }
 
 export function IssueThreadPanel(props: IssueThreadPanelProps) {
@@ -62,6 +63,10 @@ function ThreadPanel({ issueId, runId, onClose, bare = false, initialTab = 'chat
   const acceptance = useThreadAcceptance(issueId, runId)
   const [tab, setTab] = useState<ThreadTab>(initialTab)
   const accepting = !bare && Boolean(acceptance) && tab === 'acceptance'
+  // 改动 (Figma 820:4843): the agent's work tree diff, read-only, once the run saved one.
+  const { data: changes, mutate: mutateChanges } = useSWR(bare ? null : ['thread-changes', issueId, runId], () => getThreadChanges(issueId, runId))
+  const hasChanges = !!changes && changes.state !== 'none'
+  const viewingChanges = hasChanges && tab === 'changes'
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
   const [sendFailed, setSendFailed] = useState(false)
@@ -91,6 +96,8 @@ function ThreadPanel({ issueId, runId, onClose, bare = false, initialTab = 'chat
     const timer = setTimeout(() => setStopFailed(true), runStopTimeoutRemaining(requestedAt))
     return () => clearTimeout(timer)
   }, [active, requestedAt])
+  // The run saves its work as it goes; read it again when its state moves.
+  useEffect(() => { void mutateChanges() }, [view?.status, mutateChanges])
   useEffect(() => {
     // Acknowledgement updates the task's thread list as soon as this panel sees it.
     void mutateCache(['issue-threads', issueId])
@@ -127,12 +134,21 @@ function ThreadPanel({ issueId, runId, onClose, bare = false, initialTab = 'chat
       <ThreadArtifacts runId={runId} status={data?.thread.status ?? ''} />
       {onOpenTask && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className="shrink-0 text-muted-foreground" aria-label={t('openTask')} onClick={onOpenTask} />}><SquareKanban data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{t('openTask')}</TooltipContent></Tooltip>}
       {/* Frame 06 draws the machine in the wide centre-column header; the side panel has no room for it. */}
-      {acceptance && <Tabs value={tab} onValueChange={value => setTab(value as ThreadTab)} className="shrink-0 max-sm:order-last max-sm:w-full">
+      {acceptance && !hasChanges && <Tabs value={tab} onValueChange={value => setTab(value as ThreadTab)} className="shrink-0 max-sm:order-last max-sm:w-full">
         <TabsList className="max-sm:w-full"><TabsTrigger value="chat">{t('chatTab')}</TabsTrigger><TabsTrigger value="acceptance">{t('acceptanceTab')}</TabsTrigger></TabsList>
       </Tabs>}
       <Button variant="ghost" size="icon-sm" aria-label={t('close')} onClick={onClose}><X data-icon="inline-start" /></Button>
     </header>}
-    {accepting && acceptance ? <div className="flex min-h-0 flex-1 flex-col"><FactoryAcceptancePane task={acceptance} onOpenThread={onOpenThread} /></div> : <>
+    {/* With 改动 the tabs get their own row: the side panel has no room for them beside the title. */}
+    {!bare && hasChanges && <div className="flex shrink-0 items-center px-3 pt-2">
+      <Tabs value={tab} onValueChange={value => setTab(value as ThreadTab)}>
+        <TabsList><TabsTrigger value="chat">{t('chatTab')}</TabsTrigger><TabsTrigger value="changes" className="gap-1.5"><ChangesTabLabel changes={changes.state === 'ready' ? changes.changes : null} /></TabsTrigger>{acceptance && <TabsTrigger value="acceptance">{t('acceptanceTab')}</TabsTrigger>}</TabsList>
+      </Tabs>
+    </div>}
+    {viewingChanges ? (changes.state === 'ready'
+      ? <ThreadChangesPane changes={changes.changes} />
+      : <p className="p-4 text-sm text-muted-foreground">{t('changesTooLarge')}</p>)
+    : accepting && acceptance ? <div className="flex min-h-0 flex-1 flex-col"><FactoryAcceptancePane task={acceptance} onOpenThread={onOpenThread} /></div> : <>
     <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-4">
       {error ? <InlineLoadError message={t('loadFailed')} retryLabel={t('retry')} onRetry={() => { void mutate() }} />
         : !data ? <div role="status" aria-label={t('loading')} className="flex flex-col gap-3"><Skeleton className="h-5 w-40" /><Skeleton className="ml-auto h-12 w-3/4" /><Skeleton className="h-12 w-2/3" /></div>
