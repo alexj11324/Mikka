@@ -1,5 +1,6 @@
 'use server'
 
+import { withFreshSession } from '@/lib/fresh-session'
 import { headers } from 'next/headers'
 import type { ActionResult } from '@/lib/action-result'
 import type { AppAccess, PolicyApp } from '@/lib/app-policy/apps'
@@ -17,9 +18,12 @@ export async function getAppPolicy(workspaceId?: string): Promise<ActionResult<A
 }
 
 /** Admins only; audited as integration.permission_changed. */
-export async function updateAppPolicy(input: { app: PolicyApp; access: AppAccess }, workspaceId?: string): Promise<ActionResult<AppPolicyView>> {
+async function updateAppPolicyBody(input: { app: PolicyApp; access: AppAccess }, workspaceId?: string): Promise<ActionResult<AppPolicyView>> {
   return workspaceAction(async () => {
     const actor = await currentWorkspaceActor(workspaceId)
     return setAppPolicy({ id: actor.userId, name: actor.name }, actor.workspaceId, input, auditRequestContext(await headers()))
   })
 }
+
+// Money, permissions, credentials and deletion: the session is read from the database, not the cookie cache.
+export async function updateAppPolicy(...args: Parameters<typeof updateAppPolicyBody>) { return withFreshSession(() => updateAppPolicyBody(...args)) }

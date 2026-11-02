@@ -1,3 +1,4 @@
+import { freshSessionRoute } from '@/lib/fresh-session'
 import { GitHubAccessError, listAuthorizedRepositories } from '@/lib/github/user-access'
 import { auth } from '@/lib/api-auth'
 import { auth as sessionAuth } from '@/lib/auth'
@@ -34,4 +35,7 @@ async function handleDELETE(request: Request) {
 }
 
 export const GET = withRequestLog('/api/integrations/github', handleGET)
-export const DELETE = withRequestLog('/api/integrations/github', handleDELETE)
+const DELETEBody = withRequestLog('/api/integrations/github', handleDELETE)
+
+// Credentials, permissions, money and deletion: the session is read from the database, not the cookie cache.
+export const DELETE = freshSessionRoute(DELETEBody)

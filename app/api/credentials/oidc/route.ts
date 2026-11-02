@@ -1,3 +1,4 @@
+import { freshSessionRoute } from '@/lib/fresh-session'
 import { getVercelOidcToken } from '@vercel/oidc'
 import { randomUUID } from 'node:crypto'
 import { CredentialError } from '@/lib/credentials/contracts'
@@ -7,7 +8,7 @@ import { checkCredentialRequest, credentialFailure, privateHeaders } from '@/lib
 export const maxDuration = 60
 /** Vercel deployment protection controls access to this Preview-only probe.
  * It returns four authorization booleans, no credentials or account data. */
-export async function POST(request: Request) {
+async function POSTBody(request: Request) {
   try {
     if (process.env.VERCEL_ENV !== 'preview') throw new CredentialError('credential_denied', 404)
     checkCredentialRequest(request)
@@ -27,3 +28,6 @@ export async function POST(request: Request) {
     return Response.json({ app: { ownRole, crossRole }, broker: { ownRole: broker.ownRole, crossRole: broker.crossRole, sameContext: broker.sameContext, wrongOwnerRejected: broker.wrongOwnerRejected } }, { headers: privateHeaders })
   } catch (error) { return credentialFailure(error) }
 }
+
+// Credentials, permissions, money and deletion: the session is read from the database, not the cookie cache.
+export const POST = freshSessionRoute(POSTBody)

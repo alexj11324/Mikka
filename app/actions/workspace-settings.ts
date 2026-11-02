@@ -1,5 +1,6 @@
 'use server'
 
+import { withFreshSession } from '@/lib/fresh-session'
 import { cookies, headers } from 'next/headers'
 import type { ActionResult } from '@/lib/action-result'
 import { auditRequestContext } from '@/lib/audit/record'
@@ -30,7 +31,7 @@ export async function getWorkspaceDeletionImpact(workspaceId?: string): Promise<
  * 设置 › 工作区 › 常规: name, URL slug (the old one keeps redirecting) and icon. Admins only.
  * `workspaceId` is the workspace the settings page shows; without it the current one.
  */
-export async function updateWorkspace(input: UpdateWorkspaceInput, workspaceId?: string): Promise<ActionResult<WorkspaceGeneral>> {
+async function updateWorkspaceBody(input: UpdateWorkspaceInput, workspaceId?: string): Promise<ActionResult<WorkspaceGeneral>> {
   return workspaceAction(async () => {
     const actor = await currentWorkspaceActor(workspaceId)
     const saved = await updateWorkspaceGeneral(actor.userId, actor.workspaceId, input, auditRequestContext(await headers()))
@@ -47,7 +48,7 @@ export async function getWorkspaceTransferTargets(workspaceId?: string): Promise
 }
 
 /** 转让工作区 to another active member; a member is promoted to admin. */
-export async function transferWorkspace(toUserId: string, workspaceId?: string): Promise<ActionResult<{ owner: WorkspaceTransferTarget }>> {
+async function transferWorkspaceBody(toUserId: string, workspaceId?: string): Promise<ActionResult<{ owner: WorkspaceTransferTarget }>> {
   return workspaceAction(async () => {
     const actor = await currentWorkspaceActor(workspaceId)
     const { owner } = await transferWorkspaceOwnership(actor.userId, actor.workspaceId, toUserId, auditRequestContext(await headers()))
@@ -61,7 +62,7 @@ export async function transferWorkspace(toUserId: string, workspaceId?: string):
  * other members fall back to their first remaining workspace on their next
  * request, because the cookie only ever selects among active memberships.
  */
-export async function deleteWorkspace(id: string, confirmName: string): Promise<ActionResult<WorkspaceDeletion>> {
+async function deleteWorkspaceBody(id: string, confirmName: string): Promise<ActionResult<WorkspaceDeletion>> {
   return workspaceAction(async () => {
     const actor = await currentWorkspaceActor()
     const result = await deleteWorkspaceData(actor.userId, id, confirmName)
@@ -77,7 +78,7 @@ export async function deleteWorkspace(id: string, confirmName: string): Promise<
  * 移除成员 from the current workspace. `memberId` is the member's user id.
  * `transferTo` (optional) hands their bots in this workspace to another member.
  */
-export async function removeWorkspaceMember(memberId: string, options: { transferTo?: string } = {}): Promise<ActionResult<MemberRemoval>> {
+async function removeWorkspaceMemberBody(memberId: string, options: { transferTo?: string } = {}): Promise<ActionResult<MemberRemoval>> {
   return workspaceAction(async () => {
     const actor = await currentWorkspaceActor()
     const { label: _label, ...removed } = await removeMember(actor.userId, actor.workspaceId, memberId, options.transferTo, auditRequestContext(await headers()))
@@ -95,9 +96,16 @@ export async function listArchivedBots(workspaceId?: string): Promise<ActionResu
 }
 
 /** 接管: the bot becomes the admin's own and runs on the admin's resources. */
-export async function takeOverArchivedBot(botId: string, workspaceId?: string): Promise<ActionResult<AssetTransfer>> {
+async function takeOverArchivedBotBody(botId: string, workspaceId?: string): Promise<ActionResult<AssetTransfer>> {
   return workspaceAction(async () => {
     const actor = await currentWorkspaceActor(workspaceId)
     return takeOverBot(actor.userId, actor.workspaceId, botId)
   })
 }
+
+// Money, permissions, credentials and deletion: the session is read from the database, not the cookie cache.
+export async function updateWorkspace(...args: Parameters<typeof updateWorkspaceBody>) { return withFreshSession(() => updateWorkspaceBody(...args)) }
+export async function transferWorkspace(...args: Parameters<typeof transferWorkspaceBody>) { return withFreshSession(() => transferWorkspaceBody(...args)) }
+export async function deleteWorkspace(...args: Parameters<typeof deleteWorkspaceBody>) { return withFreshSession(() => deleteWorkspaceBody(...args)) }
+export async function removeWorkspaceMember(...args: Parameters<typeof removeWorkspaceMemberBody>) { return withFreshSession(() => removeWorkspaceMemberBody(...args)) }
+export async function takeOverArchivedBot(...args: Parameters<typeof takeOverArchivedBotBody>) { return withFreshSession(() => takeOverArchivedBotBody(...args)) }

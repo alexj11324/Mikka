@@ -1,5 +1,6 @@
 'use server'
 
+import { withFreshSession } from '@/lib/fresh-session'
 import { headers } from 'next/headers'
 import { auditRequestContext } from '@/lib/audit/events'
 import { secretAuditHook } from '@/lib/secrets/audit'
@@ -22,22 +23,22 @@ const withActor = <T>(fn: (userId: string, workspaceId: string, audit: SecretAud
 export async function listSecrets(workspaceId?: string): Promise<SettingsActionResult<{ secrets: WorkspaceSecretView[]; role: WorkspaceRole }>> {
   return withActor(async (u, w) => { const [secrets, role] = await Promise.all([listWorkspaceSecrets(u, w), workspaceRole(u, w)]); return { secrets, role } }, workspaceId)
 }
-export async function createSecret(input: { name: string; kind: 'secret' | 'env'; value: string; scope?: { type: 'workspace' } | { type: 'repository'; repository: string } }, workspaceId?: string): Promise<SettingsActionResult<SavedSecretView>> {
+async function createSecretBody(input: { name: string; kind: 'secret' | 'env'; value: string; scope?: { type: 'workspace' } | { type: 'repository'; repository: string } }, workspaceId?: string): Promise<SettingsActionResult<SavedSecretView>> {
   return withActor((u, w, audit) => createWorkspaceSecret(u, w, input, audit), workspaceId)
 }
-export async function replaceSecret(input: { id: string; value: string; scope?: { type: 'workspace' } | { type: 'repository'; repository: string } }, workspaceId?: string): Promise<SettingsActionResult<SavedSecretView>> {
+async function replaceSecretBody(input: { id: string; value: string; scope?: { type: 'workspace' } | { type: 'repository'; repository: string } }, workspaceId?: string): Promise<SettingsActionResult<SavedSecretView>> {
   return withActor((u, w, audit) => replaceWorkspaceSecret(u, w, input, audit), workspaceId)
 }
-export async function deleteSecret(input: { id: string }, workspaceId?: string): Promise<SettingsActionResult<{ id: string }>> {
+async function deleteSecretBody(input: { id: string }, workspaceId?: string): Promise<SettingsActionResult<{ id: string }>> {
   return withActor((u, w, audit) => deleteWorkspaceSecret(u, w, input, audit), workspaceId)
 }
 export async function getE2BKey(workspaceId?: string): Promise<SettingsActionResult<E2BKeyStatus>> {
   return withActor((u, w) => getE2BKeyStatus(u, w), workspaceId)
 }
-export async function saveE2BKey(input: { apiKey: string }, workspaceId?: string): Promise<SettingsActionResult<E2BKeyStatus>> {
+async function saveE2BKeyBody(input: { apiKey: string }, workspaceId?: string): Promise<SettingsActionResult<E2BKeyStatus>> {
   return withActor((u, w, audit) => setE2BKey(u, w, input, { audit }), workspaceId)
 }
-export async function deleteE2BKey(workspaceId?: string): Promise<SettingsActionResult<{ removed: boolean }>> {
+async function deleteE2BKeyBody(workspaceId?: string): Promise<SettingsActionResult<{ removed: boolean }>> {
   return withActor((u, w, audit) => removeE2BKey(u, w, audit), workspaceId)
 }
 
@@ -48,3 +49,10 @@ export async function getE2BKeyCapability(workspaceId?: string) {
     return getE2BKeyCapabilityForUser(actor.userId, actor.workspaceId)
   })
 }
+
+// Money, permissions, credentials and deletion: the session is read from the database, not the cookie cache.
+export async function createSecret(...args: Parameters<typeof createSecretBody>) { return withFreshSession(() => createSecretBody(...args)) }
+export async function replaceSecret(...args: Parameters<typeof replaceSecretBody>) { return withFreshSession(() => replaceSecretBody(...args)) }
+export async function deleteSecret(...args: Parameters<typeof deleteSecretBody>) { return withFreshSession(() => deleteSecretBody(...args)) }
+export async function saveE2BKey(...args: Parameters<typeof saveE2BKeyBody>) { return withFreshSession(() => saveE2BKeyBody(...args)) }
+export async function deleteE2BKey(...args: Parameters<typeof deleteE2BKeyBody>) { return withFreshSession(() => deleteE2BKeyBody(...args)) }
