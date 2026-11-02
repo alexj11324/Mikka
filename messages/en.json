@@ -3823,6 +3823,11 @@
   "DeviceAuthorization": {
     "title": "Connect this computer",
     "code": "Terminal verification code",
+    "device": "Computer",
+    "deviceUnreported": "Name not reported",
+    "clientVersion": "Client {version}",
+    "access": "Access",
+    "codeMatches": "The terminal shows this same code",
     "continue": "Continue",
     "loading": "Loading…",
     "scope": "Run your threads",

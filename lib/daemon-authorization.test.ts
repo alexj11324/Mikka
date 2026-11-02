@@ -116,3 +116,23 @@ test('a failed mint cannot leave a valid temporary session, and unrelated auth r
   assert.equal(await exchangeDaemonSession({ ...input, newSession: null }, dependencies), null)
   assert.equal(await exchangeDaemonSession({ ...input, returned: { error: 'authorization_pending' } }, dependencies), null)
 })
+
+test('the machine asking to connect is shown only to the person who claimed its code (RFC 8628 §5.4)', async () => {
+  const f = fixture()
+  const owner = await f.signIn('owner')
+  const other = await f.signIn('other')
+  const started = await f.post('/device/code', { client_id: 'mikka-daemon', device_name: 'build-box‮', device_platform: 'linux', client_version: '0.9.1' })
+  assert.equal(started.status, 200)
+  const { user_code } = await started.json() as { user_code: string }
+  const seen = await (await f.review(user_code, owner)).json()
+  // Control and bidi characters are dropped, so the name cannot be made to read as another one.
+  assert.deepEqual({ name: seen.device_name, platform: seen.device_platform, version: seen.client_version }, { name: 'build-box', platform: 'linux', version: '0.9.1' })
+  const stranger = await (await f.review(user_code, other)).json()
+  assert.equal(stranger.device_name, undefined)
+  assert.equal(stranger.client_id, undefined)
+  // An older daemon reports nothing; its code still works and the page says so.
+  const legacy = await f.code()
+  const legacySeen = await (await f.review(legacy.user_code, owner)).json()
+  assert.deepEqual([legacySeen.device_name, legacySeen.device_platform, legacySeen.client_version], [null, null, null])
+  assert.equal((await f.post('/device/code', { client_id: 'mikka-daemon', device_name: 'x'.repeat(5000) })).status, 400)
+})

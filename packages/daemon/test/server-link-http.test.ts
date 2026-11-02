@@ -18,6 +18,7 @@ import { HttpServerLink, LIVENESS_UNREACHABLE_GRACE_MS, SessionRejectedError } f
 import { Daemon } from "../src/main"
 import { readJson, writeJsonAtomic } from "../src/fs-util"
 import { createLogger } from "../src/log"
+import { DAEMON_VERSION } from "../src/paths"
 import { cleanupTempDirs, tempDir } from "./helpers"
 
 afterEach(cleanupTempDirs)
@@ -431,6 +432,7 @@ describe("mikka daemon login (device authorization)", () => {
     const token = await deviceLogin({
       serverUrl: "http://server.test",
       fetchImpl: fetch,
+      deviceName: "build-box",
       prompt: (code) => shown.push(code.user_code),
       sleep: async (ms) => {
         waits.push(ms)
@@ -438,7 +440,13 @@ describe("mikka daemon login (device authorization)", () => {
     })
     expect(token).toBe(`orv_${'d'.repeat(43)}`)
     expect(shown).toEqual(["ABCD-EFGH"])
-    expect(calls[0]?.body).toEqual({ client_id: "mikka-daemon" })
+    // The approval page shows which machine asks (RFC 8628 §5.4).
+    expect(calls[0]?.body).toEqual({
+      client_id: "mikka-daemon",
+      device_name: "build-box",
+      device_platform: process.platform,
+      client_version: DAEMON_VERSION,
+    })
     expect(calls[1]?.body).toEqual({
       grant_type: "urn:ietf:params:oauth:grant-type:device_code",
       device_code: "dc-1",
