@@ -393,6 +393,16 @@ export interface ChatView {
   artifacts: Record<string, ArtifactSummary>
 }
 
+/** The reasoning text of this person's stored messages at `positions` in one chat, in order; stored messages are already masked (appendMessages). */
+export async function storedReasoning(userId: string, botId: string, positions: readonly number[]): Promise<string[]> {
+  if (!positions.length) return []
+  const rows = await db.select({ message: coordinatorMessages.message }).from(coordinatorMessages)
+    .where(and(messagesOf(userId, botId), inArray(coordinatorMessages.position, [...positions]))).orderBy(asc(coordinatorMessages.position))
+  return rows.flatMap(({ message }) => message.role === 'assistant' && Array.isArray(message.content)
+    ? (message.content as { type?: unknown; text?: unknown }[]).flatMap(part => part.type === 'reasoning' && typeof part.text === 'string' && part.text.trim() ? [part.text] : [])
+    : [])
+}
+
 /** Looks up the issues and runs cited in `texts`, and the `threads` dispatched, keeping only what `userId` may see. */
 export async function citationSources(userId: string, texts: readonly string[], threads: readonly string[] = []): Promise<Record<string, CitationSource>> {
   const cited = citedIds(texts)
@@ -402,7 +412,7 @@ export async function citationSources(userId: string, texts: readonly string[], 
   if (issueIds.length) {
     const rows = await db.selectDistinct({ id: issues.id, ownerId: issues.userId, scope: issues.scope, title: issues.title, status: issues.status, priority: issues.priority, content: issues.content })
       .from(issues).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId)))
-      .where(and(inArray(issues.id, issueIds), (await issueVisibility(userId)).predicate))
+      .where(and(inArray(issues.id, issueIds), (await issueVisibility(userId, false, undefined, db, { onlyIssueIds: issueIds })).predicate))
     const identifiers = await taskIdentifiers(rows.map(row => ({ id: row.id, ownerId: row.ownerId, scope: row.scope, number: readIssueMetadata(row.content).number })))
     for (const { content, ownerId: _owner, scope: _scope, ...row } of rows) {
       const metadata = readIssueMetadata(content)

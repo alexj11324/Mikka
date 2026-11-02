@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 import { Pool } from 'pg'
 import { handleGroup, type GroupRequest } from '../group-conversations-store'
-import { GroupJudgmentPendingError, processGroupTurn, runGroupRounds, untilStopped, type GroupAgent, type GroupRuntime } from './group-turns'
+import { GroupJudgmentPendingError, groupsWithPendingTurns, hasPendingGroupTurn, processGroupTurn, runGroupRounds, untilStopped, type GroupAgent, type GroupRuntime } from './group-turns'
 import { checkedCorrection, checkedRoute } from './group-correction'
 import { createGroupJudgment } from './group-judgment'
 import { DECISION_MODEL, type DecisionAnswer } from './decision'
@@ -188,7 +188,14 @@ test('PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, ro
     const status = await handleGroup(scoped,directory,{...base,method:'GET',resource:'messages',id},true)
     assert.equal((status.body as {agentStatus:{agentId:string}}).agentStatus.agentId,a)
     assert.equal((await handleGroup(scoped,directory,{...base,userId:'outsider',method:'GET',resource:'messages',id},true)).status,404)
-    await send(other,'independent',[a]); assert.equal(await processGroupTurn(scoped,other,runtime),true)
+    // The minute sweep and a history read see a group's pending turn; once it ran, neither does.
+    assert.equal(await hasPendingGroupTurn(scoped,other),false)
+    await send(other,'independent',[a])
+    assert.equal(await hasPendingGroupTurn(scoped,other),true)
+    assert.ok((await groupsWithPendingTurns(scoped)).includes(other))
+    assert.equal(await processGroupTurn(scoped,other,runtime),true)
+    assert.equal(await hasPendingGroupTurn(scoped,other),false)
+    assert.equal((await groupsWithPendingTurns(scoped)).includes(other),false)
     unblock(); assert.equal(await running,true)
     assert.equal((await activeRuns()).length,0)
     assert.equal((await scoped.query('SELECT status FROM agent_runs WHERE id=$1',[active[0].id])).rows[0].status,'succeeded')

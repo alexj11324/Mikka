@@ -1,24 +1,52 @@
 import type { CoordinatorStreamEvent } from './coordinator/stream'
 
+/** A tool a live reply is using, as the stream reports it. */
+export type CoordinatorLiveTool = { call: string; name: string; state: 'running' | 'done' | 'error'; input?: string; output?: string }
+
 export type CoordinatorLiveReply = {
   id: string
   text: string
   committedThrough?: number
   quiet?: boolean
+  /** Tools in the order they were called; each keeps its latest state. */
+  tools?: CoordinatorLiveTool[]
+  /** How long the model has thought so far (`ms`), since when it is thinking now, and what it thought (masked; only when readable). */
+  thinking?: { ms: number; since?: number; text?: string }
 }
 
-export function coordinatorStreamReply(replies: CoordinatorLiveReply[], event: CoordinatorStreamEvent): CoordinatorLiveReply[] {
+/** `now` is when the event arrived; thinking time is measured from these. */
+export function coordinatorStreamReply(replies: CoordinatorLiveReply[], event: CoordinatorStreamEvent, now = Date.now()): CoordinatorLiveReply[] {
   if (event.type === 'error') throw new Error('Coordinator stream failed')
   if (event.type === 'start') return [...replies.filter(reply => reply.id !== event.id), { id: event.id, text: '' }]
-  return replies.map(reply => reply.id !== event.id ? reply : event.type === 'text'
-    ? { ...reply, text: reply.text + event.delta }
-    : event.type === 'reset'
-      ? { ...reply, text: event.text }
-      : { ...reply, committedThrough: event.through, quiet: event.quiet })
+  return replies.map(reply => {
+    if (reply.id !== event.id) return reply
+    if (event.type === 'text') return { ...reply, text: reply.text + event.delta }
+    if (event.type === 'reset') return { ...reply, text: event.text }
+    if (event.type === 'tool') {
+      const { type: _type, id: _id, ...tool } = event
+      const tools = reply.tools ?? []
+      const at = tools.findIndex(item => item.call === tool.call)
+      // A result keeps the input preview its call carried.
+      return { ...reply, tools: at < 0 ? [...tools, tool] : tools.map((item, index) => index === at ? { ...item, ...tool, ...(tool.input ?? item.input ? { input: tool.input ?? item.input } : {}) } : item) }
+    }
+    if (event.type === 'thinking') {
+      const thinking = reply.thinking ?? { ms: 0 }
+      if (event.state === 'start') return thinking.since === undefined ? { ...reply, thinking: { ...thinking, since: now } } : reply
+      if (thinking.since === undefined) return reply
+      const text = [thinking.text, event.text].filter(Boolean).join('\n\n')
+      return { ...reply, thinking: { ms: thinking.ms + Math.max(0, now - thinking.since), ...(text ? { text } : {}) } }
+    }
+    return { ...reply, committedThrough: event.through, quiet: event.quiet }
+  })
+}
+
+/** Whether a live reply has anything to show yet: text, a tool or thinking. */
+function shows(reply: CoordinatorLiveReply) {
+  return Boolean(reply.text || reply.tools?.length || reply.thinking)
 }
 
 export function visibleCoordinatorReplies(replies: CoordinatorLiveReply[], cursor: number | undefined, runId: string | undefined, persistedStreamIds?: string[]) {
-  return replies.filter(reply => reply.text && !reply.quiet && !persistedStreamIds?.includes(reply.id) && (reply.committedThrough === undefined
+  return replies.filter(reply => shows(reply) && !reply.quiet && !persistedStreamIds?.includes(reply.id) && (reply.committedThrough === undefined
     ? Boolean(runId && reply.id.startsWith(`${runId}:`))
     : cursor === undefined || cursor < reply.committedThrough))
 }
@@ -33,6 +61,13 @@ function parseEvent(line: string): CoordinatorStreamEvent {
       if (event.type === 'reset' && typeof event.text === 'string') return { type: 'reset', id: event.id, text: event.text }
       if (event.type === 'committed' && Number.isSafeInteger(event.through) && event.through >= 0 && typeof event.quiet === 'boolean') {
         return { type: 'committed', id: event.id, through: event.through, quiet: event.quiet }
+      }
+      if (event.type === 'tool' && typeof event.call === 'string' && typeof event.name === 'string' && ['running', 'done', 'error'].includes(event.state)) {
+        return { type: 'tool', id: event.id, call: event.call, name: event.name, state: event.state,
+          ...(typeof event.input === 'string' ? { input: event.input } : {}), ...(typeof event.output === 'string' ? { output: event.output } : {}) }
+      }
+      if (event.type === 'thinking' && (event.state === 'start' || event.state === 'end')) {
+        return { type: 'thinking', id: event.id, state: event.state, ...(event.state === 'end' && typeof event.text === 'string' && event.text ? { text: event.text } : {}) }
       }
     }
   }

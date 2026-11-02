@@ -12,7 +12,7 @@ import { CLOUD_WORKER_COMMAND } from '@/lib/computer/worker-command'
 import { e2bApiKey, taskTemplate, withE2BErrors } from '@/lib/secrets/e2b-runtime'
 import type { Actor } from './subagents'
 import { afterRunEnded } from '@/lib/run-completion-effects'
-import { workspaceSecretMasker } from '@/lib/secrets/runtime'
+import { secretMaskerFor } from '@/lib/secrets/runtime'
 import { readWorkerTail, saveWorkerTail, workerCommand, workerOutputForwarder } from './thread-worker-logs'
 import { credentialProbeCommand, credentialScrubCommand } from '../../packages/daemon/src/credential-globs'
 /** A thread machine runs on its owner's own E2B key (orchestration § 2); this module only acts for that owner. */
@@ -143,7 +143,7 @@ export async function parkThreadMachine(pool: Pool, actor: Actor, runId: string,
   const machine = (await pool.query(`SELECT "sandboxId","deviceId",state FROM thread_machines WHERE "runId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3`, [runId, actor.userId, actor.workspaceId])).rows[0]
   if (!machine?.sandboxId || machine.state === 'ended' || machine.state === 'paused') return
   // What the run's worker printed, kept with the machine before it sleeps. Best effort.
-  await saveWorkerTail(pool, runId, await readTail(machine.sandboxId), await workspaceSecretMasker(actor.workspaceId)).catch(() => undefined)
+  await saveWorkerTail(pool, runId, await readTail(machine.sandboxId), await secretMaskerFor({ workspaceId: actor.workspaceId, ownerId: actor.userId })).catch(() => undefined)
   await pause(machine.sandboxId)
   const client = await pool.connect()
   try {
@@ -157,7 +157,7 @@ export async function parkThreadMachine(pool: Pool, actor: Actor, runId: string,
 
 /** The worker's last output, saved before a kill; never throws, never waits past readWorkerTail's timeout. */
 export async function keepTailBeforeKill(pool: Pick<Pool, 'query'>, actor: Actor, runId: string, sandboxId: string, readTail: (sandboxId: string) => Promise<string | null> = id => readWorkerTail(() => connectComputer(actor.workspaceId, id))) {
-  try { await saveWorkerTail(pool, runId, await readTail(sandboxId), await workspaceSecretMasker(actor.workspaceId)) } catch { /* the kill goes ahead */ }
+  try { await saveWorkerTail(pool, runId, await readTail(sandboxId), await secretMaskerFor({ workspaceId: actor.workspaceId, ownerId: actor.userId })) } catch { /* the kill goes ahead */ }
 }
 
 /** Closed, duplicate or deleted tasks give up their paused sandboxes for good (kill, device retired). */
@@ -344,7 +344,7 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
     await sandbox.commands.run(`install -d -o user -g user -m 700 /home/user/.mikka; install -o user -g user -m 600 ${handoff} /home/user/.mikka/bootstrap.next; mv /home/user/.mikka/bootstrap.next /home/user/.mikka/bootstrap.json; unlink ${handoff}`, { user: 'root', timeoutMs: 10_000 })
     // The worker's output streams into the server logs only while this invocation lives;
     // the tee'd file in the sandbox keeps it for later reads (park, failure, end).
-    const mask = await workspaceSecretMasker(actor.workspaceId)
+    const mask = await secretMaskerFor({ workspaceId: actor.workspaceId, ownerId: actor.userId })
     await sandbox.commands.run(workerCommand(CLOUD_WORKER_COMMAND), { user: 'user', background: true, timeoutMs: 0, ...workerOutputForwarder(runId, mask) })
     const deadline = Date.now() + 30_000
     let ready = false

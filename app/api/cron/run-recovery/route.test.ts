@@ -24,6 +24,12 @@ mock.module(new URL('../../../../lib/cloud-computer/workspace-teardown.ts', impo
   retrySandboxKills: async () => { retried++; return { killed: 1, pending: 1 } },
 } })
 mock.module(new URL('../../../../lib/db/index.ts', import.meta.url).href, { namedExports: { pool: {}, db: {} } })
+let swept: number[] = []
+mock.module(new URL('../../../../lib/group-conversations-route.ts', import.meta.url).href, { namedExports: {
+  resumePendingGroupTurns: async (deadline: number) => { swept.push(deadline); return { groups: 1 } },
+} })
+const later: (() => unknown)[] = []
+mock.module('next/server', { namedExports: { after: (work: () => unknown) => { later.push(work) } } })
 let GET: typeof import('./route')['GET']
 before(async () => { ({ GET } = await import('./route')) })
 beforeEach(() => { process.env.CRON_SECRET = secret; calls = 0; fail = false })
@@ -48,8 +54,21 @@ test('recovery returns bounded counts and no private database error or cached re
   assert.equal(judged, 1)
   assert.equal(ended, 1)
   assert.equal(retried, 1)
+  // Queued group turns are resumed after the answer, within the route's 300 s.
+  assert.equal(later.length, 1)
+  await later.pop()!()
+  assert.equal(swept.length, 1)
+  assert.ok(swept[0] > Date.now() + 200_000 && swept[0] <= Date.now() + 220_000)
+  swept = []
   fail = true
   const failed = await call()
   assert.equal(failed.status, 502)
   assert.doesNotMatch(await failed.text(), /private-database-error/)
+})
+
+test('lost runs are reclaimed by this sweep only, not by the task-run poll or each heartbeat', async () => {
+  const { readFile } = await import('node:fs/promises')
+  for (const file of ['../../../actions/task-runs.ts', '../../../v1/devices/[deviceId]/heartbeat/route.ts']) {
+    assert.doesNotMatch(await readFile(new URL(file, import.meta.url), 'utf8'), /reclaimLostRuns/, file)
+  }
 })

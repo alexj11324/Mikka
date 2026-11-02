@@ -1,3 +1,4 @@
+import { freshSessionRoute } from '@/lib/fresh-session'
 import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import { AccountAuthenticationError, requireFreshAccountSession } from '@/lib/account/fresh-session'
@@ -10,7 +11,7 @@ const receipt = z.string().uuid()
 const requestBody = z.object({ email: z.string().trim().max(320), requestId: receipt }).strict()
 
 /** A caller keeps its private request UUID before POST so a lost response can be resumed. No ID appears in a URL. */
-export async function POST(request: Request) {
+async function POSTBody(request: Request) {
   if (request.headers.get('origin') !== new URL(request.url).origin) return Response.json({ error: 'originNotAllowed' }, { status: 403, headers })
   let session
   try { session = await requireFreshAccountSession(request.headers) }
@@ -33,7 +34,7 @@ export async function GET(request: Request) {
   try { return Response.json(await readAccountDeletionReceipt(input.data), { headers }) }
   catch { return Response.json({ error: 'accountDeletionUnavailable' }, { status: 404, headers }) }
 }
-export async function DELETE(request: Request) {
+async function DELETEBody(request: Request) {
   if (request.headers.get('origin') !== new URL(request.url).origin) return Response.json({ error: 'originNotAllowed' }, { status: 403, headers })
   const session = await auth.api.getSession({ headers: request.headers })
   if (!session?.user || !session.session) return Response.json({ error: 'authRequired' }, { status: 401, headers })
@@ -44,3 +45,7 @@ export async function DELETE(request: Request) {
     return Response.json({ cancelled }, { status: cancelled ? 200 : 409, headers })
   } catch { return Response.json({ error: 'accountDeletionUnavailable' }, { status: 404, headers }) }
 }
+
+// Credentials, permissions, money and deletion: the session is read from the database, not the cookie cache.
+export const POST = freshSessionRoute(POSTBody)
+export const DELETE = freshSessionRoute(DELETEBody)

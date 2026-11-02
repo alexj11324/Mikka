@@ -6,7 +6,7 @@ import { ComputerError } from '@/lib/computer/store'
 import { SubagentStore, type Actor } from './subagents'
 import { lockBrowserAuthority } from './browser-authority'
 import { browserEffects, browserMutationSchema, observationMetadata, type BrowserMutation, type VisualObservation } from './visual-contract'
-import { maskForWorkspace } from '@/lib/secrets/runtime'
+import { maskFor } from '@/lib/secrets/runtime'
 import type { judgeVisualBrowserAction } from './visual-model'
 export { browserMutationSchema } from './visual-contract'
 export type { BrowserMutation } from './visual-contract'
@@ -40,7 +40,7 @@ export async function browserAction(pool:Pool,actor:Actor,botId:string,id:string
   if (judgment.scope!=='within_task' || judgment.execution.vision!=='image-input-submitted' || judgment.execution.imageDigests[0]!==observationMetadata(observation).imageDigest) throw new ComputerError(409,'Browser judgment unavailable')
   // 4e2 item 4: the summary is persisted (pending_actions, needs, step, subagent_events). The mutation is
   // the executable action and is NOT masked (masking would type the placeholder); see #438 table.
-  const summary=await maskForWorkspace(actor.workspaceId,rawSummary)
+  const summary=await maskFor({ workspaceId: actor.workspaceId, ownerId: actor.userId },rawSummary)
   await sweepBrowserMutations(pool,actor.userId)
   const client=await pool.connect()
   let input:z.infer<typeof approvedSchema>

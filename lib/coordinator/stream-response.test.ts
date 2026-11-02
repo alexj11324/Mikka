@@ -95,3 +95,84 @@ test('split saved secrets are blocked before any secret character reaches the br
     else process.env.BETTER_AUTH_SECRET = old
   }
 })
+
+const call = (toolCallId: string, toolName: string, input: unknown) => ({ type: 'tool-call', toolCallId, toolName, input }) as unknown as CoordinatorWorkflowStreamPart
+const result = (toolCallId: string, toolName: string, output: unknown) => ({ type: 'tool-result', toolCallId, toolName, input: {}, output }) as unknown as CoordinatorWorkflowStreamPart
+const failure = (toolCallId: string, toolName: string) => ({ type: 'tool-error', toolCallId, toolName, input: {}, error: 'private failure detail' }) as unknown as CoordinatorWorkflowStreamPart
+const reasoning = (type: 'reasoning-start' | 'reasoning-end') => ({ type, id: 'r' }) as unknown as CoordinatorWorkflowStreamPart
+
+test('each tool streams its name, state and short previews; thinking streams as start and end only', async () => {
+  const events = await project([start(), reasoning('reasoning-start'), { type: 'reasoning-delta', id: 'r', text: 'private reasoning' } as CoordinatorWorkflowStreamPart, reasoning('reasoning-end'),
+    call('c1', 'create_issue', { title: 'Fix login', body: 'x'.repeat(400) }), result('c1', 'create_issue', { id: 'i1' }),
+    call('c2', 'record_attention', { level: 'high' }), result('c2', 'record_attention', {}),
+    call('c3', 'dispatch_run', { issueId: 'i1' }), failure('c3', 'dispatch_run'), delta('Done.'), committed()])
+  const steps = events.filter(event => event.type === 'tool' || event.type === 'thinking')
+  assert.deepEqual(steps.map(event => event.type === 'tool' ? [event.call, event.name, event.state] : [event.type, event.state]), [
+    ['thinking', 'start'], ['thinking', 'end'], ['c1', 'create_issue', 'running'], ['c1', 'create_issue', 'done'], ['c3', 'dispatch_run', 'running'], ['c3', 'dispatch_run', 'error'],
+  ], 'a hidden tool never shows')
+  const created = steps[2] as Extract<CoordinatorStreamEvent, { type: 'tool' }>
+  assert.equal(created.input?.length, 200, 'the input preview is as short as the stored one')
+  assert.ok(created.input?.startsWith('{"body": "xxx'), 'printed as the stored chat prints jsonb: keys in its order, ", " and ": "')
+  assert.equal((steps[3] as Extract<CoordinatorStreamEvent, { type: 'tool' }>).output, '{"id": "i1"}')
+  assert.equal(JSON.stringify(events).includes('private failure detail'), false, 'tool error details stay on the server')
+  assert.deepEqual(steps[1], { type: 'thinking', id: 'run:0', state: 'end', text: 'private reasoning' }, 'readable reasoning arrives whole when its block ends')
+})
+
+const reasoningDelta = (text: string) => ({ type: 'reasoning-delta', id: 'r', text }) as unknown as CoordinatorWorkflowStreamPart
+
+test('reasoning text is masked as a whole block; encrypted, empty or secret-holding reasoning streams no text', async () => {
+  const old = process.env.BETTER_AUTH_SECRET
+  process.env.BETTER_AUTH_SECRET = 'offline-stream-guard-fixture-secret'
+  try {
+    const secret = 'synthetic-password-value'
+    const token = 'ghp_' + 'B'.repeat(36)
+    const run = async (parts: CoordinatorWorkflowStreamPart[]) => {
+      const raw = new ReadableStream<CoordinatorWorkflowStreamPart>({ start(controller) { [start(), ...parts].forEach(part => controller.enqueue(part)); controller.close() } })
+      return (await drain(raw.pipeThrough(coordinatorTextStream('owner', [fingerprint('owner', secret)])))).filter(event => event.type === 'thinking')
+    }
+    // A credential split over deltas is masked once the block is whole; none of it streams before.
+    const split = await run([reasoning('reasoning-start'), reasoningDelta(`use ${token.slice(0, 10)}`), reasoningDelta(`${token.slice(10)} to call GitHub`), reasoning('reasoning-end')])
+    assert.equal(split.length, 2)
+    const text = (split[1] as { text?: string }).text ?? ''
+    assert.match(text, /^use .+ to call GitHub$/)
+    assert.equal(text.includes(token) || text.includes(token.slice(0, 10)), false)
+    // Encrypted reasoning (no text) or empty text: start and end only.
+    assert.deepEqual(await run([reasoning('reasoning-start'), reasoning('reasoning-end')]), [{ type: 'thinking', id: 'run:0', state: 'start' }, { type: 'thinking', id: 'run:0', state: 'end' }])
+    assert.deepEqual((await run([reasoning('reasoning-start'), reasoningDelta('  '), reasoning('reasoning-end')]))[1], { type: 'thinking', id: 'run:0', state: 'end' })
+    // A saved secret in the reasoning: the block streams no text at all.
+    const held = await run([reasoning('reasoning-start'), reasoningDelta(`the password is ${secret}`), reasoning('reasoning-end')])
+    assert.deepEqual(held[1], { type: 'thinking', id: 'run:0', state: 'end' })
+  } finally {
+    if (old === undefined) delete process.env.BETTER_AUTH_SECRET
+    else process.env.BETTER_AUTH_SECRET = old
+  }
+})
+
+test('a hand-off turn that may end quiet streams no tools or thinking', async () => {
+  const events = await project([start('run:0', true), reasoning('reasoning-start'), reasoning('reasoning-end'), call('c1', 'list_issues', {}), result('c1', 'list_issues', []), committed('run:0', 2, true)])
+  assert.deepEqual(events.map(event => event.type), ['start', 'committed'])
+})
+
+test('a tool preview that would carry a saved secret or a credential is masked or left out, never streamed', async () => {
+  const old = process.env.BETTER_AUTH_SECRET
+  process.env.BETTER_AUTH_SECRET = 'offline-stream-guard-fixture-secret'
+  try {
+    const secret = 'synthetic-password-value'
+    const raw = new ReadableStream<CoordinatorWorkflowStreamPart>({ start(controller) {
+      controller.enqueue(start())
+      controller.enqueue(call('c1', 'send_email', { to: 'a@example.com', body: `my password is ${secret}` }))
+      controller.enqueue(call('c2', 'github_call', { token: 'ghp_' + 'A'.repeat(36) }))
+      controller.enqueue(result('c2', 'github_call', { ok: true }))
+      controller.close()
+    } })
+    const events = await drain(raw.pipeThrough(coordinatorTextStream('owner', [fingerprint('owner', secret)])))
+    const tools = events.filter((event): event is Extract<CoordinatorStreamEvent, { type: 'tool' }> => event.type === 'tool')
+    assert.deepEqual(tools.map(tool => [tool.call, tool.state]), [['c1', 'running'], ['c2', 'running'], ['c2', 'done']], 'the tool itself still shows')
+    assert.equal(tools[0].input, undefined, 'a preview holding a saved secret is left out')
+    assert.equal(JSON.stringify(events).includes(secret), false)
+    assert.equal(JSON.stringify(events).includes('ghp_' + 'A'.repeat(36)), false, 'credential patterns are masked as stored messages are')
+  } finally {
+    if (old === undefined) delete process.env.BETTER_AUTH_SECRET
+    else process.env.BETTER_AUTH_SECRET = old
+  }
+})

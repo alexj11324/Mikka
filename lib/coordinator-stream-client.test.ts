@@ -51,3 +51,39 @@ test('aborting an idle reader cancels it without emitting unfinished content', a
   await reading
   assert.equal(cancelled, true)
 })
+
+test('a live reply keeps each tool in call order with its latest state, and adds up thinking time', async () => {
+  const id = 'run:0'
+  const timed: [CoordinatorStreamEvent, number][] = [
+    [{ type: 'start', id }, 0],
+    [{ type: 'thinking', id, state: 'start' }, 1_000], [{ type: 'thinking', id, state: 'start' }, 1_500], [{ type: 'thinking', id, state: 'end' }, 3_400],
+    [{ type: 'tool', id, call: 'c1', name: 'create_issue', state: 'running', input: '{"title":"Fix"}' }, 3_500],
+    [{ type: 'tool', id, call: 'c2', name: 'web_search', state: 'running' }, 3_600],
+    [{ type: 'tool', id, call: 'c1', name: 'create_issue', state: 'done', output: '{"id":"i1"}' }, 4_000],
+    [{ type: 'thinking', id, state: 'start' }, 5_000], [{ type: 'thinking', id, state: 'end' }, 6_000],
+    [{ type: 'tool', id, call: 'c2', name: 'web_search', state: 'error' }, 6_100],
+  ]
+  let replies: CoordinatorLiveReply[] = []
+  for (const [event, at] of timed) replies = coordinatorStreamReply(replies, event, at)
+  assert.deepEqual(replies[0].tools, [
+    { call: 'c1', name: 'create_issue', state: 'done', input: '{"title":"Fix"}', output: '{"id":"i1"}' },
+    { call: 'c2', name: 'web_search', state: 'error' },
+  ])
+  assert.deepEqual(replies[0].thinking, { ms: 3_400 }, 'a repeated start does not restart the clock')
+  // Readable blocks keep their text, in order; a block without text adds none.
+  let thought: CoordinatorLiveReply[] = [{ id, text: '' }]
+  for (const [event, at] of [[{ type: 'thinking', id, state: 'start' }, 0], [{ type: 'thinking', id, state: 'end', text: 'first' }, 1_000],
+    [{ type: 'thinking', id, state: 'start' }, 2_000], [{ type: 'thinking', id, state: 'end' }, 2_500], [{ type: 'thinking', id, state: 'start' }, 3_000], [{ type: 'thinking', id, state: 'end', text: 'second' }, 3_500]] as [CoordinatorStreamEvent, number][]) {
+    thought = coordinatorStreamReply(thought, event, at)
+  }
+  assert.deepEqual(thought[0].thinking, { ms: 2_000, text: 'first\n\nsecond' })
+  // Before any words, a reply with only steps already shows; one with nothing does not.
+  assert.equal(visibleCoordinatorReplies(replies, 0, 'run').length, 1)
+  assert.equal(visibleCoordinatorReplies([{ id, text: '' }], 0, 'run').length, 0)
+  // The JSONL reader accepts the new events and drops unknown states.
+  const lines = [{ type: 'tool', id, call: 'c1', name: 'x', state: 'done', output: 'o' }, { type: 'thinking', id, state: 'start' }]
+  const events: CoordinatorStreamEvent[] = []
+  await readCoordinatorStream(new ReadableStream({ start(controller) { controller.enqueue(new TextEncoder().encode(lines.map(line => JSON.stringify(line)).join('\n'))); controller.close() } }), event => events.push(event))
+  assert.deepEqual(events, lines)
+  await assert.rejects(readCoordinatorStream(new ReadableStream({ start(controller) { controller.enqueue(new TextEncoder().encode(JSON.stringify({ type: 'tool', id, call: 'c1', name: 'x', state: 'maybe' }))); controller.close() } }), () => {}))
+})

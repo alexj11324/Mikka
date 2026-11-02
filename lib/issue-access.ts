@@ -46,7 +46,7 @@ async function findIssueForUser(reader: IssueReader, id: string, includeDeleted:
   const acting = actingContext.getStore()
   const workspaceId = typeof reader === 'string' ? (acting?.userId === reader ? acting.tokenWorkspaceId : undefined) : reader[tokenWorkspace]
   const access = await issueTeamAccess(id, userId)
-  const visibility = await issueVisibility(reader, includeDeleted, workspaceId, executor)
+  const visibility = await issueVisibility(reader, includeDeleted, workspaceId, executor, { onlyIssueIds: [id] })
   const [row] = withoutBody
     ? await executor.select({ issue: { ...issueColumnsWithoutBody, content: issueAttrsContent } }).from(issues).where(and(eq(issues.id, id), visibility.predicate)).limit(1)
     : await executor.select({ issue: issues }).from(issues).where(and(eq(issues.id, id), visibility.predicate)).limit(1)

@@ -1,5 +1,6 @@
 'use server'
 
+import { withFreshSession } from '@/lib/fresh-session'
 import { headers } from 'next/headers'
 import { getTranslations } from 'next-intl/server'
 import { z } from 'zod'
@@ -81,7 +82,7 @@ export async function getPasswordStatus(): Promise<ActionResult<{ hasPassword: b
  * 「修改密码」: needs the current password. With `revokeOtherSessions` every
  * other device is signed out; this one stays signed in.
  */
-export async function changePassword(input: { currentPassword: string; newPassword: string; revokeOtherSessions?: boolean }): Promise<ActionResult<{ revokedOtherSessions: boolean }>> {
+async function changePasswordBody(input: { currentPassword: string; newPassword: string; revokeOtherSessions?: boolean }): Promise<ActionResult<{ revokedOtherSessions: boolean }>> {
   return runAction(async () => {
     const parsed = z.object({ currentPassword: z.string().min(1).max(128), newPassword: z.string(), revokeOtherSessions: z.boolean().optional() }).safeParse(input)
     if (!parsed.success) throw new ActionFailureError('passwordIncorrect')
@@ -98,7 +99,7 @@ export async function changePassword(input: { currentPassword: string; newPasswo
 }
 
 /** 「设置密码」 for an account without one (Google/GitHub only), so it can also sign in with email and password. */
-export async function setPassword(input: { newPassword: string }): Promise<ActionResult<{ hasPassword: true }>> {
+async function setPasswordBody(input: { newPassword: string }): Promise<ActionResult<{ hasPassword: true }>> {
   return runAction(async () => {
     const parsed = z.object({ newPassword: z.string() }).safeParse(input)
     if (!parsed.success) throw new ActionFailureError('passwordTooShort')
@@ -138,7 +139,7 @@ export async function listSessions(): Promise<ActionResult<{ sessions: SignedInD
 }
 
 /** Signs one other device out. The current device signs out with 「退出登录」 instead. */
-export async function revokeSession(sessionId: string): Promise<ActionResult<{ revoked: true }>> {
+async function revokeSessionBody(sessionId: string): Promise<ActionResult<{ revoked: true }>> {
   return runAction(async () => {
     const parsed = z.string().min(1).max(200).safeParse(sessionId)
     if (!parsed.success) throw new ActionFailureError('sessionNotFound')
@@ -152,7 +153,7 @@ export async function revokeSession(sessionId: string): Promise<ActionResult<{ r
 }
 
 /** 「退出其他所有设备」: every session of this account except this one. */
-export async function revokeOtherSessions(): Promise<ActionResult<{ revoked: number }>> {
+async function revokeOtherSessionsBody(): Promise<ActionResult<{ revoked: number }>> {
   return runAction(async () => {
     const { user, session, headers: requestHeaders } = await requireSession()
     const before = await listSignedInDevices(user.id, session.id)
@@ -166,7 +167,7 @@ export async function revokeOtherSessions(): Promise<ActionResult<{ revoked: num
  * JSON. The link works for 24 hours and only while signed in as them. One
  * request per hour. Says it was sent only once the email provider accepted it.
  */
-export async function requestDataExport(): Promise<ActionResult<{ email: string; expiresAt: string; downloadPath?: string }>> {
+async function requestDataExportBody(): Promise<ActionResult<{ email: string; expiresAt: string; downloadPath?: string }>> {
   return runAction(async () => {
     const { user } = await requireSession()
     const reservation = await reserveExport(user.id)
@@ -205,7 +206,7 @@ export async function listSharedLinks(): Promise<ActionResult<{ links: SharedArt
  * email. Refused while they are the only active admin of a workspace others belong to.
  * On success this browser is signed out; send the person to the sign-in page.
  */
-export async function deleteAccount(input: { email: string }): Promise<ActionResult<{ deleted: true; receipt?: { id: string; warnings: string[] } }>> {
+async function deleteAccountBody(input: { email: string }): Promise<ActionResult<{ deleted: true; receipt?: { id: string; warnings: string[] } }>> {
   return runAction(async () => {
     const { user, headers: requestHeaders } = await requireSession(true)
     const typed = z.object({ email: z.string().max(320) }).safeParse(input)
@@ -218,3 +219,11 @@ export async function deleteAccount(input: { email: string }): Promise<ActionRes
     return { deleted: true as const, ...(outcome.receipt ? { receipt: outcome.receipt } : {}) }
   })
 }
+
+// Money, permissions, credentials and deletion: the session is read from the database, not the cookie cache.
+export async function changePassword(...args: Parameters<typeof changePasswordBody>) { return withFreshSession(() => changePasswordBody(...args)) }
+export async function setPassword(...args: Parameters<typeof setPasswordBody>) { return withFreshSession(() => setPasswordBody(...args)) }
+export async function revokeSession(...args: Parameters<typeof revokeSessionBody>) { return withFreshSession(() => revokeSessionBody(...args)) }
+export async function revokeOtherSessions(...args: Parameters<typeof revokeOtherSessionsBody>) { return withFreshSession(() => revokeOtherSessionsBody(...args)) }
+export async function requestDataExport(...args: Parameters<typeof requestDataExportBody>) { return withFreshSession(() => requestDataExportBody(...args)) }
+export async function deleteAccount(...args: Parameters<typeof deleteAccountBody>) { return withFreshSession(() => deleteAccountBody(...args)) }

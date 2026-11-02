@@ -257,14 +257,19 @@ export class WorktreeManager {
 
   private async removePath(path: string, repoPath: string) {
     if (this.retainResources) return
-    try {
-      await simpleGit(repoPath).raw(["worktree", "remove", "--force", path])
-    } catch {
-      rmSync(path, { recursive: true, force: true })
-      await simpleGit(repoPath)
-        .raw(["worktree", "prune"])
-        .catch(() => undefined)
-    }
+    // In the same queue as `worktree add`: git reads every worktree's admin
+    // files while adding one, and fails ("failed to read
+    // .git/worktrees/<id>/commondir") if a removal deletes them meanwhile.
+    await withRepoConfig(repoPath, async () => {
+      try {
+        await simpleGit(repoPath).raw(["worktree", "remove", "--force", path])
+      } catch {
+        rmSync(path, { recursive: true, force: true })
+        await simpleGit(repoPath)
+          .raw(["worktree", "prune"])
+          .catch(() => undefined)
+      }
+    })
   }
 
   /**

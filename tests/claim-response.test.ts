@@ -325,7 +325,8 @@ test('platform cloud claims inject the configured secret assignment with BYO off
       const body=await response.json()
       assert.deepEqual(body.taskEnv,configured ? injection.env : undefined)
       assert.deepEqual(body.taskSecretNames,configured ? injection.secretNames : undefined)
-      assert.deepEqual((probe as typeof probe & {secretReads:unknown[][]}).secretReads,[['ws',probe.repo.remoteUrl]])
+      // The run owner's own secrets join the workspace's (decision 2026-11-02-2120): the claim passes run.userId.
+      assert.deepEqual((probe as typeof probe & {secretReads:unknown[][]}).secretReads.map(args=>[args[0],args[1],args[4]]),[['ws',probe.repo.remoteUrl,probe.run.userId]])
     }
     for(const denial of ['authentication','device-scope','workspace-scope'] as const) {
       const probe=fixture()

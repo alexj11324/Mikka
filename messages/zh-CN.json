@@ -1244,6 +1244,9 @@
     "secretPermissionDenied": "只有工作区管理员可以执行此操作。成员可以添加和编辑仓库级的密钥与环境变量。",
     "secretNameTaken": "该作用域下已有同名的密钥或环境变量。",
     "secretLimitReached": "此工作区的密钥和环境变量已达 500 个上限。",
+    "secretImportEmpty": ".env 里没有可以添加的行。",
+    "secretImportTooLarge": ".env 文件超过 2 MB。",
+    "secretNameShadowsWorkspace": "当前工作区已有同名密钥。",
     "secretsUnavailable": "密钥存储暂时不可用，请稍后重试。",
     "e2bKeyInvalid": "Key 无效或已被撤销。",
     "e2bKeyUnverifiable": "暂时无法验证，请稍后重试。",
@@ -2201,14 +2204,11 @@
       "loading": "正在加载密钥",
       "empty": "还没有密钥。",
       "workspaceGroup": "工作区",
-      "repositoryGroup": "仓库 {repository}",
       "repository": "仓库",
       "edit": "编辑",
       "editNamed": "编辑 {name}",
-      "kind": "类型",
       "kinds": {
-        "secret": "密钥",
-        "env": "环境变量"
+        "secret": "密钥"
       },
       "name": "名称",
       "value": "值",
@@ -2235,7 +2235,54 @@
         "remove": "移除",
         "removing": "正在移除…",
         "verifying": "正在验证…"
-      }
+      },
+      "bulkAdd": "批量添加",
+      "bulkTitle": "批量添加",
+      "filterLabel": "筛选",
+      "filters": {
+        "all": "全部",
+        "workspace": "工作区",
+        "repository": "仓库"
+      },
+      "columns": {
+        "name": "名称",
+        "type": "类型",
+        "scope": "范围",
+        "note": "说明",
+        "updatedBy": "更新者",
+        "updatedAt": "更新时间",
+        "actions": "操作"
+      },
+      "actions": "{name} 的操作",
+      "note": "说明",
+      "masked": "在输出里遮住",
+      "notMasked": "不遮住",
+      "confirmWorkspace": "{workspace} 的所有成员都能用 {name}？",
+      "confirmWorkspaceMany": "{workspace} 的所有成员都能用这 {count} 个密钥？",
+      "paste": ".env",
+      "pickFile": "选择 .env 文件",
+      "pickFileLimit": "最大 2 MB",
+      "willAdd": "{count} 个可添加",
+      "replaceExisting": "已有同名时替换",
+      "addCount": "添加 {count} 个",
+      "importDone": "已添加 {created} 个，替换 {replaced} 个，跳过 {kept} 个。",
+      "lineError": {
+        "invalidLine": "第 {line} 行格式不对",
+        "invalidName": "第 {line} 行 · {name} 不是有效的名称",
+        "emptyValue": "第 {line} 行 · {name} 没有值",
+        "duplicate": "第 {line} 行 · {name} 重复",
+        "reserved": "第 {line} 行 · {name} 是保留名称",
+        "shadowsWorkspace": "第 {line} 行 · 工作区已有 {name}"
+      },
+      "side": {
+        "label": "密钥归属",
+        "mine": "我的"
+      },
+      "mineHeading": "我的密钥",
+      "addMineTitle": "添加我的密钥",
+      "shadowConfirm": "{workspace} 已有 {name}，在你的运行里用你自己的值？",
+      "shadowConfirmMany": "{workspace} 已有 {names}，在你的运行里用你自己的值？",
+      "useMine": "用我的"
     },
     "audit": {
       "loading": "正在加载审计日志",
@@ -2921,7 +2968,6 @@
     "label": "Coordinator",
     "conversation": "与 Coordinator 的对话",
     "conversationWith": "与 {name} 的对话",
-    "usedTools": "用了 {count} 个工具",
     "pendingActions": {
       "label": "等你确认",
       "send_email": "发送邮件",
@@ -3100,6 +3146,47 @@
       "nothingToRetry": "没有待重试的回复",
       "unconfirmed": "重试未确认",
       "queued": "回复已排队"
+    },
+    "activity": {
+      "thinking": "思考中",
+      "thought": "思考了 {seconds} 秒",
+      "thoughtStored": "已思考",
+      "tool": "使用工具",
+      "tools": {
+        "create_issue": "建任务",
+        "create_issue_from_request": "建任务",
+        "update_issue": "改任务",
+        "list_issues": "查看任务",
+        "get_issue": "查看任务",
+        "dispatch_run": "派发线程",
+        "dispatch_bot_computer": "派到电脑",
+        "list_runs": "查看线程",
+        "get_run": "查看线程",
+        "send_to_run": "给线程发消息",
+        "stop_run": "停止线程",
+        "web_search": "搜索网页",
+        "start_web_subagent": "打开浏览器",
+        "remember": "记住",
+        "forget": "忘掉",
+        "find_repository": "找仓库",
+        "github_tools": "查看 GitHub",
+        "github_call": "使用 GitHub",
+        "list_calendar_events": "查看日历",
+        "get_calendar_event": "查看日历",
+        "create_calendar_event": "建日程",
+        "update_calendar_event": "改日程",
+        "cancel_calendar_event": "取消日程",
+        "search_gmail": "查看邮件",
+        "read_gmail_message": "查看邮件",
+        "send_email": "发邮件",
+        "search_slack_messages": "查看 Slack",
+        "read_slack_thread": "查看 Slack",
+        "send_slack_message": "发 Slack 消息",
+        "search_notion_pages": "查看 Notion",
+        "read_notion_page_blocks": "查看 Notion",
+        "append_notion_paragraph": "写 Notion",
+        "list_drive_files": "查看 Drive"
+      }
     }
   },
   "AgentCopy": {
@@ -4328,5 +4415,18 @@
   },
   "PullRequestsBadge": {
     "label": "{count} 个 PR"
+  },
+  "AiElements": {
+    "tool": {
+      "pending": "等待中",
+      "running": "进行中",
+      "awaitingApproval": "等待批准",
+      "responded": "已回应",
+      "completed": "完成",
+      "error": "失败",
+      "denied": "已拒绝",
+      "parameters": "输入",
+      "result": "结果"
+    }
   }
 }

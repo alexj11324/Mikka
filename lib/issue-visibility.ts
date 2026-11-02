@@ -20,21 +20,24 @@ function readerTokenWorkspace(reader: IssueReader) {
 
 /** Resolve workspace membership in its own DB; never cross-join the two DBs.
  * No request/global cache: suspension/removal takes effect on the next read. */
-export async function issueVisibility(reader: IssueReader, includeDeleted = false, workspaceId?: string, executor: Pick<typeof db, 'select'> = db) {
+/** `onlyIssueIds`: the caller asks only about these issues (its query filters by them), so only their
+ * team links are read; the predicate is exact for them and must not be used for any other issue. */
+export async function issueVisibility(reader: IssueReader, includeDeleted = false, workspaceId?: string, executor: Pick<typeof db, 'select'> = db, options: { onlyIssueIds?: readonly string[] } = {}) {
   const userId = typeof reader === 'string' ? reader : reader.id
   const token = readerTokenWorkspace(reader)
-  const allowed = await issueTeamScope(userId)
+  const only = options.onlyIssueIds
+  const allowed = await issueTeamScope(userId, [], { onlyIssueIds: only })
   const scopeWorkspace = token ?? workspaceId
   const allowedIds = allowed.filter(link => !scopeWorkspace || link.workspaceId === scopeWorkspace).map(link => link.issueId)
   const predicate = issueVisibilityPredicate(userId, { allowedIds }, includeDeleted)
   if (!token) return { predicate, allowedIds }
   // Only a token's workspace scoping reads the reader's own and shared tasks' links; a browser session skips the lookup.
-  const candidates = await executor.select({ id: issues.id }).from(issues).where(or(
+  const candidates = only && !only.length ? [] : await executor.select({ id: issues.id }).from(issues).where(and(only ? inArray(issues.id, [...only]) : undefined, or(
     eq(issues.userId, userId),
     sql`exists (select 1 from ${issueMembers} where ${issueMembers.issueId} = ${issues.id} and ${issueMembers.userId} = ${issues.userId} and ${issueMembers.memberId} = ${userId})`,
-  ))
+  )))
   // issueTeamScope includes candidate links even when membership is revoked.
-  const links = await issueTeamScope(userId, candidates.map(row => row.id))
+  const links = await issueTeamScope(userId, candidates.map(row => row.id), { onlyIssueIds: only })
   // The workspace is the tenant (decision 0231): a token for a team workspace reaches only tasks linked to it,
   // never the owner's personal or unlinked tasks. The personal workspace's token keeps those, but not a
   // workspace task linked elsewhere (as lib/issue-access.ts). Browser sessions are unchanged.

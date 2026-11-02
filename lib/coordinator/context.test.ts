@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { ModelMessage } from 'ai'
-import { chatItems, compactionCut, COMPACT_AT_TOKENS, estimateTokens, eventPrompt, forgetNotes, instructionsWithMemory, KEEP_RECENT_TOKENS, MEMORY_MAX_CHARS, promptMessages, rememberNote, type StoredMessage } from './context'
+import { chatItems, jsonbText, compactionCut, COMPACT_AT_TOKENS, estimateTokens, eventPrompt, forgetNotes, instructionsWithMemory, KEEP_RECENT_TOKENS, MEMORY_MAX_CHARS, promptMessages, rememberNote, type StoredMessage } from './context'
 import { modelMessage, pointsSwitchMessage, quotaSwitchMessage, sourcedEventMessage } from './message-safety'
 
 function stored(messages: ModelMessage[]): StoredMessage[] {
@@ -118,11 +118,12 @@ test('the chat folds one reply\'s steps together and marks events', () => {
   ])
 })
 
-test('a stored reply carries the stream its text was shown from, so the chat keeps that row when it is stored', () => {
+test('a stored reply carries the stream it was first shown from, so the chat keeps that row when it is stored', () => {
   const at = new Date('2026-10-22T00:00:00Z')
   const rows = [
     { role: 'user', content: 'what is next?' },
-    { role: 'assistant', content: [{ type: 'tool-call', toolCallId: 'c1', toolName: 'list_issues', input: {} }], mikkaStreamId: 'wrun_1:0' },
+    { role: 'assistant', content: [{ type: 'tool-call', toolCallId: 'c0', toolName: 'record_attention', input: {} }], mikkaStreamId: 'wrun_1:0' },
+    { role: 'assistant', content: [{ type: 'tool-call', toolCallId: 'c1', toolName: 'list_issues', input: {} }], mikkaStreamId: 'wrun_1:1' },
     { role: 'tool', content: [{ type: 'tool-result', toolCallId: 'c1', toolName: 'list_issues', output: { type: 'json', value: [] } }] },
     { role: 'assistant', content: [{ type: 'text', text: 'Nothing open.' }], mikkaStreamId: 'wrun_1:1' },
     { role: 'assistant', content: [{ type: 'text', text: 'Anything else?' }], mikkaStreamId: 'wrun_1:2' },
@@ -130,13 +131,44 @@ test('a stored reply carries the stream its text was shown from, so the chat kee
     { role: 'assistant', content: [{ type: 'text', text: 'Any time.' }] },
   ] as unknown as ModelMessage[]
   const items = chatItems(rows.map((message, index) => ({ position: index + 1, message, createdAt: at })))
-  // The tool step showed no text; the first text it shows is the stream the person watched.
+  // A hidden tool shows nothing; the first tool or text that shows is the stream the person watched.
   assert.deepEqual(items.map(item => [item.from, item.text, item.streamId ?? null]), [
     ['person', 'what is next?', null],
     ['coordinator', 'Nothing open.\n\nAnything else?', 'wrun_1:1'],
     ['person', 'thanks', null],
     ['coordinator', 'Any time.', null],
   ])
+})
+
+test('a stored reply keeps its tools, how each ended and their previews, and whether it thought', () => {
+  const at = new Date('2026-10-22T00:00:00Z')
+  const compact = [
+    { role: 'user', content: 'make a task and start it' },
+    { role: 'assistant', content: [{ type: 'reasoning', chars: 120 }, { type: 'tool-call', toolCallId: 'c1', toolName: 'create_issue', inputPreview: '{"title": "Fix login"}' },
+      { type: 'tool-call', toolCallId: 'c2', toolName: 'record_attention' }] },
+    { role: 'tool', content: [{ type: 'tool-result', toolCallId: 'c1', toolName: 'create_issue', status: 'done', outputPreview: '{"id": "i1"}' }] },
+    { role: 'assistant', content: [{ type: 'tool-call', toolCallId: 'c3', toolName: 'dispatch_run', inputPreview: '{"issueId": "i1"}' }] },
+    { role: 'tool', content: [{ type: 'tool-result', toolCallId: 'c3', toolName: 'dispatch_run', status: 'error', outputPreview: 'no device' }] },
+    { role: 'assistant', content: [{ type: 'tool-call', toolCallId: 'c4', toolName: 'web_search' }] },
+    { role: 'assistant', content: [{ type: 'text', text: 'Made it; the thread could not start.' }] },
+  ] as unknown as ModelMessage[]
+  const [, reply] = chatItems(compact.map((message, index) => ({ position: index + 1, message, createdAt: at })))
+  assert.equal(reply.text, 'Made it; the thread could not start.')
+  assert.deepEqual(reply.activity, { thought: true, reasoningAt: [2], tools: [
+    { call: 'c1', name: 'create_issue', state: 'done', input: '{"title": "Fix login"}', output: '{"id": "i1"}' },
+    { call: 'c3', name: 'dispatch_run', state: 'error', input: '{"issueId": "i1"}', output: 'no device' },
+    // No result stored yet: still running.
+    { call: 'c4', name: 'web_search', state: 'running' },
+  ] })
+  // Full stored messages (not the compact projection) read the same way.
+  const full = chatItems([
+    { position: 1, createdAt: at, message: { role: 'assistant', content: [{ type: 'tool-call', toolCallId: 'c1', toolName: 'list_issues', input: { query: 'login' } }] } as ModelMessage },
+    { position: 2, createdAt: at, message: { role: 'tool', content: [{ type: 'tool-result', toolCallId: 'c1', toolName: 'list_issues', output: { type: 'error-text', value: 'boom' } }] } as ModelMessage },
+  ])
+  assert.deepEqual(full[0].activity?.tools, [{ call: 'c1', name: 'list_issues', state: 'error', input: '{"query": "login"}', output: 'boom' }])
+  // Encrypted or empty reasoning: it thought, but there is nothing to open.
+  const sealed = chatItems([{ position: 1, createdAt: at, message: { role: 'assistant', content: [{ type: 'reasoning', chars: 0 }, { type: 'text', text: 'Done.' }] } as unknown as ModelMessage }])
+  assert.deepEqual(sealed[0].activity, { tools: [], thought: true })
 })
 
 test('a reply that dispatches a run carries it as a thread, once', () => {
@@ -307,4 +339,9 @@ test('a run ended because its daemon is too old tells the Bot to have the person
   const prompt = eventPrompt({ kind: 'run_finished', issueId: 'i1', runId: 'r1', payload: { status: 'failed', stopReason: 'error', daemonUpgradeRequired: true } })
   assert.match(prompt, /Mikka on that device needs an update/)
   assert.match(prompt, /Nothing is wrong with their GitHub/)
+})
+
+test('a preview prints a value as Postgres prints jsonb: its key order, ", " and ": "', () => {
+  assert.equal(jsonbText({ title: 'Fix', id: 2, aa: [1, { é: null, z: true }], skipped: undefined }), '{"aa": [1, {"z": true, "é": null}], "id": 2, "title": "Fix"}')
+  assert.equal(jsonbText('text'), '"text"')
 })
