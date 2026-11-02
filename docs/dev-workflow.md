@@ -46,6 +46,13 @@ Use a production build (`next build` then `next start`) only for production
 screenshots of a UI change. Run `next build`
 directly (`pnpm exec next build`): `pnpm build` also runs lint and migrations.
 
+Vercel builds on a Standard machine: 4 cores, 8 GB. `next build` peaks at
+"Collecting page data", while Turbopack's ~5 GB is still held in the
+`next-build` process. So production builds emit no source maps and stop
+esbuild once the workflow bundles are built (`next.config.mjs`). To check a
+change against the limit, run `next build` in an 8 GB cgroup and read
+`memory.max_usage_in_bytes`.
+
 ## 3. Environment
 
 One command sets up a container: `eval "$(scripts/dev/bootstrap-local.sh)"`
