@@ -904,6 +904,10 @@
     },
     "ssh": {
       "title": "Add device",
+      "thisComputer": "Add this computer",
+      "remote": "Add a remote computer",
+      "addingThis": "Adding this computer",
+      "reconnectingThis": "Reconnecting this computer",
       "sshConfig": "SSH config",
       "otherHost": "Other host",
       "host": "Host",

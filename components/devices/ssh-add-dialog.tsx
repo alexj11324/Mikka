@@ -1,9 +1,9 @@
 'use client'
 
 import { Fragment, useEffect, useRef, useState } from 'react'
-import { Check, Circle, Loader2, TerminalSquare, X } from 'lucide-react'
+import { Check, Circle, Laptop, Loader2, TerminalSquare, X } from 'lucide-react'
 import { useTranslations } from 'next-intl'
-import type { SshInstallState } from '@mikka/protocol/bridge'
+import { LOCAL_RECONNECT, LOCAL_TARGET, type SshInstallState } from '@mikka/protocol/bridge'
 import type { DeviceView } from '@/app/actions/agents'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input'
 import { Item, ItemGroup, ItemSeparator } from '@/components/ui/item'
 import { bridgeFromWindow, type MikkaWindow } from '@/lib/platform/detect'
 import { cn } from '@/lib/utils'
-import { STEPS, addedHost, stepStates, type StepState } from '@/lib/device-ssh-view'
+import { addedHost, stepStates, visibleSteps, type StepState } from '@/lib/device-ssh-view'
 import { AgentMarks, installedAgents } from './agent-marks'
 
 function StepIcon({ state }: { state: StepState }) {
@@ -34,10 +34,12 @@ function sshHost(host: string | { alias: string; user?: string | null; hostName?
 }
 
 /**
- * 添加设备 in the desktop app (Figma V09c 685:24728 → V09c-5 686:25550): pick a
- * host from `~/.ssh/config` or type one, trust its host key, and Mikka installs
- * and starts the daemon over SSH. The install runs in the desktop main process,
- * so closing this dialog does not stop it; reopening shows where it is.
+ * 添加设备 in the desktop app (Figma V09c 685:24728 → V09c-5 686:25550). First
+ * 添加这台电脑: one click installs, starts and signs in the daemon on this
+ * computer (usability C10). Then 添加远程电脑: pick a host from `~/.ssh/config`
+ * or type one, trust its host key, and Mikka installs and starts the daemon
+ * over SSH. Either runs in the desktop main process, so closing this dialog
+ * does not stop it; reopening shows where it is.
  */
 export function SshAddDialog({ open, onOpenChange, devices, onAdded }: {
   open: boolean
@@ -53,6 +55,8 @@ export function SshAddDialog({ open, onOpenChange, devices, onAdded }: {
   const [install, setInstall] = useState<SshInstallState | null>(null)
   const [starting, setStarting] = useState(false)
   const [startError, setStartError] = useState(false)
+  // This computer's daemon already has a device: 添加这台电脑 shows 已添加.
+  const [thisDevice, setThisDevice] = useState<string | null>(null)
   const onAddedRef = useRef(onAdded)
   useEffect(() => { onAddedRef.current = onAdded })
 
@@ -63,6 +67,7 @@ export function SshAddDialog({ open, onOpenChange, devices, onAdded }: {
     setStartError(false)
     void ssh.hosts().then(list => { if (live) setHosts((list as Parameters<typeof sshHost>[0][]).map(sshHost)) }, () => { if (live) setHosts([]) })
     void ssh.state().then(state => { if (live && state && state.status !== 'online') setInstall(state) }, () => {})
+    void bridgeFromWindow(window as MikkaWindow)?.device?.status().then(status => { if (live) setThisDevice(status.deviceId) }, () => {})
     const unsubscribe = ssh.onChange(state => {
       if (!live) return
       setInstall(state)
@@ -77,8 +82,14 @@ export function SshAddDialog({ open, onOpenChange, devices, onAdded }: {
     if (!ssh || starting) return
     setStarting(true)
     setStartError(false)
-    try { setInstall(await ssh.begin(next)) } catch { setStartError(true) } finally { setStarting(false) }
+    try {
+      setInstall(next === LOCAL_TARGET && ssh.local ? await ssh.local()
+        : next === LOCAL_RECONNECT && ssh.restartLocal ? await ssh.restartLocal()
+          : await ssh.begin(next))
+    } catch { setStartError(true) } finally { setStarting(false) }
   }
+  const canAddThis = typeof window !== 'undefined' && Boolean(bridgeFromWindow(window as MikkaWindow)?.ssh?.local)
+  const thisAdded = Boolean(thisDevice && devices.some(device => device.id === thisDevice))
   async function accept() {
     const ssh = bridgeFromWindow(window as MikkaWindow)?.ssh
     if (!ssh || !install) return
@@ -118,9 +129,9 @@ export function SshAddDialog({ open, onOpenChange, devices, onAdded }: {
           <Button size="sm" onClick={() => { void accept() }}>{t('trustContinue')}</Button>
         </DialogFooter>
       </> : progress ? <>
-        <DialogHeader><DialogTitle>{t('adding', { host: install.target })}</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{install.target === LOCAL_TARGET ? t('addingThis') : install.target === LOCAL_RECONNECT ? t('reconnectingThis') : t('adding', { host: install.target })}</DialogTitle></DialogHeader>
         <ol aria-label={t('progress')} className="flex flex-col gap-3">
-          {STEPS.map(step => {
+          {visibleSteps(install).map(step => {
             const state = stepStates(install)[step]
             return <li key={step} className="flex min-w-0 items-center gap-2.5 text-sm">
               <StepIcon state={state} />
@@ -144,6 +155,13 @@ export function SshAddDialog({ open, onOpenChange, devices, onAdded }: {
       </> : <>
         <DialogHeader><DialogTitle>{t('title')}</DialogTitle></DialogHeader>
         <div className="flex min-w-0 flex-col gap-4">
+          {canAddThis && <Item size="sm" render={<Button variant="outline" disabled={thisAdded || starting} onClick={() => { void begin(LOCAL_TARGET) }} />}
+            className="h-auto w-full justify-start gap-2.5 rounded-lg px-3 py-2.5 font-normal">
+            <Laptop aria-hidden="true" className="text-muted-foreground" />
+            <span className="min-w-0 flex-1 truncate text-left text-sm">{t('thisComputer')}</span>
+            {thisAdded && <span className="text-xs text-muted-foreground">{t('added')}</span>}
+          </Item>}
+          {canAddThis && <h3 className="-mb-2 text-sm font-medium">{t('remote')}</h3>}
           {hosts && hosts.length > 0 && <section className="flex flex-col gap-2">
             <h3 className="text-sm text-muted-foreground">{t('sshConfig')}</h3>
             <ItemGroup role="listbox" aria-label={t('sshConfig')} className="max-h-64 gap-0! overflow-y-auto rounded-lg border">

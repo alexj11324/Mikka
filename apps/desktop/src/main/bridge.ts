@@ -14,6 +14,8 @@ import { isTrustedFrame } from './security'
 
 export interface BridgeOptions {
   appUrl: string
+  /** The desktop's flavor: 添加这台电脑 installs the matching daemon. */
+  flavor?: 'prod' | 'dev'
   mintEnrollment(): Promise<string>
   openExternal(url: string): Promise<void>
   prepareAuth(state: string): Promise<string>
@@ -42,9 +44,11 @@ export function registerBridge(options: BridgeOptions, sshInstaller?: SshInstall
     for (const contents of webContents.getAllWebContents()) {
       if (!contents.isDestroyed() && isTrustedFrame(contents.getURL(), options.appUrl)) contents.send(IPC.sshChanged, state)
     }
-  })
+  }, undefined, undefined, undefined, undefined, options.flavor)
   handle(IPC.sshHosts, () => installer.hosts())
   handle(IPC.sshState, () => installer.state())
+  handle(IPC.sshLocal, () => installer.beginLocal())
+  handle(IPC.sshRestartLocal, () => installer.restartLocal())
   handle(IPC.sshBegin, target => {
     if (typeof target !== 'string' || target.length > 300) throw new Error('Invalid SSH host')
     return installer.begin(target)

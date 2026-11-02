@@ -904,6 +904,10 @@
     },
     "ssh": {
       "title": "添加设备",
+      "thisComputer": "添加这台电脑",
+      "remote": "添加远程电脑",
+      "addingThis": "添加这台电脑",
+      "reconnectingThis": "重新连接这台电脑",
       "sshConfig": "SSH 配置",
       "otherHost": "其他主机",
       "host": "主机",

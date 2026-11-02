@@ -351,6 +351,7 @@ function start(): void {
   registerSession()
   registerBridge({
     appUrl: APP_URL,
+    flavor: FLAVOR,
     mintEnrollment: async () => {
       const url = `${APP_URL.replace(/\/$/, '')}/api/devices/enrollment`
       const response = await session.fromPartition(PARTITION).fetch(url, {

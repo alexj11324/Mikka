@@ -62,6 +62,8 @@ if (appOrigin && window.location.origin === appOrigin) {
       cancel: (id: unknown) => ipcRenderer.invoke(IPC.sshCancel, id),
       accept: (id: unknown) => ipcRenderer.invoke(IPC.sshAccept, id),
       state: () => ipcRenderer.invoke(IPC.sshState),
+      local: () => ipcRenderer.invoke(IPC.sshLocal),
+      restartLocal: () => ipcRenderer.invoke(IPC.sshRestartLocal),
     },
     device: {
       status: () => ipcRenderer.invoke(IPC.deviceStatus),
