@@ -177,7 +177,9 @@ function ThreadPanel({ issueId, runId, onClose, bare = false, initialTab = 'chat
     {data?.thread.quota?.paused && <div className="shrink-0 p-3">
       <ThreadQuotaPausedCard paused={data.thread.quota.paused} onContinued={() => { void mutate(); void mutateCache(['issue-threads', issueId]) }} />
     </div>}
-    {(active || question) && detail && <div className="flex shrink-0 flex-col gap-1 p-3">
+    {/* R-10: an open thread always ends in the composer, finished or not. A message to an ended thread runs it
+        again in the same thread (R-81); only a thread the viewer cannot see in full (no `detail`) has none. */}
+    {detail && <div data-slot="thread-composer" className="flex shrink-0 flex-col gap-1 p-3">
       {/* Keep the draft editable while stop waits for the daemon; do not queue new work after stop. */}
       <ChatComposer ref={inputRef} label={t('composer', { agent: harnessLabel(detail.harness) })} value={draft} onChange={setDraft} onSubmit={() => { void send() }}
         sending={sending || stopPending} editableWhileSending submitDisabled={stopRequested || question === 'resuming'} running={active || question === 'resuming'} onStop={active && data.thread.ownedByCurrentUser && !sending && !stopPending ? () => { void stop() } : undefined} />

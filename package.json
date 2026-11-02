@@ -80,7 +80,7 @@
     "desktop:package": "pnpm --filter @mikka/desktop package",
     "check:desktop": "pnpm --filter @mikka/desktop typecheck && pnpm --filter @mikka/desktop lint && pnpm --filter @mikka/desktop test && pnpm --filter @mikka/desktop build",
     "test:group-turns": "node --import tsx --test lib/coordinator/group-turns.test.ts lib/coordinator/group-reply-prompt.test.ts && node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/coordinator/group-decision-consumer.test.ts",
-    "test:groups": "node --import tsx --test lib/group-conversations.test.ts lib/message-reactions.test.ts && node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test components/workspace/message-reactions.test.tsx",
+    "test:groups": "node --import tsx --test lib/group-conversations.test.ts lib/message-reactions.test.ts && node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test components/workspace/message-reactions.test.tsx scripts/thread-composer.test.tsx",
     "test:issue-search": "node --import ./scripts/server-test.mjs --import tsx --test lib/issue-search.test.ts lib/site-search.test.ts lib/group-messages.test.ts lib/issue-relation-search.test.ts",
     "test:issue-search-db": "node --test-force-exit --import ./scripts/server-test.mjs --import tsx --test tests/issue-search.db.test.ts",
     "test:visibility-db": "node --test-force-exit --import ./scripts/server-test.mjs --import tsx --test tests/team-visibility.db.test.ts",
