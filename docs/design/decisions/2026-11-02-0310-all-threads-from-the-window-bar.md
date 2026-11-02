@@ -10,8 +10,8 @@
    page, whichever bot is selected. It lists the threads every bot dispatched in R-52's
    groups; each row's second line opens with the mark of the Agent running it
    (R-78) and 「<Bot> 派出」, and 按派出者筛选 filters to the threads one bot
-   dispatched (a bot dispatches a thread, an Agent runs it:
-   decisions/2026-11-02-1010-a-bot-dispatches-threads.md). Its address is `?threads=all` or
+   dispatched (Alex, 2026-11-02: a bot dispatches a thread, an Agent runs
+   it). Its address is `?threads=all` or
    `?threads=<bot>`; opening it is a new entry, the filter replaces it. It
    stays open as the centre changes.
 2. **A bot's panel drops its 全部线程 tab.** Its 线程 tab lists the threads that bot dispatched.
