@@ -1,6 +1,7 @@
 'use server'
 
-import { and, eq } from 'drizzle-orm'
+import { createHash } from 'node:crypto'
+import { and, eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import * as Y from 'yjs'
 import { yXmlFragmentToProsemirrorJSON } from '@tiptap/y-tiptap'
@@ -9,7 +10,7 @@ import { ActionFailureError, runAction } from '@/lib/action-error'
 import type { ActionResult } from '@/lib/action-result'
 import { db } from '@/lib/db'
 import { issues, issueDocuments, issueMembers, issueVersions, linearIssueLinks, users } from '@/lib/db/schema'
-import { requireIssueAccess } from '@/lib/issue-access'
+import { requireIssueAccess, requireIssueAccessWithoutBody } from '@/lib/issue-access'
 import { readIssueMetadata, withIssueMetadata } from '@/lib/issue-metadata'
 import { dispatchLinearIssueSync } from '@/lib/linear-sync/dispatch'
 import { bindCommentAuthorship, snapshotCommentAuthorship } from '@/lib/linear-sync/comment-authorship'
@@ -18,10 +19,22 @@ import { requireLockedIssueScope } from '@/lib/issue-scope-authorization'
 import { readableIssueContentOnServer as readableIssueContent } from '@/lib/issue-editor-schema-snapshot'
 
 const encodedState = z.string().max(1_400_000).regex(/^[A-Za-z0-9+/]*={0,2}$/)
-const syncSchema = z.object({ id: z.uuid(), vector: encodedState.optional(), update: encodedState.optional(), seed: encodedState.optional() })
-export async function exchangeDocument(input: z.infer<typeof syncSchema>) {
+const syncSchema = z.object({ id: z.uuid(), vector: encodedState.optional(), update: encodedState.optional(), seed: encodedState.optional(), known: z.string().regex(/^[0-9a-f]{32}$/).optional() })
+/** The stored document's version: md5 of its state, as Postgres md5(state) computes it. */
+const documentVersion = (state: string) => createHash('md5').update(state).digest('hex')
+/**
+ * Sync the task body. A poll with no local edits passes the version it last
+ * received (`known`); while the stored document still has that version, the
+ * answer is `{ version }` alone, read from one hash, never the body or state.
+ */
+export async function exchangeDocument(input: z.infer<typeof syncSchema>): Promise<{ update?: string; version: string }> {
   const parsed = syncSchema.parse(input)
-  const { issue, user } = await requireIssueAccess(parsed.id)
+  const { issue, user } = await requireIssueAccessWithoutBody(parsed.id)
+  if (parsed.known && !parsed.update) {
+    const [current] = await db.select({ version: sql<string>`md5(${issueDocuments.state})` }).from(issueDocuments)
+      .where(and(eq(issueDocuments.issueId, issue.id), eq(issueDocuments.userId, issue.userId))).limit(1)
+    if (current?.version === parsed.known) return { version: current.version }
+  }
   const result = await db.transaction(async tx => {
     const [locked] = await tx.select({ id: issues.id, userId: issues.userId, scopeVersion: issues.scopeVersion, content: issues.content, scope: issues.scope, linearSyncBlocked: issues.linearSyncBlocked }).from(issues).where(and(eq(issues.id, issue.id), eq(issues.userId, issue.userId))).for('update')
     requireLockedIssueScope(locked, user.id, issue.scopeVersion)
@@ -47,11 +60,11 @@ export async function exchangeDocument(input: z.infer<typeof syncSchema>) {
         await tx.update(issues).set({ content, updatedAt: new Date() }).where(and(eq(issues.id, issue.id), eq(issues.userId, issue.userId)))
       }
       const [link] = locked.scope === 'workspace' && !locked.linearSyncBlocked ? await tx.select({ id: linearIssueLinks.id }).from(linearIssueLinks).where(and(eq(linearIssueLinks.issueId, locked.id), eq(linearIssueLinks.ownerId, issue.userId), eq(linearIssueLinks.externalTargetVerified, true))).limit(1) : []
-      return { changed, syncEligible: Boolean(link), update: Buffer.from(Y.encodeStateAsUpdate(doc, parsed.vector ? Buffer.from(parsed.vector, 'base64') : undefined)).toString('base64') }
+      return { changed, syncEligible: Boolean(link), version: documentVersion(state), update: Buffer.from(Y.encodeStateAsUpdate(doc, parsed.vector ? Buffer.from(parsed.vector, 'base64') : undefined)).toString('base64') }
     } finally { doc.destroy() }
   })
   if (result.changed && result.syncEligible) dispatchLinearIssueSync(issue.id)
-  return { update: result.update }
+  return { update: result.update, version: result.version }
 }
 export async function listMembers(id: string) {
   const { issue, user } = await requireIssueAccess(id)
