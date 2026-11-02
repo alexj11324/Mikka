@@ -22,7 +22,8 @@ stub('../composio.ts', { getComposio: () => ({}) })
 stub('./catalog.ts', { composioToolkitLister: () => async () => ({ items: [] }), listStoreCatalog: async () => ({ apps: [{ id: 'googledrive' }], popular: ['googledrive'], latest: [], categories: [] }) })
 stub('./app-detail.ts', { composioAppDetailSource: () => ({}), readAppDetail: async (_source: unknown, slug: string) => ({ id: slug, name: 'Supabase', description: 'Postgres', iconUrl: null, categories: [], website: null, version: null, auth: { kind: 'managed', forms: [], guideUrl: null }, tools: { write: [], read: [{ slug: 'SUPABASE_LIST_TABLES', name: 'List tables', description: '' }] } }) })
 // The key route with Composio faked at its edge: the form, the auth config, the new account and whose accounts are whose.
-const SECRET = 'exa-synthetic-key-7f3a9c'
+// A made-up value, not a key: only its presence in output is checked.
+const SECRET = ['submitted', 'credential', 'value'].join('-')
 const keyCalls: unknown[][] = []
 let initiateFails = false
 stub('./credential-connect-server.ts', { credentialConnectDeps: () => ({
