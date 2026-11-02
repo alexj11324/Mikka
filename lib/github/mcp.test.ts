@@ -75,3 +75,17 @@ test('scheduled read-only turns get neither GitHub MCP tool', () => {
   assert.deepEqual(Object.keys(scheduledReadTools(registry)).sort(), ['get_issue', 'web_search'])
   assert.deepEqual(Object.keys(scheduledReadTools(registry, ['github_call', 'github_tools', 'web_search'])), ['web_search'])
 })
+
+// If the hosted server refuses the GitHub App user token, only these two tools
+// say mcpUnavailable; the Coordinator's other GitHub paths (find_repository,
+// dispatch_run and the Agents' own credential) never go through this server.
+test('a server that refuses the token is mcpUnavailable, with no call sent and no token in the result', async () => {
+  const { dependencies } = fixture()
+  const refusing = { ...dependencies, connect: (async () => { throw new Error(`401 Unauthorized for Bearer ${OWN}`) }) as unknown as typeof createMCPClient }
+  const runtime = createGitHubMcpRuntime(tokens([]), refusing)
+  const listed = await runtime('owner', {})
+  const called = await runtime('owner', { name: 'issue_read', arguments: {} })
+  assert.deepEqual(listed, { error: 'mcpUnavailable' })
+  assert.deepEqual(called, { error: 'mcpUnavailable' })
+  assert.ok(!JSON.stringify([listed, called]).includes(OWN))
+})
