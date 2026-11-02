@@ -2467,10 +2467,6 @@
         "kimi": "Kimi",
         "custom": "自定义服务商"
       },
-      "protocol": {
-        "openai": "OpenAI 兼容",
-        "anthropic": "Anthropic 兼容"
-      },
       "shareLabel": "分享 {name} 给团队成员",
       "removeLabel": "删除 {name}",
       "removeTitle": "删除 {name}？",
@@ -2485,7 +2481,13 @@
       "modelsInvalid": "无法获取模型 · Key 无效或已被撤销",
       "modelsUnavailable": "无法获取模型 · 服务商没有响应",
       "refetch": "重新获取模型",
-      "refetchLabel": "重新获取 {name} 的模型"
+      "refetchLabel": "重新获取 {name} 的模型",
+      "protocolName": {
+        "anthropic": "Anthropic",
+        "openai": "OpenAI"
+      },
+      "protocolAgents": "{protocols} 协议 · 可用 {agents}",
+      "customAgents": "选了协议才知道能用哪个 Agent"
     },
     "modelOrder": {
       "title": "允许使用的模型",

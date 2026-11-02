@@ -247,8 +247,10 @@ function AddModelsDialog({ candidates, onClose }: { candidates: Candidate[]; onC
             return <Label key={key} className={cn('flex items-center gap-2.5 rounded-lg px-2 py-1.5 font-normal', item.added ? 'text-muted-foreground' : 'hover:bg-muted')}>
               <Checkbox checked={item.added || picked.has(key)} disabled={item.added}
                 onCheckedChange={checked => setPicked(current => { const next = new Set(current); if (checked) next.add(key); else next.delete(key); return next })} />
-              <span className="min-w-0 flex-1 truncate">{item.model}</span>
-              <span className="shrink-0 text-xs text-muted-foreground">{item.added ? t('added') : harnessName(item.harness)}</span>
+              {/* One row is one model on one Agent (Harness draft): a key both Agents run lists its model twice. */}
+              <span className="min-w-0 truncate">{item.model}</span>
+              <span className="shrink-0 text-xs text-muted-foreground">{harnessName(item.harness)}</span>
+              <span className="ml-auto shrink-0 text-xs text-muted-foreground">{item.added ? t('added') : null}</span>
             </Label>
           })}
         </FieldSet>)}
