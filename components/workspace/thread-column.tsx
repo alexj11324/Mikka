@@ -12,6 +12,9 @@ import { cn } from '@/lib/utils'
 import { IssueThreadPanel } from './issue-thread-panel'
 import { closeThread, navigate, openThread } from './workspace-navigation'
 
+/** Task detail's own breakpoint: narrower, a thread open on the task covers it, so 打开任务 leaves the thread behind. */
+const TASK_WIDE = '(min-width: 1024px)'
+
 /**
  * An open thread, in the right column beside what is in the centre (R-82): it
  * takes 概览's place and width, and closing it brings 概览 back. Below xl,
@@ -42,7 +45,7 @@ export function ThreadColumn({ runId, issueId: known }: { runId: string; issueId
   )}>
     <ResizeHandle resize={resize} label={tPanel('resize')} edge="start" className="hidden xl:block" />
     {thread
-      ? <IssueThreadPanel key={runId} issueId={issueId} runId={runId} onClose={closeThread} onOpenThread={openThread} onOpenTask={issueId ? () => navigate({ issue: issueId, thread: runId }) : undefined} />
+      ? <IssueThreadPanel key={runId} issueId={issueId} runId={runId} onClose={closeThread} onOpenThread={openThread} onOpenTask={issueId ? () => navigate({ issue: issueId, thread: window.matchMedia(TASK_WIDE).matches ? runId : null }) : undefined} />
       : <div role="status" aria-label={t('loading')} className="flex flex-col gap-3 p-4"><Skeleton className="h-6 w-2/3" /><Skeleton className="h-24 w-full" /></div>}
   </aside>
 }
