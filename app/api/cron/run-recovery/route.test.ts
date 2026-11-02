@@ -53,3 +53,10 @@ test('recovery returns bounded counts and no private database error or cached re
   assert.equal(failed.status, 502)
   assert.doesNotMatch(await failed.text(), /private-database-error/)
 })
+
+test('lost runs are reclaimed by this sweep only, not by the task-run poll or each heartbeat', async () => {
+  const { readFile } = await import('node:fs/promises')
+  for (const file of ['../../../actions/task-runs.ts', '../../../v1/devices/[deviceId]/heartbeat/route.ts']) {
+    assert.doesNotMatch(await readFile(new URL(file, import.meta.url), 'utf8'), /reclaimLostRuns/, file)
+  }
+})
