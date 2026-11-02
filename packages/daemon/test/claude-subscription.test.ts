@@ -13,6 +13,25 @@ import { cleanupTempDirs, makeRepo, tempDir } from "./helpers"
 
 afterEach(cleanupTempDirs)
 
+it.each([
+  ['fixture-gateway', 'account_info', 'provider_refused'],
+  ['fixture-unknown', 'account_info', 'source_refused'],
+  ['fixture-timeout', 'account_info', 'timeout'],
+  ['fixture-access', 'external_verify', 'verify_refused'],
+] as const)('reports only a finite startup reason for %s', async (accessToken, phase, reason) => {
+  const { adapter, options } = await fixture({ accountId: 'fixture-account',
+    ...(reason === 'verify_refused' ? { verify: async () => { throw new Error('private-verify-detail-must-not-log') } } : {}),
+    token: async () => ({ accountId: 'fixture-account', accessToken, expiresAt: new Date(Date.now() + 60_000).toISOString() }) })
+  const childLogger = options.log.child<string>({})
+  const child = vi.spyOn(options.log, 'child').mockReturnValue(childLogger)
+  const warn = vi.spyOn(childLogger, 'warn').mockImplementation(() => {})
+  try {
+    await expect(adapter.start(options)).rejects.toThrow('Claude subscription authentication unavailable')
+    expect(warn.mock.calls[0][0]).toEqual({ event: 'claude_subscription_startup_failed', phase, reason })
+    expect(JSON.stringify(warn.mock.calls)).not.toMatch(/fixture-account|fixture-access|private-verify-detail/)
+  } finally { warn.mockRestore(); child.mockRestore() }
+})
+
 it('rechecks revocation after native initialization before delivering the first prompt', async () => {
   const verify = vi.fn(async () => { throw new Error('fixture-access revoked') })
   const { adapter, options } = await fixture({ accountId: 'fixture-account', verify, token: async () => ({ accountId: 'fixture-account', accessToken: 'fixture-access', expiresAt: new Date(Date.now() + 60000).toISOString() }) })

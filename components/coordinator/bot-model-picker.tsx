@@ -104,9 +104,8 @@ export function BotModelPicker({ botId, running = false }: { botId: string | nul
   }, [botId, shown, menu.error])
   // Someone else's bot gets no chip; while the menu loads, the chip keeps the model it showed last time (state completeness).
   // It is the chip's look only, not a control, until the menu it opens has arrived.
-  if (!menu.data) return last && !menu.error ? <span role="status" aria-busy="true" data-testid="bot-model-chip-pending" data-next-message={running || undefined} aria-label={t('label', { name: [running ? t('nextMessage') : null, last.id === HOSTED_CHOICE ? t('hosted') : last.modelId || t('unknownModel')].filter(Boolean).join(' · ') })}
+  if (!menu.data) return last && !menu.error ? <span role="status" aria-busy="true" data-testid="bot-model-chip-pending" data-next-message={running || undefined} aria-label={t('label', { name: last.id === HOSTED_CHOICE ? t('hosted') : last.modelId || t('unknownModel') })}
     className="inline-flex h-6 max-w-56 shrink-0 items-center gap-1 rounded-full bg-control px-2 text-sm whitespace-nowrap text-foreground [&_svg]:shrink-0 [&>svg]:size-3.5">
-    {running && <span className="max-w-20 truncate text-xs">{t('nextMessage')}</span>}
     <span className="flex min-w-0"><OptionLabel t={t} option={last} /></span>
     <ChevronDown className="text-muted-foreground" />
   </span> : null
@@ -141,19 +140,13 @@ export function BotModelPicker({ botId, running = false }: { botId: string | nul
   const name = current.id === HOSTED_CHOICE ? t('hosted') : current.modelId || t('unknownModel')
   const checking = current.availability === 'checking'
   const unavailable = !current.available && !checking
-  const apiKey = current.kind === 'apiKey' || current.kind === 'shared'
-  const source = [apiKey ? t('apiKey') : null, current.credentialLabel, apiKey ? t('metered') : null].filter(Boolean).join(' · ')
-  const label = [running ? t('nextMessage') : null, name, source,
+  const label = [name,
     current.fallback ? t('fallback') : null, checking ? t('checking') : null].filter(Boolean).join(' · ')
-  const status = checking ? t('checking') : unavailable ? t('unavailable') : !running && current.fallback ? t('fallback') : null
   return <DropdownMenu open={open} onOpenChange={next => { setOpen(next); if (next) void refresh() }}>
     <DropdownMenuTrigger render={<InputGroupButton type="button" variant="secondary" size="xs" data-testid="bot-model-chip" data-unavailable={unavailable || undefined} data-next-message={running || undefined}
       className={cn('max-w-56 rounded-full px-2 font-normal', unavailable ? 'text-muted-foreground' : 'text-foreground')}
       title={label} aria-label={unavailable ? t('labelUnavailable', { name: label }) : t('label', { name: label })} />}>
-      {running && <span className="max-w-20 truncate text-xs">{t('nextMessage')}</span>}
       <span className="flex min-w-0"><OptionLabel t={t} option={current} /></span>
-      {current.credentialLabel && <span className="max-w-20 truncate text-xs text-muted-foreground">{current.credentialLabel}</span>}
-      {status && <span className="max-w-20 truncate text-xs">{status}</span>}
       {failed && <span className="shrink-0 text-xs text-destructive">{t('notSaved')}</span>}
       <ChevronDown className="text-muted-foreground" />
     </DropdownMenuTrigger>

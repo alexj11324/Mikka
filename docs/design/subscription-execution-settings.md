@@ -36,9 +36,11 @@ not exhaust unrelated Claude models. An inconclusive check does not trigger
 paid-key fallback.
 
 The composer projects the same resolution used to freeze the next reply.
-It identifies the actual credential and fallback; during generation its
-choice is labeled **下一条**. Changing it leaves the current run's snapshot
-intact. Retry distinguishes queued, already working, no reply to retry and
+The collapsed chip shows the model's icon and name. Credential names and
+email addresses stay in the expanded picker; it has no **Next / 下一条**
+prefix. Changing the choice leaves the current run's snapshot intact.
+Quota and paid-fallback notices keep their existing source and billing
+details. Retry distinguishes queued, already working, no reply to retry and
 failure; it does not acknowledge a request that was never queued.
 The failure title and recovery action share a vertically centered, wrapping
 row; retry feedback contributes to its height rather than overlapping content.
