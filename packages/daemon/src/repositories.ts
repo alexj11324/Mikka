@@ -8,6 +8,12 @@ import { daemonTestMode, normalizeRepository } from '@mikka/protocol/repository'
 import { assertBranchName } from './agents/publish'
 import { FETCH_GIT, FETCH_TIMEOUT_MS, isInside, withRepoConfig } from './worktrees'
 
+/** git's empty tree: an initial commit with no files. */
+const EMPTY_TREE = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
+/** Where a run that may not push starts on an empty remote. Never pushed. */
+const LOCAL_EMPTY_BASE = 'refs/mikka/empty-base'
+const INITIAL_COMMIT_ENV = { GIT_AUTHOR_NAME: 'Mikka Agent', GIT_AUTHOR_EMAIL: 'agent@mikka.invalid', GIT_COMMITTER_NAME: 'Mikka Agent', GIT_COMMITTER_EMAIL: 'agent@mikka.invalid' }
+
 export class EmptyRepositoryError extends Error {
   constructor() {
     super('Repository is empty. Create the first commit before running an Agent.')
@@ -62,6 +68,8 @@ export class RepositoryCache {
     // Refresh when the host changes its default branch after the first clone.
     try {
       await git(['remote', 'set-head', 'origin', '-a'], path)
+      // The remote has commits now: a local empty base from before is stale.
+      await git(['update-ref', '-d', LOCAL_EMPTY_BASE], path)
     } catch (error) {
       // A successful ls-remote with no HEAD or refs confirms an empty remote.
       // Authentication/network failures still throw; a broken HEAD with real
@@ -73,8 +81,56 @@ export class RepositoryCache {
     return path
   }
 
+  /**
+   * The first commit of an empty remote: no files, on `branch`. The push never
+   * forces, so a branch someone created meanwhile is kept and the run then
+   * starts from it (prepare again). Call only after prepare reported the
+   * remote empty.
+   */
+  async seedEmpty(remoteUrl: string, branch: string, signal?: AbortSignal, env: Record<string, string> = {}): Promise<void> {
+    await assertBranchName(branch)
+    const { remoteUrl: remote } = normalizeRepository(remoteUrl, { allowFile: this.allowFile })
+    const path = this.pathFor(remote)
+    const release = await this.lock(path, signal)
+    try {
+      await withRepoConfig(path, async () => {
+        this.assertClone(path)
+        const commit = await this.initialCommit(path)
+        const git = (args: string[]) => execa('git', [...FETCH_GIT, '-c', `protocol.file.allow=${this.allowFile ? 'always' : 'never'}`, ...args], {
+          cwd: path, env: { ...process.env, ...env, GIT_TERMINAL_PROMPT: '0' }, stdin: 'ignore', timeout: FETCH_TIMEOUT_MS, cancelSignal: signal, killDescendants: true, reject: false,
+        })
+        const pushed = await git(['push', '--no-verify', '--', 'origin', `${commit}:refs/heads/${branch}`])
+        // Refused because someone pushed first: fine, the run starts from theirs.
+        if (pushed.exitCode !== 0 && !(await git(['ls-remote', 'origin'])).stdout.trim())
+          throw new Error(`Could not push the first commit to the empty repository (git exit ${pushed.exitCode})`)
+      })
+    } finally { await release() }
+  }
+
+  /** For a run that may not push to an empty remote: a local empty first commit to start from. */
+  async localEmptyBase(remoteUrl: string): Promise<void> {
+    const path = this.pathFor(remoteUrl)
+    const release = await this.lock(path)
+    try {
+      await withRepoConfig(path, async () => {
+        this.assertClone(path)
+        const existing = await execa('git', [...FETCH_GIT, 'rev-parse', '--verify', '-q', LOCAL_EMPTY_BASE], { cwd: path, stdin: 'ignore', reject: false })
+        if (existing.exitCode !== 0) await execa('git', [...FETCH_GIT, 'update-ref', LOCAL_EMPTY_BASE, await this.initialCommit(path), ''], { cwd: path, stdin: 'ignore' })
+      })
+    } finally { await release() }
+  }
+
+  private async initialCommit(path: string): Promise<string> {
+    await execa('git', [...FETCH_GIT, 'hash-object', '-t', 'tree', '-w', '--stdin'], { cwd: path, input: '' })
+    const { stdout } = await execa('git', [...FETCH_GIT, 'commit-tree', EMPTY_TREE, '-m', 'Initial commit'], { cwd: path, stdin: 'ignore', env: { ...process.env, ...INITIAL_COMMIT_ENV } })
+    return stdout.trim()
+  }
+
   async baseRef(remoteUrl: string, baseBranch?: string): Promise<string> {
     const path = this.pathFor(remoteUrl)
+    // An empty remote a run may not push to: only the local empty base exists.
+    const emptyBase = await execa('git', [...FETCH_GIT, 'rev-parse', '--verify', '-q', LOCAL_EMPTY_BASE], { cwd: path, stdin: 'ignore', reject: false })
+    if (emptyBase.exitCode === 0) return LOCAL_EMPTY_BASE
     if (baseBranch && baseBranch !== 'HEAD') {
       await assertBranchName(baseBranch)
       return `origin/${baseBranch}`
