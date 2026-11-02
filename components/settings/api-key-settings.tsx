@@ -19,7 +19,7 @@ import { Claude } from '@/components/ui/svgs/claude'
 import { OpenAI } from '@/components/ui/svgs/openai'
 import { API_KEY_PRESETS, type ApiKeyProtocol, type ApiKeyProvider, type ApiKeyView } from '@/lib/model-api-key-providers'
 import { useActionError } from '@/lib/use-action-error'
-import { BOT_AGENTS_KEYS } from '@/lib/execution-settings-client'
+import { modelOrderKey } from '@/components/settings/model-order-settings'
 
 type Key = ApiKeyView & { shared: boolean }
 const providers = [...API_KEY_PRESETS, 'custom'] as const
@@ -70,7 +70,7 @@ export function useApiKeyList(workspaceId: string) {
       const result = await refetchApiKeyModels(key.id, workspaceId)
       if (result.error) { setFailed({ message: actionError(result.error), retry: () => void refetch(key) }); return }
       await keys.mutate(result, { revalidate: false })
-      void mutate(BOT_AGENTS_KEYS.keys)
+      void mutate(modelOrderKey(workspaceId))
     } catch { setFailed({ message: actionError(), retry: () => void refetch(key) }) } finally { setPending(false) }
   }
   async function remove(key: Key) {
@@ -79,7 +79,7 @@ export function useApiKeyList(workspaceId: string) {
       const result = await deleteApiKey(key.id, workspaceId)
       if (result.error) { setFailed({ message: actionError(result.error), retry: () => void remove(key) }); return }
       await keys.mutate()
-      void mutate(BOT_AGENTS_KEYS.keys)
+      void mutate(modelOrderKey(workspaceId))
     } catch { setFailed({ message: actionError(), retry: () => void remove(key) }) } finally { setPending(false); setRemoving(null) }
   }
 
@@ -109,7 +109,7 @@ export function useApiKeyList(workspaceId: string) {
   </SettingsSection>
   const dialogs = <>
     {failed && <SettingsSaveError message={failed.message} retryLabel={commonT('retry')} onRetry={failed.retry} />}
-    {adding && <AddApiKeyDialog workspaceId={workspaceId} onClose={async added => { setAdding(false); if (added) { await keys.mutate(); void mutate(BOT_AGENTS_KEYS.keys) } }} />}
+    {adding && <AddApiKeyDialog workspaceId={workspaceId} onClose={async added => { setAdding(false); if (added) { await keys.mutate(); void mutate(modelOrderKey(workspaceId)) } }} />}
     <AlertDialog open={sharing !== null} onOpenChange={open => { if (!open && !pending) setSharing(null) }}>
       <AlertDialogContent>
         <AlertDialogHeader>

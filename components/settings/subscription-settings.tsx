@@ -1,9 +1,11 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import useSWR from 'swr'
+import useSWR, { mutate as globalMutate } from 'swr'
+import { modelOrderKey } from '@/components/settings/model-order-settings'
 import { Check, Copy, MoreHorizontal, TriangleAlert } from 'lucide-react'
 import { useFormatter, useTranslations } from 'next-intl'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
@@ -64,10 +66,13 @@ export function SubscriptionSettings({ workspaceId }: { workspaceId: string }) {
   const [starting, setStarting] = useState<{ provider: Provider; id?: string } | null>(null)
   const [error, setError] = useState<Failure | null>(null)
   const [notice, setNotice] = useState('')
+  // 断开连接 asks first, like deleting an API key (A1).
+  const [disconnecting, setDisconnecting] = useState<{ id: string; provider: Provider; revision: number; label: string } | null>(null)
   const [now, setNow] = useState(() => Date.now())
   const connectedKey = state?.connections.filter(item => item.state === 'connected').map(item => `${item.id}:${item.revision}`).join(',') ?? ''
   const { mutate } = list
-  const refresh = useCallback(async () => { await mutate() }, [mutate])
+  // The allowed models' candidates follow the connected accounts.
+  const refresh = useCallback(async () => { await mutate(); void globalMutate(modelOrderKey(workspaceId)) }, [mutate, workspaceId])
   const failureMessage = useCallback((failure: unknown, key: 'startFailed' | 'finishFailed', provider: Provider) => {
     if (failure instanceof InvalidAuthorization) return t('refusedPage', { provider: t(provider) })
     const code = failure instanceof RequestError ? failure.code : ''
@@ -262,7 +267,7 @@ export function SubscriptionSettings({ workspaceId }: { workspaceId: string }) {
                         <DropdownMenuContent align="end">
                           <DropdownMenuGroup>
                             {live
-                              ? <DropdownMenuItem variant="destructive" onClick={() => { void disconnect(connection) }}>{t('disconnect')}</DropdownMenuItem>
+                              ? <DropdownMenuItem variant="destructive" onClick={() => setDisconnecting({ ...connection, label: account ?? product })}>{t('disconnect')}</DropdownMenuItem>
                               : <DropdownMenuItem variant="destructive" onClick={() => { void remove(connection) }}>{t('remove')}</DropdownMenuItem>}
                           </DropdownMenuGroup>
                         </DropdownMenuContent>
@@ -294,6 +299,15 @@ export function SubscriptionSettings({ workspaceId }: { workspaceId: string }) {
     </SettingsSection>
     {updated !== null && <p className="pt-1 pl-1 text-xs text-muted-foreground">{updated < 1 ? t('updatedJustNow') : t('updatedAgo', { minutes: updated })}</p>}
     {notice && <p role="status" className="pt-1 pl-1 text-xs text-muted-foreground">{notice}</p>}
+    <AlertDialog open={disconnecting !== null} onOpenChange={open => { if (!open && !pending) setDisconnecting(null) }}>
+      <AlertDialogContent>
+        <AlertDialogHeader><AlertDialogTitle>{t('disconnectTitle', { label: disconnecting?.label ?? '' })}</AlertDialogTitle></AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={pending}>{t('cancel')}</AlertDialogCancel>
+          <AlertDialogAction variant="destructive" disabled={pending} onClick={() => { const target = disconnecting; setDisconnecting(null); if (target) void disconnect(target) }}>{t('disconnect')}</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   </div>
 }
 

@@ -783,10 +783,8 @@
     "online": "Online",
     "offline": "Offline",
     "thisMachine": "This machine",
-    "allowScheduling": "Allow scheduling",
-    "allowSchedulingTo": "Allow scheduling to {name}",
-    "autoSchedule": "Auto-schedule",
-    "autoScheduleTo": "Let Mikka pick {name} automatically",
+    "allowScheduling": "Scheduling",
+    "allowSchedulingTo": "Schedule runs on {name}",
     "recheck": "Check again",
     "agent": "Available tools",
     "toggleSidebar": "Expand or collapse the sidebar",
@@ -926,8 +924,7 @@
       "retry": "Retry",
       "done": "Done",
       "cancelled": "Cancelled"
-    },
-    "autoScheduleNeedsAllow": "Turn on Allow scheduling first"
+    }
   },
   "Workspace": {
     "loadingEditor": "Loading task editor",
@@ -1704,8 +1701,8 @@
         "title": "Connections"
       },
       "models": {
-        "title": "API and subscriptions",
-        "keywords": "model subscriptions subscription quota usage API key provider models"
+        "title": "Models and subscriptions",
+        "keywords": "model subscriptions quota API key provider models allowed order dispatch run location cloud local bots agents"
       },
       "logins": {
         "title": "Logins and keys"
@@ -1721,10 +1718,6 @@
       },
       "general": {
         "title": "General"
-      },
-      "bots": {
-        "title": "Bots & Agents",
-        "keywords": "bots agents model location rules labels"
       },
       "permissions": {
         "title": "Team permissions"
@@ -1926,7 +1919,8 @@
       "paused": "Paused",
       "useSubscription": "Use {label}",
       "pauseFailed": "The subscription could not be changed.",
-      "claudePlan": "Claude {plan}"
+      "claudePlan": "Claude {plan}",
+      "disconnectTitle": "Disconnect {label}?"
     },
     "integrations": {
       "googleSignInTitle": "Google sign-in",
@@ -2517,6 +2511,53 @@
       "modelsUnavailable": "Couldn't fetch models · Provider didn't respond",
       "refetch": "Fetch models again",
       "refetchLabel": "Fetch models for {name} again"
+    },
+    "modelOrder": {
+      "title": "Allowed models",
+      "loading": "Loading allowed models…",
+      "location": "Run location",
+      "local": "Local",
+      "cloud": "Cloud",
+      "localDevices": "{count, plural, one {# computer takes runs} other {# computers take runs}}",
+      "cloudNoKey": "No E2B key",
+      "add": "Add models",
+      "addCount": "{count, plural, one {Add # model} other {Add # models}}",
+      "empty": "No allowed models yet",
+      "noCandidates": "No models to add",
+      "removeTitle": "Remove {model}?",
+      "remove": "Remove",
+      "ready": "Available",
+      "quotaUntil": "Quota used up · back {time}",
+      "noDevice": "No computer can run {harness}",
+      "blocked": {
+        "quota": "Quota used up",
+        "expired": "Needs reconnecting",
+        "paused": "Paused",
+        "missing": "No longer available",
+        "keyRefused": "Key invalid or revoked"
+      },
+      "handle": "Drag {model} (position {position})",
+      "rowMenu": "More actions for {model}",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
+      "dragInstructions": "Press Space to pick up, use the up and down arrow keys to move, press Space again to drop, Esc to cancel.",
+      "dragStart": "Picked up {model}, position {position}",
+      "dragOver": "{model} moved to position {position}",
+      "dragEnd": "{model} dropped at position {position}",
+      "dragCancel": "Moving {model} cancelled",
+      "source": {
+        "claude": "Claude subscription",
+        "codex": "ChatGPT subscription",
+        "apiKey": "{provider} API key"
+      },
+      "added": "Added",
+      "provider": {
+        "anthropic": "Anthropic",
+        "openai": "OpenAI",
+        "deepseek": "DeepSeek",
+        "kimi": "Kimi",
+        "custom": "Custom provider"
+      }
     }
   },
   "TelegramBot": {
@@ -3217,11 +3258,17 @@
     "needsMachineTitle": "No computer available",
     "needsMachineDescription": "Connect or turn on a computer first, or add your E2B API key to run in the cloud.",
     "needsMachineConnect": "Connect a computer",
-    "needsMachineAuto": "Let this computer be picked automatically",
+    "needsMachineAuto": "Schedule runs on this computer",
     "needsMachineServerOnline": "Bring the server back online",
     "needsMachineMac": "Enable on this computer",
     "needsMachineServer": "Connect my server",
-    "needsMachineE2B": "Add E2B key"
+    "needsMachineE2B": "Add E2B key",
+    "needsModelTitle": "No model can run this task",
+    "needsModelNoModels": "No allowed models yet",
+    "needsModelCloud": "Cloud has no E2B key yet",
+    "needsModelNoDevice": "No computer can run any allowed model",
+    "needsModelUnavailable": "Every allowed model is unavailable right now",
+    "needsModelSettings": "Open Models and subscriptions"
   },
   "IssueThreads": {
     "title": "Threads",

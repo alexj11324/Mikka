@@ -5,7 +5,7 @@ import useSWR from 'swr'
 import { Check, Copy, Laptop, MoreHorizontal, Plus, Server } from 'lucide-react'
 import { useFormatter, useNow, useTranslations } from 'next-intl'
 import { toast } from 'sonner'
-import { listDevices, removeDevice, renameDevice, sendDeviceCommand, setDeviceAutoSchedule, setDeviceEnabled, type DeviceView } from '@/app/actions/agents'
+import { listDevices, removeDevice, renameDevice, sendDeviceCommand, setDeviceEnabled, type DeviceView } from '@/app/actions/agents'
 import { HarnessLabel, harnessName } from '@/components/labels/entity-labels'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
@@ -17,7 +17,6 @@ import { Field, FieldGroup, FieldLabel, FieldError } from '@/components/ui/field
 import { Input } from '@/components/ui/input'
 import { Item, ItemGroup, ItemSeparator } from '@/components/ui/item'
 import { Switch } from '@/components/ui/switch'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { bridgeFromWindow, type MikkaWindow } from '@/lib/platform/detect'
 import { useActionError } from '@/lib/use-action-error'
 import { cn } from '@/lib/utils'
@@ -146,18 +145,11 @@ function DeviceRow({ device, onChanged, onReconnect }: { device: DeviceView; onC
       </span>
     </span>
     {!device.online && <Button variant="secondary" size="sm" onClick={onReconnect}>{t('reconnect')}</Button>}
+    {/* 参与调度: the device's one switch (decision 2026-11-02-1400). */}
     <span className="flex items-center gap-2 text-sm text-muted-foreground">
       <span aria-hidden="true" className="max-sm:hidden">{t('allowScheduling')}</span>
       <Switch checked={device.enabled} aria-label={t('allowSchedulingTo', { name: device.name })} onCheckedChange={enabled => { void run(() => setDeviceEnabled({ deviceId: device.id, enabled })) }} />
     </span>
-    {/* 自动调度 depends on 允许调度: while that is off this one reads off too, and its tooltip says why it is locked. */}
-    <Tooltip>
-      <TooltipTrigger render={<span className="flex items-center gap-2 text-sm text-muted-foreground" />}>
-        <span aria-hidden="true" className="max-sm:hidden">{t('autoSchedule')}</span>
-        <Switch checked={device.enabled && device.autoSchedule} disabled={!device.enabled} aria-label={t('autoScheduleTo', { name: device.name })} onCheckedChange={autoSchedule => { void run(() => setDeviceAutoSchedule({ deviceId: device.id, autoSchedule })) }} />
-      </TooltipTrigger>
-      {!device.enabled && <TooltipContent>{t('autoScheduleNeedsAllow')}</TooltipContent>}
-    </Tooltip>
     <DropdownMenu>
       <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label={t('menu', { name: device.name })} />}><MoreHorizontal data-icon="inline-start" /></DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-48">

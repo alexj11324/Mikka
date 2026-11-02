@@ -115,9 +115,3 @@ export async function quotaFallbackApiKey(query: Query, input: {
   return firstKey(keys, input.harness, input.model)
 }
 
-/** For a thread's model with no rule (rule-dispatch `threadModel`): the person's first usable key, on its own Agent. */
-export async function firstRunApiKey(query: Query, ownerId: string, botWorkspaceId: string | null): Promise<(RunApiKey & { harness: 'claude_code' | 'codex' }) | undefined> {
-  for (const key of await runKeys(query, ownerId, botWorkspaceId)) {
-    if (key.models[0]) return { keyId: key.id, model: key.models[0], harness: apiKeyHarness(key.protocol) }
-  }
-}

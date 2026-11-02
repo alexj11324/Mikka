@@ -64,7 +64,6 @@ test(
       await pool.query(catalogueMigration); await pool.query(catalogueMigration);
       const personalPolicyMigration = await readFile(new URL("../drizzle/20261101020201_workspace_personal_policies.sql",import.meta.url),"utf8");
       await pool.query(personalPolicyMigration); await pool.query(personalPolicyMigration);
-      const explicitMigration = await readFile(new URL("../drizzle/20261031054017_explicit_execution.sql",import.meta.url),"utf8");
       const settings = new ExecutionSettings(pool),
         alice = { ownerId: "alice", workspaceId: randomUUID() },
         bob = { ...alice, ownerId: "bob" },
@@ -80,143 +79,6 @@ test(
         `INSERT INTO devices (id,"ownerId",kind,enabled,"autoSchedule","lastSeenAt",harnesses) VALUES ($1,'alice','local',true,true,now(),'[{"harness":"codex","installed":true,"models":["explicit-model"],"defaultModelSlot":"default","modelSlots":[{"slot":"default","model":"explicit-model","name":"Explicit model"}]}]'),($2,'bob','local',true,true,now(),'[]')`,
         [own, foreign],
       );
-      const legacyId = randomUUID();
-      await pool.query(
-        `INSERT INTO execution_rules (id,"ownerId","workspaceId",label,place,harness,model,position) VALUES ($1,'alice',$2,'legacy','auto','auto','auto',0)`,
-        [legacyId, alice.workspaceId],
-      );
-      await pool.query(explicitMigration);
-      await pool.query(explicitMigration);
-      assert.equal((await pool.query('SELECT model FROM execution_rules WHERE id=$1',[legacyId])).rows[0].model,'default');
-      const migrated = await settings.list(alice);
-      assert.equal(
-        migrated.find((r) => r.id === legacyId)?.model,
-        "default",
-      );
-      assert.equal(migrated.find((r) => r.id === legacyId)?.place, own);
-      await settings.mutate(alice, { kind: "delete", id: legacyId });
-      const value = {
-        label: "backend",
-        place: own,
-        harness: "codex" as const,
-        model: "explicit-model",
-      };
-      assert.deepEqual(
-        (await settings.list(alice)).map((r) => r.id),
-        ["default"],
-      );
-      await settings.mutate(alice, { kind: "save", value });
-      await settings.mutate(alice, {
-        kind: "save",
-        value: { ...value, label: "frontend" },
-      });
-      await pool.query('DELETE FROM execution_rules WHERE label IS NULL AND "ownerId"=$1 AND "workspaceId"=$2',[alice.ownerId,alice.workspaceId]);
-      await Promise.all(Array.from({ length: 12 }, () => settings.list(alice)));
-      await settings.mutate(alice, {
-        kind: "save",
-        id: "default",
-        value: { ...value, model: "explicit-model" },
-      });
-      assert.equal(
-        (await settings.list(alice)).find((r) => r.id === "default")?.place,
-        own,
-      );
-      assert.equal(
-        (
-          await pool.query(
-            'SELECT count(*)::int AS n FROM execution_rules WHERE label IS NULL AND "ownerId"=$1 AND "workspaceId"=$2',
-            [alice.ownerId, alice.workspaceId],
-          )
-        ).rows[0].n,
-        1,
-      );
-      assert.deepEqual(await settings.fallbacks("alice"), {
-        whenDeviceOffline: "wait",
-      });
-      await settings.setFallbacks("alice", {
-        whenDeviceOffline: "cloud",
-      });
-      assert.equal(
-        (await settings.fallbacks("alice")).whenDeviceOffline,
-        "cloud",
-      );
-      for (const field of ["place", "harness", "model"])
-        await assert.rejects(
-          settings.mutate(alice, {
-            kind: "save",
-            value: { ...value, [field]: "auto" },
-          }),
-          { code: "executionAutoNotAllowed" },
-        );
-      const rules = await settings.list(alice),
-        ids = rules.filter((r) => r.label !== null).map((r) => r.id);
-      await assert.rejects(settings.list(bob),{code:"executionModelUnknown"});
-      assert.equal((await settings.list(other)).length, 1);
-      await assert.rejects(
-        settings.mutate(alice, {
-          kind: "save",
-          value: { ...value, place: foreign },
-        }),
-      );
-      await assert.rejects(
-        settings.mutate(bob, { kind: "save", id: ids[0], value }),
-      );
-      await assert.rejects(
-        settings.mutate(other, { kind: "delete", id: ids[0] }),
-      );
-      await assert.rejects(
-        settings.mutate(alice, { kind: "delete", id: "default" }),
-      );
-      await assert.rejects(
-        settings.mutate(alice, { kind: "reorder", ids: [ids[0], ids[0]] }),
-      );
-      await settings.mutate(alice, {
-        kind: "reorder",
-        ids: [...ids].reverse(),
-      });
-      assert.deepEqual(
-        (await settings.list(alice)).slice(0, 2).map((r) => r.id),
-        [...ids].reverse(),
-      );
-      await settings.mutate(alice, {
-        kind: "save",
-        id: ids[0],
-        value: { ...value, model: "explicit-model" },
-      });
-      assert.equal(
-        (await settings.list(alice)).find((r) => r.id === ids[0])?.model,
-        "explicit-model",
-      );
-      await settings.mutate(alice, { kind: "delete", id: ids[1] });
-      assert.equal((await settings.list(alice))[0].position, 0);
-      await assert.rejects(settings.redetect(bob, own));
-      const receipt = await settings.redetect(alice, own);
-      assert.equal((await settings.redetectStatus(alice, receipt.commandId)).status, 'pending');
-      await assert.rejects(settings.redetectStatus(bob, receipt.commandId), { code: 'executionCommandNotFound' });
-      await pool.query('UPDATE device_management_commands SET "completedAt"=now() WHERE id=$1', [receipt.commandId]);
-      assert.equal((await settings.redetectStatus(alice, receipt.commandId)).status, 'completed');
-      await pool.query('UPDATE device_management_commands SET error=$2 WHERE id=$1', [receipt.commandId, 'detection_failed']);
-      assert.equal((await settings.redetectStatus(alice, receipt.commandId)).status, 'failed');
-      assert.ok(
-        (
-          await pool.query(
-            'SELECT id FROM device_management_commands WHERE "deviceId"=$1',
-            [own],
-          )
-        ).rows[0].id,
-      );
-      await pool.query('UPDATE devices SET "removedAt"=now() WHERE id=$1', [
-        own,
-      ]);
-      await assert.rejects(settings.redetect(alice, own));
-      assert.equal(
-        (await settings.places(alice)).some((place) => place.id === own),
-        false,
-      );
-      await assert.rejects(settings.mutate(alice, { kind: "save", value }));
-      await pool.query('UPDATE devices SET "removedAt"=NULL WHERE id=$1', [
-        own,
-      ]);
       await pool.query("INSERT INTO bots VALUES ($1,$2,$3)", [
         bot,
         alice.ownerId,
@@ -235,31 +97,6 @@ test(
         "dynamic-model",
       );
       assert.equal((await settings.botModels(bob)).length, 0);
-      const server = randomUUID(),claudeConnection=randomUUID(),claudeBinding=randomUUID();
-      await pool.query(`INSERT INTO devices (id,"ownerId",kind,enabled,"lastSeenAt","deviceType",harnesses) VALUES ($1,'alice','local',true,now(),'server',$2)`,[server,JSON.stringify([{harness:'claude_code',installed:true,models:['opus'],defaultModelSlot:'opus',modelSlots:[{slot:'opus',model:'reported-opus',name:'Reported opus'}]}])]);
-      await pool.query(`INSERT INTO byos_connections (id,"ownerId","workspaceId",epoch,state,provider) VALUES ($1,'alice',$2,1,'connected','claude')`,[claudeConnection,alice.workspaceId]);
-      await pool.query(`INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision","modelId",route) VALUES ($1,'alice',$2,$3,$4,1,'reported-opus','claude_cpa')`,[claudeBinding,alice.workspaceId,bot,claudeConnection]);
-      assert.deepEqual(await settings.suggested(alice),{id:'default',label:null,place:server,harness:'claude_code',model:'opus',position:2147483647});
-      // The same slots with none marked default: no slot is picked by its name; the account's cloud model is suggested instead.
-      await pool.query('UPDATE devices SET harnesses=$2 WHERE id=$1',[server,JSON.stringify([{harness:'claude_code',installed:true,models:['opus'],modelSlots:[{slot:'opus',model:'reported-opus',name:'Reported opus'}]}])]);
-      assert.deepEqual(await settings.suggested(alice),{id:'default',label:null,place:'cloud',harness:'claude_code',model:'reported-opus',position:2147483647});
-      await pool.query('UPDATE devices SET harnesses=$2 WHERE id=$1',[server,JSON.stringify([{harness:'claude_code',installed:true,models:['opus'],defaultModelSlot:'opus',modelSlots:[{slot:'opus',model:'reported-opus',name:'Reported opus'}]}])]);
-      // A teammate's E2B key is theirs alone: it never puts Alice's cloud first (keys are personal).
-      await pool.query('INSERT INTO user_e2b_keys ("userId") VALUES ($1)',['bob']);
-      assert.equal((await settings.suggested(alice)).place,server);
-      // Alice's own E2B key puts the cloud ahead of the online device, and so does one she saved
-      // for the workspace before keys were personal, until it is adopted.
-      for (const key of ['INSERT INTO user_e2b_keys ("userId") VALUES ($1)', 'INSERT INTO workspace_e2b_keys ("workspaceId","createdBy") VALUES (gen_random_uuid(),$1)']) {
-        await pool.query(key,['alice']);
-        assert.deepEqual(await settings.suggested(alice),{id:'default',label:null,place:'cloud',harness:'claude_code',model:'reported-opus',position:2147483647});
-        await pool.query('DELETE FROM user_e2b_keys WHERE "userId"=$1',['alice']);
-        await pool.query('DELETE FROM workspace_e2b_keys');
-      }
-      await pool.query('DELETE FROM user_e2b_keys');
-      await pool.query(`UPDATE byos_connections SET state='disconnected' WHERE id=$1`,[claudeConnection]);
-      assert.equal((await settings.suggested(alice)).harness,'codex');
-      assert.equal((await settings.suggested(alice)).model,'default');
-      await pool.query('DELETE FROM devices WHERE id=$1',[server]);
 
       await assert.rejects(settings.setBotModel(bob, bot, binding));
       await assert.rejects(settings.setBotModel(other, bot, binding));
@@ -316,37 +153,6 @@ test(
       }), {code:'executionAccountUnavailable'});
       assert.equal((await pool.query(`SELECT count(*)::int AS count FROM byos_bindings WHERE "modelId"='stale-provider-model'`)).rows[0].count,0);
       await pool.query(`UPDATE byos_connections SET epoch=1 WHERE id=$1`,[connection]);
-      const ruleValue = {label:'typed', place:own,harness:'codex' as const,model:'explicit-model'};
-      for (const [patch,code] of [[{place:'invalid'},'executionPlaceInvalid'],[{harness:'missing'},'executionHarnessUnavailable'],[{harness:'mock'},'executionHarnessUnavailable'],[{model:'missing'},'executionModelUnknown']] as const) {
-        await assert.rejects(settings.mutate(alice, {kind:'save',value:{...ruleValue,...patch} as typeof ruleValue}), {code});
-      }
-      // A model one of her API keys lists runs on that key (§ 3), so Bot 与 Agents may save it for that key's Agent (decision 2026-11-02-1200).
-      const keyId = randomUUID();
-      await pool.query(`INSERT INTO model_api_keys (id,"ownerId",provider,protocol,ciphertext,iv,"keyVersion",last4,models) VALUES ($1,$2,'openai','openai','x','x',1,'abcd','["key-listed-model"]')`,[keyId,alice.ownerId]);
-      await settings.mutate(alice,{kind:'save',value:{...ruleValue,label:'keyed',model:'key-listed-model'}});
-      assert.equal((await settings.list(alice)).find(rule=>rule.label==='keyed')?.model,'key-listed-model');
-      await assert.rejects(settings.mutate(bob,{kind:'save',value:{...ruleValue,label:'keyed',model:'key-listed-model'}}),{code:'executionPlaceInvalid'},'never on someone else\'s key or device');
-      await pool.query(`DELETE FROM execution_rules WHERE label='keyed'`);
-      await pool.query('DELETE FROM model_api_keys WHERE id=$1',[keyId]);
-      await assert.rejects(settings.mutate(alice, {kind:'save',value:{...ruleValue,label:'keyed',model:'key-listed-model'}}), {code:'executionModelUnknown'},'the key gone, its model goes with it');
-      await assert.rejects(settings.mutate(alice,{kind:'delete',id:randomUUID()}), {code:'executionRuleNotFound'});
-      const fixtureScope = {...alice,workspaceId:randomUUID()};
-      await pool.query(`INSERT INTO execution_rules (id,"ownerId","workspaceId",label,place,harness,model,position) VALUES ($1,$2,$3,NULL,$4,'mock','fixture-model',2147483647)`,[randomUUID(),alice.ownerId,fixtureScope.workspaceId,own]);
-      const fixtureRules = await settings.list(fixtureScope);
-      const {resolveExecution}=await import('./execution-rules');
-      assert.deepEqual(resolveExecution([],fixtureRules,[{id:own,enabled:true,online:true,harnesses:[{harness:'mock',installed:true,version:null}]}]),{place:own,harness:'mock',model:'fixture-model'});
-      const labelled = randomUUID(), otherLabelled = randomUUID(), deletedLabelled = randomUUID(), personalLabelled = randomUUID();
-      await pool.query('CREATE TABLE issues (id uuid PRIMARY KEY,content jsonb,scope text,"updatedAt" timestamptz DEFAULT now())');
-      const labelledContent = (name: string, deletedAt: string | null = null) => ({type:'doc',attrs:{mikka:{labels:[{name,color:'blue'}],deletedAt}}});
-      for (const [id,name,kind,deletedAt] of [[labelled,'backend','workspace',null],[otherLabelled,'foreign','workspace',null],[deletedLabelled,'deleted','workspace',new Date().toISOString()],[personalLabelled,'private','personal',null]]) {
-        await pool.query('INSERT INTO issues (id,content,scope) VALUES ($1,$2,$3)', [id,JSON.stringify(labelledContent(name!,deletedAt)),kind]);
-      }
-      mock.module(new URL('./issue-team-access.ts',import.meta.url).href,{namedExports:{issueTeamScope:async () => [
-        {issueId:labelled,workspaceId:alice.workspaceId},{issueId:otherLabelled,workspaceId:other.workspaceId},
-        {issueId:deletedLabelled,workspaceId:alice.workspaceId},{issueId:personalLabelled,workspaceId:alice.workspaceId}
-      ]}});
-      assert.deepEqual(await settings.labels(alice), [{name:'backend',color:'blue'}]);
-      assert.deepEqual(await settings.labels(other), [{name:'foreign',color:'blue'}]);
       let sessionOwner: string | null = "alice";
       const stub = (path: string, exports: Record<string, unknown>) =>
         mock.module(new URL(path, import.meta.url).href, {
@@ -447,17 +253,8 @@ test(
       assert.deepEqual(await freezeBotModel({ownerId:'bob',workspaceId:teamB.workspaceId,botId:bobBot},dependencies),{harness:'ai_sdk',model:COORDINATOR_MODEL},'un-shared: bob\'s bot replies on Mikka 默认');
       assert.ok((await freezeBotModel({ownerId:alice.ownerId,workspaceId:teamB.workspaceId,botId:teamBot},dependencies)).modelSelection,'un-shared: hers still works');
       sessionOwner = null;
-      await assert.rejects(actions.listExecutionRules());
-      sessionOwner = "bob";
-      await assert.rejects(actions.deleteExecutionRule(ids[0]));
-      await assert.rejects(actions.redetectDevice(own));
+      await assert.rejects(actions.listBotModels());
       sessionOwner = "alice";
-      await actions.createExecutionRule({ ...value, label: "actions" });
-      assert.ok(
-        (await actions.listExecutionRules()).some(
-          (rule) => rule.label === "actions",
-        ),
-      );
       await pool.query(
         `UPDATE byos_connections SET state='disconnected' WHERE id=$1`,
         [connection],

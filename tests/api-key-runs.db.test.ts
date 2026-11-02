@@ -29,8 +29,6 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
   const { queueRun } = await import('../lib/agent-runs')
   const { queueCloudRun } = await import('../lib/computer/queue-run')
   const { hashDeviceToken } = await import('../lib/device-link')
-  const { threadModel } = await import('../lib/rule-dispatch')
-  const { ExecutionSettings } = await import('../lib/execution-settings')
   const claimRoute = await import('../app/v1/devices/[deviceId]/runs/[runId]/claim/route')
   const users: string[] = []
   t.after(async () => {
@@ -215,8 +213,6 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
     const chosen = await queue()
     assert.deepEqual(chosen.apiKey, { keyId: key.id, model: 'subscription-model' }, 'the bot\'s saved choice wins (§ 2)')
     assert.equal(chosen.subscription, undefined)
-    const thread = await threadModel(new ExecutionSettings(pool), { ownerId: p.id, workspaceId: p.workspaceId }, p.botId)
-    assert.deepEqual(thread, { model: 'subscription-model', subscription: false, apiKey: true, harness: 'claude_code' }, 'a saved API-key model is the thread\'s model, not Mikka 默认')
   })
 
   await t.test('a rule\'s model only an API key lists runs on that key, beside a usable subscription; one the subscription lists stays on it', async () => {

@@ -118,9 +118,6 @@ test('API keys: migration replay, sealed storage, shares, picker order and run i
     assert.deepEqual((await store.usableApiKeys(pool, 'alice', team.id)).map(key => [key.provider, key.mine]), [['anthropic', true], ['custom', false]])
     assert.deepEqual((await store.usableApiKeys(pool, 'bob', team.id)).map(key => [key.name, key.mine]), [['Gateway', true], ['Local', true]], 'Bob\'s own keys are his here without sharing; nobody shared with him')
     assert.deepEqual((await store.usableApiKeys(pool, 'alice', personal.id)).map(key => key.provider), ['anthropic'])
-    // Bot 与 Agents offers the usable keys' models under the Agent each runs on (§ 3).
-    assert.deepEqual(await store.apiKeyModels(pool, 'alice', team.id), [{ harness: 'claude_code', models: ['claude-opus-5-5'] }, { harness: 'codex', models: ['qwen-max'] }])
-    assert.deepEqual(await store.apiKeyModels(pool, 'carol', personal.id), [])
     await pool.query('UPDATE workspace_personal_policies SET subscriptions=false WHERE "workspaceId"=$1', [team.id])
     assert.deepEqual((await store.usableApiKeys(pool, 'alice', team.id)).map(key => [key.provider, key.mine]), [['anthropic', true]], 'the admin switch turns off teammates\' shared keys, never her own')
     await pool.query('UPDATE workspace_personal_policies SET subscriptions=true WHERE "workspaceId"=$1', [team.id])

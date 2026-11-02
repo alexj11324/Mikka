@@ -361,7 +361,7 @@ export async function listAgents(userId: string, scope?: NativeToolScope) {
  * One task, one thread (lib/thread-dispatch.ts): a task with a thread gets the dispatch as that thread's work; only
  * `newThread`, when the person's own message (`sourceEventId`, host-supplied) explicitly asked for it, starts another.
  */
-export async function dispatchRun(userId: string, input: { issueId: string; agentId?: string; repo: string; note?: string; requestKey?:string; readOnly?: boolean; newThread?: boolean; sourceEventId?: string; target?: import('@/lib/dispatch-target').DispatchTarget }, scope: NativeToolScope | undefined, botId: string, execution?: AgentExecution, requestEventId?: string, approvedRepositoryKey?: string) {
+export async function dispatchRun(userId: string, input: { issueId: string; agentId?: string; repo: string; note?: string; requestKey?:string; readOnly?: boolean; newThread?: boolean; sourceEventId?: string; target?: import('@/lib/dispatch-target').DispatchTarget; model?: { harness: 'claude_code' | 'codex'; model: string } }, scope: NativeToolScope | undefined, botId: string, execution?: AgentExecution, requestEventId?: string, approvedRepositoryKey?: string) {
   'use step'
   await assertNativeToolScope(userId,scope)
   const { newThread, sourceEventId, target, ...request } = input
@@ -394,7 +394,7 @@ export async function dispatchRun(userId: string, input: { issueId: string; agen
 }
 
 /** Where a new run goes by the saved label execution rules: the workspace's cloud, else an online device. */
-async function dispatchByRules(userId: string, input: { issueId: string; agentId?: string; repo: string; note?: string; requestKey?:string; readOnly?: boolean }, scope: NativeToolScope | undefined, botId: string, execution?: AgentExecution, requestEventId?: string, approvedRepositoryKey?: string, place?: import('@/lib/dispatch-target').DispatchTarget) {
+async function dispatchByRules(userId: string, input: { issueId: string; agentId?: string; repo: string; note?: string; requestKey?:string; readOnly?: boolean; model?: { harness: 'claude_code' | 'codex'; model: string } }, scope: NativeToolScope | undefined, botId: string, execution?: AgentExecution, requestEventId?: string, approvedRepositoryKey?: string, place?: import('@/lib/dispatch-target').DispatchTarget) {
   // A computer the person named: theirs, not removed, online; otherwise refused or the card at once, never another computer.
   if (place && place !== 'cloud') {
     const { targetDevice } = await import('@/lib/dispatch-target')
@@ -406,34 +406,35 @@ async function dispatchByRules(userId: string, input: { issueId: string; agentId
     return { ...result, status: 'queued' as const }
   }
   {
-    const target = await (await import('@/lib/rule-dispatch')).resolveIssueExecution(userId,botId,input.issueId,place === 'cloud' ? 'cloud' : undefined)
-    // No machine can take it (decision 2026-10-31-2200-run-machine-fallback): an error the person can act on.
-    const noMachine = async () => {
-      const card = 'card' in target ? target.card : (await import('@/lib/rule-dispatch')).machineUnavailableCard()
-      return { error: 'machineUnavailable' as const, issueId: input.issueId, card }
+    // 模型与订阅 (decision 2026-11-02-1400): the thread's own model, else 允许使用的模型 in order; 运行位置 says where.
+    // The person asking for the cloud runs it there whatever 运行位置 says.
+    const { issueForUser } = await import('@/lib/issue-access')
+    if (!await issueForUser(userId, input.issueId)) throw new ActionFailureError('issueNotFound')
+    const { executionWorkspace } = await import('@/lib/execution-settings')
+    const workspaceId = await executionWorkspace(userId, botId)
+    const { resolveModelDispatch } = await import('@/lib/model-dispatch')
+    const target = await resolveModelDispatch(pool, { ownerId: userId, workspaceId, botId }, input.model ?? null, undefined, place === 'cloud' ? 'cloud' : undefined)
+    if (target.kind === 'none') return { error: 'machineUnavailable' as const, issueId: input.issueId, reason: target.reason, card: target.card }
+    if (target.kind === 'device') {
+      const result = await queueRun(userId, { ...input, agentId: target.agentId, model: target.model, pinnedDeviceId: target.deviceId }, botId, execution, requestEventId, null, approvedRepositoryKey)
+      return { ...result, status: 'queued' as const }
     }
-    const queueOnDevice = async (device: { agentId: string; model?: string; pinnedDeviceId?: string }) => {
-      const result=await queueRun(userId,{...input,agentId:device.agentId,model:device.model,pinnedDeviceId:device.pinnedDeviceId},botId,execution,requestEventId,null,approvedRepositoryKey)
-      return {...result,status:'queued' as const}
+    if (requestEventId) {
+      const event=(await pool.query('SELECT "userId","botId",payload FROM coordinator_events WHERE id=$1',[requestEventId])).rows[0]
+      if (!event || event.userId!==userId || event.botId!==botId || event.payload?.taskDestination) throw new ActionFailureError('runInvalid')
     }
-    if ('needsMachine' in target) return noMachine()
-    if (!('agentId' in target)) {
-      if (requestEventId) {
-        const event=(await pool.query('SELECT "userId","botId",payload FROM coordinator_events WHERE id=$1',[requestEventId])).rows[0]
-        if (!event || event.userId!==userId || event.botId!==botId || event.payload?.taskDestination) throw new ActionFailureError('runInvalid')
-      }
-      if (approvedRepositoryKey) throw new ActionFailureError('runInvalid')
-      // The bot's own runtime, created on first use; the Coordinator's is its bot row's like any bot's.
-      // An API-key model binds no subscription to it.
-      const autoRuntime=await import('@/lib/computer/auto-runtime')
-      const actor={userId,workspaceId:target.workspaceId}
-      const runtime=await autoRuntime.ensureBotCloudRuntime(pool,actor,botId,{harness:target.harness,model:'apiKey' in target ? undefined : target.model})
-      const cloud = runtime ? await dispatchComputerTask(userId,{botId:runtime.botId,issueId:input.issueId,harness:runtime.harness,note:input.note,model:target.model,repo:input.repo,...(input.readOnly ? {readOnly:true} : {})},`rule:${input.requestKey ?? requestEventId ?? crypto.randomUUID()}`,scope,execution) : { error: 'cloudComputerUnavailable' as const }
-      // The person's own E2B refused (capacity, quota, key): same as no cloud.
-      if (!('error' in cloud) || cloud.error !== 'cloudComputerUnavailable') return cloud
-      return target.fallback ? queueOnDevice(target.fallback) : noMachine()
-    }
-    return queueOnDevice(target)
+    if (approvedRepositoryKey) throw new ActionFailureError('runInvalid')
+    // The bot's own runtime, created on first use; the Coordinator's is its bot row's like any bot's.
+    // An API-key model binds no subscription to it; a subscription model binds the entry's own account.
+    const autoRuntime=await import('@/lib/computer/auto-runtime')
+    const actor={userId,workspaceId}
+    const runtime=await autoRuntime.ensureBotCloudRuntime(pool,actor,botId,{harness:target.harness})
+    if (runtime && target.entry.source.kind === 'subscription') await (await import('@/lib/model-dispatch')).bindAgentToConnection(pool, { ownerId: userId, workspaceId }, runtime.agentId, target.harness, target.entry.source.connectionId, target.model)
+    const cloud = runtime ? await dispatchComputerTask(userId,{botId:runtime.botId,issueId:input.issueId,harness:runtime.harness,note:input.note,model:target.model,repo:input.repo,...(input.readOnly ? {readOnly:true} : {})},`rule:${input.requestKey ?? requestEventId ?? crypto.randomUUID()}`,scope,execution) : { error: 'cloudComputerUnavailable' as const }
+    if (!('error' in cloud) || cloud.error !== 'cloudComputerUnavailable') return cloud
+    // The person's own E2B refused (capacity, quota, key): nothing else is picked, the card says why.
+    const { modelUnavailableCard } = await import('@/lib/model-dispatch')
+    return { error: 'machineUnavailable' as const, issueId: input.issueId, reason: 'cloudNotConfigured' as const, card: modelUnavailableCard('cloudNotConfigured') }
   }
 }
 

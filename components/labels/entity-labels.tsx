@@ -4,7 +4,9 @@ import type { ComponentType, ReactNode, SVGProps } from 'react'
 import { Box, Cloud, Laptop, Monitor, Server, type LucideIcon } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { cn } from '@/lib/utils'
-import { modelProvider, type DeviceKind, type ModelProvider } from '@/lib/execution-settings-view'
+import { modelProvider, type ModelProvider } from '@/lib/execution-settings-view'
+
+type DeviceKind = 'laptop' | 'server' | 'cloud' | 'unknown'
 import { MikkaMarkSmall } from '@/components/brand/mikka-mark'
 import { ClaudeCodeMark, ClaudeMark, CodexMark, CursorMark, OpenAIMark } from './brand-marks'
 

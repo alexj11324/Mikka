@@ -48,9 +48,6 @@ export function apiKeyChatBaseUrl(key: Pick<ApiKeyView, 'provider' | 'baseUrl' |
 /** The Agent that runs a key's models: Codex for OpenAI-protocol credentials, Claude Code for the rest (§ 3). */
 export const apiKeyHarness = (protocol: ApiKeyProtocol) => protocol === 'openai' ? 'codex' as const : 'claude_code' as const
 
-/** The models of the keys a workspace's runs may use, by the Agent that runs them. */
-export interface ApiKeyModels { harness: 'claude_code' | 'codex'; models: string[] }
-
 /** One credential row as the page and the model picker read it. Never the key itself. */
 export interface ApiKeyView {
   id: string

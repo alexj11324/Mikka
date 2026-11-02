@@ -11,7 +11,7 @@ import { openSecret, sealSecret, SecretsKeyMissingError } from '@/lib/secrets/cr
 import { WorkspaceError } from '@/lib/workspace-error'
 import {
   API_KEY_PRESET_ENDPOINTS, API_KEY_PRESETS, apiKeyChatBaseUrl, apiKeyHarness, customModelsUrl,
-  type ApiKeyModels, type ApiKeyProtocol, type ApiKeyProvider, type ApiKeyView,
+  type ApiKeyProtocol, type ApiKeyProvider, type ApiKeyView,
 } from '@/lib/model-api-key-providers'
 
 /**
@@ -232,18 +232,6 @@ export async function usableApiKeys(query: Query, userId: string, workspaceId: s
   const others = allowed ? (await query.query<Row>(`SELECT ${COLUMNS.split(',').map(column => `k.${column}`).join(',')} FROM model_api_key_shares s JOIN model_api_keys k ON k.id=s."keyId"
     WHERE s."workspaceId"=$1 AND k."ownerId"<>$2 ORDER BY s."createdAt",k.id`, [workspaceId, userId])).rows : []
   return [...mine.map(row => ({ ...view(row), ownerId: row.ownerId, mine: true })), ...others.map(row => ({ ...view(row), ownerId: row.ownerId, mine: false }))]
-}
-
-/** A usable key's models, by the Agent that runs them (§ 3): what 「Bot 与 Agents」 offers next to the subscriptions. */
-export async function apiKeyModels(query: Query, userId: string, workspaceId: string): Promise<ApiKeyModels[]> {
-  const byHarness = new Map<ApiKeyModels['harness'], Set<string>>()
-  for (const key of await usableApiKeys(query, userId, workspaceId)) {
-    const harness = apiKeyHarness(key.protocol)
-    const models = byHarness.get(harness) ?? new Set<string>()
-    for (const model of key.models) models.add(model)
-    byHarness.set(harness, models)
-  }
-  return [...byHarness].flatMap(([harness, models]) => models.size ? [{ harness, models: [...models] }] : [])
 }
 
 /** What the run's Agent gets: environment variables, plus Codex's model provider when it runs on Codex. */
