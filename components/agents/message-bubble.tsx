@@ -347,7 +347,7 @@ export function MessageBubbleCollapsible({
       >
         {children}
       </div>
-      <Button variant="ghost" size="sm"
+      <Button variant="bare" size="bare"
         type="button"
         aria-expanded={currentOpen}
         aria-controls={contentId}

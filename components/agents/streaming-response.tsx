@@ -222,7 +222,7 @@ export function StreamingResponse({
                 </>
               ) : null}
               {hasSources ? (
-                <Button variant="ghost" size="sm"
+                <Button variant="bare" size="bare"
                   type="button"
                   aria-expanded={currentSourcesOpen}
                   aria-controls={sourcesContentId}

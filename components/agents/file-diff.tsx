@@ -164,7 +164,7 @@ export function FileDiff({
       aria-busy={streaming}
       className={cn("w-full text-sm", className)}
     >
-      <Button variant="ghost" size="sm"
+      <Button variant="bare" size="bare"
         id={triggerId}
         type="button"
         aria-expanded={currentOpen}

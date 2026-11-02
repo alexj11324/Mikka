@@ -22,6 +22,9 @@ const buttonVariants = cva(
         destructive:
           "bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30 dark:focus-visible:ring-destructive/40",
         link: "text-primary underline-offset-4 hover:underline",
+        // No fill of its own: a vendored beUI disclosure trigger (components/agents) whose classes carry its look,
+        // feedback on hover and focus only, so an open trigger does not turn into a grey block.
+        bare: "",
       },
       size: {
         default:
@@ -38,6 +41,8 @@ const buttonVariants = cva(
         "icon-sm":
           "relative size-7 rounded-[min(var(--radius-md),12px)] in-data-[slot=button-group]:rounded-lg pointer-coarse:after:absolute pointer-coarse:after:-inset-1.5",
         "icon-lg": "size-9",
+        // No height or padding: the trigger's own classes set them (beUI's rows line up with their content).
+        bare: "",
       },
     },
     defaultVariants: {

@@ -76,19 +76,20 @@ export async function updateWorkspaceGeneral(actorId: string, workspaceId: strin
  * so a workspace never ends up with nobody able to hand it on.
  */
 async function mayTransfer(tx: WorkspaceTransaction, workspace: typeof workspaces.$inferSelect, role: 'admin' | 'member', actorId: string) {
-  if (role !== 'admin') return false
+  // A personal workspace is its owner's and has no one to hand it to (decision 2026-11-02-0203).
+  if (role !== 'admin' || workspace.kind === 'personal') return false
   if (workspace.userId === actorId) return true
   const [owner] = await tx.select({ userId: workspaceMembers.userId }).from(workspaceMembers)
     .where(and(eq(workspaceMembers.workspaceId, workspace.id), eq(workspaceMembers.userId, workspace.userId), eq(workspaceMembers.role, 'admin'), eq(workspaceMembers.status, 'active'))).limit(1)
   return !owner
 }
 
-/** 常规 as the viewer sees it. Any active member may read; `canEdit` is true for admins only, `canTransfer` per mayTransfer. */
-export async function readWorkspaceGeneral(actorId: string, workspaceId: string): Promise<WorkspaceGeneral & { canEdit: boolean; canTransfer: boolean }> {
+/** 常规 as the viewer sees it. Any active member may read; `canEdit` is true for admins only, `canTransfer` per mayTransfer; `personal` cannot be deleted. */
+export async function readWorkspaceGeneral(actorId: string, workspaceId: string): Promise<WorkspaceGeneral & { canEdit: boolean; canTransfer: boolean; personal: boolean }> {
   return workspaceDb.transaction(async tx => {
     const { workspace, membership } = await requireWorkspace(tx, workspaceId, actorId)
     const canTransfer = await mayTransfer(tx, workspace, membership.role, actorId)
-    return { id: workspace.id, name: workspace.name, slug: workspace.slug, icon: workspace.icon, canEdit: membership.role === 'admin', canTransfer }
+    return { id: workspace.id, name: workspace.name, slug: workspace.slug, icon: workspace.icon, canEdit: membership.role === 'admin', canTransfer, personal: workspace.kind === 'personal' }
   })
 }
 
@@ -217,6 +218,8 @@ export async function deleteWorkspaceData(actorId: string, workspaceId: string, 
   const typed = z.string().max(200).parse(confirmName).trim()
   return workspaceDb.transaction(async tx => {
     const { workspace } = await requireWorkspace(tx, workspaceId, actorId, true)
+    // Every account keeps its one personal workspace (decision 2026-11-01-2310); only a team workspace is deleted.
+    if (workspace.kind === 'personal') throw new WorkspaceError('workspacePersonalDelete')
     if (typed !== workspace.name) throw new WorkspaceError('workspaceDeleteNameMismatch')
     const teamRows = await tx.select({ id: teams.id }).from(teams).where(eq(teams.workspaceId, workspaceId)).for('update')
     const teamIds = teamRows.map(row => row.id)
