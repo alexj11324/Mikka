@@ -20,7 +20,8 @@ const { projects, projectEvents } = projectSchema
  *   memory, saved logins, model subscriptions, connections, devices, artifacts
  *   and captures, then the user row, whose foreign keys take sessions, sign-in
  *   accounts, OAuth grants, avatar and export links with it.
- * - A workspace only they belong to goes with them. In a workspace shared with
+ * - A workspace only they belong to goes with them, with every main-database
+ *   row keyed by it (lib/workspace-rows.ts). In a workspace shared with
  *   others they lose their membership; the team's issues, projects and group
  *   chats stay for the team (their past group messages stay in those chats).
  *   If they are its only active admin, nothing is deleted: someone else has to
@@ -145,6 +146,9 @@ export async function accountStorageKeys(client: Pick<PoolClient, 'query'>, user
 
 export async function deleteMainAccountData(client: PoolClient, userId: string, plan: Plan): Promise<void> {
   await runToFixpoint(client, await deletionStatements(client, userId, plan))
+  // A workspace only they belong to goes with them: every row keyed by it, whoever wrote it.
+  const { deleteWorkspaceRows } = await import('@/lib/workspace-rows')
+  for (const workspaceId of plan.solo) await deleteWorkspaceRows(client, workspaceId)
   await client.query('delete from "user" where id=$1', [userId])
 }
 

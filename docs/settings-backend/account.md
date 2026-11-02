@@ -136,7 +136,7 @@ deleteAccount(input: { email: string }): Promise<ActionResult<{ deleted: true }>
   - **主库**：在一个事务里，按所有表的拥有者列（`userId` / `ownerId` / `owner_id` / `user_id`）删除本人的行——运行时从 `information_schema` 发现，以后新增的表自动覆盖。包括 Bot 及其线程、Bot 聊天、Agent、设备、任务、记忆、偏好、已保存的登录、模型订阅（BYOS）、Composio/Linear/Telegram/GitHub 连接、Artifact 及分享、截图、导出链接、头像、Factory 记录等。最后删除 `user` 行，外键 CASCADE 带走会话、登录账户、OAuth 授权等。
   - 外键顺序：先删「别处指向本人行、且没有 ON DELETE CASCADE」的行（如 `byos_native_runs → byos_bindings`），然后逐条删除；某条因外键被挡就留到下一轮（savepoint 回滚），直到全部完成。如果某一轮一条也删不掉（被不属于本人的数据引用），整个删除回滚并抛错（非预期错误，不是错误码）。
   - **工作区库**（`lib/workspace-db.ts`，生产环境可能是另一个数据库）：
-    - 只有本人一个成员的工作区（包括每人自动创建的个人工作区）：整个删除（团队、团队成员、团队任务链接、项目链接、邀请、成员、工作区）。
+    - 只有本人一个成员的工作区（包括每人自动创建的个人工作区）：整个删除（团队、团队成员、团队任务链接、项目链接、邀请、成员、工作区）。主库里以这些工作区为键的行（密钥、设置、额度、离开成员留下的 Bot 等，不论谁写的）在主库事务里一并删除，规则和例外同「删除工作区」（`lib/workspace-rows.ts`，见 `workspace.md`）。
     - 与他人共享的工作区：只移除本人的成员身份和团队成员身份；发给本人邮箱的待处理邀请删除。
     - 本人的项目（`workspace_projects`）删除，但挂在共享工作区团队下的项目保留。
   - **共享工作区里留给团队的内容**：团队任务（`mikka_team_issues` 里的 issue，含正文、版本、成员）保留，`issues.userId` 仍是原 id（指向已不存在的用户）；本人创建的群聊（共享工作区、还有其他成员时）保留，本人的成员身份删除，**本人发过的群聊消息保留**在群聊历史里。本人对他人任务的成员身份（`issue_members.memberId`）删除。

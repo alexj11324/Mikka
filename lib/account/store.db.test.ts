@@ -132,6 +132,7 @@ dbTest('deleting an account removes what the person owns, keeps what their team 
       await pool.query('delete from issue_documents where "issueId" = any($1::uuid[])', [[personalIssue, teamIssue, bobIssue]])
       await pool.query('delete from issues where id = any($1::uuid[])', [[personalIssue, teamIssue, bobIssue]])
       await pool.query('delete from user_facts where "userId" = any($1::text[])', [[alice, bob, carol, dave]])
+      for (const table of ['workspace_settings', 'workspace_secrets', 'workspace_e2b_keys', 'hosted_allowances']) await pool.query(`delete from ${table} where "workspaceId" = any($1::uuid[])`, [[solo, shared]])
       await pool.query('delete from "user" where id = any($1::text[])', [[alice, bob, carol, dave]])
     })
     await scope.close()
@@ -175,6 +176,16 @@ dbTest('deleting an account removes what the person owns, keeps what their team 
     await pool.query(`insert into conversation_members ("conversationId", "memberType", "memberId", role) values ($1, 'user', $2, 'owner'), ($1, 'user', $3, 'member'), ($4, 'user', $2, 'owner')`, [group, alice, bob, dm])
     await pool.query(`insert into conversation_messages (id, "conversationId", position, "authorType", "authorId", body) values ($1, $2, 1, 'user', $3, 'hello team')`, [randomUUID(), group, alice])
 
+    // Rows keyed by a workspace rather than by Alice (gap M4): her solo workspace's go with it, whoever wrote them; the shared one keeps its own.
+    const formerBot = randomUUID()
+    await pool.query(`insert into bots (id, "workspaceId", "ownerId", name) values ($1, $2, $3, 'Left behind')`, [formerBot, solo, dave])
+    for (const wid of [solo, shared]) {
+      await pool.query(`insert into workspace_settings ("workspaceId") values ($1)`, [wid])
+      await pool.query(`insert into workspace_secrets (id, "workspaceId", name, kind, "scopeType", "scopeRef", ciphertext, iv, "keyVersion", "createdBy", "updatedBy") values ($1, $2, 'TOKEN', 'secret', 'workspace', '', 'c', 'i', 1, $3, $3)`, [randomUUID(), wid, alice])
+      await pool.query(`insert into workspace_e2b_keys ("workspaceId", ciphertext, iv, "keyVersion", last4, "createdBy", "updatedBy") values ($1, 'c', 'i', 1, 'abcd', $2, $2)`, [wid, alice])
+      await pool.query(`insert into hosted_allowances ("workspaceId", remaining) values ($1, 5)`, [wid])
+    }
+
     // Carol is the only active admin of a workspace Dave belongs to: refused, and nothing changes.
     await pool.query(`insert into user_facts (id, "userId", kind, subject, "subjectKey", confidence, "firstSeenAt", "lastSeenAt") values ($1, $2, 'interest', 'y', 'y', 0.5, now(), now())`, [randomUUID(), carol])
     assert.deepEqual(await deletion.deleteAccount(carol, `${carol}@example.com`), { ok: false, soleAdminOf: ['Carol team'] })
@@ -210,6 +221,21 @@ dbTest('deleting an account removes what the person owns, keeps what their team 
     assert.equal((await pool.query('select 1 from conversations where id = $1', [group])).rowCount, 1)
     assert.equal((await pool.query('select 1 from conversations where id = $1', [dm])).rowCount, 0)
     assert.deepEqual((await pool.query<{ memberId: string }>('select "memberId" from conversation_members where "conversationId" = $1', [group])).rows, [{ memberId: bob }])
+    // No row keyed by her solo workspace is left; the shared workspace keeps its secrets, key, settings and allowance.
+    const { KEPT_WITH_WORKSPACE, WORKSPACE_COLUMNS } = await import('../workspace-rows')
+    const { rows: keyed } = await pool.query<{ table: string; column: string }>(
+      `select table_name as "table", column_name as "column" from information_schema.columns where table_schema = current_schema() and column_name = any($1::text[])`, [WORKSPACE_COLUMNS])
+    const keyedBy = async (wid: string) => {
+      const found: string[] = []
+      for (const { table, column } of keyed) {
+        if (KEPT_WITH_WORKSPACE.has(table)) continue
+        if ((await pool.query(`select 1 from "${table}" where "${column}"::text = $1 limit 1`, [wid])).rowCount) found.push(table)
+      }
+      return found.sort()
+    }
+    assert.deepEqual(await keyedBy(solo), [])
+    assert.equal((await pool.query('select 1 from bots where id = $1', [formerBot])).rowCount, 0)
+    assert.deepEqual(await keyedBy(shared), ['conversations', 'hosted_allowances', 'workspace_e2b_keys', 'workspace_secrets', 'workspace_settings'])
     // Bob's own things are untouched.
     assert.equal((await pool.query('select 1 from issues where id = $1', [bobIssue])).rowCount, 1)
     assert.equal((await pool.query('select 1 from "user" where id = $1', [bob])).rowCount, 1)
