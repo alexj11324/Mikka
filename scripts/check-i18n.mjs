@@ -60,6 +60,27 @@ export function extractActionErrorCodes(source) {
   return [...match[1].matchAll(/['"]([A-Za-z0-9_]+)['"]/g)].map(item => item[1])
 }
 
+/**
+ * A bot never owns or runs a thread: an Agent runs it and the bot only
+ * dispatches it (Alex, 2026-11-02). Copy says 「<Bot> 派出的线程」,
+ * never 「<Bot> 的线程」 or 「所属 Bot」, nor "a bot's threads"; and an
+ * Agent never dispatches, so 「{agent} 派出」 fails too.
+ */
+const THREAD_OWNER = {
+  'zh-CN': [/所属\s*Bot/i, /(?:Bot|Coordinator|\{(?:agent|bot|botName)\})\s*的线程/i, /它们的线程/, /\{agent\}\s*派出/],
+  en: [/\bbots?(?:['’]s?)?\s+threads?\b/i, /\{(?:agent|bot|botName)\}(?:['’]s)?\s+threads?\b/, /\bbots?\b[^.]*\btheir threads\b/i, /\{agent\}\s+dispatched|dispatched by \{agent\}/i],
+}
+
+export function findThreadOwnership(messages) {
+  const problems = []
+  for (const [locale, patterns] of Object.entries(THREAD_OWNER)) {
+    for (const [key, value] of flattenMessages(messages[locale] ?? {})) {
+      if (typeof value === 'string' && patterns.some(pattern => pattern.test(value))) problems.push(`${locale}: "${key}" says a bot owns a thread ("${value}"); say 「<Bot> 派出的线程」 / "threads a bot dispatched"`)
+    }
+  }
+  return problems
+}
+
 export function checkErrorCodes(codes, messages) {
   const problems = []
   for (const locale of LOCALES) {
@@ -263,6 +284,7 @@ export function checkRepository() {
   }
   if (problems.length) return problems
   problems.push(...compareMessages(messages))
+  problems.push(...findThreadOwnership(messages))
   const codeFile = path.join(ROOT, 'lib/action-result.ts')
   if (fs.existsSync(codeFile)) {
     const codes = extractActionErrorCodes(fs.readFileSync(codeFile, 'utf8'))

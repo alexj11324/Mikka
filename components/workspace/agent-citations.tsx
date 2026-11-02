@@ -142,7 +142,7 @@ export function RunCitation({ run }: { run: RunSource }) {
   return <InlineCitation>
     <InlineCitationTrigger
       variant="object"
-      aria-label={issue ? t('openThread', { name: run.name }) : t('runOf', { agent: run.agentName })}
+      aria-label={issue ? t('openThread', { name: run.name }) : t('runOf', { bot: run.agentName })}
       onClick={issue ? () => openThread(run.id) : undefined}
     >
       <ThreadStatusIcon status={run.status} outcome={run.outcome} small />
