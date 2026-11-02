@@ -1,0 +1,29 @@
+{
+ "label": "after-prod",
+ "revision": "06caf59b0359776680da2edbe7445ad05b54b733",
+ "origin": "http://localhost:3000",
+ "database": "mikka_e2e (127.0.0.1, isolated)",
+ "run": "wrun_flickere58470d87702",
+ "at": "2026-11-02T22:20:07.272Z",
+ "metrics": {
+  "removedChips": 0,
+  "minStoredOpacity": 0.925152,
+  "frames": 238,
+  "released": true,
+  "committed": true,
+  "afterCommitRemovedChips": 0,
+  "afterCommitRemovedRows": 0,
+  "afterCommitMinOpacity": 1,
+  "rawFrameSamples": []
+ },
+ "finalChips": 2,
+ "newChipResolvedMsAfterStreamEnd": 9,
+ "finalTextHasRaw": false,
+ "castFrames": 169,
+ "handoff": {
+  "commitFrame": 131,
+  "handedOver": true,
+  "sameRow": true,
+  "storedChips": 2
+ }
+}

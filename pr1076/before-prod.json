@@ -1,0 +1,33 @@
+{
+ "label": "before-prod",
+ "revision": "a37573b5",
+ "origin": "http://localhost:3000",
+ "database": "mikka_e2e (127.0.0.1, isolated)",
+ "run": "wrun_flickere7ea45b4107a",
+ "at": "2026-11-02T22:21:59.685Z",
+ "metrics": {
+  "removedChips": 488,
+  "minStoredOpacity": 0,
+  "frames": 2018,
+  "released": true,
+  "committed": true,
+  "afterCommitRemovedChips": 48,
+  "afterCommitRemovedRows": 1,
+  "afterCommitMinOpacity": 0,
+  "rawFrameSamples": [
+   "好的，我看了一下。[[issue:30d89c83-4d40-4b2e-aee",
+   "好的，我看了一下。[[issue:30d89c83-4d40-4b2e-aee",
+   "好的，我看了一下。[[issue:30d89c83-4d40-4b2e-aee"
+  ]
+ },
+ "finalChips": 1,
+ "newChipResolvedMsAfterStreamEnd": null,
+ "finalTextHasRaw": true,
+ "castFrames": 918,
+ "handoff": {
+  "commitFrame": 874,
+  "handedOver": true,
+  "sameRow": false,
+  "storedChips": 2
+ }
+}
