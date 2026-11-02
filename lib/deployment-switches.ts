@@ -77,6 +77,15 @@ export const DEPLOYMENT_SWITCHES = {
 
 export type DeploymentSwitch = keyof typeof DEPLOYMENT_SWITCHES
 
+/**
+ * Which deployment asks (production, preview or local), sent as the person
+ * property `deployment` so one PostHog project can hold a flag on for
+ * production only.
+ */
+export function deploymentName(env: Env = process.env): string {
+  return env.VERCEL_ENV === 'production' || env.VERCEL_ENV === 'preview' ? env.VERCEL_ENV : env.VERCEL_ENV ? 'development' : 'local'
+}
+
 /** The one identity every switch is evaluated for. */
 export const DEPLOYMENT_DISTINCT_ID = 'mikka-deployment'
 export const SWITCH_REFRESH_MS = 60_000
@@ -112,11 +121,11 @@ function scheduleRefresh(now: number) {
  * null when it gave none: an error, a partial evaluation or the quota limit.
  * A flag it does not have, or a multivariate one, gets no answer.
  */
-async function evaluate(token: string, distinctId: string, flags: readonly string[], fetcher: typeof fetch, timeoutMs: number): Promise<Answers | null> {
+async function evaluate(token: string, distinctId: string, flags: readonly string[], fetcher: typeof fetch, timeoutMs: number, personProperties?: Record<string, string>): Promise<Answers | null> {
   const response = await fetcher('https://us.i.posthog.com/flags?v=2', {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'user-agent': 'posthog-node/mikka-deployment-switches' },
-    body: JSON.stringify({ api_key: token, distinct_id: distinctId, flag_keys_to_evaluate: flags }),
+    body: JSON.stringify({ api_key: token, distinct_id: distinctId, flag_keys_to_evaluate: flags, ...(personProperties ? { person_properties: personProperties } : {}) }),
     // Never follow a redirect with the project token.
     cache: 'no-store', redirect: 'manual', signal: AbortSignal.timeout(timeoutMs),
   })
@@ -139,7 +148,7 @@ async function evaluate(token: string, distinctId: string, flags: readonly strin
  */
 export async function refreshDeploymentSwitches(token: string | undefined = process.env.NEXT_PUBLIC_POSTHOG_KEY, fetcher: typeof fetch = fetch, timeoutMs = SWITCH_TIMEOUT_MS): Promise<void> {
   if (!token) return
-  const answers = await evaluate(token, DEPLOYMENT_DISTINCT_ID, Object.values(DEPLOYMENT_SWITCHES).map(entry => entry.flag), fetcher, timeoutMs)
+  const answers = await evaluate(token, DEPLOYMENT_DISTINCT_ID, Object.values(DEPLOYMENT_SWITCHES).map(entry => entry.flag), fetcher, timeoutMs, { deployment: deploymentName() })
   if (answers) state.answers = answers
 }
 

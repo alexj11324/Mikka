@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { beforeEach, test } from 'node:test'
-import { DEPLOYMENT_DISTINCT_ID, DEPLOYMENT_SWITCHES, deploymentSwitch, refreshDeploymentSwitches, resetDeploymentSwitches, SWITCH_REFRESH_MS, switchForPerson, type Switch } from './deployment-switches'
+import { DEPLOYMENT_DISTINCT_ID, DEPLOYMENT_SWITCHES, deploymentSwitch, refreshDeploymentSwitches, resetDeploymentSwitches, deploymentName, SWITCH_REFRESH_MS, switchForPerson, type Switch } from './deployment-switches'
 
 const posthog = (flags: Record<string, unknown>, extra: Record<string, unknown> = {}) => {
   const requests: unknown[] = []
@@ -35,7 +35,7 @@ test('PostHog decides once it answers: a kill flag turns a shipped feature off, 
   assert.equal(deploymentSwitch('factoryVercelPublication', { FACTORY_VERCEL_PUBLICATION: '1' }), false)
   // A flag PostHog does not have leaves the old variable and default in charge.
   assert.equal(deploymentSwitch('factoryLifecycle', { MIKKA_FACTORY_LIFECYCLE_ENABLED: '1' }), true)
-  assert.deepEqual(requests, [{ api_key: 'phc_test', distinct_id: DEPLOYMENT_DISTINCT_ID, flag_keys_to_evaluate: Object.values(DEPLOYMENT_SWITCHES).map(entry => entry.flag) }])
+  assert.deepEqual(requests, [{ api_key: 'phc_test', distinct_id: DEPLOYMENT_DISTINCT_ID, flag_keys_to_evaluate: Object.values(DEPLOYMENT_SWITCHES).map(entry => entry.flag), person_properties: { deployment: deploymentName() } }])
 })
 
 test('a kill flag created inactive never turns a shipped feature off', async () => {
@@ -84,4 +84,11 @@ test('a person switch is evaluated for that person, cached, and falls back the s
   assert.equal(await switchForPerson(entry, 'alex', { ...lookup, token: '' , now: 1_000 }), true)
   resetDeploymentSwitches()
   assert.equal(await switchForPerson(entry, 'alex', { ...lookup, fetcher: down }), false, 'never answered: the default')
+})
+
+test('the deployment says which one it is, so a flag can be on for production only', () => {
+  assert.equal(deploymentName({ VERCEL_ENV: 'production' }), 'production')
+  assert.equal(deploymentName({ VERCEL_ENV: 'preview' }), 'preview')
+  assert.equal(deploymentName({ VERCEL_ENV: 'development' }), 'development')
+  assert.equal(deploymentName({}), 'local')
 })
