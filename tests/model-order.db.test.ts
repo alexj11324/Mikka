@@ -89,6 +89,31 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
     assert.deepEqual(deepseekView.entries.map(entry => [entry.model, entry.source]), [['key-deepseek-first', { kind: 'api_key', keyId: key.id }]])
   })
 
+  await t.test('no points for Mikka 默认: the next allowed model a chat can run on, in the person\'s order', async () => {
+    const { hostedPointsRefusal, pointsFallback } = await import('../lib/points-fallback')
+    const scope = await person('order-points')
+    // A new workspace with nothing bought or verified: Mikka 默认 is refused for points.
+    assert.equal(await hostedPointsRefusal(scope.workspaceId), 'verification_required')
+    assert.equal(await pointsFallback(pool, scope), null, 'nothing else to run on')
+    const claude = await subscribe(scope, 'claude', ['acct-opus-p'])
+    const key = await keys.addApiKey(pool, scope.ownerId, { provider: 'deepseek', apiKey: `sk-${randomBytes(12).toString('hex')}` }, { fetch: (async () => Response.json({ data: [{ id: 'key-deepseek-p' }] })) as unknown as typeof fetch })
+    const binding = (await pool.query('SELECT id FROM byos_bindings WHERE "connectionId"=$1 AND "modelId"=$2', [claude, 'acct-opus-p'])).rows[0].id
+    assert.deepEqual(await pointsFallback(pool, scope), { kind: 'subscription', bindingId: binding, model: 'acct-opus-p' }, 'the first allowed model')
+    // The subscription is out of quota: the next one, the key.
+    await pool.query('UPDATE byos_connections SET quota=$2 WHERE id=$1', [claude, JSON.stringify({ windows: [{ kind: 'five_hour', used: 1, resetsAt: new Date(Date.now() + 3_600_000).toISOString() }] })])
+    // The untouched list holds only opus here (decision 2026-11-02-1400): the key is not allowed, so nothing runs.
+    assert.equal(await pointsFallback(pool, scope), null, 'a key not in 允许使用的模型 is never used')
+    const candidate = (await order.orderView(pool, scope)).candidates.find(item => item.source.kind === 'api_key')!
+    await order.changeOrder(pool, scope, { kind: 'add', entries: [{ harness: candidate.harness, model: candidate.model, source: candidate.source }] })
+    assert.deepEqual(await pointsFallback(pool, scope), { kind: 'api_key', keyId: key.id, model: 'key-deepseek-p' }, 'once added, the key is next')
+    const keyEntry = (await order.orderView(pool, scope)).entries.find(entry => entry.source.kind === 'api_key')!
+    await order.changeOrder(pool, scope, { kind: 'remove', id: keyEntry.id })
+    assert.equal(await pointsFallback(pool, scope), null)
+    // Points bought: Mikka 默认 runs, no fallback asked for.
+    await pool.query(`INSERT INTO workspace_credit_grants (id,"workspaceId",bucket,points,reason,"externalId") VALUES ($1,$2,'purchased',100,'pack',$3)`, [randomUUID(), scope.workspaceId, `points-${randomUUID()}`])
+    assert.equal(await hostedPointsRefusal(scope.workspaceId), null)
+  })
+
   await t.test('edits: the first change stores what was shown; adds must be candidates; reorder, remove and 运行位置 save', async () => {
     const scope = await person('order-edit')
     const claude = await subscribe(scope, 'claude', ['acct-opus-b', 'acct-sonnet-b'])
