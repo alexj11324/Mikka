@@ -539,6 +539,8 @@ test('a team page keeps its address: its 项目 page survives a reload and back 
   await expect(page).toHaveURL(url => url.searchParams.get('section') === 'team-projects')
   await expect(home).toHaveCount(0)
   await expect(rail(page, '看板')).toHaveAttribute('aria-current', 'page')
+  // Back is the person's next step once the reloaded page works, as after the first load above.
+  await hydrated(rail(page, '看板'))
   await back(page)
   await expect(home).toBeVisible()
   expect([...query(page).keys()]).toEqual(['team'])
