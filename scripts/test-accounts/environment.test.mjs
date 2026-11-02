@@ -32,7 +32,7 @@ test('environment binds all explicit database aliases, origin, SHA and capabilit
     { E2E_DATABASE_URL: undefined }, { MIKKA_DATABASE_URL: undefined }, { DATABASE_URL: undefined },
     { DATABASE_URL: 'postgresql://elsewhere.invalid/production' }, { ORVILO_DATABASE_URL: 'postgresql://elsewhere.invalid/production' },
     { BETTER_AUTH_URL: 'https://app.aspectlylabs.com' }, { E2E_BASE_URL: 'http://localhost:9999' },
-    { MIKKA_TEST_DEPLOYMENT_SHA: 'b'.repeat(40) }, { RESEND_API_KEY: 'synthetic-mail-canary' }, { VERCEL_ENV: 'production' }, { VERCEL: '1' }, { MIKKA_NATIVE_COORDINATOR: '1' },
+    { MIKKA_TEST_DEPLOYMENT_SHA: 'b'.repeat(40) }, { RESEND_API_KEY: 'synthetic-mail-canary' }, { VERCEL_ENV: 'production' }, { VERCEL: '1' },
     { AI_GATEWAY_API_KEY: 'synthetic-model-canary' }, { OPENAI_API_KEY: 'synthetic-model-canary' },
     { ANTHROPIC_API_KEY: 'synthetic-model-canary' }, { COMPOSIO_API_KEY: 'synthetic-service-canary' }, { E2B_API_KEY: 'synthetic-service-canary' }, { EXPO_ACCESS_TOKEN: 'synthetic-service-canary' },
     { POSTHOG_SECRET_KEY: 'synthetic-service-canary' }, { AI_GATEWAY_API_KEY: MVP_DECISION_KEY },
@@ -138,7 +138,7 @@ test('only the exact isolated MVP key with a proven current loopback transport c
 
     for (const change of [
       { CI: undefined }, { GITHUB_ACTIONS: undefined }, { MIKKA_MVP_E2E: undefined }, { MIKKA_TEST_MODE: undefined },
-      { VERCEL: '1' }, { VERCEL_ENV: 'production' }, { MIKKA_NATIVE_COORDINATOR: '1' },
+      { VERCEL: '1' }, { VERCEL_ENV: 'production' },
       { E2E_BASE_URL: 'https://outside.invalid' }, { BETTER_AUTH_URL: 'https://outside.invalid' },
       { MIKKA_TEST_DEPLOYMENT_SHA: 'b'.repeat(40) }, { DATABASE_URL: 'postgresql://outside.invalid/production' },
       ...['AI_GATEWAY_API_KEY', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'COMPOSIO_API_KEY', 'E2B_API_KEY', 'EXPO_ACCESS_TOKEN', 'POSTHOG_SECRET_KEY', 'RESEND_API_KEY'].map(name => ({ [name]: 'synthetic-live-key-canary' })),

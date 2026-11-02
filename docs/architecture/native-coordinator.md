@@ -2,8 +2,8 @@
 
 > **Deprecated (Alex, 2026-10-27).** The Coordinator and every bot run their
 > chats only on Mikka's own harness ([R-05](../design/rules.md)). Claude Code
-> and Codex only execute threads. The code stays; with
-> `MIKKA_NATIVE_COORDINATOR` unset the server refuses this runtime. Do not
+> and Codex only execute threads. The code stays, and the server always
+> refuses this runtime; its `MIKKA_NATIVE_COORDINATOR` switch is removed. Do not
 > enable it, build a runtime picker for it or extend it. Everything below is a
 > historical record. See [decisions](../design/decisions.md), 2026-10-27.
 
