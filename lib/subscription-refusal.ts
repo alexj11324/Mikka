@@ -10,10 +10,14 @@ const REFUSALS = {
   quota_unknown: 'retry', backend_unavailable: 'retry',
 } as const satisfies Record<SubscriptionRefusalCode, string>
 
-export type SubscriptionRefusalNotice = (typeof REFUSALS)[SubscriptionRefusalCode]
+/** The provider would not answer a bot chat on this subscription (lib/subscription-routes.ts). */
+const GENERATION = { subscription_generation_failed: 'cannotAnswerChats' } as const
+
+export type SubscriptionRefusalNotice = (typeof REFUSALS)[SubscriptionRefusalCode] | (typeof GENERATION)[keyof typeof GENERATION]
+const NOTICES: Record<string, SubscriptionRefusalNotice> = { ...REFUSALS, ...GENERATION }
 
 // The code alone, or ending a wrapped message; never a word inside an unrelated error.
-const pattern = new RegExp(`^(?:[^]*: )?(${Object.keys(REFUSALS).join('|')})$`)
+const pattern = new RegExp(`^(?:[^]*: )?(${Object.keys(NOTICES).join('|')})$`)
 
 /**
  * The notice for a turn the chosen subscription refused, or null. The code is
@@ -22,5 +26,5 @@ const pattern = new RegExp(`^(?:[^]*: )?(${Object.keys(REFUSALS).join('|')})$`)
  */
 export function subscriptionRefusal(message: string | null | undefined): SubscriptionRefusalNotice | null {
   const match = message ? pattern.exec(message.trim()) : null
-  return match ? REFUSALS[match[1] as SubscriptionRefusalCode] : null
+  return match ? NOTICES[match[1]] : null
 }

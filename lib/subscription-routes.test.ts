@@ -6,9 +6,11 @@ test('a subscription route runs for an owner only when their PostHog flag is on'
   const asked: string[] = []
   const flag = (on: string[]) => async (key: string, userId: string) => { asked.push(`${key}|${userId}`); return on.includes(`${key}|${userId}`) }
   const alex = flag([`${SUBSCRIPTION_ROUTE_FLAGS.chat}|alex`])
-  assert.equal(await subscriptionRouteReady('claude_cpa', 'alex', {}, alex), true)
   assert.equal(await subscriptionRouteReady('codex_cpa', 'alex', {}, alex), true)
-  assert.equal(await subscriptionRouteReady('claude_cpa', 'someone', {}, alex), false, 'the flag is per person')
+  // Anthropic refuses a Claude subscription's token from a client that is not Claude Code (429), and Mikka
+  // does not pose as Claude Code: the flag never turns claude_cpa on for bot chats.
+  assert.equal(await subscriptionRouteReady('claude_cpa', 'alex', {}, alex), false)
+  assert.equal(await subscriptionRouteReady('codex_cpa', 'someone', {}, alex), false, 'the flag is per person')
   assert.equal(await subscriptionRouteReady('claude_code_cli', 'alex', {}, alex), false, 'threads have their own flag')
   assert.equal(await subscriptionRouteReady('claude_code_cli', 'alex', {}, flag([`${SUBSCRIPTION_ROUTE_FLAGS.native}|alex`])), true)
   assert.equal(await subscriptionRouteReady('openai_siwc', 'alex', {}, alex), false, 'an unvalidated route never runs')

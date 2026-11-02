@@ -140,3 +140,16 @@ test('对话：免费对话用完被拒时，并列绑定订阅和验证银行�
   await expect(page.getByRole('dialog', { name: '绑定订阅' })).toBeVisible()
   expect(page.url()).toBe(before)
 })
+
+test('对话：订阅不能回答 Bot 对话时说明原因并给出换模型入口，不显示回复失败', async ({ page }, testInfo) => {
+  await register(page)
+  await expect(page.getByRole('textbox', { name: '给 Coordinator 发消息', exact: true })).toBeVisible()
+  await seedCoordinatorError(page, 'subscription_generation_failed', undefined, '帮我整理本周的 PR')
+  await page.reload()
+  const notice = page.locator('[data-subscription-refusal="cannotAnswerChats"]')
+  await expect(notice).toContainText('这个订阅暂时不能回答 Bot 对话')
+  await expect(page.getByText('回复失败', { exact: true })).toHaveCount(0)
+  await attachLightDark(page, testInfo, 'chat-subscription-cannot-answer')
+  await notice.getByRole('link', { name: '模型与额度', exact: true }).click()
+  await expect(page).toHaveURL(/section=models/)
+})

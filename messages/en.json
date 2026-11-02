@@ -2954,6 +2954,7 @@
     "loadError": "Could not load the conversation. Retrying.",
     "failedTitle": "Reply failed",
     "subscriptionRefusal": {
+      "cannotAnswerChats": "This subscription can't answer bot chats right now",
       "unavailable": "Chosen subscription unavailable",
       "reconnect": "Subscription needs reconnecting",
       "quotaUsed": "Subscription quota used up",

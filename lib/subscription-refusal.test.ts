@@ -8,6 +8,9 @@ test('a subscription refusal maps to its notice, never the raw step error', () =
   assert.equal(subscriptionRefusal('reconnect_required'), 'reconnect')
   assert.equal(subscriptionRefusal('quota_exhausted'), 'quotaUsed')
   assert.equal(subscriptionRefusal('backend_unavailable'), 'retry')
+  // The provider would not answer a bot chat on this subscription (Anthropic answers 429 to a non-Claude Code client).
+  assert.equal(subscriptionRefusal('subscription_generation_failed'), 'cannotAnswerChats')
+  assert.equal(subscriptionRefusal('Step "step//./workflows/coordinator/workflow//coordinatorTurn" failed: subscription_generation_failed'), 'cannotAnswerChats')
 })
 
 test('other failures keep their own message', () => {
