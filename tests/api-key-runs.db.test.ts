@@ -249,8 +249,21 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
     await pool.query('INSERT INTO device_repos (id,"deviceId","userId","repoPath","remoteUrl") VALUES ($1,$2,$3,$4,$5)', [repoId, cloudDevice, p.id, normalizeRepository(p.remote).key, p.remote])
     const token = `task-${randomUUID()}`
     await pool.query(`INSERT INTO device_tokens (id,"userId","tokenHash","boundDeviceId","boundWorkspaceId","expiresAt") VALUES ($1,$2,$3,$4,$5,now()+interval '1 hour')`, [randomUUID(), p.id, hashDeviceToken(token), cloudDevice, p.workspaceId])
-    const { runId } = await queueCloudRun(pool, { userId: p.id, workspaceId: p.workspaceId }, { botId: p.botId, issueId: p.issueId, agentId, deviceRepoId: repoId, title: 'Task', body: '', model: 'auto' })
+    const queue = (deviceRepoId: string) => queueCloudRun(pool, { userId: p.id, workspaceId: p.workspaceId }, { botId: p.botId, issueId: p.issueId, agentId, deviceRepoId, title: 'Task', body: '', model: 'auto' })
+    const status = async (id: string) => (await pool.query('SELECT status FROM agent_runs WHERE id=$1', [id])).rows[0].status
 
+    // A computer task (no remote) needs a desktop: refused at claim, the run stays queued.
+    const computerRepo = randomUUID()
+    await pool.query('INSERT INTO device_repos (id,"deviceId","userId","repoPath") VALUES ($1,$2,$3,$4)', [computerRepo, cloudDevice, p.id, '/home/user/.mikka/bot-workspaces/fixture'])
+    const computerRun = (await queue(computerRepo)).runId
+    const refused = await claim(cloudDevice, computerRun, token)
+    assert.equal(refused.status, 409, await refused.text())
+    assert.equal(await status(computerRun), 'queued')
+    await pool.query("UPDATE agent_runs SET status='cancelled' WHERE id=$1", [computerRun])
+
+    // A person holding the Bot's desktop does not hold a run on a machine without one.
+    await pool.query(`UPDATE bot_desktops SET control='user',"controlledBy"=$2,"controlUntil"=now()+interval '5 minutes' WHERE "botId"=$1`, [p.botId, p.id])
+    const { runId } = await queue(repoId)
     const response = await claim(cloudDevice, runId, token)
     const text = await response.text()
     assert.equal(response.status, 200, text)
