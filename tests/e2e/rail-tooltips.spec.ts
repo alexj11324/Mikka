@@ -25,6 +25,8 @@ test('左侧导航只显示图标，名字在 hover 时以提示出现', async (
     expect((await item.innerText()).trim()).toBe('')
   }
   await expect(rail.getByText('主页', { exact: true })).toHaveCount(0)
+  // Off every control, so no other tooltip (the top bar's 全部线程) is open.
+  await page.mouse.move(800, 450)
   await expect(tooltip).toHaveCount(0)
 
   for (const scheme of ['light', 'dark'] as const) {
