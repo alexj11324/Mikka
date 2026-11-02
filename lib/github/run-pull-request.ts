@@ -1,34 +1,28 @@
 import { z } from 'zod'
-import { githubAppJwt } from '@/lib/suggestions/github-redelivery'
 import { pullRequestBody } from '@mikka/protocol/orchestrator'
 import { normalizeRepository } from '@mikka/protocol/repository'
 
 import { PublicationError, type PublicationErrorCode, type PublishedPullRequest } from '@/lib/run-publication-result'
 export { PublicationError, PUBLICATION_ERRORS, type PublicationErrorCode, type PublishedPullRequest } from '@/lib/run-publication-result'
 
+/** What the person's own token reads back about the repository; never a token. */
 export interface GitHubRepositoryBinding {
-  installationId: number
   repositoryId: number
   githubAccountId: string
   defaultBranch: string
 }
 type Options = {
   remoteKey: string
-  githubAccountId: string | null
-  env?: Record<string, string | undefined>
+  /** The run owner's own GitHub user token (lib/github/user-access.ts), and the GitHub account it must belong to. */
+  token: string
+  githubAccountId: string
   fetcher?: typeof fetch
 }
 
 const id = z.number().int().positive().refine(Number.isSafeInteger)
 const repoName = /^[a-z0-9_.-]+$/i
-const installationSchema = z.object({
-  id, suspended_at: z.string().nullable(),
-  permissions: z.object({ pull_requests: z.string().optional(), contents: z.string().optional() }),
-})
-const tokenSchema = z.object({ token: z.string().min(1) })
 const repositorySchema = z.object({ id, full_name: z.string(), default_branch: z.string().min(1) })
 const userSchema = z.object({ id, login: z.string().regex(/^[a-z0-9-]+$/i) })
-const permissionSchema = z.object({ permission: z.string(), user: userSchema })
 const prSchema = z.object({
   number: id, html_url: z.string(), state: z.enum(['open', 'closed']), draft: z.boolean(),
   title: z.string().max(256).optional(),
@@ -57,7 +51,7 @@ function parse<T>(schema: z.ZodType<T>, value: unknown): T {
   return parsed.data
 }
 
-/** The URL and redirects are fixed; no caller can send an App credential to a git URL. */
+/** The URL and redirects are fixed; no caller can send the person's credential to a git URL. */
 function api(fetcher: typeof fetch) {
   return async (path: string, token: string, init: { method?: 'GET' | 'POST'; body?: unknown; missing?: PublicationErrorCode } = {}) => {
     let response: Response
@@ -74,105 +68,52 @@ function api(fetcher: typeof fetch) {
       throw new PublicationError('github_unavailable', true, response.status)
     }
     if (response.status === 404 && init.missing) throw new PublicationError(init.missing, init.missing === 'branch_not_pushed', 404)
-    // GitHub rejected this server's App JWT or the token it just minted: the App ID, key or clock is wrong here, not a GitHub outage.
-    if (response.status === 401) throw new PublicationError('github_not_configured', false, 401)
+    // GitHub rejected the person's token: they reconnect GitHub in Mikka.
+    if (response.status === 401) throw new PublicationError('github_reconnect_required', false, 401)
+    if (response.status === 403 || response.status === 404) throw new PublicationError('github_access_denied', false, response.status)
     if (!response.ok) throw new PublicationError('github_request_failed', false, response.status)
     try { return await response.json() as unknown }
     catch { throw new PublicationError('github_request_failed') }
   }
 }
 
-/** `push`: the installation must grant contents:write (the push itself). `pull_request`: pull_requests:write, contents at least read. */
-async function repositoryAccess(options: Options, need: 'push' | 'pull_request' = 'pull_request') {
+/** The token must be the person's own: GitHub's /user is the linked account. */
+async function repositoryAccess(options: Options) {
   const repo = githubRepository(options.remoteKey)
-  if (!options.githubAccountId || !/^[1-9][0-9]*$/.test(options.githubAccountId)) throw new PublicationError('github_identity_required')
-  const env = options.env ?? process.env
-  if (!env.GITHUB_APP_ID || !env.GITHUB_APP_PRIVATE_KEY) throw new PublicationError('github_not_configured')
-  let jwt: string
-  try { jwt = githubAppJwt(env.GITHUB_APP_ID, env.GITHUB_APP_PRIVATE_KEY) }
-  catch { throw new PublicationError('github_not_configured') }
+  if (!options.token || !/^[1-9][0-9]*$/.test(options.githubAccountId)) throw new PublicationError('github_identity_required')
   const request = api(options.fetcher ?? fetch)
-  const installation = parse(installationSchema, await request(`${repo.path}/installation`, jwt, { missing: 'github_not_installed' }))
-  if (installation.suspended_at) throw new PublicationError('github_suspended')
-  if (need === 'push' ? installation.permissions.contents !== 'write'
-    : installation.permissions.pull_requests !== 'write' || !['read', 'write'].includes(installation.permissions.contents ?? '')) throw new PublicationError('github_permission_required')
-  // Verify the person's durable GitHub identity with a read-only token first.
-  // Only after that check may the server issue a token that can open a PR.
-  const metadataToken = parse(tokenSchema, await request(`/app/installations/${installation.id}/access_tokens`, jwt, {
-    method: 'POST', body: { repositories: [repo.repo], permissions: { metadata: 'read', contents: 'read' } },
-  })).token
-  const [repository] = await Promise.all([
-    request(repo.path, metadataToken, { missing: 'github_not_installed' }).then(value => parse(repositorySchema, value)),
-    (async () => {
-      const githubUser = parse(userSchema, await request(`/user/${options.githubAccountId}`, metadataToken, { missing: 'github_access_denied' }))
-      if (String(githubUser.id) !== options.githubAccountId) throw new PublicationError('github_access_denied')
-      const permission = parse(permissionSchema, await request(`${repo.path}/collaborators/${encodeURIComponent(githubUser.login)}/permission`, metadataToken, { missing: 'github_access_denied' }))
-      if (String(permission.user.id) !== options.githubAccountId || !['write', 'admin'].includes(permission.permission)) throw new PublicationError('github_access_denied')
-    })(),
+  const [githubUser, repository] = await Promise.all([
+    request('/user', options.token).then(value => parse(userSchema, value)),
+    request(repo.path, options.token, { missing: 'github_access_denied' }).then(value => parse(repositorySchema, value)),
   ])
+  if (String(githubUser.id) !== options.githubAccountId) throw new PublicationError('github_reconnect_required')
   if (repository.full_name.toLowerCase() !== `${repo.owner}/${repo.repo}`.toLowerCase()) throw new PublicationError('github_access_denied')
-  const binding: GitHubRepositoryBinding = { installationId: installation.id, repositoryId: repository.id, githubAccountId: options.githubAccountId, defaultBranch: repository.default_branch }
-  return { ...repo, request, jwt, metadataToken, binding }
-}
-
-/** A non-secret owner/repository installation receipt; never an access token. */
-export async function verifyGitHubRepositoryAccess(options: Options): Promise<GitHubRepositoryBinding> {
-  return (await repositoryAccess(options)).binding
-}
-
-/**
- * Push authority (decision 2026-11-01-1215): the Mikka GitHub App's installation
- * on this repository grants contents:write, and the person's own linked GitHub
- * account may write to it. No second approval is asked in Mikka.
- */
-export async function verifyGitHubPushAccess(options: Options): Promise<GitHubRepositoryBinding> {
-  return (await repositoryAccess(options, 'push')).binding
-}
-
-/** A worker receives one repository's installation token, never the App key. */
-export async function issueRunGitHubInstallationToken(options: Options) {
-  const access = await repositoryAccess(options)
-  const result = parse(z.object({ token: z.string().min(1), expires_at: z.iso.datetime() }),
-    await access.request(`/app/installations/${access.binding.installationId}/access_tokens`, access.jwt, {
-      method: 'POST', body: { repository_ids: [access.binding.repositoryId] },
-    }))
-  if (Date.parse(result.expires_at) <= Date.now()) throw new PublicationError('github_request_failed')
-  return { token: result.token, expiresAt: result.expires_at }
-}
-
-/** Discard a freshly minted token when run authority changed during GitHub IO. */
-export async function revokeRunGitHubInstallationToken(token: string, fetcher: typeof fetch = fetch) {
-  const response = await fetcher('https://api.github.com/installation/token', {
-    method: 'DELETE', redirect: 'error', cache: 'no-store',
-    headers: { authorization: `Bearer ${token}`, accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28' },
-    signal: AbortSignal.timeout(8_000),
-  })
-  if (!response.ok && response.status !== 401) throw new PublicationError('github_unavailable', true)
+  const binding: GitHubRepositoryBinding = { repositoryId: repository.id, githubAccountId: options.githubAccountId, defaultBranch: repository.default_branch }
+  return { ...repo, request, token: options.token, binding }
 }
 
 /**
  * One PR per task branch (ADR 0024). Replays and ambiguous POST responses
  * first find the issue-marked PR; a human's unrelated PR is never adopted.
- * Every retry rechecks the live installation and the person's permission.
+ * Every request uses the run owner's own GitHub token (decision 2026-11-02-1600).
  */
 export async function openRunPullRequest(options: Options & {
   issueId: string; identifier: string; title: string; summary: string
   branch: string; commit: string; baseBranch: string | null
   allowCreate?: boolean
   draft?: boolean
-  onVerified?: (binding: GitHubRepositoryBinding) => Promise<void>
   /** The host holds current task/approval authority for each bounded write. */
   withWrite?: <T>(write: () => Promise<T>) => Promise<T>
+  /** Bookkeeping once the repository is read with the owner's token; it must not throw. */
+  onVerified?: (binding: GitHubRepositoryBinding) => Promise<void>
 }): Promise<PublishedPullRequest> {
   if (!/^mikka\/[a-z0-9-]+-[1-9][0-9]*$/.test(options.branch) || !/^[a-f0-9]{40,64}$/i.test(options.commit) || !z.uuid().safeParse(options.issueId).success) throw new PublicationError('publication_mismatch')
   const access = await repositoryAccess(options)
   const { request, path, binding } = access
   await options.onVerified?.(binding)
-  const ref = parse(z.object({ object: z.object({ sha: z.string() }) }), await request(`${path}/git/ref/heads/${options.branch.split('/').map(encodeURIComponent).join('/')}`, access.metadataToken, { missing: 'branch_not_pushed' }))
+  const ref = parse(z.object({ object: z.object({ sha: z.string() }) }), await request(`${path}/git/ref/heads/${options.branch.split('/').map(encodeURIComponent).join('/')}`, access.token, { missing: 'branch_not_pushed' }))
   if (ref.object.sha.toLowerCase() !== options.commit.toLowerCase()) throw new PublicationError('branch_changed')
-  const writeToken = parse(tokenSchema, await request(`/app/installations/${binding.installationId}/access_tokens`, access.jwt, {
-    method: 'POST', body: { repository_ids: [binding.repositoryId] },
-  })).token
+  const writeToken = access.token
   const marker = `<!-- mikka-issue:${options.issueId} -->`
   const write = <T>(operation: () => Promise<T>) => options.withWrite ? options.withWrite(operation) : operation()
   const result = async (raw: unknown): Promise<PublishedPullRequest> => {

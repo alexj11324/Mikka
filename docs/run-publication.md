@@ -1,9 +1,9 @@
 # Run result publication
 
-This delivery connects an approved local git push to an issue PR and the
+This delivery connects a run's pushed task branch to an issue PR and the
 Coordinator's existing conversation. Cloud queue/runtime are unchanged.
 
-## Assignment and approval
+## Assignment
 
 `prepareRunPublication` pins the existing task identifier to ADR 0024's exact
 `mikka/<team>-<number>` branch. It uses `taskIdentifiers`; it never invents a
@@ -26,60 +26,36 @@ a new thread for the current repository identity. Only old
 GitHub physical-checkout records with a verified equivalent endpoint can reuse
 their record ID, without changing the clone URL. No data migration grants a push.
 
-Push authority is what the person granted on GitHub
-([decision](design/decisions/2026-11-01-1215-push-by-github-app.md)): the Mikka
-GitHub App's installation on the repository grants `contents: write`, and the
-person's own linked GitHub account may write to it (the App is shared by every
-Mikka user, so their own access keeps one person from pushing to another's
-repository). Mikka asks for no approval of its own and shows no push card.
+Pushing needs no approval in Mikka
+([decision](design/decisions/2026-11-02-1600-agents-use-own-github-credential.md)):
+every run works with its owner's own GitHub credential, the same as
+`gh auth login` on their own computer, for every repository they authorized.
+There is no push grant, no push card and no first-push approval per
+repository. Admission binds the task to its repository and branch only: new
+receipts carry `authority: 'owner_credential'`; older `github_app` and
+`repository_approval` receipts still match, and `configured_allow` receipts do
+not. A stored `git_push` and the 创建 Pull Request setting stay readable but
+gate nothing. `repository_settings.push`, its old pending cards and
+`github_repository_installations.pushGrantedAt` are history nobody reads.
 
-Dispatch checks GitHub live before the admission transaction
-(`lib/github/push-grant.ts`) and records the outcome on
-`github_repository_installations.pushGrantedAt` (cleared when GitHub refuses).
-Admission reads that record under a share lock; a host dispatch already inside
-its own transaction (Factory) relies on a check from the last 24 hours, and so
-does a dispatch while GitHub cannot be reached. A workspace policy or read-only
-mode that denies `git_push` still denies; `ask` no longer asks. New admission
-receipts carry `authority: 'github_app'` and the check's time as `approvedAt`.
-Receipts from the earlier per-repository approval (`repository_approval`) still
-match; old `configured_allow` receipts without `approvedAt` grant nothing.
-`repository_settings.push` and its pending cards remain readable history but
-grant and withhold nothing.
+Claim sends `pushBranch` and `policy.permissions.git_push`: `allow` when the
+run has a task branch, so the daemon may push that branch itself for a run
+whose agent does not deliver it. For every github.com run of an owner with a
+GitHub connection, claim also sends `github` (the credential endpoint and the
+run's repository; `branch` only for a writable implement or fix run with a task
+branch). The daemon uses the same credential for its own clone and fetch, with
+no force push.
 
-When GitHub refuses, dispatch returns `runInvalid` with a `reason`
-(`githubAppNotInstalled`, `githubAppPermissionRequired`, `githubAppSuspended`,
-`githubIdentityRequired`, `githubAccessDenied`, `repositoryNotGithub`, …) and a
-sentence with the GitHub installation link (`lib/run-invalid-reason.ts`); the
-Coordinator sends the person to GitHub. Plugins › GitHub shows 推送分支 as
-「由 GitHub App 授权决定」, with no switch. 创建 Pull Request is 允许 or 拒绝,
-default 允许, and never shows a card
-([decision](design/decisions/2026-11-01-1310-no-ask-for-app-granted-abilities.md));
-an ask stored before that decision is migrated to allow. `git_push` likewise
-stores only allow or deny.
-
-Claim sends `pushBranch` and `policy.permissions.git_push`; it sends `allow`
-only for an admitted receipt, and a claim without a publication never forwards
-a configured `allow`. `/repos` does not cache push authority. The daemon uses
-the same policy for fetching the previous task branch and pushing the next
-commit, with no force push. The run's GitHub token and the pull request check
-the App installation and the person's access on GitHub live.
-
-A cloud (E2B) run follows the same rule. Cloud dispatch checks GitHub live, and
-queueing gives the run a `github_app` receipt and an approved publication when
-the grant is recorded; claim prepares that publication before the lease and
-sends `allow`, with the run-scoped GitHub delivery. A cloud run without the
-grant still runs, with `git_push: deny`. No run, local or cloud, is ever sent
-`ask` for a push.
+A cloud (E2B) run follows the same rule: a writable github.com run gets its
+task branch and publication when it is queued, and the same credential.
 
 A read-only run (`dispatch_run` with `readOnly: true`: an investigation or
-review that changes nothing) needs none of this, because it never pushes. Its
-frozen definition carries `readOnly`; it gets no admission receipt, no
-publication or push branch, and claim sends the read-only policy (`git_push`,
-writes and scripts denied), whatever the CLI policy says. It ends `succeeded`
-with its report and publishes nothing.
+review) keeps the credential like any run; readOnly is task intent only. Its
+worktree is not writable, it gets no task branch or publication, ends
+`succeeded` with its report and publishes nothing.
 
-When admission refuses a run that may commit, the error is `runInvalid` with a
-`reason` and a sentence the Coordinator acts on (`lib/run-invalid-reason.ts`).
+When admission refuses a run, the error is `runInvalid` with a `reason` and a
+sentence the Coordinator acts on (`lib/run-invalid-reason.ts`).
 
 ## Completion and retries
 
@@ -95,12 +71,12 @@ infrastructure retries enter a final failure step and report a safe result.
 
 `verify: passed` can create an open PR. When there is no configured verification
 command, the daemon snapshots the real submitted tree, retains `verify: not_run`,
-and may commit/push only with the GitHub App's push grant. Without an approved,
-matching, actually pushed result the thread stays stopped/unverified and the
-task is not advanced to review. After a successful approved push the server
+and may commit and push its task branch. Without a matching, actually pushed
+result the thread stays stopped/unverified and the task is not advanced to
+review. After a successful push the server
 requests a draft PR and tells the Coordinator that human checking remains.
 A failed verify never publishes. A harness's self-reported verification is
-discarded in both the approved and unapproved paths.
+discarded in every path.
 Alex approved this missing-verification behavior on 2026-10-28.
 
 The GitHub client reuses an existing task-marked PR. An unverified continuation
@@ -109,12 +85,12 @@ automatically reopens a closed PR or marks a draft ready for review.
 
 ## GitHub ownership and permissions
 
-The server resolves the installation for the repository, checks it is active and
-has `pull_requests: write` and `contents: read`, and uses a read-only repository
-token to resolve the user's stable GitHub account ID and check write/admin access.
-Only then does it mint a PR-write token restricted to the target repository ID.
-Tokens and private keys never enter rows, workflow arguments, logs or responses.
-`github_repository_installations` stores only verified non-secret IDs.
+The server opens or adopts the pull request with the run owner's own GitHub
+token (`githubTokenForUser`, lib/github/user-access.ts), never an installation
+token. It first checks that GitHub's `/user` is the owner's linked account.
+Tokens never enter rows, workflow arguments, logs or responses. Without a
+connection the result is `github_identity_required`; a token GitHub refuses is
+`github_reconnect_required`.
 
 The API origin is fixed to `https://api.github.com`, redirects are disabled, and
 fetch errors become fixed safe error codes. A reported commit must match the

@@ -22,7 +22,7 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
   apiKey?: RunApiKey
   /** The API key the 允许使用的模型 entry names; used only when the run may use it (lib/run-credential-source.ts). */
   apiKeyId?: string
-  /** An investigation that changes nothing: read-only policy, no push branch, no push authority. */
+  /** An investigation that changes nothing: read-only policy and no task branch. */
   readOnly?: boolean
 }) {
   if (input.idempotencyKey !== undefined && (input.idempotencyKey.length < 1 || input.idempotencyKey.length > 256)) throw new ComputerError(400, 'Invalid task request')
@@ -69,7 +69,7 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
       botWorkspaceId: runBotId ? actor.workspaceId : null, choiceWorkspaceId: actor.workspaceId, subscription: binding })
     if (!subscription && !apiKey) throw new ComputerError(409,'Bot subscription unavailable')
     const frozen = freezeWorkerDefinition({ harness:target.harness,instructions:target.instructions,prompt,parent:input.execution?.snapshot ?? null,executionId:input.execution?.id ?? null,subscription,apiKey,model:input.model === 'auto' ? undefined : input.model,mailboxEnabled:personalMailboxEnabled(),mailboxScope:{botId:runBotId,workspaceId:actor.workspaceId},readOnly:input.readOnly })
-    // Push authority is the person's GitHub App grant, admitted here like a local run's (decision 2026-11-01-1215).
+    // A writable github.com run gets its task branch here, like a local run's (decision 2026-11-02-1600).
     const github = input.readOnly ? false : (await client.query('SELECT 1 FROM device_repos WHERE id=$1 AND "userId"=$2 AND "repoPath" LIKE \'v2/github.com/%\'', [input.deviceRepoId, actor.userId])).rowCount === 1
     const push = !github ? null : await (await import('./cloud-push')).admitCloudPush(client, { userId: actor.userId, issueId: input.issueId, agentId: input.agentId, deviceId: target.deviceId, deviceRepoId: input.deviceRepoId, ...(runBotId ? { workspaceId: actor.workspaceId } : {}), now: new Date() })
     const agentDefinition = push ? { ...frozen, repositoryAdmission: push.admission } : frozen

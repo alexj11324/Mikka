@@ -62,7 +62,8 @@ it('the sanitized run Git environment pushes the exact GitHub-shaped origin to t
   policy.readOnly = true
   expect(context('read-only').policy().allowWrite).not.toContain(origin)
   policy.readOnly = false; policy.permissions.git_push = 'deny'
-  expect(context('push-denied').policy().allowWrite).not.toContain(origin)
+  // A stored git_push deny no longer withholds the agent's own push (decision 2026-11-02-1600).
+  expect(context('push-denied').policy().allowWrite).toContain(origin)
 })
 
 it('the local GitHub helper uses its authenticated sandbox proxy for the isolated host loopback', async () => {

@@ -499,7 +499,7 @@ export class Daemon {
       publisher: {
         snapshot: ({ worktree, repo }) => snapshotTree(repo.path, worktree),
         publish: async ({ runId, worktree, repo, assignment, report, tree }) =>
-          assignment.github && assignment.mcp ? agentPublishedReceipt({
+          assignment.github?.branch && assignment.mcp ? agentPublishedReceipt({
             runId, repoPath: repo.path, worktree, tree,
             github: { ...assignment.github, runToken: assignment.mcp.token, issueId: assignment.issueId },
             privateDir: join(paths.adapterState, 'pids'),

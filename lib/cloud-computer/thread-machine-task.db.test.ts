@@ -92,7 +92,7 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
         for (const corrupt of [false, true]) {
           const issueId = await task(), runId = await run(issueId);
           const scope = { userId: owner, issueId, agentId, deviceId: botDevice, workspaceId, remoteKey: 'v2/github.com/acme/app', remoteUrl: 'https://github.com/acme/app.git', targetBranch: `mikka/fixture-${number}` };
-          const admission = admitRepositoryTask({ ...scope, grant: { grantedAt: new Date().toISOString() }, now: new Date() })!;
+          const admission = admitRepositoryTask({ ...scope, now: new Date() })!;
           assert.ok(admission);
           if (corrupt) admission.deviceId = randomUUID();
           await pool.query('UPDATE agent_runs SET "agentDefinition"=$2 WHERE id=$1', [runId, { repositoryAdmission: admission }]);

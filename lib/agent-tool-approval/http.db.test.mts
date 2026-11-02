@@ -136,7 +136,7 @@ test('real HTTP claim carries policy, and its run gate creates no approvals (dec
   assert.equal(assignment.prompt,'APPROVAL_TEST')
   assert.equal(assignment.expectedRepoRemote,remoteUrl)
   assert.equal(assignment.pushBranch,'mikka/appr-1')
-  assert.equal((await pool.query('SELECT "scopeVersion","pushApproved" FROM run_publications WHERE "runId"=$1',[runId])).rows[0].pushApproved,false)
+  assert.equal((await pool.query('SELECT "scopeVersion","pushApproved" FROM run_publications WHERE "runId"=$1',[runId])).rows[0].pushApproved,true,'kept for old readers: pushing needs no approval')
   const {verifyRunToken}=await import('../mcp/worker')
   assert.ok(await verifyRunToken(new Request(origin),assignment.mcp?.token),'claim issues a real run-scoped token after its lease commits')
   assert.equal(assignment.policy?.permissions.install_dependency, 'allow')

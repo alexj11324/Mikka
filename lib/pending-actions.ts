@@ -1,5 +1,5 @@
 import 'server-only'
-import { and, eq, gt, sql } from 'drizzle-orm'
+import { and, eq, gt } from 'drizzle-orm'
 import { ActionFailureError } from '@/lib/action-error'
 import { appToolCallSchema, APP_TOOL_ACTION } from '@/lib/app-tools'
 import { isApprovalAction } from '@/lib/composio-actions'
@@ -8,10 +8,7 @@ import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { actionDecidedEvent } from '@/lib/coordinator-events'
 import { wakeCoordinator } from '@/lib/coordinator/wake'
 import { db, pool } from '@/lib/db'
-import { coordinatorEvents, pendingActions, repositorySettings } from '@/lib/db/schema'
-import { z } from 'zod'
-import { taskDestinationSchema } from './task-destination'
-import { validateRepositoryApproval } from '@/lib/repository-approval-proposal'
+import { pendingActions } from '@/lib/db/schema'
 import { actionOutcome, PENDING_ACTION_TTL_MS } from '@/lib/pending-action-view'
 
 /**
@@ -20,47 +17,6 @@ import { actionOutcome, PENDING_ACTION_TTL_MS } from '@/lib/pending-action-view'
  * second tab cannot run it twice. The Coordinator hears the outcome.
  */
 export async function decidePendingAction(userId: string, id: string, approve: boolean) {
-  const [candidate] = await db.select({ action: pendingActions.action }).from(pendingActions)
-    .where(and(eq(pendingActions.id, id), eq(pendingActions.userId, userId))).limit(1)
-  if (candidate?.action === 'approve_repository_push') {
-    await db.transaction(async tx => {
-      const [saved] = await tx.select({ input: pendingActions.input }).from(pendingActions)
-        .where(and(eq(pendingActions.id, id), eq(pendingActions.userId, userId), eq(pendingActions.action, 'approve_repository_push'))).limit(1)
-      const input = validateRepositoryApproval(saved?.input)
-      if (!input) throw new ActionFailureError('pendingActionUnavailable')
-      await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${JSON.stringify(['repository-approval', userId, input.remoteKey])}, 0))`)
-      const [request] = await tx.update(pendingActions)
-        .set({ status: approve ? 'done' : 'declined', decidedAt: new Date() })
-        .where(and(eq(pendingActions.id, id), eq(pendingActions.userId, userId), eq(pendingActions.action, 'approve_repository_push'), eq(pendingActions.status, 'pending'), gt(pendingActions.createdAt, new Date(Date.now() - PENDING_ACTION_TTL_MS))))
-        .returning()
-      if (!request) throw new ActionFailureError('pendingActionUnavailable')
-      const decidedInput = validateRepositoryApproval(request.input)
-      if (!decidedInput || decidedInput.remoteKey !== input.remoteKey || decidedInput.repo !== input.repo) throw new ActionFailureError('pendingActionUnavailable')
-      const taskIds = z.array(z.uuid()).safeParse(request.context?.taskEventIds ?? [])
-      if (!taskIds.success) throw new ActionFailureError('pendingActionUnavailable')
-      const tasks: { eventId: string; botId: string | null; issueId: string | null }[] = []
-      for (const id of new Set(taskIds.data)) {
-        const [event] = await tx.select().from(coordinatorEvents).where(and(eq(coordinatorEvents.id, id), eq(coordinatorEvents.userId, userId), eq(coordinatorEvents.kind, 'user_message'))).limit(1)
-        const destination = taskDestinationSchema.safeParse(event?.payload.taskDestination)
-        if (!event?.deliveredAt || !destination.success || destination.data.kind !== 'device') throw new ActionFailureError('pendingActionUnavailable')
-        tasks.push({ eventId: event.id, botId: event.botId, issueId: event.issueId })
-      }
-      if (approve) {
-        const push = { approved: true, remote: 'origin', approvedByUserId: userId, approvedAt: new Date().toISOString() }
-        await tx.insert(repositorySettings).values({ userId, remoteKey: input.remoteKey, push }).onConflictDoUpdate({
-          target: [repositorySettings.userId, repositorySettings.remoteKey], set: { push, updatedAt: new Date() },
-        })
-      }
-      const status = approve ? 'done' as const : 'declined' as const
-      const action = { id: request.id, userId, action: request.action, input: request.input }
-      if (tasks.length) {
-        for (const task of tasks) await recordCoordinatorEvent(tx, actionDecidedEvent(action, { status, error: null, outcome: {} }, task))
-      } else await recordCoordinatorEvent(tx, actionDecidedEvent(action, { status, error: null, outcome: {} }, { botId: request.botId }))
-    })
-    const status = approve ? 'done' as const : 'declined' as const
-    await wakeCoordinator(userId)
-    return { status, error: null }
-  }
   const [row] = await db.update(pendingActions)
     .set({ status: approve ? 'running' : 'declined', decidedAt: new Date() })
     .where(and(eq(pendingActions.id, id), eq(pendingActions.userId, userId), eq(pendingActions.status, 'pending'), gt(pendingActions.createdAt, new Date(Date.now() - PENDING_ACTION_TTL_MS))))

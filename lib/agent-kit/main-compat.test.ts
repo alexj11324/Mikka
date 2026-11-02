@@ -59,6 +59,8 @@ stub('../mcp/resource.ts',{mcpResourceURL:null})
 stub('../device-repositories.ts',{readRepositorySettings:async()=>null})
 stub('../run-publications.ts',{prepareRunPublication:prepared,persistRunCompletion:completed})
 stub('../run-leases.ts',{latestCheckpoint:async()=>null})
+let githubAccount:string|null=null
+stub('../github/repository-installation.ts',{linkedGitHubAccountId:async()=>githubAccount})
 stub('../computer/local-authority.ts',{localComputerAuthority:async()=>({botId,ownerId:owner,workspaceId:workspace,policyVersion:3,permission:'allow'})})
 stub('../computer/claim.ts',{claimLocalRun:claimed,claimCloudRun:cloudClaimed})
 stub('../computer/native-run-binding.ts',{nativeRunBinding:scopedBinding})
@@ -79,13 +81,14 @@ let queue: typeof import('../computer/queue-run').queueCloudRun
 before(async()=>{claim=(await import('../../app/v1/devices/[deviceId]/runs/[runId]/claim/route')).POST;queue=(await import('../computer/queue-run')).queueCloudRun})
 beforeEach(()=>{definition=frozen();subscription={...binding};missing=false;cloud=false;localCapable=false;cliReadOnly=false;cliPolicy.permissions.git_push='deny';publicationPolicy.permissions.git_push='allow';computerPermission='ask';mismatch=undefined;protocolVersion=3;selectIndex=0;stopDuringToken=false;lockOrder.length=0;process.env.MIKKA_BYOS_ENABLED='1';process.env.MIKKA_AGENT_KIT='1';process.env.MIKKA_CLOUD_COMPUTER_TASKS='1';for(const fn of [modelAdmissionCheck,bindingById,latestBinding,scopedBinding,claimed,cloudClaimed,prepared,completed])fn.mock.resetCalls()})
 const request=()=>claim(new Request('https://example.test/v1/devices/'+deviceId+'/runs/'+randomUUID()+'/claim',{method:'POST',headers:{[REPO_ORIGIN_HEADER]:'1'}}),{params:Promise.resolve({deviceId,runId:randomUUID()})})
-const assertCliPolicy=(body:{policy:ReturnType<typeof defaultRunPolicy>;policyRevision:string})=>{assert.equal(body.policy.permissions.network,'deny');assert.equal(body.policy.permissions.install_dependency,'deny');assert.equal(body.policy.permissions.git_push,'deny');assert.deepEqual(body.policy.networkAllow,['cli-policy.invalid']);assert.equal(body.policyRevision,'a'.repeat(64))}
+const assertCliPolicy=(body:{policy:ReturnType<typeof defaultRunPolicy>;policyRevision:string})=>{assert.equal(body.policy.permissions.network,'deny');assert.equal(body.policy.permissions.install_dependency,'deny');assert.deepEqual(body.policy.networkAllow,['cli-policy.invalid']);assert.equal(body.policyRevision,'a'.repeat(64))}
 test('local claim uses frozen harness and exact subscription despite Agent edits',async()=>{
  definition={...frozen(),model:'frozen-model',cliModelSelection:'explicit'}
  const response=await request();assert.equal(response.status,200);const body=await response.json();assert.equal(body.harness,'codex');assert.equal(body.model,'frozen-model');assert.equal(body.remoteUrl,'https://github.com/example/repo.git');assert.equal(body.baseBranch,undefined);assert.deepEqual(bindingById.mock.calls[0].arguments,[owner,binding.id]);assert.equal(latestBinding.mock.callCount(),0);assert.equal(claimed.mock.callCount(),1);assert.equal(typeof (claimed.mock.calls[0].arguments as unknown[])[5],'function','Factory lineage guard remains attached')
  assert.deepEqual(modelAdmissionCheck.mock.calls[0].arguments.slice(0,2),[{workspaceId:workspace,ownerId:owner},'frozen-model'])
  assert.equal(modelAdmissionCheck.mock.calls[0].arguments[2],binding.route)
  assert.equal(prepared.mock.callCount(),1)
+ assert.equal(body.policy.permissions.git_push,'allow','a stored CLI git_push deny no longer withholds the task branch push (decision 2026-11-02-1600)')
  const [run,remoteUrl]=prepared.mock.calls[0].arguments
  assert.equal(run.userId,owner);assert.equal(run.issueId,issueId);assert.equal(run.baseBranch,null);assert.equal(remoteUrl,'https://github.com/example/repo.git')
  assert.equal(body.pushBranch,publicationAssignment.pushBranch);assertCliPolicy(body);assert.equal(completed.mock.callCount(),0)
@@ -207,10 +210,17 @@ test('a cloud run admitted with the GitHub App grant gets its publication and al
  assert.equal(body.policy.permissions.git_push,'allow')
 })
 
-test('a read-only local run gets no push branch and a read-only policy, whatever git_push says', async () => {
+test('a read-only local run gets no push branch and a read-only policy, but the owner\'s GitHub credential like any run', async () => {
  definition={...frozen(),readOnly:true};cliPolicy.permissions.git_push='allow'
  const response=await request();assert.equal(response.status,200);const body=await response.json()
  assert.equal(prepared.mock.callCount(),0,'a read-only run reserves no publication')
- assert.equal(body.pushBranch,undefined);assert.equal(body.github,undefined)
+ assert.equal(body.pushBranch,undefined);assert.equal(body.github,undefined,'no GitHub connection: nothing to give')
  assert.equal(body.policy.readOnly,true);assert.equal(body.policy.permissions.git_push,'deny')
+ selectIndex=0;githubAccount='123'
+ const mailbox=process.env.MIKKA_PERSONAL_MAILBOX_ENABLED;process.env.MIKKA_PERSONAL_MAILBOX_ENABLED='0'
+ try {
+  const connected=await (await request()).json()
+  assert.ok(connected.mcp,'the run token is issued')
+  assert.equal(connected.github?.repository,'example/repo');assert.equal(connected.github?.branch,undefined)
+ } finally { githubAccount=null;if(mailbox===undefined)delete process.env.MIKKA_PERSONAL_MAILBOX_ENABLED;else process.env.MIKKA_PERSONAL_MAILBOX_ENABLED=mailbox }
 })

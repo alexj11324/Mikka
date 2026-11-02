@@ -146,25 +146,17 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     assert.equal(await count('SELECT count(*)::int AS n FROM agent_runs WHERE "issueId"=$1', [a.issueId]), 1)
   })
 
-  await t.test('a cloud run pushes on the GitHub App grant like a local run; without it, or read-only, it cannot push', async () => {
+  await t.test('a cloud run gets its task branch like a local run, with no grant; a read-only run gets none', async () => {
     const g = await person('cloud-grant')
-    const granted = await dispatch(g.id, g.issueId, g.botId) as unknown as { runId: string; status: string }
-    assert.equal(granted.status, 'queued', JSON.stringify(granted))
-    const admitted = (await pool.query(`SELECT r."agentDefinition",p.branch,p."pushApproved" FROM agent_runs r JOIN devices d ON d.id=r."deviceId" AND d.kind='cloud'
-      LEFT JOIN run_publications p ON p."runId"=r.id WHERE r.id=$1`, [granted.runId])).rows[0]
-    assert.equal(admitted.agentDefinition.repositoryAdmission.authority, 'github_app')
+    // No push grant is recorded or read (decision 2026-11-02-1600).
+    await pool.query('DELETE FROM github_repository_installations WHERE "userId"=$1', [g.id])
+    const queued = await dispatch(g.id, g.issueId, g.botId) as unknown as { runId: string; status: string }
+    assert.equal(queued.status, 'queued', JSON.stringify(queued))
+    const admitted = (await pool.query(`SELECT r."agentDefinition",p.branch FROM agent_runs r JOIN devices d ON d.id=r."deviceId" AND d.kind='cloud'
+      LEFT JOIN run_publications p ON p."runId"=r.id WHERE r.id=$1`, [queued.runId])).rows[0]
+    assert.equal(admitted.agentDefinition.repositoryAdmission.authority, 'owner_credential')
     assert.equal(admitted.agentDefinition.repositoryAdmission.targetBranch, admitted.branch)
-    assert.equal(admitted.pushApproved, true)
-    await pool.query('UPDATE agent_runs SET status=\'succeeded\',"finishedAt"=now() WHERE id=$1', [granted.runId])
-
-    await pool.query('UPDATE github_repository_installations SET "pushGrantedAt"=null WHERE "userId"=$1', [g.id])
-    // Each case on its own task of the same person: dispatching the same task again continues its thread (lib/thread-dispatch.ts).
-    const ungranted = await dispatch(g.id, await anotherTask(g.id, 8), g.botId) as unknown as { runId: string; status: string }
-    assert.equal(ungranted.status, 'queued', 'a cloud run without the grant still runs; it just cannot push')
-    const plain = (await pool.query('SELECT r."agentDefinition",(SELECT count(*)::int FROM run_publications p WHERE p."runId"=r.id) AS publications FROM agent_runs r WHERE r.id=$1', [ungranted.runId])).rows[0]
-    assert.equal(plain.agentDefinition.repositoryAdmission, undefined)
-    assert.equal(plain.publications, 0)
-    await pool.query('UPDATE agent_runs SET status=\'succeeded\',"finishedAt"=now() WHERE id=$1', [ungranted.runId])
+    await pool.query('UPDATE agent_runs SET status=\'succeeded\',"finishedAt"=now() WHERE id=$1', [queued.runId])
 
     const readOnly = await steps.dispatchRun(g.id, { issueId: await anotherTask(g.id, 9), repo: 'octo/repo', readOnly: true, requestKey: `dispatch:${randomUUID()}` }, undefined, g.botId) as unknown as { runId: string; status: string }
     assert.equal(readOnly.status, 'queued')
@@ -182,7 +174,7 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     // Its own task numbers: another person's task 7 on octo/repo already holds that publication branch.
     const work = await anotherTask(r.id, 31)
     const writable = await dispatch(r.id, work, r.botId) as unknown as Continued
-    assert.equal((await definitionOf(writable.runId)).agentDefinition.repositoryAdmission?.authority, 'github_app', 'the thread starts writable')
+    assert.equal((await definitionOf(writable.runId)).agentDefinition.repositoryAdmission?.authority, 'owner_credential', 'the thread starts writable')
     await pool.query('UPDATE agent_runs SET status=\'failed\',"finishedAt"=now() WHERE id=$1', [writable.runId])
     const look = await steps.dispatchRun(r.id, { issueId: work, repo: 'octo/repo', readOnly: true, requestKey: `dispatch:${randomUUID()}` }, undefined, r.botId) as unknown as Continued
     assert.deepEqual([look.thread, look.threadId], ['continued', writable.runId])

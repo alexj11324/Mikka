@@ -23,7 +23,11 @@ export function githubReceiptEnvironment(host: NodeJS.ProcessEnv = process.env):
   return env
 }
 
-/** Only run-local configuration is written; never a global gh or git login. */
+/**
+ * The run owner's own GitHub credential for git and gh, for any github.com
+ * repository (decision 2026-11-02-1600). Only run-local configuration is
+ * written; never a global gh or git login, and never the token itself.
+ */
 export function prepareGitHubEnvironment(runDir: string, github: RunGitHub, path: string, runtime?: { nodeBinary: string; ghBinary: string }): Record<string, string> {
   const endpoint = new URL(github.endpoint)
   if (!endpoint.pathname.endsWith('/api/runs/github-token') || !trustedServerEndpoint(endpoint)) throw new Error('Invalid run GitHub endpoint')
@@ -48,7 +52,7 @@ export function prepareGitHubEnvironment(runDir: string, github: RunGitHub, path
   const fixtureProxy = fixtureConfig.length ? 'case "${HTTP_PROXY:-${http_proxy:-}}" in http://*@localhost:*|http://*@127.0.0.1:*) unset NO_PROXY no_proxy ;; esac\n' : ''
   writeFileSync(wrapper, `#!/bin/sh\n${fixtureProxy}exec env NODE_USE_ENV_PROXY=1 ${process.versions.electron ? 'ELECTRON_RUN_AS_NODE=1 ' : ''}${quote(node)} ${quote(helper)} gh ${quote(config)} "$@"\n`, { mode: 0o700, flag: 'wx' })
   return {
-    PATH: `${bin}${delimiter}${path}`, GH_HOST: 'github.com', GH_REPO: github.repository,
+    PATH: `${bin}${delimiter}${path}`, GH_HOST: 'github.com',
     // The agent commits inside the sandbox, where a signing program or agent
     // configured outside it (gpg, ssh-agent, a signing helper) is unreachable.
     GIT_TERMINAL_PROMPT: '0', GIT_CONFIG_COUNT: String(5 + fixtureConfig.length),
@@ -65,15 +69,14 @@ export function prepareGitHubEnvironment(runDir: string, github: RunGitHub, path
 }
 
 /**
- * The daemon's own clone and fetch for a GitHub delivery run: git asks the
- * run's credential helper, which exchanges the run token for a short-lived
- * token of this repository only (the person's Mikka GitHub App
- * authorization). A machine without a GitHub login of its own (a cloud
+ * The daemon's own clone and fetch for a GitHub run: git asks the run's
+ * credential helper, which exchanges the run token for the run owner's own
+ * GitHub credential. A machine without a GitHub login of its own (a cloud
  * sandbox, a new computer) can then clone a private repository. Only git's
  * credential settings are returned; the run-local files are removed after.
  */
 export async function withRunGitCredentials<T>(
-  assignment: { github?: { endpoint: string; repository: string; branch: string }; mcp?: { token: string }; issueId: string },
+  assignment: { github?: { endpoint: string; repository: string; branch?: string }; mcp?: { token: string }; issueId: string },
   privateDir: string,
   work: (env: Record<string, string>) => Promise<T>,
 ): Promise<T> {
@@ -99,6 +102,8 @@ export async function agentPublishedReceipt(input: {
 }): Promise<RunPublish> {
   // No helper, configuration or Git directory writable by the agent is ever
   // executed by the outer daemon. The hosted clone remains container-only.
+  if (!input.github.branch) throw new Error('No task branch to read back')
+  const branch = input.github.branch
   mkdirSync(input.privateDir, { recursive: true, mode: 0o700 })
   const receiptDir = mkdtempSync(join(input.privateDir, 'github-receipt-'))
   try {
@@ -108,7 +113,7 @@ export async function agentPublishedReceipt(input: {
     const originalHead = String((await git(['rev-parse', 'HEAD'])).stdout).trim()
     if (await snapshotTree(input.repoPath, input.worktree, env) !== input.tree) throw new Error('Agent must commit and verify every change before submitting')
     const url = `https://github.com/${input.github.repository}.git`
-    const commit = String((await git(['ls-remote', '--exit-code', url, `refs/heads/${input.github.branch}`])).stdout).trim().split(/\s+/)[0]
+    const commit = String((await git(['ls-remote', '--exit-code', url, `refs/heads/${branch}`])).stdout).trim().split(/\s+/)[0]
     if (!/^[a-f0-9]{40}$/.test(commit)) throw new Error('Invalid pushed commit')
     if (!input.hosted) {
       const headTree = String((await git(['rev-parse', 'HEAD^{tree}'])).stdout).trim()
@@ -123,7 +128,7 @@ export async function agentPublishedReceipt(input: {
       const [object, pr, checks] = await Promise.allSettled([
         // Hosted runs verify GitHub's tree, never the writable clone's config.
         input.hosted ? gh(['api', `repos/${input.github.repository}/git/commits/${commit}`]).then(result => JSON.parse(result.stdout)) : null,
-        gh(['pr', 'view', input.github.branch, '--repo', input.github.repository, '--json', 'headRefOid,body']).then(result => JSON.parse(result.stdout)),
+        gh(['pr', 'view', branch, '--repo', input.github.repository, '--json', 'headRefOid,body']).then(result => JSON.parse(result.stdout)),
         gh(['api', 'graphql', '-f', `query=${query}`, '-f', `owner=${owner}`, '-f', `repository=${repository}`, '-f', `commit=${commit}`]).then(result => JSON.parse(result.stdout)),
       ])
       if (object.status === 'rejected' || pr.status === 'rejected' || checks.status === 'rejected') throw new Error('GitHub receipt lookup failed')
@@ -140,6 +145,6 @@ export async function agentPublishedReceipt(input: {
       await git(['update-ref', `refs/heads/${runBranch(input.runId)}`, commit, originalHead])
       await git(['read-tree', commit])
     }
-    return { branch: input.github.branch, commit, pushed: true, remote: 'origin' }
+    return { branch, commit, pushed: true, remote: 'origin' }
   } finally { rmSync(receiptDir, { recursive: true, force: true }) }
 }

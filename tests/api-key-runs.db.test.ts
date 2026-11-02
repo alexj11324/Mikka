@@ -72,7 +72,7 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
     const botId = await seedBot(pool, ws.id, id)
     const issueId = await task(id)
     const remote = `https://github.com/mikka-ci/api-key-runs-${randomUUID()}.git`
-    // Push is what the GitHub App grants (lib/github/push-grant.ts); record that grant as a live check would.
+    // An installation row an earlier build recorded; admission no longer reads it (decision 2026-11-02-1600).
     await recordPushGrant(pool, id, normalizeRepository(remote).key)
     const deviceId = randomUUID()
     await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"protocolVersion","lastSeenAt",harnesses) VALUES ($1,$2,'Laptop','local',true,$3,now(),$4)`,

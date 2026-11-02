@@ -112,7 +112,7 @@ export function createSkillAssignments(pool: Pool, authorize: Authorize, authori
       WHERE r.id=$1 AND r."userId"=$2 AND r."issueId"=$3 FOR SHARE OF repo`,[runId,userId,issueId])
     if (!source) throw new ImprovementError('sourceMismatch')
     // Admission and continuations use the same repository -> issue order: the
-    // recorded GitHub App grant (lib/github/push-grant.ts), then the issue.
+    // person's repository installation row, then the issue.
     // The host acquires CLI policy before any source run/worker lock.
     await tx.query('SELECT 1 FROM github_repository_installations WHERE "userId"=$1 AND "remoteKey"=$2 FOR SHARE', [userId, source.repoPath])
     await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',

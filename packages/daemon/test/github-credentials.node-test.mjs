@@ -5,32 +5,34 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { credentialFailureMessage, getRunGitHubToken, matchesGitRepository, runGh, RunGitHubCredentialError, RUN_GITHUB_ERROR_MESSAGES } from '../src/agents/github-credentials.mjs'
 
-test('git supplies a token only to the exact HTTPS GitHub repository', () => {
+test('git supplies the owner\'s credential to any HTTPS github.com repository, and to no other host', () => {
   const valid = { protocol: 'https', host: 'github.com', path: 'owner/repo.git' }
-  assert.equal(matchesGitRepository(valid, 'owner/repo'), true)
-  for (const input of [{ ...valid, host: 'github.com.evil' }, { ...valid, protocol: 'http' }, { ...valid, path: 'other/repo.git' }, { ...valid, path: undefined }]) {
-    assert.equal(matchesGitRepository(input, 'owner/repo'), false)
+  for (const input of [valid, { ...valid, path: 'other-org/another.git' }, { ...valid, path: 'Owner/Repo' }, { ...valid, path: undefined }]) {
+    assert.equal(matchesGitRepository(input), true, JSON.stringify(input))
+  }
+  for (const input of [{ ...valid, host: 'github.com.evil' }, { ...valid, host: 'gitlab.com' }, { ...valid, host: 'api.github.com.attacker.test' }, { ...valid, protocol: 'http' }, { ...valid, protocol: 'ssh' }]) {
+    assert.equal(matchesGitRepository(input), false, JSON.stringify(input))
   }
 })
 
 test('cache refreshes after fifty minutes and retains a private file outside the checkout', async () => {
   const root = await mkdtemp(join(tmpdir(), 'mikka-github-helper-'))
-  const config = { file: join(root, 'config'), endpoint: 'https://mikka.example/api/runs/github-token', repository: 'owner/repo', runToken: 'synthetic-run' }
+  const config = { file: join(root, 'config'), endpoint: 'https://mikka.example/api/runs/github-token', runToken: 'synthetic-run' }
   let time = Date.parse('2026-10-30T12:00:00Z'), requests = 0
   const fetcher = async (url, init) => {
     assert.equal(url, config.endpoint)
     assert.equal(init.redirect, 'error')
     assert.equal(init.headers.authorization, 'Bearer synthetic-run')
-    return Response.json({ token: `synthetic-installation-${++requests}`, repository: config.repository, expiresAt: new Date(time + 3600_000).toISOString() })
+    return Response.json({ token: `synthetic-user-${++requests}`, expiresAt: new Date(time + 3600_000).toISOString() })
   }
   const deps = { fetcher, now: () => time }
-  assert.equal(await getRunGitHubToken(config, deps), 'synthetic-installation-1')
+  assert.equal(await getRunGitHubToken(config, deps), 'synthetic-user-1')
   time += 49 * 60_000
-  assert.equal(await getRunGitHubToken(config, deps), 'synthetic-installation-1')
+  assert.equal(await getRunGitHubToken(config, deps), 'synthetic-user-1')
   // A new long CI watch must not start with only eleven minutes left.
-  assert.equal(await getRunGitHubToken(config, { ...deps, minValidityMs: 41 * 60_000 }), 'synthetic-installation-2')
+  assert.equal(await getRunGitHubToken(config, { ...deps, minValidityMs: 41 * 60_000 }), 'synthetic-user-2')
   time += 60_000
-  assert.equal(await getRunGitHubToken(config, deps), 'synthetic-installation-2')
+  assert.equal(await getRunGitHubToken(config, deps), 'synthetic-user-2')
   assert.equal((await stat(`${config.file}.cache`)).mode & 0o077, 0)
   assert.doesNotMatch(await readFile(`${config.file}.cache`, 'utf8'), /synthetic-run/)
 })
@@ -81,14 +83,13 @@ test('normal gh commands run once without watch timers', async () => {
 
 test('a refused exchange names the reason in English and Chinese, from known codes only', async () => {
   const root = await mkdtemp(join(tmpdir(), 'mikka-gh-'))
-  const config = { file: join(root, 'config'), endpoint: 'https://mikka.example/api/runs/github-token', runToken: 'synthetic-run-token', repository: 'owner/repo' }
+  const config = { file: join(root, 'config'), endpoint: 'https://mikka.example/api/runs/github-token', runToken: 'synthetic-run-token' }
   const refused = (body, status = 409) => ({ fetcher: async () => new Response(typeof body === 'string' ? body : JSON.stringify(body), { status }) })
-  const error = await getRunGitHubToken(config, refused({ error: 'githubAppNotInstalled' })).catch(caught => caught)
+  const error = await getRunGitHubToken(config, refused({ error: 'githubNotConnected' })).catch(caught => caught)
   assert.ok(error instanceof RunGitHubCredentialError)
-  assert.equal(error.code, 'githubAppNotInstalled')
-  assert.equal(credentialFailureMessage(error), `Mikka: ${RUN_GITHUB_ERROR_MESSAGES.githubAppNotInstalled[0]}\nMikka：${RUN_GITHUB_ERROR_MESSAGES.githubAppNotInstalled[1]}\n`)
-  assert.match(credentialFailureMessage(error), /Install the Mikka GitHub App on this repository\./)
-  assert.match(credentialFailureMessage(error), /这个仓库还没有安装 Mikka GitHub App/)
+  assert.equal(error.code, 'githubNotConnected')
+  assert.equal(credentialFailureMessage(error), `Mikka: ${RUN_GITHUB_ERROR_MESSAGES.githubNotConnected[0]}\nMikka：${RUN_GITHUB_ERROR_MESSAGES.githubNotConnected[1]}\n`)
+  assert.match(credentialFailureMessage(error), /Plugins › GitHub/)
   for (const [code, message] of Object.entries(RUN_GITHUB_ERROR_MESSAGES)) {
     const failed = await getRunGitHubToken(config, refused({ error: code }, 502)).catch(caught => caught)
     assert.equal(failed.code, code)
