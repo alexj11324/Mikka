@@ -12,7 +12,7 @@ Decided by Alex, 2026-10-24.
 | --- | --- | --- | --- | --- |
 | **Bot** | Bot | Chats with people. Does web tasks itself through sub-agents (分身, R-72), each with its own browser, and dispatches real tasks such as coding to threads. The user creates it (Grok Bot style) and can put several bots in a group chat. The Coordinator is a bot too. Stored in its own `bots` table (name, colour, shape) and runs on Mikka's own AI SDK on Vercel; it is not a row in `agents`. | **Bot list** (left column), one row per bot or group chat. | The bot's own name, e.g. "Mikka Frontend". |
 | **Chat** | 对话 | The conversation between a person and the selected bot or group chat. | **Center column**. Header pill = the bot's (or group's) name. | Same as the bot or group. It has no name of its own. |
-| **Thread** | 线程 | Does the work a bot dispatched: one run (`agent_runs`), usually tied to a task. A bot can have many threads at once. | **Thread list** (right column), plus the thread view and the machine its Agent runs on. | Its own name, about the work, e.g. "#66 群聊前端骨架" or "MIK-11 群聊建表". Never the bot's name. |
+| **Thread** | 线程 | Does the work a bot dispatched: a run chain, identified by its root run (`rootRunId`), made of that run and every run that resumes, retries or continues it (`lib/run-chain.ts`; each is a row in `agent_runs`), usually tied to a task. A bot can have many threads at once. | **Thread list** (right column), plus the thread view and the machine its Agent runs on. | Its own name, about the work, e.g. "#66 群聊前端骨架" or "MIK-11 群聊建表". Never the bot's name. |
 
 How they connect: a person chats with a bot (center). The bot dispatches
 real tasks such as coding to threads, which do the work (right). A web task
@@ -62,7 +62,7 @@ Decided by Alex, 2026-10-28.
 | **Library** | 资料库 | A bot's files, listed read-only under 概览 › 详情 (R-51). Files are added with the composer's 「+」. |
 | **Thread** | 线程 | As above. The right panel's tab is 线程, never 任务 (R-43). |
 | **Browser** | 浏览器 | The person's own local browser, one for the whole app, opened from the globe in the top bar (R-57). |
-| **Computer** | 电脑 | A bot's cloud computer, one per bot, shown in the 电脑 tab of 概览 (R-50). Never called 浏览器. |
+| **Computer** | 电脑 | A bot's cloud computer: its own desktop (X display) on its owner's bot machine, which is one per person per workspace (`cloud_machines` keyed by `workspaceId`, `ownerId`; `bot_desktops` keyed by `botId`). Used by that bot only; a thread that needs a desktop gets its own machine ([0251](decisions/2026-11-02-0251-desktop-runs-get-their-own-machine.md)). Shown in the 电脑 tab of 概览 (R-50). Never called 浏览器. |
 
 ## Words to avoid
 
