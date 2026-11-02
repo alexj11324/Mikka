@@ -472,7 +472,7 @@ async function dispatchByRules(userId: string, input: { issueId: string; agentId
     const { resolveModelDispatch } = await import('@/lib/model-dispatch')
     const target = await resolveModelDispatch(pool, { ownerId: userId, workspaceId: await executionWorkspace(userId, botId), botId }, input.model ?? null, 'local', device.deviceId)
     if (target.kind !== 'device') return { error: 'machineUnavailable' as const, issueId: input.issueId, ...(target.kind === 'none' ? { reason: target.reason, card: target.card } : {}) }
-    const result = await queueRun(userId, { ...input, agentId: target.agentId, model: target.model, pinnedDeviceId: target.deviceId, ...(target.entry.source.kind === 'api_key' ? { apiKeyId: target.entry.source.keyId } : {}) }, botId, execution, requestEventId)
+    const result = await queueRun(userId, { ...input, agentId: target.agentId, model: target.model, pinnedDeviceId: target.deviceId, ...(target.subscriptionBindingId ? { subscriptionBindingId: target.subscriptionBindingId } : {}), ...(target.entry.source.kind === 'api_key' ? { apiKeyId: target.entry.source.keyId } : {}) }, botId, execution, requestEventId)
     return { ...result, status: 'queued' as const }
   }
   {
@@ -484,9 +484,17 @@ async function dispatchByRules(userId: string, input: { issueId: string; agentId
     const workspaceId = await executionWorkspace(userId, botId)
     const { resolveModelDispatch } = await import('@/lib/model-dispatch')
     const target = await resolveModelDispatch(pool, { ownerId: userId, workspaceId, botId }, input.model ?? null, place === 'cloud' ? 'cloud' : undefined)
-    if (target.kind === 'none') return { error: 'machineUnavailable' as const, issueId: input.issueId, reason: target.reason, card: target.card }
+    if (target.kind === 'none') {
+      if (target.reason === 'cloudNotConfigured') {
+        const { cloudDispatchFailureReason } = await import('@/lib/cloud-dispatch-failure')
+        const { modelUnavailableCard } = await import('@/lib/model-dispatch')
+        const reason = await cloudDispatchFailureReason(pool, userId)
+        return { error: 'machineUnavailable' as const, issueId: input.issueId, reason, card: modelUnavailableCard(reason) }
+      }
+      return { error: 'machineUnavailable' as const, issueId: input.issueId, reason: target.reason, card: target.card }
+    }
     if (target.kind === 'device') {
-      const result = await queueRun(userId, { ...input, agentId: target.agentId, model: target.model, pinnedDeviceId: target.deviceId, ...(target.entry.source.kind === 'api_key' ? { apiKeyId: target.entry.source.keyId } : {}) }, botId, execution, requestEventId)
+      const result = await queueRun(userId, { ...input, agentId: target.agentId, model: target.model, pinnedDeviceId: target.deviceId, ...(target.subscriptionBindingId ? { subscriptionBindingId: target.subscriptionBindingId } : {}), ...(target.entry.source.kind === 'api_key' ? { apiKeyId: target.entry.source.keyId } : {}) }, botId, execution, requestEventId)
       return { ...result, status: 'queued' as const }
     }
     if (requestEventId) {
@@ -498,12 +506,15 @@ async function dispatchByRules(userId: string, input: { issueId: string; agentId
     const autoRuntime=await import('@/lib/computer/auto-runtime')
     const actor={userId,workspaceId}
     const runtime=await autoRuntime.ensureBotCloudRuntime(pool,actor,botId,{harness:target.harness})
-    if (runtime && target.entry.source.kind === 'subscription') await (await import('@/lib/model-dispatch')).bindAgentToConnection(pool, { ownerId: userId, workspaceId }, runtime.agentId, target.harness, target.entry.source.connectionId, target.model)
-    const cloud = runtime ? await dispatchComputerTask(userId,{botId:runtime.botId,issueId:input.issueId,harness:runtime.harness,note:input.note,model:target.model,repo:input.repo,...(target.entry.source.kind === 'api_key' ? {apiKeyId:target.entry.source.keyId} : {}),...(input.readOnly ? {readOnly:true} : {})},`rule:${input.requestKey ?? requestEventId ?? crypto.randomUUID()}`,scope,execution) : { error: 'cloudComputerUnavailable' as const }
+    const subscriptionBindingId = runtime && target.entry.source.kind === 'subscription' ? await (await import('@/lib/model-dispatch')).bindAgentToConnection(pool, { ownerId: userId, workspaceId }, runtime.agentId, target.harness, target.entry.source.connectionId, target.model) : undefined
+    const cloud = runtime ? await dispatchComputerTask(userId,{botId:runtime.botId,issueId:input.issueId,harness:runtime.harness,note:input.note,model:target.model,repo:input.repo,...(subscriptionBindingId ? {subscriptionBindingId} : {}),...(target.entry.source.kind === 'api_key' ? {apiKeyId:target.entry.source.keyId} : {}),...(input.readOnly ? {readOnly:true} : {})},`rule:${input.requestKey ?? requestEventId ?? crypto.randomUUID()}`,scope,execution) : { error: 'cloudComputerUnavailable' as const }
     if (!('error' in cloud) || cloud.error !== 'cloudComputerUnavailable') return cloud
-    // The person's own E2B refused (capacity, quota, key): nothing else is picked, the card says why.
+    // A startup failure can be capacity, quota, template or service availability. Only a confirmed
+    // missing key offers 填入 E2B Key; an existing key must never be described as absent.
     const { modelUnavailableCard } = await import('@/lib/model-dispatch')
-    return { error: 'machineUnavailable' as const, issueId: input.issueId, reason: 'cloudNotConfigured' as const, card: modelUnavailableCard('cloudNotConfigured') }
+    const { cloudDispatchFailureReason } = await import('@/lib/cloud-dispatch-failure')
+    const reason = await cloudDispatchFailureReason(pool, userId)
+    return { error: 'machineUnavailable' as const, issueId: input.issueId, reason, card: modelUnavailableCard(reason) }
   }
 }
 
@@ -563,7 +574,7 @@ export async function dispatchComputerThread(userId: string, input: { botId: str
 }
 
 /** Queue and bind atomically, with a stable tool-call id for workflow retries. */
-export async function dispatchComputerTask(userId: string, input: { botId: string; issueId: string; harness: 'codex' | 'claude_code'; note?: string; model?:string; repo?:string; suggestionId?: string; readOnly?: boolean; apiKeyId?: string }, toolCallId: string, scope?: NativeToolScope, execution?: AgentExecution) {
+export async function dispatchComputerTask(userId: string, input: { botId: string; issueId: string; harness: 'codex' | 'claude_code'; note?: string; model?:string; repo?:string; suggestionId?: string; readOnly?: boolean; apiKeyId?: string; subscriptionBindingId?: string }, toolCallId: string, scope?: NativeToolScope, execution?: AgentExecution) {
   'use step'
   await assertNativeToolScope(userId, scope)
   if (!cloudComputerRunsEnabled() || !toolCallId || toolCallId.length > 200) return { error: 'cloudComputerUnavailable' }
@@ -579,7 +590,7 @@ export async function dispatchComputerTask(userId: string, input: { botId: strin
   try {
     if (input.suggestionId && !(await pool.query('SELECT 1 FROM suggestion_executions WHERE "suggestionId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND ("botId" IS NULL OR "botId"=$4)', [input.suggestionId, userId, target.workspaceId, input.botId])).rowCount) return { error: 'suggestionUnavailable' }
     const deviceRepoId = input.repo ? (await (await import('@/lib/device-repositories')).ensureDeviceRepository(userId,target.deviceId,input.repo)).id : target.repoId
-    const result = await queueCloudRun(pool, { userId, workspaceId: target.workspaceId }, { botId: input.botId, issueId: issue.id, agentId: target.agentId, deviceRepoId, title: issue.title, body: tiptapToText(issue.content), note: input.note, model:input.repo ? input.model ?? 'auto' : input.model, ...(input.apiKeyId ? { apiKeyId: input.apiKeyId } : {}), idempotencyKey: input.suggestionId ? `suggestion:${input.suggestionId}` : `coordinator:${toolCallId}`, execution, ...(input.readOnly ? { readOnly: true } : {}) })
+    const result = await queueCloudRun(pool, { userId, workspaceId: target.workspaceId }, { botId: input.botId, issueId: issue.id, agentId: target.agentId, deviceRepoId, title: issue.title, body: tiptapToText(issue.content), note: input.note, model:input.repo ? input.model ?? 'auto' : input.model, ...(input.apiKeyId ? { apiKeyId: input.apiKeyId } : {}), ...(input.subscriptionBindingId ? { subscriptionBindingId: input.subscriptionBindingId } : {}), idempotencyKey: input.suggestionId ? `suggestion:${input.suggestionId}` : `coordinator:${toolCallId}`, execution, ...(input.readOnly ? { readOnly: true } : {}) })
     if (input.suggestionId) await pool.query('UPDATE suggestion_executions SET "botId"=$4,"runId"=$5,status=\'running\' WHERE "suggestionId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND ("runId" IS NULL OR "runId"=$5)', [input.suggestionId, userId, target.workspaceId, input.botId, result.runId])
     const actor = { userId, workspaceId: target.workspaceId as string }
     queuedRunId = result.runId

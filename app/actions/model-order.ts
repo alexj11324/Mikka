@@ -3,7 +3,7 @@
 import { pool } from '@/lib/db'
 import { ExecutionSettings } from '@/lib/execution-settings'
 import { requireUser } from '@/lib/issue-access'
-import { changeOrder, orderView, type OrderChange, type OrderView } from '@/lib/model-order'
+import { changeOrder, checkOrderQuota, orderView, type OrderChange, type OrderView } from '@/lib/model-order'
 import { loadWorkspaceContext } from '@/lib/workspace-access'
 import { settingsWorkspaceAction, type SettingsActionResult } from '@/lib/workspace-admin/settings-action'
 
@@ -23,6 +23,11 @@ export async function getModelOrder(workspaceId?: string): Promise<SettingsActio
     await new ExecutionSettings(pool).ensureCatalogues(target)
     return orderView(pool, target)
   })
+}
+
+/** Checks a currently allowed subscription; its owner is derived server-side. */
+export async function checkModelOrderQuota(connectionId: string, workspaceId?: string): Promise<SettingsActionResult<OrderView>> {
+  return settingsWorkspaceAction(async () => checkOrderQuota(pool, await scope(workspaceId), connectionId))
 }
 
 /** One change (add, remove, reorder, 运行位置); the page gets the list back as saved. */

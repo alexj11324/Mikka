@@ -104,7 +104,7 @@ export function useApiKeyList(workspaceId: string) {
   const agentsLine = (key: Key) => key.protocol === 'openai' && !key.responsesApi && key.provider === 'custom'
     ? t('noResponsesApi', { protocol: t('protocolName.openai') })
     : protocolAgents(t, apiKeyProtocols(key))
-  const rows: ReactNode[] = (data?.keys ?? []).map(key => <SettingRow key={key.id} icon={<ProviderIcon provider={key.provider} />} title={title(key)}
+  const rows: ReactNode[] = (data?.keys ?? []).map(key => <div key={key.id} id={`api-key-${key.id}`} className="scroll-mt-20"><SettingRow icon={<ProviderIcon provider={key.provider} />} title={title(key)}
     description={<><span className="block">{`${key.baseUrl ? new URL(key.baseUrl).host : t('apiKey')} · ••••${key.last4} · ${agentsLine(key)}`}</span>{modelsLine(key)}</>}>
     <span className="flex items-center gap-4">
       {data?.canShare && <Label className="flex items-center gap-2 font-normal text-muted-foreground">
@@ -114,7 +114,7 @@ export function useApiKeyList(workspaceId: string) {
       </Label>}
       <Button type="button" variant="ghost" size="sm" disabled={pending} aria-label={t('removeLabel', { name: title(key) })} onClick={() => setRemoving(key)}>{commonT('delete')}</Button>
     </span>
-  </SettingRow>)
+  </SettingRow></div>)
   if (keys.data?.error) rows.push(<div key="error" className="px-5 py-4"><FieldError>{actionError(keys.data.error)}</FieldError></div>)
 
   const action = <Button type="button" {...settingsSectionAction} disabled={!data} onClick={() => setAdding(true)}>{t('add')}</Button>

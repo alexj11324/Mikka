@@ -60,7 +60,8 @@ async function quotaScope(query: Query, run: Run): Promise<QuotaScope | null> {
 
 async function quotaKey(query: Query, run: Run, scope: QuotaScope): Promise<QuotaApiKey | undefined> {
   const { quotaFallbackApiKey } = await import('@/lib/run-credential-source')
-  const key = await quotaFallbackApiKey(query, { ownerId: run.userId, botId: run.botId, harness: scope.harness, model: run.agentDefinition?.cliModelSelection === 'explicit' ? run.agentDefinition.model : undefined,
+  const model = run.agentDefinition?.cliModelSelection === 'explicit' ? run.agentDefinition.model : run.agentDefinition?.subscription?.modelId
+  const key = await quotaFallbackApiKey(query, { ownerId: run.userId, botId: run.botId, harness: scope.harness, model,
     botWorkspaceId: scope.botWorkspaceId, choiceWorkspaceId: scope.choiceWorkspaceId })
   if (!key) return undefined
   const { rows: [row] } = await query.query<{ provider: string; name: string | null; last4: string }>('SELECT provider,name,last4 FROM model_api_keys WHERE id=$1', [key.keyId])

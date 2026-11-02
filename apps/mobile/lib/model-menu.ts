@@ -1,39 +1,13 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useState, useSyncExternalStore } from 'react'
 import { api, ApiError } from '@/lib/api'
 import { choiceFailureLine } from '@/lib/model-choice'
 import { useApi } from '@/lib/useApi'
+import { optionName, type ModelMenu } from './model-menu-view'
+import { apiCache } from './api-cache'
+import { ModelMenuRead } from './model-menu-read'
+export { HOSTED_CHOICE, groupTitle, groupTag, optionName, modelMenuLabel, modelMenuReadLabel, modelStatusLine, type ModelOption, type ModelGroup, type ModelMenu } from './model-menu-view'
 
 /** The shapes `GET/PUT /api/mobile/model` return (lib/bot-model-menu-view.ts on the server). */
-export const HOSTED_CHOICE = '00000000-0000-0000-0000-000000000000'
-export type ModelGroupKind = 'hosted' | 'subscription' | 'apiKey' | 'shared'
-export interface ModelOption { id: string; modelId: string; provider: string }
-export interface ModelGroup { kind: ModelGroupKind; provider?: string; plan?: string | null; owner?: string; options: ModelOption[] }
-export interface ModelMenu { groups: ModelGroup[]; current: ModelOption & { kind: ModelGroupKind; chosen: boolean; available: boolean } }
-
-const providerName = (provider?: string) => provider === 'claude' ? 'Claude' : 'ChatGPT'
-
-/** A group's heading, as on the web (decision 2026-10-31-2330): the plan names a subscription. */
-export function groupTitle(group: ModelGroup) {
-  switch (group.kind) {
-    case 'hosted': return 'Mikka'
-    case 'subscription': return group.plan ? `${providerName(group.provider)} ${group.plan}` : providerName(group.provider)
-    case 'apiKey': return 'API Key'
-    case 'shared': return '团队成员分享的'
-  }
-}
-
-/** Who pays for an item in the group, shown under its name; a subscription item has none. */
-export function groupTag(group: ModelGroup) {
-  if (group.kind === 'hosted') return '点数'
-  if (group.kind === 'apiKey') return '按量'
-  if (group.kind === 'shared' && group.owner) return `${group.owner}的 Key`
-  return null
-}
-
-export function optionName(option: Pick<ModelOption, 'id' | 'modelId'>) {
-  return option.id === HOSTED_CHOICE ? 'Mikka 默认' : option.modelId || '未知模型'
-}
-
 /** A pick that did not save: which one, and the line naming it and why. */
 export interface ChoiceFailure { id: string; line: string }
 
@@ -44,7 +18,10 @@ export interface ChoiceFailure { id: string; line: string }
  */
 export function useModelMenu(botId: string | null) {
   const path = `/api/mobile/model${botId ? `?bot=${botId}` : ''}`
-  const { data, setData } = useApi<ModelMenu>(path)
+  const { data, setData, error, loading, reload } = useApi<ModelMenu>(path)
+  const context = apiCache.context()
+  const reader = useMemo(() => new ModelMenuRead(reload), [reload, context])
+  const retrying = useSyncExternalStore(reader.subscribe, reader.snapshot, reader.snapshot)
   const [failure, setFailure] = useState<ChoiceFailure | null>(null)
   const choose = useCallback(async (id: string) => {
     setFailure(null)
@@ -69,7 +46,7 @@ export function useModelMenu(botId: string | null) {
       setRefreshing(false)
     }
   }, [botId, setData])
-  return { menu: data, choose, failure, refresh, refreshing, refreshFailed }
+  return { menu: data, choose, failure, refresh, refreshing, refreshFailed, loading: loading || retrying, loadFailed: !data && Boolean(error), retryRead: reader.retry }
 }
 
 export type ModelMenuState = ReturnType<typeof useModelMenu>

@@ -14,6 +14,7 @@ import { Composer } from '@/components/ui'
 import { api, ApiError } from '@/lib/api'
 import { CardButton } from '@/components/cards'
 import { StopFailed } from '@/components/StopFailed'
+import { ThreadQuotaPaused } from '@/components/ThreadQuotaPaused'
 import { useStop } from '@/lib/useStop'
 import { composerStops } from '@/lib/stop'
 import { threadSendErrorLine } from '@/lib/thread-send-error'
@@ -99,6 +100,7 @@ export default function ThreadScreen() {
           }
         })}
         {sendFailed ? <Text style={styles.error}>{sendFailed}</Text> : null}
+        {data?.paused ? <ThreadQuotaPaused key={data.paused.runId} paused={data.paused} onContinued={async runId => { if (runId !== id) router.replace(`/thread/${runId}`); await reload() }} /> : null}
         {stopper.stuck ? <StopFailed busy={stopper.sending} onRetry={() => void stopper.stop()} /> : null}
         {data && !data.active && data.error && !data.items.some(item => item.kind === 'error') ? <Text style={styles.error}>{data.error}</Text> : null}
       </KeyboardChatScrollView>

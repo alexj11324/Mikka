@@ -4,7 +4,7 @@ import { useState } from 'react'
 import useSWR from 'swr'
 import { useFormatter, useTranslations } from 'next-intl'
 import { getCreditShare, getPaymentDesignation, updateCreditShare, updatePaymentDesignation } from '@/app/actions/personal-policy'
-import { SettingRow, SettingsSaveError, SettingsSection } from '@/components/settings/primitives'
+import { SettingRow, SettingsLoading, SettingsSaveError, SettingsSection } from '@/components/settings/primitives'
 import { Switch } from '@/components/ui/switch'
 import { useActionError } from '@/lib/use-action-error'
 
@@ -56,6 +56,15 @@ export function PaymentDesignationSettings({ workspaceId }: { workspaceId: strin
       setPending(false)
     }
   }
+
+  // Only successful reads can establish that this section does not apply.
+  const readError = designation.error || designation.data?.error || share.error || share.data?.error
+  if (readError) return <SettingsSection id="payment-designation-heading" title={t('heading')}>
+    <SettingsSaveError message={actionError(typeof readError === 'string' ? readError : undefined)} retryLabel={commonT('retry')} onRetry={() => { void designation.mutate(); void share.mutate() }} />
+  </SettingsSection>
+  if (!data || !shareData) return <SettingsSection id="payment-designation-heading" title={t('heading')}>
+    <SettingsLoading label={commonT('loading')} rows={2} bare />
+  </SettingsSection>
 
   const showsCard = Boolean(data && (data.canDesignate || data.mine || data.payerName || data.graceUntil))
   if (!showsCard && !shareData?.canShare) return null

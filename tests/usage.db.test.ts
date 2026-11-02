@@ -1,7 +1,7 @@
 // 用量 read model (lib/usage/read.ts) against a real PostgreSQL.
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { dbUrl, seedAgent, seedBot, seedRun, seedUser, seedWorkspace } from './support/workspace-admin-db'
+import { dbUrl, seedAgent, seedBot, seedIssue, seedRun, seedUser, seedWorkspace } from './support/workspace-admin-db'
 
 test('workspace usage', { skip: !dbUrl }, async t => {
   const { Pool } = await import('pg')
@@ -10,6 +10,7 @@ test('workspace usage', { skip: !dbUrl }, async t => {
   const { workspacePool } = await import('../lib/workspace-db')
   const { WorkspaceError } = await import('../lib/workspace-access')
   const { workspaceUsage } = await import('../lib/usage/read')
+  const { listBotRunRoots, listIssueRunChains } = await import('../lib/run-chain')
   t.after(async () => { await Promise.all([pool.end(), appPool.end(), workspacePool.end()]) })
 
   const admin = await seedUser(pool, 'admin'), member = await seedUser(pool, 'member'), stranger = await seedUser(pool, 'stranger')
@@ -21,6 +22,7 @@ test('workspace usage', { skip: !dbUrl }, async t => {
   const run = async (userId: string, agentId: string, botId: string, created: string, started: string | null, finished: string | null) => {
     const id = await seedRun(pool, { userId, agentId, botId, startedAt: started ? at(started) : null, finishedAt: finished ? at(finished) : null })
     await pool.query('update agent_runs set "createdAt"=$2 where id=$1', [id, at(created)])
+    return id
   }
   await run(admin, agent, adminBot, '2026-10-02T10:00:00Z', '2026-10-02T10:00:00Z', '2026-10-02T11:00:00Z')
   await run(admin, agent, adminBot, '2026-10-02T12:00:00Z', '2026-10-02T12:00:00Z', '2026-10-02T12:30:00Z')
@@ -54,6 +56,97 @@ test('workspace usage', { skip: !dbUrl }, async t => {
     for (const usage of [october, september, await workspaceUsage(admin, ws.id, '2026-10')]) {
       assert.equal(usage.totals.threads, usage.daily.reduce((sum, day) => sum + day.threads, 0))
     }
+  })
+
+  await t.test('retries, answered questions and continuations count one thread while every run adds time', async () => {
+    const solo = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }])
+    const first = await seedBot(pool, solo.id, admin, 'Original bot')
+    const next = await seedBot(pool, solo.id, admin, 'Continuation bot')
+    const root = await run(admin, agent, first, '2026-10-02T09:00:00Z', '2026-10-02T09:00:00Z', '2026-10-02T10:00:00Z')
+    const retry = await run(admin, agent, first, '2026-10-03T09:00:00Z', '2026-10-03T09:00:00Z', '2026-10-03T10:00:00Z')
+    await pool.query('update agent_runs set "retryOf"=$2 where id=$1', [retry, root])
+    const answer = await run(admin, agent, next, '2026-10-04T09:00:00Z', '2026-10-04T09:00:00Z', '2026-10-04T10:00:00Z')
+    await pool.query('update agent_runs set "questionContinuation"=$2 where id=$1', [answer, JSON.stringify({ originRunId: retry })])
+    const continued = await run(admin, agent, next, '2026-10-05T09:00:00Z', '2026-10-05T09:00:00Z', '2026-10-05T10:00:00Z')
+    await pool.query('update agent_runs set "continuesRunId"=$2 where id=$1', [continued, answer])
+    const usage = await workspaceUsage(admin, solo.id, '2026-10')
+    assert.deepEqual(usage.totals, { threads: 1, seconds: 14_400 })
+    assert.deepEqual(usage.bots.map(bot => [bot.name, bot.threads, bot.seconds]), [['Original bot', 1, 7200], ['Continuation bot', 0, 7200]])
+    assert.deepEqual(usage.daily.filter(day => day.threads), [{ date: '2026-10-02', threads: 1 }])
+  })
+
+  await t.test('an October retry of a September thread adds run time without a new thread', async () => {
+    const solo = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }])
+    const bot = await seedBot(pool, solo.id, admin, 'Retried last month')
+    const root = await run(admin, agent, bot, '2026-09-30T20:00:00Z', '2026-09-30T20:00:00Z', '2026-09-30T21:00:00Z')
+    const retry = await run(admin, agent, bot, '2026-10-03T09:00:00Z', '2026-10-03T09:00:00Z', '2026-10-03T10:00:00Z')
+    await pool.query('update agent_runs set "retryOf"=$2 where id=$1', [retry, root])
+    const october = await workspaceUsage(admin, solo.id, '2026-10')
+    assert.deepEqual(october.totals, { threads: 0, seconds: 3600 })
+    assert.equal(october.daily.reduce((sum, day) => sum + day.threads, 0), 0)
+    const september = await workspaceUsage(admin, solo.id, '2026-09')
+    assert.deepEqual(september.totals, { threads: 1, seconds: 3600 })
+  })
+
+  await t.test('ancestry outside the visible bots is preserved without exposing or recounting its root', async () => {
+    for (const rootDate of ['2026-09-30T09:00:00Z', '2026-10-01T09:00:00Z']) {
+      const originWorkspace = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }])
+      const currentWorkspace = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }])
+      const origin = await seedBot(pool, originWorkspace.id, admin, 'Private original bot')
+      const current = await seedBot(pool, currentWorkspace.id, admin, 'Current bot')
+      const issue = await seedIssue(pool, admin)
+      const root = await run(admin, agent, origin, rootDate, rootDate, rootDate)
+      const retry = await run(admin, agent, current, '2026-10-03T09:00:00Z', '2026-10-03T09:00:00Z', '2026-10-03T10:00:00Z')
+      await pool.query('update agent_runs set "issueId"=$2 where id=$1', [root, issue])
+      await pool.query('update agent_runs set "issueId"=$2,"retryOf"=$3 where id=$1', [retry, issue, root])
+      assert.equal((await listIssueRunChains(pool, issue, [admin], 20))[0].rootRunId, root)
+      assert.deepEqual(await listBotRunRoots(pool, [current], at('2026-10-01'), at('2026-11-01')), [], 'an out-of-scope root is not a new thread or a returned identifier')
+      const usage = await workspaceUsage(admin, currentWorkspace.id, '2026-10')
+      assert.deepEqual(usage.totals, { threads: 0, seconds: 3600 })
+      assert.deepEqual(usage.bots.map(bot => bot.id), [current])
+      assert.ok(usage.daily.every(day => day.threads === 0))
+    }
+  })
+
+  await t.test('usage ancestry accepts 64 parent links and refuses a 65th', async () => {
+    const bot = await seedBot(pool, ws.id, admin)
+    const root = await run(admin, agent, bot, '2026-10-01T09:00:00Z', null, null)
+    let previous = root
+    for (let depth = 1; depth <= 64; depth++) {
+      const child = await run(admin, agent, bot, '2026-10-02T09:00:00Z', null, null)
+      await pool.query('update agent_runs set "retryOf"=$2 where id=$1', [child, previous])
+      previous = child
+    }
+    assert.deepEqual((await listBotRunRoots(pool, [bot], at('2026-10-01'), at('2026-11-01'))).map(row => row.rootRunId), [root])
+    const over = await run(admin, agent, bot, '2026-10-03T09:00:00Z', null, null)
+    await pool.query('update agent_runs set "retryOf"=$2 where id=$1', [over, previous])
+    await assert.rejects(listBotRunRoots(pool, [bot], at('2026-10-01'), at('2026-11-01')), /runChainDepthExceeded/)
+  })
+
+  await t.test('the ancestry query seeds only the requested month instead of the entire bot history', async () => {
+    const bot = await seedBot(pool, ws.id, admin)
+    await pool.query(`insert into agent_runs (id,"userId","agentId","botId",status,"createdAt")
+      select gen_random_uuid(),$1,$2,$3,'succeeded','2025-01-01T00:00:00Z'::timestamptz from generate_series(1,2000)`, [admin, agent, bot])
+    const root = await run(admin, agent, bot, '2026-10-02T09:00:00Z', null, null)
+    let captured: { text: string; values?: unknown[] } | undefined
+    const query = { query: async (text: string, values?: unknown[]) => { captured = { text, values }; return pool.query(text, values) } }
+    assert.deepEqual((await listBotRunRoots(query, [bot], at('2026-10-01'), at('2026-11-01'))).map(row => row.rootRunId), [root])
+    interface PlanNode { 'Node Type': string; 'Actual Rows'?: number; Plans?: PlanNode[] }
+    const plan = await pool.query<{ 'QUERY PLAN': Array<{ Plan: PlanNode }> }>(`EXPLAIN (ANALYZE, FORMAT JSON) ${captured!.text}`, captured!.values)
+    const findRecursive = (node: PlanNode): PlanNode | undefined => node['Node Type'] === 'Recursive Union' ? node : node.Plans?.map(findRecursive).find(Boolean)
+    const recursive = findRecursive(plan.rows[0]['QUERY PLAN'][0].Plan)
+    assert.ok(recursive, 'the same bounded ancestry resolver supplies the query')
+    assert.equal(recursive.Plans?.[0]['Actual Rows'], 1, 'unrelated historical runs never enter the recursive seed')
+  })
+
+  await t.test('invalid cyclic ancestry is refused instead of producing a thread count', async () => {
+    const solo = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }])
+    const bot = await seedBot(pool, solo.id, admin)
+    const a = await run(admin, agent, bot, '2026-10-02T09:00:00Z', null, null)
+    const b = await run(admin, agent, bot, '2026-10-03T09:00:00Z', null, null)
+    await pool.query('update agent_runs set "retryOf"=$2 where id=$1', [a, b])
+    await pool.query('update agent_runs set "retryOf"=$2 where id=$1', [b, a])
+    await assert.rejects(workspaceUsage(admin, solo.id, '2026-10'), /runChainDepthExceeded/)
   })
 
   await t.test('members see their own bots only; outsiders are refused', async () => {

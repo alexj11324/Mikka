@@ -8,7 +8,7 @@ import { and, asc, desc, eq, inArray, isNull, or, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { ActionFailureError } from '@/lib/action-error'
 import { db, pool, withDatabaseClient } from '@/lib/db'
-import { SubscriptionRepository } from '@/lib/subscription-repository'
+import { nativeRunBinding } from '@/lib/computer/native-run-binding'
 import { agents, agentRuns, bots, deviceRepos, devices, issues, runChunks, runMessages, type SupportedHarness } from '@/lib/db/schema'
 import { ensureDeviceRepository } from '@/lib/device-repositories'
 import { localExecutionHarnesses } from '@/lib/device-agents'
@@ -71,7 +71,9 @@ export const runViewColumns = {
 /** `botId` is the bot that dispatched the run (null for the Coordinator); the run reports back to that bot's chat. */
 type LocalDispatchInput = { issueId: string; agentId: string; repo: string; note?: string; requestKey?: string; model?: string; pinnedDeviceId?: string; readOnly?: boolean
   /** The API key the 优先使用的模型 entry names; the run uses it only when it may (lib/run-credential-source.ts). */
-  apiKeyId?: string }
+  apiKeyId?: string
+  /** Exact server-selected identity; reauthorized for this owner, Agent and workspace at queue time. */
+  subscriptionBindingId?: string }
 export async function queueRun(userId: string, input: LocalDispatchInput, botId: string | null = null, execution?: AgentExecution, requestEventId?: string, source: 'mcp' | null = null) {
   return queueAdmittedRun(userId, input, botId, execution, requestEventId, source)
 }
@@ -120,7 +122,7 @@ async function queueAdmittedRun(userId: string, input: LocalDispatchInput, botId
   requestEventId?: string, source: 'mcp' | null = null,
   internal?: { executor: Pick<typeof db, 'select' | 'transaction'>; repo: typeof deviceRepos.$inferSelect; client: import('pg').PoolClient; sourceRunId?: string }) {
   const executor = internal?.executor ?? db
-  const parsed = z.object({ issueId: z.uuid(), agentId: z.uuid(), repo: z.string().trim().min(1).max(4_000), note: z.string().trim().max(10_000).optional(), requestKey: dispatchRequestKey.optional(), model: z.string().trim().min(1).max(128).optional(), pinnedDeviceId: z.uuid().optional(), readOnly: z.boolean().optional(), apiKeyId: z.uuid().optional() }).safeParse(input)
+  const parsed = z.object({ issueId: z.uuid(), agentId: z.uuid(), repo: z.string().trim().min(1).max(4_000), note: z.string().trim().max(10_000).optional(), requestKey: dispatchRequestKey.optional(), model: z.string().trim().min(1).max(128).optional(), pinnedDeviceId: z.uuid().optional(), readOnly: z.boolean().optional(), apiKeyId: z.uuid().optional(), subscriptionBindingId: z.uuid().optional() }).refine(value => !(value.apiKeyId && value.subscriptionBindingId)).safeParse(input)
   if (!parsed.success) throw new ActionFailureError('runInvalid')
   try { normalizeRepository(parsed.data.repo, { allowFile: daemonTestMode(process.env) }) } catch { throw new ActionFailureError('repoPathInvalid') }
   const issue = await issueForUser(userId, parsed.data.issueId, false, executor)
@@ -134,9 +136,15 @@ async function queueAdmittedRun(userId: string, input: LocalDispatchInput, botId
   const runId = crypto.randomUUID()
   const prompt = runPrompt(issue.title, tiptapToText(issue.content), agent.instructions, parsed.data.note)
   const captureDefinition = true
-  const found = captureDefinition && byosEnabled() ? await new SubscriptionRepository(pool).nativeBinding(userId,agent.id,agent.harness) : null
+  const query = internal?.client ?? pool
+  const workspaceId = botId ? (await query.query<{ workspaceId: string }>('SELECT "workspaceId" FROM bots WHERE id=$1 AND "ownerId"=$2', [botId, userId])).rows[0]?.workspaceId : undefined
+  if (botId && !workspaceId) throw new ActionFailureError('botNotFound')
+  const found = captureDefinition && byosEnabled() ? await nativeRunBinding(query, userId, agent.id, agent.harness, workspaceId, parsed.data.subscriptionBindingId) : null
+  if (parsed.data.subscriptionBindingId && (!found || (parsed.data.model && parsed.data.model !== found.modelId))) throw new ActionFailureError('executionAccountUnavailable')
+  const model = parsed.data.subscriptionBindingId ? found?.modelId : parsed.data.model
   // The run's credential, frozen now: the subscription, else the person's own API key (orchestration.md § 2).
-  const { subscription, apiKey } = await localRunCredential(internal?.client ?? pool, userId, botId, agent.harness, parsed.data.model, found, parsed.data.apiKeyId)
+  // A subscription's identity is its provider model, including at the CLI boundary.
+  const { subscription, apiKey } = await localRunCredential(internal?.client ?? pool, userId, botId, agent.harness, parsed.data.subscriptionBindingId ? found?.modelId : model, found, parsed.data.apiKeyId)
   const mailboxEnabled = personalMailboxEnabled()
   let mailboxScope: { botId: string | null; workspaceId: string } | undefined
   if (captureDefinition && mailboxEnabled && snapshotMailboxTools(execution?.snapshot).length) {
@@ -146,10 +154,10 @@ async function queueAdmittedRun(userId: string, input: LocalDispatchInput, botId
     mailboxScope = { botId, workspaceId: bot?.workspaceId ?? (await import('@/lib/device-link')).WORKSPACE_ID }
   }
   const agentDefinition = captureDefinition
-    ? freezeWorkerDefinition({ harness: agent.harness, instructions: agent.instructions, prompt, parent: execution?.snapshot ?? null, executionId: execution?.id ?? null,subscription, apiKey, model:parsed.data.model, pinnedDeviceId:parsed.data.pinnedDeviceId, mailboxEnabled, mailboxScope, readOnly: parsed.data.readOnly })
+    ? freezeWorkerDefinition({ harness: agent.harness, instructions: agent.instructions, prompt, parent: execution?.snapshot ?? null, executionId: execution?.id ?? null,subscription, apiKey, model, pinnedDeviceId:parsed.data.pinnedDeviceId, mailboxEnabled, mailboxScope, readOnly: parsed.data.readOnly })
     : null
   return (await import('@/lib/run-admission-store')).acceptLocalRun({ id: runId, userId, botId, issueId: issue.id, agentId: agent.id, deviceId: agent.deviceId,
-    deviceRepoId: repo.id, prompt, source, definition: agentDefinition!, ...(requestEventId ? { requestEventId } : {}), ...(parsed.data.requestKey ? { dispatch: { issueId: issue.id, agentId: agent.id, deviceRepoId: repo.id, note: parsed.data.note, requestKey: parsed.data.requestKey } } : {}), ...(internal ? { continuation: true, sourceRunId: internal.sourceRunId } : {}) }, internal?.client)
+    deviceRepoId: repo.id, prompt, source, definition: agentDefinition!, ...(requestEventId ? { requestEventId } : {}), ...(parsed.data.requestKey ? { dispatch: { issueId: issue.id, agentId: agent.id, deviceRepoId: repo.id, note: parsed.data.note, requestKey: parsed.data.requestKey, ...(parsed.data.subscriptionBindingId ? { subscriptionBindingId: parsed.data.subscriptionBindingId } : {}) } } : {}), ...(internal ? { continuation: true, sourceRunId: internal.sourceRunId } : {}) }, internal?.client)
 }
 
 /** A device run's credential source; the bot's workspace decides whose API keys it may use. */

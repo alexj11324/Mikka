@@ -36,11 +36,14 @@ test('real DB: additive migration, subagent owner isolation and separate thread 
   try {
     await pool.query(`CREATE TABLE "user"(id text PRIMARY KEY);INSERT INTO "user" VALUES('alice'),('bob');
       CREATE TABLE agent_runs(id uuid PRIMARY KEY,"userId" text,"agentId" uuid,"deviceId" uuid,status text,"stopRequestedAt" timestamptz,"finishedAt" timestamptz,"startedAt" timestamptz,"leaseExpiresAt" timestamptz,"updatedAt" timestamptz);
+      CREATE TABLE agents(id uuid PRIMARY KEY,"userId" text NOT NULL,harness text NOT NULL);
       CREATE TABLE devices(id uuid PRIMARY KEY,"ownerId" text,kind text,enabled boolean DEFAULT true,"removedAt" timestamptz);
       CREATE TABLE device_tokens("boundDeviceId" uuid,"revokedAt" timestamptz);
       CREATE TABLE device_repos(id uuid PRIMARY KEY);
       CREATE TABLE suggestions(id uuid PRIMARY KEY,"botId" uuid);
       CREATE TABLE workspace_computer_policies("workspaceId" uuid PRIMARY KEY,permission text,version integer);
+      CREATE TABLE workspace_subscription_shares("ownerId" text,"workspaceId" uuid,"allowOthers" boolean NOT NULL DEFAULT false,PRIMARY KEY("ownerId","workspaceId"));
+      CREATE TABLE workspace_personal_policies("workspaceId" uuid PRIMARY KEY,subscriptions boolean NOT NULL DEFAULT true);
       CREATE TABLE byos_connections(id uuid PRIMARY KEY,"ownerId" text,"workspaceId" text,provider text,state text,epoch bigint, paused boolean NOT NULL DEFAULT false);
       CREATE TABLE byos_bindings(id uuid PRIMARY KEY,"ownerId" text,"workspaceId" text,"consumerId" text,"connectionId" uuid,"connectionRevision" bigint,route text,"modelId" text,"createdAt" timestamptz DEFAULT now());
       CREATE TABLE byos_native_runs("runId" uuid PRIMARY KEY,"bindingId" uuid);
@@ -90,6 +93,7 @@ test('real DB: additive migration, subagent owner isolation and separate thread 
     assert.equal(events[0].event.type, 'data-subagent')
     assert.equal(JSON.stringify(events).includes('targetId'), false)
     const runA = randomUUID(), runB = randomUUID(), deviceA = randomUUID(), deviceB = randomUUID(), botDevice = randomUUID(), agentId = randomUUID(), bindingId = randomUUID()
+    await pool.query(`INSERT INTO agents(id,"userId",harness) VALUES ($1,'alice','codex')`, [agentId])
     for (const device of [deviceA, deviceB, botDevice]) await pool.query('INSERT INTO devices(id,"ownerId",kind) VALUES ($1,\'alice\',\'cloud\')', [device])
     const cancelledRun = randomUUID(), cancelledDevice = randomUUID(), lease = randomUUID(), operation = randomUUID()
     await pool.query('INSERT INTO devices(id,"ownerId",kind) VALUES ($1,\'alice\',\'cloud\')', [cancelledDevice])

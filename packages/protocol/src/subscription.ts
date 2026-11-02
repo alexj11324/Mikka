@@ -2,7 +2,7 @@
 // both the execution harness and the computer a run's tools operate (#172).
 import { z } from "zod"
 
-import { quotaSnapshotSchema, type QuotaSnapshot } from "./quota"
+import { quotaSnapshotSchema, type QuotaSnapshot, type QuotaWindow } from "./quota"
 
 const id = z.string().min(1).max(128)
 export const subscriptionRouteSchema = z.enum([
@@ -151,8 +151,37 @@ export interface SubscriptionAccess {
   binding: SubscriptionBinding | null
   connection: SubscriptionConnection | null
   backend: SubscriptionBackend | null
+  /** Actual model chosen by the trusted backend; absent while a native CLI's choice is unknown. */
+  modelId?: string
   // Trusted durable-operation metadata, never accepted from browser assertions.
   credentialTransition?: 'refreshing' | 'publication_pending'
+}
+
+const normalizeQuotaModel = (value: string) => value.trim().toLowerCase().replace(/[ ._]+/g, '-').replace(/-+/g, '-')
+
+/** A scope may be irrelevant, applicable, or not yet identified. Unknown
+ * provider labels are never silently treated as unrelated models. */
+export function subscriptionQuotaScope(window: Pick<QuotaWindow, 'model'>, modelId?: string): 'applicable' | 'irrelevant' | 'unknown' {
+  if (!window.model) return 'applicable'
+  if (!modelId) return 'unknown'
+  const scope = normalizeQuotaModel(window.model)
+  const model = normalizeQuotaModel(modelId)
+  const scopedClaude = /^(?:claude-)?(opus|sonnet|haiku|fable)(?:-(\d+(?:-\d+)*))?$/.exec(scope)
+  if (scopedClaude) {
+    const chosenClaude = /^(?:claude-)?(opus|sonnet|haiku|fable)(?:-|$)/.exec(model)
+    if (!chosenClaude) return 'unknown'
+    if (scopedClaude[1] !== chosenClaude[1]) return 'irrelevant'
+    if (!scopedClaude[2]) return 'applicable'
+    if (!/^(?:claude-)?(?:opus|sonnet|haiku|fable)-\d+(?:-\d+)*$/.test(model)) return 'unknown'
+    const selected = model.replace(/^claude-/, '')
+    const scoped = scope.replace(/^claude-/, '')
+    return selected === scoped || (selected.startsWith(`${scoped}-`) && /^\d{8}$/.test(selected.slice(scoped.length + 1))) ? 'applicable' : 'irrelevant'
+  }
+  if (/^(?:gpt-\d|o\d)[a-z0-9-]*$/.test(scope)) {
+    if (!/^(?:gpt-\d|o\d)[a-z0-9-]*$/.test(model)) return 'unknown'
+    return model === scope ? 'applicable' : 'irrelevant'
+  }
+  return 'unknown'
 }
 
 // Unknown, stale, wrong-vendor or empty usage is not evidence of free capacity.
@@ -161,6 +190,7 @@ export function subscriptionQuotaState(
   quota: QuotaSnapshot,
   route: SubscriptionRoute,
   now: number,
+  modelId?: string,
 ): "available" | "unknown" | "exhausted" {
   const vendor =
     SUBSCRIPTION_ROUTES[route].provider === "openai" ? "codex" : "claude_code"
@@ -169,21 +199,29 @@ export function subscriptionQuotaState(
     quota.vendor !== vendor ||
     quota.status !== "ok" ||
     !quota.windows.length ||
-    quota.windows.some(
-      (window) =>
-        window.meter === "api" ||
-        window.meter === "on_demand" ||
-        window.meter === "team_on_demand",
-    ) ||
     !Number.isFinite(observed) ||
     observed > now ||
     now - observed > 60_000
   )
     return "unknown"
-  // Conservatively block on any reported exhausted window. A reset needs a
-  // fresh provider observation; a local clock must not manufacture capacity.
-  if (quota.windows.some((window) => window.used >= 1)) return "exhausted"
-  return "available"
+  let applicable = false, uncertain = false, exhausted = false
+  for (const window of quota.windows) {
+    if (!Number.isFinite(window.used) || window.used < 0 || window.used > 1) return 'unknown'
+    const scope = subscriptionQuotaScope(window, modelId)
+    if (scope === 'irrelevant') continue
+    const paid = window.meter === 'api' || window.meter === 'on_demand' || window.meter === 'team_on_demand'
+    if (paid) { uncertain = true; continue }
+    if (scope === 'unknown') { if (window.used >= 1) uncertain = true; continue }
+    applicable = true
+    if (window.used >= 1) {
+      const reset = window.resetsAt ? Date.parse(window.resetsAt) : NaN
+      // Crossing a reset since the last observation requires another provider
+      // read; a local clock cannot manufacture fresh quota.
+      if (Number.isFinite(reset) && observed < reset && reset <= now) uncertain = true
+      else exhausted = true
+    }
+  }
+  return exhausted ? 'exhausted' : uncertain || !applicable ? 'unknown' : 'available'
 }
 
 /** Re-read access for every new turn; no selection, pooling, retry or paid fallback. */
@@ -250,7 +288,7 @@ export function authorizeSubscriptionUse(
     return refuse("isolation_required")
   if (backend.billing !== "subscription_only")
     return refuse("billing_unverified")
-  const quota = subscriptionQuotaState(connection.quota, binding.route, now)
+  const quota = subscriptionQuotaState(connection.quota, binding.route, now, access.modelId)
   if (quota === "unknown") return refuse("quota_unknown")
   if (quota === "exhausted") return refuse("quota_exhausted")
   return { binding, connection, backend }

@@ -16,7 +16,7 @@ export default function BotChat() {
   const bot = useHome().data?.bots.find(item => item.id === id)
   const coordinator = id === 'coordinator'
   const model = useModelMenu(coordinator ? null : id)
-  const composer = { composerAccessory: <ModelMenu model={model} />, composerNotice: <ModelNotice model={model} /> }
+  const composer = { composerAccessory: (running: boolean) => <ModelMenu model={model} running={running} />, composerNotice: <ModelNotice model={model} /> }
   if (coordinator) return <ChatScreen botId={null} name="Coordinator" draft={draft} focus={action} compose={compose === '1'} {...composer} />
   return <ChatScreen botId={id} name={bot?.name ?? ''} color={bot?.color} shape={bot?.shape} draft={draft} focus={action} compose={compose === '1'} {...composer} />
 }

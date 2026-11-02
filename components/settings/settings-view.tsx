@@ -104,13 +104,13 @@ export function SettingsView({ user, userKey, googleEnabled = false, onRail, onS
       {accountError && <FieldError className="px-6 py-2">{accountError}</FieldError>}
       {routedBody ? section === 'members' ? <SettingsContent className="gap-6 max-md:pt-1">{children ?? <MembersPanel workspaceId={workspaceId} inviteInitially={inviteInitially} />}</SettingsContent> : children : <SettingsContent key={section} className={cn('gap-6 max-md:pt-1', enter)}>
         {section === 'computers' ? <DevicesSettings workspaceId={resolvedWorkspaceId} /> : <h1 className="text-xl font-semibold max-md:sr-only">{title}</h1>}
-        <SectionBody t={t} section={section} user={user} userKey={userKey} googleEnabled={googleEnabled} workspaceId={resolvedWorkspaceId} personal={personal} team={team} admin={admin} workspaceError={Boolean(workspaceError) || (workspace !== undefined && !resolvedWorkspaceId)} linearNotice={linearNotice} preview={preview} onSignOut={onSignOut} signingOut={signingOut} />
+        <SectionBody t={t} section={section} user={user} userKey={userKey} googleEnabled={googleEnabled} workspaceId={resolvedWorkspaceId} workspaceName={workspace?.workspace.name} personal={personal} team={team} admin={admin} workspaceError={Boolean(workspaceError) || (workspace !== undefined && !resolvedWorkspaceId)} linearNotice={linearNotice} preview={preview} onSignOut={onSignOut} signingOut={signingOut} />
       </SettingsContent>}
     </AppShellContent>
   </>
 }
 
-function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, personal = false, team = false, admin = false, workspaceError = false, linearNotice, preview, onSignOut, signingOut }: { t: ReturnType<typeof useTranslations<'Settings'>> } & Pick<SettingsViewProps, 'user' | 'userKey' | 'workspaceId' | 'linearNotice' | 'preview' | 'onSignOut' | 'signingOut'> & { section: SettingsSectionId; googleEnabled: boolean; personal?: boolean; team?: boolean; admin?: boolean; workspaceError?: boolean }) {
+function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, workspaceName, personal = false, team = false, admin = false, workspaceError = false, linearNotice, preview, onSignOut, signingOut }: { t: ReturnType<typeof useTranslations<'Settings'>> } & Pick<SettingsViewProps, 'user' | 'userKey' | 'workspaceId' | 'linearNotice' | 'preview' | 'onSignOut' | 'signingOut'> & { section: SettingsSectionId; googleEnabled: boolean; workspaceName?: string; personal?: boolean; team?: boolean; admin?: boolean; workspaceError?: boolean }) {
   // Workspace sections wait for the workspace instead of rendering nothing.
   const waiting = preview || !workspaceId
     ? preview || workspaceError ? <FieldError>{t('workspaceUnavailable')}</FieldError> : <p role="status" className="text-sm text-muted-foreground">{t('workspaceLoading')}</p>
@@ -124,7 +124,7 @@ function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, pe
     case 'notifications': return <NotificationSettings />
     case 'memory': return <MemorySettings />
     case 'connections': return <PluginsView section="connections" rootLabel={t('sections.connections.title')} linearNotice={linearNotice} />
-    case 'models': return <>{workspaceId && !preview ? <ApiAndSubscriptions key={workspaceId} workspaceId={workspaceId} team={team} /> : waiting}</>
+    case 'models': return <>{workspaceId && !preview ? <ApiAndSubscriptions key={workspaceId} workspaceId={workspaceId} workspaceName={workspaceName} team={team} /> : waiting}</>
     case 'developer': return workspaceId && !preview ? <AccessTokensSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
     case 'secrets': return workspaceId && !preview ? <SecretsSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
     case 'audit': return workspaceId && !preview ? <AuditLogSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
@@ -140,19 +140,26 @@ function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, pe
 
 /**
  * 模型与订阅 (decision 2026-11-02-1400): the subscriptions and the API keys
- * (connect, status, 重新获取模型), then 运行位置 and 优先使用的模型, the order
- * new runs take. 付款 is under 计费 only; sharing with the team
- * (分享给团队成员) belongs to a team workspace (decision 2026-11-01-2310).
+ * (connect, status, 重新获取模型) and API-key fallback belong to the account.
+ * The person's thread defaults, run location and sharing choices below are
+ * scoped to the workspace open here. 付款 is under 计费 only.
  */
-function ApiAndSubscriptions({ workspaceId, team }: { workspaceId: string; team: boolean }) {
+function ApiAndSubscriptions({ workspaceId, workspaceName, team }: { workspaceId: string; workspaceName?: string; team: boolean }) {
+  const scopeT = useTranslations('Settings.modelScope')
   const apiKeys = useApiKeyList(workspaceId)
   return <>
-    <SubscriptionSettings workspaceId={workspaceId} />
-    {apiKeys.section}
+    <section aria-labelledby="account-models-scope" className="flex flex-col gap-6">
+      <h2 id="account-models-scope" className="pl-1 text-sm font-medium text-muted-foreground">{scopeT('account')}</h2>
+      <SubscriptionSettings workspaceId={workspaceId} workspaceName={workspaceName} />
+      {apiKeys.section}
+      <ApiKeyFallbackSetting workspaceId={workspaceId} />
+    </section>
     {apiKeys.dialogs}
-    <ModelOrderSettings key={`order-${workspaceId}`} workspaceId={workspaceId} />
-    <ApiKeyFallbackSetting workspaceId={workspaceId} />
-    {team && <SubscriptionShareSettings key={`share-${workspaceId}`} workspaceId={workspaceId} />}
+    <section aria-labelledby="workspace-models-scope" className="flex flex-col gap-6">
+      <h2 id="workspace-models-scope" className="pl-1 text-sm font-medium text-muted-foreground">{scopeT('workspace', { name: workspaceName ?? scopeT('currentWorkspace') })}</h2>
+      <ModelOrderSettings key={`order-${workspaceId}`} workspaceId={workspaceId} />
+      {team && <SubscriptionShareSettings key={`share-${workspaceId}`} workspaceId={workspaceId} />}
+    </section>
   </>
 }
 

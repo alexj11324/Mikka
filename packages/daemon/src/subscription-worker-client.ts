@@ -175,7 +175,7 @@ export class SubscriptionWorkerClient {
           const run = this.start({ method: "executeStream", revision, model, payload }, abort.signal, value => { if (!closed) controller.enqueue(encoder.encode(value)) })
           stop = run.stop
           void run.result.then(() => { if (!closed) { closed = true; controller.close() }; cleanup() }, error => { if (!closed) { closed = true; controller.error(error) }; cleanup() })
-        } catch { if (!closed) { closed = true; controller.error(new WorkerRefusal()) }; cleanup() }
+        } catch (error) { if (!closed) { closed = true; controller.error(error instanceof WorkerRefusal ? error : new WorkerRefusal()) }; cleanup() }
       },
       cancel: () => { closed = true; abort.abort(); stop?.(); cleanup() }
     })

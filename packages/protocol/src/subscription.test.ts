@@ -9,12 +9,24 @@ import {
   invalidateSubscriptionConnection,
   subscriptionBindingSchema,
   subscriptionConnectionSchema,
+  subscriptionQuotaState,
   SUBSCRIPTION_ROUTES,
   type SubscriptionAccess,
   type SubscriptionRefusalCode,
 } from "./subscription"
 
 describe("subscription policy", () => {
+  it('checks only the selected model quota and never treats an unknown scope as free allowance', () => {
+    const { use, access } = subscriptionFixture('claude_cpa')
+    access.connection!.quota.windows.push({ kind: 'weekly', model: 'Opus', used: 1, resetsAt: null })
+    expect(subscriptionQuotaState(access.connection!.quota, 'claude_cpa', NOW, 'claude-haiku-5-5')).toBe('available')
+    expect(subscriptionQuotaState(access.connection!.quota, 'claude_cpa', NOW, 'claude-opus-5-5')).toBe('exhausted')
+    expect(subscriptionQuotaState(access.connection!.quota, 'claude_cpa', NOW)).toBe('unknown')
+    access.modelId = 'claude-haiku-5-5'
+    expect(authorizeSubscriptionUse(use, access, NOW).connection.quota.status).toBe('ok')
+    access.modelId = 'claude-opus-5-5'
+    expect(() => authorizeSubscriptionUse(use, access, NOW)).toThrow('quota_exhausted')
+  })
   it.each(
     Object.keys(SUBSCRIPTION_ROUTES) as (keyof typeof SUBSCRIPTION_ROUTES)[],
   )("routes %s only through its explicitly bound backend", (route) => {

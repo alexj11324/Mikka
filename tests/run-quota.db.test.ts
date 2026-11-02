@@ -94,8 +94,8 @@ test('quota exhausted mid-run: continue on the person\'s key, else pause with th
     return { connection, binding }
   }
   /** A run dispatched the ordinary way, then running on the device with a session, as a claim leaves it. */
-  const running = async (p: Person, harness: 'claude_code' | 'codex') => {
-    const { runId } = await queueRun(p.id, { issueId: await task(p.id), agentId: p.agents[harness], repo: p.remote }, p.botId)
+  const running = async (p: Person, harness: 'claude_code' | 'codex', model?: string) => {
+    const { runId } = await queueRun(p.id, { issueId: await task(p.id), agentId: p.agents[harness], repo: p.remote, ...(model ? { model } : {}) }, p.botId)
     await pool.query(`UPDATE agent_runs SET status='running',"sessionId"=$2,"worktreePath"='/tmp/wt',"startedAt"=now(),"leaseExpiresAt"=now()+interval '5 minutes' WHERE id=$1`, [runId, `session-${runId}`])
     return runId
   }
@@ -115,7 +115,7 @@ test('quota exhausted mid-run: continue on the person\'s key, else pause with th
     const { connection, binding } = await subscribe(p)
     const runId = await running(p, 'claude_code')
     assert.equal((await row(runId)).agentDefinition.subscription.bindingId, binding, 'the run is on the subscription')
-    const key = await addKey(p.id, 'anthropic', ['key-model-a', 'key-model-b'])
+    const key = await addKey(p.id, 'anthropic', ['subscription-model', 'key-model-b'])
 
     await quotaEnd(p, runId, resetsAt)
     const original = await row(runId)
@@ -130,10 +130,10 @@ test('quota exhausted mid-run: continue on the person\'s key, else pause with th
     assert.equal(continuation.deviceRepoId, original.deviceRepoId)
     assert.equal(continuation.issueId, original.issueId)
     assert.equal(continuation.botId, p.botId)
-    assert.deepEqual(continuation.agentDefinition.apiKey, { keyId: key.id, model: 'key-model-a' })
+    assert.deepEqual(continuation.agentDefinition.apiKey, { keyId: key.id, model: 'subscription-model' })
     assert.equal(continuation.agentDefinition.modelSource, 'api_key')
     assert.equal(continuation.agentDefinition.subscription, undefined)
-    assert.equal(continuation.agentDefinition.model, 'key-model-a')
+    assert.equal(continuation.agentDefinition.model, 'subscription-model')
 
     const recorded = await events(runId)
     assert.deepEqual(recorded.map(event => event.kind), ['run_credential_switched'], 'no run_finished besides it')
@@ -143,7 +143,7 @@ test('quota exhausted mid-run: continue on the person\'s key, else pause with th
     assert.deepEqual(recorded[0].payload, {
       reason: 'quota_exhausted',
       from: { kind: 'subscription', provider: 'claude', connectionId: connection },
-      to: { kind: 'api_key', keyId: key.id, provider: 'anthropic', name: null, last4: key.last4, model: 'key-model-a' },
+      to: { kind: 'api_key', keyId: key.id, provider: 'anthropic', name: null, last4: key.last4, model: 'subscription-model' },
       retryRunId: continuation.id, resetsAt,
     })
 
@@ -167,7 +167,7 @@ test('quota exhausted mid-run: continue on the person\'s key, else pause with th
 
   await t.test('(b) no key: the run is paused with the reset, holds no lease, is not reclaimed, and the card says noApiKey', async () => {
     const p = await person('quota-no-key')
-    const runId = await running(p, 'codex')
+    const runId = await running(p, 'codex', 'gpt-fixture')
     await quotaEnd(p, runId, resetsAt)
     const paused = await row(runId)
     assert.equal(paused.status, 'paused')
@@ -201,11 +201,11 @@ test('quota exhausted mid-run: continue on the person\'s key, else pause with th
     await addKey(other.id, 'openai', ['intruder-model'])
     await failsWith(quota.resumeQuotaPausedRunOnApiKey(p.id, runId), 'apiKeyNotFound')
     assert.deepEqual(await threadQuotaView(other.id, [runId], runId), { switched: [], paused: null })
-    const key = await addKey(p.id, 'openai', ['key-model-c'])
+    const key = await addKey(p.id, 'openai', ['gpt-fixture'])
     assert.equal((await threadQuotaView(p.id, [runId], runId)).paused?.keyReady, true, 'the card offers 用 API Key 继续 once a key exists')
     const { runId: retryRunId } = await quota.resumeQuotaPausedRunOnApiKey(p.id, runId)
     assert.deepEqual(await threadQuotaView(p.id, [runId, retryRunId], retryRunId), {
-      switched: [{ runId, subscription: 'codex', plan: null, key: { provider: 'openai', name: null, model: 'key-model-c' } }], paused: null,
+      switched: [{ runId, subscription: 'codex', plan: null, key: { provider: 'openai', name: null, model: 'gpt-fixture' } }], paused: null,
     })
     assert.deepEqual(await quota.resumeQuotaPausedRunOnApiKey(p.id, runId), { runId: retryRunId }, 'idempotent')
     const original = await row(runId)
@@ -215,16 +215,36 @@ test('quota exhausted mid-run: continue on the person\'s key, else pause with th
     const [continuation, ...more] = await continuations(runId)
     assert.equal(more.length, 0)
     assert.equal(continuation.id, retryRunId)
-    assert.deepEqual(continuation.agentDefinition.apiKey, { keyId: key.id, model: 'key-model-c' })
+    assert.deepEqual(continuation.agentDefinition.apiKey, { keyId: key.id, model: 'gpt-fixture' })
     const switched = (await events(runId)).filter(event => event.kind === 'run_credential_switched')
     assert.equal(switched.length, 1)
     assert.deepEqual(switched[0].payload, {
       reason: 'quota_exhausted',
       from: { kind: 'subscription', provider: 'codex', connectionId: null },
-      to: { kind: 'api_key', keyId: key.id, provider: 'openai', name: null, last4: key.last4, model: 'key-model-c' },
+      to: { kind: 'api_key', keyId: key.id, provider: 'openai', name: null, last4: key.last4, model: 'gpt-fixture' },
       retryRunId, resetsAt,
     })
     await failsWith(quota.retryQuotaPausedRun(p.id, retryRunId), 'runNotActive')
+  })
+
+  await t.test('automatic subscription quota fallback requires the same frozen model, regardless of the chat Key', async () => {
+    const p = await person('quota-same-model')
+    await subscribe(p)
+    const runId = await running(p, 'claude_code')
+    assert.equal((await row(runId)).agentDefinition.cliModelSelection, 'auto', 'a subscription without an explicit dispatch model retains CLI auto')
+    const chatKey = await keys.addApiKey(pool, p.id, { provider: 'deepseek', apiKey: `fixture-chat-${randomUUID()}` }, { fetch: models(['deepseek-chat']) })
+    await keys.setBotApiKeyChoice(pool, { ownerId: p.id, workspaceId: p.workspaceId }, p.botId, chatKey.id, 'deepseek-chat')
+    await quotaEnd(p, runId, resetsAt)
+    assert.equal((await row(runId)).status, 'paused', 'a different model cannot silently continue the thread')
+    assert.equal((await continuations(runId)).length, 0)
+    assert.equal((await threadQuotaView(p.id, [runId], runId)).paused?.keyReady, false)
+    const same = await addKey(p.id, 'anthropic', ['subscription-model'])
+    assert.equal((await threadQuotaView(p.id, [runId], runId)).paused?.keyReady, true)
+    const retry = await quota.resumeQuotaPausedRunOnApiKey(p.id, runId)
+    const frozen = (await row(retry.runId)).agentDefinition
+    assert.deepEqual(frozen.apiKey, { keyId: same.id, model: 'subscription-model' })
+    assert.equal(frozen.model, 'subscription-model')
+    assert.notEqual(frozen.apiKey.keyId, chatKey.id)
   })
 
   await t.test('(c) setting off: paused with apiKeyAfterQuotaOff even with a key; (d) retry keeps the original credential', async () => {

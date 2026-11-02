@@ -134,13 +134,15 @@ test('kept per status: ok a minute, a refused sign-in ten minutes, a failure not
 function serviceWith(row: Partial<ConnectionRow>, call: (...args: unknown[]) => Promise<unknown>, after?: Partial<ConnectionRow>) {
   const base: ConnectionRow = { id, ownerId: 'alex', workspaceId: 'w', provider: 'claude', state: 'connected', epoch: '3', quota: null, accountLabel: null, ...row }
   const saved: string[] = []
+  const quotas: unknown[] = []
   let lookups = 0
   const repository = Object.assign(new SubscriptionRepository({ query: async () => ({ rows: [] }) } as never), {
     connection: async () => (lookups++ === 0 ? base : { ...base, ...after }),
     saveAccountLabel: async (_row: ConnectionRow, label: string) => { saved.push(label) },
+    saveQuota: async (_row: ConnectionRow, quota: unknown) => { quotas.push(quota) },
   })
   const worker = () => ({ call }) as never
-  return { service: new SubscriptionService(repository, worker, { ready: () => false, nativeIsolation: 'none' }), saved }
+  return { service: new SubscriptionService(repository, worker, { ready: () => false, nativeIsolation: 'none' }), saved, quotas }
 }
 
 test('a worker failure keeps the last known email and is temporary', async () => {
@@ -161,6 +163,8 @@ test('a good read stores the email for later failures; a 401 keeps it', async ()
   const ok = serviceWith({}, async () => ({ status: 200, body: { extra_usage: { is_enabled: false }, five_hour: { utilization: 10 } }, account: 'alex@example.com' }))
   assert.equal((await ok.service.usage('alex', id)).account, 'alex@example.com')
   assert.deepEqual(ok.saved, ['alex@example.com'])
+  assert.equal((ok.quotas[0] as { status: string }).status, 'ok')
+  assert.equal((ok.quotas[0] as { windows: { used: number }[] }).windows[0].used, .1)
   const refused = serviceWith({ accountLabel: 'alex@example.com' }, async () => ({ status: 401, body: {} }))
   const usage = await refused.service.usage('alex', id)
   assert.deepEqual([usage.status, usage.account], ['reauth', 'alex@example.com'])

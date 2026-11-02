@@ -11,6 +11,7 @@ import { Spinner } from '@/components/icons'
 import { SignIn } from '@/components/SignIn'
 import { StartupGate } from '@/components/StartupGate'
 import { authClient } from '@/lib/auth'
+import { apiCache } from '@/lib/api-cache'
 import { HomeProvider } from '@/lib/home'
 import { openPush } from '@/lib/navigate'
 import { colors, screenOptions } from '@/lib/theme'
@@ -33,10 +34,12 @@ export default function RootLayout() {
 /** Signed out: the sign-in screen. Signed in: the app, and this phone's pushes (PushSetup). */
 function SessionGate() {
   const { data, isPending } = authClient.useSession()
+  // Establish the identity boundary before any child can read a cached answer.
+  apiCache.setIdentity(data?.user?.id ?? null)
   if (isPending && !data) return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.page }}><Spinner size={22} /></View>
   if (!data?.user) return <SignIn />
   return (
-    <HomeProvider>
+    <HomeProvider key={data.user.id}>
       <PushSetup />
       <Stack screenOptions={screenOptions(colors.page)}>
         {/* 对话 and 线程; chats, threads and the rest are pushed over them. */}

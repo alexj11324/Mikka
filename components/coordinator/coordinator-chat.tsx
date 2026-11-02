@@ -10,7 +10,7 @@ import type { BotView } from '@/app/actions/bots'
 import { BotAvatar, COORDINATOR_AVATAR } from '@/components/nav/bot-avatar'
 import { cn } from '@/lib/utils'
 import { useActionError } from '@/lib/use-action-error'
-import { Alert, AlertAction, AlertTitle } from '@/components/ui/alert'
+import { Alert, AlertTitle } from '@/components/ui/alert'
 import { Bubble, BubbleContent } from '@/components/ui/bubble'
 import { Message, MessageContent, MessageFooter } from '@/components/ui/message'
 import { MessageScroller, MessageScrollerButton, MessageScrollerContent, MessageScrollerItem, MessageScrollerProvider, MessageScrollerViewport, useMessageScroller } from '@/components/ui/message-scroller'
@@ -54,6 +54,7 @@ import { FailureReason } from './failure-reason'
 import { QuotaNotice, QuotaSwitchLine } from './quota-notice'
 import { ChatEventLine } from './chat-event-line'
 import { RetryReplyButton } from './retry-reply-button'
+import { COMPOSER_NOTICE } from './composer-notice'
 import { FieldError } from '@/components/ui/field'
 
 /** A new message's enter: a short fade (docs/design/decisions/2026-10-31-1814-segmented-control-motion.md). */
@@ -206,8 +207,8 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   // The raw step error (workflow ids, retries, socket codes) is for the logs, never the chat: 回复失败 and 重试 (review C4).
   const failureNotice = <>
     {refusal && <HostedRefusalNotice code={refusal} botId={botId} retry={retry} onQueued={mutate} />}
-    {declined && declined !== 'quotaUsed' && <SubscriptionRefusalNotice notice={declined} retry={retry} />}
-    {data?.error && !data.working && !refusal && !declined && <Alert variant="destructive">{wakeError ? <AlertTitle>{t(`wakeErrors.${wakeError}`)}</AlertTitle> : <><AlertTitle data-chat-failure="failed">{t('failedTitle')}</AlertTitle><AlertAction>{retry}</AlertAction></>}</Alert>}
+    {declined && declined !== 'quotaUsed' && <SubscriptionRefusalNotice notice={declined} retry={retry} botId={botId} />}
+    {data?.error && !data.working && !refusal && !declined && <Alert variant="destructive" className={COMPOSER_NOTICE}>{wakeError ? <AlertTitle>{t(`wakeErrors.${wakeError}`)}</AlertTitle> : <><AlertTitle className="min-w-0 flex-1 basis-48" data-chat-failure="failed">{t('failedTitle')}</AlertTitle><span className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-1">{retry}</span></>}</Alert>}
   </>
   const sentCount = useMemo(() => items.filter(item => item.from === 'person').length, [items])
   const rootRef = useRef<HTMLElement>(null)
@@ -397,7 +398,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
       <PendingActions />
       <ChatComposer ref={inputRef} label={bot ? t('inputTo', { name: bot.name }) : t('input')} placeholder={placeholder} value={draft} onChange={updateDraft} sending={sending || stopping} editableWhileSending={stopping} onSubmit={() => { void send() }}
         running={working && !stopping} onStop={(working || sending) && !stopping ? () => { void stop() } : undefined}
-        model={<BotModelPicker botId={botId ?? null} />}
+        model={<BotModelPicker botId={botId ?? null} running={working || sending} />}
         quote={embedded?.quote || noteCount ? <div className="flex w-full min-w-0 flex-col items-start gap-0.5">
           {embedded?.quote && <ArtifactQuoteChip quote={embedded.quote} onRemove={embedded.clearQuote} />}
           {browser?.notes.map(note => <BrowserNoteChip key={note.n} note={note} onRemove={() => browser.remove(note.n)} />)}

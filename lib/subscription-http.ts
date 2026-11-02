@@ -119,13 +119,14 @@ export async function subscriptionList(request: Request, deps: SubscriptionHTTPD
     const { rows: all } = await service.repository.pool.query('select id,provider,state,epoch,"accountLabel","providerSubject",paused from byos_connections where "ownerId"=$1 and "removedAt" is null and "credentialVersion">0 and state<>\'disconnected\' order by "createdAt" desc limit 50', [session.userId])
     const subjects = new Set<string>()
     const rows = all.filter(row => !row.providerSubject || (subjects.has(`${row.provider}:${row.providerSubject}`) ? false : (subjects.add(`${row.provider}:${row.providerSubject}`), true)))
-    // Which Bots use each connection is a nicety: the list still loads without it.
-    const bots = await service.repository.connectionBots(session.userId).catch(() => [])
+    // Current saved chat selections here, not historical bindings or active runs.
+    // This optional projection never exposes another workspace or member's bots.
+    const bots = await service.repository.connectionBots(session.userId, workspaceId).catch(() => [])
     // Listing needs custody only; sign-in needs the full runtime (connect). Offer
     // 连接 only when that runtime exists, or every click fails the same way.
     let signIn: SubscriptionService | null = null
     try { signIn = deps.service(false) } catch { /* custody-only deployment: list and remove still work */ }
-    return Response.json({ enabled: true, providers: ['codex', 'claude'].map(provider => ({ provider, available: Boolean(signIn?.capabilities.oauth?.[provider as 'codex' | 'claude']) })), connections: rows.map(row => ({ id: row.id, provider: row.provider, state: row.state, revision: Number(row.epoch), account: accountLabel(row.accountLabel), paused: row.paused === true, bots: bots.filter(bot => bot.connectionId === row.id).map(({ id, name, color, shape }) => ({ id, name, color, shape })) })) }, { headers })
+    return Response.json({ enabled: true, providers: ['codex', 'claude'].map(provider => ({ provider, available: Boolean(signIn?.capabilities.oauth?.[provider as 'codex' | 'claude']) })), connections: rows.map(row => ({ id: row.id, provider: row.provider, state: row.state, revision: Number(row.epoch), account: accountLabel(row.accountLabel), paused: row.paused === true, bots: bots.filter(bot => bot.connectionId === row.id && bot.workspaceId === workspaceId).map(({ id, name, color, shape, workspaceId }) => ({ id, name, color, shape, workspaceId })) })) }, { headers })
   } catch (error) {
     if (error instanceof SubscriptionRefusal && error.code === 'backend_unavailable') return Response.json({ enabled: false, providers: [], connections: [] }, { headers })
     return Response.json({ error: 'subscription_unavailable' }, { status: 409, headers })

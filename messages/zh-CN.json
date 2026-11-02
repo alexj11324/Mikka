@@ -226,7 +226,8 @@
       "connected": "已连接 {name}",
       "replaced": "已更换 {name} 的 Key",
       "securedBy": "安全保护"
-    }
+    },
+    "connectionStatusFailed": "无法读取 {names} 的连接状态"
   },
   "Auth": {
     "haveAccount": "已经有账号？",
@@ -1916,10 +1917,6 @@
       "updatedAgo": "{minutes} 分钟前更新",
       "usedBy": "使用中：",
       "quotaWeeklyModel": "每周 · {model}",
-      "notInUse": "未在使用",
-      "extraUsageOn": "开启了额外用量，Bot 不会使用这个订阅",
-      "extraUsageClaudeFix": "在 claude.ai 的 设置 › 用量 关闭",
-      "extraUsageUnverified": "没确认额外用量已关闭，Bot 暂不会使用这个订阅",
       "removeFailed": "无法移除这个连接。",
       "loading": "正在读取模型订阅…",
       "serviceOff": "模型订阅未开启。",
@@ -1943,7 +1940,8 @@
       "pauseFailed": "无法更改这个订阅。",
       "claudePlan": "Claude {plan}",
       "disconnectTitle": "断开 {label}？",
-      "enabled": "启用"
+      "enabled": "启用",
+      "selectedBy": "{workspace} · 聊天已选用："
     },
     "integrations": {
       "googleSignInTitle": "Google 登录",
@@ -2522,7 +2520,8 @@
         "expired": "需要重新连接",
         "paused": "订阅已停用",
         "missing": "已不可用",
-        "keyRefused": "Key 无效或已被撤销"
+        "keyRefused": "Key 无效或已被撤销",
+        "checking": "待检查"
       },
       "handle": "拖动 {model}（第 {position} 个）",
       "rowMenu": "{model} 的更多操作",
@@ -2552,11 +2551,12 @@
       "removed": "已移出 {model}",
       "undo": "撤销",
       "orderUnsaved": "顺序未保存",
-      "e2bKey": "E2B Key",
+      "e2bKey": "账号 E2B Key",
       "e2bKeySet": "已填",
       "e2bKeyMissing": "未填",
       "e2bKeyFill": "填入",
       "e2bKeyReplace": "更换",
+      "agentSection": "Agent",
       "preferredAgent": "优先使用的 Agent",
       "preferredAgentHint": "两种 Agent 都能跑的模型先用它",
       "preferredMark": "优先",
@@ -2567,10 +2567,22 @@
       "emptyNoModels": "订阅和 API Key 还没有报告模型",
       "connectCredential": "连接订阅或添加 API Key",
       "openCredentials": "查看订阅与 API Key",
-      "description": "派发给 Agent 的任务按这个顺序选模型",
-      "agentSection": "Agent"
+      "checkQuota": "检查额度",
+      "quotaCheckUnconfirmed": "订阅额度仍未确认",
+      "connectSubscription": "连接订阅",
+      "addApiKey": "添加 API Key",
+      "enableSubscription": "启用订阅",
+      "reconnectSubscription": "重新连接",
+      "openApiKey": "查看 API Key",
+      "openSubscription": "查看订阅",
+      "description": "派发给 Agent 的任务按这个顺序选模型"
     },
-    "loadingPage": "正在加载设置"
+    "loadingPage": "正在加载设置",
+    "modelScope": {
+      "account": "账号",
+      "workspace": "工作区 · {name}",
+      "currentWorkspace": "当前工作区"
+    }
   },
   "TelegramBot": {
     "help": "Mikka Telegram 命令：\n/new <标题> — 新建任务草稿\n草稿进行中时发送详情，然后用 /confirm 创建到待办\n其他消息会发送给 Orchestrator，回复会发回此处\n/cancel — 丢弃草稿\n/issues — 查看最近任务\n/link ORV-123 或 /link <任务 UUID> — 关联任务\n/status — 查看关联任务\n/unlink — 取消关联",
@@ -2959,7 +2971,13 @@
       "reconnect": "订阅需要重新连接",
       "quotaUsed": "订阅额度已用完",
       "retry": "订阅暂时不可用",
-      "open": "模型与额度"
+      "open": "模型与订阅",
+      "selectionChanged": "订阅选择已失效",
+      "rateLimited": "订阅请求受限",
+      "accessDenied": "服务商拒绝订阅访问",
+      "modelRejected": "模型请求被拒绝",
+      "quotaChecking": "订阅额度待确认",
+      "runtimeUnavailable": "当前环境不支持此订阅"
     },
     "quota": {
       "used": "{name} 额度已用完",
@@ -2972,7 +2990,10 @@
       "addKey": "添加 API Key 继续",
       "useKey": "用 API Key 继续",
       "retryAfterReset": "重置后重试",
-      "continueFailed": "未能继续"
+      "continueFailed": "未能继续",
+      "keyBilling": "API Key 按 token 计费",
+      "continueUnconfirmed": "继续未确认",
+      "continueQueued": "继续已排队"
     },
     "wakeErrors": {
       "wake_failed": "回复等待重试",
@@ -3027,7 +3048,10 @@
       "notSaved": "未保存",
       "unknownModel": "未知模型",
       "refresh": "刷新模型列表",
-      "refreshFailed": "刷新失败，重试"
+      "refreshFailed": "刷新失败，重试",
+      "nextMessage": "下一条",
+      "fallback": "自动改用",
+      "checking": "待检查"
     },
     "empty": "告诉 {name} 你要做什么",
     "events": {
@@ -3061,7 +3085,14 @@
       },
       "other": "有一条新动态"
     },
-    "resend": "重新发送"
+    "resend": "重新发送",
+    "replyRetry": {
+      "unavailable": "回复暂不可重试",
+      "working": "回复正在处理",
+      "nothingToRetry": "没有待重试的回复",
+      "unconfirmed": "重试未确认",
+      "queued": "回复已排队"
+    }
   },
   "AgentCopy": {
     "pleaseSignInFirst": "请先登录。",
@@ -3332,7 +3363,9 @@
     "needsModelSettings": "打开模型与订阅",
     "repositoryAmbiguousTitle": "多个仓库匹配 {name}",
     "repositoryNotFoundTitle": "已授权的仓库里没有叫 {name} 的",
-    "githubInstallMore": "在 GitHub 上授权更多仓库"
+    "githubInstallMore": "在 GitHub 上授权更多仓库",
+    "needsModelCloudUnavailable": "云端暂时无法启动",
+    "needsModelChecking": "订阅额度暂未确认，请重试"
   },
   "IssueThreads": {
     "title": "线程",
@@ -3617,7 +3650,12 @@
       "create": "创建任务",
       "sending": "正在发送…",
       "failed": "发送失败",
-      "unavailable": "这个工作区还没有开启任务创建，可以先在对话里交给 Coordinator。"
+      "unavailable": "这个工作区还没有开启任务创建，可以先在对话里交给 Coordinator。",
+      "notParticipating": "未参与调度",
+      "modelUnavailable": "没有可运行的默认模型",
+      "loadingPlacement": "正在检查运行设置…",
+      "quotaUnchecked": "模型额度待检查",
+      "workspaceDefault": "按工作区设置"
     },
     "board": {
       "toolbar": "看板工具栏",
@@ -3859,7 +3897,8 @@
   "MobileHandoff": {
     "title": "登录 Mikka",
     "confirm": "使用此账号继续",
-    "cancel": "取消"
+    "cancel": "取消",
+    "openUnconfirmed": "网页打开未确认"
   },
   "DesktopHandoff": {
     "returnTitle": "返回 Mikka",

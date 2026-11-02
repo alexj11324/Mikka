@@ -14,25 +14,9 @@ import { SettingRow, SettingsSection } from '@/components/settings/primitives'
 import { ProfileName } from '@/components/settings/profile-name'
 import { withBasePath } from '@/lib/base-path'
 import { avatarImageSrc } from '@/lib/default-avatar'
+import { shrinkAvatar } from '@/lib/account/avatar-client'
 import { useActionError } from '@/lib/use-action-error'
 import { FieldError } from '@/components/ui/field'
-
-/** Shrinks to 256px before upload; the server refuses anything over 200 KB. */
-async function shrinkAvatar(file: File): Promise<Blob> {
-  try {
-    const bitmap = await createImageBitmap(file)
-    const side = Math.min(bitmap.width, bitmap.height, 256)
-    const canvas = new OffscreenCanvas(side, side)
-    const context = canvas.getContext('2d')
-    if (!context) return file
-    // Centre crop, so a wide photo is not squashed into an oval.
-    context.drawImage(bitmap, (bitmap.width - side) / 2, (bitmap.height - side) / 2, side, side, 0, 0, side, side)
-    bitmap.close()
-    return await canvas.convertToBlob({ type: 'image/webp', quality: 0.9 })
-  } catch {
-    return file
-  }
-}
 
 /** V01: the account's identity, plus the two ways out. */
 export function AccountSettings({ user, onSignOut, signingOut }: {

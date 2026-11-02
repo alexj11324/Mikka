@@ -1,18 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AppState } from 'react-native'
 import { api, ApiError, onWorkspaceChange } from '@/lib/api'
+import { apiCache as cache } from './api-cache'
 
 // The last answer per path, so a screen opened again draws at once and refreshes behind (a chat is not blank while it loads).
 // Another workspace's answers are dropped.
-const cache = new Map<string, unknown>()
 /** Data younger than this is fresh: coming back to the app leaves it alone (decision 2026-11-01-0400-no-refetch-on-focus). */
 export const FRESH_FOR_MS = 60_000
 onWorkspaceChange(() => cache.clear())
 
 /** Loads `path` ahead of its screen, once, so opening it draws at once (对话 warms the top chats). */
 export async function prefetch(path: string) {
-  if (cache.has(path)) return
-  try { cache.set(path, await api(path)) } catch { /* the screen loads it itself */ }
+  await cache.prefetch(path, api)
 }
 
 /** On signing out: nothing of this account is drawn for the next. */
@@ -24,40 +23,56 @@ export const clearApiCache = () => cache.clear()
  * from the path's last answer, when there is one.
  */
 export function useApi<T>(path: string | null, every = 0) {
-  const [data, setStored] = useState<T | null>(() => (path ? cache.get(path) as T | undefined : undefined) ?? null)
-  const setData = useCallback((next: T | null | ((current: T | null) => T | null)) => {
-    setStored(current => {
-      const value = typeof next === 'function' ? (next as (current: T | null) => T | null)(current) : next
-      if (path && value !== null) cache.set(path, value)
-      return value
-    })
-  }, [path])
+  const [data, setStored] = useState<T | null>(() => path ? cache.get<T>(path) : null)
   const [error, setError] = useState<ApiError | Error | null>(null)
   const [loading, setLoading] = useState(Boolean(path))
+  const request = useRef(0)
+  const context = cache.context()
+  const setData = useCallback((next: T | null | ((current: T | null) => T | null)) => {
+    cache.commit(context, () => {
+      // A saved mutation is newer than a read already in flight.
+      request.current++; setLoading(false)
+      setStored(current => {
+        let value = current
+        cache.commit(context, () => {
+          value = typeof next === 'function' ? (next as (current: T | null) => T | null)(current) : next
+          if (path && value !== null) cache.set(path, value, context)
+        })
+        return value
+      })
+    })
+  }, [path, context])
   const alive = useRef(true)
   const loadedAt = useRef(0)
 
   const load = useCallback(async () => {
     if (!path) return
+    const context = cache.context(), ticket = ++request.current
+    const accept = (apply: () => void) => cache.commit(context, () => { if (alive.current && ticket === request.current) apply() })
     try {
       const next = await api<T>(path)
-      if (alive.current) { setData(next); setError(null); loadedAt.current = Date.now() }
+      accept(() => { cache.set(path, next, context); setStored(next); setError(null); loadedAt.current = Date.now() })
     } catch (failure) {
-      if (alive.current) setError(failure as Error)
+      accept(() => setError(failure as Error))
     } finally {
-      if (alive.current) setLoading(false)
+      accept(() => setLoading(false))
     }
-  }, [path, setData])
+  }, [path])
 
   useEffect(() => {
     alive.current = true
-    setStored((path ? cache.get(path) as T | undefined : undefined) ?? null)
+    setStored(path ? cache.get<T>(path) : null)
+    setError(null)
+    loadedAt.current = 0
     setLoading(Boolean(path))
     void load()
-    return () => { alive.current = false }
+    return () => { alive.current = false; request.current++ }
   }, [load, path])
 
-  useEffect(() => onWorkspaceChange(() => void load()), [load])
+  useEffect(() => onWorkspaceChange(() => {
+    setStored(null); setError(null); loadedAt.current = 0; setLoading(Boolean(path))
+    void load()
+  }), [load, path])
 
   useEffect(() => {
     if (!path) return

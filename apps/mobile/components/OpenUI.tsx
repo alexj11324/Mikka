@@ -22,7 +22,7 @@ interface CardContext {
   /** What the person wrote next, if anything: a choice card marks the option it names. */
   reply?: string
   answer: (text: string) => Promise<boolean>
-  webPath: string
+  webPath: string | null
   sources: Record<string, CitationSource>
   onOpen: (source: CitationSource) => void
 }
@@ -360,10 +360,10 @@ function WebOnly({ text }: { text: string }) {
   return (
     <ChatCard>
       {text.trim() ? <Markdown text={text} sources={sources} onOpen={onOpen} /> : null}
-      <Pressable accessibilityRole="link" onPress={() => void openOnWeb(webPath)} style={styles.webLink} hitSlop={6}>
+      {webPath ? <Pressable accessibilityRole="link" onPress={() => void openOnWeb(webPath)} style={styles.webLink} hitSlop={6}>
         <Text style={{ color: colors.accent, fontSize: 15 }}>在网页上打开</Text>
         <ArrowUpRight size={16} color={colors.accent} strokeWidth={2} />
-      </Pressable>
+      </Pressable> : null}
     </ChatCard>
   )
 }

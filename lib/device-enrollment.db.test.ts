@@ -17,9 +17,14 @@ const target = new URL(url)
 target.searchParams.set('options', `-c search_path=${schema}`)
 const scope = createRequestDatabaseScope(target.toString())
 const run = <T>(fn: () => T) => scope.run(fn)
+let browserOwner: string | null = null
+let freshSessionRead = false
 before(async () => {
   // Device heartbeat uses bearer authentication; unrelated human-session setup is not used here.
-  mock.module('@/lib/auth', { namedExports: { auth: { api: { getSession: async () => null } } } })
+  mock.module('@/lib/auth', { namedExports: { auth: { api: { getSession: async (options: { query?: { disableCookieCache?: boolean } }) => {
+    freshSessionRead = options?.query?.disableCookieCache === true
+    return browserOwner ? { user: { id: browserOwner } } : null
+  } } } } })
   await admin.query(`CREATE SCHEMA ${schema}`)
   await run(async () => {
     const { pool } = await import('./db')
@@ -34,6 +39,24 @@ before(async () => {
   })
 })
 after(async () => { mock.restoreAll(); await scope.close(); await admin.query(`DROP SCHEMA ${schema} CASCADE`); await admin.end() })
+
+test('desktop account context reads only the current browser owner\'s active local devices', () => run(async () => {
+  const { pool } = await import('./db')
+  const { GET } = await import('../app/api/devices/enrollment/route')
+  const request = () => new Request('http://localhost/mikka/api/devices/enrollment')
+  assert.equal((await GET(request())).status, 401)
+  const own = randomUUID(), foreign = randomUUID(), cloud = randomUUID(), removed = randomUUID()
+  await pool.query(`INSERT INTO devices(id,"ownerId",kind,"removedAt") VALUES ($1,'desktop-a','local',NULL),($2,'desktop-b','local',NULL),($3,'desktop-a','cloud',NULL),($4,'desktop-a','local',now())`, [own, foreign, cloud, removed])
+  try {
+    browserOwner = 'desktop-a'
+    const first = await GET(request())
+    assert.equal(first.headers.get('Cache-Control'), 'private, no-store')
+    assert.deepEqual(await first.json(), { ownerId: 'desktop-a', deviceIds: [own] })
+    assert.equal(freshSessionRead, true)
+    browserOwner = 'desktop-b'
+    assert.deepEqual(await (await GET(request())).json(), { ownerId: 'desktop-b', deviceIds: [foreign] })
+  } finally { browserOwner = null }
+}))
 
 test('registration grant is user-bound, expires, and has one concurrent winner', () => run(async () => {
   const { pool } = await import('./db')

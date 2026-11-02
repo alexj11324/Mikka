@@ -38,7 +38,7 @@ export function WorkspaceApp({ user, initialIssues, initialTeams, initialMembers
     return { provider: () => new Map(), fallback }
   })
   return <SWRConfig value={cacheConfig}>
-    <DesktopIntegration />
+    <DesktopIntegration userId={user.id} />
     <SettingsDataPreloader workspaceId={params.get('workspace') ?? initialWorkspaceId} onWorkspaceResolved={setWorkspaceId} />
     {pathname.startsWith('/settings')
       ? <SettingsShell user={user} defaultWorkspaceId={workspaceId} googleEnabled={googleEnabled} />

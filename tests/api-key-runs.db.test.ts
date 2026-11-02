@@ -5,6 +5,10 @@
 // (no request scope in node:test) and the provider's model list are replaced.
 import assert from 'node:assert/strict'
 import { randomBytes, randomUUID } from 'node:crypto'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join, resolve } from 'node:path'
+import { execFileSync } from 'node:child_process'
 import { mock, test } from 'node:test'
 import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
 import { MODEL_CREDENTIAL_HEADER, REPO_ORIGIN_HEADER } from '@mikka/protocol/device'
@@ -218,17 +222,109 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
   await t.test('a rule\'s model only an API key lists runs on that key, beside a usable subscription; one the subscription lists stays on it', async () => {
     const p = await person('key-rule-model')
     const key = await addKey(p.id, 'anthropic', `sk-ant-${randomBytes(16).toString('hex')}`, ['key-only-model', 'shared-model'])
-    const { connection, binding } = await subscribe(p)
+    const { connection } = await subscribe(p)
     await pool.query('UPDATE byos_connections SET "modelCatalog"=$2 WHERE id=$1', [connection, JSON.stringify({ revision: '1', models: ['subscription-model', 'shared-model'] })])
-    const queue = async (model: string) => definition((await queueRun(p.id, { issueId: await task(p.id), agentId: p.agents.claude_code, repo: p.remote, model }, p.botId)).runId)
+    const queue = async (model: string) => {
+      if (model !== 'key-only-model') await (await import('../lib/model-dispatch')).bindAgentToConnection(pool, { ownerId: p.id, workspaceId: p.workspaceId }, p.agents.claude_code, 'claude_code', connection, model)
+      return definition((await queueRun(p.id, { issueId: await task(p.id), agentId: p.agents.claude_code, repo: p.remote, model }, p.botId)).runId)
+    }
     const keyed = await queue('key-only-model')
     assert.deepEqual(keyed.apiKey, { keyId: key.id, model: 'key-only-model' }, 'a model the subscription does not offer is never asked of it')
     assert.equal(keyed.subscription, undefined)
     for (const model of ['shared-model', 'subscription-model']) {
       const kept = await queue(model)
-      assert.equal(kept.subscription?.bindingId, binding, `${model}: the subscription goes first (§ 2)`)
+      assert.equal(kept.subscription?.modelId, model, `${model}: the selected subscription model stays frozen`)
       assert.equal(kept.apiKey, undefined)
     }
+  })
+
+  await t.test('explicit thread model and key remain independent of the Bot chat preference on device and cloud', async () => {
+    const p = await person('chat-thread-choice')
+    const { connection, binding } = await subscribe(p)
+    await pool.query('UPDATE byos_connections SET "modelCatalog"=$2 WHERE id=$1', [connection, JSON.stringify({ revision: '1', models: ['subscription-model'] })])
+    const chatKey = await keys.addApiKey(pool, p.id, { provider: 'deepseek', apiKey: `fixture-chat-${randomUUID()}` }, { fetch: models(['deepseek-chat']) })
+    const threadKey = await addKey(p.id, 'anthropic', `fixture-thread-${randomUUID()}`, ['subscription-model'])
+    await keys.setBotApiKeyChoice(pool, { ownerId: p.id, workspaceId: p.workspaceId }, p.botId, chatKey.id, 'deepseek-chat')
+    const { agentId, repoId } = await botComputer(p)
+    const cloudBinding = randomUUID()
+    await pool.query(`INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId")
+      VALUES ($1,$2,$3,$4,$5,1,'claude_code_cli','subscription-model')`, [cloudBinding, p.id, p.workspaceId, agentId, connection])
+    for (const cloud of [false, true]) for (const useKey of [false, true]) {
+      const issueId = await task(p.id)
+      const run = cloud
+        ? await queueCloudRun(pool, { userId: p.id, workspaceId: p.workspaceId }, { botId: p.botId, issueId, agentId, deviceRepoId: repoId, title: 'Explicit source', body: '', model: 'subscription-model', ...(useKey ? { apiKeyId: threadKey.id } : {}) })
+        : await queueRun(p.id, { issueId, agentId: p.agents.claude_code, repo: p.remote, model: 'subscription-model', ...(useKey ? { apiKeyId: threadKey.id } : {}) }, p.botId)
+      const frozen = await definition(run.runId)
+      assert.equal(frozen.model, 'subscription-model', `${cloud ? 'cloud' : 'device'} keeps the explicit thread model`)
+      if (useKey) {
+        assert.deepEqual(frozen.apiKey, { keyId: threadKey.id, model: 'subscription-model' })
+        assert.equal(frozen.subscription, undefined)
+      } else {
+        assert.equal(frozen.subscription?.bindingId, cloud ? cloudBinding : binding)
+        assert.equal(frozen.apiKey, undefined)
+      }
+      assert.notEqual(frozen.apiKey?.keyId, chatKey.id)
+    }
+  })
+
+  await t.test('a reported CLI slot cannot replace the provider model from resolver through queue and native launch', { timeout: 20_000 }, async () => {
+    const p = await person('canonical-native-model')
+    const providerModel = 'claude-opus-fixture'
+    const { connection, binding } = await subscribe(p)
+    process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES = 'claude_cpa,codex_cpa'
+    const quota = { vendor: 'claude_code', source: 'official', status: 'ok', plan: 'Max', observedAt: new Date().toISOString(), windows: [{ kind: 'five_hour', used: .2, resetsAt: null }] }
+    await pool.query('UPDATE byos_connections SET "modelCatalog"=$2,quota=$3 WHERE id=$1', [connection, JSON.stringify({ revision: '1', models: [providerModel] }), JSON.stringify(quota)])
+    await pool.query('UPDATE byos_bindings SET "modelId"=$2 WHERE id=$1', [binding, providerModel])
+    await pool.query(`INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId") VALUES ($1,$2,$3,$6,$4,1,'claude_cpa',$5)`, [randomUUID(), p.id, p.workspaceId, connection, providerModel, randomUUID()])
+    await pool.query('UPDATE devices SET harnesses=$2 WHERE id=$1', [p.deviceId, JSON.stringify([{ harness: 'claude_code', installed: true, toolApproval: true, subscriptionBroker: true, modelSlots: [{ slot: 'opus', model: providerModel, name: 'Opus' }] }])])
+    const { resolveModelDispatch } = await import('../lib/model-dispatch')
+    const target = await resolveModelDispatch(pool, { ownerId: p.id, workspaceId: p.workspaceId, botId: p.botId }, { harness: 'claude_code', model: providerModel })
+    assert.equal(target.kind, 'device')
+    if (target.kind !== 'device') throw Error('fixture dispatch failed')
+    assert.equal(target.model, providerModel)
+    const queued = await queueRun(p.id, { issueId: p.issueId, agentId: target.agentId, repo: p.remote, model: target.model, subscriptionBindingId: target.subscriptionBindingId, readOnly: true }, p.botId)
+    const frozen = await definition(queued.runId)
+    assert.equal(frozen.model, providerModel)
+    assert.equal(frozen.model, frozen.subscription.modelId)
+    const root = mkdtempSync(join(tmpdir(), 'mikka-native-model-'))
+    try {
+      execFileSync('git', ['init', '-q', root])
+      const output = execFileSync(process.execPath, ['--import', 'tsx', resolve('tests/support/subscription-native-model.mjs'), root, JSON.stringify({
+        runId: queued.runId, deviceId: target.deviceId, model: frozen.model, subscription: frozen.subscription,
+        binding: { bindingId: frozen.subscription.bindingId, ownerId: p.id, workspaceId: p.workspaceId, consumerId: target.agentId, route: 'claude_code_cli' },
+      })], { encoding: 'utf8', timeout: 15_000 })
+      assert.deepEqual(JSON.parse(output), { model: providerModel, leaseReads: 1, outcome: 'succeeded' }, 'the actual native CLI configuration must match the provider model in its lease')
+    } finally { rmSync(root, { recursive: true, force: true }) }
+  })
+
+  for (const cloud of [false, true]) await t.test(`${cloud ? 'cloud' : 'local'} freezes the selected binding despite another task rebinding the same Agent`, async () => {
+    const p = await person('exact-subscription')
+    const first = await subscribe(p)
+    await pool.query('UPDATE byos_connections SET "providerSubject"=$2 WHERE id=$1', [first.connection, `synthetic-${first.connection}`])
+    const second = await subscribe(p)
+    const runtime = cloud ? await botComputer(p) : { agentId: p.agents.claude_code, repoId: '' }
+    const { bindAgentToConnection } = await import('../lib/model-dispatch')
+    const scope = { ownerId: p.id, workspaceId: p.workspaceId }
+    const readLatest = async () => (await pool.query('SELECT id FROM byos_bindings WHERE "consumerId"=$1 ORDER BY "createdAt" DESC,id DESC LIMIT 1', [runtime.agentId])).rows[0].id as string
+    // Deterministic interleaving: task A chooses account 1, task B chooses account 2, then A queues.
+    const selectedA = await bindAgentToConnection(pool, scope, runtime.agentId, 'claude_code', first.connection, 'subscription-model')
+    const bindingA = await readLatest()
+    await bindAgentToConnection(pool, scope, runtime.agentId, 'claude_code', second.connection, 'subscription-model')
+    const bindingB = await readLatest()
+    assert.notEqual(bindingA, bindingB)
+    const issueId = await task(p.id), requestKey = `binding-race:${randomUUID()}`
+    const queue = (subscriptionBindingId: string, key = requestKey, issue = issueId) => cloud
+      ? queueCloudRun(pool, { userId: p.id, workspaceId: p.workspaceId }, { botId: p.botId, issueId: issue, agentId: runtime.agentId, deviceRepoId: runtime.repoId, title: 'Read', body: '', model: 'subscription-model', subscriptionBindingId, readOnly: true, idempotencyKey: key })
+      : queueRun(p.id, { issueId: issue, agentId: runtime.agentId, repo: p.remote, model: 'subscription-model', subscriptionBindingId, readOnly: true, requestKey: key }, p.botId)
+    const queued = await queue(bindingA)
+    assert.equal((await definition(queued.runId)).subscription?.bindingId, bindingA, 'task A must freeze the account it selected, not task B’s latest binding')
+    assert.equal(selectedA, bindingA, 'the binding returned to the dispatcher is the exact frozen identity')
+    assert.equal((await queue(bindingA)).runId, queued.runId)
+    await assert.rejects(queue(bindingB), cloud ? { status: 409 } : { code: 'runDispatchKeyConflict' }, 'the same request key cannot acquire a different subscription')
+    assert.equal((await definition(queued.runId)).subscription?.bindingId, bindingA)
+    const stranger = await person('foreign-binding')
+    const foreign = await subscribe(stranger)
+    await assert.rejects(queue(foreign.binding, `foreign:${randomUUID()}`, await task(p.id)), cloud ? { status: 409 } : { code: 'executionAccountUnavailable' }, 'an id never grants access to another Agent or owner’s subscription')
   })
 
   await t.test('cloud computer: queued with no subscription, the claim returns the key', async () => {

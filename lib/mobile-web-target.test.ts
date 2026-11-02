@@ -7,13 +7,26 @@ const BOT = '12345678-1234-1234-1234-123456789abc'
 test('the app may open the Coordinator chat, a bot chat, a task or Settings', () => {
   assert.equal(mobileWebTarget('/?section=coordinator'), '/?section=coordinator')
   assert.equal(mobileWebTarget(`/?section=coordinator&bot=${BOT.toUpperCase()}`), `/?section=coordinator&bot=${BOT}`)
+  assert.equal(mobileWebTarget(`/?section=coordinator&workspace=${BOT.toUpperCase()}`), `/?section=coordinator&workspace=${BOT}`)
+  assert.equal(mobileWebTarget(`/?section=coordinator&bot=${BOT}&workspace=${BOT}`), `/?section=coordinator&bot=${BOT}&workspace=${BOT}`)
   assert.equal(mobileWebTarget(`/?issue=${BOT}`), `/?issue=${BOT}`)
   assert.equal(mobileWebTarget('/settings'), '/settings')
   assert.equal(mobileWebTarget('/settings?section=computers'), '/settings?section=computers')
   assert.equal(mobileWebTarget('/settings?section=models'), '/settings?section=models')
+  assert.equal(mobileWebTarget('/settings?section=billing'), '/settings?section=billing')
+  assert.equal(mobileWebTarget(`/settings?section=billing&workspace=${BOT.toUpperCase()}`), `/settings?section=billing&workspace=${BOT}`)
+  assert.equal(mobileWebTarget(`/settings?section=models&workspace=${BOT}`), `/settings?section=models&workspace=${BOT}`)
   assert.equal(mobileWebTarget('/?section=plugins'), '/?section=plugins')
   assert.equal(mobileWebTarget('/?section=plugins&app=gmail'), '/?section=plugins&app=gmail')
   assert.equal(mobileWebTarget(`/api/artifacts/${BOT.toUpperCase()}/versions/3/frame`), `/api/artifacts/${BOT}/versions/3/frame`)
+})
+
+test('settings recovery only accepts one validated workspace and an allowed section', () => {
+  for (const value of ['/settings?section=billing&workspace=evil', `/settings?section=members&workspace=${BOT}`, `/settings?section=models&workspace=${BOT}&next=//evil.dev`, `/settings?section=models&workspace=${BOT}&workspace=${BOT}`, '/settings?section=models&workspace=', '/settings?section=models&section=billing']) assert.equal(mobileWebTarget(value), '/', value)
+})
+
+test('scoped chats reject malformed, extra and repeated authority parameters', () => {
+  for (const value of ['/?section=coordinator&workspace=private', `/?section=coordinator&workspace=${BOT}&workspace=${BOT}`, `/?section=coordinator&bot=${BOT}&workspace=${BOT}&owner=other`, `/?section=coordinator&bot=${BOT}&bot=${BOT}`, `/?section=coordinator&workspace=${BOT}#fragment`]) assert.equal(mobileWebTarget(value), '/', value)
 })
 
 test('anything else is the home page', () => {

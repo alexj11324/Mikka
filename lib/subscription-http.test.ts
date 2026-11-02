@@ -73,6 +73,28 @@ test('Connect is offered only when the sign-in runtime exists, not just custody'
   assert.deepEqual((await (await list(true)).json()).providers, [{ provider: 'codex', available: true }, { provider: 'claude', available: true }])
 })
 
+test('the account list projects chat selections only from the authorized workspace', async () => {
+  const botId = randomUUID(), calls: unknown[][] = []
+  const service = {
+    capabilities: { oauth: { claude: true } },
+    repository: {
+      pool: { query: async () => ({ rows: [{ id: connectionId, provider: 'claude', state: 'connected', epoch: '1', accountLabel: 'Account' }] }) },
+      connectionBots: async (...args: unknown[]) => { calls.push(args); return [
+        { connectionId, id: botId, workspaceId, name: 'Coordinator', color: 'encre', shape: 'cercle' },
+        { connectionId, id: randomUUID(), workspaceId: randomUUID(), name: 'Other workspace', color: 'encre', shape: 'cercle' },
+      ] },
+    },
+  } as unknown as SubscriptionService
+  const response = await subscriptionList(new Request(`https://mikka.test/api/subscriptions?workspace=${workspaceId}`), {
+    session: async () => ({ userId: 'alice', sessionId: 's' }),
+    workspace: async (owner, workspace) => { calls.push(['authorize', owner, workspace]) },
+    service: () => service,
+  })
+  assert.equal(response.status, 200)
+  assert.deepEqual(calls, [['authorize', 'alice', workspaceId], ['alice', workspaceId]])
+  assert.deepEqual((await response.json()).connections[0].bots, [{ id: botId, workspaceId, name: 'Coordinator', color: 'encre', shape: 'cercle' }])
+})
+
 test('pause reaches the repository with the owner and needs no provider call', async () => {
   const calls: unknown[][] = [], worker: string[] = []
   const service = {

@@ -12,7 +12,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"regexp"
 	"strings"
 	"time"
 )
@@ -30,32 +29,45 @@ type CPAPlainModel struct {
 
 func (e CPAPlainModel) Identifier() string { return e.Provider }
 
-var upstreamTypePattern = regexp.MustCompile(`^[a-z_]{1,40}$`)
-
 // upstreamFailure writes one fixed-shape line for the control plane's logs: the
 // provider, the stage, the HTTP status and the provider's error type enum. It
 // never writes a message, body, header or credential.
 func upstreamFailure(provider, stage string, status int, kind string) {
-	if !upstreamTypePattern.MatchString(kind) {
+	if !knownUpstreamType(kind) {
 		kind = "unknown"
 	}
 	fmt.Fprintf(os.Stderr, "subscription_upstream_failure %s %s %d %s\n", provider, stage, status, kind)
 }
 
+func knownUpstreamType(kind string) bool {
+	if providerEventFailure(kind) != ErrProvider {
+		return true
+	}
+	switch kind {
+	case "unknown", "unparsed", "network", "stream_ended", "request_invalid":
+		return true
+	}
+	return false
+}
+
 // upstreamErrorType reads the error type enum from a provider error body:
 // {"error":{"type":"..."}} (Anthropic, OpenAI) or {"type":"..."}.
 func upstreamErrorType(body []byte) string {
+	type providerError struct {
+		Type string `json:"type"`
+		Code string `json:"code"`
+	}
 	var parsed struct {
-		Type  string `json:"type"`
-		Error struct {
-			Type string `json:"type"`
-			Code string `json:"code"`
-		} `json:"error"`
+		Type     string        `json:"type"`
+		Error    providerError `json:"error"`
+		Response struct {
+			Error providerError `json:"error"`
+		} `json:"response"`
 	}
 	if json.Unmarshal(body, &parsed) != nil {
 		return "unparsed"
 	}
-	for _, value := range []string{parsed.Error.Type, parsed.Error.Code, parsed.Type} {
+	for _, value := range []string{parsed.Error.Type, parsed.Error.Code, parsed.Response.Error.Type, parsed.Response.Error.Code, parsed.Type} {
 		if value != "" && value != "error" {
 			return value
 		}
@@ -158,6 +170,9 @@ func (e CPAPlainModel) ExecuteStream(ctx context.Context, a *core.Auth, request 
 		body, _ := io.ReadAll(io.LimitReader(response.Body, 8192))
 		response.Body.Close()
 		upstreamFailure(e.Provider, "response", response.StatusCode, upstreamErrorType(body))
+		if response.StatusCode != http.StatusOK {
+			return nil, providerStatusFailure(response.StatusCode)
+		}
 		return nil, ErrProvider
 	}
 	chunks := make(chan ex.StreamChunk)
@@ -198,8 +213,9 @@ func (e CPAPlainModel) ExecuteStream(ctx context.Context, a *core.Auth, request 
 			}
 			kind, _ := event["type"].(string)
 			if kind == "error" || kind == "response.failed" || event["error"] != nil {
-				upstreamFailure(e.Provider, "event", 200, upstreamErrorType(raw))
-				emit(ex.StreamChunk{Err: ErrProvider})
+				kind := upstreamErrorType(raw)
+				upstreamFailure(e.Provider, "event", 200, kind)
+				emit(ex.StreamChunk{Err: providerEventFailure(kind)})
 				return
 			}
 			completed = kind == "message_stop" || kind == "response.completed" || kind == "response.incomplete"

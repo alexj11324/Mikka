@@ -226,7 +226,8 @@
       "connected": "Connected {name}",
       "replaced": "Changed {name} key",
       "securedBy": "Secured by"
-    }
+    },
+    "connectionStatusFailed": "Couldn't read connection status for {names}"
   },
   "Auth": {
     "haveAccount": "Already have an account?",
@@ -1916,10 +1917,6 @@
       "updatedAgo": "Updated {minutes} min ago",
       "usedBy": "Used by",
       "quotaWeeklyModel": "Weekly · {model}",
-      "notInUse": "Not in use",
-      "extraUsageOn": "Extra usage is on, so Bots won’t use this subscription",
-      "extraUsageClaudeFix": "Turn it off in claude.ai Settings › Usage",
-      "extraUsageUnverified": "Couldn’t confirm extra usage is off, so Bots won’t use this subscription for now",
       "removeFailed": "The connection could not be removed.",
       "loading": "Loading model subscriptions…",
       "serviceOff": "Model subscriptions are off.",
@@ -1943,7 +1940,8 @@
       "pauseFailed": "The subscription could not be changed.",
       "claudePlan": "Claude {plan}",
       "disconnectTitle": "Disconnect {label}?",
-      "enabled": "On"
+      "enabled": "On",
+      "selectedBy": "{workspace} · Selected for chat:"
     },
     "integrations": {
       "googleSignInTitle": "Google sign-in",
@@ -2522,7 +2520,8 @@
         "expired": "Needs reconnecting",
         "paused": "Subscription turned off",
         "missing": "No longer available",
-        "keyRefused": "Key invalid or revoked"
+        "keyRefused": "Key invalid or revoked",
+        "checking": "Needs check"
       },
       "handle": "Drag {model} (position {position})",
       "rowMenu": "More actions for {model}",
@@ -2552,11 +2551,12 @@
       "removed": "Removed {model}",
       "undo": "Undo",
       "orderUnsaved": "Order not saved",
-      "e2bKey": "E2B key",
+      "e2bKey": "Account E2B key",
       "e2bKeySet": "Added",
       "e2bKeyMissing": "Not added",
       "e2bKeyFill": "Add",
       "e2bKeyReplace": "Replace",
+      "agentSection": "Agent",
       "preferredAgent": "Preferred Agent",
       "preferredAgentHint": "Models both Agents can run use it first",
       "preferredMark": "Preferred",
@@ -2567,10 +2567,22 @@
       "emptyNoModels": "Subscriptions and API keys have reported no models yet",
       "connectCredential": "Connect a subscription or add an API key",
       "openCredentials": "Go to subscriptions and API keys",
-      "description": "Tasks for Agents pick a model in this order",
-      "agentSection": "Agent"
+      "checkQuota": "Check allowance",
+      "quotaCheckUnconfirmed": "Subscription allowance is still unconfirmed",
+      "connectSubscription": "Connect subscription",
+      "addApiKey": "Add API key",
+      "enableSubscription": "Enable subscription",
+      "reconnectSubscription": "Reconnect",
+      "openApiKey": "Open API key",
+      "openSubscription": "Open subscription",
+      "description": "Tasks for Agents pick a model in this order"
     },
-    "loadingPage": "Loading settings"
+    "loadingPage": "Loading settings",
+    "modelScope": {
+      "account": "Account",
+      "workspace": "Workspace · {name}",
+      "currentWorkspace": "Current workspace"
+    }
   },
   "TelegramBot": {
     "help": "Mikka Telegram commands:\n/new <title> — start a task draft\nWhile a draft is open, send details, then /confirm to create it in Backlog\nSend other messages to the Orchestrator; replies return here\n/cancel — discard the draft\n/issues — list recent tasks\n/link ORV-123 or /link <issue UUID> — link this chat to a task\n/status — show the linked task\n/unlink — clear the link",
@@ -2959,7 +2971,13 @@
       "reconnect": "Subscription needs reconnecting",
       "quotaUsed": "Subscription quota used up",
       "retry": "Subscription temporarily unavailable",
-      "open": "Models and quota"
+      "open": "Models and subscriptions",
+      "selectionChanged": "Subscription selection expired",
+      "rateLimited": "Subscription rate limited",
+      "accessDenied": "Provider denied subscription access",
+      "modelRejected": "Model request rejected",
+      "quotaChecking": "Subscription usage unconfirmed",
+      "runtimeUnavailable": "Subscription unsupported in this runtime"
     },
     "quota": {
       "used": "{name} quota used up",
@@ -2972,7 +2990,10 @@
       "addKey": "Add API key to continue",
       "useKey": "Continue with API key",
       "retryAfterReset": "Retry after reset",
-      "continueFailed": "Could not continue"
+      "continueFailed": "Could not continue",
+      "keyBilling": "API key billed per token",
+      "continueUnconfirmed": "Continuation unconfirmed",
+      "continueQueued": "Continuation queued"
     },
     "wakeErrors": {
       "wake_failed": "Reply pending retry",
@@ -3027,7 +3048,10 @@
       "notSaved": "Not saved",
       "unknownModel": "Unknown model",
       "refresh": "Refresh models",
-      "refreshFailed": "Refresh failed. Try again"
+      "refreshFailed": "Refresh failed. Try again",
+      "nextMessage": "Next message",
+      "fallback": "Fallback",
+      "checking": "Checking"
     },
     "empty": "Tell {name} what you need",
     "events": {
@@ -3061,7 +3085,14 @@
       },
       "other": "Something new happened"
     },
-    "resend": "Send again"
+    "resend": "Send again",
+    "replyRetry": {
+      "unavailable": "Reply retry unavailable",
+      "working": "Reply already processing",
+      "nothingToRetry": "No failed reply to retry",
+      "unconfirmed": "Retry unconfirmed",
+      "queued": "Reply queued"
+    }
   },
   "AgentCopy": {
     "pleaseSignInFirst": "Please sign in first.",
@@ -3332,7 +3363,9 @@
     "needsModelSettings": "Open Models and subscriptions",
     "repositoryAmbiguousTitle": "Several repositories match {name}",
     "repositoryNotFoundTitle": "No authorized repository named {name}",
-    "githubInstallMore": "Authorize more repositories on GitHub"
+    "githubInstallMore": "Authorize more repositories on GitHub",
+    "needsModelCloudUnavailable": "Cloud execution is temporarily unavailable",
+    "needsModelChecking": "Subscription allowance could not be checked. Try again."
   },
   "IssueThreads": {
     "title": "Threads",
@@ -3617,7 +3650,12 @@
       "create": "Create task",
       "sending": "Sending…",
       "failed": "Could not send",
-      "unavailable": "Task creation isn’t turned on for this workspace yet. You can hand the work to Coordinator in chat instead."
+      "unavailable": "Task creation isn’t turned on for this workspace yet. You can hand the work to Coordinator in chat instead.",
+      "notParticipating": "Not taking tasks",
+      "modelUnavailable": "No default model can run",
+      "loadingPlacement": "Checking run settings…",
+      "quotaUnchecked": "Model allowance needs checking",
+      "workspaceDefault": "Use workspace defaults"
     },
     "board": {
       "toolbar": "Board toolbar",
@@ -3859,7 +3897,8 @@
   "MobileHandoff": {
     "title": "Sign in to Mikka",
     "confirm": "Continue with this account",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "openUnconfirmed": "Web handoff unconfirmed"
   },
   "DesktopHandoff": {
     "returnTitle": "Return to Mikka",

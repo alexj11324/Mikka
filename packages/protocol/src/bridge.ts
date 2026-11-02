@@ -204,6 +204,13 @@ export interface SshInstallState {
   status: 'fingerprint' | 'running' | 'online' | 'failed'; deviceId?: string; fingerprint?: string; keyType?: string; reason?: string; retryable?: boolean
 }
 
+/** Main reads this through the authenticated browser session, never IPC input. */
+export const localDeviceAccount = z.object({
+  ownerId: z.string().min(1).max(200),
+  deviceIds: z.array(z.string().min(1).max(128)).max(10_000),
+})
+export type LocalDeviceAccount = z.infer<typeof localDeviceAccount>
+
 export interface MikkaBridge {
   ssh?: {
     onChange(listener: (state: SshInstallState) => void): () => void
@@ -217,7 +224,7 @@ export interface MikkaBridge {
     /** 重新连接 for this computer: restarts its daemon and waits until it is online. */
     restartLocal?(): Promise<SshInstallState | null>
     /**
-     * Installing the app makes this computer a device: once per launch the
+     * Installing the app makes this computer a device: once per signed-in account the
      * page asks main to install (no device, or someone else's) or repair (the
      * daemon does not answer: restart, else install). Progress arrives through
      * onChange as 添加这台电脑.

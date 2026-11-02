@@ -144,7 +144,7 @@ func (w *Worker) NativeStream(ctx context.Context, epoch int64, request NativeRe
 	}
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
-		return ErrProvider
+		return providerStatusFailure(response.StatusCode)
 	}
 	contentType := strings.Split(response.Header.Get("Content-Type"), ";")[0]
 	if contentType == "" && w.Scope.Provider == "codex" && body.Stream {
