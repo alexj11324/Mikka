@@ -13,7 +13,6 @@ const mac = [{ harness: 'codex', installed: true, models: ['gpt-5'], defaultMode
 test('run machine fallback: own E2B, own auto-schedule device, else an actionable error', { skip: !dbUrl }, async t => {
   process.env.MIKKA_CLOUD_COMPUTER_TASKS = '1'
   process.env.MIKKA_BYOS_ENABLED = '1'
-  process.env.MIKKA_CLOUD_THREAD_MACHINES = '1'
   const { Pool } = await import('pg')
   const pool = new Pool({ connectionString: dbUrl, max: 3 })
   const steps = await import('../workflows/coordinator/steps')

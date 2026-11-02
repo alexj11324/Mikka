@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { auth } from '@/lib/api-auth'
 import { runEvidence } from '@/lib/captures/store'
 import { withBasePath } from '@/lib/base-path'
+import { runOutsideToken } from '@/lib/tokens/scope'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,7 +17,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ runI
   const headers = { 'cache-control': 'private, no-store' }
   if (!session?.user) return NextResponse.json({ error: 'Sign in required' }, { status: 401, headers })
   const { runId } = await params
-  const found = z.uuid().safeParse(runId).success ? await runEvidence(session.user.id, runId) : null
+  const found = z.uuid().safeParse(runId).success && !await runOutsideToken(session.user, runId) ? await runEvidence(session.user.id, runId) : null
   if (!found) return NextResponse.json({ error: 'Not found' }, { status: 404, headers })
   return NextResponse.json({
     ...found,

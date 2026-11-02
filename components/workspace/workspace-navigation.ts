@@ -49,53 +49,113 @@ export type WorkspaceLocation = {
   section: WorkspaceSection
   /** The bot whose chat is in the centre; null for the Coordinator. */
   bot: string | null
+  /** The group chat in the centre (`group=<id>`; its section is implied). */
+  group: string | null
+  /** The saved chat in the centre (`section=agent&session=<id>`); null opens the latest. */
+  session: string | null
+  /** The team whose page is in the centre; its 主页 is `team=<id>` alone. */
+  team: string | null
+  /** The project open on the projects page. */
+  project: string | null
   /** The task open in the centre. */
   issue: string | null
   /** The thread (its run id) open in the right column, beside whatever is in the centre (R-82). */
   thread: string | null
+  /** The Artifact open in its window over the page (R-56, R-82). */
+  artifact: string | null
+}
+
+/** Team pages, under 看板 (R-82); each needs its team. */
+const TEAM_SECTIONS: readonly string[] = ['team-home', 'team-issues', 'team-projects'] satisfies readonly WorkspaceSection[]
+/** Pages that can show one project. */
+const PROJECT_SECTIONS: readonly string[] = ['projects', 'team-projects'] satisfies readonly WorkspaceSection[]
+/** Keys this file owns besides `section`, in the order a new address writes them. */
+const PLACE_KEYS = ['bot', 'group', 'session', 'team', 'project', 'issue', 'thread', 'artifact'] as const satisfies readonly (keyof WorkspaceLocation)[]
+/** What is in the centre; the thread sits beside it and the Artifact window over it. */
+const CENTRE_KEYS = ['section', 'bot', 'group', 'session', 'team', 'project', 'issue'] as const satisfies readonly (keyof WorkspaceLocation)[]
+
+/** A team page without a team is the workspace-wide page it would scope. */
+export function sectionFor(section: WorkspaceSection, team: string | null): WorkspaceSection {
+  if (!TEAM_SECTIONS.includes(section) || team) return section
+  return section === 'team-projects' ? 'projects' : section === 'team-issues' ? 'all-issues' : 'coordinator'
 }
 
 export function readLocation(params: URLSearchParams): WorkspaceLocation {
-  const section = sectionFromQuery(params.get('section') ?? undefined)
-  const bot = params.get('bot')
-  const issue = params.get('issue')
-  const thread = params.get('thread')
+  const id = (key: string) => { const value = params.get(key); return value && UUID.test(value) ? value : null }
+  const asked = params.get('section') ?? undefined
+  const team = id('team')
+  let section = sectionFromQuery(asked)
+  if (team && (asked === undefined || TEAM_SECTIONS.includes(asked))) section = (asked ?? 'team-home') as WorkspaceSection
+  else if (section === 'coordinator' && id('group')) section = 'group'
   return {
     section,
-    bot: section === 'coordinator' && bot && UUID.test(bot) ? bot : null,
-    issue: issue && UUID.test(issue) ? issue : null,
-    thread: thread && UUID.test(thread) ? thread : null,
+    bot: section === 'coordinator' ? id('bot') : null,
+    group: section === 'group' ? id('group') : null,
+    session: section === 'agent' ? id('session') : null,
+    team: TEAM_SECTIONS.includes(section) ? team : null,
+    project: PROJECT_SECTIONS.includes(section) ? id('project') : null,
+    issue: id('issue'),
+    thread: id('thread'),
+    artifact: id('artifact'),
   }
 }
 
 export function sameLocation(a: WorkspaceLocation, b: WorkspaceLocation) {
-  return a.section === b.section && a.bot === b.bot && a.issue === b.issue && a.thread === b.thread
+  return a.section === b.section && PLACE_KEYS.every(key => a[key] === b[key])
+}
+
+/**
+ * Where a task page was opened from, when its address names it: a bot's chat
+ * (`bot=`), the Coordinator's chat (`section=coordinator`), the board or
+ * another page (`section=`). Null for a bare `?issue=` link.
+ */
+export type TaskOrigin = { section: WorkspaceSection; bot: string | null }
+
+export function taskOrigin(params: URLSearchParams): TaskOrigin | null {
+  const location = readLocation(params)
+  if (location.bot) return { section: 'coordinator', bot: location.bot }
+  return READ_SECTIONS.includes(params.get('section') ?? '') ? { section: location.section, bot: null } : null
+}
+
+function buildHref(current: URL, change: Partial<WorkspaceLocation>, nameCoordinator: boolean): string {
+  const url = new URL(current.href)
+  const params = url.searchParams
+  const before = readLocation(params)
+  const named = params.get('section') === 'coordinator'
+  const next = { ...before, ...change }
+  next.section = sectionFor(next.section, next.team)
+  if (next.section !== 'coordinator') next.bot = null
+  if (next.section !== 'group') next.group = null
+  if (next.section !== 'agent') next.session = null
+  if (!TEAM_SECTIONS.includes(next.section)) next.team = null
+  if (!PROJECT_SECTIONS.includes(next.section)) next.project = null
+  const centreMoved = CENTRE_KEYS.some(key => next[key] !== before[key])
+  // A thread sits beside the centre it was opened from; a new centre closes it unless the move names one.
+  if (centreMoved && !('thread' in change)) next.thread = null
+  // The Artifact window sits over the page it was opened from: another place, or another thread, closes it unless the move names one.
+  if ((centreMoved || next.thread !== before.thread) && !('artifact' in change)) next.artifact = null
+  if (next.section !== before.section || next.bot !== before.bot) for (const key of PAGE_KEYS) params.delete(key)
+  // A task opened from the Coordinator's chat says so (a bare `?issue=` is a plain link), so ✕ and its first crumb return there.
+  // A team page reads as its team, so it names no chat.
+  if (next.issue && next.section === 'coordinator' && !next.bot && (named || (nameCoordinator && !before.issue && !next.team))) params.set('section', 'coordinator')
+  else writeSectionQuery(params, next.section)
+  if (next.team && next.section !== 'team-home') params.set('section', next.section)
+  for (const key of PLACE_KEYS) {
+    const value = next[key]
+    if (value) params.set(key, value)
+    else params.delete(key)
+  }
+  return `${url.pathname}${url.search}${url.hash}`
 }
 
 /** The address with `change` applied to `current`; query keys this file does not own are kept. */
 export function workspaceHref(current: URL, change: Partial<WorkspaceLocation>): string {
-  const url = new URL(current.href)
-  const params = url.searchParams
-  const before = readLocation(params)
-  const next = { ...before, ...change }
-  if (next.section !== 'coordinator') next.bot = null
-  const centreMoved = next.section !== before.section || next.bot !== before.bot || next.issue !== before.issue
-  // A thread sits beside the centre it was opened from; a new centre closes it unless the move names one.
-  if (centreMoved && !('thread' in change)) next.thread = null
-  if (next.section !== before.section || next.bot !== before.bot) for (const key of PAGE_KEYS) params.delete(key)
-  writeSectionQuery(params, next.section)
-  if (next.bot) params.set('bot', next.bot)
-  else params.delete('bot')
-  if (next.issue) params.set('issue', next.issue)
-  else params.delete('issue')
-  if (next.thread) params.set('thread', next.thread)
-  else params.delete('thread')
-  return `${url.pathname}${url.search}${url.hash}`
+  return buildHref(current, change, true)
 }
 
 /** The query for a place, built from nothing (a link to copy, a notification, a server redirect). */
 export function workspaceSearch(place: Partial<WorkspaceLocation>): string {
-  const href = workspaceHref(new URL('https://mikka.invalid/'), place)
+  const href = buildHref(new URL('https://mikka.invalid/'), place, place.section === 'coordinator')
   return href.slice(1)
 }
 
@@ -104,29 +164,77 @@ export function workspaceLink(place: Partial<WorkspaceLocation>): string {
   return `/${workspaceSearch(place)}`
 }
 
+/**
+ * The address as the workspace shows it: an unknown `section`, a `bot` that
+ * is not one of the person's bots (`botExists`, once the list has loaded) and
+ * keys that are not ids drop out.
+ */
+export function canonicalHref(current: URL, botExists?: (id: string) => boolean): string {
+  const location = readLocation(current.searchParams)
+  if (location.bot && botExists && !botExists(location.bot)) location.bot = null
+  return workspaceHref(current, location)
+}
+
+/**
+ * Each entry the workspace writes carries a mark in history.state beside
+ * Next's own keys (`__NA`, `__PRIVATE_NEXTJS_INTERNALS_TREE`, copied, never
+ * replaced): its position and, on a task page, the entry that opened it. ✕
+ * steps back there when that entry belongs to this page load (`doc`), so the
+ * chat comes back as it was; a pasted link, a reload or a cold start has no
+ * such entry and goes to the address's origin instead.
+ */
+export type EntryMark = { index: number; task: { start: number; doc: string; list: boolean } | null }
+const MARK = 'mikkaEntry'
+
+export function readMark(state: unknown): EntryMark | null {
+  const mark = state && typeof state === 'object' ? (state as Record<string, unknown>)[MARK] : null
+  if (!mark || typeof mark !== 'object') return null
+  const { index, task } = mark as Partial<EntryMark>
+  if (typeof index !== 'number') return null
+  return { index, task: task && typeof task.start === 'number' && typeof task.doc === 'string' ? { start: task.start, doc: task.doc, list: task.list === true } : null }
+}
+
+/** The mark for the entry written after `previous`. A task opened from a place starts its own; a move inside it (a thread, ↑↓, a sub-task) keeps the one it started with. */
+export function nextMark(previous: EntryMark | null, from: string | null, to: string | null, mode: 'push' | 'replace', doc: string, list: boolean): EntryMark {
+  const base = previous ?? { index: 0, task: null }
+  const index = mode === 'push' ? base.index + 1 : base.index
+  if (!to) return { index, task: null }
+  if (from) return { index, task: base.task }
+  return { index, task: { start: index, doc, list } }
+}
+
+/** How many entries back the place that opened this task is, in this page load; 0 when it was opened directly. */
+export function stepsToOrigin(mark: EntryMark | null, doc: string): number {
+  const task = mark?.task
+  return mark && task && task.doc === doc && task.start >= 1 ? mark.index - task.start + 1 : 0
+}
+
+/** This page load: a mark left by an earlier one (before a reload) does not count as a way back. */
+const DOC = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
+
 /** The query the workspace last wrote or showed; see queryMoved. */
 let seenQuery: string | null = null
 
-/** History-state key on an entry the workspace pushed: the address it was pushed from. */
+/** History-state key on an entry the workspace pushed: the address it was pushed from (see closeTo). */
 const PUSHED_FROM = 'mikkaPushedFrom'
 
-function write(href: string, mode: 'push' | 'replace') {
+function write(href: string, mode: 'push' | 'replace', list = false) {
   const current = `${window.location.pathname}${window.location.search}${window.location.hash}`
   if (href !== current) {
-    const state: unknown = window.history.state
-    // Next keeps its own keys in the state; ours rides along, and a null state stays null.
-    if (mode === 'push') window.history.pushState(state && typeof state === 'object' ? { ...state, [PUSHED_FROM]: current } : state, '', href)
+    const issue = (url: URL) => readLocation(url.searchParams).issue
+    const mark = nextMark(readMark(window.history.state), issue(new URL(window.location.href)), issue(new URL(href, window.location.href)), mode, DOC, list)
+    const state = { ...window.history.state, [MARK]: mark, ...(mode === 'push' ? { [PUSHED_FROM]: current } : {}) }
+    if (mode === 'push') window.history.pushState(state, '', href)
     else window.history.replaceState(state, '', href)
   }
   seenQuery = window.location.search
 }
 
 /**
- * Closing what a move opened (a thread, a task) is the same step as back: when
- * this entry was pushed from exactly where closing lands, go back, so back
- * afterwards does not reopen what was just closed. Otherwise (a link or a
- * reload opened it) the close replaces the entry. True when it went back; the
- * popstate that follows shows the place.
+ * Closing a thread a move opened is the same step as back: when this entry was
+ * pushed from exactly where closing lands, go back, so back afterwards does not
+ * reopen it. Otherwise (a link or a reload opened it) the close replaces the
+ * entry. True when it went back; the popstate that follows shows the place.
  */
 export function closeTo(change: Partial<WorkspaceLocation>): boolean {
   const href = workspaceHref(new URL(window.location.href), change)
@@ -137,6 +245,23 @@ export function closeTo(change: Partial<WorkspaceLocation>): boolean {
   }
   write(href, 'replace')
   return false
+}
+
+/** True when the task on screen was opened from a list (the board, a list, a project): its ↑↓ step through that list. */
+export function openedFromList(): boolean {
+  return typeof window !== 'undefined' && readMark(window.history.state)?.task?.list === true
+}
+
+/**
+ * ✕ on a task page opened by a move in this page load: back to that place, as
+ * it was (its open thread too). False when the task was opened directly; the
+ * caller then goes to the address's origin.
+ */
+export function backToTaskOrigin(): boolean {
+  const steps = stepsToOrigin(readMark(window.history.state), DOC)
+  if (steps < 1) return false
+  window.history.go(-steps)
+  return true
 }
 
 /**
@@ -156,8 +281,13 @@ export function queryMoved(): boolean {
  * A move the person made (a bot, a rail page, a task): a new history entry.
  * A refinement of the same place (a filter, a cleaned-up one-shot parameter): `replace`.
  */
-export function goTo(change: Partial<WorkspaceLocation>, mode: 'push' | 'replace' = 'push') {
-  write(workspaceHref(new URL(window.location.href), change), mode)
+export function goTo(change: Partial<WorkspaceLocation>, mode: 'push' | 'replace' = 'push', options: { list?: boolean } = {}) {
+  write(workspaceHref(new URL(window.location.href), change), mode, options.list)
+}
+
+/** Rewrites an invalid or stale address to what is shown, without a new entry. */
+export function tidyAddress(botExists?: (id: string) => boolean) {
+  write(canonicalHref(new URL(window.location.href), botExists), 'replace')
 }
 
 /** A page inside a section (the plugins page's app and category) writes its own keys here. */
@@ -208,4 +338,14 @@ export function openThread(runId: string) {
 /** Closes the open thread; the right column shows the list it was opened from again. */
 export function closeThread() {
   if (!closeTo({ thread: null })) window.dispatchEvent(new Event(NAVIGATE_EVENT))
+}
+
+/** Opens an Artifact in its window over the page (R-56); the centre and the thread under it stay. */
+export function openArtifact(id: string) {
+  navigate({ artifact: id })
+}
+
+/** Closes the Artifact window; the page under it is as it was. */
+export function closeArtifact() {
+  navigate({ artifact: null })
 }

@@ -41,3 +41,17 @@ test('nothing is made up: a missing field stays missing; ours and malformed slug
   await readAppDetail({ retrieve: async () => ({ slug: 'down', name: 'Down' }), listTools: async () => ({ items: [] }) }, 'down')
   resetAppDetailCache()
 })
+
+test('an app\'s page says how it connects, with Composio\'s form when it takes the person\'s key', async () => {
+  resetAppDetailCache()
+  const exa: AppDetailSource = {
+    // The single-toolkit endpoint lists its schemes only inside auth_config_details.
+    retrieve: async () => ({ slug: 'exa', name: 'Exa', composio_managed_auth_schemes: [], auth_guide_url: 'https://dashboard.exa.ai/api-keys', auth_config_details: [{ mode: 'API_KEY', fields: { connected_account_initiation: { required: [{ name: 'generic_api_key', displayName: 'API Key', is_secret: true, required: true, type: 'string' }] } } }] }),
+    listTools: async () => ({ items: [] }),
+  }
+  const detail = await readAppDetail(exa, 'exa')
+  assert.deepEqual(detail.auth, { kind: 'credentials', guideUrl: 'https://dashboard.exa.ai/api-keys', forms: [{ scheme: 'API_KEY', fields: [{ name: 'generic_api_key', label: 'API Key', description: '', secret: true, required: true, defaultValue: null }] }] })
+  const free: AppDetailSource = { retrieve: async () => ({ slug: 'hackernews', name: 'Hacker News', no_auth: true, auth_guide_url: 'http://insecure.example' }), listTools: async () => ({ items: [] }) }
+  assert.deepEqual((await readAppDetail(free, 'hackernews')).auth, { kind: 'none', forms: [], guideUrl: null })
+  resetAppDetailCache()
+})
