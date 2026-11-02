@@ -14,7 +14,8 @@ function focusable(element: Element | null) {
 /**
  * A view opened from a row (a thread, a task): focus moves to `target` when it
  * opens, and when it closes with focus lost it goes back to the row marked
- * `data-focus-id={id}` (re-rendered by then), else to what had focus before.
+ * `data-focus-id={id}` or to what had focus before, waiting a few frames for
+ * either to render, else to the chat composer of the page it returned to.
  */
 export function useFocusReturn(id: string, target: RefObject<HTMLElement | null>, enabled = true) {
   useLayoutEffect(() => {
@@ -22,11 +23,15 @@ export function useFocusReturn(id: string, target: RefObject<HTMLElement | null>
     const opener = focusable(document.activeElement)
     target.current?.focus({ preventScroll: true })
     return () => {
-      requestAnimationFrame(() => {
+      let frames = 30
+      const attempt = () => {
         if (!focusLost()) return
-        const row = document.querySelector(`[data-focus-id="${CSS.escape(id)}"]`)
-        ;(focusable(row) ?? focusable(opener))?.focus()
-      })
+        const back = focusable(document.querySelector(`[data-focus-id="${CSS.escape(id)}"]`)) ?? focusable(opener)
+        if (back) return back.focus()
+        if (--frames > 0) return requestAnimationFrame(attempt)
+        document.querySelector<HTMLElement>('main textarea[data-chat-composer]:not(:disabled)')?.focus()
+      }
+      requestAnimationFrame(attempt)
     }
   }, [id, target, enabled])
 }
