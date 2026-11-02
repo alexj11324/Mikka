@@ -2253,7 +2253,8 @@
           "access_changed": "changed access for team {target}"
         },
         "bot": {
-          "permissions_changed": "changed permissions for {target}"
+          "permissions_changed": "changed permissions for {target}",
+          "taken_over": "took over {target}"
         },
         "integration": {
           "permission_changed": "set {integration} to {to}"
@@ -3248,6 +3249,7 @@
     "needsModelNamedAgent": "{device} doesn't have {agent}",
     "needsModelNamedUpdate": "{device}'s Mikka needs an update",
     "needsModelNotOffered": "No subscription or key runs {model} on {agent}",
+    "needsModelAgentNotOffered": "No subscription or key runs {agent}",
     "needsModelPickedNoDevice": "No computer can run {model} on {agent}",
     "needsModelPickedUnavailable": "{model} on {agent} is unavailable right now",
     "needsModelSettings": "Open Models and subscriptions",

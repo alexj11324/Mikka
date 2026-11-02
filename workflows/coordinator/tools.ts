@@ -119,7 +119,7 @@ export function createCoordinatorRegistry(userId: string, botId: string, scope?:
     }),
     ...(computerEnabled ? {
       start_web_subagent: tool({
-        description: 'Start web research as this Bot’s own browser sub-agent. It stays in the Bot chat, not the thread list. Pass suggestionId when starting from a suggestion. Never handle credentials; the browser asks through a login card.',
+        description: 'Start web research or a browser check (opening a page, watching a front-end flow) as this Bot’s own browser sub-agent. It stays in the Bot chat, not the thread list. Pass suggestionId when starting from a suggestion. Never handle credentials; the browser asks through a login card.',
         inputSchema: z.object({ botId: botInput, task: z.string().trim().min(1).max(2000), suggestionId: id.optional() }),
         execute: (input, options) => { const target = targetBot(input.botId); return target ? steps.startWebSubagent(userId, { ...input, botId: target }, options.toolCallId, scope) : { error: 'botMismatch' } },
       }),
@@ -129,7 +129,7 @@ export function createCoordinatorRegistry(userId: string, botId: string, scope?:
         execute: () => steps.listComputerWorkspaces(userId, scope),
       }),
       create_computer_bot: tool({
-        description: 'Create a Bot only when the person asks to create one. Use an authorized workspace from list_computer_workspaces; if the workspace is ambiguous, ask the person.',
+        description: 'Create a Bot only when the person asks to create one. It goes in the workspace of this chat unless the person names another one from list_computer_workspaces.',
         inputSchema: z.object({ workspaceId: id, name: z.string().trim().min(1).max(120) }),
         execute: (input, options) => steps.createComputerBot(userId, input, options.toolCallId, scope),
       }),
@@ -139,7 +139,7 @@ export function createCoordinatorRegistry(userId: string, botId: string, scope?:
         execute: () => steps.listComputerBots(userId, scope),
       }),
       wake_bot_computer: tool({
-        description: 'Wake the selected Bot computer when the person asks to use it. In a Bot chat, omit botId to use this Bot. This starts cloud compute and prepares its hosted workers.',
+        description: 'Wake the Bot computer before work that needs a screen (computer use, watching a front-end test run), or when the person asks to use it. In a Bot chat, omit botId to use this Bot. This starts cloud compute and prepares its hosted workers.',
         inputSchema: z.object({ botId: botInput }),
         execute: input => { const target = targetBot(input.botId); return target ? steps.wakeComputerBot(userId, { botId: target }, scope) : { error: 'botMismatch' } },
       }),
@@ -149,26 +149,26 @@ export function createCoordinatorRegistry(userId: string, botId: string, scope?:
         execute: input => { const target = targetBot(input.botId); return target ? steps.listBotSubscriptions(userId, { botId: target }, scope) : { error: 'botMismatch' } },
       }),
       bind_bot_subscription: tool({
-        description: 'Only when the person has selected a connected subscription and model, bind it to the Bot’s hosted executor. The Bot must first be awake.',
+        description: 'Bind a connected subscription and model to the Bot’s hosted executor. The Bot must first be awake. With one connected subscription for the Agent, bind it with that Agent’s first model in the person’s allowed models without asking; ask which one only when several are connected.',
         inputSchema: z.object({ botId: botInput, connectionId: id, revision: z.number().int().positive(), harness: z.enum(['codex', 'claude_code']), modelId: z.string().regex(/^[A-Za-z0-9._:-]{1,128}$/) }),
         execute: (input, options) => { const target = targetBot(input.botId); return target ? steps.bindComputerSubscription(userId, { ...input, botId: target }, options.toolCallId, scope) : { error: 'botMismatch' } },
       }),
       dispatch_bot_computer: tool({
-        description: `When asked to use a Bot computer, give an existing issue's work to that Bot. ${ONE_THREAD} The computer must be awake and the person must already have linked a subscription. Follow the authoritative effective execution policy: allow executes, ask uses the existing wait, deny or revocation stops. Do not add another blanket confirmation.`,
+        description: `Give an existing issue's work that needs a screen (computer use, watching a front-end test run) to a Bot computer, or any work the person asked to run there; it runs on its own machine with a desktop. Work that needs no screen goes to dispatch_run. ${ONE_THREAD} The computer must be awake and the person must already have linked a subscription. Follow the authoritative effective execution policy: allow executes, ask uses the existing wait, deny or revocation stops. Do not add another blanket confirmation.`,
         inputSchema: z.object({ botId: botInput, issueId: id, harness: z.enum(['codex', 'claude_code']), note: z.string().max(10_000).optional(), suggestionId: id.optional(), readOnly: z.boolean().optional().describe('true when the task only reads and reports: no file changes, commit, push or PR.'), newThread: newThreadInput }),
         execute: (input, options) => { const target = targetBot(input.botId); return target ? steps.dispatchComputerThread(userId, { ...input, botId: target, ...(sourceEventId ? { sourceEventId } : {}) }, options.toolCallId, scope, execution ?? undefined, botId) : { error: 'botMismatch' } },
       }),
     } : {}),
     dispatch_run: tool({
-      description: `Give an issue's work to an agent. ${ONE_THREAD} A new thread takes the person's allowed models (Settings › 模型与订阅) in their order: the first that can run now, on a computer that takes part in scheduling (本地) or on their own E2B cloud (云端). Returns the run id, what happened (thread: new, message or continued) and result.placement, where it actually runs (one of the person's computers by name, or the cloud); say only that place, never one you did not get. An [Event] message arrives when the run ends. When nothing can run: error machineUnavailable with result.reason and result.card. Then draw result.card as one BeQuestions choice question (title, description and options as given, each option keeps its value and action), add no explanation, and call dispatch_run again after the person answers. A repository named without its owner is matched against the person's own authorized repositories: one match runs there; error repositoryAmbiguous (several) or repositoryNotFound (none) comes with result.card, drawn the same way, nothing is queued, and after the person picks a repository call dispatch_run again with it. Error githubNotConnected: the person connects GitHub in 插件 › GitHub.`,
+      description: `Give an issue's work to an agent. ${ONE_THREAD} A new thread takes the person's allowed models (Settings › 模型与订阅) in their order: the first that can run now, on a computer that takes part in scheduling (本地) or on their own E2B cloud (云端). Threads never run on Mikka 默认, which only answers in Bot chats. Returns the run id, what happened (thread: new, message or continued) and result.placement, where it actually runs (one of the person's computers by name, or the cloud); say only that place, never one you did not get. An [Event] message arrives when the run ends. When nothing can run (no allowed model, none connected, no computer): error machineUnavailable with result.reason and result.card, whose options lead to adding a subscription or key, a computer or an E2B key. Then draw result.card as one BeQuestions choice question (title, description and options as given, each option keeps its value and action), add no explanation, and call dispatch_run again after the person answers. A repository named without its owner is matched against the person's own authorized repositories: one match runs there; error repositoryAmbiguous (several) or repositoryNotFound (none) comes with result.card, drawn the same way, nothing is queued, and after the person picks a repository call dispatch_run again with it. Error githubNotConnected: the person connects GitHub in 插件 › GitHub.`,
       inputSchema: z.object({
-        issueId: id, agentId: id.optional(),
+        issueId: id, agentId: id.optional().describe('Deprecated: omit. 模型与订阅 picks the Agent.'),
         repo: z.string().trim().min(1).max(4_000).describe('GitHub owner/repo, an HTTPS/SSH git URL, or just the repository name the person used (e.g. Mikka_test): the host finds it among their authorized repositories. The daemon clones it; no repository registration is needed.'),
         note: z.string().max(10_000).optional().describe('Extra direction for this run, added after the issue text.'),
         readOnly: z.boolean().optional().describe('true when the task only reads and reports (investigation, review): no file changes, commit, push or PR. A read-only run needs no repository push approval.'),
         newThread: newThreadInput,
         target: z.union([z.literal('cloud'), z.object({ deviceId: id })]).optional().describe('Only when the person named where to run it: one of their computers by its deviceId from list_agents, or "cloud". Omit to let 模型与订阅 choose. A named computer that is offline or off returns machineUnavailable with result.card; nothing is queued and no other computer is used.'),
-        model: z.object({ harness: z.enum(['claude_code', 'codex']), model: z.string().regex(/^[A-Za-z0-9._:-]{1,128}$/) }).optional().describe('Only when the person picked the model for this thread: its Agent and model id as one of their subscriptions or API keys lists it. Omit to use their allowed models in order.'),
+        model: z.object({ harness: z.enum(['claude_code', 'codex']), model: z.string().regex(/^[A-Za-z0-9._:-]{1,128}$/).optional() }).optional().describe('Only when the person named the Agent or model for this thread. The Agent alone ("give it to Codex"): pass harness only; the host takes that Agent\'s first model in their allowed models. A model too: its id as one of their subscriptions or API keys lists it. Omit to use their allowed models in order.'),
       }),
       execute: (input,call) => {
         const request={...input,requestKey:`dispatch:${call.toolCallId}`,...(sourceEventId ? { sourceEventId } : {})}

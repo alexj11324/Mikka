@@ -219,7 +219,7 @@ export function eventPrompt(event: { kind: CoordinatorEventKind; issueId: string
     case 'run_blocked':
       return [
         `[Event] The agent in run ${event.runId} is blocked: ${payload.reason}`,
-        'Tell the person what it needs. Pass their answer on with send_to_run, or stop_run if they say so.',
+        'Check the current run state and existing task facts first. Resolve it within existing authority when possible and pass that on with send_to_run; ask the person only for a concrete missing decision, information or policy ask, then pass their answer on with send_to_run, or stop_run if they say so.',
         note,
       ].filter(Boolean).join('\n')
     case 'matter_handoff':
