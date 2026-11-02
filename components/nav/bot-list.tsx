@@ -22,6 +22,7 @@ import { fetchGroups } from '@/lib/group-messages'
 import { namedCitations } from '@/lib/coordinator/citations'
 import { RAIL_ITEMS, type RailDestination } from './icon-rail'
 import { BotAvatar, CoordinatorAvatar, type BotMood } from './bot-avatar'
+import { LIST_POLL_MS } from '@/components/swr-defaults'
 
 /**
  * What the center column shows: the Coordinator, a bot's chat (both on the
@@ -118,9 +119,9 @@ function BotListBody({ bots, workspaceId, threads, issues, active, onOpen, onNew
   const { toggleSidebar, setOpenMobile, open, openMobile, isMobile } = useSidebar()
   const { data: coordinator } = useSWR<CoordinatorChat>('coordinator-chat', () => getCoordinatorChat())
   // Each bot's latest line gives its row the preview and its place in the list.
-  const { data: chats = {} } = useSWR('bot-chats', () => botChatSummaries(), { refreshInterval: 15000 })
+  const { data: chats = {} } = useSWR('bot-chats', () => botChatSummaries(), { refreshInterval: LIST_POLL_MS })
   // Group chats sit among the bots (R-01), ordered by their latest message.
-  const { data: groups = [] } = useSWR(workspaceId ? ['bot-list-groups', workspaceId] : null, ([, id]: [string, string]) => fetchGroups(id), { refreshInterval: 15000 })
+  const { data: groups = [] } = useSWR(workspaceId ? ['bot-list-groups', workspaceId] : null, ([, id]: [string, string]) => fetchGroups(id), { refreshInterval: LIST_POLL_MS })
   // The Coordinator's bot row is the entry pinned on top; the rest are the person's other bots.
   const rows = [...bots.filter(bot => !bot.coordinator).map(bot => ({ kind: 'bot' as const, bot, at: chats[bot.id]?.at ?? '' })), ...groups.map(group => ({ kind: 'group' as const, group, at: group.lastMessage?.createdAt ?? group.createdAt }))]
     .sort((a, b) => b.at.localeCompare(a.at) || (a.kind === 'bot' ? a.bot.name : a.group.title).localeCompare(b.kind === 'bot' ? b.bot.name : b.group.title))

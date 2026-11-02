@@ -31,6 +31,7 @@ import { ChatComposer } from './chat-composer'
 import { BotModelPicker } from './bot-model-picker'
 import { useCoordinatorSubmit } from './use-coordinator-submit'
 import { useCoordinatorStream } from './use-coordinator-stream'
+import { chatPollInterval } from '@/lib/coordinator/chat-poll-interval'
 import { ThreadCard } from './thread-card'
 import { ToolsUsed } from './tools-used'
 import { MessageReactions, useMessageReactions } from '@/components/workspace/message-reactions'
@@ -117,7 +118,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   const actionError = useActionError()
   const reconnectStream = useRef<() => void>(() => {})
   const { data, mutate, error: loadError } = useSWR<Chat>(coordinatorChatKey(botId), () => botId ? getCoordinatorChat(botId) : getCoordinatorChat(), {
-    refreshInterval: latest => latest?.working ? 2000 : 10000,
+    refreshInterval: chatPollInterval,
     onSuccess: () => reconnectStream.current(),
   })
   const stream = useCoordinatorStream({ botId, runId: data?.streamRunId, cursor: data?.cursor, persistedStreamIds: data?.persistedStreamIds, revalidate: mutate })
