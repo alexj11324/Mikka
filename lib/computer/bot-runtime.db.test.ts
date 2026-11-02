@@ -9,6 +9,7 @@ import { randomUUID } from 'node:crypto'
 import { readFile, readdir } from 'node:fs/promises'
 import { Pool } from 'pg'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
+import { dropTestDatabase } from '../../tests/support/drop-test-database'
 import { ensureBotRuntime } from './bot-runtime'
 
 const url = process.env.E2E_DATABASE_URL
@@ -60,8 +61,8 @@ test('a bot runtime follows its computer to a new device and survives an unbound
     assert.deepEqual(moved.map(r => [r.harness, r.agentId, r.deviceId, r.repoDevice]), before.map(r => [r.harness, r.agentId, second, second]))
     assert.equal(Number((await pool.query('SELECT count(*) FROM agents WHERE "userId"=$1', [owner])).rows[0].count), 2, 'no extra agent is created')
   } finally {
-    await pool.end()
-    await admin.query(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE)`)
+    // Not pool.end() then a FORCE drop: the drop could kill a still-closing client (57P01, uncaught).
+    await dropTestDatabase(admin, database, pool)
     await admin.end()
   }
 })

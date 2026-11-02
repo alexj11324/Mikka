@@ -116,7 +116,10 @@ export async function readArtifact(userId: string, artifactId: string): Promise<
   if (!found) return null
   const [live] = await db.select({ id: artifactShares.id }).from(artifactShares)
     .where(and(eq(artifactShares.artifactId, artifactId), isNull(artifactShares.revokedAt))).limit(1)
-  return { ...found, shared: Boolean(live) }
+  // The bot whose run made it, so its window sits beside that bot's chat (as on the Artifact page); only the person's own run counts.
+  const [run] = found.runId ? await db.select({ botId: agentRuns.botId }).from(agentRuns)
+    .where(and(eq(agentRuns.id, found.runId), eq(agentRuns.userId, userId))).limit(1) : []
+  return { ...found, botId: run?.botId ?? null, shared: Boolean(live) }
 }
 
 const LIST_LIMIT = 200

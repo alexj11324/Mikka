@@ -9,6 +9,7 @@ import {
 } from "@mikka/protocol/agent-policy";
 import { FactoryError } from "./contract";
 import type { FactoryGate, FactoryTask } from "./store";
+import { maskCredentials } from "../secrets/mask";
 
 // Internal dispatch metadata on the existing attempt, never a second stage source.
 export async function configureFactoryCheck(
@@ -234,10 +235,11 @@ export async function factoryRepairBrief(
 
 // Credential protection is mechanical; this does not classify a failure or choose recovery.
 export function redactFactoryCheckText(value: string) {
-  return value
+  // GitHub tokens (including ghs_<id>_<JWT>) and JWTs, whole: the same patterns as persisted run output.
+  return maskCredentials(value, "[REDACTED]")
     .replace(/\b(?:Bearer|Basic)\s+\S+/gi, "[REDACTED]")
     .replace(
-      /\b(?:sk-[\w-]+|gh[pousr]_[\w]+|github_pat_[\w]+|mka_[\w]+|mkr_[\w]+)\b/g,
+      /\b(?:sk-[\w-]+|mka_[\w]+|mkr_[\w]+)\b/g,
       "[REDACTED]",
     )
     .replace(

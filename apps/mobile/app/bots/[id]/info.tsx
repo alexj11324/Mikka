@@ -1,4 +1,4 @@
-import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native'
+import { Alert, RefreshControl, ScrollView, StyleSheet, View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import * as WebBrowser from 'expo-web-browser'
 import { BotAvatar, Spinner } from '@/components/icons'
@@ -58,6 +58,16 @@ export default function BotInfo() {
       if (change.pinned !== undefined) await home.reload()
     } finally { void page.reload() }
   }
+  // A long press deletes one of the person's own files, after the system's confirmation (R-51, decision 2026-11-01-2255).
+  const deleteFile = (item: BotPage['library'][number]) => Alert.alert(`删除「${item.title}」？`, undefined, [
+    { text: '取消', style: 'cancel' },
+    { text: '删除', style: 'destructive', onPress: () => void (async () => {
+      try {
+        await api(`/api/mobile/artifacts/${item.id}`, { method: 'DELETE' })
+        page.setData(current => current && { ...current, library: current.library.filter(file => file.id !== item.id) })
+      } catch { Alert.alert(`「${item.title}」未删除`) } finally { void page.reload() }
+    })() },
+  ])
   const openArtifact = (item: BotPage['library'][number]) => item.kind === 'html'
     ? void openOnWeb(`/api/artifacts/${item.id}/versions/${item.version}/frame`)
     : router.push({ pathname: '/artifact/[id]', params: { id: item.id, v: String(item.version), title: item.title } })
@@ -99,7 +109,7 @@ export default function BotInfo() {
         {library.length ? (
           <Group label="资料库">
             {library.map(item => (
-              <Row key={item.id} icon={<Symbol name={item.kind === 'html' ? 'globe' : 'doc.text'} size={19} />} label={item.title} value={shortWhen(item.updatedAt)} onPress={() => openArtifact(item)} />
+              <Row key={item.id} icon={<Symbol name={item.kind === 'html' ? 'globe' : 'doc.text'} size={19} />} label={item.title} value={shortWhen(item.updatedAt)} onPress={() => openArtifact(item)} onLongPress={() => deleteFile(item)} />
             ))}
           </Group>
         ) : null}

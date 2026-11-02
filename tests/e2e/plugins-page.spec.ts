@@ -5,7 +5,8 @@ import { test, expect, register, app, rail } from './fixtures'
 // (decision 2026-10-31). Composio is never called: the catalog and the
 // person's accounts are controlled answers.
 const icon = 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 1 1%22/%3E'
-const store = (id: string, name: string, description: string, categories = [{ id: 'crm', name: 'crm' }]) => ({ id, name, description, iconUrl: icon, categories, createdAt: '2026-01-01T00:00:00.000Z' })
+const store = (id: string, name: string, description: string, categories = [{ id: 'crm', name: 'crm' }], connect = 'managed') => ({ id, name, description, iconUrl: icon, categories, createdAt: '2026-01-01T00:00:00.000Z', connect })
+const SEARCH = [{ id: 'search', name: 'search' }]
 const CATALOG = {
   configured: true,
   apps: [
@@ -16,10 +17,14 @@ const CATALOG = {
     store('attio', 'Attio', ''),
     store('zoho', 'Zoho', 'Business apps'),
     store('pipedrive', 'Pipedrive', 'Sales pipeline'),
+    // Connected with the person's own key, and one that needs no connection (decision 2026-11-02).
+    store('exa', 'Exa', 'Search the web', SEARCH, 'credentials'),
+    store('firecrawl', 'Firecrawl', 'Crawl websites', SEARCH, 'credentials'),
+    store('hackernews', 'Hacker News', 'Tech news', SEARCH, 'none'),
   ],
   popular: ['gmail', 'slack', 'hubspot'],
-  latest: ['attio'],
-  categories: [{ id: 'crm', name: 'crm', apps: ['gmail', 'slack', 'hubspot', 'salesforce', 'attio', 'zoho', 'pipedrive'] }],
+  latest: ['exa', 'firecrawl', 'hackernews', 'attio'],
+  categories: [{ id: 'crm', name: 'crm', apps: ['gmail', 'slack', 'hubspot', 'salesforce', 'attio', 'zoho', 'pipedrive'] }, { id: 'search', name: 'search', apps: ['exa', 'firecrawl', 'hackernews'] }],
 }
 const GMAIL = { id: 'fixture-gmail', toolkit: 'gmail', status: 'ACTIVE', enabled: true, alias: null, createdAt: '2026-10-01T00:00:00.000Z', email: 'fixture@example.test', isDefault: true }
 
@@ -27,19 +32,34 @@ const GMAIL = { id: 'fixture-gmail', toolkit: 'gmail', status: 'ACTIVE', enabled
 const DETAIL = {
   id: 'hubspot', name: 'HubSpot', description: 'HubSpot is an inbound marketing, sales, and customer service platform.', iconUrl: icon,
   categories: [{ id: 'crm', name: 'CRM' }, { id: 'marketing', name: 'Marketing' }], website: 'https://www.hubspot.com/', version: '20261029_00',
+  auth: { kind: 'managed', forms: [], guideUrl: null },
   tools: {
     write: [{ slug: 'HUBSPOT_CREATE_CONTACT', name: 'Create contact', description: 'Creates a contact in HubSpot.' }, { slug: 'HUBSPOT_DELETE_CONTACT', name: 'Delete contact', description: 'Archives a contact.' }],
     read: [{ slug: 'HUBSPOT_LIST_CONTACTS', name: 'List contacts', description: 'Lists contacts.' }],
   },
 }
 
-async function controlled(page: Page, options: { hold?: () => Promise<void> } = {}) {
+// Composio's own key forms for Exa (lib/plugins/connect-kind.ts).
+const EXA_AUTH = {
+  kind: 'credentials', guideUrl: 'https://dashboard.exa.ai/api-keys',
+  forms: [
+    { scheme: 'API_KEY', fields: [{ name: 'generic_api_key', label: 'API Key', description: 'Your Exa API key', secret: true, required: true, defaultValue: null }] },
+    { scheme: 'BEARER_TOKEN', fields: [{ name: 'token', label: 'Bearer Token', description: '', secret: true, required: true, defaultValue: null }] },
+  ],
+}
+const AUTH: Record<string, unknown> = { exa: EXA_AUTH, firecrawl: EXA_AUTH, hackernews: { kind: 'none', forms: [], guideUrl: null } }
+
+async function controlled(page: Page, options: { hold?: () => Promise<void>; accounts?: unknown[] } = {}) {
+  const accounts = options.accounts ?? [GMAIL]
   await page.route('**/api/integrations/composio/catalog', route => route.fulfill({ json: CATALOG }))
-  await page.route('**/api/integrations/composio/catalog/*', route => route.fulfill({ json: { ...DETAIL, id: new URL(route.request().url()).pathname.split('/').pop() } }))
+  await page.route('**/api/integrations/composio/catalog/*', route => {
+    const id = new URL(route.request().url()).pathname.split('/').pop()!
+    return route.fulfill({ json: { ...DETAIL, id, auth: AUTH[id] ?? DETAIL.auth } })
+  })
   await page.route('**/api/integrations/composio', async route => {
     if (route.request().method() !== 'GET') return route.fallback()
     await options.hold?.()
-    await route.fulfill({ json: { configured: true, callbackVerifierConfigured: true, webhookConfigured: true, accounts: [GMAIL] } })
+    await route.fulfill({ json: { configured: true, callbackVerifierConfigured: true, webhookConfigured: true, accounts } })
   })
 }
 
@@ -185,4 +205,82 @@ test('an app page shows Composio\'s description, tools and facts before anything
     await page.emulateMedia({ colorScheme: scheme })
     await testInfo.attach(`plugins-app-page-${scheme}`, { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' })
   }
+})
+
+test('an app that takes the person\'s own key connects through Composio\'s form; one that needs nothing has no control', async ({ page }, testInfo) => {
+  const SYNTHETIC = 'exa-synthetic-e2e-key'
+  const accounts: unknown[] = [GMAIL]
+  const posts: Record<string, unknown>[] = []
+  await controlled(page, { accounts })
+  await page.route('**/api/integrations/composio/credentials', async route => {
+    const body = route.request().postDataJSON() as Record<string, unknown>
+    posts.push(body)
+    const id = body.replaceAccountId ? 'fixture-exa-2' : 'fixture-exa'
+    accounts.splice(1, accounts.length, { id, toolkit: 'exa', status: 'ACTIVE', enabled: true, alias: null, createdAt: '2026-11-02T00:00:00.000Z', email: null, isDefault: true })
+    await route.fulfill({ status: 201, json: { accountId: id } })
+  })
+  const shoot = async (name: string, fullPage = false) => {
+    for (const scheme of ['light', 'dark'] as const) {
+      await page.emulateMedia({ colorScheme: scheme })
+      await testInfo.attach(`${name}-${scheme}`, { body: await page.screenshot({ fullPage }), contentType: 'image/png' })
+    }
+    await page.emulateMedia({ colorScheme: 'light' })
+  }
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await register(page, '/?section=plugins')
+
+  // Each card says how it connects.
+  const latest = page.locator('section').filter({ has: page.getByRole('heading', { name: '新品推荐', exact: true }) })
+  await expect(latest.getByText('需要 API Key', { exact: true })).toHaveCount(2)
+  await expect(latest.getByText('无需连接', { exact: true })).toHaveCount(1)
+  await expect(page.getByText('一键授权', { exact: true }).first()).toBeVisible()
+  await expect(page.getByRole('button', { name: '连接 Hacker News', exact: true })).toHaveCount(0)
+  await shoot('plugins-store-desktop', true)
+
+  // Exa's + opens Composio's form, not a redirect.
+  await page.getByRole('button', { name: '连接 Exa', exact: true }).first().click()
+  const dialog = page.getByRole('dialog')
+  await expect(dialog.getByRole('heading', { name: '连接 Exa', exact: true })).toBeVisible()
+  const key = dialog.getByLabel('API Key', { exact: true })
+  await expect(key).toHaveAttribute('type', 'password')
+  await expect(dialog.getByRole('link', { name: '去哪里拿 Key', exact: true })).toHaveAttribute('href', 'https://dashboard.exa.ai/api-keys')
+  await expect(dialog.getByRole('combobox', { name: '方式', exact: true })).toBeVisible()
+  const submit = dialog.getByRole('button', { name: '连接', exact: true })
+  await expect(submit).toBeDisabled()
+  await key.fill(SYNTHETIC)
+  await shoot('plugins-key-form-desktop')
+  await submit.click()
+  await expect(dialog).toHaveCount(0)
+  expect(posts).toEqual([{ toolkit: 'exa', scheme: 'API_KEY', fields: { generic_api_key: SYNTHETIC } }])
+
+  // Connected: … manages it, with a new key from the menu, on an empty form.
+  const menu = page.getByRole('button', { name: 'Exa 的操作', exact: true }).first()
+  await expect(menu).toBeVisible()
+  await expect(page.getByRole('button', { name: '连接 Exa', exact: true })).toHaveCount(0)
+  await shoot('plugins-key-connected-desktop', true)
+  await menu.click()
+  await page.getByRole('menuitem', { name: '更换 Key', exact: true }).click()
+  await expect(dialog.getByRole('heading', { name: '更换 Exa 的 Key', exact: true })).toBeVisible()
+  await expect(dialog.getByLabel('API Key', { exact: true })).toHaveValue('')
+  await dialog.getByLabel('API Key', { exact: true }).fill(`${SYNTHETIC}-2`)
+  await dialog.getByRole('button', { name: '连接', exact: true }).click()
+  await expect(dialog).toHaveCount(0)
+  expect(posts.at(-1)).toEqual({ toolkit: 'exa', scheme: 'API_KEY', fields: { generic_api_key: `${SYNTHETIC}-2` }, replaceAccountId: 'fixture-exa' })
+  // The key never reaches the page after it is sent.
+  expect(await page.content()).not.toContain(SYNTHETIC)
+
+  // Phone width: the store, the form, and the connected app's page.
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.getByRole('button', { name: '连接 Firecrawl', exact: true }).first().scrollIntoViewIfNeeded()
+  await shoot('plugins-store-phone')
+  await page.getByRole('button', { name: '连接 Firecrawl', exact: true }).first().click()
+  await expect(dialog.getByLabel('API Key', { exact: true })).toBeVisible()
+  await shoot('plugins-key-form-phone')
+  await page.keyboard.press('Escape')
+  await page.goto(app('/?section=plugins&app=exa'))
+  await expect(page.getByRole('heading', { name: 'Exa', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '已连接的账户', exact: true })).toBeVisible()
+  await shoot('plugins-key-connected-phone', true)
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await shoot('plugins-key-connected-app-page-desktop', true)
 })

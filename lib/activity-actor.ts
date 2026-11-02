@@ -10,7 +10,8 @@ export const userActor = (userId: string): ActivityActor => ({ actorType: 'user'
 export const agentActor = (agentId: string | null): ActivityActor => ({ actorType: 'agent', actorId: agentId })
 export const systemActor = (source: string | null = null): ActivityActor => ({ actorType: 'system', actorId: source })
 
-type ActingContext = { userId: string; actor?: ActivityActor }
+/** `tokenWorkspaceId`: the workspace a personal access token is pinned to, when an API route acts for its owner. */
+type ActingContext = { userId: string; actor?: ActivityActor; tokenWorkspaceId?: string }
 export const actingContext = new AsyncLocalStorage<ActingContext>()
 
 /**

@@ -19,6 +19,7 @@ Run it without `eval` to see the line.
 | Sandbox tools | Installs `bubblewrap`, `socat` and `ripgrep` when missing. |
 | Chromium (UI screenshots only; no browser tests run) | When the container has `/opt/pw-browsers/chromium`, exports `PLAYWRIGHT_BROWSERS_PATH` and `MIKKA_CHROMIUM_EXECUTABLE_PATH`. The Playwright configs pass the latter as [`launchOptions.executablePath`](https://playwright.dev/docs/api/class-browsertype#browser-type-launch-option-executable-path), so a container whose Chromium revision differs from the pinned Playwright's needs no `playwright install`. Playwright supports only its bundled browsers, so a screenshot can differ from a newer Chromium. |
 | Migrations | Runs `pnpm test:e2e:setup` (every `drizzle/` migration through `scripts/migrate.mjs`, then the auth tables) on `mikka_e2e`. It runs again only when a migration, that setup script or the lockfile changed. |
+| Better Auth | Makes a random `BETTER_AUTH_SECRET` once, in a 0600 file `/var/lib/mikka-dev/better-auth-secret` (`MIKKA_DEV_HOME`), and exports it by reading that file, so the value is never printed. Exports `BETTER_AUTH_URL=http://localhost:3000` unless one is already set. Without a secret, sign-up on a local server answers 500. |
 
 The export line sets `MIKKA_LOCAL_TEST_ACCOUNTS=1`, which also raises the local registration limits (`lib/abuse/signup.ts`, see `docs/dev-workflow.md`); nothing else needs setting.
 

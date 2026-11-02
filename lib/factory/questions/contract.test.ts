@@ -11,6 +11,9 @@ import {
   questionHandoffSchema,
   questionReferenceSchema,
 } from "./contract";
+import * as pure from "./schema";
+import { factoryDispatchSchema } from "../dispatch-schema";
+import { factoryDispatchSchema as serverDispatchSchema } from "../dispatch";
 
 const reference = () => ({
   questionId: randomUUID(),
@@ -148,4 +151,37 @@ test("answer fingerprints ignore object key order but bind actor, source, answer
     { ...value, answer: { ...value.answer, reference: reference() } },
   ])
     assert.notEqual(questionFingerprint(value), questionFingerprint(changed));
+});
+test("Workflow-safe schemas lowercase UUIDs and are the server contract's schemas", () => {
+  const upper = () => randomUUID().toUpperCase();
+  const ref = { ...reference(), questionId: upper(), originRunId: upper() };
+  const dispatch = factoryDispatchSchema.parse({
+    binding: ref.binding,
+    agentId: upper(),
+    deviceRepoId: upper(),
+  });
+  const answer = pure.contextQuestionAnswerSchema.parse({
+    reference: ref,
+    answerId: upper(),
+    facts: [{ kind: "request", sourceEventId: upper(), quote: "Keep it" }],
+  });
+  const escalation = pure.questionEscalationSchema.parse({
+    reference: ref,
+    eventId: upper(),
+    reason: "Needs the owner",
+  });
+  const fact = answer.facts[0];
+  assert.equal(fact.kind, "request");
+  for (const id of [
+    dispatch.agentId,
+    dispatch.deviceRepoId,
+    answer.answerId,
+    answer.reference.questionId,
+    answer.reference.originRunId,
+    fact.kind === "request" ? fact.sourceEventId : "",
+    escalation.eventId,
+  ])
+    assert.equal(id, id.toLowerCase());
+  assert.equal(contextQuestionAnswerSchema, pure.contextQuestionAnswerSchema);
+  assert.equal(serverDispatchSchema, factoryDispatchSchema);
 });

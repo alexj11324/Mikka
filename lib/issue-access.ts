@@ -3,15 +3,13 @@ import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { ActionFailureError } from '@/lib/action-error'
 import { currentUser } from '@/lib/acting-user'
+import { actingContext } from '@/lib/activity-actor'
 import { db } from '@/lib/db'
 import { issues } from '@/lib/db/schema'
 import { issueTeamAccess } from '@/lib/issue-team-access'
-import { issueVisibility } from '@/lib/issue-visibility'
+import { issueVisibility, type IssueReader } from '@/lib/issue-visibility'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 import { tokenWorkspace } from '@/lib/tokens/principal'
-
-/** A user id, or an API user whose access token is scoped to one workspace. */
-type IssueReader = string | { id: string; [tokenWorkspace]?: string }
 
 export async function requireUser() {
   const user = await currentUser()
@@ -21,7 +19,7 @@ export async function requireUser() {
 
 export async function requireIssueAccess(id: string, includeDeleted = false) {
   const user = await requireUser()
-  const issue = await findIssueForUser(user.id, id, includeDeleted)
+  const issue = await findIssueForUser(user, id, includeDeleted)
   if (!issue) throw new ActionFailureError('issueNotFound')
   return { ...issue, user }
 }
@@ -29,9 +27,11 @@ export async function requireIssueAccess(id: string, includeDeleted = false) {
 async function findIssueForUser(reader: IssueReader, id: string, includeDeleted: boolean, executor: Pick<typeof db, 'select'> = db) {
   if (!z.uuid().safeParse(id).success) return null
   const userId = typeof reader === 'string' ? reader : reader.id
-  const workspaceId = typeof reader === 'string' ? undefined : reader[tokenWorkspace]
+  // A bare id inside `actAs` for a token's owner keeps the token's scope (an API route running existing actions).
+  const acting = actingContext.getStore()
+  const workspaceId = typeof reader === 'string' ? (acting?.userId === reader ? acting.tokenWorkspaceId : undefined) : reader[tokenWorkspace]
   const access = await issueTeamAccess(id, userId)
-  const visibility = await issueVisibility(userId, includeDeleted, workspaceId, executor)
+  const visibility = await issueVisibility(reader, includeDeleted, workspaceId, executor)
   const [row] = await executor.select({ issue: issues }).from(issues)
     .where(and(eq(issues.id, id), visibility.predicate)).limit(1)
   if (!row || (!includeDeleted && readIssueMetadata(row.issue.content).deletedAt)) return null

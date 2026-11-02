@@ -34,6 +34,8 @@ const prSchema = z.object({
   title: z.string().max(256).optional(),
   node_id: z.string().min(1).optional(),
   merged_at: z.string().nullable(), body: z.string().nullable(),
+  // A single PR carries its line counts; GitHub's list of PRs leaves them out.
+  additions: z.number().int().nonnegative().optional(), deletions: z.number().int().nonnegative().optional(),
   head: z.object({ ref: z.string(), repo: z.object({ id }).nullable() }),
   base: z.object({ repo: z.object({ id }) }),
 })
@@ -68,9 +70,10 @@ function api(fetcher: typeof fetch) {
       })
     } catch { throw new PublicationError('github_unavailable', true) }
     if (response.status === 429 || response.status >= 500 || (response.status === 403 && (response.headers.get('x-ratelimit-remaining') === '0' || response.headers.has('retry-after')))) {
-      throw new PublicationError('github_unavailable', true)
+      // GitHub's status, for server logs: 429 and a limited 403 are rate limits, 5xx is GitHub itself.
+      throw new PublicationError('github_unavailable', true, response.status)
     }
-    if (response.status === 404 && init.missing) throw new PublicationError(init.missing, init.missing === 'branch_not_pushed')
+    if (response.status === 404 && init.missing) throw new PublicationError(init.missing, init.missing === 'branch_not_pushed', 404)
     // GitHub rejected this server's App JWT or the token it just minted: the App ID, key or clock is wrong here, not a GitHub outage.
     if (response.status === 401) throw new PublicationError('github_not_configured', false, 401)
     if (!response.ok) throw new PublicationError('github_request_failed', false, response.status)
@@ -174,6 +177,7 @@ export async function openRunPullRequest(options: Options & {
   const write = <T>(operation: () => Promise<T>) => options.withWrite ? options.withWrite(operation) : operation()
   const result = async (raw: unknown): Promise<PublishedPullRequest> => {
     const pr = parse(prSchema, raw)
+    const lines = pr.additions !== undefined && pr.deletions !== undefined ? { additions: pr.additions, deletions: pr.deletions } : {}
     if (pr.head.ref !== options.branch || pr.head.repo?.id !== binding.repositoryId || pr.base.repo.id !== binding.repositoryId || !pr.body?.trimEnd().endsWith(marker)) throw new PublicationError('pull_request_conflict')
     const expected = `https://github.com/${access.owner}/${access.repo}/pull/${pr.number}`
     if (pr.html_url.toLowerCase() !== expected.toLowerCase()) throw new PublicationError('github_request_failed')
@@ -188,9 +192,9 @@ export async function openRunPullRequest(options: Options & {
         },
       })))
       if (converted.data.convertPullRequestToDraft.pullRequest.id !== pr.node_id) throw new PublicationError('github_request_failed')
-      return { url: pr.html_url, ...(pr.title ? { title: pr.title } : {}), state: 'draft' }
+      return { url: pr.html_url, ...(pr.title ? { title: pr.title } : {}), state: 'draft', ...lines }
     }
-    return { url: pr.html_url, ...(pr.title ? { title: pr.title } : {}), state: pr.merged_at ? 'merged' : pr.state === 'closed' ? 'closed' : pr.draft ? 'draft' : 'open' }
+    return { url: pr.html_url, ...(pr.title ? { title: pr.title } : {}), state: pr.merged_at ? 'merged' : pr.state === 'closed' ? 'closed' : pr.draft ? 'draft' : 'open', ...lines }
   }
   const find = async () => {
     const query = new URLSearchParams({ state: 'all', head: `${access.owner}:${options.branch}`, per_page: '100', sort: 'created', direction: 'desc' })

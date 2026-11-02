@@ -56,7 +56,7 @@ test('IssueEditor: unreadable content is not editable and shows no typing hint o
 test('TaskDetail: invalid content opens read-only, with an empty save label and a disabled editor', async () => {
   const { TaskDetail } = await import('../components/workspace/task-detail')
   const noop = () => {}
-  const { container, done } = await render(<TaskDetail id="issue-1" thread={null} user={{ id: 'u1', name: 'U', email: 'u@example.invalid' }} navigation={{ index: -1, total: 0, previous: null, next: null } as never}
+  const { container, done } = await render(<TaskDetail id="issue-1" thread={null} origin="看板" user={{ id: 'u1', name: 'U', email: 'u@example.invalid' }} navigation={{ index: -1, total: 0, previous: null, next: null } as never}
     onOpen={noop} onSaved={noop} onDirty={noop} onClose={noop} onDeleted={noop} onRegisterFlush={noop} />, '[data-save-label] ~ * .ProseMirror, .ProseMirror')
   const header = container.querySelector('[data-save-label]')
   assert.ok(header, 'header rendered')
