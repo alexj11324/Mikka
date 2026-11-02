@@ -28,12 +28,13 @@ test('titles follow visibility: task title if visible, prompt only to its starte
   assert.ok(long.endsWith('…'))
 })
 
-test('href: task thread when the task is visible, chat only for its owner, else null', () => {
-  const botId = '00000000-0000-4000-8000-0000000000b0', issueId = '00000000-0000-4000-8000-0000000000a1'
-  assert.equal(botThreadHref({ issueId, ownerId: 'u1', botId }, { id: 'u2', issueVisible: true }), `/?issue=${issueId}`)
-  assert.equal(botThreadHref({ issueId, ownerId: 'u1', botId }, { id: 'u1', issueVisible: false }), null)
-  assert.equal(botThreadHref({ issueId: null, ownerId: 'u1', botId }, { id: 'u1', issueVisible: false }), `/?bot=${botId}`)
-  assert.equal(botThreadHref({ issueId: null, ownerId: 'u1', botId }, { id: 'u2', issueVisible: true }), null)
+test('href: the thread beside its task for its owner, the task for another member who sees it, chat only for its owner, else null', () => {
+  const botId = '00000000-0000-4000-8000-0000000000b0', issueId = '00000000-0000-4000-8000-0000000000a1', runId = '00000000-0000-4000-8000-0000000000c1'
+  assert.equal(botThreadHref({ issueId, ownerId: 'u1', botId, runId }, { id: 'u1', issueVisible: true }), `/?issue=${issueId}&thread=${runId}`)
+  assert.equal(botThreadHref({ issueId, ownerId: 'u1', botId, runId }, { id: 'u2', issueVisible: true }), `/?issue=${issueId}`)
+  assert.equal(botThreadHref({ issueId, ownerId: 'u1', botId, runId }, { id: 'u1', issueVisible: false }), null)
+  assert.equal(botThreadHref({ issueId: null, ownerId: 'u1', botId, runId }, { id: 'u1', issueVisible: false }), `/?bot=${botId}`)
+  assert.equal(botThreadHref({ issueId: null, ownerId: 'u1', botId, runId }, { id: 'u2', issueVisible: true }), null)
 })
 
 test('public thread ids are opaque, stable and per bot', () => {

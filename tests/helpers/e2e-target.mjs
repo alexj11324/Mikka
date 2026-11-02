@@ -48,3 +48,19 @@ export function disposableDatabase(env = process.env, ...urls) {
   if (!targets.every(isE2eTarget)) return false
   return APPLICATION_DATABASE_URLS.every(name => !env[name] || isE2eTarget(env[name]))
 }
+
+/**
+ * The same loopback *_e2e database as `base`, reached as another role. Local
+ * factory HTTP probes each connect as their own role
+ * (scripts/run-factory-http-tests.mjs); host, port and database never change.
+ */
+export function roleTargetUrl(base, role, password) {
+  const url = assertE2eTarget(base)
+  if (!/^[a-z_][a-z0-9_]{0,62}$/.test(role)) throw new Error('Role must be a plain lower-case identifier')
+  if (!/^[0-9a-f]{32,}$/.test(password)) throw new Error('Password must be at least 32 hex characters')
+  url.username = role
+  url.password = password
+  const result = url.toString()
+  assertE2eTarget(result)
+  return result
+}

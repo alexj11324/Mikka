@@ -8,7 +8,7 @@ import { openSecret, secretAad, SecretsKeyMissingError } from './crypto'
 import { byoE2BKeyEnabled, workspaceSecretsConfigured, E2BKeyError } from './flag'
 import { isReservedEnvName, repositoryRef } from './format'
 import type { SecretAuditHook } from './store'
-import { createSecretMasker, identityMasker, maskDeep, type Masker } from './mask'
+import { createSecretMasker, identityMasker, maskDeep, withCredentialMasking, type Masker } from './mask'
 
 // The settings store (and its workspace-access chain) loads only when the encryption key is configured and a query runs.
 const guardSecretsDb: typeof import('./store').guardSecretsDb = async (work, onUnique) => (await import('./store')).guardSecretsDb(work, onUnique)
@@ -103,13 +103,14 @@ async function workspaceE2BKeySecret(workspaceId: string, env: Env): Promise<{ n
   return (await (await import('./e2b')).maskableE2BKeys(workspaceId, env)).map(value => ({ name: 'E2B_API_KEY', value }))
 }
 
-/** Masker for persisted output. Identity when no encryption key is configured or the workspace has no maskable secret. Env vars (kind='env') are not masked: they are plain config shown in settings. */
+/** Masker for persisted output: saved secrets (none without an encryption key) plus credential patterns. Env vars (kind='env') are not masked: they are plain config shown in settings. */
 export async function workspaceSecretMasker(workspaceId: string | null | undefined, env: Env = process.env): Promise<Masker> {
-  if (!workspaceId || !workspaceSecretsConfigured(env)) return identityMasker
+  // Credential patterns (GitHub tokens, JWTs) are masked even with no saved secret or no key.
+  if (!workspaceId || !workspaceSecretsConfigured(env)) return withCredentialMasking(identityMasker)
   // 4e3: every secret a task of this workspace can receive, including all repository-scoped ones.
   const rows = await guardSecretsDb(() => db.select().from(workspaceSecrets).where(and(eq(workspaceSecrets.workspaceId, workspaceId), eq(workspaceSecrets.kind, 'secret'))))
   const e2bKey = await workspaceE2BKeySecret(workspaceId, env)
-  return createSecretMasker([...rows.map(row => openRuntime(row, env)), ...e2bKey])
+  return withCredentialMasking(createSecretMasker([...rows.map(row => openRuntime(row, env)), ...e2bKey]))
 }
 
 /** Workspace whose secrets a run's sandbox received: the workspace its cloud device token is bound to. Null for local devices (nothing injected, nothing to mask). */
@@ -121,11 +122,11 @@ export async function runWorkspaceId(runId: string): Promise<string | null> {
 
 /** Masker for output persisted on behalf of a run (MCP worker tools). Same secret set as the run's sandbox. */
 export async function runSecretMasker(runId: string, env: Env = process.env): Promise<Masker> {
-  if (!workspaceSecretsConfigured(env)) return identityMasker
+  if (!workspaceSecretsConfigured(env)) return withCredentialMasking(identityMasker)
   return workspaceSecretMasker(await runWorkspaceId(runId), env)
 }
 
-/** maskDeep(value) with the workspace's masker; identity (same reference) when no encryption key is configured. */
+/** maskDeep(value) with the workspace's masker. */
 export async function maskForWorkspace<T>(workspaceId: string | null | undefined, value: T, env: Env = process.env): Promise<T> {
   return maskDeep(value, await workspaceSecretMasker(workspaceId, env))
 }
