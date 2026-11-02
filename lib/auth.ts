@@ -45,7 +45,17 @@ export const auth = betterAuth({
   account: { encryptOAuthTokens: true, accountLinking: { trustedProviders: [] } },
   databaseHooks: {
     // A new account without a picture gets a default avatar now; older accounts are left as they are.
-    user: { create: { before: async user => ({ data: { ...user, image: user.image || newUserAvatar(user.name || user.email) } }) } },
+    user: { create: {
+      before: async user => ({ data: { ...user, image: user.image || newUserAvatar(user.name || user.email) } }),
+      // Every person's first workspace is their personal one (decision 2026-11-02-1500). Loading any
+      // workspace page creates it too, so a failure here only delays it.
+      after: async user => {
+        try {
+          const { ensurePersonalWorkspace } = await import('@/lib/personal-workspace')
+          await ensurePersonalWorkspace({ id: user.id, email: user.email, name: user.name }, 'zh-CN')
+        } catch (error) { console.error('Personal workspace at sign-up failed', error instanceof Error ? error.name : 'UnknownError') }
+      },
+    } },
     account: {
       create: { before: async account => ({ data: { ...account, idToken: null } }) },
       update: { before: async account => ({ data: { ...account, idToken: null } }) },

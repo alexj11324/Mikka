@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { defaultOrder, deviceModel, planDispatch, whyNoDevice, type CredentialState, type OrderEntry, type PoolDevice } from './model-order-plan'
+import { defaultOrder, deviceModel, pickDevice, planDispatch, whyNoDevice, type CredentialState, type OrderEntry, type PoolDevice } from './model-order-plan'
 
 // Model names here are fixtures standing for what a CLI or provider reported.
 const sub = (id: string, harness: OrderEntry['harness'], model: string, connectionId = `conn-${harness}`): OrderEntry => ({ id, harness, model, source: { kind: 'subscription', connectionId } })
 const key = (id: string, harness: OrderEntry['harness'], model: string): OrderEntry => ({ id, harness, model, source: { kind: 'api_key', keyId: 'key-1' } })
 const device = (id: string, over: Partial<PoolDevice> = {}): PoolDevice => ({
-  id, name: id, online: true, enabled: true,
+  id, name: id, online: true, enabled: true, server: false, activeRuns: 0, joinedAt: 0,
   harnesses: [
     { harness: 'claude_code', installed: true, subscriptionBroker: true, modelSlots: [{ slot: 'top', model: 'reported-claude-top', name: 'Top' }] },
     { harness: 'codex', installed: true, subscriptionBroker: true, models: ['reported-codex-a'] },
@@ -34,15 +34,16 @@ test('ordered fallback: quota used up, signed out, or no device moves to the nex
   assert.equal(expired.kind === 'device' && expired.entry.id, '2')
 })
 
-test('本地 picks at random among the devices that can run it, never one with 参与调度 off, offline, or unable to take a subscription run', () => {
+test('本地 picks only among the devices that can run it, never one with 参与调度 off, offline, or unable to take a subscription run', () => {
   const devices = [device('a'), device('off', { enabled: false }), device('down', { online: false }), device('b'),
     device('old', { harnesses: [{ harness: 'claude_code', installed: true, modelSlots: [{ slot: 'top', model: 'reported-claude-top', name: 'Top' }] }] })]
-  const picked = new Set<string>()
-  for (const value of [0, 0.49, 0.5, 0.99]) {
-    const plan = planDispatch({ entries: [first], location: 'local', devices, credential: usable, cloudReady: false, random: () => value })
-    if (plan.kind === 'device') picked.add(plan.deviceId)
-  }
-  assert.deepEqual([...picked].sort(), ['a', 'b'])
+  const busy = devices.map(item => item.id === 'a' ? { ...item, activeRuns: 1 } : item)
+  const plan = planDispatch({ entries: [first], location: 'local', devices: busy, credential: usable, cloudReady: false })
+  assert.equal(plan.kind === 'device' && plan.deviceId, 'b', 'the idle one of the two that can run it')
+  // Off, offline and old devices are never picked, however idle or server they are.
+  const tempting = devices.map(item => item.id === 'a' || item.id === 'b' ? { ...item, activeRuns: 9 } : { ...item, server: true })
+  const still = planDispatch({ entries: [first], location: 'local', devices: tempting, credential: usable, cloudReady: false })
+  assert.equal(still.kind === 'device' && still.deviceId, 'a')
   assert.equal(deviceModel(device('off', { enabled: false }), first), null, '参与调度 off: never sent a run')
   assert.equal(deviceModel(device('x'), keyed), 'key-model', 'an API key model runs on any installed Agent of its protocol')
   assert.equal(deviceModel(device('x', { harnesses: [] }), keyed), null)
@@ -72,6 +73,22 @@ test('no computer can run it: the reason comes from the computer closest to runn
   assert.deepEqual(whyNoDevice([device('box', { online: false }), codexOnly('mac')], opus), { why: 'notInstalled', device: 'mac', count: 1 })
   assert.deepEqual(whyNoDevice([codexOnly('mac'), old('MacBook Pro')], opus), { why: 'needsUpdate', device: 'MacBook Pro', count: 1 })
   assert.deepEqual(whyNoDevice([old('a'), old('b'), device('c', { enabled: false })], opus), { why: 'needsUpdate', device: 'a', count: 2 })
+})
+
+test('本地 order: a server before a computer, then the fewest unfinished runs, then the one that joined first; the same input gives the same device', () => {
+  const mac = device('mac', { joinedAt: 1 })
+  const server = device('server', { server: true, joinedAt: 5 })
+  const plan = (devices: PoolDevice[]) => { const result = planDispatch({ entries: [first], location: 'local', devices, credential: usable, cloudReady: false }); return result.kind === 'device' ? result.deviceId : null }
+  assert.equal(plan([mac, server]), 'server', 'a server first, though the computer joined earlier and is listed first')
+  assert.equal(plan([mac, { ...server, activeRuns: 3 }]), 'server', 'a busy server still goes before an idle computer')
+  assert.equal(plan([mac, { ...server, online: false }]), 'mac', 'no server that can run it: a computer')
+  assert.equal(plan([mac, { ...server, enabled: false }]), 'mac', '参与调度 off: the computer')
+  const second = device('server-2', { server: true, joinedAt: 9 })
+  assert.equal(plan([second, server]), 'server', 'two idle servers: the one that joined first')
+  assert.equal(plan([{ ...server, activeRuns: 2 }, { ...second, activeRuns: 1 }]), 'server-2', 'two servers: the one with fewer unfinished runs')
+  assert.equal(plan([device('b'), device('a')]), 'a', 'a full tie: by id')
+  for (let i = 0; i < 5; i++) assert.equal(plan([mac, second, server]), 'server', 'stable: no randomness')
+  assert.equal(pickDevice([]), undefined)
 })
 
 test('a model the person picked for the thread goes first, before the list', () => {

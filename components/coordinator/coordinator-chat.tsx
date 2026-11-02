@@ -50,6 +50,7 @@ import { hostedRefusal } from '@/lib/billing/verification-client'
 import { subscriptionRefusal } from '@/lib/subscription-refusal'
 import { SubscriptionRefusalNotice } from './subscription-refusal-notice'
 import { HostedUnavailableNotice } from './hosted-unavailable-notice'
+import { FailureReason } from './failure-reason'
 import { QuotaNotice, QuotaSwitchLine } from './quota-notice'
 import { RetryReplyButton } from './retry-reply-button'
 import { FieldError } from '@/components/ui/field'
@@ -190,6 +191,10 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   // With no Coordinator here, the person's last message gets no reply: show it as a failed turn instead of silence.
   // A failed turn's own line already says why; this one is only for a chat with no Coordinator to answer.
   const unanswered = data?.enabled === false && !data.error && items.findLast(item => item.from !== 'event')?.from === 'person'
+  // The failure of the newest turn sits under the message it was answering (it carries the mark, store.failTurn),
+  // with its way on; an older failure keeps only its reason there. Without the mark it stays above the composer.
+  const lastSaid = items.findLast(item => item.from !== 'event')
+  const failedAt = data?.error && !data.working && lastSaid?.from === 'person' && lastSaid.failure ? lastSaid.position : null
   // No empty chats: the Coordinator, like every bot, writes its welcome first.
   const welcomed = useRef(false)
   useEffect(() => {
@@ -197,6 +202,11 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
     welcomed.current = true
     void (botId ? welcomeCoordinator(botId) : welcomeCoordinator()).then(() => mutate())
   })
+  const failureNotice = <>
+    {refusal && <HostedRefusalNotice code={refusal} botId={botId} retry={retry} onQueued={mutate} />}
+    {declined && declined !== 'quotaUsed' && <SubscriptionRefusalNotice notice={declined} retry={retry} />}
+    {data?.error && !data.working && !refusal && !declined && <Alert variant="destructive">{wakeError ? <AlertTitle>{t(`wakeErrors.${wakeError}`)}</AlertTitle> : <><AlertTitle>{t('failedTitle')}</AlertTitle><AlertDescription>{data.error}</AlertDescription><AlertAction>{retry}</AlertAction></>}</Alert>}
+  </>
   const sentCount = useMemo(() => items.filter(item => item.from === 'person').length, [items])
   const rootRef = useRef<HTMLElement>(null)
   // Events are system lines, not messages; the person's own messages never count as unread.
@@ -334,6 +344,9 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
                     })}
                     {item.id && <MessageReactions reactions={reactions[item.id]} align={item.from === 'person' ? 'end' : 'start'} />}
                     {item.stopped && <MessageFooter><p role="status">{t('stopped')}</p></MessageFooter>}
+                    {item.failure && (item.position === failedAt
+                      ? <div data-message-failure="live" className="flex w-full max-w-md flex-col gap-2 self-end">{failureNotice}</div>
+                      : <MessageFooter className="self-end"><FailureReason failure={item.failure} /></MessageFooter>)}
                     {footerTools(item).length > 0 && <MessageFooter><ToolsUsed tools={footerTools(item)} /></MessageFooter>}
                   </MessageContent></Message>}
             </MessageScrollerItem>
@@ -369,14 +382,12 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
     </MessageScrollerProvider>
     <div className={cn('flex w-full min-w-0 max-w-full flex-col gap-2', compact ? 'px-3 pb-3' : 'px-4 pb-4 sm:px-6')}>
       {(loadError || stream.error) && <FieldError className="text-xs">{t('loadError')}</FieldError>}
-      {refusal && <HostedRefusalNotice code={refusal} botId={botId} retry={retry} onQueued={mutate} />}
-      {declined && declined !== 'quotaUsed' && <SubscriptionRefusalNotice notice={declined} retry={retry} />}
+      {failedAt === null && failureNotice}
       {/* Out of quota: after a turn stopped on it, or before the next message is sent. */}
       {/* On Mikka 默认 with no points here: said before sending (decision 2026-11-02-1450). */}
       {!data?.error && <HostedUnavailableNotice botId={botId} />}
       {!refusal && (declined === 'quotaUsed' || !data?.error) && <QuotaNotice botId={botId} stopped={declined === 'quotaUsed'}
         retry={(label, disabled) => <RetryReplyButton botId={botId} onQueued={mutate} label={label} disabled={disabled} />} />}
-      {data?.error && !data.working && !refusal && !declined && <Alert variant="destructive">{wakeError ? <AlertTitle>{t(`wakeErrors.${wakeError}`)}</AlertTitle> : <><AlertTitle>{t('failedTitle')}</AlertTitle><AlertDescription>{data.error}</AlertDescription><AlertAction>{retry}</AlertAction></>}</Alert>}
       {unanswered && <Alert variant="destructive"><AlertTitle>{t('unavailable', { name })}</AlertTitle></Alert>}
       {botId && <SubagentLoginNeeds botId={botId} />}
       <PendingActions />

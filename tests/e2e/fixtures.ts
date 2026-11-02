@@ -97,7 +97,8 @@ export async function seedSuggestion(page: Page, { source = 'gmail', action = 'r
 }
 
 /** The Coordinator's last turn failed with `error`, as a refused hosted-model call leaves it. */
-export async function seedCoordinatorError(page: Page, error: string, workspaceId?: string) {
+/** The chat's last turn failed with `error`. With `message`, the person's message that turn was answering is in the chat, carrying the reason as store.failTurn leaves it. */
+export async function seedCoordinatorError(page: Page, error: string, workspaceId?: string, message?: string) {
   const cookie = (await page.context().cookies()).find(item => item.name.endsWith('session_token'))
   if (!cookie) throw new Error('seedCoordinatorError 需要已登录的页面。')
   const db = database()
@@ -111,6 +112,9 @@ export async function seedCoordinatorError(page: Page, error: string, workspaceI
   for (let tries = 0; workspaceId && !coordinator && tries < 50; tries++) coordinator = await new Promise(resolve => setTimeout(resolve, 200)).then(find)
   if (workspaceId && !coordinator) throw new Error('这个团队还没有 Coordinator。')
   await db.query('INSERT INTO coordinator_sessions ("userId", "botId", "lastError", "lastErrorAt") VALUES ($1, $2, $3, now()) ON CONFLICT ON CONSTRAINT coordinator_sessions_chat_key DO UPDATE SET "lastError" = $3, "lastErrorAt" = now()', [session.userId, coordinator?.botId ?? null, error])
+  if (message) await db.query(`INSERT INTO coordinator_messages (id, "userId", "botId", position, message)
+    SELECT $1, $2, $3, coalesce(max(position), 0) + 1, $4 FROM coordinator_messages WHERE "userId" = $2 AND "botId" IS NOT DISTINCT FROM $3::uuid`,
+  [randomUUID(), session.userId, coordinator?.botId ?? null, JSON.stringify({ role: 'user', content: message, mikkaFailure: error })])
 }
 
 /** The signed-in person's workspace has a verified card and `remaining` microdollars of Mikka 默认 allowance (#523, #525). */

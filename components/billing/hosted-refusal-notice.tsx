@@ -23,13 +23,14 @@ import { settingsHref } from '@/lib/settings-sections'
 import { useActionError } from '@/lib/use-action-error'
 
 /**
- * A hosted-model (Mikka 默认) turn was refused (#523, #525, #526). One line above
- * the composer in place of 回复失败, styled as the composer is (Figma ALW-1
+ * A hosted-model (Mikka 默认) turn was refused (#523, #525, #526). One line under
+ * the message it was answering, in place of 回复失败, styled as the composer is (Figma ALW-1
  * `709:27554`, ALW-1b `709:27767`, ALW-2 `709:27979`, ALW-3 `709:28207`), with
  * the way on the person's real state allows (`refusalOffer`). With their own
  * subscription connected (it serves them anywhere, decision 2240), 改用我的
  * Claude 订阅 moves this chat onto it, as the model menu does, and sends the
- * message again; 重试 stays beside it.
+ * message again. 重试 is always there: after verifying or buying points it runs
+ * the turn again.
  */
 export function HostedRefusalNotice({ code, botId, retry, onQueued }: { code: HostedRefusal; botId: string | null; retry?: ReactNode; onQueued: () => unknown }) {
   const t = useTranslations('Billing.refusal')
@@ -48,7 +49,7 @@ export function HostedRefusalNotice({ code, botId, retry, onQueued }: { code: Ho
     <Icon aria-hidden="true" className="shrink-0" />
     <AlertTitle className="min-w-0 flex-1 basis-48">{title}</AlertTitle>
     <span className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-1">
-      {transient && retry}
+      {retry}
       {(transient || billing) && own && <UseSubscriptionButton botId={botId} option={own.option} label={t('useSubscription', { name: subscriptionName(own.provider, own.plan) })} onQueued={onQueued} />}
       {billing && <Button size="sm" variant="outline" nativeButton={false} role="link" render={<Link href={settingsHref('billing')} />}>{t('openBilling')}</Button>}
       {card && <Button size="sm" variant="link" className="text-muted-foreground" nativeButton={false} role="link" render={<Link href={settingsHref('billing')} />}>{t('verifyCard')}</Button>}
