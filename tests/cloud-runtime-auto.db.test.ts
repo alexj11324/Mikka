@@ -261,12 +261,16 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     } finally { delete process.env.MIKKA_CLOUD_COMPUTER_TASKS }
   })
 
-  await t.test('a workspace whose 电脑 policy is deny: no runtime, the card', async () => {
+  // The 电脑 policy governs computer use only: a repository task (octo/repo has a remote) runs on a task machine without a desktop.
+  await t.test('a workspace whose 电脑 policy is deny still runs a repository task in the cloud', async () => {
     const c = await person('policy-deny')
     await pool.query(`INSERT INTO workspace_computer_policies ("workspaceId",permission,version) VALUES ($1,'deny',1) ON CONFLICT ("workspaceId") DO UPDATE SET permission='deny'`, [c.workspaceId])
-    const before = provisioned
-    const result = await dispatch(c.id, c.issueId, c.botId) as unknown as { error: string }
-    assert.equal(result.error, 'machineUnavailable')
-    assert.equal(provisioned, before)
+    const result = await dispatch(c.id, c.issueId, c.botId) as unknown as { runId: string; status: string; botId: string }
+    assert.equal(result.status, 'queued', JSON.stringify(result))
+    assert.equal(result.botId, c.botId)
+    const run = (await pool.query(`SELECT r.status,d.kind,repo."remoteUrl" FROM agent_runs r JOIN devices d ON d.id=r."deviceId" JOIN device_repos repo ON repo.id=r."deviceRepoId" WHERE r.id=$1`, [result.runId])).rows[0]
+    assert.equal(run.status, 'queued')
+    assert.equal(run.kind, 'cloud')
+    assert.ok(run.remoteUrl, 'the queued run is a repository task')
   })
 })
