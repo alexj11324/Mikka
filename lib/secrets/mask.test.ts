@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { createSecretMasker, identityMasker, maskDeep, maskStreamStep, MASK_MIN_LENGTH } from './mask'
+import { createSecretMasker, identityMasker, maskDeep, maskStreamStep, MASK_MIN_LENGTH, withCredentialMasking } from './mask'
 
 const VALUE = 'sk_live_a+b/c=d?e&f 中'
 test('masks the raw value and its standard base64; other encodings are left alone', () => {
@@ -49,5 +49,62 @@ test('#438 A: a secret split into deltas never leaves the stream step in plainte
     out += maskStreamStep(mask, pending, '', true).release
     assert.equal(out, 'before [secret:S] middle [secret:S] after', `size ${size}`)
     for (const piece of released) assert.ok(!piece.includes('sk_live_s'), `size ${size}: no released piece starts the secret`)
+  }
+})
+
+// Fabricated credentials, assembled at runtime so no token-shaped literal sits in the repository.
+const b64url = (value: object) => Buffer.from(JSON.stringify(value)).toString('base64url')
+const fakeJwt = `${b64url({ alg: 'ES256', typ: 'JWT' })}.${b64url({ aud: 'fixture', exp: 1, iss: 'fixture' })}.${'Ab_cD-ef'.repeat(8)}`
+const fakeInstallation = ['ghs', '1234567', fakeJwt].join('_')
+const fakeClassic = ['ghp', 'x'.repeat(36)].join('_')
+const fakePat = ['github', 'pat', '11AAAAAAA0' + 'y'.repeat(70)].join('_')
+
+test('credential patterns: gh auth status output keeps no part of an installation token', () => {
+  const mask = withCredentialMasking(identityMasker)
+  // gh masks after the token's last underscore; a JWT signature contains `_`, so most of the token showed.
+  const lastUnderscore = fakeInstallation.lastIndexOf('_')
+  const ghShown = fakeInstallation.slice(0, lastUnderscore + 1) + '*'.repeat(fakeInstallation.length - lastUnderscore - 1)
+  const output = `github.com\n  ✓ Logged in to github.com account mikka-github[bot] (GH_TOKEN)\n  - Active account: true\n  - Git operations protocol: https\n  - Token: ${ghShown}\n`
+  const masked = mask(output)
+  assert.match(masked, /- Token: \[secret:github-token\]\**\n/)
+  for (const part of [fakeInstallation.slice(0, 20), fakeJwt.split('.')[0], fakeJwt.split('.')[1]]) assert.ok(!masked.includes(part), 'no fragment of the token remains')
+  assert.ok(masked.includes('mikka-github[bot]'), 'the rest of the output is untouched')
+})
+
+test('credential patterns: every GitHub token form and a bare JWT are masked whole', () => {
+  const mask = withCredentialMasking(identityMasker)
+  assert.equal(mask(`a ${fakeInstallation} b`), 'a [secret:github-token] b')
+  assert.equal(mask(`x=${fakeClassic};`), 'x=[secret:github-token];')
+  for (const prefix of ['gho', 'ghu', 'ghr']) assert.equal(mask(`${prefix}_${'z'.repeat(36)}`), '[secret:github-token]')
+  assert.equal(mask(`"${fakePat}"`), '"[secret:github-token]"')
+  assert.equal(mask(`Authorization: Bearer ${fakeJwt}`), 'Authorization: Bearer [secret:jwt]')
+})
+
+test('credential patterns leave ordinary text alone', () => {
+  const mask = withCredentialMasking(identityMasker)
+  for (const text of ['ghost_town and ghp_short', 'eyJ alone', 'see github_pat_ docs', 'git push origin mikka/zhix-13', 'sha 508682a1924a607ff19617e58efb58fb76550fa1'])
+    assert.equal(mask(text), text)
+})
+
+test('credential patterns run after saved secrets, and maskDeep reaches them', () => {
+  const mask = withCredentialMasking(createSecretMasker([{ name: 'T', value: 'tok_12345678' }]))
+  assert.equal(mask(`tok_12345678 ${fakeClassic}`), '[secret:T] [secret:github-token]')
+  assert.deepEqual(maskDeep({ output: `Token: ${fakeInstallation}` }, mask), { output: 'Token: [secret:github-token]' })
+})
+
+test('a credential split into deltas never leaves the stream step in plaintext', () => {
+  const mask = withCredentialMasking(identityMasker)
+  const text = `before ${fakeInstallation} middle ${fakeJwt} after ${fakePat} end`
+  for (const size of [1, 2, 5, 13, Math.ceil(text.length / 3)]) {
+    let pending = ''
+    let out = ''
+    for (let i = 0; i < text.length; i += size) {
+      const step = maskStreamStep(mask, pending, text.slice(i, i + size))
+      for (const part of [fakeInstallation.slice(0, 12), fakeJwt.slice(0, 12), fakePat.slice(0, 15)]) assert.ok(!step.release.includes(part), `size ${size}: released a credential fragment`)
+      out += step.release
+      pending = step.pending
+    }
+    out += maskStreamStep(mask, pending, '', true).release
+    assert.equal(out, 'before [secret:github-token] middle [secret:jwt] after [secret:github-token] end', `size ${size}`)
   }
 })

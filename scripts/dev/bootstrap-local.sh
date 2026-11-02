@@ -129,7 +129,16 @@ if [ "$("${PSQL[@]}" -d mikka_e2e -c "SELECT obj_description('public'::regnamesp
   "${PSQL[@]}" -d mikka_e2e -c "COMMENT ON SCHEMA public IS 'mikka-bootstrap $MIGRATIONS'"
 fi
 
+# 7. Better Auth for a local server (next dev / next start): a random secret made on this machine,
+# kept in a 0600 file and never printed (the export line reads the file), and the local origin.
+AUTH_FILE="$STATE/better-auth-secret"
+if [ ! -s "$AUTH_FILE" ]; then
+  ( umask 077; od -An -tx1 -N32 /dev/urandom | tr -d ' \n' | $SUDO tee "$AUTH_FILE" >/dev/null )
+  [ -z "$SUDO" ] || $SUDO chown "$(id -u):$(id -g)" "$AUTH_FILE"
+fi
+AUTH_EXPORTS=" BETTER_AUTH_SECRET=\$(cat $AUTH_FILE) BETTER_AUTH_URL=\${BETTER_AUTH_URL:-http://localhost:3000}"
+
 log "ready"
 # Local registration limits (also the fallback in lib/abuse/signup.ts): every local signup shares one IP,
 # so the production default of 5 an hour turns browser tests into 429s.
-echo "export PATH=$NODE_DIR:\$PATH E2E_DATABASE_URL=$PRINT_URL MIKKA_DATABASE_URL=$PRINT_URL DATABASE_URL=$PRINT_URL MIKKA_TEST_DB_PORT=$PG_PORT MIKKA_LOCAL_TEST_ACCOUNTS=1$PW_EXPORTS"
+echo "export PATH=$NODE_DIR:\$PATH E2E_DATABASE_URL=$PRINT_URL MIKKA_DATABASE_URL=$PRINT_URL DATABASE_URL=$PRINT_URL MIKKA_TEST_DB_PORT=$PG_PORT MIKKA_LOCAL_TEST_ACCOUNTS=1$AUTH_EXPORTS$PW_EXPORTS"

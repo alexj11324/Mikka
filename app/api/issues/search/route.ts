@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/lib/api-auth'
+import { actAs } from '@/lib/acting-user'
 import { ActionFailureError } from '@/lib/action-error'
 import { db } from '@/lib/db'
 import { parseSearchParams, searchIssues, SearchInputError } from '@/lib/issue-search'
@@ -27,7 +28,8 @@ export async function GET(request: Request) {
   try {
     const params = parseSearchParams(new URL(request.url).searchParams)
     const context = await loadWorkspaceContext(params.workspaceId ?? undefined, session.user)
-    const result = await searchIssues(db, { userId, params, workspaceId: context.workspace.id })
+    // Inside actAs, a workspace token's scope reaches the task visibility check.
+    const result = await actAs(session.user, () => searchIssues(db, { userId, params, workspaceId: context.workspace.id }))
     return NextResponse.json(result, { headers: { 'Cache-Control': 'private, no-store' } })
   } catch (error) {
     if (error instanceof SearchInputError) return NextResponse.json({ error: error.code }, { status: 400 })
