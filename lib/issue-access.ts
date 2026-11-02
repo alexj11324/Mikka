@@ -1,6 +1,5 @@
 import 'server-only'
-import { and, eq, getTableColumns, sql } from 'drizzle-orm'
-import type { JSONContent } from '@tiptap/core'
+import { and, eq, getTableColumns } from 'drizzle-orm'
 import { z } from 'zod'
 import { ActionFailureError } from '@/lib/action-error'
 import { currentUser } from '@/lib/acting-user'
@@ -8,6 +7,7 @@ import { actingContext } from '@/lib/activity-actor'
 import { db } from '@/lib/db'
 import { issues } from '@/lib/db/schema'
 import { issueTeamAccess } from '@/lib/issue-team-access'
+import { issueAttrsContent } from '@/lib/issue-summary-columns'
 import { issueVisibility, type IssueReader } from '@/lib/issue-visibility'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 import { tokenWorkspace } from '@/lib/tokens/principal'
@@ -38,7 +38,6 @@ export async function requireIssueAccessWithoutBody(id: string) {
 }
 
 const { content: _content, ...issueColumnsWithoutBody } = getTableColumns(issues)
-const issueAttrs = sql<JSONContent>`jsonb_build_object('type', 'doc', 'attrs', ${issues.content}->'attrs')`
 
 async function findIssueForUser(reader: IssueReader, id: string, includeDeleted: boolean, executor: Pick<typeof db, 'select'> = db, withoutBody = false) {
   if (!z.uuid().safeParse(id).success) return null
@@ -49,7 +48,7 @@ async function findIssueForUser(reader: IssueReader, id: string, includeDeleted:
   const access = await issueTeamAccess(id, userId)
   const visibility = await issueVisibility(reader, includeDeleted, workspaceId, executor)
   const [row] = withoutBody
-    ? await executor.select({ issue: { ...issueColumnsWithoutBody, content: issueAttrs } }).from(issues).where(and(eq(issues.id, id), visibility.predicate)).limit(1)
+    ? await executor.select({ issue: { ...issueColumnsWithoutBody, content: issueAttrsContent } }).from(issues).where(and(eq(issues.id, id), visibility.predicate)).limit(1)
     : await executor.select({ issue: issues }).from(issues).where(and(eq(issues.id, id), visibility.predicate)).limit(1)
   if (!row || (!includeDeleted && readIssueMetadata(row.issue.content).deletedAt)) return null
   // A workspace token reads its owner's workspace tasks only in that workspace, as its task list does.

@@ -6,7 +6,8 @@ import { z } from 'zod'
 import { ActionFailureError, runAction } from '@/lib/action-error'
 import { db } from '@/lib/db'
 import { issues, issueMembers, issueVersions } from '@/lib/db/schema'
-import { requireIssueAccess } from '@/lib/issue-access'
+import { requireIssueAccess, requireIssueAccessWithoutBody } from '@/lib/issue-access'
+import { issueAttrsContent } from '@/lib/issue-summary-columns'
 import { issueVisibility } from '@/lib/issue-visibility'
 import { issueView, taskIdentifiers } from '@/lib/task-identifier-server'
 import { readIssueMetadata, withIssueMetadata, type IssueMetadata } from '@/lib/issue-metadata'
@@ -28,11 +29,12 @@ function scheduleLinearWork() {
 }
 
 export async function listIssueConnections(id: string) {
-  const { issue, user } = await requireIssueAccess(id)
+  const { issue, user } = await requireIssueAccessWithoutBody(id)
   return db.transaction(async tx => {
-  const [locked] = await tx.select().from(issues).where(eq(issues.id, id)).for('share')
+  const [locked] = await tx.select({ userId: issues.userId, scope: issues.scope, scopeVersion: issues.scopeVersion }).from(issues).where(eq(issues.id, id)).for('share')
   requireLockedIssueScope(locked, user.id, issue.scopeVersion)
-  const rows = await tx.select({ id: issues.id, ownerId: issues.userId, title: issues.title, status: issues.status, priority: issues.priority, scope: issues.scope, scopeVersion: issues.scopeVersion, revision: issues.revision, content: issues.content, createdAt: issues.createdAt }).from(issues)
+  // Only each row's metadata is used: read the body's attrs, never every task's whole body.
+  const rows = await tx.select({ id: issues.id, ownerId: issues.userId, title: issues.title, status: issues.status, priority: issues.priority, scope: issues.scope, scopeVersion: issues.scopeVersion, revision: issues.revision, content: issueAttrsContent, createdAt: issues.createdAt }).from(issues)
     .leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, user.id)))
     .where(and(eq(issues.userId, issue.userId), (await issueVisibility(user.id)).predicate)).orderBy(desc(issues.updatedAt))
   const live = rows.filter(row => !readIssueMetadata(row.content).deletedAt)
