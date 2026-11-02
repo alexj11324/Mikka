@@ -68,7 +68,7 @@ if (!execute) {
   console.log(JSON.stringify({ ...plan, inferencePerformed: false, requires: 'existing authorized AI_GATEWAY_API_KEY injection and known existing budget; no secret lookup' }))
 } else {
   assert.ok(process.env.AI_GATEWAY_API_KEY, 'No authorized existing decision key injected')
-  assert.ok(!process.env.MIKKA_AGENT_KIT_LIVE_EVAL && !process.env.MIKKA_NATIVE_COORDINATOR, 'Keep live-eval and native Coordinator unset')
+  assert.ok(!process.env.MIKKA_AGENT_KIT_LIVE_EVAL, 'Keep live-eval unset')
   const actualFetch = globalThis.fetch
   const transport = []
   const generations = new Set(), executions = new Set()

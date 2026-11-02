@@ -156,7 +156,7 @@ Required next acceptance is a fixed-source isolated runtime with an existing,
 authorized model injection and known usage budget, actual synthetic pixels,
 provider generation/usage evidence, and verification of pending/retry/delivery
 against the real database. A synthetic transport test alone cannot complete it.
-`MIKKA_AGENT_KIT_LIVE_EVAL` and `MIKKA_NATIVE_COORDINATOR` remain unset/off.
+`MIKKA_AGENT_KIT_LIVE_EVAL` remains unset/off.
 
 Group-specific correction helpers in `group-routing.ts` belong to #166; issue
 scope, admission, Factory/monitor and publication owners retain their files.
