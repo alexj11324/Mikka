@@ -33,6 +33,7 @@ stub('../../workflows/coordinator/steps.ts',{
  assertScheduleRead:async(...args:unknown[])=>{record('authorize')(...args);if(denied)throw new Error('scheduleReadAuthorityLost')},
  completeScheduleRead:async(...args:unknown[])=>{record('complete')(...args);return 7},
  writeStreamPart:async(...args:unknown[])=>{record('stream')(...args)},
+ logTurnTiming:async(...args:unknown[])=>{record('timing')(...args)},
  failScheduleRead:async(...args:unknown[])=>{record('scheduleFailed')(...args)},
  appendMessages:async()=>{throw new Error('Scheduled results must use fenced occurrence publication')},
  failTurn:async()=>{},

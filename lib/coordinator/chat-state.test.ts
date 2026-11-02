@@ -49,3 +49,21 @@ test('background and handoff inbox rows stay quiet, and completed turns retain e
   assert.deepEqual(coordinatorChatState({ leaseHolder: null, leaseUntil: null, lastError: 'turn_failed' }, [], now), { working: false, error: 'turn_failed' })
   assert.deepEqual(coordinatorChatState(undefined, [], now), { working: false, error: null })
 })
+
+test('once the turn holding the lease has stored its reply, the chat is no longer working', () => {
+  const turn = { leaseHolder: 'wrun_turn', leaseUntil: future, lastError: null }
+  // After the reply is stored the workflow still finishes the execution, decides a phone push and releases the lease.
+  assert.deepEqual(coordinatorChatState(turn, [], now, { role: 'assistant', streamId: 'wrun_turn:0' }), { working: false, error: null })
+  assert.deepEqual(coordinatorChatState(turn, [], now, { role: 'assistant', streamId: 'wrun_turn:2' }), { working: false, error: null }, 'any round of this turn')
+  // Still answering: the last stored message is the person's, or a reply from an earlier turn.
+  assert.equal(coordinatorChatState(turn, [], now, { role: 'user' }).working, true)
+  assert.equal(coordinatorChatState(turn, [], now, { role: 'assistant', streamId: 'wrun_earlier:0' }).working, true)
+  assert.equal(coordinatorChatState(turn, [], now, { role: 'assistant' }).working, true, 'a reply with no stream id is not this turn\'s')
+  assert.equal(coordinatorChatState(turn, [], now, { role: 'tool', streamId: 'wrun_turn:0' }).working, true, 'tool output is not a finished reply')
+  assert.equal(coordinatorChatState(turn, [], now).working, true)
+  // A message sent meanwhile is waiting for the next round: that is work still to come.
+  assert.equal(coordinatorChatState(turn, [event], now, { role: 'assistant', streamId: 'wrun_turn:0' }).working, true)
+  assert.equal(coordinatorChatState(turn, [{ ...event, tier: 'background' }], now, { role: 'assistant', streamId: 'wrun_turn:0' }).working, false)
+  // A finished reply keeps the turn's warning, as a released lease does.
+  assert.deepEqual(coordinatorChatState({ ...turn, lastError: 'length' }, [], now, { role: 'assistant', streamId: 'wrun_turn:0' }), { working: false, error: 'length' })
+})
