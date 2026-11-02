@@ -394,6 +394,8 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   with the mark of the Agent running it and 「<Bot> 派出」, opens in the right
   column from the window bar's button beside the globe (on a phone, the page
   header's) on any page (`?threads=all`, `?threads=<bot>` for one dispatcher);
+  while threads wait on you that button carries 等待你's hand and their count
+  (Badge warning-light, 99+ past 99), and none leaves the icon alone;
   a bot's panel keeps only the 线程 it dispatched. An open thread's header leads
   with ←, back to the list it was opened from (全部线程, a bot's 线程, the task's
   线程, the chat); Esc and the browser's back do the same; it has no status icon, the

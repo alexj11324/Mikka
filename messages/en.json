@@ -3392,6 +3392,7 @@
     "panel": {
       "label": "Right panel",
       "allThreads": "All threads",
+      "allThreadsWaiting": "All threads, {count} waiting on you",
       "tabs": "Right panel content",
       "details": "Details",
       "threads": "Threads",
