@@ -1,6 +1,6 @@
 import 'server-only'
 import type { Pool, PoolClient } from 'pg'
-import { computerPermission } from './permission'
+import { computerPermission, type ComputerPermission } from './permission'
 
 /** The existing local daemon cannot operate a Bot's cloud desktop. Keep its
  * claim serialized with Bot binding and fail closed until a cloud worker with
@@ -24,10 +24,10 @@ export async function claimLocalRun(pool: Pool, runId: string, deviceId: string,
 }
 
 /** The scoped cloud device may claim only a run bound to its owner's Bot
- * and its workspace's machine. Binding and claim use the same run row lock.
+ * and to that run's own thread machine. Binding and claim use the same run row lock.
  * A run frozen on an API key has no subscription binding (null): its key
  * was checked and recorded for it by `apiKeyForRun` before the claim. */
-export async function claimCloudRun(pool: Pool, actor: { userId: string; workspaceId: string }, runId: string, deviceId: string, leaseExpiresAt: Date, subscriptionBindingId: string | null, beforeClaim?: (tx: PoolClient) => Promise<boolean | void>, afterClaim?: (tx: PoolClient) => Promise<void>, desktop = true): Promise<{ botId: string; ownerId: string; display: string; policyVersion: number; permission: 'allow' } | null> {
+export async function claimCloudRun(pool: Pool, actor: { userId: string; workspaceId: string }, runId: string, deviceId: string, leaseExpiresAt: Date, subscriptionBindingId: string | null, beforeClaim?: (tx: PoolClient) => Promise<boolean | void>, afterClaim?: (tx: PoolClient) => Promise<void>, desktop = true): Promise<{ botId: string; ownerId: string; display: string; policyVersion: number; permission: ComputerPermission } | null> {
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
@@ -36,19 +36,18 @@ export async function claimCloudRun(pool: Pool, actor: { userId: string; workspa
     await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`computer-policy:${actor.workspaceId}`])
     if (beforeClaim && (await beforeClaim(client)) === false) { await client.query('ROLLBACK'); return null }
     const policy = (await client.query('SELECT permission,version FROM workspace_computer_policies WHERE "workspaceId"=$1', [actor.workspaceId])).rows[0]
-    const permission = computerPermission(policy?.permission)
-    if (permission !== 'allow') { await client.query('COMMIT'); return null }
+    // The workspace computer policy governs computer use only: a machine without a desktop takes
+    // repository tasks under any policy, and its claim never carries a computer grant.
+    if (desktop && computerPermission(policy?.permission) !== 'allow') { await client.query('COMMIT'); return null }
+    const permission: ComputerPermission = desktop ? 'allow' : 'deny'
     if (beforeClaim && (await beforeClaim(client)) === false) { await client.query('ROLLBACK'); return null }
     const run = (await client.query('SELECT id,"agentId" FROM agent_runs WHERE id=$1 AND "deviceId"=$2 AND "userId"=$3 AND status=$4 AND "stopRequestedAt" IS NULL FOR UPDATE', [runId, deviceId, actor.userId, 'queued'])).rows[0]
     if (!run) { await client.query('COMMIT'); return null }
-    const binding = process.env.MIKKA_CLOUD_THREAD_MACHINES === '1' ? (await client.query(`SELECT b."botId",1 AS display FROM computer_run_bindings b
+    // Every cloud thread runs on its own thread machine; the Bot's computer serves only the Bot.
+    const binding = (await client.query(`SELECT b."botId",1 AS display FROM computer_run_bindings b
       JOIN thread_machines m ON m."runId"=b."runId" AND m."workspaceId"=b."workspaceId" AND m."ownerId"=b."ownerId" AND m."deviceId"=$2
       JOIN devices dev ON dev.id=m."deviceId" AND dev."ownerId"=b."ownerId" AND dev.kind='cloud' AND dev.enabled=true
-      WHERE b."runId"=$1 AND b."workspaceId"=$3 AND b."ownerId"=$4 AND m.state IN ('starting','running')`, [runId, deviceId, actor.workspaceId, actor.userId])).rows[0] : (await client.query(`SELECT b."botId",d.display FROM computer_run_bindings b
-      JOIN cloud_machines m ON m."workspaceId"=b."workspaceId" AND m."ownerId"=b."ownerId" AND m."deviceId"=$2
-      JOIN devices dev ON dev.id=m."deviceId" AND dev."ownerId"=b."ownerId" AND dev.kind='cloud' AND dev.enabled=true
-      JOIN bot_desktops d ON d."botId"=b."botId" AND d."workspaceId"=b."workspaceId" AND d."ownerId"=b."ownerId"
-      WHERE b."runId"=$1 AND b."workspaceId"=$3 AND b."ownerId"=$4`, [runId, deviceId, actor.workspaceId, actor.userId])).rows[0]
+      WHERE b."runId"=$1 AND b."workspaceId"=$3 AND b."ownerId"=$4 AND m.state IN ('starting','running')`, [runId, deviceId, actor.workspaceId, actor.userId])).rows[0]
     if (!binding) { await client.query('COMMIT'); return null }
     // A person controlling the Bot's desktop holds runs that would use it; a machine without a desktop never does.
     const held = desktop ? await client.query(`SELECT 1 FROM bot_desktops WHERE "botId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND control='user' AND "controlUntil">now()`, [binding.botId, actor.userId, actor.workspaceId]) : null

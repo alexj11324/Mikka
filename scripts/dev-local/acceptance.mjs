@@ -127,7 +127,6 @@ async function setup() {
     // The cloud leg is explicitly selected. Enable its existing host gates
     // before starting the owned server, keeping all targets on the local DB.
     process.env.MIKKA_BYOS_ENABLED = '1'
-    process.env.MIKKA_CLOUD_THREAD_MACHINES = '1'
   }
   const origin = process.env.LOCAL_LOOP_ORIGIN ?? `http://localhost:${process.env.MIKKA_DEV_PORT ?? '3110'}`
   assert.ok(['localhost', '127.0.0.1'].includes(new URL(origin).hostname), 'Only loopback app targets are allowed')
