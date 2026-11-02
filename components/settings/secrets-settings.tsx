@@ -338,7 +338,7 @@ function BulkSheet({ workspaceId, workspaceName, role, onClose, open = true, onO
           <Field>
             {/* The browser's own file button is in the browser's language; this one follows the page. */}
             <Input ref={fileInput} type="file" accept=".env,text/plain" className="hidden" tabIndex={-1} aria-hidden="true" disabled={pending} onChange={pick} />
-            <Button type="button" variant="secondary" size="sm" className="self-start" disabled={pending} onClick={() => fileInput.current?.click()}><FileUp data-icon="inline-start" />{t('pickFile')}</Button>
+            <div><Button type="button" variant="secondary" size="sm" disabled={pending} onClick={() => fileInput.current?.click()}><FileUp data-icon="inline-start" />{t('pickFile')}</Button></div>
             <FieldDescription>{t('pickFileLimit')}</FieldDescription>
           </Field>
           {preview && ('tooLarge' in preview
