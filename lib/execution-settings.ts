@@ -92,6 +92,25 @@ export class ExecutionSettings {
       },
     );
   }
+  /** The owner's connected subscriptions (any workspace); `missingOnly`: those with no catalogue for their current revision yet. */
+  async connectedSubscriptions(ownerId: string, missingOnly = false): Promise<string[]> {
+    return (await this.pool.query<{ id: string }>(
+      `SELECT id::text AS id FROM byos_connections WHERE "ownerId"=$1 AND state='connected' AND paused=false AND "removedAt" IS NULL
+       AND ($2::boolean=false OR "modelCatalog" IS NULL OR "modelCatalog"->>'revision'<>epoch::text) ORDER BY id`,
+      [ownerId, missingOnly])).rows.map((row) => row.id);
+  }
+  /**
+   * A subscription's models reach the menu, 允许使用的模型 and dispatch only through its catalogue.
+   * Each connected subscription with none for its current revision asks its account once; one that
+   * does not answer in time is asked again on the next read. Never throws.
+   */
+  async ensureCatalogues(scope: ExecutionSettingsScope, timeoutMs = 8000, discover?: (ownerId: string, connectionId: string) => Promise<{id: string; name?: string}[]>) {
+    const missing = await this.connectedSubscriptions(scope.ownerId, true);
+    await Promise.allSettled(missing.map((connectionId) => Promise.race([
+      this.refreshBotModels(scope, connectionId, discover),
+      new Promise((resolve) => setTimeout(resolve, timeoutMs).unref?.()),
+    ])));
+  }
   async refreshBotModels(scope: ExecutionSettingsScope, connectionId: string, discover?: (ownerId: string, connectionId: string) => Promise<{id: string; name?: string}[]>) {
     if (!z.uuid().safeParse(connectionId).success) throw new ActionFailureError("executionAccountUnavailable");
     const connection = (await this.pool.query(

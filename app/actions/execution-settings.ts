@@ -31,7 +31,10 @@ async function chatScope(chatBot: string | null) {
 /** The composer's model menu for a bot, or the Coordinator (`null`). */
 export async function getBotModelMenu(chatBot: string | null) {
   const { botId, scope } = await chatScope(chatBot);
-  return botModelMenu(pool, new ExecutionSettings(pool), scope, botId);
+  const settings = new ExecutionSettings(pool);
+  // A subscription never asked for its models has none to list: ask it before reading the menu.
+  await settings.ensureCatalogues(scope);
+  return botModelMenu(pool, settings, scope, botId);
 }
 /** 刷新模型列表: re-reads what this person can use here, after asking each subscription for its models. */
 export async function refreshBotModelMenuAction(chatBot: string | null) {

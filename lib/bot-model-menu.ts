@@ -192,19 +192,20 @@ async function connectionQuota(pool: Pick<Pool, "query">, connectionId: string) 
 }
 
 /**
- * 刷新模型列表: asks each subscription the menu lists for its current models
+ * 刷新模型列表: asks each connected subscription for its current models
  * (`refreshBotModels`), then reads the menu again, so a new subscription, a
  * renewed quota or a new model shows at once. A provider that does not answer
  * in time keeps its last catalogue; the menu is still re-read.
  */
 export async function refreshBotModelMenu(
   pool: Pick<Pool, "query">,
-  settings: Pick<ExecutionSettings, "botModels" | "botBinding" | "refreshBotModels">,
+  settings: Pick<ExecutionSettings, "botModels" | "botBinding" | "refreshBotModels" | "connectedSubscriptions">,
   scope: ExecutionSettingsScope,
   botId: string | null,
   timeoutMs = 8000,
 ): Promise<BotModelMenu> {
-  const connections = [...new Set((await settings.botModels(scope)).map((row) => String(row.connectionId)))];
+  // Every connected subscription, not only those already listed: one never asked has no models to list yet.
+  const connections = await settings.connectedSubscriptions(scope.ownerId);
   await Promise.allSettled(
     connections.map((connectionId) =>
       Promise.race([

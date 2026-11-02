@@ -1,6 +1,7 @@
 'use server'
 
 import { pool } from '@/lib/db'
+import { ExecutionSettings } from '@/lib/execution-settings'
 import { requireUser } from '@/lib/issue-access'
 import { changeOrder, orderView, type OrderChange, type OrderView } from '@/lib/model-order'
 import { loadWorkspaceContext } from '@/lib/workspace-access'
@@ -16,7 +17,12 @@ async function scope(workspaceId?: string) {
 }
 
 export async function getModelOrder(workspaceId?: string): Promise<SettingsActionResult<OrderView>> {
-  return settingsWorkspaceAction(async () => orderView(pool, await scope(workspaceId)))
+  return settingsWorkspaceAction(async () => {
+    const target = await scope(workspaceId)
+    // A subscription never asked for its models has no candidates yet: ask it before reading the list.
+    await new ExecutionSettings(pool).ensureCatalogues(target)
+    return orderView(pool, target)
+  })
 }
 
 /** One change (add, remove, reorder, 运行位置); the page gets the list back as saved. */
