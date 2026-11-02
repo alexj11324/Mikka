@@ -2491,7 +2491,8 @@
         "openai": "OpenAI"
       },
       "protocolAgents": "{protocols} protocol · runs on {agents}",
-      "customAgents": "Pick a protocol to see which Agent runs it"
+      "customAgents": "Pick a protocol to see which Agent runs it",
+      "noResponsesApi": "{protocol} protocol · No Responses API · Codex can't use it"
     },
     "modelOrder": {
       "title": "Allowed models",

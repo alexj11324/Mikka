@@ -88,9 +88,30 @@ export async function verifyApiKey(target: { modelsUrl: string; auth: ApiKeyProt
   } catch { return { ok: false, code: 'unavailable' } }
 }
 
-interface Row { id: string; ownerId: string; provider: ApiKeyProvider; name: string | null; baseUrl: string | null; protocol: ApiKeyProtocol; last4: string; models: string[]; modelsError: ApiKeyView['modelsError'] }
-const COLUMNS = 'id,"ownerId",provider,name,"baseUrl",protocol,last4,models,"modelsError"'
-const view = (row: Row): ApiKeyView => ({ id: row.id, provider: row.provider, name: row.name, baseUrl: row.baseUrl, protocol: row.protocol, last4: row.last4, models: row.models, modelsError: row.modelsError ?? null })
+/**
+ * Whether an OpenAI-protocol endpoint serves the Responses API, which Codex
+ * runs on: POST {base}/responses with an empty body. A server that has it
+ * refuses the body (400, no model asked, nothing billed); one that does not
+ * has no such route (404/405/501). Anything else, a timeout included, is not
+ * an answer: null, and the caller keeps what it knew.
+ */
+export async function probeResponsesApi(baseUrl: string, apiKey: string, fetchImpl: typeof fetch = fetch): Promise<boolean | null> {
+  try {
+    const response = await fetchImpl(`${baseUrl.replace(/\/+$/, '')}/responses`, {
+      method: 'POST', body: '{}', headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json', accept: 'application/json' },
+      redirect: 'manual', signal: AbortSignal.timeout(10_000), cache: 'no-store',
+    })
+    void response.body?.cancel().catch(() => {})
+    if ([404, 405, 501].includes(response.status)) return false
+    return response.status >= 400 && response.status < 500 ? true : null
+  } catch { return null }
+}
+
+interface Row { id: string; ownerId: string; provider: ApiKeyProvider; name: string | null; baseUrl: string | null; protocol: ApiKeyProtocol; last4: string; models: string[]; modelsError: ApiKeyView['modelsError']; responsesApi: boolean }
+const COLUMNS = 'id,"ownerId",provider,name,"baseUrl",protocol,last4,models,"modelsError","responsesApi"'
+const view = (row: Row): ApiKeyView => ({ id: row.id, provider: row.provider, name: row.name, baseUrl: row.baseUrl, protocol: row.protocol, last4: row.last4, models: row.models, modelsError: row.modelsError ?? null, responsesApi: row.responsesApi })
+/** Only a custom OpenAI-protocol provider is probed; the presets' endpoints serve the Responses API. */
+const probed = (row: Pick<Row, 'provider' | 'protocol' | 'baseUrl'>) => row.provider === 'custom' && row.protocol === 'openai' && row.baseUrl
 
 /** Where a key's models are listed: the preset's list, or the custom provider's by its protocol. */
 function modelsTarget(row: Pick<Row, 'provider' | 'baseUrl' | 'protocol'>): { modelsUrl: string; auth: ApiKeyProtocol } {
@@ -143,11 +164,13 @@ export async function addApiKey(query: Query, ownerId: string, input: unknown, o
   if (!result.ok) throw new WorkspaceError(result.code === 'invalid' ? 'apiKeyInvalid' : 'apiKeyUnverifiable')
   // A custom provider's own list, when given, is what its models are; otherwise what the provider listed.
   const models = custom?.models?.length ? [...new Set(custom.models)] : result.models
-  const { rows: [row] } = await query.query<Row>(`INSERT INTO model_api_keys (id,"ownerId",provider,name,"baseUrl",protocol,ciphertext,iv,"keyVersion",last4,models)
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb)
-    ON CONFLICT (id) DO UPDATE SET ciphertext=EXCLUDED.ciphertext,iv=EXCLUDED.iv,"keyVersion"=EXCLUDED."keyVersion",last4=EXCLUDED.last4,models=EXCLUDED.models,"modelsError"=NULL,"updatedAt"=now()
+  // Saved either way: without the Responses API the key still serves bot chats.
+  const responsesApi = probed({ provider: parsed.provider, protocol, baseUrl }) ? await probeResponsesApi(baseUrl!, parsed.apiKey, options.fetch) ?? true : true
+  const { rows: [row] } = await query.query<Row>(`INSERT INTO model_api_keys (id,"ownerId",provider,name,"baseUrl",protocol,ciphertext,iv,"keyVersion",last4,models,"responsesApi")
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12)
+    ON CONFLICT (id) DO UPDATE SET ciphertext=EXCLUDED.ciphertext,iv=EXCLUDED.iv,"keyVersion"=EXCLUDED."keyVersion",last4=EXCLUDED.last4,models=EXCLUDED.models,"modelsError"=NULL,"responsesApi"=EXCLUDED."responsesApi","updatedAt"=now()
     RETURNING ${COLUMNS}`,
-  [id, ownerId, parsed.provider, custom?.name ?? null, baseUrl, protocol, sealed.ciphertext, sealed.iv, sealed.keyVersion, parsed.apiKey.slice(-4), JSON.stringify(models)])
+  [id, ownerId, parsed.provider, custom?.name ?? null, baseUrl, protocol, sealed.ciphertext, sealed.iv, sealed.keyVersion, parsed.apiKey.slice(-4), JSON.stringify(models), responsesApi])
   return view(row)
 }
 
@@ -167,8 +190,10 @@ export async function refreshApiKeyModels(query: Query, ownerId: string, id: str
   const reachable = row.provider !== 'custom' || await checkBaseUrl(row.baseUrl!, env, options.resolve).then(() => true, () => false)
   const result: ApiKeyVerifyResult = reachable ? await verifyApiKey(modelsTarget(row), apiKey, options.fetch) : { ok: false, code: 'unavailable' }
   const models = result.ok ? (result.models.length || row.provider !== 'custom' ? result.models : row.models) : row.models
-  const { rows: [saved] } = await query.query<Row>(`UPDATE model_api_keys SET models=$3::jsonb,"modelsError"=$4,"updatedAt"=now() WHERE id=$1 AND "ownerId"=$2 RETURNING ${COLUMNS}`,
-    [id, ownerId, JSON.stringify(models), result.ok ? null : result.code])
+  // Asked again too: the provider may have added (or dropped) the Responses API since.
+  const responsesApi = result.ok && probed(row) ? await probeResponsesApi(row.baseUrl!, apiKey, options.fetch) ?? row.responsesApi : row.responsesApi
+  const { rows: [saved] } = await query.query<Row>(`UPDATE model_api_keys SET models=$3::jsonb,"modelsError"=$4,"responsesApi"=$5,"updatedAt"=now() WHERE id=$1 AND "ownerId"=$2 RETURNING ${COLUMNS}`,
+    [id, ownerId, JSON.stringify(models), result.ok ? null : result.code, responsesApi])
   if (!saved) throw new WorkspaceError('apiKeyNotFound')
   return view(saved)
 }
@@ -260,8 +285,8 @@ async function openKey(query: Query, keyId: string, env: Env) {
 export interface BotApiKeyChoice { keyId: string; model: string; harnesses: ApiKeyHarness[] }
 
 export async function botApiKeyChoice(query: Query, scope: { ownerId: string; workspaceId: string }, botId: string | null): Promise<BotApiKeyChoice | undefined> {
-  const { rows: [row] } = await query.query<{ apiKeyId: string; apiKeyModel: string; provider: ApiKeyProvider; protocol: ApiKeyProtocol }>(
-    `SELECT c."apiKeyId",c."apiKeyModel",k.provider,k.protocol FROM bot_model_choices c JOIN model_api_keys k ON k.id=c."apiKeyId"
+  const { rows: [row] } = await query.query<{ apiKeyId: string; apiKeyModel: string; provider: ApiKeyProvider; protocol: ApiKeyProtocol; responsesApi: boolean }>(
+    `SELECT c."apiKeyId",c."apiKeyModel",k.provider,k.protocol,k."responsesApi" FROM bot_model_choices c JOIN model_api_keys k ON k.id=c."apiKeyId"
     WHERE c."ownerId"=$1 AND c."workspaceId"=$2 AND c."botKey"=$3`, [scope.ownerId, scope.workspaceId, botId ?? 'coordinator'])
   return row && { keyId: row.apiKeyId, model: row.apiKeyModel, harnesses: apiKeyHarnesses(row) }
 }

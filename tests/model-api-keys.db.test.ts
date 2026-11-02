@@ -42,6 +42,9 @@ test('API keys: migration replay, sealed storage, shares, picker order and run i
     const errorMigration = await readFile(new URL('../drizzle/20261102120000_model_api_key_models_error.sql', import.meta.url), 'utf8')
     await pool.query(errorMigration)
     await pool.query(errorMigration)
+    const responsesMigration = await readFile(new URL('../drizzle/20261102190000_model_api_key_responses_api.sql', import.meta.url), 'utf8')
+    await pool.query(responsesMigration)
+    await pool.query(responsesMigration)
     assert.equal(await store.apiKeyAfterQuota(pool, 'alice'), true, 'on by default')
 
     const personal = { id: randomUUID(), kind: 'personal' as const }
@@ -65,7 +68,7 @@ test('API keys: migration replay, sealed storage, shares, picker order and run i
     const secret = firstKey
     const anthropic = await store.addApiKey(pool, 'alice', { provider: 'anthropic', apiKey: secret }, { env, fetch: fetchWith(() => models(['claude-opus-5-5', 'claude-sonnet-5-5'])) })
     assert.equal(calls.at(-1)!.headers['x-api-key'], secret)
-    assert.deepEqual({ ...anthropic, id: undefined }, { id: undefined, provider: 'anthropic', name: null, baseUrl: null, protocol: 'anthropic', last4: firstKey.slice(-4), models: ['claude-opus-5-5', 'claude-sonnet-5-5'], modelsError: null })
+    assert.deepEqual({ ...anthropic, id: undefined }, { id: undefined, provider: 'anthropic', name: null, baseUrl: null, protocol: 'anthropic', last4: firstKey.slice(-4), models: ['claude-opus-5-5', 'claude-sonnet-5-5'], modelsError: null, responsesApi: true })
     const raw = (await pool.query('SELECT * FROM model_api_keys WHERE id=$1', [anthropic.id])).rows[0]
     assert.ok(!JSON.stringify(raw).includes(secret), 'stored sealed')
     // Adding the same preset again replaces the key in place.
@@ -79,7 +82,9 @@ test('API keys: migration replay, sealed storage, shares, picker order and run i
     await assert.rejects(store.addApiKey(pool, 'alice', { provider: 'custom', name: 'Internal', baseUrl: 'https://llm.internal.example/v1', protocol: 'openai', apiKey: customKey }, { env, fetch: fetchWith(() => models([])), resolve: async () => ['192.168.1.4'] }), { code: 'apiKeyBaseUrlInvalid' })
     await assert.rejects(store.addApiKey(pool, 'alice', { provider: 'custom', name: 'Local', baseUrl: 'http://127.0.0.1:9/v1', protocol: 'openai', apiKey: customKey }, { env: { ...env, MIKKA_MODEL_KEY_LOOPBACK: '1', VERCEL: '1' }, fetch: fetchWith(() => models([])) }), { code: 'apiKeyBaseUrlInvalid' })
     const gateway = await store.addApiKey(pool, 'bob', { provider: 'custom', name: 'Gateway', baseUrl: 'https://gateway.example.com/v1/', protocol: 'openai', apiKey: gatewayKey, models: ['qwen-max', 'qwen-max'] }, { env, fetch: fetchWith(() => models(['a', 'b'])), resolve: async () => ['93.184.216.34'] })
-    assert.equal(calls.at(-1)!.url, 'https://gateway.example.com/v1/models')
+    // A custom OpenAI-protocol provider is also asked whether it has the Responses API; an answer that is not a refusal changes nothing.
+    assert.deepEqual(calls.slice(-2).map(call => call.url), ['https://gateway.example.com/v1/models', 'https://gateway.example.com/v1/responses'])
+    assert.equal(gateway.responsesApi, true)
     assert.deepEqual([gateway.baseUrl, gateway.protocol, gateway.models], ['https://gateway.example.com/v1', 'openai', ['qwen-max']])
     const local = await store.addApiKey(pool, 'bob', { provider: 'custom', name: 'Local', baseUrl: 'http://127.0.0.1:8787', protocol: 'anthropic', apiKey: localKey }, { env: { ...env, MIKKA_MODEL_KEY_LOOPBACK: '1' }, fetch: fetchWith(() => models(['glm-5'])) })
     assert.equal(calls.at(-1)!.url, 'http://127.0.0.1:8787/v1/models')
@@ -190,6 +195,35 @@ test('API keys: migration replay, sealed storage, shares, picker order and run i
     await store.setApiKeyShare(pool, 'bob', team, gateway.id, true)
     await pool.query('UPDATE model_api_keys SET ciphertext=(SELECT ciphertext FROM model_api_keys WHERE id=$1), iv=(SELECT iv FROM model_api_keys WHERE id=$1) WHERE id=$2', [local.id, gateway.id])
     await assert.rejects(store.apiKeyForRun(pool, carolRun, gateway.id, 'codex', env), { code: 'apiKeyNotFound' })
+
+    // A chat-only gateway (no Responses API, which Codex runs on): the key is saved, serves bot chats, and no Agent run.
+    const chatKey = `sk-${randomUUID()}`
+    let responses = 404
+    const probes: { method?: string; body?: unknown; auth?: string }[] = []
+    const chatFetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).endsWith('/responses')) {
+        probes.push({ method: init?.method, body: init?.body, auth: (init?.headers as Record<string, string> | undefined)?.authorization })
+        return new Response('{"error":{"message":"bad request"}}', { status: responses })
+      }
+      return models(['chat-1'])
+    }) as typeof fetch
+    const chatOnly = await store.addApiKey(pool, 'alice', { provider: 'custom', name: 'Chat only', baseUrl: 'https://chat.example.com/v1', protocol: 'openai', apiKey: chatKey }, { env, fetch: chatFetch, resolve: async () => ['93.184.216.34'] })
+    assert.deepEqual(probes, [{ method: 'POST', body: '{}', auth: `Bearer ${chatKey}` }], 'one empty POST: no model is asked, so nothing is billed')
+    assert.deepEqual([chatOnly.responsesApi, chatOnly.models], [false, ['chat-1']])
+    assert.deepEqual((await store.setBotApiKeyChoice(pool, scope, null, chatOnly.id, 'chat-1')).harnesses, [], 'a bot chats on it; no thread runs on it')
+    assert.deepEqual((await store.openApiKeyForChat(pool, 'alice', team.id, chatOnly.id, env)).baseUrl, 'https://chat.example.com/v1')
+    // Its own run, so the runs above keep the keys they were handed.
+    const chatRun = randomUUID()
+    await pool.query(`INSERT INTO agent_runs (id,"userId","botId",status) VALUES ($1,'alice',$2,'running')`, [chatRun, teamBot])
+    await assert.rejects(store.apiKeyForRun(pool, chatRun, chatOnly.id, 'codex', env), { code: 'apiKeyNotFound' })
+    // 重新获取模型 asks again: a provider that says nothing keeps what was known; one that refuses the empty body has it now.
+    responses = 503
+    assert.equal((await store.refreshApiKeyModels(pool, 'alice', chatOnly.id, { env, fetch: chatFetch, resolve: async () => ['93.184.216.34'] })).responsesApi, false)
+    responses = 400
+    assert.equal((await store.refreshApiKeyModels(pool, 'alice', chatOnly.id, { env, fetch: chatFetch, resolve: async () => ['93.184.216.34'] })).responsesApi, true)
+    assert.equal((await store.apiKeyForRun(pool, chatRun, chatOnly.id, 'codex', env)).harness, 'codex')
+    await store.setBotApiKeyChoice(pool, scope, null, anthropic.id, 'claude-opus-5-5')
+    await store.removeApiKey(pool, 'alice', chatOnly.id)
 
     // A member leaving takes their shares; removing a key removes its shares.
     await store.removeMemberApiKeyShares(pool, 'bob', team.id)
