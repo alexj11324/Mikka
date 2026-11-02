@@ -15,7 +15,7 @@ const translator = (namespace: string) => {
   }
   return Object.assign(lookup, { has: () => false })
 }
-mock.module('next-intl', { namedExports: { useTranslations: translator } })
+mock.module('next-intl', { namedExports: { useLocale: () => 'zh-CN', useTranslations: translator } })
 
 let general: unknown
 let capability: unknown
@@ -28,7 +28,7 @@ const save = mock.fn(async () => ({ configured: true, lastErrorCode: null, lastE
 const unused = async () => { throw new Error('not called') }
 mock.module('@/app/actions/onboarding', { namedExports: { resetOnboarding: reset, completeOnboarding: unused } })
 mock.module('@/app/actions/workspace-settings', { namedExports: { deleteWorkspace: unused, getWorkspaceDeletionImpact: unused, getWorkspaceGeneral: unused, getWorkspaceTransferTargets: unused, transferWorkspace: unused, updateWorkspace: unused } })
-mock.module('@/app/actions/workspace-secrets', { namedExports: { createSecret: unused, deleteSecret: unused, listSecrets: unused, replaceSecret: unused, getE2BKey: unused, getE2BKeyCapability: async () => capability, saveE2BKey: save, deleteE2BKey: async () => ({ removed: true }) } })
+mock.module('@/app/actions/workspace-secrets', { namedExports: { createSecret: unused, deleteSecret: unused, importSecrets: unused, listSecrets: unused, replaceSecret: unused, getE2BKey: unused, getE2BKeyCapability: async () => capability, saveE2BKey: save, deleteE2BKey: async () => ({ removed: true }) } })
 mock.module('@/hooks/use-feature-availability', { namedExports: { useGatedFeature: () => false } })
 
 const browser = new Window({ url: 'https://mikka.example/zh-CN/settings' })
