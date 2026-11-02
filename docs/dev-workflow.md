@@ -53,6 +53,12 @@ esbuild once the workflow bundles are built (`next.config.mjs`). To check a
 change against the limit, run `next build` in an 8 GB cgroup and read
 `memory.max_usage_in_bytes`.
 
+Vercel keeps every `node_modules` and `.next/cache` between builds, up to
+1.5 GB on that machine; a bigger cache is dropped and the next build starts
+cold. The Expo app's packages (`react-native-skia` alone is ~840 MB) pushed it
+over, so `vercel.json` installs every workspace except `@mikka/mobile`, which
+the web build and typecheck do not use.
+
 ## 3. Environment
 
 One command sets up a container: `eval "$(scripts/dev/bootstrap-local.sh)"`

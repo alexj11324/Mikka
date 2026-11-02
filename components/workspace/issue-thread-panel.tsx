@@ -4,10 +4,10 @@ import { PersonAvatar } from '@/components/person-avatar'
 import { useEffect, useRef, useState } from 'react'
 import useSWR, { useSWRConfig } from 'swr'
 import { useFormatter, useTranslations } from 'next-intl'
-import { ArrowLeft, SquareKanban, X } from 'lucide-react'
+import { ArrowLeft, Square, SquareKanban, X } from 'lucide-react'
 import { getIssueThread, getThreadChanges, sendIssueThreadReply, stopRun } from '@/app/actions/agents'
 import { useActionError } from '@/lib/use-action-error'
-import { runFailureText, runIsActive, runStopTimeoutRemaining, threadItems } from '@/lib/issue-run-conversation'
+import { runFailureText, runIsActive, runIsWorking, runStopTimeoutRemaining, threadItems } from '@/lib/issue-run-conversation'
 import { ThreadSteps } from './thread-steps'
 import { threadQuestionView, type IssueThread } from '@/lib/issue-threads'
 import { ChatComposer } from '@/components/coordinator/chat-composer'
@@ -90,6 +90,8 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   const question = view?.question ?? null
   const liveRunId = view?.runId ?? runId
   const active = !!view && question !== 'resuming' && runIsActive(view.status)
+  // Only a run that is generating or running turns send into stop; one waiting for an answer sends (N1).
+  const working = active && runIsWorking(view.status)
   // Stop was asked for; the run keeps its live status until the daemon ends it.
   const requestedAt = stopAttempt ?? (data?.thread.stopRequestedAt ? new Date(data.thread.stopRequestedAt).getTime() : null)
   const stopRequested = active && (requestedAt !== null || !!view?.stopping)
@@ -98,7 +100,12 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   // A failed run says why under the stage that stopped, else at the end of the conversation.
   const failure = data ? runFailureText(data.thread.status, data.thread.error) : null
   const failedStagesId = failure ? [...items].reverse().find(item => item.kind === 'stages' && item.stages.some(stage => !stage.ok))?.id : undefined
-  const failureLine = failure && <p className="line-clamp-2 text-xs break-words text-destructive/80" title={failure} data-slot="thread-failure">{failure}</p>
+  // A message to an ended thread runs it again in the same thread (R-81): 重试 is that message, one tap (N2).
+  const canRetry = !!failure && !!data?.thread.detail && data.thread.ownedByCurrentUser && !runIsActive(view?.status ?? '')
+  const failureLine = failure && <div className="flex items-start gap-2" data-slot="thread-failure">
+    <p className="line-clamp-2 min-w-0 flex-1 text-xs break-words text-destructive/80" title={failure}>{failure}</p>
+    {canRetry && <Button variant="outline" size="xs" className="shrink-0 pointer-coarse:h-11" disabled={sending} onClick={() => { void send(t('retry')) }}>{t('retry')}</Button>}
+  </div>
   useEffect(() => {
     if (!active || requestedAt === null) return
     const timer = setTimeout(() => setStopFailed(true), runStopTimeoutRemaining(requestedAt))
@@ -110,14 +117,15 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
     // Acknowledgement updates the task's thread list as soon as this panel sees it.
     void mutateCache(['issue-threads', issueId])
   }, [issueId, view?.status, view?.stopping, question, mutateCache])
-  async function send() {
-    const text = draft.trim()
+  async function send(retry?: string) {
+    const text = retry ?? draft.trim()
     if (!text || sending || stopRequested || question === 'resuming') return
     setSending(true); setSendFailed(false)
     try {
       const result = await sendIssueThreadReply({ issueId, runId: liveRunId, text })
       if (result.error) { setSendFailed(actionError(result.error)); return }
-      setDraft(current => current.trim() === text ? '' : current); void mutate()
+      if (retry === undefined) setDraft(current => current.trim() === text ? '' : current)
+      void mutate(); void mutateCache(['issue-threads', issueId])
     }
     catch { setSendFailed(t('sendFailed')) }
     finally { setSending(false) }
@@ -138,6 +146,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
       }
     }
   }
+  const canStop = active && !!data?.thread.ownedByCurrentUser && !sending && !stopPending
   const title = listedName || (detail?.name ?? t('title'))
   // Esc inside the thread is ←; in its composer or another field it only leaves the field (decision 0301). A window opened from it keeps its own Esc.
   return <section aria-label={title} className="flex h-full min-h-0 flex-col" onKeyDown={bare || !onBack ? undefined : event => closeOnEscape(event, headingRef.current, onBack)}>
@@ -146,6 +155,8 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
       <h2 ref={headingRef} tabIndex={-1} className={cn('min-w-0 truncate text-sm font-semibold outline-none', !acceptance && 'flex-1')}>{title}</h2>
       {acceptance && <><AcceptanceStateBadge task={acceptance} /><span className="flex-1" /></>}
       <ThreadArtifacts runId={runId} status={data?.thread.status ?? ''} />
+      {/* Stop lives here for every live run, also one waiting for an answer, whose composer button sends. */}
+      {canStop && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className="shrink-0 text-muted-foreground" aria-label={t('stop')} data-slot="thread-stop" onClick={() => { void stop() }} />}><Square data-icon="inline-start" className="fill-current" /></TooltipTrigger><TooltipContent side="bottom">{t('stop')}</TooltipContent></Tooltip>}
       {onOpenTask && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className="shrink-0 text-muted-foreground" aria-label={t('openTask')} onClick={onOpenTask} />}><SquareKanban data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{t('openTask')}</TooltipContent></Tooltip>}
       {/* Frame 06 draws the machine in the wide centre-column header; the side panel has no room for it. */}
       {acceptance && !hasChanges && <Tabs value={tab} onValueChange={value => setTab(value as ThreadTab)} className="shrink-0 max-sm:order-last max-sm:w-full">
@@ -210,7 +221,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
     {detail && <div data-slot="thread-composer" className="flex shrink-0 flex-col gap-1 p-3">
       {/* Keep the draft editable while stop waits for the daemon; do not queue new work after stop. */}
       <ChatComposer ref={inputRef} label={t('composer', { agent: harnessLabel(detail.harness) })} value={draft} onChange={setDraft} onSubmit={() => { void send() }}
-        sending={sending || stopPending} editableWhileSending submitDisabled={stopRequested || question === 'resuming'} running={active || question === 'resuming'} thread onStop={active && data.thread.ownedByCurrentUser && !sending && !stopPending ? () => { void stop() } : undefined} />
+        sending={sending || stopPending} editableWhileSending submitDisabled={stopRequested || question === 'resuming'} running={working || question === 'resuming'} thread onStop={working && canStop ? () => { void stop() } : undefined} />
       {sendFailed && <FieldError className="px-3 text-xs">{sendFailed}</FieldError>}
       {stopFailed && <div role="alert" className="flex items-center gap-2 px-3 text-xs"><span className="text-destructive">{t('stopFailed')}</span><Button variant="ghost" size="sm" className="min-w-22 max-sm:h-11" onClick={() => { void stop() }}>{t('retryStop')}</Button></div>}
     </div>}
