@@ -3249,6 +3249,7 @@
     "needsModelNamedAgent": "{device} doesn't have {agent}",
     "needsModelNamedUpdate": "{device}'s Mikka needs an update",
     "needsModelNotOffered": "No subscription or key runs {model} on {agent}",
+    "needsModelAgentNotOffered": "No subscription or key runs {agent}",
     "needsModelPickedNoDevice": "No computer can run {model} on {agent}",
     "needsModelPickedUnavailable": "{model} on {agent} is unavailable right now",
     "needsModelSettings": "Open Models and subscriptions",
