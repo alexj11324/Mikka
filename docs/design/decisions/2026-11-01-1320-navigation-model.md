@@ -6,6 +6,7 @@
   严查页面跳转的问题：到底哪个路径应该在哪里，页面应该怎么样去跳转。」 On the
   audit's four questions: 「那你就按照建议的来」.
 - Rule: R-82 (new), R-66 (desktop half rewritten)
+- Superseded in part by: decisions/2026-11-02-0310-all-threads-from-the-window-bar.md (全部线程 leaves the right panel)
 - Replaces: decisions.md 2026-10-25 「clicking it opens the thread conversation
   in the centre, ‹ Coordinator goes back」; R-66's 「on desktop the centre
   column switches to it」

@@ -53,6 +53,8 @@ export type WorkspaceLocation = {
   issue: string | null
   /** The thread (its run id) open in the right column, beside whatever is in the centre (R-82). */
   thread: string | null
+  /** 全部线程 in the right column: 'all', or one bot's id when filtered to it. It stays open as the centre changes. */
+  threads: string | null
 }
 
 export function readLocation(params: URLSearchParams): WorkspaceLocation {
@@ -60,16 +62,18 @@ export function readLocation(params: URLSearchParams): WorkspaceLocation {
   const bot = params.get('bot')
   const issue = params.get('issue')
   const thread = params.get('thread')
+  const threads = params.get('threads')
   return {
     section,
     bot: section === 'coordinator' && bot && UUID.test(bot) ? bot : null,
     issue: issue && UUID.test(issue) ? issue : null,
     thread: thread && UUID.test(thread) ? thread : null,
+    threads: threads === 'all' || (threads && UUID.test(threads)) ? threads : null,
   }
 }
 
 export function sameLocation(a: WorkspaceLocation, b: WorkspaceLocation) {
-  return a.section === b.section && a.bot === b.bot && a.issue === b.issue && a.thread === b.thread
+  return a.section === b.section && a.bot === b.bot && a.issue === b.issue && a.thread === b.thread && a.threads === b.threads
 }
 
 /** The address with `change` applied to `current`; query keys this file does not own are kept. */
@@ -90,6 +94,8 @@ export function workspaceHref(current: URL, change: Partial<WorkspaceLocation>):
   else params.delete('issue')
   if (next.thread) params.set('thread', next.thread)
   else params.delete('thread')
+  if (next.threads) params.set('threads', next.threads)
+  else params.delete('threads')
   return `${url.pathname}${url.search}${url.hash}`
 }
 
@@ -177,12 +183,39 @@ export function navigate(change: Partial<WorkspaceLocation>, mode: 'push' | 'rep
   window.dispatchEvent(new Event(NAVIGATE_EVENT))
 }
 
-/** Opens a thread in the right column beside what is in the centre (R-82). */
-export function openThread(runId: string) {
-  navigate({ thread: runId })
+/** The entry openThread pushed: the thread it opened and the address it was opened from. */
+type OpenedThread = { runId: string; from: string }
+const OPENED = 'mikkaOpenedThread'
+
+function here() {
+  return `${window.location.pathname}${window.location.search}${window.location.hash}`
 }
 
-/** Closes the open thread; the right column shows 概览 again. */
+/** Opens a thread in the right column beside what is in the centre (R-82). */
+export function openThread(runId: string) {
+  const from = here()
+  goTo({ thread: runId })
+  // Remembers where it came from, so ← steps back to that list as the browser's back does.
+  window.history.replaceState({ ...window.history.state, [OPENED]: { runId, from } satisfies OpenedThread }, '', here())
+  window.dispatchEvent(new Event(NAVIGATE_EVENT))
+}
+
+/**
+ * ← in an open thread: back to the list it was opened from (全部线程, the bot's
+ * 线程, the chat), the same step as the browser's back. A thread opened from
+ * its address alone has no step to go back to, so its list replaces it.
+ */
 export function closeThread() {
-  navigate({ thread: null })
+  const opened = (window.history.state as Record<string, unknown> | null)?.[OPENED] as OpenedThread | undefined
+  const current = readLocation(new URL(window.location.href).searchParams).thread
+  if (opened && opened.runId === current && opened.from === workspaceHref(new URL(window.location.href), { thread: null })) {
+    window.history.back()
+    return
+  }
+  navigate({ thread: null }, 'replace')
+}
+
+/** Opens 全部线程 in the right column, or closes it with any thread open over it. */
+export function toggleAllThreads(open: boolean) {
+  navigate(open ? { threads: 'all', thread: null } : { threads: null, thread: null })
 }

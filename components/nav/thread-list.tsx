@@ -59,7 +59,8 @@ function WaitingChip({ waiting }: { waiting: NonNullable<ThreadView['waitingFor'
  * its newest; past the first, the line opens with 第 N 次尝试, and the task's
  * page lists them all. In 全部线程 the mark of the Agent running it (R-78; a
  * neutral thread mark when unknown, never the bot's avatar) and the last
- * activity sit beside the name. The whole card opens the thread's own
+ * activity sit beside the name, and the second line opens with the name of
+ * the bot that dispatched it. The whole card opens the thread's own
  * conversation, task or no task.
  */
 function ThreadRow({ thread, group, issues, all, now, onOpenThread }: { thread: ThreadRowOf<Thread>; group: ThreadGroup; issues: Issue[]; all: boolean; now: Date; onOpenThread: (thread: { issueId: string | null; runId: string }) => void }) {
@@ -80,7 +81,7 @@ function ThreadRow({ thread, group, issues, all, now, onOpenThread }: { thread: 
       </span>
       {waiting
         ? <WaitingChip waiting={waiting} />
-        : (thread.lastReply || thread.attempts > 1) && <span className="block w-full truncate text-xs text-muted-foreground">{[thread.attempts > 1 ? t('attempt', { count: thread.attempts }) : null, thread.lastReply].filter(Boolean).join(' · ')}</span>}
+        : (all || thread.lastReply || thread.attempts > 1) && <span className="block w-full truncate text-xs text-muted-foreground">{[all ? <span key="bot" data-slot="thread-bot" className="text-foreground/80">{thread.agentName}</span> : null, thread.attempts > 1 ? t('attempt', { count: thread.attempts }) : null, thread.lastReply].filter(Boolean).flatMap((part, index) => index ? [' · ', part] : [part])}</span>}
     </span>
     <ChevronRight aria-hidden="true" className="pointer-events-none relative size-4 shrink-0 text-muted-foreground" />
   </li>

@@ -25,7 +25,6 @@ import { useResizableWidth } from '@/hooks/use-resizable-width'
 import { ResizeHandle } from '@/components/ui/resizable-pane'
 
 type Issue = Awaited<ReturnType<typeof listIssues>>[number]
-type PanelView = 'overview' | 'all'
 export type PanelTab = 'details' | 'threads' | 'prs' | 'computer'
 const TABS: readonly PanelTab[] = ['details', 'threads', 'prs', 'computer']
 /** The right column's width, shared by 概览 and an open thread (R-82): one column, one remembered width. */
@@ -101,10 +100,11 @@ function ThreadResults({ threads, shown, ...props }: Omit<Parameters<typeof Thre
 export type PanelConversation = { id?: string | null; name: string; color?: string; shape?: string; kind: 'coordinator' | 'bot' | 'agent'; updatedAt?: string }
 
 /**
- * The right column beside a chat, read-only (Figma 395:27702, 445:6126). Its
- * header switches only this column: 概览 shows the bot (avatar and name) with
- * 详情 / 线程 / PR / 电脑; 全部线程 lists every bot's threads. ⤢ widens just
- * this column. Picking another bot switches its threads, PRs and computer.
+ * The right column beside a chat, read-only (Figma 395:27702, 445:6126): 概览,
+ * the bot (avatar and name) with 详情 / 线程 / PR / 电脑. 线程 is this bot's
+ * threads; every bot's threads are 全部线程, opened from the window bar on any
+ * page (R-82), so this column has no tab for them. ⤢ widens just this column.
+ * Picking another bot switches its threads, PRs and computer.
  */
 export function ContextPanel({ issues, threads, conversation, workspaceId, onOpenThread, onClose, sheet = false }: {
   issues: Issue[]
@@ -119,7 +119,6 @@ export function ContextPanel({ issues, threads, conversation, workspaceId, onOpe
   sheet?: boolean
 }) {
   const t = useTranslations('Shell.panel')
-  const [view, setView] = useState<PanelView>('overview')
   const [tab, setTab] = useState<PanelTab>('threads')
   // The header's search filters this column's lists in place (R-50); null while it is closed.
   const [query, setQuery] = useState<string | null>(null)
@@ -151,7 +150,7 @@ export function ContextPanel({ issues, threads, conversation, workspaceId, onOpe
   const computerTab = useComputerTab()
   const computer = (computerTab ? chatBotId : null) ?? (cloudComputer ? registered?.botId : undefined)
   // A conversation whose bot works on its computer opens on its screen (Figma 103:64).
-  useEffect(() => { if (registered?.runId) { setView('overview'); setTab('computer') } }, [registered?.runId])
+  useEffect(() => { if (registered?.runId) setTab('computer') }, [registered?.runId])
   // No computer here (the kill switch is on): no 电脑 tab.
   const tabs = computer ? TABS : TABS.filter(item => item !== 'computer')
   const shown = tabs.includes(tab) ? tab : 'threads'
@@ -164,12 +163,8 @@ export function ContextPanel({ issues, threads, conversation, workspaceId, onOpe
   return <aside ref={asideRef} aria-label={t('label')} className={cn('relative min-h-0 shrink-0 flex-col', sheet ? 'flex size-full' : 'hidden w-(--context-panel-width) overflow-hidden border-l bg-background xl:flex', dragging && 'select-none')}>
     {/* Drag the inner edge or use the arrow keys on it to resize the panel; double-click it to reset. */}
     {!sheet && <ResizeHandle resize={resize} label={t('resize')} edge="start" onDoubleClick={() => setBeforeWide(null)} />}
-    <Tabs value={view} onValueChange={value => setView(value as PanelView)} className={cn('min-h-0 flex-1 gap-0', !sheet && 'min-w-[var(--context-panel-width,22.5rem)]')}>
+    <div className={cn('flex min-h-0 flex-1 flex-col', !sheet && 'min-w-[var(--context-panel-width,22.5rem)]')}>
       <div className="flex h-11 shrink-0 items-center gap-1 px-3">
-        <TabsList aria-label={t('views')} className="gap-1 bg-transparent p-0">
-          <TabsTrigger value="overview" {...pillTab}>{t('overview')}</TabsTrigger>
-          <TabsTrigger value="all" {...pillTab}>{t('allThreads')}</TabsTrigger>
-        </TabsList>
         <div className="ml-auto flex items-center">
           <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label={t('search')} aria-pressed={query !== null} onClick={() => setQuery(query === null ? '' : null)} />}><Search data-icon="inline-start" /></TooltipTrigger><TooltipContent>{t('search')}</TooltipContent></Tooltip>
           <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label={wide ? t('narrow') : t('widen')} aria-pressed={wide} className={cn(sheet && 'hidden')} onClick={toggleWide} />}>{wide ? <Minimize2 data-icon="inline-start" /> : <Maximize2 data-icon="inline-start" />}</TooltipTrigger><TooltipContent>{wide ? t('narrow') : t('widen')}</TooltipContent></Tooltip>
@@ -179,8 +174,7 @@ export function ContextPanel({ issues, threads, conversation, workspaceId, onOpe
       {query !== null && <div className="shrink-0 px-3 pb-2">
         <SearchInput autoFocus aria-label={t('search')} placeholder={t('search')} value={query} onChange={event => setQuery(event.target.value)} onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); setQuery(null) } }} />
       </div>}
-      <TabsContent value="overview" className="flex min-h-0 flex-col">
-        <Tabs value={shown} onValueChange={value => setTab(value as PanelTab)} className="min-h-0 flex-1 gap-0">
+      <Tabs value={shown} onValueChange={value => setTab(value as PanelTab)} className="min-h-0 flex-1 gap-0">
           <div className="flex shrink-0 flex-col items-center gap-3 px-4 pt-9 pb-4">
             {/* A bot's name and look are edited in place; the Coordinator keeps its own. */}
             {botId ? <BotLookEditor botId={botId} name={conversation.name} color={conversation.color} shape={conversation.shape} />
@@ -204,10 +198,6 @@ export function ContextPanel({ issues, threads, conversation, workspaceId, onOpe
             {chatBotId ? <AgentComputer botId={chatBotId} name={conversation.name} header={false} workspaceId={workspaceId} /> : registered && <AgentComputer key={registered.runId} botId={registered.botId} name={registered.botName} header={false} workspaceId={workspaceId} />}
           </TabsContent>}
         </Tabs>
-      </TabsContent>
-      <TabsContent value="all" className="min-h-0 overflow-y-auto px-4 py-3">
-        <ThreadResults threads={threads} shown={filter(threads)} issues={issues} all onOpenThread={onOpenThread} />
-      </TabsContent>
-    </Tabs>
+    </div>
   </aside>
 }

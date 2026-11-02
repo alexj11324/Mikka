@@ -354,8 +354,16 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   bot that dispatched it; a task as its own page in the centre, as Linear; an
   Artifact in its window over the page (R-56); PRs and web pages in a new
   tab. Projects and teams live under 看板, with no rail item of their own. On
-  a phone the right column is a page pushed over the chat. Source: Alex,
-  2026-11-01 ([decision](decisions/2026-11-01-1320-navigation-model.md)).
+  a phone the right column is a page pushed over the chat. 全部线程, every
+  bot's threads in R-52's groups, each row naming its bot, opens in the right
+  column from the window bar's button beside the globe (on a phone, the page
+  header's) on any page (`?threads=all`, `?threads=<bot>` filtered); a bot's
+  panel keeps only that bot's 线程. An open thread's header leads with ←, back
+  to the list it was opened from (全部线程, the bot's 线程, the task's 线程, the
+  chat); Esc and the browser's back do the same; it has no status icon, the
+  badge under it says the state. Source: Alex, 2026-11-01
+  ([decision](decisions/2026-11-01-1320-navigation-model.md)), 2026-11-02
+  ([decision](decisions/2026-11-02-0310-all-threads-from-the-window-bar.md)).
 
 ## Settings
 

@@ -27,19 +27,21 @@ test('unknown or missing sections open the chat; older ?section=coordinator link
   assert.equal(sectionFromQuery(undefined), 'coordinator')
   assert.equal(sectionFromQuery('team-home'), 'coordinator')
   assert.equal(sectionFromQuery('projects'), 'projects')
-  assert.deepEqual(readLocation(new URLSearchParams(`section=coordinator&bot=${BOT}`)), { section: 'coordinator', bot: BOT, issue: null, thread: null })
+  assert.deepEqual(readLocation(new URLSearchParams(`section=coordinator&bot=${BOT}`)), { section: 'coordinator', bot: BOT, issue: null, thread: null, threads: null })
 })
 
 test('an address reads back as the place it was written for', () => {
   for (const place of [
-    { section: 'coordinator', bot: null, issue: null, thread: null },
-    { section: 'coordinator', bot: BOT, issue: null, thread: null },
-    { section: 'coordinator', bot: BOT, issue: ISSUE, thread: null },
-    { section: 'coordinator', bot: null, issue: null, thread: RUN },
-    { section: 'coordinator', bot: BOT, issue: ISSUE, thread: RUN },
-    { section: 'all-issues', bot: null, issue: ISSUE, thread: null },
-    { section: 'artifacts', bot: null, issue: null, thread: RUN },
-    { section: 'projects', bot: null, issue: null, thread: null },
+    { section: 'coordinator', bot: null, issue: null, thread: null, threads: null },
+    { section: 'coordinator', bot: BOT, issue: null, thread: null, threads: null },
+    { section: 'coordinator', bot: BOT, issue: ISSUE, thread: null, threads: null },
+    { section: 'coordinator', bot: null, issue: null, thread: RUN, threads: null },
+    { section: 'coordinator', bot: BOT, issue: ISSUE, thread: RUN, threads: null },
+    { section: 'all-issues', bot: null, issue: ISSUE, thread: null, threads: null },
+    { section: 'artifacts', bot: null, issue: null, thread: RUN, threads: null },
+    { section: 'projects', bot: null, issue: null, thread: null, threads: null },
+    { section: 'coordinator', bot: null, issue: null, thread: null, threads: 'all' },
+    { section: 'all-issues', bot: null, issue: ISSUE, thread: RUN, threads: BOT },
   ] as const) {
     const href = workspaceHref(at('/mikka/zh-CN'), place)
     assert.ok(href.startsWith('/mikka/zh-CN'), href)
@@ -60,7 +62,7 @@ test('a new place drops the plugins page\'s app and category; keys this file doe
 })
 
 test('ids that are not UUIDs are not places', () => {
-  assert.deepEqual(readLocation(new URLSearchParams('issue=../x&bot=nope')), { section: 'coordinator', bot: null, issue: null, thread: null })
+  assert.deepEqual(readLocation(new URLSearchParams('issue=../x&bot=nope')), { section: 'coordinator', bot: null, issue: null, thread: null, threads: null })
 })
 
 test('links built from nothing', () => {
@@ -78,4 +80,14 @@ test('a thread sits beside its centre: a new centre closes it unless the move na
   assert.equal(workspaceHref(chatWithThread, { thread: null }), `/mikka?bot=${BOT}`)
   assert.equal(workspaceHref(at('/mikka'), { thread: RUN }), `/mikka?thread=${RUN}`)
   assert.equal(readLocation(new URLSearchParams('thread=nope')).thread, null)
+})
+
+test('全部线程 stays open as the centre changes; a thread opened over it closes with a new centre', () => {
+  const list = at(`/mikka?threads=all&thread=${RUN}`)
+  assert.equal(workspaceHref(list, { section: 'all-issues' }), '/mikka?threads=all&section=all-issues')
+  assert.equal(workspaceHref(list, { thread: null }), '/mikka?threads=all')
+  assert.equal(workspaceHref(at('/mikka?threads=all'), { threads: BOT }), `/mikka?threads=${BOT}`)
+  assert.equal(workspaceHref(list, { threads: null, thread: null }), '/mikka')
+  assert.equal(readLocation(new URLSearchParams('threads=../x')).threads, null)
+  assert.equal(readLocation(new URLSearchParams('threads=all')).threads, 'all')
 })

@@ -3221,7 +3221,8 @@
     "runInfo": {
       "paidBy": "{owner} 的 {plan}",
       "movedTo": "已换到 {machine} 继续"
-    }
+    },
+    "back": "返回"
   },
   "Computer": {
     "status": {
@@ -3365,8 +3366,6 @@
     "coordinatorPlaceholder": "问 Coordinator 或布置任务…",
     "panel": {
       "label": "右栏",
-      "views": "右栏视图",
-      "overview": "概览",
       "allThreads": "全部线程",
       "tabs": "右栏内容",
       "details": "详情",
@@ -3398,7 +3397,10 @@
       "nameTooLong": "名字最多 {max} 个字",
       "changeAvatar": "更换 {name} 的头像",
       "close": "关闭右栏",
-      "open": "打开右栏"
+      "open": "打开右栏",
+      "filterBot": "按 Bot 筛选",
+      "allBots": "全部 Bot",
+      "closeAllThreads": "关闭全部线程"
     },
     "suggestions": {
       "title": "建议",
