@@ -33,9 +33,13 @@ mac:
   gatekeeperAssess: false
   entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.plist
-  # Signs with CSC_LINK / CSC_KEY_PASSWORD. Notarization runs only when
-  # APPLE_ID + APPLE_APP_SPECIFIC_PASSWORD + APPLE_TEAM_ID (or an App Store
-  # Connect key) are present; otherwise electron-builder warns and skips it.
-  notarize: true
+  # Signs with CSC_LINK / CSC_KEY_PASSWORD. Notarization and stapling run in
+  # afterSign (scripts/notarize.mjs) so the staple can wait for Apple's ticket
+  # to propagate; it runs when APPLE_ID + APPLE_APP_SPECIFIC_PASSWORD +
+  # APPLE_TEAM_ID (or an App Store Connect key) are present, before the dmg
+  # and zip are built from the stapled app.
+  notarize: false
+
+afterSign: ./scripts/notarize.mjs
 
 artifactName: ${productName}-${version}-${os}-${arch}.${ext}

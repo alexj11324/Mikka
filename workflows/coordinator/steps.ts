@@ -135,16 +135,19 @@ export async function stoppedStepText(holder: string, streamId: string) {
 }
 
 /**
- * 订阅额度用完后，自动改用 API Key: when this turn was frozen on the person's
- * key because the subscription ran out, the chat says so before the reply.
+ * 订阅额度用完后，自动改用 API Key, or 点数不足时改用: when this turn was
+ * frozen on another model because the subscription or the points ran out,
+ * the chat says so before the reply.
  */
 export async function noteQuotaSwitch(userId: string, holder: string, runtime: { modelSelection?: unknown }, botId: string) {
   'use step'
-  const { hostedApiKeySnapshotSchema } = await import('@/lib/subscription-model-snapshot')
-  const selection = hostedApiKeySnapshotSchema.safeParse(runtime.modelSelection)
-  if (!selection.success || !selection.data.afterQuota) return
-  const { quotaSwitchMessage } = await import('@/lib/coordinator/message-safety')
-  await store.appendMessages(userId, holder, [quotaSwitchMessage(selection.data.afterQuota, new Date())], null, botId)
+  const { hostedModelSelectionSchema } = await import('@/lib/subscription-model-snapshot')
+  const selection = hostedModelSelectionSchema.safeParse(runtime.modelSelection)
+  if (!selection.success) return
+  const { quotaSwitchMessage, pointsSwitchMessage } = await import('@/lib/coordinator/message-safety')
+  // 点数不足时改用 (decision 2026-11-02-1450): Mikka 默认 had no points, this turn runs on the next allowed model.
+  if (selection.data.afterPoints) await store.appendMessages(userId, holder, [pointsSwitchMessage(selection.data.modelId, new Date())], null, botId)
+  else if (selection.data.type === 'api_key' && selection.data.afterQuota) await store.appendMessages(userId, holder, [quotaSwitchMessage(selection.data.afterQuota, new Date())], null, botId)
 }
 
 export async function writeStreamPart(writable: WritableStream<CoordinatorWorkflowStreamPart>, part: CoordinatorWorkflowStreamPart) {
@@ -178,6 +181,32 @@ export async function pushToPhones(userId: string, botId: string, text: string |
   if (reason === null) { console.warn('Phone push skipped: no Decisions answer'); return }
   if (reason !== 'none') await pushReply(userId, botId, text, [reason])
 }
+
+/**
+ * Mikka 默认 refused the turn (points used up, a card to verify, …): the web
+ * draws that on the chat, but Telegram and the phone would hear nothing. They
+ * get the same status line instead (lib/coordinator/refusal-line.ts). Any
+ * other failure, and a scheduled read, sends nothing here. Never throws: the
+ * turn's own failure is what the caller records.
+ */
+export async function noticeHostedRefusal(userId: string, botId: string, holder: string, error: string, telegramTargets: readonly PendingTelegramTarget[], pushEvents: readonly InboxEvent[]) {
+  'use step'
+  const { hostedRefusalLine, deliverRefusalLine } = await import('@/lib/coordinator/refusal-line')
+  const line = hostedRefusalLine(error)
+  if (!line) return false
+  const replies = createTelegramReplies(pool, workspacePool)
+  const { failed } = await deliverRefusalLine(line, telegramTargets, pushEvents, {
+    telegram: async (target, text) => {
+      await replies.send(userId, botId, holder, target, tx => postTelegramText(target.threadId, text, tx))
+      await replies.acknowledge(userId, botId, holder, target)
+    },
+    push: (text, events) => pushToPhones(userId, botId, text, events),
+  })
+  if (failed.length) console.error('Refusal notice failed:', failed.join(', '))
+  return true
+}
+// A sent Telegram line has no idempotency key: never replay it.
+noticeHostedRefusal.maxRetries = 0
 
 /**
  * Folds older messages into the summary once the conversation passes the
@@ -218,7 +247,9 @@ export async function preparePrompt(userId: string, botId: string, snapshot?: De
   // The person's 个人指令 sit after the rules and before the memory, marked as theirs.
   // The person's own GitHub account, so the Bot looks a repository up instead of asking which account it is under.
   const { githubContext } = await import('@/lib/coordinator/github-context')
-  return { instructions: instructionsWithMemory(await withPersonalInstructions(userId, instructions, snapshot ? snapshot.personalPlugins ?? { servers: [], skills: [] } : undefined), memory) + factoryPolicy + '\n' + SCHEDULE_INSTRUCTIONS + '\n' + await githubContext(userId), messages: promptMessages(summary, messages, summaryTrust) }
+  const { executionContext } = await import('@/lib/coordinator/execution-context')
+  const executionContextBlock = async (owner: string, bot: string) => { const text = await executionContext(owner, bot); return text ? '\n' + text : '' }
+  return { instructions: instructionsWithMemory(await withPersonalInstructions(userId, instructions, snapshot ? snapshot.personalPlugins ?? { servers: [], skills: [] } : undefined), memory) + factoryPolicy + '\n' + SCHEDULE_INSTRUCTIONS + '\n' + await githubContext(userId) + await executionContextBlock(userId, botId), messages: promptMessages(summary, messages, summaryTrust) }
 }
 
 export async function personalWriteToolsEnabled() { 'use step'; const { personalWritesEnabled } = await import('@/lib/operations/write-feature'); return personalWritesEnabled() }
@@ -370,7 +401,7 @@ export async function findRepository(userId: string, input: { name?: string }, s
  * One task, one thread (lib/thread-dispatch.ts): a task with a thread gets the dispatch as that thread's work; only
  * `newThread`, when the person's own message (`sourceEventId`, host-supplied) explicitly asked for it, starts another.
  */
-export async function dispatchRun(userId: string, input: { issueId: string; agentId?: string; repo: string; note?: string; requestKey?:string; readOnly?: boolean; newThread?: boolean; sourceEventId?: string; target?: import('@/lib/dispatch-target').DispatchTarget; model?: { harness: 'claude_code' | 'codex'; model: string } }, scope: NativeToolScope | undefined, botId: string, execution?: AgentExecution, requestEventId?: string, approvedRepositoryKey?: string) {
+export async function dispatchRun(userId: string, input: { issueId: string; agentId?: string; repo: string; note?: string; requestKey?:string; readOnly?: boolean; newThread?: boolean; sourceEventId?: string; target?: import('@/lib/dispatch-target').DispatchTarget; model?: { harness: 'claude_code' | 'codex'; model?: string } }, scope: NativeToolScope | undefined, botId: string, execution?: AgentExecution, requestEventId?: string, approvedRepositoryKey?: string) {
   'use step'
   await assertNativeToolScope(userId,scope)
   const { newThread, sourceEventId, target, ...request } = input
@@ -407,7 +438,7 @@ export async function dispatchRun(userId: string, input: { issueId: string; agen
 }
 
 /** Where a new run goes and on which model (decision 2026-11-02-1400): a named computer, else 运行位置; the model by the same rule either way. */
-async function dispatchByRules(userId: string, input: { issueId: string; agentId?: string; repo: string; note?: string; requestKey?:string; readOnly?: boolean; model?: { harness: 'claude_code' | 'codex'; model: string } }, scope: NativeToolScope | undefined, botId: string, execution?: AgentExecution, requestEventId?: string, approvedRepositoryKey?: string, place?: import('@/lib/dispatch-target').DispatchTarget) {
+async function dispatchByRules(userId: string, input: { issueId: string; agentId?: string; repo: string; note?: string; requestKey?:string; readOnly?: boolean; model?: { harness: 'claude_code' | 'codex'; model?: string } }, scope: NativeToolScope | undefined, botId: string, execution?: AgentExecution, requestEventId?: string, approvedRepositoryKey?: string, place?: import('@/lib/dispatch-target').DispatchTarget) {
   // A computer the person named: theirs, not removed, online; otherwise refused or the card at once, never another computer.
   if (place && place !== 'cloud') {
     const { targetDevice } = await import('@/lib/dispatch-target')
@@ -420,7 +451,7 @@ async function dispatchByRules(userId: string, input: { issueId: string; agentId
     if (!await issueForUser(userId, input.issueId)) throw new ActionFailureError('issueNotFound')
     const { executionWorkspace } = await import('@/lib/execution-settings')
     const { resolveModelDispatch } = await import('@/lib/model-dispatch')
-    const target = await resolveModelDispatch(pool, { ownerId: userId, workspaceId: await executionWorkspace(userId, botId), botId }, input.model ?? null, undefined, 'local', device.deviceId)
+    const target = await resolveModelDispatch(pool, { ownerId: userId, workspaceId: await executionWorkspace(userId, botId), botId }, input.model ?? null, 'local', device.deviceId)
     if (target.kind !== 'device') return { error: 'machineUnavailable' as const, issueId: input.issueId, ...(target.kind === 'none' ? { reason: target.reason, card: target.card } : {}) }
     const result = await queueRun(userId, { ...input, agentId: target.agentId, model: target.model, pinnedDeviceId: target.deviceId, ...(target.entry.source.kind === 'api_key' ? { apiKeyId: target.entry.source.keyId } : {}) }, botId, execution, requestEventId, null, approvedRepositoryKey)
     return { ...result, status: 'queued' as const }
@@ -433,7 +464,7 @@ async function dispatchByRules(userId: string, input: { issueId: string; agentId
     const { executionWorkspace } = await import('@/lib/execution-settings')
     const workspaceId = await executionWorkspace(userId, botId)
     const { resolveModelDispatch } = await import('@/lib/model-dispatch')
-    const target = await resolveModelDispatch(pool, { ownerId: userId, workspaceId, botId }, input.model ?? null, undefined, place === 'cloud' ? 'cloud' : undefined)
+    const target = await resolveModelDispatch(pool, { ownerId: userId, workspaceId, botId }, input.model ?? null, place === 'cloud' ? 'cloud' : undefined)
     if (target.kind === 'none') return { error: 'machineUnavailable' as const, issueId: input.issueId, reason: target.reason, card: target.card }
     if (target.kind === 'device') {
       const result = await queueRun(userId, { ...input, agentId: target.agentId, model: target.model, pinnedDeviceId: target.deviceId, ...(target.entry.source.kind === 'api_key' ? { apiKeyId: target.entry.source.keyId } : {}) }, botId, execution, requestEventId, null, approvedRepositoryKey)

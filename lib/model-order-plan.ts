@@ -10,7 +10,8 @@
  * refused), and the run location has a place for it. 本地: a device whose
  * 参与调度 is on, online, with the Agent installed and, for a subscription
  * model, able to take a subscription run (its daemon brokers the subscription
- * lease); one is picked at random. 云端:
+ * lease); servers before computers, then the one with the fewest unfinished
+ * runs, then the one that joined first (`pickDevice`). 云端:
  * the person's own E2B key is set. A model the person picked for the thread
  * goes before the list. Once a run starts nothing about it changes.
  */
@@ -39,6 +40,12 @@ export interface PoolDevice {
   online: boolean
   /** 参与调度: off means Mikka never sends a run here. */
   enabled: boolean
+  /** A server (deviceType server) is used before a computer. */
+  server: boolean
+  /** Its runs not yet ended: the fewest goes first among the same kind. */
+  activeRuns: number
+  /** When it joined (ms): the earlier goes first on a tie. */
+  joinedAt: number
   harnesses: readonly Pick<HarnessInfo, 'harness' | 'installed' | 'models' | 'modelSlots' | 'subscriptionBroker'>[]
 }
 
@@ -110,6 +117,20 @@ export function whyNoDevice(devices: readonly PoolDevice[], entry: OrderEntry): 
   return { why, device: best.device.name, count: staged.filter(item => item.stage === best.stage).length }
 }
 
+/**
+ * Which of the devices that can run an entry takes it (Alex, 2026-11-02): a
+ * server before a computer, then the one with the fewest unfinished runs
+ * (threads run in parallel and no machine has a cap, so this spreads them),
+ * then the one that joined first, then by id. Stable: the same devices and
+ * runs give the same device, which the settings page shows as 会先用.
+ */
+export function pickDevice<T extends { device: Pick<PoolDevice, 'id' | 'server' | 'activeRuns' | 'joinedAt'> }>(eligible: readonly T[]): T | undefined {
+  return [...eligible].sort((a, b) => Number(b.device.server) - Number(a.device.server)
+    || a.device.activeRuns - b.device.activeRuns
+    || a.device.joinedAt - b.device.joinedAt
+    || (a.device.id < b.device.id ? -1 : a.device.id > b.device.id ? 1 : 0))[0]
+}
+
 export function planDispatch(input: {
   entries: readonly OrderEntry[]
   /** The model the person picked for this thread, when they did. */
@@ -119,9 +140,7 @@ export function planDispatch(input: {
   credential: (entry: OrderEntry) => CredentialState
   /** 云端: the person's own E2B key is set and cloud runs are on. */
   cloudReady: boolean
-  random?: () => number
 }): DispatchPlan {
-  const random = input.random ?? Math.random
   const entries = input.explicit ? [input.explicit, ...input.entries.filter(entry => entry.id !== input.explicit!.id)] : [...input.entries]
   const skipped: SkippedEntry[] = []
   if (!entries.length) return { kind: 'none', reason: 'noModels', skipped }
@@ -137,7 +156,7 @@ export function planDispatch(input: {
       return model ? [{ device, model }] : []
     })
     if (!eligible.length) { skipped.push({ entry, block: { usable: false, reason: 'noDevice' } }); continue }
-    const pick = eligible[Math.min(eligible.length - 1, Math.floor(random() * eligible.length))]
+    const pick = pickDevice(eligible)!
     return { kind: 'device', entry, deviceId: pick.device.id, model: pick.model, skipped }
   }
   const reason: NothingReason = skipped.some(item => item.block.reason === 'noDevice') ? 'noDevice' : 'unavailable'
