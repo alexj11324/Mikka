@@ -11,6 +11,7 @@
     "next-env.d.ts",
     "user_read_only_context/**",
     "v0_memories/**",
-    ".claude/**"
+    ".claude/**",
+    "tests/fixtures/daemon-*/**"
   ]
 }
