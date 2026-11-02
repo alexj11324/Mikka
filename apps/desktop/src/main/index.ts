@@ -2,7 +2,7 @@
 // the UI reads through `window.mikka`. The renderer is treated as untrusted;
 // every privileged call goes through the validated IPC surface in `./bridge`.
 
-import { app, BrowserWindow, Menu, Notification, dialog, nativeTheme, session, shell, webContents } from 'electron'
+import { app, BrowserWindow, Menu, Notification, dialog, nativeTheme, net, session, shell, webContents } from 'electron'
 import { autoUpdater } from 'electron-updater'
 import { join } from 'node:path'
 
@@ -10,7 +10,7 @@ import { IPC } from '@mikka/protocol/ipc'
 
 import { registerBridge } from './bridge'
 import { localDeviceStatus, localQuota } from './daemon'
-import { AppLoadState, offlineRetryDelay } from './offline'
+import { AppLoadState, offlineReason, offlineRetryDelay } from './offline'
 import { startLoopbackAuth, type LoopbackAuthServer } from './loopback'
 import { catchClaudeCallback } from './subscription-callback'
 import { NotificationCenter } from './notification-center'
@@ -170,11 +170,11 @@ function loadApp(): void {
   if (mainWindow && !mainWindow.isDestroyed()) void mainWindow.loadURL(APP_URL)
 }
 
-function showOffline(): void {
+function showOffline(reason: 'network' | 'server'): void {
   if (!mainWindow || mainWindow.isDestroyed()) return
   const delay = offlineRetryDelay(offlineAttempt++)
   if (!mainWindow.webContents.getURL().startsWith('file:')) {
-    void mainWindow.loadFile(join(__dirname, 'offline.html'), { query: { app: APP_URL } })
+    void mainWindow.loadFile(join(__dirname, 'offline.html'), { query: { app: APP_URL, reason } })
   }
   if (retrying) clearTimeout(retrying)
   retrying = setTimeout(() => { retrying = null; loadApp() }, delay)
@@ -243,7 +243,7 @@ function createMainWindow(): void {
   mainWindow.webContents.on('did-fail-load', (_event, errorCode, _description, validatedURL, isMainFrame) => {
     if (!isMainFrame || errorCode === -3 || !validatedURL.startsWith(APP_ORIGIN)) return
     appLoad.failedLoad()
-    showOffline()
+    showOffline(offlineReason(errorCode, net.isOnline()))
   })
   void mainWindow.loadURL(APP_URL)
 }

@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { AppLoadState, offlineRetryDelay } from './offline'
+import { AppLoadState, offlineReason, offlineRetryDelay } from './offline'
 
 test('offline reconnects back off and keep going', () => {
   assert.deepEqual([0, 1, 2, 3, 4, 5, 50].map(offlineRetryDelay), [2_000, 4_000, 8_000, 16_000, 30_000, 30_000, 30_000])
@@ -30,4 +30,13 @@ test('a retry that fails again keeps the offline page retrying; one that succeed
   assert.equal(state.finished(APP), false)
   state.started(APP)
   assert.equal(state.finished(APP), true)
+})
+
+test('the offline page says whether this computer or Mikka is unreachable (review C9)', () => {
+  assert.equal(offlineReason(-106, true), 'network', 'INTERNET_DISCONNECTED')
+  assert.equal(offlineReason(-105, false), 'network', 'name not resolved while the system is offline')
+  assert.equal(offlineReason(-105, true), 'server', 'name not resolved with a working network')
+  assert.equal(offlineReason(-102, true), 'server', 'CONNECTION_REFUSED')
+  assert.equal(offlineReason(-118, true), 'server', 'CONNECTION_TIMED_OUT')
+  assert.equal(offlineReason(-102, false), 'network')
 })

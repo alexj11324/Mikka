@@ -1,5 +1,6 @@
 'use client'
 
+import { SettingsLoading } from '@/components/settings/primitives'
 import { Fragment, useEffect, useState } from 'react'
 import useSWR from 'swr'
 import { Check, Copy, Laptop, MoreHorizontal, Plus, Server } from 'lucide-react'
@@ -247,7 +248,8 @@ function DeviceGroup({ title, devices, deviceModels, onChanged, onReconnect }: {
  */
 export function DevicesSettings({ workspaceId }: { workspaceId?: string }) {
   const t = useTranslations('Devices')
-  const { data: devices = [], error, mutate } = useSWR('devices', listDevices, { refreshInterval: 5000 })
+  const { data, error, mutate } = useSWR('devices', listDevices, { refreshInterval: 5000 })
+  const devices = data ?? []
   // The same read as 模型与订阅, so both pages agree on what each device can run.
   const order = useSWR(workspaceId ? modelOrderKey(workspaceId) : null, () => readModelOrder(workspaceId!))
   const deviceModels = order.data && !order.data.error ? order.data.deviceModels : undefined
@@ -262,19 +264,24 @@ export function DevicesSettings({ workspaceId }: { workspaceId?: string }) {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
   const changed = () => { void mutate() }
-  const reconnect = () => setAdding(true)
+  // 重新连接 a device that was paired before: only the command that starts the client again (review C11).
+  const [reconnecting, setReconnecting] = useState(false)
+  const reconnect = () => { if (desktopSsh) setAdding(true); else setReconnecting(true) }
   return <div className="flex flex-col gap-6">
     <div className="flex items-center justify-between gap-3">
       <h1 className="text-xl font-semibold">{t('title')}</h1>
       <Button size="sm" variant="secondary" aria-keyshortcuts="Meta+N Control+N" onClick={() => setAdding(true)}><Plus data-icon="inline-start" />{t('add.trigger')}</Button>
     </div>
     {error && <FieldError className="text-xs">{t('listError')}</FieldError>}
-    {devices.length === 0 ? <Empty className="rounded-xl border"><EmptyHeader><EmptyTitle>{t('emptyTitle')}</EmptyTitle></EmptyHeader></Empty> : <>
+    {/* Not read yet: rows' shapes, never 还没有设备 (review C6, R-39). A failed first read says only that. */}
+    {!data ? !error && <div className="overflow-hidden rounded-xl border bg-card"><SettingsLoading bare label={t('loading')} /></div>
+      : devices.length === 0 ? <Empty className="rounded-xl border"><EmptyHeader><EmptyTitle>{t('emptyTitle')}</EmptyTitle></EmptyHeader></Empty> : <>
       <DeviceGroup title={t('thisMachine')} devices={devices.filter(device => device.deviceType !== 'server')} deviceModels={deviceModels} onChanged={changed} onReconnect={reconnect} />
       <DeviceGroup title={t('otherDevices')} devices={devices.filter(device => device.deviceType === 'server')} deviceModels={deviceModels} onChanged={changed} onReconnect={reconnect} />
     </>}
     {desktopSsh
       ? <SshAddDialog open={adding} onOpenChange={setAdding} devices={devices} onAdded={changed} />
       : <ConnectDeviceDialog open={adding} onOpenChange={setAdding} hideTrigger />}
+    {!desktopSsh && <ConnectDeviceDialog open={reconnecting} onOpenChange={setReconnecting} hideTrigger reconnect />}
   </div>
 }

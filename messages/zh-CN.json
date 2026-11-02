@@ -854,10 +854,12 @@
       "commands": {
         "install": "1 安装",
         "login": "2 登录",
-        "start": "3 上线"
+        "start": "3 上线",
+        "startAlone": "上线"
       },
       "requirements": "Node.js 24+ · Git",
-      "configurationFailed": "安装命令暂不可用"
+      "configurationFailed": "安装命令暂不可用",
+      "reconnectTitle": "重新连接"
     },
     "setup": "设置仓库和 Agent",
     "offlineSince": "离线 · {time}",
@@ -935,7 +937,8 @@
     "runsModels": "能跑 {models}",
     "runsCount": "能跑 {count} 个允许使用的模型",
     "runsNone": "不能跑允许使用的模型",
-    "offlineNoRuns": "离线 · 不会被派任务"
+    "offlineNoRuns": "离线 · 不会被派任务",
+    "loading": "正在加载设备"
   },
   "Workspace": {
     "loadingEditor": "正在加载任务编辑器",
@@ -2550,7 +2553,8 @@
       "e2bKeyMissing": "未填",
       "e2bKeyFill": "填入",
       "e2bKeyReplace": "更换"
-    }
+    },
+    "loadingPage": "正在加载设置"
   },
   "TelegramBot": {
     "help": "Mikka Telegram 命令：\n/new <标题> — 新建任务草稿\n草稿进行中时发送详情，然后用 /confirm 创建到待办\n其他消息会发送给 Orchestrator，回复会发回此处\n/cancel — 丢弃草稿\n/issues — 查看最近任务\n/link ORV-123 或 /link <任务 UUID> — 关联任务\n/status — 查看关联任务\n/unlink — 取消关联",
@@ -3831,6 +3835,7 @@
     "returnToTerminal": "回到终端启动 Mikka 客户端",
     "done": "完成",
     "invalid": "验证码无效或已过期",
+    "rateLimited": "查询次数过多，30 分钟后再试",
     "failed": "连接失败",
     "enterAgain": "重新输入",
     "retry": "重试"
