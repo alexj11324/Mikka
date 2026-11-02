@@ -2,7 +2,7 @@
 
 import useSWR from 'swr'
 import { useFormatter, useNow, useTranslations } from 'next-intl'
-import { ChevronRight } from 'lucide-react'
+import { ChevronRight, Hand } from 'lucide-react'
 import { listIssueThreads } from '@/app/actions/agents'
 import { threadQuestionView, threadTime, type IssueThread } from '@/lib/issue-threads'
 import { runListRefreshInterval, runStatusKey } from '@/lib/issue-run-conversation'
@@ -26,9 +26,10 @@ export function ThreadStatus({ status, stopping = false, waiting = false }: { st
   const statusLabel = useTranslations('Coordinator.citation.runStatus')
   const t = useTranslations('IssueThreads')
   const key = runStatusKey(status)
-  if (waiting) return <Badge variant="warning-light" size="sm">{t('waiting')}</Badge>
+  if (waiting) return <Badge variant="warning-light" size="sm"><Hand aria-hidden="true" />{t('waiting')}</Badge>
   if (stopping) return <Badge variant="secondary" size="sm">{t('stopping')}</Badge>
-  return <Badge variant={RUN_BADGES[status] ?? 'secondary'} size="sm">{key ? statusLabel(key) : status}</Badge>
+  // A run waiting on input is 等待你 (R-52): it raises the same hand.
+  return <Badge variant={RUN_BADGES[status] ?? 'secondary'} size="sm">{status === 'waiting_input' && <Hand aria-hidden="true" />}{key ? statusLabel(key) : status}</Badge>
 }
 
 /** 线程: the agent runs working on this issue (R-62). A readable one opens on the right. */

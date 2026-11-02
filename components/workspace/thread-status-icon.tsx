@@ -1,7 +1,7 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import { Circle, CircleAlert, CircleCheck, CircleSlash2, LoaderCircle } from 'lucide-react'
+import { CircleAlert, CircleCheck, CircleSlash2, Hand, LoaderCircle } from 'lucide-react'
 import { threadGroup, type ThreadGroup, type ThreadOutcome } from '@/lib/thread-groups'
 
 /**
@@ -20,7 +20,7 @@ export function threadGroupOfRun(status: string, outcome?: ThreadOutcome | strin
  * One icon set everywhere a thread shows status (the right column's rows, thread
  * cards, chips, the task's 线程 tab, the phone): it follows the thread's group
  * (R-52), never the run's raw status, so a run that finished blocked never shows
- * the check. 进行中 spins, 受阻 a red alert, 等待你 a hollow circle, 空闲 a slashed
+ * the check. 进行中 spins, 受阻 a red alert, 等待你 a raised hand, 空闲 a slashed
  * circle, 已解决 a green check. Pass the list's `group`, or the run's `status`
  * with its judged `outcome`. `small` is the 14px size of rows and chips.
  */
@@ -44,7 +44,7 @@ function SmallIcon({ group }: { group: ThreadGroup }) {
   if (group === 'blocked') return <CircleAlert aria-hidden="true" className="size-3.5 text-destructive" />
   if (group === 'resolved') return <CircleCheck aria-hidden="true" className="size-3.5 text-success" />
   if (group === 'idle') return <CircleSlash2 aria-hidden="true" className="size-3.5 text-muted-foreground" />
-  return <Circle aria-hidden="true" className="size-3.5 text-muted-foreground" />
+  return <Hand aria-hidden="true" className="size-3.5 text-muted-foreground" />
 }
 
 function LargeIcon({ group }: { group: ThreadGroup }) {
@@ -52,5 +52,5 @@ function LargeIcon({ group }: { group: ThreadGroup }) {
   if (group === 'blocked') return <CircleAlert aria-hidden="true" className="size-5 text-destructive" />
   if (group === 'resolved') return <CircleCheck aria-hidden="true" className="size-5 text-success" />
   if (group === 'idle') return <CircleSlash2 aria-hidden="true" className="size-5 text-muted-foreground" />
-  return <Circle aria-hidden="true" className="size-5 text-muted-foreground" />
+  return <Hand aria-hidden="true" className="size-5 text-muted-foreground" />
 }
