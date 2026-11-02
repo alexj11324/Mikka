@@ -3392,6 +3392,7 @@
     "panel": {
       "label": "右栏",
       "allThreads": "全部线程",
+      "allThreadsWaiting": "全部线程，{count} 条等你",
       "tabs": "右栏内容",
       "details": "详情",
       "threads": "线程",

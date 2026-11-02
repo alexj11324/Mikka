@@ -1,28 +1,40 @@
 'use client'
 
-import { MessagesSquare, X } from 'lucide-react'
+import { Hand, MessagesSquare, X } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import type { listIssues } from '@/app/actions/issues'
 import type { Thread } from '@/app/actions/task-runs'
+import { Badge } from '@/components/reui/badge'
 import { Button } from '@/components/ui/button'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { RightColumn } from '@/components/workspace/thread-column'
 import { navigate, openThread, toggleAllThreads } from '@/components/workspace/workspace-navigation'
+import { groupThreads } from '@/lib/thread-groups'
 import { cn } from '@/lib/utils'
 import { ThreadList } from './thread-list'
 
 type Issue = Awaited<ReturnType<typeof listIssues>>[number]
 
+/** How many rows of 全部线程 sit in 等待你 (R-52), counted as the list groups them. */
+export function waitingCount(threads: Thread[], issues: Issue[]) {
+  return groupThreads(threads, id => issues.find(issue => issue.id === id)).waiting.length
+}
+
 /**
  * 全部线程's button, beside the globe in the window bar and in the phone's
  * header: the threads every bot dispatched, from any page, not only from a
- * bot's panel (R-82).
+ * bot's panel (R-82). While threads wait on you it carries their count after
+ * 等待你's hand (Figma 802:56), 99+ past 99; with none, the icon alone.
  */
-export function AllThreadsToggle({ open, onToggle }: { open: boolean; onToggle: () => void }) {
+export function AllThreadsToggle({ open, onToggle, waiting = 0 }: { open: boolean; onToggle: () => void; waiting?: number }) {
   const t = useTranslations('Shell.panel')
-  return <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label={t('allThreads')} aria-pressed={open} onClick={onToggle}
-    className={cn('text-muted-foreground', open && 'bg-muted text-foreground')} />}><MessagesSquare data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{t('allThreads')}</TooltipContent></Tooltip>
+  const label = waiting ? t('allThreadsWaiting', { count: waiting }) : t('allThreads')
+  return <Tooltip><TooltipTrigger render={<Button variant="ghost" size={waiting ? 'sm' : 'icon-sm'} aria-label={label} aria-pressed={open} onClick={onToggle}
+    className={cn('text-muted-foreground', waiting && 'relative gap-1 px-1.5 pointer-coarse:after:absolute pointer-coarse:after:-inset-1.5', open && 'bg-muted text-foreground')} />}>
+    <MessagesSquare data-icon="inline-start" />
+    {waiting > 0 && <Badge data-slot="threads-waiting" variant="warning-light" className="gap-0.5 px-1.5 tabular-nums"><Hand aria-hidden="true" />{waiting > 99 ? '99+' : waiting}</Badge>}
+  </TooltipTrigger><TooltipContent side="bottom">{label}</TooltipContent></Tooltip>
 }
 
 /** The bots that dispatched these threads, each once, by name: the choices of 按派出者筛选. */
