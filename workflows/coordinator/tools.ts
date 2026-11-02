@@ -33,7 +33,7 @@ export function readCoordinatorSwitches(): CoordinatorSwitches {
   return { issueTools: issueMutationsEnabled(), factoryRouting: deploymentSwitch('factoryRouting'), factoryLifecycle: deploymentSwitch('factoryLifecycle') }
 }
 
-export interface CoordinatorToolOptions { switches?: CoordinatorSwitches; coordinator?: boolean; execution?: AgentExecution | null; readOnly?: boolean; readToolIds?: readonly string[]; sourceEventId?: string; writeEnabled?: boolean; taskEventId?: string; computerEnabled?: boolean; mailboxEnabled?: boolean; mailboxTools?: readonly MailboxToolName[]; writeTools?: { catalog: readonly ModelWriteTool[]; submit: (call: ModelWriteCall) => Promise<unknown> } }
+export interface CoordinatorToolOptions { /** Started tool finish records; the round awaits them before storing its reply. Without it each record is awaited in place. */ audits?: Promise<unknown>[]; switches?: CoordinatorSwitches; coordinator?: boolean; execution?: AgentExecution | null; readOnly?: boolean; readToolIds?: readonly string[]; sourceEventId?: string; writeEnabled?: boolean; taskEventId?: string; computerEnabled?: boolean; mailboxEnabled?: boolean; mailboxTools?: readonly MailboxToolName[]; writeTools?: { catalog: readonly ModelWriteTool[]; submit: (call: ModelWriteCall) => Promise<unknown> } }
 /** One task, one thread (decision 2026-11-01-1330-one-thread-per-task): how both dispatch tools say it. */
 const ONE_THREAD = 'A task has one thread at a time. When the task already has one, this goes to that thread: a thread still working gets `note` as a message; a thread that ended (done, failed or stopped) runs again in the same thread with `note`. Use it to retry or to add information; never to start over. Set newThread only when the person, in their own words, explicitly asked for a new session or thread, or a different agent; the host checks their message and otherwise keeps the existing thread.'
 const newThreadInput = z.boolean().optional().describe('Only when the person explicitly asked for a new session or thread, or a different agent, in their own words. Retries and added information never set it.')
@@ -261,6 +261,13 @@ export function coordinatorTools(userId: string, botId: string, scope?: NativeTo
     (!(PERSONAL_WRITE_TOOL_IDS as readonly string[]).includes(name) || ((options.writeEnabled === true) && Boolean(execution && supportsWritePlanning(execution.snapshot.runtime)) && (!options.writeTools || options.writeTools.catalog.some(entry => entry.name === name)))))
   return instrumentTools(registry,requested,{
     before:(callId,name) => kit.beforeAgentTool(userId,botId,execution.id,callId,name,scope),
-    after:(callId,name,outcome) => kit.afterAgentTool(userId,botId,execution.id,callId,name,outcome,scope),
+    after:(callId,name,outcome) => {
+      const record = kit.afterAgentTool(userId,botId,execution.id,callId,name,outcome,scope)
+      if (!options.audits) return record
+      // Observed now so an early failure is not unhandled; the round's Promise.all still sees it.
+      record.catch(() => {})
+      options.audits.push(record)
+      return Promise.resolve()
+    },
   })
 }

@@ -78,9 +78,10 @@ export function prepareGitHubEnvironment(runDir: string, github: RunGitHub, path
 export async function withRunGitCredentials<T>(
   assignment: { github?: { endpoint: string; repository: string; branch?: string }; mcp?: { token: string }; issueId: string },
   privateDir: string,
-  work: (env: Record<string, string>) => Promise<T>,
+  work: (env: Record<string, string>, github: { defaultBranch(): Promise<string | undefined> }) => Promise<T>,
 ): Promise<T> {
-  if (!assignment.github || !assignment.mcp) return work({})
+  const none = { defaultBranch: async () => undefined }
+  if (!assignment.github || !assignment.mcp) return work({}, none)
   mkdirSync(privateDir, { recursive: true, mode: 0o700 })
   const dir = mkdtempSync(join(privateDir, 'github-fetch-'))
   try {
@@ -90,9 +91,16 @@ export async function withRunGitCredentials<T>(
     } catch {
       // No gh on this machine: GitHub delivery is unavailable, and the clone
       // falls back to the machine's own git credentials as before.
-      return await work({})
+      return await work({}, none)
     }
-    return await work(Object.fromEntries(Object.entries(env).filter(([key]) => key.startsWith('GIT_CONFIG_') || key === 'GIT_TERMINAL_PROMPT')))
+    const repository = assignment.github.repository
+    // GitHub's default branch for a repository with no branch yet; undefined when it cannot be read.
+    const defaultBranch = async () => {
+      const result = await execa('gh', ['api', `repos/${repository}`, '--jq', '.default_branch'], { env: { ...process.env, ...env }, stdin: 'ignore', timeout: 30_000, reject: false })
+      const name = result.exitCode === 0 ? result.stdout.trim() : ''
+      return name || undefined
+    }
+    return await work(Object.fromEntries(Object.entries(env).filter(([key]) => key.startsWith('GIT_CONFIG_') || key === 'GIT_TERMINAL_PROMPT')), { defaultBranch })
   } finally { rmSync(dir, { recursive: true, force: true }) }
 }
 

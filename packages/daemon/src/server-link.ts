@@ -31,6 +31,8 @@ import {
   type RunState,
   type StopReason,
   type RunCheckpoint,
+  type DaemonVersions,
+  type DeviceManagementCommand,
 } from "@mikka/protocol"
 
 import type { LocalComputerDecision, LocalComputerRequest } from "@mikka/protocol/computer"
@@ -136,7 +138,7 @@ export interface ServerLink {
   fetchCommands(
     deviceId: string,
     waitSeconds: number,
-    options?: { signal?: AbortSignal; skipRuns?: readonly string[]; onQueuedRuns?: (runIds: string[]) => void }
+    options?: FetchCommandsOptions
   ): Promise<RunCommand[]>
   /** Marks messages as handed to their agents. */
   ackCommands(deviceId: string, delivered: string[]): Promise<void>
@@ -154,6 +156,20 @@ export interface ServerLink {
     requestId: string,
     result: FsResult
   ): Promise<void>
+}
+
+export interface FetchCommandsOptions {
+  signal?: AbortSignal
+  skipRuns?: readonly string[]
+  onQueuedRuns?: (runIds: string[]) => void
+  /**
+   * The newest release this daemon knows of and the device commands it
+   * already holds. Sending them asks the server for releases and device
+   * commands on this poll, which ends as soon as either is news.
+   * Older servers ignore them and never call `onUpdates`.
+   */
+  updates?: { daemonLatest: string; skipDeviceCommands?: readonly string[] }
+  onUpdates?: (updates: { daemonVersions?: DaemonVersions; deviceCommands: DeviceManagementCommand[] }) => void
 }
 
 /** Default caps until they become project settings. */

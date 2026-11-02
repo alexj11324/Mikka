@@ -442,6 +442,7 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
     const body = await refused.json()
     assert.equal(body.code, 'daemonUpgradeRequired')
     assert.equal(body.minVersion, MIN_DAEMON_VERSION)
+    assert.equal(body.daemonVersions?.min, MIN_DAEMON_VERSION, 'names the releases so the refused daemon updates to the version this server names')
     const run = (await pool.query('SELECT status, "stopReason", error FROM agent_runs WHERE id=$1', [runId])).rows[0]
     assert.deepEqual(run, { status: 'failed', stopReason: 'error', error: DAEMON_UPGRADE_REQUIRED })
     const events = (await pool.query('SELECT kind, payload FROM coordinator_events WHERE "runId"=$1', [runId])).rows

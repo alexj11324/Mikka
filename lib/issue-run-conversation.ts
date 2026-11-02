@@ -77,12 +77,17 @@ function stepDetail(input: unknown): string | null {
  * A thread's chunks across its runs (R-81: an ended thread runs again in the same thread). Each run numbers its own
  * text and tool calls, so ids are made per run before they meet in one conversation; one run keeps them as they are.
  */
-export function chainChunks<T extends { runId: string; chunk: Record<string, unknown>; at: Date | string }>(rows: readonly T[]): { chunk: Record<string, unknown>; at: T['at'] }[] {
-  if (new Set(rows.map(row => row.runId)).size < 2) return rows.map(({ chunk, at }) => ({ chunk, at }))
+export function chainChunks<T extends { runId: string; chunk: Record<string, unknown>; at: Date | string }>(rows: readonly T[], spansRuns = new Set(rows.map(row => row.runId)).size > 1): { chunk: Record<string, unknown>; at: T['at'] }[] {
+  if (!spansRuns) return rows.map(({ chunk, at }) => ({ chunk, at }))
   return rows.map(({ runId, chunk, at }) => ({
     at,
     chunk: { ...chunk, ...(chunk.id !== undefined ? { id: `${runId}:${String(chunk.id)}` } : {}), ...(chunk.toolCallId !== undefined ? { toolCallId: `${runId}:${String(chunk.toolCallId)}` } : {}) },
   }))
+}
+
+/** A thread read with a chunk cursor: the chunks held plus the appended ones, or the read alone (lib/thread-chunks.ts). */
+export function mergeThreadChunks<T extends { chunks: unknown[]; chunksAppend: boolean }>(held: T | undefined, read: T): T {
+  return read.chunksAppend && held ? { ...read, chunks: [...held.chunks, ...read.chunks] } : read
 }
 
 export type ThreadItem =

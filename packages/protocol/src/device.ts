@@ -91,10 +91,15 @@ export const devicePaths = {
     deviceId: string,
     waitSeconds: number,
     skipRuns: readonly string[] = [],
+    updates?: { daemonLatest: string; skipDeviceCommands?: readonly string[] },
   ) =>
     `/v1/devices/${seg(deviceId)}/commands?wait=${waitSeconds}` +
     (skipRuns.length
       ? `&${COMMANDS_SKIP_PARAM}=${skipRuns.map(seg).join(",")}`
+      : "") +
+    (updates
+      ? `&${COMMANDS_DAEMON_LATEST_PARAM}=${seg(updates.daemonLatest)}` +
+        (updates.skipDeviceCommands?.length ? `&${COMMANDS_SKIP_DEVICE_COMMANDS_PARAM}=${updates.skipDeviceCommands.map(seg).join(",")}` : "")
       : ""),
   commandsAck: (deviceId: string) =>
     `/v1/devices/${seg(deviceId)}/commands/ack`,
@@ -180,6 +185,7 @@ export type DaemonUpdateFailure = z.infer<typeof daemonUpdateFailureSchema>
 
 /** `POST /v1/devices/:deviceId/heartbeat` */
 export const deviceManagementCommand = z.object({ id: z.uuid(), kind: z.enum(['redetect', 'restart', 'update', 'uninstall']) })
+export type DeviceManagementCommand = z.infer<typeof deviceManagementCommand>
 export const deviceHeartbeatSchema = z.object({
   completedDeviceCommands: z.array(z.uuid()).max(100).optional(),
   failedDeviceCommands: z.array(z.object({ id: z.uuid(), error: z.string().max(500) })).max(100).optional(),
@@ -525,6 +531,17 @@ export const COMMANDS_MAX_WAIT_SECONDS = 25
  */
 export const COMMANDS_SKIP_PARAM = "skip"
 export const COMMANDS_MAX_SKIP = 100
+/**
+ * The newest daemon release this daemon already knows of (its own version
+ * when none). Sending it says the daemon reads `daemonVersions` and
+ * `deviceCommands` from this answer: the long-poll then ends as soon as the
+ * server knows a newer release, or has a device command outside
+ * `COMMANDS_SKIP_DEVICE_COMMANDS_PARAM`.
+ */
+export const COMMANDS_DAEMON_LATEST_PARAM = "daemonLatest"
+/** Device commands the daemon already holds (comma-separated ids), so a held update does not end every poll. */
+export const COMMANDS_SKIP_DEVICE_COMMANDS_PARAM = "skipDeviceCommands"
+export const COMMANDS_MAX_SKIP_DEVICE_COMMANDS = 10
 
 /**
  * Something a person asked of a run on this device. `input` is a message a
@@ -562,6 +579,10 @@ export const runCommandsResponse = z.object({
    * Absent from older servers; the heartbeat still claims either way.
    */
   queuedRuns: z.array(id).max(100).optional(),
+  /** Only for a daemon that sent `COMMANDS_DAEMON_LATEST_PARAM`; a malformed value is dropped. */
+  daemonVersions: daemonVersionsSchema.optional().catch(undefined),
+  /** The oldest pending device command (as the heartbeat's), so a person's update reaches the device now. */
+  deviceCommands: z.array(deviceManagementCommand).max(1).optional().catch(undefined),
 })
 export type RunCommandsResponse = z.infer<typeof runCommandsResponse>
 

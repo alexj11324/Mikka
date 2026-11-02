@@ -56,7 +56,7 @@ dbTest('one read of a device\'s runs finds its stops, messages and queued runs',
   })
 })
 
-dbTest('the idle check answers in one boolean, finds the same work, and refuses a revoked credential', async t => {
+dbTest('the idle check answers in one statement, finds the same work and pending device commands, and refuses a revoked credential', async t => {
   const [{ createRequestDatabaseScope, pool }, { deviceMayHaveWork }, { withDeviceDatabaseAuthority, DeviceAuthorityRevoked }] = await Promise.all([import('./db'), import('./device-link'), import('./db/device-scope')])
   const scope = createRequestDatabaseScope(databaseUrl!)
   const owner = `test-device-idle-${randomUUID()}`
@@ -67,6 +67,7 @@ dbTest('the idle check answers in one boolean, finds the same work, and refuses 
       await pool.query('delete from agent_runs where "userId"=$1', [owner])
       await pool.query('delete from agents where "userId"=$1', [owner])
       await pool.query('delete from device_tokens where "userId"=$1', [owner])
+      await pool.query('delete from device_management_commands where "deviceId"=$1', [device])
       await pool.query('delete from devices where "ownerId"=$1', [owner])
       await pool.query('delete from "user" where id=$1', [owner])
     })
@@ -77,8 +78,9 @@ dbTest('the idle check answers in one boolean, finds the same work, and refuses 
     await pool.query(`insert into devices (id, name, "ownerId") values ($1, 'mine', $2)`, [device, owner])
     await pool.query(`insert into device_tokens (id, "userId", "tokenHash") values ($1, $2, $3)`, [tokenId, owner, randomUUID()])
     await pool.query(`insert into agents (id, "userId", harness, name) values ($1, $2, 'codex', 'a')`, [agent, owner])
-    const check = (options: { queued?: boolean; mailboxNotices?: boolean } = {}, skip: string[] = []) =>
+    const idle = (options: { queued?: boolean; mailboxNotices?: boolean; skipDeviceCommands?: string[] } = {}, skip: string[] = []) =>
       withDeviceDatabaseAuthority({ tokenId, userId: owner }, () => deviceMayHaveWork(device, skip, options))
+    const check = async (options: { queued?: boolean; mailboxNotices?: boolean } = {}, skip: string[] = []) => (await idle(options, skip)).work
 
     assert.equal(await check({ queued: true }), false, 'no runs: nothing to read')
     await pool.query(`insert into agent_runs (id, "agentId", "userId", "deviceId", status) values ($1, $2, $3, $4, 'queued')`, [run, agent, owner, device])
@@ -93,6 +95,15 @@ dbTest('the idle check answers in one boolean, finds the same work, and refuses 
     await pool.query(`update run_messages set "deliveredAt"=now() where "runId"=$1`, [run])
     await pool.query(`update agent_runs set "stopRequestedAt"=now() where id=$1`, [run])
     assert.equal(await check(), true, 'a stop to deliver')
+
+    const update = randomUUID(), restart = randomUUID()
+    assert.equal((await idle({ skipDeviceCommands: [] })).deviceCommand, null, 'no device command pending')
+    await pool.query(`insert into device_management_commands (id, "deviceId", kind, "createdAt") values ($1, $3, 'update', now() - interval '1 minute'), ($2, $3, 'restart', now())`, [update, restart, device])
+    assert.equal((await idle()).deviceCommand, null, 'a daemon that does not read device commands from the poll is not told')
+    assert.deepEqual((await idle({ skipDeviceCommands: [] })).deviceCommand, { id: update, kind: 'update' }, 'the oldest pending command')
+    assert.deepEqual((await idle({ skipDeviceCommands: [update, 'not-a-uuid'] })).deviceCommand, { id: restart, kind: 'restart' }, 'commands the daemon holds are left out')
+    await pool.query(`update device_management_commands set "completedAt"=now() where "deviceId"=$1`, [device])
+    assert.equal((await idle({ skipDeviceCommands: [] })).deviceCommand, null, 'completed commands are not news')
 
     await pool.query(`update device_tokens set "revokedAt"=now() where id=$1`, [tokenId])
     await assert.rejects(check(), DeviceAuthorityRevoked, 'a revoked credential ends the poll')

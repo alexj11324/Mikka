@@ -11,7 +11,7 @@ import type { ActionResult } from '@/lib/action-result'
 import { auth } from '@/lib/auth'
 import { db, pool } from '@/lib/db'
 import {
-  agents, agentRuns, deviceRepos, devices, issueMembers, runChunks, runMessages, users,
+  agents, agentRuns, deviceRepos, devices, issueMembers, runMessages, users,
   type SupportedHarness,
 } from '@/lib/db/schema'
 import { DEVICE_ONLINE_WINDOW_MS, issueDeviceToken } from '@/lib/device-link'
@@ -21,7 +21,7 @@ import { listSshHosts } from '@/lib/ssh'
 import { citationSources } from '@/lib/coordinator/store'
 import { requestRunStop } from '@/lib/agent-runs'
 import { sendThreadMessage } from '@/lib/thread-continue'
-import { chainChunks } from '@/lib/issue-run-conversation'
+import { readThreadChunks, threadChunkCursor, type ThreadChunkCursor } from '@/lib/thread-chunks'
 import { executionBotName, runBotId, runBotName } from '@/lib/run-bot-name'
 import { requireIssueAccess } from '@/lib/issue-access'
 import { workspaceDb } from '@/lib/workspace-db'
@@ -241,6 +241,10 @@ export interface IssueThreadDetail {
   thread: IssueThread & { prompt: string; stopRequestedAt: Date | null; feedbackEligible:boolean; /** This run's failure reason, stored masked (agent_runs.error). */ error: string | null; /** The owner's own: quota switches and a quota pause (lib/run-quota-view.ts). */ quota: import('@/lib/run-quota-view').ThreadQuotaView | null }
   chunks: { chunk: Record<string, unknown>; at: Date }[]
   messages: { id: string; text: string; at: Date; author: string; image: string | null; mine: boolean }[]
+  /** Where `chunks` ends; passed back, the next read returns only later chunks. */
+  chunkCursor: ThreadChunkCursor | null
+  /** `chunks` holds only the chunks after the cursor that was passed: append them to the ones held. */
+  chunksAppend: boolean
 }
 
 /**
@@ -261,7 +265,8 @@ async function threadQuestions(threads: readonly IssueThread[], viewerId: string
 }
 
 /** One thread as a conversation: what it was asked, what the agent did, and what people said in it. */
-export async function getIssueThread(issueId: string | null, runId: string): Promise<IssueThreadDetail> {
+export async function getIssueThread(issueId: string | null, runId: string, after?: ThreadChunkCursor | null): Promise<IssueThreadDetail> {
+  const cursor = after ? threadChunkCursor.parse(after) : null
   const { row, user } = await readableThread(issueId, runId)
   // The run that resumes this one after an answered question, or runs it again after it ended (R-81), is the same thread: its chain (BE-18).
   const [projected] = projectIssueThreads([row], row.issueId, user.id, new Set([user.id]))
@@ -269,9 +274,9 @@ export async function getIssueThread(issueId: string | null, runId: string): Pro
   // The conversation is the thread's, across its runs from this one on, oldest first.
   const from = chain ? Math.max(0, chain.attempts.findIndex(attempt => attempt.runId === row.id)) : 0
   const runIds = chain ? chain.attempts.slice(from).map(attempt => attempt.runId) : [row.id]
-  const chunks = chainChunks(await db.select({ runId: runChunks.runId, chunk: runChunks.chunk, at: runChunks.createdAt }).from(runChunks)
-    .innerJoin(agentRuns, eq(agentRuns.id, runChunks.runId))
-    .where(inArray(runChunks.runId, runIds)).orderBy(asc(agentRuns.createdAt), asc(runChunks.seq)))
+  // A live run is polled every 2 s; only the chunks after the caller's cursor are read, not the whole chain again.
+  const read = await readThreadChunks(runIds, cursor)
+  const chunks = read.chunks
   const messages = await db.select({ id: runMessages.id, text: runMessages.text, at: runMessages.createdAt, userId: runMessages.userId, name: users.name, email: users.email, image: users.image })
     .from(runMessages).leftJoin(users, eq(users.id, runMessages.userId))
     .where(inArray(runMessages.runId, runIds)).orderBy(asc(runMessages.createdAt))
@@ -287,6 +292,8 @@ export async function getIssueThread(issueId: string | null, runId: string): Pro
     thread: { ...thread, prompt: row.prompt, stopRequestedAt, quota, error: row.status === 'failed' ? row.error ?? null : null, feedbackEligible: row.userId===user.id && ['succeeded','failed'].includes(row.status) && !!row.finishedAt && !!row.sessionId && !!row.deviceRepoId },
     chunks,
     messages: messages.map(message => ({ id: message.id, text: message.text, at: message.at, author: message.name || message.email || '', image: message.image ?? null, mine: message.userId === user.id })),
+    chunkCursor: read.cursor,
+    chunksAppend: read.append,
   }
 }
 

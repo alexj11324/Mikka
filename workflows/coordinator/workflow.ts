@@ -8,7 +8,6 @@ import { splitTelegramText } from '@/lib/telegram/messages'
 import type { AgentExecution } from '@/lib/agent-kit/store'
 import { QUIET_REPLY } from '@/lib/attention/handoff'
 import * as steps from './steps'
-import * as native from './native-steps'
 import * as kit from './agent-kit-steps'
 import { nativeCoordinatorTurn } from './native-turn'
 import { coordinatorTools } from './tools'
@@ -24,11 +23,8 @@ export async function coordinatorTurn(userId: string, botId: string) {
   'use workflow'
   const holder = getWorkflowMetadata().workflowRunId
   const writable = getWritable<CoordinatorWorkflowStreamPart>()
-  const computerEnabled = await steps.computerToolsEnabled()
-  const mailboxEnabled = await steps.mailboxToolsEnabled()
-  const writeEnabled = await steps.personalWriteToolsEnabled()
-  const switches = await steps.coordinatorSwitches()
-  const coordinator = await steps.isCoordinatorChat(userId,botId)
+  // One step for what the run reads once (each step is a durable round trip of about a second).
+  const { computerEnabled, mailboxEnabled, writeEnabled, switches, coordinator, runtime: selected } = await steps.turnSettings(userId,botId)
   // 停止 (lib/coordinator/stop.ts) aborts the round in flight; a later round, for messages sent after it, runs normally.
   let controller = new AbortController()
   const stop = createHook<Record<string, never>>({ token: coordinatorStopToken(holder) })
@@ -45,29 +41,34 @@ export async function coordinatorTurn(userId: string, botId: string) {
       return
     }
     let execution: AgentExecution | null = null
+    // A tool's finish record does not hold up the next model call; every record is awaited before the reply is stored.
+    const audits: Promise<unknown>[] = []
     try {
       if(inbox.scheduledRead) await steps.assertScheduleRead(userId,botId,inbox.scheduledRead)
-      const selected = await native.runtime(userId)
-      execution = await kit.beginAgentExecution(userId,botId,holder,round,selected)
-      if (execution && execution.snapshot.runtime.harness !== selected.harness) throw new Error('agent_runtime_changed')
-      const mailboxTools = mailboxEnabled ? await steps.mailboxCatalogue(userId,botId,execution?.id) : []
       const scheduleOptions = inbox.scheduledRead ? {readOnly:true,readToolIds:inbox.scheduledRead.allowedActions} : {}
       const sourceOptions = inbox.sourceEventId ? {sourceEventId:inbox.sourceEventId} : {}
       const scheduledAuthority = inbox.scheduledRead ? {botId,occurrence:inbox.scheduledRead} : undefined
       const streamId = `${holder}:${round}`
-      await steps.writeStreamPart(writable,{type:'coordinator-turn-start',id:streamId,quietEligible:inbox.handoffOnly})
+      // Independent: the execution and the stream's start run side by side.
+      ;[execution] = await Promise.all([kit.beginAgentExecution(userId,botId,holder,round,selected),steps.writeStreamPart(writable,{type:'coordinator-turn-start',id:streamId,quietEligible:inbox.handoffOnly})])
+      if (execution && execution.snapshot.runtime.harness !== selected.harness) throw new Error('agent_runtime_changed')
       const hosted = selected.harness === 'ai_sdk' ? execution?.snapshot.runtime ?? await kit.botRuntime(userId,botId) : null
-      // A scheduled read publishes only its fenced result, never a chat line.
-      if (hosted && !inbox.scheduledRead) await steps.noteQuotaSwitch(userId,holder,hosted,botId)
+      // One step for the mailbox catalogue, the model-switch notice (never on a scheduled read, which publishes only its
+      // fenced result) and the prompt.
+      const prepared = selected.harness === 'ai_sdk'
+        ? await steps.prepareTurn(userId,botId,holder,{ snapshot:execution?.snapshot,executionId:execution?.id,mailboxEnabled,runtime:inbox.scheduledRead ? null : hosted })
+        : { mailboxTools:mailboxEnabled ? await steps.mailboxCatalogue(userId,botId,execution?.id) : [],prompt:null }
+      const mailboxTools = prepared.mailboxTools
       // A model call cut short by 停止 may surface as an abort error; nothing of it was kept, so the turn ends with what streamed.
       const result = await (selected.harness === 'ai_sdk'
-        ? runHostedWorkflowTurn(hosted ?? await kit.botRuntime(userId,botId),coordinatorTools(userId,botId,scheduledAuthority ? {scheduledRead:scheduledAuthority} : undefined,{ ...scheduleOptions,...sourceOptions,switches,coordinator,execution,writeEnabled,computerEnabled,mailboxEnabled,mailboxTools,...(inbox.taskEventId ? { taskEventId: inbox.taskEventId } : {}) }),{ ...promptOptions(await steps.preparePrompt(userId,botId,execution?.snapshot,mailboxTools)),stopWhen:isStepCount(AGENT_MAX_ROUNDS),prepareStep:coordinatorStep,writable,preventClose:true,...(inbox.scheduledRead ? {} : { abortSignal:signal }) },{ ownerId:userId,botId })
+        ? runHostedWorkflowTurn(hosted ?? await kit.botRuntime(userId,botId),coordinatorTools(userId,botId,scheduledAuthority ? {scheduledRead:scheduledAuthority} : undefined,{ ...scheduleOptions,...sourceOptions,switches,coordinator,execution,writeEnabled,computerEnabled,mailboxEnabled,mailboxTools,audits,...(inbox.taskEventId ? { taskEventId: inbox.taskEventId } : {}) }),{ ...promptOptions(prepared.prompt!),stopWhen:isStepCount(AGENT_MAX_ROUNDS),prepareStep:coordinatorStep,writable,preventClose:true,...(inbox.scheduledRead ? {} : { abortSignal:signal }) },{ ownerId:userId,botId })
         : nativeCoordinatorTurn(userId,holder,round,selected,scope => coordinatorTools(userId,botId,scheduledAuthority ? {...scope,scheduledRead:scheduledAuthority} : scope,{ ...scheduleOptions,...sourceOptions,switches,coordinator,execution,writeEnabled,computerEnabled,mailboxEnabled,mailboxTools,...(inbox.taskEventId ? { taskEventId: inbox.taskEventId } : {}) }),botId,execution?.snapshot,inbox.scheduledRead ? undefined : signal))
         .catch((error: unknown) => { if (signal.aborted && !inbox.scheduledRead) return { text:'',finishReason:'stop',responseMessages:[] }; throw error })
       // A scheduled read is not stoppable from the chat: it posts only its fenced result.
       if (signal.aborted && !inbox.scheduledRead) {
         await steps.writeStreamPart(writable,{type:'coordinator-turn-stopped',id:streamId})
         const said = await steps.stoppedStepText(holder,streamId)
+        await Promise.all(audits)
         const through = await steps.appendMessages(userId,holder,stoppedMessages(result.responseMessages,said,result.text),null,botId,streamId,true)
         if (inbox.handoffMatterIds.length) await steps.settleAttention(userId,inbox.handoffMatterIds,false)
         await kit.finishAgentExecution(userId,botId,execution?.id)
@@ -76,6 +77,7 @@ export async function coordinatorTurn(userId: string, botId: string) {
       }
       const quiet = inbox.handoffOnly && (!result.text.trim() || result.text.trim() === QUIET_REPLY)
       let through: number
+      await Promise.all(audits)
       if(inbox.scheduledRead){
         if(turnWarning(result.finishReason,result.text)) throw new Error('scheduledReadFailed')
         through = await steps.completeScheduleRead(userId,botId,inbox.scheduledRead,result.text,streamId)
@@ -103,6 +105,8 @@ export async function coordinatorTurn(userId: string, botId: string) {
       // After the reply is stored and committed, so it never delays what the person sees.
       await steps.logTurnTiming({ workflowRunId:holder,round,route:selected.harness !== 'ai_sdk' ? 'native' : hosted?.modelSelection ? 'subscription' : 'hosted',untilStoredMs:storedAt - takenAt,modelCalls:(result as { modelCalls?: number }).modelCalls ?? null,tools:(result as { toolTimings?: ToolTiming[] }).toolTimings ?? [] })
     } catch (error) {
+      // Records already started finish before the turn is marked failed.
+      await Promise.allSettled(audits)
       if(inbox.scheduledRead){
         const denied=error instanceof Error && ['scheduleReadAuthorityLost','scheduleWorkspaceAccessDenied','scheduleConversationUnavailable'].includes(error.message)
         try{await steps.failScheduleRead(inbox.scheduledRead,denied)}catch{/* the durable occurrence lease remains recoverable */}

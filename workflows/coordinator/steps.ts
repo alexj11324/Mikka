@@ -146,11 +146,44 @@ export async function stoppedStepText(holder: string, streamId: string) {
  * frozen on another model because the subscription or the points ran out,
  * the chat says so before the reply.
  */
-export async function noteQuotaSwitch(userId: string, holder: string, runtime: { modelSelection?: unknown }, botId: string) {
+/**
+ * Everything a Coordinator run reads once before its first round, in one step
+ * (each step is a durable round trip of about a second): the deployment
+ * switches, whether this chat is the Coordinator's, and the chat runtime.
+ */
+export async function turnSettings(userId: string, botId: string) {
+  'use step'
+  const { personalWritesEnabled } = await import('@/lib/operations/write-feature')
+  const { runtime } = await import('./native-steps')
+  const [coordinator, selected] = await Promise.all([
+    (await import('@/lib/coordinator/coordinator-bot')).isCoordinatorBot(pool, userId, botId),
+    runtime(userId),
+  ])
+  return { computerEnabled: cloudComputerRunsEnabled(), mailboxEnabled: personalMailboxEnabled(), writeEnabled: personalWritesEnabled(), switches: (await import('./tools')).readCoordinatorSwitches(), coordinator, runtime: selected }
+}
+
+/**
+ * Everything a round needs between starting its execution and its first model
+ * call, in one step: the mailbox catalogue, the model-switch notice and the
+ * prompt. A retry after the notice was stored finds it as the last message and
+ * does not store it twice.
+ */
+export async function prepareTurn(userId: string, botId: string, holder: string, input: { snapshot?: DefinitionSnapshot; executionId?: string; mailboxEnabled: boolean; runtime: { modelSelection?: unknown } | null }) {
+  'use step'
+  const mailboxTools = input.mailboxEnabled ? await mailboxCatalogue(userId, botId, input.executionId) : []
+  if (input.runtime) await noteQuotaSwitch(userId, holder, input.runtime, botId, true)
+  return { mailboxTools, prompt: await preparePrompt(userId, botId, input.snapshot, mailboxTools) }
+}
+
+export async function noteQuotaSwitch(userId: string, holder: string, runtime: { modelSelection?: unknown }, botId: string, once = false) {
   'use step'
   const { hostedModelSelectionSchema } = await import('@/lib/subscription-model-snapshot')
   const selection = hostedModelSelectionSchema.safeParse(runtime.modelSelection)
   if (!selection.success) return
+  const kind = selection.data.afterPoints ? 'points_switch' : selection.data.type === 'api_key' && selection.data.afterQuota ? 'quota_switch' : null
+  if (!kind) return
+  // Inside prepareTurn a retried step must not store the notice twice: it would be the last message.
+  if (once && await store.lastEventKind(userId, botId) === kind) return
   const { quotaSwitchMessage, pointsSwitchMessage } = await import('@/lib/coordinator/message-safety')
   // 点数不足时改用 (decision 2026-11-02-1450): Mikka 默认 had no points, this turn runs on the next allowed model.
   if (selection.data.afterPoints) await store.appendMessages(userId, holder, [pointsSwitchMessage(selection.data.modelId, new Date())], null, botId)

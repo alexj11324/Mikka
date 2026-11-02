@@ -1,5 +1,5 @@
 import { withDeviceRoute } from '@/lib/device-route'
-import { authenticateDevice, ownedDevice } from "@/lib/device-link";
+import { authenticateDevice, ownedDeviceWithReport } from "@/lib/device-link";
 import { subscriptionRuntime } from "@/lib/subscription-runtime";
 import { subscriptionNativeHTTP } from "@/lib/subscription-native-http";
 import { hostedBrokerDevice } from "@/lib/subscription-native-device";
@@ -10,7 +10,7 @@ const handlePOST = subscriptionNativeHTTP({
   authorize: async (request, deviceId) => {
     const caller = await authenticateDevice(request);
     if (!caller) return null;
-    const device = await ownedDevice(deviceId, caller.userId);
+    const device = await ownedDeviceWithReport(deviceId, caller.userId);
     if (!hostedBrokerDevice(device, deviceId, caller.scopeDeviceId)) return null;
     return caller.userId;
   },

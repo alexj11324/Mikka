@@ -15,6 +15,7 @@ import { worktreeGitWritePaths } from '../src/agents/publish'
 import { runPolicy } from '../src/permissions'
 import { RunContext } from '../src/agents/run-context'
 import { makeRepo, tempDir, waitFor } from './helpers'
+import { defaultRunPolicy } from '@mikka/protocol/agent-policy'
 
 const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
 const daemons: Daemon[] = []
@@ -222,6 +223,48 @@ describe('daemon-owned clone cache', () => {
     expect(readonly.policy().denyWrite).toContain(path)
     expect(context.gitDir.startsWith(`${path}/`)).toBe(true)
   })
+  describe('an empty remote (no commit, no branch)', () => {
+    const EMPTY_TREE = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
+    async function emptyRemoteRun(push: boolean) {
+      const bare = join(tempDir(), 'empty.git')
+      git(tempDir(), 'init', '--bare', '--initial-branch=main', bare)
+      const server = new MemoryServer('device-empty')
+      const dataDir = tempDir()
+      expect(await runCli(['daemon', 'login', '--dev', '--data-dir', dataDir, '--token', 'isolated-test-token'], { out: () => {}, err: () => {} })).toBe(0)
+      const daemon = await new Daemon({ dataDir, flavor: 'dev', agentSandbox: null, link: server.link(),
+        harnesses: [{ harness: 'mock', installed: true, version: 'test' }], mockSpeed: Infinity, heartbeatMs: 25, quotaSource: null }).start()
+      daemons.push(daemon)
+      await daemon.syncWithServer()
+      const policy = defaultRunPolicy()
+      policy.permissions.git_push = push ? 'allow' : 'deny'
+      const runId = server.queueRun('device-empty', { issueId: 'issue-empty', repoId: 'record-only', remoteUrl: pathToFileURL(bare).href,
+        harness: 'mock', prompt: 'Write a README', fixture: 'success-edit', verifyCommand: 'git diff --check', pushBranch: 'mikka/alex-5', policy })
+      await daemon.syncWithServer()
+      await waitFor(() => daemon.supervisor.list().find(run => run.runId === runId))
+      await daemon.supervisor.idle()
+      await waitFor(() => daemon.status().pendingUploads === 0)
+      return { bare, daemon, server, runId }
+    }
+
+    it('starts from an empty initial commit on the base branch, pushed without force, and pushes the task branch on top', async () => {
+      const { bare, daemon, server, runId } = await emptyRemoteRun(true)
+      expect(daemon.supervisor.get(runId).state).toBe('succeeded')
+      const base = git(bare, 'rev-parse', 'refs/heads/main')
+      expect(git(bare, 'rev-parse', `${base}^{tree}`)).toBe(EMPTY_TREE)
+      expect(git(bare, 'rev-list', '--parents', '-n', '1', base)).toBe(base)
+      const task = git(bare, 'rev-parse', 'refs/heads/mikka/alex-5')
+      expect(server.runs.get(runId)?.completion?.report.publish?.commit).toBe(task)
+      expect(git(bare, 'rev-parse', `${task}^`)).toBe(base)
+      expect(git(bare, 'merge-base', '--is-ancestor', base, task)).toBe('')
+    })
+
+    it('a run that may not push works from a local empty commit and leaves the remote untouched', async () => {
+      const { bare, daemon, runId } = await emptyRemoteRun(false)
+      expect(daemon.supervisor.get(runId).state).toBe('succeeded')
+      expect(git(bare, 'for-each-ref')).toBe('')
+    })
+  })
+
   it('a real daemon claims a URL-only assignment without registering any repository', async () => {
     const source = await makeRepo()
     const bare = join(tempDir(), 'origin.git')

@@ -302,6 +302,31 @@ describe("HttpServerLink", () => {
     ])
   })
 
+  it("asks the commands poll for releases and device commands, and passes on what the server names", async () => {
+    const command = { id: "6f1c2b8e-2a8e-4c39-9d1a-3b5d7c9e1f20", kind: "update" }
+    const answers = [
+      { commands: [], daemonVersions: { min: "0.0.299", latest: "0.0.401" }, deviceCommands: [command] },
+      { commands: [] }, // an older server
+      { commands: [], daemonVersions: { min: "0.0.299", latest: "0.0.401; rm -rf ~" }, deviceCommands: [{ id: "x", kind: "format" }] },
+    ]
+    const { fetch, calls } = scripted(() => json(answers[calls.length - 1]))
+    const link = new HttpServerLink("http://server.test", fetch)
+    const updates = vi.fn()
+    await link.fetchCommands("d", 25, { updates: { daemonLatest: "0.0.400", skipDeviceCommands: ["c1"] }, onUpdates: updates })
+    expect(calls[0]!.path).toBe("/v1/devices/d/commands?wait=25&daemonLatest=0.0.400&skipDeviceCommands=c1")
+    expect(updates).toHaveBeenCalledExactlyOnceWith({ daemonVersions: { min: "0.0.299", latest: "0.0.401" }, deviceCommands: [command] })
+    await expect(link.fetchCommands("d", 25, { updates: { daemonLatest: "0.0.400" }, onUpdates: updates })).resolves.toEqual([])
+    expect(calls[1]!.path).toBe("/v1/devices/d/commands?wait=25&daemonLatest=0.0.400")
+    await expect(link.fetchCommands("d", 25, { onUpdates: updates })).resolves.toEqual([])
+    expect(updates).toHaveBeenCalledOnce() // nothing named, or nothing valid: no call, no failure
+  })
+
+  it("passes on the release a server names when it refuses a claim from a daemon too old", async () => {
+    const { fetch } = scripted(() => json({ error: "x", code: "daemonUpgradeRequired", daemonVersions: { min: "0.0.299", latest: "0.0.401" } }, 409))
+    const error = await new HttpServerLink("http://server.test", fetch).claimRun("d", "r").catch((e: unknown) => e)
+    expect((error as RunNotPinnedHereError).latest).toBe("0.0.401")
+  })
+
   it("marks a claim refused because the daemon is too old", async () => {
     for (const [body, upgradeRequired] of [[{ error: "x", code: "daemonUpgradeRequired" }, true], [{ error: "Run is not queued for this device." }, false]] as const) {
       const { fetch } = scripted(() => json(body, 409))
