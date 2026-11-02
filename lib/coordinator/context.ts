@@ -126,7 +126,7 @@ export function eventPrompt(event: { kind: CoordinatorEventKind; issueId: string
         payload.summary ? `The agent's summary: ${payload.summary}` : null,
         ...publicationPrompt(payload.publication),
         payload.verification === 'not_run' ? 'Verification was not run: no verification command is configured. Never say the changes passed verification. Mention a draft PR only when the server-confirmed publication includes one.' : null,
-        payload.daemonUpgradeRequired ? 'Mikka on its device is too old to run it. Tell the person to update Mikka on that device (设备上的 Mikka 需要更新), then dispatch the issue again. Nothing is wrong with their GitHub or other connections.' : null,
+        payload.daemonUpgradeRequired ? 'Mikka on its device is too old to run it. Tell the person that Mikka on that device needs an update, then dispatch the issue again. Nothing is wrong with their GitHub or other connections.' : null,
         payload.noMachine ? `Its machine went offline and no other machine can continue it. Draw this card and dispatch the issue again after the person answers: ${JSON.stringify(payload.noMachine)}` : null,
         note,
       ].filter(Boolean).join('\n')
