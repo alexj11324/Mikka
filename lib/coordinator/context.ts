@@ -294,7 +294,17 @@ function withPreview<K extends 'input' | 'output'>(key: K, text: string | undefi
 function toolPreview(compact: unknown, value: unknown): string | undefined {
   if (typeof compact === 'string') return compact || undefined
   if (value === undefined || value === null) return undefined
-  return (typeof value === 'string' ? value : JSON.stringify(value) ?? '').slice(0, 200) || undefined
+  return (typeof value === 'string' ? value : jsonbText(value)).slice(0, 200) || undefined
+}
+
+/**
+ * A value as Postgres prints jsonb (`{"a": 1, "b": [1, 2]}`), so a preview built from the full message reads
+ * the same as the compact projection's `left(p->>'input', 200)`. Stored rows come back in jsonb's key order.
+ */
+function jsonbText(value: unknown): string {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value) ?? ''
+  if (Array.isArray(value)) return `[${value.map(item => item === undefined ? 'null' : jsonbText(item)).join(', ')}]`
+  return `{${Object.entries(value).filter(([, item]) => item !== undefined).map(([key, item]) => `${JSON.stringify(key)}: ${jsonbText(item)}`).join(', ')}}`
 }
 
 export interface ChatItem {
