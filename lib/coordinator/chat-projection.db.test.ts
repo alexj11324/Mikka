@@ -80,6 +80,8 @@ dbTest('the chat reads compact parts and shows exactly what the full messages sh
     assert.deepEqual(results[1].output, { type: 'json', value: { runId } }, 'only the dispatched run id is kept of a dispatch result')
     assert.equal((compact[3].content as Record<string, unknown>[])[0].status, 'error')
     assert.deepEqual((compact[5].content as unknown[])[1], { type: 'file', mediaType: 'image/png' })
+    // The chat keys a streamed reply and its stored row by mikkaStreamId (ChatItem.streamId): every row keeps it.
+    assert.deepEqual(compact.map(message => message.mikkaStreamId), stored.map(message => message.mikkaStreamId))
     assert.deepEqual(compact[0], stored[0], 'a plain message is unchanged')
     assert.deepEqual(compact[6], stored[6])
 
