@@ -1246,6 +1246,7 @@
     "secretLimitReached": "This workspace has reached the limit of 500 secrets and variables.",
     "secretImportEmpty": "The .env has no lines that can be added.",
     "secretImportTooLarge": "The .env file is over 2 MB.",
+    "secretNameShadowsWorkspace": "This workspace already has a secret with this name.",
     "secretsUnavailable": "Secret storage isn't available right now. Please try again later.",
     "e2bKeyInvalid": "This E2B key is invalid or has been revoked.",
     "e2bKeyUnverifiable": "Couldn't verify the key right now. Please try again later.",
@@ -2270,12 +2271,18 @@
         "invalidName": "Line {line} · {name} is not a valid name",
         "emptyValue": "Line {line} · {name} has no value",
         "duplicate": "Line {line} · {name} repeats",
-        "reserved": "Line {line} · {name} is reserved"
+        "reserved": "Line {line} · {name} is reserved",
+        "shadowsWorkspace": "Line {line} · the workspace already has {name}"
       },
       "side": {
         "label": "Whose secrets",
         "mine": "Mine"
-      }
+      },
+      "mineHeading": "My secrets",
+      "addMineTitle": "Add my secret",
+      "shadowConfirm": "{workspace} already has {name}. Use your own value in your runs?",
+      "shadowConfirmMany": "{workspace} already has {names}. Use your own values in your runs?",
+      "useMine": "Use mine"
     },
     "audit": {
       "loading": "Loading audit log",

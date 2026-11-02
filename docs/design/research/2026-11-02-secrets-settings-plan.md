@@ -95,12 +95,13 @@ user_secrets(id uuid pk, userId text → user(id) ON DELETE CASCADE, name text, 
 5. **「环境变量」改成「在输出里遮住」开关，默认打开**：同意（Alex，2026-11-02）。放在 PR2。
 6. **只写不读，和 Devin 一致**（Alex，2026-11-02，撤回了之前「可以查看和复制」的说法）：存进去后能用、能替换、能删除，但不能查看或复制，网站登录密码也一样。服务端任何接口都不返回值。
 
-## 8. 个人密钥进 Bot 自己的工具（PR3）
+## 8. 个人密钥注入到哪里（PR3）
 
-- **注入点**：Bot 的云电脑（`bot_subagents`，`lib/cloud-computer/runtime.ts` 起的 subagent gateway、`lib/computer/bot-runtime.ts` 里在沙箱里跑的命令）。现在这里不注入任何工作区密钥。PR3 在 Bot 执行命令的地方，按 `bots."ownerId"` 加载这个人的 `user_secrets`，作为这次命令的环境变量传进去，不写进沙箱文件、也不进 gateway 的持久状态。Agent run（设备和云线程）继续走认领路由的 `taskSecretInjection`，加上 `run.userId` 的个人密钥。
-- **权限**：只在 `bots."ownerId" = user_secrets."userId"` 时注入，也就是本人的 Bot、本人的会话。同一工作区里别人的 Bot 拿不到（即使那个 Bot 被分享给本人用）。判断放在服务端加载函数里，不信任调用方传来的 userId。
-- **打码**：新加 `ownerSecretMasker(userId, workspaceId)` = 工作区 masker 加上本人的个人密钥。把 Bot 云电脑相关的 `maskForWorkspace` 调用（`lib/cloud-computer/subagents.ts`、`action-reviews.ts`、`thread-machines.ts` 的日志尾巴）和 run 的 `maskForRun` 换成它；`kind=env`（不遮）的照旧不遮。
-- **测试**：db test 两个人同一工作区：A 的个人密钥只进 A 的 Bot 和 A 的 run，B 的 Bot 和 run 都拿不到；同名时 A 的值覆盖工作区值；A 的值在 subagent 事件、run 事件和日志尾巴里被遮住；删除后下一次不再注入。
+- **核实结果**：Bot 自己的工具里没有能跑命令、能读环境变量的工具。Bot 云电脑上只有浏览器子代理（`bot_subagents`），它用的凭据是网站登录，本来就是个人的（密码箱 + broker）。Coordinator 的工具也不跑 shell。跑命令的工作都是线程（Agent run）：本地设备和云端线程机上的 daemon / 云 worker，都通过 `/v1/devices/…/runs/…/claim` 认领。
+- **注入点**：认领路由的 `taskSecretInjection(…, run.userId)`。合并顺序是工作区 < 仓库 < 个人（同名时个人赢，这是决定 4）；只加载 `run.userId` 自己的 `user_secrets`。
+- **以后的 Bot 工具**：哪个 Bot 工具需要环境变量（比如给 Bot 云电脑加终端），就在那个工具里按 `bots."ownerId"` 用 `loadUserRuntimeSecrets` 注入，只给本人的 Bot。
+- **打码**：`secretMaskerFor({ workspaceId, ownerId })` / `maskFor` = 工作区 masker 加上本人 `kind='secret'` 的个人密钥。run 的 events、complete、PATCH error、checkpoint、captures、screen，设备的 computer review 和 coordinator command，Bot 云电脑的 subagent 事件、action review、worker 日志尾巴、subagent workflow 报告，全部改用它。`tests/secret-masking-points.test.ts` 也改成要求带 owner 的版本。`runSecretMasker(runId)` 会取 run 的主人。
+- **测试**：`tests/personal-secrets.db.test.ts`。覆盖：只有本人能看能改；同名提示；个人覆盖工作区和仓库，但只在本人的 run 里；另一个成员拿不到；打码；批量添加；检查同名需要是这个工作区的成员；挪到别人名下的行解不开；删账号级联删除。
 
 ## 9. PR1 实际范围（和 §6 的差别）
 

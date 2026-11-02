@@ -215,7 +215,7 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
     // 4e3: the task's explicit user variables (workspace + this repo's secrets/env). Resolved before the
     // claim so a decrypt failure leaves the run queued. The injection helper returns an empty
     // assignment without an encryption key; platform versus BYO billing does not change it.
-    try { ({ env: taskEnv, secretNames: taskSecretNames } = await taskSecretInjection(caller.scopeWorkspaceId, remoteRepositoryRef(repo.remoteUrl))) }
+    try { ({ env: taskEnv, secretNames: taskSecretNames } = await taskSecretInjection(caller.scopeWorkspaceId, remoteRepositoryRef(repo.remoteUrl), process.env, undefined, run.userId)) }
     catch { return NextResponse.json({ error: 'Workspace secrets unavailable.' }, { status: 409 }) }
     // A cloud run with a task branch gets its publication like a local run,
     // before the lease, so a refusal leaves it queued.

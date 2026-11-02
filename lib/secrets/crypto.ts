@@ -49,3 +49,5 @@ export const secretAad = (row: { workspaceId: string; kind: string; scopeType: s
 export const e2bKeyAad = (workspaceId: string) => ['workspace_e2b_key', workspaceId.toLowerCase()].join('\u0000')
 /** A person's own E2B key: bound to their user id, so it cannot be moved to anyone else's row. */
 export const userE2bKeyAad = (userId: string) => ['user_e2b_key', userId].join('\u0000')
+/** A person's own secret: moving it to another person, kind or name breaks decryption. */
+export const userSecretAad = (row: { userId: string; kind: string; name: string }) => ['user_secret', row.userId, row.kind, row.name].join('\u0000')

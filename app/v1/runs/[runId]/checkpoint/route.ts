@@ -7,7 +7,7 @@ import { agentRuns, devices } from '@/lib/db/schema'
 import { authenticateDevice } from '@/lib/device-link'
 import { LEASED_RUN_STATUSES } from '@/lib/run-retry'
 import { CheckpointUnmaskable, maskCheckpoint } from '@/lib/secrets/checkpoint'
-import { workspaceSecretMasker } from '@/lib/secrets/runtime'
+import { secretMaskerFor } from '@/lib/secrets/runtime'
 
 export const dynamic = 'force-dynamic'
 
@@ -35,7 +35,7 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ runI
   const patch = Buffer.from(parsed.data.patch, 'base64')
   if (patch.length > RUN_CHECKPOINT_MAX_BYTES) return NextResponse.json({ error: 'Checkpoint too large.' }, { status: 413 })
   // 4e2 item 4: the patch is the agent's work tree diff; secrets written to files are masked.
-  const mask = await workspaceSecretMasker(caller.scopeWorkspaceId)
+  const mask = await secretMaskerFor({ workspaceId: caller.scopeWorkspaceId, ownerId: caller.userId })
   let masked: ReturnType<typeof maskCheckpoint<number>>
   try { masked = maskCheckpoint({ patch, files: parsed.data.files }, mask) } catch (error) {
     if (error instanceof CheckpointUnmaskable) return NextResponse.json({ error: 'Checkpoint could not be read.' }, { status: 422 })

@@ -54,3 +54,17 @@ export const userE2bKeys = pgTable('user_e2b_keys', {
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 })
+
+/** A person's own secrets (account-level; drizzle/20261102230000_user_secrets.sql). Reach only their own runs. */
+export const userSecrets = pgTable('user_secrets', {
+  id: uuid('id').primaryKey(),
+  userId: text('userId').notNull(),
+  name: text('name').notNull(),
+  kind: text('kind').$type<(typeof WORKSPACE_SECRET_KINDS)[number]>().notNull(),
+  note: text('note').notNull().default(''),
+  ciphertext: text('ciphertext').notNull(),
+  iv: text('iv').notNull(),
+  keyVersion: integer('keyVersion').notNull(),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [uniqueIndex('user_secrets_name_key').on(table.userId, table.name)])

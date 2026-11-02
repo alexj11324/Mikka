@@ -116,8 +116,8 @@ async function report(actor:Actor,botId:string,id:string,rawText:string,state:st
   const userId=actor.userId
   const {db,pool}=await import('@/lib/db')
   // 4e2 item 4: the report text is visual-model output persisted as a coordinator event.
-  const {maskForWorkspace}=await import('@/lib/secrets/runtime')
-  const text=await maskForWorkspace(actor.workspaceId,rawText)
+  const {maskFor}=await import('@/lib/secrets/runtime')
+  const text=await maskFor({workspaceId:actor.workspaceId,ownerId:actor.userId},rawText)
   const {recordCoordinatorEvent}=await import('@/lib/coordinator-event-store')
   const {wakeCoordinator}=await import('@/lib/coordinator/wake')
   // A suggestion's web task reports to the chat the suggestion started in (its stored Coordinator bot row).
