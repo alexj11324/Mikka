@@ -74,7 +74,7 @@ test('credit shares: opt in, pay order, leave, scope', { skip: !dbUrl }, async t
     await assert.rejects(admit(team.id), { code: 'free_allowance_used' })
   })
 
-  await t.test('a team with one member spends that member\'s credits without the switch, until a second member joins', async () => {
+  await t.test('fallback: a team left with one member spends that member\'s credits without the switch, until someone else joins', async () => {
     const { workspaceSoloMember } = await import('../lib/workspace-solo')
     const founder = await seedUser(pool, 'share-founder'), joiner = await seedUser(pool, 'share-joiner')
     const founderOwn = await personal(founder)

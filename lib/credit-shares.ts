@@ -20,7 +20,7 @@ export interface CreditShareView {
   mine: boolean
   /** A team workspace with more than one member: the switch shows. */
   canShare: boolean
-  /** A team with one member: their credits pay without the switch (decision 2026-11-02-1500). */
+  /** A team left with one member: their credits pay without the switch (fallback, decision 2026-11-02-1500 item 4). */
   solo: boolean
   /** Admins: who shares, by name, oldest first. Empty for members. */
   sharers: string[]
@@ -62,8 +62,8 @@ export async function removeCreditShare(query: Query, workspaceId: string, userI
 /**
  * The personal workspaces whose credits a team may spend, oldest share first:
  * only sharers who are still active members of the team. Never the team itself.
- * A team with one member spends that member's credits without a share
- * (decision 2026-11-02-1500, `workspaceSoloMember`).
+ * Fallback: a team left with one member spends that member's credits without
+ * a share (decision 2026-11-02-1500 item 4, `workspaceSoloMember`).
  */
 export async function sharedCreditWorkspaces(workspaceId: string): Promise<string[]> {
   const [{ rows: shared }, solo] = await Promise.all([

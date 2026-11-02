@@ -5,13 +5,13 @@ import { workspacePool } from '@/lib/workspace-db'
 type Query = Pick<Pool | PoolClient, 'query'>
 
 /**
- * A workspace with one person in it (decision 2026-11-02-1500): its only
- * active member, else null. A personal workspace always has one; a team has
- * one until a second member joins. Pending invitations and suspended members
- * do not count. While a workspace has one member, everything that person owns
- * is usable there without a sharing switch (credits, subscriptions, API keys,
- * computers); once a second member joins, the switches and permissions apply.
- * Every "share with the team" decision asks this one function.
+ * Fallback for a team left with one member (decision 2026-11-02-1500 item 4):
+ * its only active member, else null. A team starts with two people; it can
+ * still end up with one (a team from before that decision, or the others
+ * left). Until someone else joins, that member's own credits pay for it
+ * without the sharing switch. Pending invitations and suspended members do
+ * not count. A personal workspace also has one member. This is the one check
+ * for it; nothing in the product names it.
  */
 export async function workspaceSoloMember(workspaceId: string, query: Query = workspacePool): Promise<string | null> {
   const { rows } = await query.query<{ userId: string }>(
@@ -19,7 +19,7 @@ export async function workspaceSoloMember(workspaceId: string, query: Query = wo
   return rows.length === 1 ? rows[0].userId : null
 }
 
-/** The person's own resources pay and run in this workspace without a share switch. */
+/** The person's own resources pay for this workspace without a share switch (the fallback above). */
 export async function ownResourcesUsableWithoutShare(workspaceId: string, userId: string, query: Query = workspacePool): Promise<boolean> {
   return await workspaceSoloMember(workspaceId, query) === userId
 }
