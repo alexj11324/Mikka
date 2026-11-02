@@ -185,3 +185,21 @@ for (const contentType of ['text/event-stream', 'application/json; charset=utf-8
     assert.deepEqual((result as { tools: { name: string }[] }).tools.map(tool => tool.name), ['issue_read'])
   })
 }
+
+test('a Vercel deployment never sends MCP requests through a proxy; development may', async () => {
+  const sent: unknown[] = []
+  const send = async (_url: unknown, options?: { dispatcher?: unknown }) => { sent.push(options?.dispatcher); return new Response('ok') as never }
+  const resolve = async () => [{ address: '8.8.8.8' }]
+  for (const env of [{ VERCEL: '1' }, { VERCEL_ENV: 'production' }]) {
+    const vercel = publicMcpFetch('https://mcp.acme.dev', AbortSignal.timeout(5000), { resolve, send: send as never, proxy: 'http://proxy.dev:8080', env })
+    try { await assert.rejects(vercel.fetch('https://mcp.acme.dev/rpc'), /mcpProxyNotAllowed/) } finally { await vercel.close() }
+  }
+  assert.equal(sent.length, 0)
+  const deployed = publicMcpFetch('https://mcp.acme.dev', AbortSignal.timeout(5000), { resolve, send: send as never, proxy: '', env: { VERCEL: '1' } })
+  const development = publicMcpFetch('https://mcp.acme.dev', AbortSignal.timeout(5000), { resolve, send: send as never, proxy: 'http://proxy.dev:8080', env: {} })
+  try {
+    assert.equal(await (await deployed.fetch('https://mcp.acme.dev/rpc')).text(), 'ok')
+    assert.equal(await (await development.fetch('https://mcp.acme.dev/rpc')).text(), 'ok')
+  } finally { await deployed.close(); await development.close() }
+  assert.equal(sent.length, 2)
+})
