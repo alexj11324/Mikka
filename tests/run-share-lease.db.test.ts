@@ -92,7 +92,7 @@ test('device runs on a shared subscription', { skip: !dbUrl }, async t => {
     }
     const switched = await fresh()
     await pool.query(`INSERT INTO workspace_personal_policies ("workspaceId",subscriptions) VALUES ($1,false) ON CONFLICT ("workspaceId") DO UPDATE SET subscriptions=false`, [team.id])
-    await assert.rejects(lease(peer, switched.run), /account_unavailable/, '允许成员使用个人订阅 off')
+    await assert.rejects(lease(peer, switched.run), /account_unavailable/, '团队权限 › 订阅与 API Key set to 禁止')
     await pool.query('DELETE FROM workspace_personal_policies WHERE "workspaceId"=$1', [team.id])
     assert.equal((await lease(peer, switched.run)).ownerId, owner)
 

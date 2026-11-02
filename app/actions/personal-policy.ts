@@ -1,10 +1,28 @@
 'use server'
 
+import { headers } from 'next/headers'
 import type { ActionResult } from '@/lib/action-result'
-import { getSubscriptionShare as readShare, setOwnSubscriptionShare, type SubscriptionShareView } from '@/lib/personal-policy-server'
+import { auditRequestContext } from '@/lib/audit/events'
+import { getMemberSubscriptionPolicy, getSubscriptionShare as readShare, setMemberSubscriptionPolicy, setOwnSubscriptionShare, type MemberSubscriptionPolicy, type SubscriptionShareView } from '@/lib/personal-policy-server'
 import { designateOwnCard, paymentDesignation, releasePaymentDesignation, type PaymentDesignationView } from '@/lib/payment-designation'
 import { workspaceAction } from '@/lib/workspace-admin/action'
 import { currentWorkspaceActor } from '@/lib/workspace-admin/current'
+
+/** 团队权限 › 订阅与 API Key: may members share theirs with teammates here. Every member reads; `canEdit` for admins. */
+export async function getSharePolicy(workspaceId?: string): Promise<ActionResult<MemberSubscriptionPolicy>> {
+  return workspaceAction(async () => {
+    const actor = await currentWorkspaceActor(workspaceId)
+    return getMemberSubscriptionPolicy(actor.userId, actor.workspaceId)
+  })
+}
+
+/** Admins of a team workspace only; audited. 禁止 stops only teammates' runs on shared credentials (decision 2026-11-01-2240). */
+export async function updateSharePolicy(allowed: boolean, workspaceId?: string): Promise<ActionResult<MemberSubscriptionPolicy>> {
+  return workspaceAction(async () => {
+    const actor = await currentWorkspaceActor(workspaceId)
+    return setMemberSubscriptionPolicy({ id: actor.userId, name: actor.name }, actor.workspaceId, allowed, auditRequestContext(await headers()))
+  })
+}
 
 /** 模型与额度 › 在这里使用我的订阅, for the signed-in member only. */
 export async function getSubscriptionShare(workspaceId?: string): Promise<ActionResult<SubscriptionShareView>> {

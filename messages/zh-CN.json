@@ -2367,6 +2367,12 @@
       "mine": "我的点数也可用于这个团队",
       "sharers": "分享点数的成员"
     },
+    "sharePolicy": {
+      "loading": "正在加载分享设置",
+      "heading": "订阅与 API Key",
+      "label": "成员把自己的订阅和 API Key 分享给队友",
+      "detail": "禁止后只停用分享给别人的部分，每个人自己照常能用"
+    },
     "appPolicy": {
       "loading": "正在加载应用权限",
       "heading": "允许使用的应用",

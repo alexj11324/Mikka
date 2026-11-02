@@ -2367,6 +2367,12 @@
       "mine": "My credits also pay for this team",
       "sharers": "Members sharing credits"
     },
+    "sharePolicy": {
+      "loading": "Loading sharing settings",
+      "heading": "Subscriptions and API keys",
+      "label": "Members share their own subscriptions and API keys with teammates",
+      "detail": "Deny stops only what is shared with others; everyone keeps using their own"
+    },
     "appPolicy": {
       "loading": "Loading app permissions",
       "heading": "Apps bots may use",
