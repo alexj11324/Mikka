@@ -7,11 +7,6 @@ test('从工作台打开设置不等待 RSC，成员读取未完成时仍可立�
   let releaseRead!: () => void
   let readingMembers = false
   const waitingForData = new Promise<void>(resolve => { releaseRead = resolve })
-  await page.route('**/api/workspace*', async route => {
-    readingMembers = true
-    await waitingForData
-    await route.continue()
-  })
   await registerInTeam(page)
   // The conversation list is an in-flow sidebar (collapsible="none"), not the offcanvas container.
   const workspaceSidebar = page.locator('[data-slot="sidebar"]')
@@ -26,6 +21,15 @@ test('从工作台打开设置不等待 RSC，成员读取未完成时仍可立�
       return route.abort()
     }
     return route.fallback()
+  })
+  // Settings show team-only sections such as 成员 once their own read of the workspace says it is a team
+  // (#882, decision 2026-11-01-2310). Let that first read through; hold the members reads after it.
+  let settingsReads = 0
+  await page.route('**/api/workspace*', async route => {
+    if (!new URL(route.request().url()).searchParams.has('workspace') || ++settingsReads === 1) return route.continue()
+    readingMembers = true
+    await waitingForData
+    await route.continue()
   })
   await page.getByRole('button', { name: '工作区菜单', exact: true }).click()
   await page.getByRole('menuitem', { name: '设置', exact: true }).click()
