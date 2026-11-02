@@ -11,7 +11,7 @@ import { dbUrl, seedIssue, seedUser, seedWorkspace } from './support/workspace-a
 import { githubAppStub } from './support/github-app-stub'
 
 // The computer's Codex reported gpt-5, the model the person's ChatGPT account lists (decision 2026-11-02-1400).
-const mac = [{ harness: 'codex', installed: true, modelSlots: [{ slot: 'gpt-5', model: 'gpt-5', name: 'gpt-5' }] }]
+const mac = [{ harness: 'codex', installed: true, subscriptionBroker: true, modelSlots: [{ slot: 'gpt-5', model: 'gpt-5', name: 'gpt-5' }] }]
 // The Decision API's judgment of the person's message, scripted per case.
 let judged: number | null = null
 const judgments: string[] = []
@@ -73,10 +73,11 @@ test('one task, one thread: dispatch continues the task\'s thread unless the per
     return { id, issueId, botId, deviceId }
   }
   /** One of the person's computers; `takesPart: false` is 参与调度 off. */
-  async function computer(userId: string, name: string, state: { online?: boolean; takesPart?: boolean; removed?: boolean; reports?: string; agent?: 'codex' | 'claude_code' } = {}) {
+  /** `old`: its Mikka cannot take a subscription run (no subscriptionBroker). */
+  async function computer(userId: string, name: string, state: { online?: boolean; takesPart?: boolean; removed?: boolean; reports?: string; agent?: 'codex' | 'claude_code'; old?: boolean } = {}) {
     const deviceId = randomUUID()
     const agent = state.agent ?? 'codex'
-    const harnesses = state.reports || agent !== 'codex' ? [{ harness: agent, installed: true, modelSlots: [{ slot: state.reports ?? 'gpt-5', model: state.reports ?? 'gpt-5', name: state.reports ?? 'gpt-5' }] }] : mac
+    const harnesses = state.old ? [{ harness: agent, installed: true }] : state.reports || agent !== 'codex' ? [{ harness: agent, installed: true, subscriptionBroker: true, modelSlots: [{ slot: state.reports ?? 'gpt-5', model: state.reports ?? 'gpt-5', name: state.reports ?? 'gpt-5' }] }] : mac
     await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,"deviceType",enabled,"lastSeenAt",harnesses,"removedAt") VALUES ($1,$2,$3,'local','laptop',$4,$5,$6,$7)`,
       [deviceId, userId, name, state.takesPart ?? true, state.online === false ? new Date(Date.now() - 3_600_000) : new Date(), JSON.stringify(harnesses), state.removed ? new Date() : null])
     await pool.query(`INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,$4,$5)`, [randomUUID(), userId, deviceId, agent, `${agent}-${deviceId.slice(0, 8)}`])
@@ -201,9 +202,9 @@ test('one task, one thread: dispatch continues the task\'s thread unless the per
     const claudeBox = await computer(b.id, 'Claude box', { agent: 'claude_code' })
     const lacking = await dispatch(b, { target: { deviceId: claudeBox }, model: { harness: 'codex', model: 'gpt-5' } })
     assert.deepEqual([lacking.error, lacking.card?.description], ['machineUnavailable', '这台电脑没装 Codex'])
-    // Its Codex did not report the allowed model: it says so, and nothing else is used in its place.
-    const stale = await dispatch(b, { target: { deviceId: await computer(b.id, 'Stale', { reports: 'other-model' }) } })
-    assert.deepEqual([stale.error, stale.card?.description], ['machineUnavailable', '这台电脑的 Codex 没有报告 gpt-5'])
+    // Its Mikka cannot take a subscription run: it says so, and nothing else is used in its place.
+    const stale = await dispatch(b, { target: { deviceId: await computer(b.id, 'Stale', { old: true }) } })
+    assert.deepEqual([stale.error, stale.card?.description], ['machineUnavailable', '这台电脑的 Mikka 需要更新'])
     assert.equal((await runs(b.id)).length, 0)
     // No computer named, a model no subscription or key offers on that Agent: refused with why, not run on the list's model.
     const unoffered = await dispatch(b, { model: { harness: 'claude_code', model: 'gpt-5' } })

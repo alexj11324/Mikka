@@ -23,23 +23,36 @@ async function seed(page: Page) {
     VALUES ($1, $2, $3, 'claude', 'connected', 1, $4, $5, 'e2e-subject')`, [connection, session.userId, member.workspaceId, `e2e-fixture-${connection}`, 'a'.repeat(64)])
   for (const model of ['e2e-opus-reported', 'e2e-sonnet-reported']) await db().query(`INSERT INTO byos_bindings (id, "ownerId", "workspaceId", "consumerId", "connectionId", "connectionRevision", route, "modelId")
     VALUES ($1, $2, $3, 'e2e-catalogue', $4, 1, 'claude_cpa', $5)`, [randomUUID(), session.userId, member.workspaceId, connection, model])
-  // A computer that takes part and whose Claude Code reported the opus model only.
+  // A computer that takes part, Claude Code installed and no models reported (as in production 2026-11-02), its Mikka
+  // too old to take a subscription run (no subscriptionBroker) until `brokerReady` below.
+  const device = randomUUID()
   await db().query(`INSERT INTO devices (id, "ownerId", name, kind, enabled, "deviceType", "lastSeenAt", harnesses) VALUES ($1, $2, 'E2E MacBook', 'local', true, 'laptop', now() + interval '1 hour', $3)`,
-    [randomUUID(), session.userId, JSON.stringify([{ harness: 'claude_code', installed: true, version: '2.1.309', modelSlots: [{ slot: 'opus', model: 'e2e-opus-reported', name: 'Opus' }] }])])
+    [device, session.userId, JSON.stringify([{ harness: 'claude_code', installed: true, version: '2.1.309' }])])
+  return device
+}
+
+/** The computer's Mikka now takes subscription runs; still no models reported. */
+async function brokerReady(device: string) {
+  await db().query(`UPDATE devices SET harnesses = $2 WHERE id = $1`, [device, JSON.stringify([{ harness: 'claude_code', installed: true, version: '2.1.309', subscriptionBroker: true }])])
 }
 
 test('模型与订阅：默认顺序来自已有订阅，添加、键盘排序、移除确认、运行位置都会保存', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 1440, height: 1000 })
   await registerInTeam(page, '/settings?section=models')
   await expect(page.getByRole('heading', { level: 1, name: '模型与订阅' })).toBeVisible()
-  await seed(page)
+  const device = await seed(page)
   await page.reload()
 
   const list = page.getByRole('list', { name: '允许使用的模型' })
-  // Untouched: Claude Code's opus from the connected account, and it can run on the computer that reported it.
+  // Untouched: Claude Code's opus from the connected account. The only computer cannot take a subscription run: the row names it and why.
   await expect(list.getByRole('listitem')).toHaveCount(1)
   const opus = list.getByRole('listitem').filter({ hasText: 'e2e-opus-reported' })
   await expect(opus).toContainText('Claude Code · Claude 订阅')
+  await expect(opus.getByRole('status')).toHaveText('E2E MacBook 的 Mikka 需要更新')
+  await attachLightDark(page, testInfo, 'model-order-needs-update')
+  // Its Mikka updated: the subscription's model runs there, though its CLI reported no models.
+  await brokerReady(device)
+  await page.reload()
   await expect(opus.getByRole('status')).toHaveText('可用')
   await expect(page.getByRole('radio', { name: '本地' }).or(page.getByRole('button', { name: '本地' }))).toHaveAttribute('aria-pressed', 'true')
   await expect(page.getByText('1 台电脑参与调度', { exact: true })).toBeVisible()
@@ -54,8 +67,8 @@ test('模型与订阅：默认顺序来自已有订阅，添加、键盘排序�
   await expect(dialog).toHaveCount(0)
   await expect(list.getByRole('listitem')).toHaveCount(2)
   const sonnet = list.getByRole('listitem').filter({ hasText: 'e2e-sonnet-reported' })
-  // The computer's CLI did not report it: the row says why it cannot run.
-  await expect(sonnet.getByRole('status')).toHaveText('没有电脑能跑 Claude Code')
+  // A subscription's model needs no report from the computer's CLI.
+  await expect(sonnet.getByRole('status')).toHaveText('可用')
   await attachLightDark(page, testInfo, 'model-order-list')
 
   // Keyboard: Space picks the row up, ArrowUp moves it, Space drops it; the order is saved.

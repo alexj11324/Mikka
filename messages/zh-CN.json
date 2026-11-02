@@ -2491,7 +2491,13 @@
       "remove": "移除",
       "ready": "可用",
       "quotaUntil": "额度用完 · {time}恢复",
-      "noDevice": "没有电脑能跑 {harness}",
+      "noDevice": {
+        "none": "还没有连接电脑",
+        "off": "{count, plural, =1 {{device} 没参与调度} other {# 台电脑没参与调度}}",
+        "offline": "{count, plural, =1 {{device} 离线} other {# 台电脑离线}}",
+        "notInstalled": "{count, plural, =1 {{device} 没装 {harness}} other {# 台电脑没装 {harness}}}",
+        "needsUpdate": "{count, plural, =1 {{device} 的 Mikka 需要更新} other {# 台电脑的 Mikka 需要更新}}"
+      },
       "blocked": {
         "quota": "额度用完",
         "expired": "需要重新连接",
@@ -3231,7 +3237,12 @@
     "needsModelNoDevice": "允许使用的模型都没有电脑能跑",
     "needsModelUnavailable": "允许使用的模型都暂时不可用",
     "needsModelDeviceAgent": "这台电脑没装 {agent}",
-    "needsModelDeviceModel": "这台电脑的 {agent} 没有报告 {model}",
+    "needsModelDeviceUpdate": "这台电脑的 Mikka 需要更新",
+    "needsModelNoComputer": "还没有连接电脑",
+    "needsModelNamedOff": "{device} 没参与调度",
+    "needsModelNamedOffline": "{device} 离线",
+    "needsModelNamedAgent": "{device} 没装 {agent}",
+    "needsModelNamedUpdate": "{device} 的 Mikka 需要更新",
     "needsModelNotOffered": "没有订阅或 Key 能用 {agent} 跑 {model}",
     "needsModelPickedNoDevice": "没有电脑能用 {agent} 跑 {model}",
     "needsModelPickedUnavailable": "{agent} 的 {model} 暂时不可用",

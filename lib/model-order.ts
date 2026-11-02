@@ -8,8 +8,8 @@ import { ActionFailureError } from './action-error'
 import { apiKeyHarness } from './model-api-key-providers'
 import { quotaExhausted, quotaResetsAt } from './subscription-quota'
 import {
-  defaultOrder, deviceModel, entryKey,
-  type CredentialState, type OrderCandidate, type OrderEntry, type OrderHarness, type PoolDevice, type RunLocation,
+  defaultOrder, deviceModel, entryKey, whyNoDevice,
+  type CredentialState, type NoDeviceWhy, type OrderCandidate, type OrderEntry, type OrderHarness, type PoolDevice, type RunLocation,
 } from './model-order-plan'
 
 /**
@@ -28,8 +28,10 @@ export interface OrderScope { ownerId: string; workspaceId: string }
 export interface OrderRow extends OrderEntry {
   /** The subscription's provider or the key's provider, for its mark and label. */
   provider: string
-  /** Why it cannot run now, or null when it can. noDevice only for 本地. */
-  block: null | { reason: 'quota' | 'expired' | 'paused' | 'missing' | 'keyRefused' | 'noDevice'; resetsAt?: string | null }
+  /** Why it cannot run now, or null when it can. noDevice only for 本地, with what the closest computer lacks. */
+  block: null
+    | { reason: 'quota' | 'expired' | 'paused' | 'missing' | 'keyRefused'; resetsAt?: string | null }
+    | { reason: 'noDevice'; device: NoDeviceWhy }
 }
 
 export interface OrderView {
@@ -126,9 +128,9 @@ export async function credentialStates(query: Query, scope: OrderScope, entries:
 
 /** The person's own local devices as dispatch sees them; 参与调度 is `enabled`. */
 export async function poolDevices(query: Query, ownerId: string): Promise<PoolDevice[]> {
-  const { rows } = await query.query<{ id: string; enabled: boolean; lastSeenAt: Date | null; harnesses: HarnessInfo[] | null }>(
-    `SELECT id,enabled,"lastSeenAt",harnesses FROM devices WHERE "ownerId"=$1 AND kind='local' AND "removedAt" IS NULL ORDER BY "lastSeenAt" DESC NULLS LAST,id`, [ownerId])
-  return rows.map(row => ({ id: row.id, enabled: row.enabled, online: isDeviceOnline(row.lastSeenAt), harnesses: row.harnesses ?? [] }))
+  const { rows } = await query.query<{ id: string; name: string; enabled: boolean; lastSeenAt: Date | null; harnesses: HarnessInfo[] | null }>(
+    `SELECT id,name,enabled,"lastSeenAt",harnesses FROM devices WHERE "ownerId"=$1 AND kind='local' AND "removedAt" IS NULL ORDER BY "lastSeenAt" DESC NULLS LAST,id`, [ownerId])
+  return rows.map(row => ({ id: row.id, name: row.name, enabled: row.enabled, online: isDeviceOnline(row.lastSeenAt), harnesses: row.harnesses ?? [] }))
 }
 
 /** The page: credentials' candidates, the list with each entry's status, and 运行位置. */
@@ -144,8 +146,8 @@ export async function orderView(query: Query, scope: OrderScope): Promise<OrderV
     devices: devices.filter(device => device.enabled).length,
     entries: order.entries.map(entry => {
       const state = states.get(entry.id)!
-      const block = !state.credential.usable ? { reason: state.credential.reason, ...(state.credential.resetsAt ? { resetsAt: state.credential.resetsAt } : {}) }
-        : order.location === 'local' && !devices.some(device => deviceModel(device, entry)) ? { reason: 'noDevice' as const } : null
+      const block: OrderRow['block'] = !state.credential.usable ? { reason: state.credential.reason, ...(state.credential.resetsAt ? { resetsAt: state.credential.resetsAt } : {}) }
+        : order.location === 'local' && !devices.some(device => deviceModel(device, entry)) ? { reason: 'noDevice', device: whyNoDevice(devices, entry) } : null
       return { ...entry, provider: state.provider, block }
     }),
     candidates: candidates.map(candidate => ({ ...candidate, added: added.has(entryKey(candidate)) })),

@@ -3,6 +3,7 @@
 - Date: 2026-11-02
 - Source: Alex, relayed by the coordinator session: 「就这么去做吧」 on the model-order scheme, then his additions the same day (the default order; two settings entries, 「设备」 and 「模型与订阅」; 「允许使用的模型」 with add/remove and drag order; run location on that page). The coordinator filled in what Alex did not say (marked "coordinator" below).
 - Rule: —
+- Partly superseded by: [2026-11-02-1500](2026-11-02-1500-subscription-models-need-no-device-report.md) (a subscription model needs no report from the computer's CLI)
 - Replaces: [decisions.md](../decisions.md) rows on label execution rules and 任务默认; [2026-10-31-2200 run machine fallback](2026-10-31-2200-run-machine-fallback.md) as to how a new run picks its machine; the 「允许调度」 / 「允许自动调度」 pair; 「Bot 与 Agents」 and 「API 与订阅」 as settings entries; [2026-11-02-1200](2026-11-02-1200-api-keys-own-group-and-provider-models.md) as to key models in 「Bot 与 Agents」.
 
 ## Settings
