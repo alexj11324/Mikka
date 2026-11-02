@@ -3,11 +3,10 @@
 // through this run's broker socket.
 //
 // A hosted run happens on the task's own E2B machine (one task, one machine; no
-// Docker: decision 2026-11-01-1312). Anthropic's sandbox-runtime encloses the
-// CLI and everything it runs, and is the security boundary: it keeps the
-// worker's device credential, its other files and the model key (held by the
-// broker in this process) out of the agent's reach. The sandbox has no network;
-// the run's broker and public-egress relay sockets are its only way out.
+// Docker: decision 2026-11-01-1312). The E2B sandbox is the only boundary: the
+// CLI runs directly as the machine's default user, with no sandbox inside it
+// (decision 2026-11-01-2335). The model key stays in this process's broker;
+// the CLI reaches the model only through the run's broker socket.
 import { execFile, spawn } from "node:child_process";
 import {
   existsSync,
@@ -29,9 +28,9 @@ import { nativeBrokerContextSchema, type RunAssignment } from "@mikka/protocol";
 import { ClaudeAdapter } from "./adapters/claude";
 import { CodexAdapter } from "./adapters/codex";
 import type { AgentSession, StartOptions } from "./adapters/types";
-import { credentialDenyRead, daemonSecrets, runPaths } from "./agents/run-context";
+import { runPaths } from "./agents/run-context";
 import type { spawnCli } from "./agents/child";
-import { SandboxRuntime, type AgentSandbox, type SandboxedCommand } from "./agents/sandbox";
+import type { AgentSandbox } from "./agents/sandbox";
 import { requireRunToolApproval } from "./agents/tool-approval";
 import { createNativeSubscriptionBroker } from "./subscription-native-broker";
 import { createApiKeyBroker } from "./api-key-broker";
@@ -40,9 +39,7 @@ import type { ServerLink } from "./server-link";
 import { readJson, writeJsonAtomic } from "./fs-util";
 import { withTaskEnv } from "./task-env";
 import type { ComputerBroker } from "./computer/broker.mjs";
-import { decide, runDomains, runPolicy } from "./permissions";
-import { startPublicEgress, type PublicEgress } from "./agents/public-egress";
-import { matchesRunSandboxDomain } from "./agents/run-sandbox-launcher";
+import { decide } from "./permissions";
 import { removeRunCredentials } from "./run-scratch";
 
 const exec = promisify(execFile);
@@ -59,13 +56,6 @@ const startFailure = (error: unknown) => {
   const stderr = String(value.stderr ?? "").trim();
   return new Error((stderr || (error instanceof Error ? error.message : String(error))).slice(-500));
 };
-/**
- * sandbox-runtime allows one owner per process; every runner here shares it.
- * Unix sockets are allowed (a run reaches its broker and egress relay over
- * them), so every socket a run must not reach is hidden by `hostOnly`.
- */
-let hostSandbox: SandboxRuntime | undefined;
-const sandboxRuntime = () => (hostSandbox ??= new SandboxRuntime(undefined, { allowAllUnixSockets: true }));
 /** SIGTERM a run's process group, then SIGKILL whatever is left of it. */
 async function stopGroup(child: ReturnType<typeof spawn>, graceMs = 3000) {
   const signal = (name: NodeJS.Signals) => {
@@ -113,15 +103,6 @@ export async function createHostedBotRunner(host: {
   // Runs use no Docker (decision 2026-11-01-1312). The template's worker still
   // passes its socket; it is accepted and unused.
   const bareEnv = { PATH: process.env.PATH, LANG: "C.UTF-8" };
-  // What no run may read: the worker's device credential, RPC secret, journal
-  // and logs, the owner session ledgers, logins in the worker's home, and the
-  // Docker socket the machine's infrastructure keeps.
-  const hostOnly = (harness: "codex" | "claude_code" | null) => [
-    ...credentialDenyRead(harness),
-    ...daemonSecrets(dirname(host.stateDir)),
-    join(host.stateDir, "native-ledgers"),
-    "/run/mikka-container",
-  ];
   // Per-run container records from before that decision name nothing this
   // runner creates; a leftover must not block the machine.
   rmSync(join(host.stateDir, "native-resources"), { recursive: true, force: true });
@@ -157,9 +138,8 @@ export async function createHostedBotRunner(host: {
       }
     }
   if (!binaries.codex && !binaries.claude_code) throw unavailable();
-  // A verify command runs in Anthropic's sandbox-runtime: the worktree (unless
-  // read-only) and a private git copy are writable, the worktree's `.git` and
-  // the worker's own files are not, and it reaches no network.
+  // A verify command runs directly on the task's machine against a private git
+  // copy, so it cannot change the worktree's own `.git`.
   const command = async (
     worktree: string,
     script: string,
@@ -171,7 +151,6 @@ export async function createHostedBotRunner(host: {
     let phase: "create" | "run" = "create";
     let began = performance.now();
     const gitCopy = mkdtempSync(join(host.stateDir, "native-verify-git-"));
-    let wrapped: SandboxedCommand | undefined;
     try {
       const cwd = realpathSync(worktree);
       await exec(
@@ -209,16 +188,10 @@ export async function createHostedBotRunner(host: {
       });
       const home = join(gitCopy, "home");
       mkdirSync(home, { mode: 0o700 });
-      wrapped = await sandboxRuntime().wrap(["/bin/sh", "-c", script], {
-        allowWrite: [...(readOnly ? [] : [cwd]), gitCopy],
-        denyWrite: [join(cwd, ".git")],
-        denyRead: hostOnly(null),
-        allowDomains: [],
-      });
       timing.createMs = Math.round(performance.now() - began);
       phase = "run";
       began = performance.now();
-      const result = await exec("/bin/sh", ["-c", wrapped.command], {
+      const result = await exec("/bin/sh", ["-c", script], {
         cwd,
         env: {
           ...bareEnv,
@@ -262,7 +235,6 @@ export async function createHostedBotRunner(host: {
         timing,
       };
     } finally {
-      wrapped?.release();
       rmSync(gitCopy, { recursive: true, force: true });
     }
   };
@@ -301,11 +273,8 @@ export async function createHostedBotRunner(host: {
       type Broker = Awaited<ReturnType<typeof createNativeSubscriptionBroker>>;
       let broker: Broker | undefined;
       let brokerStarting: Promise<Broker> | undefined;
-      let egress: PublicEgress | undefined;
-      let egressStarting: Promise<PublicEgress> | undefined;
-      // This run's process groups: the sandbox leads each, the bootstrap, the CLI and its children follow.
+      // This run's process groups: the bootstrap leads each, the CLI and its children follow.
       const children = new Set<ReturnType<typeof spawn>>();
-      let confined: SandboxedCommand | undefined;
       let timer: ReturnType<typeof setInterval> | undefined;
       let offRevoke = () => {};
       const assertOpen = () => {
@@ -330,15 +299,12 @@ export async function createHostedBotRunner(host: {
           const brokerClosed = (async () => {
             await brokerStarting?.catch(() => undefined);
             await broker?.close();
-            await egressStarting?.catch(() => undefined);
-            await egress?.close();
           })();
           // Observe failures immediately while the CLI is still stopping;
           // the finally below still propagates the broker cleanup failure.
           void brokerClosed.catch(() => undefined);
           try {
             await Promise.all([...children].map((child) => stopGroup(child)));
-            confined?.release();
           } finally {
             try { await brokerClosed; }
             finally {
@@ -493,21 +459,8 @@ export async function createHostedBotRunner(host: {
         });
         const readyBroker = await brokerStarting;
         await live();
-        // The CLI's proxy is a public-destination relay; each connection
-        // rechecks this run's current policy.
         const githubCli = options.github ? (process.env.PATH ?? '').split(delimiter).map(dir => join(dir, 'gh')).find(file => existsSync(file)) : undefined;
         if (options.github && !githubCli) throw new Error('Install GitHub CLI (gh) in the cloud worker image');
-        const githubDomains = options.github ? ['github.com', 'api.github.com', new URL(options.github.endpoint).host] : [];
-        const egressMaximum = runDomains(runPolicy(options.policy), [...(options.networkAllow ?? []), ...githubDomains]);
-        if (egressMaximum.length) {
-          egressStarting = startPublicEgress({
-            signal: lifetime.signal,
-            authorize: async (destination, signal) => matchesRunSandboxDomain(destination, egressMaximum)
-              && await gate.preapprovedNetwork({runId: assignment.runId, harness: kind, requestId: 'hosted-egress', method: 'sandbox/network', input: destination}, signal),
-          }).then(created => { egress = created; return created; });
-          await egressStarting;
-          await live();
-        }
         const cwd = realpathSync(options.cwd);
         const runDir = realpathSync(paths.runDir);
         if (
@@ -527,17 +480,6 @@ export async function createHostedBotRunner(host: {
         const computerMcp = computerGrant ? {
           command: process.execPath, args: [computerProxy, computerGrant.socketPath, computerGrant.token, "--captures"], env: {},
         } : undefined;
-        await live();
-        // The CLI's args reach the bootstrap over stdin, so one wrapped command
-        // serves every start of this run.
-        const wrapStarted = performance.now();
-        confined = await sandboxRuntime().wrap([process.execPath, bootstrap], {
-          allowWrite: [...(options.policy?.readOnly ? [] : [cwd]), runDir],
-          denyWrite: [join(cwd, ".git"), ...(options.policy?.readOnly ? [cwd] : [])],
-          denyRead: hostOnly(kind),
-          allowDomains: [],
-        });
-        console.info(`run ${assignment.runId}: hosted sandbox ready in ${Math.round(performance.now() - wrapStarted)}ms`);
         await live();
         const spawnHosted = (config: SpawnOptions): SpawnedProcess => {
           assertOpen();
@@ -567,7 +509,8 @@ export async function createHostedBotRunner(host: {
           const task = withTaskEnv(env, assignment.taskEnv);
           if (task.dropped.length) console.warn(`run ${assignment.runId}: skipped reserved task variables ${task.dropped.join(", ")}`);
           // Its own process group, so a stop reaches the CLI's children too.
-          const child = spawn("/bin/sh", ["-c", confined!.command], {
+          // The CLI's args reach the bootstrap over stdin.
+          const child = spawn(process.execPath, [bootstrap], {
             cwd,
             env: bareEnv,
             detached: true,
@@ -587,8 +530,6 @@ export async function createHostedBotRunner(host: {
               cli: binaries[kind],
               node: process.execPath,
               brokerSocket: readyBroker.socket,
-              publicEgress: Boolean(egress),
-              ...(egress ? { egressSocket: egress.socketPath } : {}),
               ...(options.github ? { githubBin: join(runDir, 'github', 'bin') } : {}),
             }) + "\n",
           );

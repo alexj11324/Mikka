@@ -270,79 +270,21 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: ./.github/actions/pnpm-install
-      - name: Prepare pinned hosted-runner test image
-        run: docker pull node@sha256:6449e19d8184d84062525b6a7524def03146c2cb04a7f08b076680d0e8e4240a
-      - name: Let the hosted runner tests use bubblewrap, as on the E2B machine
-        # Hosted runs execute the CLI under Anthropic's sandbox-runtime (no Docker),
-        # which needs bubblewrap, socat and ripgrep and capability-bearing user
-        # namespaces. Ubuntu 24.04 runners restrict those
-        # (kernel.apparmor_restrict_unprivileged_userns=1, recorded on run 41313960870);
-        # sandbox-runtime's README (Ubuntu 24.04+ note) lifts it with this sysctl. The
-        # E2B machine (Debian 12) has no such restriction. The setting is put back right
-        # after the two whole-suite runs (unit, and sandbox acceptance), so the later steps
-        # still run on the unchanged host policy.
-        timeout-minutes: 5
-        run: |
-          apt_options=(-o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30)
-          sudo apt-get "${apt_options[@]}" update
-          sudo apt-get "${apt_options[@]}" install -y bubblewrap socat ripgrep
-          echo "USERNS_RESTRICT_BEFORE=$(sysctl -n kernel.apparmor_restrict_unprivileged_userns 2>/dev/null || echo none)" >> "$GITHUB_ENV"
-          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
       - name: Daemon unit and transport regression tests
         run: pnpm --filter @mikka/daemon exec vitest run --no-cache --reporter=default --reporter=github-actions --reporter=json --outputFile.json="$RUNNER_TEMP/pr13-daemon-unit-results.json"
       - name: Existing mailbox CLI integration tests
         run: pnpm --filter @mikka/daemon test:mailbox-cli
-      - name: Host Git configuration isolation in the actual sandbox
-        run: pnpm --filter @mikka/daemon test:local-git-origin-sandbox
       - name: Local computer authority through actual daemon and adapter protocol
         run: pnpm --filter @mikka/daemon exec node --import tsx --test test/local-computer-adapters.node-test.ts test/local-computer-daemon.node-test.ts src/computer/proxy.test.mjs
         env:
           NODE_ENV: test
           MIKKA_TEST_MODE: '1'
-      - name: Install sandbox runtime dependencies without changing host namespace policy
-        if: ${{ !cancelled() }}
-        # A stalled Ubuntu mirror once held apt for the rest of the job
-        # (2026-11-01, run 41257416436). Fail this step instead of the job.
-        timeout-minutes: 5
-        run: |
-          apt_options=(-o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30)
-          sudo apt-get "${apt_options[@]}" update
-          sudo apt-get "${apt_options[@]}" install -y bubblewrap socat ripgrep
-      - name: Install pinned official CLI for offline protocol diagnostics
-        if: ${{ !cancelled() }}
-        run: |
-          npm install --prefix "$RUNNER_TEMP/pr13-codex-contract" --no-audit --no-fund --ignore-scripts @openai/codex@0.163.0
-          echo "CODEX_CONTRACT_BIN=$RUNNER_TEMP/pr13-codex-contract/node_modules/.bin/codex" >> "$GITHUB_ENV"
-      - name: Require real sandbox probe and daemon lifecycle acceptance (no skips)
-        if: ${{ !cancelled() }}
-        run: pnpm --filter @mikka/daemon exec vitest run --no-cache --reporter=default --reporter=github-actions --reporter=json --outputFile.json="$RUNNER_TEMP/pr13-sandbox-results.json"
-        env:
-          MIKKA_SANDBOX_ACCEPTANCE: '1'
-      - name: Put the host's user namespace policy back
-        if: ${{ always() }}
-        run: |
-          if [ "$USERNS_RESTRICT_BEFORE" != none ]; then sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns="$USERNS_RESTRICT_BEFORE"; fi
-      - name: Preserve offline CLI diagnostic evidence
+      - name: Preserve daemon unit evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: pr13-cli-diagnostics-${{ github.sha }}
-          path: |
-            ${{ runner.temp }}/pr13-sandbox-results.json
-            ${{ runner.temp }}/pr13-daemon-unit-results.json
-            /tmp/mikka-official-codex-synthetic-*/evidence.json
-            /tmp/mikka-official-codex-synthetic-*/runs/*/official-cli.stderr.log
-            /tmp/mikka-official-codex-computer-*/evidence.json
-            /tmp/mikka-official-codex-computer-*/runs/*/official-cli.stderr.log
-            /tmp/mikka-official-claude-synthetic-*/evidence.json
-            /tmp/mikka-official-claude-synthetic-*/adapters/runs/*/official-cli.stderr.log
-            /tmp/mikka-official-claude-computer-*/evidence.json
-            /tmp/mikka-official-claude-computer-*/adapters/runs/*/official-cli.stderr.log
-            /tmp/mikka-hosted-approval-*/evidence.json
-            /tmp/mikka-hosted-approval-*/docker.jsonl
-            /tmp/mikka-hosted-approval-*/created-id
-            /tmp/mikka-hosted-approval-*/adapters/native-resources/*.json
-            /tmp/mikka-launcher-computer-*/evidence.json
+          path: ${{ runner.temp }}/pr13-daemon-unit-results.json
           if-no-files-found: warn
       - run: pnpm --filter @mikka/daemon typecheck
       - run: pnpm --filter @mikka/daemon build

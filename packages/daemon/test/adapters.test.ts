@@ -36,7 +36,7 @@ afterEach(async () => {
 
 async function boot(server: MemoryServer, dataDir: string) {
   const link = server.link()
-  link.prepareRunToolApproval = async assignment => new ToolApprovalGate(assignment.runId, { permission: () => 'allow', ask: async () => 'deny', isLive: () => true })
+  link.prepareRunToolApproval = async assignment => new ToolApprovalGate(assignment.runId, { isLive: () => true })
   const daemon = await new Daemon({
     dataDir,
     flavor: "dev",
@@ -115,10 +115,10 @@ function texts(chunks: RunChunk[]) {
     .join("")
 }
 
-it('does not advertise policy enforcement from callback availability alone', async () => {
+it('advertises the run gate without any sandbox (decision 2026-11-01-2335), for any Codex version', async () => {
   const { server } = await setup()
   const reported = server.devices.get(DEVICE)?.info.harnesses ?? []
-  expect(reported.some(item => item.toolApproval === true)).toBe(false)
+  expect(reported.filter(item => item.toolApproval === true).map(item => item.harness).sort()).toEqual(['claude_code', 'codex'])
 })
 
 describe.each(["claude_code", "codex", "cursor"] as const)(

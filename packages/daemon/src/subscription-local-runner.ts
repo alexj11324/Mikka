@@ -18,7 +18,7 @@ import { removeRunCredentials } from "./run-scratch"
 
 const unavailable = () => new Error("subscription_local_runtime_unavailable")
 
-type Common = Pick<ClaudeAdapterOptions & CodexAdapterOptions, "sandbox" | "stateDir" | "computerProvider" | "networkCeiling">
+type Common = Pick<ClaudeAdapterOptions & CodexAdapterOptions, "sandbox" | "stateDir" | "computerProvider">
 
 export interface LocalSubscriptionHost {
   stateDir: string

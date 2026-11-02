@@ -63,7 +63,7 @@ function recordingCli(fake: string, record: string, credential: string) {
 }
 
 function gate(runId: string) {
-  return new ToolApprovalGate(runId, { permission: () => "deny", ask: async () => "deny", isLive: id => id === runId })
+  return new ToolApprovalGate(runId, { isLive: id => id === runId })
 }
 
 async function runToExit(session: Awaited<ReturnType<ClaudeAdapter["start"]>>) {

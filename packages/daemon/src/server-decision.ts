@@ -11,13 +11,8 @@
  * a permission never fails open. Hard boundaries (read-only runs, worktree containment, the
  * network ceiling, the git push deny) stay in code and are not asked.
  */
-export type ServerDecisionPurpose =
-  | 'command-action'
-  | 'network-destination'
-  | 'computer-action'
-  | 'tool-access'
-  | 'setup-recipe'
-  | 'permission-default'
+/** Runs ask nothing per tool or destination (decision 2026-11-01-2335); only the computer broker asks. */
+export type ServerDecisionPurpose = 'computer-action'
 
 export type ServerDecisionQuestion =
   | { type: 'predicate'; name: string; instructions: string }

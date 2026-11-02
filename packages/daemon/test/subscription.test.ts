@@ -98,7 +98,7 @@ describe("hosted subscription seam", () => {
       for (let task = 0; task < 2; task++) {
         const session = await startSubscriptionSession(
           use,
-          { ...base, runId: `fixture-${task}`, toolApproval: new ToolApprovalGate(`fixture-${task}`, { permission: () => 'deny', ask: async () => 'deny', isLive: () => true }) },
+          { ...base, runId: `fixture-${task}`, toolApproval: new ToolApprovalGate(`fixture-${task}`, { isLive: () => true }) },
           backend,
           () => NOW,
         )

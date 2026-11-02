@@ -1,7 +1,7 @@
 import { codexQuotaSignal, mergeQuota, type CodexRateLimits, type QuotaSignal } from "../runs/quota-exhausted"
-import { sandboxComputerSpec, computerSandboxPolicy, computerDomain } from '../computer/transport'
 // Codex adapter (ADR 0003): the user's own signed-in `codex app-server`,
-// one process per session, inside the run's sandbox, with an isolated
+// one process per session, run directly (no sandbox; approvals "never" and
+// sandbox "danger-full-access", decision 2026-11-01-2335), with an isolated
 // `CODEX_HOME` (see `agents/harness-home.ts`). Thread = session: `thread/start`
 // or `thread/resume`, then `turn/start`; a message during a turn is a
 // `turn/steer`, one between turns starts the next turn. Threads live in the
@@ -19,7 +19,6 @@ import {
   spawnCli,
   untilReady,
 } from "../agents/child"
-import type { RunContainer, RunContainerOptions } from "../run-container"
 import {
   carryHistory,
   prepareCodexHome,
@@ -38,11 +37,8 @@ import {
 } from "../agents/run-context"
 import type { AgentSandbox } from "../agents/sandbox"
 import { requireRunToolApproval } from "../agents/tool-approval"
-import { spawnRunSandbox } from "../agents/run-sandbox-launcher"
-import { runNetworkApproval } from "../agents/run-network"
-import { runAppsHost, type RunApps } from "../agents/run-apps"
+import type { RunApps } from "../agents/run-apps"
 import { rawCliShellAvailable, runPolicy } from "../permissions"
-import { codexHasAuditedDynamicTools, codexSupportsRunApproval } from "./codex-version"
 import type { RunChunk } from "../chunks"
 import { DAEMON_VERSION } from "../paths"
 import { buildChildEnv } from "../env"
@@ -69,15 +65,11 @@ import type {
 
 export interface CodexAdapterOptions {
   sandbox: AgentSandbox
-  /** Optional host-owned additional ceiling; conservative intersection only. */
-  networkCeiling?: readonly string[]
   /** The daemon's adapter state dir (per-run dirs and homes live under it). */
   stateDir: string
   binary?: string
   /** The daemon's pinned Codex, installed on first need. */
   ensureBinary?: () => Promise<string>
-  /** Docker mode (run-container.ts): set by the daemon when this device runs harnesses in containers. */
-  openContainer?: (run: Omit<RunContainerOptions, "image" | "owner">) => Promise<RunContainer>
   /** Trusted hosted transport, retaining the existing app-server adapter. */
   spawnCli?: typeof spawnCli
   /** Persist an owner-bound session before any prompt can execute. */
@@ -329,15 +321,12 @@ export class CodexAdapter implements AgentAdapter {
     }
     // Inside the run dir: one run's home is never another run's.
     const codexHome = prepareCodexHome(join(runDir, "codex-home"), log)
-    const assignedComputer = this.options.computerMcp ?? this.options.computerProvider?.(options.runId, options.policy)
-    // Docker mode: the CLI runs in a disposable container of the runner image.
-    const inContainer = !this.options.spawnCli && this.options.sandbox.kind !== 'none' && !assignedComputer && Boolean(this.options.openContainer)
-    const binary = this.options.binary ?? (inContainer ? "codex" : await this.options.ensureBinary?.()) ?? "codex"
+    const computerMcp = this.options.computerMcp ?? this.options.computerProvider?.(options.runId, options.policy)
+    const binary = this.options.binary ?? await this.options.ensureBinary?.() ?? "codex"
     if (externalAuth && options.credential) throw new Error(SUBSCRIPTION_AUTH_ERROR)
     const credential = codexCredential(options.credential)
     const providerDomain = credentialDomain(options.credential)
     const ctx = new RunContext({
-      ...(inContainer ? { nodeBinary: "node" } : {}),
       harnessDomains: providerDomain ? [providerDomain] : undefined,
       github: options.github,
       apps: options.apps,
@@ -360,7 +349,6 @@ export class CodexAdapter implements AgentAdapter {
     const earlier = mode === "restart" ? ctx.readHandoff(log) : null
     if (threadId && earlier) return endedSession(threadId, earlier)
     ctx.clearHandoff()
-    const computerMcp = sandboxComputerSpec(assignedComputer, this.options.sandbox.kind)
     const mcp = ctx.mcpServer()
     const argv = [
       binary,
@@ -377,9 +365,6 @@ export class CodexAdapter implements AgentAdapter {
       ...(computerMcp ? [
         "-c", `mcp_servers.${COMPUTER_MCP_SERVER_NAME}.command=${toml(computerMcp.command)}`,
         "-c", `mcp_servers.${COMPUTER_MCP_SERVER_NAME}.args=${toml(computerMcp.args)}`,
-        ...(computerMcp.env.MIKKA_COMPUTER_SANDBOX_PROXY === "1" ? [
-          "-c", `mcp_servers.${COMPUTER_MCP_SERVER_NAME}.env_vars=["HTTP_PROXY","http_proxy"]`,
-        ] : []),
         ...Object.entries(computerMcp.env).flatMap(([key, value]) => ["-c", `mcp_servers.${COMPUTER_MCP_SERVER_NAME}.env.${key}=${toml(value)}`]),
       ] : []),
       ...codexAppArgs(options.apps),
@@ -393,30 +378,16 @@ export class CodexAdapter implements AgentAdapter {
     const spawnOptions = {
       cwd: ctx.worktree,
       env: { ...options.env, ...ctx.tempEnv(), ...credential.env, CODEX_HOME: codexHome.home },
-      policy: computerSandboxPolicy(ctx.policy(), computerMcp),
+      policy: ctx.policy(),
       pidFile: paths.pidFile,
       marker: ctx.runDir,
     }
-    const requestedCeiling = this.options.networkCeiling
-    const maximum = requestedCeiling === undefined ? spawnOptions.policy.allowDomains
-      : spawnOptions.policy.allowDomains.includes('*') ? [...requestedCeiling]
-      : requestedCeiling.includes('*') ? spawnOptions.policy.allowDomains
-      : requestedCeiling.filter(domain => spawnOptions.policy.allowDomains.includes(domain))
-    let launcher: { revoke(): Promise<void> } | undefined
-    const onNetwork = runNetworkApproval(options.runId,'codex',options.toolApproval!,maximum,computerDomain(computerMcp),runAppsHost(options.apps))
-    const container = inContainer ? await this.options.openContainer!({ runId: options.runId, cwd: ctx.worktree, policy: spawnOptions.policy, onNetwork }) : undefined
-    const child = container
-      ? (launcher = container.spawn(argv[0], argv.slice(1), spawnOptions.env))
-      : this.options.spawnCli || this.options.sandbox.kind === 'none'
-      ? await (this.options.spawnCli ?? spawnCli)(this.options.sandbox, argv, spawnOptions)
-      : (launcher = spawnRunSandbox({ command:argv[0], args:argv.slice(1), cwd:spawnOptions.cwd, env:spawnOptions.env, policy:spawnOptions.policy, maxAllowDomains:maximum, onNetwork:runNetworkApproval(options.runId,'codex',options.toolApproval!,maximum,computerDomain(computerMcp),runAppsHost(options.apps)) }))
-    if (launcher) {
-      const ownedLauncher = launcher
-      const off = options.toolApproval!.onRevoke(() => { void ownedLauncher.revoke().catch(() => undefined) })
-      void child.exited.finally(off)
-    }
+    const child = await (this.options.spawnCli ?? spawnCli)(this.options.sandbox, argv, spawnOptions)
+    // A revoked run gate stops the CLI (no sandbox launcher owns it any more).
+    const off = options.toolApproval!.onRevoke(() => { void child.kill().catch(() => undefined) })
+    void child.exited.finally(off)
     // After the whole group is gone (`exited` kills it first).
-    void child.exited.then(async () => { await container?.close(); wipeRunCredentials(runDir) })
+    void child.exited.then(() => { wipeRunCredentials(runDir) })
     const rpc: MessageConnection = jsonlConnection(
       child.process.stdout,
       child.process.stdin,
@@ -481,8 +452,8 @@ export class CodexAdapter implements AgentAdapter {
         if (candidates.length !== 1) return {action:'decline'}
         const [itemId,item] = candidates[0]
         item.attempted = true // repeated native requests never mint another permit
-        const decision = await approval.request({runId:options.runId,harness:'codex',requestId:`${activeTurn}/${itemId}/mcp-transport`,method:`cli/mcp__${item.server}__${item.tool}`,input:{} })
-        return decision === 'allow' && !ending && !approval.revoked && call.turnId === activeTurn && pendingMcp.get(itemId) === item
+        // Nothing is asked per tool (decision 2026-11-01-2335); the run must still be live.
+        return await approval.checkLive() && !ending && !approval.revoked && call.turnId === activeTurn && pendingMcp.get(itemId) === item
           ? {action:'accept',content:{}} : {action:'decline'}
       }
       if (method === 'item/tool/call') {
@@ -521,10 +492,9 @@ export class CodexAdapter implements AgentAdapter {
         if (method === 'item/fileChange/requestApproval' && call.grantRoot != null) return { decision: 'cancel' }
         if (call.availableDecisions != null && (!Array.isArray(call.availableDecisions) || !call.availableDecisions.includes('accept'))) return { decision: 'cancel' }
         if (call.approvalId != null && (typeof call.approvalId !== 'string' || !call.approvalId)) return { decision: 'decline' }
-        const callbackId = typeof call.approvalId === 'string' ? call.approvalId : call.itemId
-        const decision = await options.toolApproval.request({ runId: options.runId, harness: 'codex', requestId: `${activeTurn}/${call.itemId}/${callbackId}`, method, input: params })
+        // Approvals are "never"; a request that still arrives goes ahead while the run is live.
         // Do not grant a session or policy amendment in place of one action.
-        return { decision: decision === 'allow' && !options.toolApproval.revoked && !ending && call.turnId === activeTurn ? 'accept' : 'decline' }
+        return { decision: await options.toolApproval.checkLive() && !options.toolApproval.revoked && !ending && call.turnId === activeTurn ? 'accept' : 'decline' }
       }
       if (method === "item/permissions/requestApproval") return { permissions: {}, scope: "turn" }
       log.warn({ method }, "unhandled codex request; declining")
@@ -712,10 +682,6 @@ export class CodexAdapter implements AgentAdapter {
         }),
         "initialize",
       )
-      // Public schemas omit the experimental dynamicTools field. Support only
-      // the exact pinned CLI whose Rust protocol and response were audited.
-      if (options.mailbox && !codexHasAuditedDynamicTools(initialized.userAgent)) throw new Error('Run permissions require the audited Codex0.163.0 tool interface')
-      if (!codexSupportsRunApproval(initialized.userAgent)) throw new Error('This Codex version is too old for Mikka; update Codex')
       await rpc.sendNotification("initialized")
       if (externalAuth) {
         try {
@@ -738,7 +704,9 @@ export class CodexAdapter implements AgentAdapter {
       }
       const thread: ThreadStartParams = {
         cwd: ctx.worktree,
-        approvalPolicy: "on-request",
+        // Nothing is asked and Codex's own sandbox is off: the equivalent of
+        // `--dangerously-bypass-approvals-and-sandbox` (decision 2026-11-01-2335).
+        approvalPolicy: "never",
         sandbox: "danger-full-access",
         developerInstructions: ctx.instructions(),
         ...(options.mailbox ? { dynamicTools: options.mailbox.tools.map(tool => ({ type: 'function' as const, ...tool })) } : {}),

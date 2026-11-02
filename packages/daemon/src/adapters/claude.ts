@@ -1,10 +1,9 @@
 // Claude Code adapter (ADR 0003): the user's own signed-in Claude Code, run
 // through `@anthropic-ai/claude-agent-sdk`, one CLI process per session.
 //
-// The SDK's process hook places the entire local CLI inside its run-owned
-// official sandbox, including native tools and MCP children. Hosted runs use
-// their enclosing Docker boundary. Native permission callbacks additionally
-// use the live run gate; they cannot expand either outer boundary.
+// The CLI runs directly, with no sandbox, in bypassPermissions mode (decision
+// 2026-11-01-2335): nothing is asked per tool. The run's live gate stops it
+// when the run is revoked. Hosted runs spawn through the hosted runner.
 //
 // Isolation (ADR 0009; devices are runners, 2026-10-31): every run gets its
 // own `HOME` and `CLAUDE_CONFIG_DIR` in its run dir, so the person's
@@ -17,7 +16,6 @@
 // `projects` store first.
 import { claudeQuotaSignal, mergeQuota, type QuotaSignal } from "../runs/quota-exhausted"
 import { spawn } from "node:child_process"
-import { computerDomain, computerSandboxPolicy, sandboxComputerSpec } from '../computer/transport'
 import { randomUUID } from "node:crypto"
 import { realpathSync } from "node:fs"
 import { join } from "node:path"
@@ -49,12 +47,9 @@ import {
   type McpServerSpec,
   type ComputerSpecProvider,
 } from "../agents/run-context"
-import type { AgentSandbox, SandboxPolicy } from "../agents/sandbox"
 import { requireRunToolApproval } from "../agents/tool-approval"
-import { spawnRunSandbox } from "../agents/run-sandbox-launcher"
-import { runNetworkApproval } from "../agents/run-network"
-import { runAppsHost, type RunApps } from "../agents/run-apps"
-import type { RunContainer, RunContainerOptions } from "../run-container"
+import type { RunApps } from "../agents/run-apps"
+import type { AgentSandbox } from "../agents/sandbox"
 import { carryHistory, ownDir, wipeRunCredentials } from "../agents/harness-home"
 import { claudeCredentialEnv, credentialDomain } from "../agents/run-credential"
 import { buildChildEnv } from "../env"
@@ -76,7 +71,7 @@ import type {
 } from "./types"
 
 export interface ClaudeAdapterOptions {
-  /** Explicit synthetic-test transport only; production uses the outer launcher. */
+  /** @deprecated Ignored: the SDK starts the CLI directly (no sandbox, decision 2026-11-01-2335). */
   sandbox?: AgentSandbox
   /** The daemon's adapter state dir (per-run dirs live under it). */
   stateDir: string
@@ -87,10 +82,6 @@ export interface ClaudeAdapterOptions {
   binary?: string
   /** The daemon's pinned Claude Code, installed on first need. */
   ensureBinary?: () => Promise<string>
-  /** Docker mode (run-container.ts): set by the daemon when this device runs harnesses in containers. */
-  openContainer?: (run: Omit<RunContainerOptions, "image" | "owner">) => Promise<RunContainer>
-  /** Trusted host-only restriction; never widens the run's network ceiling. */
-  networkCeiling?: readonly string[]
   /** Trusted hosted transport; ordinary local sessions retain SDK spawning. */
   spawnHosted?: (options: SpawnOptions, oauthPlaceholder: string) => SpawnedProcess
   onHostedSession?(sessionId:string):Promise<void>
@@ -137,56 +128,16 @@ export function claudeProjectDirName(cwd: string): string {
 }
 
 /**
- * The run's policy as Claude Code's own sandbox (ADR 0009). The CLI process
- * itself is not confined — it is the SDK's child, and it needs its login and
- * the model API — but every command the agent runs through it is.
- *
- * `network` is left out when the run may reach any host: the sandbox refuses
- * a bare `*` allow-list entry, and a host no list covers is prompted for,
- * which bypass mode auto-allows.
- */
-export function claudeSandboxSettings(
-  policy: SandboxPolicy,
-): NonNullable<Settings["sandbox"]> {
-  const anyHost = policy.allowDomains.includes("*")
-  return {
-    enabled: true,
-    // Nobody is watching: a sandbox that cannot start must not be skipped.
-    failIfUnavailable: true,
-    allowUnsandboxedCommands: false,
-    // Rust and Go CLIs verify TLS through trustd, which the sandbox
-    // otherwise blocks; the daemon's own sandbox sets this for the same
-    // reason. Network egress is still confined to the domains below.
-    enableWeakerNetworkIsolation: true,
-    filesystem: {
-      allowWrite: [...policy.allowWrite],
-      denyWrite: [...(policy.denyWrite ?? [])],
-      denyRead: [...(policy.denyRead ?? [])],
-    },
-    ...(anyHost
-      ? {}
-      : {
-          network: {
-            allowedDomains: [...policy.allowDomains],
-            // Deny what no list covers rather than asking a person who is
-            // not there (the daemon's own sandbox does the same).
-            strictAllowlist: true,
-          },
-        }),
-  }
-}
-
-/**
- * Host-config switches every Claude session gets (see the header), with the
- * workspace's command rules as Claude permission rules (ADR 0028).
+ * Host-config switches every Claude session gets: Claude Code's own Bash
+ * sandbox stays off (runs use no sandbox, decision 2026-11-01-2335), and the
+ * workspace's command rules apply as Claude permission rules (ADR 0028).
  */
 export function claudeSettings(
-  policy: SandboxPolicy,
   workspace?: RunPolicy,
   agentDelivers = false,
 ): Settings {
   return {
-    sandbox: claudeSandboxSettings(policy),
+    sandbox: { enabled: false },
     permissions: claudePermissionRules(runPolicy(workspace), agentDelivers),
   }
 }
@@ -479,13 +430,9 @@ export class ClaudeAdapter implements AgentAdapter {
     if (externalAuth && options.credential) throw new Error(SUBSCRIPTION_ERROR)
     const credentialEnv = claudeCredentialEnv(options.credential)
     const providerDomain = credentialDomain(options.credential)
-    const outerLocal = !this.options.spawnHosted && this.options.sandbox?.kind !== 'none'
-    const assignedComputer = this.options.computerMcp ?? this.options.computerProvider?.(options.runId, options.policy)
-    // Docker mode: the CLI runs in a disposable container of the runner image.
-    const inContainer = outerLocal && !assignedComputer && Boolean(this.options.openContainer)
-    const binary = this.options.binary ?? (inContainer ? undefined : await this.options.ensureBinary?.())
+    const computerMcp = this.options.computerMcp ?? this.options.computerProvider?.(options.runId, options.policy)
+    const binary = this.options.binary ?? (this.options.spawnHosted ? undefined : await this.options.ensureBinary?.())
     const ctx = new RunContext({
-      ...(inContainer ? { nodeBinary: "node" } : {}),
       harnessDomains: providerDomain ? [providerDomain] : undefined,
       github: options.github,
       apps: options.apps,
@@ -523,10 +470,8 @@ export class ClaudeAdapter implements AgentAdapter {
     const earlier = mode === "restart" ? ctx.readHandoff(log) : null
     if (earlier) return endedSession(sessionId, earlier)
     ctx.clearHandoff()
-    const computerMcp = sandboxComputerSpec(assignedComputer, outerLocal ? 'sandbox-runtime' : 'none')
 
     const queue = new EventQueue()
-    const approvalTransport = new AbortController()
     const prompts = new PromptQueue(sessionId)
     let written = 0
     let results = 0
@@ -549,33 +494,12 @@ export class ClaudeAdapter implements AgentAdapter {
     if(externalAuth && this.options.onHostedSession) {
       try{await this.options.onHostedSession(sessionId)}catch{throw new Error(SUBSCRIPTION_ERROR)}
     }
-    const outerPolicy = () => {
-      const policy = computerSandboxPolicy(ctx.policy(), computerMcp)
-      const requested = this.options.networkCeiling
-      const maximum = requested === undefined ? policy.allowDomains
-        : policy.allowDomains.includes('*') ? [...requested]
-        : requested.includes('*') ? policy.allowDomains
-        : requested.filter(domain => policy.allowDomains.includes(domain))
-      return { policy, maximum }
-    }
-    const container = inContainer ? await (async () => {
-      const { policy, maximum } = outerPolicy()
-      return this.options.openContainer!({ runId: options.runId, cwd: ctx.worktree, policy,
-        onNetwork: runNetworkApproval(options.runId, 'claude_code', options.toolApproval!, maximum, undefined, runAppsHost(options.apps)) })
-    })() : undefined
-    const spawnOuter = (config: SpawnOptions): SpawnedProcess => {
-      if (container) {
-        // The image's own pinned CLI; the credential goes in by env name.
-        const child = container.spawn("claude", config.args, { ...config.env, ...(nativeToken ? { CLAUDE_CODE_OAUTH_TOKEN: nativeToken } : {}) })
-        const off = options.toolApproval!.onRevoke(() => { void child.revoke().catch(() => undefined) })
-        void child.exited.finally(off)
-        return child.process
-      }
-      const { policy, maximum } = outerPolicy()
-      const child = spawnRunSandbox({ command:binary ?? config.command, args:config.args, cwd:config.cwd ?? ctx.worktree, env:config.env, policy, maxAllowDomains:maximum, onNetwork:runNetworkApproval(options.runId,'claude_code',options.toolApproval!,maximum,computerDomain(computerMcp),runAppsHost(options.apps)), signal:config.signal, ...(nativeToken ? {authToken:nativeToken} : {}) })
-      const off = options.toolApproval!.onRevoke(() => { void child.revoke().catch(() => undefined) })
-      void child.exited.finally(off)
-      return child.process
+    // No sandbox: the CLI starts directly. A revoked run gate stops it.
+    const spawnLocal = (config: SpawnOptions): SpawnedProcess => {
+      const child = spawnBinary(binary, nativeToken)(config)
+      const off = options.toolApproval!.onRevoke(() => { child.kill("SIGTERM") })
+      child.once("exit", off)
+      return child
     }
     const session = query({
       prompt: prompts,
@@ -593,10 +517,7 @@ export class ClaudeAdapter implements AgentAdapter {
         },
         settingSources: [],
         settings: {
-          ...claudeSettings(ctx.policy(), options.policy, ctx.agentDelivers),
-          // The official runtime launcher encloses the entire CLI. Nesting
-          // the CLI's Bash-only sandbox is unsupported on macOS.
-          ...(outerLocal ? {sandbox:{enabled:false,allowUnsandboxedCommands:true,autoAllowBashIfSandboxed:false}} : {}),
+          ...claudeSettings(options.policy, ctx.agentDelivers),
           ...(externalAuth ? { forceLoginMethod: "claudeai" as const } : {})
         },
         mcpServers: {
@@ -611,21 +532,15 @@ export class ClaudeAdapter implements AgentAdapter {
           preset: "claude_code",
           append: ctx.instructions(),
         },
-        permissionMode: "default" as const,
-        canUseTool: async (toolName: string, input: Record<string, unknown>, callback: { toolUseID: string; signal: AbortSignal }) => {
-            const gate = options.toolApproval!
-            const signal = AbortSignal.any([callback.signal, approvalTransport.signal])
-            const decision = await gate.request({ runId: options.runId, harness: 'claude_code', requestId: callback.toolUseID, method: `cli/${toolName}`, input }, signal)
-            return decision === 'allow' && !gate.revoked && !signal.aborted && !ending ? { behavior: 'allow' as const, updatedInput: input } : { behavior: 'deny' as const, message: 'Permission not granted.' }
-        },
+        // Nothing is asked per tool (decision 2026-11-01-2335).
+        permissionMode: "bypassPermissions" as const,
+        allowDangerouslySkipPermissions: true,
         ...(mode === "new" ? { sessionId } : { resume: sessionId }),
         ...(options.model ? { model: options.model } : {}),
-        // A hosted runtime always spawns into its own container; an API-key run there holds the placeholder too.
-        ...(outerLocal ? {spawnClaudeCodeProcess:spawnOuter} : this.options.spawnHosted
-          ? { spawnClaudeCodeProcess: (options:SpawnOptions) => this.options.spawnHosted!(options,nativeToken ?? NATIVE_AUTH_PLACEHOLDER) }
-          : binary || externalAuth
-          ? { spawnClaudeCodeProcess: spawnBinary(binary, nativeToken) }
-          : {}),
+        // A hosted run spawns through the hosted runner; an API-key run there holds the placeholder too.
+        spawnClaudeCodeProcess: this.options.spawnHosted
+          ? (options:SpawnOptions) => this.options.spawnHosted!(options,nativeToken ?? NATIVE_AUTH_PLACEHOLDER)
+          : spawnLocal,
         stderr: (data: string) => {
           if (!externalAuth) stderr = (stderr + data).slice(-STDERR_TAIL * 4)
         },
@@ -638,14 +553,12 @@ export class ClaudeAdapter implements AgentAdapter {
       (ended ??= close(event, revokeRunGate))
     const close = async (event: Omit<ExitEvent, "type"> | null, revokeRunGate: boolean) => {
       ending = true
-      approvalTransport.abort()
       if (revokeRunGate) options.toolApproval?.revoke()
       clearTimeout(graceTimer)
       clearTimeout(authTimer)
       prompts.close()
       session.close()
       await gone
-      await container?.close()
       wipeRunCredentials(runDir)
       if (event) queue.exit(event)
     }
@@ -723,7 +636,6 @@ export class ClaudeAdapter implements AgentAdapter {
       } catch (error) {
         if (!ending) diedEarly(errorMessage(error))
       } finally {
-        approvalTransport.abort()
         clearTimeout(authTimer)
         spoke(false)
         finished()

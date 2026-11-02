@@ -16,7 +16,7 @@ from pathlib import Path
 import time
 
 HERE = Path(__file__).resolve().parent
-COMPUTER_FILES = ('start-desktop.sh', 'viewer-gateway.py', 'lease-driver.py')
+COMPUTER_FILES = ('viewer-gateway.py', 'lease-driver.py')
 DOCKER_FREE_WORKER = ('cd /opt/mikka/worker/packages/daemon && '
                      'if test -f dist/cloud/cloud-worker.js; then node dist/cloud/cloud-worker.js; '
                      'else ./node_modules/.bin/tsx bin/cloud-worker.ts; fi')
@@ -28,7 +28,7 @@ def runtime_command():
 MIKKA_RUNTIME_HASHES
 then printf 'mikka-runtime-install-required'; exit 0; fi
 set -e
-install -d -m 710 -o root -g mikka-runner /run/mikka-viewer
+install -d -m 710 -o root -g user /run/mikka-viewer
 umask 077
 head -c 32 /dev/urandom > /run/mikka-viewer/key
 chmod 0755 /opt/mikka/computer/lease-driver.py
@@ -52,7 +52,7 @@ def measure(source, key):
     ready = time.monotonic()
     try:
         run = lambda cmd, user='root': sandbox.commands.run(cmd, user=user, timeout=60)
-        step('scrub_copied_worker_identity', lambda: run('rm -rf /home/mikka-runner/.mikka/worker /home/mikka-runner/.mikka/bootstrap.json /run/mikka-viewer /run/mikka-subagents; install -d -m 700 /run/mikka-viewer'))
+        step('scrub_copied_worker_identity', lambda: run('rm -rf /home/user/.mikka/worker /home/user/.mikka/bootstrap.json /run/mikka-viewer /run/mikka-subagents; install -d -m 700 /run/mikka-viewer'))
         def runtime():
             command = runtime_command()
             result = run(command)
@@ -62,17 +62,17 @@ def measure(source, key):
                     raise RuntimeError('Runtime file validation failed')
         step('viewer_runtime_current_template_one_rpc', runtime)
         step('read_worker_sha', lambda: sandbox.files.read('/opt/mikka/worker-source-sha', user='root'))
-        preloaded = step('inspect_preloaded_worker', lambda: run('read -r p < /home/mikka-runner/.mikka/preloaded.pid 2>/dev/null || p=; if test -n "$p" && kill -0 "$p" 2>/dev/null && tr "\\0" "\\n" < "/proc/$p/cmdline" | grep -Fxq -- "--wait-bootstrap"; then printf yes; fi', user='mikka-runner')).stdout.strip() == 'yes'
+        preloaded = step('inspect_preloaded_worker', lambda: run('read -r p < /home/user/.mikka/preloaded.pid 2>/dev/null || p=; if test -n "$p" && kill -0 "$p" 2>/dev/null && tr "\\0" "\\n" < "/proc/$p/cmdline" | grep -Fxq -- "--wait-bootstrap"; then printf yes; fi', user='user')).stdout.strip() == 'yes'
         def worker_load():
             # Catch only the known missing-handoff refusal. A missing module or
             # binary is a failed probe, never reported as a fast worker start.
-            result = run(f"{DOCKER_FREE_WORKER} >/tmp/mikka-worker-load-probe.log 2>&1; result=$?; test \"$result\" = 1 && grep -qx 'Cloud worker unavailable' /tmp/mikka-worker-load-probe.log", user='mikka-runner')
+            result = run(f"{DOCKER_FREE_WORKER} >/tmp/mikka-worker-load-probe.log 2>&1; result=$?; test \"$result\" = 1 && grep -qx 'Cloud worker unavailable' /tmp/mikka-worker-load-probe.log", user='user')
             return result
         def preloaded_probe():
             # A disposable sandbox only. The invalid handoff ends its waiting
             # worker without starting a daemon, making the hot activation time
             # visible without any application account or model credential.
-            return run("read -r p < /home/mikka-runner/.mikka/preloaded.pid; umask 077; printf '{}' > /home/mikka-runner/.mikka/bootstrap.next; mv /home/mikka-runner/.mikka/bootstrap.next /home/mikka-runner/.mikka/bootstrap.json; kill -USR1 \"$p\"; for i in $(seq 1 3000); do if test ! -e /home/mikka-runner/.mikka/preloaded.pid && grep -qx 'Cloud worker unavailable' /home/mikka-runner/.mikka/worker-preload.log; then exit 0; fi; sleep .01; done; exit 1", user='mikka-runner')
+            return run("read -r p < /home/user/.mikka/preloaded.pid; umask 077; printf '{}' > /home/user/.mikka/bootstrap.next; mv /home/user/.mikka/bootstrap.next /home/user/.mikka/bootstrap.json; kill -USR1 \"$p\"; for i in $(seq 1 3000); do if test ! -e /home/user/.mikka/preloaded.pid && grep -qx 'Cloud worker unavailable' /home/user/.mikka/worker-preload.log; then exit 0; fi; sleep .01; done; exit 1", user='user')
         step('preloaded_handoff_to_refusal' if preloaded else 'worker_load_to_missing_bootstrap_refusal', preloaded_probe if preloaded else worker_load)
         out = {'source': source, 'marks': marks, 'e2bBootSeconds': round(ready - requested, 3),
                'diagnosticAfterBootSeconds': round(time.monotonic() - ready, 3),

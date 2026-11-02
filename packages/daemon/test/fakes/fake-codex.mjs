@@ -232,7 +232,8 @@ createInterface({ input: process.stdin }).on("line", async (line) => {
     case "thread/start":
     case "thread/resume":
       dynamicTools = params.dynamicTools ?? []
-      if (!params.cwd || params.sandbox !== "danger-full-access")
+      // Runs ask nothing and use no Codex sandbox (decision 2026-11-01-2335).
+      if (!params.cwd || params.sandbox !== "danger-full-access" || params.approvalPolicy !== "never")
         return send({ id, error: { code: -1, message: "bad thread params" } })
       if (params.model) model = params.model
       if (method === "thread/resume") {

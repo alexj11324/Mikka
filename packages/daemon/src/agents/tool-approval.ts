@@ -1,27 +1,11 @@
-// Run-bound CLI approval bridge. Host callbacks are injected in-process by
-// trusted daemon code; model-facing request data never supplies authority.
-import { randomUUID } from 'node:crypto'
-import type { PermissionDecision } from '@mikka/protocol/agent-policy'
-import { decisionFallback } from '../decision-judgments'
+// A run's live gate: whether the run may still act, and its revocation.
+// Agent CLIs ask nothing per tool or destination (decision 2026-11-01-2335:
+// Claude Code in bypassPermissions, Codex with approvals "never"); this gate
+// only stops a run whose lease, owner or policy is no longer live.
 
-export interface ToolApprovalRequest {
-  runId: string
-  harness: 'codex' | 'claude_code'
-  requestId: string
-  method: string
-  input: unknown
-}
 export interface ToolApprovalHost {
-  /** Must derive the decision from trusted effective policy, not model input. */
-  permission(request: Readonly<ToolApprovalRequest>): PermissionDecision | 'unavailable' | Promise<PermissionDecision | 'unavailable'>
-  /** Authenticated host flow, bound to the exact request and this signal. */
-  ask(request: Readonly<ToolApprovalRequest>, signal: AbortSignal): Promise<'allow' | 'deny'>
   /** Must reflect current run lease, owner, and revocation state. */
   isLive(runId: string): boolean | Promise<boolean>
-  /** Under network `ask`, the Decisions API's call on one destination the
-   * ceiling already admits: true goes ahead, false asks the person, null (no
-   * answer) goes ahead and is logged. Absent: every such destination is asked. */
-  preauthorizeNetwork?(request: Readonly<ToolApprovalRequest>, signal: AbortSignal): Promise<boolean | null>
 }
 
 async function abortable<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
@@ -36,9 +20,6 @@ async function abortable<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
 }
 
 export class ToolApprovalGate {
-  private readonly epoch = randomUUID()
-  private readonly seen = new Set<string>()
-  private readonly networkApprovals = new Map<string, Promise<'allow' | 'deny'>>()
   private readonly stop = new AbortController()
   constructor(readonly runId: string, private readonly host: ToolApprovalHost) {}
   revoke() { this.stop.abort() }
@@ -52,79 +33,6 @@ export class ToolApprovalGate {
     if (this.revoked) return false
     try { return await abortable(Promise.resolve(this.host.isLive(this.runId)), this.stop.signal) && !this.revoked }
     catch { return false }
-  }
-
-  /** A ceiling limits destinations; it is not itself user consent. Cloud allow
-   * needs no prompt. Explicit ask obtains one exact-destination grant and shares
-   * it across this run's sockets, while every connection rechecks live policy. */
-  async preapprovedNetwork(request: ToolApprovalRequest, signal?: AbortSignal): Promise<boolean> {
-    if (request.runId !== this.runId || request.method !== 'sandbox/network' || this.revoked || signal?.aborted) return false
-    const destination = request.input as { host?: unknown; port?: unknown } | null
-    if (!destination || typeof destination.host !== 'string' || !Number.isInteger(destination.port) || Number(destination.port) < 1 || Number(destination.port) > 65535) return false
-    const key = JSON.stringify([request.harness, destination.host, destination.port])
-    const lifetime = signal ? AbortSignal.any([signal, this.stop.signal]) : this.stop.signal
-    try {
-      if (!await abortable(Promise.resolve(this.host.isLive(this.runId)), lifetime)) return false
-      const decision = await abortable(Promise.resolve(this.host.permission(request)), lifetime)
-      if (decision !== 'allow' && decision !== 'ask') { this.networkApprovals.delete(key); return false }
-      if (decision === 'ask') {
-        let granted = this.networkApprovals.get(key)
-        if (!granted) {
-          if (this.networkApprovals.size >= 1024 || lifetime.aborted) return false
-          granted = this.networkGrant(request, lifetime)
-          this.networkApprovals.set(key, granted)
-        }
-        if (await abortable(granted, lifetime) !== 'allow' || this.networkApprovals.get(key) !== granted) return false
-      }
-      return await abortable(Promise.resolve(this.host.isLive(this.runId)), lifetime) && !lifetime.aborted && !this.revoked
-    } catch { return false }
-  }
-
-  private async networkGrant(request: ToolApprovalRequest, signal: AbortSignal): Promise<'allow' | 'deny'> {
-    if (this.host.preauthorizeNetwork) {
-      let judged: boolean | null
-      try { judged = await abortable(this.host.preauthorizeNetwork(request, signal), signal) }
-      catch { return 'deny' }
-      if (judged === true) return 'allow'
-      if (judged === null) {
-        // No answer: as before the Decisions API, the person is asked.
-        const { host, port } = request.input as { host: string; port: number }
-        decisionFallback(`network ${host}:${port} asked as before without a judgment`)
-      }
-    }
-    return this.request({ ...request, requestId: `network:${randomUUID()}` }, signal)
-  }
-
-  async request(request: ToolApprovalRequest, signal?: AbortSignal): Promise<'allow' | 'deny'> {
-    if (request.runId !== this.runId || !request.requestId || request.requestId.length > 219 || this.seen.has(request.requestId) || this.seen.size >= 1024 || this.stop.signal.aborted || signal?.aborted) return 'deny'
-    let snapshot: ToolApprovalRequest
-    try {
-      const serialized = JSON.stringify(request)
-      if (serialized.length > 20_000) return 'deny'
-      snapshot = JSON.parse(serialized) as ToolApprovalRequest
-      snapshot.requestId = `${this.epoch}/${snapshot.requestId}`
-    } catch { return 'deny' }
-    this.seen.add(request.requestId) // consume before asynchronous work; never refund
-    const controller = new AbortController()
-    const abort = () => controller.abort()
-    this.stop.signal.addEventListener('abort', abort, { once: true })
-    signal?.addEventListener('abort', abort, { once: true })
-    try {
-      if (this.stop.signal.aborted || signal?.aborted || !await abortable(Promise.resolve(this.host.isLive(this.runId)), controller.signal)) return 'deny'
-      const permission = await abortable(Promise.resolve(this.host.permission(snapshot)), controller.signal)
-      if (!await abortable(Promise.resolve(this.host.isLive(this.runId)), controller.signal) || controller.signal.aborted) return 'deny'
-      if (permission === 'deny') return 'deny'
-      if (permission === 'allow') return 'allow'
-      if (permission !== 'ask') return 'deny'
-      const decision = await abortable(this.host.ask(snapshot, controller.signal), controller.signal)
-      if (!await abortable(Promise.resolve(this.host.isLive(this.runId)), controller.signal) || controller.signal.aborted) return 'deny'
-      return decision === 'allow' ? 'allow' : 'deny'
-    } catch {
-      return 'deny'
-    } finally {
-      this.stop.signal.removeEventListener('abort', abort)
-      signal?.removeEventListener('abort', abort)
-    }
   }
 }
 

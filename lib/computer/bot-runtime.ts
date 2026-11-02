@@ -22,8 +22,8 @@ export async function ensureBotRuntime(pool: Pool, actor: { userId: string; work
     const harnesses = (Array.isArray(machine.harnesses) ? machine.harnesses : []).filter((h: { harness?: string; installed?: boolean; subscriptionBroker?: boolean; computerBroker?: boolean }) =>
       (h.harness === 'codex' || h.harness === 'claude_code') && h.installed === true && h.subscriptionBroker === true && h.computerBroker === true)
     if (!harnesses.length) throw new Error('Bot runtime unavailable')
-    const path = `/home/mikka-runner/.mikka/bot-workspaces/${botId}`
-    await sandbox.commands.run(`install -d -m 0700 ${path}; if ! test -d ${path}/.git; then git -C ${path} init -q -b main && git -C ${path} -c user.name=Mikka -c user.email=bot@mikka.invalid commit --allow-empty -qm init; fi; git -C ${path} rev-parse --verify main >/dev/null`, { user: 'mikka-runner', timeoutMs: 20_000 })
+    const path = `/home/user/.mikka/bot-workspaces/${botId}`
+    await sandbox.commands.run(`install -d -m 0700 ${path}; if ! test -d ${path}/.git; then git -C ${path} init -q -b main && git -C ${path} -c user.name=Mikka -c user.email=bot@mikka.invalid commit --allow-empty -qm init; fi; git -C ${path} rev-parse --verify main >/dev/null`, { user: 'user', timeoutMs: 20_000 })
     const repo = (await client.query(`INSERT INTO device_repos (id,"deviceId","userId","repoPath","baseBranch") VALUES ($1,$2,$3,$4,'main')
       ON CONFLICT ("deviceId","repoPath") DO UPDATE SET "repoPath"=EXCLUDED."repoPath" WHERE device_repos."userId"=EXCLUDED."userId" RETURNING id`, [randomUUID(), deviceId, actor.userId, path])).rows[0]
     if (!repo) throw new Error('Bot runtime unavailable')

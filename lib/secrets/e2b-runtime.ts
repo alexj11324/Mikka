@@ -21,10 +21,21 @@ export async function sandboxKeyOwner(workspaceId: string, sandboxId: string): P
   return rows[0]?.ownerId ?? null
 }
 
-/** Base desktop template: E2B_BYO_COMPUTER_TEMPLATE (must be a public template); unset → e2b_template_unavailable. */
+/** The bot's computer: Mikka's template on E2B's desktop, E2B_BYO_COMPUTER_TEMPLATE (must be public); unset → e2b_template_unavailable. */
 export function computerTemplate(env: Env = process.env): string {
   if (!env.E2B_BYO_COMPUTER_TEMPLATE) throw new E2BKeyError('e2b_template_unavailable', 'BYO template not configured')
   return env.E2B_BYO_COMPUTER_TEMPLATE
+}
+
+/** Which variable names a task machine's template, by the run's harness (decision 2026-11-01-2335). */
+const TASK_TEMPLATE_ENV = { claude_code: 'E2B_CLAUDE_TEMPLATE', codex: 'E2B_CODEX_TEMPLATE' } as const
+
+/** A repository task's machine: Mikka's template on E2B's `claude` or `codex`, by harness; unset or another harness → e2b_template_unavailable. */
+export function taskTemplate(harness: string, env: Env = process.env): string {
+  const key = Object.hasOwn(TASK_TEMPLATE_ENV, harness) ? TASK_TEMPLATE_ENV[harness as keyof typeof TASK_TEMPLATE_ENV] : undefined
+  const value = key ? env[key] : undefined
+  if (!value) throw new E2BKeyError('e2b_template_unavailable', 'Task template not configured')
+  return value
 }
 
 const status = (error: unknown): number | undefined => {

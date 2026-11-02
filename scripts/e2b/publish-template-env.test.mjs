@@ -4,7 +4,10 @@ import { currentWorkerSha, pairEnv, publish } from './publish-template-env.mjs'
 
 const SHA = 'a'.repeat(40)
 
-function fakeVercel({ inFlight = 0, stored = { E2B_BYO_COMPUTER_TEMPLATE: 'tpl1', MIKKA_CLOUD_WORKER_SHA: SHA }, redeploy = 'READY' } = {}) {
+const TEMPLATES = { desktop: 'tpl1', claude: 'tpl2', codex: 'tpl3' }
+const STORED = { E2B_BYO_COMPUTER_TEMPLATE: 'tpl1', E2B_CLAUDE_TEMPLATE: 'tpl2', E2B_CODEX_TEMPLATE: 'tpl3', MIKKA_CLOUD_WORKER_SHA: SHA }
+
+function fakeVercel({ inFlight = 0, stored = STORED, redeploy = 'READY' } = {}) {
   const calls = []
   let listings = 0
   const fetchImpl = async (url, init) => {
@@ -24,16 +27,17 @@ function fakeVercel({ inFlight = 0, stored = { E2B_BYO_COMPUTER_TEMPLATE: 'tpl1'
   return { fetchImpl, calls }
 }
 
-const run = (fake, extra = {}) => publish({ token: 't', templateId: 'tpl1', sourceSha: SHA, fetchImpl: fake.fetchImpl, wait: async () => {}, log: () => {}, ...extra })
+const run = (fake, extra = {}) => publish({ token: 't', templates: TEMPLATES, sourceSha: SHA, fetchImpl: fake.fetchImpl, wait: async () => {}, log: () => {}, ...extra })
 
-test('both variables go to production in one upsert, then production is redeployed', async () => {
+test('every template and the worker hash go to production in one upsert, then production is redeployed', async () => {
   const fake = fakeVercel()
   assert.deepEqual(await run(fake), { deploymentId: 'dpl_redeploy' })
   const writes = fake.calls.filter((c) => c.method === 'POST' && c.path.endsWith('/env'))
   assert.equal(writes.length, 1)
   assert.match(writes[0].search, /upsert=true/)
   assert.deepEqual(writes[0].body.map((e) => [e.key, e.value, e.target]), [
-    ['E2B_BYO_COMPUTER_TEMPLATE', 'tpl1', ['production']], ['MIKKA_CLOUD_WORKER_SHA', SHA, ['production']]])
+    ['E2B_BYO_COMPUTER_TEMPLATE', 'tpl1', ['production']], ['E2B_CLAUDE_TEMPLATE', 'tpl2', ['production']],
+    ['E2B_CODEX_TEMPLATE', 'tpl3', ['production']], ['MIKKA_CLOUD_WORKER_SHA', SHA, ['production']]])
   const redeploy = fake.calls.find((c) => c.method === 'POST' && c.path === '/v13/deployments')
   assert.deepEqual(redeploy.body, { name: 'mikka', deploymentId: 'dpl_live', target: 'production' })
 })
@@ -45,8 +49,8 @@ test('waits for a production build already running before redeploying', async ()
 })
 
 test('stops before redeploying when the env did not take', async () => {
-  const fake = fakeVercel({ stored: { E2B_BYO_COMPUTER_TEMPLATE: 'old', MIKKA_CLOUD_WORKER_SHA: SHA } })
-  await assert.rejects(run(fake), /env_not_updated E2B_BYO_COMPUTER_TEMPLATE/)
+  const fake = fakeVercel({ stored: { ...STORED, E2B_CODEX_TEMPLATE: 'old' } })
+  await assert.rejects(run(fake), /env_not_updated E2B_CODEX_TEMPLATE/)
   assert.ok(!fake.calls.some((c) => c.path === '/v13/deployments'))
 })
 
@@ -54,9 +58,10 @@ test('a failed redeploy fails the run', async () => {
   await assert.rejects(run(fakeVercel({ redeploy: 'ERROR' })), /redeploy_error/)
 })
 
-test('refuses a short SHA or an odd template id before any write', () => {
-  assert.throws(() => pairEnv({ templateId: 'tpl1', sourceSha: 'abc1234' }), /source_sha_invalid/)
-  assert.throws(() => pairEnv({ templateId: 'a/b', sourceSha: SHA }), /template_id_invalid/)
+test('refuses a short SHA, an odd or a missing template id before any write', () => {
+  assert.throws(() => pairEnv({ templates: TEMPLATES, sourceSha: 'abc1234' }), /source_sha_invalid/)
+  assert.throws(() => pairEnv({ templates: { ...TEMPLATES, claude: 'a/b' }, sourceSha: SHA }), /template_id_invalid claude/)
+  assert.throws(() => pairEnv({ templates: { desktop: 'tpl1', claude: 'tpl2' }, sourceSha: SHA }), /template_id_invalid codex/)
 })
 
 test('reads production\'s current worker hash, empty when unset', async () => {

@@ -121,23 +121,3 @@ jobs:
           path: ${{ runner.temp }}/cua/desktop*.png
           if-no-files-found: ignore
 
-  local-sandbox:
-    name: Local computer through real Linux sandbox
-    # Pin a host that supports nested unprivileged user namespaces. Keep the
-    # runtime's seccomp/user/PID/network isolation intact; never disable probes.
-    runs-on: ubuntu-22.04
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - name: Require actual isolated proxy transport and port denial
-        run: |
-          docker run --rm --privileged \
-            -v "$PWD:/workspace:ro" -w /runtime/packages/daemon \
-            node@sha256:6449e19d8184d84062525b6a7524def03146c2cb04a7f08b076680d0e8e4240a \
-            sh -c 'apt-get update -qq && apt-get install -y -qq bubblewrap socat ripgrep git >/dev/null && mkdir -p /runtime && cp -a --no-preserve=ownership /workspace/node_modules /workspace/packages /workspace/package.json /workspace/tsconfig.json /runtime/ && HOME=/tmp TSX_DISABLE_CACHE=1 node --import tsx --test test/computer-sandbox.acceptance.node.ts'

@@ -419,7 +419,9 @@ test('CI partitions DB suites across isolated jobs and requires source and daemo
   const checks = job('source-checks')
   for (const command of ['pnpm lint:code', 'pnpm exec next typegen', 'pnpm typecheck', 'pnpm --filter @mikka/protocol typecheck', 'pnpm --filter @mikka/mobile typecheck']) assert(checks.includes(`run: ${command}\n`), command)
   const daemon = job('daemon-checks')
-  assert(daemon.includes("MIKKA_SANDBOX_ACCEPTANCE: '1'"))
+  // Runs use no sandbox (decision 2026-11-01-2335): the daemon lane runs its unit suite, no sandbox acceptance.
+  assert(daemon.includes('pnpm --filter @mikka/daemon exec vitest run'))
+  assert(!daemon.includes('MIKKA_SANDBOX_ACCEPTANCE'))
   assert(daemon.includes('pnpm --filter @mikka/daemon test:package'))
   const gate = job('ui-policy')
   assert(gate.includes('needs: [changes, ui-policy-full, ui-policy-integrations, source-checks, daemon-checks]'))

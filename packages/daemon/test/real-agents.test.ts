@@ -1,5 +1,5 @@
 // End-to-end runs with the real, signed-in CLIs on this machine: the daemon
-// claims a run, creates the worktree, drives the CLI inside sandbox-runtime,
+// claims a run, creates the worktree, drives the CLI directly (no sandbox),
 // the agent hands in through Mikka's MCP tool, the daemon verifies,
 // commits and pushes the run branch to the repo's remote. Uses the user's
 // subscription, so it only runs when asked:
@@ -54,7 +54,7 @@ async function setup() {
 async function boot(server: MemoryServer, dataDir: string) {
   // The HTTP link supplies this gate in production; this run allows every tool.
   const link = server.link()
-  link.prepareRunToolApproval = async assignment => new ToolApprovalGate(assignment.runId, { permission: () => 'allow', ask: async () => 'deny', isLive: () => true })
+  link.prepareRunToolApproval = async assignment => new ToolApprovalGate(assignment.runId, { isLive: () => true })
   const daemon = await new Daemon({
     dataDir,
     flavor: "dev",

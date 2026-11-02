@@ -22,7 +22,7 @@ const lease = (patch: Partial<NativeLease> = {}): NativeLease => ({ route: "clau
   expiresAt: new Date(Date.now() + 3_600_000).toISOString(), accessToken: TOKEN, ...patch })
 const assignment = { runId: RUN, deviceId: "device-1", harness: "claude_code",
   subscriptionBinding: { bindingId: "b", ownerId: "o", workspaceId: "w", consumerId: "c", route: "claude_code_cli" } } as unknown as RunAssignment
-const gate = () => new ToolApprovalGate(RUN, { permission: () => "deny", ask: async () => "deny", isLive: id => id === RUN })
+const gate = () => new ToolApprovalGate(RUN, { isLive: id => id === RUN })
 
 /** Records the token it was handed on fd 3, then speaks the fake Claude protocol. */
 function recordingCli(record: string) {

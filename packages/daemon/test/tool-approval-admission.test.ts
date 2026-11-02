@@ -10,7 +10,7 @@ import { makeRepo, tempDir } from './helpers'
 
 it.each(['codex','claude_code'] as const)('refuses an already-stale %s assignment before filesystem, credential or CLI startup', async harness => {
   const stateDir=tempDir('mikka-stale-admission-')
-  const gate=new ToolApprovalGate('stale-run',{permission:()=> 'allow',ask:async()=> 'allow',isLive:()=>false})
+  const gate=new ToolApprovalGate('stale-run',{isLive:()=>false})
   const token=vi.fn(async()=>({accessToken:'synthetic-not-to-be-read',accountId:'fixture-account',chatgptAccountId:'fixture-account',expiresAt:new Date(Date.now()+60000).toISOString()}))
   const host={stateDir,sandbox:new NoSandbox(),binary:join(stateDir,'must-not-start'),subscriptionAuth:{accountId:'fixture-account',token}}
   const adapter=harness==='codex' ? new CodexAdapter(host) : new ClaudeAdapter(host)

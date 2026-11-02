@@ -163,7 +163,7 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     const bobBot = await store.createBot(bob, 'Other owner')
     await pool.query('UPDATE devices SET harnesses=$2 WHERE id=$1', [worker.deviceId, JSON.stringify([{ harness: 'codex', installed: true, computerBroker: true, subscriptionBroker: true }, { harness: 'claude_code', installed: true, computerBroker: true, subscriptionBroker: true }])])
     let repoSetupCalls = 0
-    const botSandbox = { sandboxId: 'sandbox-test', commands: { run: async (_command: string, options: { user: string }) => { assert.equal(options.user, 'mikka-runner'); repoSetupCalls++ } } } as unknown as import('e2b').Sandbox
+    const botSandbox = { sandboxId: 'sandbox-test', commands: { run: async (_command: string, options: { user: string }) => { assert.equal(options.user, 'user'); repoSetupCalls++ } } } as unknown as import('e2b').Sandbox
     await assert.rejects(ensureBotRuntime(pool, bob, bot.id, botSandbox, worker.deviceId), /unavailable/)
     const setups = await Promise.all([ensureBotRuntime(pool, actor, bot.id, botSandbox, worker.deviceId), ensureBotRuntime(pool, actor, bot.id, botSandbox, worker.deviceId)])
     assert.deepEqual(setups[0], setups[1])

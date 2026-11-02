@@ -26,9 +26,18 @@ class Publish(unittest.TestCase):
     def test_runtime_files_do_not_replace_requested_template_name(self):
         class Recipe:
             def from_base_image(self): return self
+            def from_template(self, name):
+                called['base_template'] = name
+                return self
             def copy(self, *_): return self
+            def set_workdir(self, path):
+                called.setdefault('workdirs', []).append(path)
+                self.workdir = path
+                return self
             def run_cmd(self, command, **__):
                 called.setdefault('commands', []).append(command)
+                if command == bt.NPM_RUNTIME_CHECK:
+                    called['npm_workdir'] = self.workdir
                 return self
             def set_user(self, user):
                 self.user = user
@@ -48,15 +57,66 @@ class Publish(unittest.TestCase):
         with patch.dict('sys.modules', {'e2b': sdk}), patch.object(bt, 'source_context', return_value='a' * 40):
             sha, result = bt.build('mikka-versioned-worker', api_key='fixture-key')
         self.assertEqual(called['name'], 'mikka-versioned-worker')
+        self.assertEqual(called.get('base_template'), 'desktop')
+        self.assertEqual(called['npm_workdir'], '/')
+        self.assertEqual(called['workdirs'], ['/'])
         self.assertEqual(sha, 'a' * 40)
         self.assertEqual(result.template_id, 'tpl1')
         self.assertIn('systemctl start mikka-preload.service mikka-viewer.service', called['start'])
         self.assertTrue(any('systemctl enable mikka-preload.service mikka-viewer.service' in command for command in called['commands']))
         self.assertIn('test ! -e /run/mikka-viewer/key', called['ready'])
+        self.assertTrue(any('claude --version && codex --version' in command for command in called['commands']))
+
+    def fake_build(self, kind):
+        called = {'commands': [], 'users': []}
+        class Recipe:
+            def from_template(self, name):
+                called['base_template'] = name
+                return self
+            def copy(self, *_): return self
+            def set_workdir(self, _): return self
+            def run_cmd(self, command, user=None, **__):
+                called['commands'].append(command)
+                called['users'].append((command, user))
+                return self
+            def set_user(self, _): return self
+            def set_start_cmd(self, start, ready):
+                self.start, self.ready = start, ready
+                return self
+        def build_recipe(recipe, **options):
+            called.update(options)
+            called['start'], called['ready'] = recipe.start, recipe.ready
+            return SimpleNamespace(template_id='tpl1', build_id='b1')
+        class Template:
+            def __new__(cls, **_): return Recipe()
+            build = staticmethod(build_recipe)
+        with patch.dict('sys.modules', {'e2b': SimpleNamespace(Template=Template)}), patch.object(bt, 'source_context', return_value='a' * 40):
+            bt.build(f'mikka-test-{kind}', api_key='fixture-key', kind=kind)
+        return called
+
+    def test_task_templates_start_from_the_official_cli_templates_without_a_desktop(self):
+        for kind, base in (('claude', 'claude'), ('codex', 'codex')):
+            called = self.fake_build(kind)
+            self.assertEqual(called['base_template'], base)
+            self.assertEqual(called['name'], f'mikka-test-{kind}')
+            self.assertEqual(called['start'], 'systemctl start mikka-preload.service && exec sleep infinity')
+            self.assertNotIn('mikka-viewer', called['ready'])
+            self.assertTrue(any('systemctl enable mikka-preload.service' == command.split(' && ')[-1] for command in called['commands']))
+            self.assertFalse(any('bootstrap-desktop' in command for command in called['commands']))
+            # The worker's checks run as the template's default user.
+            self.assertIn((bt.NPM_RUNTIME_CHECK, 'user'), called['users'])
+            # The CLI E2B ships stays: nothing is installed over it.
+            self.assertFalse(any('harness/cli.mjs' in command for command in called['commands']))
+
+    def test_bootstrap_adds_no_users_sandbox_tools_or_sudo_changes(self):
+        for name in bt.BOOTSTRAP_FILES:
+            text = (bt.ROOT / 'scripts/e2b' / name).read_text()
+            for absent in ('useradd', 'groupadd', 'sudoers', 'gpasswd', '/usr/bin/sudo', 'bubblewrap', 'socat', 'ripgrep', 'mikka-runner'):
+                self.assertNotIn(absent, text, f'{name} contains {absent}')
 
     def test_cold_boot_scrubs_capabilities_once_before_starting_anonymous_services(self):
         scrub = bt.BOOT_SERVICES['mikka-boot-scrub.service']
-        for path in ('/home/mikka-runner/.mikka/worker', '/home/mikka-runner/.mikka/bootstrap.json', '/home/mikka-runner/.mikka/preloaded.pid', '/run/mikka-viewer'):
+        for path in ('/home/user/.mikka/worker', '/home/user/.mikka/bootstrap.json', '/home/user/.mikka/preloaded.pid', '/run/mikka-viewer'):
             self.assertIn(path, scrub)
         self.assertIn('RemainAfterExit=yes', scrub)
         self.assertIn('DefaultDependencies=no', scrub)
@@ -100,7 +160,7 @@ class Publish(unittest.TestCase):
             self.assertTrue(names)
             self.assertTrue(all(n in bt.WORKER_PATHS or n.split('/', 2)[0] in bt.WORKER_PATHS or '/'.join(n.split('/')[:2]) in bt.WORKER_PATHS for n in names))
             import subprocess
-            for name in bt.COMPUTER_FILES:
+            for name in (*bt.BOOTSTRAP_FILES, *bt.COMPUTER_FILES):
                 self.assertEqual(Path(temp, name).read_bytes(), subprocess.check_output(['git', 'show', f'{sha}:scripts/e2b/{name}'], cwd=bt.ROOT))
 
 class WorkerHash(unittest.TestCase):

@@ -21,7 +21,7 @@ export type UserInput = {
 }
 
 export interface ThreadStartParams {
-  /** Experimental host tools, audited against official Codex0.163.0. */
+  /** Experimental host tools (app-server `dynamicTools`). */
   dynamicTools?: { type: 'function'; name: string; description: string; inputSchema: Record<string, unknown> }[]
   cwd?: string | null
   approvalPolicy?: AskForApproval | null

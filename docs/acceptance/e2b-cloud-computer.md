@@ -1,5 +1,10 @@
 # E2B cloud computer: implementation and live evidence
 
+> Historical record. Cloud machines now use E2B's own desktop, Codex and
+> Claude Code templates with no sandbox-runtime wrapper
+> ([decision 2026-11-01-2335](../design/decisions/2026-11-01-2335-e2b-official-templates.md));
+> the Mikka-built template described below is being replaced.
+
 Date: 2026-10-26. Tracks #172. Branch: `codex/e2b-cloud-computer-172`.
 
 ## Current status (2026-10-27)

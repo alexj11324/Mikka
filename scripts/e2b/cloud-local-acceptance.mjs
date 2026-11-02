@@ -150,12 +150,12 @@ async function main() {
       // This transport credential is a separate read-only capability for the
       // disposable fixture, never a device token. It stays under the daemon's
       // existing SRT denyRead path; the repository config and agent env omit it.
-      const gitConfig = '/home/mikka-runner/.mikka/worker/adapters/pids/fixture-git.config'
+      const gitConfig = '/home/user/.mikka/worker/adapters/pids/fixture-git.config'
       // install sets ownership only on named directories, not implicit parents.
-      await sandbox.commands.run('install -d -o mikka-runner -g mikka-runner -m 700 /home/mikka-runner/.mikka/worker /home/mikka-runner/.mikka/worker/adapters /home/mikka-runner/.mikka/worker/adapters/pids', { user: 'root' })
+      await sandbox.commands.run('install -d -o user -g user -m 700 /home/user/.mikka/worker /home/user/.mikka/worker/adapters /home/user/.mikka/worker/adapters/pids', { user: 'root' })
       await sandbox.files.write(gitConfig, `[http "${repository}"]\n\textraHeader =\n\textraHeader = Authorization: Bearer ${repoToken}\n`, { user: 'root' })
       await sandbox.files.write('/usr/local/bin/git', `#!/bin/sh\nif test -r ${gitConfig}; then exec /usr/bin/git -c include.path=${gitConfig} "$@"; fi\nexec /usr/bin/git "$@"\n`, { user: 'root' })
-      await sandbox.commands.run(`chown mikka-runner:mikka-runner ${gitConfig}; chmod 600 ${gitConfig}; chown root:root /usr/local/bin/git; chmod 755 /usr/local/bin/git`, { user: 'root' })
+      await sandbox.commands.run(`chown user:user ${gitConfig}; chmod 600 ${gitConfig}; chown root:root /usr/local/bin/git; chmod 755 /usr/local/bin/git`, { user: 'root' })
       metric.fixtureTransportSetupMs = Math.round(performance.now() - fixtureStarted)
       const files = new Proxy(sandbox.files, { get(target, name) {
         if (name === 'write') return async (path, contents, options) => {
@@ -196,9 +196,9 @@ async function main() {
   const taskMachine = (await pool.query('SELECT "sandboxId" FROM thread_machines WHERE "runId"=$1 AND "ownerId"=$2', [runId, actor.userId])).rows[0]
   assert.ok(taskMachine?.sandboxId && sandboxIds.has(taskMachine.sandboxId))
   const taskSandbox = await Sandbox.connect(taskMachine.sandboxId, connection)
-  const content = await taskSandbox.files.read(`/home/mikka-runner/.mikka/worker/worktrees/${runId}/cloud-acceptance.txt`, { user: 'mikka-runner' })
+  const content = await taskSandbox.files.read(`/home/user/.mikka/worker/worktrees/${runId}/cloud-acceptance.txt`, { user: 'user' })
   assert.ok(content.includes(marker), 'Real E2B worktree lacks the model-written marker')
-  const base = (await taskSandbox.commands.run(`git -C /home/mikka-runner/.mikka/worker/worktrees/${runId} merge-base HEAD ${quote(`origin/${baseBranch}`)}`, { user: 'mikka-runner', timeoutMs: 10_000 })).stdout.trim()
+  const base = (await taskSandbox.commands.run(`git -C /home/user/.mikka/worker/worktrees/${runId} merge-base HEAD ${quote(`origin/${baseBranch}`)}`, { user: 'user', timeoutMs: 10_000 })).stdout.trim()
   assert.equal(base, metric.fixtureBaseCommit, 'The task must branch from the repository-declared default base commit')
   metric.runId = runId
   metric.status = done.status

@@ -1,26 +1,19 @@
 // The pieces real adapters share: Mikka's MCP hand-in server, the run
-// context's handoff file, sandbox-runtime's write and network limits on this
-// machine, and the daemon's commit and push of a verified run.
+// context's handoff file, and the daemon's commit and push of a verified run.
 import { spawn } from "node:child_process"
 import { randomUUID } from "node:crypto"
-import { existsSync, readFileSync, writeFileSync } from "node:fs"
+import { existsSync, writeFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { join } from "node:path"
 
 import { execa } from "execa"
-import { afterAll, afterEach, describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it } from "vitest"
 
 import { defaultRunPolicy, PACKAGE_REGISTRY_DOMAINS } from "@mikka/protocol/agent-policy"
 
 import { onLines } from "../src/agents/child"
 import { commitMessage, publishRun, snapshotTree } from "../src/agents/publish"
 import { MCP_SERVER_SCRIPT, RunContext } from "../src/agents/run-context"
-import {
-  SandboxRuntime,
-  shellQuote,
-  type SandboxPolicy,
-} from "../src/agents/sandbox"
-import { runVerify } from "../src/agents/verify"
 import type { Logger } from "../src/log"
 import { cleanupTempDirs, makeRepo, tempDir } from "./helpers"
 
@@ -252,208 +245,6 @@ describe("run context", () => {
     // Its instructions say so, so the agent does not try.
     expect(ctx.instructions()).toContain("read-only check")
   })
-})
-
-describe.skipIf(!SandboxRuntime.supported())("sandbox-runtime", () => {
-  const sandbox = new SandboxRuntime()
-  afterAll(() => sandbox.reset())
-
-  async function run(
-    command: string,
-    allowWrite: string[],
-    domains: string[] = [],
-    extra: Pick<SandboxPolicy, "denyWrite" | "denyRead"> = {},
-  ) {
-    const wrapped = await sandbox.wrap(["/bin/sh", "-c", command], {
-      allowWrite,
-      allowDomains: domains,
-      ...extra,
-    })
-    try {
-      return await execa("/bin/sh", ["-c", wrapped.command], {
-        reject: false,
-        env: { PATH: "/usr/bin:/bin", HOME: process.env.HOME ?? "/" },
-        extendEnv: false,
-        timeout: 30_000,
-      })
-    } finally {
-      wrapped.release()
-    }
-  }
-
-  it("allows writes only in the declared paths", async () => {
-    const inside = tempDir("orvs-")
-    const outside = tempDir("orvx-")
-    const ok = await run(`echo hi > ${shellQuote(join(inside, "a.txt"))}`, [
-      inside,
-    ])
-    expect(ok.exitCode).toBe(0)
-    expect(readFileSync(join(inside, "a.txt"), "utf8")).toBe("hi\n")
-    const denied = await run(
-      `echo hi > ${shellQuote(join(outside, "b.txt"))}`,
-      [inside],
-    )
-    expect(denied.exitCode).not.toBe(0)
-    expect(existsSync(join(outside, "b.txt"))).toBe(false)
-    const home = await run(`echo hi > "$HOME/.mikka-sandbox-probe"`, [inside])
-    expect(home.exitCode).not.toBe(0)
-  })
-
-  it("keeps the .git file read-only and credential files unreadable", async () => {
-    const inside = tempDir("orvs-")
-    writeFileSync(join(inside, ".git"), "gitdir: /real\n")
-    const secret = join(tempDir("orvk-"), "token")
-    writeFileSync(secret, "s3cret\n")
-    const policy = { denyWrite: [join(inside, ".git")], denyRead: [secret] }
-    const write = await run(
-      `echo 'gitdir: /evil' > ${shellQuote(join(inside, ".git"))}`,
-      [inside],
-      [],
-      policy,
-    )
-    expect(write.exitCode).not.toBe(0)
-    const remove = await run(
-      `rm -f ${shellQuote(join(inside, ".git"))}`,
-      [inside],
-      [],
-      policy,
-    )
-    expect(remove.exitCode).not.toBe(0)
-    expect(readFileSync(join(inside, ".git"), "utf8")).toBe("gitdir: /real\n")
-    const read = await run(`cat ${shellQuote(secret)}`, [inside], [], policy)
-    expect(read.exitCode).not.toBe(0)
-    expect(read.stdout).not.toContain("s3cret")
-  })
-
-  it("refuses a read-only check's write to the worktree it is checking", async () => {
-    const repo = await makeRepo()
-    const ctx = new RunContext({
-      harness: "codex",
-      worktree: await worktreeOf(repo),
-      runDir: tempDir(),
-      privateDir: tempDir("orvp-"),
-      policy: { ...defaultRunPolicy(), readOnly: true },
-    })
-    const policy = ctx.policy()
-    const target = join(ctx.worktree, "checked-by-the-agent.txt")
-    const write = await run(
-      `echo nope > ${shellQuote(target)}`,
-      policy.allowWrite,
-      [],
-      { denyWrite: policy.denyWrite },
-    )
-    expect(write.exitCode).not.toBe(0)
-    expect(existsSync(target)).toBe(false)
-    // Reading the same worktree is what the check is for.
-    const read = await run(
-      `cat ${shellQuote(join(ctx.worktree, "README.md"))}`,
-      policy.allowWrite,
-      [],
-      { denyWrite: policy.denyWrite },
-    )
-    expect(read.exitCode).toBe(0)
-    // Its own handoff still lands: the run dir stays writable.
-    const handoff = await run(
-      `echo ok > ${shellQuote(join(ctx.runDir, "probe.txt"))}`,
-      policy.allowWrite,
-      [],
-      { denyWrite: policy.denyWrite },
-    )
-    expect(handoff.exitCode).toBe(0)
-  })
-
-  it("runs verify inside the sandbox and kills it on timeout", async () => {
-    const repo = await makeRepo()
-    const worktree = await worktreeOf(repo)
-    const privateDir = tempDir("orvp-")
-    writeFileSync(join(privateDir, "daemon.secret"), "hunter2\n")
-    const verify = (command: string, timeoutMs = 30_000) =>
-      runVerify(sandbox, {
-        command,
-        worktree,
-        tmpRoot: join(privateDir, "verify"),
-        privateDir,
-        pidFile: join(privateDir, `${randomUUID()}.pgid`),
-        env: { PATH: "/usr/bin:/bin", HOME: process.env.HOME ?? "/" },
-        timeoutMs,
-      })
-    const ok = await verify("echo checked && touch built.txt")
-    expect(ok).toMatchObject({ exitCode: 0, timedOut: false })
-    expect(ok.output).toContain("checked")
-    expect(existsSync(join(worktree, "built.txt"))).toBe(true)
-    const escape = await verify(
-      `echo x > ${shellQuote(join(worktree, ".git"))}`,
-    )
-    expect(escape.exitCode).not.toBe(0)
-    const secret = await verify(
-      `cat ${shellQuote(join(privateDir, "daemon.secret"))}`,
-    )
-    expect(secret.exitCode).not.toBe(0)
-    expect(secret.output).not.toContain("hunter2")
-    const started = Date.now()
-    const slow = await verify("sleep 30 & sleep 30", 500)
-    expect(slow.timedOut).toBe(true)
-    expect(Date.now() - started).toBeLessThan(10_000)
-  })
-
-  it("keeps a read-only check's verify command out of the worktree (ADR 0046)", async () => {
-    const repo = await makeRepo()
-    const worktree = await worktreeOf(repo)
-    const privateDir = tempDir("orvp-")
-    const verify = (command: string, readOnly: boolean) =>
-      runVerify(sandbox, {
-        command,
-        worktree,
-        tmpRoot: join(privateDir, "verify"),
-        privateDir,
-        pidFile: join(privateDir, `${randomUUID()}.pgid`),
-        env: { PATH: "/usr/bin:/bin", HOME: process.env.HOME ?? "/" },
-        timeoutMs: 30_000,
-        readOnly,
-      })
-    // Reading the worktree is what the check's verify is for.
-    const reads = await verify("cat README.md", true)
-    expect(reads).toMatchObject({ exitCode: 0, timedOut: false })
-    // A command that would leave the tree dirty fails here instead of
-    // dirtying the worktree the next run continues in.
-    const writes = await verify("echo patched > NOTES.md", true)
-    expect(writes.exitCode).not.toBe(0)
-    expect(existsSync(join(worktree, "NOTES.md"))).toBe(false)
-    // The same command is fine for an ordinary run's verify.
-    const normal = await verify("echo patched > NOTES.md", false)
-    expect(normal.exitCode).toBe(0)
-    expect(existsSync(join(worktree, "NOTES.md"))).toBe(true)
-  })
-
-  it.skipIf(process.platform !== "darwin")(
-    "refuses a second Seatbelt profile inside the sandbox",
-    async () => {
-      const nested = await run(
-        `/usr/bin/sandbox-exec -p '(version 1)(allow default)' /bin/echo nested`,
-        [tempDir("orvs-")],
-      )
-      expect(nested.exitCode).not.toBe(0)
-      expect(nested.stderr).toMatch(/sandbox_apply/)
-    },
-  )
-
-  it.skipIf(!process.env.MIKKA_NETWORK_TESTS)(
-    "reaches listed domains only",
-    async () => {
-      const curl = (url: string, domains: string[]) =>
-        run(
-          `curl -sS -o /dev/null -w '%{http_code}' --max-time 15 ${url}`,
-          [tempDir("orvs-")],
-          domains,
-        )
-      const allowed = await curl("https://api.anthropic.com/", [
-        "api.anthropic.com",
-      ])
-      expect(allowed.stdout).toMatch(/^[2-4]\d\d$/)
-      const blocked = await curl("https://example.com/", ["api.anthropic.com"])
-      expect(blocked.stdout).not.toMatch(/^2\d\d$/)
-    },
-  )
 })
 
 describe("publish", () => {
