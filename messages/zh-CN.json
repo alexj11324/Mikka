@@ -2479,7 +2479,8 @@
       "labels": "按标签",
       "pickModel": "选择模型",
       "noModels": "还没有可用模型",
-      "unavailable": "不可用"
+      "unavailable": "不可用",
+      "unverified": "未与账号核对"
     },
     "searchEmpty": "没有匹配的设置",
     "apiKeys": {

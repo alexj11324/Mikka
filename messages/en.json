@@ -2479,7 +2479,8 @@
       "labels": "By label",
       "pickModel": "Choose a model",
       "noModels": "No models yet",
-      "unavailable": "Unavailable"
+      "unavailable": "Unavailable",
+      "unverified": "Not checked against an account"
     },
     "searchEmpty": "No matching settings",
     "apiKeys": {
