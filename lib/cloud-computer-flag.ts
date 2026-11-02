@@ -16,9 +16,9 @@ export function byosEnabled(env: Env = process.env) {
   return env.MIKKA_BYOS_ENABLED === '1'
 }
 
-/** `MIKKA_BYOS_ENROLLMENT_ENABLED=1`: subscription enrollment custody is on. */
+/** Subscription enrollment custody: PostHog's mikka-byos-enrollment (lib/deployment-switches.ts). */
 export function byosEnrollmentEnabled(env: Env = process.env) {
-  return env.MIKKA_BYOS_ENROLLMENT_ENABLED === '1'
+  return deploymentSwitch('byosEnrollment', env)
 }
 
 /** A cloud computer run needs both: cloud computer tasks not killed and the BYOS backend on. */
