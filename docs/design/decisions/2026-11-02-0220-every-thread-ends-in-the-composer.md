@@ -19,6 +19,12 @@
   URLs may open its history, but it can never start another generation. A
   thread the viewer cannot read in full (someone else's) shows no composer,
   since it shows no conversation either.
-- 现状（非决定）：the server still refuses a message to an ended thread
-  (`runNotActive`); until it runs the thread again, sending there keeps the
-  draft and says 「发送失败，草稿已保留」 (backend, open).
+- How an ended thread runs again (`lib/thread-continue.ts`): the task's next
+  run continues the thread's last one, on the same machine (or the bot's
+  cloud computer) and repository, through the same admission as any dispatch
+  (the device, the credential and its quota). The words are its note and show
+  in the thread as the person's message. Only the thread's owner can send, as
+  for a working thread. A thread that another thread replaced
+  (`threadReplaced`), or one that works on no task (`threadCannotContinue`),
+  cannot run again; a send that fails for any reason keeps the draft and
+  says 「发送失败，草稿已保留」.

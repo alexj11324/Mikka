@@ -45,6 +45,8 @@ export const ACTION_ERROR_CODES = [
   'runDispatchKeyConflict',
   'runNotFound',
   'runNotActive',
+  'threadReplaced',
+  'threadCannotContinue',
   'runChainEnded',
   'threadStopping',
   'apiKeyNotFound',
