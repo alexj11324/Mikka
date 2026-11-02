@@ -1,3 +1,4 @@
+import { deploymentSwitch } from '@/lib/deployment-switches'
 import { FactoryError } from "./contract";
 import type { MonitorProbeAdapter, MonitorPublication } from "./monitor-probe";
 import { MIKKA_VERCEL, vercelTarget } from "./vercel-publication";
@@ -328,7 +329,7 @@ export function configuredVercelMonitorProbes(
   // Publication remains an explicit resource/cost choice. Its finished GET-only
   // observer follows that configuration, unless the operator explicitly stops it.
   if (env.FACTORY_VERCEL_MONITOR === "0") return [];
-  if (env.FACTORY_VERCEL_PUBLICATION !== "1") {
+  if (!deploymentSwitch('factoryVercelPublication', env)) {
     if (env.FACTORY_VERCEL_MONITOR === "1")
       throw new FactoryError("factoryMonitorTargetInvalid");
     return [];
@@ -337,7 +338,7 @@ export function configuredVercelMonitorProbes(
     throw new FactoryError("factoryVercelCredentialUnavailable");
   return [
     createVercelMonitorProbe("preview", () => env.VERCEL_TOKEN),
-    ...(env.FACTORY_VERCEL_PRODUCTION === "1"
+    ...(deploymentSwitch('factoryVercelProduction', env)
       ? [createVercelMonitorProbe("production", () => env.VERCEL_TOKEN)]
       : []),
   ];

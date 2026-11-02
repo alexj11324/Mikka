@@ -1,4 +1,5 @@
 'use server'
+import { deploymentSwitch } from '@/lib/deployment-switches'
 
 import { createHash } from 'node:crypto'
 import { gunzipSync } from 'node:zlib'
@@ -254,7 +255,7 @@ async function threadQuestions(threads: readonly IssueThread[], viewerId: string
     const runId = thread.ownedByCurrentUser ? threadQuestionRunId(thread) : null
     return runId ? [[thread.id, runId] as const] : []
   }))
-  if (!asked.size || process.env.MIKKA_FACTORY_ROUTING_ENABLED !== '1' || process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED !== '1') return [...threads]
+  if (!asked.size || !deploymentSwitch('factoryRouting') || !deploymentSwitch('factoryLifecycle')) return [...threads]
   const byRun = await threadQuestionStates(pool, [...new Set(asked.values())], viewerId)
   return threads.map(thread => ({ ...thread, question: byRun.get(asked.get(thread.id) ?? '') ?? null }))
 }

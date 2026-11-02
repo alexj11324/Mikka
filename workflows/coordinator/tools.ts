@@ -14,6 +14,7 @@ import { factoryCheckRecoverySchema } from '@/lib/factory/check-recovery'
 import { contextQuestionAnswerSchema, questionEscalationSchema } from '@/lib/factory/questions/schema'
 import { intakeSchema, resolveInput, stopInput } from '@/lib/factory/intake'
 import { issueMutationsEnabled } from '@/lib/coordinator/issue-tools-enabled'
+import { deploymentSwitch } from '@/lib/deployment-switches'
 import { personalMailboxTools } from '@/lib/mailbox-tools'
 import { mailboxInputs, type MailboxToolName } from '@mikka/protocol/mailbox'
 import { modelWriteTools, type ModelWriteCall, type ModelWriteTool } from '@/lib/operations/model-write-tools'
@@ -24,7 +25,15 @@ import { scheduledReadTools } from '@/lib/coordinator/scheduled-read-tools'
 import { scheduleTools } from '@/lib/schedules/tools'
 
 /** `coordinator`: this chat's bot is the person's Coordinator, which may act on any of their bots and hold the factory tools. */
-export interface CoordinatorToolOptions { coordinator?: boolean; execution?: AgentExecution | null; readOnly?: boolean; readToolIds?: readonly string[]; sourceEventId?: string; writeEnabled?: boolean; taskEventId?: string; computerEnabled?: boolean; mailboxEnabled?: boolean; mailboxTools?: readonly MailboxToolName[]; writeTools?: { catalog: readonly ModelWriteTool[]; submit: (call: ModelWriteCall) => Promise<unknown> } }
+/** Deployment switches the tools depend on (lib/deployment-switches.ts), read in a step: a workflow body never reads one itself. */
+export interface CoordinatorSwitches { issueTools: boolean; factoryRouting: boolean; factoryLifecycle: boolean }
+
+/** Outside a workflow (routes, tests) the switches are read where the tools are made. */
+export function readCoordinatorSwitches(): CoordinatorSwitches {
+  return { issueTools: issueMutationsEnabled(), factoryRouting: deploymentSwitch('factoryRouting'), factoryLifecycle: deploymentSwitch('factoryLifecycle') }
+}
+
+export interface CoordinatorToolOptions { switches?: CoordinatorSwitches; coordinator?: boolean; execution?: AgentExecution | null; readOnly?: boolean; readToolIds?: readonly string[]; sourceEventId?: string; writeEnabled?: boolean; taskEventId?: string; computerEnabled?: boolean; mailboxEnabled?: boolean; mailboxTools?: readonly MailboxToolName[]; writeTools?: { catalog: readonly ModelWriteTool[]; submit: (call: ModelWriteCall) => Promise<unknown> } }
 /** One task, one thread (decision 2026-11-01-1330-one-thread-per-task): how both dispatch tools say it. */
 const ONE_THREAD = 'A task has one thread at a time. When the task already has one, this goes to that thread: a thread still working gets `note` as a message; a thread that ended (done, failed or stopped) runs again in the same thread with `note`. Use it to retry or to add information; never to start over. Set newThread only when the person, in their own words, explicitly asked for a new session or thread, or a different agent; the host checks their message and otherwise keeps the existing thread.'
 const newThreadInput = z.boolean().optional().describe('Only when the person explicitly asked for a new session or thread, or a different agent, in their own words. Retries and added information never set it.')
@@ -34,6 +43,8 @@ const factoryCapabilities = new Set<string>([...FACTORY_TOOL_IDS, 'dispatch_fact
 export function createCoordinatorRegistry(userId: string, botId: string, scope?: NativeToolScope, options: CoordinatorToolOptions = {}): ToolSet {
   if (!options || typeof options !== 'object') throw new Error('agentToolOptionsInvalid')
   const { execution,computerEnabled = false,mailboxEnabled = false,coordinator = false,sourceEventId } = options
+  const switches = options.switches ?? readCoordinatorSwitches()
+  const factoryOn = switches.issueTools && switches.factoryRouting && switches.factoryLifecycle
   const id = z.uuid()
   // A named Bot always controls its own computer. The Coordinator
   // may select any authorized Bot on the person's explicit instruction.
@@ -59,7 +70,7 @@ export function createCoordinatorRegistry(userId: string, botId: string, scope?:
     }),
     ...scheduleTools(command => steps.scheduleCommand(userId, botId, options.sourceEventId, command, scope)),
     ...modelWriteTools((options.writeEnabled === true) && Boolean(execution && supportsWritePlanning(execution.snapshot.runtime)) && Boolean(writeTools), writeTools?.catalog ?? [], call => writeTools!.submit(call)),
-    ...(coordinator && issueMutationsEnabled() && process.env.MIKKA_FACTORY_ROUTING_ENABLED === '1' && process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED === '1' ? factoryCoordinatorTools(userId,scope) : {}),
+    ...(coordinator && factoryOn ? factoryCoordinatorTools(userId,scope) : {}),
     ...personalMailboxTools(mailboxEnabled && Boolean(execution), request => steps.personalMailbox(userId, botId, request, scope, execution?.id)),
     // A named Bot carries its id so the workspace's 团队权限 › 允许使用的应用 applies (lib/app-policy).
     ...createComposioAITools(read),
@@ -80,7 +91,7 @@ export function createCoordinatorRegistry(userId: string, botId: string, scope?:
       inputSchema: z.object({ issueId: id }),
       execute: input => steps.getIssue(userId, input, scope, botId),
     }),
-    ...(issueMutationsEnabled() ? { create_issue: tool({
+    ...(switches.issueTools ? { create_issue: tool({
       description: 'Create the task the person asked for, including requests from the new-task dialog. Write a short title and put details in body. The assignee can only be a person; dispatching a thread is a separate action. Defaults to todo and normal priority.',
       inputSchema: createIssueInput,
       execute: (input, toolOptions) => options.taskEventId
@@ -93,14 +104,14 @@ export function createCoordinatorRegistry(userId: string, botId: string, scope?:
       execute: (input, options) => steps.updateIssue(userId, input, options.toolCallId, scope, botId),
     }),
     } : {}),
-    ...(issueMutationsEnabled() && process.env.MIKKA_FACTORY_ROUTING_ENABLED === '1' && process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED === '1' ? {
+    ...(factoryOn ? {
       dispatch_factory_task: tool({description:'Dispatch an authorized pending Factory attempt through its current binding. No permission is granted by dispatch.',inputSchema:factoryDispatchSchema,execute:input=>steps.dispatchFactoryTask(userId,input,scope,botId)}),
       recover_factory_check: tool({description:'Request an evidence-bound recovery judgment from the existing decision model. Supply only the current binding. Missing/refused evidence stays pending; no permission is granted and no run is dispatched.',inputSchema:factoryCheckRecoverySchema,execute:(input,call)=>steps.recoverFactoryCheck(userId,input,call.toolCallId,scope,botId)}),
       list_factory_questions: tool({description:'Read durable execution questions for this task. Resolve context from exact existing facts first; escalate material decisions or permissions to the user.',inputSchema:z.object({taskId:id}).strict(),execute:input=>steps.listFactoryQuestionsScoped(userId,input.taskId,scope,botId)}),
       answer_factory_context: tool({description:'Answer only a context question with exact quotations from the original request or issue. Cannot answer decisions, permission requests or external blockers.',inputSchema:contextQuestionAnswerSchema,execute:input=>steps.answerFactoryContextScoped(userId,input,scope,botId)}),
       escalate_factory_question: tool({description:'Escalate an unresolved execution question to its owner in the original task and Bot thread.',inputSchema:questionEscalationSchema,execute:input=>steps.escalateFactoryQuestionScoped(userId,input,scope,botId)}),
     } : {}),
-    ...(issueMutationsEnabled() && process.env.MIKKA_FACTORY_ROUTING_ENABLED === '1' ? {
+    ...(switches.issueTools && switches.factoryRouting ? {
       list_factory_requests: tool({description:'Read original personal requests from this owner and Bot chat. Peer/runtime data is not a human request.',inputSchema:z.object({}).strict(),execute:()=>steps.listFactoryRequestsScoped(userId,scope,botId)}),
       intake_factory_request: tool({description:'Create and persist the task requested by an actual source event. Clear authorized work routes directly to execute; only material missing information or permissions route to clarify. Spec is optional. Routing grants no permission and does not dispatch a run.',inputSchema:intakeSchema,execute:input=>steps.intakeFactoryRequest(userId,input,scope,botId)}),
       stop_factory_task: tool({description:'Cancel this task or record withdrawn permission. This cannot restart or grant permission.',inputSchema:stopInput,execute:input=>steps.stopFactoryTaskScoped(userId,input,scope,botId)}),
@@ -235,7 +246,7 @@ export function coordinatorTools(userId: string, botId: string, scope?: NativeTo
     // Frozen grants are narrowed by the current Factory rollout and Bot scope.
     // Unknown tool IDs still reach instrumentTools and fail closed there.
     (!factoryCapabilities.has(name) || Object.hasOwn(registry, name)) &&
-    (issueMutationsEnabled() || (name !== 'create_issue' && name !== 'update_issue')) &&
+    ((options.switches ?? readCoordinatorSwitches()).issueTools || (name !== 'create_issue' && name !== 'update_issue')) &&
     (!Object.hasOwn(mailboxInputs, name) || (options.mailboxEnabled && options.mailboxTools?.includes(name as MailboxToolName))) &&
     (!(PERSONAL_WRITE_TOOL_IDS as readonly string[]).includes(name) || ((options.writeEnabled === true) && Boolean(execution && supportsWritePlanning(execution.snapshot.runtime)) && (!options.writeTools || options.writeTools.catalog.some(entry => entry.name === name)))))
   return instrumentTools(registry,requested,{

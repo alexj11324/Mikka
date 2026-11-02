@@ -26,6 +26,7 @@ export async function coordinatorTurn(userId: string, botId: string) {
   const computerEnabled = await steps.computerToolsEnabled()
   const mailboxEnabled = await steps.mailboxToolsEnabled()
   const writeEnabled = await steps.personalWriteToolsEnabled()
+  const switches = await steps.coordinatorSwitches()
   const coordinator = await steps.isCoordinatorChat(userId,botId)
   // 停止 (lib/coordinator/stop.ts) aborts the round in flight; a later round, for messages sent after it, runs normally.
   let controller = new AbortController()
@@ -57,8 +58,8 @@ export async function coordinatorTurn(userId: string, botId: string) {
       if (hosted && !inbox.scheduledRead) await steps.noteQuotaSwitch(userId,holder,hosted,botId)
       // A model call cut short by 停止 may surface as an abort error; nothing of it was kept, so the turn ends with what streamed.
       const result = await (selected.harness === 'ai_sdk'
-        ? runHostedWorkflowTurn(hosted ?? await kit.botRuntime(userId,botId),coordinatorTools(userId,botId,scheduledAuthority ? {scheduledRead:scheduledAuthority} : undefined,{ ...scheduleOptions,...sourceOptions,coordinator,execution,writeEnabled,computerEnabled,mailboxEnabled,mailboxTools,...(inbox.taskEventId ? { taskEventId: inbox.taskEventId } : {}) }),{ ...(await steps.preparePrompt(userId,botId,execution?.snapshot,mailboxTools)),stopWhen:isStepCount(AGENT_MAX_ROUNDS),prepareStep:coordinatorStep,writable,preventClose:true,...(inbox.scheduledRead ? {} : { abortSignal:signal }) },{ ownerId:userId,botId })
-        : nativeCoordinatorTurn(userId,holder,round,selected,scope => coordinatorTools(userId,botId,scheduledAuthority ? {...scope,scheduledRead:scheduledAuthority} : scope,{ ...scheduleOptions,...sourceOptions,coordinator,execution,writeEnabled,computerEnabled,mailboxEnabled,mailboxTools,...(inbox.taskEventId ? { taskEventId: inbox.taskEventId } : {}) }),botId,execution?.snapshot,inbox.scheduledRead ? undefined : signal))
+        ? runHostedWorkflowTurn(hosted ?? await kit.botRuntime(userId,botId),coordinatorTools(userId,botId,scheduledAuthority ? {scheduledRead:scheduledAuthority} : undefined,{ ...scheduleOptions,...sourceOptions,switches,coordinator,execution,writeEnabled,computerEnabled,mailboxEnabled,mailboxTools,...(inbox.taskEventId ? { taskEventId: inbox.taskEventId } : {}) }),{ ...(await steps.preparePrompt(userId,botId,execution?.snapshot,mailboxTools)),stopWhen:isStepCount(AGENT_MAX_ROUNDS),prepareStep:coordinatorStep,writable,preventClose:true,...(inbox.scheduledRead ? {} : { abortSignal:signal }) },{ ownerId:userId,botId })
+        : nativeCoordinatorTurn(userId,holder,round,selected,scope => coordinatorTools(userId,botId,scheduledAuthority ? {...scope,scheduledRead:scheduledAuthority} : scope,{ ...scheduleOptions,...sourceOptions,switches,coordinator,execution,writeEnabled,computerEnabled,mailboxEnabled,mailboxTools,...(inbox.taskEventId ? { taskEventId: inbox.taskEventId } : {}) }),botId,execution?.snapshot,inbox.scheduledRead ? undefined : signal))
         .catch((error: unknown) => { if (signal.aborted && !inbox.scheduledRead) return { text:'',finishReason:'stop',responseMessages:[] }; throw error })
       // A scheduled read is not stoppable from the chat: it posts only its fenced result.
       if (signal.aborted && !inbox.scheduledRead) {
