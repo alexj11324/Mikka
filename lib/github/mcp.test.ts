@@ -136,3 +136,15 @@ test('a known code (not connected) is not logged as unavailable', async () => {
   try { assert.deepEqual(await createGitHubMcpRuntime(tokens([]), dependencies)('stranger', {}), { error: 'githubNotConnected' }) } finally { console.warn = warn }
   assert.deepEqual(logged, [])
 })
+
+test('a transport refusal (proxy on Vercel) is logged by its code', async () => {
+  const { dependencies } = fixture()
+  const logged: string[] = []
+  const warn = console.warn
+  console.warn = (line: unknown) => { logged.push(String(line)) }
+  try {
+    const refusing = { ...dependencies, connect: (async () => { throw new Error('mcpProxyNotAllowed') }) as unknown as typeof createMCPClient }
+    assert.deepEqual(await createGitHubMcpRuntime(tokens([]), refusing)('owner', {}), { error: 'mcpUnavailable' })
+  } finally { console.warn = warn }
+  assert.equal(JSON.parse(logged[0]).reason, 'proxyNotAllowed')
+})

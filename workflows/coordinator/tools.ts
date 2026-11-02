@@ -124,7 +124,7 @@ export function createCoordinatorRegistry(userId: string, botId: string, scope?:
       execute: () => steps.listAgents(userId, scope),
     }),
     find_repository: tool({
-      description: 'Look up the person\'s own GitHub repositories that the Mikka GitHub App reaches. With name (the one the person used, with or without owner): match one (result.repository is owner/repo), several (result.candidates and result.card) or none (result.card). Case and -, _, . do not matter. Without name: the first 50 and the total. For several or none, draw result.card. Errors githubNotConnected, githubReconnectRequired: the person connects GitHub in 插件 › GitHub. mcpUnavailable: the GitHub server is not answering; do the work by dispatching an Agent instead.',
+      description: 'Look up the person\'s own GitHub repositories that the Mikka GitHub App reaches. With name (the one the person used, with or without owner): match one (result.repository is owner/repo), several (result.candidates and result.card) or none (result.card). Case and -, _, . do not matter. Without name: the first 50 and the total. For several or none, draw result.card. Errors githubNotConnected, githubReconnectRequired: the person connects GitHub in 插件 › GitHub. mcpUnavailable: GitHub could not be reached just now; the cause is recorded for Mikka, not known to you, so never state or guess one. Dispatch an Agent for the work instead.',
       inputSchema: z.object({ name: z.string().trim().max(200).optional() }),
       execute: input => steps.findRepository(userId, input, scope),
     }),
