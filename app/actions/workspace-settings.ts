@@ -11,7 +11,7 @@ import { archivedBots, removeMember, takeOverBot, type AssetTransfer, type Membe
 const COOKIE = 'mikka-workspace'
 
 /** 常规 as the viewer sees it: values for everyone, `canEdit` for admins. */
-export async function getWorkspaceGeneral(workspaceId?: string): Promise<ActionResult<WorkspaceGeneral & { canEdit: boolean; canTransfer: boolean }>> {
+export async function getWorkspaceGeneral(workspaceId?: string): Promise<ActionResult<WorkspaceGeneral & { canEdit: boolean; canTransfer: boolean; personal: boolean }>> {
   return workspaceAction(async () => {
     const actor = await currentWorkspaceActor(workspaceId)
     return readWorkspaceGeneral(actor.userId, actor.workspaceId)

@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { mailboxInputs, type MailboxToolName } from '@mikka/protocol/mailbox'
 import { isTerminalRunState, type RunAssignment, type RunState } from '@mikka/protocol'
 import { personalMessagePacket, PERSONAL_MESSAGE_INSTRUCTIONS } from '@mikka/protocol/personal-agent-message'
+import { trustedServerEndpoint } from './trusted-endpoint'
 
 /** Fixed host notice, without peer text or a claim of user authorization. */
 export function mailboxNoticeText(runId: string, ids: readonly string[]): string {
@@ -71,8 +72,7 @@ export async function createRunMailbox(host: {
   if (assigned?.mailbox !== true) return undefined
   let endpoint: URL
   try { endpoint = new URL(assigned.url) } catch { throw unavailable() }
-  if (endpoint.href !== host.endpoint.href || endpoint.username || endpoint.password || endpoint.search || endpoint.hash ||
-      (endpoint.protocol !== 'https:' && !(endpoint.protocol === 'http:' && ['127.0.0.1', 'localhost', '[::1]'].includes(endpoint.hostname))) ||
+  if (endpoint.href !== host.endpoint.href || !trustedServerEndpoint(endpoint) ||
       !/^mkw_[A-Za-z0-9_-]{43}$/.test(assigned.token)) throw unavailable()
   let nextId = 0, session: string | null = null, version = '2025-03-26', closed = false, inFlight = 0
   const pending = new Set<AbortController>()

@@ -13,6 +13,7 @@ import { HarnessMark } from '@/components/labels/entity-labels'
 import { GroupHeader } from './group-header'
 import { ThreadStatusIcon } from '@/components/workspace/thread-status-icon'
 import { THREAD_CARD, THREAD_CARD_BUTTON } from '@/components/coordinator/thread-card'
+import { PullRequestsBadge } from '@/components/workspace/pull-requests-badge'
 
 type Issue = Awaited<ReturnType<typeof listIssues>>[number]
 
@@ -69,6 +70,8 @@ function ThreadRow({ thread, group, issues, all, now, onOpenThread }: { thread: 
   const at = new Date(lastActivity(thread))
   const when = activityLabel(at, now)
   const waiting = thread.status === 'queued' ? (thread as ThreadView).waitingFor : undefined
+  // The PRs its task carries, as on the chat's card (R-66).
+  const pullRequests = thread.issueId ? issues.find(issue => issue.id === thread.issueId)?.metadata.pullRequests : undefined
   return <li data-slot="thread-card" className={THREAD_CARD}>
     <Button variant="ghost" className={THREAD_CARD_BUTTON} aria-label={name} onClick={() => onOpenThread({ issueId: thread.issueId ?? null, runId: thread.id })} />
     <span data-slot="thread-status" className="pointer-events-none relative flex shrink-0 items-center justify-center"><ThreadStatusIcon group={group} /></span>
@@ -82,6 +85,7 @@ function ThreadRow({ thread, group, issues, all, now, onOpenThread }: { thread: 
         ? <WaitingChip waiting={waiting} />
         : (thread.lastReply || thread.attempts > 1) && <span className="block w-full truncate text-xs text-muted-foreground">{[thread.attempts > 1 ? t('attempt', { count: thread.attempts }) : null, thread.lastReply].filter(Boolean).join(' · ')}</span>}
     </span>
+    {pullRequests && <PullRequestsBadge pullRequests={pullRequests} />}
     <ChevronRight aria-hidden="true" className="pointer-events-none relative size-4 shrink-0 text-muted-foreground" />
   </li>
 }
