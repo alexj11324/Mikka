@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, type ReactNode } from 'react'
-import useSWR, { mutate } from 'swr'
+import useSWR, { useSWRConfig } from 'swr'
 import { useTranslations } from 'next-intl'
 import { KeyRound, TriangleAlert } from 'lucide-react'
 import { createApiKey, deleteApiKey, refetchApiKeyModels, updateApiKeyAfterQuota, updateApiKeyShare, type getApiKeys } from '@/app/actions/model-api-keys'
@@ -48,6 +48,8 @@ export function useApiKeyList(workspaceId: string) {
   const commonT = useTranslations('Common')
   const actionError = useActionError()
   const keys = useSWR(apiKeysKey(workspaceId), () => readApiKeys(workspaceId))
+  // The workspace's own SWR cache (workspace-app.tsx), where 允许使用的模型 lives: a key change re-reads it.
+  const { mutate } = useSWRConfig()
   const [adding, setAdding] = useState(false)
   const [sharing, setSharing] = useState<Key | null>(null)
   const [removing, setRemoving] = useState<Key | null>(null)

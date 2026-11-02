@@ -63,6 +63,12 @@ test('模型与订阅：添加自定义服务商、校验失败、分享给团�
   expect(await page.content()).not.toContain(GOOD)
   // The row counts what the provider's /models gave.
   await expect(apiKeys.getByRole('status').filter({ hasText: '2 个模型' })).toBeVisible()
+  // 允许使用的模型 offers the new key's models at once, without a reload.
+  await page.getByRole('button', { name: '添加模型', exact: true }).click()
+  const addModels = page.getByRole('dialog', { name: '添加模型' })
+  await expect(addModels.getByText('e2e-large', { exact: true })).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(addModels).toHaveCount(0)
 
   // 重新获取模型: a failed ask says why on the row; the next good one replaces the list.
   const refetch = apiKeys.getByRole('button', { name: '重新获取 E2E 网关 的模型', exact: true })

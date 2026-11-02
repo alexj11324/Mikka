@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import useSWR, { mutate as globalMutate } from 'swr'
+import useSWR, { useSWRConfig } from 'swr'
 import { modelOrderKey } from '@/components/settings/model-order-settings'
 import { Check, Copy, MoreHorizontal, TriangleAlert } from 'lucide-react'
 import { useFormatter, useTranslations } from 'next-intl'
@@ -73,7 +73,9 @@ export function SubscriptionSettings({ workspaceId }: { workspaceId: string }) {
   const connectedKey = state?.connections.filter(item => item.state === 'connected').map(item => `${item.id}:${item.revision}`).join(',') ?? ''
   const { mutate } = list
   // The allowed models' candidates follow the connected accounts.
-  const refresh = useCallback(async () => { await mutate(); void globalMutate(modelOrderKey(workspaceId)) }, [mutate, workspaceId])
+  // The workspace's own SWR cache (workspace-app.tsx), not swr's global one: 启用 and a disconnect re-read 允许使用的模型.
+  const { mutate: mutateCached } = useSWRConfig()
+  const refresh = useCallback(async () => { await mutate(); void mutateCached(modelOrderKey(workspaceId)) }, [mutate, mutateCached, workspaceId])
   const failureMessage = useCallback((failure: unknown, key: 'startFailed' | 'finishFailed', provider: Provider) => {
     if (failure instanceof InvalidAuthorization) return t('refusedPage', { provider: t(provider) })
     const code = failure instanceof RequestError ? failure.code : ''
