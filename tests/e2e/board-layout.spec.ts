@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { Pool } from 'pg'
-import { test, expect, register, seedTask, rail, app } from './fixtures'
+import { test, expect, register, seedTask, rail, app, showEveryTask } from './fixtures'
 
 function isolatedPool() {
   const connectionString = process.env.E2E_DATABASE_URL
@@ -40,6 +40,7 @@ for (const width of [1280, 1440]) {
   test(`${width}px，Coordinator 侧栏打开：每一列（含已完成）都固定 300，放不下就横向滚动`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 })
     await register(page)
+    await showEveryTask(page)
     await seedTask(page, '已完成里的任务', { status: 'done' })
     await seedTask(page, '待整理里的任务', { status: 'backlog' })
     await page.goto(app('/'))
@@ -78,6 +79,7 @@ for (const width of [1280, 1440]) {
 test('1024px：Coordinator 侧栏默认收起，展开时浮在看板上；无编号不占位，列表没有版本号', async ({ page }) => {
   await page.setViewportSize({ width: 1024, height: 768 })
   await register(page)
+  await showEveryTask(page)
   await seedTask(page, '窄窗口里的任务', { status: 'todo' })
   await page.goto(app('/'))
   await rail(page, '看板').click()
@@ -119,6 +121,18 @@ test('看板工具栏：范围切换、筛选和筛选条同高', async ({ page 
 
   const heights = await Promise.all([scope, filter, chip].map(async item => (await item.boundingBox())!.height))
   expect(heights).toEqual([28, 28, 28])
+
+  // 我创建的 is its own filter, one checkbox right after 负责人 (decision 2026-11-02-0302).
+  await filter.click()
+  const menu = page.getByRole('menu')
+  await expect(menu.getByRole('menuitem').or(menu.getByRole('menuitemcheckbox'))).toHaveText(['状态', '优先级', '负责人', '我创建的', '标签', '项目', '线程状态'])
+  await menu.getByRole('menuitemcheckbox', { name: '我创建的', exact: true }).click()
+  await page.keyboard.press('Escape')
+  const created = toolbar.getByRole('group', { name: '我创建的', exact: true })
+  await expect(created).toHaveText('我创建的')
+  await expect(chip).toBeVisible()
+  await created.getByRole('button', { name: '移除我创建的筛选', exact: true }).click()
+  await expect(created).toHaveCount(0)
 })
 
 // A due date is a calendar day: it reads the same on either side of UTC (seeded 10-30, never 「10月29日」).
@@ -129,6 +143,7 @@ for (const timezoneId of ['America/Los_Angeles', 'Asia/Shanghai']) test.describe
     await page.setViewportSize({ width: 1440, height: 900 })
     const email = `e2e-${randomUUID()}@example.com`
     await register(page, '/', email)
+    await showEveryTask(page)
     await seedTask(page, 'Bot 负责的看板任务', { status: 'doing' })
     await seedTask(page, '只有 PR 的看板任务', { status: 'todo' })
     const viewerId = await seedCardTasks(email, 'Bot 负责的看板任务', '只有 PR 的看板任务')

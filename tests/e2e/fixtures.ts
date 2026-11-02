@@ -52,6 +52,20 @@ function database() {
 }
 
 /**
+ * Opens the board with no filters. The board starts on 负责人 我, which matches
+ * the assignee only (decision 2026-11-02-0302), so a seeded task (nobody on it)
+ * shows only once the filter is off. Call before the next navigation.
+ */
+export async function showEveryTask(page: Page) {
+  await page.addInitScript(() => {
+    if (sessionStorage.getItem('e2e:board-unfiltered')) return
+    sessionStorage.setItem('e2e:board-unfiltered', '1')
+    const stored = JSON.parse(localStorage.getItem('mikka:board-v2') ?? '{}')
+    localStorage.setItem('mikka:board-v2', JSON.stringify({ ...stored, filters: {} }))
+  })
+}
+
+/**
  * Unrelated browser tests seed tasks directly to stay focused. The separate
  * tests/mvp suite runs the actual Coordinator workflow and must not use this.
  */

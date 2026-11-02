@@ -4,9 +4,8 @@ import { PersonAvatar } from '@/components/person-avatar'
 import { useEffect, useId, useMemo, useState } from 'react'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
-import { Box, Check, CircleUserRound, Columns3, Flag, List, ListFilter, PanelRightClose, PanelRightOpen, Plus, RefreshCw, Settings2, SquareKanban, Tag, X } from 'lucide-react'
+import { Box, Check, CircleUserRound, UserRoundPen, Columns3, Flag, List, ListFilter, PanelRightClose, PanelRightOpen, Plus, RefreshCw, Settings2, SquareKanban, Tag, X } from 'lucide-react'
 import type { listIssues } from '@/app/actions/issues'
-import { listAgents } from '@/app/actions/agents'
 import { listTaskRuns } from '@/app/actions/task-runs'
 import { getLinearBoardSync } from '@/app/actions/linear-sync'
 import { CoordinatorChat } from '@/components/coordinator/coordinator-chat'
@@ -27,6 +26,7 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import { statusIconTints } from '@/lib/status-appearance'
+import { personFilters } from '@/lib/board-filters'
 import { IssueBoard } from './issue-board'
 import { IssueList } from './issue-list'
 import { AgentSphere } from './issue-assignee-menu'
@@ -36,7 +36,7 @@ import { ResizablePane } from '@/components/ui/resizable-pane'
 
 type Issue = Awaited<ReturnType<typeof listIssues>>[number]
 type Scope = 'all' | 'workspace' | 'personal'
-type FilterField = 'status' | 'priority' | 'assignee' | 'labels' | 'project' | 'agentState'
+type FilterField = 'status' | 'priority' | 'assignee' | 'creator' | 'labels' | 'project' | 'agentState'
 type Filters = Partial<Record<FilterField, string[]>>
 type Sort = 'priority' | 'updated' | 'created'
 type Completed = 'all' | 'week' | 'month'
@@ -54,7 +54,7 @@ const DISPLAY_CHIP = 'h-7 rounded-md px-2 text-xs font-normal text-muted-foregro
 const PRIORITY_RANK: Record<string, number> = { urgent: 0, high: 1, normal: 2, low: 3 }
 const COMPLETED_DAYS: Record<Completed, number> = { all: Infinity, week: 7, month: 30 }
 const FILTER_FIELDS: { field: FilterField; icon: typeof Flag }[] = [
-  { field: 'status', icon: ISSUE_STATUSES[1].icon }, { field: 'priority', icon: Flag }, { field: 'assignee', icon: CircleUserRound },
+  { field: 'status', icon: ISSUE_STATUSES[1].icon }, { field: 'priority', icon: Flag }, { field: 'assignee', icon: CircleUserRound }, { field: 'creator', icon: UserRoundPen },
   { field: 'labels', icon: Tag }, { field: 'project', icon: Box }, { field: 'agentState', icon: SquareKanban },
 ]
 
@@ -126,12 +126,10 @@ export function BoardPage({ issues, userId, onOpen, onUpdated, onBusyChange }: {
   const sidebarShown = sidebar && wide
   const [prefill, setPrefill] = useState<{ text: string; nonce: number }>()
   const [newTask, setNewTask] = useState(false)
-  const { data: agents } = useSWR('agents', () => listAgents())
   const { data: linear } = useSWR('linear-board-sync', () => getLinearBoardSync(), { revalidateOnFocus: false })
   // Without a connected Linear team, the button only reloads the board.
   const linearSynced = !!linear && !linear.error && linear.synced
   const { data: runs } = useSWR('task-runs', () => listTaskRuns(), { refreshInterval: 15000 })
-  const myAgents = useMemo(() => new Set((agents ?? []).map(agent => agent.id)), [agents])
   const owners = useMemo(() => new Map((runs ?? []).map(run => [run.issueId, { bot: run.bot, harnesses: run.harnesses }] as const)), [runs])
   // listTaskRuns returns each task's newest run once; the card shows that run's group, never its raw status.
   const agentStates = useMemo(() => new Map((runs ?? []).flatMap(run => { const state = agentStateOf(run, issues.find(issue => issue.id === run.issueId)); return state ? [[run.issueId, state] as const] : [] })), [runs, issues])
@@ -145,13 +143,12 @@ export function BoardPage({ issues, userId, onOpen, onUpdated, onBusyChange }: {
     return result
   }, [issues])
 
-  // Mine: assigned to me, created by me, or held by one of my agents.
-  const isMine = (issue: Issue) => issue.ownerId === userId || issue.metadata.assignee?.id === userId || (issue.metadata.assignee?.kind === 'agent' && myAgents.has(issue.metadata.assignee.id))
   const valuesOf = (issue: Issue, field: FilterField): string[] => {
     switch (field) {
       case 'status': return [issue.status]
       case 'priority': return [issue.priority]
-      case 'assignee': return [...(isMine(issue) ? [ME] : []), issue.metadata.assignee?.id ?? NONE]
+      case 'assignee': return [...(personFilters(issue, userId).assignee ? [ME] : []), issue.metadata.assignee?.id ?? NONE]
+      case 'creator': return personFilters(issue, userId).creator ? [ME] : []
       case 'labels': return issue.metadata.labels.map(label => label.name)
       case 'project': return [issue.metadata.project ?? NONE]
       case 'agentState': return [agentStates.get(issue.id) ?? NONE]
@@ -176,6 +173,7 @@ export function BoardPage({ issues, userId, onOpen, onUpdated, onBusyChange }: {
     status: ISSUE_STATUSES.map(status => ({ value: status.value, label: statusLabel(status.value), mark: <status.icon className={cn(statusIconTints[status.tone])} /> })),
     priority: ISSUE_PRIORITIES.map(priority => ({ value: priority.value, label: priorityLabel(priority.value), mark: <priority.icon {...priority.iconProps} /> })),
     assignee: [{ value: ME, label: t('me') }, ...assignees.filter(assignee => assignee.id !== userId).map(assignee => ({ value: assignee.id, label: assignee.name, mark: assignee.kind === 'agent' ? <AgentSphere name={assignee.name} compact /> : <PersonAvatar name={assignee.name} image={assignee.image} size="row" /> })), { value: NONE, label: t('unassigned'), mark: <CircleUserRound /> }],
+    creator: [{ value: ME, label: t('me') }],
     labels: labels.map(label => ({ value: label.name, label: label.name, mark: <LabelDot color={label.color} /> })),
     project: [...projects.map(project => ({ value: project, label: project, mark: <Box /> })), { value: NONE, label: t('noProject') }],
     agentState: [...AGENT_STATES.map(state => ({ value: state, label: t(`card.agent.${state}` as `card.agent.${AgentState}`) })), { value: NONE, label: t('noRun') }],
@@ -199,7 +197,9 @@ export function BoardPage({ issues, userId, onOpen, onUpdated, onBusyChange }: {
         <DropdownMenu>
           <DropdownMenuTrigger render={<Button variant="outline" size="sm" />}><ListFilter data-icon="inline-start" />{t('filter')}</DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-52"><DropdownMenuGroup>
-            {FILTER_FIELDS.map(({ field, icon: Icon }) => <DropdownMenuSub key={field}>
+            {FILTER_FIELDS.map(({ field, icon: Icon }) => field === 'creator'
+              ? <DropdownMenuCheckboxItem key={field} checked={filters.creator?.includes(ME) ?? false} closeOnClick={false} onCheckedChange={() => toggleFilter(field, ME)}><Icon />{t(`filterField.${field}`)}</DropdownMenuCheckboxItem>
+              : <DropdownMenuSub key={field}>
               <DropdownMenuSubTrigger><Icon />{t(`filterField.${field}`)}</DropdownMenuSubTrigger>
               <DropdownMenuSubContent className="max-h-80 w-52 overflow-y-auto">
                 {options[field].map(option => <DropdownMenuCheckboxItem key={option.value} checked={filters[field]?.includes(option.value) ?? false} closeOnClick={false} onCheckedChange={() => toggleFilter(field, option.value)}>{option.mark}<span className="truncate">{option.label}</span></DropdownMenuCheckboxItem>)}
@@ -210,7 +210,7 @@ export function BoardPage({ issues, userId, onOpen, onUpdated, onBusyChange }: {
         {/* One chip per filter (Linear): field, value and remove in a single control-grey container. */}
         {activeFilters.map(([field, values]) => <div key={field} role="group" aria-label={t(`filterField.${field}`)} className="flex h-7 min-w-0 items-center gap-1.5 rounded-md bg-control pr-0.5 pl-2.5 text-xs">
           <span className="text-muted-foreground">{t(`filterField.${field}`)}</span>
-          <span className="max-w-48 truncate font-medium">{values.map(value => options[field].find(option => option.value === value)?.label ?? value).join(', ')}</span>
+          {field !== 'creator' && <span className="max-w-48 truncate font-medium">{values.map(value => options[field].find(option => option.value === value)?.label ?? value).join(', ')}</span>}
           <Button variant="ghost" size="icon-xs" className="rounded-sm text-muted-foreground hover:bg-control-hover" aria-label={t('removeFilter', { field: t(`filterField.${field}`) })} onClick={() => update({ filters: { ...filters, [field]: [] } })}><X data-icon="inline-start" /></Button>
         </div>)}
         <div className="ml-auto flex items-center gap-1">

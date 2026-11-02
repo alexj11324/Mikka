@@ -1,4 +1,4 @@
-import { test, expect, register, app, seedTask } from './fixtures'
+import { test, expect, register, app, seedTask, showEveryTask } from './fixtures'
 
 // Network failure is the action under test, not an ignored application exception.
 test.use({ expectedConsoleErrors: [{ path: app('/'), message: 'Failed to load resource: net::ERR_INTERNET_DISCONNECTED' }] })
@@ -9,6 +9,7 @@ for (const width of [1280, 402]) {
     test(`offline refresh keeps ${layout} bounds stable at ${width}px`, async ({ page, context }, testInfo) => {
       await page.setViewportSize({ width, height: 900 })
       await register(page)
+      await showEveryTask(page)
       const title = `Offline layout ${width} ${layout}`
       await seedTask(page, title)
       await page.reload()
