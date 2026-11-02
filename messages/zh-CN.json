@@ -2506,7 +2506,16 @@
       "removeTitle": "删除 {name}？",
       "othersUsage": "团队成员可以用它跑自己的 Bot，用量算在你的 API 账单上。",
       "afterQuota": "订阅额度用完后，自动改用 API Key",
-      "afterQuotaBilling": "会按 API 服务商的价格计费"
+      "afterQuotaBilling": "会按 API 服务商的价格计费",
+      "sectionTitle": "API Key",
+      "none": "还没有 API Key",
+      "loading": "正在读取 API Key…",
+      "modelCount": "{count} 个模型",
+      "noModels": "服务商没有返回模型",
+      "modelsInvalid": "无法获取模型 · Key 无效或已被撤销",
+      "modelsUnavailable": "无法获取模型 · 服务商没有响应",
+      "refetch": "重新获取模型",
+      "refetchLabel": "重新获取 {name} 的模型"
     }
   },
   "TelegramBot": {

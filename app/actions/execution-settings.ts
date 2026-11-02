@@ -11,7 +11,7 @@ import { botModelMenu, botModelScope, refreshBotModelMenu } from "@/lib/bot-mode
 import { z } from "zod";
 import { chatBotId } from "@/lib/coordinator/coordinator-bot";
 import { parseApiKeyOption } from "@/lib/bot-model-menu-view";
-import { setBotApiKeyChoice } from "@/lib/model-api-keys";
+import { apiKeyModels, setBotApiKeyChoice } from "@/lib/model-api-keys";
 import { WorkspaceError } from "@/lib/workspace-error";
 async function context(workspaceId?: string) {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -74,6 +74,11 @@ export async function redetectDevice(deviceId: string) {
 }
 export async function listBotModels() {
   return new ExecutionSettings(pool).botModels(await context());
+}
+/** The models of the API keys this workspace's runs may use, by Agent (Bot 与 Agents). */
+export async function listApiKeyModels() {
+  const scope = await context();
+  return apiKeyModels(pool, scope.ownerId, scope.workspaceId);
 }
 /** The chat's bot (no bot named: the person's Coordinator, an ordinary bot row) and the scope its picker reads and saves in. */
 async function chatScope(chatBot: string | null) {

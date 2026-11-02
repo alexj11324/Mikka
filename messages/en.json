@@ -2506,7 +2506,16 @@
       "removeTitle": "Delete {name}?",
       "othersUsage": "Team members can use it to run their own bots. Usage is billed to your API account.",
       "afterQuota": "Use an API key when subscription quota runs out",
-      "afterQuotaBilling": "Billed at the API provider's prices"
+      "afterQuotaBilling": "Billed at the API provider's prices",
+      "sectionTitle": "API keys",
+      "none": "No API keys yet",
+      "loading": "Loading API keys…",
+      "modelCount": "{count, plural, one {# model} other {# models}}",
+      "noModels": "The provider listed no models",
+      "modelsInvalid": "Couldn't fetch models · Key invalid or revoked",
+      "modelsUnavailable": "Couldn't fetch models · Provider didn't respond",
+      "refetch": "Fetch models again",
+      "refetchLabel": "Fetch models for {name} again"
     }
   },
   "TelegramBot": {

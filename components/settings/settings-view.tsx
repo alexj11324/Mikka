@@ -139,13 +139,15 @@ function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, pe
 }
 
 /**
- * 「API 与订阅」: subscriptions, API keys and custom providers in one list (orchestration.md § 1).
+ * 「API 与订阅」: the subscriptions, then the API keys and custom providers as their own group
+ * (orchestration.md § 1; decision 2026-11-02-1200).
  * Sharing with the team (分享给团队成员) and 付款 belong to a team workspace only (decision 2026-11-01-2310).
  */
 function ApiAndSubscriptions({ workspaceId, team }: { workspaceId: string; team: boolean }) {
   const apiKeys = useApiKeyList(workspaceId)
   return <>
-    <SubscriptionSettings workspaceId={workspaceId} extraRows={apiKeys.rows} action={apiKeys.action} />
+    <SubscriptionSettings workspaceId={workspaceId} />
+    {apiKeys.section}
     {apiKeys.dialogs}
     <ApiKeyFallbackSetting workspaceId={workspaceId} />
     {/* The person's own E2B key: account-level, so before this workspace's settings. */}

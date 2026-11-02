@@ -9,6 +9,7 @@ import {
   type getExecutionFallbacks, type listExecutionRules,
 } from '@/app/actions/execution-settings'
 import { settingsRead } from '@/lib/settings-read'
+import type { ApiKeyModels } from '@/lib/model-api-key-providers'
 import type { ExecutionRule } from '@/lib/execution-rules'
 import { initialExecution, retarget, type BotModelRow, type ExecutionChoice, type ExecutionPlace, type RuleHarness } from '@/lib/execution-settings-view'
 
@@ -88,14 +89,16 @@ export async function removeRule(id: string) {
 
 export const listPlaces = () => settingsRead<ExecutionPlace[]>('execution-places')
 export const listAccountModels = () => settingsRead<BotModelRow[]>('bot-models')
+export const listApiKeyModels = () => settingsRead<ApiKeyModels[]>('api-key-models')
 
 /** Bot 与 Agents' SWR keys; settings-prefetch fills the same ones. */
-export const BOT_AGENTS_KEYS = { settings: 'execution-settings', places: 'execution-places', accounts: 'bot-models' } as const
+export const BOT_AGENTS_KEYS = { settings: 'execution-settings', places: 'execution-places', accounts: 'bot-models', keys: 'api-key-models' } as const
 
 /** The section's first reads, by key, for settings-prefetch. */
 export const botAgentsReads = (): [key: string, read: () => Promise<unknown>][] => [
   [BOT_AGENTS_KEYS.settings, readExecutionSettings],
   [BOT_AGENTS_KEYS.places, listPlaces],
   [BOT_AGENTS_KEYS.accounts, listAccountModels],
+  [BOT_AGENTS_KEYS.keys, listApiKeyModels],
 ]
 export const redetect = (deviceIds: string[]) => Promise.all(deviceIds.map(id => redetectDevice(id)))

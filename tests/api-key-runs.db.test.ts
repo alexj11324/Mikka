@@ -219,6 +219,22 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
     assert.deepEqual(thread, { model: 'subscription-model', subscription: false, apiKey: true, harness: 'claude_code' }, 'a saved API-key model is the thread\'s model, not Mikka 默认')
   })
 
+  await t.test('a rule\'s model only an API key lists runs on that key, beside a usable subscription; one the subscription lists stays on it', async () => {
+    const p = await person('key-rule-model')
+    const key = await addKey(p.id, 'anthropic', `sk-ant-${randomBytes(16).toString('hex')}`, ['key-only-model', 'shared-model'])
+    const { connection, binding } = await subscribe(p)
+    await pool.query('UPDATE byos_connections SET "modelCatalog"=$2 WHERE id=$1', [connection, JSON.stringify({ revision: '1', models: ['subscription-model', 'shared-model'] })])
+    const queue = async (model: string) => definition((await queueRun(p.id, { issueId: await task(p.id), agentId: p.agents.claude_code, repo: p.remote, model }, p.botId)).runId)
+    const keyed = await queue('key-only-model')
+    assert.deepEqual(keyed.apiKey, { keyId: key.id, model: 'key-only-model' }, 'a model the subscription does not offer is never asked of it')
+    assert.equal(keyed.subscription, undefined)
+    for (const model of ['shared-model', 'subscription-model']) {
+      const kept = await queue(model)
+      assert.equal(kept.subscription?.bindingId, binding, `${model}: the subscription goes first (§ 2)`)
+      assert.equal(kept.apiKey, undefined)
+    }
+  })
+
   await t.test('cloud computer: queued with no subscription, the claim returns the key', async () => {
     const p = await person('key-cloud')
     const secret = `sk-ant-${randomBytes(16).toString('hex')}`

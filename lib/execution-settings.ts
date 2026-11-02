@@ -31,6 +31,12 @@ const ruleInput = z
   .strict();
 
 /** Callers obtain scope from the session and current workspace, never from input. */
+/** A model one of the person's usable API keys lists for this Agent (§ 3): the run is handed that key. */
+async function apiKeyServes(client: Pick<PoolClient, "query">, scope: ExecutionSettingsScope, harness: string, model: string) {
+  const { apiKeyModels } = await import("./model-api-keys");
+  return (await apiKeyModels(client, scope.ownerId, scope.workspaceId)).some((key) => key.harness === harness && key.models.includes(model));
+}
+
 export class ExecutionSettings {
   constructor(readonly pool: Pool) {}
   async fallbacks(ownerId: string): Promise<ExecutionFallbacks> {
@@ -305,7 +311,8 @@ export class ExecutionSettings {
               (h) =>
                 h.models?.includes(value.model) ||
                 h.modelSlots?.some((s) => s.slot === value.model),
-            )
+            ) &&
+            !(await apiKeyServes(client, scope, value.harness, value.model))
           )
             throw new ActionFailureError("executionModelUnknown");
         }
@@ -316,7 +323,7 @@ export class ExecutionSettings {
             WHERE b."ownerId"=$1 AND b."workspaceId"=$2 AND b."modelId"=$3 AND c.provider=CASE WHEN $4='claude_code' THEN 'claude' WHEN $4='codex' THEN 'codex' END`,
             [scope.ownerId, scope.workspaceId, value.model, value.harness],
           );
-          if (!models.rowCount)
+          if (!models.rowCount && !(await apiKeyServes(client, scope, value.harness, value.model)))
             throw new ActionFailureError("executionModelUnknown");
         }
         const id =

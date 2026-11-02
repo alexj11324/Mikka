@@ -156,3 +156,36 @@ test('Bot 与 Agents：没有 Coordinator 和各 Bot 的模型行，模型在对
   await expect(page.getByRole('button', { name: /^Coordinator 模型/ })).toHaveCount(0)
   await expect(page.getByRole('main').getByText('未连接账号')).toHaveCount(0)
 })
+
+// An API key's models (decision 2026-11-02-1200): what the provider's /models gave, offered under the Agent its
+// protocol needs wherever that Agent is installed. The key row is seeded as the add flow stores it (sealed; the
+// screen never opens it); settings-api-keys.spec.ts covers adding and 重新获取模型 against a local provider.
+test('Bot 与 Agents：API Key 的模型可以选，按协议归到对应的 Agent', async ({ page }, testInfo) => {
+  await registerInTeam(page, '/settings?section=bots')
+  await expect(page.getByRole('button', { name: '添加规则', exact: true })).toBeVisible()
+  await seed(page)
+  const cookie = (await page.context().cookies()).find(item => item.name.endsWith('session_token'))!
+  const { rows: [session] } = await db().query<{ userId: string }>('SELECT "userId" FROM session WHERE token = $1', [decodeURIComponent(cookie.value).split('.')[0]])
+  await db().query(`INSERT INTO model_api_keys (id, "ownerId", provider, name, "baseUrl", protocol, ciphertext, iv, "keyVersion", last4, models)
+    VALUES ($1, $2, 'custom', 'E2E 网关', 'https://gateway.e2e.invalid/v1', 'openai', 'e2e-sealed', 'e2e-iv', 1, 'e2e0', '["e2e-key-model"]')`, [randomUUID(), session.userId])
+  await page.reload()
+
+  const fallback = page.locator('[data-rule="default"]')
+  await fallback.getByRole('button', { name: '默认 Agent：Claude Code', exact: true }).click()
+  await page.getByRole('option', { name: 'Codex' }).click()
+  await fallback.getByRole('button', { name: /^默认 模型：/ }).click()
+  // Codex lists what the CLI reported, then the key's model.
+  await expect(page.getByRole('option')).toHaveText(['e2e-reported-model', 'e2e-other-model', 'e2e-key-model'])
+  await page.getByRole('option', { name: 'e2e-key-model' }).click()
+  await expect(fallback.getByRole('button', { name: '默认 模型：e2e-key-model', exact: true })).toBeVisible()
+  await page.reload()
+  await expect(fallback.getByRole('button', { name: '默认 模型：e2e-key-model', exact: true })).toBeVisible()
+  await expect(page.getByRole('alert').filter({ hasText: '未保存' })).toHaveCount(0)
+  // An OpenAI-protocol key runs on Codex, never on Claude Code.
+  await fallback.getByRole('button', { name: '默认 Agent：Codex', exact: true }).click()
+  await page.getByRole('option', { name: 'Claude Code' }).click()
+  await fallback.getByRole('button', { name: /^默认 模型：/ }).click()
+  await expect(page.getByRole('option', { name: 'e2e-key-model' })).toHaveCount(0)
+  await page.keyboard.press('Escape')
+  await testInfo.attach('bot-agents-api-key-model', { body: await page.screenshot(), contentType: 'image/png' })
+})

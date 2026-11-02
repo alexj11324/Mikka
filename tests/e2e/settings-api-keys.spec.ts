@@ -11,12 +11,15 @@ import { attachLightDark } from './settings-v4-shots'
 const GOOD = `test-${Date.now()}-good-k3y9`
 let server: Server
 let baseUrl = ''
+/** What the provider's /models answers next: its model ids, or down (503). */
+let listed: string[] | 'down' = ['e2e-large', 'e2e-small']
 
 test.beforeAll(async () => {
   server = createServer((request, response) => {
     if (request.method !== 'GET' || request.url !== '/v1/models') { response.writeHead(404).end(); return }
     if (request.headers.authorization !== `Bearer ${GOOD}`) { response.writeHead(401, { 'content-type': 'application/json' }).end('{"error":"invalid"}'); return }
-    response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ object: 'list', data: [{ id: 'e2e-large', object: 'model' }, { id: 'e2e-small', object: 'model' }] }))
+    if (listed === 'down') { response.writeHead(503).end(); return }
+    response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ object: 'list', data: listed.map(id => ({ id, object: 'model' })) }))
   })
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
   baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}/v1`
@@ -30,6 +33,12 @@ test('API 与订阅：添加自定义服务商、校验失败、分享给团队�
   const fallback = page.getByRole('switch', { name: '订阅额度用完后，自动改用 API Key', exact: true })
   await expect(fallback).toBeChecked()
   await expect(page.getByText('会按 API 服务商的价格计费', { exact: true })).toBeVisible()
+  // Subscriptions and API keys are two groups (decision 2026-11-02-1200); 添加 API Key belongs to the second.
+  const subscriptions = page.getByRole('region', { name: '模型订阅', exact: true })
+  const apiKeys = page.getByRole('region', { name: 'API Key', exact: true })
+  await expect(subscriptions).toBeVisible()
+  await expect(apiKeys.getByText('还没有 API Key', { exact: true })).toBeVisible()
+  await expect(apiKeys.getByRole('button', { name: '添加 API Key', exact: true })).toBeVisible()
   await attachLightDark(page, testInfo, 'api-keys-empty')
 
   // A wrong key is refused by the provider and nothing is saved.
@@ -49,8 +58,22 @@ test('API 与订阅：添加自定义服务商、校验失败、分享给团队�
   await dialog.getByRole('button', { name: '添加', exact: true }).click()
   await expect(dialog).toHaveCount(0)
   const host = new URL(baseUrl).host
-  await expect(page.getByText(`${host} · ••••k3y9`, { exact: true })).toBeVisible()
+  await expect(apiKeys.getByText(`${host} · ••••k3y9`, { exact: true })).toBeVisible()
+  await expect(subscriptions.getByText(`${host} · ••••k3y9`, { exact: true })).toHaveCount(0)
   expect(await page.content()).not.toContain(GOOD)
+  // The row counts what the provider's /models gave.
+  await expect(apiKeys.getByRole('status').filter({ hasText: '2 个模型' })).toBeVisible()
+
+  // 重新获取模型: a failed ask says why on the row; the next good one replaces the list.
+  const refetch = apiKeys.getByRole('button', { name: '重新获取 E2E 网关 的模型', exact: true })
+  listed = 'down'
+  await refetch.click()
+  await expect(apiKeys.getByRole('status').filter({ hasText: '无法获取模型 · 服务商没有响应' })).toBeVisible()
+  await attachLightDark(page, testInfo, 'api-keys-models-failed')
+  listed = ['e2e-large', 'e2e-small', 'e2e-new']
+  await refetch.click()
+  await expect(apiKeys.getByRole('status').filter({ hasText: '3 个模型' })).toBeVisible()
+  await expect(apiKeys.getByText('无法获取模型', { exact: false })).toHaveCount(0)
 
   // 分享给团队成员 asks first; the first line says whose bill pays.
   const share = page.getByRole('switch', { name: '分享 E2E 网关 给团队成员', exact: true })

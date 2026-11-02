@@ -57,6 +57,9 @@ test(
       await pool.query(
         await readFile(new URL("../drizzle/20261101021100_bot_api_key_choice.sql", import.meta.url), "utf8"),
       );
+      await pool.query(
+        await readFile(new URL("../drizzle/20261102120000_model_api_key_models_error.sql", import.meta.url), "utf8"),
+      );
       const catalogueMigration = await readFile(new URL('../drizzle/20261030233002_byos_model_catalog.sql',import.meta.url),'utf8');
       await pool.query(catalogueMigration); await pool.query(catalogueMigration);
       const personalPolicyMigration = await readFile(new URL("../drizzle/20261101020201_workspace_personal_policies.sql",import.meta.url),"utf8");
@@ -317,6 +320,15 @@ test(
       for (const [patch,code] of [[{place:'invalid'},'executionPlaceInvalid'],[{harness:'missing'},'executionHarnessUnavailable'],[{harness:'mock'},'executionHarnessUnavailable'],[{model:'missing'},'executionModelUnknown']] as const) {
         await assert.rejects(settings.mutate(alice, {kind:'save',value:{...ruleValue,...patch} as typeof ruleValue}), {code});
       }
+      // A model one of her API keys lists runs on that key (§ 3), so Bot 与 Agents may save it for that key's Agent (decision 2026-11-02-1200).
+      const keyId = randomUUID();
+      await pool.query(`INSERT INTO model_api_keys (id,"ownerId",provider,protocol,ciphertext,iv,"keyVersion",last4,models) VALUES ($1,$2,'openai','openai','x','x',1,'abcd','["key-listed-model"]')`,[keyId,alice.ownerId]);
+      await settings.mutate(alice,{kind:'save',value:{...ruleValue,label:'keyed',model:'key-listed-model'}});
+      assert.equal((await settings.list(alice)).find(rule=>rule.label==='keyed')?.model,'key-listed-model');
+      await assert.rejects(settings.mutate(bob,{kind:'save',value:{...ruleValue,label:'keyed',model:'key-listed-model'}}),{code:'executionPlaceInvalid'},'never on someone else\'s key or device');
+      await pool.query(`DELETE FROM execution_rules WHERE label='keyed'`);
+      await pool.query('DELETE FROM model_api_keys WHERE id=$1',[keyId]);
+      await assert.rejects(settings.mutate(alice, {kind:'save',value:{...ruleValue,label:'keyed',model:'key-listed-model'}}), {code:'executionModelUnknown'},'the key gone, its model goes with it');
       await assert.rejects(settings.mutate(alice,{kind:'delete',id:randomUUID()}), {code:'executionRuleNotFound'});
       const fixtureScope = {...alice,workspaceId:randomUUID()};
       await pool.query(`INSERT INTO execution_rules (id,"ownerId","workspaceId",label,place,harness,model,position) VALUES ($1,$2,$3,NULL,$4,'mock','fixture-model',2147483647)`,[randomUUID(),alice.ownerId,fixtureScope.workspaceId,own]);

@@ -44,6 +44,24 @@ test('models are only what the harness reported there, never a built-in list', (
   assert.deepEqual(modelOptions(places, laptop.id, 'claude_code'), [])
 })
 
+test('an API key\'s models are offered under the Agent its protocol needs, on Mikka Cloud and on devices where that Agent is installed', () => {
+  const keys = [{ harness: 'claude_code' as const, models: ['key-a', 'key-b'] }, { harness: 'codex' as const, models: ['reported-b', 'key-c'] }]
+  const withKeys = withCloudModels(places, accounts.slice(1), keys)
+  assert.deepEqual(harnessOptions(withKeys, 'cloud'), ['claude_code', 'codex'], 'a key alone gives Mikka Cloud its Agent')
+  assert.deepEqual(names(modelOptions(withKeys, 'cloud', 'claude_code')), ['key-a', 'key-b'])
+  assert.deepEqual(names(modelOptions(withKeys, 'cloud', 'codex')), ['codex-a', 'codex-b', 'reported-b', 'key-c'])
+  // Claude Code reported nothing on the laptop; the key's models are offered there, once each, after what the CLI reported.
+  assert.deepEqual(names(modelOptions(withKeys, laptop.id, 'claude_code')), ['key-a', 'key-b'])
+  assert.deepEqual(names(modelOptions(withKeys, laptop.id, 'codex')), ['reported-a', 'reported-b', 'key-c'])
+  assert.deepEqual(names(modelOptions(withKeys, laptop.id, 'cursor')), [], 'never on an Agent that is not installed')
+  // A key's model is marked as one: its mark is its own name's provider, never the Agent's (R-74).
+  assert.deepEqual(modelOptions(withKeys, laptop.id, 'codex').map(option => [option.value, Boolean(option.apiKey)]), [['reported-a', false], ['reported-b', false], ['key-c', true]])
+  assert.deepEqual(modelOptions(withKeys, 'cloud', 'codex').filter(option => option.apiKey).map(option => option.value), ['reported-b', 'key-c'])
+  // A device reporting slots keeps them, with the key's models after them.
+  const mac = withCloudModels([slotted('mac', 'laptop', true, 'Opus Z')], [], keys)
+  assert.deepEqual(modelOptions(mac, 'mac', 'claude_code').map(option => [option.value, option.name]), [['sonnet', 'Sonnet X'], ['opus', 'Opus Z'], ['key-a', 'key-a'], ['key-b', 'key-b']])
+})
+
 const slotted = (id: string, deviceType: 'laptop' | 'server', online: boolean, resolved: string, claudeDefault?: string): ExecutionPlace => ({
   id, name: id, deviceType, enabled: true, online,
   harnesses: [

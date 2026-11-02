@@ -132,12 +132,16 @@ export async function resolveIssueExecution(
   })();
   // Cloud, by rule or because nothing else matched. A device is the fallback.
   const harness = chosen.harness;
+  // A rule's model that only an API key serves runs on that key: no subscription is bound for it.
+  const keyed = resolution
+    ? Boolean(await (await import("./run-credential-source")).ruleApiKey(pool, { ownerId, botWorkspaceId: botId ? workspaceId : null, harness: resolution.harness, model: resolution.model }))
+    : false;
   const found = only === "cloud" ? null : await fallbackDevice(pool, ownerId, devices, rules, harness);
   // A subscription or API-key model on the same Agent goes to the device's run; otherwise the device's own default.
   const fallback = found && !resolution && "subscription" in chosen && chosen.subscription && found.harness === harness
     ? { ...found, model: chosen.model } : found;
   if (await cloudReady(pool, { ownerId, workspaceId, botId, harness }))
-    return { place: "cloud" as const, harness, model: chosen.model, workspaceId, issue, ...("apiKey" in chosen && chosen.apiKey ? { apiKey: true as const } : {}), ...(fallback ? { fallback } : {}) };
+    return { place: "cloud" as const, harness, model: chosen.model, workspaceId, issue, ...(("apiKey" in chosen && chosen.apiKey) || keyed ? { apiKey: true as const } : {}), ...(fallback ? { fallback } : {}) };
   if (fallback) return { ...fallback, workspaceId, issue };
   return { needsMachine: true as const, workspaceId, issue, card: machineUnavailableCard() };
 }

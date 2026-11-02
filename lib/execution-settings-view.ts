@@ -1,4 +1,5 @@
 import type { HarnessInfo } from '@mikka/protocol/harness'
+import type { ApiKeyModels } from '@/lib/model-api-key-providers'
 
 /** The harnesses a rule names. There is no 自动: every value is concrete (#537). */
 export const RULE_HARNESSES = ['claude_code', 'codex', 'cursor'] as const
@@ -20,6 +21,8 @@ export interface ExecutionPlace {
   enabled?: boolean
   online: boolean
   harnesses: HarnessReport[]
+  /** Models offered here because an API key lists them (`withCloudModels`), by Agent; the CLI did not report them. */
+  keyModels?: Partial<Record<RuleHarness, string[]>>
 }
 
 export type DeviceKind = 'laptop' | 'server' | 'cloud' | 'unknown'
@@ -50,17 +53,48 @@ const CLOUD_PROVIDERS = { claude_code: 'claude', codex: 'codex' } as const
  * Mikka Cloud runs an Agent on the person's own subscription, so its Agents and models are
  * the connected accounts' (Claude → Claude Code, ChatGPT → Codex), never what a device reports.
  */
-export function withCloudModels(places: readonly ExecutionPlace[], accounts: readonly Pick<BotModelRow, 'provider' | 'modelId'>[]): ExecutionPlace[] {
-  return places.map(place => placeKind(place) !== 'cloud' ? place : {
-    ...place,
-    harnesses: (Object.entries(CLOUD_PROVIDERS) as [RuleHarness, string][])
-      .map(([harness, provider]) => ({ harness, installed: true, version: null, models: [...new Set(accounts.filter(row => row.provider === provider).map(row => row.modelId))] }))
-      .filter(info => info.models.length > 0) as HarnessReport[],
+export function withCloudModels(places: readonly ExecutionPlace[], accounts: readonly Pick<BotModelRow, 'provider' | 'modelId'>[], keys: readonly ApiKeyModels[] = []): ExecutionPlace[] {
+  const keyModels = (harness: RuleHarness) => keys.filter(key => key.harness === harness).flatMap(key => key.models)
+  return places.map(place => {
+    if (placeKind(place) !== 'cloud') return withKeyModels(place, keyModels)
+    const harnesses = (Object.entries(CLOUD_PROVIDERS) as [RuleHarness, string][]).map(([harness, provider]) => {
+      const account = accounts.filter(row => row.provider === provider).map(row => row.modelId)
+      return { harness, account, keyed: keyModels(harness).filter(model => !account.includes(model)) }
+    })
+    return {
+      ...place,
+      harnesses: harnesses.map(({ harness, account, keyed }) => ({ harness, installed: true, version: null, models: [...new Set([...account, ...keyed])] }))
+        .filter(info => info.models.length > 0) as HarnessReport[],
+      keyModels: Object.fromEntries(harnesses.map(({ harness, keyed }) => [harness, [...new Set(keyed)]])),
+    }
   })
 }
 
-/** A model a rule can pick: `value` is stored (a slot or a reported id), `name` is shown. */
-export interface ModelOption { value: string; name: string; isDefault?: boolean }
+/**
+ * An API key's models run on the Agent its protocol needs (§ 3) wherever that Agent is installed: the key is
+ * handed to the run, so a device offers them next to what its CLI reported. A reported slot keeps its name.
+ */
+function withKeyModels(place: ExecutionPlace, keyModels: (harness: RuleHarness) => string[]): ExecutionPlace {
+  const extras = new Map(place.harnesses.map(info => [info.harness, info.installed
+    ? [...new Set(keyModels(info.harness as RuleHarness))].filter(model => !info.models?.includes(model) && !info.modelSlots?.some(slot => slot.slot === model))
+    : []]))
+  return {
+    ...place,
+    keyModels: Object.fromEntries(extras),
+    harnesses: place.harnesses.map(info => {
+      const extra = extras.get(info.harness) ?? []
+      if (!extra.length) return info
+      return {
+        ...info,
+        models: [...(info.models ?? info.modelSlots?.map(slot => slot.slot) ?? []), ...extra],
+        ...(info.modelSlots?.length ? { modelSlots: [...info.modelSlots, ...extra.map(model => ({ slot: model, model, name: model }))] } : {}),
+      }
+    }),
+  }
+}
+
+/** A model a rule can pick: `value` is stored (a slot or a reported id), `name` is shown; `apiKey` when a key lists it. */
+export interface ModelOption { value: string; name: string; isDefault?: boolean; apiKey?: boolean }
 
 /**
  * Models a harness reported at a place, by slot when it reports slots; on Mikka Cloud, the
@@ -75,6 +109,10 @@ export function modelOptions(places: readonly ExecutionPlace[], place: string, h
       ? info.modelSlots.map(slot => ({ value: slot.slot, name: slot.name, isDefault: slot.slot === info.defaultModelSlot }))
       : (info.models ?? []).map(model => ({ value: model, name: model, isDefault: model === info.defaultModelSlot }))
     for (const option of reported) if (!options.has(option.value)) options.set(option.value, option)
+  }
+  for (const model of devices.flatMap(device => device.keyModels?.[harness as RuleHarness] ?? [])) {
+    const option = options.get(model)
+    if (option) options.set(model, { ...option, apiKey: true })
   }
   return [...options.values()]
 }

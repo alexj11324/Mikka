@@ -14,7 +14,7 @@ import { DeviceLabel, HarnessLabel, ModelLabel, harnessName } from '@/components
 import { SettingsLoading, SettingsSaveError } from '@/components/settings/primitives'
 import { LabelDot } from '@/components/workspace/issue-metadata-controls'
 import {
-  BOT_AGENTS_KEYS, addRule, executionSettingsView, listAccountModels, listPlaces, readExecutionSettings, redetect, removeRule, saveDefaultRule, updateRule,
+  BOT_AGENTS_KEYS, addRule, executionSettingsView, listAccountModels, listApiKeyModels, listPlaces, readExecutionSettings, redetect, removeRule, saveDefaultRule, updateRule,
   type LabelRule, type StoredExecutionSettings, type TaskDefaults,
 } from '@/lib/execution-settings-client'
 import type { ExecutionRule } from '@/lib/execution-rules'
@@ -38,6 +38,7 @@ export function BotAgentsSettings() {
   const stored = useSWR(KEYS.settings, readExecutionSettings)
   const places = useSWR(KEYS.places, listPlaces, { refreshInterval: 15_000 })
   const accounts = useSWR(KEYS.accounts, listAccountModels)
+  const keys = useSWR(KEYS.keys, listApiKeyModels)
   const e2bKey = useOwnE2BKey()
   const [failed, setFailed] = useState<(() => Promise<void>) | null>(null)
   /** A choice the server refused stays on screen, marked 未保存, until a retry saves it. */
@@ -48,12 +49,12 @@ export function BotAgentsSettings() {
     try { await change() } catch { setFailed(() => change) }
   }
 
-  if (stored.error || places.error || accounts.error) return <FieldError>{t('loadFailed')}</FieldError>
-  if (!stored.data || !places.data || !accounts.data) return <SettingsLoading label={t('loading')} rows={4} />
+  if (stored.error || places.error || accounts.error || keys.error) return <FieldError>{t('loadFailed')}</FieldError>
+  if (!stored.data || !places.data || !accounts.data || !keys.data) return <SettingsLoading label={t('loading')} rows={4} />
 
   const accountRows = accounts.data
   // Mikka Cloud can run only with the person's own E2B key; a failed read leaves it as the server reports it.
-  const placeList = withCloudModels(places.data, accountRows).map(place => placeKind(place) === 'cloud' && e2bKey.configured === false ? { ...place, online: false } : place)
+  const placeList = withCloudModels(places.data, accountRows, keys.data).map(place => placeKind(place) === 'cloud' && e2bKey.configured === false ? { ...place, online: false } : place)
   const view = executionSettingsView(stored.data, placeList, accountRows)
   const defaults = unsaved.defaults ?? view.defaults
   const current = stored.data
@@ -198,11 +199,11 @@ function executionPickers({ t, row, value, places, wide, disabled, onChange, onR
       </CommandGroup>}
     </Picker>,
     model: <Picker t={t} wide={wide} disabled={disabled} ariaLabel={cell(t('columns.model'), modelCell)} heading={t('columns.model')} onRefresh={refresh} search={models.length ? t('searchModels') : undefined}
-      value={shownModel ? <ModelLabel model={shownModel} source={value.harness} />
+      value={shownModel ? <ModelLabel model={shownModel} source={models.find(option => option.value === value.model)?.apiKey ? 'api_key' : value.harness} />
         : <span data-slot="model-unset" data-unavailable={unavailable || undefined} className="truncate text-muted-foreground">{modelCell}</span>}>
       {close => models.length
         ? <CommandGroup>
-          {models.map(option => <CommandItem key={option.value} value={option.value} keywords={[option.name]} data-checked={value.model === option.value} onSelect={() => { close(); onChange({ ...value, model: option.value }) }}><ModelLabel model={option.name} source={value.harness} /></CommandItem>)}
+          {models.map(option => <CommandItem key={option.value} value={option.value} keywords={[option.name]} data-checked={value.model === option.value} onSelect={() => { close(); onChange({ ...value, model: option.value }) }}><ModelLabel model={option.name} source={option.apiKey ? 'api_key' : value.harness} /></CommandItem>)}
         </CommandGroup>
         : <p role="status" className="px-2 pt-1 pb-2.5 text-sm text-muted-foreground">{t('noModels')}</p>}
     </Picker>,

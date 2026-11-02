@@ -10,7 +10,7 @@ import { getE2BKeyCapability, listSecrets } from '@/app/actions/workspace-secret
 import { getUsage } from '@/app/actions/usage'
 import { cardVerificationStatus, getBilling, getCreditBilling } from '@/app/actions/billing'
 import { listAuditLog } from '@/app/actions/audit-log'
-import { getExecutionFallbacks, listBotModels, listExecutionPlaces, listExecutionRules } from '@/app/actions/execution-settings'
+import { getExecutionFallbacks, listApiKeyModels, listBotModels, listExecutionPlaces, listExecutionRules } from '@/app/actions/execution-settings'
 import { listBots } from '@/app/actions/bots'
 import { getApiKeys } from '@/app/actions/model-api-keys'
 import type { AuditFilter } from '@/lib/audit/cursor'
@@ -45,6 +45,7 @@ const READS: Record<SettingsRead, (query: URLSearchParams) => Promise<unknown>> 
   'execution-fallbacks': () => getExecutionFallbacks(),
   'execution-places': () => listExecutionPlaces(),
   'bot-models': () => listBotModels(),
+  'api-key-models': () => listApiKeyModels(),
   bots: () => listBots(),
   'api-keys': query => getApiKeys(workspace(query)),
   audit: query => listAuditLog({ filter: (query.get('filter') ?? undefined) as AuditFilter | undefined, cursor: query.get('cursor') }, workspace(query)),

@@ -11,7 +11,7 @@ import { openSecret, sealSecret, SecretsKeyMissingError } from '@/lib/secrets/cr
 import { WorkspaceError } from '@/lib/workspace-error'
 import {
   API_KEY_PRESET_ENDPOINTS, API_KEY_PRESETS, apiKeyChatBaseUrl, apiKeyHarness, customModelsUrl,
-  type ApiKeyProtocol, type ApiKeyProvider, type ApiKeyView,
+  type ApiKeyModels, type ApiKeyProtocol, type ApiKeyProvider, type ApiKeyView,
 } from '@/lib/model-api-key-providers'
 
 /**
@@ -87,9 +87,16 @@ export async function verifyApiKey(target: { modelsUrl: string; auth: ApiKeyProt
   } catch { return { ok: false, code: 'unavailable' } }
 }
 
-interface Row { id: string; ownerId: string; provider: ApiKeyProvider; name: string | null; baseUrl: string | null; protocol: ApiKeyProtocol; last4: string; models: string[] }
-const COLUMNS = 'id,"ownerId",provider,name,"baseUrl",protocol,last4,models'
-const view = (row: Row): ApiKeyView => ({ id: row.id, provider: row.provider, name: row.name, baseUrl: row.baseUrl, protocol: row.protocol, last4: row.last4, models: row.models })
+interface Row { id: string; ownerId: string; provider: ApiKeyProvider; name: string | null; baseUrl: string | null; protocol: ApiKeyProtocol; last4: string; models: string[]; modelsError: ApiKeyView['modelsError'] }
+const COLUMNS = 'id,"ownerId",provider,name,"baseUrl",protocol,last4,models,"modelsError"'
+const view = (row: Row): ApiKeyView => ({ id: row.id, provider: row.provider, name: row.name, baseUrl: row.baseUrl, protocol: row.protocol, last4: row.last4, models: row.models, modelsError: row.modelsError ?? null })
+
+/** Where a key's models are listed: the preset's list, or the custom provider's by its protocol. */
+function modelsTarget(row: Pick<Row, 'provider' | 'baseUrl' | 'protocol'>): { modelsUrl: string; auth: ApiKeyProtocol } {
+  if (row.provider === 'custom') return { modelsUrl: customModelsUrl(row.baseUrl!, row.protocol), auth: row.protocol }
+  const preset = API_KEY_PRESET_ENDPOINTS[row.provider]
+  return { modelsUrl: preset.modelsUrl, auth: preset.modelsAuth }
+}
 
 /** The page's list: the owner's keys, each with whether it is shared in this workspace. */
 export interface ApiKeysPage {
@@ -122,9 +129,7 @@ export async function addApiKey(query: Query, ownerId: string, input: unknown, o
   const custom = parsed.provider === 'custom' ? parsed : null
   const baseUrl = custom ? await checkBaseUrl(custom.baseUrl, env, options.resolve) : null
   const protocol: ApiKeyProtocol = custom ? custom.protocol : API_KEY_PRESET_ENDPOINTS[parsed.provider as Exclude<ApiKeyProvider, 'custom'>].protocol
-  const target = custom
-    ? { modelsUrl: customModelsUrl(baseUrl!, protocol), auth: protocol }
-    : { modelsUrl: API_KEY_PRESET_ENDPOINTS[parsed.provider as Exclude<ApiKeyProvider, 'custom'>].modelsUrl, auth: API_KEY_PRESET_ENDPOINTS[parsed.provider as Exclude<ApiKeyProvider, 'custom'>].modelsAuth }
+  const target = modelsTarget({ provider: parsed.provider, baseUrl, protocol })
   const existing = custom ? undefined : (await query.query<{ id: string }>('SELECT id FROM model_api_keys WHERE "ownerId"=$1 AND provider=$2', [ownerId, parsed.provider])).rows[0]
   const id = existing?.id ?? randomUUID()
   let sealed: ReturnType<typeof sealSecret>
@@ -138,10 +143,29 @@ export async function addApiKey(query: Query, ownerId: string, input: unknown, o
   const models = custom?.models?.length ? [...new Set(custom.models)] : result.models
   const { rows: [row] } = await query.query<Row>(`INSERT INTO model_api_keys (id,"ownerId",provider,name,"baseUrl",protocol,ciphertext,iv,"keyVersion",last4,models)
     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb)
-    ON CONFLICT (id) DO UPDATE SET ciphertext=EXCLUDED.ciphertext,iv=EXCLUDED.iv,"keyVersion"=EXCLUDED."keyVersion",last4=EXCLUDED.last4,models=EXCLUDED.models,"updatedAt"=now()
+    ON CONFLICT (id) DO UPDATE SET ciphertext=EXCLUDED.ciphertext,iv=EXCLUDED.iv,"keyVersion"=EXCLUDED."keyVersion",last4=EXCLUDED.last4,models=EXCLUDED.models,"modelsError"=NULL,"updatedAt"=now()
     RETURNING ${COLUMNS}`,
   [id, ownerId, parsed.provider, custom?.name ?? null, baseUrl, protocol, sealed.ciphertext, sealed.iv, sealed.keyVersion, parsed.apiKey.slice(-4), JSON.stringify(models)])
   return view(row)
+}
+
+/**
+ * 重新获取模型: asks the provider's /models again with the stored key. A good
+ * answer replaces the list (a custom provider that lists nothing keeps the
+ * models it was added with); a failed one keeps the last list and records why,
+ * for the key's row. Only the owner refreshes; the key is never returned.
+ */
+export async function refreshApiKeyModels(query: Query, ownerId: string, id: string, options: { env?: Env; fetch?: typeof fetch } = {}): Promise<ApiKeyView> {
+  z.uuid().parse(id)
+  const { rowCount } = await query.query('SELECT 1 FROM model_api_keys WHERE id=$1 AND "ownerId"=$2', [id, ownerId])
+  if (!rowCount) throw new WorkspaceError('apiKeyNotFound')
+  const { row, apiKey } = await openKey(query, id, options.env ?? process.env)
+  const result = await verifyApiKey(modelsTarget(row), apiKey, options.fetch)
+  const models = result.ok ? (result.models.length || row.provider !== 'custom' ? result.models : row.models) : row.models
+  const { rows: [saved] } = await query.query<Row>(`UPDATE model_api_keys SET models=$3::jsonb,"modelsError"=$4,"updatedAt"=now() WHERE id=$1 AND "ownerId"=$2 RETURNING ${COLUMNS}`,
+    [id, ownerId, JSON.stringify(models), result.ok ? null : result.code])
+  if (!saved) throw new WorkspaceError('apiKeyNotFound')
+  return view(saved)
 }
 
 /** The owner removes their key; its shares go with it. */
@@ -208,6 +232,18 @@ export async function usableApiKeys(query: Query, userId: string, workspaceId: s
   const others = allowed ? (await query.query<Row>(`SELECT ${COLUMNS.split(',').map(column => `k.${column}`).join(',')} FROM model_api_key_shares s JOIN model_api_keys k ON k.id=s."keyId"
     WHERE s."workspaceId"=$1 AND k."ownerId"<>$2 ORDER BY s."createdAt",k.id`, [workspaceId, userId])).rows : []
   return [...mine.map(row => ({ ...view(row), ownerId: row.ownerId, mine: true })), ...others.map(row => ({ ...view(row), ownerId: row.ownerId, mine: false }))]
+}
+
+/** A usable key's models, by the Agent that runs them (§ 3): what 「Bot 与 Agents」 offers next to the subscriptions. */
+export async function apiKeyModels(query: Query, userId: string, workspaceId: string): Promise<ApiKeyModels[]> {
+  const byHarness = new Map<ApiKeyModels['harness'], Set<string>>()
+  for (const key of await usableApiKeys(query, userId, workspaceId)) {
+    const harness = apiKeyHarness(key.protocol)
+    const models = byHarness.get(harness) ?? new Set<string>()
+    for (const model of key.models) models.add(model)
+    byHarness.set(harness, models)
+  }
+  return [...byHarness].flatMap(([harness, models]) => models.size ? [{ harness, models: [...models] }] : [])
 }
 
 /** What the run's Agent gets: environment variables, plus Codex's model provider when it runs on Codex. */
