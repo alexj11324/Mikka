@@ -64,6 +64,18 @@ function stepDetail(input: unknown): string | null {
   return line.length > STEP_DETAIL_MAX ? `${line.slice(0, STEP_DETAIL_MAX - 1)}…` : line
 }
 
+/**
+ * A thread's chunks across its runs (R-81: an ended thread runs again in the same thread). Each run numbers its own
+ * text and tool calls, so ids are made per run before they meet in one conversation; one run keeps them as they are.
+ */
+export function chainChunks<T extends { runId: string; chunk: Record<string, unknown>; at: Date | string }>(rows: readonly T[]): { chunk: Record<string, unknown>; at: T['at'] }[] {
+  if (new Set(rows.map(row => row.runId)).size < 2) return rows.map(({ chunk, at }) => ({ chunk, at }))
+  return rows.map(({ runId, chunk, at }) => ({
+    at,
+    chunk: { ...chunk, ...(chunk.id !== undefined ? { id: `${runId}:${String(chunk.id)}` } : {}), ...(chunk.toolCallId !== undefined ? { toolCallId: `${runId}:${String(chunk.toolCallId)}` } : {}) },
+  }))
+}
+
 export type ThreadItem =
   | { kind: 'agent'; id: string; text: string; at: number }
   | { kind: 'steps'; id: string; count: number; steps: ThreadStep[]; at: number }
