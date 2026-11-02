@@ -1,6 +1,7 @@
 import { Button as ButtonPrimitive } from "@base-ui/react/button"
 import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "cn"
+import { touchTarget } from "@/lib/touch-target"
 import { statusTones, type StatusTone } from '@/lib/status-appearance'
 
 const buttonVariants = cva(
@@ -36,10 +37,9 @@ const buttonVariants = cva(
         "icon-xs":
           "size-6 rounded-[min(var(--radius-md),10px)] in-data-[slot=button-group]:rounded-lg [&_svg:not([class*='size-'])]:size-3",
         "icon-compact": "size-6",
-        // interface-design: a 28px target is too small for a finger, so on a coarse pointer an
-        // invisible 6px ring makes the hit area 40px without changing how the button looks.
+        // Every size grows to a 44px hit area on a coarse pointer (touchTarget).
         "icon-sm":
-          "relative size-7 rounded-[min(var(--radius-md),12px)] in-data-[slot=button-group]:rounded-lg pointer-coarse:after:absolute pointer-coarse:after:-inset-1.5",
+          "relative size-7 rounded-[min(var(--radius-md),12px)] in-data-[slot=button-group]:rounded-lg",
         "icon-lg": "size-9",
         // No height or padding: the trigger's own classes set them (beUI's rows line up with their content).
         bare: "",
@@ -64,7 +64,7 @@ function Button({
       data-slot="button"
       data-button-variant={tone ? undefined : variant}
       data-tone={tone}
-      className={cn(buttonVariants({ variant: tone ? 'status' : variant, size }), tone && 'rounded-md hover:brightness-95 aria-expanded:brightness-95', tone && statusTones[tone], className)}
+      className={cn(buttonVariants({ variant: tone ? 'status' : variant, size }), tone && 'rounded-md hover:brightness-95 aria-expanded:brightness-95', tone && statusTones[tone], touchTarget(className), className)}
       {...props}
     />
   )

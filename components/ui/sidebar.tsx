@@ -501,8 +501,9 @@ const sidebarMenuButtonVariants = cva(
           "bg-control hover:bg-control-hover hover:text-sidebar-accent-foreground",
       },
       size: {
-        default: "h-8 text-sm",
-        sm: "h-7 text-xs",
+        // A phone's drawer (data-mobile) gives each row a 44px finger target.
+        default: "h-8 text-sm in-data-[mobile=true]:h-11",
+        sm: "h-7 text-xs in-data-[mobile=true]:h-11",
         lg: "h-12 text-sm group-data-[collapsible=icon]:p-0!",
       },
     },
