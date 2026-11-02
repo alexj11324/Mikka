@@ -1,7 +1,8 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import { Circle, CircleAlert, CircleCheck, CircleSlash2, LoaderCircle } from 'lucide-react'
+import { CircleAlert, CircleCheck, CircleSlash2, Hand, LoaderCircle } from 'lucide-react'
+import { Badge } from '@/components/reui/badge'
 import { threadGroup, type ThreadGroup, type ThreadOutcome } from '@/lib/thread-groups'
 
 /**
@@ -20,10 +21,15 @@ export function threadGroupOfRun(status: string, outcome?: ThreadOutcome | strin
  * One icon set everywhere a thread shows status (the right column's rows, thread
  * cards, chips, the task's 线程 tab, the phone): it follows the thread's group
  * (R-52), never the run's raw status, so a run that finished blocked never shows
- * the check. 进行中 spins, 受阻 a red alert, 等待你 a hollow circle, 空闲 a slashed
+ * the check. 进行中 spins, 受阻 a red alert, 等待你 a raised hand, 空闲 a slashed
  * circle, 已解决 a green check. Pass the list's `group`, or the run's `status`
  * with its judged `outcome`. `small` is the 14px size of rows and chips.
  */
+/** The badge colour of each group, so a badge reads as its group's icon does (R-52). */
+export const GROUP_BADGES: Record<ThreadGroup, 'secondary' | 'warning-light' | 'destructive-light' | 'success-light'> = {
+  running: 'secondary', waiting: 'warning-light', blocked: 'destructive-light', idle: 'secondary', resolved: 'success-light',
+}
+
 export function ThreadStatusIcon({ status = '', outcome, waiting = false, group, small = false }: {
   status?: string
   outcome?: ThreadOutcome | string | null
@@ -44,7 +50,7 @@ function SmallIcon({ group }: { group: ThreadGroup }) {
   if (group === 'blocked') return <CircleAlert aria-hidden="true" className="size-3.5 text-destructive" />
   if (group === 'resolved') return <CircleCheck aria-hidden="true" className="size-3.5 text-success" />
   if (group === 'idle') return <CircleSlash2 aria-hidden="true" className="size-3.5 text-muted-foreground" />
-  return <Circle aria-hidden="true" className="size-3.5 text-muted-foreground" />
+  return <Hand aria-hidden="true" className="size-3.5 text-muted-foreground" />
 }
 
 function LargeIcon({ group }: { group: ThreadGroup }) {
@@ -52,5 +58,19 @@ function LargeIcon({ group }: { group: ThreadGroup }) {
   if (group === 'blocked') return <CircleAlert aria-hidden="true" className="size-5 text-destructive" />
   if (group === 'resolved') return <CircleCheck aria-hidden="true" className="size-5 text-success" />
   if (group === 'idle') return <CircleSlash2 aria-hidden="true" className="size-5 text-muted-foreground" />
-  return <Circle aria-hidden="true" className="size-5 text-muted-foreground" />
+  return <Hand aria-hidden="true" className="size-5 text-muted-foreground" />
+}
+
+/**
+ * A thread's state as a badge: its group's icon and word (R-52), the same as
+ * the list it sits in, so a run that finished but was not judged reads 等待你,
+ * never 已完成. Only a stop on its way says so instead. `icon={false}` where the
+ * row already leads with the icon.
+ */
+export function ThreadStatus({ status, outcome, stopping = false, waiting = false, icon = true }: { status: string; outcome?: ThreadOutcome | string | null; stopping?: boolean; waiting?: boolean; icon?: boolean }) {
+  const t = useTranslations('IssueThreads')
+  const tState = useTranslations('Shell.threads.state')
+  if (stopping) return <Badge variant="secondary" size="sm">{t('stopping')}</Badge>
+  const group = threadGroupOfRun(status, outcome, waiting)
+  return <Badge variant={GROUP_BADGES[group]} size="sm" data-group={group}>{icon && <ThreadStatusIcon group={group} small />}{tState(group)}</Badge>
 }

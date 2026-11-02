@@ -7,6 +7,9 @@ export const pullRequestSchema = z.object({
   url: z.url().max(500).refine(value => /^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/pull\/[1-9]\d*\/?$/.test(value), 'issueMetadataInvalid'),
   state: z.enum(['open', 'draft', 'merged', 'closed']),
   title: z.string().max(256).optional(),
+  /** Lines added and removed, as GitHub last reported them; absent on PRs stored before they were recorded. */
+  additions: z.number().int().nonnegative().optional(),
+  deletions: z.number().int().nonnegative().optional(),
 })
 export const assigneeSchema = z.object({ kind: z.enum(['member', 'agent']), id: z.string().min(1).max(128), name: z.string().max(200), image: z.string().nullable() })
 export const metadataSchema = z.object({

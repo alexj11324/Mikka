@@ -68,6 +68,13 @@ test("approval schema cannot accept a client-supplied human identity", () => {
   );
 });
 
+test("evidence masks an installation token and a JWT whole (shared credential patterns)", () => {
+  const b64url = (value: object) => Buffer.from(JSON.stringify(value)).toString("base64url");
+  const jwt = `${b64url({ alg: "ES256", typ: "JWT" })}.${b64url({ aud: "fixture" })}.${"Ab_cD-ef".repeat(8)}`;
+  const installation = ["ghs", "1234567", jwt].join("_");
+  assert.deepEqual(redactArtifact({ log: `pushed with ${installation}`, list: [`jwt ${jwt}`] }), { log: "pushed with [REDACTED]", list: ["jwt [REDACTED]"] });
+});
+
 const dbURL = disposableDatabase() ? process.env.E2E_DATABASE_URL : undefined;
 
 test(

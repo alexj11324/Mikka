@@ -64,6 +64,9 @@ import type {
   ServerLink,
 } from "./server-link"
 
+/** How long a run's liveness check may go unanswered (timeouts, 5xx) before
+ * the run is treated as not live. A 90 s run lease bounds it from the server. */
+export const LIVENESS_UNREACHABLE_GRACE_MS = 30_000
 const deviceSessionRejection = z.object({ error: z.enum(["Unauthorized", "authRequired"]) }).strict()
 
 /**
@@ -159,7 +162,14 @@ export class HttpServerLink implements ServerLink {
     const gate = new ToolApprovalGate(assignment.runId, {
       // A paused run stays pending here; its session and checkpoint remain intact.
       isLive: async () => {
+        const pause = () => new Promise<void>((resolve, reject) => {
+          const stop = () => { clearTimeout(timer); reject(new Error('cancelled')) }
+          const timer = setTimeout(() => { liveness.signal.removeEventListener('abort',stop); resolve() },1000)
+          liveness.signal.addEventListener('abort',stop,{once:true})
+          if (liveness.signal.aborted) stop()
+        })
         try {
+          let unreachableSince: number | undefined
           for (;;) {
             check()
             if (assignment.policySnapshot) {
@@ -168,15 +178,23 @@ export class HttpServerLink implements ServerLink {
               if (!context) return false
               verifyPolicySnapshot(assignment.policySnapshot,context,{runId:assignment.runId,deviceId:assignment.deviceId,revision:policyRevision,policy:assignment.policy})
             }
-            const current = await this.call('POST', path, { body: { operation: 'check', deviceId: assignment.deviceId, policyRevision }, schema: z.object({ live: z.boolean(), paused: z.boolean().optional() }), signal:liveness.signal, timeoutMs:5000 })
+            let current: { live: boolean; paused?: boolean }
+            try {
+              current = await this.call('POST', path, { body: { operation: 'check', deviceId: assignment.deviceId, policyRevision }, schema: z.object({ live: z.boolean(), paused: z.boolean().optional() }), signal:liveness.signal, timeoutMs:5000 })
+            } catch (error) {
+              // A timeout, network failure, 5xx or 429 (a cold deployment) is no
+              // answer about the run. Ask again for a bounded time; nothing passes
+              // the gate meanwhile. Any answer the server gives still counts at once.
+              if (!(error instanceof ServerUnreachableError) || liveness.signal.aborted) throw error
+              unreachableSince ??= Date.now()
+              if (Date.now() - unreachableSince >= LIVENESS_UNREACHABLE_GRACE_MS) throw error
+              await pause()
+              continue
+            }
+            unreachableSince = undefined
             check()
             if (!current.live || !current.paused) return current.live
-            await new Promise<void>((resolve, reject) => {
-              const stop = () => { clearTimeout(timer); reject(new Error('cancelled')) }
-              const timer = setTimeout(() => { liveness.signal.removeEventListener('abort',stop); resolve() },1000)
-              liveness.signal.addEventListener('abort',stop,{once:true})
-              if (liveness.signal.aborted) stop()
-            })
+            await pause()
           }
         } catch { return false }
       }

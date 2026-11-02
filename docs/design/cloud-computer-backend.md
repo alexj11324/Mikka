@@ -367,10 +367,11 @@ section 5 is settled.
 - Sub-agent cap per workspace (proposal: 6) and how many headless contexts one
   bot machine size can hold.
 
-## 8. Enabling per-thread machines
+## 8. Per-thread machines
 
-Off by default. The code path needs one flag and one provider key; nothing
-provisions a machine without both.
+Every cloud thread runs on its own thread machine; the Bot's computer serves
+only the Bot. There is no flag. Nothing provisions a machine without the
+owner's own E2B key.
 
 Prerequisites:
 
@@ -381,9 +382,10 @@ Prerequisites:
 3. A workspace cloud machine exists for the owner, because every thread machine
    starts from its workspace snapshot.
 
-Enable with `MIKKA_CLOUD_THREAD_MACHINES=1`. Enqueue then writes one
-`thread_machines` row in `starting`, and `claimCloudRun` accepts the run only
-from that dedicated cloud device.
+Enqueue writes one `thread_machines` row in `starting`, and `claimCloudRun`
+accepts the run only from that dedicated cloud device. The workspace computer
+policy gates only a claim from a machine with a desktop; a task machine without
+one takes repository tasks under either policy and gets no computer grant.
 
 Cost boundaries: one machine per cloud thread; idle pause after 15 minutes, with
 the provider timeout refreshed only while the run is active; a hard end after 12
@@ -407,8 +409,7 @@ A cloud run uses the cloud runtime of the bot that dispatched it, never another
 bot's: a Coordinator run, which has no bot, does not borrow one and goes to the
 person's device or the card instead. Every cloud run freezes its definition
 (Agent, model, credential source) when it is queued, with or without a model in
-the request. Moving cloud runs from the bot's computer to a thread machine of
-the run owner is the next change ([orchestration](orchestration.md) § 1, § 5).
+the request.
 
 The run-recovery cron also reconciles Bot computers (`cloud_machines`): a row
 that has said running or waking for over an hour is checked with E2B. A sandbox

@@ -1,6 +1,7 @@
 import { isToolkitSlug, OWN_INTEGRATIONS } from '@/lib/composio-accounts'
 import { PluginError } from './contracts'
 import type { StoreCategory } from './catalog'
+import { connectKind, credentialForms, type ConnectKind, type CredentialForm } from './connect-kind'
 
 // One store app's page (decision 2026-10-31, as Codex's app page): Composio's
 // own description, tool list and facts, shown whether or not the person has
@@ -16,6 +17,8 @@ export type AppDetail = {
   categories: StoreCategory[]
   website: string | null
   version: string | null
+  /** How it connects, and for the person's own credentials Composio's form for each scheme. */
+  auth: { kind: ConnectKind; forms: CredentialForm[]; guideUrl: string | null }
   /** Split by Composio's MCP annotations: `readOnlyHint` reads; anything else (including no hint) writes, as in #658. */
   tools: { write: AppTool[]; read: AppTool[] }
 }
@@ -23,6 +26,11 @@ export type AppDetail = {
 type RawToolkit = {
   slug?: string | null
   name?: string | null
+  no_auth?: boolean | null
+  auth_schemes?: string[] | null
+  composio_managed_auth_schemes?: string[] | null
+  auth_config_details?: unknown
+  auth_guide_url?: string | null
   meta?: { description?: string | null; logo?: string | null; app_url?: string | null; version?: string | null; categories?: { slug?: string | null; id?: string | null; name?: string | null }[] | null } | null
 }
 type RawTool = { slug?: string | null; name?: string | null; description?: string | null; tags?: string[] | null; is_deprecated?: boolean | null; toolkit?: { slug?: string | null } | null }
@@ -68,7 +76,13 @@ export async function fetchAppDetail(source: AppDetailSource, slug: string): Pro
   return {
     id: slug, name: clean(toolkit.name, 200) || slug, description: clean(meta.description, 2000), iconUrl: publicUrl(meta.logo),
     categories, website: publicUrl(meta.app_url), version: clean(meta.version, 40) || null, tools,
+    auth: { kind: connectKind({ ...toolkit, auth_schemes: toolkit.auth_schemes ?? schemesOf(toolkit.auth_config_details) }), forms: credentialForms(toolkit.auth_config_details), guideUrl: publicUrl(toolkit.auth_guide_url) },
   }
+}
+
+/** The single-toolkit endpoint names its schemes inside `auth_config_details`. */
+function schemesOf(details: unknown) {
+  return Array.isArray(details) ? details.flatMap(detail => typeof (detail as { mode?: unknown })?.mode === 'string' ? [(detail as { mode: string }).mode] : []) : []
 }
 
 const cache = new Map<string, { at: number; value: Promise<AppDetail> }>()
