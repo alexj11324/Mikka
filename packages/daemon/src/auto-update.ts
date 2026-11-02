@@ -7,7 +7,8 @@ import { readJson, writeJsonAtomic } from './fs-util'
 
 const exec = promisify(execFile)
 const PACKAGE = '@aspectlylabs/mikka'
-const DAY = 24 * 60 * 60 * 1000
+// Releases ship on every main push; a daily check left devices hours behind the server.
+const CHECK_INTERVAL = 60 * 60 * 1000
 
 export function newerStableVersion(candidate: unknown, current: string): candidate is string {
   const stable = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/
@@ -49,9 +50,12 @@ export async function managedAutoUpdateRuntime(entry: string, flavor: string, en
   } catch { return undefined }
 }
 
-export async function checkLatestVersion(file: string, current: string, runtime: AutoUpdateRuntime, now = Date.now()): Promise<string | undefined> {
+// A server that refuses this daemon as too old asks for a check now, at most this often.
+const URGENT_CHECK_INTERVAL = 5 * 60 * 1000
+
+export async function checkLatestVersion(file: string, current: string, runtime: AutoUpdateRuntime, now = Date.now(), urgent = false): Promise<string | undefined> {
   const state = readJson(file) as { lastAttemptAt?: number } | undefined
-  if (typeof state?.lastAttemptAt === 'number' && now - state.lastAttemptAt < DAY) return
+  if (typeof state?.lastAttemptAt === 'number' && now - state.lastAttemptAt < (urgent ? URGENT_CHECK_INTERVAL : CHECK_INTERVAL)) return
   // Persist before network I/O: a failed registry request must not retry after restart.
   writeJsonAtomic(file, { lastAttemptAt: now })
   const latest = await runtime.latest()

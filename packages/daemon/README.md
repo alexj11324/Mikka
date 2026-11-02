@@ -46,7 +46,7 @@ mikka daemon service install --server https://app.aspectlylabs.com/mikka --devic
 ```
 
 Public npm installations running under launchd or systemd check for a newer
-stable release once per day. The daemon finishes its running threads and
+stable release once an hour. The daemon finishes its running threads and
 Coordinator work before installing the exact version and restarting. Version
 checks and installation run in the background so heartbeats remain available.
 The service keeps its server, data directory and device identity. Foreground,

@@ -57,6 +57,7 @@ import {
   DaemonError,
   InvalidIdError,
   RunNotFoundError,
+  RunNotPinnedHereError,
   ServerUnreachableError,
 } from "./errors"
 import { readJson, writeFileAtomic, writeJsonAtomic } from "./fs-util"
@@ -1241,6 +1242,13 @@ export class Daemon {
     const claim = this.claimAndStartInternal(runId)
     this.claims.set(runId, claim)
     try { return await claim }
+    catch (error) {
+      if (error instanceof RunNotPinnedHereError && error.upgradeRequired) {
+        this.log.warn({ run_id: runId }, 'server requires a newer daemon; checking for an update')
+        this.checkAutoUpdate(true)
+      }
+      throw error
+    }
     finally {
       this.claims.delete(runId)
       this.claimsInFlight--
@@ -1528,7 +1536,7 @@ export class Daemon {
     }).finally(() => { this.maintenance = null })
   }
 
-  private checkAutoUpdate() {
+  private checkAutoUpdate(urgent = false) {
     const runtime = this.options.autoUpdate
     if (!runtime || this.draining || this.updating) return
     if (this.updateVersion && this.maintenanceIdle()) {
@@ -1540,7 +1548,7 @@ export class Daemon {
         await restartService(false, () => {}, undefined, () => !this.stopped)
       })
     } else if (!this.updateCheck && !this.updateVersion) {
-      this.updateCheck = checkLatestVersion(join(this.paths.dataDir, 'auto-update.json'), DAEMON_VERSION, runtime)
+      this.updateCheck = checkLatestVersion(join(this.paths.dataDir, 'auto-update.json'), DAEMON_VERSION, runtime, Date.now(), urgent)
         .then(version => { this.updateVersion = version })
         .catch(() => { this.log.warn('Daemon automatic update check failed') })
         .finally(() => { this.updateCheck = null })

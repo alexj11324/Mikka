@@ -310,8 +310,10 @@ export class HttpServerLink implements ServerLink {
     if (response.status >= 500 || response.status === 429)
       throw new ServerUnreachableError(response.status)
     if (response.status === 401) throw new SessionRejectedError()
-    if (response.status === 409 && options.claimOf)
-      throw new RunNotPinnedHereError(options.claimOf)
+    if (response.status === 409 && options.claimOf) {
+      const body: unknown = await response.json().catch(() => null)
+      throw new RunNotPinnedHereError(options.claimOf, typeof body === 'object' && body !== null && (body as { code?: unknown }).code === 'daemonUpgradeRequired')
+    }
     if (!response.ok) {
       const detail = await response
         .json()

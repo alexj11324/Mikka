@@ -1,9 +1,10 @@
 import { afterEach, expect, it, vi } from 'vitest'
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { checkLatestVersion, managedAutoUpdateRuntime, newerStableVersion } from '../src/auto-update'
 import { Daemon } from '../src/main'
+import { RunNotPinnedHereError } from '../src/errors'
 import * as service from '../src/service'
 
 const dirs: string[] = []
@@ -19,13 +20,22 @@ it.each([
 ])('stable upgrade %s from %s = %s', (candidate, current, expected) => {
   expect(newerStableVersion(candidate, current)).toBe(expected)
 })
-it('persists failed attempts before I/O and retries only after a day, including across restarts', async () => {
+it('persists failed attempts before I/O and retries only after an hour, including across restarts', async () => {
   const file = stateFile(), now = 1_800_000_000_000
   const runtime = { latest: vi.fn(async (): Promise<string> => { expect(JSON.parse(readFileSync(file, 'utf8')).lastAttemptAt).toBe(now); throw new Error('registry unavailable') }), install: vi.fn() }
   await expect(checkLatestVersion(file, '1.0.0', runtime, now)).rejects.toThrow('unavailable')
   runtime.latest.mockImplementation(async () => '1.0.1')
   expect(await checkLatestVersion(file, '1.0.0', runtime, now + 1)).toBeUndefined()
-  expect(await checkLatestVersion(file, '1.0.0', runtime, now + 86_400_000)).toBe('1.0.1')
+  expect(await checkLatestVersion(file, '1.0.0', runtime, now + 3_599_999)).toBeUndefined()
+  expect(await checkLatestVersion(file, '1.0.0', runtime, now + 3_600_000)).toBe('1.0.1')
+  expect(runtime.latest).toHaveBeenCalledTimes(2)
+})
+it('a server asking for a newer daemon shortens the wait to five minutes', async () => {
+  const file = stateFile(), now = 1_800_000_000_000
+  const runtime = { latest: vi.fn(async () => '1.0.1'), install: vi.fn() }
+  expect(await checkLatestVersion(file, '1.0.0', runtime, now)).toBe('1.0.1')
+  expect(await checkLatestVersion(file, '1.0.0', runtime, now + 299_999, true)).toBeUndefined()
+  expect(await checkLatestVersion(file, '1.0.0', runtime, now + 300_000, true)).toBe('1.0.1')
   expect(runtime.latest).toHaveBeenCalledTimes(2)
 })
 it('excludes foreground, development, opted-out and source CLIs', async () => {
@@ -46,7 +56,8 @@ function maintenanceDaemon() {
     maintenance: Promise<void> | null; updateVersion?: string
     options: { autoUpdate?: { latest(): Promise<string>; install(version: string): Promise<void> } }
     startMaintenance(work: () => Promise<void>): void; checkAutoUpdate(): void
-    claimAndStart(id: string): Promise<unknown>
+    claimAndStart(id: string): Promise<unknown>; claimAndStartInternal(id: string): Promise<unknown>
+    updateCheck: Promise<void> | null; paths: { dataDir: string }
   }
   internal.supervisor = { heartbeatRuns: () => [] }
   return { daemon, internal, log }
@@ -134,4 +145,17 @@ it('counts the whole run claim and start before allowing an update', async () =>
   internal.startMaintenance(install)
   await internal.maintenance
   expect(install).toHaveBeenCalledOnce()
+})
+it('a claim refused as daemonUpgradeRequired checks for an update now, not at the next hourly check', async () => {
+  const { internal } = maintenanceDaemon()
+  writeFileSync(join(internal.paths.dataDir, 'auto-update.json'), JSON.stringify({ lastAttemptAt: Date.now() - 10 * 60_000 }))
+  const latest = vi.fn(async () => '999.0.0')
+  internal.options.autoUpdate = { latest, install: vi.fn(async () => {}) }
+  for (const upgradeRequired of [false, true]) {
+    internal.claimAndStartInternal = async id => { throw new RunNotPinnedHereError(id, upgradeRequired) }
+    await expect(internal.claimAndStart('run-1')).rejects.toBeInstanceOf(RunNotPinnedHereError)
+    await internal.updateCheck
+    expect(latest).toHaveBeenCalledTimes(upgradeRequired ? 1 : 0)
+  }
+  expect(internal.updateVersion).toBe('999.0.0')
 })
