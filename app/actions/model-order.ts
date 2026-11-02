@@ -7,7 +7,7 @@ import { changeOrder, orderView, type OrderChange, type OrderView } from '@/lib/
 import { loadWorkspaceContext } from '@/lib/workspace-access'
 import { settingsWorkspaceAction, type SettingsActionResult } from '@/lib/workspace-admin/settings-action'
 
-// 设置 › 模型与订阅 › 允许使用的模型 and 运行位置 (decision 2026-11-02-1400): the
+// 设置 › 模型与订阅 › 优先使用的模型 and 运行位置 (decision 2026-11-02-1400): the
 // signed-in person's own list in the workspace the page shows.
 
 async function scope(workspaceId?: string) {

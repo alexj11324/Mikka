@@ -15,7 +15,7 @@ const NOT_MODEL_OPTIONS = new Map<string, string>([
   // Claude's usage answer names its per-model weekly meters "Opus" and "Sonnet"; matching them reads quota, it offers no model.
   ['lib/subscription-usage.ts "Opus"', 'quota meter name'],
   ['lib/subscription-usage.ts "Sonnet"', 'quota meter name'],
-  // Alex, 2026-11-02 (decision 2026-11-02-1400): how an untouched 允许使用的模型 list is filled. A preference word
+  // Alex, 2026-11-02 (decision 2026-11-02-1400): how an untouched 优先使用的模型 list is filled. A preference word
   // matched against reported ids and names; it never adds a model nothing reported (DEFAULT_ORDER_PREFERENCE).
   ['lib/model-order-plan.ts "opus"', 'default-order preference word'],
 ])

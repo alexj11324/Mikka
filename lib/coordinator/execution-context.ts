@@ -94,7 +94,7 @@ export function executionContextText(facts: ExecutionFacts): string {
       : 'No subscription or API key is connected for threads; dispatch_run returns a card that leads to adding one.')
     if (entries.length) {
       const shown = entries.slice(0, SHOWN_MODELS).map(entry => `${entry.agent} ${entry.model}${entry.block ? ` (cannot run now: ${entry.block})` : ''}`)
-      lines.push(`Allowed models in order (${location === 'cloud' ? '运行位置 云端' : '运行位置 本地'}): ${shown.join('; ')}${entries.length > SHOWN_MODELS ? `; and ${entries.length - SHOWN_MODELS} more` : ''}.`)
+      lines.push(`Preferred models in order (优先使用的模型, ${location === 'cloud' ? '运行位置 云端' : '运行位置 本地'}): ${shown.join('; ')}${entries.length > SHOWN_MODELS ? `; and ${entries.length - SHOWN_MODELS} more` : ''}.`)
     }
   }
   if (facts.e2b !== null) lines.push(facts.e2b ? 'The person has their own E2B key, so cloud runs are possible.' : 'The person has no E2B key: nothing runs in the cloud until they add one.')

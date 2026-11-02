@@ -81,7 +81,7 @@ Rules that hold everywhere:
     重试 never re-resolves on its own.
 - Conversation compaction uses the same frozen model and credential as the
   turn.
-- This order serves bot chats. A thread takes the person's 允许使用的模型 in
+- This order serves bot chats. A thread takes the person's 优先使用的模型 in
   their order instead (§4,
   [1400](decisions/2026-11-02-1400-model-order-dispatch.md)). The bot itself
   runs on Mikka's own AI SDK on Vercel; a thread goes through the daemon to
@@ -89,7 +89,7 @@ Rules that hold everywhere:
 
 ## 3. Agents and runners
 
-**Model → Agent.** Each entry of 允许使用的模型 names its Agent: a
+**Model → Agent.** Each entry of 优先使用的模型 names its Agent: a
 subscription model runs on the Agent of its account (Claude → Claude Code,
 ChatGPT → Codex); an API key's model runs on each Agent a protocol of the key
 can talk to (OpenAI → Codex, Anthropic → Claude Code). A preset provider
@@ -150,7 +150,7 @@ not report the model ([1400](decisions/2026-11-02-1400-model-order-dispatch.md),
 1. A machine the run asks for is used as asked: a thread continuing in its
    environment, a device-only source event, or a device the person picked.
 2. Otherwise the thread's own model, when the person picked one, then
-   允许使用的模型 in the person's order: the first entry that can run now.
+   优先使用的模型 in the person's order: the first entry that can run now.
    运行位置 decides where: 本地 picks, among the devices with 参与调度 on
    that can run the entry, a server before a computer, then the one with the
    fewest unfinished runs, then the one that joined first
@@ -287,7 +287,7 @@ The workspace where the work happens pays.
 | Model → Agent mapping with a per-model override | — |
 | Mikka Cloud on each person's own E2B key, with no Mikka caps | — |
 | Personal computers and daemon servers as runners with the same contract: daemon-managed Agents, a container where Docker exists, otherwise a worktree plus a temporary config dir, one multi-arch image | — |
-| A device capability check and 参与调度 instead of Agent detection and 「设备离线时」; 允许使用的模型 in order instead of label rules and 任务默认 | — |
+| A device capability check and 参与调度 instead of Agent detection and 「设备离线时」; 优先使用的模型 in order instead of label rules and 任务默认 | — |
 | 立即警告 (the action card) when there is no machine; the offline flow of §4 | — |
 | One environment per thread; leases and heartbeats; credentials injected each run and absent while paused | — |
 | Card verification per person; credit and card shares per workspace | — |

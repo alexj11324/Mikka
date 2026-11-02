@@ -32,7 +32,7 @@ export const SETTINGS_SECTIONS: readonly SettingsSectionDef[] = [
   { id: 'notifications', group: 'personal', title: 'Notifications' },
   { id: 'memory', group: 'personal', title: 'Memory' },
   { id: 'connections', group: 'personal', title: 'Connections' },
-  // 模型与订阅 (decision 2026-11-02-1400): subscriptions, API keys, 运行位置 and 允许使用的模型 (was API 与订阅 and Bot 与 Agents).
+  // 模型与订阅 (decision 2026-11-02-1400): subscriptions, API keys, 运行位置 and 优先使用的模型 (was API 与订阅 and Bot 与 Agents).
   { id: 'models', group: 'personal', title: 'Models and subscriptions' },
   { id: 'logins', group: 'personal', title: 'Logins and keys' },
   { id: 'privacy', group: 'personal', title: 'Data and privacy' },

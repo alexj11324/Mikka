@@ -20,7 +20,7 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
   withoutBot?: boolean; model?:string; idempotencyKey?: string; execution?: AgentExecution
   /** A quota continuation's key (lib/run-quota.ts): frozen as given instead of choosing the credential. */
   apiKey?: RunApiKey
-  /** The API key the 允许使用的模型 entry names; used only when the run may use it (lib/run-credential-source.ts). */
+  /** The API key the 优先使用的模型 entry names; used only when the run may use it (lib/run-credential-source.ts). */
   apiKeyId?: string
   /** An investigation that changes nothing: read-only policy and no task branch. */
   readOnly?: boolean

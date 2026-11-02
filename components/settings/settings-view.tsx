@@ -140,7 +140,7 @@ function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, pe
 
 /**
  * 模型与订阅 (decision 2026-11-02-1400): the subscriptions and the API keys
- * (connect, status, 重新获取模型), then 运行位置 and 允许使用的模型, the order
+ * (connect, status, 重新获取模型), then 运行位置 and 优先使用的模型, the order
  * new runs take. 付款 is under 计费 only; sharing with the team
  * (分享给团队成员) belongs to a team workspace (decision 2026-11-01-2310).
  */

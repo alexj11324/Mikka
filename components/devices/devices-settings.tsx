@@ -106,7 +106,7 @@ function DeviceTypeIcon({ device }: { device: DeviceView }) {
 }
 
 /**
- * R5: which allowed models (模型与订阅 › 允许使用的模型, this workspace) the device
+ * R5: which allowed models (模型与订阅 › 优先使用的模型, this workspace) the device
  * can run, or that it gets no runs while offline. Two names at most, else a count.
  */
 function RunsLine({ device, models }: { device: DeviceView; models: string[] | undefined }) {

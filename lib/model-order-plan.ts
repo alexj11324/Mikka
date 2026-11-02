@@ -1,5 +1,5 @@
 /**
- * 模型与订阅 › 允许使用的模型 (decision 2026-11-02-1400): which allowed model a new
+ * 模型与订阅 › 优先使用的模型 (decision 2026-11-02-1400): which allowed model a new
  * run takes, and where. Pure: the server reads the list, the credentials and
  * the devices (lib/model-order.ts) and asks this module; nothing here reads a
  * database or names a model.

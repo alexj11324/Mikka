@@ -36,7 +36,7 @@ const sourceKey = (item: Pick<OrderCandidate, 'harness' | 'model' | 'source'>) =
   `${item.harness}:${item.model}:${item.source.kind === 'subscription' ? item.source.connectionId : item.source.keyId}`
 
 /**
- * 模型与订阅 › 运行位置 and 允许使用的模型 (decision 2026-11-02-1400). New runs take
+ * 模型与订阅 › 运行位置 and 优先使用的模型 (decision 2026-11-02-1400). New runs take
  * the first model here that can run now, on a computer that takes part in
  * scheduling (本地) or the person's own E2B machine (云端). Drag a row, use
  * its handle with Space and the arrow keys, or its menu (移到最前, 上移, 下移)
@@ -123,8 +123,10 @@ export function ModelOrderSettings({ workspaceId }: { workspaceId: string }) {
         </span>
       </SettingRow>}
     </SettingsSection>
-    {/* 优先使用的 Agent (Harness draft): where a model both Agents run goes by default. */}
-    <SettingsSection id="agent-heading" title={t('agentSection')}>
+    {/* What a task dispatched to an Agent runs on (Alex, 2026-11-02): the preferred Agent and the models in
+        order, one card. Bot chats pick their own model; this is a preference order, not a permission. */}
+    <SettingsSection id="model-order-heading" title={t('title')} description={t('description')}
+      action={data.entries.length > 0 && <Button type="button" {...settingsSectionAction} disabled={pending} onClick={() => setAdding(true)}>{t('add')}</Button>}>
       <SettingRow title={t('preferredAgent')} description={t('preferredAgentHint')}>
         <ToggleGroup aria-label={t('preferredAgent')} variant="segment" spacing={0.5} value={[data.preferredHarness]} disabled={pending}
           onValueChange={values => { const next = values[0]; if ((next === 'claude_code' || next === 'codex') && next !== data.preferredHarness) void save({ kind: 'preferred', harness: next }, { ...data, preferredHarness: next }) }}>
@@ -132,9 +134,6 @@ export function ModelOrderSettings({ workspaceId }: { workspaceId: string }) {
           <ToggleGroupItem value="codex">{harnessName('codex')}</ToggleGroupItem>
         </ToggleGroup>
       </SettingRow>
-    </SettingsSection>
-    <SettingsSection id="model-order-heading" title={t('title')}
-      action={data.entries.length > 0 && <Button type="button" {...settingsSectionAction} disabled={pending} onClick={() => setAdding(true)}>{t('add')}</Button>}>
       {data.entries.length === 0
         ? <div className="flex flex-col items-center gap-3 px-5 py-7">
           {/* C8: one line naming what is missing, and the one button that gets it (R-41). */}
@@ -196,18 +195,20 @@ function OrderItem({ row, index, last, pending, preferred, retry, onAgent, onFir
       : block.reason === 'noDevice' ? (block.device.why === 'none' ? t('noDevice.none') : t(`noDevice.${block.device.why}`, { device: block.device.device, count: block.device.count, harness: harnessName(row.harness) }))
         : t(`blocked.${block.reason}`)
   // The handle carries the drag semantics; the row stays a list item (the primitive puts role=button on the item too).
-  return <KanbanItem value={row.id} disabled={pending} render={<li />} role="listitem" tabIndex={-1} aria-roledescription={undefined} className="flex items-center gap-3 bg-card py-3 pr-3 pl-2 data-[dragging=true]:relative data-[dragging=true]:z-10 data-[dragging=true]:rounded-xl data-[dragging=true]:shadow-lg data-[dragging=true]:ring-1 data-[dragging=true]:ring-border">
+  return <KanbanItem value={row.id} disabled={pending} render={<li />} role="listitem" tabIndex={-1} aria-roledescription={undefined} className="flex flex-wrap items-center gap-x-3 gap-y-2 bg-card py-3 pr-3 pl-2 data-[dragging=true]:relative data-[dragging=true]:z-10 data-[dragging=true]:rounded-xl data-[dragging=true]:shadow-lg data-[dragging=true]:ring-1 data-[dragging=true]:ring-border">
     <KanbanItemHandle render={<Button type="button" variant="ghost" size="icon-sm" aria-label={t('handle', { model: row.model, position: index + 1 })} />} className="touch-none text-muted-foreground">
       <GripVertical aria-hidden="true" />
     </KanbanItemHandle>
     <span aria-hidden="true" className="w-4 shrink-0 text-center text-xs text-muted-foreground tabular-nums">{index + 1}</span>
-    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+    <span className="flex min-w-0 flex-1 basis-40 flex-col gap-0.5">
       <span className="flex min-w-0 items-center text-sm font-medium">
         {row.source.kind === 'api_key' ? <span className="inline-flex min-w-0 items-center gap-1.5"><KeyRound aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" /><span className="truncate">{row.model}</span></span>
           : <ModelLabel model={row.model} source={row.harness} />}
       </span>
       <span className="truncate text-xs text-muted-foreground">{`${sourceName(t, row)} · ${agentsLine(t, row.agents)}`}</span>
     </span>
+    {/* The row's controls: beside the model where they fit, on their own line on a phone, so the name is never cut to a letter. */}
+    <span className="ml-auto flex shrink-0 items-center gap-3">
     {/* A model both Agents run: its Agent here, 优先 marking the preferred one (Harness draft). */}
     {row.agents.length > 1 && <DropdownMenu>
       <DropdownMenuTrigger disabled={pending} render={<Button variant="secondary" size="sm" aria-label={t('agentMenu', { model: row.model, agent: harnessName(row.harness) })} />}>
@@ -242,6 +243,7 @@ function OrderItem({ row, index, last, pending, preferred, retry, onAgent, onFir
         </DropdownMenuGroup>
       </DropdownMenuContent>
     </DropdownMenu>
+    </span>
   </KanbanItem>
 }
 

@@ -60,7 +60,7 @@ test('one task, one thread: dispatch continues the task\'s thread unless the per
     github.allowWriter('octo/repo', githubAccountId)
     await pool.query('INSERT INTO repository_settings ("userId","remoteKey",push) VALUES ($1,$2,$3)', [id, normalizeRepository('octo/repo').key, JSON.stringify({ approved: true, remote: 'origin', approvedByUserId: id, approvedAt: new Date().toISOString() })])
     const ws = await seedWorkspace(pool, id, [{ userId: id, role: 'admin' }])
-    // A connected ChatGPT subscription whose account lists gpt-5: 允许使用的模型 is that model by default, 运行位置 本地.
+    // A connected ChatGPT subscription whose account lists gpt-5: 优先使用的模型 is that model by default, 运行位置 本地.
     const connection = randomUUID()
     await pool.query(`INSERT INTO byos_connections (id,"ownerId","workspaceId",provider,state,epoch,"secretName","secretDigest","providerSubject","modelCatalog") VALUES ($1,$2,$3,'codex','connected',1,$4,$5,'synthetic-subject',$6)`,
       [connection, id, ws.id, `synthetic-${connection}`, 'a'.repeat(64), JSON.stringify({ revision: '1', models: ['gpt-5'] })])
@@ -218,7 +218,7 @@ test('one task, one thread: dispatch continues the task\'s thread unless the per
     assert.equal((await dispatch(b, { target: { deviceId: a.deviceId } })).error, 'deviceNotFound')
     assert.equal((await dispatch(b, { target: { deviceId: await computer(b.id, 'Gone', { removed: true }) } })).error, 'deviceNotFound')
     assert.equal((await runs(b.id)).length, 0)
-    // No target: 允许使用的模型 picks (here the MacBook, the one computer that takes part and runs gpt-5), and the result names it.
+    // No target: 优先使用的模型 picks (here the MacBook, the one computer that takes part and runs gpt-5), and the result names it.
     const ruled = await dispatch(b)
     assert.deepEqual(ruled.placement, { kind: 'device', deviceId: b.deviceId, name: 'MacBook' })
   })
