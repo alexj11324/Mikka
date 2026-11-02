@@ -35,7 +35,7 @@ fixtureGit(['init', '-q', supervisorRepository])
 fixtureGit(['-C', supervisorRepository, '-c', 'user.name=Mailbox fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '--allow-empty', '-qm', 'Synthetic mailbox fixture'])
 fixtureGit(['-C', supervisorRepository, 'worktree', 'add', '--detach', supervisorWorktree, 'HEAD'])
 const endpoint = new URL('https://mikka.invalid/mikka/api/mcp')
-const syntheticApproval = (runId: string) => new ToolApprovalGate(runId, { permission: () => 'allow', ask: async () => 'deny', isLive: () => true })
+const syntheticApproval = (runId: string) => new ToolApprovalGate(runId, { isLive: () => true })
 
 function fixture() {
   const token = 'mkw_' + randomBytes(32).toString('base64url')

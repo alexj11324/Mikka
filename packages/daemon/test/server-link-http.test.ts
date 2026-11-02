@@ -96,13 +96,13 @@ describe("HttpServerLink", () => {
     const result=await new HttpServerLink('http://server.test',fetcher).claimRun('dev-1','run-1')
     expect(result.requireWorktreeContinuation).toBe(true)
   })
-  it('holds every pending tool callback during human control and continues the same gate on release', async () => {
+  it('holds the run during human control and continues the same gate on release', async () => {
     vi.useFakeTimers()
     let paused = true, live = true, executed = 0
     const { fetch } = scripted(() => json({ live, paused }))
-    const gate = await new HttpServerLink('http://server.test', fetch).prepareRunToolApproval({ ...assignment('run-1'), harness:'codex', policy:{...defaultRunPolicy(),permissions:{...defaultRunPolicy().permissions,computer_use:'allow'}}, policyRevision:'a'.repeat(64) }, new AbortController().signal, () => {}, '/tmp')
+    const gate = await new HttpServerLink('http://server.test', fetch).prepareRunToolApproval({ ...assignment('run-1'), harness:'codex', policy:{...defaultRunPolicy(),permissions:{...defaultRunPolicy().permissions,computer_use:'allow'}}, policyRevision:'a'.repeat(64) }, new AbortController().signal, () => {})
     try {
-      const pending = gate.request({runId:'run-1',harness:'codex',requestId:'paused-computer-call',method:'cli/mcp__mikka_computer__click',input:{}}).then(decision => { if (decision === 'allow') executed++ })
+      const pending = gate.checkLive().then(allowed => { if (allowed) executed++ })
       await vi.advanceTimersByTimeAsync(3000)
       expect(executed).toBe(0)
       expect(gate.revoked).toBe(false)
@@ -121,32 +121,6 @@ describe("HttpServerLink", () => {
     } finally { gate.revoke(); vi.useRealTimers() }
   })
 
-  it('holds an already pending approval across takeover instead of denying the same tool call', async () => {
-    vi.useFakeTimers()
-    let paused=false, proposed=false, approved=false, consumed=0
-    const { fetch } = scripted(call => {
-      const body=call.body as {operation:string}
-      if (body.operation === 'check') return json({live:true,paused})
-      if (body.operation === 'propose') { proposed=true; paused=true; return json({id:'10000000-0000-4000-8000-000000000001',digest:'b'.repeat(64),status:'pending'}) }
-      if (body.operation === 'take') { if (approved) consumed++; return json({decision:approved?'allow':'pending'}) }
-      return json({cancelled:true})
-    })
-    const policy=defaultRunPolicy(); policy.permissions.network='ask'
-    const gate=await new HttpServerLink('http://server.test',fetch).prepareRunToolApproval({...assignment('run-1'),harness:'codex',policy,policyRevision:'a'.repeat(64)},new AbortController().signal,()=>{})
-    try {
-      let decision: string|undefined
-      const pending=gate.request({runId:'run-1',harness:'codex',requestId:'pending-before-takeover',method:'sandbox/network',input:{host:'example.test',port:443}}).then(value=>{decision=value})
-      await vi.advanceTimersByTimeAsync(3000)
-      expect(proposed).toBe(true)
-      expect(decision).toBeUndefined()
-      expect(consumed).toBe(0)
-      paused=false; approved=true
-      await vi.advanceTimersByTimeAsync(1000)
-      await pending
-      expect(decision).toBe('allow')
-      expect(consumed).toBe(1)
-    } finally { gate.revoke(); vi.useRealTimers() }
-  })
   it.each([403,500])('revokes an idle run when its liveness endpoint returns %s', async status => {
     vi.useFakeTimers()
     let gate: Awaited<ReturnType<HttpServerLink['prepareRunToolApproval']>> | undefined
@@ -201,14 +175,15 @@ describe("HttpServerLink", () => {
     const { fetch, calls } = scripted(() => json({ live: true }))
     const link = new HttpServerLink('http://server.test', fetch)
     const run = { ...assignment('run-1'), harness:'codex' as const, policy:defaultRunPolicy(), policyRevision:'a'.repeat(64) }
-    const request = { runId:'run-1', harness:'codex' as const, requestId:'fixture', method:'fixture', input:{} }
     const before = new AbortController(); before.abort()
     const alreadyAborted = await link.prepareRunToolApproval(run, before.signal, () => {})
-    expect(await alreadyAborted.request(request)).toBe('deny')
+    expect(alreadyAborted.revoked).toBe(true)
+    expect(await alreadyAborted.checkLive()).toBe(false)
     const during = new AbortController()
     const gate = await link.prepareRunToolApproval(run, during.signal, () => {})
     during.abort()
-    expect(await gate.request(request)).toBe('deny')
+    expect(gate.revoked).toBe(true)
+    expect(await gate.checkLive()).toBe(false)
     expect(calls).toHaveLength(0)
   })
   it('sends a private preview bypass only to the fixed HTTPS preview origin and refuses redirects', async () => {
@@ -460,7 +435,7 @@ describe("mikka daemon login (device authorization)", () => {
 })
 
 describe('HttpServerLink.decide', () => {
-  const request = { purpose: 'command-action' as const, input: 'rm -rf build', questions: [{ type: 'predicate' as const, name: 'safe', instructions: 'Is it safe?' }] }
+  const request = { purpose: 'computer-action' as const, input: 'click Send', questions: [{ type: 'predicate' as const, name: 'safe', instructions: 'Is it safe?' }] }
   it('posts the request to the run decision route and keys answers by name', async () => {
     const { fetch, calls } = scripted(() => json({ answers: [{ type: 'predicate', name: 'safe', probability: 0.9 }, { type: 'choice', name: 'level', choice: 'low' }] }))
     const answers = await new HttpServerLink('http://server.test', fetch).decide('run/1', request)

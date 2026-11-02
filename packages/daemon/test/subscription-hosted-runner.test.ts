@@ -18,7 +18,7 @@ import { cleanupTempDirs, makeRepo, tempDir, waitFor } from "./helpers";
 
 afterEach(cleanupTempDirs);
 for (const harness of ["codex", "claude_code"] as const) {
-  it(`runs ${harness} through the existing adapter in Anthropic's sandbox-runtime on the machine, with no Docker, and retains the owner session ledger`, async () => {
+  it(`runs ${harness} through the existing adapter directly on the machine, with no sandbox or Docker, and retains the owner session ledger`, async () => {
     const root = tempDir("mnh-");
     const stateDir = join(root, "adapters");
     mkdirSync(stateDir);
@@ -81,11 +81,10 @@ for (const harness of ["codex", "claude_code"] as const) {
     } as RunAssignment;
     const options = {
       runId,
-      toolApproval: new ToolApprovalGate(runId, { permission: () => 'deny', ask: async () => 'deny', isLive: () => true }),
+      toolApproval: new ToolApprovalGate(runId, { isLive: () => true }),
       cwd: await makeRepo(),
       prompt: "PROBE_GIT",
       model: "fixture-model",
-      // The worker's device credential: the sandboxed CLI must not read it.
       env: buildChildEnv({ host: { PATH: process.env.PATH, HOME: tempDir() } }),
       log: createLogger({ level: "silent" }),
       github: { endpoint: 'https://mikka.example/api/runs/github-token', repository: 'owner/repo', branch: 'mikka/mik-1', runToken: 'synthetic-run-token', issueId: assignment.issueId },
@@ -121,7 +120,7 @@ for (const harness of ["codex", "claude_code"] as const) {
     await expect(runner.start(assignment, options)).rejects.toThrow("revoked");
     const verify = await runner.command(
       options.cwd,
-      'test -z "$(git status --porcelain)" && test -z "$E2B_API_KEY$INFISICAL_CLIENT_SECRET" && ! (printf blocked > .git/guard) 2>/dev/null && printf allowed > project-probe',
+      'test -z "$(git status --porcelain)" && test -z "$E2B_API_KEY$INFISICAL_CLIENT_SECRET" && printf allowed > project-probe',
       false,
       10000,
     );
@@ -186,7 +185,7 @@ it.each([
 }, 60000)
 
 function denyGate(runId: string, live = () => true) {
-  return new ToolApprovalGate(runId, { permission: () => 'deny', ask: async () => 'deny', isLive: live })
+  return new ToolApprovalGate(runId, { isLive: live })
 }
 function deferred<T>() {
   let resolve!: (value: T) => void

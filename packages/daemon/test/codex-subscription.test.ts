@@ -50,7 +50,7 @@ async function fixture(token?: CodexAdapterOptions["subscriptionAuth"]) {
   })
   const options = {
     runId: "external-run",
-    toolApproval: new ToolApprovalGate("external-run", { permission: () => "allow", ask: async () => "deny", isLive: () => true }),
+    toolApproval: new ToolApprovalGate("external-run", { isLive: () => true }),
     cwd: await makeRepo(),
     prompt: "REFRESH",
     env: buildChildEnv({ host: { PATH: process.env.PATH, HOME: home } }),

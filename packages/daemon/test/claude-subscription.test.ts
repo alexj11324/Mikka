@@ -51,7 +51,7 @@ async function fixture(
   })
   const options = {
     runId: "external-claude",
-    toolApproval: new ToolApprovalGate("external-claude", { permission: () => "allow", ask: async () => "deny", isLive: () => true }),
+    toolApproval: new ToolApprovalGate("external-claude", { isLive: () => true }),
     cwd: await makeRepo(),
     prompt: "hello",
     env: buildChildEnv({ host: { PATH: process.env.PATH, HOME: home } }),

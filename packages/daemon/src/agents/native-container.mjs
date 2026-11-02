@@ -1,15 +1,14 @@
 // Private hosted-run bootstrap. The first stdin frame is host configuration;
 // later bytes are the existing CLI protocol. No vault/provider token is accepted.
 //
-// It runs inside Anthropic's sandbox-runtime on the task's own E2B machine
-// (one task, one machine; no Docker: decision 2026-11-01-1312), with the CLI
-// it starts. The host names the CLI, the run's broker and egress sockets and
-// its node. Those sockets are its only way out: the sandbox has no network.
+// It runs directly on the task's own E2B machine (one task, one machine; no
+// Docker: decision 2026-11-01-1312; no sandbox: decision 2026-11-01-2335),
+// with the CLI it starts. The host names the CLI, the run's broker socket and
+// its node. The model is reached only through that broker.
 import { spawn } from "node:child_process";
 import { dirname } from "node:path";
 import { createServer, request as httpRequest } from "node:http";
 import { mkdirSync } from "node:fs";
-import { startNativeEgress } from "./native-egress.mjs";
 
 const PLACEHOLDER = "mikka-native-broker-placeholder";
 const fail = () => {
@@ -54,9 +53,7 @@ async function start(config, remainder) {
     typeof config.env !== "object" ||
     !hostPath(config.cli) ||
     !hostPath(config.node) ||
-    !hostPath(config.brokerSocket) ||
-    (config.egressSocket !== undefined && !hostPath(config.egressSocket)) ||
-    (config.publicEgress === true) !== (config.egressSocket !== undefined)
+    !hostPath(config.brokerSocket)
   )
     fail();
   for (const [key, value] of Object.entries(config.env)) {
@@ -73,17 +70,6 @@ async function start(config, remainder) {
   if (config.githubBin !== undefined && (typeof config.githubBin !== 'string' || !config.githubBin.startsWith('/') || !config.githubBin.endsWith('/github/bin') || config.githubBin.includes(':') || config.githubBin.includes('\n'))) fail();
   config.env.PATH = `${config.githubBin ? config.githubBin + ':' : ''}${dirname(config.node)}:/usr/local/bin:/usr/bin:/bin`;
   mkdirSync(config.env.HOME, { recursive: true, mode: 0o700 });
-  // Model credentials stay on the original task broker. Public downloads use
-  // a separate live, public-IP-only host proxy, never that credential endpoint.
-  const egress = config.publicEgress === true ? await startNativeEgress(config.egressSocket) : null;
-  if (egress) {
-    Object.assign(config.env, {
-      HTTP_PROXY: egress.url, HTTPS_PROXY: egress.url,
-      http_proxy: egress.url, https_proxy: egress.url,
-      NO_PROXY: 'localhost,127.0.0.1,::1', no_proxy: 'localhost,127.0.0.1,::1',
-      NODE_USE_ENV_PROXY: '1',
-    });
-  }
   // The model transport remains bound to the mounted task broker socket.
   const proxy = createServer((request, response) => {
     if (request.method !== "POST") {
@@ -117,8 +103,7 @@ async function start(config, remainder) {
   if (config.kind === "claude_code") {
     config.env.ANTHROPIC_BASE_URL = base;
     config.env.CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR = "3";
-    // The worker's sandbox-runtime encloses the CLI and every command it runs;
-    // a nested sandbox cannot start inside it (no nested user namespaces).
+    // Runs use no sandbox (decision 2026-11-01-2335): Claude Code's own stays off.
     const settingsIndex = args.findIndex(
       (value) => value === "--settings" || value.startsWith("--settings="),
     );
@@ -166,7 +151,6 @@ async function start(config, remainder) {
       'PATH', 'GH_HOST', 'GH_REPO', 'GIT_AUTHOR_NAME', 'GIT_AUTHOR_EMAIL', 'GIT_COMMITTER_NAME', 'GIT_COMMITTER_EMAIL',
       ...Object.keys(config.env).filter(key => /^GIT_CONFIG_(?:COUNT|KEY_[0-9]+|VALUE_[0-9]+)$/.test(key)),
       "HOME",
-      ...(egress ? ["HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy", "NO_PROXY", "no_proxy", "NODE_USE_ENV_PROXY"] : []),
     ])
       if (config.env[key] !== undefined) args.push(
         "-c",
@@ -207,6 +191,6 @@ async function start(config, remainder) {
   child.on("exit", (code) => {
     clearTimeout(timer);
     proxy.closeAllConnections();
-    void (egress?.close() ?? Promise.resolve()).finally(() => proxy.close(() => process.exit(code ?? 1)));
+    proxy.close(() => process.exit(code ?? 1));
   });
 }

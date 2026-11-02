@@ -1,5 +1,5 @@
 // Installs the pinned harnesses with plain Node, for images built from the
-// same pins as the daemon (Dockerfile, scripts/e2b/build-template.py):
+// same pins as the daemon (scripts/e2b/build-template.py):
 //   node harness/cli.mjs <root> [claude_code|codex ...]
 // Prints each installed binary's path.
 import { ensureHarness, MANAGED_HARNESSES } from './install.mjs'

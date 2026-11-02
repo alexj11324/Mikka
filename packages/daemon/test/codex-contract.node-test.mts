@@ -25,8 +25,9 @@ test('official Codex reports the actual explicit approval policy and sandbox', {
     const init=await call(1,'initialize',{clientInfo:{name:'mikka-contract-test',version:'1'},capabilities:null})
     assert.ok(init.result)
     child.stdin.write(JSON.stringify({jsonrpc:'2.0',method:'initialized'})+'\n')
-    const thread=await call(2,'thread/start',{cwd:dir,approvalPolicy:'on-request',sandbox:'danger-full-access',ephemeral:true})
-    assert.equal(thread.result.approvalPolicy,'on-request')
+    // The adapter's thread parameters (decision 2026-11-01-2335): no approvals, no Codex sandbox.
+    const thread=await call(2,'thread/start',{cwd:dir,approvalPolicy:'never',sandbox:'danger-full-access',ephemeral:true})
+    assert.equal(thread.result.approvalPolicy,'never')
     assert.equal(thread.result.sandbox.type,'dangerFullAccess')
   } finally {
     lines.close()
