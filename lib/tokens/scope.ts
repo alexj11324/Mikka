@@ -30,6 +30,25 @@ export async function runOutsideToken(user: ApiUser, runId: string) {
   return (await runsOutsideToken(user, [runId])).has(runId)
 }
 
+// The runs a self-improvement record was made from.
+const improvementSourceRuns = {
+  proposal: 'SELECT "runId" FROM improvement_proposal_sources WHERE "proposalId"=$1',
+  instance: 'SELECT "sourceRunId" AS "runId" FROM improvement_benchmark_instances WHERE id=$1',
+  evaluation: `SELECT i."sourceRunId" AS "runId" FROM improvement_skill_evaluations e JOIN improvement_benchmark_instances i ON i.id=e."instanceId" WHERE e.id=$1
+    UNION SELECT s."runId" FROM improvement_skill_evaluations e JOIN improvement_proposal_sources s ON s."proposalId"=e."proposalId" WHERE e.id=$1`,
+}
+
+/** A self-improvement record belongs to its source runs; one whose source runs cannot be found is outside. */
+export async function improvementRecordOutsideToken(user: ApiUser, record: { kind: 'run' | keyof typeof improvementSourceRuns; id: string }) {
+  if (!user[tokenWorkspace]) return false
+  if (record.kind === 'run') return runOutsideToken(user, record.id)
+  const { rows } = await pool.query<{ runId: string }>(improvementSourceRuns[record.kind], [record.id])
+  const runIds = [...new Set(rows.map(row => row.runId))]
+  if (!runIds.length) return true
+  const { rows: found } = await pool.query<{ id: string }>('SELECT id FROM agent_runs WHERE id=ANY($1::uuid[])', [runIds])
+  return found.length < runIds.length || (await runsOutsideToken(user, runIds)).size > 0
+}
+
 /** A capture belongs to its run. */
 export async function captureOutsideToken(user: ApiUser, captureId: string) {
   if (!user[tokenWorkspace]) return false
