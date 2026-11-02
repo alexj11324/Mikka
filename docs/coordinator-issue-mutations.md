@@ -24,10 +24,11 @@ back task changes, history and the tool receipt together.
 
 ## Independent deployment gate
 
-`MIKKA_ISSUE_TOOLS_ENABLED` defaults on (Alex, 2026-10-31: every workspace
-feature is on by default; `docs/design/decisions.md`). Unset or `1` enables the
-Coordinator tools and durable mutation receipts; any other value is the
-incident kill switch. With the kill switch set, the tools are not exposed to
+The issue tools default on (Alex, 2026-10-31: every workspace
+feature is on by default; `docs/design/decisions.md`). The PostHog flag
+`mikka-issue-tools-off` is the incident kill switch
+(`lib/deployment-switches.ts`); the old `MIKKA_ISSUE_TOOLS_ENABLED` variable is
+no longer read. With the kill switch set, the tools are not exposed to
 the model, frozen grants can only narrow, 新建任务 is refused with
 `issueToolsDisabled`, and the existing external MCP create/update path keeps
 its pre-rollout behavior without querying `issue_tool_calls`. Enabling never adds tools absent
@@ -89,4 +90,4 @@ matching schema, fixed Preview and UI acceptance before release.
   or skipped DB test is not evidence that deployed acceptance passed.
 
 No configuration is required: the capability is on once the deploy has
-migrated. Set `MIKKA_ISSUE_TOOLS_ENABLED=0` only to stop it during an incident.
+migrated. Turn on `mikka-issue-tools-off` in PostHog only to stop it during an incident.

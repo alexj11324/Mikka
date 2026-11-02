@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict'
-import { before, mock, test } from 'node:test'
+import { afterEach, before, mock, test } from 'node:test'
 import { asSchema, type ToolSet } from 'ai'
 import { DEFAULT_AGENT_DEFINITION, builtinAgentDefinition } from './builtin'
 import { COMPUTER_TOOL_IDS, FACTORY_TOOL_IDS } from './registry'
 import { makeSnapshot, parseDefinition, exportDefinition, importDefinition, digest } from './definition'
 import { AgentKitStore, type AgentExecution } from './store'
 import { skillEvaluationCommandSchema } from '../self-improvement/schema'
+import { overrideDeploymentSwitch } from '../deployment-switches'
 /** The person's Coordinator: an ordinary bot row, marked as the Coordinator. */
 const COORDINATOR_BOT = '00000000-0000-4000-8000-0000000c0de1'
 
@@ -34,7 +35,8 @@ const owner = 'synthetic-owner', bot = '10000000-0000-4000-8000-000000000003'
 const scope = {holder: 'synthetic-holder', turnId: 'synthetic-turn', callId: 'synthetic-call'}
 const execution = (definition = DEFAULT_AGENT_DEFINITION): AgentExecution => ({id: bot, status: 'running', snapshot: makeSnapshot(bot, 1, definition, 'host', {harness: 'ai_sdk', model: 'existing'})})
 const invoke = (tools: ToolSet, name: string, input: unknown) => (tools[name].execute as unknown as (input: unknown, options: {toolCallId: string; messages: []}) => Promise<unknown>)(input, {toolCallId: 'synthetic-call', messages: []})
-const factoryGateKeys = ['MIKKA_ISSUE_TOOLS_ENABLED', 'MIKKA_FACTORY_ROUTING_ENABLED', 'MIKKA_FACTORY_LIFECYCLE_ENABLED'] as const
+afterEach(() => overrideDeploymentSwitch('issueTools', undefined))
+const factoryGateKeys = ['MIKKA_FACTORY_ROUTING_ENABLED', 'MIKKA_FACTORY_LIFECYCLE_ENABLED'] as const
 const scopedRoutingFactoryTools = ['list_factory_requests', 'intake_factory_request', 'stop_factory_task', 'get_factory_task', 'resolve_factory_task'] as const
 const scopedLifecycleFactoryTools = ['dispatch_factory_task', 'recover_factory_check', 'list_factory_questions', 'answer_factory_context', 'escalate_factory_question'] as const
 const knownFactoryTools = new Set<string>([...FACTORY_TOOL_IDS, ...scopedRoutingFactoryTools, ...scopedLifecycleFactoryTools])
@@ -138,7 +140,7 @@ test('existing custom and legacy execution snapshots never acquire new capabilit
     assert.deepEqual(importDefinition(exportDefinition(definition)), definition)
     assert.equal(run.snapshot.definitionDigest, digest(definition))
     for (const [computerEnabled, enabled] of [[false, false], [true, false], [false, true], [true, true]] as const) {
-      process.env.MIKKA_ISSUE_TOOLS_ENABLED = enabled ? '1' : '0'
+      overrideDeploymentSwitch('issueTools', enabled)
       const tools = registry.coordinatorTools(owner, bot, undefined, {execution: run, computerEnabled})
       const allowedFactoryTools = new Set<string>(enabled ? [...scopedRoutingFactoryTools, ...scopedLifecycleFactoryTools] : [])
       const expected = definition.tools.filter(name =>
@@ -164,7 +166,7 @@ test('Factory gates narrow frozen grants, preserve ordinary tools and keep named
   ]
   try {
     for (const issues of [false, true]) for (const routing of [false, true]) for (const lifecycle of [false, true]) {
-      process.env.MIKKA_ISSUE_TOOLS_ENABLED = issues ? '1' : '0'
+      overrideDeploymentSwitch('issueTools', issues)
       process.env.MIKKA_FACTORY_ROUTING_ENABLED = routing ? '1' : '0'
       process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED = lifecycle ? '1' : '0'
       for (const botId of [COORDINATOR_BOT, bot]) for (const definition of definitions) {

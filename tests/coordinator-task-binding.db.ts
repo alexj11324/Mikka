@@ -10,9 +10,10 @@ import { actAs } from '../lib/acting-user'
 import { createCoordinatorRegistry } from '../workflows/coordinator/tools'
 import { takeInbox } from '../lib/coordinator/store'
 import { seedCoordinator } from './support/coordinator-bot'
+import { overrideDeploymentSwitch } from '../lib/deployment-switches'
 async function main() {
 validateTarget(process.env)
-process.env.MIKKA_ISSUE_TOOLS_ENABLED='1'
+overrideDeploymentSwitch('issueTools', true)
 const owner = `pr358-${randomUUID()}`, other = `pr358-${randomUUID()}`
 const event = randomUUID(), device = randomUUID(), issue = randomUUID(), failed = randomUUID(), partial = randomUUID()
 await pool.query('insert into "user" (id,name,email,"emailVerified","createdAt","updatedAt") values ($1,$1,$2,false,now(),now()),($3,$3,$4,false,now(),now())',[owner,`${owner}@example.invalid`,other,`${other}@example.invalid`])
@@ -65,10 +66,8 @@ assert.equal(stored.find(row=>row.id===nextEvent).payload.taskDestination.device
 console.log(JSON.stringify({status:'passed',owner,event,issue,failed,toolEvent,toolIssue:created.id,checks:['concurrent replay','owner rejection','second call rejection','failure rollback','registered tool creates bound task','registered tool replay preserves one version']}))
 }
 test('real registered tasks retain owner, replay and inbox-event bindings', { timeout: 60000 }, async () => {
-  const original = process.env.MIKKA_ISSUE_TOOLS_ENABLED
   try { await main() } finally {
-    if (original === undefined) delete process.env.MIKKA_ISSUE_TOOLS_ENABLED
-    else process.env.MIKKA_ISSUE_TOOLS_ENABLED = original
+    overrideDeploymentSwitch('issueTools', undefined)
     await Promise.all([pool.end(), workspacePool.end()])
   }
 })

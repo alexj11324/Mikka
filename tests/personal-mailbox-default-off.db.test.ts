@@ -9,10 +9,14 @@ import { SKILL_ARTIFACT_HEADER } from '@mikka/protocol/skill'
 import { revokeSyntheticMailboxCredentials } from '../scripts/personal-mailbox-ci-cleanup.mjs'
 import { assertPersonalMailboxCITarget } from '../scripts/personal-mailbox-ci-target.mjs'
 import { loadEnvironment, assertDatabaseIdentity } from '../scripts/test-accounts/environment.mjs'
+import { overrideDeploymentSwitch } from '../lib/deployment-switches'
+import { personalMailboxEnabled } from '../lib/personal-mailbox-config'
 
 // Mandatory CI-only real PG/handler regression. No schema preparation, model,
 // authentication mock, mailbox migration, retained resources or fixture delete.
 assertPersonalMailboxCITarget()
+// The mailbox kill switch is on for this whole file (PostHog's mikka-personal-mailbox-off in a deployment).
+overrideDeploymentSwitch('personalMailbox', false)
 test('default-off claim, MCP and Coordinator work on the tracked schema with the mailbox flag off', { timeout: 60_000 }, async t => {
   const environment = await loadEnvironment()
   const { pool } = await import('../lib/db')
@@ -41,7 +45,7 @@ test('default-off claim, MCP and Coordinator work on the tracked schema with the
       assert.equal((await pool.query("select to_regclass('public.session_mailboxes') as mailbox")).rows[0].mailbox, 'session_mailboxes')
       const cols = await pool.query("select table_name,column_name from information_schema.columns where table_schema='public' and table_name in ('agent_runs','run_messages') and column_name in ('mailboxId','senderMailboxId','dedupeKey')")
       assert.equal(cols.rowCount, 4)
-      assert.equal(process.env.MIKKA_PERSONAL_MAILBOX_ENABLED, '0')
+      assert.equal(personalMailboxEnabled(), false)
     })
     // Seven nonce-owned synthetic fixture rows. The only generated credential
     // is a CI-only device token hash; claim issues its normal short-lived run token.

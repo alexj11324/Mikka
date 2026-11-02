@@ -10,6 +10,7 @@ import { POLICY_SNAPSHOT_HEADER } from '@mikka/protocol/policy-snapshot'
 import { policyDistributionContext } from '../lib/agent-tool-approval/policy-distribution'
 import { verifyPolicySnapshot } from '@mikka/protocol/node-policy-snapshot'
 import { POST } from '../app/v1/devices/[deviceId]/runs/[runId]/claim/route'
+import { overrideDeploymentSwitch } from '../lib/deployment-switches'
 
 function fixture() {
   const repository = normalizeRepository('https://github.com/synthetic/claim-fixture.git')
@@ -98,8 +99,7 @@ test('ordinary retries retain the normal claim path after question lineage valid
 })
 
 test('every github.com run of a connected owner gets the owner credential endpoint, read-only and plan runs included', async () => {
-  const mailbox = process.env.MIKKA_PERSONAL_MAILBOX_ENABLED
-  process.env.MIKKA_PERSONAL_MAILBOX_ENABLED = '0'
+  overrideDeploymentSwitch('personalMailbox', false)
   try { for (const variant of ['implement', 'plan', 'readOnly'] as const) {
     const probe = fixture()
     if (variant === 'plan') probe.run.kind = 'plan'
@@ -114,7 +114,7 @@ test('every github.com run of a connected owner gets the owner credential endpoi
     assert.equal(Object.hasOwn(body.github, 'token'), false, 'the credential itself never travels in the claim')
     assert.equal(body.github?.branch, variant === 'implement' ? 'synthetic-claim-branch' : undefined, variant)
     assert.deepEqual((probe as unknown as { githubLookups: string[] }).githubLookups, ['member'], 'only the run owner\'s connection is looked up')
-  } } finally { if (mailbox === undefined) delete process.env.MIKKA_PERSONAL_MAILBOX_ENABLED; else process.env.MIKKA_PERSONAL_MAILBOX_ENABLED = mailbox }
+  } } finally { overrideDeploymentSwitch('personalMailbox', undefined) }
 })
 
 test('an owner without a GitHub connection gets no credential endpoint', async () => {

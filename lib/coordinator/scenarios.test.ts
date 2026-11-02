@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { before, beforeEach, mock, test } from 'node:test'
 import { generateText, stepCountIs, type ToolSet } from 'ai'
 import { MockLanguageModelV3 } from 'ai/test'
+import { overrideDeploymentSwitch } from '../deployment-switches'
 
 /**
  * Coordinator scenarios with recorded model replies: the real system prompt
@@ -51,7 +52,7 @@ before(async () => {
   })
   systemPrompt = async () => `${instructions}\n${github}\n${execution}`
 })
-beforeEach(() => { calls.length = 0; process.env.MIKKA_ISSUE_TOOLS_ENABLED = '1' })
+beforeEach(() => { calls.length = 0; overrideDeploymentSwitch('issueTools', true) })
 
 type Recorded = { tool: string; input: Record<string, unknown> } | { text: string }
 const usage = { inputTokens: { total: 1, noCache: 1, cacheRead: 0, cacheWrite: 0 }, outputTokens: { total: 1, text: 1, reasoning: 0 } }

@@ -4,6 +4,7 @@ import { randomUUID, createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import pg from 'pg'
 import { validateTarget } from '../../scripts/run-db-tests.mjs'
+import { overrideDeploymentSwitch } from '../deployment-switches'
 
 /** Required CI-only old-schema regression. It can never target retained local
  * PG or production; records remain until the disposable Actions service exits. */
@@ -34,8 +35,7 @@ test('gate-off endpoint and legacy approval reads work without new operation sch
   globalThis.fetch = async () => { budget.provider++; throw Error('real provider request forbidden') }
   const admin = new pg.Pool({ connectionString: process.env.E2E_DATABASE_URL, max: 1, connectionTimeoutMillis: 2000 })
   let failure: unknown
-  const previousAvailability = process.env.MIKKA_PERSONAL_WRITES_ENABLED
-  process.env.MIKKA_PERSONAL_WRITES_ENABLED = '0'
+  overrideDeploymentSwitch('personalWrites', false)
   let scope: ReturnType<typeof import('../db/request-scope').createRequestDatabaseScope> | undefined
   try {
     const client = await admin.connect(); allowedAdmin.add(client)
@@ -73,8 +73,7 @@ test('gate-off endpoint and legacy approval reads work without new operation sch
     const closed=await Promise.allSettled([Promise.resolve().then(()=>scope?.close()),Promise.resolve().then(()=>admin.end())])
     const errors=closed.filter(r=>r.status==='rejected').map(r=>(r as PromiseRejectedResult).reason)
     pg.Client.prototype.query = originalQuery; globalThis.fetch = originalFetch
-    if (previousAvailability === undefined) delete process.env.MIKKA_PERSONAL_WRITES_ENABLED
-    else process.env.MIKKA_PERSONAL_WRITES_ENABLED = previousAvailability
+    overrideDeploymentSwitch('personalWrites', undefined)
     if(errors.length)failure=new AggregateError([...(failure?[failure]:[]),...errors],'fixture close failed')
   }
   if(failure)throw failure
