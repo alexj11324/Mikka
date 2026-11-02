@@ -67,7 +67,7 @@ test('remarkCitations leaves code and Markdown links alone', () => {
 
 test('namedCitations writes cited threads and tasks as their names for a preview', () => {
   const sources: Record<string, CitationSource> = {
-    [RUN]: { kind: 'run', id: RUN, agentName: 'Codex', harness: 'codex', status: 'running', issue: null, name: '修复 daemon 重连', summary: null, steps: 0, createdAt: '2026-11-01T00:00:00.000Z', finishedAt: null },
+    [RUN]: { kind: 'run', id: RUN, agentName: 'Mikka Backend', harness: 'codex', status: 'running', issue: null, name: '修复 daemon 重连', summary: null, steps: 0, createdAt: '2026-11-01T00:00:00.000Z', finishedAt: null },
     [ISSUE]: { kind: 'issue', id: ISSUE, number: 12, identifier: 'MIK-12', title: '看板横向滚动', status: 'todo', priority: 'normal' },
   }
   assert.equal(namedCitations(`线程在这里：${RUN}`, sources), '线程在这里：修复 daemon 重连')

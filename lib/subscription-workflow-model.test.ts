@@ -4,7 +4,7 @@ import { WORKFLOW_SERIALIZE, WORKFLOW_DESERIALIZE } from '@workflow/serde'
 import { SubscriptionWorkflowModel } from './subscription-workflow-model'
 const calls: {selection: unknown; signal: unknown; options?: unknown}[] = []
 const streamResult = {stream: new ReadableStream({start(controller) {controller.close()}})}
-mock.module(new URL('./subscription-workflow-model-runtime.ts', import.meta.url).href, {exports: {
+mock.module(new URL('./subscription-workflow-model-runtime.ts', import.meta.url).href, {namedExports: {
   resolveSubscriptionWorkflowModel: async (selection: unknown, signal: unknown) => {
     const call = {selection, signal, options: undefined as unknown}; calls.push(call)
     return {specificationVersion: 'v4', doStream: async (options: unknown) => {call.options = options; return streamResult}}

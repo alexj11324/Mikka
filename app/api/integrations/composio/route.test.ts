@@ -7,8 +7,8 @@ import { PluginError } from '../../../../lib/plugins/contracts'
 // be connected per person; anything else is refused before Composio is asked.
 const authorized: { user: string; toolkit: string }[] = []
 const store = new Set(['gmail', 'hubspot', 'googlesheets'])
-const stub = (path: string, exports: Record<string, unknown>) => mock.module(new URL(path, import.meta.url).href, { exports })
-mock.module('next/server', { exports: { NextRequest, NextResponse, after: () => {} } })
+const stub = (path: string, exports: Record<string, unknown>) => mock.module(new URL(path, import.meta.url).href, { namedExports: exports })
+mock.module('next/server', { namedExports: { NextRequest, NextResponse, after: () => {} } })
 stub('../../../../lib/request-log.ts', { noteLogUser: () => {}, withRequestLog: (_path: string, handler: unknown) => handler })
 stub('../../../../lib/api-auth.ts', { auth: { api: { getSession: async () => ({ user: { id: 'synthetic-user' } }) } } })
 stub('../../../../lib/auth.ts', { authBaseURL: 'https://example.test' })

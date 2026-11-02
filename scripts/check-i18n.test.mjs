@@ -8,6 +8,7 @@ import {
   extractPlaceholders,
   findHardcodedText,
   findMissingTranslationKeys,
+  findThreadOwnership,
   flattenMessages,
 } from './check-i18n.mjs'
 
@@ -133,4 +134,17 @@ test('findMissingTranslationKeys skips dynamic and ambiguous keys', () => {
   `
   const reference = flattenMessages(messages['zh-CN'])
   assert.deepEqual(findMissingTranslationKeys('/tmp/demo.tsx', source, reference), [])
+})
+
+test('copy never says a bot owns or runs a thread', () => {
+  const bad = {
+    'zh-CN': { a: '所属 Bot', b: 'Coordinator 的线程', c: '{agent} 的线程', d: '3 个 Bot、它们的线程', e: '{agent} 派出的线程' },
+    en: { a: "the bot's threads", b: '{agent} thread', c: 'bots, their threads and computers', d: 'Thread {agent} dispatched' },
+  }
+  assert.equal(findThreadOwnership(bad).length, 9)
+  const good = {
+    'zh-CN': { a: 'Coordinator 派出的线程', b: '{bot} 派出的线程', c: '{name} 的线程', d: '所属项目', e: '派出线程' },
+    en: { a: 'Thread {bot} dispatched', b: "{name}'s thread", c: 'the threads they dispatched' },
+  }
+  assert.deepEqual(findThreadOwnership(good), [])
 })

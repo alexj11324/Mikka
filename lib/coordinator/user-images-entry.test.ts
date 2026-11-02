@@ -39,7 +39,7 @@ const transport={
  })}}}}},
 }
 const database={...transport,transaction:async<T>(fn:(tx:typeof transport)=>Promise<T>)=>fn(transport)}
-const stub=(path:string,exports:Record<string,unknown>)=>mock.module(new URL(path,import.meta.url).href,{exports})
+const stub=(path:string,exports:Record<string,unknown>)=>mock.module(new URL(path,import.meta.url).href, { namedExports: exports })
 stub('../db/index.ts',{db:database,pool:null,withDatabaseClient:forbidden})
 stub('../auth.ts',{auth:{api:{getSession:async()=>authenticated?{user:{id:owner}}:null}}})
 stub('../request-log.ts',{noteLogUser:()=>{},withRequestLog:(_path:string,handler:unknown)=>handler})
@@ -60,7 +60,7 @@ stub('../preferences.ts',{readPreferences:async()=>({memoryEnabled:false})})
 stub('../telegram/client.ts',{postTelegramText:forbidden})
 stub('../attention/store.ts',{recordDecision:forbidden,settleTurn:forbidden})
 stub('../../workflows/coordinator/tool-scope.ts',{assertNativeToolScope:async()=>{}})
-mock.module('next/server',{exports:{NextResponse:Response,after:()=>{}}})
+mock.module('next/server',{namedExports:{NextResponse:Response,after:()=>{}}})
 let post:typeof import('../../app/api/coordinator/messages/route').POST,store:typeof import('./store'),sdk:typeof import('../../workflows/coordinator/steps')
 before(async()=>{post=(await import('../../app/api/coordinator/messages/route')).POST;store=await import('./store');sdk=await import('../../workflows/coordinator/steps')})
 beforeEach(()=>{authenticated=true;events=[];messages=[];session={};effects.length=0})

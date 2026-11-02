@@ -56,7 +56,7 @@ export async function runHttpAcceptance() {
     if (serverExited) throw new EnvironmentError('OWNED_HTTP_SERVER_EXITED')
     await assertDeploymentIdentity(environment)
     if (abort.signal.aborted) throw new EnvironmentError('HTTP_ACCEPTANCE_CANCELLED')
-    tests = spawn(process.execPath, ['--test', '--test-isolation=none', '--test-reporter=tap', 'tests/test-account-pool.http.test.mjs'], {
+    tests = spawn(process.execPath, ['--test', '--experimental-test-isolation=none', '--test-reporter=tap', 'tests/test-account-pool.http.test.mjs'], {
       env: process.env, stdio: ['ignore', 'pipe', 'pipe'], detached: true,
     })
     let output = '', overflow = false
