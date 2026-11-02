@@ -4,8 +4,8 @@ import { test, expect, register, app } from './fixtures'
 // components/version-guard.tsx and lib/app-build.ts. The deploy is stood in
 // for at the network: a newer /api/version, then a server action the server no
 // longer has (Next answers 404 with x-nextjs-action-not-found).
-// The one 404 the test answers on purpose, on the home page's first server action.
-test.use({ expectedConsoleErrors: [{ path: '/mikka', message: 'Failed to load resource: the server responded with a status of 404 (Not Found)' }] })
+// The 404s the test answers on purpose, for server actions on the home page.
+test.use({ allowedConsoleErrors: [{ path: '/mikka', message: 'Failed to load resource: the server responded with a status of 404 (Not Found)' }] })
 
 test('打开很久的页面：新部署后提示「Mikka 已更新 · 刷新」，已删除的 server action 自动刷新而不报错', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 1440, height: 900 })
@@ -35,12 +35,13 @@ test('打开很久的页面：新部署后提示「Mikka 已更新 · 刷新」�
   await page.unroute('**/api/version')
   await expect(page.getByRole('navigation', { name: '主导航', exact: true })).toBeVisible()
 
-  // The next server action the page calls is gone from the server: the page
-  // reloads once instead of showing a read error.
+  // Every server action the page calls is gone from the server. The first miss
+  // reloads the page once instead of showing a read error; a miss within the
+  // next minute does not reload again but offers 刷新.
   let missing = 0
   await page.route('**/*', async route => {
     const request = route.request()
-    if (missing === 0 && request.method() === 'POST' && request.headers()['next-action']) {
+    if (request.method() === 'POST' && request.headers()['next-action']) {
       missing += 1
       await route.fulfill({ status: 404, headers: { 'x-nextjs-action-not-found': '1', 'content-type': 'text/plain' }, body: 'Server action not found.' })
       return
@@ -49,8 +50,9 @@ test('打开很久的页面：新部署后提示「Mikka 已更新 · 刷新」�
   })
   // The guard may reload before this navigation finishes loading, which aborts it.
   await page.goto(app('/'), { waitUntil: 'commit' }).catch(() => {})
-  await expect.poll(() => missing).toBe(1)
   await expect.poll(() => page.evaluate(() => sessionStorage.getItem('mikka-stale-build-reload')).catch(() => null)).not.toBeNull()
+  await expect(toast).toBeVisible()
+  expect(missing).toBeGreaterThanOrEqual(2)
   await expect(page.getByRole('navigation', { name: '主导航', exact: true })).toBeVisible()
   await expect(page.getByText(/无法读取|读取失败/)).toHaveCount(0)
 })
