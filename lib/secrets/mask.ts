@@ -69,9 +69,10 @@ const CREDENTIAL_STARTS = ['ghp_', 'gho_', 'ghu_', 'ghs_', 'ghr_', 'github_pat_'
 /** The longest token-shaped end of a stream part is held back at most this far. */
 const CREDENTIAL_HOLDBACK_MAX = 4096
 
-const maskCredentials = (text: string) => {
+/** Replaces every credential pattern match whole: with its `[secret:…]` label, or with `replacement` when given. */
+export function maskCredentials(text: string, replacement?: string) {
   let out = text
-  for (const [pattern, label] of CREDENTIAL_PATTERNS) out = out.replace(pattern, label)
+  for (const [pattern, label] of CREDENTIAL_PATTERNS) out = out.replace(pattern, replacement ?? label)
   return out
 }
 /** Characters at the end of `text` that could still grow into a credential with the next delta. */
