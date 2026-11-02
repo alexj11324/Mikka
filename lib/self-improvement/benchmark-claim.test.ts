@@ -10,6 +10,8 @@ import * as repositoryProtocol from '@mikka/protocol/repository'
 import { defaultRunPolicy } from '@mikka/protocol/agent-policy'
 import { constrainedAssignmentPolicy } from '../run-assignment-policy'
 import { ModelAdmissionError } from '../model-admission/contract'
+import { deploymentSwitch, type DeploymentSwitch } from '@/lib/deployment-switches'
+const fixtureEnv={MIKKA_BYOS_ENABLED:'0',MIKKA_FACTORY_ROUTING_ENABLED:'1',MIKKA_FACTORY_LIFECYCLE_ENABLED:'1'}
 
 // Execute the actual route in memory, with its database/auth boundaries replaced.
 async function routeFixture(unavailable=false,stopped=false,modelDenied=false,issueDenied=false) {
@@ -75,6 +77,8 @@ async function routeFixture(unavailable=false,stopped=false,modelDenied=false,is
       if(!await guard(tx))return 'unavailable';calls.push('claim');run.status='preparing';await after(tx);return 'claimed'
     }},
     '@/lib/subscription-runtime':{},
+    // The real switch, read against this fixture's environment rather than the test process's.
+    '@/lib/deployment-switches':{deploymentSwitch:(name:DeploymentSwitch)=>deploymentSwitch(name,fixtureEnv)},
     '@/lib/computer/native-run-binding':{},
     '@/lib/personal-policy':{sharedNativeBinding:async()=>null},
     '@/lib/secrets/flag':{byoE2BKeyEnabled:()=>false},
@@ -90,7 +94,7 @@ async function routeFixture(unavailable=false,stopped=false,modelDenied=false,is
   const source=await readFile(new URL('../../app/v1/devices/[deviceId]/runs/[runId]/claim/route.ts',import.meta.url),'utf8')
   const exports:Record<string,unknown>={}
   runInNewContext(transpileModule(source,{compilerOptions:{module:ModuleKind.CommonJS}}).outputText,
-    {exports,require:(name:string)=>{if(!Object.hasOwn(modules,name))throw Error(`Unexpected import ${name}`);return modules[name]},Response,URL,Date,process:{env:{MIKKA_BYOS_ENABLED:'0',MIKKA_FACTORY_ROUTING_ENABLED:'1',MIKKA_FACTORY_LIFECYCLE_ENABLED:'1'}}})
+    {exports,require:(name:string)=>{if(!Object.hasOwn(modules,name))throw Error(`Unexpected import ${name}`);return modules[name]},Response,URL,Date,process:{env:fixtureEnv}})
   return {calls,admissionScopes,run,benchmark,post:exports.POST as (request:Request,context:{params:Promise<{deviceId:string;runId:string}>})=>Promise<Response>}
 }
 
