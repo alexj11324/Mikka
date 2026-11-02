@@ -14,6 +14,8 @@ test('PAT bearer authenticates existing GET/POST routes with owner/workspace che
   process.env.MIKKA_AGENT_KIT = '1'
   const previousFlag = process.env.MIKKA_CLOUD_COMPUTER_TASKS
   process.env.MIKKA_CLOUD_COMPUTER_TASKS = '1'
+  const previousByos = process.env.MIKKA_BYOS_ENABLED
+  process.env.MIKKA_BYOS_ENABLED = '1'
   const owner = await seedUser(pool, 'pat-owner'), member = await seedUser(pool, 'pat-member')
   const ws = await seedWorkspace(pool, owner, [{ userId: owner, role: 'admin' }, { userId: member, role: 'member' }])
   const other = await seedWorkspace(pool, owner, [{ userId: owner, role: 'admin' }])
@@ -50,6 +52,8 @@ test('PAT bearer authenticates existing GET/POST routes with owner/workspace che
   const mobileTasks = await import('../app/api/mobile/tasks/route')
   const mobileChat = await import('../app/api/mobile/chat/route')
   const mobileImage = await import('../app/api/mobile/chat/image/route')
+  const pullRequestStatusRoute = await import('../app/api/github/pull-request-status/route')
+  const computerRunsRoute = await import('../app/api/bots/[botId]/computer/runs/route')
   const token = await store.createPersonalAccessToken(owner, ws.id, { name: 'API test' })
   const memberToken = await store.createPersonalAccessToken(member, ws.id, { name: 'Member API test' })
   const server = createServer(async (req, res) => {
@@ -68,6 +72,8 @@ test('PAT bearer authenticates existing GET/POST routes with owner/workspace che
         : pathname === '/api/mobile/chat' ? await (req.method === 'POST' ? mobileChat.POST : mobileChat.GET)(request)
         : pathname === '/api/mobile/chat/image' ? await mobileImage.GET(request)
         : pathname === '/api/search' ? await searchRoute.GET(request)
+        : pathname === '/api/github/pull-request-status' ? await pullRequestStatusRoute.POST(request)
+        : pathname.startsWith('/api/computer-runs/') ? await computerRunsRoute.POST(request, { params: Promise.resolve({ botId: pathname.split('/')[3] }) })
         : await policyRoute.GET(request, { params: Promise.resolve({ workspaceId: pathname.split('/')[3] }) })
       res.writeHead(response.status, Object.fromEntries(response.headers)); res.end(Buffer.from(await response.arrayBuffer()))
     } catch { res.writeHead(500); res.end('fixture handler failed') }
@@ -81,6 +87,7 @@ test('PAT bearer authenticates existing GET/POST routes with owner/workspace che
     server.closeAllConnections(); await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()))
     if (previousAgentKit === undefined) delete process.env.MIKKA_AGENT_KIT; else process.env.MIKKA_AGENT_KIT = previousAgentKit
     if (previousFlag === undefined) delete process.env.MIKKA_CLOUD_COMPUTER_TASKS; else process.env.MIKKA_CLOUD_COMPUTER_TASKS = previousFlag
+    if (previousByos === undefined) delete process.env.MIKKA_BYOS_ENABLED; else process.env.MIKKA_BYOS_ENABLED = previousByos
     mock.restoreAll()
     const [{ pool: appPool }, { workspacePool }] = await Promise.all([import('../lib/db'), import('../lib/workspace-db')])
     await Promise.all([pool.end(), appPool.end(), workspacePool.end()])
@@ -123,6 +130,24 @@ test('PAT bearer authenticates existing GET/POST routes with owner/workspace che
     assert.equal((await request(`/api/conversations?workspaceId=${other.id}`)).status, 404)
     assert.equal((await request('/api/conversations', 'POST', { workspaceId: other.id, title: 'Must not create', members: [] })).status, 404)
     assert.equal((await request(`/api/search?source=tasks&q=fixture&workspaceId=${other.id}`)).status, 403)
+  })
+  await t.test('task lookups by id stay in the token workspace', async () => {
+    const ownIssue = randomUUID(), otherIssue = randomUUID()
+    for (const [issueId, workspaceId, teamId] of [[ownIssue, ws.id, ownTeam.id], [otherIssue, other.id, otherTeam.id]]) {
+      await pool.query(`INSERT INTO issues (id,"userId",title,content,status,priority,scope) VALUES ($1,$2,'Task','{"type":"doc"}','todo','normal','workspace')`, [issueId, owner])
+      await pool.query('INSERT INTO mikka_team_issues ("issueId","teamId","workspaceId","userId") VALUES ($1,$2,$3,$4)', [issueId, teamId, workspaceId, owner])
+    }
+    const post = async (path: string, body: unknown) => {
+      const response = await fetch(`${origin}${path}`, { method: 'POST', headers: { authorization: `Bearer ${token.token}`, origin, 'content-type': 'application/json' }, body: JSON.stringify(body) })
+      return { status: response.status, error: (await response.json()).error }
+    }
+    const url = 'https://github.com/example/repo/pull/1'
+    // Visible task without that PR linked: the lookup passed; another workspace's task is not found.
+    assert.deepEqual(await post('/api/github/pull-request-status', { issueId: ownIssue, url }), { status: 404, error: 'githubPullRequestNotLinked' })
+    assert.deepEqual(await post('/api/github/pull-request-status', { issueId: otherIssue, url }), { status: 404, error: 'issueNotFound' })
+    // Visible task without a bot runtime: 409; another workspace's task: 404.
+    assert.equal((await post(`/api/computer-runs/${ownBot}`, { issueId: ownIssue, harness: 'codex' })).status, 409)
+    assert.deepEqual(await post(`/api/computer-runs/${ownBot}`, { issueId: otherIssue, harness: 'codex' }), { status: 404, error: 'Task unavailable' })
   })
   await t.test('mobile business APIs use the PAT owner and bound Bot workspace without a cookie session', async () => {
     const callMobile = (path: string, body?: unknown) => fetch(`${origin}${path}`, { method: body ? 'POST' : 'GET', headers: { authorization: `Bearer ${token.token}`, origin, 'content-type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) })
