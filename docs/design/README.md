@@ -70,6 +70,7 @@ Notes:
 | Tokens in code | `app/globals.css`, mapped in `rules.md` § Tokens | Frontend threads; any token change updates Figma too |
 | Enforced rules | `scripts/lint-ui.mjs`, `scripts/*-policy.mjs`, `ui-policy.json` | Frontend threads |
 | UI copy | `messages/zh-CN.json`, `messages/en.json` | The thread that writes the UI |
+| Objects, owners, settings levels and the navigation tree | `docs/design/information-architecture.md` | Whoever adds an object, a settings section or a global entry, in the same PR |
 | Feature specs | `docs/design/<feature>.md` from `spec-template.md` | The feature's thread |
 | Review and done | `docs/review-checklist.md` | Any thread; Alex decides changes to the definition of done |
 

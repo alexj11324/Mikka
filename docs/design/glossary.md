@@ -80,3 +80,110 @@ Decided by Alex, 2026-10-28.
   Code identifiers may keep `harness`.
 - 「Mikka Cloud」 for the hosted model, or 「Mikka 默认」 for the cloud machine.
   Mikka 默认 is a model, Mikka Cloud is a machine ([orchestration](orchestration.md) § 1).
+
+## Domain terms: tenancy and ownership
+
+Who owns what, in the format of the domain-modeling skill's glossary
+(`mattpocock_skills` `GLOSSARY-FORMAT.md`). Each term names the aggregate it
+belongs to (DDD: the consistency boundary that owns it). Where a line below
+and the Workspaces table above differ about 密钥与环境, the line below follows
+[2026-11-02-0230](decisions/2026-11-02-0230-workspace-is-the-tenant.md), which
+waits for Alex's confirmation. Bounded contexts, aggregates and the code that
+stores them: [information-architecture.md](information-architecture.md) § 1.
+
+### People and tenants
+
+**Account (账号)**:
+The person. Not a tenant: what is bound to the person follows them into every
+workspace they belong to.
+_Owner_: itself (Account aggregate).
+_Avoid_: 账户 for the whole level (账户 is one settings page), user, profile.
+
+**Workspace (工作区)**:
+The tenant. Every bot, chat, task, thread, secret, credit and invoice belongs
+to exactly one workspace, and nothing crosses between workspaces.
+_Owner_: its owner account; administered by its admins (Workspace aggregate).
+_Avoid_: 工作空间, organization, space, team (for the workspace itself).
+
+**Personal workspace (个人工作区)**:
+A workspace with exactly one member, created with the account and kept as long
+as the account exists. It has everything a workspace has except what is
+between people.
+_Owner_: the account (Workspace aggregate).
+_Avoid_: 个人空间, "my account", the personal level.
+
+**Team workspace (团队工作区)**:
+A workspace with more than one possible member. Only it has what is between
+people: members, teams, roles and team permissions, member audit, shared
+credits and seats, transfer.
+_Owner_: its owner account; administered by its admins (Workspace aggregate).
+_Avoid_: 团队 on its own (a 团队 is a group inside a workspace), organization.
+
+**Team (团队)**:
+A named group of members inside a team workspace, with its own task prefix,
+tasks and projects (as a Linear team).
+_Owner_: the team workspace (Team aggregate).
+_Avoid_: 团队 for the workspace, group, squad.
+
+**Member (成员)**:
+An account's place in one workspace, with a role (管理员 or 成员) and a state
+(active or suspended).
+_Owner_: the workspace (inside the Workspace aggregate).
+_Avoid_: user, seat (a seat is a billing count), collaborator.
+
+### Work
+
+**Bot**:
+As defined above. It lives in one workspace and has one owner account; a
+person's Coordinator is their bot in that workspace.
+_Owner_: the workspace, held by the owner account (Bot aggregate).
+_Avoid_: Agent, assistant, 机器人.
+
+**Agent**:
+As defined above: the coding worker (Claude Code, Codex) that runs a thread.
+Which Agent a person's bots use is the person's choice per workspace
+(Bot 与 Agents).
+_Owner_: the account (Agent aggregate).
+_Avoid_: harness, 执行器, bot.
+
+**Thread (线程)**:
+As defined above: one piece of work a bot dispatched, run by an Agent.
+_Owner_: the workspace of the bot that dispatched it (Thread aggregate).
+_Avoid_: 会话, session, 任务, run (a run is one turn of a thread).
+
+**Task (任务)**:
+A unit of work to be done, with a status and an assignee who is always a
+person (`MIK-xx`). A thread works on it; it is not a thread.
+_Owner_: the workspace; in a team workspace, its team (Task aggregate).
+_Avoid_: issue in the UI, ticket, 工单, thread.
+
+### Resources
+
+**Device (设备)**:
+A computer or server of the person's that runs their Agents through the
+desktop app or the daemon. Not a bot's cloud computer (电脑).
+_Owner_: the account (Device aggregate).
+_Avoid_: 电脑 (a bot's cloud computer), machine in the UI, runner.
+
+**Connection (连接)**:
+The person's authorised link to an outside app (Gmail, GitHub, Linear,
+Telegram…), used only by their own bots unless a workspace policy says
+otherwise.
+_Owner_: the account (Connection aggregate).
+_Avoid_: integration, plugin (a 插件 is the store item, the connection is
+what linking it creates), binding.
+
+**Secret (密钥)**:
+A named value, secret or environment variable, injected into the runs of one
+workspace, or of one repository in it.
+_Owner_: the workspace (Secret aggregate).
+_Avoid_: credential (a model credential is the account's), token, 环境变量 as
+a separate thing (an environment variable is a kind of secret).
+
+**Credits (点数) and free allowance (免费额度)**:
+Credits are what a workspace spends on Mikka 默认 and pays for; the free
+allowance is the credits a new workspace starts with once its owner is
+verified. A model subscription's quota (订阅额度) is the subscription owner's,
+never the workspace's.
+_Owner_: the workspace (Billing aggregate); 订阅额度 belongs to the account.
+_Avoid_: bare 额度 (say 免费额度 or 订阅额度), balance, quota for credits.
