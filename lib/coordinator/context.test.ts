@@ -118,6 +118,27 @@ test('the chat folds one reply\'s steps together and marks events', () => {
   ])
 })
 
+test('a stored reply carries the stream its text was shown from, so the chat keeps that row when it is stored', () => {
+  const at = new Date('2026-10-22T00:00:00Z')
+  const rows = [
+    { role: 'user', content: 'what is next?' },
+    { role: 'assistant', content: [{ type: 'tool-call', toolCallId: 'c1', toolName: 'list_issues', input: {} }], mikkaStreamId: 'wrun_1:0' },
+    { role: 'tool', content: [{ type: 'tool-result', toolCallId: 'c1', toolName: 'list_issues', output: { type: 'json', value: [] } }] },
+    { role: 'assistant', content: [{ type: 'text', text: 'Nothing open.' }], mikkaStreamId: 'wrun_1:1' },
+    { role: 'assistant', content: [{ type: 'text', text: 'Anything else?' }], mikkaStreamId: 'wrun_1:2' },
+    { role: 'user', content: 'thanks' },
+    { role: 'assistant', content: [{ type: 'text', text: 'Any time.' }] },
+  ] as unknown as ModelMessage[]
+  const items = chatItems(rows.map((message, index) => ({ position: index + 1, message, createdAt: at })))
+  // The tool step showed no text; the first text it shows is the stream the person watched.
+  assert.deepEqual(items.map(item => [item.from, item.text, item.streamId ?? null]), [
+    ['person', 'what is next?', null],
+    ['coordinator', 'Nothing open.\n\nAnything else?', 'wrun_1:1'],
+    ['person', 'thanks', null],
+    ['coordinator', 'Any time.', null],
+  ])
+})
+
 test('a reply that dispatches a run carries it as a thread, once', () => {
   const at = new Date('2026-10-22T00:00:00Z')
   const dispatch = (id: string, value: unknown, toolName = 'dispatch_run'): ModelMessage[] => [

@@ -11,8 +11,9 @@ import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { userMessageEvent } from '@/lib/coordinator-events'
 import type { UserImageInput } from '@/lib/coordinator/user-attachments'
 import { personalSubmissionInput, personalSubmissionRecorded, recordPersonalSubmission, SubmissionConflictError } from '@/lib/coordinator-submission'
-import { botChats, chatVersion, chatView, retryFailedTurn, sendRetryOf, type BotChatSummary, type ChatView } from '@/lib/coordinator/store'
+import { botChats, chatVersion, chatView, citationSources, retryFailedTurn, sendRetryOf, type BotChatSummary, type ChatView } from '@/lib/coordinator/store'
 import type { UnchangedChat } from '@/lib/coordinator/chat-poll'
+import type { CitationSource } from '@/lib/coordinator/citations'
 import { and, eq, sql } from 'drizzle-orm'
 import { openChatBotId } from '@/lib/coordinator/coordinator-bot'
 import { bots, devices } from '@/lib/db/schema'
@@ -97,6 +98,18 @@ const notesSchema = z.array(z.object({
   selector: z.string().max(1000).optional(),
   rect: z.object({ x: z.number(), y: z.number(), width: z.number().min(0), height: z.number().min(0), viewportWidth: z.number().min(0), viewportHeight: z.number().min(0) }).optional(),
 }).strict()).max(NOTES_MAX)
+
+const citedIdsSchema = z.array(z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/)).min(1).max(50)
+
+/**
+ * The issues and runs a reply still streaming cites, that this person can see: the chat's own sources come
+ * from stored replies only, so a task or thread the reply has just made would otherwise show as its marker.
+ */
+export async function coordinatorCitationSources(ids: readonly string[]): Promise<Record<string, CitationSource>> {
+  const parsed = citedIdsSchema.safeParse(ids)
+  if (!parsed.success) return {}
+  return citationSources(await getUserId(), [parsed.data.join(' ')])
+}
 
 /** Each bot's latest line and whether it is answering, for the bot list. */
 export async function botChatSummaries(): Promise<Record<string, BotChatSummary>> {

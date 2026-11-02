@@ -31,6 +31,8 @@ export interface AgentCitations {
   sources: Record<string, CitationSource>
   previews: LinkPreviews
   onOpenIssue: (id: string) => void
+  /** A reply still arriving, or its cited issues and runs still being looked up: a chip not known yet holds its place. */
+  pending?: boolean
 }
 
 export const AgentCitationsContext = createContext<AgentCitations | null>(null)
@@ -39,10 +41,13 @@ export function useAgentCitations() {
   return useContext(AgentCitationsContext)
 }
 
+/** One empty value, so a chat with no web links keeps the same citations across renders. */
+const NO_PREVIEWS: LinkPreviews = {}
+
 /** Link previews for every web page cited in `texts`, fetched once. */
 export function useLinkPreviews(texts: readonly string[]): LinkPreviews {
   const urls = [...new Set(texts.flatMap(text => splitCitations(text).flatMap(part => part.type === 'link' ? [part.url] : [])))].sort()
-  const { data = {} } = useSWR<LinkPreviews>(urls.length ? ['link-previews', ...urls] : null, async () => {
+  const { data = NO_PREVIEWS } = useSWR<LinkPreviews>(urls.length ? ['link-previews', ...urls] : null, async () => {
     const results = await Promise.all(urls.map(url => getLinkPreview(url).catch(() => null)))
     return Object.fromEntries(urls.map((url, index) => [url, results[index]]))
   }, { revalidateOnFocus: false, revalidateIfStale: false, shouldRetryOnError: false })
@@ -55,6 +60,7 @@ export function CitationAnchor({ href, children, className: _className, ...props
   if (citations && href?.startsWith(CITATION_HREF)) {
     const [kind, id] = href.slice(CITATION_HREF.length).split('/') as [CitationKind | 'any', string]
     const source = citations.sources[id]
+    if (!source && citations.pending) return <PendingCitation />
     if (!source || (kind !== 'any' && kind !== source.kind)) return <>{children}</>
     return <CitationChip id={id} kind={source.kind} />
   }
@@ -89,6 +95,11 @@ export function CitationSources({ text }: { text: string }) {
   </div>
 }
 
+/** The place of a task or thread chip whose task or thread is still being looked up; never its id or marker. */
+export function PendingCitation() {
+  return <span aria-hidden="true" data-citation-pending="" className="mx-0.5 inline-block h-5 w-16 translate-y-[-1px] animate-pulse rounded-[5px] bg-object-chip align-middle motion-reduce:animate-none" />
+}
+
 /** A task mentioned in a reply: a boxed chip with its status icon and title; the number is in the hover card. */
 export function IssueCitation({ issue, onOpen }: { issue: IssueSource; onOpen: (id: string) => void }) {
   const t = useTranslations('Coordinator.citation')
@@ -118,6 +129,7 @@ export function IssueCitation({ issue, onOpen }: { issue: IssueSource; onOpen: (
 export function CitationChip({ id, kind }: { id: string; kind: CitationKind }) {
   const citations = useAgentCitations()
   const source = citations?.sources[id]
+  if (!source && citations?.pending) return <PendingCitation />
   if (!citations || source?.kind !== kind) return <>{id}</>
   return source.kind === 'issue'
     ? <IssueCitation issue={source} onOpen={citations.onOpenIssue} />

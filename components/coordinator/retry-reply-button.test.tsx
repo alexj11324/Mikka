@@ -23,7 +23,7 @@ const plain = ({ children }: { children?: ReactNode }) => <div>{children}</div>
 const nothing = () => null
 mock.module(new URL('../../app/actions/coordinator.ts', import.meta.url).href, { namedExports: {
   retryCoordinatorTurn: async () => { calls++; if (reply instanceof Error) throw reply; if (typeof reply === 'function') return reply(); return reply },
-  getCoordinatorChat: async () => ({}), pollCoordinatorChat: async () => ({}), stopCoordinatorTurn: async () => ({}), welcomeCoordinator: async () => ({}),
+  getCoordinatorChat: async () => ({}), pollCoordinatorChat: async () => ({}), stopCoordinatorTurn: async () => ({}), welcomeCoordinator: async () => ({}), coordinatorCitationSources: async () => ({}),
 } })
 mock.module('next-intl', { namedExports: { useTranslations: (namespace: string) => (key: string) => `${namespace}.${key}` } })
 mock.module(new URL('../../lib/use-action-error.ts', import.meta.url).href, { namedExports: { useActionError: () => (key: string) => `Errors.${key}` } })
