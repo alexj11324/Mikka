@@ -161,6 +161,24 @@ export class SubscriptionService {
     }
     return selectedModel
   }
+  /**
+   * In-process native launch, used only by the BYOS custody test
+   * (tests/byos-application.test.mjs) to drive synthetic CLIs through
+   * disconnect and reconnect. No production path calls it: a device run gets
+   * native credentials through `nativeRun`, which needs a runId and checks
+   * `runMayUseCredentialSql` and membership on both sides.
+   */
+  async launchNative<T>(ownerId: string, consumerId: string, bindingId: string, run: (context: { use: SubscriptionUse; modelId: string; worker: Pick<SubscriptionWorkerClient, 'call'>; access(): Promise<SubscriptionAccess> }) => Promise<T>) {
+    const binding = await this.repository.binding(ownerId, bindingId)
+    // This legacy in-process launcher hands credentials to its adapter. It is
+    // not the task-bound HTTP broker and cannot claim controlled model routing.
+    const { assertUnmanagedModelTransport } = await import('./model-admission/runtime')
+    await assertUnmanagedModelTransport({ ownerId, workspaceId: binding.workspaceId }, binding.modelId)
+    const use: SubscriptionUse = { ownerId, consumerId, bindingId, workspaceId: binding.workspaceId, execution: 'native' }
+    await this.check(use)
+    const row = await this.repository.connection(ownerId, binding.connectionId)
+    return run({ use, modelId: binding.modelId, access: () => this.access(use), worker: this.worker(this.repository.scope(row)).forUse(use) })
+  }
   /** The owner's own Settings read: no binding, a connected revision only.
    * Never throws for a provider or worker failure: the row degrades instead,
    * keeping the last known email. */
