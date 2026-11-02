@@ -2,6 +2,7 @@
 
 import { PersonAvatar } from '@/components/person-avatar'
 import { useEffect, useId, useMemo, useState } from 'react'
+import { ShortcutKeys } from '@/components/shortcut-keys'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
 import { Box, Check, CircleUserRound, Columns3, Flag, List, ListFilter, PanelRightClose, PanelRightOpen, Plus, RefreshCw, Settings2, SquareKanban, Tag, X } from 'lucide-react'
@@ -124,6 +125,17 @@ export function BoardPage({ issues, userId, onOpen, onUpdated, onBusyChange }: {
   }, [])
   const openPanel = () => { setSidebar(true); if (!window.matchMedia(WIDE).matches) setSheet(true) }
   const sidebarShown = sidebar && wide
+  // R-65: ⌘J / Ctrl+J opens and closes the AI sidebar, the sheet below xl.
+  useEffect(() => {
+    function toggle(event: KeyboardEvent) {
+      if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey || event.isComposing || event.key.toLowerCase() !== 'j') return
+      event.preventDefault()
+      if (window.matchMedia(WIDE).matches) setSidebar(!sidebar)
+      else { setSheet(!sheet); if (!sheet) setSidebar(true) }
+    }
+    window.addEventListener('keydown', toggle)
+    return () => window.removeEventListener('keydown', toggle)
+  }, [sidebar, sheet, setSidebar])
   const [prefill, setPrefill] = useState<{ text: string; nonce: number }>()
   const [newTask, setNewTask] = useState(false)
   const { data: agents } = useSWR('agents', () => listAgents())
@@ -247,7 +259,7 @@ export function BoardPage({ issues, userId, onOpen, onUpdated, onBusyChange }: {
             </PopoverContent>
           </Popover>
           <Button size="sm" className="ml-1 bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90" onClick={() => setNewTask(true)}><Plus data-icon="inline-start" />{t('newTask')}</Button>
-          <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className={cn('text-muted-foreground', sidebar && 'xl:hidden')} aria-expanded={sheet} aria-label={t('expand')} onClick={openPanel} />}><PanelRightOpen data-icon="inline-start" /></TooltipTrigger><TooltipContent>{t('expand')}</TooltipContent></Tooltip>
+          <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className={cn('text-muted-foreground', sidebar && 'xl:hidden')} aria-expanded={sheet} aria-label={t('expand')} aria-keyshortcuts="Control+j Meta+j" onClick={openPanel} />}><PanelRightOpen data-icon="inline-start" /></TooltipTrigger><TooltipContent>{t('expand')}<ShortcutKeys keys={['mod', 'J']} /></TooltipContent></Tooltip>
         </div>
       </div>
       {view === 'board'
@@ -257,7 +269,7 @@ export function BoardPage({ issues, userId, onOpen, onUpdated, onBusyChange }: {
     {sidebar && <ResizablePane render="aside" aria-label={tNav('coordinator')} storageKey="mikka:board-sidebar-width" defaultWidth={360} min={280} max={560} edge="start" from="xl" label={tCommon('resize.boardSidebar')} className="hidden shrink-0 flex-col border-l xl:flex">
       {/* Same centered pill as the Coordinator page, so the two read as one conversation. */}
       <ConversationPill name={tNav('coordinator')} avatar={<CoordinatorAvatar size="pill" />} />
-      <div className="absolute top-3.5 right-3 z-20"><Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label={t('collapse')} aria-expanded onClick={() => setSidebar(false)} />}><PanelRightClose data-icon="inline-start" /></TooltipTrigger><TooltipContent side="left">{t('collapse')}</TooltipContent></Tooltip></div>
+      <div className="absolute top-3.5 right-3 z-20"><Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label={t('collapse')} aria-expanded aria-keyshortcuts="Control+j Meta+j" onClick={() => setSidebar(false)} />}><PanelRightClose data-icon="inline-start" /></TooltipTrigger><TooltipContent side="left">{t('collapse')}<ShortcutKeys keys={['mod', 'J']} /></TooltipContent></Tooltip></div>
       <div aria-hidden="true" className="h-14 shrink-0" />
       <CoordinatorChat compact prefill={prefill} onOpenIssue={id => { onOpen(id) }} />
     </ResizablePane>}
