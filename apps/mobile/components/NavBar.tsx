@@ -48,9 +48,11 @@ const webItem = (item: BarItem) => 'view' in item
  * bar in React Native (`Header`).
  *
  * A screen's scroll view sets `contentInsetAdjustmentBehavior="automatic"` so
- * its content starts below the bar and scrolls under it.
+ * its content starts below the bar and scrolls under it. `material` gives the
+ * bar the system chrome material and a hairline, so long text scrolled under it
+ * never shows through on any iOS version (Figma 843:2 #4; chats).
  */
-export function NavBar({ title, titleView, left, right, back, large, search }: {
+export function NavBar({ title, titleView, left, right, back, large, search, material }: {
   title?: string
   titleView?: ReactNode
   left?: BarItem | BarItem[]
@@ -58,6 +60,7 @@ export function NavBar({ title, titleView, left, right, back, large, search }: {
   back?: () => void
   large?: boolean
   search?: { placeholder: string; onChange: (text: string) => void }
+  material?: boolean
 }) {
   const router = useRouter()
   const lefts = list(left), rights = list(right)
@@ -77,6 +80,7 @@ export function NavBar({ title, titleView, left, right, back, large, search }: {
         title: title ?? '',
         headerTitle: titleView ? () => titleView : undefined,
         headerLargeTitle: large,
+        ...(material ? { headerBlurEffect: 'systemChromeMaterial' as const, headerShadowVisible: true, scrollEdgeEffects: { top: 'hidden' as const, bottom: 'soft' as const } } : {}),
         ...(search ? { headerSearchBarOptions: { placeholder: search.placeholder, hideWhenScrolling: false, onChangeText: event => search.onChange(event.nativeEvent.text), onCancelButtonPress: () => search.onChange('') } } : {}),
       }} />
       {lefts.length ? <Stack.Toolbar placement="left">{lefts.map(nativeItem)}</Stack.Toolbar> : null}
