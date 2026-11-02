@@ -261,7 +261,7 @@ export async function appendMessages(userId: string, holder: string, messages: M
     const first = await nextPosition(tx, userId, botId)
     if (messages.length) {
       await tx.insert(coordinatorMessages).values(messages.map((message, index) => {
-        const { mikkaStreamId: _untrusted, mikkaStopped: _unmarked, ...plain } = message as unknown as Record<string, unknown>
+        const { mikkaStreamId: _untrusted, mikkaStopped: _unmarked, mikkaFailure: _unfailed, ...plain } = message as unknown as Record<string, unknown>
         // 停止: the turn's last message carries the mark; the chat shows 已停止 under the reply.
         const stop = stopped && index === messages.length - 1 && message.role === 'assistant'
         return { id: crypto.randomUUID(), userId, botId, position: first + index,
@@ -307,10 +307,21 @@ export async function retryFailedTurn(userId: string, botId: string): Promise<bo
   })
 }
 
-/** Records why a turn failed and lets go of the lease. */
+/**
+ * Records why a turn failed and lets go of the lease. The person's message the
+ * turn was answering keeps the reason too (`mikkaFailure`), so the chat shows it
+ * under that message after the next turn and after a reload.
+ */
 export async function failTurn(userId: string, holder: string, error: string, botId: string): Promise<void> {
-  await db.update(coordinatorSessions).set({ leaseHolder: null, leaseUntil: null, lastError: error.slice(0, 1000), lastErrorAt: new Date(), updatedAt: new Date() })
-    .where(and(sessionOf(userId, botId), eq(coordinatorSessions.leaseHolder, holder)))
+  const reason = error.slice(0, 1000)
+  await db.transaction(async tx => {
+    const released = await tx.update(coordinatorSessions).set({ leaseHolder: null, leaseUntil: null, lastError: reason, lastErrorAt: new Date(), updatedAt: new Date() })
+      .where(and(sessionOf(userId, botId), eq(coordinatorSessions.leaseHolder, holder))).returning({ userId: coordinatorSessions.userId })
+    if (!released.length) return
+    await tx.execute(sql`UPDATE coordinator_messages SET message = message || jsonb_build_object('mikkaFailure', ${reason}::text)
+      WHERE "userId"=${userId} AND "botId"=${botId}::uuid AND message->>'role'='user'
+        AND position=(SELECT max(position) FROM coordinator_messages WHERE "userId"=${userId} AND "botId"=${botId}::uuid)`)
+  })
 }
 
 /** The summary so far, the memory, and every message after the summary, oldest first. */
@@ -324,7 +335,7 @@ export async function loadConversation(userId: string, botId: string): Promise<{
   // 使用记忆 off (the app's 记忆 setting): the prompt leaves the memory out; it stays saved.
   const memory = (await readPreferences(userId)).memoryEnabled ? session?.memory ?? '' : ''
   return { summary: session?.summary ?? null, memory, messages: rows.map(row => {
-    const { mikkaStreamId: _streamId, mikkaStopped: _stopped, ...message } = row.message
+    const { mikkaStreamId: _streamId, mikkaStopped: _stopped, mikkaFailure: _failure, ...message } = row.message
     return { position: row.position, message: message as unknown as ModelMessage }
   }) }
 }
