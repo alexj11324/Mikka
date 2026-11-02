@@ -33,9 +33,9 @@ export default function MemorySummaryScreen() {
         <View style={[styles.askWrap, { paddingBottom: Math.max(insets.bottom, 12) }]}>
           {failed ? <Text style={styles.failed}>没发出去</Text> : null}
           <View style={styles.ask}>
-            <TextInput value={text} onChangeText={setText} onSubmitEditing={() => void ask()} placeholder="提问或更新" placeholderTextColor={colors.tertiary} style={styles.input} />
-            <Pressable accessibilityRole="button" accessibilityLabel="发送" onPress={() => void ask()} style={[styles.send, text.trim() ? { backgroundColor: colors.accent } : null]}>
-              <ArrowUp size={20} color="#fff" strokeWidth={2.4} />
+            <TextInput value={text} onChangeText={setText} onSubmitEditing={() => void ask()} placeholder="提问或更新" placeholderTextColor={colors.secondary} style={styles.input} />
+            <Pressable accessibilityRole="button" accessibilityLabel="发送" onPress={() => void ask()} style={[styles.send, text.trim() ? { backgroundColor: colors.accentFill } : null]}>
+              <ArrowUp size={20} color={colors.onAccent} strokeWidth={2.4} />
             </Pressable>
           </View>
         </View>
@@ -50,7 +50,7 @@ const styles = StyleSheet.create({
   text: { fontSize: 16, lineHeight: 26 },
   askWrap: { paddingHorizontal: 16, paddingTop: 8, gap: 6 },
   failed: { fontSize: 13, color: colors.danger, marginLeft: 18 },
-  ask: { flexDirection: 'row', alignItems: 'center', height: 52, borderRadius: 26, backgroundColor: '#fff', paddingLeft: 18, paddingRight: 6, ...lift },
+  ask: { flexDirection: 'row', alignItems: 'center', height: 52, borderRadius: 26, backgroundColor: colors.surface, paddingLeft: 18, paddingRight: 6, ...lift },
   input: { flex: 1, minWidth: 0, width: 0, fontFamily: font, fontSize: 16, outlineStyle: 'none' } as never,
-  send: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#B8B8BD', alignItems: 'center', justifyContent: 'center' },
+  send: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.tertiary, alignItems: 'center', justifyContent: 'center' },
 })

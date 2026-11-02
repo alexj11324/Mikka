@@ -86,8 +86,8 @@ export function ThreadsScreen({ bot }: { bot?: { id: string; name: string } }) {
                 const active = machine === m.id
                 return (
                   <Pressable key={m.id} accessibilityRole="button" onPress={() => setMachine(active ? null : m.id)} style={[styles.chip, active && styles.chipActive]}>
-                    <MachineIcon machine={m.kind} size={16} color={active ? '#fff' : colors.ink} />
-                    <Text style={[styles.chipText, active && { color: '#fff' }]}>{m.name}</Text>
+                    <MachineIcon machine={m.kind} size={16} color={active ? colors.onInk : colors.ink} />
+                    <Text style={[styles.chipText, active && { color: colors.onInk }]}>{m.name}</Text>
                     {m.online ? <View style={styles.online} /> : null}
                   </Pressable>
                 )
@@ -147,6 +147,6 @@ const styles = StyleSheet.create({
   rowMeta: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 },
   rowMetaText: { fontSize: 12, color: colors.secondary },
   empty: { textAlign: 'center', color: colors.secondary, marginTop: 40 },
-  menu: { position: 'absolute', right: 16, width: 220, backgroundColor: '#fff', borderRadius: 18, paddingVertical: 6, ...lift, shadowOpacity: 0.16, shadowRadius: 24 },
+  menu: { position: 'absolute', right: 16, width: 220, backgroundColor: colors.surface, borderRadius: 18, paddingVertical: 6, ...lift, shadowOpacity: 0.16, shadowRadius: 24 },
   menuRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, height: 44 },
 })

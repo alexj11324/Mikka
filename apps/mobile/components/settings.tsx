@@ -61,7 +61,7 @@ export function ToggleRow({ label, value, onChange }: { label: string; value: bo
   return (
     <View style={styles.row}>
       <Text style={[styles.label, { flex: 1 }]}>{label}</Text>
-      <Switch value={value} onValueChange={onChange} trackColor={{ true: colors.success, false: '#E3E3E8' }} thumbColor="#fff" {...{ activeThumbColor: '#fff' }} />
+      <Switch value={value} onValueChange={onChange} trackColor={{ true: colors.success, false: colors.chip }} thumbColor="#fff" {...{ activeThumbColor: '#fff' }} />
     </View>
   )
 }
@@ -76,7 +76,7 @@ export function ChoiceRow({ label, selected, onPress }: { label: string; selecte
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', minHeight: 52, paddingHorizontal: 16, paddingVertical: 10, gap: 12, backgroundColor: '#fff' },
+  row: { flexDirection: 'row', alignItems: 'center', minHeight: 52, paddingHorizontal: 16, paddingVertical: 10, gap: 12, backgroundColor: colors.surface },
   icon: { minWidth: 24, alignItems: 'center' },
   label: { fontSize: 16 },
   detail: { fontSize: 12, color: colors.secondary, marginTop: 2 },

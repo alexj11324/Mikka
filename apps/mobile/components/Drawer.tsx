@@ -150,7 +150,7 @@ const styles = StyleSheet.create({
   panel: { position: 'absolute', top: 0, bottom: 0, left: 0, backgroundColor: colors.grouped },
   content: { flex: 1, backgroundColor: colors.page, overflow: 'hidden', shadowColor: '#000', shadowRadius: 16, shadowOffset: { width: -2, height: 0 } },
   row: { flexDirection: 'row', alignItems: 'center', height: 50, paddingHorizontal: 12, borderRadius: 14, gap: 14 },
-  rowActive: { backgroundColor: '#E4E4E6' },
+  rowActive: { backgroundColor: colors.pressed },
   rowIcon: { width: 26, alignItems: 'center' },
   rowLabel: { flex: 1, fontSize: 17 },
   count: { fontSize: 15, color: colors.secondary },

@@ -19,7 +19,7 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <KeyboardProvider>
-          <StatusBar style="dark" />
+          <StatusBar style="auto" />
           <SessionGate />
         </KeyboardProvider>
       </SafeAreaProvider>

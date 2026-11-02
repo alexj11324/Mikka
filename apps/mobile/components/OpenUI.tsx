@@ -202,7 +202,7 @@ function Questions({ value }: { value: Component }) {
               <Pressable key={option.value} accessibilityRole={question.multiple ? 'checkbox' : 'radio'} accessibilityState={{ checked: on, disabled: !open }} disabled={!open}
                 onPress={() => toggle(question, option.value)} style={({ pressed }) => [styles.option, (pressed || on) && { backgroundColor: colors.bubble }]}>
                 <View style={[styles.tick, question.multiple ? { borderRadius: 6 } : null, on && { backgroundColor: colors.ink }]}>
-                  {on ? <Check size={14} color="#fff" strokeWidth={3} /> : null}
+                  {on ? <Check size={14} color={colors.onInk} strokeWidth={3} /> : null}
                 </View>
                 <Text style={[cardText.body, { flex: 1 }]}>{option.label}</Text>
               </Pressable>
@@ -210,7 +210,7 @@ function Questions({ value }: { value: Component }) {
           })}
           {question.allowCustom ? (
             <TextInput value={custom[question.id] ?? ''} onChangeText={text => setCustom(current => ({ ...current, [question.id]: text }))} editable={open}
-              placeholder="补充其他回答…" placeholderTextColor={colors.tertiary} style={styles.input} />
+              placeholder="补充其他回答…" placeholderTextColor={colors.secondary} style={styles.input} />
           ) : null}
         </View>
       ))}
