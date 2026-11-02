@@ -1,7 +1,7 @@
 'use client'
 
 import { PersonAvatar } from '@/components/person-avatar'
-import { useEffect, useId, useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { ShortcutKeys } from '@/components/shortcut-keys'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
@@ -125,6 +125,8 @@ export function BoardPage({ issues, userId, onOpen, onUpdated, onBusyChange }: {
   }, [])
   const openPanel = () => { setSidebar(true); if (!window.matchMedia(WIDE).matches) setSheet(true) }
   const sidebarShown = sidebar && wide
+  // The sheet opens on its composer, not on the first tabbable (the message list).
+  const sheetRef = useRef<HTMLDivElement>(null)
   // R-65: ⌘J / Ctrl+J opens and closes the AI sidebar, the sheet below xl.
   useEffect(() => {
     function toggle(event: KeyboardEvent) {
@@ -274,7 +276,7 @@ export function BoardPage({ issues, userId, onOpen, onUpdated, onBusyChange }: {
       <CoordinatorChat compact prefill={prefill} onOpenIssue={id => { onOpen(id) }} />
     </ResizablePane>}
     <Sheet open={sheet} onOpenChange={setSheet}>
-      <SheetContent side="right" className="w-full gap-0 p-0 sm:max-w-sm">
+      <SheetContent ref={sheetRef} initialFocus={() => sheetRef.current?.querySelector<HTMLElement>('textarea:not(:disabled)') ?? true} side="right" className="w-full gap-0 p-0 sm:max-w-sm">
         <SheetHeader className="sr-only"><SheetTitle>{tNav('coordinator')}</SheetTitle></SheetHeader>
         <ConversationPill name={tNav('coordinator')} avatar={<CoordinatorAvatar size="pill" />} />
         <div aria-hidden="true" className="h-14 shrink-0" />
