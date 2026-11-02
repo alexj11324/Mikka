@@ -7,7 +7,6 @@ import { Ellipsis, EyeIcon, EyeOffIcon, LockIcon, Plus } from 'lucide-react'
 import { deleteSavedLogin, listSavedLoginUsage, replaceSavedLoginPassword, saveSavedLogin, type listSavedLogins } from '@/app/actions/settings-activity'
 import { settingsRead } from '@/lib/settings-read'
 import type { SavedLogin, SavedLoginUse } from '@/lib/settings/saved-logins'
-import { MikkaMarkSmall } from '@/components/brand/mikka-mark'
 import { SiteIcon } from '@/components/credentials/site-icon'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
@@ -170,7 +169,7 @@ function LoginSheet({ editing, open, onOpenChangeComplete, onClose }: { editing:
           </Field>
         </FieldGroup>
         <SheetFooter className="flex-row items-center">
-          <span className="mr-auto flex items-center gap-1 text-xs text-muted-foreground"><LockIcon className="size-3" />{card('securedBy')}<MikkaMarkSmall />Mikka</span>
+          <span className="mr-auto flex items-center gap-1 text-xs text-muted-foreground"><LockIcon className="size-3" />{card('securedBy')} Mikka</span>
           <Button type="button" variant="outline" disabled={pending} onClick={() => onClose(false)}>{t('cancel')}</Button>
           <Button type="submit" disabled={pending || !ready}>{pending ? <Spinner data-icon="inline-start" /> : null}{t('save')}</Button>
         </SheetFooter>

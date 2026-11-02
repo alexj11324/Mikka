@@ -1,9 +1,9 @@
 'use client'
 
-import { useMemo, useState, type ChangeEvent } from 'react'
+import { useMemo, useRef, useState, type ChangeEvent } from 'react'
 import useSWR from 'swr'
 import { useLocale, useTranslations } from 'next-intl'
-import { Cloud, Ellipsis, EyeIcon, EyeOffIcon, Plus } from 'lucide-react'
+import { Cloud, Ellipsis, EyeIcon, EyeOffIcon, FileUp, Plus } from 'lucide-react'
 import { createSecret, deleteSecret, importSecrets, replaceSecret, type listSecrets } from '@/app/actions/workspace-secrets'
 import { E2BKeyDialog, useE2BKeyStatus } from '@/components/settings/e2b-key-dialog'
 import { settingsRead } from '@/lib/settings-read'
@@ -11,7 +11,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@/components/ui/input-group'
 import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet'
@@ -297,6 +297,7 @@ function BulkSheet({ workspaceId, workspaceName, role, onClose, open = true, onO
   const count = preview && !('tooLarge' in preview) ? preview.entries.length : 0
   const ready = count > 0 && (scope === 'workspace' || REPOSITORY.test(repository.trim()))
 
+  const fileInput = useRef<HTMLInputElement>(null)
   function pick(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
     event.target.value = ''
@@ -335,8 +336,10 @@ function BulkSheet({ workspaceId, workspaceName, role, onClose, open = true, onO
             {error && <FieldError>{error}</FieldError>}
           </Field>
           <Field>
-            <FieldLabel htmlFor="secret-dotenv-file">{t('pickFile')}</FieldLabel>
-            <Input id="secret-dotenv-file" type="file" accept=".env,text/plain" disabled={pending} onChange={pick} />
+            {/* The browser's own file button is in the browser's language; this one follows the page. */}
+            <Input ref={fileInput} type="file" accept=".env,text/plain" className="hidden" tabIndex={-1} aria-hidden="true" disabled={pending} onChange={pick} />
+            <Button type="button" variant="secondary" size="sm" className="self-start" disabled={pending} onClick={() => fileInput.current?.click()}><FileUp data-icon="inline-start" />{t('pickFile')}</Button>
+            <FieldDescription>{t('pickFileLimit')}</FieldDescription>
           </Field>
           {preview && ('tooLarge' in preview
             ? <FieldError>{actionError('secretImportTooLarge')}</FieldError>
