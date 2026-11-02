@@ -5,7 +5,7 @@ import type { Pool, PoolClient } from "pg";
 import { z } from "zod";
 import { othersMayUse, pooledOwners } from "./personal-policy";
 import { HOSTED_CHOICE } from "./bot-model-menu-view";
-import { subscriptionChatRouteReady } from "./cloud-computer-flag";
+import { subscriptionRouteReady } from "./subscription-routes";
 
 export interface ExecutionSettingsScope {
   ownerId: string;
@@ -49,7 +49,7 @@ export class ExecutionSettings {
   async pooledBindings(scope: ExecutionSettingsScope) {
     const rows = [];
     for (const ownerId of await pooledOwners(this.pool, scope.ownerId, scope.workspaceId))
-      rows.push(...(await this.bindingsOf(ownerId, scope.workspaceId)).filter((row) => subscriptionChatRouteReady(row.route)));
+      rows.push(...(await chatReady(await this.bindingsOf(ownerId, scope.workspaceId))));
     return [...rows.filter((row) => row.provider === "claude"), ...rows.filter((row) => row.provider !== "claude")];
   }
   /** Clone another member's binding for this bot only, while they allow it here; never a credential. */
@@ -78,14 +78,14 @@ export class ExecutionSettings {
   async botBinding(scope: ExecutionSettingsScope, bindingId: string) {
     return (await this.connectedBindings(scope, bindingId))[0];
   }
-  /** A bot chat's subscription options: `botModels` on a route that answers chats (`subscriptionChatRouteReady`). */
+  /** A bot chat's subscription options: `botModels` on a route that answers chats for its owner (`subscriptionRouteReady`). */
   async chatModels(scope: ExecutionSettingsScope, query: Pick<PoolClient, "query"> = this.pool) {
-    return (await this.botModels(scope, query)).filter((row) => subscriptionChatRouteReady(row.route));
+    return chatReady(await this.botModels(scope, query));
   }
   /** A saved chat choice, while its route answers chats. */
   async chatBinding(scope: ExecutionSettingsScope, bindingId: string) {
     const row = await this.botBinding(scope, bindingId);
-    return row && subscriptionChatRouteReady(row.route) ? row : undefined;
+    return row && (await chatReady([row])).length ? row : undefined;
   }
   /** One option per model/account. Binding lookups remain independent of this presentation deduplication. */
   async botModels(
@@ -299,4 +299,16 @@ export async function executionWorkspace(
     .limit(1);
   if (!workspace) throw new ActionFailureError("workspaceAccessDenied");
   return workspace.id;
+}
+
+/** The rows whose route answers bot chats for the subscription's owner; one check per owner and route. */
+async function chatReady<T extends { route: string; ownerId: string }>(rows: T[]): Promise<T[]> {
+  const ready = new Map<string, Promise<boolean>>();
+  const check = (row: T) => {
+    const key = `${row.ownerId}|${row.route}`;
+    if (!ready.has(key)) ready.set(key, subscriptionRouteReady(row.route, row.ownerId));
+    return ready.get(key)!;
+  };
+  const answers = await Promise.all(rows.map(check));
+  return rows.filter((_, index) => answers[index]);
 }

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { randomBytes, randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { Pool } from "pg";
-// Subscription chats answer only on validated routes (lib/cloud-computer-flag.ts); these tests run with both on.
+// Subscription chats answer only on validated routes (lib/subscription-routes.ts); these tests run with both on.
 process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES = 'claude_cpa,codex_cpa'
 
 /*

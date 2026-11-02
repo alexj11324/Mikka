@@ -15,18 +15,6 @@ export function byosEnabled(env: Env = process.env) {
   return env.MIKKA_BYOS_ENABLED === '1'
 }
 
-/**
- * `MIKKA_BYOS_VALIDATED_MODEL_ROUTES`: the subscription routes that answer bot chats. The model menu,
- * the bot's model resolver and the subscription runtime all read this one list, so a subscription whose
- * route is not on it is never offered and never picked.
- */
-export function subscriptionChatRoutes(env: Env = process.env): Set<string> {
-  return new Set((env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES ?? '').split(',').filter(route => ['codex_cpa', 'claude_cpa'].includes(route)))
-}
-export function subscriptionChatRouteReady(route: string, env: Env = process.env) {
-  return subscriptionChatRoutes(env).has(route)
-}
-
 /** `MIKKA_BYOS_ENROLLMENT_ENABLED=1`: subscription enrollment custody is on. */
 export function byosEnrollmentEnabled(env: Env = process.env) {
   return env.MIKKA_BYOS_ENROLLMENT_ENABLED === '1'

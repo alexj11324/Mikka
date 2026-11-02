@@ -8,7 +8,7 @@ import assert from 'node:assert/strict'
 import { randomBytes, randomUUID } from 'node:crypto'
 import { test } from 'node:test'
 import { dbUrl, seedUser, seedWorkspace } from './support/workspace-admin-db'
-// Subscription chats answer only on validated routes (lib/cloud-computer-flag.ts); these tests run with both on.
+// Subscription chats answer only on validated routes (lib/subscription-routes.ts); these tests run with both on.
 process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES = 'claude_cpa,codex_cpa'
 
 test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }, async t => {
