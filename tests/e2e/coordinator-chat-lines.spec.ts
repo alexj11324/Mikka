@@ -29,7 +29,7 @@ test('runtime events read as lines in the person\'s language, with the thread as
     // What the server stores for each event (eventPrompt + sourcedEventMessage): the model's text and its kind.
     const events = [
       { kind: 'run_question', text: `[Event] The agent in run ${runId} asks the person: msw or just these two tests?\nCheck the current run state and existing task facts first. Never invent their permission. send_to_run does not itself prove the run resumed.` },
-      { kind: 'issue_status_changed', text: `[Event] Issue ${issueId} "登录页在 Safari 17 上白屏" moved from todo to in_review.` },
+      { kind: 'issue_status_changed', text: `[Event] Issue ${issueId} "登录页在 Safari 17 上白屏" moved from todo to review.` },
       { kind: 'run_retried', text: `[Event] Run ${runId} lost its machine (the device went offline or its cloud sandbox is gone), so it was moved to a new cloud sandbox as run ${randomUUID()}, attempt 2 of 3.\nNothing to do; follow the new run.` },
     ]
     for (const event of events) {
@@ -70,4 +70,25 @@ test('a failed reply says 回复失败 with 重试, never the step error; later 
   await attachLightDark(page, testInfo, 'chat-failed-past')
   await past.getByRole('button', { name: '重新发送', exact: true }).click()
   await expect(page.getByRole('region', { name: '与 Coordinator 的对话', exact: true }).getByText('帮我看看 CI 为什么红了', { exact: true })).toHaveCount(2)
+})
+
+test('a cold start shows the shapes of the chat and the thread list, never 还没有线程 (C7)', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await register(page)
+  await expect(page.getByRole('textbox', { name: '给 Coordinator 发消息', exact: true })).toBeVisible()
+  // Hold every server action (the chat, the threads) as a slow network would on a cold start.
+  let release!: () => void
+  const held = new Promise<void>(resolve => { release = resolve })
+  await page.route('**/*', async route => {
+    if (route.request().method() === 'POST' && route.request().headers()['next-action']) await held
+    await route.fallback()
+  })
+  try {
+    await page.reload()
+    const chat = page.getByRole('region', { name: '与 Coordinator 的对话', exact: true })
+    await expect(chat.getByRole('status', { name: '加载中…', exact: true })).toBeVisible()
+    await expect(page.getByText('还没有线程', { exact: true })).toHaveCount(0)
+    await attachLightDark(page, testInfo, 'chat-cold-start')
+  } finally { release() }
+  await page.unroute('**/*')
 })

@@ -14,8 +14,8 @@ test('every event the chat shows becomes a line kind, from the text the server i
   assert.deepEqual(eventLine('run_finished', finished, 'failed'), { kind: 'runFinished', runId, issueId, status: 'failed', title: null })
   assert.equal(eventLine('run_finished', finished).status, 'failed', 'older rows carry no observed state')
 
-  const moved = eventPrompt({ kind: 'issue_status_changed', issueId, runId: null, payload: { title: '登录页在 Safari 17 上白屏', previousStatus: 'todo', status: 'in_review' } })
-  assert.deepEqual(eventLine('issue_status_changed', moved), { kind: 'issueStatus', runId: null, issueId, status: 'in_review', title: '登录页在 Safari 17 上白屏' })
+  const moved = eventPrompt({ kind: 'issue_status_changed', issueId, runId: null, payload: { title: '登录页在 Safari 17 上白屏', previousStatus: 'todo', status: 'review' } })
+  assert.deepEqual(eventLine('issue_status_changed', moved), { kind: 'issueStatus', runId: null, issueId, status: 'review', title: '登录页在 Safari 17 上白屏' })
   const done = eventPrompt({ kind: 'issue_done', issueId, runId: null, payload: { title: 'Trim the bundle', previousStatus: 'doing' } })
   assert.equal(eventLine('issue_done', done).status, 'done')
 

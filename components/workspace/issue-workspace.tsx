@@ -167,10 +167,10 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
   const { data: botList } = useSWR('bots', listBots, { ...whileSettings })
   const bots = botList ?? []
   const [onboardingOpen, setOnboardingOpen] = useState(Boolean(onboarding))
-  const { data: threadsData, mutate: refreshThreads } = useSWR('threads', () => listThreads(), { ...whileSettings, refreshInterval: boardBusy || settingsShown ? 0 : 15000 })
+  const { data: threadsData, error: threadsError, mutate: refreshThreads } = useSWR('threads', () => listThreads(), { ...whileSettings, refreshInterval: boardBusy || settingsShown ? 0 : 15000 })
   const threads = useMemo(() => threadsData ?? [], [threadsData])
   // Not read yet: the thread lists show rows' shapes instead of 还没有线程 (review C7).
-  const threadsLoading = threadsData === undefined
+  const threadsLoading = threadsData === undefined && !threadsError
   const settingsWereShown = useRef(settingsShown)
   useEffect(() => {
     if (settingsWereShown.current && !settingsShown) {
