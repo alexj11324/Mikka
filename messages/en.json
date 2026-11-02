@@ -2922,7 +2922,7 @@
     "citation": {
       "issue": "Task",
       "run": "Thread",
-      "runOf": "Thread {agent} dispatched",
+      "runOf": "Thread {bot} dispatched",
       "openIssue": "Open task: {title}",
       "openThread": "Open thread: {name}",
       "noIssue": "No linked task",

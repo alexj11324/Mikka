@@ -2922,7 +2922,7 @@
     "citation": {
       "issue": "任务",
       "run": "线程",
-      "runOf": "{agent} 派出的线程",
+      "runOf": "{bot} 派出的线程",
       "openIssue": "打开任务：{title}",
       "openThread": "打开线程：{name}",
       "noIssue": "没有关联的任务",
