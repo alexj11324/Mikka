@@ -18,10 +18,8 @@ type Query = Pick<Pool | PoolClient, 'query'>
 export interface CreditShareView {
   /** The signed-in member shares their credits with this team. */
   mine: boolean
-  /** A team workspace with more than one member: the switch shows. */
+  /** A team workspace: the switch shows (decision 2026-11-02-1500 item 3). */
   canShare: boolean
-  /** A team left with one member: their credits pay without the switch (fallback, decision 2026-11-02-1500 item 4). */
-  solo: boolean
   /** Admins: who shares, by name, oldest first. Empty for members. */
   sharers: string[]
   admin: boolean
@@ -31,15 +29,13 @@ export async function creditShareView(actorId: string, workspaceId: string): Pro
   const { workspace, membership } = await workspaceDb.transaction(tx => requireWorkspace(tx, workspaceId, actorId))
   const admin = membership.role === 'admin'
   const team = workspace.kind === 'team'
-  const solo = team && await workspaceSoloMember(workspaceId) === actorId
   const { rows } = team
     ? await pool.query<{ userId: string; name: string | null }>(
       `SELECT s."userId",u.name FROM workspace_credit_shares s LEFT JOIN "user" u ON u.id=s."userId" WHERE s."workspaceId"=$1 ORDER BY s."sharedAt",s."userId"`, [workspaceId])
     : { rows: [] }
   return {
     mine: rows.some(row => row.userId === actorId),
-    canShare: team && !solo,
-    solo,
+    canShare: team,
     sharers: admin ? rows.flatMap(row => row.name ? [row.name] : []) : [],
     admin,
   }
@@ -62,8 +58,9 @@ export async function removeCreditShare(query: Query, workspaceId: string, userI
 /**
  * The personal workspaces whose credits a team may spend, oldest share first:
  * only sharers who are still active members of the team. Never the team itself.
- * Fallback: a team left with one member spends that member's credits without
- * a share (decision 2026-11-02-1500 item 4, `workspaceSoloMember`).
+ * Fallback: a team left with one person (nobody else in it or invited) spends
+ * that person's credits without a share (decision 2026-11-02-1500 item 4,
+ * `workspaceSoloMember`).
  */
 export async function sharedCreditWorkspaces(workspaceId: string): Promise<string[]> {
   const [{ rows: shared }, solo] = await Promise.all([
