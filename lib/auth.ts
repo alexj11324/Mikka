@@ -151,8 +151,13 @@ export const auth = betterAuth({
     }),
   },
   session: { expiresIn: 60 * 60 * 24 * 7, updateAge: 60 * 60 * 24 },
-  ...(process.env.NODE_ENV === 'development' && authBaseURL?.startsWith('https://') ? { advanced: {
+  advanced: {
+    // Migrations own the schema (scripts/migrate.mjs on every deploy). Better Auth's own check reads
+    // every column of every table from the catalog on each cold start, about 225 KB a time.
+    database: { validateSchema: false },
     // Partition preview sessions by top-level site when third-party cookies are blocked.
-    defaultCookieAttributes: { sameSite: 'none' as const, secure: true, partitioned: true },
-  } } : {}),
+    ...(process.env.NODE_ENV === 'development' && authBaseURL?.startsWith('https://') ? {
+      defaultCookieAttributes: { sameSite: 'none' as const, secure: true, partitioned: true },
+    } : {}),
+  },
 })
