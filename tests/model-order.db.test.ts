@@ -162,6 +162,17 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
     await keys.removeApiKey(pool, scope.ownerId, second.id)
     const named = await resolveModelDispatch(pool, ctx, { harness: 'claude_code', model: 'acct-sonnet-c' })
     assert.equal(named.kind === 'device' && named.model, 'mid')
+    // The thread's model is the only one tried; it never falls back to the list, which has a model that runs (opus).
+    const notOffered = await resolveModelDispatch(pool, ctx, { harness: 'codex', model: 'acct-opus-c' })
+    assert.deepEqual([notOffered.kind, notOffered.kind === 'none' && notOffered.reason, notOffered.kind === 'none' && notOffered.card.description], ['none', 'notOffered', '没有订阅或 Key 能用 Codex 跑 acct-opus-c'])
+    await subscribe(scope, 'codex', ['acct-codex-z'])
+    const noComputer = await resolveModelDispatch(pool, ctx, { harness: 'codex', model: 'acct-codex-z' })
+    assert.deepEqual([noComputer.kind === 'none' && noComputer.reason, noComputer.kind === 'none' && noComputer.card.description, noComputer.kind === 'none' && noComputer.card.options.map(option => option.action)],
+      ['pickedNoDevice', '没有电脑能用 Codex 跑 acct-codex-z', ['connectServer', 'modelSettings']])
+    await pool.query('UPDATE byos_connections SET paused=true WHERE id=$1', [claude])
+    const paused = await resolveModelDispatch(pool, ctx, { harness: 'claude_code', model: 'acct-sonnet-c' })
+    assert.deepEqual([paused.kind === 'none' && paused.reason, paused.kind === 'none' && paused.card.description], ['pickedUnavailable', 'Claude Code 的 acct-sonnet-c 暂时不可用'])
+    await pool.query('UPDATE byos_connections SET paused=false WHERE id=$1', [claude])
     // 云端 without the person's E2B key: the card says so.
     const cloud = await resolveModelDispatch(pool, ctx, null, undefined, 'cloud')
     assert.deepEqual([cloud.kind, cloud.kind === 'none' && cloud.reason, cloud.kind === 'none' && cloud.card.options.map(option => option.action)], ['none', 'cloudNotConfigured', ['e2bKey', 'modelSettings']])

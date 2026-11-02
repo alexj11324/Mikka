@@ -3233,6 +3233,8 @@
     "needsModelDeviceAgent": "This computer doesn't have {agent}",
     "needsModelDeviceModel": "This computer's {agent} didn't report {model}",
     "needsModelNotOffered": "No subscription or key runs {model} on {agent}",
+    "needsModelPickedNoDevice": "No computer can run {model} on {agent}",
+    "needsModelPickedUnavailable": "{model} on {agent} is unavailable right now",
     "needsModelSettings": "Open Models and subscriptions"
   },
   "IssueThreads": {

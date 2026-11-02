@@ -205,6 +205,10 @@ test('one task, one thread: dispatch continues the task\'s thread unless the per
     const stale = await dispatch(b, { target: { deviceId: await computer(b.id, 'Stale', { reports: 'other-model' }) } })
     assert.deepEqual([stale.error, stale.card?.description], ['machineUnavailable', '这台电脑的 Codex 没有报告 gpt-5'])
     assert.equal((await runs(b.id)).length, 0)
+    // No computer named, a model no subscription or key offers on that Agent: refused with why, not run on the list's model.
+    const unoffered = await dispatch(b, { model: { harness: 'claude_code', model: 'gpt-5' } })
+    assert.deepEqual([unoffered.error, unoffered.card?.description], ['machineUnavailable', '没有订阅或 Key 能用 Claude Code 跑 gpt-5'])
+    assert.equal((await runs(b.id)).length, 0)
     // 参与调度 off: Mikka never sends it a run, even when named (decision 2026-11-02-1400).
     const kept = await dispatch(b, { target: { deviceId: await computer(b.id, 'Kept out', { takesPart: false }) } })
     assert.equal(kept.error, 'machineUnavailable')
