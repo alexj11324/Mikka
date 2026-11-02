@@ -11,6 +11,8 @@ let calls = 0
 let currentBuild = true
 let buildCheck = async () => currentBuild
 let submissions = 0, removedNotes = 0
+const submitted: { text: string; context: { retryOf?: number } | undefined }[] = []
+let chatItems: import('@/lib/coordinator/context').ChatItem[] = []
 let versionReads = 0
 let pathname = '/mikka/en', search = ''
 let serverVersion: { build: string } = { build: 'fixture-current' }
@@ -36,8 +38,8 @@ mock.module(new URL('../../lib/app-build.ts', import.meta.url).href, { namedExpo
 mock.module('next/navigation', { namedExports: { usePathname: () => pathname, useSearchParams: () => new URLSearchParams(search) } })
 mock.module(new URL('../../i18n/navigation.ts', import.meta.url).href, { namedExports: { Link: plain, useRouter: () => ({ push: nothing }), usePathname: () => pathname } })
 mock.module('sonner', { namedExports: { toast: Object.assign((...args: unknown[]) => { notices.push(args) }, { error: nothing }) } })
-mock.module('swr', { defaultExport: () => ({ data: { items: [], enabled: false, working: false, error: null, artifacts: {} }, mutate: async () => {} }), namedExports: { useSWRConfig: () => ({ mutate: async () => {} }) } })
-mock.module(new URL('./use-coordinator-submit.ts', import.meta.url).href, { namedExports: { useCoordinatorSubmit: () => ({ submit: async () => { submissions++; return { kind: 'accepted' } }, failureMessage: () => 'fixture failed' }) } })
+mock.module('swr', { defaultExport: () => ({ data: { items: chatItems, enabled: false, working: false, error: null, artifacts: {} }, mutate: async () => {} }), namedExports: { useSWRConfig: () => ({ mutate: async () => {} }) } })
+mock.module(new URL('./use-coordinator-submit.ts', import.meta.url).href, { namedExports: { useCoordinatorSubmit: () => ({ submit: async (text: string, context?: { retryOf?: number }) => { submissions++; submitted.push({ text, context }); return { kind: 'accepted' } }, failureMessage: () => 'fixture failed' }) } })
 mock.module(new URL('./use-coordinator-stream.ts', import.meta.url).href, { namedExports: { useCoordinatorStream: () => ({ replies: [], error: false, reconnect: nothing }) } })
 mock.module(new URL('./chat-composer.tsx', import.meta.url).href, { namedExports: { ChatComposer: (props: { value: string; onChange: (value: string) => void; onSubmit: () => void; ref: Ref<HTMLTextAreaElement>; quote?: ReactNode }) => {
   composer = props
@@ -80,11 +82,29 @@ before(async () => {
   ;({ CoordinatorChat } = await import('./coordinator-chat'))
   ;({ VersionGuard } = await import('../version-guard'))
 })
-beforeEach(() => { calls = 0; currentBuild = true; buildCheck = async () => currentBuild; submissions = 0; removedNotes = 0; versionReads = 0; pathname = '/mikka/en'; search = ''; serverVersion = { build: 'fixture-current' }; notices.length = 0; reply = { queued: true }; container = browser.document.createElement('div') as unknown as HTMLDivElement; document.body.append(container); root = createRoot(container) })
+beforeEach(() => { calls = 0; currentBuild = true; buildCheck = async () => currentBuild; submissions = 0; submitted.length = 0; chatItems = []; removedNotes = 0; versionReads = 0; pathname = '/mikka/en'; search = ''; serverVersion = { build: 'fixture-current' }; notices.length = 0; reply = { queued: true }; container = browser.document.createElement('div') as unknown as HTMLDivElement; document.body.append(container); root = createRoot(container) })
 afterEach(async () => { await act(async () => root.unmount()); container.remove() })
 after(() => browser.happyDOM.close())
 const render = async (onQueued = async () => {}) => { await act(async () => root.render(<RetryReplyButton botId={null} onQueued={onQueued} />)) }
 const click = async () => { await act(async () => (container.querySelector('button') as HTMLButtonElement).click()) }
+
+for (const valid of [false, true]) test(`retrying a historical failure ${valid ? 'keeps retryOf in the submission' : 'keeps the original bubble when stale'}`, async () => {
+  currentBuild = valid
+  chatItems = [{ id: 'fixture-failed-message', position: 7, from: 'person', text: 'retry this original message', tools: [], threads: [], artifacts: [], createdAt: '2026-11-02T20:00:00Z', failure: { kind: 'failed' } }]
+  await act(async () => root.render(<CoordinatorChat onOpenIssue={nothing} userId="fixture-owner" />))
+  assert.match(container.textContent ?? '', /retry this original message/)
+  await act(async () => container.querySelector<HTMLButtonElement>('[data-message-failure="past"] button')!.click())
+  assert.equal(submissions, valid ? 1 : 0)
+  if (valid) {
+    assert.equal(submitted[0].text, 'retry this original message')
+    assert.equal(submitted[0].context?.retryOf, 7)
+    assert.equal(container.querySelector('[data-message-failure="past"]'), null)
+  } else {
+    assert.match(container.textContent ?? '', /retry this original message/)
+    assert.ok(container.querySelector('[data-message-failure="past"]'))
+    assert.equal(container.querySelector('[data-testid="failed-message"]'), null)
+  }
+})
 
 for (const valid of [true, false]) test(`parallel sends during a pending version probe are serialized (${valid ? 'current' : 'stale'})`, async () => {
   let finish!: (value: boolean) => void
