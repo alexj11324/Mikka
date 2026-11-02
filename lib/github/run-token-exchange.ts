@@ -47,7 +47,10 @@ export function createRunGitHubTokenExchange(deps: {
       await deps.afterIssue?.(current, issued).catch(() => undefined)
       const cap = now() + MAX_ANSWER_MS
       const expiresAt = new Date(issued.expiresAt ? Math.min(issued.expiresAt.getTime(), cap) : cap).toISOString()
-      return Response.json({ token: issued.token, expiresAt }, { headers })
+      // Older daemons validate this response metadata before using the owner's
+      // token. It describes the reauthorized run; it does not scope the token.
+      const repository = /^v2\/github\.com\/([\w.-]+\/[\w.-]+)$/.exec(current.remoteKey ?? '')?.[1]
+      return Response.json({ token: issued.token, expiresAt, ...(repository ? { repository } : {}) }, { headers })
     } catch (error) {
       // Never expose a provider body, token or fetch exception to a worker or a log: only the code.
       const failure = classifyRunGitHubFailure(error)

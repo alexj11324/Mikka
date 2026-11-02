@@ -20,6 +20,30 @@ test('the owner\'s own token is issued with no repository scope; the request bod
   assert.deepEqual(await result.json(), { token: 'synthetic-user-token', expiresAt: '2026-11-02T01:00:00.000Z' }, 'a worker asks again within the hour')
 })
 
+test('old daemons receive the run repository metadata from the reauthorized server scope', async () => {
+  let authorizations = 0
+  const handle = createRunGitHubTokenExchange({
+    authorize: async () => ({ ...scope, remoteKey: ++authorizations === 1 ? 'v2/github.com/owner/previous' : 'v2/github.com/alexj11324/mikka_test' }),
+    issue: async userId => {
+      assert.equal(userId, scope.userId)
+      return { token: 'synthetic-user-token', expiresAt: null }
+    },
+    now: () => now,
+  })
+  const result = await handle(new Request(request(), { method: 'POST', body: JSON.stringify({ repository: 'peer/untrusted' }) }))
+  assert.equal(result.status, 200)
+  assert.deepEqual(await result.json(), { token: 'synthetic-user-token', expiresAt: '2026-11-02T01:00:00.000Z', repository: 'alexj11324/mikka_test' })
+  assert.equal(authorizations, 2)
+})
+
+test('a non-GitHub repository does not add compatibility metadata or withhold the owner token', async () => {
+  const handle = createRunGitHubTokenExchange({ authorize: async () => ({ ...scope, remoteKey: 'v2/git.example/owner/repo' }),
+    issue: async () => ({ token: 'synthetic-user-token', expiresAt: null }), now: () => now })
+  const result = await handle(request())
+  assert.equal(result.status, 200)
+  assert.deepEqual(await result.json(), { token: 'synthetic-user-token', expiresAt: '2026-11-02T01:00:00.000Z' })
+})
+
 test('a token GitHub expires sooner keeps its own expiry', async () => {
   const expiresAt = new Date(now + 50 * 60_000)
   const handle = createRunGitHubTokenExchange({ authorize: async () => scope, now: () => now, issue: async () => ({ token: 'synthetic-user-token', expiresAt }) })
