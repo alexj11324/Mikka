@@ -13,7 +13,6 @@ const points: Array<[string, string, RegExp]> = [
   ['completion result', 'app/v1/runs/[runId]/complete/route.ts', /workspaceSecretMasker|maskForWorkspace/],
   ['run PATCH error', 'app/v1/runs/[runId]/route.ts', /maskForWorkspace\(caller\.scopeWorkspaceId/],
   ['checkpoint patch/files', 'app/v1/runs/[runId]/checkpoint/route.ts', /maskCheckpoint\(/],
-  ['tool approval input', 'app/v1/runs/[runId]/tool-approval/route.ts', /maskForWorkspace\(caller\.scopeWorkspaceId|workspaceSecretMasker\(caller\.scopeWorkspaceId\)/],
   ['capture title', 'app/v1/runs/[runId]/captures/route.ts', /maskForWorkspace\(|workspaceSecretMasker\(/],
   ['screen capture title', 'app/v1/runs/[runId]/screen/route.ts', /maskForWorkspace\(|workspaceSecretMasker\(/],
   ['MCP report/ask/blocked', 'lib/mcp/worker.ts', /maskForRun\(run\.id/],

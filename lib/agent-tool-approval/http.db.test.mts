@@ -37,7 +37,6 @@ mock.module(new URL('../personal-mailbox-config.ts', import.meta.url).href, { na
 mock.module(new URL('../auth.ts', import.meta.url).href, { namedExports: { auth: { api: { getSession: async ({ headers }: { headers: Headers }) => ({ user: { id: headers.get('cookie') === 'owner=1' ? owner : 'other' } }) } } } })
 let server: Server, origin: string
 const originalFetch = globalThis.fetch
-const proposals: { requestId: string; method: string; input: unknown }[] = []
 before(async () => {
   // The preceding policy-store suite retains its deliberately minimal schema.
   // Keep it intact and migrate a separate disposable database for this complete
@@ -63,13 +62,12 @@ before(async () => {
   await pool.query('INSERT INTO device_repos (id,"deviceId","userId","repoPath","remoteUrl","baseBranch") VALUES ($1,$2,$3,$4,$5,\'main\')',[repoId,deviceId,owner,remoteKey(remoteUrl),remoteUrl])
   await pool.query('INSERT INTO issues (id,"userId",title,content,status,priority,scope) VALUES ($1,$2,\'Synthetic approval task\',$3,\'todo\',\'normal\',\'personal\')',[issueId,owner,JSON.stringify({type:'doc',attrs:{mikka:{number:1}},content:[]})])
   // Network is open by default (decision 2026-11-01-1230). The owner chose
-  // `ask` for this bot, which is what the approval roundtrip below exercises.
+  // `ask` for this bot; the run gate below still asks nothing per tool.
   await pool.query(`INSERT INTO agent_kit_heads (owner_id,bot_key,workspace_id,cli_run_policy) VALUES ($1,'coordinator',NULL,'{"permissions":{"install_dependency":"allow","network":"ask"}}'::jsonb)`, [owner])
   await pool.query(`INSERT INTO agent_runs (id,"userId","deviceId","issueId","deviceRepoId",status,"agentId",kind,prompt) VALUES ($1,$2,$3,$4,$5,'queued',$6,'implement','APPROVAL_TEST')`, [runId,owner,deviceId,issueId,repoId,agentId])
   const device = await import('../../app/v1/runs/[runId]/tool-approval/route')
   const policy = await import('../../app/v1/runs/[runId]/policy-snapshot/route')
   const claim = await import('../../app/v1/devices/[deviceId]/runs/[runId]/claim/route')
-  const browser = await import('../../app/api/agent-tool-approvals/route')
   const settings = await import('../../app/api/agent-cli-policy/route')
   server = createServer(async (req,res) => {
     try {
@@ -78,11 +76,7 @@ before(async () => {
       const request = new Request(`${origin}${req.url}`, { method: req.method, headers: req.headers as HeadersInit, ...(req.method==='GET' || req.method==='HEAD' ? {} : {body:Buffer.concat(chunks)}) })
       const runRoute = /^\/v1\/runs\/([^/]+)\/(tool-approval|policy-snapshot)$/.exec(pathname)
       const routeRunId = runRoute?.[1] ?? runId
-      if (req.url?.endsWith('/tool-approval')) {
-        const body = JSON.parse(Buffer.concat(chunks).toString())
-        if (body.operation === 'propose') proposals.push(body)
-      }
-      const response = req.url === '/api/agent-tool-approvals' ? await browser.POST(request) : req.url === '/api/agent-cli-policy' ? await settings.POST(request) : req.url?.endsWith('/claim') ? await claim.POST(request, { params: Promise.resolve({ runId,deviceId }) }) : runRoute?.[2] === 'policy-snapshot' ? await (req.method==='GET' ? policy.GET : policy.POST)(request, {params:Promise.resolve({runId:routeRunId})}) : await device.POST(request, { params: Promise.resolve({ runId: routeRunId }) })
+      const response = req.url === '/api/agent-cli-policy' ? await settings.POST(request) : req.url?.endsWith('/claim') ? await claim.POST(request, { params: Promise.resolve({ runId,deviceId }) }) : runRoute?.[2] === 'policy-snapshot' ? await (req.method==='GET' ? policy.GET : policy.POST)(request, {params:Promise.resolve({runId:routeRunId})}) : await device.POST(request, { params: Promise.resolve({ runId: routeRunId }) })
       res.writeHead(response.status, Object.fromEntries(response.headers)); res.end(Buffer.from(await response.arrayBuffer()))
     } catch(error) {
       // HTTP failures may include a Drizzle query or response object. Keep the
@@ -149,12 +143,9 @@ test('real HTTP claim carries policy, and its run gate creates no approvals (dec
   assert.equal(assignment.policySnapshot?.algorithm,'Ed25519')
   assert.deepEqual(assignment.policySnapshot?.payload.policy,assignment.policy)
   const gate = await link.prepareRunToolApproval(assignment, new AbortController().signal, () => {})
-  const browser = async (cookie: string, payload: object) => fetch(`${origin}/api/agent-tool-approvals`, { method: 'POST', headers: { cookie, origin, 'content-type': 'application/json' }, body: JSON.stringify(payload) })
   // Runs ask nothing per tool or destination; the gate only reports whether the run is live.
   assert.equal(await gate.checkLive(), true)
-  const response = await browser('owner=1',{ operation:'list',runId })
-  const body = await response.json() as { requests: unknown[] }
-  assert.deepEqual(body.requests, [])
+  assert.equal((await pool.query('SELECT count(*)::int n FROM agent_tool_approvals WHERE "runId"=$1',[runId])).rows[0].n,0)
   gate.revoke()
 })
 

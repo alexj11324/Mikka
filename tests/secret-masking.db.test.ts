@@ -1,4 +1,4 @@
-// #438 A/C/E/F: masking checked by writing through the real code paths and reading the rows back.
+// #438 A/C/F: masking checked by writing through the real code paths and reading the rows back.
 // Uses an ephemeral local WORKSPACE_SECRETS_KEY and flips MIKKA_BYO_E2B_KEY on for this process only.
 import assert from 'node:assert/strict'
 import { randomBytes, randomUUID } from 'node:crypto'
@@ -230,6 +230,4 @@ test('#438 masking write-then-read-back', { skip: !dbUrl }, async t => {
       await dropTestDatabase(pool, name, mailboxPool)
     }
   })
-
-  // E is covered in lib/agent-tool-approval/store.db.test.ts (needs that suite's policy fixture).
 })
