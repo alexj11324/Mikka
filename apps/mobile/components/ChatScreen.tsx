@@ -28,6 +28,8 @@ import { runTitle, type Chat, type ChatFailure, type CitationSource, type Pendin
 import { failureLine } from '@/lib/chat-failure'
 import { waitingLabel } from '@/lib/waiting'
 import { useApi } from '@/lib/useApi'
+import { useStop } from '@/lib/useStop'
+import { StopFailed } from '@/components/StopFailed'
 import { runInfoLine } from '@/lib/run-info'
 import { openOnWeb, webChatPath } from '@/lib/web'
 import { colors } from '@/lib/theme'
@@ -124,13 +126,9 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, c
 
   const answer = async (message: string) => send(message)
 
-  // 停止: the turn ends on the server, keeping what it had said. Stop is away only while its request is out, so a chat still working can always be stopped again.
-  const [stopping, setStopping] = useState(false)
-  const stop = async () => {
-    setStopping(true)
-    try { await api('/api/mobile/chat/stop', { method: 'POST', body: { botId } }) } catch { /* the button comes back */ }
-    try { await reload() } finally { setStopping(false) }
-  }
+  // 停止: the turn ends on the server, keeping what it had said. Stop is away only while its request is out; one that fails or
+  // leaves the chat working 10 seconds later shows 「没停下 · 重试」.
+  const stopper = useStop(() => api('/api/mobile/chat/stop', { method: 'POST', body: { botId } }), Boolean(data?.working), reload)
 
   const reactions = data?.reactions ?? {}
   // Drawn at once, then saved; the next load has the server's word.
@@ -154,10 +152,11 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, c
       {/* Back is the system's (and its edge swipe); the bot's name opens the bot's page. */}
       <NavBar material
         titleView={
-          <Pressable accessibilityRole="button" accessibilityLabel={`${name} 的资料`} onPress={() => router.push(`/bots/${self}/info`)}>
+          <Pressable accessibilityRole="button" accessibilityLabel={name ? `${name} 的资料` : '资料'} onPress={() => router.push(`/bots/${self}/info`)}>
             <Capsule>
               <BotAvatar color={color} shape={shape} size={22} />
-              <Text style={styles.titleText} numberOfLines={1}>{name}</Text>
+              {/* The bot's name is not in yet (opened from a push before 对话 loaded): a spinner, never an empty pill. */}
+              {name ? <Text style={styles.titleText} numberOfLines={1}>{name}</Text> : <Spinner size={14} />}
             </Capsule>
           </Pressable>
         }
@@ -197,6 +196,7 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, c
           })}
           {outbox.map(item => <OutgoingBubble key={item.key} text={item.text} photos={item.images.map(image => image.uri)} failed={item.state === 'failed'} onRetry={() => void retry(item)} />)}
           {working ? <WaitingLine since={outbox.length ? null : waitingSince(items)} /> : null}
+          {stopper.stuck ? <StopFailed busy={stopper.sending} onRetry={() => void stopper.stop()} /> : null}
           {!data && !error ? <View style={styles.loading}><Spinner /></View> : null}
           {data && !items.length && !working ? <Text style={styles.empty}>有什么要我做的，直接说。</Text> : null}
           {error && !data ? (
@@ -214,8 +214,8 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, c
         </KeyboardChatScrollView>
       </View>
       <OfflineBanner top={insets.top + 66} />
-      <Composer value={text} onChangeText={setText} placeholder={`给 ${name} 发消息`} onSend={send} attach overlay onHeight={setComposerHeight} autoFocus={compose || Boolean(draft)}
-        quote={quote} onClearQuote={() => setQuote(null)} accessory={composerAccessory} notice={composerNotice} onStop={Boolean(data?.working) && !stopping ? () => void stop() : undefined} />
+      <Composer value={text} onChangeText={setText} placeholder={name ? `给 ${name} 发消息` : '发消息'} onSend={send} attach overlay onHeight={setComposerHeight} autoFocus={compose || Boolean(draft)}
+        quote={quote} onClearQuote={() => setQuote(null)} accessory={composerAccessory} notice={composerNotice} onStop={Boolean(data?.working) && !stopper.sending ? () => void stopper.stop() : undefined} />
     </View>
   )
 }

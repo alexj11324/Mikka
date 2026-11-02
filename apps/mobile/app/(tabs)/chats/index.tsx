@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { Plus } from 'lucide-react-native'
+import { CardButton } from '@/components/cards'
 import { ChatRowView, rowKey, useChatRows } from '@/components/ChatList'
 import { Avatar, useDrawer } from '@/components/Drawer'
 import { BotAvatar, Spinner } from '@/components/icons'
@@ -24,7 +25,7 @@ import { colors } from '@/lib/theme'
 export default function ChatsScreen() {
   const router = useRouter()
   const drawer = useDrawer()
-  const { rows: all, loading, reload } = useChatRows()
+  const { rows: all, loading, error, reload } = useChatRows()
   // Pinned bots sit in the row on top, each with the star; the rest are the list (置顶 on a bot's page).
   const split = splitPinned(all)
   const pinned = split.pinned.flatMap(row => row.kind === 'bot' ? [row.bot] : [])
@@ -75,7 +76,12 @@ export default function ChatsScreen() {
             </ScrollView>
           </View>
         }
-        ListEmptyComponent={loading ? <View style={styles.center}><Spinner /></View> : undefined}
+        ListEmptyComponent={loading ? <View style={styles.center}><Spinner /></View> : error ? (
+          <View style={styles.failed}>
+            <Text style={styles.error}>连不上 Mikka。</Text>
+            <CardButton label="重试" onPress={() => void reload()} />
+          </View>
+        ) : undefined}
         renderItem={({ item }) => <ChatRowView row={item} onPress={() => router.push(item.kind === 'bot' ? botPath(item.bot) : `/groups/${item.group.id}`)} />}
       />
     </View>
@@ -92,4 +98,6 @@ const styles = StyleSheet.create({
   starText: { color: colors.onAccent, fontSize: 12 },
   pinName: { fontSize: 15 },
   center: { paddingTop: 40, alignItems: 'center' },
+  failed: { paddingTop: 40, alignItems: 'center', gap: 10 },
+  error: { fontSize: 13, color: colors.danger },
 })
