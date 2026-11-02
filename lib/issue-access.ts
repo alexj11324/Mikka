@@ -1,5 +1,6 @@
 import 'server-only'
-import { and, eq } from 'drizzle-orm'
+import { and, eq, getTableColumns, sql } from 'drizzle-orm'
+import type { JSONContent } from '@tiptap/core'
 import { z } from 'zod'
 import { ActionFailureError } from '@/lib/action-error'
 import { currentUser } from '@/lib/acting-user'
@@ -24,7 +25,22 @@ export async function requireIssueAccess(id: string, includeDeleted = false) {
   return { ...issue, user }
 }
 
-async function findIssueForUser(reader: IssueReader, id: string, includeDeleted: boolean, executor: Pick<typeof db, 'select'> = db) {
+/**
+ * Like requireIssueAccess, without reading the task body: `content` holds only
+ * its attrs (where the metadata lives). For callers that re-read the body under
+ * a lock, or never need it; a full body is up to 250 KB of database egress.
+ */
+export async function requireIssueAccessWithoutBody(id: string) {
+  const user = await requireUser()
+  const issue = await findIssueForUser(user, id, false, db, true)
+  if (!issue) throw new ActionFailureError('issueNotFound')
+  return { ...issue, user }
+}
+
+const { content: _content, ...issueColumnsWithoutBody } = getTableColumns(issues)
+const issueAttrs = sql<JSONContent>`jsonb_build_object('type', 'doc', 'attrs', ${issues.content}->'attrs')`
+
+async function findIssueForUser(reader: IssueReader, id: string, includeDeleted: boolean, executor: Pick<typeof db, 'select'> = db, withoutBody = false) {
   if (!z.uuid().safeParse(id).success) return null
   const userId = typeof reader === 'string' ? reader : reader.id
   // A bare id inside `actAs` for a token's owner keeps the token's scope (an API route running existing actions).
@@ -32,8 +48,9 @@ async function findIssueForUser(reader: IssueReader, id: string, includeDeleted:
   const workspaceId = typeof reader === 'string' ? (acting?.userId === reader ? acting.tokenWorkspaceId : undefined) : reader[tokenWorkspace]
   const access = await issueTeamAccess(id, userId)
   const visibility = await issueVisibility(reader, includeDeleted, workspaceId, executor)
-  const [row] = await executor.select({ issue: issues }).from(issues)
-    .where(and(eq(issues.id, id), visibility.predicate)).limit(1)
+  const [row] = withoutBody
+    ? await executor.select({ issue: { ...issueColumnsWithoutBody, content: issueAttrs } }).from(issues).where(and(eq(issues.id, id), visibility.predicate)).limit(1)
+    : await executor.select({ issue: issues }).from(issues).where(and(eq(issues.id, id), visibility.predicate)).limit(1)
   if (!row || (!includeDeleted && readIssueMetadata(row.issue.content).deletedAt)) return null
   // A workspace token reads its owner's workspace tasks only in that workspace, as its task list does.
   if (workspaceId && row.issue.scope === 'workspace' && access.linked && access.workspaceId !== workspaceId) return null
