@@ -2199,6 +2199,7 @@
       "newValue": "New value",
       "scope": "Scope",
       "deleting": "Deleting…",
+      "removeTitle": "Delete {name}?",
       "shortValueNotMasked": "{name} is shorter than 8 characters and is not masked in output.",
       "e2b": {
         "heading": "Cloud computer",
@@ -2370,11 +2371,6 @@
     "creditShare": {
       "mine": "My credits also pay for this team",
       "sharers": "Members sharing credits"
-    },
-    "personalPolicy": {
-      "loading": "Loading personal subscription settings",
-      "heading": "Personal subscriptions",
-      "subscriptions": "Let members use their own subscriptions and API keys"
     },
     "appPolicy": {
       "loading": "Loading app permissions",
