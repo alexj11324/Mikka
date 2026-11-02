@@ -42,6 +42,8 @@ export const SNAPSHOT_CREDENTIAL_GLOBS: readonly string[] = [
   "/home/*/.config/gh/hosts.yml",
   "/home/*/.git-credentials",
   "/root/.git-credentials",
+  // A Bot desktop's cached GitHub credential (lib/computer/desktop-github.ts).
+  "/home/*/.mikka/github/token.json",
   ...runCredentialGlobs(CLOUD_WORKER_STATE_DIR),
 ]
 

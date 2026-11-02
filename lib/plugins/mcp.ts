@@ -4,44 +4,67 @@ import type { PersonalPluginStore } from './store'
 import { publicMcpFetch } from './public-fetch'
 import { abortable } from '@/lib/search/url-policy'
 
-export type PersonalMcpCommand = { serverId: string; cursor?: string } | { serverId: string; name: string; arguments: Record<string, unknown> }
+export type McpCommand = { cursor?: string } | { name: string; arguments: Record<string, unknown> }
+export type PersonalMcpCommand = { serverId: string } & McpCommand
+export type McpDependencies = { connect?: typeof createMCPClient; transport?: typeof publicMcpFetch }
+/** `secrets`: header values a result must never carry back (the server can echo them). */
+export type McpTarget = { url: string; transport: 'http' | 'sse'; headers: Record<string, string>; secrets: string[] }
+type McpResult = { tools: unknown[]; nextCursor: string | null } | Record<string, unknown>
 
-export function createPersonalMcpRuntime(store: Pick<PersonalPluginStore, 'mcpConnection'>, dependencies: {
-  connect?: typeof createMCPClient; transport?: typeof publicMcpFetch;
-} = {}) {
+/**
+ * One list or call on a remote MCP server. Errors are codes only: `code` names
+ * a known failure from `target` or `ready`; anything else is mcpUnavailable,
+ * or mcpOutcomeUnknown once a call was sent.
+ */
+export async function runMcpCommand(target: () => Promise<McpTarget>, command: McpCommand, dependencies: McpDependencies = {}, hooks: {
+  ready?: () => Promise<unknown>; code?: (error: unknown) => string | undefined;
+} = {}): Promise<McpResult | { error: string }> {
+  let client: MCPClient | undefined
+  let transport: ReturnType<typeof publicMcpFetch> | undefined
+  const signal = AbortSignal.timeout(25_000)
+  let dispatched = false
+  try {
+    const connection = await target()
+    transport = (dependencies.transport ?? publicMcpFetch)(new URL(connection.url).origin, signal)
+    client = await (dependencies.connect ?? createMCPClient)({
+      transport: { type: connection.transport, url: connection.url, headers: connection.headers, fetch: transport.fetch, redirect: 'error' },
+      initializationOptions: { signal }, protocolVersionDiscovery: false, maxRetries: 0,
+      onUncaughtError: () => {},
+    })
+    await hooks.ready?.()
+    if ('name' in command) {
+      dispatched = true
+      const result = await abortable(() => client!.callTool({ name: command.name, arguments: command.arguments, options: { signal } }), signal)
+      return redact(result, connection.secrets)
+    }
+    const result = await abortable(() => client!.listTools({ params: { cursor: command.cursor }, options: { signal } }), signal)
+    // Server descriptions/schemas are untrusted tool evidence, never system instructions.
+    return redact({ tools: result.tools, nextCursor: result.nextCursor ?? null }, connection.secrets)
+  } catch (error) {
+    if (dispatched) return { error: 'mcpOutcomeUnknown' }
+    return { error: hooks.code?.(error) ?? 'mcpUnavailable' }
+  } finally {
+    // Cleanup cannot replace a confirmed result with a retryable failure.
+    if (client) await abortable(() => client!.close(), AbortSignal.timeout(2000)).catch(() => {})
+    await transport?.close().catch(() => {})
+  }
+}
+
+export function createPersonalMcpRuntime(store: Pick<PersonalPluginStore, 'mcpConnection'>, dependencies: McpDependencies = {}) {
   return async (userId: string, snapshot: PersonalPluginSnapshot | undefined, command: PersonalMcpCommand) => {
-    let client: MCPClient | undefined
-    let transport: ReturnType<typeof publicMcpFetch> | undefined
-    const signal = AbortSignal.timeout(25_000)
-    let dispatched = false
-    try {
+    let revision: number | undefined
+    const result = await runMcpCommand(async () => {
       const entry = snapshot?.servers.find(server => server.id === command.serverId)
       if (snapshot && !entry) throw new PluginError('mcpNotEnabledForExecution', 403)
       const connection = await store.mcpConnection(userId, command.serverId, entry?.revision)
-      transport = (dependencies.transport ?? publicMcpFetch)(new URL(connection.url).origin, signal)
-      client = await (dependencies.connect ?? createMCPClient)({
-        transport: { type: connection.transport, url: connection.url, headers: connection.headers, fetch: transport.fetch, redirect: 'error' },
-        initializationOptions: { signal }, protocolVersionDiscovery: false, maxRetries: 0,
-        onUncaughtError: () => {},
-      })
+      revision = connection.revision
+      return { url: connection.url, transport: connection.transport, headers: connection.headers, secrets: Object.values(connection.headers) }
+    }, command, dependencies, {
       // A setting changed while the server initialized: do not dispatch with an old credential.
-      await store.mcpConnection(userId, command.serverId, connection.revision)
-      if ('name' in command) {
-        dispatched = true
-        const result = await abortable(() => client!.callTool({ name: command.name, arguments: command.arguments, options: { signal } }), signal)
-        return redact(result, Object.values(connection.headers))
-      }
-      const result = await abortable(() => client!.listTools({ params: { cursor: command.cursor }, options: { signal } }), signal)
-      // Server descriptions/schemas are untrusted tool evidence, never system instructions.
-      return redact({ serverId: connection.id, tools: result.tools, nextCursor: result.nextCursor ?? null }, Object.values(connection.headers))
-    } catch (error) {
-      if (dispatched) return { error: 'mcpOutcomeUnknown' }
-      return { error: error instanceof PluginError ? error.code : 'mcpUnavailable' }
-    } finally {
-      // Cleanup cannot replace a confirmed result with a retryable failure.
-      if (client) await abortable(() => client!.close(), AbortSignal.timeout(2000)).catch(() => {})
-      await transport?.close().catch(() => {})
-    }
+      ready: () => store.mcpConnection(userId, command.serverId, revision),
+      code: error => error instanceof PluginError ? error.code : undefined,
+    })
+    return 'name' in command || 'error' in result ? result : { serverId: command.serverId, ...result }
   }
 }
 
