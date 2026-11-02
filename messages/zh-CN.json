@@ -2487,7 +2487,8 @@
         "openai": "OpenAI"
       },
       "protocolAgents": "{protocols} 协议 · 可用 {agents}",
-      "customAgents": "选了协议才知道能用哪个 Agent"
+      "customAgents": "选了协议才知道能用哪个 Agent",
+      "noResponsesApi": "{protocol} 协议 · 不支持 Responses API · Codex 用不了"
     },
     "modelOrder": {
       "title": "允许使用的模型",

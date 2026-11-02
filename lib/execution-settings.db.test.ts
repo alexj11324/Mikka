@@ -60,6 +60,9 @@ test(
       await pool.query(
         await readFile(new URL("../drizzle/20261102120000_model_api_key_models_error.sql", import.meta.url), "utf8"),
       );
+      await pool.query(
+        await readFile(new URL("../drizzle/20261102190000_model_api_key_responses_api.sql", import.meta.url), "utf8"),
+      );
       const catalogueMigration = await readFile(new URL('../drizzle/20261030233002_byos_model_catalog.sql',import.meta.url),'utf8');
       await pool.query(catalogueMigration); await pool.query(catalogueMigration);
       const personalPolicyMigration = await readFile(new URL("../drizzle/20261101020201_workspace_personal_policies.sql",import.meta.url),"utf8");

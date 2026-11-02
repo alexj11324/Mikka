@@ -16,13 +16,13 @@ interface Binding { id: string; ownerId: string; connectionId: string; connectio
  * workspace its owner's own keys, then teammates' shared ones; with no bot
  * (the Coordinator), the owner's own keys only.
  */
-async function runKeys(query: Query, ownerId: string, botWorkspaceId: string | null): Promise<Pick<ApiKeyView, 'id' | 'provider' | 'protocol' | 'models'>[]> {
+async function runKeys(query: Query, ownerId: string, botWorkspaceId: string | null): Promise<Pick<ApiKeyView, 'id' | 'provider' | 'protocol' | 'responsesApi' | 'models'>[]> {
   if (botWorkspaceId) return usableApiKeys(query, ownerId, botWorkspaceId)
-  return (await query.query<Pick<ApiKeyView, 'id' | 'provider' | 'protocol' | 'models'>>('SELECT id,provider,protocol,models FROM model_api_keys WHERE "ownerId"=$1 ORDER BY "createdAt",id', [ownerId])).rows
+  return (await query.query<Pick<ApiKeyView, 'id' | 'provider' | 'protocol' | 'responsesApi' | 'models'>>('SELECT id,provider,protocol,"responsesApi",models FROM model_api_keys WHERE "ownerId"=$1 ORDER BY "createdAt",id', [ownerId])).rows
 }
 
 /** The first key whose Agent is the run's: the asked model when it serves it, else its first listed model. */
-function firstKey(keys: Pick<ApiKeyView, 'id' | 'provider' | 'protocol' | 'models'>[], harness: string, model?: string): RunApiKey | undefined {
+function firstKey(keys: Pick<ApiKeyView, 'id' | 'provider' | 'protocol' | 'responsesApi' | 'models'>[], harness: string, model?: string): RunApiKey | undefined {
   for (const key of keys) {
     if (!apiKeyHarnesses(key).includes(harness as never)) continue
     const chosen = model && (!key.models.length || key.models.includes(model)) ? model : key.models[0]
@@ -37,8 +37,8 @@ function firstKey(keys: Pick<ApiKeyView, 'id' | 'provider' | 'protocol' | 'model
  * An entry of 允许使用的模型 that names its key (`keyId`) runs on that key when
  * the run may use it and it serves the model, whatever other key lists the model too.
  */
-async function keyOnlyModel(query: Query, ownerId: string, keys: Pick<ApiKeyView, 'id' | 'provider' | 'protocol' | 'models'>[], harness: string, model: string, keyId?: string): Promise<RunApiKey | undefined> {
-  const serves = (item: Pick<ApiKeyView, 'provider' | 'protocol' | 'models'>) => apiKeyHarnesses(item).includes(harness as never) && item.models.includes(model)
+async function keyOnlyModel(query: Query, ownerId: string, keys: Pick<ApiKeyView, 'id' | 'provider' | 'protocol' | 'responsesApi' | 'models'>[], harness: string, model: string, keyId?: string): Promise<RunApiKey | undefined> {
+  const serves = (item: Pick<ApiKeyView, 'provider' | 'protocol' | 'responsesApi' | 'models'>) => apiKeyHarnesses(item).includes(harness as never) && item.models.includes(model)
   if (keyId) {
     const named = keys.find(item => item.id === keyId)
     if (named && serves(named)) return { keyId: named.id, model }
