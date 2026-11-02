@@ -189,7 +189,7 @@ export function BotList({ bots, workspaceId, threads, issues, active, onOpen, on
   if (isMobile) return <Sidebar collapsible="offcanvas" mobileTitle={i18nText('Nav.sidebarTitle')} mobileDescription={i18nText('Nav.sidebarDescription')} mobileCloseLabel={i18nText('Common.close')}>{body}</Sidebar>
   // On desktop the list is the first column inside the card; it folds to nothing and the rail stays.
   // R-37: folding and unfolding are instant, no motion (decision 2026-11-01-2320); dragging the edge follows the pointer.
-  return <div ref={listRef} data-slot="bot-list" data-state={open ? 'expanded' : 'collapsed'} inert={!open} className={cn('relative hidden shrink-0 overflow-hidden md:block', open ? 'w-(--bot-list-width) border-r' : 'w-0 border-r-0', dragging && 'select-none')}>
+  return <div ref={listRef} data-slot="bot-list" data-state={open ? 'expanded' : 'collapsed'} inert={!open} className={cn('relative hidden shrink-0 overflow-hidden md:block in-data-desktop-translucent:bg-shell-material', open ? 'w-(--bot-list-width) border-r' : 'w-0 border-r-0', dragging && 'select-none')}>
     <Sidebar collapsible="none" className="w-[var(--bot-list-width,16rem)] bg-transparent">{body}</Sidebar>
     {/* Comma's edge strip with a hairline on hover: drag it or use the arrow keys to resize the list, double-click it to reset, click it to fold the list. */}
     <ResizeHandle resize={resize} label={i18nText('Nav.resizeList')} title={i18nText('Nav.collapseList')} edge="end" onClick={onEdgeClick} />

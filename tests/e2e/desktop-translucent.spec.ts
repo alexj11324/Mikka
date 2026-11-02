@@ -2,9 +2,10 @@ import type { Page } from '@playwright/test'
 import { test, expect, register } from './fixtures'
 
 // The macOS desktop window (docs/design/platforms.md): under data-desktop-translucent
-// the window bar, the rail and the bot list let the window's material through a
-// grey veil (--shell-material); the content column stays opaque. A browser has no
-// vibrancy, so a solid color on <html>, behind the page, stands in for the material.
+// the window bar and the rail let the window's material through untinted; the bot
+// list lays a grey veil (--shell-material) over it; the content column stays opaque.
+// A browser has no vibrancy, so a solid color on <html>, behind the page, stands in
+// for the material.
 const MATERIAL = [255, 0, 170] as const
 
 type Point = { x: number; y: number }
@@ -65,12 +66,13 @@ test('macOS translucent window: chrome shows the material, content stays opaque'
 
   await translucent(page, true, `rgb(${MATERIAL.join(',')})`)
   const [bar, rail, list, current, content] = await pixels(page, [at.bar, at.rail, at.list, at.current, at.content])
-  // The chrome is veiled (--shell-material): the material shows only faintly, neither raw nor the opaque frame.
-  for (const [name, pixel, solid] of [['window bar', bar, opaque[0]], ['rail', rail, opaque[1]], ['bot list', list, opaque[2]]] as const) {
-    expect(near(pixel, MATERIAL, 40), `${name} ${pixel} is veiled`).toBe(false)
-    expect(near(pixel, solid, 3), `${name} ${pixel} still shows the material`).toBe(false)
-    expect(pixel[0] - pixel[1] > 8, `${name} ${pixel} keeps a trace of the material`).toBe(true)
-  }
+  // The bar and rail show the material untinted; the bot list is veiled (--shell-material),
+  // so it reads apart from the rail: neither the raw material nor the opaque frame.
+  expect(near(bar, MATERIAL), `window bar ${bar}`).toBe(true)
+  expect(near(rail, MATERIAL), `rail ${rail}`).toBe(true)
+  expect(near(list, MATERIAL, 40), `bot list ${list} is veiled`).toBe(false)
+  expect(near(list, opaque[2], 3), `bot list ${list} still shows the material`).toBe(false)
+  expect(list[0] - list[1] > 8, `bot list ${list} keeps a trace of the material`).toBe(true)
   // The current row is an overlay on the veil: it reads apart from the list.
   expect(near(current, list, 6), `current row ${current} vs list ${list}`).toBe(false)
   expect(near(content, [255, 255, 255]), `content ${content}`).toBe(true)

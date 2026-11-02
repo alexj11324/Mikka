@@ -45,11 +45,12 @@ ship a smaller surface without the UI claiming a feature it cannot perform.
 - On macOS the desktop window is translucent, as in Codex: the window uses the
   `sidebar` vibrancy material (`apps/desktop/src/main/window-appearance.ts`), and
   the preload sets `data-desktop-translucent` on `<html>`. Under that attribute
-  the frame chrome (window bar, rail) and the card's first column (bot list,
-  settings list) paint no background of their own; the page behind them is
-  `--shell-material`, a grey veil (light 75 %, dark 82 % opaque), so the
-  wallpaper shows only faintly and the chrome reads apart from the content, as
-  in Codex. The content column and right panels stay opaque. Hover and current
+  the frame chrome (window bar, rail) and the settings list paint no
+  background of their own, so the material shows untinted there. The bot list
+  lays `--shell-material` over it instead, a grey
+  veil (light 75 %, dark 82 % opaque): the rail stays clear and the list reads
+  darker, apart from both the rail and the content, as in the ChatGPT desktop
+  app. The content column and right panels stay opaque. Hover and current
   fills there (`--sidebar-accent`, `--sidebar-item`) become a black (light) or
   white (dark) overlay, and ghost buttons and the settings search field take
   `--control` instead of the opaque `muted`.
