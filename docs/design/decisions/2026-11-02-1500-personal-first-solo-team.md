@@ -27,11 +27,15 @@
 4. **The switch sits next to the resource.** 「共享给团队」 is set where the
    person adds and manages the thing: on each subscription and API key row in
    模型与订阅 (and right after adding one), and for personal credits in the
-   person's own 点数/计费 as 「也用于哪些团队」. A team's settings show at most
-   who shares what, read-only; they are not where it is set. The switch shows
+   person's own 点数/计费 as 「也用于这些团队」, where each team also has
+   「我的卡」 (由我的卡支付这个团队; one member's card per team, so another
+   member's card shows as 「<名字>的卡在付」). A team's settings show at most
+   who shares what, read-only; they are not where it is set. The switches show
    only when the person belongs to a team with more than one member. A team
-   admin's ban on sharing (团队权限 › 订阅与 API Key) still holds: the switch
-   is disabled and says why.
+   admin's ban on sharing (团队权限 › 订阅与 API Key) still holds, for
+   subscriptions and API keys alike: the switch is disabled and names the
+   admin who turned sharing off; when the viewer is that team's admin, it
+   links to the setting instead.
 5. **One predicate.** `workspaceSoloMember` in `lib/workspace-solo.ts`
    answers "one person here?" for every such decision, including the Mikka
    default-credit check.
