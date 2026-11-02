@@ -32,7 +32,7 @@ import { Field, FieldGroup, FieldLabel, FieldError } from '@/components/ui/field
 import { Textarea } from '@/components/ui/textarea'
 import { ResizeHandle } from '@/components/ui/resizable-pane'
 import { useResizableWidth } from '@/hooks/use-resizable-width'
-import { useFocusReturn } from '@/hooks/use-focus-return'
+import { closeOnEscape, useFocusReturn } from '@/hooks/use-focus-return'
 
 type Issue = IssueView
 
@@ -253,7 +253,7 @@ function TaskForm({ initial, thread: openThread, user, onSaved, onDirty, onClose
     : openAcceptance && <FactoryAcceptancePanel key={openAcceptance.id} task={openAcceptance} onOpenThread={showThread} onClose={() => setOpenAcceptance(null)} />
 
   // R-61: one line under the header, one before the properties or an open thread; the page scrolls, the right column stays.
-  return <div ref={rootRef} tabIndex={-1} role="region" aria-label={title || t('titleLabel')} className="flex min-w-0 flex-1 outline-none">
+  return <div ref={rootRef} tabIndex={-1} role="region" aria-label={title || t('titleLabel')} className="flex min-w-0 flex-1 outline-none" onKeyDown={event => closeOnEscape(event, rootRef.current, onClose)}>
     <div className="flex min-w-0 flex-1 flex-col">
     <IssueDetailHeader identifier={saved.identifier} title={title} saveLabel={readOnly ? '' : error ? t('saveFailed') : syncState.error ? t('syncFailed') : pending || metadataSaving ? t('saving') : t('autosaved')} saved={!error && !syncState.error && !pending && !metadataSaving} pending={false} navigation={navigation} onClose={onClose} actions={<IssueDetailActions task={saved} userId={user.id} disabled={false} documentTools={documentTools} request={actionRequest} getCurrent={getCurrent} onSaved={adopt} onOpen={onOpen} onDeleted={onDeleted} onHistory={() => { void save().then(success => { if (success) { void refreshVersions(); setHistory(true) } }) }} onMembers={() => setMembers(true)} onDocumentTools={() => setDocumentTools(value => !value)} onProperty={requestProperty} onStatus={value => { changed({ status: value }); void save() }} onPriority={value => { changed({ priority: value }); void save() }} />} />
     <div className="mx-auto flex w-full min-w-0 max-w-170 flex-1 flex-col gap-6 px-5 py-6 sm:px-8 lg:py-10">
