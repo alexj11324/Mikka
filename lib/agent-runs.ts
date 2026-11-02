@@ -173,7 +173,11 @@ async function localRunCredential<S extends { id: string; ownerId: string; conne
 export async function visibleRuns(userId: string, input: { issueId?: string; runIds?: string[]; activeOnly?: boolean; limit?: number } = {}): Promise<RunView[]> {
   if (input.issueId && !z.uuid().safeParse(input.issueId).success) return []
   if (input.runIds && (!input.runIds.length || input.runIds.some(id => !z.uuid().safeParse(id).success))) return []
-  const visibility = await issueVisibility(userId)
+  // Asked about one task or known runs: only their tasks' team links are read.
+  const onlyIssueIds = input.issueId ? [input.issueId]
+    : input.runIds ? [...new Set((await db.select({ issueId: agentRuns.issueId }).from(agentRuns).where(inArray(agentRuns.id, input.runIds))).flatMap(row => row.issueId ? [row.issueId] : []))]
+    : undefined
+  const visibility = await issueVisibility(userId, false, undefined, db, { onlyIssueIds })
   const shared = visibility.allowedIds.length ? and(eq(issues.scope, 'workspace'), inArray(issues.id, visibility.allowedIds)) : sql`false`
   const rows = await db.select({ ...runViewColumns, ownerId: agentRuns.userId, waitDeviceId: agentRuns.deviceId, lastSeenAt:devices.lastSeenAt, deviceEnabled:devices.enabled }).from(agentRuns)
     .innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(issues, eq(issues.id, agentRuns.issueId)).leftJoin(devices,eq(devices.id,agentRuns.deviceId))

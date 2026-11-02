@@ -402,7 +402,7 @@ export async function citationSources(userId: string, texts: readonly string[], 
   if (issueIds.length) {
     const rows = await db.selectDistinct({ id: issues.id, ownerId: issues.userId, scope: issues.scope, title: issues.title, status: issues.status, priority: issues.priority, content: issues.content })
       .from(issues).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId)))
-      .where(and(inArray(issues.id, issueIds), (await issueVisibility(userId)).predicate))
+      .where(and(inArray(issues.id, issueIds), (await issueVisibility(userId, false, undefined, db, { onlyIssueIds: issueIds })).predicate))
     const identifiers = await taskIdentifiers(rows.map(row => ({ id: row.id, ownerId: row.ownerId, scope: row.scope, number: readIssueMetadata(row.content).number })))
     for (const { content, ownerId: _owner, scope: _scope, ...row } of rows) {
       const metadata = readIssueMetadata(content)
