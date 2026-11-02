@@ -357,6 +357,8 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
         briefingBoundary = true
         continue
       }
+      // 重新发送 retried this failed message in place (store.sendRetryOf): the new attempt stands for it.
+      if ((message as { mikkaRetried?: unknown }).mikkaRetried === true) continue
       const raw = typeof message.content === 'string' ? message.content : message.content.flatMap(part => part.type === 'text' ? [part.text] : []).join('\n')
       // The request for its welcome is for the Coordinator only.
       if (raw.startsWith(COORDINATOR_WELCOME_MARK)) continue

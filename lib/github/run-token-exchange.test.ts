@@ -82,3 +82,38 @@ test('every code the server returns has words the daemon can show', () => {
     assert.equal(words.length, 2)
   }
 })
+
+// Daemons released before #1023 (up to 0.0.315) refuse an answer that does not name
+// the run's repository; their clone then fails with "could not read Username"
+// (production, 2026-11-02 21:08Z, daemon 0.0.310). The released helper must still work.
+for (const [label, load] of [
+  ['daemon 0.0.310 (released)', () => import('./fixtures/github-credentials-0.0.310.mjs')],
+  ['current daemon', () => import('../../packages/daemon/src/agents/github-credentials.mjs')],
+] as const) {
+  test(`${label}: its git credential helper gets the owner's token from today's answer`, async () => {
+    const { mkdtemp, rm, writeFile } = await import('node:fs/promises')
+    const { tmpdir } = await import('node:os')
+    const { join } = await import('node:path')
+    const helper = await load() as { getRunGitHubToken(config: Record<string, string>, options: { fetcher: typeof fetch; now: () => number }): Promise<string> }
+    const handle = createRunGitHubTokenExchange({
+      authorize: async () => ({ ...scope, remoteKey: 'v2/github.com/alexj11324/mikka_test' }), now: () => now,
+      issue: async () => ({ token: 'synthetic-user-token', expiresAt: new Date(now + 8 * 60 * 60_000) }),
+    })
+    const directory = await mkdtemp(join(tmpdir(), 'run-github-'))
+    try {
+      // The claim's github.repository is the remote key without its v2/github.com/ prefix.
+      const config = { file: join(directory, 'config.json'), endpoint: 'https://mikka.example/api/runs/github-token', runToken: 'synthetic-run-token', repository: 'alexj11324/mikka_test' }
+      await writeFile(config.file, JSON.stringify(config), { mode: 0o600 })
+      const fetcher = (async (url: string, init: RequestInit) => handle(new Request(url, init))) as typeof fetch
+      assert.equal(await helper.getRunGitHubToken(config, { fetcher, now: () => now }), 'synthetic-user-token')
+    } finally { await rm(directory, { recursive: true, force: true }) }
+  })
+}
+
+test('the answer names the run\'s repository only when the run has a github.com one', async () => {
+  const issue = async () => ({ token: 'synthetic-user-token', expiresAt: null })
+  const withRepo = createRunGitHubTokenExchange({ authorize: async () => ({ ...scope, remoteKey: 'v2/github.com/o/r' }), now: () => now, issue })
+  assert.equal((await (await withRepo(request())).json() as { repository?: string }).repository, 'o/r')
+  const without = createRunGitHubTokenExchange({ authorize: async () => scope, now: () => now, issue })
+  assert.equal('repository' in (await (await without(request())).json() as object), false)
+})

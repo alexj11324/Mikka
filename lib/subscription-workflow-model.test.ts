@@ -27,7 +27,10 @@ test('unsupported non-streaming invocation refuses rather than calling a default
 
 test('the Node model method resolves the fixed descriptor and forwards cancellation into the existing stream call', async () => {
   const controller = new AbortController(), options = {prompt: [], abortSignal: controller.signal}
-  assert.equal(await new SubscriptionWorkflowModel(selection).doStream(options), streamResult)
+  // The provider's result comes back with its stream timed (lib/model-call-timing.ts), its parts unchanged.
+  const result = await new SubscriptionWorkflowModel(selection).doStream(options)
+  assert.deepEqual(Object.keys(result), Object.keys(streamResult))
+  assert.deepEqual(await Array.fromAsync(result.stream as unknown as AsyncIterable<unknown>), [])
   assert.equal(calls.length, 1)
   assert.deepEqual(calls[0].selection, selection)
   assert.equal(calls[0].signal, controller.signal)
