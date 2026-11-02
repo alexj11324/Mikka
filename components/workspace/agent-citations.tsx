@@ -97,7 +97,7 @@ export function IssueCitation({ issue, onOpen }: { issue: IssueSource; onOpen: (
   const priority = ISSUE_PRIORITIES.find(item => item.value === issue.priority)
   const identifier = issue.identifier
   return <InlineCitation>
-    <InlineCitationTrigger variant="object" aria-label={t('openIssue', { title: issue.title })} onClick={() => onOpen(issue.id)}>
+    <InlineCitationTrigger variant="object" aria-label={t('openIssue', { title: issue.title })} data-focus-id={issue.id} onClick={() => onOpen(issue.id)}>
       <status.icon aria-hidden="true" className={cn('size-3.5 shrink-0', statusIconTints[status.tone])} />
       <InlineCitationLabel>{issue.title}</InlineCitationLabel>
     </InlineCitationTrigger>

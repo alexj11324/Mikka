@@ -31,6 +31,7 @@ import { openArtifact } from './workspace-navigation'
 import { ThreadFeedback } from './self-improvement'
 import { InlineLoadError } from '@/components/load-error'
 import { FieldError } from '@/components/ui/field'
+import { useFocusReturn } from '@/hooks/use-focus-return'
 
 // R-32 chat: 13/21 as in Comma, also for the agent's Markdown inside a bubble.
 const BUBBLE = 'max-w-[85%] rounded-2xl bg-muted px-3.5 py-2 text-sm/5.25 whitespace-pre-wrap break-words [&_[data-agent-markdown]]:leading-5.25'
@@ -69,6 +70,8 @@ function ThreadPanel({ issueId, runId, onClose, bare = false, initialTab = 'chat
   const [stopFailed, setStopFailed] = useState(false)
   const stopAttemptRef = useRef<number | null>(null)
   const inputRef = useRef<HTMLTextAreaElement | null>(null)
+  const headingRef = useRef<HTMLHeadingElement>(null)
+  useFocusReturn(runId, headingRef, !bare)
   const detail = data?.thread.detail
   // 等你回复: the run ended on a question; the composer answers it (lib/agent-runs.ts addRunMessage).
   // Once answered it reads as the running thread it continues, with nothing to send or stop yet;
@@ -123,7 +126,7 @@ function ThreadPanel({ issueId, runId, onClose, bare = false, initialTab = 'chat
   return <section aria-label={title} className="flex h-full min-h-0 flex-col">
     {!bare && <header className={cn('flex h-12 shrink-0 items-center gap-2 border-b border-rule px-4', acceptance && 'max-sm:h-auto max-sm:flex-wrap max-sm:py-2')}>
       {detail && view && <ThreadStatusIcon status={view.status} outcome={view.outcome} waiting={view.waiting} />}
-      <h2 className={cn('min-w-0 truncate text-sm font-semibold', !acceptance && 'flex-1')}>{title}</h2>
+      <h2 ref={headingRef} tabIndex={-1} className={cn('min-w-0 truncate text-sm font-semibold outline-none', !acceptance && 'flex-1')}>{title}</h2>
       {acceptance && <><AcceptanceStateBadge task={acceptance} /><span className="flex-1" /></>}
       <ThreadArtifacts runId={runId} status={data?.thread.status ?? ''} />
       {onOpenTask && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className="shrink-0 text-muted-foreground" aria-label={t('openTask')} onClick={onOpenTask} />}><SquareKanban data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{t('openTask')}</TooltipContent></Tooltip>}
@@ -181,7 +184,7 @@ function ThreadPanel({ issueId, runId, onClose, bare = false, initialTab = 'chat
     {detail && <div data-slot="thread-composer" className="flex shrink-0 flex-col gap-1 p-3">
       {/* Keep the draft editable while stop waits for the daemon; do not queue new work after stop. */}
       <ChatComposer ref={inputRef} label={t('composer', { agent: harnessLabel(detail.harness) })} value={draft} onChange={setDraft} onSubmit={() => { void send() }}
-        sending={sending || stopPending} editableWhileSending submitDisabled={stopRequested || question === 'resuming'} running={active || question === 'resuming'} onStop={active && data.thread.ownedByCurrentUser && !sending && !stopPending ? () => { void stop() } : undefined} />
+        sending={sending || stopPending} editableWhileSending submitDisabled={stopRequested || question === 'resuming'} running={active || question === 'resuming'} thread onStop={active && data.thread.ownedByCurrentUser && !sending && !stopPending ? () => { void stop() } : undefined} />
       {sendFailed && <FieldError className="px-3 text-xs">{t('sendFailed')}</FieldError>}
       {stopFailed && <div role="alert" className="flex items-center gap-2 px-3 text-xs"><span className="text-destructive">{t('stopFailed')}</span><Button variant="ghost" size="sm" className="min-w-22 max-sm:h-11" onClick={() => { void stop() }}>{t('retryStop')}</Button></div>}
     </div>}

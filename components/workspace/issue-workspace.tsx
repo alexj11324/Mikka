@@ -68,6 +68,7 @@ import type { WorkspaceSwitcher } from '@/lib/workspace-switcher'
 import type { AgentHistory, SavedAgentSession } from '@/lib/agent-history'
 import { useAgentHistory } from '@/hooks/use-agent-history'
 import { useWorkspace } from '@/hooks/use-workspace'
+import { focusChatComposer } from '@/hooks/use-focus-return'
 import { usePresence } from '@/lib/use-presence'
 import { FieldError } from '@/components/ui/field'
 
@@ -413,6 +414,7 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
       applySelection(null); move({ ...changeSection(target.kind === 'agent' ? 'agent' : target.kind === 'group' ? 'group' : 'coordinator', bot?.id ?? null), issue: null, group: target.kind === 'group' ? target.id : null, session: target.kind === 'agent' ? target.sessionId : null }); setTeamId(null); setProjectId(null)
       if (target.kind === 'agent') setAgentRequest(current => ({ sessionId: target.sessionId, nonce: (current?.nonce ?? 0) + 1 }))
       if (target.kind === 'group') setOpenedGroup({ id: target.id, title: target.title, workspaceId: target.workspaceId })
+      focusChatComposer()
     })
   }
   function openRail(destination: RailDestination) {
