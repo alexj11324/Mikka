@@ -14,7 +14,7 @@ export async function issueTeamScope(userId: string, ids: string[] = []) {
 }
 export async function issueTeamAccess(issueId: string, userId: string) {
   const [link] = await workspaceDb.select().from(teamIssues).where(eq(teamIssues.issueId, issueId)).limit(1)
-  if (!link) return { teamId: null, allowed: false, linked: false }
+  if (!link) return { teamId: null, workspaceId: null, allowed: false, linked: false }
   const [member] = await workspaceDb.select({ id: workspaceMembers.userId }).from(workspaceMembers).where(and(eq(workspaceMembers.workspaceId, link.workspaceId), eq(workspaceMembers.userId, userId), eq(workspaceMembers.status, 'active'))).limit(1)
-  return { teamId: link.teamId, allowed: !!member, linked: true }
+  return { teamId: link.teamId, workspaceId: link.workspaceId, allowed: !!member, linked: true }
 }

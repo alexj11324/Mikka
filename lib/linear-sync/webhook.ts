@@ -1,5 +1,8 @@
 import { z } from 'zod'
 
+// The cron Worker in cloudflare/linear-sync imports the bearer check from here.
+export { verifyBearer } from '../cron-auth'
+
 const MAX_BODY_BYTES = 1_000_000
 const payloadSchema = z.object({
   action: z.string().min(1).max(32),
@@ -16,21 +19,6 @@ export async function verifyLinearSignature(rawBody: string, signature: string, 
   const key = await crypto.subtle.importKey('raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['verify'])
   const signatureBytes = Uint8Array.from({ length: 32 }, (_, index) => Number.parseInt(signature.slice(index * 2, index * 2 + 2), 16))
   return crypto.subtle.verify('HMAC', key, signatureBytes, encoder.encode(rawBody))
-}
-
-export async function verifyBearer(value: string | null, secret: string) {
-  const match = value?.match(/^Bearer (.+)$/)
-  if (!match || !secret) return false
-  const key = await crypto.subtle.importKey('raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
-  const [actual, expected] = await Promise.all([
-    crypto.subtle.sign('HMAC', key, encoder.encode(match[1]!)),
-    crypto.subtle.sign('HMAC', key, encoder.encode(secret)),
-  ])
-  const actualBytes = new Uint8Array(actual)
-  const expectedBytes = new Uint8Array(expected)
-  let difference = 0
-  for (let index = 0; index < expectedBytes.length; index++) difference |= actualBytes[index]! ^ expectedBytes[index]!
-  return difference === 0
 }
 
 type LinearWebhookPayload = z.infer<typeof payloadSchema>
