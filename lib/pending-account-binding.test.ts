@@ -20,6 +20,7 @@ const db = {
 const stub = (path: string, exports: Record<string, unknown>) => mock.module(new URL(path, import.meta.url).href, { exports })
 stub('./db/index.ts', { db, pool: {} })
 stub('./composio.ts', {
+  getComposio: () => ({}),
   resolveActionAccount: async (_userId: string, _action: string, requested?: string) => ({ accountId: requested ?? selected, accounts: [] }),
   runComposioAction: async (...args: unknown[]) => {
     calls.push(args)
@@ -32,6 +33,9 @@ stub('./coordinator-event-store.ts', { recordCoordinatorEvent: async () => {} })
 stub('./coordinator/wake.ts', { wakeCoordinator: async () => {} })
 stub('./cloud-computer/credential-reviews.ts', { executeCredentialOperation: async (...args: unknown[]) => { reviews.push(['credential', ...args.slice(1)]); return { data: {} } } })
 stub('./cloud-computer/action-reviews.ts', { executeApprovedBrowserAction: async (...args: unknown[]) => { reviews.push(['browser', ...args.slice(1)]); return { data: {} } } })
+const appCalls: unknown[][] = []
+stub('./app-tools-server.ts', { executeAppToolCall: async (_client: unknown, userId: string, call: { toolkit: string }, accountId: string | null) => { appCalls.push([userId, call.toolkit, accountId]); return { successful: true, data: {} } } })
+stub('./plugins/catalog.ts', { composioToolkitLister: () => async () => ({ items: [] }), isNoAuthToolkit: async (_list: unknown, id: string) => id === 'hackernews' })
 let store: typeof import('./pending-action-store'), actions: typeof import('./pending-actions')
 before(async () => { store = await import('./pending-action-store'); actions = await import('./pending-actions') })
 
@@ -116,4 +120,20 @@ test('a call judged destructive, or not judged at all, becomes an approval card 
     assert.equal(row.connectedAccountId, 'selected-account')
     assert.equal(calls.length, 1, 'stopped at the gate: no dispatch')
   } finally { toolTags = ['important', 'openWorldHint'] }
+})
+
+test('an approved store-app call without an account runs only for an app that needs none', async () => {
+  appCalls.length = 0
+  const input = (toolkit: string) => ({ toolkit, tool: `${toolkit.toUpperCase()}_DO`, name: 'Do', version: '20261030_00', arguments: {} })
+  row = { id: 'free', action: 'app_tool_call', input: input('hackernews'), connectedAccountId: null, createdAt: new Date() }
+  assert.equal((await actions.decidePendingAction('u', 'free', true)).error, null)
+  assert.deepEqual(appCalls, [['u', 'hackernews', null]])
+  // Unbound for an app that has accounts: fails closed, nothing runs.
+  row = { id: 'unbound', action: 'app_tool_call', input: input('hubspot'), connectedAccountId: null, createdAt: new Date() }
+  assert.equal((await actions.decidePendingAction('u', 'unbound', true)).error, 'integrationAccountNotBound')
+  assert.deepEqual(appCalls, [['u', 'hackernews', null]])
+  // Bound: runs in exactly that account.
+  row = { id: 'bound', action: 'app_tool_call', input: input('hubspot'), connectedAccountId: 'ca_frozen', createdAt: new Date() }
+  await actions.decidePendingAction('u', 'bound', true)
+  assert.deepEqual(appCalls.at(-1), ['u', 'hubspot', 'ca_frozen'])
 })
