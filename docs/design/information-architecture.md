@@ -150,7 +150,7 @@ terms) and tenancy rule.
 | 记忆与建议 (`memory`) | Account | Account (profile memory) | T6; 2310 | Account | Facts about the person |
 | 连接 (`connections`) | Account | Connection | T6; 2240 | Account | Runs only the owner's bots |
 | 模型与订阅 (`models`) | Account credentials; per-person workspace thread defaults; 分享给团队成员 team-only | Model credential; share | T6, T2 | Matches (`settings-view.tsx:153`) | Credential is the person's, the share is between people |
-| 登录与密钥 (`logins`) | Account | Account | T6 | Account | Saved logins are the person's |
+| 密钥与登录 (`logins`) | Account | Account | T6 | Account | Saved logins are the person's |
 | 数据与隐私 (`privacy`) | Account | Account | T6 | Account | Export and deletion of the person |
 | 设备 (`computers`) | Account | Device | T6 | Account | The person's machines |
 | 个人访问令牌 (`developer`, unbuilt) | Open | — | T6 vs storage | Unbuilt; stored per workspace (M13) | Decide before shipping |
@@ -223,7 +223,7 @@ Card
     ├── a thread: 对话 / 验收, composer at the bottom, ended or not (#892)
     └── 浏览器
 设置 (same frame, R-35; /settings?section=…, /settings/members, /settings/teams)
-├── 账号: 账户 · 安全 · 偏好设置 · 通知 · 记忆与建议 · 连接 · 模型与订阅 · 登录与密钥 · 数据与隐私 · 设备
+├── 账号: 账户 · 安全 · 偏好设置 · 通知 · 记忆与建议 · 连接 · 模型与订阅 · 密钥与登录 · 数据与隐私 · 设备
 ├── <workspace name>: 常规 · 成员* · 团队* · Bot 与 Agents · 团队权限* · 密钥与环境 · 审计日志* · 用量 · 计费   (* team-only)
 └── 你的团队: one row per team, 创建团队 (shared workspace only)
 ```

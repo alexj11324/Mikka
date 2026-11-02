@@ -171,3 +171,76 @@ test('real PostgreSQL: observed credential lease inserts once and stays guarded'
     await admin.end()
   }
 })
+
+test('real PostgreSQL: settings save a login without a browser, only for its owner', { skip: !databaseURL }, async () => {
+  const targetUrl = new URL(databaseURL!)
+  const isolated = targetUrl.pathname === '/credential_test' || disposableDatabase(process.env, databaseURL)
+  if (!isolated) throw new Error('Use the isolated credential test database')
+  const schema = `credential_${randomBytes(8).toString('hex')}`, admin = new Pool({ connectionString: databaseURL })
+  await admin.query(`CREATE SCHEMA ${schema}`)
+  const pool = new Pool({ connectionString: databaseURL, options: `-c search_path=${schema}` })
+  try {
+    await pool.query(`CREATE TABLE "user"(id text PRIMARY KEY); CREATE TABLE bots(id uuid PRIMARY KEY,"ownerId" text,"workspaceId" uuid); CREATE TABLE bot_subagents(id uuid PRIMARY KEY,"ownerId" text,"workspaceId" uuid,"botId" uuid,status text); CREATE TABLE agent_runs(id uuid,"userId" text,"botId" uuid,"stopRequestedAt" timestamptz,status text,"leaseExpiresAt" timestamptz)`)
+    await pool.query(await readFile(new URL('../../drizzle/20261029012027_account_credential_vault.sql', import.meta.url), 'utf8'))
+    await pool.query(await readFile(new URL('../../drizzle/20261030204833_workspace_audit_events.sql', import.meta.url), 'utf8'))
+    const owner = { userId: 'owner-a', workspaceId: randomUUID(), auditActor: { type: 'user' as const, id: 'owner-a', name: 'Owner A' } }
+    const other = { userId: 'owner-b', workspaceId: owner.workspaceId }
+    await pool.query(`INSERT INTO "user"(id) VALUES('owner-a'),('owner-b')`)
+    const ownerBot = { ...owner, botId: randomUUID(), subagentId: randomUUID() }
+    const otherBot = { ...other, botId: randomUUID(), subagentId: randomUUID() }
+    for (const caller of [ownerBot, otherBot]) {
+      await pool.query('INSERT INTO bots VALUES($1,$2,$3)', [caller.botId, caller.userId, caller.workspaceId])
+      await pool.query(`INSERT INTO bot_subagents VALUES($1,$2,$3,$4,'running')`, [caller.subagentId, caller.userId, caller.workspaceId, caller.botId])
+    }
+    let generated = 0
+    const kms: Kms = { generate: async () => { generated++; return { plaintext: randomBytes(32), wrapped: 'synthetic-key' } }, decrypt: async () => { throw new Error('Saving never decrypts') } }
+    const store = new CredentialStore(pool, kms)
+    const password = randomBytes(24).toString('base64url'), replacement = randomBytes(24).toString('base64url')
+
+    // The site is canonicalized; anything that is not https is refused before any key is made.
+    await assert.rejects(store.saveDirect(owner, { origin: 'http://example.com', username: 'fixture-user', password }), (error: unknown) => error instanceof CredentialError && error.code === 'credential_origin_invalid')
+    await assert.rejects(store.saveDirect(owner, { origin: 'https://example.com', username: 'fixture-user', password: 'two\nlines' }), CredentialError)
+    assert.equal(generated, 0)
+    const saved = await store.saveDirect(owner, { origin: 'https://Example.com/login?next=1', username: 'fixture-user', password })
+    assert.equal(saved.status, 'saved')
+    assert.equal(saved.origin, 'https://example.com')
+    assert(!JSON.stringify(saved).includes(password))
+    assert.equal((await store.list(owner)).length, 1)
+    assert.equal((await store.list(other)).length, 0)
+
+    // Saved from settings, it is usable by the owner's bots and by nobody else's.
+    const browserTarget = { targetId: 'fixture-page', origin: 'https://example.com', endpoint: 'https://fixture.e2b.app/', expiresAt: Date.now() + 120000 }
+    assert.equal((await store.lease(ownerBot, 'https://example.com', browserTarget)).status, 'ready')
+    assert.deepEqual(await store.lease(otherBot, 'https://example.com', browserTarget), { status: 'needs_login', origin: 'https://example.com' })
+
+    // Saving the same site and account again replaces the secret and expires its saved sessions.
+    await pool.query(`INSERT INTO browser_sessions(credential_id,wrapped_dek,nonce,ciphertext,expires_at) SELECT credential_id,wrapped_dek,nonce,ciphertext,now()+interval '1 hour' FROM credential_secrets`)
+    const before = (await pool.query('SELECT nonce FROM credential_secrets WHERE credential_id=$1', [saved.id])).rows[0].nonce
+    const again = await store.saveDirect(owner, { origin: 'https://example.com', username: 'fixture-user', password: replacement })
+    assert.equal(again.id, saved.id)
+    assert.notEqual((await pool.query('SELECT nonce FROM credential_secrets WHERE credential_id=$1', [saved.id])).rows[0].nonce, before)
+    assert.equal((await pool.query('SELECT count(*)::int AS count FROM browser_sessions WHERE expires_at>now()')).rows[0].count, 0)
+
+    // A new password for an existing login, by id: the owner only, never a revoked login.
+    await assert.rejects(store.replacePassword(other, saved.id, replacement), (error: unknown) => error instanceof CredentialError && error.status === 404)
+    await assert.rejects(store.replacePassword(owner, randomUUID(), replacement), CredentialError)
+    const replaced = await store.replacePassword(owner, saved.id, password)
+    assert.deepEqual({ id: replaced.id, origin: replaced.origin }, { id: saved.id, origin: 'https://example.com' })
+    await store.remove(owner, 'https://example.com', 'fixture-user')
+    await assert.rejects(store.replacePassword(owner, saved.id, password), CredentialError)
+
+    // Saving it again after removal restores the same login.
+    const restored = await store.saveDirect(owner, { origin: 'https://example.com', username: 'fixture-user', password })
+    assert.equal(restored.id, saved.id)
+    assert.equal((await store.list(owner)).length, 1)
+
+    const audits = (await pool.query(`SELECT action, "workspaceId"::text AS workspace, "targetId" AS target FROM workspace_audit_events ORDER BY "createdAt"`)).rows
+    assert.deepEqual(audits.map(row => row.action), ['credential.created', 'credential.replaced', 'credential.replaced', 'credential.revoked', 'credential.replaced'])
+    assert(audits.every(row => row.workspace === owner.workspaceId && row.target === saved.id))
+    assert(!JSON.stringify(audits).includes(password) && !JSON.stringify(audits).includes(replacement))
+  } finally {
+    await pool.end()
+    await admin.query(`DROP SCHEMA ${schema} CASCADE`)
+    await admin.end()
+  }
+})

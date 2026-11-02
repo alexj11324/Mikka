@@ -87,9 +87,22 @@ user_secrets(id uuid pk, userId text → user(id) ON DELETE CASCADE, name text, 
 
 每个 PR 都跑 typecheck、lint、相关单测，加上那一个浏览器用例（mikka_e2e）。
 
-## 7. 要 Alex 拍板的（已经对照过 Devin，见调研 §11）
-1. **同名优先级**：Devin 不覆盖，同名的第二个变成 `NAME_2`。我建议不照搬：新建时提示已有同名，确认后个人覆盖工作区。用哪种？
-2. **密钥的“每次使用前问我”**：Devin 文档里没有这个功能。网站登录现在就做；密钥要不要做（会让 run 停下等人）？
-3. **个人密钥给不给 Bot 自己的工具**：Devin 的 Agent 本身就会用密钥。先给 Agent run，Bot 的工具后面跟上，可以吗？
-4. **入口**：已经改成一个页面加顶部切换（Alex 要的 Devin 样式），侧栏两个入口都打开这一页。可以吗？
-5. **「环境变量」类型改成「在输出里遮住」开关**，可以吗？
+## 7. Alex 的决定（2026-11-02，见 [`../decisions/2026-11-02-2120-secrets-and-logins-in-settings.md`](../decisions/2026-11-02-2120-secrets-and-logins-in-settings.md)）
+1. **同名**：新建时提示重名，确认后个人覆盖工作区（只在本人的 run 和 Bot 工具里）。
+2. **不做「使用前问我」**：密钥和网站登录都直接用，界面上不放这个开关。现状：`credentials.unattended_allowed` 默认 `true`，代码里没有任何地方把它改成 `false`；它是 `false` 的登录不会被使用（没有审批流程，相当于停用）。默认值不改。
+3. **个人密钥给 Agent run 和本人 Bot 自己的工具**（见 §8）。
+4. **一个页面加顶部切换**：同意。
+5. **「环境变量」改成「在输出里遮住」**：还在等 Alex，先不动。
+
+## 8. 个人密钥进 Bot 自己的工具（PR3）
+
+- **注入点**：Bot 的云电脑（`bot_subagents`，`lib/cloud-computer/runtime.ts` 起的 subagent gateway、`lib/computer/bot-runtime.ts` 里在沙箱里跑的命令）。现在这里不注入任何工作区密钥。PR3 在 Bot 执行命令的地方，按 `bots."ownerId"` 加载这个人的 `user_secrets`，作为这次命令的环境变量传进去，不写进沙箱文件、也不进 gateway 的持久状态。Agent run（设备和云线程）继续走认领路由的 `taskSecretInjection`，加上 `run.userId` 的个人密钥。
+- **权限**：只在 `bots."ownerId" = user_secrets."userId"` 时注入，也就是本人的 Bot、本人的会话。同一工作区里别人的 Bot 拿不到（即使那个 Bot 被分享给本人用）。判断放在服务端加载函数里，不信任调用方传来的 userId。
+- **打码**：新加 `ownerSecretMasker(userId, workspaceId)` = 工作区 masker 加上本人的个人密钥。把 Bot 云电脑相关的 `maskForWorkspace` 调用（`lib/cloud-computer/subagents.ts`、`action-reviews.ts`、`thread-machines.ts` 的日志尾巴）和 run 的 `maskForRun` 换成它；`kind=env`（不遮）的照旧不遮。
+- **测试**：db test 两个人同一工作区：A 的个人密钥只进 A 的 Bot 和 A 的 run，B 的 Bot 和 run 都拿不到；同名时 A 的值覆盖工作区值；A 的值在 subagent 事件、run 事件和日志尾巴里被遮住；删除后下一次不再注入。
+
+## 9. PR1 实际范围（和 §6 的差别）
+
+- 顶部「我的 / 工作区」切换挪到 PR2：PR1 里工作区那一侧没有内容可放（成员可见的工作区密钥是 PR2 的事）。PR1 只把 `logins` 改名为「密钥与登录」。
+- 不做「每次使用前问我」（Alex 的决定）。
+- 网站登录的「说明」和「两步验证密钥」不在 PR1：前者要给 `credentials` 加列、后者要给 `credential_secrets` 加密文，按范围控制放到后面的 PR。

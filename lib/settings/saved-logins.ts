@@ -4,7 +4,8 @@ import { ActionFailureError } from '@/lib/action-error'
 import { pool } from '@/lib/db'
 import { awsKms } from '@/lib/credentials/kms'
 import { CredentialStore } from '@/lib/credentials/store'
-import type { Actor } from '@/lib/credentials/contracts'
+import { CredentialError, secretText, type Actor } from '@/lib/credentials/contracts'
+import { credentialVaultEnabled } from '@/lib/credentials/feature'
 
 /**
  * What the broker recorded for one use of a saved login
@@ -99,4 +100,49 @@ export async function savedLoginUsage(userId: string, id: unknown): Promise<Save
     id: row.id, at: row.ts.toISOString(), botId: row.botId, botName: row.botName ?? null,
     runId: row.runId, subagentId: row.subagentId, issueId: row.issueId ?? null, result: row.decision,
   }))
+}
+
+/** What settings send to add a login. `site` may be a bare host; it is read as https. */
+export interface SavedLoginInput { site: string; account: string; password: string }
+
+function vault(): CredentialStore {
+  if (!credentialVaultEnabled()) throw new ActionFailureError('savedLoginsUnavailable')
+  return new CredentialStore(pool, awsKms('app'))
+}
+
+/** Store failures as settings errors. The vault's own codes never reach the client. */
+function asActionError(error: unknown): never {
+  if (error instanceof CredentialError) {
+    if (error.code === 'credential_origin_invalid') throw new ActionFailureError('savedLoginSiteInvalid')
+    if (error.code === 'credential_submission_invalid') throw new ActionFailureError('savedLoginInvalid')
+    if (error.status === 404) throw new ActionFailureError('savedLoginNotFound')
+    throw new ActionFailureError('savedLoginsUnavailable')
+  }
+  throw error
+}
+
+const siteUrl = (site: string) => /^[a-z][a-z0-9+.-]*:\/\//i.test(site.trim()) ? site.trim() : `https://${site.trim()}`
+
+/**
+ * Settings › 密钥与登录: the person adds a login for a site themselves, without
+ * a Bot asking in chat. Saving the same site and account again replaces it.
+ */
+export async function saveLoginFor(actor: Actor, input: SavedLoginInput): Promise<{ id: string; site: string }> {
+  if (!secretText.safeParse(input.account).success || !secretText.safeParse(input.password).success) throw new ActionFailureError('savedLoginInvalid')
+  const store = vault()
+  try {
+    const saved = await store.saveDirect(actor, { origin: siteUrl(String(input.site ?? '')), username: input.account, password: input.password })
+    return { id: saved.id, site: saved.origin }
+  } catch (error) { return asActionError(error) }
+}
+
+/** A new password for one of the person's saved logins. */
+export async function replaceLoginPasswordFor(actor: Actor, id: unknown, password: string): Promise<{ id: string; site: string }> {
+  const target = credentialId(id)
+  if (!secretText.safeParse(password).success) throw new ActionFailureError('savedLoginInvalid')
+  const store = vault()
+  try {
+    const saved = await store.replacePassword(actor, target, password)
+    return { id: saved.id, site: saved.origin }
+  } catch (error) { return asActionError(error) }
 }
