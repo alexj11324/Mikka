@@ -7,6 +7,7 @@ import { Cloud } from 'lucide-react'
 import { createSecret, deleteSecret, replaceSecret, type listSecrets } from '@/app/actions/workspace-secrets'
 import { E2BKeyDialog, useE2BKeyStatus } from '@/components/settings/e2b-key-dialog'
 import { settingsRead } from '@/lib/settings-read'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -15,6 +16,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { SettingRow, SettingsLoading, SettingsSection, settingsSectionAction } from '@/components/settings/primitives'
+import { memberMayWrite, secretActionAllowed, type WorkspaceRole } from '@/lib/secrets/permissions'
 import type { WorkspaceSecretView } from '@/lib/secrets/store'
 import { useActionError } from '@/lib/use-action-error'
 import { cn } from '@/lib/utils'
@@ -39,21 +41,23 @@ export function SecretsSettings({ workspaceId }: { workspaceId: string }) {
   const secretDialog = usePresence(editing)
   const [warning, setWarning] = useState<string | null>(null)
   const secrets = list.data && !list.data.error ? list.data.secrets : null
+  // Offer only what this reader may do (lib/secrets/permissions.ts); the server checks again.
+  const role = list.data && !list.data.error ? list.data.role : null
 
   return <>
-    <SettingsSection id="secrets-heading" title={t('heading')} action={<Button {...settingsSectionAction} onClick={() => { setWarning(null); setEditing('new') }}>{t('add')}</Button>}>
+    <SettingsSection id="secrets-heading" title={t('heading')} action={<Button {...settingsSectionAction} disabled={!role} onClick={() => { setWarning(null); setEditing('new') }}>{t('add')}</Button>}>
       {!list.data && !list.error && <SettingsLoading label={t('loading')} rows={2} bare />}
       {(list.error || list.data?.error) && <FieldError className="px-5 py-4">{actionError(list.data?.error)}</FieldError>}
       {secrets?.length === 0 && <p className="px-5 py-4 text-sm text-muted-foreground">{t('empty')}</p>}
       {secrets && groupByScope(secrets).map(([repository, rows]) => <div key={repository || 'workspace'} role="group" aria-label={repository ? t('repositoryGroup', { repository }) : t('workspaceGroup')}>
         <p className="px-5 pt-3 text-xs font-medium text-muted-foreground">{repository ? t('repositoryGroup', { repository }) : t('workspaceGroup')}</p>
         <div className="divide-y divide-border">
-          {rows.map(secret => <SecretRow key={secret.id} secret={secret} onEdit={() => { setWarning(null); setEditing(secret) }} />)}
+          {rows.map(secret => <SecretRow key={secret.id} secret={secret} onEdit={role && secretActionAllowed(role, 'secret.replace', [secret]) ? () => { setWarning(null); setEditing(secret) } : undefined} />)}
         </div>
       </div>)}
     </SettingsSection>
     {warning && <p role="status" className="px-1 text-sm text-muted-foreground">{warning}</p>}
-    {secretDialog.value && <SecretDialog open={secretDialog.open} onOpenChangeComplete={secretDialog.onOpenChangeComplete} workspaceId={workspaceId} secret={secretDialog.value === 'new' ? null : secretDialog.value} onClose={saved => {
+    {secretDialog.value && role && <SecretDialog role={role} open={secretDialog.open} onOpenChangeComplete={secretDialog.onOpenChangeComplete} workspaceId={workspaceId} secret={secretDialog.value === 'new' ? null : secretDialog.value} onClose={saved => {
       setEditing(null)
       if (saved?.warning === 'shortValueNotMasked') setWarning(t('shortValueNotMasked', { name: saved.name }))
       if (saved) void list.mutate()
@@ -86,32 +90,35 @@ export function E2BKeySettings({ workspaceId }: { workspaceId: string }) {
   </>
 }
 
-function SecretRow({ secret, onEdit }: { secret: WorkspaceSecretView; onEdit: () => void }) {
+function SecretRow({ secret, onEdit }: { secret: WorkspaceSecretView; onEdit?: () => void }) {
   const t = useTranslations('Settings.secrets')
   return <div className="flex items-center gap-3 px-5 py-3">
     <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
       <span className="truncate font-mono text-sm">{secret.name}</span>
       {secret.kind === 'env' && <Badge variant="secondary">{t('kinds.env')}</Badge>}
     </div>
-    <Button type="button" variant="secondary" size="sm" aria-label={t('editNamed', { name: secret.name })} onClick={onEdit}>{t('edit')}</Button>
+    {onEdit && <Button type="button" variant="secondary" size="sm" aria-label={t('editNamed', { name: secret.name })} onClick={onEdit}>{t('edit')}</Button>}
   </div>
 }
 
 type Saved = { name: string; warning: 'shortValueNotMasked' | null } | null
 
-function SecretDialog({ workspaceId, secret, onClose, open = true, onOpenChangeComplete }: { workspaceId: string; secret: WorkspaceSecretView | null; onClose: (saved: Saved) => void } & PresenceProps) {
+function SecretDialog({ workspaceId, role, secret, onClose, open = true, onOpenChangeComplete }: { workspaceId: string; role: WorkspaceRole; secret: WorkspaceSecretView | null; onClose: (saved: Saved) => void } & PresenceProps) {
   const t = useTranslations('Settings.secrets')
   const commonT = useTranslations('Common')
   const actionError = useActionError()
   const [kind, setKind] = useState<'secret' | 'env'>(secret?.kind ?? 'secret')
   const [name, setName] = useState(secret?.name ?? '')
   const [value, setValue] = useState('')
-  const [scope, setScope] = useState<'workspace' | 'repository'>(secret?.scopeType ?? 'workspace')
+  // A member writes repository entries only, so their form has no 范围 to pick.
+  const scopes = (['workspace', 'repository'] as const).filter(scopeType => role === 'admin' || memberMayWrite({ scopeType }))
+  const [scope, setScope] = useState<'workspace' | 'repository'>(secret?.scopeType ?? scopes[0])
   const [repository, setRepository] = useState(secret?.scopeRef ?? '')
   const [pending, setPending] = useState<'save' | 'delete' | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [confirming, setConfirming] = useState(false)
   const kindItems = [{ value: 'secret', label: t('kinds.secret') }, { value: 'env', label: t('kinds.env') }]
-  const scopeItems = [{ value: 'workspace', label: t('workspaceGroup') }, { value: 'repository', label: t('repository') }]
+  const scopeItems = scopes.map(value => ({ value, label: value === 'workspace' ? t('workspaceGroup') : t('repository') }))
   const scopeValue = scope === 'workspace' ? { type: 'workspace' as const } : { type: 'repository' as const, repository: repository.trim() }
   const ready = Boolean(value) && Boolean(name.trim()) && (scope === 'workspace' || /^[^/\s]+\/[^/\s]+$/.test(repository.trim()))
 
@@ -133,6 +140,7 @@ function SecretDialog({ workspaceId, secret, onClose, open = true, onOpenChangeC
 
   async function remove() {
     if (!secret) return
+    setConfirming(false)
     setPending('delete')
     setError(null)
     try {
@@ -164,22 +172,32 @@ function SecretDialog({ workspaceId, secret, onClose, open = true, onOpenChangeC
         <Label className="flex flex-col items-start gap-1.5">{secret ? t('newValue') : t('value')}
           <Input type="password" value={value} autoComplete="new-password" onChange={event => setValue(event.target.value)} />
         </Label>
-        <Label className="flex flex-col items-start gap-1.5">{t('scope')}
+        {scopeItems.length > 1 && <Label className="flex flex-col items-start gap-1.5">{t('scope')}
           <Select value={scope} items={scopeItems} onValueChange={next => { if (next === 'workspace' || next === 'repository') setScope(next) }}>
             <SelectTrigger aria-label={t('scope')} className="w-full"><SelectValue /></SelectTrigger>
             <SelectContent><SelectGroup>{scopeItems.map(item => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectGroup></SelectContent>
           </Select>
-        </Label>
+        </Label>}
         {scope === 'repository' && <Label className="flex flex-col items-start gap-1.5">{t('repository')}
           <Input value={repository} placeholder="owner/repo" autoComplete="off" onChange={event => setRepository(event.target.value)} />
         </Label>}
         {error && <FieldError>{error}</FieldError>}
       </div>
       <DialogFooter>
-        {secret && <Button type="button" variant="destructive" className="sm:mr-auto" disabled={pending !== null} onClick={() => void remove()}>{pending === 'delete' ? t('deleting') : commonT('delete')}</Button>}
+        {secret && secretActionAllowed(role, 'secret.delete') && <Button type="button" variant="destructive" className="sm:mr-auto" disabled={pending !== null} onClick={() => setConfirming(true)}>{pending === 'delete' ? t('deleting') : commonT('delete')}</Button>}
         <Button type="button" variant="outline" disabled={pending !== null} onClick={() => onClose(null)}>{commonT('cancel')}</Button>
         <Button type="button" disabled={pending !== null || !ready} onClick={() => void save()}>{pending === 'save' ? commonT('saving') : commonT('save')}</Button>
       </DialogFooter>
     </DialogContent>
+    {/* Deleting can't be undone: ask first, as API Key removal does. */}
+    <AlertDialog open={confirming} onOpenChange={next => { if (!next) setConfirming(false) }}>
+      <AlertDialogContent>
+        <AlertDialogHeader><AlertDialogTitle>{t('removeTitle', { name: secret?.name ?? '' })}</AlertDialogTitle></AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>{commonT('cancel')}</AlertDialogCancel>
+          <AlertDialogAction variant="destructive" onClick={() => void remove()}>{commonT('delete')}</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   </Dialog>
 }

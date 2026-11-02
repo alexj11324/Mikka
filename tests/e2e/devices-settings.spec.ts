@@ -25,7 +25,8 @@ async function seed(page: Page) {
     ($4, $5, 'gpu-box', 'local', false, 'server', now() - interval '3 days', '[]'),
     ($8, $5, 'no-sandbox', 'local', true, 'server', now() + interval '1 hour', $9),
     ($10, $5, 'ubuntu-2404', 'local', true, 'server', now() + interval '1 hour', $11)`, [ids.laptop, ids.server, ids.bare, ids.offline, session.userId,
-    JSON.stringify([{ harness: 'claude_code', installed: true, version: '1.0.0' }, { harness: 'codex', installed: true, version: '1.0.0' }]),
+    // The version lines the two CLIs print; the row shows the number only.
+    JSON.stringify([{ harness: 'claude_code', installed: true, version: '2.1.3 (Claude Code)' }, { harness: 'codex', installed: true, version: 'codex-cli 0.46.0' }]),
     JSON.stringify([{ harness: 'claude_code', installed: true, version: '1.0.0' }, { harness: 'cursor', installed: false, version: null }]),
     ids.blocked,
     JSON.stringify([{ harness: 'claude_code', installed: false, version: '1.0.0', sandboxBlocked: { missing: ['socat', 'ripgrep'] } }]),
@@ -49,10 +50,15 @@ test('设备：本机与 Remote control 分组，Agent 图标，重命名、重�
   await expect(remote.getByText('build-01', { exact: true })).toBeVisible()
   await expect(page.getByText('这个分区还在设计中', { exact: false })).toHaveCount(0)
 
-  // R-74: the reported agents are their marks, named for screen readers; uninstalled ones are not shown.
-  await expect(row(page, 'E2E MacBook').getByRole('img', { name: 'Claude Code' })).toBeVisible()
-  await expect(row(page, 'E2E MacBook').getByRole('img', { name: 'Codex' })).toBeVisible()
-  await expect(row(page, 'build-01').getByRole('img', { name: 'Cursor' })).toHaveCount(0)
+  // R-74: each reported agent shows its mark, name and version (settings evaluation D2); uninstalled ones are not shown.
+  await expect(row(page, 'E2E MacBook')).toContainText(/Claude Code\s*2\.1\.3/)
+  await expect(row(page, 'E2E MacBook')).toContainText(/Codex\s*0\.46\.0/)
+  await expect(row(page, 'build-01')).not.toContainText('Cursor')
+  // On a phone the switches keep their labels on a line of their own (D1).
+  await page.setViewportSize({ width: 390, height: 844 })
+  await expect(row(page, 'E2E MacBook').getByText('允许调度', { exact: true })).toBeVisible()
+  await expect(row(page, 'E2E MacBook').getByText('自动调度', { exact: true })).toBeVisible()
+  await page.setViewportSize({ width: 1280, height: 800 })
   await expect(row(page, 'dev-vps')).toContainText('未检测到 Agent')
   await row(page, 'dev-vps').getByRole('button', { name: '安装方法' }).click()
   await expect(page.getByText('npm install -g @openai/codex')).toBeVisible()
@@ -155,7 +161,7 @@ test('设备（桌面版）：从 SSH 配置选主机，确认指纹，看安装
   await expect(dialog.getByRole('heading', { name: '添加「build-02」' })).toBeVisible()
   await expect(dialog).toContainText('npm 权限不足（EACCES）')
   await dialog.getByRole('button', { name: '重试' }).click()
-  await expect(dialog.getByRole('listitem').filter({ hasText: '已上线' }).getByRole('img', { name: 'Claude Code' })).toBeVisible()
+  await expect(dialog.getByRole('listitem').filter({ hasText: '已上线' })).toContainText('Claude Code')
   await dialog.getByRole('button', { name: '完成' }).click()
   await expect(dialog).toBeHidden()
 })

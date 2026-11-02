@@ -69,7 +69,7 @@ export class ComputerStore {
           for (const desktop of desktops.filter(d => d.ownerId === machine.ownerId)) await this.runtime.syncDesktopLease(sandbox, this.lease(desktop, permission !== 'deny', policy.version))
         }
         // Dedicated threads have their own driver lease. Updating only the
-        // Bot machine leaves an already issued thread grant on an old policy.
+        // Bot machine leaves a thread's agent on an old policy.
         const threads = (await client.query(`SELECT t."sandboxId",t."botId",t."ownerId",t.epoch FROM thread_machines t
           JOIN bots b ON b.id=t."botId" AND b."workspaceId"=t."workspaceId" AND b."ownerId"=t."ownerId"
           WHERE t."workspaceId"=$1 AND t."sandboxId" IS NOT NULL AND t.state IN ('starting','running') ORDER BY t."runId"`, [workspaceId])).rows

@@ -2194,6 +2194,7 @@
       "newValue": "新的值",
       "scope": "范围",
       "deleting": "正在删除…",
+      "removeTitle": "删除 {name}？",
       "shortValueNotMasked": "{name} 少于 8 个字符，输出里不会遮住。",
       "e2b": {
         "heading": "云电脑",
@@ -2365,11 +2366,6 @@
     "creditShare": {
       "mine": "我的点数也可用于这个团队",
       "sharers": "分享点数的成员"
-    },
-    "personalPolicy": {
-      "loading": "正在加载个人订阅设置",
-      "heading": "个人订阅",
-      "subscriptions": "允许成员使用个人订阅和 API Key"
     },
     "appPolicy": {
       "loading": "正在加载应用权限",

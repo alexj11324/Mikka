@@ -131,23 +131,24 @@ function DeviceRow({ device, onChanged, onReconnect }: { device: DeviceView; onC
     ? t('online')
     : device.lastSeenAt ? t('offlineSince', { time: format.relativeTime(new Date(device.lastSeenAt), now) }) : t('neverOnline')
 
-  return <Item role="listitem" className="gap-3 rounded-none px-3.5 py-3">
+  // On a phone the two switches move to their own line under the name, keeping their labels (D1).
+  return <Item role="listitem" className="flex-wrap gap-3 rounded-none px-3.5 py-3">
     <DeviceTypeIcon device={device} />
     <span className={cn('flex min-w-0 flex-1 flex-col gap-0.5', !device.online && 'text-muted-foreground')}>
       <span className="truncate text-sm font-medium">{device.name}</span>
-      <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+      <span className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-muted-foreground">
         <span className="truncate">{device.online && agents.length === 0
           ? `${status} · ${blocked.agents.length > 0 ? t('sandboxBlocked', { agents: blocked.agents.map(harnessName).join(', ') }) : t('noAgent')}`
           : status}</span>
         {device.online && (agents.length > 0
-          ? <AgentMarks harnesses={agents} />
+          ? <AgentMarks agents={agents} />
           : blocked.agents.length > 0 ? <SandboxBlocked missing={blocked.missing} reason={blocked.reason} detail={blocked.detail} /> : <InstallAgents />)}
       </span>
     </span>
     {!device.online && <Button variant="secondary" size="sm" onClick={onReconnect}>{t('reconnect')}</Button>}
-    {/* 参与调度: the device's one switch (decision 2026-11-02-1400). */}
-    <span className="flex items-center gap-2 text-sm text-muted-foreground">
-      <span aria-hidden="true" className="max-sm:hidden">{t('allowScheduling')}</span>
+    {/* 参与调度: the device's one switch (decision 2026-11-02-1400); on a phone it keeps its label on its own line. */}
+    <span className="flex items-center gap-2 text-sm text-muted-foreground max-sm:order-last max-sm:basis-full max-sm:pl-8">
+      <span aria-hidden="true">{t('allowScheduling')}</span>
       <Switch checked={device.enabled} aria-label={t('allowSchedulingTo', { name: device.name })} onCheckedChange={enabled => { void run(() => setDeviceEnabled({ deviceId: device.id, enabled })) }} />
     </span>
     <DropdownMenu>

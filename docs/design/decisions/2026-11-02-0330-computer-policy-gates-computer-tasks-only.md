@@ -24,5 +24,6 @@ may run code.
   claimed, and its claim never carries a computer grant (permission `deny`,
   #918).
 
-Gates on actual computer use stay on the policy: opening a thread desktop, the
+Gates on actual computer use stay on the policy: ~~opening a thread desktop~~
+(removed, [1232](2026-11-02-1232-computer-policy-binds-agents-not-people.md)), the
 cloud computer's driver and browser, and the credential broker.

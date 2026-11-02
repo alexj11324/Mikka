@@ -127,7 +127,7 @@ export function SshAddDialog({ open, onOpenChange, devices, onAdded }: {
               <span className={cn('shrink-0', state === 'pending' && 'text-muted-foreground')}>{t(`steps.${step}`)}</span>
               <span className="sr-only">{t(`stepState.${state}`)}</span>
               {state === 'failed' && install.reason && <span className="ml-auto min-w-0 truncate text-xs text-destructive" title={install.reason}>{install.reason === 'cancelled' ? t('cancelled') : install.reason}</span>}
-              {step === 'online' && added && <span className="ml-auto"><AgentMarks harnesses={installedAgents(added.harnesses)} /></span>}
+              {step === 'online' && added && <span className="ml-auto flex items-center gap-2"><AgentMarks agents={installedAgents(added.harnesses)} /></span>}
             </li>
           })}
         </ol>

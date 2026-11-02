@@ -29,7 +29,7 @@ before(async () => {
     removeE2BKey: async (...args: unknown[]) => { calls.push(['remove', ...args]); return { removed: true } },
   } })
   const unused = async () => { throw new Error('unrelated secret action') }
-  mock.module('@/lib/secrets/store', { namedExports: { createWorkspaceSecret: unused, deleteWorkspaceSecret: unused, listWorkspaceSecrets: unused, replaceWorkspaceSecret: unused } })
+  mock.module('@/lib/secrets/store', { namedExports: { createWorkspaceSecret: unused, deleteWorkspaceSecret: unused, listWorkspaceSecrets: unused, replaceWorkspaceSecret: unused, workspaceRole: unused } })
   actions = await import('../app/actions/workspace-secrets')
 })
 

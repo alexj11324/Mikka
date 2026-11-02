@@ -139,6 +139,8 @@ Each of these is a gap to fix in its own PR. None is fixed here.
    {action:'desktop'}` issues a view grant (`app/api/threads/[runId]/machine/route.ts:17`,
    `thread-machines.ts:362-371`). By this record, nobody watches a thread's
    desktop, so that grant and its route go away.
+   Fixed: the route takes only `pause`, `resume` and `end`, and `openThreadDesktop`
+   is gone ([1232](2026-11-02-1232-computer-policy-binds-agents-not-people.md)).
 4. **A resumed thread machine is not watched by its lifecycle.** Resuming a
    parked machine does not restart its lifecycle workflow, so it is not parked or
    ended when that run finishes (`thread-machines.ts:417`; #956).
