@@ -43,7 +43,7 @@ export function validateEnvironment(value, env = process.env) {
   if (typeof value.capabilities?.provision !== 'boolean' || value.capabilities.mail !== 'disabled' || typeof value.capabilities.reset !== 'boolean') fail('ENVIRONMENT_CAPABILITIES_INVALID')
   const localTransport = hasBoundDevLocalTransport(env)
   if (env.RESEND_API_KEY && !(env.RESEND_API_KEY === LOCAL_RESEND_KEY && localTransport)) fail('EXTERNAL_MAIL_FORBIDDEN')
-  if ((env.AI_GATEWAY_API_KEY && !(env.AI_GATEWAY_API_KEY === MVP_DECISION_KEY && (hasBoundMvpTransport(env) || localTransport))) || ['OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'COMPOSIO_API_KEY', 'E2B_API_KEY', 'EXPO_ACCESS_TOKEN', 'POSTHOG_SECRET_KEY'].some(name => Boolean(env[name])) || env.MIKKA_NATIVE_COORDINATOR === '1') fail('EXTERNAL_SERVICE_CREDENTIALS_FORBIDDEN')
+  if ((env.AI_GATEWAY_API_KEY && !(env.AI_GATEWAY_API_KEY === MVP_DECISION_KEY && (hasBoundMvpTransport(env) || localTransport))) || ['OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'COMPOSIO_API_KEY', 'E2B_API_KEY', 'EXPO_ACCESS_TOKEN', 'POSTHOG_SECRET_KEY'].some(name => Boolean(env[name]))) fail('EXTERNAL_SERVICE_CREDENTIALS_FORBIDDEN')
   if (!env.E2E_DATABASE_URL || !env.MIKKA_DATABASE_URL || !env.DATABASE_URL) fail('DATABASE_TARGET_CONFIGURATION_REQUIRED')
   if (env.MIKKA_DATABASE_URL !== env.E2E_DATABASE_URL || env.DATABASE_URL !== env.E2E_DATABASE_URL || (env.ORVILO_DATABASE_URL && env.ORVILO_DATABASE_URL !== env.E2E_DATABASE_URL)) fail('DATABASE_FALLBACK_MISMATCH')
   const target = databaseTarget(env.E2E_DATABASE_URL)
