@@ -91,3 +91,21 @@ test('a PR state reads as GitHub names it: 打开 / Open, never 进行中', asyn
   assert.deepEqual(zh.Metadata.prState, { open: '打开', draft: '草稿', merged: '已合并', closed: '已关闭' })
   assert.deepEqual(en.Metadata.prState, { open: 'Open', draft: 'Draft', merged: 'Merged', closed: 'Closed' })
 })
+
+test('a row shows its line counts when known, and only a GitHub address becomes a link', async () => {
+  const list = [pr(92, 'merged', { title: 'Fix the Safari login page', additions: 18, deletions: 4 }), { url: 'https://example.com/acme/ledger/pull/5', state: 'open' as const, title: 'Elsewhere' }, { url: 'javascript:alert(1)', state: 'open' as const, title: 'Script' }]
+  act(() => root.render(<badge.PullRequestsBadge pullRequests={list} />))
+  await act(async () => { (container.querySelector('[data-slot="pull-requests-badge"]') as HTMLButtonElement).click(); await new Promise(resolve => setTimeout(resolve, 20)) })
+  const rows = [...document.querySelectorAll('[data-slot="pull-requests-list"] [data-slot="pull-request-row"]')] as HTMLElement[]
+  assert.equal(rows.length, 3)
+  assert.equal(rows[0].tagName, 'A')
+  assert.match(rows[0].textContent ?? '', /\+18−4$/)
+  for (const row of rows.slice(1)) {
+    assert.equal(row.tagName, 'DIV')
+    assert.equal(row.getAttribute('href'), null)
+    assert.equal(row.querySelector('a'), null)
+  }
+  assert.equal(badge.isGitHubUrl('https://github.com.evil.example/a/b/pull/1'), false)
+  assert.equal(badge.isGitHubUrl('http://github.com/a/b/pull/1'), false)
+  assert.equal(badge.isGitHubUrl('https://github.com/a/b/pull/1'), true)
+})
