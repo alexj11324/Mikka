@@ -61,7 +61,7 @@ referenced by id (DDD).
 | Account | The person | Account · itself | `user`; `user_preferences.userId` (`lib/db/schema.ts:1090`) | Sign-up | 设置 › 账户, 安全, 偏好设置 | Rail avatar → account menu (R-75) |
 | Workspace | The tenant (T1) | Workspace · owner account | `mikka_workspaces.userId`, `kind` personal/team (`lib/db/workspace-schema.ts:4-14`) | Personal: on first use (`lib/personal-workspace.ts:16-26`); team: 创建工作区 (`app/actions/workspace.ts:49`) | 设置 › 常规 | Account menu, the only switcher (R-75, R-79) |
 | Member | An account's place in a workspace | Workspace · workspace | `mikka_workspace_members (workspaceId, userId, role, status)` (`workspace-schema.ts:16-24`) | Invitation, team only (`app/actions/workspace.ts:91`, refuses personal at `:100`) | 设置 › 成员 | 设置 › 成员 |
-| Team (团队) | A group inside a team workspace | Team · workspace | `mikka_teams.workspaceId` (`lib/db/team-schema.ts:3-9`) | 设置 › 团队 › 创建团队 (`app/actions/teams.ts:47`) | 设置 › 团队 | 看板 (R-82); 设置 › 你的团队 |
+| Team (团队) | A group inside a shared workspace | Team · workspace | `mikka_teams.workspaceId` (`lib/db/team-schema.ts:3-9`) | 设置 › 团队 › 创建团队 (`app/actions/teams.ts:47`) | 设置 › 团队 | 看板 (R-82); 设置 › 你的团队 |
 | Bot | Chats, dispatches threads | Bot · workspace, held by owner | `bots (ownerId, workspaceId, archivedAt)` (`schema.ts:95-115`) | 新建 Bot (`app/actions/bots.ts:45` → `lib/bot-create.ts:14`) | 概览 header (name, look; R-51); defaults in 设置 › Bot 与 Agents | Bot list (R-01); ⌘K |
 | Coordinator | The person's ordinary bot in a workspace (R-06) | Bot · workspace, one per person | `coordinator_bots (ownerId, workspaceId) → bots` (`schema.ts:117-122`; `lib/coordinator/coordinator-bot.ts:5-16`) | On first use | As any bot | Bot list, pinned |
 | Group chat | Chat with several bots and people | Conversation · workspace | `conversations.workspaceId`, `createdBy`; `conversation_members` (`schema.ts:822-836`) | Bot list 「+」 | Group panel | Bot list; ⌘K |
@@ -89,10 +89,10 @@ since `issues` has no `workspaceId`.
 
 Each cell cites the code path; "not implemented" means no code path exists.
 
-| Object | Created by | Belongs to | Changed by | Transfer | Delete | Owner leaves a team workspace | Owner deletes the account (personal workspace) |
+| Object | Created by | Belongs to | Changed by | Transfer | Delete | Owner leaves a shared workspace | Owner deletes the account (personal workspace) |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Personal workspace | System, first use (`lib/personal-workspace.ts:16-26`) | Its account | Owner (admin of it) | Never (#895: `general.ts` `mayTransfer`) | Never (#895: `workspacePersonalDelete`) | n/a, one member | Workspace DB rows go (`lib/account/delete.ts:110-119`); main-DB rows keyed only by workspace (`workspace_secrets`, `workspace_billing`, `workspace_settings`, `hosted_allowances`) are not swept: the sweep matches owner columns only (`delete.ts:32`, `:180`), and `workspace_secrets` has `createdBy` |
-| Team workspace | Any account (`app/actions/workspace.ts:49`) | Owner account (`mikka_workspaces.userId`) | Admins (`lib/workspace-admin/general.ts:44`) | Owner, or an admin when the owner is no longer an active admin (`general.ts:78-85`, `:114-134`); only `workspaces.userId` changes | Admin, typed name (`general.ts:215-250`); leaves `workspace_secrets`, `workspace_e2b_keys`, `workspace_app_policies`, `workspace_personal_policies`, `workspace_subscription_shares`, `model_api_key_shares`, `workspace_credit_shares`, `workspace_payment_designations`, `hosted_allowances`, `execution_rules`, `bot_model_choices`, `personal_access_tokens` (`deleteAppData`, `general.ts:170-213`) | Last active admin cannot be removed (`members.ts:117-121`) | Refused while they are its only active admin (`delete.ts:96-100`); otherwise membership goes (`delete.ts:121-122`) |
+| Shared workspace | Any account (`app/actions/workspace.ts:49`) | Owner account (`mikka_workspaces.userId`) | Admins (`lib/workspace-admin/general.ts:44`) | Owner, or an admin when the owner is no longer an active admin (`general.ts:78-85`, `:114-134`); only `workspaces.userId` changes | Admin, typed name (`general.ts:215-250`); leaves `workspace_secrets`, `workspace_e2b_keys`, `workspace_app_policies`, `workspace_personal_policies`, `workspace_subscription_shares`, `model_api_key_shares`, `workspace_credit_shares`, `workspace_payment_designations`, `hosted_allowances`, `execution_rules`, `bot_model_choices`, `personal_access_tokens` (`deleteAppData`, `general.ts:170-213`) | Last active admin cannot be removed (`members.ts:117-121`) | Refused while they are its only active admin (`delete.ts:96-100`); otherwise membership goes (`delete.ts:121-122`) |
 | Member | Invitation accepted (`workspace.ts:164`) | Workspace | Admins: role, suspend (`workspace.ts:122-147`) | n/a | Admin removes (`members.ts:133-155`); not themselves (`:135`); self-leave not implemented, though `workspaceCannotRemoveSelf` copy names 「离开工作区」 (`messages/zh-CN.json:1160`) | Removed or suspended | Membership rows deleted (`delete.ts:121-123`) |
 | Team | Any member (`app/actions/teams.ts:47-60`, no admin or kind check) | Workspace | Team admins (`teams.ts:56`) | Not implemented | Typed name (`lib/workspace-admin/teams.ts:57-80`) | Their team memberships go (`members.ts:146`) | Team memberships go (`delete.ts:121`); a team they created stays |
 | Bot | Owner (`lib/bot-create.ts:14`) | Workspace, held by owner | Owner (`lib/bot-update.ts:19`); defaults by admins (`lib/workspace-admin/bots.ts:59`) | On removal or suspension to a named member, or admin takeover (`members.ts:45-66`, `:94-107`); Coordinator never (`:40-43`); threads keep `agent_runs.userId` of the old owner | Not implemented for one bot; only with its workspace (`general.ts:192`) or account | Paused, `archivedAt` (`members.ts:72-86`); restored on reactivation (`:89-91`) | Deleted with every `ownerId` row (`delete.ts:17-21`), in shared workspaces too, unlike leaving |
@@ -209,7 +209,7 @@ Card
 设置 (same frame, R-35; /settings?section=…, /settings/members, /settings/teams)
 ├── 账号: 账户 · 安全 · 偏好设置 · 通知 · 记忆与建议 · 连接 · API 与订阅 · 登录与密钥 · 数据与隐私 · 设备
 ├── <workspace name>: 常规 · 成员* · 团队* · Bot 与 Agents · 团队权限* · 密钥与环境 · 审计日志* · 用量 · 计费   (* team-only)
-└── 你的团队: one row per team, 创建团队 (team workspace only)
+└── 你的团队: one row per team, 创建团队 (shared workspace only)
 ```
 
 ### Narrow desktop (768–1279px) and phone web (< 768px)
@@ -258,7 +258,7 @@ threads sit inside a bot's panel.
 | Account (settings page) | 账户 | Account |
 | Workspace | 工作区 | Workspace |
 | Personal workspace | 个人工作区 | Personal workspace |
-| Team workspace | 团队工作区 | Team workspace |
+| Shared workspace | 共享工作区 | Shared workspace |
 | Team (inside a workspace) | 团队 | Team |
 | Member | 成员 | Member |
 | Bot list / thread list | Bot / 线程 | Bots / Threads |
@@ -281,7 +281,7 @@ threads sit inside a bot's panel.
 
 | # | Where | Names | Fix |
 | --- | --- | --- | --- |
-| L1 | Glossary, settings | 团队 is both the team workspace (decision 2310 prose) and a team inside a workspace (设置 › 团队, `mikka_teams`) | 团队工作区 for the tenant, 团队 only for the group (DM "sharpen fuzzy language") |
+| L1 | Glossary, settings | 团队 is both the shared workspace (decision 2310 prose) and a team inside a workspace (设置 › 团队, `mikka_teams`) | 共享工作区 for the tenant, 团队 only for the group (DM "sharpen fuzzy language") |
 | L2 | `lib/settings-sections.ts:44` vs `en.json` | "Bots and agents" (search title) vs "Bots & Agents" | One string; the search reads `title` |
 | L3 | `settings-sections.ts` vs `zh-CN.json` vs `mobile.md` | "Memory" vs 记忆与建议 vs 记忆; 建议 is also a rail page | 记忆 for the section (ChatGPT, Claude) |
 | L4 | Settings vs rail vs `docs/settings.md` | 连接 vs 插件 vs "Integrations" for the same `PluginsView` | Keep 插件 for the store, 连接 for linked apps; fix `docs/settings.md` |

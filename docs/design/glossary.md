@@ -31,7 +31,7 @@ not on its bot's machine (`cloud-computer-backend.md` § 2).
 | --- | --- | --- |
 | **Account** | 账号 | The person: 账户, security, 偏好, 通知, profile memory (个人资料类记忆), 登录与密钥, 设备 and 「API 与订阅」. The same in every workspace. |
 | **Personal workspace** | 个人工作区 | One per person. Only that person's bots, chats, tasks, threads and their memory; personal 计费 and 用量; no team settings. |
-| **Team workspace** | 团队工作区 | Members, 团队权限, 密钥与环境, 审计日志, team 用量 and 计费. Nothing moves between it and a personal workspace. |
+| **Shared workspace** | 共享工作区 (the UI says 团队工作区 until the rename in Known naming debt) | Members, 团队权限, 密钥与环境, 审计日志, team 用量 and 计费. Nothing moves between it and a personal workspace. |
 
 Decision: [2026-11-01-2310](decisions/2026-11-01-2310-personal-and-team-workspaces-apart.md).
 
@@ -112,19 +112,19 @@ between people.
 _Owner_: the account (Workspace aggregate).
 _Avoid_: 个人空间, "my account", the personal level.
 
-**Team workspace (团队工作区)**:
+**Shared workspace (共享工作区)**:
 A workspace with more than one possible member. Only it has what is between
 people: members, teams, roles and team permissions, member audit, shared
 credits and seats, transfer.
 _Owner_: its owner account; administered by its admins (Workspace aggregate).
-_Avoid_: 团队 on its own (a 团队 is a group inside a workspace), organization.
-_Note_: Known naming debt (below) plans to rename this to 共享工作区 (shared
-workspace) in code and copy; until that row is done, the UI says 团队工作区.
+_Avoid_: 团队工作区 and 团队 on its own (a 团队 is only a group inside a workspace), organization.
+_Note_: target term (decision D11 of the coordinating session, 2026-11-02). The UI
+and code still say 团队工作区 / team workspace until the rename in Known naming debt.
 
 **Team (团队)**:
-A named group of members inside a team workspace, with its own task prefix,
+A named group of members inside a shared workspace, with its own task prefix,
 tasks and projects (as a Linear team).
-_Owner_: the team workspace (Team aggregate).
+_Owner_: the shared workspace (Team aggregate).
 _Avoid_: 团队 for the workspace, group, squad.
 
 **Member (成员)**:
@@ -156,7 +156,7 @@ _Avoid_: 会话, session, 任务, run (a run is one turn of a thread).
 **Task (任务)**:
 A unit of work to be done, with a status and an assignee who is always a
 person (`MIK-xx`). A thread works on it; it is not a thread.
-_Owner_: the workspace; in a team workspace, its team (Task aggregate).
+_Owner_: the workspace; in a shared workspace, its team (Task aggregate).
 _Avoid_: issue in the UI, ticket, 工单, thread.
 
 ### Resources

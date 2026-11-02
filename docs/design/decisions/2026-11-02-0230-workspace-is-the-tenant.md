@@ -1,12 +1,12 @@
 # The workspace is the tenant
 
 - Date: 2026-11-02
-- Source: the principle Alex gave on 2026-11-01 and restated in [0216](2026-11-02-0216-personal-workspace-has-workspace-settings.md): 「个人工作区和团队工作区的区别只在『人与人之间』的东西（成员、团队、团队权限、审计日志、共享额度、离开成员的 Bot、转让）。凡是工作区自身的能力，两边都要有。」 Settled into these rules by the coordinating session from the workspace domain-model review, under Alex's instruction to decide such questions from that principle.
+- Source: the principle Alex gave on 2026-11-01 and restated in [0216](2026-11-02-0216-personal-workspace-has-workspace-settings.md): 「个人工作区和共享工作区的区别只在『人与人之间』的东西（成员、团队、团队权限、审计日志、共享额度、离开成员的 Bot、转让）。凡是工作区自身的能力，两边都要有。」 Settled into these rules by the coordinating session from the workspace domain-model review, under Alex's instruction to decide such questions from that principle.
 - Rule: R-26
-- Replaces, in part: [2026-11-01-2310](2026-11-01-2310-personal-and-team-workspaces-apart.md) levels 2 and 3 where they list 密钥与环境 as a team setting ([0203](2026-11-02-0203-personal-workspace-keeps-bots.md) and [0216](2026-11-02-0216-personal-workspace-has-workspace-settings.md) already replace them for settings); [`orchestration.md`](../orchestration.md) § 1, team workspace row
+- Replaces, in part: [2026-11-01-2310](2026-11-01-2310-personal-and-team-workspaces-apart.md) levels 2 and 3 where they list 密钥与环境 as a team setting ([0203](2026-11-02-0203-personal-workspace-keeps-bots.md) and [0216](2026-11-02-0216-personal-workspace-has-workspace-settings.md) already replace them for settings); [`orchestration.md`](../orchestration.md) § 1, shared workspace row
 
 A workspace is the tenant. A personal workspace is a tenant with one member;
-a team workspace is a tenant with several. Both have every capability of a
+a shared workspace is a tenant with several. Both have every capability of a
 workspace. Only what exists between people is team-only. The account is not a
 tenant: what is bound to the person (sign-in, devices, connections, model
 credentials, profile memory) follows them into every workspace and is stored
@@ -59,7 +59,7 @@ fairness have no counterpart here and are skipped.
 
 - 设置: 常规 (without 转让; a personal workspace cannot be deleted), Bot 与
   Agents, 密钥与环境, 用量 and 计费 show in both kinds; 成员, 团队, 团队权限,
-  审计日志, 付款, 分享给团队成员 and 已暂停的 Bot only in a team workspace.
+  审计日志, 付款, 分享给团队成员 and 已暂停的 Bot only in a shared workspace.
   PRs #890 and #895 do this in code.
 - `glossary.md` (Workspaces table, team row), `orchestration.md` § 1 and
   `docs/settings.md` drop 密钥与环境 from the team-only lists (done with this
