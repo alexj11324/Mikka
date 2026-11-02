@@ -3246,6 +3246,7 @@
     "needsModelNamedAgent": "{device} 没装 {agent}",
     "needsModelNamedUpdate": "{device} 的 Mikka 需要更新",
     "needsModelNotOffered": "没有订阅或 Key 能用 {agent} 跑 {model}",
+    "needsModelAgentNotOffered": "没有订阅或 Key 能用 {agent}",
     "needsModelPickedNoDevice": "没有电脑能用 {agent} 跑 {model}",
     "needsModelPickedUnavailable": "{agent} 的 {model} 暂时不可用",
     "needsModelSettings": "打开模型与订阅",
