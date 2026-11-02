@@ -48,7 +48,8 @@ const switches={issueTools:true,factoryRouting:false,factoryLifecycle:false}
 // The real turnSettings and prepareTurn compose these same reads in one step each (workflows/coordinator/steps.ts).
 const mailboxCatalogue=async(...args:unknown[])=>{record('mailboxCatalogue')(...args);return ['mailbox_inbox']}
 const noteQuotaSwitch=async(...args:unknown[])=>{record('quotaSwitch')(...args)}
-const preparePrompt=async(...args:unknown[])=>{record('prompt')(...args);return {prompt:'synthetic request'}}
+let preparedPrompt:Record<string,unknown>|null=null
+const preparePrompt=async(...args:unknown[])=>{record('prompt')(...args);return preparedPrompt ?? {prompt:'synthetic request'}}
 stub('../../workflows/coordinator/steps.ts',{
   turnSettings:async()=>({computerEnabled:false,mailboxEnabled,writeEnabled:false,switches,coordinator:false,runtime:{harness:'ai_sdk'}}),
   prepareTurn:async(userId:string,botId:string,holder:string,input:{snapshot?:unknown;executionId?:string;mailboxEnabled:boolean;runtime:unknown}) => {
@@ -161,4 +162,14 @@ test('the run reads its settings in one step and starts the execution beside the
   assert.ok(names.indexOf('stream')<names.indexOf('begun'),'the two run side by side')
   assert.ok(names.indexOf('begun')<names.indexOf('prompt') && names.indexOf('stream')<names.indexOf('prompt'))
   assert.deepEqual(calls.filter(c=>c.name==='prompt').length,1)
+})
+
+test('the prepared prompt reaches the model with its stable rules as their own system message, ready for a cache breakpoint',async()=>{
+  reset('ai_sdk');preparedPrompt={instructions:'RULES and catalogmemory, GitHub, computers',stable:'RULES and catalog'.length,messages:[]}
+  try{
+    await coordinatorTurn(owner,bot)
+    const options=calls.find(c=>c.name==='hosted')?.args[2] as {instructions:unknown;stable?:unknown}
+    assert.deepEqual(options.instructions,[{role:'system',content:'RULES and catalog'},{role:'system',content:'memory, GitHub, computers'}])
+    assert.equal('stable' in options,false,'stable is never a model option')
+  }finally{preparedPrompt=null}
 })
