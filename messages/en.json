@@ -747,7 +747,7 @@
     "editorAria": "{label} editor"
   },
   "Devices": {
-    "otherDevices": "Remote control",
+    "otherDevices": "Servers",
     "menu": "More for {name}",
     "add": {
       "title": "Add device",
@@ -783,10 +783,8 @@
     "online": "Online",
     "offline": "Offline",
     "thisMachine": "This machine",
-    "allowScheduling": "Allow scheduling",
-    "allowSchedulingTo": "Allow scheduling to {name}",
-    "autoSchedule": "Auto-schedule",
-    "autoScheduleTo": "Let Mikka pick {name} automatically",
+    "allowScheduling": "Scheduling",
+    "allowSchedulingTo": "Schedule runs on {name}",
     "recheck": "Check again",
     "agent": "Available tools",
     "toggleSidebar": "Expand or collapse the sidebar",
@@ -926,8 +924,7 @@
       "retry": "Retry",
       "done": "Done",
       "cancelled": "Cancelled"
-    },
-    "autoScheduleNeedsAllow": "Turn on Allow scheduling first"
+    }
   },
   "Workspace": {
     "loadingEditor": "Loading task editor",
@@ -1704,8 +1701,8 @@
         "title": "Connections"
       },
       "models": {
-        "title": "API and subscriptions",
-        "keywords": "model subscriptions subscription quota usage API key provider models"
+        "title": "Models and subscriptions",
+        "keywords": "model subscriptions quota API key provider models allowed order dispatch run location cloud local bots agents"
       },
       "logins": {
         "title": "Logins and keys"
@@ -1721,10 +1718,6 @@
       },
       "general": {
         "title": "General"
-      },
-      "bots": {
-        "title": "Bots & Agents",
-        "keywords": "bots agents model location rules labels"
       },
       "permissions": {
         "title": "Team permissions"
@@ -1923,10 +1916,12 @@
       "copied": "Copied",
       "rowMenu": "More for {label}",
       "callbackPlaceholder": "http://localhost:54545/callback?code=…",
-      "paused": "Paused",
+      "paused": "Off",
       "useSubscription": "Use {label}",
       "pauseFailed": "The subscription could not be changed.",
-      "claudePlan": "Claude {plan}"
+      "claudePlan": "Claude {plan}",
+      "disconnectTitle": "Disconnect {label}?",
+      "enabled": "On"
     },
     "integrations": {
       "googleSignInTitle": "Google sign-in",
@@ -2443,47 +2438,6 @@
         "incomplete": "Payment pending"
       }
     },
-    "botAgents": {
-      "bots": "Bots",
-      "addRule": "Add rule",
-      "default": "Default",
-      "cloud": "Mikka Cloud",
-      "online": "Online",
-      "offline": "Offline",
-      "removedDevice": "Removed device",
-      "redetect": "Detect again",
-      "searchModels": "Search models",
-      "claudeAccount": "Claude",
-      "openaiAccount": "ChatGPT",
-      "add": "Add",
-      "save": "Save",
-      "delete": "Delete",
-      "rowMenu": "More for {label}",
-      "cell": "{row} {column}: {value}",
-      "loading": "Loading bots and agents",
-      "loadFailed": "Couldn't load bots and agents",
-      "notSaved": "Not saved",
-      "retry": "Retry",
-      "columns": {
-        "label": "Label",
-        "place": "Runs on",
-        "harness": "Agent",
-        "model": "Model",
-        "actions": "Actions"
-      },
-      "hostedDefault": "Mikka Default",
-      "defaults": "Task defaults",
-      "fallbacks": "When something goes wrong",
-      "setting": "{name}: {value}",
-      "whenDeviceOffline": "When the device is offline",
-      "offlineWait": "Wait for it",
-      "offlineCloud": "Run in the cloud",
-      "labels": "By label",
-      "pickModel": "Choose a model",
-      "noModels": "No models yet",
-      "unavailable": "Unavailable",
-      "unverified": "Not checked against an account"
-    },
     "searchEmpty": "No matching settings",
     "apiKeys": {
       "add": "Add API key",
@@ -2510,7 +2464,63 @@
       "removeTitle": "Delete {name}?",
       "othersUsage": "Team members can use it to run their own bots. Usage is billed to your API account.",
       "afterQuota": "Use an API key when subscription quota runs out",
-      "afterQuotaBilling": "Billed at the API provider's prices"
+      "afterQuotaBilling": "Billed at the API provider's prices",
+      "sectionTitle": "API keys",
+      "none": "No API keys yet",
+      "loading": "Loading API keys…",
+      "modelCount": "{count, plural, one {# model} other {# models}}",
+      "noModels": "The provider listed no models",
+      "modelsInvalid": "Couldn't fetch models · Key invalid or revoked",
+      "modelsUnavailable": "Couldn't fetch models · Provider didn't respond",
+      "refetch": "Fetch models again",
+      "refetchLabel": "Fetch models for {name} again"
+    },
+    "modelOrder": {
+      "title": "Allowed models",
+      "loading": "Loading allowed models…",
+      "location": "Run location",
+      "local": "Local",
+      "cloud": "Cloud",
+      "localDevices": "{count, plural, one {# computer takes runs} other {# computers take runs}}",
+      "cloudNoKey": "No E2B key",
+      "add": "Add models",
+      "addCount": "{count, plural, one {Add # model} other {Add # models}}",
+      "empty": "No allowed models yet",
+      "noCandidates": "No models to add",
+      "removeTitle": "Remove {model}?",
+      "remove": "Remove",
+      "ready": "Available",
+      "quotaUntil": "Quota used up · back {time}",
+      "noDevice": "No computer can run {harness}",
+      "blocked": {
+        "quota": "Quota used up",
+        "expired": "Needs reconnecting",
+        "paused": "Subscription turned off",
+        "missing": "No longer available",
+        "keyRefused": "Key invalid or revoked"
+      },
+      "handle": "Drag {model} (position {position})",
+      "rowMenu": "More actions for {model}",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
+      "dragInstructions": "Press Space to pick up, use the up and down arrow keys to move, press Space again to drop, Esc to cancel.",
+      "dragStart": "Picked up {model}, position {position}",
+      "dragOver": "{model} moved to position {position}",
+      "dragEnd": "{model} dropped at position {position}",
+      "dragCancel": "Moving {model} cancelled",
+      "source": {
+        "claude": "Claude subscription",
+        "codex": "ChatGPT subscription",
+        "apiKey": "{provider} API key"
+      },
+      "added": "Added",
+      "provider": {
+        "anthropic": "Anthropic",
+        "openai": "OpenAI",
+        "deepseek": "DeepSeek",
+        "kimi": "Kimi",
+        "custom": "Custom provider"
+      }
     }
   },
   "TelegramBot": {
@@ -2956,7 +2966,7 @@
       "metered": "Pay as you go",
       "shared": "Shared by teammates",
       "sharedKey": "{name}'s key",
-      "manage": "Manage API and subscriptions",
+      "manage": "Manage models and subscriptions",
       "unavailable": "Unavailable",
       "notSaved": "Not saved",
       "unknownModel": "Unknown model",
@@ -3210,11 +3220,17 @@
     "needsMachineTitle": "No computer available",
     "needsMachineDescription": "Connect or turn on a computer first, or add your E2B API key to run in the cloud.",
     "needsMachineConnect": "Connect a computer",
-    "needsMachineAuto": "Let this computer be picked automatically",
+    "needsMachineAuto": "Schedule runs on this computer",
     "needsMachineServerOnline": "Bring the server back online",
     "needsMachineMac": "Enable on this computer",
     "needsMachineServer": "Connect my server",
-    "needsMachineE2B": "Add E2B key"
+    "needsMachineE2B": "Add E2B key",
+    "needsModelTitle": "No model can run this task",
+    "needsModelNoModels": "No allowed models yet",
+    "needsModelCloud": "Cloud has no E2B key yet",
+    "needsModelNoDevice": "No computer can run any allowed model",
+    "needsModelUnavailable": "Every allowed model is unavailable right now",
+    "needsModelSettings": "Open Models and subscriptions"
   },
   "IssueThreads": {
     "title": "Threads",

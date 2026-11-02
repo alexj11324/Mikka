@@ -15,7 +15,6 @@ import { wakeCoordinator } from '@/lib/coordinator/wake'
 import { revokeRunTokens } from '@/lib/mcp/worker'
 import { stopRecordingsAfter } from '@/lib/captures/run-end'
 import { DEVICE_STAYED_OFFLINE, LEASED_RUN_STATUSES, lostRunOutcome, MAX_RUN_ATTEMPTS, pickTakeover, retryNote, retryPrompt, type TakeoverCandidate } from '@/lib/run-retry'
-import { autoScheduleOn } from '@/lib/device-auto-schedule'
 import { tiptapToText } from '@/lib/tiptap-text'
 import { afterRunEnded } from '@/lib/run-completion-effects'
 import { ownE2BKeySql } from './secrets/e2b-owner-sql'
@@ -107,7 +106,7 @@ export async function reclaimLostRuns(userId: string, now = new Date()): Promise
 
 /**
  * Another online machine of the owner with the execution harness and
- * 允许自动调度 on. The target clones the same remote; the original agentId
+ * 参与调度 on. The target clones the same remote; the original agentId
  * stays as provenance.
  */
 async function takeoverTarget(run: { id: string; userId: string; agentId: string; deviceId: string | null; deviceRepoId: string | null; agentDefinition?: Run['agentDefinition'] }, now: Date): Promise<(TakeoverCandidate & { deviceRepoId: string }) | null> {
@@ -118,12 +117,12 @@ async function takeoverTarget(run: { id: string; userId: string; agentId: string
   if (!repo?.remoteUrl || !agent || !repositoryBindingMatches(repo.repoPath, repo.remoteUrl, { allowFile: daemonTestMode(process.env) })) return null
   const bound = await db.execute(sql`select 1 from computer_run_bindings where "runId"=${run.id} and "ownerId"=${run.userId}`)
   if (bound.rows.length) return null
-  const online = await db.select({ deviceId: devices.id, harnesses: devices.harnesses, deviceType: devices.deviceType, autoSchedule: devices.autoSchedule })
+  const online = await db.select({ deviceId: devices.id, harnesses: devices.harnesses, deviceType: devices.deviceType })
     .from(devices)
     .where(and(eq(devices.ownerId, run.userId), eq(devices.enabled, true), eq(devices.kind, 'local'), sql`${devices.protocolVersion} >= ${DAEMON_PROTOCOL_VERSION}`, gt(devices.lastSeenAt, new Date(now.getTime() - DEVICE_ONLINE_WINDOW_MS))))
     .orderBy(desc(devices.lastSeenAt))
-  // Only devices Mikka may pick on its own; servers first (orchestration.md § 4).
-  const candidates = online.filter(autoScheduleOn).sort((a, b) => Number(b.deviceType === 'server') - Number(a.deviceType === 'server'))
+  // Only devices with 参与调度 on (enabled, decision 2026-11-02-1400); servers first.
+  const candidates = online.sort((a, b) => Number(b.deviceType === 'server') - Number(a.deviceType === 'server'))
   const target = pickTakeover(run.agentDefinition?.subscription ? candidates.filter(candidate => candidate.harnesses.some(info => info.harness === run.agentDefinition?.harness && info.subscriptionBroker)) : candidates, { remoteUrl: repo.remoteUrl, harness: run.agentDefinition?.harness ?? agent.harness, lostDeviceId: run.deviceId })
   if (!target) return null
   const targetRepo = await ensureDeviceRepository(run.userId, target.deviceId, repo.remoteUrl)

@@ -19,59 +19,6 @@ async function context(workspaceId?: string) {
   const workspace = await loadWorkspaceContext(workspaceId, session.user);
   return { ownerId: session.user.id, workspaceId: workspace.workspace.id };
 }
-export async function listExecutionRules() {
-  const scope = await context();
-  try {
-    return await new ExecutionSettings(pool).list(scope);
-  } catch (error) {
-    // A new account has no device or connected account to suggest a default from yet:
-    // there are no rules to show, and the settings page fills in the initial choice.
-    if (error instanceof ActionFailureError && error.code === "executionModelUnknown") return [];
-    throw error;
-  }
-}
-export async function createExecutionRule(
-  value: Extract<
-    Parameters<ExecutionSettings["mutate"]>[1],
-    { kind: "save" }
-  >["value"],
-) {
-  return new ExecutionSettings(pool).mutate(await context(), {
-    kind: "save",
-    value,
-  });
-}
-export async function updateExecutionRule(
-  id: string,
-  value: Extract<
-    Parameters<ExecutionSettings["mutate"]>[1],
-    { kind: "save" }
-  >["value"],
-) {
-  return new ExecutionSettings(pool).mutate(await context(), {
-    kind: "save",
-    id,
-    value,
-  });
-}
-export async function deleteExecutionRule(id: string) {
-  return new ExecutionSettings(pool).mutate(await context(), {
-    kind: "delete",
-    id,
-  });
-}
-export async function reorderExecutionRules(ids: string[]) {
-  return new ExecutionSettings(pool).mutate(await context(), {
-    kind: "reorder",
-    ids,
-  });
-}
-export async function listExecutionPlaces() {
-  return new ExecutionSettings(pool).places(await context());
-}
-export async function redetectDevice(deviceId: string) {
-  return new ExecutionSettings(pool).redetect(await context(), deviceId);
-}
 export async function listBotModels() {
   return new ExecutionSettings(pool).botModels(await context());
 }
@@ -117,24 +64,6 @@ export async function chooseBotModel(chatBot: string | null, id: string): Promis
   });
 }
 
-export async function listWorkspaceIssueLabels(workspaceId?: string) {
-  return new ExecutionSettings(pool).labels(await context(workspaceId));
-}
 export async function refreshBotModels(connectionId: string, workspaceId?: string) {
   return new ExecutionSettings(pool).refreshBotModels(await context(workspaceId), connectionId);
-}
-export async function getRedetectDeviceStatus(commandId: string, workspaceId?: string) {
-  return new ExecutionSettings(pool).redetectStatus(await context(workspaceId), commandId);
-}
-
-export async function getExecutionFallbacks() {
-  return new ExecutionSettings(pool).fallbacks((await context()).ownerId);
-}
-export async function updateExecutionFallbacks(
-  value: import("@/lib/execution-rules").ExecutionFallbacks,
-) {
-  return new ExecutionSettings(pool).setFallbacks(
-    (await context()).ownerId,
-    value,
-  );
 }

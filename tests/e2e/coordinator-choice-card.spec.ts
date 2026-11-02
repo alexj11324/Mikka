@@ -25,7 +25,7 @@ const dispatchFailed = (task: string, noKey = false) => `root = Stack([q])\nq = 
 
 // What the bot draws from dispatch_run's machineUnavailable result (lib/rule-dispatch.ts machineUnavailableCard).
 const needsMachine = 'root = Stack([q])\nq = BeQuestions("没有电脑能跑这个任务", [{id:"machine", title:"没有可用的电脑", description:"先连接或开启一台电脑，或者填入你的 E2B API Key 用云端运行。", options:[{value:"computer", label:"连接电脑", action:"connectServer"}, {value:"e2b", label:"填入 E2B Key", action:"e2bKey"}]}])'
-const allowMachine = (deviceId: string) => `root = Stack([q])\nq = BeQuestions("没有电脑能跑这个任务", [{id:"machine", title:"没有可用的电脑", description:"先连接或开启一台电脑，或者填入你的 E2B API Key 用云端运行。", options:[{value:"${deviceId}", label:"允许这台电脑自动调度", action:"allowAutoSchedule"}, {value:"e2b", label:"填入 E2B Key", action:"e2bKey"}, {value:"server", label:"让服务器重新上线", action:"serverOnline"}]}])`
+const allowMachine = (deviceId: string) => `root = Stack([q])\nq = BeQuestions("没有电脑能跑这个任务", [{id:"machine", title:"没有可用的电脑", description:"先连接或开启一台电脑，或者填入你的 E2B API Key 用云端运行。", options:[{value:"${deviceId}", label:"让这台电脑参与调度", action:"allowAutoSchedule"}, {value:"e2b", label:"填入 E2B Key", action:"e2bKey"}, {value:"server", label:"让服务器重新上线", action:"serverOnline"}]}])`
 
 // Dispatch option labels are English on purpose: the card localizes them by value.
 // Visual and interaction coverage of stored replies; the Factory clarify answer itself is the person's next message.
@@ -91,7 +91,7 @@ for (const viewport of [{ name: 'desktop', width: 1280, height: 800 }, { name: '
     await page.goto(app('/?section=coordinator'))
     const card = page.getByRole('region', { name: 'Coordinator', exact: true }).getByRole('group', { name: /派不出去/ })
     const setup = card.getByRole('link', { name: /去设置 E2B 密钥/ })
-    // The E2B key is the person's own and lives under API 与订阅 (#745, CLOUD_KEY_SETTINGS).
+    // The E2B key is the person's own and lives under 模型与订阅 (#745, CLOUD_KEY_SETTINGS).
     await expect(setup).toHaveAttribute('href', /\/settings\?section=models$/)
     // Without a key there is no run-on-cloud option: no button or link offers it (the question itself names Mikka Cloud).
     const runOnCloud = /Run on Mikka Cloud|在 Mikka Cloud 上运行/
@@ -101,7 +101,7 @@ for (const viewport of [{ name: 'desktop', width: 1280, height: 800 }, { name: '
     await shoot(page, testInfo, `choice-${viewport.name}-nokey`)
     await setup.click()
     await expect(page).toHaveURL(/\/settings\?section=models/)
-    await expect(page.getByRole('heading', { level: 1, name: 'API 与订阅', exact: true })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 1, name: '模型与订阅', exact: true })).toBeVisible()
   })
 
   test(`after answering, the no-key option is a record, not a settings link (${viewport.name})`, async ({ page }) => {
@@ -138,25 +138,26 @@ for (const viewport of [{ name: 'desktop', width: 1280, height: 800 }, { name: '
     await expect(card.getByRole('button', { name: /填入 E2B Key/ })).toBeEnabled()
   })
 
-  test(`no machine with a personal computer online: 允许这台电脑自动调度 switches it on and answers (${viewport.name})`, async ({ page }) => {
+  test(`no machine with a personal computer online: 让这台电脑参与调度 switches it on and answers (${viewport.name})`, async ({ page }) => {
     await page.setViewportSize(viewport)
     const { email } = await register(page)
     const pool = isolatedPool()
     const deviceId = randomUUID()
     try {
       const { rows: [user] } = await pool.query<{ id: string }>('SELECT id FROM "user" WHERE email = $1', [email])
-      await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,"deviceType",enabled,"lastSeenAt") VALUES ($1,$2,'MacBook','local','laptop',true,now())`, [deviceId, user.id])
+      await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,"deviceType",enabled,"lastSeenAt") VALUES ($1,$2,'MacBook','local','laptop',false,now())`, [deviceId, user.id])
     } finally { await pool.end() }
     await seed(email, [{ role: 'user', content: '把首页压到 2 秒以内' }, { role: 'assistant', content: allowMachine(deviceId) }])
     await page.goto(app('/?section=coordinator'))
     const chat = page.getByRole('region', { name: 'Coordinator', exact: true })
     const card = chat.getByRole('group', { name: '没有可用的电脑' })
     await expect(card.getByRole('link', { name: /让服务器重新上线/ })).toHaveAttribute('href', /\/settings\?section=computers$/)
-    const allow = card.getByRole('button', { name: /允许这台电脑自动调度/ })
+    // 参与调度 is the device's one switch now (decision 2026-11-02-1400).
+    const allow = card.getByRole('button', { name: /让这台电脑参与调度/ })
     await allow.click()
     await expect(allow).toHaveAttribute('aria-pressed', 'true')
-    await expect(chat.getByText('允许这台电脑自动调度', { exact: true }).last()).toBeVisible()
+    await expect(chat.getByText('让这台电脑参与调度', { exact: true }).last()).toBeVisible()
     const check = isolatedPool()
-    try { expect((await check.query('SELECT "autoSchedule" FROM devices WHERE id=$1', [deviceId])).rows[0].autoSchedule).toBe(true) } finally { await check.end() }
+    try { expect((await check.query('SELECT enabled FROM devices WHERE id=$1', [deviceId])).rows[0].enabled).toBe(true) } finally { await check.end() }
   })
 }
