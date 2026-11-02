@@ -26,8 +26,9 @@ export async function syncLocalComputerReviews(pool: Pool, deviceId: string, use
       [row.id, deviceId, row.runId, userId, row.target, JSON.stringify(row.call), row.digest, new Date(row.expiresAt)])
       if (!inserted.rowCount) throw new Error('Local review changed or expired')
     }
+    // Runs every second per daemon: only rows not yet expired, never the device's whole review history again.
     await client.query(`UPDATE local_computer_reviews SET "seenAt"='-infinity'::timestamptz
-      WHERE "deviceId"=$1 AND "userId"=$2 AND display IS NULL AND NOT (id=ANY($3::uuid[]))`, [deviceId, userId, rows.map(row => row.id)])
+      WHERE "deviceId"=$1 AND "userId"=$2 AND display IS NULL AND "seenAt"<>'-infinity'::timestamptz AND NOT (id=ANY($3::uuid[]))`, [deviceId, userId, rows.map(row => row.id)])
     const result = await client.query(`SELECT id,digest,decision AS approve FROM local_computer_reviews WHERE "deviceId"=$1 AND "userId"=$2
       AND id=ANY($3::uuid[]) AND decision IS NOT NULL AND "expiresAt">now() AND "seenAt">now()-interval '10 seconds'`, [deviceId, userId, rows.map(row => row.id)])
     await client.query('COMMIT')
