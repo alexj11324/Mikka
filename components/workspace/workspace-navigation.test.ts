@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { readLocation, sameLocation, sectionFromQuery, workspaceHref, workspaceLink, workspaceSearch, writeSectionQuery } from './workspace-navigation'
+import { canonicalHref, nextMark, readLocation, readMark, sameLocation, sectionFromQuery, stepsToOrigin, taskOrigin, workspaceHref, workspaceLink, workspaceSearch, writeSectionQuery, type EntryMark } from './workspace-navigation'
 
 const BOT = '3f0c9d2e-5b1a-4c7e-9f00-1a2b3c4d5e6f'
 const ISSUE = 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d'
@@ -78,4 +78,60 @@ test('a thread sits beside its centre: a new centre closes it unless the move na
   assert.equal(workspaceHref(chatWithThread, { thread: null }), `/mikka?bot=${BOT}`)
   assert.equal(workspaceHref(at('/mikka'), { thread: RUN }), `/mikka?thread=${RUN}`)
   assert.equal(readLocation(new URLSearchParams('thread=nope')).thread, null)
+})
+
+test('a task opened from a chat names that chat; a bare link names none', () => {
+  assert.equal(workspaceHref(at('/mikka'), { issue: ISSUE }), `/mikka?section=coordinator&issue=${ISSUE}`)
+  assert.equal(workspaceHref(at(`/mikka?bot=${BOT}`), { issue: ISSUE }), `/mikka?bot=${BOT}&issue=${ISSUE}`)
+  assert.equal(workspaceHref(at('/mikka?section=all-issues'), { issue: ISSUE }), `/mikka?section=all-issues&issue=${ISSUE}`)
+  // A move inside the task keeps what it named, or that it named nothing.
+  assert.equal(workspaceHref(at(`/mikka?section=coordinator&issue=${ISSUE}`), { thread: RUN }), `/mikka?section=coordinator&issue=${ISSUE}&thread=${RUN}`)
+  assert.equal(workspaceHref(at(`/mikka?issue=${ISSUE}`), { thread: RUN }), `/mikka?issue=${ISSUE}&thread=${RUN}`)
+  // Leaving the task for the chat is the bare address again; a team page names no chat.
+  assert.equal(workspaceHref(at(`/mikka?section=coordinator&issue=${ISSUE}`), { issue: null }), '/mikka')
+  assert.equal(workspaceHref(at('/mikka?team=t1'), { issue: ISSUE }), `/mikka?team=t1&issue=${ISSUE}`)
+  assert.equal(workspaceLink({ issue: ISSUE }), `/?issue=${ISSUE}`)
+  assert.equal(workspaceLink({ section: 'coordinator', issue: ISSUE }), `/?section=coordinator&issue=${ISSUE}`)
+
+  const origin = (search: string) => taskOrigin(new URLSearchParams(search))
+  assert.deepEqual(origin(`section=coordinator&issue=${ISSUE}`), { section: 'coordinator', bot: null })
+  assert.deepEqual(origin(`bot=${BOT}&issue=${ISSUE}`), { section: 'coordinator', bot: BOT })
+  assert.deepEqual(origin(`section=all-issues&issue=${ISSUE}`), { section: 'all-issues', bot: null })
+  assert.equal(origin(`issue=${ISSUE}`), null)
+  assert.equal(origin(`section=team-home&issue=${ISSUE}`), null)
+})
+
+test('an invalid or stale address rewrites to what is shown', () => {
+  assert.equal(canonicalHref(at(`/mikka?section=nope&issue=${ISSUE}`)), `/mikka?issue=${ISSUE}`)
+  assert.equal(canonicalHref(at('/mikka?section=coordinator')), '/mikka')
+  assert.equal(canonicalHref(at('/mikka?bot=not-an-id&thread=7')), '/mikka')
+  assert.equal(canonicalHref(at('/mikka?section=plugins&app=gmail')), '/mikka?section=plugins&app=gmail')
+  assert.equal(canonicalHref(at(`/mikka?bot=${BOT}&thread=${RUN}`), () => false), `/mikka?thread=${RUN}`)
+  assert.equal(canonicalHref(at(`/mikka?bot=${BOT}&issue=${ISSUE}`), () => true), `/mikka?bot=${BOT}&issue=${ISSUE}`)
+  assert.equal(canonicalHref(at(`/mikka?section=coordinator&issue=${ISSUE}&thread=${RUN}`)), `/mikka?section=coordinator&issue=${ISSUE}&thread=${RUN}`)
+})
+
+test('history marks: ✕ steps back to the entry that opened the task, in this page load only', () => {
+  const doc = 'load-1'
+  let mark: EntryMark | null = null
+  // Chat (unmarked, a cold start) → task: one step back.
+  mark = nextMark(mark, null, ISSUE, 'push', doc, false)
+  assert.deepEqual(mark, { index: 1, task: { start: 1, doc, list: false } })
+  assert.equal(stepsToOrigin(mark, doc), 1)
+  // A thread beside it and ↑↓ keep the place that opened the task.
+  mark = nextMark(mark, ISSUE, ISSUE, 'push', doc, false)
+  mark = nextMark(mark, ISSUE, RUN, 'push', doc, true)
+  assert.deepEqual(mark, { index: 3, task: { start: 1, doc, list: false } })
+  assert.equal(stepsToOrigin(mark, doc), 3)
+  // After a reload the earlier load's entries are not this page's.
+  assert.equal(stepsToOrigin(mark, 'load-2'), 0)
+  // Opened directly: no entry behind it.
+  assert.equal(stepsToOrigin(nextMark(null, ISSUE, ISSUE, 'push', doc, false), doc), 0)
+  assert.equal(stepsToOrigin(null, doc), 0)
+  // Leaving the task clears it; a list remembers it opened the task.
+  assert.deepEqual(nextMark(mark, ISSUE, null, 'push', doc, false), { index: 4, task: null })
+  assert.equal(nextMark({ index: 4, task: null }, null, ISSUE, 'push', doc, true).task?.list, true)
+  // Next's keys sit beside the mark; anything malformed reads as none.
+  assert.deepEqual(readMark({ __NA: true, mikkaEntry: { index: 2, task: { start: 2, doc, list: true } } }), { index: 2, task: { start: 2, doc, list: true } })
+  for (const state of [null, 'x', {}, { mikkaEntry: { index: 'a' } }]) assert.equal(readMark(state), null)
 })

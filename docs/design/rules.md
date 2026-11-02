@@ -200,7 +200,8 @@ do what Linear does. Figma: `220:5022` (MIK-25).
 - **R-79** No breadcrumb, title bar or page header shows the workspace's
   name. There is one workspace on screen, the name cannot be clicked there,
   and it is shown and switched only from the avatar menu at the bottom left.
-  The task page's breadcrumb starts at 看板. A group heading that names the
+  The task page's breadcrumb starts at the place it was opened from (R-82).
+  A group heading that names the
   workspace its settings apply to (设置's workspace group) is not a crumb and
   stays.
 - **R-62** 线程 lists the threads working on the issue, grouped as R-52:
@@ -311,8 +312,8 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
     duplicate, or its PR is merged. A run nobody could judge sits under 受阻
     (failed) or 等待你, never 已解决.
   - Every row leads with its group's status icon and colour, the phone's set
-    (`ThreadStatusIcon`): 进行中 spins, 受阻 a red alert, 等待你 a hollow
-    circle, 空闲 a slashed circle, 已解决 a green check.
+    (`ThreadStatusIcon`): 进行中 spins, 受阻 a red alert, 等待你 a raised
+    hand, 空闲 a slashed circle, 已解决 a green check.
   - A task's existing threads fold into its newest one, which carries
     「第 N 次尝试」 past the first and stays out of 已解决 until the task is
     resolved; the task's own 线程 tab lists every attempt. (New work keeps one
@@ -369,7 +370,17 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   the header opens 概览 (a group's 详情), and an open thread covers the screen
   with its close in the header; every page but a task keeps the header's list
   button, whose sheet is the bot list with the rail's items below it (a task's
-  own header carries the same button). Source: Alex,
+  own header carries the same button). A task page knows
+  where it was opened from: its address names that chat or page (`bot=`,
+  `section=`, `section=coordinator` for the Coordinator's chat), its first
+  crumb names it, and ✕ returns there. Opened by a move in the same page
+  load, ✕ is a step back, so the chat comes back as it was, its open thread
+  included; opened from a link, a reload or a notification at launch, ✕ goes
+  to the place the address names, and to 看板 when it names none. Its ↑↓ show
+  only when the board, a list or a project opened it. A notification or an
+  admin link to a thread opens it beside its task where the viewer can read
+  it. An address with an unknown section or a bot that is not the person's
+  rewrites itself to what is shown, without a new entry. Source: Alex,
   2026-11-01 ([decision](decisions/2026-11-01-1320-navigation-model.md)).
 
 ## Settings

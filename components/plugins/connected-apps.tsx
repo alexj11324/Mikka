@@ -7,6 +7,7 @@ import { ArrowUpRight, Blocks, ChevronDown, ChevronRight, Ellipsis, Plus } from 
 import { toast } from 'sonner'
 
 import { APP_ICONS } from '@/components/plugins/app-icons'
+import { CredentialDialog, type CredentialTarget } from '@/components/plugins/credential-dialog'
 import { SettingsSection } from '@/components/settings/primitives'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
@@ -78,6 +79,7 @@ export function useAppInfo() {
 }
 
 const integrationPath = withBasePath('/api/integrations/composio')
+const credentialsPath = withBasePath('/api/integrations/composio/credentials')
 
 /** The SWR key of the Composio apps' state; 建议 reads the same key. */
 export const connectedAppsKey = integrationPath
@@ -236,6 +238,26 @@ export function useConnectedApps(enabled = true) {
     }
   }
 
+  /**
+   * Connects an app with the person's own credentials. The values go to the
+   * server once, in the body, and are not kept here; the result says only
+   * whether it worked.
+   */
+  async function connectWithKey(app: string, scheme: string, fields: Record<string, string>, replaceAccountId?: string): Promise<'ok' | 'incomplete' | 'failed'> {
+    setPending(replaceAccountId ?? app); setError('')
+    try {
+      const response = await fetch(credentialsPath, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ toolkit: app, scheme, fields, ...(replaceAccountId ? { replaceAccountId } : {}) }) })
+      if (response.status === 400) return 'incomplete'
+      if (!response.ok) return 'failed'
+      await refresh()
+      return 'ok'
+    } catch {
+      return 'failed'
+    } finally {
+      setPending('')
+    }
+  }
+
   async function disconnect(accountId: string) {
     setPending(accountId)
     try {
@@ -251,10 +273,12 @@ export function useConnectedApps(enabled = true) {
   }
 
   const canLink = enabled && Boolean(state?.configured && state.callbackVerifierConfigured)
+  // A key needs no callback: Composio being set up is enough.
+  const canEnterKey = enabled && Boolean(state?.configured)
   // Shown on the disabled 连接 buttons, so they say why instead of doing nothing.
   const unavailable = state && !canLink ? t('connectUnavailable') : undefined
   return {
-    state, pending, error, notice, canLink, unavailable,
+    state, pending, error, notice, canLink, canEnterKey, unavailable,
     // Nothing read yet: rows hold their place without guessing 连接 or the switch.
     loading: enabled && !state && !loadError,
     accountsFor: (app: string) => state?.accounts.filter(account => account.toolkit === app) ?? [],
@@ -262,7 +286,7 @@ export function useConnectedApps(enabled = true) {
     connectedToolkits: () => [...new Set(state?.accounts.map(account => account.toolkit) ?? [])],
     connect: (app: string) => startLink(app, { toolkit: app }),
     reconnect: (accountId: string) => startLink(accountId, { accountId }),
-    setEnabled, makeDefault, rename, disconnect,
+    connectWithKey, setEnabled, makeDefault, rename, disconnect,
   }
 }
 
@@ -403,6 +427,7 @@ export function PluginBreadcrumb({ rootLabel, rootHref, onBack, name }: { rootLa
 /** One app: header, its connected accounts with their actions, and 关于. */
 export function ConnectedAppDetail({ apps, app, rootLabel, rootHref, onBack }: { apps: ConnectedApps; app: string; rootLabel: string; rootHref: string; onBack: () => void }) {
   const t = useTranslations('Settings.integrations')
+  const tPlugins = useTranslations('Plugins')
   const common = useTranslations('Common')
   const format = useFormatter()
   const [renaming, setRenaming] = useState<ConnectedAccountView | null>(null)
@@ -425,6 +450,13 @@ export function ConnectedAppDetail({ apps, app, rootLabel, rootHref, onBack }: {
     : account.status === 'FAILED' ? t('statusFailed') : account.status !== 'ACTIVE' ? t('statusInactive') : null
   const closeRename = () => { setRenaming(null); setDialogError('') }
   const closeConfirm = () => { setConfirming(null); setDialogError('') }
+  // How it connects: Composio's OAuth, the person's own key in a form, or nothing to connect.
+  const kind = detail.data?.auth.kind ?? null
+  const withKey = kind === 'credentials'
+  const canAdd = withKey ? apps.canEnterKey : apps.canLink
+  const [keyTarget, setKeyTarget] = useState<CredentialTarget | null>(null)
+  const add = () => { if (withKey) setKeyTarget({ app }); else void apps.connect(app) }
+  const reconnect = (accountId: string) => { if (withKey) setKeyTarget({ app, replaceAccountId: accountId }); else void apps.reconnect(accountId) }
 
   return <div className="flex flex-col gap-8">
     <PluginBreadcrumb rootLabel={rootLabel} rootHref={rootHref} onBack={onBack} name={name} />
@@ -434,7 +466,8 @@ export function ConnectedAppDetail({ apps, app, rootLabel, rootHref, onBack }: {
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <h2 className="text-xl font-semibold">{name}</h2>
       </div>
-      {!accounts.length && !apps.loading && <WhyDisabled reason={apps.unavailable}><Button type="button" disabled={!apps.canLink || busy} onClick={() => void apps.connect(app)}>{apps.pending === app ? t('working') : t('connect')}</Button></WhyDisabled>}
+      {kind === 'none' ? <Badge variant="secondary">{tPlugins('connectKind.none')}</Badge>
+        : !accounts.length && !apps.loading && kind !== 'unsupported' && <WhyDisabled reason={apps.unavailable}><Button type="button" disabled={!canAdd || busy || detail.isLoading} onClick={add}>{apps.pending === app ? t('working') : t('connect')}</Button></WhyDisabled>}
     </header>
 
     {detail.data?.description ? <p className="max-w-prose text-sm leading-6 text-muted-foreground">{detail.data.description}</p>
@@ -464,7 +497,7 @@ export function ConnectedAppDetail({ apps, app, rootLabel, rootHref, onBack }: {
             <span className="truncate text-xs text-muted-foreground">{detail}</span>
             {defaultRow && <span className="text-xs text-muted-foreground">{t('botsUseThis')}</span>}
           </div>
-          {broken && <Button type="button" variant="secondary" size="sm" disabled={!apps.canLink || busy} onClick={() => void apps.reconnect(account.id)}>{apps.pending === account.id ? t('working') : t('reconnect')}</Button>}
+          {broken && <Button type="button" variant="secondary" size="sm" disabled={!canAdd || busy} onClick={() => reconnect(account.id)}>{apps.pending === account.id ? t('working') : withKey ? tPlugins('key.replace') : t('reconnect')}</Button>}
           <DropdownMenu>
             <DropdownMenuTrigger render={<Button type="button" variant="ghost" size="icon-sm" aria-label={t('accountActions', { name: title })} disabled={busy} />}><Ellipsis data-icon="inline-start" /></DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-44">
@@ -473,7 +506,7 @@ export function ConnectedAppDetail({ apps, app, rootLabel, rootHref, onBack }: {
                   void apps.makeDefault(account.id).then(ok => { if (ok) toast.success(t('madeDefault', { account: title })) })
                 }}>{t('makeDefault')}</DropdownMenuItem>}
                 <DropdownMenuItem onClick={() => { setAlias(account.alias ?? account.email ?? ''); setDialogError(''); setRenaming(account) }}>{t('rename')}</DropdownMenuItem>
-                <DropdownMenuItem disabled={!apps.canLink} onClick={() => void apps.reconnect(account.id)}>{t('reconnect')}</DropdownMenuItem>
+                <DropdownMenuItem disabled={!canAdd} onClick={() => reconnect(account.id)}>{withKey ? tPlugins('key.replace') : t('reconnect')}</DropdownMenuItem>
                 {!broken && <DropdownMenuItem onClick={() => {
                   const turningOff = account.enabled
                   // Worked out before the switch moves: who the bots use once this one is off.
@@ -488,7 +521,7 @@ export function ConnectedAppDetail({ apps, app, rootLabel, rootHref, onBack }: {
           </DropdownMenu>
         </div>
       })}
-      <WhyDisabled reason={apps.unavailable} fill><Button type="button" variant="ghost" disabled={!apps.canLink || busy} onClick={() => void apps.connect(app)} className="h-auto w-full justify-start gap-3 rounded-none py-2 pr-3 pl-5 font-normal text-muted-foreground hover:bg-transparent hover:text-foreground">
+      <WhyDisabled reason={apps.unavailable} fill><Button type="button" variant="ghost" disabled={!canAdd || busy} onClick={add} className="h-auto w-full justify-start gap-3 rounded-none py-2 pr-3 pl-5 font-normal text-muted-foreground hover:bg-transparent hover:text-foreground">
         <span className="flex size-10 items-center justify-center"><Plus data-icon="inline-start" aria-hidden="true" /></span>
         {apps.pending === app ? t('working') : t('connectAnotherAccount')}
       </Button></WhyDisabled>
@@ -502,6 +535,8 @@ export function ConnectedAppDetail({ apps, app, rootLabel, rootHref, onBack }: {
       {website && <InfoRow label={t('website')}><a href={website} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 hover:underline">{new URL(website).hostname}<ArrowUpRight className="size-3.5" aria-hidden="true" /></a></InfoRow>}
       {detail.data?.version && <InfoRow label={t('version')}>{detail.data.version}</InfoRow>}
     </SettingsSection> : null}
+
+    <CredentialDialog apps={apps} target={keyTarget} onClose={() => setKeyTarget(null)} />
 
     <Dialog open={Boolean(renaming)} onOpenChange={open => { if (!open && !busy) closeRename() }}>
       <DialogContent>

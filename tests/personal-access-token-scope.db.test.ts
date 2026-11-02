@@ -11,6 +11,9 @@ test('a workspace token stays in its workspace on thread, evidence, proposal and
   const owner = await seedUser(pool, 'pat-scope-owner')
   const ws = await seedWorkspace(pool, owner, [{ userId: owner, role: 'admin' }])
   const other = await seedWorkspace(pool, owner, [{ userId: owner, role: 'admin' }])
+  // The owner's personal workspace: the one a record naming no workspace belongs to.
+  const personal = await seedWorkspace(pool, owner, [{ userId: owner, role: 'admin' }])
+  await pool.query(`UPDATE mikka_workspaces SET kind='personal' WHERE id=$1`, [personal.id])
   const ownBot = await seedBot(pool, ws.id, owner), otherBot = await seedBot(pool, other.id, owner)
   const ownTeam = await seedTeam(pool, ws.id, owner), otherTeam = await seedTeam(pool, other.id, owner)
   const ownIssue = randomUUID(), otherIssue = randomUUID()
@@ -29,18 +32,27 @@ test('a workspace token stays in its workspace on thread, evidence, proposal and
   }
   // Another workspace's run: by its Bot, or (no Bot) by its task.
   const ownRun = await run(ownBot, ownIssue), otherRun = await run(otherBot, otherIssue), otherTaskRun = await run(null, otherIssue)
+  // A task in no workspace: only its run's Bot places the run.
+  const looseIssue = randomUUID()
+  await pool.query(`INSERT INTO issues (id,"userId",title,content,status,priority,scope) VALUES ($1,$2,'Task','{"type":"doc"}','todo','normal','personal')`, [looseIssue, owner])
+  const ownBotLooseRun = await run(ownBot, looseIssue), otherBotLooseRun = await run(otherBot, looseIssue), otherBotNoTaskRun = await run(otherBot, null)
 
   let currentHeaders = new Headers()
   mock.module('next/headers', { namedExports: { headers: async () => currentHeaders, cookies: async () => ({ get: () => undefined }) } })
   mock.module('next-intl/server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => Object.assign((code: string) => code, { has: () => true }) } })
-  mock.module('@/lib/auth', { namedExports: { MOBILE_APP_ORIGIN: 'mikka://', auth: { api: { getSession: async () => null } } } })
+  // A browser session (no bearer token) is the owner's cookie session when `browser` is set.
+  let browser = false
+  const ownerName = 'pat-scope-owner'
+  mock.module('@/lib/auth', { namedExports: { MOBILE_APP_ORIGIN: 'mikka://', auth: { api: { getSession: async () => browser ? { user: { id: owner, name: ownerName, email: `${owner}@example.invalid`, image: null }, session: { id: 'browser' } } : null } } } })
   const next = await import('next/server')
   mock.module('next/server', { namedExports: { ...next, after: () => {} } })
   const store = await import('../lib/tokens/store')
   const token = await store.createPersonalAccessToken(owner, ws.id, { name: 'Scope test' })
+  const personalToken = await store.createPersonalAccessToken(owner, personal.id, { name: 'Scope test personal' })
+  let bearer: string | null = token.token
   const origin = 'http://127.0.0.1'
   const call = async <P>(handler: (request: Request, context: { params: Promise<P> }) => Promise<Response>, path: string, params: P, body?: unknown, method = body === undefined ? 'GET' : 'POST') => {
-    currentHeaders = new Headers({ authorization: `Bearer ${token.token}`, origin, 'content-type': 'application/json' })
+    currentHeaders = new Headers({ ...(bearer ? { authorization: `Bearer ${bearer}` } : {}), origin, 'content-type': 'application/json' })
     const response = await handler(new Request(`${origin}${path}`, { method, headers: currentHeaders, ...(body === undefined ? {} : { body: JSON.stringify(body) }) }), { params: Promise.resolve(params) })
     return { status: response.status, body: response.headers.get('content-type')?.includes('json') ? await response.json() : await response.text() }
   }
@@ -48,6 +60,64 @@ test('a workspace token stays in its workspace on thread, evidence, proposal and
     mock.restoreAll()
     const [{ pool: appPool }, { workspacePool }] = await Promise.all([import('../lib/db'), import('../lib/workspace-db')])
     await Promise.all([pool.end(), appPool.end(), workspacePool.end()])
+  })
+
+  // Runs first: nothing has moved the owner's bot-less rows onto a Coordinator yet (lib/coordinator/coordinator-bot.ts backfill).
+  await t.test('a record naming no workspace: the personal workspace token only', async () => {
+    const list = await import('../app/api/mobile/threads/route')
+    const evidence = await import('../app/api/runs/[runId]/evidence/route')
+    const download = await import('../app/api/artifacts/[artifactId]/versions/[version]/download/route')
+    const listRoute = await import('../app/api/pending-actions/route')
+    const decide = await import('../app/api/mobile/pending-actions/[id]/route')
+    const reactions = await import('../app/api/mobile/reactions/route')
+    // No Bot and no task; a personal task linked to no workspace; an OAuth client's artifact; an older proposal; an older Coordinator message.
+    const personalIssue = randomUUID()
+    await pool.query(`INSERT INTO issues (id,"userId",title,content,status,priority) VALUES ($1,$2,'Mine','{"type":"doc"}','todo','normal')`, [personalIssue, owner])
+    const bare = await run(null, null), personalTask = await run(null, personalIssue)
+    // A cloud computer run with no Bot of its own belongs to the workspace its binding names.
+    const bound = await run(null, null)
+    await pool.query('INSERT INTO computer_run_bindings ("runId","botId","workspaceId","ownerId") VALUES ($1,$2,$3,$4)', [bound, ownBot, ws.id, owner])
+    const artifact = randomUUID(), proposal = randomUUID(), message = randomUUID()
+    await pool.query(`INSERT INTO artifacts (id,"userId",kind,title) VALUES ($1,$2,'markdown','From a client')`, [artifact, owner])
+    await pool.query(`INSERT INTO artifact_versions (id,"artifactId",version,"storageKey","inlineContent",sha256,size,"authorName") VALUES ($1,$2,1,'inline','# Notes','sha',7,'Client')`, [randomUUID(), artifact])
+    await pool.query(`INSERT INTO pending_actions (id,"userId",action,input) VALUES ($1,$2,'credential_operation',$3)`, [proposal, owner, { summary: 'Sign in', origin: 'https://example.invalid', operation: 'login' }])
+    await pool.query(`INSERT INTO coordinator_messages (id,"userId",position,message) VALUES ($1,$2,1,'{"role":"assistant"}')`, [message, owner])
+    const reach = async () => {
+      const threads = (await call(list.GET, '/api/mobile/threads', {})).body.threads.map((item: { id: string }) => item.id)
+      return {
+        threads: [bare, personalTask].map(id => threads.includes(id)),
+        evidence: [(await call(evidence.GET, `/api/runs/${bare}/evidence`, { runId: bare })).status, (await call(evidence.GET, `/api/runs/${personalTask}/evidence`, { runId: personalTask })).status],
+        artifact: (await call(download.GET, `/api/artifacts/${artifact}/versions/1/download`, { artifactId: artifact, version: '1' })).status,
+        proposals: (await call(listRoute.GET, '/api/pending-actions', {})).body.map((item: { id: string }) => item.id).includes(proposal),
+      }
+    }
+    try {
+      assert.equal((await call(evidence.GET, `/api/runs/${bound}/evidence`, { runId: bound })).status, 200)
+      // A team workspace's token: refused.
+      assert.deepEqual(await reach(), { threads: [false, false], evidence: [404, 404], artifact: 404, proposals: false })
+      assert.equal((await call(decide.POST, `/api/mobile/pending-actions/${proposal}`, { id: proposal }, { approve: false })).status, 409)
+      assert.equal((await pool.query('SELECT status FROM pending_actions WHERE id=$1', [proposal])).rows[0].status, 'pending')
+      assert.equal((await call(reactions.POST, '/api/mobile/reactions', {}, { messageId: message, emoji: '👍' })).status, 404)
+      assert.equal(Number((await pool.query('SELECT count(*) FROM message_reactions WHERE "messageId"=$1', [message])).rows[0].count), 0)
+      // The personal workspace's token: allowed, and still refused another workspace's run.
+      bearer = personalToken.token
+      assert.deepEqual(await reach(), { threads: [true, true], evidence: [200, 200], artifact: 200, proposals: true })
+      assert.equal((await call(reactions.POST, '/api/mobile/reactions', {}, { messageId: message, emoji: '👍' })).status, 200)
+      assert.equal((await call(evidence.GET, `/api/runs/${otherRun}/evidence`, { runId: otherRun })).status, 404)
+      assert.equal((await call(evidence.GET, `/api/runs/${ownRun}/evidence`, { runId: ownRun })).status, 404)
+      assert.equal((await call(evidence.GET, `/api/runs/${bound}/evidence`, { runId: bound })).status, 404)
+      // A browser session: unchanged, every record of the owner.
+      bearer = null; browser = true
+      assert.deepEqual(await reach(), { threads: [true, true], evidence: [200, 200], artifact: 200, proposals: true })
+      assert.equal((await call(evidence.GET, `/api/runs/${otherRun}/evidence`, { runId: otherRun })).status, 200)
+    } finally {
+      bearer = token.token; browser = false
+      await pool.query('DELETE FROM agent_runs WHERE id=ANY($1::uuid[])', [[bare, personalTask, bound]])
+      await pool.query('DELETE FROM issues WHERE id=$1', [personalIssue])
+      await pool.query('DELETE FROM pending_actions WHERE id=$1', [proposal])
+      await pool.query('DELETE FROM message_reactions WHERE "messageId"=$1', [message])
+      await pool.query('DELETE FROM coordinator_messages WHERE id=$1', [message])
+    }
   })
 
   await t.test('threads: the list and a thread by id', async () => {
@@ -155,9 +225,138 @@ test('a workspace token stays in its workspace on thread, evidence, proposal and
     // A bare id, as the Coordinator and MCP pass, keeps the owner's reach.
     assert.equal((await actAs(owner, () => requireIssueAccess(otherIssue))).issue.id, otherIssue)
   })
+  await t.test('tasks: a team token reaches only its workspace tasks; the personal token keeps personal and unlinked ones', async () => {
+    const [{ actAs }, { requireIssueAccess, issueForUser }, { getApiSession }] = await Promise.all([import('../lib/acting-user'), import('../lib/issue-access'), import('../lib/api-auth')])
+    const tasks = await import('../app/api/mobile/tasks/route')
+    const search = await import('../app/api/issues/search/route')
+    const personalTask = randomUUID(), unlinkedTask = randomUUID()
+    await pool.query(`INSERT INTO issues (id,"userId",title,content,status,priority) VALUES ($1,$2,'Mine','{"type":"doc"}','todo','normal')`, [personalTask, owner])
+    await pool.query(`INSERT INTO issues (id,"userId",title,content,status,priority,scope) VALUES ($1,$2,'Loose','{"type":"doc"}','todo','normal','workspace')`, [unlinkedTask, owner])
+    const ids = [ownIssue, personalTask, unlinkedTask]
+    const reach = async () => {
+      const listed = (await call(tasks.GET, '/api/mobile/tasks', {})).body.tasks.map((item: { id: string }) => item.id)
+      const found = (await call(search.GET, '/api/issues/search?q=', {})).body.items.map((item: { id: string }) => item.id)
+      const session = bearer ? await getApiSession({ headers: new Headers({ authorization: `Bearer ${bearer}` }) }) : null
+      const user = session?.user ?? owner
+      const read = await Promise.all(ids.map(async id => Boolean(await issueForUser(user, id))))
+      const acted = await Promise.all(ids.map(id => actAs(user, () => requireIssueAccess(id)).then(() => true, () => false)))
+      return { listed: ids.map(id => listed.includes(id)), searched: ids.map(id => found.includes(id)), read, acted }
+    }
+    try {
+      // [W-linked task, personal task, unlinked task]
+      assert.deepEqual(await reach(), { listed: [true, false, false], searched: [true, false, false], read: [true, false, false], acted: [true, false, false] })
+      bearer = personalToken.token
+      assert.deepEqual(await reach(), { listed: [false, true, true], searched: [false, true, true], read: [false, true, true], acted: [false, true, true] })
+      // A browser session: unchanged, the owner's tasks wherever they are.
+      bearer = null; browser = true
+      const read = await Promise.all(ids.map(async id => Boolean(await issueForUser(owner, id))))
+      assert.deepEqual(read, [true, true, true])
+      const found = (await call(search.GET, `/api/issues/search?q=&workspaceId=${ws.id}`, {})).body.items.map((item: { id: string }) => item.id)
+      assert.deepEqual(ids.map(id => found.includes(id)), [true, true, true])
+    } finally {
+      bearer = token.token; browser = false
+      await pool.query('DELETE FROM issues WHERE id=ANY($1::uuid[])', [[personalTask, unlinkedTask]])
+    }
+  })
   await t.test('self-improvement reads a run of the token workspace only', async () => {
     const route = await import('../app/api/self-improvement/route')
     assert.equal((await call(route.GET, `/api/self-improvement?runId=${ownRun}`, {})).status, 200)
     assert.equal((await call(route.GET, `/api/self-improvement?runId=${otherRun}`, {})).status, 404)
+    // A team token reaches no task in no workspace (the task allowlist), so neither run on one opens.
+    assert.equal((await call(route.GET, `/api/self-improvement?runId=${ownBotLooseRun}`, {})).status, 404)
+    assert.equal((await call(route.GET, `/api/self-improvement?runId=${otherBotLooseRun}`, {})).status, 404)
+    // The personal token keeps tasks in no workspace, so only the run's Bot keeps it out of a team
+    // workspace's run: a task in no workspace does not open a run whose Bot is in another one.
+    bearer = personalToken.token
+    try {
+      for (const runId of [ownBotLooseRun, otherBotLooseRun]) {
+        assert.equal((await call(route.GET, `/api/self-improvement?runId=${runId}`, {})).status, 404)
+        assert.equal((await call(route.POST, '/api/self-improvement', {}, { action: 'propose', runId })).status, 404)
+        assert.equal((await call(route.POST, '/api/self-improvement', {}, { action: 'feedback', eventId: randomUUID(), runId, verdict: 'negative' })).status, 404)
+        assert.equal(Number((await pool.query('SELECT count(*) FROM improvement_scores WHERE "runId"=$1', [runId])).rows[0].count), 0)
+      }
+    } finally {
+      bearer = token.token
+    }
+    // A run with no task has no improvement record to reach.
+    assert.equal((await call(route.GET, `/api/self-improvement?runId=${otherBotNoTaskRun}`, {})).status, 404)
+  })
+
+  // Records made from runs: a proposal (its source runs), a benchmark instance (its source run)
+  // and an evaluation (its instance's and its proposal's source runs), all on the task in no workspace.
+  const scorer = randomUUID().replaceAll('-', '')
+  await pool.query(`INSERT INTO improvement_scorers (digest,id,version,definition) VALUES ($1,$1,1,'{}')`, [scorer])
+  const proposal = async (sourceRuns: string[]) => {
+    const id = randomUUID(), bucket = randomUUID(), task = randomUUID(), attempt = randomUUID(), event = randomUUID()
+    await pool.query(`INSERT INTO improvement_proposals (id,"userId",bucket,fingerprint,"issueId","scorerDigest",candidate,result,status)
+      VALUES ($1,$2,$3,$4,$5,$6,'{}','{}','awaiting_model_candidate')`, [id, owner, bucket, randomUUID(), looseIssue, scorer])
+    for (const runId of sourceRuns) {
+      const score = randomUUID()
+      await pool.query(`INSERT INTO improvement_feedback (id,"userId","eventId","runId","issueId",fingerprint,verdict,note) VALUES ($1,$2,$3,$4,$5,'f','negative','')`, [score, owner, randomUUID(), runId, looseIssue])
+      await pool.query(`INSERT INTO improvement_scores (id,"userId","runId",bucket,"scorerDigest",outcome,reason,snapshot) VALUES ($1,$2,$3,$4,$5,'failure','r','{}')`, [score, owner, runId, bucket, scorer])
+      await pool.query('INSERT INTO improvement_proposal_sources ("proposalId","scoreId","userId",bucket,"runId") VALUES ($1,$2,$3,$4,$5)', [id, score, owner, bucket, runId])
+    }
+    // Its Factory handoff, so its status reads. Its Factory task and attempt reference each other (a deferred key), so they go in together.
+    await pool.query(`INSERT INTO coordinator_events (id,"userId",kind,"dedupeKey",payload) VALUES ($1,$2,'user_message',$3,'{}')`, [event, owner, event])
+    await pool.query(`WITH t AS (INSERT INTO factory_tasks (id,"userId","issueId","sourceEventId",route,stage,status,"attemptId",reason)
+      VALUES ($1,$2,$3,$4,'{}','execute','running',$5,'Scope fixture'))
+      INSERT INTO factory_attempts (id,"taskId",stage,ordinal,position,status,reason) VALUES ($5,$1,'execute',1,1,'running','Scope fixture')`, [task, owner, looseIssue, event, attempt])
+    await pool.query(`INSERT INTO improvement_factory_links ("proposalId","userId","issueId","taskId","attemptId","runId",request) VALUES ($1,$2,$3,$4,$5,$6,'{}')`,
+      [id, owner, looseIssue, task, attempt, sourceRuns[0] ?? randomUUID()])
+    return { id, binding: { taskId: task, issueId: looseIssue, attemptId: attempt, revision: 1, candidateId: null } }
+  }
+  // A run with no Bot on a task in no workspace belongs to the owner's personal workspace.
+  const personalLooseRun = await run(null, looseIssue)
+  const ownProposal = await proposal([ownBotLooseRun]), otherProposal = await proposal([otherBotLooseRun]), sourcelessProposal = await proposal([])
+  const personalProposal = await proposal([personalLooseRun])
+  const instance = randomUUID(), candidateVersion = randomUUID(), baselineVersion = randomUUID(), evaluation = randomUUID()
+  await pool.query(`INSERT INTO improvement_benchmark_instances (id,"userId","issueId","agentId","repoId","sourceRunId","sourceCommit","definitionDigest","instanceDigest",seed,settings)
+    VALUES ($1,$2,$3,$4,$5,$6,repeat('a',40),'definition','instance',repeat('b',64),'{}')`, [instance, owner, looseIssue, agent, repo, otherBotLooseRun])
+  await pool.query(`INSERT INTO improvement_skill_versions (id,artifact,markdown) VALUES ($1,'{}',''),($2,'{}','')`, [candidateVersion, baselineVersion])
+  await pool.query(`INSERT INTO improvement_skill_candidates ("versionId","userId","issueId","agentId","repoId","proposalId","factoryTaskId","candidateId",repository,"commitSha",path,"baselineVersionId")
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'repo',repeat('c',40),'SKILL.md',$9)`, [candidateVersion, owner, looseIssue, agent, repo, otherProposal.id, otherProposal.binding.taskId, randomUUID(), baselineVersion])
+  await pool.query(`INSERT INTO improvement_skill_evaluations (id,"instanceId","userId","proposalId","candidateVersionId",scope) VALUES ($1,$2,$3,$4,$5,'{}')`,
+    [evaluation, instance, owner, otherProposal.id, candidateVersion])
+
+  await t.test('self-improvement keeps a token to records made from runs of its workspace', async () => {
+    const route = await import('../app/api/self-improvement/route')
+    const post = (body: unknown) => call(route.POST, '/api/self-improvement', {}, body)
+    const proposalStatus = async (id: string) => (await call(route.GET, `/api/self-improvement?proposalId=${id}`, {})).status
+    // A team token reaches no task in no workspace (the task allowlist), so no proposal on one opens.
+    for (const id of [ownProposal.id, otherProposal.id, personalProposal.id]) assert.equal(await proposalStatus(id), 404)
+    // The personal token keeps tasks in no workspace, so only the records' source runs keep it out.
+    bearer = personalToken.token
+    try {
+      assert.equal(await proposalStatus(personalProposal.id), 200)
+      // A proposal on a task in no workspace whose source run's Bot is in a team workspace.
+      assert.equal(await proposalStatus(otherProposal.id), 404)
+      assert.equal(await proposalStatus(ownProposal.id), 404)
+      assert.equal((await post({ action: 'handoff', proposalId: otherProposal.id, binding: otherProposal.binding, agentId: agent, deviceRepoId: repo })).status, 404)
+      assert.equal((await post({ action: 'register_candidate', proposalId: otherProposal.id, binding: otherProposal.binding })).status, 404)
+      assert.equal((await post({ action: 'dispatch_training', instanceId: instance })).status, 404)
+      assert.equal((await post({ action: 'begin_evaluation', instanceId: instance, proposalId: personalProposal.id, candidateVersionId: candidateVersion })).status, 404)
+      assert.equal((await post({ action: 'dispatch_evaluation', evaluationId: evaluation })).status, 404)
+      assert.equal((await post({ action: 'compare_evaluation', evaluationId: evaluation })).status, 404)
+      // A record with no source run to place it.
+      assert.equal(await proposalStatus(sourcelessProposal.id), 404)
+    } finally {
+      bearer = token.token
+    }
+  })
+
+  await t.test('self-improvement keeps a browser session to its owner checks', async () => {
+    const route = await import('../app/api/self-improvement/route')
+    // The mocked cookie session, as the owner's browser.
+    const { api } = (await import('../lib/auth')).auth as unknown as { api: { getSession: () => Promise<unknown> } }
+    const signedOut = api.getSession
+    api.getSession = async () => ({ user: { id: owner }, session: { id: 'browser' } })
+    try {
+      const read = (runId: string) => route.GET(new Request(`${origin}/api/self-improvement?runId=${runId}`, { headers: currentHeaders = new Headers() }))
+      assert.equal((await read(otherBotLooseRun)).status, 200)
+      assert.equal((await read(otherRun)).status, 200)
+      const proposalStatus = (id: string) => route.GET(new Request(`${origin}/api/self-improvement?proposalId=${id}`, { headers: currentHeaders = new Headers() }))
+      assert.equal((await proposalStatus(otherProposal.id)).status, 200)
+      assert.equal((await proposalStatus(sourcelessProposal.id)).status, 200)
+    } finally { api.getSession = signedOut }
   })
 })
