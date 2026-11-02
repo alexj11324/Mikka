@@ -4,10 +4,8 @@ import type { ReconcileResult } from '@/lib/suggestions/reconcile'
 
 const originalSecret = process.env.CRON_SECRET
 const secret = 'source-only-cron-test-secret'
-const verifyBearer = mock.fn(async (_value: string | null, _secret: string) => false)
 const result = (): ReconcileResult => ({ people: 2, read: { gmail: 3 }, failed: {}, reconnect: {}, deferred: 1, linear: { deliveries: 4, notifications: 2 }, github: { configured: true, scanned: 30, failed: 27, redelivered: 25, errors: 0 } })
 const reconcile = mock.fn(async (_options: { deadline: number }) => result())
-mock.module(new URL('../../../../lib/linear-sync/webhook.ts', import.meta.url).href, { namedExports: { verifyBearer } })
 mock.module(new URL('../../../../lib/suggestions/reconcile.ts', import.meta.url).href, { namedExports: { reconcileSuggestions: reconcile } })
 const sweepResult = () => ({ enabled: true, scopes: 2, observed: 3, failed: 0, deferred: 0 })
 const sweep = mock.fn(async (_options: { deadline: number }) => sweepResult())
@@ -15,8 +13,6 @@ mock.module(new URL('../../../../lib/factory/monitor-cron.ts', import.meta.url).
 let GET: typeof import('./route')['GET']
 before(async () => { ({ GET } = await import('./route')) })
 beforeEach(() => {
-  verifyBearer.mock.resetCalls()
-  verifyBearer.mock.mockImplementation(async () => false)
   reconcile.mock.mockImplementation(async () => result())
   reconcile.mock.resetCalls()
   sweep.mock.mockImplementation(async () => sweepResult())
@@ -31,7 +27,7 @@ test('missing cron configuration returns 503 without accessing GitHub', async ()
   delete process.env.CRON_SECRET
   const response = await GET(new Request('https://preview.example.test/mikka/api/cron/suggestions-reconcile'))
   assert.equal(response.status, 503)
-  assert.equal(verifyBearer.mock.callCount(), 0)
+  assert.equal(response.headers.get('cache-control'), 'no-store')
   assert.equal(reconcile.mock.callCount(), 0)
   assert.equal(sweep.mock.callCount(), 0, 'no Factory read or write without the bearer')
 })
@@ -42,7 +38,7 @@ test('an invalid bearer returns 401 without accessing GitHub', async () => {
     headers: { authorization: 'Bearer incorrect-test-secret' },
   }))
   assert.equal(response.status, 401)
-  assert.deepEqual(verifyBearer.mock.calls.map(call => call.arguments), [['Bearer incorrect-test-secret', secret]])
+  assert.equal(response.headers.get('cache-control'), 'no-store')
   assert.equal(reconcile.mock.callCount(), 0)
   assert.equal(sweep.mock.callCount(), 0, 'no Factory read or write without the bearer')
 })
@@ -51,7 +47,6 @@ const request = () => new Request('https://preview.example.test/mikka/api/cron/s
 
 test('an authorized call preserves all nested counts and gives reconciliation a 40-second budget', async () => {
   process.env.CRON_SECRET = secret
-  verifyBearer.mock.mockImplementation(async () => true)
   const started = Date.now()
   const response = await GET(request())
   assert.equal(response.status, 200)
@@ -64,7 +59,6 @@ test('an authorized call preserves all nested counts and gives reconciliation a 
 
 test('an unconfigured GitHub backfill reports 503 with the complete result', async () => {
   process.env.CRON_SECRET = secret
-  verifyBearer.mock.mockImplementation(async () => true)
   const summary = result()
   summary.github!.configured = false
   reconcile.mock.mockImplementation(async () => summary)
@@ -75,7 +69,6 @@ test('an unconfigured GitHub backfill reports 503 with the complete result', asy
 
 test('GitHub errors and caught source failures report 502 with the complete result', async () => {
   process.env.CRON_SECRET = secret
-  verifyBearer.mock.mockImplementation(async () => true)
   for (const source of ['github-response', 'github-thrown', 'linear', 'composio', 'gmail']) {
     const summary = result()
     if (source === 'github-response') summary.github!.errors = 1
@@ -90,7 +83,6 @@ test('GitHub errors and caught source failures report 502 with the complete resu
 
 test('a connection that needs reconnecting is reported, not a failed run', async () => {
   process.env.CRON_SECRET = secret
-  verifyBearer.mock.mockImplementation(async () => true)
   const summary = result()
   summary.reconnect.notion = 1
   reconcile.mock.mockImplementation(async () => summary)
@@ -101,7 +93,6 @@ test('a connection that needs reconnecting is reported, not a failed run', async
 
 test('the Factory monitor sweep runs once, alongside the backfill, with a 50-second budget', async () => {
   process.env.CRON_SECRET = secret
-  verifyBearer.mock.mockImplementation(async () => true)
   const order: string[] = []
   let release!: () => void
   const gate = new Promise<void>(r => { release = r })
@@ -120,14 +111,13 @@ test('a missing Authorization header returns 401 without any read or write', asy
   process.env.CRON_SECRET = secret
   const response = await GET(new Request('https://preview.example.test/mikka/api/cron/suggestions-reconcile'))
   assert.equal(response.status, 401)
-  assert.deepEqual(verifyBearer.mock.calls.map(call => call.arguments), [[null, secret]])
+  assert.equal(response.headers.get('cache-control'), 'no-store')
   assert.equal(reconcile.mock.callCount(), 0)
   assert.equal(sweep.mock.callCount(), 0)
 })
 
 test('suggestions still finish when the sweep throws, and the reverse; each failure is logged without its message', async () => {
   process.env.CRON_SECRET = secret
-  verifyBearer.mock.mockImplementation(async () => true)
   const errors = mock.method(console, 'error', () => {})
   sweep.mock.mockImplementation(async () => { throw new Error('token=sweep-secret') })
   let response = await GET(request())
@@ -149,7 +139,6 @@ test('suggestions still finish when the sweep throws, and the reverse; each fail
 
 test('a failing Factory monitor scope or a thrown sweep reports 502 and keeps the backfill result', async () => {
   process.env.CRON_SECRET = secret
-  verifyBearer.mock.mockImplementation(async () => true)
   sweep.mock.mockImplementation(async () => ({ ...sweepResult(), failed: 1 }))
   let response = await GET(request())
   assert.equal(response.status, 502)
@@ -165,7 +154,6 @@ test('a failing Factory monitor scope or a thrown sweep reports 502 and keeps th
 
 test('a disabled Factory sweep leaves the status to the backfill', async () => {
   process.env.CRON_SECRET = secret
-  verifyBearer.mock.mockImplementation(async () => true)
   sweep.mock.mockImplementation(async () => ({ enabled: false, scopes: 0, observed: 0, failed: 0, deferred: 0 }))
   const response = await GET(request())
   assert.equal(response.status, 200)
