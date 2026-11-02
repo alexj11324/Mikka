@@ -77,6 +77,19 @@ test('设备：本机与服务器分组，Agent 图标，重命名、重新检�
   await expect(page.getByText('需要管理员开启 user namespace', { exact: false })).toHaveCount(0)
   await page.keyboard.press('Escape')
   await expect(row(page, 'gpu-box').getByRole('button', { name: '重新连接' })).toBeVisible()
+  // Review C11: a device paired before only needs its client started again, not install and login.
+  await row(page, 'gpu-box').getByRole('button', { name: '重新连接' }).click()
+  const again = page.getByRole('dialog', { name: '重新连接', exact: true })
+  await expect(again).toContainText('mikka daemon')
+  await expect(again).not.toContainText('mikka daemon login')
+  await expect(again).not.toContainText('npm install')
+  for (const scheme of ['light', 'dark'] as const) {
+    await page.emulateMedia({ colorScheme: scheme })
+    await test.info().attach(`device-reconnect-${scheme}`, { body: await page.screenshot(), contentType: 'image/png' })
+  }
+  await page.emulateMedia({ colorScheme: 'light' })
+  await page.keyboard.press('Escape')
+  await expect(again).toHaveCount(0)
   // R5: an offline computer gets no runs; an online one with nothing allowed to run says so.
   await expect(row(page, 'gpu-box')).toContainText('离线 · 不会被派任务')
   await expect(row(page, 'E2E MacBook')).toContainText('不能跑允许使用的模型')
@@ -166,4 +179,29 @@ test('设备（桌面版）：从 SSH 配置选主机，确认指纹，看安装
   await expect(dialog.getByRole('listitem').filter({ hasText: '已上线' })).toContainText('Claude Code')
   await dialog.getByRole('button', { name: '完成' }).click()
   await expect(dialog).toBeHidden()
+})
+
+// Review C6: until the list is read the page shows its shape, never 还没有设备.
+test('设备：列表读到之前显示加载，读到空列表才说还没有设备', async ({ page }) => {
+  await register(page, '/settings?section=devices')
+  await expect(page.getByRole('heading', { level: 1, name: '设备' })).toBeVisible()
+  let release!: () => void
+  const held = new Promise<void>(resolve => { release = resolve })
+  await page.route('**/*', async route => {
+    if (route.request().method() === 'POST' && route.request().headers()['next-action']) await held
+    await route.fallback()
+  })
+  try {
+    await page.reload()
+    await expect(page.getByRole('status', { name: '正在加载设备', exact: true })).toBeVisible()
+    await expect(page.getByText('还没有设备', { exact: true })).toHaveCount(0)
+    for (const scheme of ['light', 'dark'] as const) {
+      await page.emulateMedia({ colorScheme: scheme })
+      await test.info().attach(`devices-loading-${scheme}`, { body: await page.screenshot(), contentType: 'image/png' })
+    }
+    await page.emulateMedia({ colorScheme: 'light' })
+  } finally { release() }
+  await page.unroute('**/*')
+  await expect(page.getByText('还没有设备', { exact: true })).toBeVisible()
+  await expect(page.getByRole('status', { name: '正在加载设备', exact: true })).toHaveCount(0)
 })

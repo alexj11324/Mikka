@@ -216,6 +216,13 @@ export interface MikkaBridge {
     local?(): Promise<SshInstallState | null>
     /** 重新连接 for this computer: restarts its daemon and waits until it is online. */
     restartLocal?(): Promise<SshInstallState | null>
+    /**
+     * Installing the app makes this computer a device: once per launch the
+     * page asks main to install (no device, or someone else's) or repair (the
+     * daemon does not answer: restart, else install). Progress arrives through
+     * onChange as 添加这台电脑.
+     */
+    autoLocal?(action: "install" | "repair"): Promise<SshInstallState | null>
   }
 
   app: {

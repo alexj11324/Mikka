@@ -4,11 +4,12 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
-    <title>Mikka · 未连接</title>
+    <title>Mikka</title>
     <style>
       :root { color-scheme: light dark; --bg: #f5f5f4; --card: #ffffff; --fg: #1c1917; --muted: #78716c; --border: #e7e5e4; --primary: #1c1917; --primary-fg: #fafaf9; }
       @media (prefers-color-scheme: dark) { :root { --bg: #0a0a0a; --card: #171717; --fg: #e7e5e4; --muted: #a8a29e; --border: #292524; --primary: #e7e5e4; --primary-fg: #1c1917; } }
       * { box-sizing: border-box; }
+      [hidden] { display: none !important; }
       body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px; font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; background: var(--bg); color: var(--fg); -webkit-app-region: drag; }
       main { width: 100%; max-width: 360px; display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 28px 24px 24px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); text-align: center; }
       svg { width: 20px; height: 20px; color: var(--muted); }
@@ -22,22 +23,39 @@
   </head>
   <body>
     <main>
-      <svg class="pulse" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h.01"/><path d="M8.5 16.4a5 5 0 0 1 7 0"/><path d="M5 12.9a10 10 0 0 1 5.2-2.7"/><path d="M19 12.9a10 10 0 0 0-2-1.4"/><path d="M2 8.8a15 15 0 0 1 4.2-2.6"/><path d="M22 8.8A15 15 0 0 0 11 5"/><path d="m2 2 20 20"/></svg>
-      <h1>暂时连不上 Mikka</h1>
-      <p>请检查网络连接，Mikka 会自动重新连接。</p>
-      <p class="status" role="status" aria-live="polite" id="status">正在等待网络…</p>
+      <svg id="icon-network" class="pulse" hidden viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h.01"/><path d="M8.5 16.4a5 5 0 0 1 7 0"/><path d="M5 12.9a10 10 0 0 1 5.2-2.7"/><path d="M19 12.9a10 10 0 0 0-2-1.4"/><path d="M2 8.8a15 15 0 0 1 4.2-2.6"/><path d="M22 8.8A15 15 0 0 0 11 5"/><path d="m2 2 20 20"/></svg>
+      <svg id="icon-server" class="pulse" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m2 2 20 20"/><path d="M5.782 5.782A7 7 0 0 0 9 19h8.5a4.5 4.5 0 0 0 1.307-.193"/><path d="M21.532 16.5A4.5 4.5 0 0 0 17.5 10h-1.79A7.008 7.008 0 0 0 10 5.07"/></svg>
+      <h1 id="title">无法连接 Mikka</h1>
+      <p class="status" role="status" aria-live="polite" id="status"></p>
       <a id="retry" href="#">立即重试</a>
     </main>
     <script>
       (() => {
-        const app = new URLSearchParams(location.search).get('app');
+        // The title says what failed (review C9): this computer has no network, or Mikka did not answer.
+        // The status line says only the state (R-40); the page keeps retrying on its own.
+        const params = new URLSearchParams(location.search);
+        const en = /^en\b/i.test(navigator.language);
+        const copy = en
+          ? { network: 'No network', server: "Can't reach Mikka", waiting: s => 'Disconnected for ' + s + 's · retrying', reconnecting: 'Reconnecting…', retry: 'Retry now' }
+          : { network: '没有网络', server: '无法连接 Mikka', waiting: s => '已断开 ' + s + ' 秒 · 自动重试中', reconnecting: '正在重新连接…', retry: '立即重试' };
+        const app = params.get('app');
         const retry = document.getElementById('retry');
         const status = document.getElementById('status');
+        const title = document.getElementById('title');
+        const network = params.get('reason') === 'network';
+        title.textContent = network ? copy.network : copy.server;
+        // SVG elements have no .hidden property: set the attribute.
+        document.getElementById('icon-network').toggleAttribute('hidden', !network);
+        document.getElementById('icon-server').toggleAttribute('hidden', network);
+        document.title = 'Mikka · ' + title.textContent;
+        document.documentElement.lang = en ? 'en' : 'zh-CN';
+        retry.textContent = copy.retry;
         if (!app || !/^https?:\/\//.test(app)) { retry.hidden = true; return; }
         retry.href = app;
-        retry.addEventListener('click', () => { status.textContent = '正在重新连接…'; });
+        retry.addEventListener('click', () => { status.textContent = copy.reconnecting; });
         let seconds = 0;
-        setInterval(() => { seconds += 1; status.textContent = '已离线 ' + seconds + ' 秒，正在自动重试…'; }, 1000);
+        status.textContent = copy.waiting(seconds);
+        setInterval(() => { seconds += 1; status.textContent = copy.waiting(seconds); }, 1000);
       })();
     </script>
   </body>

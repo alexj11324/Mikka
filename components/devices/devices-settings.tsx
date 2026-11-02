@@ -1,5 +1,6 @@
 'use client'
 
+import { SettingsLoading } from '@/components/settings/primitives'
 import { Fragment, useEffect, useState } from 'react'
 import useSWR from 'swr'
 import { Check, Copy, Laptop, MoreHorizontal, Plus, Server } from 'lucide-react'
@@ -24,6 +25,7 @@ import { cn } from '@/lib/utils'
 import { ConnectDeviceDialog } from './connect-device-dialog'
 import { AgentMarks, installedAgents, sandboxBlockedAgents } from './agent-marks'
 import { SshAddDialog } from './ssh-add-dialog'
+import { LocalSetupStatus } from './local-setup-status'
 
 type Command = 'redetect' | 'restart' | 'update'
 type Result = { error: string } | object
@@ -242,14 +244,16 @@ function DeviceGroup({ title, devices, deviceModels, onChanged, onReconnect }: {
  * 设置 › 设备 (Figma V09b 683:24269, S-L2 684:24422, S-L3 684:24731): only
  * machines the user connected, laptops under 本机 and SSH-installed servers
  * under Remote control. The bots' cloud computer is ours and never listed.
- * 添加设备 in the desktop app (V09c) offers 添加这台电脑 first and the one-click
- * SSH install for remote computers after it; the web shows the three commands
- * (V09d), where the browser cannot open SSH (#491). In the desktop app,
- * 重新连接 on this computer's own row restarts its daemon (usability C10).
+ * In the desktop app this computer becomes a device by itself, shown here by
+ * LocalSetupStatus; 添加设备 is the one-click SSH install for remote computers
+ * with 手动连接 last (V09c), and the web shows the three commands (V09d), where
+ * the browser cannot open SSH (#491). In the desktop app, 重新连接 on this
+ * computer's own row restarts its daemon (usability C10).
  */
 export function DevicesSettings({ workspaceId }: { workspaceId?: string }) {
   const t = useTranslations('Devices')
-  const { data: devices = [], error, mutate } = useSWR('devices', listDevices, { refreshInterval: 5000 })
+  const { data, error, mutate } = useSWR('devices', listDevices, { refreshInterval: 5000 })
+  const devices = data ?? []
   // The same read as 模型与订阅, so both pages agree on what each device can run.
   const order = useSWR(workspaceId ? modelOrderKey(workspaceId) : null, () => readModelOrder(workspaceId!))
   const deviceModels = order.data && !order.data.error ? order.data.deviceModels : undefined
@@ -269,10 +273,13 @@ export function DevicesSettings({ workspaceId }: { workspaceId?: string }) {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
   const changed = () => { void mutate() }
-  // This computer restarts its own daemon; any other offline device opens 添加设备.
+  // 重新连接: this computer restarts its own daemon; another device opens 添加设备 on the desktop,
+  // and on the web only the command that starts its client again (review C11).
+  const [reconnecting, setReconnecting] = useState(false)
   const reconnect = (device: DeviceView) => {
     const ssh = bridgeFromWindow(window as MikkaWindow)?.ssh
-    if (device.id === thisDevice && ssh?.restartLocal) void ssh.restartLocal().catch(() => {})
+    if (!ssh) return setReconnecting(true)
+    if (device.id === thisDevice && ssh.restartLocal) void ssh.restartLocal().catch(() => {})
     setAdding(true)
   }
   return <div className="flex flex-col gap-6">
@@ -280,13 +287,17 @@ export function DevicesSettings({ workspaceId }: { workspaceId?: string }) {
       <h1 className="text-xl font-semibold">{t('title')}</h1>
       <Button size="sm" variant="secondary" aria-keyshortcuts="Meta+N Control+N" onClick={() => setAdding(true)}><Plus data-icon="inline-start" />{t('add.trigger')}</Button>
     </div>
+    {desktopSsh && <LocalSetupStatus onOnline={changed} />}
     {error && <FieldError className="text-xs">{t('listError')}</FieldError>}
-    {devices.length === 0 ? <Empty className="rounded-xl border"><EmptyHeader><EmptyTitle>{t('emptyTitle')}</EmptyTitle></EmptyHeader></Empty> : <>
+    {/* Not read yet: rows' shapes, never 还没有设备 (review C6, R-39). A failed first read says only that. */}
+    {!data ? !error && <div className="overflow-hidden rounded-xl border bg-card"><SettingsLoading bare label={t('loading')} /></div>
+      : devices.length === 0 ? <Empty className="rounded-xl border"><EmptyHeader><EmptyTitle>{t('emptyTitle')}</EmptyTitle></EmptyHeader></Empty> : <>
       <DeviceGroup title={t('thisMachine')} devices={devices.filter(device => device.deviceType !== 'server')} deviceModels={deviceModels} onChanged={changed} onReconnect={reconnect} />
       <DeviceGroup title={t('otherDevices')} devices={devices.filter(device => device.deviceType === 'server')} deviceModels={deviceModels} onChanged={changed} onReconnect={reconnect} />
     </>}
     {desktopSsh
       ? <SshAddDialog open={adding} onOpenChange={setAdding} devices={devices} onAdded={changed} />
       : <ConnectDeviceDialog open={adding} onOpenChange={setAdding} hideTrigger />}
+    {!desktopSsh && <ConnectDeviceDialog open={reconnecting} onOpenChange={setReconnecting} hideTrigger reconnect />}
   </div>
 }

@@ -854,10 +854,12 @@
       "commands": {
         "install": "1 Install",
         "login": "2 Sign in",
-        "start": "3 Start"
+        "start": "3 Start",
+        "startAlone": "Start"
       },
       "requirements": "Node.js 24+ · Git",
-      "configurationFailed": "Installation commands are unavailable"
+      "configurationFailed": "Installation commands are unavailable",
+      "reconnectTitle": "Reconnect"
     },
     "setup": "Set up repository and agent",
     "offlineSince": "Offline · {time}",
@@ -904,9 +906,6 @@
     },
     "ssh": {
       "title": "Add device",
-      "thisComputer": "Add this computer",
-      "remote": "Add a remote computer",
-      "addingThis": "Adding this computer",
       "reconnectingThis": "Reconnecting this computer",
       "sshConfig": "SSH config",
       "otherHost": "Other host",
@@ -934,12 +933,20 @@
       "hide": "Close",
       "retry": "Retry",
       "done": "Done",
-      "cancelled": "Cancelled"
+      "cancelled": "Cancelled",
+      "manual": "Connect manually"
     },
     "runsModels": "Runs {models}",
     "runsCount": "{count, plural, one {Runs # allowed model} other {Runs # allowed models}}",
     "runsNone": "Runs no allowed model",
-    "offlineNoRuns": "Offline · gets no runs"
+    "offlineNoRuns": "Offline · gets no runs",
+    "local": {
+      "adding": "Adding this computer",
+      "online": "This computer is online",
+      "failed": "Couldn't add this computer",
+      "retry": "Retry"
+    },
+    "loading": "Loading devices"
   },
   "Workspace": {
     "loadingEditor": "Loading task editor",
@@ -2556,7 +2563,8 @@
       "e2bKeyMissing": "Not added",
       "e2bKeyFill": "Add",
       "e2bKeyReplace": "Replace"
-    }
+    },
+    "loadingPage": "Loading settings"
   },
   "TelegramBot": {
     "help": "Mikka Telegram commands:\n/new <title> — start a task draft\nWhile a draft is open, send details, then /confirm to create it in Backlog\nSend other messages to the Orchestrator; replies return here\n/cancel — discard the draft\n/issues — list recent tasks\n/link ORV-123 or /link <issue UUID> — link this chat to a task\n/status — show the linked task\n/unlink — clear the link",
@@ -3843,6 +3851,7 @@
     "returnToTerminal": "Return to your terminal to start the Mikka client",
     "done": "Done",
     "invalid": "This code is invalid or expired",
+    "rateLimited": "Too many lookups. Try again in 30 minutes",
     "failed": "Connection failed",
     "enterAgain": "Enter another code",
     "retry": "Retry"

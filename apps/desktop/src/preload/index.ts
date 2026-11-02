@@ -65,6 +65,7 @@ if (appOrigin && window.location.origin === appOrigin) {
       state: () => ipcRenderer.invoke(IPC.sshState),
       local: () => ipcRenderer.invoke(IPC.sshLocal),
       restartLocal: () => ipcRenderer.invoke(IPC.sshRestartLocal),
+      autoLocal: (action: unknown) => ipcRenderer.invoke(IPC.sshAutoLocal, action),
     },
     device: {
       status: () => ipcRenderer.invoke(IPC.deviceStatus),
