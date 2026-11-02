@@ -43,8 +43,9 @@ lines.on("line", async (line) => {
           models: [],
           account: {
             apiProvider: token === "fixture-gateway" ? "gateway" : "firstParty",
-            apiKeySource:
-              token === "fixture-paid" ? "ANTHROPIC_API_KEY" : "none"
+            // Official 2.1.309 omits apiKeySource for descriptor-delivered OAuth.
+            ...(token === "fixture-paid" ? { apiKeySource: "ANTHROPIC_API_KEY" } : token === "fixture-legacy" ? { apiKeySource: "none" } : {}),
+            ...(token === "fixture-unknown" ? {} : { tokenSource: token === "fixture-environment" ? "CLAUDE_CODE_OAUTH_TOKEN" : "CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR" })
           }
         }
       }

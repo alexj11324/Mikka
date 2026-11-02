@@ -149,7 +149,12 @@ func (e CPAPlainModel) ExecuteStream(ctx context.Context, a *core.Auth, request 
 		upstreamFailure(e.Provider, "transport", 0, "network")
 		return nil, ErrProvider
 	}
-	if response.StatusCode != http.StatusOK || !strings.HasPrefix(response.Header.Get("Content-Type"), "text/event-stream") {
+	contentType := response.Header.Get("Content-Type")
+	// Codex can omit MIME on a successful streaming response. The parser below
+	// still requires valid SSE JSON and a terminal response event; an HTML/JSON
+	// error page or truncated stream cannot become a successful model reply.
+	streamType := strings.HasPrefix(contentType, "text/event-stream") || (e.Provider == "codex" && contentType == "")
+	if response.StatusCode != http.StatusOK || !streamType {
 		body, _ := io.ReadAll(io.LimitReader(response.Body, 8192))
 		response.Body.Close()
 		upstreamFailure(e.Provider, "response", response.StatusCode, upstreamErrorType(body))

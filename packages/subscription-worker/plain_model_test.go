@@ -140,3 +140,32 @@ func TestClaudeSubscriptionRequestPreservesInstructionsAndToolHistory(t *testing
 		}
 	}
 }
+
+func TestCodexSubscriptionStreamWithoutContentType(t *testing.T) {
+	for _, test := range []struct {
+		name        string
+		contentType string
+		body        string
+		wantError   bool
+	}{
+		{"valid SSE without MIME", "", "data: {\"type\":\"response.completed\",\"response\":{\"id\":\"fixture-response\",\"model\":\"fixture-model\",\"output\":[],\"usage\":{\"input_tokens\":1,\"output_tokens\":1}}}\n\n", false},
+		{"HTML", "text/html", "<html>not a model reply</html>", true},
+		{"JSON without MIME", "", `{"error":{"type":"invalid_request_error"}}`, true},
+		{"truncated SSE", "", "data: {\"type\":\"response.created\",\"response\":{\"id\":\"fixture-response\",\"output\":[]}}\n\n", true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			model := CPAPlainModel{Provider: "codex", Client: &http.Client{Transport: fixedTransport{status: 200, contentType: test.contentType, body: test.body}}}
+			result, err := model.ExecuteStream(context.Background(), &core.Auth{Metadata: map[string]any{"access_token": "fixture-access", "account_id": "fixture-account"}}, ex.Request{Model: "fixture-model", Payload: []byte(`{"messages":[{"role":"user","content":"hi"}]}`)}, ex.Options{})
+			failed, done := err != nil, false
+			if err == nil {
+				for chunk := range result.Chunks {
+					failed = failed || chunk.Err != nil
+					done = done || strings.Contains(string(chunk.Payload), "[DONE]")
+				}
+			}
+			if failed != test.wantError || (!test.wantError && !done) {
+				t.Fatalf("failed=%v, done=%v", failed, done)
+			}
+		})
+	}
+}
