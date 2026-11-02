@@ -25,9 +25,12 @@ export class SubscriptionWorkflowModel implements V4Model {
     // The SDK's doStreamStep calls this in Node, where a step-to-step call
     // is a normal call. The directive also removes custody imports from the
     // Workflow VM bundle; no provider backend crosses the serde boundary.
+    const startedAt = Date.now()
     const { resolveSubscriptionWorkflowModel } = await import('./subscription-workflow-model-runtime')
     const model = await resolveSubscriptionWorkflowModel(this.selection, options.abortSignal)
     if (typeof model === 'string' || model.specificationVersion !== 'v4') throw new Error('subscription_model_unavailable')
-    return model.doStream(options)
+    const { stepIdentity, timedModelStream } = await import('./model-call-timing')
+    const requestedAt = Date.now()
+    return timedModelStream(await model.doStream(options), { route: 'subscription', model: this.modelId, tools: options.tools?.length ?? 0, startedAt, requestedAt, ...await stepIdentity() })
   }
 }

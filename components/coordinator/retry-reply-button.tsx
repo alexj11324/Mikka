@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl'
 import { retryCoordinatorTurn } from '@/app/actions/coordinator'
 import { Button } from '@/components/ui/button'
 import { useActionError } from '@/lib/use-action-error'
+import { checkPageBuildBeforeAction } from '@/lib/app-build'
 
 /**
  * 重试 beside a failed reply, in the Coordinator's and every bot's chat: runs
@@ -24,6 +25,7 @@ export function RetryReplyButton({ botId, onQueued, label, disabled }: { botId: 
     setPending(true)
     setFeedback(null)
     try {
+      if (!await checkPageBuildBeforeAction()) return
       const result = botId ? await retryCoordinatorTurn(botId) : await retryCoordinatorTurn()
       if (result.error) {
         setFeedback({ text: actionError(result.error), error: true })

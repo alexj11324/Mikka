@@ -68,8 +68,15 @@ test('a failed reply says 回复失败 with 重试, never the step error; later 
   await expect(past).toContainText('回复失败')
   await expect(past.getByRole('button', { name: '重新发送', exact: true })).toBeVisible()
   await attachLightDark(page, testInfo, 'chat-failed-past')
+  // 重新发送 retries in place (Alex, 2026-11-02): one message stays, the attempt that failed and its line go,
+  // now and after a reload; a failure of the new attempt shows only under it.
   await past.getByRole('button', { name: '重新发送', exact: true }).click()
-  await expect(page.getByRole('region', { name: '与 Coordinator 的对话', exact: true }).getByText('帮我看看 CI 为什么红了', { exact: true })).toHaveCount(2)
+  const chat = page.getByRole('region', { name: '与 Coordinator 的对话', exact: true })
+  await expect(chat.getByText('帮我看看 CI 为什么红了', { exact: true })).toHaveCount(1)
+  await expect(chat.locator('[data-message-failure]')).toHaveCount(0)
+  await attachLightDark(page, testInfo, 'chat-failed-resent')
+  await page.reload()
+  await expect(chat.getByText('帮我看看 CI 为什么红了', { exact: true })).toHaveCount(1)
 })
 
 test('a cold start shows the shapes of the chat and the thread list, never 还没有线程 (C7)', async ({ page }, testInfo) => {

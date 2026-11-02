@@ -40,15 +40,17 @@ export class HostedWorkflowModel implements Model {
   }
   async doStream(options: Parameters<Model['doStream']>[0]) {
     'use step'
+    const startedAt = Date.now()
     const { executionWorkspace } = await import('../execution-settings')
     const { hostedModel } = await import('./model')
-    return (
-      await hostedModel(
-        await executionWorkspace(this.ownerId, this.botId),
-        this.modelId,
-        undefined,
-        this.ownerId,
-      )
-    ).doStream(options)
+    const model = await hostedModel(
+      await executionWorkspace(this.ownerId, this.botId),
+      this.modelId,
+      undefined,
+      this.ownerId,
+    )
+    const { stepIdentity, timedModelStream } = await import('../model-call-timing')
+    const requestedAt = Date.now()
+    return timedModelStream(await model.doStream(options), { route: 'hosted', model: this.modelId, tools: options.tools?.length ?? 0, startedAt, requestedAt, ...await stepIdentity() })
   }
 }

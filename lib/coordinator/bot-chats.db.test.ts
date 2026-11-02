@@ -62,6 +62,9 @@ dbTest('failed wake state stays with its owner and bot, and recovery keeps the o
     const streamId='wrun_recovered-turn:0'
     assert.equal(await store.appendMessages(owner, 'wrun_recovered-turn', [{ role: 'assistant', content: 'Recovered reply',mikkaStreamId:'forged' } as unknown as import('ai').ModelMessage], null, botId,streamId),2)
     assert.deepEqual((await store.chatView(owner,200,botId)).persistedStreamIds,[streamId],'polling sees persistence before any stream commit marker')
+    const finishing = await store.chatView(owner,200,botId)
+    assert.equal(finishing.streamRunId,'wrun_recovered-turn','the turn still holds its lease while it finishes up')
+    assert.deepEqual([finishing.working,finishing.error],[false,null],'its stored reply ends the working state')
     assert.ok((await store.loadConversation(owner,botId)).messages.every(({message})=>!('mikkaStreamId' in message)),'stream markers never reach the model history')
     assert.equal(await store.appendMessages(owner, 'wrun_recovered-turn', [], null, botId),2,'an empty append returns the existing cursor')
     await db.update(schema.coordinatorSessions).set({leaseUntil:new Date(Date.now()-1)}).where(and(eq(schema.coordinatorSessions.userId,owner),eq(schema.coordinatorSessions.botId,botId)))
@@ -476,6 +479,67 @@ dbTest('重试 re-runs a failed bot turn once, for the message already sent, in 
   })
 })
 
+dbTest('重新发送 retries a failed message in place: marked once, left out of the chat and the model history, others ignored', async t => {
+  const [{ createRequestDatabaseScope, db }, schema, store, { recordPersonalSubmission }, { and, eq, isNull, sql }] = await Promise.all([
+    import('../db'), import('../db/schema'), import('./store'), import('../coordinator-submission'), import('drizzle-orm'),
+  ])
+  const scope = createRequestDatabaseScope(databaseUrl!)
+  const owner = `test-resend-${randomUUID()}`, other = `test-resend-other-${randomUUID()}`
+  const botId = randomUUID(), otherBot = randomUUID()
+  t.after(async () => {
+    t.diagnostic(JSON.stringify({ event: 'coordinator_db_fixture_retained', fixtureOwnerIds: [owner, other], database: 'mikka_e2e' }))
+    await scope.close()
+  })
+  await scope.run(async () => {
+    for (const [id, bot] of [[owner, botId], [other, otherBot]]) {
+      await db.execute(sql`insert into "user" (id, name, email, "emailVerified", "createdAt", "updatedAt") values (${id}, 'Resend fixture', ${`${id}@example.invalid`}, false, now(), now())`)
+      await db.insert(schema.bots).values({ id: bot, ownerId: id, workspaceId: randomUUID(), name: 'Resend bot' })
+    }
+    // A message whose turn failed (store.failTurn), and one of the other person's.
+    const send = (userId: string, bot: string, text: string) => (tx: Parameters<typeof recordPersonalSubmission>[0]) => recordPersonalSubmission(tx, userId, text, { botId: bot, submissionId: randomUUID() })
+    await send(owner, botId, '帮我看看 CI 为什么红了')(db)
+    await store.takeInbox(owner, 'wrun_resend-failed', botId)
+    await store.failTurn(owner, 'wrun_resend-failed', 'backend_unavailable', botId)
+    await send(other, otherBot, 'not yours')(db)
+    await store.takeInbox(other, 'wrun_resend-other', otherBot)
+    await store.failTurn(other, 'wrun_resend-other', 'backend_unavailable', otherBot)
+    const [failed] = (await store.chatView(owner, 200, botId)).items
+    const [othersFailed] = (await store.chatView(other, 200, otherBot)).items
+    assert.ok(failed.failure && othersFailed.failure)
+    const waiting = async (userId: string) => (await db.select().from(schema.coordinatorEvents).where(and(eq(schema.coordinatorEvents.userId, userId), isNull(schema.coordinatorEvents.deliveredAt)))).length
+
+    // Not this person's message, not a failed one, or another chat: ignored, sent as an ordinary message, nothing marked.
+    await store.sendRetryOf(owner, botId, failed.position + 100, send(owner, botId, 'ordinary'))
+    await store.sendRetryOf(owner, otherBot, othersFailed.position, send(owner, botId, 'ordinary'))
+    assert.ok((await store.chatView(owner, 200, botId)).items.some(item => item.position === failed.position && item.failure), 'still shown')
+    assert.equal(await waiting(owner), 2)
+    const othersRow = await db.execute(sql`SELECT message FROM coordinator_messages WHERE "userId"=${other} AND position=${othersFailed.position}`)
+    assert.equal((othersRow.rows[0].message as Record<string, unknown>).mikkaRetried, undefined, "another person's message is never marked")
+    await db.delete(schema.coordinatorEvents).where(and(eq(schema.coordinatorEvents.userId, owner), isNull(schema.coordinatorEvents.deliveredAt)))
+
+    // Two sends at once (a double click): one marks it and sends; the other sends nothing.
+    const results = await Promise.all([1, 2].map(() => store.sendRetryOf(owner, botId, failed.position, send(owner, botId, '帮我看看 CI 为什么红了'))))
+    assert.equal(results.filter(result => result !== null).length, 1)
+    assert.equal(await waiting(owner), 1, 'one new message')
+    // The failed message is only marked: its text and failure stay stored.
+    const row = await db.execute(sql`SELECT message FROM coordinator_messages WHERE "userId"=${owner} AND "botId"=${botId}::uuid AND position=${failed.position}`)
+    const stored = row.rows[0].message as Record<string, unknown>
+    assert.deepEqual([stored.content, stored.mikkaFailure, stored.mikkaRetried], ['帮我看看 CI 为什么红了', 'backend_unavailable', true])
+    assert.equal(await store.sendRetryOf(owner, botId, failed.position, send(owner, botId, '帮我看看 CI 为什么红了')), null, 'a later click sends nothing either')
+
+    // The new attempt is taken and answered: one message in the chat (web and phone read chatView), and the model reads it once (Telegram replies come from that history).
+    await store.takeInbox(owner, 'wrun_resend-retry', botId)
+    await store.appendMessages(owner, 'wrun_resend-retry', [{ role: 'assistant', content: '看过了。' }], null, botId)
+    const view = await store.chatView(owner, 200, botId)
+    assert.deepEqual(view.items.map(item => [item.from, item.text, item.failure ?? null]), [['person', '帮我看看 CI 为什么红了', null], ['coordinator', '看过了。', null]])
+    const context = await store.loadConversation(owner, botId)
+    assert.deepEqual(context.messages.map(({ message }) => [message.role, message.content]), [['user', '帮我看看 CI 为什么红了'], ['assistant', '看过了。']])
+    assert.ok(context.messages.every(({ message }) => !('mikkaRetried' in message)), 'the model never sees the mark')
+    // The other person's chat is as it was.
+    assert.ok((await store.chatView(other, 200, otherBot)).items[0].failure)
+  })
+})
+
 dbTest('重试 also re-runs a turn that ended with no reply and nothing recorded (its lease ran out)', async t => {
   const [{ createRequestDatabaseScope, db }, schema, store, { recordCoordinatorEvent }, { userMessageEvent }, { eq, sql }] = await Promise.all([
     import('../db'), import('../db/schema'), import('./store'), import('../coordinator-event-store'), import('../coordinator-events'), import('drizzle-orm'),
@@ -503,5 +567,40 @@ dbTest('重试 also re-runs a turn that ended with no reply and nothing recorded
     const take = await store.takeInbox(owner, 'wrun_retried-lost-turn', botId)
     assert.equal(take.added, 1, 'the retry starts a turn')
     assert.deepEqual((await store.chatView(owner, 200, botId)).items.map(item => [item.from, item.text]), [['person', '介绍一下北京的历史']], 'the message is not sent twice')
+  })
+})
+
+dbTest('a turn that says something, calls a tool and then answers stays working until its final reply is stored', async t => {
+  const [{ createRequestDatabaseScope, db }, schema, store, { recordCoordinatorEvent }, { userMessageEvent }, { sql }] = await Promise.all([
+    import('../db'), import('../db/schema'), import('./store'), import('../coordinator-event-store'), import('../coordinator-events'), import('drizzle-orm'),
+  ])
+  const scope = createRequestDatabaseScope(databaseUrl!)
+  const owner = `test-working-${randomUUID()}`, botId = randomUUID(), holder = 'wrun_multi-step-turn'
+  t.after(async () => {
+    t.diagnostic(JSON.stringify({ event: 'coordinator_db_fixture_retained', fixtureOwnerIds: [owner], database: 'mikka_e2e' }))
+    await scope.close()
+  })
+  await scope.run(async () => {
+    await db.execute(sql`insert into "user" (id, name, email, "emailVerified", "createdAt", "updatedAt") values (${owner}, 'Working fixture', ${`${owner}@example.invalid`}, false, now(), now())`)
+    await db.insert(schema.bots).values({ id: botId, ownerId: owner, workspaceId: randomUUID(), name: 'Dispatch bot' })
+    await recordCoordinatorEvent(db, userMessageEvent(owner, '派发任务，给 Mikka_test 写一个简单的 README', { botId }))
+    assert.equal((await store.chatView(owner, 200, botId)).working, true, 'the message waits for a turn')
+    await store.takeInbox(owner, holder, botId)
+    // While the model speaks, calls dispatch_run and answers, nothing of the round is stored: the chat stays working.
+    assert.equal((await store.chatView(owner, 200, botId)).working, true, 'the turn is answering')
+    // The round is stored once, after the model finished: the words before the tool call, the call, its result, the answer.
+    await store.appendMessages(owner, holder, [
+      { role: 'assistant', content: [{ type: 'text', text: '我去派发一下' }, { type: 'tool-call', toolCallId: 'call-1', toolName: 'dispatch_run', input: { repo: 'Mikka_test' } }] },
+      { role: 'tool', content: [{ type: 'tool-result', toolCallId: 'call-1', toolName: 'dispatch_run', output: { type: 'json', value: { runId: 'run-1' } } }] },
+      { role: 'assistant', content: [{ type: 'text', text: '已派发，写好后告诉你。' }] },
+    ], null, botId, `${holder}:0`)
+    const answered = await store.chatView(owner, 200, botId)
+    assert.equal(answered.streamRunId, holder, 'the turn still holds its lease while it finishes up')
+    assert.deepEqual([answered.working, answered.error], [false, null], 'its final reply ends the working state')
+    // A message sent while the turn finishes up is answered by its next round: still working.
+    await recordCoordinatorEvent(db, userMessageEvent(owner, '再加一个 LICENSE', { botId }))
+    assert.equal((await store.chatView(owner, 200, botId)).working, true, 'the queued message is work still to come')
+    await store.takeInbox(owner, holder, botId)
+    assert.equal((await store.chatView(owner, 200, botId)).working, true, 'the next round of the same turn is answering it')
   })
 })
