@@ -195,7 +195,7 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
   let taskEnv: Record<string, string> = {}
   let taskSecretNames: string[] = []
   if (device.kind === 'cloud') {
-    if (!cloudComputerTasksEnabled() || caller.scopeDeviceId !== deviceId || !caller.scopeWorkspaceId || !(subscription ? subscription.workspaceId === caller.scopeWorkspaceId : frozenKey) || !device.harnesses.some(info => info.harness === harness && info.computerBroker)) return NextResponse.json({ error: 'Cloud computer worker unavailable.' }, { status: 409 })
+    if (!cloudComputerTasksEnabled() || caller.scopeDeviceId !== deviceId || !caller.scopeWorkspaceId || !(subscription ? subscription.workspaceId === caller.scopeWorkspaceId : frozenKey)) return NextResponse.json({ error: 'Cloud computer worker unavailable.' }, { status: 409 })
     // 4e3: the task's explicit user variables (workspace + this repo's secrets/env). Resolved before the
     // claim so a decrypt failure leaves the run queued. The injection helper returns an empty
     // assignment without an encryption key; platform versus BYO billing does not change it.
@@ -213,8 +213,11 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
     }
     const refused = await openRunKey()
     if (refused) return refused
-    computer = await claimCloudRun(pool, { userId: caller.userId, workspaceId: caller.scopeWorkspaceId }, runId, deviceId, new Date(leaseExpiresAt), subscription?.id ?? null, beforeClaim, afterClaim)
-    if (!computer) return NextResponse.json({ error: 'Cloud computer run unavailable.' }, { status: 409 })
+    const claimed = await claimCloudRun(pool, { userId: caller.userId, workspaceId: caller.scopeWorkspaceId }, runId, deviceId, new Date(leaseExpiresAt), subscription?.id ?? null, beforeClaim, afterClaim)
+    if (!claimed) return NextResponse.json({ error: 'Cloud computer run unavailable.' }, { status: 409 })
+    // A task machine (E2B's claude or codex template, decision 2026-11-01-2335) has no desktop:
+    // its worker reports no computer broker and gets no desktop with the run.
+    computer = device.harnesses.some(info => info.harness === harness && info.computerBroker) ? claimed : null
   } else {
     // A read-only run (an investigation) publishes nothing: no push branch, no push grant.
     if (!run.agentDefinition?.readOnly) {
