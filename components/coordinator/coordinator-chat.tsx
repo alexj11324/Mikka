@@ -16,7 +16,6 @@ import { Alert, AlertTitle } from '@/components/ui/alert'
 import { Bubble, BubbleContent } from '@/components/ui/bubble'
 import { Message, MessageContent, MessageFooter } from '@/components/ui/message'
 import { MessageScroller, MessageScrollerButton, MessageScrollerContent, MessageScrollerItem, MessageScrollerProvider, MessageScrollerViewport, useMessageScroller } from '@/components/ui/message-scroller'
-import { Spinner } from '@/components/ui/spinner'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
 import { CircleAlert } from 'lucide-react'
@@ -36,7 +35,8 @@ import { chatPollInterval } from '@/lib/coordinator/chat-poll-interval'
 import { useLiveCitations } from './use-live-citations'
 import type { CoordinatorLiveReply } from '@/lib/coordinator-stream-client'
 import { ThreadCard } from './thread-card'
-import { ToolsUsed } from './tools-used'
+import { ReplyActivity } from './reply-activity'
+import { Shimmer } from '@/components/ai-elements/shimmer'
 import { MessageReactions, useMessageReactions } from '@/components/workspace/message-reactions'
 import { PendingActions } from './pending-actions'
 import { SubagentLoginNeeds } from './subagent-login-needs'
@@ -82,14 +82,15 @@ export function coordinatorChatKey(botId?: string | null) {
   return botId ? ['coordinator-chat', botId] as const : 'coordinator-chat'
 }
 
-/** The tools a reply used, less a dispatch that already shows as its thread card. */
-function footerTools(item: Chat['items'][number]) {
-  return [...new Set(item.tools.filter(tool => !((tool === 'dispatch_run' || tool === 'dispatch_bot_computer') && item.threads.length)))]
-}
-
 /** A reply still streaming, drawn by the same row as a stored one. */
 function streamedItem(reply: CoordinatorLiveReply): Chat['items'][number] {
-  return { position: -1, from: 'coordinator', text: reply.text, tools: [], threads: [], artifacts: [], createdAt: '' }
+  return { position: -1, from: 'coordinator', text: reply.text, tools: [], threads: [], artifacts: [], createdAt: '',
+    ...(reply.tools?.length || reply.thinking ? { activity: { tools: reply.tools ?? [], thought: Boolean(reply.thinking) } } : {}) }
+}
+
+/** A live reply's thinking as the activity shows it: still thinking, or the whole seconds it took (at least one). */
+function liveThinking(reply: CoordinatorLiveReply) {
+  return reply.thinking && { active: reply.thinking.since !== undefined, seconds: Math.max(1, Math.round(reply.thinking.ms / 1000)), ...(reply.thinking.text ? { text: reply.thinking.text } : {}) }
 }
 
 /** A message the person just sent brings the chat back to its end, wherever they had scrolled. */
@@ -366,6 +367,8 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
                 : <Message align={item.from === 'person' ? 'end' : 'start'}><MessageContent>
                     {/* A tapped 建议 card: the same card, then only what it adds (R-21, R-40). */}
                     {item.suggestion && <SentSuggestion card={item.suggestion} compact={compact} />}
+                    {/* Before the words, as they happened: thinking, then each tool. The same slot live and stored, so storing keeps it. */}
+                    {item.activity && <ReplyActivity tools={item.activity.tools} thinking={live ? liveThinking(live) : undefined} thought={item.activity.thought} reasoningAt={item.activity.reasoningAt} botId={botId} />}
                     {item.text && (item.from === 'coordinator'
                       ? <ReplyAnswer value={live ? null : answers.get(item.position) ?? null}><CoordinatorReply text={item.text} citations={live ? live.committedThrough === undefined ? liveCitations.streaming : liveCitations.settled : citations} isStreaming={Boolean(live && live.committedThrough === undefined)} /></ReplyAnswer>
                       : <Bubble variant="secondary" align="end" className={personBubble}><BubbleContent className="flex flex-col gap-1.5 rounded-2xl px-4 py-3 whitespace-pre-wrap">{item.quote && <ArtifactQuoteLine quote={item.quote} />}{item.notes?.map(note => <BrowserNoteLine key={note.n} note={note} />)}<UserMessageText text={item.text} /></BubbleContent></Bubble>)}
@@ -383,7 +386,6 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
                     {item.failure && (item.position === failedAt
                       ? <div data-message-failure="live" className="flex w-full max-w-md flex-col gap-2 self-end">{failureNotice}</div>
                       : <MessageFooter className="self-end"><FailureReason failure={item.failure} botId={botId} sending={sending} onResend={() => { void deliver(item.text, false, item.position) }} /></MessageFooter>)}
-                    {footerTools(item).length > 0 && <MessageFooter><ToolsUsed tools={footerTools(item)} /></MessageFooter>}
                   </MessageContent></Message>}
             </MessageScrollerItem>
             </Fragment>)}
@@ -401,7 +403,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
             </MessageScrollerItem>}
             {/* The working line fades in (R-37: opacity on a duration). It leaves at once: an exit would keep its height
                 after the reply lands and pull the scroll position back (coordinator-scroll.spec). */}
-            {data?.working && items.length > 0 && <p role="status" className={cn('flex items-center gap-2 text-sm text-muted-foreground', workingEnter && ENTER)}><Spinner />{t('working')}</p>}
+            {data?.working && items.length > 0 && <p role="status" className={cn('flex items-center gap-2 text-sm text-muted-foreground', workingEnter && ENTER)}><Shimmer as="span">{t('working')}</Shimmer></p>}
           </MessageScrollerContent>
         </MessageScrollerViewport>
         <AnimatePresence initial={false}>

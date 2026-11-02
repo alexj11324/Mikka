@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { after, before, test } from 'node:test'
+import { after, before, mock, test } from 'node:test'
 import { act, type ReactNode } from 'react'
 import { Window } from 'happy-dom'
 import { NextIntlClientProvider } from 'next-intl'
@@ -9,6 +9,11 @@ import type { AgentCitations } from '../components/workspace/agent-citations'
 
 // Streaming a Coordinator reply: a token redraws only the reply that is arriving, and a task or thread chip never
 // shows its marker or id on the way, however the tokens are cut.
+// A stored reply's reasoning, as the server action would return it for these positions (masked).
+const reasoningCalls: [string | null, readonly number[]][] = []
+mock.module(new URL('../app/actions/coordinator.ts', import.meta.url).href, { namedExports: {
+  coordinatorReasoning: async (botId: string | null, positions: readonly number[]) => { reasoningCalls.push([botId, positions]); return 'Check the login redirect first.' },
+} })
 const browser = new Window({ url: 'https://mikka.example/' })
 let createRoot: typeof import('react-dom/client')['createRoot']
 let CoordinatorReply: typeof import('../components/coordinator/coordinator-reply')['CoordinatorReply']
@@ -129,4 +134,81 @@ test('the streaming reply keeps its earlier chips mounted as new tokens arrive',
     for (const text of steps.slice(at + 1)) await view.render(<CoordinatorReply text={text} citations={{ ...base, pending: true }} isStreaming />)
     assert.equal(view.container.querySelector('[data-slot="inline-citation-trigger"]'), chip, 'the chip is the same element after more tokens')
   } finally { await view.unmount() }
+})
+
+test('a reply shows its thinking and each tool by name and state with AI Elements; previews open on demand', async () => {
+  const { ReplyActivity } = await import('../components/coordinator/reply-activity')
+  const view = await mount()
+  try {
+    const tools = [
+      { call: 'c1', name: 'create_issue', state: 'done' as const, input: '{"title":"Fix login"}', output: '{"id":"i1"}' },
+      { call: 'c2', name: 'dispatch_run', state: 'running' as const },
+      { call: 'c3', name: 'some_internal_tool', state: 'error' as const, output: 'no device' },
+    ]
+    await view.render(<ReplyActivity tools={tools} thinking={{ active: true, seconds: 1 }} />)
+    const text = () => view.container.textContent ?? ''
+    assert.equal(view.container.querySelector('[data-activity-thinking]')?.getAttribute('data-activity-thinking'), 'active')
+    assert.match(view.container.querySelector('[data-activity-thinking]')?.textContent ?? '', /^Thinking$/)
+    // AI Elements Tool: our label as its title, the AI SDK state as its badge; internal names never show.
+    assert.deepEqual([...view.container.querySelectorAll('[data-activity-tool]')].map(row => [row.getAttribute('data-activity-tool'), row.querySelector('[data-slot="collapsible-trigger"], button')?.textContent]),
+      [['done', 'Create taskDone'], ['running', 'Start threadRunning'], ['error', 'Use a toolFailed']])
+    assert.doesNotMatch(text(), /some_internal_tool|Fix login/, 'previews start closed')
+    await act(async () => { (view.container.querySelector('[data-activity-tool="done"] button') as HTMLButtonElement).click() })
+    for (let tries = 0; tries < 100 && !/i1/.test(text()); tries++) await act(() => new Promise(resolve => setTimeout(resolve, 20)))
+    assert.match(text(), /Input[\s\S]*Fix login[\s\S]*Result[\s\S]*i1/)
+    const thinkingTrigger = view.container.querySelector('[data-activity-thinking] button') as HTMLButtonElement
+    assert.ok(thinkingTrigger.disabled, 'reasoning text is never shown, so thinking does not open')
+
+    await view.render(<ReplyActivity tools={[]} thinking={{ active: false, seconds: 3 }} />)
+    assert.equal(text(), 'Thought for 3 seconds')
+    await view.render(<ReplyActivity tools={[]} thought />)
+    assert.equal(text(), 'Thought', 'a stored reply knows only that it thought')
+    await view.render(<ReplyActivity tools={[]} />)
+    assert.equal(view.container.innerHTML, '')
+  } finally { await view.unmount() }
+})
+
+test('readable reasoning opens under 「思考了 N 秒」, live and stored alike; without it the line does not open', async () => {
+  const { ReplyActivity } = await import('../components/coordinator/reply-activity')
+  const view = await mount()
+  const trigger = () => view.container.querySelector('[data-activity-thinking] button') as HTMLButtonElement
+  const content = () => view.container.querySelector('[data-activity-thinking] [data-slot="collapsible-content"]')?.textContent ?? ''
+  const settle = async (done: () => boolean) => { for (let tries = 0; tries < 100 && !done(); tries++) await act(() => new Promise(resolve => setTimeout(resolve, 20))) }
+  try {
+    // Live, with what the model thought: AI Elements' trigger with its chevron, closed until opened.
+    await view.render(<ReplyActivity tools={[]} thinking={{ active: false, seconds: 4, text: 'Check the login redirect first.' }} />)
+    assert.equal(view.container.querySelector('[data-activity-thinking]')?.getAttribute('data-reasoning'), 'readable')
+    assert.equal(trigger().disabled, false)
+    assert.ok(trigger().querySelector('svg.lucide-chevron-down'), 'it shows the chevron')
+    assert.doesNotMatch(content(), /login redirect/, 'closed by default')
+    await act(async () => { trigger().click() })
+    await settle(() => /login redirect/.test(content()))
+    assert.match(content(), /Check the login redirect first\./)
+    assert.equal(reasoningCalls.length, 0, 'live text needs no request')
+    await view.unmount()
+
+    // Stored: the same line opens and reads the same text, fetched only when opened.
+    const stored = await mount()
+    await stored.render(<ReplyActivity tools={[]} thought reasoningAt={[7, 9]} botId="bot-1" />)
+    const storedTrigger = stored.container.querySelector('[data-activity-thinking] button') as HTMLButtonElement
+    assert.equal(storedTrigger.disabled, false)
+    assert.equal(reasoningCalls.length, 0, 'nothing is fetched until it is opened')
+    await act(async () => { storedTrigger.click() })
+    for (let tries = 0; tries < 100 && !/login redirect/.test(stored.container.textContent ?? ''); tries++) await act(() => new Promise(resolve => setTimeout(resolve, 20)))
+    assert.match(stored.container.querySelector('[data-slot="collapsible-content"]')?.textContent ?? '', /Check the login redirect first\./, 'stored reads as live did')
+    assert.deepEqual(reasoningCalls, [['bot-1', [7, 9]]])
+    await stored.unmount()
+
+    // Encrypted or no reasoning text, live or stored: the line only, no chevron, and it does not open.
+    for (const props of [{ thinking: { active: false, seconds: 2 } }, { thought: true }]) {
+      const plain = await mount()
+      await plain.render(<ReplyActivity tools={[]} {...props} />)
+      const button = plain.container.querySelector('[data-activity-thinking] button') as HTMLButtonElement
+      assert.equal(plain.container.querySelector('[data-activity-thinking]')?.getAttribute('data-reasoning'), 'none')
+      assert.ok(button.disabled)
+      assert.equal(button.querySelector('svg.lucide-chevron-down'), null, 'no chevron')
+      assert.equal(plain.container.querySelector('[data-slot="collapsible-content"]'), null)
+      await plain.unmount()
+    }
+  } finally { try { await view.unmount() } catch { /* already unmounted */ } }
 })
