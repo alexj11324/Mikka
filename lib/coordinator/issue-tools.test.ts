@@ -4,6 +4,7 @@ import { createIssueInput, updateIssueInput } from './issue-input'
 import { DEFAULT_AGENT_DEFINITION } from '@/lib/agent-kit/builtin'
 import { AGENT_TOOL_IDS, SCHEDULE_TOOL_IDS } from '@/lib/agent-kit/registry'
 import { issueMutationsEnabled } from './issue-tools-enabled'
+import { overrideDeploymentSwitch } from '@/lib/deployment-switches'
 import { COORDINATOR_INSTRUCTIONS } from './instructions'
 /** The person's Coordinator: an ordinary bot row, marked as the Coordinator. */
 const COORDINATOR_BOT = '00000000-0000-4000-8000-0000000c0de1'
@@ -18,23 +19,26 @@ mock.module('@/workflows/coordinator/agent-kit-steps', { namedExports: {} })
 mock.module('@/lib/composio-actions', { namedExports: { createComposioAITools: () => ({}), createGoogleAITools: () => ({}) } })
 let registry: typeof import('@/workflows/coordinator/tools')
 before(async () => { registry = await import('@/workflows/coordinator/tools') })
-const previousFlag = process.env.MIKKA_ISSUE_TOOLS_ENABLED
-beforeEach(() => { process.env.MIKKA_ISSUE_TOOLS_ENABLED = '1' })
-afterEach(() => { if (previousFlag === undefined) delete process.env.MIKKA_ISSUE_TOOLS_ENABLED; else process.env.MIKKA_ISSUE_TOOLS_ENABLED = previousFlag })
+beforeEach(() => overrideDeploymentSwitch('issueTools', true))
+afterEach(() => overrideDeploymentSwitch('issueTools', undefined))
 
 test('issue tools default on; only an explicit kill switch turns them off', () => {
-  assert.equal(issueMutationsEnabled({}), true)
-  assert.equal(issueMutationsEnabled({ MIKKA_ISSUE_TOOLS_ENABLED: '1' }), true)
-  assert.equal(issueMutationsEnabled({ MIKKA_ISSUE_TOOLS_ENABLED: '0' }), false)
-  assert.equal(issueMutationsEnabled({ MIKKA_ISSUE_TOOLS_ENABLED: 'true' }), false)
-  delete process.env.MIKKA_ISSUE_TOOLS_ENABLED
+  assert.equal(issueMutationsEnabled(), true)
+  overrideDeploymentSwitch('issueTools', false)
+  assert.equal(issueMutationsEnabled(), false)
+  overrideDeploymentSwitch('issueTools', undefined)
+  assert.equal(issueMutationsEnabled(), true, 'default on')
+  const previous = process.env.MIKKA_ISSUE_TOOLS_ENABLED
+  process.env.MIKKA_ISSUE_TOOLS_ENABLED = '0'
+  try { assert.equal(issueMutationsEnabled(), true, 'the old variable no longer decides') }
+  finally { if (previous === undefined) delete process.env.MIKKA_ISSUE_TOOLS_ENABLED; else process.env.MIKKA_ISSUE_TOOLS_ENABLED = previous }
   const unset = registry.createCoordinatorRegistry('owner', COORDINATOR_BOT, undefined, { coordinator: true })
   assert.ok(unset.create_issue)
   assert.ok(unset.update_issue)
 })
 
 test('the kill switch removes the tools and never widens a frozen execution grant', () => {
-  process.env.MIKKA_ISSUE_TOOLS_ENABLED = '0'
+  overrideDeploymentSwitch('issueTools', false)
   const disabled = registry.createCoordinatorRegistry('owner', COORDINATOR_BOT, undefined, { coordinator: true })
   assert.equal(disabled.create_issue, undefined)
   assert.equal(disabled.update_issue, undefined)
@@ -42,7 +46,7 @@ test('the kill switch removes the tools and never widens a frozen execution gran
   type Execution = NonNullable<NonNullable<Parameters<typeof registry.coordinatorTools>[3]>['execution']>
   const executionFor = (effectiveTools: string[]) => ({ id: 'execution', snapshot: { effectiveTools } }) as unknown as Execution
   assert.deepEqual(Object.keys(registry.coordinatorTools('owner', COORDINATOR_BOT, undefined, { coordinator: true,  execution: executionFor(['create_issue', 'get_issue']) })), ['get_issue'])
-  process.env.MIKKA_ISSUE_TOOLS_ENABLED = '1'
+  overrideDeploymentSwitch('issueTools', true)
   assert.deepEqual(Object.keys(registry.coordinatorTools('owner', COORDINATOR_BOT, undefined, { coordinator: true,  execution: executionFor(['get_issue']) })), ['get_issue'])
   assert.throws(() => registry.coordinatorTools('owner', COORDINATOR_BOT, undefined, { coordinator: true,  execution: executionFor(['unregistered_tool']) }))
 })

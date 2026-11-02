@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { GET, POST } from '../../app/api/approved-writes/route'
 import { createPersonalWriteRoute, PERSONAL_WRITES_ENABLED } from './write-route'
 import { personalWritesEnabled } from './write-feature'
+import { overrideDeploymentSwitch } from '../deployment-switches'
 
 const id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
 function request(body: unknown, headers: Record<string, string> = {}) {
@@ -11,30 +12,26 @@ function request(body: unknown, headers: Record<string, string> = {}) {
 const proposal = { op: 'propose', action: 'send_slack_message', intentId: id, input: { channel: 'C12345678', text: 'Fixture' } }
 
 test('public availability reports only the server gate as 200 no-store without runtime services', async () => {
-  const previous = process.env.MIKKA_PERSONAL_WRITES_ENABLED
   try {
-    for (const [value, enabled] of [['0', false], ['1', true]] as const) {
-      process.env.MIKKA_PERSONAL_WRITES_ENABLED = value
+    for (const enabled of [false, true]) {
+      overrideDeploymentSwitch('personalWrites', enabled)
       const response = GET()
       assert.equal(response.status, 200)
       assert.equal(response.headers.get('cache-control'), 'no-store')
       assert.deepEqual(await response.json(), { enabled })
     }
   } finally {
-    if (previous === undefined) delete process.env.MIKKA_PERSONAL_WRITES_ENABLED
-    else process.env.MIKKA_PERSONAL_WRITES_ENABLED = previous
+    overrideDeploymentSwitch('personalWrites', undefined)
   }
 })
 
 test('the explicit incident switch closes product POST without initializing runtime', async () => {
   assert.equal(PERSONAL_WRITES_ENABLED, true)
-  const previous = process.env.MIKKA_PERSONAL_WRITES_ENABLED
-  process.env.MIKKA_PERSONAL_WRITES_ENABLED = '0'
+  overrideDeploymentSwitch('personalWrites', false)
   let response: Response
   try { response = await POST(request(proposal)) }
   finally {
-    if (previous === undefined) delete process.env.MIKKA_PERSONAL_WRITES_ENABLED
-    else process.env.MIKKA_PERSONAL_WRITES_ENABLED = previous
+    overrideDeploymentSwitch('personalWrites', undefined)
   }
   assert.equal(response.status, 503)
   assert.deepEqual(await response.json(), { error: 'approvedWritesDisabled' })
@@ -47,7 +44,7 @@ test('the explicit incident switch closes product POST without initializing runt
 
 test('production rollout delegates browser authority and durable IDs to the existing HTTP service', async () => {
   const calls: unknown[] = []
-  const handler = createPersonalWriteRoute({ enabled: () => personalWritesEnabled({VERCEL_ENV:'production'}), load: async () => ({
+  const handler = createPersonalWriteRoute({ enabled: () => personalWritesEnabled(), load: async () => ({
     auth: { api: { getSession: async ({ query }) => { assert.equal(query.disableCookieCache, true); return { user: { id: 'owner' }, session: { id: 'session' } } } } },
     operations: action => ({
       propose: async (ownerId, input, intentId) => { calls.push({ action, ownerId, input, intentId }); return { status: 'awaiting_approval', actionId: id } },

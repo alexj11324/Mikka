@@ -6,6 +6,7 @@ import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
 import { normalizeRepository } from '@mikka/protocol/repository'
 import { recordPushGrant } from './support/github-app-stub'
 import { disposableDatabase } from './helpers/e2e-target.mjs'
+import { overrideDeploymentSwitch } from '../lib/deployment-switches'
 
 const connection = process.env.E2E_DATABASE_URL
 const required = process.env.REQUIRE_DB === '1'
@@ -14,7 +15,7 @@ if (required && !enabled) throw new Error('Issue mutation DB regression requires
 if (enabled) {
   assert.equal(process.env.MIKKA_DATABASE_URL, connection)
   assert.equal(process.env.DATABASE_URL, connection, 'workspace and issue stores must share only this disposable target')
-  process.env.MIKKA_ISSUE_TOOLS_ENABLED = '1'
+  overrideDeploymentSwitch('issueTools', true)
 }
 
 test('actual issue actions commit one issue per tool call, roll back partial writes, and preserve history on replay', { skip: !enabled }, async () => {
@@ -38,7 +39,7 @@ test('actual issue actions commit one issue per tool call, roll back partial wri
     // The owner's Coordinator is an ordinary bot row; its tools write as that bot.
     const coordinator = (await seedCoordinator(owner)).botId
     await pool.query('insert into agents (id,"userId",harness,name) values ($1,$2,\'codex\',\'Legacy fixture\')', [legacyAgent, stranger])
-    process.env.MIKKA_ISSUE_TOOLS_ENABLED = '0'
+    overrideDeploymentSwitch('issueTools', false)
     const legacy = await createIssue(stranger, { title: 'Existing MCP path without rollout', assigneeAgentId: null }, actor)
     assert.ok('id' in legacy)
     const assigned = await updateIssue(stranger, { issueId: legacy.id, assigneeAgentId: legacyAgent }, agentActor(legacyAgent))
@@ -54,7 +55,7 @@ test('actual issue actions commit one issue per tool call, roll back partial wri
       assert.equal(await count('issue_versions'), 0)
       assert.equal(await count('issue_tool_calls'), 0)
     }
-    process.env.MIKKA_ISSUE_TOOLS_ENABLED = '1'
+    overrideDeploymentSwitch('issueTools', true)
     // The actual registered Workflow tool invokes its scoped step and shared
     // actions. No test-only issue writer stands in for the Coordinator.
     const tools = createCoordinatorRegistry(owner, coordinator, undefined, { coordinator: true })
@@ -67,13 +68,13 @@ test('actual issue actions commit one issue per tool call, roll back partial wri
     const id = results[0].id as string
     assert.deepEqual(await updateIssue(owner, { issueId: id, assigneeAgentId: legacyAgent }, agentActor(legacyAgent)), { error: 'agentNotFound' }, 'legacy MCP cannot assign another owner’s agent')
     const versions = await count('issue_versions')
-    process.env.MIKKA_ISSUE_TOOLS_ENABLED = '0'
+    overrideDeploymentSwitch('issueTools', false)
     assert.deepEqual(await createIssue(owner, { ...input }, actor, callId), { error: 'issueToolsDisabled' })
     assert.deepEqual(await updateIssue(owner, { issueId: id, title: 'Disabled retry' }, actor, `disabled-update-${randomUUID()}`), { error: 'issueToolsDisabled' })
     assert.equal(await count('issues'), 1)
     assert.equal(await count('issue_versions'), versions)
     assert.equal(await count('issue_tool_calls'), 1)
-    process.env.MIKKA_ISSUE_TOOLS_ENABLED = '1'
+    overrideDeploymentSwitch('issueTools', true)
     assert.deepEqual(await createIssue(owner, { ...input }, actor, callId), results[0])
     assert.equal(await count('issue_versions'), versions)
     assert.deepEqual(await createIssue(owner, { ...input, title: 'Different request' }, actor, callId), { error: 'issueToolCallConflict' })

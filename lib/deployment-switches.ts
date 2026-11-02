@@ -9,9 +9,13 @@
  *
  * 1. PostHog's explicit answer for its flag (true or false);
  * 2. while PostHog is unreachable, still loading, or the flag does not exist:
- *    the environment variable that used to decide it, so a deployment that set
- *    one keeps behaving as it did until the flag is created;
+ *    the environment variable that used to decide it, for a switch that still
+ *    has one (`legacy`): its flag is not created yet, or its default differs
+ *    from production, so a fresh process must not fall to the default;
  * 3. otherwise the switch's default, the behaviour without either.
+ *
+ * Tests set a switch with overrideDeploymentSwitch, never an environment
+ * variable; it throws in a deployment or a production build.
  *
  * A feature that ships on has a kill flag (`…-off`): true turns it off, so a
  * flag created inactive never turns a shipped feature off by accident. A
@@ -31,8 +35,8 @@ export interface Switch {
   flag: string
   /** kill: true turns a shipped feature off. gate: true turns a feature on. */
   kind: 'kill' | 'gate'
-  /** What the old environment variable said, or undefined when it is not set. */
-  legacy: (env: Env) => boolean | undefined
+  /** What the old environment variable said, or undefined when it is not set. Absent once the flag decides alone. */
+  legacy?: (env: Env) => boolean | undefined
   /** Without PostHog and without the variable. */
   fallback: boolean
 }
@@ -54,15 +58,15 @@ export const DEPLOYMENT_SWITCHES = {
   /** Bot cloud computers and their thread machines. */
   cloudComputerTasks: { flag: 'mikka-cloud-computer-tasks-off', kind: 'kill', legacy: notZero('MIKKA_CLOUD_COMPUTER_TASKS'), fallback: true },
   /** The Coordinator's create_issue and update_issue. */
-  issueTools: { flag: 'mikka-issue-tools-off', kind: 'kill', legacy: (env: Env) => env.MIKKA_ISSUE_TOOLS_ENABLED === undefined ? undefined : env.MIKKA_ISSUE_TOOLS_ENABLED === '1', fallback: true },
+  issueTools: { flag: 'mikka-issue-tools-off', kind: 'kill', fallback: true },
   /** Factory intake and routing. */
   factoryRouting: { flag: 'mikka-factory-routing', kind: 'gate', legacy: exact('MIKKA_FACTORY_ROUTING_ENABLED'), fallback: false },
   /** Factory run lifecycle (questions, check recovery, dispatch). */
   factoryLifecycle: { flag: 'mikka-factory-lifecycle', kind: 'gate', legacy: exact('MIKKA_FACTORY_LIFECYCLE_ENABLED'), fallback: false },
   /** The personal mailbox tools. */
-  personalMailbox: { flag: 'mikka-personal-mailbox-off', kind: 'kill', legacy: notZero('MIKKA_PERSONAL_MAILBOX_ENABLED'), fallback: true },
+  personalMailbox: { flag: 'mikka-personal-mailbox-off', kind: 'kill', fallback: true },
   /** Writes to the person's connected apps. */
-  personalWrites: { flag: 'mikka-personal-writes-off', kind: 'kill', legacy: exact('MIKKA_PERSONAL_WRITES_ENABLED'), fallback: true },
+  personalWrites: { flag: 'mikka-personal-writes-off', kind: 'kill', fallback: true },
   /** Model-judged Skill evaluations; spends model calls. */
   skillModelEvaluation: { flag: 'mikka-skill-model-evaluation', kind: 'gate', legacy: exact('MIKKA_SKILL_MODEL_EVALUATION'), fallback: false },
   /** Proactive profile building for the whole deployment; each person also needs mikka-proactive-profile. */
@@ -73,7 +77,7 @@ export const DEPLOYMENT_SWITCHES = {
   byosClaudeOAuth: { flag: 'mikka-byos-claude-oauth', kind: 'gate', legacy: exact('MIKKA_BYOS_CLAUDE_OAUTH'), fallback: false },
   /** Connecting a ChatGPT (Codex) subscription through OAuth. */
   byosCodexOAuth: { flag: 'mikka-byos-codex-oauth', kind: 'gate', legacy: exact('MIKKA_BYOS_CODEX_OAUTH'), fallback: false },
-  /** Subscription (BYOS) enrollment custody. */
+  /** Subscription (BYOS) enrollment custody. Keeps its variable: on in production, off by default, so a fresh process reads the variable until PostHog answers. */
   byosEnrollment: { flag: 'mikka-byos-enrollment', kind: 'gate', legacy: exact('MIKKA_BYOS_ENROLLMENT_ENABLED'), fallback: false },
   /** Factory's Vercel deployment publication. */
   factoryVercelPublication: { flag: 'mikka-factory-vercel-publication', kind: 'gate', legacy: exact('FACTORY_VERCEL_PUBLICATION'), fallback: false },
@@ -111,7 +115,26 @@ function answered(entry: Switch, answers: Answers): boolean | undefined {
 export function deploymentSwitch(name: DeploymentSwitch, env: Env = process.env, now = Date.now()): boolean {
   const entry: Switch = DEPLOYMENT_SWITCHES[name]
   if (env === process.env) scheduleRefresh(now)
-  return answered(entry, state.answers) ?? entry.legacy(env) ?? entry.fallback
+  return testOverrides()?.get(name) ?? answered(entry, state.answers) ?? entry.legacy?.(env) ?? entry.fallback
+}
+
+/** Kept on globalThis so every copy of this module a test loads sees the same overrides. */
+const OVERRIDES = Symbol.for('mikka.deploymentSwitchOverrides')
+function testOverrides(): Map<string, boolean> | undefined {
+  return (globalThis as { [OVERRIDES]?: Map<string, boolean> })[OVERRIDES]
+}
+
+/**
+ * Tests only: sets a deployment switch (undefined clears it), ahead of PostHog
+ * and any variable. Throws in a deployment or a production build, and only
+ * test files may import it (deployment-switches.test.ts checks both).
+ */
+export function overrideDeploymentSwitch(name: DeploymentSwitch, value: boolean | undefined, env: Env = process.env): void {
+  if (env.VERCEL || env.VERCEL_ENV || env.NODE_ENV === 'production') throw new Error('overrideDeploymentSwitch is for tests only')
+  const holder = globalThis as { [OVERRIDES]?: Map<string, boolean> }
+  const map = holder[OVERRIDES] ??= new Map()
+  if (value === undefined) map.delete(name)
+  else map.set(name, value)
 }
 
 function scheduleRefresh(now: number) {
@@ -195,7 +218,7 @@ export async function switchForPerson(entry: Switch, userId: string, { env = pro
     cached = { value, at: now }
     personAnswers.set(key, cached)
   }
-  return answered(entry, cached.value === undefined ? {} : { [entry.flag]: cached.value }) ?? entry.legacy(env) ?? entry.fallback
+  return answered(entry, cached.value === undefined ? {} : { [entry.flag]: cached.value }) ?? entry.legacy?.(env) ?? entry.fallback
 }
 
 /** Forgets PostHog's answers; for tests. */

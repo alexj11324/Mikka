@@ -4,6 +4,7 @@ import '../scripts/credential-diagnostics-offline.mjs'
 import assert from 'node:assert/strict'
 import { mock, test } from 'node:test'
 import pg from 'pg'
+import { overrideDeploymentSwitch } from './deployment-switches'
 
 // #438 (2): with the personal mailbox flag off the worker entry answers 503 before any
 // database work, including the run lookup and the secret-set read behind masking.
@@ -18,12 +19,11 @@ for (const [name, proto] of [['Pool', pg.Pool.prototype], ['Client', pg.Client.p
     mock.method(proto, method, function () { touched.push(`${name}.${method}`); return Promise.reject(new Error('database touched while the mailbox is off')) })
 
 test('personal worker mailbox with the flag off returns 503 and never touches the database or the secret set', async () => {
-  const saved = process.env.MIKKA_PERSONAL_MAILBOX_ENABLED
-  process.env.MIKKA_PERSONAL_MAILBOX_ENABLED = '0'
+  overrideDeploymentSwitch('personalMailbox', false)
   try {
     const { personalWorkerMailbox } = await import('./personal-mailbox-runtime')
     const result = await personalWorkerMailbox('owner', '00000000-0000-4000-8000-000000000001', { action: 'send', to: 'peer', key: 'k', text: 'sk-synthetic-only' }, 'synthetic-token')
     assert.deepEqual(result, { status: 503, body: { error: 'personal_mailbox_unavailable' } })
     assert.deepEqual(touched, [])
-  } finally { if (saved === undefined) delete process.env.MIKKA_PERSONAL_MAILBOX_ENABLED; else process.env.MIKKA_PERSONAL_MAILBOX_ENABLED = saved }
+  } finally { overrideDeploymentSwitch('personalMailbox', undefined) }
 })
