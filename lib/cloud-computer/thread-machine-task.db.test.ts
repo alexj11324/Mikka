@@ -119,6 +119,46 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
       }
     });
 
+    // The daemon runs every computer action as lease-driver.py under /run/mikka-viewer/1.lock,
+    // which reads /run/mikka-viewer/1.json; a snapshot boots with no display and no lease.
+    await t.test('a computer task starts display :1 and publishes its lease before the worker is handed a credential', async () => {
+      const savedWorker = { url: process.env.MIKKA_CLOUD_WORKER_URL, sha: process.env.MIKKA_CLOUD_WORKER_SHA };
+      process.env.MIKKA_CLOUD_WORKER_URL = 'https://worker.example.invalid/mikka';
+      process.env.MIKKA_CLOUD_WORKER_SHA = 'a'.repeat(40);
+      try {
+        const computerRepo = randomUUID();
+        await pool.query(`INSERT INTO device_repos (id,"deviceId","userId","repoPath") VALUES ($1,$2,$3,'/home/user/.mikka/bot-workspaces/fixture')`, [computerRepo, botDevice, owner]);
+        await pool.query(`INSERT INTO workspace_computer_policies ("workspaceId",permission,version) VALUES ($1,'allow',3) ON CONFLICT ("workspaceId") DO UPDATE SET permission='allow',version=3`, [workspaceId]);
+        const runId = await run(await task(), { repo: computerRepo });
+        const steps: string[] = [];
+        const files = new Map<string, string>();
+        const { provider } = fake();
+        provider.create = async (_source, op) => ({
+          sandboxId: `sandbox-${op}`,
+          files: {
+            read: async () => 'a'.repeat(40),
+            write: async (path: string, body: string) => {
+              if (path.startsWith('/run/mikka-viewer/thread-')) { steps.push('handoff'); throw new Error('fixture reached worker handoff'); }
+              files.set(path, body);
+            },
+          },
+          commands: { run: async (command: string) => {
+            if (command.includes('start-desktop.sh 1')) steps.push('display');
+            if (command.includes('mv /run/mikka-viewer/1.next /run/mikka-viewer/1.json')) steps.push('lease');
+            return { stdout: '', stderr: '', exitCode: 0 };
+          } },
+        }) as never;
+        await assert.rejects(ensureThreadMachine(pool, actor, runId, provider), /fixture reached worker handoff/);
+        assert.deepEqual(steps, ['display', 'lease', 'handoff']);
+        const { epoch } = (await pool.query('SELECT epoch FROM thread_machines WHERE "runId"=$1', [runId])).rows[0];
+        assert.deepEqual(JSON.parse(files.get('/run/mikka-viewer/1.next')!), { botId, ownerId: owner, display: 1, epoch, controlledBy: null, controlUntil: 0, computerAllowed: true, policyVersion: 3 });
+      } finally {
+        await pool.query('DELETE FROM workspace_computer_policies WHERE "workspaceId"=$1', [workspaceId]);
+        if (savedWorker.url === undefined) delete process.env.MIKKA_CLOUD_WORKER_URL; else process.env.MIKKA_CLOUD_WORKER_URL = savedWorker.url;
+        if (savedWorker.sha === undefined) delete process.env.MIKKA_CLOUD_WORKER_SHA; else process.env.MIKKA_CLOUD_WORKER_SHA = savedWorker.sha;
+      }
+    });
+
     await t.test("the task's next run resumes the paused sandbox: no snapshot, no new sandbox, same device", async () => {
       const issueId = await task();
       const before = await parked(issueId);
