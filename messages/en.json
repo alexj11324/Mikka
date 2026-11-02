@@ -201,7 +201,30 @@
     "storeLoadFailed": "Couldn't load the app directory.",
     "loadingApps": "Loading apps…",
     "noConnections": "No connected apps yet",
-    "openStore": "Open Plugins"
+    "openStore": "Open Plugins",
+    "connectKind": {
+      "managed": "One-click",
+      "credentials": "API key",
+      "none": "No setup"
+    },
+    "key": {
+      "title": "Connect {name}",
+      "replaceTitle": "Change {name} key",
+      "replace": "Change key",
+      "where": "Get a key",
+      "scheme": "Method",
+      "schemes": {
+        "API_KEY": "API key",
+        "BEARER_TOKEN": "Bearer token",
+        "BASIC": "Username and password"
+      },
+      "submit": "Connect",
+      "incomplete": "Fill in the required fields",
+      "failed": "Could not connect. Check and try again",
+      "connected": "Connected {name}",
+      "replaced": "Changed {name} key",
+      "securedBy": "Secured by"
+    }
   },
   "Auth": {
     "haveAccount": "Already have an account?",
