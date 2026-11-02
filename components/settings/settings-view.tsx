@@ -33,7 +33,7 @@ import { E2BKeySettings, SecretsSettings } from '@/components/settings/secrets-s
 import { AuditLogSettings } from '@/components/settings/audit-log-settings'
 import { UsageSettings } from '@/components/settings/usage-settings'
 import { BillingSettings } from '@/components/settings/billing-settings'
-import { BotAgentsSettings } from '@/components/settings/bot-agents-settings'
+import { ModelOrderSettings } from '@/components/settings/model-order-settings'
 import { ArchivedBotsSettings } from '@/components/settings/archived-bots-settings'
 import { SettingRow, SettingsSection } from '@/components/settings/primitives'
 import { useWorkspace } from '@/hooks/use-workspace'
@@ -130,28 +130,31 @@ function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, pe
     case 'audit': return workspaceId && !preview ? <AuditLogSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
     case 'usage': return workspaceId && !preview ? <UsageSettings key={workspaceId} workspaceId={workspaceId} personal={personal} /> : waiting
     case 'billing': return workspaceId && !preview ? <>{team && <PaymentDesignationSettings key={`payment-${workspaceId}`} workspaceId={workspaceId} />}{admin && <BillingSettings key={workspaceId} workspaceId={workspaceId} personal={personal} />}</> : waiting
-    case 'general': return <WorkspaceSettings userKey={userKey ?? user.email} workspaceId={workspaceId} />
+    // Bots of people who left are a team's (decision 2026-11-02-0203); they moved here with Bot 与 Agents' removal (2026-11-02-1400).
+    case 'general': return <><WorkspaceSettings userKey={userKey ?? user.email} workspaceId={workspaceId} />{team && workspaceId && !preview && <ArchivedBotsSettings key={`archived-${workspaceId}`} workspaceId={workspaceId} />}</>
     case 'computers': return null
-    case 'bots': return workspaceId && !preview ? <><BotAgentsSettings key={workspaceId} />{/* Bots of people who left are a team's (decision 2026-11-02-0203). */}{team && <ArchivedBotsSettings key={`archived-${workspaceId}`} workspaceId={workspaceId} />}</> : waiting
     case 'permissions': return workspaceId && !preview ? <TeamPermissionsSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
     default: return null
   }
 }
 
 /**
- * 「API 与订阅」: subscriptions, API keys and custom providers in one list (orchestration.md § 1).
- * Sharing with the team (分享给团队成员) and 付款 belong to a team workspace only (decision 2026-11-01-2310).
+ * 模型与订阅 (decision 2026-11-02-1400): the subscriptions and the API keys
+ * (connect, status, 重新获取模型), then 运行位置 and 允许使用的模型, the order
+ * new runs take. 付款 is under 计费 only; sharing with the team
+ * (分享给团队成员) belongs to a team workspace (decision 2026-11-01-2310).
  */
 function ApiAndSubscriptions({ workspaceId, team }: { workspaceId: string; team: boolean }) {
   const apiKeys = useApiKeyList(workspaceId)
   return <>
-    <SubscriptionSettings workspaceId={workspaceId} extraRows={apiKeys.rows} action={apiKeys.action} />
+    <SubscriptionSettings workspaceId={workspaceId} />
+    {apiKeys.section}
     {apiKeys.dialogs}
     <ApiKeyFallbackSetting workspaceId={workspaceId} />
-    {/* The person's own E2B key: account-level, so before this workspace's settings. */}
+    <ModelOrderSettings key={`order-${workspaceId}`} workspaceId={workspaceId} />
+    {/* The person's own E2B key: account-level, what 云端 runs on. */}
     <E2BKeySettings key={`e2b-${workspaceId}`} workspaceId={workspaceId} />
     {team && <SubscriptionShareSettings key={`share-${workspaceId}`} workspaceId={workspaceId} />}
-    {team && <PaymentDesignationSettings key={`payment-${workspaceId}`} workspaceId={workspaceId} />}
   </>
 }
 

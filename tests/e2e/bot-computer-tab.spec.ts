@@ -3,7 +3,7 @@ import { test, expect, register } from './fixtures'
 
 // Every bot's right panel has 电脑 (decisions 2026-10-31). Mikka Cloud runs on the
 // person's own E2B key: without one the screen offers 添加 E2B API Key, which opens
-// the same dialog as API 与订阅; with one it is the bot's screen. Saving a key checks it
+// the same dialog as 模型与订阅; with one it is the bot's screen. Saving a key checks it
 // against E2B, which no e2e run can reach, so the key row is written straight into the
 // disposable database and the tab picks it up from the shared cache without a reload.
 function e2eDatabase() {

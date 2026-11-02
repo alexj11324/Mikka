@@ -5,7 +5,7 @@ import { pool } from '@/lib/db'
 import { workspaceMembers } from '@/lib/db/workspace-schema'
 import { requireUser } from '@/lib/issue-access'
 import type { ApiKeyView } from '@/lib/model-api-key-providers'
-import { addApiKey, listApiKeys, removeApiKey, setApiKeyAfterQuota, setApiKeyShare, usableApiKeys, type ApiKeysPage, type UsableApiKey } from '@/lib/model-api-keys'
+import { addApiKey, listApiKeys, refreshApiKeyModels, removeApiKey, setApiKeyAfterQuota, setApiKeyShare, usableApiKeys, type ApiKeysPage, type UsableApiKey } from '@/lib/model-api-keys'
 import { loadWorkspaceContext } from '@/lib/workspace-access'
 import { workspaceDb } from '@/lib/workspace-db'
 import { settingsWorkspaceAction, type SettingsActionResult } from '@/lib/workspace-admin/settings-action'
@@ -38,6 +38,15 @@ export async function deleteApiKey(id: string, workspaceId?: string): Promise<Se
   return settingsWorkspaceAction(async () => {
     const { userId } = await actor(workspaceId)
     return removeApiKey(pool, userId, id)
+  })
+}
+
+/** 重新获取模型 for one of the person's keys; the page's list comes back with the result or the reason. */
+export async function refetchApiKeyModels(id: string, workspaceId?: string): Promise<SettingsActionResult<ApiKeysPage>> {
+  return settingsWorkspaceAction(async () => {
+    const { userId, workspace } = await actor(workspaceId)
+    await refreshApiKeyModels(pool, userId, id)
+    return listApiKeys(pool, userId, workspace)
   })
 }
 

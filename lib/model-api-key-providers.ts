@@ -1,5 +1,5 @@
 /**
- * 「API 与订阅」: the API key providers a person can add, and the shape the
+ * 「模型与订阅」: the API key providers a person can add, and the shape the
  * page, the model picker and the run injection share (orchestration.md § 1,
  * § 3, § 6). GPT/OpenAI models run on Codex; every other model, including
  * those reached through an API key or an Anthropic-compatible custom
@@ -58,5 +58,8 @@ export interface ApiKeyView {
   protocol: ApiKeyProtocol
   /** The key's last four characters. */
   last4: string
+  /** What the provider's /models last answered; never a list written by Mikka. */
   models: string[]
+  /** Why the last 重新获取模型 failed (401/403, or anything else); null after a good answer. */
+  modelsError: 'invalid' | 'unavailable' | null
 }

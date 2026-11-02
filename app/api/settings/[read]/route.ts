@@ -10,7 +10,7 @@ import { getE2BKeyCapability, listSecrets } from '@/app/actions/workspace-secret
 import { getUsage } from '@/app/actions/usage'
 import { cardVerificationStatus, getBilling, getCreditBilling } from '@/app/actions/billing'
 import { listAuditLog } from '@/app/actions/audit-log'
-import { getExecutionFallbacks, listBotModels, listExecutionPlaces, listExecutionRules } from '@/app/actions/execution-settings'
+import { getModelOrder } from '@/app/actions/model-order'
 import { listBots } from '@/app/actions/bots'
 import { getApiKeys } from '@/app/actions/model-api-keys'
 import type { AuditFilter } from '@/lib/audit/cursor'
@@ -40,11 +40,8 @@ const READS: Record<SettingsRead, (query: URLSearchParams) => Promise<unknown>> 
   'credit-billing': query => getCreditBilling(workspace(query)),
   'card-verification': query => cardVerificationStatus(workspace(query)),
   // listWorkspaceAudit validates the filter and cursor.
-  // Bot 与 Agents: the current workspace's rules, fallbacks, places, accounts and Bots.
-  'execution-rules': () => listExecutionRules(),
-  'execution-fallbacks': () => getExecutionFallbacks(),
-  'execution-places': () => listExecutionPlaces(),
-  'bot-models': () => listBotModels(),
+  // 模型与订阅: the allowed models in order and 运行位置 (decision 2026-11-02-1400).
+  'model-order': query => getModelOrder(workspace(query)),
   bots: () => listBots(),
   'api-keys': query => getApiKeys(workspace(query)),
   audit: query => listAuditLog({ filter: (query.get('filter') ?? undefined) as AuditFilter | undefined, cursor: query.get('cursor') }, workspace(query)),

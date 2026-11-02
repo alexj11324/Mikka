@@ -7,7 +7,7 @@ test('管理员添加、编辑和删除密钥，值不回显', async ({ page }, 
   await registerInTeam(page, '/settings?section=secrets')
   await expect(page.getByRole('heading', { level: 1, name: '密钥与环境' })).toBeVisible()
   await expect(page.getByText('还没有密钥。')).toBeVisible()
-  // The E2B key is personal now: it is under 账号 › API 与订阅, not the workspace's 密钥与环境.
+  // The E2B key is personal now: it is under 账号 › 模型与订阅, not the workspace's 密钥与环境.
   await expect(page.getByRole('region', { name: '云电脑' })).toHaveCount(0)
   await attachLightDark(page, testInfo, 'secrets-empty')
 
@@ -47,8 +47,8 @@ test('管理员添加、编辑和删除密钥，值不回显', async ({ page }, 
 })
 
 // Keys are personal (orchestration § 2): every member, admin or not, sets their own E2B key
-// under 账号 › API 与订阅, and the team's 密钥与环境 no longer holds one.
-test('团队成员在 API 与订阅 里设置自己的 E2B Key', async ({ page }, testInfo) => {
+// under 账号 › 模型与订阅, and the team's 密钥与环境 no longer holds one.
+test('团队成员在模型与订阅里设置自己的 E2B Key', async ({ page }, testInfo) => {
   const { workspaceId } = await registerInTeam(page, '/settings?section=models')
   // A plain member, not an admin, still edits their own key.
   const pool = new Pool({ connectionString: process.env.E2E_DATABASE_URL })

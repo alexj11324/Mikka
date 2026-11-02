@@ -72,17 +72,14 @@ test('设备：本机与 Remote control 分组，Agent 图标，重命名、重�
   await expect(page.getByText('需要管理员开启 user namespace', { exact: false })).toHaveCount(0)
   await page.keyboard.press('Escape')
   await expect(row(page, 'gpu-box').getByRole('button', { name: '重新连接' })).toBeVisible()
-  await expect(row(page, 'gpu-box').getByRole('switch', { name: '允许调度到 gpu-box' })).not.toBeChecked()
-  // 自动调度 needs 允许调度: a server defaults to auto, but with scheduling off it reads off and is locked.
-  await expect(row(page, 'gpu-box').getByRole('switch', { name: '允许 gpu-box 自动调度' })).not.toBeChecked()
-  await expect(row(page, 'gpu-box').getByRole('switch', { name: '允许 gpu-box 自动调度' })).toBeDisabled()
-  // 允许自动调度: servers on and personal computers off by default; turning it on is saved.
-  await expect(row(page, 'build-01').getByRole('switch', { name: '允许 build-01 自动调度' })).toBeChecked()
-  const auto = row(page, 'E2E MacBook').getByRole('switch', { name: '允许 E2E MacBook 自动调度' })
-  await expect(auto).not.toBeChecked()
-  await auto.click()
-  await expect(auto).toBeChecked()
-  await expect.poll(async () => (await db().query('SELECT "autoSchedule" FROM devices WHERE id = $1', [ids.laptop])).rows[0].autoSchedule).toBe(true)
+  // 参与调度 is each computer's one switch (decision 2026-11-02-1400); turning it off is saved and nothing else is offered.
+  await expect(row(page, 'gpu-box').getByRole('switch', { name: 'gpu-box 参与调度' })).not.toBeChecked()
+  await expect(row(page, 'build-01').getByRole('switch')).toHaveCount(1)
+  const scheduling = row(page, 'E2E MacBook').getByRole('switch', { name: 'E2E MacBook 参与调度' })
+  await expect(scheduling).toBeChecked()
+  await scheduling.click()
+  await expect(scheduling).not.toBeChecked()
+  await expect.poll(async () => (await db().query('SELECT enabled FROM devices WHERE id = $1', [ids.laptop])).rows[0].enabled).toBe(false)
 
   await row(page, 'build-01').getByRole('button', { name: 'build-01 的更多操作' }).click()
   await page.getByRole('menuitem', { name: '重新检测 Agent' }).click()

@@ -783,10 +783,8 @@
     "online": "在线",
     "offline": "离线",
     "thisMachine": "本机",
-    "allowScheduling": "允许调度",
-    "allowSchedulingTo": "允许调度到 {name}",
-    "autoSchedule": "自动调度",
-    "autoScheduleTo": "允许 {name} 自动调度",
+    "allowScheduling": "参与调度",
+    "allowSchedulingTo": "{name} 参与调度",
     "recheck": "重新检查",
     "agent": "可用工具",
     "toggleSidebar": "展开或收起侧栏",
@@ -926,8 +924,7 @@
       "retry": "重试",
       "done": "完成",
       "cancelled": "已取消"
-    },
-    "autoScheduleNeedsAllow": "需先开启「允许调度」"
+    }
   },
   "Workspace": {
     "loadingEditor": "正在加载任务编辑器",
@@ -1704,8 +1701,8 @@
         "title": "连接"
       },
       "models": {
-        "title": "API 与订阅",
-        "keywords": "模型订阅 订阅 额度 用量 API Key 服务商 模型"
+        "title": "模型与订阅",
+        "keywords": "模型订阅 订阅 额度 API Key 服务商 模型 允许使用的模型 顺序 派发 运行位置 云端 本地 Bot Agent"
       },
       "logins": {
         "title": "登录与密钥"
@@ -1721,10 +1718,6 @@
       },
       "general": {
         "title": "常规"
-      },
-      "bots": {
-        "title": "Bot 与 Agents",
-        "keywords": "Bot Agent 模型 运行位置 规则 标签"
       },
       "permissions": {
         "title": "团队权限"
@@ -1926,7 +1919,8 @@
       "paused": "已暂停",
       "useSubscription": "使用 {label}",
       "pauseFailed": "无法更改这个订阅。",
-      "claudePlan": "Claude {plan}"
+      "claudePlan": "Claude {plan}",
+      "disconnectTitle": "断开 {label}？"
     },
     "integrations": {
       "googleSignInTitle": "Google 登录",
@@ -2441,47 +2435,6 @@
         "incomplete": "待完成付款"
       }
     },
-    "botAgents": {
-      "bots": "Bot",
-      "addRule": "添加规则",
-      "default": "默认",
-      "cloud": "Mikka Cloud",
-      "online": "在线",
-      "offline": "离线",
-      "removedDevice": "已移除的设备",
-      "redetect": "重新检测",
-      "searchModels": "搜索模型",
-      "claudeAccount": "Claude",
-      "openaiAccount": "ChatGPT",
-      "add": "添加",
-      "save": "保存",
-      "delete": "删除",
-      "rowMenu": "{label} 的更多操作",
-      "cell": "{row} {column}：{value}",
-      "loading": "正在读取 Bot 与 Agents",
-      "loadFailed": "无法读取 Bot 与 Agents",
-      "notSaved": "未保存",
-      "retry": "重试",
-      "columns": {
-        "label": "标签",
-        "place": "运行位置",
-        "harness": "Agent",
-        "model": "模型",
-        "actions": "操作"
-      },
-      "hostedDefault": "Mikka 默认",
-      "defaults": "任务默认",
-      "fallbacks": "出问题时",
-      "setting": "{name}：{value}",
-      "whenDeviceOffline": "设备离线时",
-      "offlineWait": "等它上线",
-      "offlineCloud": "改到云端运行",
-      "labels": "按标签",
-      "pickModel": "选择模型",
-      "noModels": "还没有可用模型",
-      "unavailable": "不可用",
-      "unverified": "未与账号核对"
-    },
     "searchEmpty": "没有匹配的设置",
     "apiKeys": {
       "add": "添加 API Key",
@@ -2508,7 +2461,63 @@
       "removeTitle": "删除 {name}？",
       "othersUsage": "团队成员可以用它跑自己的 Bot，用量算在你的 API 账单上。",
       "afterQuota": "订阅额度用完后，自动改用 API Key",
-      "afterQuotaBilling": "会按 API 服务商的价格计费"
+      "afterQuotaBilling": "会按 API 服务商的价格计费",
+      "sectionTitle": "API Key",
+      "none": "还没有 API Key",
+      "loading": "正在读取 API Key…",
+      "modelCount": "{count} 个模型",
+      "noModels": "服务商没有返回模型",
+      "modelsInvalid": "无法获取模型 · Key 无效或已被撤销",
+      "modelsUnavailable": "无法获取模型 · 服务商没有响应",
+      "refetch": "重新获取模型",
+      "refetchLabel": "重新获取 {name} 的模型"
+    },
+    "modelOrder": {
+      "title": "允许使用的模型",
+      "loading": "正在读取允许使用的模型…",
+      "location": "运行位置",
+      "local": "本地",
+      "cloud": "云端",
+      "localDevices": "{count} 台电脑参与调度",
+      "cloudNoKey": "E2B Key 未设置",
+      "add": "添加模型",
+      "addCount": "添加 {count} 个",
+      "empty": "还没有允许使用的模型",
+      "noCandidates": "没有可添加的模型",
+      "removeTitle": "移除 {model}？",
+      "remove": "移除",
+      "ready": "可用",
+      "quotaUntil": "额度用完 · {time}恢复",
+      "noDevice": "没有电脑能跑 {harness}",
+      "blocked": {
+        "quota": "额度用完",
+        "expired": "需要重新连接",
+        "paused": "已暂停",
+        "missing": "已不可用",
+        "keyRefused": "Key 无效或已被撤销"
+      },
+      "handle": "拖动 {model}（第 {position} 个）",
+      "rowMenu": "{model} 的更多操作",
+      "moveUp": "上移",
+      "moveDown": "下移",
+      "dragInstructions": "按空格拿起，用上下方向键移动，再按空格放下，按 Esc 取消。",
+      "dragStart": "拿起 {model}，第 {position} 个",
+      "dragOver": "{model} 移到第 {position} 个",
+      "dragEnd": "{model} 放在第 {position} 个",
+      "dragCancel": "取消移动 {model}",
+      "source": {
+        "claude": "Claude 订阅",
+        "codex": "ChatGPT 订阅",
+        "apiKey": "{provider} API Key"
+      },
+      "added": "已添加",
+      "provider": {
+        "anthropic": "Anthropic",
+        "openai": "OpenAI",
+        "deepseek": "DeepSeek",
+        "kimi": "Kimi",
+        "custom": "自定义服务商"
+      }
     }
   },
   "TelegramBot": {
@@ -2954,7 +2963,7 @@
       "metered": "按量",
       "shared": "团队成员分享的",
       "sharedKey": "{name}的 Key",
-      "manage": "管理 API 与订阅",
+      "manage": "管理模型与订阅",
       "unavailable": "不可用",
       "notSaved": "未保存",
       "unknownModel": "未知模型",
@@ -3208,11 +3217,17 @@
     "needsMachineTitle": "没有可用的电脑",
     "needsMachineDescription": "先连接或开启一台电脑，或者填入你的 E2B API Key 用云端运行。",
     "needsMachineConnect": "连接电脑",
-    "needsMachineAuto": "允许这台电脑自动调度",
+    "needsMachineAuto": "让这台电脑参与调度",
     "needsMachineServerOnline": "让服务器重新上线",
     "needsMachineMac": "在这台电脑上启用",
     "needsMachineServer": "连接我的服务器",
-    "needsMachineE2B": "填入 E2B Key"
+    "needsMachineE2B": "填入 E2B Key",
+    "needsModelTitle": "没有能跑这个任务的模型",
+    "needsModelNoModels": "还没有允许使用的模型",
+    "needsModelCloud": "云端还没有 E2B Key",
+    "needsModelNoDevice": "允许使用的模型都没有电脑能跑",
+    "needsModelUnavailable": "允许使用的模型都暂时不可用",
+    "needsModelSettings": "打开模型与订阅"
   },
   "IssueThreads": {
     "title": "线程",

@@ -30,6 +30,25 @@ function firstKey(keys: Pick<ApiKeyView, 'id' | 'protocol' | 'models'>[], harnes
   }
 }
 
+/**
+ * A model an API key lists for this Agent and none of the person's connected subscriptions of that
+ * Agent's provider lists in its catalogue: a key's model in 允许使用的模型. It runs on
+ * the key; a subscription is never asked for a model its account does not offer.
+ */
+async function keyOnlyModel(query: Query, ownerId: string, keys: Pick<ApiKeyView, 'id' | 'protocol' | 'models'>[], harness: string, model: string): Promise<RunApiKey | undefined> {
+  const key = keys.find(item => apiKeyHarness(item.protocol) === harness && item.models.includes(model))
+  if (!key) return
+  const { rowCount } = await query.query(`SELECT 1 FROM byos_connections WHERE "ownerId"=$1 AND provider=$2 AND state='connected' AND "modelCatalog"->'models' ? $3 LIMIT 1`,
+    [ownerId, harness === 'codex' ? 'codex' : 'claude', model])
+  return rowCount ? undefined : { keyId: key.id, model }
+}
+
+/** Whether a rule's model is one only an API key serves, so its run takes no subscription (rule-dispatch). */
+export async function ruleApiKey(query: Query, input: { ownerId: string; botWorkspaceId: string | null; harness: string; model: string }): Promise<RunApiKey | undefined> {
+  if (input.harness !== 'codex' && input.harness !== 'claude_code') return
+  return keyOnlyModel(query, input.ownerId, await runKeys(query, input.ownerId, input.botWorkspaceId), input.harness, input.model)
+}
+
 /** Connected, not paused, on the binding's revision: what a subscription run can be leased now. */
 async function subscriptionState(query: Query, binding: Binding): Promise<'usable' | 'exhausted' | 'unusable'> {
   const { rows: [row] } = await query.query<{ state: string; paused: boolean; epoch: string; quota: unknown }>(
@@ -67,6 +86,8 @@ export async function runCredentialSource<S extends Binding>(query: Query, input
   const choiceWorkspaceId = typeof input.choiceWorkspaceId === 'function' ? await input.choiceWorkspaceId() : input.choiceWorkspaceId
   const saved = choiceWorkspaceId ? await botApiKeyChoice(query, { ownerId: input.ownerId, workspaceId: choiceWorkspaceId }, input.botId) : undefined
   if (saved && saved.harness === input.harness && keys.some(key => key.id === saved.keyId)) return { subscription: null, apiKey: { keyId: saved.keyId, model: saved.model } }
+  const keyed = input.model ? await keyOnlyModel(query, input.ownerId, keys, input.harness, input.model) : undefined
+  if (keyed) return { subscription: null, apiKey: keyed }
   // The server cannot see whether the device's CLI is signed in, so a free local login is never turned into per-token billing.
   if (input.localLogin) return kept
   const state = input.subscription ? await subscriptionState(query, input.subscription) : 'unusable'
@@ -94,9 +115,3 @@ export async function quotaFallbackApiKey(query: Query, input: {
   return firstKey(keys, input.harness, input.model)
 }
 
-/** For a thread's model with no rule (rule-dispatch `threadModel`): the person's first usable key, on its own Agent. */
-export async function firstRunApiKey(query: Query, ownerId: string, botWorkspaceId: string | null): Promise<(RunApiKey & { harness: 'claude_code' | 'codex' }) | undefined> {
-  for (const key of await runKeys(query, ownerId, botWorkspaceId)) {
-    if (key.models[0]) return { keyId: key.id, model: key.models[0], harness: apiKeyHarness(key.protocol) }
-  }
-}

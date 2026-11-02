@@ -1,10 +1,10 @@
 'use client'
 
 import { useState, type ReactNode } from 'react'
-import useSWR from 'swr'
+import useSWR, { mutate } from 'swr'
 import { useTranslations } from 'next-intl'
-import { KeyRound } from 'lucide-react'
-import { createApiKey, deleteApiKey, updateApiKeyAfterQuota, updateApiKeyShare, type getApiKeys } from '@/app/actions/model-api-keys'
+import { KeyRound, TriangleAlert } from 'lucide-react'
+import { createApiKey, deleteApiKey, refetchApiKeyModels, updateApiKeyAfterQuota, updateApiKeyShare, type getApiKeys } from '@/app/actions/model-api-keys'
 import { settingsRead } from '@/lib/settings-read'
 import { SettingRow, SettingsSaveError, SettingsSection, settingsSectionAction } from '@/components/settings/primitives'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
@@ -19,6 +19,7 @@ import { Claude } from '@/components/ui/svgs/claude'
 import { OpenAI } from '@/components/ui/svgs/openai'
 import { API_KEY_PRESETS, type ApiKeyProtocol, type ApiKeyProvider, type ApiKeyView } from '@/lib/model-api-key-providers'
 import { useActionError } from '@/lib/use-action-error'
+import { modelOrderKey } from '@/components/settings/model-order-settings'
 
 type Key = ApiKeyView & { shared: boolean }
 const providers = [...API_KEY_PRESETS, 'custom'] as const
@@ -35,9 +36,11 @@ function ProviderIcon({ provider }: { provider: ApiKeyProvider }) {
 
 /**
  * 「API 与订阅」's API keys and custom providers (orchestration.md § 1, C22):
- * rows that sit in the same list as the subscriptions, the 添加 API Key
- * action for that list, and the account's 订阅额度用完后，自动改用 API Key
- * switch. Keys are write-only: a row shows the last four characters only.
+ * their own group after the subscriptions (decision 2026-11-02-1200), with
+ * 添加 API Key, and the account's 订阅额度用完后，自动改用 API Key switch.
+ * Keys are write-only: a row shows the last four characters only. A row
+ * shows how many models the provider's /models gave, or why it gave none,
+ * with 重新获取模型.
  */
 export function useApiKeyList(workspaceId: string) {
   const t = useTranslations('Settings.apiKeys')
@@ -61,17 +64,34 @@ export function useApiKeyList(workspaceId: string) {
       await keys.mutate(result, { revalidate: false })
     } catch { setFailed({ message: actionError(), retry: () => void share(key, shared) }) } finally { setPending(false); setSharing(null) }
   }
+  async function refetch(key: Key) {
+    setPending(true); setFailed(null)
+    try {
+      const result = await refetchApiKeyModels(key.id, workspaceId)
+      if (result.error) { setFailed({ message: actionError(result.error), retry: () => void refetch(key) }); return }
+      await keys.mutate(result, { revalidate: false })
+      void mutate(modelOrderKey(workspaceId))
+    } catch { setFailed({ message: actionError(), retry: () => void refetch(key) }) } finally { setPending(false) }
+  }
   async function remove(key: Key) {
     setPending(true); setFailed(null)
     try {
       const result = await deleteApiKey(key.id, workspaceId)
       if (result.error) { setFailed({ message: actionError(result.error), retry: () => void remove(key) }); return }
       await keys.mutate()
+      void mutate(modelOrderKey(workspaceId))
     } catch { setFailed({ message: actionError(), retry: () => void remove(key) }) } finally { setPending(false); setRemoving(null) }
   }
 
+  const modelsLine = (key: Key) => {
+    const refetchButton = <Button type="button" variant="secondary" size="xs" disabled={pending} aria-label={t('refetchLabel', { name: title(key) })} onClick={() => void refetch(key)}>{t('refetch')}</Button>
+    if (key.modelsError) return <span role="status" className="flex flex-wrap items-center gap-2 text-xs text-warning-foreground">
+      <TriangleAlert aria-hidden="true" className="size-3.5 shrink-0 text-warning" />{t(key.modelsError === 'invalid' ? 'modelsInvalid' : 'modelsUnavailable')}{refetchButton}
+    </span>
+    return <span role="status" className="flex flex-wrap items-center gap-2 text-xs">{key.models.length ? t('modelCount', { count: key.models.length }) : t('noModels')}{refetchButton}</span>
+  }
   const rows: ReactNode[] = (data?.keys ?? []).map(key => <SettingRow key={key.id} icon={<ProviderIcon provider={key.provider} />} title={title(key)}
-    description={`${key.baseUrl ? new URL(key.baseUrl).host : t('apiKey')} · ••••${key.last4}`}>
+    description={<><span className="block">{`${key.baseUrl ? new URL(key.baseUrl).host : t('apiKey')} · ••••${key.last4}`}</span>{modelsLine(key)}</>}>
     <span className="flex items-center gap-4">
       {data?.canShare && <Label className="flex items-center gap-2 font-normal text-muted-foreground">
         {shareT('others')}
@@ -84,9 +104,12 @@ export function useApiKeyList(workspaceId: string) {
   if (keys.data?.error) rows.push(<div key="error" className="px-5 py-4"><FieldError>{actionError(keys.data.error)}</FieldError></div>)
 
   const action = <Button type="button" {...settingsSectionAction} disabled={!data} onClick={() => setAdding(true)}>{t('add')}</Button>
+  const section = <SettingsSection id="api-keys-heading" title={t('sectionTitle')} action={action}>
+    {rows.length ? rows : <p className="px-5 py-4 text-sm text-muted-foreground">{data ? t('none') : t('loading')}</p>}
+  </SettingsSection>
   const dialogs = <>
     {failed && <SettingsSaveError message={failed.message} retryLabel={commonT('retry')} onRetry={failed.retry} />}
-    {adding && <AddApiKeyDialog workspaceId={workspaceId} onClose={async added => { setAdding(false); if (added) await keys.mutate() }} />}
+    {adding && <AddApiKeyDialog workspaceId={workspaceId} onClose={async added => { setAdding(false); if (added) { await keys.mutate(); void mutate(modelOrderKey(workspaceId)) } }} />}
     <AlertDialog open={sharing !== null} onOpenChange={open => { if (!open && !pending) setSharing(null) }}>
       <AlertDialogContent>
         <AlertDialogHeader>
@@ -115,7 +138,7 @@ export function useApiKeyList(workspaceId: string) {
       </AlertDialogContent>
     </AlertDialog>
   </>
-  return { rows, action, dialogs }
+  return { section, dialogs }
 }
 
 /** 订阅额度用完后，自动改用 API Key: on by default (orchestration.md § 2). */
