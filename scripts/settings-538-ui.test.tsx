@@ -5,7 +5,7 @@ import { act } from 'react'
 import type { Root } from 'react-dom/client'
 import { Window } from 'happy-dom'
 
-// #538 UI: 通用 「重新播放引导」 and the E2B row's capability, with the server actions mocked.
+// #538 UI: 「重新播放引导」 (偏好设置 since decision 2026-11-02-0203) and the E2B row's capability, with the server actions mocked.
 const zh = JSON.parse(readFileSync(new URL('../messages/zh-CN.json', import.meta.url), 'utf8'))
 const translator = (namespace: string) => {
   const lookup = (key: string, args?: Record<string, string>) => {
@@ -36,6 +36,7 @@ const assigned: string[] = []
 let container: HTMLDivElement
 let root: Root
 let createRoot: typeof import('react-dom/client')['createRoot']
+let ReplayOnboarding: typeof import('../components/settings/workspace-settings')['ReplayOnboarding']
 let WorkspaceSettings: typeof import('../components/settings/workspace-settings')['WorkspaceSettings']
 let E2BKeySettings: typeof import('../components/settings/secrets-settings')['E2BKeySettings']
 
@@ -46,11 +47,11 @@ before(async () => {
   Object.defineProperty(globalThis, 'navigator', { configurable: true, value: browser.navigator })
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true, HTMLElement: browser.HTMLElement, Element: browser.Element })
   ;({ createRoot } = await import('react-dom/client'))
-  ;({ WorkspaceSettings } = await import('../components/settings/workspace-settings'))
+  ;({ ReplayOnboarding, WorkspaceSettings } = await import('../components/settings/workspace-settings'))
   ;({ E2BKeySettings } = await import('../components/settings/secrets-settings'))
 })
 beforeEach(() => {
-  general = { id: 'w1', name: 'Acme', slug: 'acme', icon: null, canEdit: false, canTransfer: false }
+  general = { id: 'w1', name: 'Acme', slug: 'acme', icon: null, canEdit: false, canTransfer: false, personal: false }
   capability = { canEdit: true, byoEnabled: true, configured: true, lastErrorCode: null, lastErrorAt: null }
   assigned.length = 0
   reset.mock.resetCalls()
@@ -64,8 +65,8 @@ after(() => browser.happyDOM.close())
 const button = (name: string) => [...document.querySelectorAll('button')].find(item => item.textContent?.trim() === name) as unknown as HTMLButtonElement | undefined
 const status = () => document.querySelector('[role="status"]')?.textContent
 
-test('通用 offers 重新播放引导 to members too; it resets and reloads the app', async () => {
-  await act(async () => root.render(<WorkspaceSettings workspaceId="w1" />))
+test('偏好设置 offers 重新播放引导 in every workspace; it resets and reloads the app', async () => {
+  await act(async () => root.render(<ReplayOnboarding />))
   assert.ok(container.textContent?.includes('重新播放引导'))
   await act(async () => button('重新播放')!.click())
   assert.equal(reset.mock.callCount(), 1)
@@ -74,13 +75,19 @@ test('通用 offers 重新播放引导 to members too; it resets and reloads the
 
 test('a failed reset stays on the page with 重试', async () => {
   reset.mock.mockImplementationOnce(async () => { throw new Error('down') })
-  await act(async () => root.render(<WorkspaceSettings workspaceId="w1" />))
+  await act(async () => root.render(<ReplayOnboarding />))
   await act(async () => button('重新播放')!.click())
   assert.deepEqual(assigned, [])
   assert.ok(document.querySelector('[role="alert"]'))
   await act(async () => button('重试')!.click())
   assert.equal(reset.mock.callCount(), 2)
   assert.deepEqual(assigned, ['/'])
+})
+
+test('常规 no longer carries 重新播放引导: it is the person\'s, not the workspace\'s', async () => {
+  await act(async () => root.render(<WorkspaceSettings workspaceId="w1" />))
+  assert.ok(container.textContent?.includes('Acme'))
+  assert.equal(container.textContent?.includes('重新播放引导'), false)
 })
 
 // The E2B row is the person's own key, under 账号 › API 与订阅 (keys are personal).

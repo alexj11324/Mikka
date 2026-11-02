@@ -271,7 +271,7 @@ export function Citations({
 
   return (
     <div className={cn("w-full text-sm", className)}>
-      <Button variant="ghost" size="sm"
+      <Button variant="bare" size="bare"
         type="button"
         aria-expanded={currentOpen}
         aria-controls={contentId}

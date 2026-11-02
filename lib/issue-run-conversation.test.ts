@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { runFailureText, runIsActive, runListRefreshInterval, runStopTimeoutRemaining, runSummaryText, threadItems } from './issue-run-conversation'
+import { chainChunks, runFailureText, runIsActive, runListRefreshInterval, runStopTimeoutRemaining, runSummaryText, threadItems } from './issue-run-conversation'
 
 test('only active run states offer messages; completed history stays readable', () => {
   for (const state of ['queued', 'preparing', 'running', 'waiting_input', 'finishing']) assert.equal(runIsActive(state), true)
@@ -98,4 +98,19 @@ test('a failed run says why; any other run says nothing', () => {
   assert.equal(runFailureText('failed', '   '), null)
   assert.equal(runFailureText('succeeded', 'leftover error'), null)
   assert.equal(runFailureText('running', 'transient error'), null)
+})
+
+test('a thread that ran again reads as one conversation: each run keeps its own text and steps', () => {
+  const at = (s: number) => new Date(Date.UTC(2026, 10, 2, 0, 0, s))
+  const rows = [
+    { runId: 'r1', chunk: { type: 'text-delta', id: 't1', delta: 'First.' }, at: at(1) },
+    { runId: 'r1', chunk: { type: 'tool-input-available', toolCallId: 'a', toolName: 'Edit' }, at: at(2) },
+    { runId: 'r2', chunk: { type: 'text-delta', id: 't1', delta: 'Second.' }, at: at(10) },
+    { runId: 'r2', chunk: { type: 'tool-input-available', toolCallId: 'a', toolName: 'Bash' }, at: at(11) },
+    { runId: 'r2', chunk: { type: 'tool-output-error', toolCallId: 'a', errorText: 'x' }, at: at(12) },
+  ]
+  const items = threadItems(chainChunks(rows), [{ id: 'm', text: 'Go on.', author: 'Alex', mine: true, at: at(9) }])
+  assert.deepEqual(items.map(item => item.kind === 'agent' ? `agent:${item.text}` : item.kind === 'steps' ? `steps:${item.steps.map(step => `${step.name}${step.failed ? '!' : ''}`).join(',')}` : item.kind),
+    ['agent:First.', 'steps:Edit', 'person', 'agent:Second.', 'steps:Bash!'])
+  assert.deepEqual(chainChunks(rows.slice(0, 2)).map(row => row.chunk.id ?? row.chunk.toolCallId), ['t1', 'a'], 'one run keeps its ids')
 })

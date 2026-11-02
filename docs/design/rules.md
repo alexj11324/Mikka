@@ -48,7 +48,11 @@ source wins in a conflict is in [`README.md`](README.md).
   button). Views that are not a conversation never get one: the thread list
   and a bot's computer screen send instructions through the centre composer.
   An open thread is a conversation with the agent running it, so its detail
-  ends in that composer and what is typed there goes to that agent.
+  ends in that composer and what is typed there goes to that agent, whether
+  the thread is running or has ended (an ended one runs again, R-81), wherever
+  it opens: task page, thread column, Artifact window, phone. Only the legacy
+  agent archive is read-only
+  ([decision](decisions/2026-11-02-0220-every-thread-ends-in-the-composer.md)).
 - **R-11** A bot's composer, the Coordinator's included, has one model chip
   (`BotModelPicker`) beside 「+」, saved per bot; it picks a model only, never
   an Agent. Settings has no per-bot model rows

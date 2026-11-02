@@ -85,7 +85,8 @@ export default function ThreadScreen() {
         {data && !data.active && data.error && !data.items.some(item => item.kind === 'error') ? <Text style={styles.error}>{data.error}</Text> : null}
       </KeyboardChatScrollView>
       <OfflineBanner top={insets.top + 66} />
-      {data?.active ? <Composer placeholder="给这个线程发消息" onSend={send} disabled={sending} /> : null}
+      {/* R-10: a thread ends in the composer, finished or not; a message to an ended thread runs it again (R-81). */}
+      {data ? <Composer placeholder="给这个线程发消息" onSend={send} disabled={sending} /> : null}
     </View>
   )
 }
