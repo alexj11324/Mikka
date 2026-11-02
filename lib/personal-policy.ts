@@ -6,7 +6,7 @@ import type { Pool, PoolClient } from 'pg'
  * that person's own bots and runs, in every workspace they belong to. No share
  * row and no admin switch limits it. What a share row and the admin switch
  * decide is whether OTHER members' bots may use it there: 分享给团队成员
- * (`allowOthers`), and only while the admin leaves 允许成员使用个人订阅 on.
+ * (`allowOthers`), and only while the admin leaves 团队权限 › 订阅与 API Key on 允许.
  */
 type Query = Pick<Pool | PoolClient, 'query'>
 

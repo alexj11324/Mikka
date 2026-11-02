@@ -15,7 +15,7 @@ type Change = { shared: boolean; allowOthers?: boolean }
 /**
  * 分享给团队成员: a member's own subscriptions always serve their own bots in
  * every workspace, with no switch (Alex, #838); this switch lets other
- * members' bots use them too. An admin's 允许成员使用个人订阅 turned off
+ * members' bots use them too. An admin's 团队权限 › 订阅与 API Key set to 禁止
  * blocks only this sharing. Turning it on asks first, in Alex's words: whose quota pays, that
  * the credential sits on the running computer (maybe a member's own) until
  * the task ends, and to share only with people you trust. Turning it off

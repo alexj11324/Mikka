@@ -10,7 +10,7 @@ import { workspaceMembers } from '@/lib/db/workspace-schema'
 import { stopRunsUsingApiKeys } from '@/lib/model-api-key-runs'
 import { memberSubscriptionsAllowed, pooledOwners, setSubscriptionShare, stopRunsUsingSubscriptions } from '@/lib/personal-policy'
 
-/** 团队权限 › 允许成员使用个人订阅. */
+/** 团队权限 › 订阅与 API Key: may members share theirs with teammates (decision 2026-11-01-2240). */
 export interface MemberSubscriptionPolicy { allowed: boolean; canEdit: boolean }
 
 /** Any member reads; `canEdit` for admins of a team workspace (a personal workspace has no switch). */
