@@ -6,8 +6,9 @@ import { computerApi, isMockedComputer, subscribeComputerEvents } from '@/lib/co
 import type { ComputerState, ViewerGrant, ViewerMode } from '@/lib/computer/types'
 
 /**
- * One bot's computer: polled every 2s and patched by pushes, so the details
- * page, the chat card and the viewer all show the same state.
+ * One bot's computer: polled every 2s (patched by the mock's pushes in
+ * development), so the details page, the chat card and the viewer all show
+ * the same state.
  */
 export function useComputer(botId: string | null | undefined) {
   const swr = useSWR<ComputerState>(botId ? ['computer', botId] : null, ([, id]: [string, string]) => computerApi.state(id), { refreshInterval: 2000 })
