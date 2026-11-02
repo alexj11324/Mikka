@@ -11,6 +11,13 @@ import { stripeConfig, stripePost, StripeRequestError } from './stripe'
 
 type Env = Readonly<Record<string, string | undefined>>
 
+/**
+ * The points' Stripe tax code: Artificial Intelligence as a Service (AIaaS) - Cloud Based - Business Use.
+ * Managed Payments, on by default for the account, refuses a product without an eligible code
+ * (Alex, 2026-11-02: keep Managed Payments). Both the embedded and the hosted Checkout use it.
+ */
+export const POINTS_TAX_CODE = 'txcd_10105002'
+
 /** Admin-only; the browser supplies dollars, never points, price IDs or redirect URLs. Comes back to 计费. */
 export async function pointsPurchaseUrl(actorId: string, workspaceId: string, amount: number, locale: string, fetchImpl: typeof fetch = fetch, env: Env = process.env): Promise<{ url: string }> {
   const result = await pointsPurchase(actorId, workspaceId, amount, locale, {}, fetchImpl, env)
@@ -61,7 +68,7 @@ export async function pointsPurchase(actorId: string, workspaceId: string, amoun
     back.searchParams.set('topup', 'cancelled')
     const common = {
       mode: 'payment', customer: binding.id, client_reference_id: workspaceId,
-      line_items: [{ price_data: { currency: 'usd', unit_amount: amount * 100, product_data: { name: 'Mikka points' } }, quantity: 1 }],
+      line_items: [{ price_data: { currency: 'usd', unit_amount: amount * 100, product_data: { name: 'Mikka points', tax_code: POINTS_TAX_CODE } }, quantity: 1 }],
       metadata, payment_intent_data: { metadata },
     }
     if (embedded) {

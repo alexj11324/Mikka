@@ -60,6 +60,8 @@ test('each fixed USD amount creates a payment session with server-owned pricing 
     assert.equal(body.get('line_items[0][price_data][currency]'), 'usd')
     assert.equal(body.get('line_items[0][price_data][unit_amount]'), String(amount * 100))
     assert.equal(body.get('line_items[0][quantity]'), '1')
+    // Managed Payments (on by default for the account) refuses a product without an eligible tax code.
+    assert.equal(body.get('line_items[0][price_data][product_data][tax_code]'), 'txcd_10105002')
     for (const prefix of ['metadata', 'payment_intent_data[metadata]']) {
       assert.equal(body.get(`${prefix}[workspaceId]`), workspaceId)
       assert.equal(body.get(`${prefix}[points]`), String(amount * 100))
@@ -142,6 +144,7 @@ test('from a chat: a dialog session with a publishable key, else a hosted page; 
   const { body } = requests.at(-1)!
   assert.deepEqual([body.get('ui_mode'), body.has('success_url'), body.has('cancel_url'), new URL(body.get('return_url')!).searchParams.get('bot')], ['embedded_page', false, false, bot])
   assert.equal(body.get('metadata[points]'), '2500')
+  assert.equal(body.get('line_items[0][price_data][product_data][tax_code]'), 'txcd_10105002')
   // 计费 keeps its hosted page even with the key; a bot id that is not one is refused before Stripe.
   assert.deepEqual(await pointsPurchaseUrl('actor', workspaceId, 10, 'zh-CN', fake, { ...env, NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: 'pk_test_fixture' }), { url: checkoutUrl })
   const count = requests.length
