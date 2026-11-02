@@ -3,14 +3,14 @@
 // `model/list` and Claude Code 2.1.309's stream-json `initialize` response,
 // both captured with an empty home (no account; the initialize response's
 // account and other fields were removed, only `models` kept).
-import { chmodSync, existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs"
+import { chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs"
 import { join, resolve } from "node:path"
 
 import { afterEach, describe, expect, it } from "vitest"
 
 import { NoSandbox } from "../src/agents/sandbox"
 import { Daemon } from "../src/main"
-import { parseClaudeInitialize, parseCodexModelList, probeHarnessModels } from "../src/model-probe"
+import { parseClaudeInitialize, parseCodexModelList, probeHarnessModels, sweepModelProbeHomes } from "../src/model-probe"
 import { MemoryServer } from "../src/server-link"
 import { cleanupTempDirs, tempDir, waitFor } from "./helpers"
 
@@ -59,6 +59,7 @@ function fakeCli(dir: string, harness: "codex" | "claude_code", options: { silen
   writeFileSync(path, `#!/usr/bin/env node
 import { appendFileSync, writeFileSync } from "node:fs"
 appendFileSync(${JSON.stringify(homes)}, process.env.HOME + "\\n")
+writeFileSync(${JSON.stringify(join(dir, `${harness}.pid`))}, String(process.pid))
 writeFileSync(process.env.HOME + "/written-by-cli", "x")
 if (${options.silent ? "true" : "false"}) setInterval(() => {}, 1000)
 let buffer = ""
@@ -91,6 +92,35 @@ describe("probing a CLI", () => {
       expect(existsSync(home)).toBe(false)
     }
     expect(readdirSync(scratch)).toEqual([])
+  })
+
+  it("hands the answer back only once the CLI has exited, so its home is never removed under it", async () => {
+    const dir = tempDir(), scratch = tempDir()
+    for (const options of [{}, { silent: true }]) {
+      const cli = fakeCli(dir, "codex", options)
+      await probeHarnessModels("codex", cli.path, { scratchDir: scratch, timeoutMs: 500 })
+      const pid = Number(readFileSync(join(dir, "codex.pid"), "utf8"))
+      expect(() => process.kill(pid, 0)).toThrow()
+      expect(readdirSync(scratch)).toEqual([])
+    }
+  })
+
+  it("a CLI that exits without answering gives no report", async () => {
+    const dir = tempDir(), scratch = tempDir()
+    const path = join(dir, "gone.mjs")
+    writeFileSync(path, "#!/usr/bin/env node\nprocess.exit(3)\n")
+    chmodSync(path, 0o755)
+    expect(await probeHarnessModels("claude_code", path, { scratchDir: scratch })).toBeNull()
+    expect(await probeHarnessModels("claude_code", join(dir, "missing"), { scratchDir: scratch })).toBeNull()
+    expect(readdirSync(scratch)).toEqual([])
+  })
+
+  it("at start, removes the probe homes a killed daemon left, and nothing else", () => {
+    const scratch = tempDir()
+    for (const name of ["model-probe-abc", "model-probe-def/nested", "runs", "keep-model-probe-x"]) mkdirSync(join(scratch, name), { recursive: true })
+    sweepModelProbeHomes(scratch)
+    expect(readdirSync(scratch).sort()).toEqual(["keep-model-probe-x", "runs"])
+    sweepModelProbeHomes(join(scratch, "absent"))
   })
 
   it("a CLI that never answers gives no report after the timeout", async () => {

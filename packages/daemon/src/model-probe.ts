@@ -11,7 +11,7 @@
 // (agents/harness-home.ts): the person's own ~/.codex and ~/.claude are never
 // read, no task runs, and the home is removed afterwards.
 import { spawn } from "node:child_process"
-import { mkdtempSync, rmSync } from "node:fs"
+import { mkdtempSync, readdirSync, rmSync } from "node:fs"
 import { join } from "node:path"
 
 import type { HarnessInfo } from "@mikka/protocol"
@@ -72,9 +72,21 @@ export interface ProbeOptions {
   spawnImpl?: typeof spawn
 }
 
+const HOME_PREFIX = "model-probe-"
+
+/**
+ * Removes probe homes a crashed or killed daemon left behind. Run at daemon
+ * start, before any probe: only `model-probe-*` dirs directly in `scratchDir`.
+ */
+export function sweepModelProbeHomes(scratchDir: string) {
+  let names: string[]
+  try { names = readdirSync(scratchDir) } catch { return }
+  for (const name of names) if (name.startsWith(HOME_PREFIX)) rmSync(join(scratchDir, name), { recursive: true, force: true })
+}
+
 /** Ask one harness CLI for its models. Null when it does not answer in time or answers nothing usable. */
 export async function probeHarnessModels(harness: ProbedHarness, binary: string, options: ProbeOptions): Promise<ModelReport | null> {
-  const home = mkdtempSync(join(options.scratchDir, "model-probe-"))
+  const home = mkdtempSync(join(options.scratchDir, HOME_PREFIX))
   try {
     return await exchange(harness, binary, home, options)
   } finally {
@@ -88,19 +100,23 @@ function exchange(harness: ProbedHarness, binary: string, home: string, options:
   const env = { PATH: process.env.PATH ?? "", HOME: home, CODEX_HOME: home, CLAUDE_CONFIG_DIR: join(home, ".claude"), LANG: process.env.LANG ?? "C.UTF-8" }
   return new Promise(resolve => {
     const child = (options.spawnImpl ?? spawn)(binary, args, { env, cwd: home, stdio: ["pipe", "pipe", "ignore"] })
-    let settled = false
+    let result: ModelReport | null | undefined
+    let exited = false
+    // The answer is handed back only once the CLI has exited, so the caller
+    // never removes the home while the CLI can still write into it.
+    const done = () => { clearTimeout(timer); resolve(result ?? null) }
     const finish = (value: ModelReport | null) => {
-      if (settled) return
-      settled = true
-      clearTimeout(timer)
+      if (result !== undefined) return
+      result = value
       child.stdout?.removeAllListeners("data")
+      if (exited) return done()
       child.kill("SIGKILL")
-      resolve(value)
     }
     const timer = setTimeout(() => finish(null), options.timeoutMs ?? 20_000)
     const send = (message: unknown) => { try { child.stdin?.write(`${JSON.stringify(message)}\n`) } catch { finish(null) } }
-    child.on("error", () => finish(null))
-    child.on("exit", () => finish(null))
+    // A spawn error has no process to wait for.
+    child.on("error", () => { exited = true; finish(null); done() })
+    child.on("exit", () => { exited = true; if (result === undefined) result = null; done() })
     let buffer = ""
     child.stdout?.on("data", (chunk: Buffer) => {
       buffer += chunk.toString("utf8")
