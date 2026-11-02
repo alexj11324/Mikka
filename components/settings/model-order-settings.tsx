@@ -157,7 +157,7 @@ function OrderItem({ row, index, last, pending, onUp, onDown, onRemove }: { row:
   const block = row.block
   const status = !block ? t('ready')
     : block.reason === 'quota' && block.resetsAt ? t('quotaUntil', { time: format.relativeTime(new Date(block.resetsAt), now) })
-      : block.reason === 'noDevice' ? t('noDevice', { harness: harnessName(row.harness) })
+      : block.reason === 'noDevice' ? (block.device.why === 'none' ? t('noDevice.none') : t(`noDevice.${block.device.why}`, { device: block.device.device, count: block.device.count, harness: harnessName(row.harness) }))
         : t(`blocked.${block.reason}`)
   // The handle carries the drag semantics; the row stays a list item (the primitive puts role=button on the item too).
   return <KanbanItem value={row.id} disabled={pending} render={<li />} role="listitem" tabIndex={-1} aria-roledescription={undefined} className="flex items-center gap-3 bg-card py-3 pr-3 pl-2 data-[dragging=true]:relative data-[dragging=true]:z-10 data-[dragging=true]:rounded-xl data-[dragging=true]:shadow-lg data-[dragging=true]:ring-1 data-[dragging=true]:ring-border">

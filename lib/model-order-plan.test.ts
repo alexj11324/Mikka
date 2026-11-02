@@ -1,15 +1,15 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { defaultOrder, deviceModel, planDispatch, type CredentialState, type OrderEntry, type PoolDevice } from './model-order-plan'
+import { defaultOrder, deviceModel, planDispatch, whyNoDevice, type CredentialState, type OrderEntry, type PoolDevice } from './model-order-plan'
 
 // Model names here are fixtures standing for what a CLI or provider reported.
 const sub = (id: string, harness: OrderEntry['harness'], model: string, connectionId = `conn-${harness}`): OrderEntry => ({ id, harness, model, source: { kind: 'subscription', connectionId } })
 const key = (id: string, harness: OrderEntry['harness'], model: string): OrderEntry => ({ id, harness, model, source: { kind: 'api_key', keyId: 'key-1' } })
 const device = (id: string, over: Partial<PoolDevice> = {}): PoolDevice => ({
-  id, online: true, enabled: true,
+  id, name: id, online: true, enabled: true,
   harnesses: [
-    { harness: 'claude_code', installed: true, modelSlots: [{ slot: 'top', model: 'reported-claude-top', name: 'Top' }] },
-    { harness: 'codex', installed: true, models: ['reported-codex-a'] },
+    { harness: 'claude_code', installed: true, subscriptionBroker: true, modelSlots: [{ slot: 'top', model: 'reported-claude-top', name: 'Top' }] },
+    { harness: 'codex', installed: true, subscriptionBroker: true, models: ['reported-codex-a'] },
   ],
   ...over,
 })
@@ -28,15 +28,15 @@ test('ordered fallback: quota used up, signed out, or no device moves to the nex
   const plan = planDispatch({ entries: [first, second], location: 'local', devices: [device('mac')], credential, cloudReady: false })
   assert.equal(plan.kind === 'device' && plan.entry.id, '2')
   assert.deepEqual(plan.skipped.map(item => [item.entry.id, item.block.reason]), [['1', 'quota']])
-  const noClaude = planDispatch({ entries: [first, second], location: 'local', devices: [device('box', { harnesses: [{ harness: 'codex', installed: true, models: ['reported-codex-a'] }] })], credential: usable, cloudReady: false })
+  const noClaude = planDispatch({ entries: [first, second], location: 'local', devices: [device('box', { harnesses: [{ harness: 'codex', installed: true, subscriptionBroker: true, models: ['reported-codex-a'] }] })], credential: usable, cloudReady: false })
   assert.deepEqual([noClaude.kind === 'device' && noClaude.entry.id, noClaude.skipped.map(item => item.block.reason)], ['2', ['noDevice']])
   const expired = planDispatch({ entries: [first, second], location: 'local', devices: [device('mac')], credential: entry => entry.id === '2' ? usable() : { usable: false, reason: 'expired' }, cloudReady: false })
   assert.equal(expired.kind === 'device' && expired.entry.id, '2')
 })
 
-test('本地 picks at random among the devices that can run it, never one with 参与调度 off, offline, or without the model', () => {
+test('本地 picks at random among the devices that can run it, never one with 参与调度 off, offline, or unable to take a subscription run', () => {
   const devices = [device('a'), device('off', { enabled: false }), device('down', { online: false }), device('b'),
-    device('other', { harnesses: [{ harness: 'claude_code', installed: true, models: ['reported-elsewhere'] }] })]
+    device('old', { harnesses: [{ harness: 'claude_code', installed: true, modelSlots: [{ slot: 'top', model: 'reported-claude-top', name: 'Top' }] }] })]
   const picked = new Set<string>()
   for (const value of [0, 0.49, 0.5, 0.99]) {
     const plan = planDispatch({ entries: [first], location: 'local', devices, credential: usable, cloudReady: false, random: () => value })
@@ -46,6 +46,32 @@ test('本地 picks at random among the devices that can run it, never one with �
   assert.equal(deviceModel(device('off', { enabled: false }), first), null, '参与调度 off: never sent a run')
   assert.equal(deviceModel(device('x'), keyed), 'key-model', 'an API key model runs on any installed Agent of its protocol')
   assert.equal(deviceModel(device('x', { harnesses: [] }), keyed), null)
+})
+
+test('a subscription model runs on any computer whose Agent takes subscription runs, reported by its CLI or not', () => {
+  // Production 2026-11-02: online, 参与调度 on, Claude Code installed with subscriptionBroker, and no models reported at all.
+  const silent = device('mac', { harnesses: [{ harness: 'claude_code', installed: true, subscriptionBroker: true }] })
+  const opus = sub('9', 'claude_code', 'account-opus')
+  assert.equal(deviceModel(silent, opus), 'account-opus', 'the subscription\'s model id is what runs')
+  assert.equal(deviceModel(device('mac'), first), 'top', 'a reported slot for it is still used')
+  const plan = planDispatch({ entries: [opus], location: 'local', devices: [silent], credential: usable, cloudReady: false })
+  assert.deepEqual([plan.kind, plan.kind === 'device' && plan.model], ['device', 'account-opus'])
+  // The claim is refused without a subscription broker, so that computer cannot take it; an API key model still can.
+  const old = device('old', { harnesses: [{ harness: 'claude_code', installed: true }] })
+  assert.equal(deviceModel(old, opus), null)
+  assert.equal(deviceModel(old, keyed), 'key-model')
+})
+
+test('no computer can run it: the reason comes from the computer closest to running it', () => {
+  const opus = sub('9', 'claude_code', 'account-opus')
+  const old = (id: string) => device(id, { harnesses: [{ harness: 'claude_code', installed: true }] })
+  const codexOnly = (id: string) => device(id, { harnesses: [{ harness: 'codex', installed: true, subscriptionBroker: true }] })
+  assert.deepEqual(whyNoDevice([], opus), { why: 'none' })
+  assert.deepEqual(whyNoDevice([device('mac', { enabled: false })], opus), { why: 'off', device: 'mac', count: 1 })
+  assert.deepEqual(whyNoDevice([device('mac', { enabled: false }), device('box', { online: false })], opus), { why: 'offline', device: 'box', count: 1 })
+  assert.deepEqual(whyNoDevice([device('box', { online: false }), codexOnly('mac')], opus), { why: 'notInstalled', device: 'mac', count: 1 })
+  assert.deepEqual(whyNoDevice([codexOnly('mac'), old('MacBook Pro')], opus), { why: 'needsUpdate', device: 'MacBook Pro', count: 1 })
+  assert.deepEqual(whyNoDevice([old('a'), old('b'), device('c', { enabled: false })], opus), { why: 'needsUpdate', device: 'a', count: 2 })
 })
 
 test('a model the person picked for the thread goes first, before the list', () => {

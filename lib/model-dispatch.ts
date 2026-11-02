@@ -4,7 +4,7 @@ import type { Pool } from 'pg'
 import { defaultAgentCopy } from './agent-copy'
 import { cloudReady } from './rule-dispatch'
 import { credentialStates, orderCandidates, poolDevices, readOrder, type OrderScope } from './model-order'
-import { planDispatch, type NothingReason, type OrderEntry, type RunLocation } from './model-order-plan'
+import { planDispatch, whyNoDevice, type NoDeviceWhy, type NothingReason, type OrderEntry, type RunLocation } from './model-order-plan'
 
 /**
  * Where a new run goes and on which model (decision 2026-11-02-1400): the
@@ -49,6 +49,11 @@ export async function resolveModelDispatch(pool: Pool, scope: OrderScope & { bot
     const installed = devices[0].harnesses.some(item => item.harness === wanted.harness && item.installed)
     return { kind: 'none', reason: 'namedDevice', card: modelUnavailableCard('namedDevice', { agent: HARNESS_NAMES[wanted.harness], model: wanted.model, installed }) }
   }
+  if (plan.kind === 'none' && plan.reason === 'noDevice' && !named) {
+    // What the computer closest to running the first allowed model lacks.
+    const first = plan.skipped.find(item => item.block.reason === 'noDevice')!.entry
+    return { kind: 'none', reason: 'noDevice', card: modelUnavailableCard('noDevice', { agent: HARNESS_NAMES[first.harness], model: first.model, device: whyNoDevice(devices, first) }) }
+  }
   if (plan.kind === 'none' && named && plan.reason !== 'cloudNotConfigured') {
     const reason = plan.reason === 'noDevice' ? 'pickedNoDevice' : 'pickedUnavailable'
     return { kind: 'none', reason, card: modelUnavailableCard(reason, named) }
@@ -90,18 +95,29 @@ export async function bindAgentToConnection(pool: Pick<Pool, 'query'>, scope: Or
 const HARNESS_NAMES: Record<OrderEntry['harness'], string> = { claude_code: 'Claude Code', codex: 'Codex' }
 
 /** 没有能跑这个任务的模型: the reason, and the rows that fix it. A model or computer the thread named is named in it. */
-export function modelUnavailableCard(reason: DispatchNothingReason, named?: { agent: string; model: string; installed?: boolean }) {
+export function modelUnavailableCard(reason: DispatchNothingReason, named?: { agent: string; model: string; installed?: boolean; device?: NoDeviceWhy }) {
   const copy = defaultAgentCopy
   const line = {
-    noModels: copy.needsModelNoModels, cloudNotConfigured: copy.needsModelCloud, noDevice: copy.needsModelNoDevice, unavailable: copy.needsModelUnavailable,
-    notOffered: copy.needsModelNotOffered, namedDevice: named?.installed ? copy.needsModelDeviceModel : copy.needsModelDeviceAgent,
+    noModels: copy.needsModelNoModels, cloudNotConfigured: copy.needsModelCloud, noDevice: noDeviceLine(named?.device), unavailable: copy.needsModelUnavailable,
+    // Installed but nothing it can run: a subscription model on a Mikka too old to take a subscription run.
+    notOffered: copy.needsModelNotOffered, namedDevice: named?.installed ? copy.needsModelDeviceUpdate : copy.needsModelDeviceAgent,
     pickedNoDevice: copy.needsModelPickedNoDevice, pickedUnavailable: copy.needsModelPickedUnavailable,
   }[reason]
   const description = line.replace('{agent}', named?.agent ?? '').replace('{model}', named?.model ?? '')
+    .replace('{device}', named?.device && named.device.why !== 'none' ? named.device.device : '')
   const options = reason === 'cloudNotConfigured'
     ? [{ value: 'e2b', label: copy.needsMachineE2B, action: 'e2bKey' as const }, { value: 'models', label: copy.needsModelSettings, action: 'modelSettings' as const }]
     : reason === 'noDevice' || reason === 'pickedNoDevice'
       ? [{ value: 'computer', label: copy.needsMachineConnect, action: 'connectServer' as const }, { value: 'models', label: copy.needsModelSettings, action: 'modelSettings' as const }]
       : [{ value: 'models', label: copy.needsModelSettings, action: 'modelSettings' as const }]
   return { title: copy.needsModelTitle, description, options }
+}
+
+/** 允许使用的模型都没有电脑能跑, or what the one computer closest to running it lacks. */
+function noDeviceLine(device?: NoDeviceWhy) {
+  const copy = defaultAgentCopy
+  if (!device) return copy.needsModelNoDevice
+  if (device.why === 'none') return copy.needsModelNoComputer
+  if (device.count !== 1) return copy.needsModelNoDevice
+  return { off: copy.needsModelNamedOff, offline: copy.needsModelNamedOffline, notInstalled: copy.needsModelNamedAgent, needsUpdate: copy.needsModelNamedUpdate }[device.why]
 }

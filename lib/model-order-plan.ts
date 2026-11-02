@@ -9,7 +9,8 @@
  * its credential is usable (connected, not paused, quota left, the key not
  * refused), and the run location has a place for it. 本地: a device whose
  * 参与调度 is on, online, with the Agent installed and, for a subscription
- * model, the model among what its CLI reported; one is picked at random. 云端:
+ * model, able to take a subscription run (its daemon brokers the subscription
+ * lease); one is picked at random. 云端:
  * the person's own E2B key is set. A model the person picked for the thread
  * goes before the list. Once a run starts nothing about it changes.
  */
@@ -34,10 +35,11 @@ export type CredentialState =
 
 export interface PoolDevice {
   id: string
+  name: string
   online: boolean
   /** 参与调度: off means Mikka never sends a run here. */
   enabled: boolean
-  harnesses: readonly Pick<HarnessInfo, 'harness' | 'installed' | 'models' | 'modelSlots'>[]
+  harnesses: readonly Pick<HarnessInfo, 'harness' | 'installed' | 'models' | 'modelSlots' | 'subscriptionBroker'>[]
 }
 
 export type EntryBlock =
@@ -63,18 +65,49 @@ export type NothingReason = 'noModels' | 'cloudNotConfigured' | 'noDevice' | 'un
 /**
  * The model a device runs for an entry: the slot its CLI reported for it, or
  * the model itself. Null when the device cannot run the entry: 参与调度 off,
- * offline, the Agent not installed, or (for a subscription model) the CLI did
- * not report it. An API key's model runs on any installed Agent of the key's
- * protocol, since the key is handed to the run.
+ * offline, the Agent not installed, or (for a subscription model) the daemon
+ * cannot take a subscription run (no `subscriptionBroker`: the claim is
+ * refused without it). A subscription's model is what its account offers, so
+ * the CLI need not have reported it; the run passes the model to the CLI. An
+ * API key's model runs on any installed Agent of the key's protocol, since the
+ * key is handed to the run.
  */
 export function deviceModel(device: PoolDevice, entry: OrderEntry): string | null {
-  if (!device.enabled || !device.online) return null
+  return deviceStage(device, entry) === 'ready' ? runModel(device, entry) : null
+}
+
+type DeviceStage = 'off' | 'offline' | 'notInstalled' | 'needsUpdate' | 'ready'
+const STAGES: readonly DeviceStage[] = ['off', 'offline', 'notInstalled', 'needsUpdate', 'ready']
+
+function deviceStage(device: PoolDevice, entry: OrderEntry): DeviceStage {
+  if (!device.enabled) return 'off'
+  if (!device.online) return 'offline'
   const info = device.harnesses.find(item => item.harness === entry.harness && item.installed)
-  if (!info) return null
+  if (!info) return 'notInstalled'
+  if (entry.source.kind === 'subscription' && !info.subscriptionBroker) return 'needsUpdate'
+  return 'ready'
+}
+
+function runModel(device: PoolDevice, entry: OrderEntry): string {
   if (entry.source.kind === 'api_key') return entry.model
-  const slot = info.modelSlots?.find(item => item.slot === entry.model || item.model === entry.model)
-  if (slot) return slot.slot
-  return info.models?.includes(entry.model) ? entry.model : null
+  const info = device.harnesses.find(item => item.harness === entry.harness && item.installed)
+  return info?.modelSlots?.find(item => item.slot === entry.model || item.model === entry.model)?.slot ?? entry.model
+}
+
+/**
+ * Why no device can run an entry, told from the device closest to running it:
+ * none connected; 参与调度 off; offline; the Agent not installed; or its Mikka
+ * too old to take a subscription run. `device` names that computer when it is
+ * the only one at that step, `count` how many are.
+ */
+export type NoDeviceWhy = { why: 'none' } | { why: Exclude<DeviceStage, 'ready'>; device: string; count: number }
+
+export function whyNoDevice(devices: readonly PoolDevice[], entry: OrderEntry): NoDeviceWhy {
+  if (!devices.length) return { why: 'none' }
+  const staged = devices.map(device => ({ device, stage: deviceStage(device, entry) }))
+  const best = staged.reduce((top, item) => STAGES.indexOf(item.stage) > STAGES.indexOf(top.stage) ? item : top)
+  const why = best.stage === 'ready' ? 'needsUpdate' : best.stage
+  return { why, device: best.device.name, count: staged.filter(item => item.stage === best.stage).length }
 }
 
 export function planDispatch(input: {

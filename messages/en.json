@@ -2493,7 +2493,13 @@
       "remove": "Remove",
       "ready": "Available",
       "quotaUntil": "Quota used up · back {time}",
-      "noDevice": "No computer can run {harness}",
+      "noDevice": {
+        "none": "No computer connected",
+        "off": "{count, plural, =1 {{device} isn't in scheduling} other {# computers aren't in scheduling}}",
+        "offline": "{count, plural, =1 {{device} is offline} other {# computers are offline}}",
+        "notInstalled": "{count, plural, =1 {{device} doesn't have {harness}} other {# computers don't have {harness}}}",
+        "needsUpdate": "{count, plural, =1 {{device}'s Mikka needs an update} other {# computers need a Mikka update}}"
+      },
       "blocked": {
         "quota": "Quota used up",
         "expired": "Needs reconnecting",
@@ -3233,7 +3239,12 @@
     "needsModelNoDevice": "No computer can run any allowed model",
     "needsModelUnavailable": "Every allowed model is unavailable right now",
     "needsModelDeviceAgent": "This computer doesn't have {agent}",
-    "needsModelDeviceModel": "This computer's {agent} didn't report {model}",
+    "needsModelDeviceUpdate": "This computer's Mikka needs an update",
+    "needsModelNoComputer": "No computer connected",
+    "needsModelNamedOff": "{device} isn't in scheduling",
+    "needsModelNamedOffline": "{device} is offline",
+    "needsModelNamedAgent": "{device} doesn't have {agent}",
+    "needsModelNamedUpdate": "{device}'s Mikka needs an update",
     "needsModelNotOffered": "No subscription or key runs {model} on {agent}",
     "needsModelPickedNoDevice": "No computer can run {model} on {agent}",
     "needsModelPickedUnavailable": "{model} on {agent} is unavailable right now",

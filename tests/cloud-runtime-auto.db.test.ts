@@ -216,7 +216,7 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     // 运行位置 本地 and their own server online (参与调度 on), its Codex reporting gpt-5: it takes the run.
     await order.changeOrder(pool, { ownerId: n.id, workspaceId: n.workspaceId }, { kind: 'location', location: 'local' })
     const server = randomUUID()
-    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,"deviceType",enabled,"lastSeenAt",harnesses) VALUES ($1,$2,'Server','local','server',true,now(),$3)`, [server, n.id, JSON.stringify([{ harness: 'codex', installed: true, modelSlots: [{ slot: 'gpt-5', model: 'gpt-5', name: 'gpt-5' }] }])])
+    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,"deviceType",enabled,"lastSeenAt",harnesses) VALUES ($1,$2,'Server','local','server',true,now(),$3)`, [server, n.id, JSON.stringify([{ harness: 'codex', installed: true, subscriptionBroker: true, modelSlots: [{ slot: 'gpt-5', model: 'gpt-5', name: 'gpt-5' }] }])])
     await pool.query(`INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,'codex',$4)`, [randomUUID(), n.id, server, `codex-${server.slice(0, 8)}`])
     const queued = await dispatch(n.id, n.issueId, n.botId) as unknown as { runId: string; status: string }
     assert.equal(queued.status, 'queued')
