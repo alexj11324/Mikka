@@ -7,7 +7,7 @@ import { noteLogOutcome, withRequestLog } from '@/lib/request-log'
 export const dynamic = 'force-dynamic'
 
 /** How often a waiting long-poll looks for new work. */
-const IDLE_CHECK_MS = 2_000
+const IDLE_CHECK_MS = 5_000
 
 /**
  * `GET /v1/devices/:deviceId/commands?wait=<seconds>`: messages people sent
@@ -33,7 +33,7 @@ async function handleGET(request: Request, { params }: { params: Promise<{ devic
       noteLogOutcome(commands.length > 0 || queued.length > 0 ? 'work' : 'empty')
       return NextResponse.json(queued.length > 0 ? { commands, queuedRuns: queued } : { commands })
     }
-    // Each check is a database round trip under the device credential fence; every 2 s keeps an idle device cheap.
+    // Each check is a database round trip under the device credential fence; every 5 s keeps an idle device cheap.
     await sleep(Math.min(IDLE_CHECK_MS, Math.max(50, deadline - Date.now())), request.signal)
   }
   noteLogOutcome('ignored')

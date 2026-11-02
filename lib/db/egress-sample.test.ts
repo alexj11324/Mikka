@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { PoolClient } from 'pg'
-import { describeSample, sampleClient, sampleRate } from './egress-sample'
+import { describeSample, SAMPLE_RATE, sampleClient } from './egress-sample'
 
 const result = { command: 'SELECT', rowCount: 2, rows: [{ id: 'a', text: 'PRIVATE_TEXT' }, { id: 'b', text: 'x' }], fields: [], oid: 0 }
 function fakeClient() {
@@ -17,7 +17,7 @@ function fakeClient() {
 test('a sampled query logs its tables, rows and bytes, never its parameters or row content', async () => {
   const lines: string[] = []
   const client = fakeClient()
-  sampleClient(client, 1, () => 0, line => lines.push(line))
+  sampleClient(client, () => true, () => 0, line => lines.push(line))
   const sqlText = 'select "id", "text" from "coordinator_messages" join bots b on b.id = $1 where "userId" = $2'
   await client.query(sqlText, ['PRIVATE_PARAM', 'PRIVATE_USER'])
   await new Promise<void>(resolve => (client.query as (...args: unknown[]) => void)({ text: 'update agent_runs set x = $1', values: ['PRIVATE_PARAM'] }, () => resolve()))
@@ -29,15 +29,19 @@ test('a sampled query logs its tables, rows and bytes, never its parameters or r
   assert.ok(!lines.join('\n').includes('PRIVATE'), 'no values reach the log')
 })
 
-test('unsampled queries pass straight through and the rate is bounded', async () => {
+test('unsampled queries and a gate that is off pass straight through', async () => {
   const lines: string[] = []
-  const client = fakeClient()
-  sampleClient(client, 0.01, () => 0.5, line => lines.push(line))
-  assert.equal(await client.query('select 1'), result)
+  const unsampled = fakeClient()
+  sampleClient(unsampled, () => true, () => SAMPLE_RATE, line => lines.push(line))
+  assert.equal(await unsampled.query('select 1'), result)
+  const off = fakeClient()
+  sampleClient(off, () => false, () => 0, line => lines.push(line))
+  assert.equal(await off.query('select 1'), result)
   assert.equal(lines.length, 0)
-  assert.equal(sampleRate({}), 0.01)
-  assert.equal(sampleRate({ DB_EGRESS_SAMPLE_RATE: '0' }), 0)
-  assert.equal(sampleRate({ DB_EGRESS_SAMPLE_RATE: '7' }), 1)
-  assert.equal(sampleRate({ DB_EGRESS_SAMPLE_RATE: 'nope' }), 0)
   assert.equal(describeSample('BEGIN', { command: 'BEGIN', rows: [] } as never, 'r').bytes, 0)
+})
+
+test('the gate is off without PostHog', async () => {
+  const { deploymentSwitch } = await import('../deployment-switches')
+  assert.equal(deploymentSwitch('dbEgressSample', {}), false)
 })
