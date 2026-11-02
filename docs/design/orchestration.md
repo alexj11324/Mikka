@@ -19,7 +19,7 @@
 | --- | --- |
 | **Account** | A person. Owns their sign-in, devices, app connections, cards, credits they verified, model credentials and E2B key. |
 | **Personal workspace** | One per account, with exactly one member. Every account has one. Only that person's bots, chats, tasks and threads; personal billing; no team settings ([2310](decisions/2026-11-01-2310-personal-and-team-workspaces-apart.md)). |
-| **Team workspace** | Several members, with the team's policies, secrets, credits and payment method. It has no E2B key of its own. Nothing moves between it and a personal workspace; a personal workspace is never upgraded into one. |
+| **Team workspace** | Several members, with the team's members, policies, shared credits and payment method. Secrets belong to every workspace, personal or team ([0230](decisions/2026-11-02-0230-workspace-is-the-tenant.md)). It has no E2B key of its own. Nothing moves between it and a personal workspace; a personal workspace is never upgraded into one. |
 | **Bot** | Lives in one workspace and has one owner. Runs on Mikka's own AI SDK on Vercel; when it has work to do, it sends a thread through the daemon to Claude Code or Codex (R-05). |
 | **Thread** | The work a bot dispatched (`agent_runs`). Each turn of it is a **run**. |
 | **Agent** | The coding worker that runs a thread: Claude Code or Codex. Code may say `harness`; the UI says Agent (R-43). |

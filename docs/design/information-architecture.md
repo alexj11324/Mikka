@@ -244,7 +244,7 @@ threads sit inside a bot's panel.
 | --- | --- | --- |
 | ⌘K search | Window bar pill and ⌘K; settings pill asks the app to open it (`lib/settings-navigation.ts`) | Also threads, Artifacts and settings sections (G3) |
 | 全部线程 | Pill inside the right column's header | Top-bar entry, opens in the right column beside the centre (R-82); in progress in another session |
-| 等你 inbox / notifications | Web: none. `inbox` section (收件箱, followed tasks) exists in `workspace-navigation.ts:12` and `workspace-overview.tsx:28` but nothing opens it; `components/app-sidebar.tsx` that linked it is imported nowhere | Proposal for Alex: the top-bar 全部线程 entry carries the 等你 count, the same number as the desktop Dock badge |
+| 等你 inbox / notifications | Web: none. `inbox` section (收件箱, followed tasks) exists in `workspace-navigation.ts:12` and `workspace-overview.tsx:28` but nothing opens it; `components/app-sidebar.tsx` that linked it is imported nowhere | Rule: the top-bar 全部线程 entry carries the 等你 count, the same number as the desktop Dock badge (heuristic "visibility of system status"; built in the top-bar 全部线程 PR) |
 | 设置 | Account menu and ⌘, (R-75) | Unchanged |
 | Workspace switch | Account menu only (R-75, R-79) | Unchanged |
 
@@ -316,11 +316,11 @@ threads sit inside a bot's panel.
 | G2 | Phone web cannot open the right column: no 概览, no 全部线程, no bot threads, PR or 电脑 | `issue-workspace.tsx:180`, `:448`; window bar hidden below `md` | P1 | P9; PM:`persistent-nav` | A header button on phones, as the iOS app's bot page; verify in a browser at < 768px (found from code only) | Open |
 | G3 | 全部线程 sits inside one bot's panel | `context-panel.tsx:171` | P1 | P4, P5; NAV | Top-bar global entry | In progress (another session) |
 | G4 | ⌘K finds no threads, Artifacts or settings sections | `lib/site-search.ts:14-16`, `global-search.tsx` | P1 | P6; IA-5 | Add the three sources | Open |
-| G5 | No web inbox for 等你; dead `inbox` section and unused `components/app-sidebar.tsx` | `workspace-navigation.ts:12`, `workspace-overview.tsx:28` | P2 | P4; H-1 | Count on the 全部线程 entry (ask Alex); remove the dead section and file | Open |
+| G5 | No web inbox for 等你; dead `inbox` section and unused `components/app-sidebar.tsx` | `workspace-navigation.ts:12`, `workspace-overview.tsx:28` | P2 | P4; H-1 | Count on the 全部线程 entry (decided, built in the top-bar 全部线程 PR); remove the dead section and file | Open |
 | G6 | 重新播放引导 lived in 常规, a team setting | `workspace-settings.tsx` | P1 | P1 | Move to 偏好设置 | #890 |
 | G7 | An open ended thread had no composer | `issue-thread-panel.tsx` | P1 | R-10 | Composer everywhere a thread opens | #892 |
 | G8 | Members cannot reach their repository-scoped secrets | M6 | P2 | P3 | Member view of 密钥与环境 | Open |
-| G9 | Account deletion deletes team bots; workspace and account deletion leave tenant data | M2, M3, M4 | P1 | T2, T5 | See § 3 | Open |
+| G9 | Account deletion deletes team bots; workspace and account deletion leave tenant data | M2, M3, M4 | P1 | T2, T5 | Decided in [0230](decisions/2026-11-02-0230-workspace-is-the-tenant.md) Consequences: pause and keep in shared workspaces; delete all tenant rows. Separate PRs | Open |
 | G10 | Label drift L1–L10 | § 6 | P2 | P10 | Fix strings and docs | Open |
 | G11 | A bot's PR tab has no global list | `context-panel.tsx` PR tab | P2 | P5 | 全部线程 rows already link PRs through tasks; a global PR list only if Alex wants one (GitHub precedent) | Ask Alex |
 

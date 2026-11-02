@@ -1,9 +1,9 @@
 # The workspace is the tenant
 
 - Date: 2026-11-02
-- Source: Relayed by the coordinating Claude session on 2026-11-02 as Alex's requirement; not yet confirmed by Alex in the repo. It generalises the settings split Alex gave in 2026-11-02-0216 (PR #895, not yet on main): 「个人工作区和团队工作区的区别只在『人与人之间』的东西（成员、团队、团队权限、审计日志、共享额度、离开成员的 Bot、转让）。凡是工作区自身的能力，两边都要有。」
+- Source: the principle Alex gave on 2026-11-01 and restated in [0216](2026-11-02-0216-personal-workspace-has-workspace-settings.md): 「个人工作区和团队工作区的区别只在『人与人之间』的东西（成员、团队、团队权限、审计日志、共享额度、离开成员的 Bot、转让）。凡是工作区自身的能力，两边都要有。」 Settled into these rules by the coordinating session from the workspace domain-model review, under Alex's instruction to decide such questions from that principle.
 - Rule: R-26
-- Replaces, in part, once Alex confirms: [2026-11-01-2310](2026-11-01-2310-personal-and-team-workspaces-apart.md) levels 2 and 3 where they list 密钥与环境 and Bot 与 Agents as team settings (2026-11-02-0203 in PR #890 and 2026-11-02-0216 in PR #895 already replace those lines for settings); [`orchestration.md`](../orchestration.md) § 1 "Team workspace … secrets"
+- Replaces, in part: [2026-11-01-2310](2026-11-01-2310-personal-and-team-workspaces-apart.md) levels 2 and 3 where they list 密钥与环境 as a team setting ([0203](2026-11-02-0203-personal-workspace-keeps-bots.md) and [0216](2026-11-02-0216-personal-workspace-has-workspace-settings.md) already replace them for settings); [`orchestration.md`](../orchestration.md) § 1, team workspace row
 
 A workspace is the tenant. A personal workspace is a tenant with one member;
 a team workspace is a tenant with several. Both have every capability of a
@@ -62,14 +62,21 @@ fairness have no counterpart here and are skipped.
   审计日志, 付款, 分享给团队成员 and 已暂停的 Bot only in a team workspace.
   PRs #890 and #895 do this in code.
 - `glossary.md` (Workspaces table, team row), `orchestration.md` § 1 and
-  `docs/settings.md` drop 密钥与环境 from the team-only lists once Alex
-  confirms.
+  `docs/settings.md` drop 密钥与环境 from the team-only lists (done with this
+  decision for `orchestration.md` and 2310).
 - Deleting a workspace deletes every row keyed by it, its secrets included
   (T5); today `deleteAppData` leaves several behind (see the
   information-architecture gap list).
 - Deleting an account treats the person's bots in a shared workspace as
-  leaving does: paused for an admin to take over, not deleted (T2: bots of
-  people who left are a team's).
+  leaving does: each bot is paused for an admin to take over, and its threads
+  stay in the workspace with it, not deleted (T1, T2: work done in a team
+  workspace belongs to the tenant, as in Slack and Notion). The account's own
+  data still goes: name, avatar, devices, connections, model credentials and
+  its personal workspace. Today `lib/account/delete.ts` deletes those bots and
+  threads; the code change is a separate PR.
+- Deleting a workspace or an account removes the encrypted secrets and other
+  rows keyed by the workspace it deletes (gap M3, M4); a separate PR, with
+  tests.
 - A per-person object stored per workspace is either a share (T6) or a
   per-workspace preference of that person (Bot 与 Agents rules); anything
   else is moved to the account.
