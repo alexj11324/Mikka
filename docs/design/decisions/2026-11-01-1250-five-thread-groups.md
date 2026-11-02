@@ -9,6 +9,7 @@
   Relayed by the coordinator session.
 - Rule: R-52
 - Replaces: [decisions.md](../decisions.md) 2026-10-28 row "Thread lists group as
+- Superseded in part by: [2026-11-02-0300](2026-11-02-0300-waiting-for-you-first.md) (等待你 is the first group)
   等待回复 → 进行中 → 空闲 → 已解决 (… failed under 等待回复 …)", as to the groups
 
 Thread lists, on the web and the phone, group as 进行中 · 受阻 · 等待你 · 空闲 ·

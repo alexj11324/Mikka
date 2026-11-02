@@ -57,7 +57,7 @@ the iOS navigation bar with its own bar buttons, menus and back button;
 the tab bar, capsules and the composer are Liquid Glass on iOS 26.
 
 **线程** (the tab; like the Claude app's Code screen): grouped as on the
-web (R-52), 进行中 · 受阻 · 等待你 · 空闲 · 已解决, a task's attempts folded
+web (R-52), 等待你 · 进行中 · 受阻 · 空闲 · 已解决, a task's attempts folded
 into its newest thread (「第 N 次尝试」); 新线程 and the filter menu sit in the bar.
 
 - A thread row is a status icon, the thread name, and one grey line: the
