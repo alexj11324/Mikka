@@ -145,21 +145,14 @@ export function ModelOrderSettings({ workspaceId }: { workspaceId: string }) {
 
 function OrderList({ rows, pending, unsaved, onMove, onRemove }: { rows: OrderRow[]; pending: boolean; unsaved: { id: string; to: number } | null; onMove: (from: number, to: number) => void; onRemove: (row: OrderRow) => void }) {
   const t = useTranslations('Settings.modelOrder')
-  // The list as dragged; the saved order comes back from the server.
-  const [dragged, setDragged] = useState<OrderRow[] | null>(null)
-  const items = dragged ?? rows
+  // No live reorder while dragging (the sortable strategy shows the shift): a live reorder moved the row under
+  // the pointer, and a drop before dnd-kit re-measured landed on the stale target and put the row back (#1000).
+  const items = rows
   const name = (id: string | number) => rows.find(row => row.id === id)?.model ?? ''
   const position = (id: string | number) => items.findIndex(row => row.id === id) + 1
   return <Kanban value={{ models: items }} getItemValue={row => row.id}
-    onValueChange={value => setDragged(value.models ?? rows)}
-    onDragCancel={() => setDragged(null)}
-    onValueCommit={(value, meta) => {
-      setDragged(null)
-      // One row moved: its place in the saved list and where it was dropped.
-      const from = rows.findIndex(row => row.id === meta.event.active.id)
-      const to = (value.models ?? rows).findIndex(row => row.id === meta.event.active.id)
-      if (from >= 0 && to >= 0) onMove(from, to)
-    }}
+    onValueChange={() => {}}
+    onMove={({ activeIndex, overIndex }) => { if (activeIndex >= 0 && overIndex >= 0 && activeIndex !== overIndex) onMove(activeIndex, overIndex) }}
     accessibility={{
       screenReaderInstructions: { draggable: t('dragInstructions') },
       announcements: {
