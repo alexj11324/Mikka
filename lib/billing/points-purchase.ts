@@ -11,17 +11,39 @@ import { stripeConfig, stripePost, StripeRequestError } from './stripe'
 
 type Env = Readonly<Record<string, string | undefined>>
 
-/** Admin-only; the browser supplies dollars, never points, price IDs or redirect URLs. */
+/** Admin-only; the browser supplies dollars, never points, price IDs or redirect URLs. Comes back to 计费. */
 export async function pointsPurchaseUrl(actorId: string, workspaceId: string, amount: number, locale: string, fetchImpl: typeof fetch = fetch, env: Env = process.env): Promise<{ url: string }> {
+  const result = await pointsPurchase(actorId, workspaceId, amount, locale, {}, fetchImpl, env)
+  if (!('url' in result)) throw new WorkspaceError('billingProviderFailed')
+  return result
+}
+
+/**
+ * Where a purchase started from a chat comes back to (decision
+ * 2026-11-02-1450, 「同一页完成」): that chat, which then runs the refused
+ * turn again. Only a bot id is taken from the browser, never a URL.
+ */
+export interface PurchaseFromChat { chat: { botId: string | null } }
+
+/**
+ * 充值. From a chat with NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY set, an embedded
+ * Checkout session whose client secret the chat mounts in a dialog. Without
+ * the key, or from 计费, a hosted Checkout page that comes back to where it
+ * started (`url`).
+ */
+export async function pointsPurchase(actorId: string, workspaceId: string, amount: number, locale: string, from: Partial<PurchaseFromChat>, fetchImpl: typeof fetch = fetch, env: Env = process.env): Promise<{ url: string } | { clientSecret: string }> {
   await workspaceDb.transaction(tx => requireWorkspace(tx, workspaceId, actorId, true))
   z.number().refine(value => (POINTS_PURCHASE_AMOUNTS as readonly number[]).includes(value)).parse(amount)
   const config = stripeConfig(env)
   const origin = resolveAppOrigin(env)
   if (!config?.webhookSecret || !origin) throw new WorkspaceError('billingNotConfigured')
   const [trustedOrigin] = authTrustedOrigins({ BETTER_AUTH_URL: origin, NODE_ENV: env.NODE_ENV, CI: env.CI })
-  const back = new URL(withBasePath(`${locale === 'en' ? '/en' : ''}/settings`), trustedOrigin)
-  back.searchParams.set('section', 'billing')
+  const chat = from.chat ? { botId: from.chat.botId === null ? null : z.uuid().parse(from.chat.botId) } : null
+  const { workspaceLink } = await import('@/components/workspace/workspace-navigation')
+  const back = new URL(withBasePath(`${locale === 'en' ? '/en' : ''}${chat ? workspaceLink(chat.botId ? { bot: chat.botId } : {}) : '/settings'}`), trustedOrigin)
+  if (!chat) back.searchParams.set('section', 'billing')
   back.searchParams.set('workspace', workspaceId)
+  const embedded = Boolean(chat && env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
   const metadata = { workspaceId, points: String(amount * 1_000_000 / MICRO_USD_PER_POINT), purpose: 'points_purchase' }
   try {
     const prior = (await pool.query<{ id: string }>(`
@@ -37,12 +59,17 @@ export async function pointsPurchaseUrl(actorId: string, workspaceId: string, am
     back.searchParams.set('topup', 'success')
     const successUrl = `${back.href}&session_id={CHECKOUT_SESSION_ID}`
     back.searchParams.set('topup', 'cancelled')
-    const session = await stripePost<{ url: string }>(config, 'checkout/sessions', {
+    const common = {
       mode: 'payment', customer: binding.id, client_reference_id: workspaceId,
       line_items: [{ price_data: { currency: 'usd', unit_amount: amount * 100, product_data: { name: 'Mikka points' } }, quantity: 1 }],
       metadata, payment_intent_data: { metadata },
-      success_url: successUrl, cancel_url: back.href,
-    }, fetchImpl)
+    }
+    if (embedded) {
+      // In a dialog on the chat: Stripe returns there only for payment methods that must leave the page.
+      const session = await stripePost<{ client_secret: string }>(config, 'checkout/sessions', { ...common, ui_mode: 'embedded_page', return_url: successUrl }, fetchImpl)
+      return { clientSecret: z.string().min(1).parse(session.client_secret) }
+    }
+    const session = await stripePost<{ url: string }>(config, 'checkout/sessions', { ...common, success_url: successUrl, cancel_url: back.href }, fetchImpl)
     const url = z.url().parse(session.url)
     if (new URL(url).origin !== 'https://checkout.stripe.com') throw new WorkspaceError('billingProviderFailed')
     return { url }
