@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import useSWR, { useSWRConfig } from 'swr'
 import { toast } from 'sonner'
 import { useTranslations } from 'next-intl'
@@ -19,8 +19,10 @@ import { botModelMenuKey } from '@/components/coordinator/bot-model-picker'
 import { subscriptionName } from '@/components/coordinator/quota-notice'
 import { getHostedUsage, type HostedRefusal } from '@/lib/billing/verification-client'
 import { ownSubscriptionOption, type BotModelMenu } from '@/lib/bot-model-menu-view'
-import { refusalOffer } from '@/lib/billing/hosted-usage'
+import { balancePoints, pollUntil, refusalOffer } from '@/lib/billing/hosted-usage'
 import { ConnectSubscriptionButton } from '@/components/billing/connect-subscription-dialog'
+import { TopUpInPlace } from '@/components/billing/top-up-in-place'
+import { dropQueryKeys } from '@/components/workspace/workspace-navigation'
 import { settingsHref } from '@/lib/settings-sections'
 import { useActionError } from '@/lib/use-action-error'
 import { cn } from '@/lib/utils'
@@ -39,9 +41,28 @@ export function HostedRefusalNotice({ code, botId, retry, onQueued }: { code: Ho
   const t = useTranslations('Billing.refusal')
   const usage = useSWR(['hosted-usage'], () => getHostedUsage())
   const read = usage.data && !usage.data.error ? usage.data : null
-  const { transient, billing, card, connect } = refusalOffer(code, read)
+  const { transient, billing, card, connect, topUp } = refusalOffer(code, read)
   // The free messages are used up (no card yet): 绑定订阅 and 验证银行卡 side by side (decision 2026-11-02-1450).
   const trialUsed = code === 'verification_required' && read?.trialLeft === 0
+  const actionError = useActionError()
+  // Paid: once the webhook has credited the points, the refused turn runs again.
+  async function afterPayment() {
+    await pollUntil(() => getHostedUsage(), read => !read.error && balancePoints(read.balance) > 0)
+    await usage.mutate()
+    const result = botId ? await retryCoordinatorTurn(botId) : await retryCoordinatorTurn()
+    if (result.error) toast.error(actionError(result.error))
+    else await onQueued()
+  }
+  // Back from Stripe's own page (no publishable key, or a payment method that left the page): the same.
+  const returned = useRef(false)
+  useEffect(() => {
+    if (returned.current) return
+    const topup = new URL(window.location.href).searchParams.get('topup')
+    if (!topup) return
+    returned.current = true
+    dropQueryKeys('topup', 'session_id')
+    if (topup === 'success') void afterPayment()
+  })
   // The model menu's own read (the same SWR key as the composer's chip): its first own subscription.
   const menu = useSWR<BotModelMenu>(transient || billing ? botModelMenuKey(botId) : null, () => getBotModelMenu(botId))
   // A team with no points: the member's own share turns on right here (decision 2026-11-02-1450).
@@ -63,9 +84,10 @@ export function HostedRefusalNotice({ code, botId, retry, onQueued }: { code: Ho
       {billing && (share.data && !share.data.error && share.data.canShare && !share.data.mine
         ? <ShareMyPointsButton botId={botId} label={t('useMyPoints')} onQueued={onQueued} onShared={() => share.mutate()} />
         : <Button size="sm" variant="outline" nativeButton={false} role="link" render={<Link href={settingsHref('billing')} />}>{t('openBilling')}</Button>)}
+      {topUp && <TopUpInPlace botId={botId} label={t('topUp')} onPaid={afterPayment} />}
       {connect && trialUsed && read?.workspaceId && <ConnectSubscriptionButton workspaceId={read.workspaceId} botId={botId} label={t('bindSubscription')} />}
       {card && <Button size="sm" variant={trialUsed ? 'outline' : 'link'} className={cn(!trialUsed && 'text-muted-foreground')} nativeButton={false} role="link" render={<Link href={settingsHref('billing')} />}>{t('verifyCard')}</Button>}
-      {connect && !trialUsed && <Button size="sm" variant={billing ? "outline" : "default"} nativeButton={false} role="link" render={<Link href={settingsHref('models')} />}>
+      {connect && !trialUsed && <Button size="sm" variant={billing || topUp ? "outline" : "default"} nativeButton={false} role="link" render={<Link href={settingsHref('models')} />}>
         {t.rich('connect', { claude: () => <Claude aria-hidden="true" />, openai: () => <OpenAI aria-hidden="true" /> })}
       </Button>}
     </span>

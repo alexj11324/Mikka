@@ -87,6 +87,8 @@ export function refusalOffer(code: HostedRefusal, usage: HostedUsage | null) {
     billing,
     card: !transient && Boolean(usage?.personal) && (code === 'verification_required' || (usage?.balance.verified === false && (code === 'free_allowance_used' || code === 'points_exhausted'))),
     connect: !transient && usage?.subscribed === false,
+    // A personal workspace with a verified card that ran out: 充值 right there (decision 2026-11-02-1450).
+    topUp: !transient && Boolean(usage?.personal) && usage?.balance.verified === true && (code === 'free_allowance_used' || code === 'points_exhausted'),
   }
 }
 

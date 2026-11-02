@@ -64,7 +64,7 @@ for (const { code, title, card } of [
   })
 }
 
-test('对话：已验证的工作区额度用完时不再提供验证银行卡', async ({ page }) => {
+test('对话：已验证的工作区额度用完时不再提供验证银行卡，就地充值', async ({ page }, testInfo) => {
   await register(page, '/settings?section=usage')
   await expect(page.locator('[data-slot="balance"]')).toBeVisible()
   await seedHostedVerification(page, 0)
@@ -74,6 +74,14 @@ test('对话：已验证的工作区额度用完时不再提供验证银行卡',
   await expect(notice).toContainText('免费额度已用完')
   await expect(notice.getByRole('link', { name: '连接 Claude / ChatGPT 订阅' })).toBeVisible()
   await expect(notice.getByRole('link', { name: '验证银行卡', exact: true })).toHaveCount(0)
+  // 充值 right there (decision 2026-11-02-1450): the amounts open on the card, not on 计费.
+  await notice.getByRole('button', { name: '充值', exact: true }).click()
+  await expect(page.getByRole('menuitem', { name: /1,000 点/ })).toBeVisible()
+  await attachLightDark(page, testInfo, 'chat-top-up-in-place')
+  // Without Stripe here, the purchase says so where it was asked for.
+  await page.getByRole('menuitem', { name: /1,000 点/ }).click()
+  await expect(page.getByText('充值暂不可用')).toBeVisible()
+  expect(page.url()).not.toMatch(/section=billing/)
 })
 
 test('对话：团队没有点数时说明原因，并就地把我的点数用于这个团队再重试', async ({ page }, testInfo) => {
