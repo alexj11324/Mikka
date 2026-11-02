@@ -62,6 +62,9 @@ dbTest('failed wake state stays with its owner and bot, and recovery keeps the o
     const streamId='wrun_recovered-turn:0'
     assert.equal(await store.appendMessages(owner, 'wrun_recovered-turn', [{ role: 'assistant', content: 'Recovered reply',mikkaStreamId:'forged' } as unknown as import('ai').ModelMessage], null, botId,streamId),2)
     assert.deepEqual((await store.chatView(owner,200,botId)).persistedStreamIds,[streamId],'polling sees persistence before any stream commit marker')
+    const finishing = await store.chatView(owner,200,botId)
+    assert.equal(finishing.streamRunId,'wrun_recovered-turn','the turn still holds its lease while it finishes up')
+    assert.deepEqual([finishing.working,finishing.error],[false,null],'its stored reply ends the working state')
     assert.ok((await store.loadConversation(owner,botId)).messages.every(({message})=>!('mikkaStreamId' in message)),'stream markers never reach the model history')
     assert.equal(await store.appendMessages(owner, 'wrun_recovered-turn', [], null, botId),2,'an empty append returns the existing cursor')
     await db.update(schema.coordinatorSessions).set({leaseUntil:new Date(Date.now()-1)}).where(and(eq(schema.coordinatorSessions.userId,owner),eq(schema.coordinatorSessions.botId,botId)))
