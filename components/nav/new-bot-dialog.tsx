@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { useSWRConfig } from 'swr'
 import { toast } from 'sonner'
@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input'
 import { useActionError } from '@/lib/use-action-error'
 import { BotAvatar, DEFAULT_BOT_COLOR, DEFAULT_BOT_SHAPE, type BotColor, type BotShape } from './bot-avatar'
 import { BotLookPicker } from './bot-look-picker'
+import { useOpenerFocus } from '@/hooks/use-focus-return'
 
 /**
  * 新建 Bot (Figma 195:3226, Grok's avatar editor): a big live preview, the
@@ -28,7 +29,10 @@ export function NewBotDialog({ open, onOpenChange, onCreated }: { open: boolean;
   const [color, setColor] = useState<BotColor>(DEFAULT_BOT_COLOR)
   const [shape, setShape] = useState<BotShape>(DEFAULT_BOT_SHAPE)
   const [saving, setSaving] = useState(false)
-  useEffect(() => { if (!open) { setName(''); setColor(DEFAULT_BOT_COLOR); setShape(DEFAULT_BOT_SHAPE) } }, [open])
+  // Closing returns focus to 新建 Bot; a created bot's chat takes it instead (its composer).
+  const openerFocus = useOpenerFocus(open)
+  const created = useRef(false)
+  useEffect(() => { if (open) created.current = false; else { setName(''); setColor(DEFAULT_BOT_COLOR); setShape(DEFAULT_BOT_SHAPE) } }, [open])
 
   async function submit() {
     const trimmed = name.trim()
@@ -37,6 +41,7 @@ export function NewBotDialog({ open, onOpenChange, onCreated }: { open: boolean;
     try {
       const bot = await createBot({ name: trimmed, color, shape })
       await mutate('bots')
+      created.current = true
       onCreated(bot)
     } catch (error) {
       // Server actions keep the failure code as the message (botDuplicateName…).
@@ -47,7 +52,7 @@ export function NewBotDialog({ open, onOpenChange, onCreated }: { open: boolean;
   }
 
   return <Dialog open={open} onOpenChange={onOpenChange}>
-    <DialogContent className="gap-4 p-0 shadow-2xl sm:max-w-130" closeLabel={tCommon('close')}>
+    <DialogContent className="gap-4 p-0 shadow-2xl sm:max-w-130" closeLabel={tCommon('close')} finalFocus={() => !created.current && openerFocus()}>
       <DialogHeader className="px-5 pt-4">
         <DialogTitle className="text-base">{t('title')}</DialogTitle>
         <DialogDescription className="sr-only">{t('description')}</DialogDescription>

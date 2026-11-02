@@ -376,9 +376,12 @@ test('团队创建、常规设置与成员管理都在同一设置页内完成',
   await expect(sidebar.getByRole('link', { name: '团队常规设置', exact: true })).toHaveCount(0)
   const settings = page.getByRole('region', { name: '团队设置选项', exact: true })
   await expect(settings.getByLabel('1 位成员', { exact: true })).toBeVisible()
-  await expectItems(page.getByRole('heading', { level: 2 }), ['任务、项目和文档', '工作流', 'AI 与 Bot', '团队层级', '危险操作'])
-  await expect(page.getByText('Slack 通知', { exact: true })).toBeVisible()
-  await expect(page.getByText('任务状态', { exact: true })).toHaveCount(1)
+  // Rows for unbuilt features are not shown (decision 2026-11-02-0303).
+  await expectItems(page.getByRole('heading', { level: 2 }), ['危险操作'])
+  for (const heading of ['任务、项目和文档', '工作流', 'AI 与 Bot', '团队层级']) await expect(page.getByRole('heading', { name: heading, exact: true })).toHaveCount(0)
+  await expect(settings.getByRole('listitem')).toHaveCount(2)
+  await expect(page.getByText('Slack 通知', { exact: true })).toHaveCount(0)
+  await expect(page.getByText('任务状态', { exact: true })).toHaveCount(0)
   await page.getByRole('button', { name: '退出团队', exact: true }).click()
   const confirmation = page.getByRole('alertdialog')
   await expect(confirmation).toBeVisible()
@@ -447,7 +450,9 @@ test('移动端页内创建不横向溢出，返回和侧栏切换保护未保�
   page.once('dialog', confirmation => confirmation.accept())
   await navigation.getByRole('link', { name: '成员', exact: true }).click()
   await expect(navigation).not.toBeVisible()
-  await expect(page.getByRole('heading', { name: '成员', exact: true })).toBeVisible()
+  // On a phone the header bar names the page; the H1 stays for screen readers only (M15, R-40).
+  await expect(page.getByRole('navigation', { name: '当前位置', exact: true }).getByText('成员', { exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '成员', exact: true })).toBeAttached()
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
 })
 

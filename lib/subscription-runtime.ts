@@ -22,8 +22,9 @@ export async function authorizeSubscriptionUse(userId: string, workspaceId: stri
   await authorizeSubscriptionWorkspace(userId, workspaceId)
   // Another member's bot needs 分享给团队成员 on, checked on every call: un-sharing or leaving stops it at once.
   if (consumerId && z.uuid().safeParse(consumerId).success) {
-    const { rows: [bot] } = await pool.query<{ ownerId: string }>('SELECT "ownerId" FROM bots WHERE id=$1 AND "workspaceId"=$2', [consumerId, workspaceId])
-    if (bot && bot.ownerId !== userId && !(await othersMayUse(pool, userId, workspaceId))) throw new SubscriptionRefusal('account_unavailable')
+    const { rows: [bot] } = await pool.query<{ ownerId: string | null }>('SELECT "ownerId" FROM bots WHERE id=$1 AND "workspaceId"=$2', [consumerId, workspaceId])
+    // A bot awaiting takeover (null owner) runs on nobody's subscription.
+    if (bot && (bot.ownerId === null || (bot.ownerId !== userId && !(await othersMayUse(pool, userId, workspaceId))))) throw new SubscriptionRefusal('account_unavailable')
   }
 }
 export function subscriptionRuntime(nativeBroker = false, custodyOnly = false, options: { exportAccessLease?: boolean } = {}): SubscriptionService {

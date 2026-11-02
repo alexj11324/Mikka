@@ -97,7 +97,7 @@ export interface Thread {
   attempts?: number
 }
 
-/** 进行中, 受阻, 等待你, 空闲, 已解决, in that order (R-52). */
+/** 等待你, 进行中, 受阻, 空闲, 已解决, in that order (R-52). */
 export type ThreadGroup = 'running' | 'blocked' | 'waiting' | 'idle' | 'resolved'
 
 /** A bot's page (GET /api/mobile/bots/<id>): its threads, its tasks' PRs, its scheduled tasks, its 资料库 and the person's 置顶 / 通知. */

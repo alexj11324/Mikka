@@ -74,7 +74,7 @@ function ThreadRow({ thread, group, issues, all, now, onOpenThread }: { thread: 
   // The PRs its task carries, as on the chat's card (R-66).
   const pullRequests = thread.issueId ? issues.find(issue => issue.id === thread.issueId)?.metadata.pullRequests : undefined
   return <li data-slot="thread-card" className={THREAD_CARD}>
-    <Button variant="ghost" className={THREAD_CARD_BUTTON} aria-label={name} onClick={() => onOpenThread({ issueId: thread.issueId ?? null, runId: thread.id })} />
+    <Button variant="ghost" className={THREAD_CARD_BUTTON} aria-label={name} data-focus-id={thread.id} onClick={() => onOpenThread({ issueId: thread.issueId ?? null, runId: thread.id })} />
     <span data-slot="thread-status" className="pointer-events-none relative flex shrink-0 items-center justify-center"><ThreadStatusIcon group={group} /></span>
     <span className="pointer-events-none relative flex min-w-0 flex-1 flex-col gap-0.5">
       <span className="flex w-full min-w-0 items-center gap-2">
@@ -94,7 +94,7 @@ function ThreadRow({ thread, group, issues, all, now, onOpenThread }: { thread: 
 }
 
 /**
- * The right column's thread list (R-52): 进行中 → 受阻 → 等待你 → 空闲 →
+ * The right column's thread list (R-52): 等待你 → 进行中 → 受阻 → 空闲 →
  * 已解决, each with its count; 已解决 starts collapsed. Outside 进行中 the
  * judged outcome places a thread, so a failed or blocked run never reads as
  * resolved. Picking a thread opens it beside the chat, as a thread card does;

@@ -12,6 +12,7 @@ import { Columns3, List, Plus, Search } from 'lucide-react'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { IconRail, type RailDestination } from '@/components/nav/icon-rail'
 import { BotList, type ChatTarget } from '@/components/nav/bot-list'
+import { threadName } from '@/components/nav/thread-list'
 import { NewBotDialog } from '@/components/nav/new-bot-dialog'
 import { Onboarding, type E2BKeyResult, type OnboardingComputer } from '@/components/onboarding/onboarding'
 import type { LegacyChatRequest } from './legacy-chat-archive'
@@ -68,6 +69,7 @@ import type { WorkspaceSwitcher } from '@/lib/workspace-switcher'
 import type { AgentHistory, SavedAgentSession } from '@/lib/agent-history'
 import { useAgentHistory } from '@/hooks/use-agent-history'
 import { useWorkspace } from '@/hooks/use-workspace'
+import { focusChatComposer } from '@/hooks/use-focus-return'
 import { usePresence } from '@/lib/use-presence'
 import { FieldError } from '@/components/ui/field'
 
@@ -417,6 +419,7 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
       applySelection(null); move({ ...changeSection(target.kind === 'agent' ? 'agent' : target.kind === 'group' ? 'group' : 'coordinator', bot?.id ?? null), issue: null, group: target.kind === 'group' ? target.id : null, session: target.kind === 'agent' ? target.sessionId : null }); setTeamId(null); setProjectId(null)
       if (target.kind === 'agent') setAgentRequest(current => ({ sessionId: target.sessionId, nonce: (current?.nonce ?? 0) + 1 }))
       if (target.kind === 'group') setOpenedGroup({ id: target.id, title: target.title, workspaceId: target.workspaceId })
+      focusChatComposer()
     })
   }
   function openRail(destination: RailDestination) {
@@ -472,6 +475,7 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
   // An open thread takes the right column beside the chat or a page (R-82); a task shows its own threads in its own right column,
   // but a thread opened from 全部线程 stays in 全部线程's column.
   const threadShown = threadId && (!selected || threadsView) ? threadId : null
+  const shownThread = threadShown ? threads.find(thread => thread.id === threadShown) : undefined
   // One thing on the right at a time: the thread, else 全部线程, else the browser, else 概览.
   const rightTaken = browserShown || !!threadShown || !!threadsView
   // On a phone the chat's pill sits in its header and opens the right column as a page over the chat (R-82).
@@ -511,7 +515,7 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
       </>}
     </AppShellContent>
     {browserShown && !threadShown && !threadsView && <BrowserPane onClose={() => showBrowser(false)} />}
-    {threadShown && <ThreadColumn runId={threadShown} issueId={threads.find(thread => thread.id === threadShown)?.issueId} overList={!!threadsView} />}
+    {threadShown && <ThreadColumn runId={threadShown} issueId={shownThread?.issueId} overList={!!threadsView} name={shownThread ? threadName(shownThread, tasks, '') : undefined} />}
     {threadsView && !threadShown && <AllThreadsColumn view={threadsView} threads={threads} issues={tasks} />}
     {/* Opening, closing and handing the column to a thread are instant (R-37). */}
     {isConversation && panelOpen && !rightTaken && <ContextPanel key="context-panel" workspaceId={workspaceData?.workspace.id} issues={tasks} threads={threads} onOpenThread={thread => openThread(thread.runId)} onClose={() => showPanel(false)}

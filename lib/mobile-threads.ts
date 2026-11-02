@@ -43,7 +43,7 @@ export interface MobileThread {
   device: { id: string; name: string; kind: 'cloud' | 'laptop' | 'server' } | null
   createdAt: string
   finishedAt: string | null
-  /** Its place in the list, as on the web (R-52): 进行中, 受阻, 等待你, 空闲 or 已解决. */
+  /** Its place in the list, as on the web (R-52): 等待你, 进行中, 受阻, 空闲 or 已解决. */
   group: ThreadGroup
   /** How many threads its task has had (第 N 次尝试); a list shows only the newest of them. */
   attempts: number

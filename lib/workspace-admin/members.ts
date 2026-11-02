@@ -42,9 +42,12 @@ async function requireTransferTarget(tx: WorkspaceTransaction, workspaceId: stri
  * is paused with their other bots when they leave (releaseDepartingMember)
  * and stays theirs.
  */
-export async function transferBots(tx: MainTransaction, workspaceId: string, fromUserId: string, toUserId: string, only?: string[]): Promise<AssetTransfer> {
+export async function transferBots(tx: MainTransaction, workspaceId: string, fromUserId: string | null, toUserId: string, only?: string[]): Promise<AssetTransfer> {
+  // A null owner (「待接管」, the owner deleted their account) is only ever taken over one bot at a time.
+  if (fromUserId === null && !only) throw new Error('transferBots needs explicit bots for a null owner')
+  const ownedBy = fromUserId === null ? isNull(bots.ownerId) : eq(bots.ownerId, fromUserId)
   const owned = await tx.select({ id: bots.id, name: bots.name }).from(bots)
-    .where(and(eq(bots.workspaceId, workspaceId), eq(bots.ownerId, fromUserId), sql`not exists (select 1 from coordinator_bots cb where cb."botId" = ${bots.id})`, ...(only ? [inArray(bots.id, only)] : []))).for('update')
+    .where(and(eq(bots.workspaceId, workspaceId), ownedBy, sql`not exists (select 1 from coordinator_bots cb where cb."botId" = ${bots.id})`, ...(only ? [inArray(bots.id, only)] : []))).for('update')
   if (!owned.length) return { bots: 0 }
   const ids = owned.map(bot => bot.id)
   const [busyRun] = await tx.select({ id: agentRuns.id }).from(agentRuns)
@@ -59,7 +62,7 @@ export async function transferBots(tx: MainTransaction, workspaceId: string, fro
   await tx.execute(sql`delete from computer_run_bindings where "botId" in ${ids}`)
   await tx.execute(sql`delete from agent_kit_heads where bot_id in ${ids}`)
   // A bot handed over runs on its new owner's resources, never on the previous owner's credentials.
-  await tx.update(bots).set({ ownerId: toUserId, archivedAt: null, updatedAt: new Date() }).where(and(inArray(bots.id, ids), eq(bots.workspaceId, workspaceId), eq(bots.ownerId, fromUserId)))
+  await tx.update(bots).set({ ownerId: toUserId, archivedAt: null, updatedAt: new Date() }).where(and(inArray(bots.id, ids), eq(bots.workspaceId, workspaceId), ownedBy))
   return { bots: ids.length }
 }
 
@@ -90,7 +93,7 @@ export async function restoreReturningMember(workspaceId: string, userId: string
   await db.update(bots).set({ archivedAt: null, updatedAt: new Date() }).where(and(eq(bots.workspaceId, workspaceId), eq(bots.ownerId, userId)))
 }
 
-/** An admin takes over a paused bot of someone who left or was suspended; it then runs on the admin's own resources. */
+/** An admin takes over a paused bot of someone who left, was suspended or deleted their account (null owner); it then runs on the admin's own resources. */
 export async function takeOverBot(actorId: string, workspaceId: string, botId: string): Promise<AssetTransfer> {
   z.uuid().parse(botId)
   await workspaceDb.transaction(tx => requireWorkspace(tx, workspaceId, actorId, true))

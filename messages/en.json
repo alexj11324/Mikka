@@ -2409,7 +2409,8 @@
       "minutes": "{count} min",
       "hours": "{count} h",
       "balance": "Balance",
-      "points": "{points} points"
+      "points": "{points} points",
+      "awaitingTakeover": "Awaiting takeover"
     },
     "billing": {
       "loading": "Loading billing",
@@ -2759,7 +2760,6 @@
     "c_c6492461": "View all tasks ·",
     "c_30108106": "View all teams",
     "c_4090a5db": "View all projects",
-    "c_37ee9ddc": "View team hierarchy documentation (opens in a new window)",
     "c_c4c23eda": "View project ·",
     "c_95c35444": "Use 2–12 uppercase letters or digits, starting with a letter.",
     "c_62e51561": "Loading",
@@ -3496,6 +3496,7 @@
         "status": "Status",
         "priority": "Priority",
         "assignee": "Assignee",
+        "creator": "Created by me",
         "labels": "Labels",
         "project": "Project",
         "agentState": "Thread status"
@@ -3556,7 +3557,7 @@
         "delete": "Delete",
         "agent": {
           "running": "Running",
-          "waiting": "Waiting on you",
+          "waiting": "Waiting for you",
           "blocked": "Blocked"
         }
       },
@@ -3950,35 +3951,11 @@
     "accessibleToAll": "Accessible to all workspace members",
     "teamOverview": "Team overview",
     "memberCount": "{count, plural, one {# member} other {# members}}",
-    "hierarchy": "Team hierarchy",
-    "docs": "Docs",
     "dangerZone": "Danger zone",
     "rows": {
       "general": "General",
       "members": "Members",
-      "slack": "Slack notifications",
-      "issuesSection": "Issues, projects, and documents",
-      "issueLabels": "Issue labels",
-      "projectLabels": "Project labels",
-      "templates": "Templates",
-      "recurringIssues": "Recurring issues",
-      "workflowSection": "Workflow",
-      "issueStatuses": "Issue statuses",
-      "projectStatuses": "Project statuses",
-      "workflows": "Workflows & automations",
-      "triage": "Triage",
-      "cycles": "Cycles",
-      "agentsSection": "AI & bots",
-      "teamAgents": "Team bots",
-      "agentSkills": "Bot skills",
-      "agentConnectors": "Bot connectors",
-      "projectUpdates": "Project updates",
-      "threadSummaries": "Resolved thread summaries",
-      "parentTeam": "Parent team",
-      "none": "None",
-      "leaveTeam": "Leave team",
-      "retireTeam": "Retire team",
-      "deleteTeam": "Delete team"
+      "leaveTeam": "Leave team"
     }
   },
   "CredentialLogin": {

@@ -232,7 +232,7 @@
    A neutral translucent overlay (R-30), so the button still reads on grey cards and sidebars. */
 --control: oklch(0 0 0 / 6%);
 --control-hover: oklch(0 0 0 / 10%);
---ring: oklch(0.708 0 0);
+--ring: oklch(0.556 0 0);
 /* Chart series: blue, teal, orange, violet, ochre; each at least 3:1 on the card. */
 --chart-1: oklch(0.546 0.215 262.9);
 --chart-2: oklch(0.6 0.105 185);
@@ -254,7 +254,7 @@
 --sidebar-item: #dfe0e2; /* Comma's sidebar-bg-item: the rail's hover and current fill */
 --sidebar-accent-foreground: oklch(0.205 0 0);
 --sidebar-border: oklch(0.922 0 0);
---sidebar-ring: oklch(0.708 0 0);
+--sidebar-ring: oklch(0.556 0 0);
 --destructive-foreground: var(--color-red-800);
 --success: var(--color-emerald-500);
 --success-foreground: var(--color-emerald-900);
@@ -318,7 +318,7 @@
 --input: oklch(1 0 0 / 6%);
 --control: oklch(1 0 0 / 9%);
 --control-hover: oklch(1 0 0 / 14%);
---ring: oklch(0.556 0 0);
+--ring: oklch(0.708 0 0);
 --chart-1: oklch(0.68 0.16 259);
 --chart-2: oklch(0.72 0.12 182);
 --chart-3: oklch(0.72 0.17 45);
@@ -337,7 +337,7 @@
 --sidebar-item: #222326;
 --sidebar-accent-foreground: oklch(0.985 0 0);
 --sidebar-border: oklch(1 0 0 / 10%);
---sidebar-ring: oklch(0.556 0 0);
+--sidebar-ring: oklch(0.708 0 0);
 --destructive-foreground: var(--color-red-600);
 --success: var(--color-emerald-500);
 --success-foreground: var(--color-emerald-600);

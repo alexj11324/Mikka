@@ -12,6 +12,9 @@ import { cn } from '@/lib/utils'
 import { IssueThreadPanel } from './issue-thread-panel'
 import { closeThread, navigate, openThread, toggleAllThreads } from './workspace-navigation'
 
+/** Task detail's own breakpoint: narrower, a thread open on the task covers it, so 打开任务 leaves the thread behind. */
+const TASK_WIDE = '(min-width: 1024px)'
+
 /**
  * An open thread, in the right column beside what is in the centre (R-82): it
  * takes 概览's place and width, and closing it brings 概览 back. Below xl,
@@ -22,7 +25,7 @@ import { closeThread, navigate, openThread, toggleAllThreads } from './workspace
  * thread lists do); a thread opened from its address alone, or one with no
  * task, looks it up.
  */
-export function ThreadColumn({ runId, issueId: known, overList = false }: { runId: string; issueId?: string | null; /** Opened from 全部线程: ← goes back to that list, ✕ closes both. */ overList?: boolean }) {
+export function ThreadColumn({ runId, issueId: known, overList = false, name }: { runId: string; issueId?: string | null; /** Opened from 全部线程: ← goes back to that list, ✕ closes both. */ overList?: boolean; /** Its row's name in the thread list, so the header reads the same. */ name?: string }) {
   const t = useTranslations('IssueThreads')
   const { data: looked, isLoading } = useSWR(known ? null : ['thread-issue', runId], () => findThreadIssue(runId))
   // A thread with no task opens too, on its own conversation; it just has no task to link to.
@@ -32,7 +35,7 @@ export function ThreadColumn({ runId, issueId: known, overList = false }: { runI
   const issueId = thread?.issueId ?? null
   return <RightColumn slot="thread-column">
     {thread
-      ? <IssueThreadPanel key={runId} issueId={issueId} runId={runId} onBack={closeThread} onClose={overList ? () => toggleAllThreads(false) : undefined} onOpenThread={openThread} onOpenTask={issueId ? () => navigate({ issue: issueId, thread: runId }) : undefined} />
+      ? <IssueThreadPanel key={runId} issueId={issueId} runId={runId} name={name} onBack={closeThread} onClose={overList ? () => toggleAllThreads(false) : undefined} onOpenThread={openThread} onOpenTask={issueId ? () => navigate({ issue: issueId, thread: window.matchMedia(TASK_WIDE).matches ? runId : null }) : undefined} />
       : <div role="status" aria-label={t('loading')} className="flex flex-col gap-3 p-4"><Skeleton className="h-6 w-2/3" /><Skeleton className="h-24 w-full" /></div>}
   </RightColumn>
 }

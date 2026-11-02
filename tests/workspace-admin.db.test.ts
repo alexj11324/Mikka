@@ -125,7 +125,39 @@ test('workspace settings backend', { skip: !dbUrl }, async t => {
       await pool.query(`insert into mikka_workspace_invitations (id,"workspaceId","userId",email,role,"tokenHash","expiresAt") values ($1,$2,$3,$4,'member',$5,now()+interval '1 day')`, [randomUUID(), workspaceId, admin, `${randomUUID()}@example.invalid`, randomUUID()])
       await pool.query(`insert into byos_connections (id,"ownerId","workspaceId",provider) values ($1,$2,$3,'codex')`, [randomUUID(), member, workspaceId])
       await pool.query('insert into workspace_settings ("workspaceId","defaultModel") values ($1,\'mikka\')', [workspaceId])
+      // Secrets, keys, policies, shares, payment, allowances, rules and tokens keyed by the workspace (gap M3).
+      const key = randomUUID(), mailbox = randomUUID()
+      for (const [text, values] of [
+        [`insert into workspace_secrets (id,"workspaceId",name,kind,"scopeType","scopeRef",ciphertext,iv,"keyVersion","createdBy","updatedBy") values ($1,$2,'TOKEN','secret','workspace','','c','i',1,$3,$3)`, [randomUUID(), workspaceId, admin]],
+        [`insert into workspace_e2b_keys ("workspaceId",ciphertext,iv,"keyVersion",last4,"createdBy","updatedBy") values ($1,'c','i',1,'abcd',$2,$2)`, [workspaceId, admin]],
+        [`insert into workspace_app_policies ("workspaceId",app,access,"updatedBy") values ($1,'gmail','deny',$2)`, [workspaceId, admin]],
+        ['insert into workspace_personal_policies ("workspaceId") values ($1)', [workspaceId]],
+        ['insert into workspace_subscription_shares ("ownerId","workspaceId") values ($1,$2)', [member, workspaceId]],
+        ['insert into workspace_credit_shares ("workspaceId","userId") values ($1,$2)', [workspaceId, member]],
+        [`insert into model_api_keys (id,"ownerId",provider,protocol,ciphertext,iv,"keyVersion",last4) values ($1,$2,$3,'openai','c','i',1,'abcd')`, [key, member, `provider-${workspaceId}`]],
+        ['insert into model_api_key_shares ("keyId","workspaceId") values ($1,$2)', [key, workspaceId]],
+        ['insert into workspace_payment_designations ("workspaceId","userId") values ($1,$2)', [workspaceId, member]],
+        ['insert into hosted_allowances ("workspaceId",remaining) values ($1,5)', [workspaceId]],
+        ['insert into hosted_verifications ("workspaceId") values ($1)', [workspaceId]],
+        ['insert into hosted_card_claims (fingerprint,"workspaceId") values ($1,$2)', [randomUUID(), workspaceId]],
+        [`insert into execution_rules (id,"ownerId","workspaceId",place,harness,model,position) values ($1,$2,$3,'local','codex','gpt',0)`, [randomUUID(), member, workspaceId]],
+        [`insert into personal_access_tokens (id,"userId","workspaceId",name,"tokenHash",hint) values ($1,$2,$3,'cli',$4,'abcd')`, [randomUUID(), member, workspaceId, randomUUID().replaceAll('-', '').repeat(2)]],
+        [`insert into bot_model_choices ("ownerId","workspaceId","botKey") values ($1,$2,'k')`, [member, workspaceId]],
+        // A run outside any bot that names the workspace's mailbox, without ON DELETE CASCADE.
+        [`insert into session_mailboxes (id,"userId","workspaceId",kind,"sessionKey") values ($1,$2,$3,'run',$4)`, [mailbox, member, workspaceId, randomUUID()]],
+        [`insert into agent_runs (id,"userId","agentId","mailboxId",status) values ($1,$2,$3,$4,'succeeded')`, [randomUUID(), member, agent, mailbox]],
+      ] as const) await pool.query(text, [...values])
       return { bot, run, team, issue, project }
+    }
+    // Every main-database table keyed by a workspace, except those that stay on purpose (lib/workspace-rows.ts).
+    const { KEPT_WITH_WORKSPACE, WORKSPACE_COLUMNS } = await import('../lib/workspace-rows')
+    const keyed = (await pool.query<{ table: string; column: string }>(`select c.table_name as "table", c.column_name as "column" from information_schema.columns c
+      join information_schema.tables t using (table_schema, table_name) where c.table_schema = current_schema() and t.table_type = 'BASE TABLE' and c.column_name = any($1::text[])`, [WORKSPACE_COLUMNS])).rows
+      .filter(row => !KEPT_WITH_WORKSPACE.has(row.table))
+    const rowsKeyedBy = async (workspaceId: string) => {
+      const found: string[] = []
+      for (const { table, column } of keyed) if (await count(pool, `"${table}" where "${column}"::text = $1`, [workspaceId])) found.push(table)
+      return found.sort()
     }
     const doomed = await seed(ws.id)
     const kept = await seed(keep.id)
@@ -151,6 +183,17 @@ test('workspace settings backend', { skip: !dbUrl }, async t => {
     assert.equal(await count(pool, '"user" where id = any($1)', [[admin, member]]), 2, 'accounts stay')
     assert.equal(await count(pool, 'issues where id=$1', [personalIssue]), 1, 'personal tasks stay')
     assert.equal(await count(pool, 'byos_connections where "ownerId"=$1 and "workspaceId"=$2', [member, ws.id]), 1, 'personal model subscriptions stay')
+    // No row keyed by the deleted workspace is left; the other workspace keeps every one of its own.
+    assert.deepEqual(await rowsKeyedBy(ws.id), [])
+    const seeded = ['bot_model_choices', 'bots', 'conversations', 'execution_rules', 'hosted_allowances', 'hosted_verifications', 'model_api_key_shares', 'personal_access_tokens', 'session_mailboxes',
+      'workspace_app_policies', 'workspace_credit_shares', 'workspace_e2b_keys', 'workspace_payment_designations', 'workspace_personal_policies', 'workspace_secrets', 'workspace_settings', 'workspace_subscription_shares']
+    const left = await rowsKeyedBy(keep.id)
+    assert.deepEqual(seeded.filter(table => !left.includes(table)), [], 'the other workspace is untouched')
+    assert.equal(await count(pool, 'hosted_card_claims where "workspaceId"=$1', [ws.id]), 1, 'a card claim is never released')
+    // Its audit log stays until the retention job expires it, from the recorded deletion time.
+    assert.equal(await count(pool, 'workspace_deletions where id=$1 and "deletedAt" > now() - interval \'1 minute\'', [ws.id]), 1)
+    assert.equal(await count(pool, 'workspace_deletions where id=$1', [keep.id]), 0)
+    assert.equal(await count(pool, 'model_api_keys where "ownerId"=$1', [member]), 2, 'the API keys themselves are the member\'s')
   })
 
   await t.test('removeMember: guards, immediate access loss, bot transfer', async () => {

@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { Pool } from 'pg'
 import { test, expect, register, app, seedTask } from './fixtures'
 
-// R-52: the right column groups threads 进行中 · 受阻 · 等待你 · 空闲 · 已解决 by the
+// R-52: the right column groups threads 等待你 · 进行中 · 受阻 · 空闲 · 已解决 by the
 // judged outcome. A task's sixteen failed or blocked runs (the ZHIX-2 shape)
 // fold into one 受阻 row, 第 16 次尝试, and nothing of it reads as 已解决.
 // Outcomes are written as the judge would store them; no model runs.
@@ -49,6 +49,9 @@ test('a task\'s failed and blocked attempts fold into one 受阻 row; only done 
   await expect(blocked.getByRole('img', { name: '受阻', exact: true })).toHaveCount(1)
   await expect(panel.getByRole('group', { name: '线程', exact: true }).locator('[data-slot="bot-avatar"]')).toHaveCount(0)
   await expect(panel.getByRole('region', { name: '等待你（1）', exact: true })).toContainText(`Question ${marker}`)
+  // 等待你 comes before every other group (decision 2026-11-02-0300).
+  const groupNames = await panel.getByRole('group', { name: '线程', exact: true }).getByRole('region').evaluateAll(regions => regions.map(region => region.getAttribute('aria-label') ?? ''))
+  expect(groupNames.slice(0, 2)).toEqual(['等待你（1）', '受阻（1）'])
   // 已解决 holds only the done task, collapsed.
   const resolved = panel.getByRole('button', { name: /^已解决（1）/ })
   await expect(resolved).toBeVisible()

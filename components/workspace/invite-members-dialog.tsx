@@ -328,6 +328,8 @@ export function InviteMembersDialog({
                   type="file"
                   accept=".csv,text/csv"
                   className="sr-only"
+                  tabIndex={-1}
+                  aria-hidden="true"
                   disabled={busy}
                   onChange={(event) => {
                     void importFile(Array.from(event.target.files ?? []));

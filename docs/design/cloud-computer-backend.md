@@ -43,7 +43,10 @@ Revised 2026-10-27 (Alex; `decisions.md`, R-72). The 2026-10-24 version put
 every bot and every cloud thread on one machine per workspace. Threads build,
 install and test, which is heavy, so they now get machines of their own, as in
 Cursor's cloud agents, Devin, Codex cloud and Copilot's coding agent. Bots stay
-on one shared machine, as in Grok Bot.
+on one shared machine, as in Grok Bot: since 2026-10-29 one per person per
+workspace (`cloud_machines` primary key `workspaceId`, `ownerId`, migration
+`20261029080001_owner_cloud_machines.sql`), so one person's bots share it and
+another member's bots never do.
 
 ```
 workspace ──1:1── bot machine (E2B sandbox, Linux)          light, shared
@@ -62,9 +65,9 @@ cloud thread ──1:1── thread machine (E2B sandbox from the workspace snap
                     └─ desktop (Xvfb + WM + VNC + Chrome) only when needed
 ```
 
-### Bot machine (one per workspace)
+### Bot machine (one per person per workspace)
 
-- **Shared:** all bots and their web sub-agents. The load is light: chat turns
+- **Shared:** all of one person's bots in the workspace and their web sub-agents. The load is light: chat turns
   and browsers, no builds.
 - **Bot desktops:** each bot keeps its own X display, window manager, apps,
   windows and VNC stream (R-04). Displays are allocated lazily on a bot's first
@@ -214,7 +217,7 @@ Report findings in the issue before building on an assumption that failed.
 
 ## 4. Data model (proposal)
 
-- `cloud_machines`: workspaceId (unique), sandboxId, deviceId, state
+- `cloud_machines`: workspaceId, ownerId (primary key: one per person per workspace), sandboxId, deviceId, state
   (`sleeping | waking | running | error`), lastActiveAt.
 - `bot_desktops`: workspaceId, botId (references `bots.id`; unique pair), display number, control
   (`agent | user | idle`), controlledBy (userId, nullable), lastActiveAt.

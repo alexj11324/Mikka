@@ -14,8 +14,8 @@ import { monthBounds, monthDays } from './month'
  * daily bars); `seconds` is run time spent in the month, so a thread that started
  * last month and ran on adds time with no new thread.
  */
-export interface UsageRow { id: string; name: string; threads: number; seconds: number }
-export interface BotUsageRow extends UsageRow { color: string; shape: string; ownerId: string }
+export interface UsageRow { id: string; name: string; threads: number; seconds: number; /** The bots of someone who deleted their account: 「待接管」, no name. */ awaitingTakeover?: true }
+export interface BotUsageRow extends UsageRow { color: string; shape: string; ownerId: string | null }
 export interface WorkspaceUsage {
   month: string
   hosted?: Awaited<ReturnType<typeof import('../abuse/runtime')['hostedUsage']['status']>>
@@ -48,10 +48,13 @@ export async function workspaceUsage(actorId: string, workspaceId: string, month
   const botUsage = botRows.map(bot => ({ ...bot, threads: usage.get(bot.id)?.threads ?? 0, seconds: Math.round(Number(usage.get(bot.id)?.seconds ?? 0)) }))
     .sort((a, b) => b.threads - a.threads || b.seconds - a.seconds || a.name.localeCompare(b.name))
   const owners = [...new Set(botUsage.map(bot => bot.ownerId))]
-  const names = owners.length ? new Map((await workspaceDb.select({ userId: workspaceMembers.userId, name: workspaceMembers.name, email: workspaceMembers.email }).from(workspaceMembers)
-    .where(and(eq(workspaceMembers.workspaceId, workspaceId), inArray(workspaceMembers.userId, owners)))).map(row => [row.userId, row.name || row.email])) : new Map<string, string>()
+  const named = owners.filter((owner): owner is string => owner !== null)
+  const names = named.length ? new Map((await workspaceDb.select({ userId: workspaceMembers.userId, name: workspaceMembers.name, email: workspaceMembers.email }).from(workspaceMembers)
+    .where(and(eq(workspaceMembers.workspaceId, workspaceId), inArray(workspaceMembers.userId, named)))).map(row => [row.userId, row.name || row.email])) : new Map<string, string>()
   const memberUsage = owners.map(ownerId => {
     const mine = botUsage.filter(bot => bot.ownerId === ownerId)
+    const totals = { threads: mine.reduce((sum, bot) => sum + bot.threads, 0), seconds: mine.reduce((sum, bot) => sum + bot.seconds, 0) }
+    if (ownerId === null) return { id: '', name: '', awaitingTakeover: true as const, ...totals }
     return { id: ownerId, name: names.get(ownerId) ?? ownerId, threads: mine.reduce((sum, bot) => sum + bot.threads, 0), seconds: mine.reduce((sum, bot) => sum + bot.seconds, 0) }
   }).sort((a, b) => b.threads - a.threads || b.seconds - a.seconds)
   const byDay = new Map(daily.map(row => [row.date, row.threads]))
