@@ -1,4 +1,4 @@
-import { runHostedWorkflowTurn } from '@/lib/subscription-workflow-turn'
+import { runHostedWorkflowTurn, type ToolTiming } from '@/lib/subscription-workflow-turn'
 import { isStepCount } from 'ai'
 import { createHook, getWorkflowMetadata, getWritable } from 'workflow'
 import type { CoordinatorWorkflowStreamPart } from '@/lib/coordinator/stream'
@@ -36,6 +36,8 @@ export async function coordinatorTurn(userId: string, botId: string) {
     if (controller.signal.aborted) controller = new AbortController()
     const signal = controller.signal
     const inbox = await steps.takeInbox(userId,holder,botId)
+    // The Workflow clock is the durable event time: this is when the inbox was taken.
+    const takenAt = Date.now()
     if (!inbox.held) return
     if (!inbox.added) {
       if (await steps.releaseLease(userId,holder,botId)) continue
@@ -77,6 +79,7 @@ export async function coordinatorTurn(userId: string, botId: string) {
         if(turnWarning(result.finishReason,result.text)) throw new Error('scheduledReadFailed')
         through = await steps.completeScheduleRead(userId,botId,inbox.scheduledRead,result.text,streamId)
       } else through = await steps.appendMessages(userId,holder,result.responseMessages,quiet ? null : turnWarning(result.finishReason,result.text),botId,streamId)
+      const storedAt = Date.now()
       if (inbox.handoffMatterIds.length) await steps.settleAttention(userId,inbox.handoffMatterIds,inbox.handoffOnly && !quiet)
       await kit.finishAgentExecution(userId,botId,execution?.id,!quiet && !result.text.trim() ? 'empty_reply' : result.finishReason === 'error' ? 'turn_failed' : undefined)
       // Whether the reply also goes to the person's phones is the Decisions API's answer (lib/push-reasons.ts); pushToPhones never throws.
@@ -96,6 +99,8 @@ export async function coordinatorTurn(userId: string, botId: string) {
         }
       }
       await steps.writeStreamPart(writable,{type:'coordinator-turn-committed',id:streamId,through,quiet})
+      // After the reply is stored and committed, so it never delays what the person sees.
+      await steps.logTurnTiming({ workflowRunId:holder,round,route:selected.harness !== 'ai_sdk' ? 'native' : hosted?.modelSelection ? 'subscription' : 'hosted',untilStoredMs:storedAt - takenAt,modelCalls:(result as { modelCalls?: number }).modelCalls ?? null,tools:(result as { toolTimings?: ToolTiming[] }).toolTimings ?? [] })
     } catch (error) {
       if(inbox.scheduledRead){
         const denied=error instanceof Error && ['scheduleReadAuthorityLost','scheduleWorkspaceAccessDenied','scheduleConversationUnavailable'].includes(error.message)

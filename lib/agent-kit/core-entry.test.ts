@@ -50,6 +50,7 @@ stub('../../workflows/coordinator/steps.ts',{
   appendMessages:async(...args:unknown[])=>{record('append')(...args);return 3},
   noteQuotaSwitch:async(...args:unknown[])=>{record('quotaSwitch')(...args)},
   writeStreamPart:async(...args:unknown[])=>{record('stream')(...args)},
+  logTurnTiming:async(...args:unknown[])=>{record('timing')(...args)},
   stoppedStepText:async(...args:unknown[])=>{record('stoppedText')(...args);return 'The task is'},
   settleAttention:async()=>{throw new Error('unexpected attention action')},
   telegramReplyThreads:async()=>{throw new Error('unexpected external message')},
