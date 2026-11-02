@@ -157,6 +157,17 @@ export async function noteQuotaSwitch(userId: string, holder: string, runtime: {
   else if (selection.data.type === 'api_key' && selection.data.afterQuota) await store.appendMessages(userId, holder, [quotaSwitchMessage(selection.data.afterQuota, new Date())], null, botId)
 }
 
+/**
+ * One round's timing as one log line (`turn_timing`): how long from taking the
+ * inbox to storing the reply, how many model calls, and each tool call's name
+ * and duration. Durations and counts only. Each model call logs its own line
+ * (`model_call_timing`, lib/model-call-timing.ts) with the same workflowRunId.
+ */
+export async function logTurnTiming(timing: { workflowRunId: string; round: number; route: 'hosted' | 'subscription' | 'native'; untilStoredMs: number; modelCalls: number | null; tools: { tool: string; ms: number; failed: boolean }[] }) {
+  'use step'
+  try { console.info(JSON.stringify({ msg: 'turn_timing', ...timing })) } catch { /* timing never fails the turn */ }
+}
+
 export async function writeStreamPart(writable: WritableStream<CoordinatorWorkflowStreamPart>, part: CoordinatorWorkflowStreamPart) {
   'use step'
   const writer = writable.getWriter()
