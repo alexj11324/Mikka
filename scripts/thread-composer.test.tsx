@@ -12,14 +12,12 @@ const messages = JSON.parse(readFileSync(new URL('../messages/en.json', import.m
 const at = (path: string) => new URL(`../${path}`, import.meta.url).href
 let thread: Record<string, unknown> | null
 mock.module('swr', {
-  exports: {
-    default: (key: unknown) => Array.isArray(key) && key[0] === 'issue-thread'
-      ? { data: thread && { thread, chunks: [{ chunk: { type: 'text-delta', id: 'a', delta: 'Done.' }, at: new Date(0) }], messages: [] }, mutate: () => {} }
-      : { data: [], mutate: () => {} },
-    useSWRConfig: () => ({ mutate: () => {} }),
-  },
+  defaultExport: (key: unknown) => Array.isArray(key) && key[0] === 'issue-thread'
+    ? { data: thread && { thread, chunks: [{ chunk: { type: 'text-delta', id: 'a', delta: 'Done.' }, at: new Date(0) }], messages: [] }, mutate: () => {} }
+    : { data: [], mutate: () => {} },
+  namedExports: { useSWRConfig: () => ({ mutate: () => {} }) },
 })
-mock.module('next/dynamic', { exports: { default: () => () => null } })
+mock.module('next/dynamic', { defaultExport: () => () => null })
 mock.module(at('app/actions/agents.ts'), { namedExports: { retryQuotaPausedRun: async () => null, resumeQuotaPausedRunOnApiKey: async () => null, getThreadName: async () => null, listIssueThreads: async () => null, getIssueThread: async () => null, sendIssueThreadMessage: async () => {}, stopRun: async () => ({}) } })
 mock.module(at('app/actions/artifacts.ts'), { namedExports: { listRunArtifacts: async () => [] } })
 mock.module(at('components/workspace/factory-acceptance.tsx'), { namedExports: { useThreadAcceptance: () => null, AcceptanceStateBadge: () => null } })

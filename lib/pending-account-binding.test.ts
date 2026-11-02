@@ -17,7 +17,7 @@ const db = {
     return Object.assign(Promise.resolve(), { returning: async () => [row] })
   } }) }),
 }
-const stub = (path: string, exports: Record<string, unknown>) => mock.module(new URL(path, import.meta.url).href, { exports })
+const stub = (path: string, exports: Record<string, unknown>) => mock.module(new URL(path, import.meta.url).href, { namedExports: exports })
 stub('./db/index.ts', { db, pool: {} })
 stub('./composio.ts', {
   getComposio: () => ({}),

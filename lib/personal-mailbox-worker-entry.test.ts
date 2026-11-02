@@ -74,13 +74,13 @@ const pool = {
     return result
   },
 }
-mock.module(new URL('./db/index.ts', import.meta.url).href, { exports: { pool } })
-mock.module(new URL('./device-link.ts', import.meta.url).href, { exports: { WORKSPACE_ID: '28700000-0000-4000-8000-000000000099' } })
+mock.module(new URL('./db/index.ts', import.meta.url).href, { namedExports: { pool } })
+mock.module(new URL('./device-link.ts', import.meta.url).href, { namedExports: { WORKSPACE_ID: '28700000-0000-4000-8000-000000000099' } })
 // #438: the run's secret masker is covered by tests/secret-masking.db.test.ts; here it is identity so the
 // mailbox fixture does not load the secrets store (device tokens, DB).
-mock.module(new URL('./secrets/runtime.ts', import.meta.url).href, { exports: { maskForRun: async (_runId: string, text: string) => text, maskForWorkspace: async (_ws: string, value: unknown) => value, workspaceSecretMasker: async () => (text: string) => text } })
+mock.module(new URL('./secrets/runtime.ts', import.meta.url).href, { namedExports: { maskForRun: async (_runId: string, text: string) => text, maskForWorkspace: async (_ws: string, value: unknown) => value, workspaceSecretMasker: async () => (text: string) => text } })
 let memberConnections = 0
-mock.module(new URL('./workspace-db.ts', import.meta.url).href, { exports: { workspacePool: {
+mock.module(new URL('./workspace-db.ts', import.meta.url).href, { namedExports: { workspacePool: {
   async connect() {
     memberConnections++
     const client = Object.assign(new EventEmitter(), { release() {}, async query(input: string | { text: string }) {
@@ -90,23 +90,23 @@ mock.module(new URL('./workspace-db.ts', import.meta.url).href, { exports: { wor
     return client
   },
 } } })
-mock.module(new URL('./agent-kit/service.ts', import.meta.url).href, { exports: { agentScope: async (userId: string, id: string | null) => {
+mock.module(new URL('./agent-kit/service.ts', import.meta.url).href, { namedExports: { agentScope: async (userId: string, id: string | null) => {
   if (id && memberStatus !== 'active') throw Error('agentScopeNotFound')
   return { ownerId: userId, botId: id, workspaceId: id ? namespace : null }
 } } })
-mock.module(new URL('./mcp/worker.ts', import.meta.url).href, { exports: {
+mock.module(new URL('./mcp/worker.ts', import.meta.url).href, { namedExports: {
   RUN_TOKEN_PREFIX: 'mkw_',
   verifyRunToken: async (_request: Request, token?: string) => validToken && token === bearer ? { token, clientId: `run:${runId}`, scopes: [], expiresAt: Math.floor(Date.now() / 1000) + 60, extra: { userId: owner, runId } } : undefined,
   workerRun: (auth: { extra: { userId: string; runId: string } }) => ({ id: auth.extra.runId, userId: auth.extra.userId }),
   report: () => {}, ask: () => {}, blocked: () => {},
 } })
-mock.module(new URL('./mcp/auth.ts', import.meta.url).href, { exports: {
+mock.module(new URL('./mcp/auth.ts', import.meta.url).href, { namedExports: {
   verifyMcpToken: async () => undefined,
   mcpUserId: () => { throw Error('OAuth tool outside worker fixture') },
   mcpActor: () => { throw Error('OAuth tool outside worker fixture') },
 } })
-for (const path of ['./mcp/actions.ts', './mcp/tools.ts', './mcp/artifacts.ts']) mock.module(new URL(path, import.meta.url).href, { exports: {} })
-mock.module(new URL('./composio.ts', import.meta.url).href, { exports: { runComposioAction: () => { throw Error('Provider forbidden') } } })
+for (const path of ['./mcp/actions.ts', './mcp/tools.ts', './mcp/artifacts.ts']) mock.module(new URL(path, import.meta.url).href, { namedExports: {} })
+mock.module(new URL('./composio.ts', import.meta.url).href, { namedExports: { runComposioAction: () => { throw Error('Provider forbidden') } } })
 let POST: typeof import('../app/v1/mailbox/route').POST
 let mcpPOST: typeof import('../app/api/mcp/route').POST
 const previousFlag = process.env.MIKKA_PERSONAL_MAILBOX_ENABLED

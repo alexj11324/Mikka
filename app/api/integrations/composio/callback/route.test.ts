@@ -4,8 +4,8 @@ import { NextRequest, NextResponse } from 'next/server'
 
 let followUpResult = true
 let listFails = false
-const stub = (path: string, exports: Record<string, unknown>) => mock.module(new URL(path, import.meta.url).href, { exports })
-mock.module('next/server', { exports: { NextRequest, NextResponse, after: () => {} } })
+const stub = (path: string, exports: Record<string, unknown>) => mock.module(new URL(path, import.meta.url).href, { namedExports: exports })
+mock.module('next/server', { namedExports: { NextRequest, NextResponse, after: () => {} } })
 stub('../../../../../lib/request-log.ts', { noteLogUser: () => {}, withRequestLog: (_path: string, handler: unknown) => handler })
 stub('../../../../../lib/auth.ts', { auth: { api: { getSession: async () => ({ user: { id: 'synthetic-user' } }) } }, authBaseURL: 'https://example.test' })
 stub('../../../../../lib/composio.ts', { getComposio: () => ({ connectedAccounts: { completeAuth: async () => ({ connectedAccountId: 'new' }), list: async () => ({ items: [] }) } }), readComposioAccountEmail: () => {}, renameComposioAccount: () => {}, retireComposioAccount: () => {} })
