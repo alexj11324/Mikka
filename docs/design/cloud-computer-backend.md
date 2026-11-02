@@ -217,7 +217,7 @@ Report findings in the issue before building on an assumption that failed.
 
 ## 4. Data model (proposal)
 
-- `cloud_machines`: workspaceId (unique), sandboxId, deviceId, state
+- `cloud_machines`: workspaceId, ownerId (primary key: one per person per workspace), sandboxId, deviceId, state
   (`sleeping | waking | running | error`), lastActiveAt.
 - `bot_desktops`: workspaceId, botId (references `bots.id`; unique pair), display number, control
   (`agent | user | idle`), controlledBy (userId, nullable), lastActiveAt.
