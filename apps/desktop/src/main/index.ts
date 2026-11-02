@@ -10,6 +10,7 @@ import { IPC } from '@mikka/protocol/ipc'
 
 import { registerBridge } from './bridge'
 import { localDeviceStatus, localQuota } from './daemon'
+import { connectForUpdate, updateLocalDaemon } from './daemon-update'
 import { readLocalDeviceAccount } from './local-setup'
 import { AppLoadState, offlineReason, offlineRetryDelay } from './offline'
 import { startLoopbackAuth, type LoopbackAuthServer } from './loopback'
@@ -468,6 +469,8 @@ function start(): void {
   const open = () => {
     createMainWindow()
     if (!app.isPackaged) return
+    // This app may just have updated: the daemon on this computer updates too, when idle (daemon-update.ts).
+    void updateLocalDaemon(FLAVOR, { connect: connectForUpdate({ name: 'mikka-desktop', version: APP_VERSION }) })
     // Background checks start once the app is open, so they never race the launch gate.
     setTimeout(() => { void checkForUpdates(false) }, 15_000)
     setInterval(() => { void checkForUpdates(false) }, UPDATE_CHECK_INTERVAL_MS)

@@ -1446,6 +1446,7 @@ export class Daemon {
         }, 50)
         return { ok: true as const }
       },
+      "daemon.update": async () => ({ state: await this.requestUpdate() }),
       "device.setCredential": (raw) => {
         this.reviewAbort?.abort()
         this.reviewAbort = null
@@ -1566,6 +1567,17 @@ export class Daemon {
         .catch(() => { this.log.warn('Daemon automatic update check failed') })
         .finally(() => { this.updateCheck = null })
     }
+  }
+
+  /** `daemon.update`: check now instead of at the next hourly check; the install still waits for idle. */
+  private async requestUpdate(): Promise<"unmanaged" | "current" | "waiting" | "installing"> {
+    if (!this.options.autoUpdate) return "unmanaged"
+    if (!this.updating && !this.updateVersion) {
+      this.checkAutoUpdate(true)
+      await this.updateCheck
+    }
+    this.checkAutoUpdate()
+    return this.updating ? "installing" : this.updateVersion ? "waiting" : "current"
   }
 
   stop(): Promise<void> {
