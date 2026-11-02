@@ -9,7 +9,6 @@ import { readFile } from 'node:fs/promises'
 import { Pool } from 'pg'
 import { Sandbox } from 'e2b'
 import { ComputerStore } from '../../lib/computer/store'
-import { ensureContainerRuntime } from '../../lib/computer/e2b-provider'
 import { bindComputerRun } from '../../lib/computer/run-binding'
 import { decideComputerReview, syncComputerReviews } from '../../lib/computer/reviews'
 import { ComputerBroker } from '../../packages/daemon/src/computer/broker.mjs'
@@ -44,13 +43,6 @@ async function main() {
     const ingress = await fetch(`https://${sandbox.getHost(6080)}/vnc`, { signal: AbortSignal.timeout(15_000) })
     assert.equal(ingress.status, 401, 'public viewer requires a grant')
     console.log('live stage: public viewer denies anonymous traffic')
-    if (process.env.E2B_TEST_CONTAINERS === '1') {
-      await ensureContainerRuntime(sandbox)
-      await ensureContainerRuntime(sandbox)
-      const runner = await sandbox.commands.run('docker --host=unix:///run/mikka-container/docker.sock info >/dev/null 2>&1', { user: 'user' })
-      assert.equal(runner.exitCode, 0)
-      console.log('live stage: the default user reaches the container runtime')
-    }
     const rawCDP = await fetch(`https://${sandbox.getHost(9201)}/json/version`, { signal: AbortSignal.timeout(15_000) })
     assert.ok([502, 503].includes(rawCDP.status), 'no public CDP listener')
     console.log('live stage: public CDP unavailable')
@@ -106,7 +98,6 @@ async function main() {
     await new ComputerStore(pool).operate(actor, bot.id, 'wake')
     console.log('live stage: resumed through store')
     sandbox = await Sandbox.connect(id, connection)
-    if (process.env.E2B_TEST_CONTAINERS === '1') { await ensureContainerRuntime(sandbox); console.log('live stage: container runtime survives pause/resume') }
     assert.equal(await sandbox.files.read('/workspace/acceptance-marker'), 'preserved')
     console.log('live stage: persisted file verified')
     try {

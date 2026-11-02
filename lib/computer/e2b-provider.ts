@@ -3,7 +3,6 @@ import { createHash, createHmac } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Sandbox, SandboxNotFoundError } from 'e2b'
-import { HOSTED_NATIVE_IMAGE } from '@mikka/protocol/subscription'
 import { computerTemplate, e2bApiKey, sandboxKeyOwner, withE2BErrors } from '@/lib/secrets/e2b-runtime'
 import { E2BKeyError } from '@/lib/secrets/flag'
 
@@ -90,21 +89,6 @@ exit 1`
   if (installed.stdout.trim() === 'mikka-runtime-install-required') throw new Error('Computer runtime installation failed')
 }
 
-/** Start the container service for a dedicated trusted hosted worker. The
- * task account never receives its socket or E2B control-plane credentials. */
-export async function ensureContainerRuntime(sandbox: Sandbox) {
-  const script = await readFile(join(process.cwd(), 'scripts/e2b/start-container-runtime.sh'), 'utf8')
-  await sandbox.files.write('/opt/mikka/computer/start-container-runtime.sh', script, { user: 'root' })
-  await sandbox.commands.run('bash /opt/mikka/computer/start-container-runtime.sh', { user: 'root', background: true, timeoutMs: 0 })
-  await sandbox.commands.run('for i in $(seq 1 60); do docker --host=unix:///run/mikka-container/docker.sock info >/dev/null 2>&1 && exit 0; sleep .5; done; exit 1', { user: 'root', timeoutMs: 35_000 })
-}
-
-/** Provision only the fixed reviewed runtime image, never a model-supplied image. */
-export async function ensureHostedRunnerImage(sandbox: Sandbox) {
-  await ensureContainerRuntime(sandbox)
-  const image = HOSTED_NATIVE_IMAGE
-  await sandbox.commands.run(`docker --host=unix:///run/mikka-container/docker.sock image inspect ${image} >/dev/null 2>&1 || docker --host=unix:///run/mikka-container/docker.sock pull ${image} >/dev/null`, { user: 'root', timeoutMs: 300_000 })
-}
 
 export async function startDesktop(sandbox: Sandbox, display: number, managedChrome = false) {
   if (!Number.isInteger(display) || display < 1 || display > 999) throw new Error('Invalid display')

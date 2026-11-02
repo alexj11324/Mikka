@@ -17,5 +17,5 @@ corepack enable
 mkdir -p /opt/mikka/computer /workspace
 install -d -m 710 -o root -g user /run/mikka-viewer
 # A public template must not ship SSH host private keys: every sandbox would
-# share them. Keys are generated per sandbox at boot (start-container-runtime.sh).
+# share them.
 rm -f /etc/ssh/ssh_host_*
