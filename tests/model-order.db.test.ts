@@ -55,11 +55,12 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
    * harness. Its daemon takes subscription runs (subscriptionBroker) unless the
    * report says otherwise, as a current local daemon does.
    */
-  const device = async (ownerId: string, harnesses: object[], enabled = true, over: { name?: string; online?: boolean } = {}) => {
+  const device = async (ownerId: string, harnesses: object[], enabled = true, over: { name?: string; online?: boolean; server?: boolean; joinedMinutesAgo?: number } = {}) => {
     const id = randomUUID()
     const report = harnesses.map(info => ({ subscriptionBroker: true, ...info }))
-    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"lastSeenAt",harnesses) VALUES ($1,$2,$5,'local',$3,$6,$4)`,
-      [id, ownerId, enabled, JSON.stringify(report), over.name ?? 'Laptop', over.online === false ? new Date(Date.now() - 3_600_000) : new Date()])
+    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"lastSeenAt",harnesses,"deviceType","createdAt") VALUES ($1,$2,$5,'local',$3,$6,$4,$7,$8)`,
+      [id, ownerId, enabled, JSON.stringify(report), over.name ?? 'Laptop', over.online === false ? new Date(Date.now() - 3_600_000) : new Date(),
+        over.server ? 'server' : 'laptop', new Date(Date.now() - (over.joinedMinutesAgo ?? 0) * 60_000)])
     const agents: Record<string, string> = {}
     for (const info of harnesses as { harness: string }[]) {
       agents[info.harness] = randomUUID()
@@ -87,6 +88,31 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
     const key = await keys.addApiKey(pool, deepseekOnly.ownerId, { provider: 'deepseek', apiKey: `sk-${randomBytes(12).toString('hex')}` }, { fetch: (async () => Response.json({ data: [{ id: 'key-deepseek-first' }, { id: 'key-deepseek-second' }] })) as unknown as typeof fetch })
     const deepseekView = await order.orderView(pool, deepseekOnly)
     assert.deepEqual(deepseekView.entries.map(entry => [entry.model, entry.source]), [['key-deepseek-first', { kind: 'api_key', keyId: key.id }]])
+  })
+
+  await t.test('no points for Mikka 默认: the next allowed model a chat can run on, in the person\'s order', async () => {
+    const { hostedPointsRefusal, pointsFallback } = await import('../lib/points-fallback')
+    const scope = await person('order-points')
+    // A new workspace with nothing bought or verified: Mikka 默认 is refused for points.
+    assert.equal(await hostedPointsRefusal(scope.workspaceId), 'verification_required')
+    assert.equal(await pointsFallback(pool, scope), null, 'nothing else to run on')
+    const claude = await subscribe(scope, 'claude', ['acct-opus-p'])
+    const key = await keys.addApiKey(pool, scope.ownerId, { provider: 'deepseek', apiKey: `sk-${randomBytes(12).toString('hex')}` }, { fetch: (async () => Response.json({ data: [{ id: 'key-deepseek-p' }] })) as unknown as typeof fetch })
+    const binding = (await pool.query('SELECT id FROM byos_bindings WHERE "connectionId"=$1 AND "modelId"=$2', [claude, 'acct-opus-p'])).rows[0].id
+    assert.deepEqual(await pointsFallback(pool, scope), { kind: 'subscription', bindingId: binding, model: 'acct-opus-p' }, 'the first allowed model')
+    // The subscription is out of quota: the next one, the key.
+    await pool.query('UPDATE byos_connections SET quota=$2 WHERE id=$1', [claude, JSON.stringify({ windows: [{ kind: 'five_hour', used: 1, resetsAt: new Date(Date.now() + 3_600_000).toISOString() }] })])
+    // The untouched list holds only opus here (decision 2026-11-02-1400): the key is not allowed, so nothing runs.
+    assert.equal(await pointsFallback(pool, scope), null, 'a key not in 允许使用的模型 is never used')
+    const candidate = (await order.orderView(pool, scope)).candidates.find(item => item.source.kind === 'api_key')!
+    await order.changeOrder(pool, scope, { kind: 'add', entries: [{ harness: candidate.harness, model: candidate.model, source: candidate.source }] })
+    assert.deepEqual(await pointsFallback(pool, scope), { kind: 'api_key', keyId: key.id, model: 'key-deepseek-p' }, 'once added, the key is next')
+    const keyEntry = (await order.orderView(pool, scope)).entries.find(entry => entry.source.kind === 'api_key')!
+    await order.changeOrder(pool, scope, { kind: 'remove', id: keyEntry.id })
+    assert.equal(await pointsFallback(pool, scope), null)
+    // Points bought: Mikka 默认 runs, no fallback asked for.
+    await pool.query(`INSERT INTO workspace_credit_grants (id,"workspaceId",bucket,points,reason,"externalId") VALUES ($1,$2,'purchased',100,'pack',$3)`, [randomUUID(), scope.workspaceId, `points-${randomUUID()}`])
+    assert.equal(await hostedPointsRefusal(scope.workspaceId), null)
   })
 
   await t.test('edits: the first change stores what was shown; adds must be candidates; reorder, remove and 运行位置 save', async () => {
@@ -181,7 +207,7 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
     assert.deepEqual([paused.kind === 'none' && paused.reason, paused.kind === 'none' && paused.card.description], ['pickedUnavailable', 'Claude Code 的 acct-sonnet-c 暂时不可用'])
     await pool.query('UPDATE byos_connections SET paused=false WHERE id=$1', [claude])
     // 云端 without the person's E2B key: the card says so.
-    const cloud = await resolveModelDispatch(pool, ctx, null, undefined, 'cloud')
+    const cloud = await resolveModelDispatch(pool, ctx, null, 'cloud')
     assert.deepEqual([cloud.kind, cloud.kind === 'none' && cloud.reason, cloud.kind === 'none' && cloud.card.options.map(option => option.action)], ['none', 'cloudNotConfigured', ['e2bKey', 'modelSettings']])
     // An emptied list: noModels.
     for (const entry of (await order.orderView(pool, scope)).entries) await order.changeOrder(pool, scope, { kind: 'remove', id: entry.id })
@@ -203,30 +229,30 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
     const codexOnly = await device(scope.ownerId, [{ harness: 'codex', installed: true, modelSlots: [{ slot: 'acct-codex-n', model: 'acct-codex-n', name: 'acct-codex-n' }] }])
     const claudeOnly = await device(scope.ownerId, [{ harness: 'claude_code', installed: true, modelSlots: [{ slot: 'top', model: 'acct-opus-n', name: 'Top' }] }])
     // Named computer and the thread's own Codex model: Codex runs it there, though the list starts with Claude Code.
-    const asked = await resolveModelDispatch(pool, ctx, { harness: 'codex', model: 'acct-codex-n' }, undefined, undefined, both.id)
+    const asked = await resolveModelDispatch(pool, ctx, { harness: 'codex', model: 'acct-codex-n' }, undefined, both.id)
     assert.deepEqual(asked.kind === 'device' && [asked.deviceId, asked.agentId, asked.entry.harness, asked.entry.source], [both.id, both.agents.codex, 'codex', { kind: 'subscription', connectionId: chatgpt }])
     // Named computer that lacks Codex: refused with what it lacks; Claude Code is never put in its place.
-    const lacking = await resolveModelDispatch(pool, ctx, { harness: 'codex', model: 'acct-codex-n' }, undefined, undefined, claudeOnly.id)
+    const lacking = await resolveModelDispatch(pool, ctx, { harness: 'codex', model: 'acct-codex-n' }, undefined, claudeOnly.id)
     assert.deepEqual([lacking.kind, lacking.kind === 'none' && lacking.reason, lacking.kind === 'none' && lacking.card.description], ['none', 'namedDevice', '这台电脑没装 Codex'])
     // No model of the thread's own: the list in order, the first this computer runs (Codex here; opus first elsewhere).
-    const listed = await resolveModelDispatch(pool, ctx, null, undefined, undefined, codexOnly.id)
+    const listed = await resolveModelDispatch(pool, ctx, null, undefined, codexOnly.id)
     assert.deepEqual(listed.kind === 'device' && [listed.deviceId, listed.entry.harness, listed.model], [codexOnly.id, 'codex', 'acct-codex-n'])
-    const first = await resolveModelDispatch(pool, ctx, null, undefined, undefined, both.id)
+    const first = await resolveModelDispatch(pool, ctx, null, undefined, both.id)
     assert.deepEqual(first.kind === 'device' && [first.deviceId, first.entry.harness], [both.id, 'claude_code'])
     // Its Codex installed and reporting other models: the subscription's model runs there all the same.
     const elsewhere = await device(scope.ownerId, [{ harness: 'codex', installed: true, modelSlots: [{ slot: 'other', model: 'other-model', name: 'other' }] }])
-    const unreported = await resolveModelDispatch(pool, ctx, { harness: 'codex', model: 'acct-codex-n' }, undefined, undefined, elsewhere.id)
+    const unreported = await resolveModelDispatch(pool, ctx, { harness: 'codex', model: 'acct-codex-n' }, undefined, elsewhere.id)
     assert.deepEqual(unreported.kind === 'device' && [unreported.deviceId, unreported.model], [elsewhere.id, 'acct-codex-n'])
     // Its Mikka too old to take a subscription run (no subscriptionBroker): it says so.
     const old = await device(scope.ownerId, [{ harness: 'codex', installed: true, subscriptionBroker: false }])
-    const stale = await resolveModelDispatch(pool, ctx, { harness: 'codex', model: 'acct-codex-n' }, undefined, undefined, old.id)
+    const stale = await resolveModelDispatch(pool, ctx, { harness: 'codex', model: 'acct-codex-n' }, undefined, old.id)
     assert.equal(stale.kind === 'none' && stale.card.description, '这台电脑的 Mikka 需要更新')
     // A model of the thread's own that no subscription or key offers on that Agent (a DeepSeek key runs on Claude Code): refused, not swapped.
-    const notOffered = await resolveModelDispatch(pool, ctx, { harness: 'codex', model: 'deepseek-flash' }, undefined, undefined, both.id)
+    const notOffered = await resolveModelDispatch(pool, ctx, { harness: 'codex', model: 'deepseek-flash' }, undefined, both.id)
     assert.deepEqual([notOffered.kind, notOffered.kind === 'none' && notOffered.card.description], ['none', '没有订阅或 Key 能用 Codex 跑 deepseek-flash'])
     // 运行位置 云端 does not move a run the person pinned to a computer.
     await order.changeOrder(pool, scope, { kind: 'location', location: 'cloud' })
-    assert.equal((await resolveModelDispatch(pool, ctx, null, undefined, undefined, codexOnly.id)).kind, 'device')
+    assert.equal((await resolveModelDispatch(pool, ctx, null, undefined, codexOnly.id)).kind, 'device')
   })
 
   await t.test('a subscription model runs on a computer that takes subscription runs, whether or not its CLI reported the model; else the row says what is missing', async () => {
@@ -251,5 +277,35 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
     const run = await resolveModelDispatch(pool, ctx)
     assert.deepEqual(run.kind === 'device' && [run.deviceId, run.agentId, run.model], [mac.id, mac.agents.claude_code, 'acct-opus-u'])
     assert.notEqual(run.kind === 'device' && run.deviceId, old.id, 'a daemon that cannot take a subscription run is never picked for one')
+  })
+
+  await t.test('本地: a server before a computer, then the least busy, then the one that joined first; 会先用 names the same device dispatch picks', async () => {
+    const scope = await person('order-server-first')
+    await subscribe(scope, 'claude', ['acct-opus-s'])
+    const ctx = { ...scope, botId: null }
+    const claude = [{ harness: 'claude_code', installed: true }]
+    const mac = await device(scope.ownerId, claude, true, { name: 'Mac', joinedMinutesAgo: 600 })
+    let view = await order.orderView(pool, scope)
+    assert.equal(view.firstDevice, 'Mac', 'only a computer: it')
+    const server = await device(scope.ownerId, claude, true, { name: 'instance-a', server: true, joinedMinutesAgo: 60 })
+    const later = await device(scope.ownerId, claude, true, { name: 'instance-b', server: true, joinedMinutesAgo: 30 })
+    view = await order.orderView(pool, scope)
+    const run = await resolveModelDispatch(pool, ctx)
+    assert.deepEqual([view.firstDevice, run.kind === 'device' && run.deviceId], ['instance-a', server.id], 'a server before the computer that joined first; of two idle servers, the earlier')
+    // A run not yet ended on instance-a: the idle server takes the next one; an ended run does not count.
+    await pool.query(`INSERT INTO agent_runs (id,"userId","agentId","deviceId",status) VALUES ($1,$2,$3,$4,'running')`, [randomUUID(), scope.ownerId, server.agents.claude_code, server.id])
+    await pool.query(`INSERT INTO agent_runs (id,"userId","agentId","deviceId",status) VALUES ($1,$2,$3,$4,'succeeded'),($5,$2,$6,$7,'succeeded')`,
+      [randomUUID(), scope.ownerId, later.agents.claude_code, later.id, randomUUID(), later.agents.claude_code, later.id])
+    view = await order.orderView(pool, scope)
+    const next = await resolveModelDispatch(pool, ctx)
+    assert.deepEqual([view.firstDevice, next.kind === 'device' && next.deviceId], ['instance-b', later.id])
+    // Both servers offline: the computer.
+    await pool.query(`UPDATE devices SET "lastSeenAt"=now()-interval '1 hour' WHERE id = ANY($1)`, [[server.id, later.id]])
+    view = await order.orderView(pool, scope)
+    const fallback = await resolveModelDispatch(pool, ctx)
+    assert.deepEqual([view.firstDevice, fallback.kind === 'device' && fallback.deviceId], ['Mac', mac.id])
+    // Nothing can run: no 会先用.
+    await pool.query('UPDATE devices SET enabled=false WHERE id=$1', [mac.id])
+    assert.equal((await order.orderView(pool, scope)).firstDevice, null)
   })
 })

@@ -36,6 +36,12 @@ async function brokerReady(device: string) {
   await db().query(`UPDATE devices SET harnesses = $2 WHERE id = $1`, [device, JSON.stringify([{ harness: 'claude_code', installed: true, version: '2.1.309', subscriptionBroker: true }])])
 }
 
+/** A server of the same person that takes part and runs Claude Code subscription runs. */
+async function addServer(device: string) {
+  await db().query(`INSERT INTO devices (id, "ownerId", name, kind, enabled, "deviceType", "lastSeenAt", harnesses) SELECT $1, "ownerId", 'E2E Server', 'local', true, 'server', now() + interval '1 hour', $3 FROM devices WHERE id = $2`,
+    [randomUUID(), device, JSON.stringify([{ harness: 'claude_code', installed: true, version: '2.1.309', subscriptionBroker: true }])])
+}
+
 test('模型与订阅：默认顺序来自已有订阅，添加、键盘排序、移除确认、运行位置都会保存', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 1440, height: 1000 })
   await registerInTeam(page, '/settings?section=models')
@@ -55,7 +61,12 @@ test('模型与订阅：默认顺序来自已有订阅，添加、键盘排序�
   await page.reload()
   await expect(opus.getByRole('status')).toHaveText('可用')
   await expect(page.getByRole('radio', { name: '本地' }).or(page.getByRole('button', { name: '本地' }))).toHaveAttribute('aria-pressed', 'true')
-  await expect(page.getByText('1 台电脑参与调度', { exact: true })).toBeVisible()
+  // 会先用: the device a new run would go to now.
+  await expect(page.getByText('1 台电脑参与调度 · 会先用 E2E MacBook', { exact: true })).toBeVisible()
+  // A server that takes part goes before the computer.
+  await addServer(device)
+  await page.reload()
+  await expect(page.getByText('2 台电脑参与调度 · 会先用 E2E Server', { exact: true })).toBeVisible()
 
   // 添加模型: only what the account lists; the one in the list is marked 已添加.
   await page.getByRole('button', { name: '添加模型', exact: true }).click()
