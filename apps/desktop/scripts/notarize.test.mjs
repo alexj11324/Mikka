@@ -1,4 +1,5 @@
 import test from 'node:test'
+import { randomBytes } from 'node:crypto'
 import assert from 'node:assert/strict'
 
 import { STAPLE_RETRY_DELAYS, notaryAuth, requireNotaryAuth, runQuietly, secretValues, stapleWithRetry } from './notarize.mjs'
@@ -42,11 +43,13 @@ test('on CI missing credentials fail the build; only a local build may skip nota
 })
 
 test('a failed notarytool or stapler call reports its exit code and last stderr line, never a credential', async () => {
-  const password = 'abcd-efgh-ijkl-mnop'
-  const keyPath = '/tmp/runner/AuthKey_SECRET.p8'
+  // Throwaway values made per run, so no credential-shaped literal sits in the repository.
+  const fake = () => randomBytes(8).toString('hex')
+  const password = fake()
+  const keyPath = `/tmp/runner/AuthKey_${fake()}.p8`
   for (const auth of [
-    ['--apple-id', 'dev@example.com', '--password', password, '--team-id', 'TEAM123'],
-    ['--key', keyPath, '--key-id', 'KEYID99', '--issuer', 'issuer-uuid-1'],
+    ['--apple-id', `${fake()}@example.invalid`, '--password', password, '--team-id', fake()],
+    ['--key', keyPath, '--key-id', fake(), '--issuer', fake()],
   ]) {
     const secrets = secretValues(auth)
     assert.ok(secrets.length >= 2)
