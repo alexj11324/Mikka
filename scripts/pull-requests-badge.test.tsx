@@ -84,3 +84,10 @@ test('on a thread card the badge opens its list, not the thread', async () => {
   act(() => (container.querySelector('[data-slot="thread-card"] > button') as HTMLButtonElement).click())
   assert.deepEqual(opened, [{ issueId: 'task-1', runId: '7d3d2f62-1d7c-4f2c-9a7e-3b1f0c0a5e11' }])
 })
+
+test('a PR state reads as GitHub names it: 打开 / Open, never 进行中', async () => {
+  const { default: zh } = await import('../messages/zh-CN.json', { with: { type: 'json' } })
+  const { default: en } = await import('../messages/en.json', { with: { type: 'json' } })
+  assert.deepEqual(zh.Metadata.prState, { open: '打开', draft: '草稿', merged: '已合并', closed: '已关闭' })
+  assert.deepEqual(en.Metadata.prState, { open: 'Open', draft: 'Draft', merged: 'Merged', closed: 'Closed' })
+})

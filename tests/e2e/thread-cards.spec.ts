@@ -146,7 +146,7 @@ test('A dispatched thread is a card under the reply that opens its conversation 
   await resultCard(fixtures[0].name).getByRole('button', { name: '1 个 PR', exact: true }).click()
   const list = page.locator('[data-slot="pull-requests-list"]')
   await expect(list.getByRole('link')).toHaveCount(1)
-  await expect(list.getByRole('link')).toContainText('进行中')
+  await expect(list.getByRole('link')).toContainText('打开')
   await expect(list.getByRole('link')).toContainText('cards #101')
   await expect(page.getByRole('region', { name: fixtures[0].name, exact: true })).toHaveCount(0)
   const popupOpened = page.waitForEvent('popup')
