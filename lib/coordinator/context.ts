@@ -8,6 +8,7 @@ import { PUBLICATION_ERRORS, type PublicationErrorCode } from '@/lib/run-publica
 import { pullRequestSchema } from '@/lib/issue-metadata'
 import { splitBrowserNotes, type BrowserNote } from '@/lib/browser/note'
 import { splitSuggestion, type SuggestionCard } from '@/lib/suggestions/card'
+import { chatFailure, type ChatFailure } from '@/lib/chat-failure'
 
 // What the Coordinator's model sees. Everything here depends only on the
 // stored conversation, never on time or on how long the person was away, so
@@ -305,6 +306,8 @@ export interface ChatItem {
   notice?: QuotaSwitchNotice
   /** The person stopped this reply (停止); it keeps what it had said. */
   stopped?: true
+  /** Why the turn answering this message of the person's failed; it stays after later turns and reloads. */
+  failure?: ChatFailure
 }
 
 /** The run id a successful local or Bot-computer dispatch carries. */
@@ -380,7 +383,10 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
         const { notes, text: rest } = splitBrowserNotes(unquoted)
         const { suggestion, text } = splitSuggestion(rest)
         const images = typeof message.content === 'string' ? 0 : message.content.filter(part => part.type === 'file' && part.mediaType.startsWith('image/')).length
-        items.push({ ...base, from: 'person', text, ...(quote ? { quote } : {}), ...(notes.length ? { notes } : {}), ...(suggestion ? { suggestion } : {}), ...(images ? { images } : {}) })
+        // The turn that answered this message failed (store.failTurn): the reason stays under it.
+        const reason = (message as { mikkaFailure?: unknown }).mikkaFailure
+        const failure = typeof reason === 'string' && reason ? chatFailure({ working: false, error: reason }) : null
+        items.push({ ...base, from: 'person', text, ...(quote ? { quote } : {}), ...(notes.length ? { notes } : {}), ...(suggestion ? { suggestion } : {}), ...(images ? { images } : {}), ...(failure ? { failure } : {}) })
       }
     } else if (message.role === 'assistant') {
       const parts = typeof message.content === 'string' ? [{ type: 'text' as const, text: message.content }] : message.content

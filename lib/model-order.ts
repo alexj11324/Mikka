@@ -8,7 +8,7 @@ import { ActionFailureError } from './action-error'
 import { apiKeyHarness } from './model-api-key-providers'
 import { quotaExhausted, quotaResetsAt } from './subscription-quota'
 import {
-  defaultOrder, deviceModel, entryKey, whyNoDevice,
+  defaultOrder, deviceModel, entryKey, planDispatch, whyNoDevice,
   type CredentialState, type NoDeviceWhy, type OrderCandidate, type OrderEntry, type OrderHarness, type PoolDevice, type RunLocation,
 } from './model-order-plan'
 
@@ -41,6 +41,8 @@ export interface OrderView {
   candidates: (OrderCandidate & { provider: string; added: boolean })[]
   /** Devices that take part (参与调度 on), for the 本地 line. */
   devices: number
+  /** 本地: the device a new run would go to now (会先用), by the same plan as dispatch; null when none. */
+  firstDevice: string | null
 }
 
 interface EntryRow { id: string; harness: OrderHarness; model: string; sourceKind: 'subscription' | 'api_key'; sourceId: string }
@@ -126,11 +128,19 @@ export async function credentialStates(query: Query, scope: OrderScope, entries:
   return states
 }
 
-/** The person's own local devices as dispatch sees them; 参与调度 is `enabled`. */
+/**
+ * The person's own local devices as dispatch sees them; 参与调度 is `enabled`.
+ * A run not yet ended counts toward its device's load (pickDevice).
+ */
 export async function poolDevices(query: Query, ownerId: string): Promise<PoolDevice[]> {
-  const { rows } = await query.query<{ id: string; name: string; enabled: boolean; lastSeenAt: Date | null; harnesses: HarnessInfo[] | null }>(
-    `SELECT id,name,enabled,"lastSeenAt",harnesses FROM devices WHERE "ownerId"=$1 AND kind='local' AND "removedAt" IS NULL ORDER BY "lastSeenAt" DESC NULLS LAST,id`, [ownerId])
-  return rows.map(row => ({ id: row.id, name: row.name, enabled: row.enabled, online: isDeviceOnline(row.lastSeenAt), harnesses: row.harnesses ?? [] }))
+  const { rows } = await query.query<{ id: string; name: string; enabled: boolean; lastSeenAt: Date | null; harnesses: HarnessInfo[] | null; deviceType: string | null; createdAt: Date; activeRuns: number }>(
+    `SELECT d.id,d.name,d.enabled,d."lastSeenAt",d.harnesses,d."deviceType",d."createdAt",
+      (SELECT count(*)::int FROM agent_runs r WHERE r."deviceId"=d.id AND r.status IN ('queued','preparing','running','paused','waiting_input','finishing')) AS "activeRuns"
+    FROM devices d WHERE d."ownerId"=$1 AND d.kind='local' AND d."removedAt" IS NULL ORDER BY d."lastSeenAt" DESC NULLS LAST,d.id`, [ownerId])
+  return rows.map(row => ({
+    id: row.id, name: row.name, enabled: row.enabled, online: isDeviceOnline(row.lastSeenAt), harnesses: row.harnesses ?? [],
+    server: row.deviceType === 'server', activeRuns: row.activeRuns, joinedAt: row.createdAt.getTime(),
+  }))
 }
 
 /** The page: credentials' candidates, the list with each entry's status, and 运行位置. */
@@ -140,10 +150,15 @@ export async function orderView(query: Query, scope: OrderScope): Promise<OrderV
   const states = await credentialStates(query, scope, order.entries, candidates)
   const devices = await poolDevices(query, scope.ownerId)
   const added = new Set(order.entries.map(entryKey))
+  // 会先用: what dispatch would pick for a new run now, from the same plan.
+  const plan = order.location === 'local'
+    ? planDispatch({ entries: order.entries, location: 'local', devices, credential: entry => states.get(entry.id)?.credential ?? { usable: false, reason: 'missing' }, cloudReady: false })
+    : null
   return {
     location: order.location,
     customized: order.customized,
     devices: devices.filter(device => device.enabled).length,
+    firstDevice: plan?.kind === 'device' ? devices.find(device => device.id === plan.deviceId)?.name ?? null : null,
     entries: order.entries.map(entry => {
       const state = states.get(entry.id)!
       const block: OrderRow['block'] = !state.credential.usable ? { reason: state.credential.reason, ...(state.credential.resetsAt ? { resetsAt: state.credential.resetsAt } : {}) }
