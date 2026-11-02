@@ -4,12 +4,12 @@ import { readFile } from 'node:fs/promises'
 import { before, after, test } from 'node:test'
 import { Pool } from 'pg'
 import { NativeCoordinatorStore } from './native-store'
+import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
 
 const url = process.env.NATIVE_COORDINATOR_TEST_DATABASE_URL ?? (process.env.REQUIRE_DB === '1' ? process.env.E2E_DATABASE_URL : undefined)
 if (url) {
   const parsed = new URL(url)
-  const ci = process.env.CI === 'true' && process.env.GITHUB_ACTIONS === 'true' && process.env.REQUIRE_DB === '1' && url === process.env.E2E_DATABASE_URL
-  if (!['127.0.0.1','localhost'].includes(parsed.hostname) || (parsed.pathname !== '/mikka_native_test' && !(ci && parsed.pathname === '/mikka_e2e')) || parsed.search || parsed.hash) throw new Error('Native Coordinator tests require an isolated localhost test database')
+  if (!['127.0.0.1','localhost'].includes(parsed.hostname) || (parsed.pathname !== '/mikka_native_test' && !disposableDatabase(process.env, url)) || parsed.search || parsed.hash) throw new Error('Native Coordinator tests require an isolated localhost test database')
 } else if (process.env.REQUIRE_DB === '1') throw new Error('Native Coordinator database is required')
 const schema = `native_${randomUUID().replaceAll('-','')}`
 const admin = url ? new Pool({ connectionString: url }) : null

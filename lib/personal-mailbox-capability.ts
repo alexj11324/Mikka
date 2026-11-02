@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { mailboxInputs, type MailboxToolName } from '@mikka/protocol/mailbox'
-import { digest, type DefinitionSnapshot } from './agent-kit/definition'
+import { type DefinitionSnapshot } from './agent-kit/definition'
+import { workerDefinitionDigest } from './agent-kit/worker-digest'
 
 export const workerMailboxScope = z.strictObject({ botId: z.uuid().nullable(), workspaceId: z.uuid() })
 export type WorkerMailboxScope = z.infer<typeof workerMailboxScope>
@@ -12,12 +13,12 @@ export function snapshotMailboxTools(snapshot: DefinitionSnapshot | null | undef
 /** Reads trusted stored snapshots only. A parsed model body is never a grant. */
 export function personalWorkerMailboxTools(harness: string, raw: unknown): MailboxToolName[] {
   if (!['claude_code', 'codex'].includes(harness) || !raw || typeof raw !== 'object') return []
-  const s = raw as { schemaVersion?: unknown; kind?: unknown; harness?: unknown; instructions?: unknown; definitionDigest?: unknown; subscription?: unknown; parent?: { executionId?: unknown }; mailbox?: WorkerMailboxGrant }
+  const s = raw as { schemaVersion?: unknown; kind?: unknown; harness?: unknown; instructions?: unknown; definitionDigest?: unknown; model?: unknown; pinnedDeviceId?: unknown; subscription?: unknown; apiKey?: unknown; readOnly?: unknown; parent?: { executionId?: unknown }; mailbox?: WorkerMailboxGrant }
   const g = s.mailbox
   if (s.schemaVersion !== 1 || s.kind !== 'worker' || s.harness !== harness || typeof s.instructions !== 'string' || typeof s.parent?.executionId !== 'string'
     || g?.version !== 2 || !workerMailboxScope.safeParse(g.scope).success || !Array.isArray(g.tools) || !g.tools.length || new Set(g.tools).size !== g.tools.length
     || g.tools.some(name => !MAILBOX_TOOL_NAMES.includes(name))) return []
-  const expected = digest({ harness, instructions: s.instructions, ...(s.subscription ? { subscription: s.subscription } : {}), mailbox: g })
+  const expected = workerDefinitionDigest({ ...s, harness, instructions: s.instructions, mailbox: g })
   return s.definitionDigest === expected ? [...g.tools] : []
 }
 export function personalWorkerMailboxSupported(harness: string, raw: unknown): boolean { return personalWorkerMailboxTools(harness, raw).length > 0 }

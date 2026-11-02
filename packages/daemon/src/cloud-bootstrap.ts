@@ -1,4 +1,5 @@
-import { constants, closeSync, existsSync, fstatSync, openSync, readFileSync, unlinkSync } from 'node:fs'
+import { constants, closeSync, existsSync, fstatSync, openSync, readFileSync, unlinkSync, watch } from 'node:fs'
+import { join } from 'node:path'
 import { z } from 'zod'
 import { readJson, writeJsonAtomic } from './fs-util'
 import { DAEMON_VERSION, daemonPaths } from './paths'
@@ -24,6 +25,30 @@ export function consumeCloudBootstrap(path: string) {
     unlinkSync(path)
     return config
   } finally { closeSync(fd) }
+}
+
+/** A template can preload the worker without an identity. Only an atomic
+ * bootstrap.json handoff wakes it; later handoffs rotate the same daemon.
+ * Serialize events so a rename and its explicit wake cannot consume twice. */
+export function watchCloudBootstraps(directory: string, accept: () => Promise<void>, failed: (error: unknown) => void) {
+  const path = join(directory, 'bootstrap.json')
+  let busy = false, closed = false, pending = false
+  const wake = () => {
+    pending = true
+    if (busy || closed) return
+    busy = true
+    void (async () => {
+      while (pending && !closed) {
+        pending = false
+        if (existsSync(path)) await accept()
+      }
+    })().catch(failed).finally(() => { busy = false; if (pending && !closed) wake() })
+  }
+  const watcher = watch(directory, (_event, name) => { if (String(name) === 'bootstrap.json') wake() })
+  watcher.on('error', failed)
+  process.on('SIGUSR1', wake)
+  wake()
+  return () => { closed = true; watcher.close(); process.off('SIGUSR1', wake) }
 }
 
 /** Seed a new daemon, or rotate a live daemon's credential over its private

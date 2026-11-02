@@ -13,6 +13,8 @@ export default defineConfig({
   captureGitInfo: { commit: true, diff: false },
   reporter: [['list'], ['html', { open: 'never' }]],
   use: {
+    // A container's own Chromium when Playwright's bundled one is not installed (scripts/dev/bootstrap-local.sh).
+    ...(process.env.MIKKA_CHROMIUM_EXECUTABLE_PATH ? { launchOptions: { executablePath: process.env.MIKKA_CHROMIUM_EXECUTABLE_PATH } } : {}),
     baseURL: process.env.E2E_BASE_URL ?? 'http://localhost:3100',
     locale: 'zh-CN',
     // Authenticated traces include cookies/form network bodies. The evidence

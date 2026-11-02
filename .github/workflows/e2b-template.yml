@@ -1,6 +1,7 @@
 name: E2B worker template
-# Builds the cloud worker template from main, makes it public, points production at it
-# and redeploys (decision 2026-11-01-1201-e2b-template-public-auto-release).
+# Builds the three cloud templates from main (the bot's computer from E2B's desktop, task
+# machines from E2B's claude and codex; decision 2026-11-01-2335), makes them public, points
+# production at them and redeploys (decision 2026-11-01-1201-e2b-template-public-auto-release).
 on:
   push:
     branches: [main]
@@ -82,17 +83,19 @@ jobs:
           echo "worker hash $wanted; production $live"
           if [ "$wanted" = "$live" ] && [ "${{ inputs.force }}" != "true" ]; then echo "changed=false" >> "$GITHUB_OUTPUT"; else echo "changed=true" >> "$GITHUB_OUTPUT"; fi
 
-  # Holds only E2B_API_KEY. Nothing below runs unless the template is built, public and ready.
+  # Holds only E2B_API_KEY. Nothing below runs unless every template is built, public and ready.
   build:
     needs: check
     if: needs.check.outputs.changed == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     permissions:
       contents: read
       id-token: write
     outputs:
-      template-id: ${{ steps.build.outputs.template-id }}
+      desktop-template-id: ${{ steps.build.outputs.desktop-template-id }}
+      claude-template-id: ${{ steps.build.outputs.claude-template-id }}
+      codex-template-id: ${{ steps.build.outputs.codex-template-id }}
       source-sha: ${{ steps.build.outputs.source-sha }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -116,20 +119,25 @@ jobs:
       - name: Build, make public and verify
         id: build
         run: |
-          name="mikka-cloud-desktop-$(date -u +%Y%m%d)-${GITHUB_SHA::7}"
+          name="mikka-cloud-$(date -u +%Y%m%d)-${GITHUB_SHA::7}"
           "$RUNNER_TEMP/e2b/bin/python" scripts/e2b/build-template.py --name "$name" --source-ref "$GITHUB_SHA" --public --json > "$RUNNER_TEMP/template.json"
           node --input-type=module - "$RUNNER_TEMP/template.json" <<'JS'
           import { readFileSync, appendFileSync } from 'node:fs'
           const out = JSON.parse(readFileSync(process.argv[2], 'utf8'))
-          if (out.public !== true || out.buildStatus !== 'ready') throw new Error('Template is not public and ready')
-          if (out.sourceCommit !== process.env.GITHUB_SHA) throw new Error('Template was built from another commit')
+          if (out.sourceCommit !== process.env.GITHUB_SHA) throw new Error('Templates were built from another commit')
           if (!/^[0-9a-f]{40}$/.test(out.workerSha)) throw new Error('Invalid worker hash')
-          if (!/^[A-Za-z0-9_-]+$/.test(out.templateId)) throw new Error('Invalid template id')
-          appendFileSync(process.env.GITHUB_OUTPUT, `template-id=${out.templateId}\nsource-sha=${out.workerSha}\n`)
-          console.log(`template ${out.templateId} (${out.name}) from ${out.sourceCommit}, worker hash ${out.workerSha}: public, ready`)
+          const lines = [`source-sha=${out.workerSha}`]
+          for (const kind of ['desktop', 'claude', 'codex']) {
+            const template = out.templates?.[kind]
+            if (template?.public !== true || template.buildStatus !== 'ready') throw new Error(`Template ${kind} is not public and ready`)
+            if (!/^[A-Za-z0-9_-]+$/.test(template.templateId)) throw new Error(`Invalid ${kind} template id`)
+            lines.push(`${kind}-template-id=${template.templateId}`)
+            console.log(`${kind} template ${template.templateId} (${template.name}) from ${out.sourceCommit}, worker hash ${out.workerSha}: public, ready`)
+          }
+          appendFileSync(process.env.GITHUB_OUTPUT, lines.join('\n') + '\n')
           JS
 
-  # Holds only the Vercel team token. Both variables change in one request, then production redeploys.
+  # Holds only the Vercel team token. All variables change in one request, then production redeploys.
   publish:
     needs: build
     runs-on: ubuntu-latest
@@ -155,8 +163,10 @@ jobs:
           secret-path: /platform
           secret-name: VERCEL_TEAM_TOKEN
           include-imports: false
-      - name: Point production at the template and redeploy
+      - name: Point production at the templates and redeploy
         run: node scripts/e2b/publish-template-env.mjs
         env:
-          TEMPLATE_ID: ${{ needs.build.outputs.template-id }}
+          DESKTOP_TEMPLATE_ID: ${{ needs.build.outputs.desktop-template-id }}
+          CLAUDE_TEMPLATE_ID: ${{ needs.build.outputs.claude-template-id }}
+          CODEX_TEMPLATE_ID: ${{ needs.build.outputs.codex-template-id }}
           SOURCE_SHA: ${{ needs.build.outputs.source-sha }}

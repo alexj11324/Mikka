@@ -1,23 +1,15 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
+import { disposableDatabase } from '../tests/helpers/e2e-target.mjs'
 
 // A connected account the provider refused, against real Postgres with the
 // tracked migrations: it is marked for its own person only, read back as
-// needing reconnection, and cleared or forgotten with it. Runs in CI against
-// the ephemeral mikka_e2e; locally opt in with ACCOUNT_DB_TEST=1 and a loopback
-// *_e2e database in all three URLs. REQUIRE_DB=1 makes a missing database fail.
-let databaseUrl: string | undefined
-try {
-  const target = new URL(process.env.E2E_DATABASE_URL ?? '')
-  const ci = process.env.CI === 'true' && process.env.GITHUB_ACTIONS === 'true' && target.pathname === '/mikka_e2e'
-  const local = process.env.ACCOUNT_DB_TEST === '1' && /^\/mikka_[a-z0-9_]*e2e$/.test(target.pathname)
-  if ((ci || local) && ['postgres:', 'postgresql:'].includes(target.protocol)
-    && target.hostname === '127.0.0.1' && target.port === '5432'
-    && !target.search && !target.hash && process.env.MIKKA_DATABASE_URL === target.href
-    && process.env.DATABASE_URL === target.href) databaseUrl = target.href
-} catch { /* no eligible disposable database */ }
-if (!databaseUrl && process.env.REQUIRE_DB === '1') throw new Error('REQUIRE_DB=1 requires the matching Actions loopback mikka_e2e database')
+// needing reconnection, and cleared or forgotten with it. Runs when one loopback
+// *_e2e database is in all three URLs. REQUIRE_DB=1 makes a missing database fail.
+const target = process.env.E2E_DATABASE_URL
+const databaseUrl = disposableDatabase() && process.env.MIKKA_DATABASE_URL === target && process.env.DATABASE_URL === target ? target : undefined
+if (!databaseUrl && process.env.REQUIRE_DB === '1') throw new Error('REQUIRE_DB=1 requires the matching loopback *_e2e database')
 const dbTest = databaseUrl ? test : test.skip
 
 dbTest('a refused account needs reconnecting for its own person only, until it works again or is forgotten', async t => {

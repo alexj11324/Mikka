@@ -16,6 +16,7 @@ import { personalMailboxEnabled } from './personal-mailbox-config'
 import { workspacePool } from './workspace-db'
 import { acquireWorkspaceMembership } from './workspace-membership-guard'
 import type { MailboxTransactionGuard } from './mailbox-transaction-guard'
+import { mailboxTriggerDepth, MAILBOX_NOTIFICATION_LIMIT } from './mailbox-notification-budget'
 export { personalMailboxEnabled } from './personal-mailbox-config'
 
 // Both personal Coordinator and Bot calls get cancellation/deadline custody.
@@ -28,8 +29,7 @@ function authorityGuard(userId: string, botId: string | null, workspaceId: strin
   }, { signal })
 }
 
-// Default-off until the separately reviewed personal schema is installed and
-// acceptance is approved. This code does not change deployment configuration.
+// Delivery is on by default, independently of the definition's explicit grant.
 async function workerRecord(userId: string, runId: string) {
   const { rows: [run] } = await pool.query('select r."botId",r."deviceId",r."agentId",r.status,r."stopRequestedAt",r."leaseExpiresAt",b."workspaceId",coalesce(to_jsonb(r)->\'agentDefinition\'->>\'harness\',a.harness) as harness,to_jsonb(r)->\'agentDefinition\' as "agentDefinition" from agent_runs r join agents a on a.id=r."agentId" and a."userId"=r."userId" join devices d on d.id=r."deviceId" and d."ownerId"=r."userId" and d.enabled left join bots b on b.id=r."botId" and b."ownerId"=r."userId" where r.id=$1 and r."userId"=$2', [runId, userId])
   return run
@@ -86,7 +86,10 @@ export async function personalWorkerMailbox(userId: string, runId: string, rawIn
     snapshot: run.agentDefinition as WorkerDefinitionSnapshot, tool: `mailbox_${parsed.data.action}` }, personalMailboxEnabled)
   const guard = authorityGuard(userId, run.botId, namespace, fence, signal)
   const store = new SessionMailbox(pool, namespace, async (client, lease) => { await assertMailboxScope(userId, run.botId, namespace, client, lease?.workspaceClient); await fence(client); await assertMailboxScope(userId, run.botId, namespace, client, lease?.workspaceClient) }, guard)
-  return personalMailboxAction(input, { enabled: true, store, actor: () => store.run(userId, runId, tokenHash) })
+  const result = await personalMailboxAction(input, { enabled: true, store, actor: async () => store.run(userId, runId, tokenHash,
+    parsed.data.action === 'send' ? await executionMailboxTriggerDepth(userId, run.agentDefinition.parent.executionId) : MAILBOX_NOTIFICATION_LIMIT) })
+  await wakeAfterSend(userId, parsed.data.action, result.status)
+  return result
 }
 /** Host-only seam for an actual Coordinator/private Bot context. It is not
  * exposed as a caller-selected source mailbox in the public request schema. */
@@ -116,5 +119,32 @@ export async function personalConversationMailbox(userId: string, botId: string 
   }
   const guard = authorityGuard(userId, botId, namespace, appFence, signal)
   const store = new SessionMailbox(pool, namespace, fence, guard)
-  return personalMailboxAction(input, { enabled: true, store, actor: () => store.conversation(userId, botId ? 'bot' : 'coordinator', botId ?? 'coordinator') })
+  const result = await personalMailboxAction(input, { enabled: true, store, actor: async () => {
+    const actor = await store.conversation(userId, botId ? 'bot' : 'coordinator', botId ?? 'coordinator')
+    if (parsed.data.action !== 'send') return actor
+    // Bind the causal notification to this exact execution's consumed inbox
+    // batch, not an arbitrary past user message or model-supplied replyTo.
+    return { ...actor, notificationDepth: await executionMailboxTriggerDepth(userId, executionId) }
+  } })
+  await wakeAfterSend(userId, parsed.data.action, result.status)
+  return result
+}
+
+async function executionMailboxTriggerDepth(userId: string, executionId: string): Promise<number> {
+  // The owning, frozen parent execution supplies its Bot key. This also
+  // handles an owned Bot's worker explicitly delegated by the Coordinator.
+  const { rows } = await pool.query(`select e.kind,e."dedupeKey",e.payload from agent_kit_executions x
+    join coordinator_events e on e."userId"=x.owner_id and e."botId" is not distinct from nullif(x.bot_key,'coordinator')::uuid
+    where x.owner_id=$1 and x.id=$2 and e."deliveredAt"=(
+      select max(previous."deliveredAt") from coordinator_events previous where previous."userId"=x.owner_id
+        and previous."botId" is not distinct from nullif(x.bot_key,'coordinator')::uuid and previous."deliveredAt"<=x.started_at)`, [userId, executionId])
+  return mailboxTriggerDepth(rows)
+}
+
+async function wakeAfterSend(userId: string, action: string, status: number) {
+  if (action !== 'send' || status !== 200) return
+  // The message and notification event have committed. The existing durable
+  // wake sweep recovers a process failure or an unavailable Workflow service.
+  try { await (await import('@/lib/coordinator/wake')).wakeCoordinator(userId) }
+  catch { console.error('Personal mailbox wake deferred to recovery') }
 }

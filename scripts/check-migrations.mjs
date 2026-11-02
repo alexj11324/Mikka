@@ -2,6 +2,7 @@
 // scripts/migrate.mjs 以文件名为主键记录已执行的迁移，所以：
 // - 旧的 NNNN_*.sql 已经在生产执行过，冻结：不许新增、改名或修改（含 0004–0008 的历史重号）。
 // - 新迁移一律 YYYYMMDDHHMMSS_slug.sql（UTC），时间戳必须合法、晚于 main 上最新的迁移、文件名唯一。
+//   时间戳由协调者派活时分配（docs/dev-workflow.md § 6），不要自己挑。
 import { execFileSync } from 'node:child_process'
 import { readdirSync, readFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
@@ -64,7 +65,7 @@ export function checkMigrations(files, mainFiles, legacy = LEGACY_FROZEN) {
     if (seenTs.has(ts)) problems.push(`${name}：时间戳和 ${seenTs.get(ts)} 相同，请换一个时间戳`)
     seenTs.set(ts, name)
     if (mainFiles && !mainSet.has(name) && ts <= mainLatest) {
-      problems.push(`${name}：时间戳必须晚于 main 上最新的迁移 ${mainLatest}，请用当前 UTC 时间重新命名`)
+      problems.push(`${name}：时间戳必须晚于 main 上最新的迁移 ${mainLatest}，请向协调者要一个新的时间戳（docs/dev-workflow.md § 6）`)
     }
   }
   for (const name of Object.keys(legacy)) {

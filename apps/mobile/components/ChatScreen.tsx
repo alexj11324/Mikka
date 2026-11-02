@@ -4,7 +4,8 @@ import { KeyboardChatScrollView } from 'react-native-keyboard-controller'
 import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ellipsis } from 'lucide-react-native'
-import { BotAvatar, Spinner, threadStatus } from '@/components/icons'
+import { BotAvatar, Spinner } from '@/components/icons'
+import { runIcon } from '@/lib/thread-icon'
 import { CardButton } from '@/components/cards'
 import { BotBubble, CopyButton, EventLine, MyBubble, OutgoingBubble, Reactions, ThreadCard, TimedRow, useChatPhotos, useTimeReveal } from '@/components/chat'
 import { myReaction, toggled, withMine } from '@/lib/reactions'
@@ -25,6 +26,7 @@ import { delivered, inFlight, marked, outgoingKey, queued, type Outgoing, type O
 import { askForPush, usePushState } from '@/lib/push-state'
 import { runTitle, type Chat, type CitationSource, type PendingAction } from '@/lib/types'
 import { useApi } from '@/lib/useApi'
+import { runInfoLine } from '@/lib/run-info'
 import { webChatPath } from '@/lib/web'
 import { colors } from '@/lib/theme'
 
@@ -186,7 +188,7 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, c
                 {item.threads.map(id => {
                   const run = sources[id]
                   return run?.kind === 'run'
-                    ? <TimedRow key={id} time={time} offset={offset}><ThreadCard title={runTitle(run)} status={threadStatus(run.status)} onPress={() => router.push(`/thread/${id}`)} /></TimedRow>
+                    ? <TimedRow key={id} time={time} offset={offset}><ThreadCard title={runTitle(run)} status={runIcon(run)} info={runInfoLine(run.info)} onPress={() => router.push(`/thread/${id}`)} /></TimedRow>
                     : null
                 })}
               </Fragment>

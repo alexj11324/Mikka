@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { Pool } from 'pg'
-import { test, expect, register, rail, watchRuntime, seedTask, openSearch, openIssueFromSearch, app } from './fixtures'
+import { test, expect, register, rail, watchRuntime, seedTask, openSearch, openIssueFromSearch, app, registerInTeam } from './fixtures'
 
 // Real app, real routes, real server actions: no request or action is mocked.
 // Scope promotion requires an explicitly saved team choice; returning to personal
@@ -47,7 +47,7 @@ test('⌘K finds a task outside the loaded recent list through server search', a
 })
 
 async function prepareTeam(page: import('@playwright/test').Page) {
-  await register(page, '/settings/teams')
+  await registerInTeam(page, '/settings/teams')
   await page.getByRole('button', { name: '新建团队', exact: true }).first().click()
   const form = page.getByRole('form', { name: '创建新团队', exact: true })
   await form.getByLabel('团队名称', { exact: true }).fill('范围测试团队')

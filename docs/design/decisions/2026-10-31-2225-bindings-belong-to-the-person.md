@@ -7,6 +7,7 @@
   on letting other members use a shared subscription, 「B」; on cloud
   snapshots, 「对你的建议没有错，应该这样去做」
 - Rule: —
+- Superseded in part by: [2026-11-01-2240-own-credentials-always-usable](2026-11-01-2240-own-credentials-always-usable.md) (rule 3: no per-workspace opt-in and no admin switch for a person's own subscriptions and API keys; an admin can switch off only 分享给团队成员; app and computer policies never stop a person's own connections or bots)
 - Replaces: in [personal vs workspace](2026-10-31-2130-personal-vs-workspace.md),
   the three admin switches, 「a subscription runs in any workspace the owner
   belongs to」, and 「work with no workspace of its own bills the personal

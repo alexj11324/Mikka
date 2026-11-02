@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
+import { disposableDatabase } from './helpers/e2e-target.mjs'
 
 // No business/local database fallback, including when REQUIRE_DB is unset.
 const url = process.env.E2E_DATABASE_URL
-const authorized = process.env.CI === 'true' && process.env.GITHUB_ACTIONS === 'true' && url
-if (url && (!authorized || new URL(url).hostname !== '127.0.0.1' || new URL(url).pathname !== '/mikka_e2e')) throw new Error('Visibility DB tests require GitHub CI ephemeral mikka_e2e')
+const authorized = disposableDatabase()
+if (url && !authorized) throw new Error('Visibility DB tests require a loopback *_e2e database')
 if (process.env.REQUIRE_DB === '1' && !authorized) throw new Error('Visibility database tests cannot skip in required CI')
 
 test('real API/core visibility: owner, teammate, outsider, scope flip and suspension', { skip: !authorized }, async () => {

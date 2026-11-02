@@ -18,11 +18,12 @@ import {
   readFactoryPublicationReceiptV2,
   readFactoryPublicationReceipt,
 } from "./publication-receipt";
+import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
 
 const ci = process.env.CI === "true" && process.env.GITHUB_ACTIONS === "true";
 const db =
   process.env.FACTORY194_TEST_URL ??
-  (ci ? process.env.E2E_DATABASE_URL : undefined);
+  (disposableDatabase() ? process.env.E2E_DATABASE_URL : undefined);
 if (process.env.REQUIRE_DB === "1" && !db)
   throw new Error(
     "Factory approval DB test requires an explicit disposable database",

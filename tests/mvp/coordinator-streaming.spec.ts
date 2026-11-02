@@ -20,7 +20,7 @@ async function control(path: 'scenario' | 'state' | 'release', input: { marker: 
 test('Coordinator streams before completion, resumes once and isolates bot and owner streams', { tag: '@smoke' }, async ({ page, request, testAccounts }, testInfo) => {
   const owner = testAccounts.scope.owner.userId
   await testAccounts.scope.assertActive()
-  await seedMvpSubscription(pool, owner)
+  const { workspaceId } = await seedMvpSubscription(pool, owner)
   const primary = { marker: `mvp-stream-${randomUUID()}`, first: `First ${randomUUID()}`, last: ' then complete.' }
   const botFirst = `Bot ${randomUUID()}`
   const botLast = 'OpenUI complete.'
@@ -52,15 +52,21 @@ test('Coordinator streams before completion, resumes once and isolates bot and o
     await bots.getByRole('button', { name: /^Coordinator(?:，正在工作)?$/ }).click()
     const composer = page.getByRole('textbox', { name: '给 Coordinator 发消息', exact: true })
     await hydrated(composer)
+    // The Coordinator is the person's bot row in this workspace (coordinator_bots, #757); its chat and lease are keyed by that id.
+    const coordinatorId = (await pool.query<{ botId: string }>(
+      'SELECT "botId" FROM coordinator_bots WHERE "ownerId"=$1 AND "workspaceId"=$2', [owner, workspaceId],
+    )).rows[0]?.botId ?? null
+    expect(coordinatorId).toMatch(/^[a-f0-9-]{36}$/)
+    expect(coordinatorId).not.toBe(botId)
     await composer.fill(primary.marker)
     await composer.press('Enter')
     const live = page.locator('[data-coordinator-stream-id]').filter({ hasText: primary.first })
     await expect(live).toBeVisible()
     await expect(live).toHaveAttribute('data-streaming', 'true')
     expect(await control('state', primary)).toEqual({ started: 1, released: false })
-    expect(await persisted(null, primary.first)).toBe(0)
+    expect(await persisted(coordinatorId, primary.first)).toBe(0)
     await expect(page.getByText(primary.last, { exact: false })).toHaveCount(0)
-    const primaryRun = await holder(null)
+    const primaryRun = await holder(coordinatorId)
     expect(primaryRun).toMatch(/^wrun_/)
     await testInfo.attach('01-partial-before-model-completion', { body: await page.screenshot({ mask: [page.locator('input'), page.locator('[data-slot="avatar"]')] }), contentType: 'image/png' })
 
@@ -84,7 +90,7 @@ test('Coordinator streams before completion, resumes once and isolates bot and o
       return text
     }, { path: streamPath, expected: primary.first })
     expect(replay).toContain(primary.first)
-    expect(await holder(null)).toBe(primaryRun)
+    expect(await holder(coordinatorId)).toBe(primaryRun)
     expect(await control('state', primary)).toEqual({ started: 1, released: false })
 
     await bots.getByRole('button', { name, exact: true }).click()
@@ -113,17 +119,17 @@ test('Coordinator streams before completion, resumes once and isolates bot and o
     await page.reload()
     await expect(live).toHaveCount(1)
     await expect(live).toBeVisible()
-    expect(await holder(null)).toBe(primaryRun)
+    expect(await holder(coordinatorId)).toBe(primaryRun)
     expect(await control('state', primary)).toEqual({ started: 1, released: false })
-    expect(await persisted(null, primary.first)).toBe(0)
+    expect(await persisted(coordinatorId, primary.first)).toBe(0)
     await testInfo.attach('02-partial-replayed-after-refresh', { body: await page.screenshot({ mask: [page.locator('input'), page.locator('[data-slot="avatar"]')] }), contentType: 'image/png' })
 
     await control('release', primary)
     const chat = page.getByRole('region', { name: '与 Coordinator 的对话', exact: true })
     await expect(chat.getByText(primary.first + primary.last, { exact: true })).toHaveCount(1)
-    await expect.poll(() => persisted(null, primary.first)).toBe(1)
+    await expect.poll(() => persisted(coordinatorId, primary.first)).toBe(1)
     await expect(live).toHaveCount(0)
-    expect(await persisted(null, botFirst)).toBe(0)
+    expect(await persisted(coordinatorId, botFirst)).toBe(0)
     expect(await persisted(botId, primary.first)).toBe(0)
     await testInfo.attach('03-persisted-once-after-stream', { body: await page.screenshot({ mask: [page.locator('input'), page.locator('[data-slot="avatar"]')] }), contentType: 'image/png' })
     await testInfo.attach('coordinator-streaming-evidence', { body: JSON.stringify({

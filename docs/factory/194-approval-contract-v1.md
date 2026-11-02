@@ -41,8 +41,7 @@ Run only against a disposable loopback PostgreSQL 17 database named `mikka_e2e`.
 ```sh
 docker run -d --name mikka-194-pg -e POSTGRES_HOST_AUTH_METHOD=trust \
   -e POSTGRES_DB=mikka_e2e -p 127.0.0.1:55434:5432 postgres:17
-FACTORY_LOCAL_DB_TESTS=1 \
-  E2E_DATABASE_URL=postgresql://postgres@127.0.0.1:55434/mikka_e2e \
+E2E_DATABASE_URL=postgresql://postgres@127.0.0.1:55434/mikka_e2e \
   node --import tsx --test lib/factory/contract.test.ts \
   lib/factory/postgres.test.ts lib/factory/approval.test.ts lib/factory/local-publication.test.ts
 node --test scripts/check-migrations.test.mjs scripts/migration-order.test.mjs

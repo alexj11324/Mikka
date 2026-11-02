@@ -42,7 +42,7 @@ after(() => { for (const key of flags) if (original[key] === undefined) delete p
 
 test('actual personal producer freezes owned Bot workspace or explicit unbound scope and keeps flag-off old paths query-free', async () => {
   const { queueRun } = await import('./agent-runs')
-  process.env.MIKKA_PERSONAL_MAILBOX_ENABLED = '1'; delete process.env.MIKKA_BYOS_ENABLED
+  delete process.env.MIKKA_PERSONAL_MAILBOX_ENABLED; delete process.env.MIKKA_BYOS_ENABLED
   for (const bot of [botId, null]) {
     await queueRun(owner, { issueId, agentId, repo: repoUrl }, bot, execution)
     assert.equal(personalWorkerMailboxScopeMatches('codex', inserted.at(-1)!.agentDefinition, { botId: bot, workspaceId: bot ? workspaceId : globalId }), true)
@@ -51,7 +51,7 @@ test('actual personal producer freezes owned Bot workspace or explicit unbound s
   const count = inserted.length
   await assert.rejects(queueRun(owner, { issueId, agentId, repo: repoUrl }, botId, execution), /runInvalid/)
   assert.equal(inserted.length, count)
-  delete process.env.MIKKA_PERSONAL_MAILBOX_ENABLED
+  process.env.MIKKA_PERSONAL_MAILBOX_ENABLED = '0'
   const lookups = botQueries
   await queueRun(owner, { issueId, agentId, repo: repoUrl }, botId, execution)
   assert.equal(botQueries, lookups)

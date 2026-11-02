@@ -211,7 +211,7 @@ export function AgentActivity({
             : <ThinkingShimmer>{liveLabel}</ThinkingShimmer>}
         </div>
       ) : (
-        <Button variant="ghost" size="sm"
+        <Button variant="bare" size="bare"
           id={triggerId}
           type="button"
           aria-expanded={expanded}

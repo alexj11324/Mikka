@@ -23,8 +23,9 @@ const accepting = (task: FactoryTask) => (task.stage === 'approval' && ['pending
 const tasksKey = (issueId: string) => `/api/factory/tasks?issueId=${encodeURIComponent(issueId)}`
 
 /** The issue's acceptance tasks, shared by the issue page list and every thread header. */
-function useAcceptanceTasks(issueId: string, refreshInterval = 15000) {
-  const result = useSWR<{ tasks: FactoryTask[] }>(tasksKey(issueId), request, { refreshInterval })
+function useAcceptanceTasks(issueId: string | null, refreshInterval = 15000) {
+  // A thread with no task has no acceptance ledger.
+  const result = useSWR<{ tasks: FactoryTask[] }>(issueId ? tasksKey(issueId) : null, request, { refreshInterval })
   // A 200 body that is not `{ tasks: [...] }` (an HTML fallback parsed as `{}`,
   // or an API that omits `tasks`) must read as no tasks, not crash the page.
   const tasks = (Array.isArray(result.data?.tasks) ? result.data.tasks : []).filter(accepting)
@@ -32,7 +33,7 @@ function useAcceptanceTasks(issueId: string, refreshInterval = 15000) {
 }
 
 /** The acceptance task whose candidate this thread produced, if any: its header then offers 验收 (frame 06). */
-export function useThreadAcceptance(issueId: string, runId: string) {
+export function useThreadAcceptance(issueId: string | null, runId: string) {
   return useAcceptanceTasks(issueId).tasks.find(task => task.candidateRunId === runId)
 }
 

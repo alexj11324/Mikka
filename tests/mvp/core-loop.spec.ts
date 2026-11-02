@@ -22,7 +22,7 @@ type Device = { id: string; name: string; protocolVersion: number }
 type Run = { id: string; issueId: string; deviceId: string; deviceRepoId: string; baseBranch: string | null; status: string; stopReason: string | null; error: string | null; report: { summary: string; verify: { status: string }; publish?: { pushed: boolean; commit: string; branch: string } } | null; worktreePath: string | null; stopRequestedAt: string | null }
 type Observation = { kind: string; toolName?: string; deviceId?: string; runId?: string; issueId?: string; url?: string; commit?: string; branch?: string; requestId?: string; path?: string }
 type ServiceEvidence = { observations: Observation[]; errors: unknown[]; pullRequests: { number: number; url: string; branch: string; draft: boolean }[] }
-type MvpCheckpoint = 'accounts-active' | 'home-open' | 'fixture-ready' | 'daemon-started' | 'daemon-registered' | 'task-submitted' | 'event-bound' | 'run-dispatched' | 'worktree-ready' | 'reply-delivered' | 'published' | 'favicon-decoded' | 'chat-result-verified' | 'stop-completed'
+type MvpCheckpoint = 'accounts-active' | 'home-open' | 'fixture-ready' | 'daemon-started' | 'daemon-registered' | 'task-submitted' | 'event-bound' | 'run-dispatched' | 'worktree-ready' | 'reply-delivered' | 'published' | 'citation-mark' | 'chat-result-verified' | 'stop-completed'
 
 assertMvpEnvironment()
 const pool = new Pool({ connectionString: process.env.E2E_DATABASE_URL, max: 2 })
@@ -154,7 +154,10 @@ async function setup(page: Page, testInfo: TestInfo, accounts: AccountScope) {
     const event = await pool.query<{ id: string; issueId: string; deliveredAt: Date | null; botId: string | null; payload: { taskDestination?: unknown } }>(
       'SELECT id, "issueId", "deliveredAt", "botId", payload FROM coordinator_events WHERE "userId" = $1 AND kind = $2 AND payload->>\'text\' LIKE $3', [user.id, 'user_message', `%${marker}%`])
     expect(event.rows).toHaveLength(1)
-    expect(event.rows[0]).toMatchObject({ issueId: (await run()).issueId, botId: null, payload: { taskDestination: { kind: 'device', deviceId: device!.id } } })
+    // 新建任务 names no bot, so the message goes to the Coordinator of the open workspace: its coordinator_bots row (#757, #767).
+    const coordinator = await pool.query<{ botId: string }>('SELECT "botId" FROM coordinator_bots WHERE "ownerId" = $1 AND "workspaceId" = $2', [user.id, subscription.workspaceId])
+    expect(coordinator.rows).toHaveLength(1)
+    expect(event.rows[0]).toMatchObject({ issueId: (await run()).issueId, botId: coordinator.rows[0].botId, payload: { taskDestination: { kind: 'device', deviceId: device!.id } } })
     expect(event.rows[0].deliveredAt).toBeTruthy()
     const receipt = await pool.query('SELECT operation, "issueId" FROM issue_tool_calls WHERE "userId" = $1 AND "toolCallId" = $2', [user.id, `${marker}-dispatch-create_issue`])
     expect(receipt.rows).toEqual([{ operation: 'create_issue', issueId: event.rows[0].issueId }])
@@ -227,14 +230,18 @@ test('Chat creates a task, the selected real daemon runs it, and the pushed PR r
     await loop.thread.getByRole('button', { name: '关闭线程', exact: true }).click()
     await expect(loop.chat).toContainText('已完成：Added MIKKA_MOCK.md', { timeout: 60_000 })
     await expect(loop.chat.locator(`[data-agent-markdown] a[href="${pr}"]`)).toBeVisible()
-    const favicon = loop.chat.locator(`img[src="${GITHUB_FAVICON}"]`).first()
-    await expect(favicon).toBeVisible()
-    await expect.poll(() => favicon.evaluate(image => image instanceof HTMLImageElement && image.complete && image.naturalWidth > 0)).toBe(true)
-    loop.checkpoint('favicon-decoded', 'The real PR citation image decoded the synthetic favicon response')
+    // A GitHub citation carries GitHub's mark in the text colour, not its favicon,
+    // which vanished on the dark page (#747, components/workspace/agent-citations.tsx).
+    const citation = loop.chat.locator(`a[data-slot="inline-citation-trigger"][href="${pr}"]`).first()
+    await expect(citation.locator('.source-avatar svg')).toBeVisible()
+    await expect(loop.chat.locator(`img[src="${GITHUB_FAVICON}"]`)).toHaveCount(0)
+    loop.checkpoint('citation-mark', 'The real PR citation shows the GitHub mark')
     const prCard = loop.chat.locator('[data-slot="thread-card"]').filter({ has: page.getByRole('button', { name: `打开线程 ${loop.threadTitle}`, exact: true }) })
-    const prChip = prCard.getByRole('link', { name: 'PR #41', exact: true })
-    await expect(prChip).toHaveAttribute('href', pr)
-    await expect(prChip).toHaveAttribute('data-pr-state', 'open')
+    const prBadge = prCard.getByRole('button', { name: '1 个 PR', exact: true })
+    await expect(prBadge).toHaveAttribute('data-state-summary', 'open')
+    await prBadge.click()
+    await expect(page.locator('[data-slot="pull-requests-list"]').getByRole('link')).toHaveAttribute('href', pr)
+    await page.keyboard.press('Escape')
     await expect(prCard).not.toContainText('执行了')
     await expect(prCard).not.toContainText('Added MIKKA_MOCK.md')
     await expect(loop.chat).not.toContainText(`mock ${loop.device.id}`)

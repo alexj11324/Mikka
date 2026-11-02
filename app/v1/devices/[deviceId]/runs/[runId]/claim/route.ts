@@ -10,7 +10,8 @@ import { localExecutionHarnesses } from '@/lib/device-agents'
 import { runTestFixture } from '@/lib/run-test-fixture'
 import { RUN_LEASE_MS, REPO_ORIGIN_HEADER, RECOVERY_WORKTREE_HEADER, MODEL_CREDENTIAL_HEADER, runModelCredentialSchema, type RunModelCredential } from '@mikka/protocol/device'
 import { POLICY_SNAPSHOT_HEADER, POLICY_SNAPSHOT_VERSION } from '@mikka/protocol/policy-snapshot'
-import { issuePolicySnapshot, policyDistributionContext, requestPolicyIssuer } from '@/lib/agent-tool-approval/policy-distribution'
+import { issuePolicySnapshot, policyDistributionContext } from '@/lib/agent-tool-approval/policy-distribution'
+import { requestDevicePolicyIssuer } from '@/lib/agent-tool-approval/local-cloud-issuer'
 import { readCliRunPolicy } from '@/lib/agent-tool-approval/policy-store'
 import { assertUnmanagedModelTransport, assertSubscriptionModelTransport } from '@/lib/model-admission/runtime'
 import { ModelAdmissionError } from '@/lib/model-admission/contract'
@@ -142,7 +143,7 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
   if ((snapshotCapability !== null && snapshotCapability !== POLICY_SNAPSHOT_VERSION) || (cliPolicy.policySnapshotRequired && snapshotCapability !== POLICY_SNAPSHOT_VERSION)) return NextResponse.json({error:'Signed policy consumer required.',code:'policyConsumerUpgradeRequired'},{status:409})
   let distribution: ReturnType<typeof policyDistributionContext> | undefined
   if (snapshotCapability === POLICY_SNAPSHOT_VERSION) {
-    try { distribution = policyDistributionContext(requestPolicyIssuer(request),caller.userId,deviceId,runId,cliPolicy) }
+    try { distribution = policyDistributionContext(await requestDevicePolicyIssuer(request,caller,deviceId,runId),caller.userId,deviceId,runId,cliPolicy) }
     catch { return NextResponse.json({error:'Policy signing unavailable.'},{status:503}) }
   }
   const leaseExpiresAt = new Date(Date.now() + RUN_LEASE_MS).toISOString()
@@ -194,7 +195,11 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
   let taskEnv: Record<string, string> = {}
   let taskSecretNames: string[] = []
   if (device.kind === 'cloud') {
-    if (!cloudComputerTasksEnabled() || caller.scopeDeviceId !== deviceId || !caller.scopeWorkspaceId || !(subscription ? subscription.workspaceId === caller.scopeWorkspaceId : frozenKey) || !device.harnesses.some(info => info.harness === harness && info.computerBroker)) return NextResponse.json({ error: 'Cloud computer worker unavailable.' }, { status: 409 })
+    if (!cloudComputerTasksEnabled() || caller.scopeDeviceId !== deviceId || !caller.scopeWorkspaceId || !(subscription ? subscription.workspaceId === caller.scopeWorkspaceId : frozenKey)) return NextResponse.json({ error: 'Cloud computer worker unavailable.' }, { status: 409 })
+    // A task machine (E2B's claude or codex template, decision 2026-11-01-2335) has no desktop: its
+    // worker reports no computer broker. It takes repository tasks only; a computer task stays queued.
+    const desktop = device.harnesses.some(info => info.harness === harness && info.computerBroker)
+    if (!desktop && !repo.remoteUrl) return NextResponse.json({ error: 'Cloud computer worker unavailable.' }, { status: 409 })
     // 4e3: the task's explicit user variables (workspace + this repo's secrets/env). Resolved before the
     // claim so a decrypt failure leaves the run queued. The injection helper returns an empty
     // assignment without an encryption key; platform versus BYO billing does not change it.
@@ -212,8 +217,10 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
     }
     const refused = await openRunKey()
     if (refused) return refused
-    computer = await claimCloudRun(pool, { userId: caller.userId, workspaceId: caller.scopeWorkspaceId }, runId, deviceId, new Date(leaseExpiresAt), subscription?.id ?? null, beforeClaim, afterClaim)
-    if (!computer) return NextResponse.json({ error: 'Cloud computer run unavailable.' }, { status: 409 })
+    const claimed = await claimCloudRun(pool, { userId: caller.userId, workspaceId: caller.scopeWorkspaceId }, runId, deviceId, new Date(leaseExpiresAt), subscription?.id ?? null, beforeClaim, afterClaim, desktop)
+    if (!claimed) return NextResponse.json({ error: 'Cloud computer run unavailable.' }, { status: 409 })
+    // Without a desktop the run gets none (the daemon refuses a `computer` it cannot serve).
+    computer = desktop ? claimed : null
   } else {
     // A read-only run (an investigation) publishes nothing: no push branch, no push grant.
     if (!run.agentDefinition?.readOnly) {
@@ -279,7 +286,8 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
   const threadContinuation = earlier && run.continuesRunId
     ? { continuesRunId: run.continuesRunId, ...(followUp ? { followUp } : {}), ...(earlier.sessionId && earlier.deviceId === deviceId ? { resumeSessionId: earlier.sessionId } : {}) }
     : {}
-  const settings = device.kind === 'local' && repo.remoteUrl ? await readRepositorySettings(caller.userId, repo.remoteUrl) : null
+  const settings = repo.remoteUrl ? await readRepositorySettings(caller.userId, repo.remoteUrl) : null
+  const verifyCommand = settings ? settings.verifyCommand : device.kind === 'cloud' ? repo.verifyCommand : null
   // Push authority was decided at admission (the GitHub App grant, decision
   // 2026-11-01-1215), for local and cloud runs alike: `allow` when admitted,
   // `deny` otherwise. `ask` is never forwarded, so no push card can appear.
@@ -308,7 +316,7 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
     ...(run.baseBranch ? { baseBranch: run.baseBranch } : {}), harness, prompt: current.prompt,
     kind: current.kind, leaseExpiresAt, policyRevision: cliPolicy.revision,
     ...(runTestFixture(harness) ? { fixture: runTestFixture(harness) } : {}),
-    ...((device.kind === 'cloud' ? repo.verifyCommand : settings?.verifyCommand) ? { verifyCommand: (device.kind === 'cloud' ? repo.verifyCommand : settings?.verifyCommand)! } : {}),
+    ...(verifyCommand ? { verifyCommand } : {}),
     ...(mcp ? { mcp } : {}),
     ...(mcp && publication?.pushBranch && /^v2\/github\.com\/[a-z0-9_.-]+\/[a-z0-9_.-]+$/.test(repo.repoPath) &&
       ['implement', 'fix'].includes(current.kind) && !assignmentPolicy.readOnly && assignmentPolicy.permissions.git_push === 'allow' && harness !== 'mock'

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
 import { ArrowUpRight, ChevronRight } from 'lucide-react'
@@ -11,7 +11,10 @@ import { Alert, AlertTitle } from '@/components/ui/alert'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
+import { InlineLoadError } from '@/components/load-error'
 import { SearchInput } from '@/components/ui/search-input'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { withBasePath } from '@/lib/base-path'
@@ -31,6 +34,7 @@ const githubKey = (userId: string) => ['integrations:github', userId] as const
 const permissionsKey = (userId: string) => ['integrations:github:permissions', userId] as const
 const CONNECT_PATH = withBasePath('/api/integrations/github/connect')
 const PERMISSIONS_PATH = withBasePath('/api/integrations/github/permissions')
+const VERIFICATION_PATH = withBasePath('/api/integrations/github/repositories/verification')
 /** The Mikka GitHub App's page where a person picks which repositories it may reach. */
 const INSTALL_URL = 'https://github.com/apps/mikka-github/installations/new'
 /** 创建 Pull Request is allow or deny: what the App was granted is never asked again (decision 2026-11-01-1215). */
@@ -221,7 +225,7 @@ function ViewerGitHubSettings({ userId, isPending }: { userId: string | undefine
       <ToolGroup label={t('readTools', { count: reads.length })} tools={reads} uniformRows />
     </PageSection>
 
-    {githubState && <RepositoriesDialog open={browsing} onOpenChange={setBrowsing} repositories={githubState.repositories} />}
+    {userId && githubState && <RepositoriesDialog open={browsing} onOpenChange={setBrowsing} repositories={githubState.repositories} userId={userId} />}
 
     <AlertDialog open={confirming} onOpenChange={open => { if (!open && !githubLinking) setConfirming(false) }}>
       <AlertDialogContent size="sm">
@@ -238,28 +242,84 @@ function ViewerGitHubSettings({ userId, isPending }: { userId: string | undefine
   </div>
 }
 
-/** 已授权的仓库: search by name; each opens on GitHub. The card never lists them. */
-function RepositoriesDialog({ open, onOpenChange, repositories }: { open: boolean; onOpenChange: (open: boolean) => void; repositories: GitHubRepository[] }) {
+/** 已授权的仓库: search, open GitHub or configure the owner's verification command. */
+function RepositoriesDialog({ open, onOpenChange, repositories, userId }: { open: boolean; onOpenChange: (open: boolean) => void; repositories: GitHubRepository[]; userId: string }) {
   const t = useTranslations('Settings.integrations')
   const [query, setQuery] = useState('')
+  const [editing, setEditing] = useState<GitHubRepository | null>(null)
   const shown = useMemo(() => {
     const needle = query.trim().toLowerCase()
     return needle ? repositories.filter(repository => repository.fullName.toLowerCase().includes(needle)) : repositories
   }, [query, repositories])
-  return <Dialog open={open} onOpenChange={next => { onOpenChange(next); if (!next) setQuery('') }}>
+  return <Dialog open={open} onOpenChange={next => { onOpenChange(next); if (!next) { setQuery(''); setEditing(null) } }}>
     <DialogContent className="flex max-h-[min(36rem,85dvh)] flex-col gap-4">
-      <DialogHeader><DialogTitle>{t('githubRepositoriesDialog')}</DialogTitle></DialogHeader>
+      <DialogHeader><DialogTitle className="pr-6 break-words">{editing?.fullName ?? t('githubRepositoriesDialog')}</DialogTitle></DialogHeader>
+      {editing ? <RepositoryVerificationForm key={editing.fullName} repository={editing.fullName} userId={userId} onBack={() => setEditing(null)} /> : <>
       <SearchInput aria-label={t('githubRepositorySearch')} placeholder={t('githubRepositorySearch')} value={query} onChange={event => setQuery(event.target.value)} />
       <ul aria-label={t('githubRepositoryList')} className="-mx-2 flex min-h-0 flex-1 flex-col overflow-y-auto">
-        {shown.map(repository => <li key={repository.id}>
-          <a href={repository.htmlUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm transition-colors hover:bg-muted/50">
+        {shown.map(repository => <li key={repository.id} className="flex items-center gap-2">
+          <a href={repository.htmlUrl} target="_blank" rel="noopener noreferrer" className="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-2 text-sm transition-colors hover:bg-muted/50">
             <span className="min-w-0 truncate">{repository.fullName}</span>
             {repository.private && <Badge variant="secondary">{t('githubPrivate')}</Badge>}
           </a>
+          <Button type="button" variant="ghost" size="sm" aria-label={t('githubVerificationFor', { repository: repository.fullName })} onClick={() => setEditing(repository)}>{t('githubVerification')}</Button>
         </li>)}
       </ul>
+      </>}
     </DialogContent>
   </Dialog>
+}
+
+type RepositoryVerification = { viewerId: string; repository: string; verifyCommand: string | null }
+function verificationResult(userId: string, repository: string, value: Partial<RepositoryVerification>): RepositoryVerification {
+  if (value.viewerId !== userId || value.repository?.toLowerCase() !== repository.toLowerCase() || (value.verifyCommand !== null && typeof value.verifyCommand !== 'string')) throw new Error('shape')
+  return value as RepositoryVerification
+}
+async function fetchVerification([, userId, repository]: readonly [string, string, string]) {
+  const response = await fetch(`${VERIFICATION_PATH}?${new URLSearchParams({ repository })}`, { cache: 'no-store' })
+  if (!response.ok) throw new Error(String(response.status))
+  return verificationResult(userId, repository, await response.json())
+}
+
+function RepositoryVerificationForm({ repository, userId, onBack }: { repository: string; userId: string; onBack: () => void }) {
+  const t = useTranslations('Settings.integrations')
+  const common = useTranslations('Common')
+  const { data, error, mutate } = useSWR([VERIFICATION_PATH, userId, repository] as const, fetchVerification, { revalidateOnFocus: false, shouldRetryOnError: false })
+  const [command, setCommand] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState(false)
+  const active = useRef(false)
+  useEffect(() => { active.current = true; return () => { active.current = false } }, [])
+
+  async function save() {
+    if (!data || saving) return
+    setSaving(true); setSaveError(false)
+    try {
+      const response = await fetch(VERIFICATION_PATH, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ repository, verifyCommand: (command ?? data.verifyCommand ?? '').trim() || null }),
+      })
+      if (!response.ok) throw new Error(String(response.status))
+      await mutate(verificationResult(userId, repository, await response.json()), { revalidate: false })
+      if (active.current) {
+        toast.success(t('githubVerificationSaved'))
+        onBack()
+      }
+    } catch { setSaveError(true) } finally { setSaving(false) }
+  }
+
+  return <form className="flex flex-col gap-4" onSubmit={event => { event.preventDefault(); void save() }}>
+    {error ? <InlineLoadError message={t('githubVerificationLoadFailed')} retryLabel={common('retry')} onRetry={() => { void mutate() }} /> : <FieldGroup><Field>
+      <FieldLabel htmlFor="github-verification-command">{t('githubVerification')}</FieldLabel>
+      <Input id="github-verification-command" className="font-mono" value={command ?? data?.verifyCommand ?? ''} placeholder={t('githubNotConfigured')} maxLength={2000} disabled={!data || saving} autoComplete="off" spellCheck={false} aria-invalid={saveError} aria-describedby={saveError ? 'github-verification-error' : undefined} onChange={event => { setCommand(event.target.value); setSaveError(false) }} />
+      {!data && <span role="status" className="sr-only">{common('loading')}</span>}
+    </Field></FieldGroup>}
+    {saveError && <FieldError id="github-verification-error">{t('githubVerificationSaveUnconfirmed')}</FieldError>}
+    <DialogFooter>
+      <Button type="button" variant="ghost" disabled={saving} onClick={onBack}>{common('cancel')}</Button>
+      <Button type="submit" disabled={!data || Boolean(error) || saving}>{saving ? common('saving') : common('save')}</Button>
+    </DialogFooter>
+  </form>
 }
 
 /** One heading style for every section on this page, flush with the card edge below it. */

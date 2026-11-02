@@ -12,6 +12,8 @@ export default defineConfig({
   expect: { timeout: 20000 },
   reporter: [['list'], ['html', { open: 'never', outputFolder: 'playwright-report-smoke' }]],
   use: {
+    // A container's own Chromium when Playwright's bundled one is not installed (scripts/dev/bootstrap-local.sh).
+    ...(process.env.MIKKA_CHROMIUM_EXECUTABLE_PATH ? { launchOptions: { executablePath: process.env.MIKKA_CHROMIUM_EXECUTABLE_PATH } } : {}),
     baseURL: process.env.SMOKE_BASE_URL ?? 'https://app.aspectlylabs.com',
     locale: 'en-US',
     // Traces would carry the session cookie; screenshots of the smoke account are enough.

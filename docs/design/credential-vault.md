@@ -202,7 +202,7 @@ Coordinator attention（#339）等，`lib/coordinator`、`workflows/coordinator`
 
 ## 6. 验收（沿用 #180 的完成门槛）
 
-- 在 Preview 上，用一个**测试站点和测试账号**走完：药丸 → 卡片 → 保存 → 填写 → 分身继续 →
+- 在本地（`pnpm dev`、本地数据库、源码跑的 daemon，见 `docs/dev-workflow.md`），用一个**测试站点和测试账号**走完：药丸 → 卡片 → 保存 → 填写 → 分身继续 →
   另一个线程或另一个 bot 的分身直接用同一条密码登录（先试登录态，再试密码）→ 设置里删除 → 再用就被拒。截真实界面图。
 - 检查数据库、日志、聊天记录、SSE、截图、遥测、模型输入，全部没有明文；故意走错误路径也要查。
 - 别的用户的线程或分身来调用、origin 不匹配、过期或重放的 lease，userinfo 或 punycode 仿冒的 URL，
@@ -211,7 +211,7 @@ Coordinator attention（#339）等，`lib/coordinator`、`workflows/coordinator`
   从 Infisical 里拿 A 的那条，用 B 的 user_id 解密必须失败。
 - Infisical 不可用时不能谎报成功；清理失败要可重试。
 - 不碰生产数据和真实账号；生产迁移先走 manifest 检查。按 `AGENTS.md`，凭据只放在 Infisical。
-- 交付时写明：分支、commit SHA、Preview URL；分别列出通过、失败、阻塞、未执行的项。
+- 交付时写明：分支、commit SHA、本地验收环境；分别列出通过、失败、阻塞、未执行的项。
 
 ## 7. 主要来源
 

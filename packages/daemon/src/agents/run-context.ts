@@ -2,7 +2,8 @@ import { policySnapshotHash } from '@mikka/protocol/node-policy-snapshot'
 import { PERSONAL_MESSAGE_INSTRUCTIONS } from '@mikka/protocol/personal-agent-message'
 import { prepareGitHubEnvironment, type RunGitHub } from './github-runtime'
 import { runAppsHost, type RunApps } from './run-apps'
-// What every real harness adapter needs about one run: the sandbox policy,
+// What every real harness adapter needs about one run: its declared policy
+// (what it writes and reaches; runs use no sandbox, decision 2026-11-01-2335),
 // the Mikka MCP server (hand-in tools) and the handoff file it writes, and
 // the instructions that tell the agent how a run ends.
 import { execFileSync } from "node:child_process"
@@ -44,6 +45,7 @@ import {
 import { CAPTURES_DIR } from "../captures"
 import { ownDir } from "./harness-home"
 import type { SandboxPolicy } from "./sandbox"
+import { localGitOrigin } from './local-git-origin'
 
 /**
  * Model API and login domains per harness: always reachable from that
@@ -79,8 +81,8 @@ export const COMPUTER_MCP_SERVER_NAME = "mikka_computer"
  * Git runs auto maintenance after commit, fetch and merge (gc; since 2.56 also
  * pack-refs and repack by default). It would rewrite the shared clone cache
  * outside this run's git dir, which the run may not write; the daemon
- * maintains the cache. Set as GIT_CONFIG_COUNT entries: sandbox-runtime
- * continues those, but replaces GIT_CONFIG_PARAMETERS with its proxy setting.
+ * maintains the cache. Set as GIT_CONFIG_COUNT entries, which survive a
+ * wrapper that replaces GIT_CONFIG_PARAMETERS.
  */
 const RUN_GIT_CONFIG: ReadonlyArray<readonly [string, string]> = [["maintenance.auto", "false"], ["gc.auto", "0"]]
 
@@ -312,23 +314,27 @@ export class RunContext {
     // the run dir stays writable so its handoff still lands, and the
     // worktree moves from `allowWrite` to `denyWrite`.
     const readOnly = runPolicy(this.options.policy).readOnly === true
+    const fixtureOrigin = this.options.github?.repository === 'mikka-e2e/core-loop' && !readOnly && runPolicy(this.options.policy).permissions.git_push === 'allow' ? localGitOrigin() : undefined
     return {
       allowWrite: [
         ...(readOnly ? [] : [this.worktree, ...(this.options.gitWritePaths ?? [])]),
         this.runDir,
         ...(this.options.extraWrite ?? []),
+        ...(fixtureOrigin ? [fixtureOrigin] : []),
       ],
       // The daemon runs git here after the agent: the `.git` file (which
       // says where the repo is) stays read-only. Only the daemon-validated
       // per-worktree administration and object/ref paths are writable.
       denyWrite: [
+        // The fixture's refs/objects are writable for push; its configuration
+        // and hooks must remain host-owned because fixture verification runs Git.
+        ...(fixtureOrigin ? [join(fixtureOrigin, 'config'), join(fixtureOrigin, 'hooks')] : []),
         join(this.worktree, ".git"),
         join(this.gitDir, "commondir"),
         join(this.gitDir, "gitdir"),
         join(this.gitDir, "config.worktree"),
-        // sandbox-runtime's own protection of a repository's config and hooks
-        // covers repositories under the process's working directory only;
-        // the shared clone lies outside it, so it is declared here the same way.
+        // A repository's config and hooks in the shared clone, outside the
+        // working directory, are declared read-only here too.
         ...(this.options.gitWritePaths?.length ? [join(this.gitDir, "..", "..", "config"), join(this.gitDir, "..", "..", "hooks")] : []),
         ...(readOnly ? [this.worktree, ...(this.options.gitWritePaths ?? [])] : []),
       ],
@@ -385,7 +391,7 @@ export class RunContext {
 
   /**
    * Temp locations for the CLI and its shells, all inside `tmpDir`:
-   * sandbox-runtime's own TMPDIR is not inherited by every harness shell,
+   * a wrapper's own TMPDIR is not inherited by every harness shell,
    * and zsh writes here-docs to `$TMPPREFIX` (default `/tmp/zsh`).
    */
   tempEnv(): Record<string, string> {

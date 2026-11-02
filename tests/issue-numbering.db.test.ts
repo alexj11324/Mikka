@@ -1,19 +1,13 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
+import { disposableDatabase } from './helpers/e2e-target.mjs'
 
 // #560/#499: reads never allocate numbers or lock issue rows; writes allocate
 // transactionally from the owner counter without scanning existing issues.
 const connection = process.env.E2E_DATABASE_URL
 const required = process.env.REQUIRE_DB === '1'
-const ci = process.env.CI === 'true' && process.env.GITHUB_ACTIONS === 'true'
-let enabled = false
-if (connection) {
-  const url = new URL(connection)
-  enabled = ['postgres:', 'postgresql:'].includes(url.protocol) && url.hostname === '127.0.0.1' &&
-    /^\/[A-Za-z0-9_]+_e2e$/.test(url.pathname) && !url.search && !url.hash && process.env.DATABASE_URL === connection &&
-    (ci ? url.port === '5432' && url.pathname === '/mikka_e2e' : true)
-}
+const enabled = disposableDatabase() && process.env.DATABASE_URL === connection
 if (required && !enabled) throw new Error('Issue numbering regression requires a loopback *_e2e PG')
 
 test('issue numbering: read-only lists and transactional owner counters', { skip: !enabled, timeout: 120000 }, async (t) => {

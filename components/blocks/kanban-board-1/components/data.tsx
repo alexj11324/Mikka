@@ -1,5 +1,6 @@
 import type { listIssues } from '@/app/actions/issues'
 import type { TaskRun } from '@/app/actions/task-runs'
+import { threadGroup, type GroupIssue } from '@/lib/thread-groups'
 import { ISSUE_STATUSES, type IssueStatus } from '@/components/workspace/issue-properties'
 
 export type BoardTask = Awaited<ReturnType<typeof listIssues>>[number]
@@ -17,13 +18,11 @@ export const DEFAULT_CARD_PROPERTIES: CardProperty[] = ['identifier', 'priority'
 /** Who works a task beyond its assignee: the Bot of its newest thread and the coding agents of its threads. */
 export type RunOwner = Pick<TaskRun, 'bot' | 'harnesses'>
 
-/** The latest agent run on a task, folded into the three states a card shows. */
-export type AgentState = 'running' | 'waiting' | 'failed'
-export const AGENT_STATES: AgentState[] = ['running', 'waiting', 'failed']
-export function agentStateOf(status: string | undefined): AgentState | null {
-  if (!status) return null
-  if (['queued', 'preparing', 'running', 'finishing'].includes(status)) return 'running'
-  if (status === 'waiting_input') return 'waiting'
-  if (status === 'failed') return 'failed'
-  return null
+/** The task's newest thread, by its group in the right column (R-52); a settled thread (空闲, 已解决) shows nothing. */
+export type AgentState = 'running' | 'waiting' | 'blocked'
+export const AGENT_STATES: AgentState[] = ['running', 'waiting', 'blocked']
+export function agentStateOf(run: Pick<TaskRun, 'status' | 'outcome'> | undefined, issue: GroupIssue | undefined): AgentState | null {
+  if (!run) return null
+  const group = threadGroup({ id: '', status: run.status, issueId: null, createdAt: '', outcome: run.outcome }, issue)
+  return group === 'running' || group === 'waiting' || group === 'blocked' ? group : null
 }

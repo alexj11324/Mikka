@@ -325,22 +325,25 @@ test('hosted controls on isolated PostgreSQL', { skip: !url }, async (t) => {
         ]),
       ])
       assert.equal(results.filter((r) => r.status === 'fulfilled').length, 1)
+      // Production's limits, set explicitly: a local shell may carry CI's higher ones or local test mode.
+      const limits = { MIKKA_SIGNUP_IP_HOURLY: '5', MIKKA_SIGNUP_GLOBAL_HOURLY: '100', MIKKA_VERIFICATION_IP_HOURLY: '15', MIKKA_VERIFICATION_GLOBAL_HOURLY: '300' }
+      const limited = (kind: 'signup' | 'verification', ip: string, email: string) => signupRateLimit(pool, kind, ip, email, Date.now(), limits)
       for (let n = 0; n < 5; n++)
-        await signupRateLimit(pool, 'signup', 'ip-a', `x${n}@example.com`)
+        await limited('signup', 'ip-a', `x${n}@example.com`)
       await assert.rejects(
-        signupRateLimit(pool, 'signup', 'ip-a', 'fresh@example.com'),
+        limited('signup', 'ip-a', 'fresh@example.com'),
         /SIGNUP_RATE_LIMITED/,
       )
-      await signupRateLimit(pool, 'signup', 'ip-b', 'fresh@example.com')
+      await limited('signup', 'ip-b', 'fresh@example.com')
       await pool.query(
         'UPDATE "rateLimit" SET count=300 WHERE key LIKE \'abuse:verification:global:%\'',
       )
-      await signupRateLimit(pool, 'verification', 'ip-a', 'a@example.com')
+      await limited('verification', 'ip-a', 'a@example.com')
       await pool.query(
         'UPDATE "rateLimit" SET count=300 WHERE key LIKE \'abuse:verification:global:%\'',
       )
       await assert.rejects(
-        signupRateLimit(pool, 'verification', 'ip-b', 'b@example.com'),
+        limited('verification', 'ip-b', 'b@example.com'),
         /SIGNUP_RATE_LIMITED/,
       )
     },

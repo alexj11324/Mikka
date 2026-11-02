@@ -1,3 +1,5 @@
+import { localTestAccountsMode } from '@mikka/protocol/local-test-mode'
+
 /** Repository identity and clone input shared by the server and daemon. */
 export interface Repository {
   remoteUrl: string
@@ -18,7 +20,7 @@ export function repositoryBindingMatches(key: string, url: string | null, option
 /** The explicit test switch can never enable mock/local origins in production. */
 export function daemonTestMode(env: Record<string, string | undefined>): boolean {
   return env.VERCEL_ENV !== 'production' && env.MIKKA_TEST_MODE === '1'
-    && (env.NODE_ENV === 'test' || env.CI === 'true' || env.VERCEL_ENV === 'preview')
+    && (env.NODE_ENV === 'test' || env.CI === 'true' || env.VERCEL_ENV === 'preview' || localTestAccountsMode(env))
 }
 
 /**

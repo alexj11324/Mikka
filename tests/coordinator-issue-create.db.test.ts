@@ -1,19 +1,13 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
+import { disposableDatabase } from './helpers/e2e-target.mjs'
 
 const connection = process.env.E2E_DATABASE_URL
 const required = process.env.REQUIRE_DB === '1'
-const enabled = process.env.CI === 'true' && process.env.GITHUB_ACTIONS === 'true' && !!connection
-if (required && !enabled) throw new Error('Coordinator issue creation requires GitHub Actions temporary PG17')
+const enabled = disposableDatabase()
+if (required && !enabled) throw new Error('Coordinator issue creation requires a loopback *_e2e database')
 if (enabled) {
-  const url = new URL(connection!)
-  assert.ok(['postgres:', 'postgresql:'].includes(url.protocol))
-  assert.equal(url.hostname, '127.0.0.1')
-  assert.equal(url.port, '5432')
-  assert.equal(url.pathname, '/mikka_e2e')
-  assert.equal(url.search, '')
-  assert.equal(url.hash, '')
   assert.equal(process.env.MIKKA_DATABASE_URL, connection)
   assert.equal(process.env.DATABASE_URL, connection)
 }

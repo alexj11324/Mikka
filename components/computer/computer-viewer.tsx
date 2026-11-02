@@ -10,7 +10,6 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { useComputer } from '@/hooks/use-computer'
 import { authClient } from '@/lib/auth-client'
 import { ComputerRequestError, computerApi } from '@/lib/computer/client'
-import { cn } from '@/lib/utils'
 import { ComputerScreen } from './computer-screen'
 
 /**
@@ -35,20 +34,31 @@ export function ComputerViewer({ botId, name, open, onOpenChange }: { botId: str
       const grant = await computerApi.takeover(botId, session.user.id)
       await mutateKey(['computer-viewer', botId, 'control'], grant, { revalidate: false })
       await mutate()
+      await mutateKey(['computer-viewer', botId, 'view'])
     } catch (error) {
       toast.error(error instanceof ComputerRequestError && error.status === 409 ? t('takenByOther') : t('takeoverFailed'))
     } finally { setBusy(false) }
   }
   async function handback() {
     setBusy(true)
-    try { await computerApi.handback(botId); await mutate() } catch { toast.error(t('handbackFailed')) } finally { setBusy(false) }
+    try {
+      await computerApi.handback(botId)
+      await mutateKey(['computer-viewer', botId, 'control'], undefined, { revalidate: false })
+      await mutate()
+      await mutateKey(['computer-viewer', botId, 'view'])
+    } catch { toast.error(t('handbackFailed')) } finally { setBusy(false) }
   }
 
-  return <Dialog open={open} onOpenChange={next => { if (!next && mine) void handback(); onOpenChange(next) }}>
-    <DialogContent showCloseButton={false} overlay="dim" className="top-0 left-0 flex h-dvh w-screen max-w-none translate-x-0 translate-y-0 flex-col items-center justify-center gap-4 rounded-none bg-screen p-6 text-screen-foreground ring-0 sm:max-w-none sm:px-24 sm:py-12">
+  function changeOpen(next: boolean) {
+    if (!next && mine) void handback()
+    onOpenChange(next)
+  }
+
+  return <Dialog open={open} onOpenChange={changeOpen}>
+    <DialogContent showCloseButton={false} overlay="dim" onClick={event => { if (event.target === event.currentTarget) changeOpen(false) }} className="top-0 left-0 flex h-dvh w-screen max-w-none translate-x-0 translate-y-0 flex-col items-center justify-center gap-4 rounded-none bg-screen p-6 text-screen-foreground ring-0 sm:max-w-none sm:px-24 sm:py-12 data-open:animate-none data-closed:animate-none">
       <DialogTitle className="sr-only">{t('title', { name })}</DialogTitle>
-      <Button variant="ghost" size="icon-sm" aria-label={t('close')} className="absolute top-3 right-3 text-screen-foreground/70 hover:bg-screen-foreground/10 hover:text-screen-foreground" onClick={() => onOpenChange(false)}><Minimize2 data-icon="inline-start" /></Button>
-      <div className={cn('w-full max-w-[calc((100dvh-10rem)*1.6)] rounded-xl transition-shadow duration-150', mine && 'ring-2 ring-attention')}>
+      <Button variant="ghost" size="icon-sm" aria-label={t('close')} className="absolute top-3 right-3 text-screen-foreground/70 hover:bg-screen-foreground/10 hover:text-screen-foreground" onClick={() => changeOpen(false)}><Minimize2 data-icon="inline-start" /></Button>
+      <div className="w-full max-w-[calc((100dvh-10rem)*1.6)] rounded-xl">
         <ComputerScreen botId={botId} name={name} mode={mine ? 'control' : 'view'} frame="viewer" showTarget={!mine} />
       </div>
       <div role="group" aria-label={t('controls')} className="flex items-center gap-1 rounded-full bg-screen-foreground/10 p-1 ring-1 ring-screen-foreground/15">

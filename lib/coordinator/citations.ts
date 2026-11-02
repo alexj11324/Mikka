@@ -31,6 +31,8 @@ export interface RunSource {
   status: string
   /** How it came out once it ended (R-52); null while running or not judged yet. */
   outcome?: string | null
+  /** Its group in the thread list (R-52), decided on the server: the phone draws it as is. */
+  group?: import('@/lib/thread-groups').ThreadGroup
   issue: { id: string; number: number | null; identifier: string | null; title: string } | null
   /** The thread's name: the first line of what it was asked to do. */
   name: string
@@ -42,6 +44,8 @@ export interface RunSource {
   finishedAt: string | null
   /** Task outputs, already filtered through the viewer's task access. */
   pullRequests?: import('@/lib/issue-metadata').IssuePullRequest[]
+  /** 运行信息, for the viewer's own runs: where it ran, on what, who pays (lib/run-info.ts). */
+  info?: import('@/lib/run-info-view').RunInfo
 }
 
 export type CitationSource = IssueSource | RunSource

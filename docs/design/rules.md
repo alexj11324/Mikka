@@ -2,8 +2,10 @@
 
 These are decisions Alex has already made. Designs, specs and code follow
 them without asking again. To change a rule, Alex decides, the change is
-logged in [`decisions.md`](decisions.md), and this file is edited in the same
-PR. Cite rules by id in reviews ("breaks R-11").
+recorded as a file in [`decisions/`](decisions/README.md), and this file is
+edited in the same PR. A new rule's id (`R-xx`) is assigned by the
+coordinator when the work is dispatched ([dev workflow](../dev-workflow.md)
+§ 6). Cite rules by id in reviews ("breaks R-11").
 
 Words (bot, chat, thread) are defined in [`glossary.md`](glossary.md). Which
 source wins in a conflict is in [`README.md`](README.md).
@@ -46,7 +48,11 @@ source wins in a conflict is in [`README.md`](README.md).
   button). Views that are not a conversation never get one: the thread list
   and a bot's computer screen send instructions through the centre composer.
   An open thread is a conversation with the agent running it, so its detail
-  ends in that composer and what is typed there goes to that agent.
+  ends in that composer and what is typed there goes to that agent, whether
+  the thread is running or has ended (an ended one runs again, R-81), wherever
+  it opens: task page, thread column, Artifact window, phone. Only the legacy
+  agent archive is read-only
+  ([decision](decisions/2026-11-02-0220-every-thread-ends-in-the-composer.md)).
 - **R-11** A bot's composer, the Coordinator's included, has one model chip
   (`BotModelPicker`) beside 「+」, saved per bot; it picks a model only, never
   an Agent. Settings has no per-bot model rows
@@ -142,10 +148,15 @@ source wins in a conflict is in [`README.md`](README.md).
   status pick. The 新建任务 button, ⌘K and `c` open one dialog where the user
   describes the task in a sentence and the Coordinator writes it. The dialog
   shows a machine picker.
-- **R-23** Machine picker order: **Mikka Cloud** first and selected by
-  default; then the group **本机** (this Mac, a local Linux machine); then the
-  group **Remote control** (VPS and SSH hosts reached through the user's
-  machine). Settings › 设备 uses the same two groups.
+- **R-23** Machine picker order: **Mikka Cloud** first; then the group
+  **本机** (this Mac, a local Linux machine); then the group **Remote
+  control** (VPS and SSH hosts reached through the user's machine). Settings ›
+  设备 uses the same two groups. The default is the first machine that can
+  run the task now: Mikka Cloud only with the person's own E2B key, a device
+  only while online. Without a key Mikka Cloud is grey and marked 填入 E2B Key,
+  which opens the key dialog. A dot is green only while the machine is
+  actually online (Mikka Cloud: running)
+  ([decision](decisions/2026-11-01-2250-default-first-usable-machine.md)).
 - **R-24** A device's online state is a StatusDot on the top-right of its
   icon (green online, grey offline, red error), never a text badge.
 - **R-25** Board cards follow Figma 「看板卡片 v1」 (`714:5283`): a filled card
@@ -167,9 +178,11 @@ source wins in a conflict is in [`README.md`](README.md).
   no column folds to a strip
   ([decision](decisions/2026-11-01-1144-board-done-keeps-its-width.md)). Figma: page 「看板卡片 v1 · 定稿 2026-10-31」
   (`714:5283`).
-- **R-26** Workspace tasks sync with Linear (`MIK-xx`); personal tasks stay in
-  Mikka. A task can move both ways: a workspace task can be turned back into
-  a personal one (its Linear issue is archived; issue #184). Teammates see agent runs on workspace issues only, never left-column
+- **R-26** Team workspace tasks sync with Linear (`MIK-xx`); tasks in the
+  personal workspace stay in Mikka. Personal and team workspaces are kept
+  apart: a task or chat never moves between them
+  ([decision 2026-11-01-2310](decisions/2026-11-01-2310-personal-and-team-workspaces-apart.md), which replaces turning a
+  workspace task back into a personal one, issue #184). Teammates see agent runs on workspace issues only, never left-column
   chats or private memory.
 
 ## Issue detail
@@ -196,10 +209,15 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   the opening of its last reply (R-53). Someone who cannot open the thread
   sees no reply line. Clicking one opens it on
   the right as a conversation that ends in the composer (R-10); people and
-  the agent talk there. A thread's content is its owner's alone: teammates
-  (R-26) see 「<人> 的线程」, its status and time, and cannot open or join it,
-  as GitHub Copilot and Cursor keep agent sessions private; what the thread
-  produces (a PR, a comment its owner posts) is how the team sees the work. The bot dispatches the thread; the Agent it hands the work
+  the agent talk there. Visibility follows Warp Factories (Alex:
+  「按照他们的去做」, [decision 2026-11-01-2300](decisions/2026-11-01-2300-thread-visibility-follows-warp.md)): a
+  thread a bot or the Coordinator dispatches in a workspace is visible to
+  every member who can access that bot, live and as a transcript, and
+  teammates only watch, never send messages. A person's private chat with
+  the Coordinator is theirs alone until they share it (team by default,
+  chosen people, or anyone with the link); people it is shared with view it,
+  can ask for edit access, which the owner approves, and otherwise fork a
+  copy to continue. The bot dispatches the thread; the Agent it hands the work
   to (Codex, Claude Code) runs it, and where a thread carries an icon
   other than its status, that icon is the Agent's mark (R-78).
 - **R-63** Activity: events (created, handed to, dispatched a thread,
@@ -222,10 +240,17 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   Figma: page 「AI 侧栏 · 全局」.
 - **R-66** When the Coordinator dispatches a thread, the chat shows one
   thread card under its reply: status icon (never the bot's avatar), thread
-  name, then its outputs as chips such as a PR, folding extras into +N. No
-  step or progress line under the name (Alex, 2026-10-27). The card updates in place, so a thread has one
+  name, then on the right one PR badge for the PRs it produced: the summary
+  state's git mark in its GitHub colour (any open: green; else any draft:
+  grey; else any merged: purple; else closed: red) and the count. Hovering
+  the badge, or tapping it on a phone, lists each PR (title; state mark,
+  state, repository #number, and +added −removed lines when known); a row
+  opens the PR. Every thread card carries it, in the chat and in the thread
+  lists ([decision](decisions/2026-11-02-0230-pr-badge-on-thread-cards.md)).
+  No step or progress line under the name (Alex, 2026-10-27). The card updates in place, so a thread has one
   card in a chat; a later change of state is a sentence from the Coordinator,
-  not a second card. The card has no log, input box or buttons. Clicking it
+  not a second card. The card has no log, input box or buttons besides the
+  PR badge. Clicking it
   opens the thread conversation as R-82 says for every thread: on desktop in
   the right column beside the chat, which stays; on a phone it pushes in full
   screen ([decision](decisions/2026-11-01-1320-navigation-model.md)).
@@ -374,7 +399,10 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   `icons/no-sparkle`).
 - **R-76** Every workspace feature is on by default. Only a workspace admin
   turns one off (Settings › 工作区 or 团队权限), and members see the current
-  value read-only. A stored off is an admin's choice, never a leftover
+  value read-only. A person's own subscriptions and API keys are not such a
+  feature: they always run that person's own bots, with no switch; an admin
+  can switch off only 「分享给团队成员」 (decision
+  [2026-11-01-2240](decisions/2026-11-01-2240-own-credentials-always-usable.md)). A stored off is an admin's choice, never a leftover
   default: a migration that turns a default on also rewrites rows that hold
   the old default. A feature stays off only for real per-use cost, an
   incident kill switch or a recorded Alex decision (`decisions.md`). Safety
@@ -547,7 +575,11 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   montage on one shared clock, so every animated copy of one bot shows the
   same pose. Small (`row`) and `still` avatars (group messages, members, the
   group avatar) hold the bot's own shape and do not play the montage.
-- **R-37** Animate only when the user's action changes a size or position.
+- **R-37** Panels and columns open, close and switch instantly: the right
+  column, an open thread taking its place, the bot list, the Artifact window
+  and the sheets that stand in for them get no slide, fade, zoom, width or
+  height animation ([decision](decisions/2026-11-01-2320-panels-open-instantly.md)).
+  Otherwise animate only when the user's action changes a size or position.
   Position and size move with springs; opacity and colour use a duration.
   Springs settle without visible overshoot (no bouncy springs). No hover
   scale or lift: hover is a colour or surface change, a press may scale to

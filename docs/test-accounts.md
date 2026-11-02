@@ -7,11 +7,11 @@ not create product roles or a separate authentication system.
 
 ## Supported environment and side effects
 
-The first adapter supports an isolated cloud Linux CI process with one
-disposable PostgreSQL database. Application, workspace and pool metadata must
+The adapter supports one disposable loopback PostgreSQL database, in CI or in
+local test-account mode (below). Application, workspace and pool metadata must
 all address that exact database. A multi-database or deployed Preview adapter
 needs independent registration and approval; the current adapter rejects it.
-A production build in CI is supported. A production deployment is not.
+A production deployment is not supported.
 
 The owning harness creates the disposable resource and initializes the normal
 application schema. Before any users exist, it installs a random environment
@@ -48,8 +48,8 @@ It returns 404 when the environment, origin, marker or build does not match.
 
 ## Bootstrap
 
-The browser and database CI jobs bootstrap their existing disposable PostgreSQL
-service after schema setup and before tests create users:
+The database CI job and local runs bootstrap the disposable PostgreSQL
+database after schema setup and before tests create users:
 
 ```sh
 node scripts/test-accounts/bootstrap.mjs --output .cache/e2e/environment.json
@@ -68,6 +68,41 @@ that verifies the created resource's data directory/process/container identity
 against the exact connection. It must not impersonate GitHub Actions by setting
 CI flags. Ordinary shared or production databases have no bootstrap path here.
 
+### Local mode (a developer's own disposable database)
+
+`MIKKA_LOCAL_TEST_ACCOUNTS=1 node scripts/test-accounts/bootstrap.mjs --output <file>`
+is that path for a PostgreSQL 17 you started yourself on this machine (the
+version CI uses). It reads no
+CI variable and sets none. Before connecting it refuses any database that is
+not on `127.0.0.1`, `localhost` or `[::1]` or whose name does not end in `_e2e`;
+after that it applies the CI checks unchanged (a database with no users and no
+marker, the checked-out SHA equal to `MIKKA_TEST_DEPLOYMENT_SHA`, no mail or
+external service keys). Start from an empty database: migrate, run
+`pnpm test:e2e:setup`, then bootstrap. Keep the PostgreSQL data directory
+outside the session scratchpad, whose permissions can change under a running
+server.
+
+The rule is one function, `localTestAccountsMode` in
+`packages/protocol/src/local-test-mode.ts`: `MIKKA_LOCAL_TEST_ACCOUNTS=1`, no
+`VERCEL` or `VERCEL_ENV`, `E2E_DATABASE_URL` set, and every configured database
+URL a loopback `*_e2e` database. The bootstrap, auth origins
+(`lib/auth-config.ts`), signup limits (`lib/abuse/signup.ts`), the daemon's
+`MIKKA_TEST_MODE` (`daemonTestMode`) and the MVP acceptance all use it. MVP
+acceptance runs through the API and the CLI: `pnpm test:local-loop`
+([local-runtime.md](local-runtime.md)). No browser tests run, locally or in CI
+([decision](design/decisions/2026-11-01-2225-api-cli-acceptance-and-backend-owner.md)); the `pnpm test:e2e:mvp` specs
+are not an acceptance entry point.
+
+Do not set `CI` for a local server.
+
+- Every acceptance run registers new accounts. In local test-account mode the sign-up
+  and verification limits default to 1000 per address and 10000 overall each
+  hour, and Better Auth's sign-up rule to 100 per ten seconds
+  (`lib/abuse/signup.ts`); outside it they stay at five sign-ups per address
+  an hour and Better Auth's three per ten seconds. An explicitly set
+  `MIKKA_SIGNUP_*_HOURLY` or `MIKKA_VERIFICATION_*_HOURLY` still wins. Run one
+  acceptance process at a time and do not register by hand during a run.
+
 The environment binding is immutable for its lifetime. A new SHA or origin
 requires a new disposable environment and descriptor; changing an alias while
 an acceptance run is active cannot redirect its sessions.
@@ -75,7 +110,7 @@ an acceptance run is active cannot redirect its sessions.
 ## Shared module and CLI
 
 `acquireTestAccounts` in `scripts/test-accounts/session.mjs` is the authenticated
-entry point used by browser and HTTP acceptance. It returns owner/peer request
+entry point used by HTTP/API acceptance. It returns owner/peer request
 clients and private storage-state references. `withTestAccounts` adds automatic
 release around an awaited callback.
 
@@ -134,8 +169,7 @@ secret-scanning material remain only for the owning disposable environment's
 lifetime, then leave with that resource. Never upload the `.cache/e2e` directory
 or its private account/session files. CI may upload only its explicitly allowlisted
 summaries and logs: `.cache/e2e/http-acceptance-summary.json`,
-`.cache/e2e/account-http-evidence.json`, `.cache/e2e/playwright-performance.log`
-and `.cache/e2e/playwright-browser.log`, after the evidence scan passes.
+and `.cache/e2e/account-http-evidence.json`, after the evidence scan passes.
 
 Account cleanliness includes ordinary owned rows and their descendants through
 actual PostgreSQL foreign keys, plus reviewed logical links for legacy E2E
@@ -157,7 +191,11 @@ verified lifecycle action.
 
 ## Browser and HTTP integration
 
-The existing settings-surface browser test now acquires its two accounts through
+History: no browser tests run any more
+([decision](design/decisions/2026-11-01-2225-api-cli-acceptance-and-backend-owner.md)); the browser adapter below is
+kept for reference. HTTP acceptance is current.
+
+The settings-surface browser test acquired its two accounts through
 `tests/e2e/test-account-fixtures.ts`. Cookie storage is bound to an environment,
 account and origin. The first adapter uses Chromium: `context.newPage()` waits
 for its CDP request gate before returning. Initial routing and that gate validate
@@ -197,12 +235,9 @@ timestamp, run/lease IDs, non-sensitive account IDs and expected/actual results.
 Do not place credentials, cookies, tokens, raw authentication responses or
 unfiltered driver errors in logs, PRs, screenshots, traces or public artifacts.
 Secret scans must include the generated logs and exported browser evidence.
-Both CI Playwright commands first capture stdout and stderr in mode 0600 logs.
-Each log is scanned before any of its content is printed to Actions; a blocked
-scan never prints the log. The workflow preserves the test command's failure
-exit code and fails a successful test command if its log scan fails. The final
-artifact scan and upload use the same explicit log paths alongside the reports.
-The scanner also decodes the ZIP payload embedded inside Playwright HTML reports,
+CI runs no browser tests (decision 2026-11-01-1520). The lease session scans
+the evidence it records (`scripts/test-accounts/session.mjs` with
+`evidence-content.mjs`); the scanner also decodes the ZIP payload embedded inside Playwright HTML reports,
 with bounded entry count, depth and decompressed size. It rejects malformed,
 encrypted, unsupported and raw nested archives. The regular registration fixture
 records its generated passwords and cookies in the same protected scanner store.

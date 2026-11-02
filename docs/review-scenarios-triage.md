@@ -31,7 +31,7 @@
 | D14 界面语言 | 切换后进入 `/en`，界面文案变英文 | 同上 |
 | D16 通知设置 | 设置页新增通知分区，开关保存后刷新仍生效 | 同上 |
 
-E2E 运行方式：独立 Postgres 库 `mikka_120_e2e`，`CI=true`，`BETTER_AUTH_URL=http://localhost:3100`，密钥走 `infisical run --env dev --path /vercel`。
+验收方式：通过 API 和 CLI 在本地跑（不跑浏览器测试，[决定](design/decisions/2026-11-01-2225-api-cli-acceptance-and-backend-owner.md)），本地 loopback `*_e2e` 库，`MIKKA_LOCAL_TEST_ACCOUNTS=1`，不设任何 CI 变量，密钥走 `infisical run --env dev --path /vercel`。
 
 ## 文案规范已落地
 
@@ -49,7 +49,7 @@ Writing Style Guide、Shopify Polaris、Material 3 的公开规则。本轮收�
 |---|---|
 | 依赖 | 该场景要跑通所触及的层；含外部服务即「env」 |
 | 报告状态 | HTML 里该场景自己写的证据状态 |
-| 动作 | `run-e2e` 功能已具备、直接跑；`fix-code` 有已知缺陷、先改再跑 |
+| 动作 | `run-acceptance` 功能已具备、直接走 API/CLI 验收；`fix-code` 有已知缺陷、先改再跑 |
 | 环境 | `local` 本机即可；`env` 需外部服务/daemon/多账号 |
 
 ## A · 对话 / Bot / 线程

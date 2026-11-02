@@ -42,3 +42,10 @@ export async function readRepositorySettings(userId: string, remoteUrl: string) 
     .where(and(eq(repositorySettings.userId, userId), eq(repositorySettings.remoteKey, key))).limit(1)
   return settings ?? null
 }
+
+export async function saveRepositoryVerifyCommand(userId: string, remoteUrl: string, verifyCommand: string | null) {
+  const key = remoteKey(remoteUrl)
+  const [settings] = await db.insert(repositorySettings).values({ userId, remoteKey: key, verifyCommand })
+    .onConflictDoUpdate({ target: [repositorySettings.userId, repositorySettings.remoteKey], set: { verifyCommand, updatedAt: new Date() } }).returning()
+  return settings
+}

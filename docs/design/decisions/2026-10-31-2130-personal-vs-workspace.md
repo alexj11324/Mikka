@@ -6,6 +6,8 @@
   「可以按你的建议来」. Research and audit:
   [personal vs workspace](../research/2026-10-31-personal-vs-workspace.md)
 - Rule: —
+- Superseded in part by: [2026-11-01-2310-personal-and-team-workspaces-apart](2026-11-01-2310-personal-and-team-workspaces-apart.md) (the three levels: profile memory and 「API 与订阅」 belong to the account, while bot and team memory stay in their workspace; a personal workspace hides every team setting, keeps personal billing and handles only personal events; nothing moves between personal and team)
+- Superseded in part by: [2026-11-01-2240-own-credentials-always-usable](2026-11-01-2240-own-credentials-always-usable.md) (an admin can no longer switch off personal subscriptions or API keys)
 - Superseded by: [bindings belong to the person](2026-10-31-2225-bindings-belong-to-the-person.md), for the admin switches, where subscriptions run and who pays for work with no workspace of its own
 - Superseded in part by: [2026-10-31-2300-orchestration-spec](2026-10-31-2300-orchestration-spec.md) (a member may share a credential with 「分享给团队成员」; cards and verification belong to the person; the E2B key is personal, never a team's, and E2B bills it, not Mikka; a leaving member's bots are paused; 「设备离线时」 and 「Bot 额度用完时」 are replaced)
 - Replaces: subscriptions stored and resolved per (owner, workspace); the

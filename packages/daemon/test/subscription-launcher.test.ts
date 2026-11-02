@@ -13,7 +13,7 @@ import { makeRepo, tempDir } from './helpers'
 it('preserves successful native completion when the adapter revokes its completed run gate', async () => {
   const {use,access}=subscriptionFixture('codex_cli')
   access.connection!.quota.observedAt=new Date().toISOString()
-  const gate=new ToolApprovalGate('completed-policy-run',{permission:()=> 'deny',ask:async()=> 'deny',isLive:()=>true})
+  const gate=new ToolApprovalGate('completed-policy-run',{isLive:()=>true})
   const session=await launchHostedSubscription(use,{
     runId:gate.runId,toolApproval:gate,cwd:await makeRepo(),prompt:'hello',model:'fixture-model',
     env:buildChildEnv({host:{PATH:process.env.PATH,HOME:tempDir('mikka-completed-owner-')}}),log:createLogger({level:'silent'}),
@@ -33,7 +33,7 @@ it('cancels a standalone native session when its gate ceases to be live without 
   const { use, access } = subscriptionFixture('claude_code_cli')
   access.connection!.quota.observedAt = new Date().toISOString()
   let live = true
-  const gate = new ToolApprovalGate('standalone-policy-run', { permission:()=> 'deny', ask:async()=> 'deny', isLive:()=>live })
+  const gate = new ToolApprovalGate('standalone-policy-run', { isLive:()=>live })
   const credential = vi.fn(async () => ({ accountId:'fixture-account', accessToken:'fixture-access', expiresAt:new Date(Date.now()+60000).toISOString() }))
   const home = tempDir('mikka-standalone-owner-')
   const session = await launchHostedSubscription(use, {

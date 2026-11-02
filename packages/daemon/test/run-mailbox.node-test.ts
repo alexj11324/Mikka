@@ -35,7 +35,7 @@ fixtureGit(['init', '-q', supervisorRepository])
 fixtureGit(['-C', supervisorRepository, '-c', 'user.name=Mailbox fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '--allow-empty', '-qm', 'Synthetic mailbox fixture'])
 fixtureGit(['-C', supervisorRepository, 'worktree', 'add', '--detach', supervisorWorktree, 'HEAD'])
 const endpoint = new URL('https://mikka.invalid/mikka/api/mcp')
-const syntheticApproval = (runId: string) => new ToolApprovalGate(runId, { permission: () => 'allow', ask: async () => 'deny', isLive: () => true })
+const syntheticApproval = (runId: string) => new ToolApprovalGate(runId, { isLive: () => true })
 
 function fixture() {
   const token = 'mkw_' + randomBytes(32).toString('base64url')
@@ -331,7 +331,7 @@ test('stop aborts a genuinely pending host request and prevents another request 
   await mailbox.close()
 })
 
-test('Codex unaudited versions and mailbox-enabled history resume fail closed without a fallback thread', async () => {
+test('Codex mailbox-enabled history resume fails closed without a fallback thread, on any Codex version', async () => {
   const f = fixture(), mailbox = (await f.create())!
   const dir = join(retained, 'unsupported'); mkdirSync(dir, { recursive: true, mode: 0o700 })
   const original = readFileSync('test/fakes/fake-codex.mjs', 'utf8')
@@ -344,10 +344,7 @@ test('Codex unaudited versions and mailbox-enabled history resume fail closed wi
       const adapter = new CodexAdapter({ sandbox: new NoSandbox(), stateDir: join(dir, version), binary, userHome: home })
       const runId = randomUUID()
       const options = { runId, toolApproval: syntheticApproval(runId), cwd: resolve('../..'), env: buildChildEnv({ host: { PATH: process.env.PATH, HOME: home } }), log, mailbox, prompt: 'No provider invocation' }
-      await assert.rejects(adapter.start(options), /audited Codex0.163.0/)
-      // The failed start has revoked its gate. Use a new host-owned lifetime
-      // to exercise the separate history guard instead of stopping at revoke.
-      await assert.rejects(adapter.resume('another-history', { ...options, toolApproval: syntheticApproval(runId) }), /fresh Codex thread/)
+      await assert.rejects(adapter.resume('another-history', options), /fresh Codex thread/)
     }
     assert.equal(f.state.writes, 0)
   } finally { await mailbox.close() }

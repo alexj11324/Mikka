@@ -1127,7 +1127,8 @@
     "workspaceAccessDenied": "You do not have permission to manage this workspace, or your membership is suspended.",
     "workspaceNotFound": "No accessible workspace.",
     "workspacePaymentTaken": "Another member's card already pays for this team.",
-    "workspacePersonal": "A personal workspace has only you. To invite people, create a workspace.",
+    "workspacePersonal": "A personal workspace has only you. To invite people, create a team workspace.",
+    "workspacePersonalDelete": "A personal workspace cannot be deleted.",
     "workspaceMemberExists": "One of these emails is already a workspace member. Manage or restore them in the member list.",
     "workspaceMemberNotFound": "This member does not exist.",
     "workspaceLastAdmin": "A workspace must keep at least one active admin.",
@@ -1150,6 +1151,8 @@
     "runAlreadyActive": "This task already has an active run.",
     "runDispatchKeyConflict": "This request key was already used for different run parameters.",
     "runNotActive": "This run has ended and has no answerable question.",
+    "threadReplaced": "A newer thread took this task over. Send it there.",
+    "threadCannotContinue": "This thread works on no task, so it can’t run again.",
     "factoryQuestionNeedsAnswerTool": "Use the Factory question answer tool to provide a verifiable response.",
     "savedLoginNotFound": "This login does not exist or was already deleted.",
     "deviceHasActiveRuns": "Threads are running on this device. Stop them before removing it.",
@@ -1779,6 +1782,7 @@
       "address": "Address",
       "danger": "Danger zone",
       "deleteWorkspace": "Delete workspace",
+      "personalUndeletable": "A personal workspace cannot be deleted",
       "deleting": "Deleting…",
       "deleteTitle": "Delete “{name}”?",
       "deleteLead": "Permanently deleted, with no way back:",
@@ -1934,6 +1938,11 @@
       "githubRepositoryAccess": "Repository access",
       "githubRepositoriesDialog": "Authorized repositories",
       "githubRepositorySearch": "Search repositories",
+      "githubVerification": "Verification command",
+      "githubVerificationFor": "Verification command for {repository}",
+      "githubVerificationLoadFailed": "Verification command unavailable",
+      "githubVerificationSaveUnconfirmed": "Save unconfirmed. Changes retained.",
+      "githubVerificationSaved": "Verification command saved",
       "githubAbilitiesHeading": "Abilities",
       "githubAbilitiesSummary": "{count} abilities ({write} write, {read} read)",
       "githubPermission": {
@@ -2305,7 +2314,6 @@
     },
     "subscriptionShare": {
       "heading": "This workspace",
-      "share": "Use my subscriptions here",
       "blocked": "Turned off by an admin",
       "others": "Share with team members",
       "othersTitle": "Share {name} with team members?",
@@ -2635,7 +2643,7 @@
     "c_6dfc6360": "The association was not saved. Check your permissions and refresh before trying again.",
     "c_b8e346ef": "Could not switch. Please try again.",
     "c_cb11190c": "Create team",
-    "c_d92d1b8d": "Create workspace",
+    "c_d92d1b8d": "Create team workspace",
     "c_63373890": "Create workspace · Mikka",
     "c_4eec1ff7": "Create a new team",
     "c_4598f1cb": "Create a Mikka workspace with a name and unique URL, then invite your team.",
@@ -3161,12 +3169,12 @@
     "loadingWorkspace": "Loading workspace…",
     "switchWorkspace": "Switch workspace",
     "reloadWorkspace": "Reload workspace",
-    "newWorkspace": "New workspace",
+    "newWorkspace": "New team workspace",
     "workspaceName": "Workspace name",
     "forExampleProductTeam": "For example: Product team",
     "cancel": "Cancel",
     "creating": "Creating…",
-    "createWorkspace": "Create workspace",
+    "createWorkspace": "Create team workspace",
     "sendingChoice": "Sending",
     "cloudKeySetup": "Set up your E2B key",
     "dispatchWait": "Wait for it",
@@ -3200,9 +3208,6 @@
     "sendFailed": "Not sent. Draft kept",
     "stopping": "Stopping…",
     "stopFailed": "Stop not confirmed",
-    "pullRequest": "PR #{number}",
-    "moreOutputs": "+{count}",
-    "moreOutputsAria": "{count, plural, one {# more output} other {# more outputs}}",
     "send": "Send",
     "retryStop": "Try stopping again",
     "waiting": "Waiting for you",
@@ -3213,6 +3218,10 @@
       "worktree": "Worktree",
       "agent_start": "Agent start",
       "duration": "{seconds}s"
+    },
+    "runInfo": {
+      "paidBy": "{owner}'s {plan}",
+      "movedTo": "Moved to {machine} to continue"
     }
   },
   "Computer": {
@@ -3430,6 +3439,7 @@
       "offline": "Offline",
       "online": "Online",
       "cloud": "Mikka Cloud",
+      "addE2BKey": "Add E2B Key",
       "contextProject": "project: {project}",
       "contextSeparator": ", ",
       "prompt": "Create a task for me: {text}",
@@ -3512,7 +3522,7 @@
         "agent": {
           "running": "Running",
           "waiting": "Waiting on you",
-          "failed": "Run failed"
+          "blocked": "Blocked"
         }
       },
       "title": "Board",
@@ -3705,6 +3715,11 @@
     "failed": "Connection failed",
     "enterAgain": "Enter another code",
     "retry": "Retry"
+  },
+  "Reactions": {
+    "list": "Reactions",
+    "others": "{emoji}: {count, plural, one {# person} other {# people}}",
+    "mine": "{emoji}: {others, plural, =0 {just you} one {you and # other} other {you and # others}}"
   },
   "GroupChat": {
     "untitled": "Untitled group chat",
@@ -4008,8 +4023,9 @@
       "free_allowance_used": "Free allowance used up",
       "points_exhausted": "Points used up",
       "platform_paused": "Free allowance paused",
-      "unavailable": "Mikka Default is unavailable. Please try again later.",
+      "unavailable": "Mikka Default is unavailable",
       "verifyCard": "Verify card",
+      "useSubscription": "Use my {name} subscription",
       "connect": "Connect <claude></claude> Claude / <openai></openai> ChatGPT subscription"
     }
   },
@@ -4094,5 +4110,8 @@
     "appsLater": "OK. You can connect them in Settings later.",
     "welcome": "Your first Bot",
     "enter": "Open Mikka"
+  },
+  "PullRequestsBadge": {
+    "label": "{count, plural, one {# pull request} other {# pull requests}}"
   }
 }

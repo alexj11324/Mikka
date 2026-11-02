@@ -41,17 +41,6 @@ export function StatusIcon({ status, size = 18 }: { status: ThreadStatus; size?:
   }
 }
 
-/** A run's stored status (agent_runs.status) as the app's thread state. */
-export function threadStatus(status: string): ThreadStatus {
-  switch (status) {
-    case 'waiting_input': return 'waiting'
-    case 'failed': return 'failed'
-    case 'succeeded': return 'done'
-    case 'stopped': case 'cancelled': return 'stopped'
-    default: return 'running'
-  }
-}
-
 export function MachineIcon({ machine, size = 13, color = colors.secondary }: { machine: MachineKind; size?: number; color?: string }) {
   const Icon = machine === 'cloud' ? Cloud : machine === 'laptop' ? Laptop : Server
   return <Icon size={size} color={color} strokeWidth={2} />

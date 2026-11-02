@@ -27,7 +27,7 @@ export async function claimLocalRun(pool: Pool, runId: string, deviceId: string,
  * and its workspace's machine. Binding and claim use the same run row lock.
  * A run frozen on an API key has no subscription binding (null): its key
  * was checked and recorded for it by `apiKeyForRun` before the claim. */
-export async function claimCloudRun(pool: Pool, actor: { userId: string; workspaceId: string }, runId: string, deviceId: string, leaseExpiresAt: Date, subscriptionBindingId: string | null, beforeClaim?: (tx: PoolClient) => Promise<boolean | void>, afterClaim?: (tx: PoolClient) => Promise<void>): Promise<{ botId: string; ownerId: string; display: string; policyVersion: number; permission: 'allow' } | null> {
+export async function claimCloudRun(pool: Pool, actor: { userId: string; workspaceId: string }, runId: string, deviceId: string, leaseExpiresAt: Date, subscriptionBindingId: string | null, beforeClaim?: (tx: PoolClient) => Promise<boolean | void>, afterClaim?: (tx: PoolClient) => Promise<void>, desktop = true): Promise<{ botId: string; ownerId: string; display: string; policyVersion: number; permission: 'allow' } | null> {
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
@@ -50,8 +50,9 @@ export async function claimCloudRun(pool: Pool, actor: { userId: string; workspa
       JOIN bot_desktops d ON d."botId"=b."botId" AND d."workspaceId"=b."workspaceId" AND d."ownerId"=b."ownerId"
       WHERE b."runId"=$1 AND b."workspaceId"=$3 AND b."ownerId"=$4`, [runId, deviceId, actor.workspaceId, actor.userId])).rows[0]
     if (!binding) { await client.query('COMMIT'); return null }
-    const held = await client.query(`SELECT 1 FROM bot_desktops WHERE "botId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND control='user' AND "controlUntil">now()`, [binding.botId, actor.userId, actor.workspaceId])
-    if (held.rowCount) { await client.query('COMMIT'); return null }
+    // A person controlling the Bot's desktop holds runs that would use it; a machine without a desktop never does.
+    const held = desktop ? await client.query(`SELECT 1 FROM bot_desktops WHERE "botId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND control='user' AND "controlUntil">now()`, [binding.botId, actor.userId, actor.workspaceId]) : null
+    if (held?.rowCount) { await client.query('COMMIT'); return null }
     if (subscriptionBindingId) {
       const subscription = await client.query('SELECT 1 FROM byos_bindings WHERE id=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND "consumerId"=$4', [subscriptionBindingId, actor.userId, actor.workspaceId, run.agentId])
       if (!subscription.rowCount) { await client.query('COMMIT'); return null }

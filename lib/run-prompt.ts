@@ -3,7 +3,7 @@ export function runPrompt(title: string, body: string, instructions: string, not
   const parts = [`# ${title}`]
   if (body) parts.push(body)
   if (note) parts.push('## Notes for this run', note)
-  parts.push('---', 'Work in the repository checked out for this run. Mikka saves your changes as you go and handles commits and pushes, so you do not need to run git commit or git push. When you are done, hand in your work with a short summary of what changed.')
+  parts.push('---', 'Work in the repository checked out for this run. Follow the delivery rules supplied for this run; commit and push only when those rules authorize it. When you are done, hand in your work with a short summary of what changed.')
   if (instructions) parts.push('## Your standing instructions', instructions)
   return parts.join('\n\n').slice(0, 100_000)
 }

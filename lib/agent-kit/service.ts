@@ -9,8 +9,7 @@ import { builtinAgentDefinition } from './builtin'
 import { AgentKitError, AgentKitStore, type AgentScope } from './store'
 import type { PoolClient } from 'pg'
 
-/** Opt-in deployment; migration must be applied first. No runtime/vendor change is implied. */
-export function agentKitEnabled() { return process.env.MIKKA_AGENT_KIT === '1' }
+export { agentKitEnabled } from './config'
 export function agentKitDefaults() {
   return builtinAgentDefinition({ computerEnabled: cloudComputerTasksEnabled() && process.env.MIKKA_BYOS_ENABLED === '1' })
 }

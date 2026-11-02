@@ -2,11 +2,13 @@
 
 ## Ordinary functional acceptance
 
-Run ordinary functional acceptance in cloud Linux against a local application,
-a real isolated PostgreSQL database and a real daemon when the flow uses one.
-A deployed site and provider OAuth are not prerequisites for ordinary business
-checks. Builds and type checks run in cloud Linux or CI; keep the existing rule
-against starting those services or builds on the developer's Mac.
+Run ordinary functional acceptance locally, in the session's cloud Linux
+container, against `pnpm dev`, a real isolated PostgreSQL database and a real
+daemon from source when the flow uses one ([dev workflow](dev-workflow.md)).
+Do not wait for CI, a merge or a deploy to check what can be checked here. A
+deployed site and provider OAuth are not prerequisites for ordinary business
+checks. Keep the existing rule against starting those services or builds on
+the developer's Mac.
 
 Use the existing automatic test-account allocation, reuse and lease mechanism
 by default: `acquireTestAccounts` in `scripts/test-accounts/session.mjs` uses
@@ -23,14 +25,14 @@ origin and actual database identity. These checks remain in force. This is an
 implementation boundary, not a user policy prohibiting deployed or other test
 environments. Where that adapter is not implemented, use an existing supported
 automatic test-identity fixture or authorized session for that environment and
-record the actual capability gap. The MVP CI's existing `register()` fixture is
-one such automatic normal-registration path; it does not establish shared-pool
-lease reuse or provider OAuth acceptance.
+record the actual capability gap. Acceptance runs through the API and the CLI
+(`pnpm test:local-loop`); no browser tests run, locally or in CI
+([decision](design/decisions/2026-11-01-2225-api-cli-acceptance-and-backend-owner.md)).
 
 ## Record the version and environment
 
-Record the branch/revision, Git-linked CI run, application origin, database and
-daemon environment, UTC interval, expected/actual behavior and observed request
+Record the branch/revision, the local run (and the Git-linked CI run once it
+reports), application origin, database and daemon environment, UTC interval, expected/actual behavior and observed request
 IDs. Keep code and environment fixed during each run. Reuse completed checks
 when their code and environment remain applicable, using Git's PR/commit-to-CI
 association instead of repeatedly comparing identifiers. Recheck the affected

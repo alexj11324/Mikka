@@ -11,8 +11,8 @@ import type { Pool } from 'pg'
 
 type Mask = (text: string) => string
 
-export const WORKER_LOG = '/home/mikka-runner/.mikka/thread-bootstrap.log'
-const DAEMON_LOGS = '/home/mikka-runner/.mikka/worker/logs'
+export const WORKER_LOG = '/home/user/.mikka/thread-bootstrap.log'
+const DAEMON_LOGS = '/home/user/.mikka/worker/logs'
 const LINE_MAX = 500
 const LINES_PER_INVOCATION = 500
 export const TAIL_MAX = 8000

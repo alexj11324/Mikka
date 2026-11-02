@@ -3,11 +3,14 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
 import { NotFoundError, Sandbox, SandboxNotFoundError } from 'e2b'
 import { z } from 'zod'
+import { repositoryBindingMatches } from '@mikka/protocol/repository'
+import { matchesRepositoryAdmission } from '@/lib/repository-admission'
 import { ComputerError } from '@/lib/computer/store'
 import { computerPermission } from '@/lib/computer/permission'
-import { connectComputer, installComputerRuntime, startDesktop, syncDesktopLease, viewerGrant, ensureHostedRunnerImage } from '@/lib/computer/e2b-provider'
+import { connectComputer, installComputerRuntime, startDesktop, syncDesktopLease, viewerGrant } from '@/lib/computer/e2b-provider'
+import { CLOUD_WORKER_COMMAND } from '@/lib/computer/worker-command'
 import { installSubagentRuntime, runtimeRequest } from './runtime'
-import { e2bApiKey, withE2BErrors } from '@/lib/secrets/e2b-runtime'
+import { e2bApiKey, taskTemplate, withE2BErrors } from '@/lib/secrets/e2b-runtime'
 import type { Actor } from './subagents'
 import { afterRunEnded } from '@/lib/run-completion-effects'
 import { workspaceSecretMasker } from '@/lib/secrets/runtime'
@@ -31,9 +34,9 @@ export async function recordCancelledSandbox(pool: Pick<Pool, 'query'>, runId: s
  * bot machine (a coding-CLI login, a run's GitHub token, a live broker), the
  * last clean snapshot is reused, or the thread waits with a refusal. */
 export async function workspaceSnapshot(pool: Pick<Pool, 'query'>, actor: Actor, source: Pick<Sandbox, 'commands' | 'createSnapshot'>, repoPath: string) {
-  const revision = (await source.commands.run(`git -C ${quote(repoPath)} rev-parse HEAD`, { user: 'mikka-runner', timeoutMs: 10_000 })).stdout.trim()
+  const revision = (await source.commands.run(`git -C ${quote(repoPath)} rev-parse HEAD`, { user: 'user', timeoutMs: 10_000 })).stdout.trim()
   if (!/^[a-f0-9]{40}$/.test(revision)) throw new ComputerError(409, 'Workspace source unavailable')
-  const lock = (await source.commands.run(`cd ${quote(repoPath)} && for f in pnpm-lock.yaml package-lock.json yarn.lock; do if test -f "$f"; then sha256sum "$f"; fi; done`, { user: 'mikka-runner', timeoutMs: 10_000 })).stdout
+  const lock = (await source.commands.run(`cd ${quote(repoPath)} && for f in pnpm-lock.yaml package-lock.json yarn.lock; do if test -f "$f"; then sha256sum "$f"; fi; done`, { user: 'user', timeoutMs: 10_000 })).stdout
   const lockDigest = createHash('sha256').update(lock).digest('hex')
   const old = (await pool.query('SELECT * FROM workspace_snapshots WHERE "workspaceId"=$1 AND "ownerId"=$2', [actor.workspaceId, actor.userId])).rows[0]
   if (old && old.sourceRevision === revision && old.lockDigest === lockDigest && Date.now() - new Date(old.createdAt).getTime() < 24 * 60 * 60_000) return old.snapshotId as string
@@ -106,8 +109,10 @@ async function endStopRequestedRun(client: PoolClient, actor: Actor, runId: stri
  * the worker survive. No other task's machine can match. Caller holds BEGIN
  * and the new run's lock.
  */
-async function adoptTaskMachine(client: PoolClient, actor: Actor, runId: string, run: { issueId: string; runtimeBotId: string; repoPath: string; remoteUrl: string | null }) {
+async function adoptTaskMachine(client: PoolClient, actor: Actor, runId: string, run: { issueId: string; runtimeBotId: string; repoPath: string; remoteUrl: string | null }, template: string | null) {
   // The run's bot runtime is recorded on the new row; the old row's bot does not have to match.
+  // A repository task's machine holds only its harness's CLI: a run on another harness (or a
+  // since-released template) starts its own machine, and the old one stays parked for the task.
   const previous = (await client.query(`SELECT m.* FROM thread_machines m
       JOIN agent_runs r ON r.id=m."runId" AND r."userId"=m."ownerId"
       JOIN device_repos repo ON repo.id=m."repoId" AND repo."userId"=m."ownerId"
@@ -115,7 +120,8 @@ async function adoptTaskMachine(client: PoolClient, actor: Actor, runId: string,
       AND m.state='paused' AND m."sandboxId" IS NOT NULL AND m."deviceId" IS NOT NULL
       AND r.status IN ('succeeded','failed','stopped','cancelled')
       AND repo."repoPath"=$5 AND repo."remoteUrl" IS NOT DISTINCT FROM $6
-    ORDER BY m."lastActiveAt" DESC LIMIT 1 FOR UPDATE OF m`, [actor.userId, actor.workspaceId, run.issueId, runId, run.repoPath, run.remoteUrl])).rows[0]
+      AND ($7::text IS NULL OR m."snapshotId"=$7)
+    ORDER BY m."lastActiveAt" DESC LIMIT 1 FOR UPDATE OF m`, [actor.userId, actor.workspaceId, run.issueId, runId, run.repoPath, run.remoteUrl, template])).rows[0]
   if (!previous) return null
   await client.query(`UPDATE thread_machines SET state='ended',"endedAt"=COALESCE("endedAt",now()),"sandboxId"=NULL WHERE "runId"=$1`, [previous.runId])
   return (await client.query(`INSERT INTO thread_machines ("runId","workspaceId","ownerId","botId","issueId","snapshotId","operationId",state,"sandboxId","deviceId","repoId")
@@ -178,14 +184,16 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
   try {
     await client.query('BEGIN')
     await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`thread-machine:${runId}`])
-    const run = (await client.query(`SELECT r.*,b."workspaceId",b."botId" AS "runtimeBotId",repo."repoPath",repo."remoteUrl",repo."baseBranch",repo."verifyCommand",COALESCE(source_repo."repoPath",repo."repoPath") AS "snapshotRepoPath",m."sandboxId" AS "botSandboxId"
+    const run = (await client.query(`SELECT r.*,COALESCE(r."agentDefinition"->>'harness',agent.harness) AS "runHarness",b."workspaceId",b."botId" AS "runtimeBotId",repo."repoPath",repo."remoteUrl",repo."baseBranch",repo."verifyCommand",COALESCE(source_repo."repoPath",repo."repoPath") AS "snapshotRepoPath",m."sandboxId" AS "botSandboxId"
       FROM agent_runs r JOIN computer_run_bindings b ON b."runId"=r.id AND b."ownerId"=r."userId"
+      LEFT JOIN agents agent ON agent.id=r."agentId"
       JOIN device_repos repo ON repo.id=r."deviceRepoId" AND repo."userId"=r."userId"
       JOIN cloud_machines m ON m."workspaceId"=b."workspaceId" AND m."ownerId"=b."ownerId"
       LEFT JOIN bot_cloud_runtimes runtime ON runtime."botId"=b."botId" AND runtime."ownerId"=b."ownerId" AND runtime."workspaceId"=b."workspaceId" AND runtime."agentId"=r."agentId"
       LEFT JOIN device_repos source_repo ON source_repo.id=runtime."repoId" AND source_repo."userId"=r."userId"
       WHERE r.id=$1 AND r."userId"=$2 AND b."workspaceId"=$3 FOR UPDATE OF r`, [runId, actor.userId, actor.workspaceId])).rows[0]
     if (!run || !run.botSandboxId || !['queued', 'preparing', 'running', 'waiting_input'].includes(run.status)) throw new ComputerError(404, 'Thread unavailable')
+    const repositoryTask = Boolean(run.remoteUrl)
     // Stop check 1, before any provider call, under the run lock stopOwnedRun also takes.
     if (run.status === 'queued' && run.stopRequestedAt) {
       const stale = await endStopRequestedRun(client, actor, runId)
@@ -193,6 +201,7 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
       if (stale) await provider.kill(stale, actor.userId)
       throw new ComputerError(409, 'Thread stopped')
     }
+    if (repositoryTask && !repositoryBindingMatches(run.repoPath, run.remoteUrl)) throw new ComputerError(409, 'Repository identity unavailable')
     let machine = (await client.query('SELECT * FROM thread_machines WHERE "runId"=$1 FOR UPDATE', [runId])).rows[0]
     if (machine?.state === 'ended') throw new ComputerError(409, 'Thread ended')
     if (machine?.state === 'running' && machine.sandboxId) {
@@ -213,11 +222,16 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
     if (machine?.workerLeaseUntil && new Date(machine.workerLeaseUntil).getTime() > Date.now() && machine.state !== 'paused') throw new ComputerError(409, 'Thread provisioning in progress')
     // No Mikka caps: the person's own E2B account sets the limit (orchestration.md § 5).
     if (!machine || machine.snapshotId === 'pending') {
-      // The task's own paused sandbox comes first; only its first run starts from the workspace snapshot.
-      const adopted = run.issueId ? await adoptTaskMachine(client, actor, runId, run) : null
+      // A follow-up keeps this task's own machine. A new repository task starts
+      // from the anonymous ready template of its harness (E2B's claude or codex
+      // with Mikka's worker, decision 2026-11-01-2335): the daemon clones its admitted
+      // remote and creates the task worktree from the configured base branch.
+      // Only non-repository computer work retains the existing desktop snapshot.
+      const template = repositoryTask ? taskTemplate(run.runHarness) : null
+      const adopted = run.issueId ? await adoptTaskMachine(client, actor, runId, run, template) : null
       if (adopted) machine = adopted
       else {
-        const snapshotId = await provider.snapshot(client, actor, run.botSandboxId, run.snapshotRepoPath)
+        const snapshotId = template ?? await provider.snapshot(client, actor, run.botSandboxId, run.snapshotRepoPath)
         machine = (await client.query(`INSERT INTO thread_machines ("runId","workspaceId","ownerId","botId","issueId","snapshotId","operationId",state)
           VALUES ($1,$2,$3,$4,$5,$6,$7,'starting') ON CONFLICT ("runId") DO UPDATE SET "snapshotId"=EXCLUDED."snapshotId","issueId"=EXCLUDED."issueId" RETURNING *`, [runId, actor.workspaceId, actor.userId, run.runtimeBotId, run.issueId ?? null, snapshotId, randomUUID()])).rows[0]
       }
@@ -258,42 +272,58 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
       throw new ComputerError(409, 'Thread stopped')
     }
     await client.query('COMMIT')
-    if (!machine.sandboxId) {
+    if (!machine.sandboxId && !repositoryTask) {
       // Filesystem snapshots start no old worker process. Remove copied device
       // identity/capabilities before a new worker can make any network call.
       // A snapshot never holds a credential; scrub the same list again in case an older snapshot did.
-      await sandbox.commands.run(`rm -rf /home/mikka-runner/.mikka/worker /home/mikka-runner/.mikka/bootstrap.json /run/mikka-viewer /run/mikka-subagents; ${credentialScrubCommand()}; install -d -m 700 /run/mikka-viewer`, { user: 'root', timeoutMs: 10_000 })
+      await sandbox.commands.run(`rm -rf /home/user/.mikka/worker /home/user/.mikka/bootstrap.json /run/mikka-viewer /run/mikka-subagents; ${credentialScrubCommand()}; install -d -m 700 /run/mikka-viewer`, { user: 'root', timeoutMs: 10_000 })
     }
-    await installComputerRuntime(sandbox)
-    await ensureHostedRunnerImage(sandbox)
     const deviceId = machine.deviceId ?? randomUUID()
     const repoId = machine.repoId ?? randomUUID()
     const credential = `orv_${randomBytes(32).toString('base64url')}`
     const origin = new URL(process.env.MIKKA_CLOUD_WORKER_URL ?? '')
     if (origin.protocol !== 'https:' || origin.username || origin.password) throw new Error('Worker unavailable')
     const expectedSha = process.env.MIKKA_CLOUD_WORKER_SHA
-    const sourceSha = (await sandbox.files.read('/opt/mikka/worker-source-sha', { user: 'root' })).trim()
+    // Version verification and viewer startup are independent. Hosted runs no
+    // longer use Docker; never pull its obsolete image on the critical path.
+    // A repository task's machine (claude or codex template) has no desktop.
+    const [sourceSha] = await Promise.all([
+      sandbox.files.read('/opt/mikka/worker-source-sha', { user: 'root' }).then(value => value.trim()),
+      repositoryTask ? undefined : installComputerRuntime(sandbox),
+    ])
     if (!expectedSha || sourceSha !== expectedSha) throw new Error('Worker version mismatch')
     await client.query('BEGIN')
     // Provision, end and desktop all lock the parent run before its machine.
-    await client.query('SELECT id FROM agent_runs WHERE id=$1 AND "userId"=$2 FOR UPDATE', [runId, actor.userId])
+    const current = (await client.query('SELECT * FROM agent_runs WHERE id=$1 AND "userId"=$2 FOR UPDATE', [runId, actor.userId])).rows[0]
     const activeLease = await client.query('SELECT 1 FROM thread_machines WHERE "runId"=$1 AND "workerLeaseId"=$2 AND state<>\'ended\' FOR UPDATE', [runId, leaseId])
     if (!activeLease.rowCount) throw new ComputerError(409, 'Thread provisioning cancelled')
+    const definition = current.agentDefinition
+    const admission = definition?.repositoryAdmission
+    if (current.status === 'queued' && admission) {
+      if (!matchesRepositoryAdmission(admission, {
+        userId: actor.userId, issueId: current.issueId, deviceId: current.deviceId, agentId: current.agentId,
+        remoteKey: run.repoPath, remoteUrl: run.remoteUrl, targetBranch: admission.targetBranch,
+        ...(current.botId ? { workspaceId: actor.workspaceId } : {}),
+        workspaceLinked: admission.workspaceLinked, requestEventId: admission.requestEventId,
+      })) throw new ComputerError(409, 'Repository authority unavailable')
+      // Host-owned relocation changes the executor, never the admitted repository or branch.
+      definition.repositoryAdmission = { ...admission, deviceId }
+    }
     // The sandbox's hostname (e2b.local) never renames it; a re-provisioned machine is live again.
     await client.query('INSERT INTO devices (id,"ownerId",name,kind,"nameLocked") VALUES ($1,$2,$3,\'cloud\',true) ON CONFLICT(id) DO UPDATE SET "removedAt"=NULL', [deviceId, actor.userId, 'Thread computer'])
     await client.query('INSERT INTO device_repos (id,"deviceId","userId","repoPath","baseBranch","verifyCommand","remoteUrl") VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(id) DO NOTHING', [repoId, deviceId, actor.userId, run.repoPath, run.baseBranch, run.verifyCommand,run.remoteUrl])
     await client.query('UPDATE thread_machines SET "deviceId"=$2,"repoId"=$3 WHERE "runId"=$1', [runId, deviceId, repoId])
     await client.query('UPDATE device_tokens SET "revokedAt"=now() WHERE "boundDeviceId"=$1', [deviceId])
     await client.query('INSERT INTO device_tokens (id,"userId",name,"tokenHash","boundDeviceId","boundWorkspaceId","expiresAt") VALUES ($1,$2,$3,$4,$5,$6,now()+interval \'24 hours\')', [randomUUID(), actor.userId, 'Thread worker', createHash('sha256').update(credential).digest('hex'), deviceId, actor.workspaceId])
-    await client.query('UPDATE agent_runs SET "deviceId"=$2,"deviceRepoId"=$3 WHERE id=$1 AND "userId"=$4 AND status=\'queued\'', [runId, deviceId, repoId, actor.userId])
+    await client.query('UPDATE agent_runs SET "deviceId"=$2,"deviceRepoId"=$3,"agentDefinition"=COALESCE($5::jsonb,"agentDefinition") WHERE id=$1 AND "userId"=$4 AND status=\'queued\'', [runId, deviceId, repoId, actor.userId, admission ? JSON.stringify(definition) : null])
     await client.query('COMMIT')
     const handoff = `/run/mikka-viewer/thread-${leaseId}.json`
     await sandbox.files.write(handoff, JSON.stringify({ deviceId, workspaceId: actor.workspaceId, credential, server: origin.toString(), ...(process.env.VERCEL_ENV === 'preview' && process.env.MIKKA_CLOUD_PREVIEW_BYPASS ? { protectionBypass: process.env.MIKKA_CLOUD_PREVIEW_BYPASS } : {}) }), { user: 'root' })
-    await sandbox.commands.run(`install -d -o mikka-runner -g mikka-runner -m 700 /home/mikka-runner/.mikka; install -o mikka-runner -g mikka-runner -m 600 ${handoff} /home/mikka-runner/.mikka/bootstrap.json; unlink ${handoff}`, { user: 'root', timeoutMs: 10_000 })
+    await sandbox.commands.run(`install -d -o user -g user -m 700 /home/user/.mikka; install -o user -g user -m 600 ${handoff} /home/user/.mikka/bootstrap.next; mv /home/user/.mikka/bootstrap.next /home/user/.mikka/bootstrap.json; unlink ${handoff}`, { user: 'root', timeoutMs: 10_000 })
     // The worker's output streams into the server logs only while this invocation lives;
     // the tee'd file in the sandbox keeps it for later reads (park, failure, end).
     const mask = await workspaceSecretMasker(actor.workspaceId)
-    await sandbox.commands.run(workerCommand('cd /opt/mikka/worker/packages/daemon && HOME=/home/mikka-runner ./node_modules/.bin/tsx bin/cloud-worker.ts'), { user: 'mikka-runner', background: true, timeoutMs: 0, ...workerOutputForwarder(runId, mask) })
+    await sandbox.commands.run(workerCommand(CLOUD_WORKER_COMMAND), { user: 'user', background: true, timeoutMs: 0, ...workerOutputForwarder(runId, mask) })
     const deadline = Date.now() + 30_000
     let ready = false
     do {

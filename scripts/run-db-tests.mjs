@@ -28,6 +28,7 @@ export const REQUIRED_SUITES = [
   { marker: 'lib/run-credential-source.ts', file: 'tests/api-key-runs.db.test.ts', script: 'test:bot-threads-db' },
   { marker: 'lib/run-quota.ts', file: 'tests/run-quota.db.test.ts', script: 'test:bot-threads-db' },
   { marker: 'lib/run-publications.ts', file: 'tests/run-publications.db.test.ts', script: 'test:run-publication-db' },
+  { marker: 'lib/github/publication-webhook.ts', file: 'lib/github/publication-webhook.db.test.ts', script: 'test:run-publication-db' },
   { marker: 'lib/cloud-computer/browser-authority.ts', file: 'lib/cloud-computer/unattended.db.test.ts', script: 'test:cloud-backend-db' },
   { marker: 'lib/credentials/store.ts', file: 'lib/credentials/store.db.test.ts', script: 'test:credentials-db' },
   { marker: 'lib/cloud-computer/subagents.ts', file: 'lib/cloud-computer/backend.db.test.ts', script: 'test:cloud-backend-db' },
@@ -104,7 +105,7 @@ export const REQUIRED_SUITES = [
 // Suites that provision their own throwaway database and refuse the shared mikka_e2e service.
 // Each entry names its dedicated runner; the runner must exist and still invoke the file.
 export const SELF_MANAGED = [
-  { file: 'tests/test-account-pool.http.test.mjs', runner: 'scripts/test-accounts/run-http.mjs', reason: 'owns the exact built Next server and registered disposable environment in the browser CI job' },
+  { file: 'tests/test-account-pool.http.test.mjs', runner: 'scripts/test-accounts/run-http.mjs', reason: 'owns the exact built Next server and registered disposable environment; runs locally (pnpm test:test-accounts-http), since CI has no browser job or production build (decision 2026-11-01-1520)', local: true },
   { file: 'lib/auth-email.test.ts', runner: 'scripts/test-auth-email.mjs', reason: 'starts its own Docker Postgres and refuses any application database' },
   { file: 'tests/byos-application.test.mjs', runner: 'scripts/test-subscription-worker.mjs', reason: 'starts an isolated BYOS Postgres and worker fixture' },
   { file: 'tests/byos-enrollment-binding.test.mjs', runner: 'scripts/test-subscription-worker.mjs', reason: 'starts an isolated BYOS Postgres and worker fixture' },

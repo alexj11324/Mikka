@@ -4,19 +4,14 @@ import { readFileSync, readdirSync } from 'node:fs'
 import test from 'node:test'
 import { Pool } from 'pg'
 import { withActivitySession } from './fixtures/activity-runtime.mjs'
+import { disposableDatabase } from './helpers/e2e-target.mjs'
 
-// Do not connect on developers' machines, even to a local database. In CI this
-// command is required, and only the job's disposable PG17 service is admissible.
+// Only a disposable loopback *_e2e database is admissible; required in CI.
 const connection = process.env.E2E_DATABASE_URL
 const required = process.env.REQUIRE_DB === '1'
-const enabled = process.env.CI === 'true' && process.env.GITHUB_ACTIONS === 'true' && !!connection
-if (required && !enabled) throw new Error('Actor DB regression requires GitHub Actions temporary PG17')
-if (enabled) {
-  const url = new URL(connection!)
-  assert.equal(url.hostname, '127.0.0.1')
-  assert.equal(url.pathname, '/mikka_e2e')
-  assert.equal(process.env.MIKKA_DATABASE_URL, connection)
-}
+const enabled = disposableDatabase()
+if (required && !enabled) throw new Error('Actor DB regression requires a loopback *_e2e database')
+if (enabled) assert.equal(process.env.MIKKA_DATABASE_URL, connection)
 
 test('actor migration: legacy rows stay NULL, reruns preserve identity, new rows enforce type', { skip: !enabled }, async () => {
   const pool = new Pool({ connectionString: connection, max: 1 })

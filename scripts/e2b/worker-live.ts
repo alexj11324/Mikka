@@ -106,32 +106,30 @@ async function main() {
       const again = await startCloudWorker(pool, actor, sandbox, server, process.env.E2B_WORKER_SHA!)
       assert.equal(again.deviceId, worker.deviceId)
       assert.equal(Number((await pool.query('SELECT count(*) FROM device_tokens WHERE "boundDeviceId"=$1', [worker.deviceId])).rows[0].count), 1)
-      await sandbox.commands.run('if test -r /home/mikka-runner/.mikka/worker/device.json; then exit 1; fi', { user: 'user' })
       stage = 'provision Bot working tree'
       const runtimes = await ensureBotRuntime(pool, actor, bot.id, sandbox, worker.deviceId)
       const codex = runtimes.find(item => item.harness === 'codex')
       assert.ok(codex)
       assert.deepEqual(await ensureBotRuntime(pool, actor, bot.id, sandbox, worker.deviceId), runtimes)
       stage = 'install guarded driver probe'
-      await sandbox.files.write('/home/mikka-runner/.mikka/driver-probe.mjs', await readFile(new URL('../../packages/daemon/src/computer/driver.mjs', import.meta.url), 'utf8'), { user: 'mikka-runner' })
-      await sandbox.files.write('/home/mikka-runner/.mikka/guard-probe.mjs', `import {detectComputerDriver,executeDriver} from './driver-probe.mjs';\nconst d=await detectComputerDriver('/opt/mikka/computer/cua-driver');\nif(!d)throw new Error('driver unavailable');\nawait executeDriver(d,{name:'click',arguments:{x:500,y:500}},':1',{botId:${JSON.stringify(bot.id)},ownerId:${JSON.stringify(actor.userId)},policyVersion:Number(process.argv[2])});\n`, { user: 'mikka-runner' })
-      const probe = (version = 0) => sandbox!.commands.run(`node /home/mikka-runner/.mikka/guard-probe.mjs ${version}`, { user: 'mikka-runner', timeoutMs: 30_000 })
+      await sandbox.files.write('/home/user/.mikka/driver-probe.mjs', await readFile(new URL('../../packages/daemon/src/computer/driver.mjs', import.meta.url), 'utf8'), { user: 'user' })
+      await sandbox.files.write('/home/user/.mikka/guard-probe.mjs', `import {detectComputerDriver,executeDriver} from './driver-probe.mjs';\nconst d=await detectComputerDriver('/opt/mikka/computer/cua-driver');\nif(!d)throw new Error('driver unavailable');\nawait executeDriver(d,{name:'click',arguments:{x:500,y:500}},':1',{botId:${JSON.stringify(bot.id)},ownerId:${JSON.stringify(actor.userId)},policyVersion:Number(process.argv[2])});\n`, { user: 'user' })
+      const probe = (version = 0) => sandbox!.commands.run(`node /home/user/.mikka/guard-probe.mjs ${version}`, { user: 'user', timeoutMs: 30_000 })
       stage = 'deny agent while person controls'
       await store.operate(actor, bot.id, 'takeover')
-      const before = await sandbox.commands.run('DISPLAY=:1 xdotool getmouselocation --shell', { user: 'mikka-runner' })
+      const before = await sandbox.commands.run('DISPLAY=:1 xdotool getmouselocation --shell', { user: 'user' })
       await assert.rejects(probe())
-      const after = await sandbox.commands.run('DISPLAY=:1 xdotool getmouselocation --shell', { user: 'mikka-runner' })
+      const after = await sandbox.commands.run('DISPLAY=:1 xdotool getmouselocation --shell', { user: 'user' })
       assert.equal(after.stdout, before.stdout)
       await store.operate(actor, bot.id, 'handback')
-      stage = 'deny another Bot and task user'
-      await sandbox.files.write('/home/mikka-runner/.mikka/wrong-bot-probe.mjs', `import {detectComputerDriver,executeDriver} from './driver-probe.mjs';\nconst d=await detectComputerDriver('/opt/mikka/computer/cua-driver');\nif(!d)throw new Error('driver unavailable');\nawait executeDriver(d,{name:'click',arguments:{x:500,y:500}},':1',{botId:${JSON.stringify(randomUUID())},ownerId:${JSON.stringify(actor.userId)},policyVersion:0});\n`, { user: 'mikka-runner' })
-      await assert.rejects(sandbox.commands.run('node /home/mikka-runner/.mikka/wrong-bot-probe.mjs', { user: 'mikka-runner', timeoutMs: 30_000 }))
-      await sandbox.commands.run('if test -r /run/mikka-viewer/1.json || test -w /run/mikka-viewer/1.lock; then exit 1; fi', { user: 'user' })
+      stage = 'deny another Bot'
+      await sandbox.files.write('/home/user/.mikka/wrong-bot-probe.mjs', `import {detectComputerDriver,executeDriver} from './driver-probe.mjs';\nconst d=await detectComputerDriver('/opt/mikka/computer/cua-driver');\nif(!d)throw new Error('driver unavailable');\nawait executeDriver(d,{name:'click',arguments:{x:500,y:500}},':1',{botId:${JSON.stringify(randomUUID())},ownerId:${JSON.stringify(actor.userId)},policyVersion:0});\n`, { user: 'user' })
+      await assert.rejects(sandbox.commands.run('node /home/user/.mikka/wrong-bot-probe.mjs', { user: 'user', timeoutMs: 30_000 }))
       stage = 'allow agent after handback'
       await probe()
       stage = 'workspace denial is enforced at the real driver'
-      await sandbox.commands.run("flock -F -s /run/mikka-viewer/1.lock sh -c 'touch /home/mikka-runner/.mikka/policy-lock-held; exec sleep 2'", { user: 'mikka-runner', background: true, timeoutMs: 0 })
-      await sandbox.commands.run('for i in $(seq 1 50); do test -f /home/mikka-runner/.mikka/policy-lock-held && exit 0; sleep .1; done; exit 1', { user: 'mikka-runner', timeoutMs: 7_000 })
+      await sandbox.commands.run("flock -F -s /run/mikka-viewer/1.lock sh -c 'touch /home/user/.mikka/policy-lock-held; exec sleep 2'", { user: 'user', background: true, timeoutMs: 0 })
+      await sandbox.commands.run('for i in $(seq 1 50); do test -f /home/user/.mikka/policy-lock-held && exit 0; sleep .1; done; exit 1', { user: 'user', timeoutMs: 7_000 })
       const policyBegan = Date.now()
       await store.setPolicy(actor.workspaceId, 'deny')
       assert.ok(Date.now() - policyBegan >= 800, 'workspace denial waits for an operation already in progress')
@@ -142,8 +140,8 @@ async function main() {
       await assert.rejects(probe(), 'a stale run stays blocked after re-enablement')
       await probe(2)
       stage = 'serialize takeover with an active operation'
-      await sandbox.commands.run("flock -F -s /run/mikka-viewer/1.lock sh -c 'touch /home/mikka-runner/.mikka/lock-held; exec sleep 2'", { user: 'mikka-runner', background: true, timeoutMs: 0 })
-      await sandbox.commands.run('for i in $(seq 1 50); do test -f /home/mikka-runner/.mikka/lock-held && exit 0; sleep .1; done; exit 1', { user: 'mikka-runner', timeoutMs: 7_000 })
+      await sandbox.commands.run("flock -F -s /run/mikka-viewer/1.lock sh -c 'touch /home/user/.mikka/lock-held; exec sleep 2'", { user: 'user', background: true, timeoutMs: 0 })
+      await sandbox.commands.run('for i in $(seq 1 50); do test -f /home/user/.mikka/lock-held && exit 0; sleep .1; done; exit 1', { user: 'user', timeoutMs: 7_000 })
       const began = Date.now()
       await store.operate(actor, bot.id, 'takeover')
       assert.ok(Date.now() - began >= 800, 'takeover waits for the operation lock')
@@ -163,7 +161,7 @@ async function main() {
       await sandbox.commands.run('install -m 0755 /tmp/mikka-fake-codex.mjs /usr/local/bin/codex', { user: 'root' })
       await sandbox.commands.run('DISPLAY=:1 stdbuf -oL xev -name MikkaComputerProbe -geometry 640x480+40+40 -event keyboard -event mouse > /tmp/mikka-xev.log 2>&1', { user: 'user', background: true, timeoutMs: 0 })
       await sandbox.commands.run('for i in $(seq 1 50); do id=$(DISPLAY=:1 xdotool search --onlyvisible --name MikkaComputerProbe 2>/dev/null | head -1); if test -n "$id"; then DISPLAY=:1 xdotool windowmove "$id" 40 40 windowsize "$id" 640 480 windowactivate --sync "$id"; exit 0; fi; sleep .1; done; exit 1', { user: 'user', timeoutMs: 10_000 })
-      const repoPath = `/home/mikka-runner/.mikka/bot-workspaces/${bot.id}`
+      const repoPath = `/home/user/.mikka/bot-workspaces/${bot.id}`
       const assignment = { runId, issueId, deviceId: worker.deviceId, repoId, baseBranch: 'main', harness: 'codex', prompt, model: 'fixture-model', verifyCommand: 'true', leaseExpiresAt, computer,
         subscriptionBinding: { bindingId, ownerId: actor.userId, workspaceId: actor.workspaceId, consumerId: agentId, route: 'codex_cli' } }
       const context = { route: 'codex_cli', modelId: 'fixture-model', revision: 2, accountId: 'fixture-account', expiresAt: new Date(Date.now() + 180_000).toISOString() }
@@ -195,7 +193,7 @@ async function main() {
       else if (log.includes('Address already in use')) console.error('mock service port unavailable')
     }
     if (sandbox && stage === 'start cloud worker') {
-      const log = await sandbox.files.read('/home/mikka-runner/.mikka/worker-bootstrap.log', { user: 'root' }).catch(() => '')
+      const log = await sandbox.files.read('/home/user/.mikka/worker-bootstrap.log', { user: 'root' }).catch(() => '')
       if (log.includes('Cloud worker unavailable')) console.error('cloud worker bootstrap failed')
     }
     throw error

@@ -55,6 +55,7 @@ import {
   normalizeMonitorFailure,
   monitorWorkspacePartition,
 } from "./monitor-fingerprint";
+import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
 
 test("legacy and unlinked workspace issues never collapse into a personal-owner partition", () => {
   const base = {
@@ -132,9 +133,7 @@ if (target) {
   assert.equal(url.hostname, "127.0.0.1");
   assert.ok(
     url.pathname === "/mikka_monitor_195" ||
-      (process.env.CI === "true" &&
-        process.env.GITHUB_ACTIONS === "true" &&
-        url.pathname === "/mikka_e2e"),
+      disposableDatabase(process.env, target),
   );
 }
 const binding = (t: FactoryTask): FactoryBinding => ({

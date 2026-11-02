@@ -13,10 +13,10 @@ its existing protected status names and real acceptance coverage.
   successful for non-documentation PRs; the latter is the gate over the four
   isolated PostgreSQL DB/migration integration shards. Despite its name, CI
   runs no production build (decision 2026-11-01-0230); Vercel builds `main`.
-- Browser tests are manual only: `browser-gate.yml` reports
-  `Browser tests (before merge)` and passes at once. `browser-tests.yml` runs
-  only from Actions → Browser tests → Run workflow, with a real isolated
-  PostgreSQL database and the applicable Factory/daemon/browser acceptance.
+- CI runs no browser tests, not even by hand (decision 2026-11-01-1520).
+  `browser-gate.yml` only keeps the protected check name
+  `Browser tests (before merge)` and passes at once; delete it once that name
+  is removed from the required checks in the repository settings.
 - `GitGuardian Security Checks` is a separate external required check.
 - All four existing required names remain intact. Do not silently replace
   them with a new aggregate check until the GitHub branch-protection settings
@@ -34,11 +34,16 @@ its existing protected status names and real acceptance coverage.
 
 ## Cloud worker template release
 
-- `e2b-template.yml` builds the E2B worker template from `main`, makes it
-  public and points Vercel Production at it (template id and worker hash in one
-  request), then redeploys Production. A `check` job first compares the worker
+Cloud machines start from E2B's own `desktop`, `claude` and `codex` templates
+with the Mikka worker added ([decision 2026-11-01-2335](../../docs/design/decisions/2026-11-01-2335-e2b-official-templates.md)).
+
+- `e2b-template.yml` builds the three templates from `main`, makes them
+  public and points Vercel Production at them (all three template ids and the
+  worker hash in one request), then redeploys Production. A `check` job first compares the worker
   hash with Production's and stops when it is unchanged. Pull requests run only
-  its unit tests.
+  its unit tests. Branch testing uses `-dev` templates built from the branch,
+  never the production templates or Vercel's production variables
+  (`docs/dev-workflow.md` § 7).
   The build job holds only `E2B_API_KEY` (Infisical `prod:/vercel`) and the
   check and publish jobs only `VERCEL_TEAM_TOKEN` (`prod:/platform`), both read through the
   existing GitHub OIDC identity.

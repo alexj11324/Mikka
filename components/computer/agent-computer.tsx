@@ -20,8 +20,9 @@ import { ComputerViewer } from './computer-viewer'
  * bot's blob and name, exactly as in the left list (never a thread's), then the bot's screen captioned
  * 「<Bot> 的屏幕」 and nothing else. 打开 opens the full-window viewer. Without
  * `header` (the right column's 电脑 tab, under the bot's own header) it starts at the screen.
- * Mikka Cloud runs on the workspace's own E2B key (decisions 2026-10-30): with no
- * key in `workspaceId` the screen offers 添加 E2B API Key instead.
+ * Mikka Cloud runs only on the person's own E2B key
+ * (decisions/2026-11-01-1200-own-e2b-key-is-enough-for-cloud.md): without one the
+ * screen offers 添加 E2B API Key instead. `workspaceId` is the workspace the key is read for.
  */
 export function AgentComputer({ botId, name, header = true, workspaceId }: { botId: string; name: string; header?: boolean; workspaceId: string | undefined }) {
   const { data: bots } = useSWR('bots', listBots)
@@ -46,7 +47,9 @@ export function AgentComputer({ botId, name, header = true, workspaceId }: { bot
         <Button size="sm" className="h-9 rounded-full bg-screen-foreground/15 px-3.5 text-screen-foreground hover:bg-screen-foreground/25" onClick={() => setAdding(true)}><KeyRound data-icon="inline-start" />{t('addE2BKey')}</Button>
       </div>
       : <ComputerScreen botId={botId} name={name}>
-        <Button size="sm" className="h-9 rounded-full bg-screen/80 px-3.5 text-screen-foreground backdrop-blur-sm hover:bg-screen/90" onClick={() => setViewing(true)}><Maximize2 data-icon="inline-start" />{t('open')}</Button>
+        <Button variant="ghost" aria-label={t('openScreen', { name })} className="absolute inset-0 size-full rounded-lg p-0 hover:bg-transparent" onClick={() => setViewing(true)}>
+          <span className="inline-flex h-9 items-center gap-2 rounded-full bg-screen/80 px-3.5 text-screen-foreground backdrop-blur-sm"><Maximize2 data-icon="inline-start" aria-hidden="true" className="size-4" />{t('open')}</span>
+        </Button>
       </ComputerScreen>}
     <p className="max-w-full truncate text-xs text-muted-foreground">{missing ? `E2B API Key ${e2b('missing')}` : t('screenOf', { name })}</p>
     {viewing && <ComputerViewer botId={botId} name={name} open={viewing} onOpenChange={setViewing} />}

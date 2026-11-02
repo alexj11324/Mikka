@@ -4,9 +4,11 @@
 - Source: Alex, relayed by the coordinator session: every new cloud worker
   template is made public directly, and its release becomes automatic in CI.
 - Rule: —
+- Superseded by: [2026-11-01-2335 E2B official templates](2026-11-01-2335-e2b-official-templates.md)
 - Replaces: the manual release steps (build, make public, set the two
   Production variables, redeploy)
 - See also: [own E2B key is enough](2026-11-01-1200-own-e2b-key-is-enough-for-cloud.md)
+- Superseded in part by: [2026-11-01-1440-dev-workflow-local-first](2026-11-01-1440-dev-workflow-local-first.md) (branches are tested on a `-dev` template)
 
 People start sandboxes from Mikka's worker template with their own E2B key, so
 the template must be public. It holds only the daemon and protocol sources and
