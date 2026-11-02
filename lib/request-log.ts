@@ -1,6 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { createHash, randomUUID } from 'node:crypto'
-import { withRequestRoute } from './request-route'
 
 // Start and completion JSON lines per API request, written to stdout so Vercel Runtime Logs
 // (free on every plan) can search it. Only safe fields: never headers,
@@ -9,6 +8,9 @@ import { withRequestRoute } from './request-route'
 export type RequestLogOutcome = 'empty' | 'work' | 'ignored'
 type Store = { userId?: string; outcome?: RequestLogOutcome }
 const requestScope = new AsyncLocalStorage<Store>()
+// The route template of the request being handled, read by the database sample
+// (lib/db/egress-sample.ts) through this global key, so neither module imports the other.
+const routeScope: AsyncLocalStorage<string> = ((globalThis as Record<symbol, unknown>)[Symbol.for('mikka.requestRoute')] ??= new AsyncLocalStorage<string>()) as AsyncLocalStorage<string>
 
 /** Records the signed-in user for the current request's log line. */
 export function noteLogUser(userId: string | null | undefined) {
@@ -95,7 +97,7 @@ export function withRequestLog<R extends Request, A extends unknown[], T extends
       try { sink(JSON.stringify(entry), entry.level) } catch { /* logging never breaks a request */ }
     }
     try {
-      const response = await requestScope.run(store, () => withRequestRoute(route, () => handler(request, ...rest)))
+      const response = await requestScope.run(store, () => routeScope.run(route, () => handler(request, ...rest)))
       write(response.status)
       return response
     } catch (error) {

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { PoolClient } from 'pg'
 import { describeSample, SAMPLE_RATE, sampleClient } from './egress-sample'
-import { withRequestRoute } from '../request-route'
+import { withRequestLog } from '../request-log'
 
 const result = { command: 'SELECT', rowCount: 2, rows: [{ id: 'a', text: 'PRIVATE_TEXT' }, { id: 'b', text: 'x' }], fields: [], oid: 0 }
 function fakeClient() {
@@ -51,6 +51,6 @@ test('a sampled query names the logged route it ran under', async () => {
   const lines: string[] = []
   const client = fakeClient()
   sampleClient(client, () => true, () => 0, line => lines.push(line))
-  await withRequestRoute('/v1/devices/[deviceId]/commands', () => client.query('select id from agent_runs'))
+  await withRequestLog('/v1/devices/[deviceId]/commands', async () => { await client.query('select id from agent_runs'); return new Response(null) }, () => {})(new Request('https://x.test/'))
   assert.equal(JSON.parse(lines[0]).route, '/v1/devices/[deviceId]/commands')
 })

@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import type { PoolClient, QueryResult } from 'pg'
-import { currentRequestRoute } from '@/lib/request-route'
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { deploymentSwitch } from '@/lib/deployment-switches'
 
 // Sampled accounting of what queries send back from the database (Neon bills
@@ -38,6 +38,9 @@ export function describeSample(text: string, result: QueryResult | QueryResult[]
 
 const instrumented = new WeakSet<PoolClient>()
 
+/** The route template lib/request-log.ts runs a request under (shared through a global key). */
+const routeScope: AsyncLocalStorage<string> = ((globalThis as Record<symbol, unknown>)[Symbol.for('mikka.requestRoute')] ??= new AsyncLocalStorage<string>()) as AsyncLocalStorage<string>
+
 /** Wraps a pooled connection's queries with the sample. `Pool.query` calls it with a callback; checked-out clients use promises. */
 export function sampleClient(client: PoolClient, on: () => boolean = sampling, random = Math.random, sink: (line: string) => void = line => console.log(line)) {
   if (instrumented.has(client)) return
@@ -47,7 +50,7 @@ export function sampleClient(client: PoolClient, on: () => boolean = sampling, r
     const first = args[0]
     const text = typeof first === 'string' ? first : (first as { text?: unknown } | null)?.text
     if (typeof text !== 'string' || random() >= SAMPLE_RATE || !on()) return query(...args)
-    const route = currentRequestRoute() ?? null
+    const route = routeScope.getStore() ?? null
     const record = (result: unknown) => {
       try { sink(JSON.stringify(describeSample(text, result as QueryResult, route))) } catch { /* sampling never breaks a query */ }
     }
