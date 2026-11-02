@@ -43,7 +43,7 @@ Full license texts are in [`../skill-licenses/`](../skill-licenses/).
 - **iOS app UI** (`apps/mobile`): `ios-design`. Native controls first, gestures as springs, keyboard through `react-native-keyboard-controller`. Its Uizze MCP steps are optional and not connected here.
 
 - **Product UX checks**: `ux-heuristics-audit`, `ux-information-architecture-audit`, `ux-navigation`, `ux-settings` (with `settings-pages`); `ui-ux-pro-max` references as a UI checklist. `docs/design/` and `interface-design` still decide.
-- **Planning and design of code**: `grill-me` / `grill-with-docs` (interview before building), `domain-modeling`, `codebase-design`, `improve-codebase-architecture`, `prototype`, `tdd`, `to-spec`, `to-tickets`. `handoff` for a session summary. Skills that post to GitHub (`to-spec`, `to-tickets`, `triage`, `wayfinder`, `implement-spec`) follow `AGENTS.md` and the session's own GitHub rules; `triage` never runs an external PR's code without approval.
+- **Planning and design of code**: `grill-me` / `grill-with-docs` (interview before building), `domain-modeling`, `codebase-design`, `improve-codebase-architecture`, `prototype`, `tdd`, `to-spec`, `to-tickets`. `handoff` for a session summary. Skills that post to GitHub (`to-spec`, `to-tickets`, `triage`, `wayfinder`, `implement-spec`) follow `AGENTS.md` and the session's own GitHub rules; `triage` never runs an external PR's code without approval, and `wayfinder` asks for approval before pushing any branch.
 
 - **Bug or failing test**: `debug` (root cause before a fix); `diagnosing-bugs` is the longer version.
 - **Production incident**: `incident`, then `debug`.
