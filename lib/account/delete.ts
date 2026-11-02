@@ -22,7 +22,8 @@ const { projects, projectEvents } = projectSchema
  *   their Coordinator and every bot outside a shared workspace with its
  *   threads, then the user row, whose foreign keys take sessions, sign-in
  *   accounts, OAuth grants, avatar and export links with it.
- * - A workspace only they belong to goes with them. In a workspace shared with
+ * - A workspace only they belong to goes with them, with every main-database
+ *   row keyed by it (lib/workspace-rows.ts). In a workspace shared with
  *   others they lose their membership; the team's issues, projects and group
  *   chats stay for the team (their past group messages stay in those chats).
  *   If they are its only active admin, nothing is deleted: someone else has to
@@ -192,6 +193,9 @@ export async function deleteMainAccountData(client: PoolClient, userId: string, 
   // As when a member leaves (releaseDepartingMember): paused until an admin takes the bot over, now with no owner (「待接管」).
   // After the sweep: the owner-bound rows that reference (id, workspaceId, ownerId) are gone. Their shares and card designation went with it.
   if (kept.bots.length) await client.query('update bots set "ownerId" = null, "archivedAt" = coalesce("archivedAt", now()), "updatedAt" = now() where id = any($1::uuid[])', [kept.bots])
+  // A workspace only they belong to goes with them: every row keyed by it, whoever wrote it.
+  const { deleteWorkspaceRows } = await import('@/lib/workspace-rows')
+  for (const workspaceId of plan.solo) await deleteWorkspaceRows(client, workspaceId)
   await client.query('delete from "user" where id=$1', [userId])
 }
 
