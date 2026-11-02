@@ -47,7 +47,7 @@ deleteWorkspace(id: string, confirmName: string): Promise<ActionResult<{
 - `confirmName` 去掉首尾空白后必须和工作区名称完全一致（区分大小写），否则返回 `workspaceDeleteNameMismatch`。
 - 如果 `workspace_billing.status` 还在 `active / trialing / past_due / unpaid / incomplete` 之一，返回 `workspaceHasActiveSubscription`，要先取消订阅才能删除。
 - 删除范围，应用库（一个事务）：
-  - 工作区的 Bot（`bots.workspaceId`），以及这些 Bot 派出的线程（`agent_runs.botId`）。删除 Bot 时会级联删掉它的对话（coordinator_sessions/messages/events）、云桌面、云运行时、计算机运行绑定、agent kit 和后台任务（bot_subagents）。
+  - 工作区的 Bot（`bots.workspaceId`），以及这些 Bot 的线程（`agent_runs.botId`）。删除 Bot 时会级联删掉它的对话（coordinator_sessions/messages/events）、云桌面、云运行时、计算机运行绑定、agent kit 和后台任务（bot_subagents）。
   - 没有 `ON DELETE CASCADE`、会挡住删除的表要先删：`suggestion_executions`、`thread_machines`（同时按 workspaceId 和 botId 删）。
   - 团队任务：`mikka_team_issues` 里关联的 `issues`（会级联删掉任务上的运行和 Linear 发布）；以及 `team_issue_create_requests`、`team_issue_promotions`。
   - 按 workspaceId 删：`conversations`、`subagent_events`、`cloud_machines`、`workspace_snapshots`、`workspace_computer_policies`、`credential_fill_leases`、`credential_challenges`、`operation_ledger`、`workspace_settings`、`workspace_credit_grants`、`workspace_billing`。

@@ -16,7 +16,7 @@
     apply on top.
 - Both are the person's own, per chat, in `chat_preferences`. They can be set
   only for the Coordinator or the person's own bots.
-- **资料库** lists what the threads the bot dispatched handed over, newest first.
+- **资料库** lists what the bot's threads handed over, newest first.
   - A Markdown document opens in the app.
   - An HTML one opens on the web, signed in, in its sandboxed frame.
 - 现状（非决定）：the web shows neither reactions nor pins yet.

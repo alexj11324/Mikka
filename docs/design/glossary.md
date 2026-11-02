@@ -12,17 +12,14 @@ Decided by Alex, 2026-10-24.
 | --- | --- | --- | --- | --- |
 | **Bot** | Bot | Chats with people. Does web tasks itself through sub-agents (分身, R-72), each with its own browser, and dispatches real tasks such as coding to threads. The user creates it (Grok Bot style) and can put several bots in a group chat. The Coordinator is a bot too. Stored in its own `bots` table (name, colour, shape) and runs on Mikka's own AI SDK on Vercel; it is not a row in `agents`. | **Bot list** (left column), one row per bot or group chat. | The bot's own name, e.g. "Mikka Frontend". |
 | **Chat** | 对话 | The conversation between a person and the selected bot or group chat. | **Center column**. Header pill = the bot's (or group's) name. | Same as the bot or group. It has no name of its own. |
-| **Thread** | 线程 | Does the work a bot dispatched: one run (`agent_runs`), usually tied to a task, run by an Agent (Claude Code, Codex). A bot can have dispatched many threads at once. | **Thread list** (right column), plus the thread view and the machine its Agent runs on. | Its own name, about the work, e.g. "#66 群聊前端骨架" or "MIK-11 群聊建表". Never the bot's name. |
+| **Thread** | 线程 | Does the work a bot dispatched: one run (`agent_runs`), usually tied to a task. A bot can have many threads at once. | **Thread list** (right column), plus the thread view and the machine its Agent runs on. | Its own name, about the work, e.g. "#66 群聊前端骨架" or "MIK-11 群聊建表". Never the bot's name. |
 
 How they connect: a person chats with a bot (center). The bot dispatches
 real tasks such as coding to threads, which do the work (right). A web task
 stays with the bot: one of its sub-agents (分身) does it in its own browser,
 it shows only as a card in the chat, never in the thread list, and the bot
-reports the result itself (R-72). A thread is run by an Agent (Claude Code,
-Codex). A bot never runs, owns or does a thread; it only dispatches it, and
-each thread names the one bot that dispatched it. UI wording: 「<Bot> 派出的线程」
-or 「<Bot> 派出」, never 「<Bot> 的线程」 or 「所属 Bot」. A thread is never drawn
-with the bot's avatar; it shows a status icon (decisions
+reports the result itself (R-72). Every thread belongs to exactly one bot but
+is never drawn with the bot's avatar; it shows a status icon (decisions
 2026-10-27), except in the right panel's 全部线程, where each row carries
 the 16px mark of the Agent running it (R-50, R-78). A bot does no coding
 work itself: an Agent (Claude Code, Codex) runs every thread. A cloud thread runs on its own thread machine,
@@ -78,10 +75,6 @@ Decided by Alex, 2026-10-28.
 - "Agent" when you mean the thing on the left. Say **bot**. **Agent** is the
   right-side worker that runs threads (`agents` table, Claude Code, Codex).
 - "harness" or 「执行器」 in the UI for that worker. Say **Agent** (R-43).
-- 「<Bot> 的线程」, 「Bot 的线程」, 「所属 Bot」 or "a bot's threads" / "bot's
-  threads": a bot does not own or run a thread. Say 「<Bot> 派出的线程」 or
-  「<Bot> 派出」, "threads a bot dispatched" (Alex, 2026-11-02;
-  `scripts/check-i18n.mjs` fails such copy in `messages/`).
 - 「E2B」 as the cloud machine's name. It is **Mikka Cloud** in both languages,
   never translated; E2B names only the provider and its API key.
   Code identifiers may keep `harness`.

@@ -8,7 +8,7 @@
 - Rule: — (R-52 grouping and R-66 thread cards stand)
 - Replaces: —
 
-Every entry in a thread list (the 线程 tab of threads a bot dispatched, 全部线程) is the chat's
+Every entry in a thread list (a bot's 线程 tab, 全部线程) is the chat's
 thread card (`components/coordinator/thread-card.tsx`): status icon, name,
 the last reply on one line, a chevron. The whole card opens the thread in the
 right column (R-82), whether or not the thread works on a task. A thread with

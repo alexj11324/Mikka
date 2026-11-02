@@ -14,7 +14,7 @@
     the system's confirmation (same words).
   - It asks first (「删除「名字」？」 · 取消 / 删除); nothing brings a file back.
   - A failed delete keeps the row and says so.
-- 资料库 lists what the threads the bot dispatched handed over (decision
+- 资料库 lists what the bot's threads handed over (decision
   2026-11-01-0050-mobile-chat-settings); the web reads the same list as the
   phone.
 - 现状（非决定）：both call DELETE /api/mobile/artifacts/<id> (#935). Only
