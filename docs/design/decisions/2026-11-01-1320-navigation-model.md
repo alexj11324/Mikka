@@ -57,6 +57,8 @@ Every one of them pushes a side pane in full screen on a phone.
 
 PR 1 (this file): the address module, back and forward for sections, bots and
 tasks, the CI guard, R-82. Then the thread column (`thread=`), addresses for
-Artifacts, group chats, projects and teams, the task page's origin and
+Artifacts, group chats, projects and teams (`artifact=`, `group=`,
+`section=agent&session=`, `section=projects&project=`, `team=` for a team's
+主页 and `section=team-issues|team-projects&team=`), the task page's origin and
 notifications, and the phone web's ways in and out, each with browser tests
 for its rows of R-82.

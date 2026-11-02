@@ -164,14 +164,14 @@ export async function listBotThreadsFor(viewerId: string, workspaceId: string, i
     prompt: sql<string | null>`case when ${agentRuns.issueId} is null and ${agentRuns.userId} = ${viewerId} then ${agentRuns.prompt} end`.as('prompt'),
   }).from(agentRuns).where(eq(agentRuns.botId, botId)))
   const threads = db.$with('bot_threads').as(db.with(runs).selectDistinctOn([runs.threadId], {
-    threadId: runs.threadId, issueId: runs.issueId, ownerId: runs.ownerId, status: runs.status,
+    threadId: runs.threadId, runId: runs.id, issueId: runs.issueId, ownerId: runs.ownerId, status: runs.status,
     lastActivity: sql<Date>`max(${runs.activity}) over (partition by ${runs.threadId})`.as('lastActivity'),
     initiatorId: sql<string>`first_value(${runs.ownerId}) over (partition by ${runs.threadId} order by ${runs.createdAt}, ${runs.id})`.as('initiatorId'),
     opening: sql<string | null>`first_value(${runs.prompt}) over (partition by ${runs.threadId} order by ${runs.createdAt}, ${runs.id})`.as('opening'),
   }).from(runs).orderBy(runs.threadId, desc(runs.createdAt), desc(runs.id)))
   const after = position ? sql`(${threads.lastActivity}, ${threads.threadId}) < (${position.at}::timestamptz, ${position.threadId})` : undefined
   const rows = await db.with(runs, threads).select({
-    threadId: threads.threadId, issueId: threads.issueId, ownerId: threads.ownerId, initiatorId: threads.initiatorId, status: threads.status, opening: threads.opening,
+    threadId: threads.threadId, runId: threads.runId, issueId: threads.issueId, ownerId: threads.ownerId, initiatorId: threads.initiatorId, status: threads.status, opening: threads.opening,
     lastActivityAt: iso(sql`${threads.lastActivity}`), issueTitle: issues.title,
   }).from(threads).leftJoin(issues, eq(issues.id, threads.issueId))
     .where(after).orderBy(desc(threads.lastActivity), desc(threads.threadId)).limit(limit + 1)
@@ -198,7 +198,7 @@ export async function listBotThreadsFor(viewerId: string, workspaceId: string, i
   const unfinished = new Set<string>(UNFINISHED_RUN_STATUSES)
   const views = page.map(row => {
     const issueVisible = !!row.issueId && visible.has(row.issueId)
-    const href = botThreadHref({ issueId: row.issueId, ownerId: row.ownerId, botId }, { id: viewerId, issueVisible })
+    const href = botThreadHref({ issueId: row.issueId, ownerId: row.ownerId, botId, runId: row.runId }, { id: viewerId, issueVisible })
     return {
       threadId: row.threadId,
       initiator: { id: row.initiatorId, name: memberName.get(row.initiatorId) ?? profile.get(row.initiatorId)?.name ?? null, avatarUrl: profile.get(row.initiatorId)?.image ?? null },

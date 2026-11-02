@@ -1,22 +1,26 @@
 // A person's own E2B key is enough for cloud runs: a bot with no cloud runtime gets
 // one when a run is dispatched, once. No key: never the cloud. MIKKA_CLOUD_COMPUTER_TASKS=0 turns it off. Real PostgreSQL;
-// only the E2B calls (waking the computer, starting its worker) are replaced.
+// only the E2B calls (waking the computer, starting its worker, creating each thread's own
+// machine) and the start of the thread machine's lifecycle workflow are replaced.
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
-import test from 'node:test'
+import test, { mock } from 'node:test'
 import type { Pool as PgPool } from 'pg'
 import { normalizeRepository } from '@mikka/protocol/repository'
 import { dbUrl, seedBot, seedIssue, seedUser, seedWorkspace } from './support/workspace-admin-db'
 import { recordPushGrant } from './support/github-app-stub'
+import { fakeThreadMachines } from './support/thread-machine-fake'
 
 const harnesses = [{ harness: 'codex', installed: true, subscriptionBroker: true, computerBroker: true }]
 
 test('cloud runs: the bot runtime is created on dispatch, once; the kill switch falls back to the card', { skip: !dbUrl }, async t => {
   delete process.env.MIKKA_CLOUD_COMPUTER_TASKS
-  delete process.env.MIKKA_CLOUD_THREAD_MACHINES
   process.env.MIKKA_BYOS_ENABLED = '1'
+  // Every cloud thread runs on its own thread machine; its lifecycle workflow is not started here.
+  mock.module('workflow/api', { namedExports: { start: async () => ({ runId: 'synthetic-workflow' }) } })
   const { Pool } = await import('pg')
   const pool = new Pool({ connectionString: dbUrl, max: 3 })
+  const threadMachines = await fakeThreadMachines(pool, [{ harness: 'codex', installed: true, subscriptionBroker: true, toolApproval: true }])
   const steps = await import('../workflows/coordinator/steps')
   const { botRuntimeProvisioner } = await import('../lib/computer/auto-runtime')
   const { ensureBotRuntime } = await import('../lib/computer/bot-runtime')
@@ -38,10 +42,12 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
   }
   t.after(async () => {
     botRuntimeProvisioner.provision = realProvision
+    threadMachines.restore()
     delete process.env.MIKKA_CLOUD_COMPUTER_TASKS
     await pool.query('DELETE FROM coordinator_events WHERE "userId" = ANY($1)', [users])
     await pool.query('DELETE FROM coordinator_bots WHERE "ownerId" = ANY($1)', [users])
     await pool.query('DELETE FROM computer_run_bindings WHERE "ownerId" = ANY($1)', [users])
+    await pool.query('DELETE FROM thread_machines WHERE "ownerId" = ANY($1)', [users])
     await pool.query('DELETE FROM run_publications WHERE "userId" = ANY($1)', [users])
     await pool.query('DELETE FROM agent_runs WHERE "userId" = ANY($1)', [users])
     await pool.query('DELETE FROM byos_bindings WHERE "ownerId" = ANY($1)', [users])
@@ -261,12 +267,16 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     } finally { delete process.env.MIKKA_CLOUD_COMPUTER_TASKS }
   })
 
-  await t.test('a workspace whose 电脑 policy is deny: no runtime, the card', async () => {
+  // The 电脑 policy governs computer use only: a repository task (octo/repo has a remote) runs on a task machine without a desktop.
+  await t.test('a workspace whose 电脑 policy is deny still runs a repository task in the cloud', async () => {
     const c = await person('policy-deny')
     await pool.query(`INSERT INTO workspace_computer_policies ("workspaceId",permission,version) VALUES ($1,'deny',1) ON CONFLICT ("workspaceId") DO UPDATE SET permission='deny'`, [c.workspaceId])
-    const before = provisioned
-    const result = await dispatch(c.id, c.issueId, c.botId) as unknown as { error: string }
-    assert.equal(result.error, 'machineUnavailable')
-    assert.equal(provisioned, before)
+    const result = await dispatch(c.id, c.issueId, c.botId) as unknown as { runId: string; status: string; botId: string }
+    assert.equal(result.status, 'queued', JSON.stringify(result))
+    assert.equal(result.botId, c.botId)
+    const run = (await pool.query(`SELECT r.status,d.kind,repo."remoteUrl" FROM agent_runs r JOIN devices d ON d.id=r."deviceId" JOIN device_repos repo ON repo.id=r."deviceRepoId" WHERE r.id=$1`, [result.runId])).rows[0]
+    assert.equal(run.status, 'queued')
+    assert.equal(run.kind, 'cloud')
+    assert.ok(run.remoteUrl, 'the queued run is a repository task')
   })
 })

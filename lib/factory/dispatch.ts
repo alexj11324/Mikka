@@ -2,19 +2,12 @@ import type { Pool, PoolClient } from 'pg';
 import { freezeWorkerDefinition, retryWorkerDefinition } from '../agent-kit/worker';
 import { configureFactoryCheck, factoryRepairBrief } from './checks';
 import type { DispatchInput, DispatchResult } from '../run-dispatch';
-import { z } from 'zod';
-import { bindingSchema, FactoryError, type FactoryBinding, type FactoryStage } from './contract';
+import { FactoryError, type FactoryBinding, type FactoryStage } from './contract';
 import { factoryEventId } from './event-id';
 import { maskFactoryNote } from './note-mask';
 import type { createFactoryStore, FactoryTask, FactorySnapshot } from './store';
-
-export const factoryDispatchSchema = z.object({
-  binding: bindingSchema,
-  agentId: z.uuid().transform(v => v.toLowerCase()),
-  deviceRepoId: z.uuid().transform(v => v.toLowerCase()),
-  note: z.string().trim().max(10000).optional(),
-}).strict();
-export type FactoryDispatchInput = z.infer<typeof factoryDispatchSchema>;
+import { factoryDispatchSchema, type FactoryDispatchInput } from './dispatch-schema';
+export { factoryDispatchSchema, type FactoryDispatchInput };
 export type QueueFactoryRun = (tx: PoolClient, userId: string, input: DispatchInput, sourceRunId?: string) => Promise<DispatchResult>;
 export type FactoryQueue = (tx: PoolClient, userId: string, input: {
   issueId: string; agentId: string; deviceRepoId: string; note?: string;

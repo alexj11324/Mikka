@@ -6,6 +6,7 @@ import { desktopRunUpdate, type DesktopRun } from './desktop-notifications'
 function run(overrides: Partial<DesktopRun> = {}): DesktopRun {
   return {
     issueId: 'issue-1',
+    runId: `run-${overrides.issueId ?? 'issue-1'}`,
     issueTitle: 'Ship the desktop app',
     agentName: 'Coordinator',
     status: 'running',
@@ -33,8 +34,8 @@ test('entering 等你 and failing raise one notification each', () => {
   ], 1_000)
   assert.equal(update.badge, 1)
   assert.deepEqual(update.notifications, [
-    { id: 'run:a:awaiting:1000', kind: 'awaiting', title: 'Ship the desktop app', body: 'Coordinator', href: '/?issue=a' },
-    { id: 'run:b:failed:1000', kind: 'failed', title: 'Ship the desktop app', body: 'Coordinator', href: '/?issue=b' },
+    { id: 'run:a:awaiting:1000', kind: 'awaiting', title: 'Ship the desktop app', body: 'Coordinator', href: '/?issue=a&thread=run-a' },
+    { id: 'run:b:failed:1000', kind: 'failed', title: 'Ship the desktop app', body: 'Coordinator', href: '/?issue=b&thread=run-b' },
   ])
 })
 
@@ -67,7 +68,7 @@ test('a finished thread notifies the desktop when 线程完成 is on', () => {
     run({ issueId: 'b', status: 'succeeded' }),
   ], 2_000, true)
   assert.deepEqual(update.notifications, [
-    { id: 'run:a:finished:2000', kind: 'finished', title: 'Ship the desktop app', body: 'Coordinator', href: '/?issue=a' },
+    { id: 'run:a:finished:2000', kind: 'finished', title: 'Ship the desktop app', body: 'Coordinator', href: '/?issue=a&thread=run-a' },
   ])
 })
 

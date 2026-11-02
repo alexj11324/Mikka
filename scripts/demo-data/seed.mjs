@@ -79,8 +79,9 @@ function plan(owner) {
     key: `t-${bot}-${index}`, issue: null, bot, agent: index % 2 ? 'ag-codex' : 'ag-claude', status,
     minutesAgo: Math.max(20, Math.round(hoursAgo * 60)), minutes: 6 + (index * 7) % 40, prompt: title, lastReply,
     error: status === 'failed' ? lastReply : undefined,
+    // The daemon writes no error chunk: a failed run's reason is run.error alone, which the thread shows once.
     chunks: [{ type: 'text-delta', id: 't1', delta: `开始：${title}。` }, { type: 'tool-input-available', toolCallId: 'a' }, { type: 'tool-input-available', toolCallId: 'b' },
-      status === 'failed' ? { type: 'error', errorText: lastReply } : { type: 'text-delta', id: 't2', delta: lastReply }],
+      ...(status === 'failed' ? [] : [{ type: 'text-delta', id: 't2', delta: lastReply }])],
   })))
   const runs = [...RUNS, ...threads].map(run => {
     const createdAt = ago(run.minutesAgo)

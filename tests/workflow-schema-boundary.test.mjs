@@ -26,12 +26,29 @@ function imports(file) {
 }
 
 test('Coordinator schemas cannot bring Node/server modules across the durable Workflow boundary', () => {
-  const workflow = resolve(root, 'workflows/coordinator/workflow.ts')
+  // The schemas reach the workflow through its tool registries (tools.ts, factory-tools.ts), so walk
+  // workflow.ts and every coordinator module it bundles. Step files ('use step') run outside the sandbox.
   const names = new Set(['factoryDispatchSchema', 'contextQuestionAnswerSchema', 'questionReferenceSchema', 'questionEscalationSchema', 'commandSchema', 'skillEvaluationCommandSchema'])
-  const roots = source(workflow).statements.flatMap(statement => {
-    if (!ts.isImportDeclaration(statement) || !statement.importClause?.namedBindings || !ts.isNamedImports(statement.importClause.namedBindings)) return []
-    return statement.importClause.namedBindings.elements.some(item => names.has(item.name.text)) ? [localPath(statement.moduleSpecifier.text, workflow)] : []
-  })
+  const coordinator = resolve(root, 'workflows/coordinator')
+  const bundled = new Set()
+  function bundle(file) {
+    if (bundled.has(file) || readFileSync(file, 'utf8').includes("'use step'")) return
+    bundled.add(file)
+    for (const specifier of imports(file)) {
+      const dependency = localPath(specifier, file)
+      if (dependency && dirname(dependency) === coordinator) bundle(dependency)
+    }
+  }
+  bundle(resolve(coordinator, 'workflow.ts'))
+  const found = new Set()
+  const roots = [...bundled].flatMap(file => source(file).statements.flatMap(statement => {
+    if (!ts.isImportDeclaration(statement) || statement.importClause?.isTypeOnly || !statement.importClause?.namedBindings || !ts.isNamedImports(statement.importClause.namedBindings)) return []
+    const schemas = statement.importClause.namedBindings.elements.filter(item => !item.isTypeOnly && names.has((item.propertyName ?? item.name).text))
+    schemas.forEach(item => found.add((item.propertyName ?? item.name).text))
+    return schemas.length ? [localPath(statement.moduleSpecifier.text, file)] : []
+  }))
+  assert.ok(bundled.has(resolve(coordinator, 'tools.ts')) && bundled.has(resolve(coordinator, 'factory-tools.ts')), 'Coordinator tool registries are walked')
+  assert.deepEqual([...names].filter(name => !found.has(name)), [], 'Every coordinator tool schema import is covered')
   assert.ok(roots.length > 0, 'Coordinator tool schema imports are covered')
   const visited = new Set(), forbidden = []
   function walk(file) {

@@ -9,6 +9,8 @@ export interface MaskableSecret { name: string; value: string }
 export type Masker = ((text: string) => string) & {
   /** Characters at the end of already-masked text that could still be the start of a secret form; a stream holds these back. */
   holdback?: (text: string) => number
+  /** Characters at the end of raw text that could still grow into a credential; a stream holds these back unmasked, in memory, until they end. */
+  rawHoldback?: (text: string) => number
 }
 
 export const identityMasker: Masker = text => text
@@ -46,10 +48,50 @@ export function createSecretMasker(secrets: readonly MaskableSecret[]): Masker {
  * released. `final` (part or run ended) releases the rest, masked.
  */
 export function maskStreamStep(mask: Masker, pending: string, delta: string, final = false): { release: string; pending: string } {
-  const masked = mask(pending + delta)
-  if (final || !mask.holdback) return { release: masked, pending: '' }
+  const raw = pending + delta
+  // A credential pattern matches a growing token early: keep its raw end back until the token ends.
+  const rawHold = final ? 0 : (mask.rawHoldback?.(raw) ?? 0)
+  const tail = raw.slice(raw.length - rawHold)
+  const masked = mask(raw.slice(0, raw.length - rawHold))
+  if (final || !mask.holdback) return { release: masked, pending: tail }
   const hold = mask.holdback(masked)
-  return { release: masked.slice(0, masked.length - hold), pending: masked.slice(masked.length - hold) }
+  return { release: masked.slice(0, masked.length - hold), pending: masked.slice(masked.length - hold) + tail }
+}
+
+// Credentials Mikka issues or a CLI prints that are not saved workspace secrets: GitHub tokens
+// (classic, fine-grained, and installation tokens of the form ghs_<id>_<JWT>, whose `_`s defeat
+// gh's own "mask after the last underscore") and JWTs. Each match is masked whole.
+const CREDENTIAL_PATTERNS: ReadonlyArray<[RegExp, string]> = [
+  [/(?<![A-Za-z0-9])(?:gh[pousr]_[A-Za-z0-9_.-]{16,}|github_pat_[A-Za-z0-9_]{20,})/g, '[secret:github-token]'],
+  [/(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}(?:\.[A-Za-z0-9_-]*)?/g, '[secret:jwt]'],
+]
+const CREDENTIAL_STARTS = ['ghp_', 'gho_', 'ghu_', 'ghs_', 'ghr_', 'github_pat_', 'eyJ']
+/** The longest token-shaped end of a stream part is held back at most this far. */
+const CREDENTIAL_HOLDBACK_MAX = 4096
+
+/** Replaces every credential pattern match whole: with its `[secret:…]` label, or with `replacement` when given. */
+export function maskCredentials(text: string, replacement?: string) {
+  let out = text
+  for (const [pattern, label] of CREDENTIAL_PATTERNS) out = out.replace(pattern, replacement ?? label)
+  return out
+}
+/** Characters at the end of `text` that could still grow into a credential with the next delta. */
+const credentialHoldback = (text: string) => {
+  const tail = /[A-Za-z0-9_.-]+$/.exec(text)?.[0]
+  if (!tail) return 0
+  for (let i = 0; i < tail.length; i++) {
+    const rest = tail.slice(i)
+    if (CREDENTIAL_STARTS.some(start => rest.startsWith(start) || start.startsWith(rest))) return Math.min(rest.length, CREDENTIAL_HOLDBACK_MAX)
+  }
+  return 0
+}
+
+/** `mask`, then credential patterns: what persisted run output always gets, with or without saved secrets. */
+export function withCredentialMasking(mask: Masker): Masker {
+  const masked: Masker = text => (typeof text !== 'string' || !text ? text : maskCredentials(mask(text)))
+  if (mask.holdback) masked.holdback = mask.holdback
+  masked.rawHoldback = credentialHoldback
+  return masked
 }
 
 /** Applies the masker to every string (values and object keys) in a JSON-like value. */

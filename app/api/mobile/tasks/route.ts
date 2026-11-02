@@ -12,7 +12,7 @@ async function handleGET(request: Request) {
   noteLogUser(user?.id)
   if (!user) return unauthorized()
   const workspaceId = (user as typeof user & { [tokenWorkspace]?: string })[tokenWorkspace]
-  const issues = workspaceId ? await actAs(user.id, () => listWorkspaceIssues(workspaceId)) : await listIssues()
+  const issues = workspaceId ? await actAs(user, () => listWorkspaceIssues(workspaceId)) : await listIssues()
   return json({
     tasks: issues.map(issue => ({
       id: issue.id, identifier: issue.identifier, title: issue.title, status: issue.status, priority: issue.priority,
