@@ -30,8 +30,6 @@ test('real DB: additive migration, subagent owner isolation and separate thread 
   const admin = new Pool({ connectionString: databaseURL })
   await admin.query(`CREATE SCHEMA ${schema}`)
   const pool = new Pool({ connectionString: databaseURL, options: `-c search_path=${schema}` })
-  const prior = process.env.MIKKA_CLOUD_THREAD_MACHINES
-  process.env.MIKKA_CLOUD_THREAD_MACHINES = '1'
   const alice = { userId: 'alice', workspaceId: randomUUID() }
   const bob = { ...alice, userId: 'bob' }
   const stranger = { ...alice, workspaceId: randomUUID() }
@@ -181,8 +179,6 @@ test('real DB: additive migration, subagent owner isolation and separate thread 
     await denied
     assert.deepEqual(desktopCalls, [], 'a denied desktop never reaches E2B')
   } finally {
-    if (prior === undefined) delete process.env.MIKKA_CLOUD_THREAD_MACHINES
-    else process.env.MIKKA_CLOUD_THREAD_MACHINES = prior
     await pool.end(); await admin.query(`DROP SCHEMA ${schema} CASCADE`); await admin.end()
   }
 })

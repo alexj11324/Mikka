@@ -3,7 +3,7 @@ import test from 'node:test'
 import { mkdtemp, readFile, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { getRunGitHubToken, matchesGitRepository, runGh } from '../src/agents/github-credentials.mjs'
+import { credentialFailureMessage, getRunGitHubToken, matchesGitRepository, runGh, RunGitHubCredentialError, RUN_GITHUB_ERROR_MESSAGES } from '../src/agents/github-credentials.mjs'
 
 test('git supplies a token only to the exact HTTPS GitHub repository', () => {
   const valid = { protocol: 'https', host: 'github.com', path: 'owner/repo.git' }
@@ -77,4 +77,28 @@ test('normal gh commands run once without watch timers', async () => {
     },
   }), 0)
   assert.equal(calls, 1)
+})
+
+test('a refused exchange names the reason in English and Chinese, from known codes only', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'mikka-gh-'))
+  const config = { file: join(root, 'config'), endpoint: 'https://mikka.example/api/runs/github-token', runToken: 'synthetic-run-token', repository: 'owner/repo' }
+  const refused = (body, status = 409) => ({ fetcher: async () => new Response(typeof body === 'string' ? body : JSON.stringify(body), { status }) })
+  const error = await getRunGitHubToken(config, refused({ error: 'githubAppNotInstalled' })).catch(caught => caught)
+  assert.ok(error instanceof RunGitHubCredentialError)
+  assert.equal(error.code, 'githubAppNotInstalled')
+  assert.equal(credentialFailureMessage(error), `Mikka: ${RUN_GITHUB_ERROR_MESSAGES.githubAppNotInstalled[0]}\nMikka：${RUN_GITHUB_ERROR_MESSAGES.githubAppNotInstalled[1]}\n`)
+  assert.match(credentialFailureMessage(error), /Install the Mikka GitHub App on this repository\./)
+  assert.match(credentialFailureMessage(error), /这个仓库还没有安装 Mikka GitHub App/)
+  for (const [code, message] of Object.entries(RUN_GITHUB_ERROR_MESSAGES)) {
+    const failed = await getRunGitHubToken(config, refused({ error: code }, 502)).catch(caught => caught)
+    assert.equal(failed.code, code)
+    assert.ok(credentialFailureMessage(failed).includes(message[0]) && credentialFailureMessage(failed).includes(message[1]))
+  }
+  // An unknown code, a provider body or a non-JSON reply is never shown.
+  for (const body of [{ error: 'synthetic-provider-detail' }, { error: { token: 'synthetic-leak' } }, 'synthetic-html <b>error</b>']) {
+    const failed = await getRunGitHubToken(config, refused(body, 502)).catch(caught => caught)
+    assert.equal(failed.code, null)
+    assert.equal(credentialFailureMessage(failed), 'Mikka GitHub credentials or CI status unavailable.\n')
+  }
+  assert.equal(credentialFailureMessage(new Error('synthetic-other-failure')), 'Mikka GitHub credentials or CI status unavailable.\n')
 })

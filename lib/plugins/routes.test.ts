@@ -20,7 +20,28 @@ stub('./runtime.ts', { personalPlugins: {
 stub('./skill-source.ts', { fetchSkillSource: async (input: unknown) => ({ ...input as object, body: '# Fixture' }) })
 stub('../composio.ts', { getComposio: () => ({}) })
 stub('./catalog.ts', { composioToolkitLister: () => async () => ({ items: [] }), listStoreCatalog: async () => ({ apps: [{ id: 'googledrive' }], popular: ['googledrive'], latest: [], categories: [] }) })
-stub('./app-detail.ts', { composioAppDetailSource: () => ({}), readAppDetail: async (_source: unknown, slug: string) => ({ id: slug, name: 'Supabase', description: 'Postgres', iconUrl: null, categories: [], website: null, version: null, tools: { write: [], read: [{ slug: 'SUPABASE_LIST_TABLES', name: 'List tables', description: '' }] } }) })
+stub('./app-detail.ts', { composioAppDetailSource: () => ({}), readAppDetail: async (_source: unknown, slug: string) => ({ id: slug, name: 'Supabase', description: 'Postgres', iconUrl: null, categories: [], website: null, version: null, auth: { kind: 'managed', forms: [], guideUrl: null }, tools: { write: [], read: [{ slug: 'SUPABASE_LIST_TABLES', name: 'List tables', description: '' }] } }) })
+// The key route with Composio faked at its edge: the form, the auth config, the new account and whose accounts are whose.
+// A made-up value, not a key: only its presence in output is checked.
+const SECRET = ['submitted', 'credential', 'value'].join('-')
+const keyCalls: unknown[][] = []
+let initiateFails = false
+stub('./credential-connect-server.ts', { credentialConnectDeps: () => ({
+  form: async (toolkit: string, scheme: string) => toolkit === 'exa' && scheme === 'API_KEY'
+    ? { scheme, fields: [{ name: 'generic_api_key', label: 'API Key', description: '', secret: true, required: true, defaultValue: null }, { name: 'full', label: 'Base URL', description: '', secret: false, required: false, defaultValue: 'https://api.exa.ai' }] }
+    : null,
+  authConfig: async (toolkit: string, scheme: string) => { keyCalls.push(['authConfig', toolkit, scheme]); return 'ac_mikka_exa' },
+  initiate: async (...args: unknown[]) => {
+    keyCalls.push(['initiate', ...args])
+    // Composio's error may quote what was sent; it must not reach the person or the logs.
+    if (initiateFails) throw new Error(`rejected ${SECRET}`)
+    return { id: 'ca_new', status: 'ACTIVE' }
+  },
+  ownAccount: async (userId: string, accountId: string) => userId === 'owner' && accountId === 'ca_owner' ? { id: accountId } : null,
+  replace: async (...args: unknown[]) => { keyCalls.push(['replace', ...args]) },
+}) })
+let credentials: typeof import('../../app/api/integrations/composio/credentials/route')
+before(async () => { credentials = await import('../../app/api/integrations/composio/credentials/route') })
 let appDetail: typeof import('../../app/api/integrations/composio/catalog/[toolkit]/route')
 before(async () => { appDetail = await import('../../app/api/integrations/composio/catalog/[toolkit]/route') })
 let mcp: typeof import('../../app/api/integrations/mcp/route'), skills: typeof import('../../app/api/skills/route'), catalog: typeof import('../../app/api/integrations/composio/catalog/route')
@@ -61,4 +82,51 @@ test('an app page needs a signed-in person, not a connected account', async () =
   const response = await appDetail.GET(request('/api/integrations/composio/catalog/supabase'), params)
   assert.equal(response.status, 200)
   assert.equal((await response.json() as { tools: { read: unknown[] } }).tools.read.length, 1)
+})
+
+test('a key goes from the signed-in person to Composio and never back out, in a response or a log', async () => {
+  const printed: string[] = []
+  const methods = ['log', 'info', 'warn', 'error', 'debug'] as const
+  const original = methods.map(method => console[method])
+  for (const method of methods) console[method] = (...args: unknown[]) => { printed.push(args.map(arg => arg instanceof Error ? `${arg.message} ${arg.stack}` : typeof arg === 'string' ? arg : JSON.stringify(arg)).join(' ')) }
+  try {
+    const body = { toolkit: 'exa', scheme: 'API_KEY', fields: { generic_api_key: SECRET } }
+    const path = '/api/integrations/composio/credentials'
+    owner = null; keyCalls.length = 0
+    assert.equal((await credentials.POST(request(path, 'POST', body))).status, 401)
+    owner = 'owner'
+    assert.equal((await credentials.POST(request(path, 'POST', body, 'https://evil.acme.dev'))).status, 403)
+    assert.deepEqual(keyCalls, [])
+
+    const responses: { status: number; text: string }[] = []
+    const send = async (data: unknown) => { const response = await credentials.POST(request(path, 'POST', data)); const result = { status: response.status, text: await response.text() }; responses.push(result); return result }
+    // Connected for the signed-in person, with Composio's default where nothing was typed; only the account id comes back.
+    const ok = await send(body)
+    assert.equal(ok.status, 201)
+    assert.deepEqual(JSON.parse(ok.text), { accountId: 'ca_new' })
+    assert.deepEqual(keyCalls, [['authConfig', 'exa', 'API_KEY'], ['initiate', 'owner', 'ac_mikka_exa', 'API_KEY', { generic_api_key: SECRET, full: 'https://api.exa.ai' }]])
+    keyCalls.length = 0
+    // Someone else's id in the body, a field Composio does not define, a missing key, an app that does not take a key.
+    assert.equal((await send({ ...body, userId: 'peer' })).status, 400)
+    assert.equal((await send({ ...body, fields: { generic_api_key: SECRET, extra: 'x' } })).status, 400)
+    assert.equal((await send({ ...body, fields: { full: 'https://api.exa.ai' } })).status, 400)
+    assert.equal((await send({ ...body, toolkit: 'gmail' })).status, 400)
+    assert.equal((await send({ ...body, scheme: 'OAUTH2' })).status, 400)
+    // Another person's account cannot be replaced, nor its existence learned.
+    assert.equal((await send({ ...body, replaceAccountId: 'ca_peer' })).status, 404)
+    assert.deepEqual(keyCalls, [])
+    // A new key for one's own account retires the old one.
+    assert.equal((await send({ ...body, replaceAccountId: 'ca_owner' })).status, 201)
+    assert.deepEqual(keyCalls.at(-1), ['replace', 'owner', 'ca_new', 'ca_owner'])
+    // Composio refusing it, with the key in its message.
+    initiateFails = true
+    const failed = await send(body)
+    assert.equal(failed.status, 502)
+    assert.deepEqual(JSON.parse(failed.text), { error: 'integrationConnectFailed' })
+    for (const response of responses) assert.ok(!response.text.includes(SECRET), response.text)
+    assert.ok(printed.every(line => !line.includes(SECRET)), printed.join('\n'))
+  } finally {
+    initiateFails = false
+    methods.forEach((method, index) => { console[method] = original[index] })
+  }
 })

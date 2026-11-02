@@ -73,7 +73,7 @@ export async function proposeAction(userId: string, action: string, input: unkno
  * A store app's tool call that needs the person's approval (a destructive
  * write, or one an explicit setting asks for). Nothing runs here.
  */
-export async function proposeAppToolCall(userId: string, call: AppToolCall, accountId: string, botId: string | null = null) {
+export async function proposeAppToolCall(userId: string, call: AppToolCall, accountId: string | null, botId: string | null = null) {
   const parsed = appToolCallSchema.safeParse(call)
   if (!parsed.success) return { error: 'invalidIntegrationInput' }
   const waiting = await db.$count(pendingActions, and(eq(pendingActions.userId, userId), eq(pendingActions.status, 'pending'), gt(pendingActions.createdAt, new Date(Date.now() - PENDING_ACTION_TTL_MS))))

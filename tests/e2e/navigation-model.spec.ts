@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { Pool } from 'pg'
 import type { Page } from '@playwright/test'
-import { test, expect, register, app, rail, seedTask, openIssueFromSearch, conversationPill, hydrated, showCreatedByMe } from './fixtures'
+import { test, expect, register, app, rail, seedTask, openIssueFromSearch, openSearch, conversationPill, hydrated, showCreatedByMe } from './fixtures'
 
 // R-82: one address says what is on screen, every move is a history entry,
 // and back / forward step through it one move at a time without leaving Mikka.
@@ -12,6 +12,11 @@ const chat = (page: Page) => page.getByRole('textbox', { name: '给 Coordinator 
 const board = (page: Page) => page.getByRole('region', { name: '任务看板', exact: true })
 const taskTitle = (page: Page) => page.getByLabel('任务标题', { exact: true })
 const query = (page: Page) => new URL(page.url()).searchParams
+
+const closeTask = (page: Page) => page.getByRole('button', { name: '关闭任务详情', exact: true }).click()
+/** The task page's first crumb: where the task was opened from. */
+const originCrumb = (page: Page, name: string) => page.getByRole('navigation', { name: '当前位置', exact: true }).getByRole('button', { name, exact: true })
+const pager = (page: Page) => page.getByRole('button', { name: '下一个任务', exact: true })
 
 async function back(page: Page) {
   await page.goBack()
@@ -89,10 +94,11 @@ test('a task opened from the chat is its own page; back returns to the chat, for
   await page.goForward()
   await expect(taskTitle(page)).toHaveValue(title)
 
-  // Closing the task is a step too, and back reopens it.
-  await page.getByRole('button', { name: '关闭任务详情', exact: true }).click()
+  // ✕ steps back to the chat it was opened from, so forward reopens the task.
+  await closeTask(page)
   await expect(chat(page)).toBeVisible()
-  await back(page)
+  expect(query(page).get('issue')).toBeNull()
+  await page.goForward()
   await expect(taskTitle(page)).toHaveValue(title)
 })
 
@@ -288,4 +294,257 @@ test('全部线程: another bot\'s thread opens beside the current chat, naming 
   await expectThreadBesideChat(page, runId)
   await expect(conversationPill(page)).toHaveText('Coordinator')
   await expect(threadIn(page)).toContainText('写作助手 派出线程')
+})
+
+// ── Artifacts, group chats, projects and teams (PR 3): each has its own address ──
+
+async function userOf(pool: Pool, email: string) {
+  const { rows: [user] } = await pool.query<{ id: string; workspaceId: string }>('SELECT u.id, m."workspaceId" FROM "user" u JOIN mikka_workspace_members m ON m."userId" = u.id WHERE u.email = $1 LIMIT 1', [email])
+  return user
+}
+
+/** An artifact handed over in the Coordinator's chat, as artifact-share.spec.ts seeds it. */
+async function seedArtifact(email: string, title: string) {
+  const pool = isolatedPool()
+  try {
+    const user = await userOf(pool, email)
+    const artifactId = randomUUID()
+    const body = `# ${title}\n\n首页 3.8 秒。`
+    await pool.query(`INSERT INTO artifacts (id, "userId", kind, title, "latestVersion") VALUES ($1, $2, 'markdown', $3, 1)`, [artifactId, user.id, title])
+    await pool.query('INSERT INTO artifact_versions (id, "artifactId", version, "storageKey", "inlineContent", sha256, size, "authorName") VALUES ($1, $2, 1, $3, $4, $5, $6, $7)', [randomUUID(), artifactId, `e2e/${artifactId}/1`, body, '0'.repeat(64), body.length, 'Mikka Frontend'])
+    await pool.query('INSERT INTO coordinator_messages (id, "userId", "botId", position, message) VALUES ($1, $2, (SELECT "botId" FROM coordinator_bots WHERE "ownerId" = $2), (SELECT COALESCE(MAX(position), 0) + 1 FROM coordinator_messages WHERE "userId" = $2), $3)', [randomUUID(), user.id, JSON.stringify({ role: 'user', content: `[Event] [[artifact:${artifactId}]] handed over` })])
+    return artifactId
+  } finally { await pool.end() }
+}
+
+const artifactWindow = (page: Page, title: string) => page.getByRole('dialog', { name: title, exact: true })
+
+test('an Artifact card opens its window over the chat; back closes it, forward, reload and a pasted link reopen it', async ({ page }) => {
+  const { email } = await register(page)
+  const title = `导航记录 ${randomUUID().slice(0, 8)}`
+  const artifactId = await seedArtifact(email, title)
+  await page.reload()
+  await hydrated(chat(page))
+  await page.locator('[data-slot="artifact-card"]').filter({ hasText: title }).click()
+  await expect(artifactWindow(page, title)).toContainText('首页 3.8 秒。')
+  expect(query(page).get('artifact')).toBe(artifactId)
+  // A window over the chat: the chat's own address stays.
+  expect(query(page).get('section')).toBeNull()
+
+  await back(page)
+  await expect(artifactWindow(page, title)).toHaveCount(0)
+  await expect(chat(page)).toBeVisible()
+  await page.goForward()
+  await expect(artifactWindow(page, title)).toContainText('首页 3.8 秒。')
+  await page.reload()
+  await expect(artifactWindow(page, title)).toContainText('首页 3.8 秒。')
+  await artifactWindow(page, title).getByRole('button', { name: '关闭', exact: true }).click()
+  await expect(artifactWindow(page, title)).toHaveCount(0)
+  expect(query(page).get('artifact')).toBeNull()
+
+  await page.goto(app(`/?artifact=${artifactId}`))
+  await expect(artifactWindow(page, title)).toContainText('首页 3.8 秒。')
+})
+
+test('an Artifact page row opens the same window; back closes it and stays on the page', async ({ page }) => {
+  const { email } = await register(page)
+  const title = `资料库记录 ${randomUUID().slice(0, 8)}`
+  const artifactId = await seedArtifact(email, title)
+  await page.goto(app('/?section=artifacts'))
+  await hydrated(rail(page, 'Artifact'))
+  await page.getByRole('button').filter({ hasText: title }).click()
+  await expect(artifactWindow(page, title)).toContainText('首页 3.8 秒。')
+  expect(query(page).get('section')).toBe('artifacts')
+  expect(query(page).get('artifact')).toBe(artifactId)
+  await back(page)
+  await expect(artifactWindow(page, title)).toHaveCount(0)
+  await expect(rail(page, 'Artifact')).toHaveAttribute('aria-current', 'page')
+})
+
+test('a group chat is a step with its own address: back, forward and reload return to it', async ({ page }) => {
+  await register(page)
+  const workspaceId = (await (await page.request.get(app('/api/workspace'))).json()).workspace.id as string
+  const title = `导航群 ${randomUUID().slice(0, 8)}`
+  const created = await page.request.post(app('/api/conversations'), { headers: { origin: new URL(page.url()).origin }, data: { workspaceId, title } })
+  expect(created.status()).toBe(201)
+  const { id: groupId } = await created.json() as { id: string }
+  await page.reload()
+  await hydrated(chat(page))
+  const bots = page.getByRole('list', { name: 'Bot', exact: true })
+  const group = page.getByRole('region', { name: title, exact: true })
+
+  await bots.getByRole('button', { name: title, exact: true }).click()
+  await expect(group).toBeVisible()
+  expect(query(page).get('group')).toBe(groupId)
+  await bots.getByRole('button', { name: 'Coordinator', exact: true }).click()
+  await expect(chat(page)).toBeVisible()
+  expect(query(page).get('group')).toBeNull()
+
+  await back(page)
+  await expect(group).toBeVisible()
+  await page.goForward()
+  await expect(chat(page)).toBeVisible()
+  await back(page)
+  await page.reload()
+  await expect(group).toBeVisible()
+  await expect(bots.getByRole('button', { name: title, exact: true })).toHaveAttribute('aria-current', 'page')
+})
+
+test('a project from ⌘K opens under 看板 with its address; back returns to the chat', async ({ page }) => {
+  const { email } = await register(page)
+  const name = `导航项目 ${randomUUID().slice(0, 8)}`
+  const projectId = randomUUID()
+  const pool = isolatedPool()
+  try {
+    const user = await userOf(pool, email)
+    await pool.query(`INSERT INTO workspace_projects (id, "userId", name, summary, description, status, priority, lead, team, "startDate", "targetDate", "issueIds", revision) VALUES ($1, $2, $3, '', '', 'started', 'none', '', '', '', '', '[]', 1)`, [projectId, user.id, name])
+  } finally { await pool.end() }
+  await page.reload()
+  await hydrated(chat(page))
+  const dialog = await openSearch(page)
+  await dialog.getByRole('combobox', { name: '全局搜索', exact: true }).fill(name)
+  await dialog.getByRole('option').filter({ hasText: name }).click()
+  await expect(page.getByRole('button', { name: '返回项目列表', exact: true })).toBeVisible()
+  expect(query(page).get('section')).toBe('projects')
+  expect(query(page).get('project')).toBe(projectId)
+  // Projects live under 看板 (R-82): its rail item is current and no bot list sits beside the page.
+  await expect(rail(page, '看板')).toHaveAttribute('aria-current', 'page')
+  await expect(page.getByRole('list', { name: 'Bot', exact: true })).toHaveCount(0)
+
+  await page.reload()
+  await expect(page.getByRole('button', { name: '返回项目列表', exact: true })).toBeVisible()
+  await back(page)
+  await expect(chat(page)).toBeVisible()
+})
+
+test('a team page keeps its address: its 项目 page survives a reload and back returns to the team\'s 主页', async ({ page }) => {
+  const { email } = await register(page)
+  const name = `导航团队 ${randomUUID().slice(0, 8)}`
+  const teamId = randomUUID()
+  const pool = isolatedPool()
+  try {
+    const user = await userOf(pool, email)
+    await pool.query('INSERT INTO mikka_teams (id, "workspaceId", "userId", name, identifier) VALUES ($1, $2, $3, $4, $5)', [teamId, user.workspaceId, user.id, name, `N${randomUUID().slice(0, 6).toUpperCase()}`])
+    await pool.query(`INSERT INTO mikka_team_members ("teamId", "userId", role) VALUES ($1, $2, 'owner')`, [teamId, user.id])
+  } finally { await pool.end() }
+  await page.goto(app(`/?team=${teamId}`))
+  const home = page.getByRole('heading', { name, exact: true, level: 1 })
+  await expect(home).toBeVisible()
+  await expect(rail(page, '看板')).toHaveAttribute('aria-current', 'page')
+  await hydrated(rail(page, '看板'))
+
+  await page.getByRole('complementary').getByRole('button', { name: /^项目/ }).click()
+  await expect(page).toHaveURL(url => url.searchParams.get('section') === 'team-projects' && url.searchParams.get('team') === teamId)
+  await page.reload()
+  await expect(page).toHaveURL(url => url.searchParams.get('section') === 'team-projects')
+  await expect(home).toHaveCount(0)
+  await expect(rail(page, '看板')).toHaveAttribute('aria-current', 'page')
+  await back(page)
+  await expect(home).toBeVisible()
+  expect([...query(page).keys()]).toEqual(['team'])
+})
+
+// ── The task page's origin (PR 4): crumb, ✕, ↑↓, and addresses that rewrite themselves ──
+
+test('chat → thread → 打开任务: the first crumb names the chat; ✕ brings back the chat with its thread, no ↑↓', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 960 })
+  const { title, runId } = await chatWithThread(page)
+  await page.getByRole('button', { name: `打开线程 ${THREAD}`, exact: true }).first().click()
+  await expectThreadBesideChat(page, runId)
+  await threadIn(page).getByRole('button', { name: '打开任务', exact: true }).click()
+  await expect(taskTitle(page)).toHaveValue(title)
+  // The address names the chat it came from, so a reload or a copied link knows it too.
+  expect(query(page).get('section')).toBe('coordinator')
+  // The thread beside it narrows the page, so the first crumb is folded into 更多位置.
+  await page.getByRole('button', { name: '更多位置', exact: true }).click()
+  await expect(page.getByRole('menuitem', { name: 'Coordinator', exact: true })).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(pager(page)).toHaveCount(0)
+
+  await closeTask(page)
+  await expectThreadBesideChat(page, runId)
+  expect(query(page).get('issue')).toBeNull()
+})
+
+test('a pasted chat task link: ✕ opens that chat, not the board; a bare task link closes onto the board', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 960 })
+  await register(page)
+  const title = `来源任务 ${randomUUID()}`
+  const issueId = await seedTask(page, title)
+
+  await page.goto(app(`/?section=coordinator&issue=${issueId}`))
+  await expect(taskTitle(page)).toHaveValue(title)
+  await expect(originCrumb(page, 'Coordinator')).toBeVisible()
+  await hydrated(taskTitle(page))
+  await closeTask(page)
+  await expect(chat(page)).toBeVisible()
+  expect([...query(page).keys()]).toEqual([])
+
+  await page.goto(app(`/?issue=${issueId}`))
+  await expect(originCrumb(page, '看板')).toBeVisible()
+  await hydrated(taskTitle(page))
+  await originCrumb(page, '看板').click()
+  await expect(board(page)).toBeVisible()
+})
+
+test('a bot\'s task link names the bot; ✕ opens that bot\'s chat', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 960 })
+  await register(page)
+  const title = `Bot 来源任务 ${randomUUID()}`
+  const issueId = await seedTask(page, title)
+  await page.getByRole('button', { name: '新建 Bot', exact: true }).first().click()
+  const dialog = page.getByRole('dialog', { name: '新建 Bot' })
+  await dialog.getByLabel('名字', { exact: true }).fill('来源 Bot')
+  await dialog.getByRole('button', { name: '创建', exact: true }).click()
+  await expect(conversationPill(page)).toHaveText('来源 Bot')
+  const botId = query(page).get('bot')
+
+  await page.goto(app(`/?bot=${botId}&issue=${issueId}`))
+  await expect(taskTitle(page)).toHaveValue(title)
+  await expect(originCrumb(page, '来源 Bot')).toBeVisible()
+  await hydrated(taskTitle(page))
+  await closeTask(page)
+  await expect(conversationPill(page)).toHaveText('来源 Bot')
+  expect(query(page).get('bot')).toBe(botId)
+})
+
+test('board → task: ↑↓ step through the board and the crumb says 看板; ⌘K from the chat: no ↑↓', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 960 })
+  await register(page)
+  const first = `看板翻页 A ${randomUUID()}`
+  const second = `看板翻页 B ${randomUUID()}`
+  await seedTask(page, first)
+  await seedTask(page, second)
+  await page.goto(app('/?section=all-issues'))
+  await hydrated(rail(page, '看板'))
+  // Nobody is on the seeded tasks: 负责人 我 leaves them out, 我创建的 shows them (decision 2026-11-02-0302).
+  await expect(board(page)).toBeVisible()
+  await expect(board(page).getByText(first, { exact: true })).toHaveCount(0)
+  await showCreatedByMe(page)
+  await board(page).getByText(first, { exact: true }).click()
+  await expect(taskTitle(page)).toHaveValue(first)
+  await expect(originCrumb(page, '看板')).toBeVisible()
+  await expect(pager(page)).toBeVisible()
+
+  await closeTask(page)
+  await expect(board(page)).toBeVisible()
+  await rail(page, '主页').click()
+  await hydrated(chat(page))
+  await openIssueFromSearch(page, second)
+  await expect(taskTitle(page)).toHaveValue(second)
+  await expect(originCrumb(page, 'Coordinator')).toBeVisible()
+  await expect(pager(page)).toHaveCount(0)
+})
+
+test('an unknown section or bot in the address rewrites itself to what is shown, without a new entry', async ({ page }) => {
+  await register(page)
+  await page.goto(app('/?section=nope'))
+  await expect(chat(page)).toBeVisible()
+  await expect(page).toHaveURL(url => !url.searchParams.has('section'))
+  const entries = await page.evaluate(() => window.history.length)
+
+  await page.goto(app(`/?bot=${randomUUID()}`))
+  await expect(conversationPill(page)).toHaveText('Coordinator')
+  await expect(page).toHaveURL(url => !url.searchParams.has('bot'))
+  expect(await page.evaluate(() => window.history.length)).toBe(entries + 1)
 })

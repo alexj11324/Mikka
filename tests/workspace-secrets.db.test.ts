@@ -209,14 +209,18 @@ test('workspace secrets and E2B key', { skip: !dbUrl }, async t => {
     assert.deepEqual(await runtime.taskSecretEnv(third.id, null, on), { GH_TOKEN: TOKEN, SHORT: 'abc1234', REGION: 'us-east-1-long' }, 'workspace-scoped values are injected; repo-scoped ones only for their repo')
     const chunk = { type: 'text-delta', delta: `push ${TOKEN} b64=${Buffer.from(TOKEN).toString('base64')} short=abc1234 region=us-east-1-long`, nested: [{ url: `https://x/?t=${encodeURIComponent(TOKEN)}` }] }
     const offMask = await runtime.workspaceSecretMasker(third.id, off)
-    assert.deepEqual(maskDeep(chunk, offMask), chunk, 'no encryption key: identity masker')
+    // No encryption key: saved values are not masked (the base64 form stays), but a GitHub-token-shaped
+    // value is still masked as a credential pattern.
+    assert.deepEqual(maskDeep(chunk, offMask), { ...chunk, delta: `push [secret:github-token] b64=${Buffer.from(TOKEN).toString('base64')} short=abc1234 region=us-east-1-long`, nested: [{ url: `https://x/?t=[secret:github-token]` }] }, 'no encryption key: credential patterns only')
     const masked = maskDeep(chunk, await runtime.workspaceSecretMasker(third.id, on))
     const text = JSON.stringify(masked)
     assert.ok(!text.includes(TOKEN) && !text.includes(Buffer.from(TOKEN).toString('base64')))
     assert.match(masked.delta, /push \[secret:GH_TOKEN\] b64=\[secret:GH_TOKEN\] short=abc1234 region=us-east-1-long/)
     assert.equal(masked.nested[0].url, 'https://x/?t=[secret:GH_TOKEN]')
     const otherMask = await runtime.workspaceSecretMasker(other.id, on)
-    assert.ok(otherMask(TOKEN) === TOKEN, 'another workspace does not mask this one\'s values')
+    // Another workspace never knows this one's values: no [secret:GH_TOKEN] label, only the credential pattern.
+    assert.equal(otherMask(TOKEN), '[secret:github-token]', 'another workspace does not mask this one\'s values')
+    assert.equal(otherMask(Buffer.from(TOKEN).toString('base64')), Buffer.from(TOKEN).toString('base64'), 'another workspace does not mask this one\'s values')
     assert.equal((await runtime.workspaceSecretMasker(null, on))('x'), 'x')
     await assert.rejects(runtime.taskSecretEnv(third.id, null, { WORKSPACE_SECRETS_KEY: 'invalid' }), (error: unknown) => error instanceof e2b.E2BKeyError && error.code === 'e2b_unavailable')
   })
@@ -293,7 +297,8 @@ test('workspace secrets and E2B key', { skip: !dbUrl }, async t => {
     const binary = Buffer.from([0xff, 0xfe, 0x00, ...Buffer.from(TOKEN)])
     assert.equal(maskCheckpoint({ patch: binary, files: [] }, mask).patch, binary, 'non-UTF-8 patch left as is (documented gap)')
     const offCp = { patch, files: [] }
-    assert.equal(maskCheckpoint(offCp, await runtime.workspaceSecretMasker(w.id, off)), offCp, 'no encryption key: same object')
+    // No encryption key: saved values stay (credential patterns still apply; this patch has none).
+    assert.deepEqual(maskCheckpoint(offCp, await runtime.workspaceSecretMasker(w.id, off)), offCp, 'no encryption key: saved values not masked')
   })
 
   await t.test('4e2 runtime: E2B errors map to codes and mark the card (flag on only)', async () => {
