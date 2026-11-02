@@ -87,7 +87,7 @@ test('A dispatched thread is a card under the reply that opens its conversation 
   const surface = chat.locator('[data-slot="thread-card"]').filter({ has: page.getByRole('button', { name: '打开线程 Speed up the home page', exact: true }) })
   await expect(surface).toContainText('Speed up the home page')
   await expect(surface.getByRole('img', { name: '进行中', exact: true })).toBeVisible()
-  // R-66: status icon + title + real output chips; no avatar or progress row.
+  // R-66: status icon + title + the PR badge; no avatar or progress row.
   await expect(surface).not.toContainText('交给 Codex')
   await expect(surface).not.toContainText('执行了 2 步')
   await testInfo.attach('thread-card', { body: await page.screenshot(), contentType: 'image/png' })
@@ -141,10 +141,16 @@ test('A dispatched thread is a card under the reply that opens its conversation 
   await page.reload()
   const resultCard = (name: string) => chat.locator('[data-slot="thread-card"]').filter({ has: page.getByRole('button', { name: `打开线程 ${name}`, exact: true }) })
 
-  // The anchor must open its target, without bubbling into the card's thread.
+  // The badge opens its list without bubbling into the card's thread; a row opens its PR.
   await page.context().route('https://github.com/**', route => route.fulfill({ contentType: 'text/html', body: '<title>PR visual fixture destination</title>' }))
+  await resultCard(fixtures[0].name).getByRole('button', { name: '1 个 PR', exact: true }).click()
+  const list = page.locator('[data-slot="pull-requests-list"]')
+  await expect(list.getByRole('link')).toHaveCount(1)
+  await expect(list.getByRole('link')).toContainText('进行中')
+  await expect(list.getByRole('link')).toContainText('cards #101')
+  await expect(page.getByRole('region', { name: fixtures[0].name, exact: true })).toHaveCount(0)
   const popupOpened = page.waitForEvent('popup')
-  await resultCard(fixtures[0].name).getByRole('link', { name: 'PR #101', exact: true }).click()
+  await list.getByRole('link').click()
   const popup = await popupOpened
   try { await expect(popup).toHaveURL(outputs[0].url) } finally { await popup.close() }
   await expect(chat).toBeVisible()
@@ -167,15 +173,22 @@ test('A dispatched thread is a card under the reply that opens its conversation 
       await expect(outputCard).not.toContainText('执行了')
       await expect(outputCard).not.toContainText('交给 Codex')
       await expect(outputCard).not.toContainText('Visual result fixture')
+      const badge = outputCard.locator('[data-slot="pull-requests-badge"]')
       if (index < states.length) {
-        const pr = fixture.pullRequests[0]
-        const link = outputCard.getByRole('link', { name: `PR #${101 + index}`, exact: true })
-        await expect(link).toHaveAttribute('data-pr-state', pr.state)
-        await expect(link).toHaveAttribute('href', pr.url)
+        // One PR: the badge takes its state and shows 1.
+        await expect(badge).toHaveAttribute('data-state-summary', fixture.pullRequests[0].state)
+        await expect(badge).toHaveText('1')
       } else {
-        const visible = await outputCard.getByRole('link').count()
-        expect(visible).toBeLessThanOrEqual(2)
-        await expect(outputCard.getByText(`+${outputs.length - visible}`, { exact: true }).filter({ visible: true })).toBeVisible()
+        // Open, draft, merged and closed together read as open, with the count of all four.
+        await expect(badge).toHaveAttribute('data-state-summary', 'open')
+        await expect(badge).toHaveText(String(outputs.length))
+        await badge.click()
+        const rows = page.locator('[data-slot="pull-requests-list"]').getByRole('link')
+        await expect(rows).toHaveCount(outputs.length)
+        for (const [row, pr] of outputs.entries()) await expect(rows.nth(row)).toHaveAttribute('href', pr.url)
+        await testInfo.attach(`r66-pr-list-${view.name}`, { body: await page.screenshot(), contentType: 'image/png' })
+        await page.keyboard.press('Escape')
+        await expect(rows).toHaveCount(0)
       }
       await outputCard.scrollIntoViewIfNeeded()
       const bounds = await outputCard.boundingBox()

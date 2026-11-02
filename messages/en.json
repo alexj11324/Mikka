@@ -3204,9 +3204,6 @@
     "sendFailed": "Not sent. Draft kept",
     "stopping": "Stopping…",
     "stopFailed": "Stop not confirmed",
-    "pullRequest": "PR #{number}",
-    "moreOutputs": "+{count}",
-    "moreOutputsAria": "{count, plural, one {# more output} other {# more outputs}}",
     "send": "Send",
     "retryStop": "Try stopping again",
     "waiting": "Waiting for you",
@@ -4109,5 +4106,8 @@
     "appsLater": "OK. You can connect them in Settings later.",
     "welcome": "Your first Bot",
     "enter": "Open Mikka"
+  },
+  "PullRequestsBadge": {
+    "label": "{count, plural, one {# pull request} other {# pull requests}}"
   }
 }
