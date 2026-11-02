@@ -2,12 +2,12 @@
 
 import { PersonAvatar } from '@/components/person-avatar'
 import { useEffect, useRef, useState } from 'react'
-import useSWR, { useSWRConfig } from 'swr'
+import useSWR, { unstable_serialize, useSWRConfig } from 'swr'
 import { useFormatter, useTranslations } from 'next-intl'
 import { ArrowLeft, Square, SquareKanban, X } from 'lucide-react'
-import { getIssueThread, getThreadChanges, sendIssueThreadReply, stopRun } from '@/app/actions/agents'
+import { getIssueThread, getThreadChanges, sendIssueThreadReply, stopRun, type IssueThreadDetail } from '@/app/actions/agents'
 import { useActionError } from '@/lib/use-action-error'
-import { runFailureText, runIsActive, runIsWorking, runStopTimeoutRemaining, threadItems } from '@/lib/issue-run-conversation'
+import { mergeThreadChunks, runFailureText, runIsActive, runIsWorking, runStopTimeoutRemaining, threadItems } from '@/lib/issue-run-conversation'
 import { ThreadSteps } from './thread-steps'
 import { threadQuestionView, type IssueThread } from '@/lib/issue-threads'
 import { ChatComposer } from '@/components/coordinator/chat-composer'
@@ -56,9 +56,15 @@ export function IssueThreadPanel(props: IssueThreadPanelProps) {
 function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab = 'chat', onOpenThread, onOpenTask, name: listedName }: IssueThreadPanelProps) {
   const t = useTranslations('IssueThreads')
   const format = useFormatter()
-  const { mutate: mutateCache } = useSWRConfig()
+  const { mutate: mutateCache, cache } = useSWRConfig()
   const questionPolls = useRef(0)
-  const { data, error, mutate } = useSWR(['issue-thread', issueId, runId], () => getIssueThread(issueId, runId), {
+  const key = ['issue-thread', issueId, runId]
+  // A live run polls every 2 s: pass where the held chunks end, so only later chunks are read and sent.
+  const { data, error, mutate } = useSWR(key, async () => {
+    const held = cache.get(unstable_serialize(key))?.data as IssueThreadDetail | undefined
+    const previous = held?.chunkCursor ? held : undefined
+    return mergeThreadChunks(previous, await getIssueThread(issueId, runId, previous?.chunkCursor))
+  }, {
     // A question changes only when it is answered or its continuation starts: back off, capped.
     refreshInterval: detail => !detail ? 0 : runIsActive(threadQuestionView(detail.thread).status) ? 2000 : threadQuestionView(detail.thread).question ? Math.min(2000 * 2 ** questionPolls.current, 30_000) : 0,
     onSuccess: detail => { questionPolls.current = threadQuestionView(detail.thread).question ? questionPolls.current + 1 : 0 },

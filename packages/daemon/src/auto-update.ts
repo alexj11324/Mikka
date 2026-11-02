@@ -7,8 +7,6 @@ import { readJson, writeJsonAtomic } from './fs-util'
 
 const exec = promisify(execFile)
 const PACKAGE = '@aspectlylabs/mikka'
-// Releases ship on every main push; a daily check left devices hours behind the server.
-const CHECK_INTERVAL = 60 * 60 * 1000
 
 export function newerStableVersion(candidate: unknown, current: string): candidate is string {
   const stable = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/
@@ -28,8 +26,8 @@ export async function runServiceNpm(args: string[]): Promise<string> {
   return stdout.trim()
 }
 
+/** The server names the release (heartbeat, commands poll, refused claim); the daemon never asks npm which one is latest. */
 export interface AutoUpdateRuntime {
-  latest(): Promise<string>
   install(version: string): Promise<void>
 }
 
@@ -44,18 +42,13 @@ export async function managedAutoUpdateRuntime(entry: string, flavor: string, en
     const globalRoot = await runServiceNpm(['root', '--global'])
     if (realpathSync(join(globalRoot, PACKAGE)) !== root || file !== join(root, 'mikka.js')) return
     return {
-      latest: async () => JSON.parse(await runServiceNpm(['view', `${PACKAGE}@latest`, 'version', '--json'])) as string,
       install: async version => { await runServiceNpm(['install', '--global', '--engine-strict', `${PACKAGE}@${version}`]) },
     }
   } catch { return undefined }
 }
 
-// A server that refuses this daemon as too old asks for a check now, at most this often.
-const URGENT_CHECK_INTERVAL = 5 * 60 * 1000
-
 type UpdateFailureCode = 'install_failed' | 'restart_failed'
 interface UpdateState {
-  lastAttemptAt?: number
   /** The last failed install of `version`; cleared by the restart into a newer version. */
   failure?: { version: string; code: UpdateFailureCode; at: number; attempts: number }
 }
@@ -80,13 +73,4 @@ export function recordUpdateFailure(file: string, version: string, code: UpdateF
 export function reportedUpdateFailure(file: string, current: string): { version: string; code: UpdateFailureCode; at: string } | null {
   const failure = readState(file).failure
   return failure && newerStableVersion(failure.version, current) ? { version: failure.version, code: failure.code, at: new Date(failure.at).toISOString() } : null
-}
-
-export async function checkLatestVersion(file: string, current: string, runtime: AutoUpdateRuntime, now = Date.now(), urgent = false): Promise<string | undefined> {
-  const state = readState(file)
-  if (typeof state.lastAttemptAt === 'number' && now - state.lastAttemptAt < (urgent ? URGENT_CHECK_INTERVAL : CHECK_INTERVAL)) return
-  // Persist before network I/O: a failed registry request must not retry after restart.
-  writeJsonAtomic(file, { ...state, lastAttemptAt: now })
-  const latest = await runtime.latest()
-  return newerStableVersion(latest, current) ? latest : undefined
 }

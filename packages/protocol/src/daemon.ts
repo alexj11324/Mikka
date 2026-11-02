@@ -173,6 +173,17 @@ export const daemonRpc = {
   "quota.snapshot": { params: empty, result: quotaSnapshotReportSchema },
   /** Stop accepting runs, journal active ones for resume, then exit. */
   "daemon.drain": { params: empty, result: ok },
+  /**
+   * The desktop app on this computer asks after it starts (it may just have
+   * updated): ask the server now (one heartbeat) for the release it names, never npm,
+   * and install it once no run is
+   * active. Only a managed production install updates; others answer `unmanaged`.
+   * A failed install is reported through the heartbeat's `updateFailure`.
+   */
+  "daemon.update": {
+    params: empty,
+    result: z.object({ state: z.enum(["unmanaged", "current", "waiting", "installing"]) }),
+  },
   /** Hand the daemon a device credential obtained by the signed-in desktop. */
   "device.setCredential": {
     params: z.object({

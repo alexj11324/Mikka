@@ -97,8 +97,10 @@ async function noticeWakeExhausted(claim: WakeClaim) {
 /** Called every minute by the existing scheduling Worker. The persisted next
  * attempt/lease timestamps make overlapping sweeps converge. */
 export async function retryCoordinatorWakes(deadline = Date.now() + 45_000) {
-  const counts = { due: 0, started: 0, deferred: 0, failed: 0, exhausted: 0 }
+  const counts = { due: 0, started: 0, deferred: 0, failed: 0, exhausted: 0, interrupted: 0 }
   if (!coordinatorEnabled()) return counts
+  // First, so a turn whose run ended without releasing its chat is retried in this same sweep.
+  try { counts.interrupted = (await (await import('./interrupted-turns')).recoverInterruptedTurns()).recovered } catch { /* the lease expiry still frees it */ }
   const scopes = await recovery.due()
   counts.due = scopes.length
   for (const scope of scopes) {

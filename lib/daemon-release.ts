@@ -33,6 +33,22 @@ export async function daemonVersions(now = Date.now(), read: () => Promise<strin
 }
 
 /**
+ * The cached answer, without waiting: a long-poll compares it every idle check,
+ * so it never touches the database or the registry itself. A stale cache starts
+ * one refresh in the background; the next check sees its result.
+ */
+export function cachedDaemonVersions(now = Date.now(), read: () => Promise<string | undefined> = defaultRead): DaemonVersions | undefined {
+  if (!cached || now - cached.at >= CACHE_MS) void daemonVersions(now, read).catch(() => undefined)
+  return cached ? { min: MIN_DAEMON_VERSION, ...(cached.latest ? { latest: cached.latest } : {}) } : undefined
+}
+
+/** Whether `versions` names a release newer than `known`, the newest one the daemon already has word of. */
+export function newerDaemonRelease(versions: DaemonVersions | undefined, known: string): boolean {
+  const latest = versions?.latest
+  return Boolean(latest && STABLE.test(known) && latest !== known && meetsMinimumVersion(latest, known))
+}
+
+/**
  * A released local daemon below the minimum gets no runs. Cloud workers and
  * daemons run from source report the source version and run current code.
  */

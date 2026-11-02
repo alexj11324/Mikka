@@ -604,3 +604,46 @@ dbTest('a turn that says something, calls a tool and then answers stays working 
     assert.equal((await store.chatView(owner, 200, botId)).working, true, 'the next round of the same turn is answering it')
   })
 })
+
+dbTest('a run that dies after taking a message (a replay that fails after a deploy) gives the chat back and the next turn answers the same message', async t => {
+  const [{ createRequestDatabaseScope, db }, schema, store, { recordCoordinatorEvent }, { userMessageEvent }, { recoverInterruptedTurns }, { and, eq, isNull, sql }] = await Promise.all([
+    import('../db'), import('../db/schema'), import('./store'), import('../coordinator-event-store'), import('../coordinator-events'), import('./interrupted-turns'), import('drizzle-orm'),
+  ])
+  const scope = createRequestDatabaseScope(databaseUrl!)
+  const owner = `test-interrupted-${randomUUID()}`, botId = randomUUID()
+  t.after(async () => {
+    t.diagnostic(JSON.stringify({ event: 'coordinator_db_fixture_retained', fixtureOwnerIds: [owner], database: 'mikka_e2e' }))
+    await scope.close()
+  })
+  await scope.run(async () => {
+    await db.execute(sql`insert into "user" (id, name, email, "emailVerified", "createdAt", "updatedAt") values (${owner}, 'Interrupted fixture', ${`${owner}@example.invalid`}, false, now(), now())`)
+    await db.insert(schema.bots).values({ id: botId, ownerId: owner, workspaceId: randomUUID(), name: 'Interrupted bot' })
+    await recordCoordinatorEvent(db, userMessageEvent(owner, '重新派发 ALEX-5', { botId }))
+    // The run takes the message (stored in the chat, lease held), then dies before it can answer or let go.
+    assert.equal((await store.takeInbox(owner, 'wrun_killed', botId)).added, 1)
+    const dying = await store.chatView(owner, 200, botId)
+    assert.deepEqual([dying.working, dying.streamRunId], [true, 'wrun_killed'])
+    const statuses: Record<string, string> = { wrun_killed: 'failed' }
+    const leased = async () => (await db.select({ userId: schema.coordinatorSessions.userId, botId: schema.coordinatorSessions.botId, holder: schema.coordinatorSessions.leaseHolder })
+      .from(schema.coordinatorSessions).where(eq(schema.coordinatorSessions.userId, owner))).flatMap(row => row.botId && row.holder ? [{ userId: row.userId, botId: row.botId, holder: row.holder }] : [])
+    const sweep = () => recoverInterruptedTurns({ leased, status: async holder => statuses[holder] ?? 'running', release: store.releaseLease, retry: store.retryFailedTurn })
+    assert.deepEqual(await sweep(), { checked: 1, recovered: 1, retried: 1 })
+    // The chat is let go at once, not after the 10-minute lease, and its message waits for the next turn.
+    const [session] = await db.select().from(schema.coordinatorSessions).where(and(eq(schema.coordinatorSessions.userId, owner), eq(schema.coordinatorSessions.botId, botId)))
+    assert.deepEqual([session.leaseHolder, session.leaseUntil, session.lastError], [null, null, null])
+    const waiting = await db.select().from(schema.coordinatorEvents).where(and(eq(schema.coordinatorEvents.userId, owner), isNull(schema.coordinatorEvents.deliveredAt)))
+    assert.deepEqual(waiting.map(event => [event.kind, event.payload.retry, event.payload.postedToChat]), [['user_message', true, true]])
+    const recovered = await store.chatView(owner, 200, botId)
+    assert.equal(recovered.working, true, 'the retry is waiting for a turn')
+    assert.equal(recovered.error, null)
+    assert.deepEqual(recovered.items.map(item => [item.from, item.text, item.failure ?? null]), [['person', '重新派发 ALEX-5', null]], 'shown once, with no failure mark')
+    // A second sweep finds nothing; the next turn takes the retry and answers the same message.
+    assert.deepEqual(await sweep(), { checked: 0, recovered: 0, retried: 0 })
+    assert.equal((await store.takeInbox(owner, 'wrun_next', botId)).added, 1)
+    assert.deepEqual((await store.chatView(owner, 200, botId)).items.map(item => [item.from, item.text]), [['person', '重新派发 ALEX-5']], 'the retry adds no second copy')
+    await store.appendMessages(owner, 'wrun_next', [{ role: 'assistant', content: '已重新派发。' }], null, botId, 'wrun_next:0')
+    const answered = await store.chatView(owner, 200, botId)
+    assert.deepEqual(answered.items.map(item => [item.from, item.text, item.failure ?? null]), [['person', '重新派发 ALEX-5', null], ['coordinator', '已重新派发。', null]])
+    assert.equal(answered.working, false)
+  })
+})

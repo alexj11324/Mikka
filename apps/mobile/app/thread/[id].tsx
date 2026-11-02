@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 import { KeyboardChatScrollView } from 'react-native-keyboard-controller'
 import { useLocalSearchParams, useRouter } from 'expo-router'
@@ -30,7 +30,11 @@ export default function ThreadScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const router = useRouter()
   const insets = useSafeAreaInsets()
-  const { data, error, reload } = useApi<ThreadDetail>(`/api/mobile/threads/${id}`, 4000)
+  // A working thread is read every 4 s; an ended one only changes when it runs again (a message here
+  // reloads at once), so it is read every 30 s instead. Each read is the whole conversation.
+  const [ended, setEnded] = useState(false)
+  const { data, error, reload } = useApi<ThreadDetail>(`/api/mobile/threads/${id}`, ended ? 30_000 : 4000)
+  useEffect(() => { setEnded(data ? !data.active : false) }, [data])
   const [sending, setSending] = useState(false)
   // What to say when a message was not sent: the server's reason when it gave one (threadReplaced…).
   const [sendFailed, setSendFailed] = useState<string | null>(null)
