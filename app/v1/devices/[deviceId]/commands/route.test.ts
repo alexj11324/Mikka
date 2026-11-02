@@ -11,6 +11,7 @@ let actual: typeof import('../../../../../lib/device-link')
 const authenticateDevice = mock.fn(async () => ({ userId: 'owner', tokenId: 'token' }) as object | null)
 const ownsDevice = mock.fn(async () => ({ id: 'device-1', enabled: true }) as object | null)
 type Work = { commands: unknown[]; queuedRuns: string[] }
+const deviceMayHaveWork = mock.fn(async (_deviceId: string, _skip: readonly string[], _options?: { mailboxNotices?: boolean; queued?: boolean }) => true)
 const deviceWork = mock.fn(async (_deviceId: string, _skip: readonly string[], _options?: { mailboxNotices?: boolean; queued?: boolean }): Promise<Work> => ({ commands: [], queuedRuns: [] }))
 const sleep = mock.fn(async (ms: number, signal?: AbortSignal) => actual.sleep(ms, signal))
 const logs: RequestLogEntry[] = []
@@ -30,7 +31,7 @@ let GET: typeof import('./route')['GET']
 before(async () => {
   actual = await import('../../../../../lib/device-link')
   mock.module(new URL('../../../../../lib/device-link.ts', import.meta.url).href, {
-    namedExports: { authenticateDevice, deviceWork, ownsDevice, sleep, waitSeconds: actual.waitSeconds },
+    namedExports: { authenticateDevice, deviceMayHaveWork, deviceWork, ownsDevice, sleep, waitSeconds: actual.waitSeconds },
   })
   GET = (await import('./route')).GET
 })
@@ -40,6 +41,8 @@ beforeEach(() => {
   authenticateDevice.mock.mockImplementation(async () => ({ userId: 'owner', tokenId: 'token' }))
   ownsDevice.mock.resetCalls()
   ownsDevice.mock.mockImplementation(async () => ({ id: 'device-1', enabled: true }))
+  deviceMayHaveWork.mock.resetCalls()
+  deviceMayHaveWork.mock.mockImplementation(async () => true)
   deviceWork.mock.resetCalls()
   deviceWork.mock.mockImplementation(async () => ({ commands: [], queuedRuns: [] }))
   sleep.mock.resetCalls()
@@ -137,4 +140,14 @@ test('mailbox notice commands require a capable daemon so older clients keep rec
   assert.equal(deviceWork.mock.calls[0].arguments[2]?.mailboxNotices, false)
   await GET(request(undefined, 0, '', true), params)
   assert.equal(deviceWork.mock.calls[1].arguments[2]?.mailboxNotices, true)
+})
+
+test('an idle check that finds nothing never runs the full read, and the poll still ends empty at its deadline', async () => {
+  deviceMayHaveWork.mock.mockImplementation(async () => false)
+  sleep.mock.mockImplementation(async () => {})
+  assert.deepEqual(await (await GET(request(undefined, 0), params)).json(), { commands: [] })
+  assert.equal(deviceMayHaveWork.mock.callCount(), 1)
+  assert.deepEqual(deviceMayHaveWork.mock.calls[0].arguments, ['device-1', [], { mailboxNotices: false, queued: true }])
+  assert.equal(deviceWork.mock.callCount(), 0)
+  assert.equal(logs[0].outcome, 'empty')
 })

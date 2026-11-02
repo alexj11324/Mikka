@@ -150,6 +150,24 @@ export function waitSeconds(request: Request, max: number): number {
 }
 
 /**
+ * Whether `deviceWork` could find anything: one statement, one round trip,
+ * returning one boolean, with the credential check inside it (a revoked or
+ * expired credential throws, as any fenced query does). A long-poll asks this
+ * between full reads, which stay fenced and are the only path that hands over
+ * message text or queued runs. Mailbox notices are not modelled: with them on,
+ * a live run always counts as possible work and the full read decides.
+ */
+export async function deviceMayHaveWork(deviceId: string, skip: readonly string[], options: { mailboxNotices?: boolean; queued?: boolean } = {}): Promise<boolean> {
+  const skipped = skip.filter(id => z.uuid().safeParse(id).success)
+  const { readUnderDeviceAuthority } = await import('@/lib/db')
+  return readUnderDeviceAuthority<boolean>(`EXISTS (SELECT 1 FROM agent_runs r WHERE r."deviceId"=$1 AND r.status = ANY($2::text[]) AND NOT (r.id = ANY($3::uuid[]))
+    AND (r."stopRequestedAt" IS NOT NULL OR ($4 AND r.status='queued')
+      OR ($5 AND r.status IN ('preparing','running','waiting_input'))
+      OR EXISTS (SELECT 1 FROM run_messages m WHERE m."runId"=r.id AND m."deliveredAt" IS NULL)))`,
+  [deviceId, [...LIVE_RUN_STATUSES], skipped, Boolean(options.queued), Boolean(options.mailboxNotices)])
+}
+
+/**
  * What a device has waiting, read with one query of its runs per poll:
  * - `commands`: a person's message to a running agent (repeats until acked)
  *   and a stop someone asked for (repeats until the run ends);

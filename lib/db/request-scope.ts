@@ -3,7 +3,7 @@ import { Pool, type PoolClient } from 'pg'
 import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres'
 import * as schema from './schema'
 import { mikkaDatabaseURL } from './config'
-import { deviceScopedPool } from './device-scope'
+import { deviceScopedPool, readUnderAuthority } from './device-scope'
 import { sampleClient } from './egress-sample'
 
 const defaultConnectionString = mikkaDatabaseURL(process.env)
@@ -62,6 +62,11 @@ export function withDatabaseTransaction<T>(transaction: Transaction, callback: (
 /** Reuse an already-open SQL transaction without acquiring another pool connection. */
 export function withDatabaseClient<T>(client: PoolClient, callback: () => T): T {
   return heldClient.run(client, () => transactionDatabase.run(drizzle(client, { schema }), callback))
+}
+
+/** A single read whose statement checks the daemon's credential itself (device-scope.ts `readUnderAuthority`). */
+export function readUnderDeviceAuthority<T>(select: string, params: readonly unknown[]): Promise<T> {
+  return readUnderAuthority<T>(requestDatabase.getStore()?.pool ?? defaultPool, select, params)
 }
 
 export function createRequestDatabaseScope(connectionString: string) {

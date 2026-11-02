@@ -105,6 +105,24 @@ function fencedClient(client: PoolClient, caller: DeviceAuthority): PoolClient {
   })
 }
 
+/**
+ * One read-only statement that carries the credential check itself, in one
+ * round trip: `select` is evaluated only when the caller's credential is
+ * still live, and no row means it was revoked or expired. For a read, a
+ * single statement's snapshot is as strong as the fenced transaction (a
+ * revocation commits wholly before or after it); it takes no lock and is not
+ * for writes. The parameters after `params` are the credential's.
+ */
+export async function readUnderAuthority<T>(base: Pool, select: string, params: readonly unknown[]): Promise<T> {
+  const scope = authority.getStore()
+  if (!scope) throw new Error('A device authority read requires an authenticated daemon scope')
+  const token = `$${params.length + 1}`, user = `$${params.length + 2}`
+  const { rows } = await base.query(`SELECT (${select}) AS value FROM device_tokens WHERE id=${token} AND "userId"=${user} AND "revokedAt" IS NULL AND ("expiresAt" IS NULL OR "expiresAt">clock_timestamp())`,
+    [...params, scope.caller.tokenId, scope.caller.userId])
+  if (!rows.length) throw new DeviceAuthorityRevoked()
+  return rows[0].value as T
+}
+
 /** Applies only inside an authenticated daemon scope. No extra admission pool:
  * the connection holding the authority lock performs the protected SQL itself.
  * A connection failure rolls back both, and there is no reconnect/retry here. */
