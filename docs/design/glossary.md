@@ -173,6 +173,12 @@ desktop app or the daemon. Not a bot's cloud computer (电脑).
 _Owner_: the account (Device aggregate).
 _Avoid_: 电脑 (a bot's cloud computer), machine in the UI, runner.
 
+**Daemon (daemon)**:
+The background service on a device that connects it to Mikka and runs its
+Agents. The UI calls it daemon in both languages, with no 「Mikka」 in front:
+「重启 daemon」, "Update daemon". Not the Mikka desktop app.
+_Avoid_: Mikka 客户端, Mikka client, 客户端 (reads as the desktop app).
+
 **Connection (连接)**:
 The person's authorised link to an outside app (Gmail, GitHub, Linear,
 Telegram…), used only by their own bots unless a workspace policy says

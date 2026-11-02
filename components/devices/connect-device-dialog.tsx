@@ -55,7 +55,7 @@ export function ConnectDeviceDialog({ open: controlledOpen, onOpenChange, hideTr
 }
 
 /**
- * The three commands that install the Mikka client, sign it in and start it on
+ * The three commands that install the daemon, sign it in and start it on
  * a computer by hand: the web's 添加设备, and the desktop's 手动连接 fallback.
  * A device paired before needs only the start command (review C11).
  */
