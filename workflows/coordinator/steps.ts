@@ -1,4 +1,4 @@
-import { cloudComputerTasksEnabled } from '@/lib/cloud-computer-flag'
+import { cloudComputerRunsEnabled } from '@/lib/cloud-computer-flag'
 import { runInvalidDetail } from '@/lib/run-invalid-reason'
 import { FatalError } from 'workflow'
 import type { CoordinatorWorkflowStreamPart } from '@/lib/coordinator/stream'
@@ -59,7 +59,7 @@ type ToolResult<T> = T | { error: string; reason?: string; detail?: string }
 
 export async function computerToolsEnabled() {
   'use step'
-  return cloudComputerTasksEnabled() && process.env.MIKKA_BYOS_ENABLED === '1'
+  return cloudComputerRunsEnabled()
 }
 
 async function asToolResult<T>(fn: () => Promise<T>): Promise<ToolResult<T>> {
@@ -441,7 +441,7 @@ async function dispatchByRules(userId: string, input: { issueId: string; agentId
 export async function listComputerWorkspaces(userId: string, scope?: NativeToolScope) {
   'use step'
   await assertNativeToolScope(userId, scope)
-  if (!cloudComputerTasksEnabled() || process.env.MIKKA_BYOS_ENABLED !== '1') return { error: 'cloudComputerUnavailable' }
+  if (!cloudComputerRunsEnabled()) return { error: 'cloudComputerUnavailable' }
   const [{ workspaceDb }, { workspaces, workspaceMembers }] = await Promise.all([import('@/lib/workspace-db'), import('@/lib/db/workspace-schema')])
   return workspaceDb.select({ id: workspaces.id, name: workspaces.name }).from(workspaces)
     .innerJoin(workspaceMembers, eq(workspaceMembers.workspaceId, workspaces.id))
@@ -452,7 +452,7 @@ export async function listComputerWorkspaces(userId: string, scope?: NativeToolS
 export async function createComputerBot(userId: string, input: { workspaceId: string; name: string }, toolCallId: string, scope?: NativeToolScope) {
   'use step'
   await assertNativeToolScope(userId, scope)
-  if (!cloudComputerTasksEnabled() || process.env.MIKKA_BYOS_ENABLED !== '1' || !toolCallId || toolCallId.length > 200) return { error: 'cloudComputerUnavailable' }
+  if (!cloudComputerRunsEnabled() || !toolCallId || toolCallId.length > 200) return { error: 'cloudComputerUnavailable' }
   try {
     await (await import('@/lib/subscription-runtime')).authorizeSubscriptionWorkspace(userId, input.workspaceId)
     const hash = createHash('sha256').update(JSON.stringify(['create-bot', userId, toolCallId])).digest('hex')
@@ -466,7 +466,7 @@ export async function createComputerBot(userId: string, input: { workspaceId: st
 export async function listComputerBots(userId: string, scope?: NativeToolScope) {
   'use step'
   await assertNativeToolScope(userId, scope)
-  if (!cloudComputerTasksEnabled() || process.env.MIKKA_BYOS_ENABLED !== '1') return { error: 'cloudComputerUnavailable' }
+  if (!cloudComputerRunsEnabled()) return { error: 'cloudComputerUnavailable' }
   const { authorizeSubscriptionWorkspace } = await import('@/lib/subscription-runtime')
   const { rows } = await pool.query(`SELECT b.id,b.name,b."workspaceId",coalesce(array_agg(r.harness) FILTER (WHERE r.harness IS NOT NULL),'{}') AS harnesses
     FROM bots b LEFT JOIN bot_cloud_runtimes r ON r."botId"=b.id AND r."ownerId"=b."ownerId" AND r."workspaceId"=b."workspaceId"
@@ -496,7 +496,7 @@ export async function dispatchComputerThread(userId: string, input: { botId: str
 export async function dispatchComputerTask(userId: string, input: { botId: string; issueId: string; harness: 'codex' | 'claude_code'; note?: string; model?:string; repo?:string; suggestionId?: string; readOnly?: boolean }, toolCallId: string, scope?: NativeToolScope, execution?: AgentExecution) {
   'use step'
   await assertNativeToolScope(userId, scope)
-  if (!cloudComputerTasksEnabled() || process.env.MIKKA_BYOS_ENABLED !== '1' || !toolCallId || toolCallId.length > 200) return { error: 'cloudComputerUnavailable' }
+  if (!cloudComputerRunsEnabled() || !toolCallId || toolCallId.length > 200) return { error: 'cloudComputerUnavailable' }
   const target = (await pool.query(`SELECT b."workspaceId",r."agentId",r."repoId",a."deviceId" FROM bots b
     JOIN bot_cloud_runtimes r ON r."botId"=b.id AND r."ownerId"=b."ownerId" AND r."workspaceId"=b."workspaceId"
     JOIN agents a ON a.id=r."agentId" AND a."userId"=b."ownerId"
@@ -535,7 +535,7 @@ export async function dispatchComputerTask(userId: string, input: { botId: strin
 export async function wakeComputerBot(userId: string, input: { botId: string }, scope?: NativeToolScope) {
   'use step'
   await assertNativeToolScope(userId, scope)
-  if (!cloudComputerTasksEnabled() || process.env.MIKKA_BYOS_ENABLED !== '1') return { error: 'cloudComputerUnavailable' }
+  if (!cloudComputerRunsEnabled()) return { error: 'cloudComputerUnavailable' }
   const bot = (await pool.query('SELECT "workspaceId" FROM bots WHERE id=$1 AND "ownerId"=$2', [input.botId, userId])).rows[0]
   if (!bot) return { error: 'cloudComputerUnavailable' }
   try {
@@ -552,7 +552,7 @@ export async function wakeComputerBot(userId: string, input: { botId: string }, 
 export async function listBotSubscriptions(userId: string, input: { botId: string }, scope?: NativeToolScope) {
   'use step'
   await assertNativeToolScope(userId, scope)
-  if (!cloudComputerTasksEnabled() || process.env.MIKKA_BYOS_ENABLED !== '1') return { error: 'cloudComputerUnavailable' }
+  if (!cloudComputerRunsEnabled()) return { error: 'cloudComputerUnavailable' }
   const bot = (await pool.query('SELECT "workspaceId" FROM bots WHERE id=$1 AND "ownerId"=$2', [input.botId, userId])).rows[0]
   if (!bot) return { error: 'cloudComputerUnavailable' }
   try { await (await import('@/lib/subscription-runtime')).authorizeSubscriptionWorkspace(userId, bot.workspaceId) } catch { return { error: 'cloudComputerUnavailable' } }
@@ -564,7 +564,7 @@ export async function listBotSubscriptions(userId: string, input: { botId: strin
 export async function bindComputerSubscription(userId: string, input: { botId: string; connectionId: string; revision: number; harness: 'codex' | 'claude_code'; modelId: string }, toolCallId: string, scope?: NativeToolScope) {
   'use step'
   await assertNativeToolScope(userId, scope)
-  if (!cloudComputerTasksEnabled() || process.env.MIKKA_BYOS_ENABLED !== '1' || !toolCallId || toolCallId.length > 200) return { error: 'cloudComputerUnavailable' }
+  if (!cloudComputerRunsEnabled() || !toolCallId || toolCallId.length > 200) return { error: 'cloudComputerUnavailable' }
   const bot = (await pool.query('SELECT "workspaceId" FROM bots WHERE id=$1 AND "ownerId"=$2', [input.botId, userId])).rows[0]
   if (!bot) return { error: 'cloudComputerUnavailable' }
   try {

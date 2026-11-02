@@ -1,5 +1,6 @@
 import 'server-only'
 import { personalMailboxEnabled } from './personal-mailbox-config'
+import { byosEnabled } from './cloud-computer-flag'
 import { snapshotMailboxTools } from '@/lib/personal-mailbox-capability'
 import { freezeWorkerDefinition } from '@/lib/agent-kit/worker'
 import type { AgentExecution } from '@/lib/agent-kit/store'
@@ -137,7 +138,7 @@ async function queueAdmittedRun(userId: string, input: LocalDispatchInput, botId
   const runId = crypto.randomUUID()
   const prompt = runPrompt(issue.title, tiptapToText(issue.content), agent.instructions, parsed.data.note)
   const captureDefinition = true
-  const found = captureDefinition && process.env.MIKKA_BYOS_ENABLED === '1' ? await new SubscriptionRepository(pool).nativeBinding(userId,agent.id,agent.harness) : null
+  const found = captureDefinition && byosEnabled() ? await new SubscriptionRepository(pool).nativeBinding(userId,agent.id,agent.harness) : null
   // The run's credential, frozen now: the subscription, else the person's own API key (orchestration.md § 2).
   const { subscription, apiKey } = await localRunCredential(internal?.client ?? pool, userId, botId, agent.harness, parsed.data.model, found)
   const mailboxEnabled = personalMailboxEnabled()

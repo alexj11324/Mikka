@@ -1,5 +1,5 @@
 import "server-only";
-import { cloudComputerTasksEnabled } from "./cloud-computer-flag";
+import { cloudComputerRunsEnabled } from "./cloud-computer-flag";
 import type { Pool } from "pg";
 import { pool } from "./db";
 import { issueForUser } from "./issue-access";
@@ -39,7 +39,7 @@ export async function cloudReady(
   query: Query,
   scope: { ownerId: string; workspaceId: string; botId: string | null; harness: string },
 ) {
-  if (!cloudComputerTasksEnabled() || process.env.MIKKA_BYOS_ENABLED !== "1") return false;
+  if (!cloudComputerRunsEnabled()) return false;
   const { rowCount } = await query.query(
     `SELECT 1 WHERE ${ownE2BKeySql('$3::text')}
         AND ($2::uuid IS NULL OR EXISTS (SELECT 1 FROM bots b WHERE b.id=$2 AND b."workspaceId"=$1::uuid AND b."ownerId"=$3 AND b."archivedAt" IS NULL))`,
