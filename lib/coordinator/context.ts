@@ -283,7 +283,8 @@ export function instructionsWithPersonal(instructions: string, personal: string)
 /** One entry in the chat the person sees. */
 /** A tool a reply used, as the chat shows it: `running` until its result is stored. */
 export interface ChatTool { call: string; name: string; state: 'running' | 'done' | 'error'; input?: string; output?: string }
-export interface ChatActivity { tools: ChatTool[]; thought: boolean }
+/** `reasoningAt`: the stored rows whose reasoning is readable text, fetched only when the person opens it (chat-projection.ts keeps its length). */
+export interface ChatActivity { tools: ChatTool[]; thought: boolean; reasoningAt?: number[] }
 
 function withPreview<K extends 'input' | 'output'>(key: K, text: string | undefined): Partial<Record<K, string>> {
   return text ? { [key]: text } as Record<K, string> : {}
@@ -420,7 +421,9 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
       const tools = parts.flatMap(part => part.type === 'tool-call' && !HIDDEN_TOOLS.has(part.toolName) ? [part.toolName] : [])
       const steps = parts.flatMap((part): ChatTool[] => part.type === 'tool-call' && !HIDDEN_TOOLS.has(part.toolName)
         ? [{ call: part.toolCallId, name: part.toolName, state: 'running', ...withPreview('input', toolPreview((part as { inputPreview?: unknown }).inputPreview, part.input)) }] : [])
-      const thought = parts.some(part => part.type === 'reasoning' && (Number((part as { chars?: unknown }).chars) > 0 || Boolean((part as { text?: unknown }).text)))
+      // Any reasoning means it thought; only readable text (not encrypted or empty) can be opened.
+      const thought = parts.some(part => part.type === 'reasoning')
+      const readable = parts.some(part => part.type === 'reasoning' && (Number((part as { chars?: unknown }).chars) > 0 || Boolean((part as { text?: unknown }).text?.toString().trim())))
       const last = items.at(-1)
       const shown = [...waiting.ids, ...cited.ids]
       // 停止 cut this reply short (lib/coordinator/stop.ts); the mark may sit on an empty message.
@@ -431,13 +434,14 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
       const shows = Boolean(cited.text || steps.length || thought)
       if (last?.from === 'coordinator' && !waiting.ids.length && !briefingBoundary) {
         if (!last.streamId && shows && streamId) last.streamId = streamId
-        if (steps.length || thought) last.activity = { tools: [...last.activity?.tools ?? [], ...steps], thought: Boolean(last.activity?.thought || thought) }
+        if (steps.length || thought) last.activity = { tools: [...last.activity?.tools ?? [], ...steps], thought: Boolean(last.activity?.thought || thought),
+          ...(last.activity?.reasoningAt || readable ? { reasoningAt: [...last.activity?.reasoningAt ?? [], ...(readable ? [position] : [])] } : {}) }
         last.text = [last.text, cited.text].filter(Boolean).join('\n\n')
         last.tools.push(...tools)
         last.artifacts = [...new Set([...last.artifacts, ...cited.ids])]
         if (stopped) last.stopped = true
       } else if (cited.text || tools.length || shown.length || stopped || thought) {
-        items.push({ ...(id ? { id } : {}), position, from: 'coordinator', text: cited.text, tools, threads: [], createdAt: createdAt.toISOString(), artifacts: [...new Set(shown)], ...(stopped ? { stopped } : {}), ...(streamId && shows ? { streamId } : {}), ...(steps.length || thought ? { activity: { tools: steps, thought } } : {}) })
+        items.push({ ...(id ? { id } : {}), position, from: 'coordinator', text: cited.text, tools, threads: [], createdAt: createdAt.toISOString(), artifacts: [...new Set(shown)], ...(stopped ? { stopped } : {}), ...(streamId && shows ? { streamId } : {}), ...(steps.length || thought ? { activity: { tools: steps, thought, ...(readable ? { reasoningAt: [position] } : {}) } } : {}) })
         waiting.ids = []
         // Only a reply that shows ends the boundary; hidden tool-only steps do not.
         briefingBoundary = false

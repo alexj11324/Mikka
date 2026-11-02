@@ -114,7 +114,38 @@ test('each tool streams its name, state and short previews; thinking streams as 
   assert.equal(created.input?.length, 200, 'the input preview is as short as the stored one')
   assert.ok(created.input?.startsWith('{"title":"Fix login"'))
   assert.equal((steps[3] as Extract<CoordinatorStreamEvent, { type: 'tool' }>).output, '{"id":"i1"}')
-  assert.equal(JSON.stringify(events).includes('private'), false, 'reasoning text and error details stay on the server')
+  assert.equal(JSON.stringify(events).includes('private failure detail'), false, 'tool error details stay on the server')
+  assert.deepEqual(steps[1], { type: 'thinking', id: 'run:0', state: 'end', text: 'private reasoning' }, 'readable reasoning arrives whole when its block ends')
+})
+
+const reasoningDelta = (text: string) => ({ type: 'reasoning-delta', id: 'r', text }) as unknown as CoordinatorWorkflowStreamPart
+
+test('reasoning text is masked as a whole block; encrypted, empty or secret-holding reasoning streams no text', async () => {
+  const old = process.env.BETTER_AUTH_SECRET
+  process.env.BETTER_AUTH_SECRET = 'offline-stream-guard-fixture-secret'
+  try {
+    const secret = 'synthetic-password-value'
+    const token = 'ghp_' + 'B'.repeat(36)
+    const run = async (parts: CoordinatorWorkflowStreamPart[]) => {
+      const raw = new ReadableStream<CoordinatorWorkflowStreamPart>({ start(controller) { [start(), ...parts].forEach(part => controller.enqueue(part)); controller.close() } })
+      return (await drain(raw.pipeThrough(coordinatorTextStream('owner', [fingerprint('owner', secret)])))).filter(event => event.type === 'thinking')
+    }
+    // A credential split over deltas is masked once the block is whole; none of it streams before.
+    const split = await run([reasoning('reasoning-start'), reasoningDelta(`use ${token.slice(0, 10)}`), reasoningDelta(`${token.slice(10)} to call GitHub`), reasoning('reasoning-end')])
+    assert.equal(split.length, 2)
+    const text = (split[1] as { text?: string }).text ?? ''
+    assert.match(text, /^use .+ to call GitHub$/)
+    assert.equal(text.includes(token) || text.includes(token.slice(0, 10)), false)
+    // Encrypted reasoning (no text) or empty text: start and end only.
+    assert.deepEqual(await run([reasoning('reasoning-start'), reasoning('reasoning-end')]), [{ type: 'thinking', id: 'run:0', state: 'start' }, { type: 'thinking', id: 'run:0', state: 'end' }])
+    assert.deepEqual((await run([reasoning('reasoning-start'), reasoningDelta('  '), reasoning('reasoning-end')]))[1], { type: 'thinking', id: 'run:0', state: 'end' })
+    // A saved secret in the reasoning: the block streams no text at all.
+    const held = await run([reasoning('reasoning-start'), reasoningDelta(`the password is ${secret}`), reasoning('reasoning-end')])
+    assert.deepEqual(held[1], { type: 'thinking', id: 'run:0', state: 'end' })
+  } finally {
+    if (old === undefined) delete process.env.BETTER_AUTH_SECRET
+    else process.env.BETTER_AUTH_SECRET = old
+  }
 })
 
 test('a hand-off turn that may end quiet streams no tools or thinking', async () => {

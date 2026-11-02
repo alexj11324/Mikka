@@ -90,7 +90,7 @@ function streamedItem(reply: CoordinatorLiveReply): Chat['items'][number] {
 
 /** A live reply's thinking as the activity shows it: still thinking, or the whole seconds it took (at least one). */
 function liveThinking(reply: CoordinatorLiveReply) {
-  return reply.thinking && { active: reply.thinking.since !== undefined, seconds: Math.max(1, Math.round(reply.thinking.ms / 1000)) }
+  return reply.thinking && { active: reply.thinking.since !== undefined, seconds: Math.max(1, Math.round(reply.thinking.ms / 1000)), ...(reply.thinking.text ? { text: reply.thinking.text } : {}) }
 }
 
 /** A message the person just sent brings the chat back to its end, wherever they had scrolled. */
@@ -368,7 +368,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
                     {/* A tapped 建议 card: the same card, then only what it adds (R-21, R-40). */}
                     {item.suggestion && <SentSuggestion card={item.suggestion} compact={compact} />}
                     {/* Before the words, as they happened: thinking, then each tool. The same slot live and stored, so storing keeps it. */}
-                    {item.activity && <ReplyActivity tools={item.activity.tools} thinking={live ? liveThinking(live) : undefined} thought={item.activity.thought} />}
+                    {item.activity && <ReplyActivity tools={item.activity.tools} thinking={live ? liveThinking(live) : undefined} thought={item.activity.thought} reasoningAt={item.activity.reasoningAt} botId={botId} />}
                     {item.text && (item.from === 'coordinator'
                       ? <ReplyAnswer value={live ? null : answers.get(item.position) ?? null}><CoordinatorReply text={item.text} citations={live ? live.committedThrough === undefined ? liveCitations.streaming : liveCitations.settled : citations} isStreaming={Boolean(live && live.committedThrough === undefined)} /></ReplyAnswer>
                       : <Bubble variant="secondary" align="end" className={personBubble}><BubbleContent className="flex flex-col gap-1.5 rounded-2xl px-4 py-3 whitespace-pre-wrap">{item.quote && <ArtifactQuoteLine quote={item.quote} />}{item.notes?.map(note => <BrowserNoteLine key={note.n} note={note} />)}<UserMessageText text={item.text} /></BubbleContent></Bubble>)}

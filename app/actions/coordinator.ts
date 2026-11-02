@@ -11,9 +11,11 @@ import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { userMessageEvent } from '@/lib/coordinator-events'
 import type { UserImageInput } from '@/lib/coordinator/user-attachments'
 import { personalSubmissionInput, personalSubmissionRecorded, recordPersonalSubmission, SubmissionConflictError } from '@/lib/coordinator-submission'
-import { botChats, chatVersion, chatView, citationSources, retryFailedTurn, sendRetryOf, type BotChatSummary, type ChatView } from '@/lib/coordinator/store'
+import { botChats, chatVersion, chatView, citationSources, storedReasoning, retryFailedTurn, sendRetryOf, type BotChatSummary, type ChatView } from '@/lib/coordinator/store'
 import type { UnchangedChat } from '@/lib/coordinator/chat-poll'
 import type { CitationSource } from '@/lib/coordinator/citations'
+import { reasoningText } from '@/lib/coordinator/stream-response'
+import { credentialChatFingerprints } from '@/lib/credentials/chat-guard'
 import { and, eq, sql } from 'drizzle-orm'
 import { openChatBotId } from '@/lib/coordinator/coordinator-bot'
 import { bots, devices } from '@/lib/db/schema'
@@ -109,6 +111,22 @@ export async function coordinatorCitationSources(ids: readonly string[]): Promis
   const parsed = citedIdsSchema.safeParse(ids)
   if (!parsed.success) return {}
   return citationSources(await getUserId(), [parsed.data.join(' ')])
+}
+
+const reasoningPositionsSchema = z.array(z.number().int().min(1).max(Number.MAX_SAFE_INTEGER)).min(1).max(50)
+
+/**
+ * What a stored reply thought, for the chat's 「思考了」 when the person opens it: the readable reasoning of the
+ * person's own messages at `positions` in this bot's chat, masked as the live stream masks it. Null when there is none.
+ */
+export async function coordinatorReasoning(botId: string | null, positions: readonly number[]): Promise<string | null> {
+  const parsed = reasoningPositionsSchema.safeParse(positions)
+  if (!parsed.success) return null
+  const user = await getUser()
+  const bot = await ownBot(user, botId)
+  const fingerprints = await credentialChatFingerprints(user.id)
+  const texts = (await storedReasoning(user.id, bot.id, parsed.data)).flatMap(text => reasoningText(user.id, text, fingerprints) ?? [])
+  return texts.length ? texts.join('\n\n') : null
 }
 
 /** Each bot's latest line and whether it is answering, for the bot list. */

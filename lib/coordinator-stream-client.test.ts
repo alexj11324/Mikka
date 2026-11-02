@@ -70,6 +70,13 @@ test('a live reply keeps each tool in call order with its latest state, and adds
     { call: 'c2', name: 'web_search', state: 'error' },
   ])
   assert.deepEqual(replies[0].thinking, { ms: 3_400 }, 'a repeated start does not restart the clock')
+  // Readable blocks keep their text, in order; a block without text adds none.
+  let thought: CoordinatorLiveReply[] = [{ id, text: '' }]
+  for (const [event, at] of [[{ type: 'thinking', id, state: 'start' }, 0], [{ type: 'thinking', id, state: 'end', text: 'first' }, 1_000],
+    [{ type: 'thinking', id, state: 'start' }, 2_000], [{ type: 'thinking', id, state: 'end' }, 2_500], [{ type: 'thinking', id, state: 'start' }, 3_000], [{ type: 'thinking', id, state: 'end', text: 'second' }, 3_500]] as [CoordinatorStreamEvent, number][]) {
+    thought = coordinatorStreamReply(thought, event, at)
+  }
+  assert.deepEqual(thought[0].thinking, { ms: 2_000, text: 'first\n\nsecond' })
   // Before any words, a reply with only steps already shows; one with nothing does not.
   assert.equal(visibleCoordinatorReplies(replies, 0, 'run').length, 1)
   assert.equal(visibleCoordinatorReplies([{ id, text: '' }], 0, 'run').length, 0)

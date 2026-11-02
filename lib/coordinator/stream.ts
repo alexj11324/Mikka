@@ -16,6 +16,9 @@ export type CoordinatorStreamEvent =
    * (`TOOL_PREVIEW_CHARS`, masked; left out when they would carry a saved secret), as the stored chat keeps them.
    */
   | { type: 'tool'; id: string; call: string; name: string; state: 'running' | 'done' | 'error'; input?: string; output?: string }
-  /** The model started or stopped thinking; its words never leave the server (chat-projection.ts). */
-  | { type: 'thinking'; id: string; state: 'start' | 'end' }
+  /**
+   * The model started or stopped thinking. At the end comes what it thought, masked, when the model returned
+   * readable reasoning; none for encrypted or empty reasoning, or when it would hold a saved secret.
+   */
+  | { type: 'thinking'; id: string; state: 'start' | 'end'; text?: string }
   | { type: 'error' }

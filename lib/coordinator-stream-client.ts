@@ -10,8 +10,8 @@ export type CoordinatorLiveReply = {
   quiet?: boolean
   /** Tools in the order they were called; each keeps its latest state. */
   tools?: CoordinatorLiveTool[]
-  /** How long the model has thought so far (`ms`), and since when it is thinking now. */
-  thinking?: { ms: number; since?: number }
+  /** How long the model has thought so far (`ms`), since when it is thinking now, and what it thought (masked; only when readable). */
+  thinking?: { ms: number; since?: number; text?: string }
 }
 
 /** `now` is when the event arrived; thinking time is measured from these. */
@@ -32,7 +32,9 @@ export function coordinatorStreamReply(replies: CoordinatorLiveReply[], event: C
     if (event.type === 'thinking') {
       const thinking = reply.thinking ?? { ms: 0 }
       if (event.state === 'start') return thinking.since === undefined ? { ...reply, thinking: { ...thinking, since: now } } : reply
-      return thinking.since === undefined ? reply : { ...reply, thinking: { ms: thinking.ms + Math.max(0, now - thinking.since) } }
+      if (thinking.since === undefined) return reply
+      const text = [thinking.text, event.text].filter(Boolean).join('\n\n')
+      return { ...reply, thinking: { ms: thinking.ms + Math.max(0, now - thinking.since), ...(text ? { text } : {}) } }
     }
     return { ...reply, committedThrough: event.through, quiet: event.quiet }
   })
@@ -64,7 +66,9 @@ function parseEvent(line: string): CoordinatorStreamEvent {
         return { type: 'tool', id: event.id, call: event.call, name: event.name, state: event.state,
           ...(typeof event.input === 'string' ? { input: event.input } : {}), ...(typeof event.output === 'string' ? { output: event.output } : {}) }
       }
-      if (event.type === 'thinking' && (event.state === 'start' || event.state === 'end')) return { type: 'thinking', id: event.id, state: event.state }
+      if (event.type === 'thinking' && (event.state === 'start' || event.state === 'end')) {
+        return { type: 'thinking', id: event.id, state: event.state, ...(event.state === 'end' && typeof event.text === 'string' && event.text ? { text: event.text } : {}) }
+      }
     }
   }
   throw new Error('Invalid Coordinator stream event')

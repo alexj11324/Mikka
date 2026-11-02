@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { after, before, test } from 'node:test'
+import { after, before, mock, test } from 'node:test'
 import { act, type ReactNode } from 'react'
 import { Window } from 'happy-dom'
 import { NextIntlClientProvider } from 'next-intl'
@@ -9,6 +9,11 @@ import type { AgentCitations } from '../components/workspace/agent-citations'
 
 // Streaming a Coordinator reply: a token redraws only the reply that is arriving, and a task or thread chip never
 // shows its marker or id on the way, however the tokens are cut.
+// A stored reply's reasoning, as the server action would return it for these positions (masked).
+const reasoningCalls: [string | null, readonly number[]][] = []
+mock.module(new URL('../app/actions/coordinator.ts', import.meta.url).href, { namedExports: {
+  coordinatorReasoning: async (botId: string | null, positions: readonly number[]) => { reasoningCalls.push([botId, positions]); return 'Check the login redirect first.' },
+} })
 const browser = new Window({ url: 'https://mikka.example/' })
 let createRoot: typeof import('react-dom/client')['createRoot']
 let CoordinatorReply: typeof import('../components/coordinator/coordinator-reply')['CoordinatorReply']
@@ -161,4 +166,49 @@ test('a reply shows its thinking and each tool by name and state with AI Element
     await view.render(<ReplyActivity tools={[]} />)
     assert.equal(view.container.innerHTML, '')
   } finally { await view.unmount() }
+})
+
+test('readable reasoning opens under 「思考了 N 秒」, live and stored alike; without it the line does not open', async () => {
+  const { ReplyActivity } = await import('../components/coordinator/reply-activity')
+  const view = await mount()
+  const trigger = () => view.container.querySelector('[data-activity-thinking] button') as HTMLButtonElement
+  const content = () => view.container.querySelector('[data-activity-thinking] [data-slot="collapsible-content"]')?.textContent ?? ''
+  const settle = async (done: () => boolean) => { for (let tries = 0; tries < 100 && !done(); tries++) await act(() => new Promise(resolve => setTimeout(resolve, 20))) }
+  try {
+    // Live, with what the model thought: AI Elements' trigger with its chevron, closed until opened.
+    await view.render(<ReplyActivity tools={[]} thinking={{ active: false, seconds: 4, text: 'Check the login redirect first.' }} />)
+    assert.equal(view.container.querySelector('[data-activity-thinking]')?.getAttribute('data-reasoning'), 'readable')
+    assert.equal(trigger().disabled, false)
+    assert.ok(trigger().querySelector('svg.lucide-chevron-down'), 'it shows the chevron')
+    assert.doesNotMatch(content(), /login redirect/, 'closed by default')
+    await act(async () => { trigger().click() })
+    await settle(() => /login redirect/.test(content()))
+    assert.match(content(), /Check the login redirect first\./)
+    assert.equal(reasoningCalls.length, 0, 'live text needs no request')
+    await view.unmount()
+
+    // Stored: the same line opens and reads the same text, fetched only when opened.
+    const stored = await mount()
+    await stored.render(<ReplyActivity tools={[]} thought reasoningAt={[7, 9]} botId="bot-1" />)
+    const storedTrigger = stored.container.querySelector('[data-activity-thinking] button') as HTMLButtonElement
+    assert.equal(storedTrigger.disabled, false)
+    assert.equal(reasoningCalls.length, 0, 'nothing is fetched until it is opened')
+    await act(async () => { storedTrigger.click() })
+    for (let tries = 0; tries < 100 && !/login redirect/.test(stored.container.textContent ?? ''); tries++) await act(() => new Promise(resolve => setTimeout(resolve, 20)))
+    assert.match(stored.container.querySelector('[data-slot="collapsible-content"]')?.textContent ?? '', /Check the login redirect first\./, 'stored reads as live did')
+    assert.deepEqual(reasoningCalls, [['bot-1', [7, 9]]])
+    await stored.unmount()
+
+    // Encrypted or no reasoning text, live or stored: the line only, no chevron, and it does not open.
+    for (const props of [{ thinking: { active: false, seconds: 2 } }, { thought: true }]) {
+      const plain = await mount()
+      await plain.render(<ReplyActivity tools={[]} {...props} />)
+      const button = plain.container.querySelector('[data-activity-thinking] button') as HTMLButtonElement
+      assert.equal(plain.container.querySelector('[data-activity-thinking]')?.getAttribute('data-reasoning'), 'none')
+      assert.ok(button.disabled)
+      assert.equal(button.querySelector('svg.lucide-chevron-down'), null, 'no chevron')
+      assert.equal(plain.container.querySelector('[data-slot="collapsible-content"]'), null)
+      await plain.unmount()
+    }
+  } finally { try { await view.unmount() } catch { /* already unmounted */ } }
 })

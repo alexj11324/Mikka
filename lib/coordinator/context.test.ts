@@ -154,7 +154,7 @@ test('a stored reply keeps its tools, how each ended and their previews, and whe
   ] as unknown as ModelMessage[]
   const [, reply] = chatItems(compact.map((message, index) => ({ position: index + 1, message, createdAt: at })))
   assert.equal(reply.text, 'Made it; the thread could not start.')
-  assert.deepEqual(reply.activity, { thought: true, tools: [
+  assert.deepEqual(reply.activity, { thought: true, reasoningAt: [2], tools: [
     { call: 'c1', name: 'create_issue', state: 'done', input: '{"title": "Fix login"}', output: '{"id": "i1"}' },
     { call: 'c3', name: 'dispatch_run', state: 'error', input: '{"issueId": "i1"}', output: 'no device' },
     // No result stored yet: still running.
@@ -166,6 +166,9 @@ test('a stored reply keeps its tools, how each ended and their previews, and whe
     { position: 2, createdAt: at, message: { role: 'tool', content: [{ type: 'tool-result', toolCallId: 'c1', toolName: 'list_issues', output: { type: 'error-text', value: 'boom' } }] } as ModelMessage },
   ])
   assert.deepEqual(full[0].activity?.tools, [{ call: 'c1', name: 'list_issues', state: 'error', input: '{"query":"login"}', output: 'boom' }])
+  // Encrypted or empty reasoning: it thought, but there is nothing to open.
+  const sealed = chatItems([{ position: 1, createdAt: at, message: { role: 'assistant', content: [{ type: 'reasoning', chars: 0 }, { type: 'text', text: 'Done.' }] } as unknown as ModelMessage }])
+  assert.deepEqual(sealed[0].activity, { tools: [], thought: true })
 })
 
 test('a reply that dispatches a run carries it as a thread, once', () => {
