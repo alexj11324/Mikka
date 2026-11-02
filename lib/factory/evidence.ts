@@ -6,6 +6,7 @@ import {
   type FactoryEvidence,
 } from "./approval-contract";
 import type { FactoryCandidate, FactoryTask } from "./approval-dependencies";
+import { maskCredentials } from "../secrets/mask";
 
 /** What a screenshot or recording entry shown to the reviewer carries. */
 export interface FactoryCaptureEvidence {
@@ -56,10 +57,11 @@ export function redactArtifact(value: unknown): unknown {
       ]),
     );
   if (typeof value !== "string") return value;
-  return value
+  // GitHub tokens (including ghs_<id>_<JWT>) and JWTs, whole: the same patterns as persisted run output.
+  return maskCredentials(value, "[REDACTED]")
     .replace(/\b(?:Bearer|Basic)\s+\S+/gi, "[REDACTED]")
     .replace(
-      /\b(?:sk-[\w-]+|gh[pousr]_[\w]+|github_pat_[\w]+|mka_[\w]+|mkr_[\w]+)\b/g,
+      /\b(?:sk-[\w-]+|mka_[\w]+|mkr_[\w]+)\b/g,
       "[REDACTED]",
     )
     .replace(

@@ -58,7 +58,7 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     await pool.query(reviewMigration); await pool.query(reviewMigration)
     const runApprovalMigration = await readFile(new URL('../../drizzle/20261027164513_computer_run_approvals.sql', import.meta.url), 'utf8')
     await pool.query(runApprovalMigration); await pool.query(runApprovalMigration)
-    await pool.query('CREATE TABLE byos_connections (id uuid PRIMARY KEY, "ownerId" text, "workspaceId" text, state text, epoch bigint, provider text, "removedAt" timestamptz, paused boolean NOT NULL DEFAULT false); CREATE TABLE byos_bindings (id uuid PRIMARY KEY, "ownerId" text, "workspaceId" text, "consumerId" text, "connectionId" uuid, "connectionRevision" bigint, route text, "modelId" text, "createdAt" timestamptz NOT NULL DEFAULT now()); CREATE TABLE byos_native_runs ("runId" uuid PRIMARY KEY REFERENCES agent_runs(id), "bindingId" uuid NOT NULL REFERENCES byos_bindings(id)); CREATE TABLE agents (id uuid PRIMARY KEY, "userId" text NOT NULL, "deviceId" uuid, harness text, name text NOT NULL, instructions text NOT NULL DEFAULT \'\'); CREATE UNIQUE INDEX agent_name_test ON agents ("userId",lower(name)); CREATE TABLE device_repos (id uuid PRIMARY KEY, "userId" text NOT NULL, "deviceId" uuid, "repoPath" text NOT NULL, "baseBranch" text, UNIQUE ("deviceId","repoPath"))')
+    await pool.query('CREATE TABLE byos_connections (id uuid PRIMARY KEY, "ownerId" text, "workspaceId" text, state text, epoch bigint, provider text, "removedAt" timestamptz, paused boolean NOT NULL DEFAULT false); CREATE TABLE byos_bindings (id uuid PRIMARY KEY, "ownerId" text, "workspaceId" text, "consumerId" text, "connectionId" uuid, "connectionRevision" bigint, route text, "modelId" text, "createdAt" timestamptz NOT NULL DEFAULT now()); CREATE TABLE byos_native_runs ("runId" uuid PRIMARY KEY REFERENCES agent_runs(id), "bindingId" uuid NOT NULL REFERENCES byos_bindings(id)); CREATE TABLE agents (id uuid PRIMARY KEY, "userId" text NOT NULL, "deviceId" uuid, harness text, name text NOT NULL, instructions text NOT NULL DEFAULT \'\'); CREATE UNIQUE INDEX agent_name_test ON agents ("userId",lower(name)); CREATE TABLE device_repos (id uuid PRIMARY KEY, "userId" text NOT NULL, "deviceId" uuid, "repoPath" text NOT NULL, "remoteUrl" text, "baseBranch" text, UNIQUE ("deviceId","repoPath"))')
     await pool.query('ALTER TABLE byos_connections ADD COLUMN "accessSecretName" text')
     const botRuntimeMigration = await readFile(new URL('../../drizzle/20261027164514_bot_cloud_runtimes.sql', import.meta.url), 'utf8')
     await pool.query(botRuntimeMigration); await pool.query(botRuntimeMigration)
@@ -222,6 +222,12 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     await pool.query('INSERT INTO agents (id,"userId","deviceId",harness,instructions,name) VALUES ($1,$2,$3,$4,$5,$6)', [consumer, actor.userId, worker.deviceId, 'codex', 'Follow the task', 'Fixture'])
     await pool.query('INSERT INTO device_repos (id,"userId","deviceId","baseBranch","repoPath") VALUES ($1,$2,$3,$4,$5)', [cloudRepo, actor.userId, worker.deviceId, 'main', '/tmp/cloud-repo'])
     const cloudInput = { botId: bot.id, issueId: randomUUID(), agentId: consumer, deviceRepoId: cloudRepo, title: 'Task', body: 'Use the desktop' }
+    // A repository task: its repository has a remote, so it runs on a task machine and the 电脑 policy does not gate it.
+    const remoteRepo = randomUUID()
+    await pool.query('INSERT INTO device_repos (id,"userId","deviceId","baseBranch","repoPath","remoteUrl") VALUES ($1,$2,$3,$4,$5,$6)', [remoteRepo, actor.userId, worker.deviceId, 'main', 'v2/example.test/octo/repo', 'https://example.test/octo/repo.git'])
+    const repositoryInput = { ...cloudInput, issueId: randomUUID(), deviceRepoId: remoteRepo, body: 'Fix the bug' }
+    const allowedRepository = await queueCloudRun(pool, actor, repositoryInput)
+    assert.equal((await pool.query('SELECT status FROM agent_runs WHERE id=$1', [allowedRepository.runId])).rows[0].status, 'queued', 'an allow workspace queues a repository task')
     await assert.rejects(queueCloudRun(pool, otherWorkspace, cloudInput), { status: 409 })
     await assert.rejects(queueCloudRun(pool, bob, cloudInput), { status: 409 })
     await assert.rejects(queueCloudRun(pool, actor, { ...cloudInput, deviceRepoId: randomUUID() }), { status: 409 })
@@ -362,6 +368,8 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     assert.equal(await decideComputerReview(pool, actor, laterReview.id, laterReview.digest, true), false)
     await assert.rejects(syncComputerReviews(pool, deviceId, actor.userId, [makeReview(runId, 20)]), /Run or desktop unavailable/)
     await assert.rejects(queueCloudRun(pool, actor, cloudInput), { status: 409 })
+    const deniedRepository = await queueCloudRun(pool, actor, { ...repositoryInput, issueId: randomUUID() })
+    assert.equal((await pool.query('SELECT status FROM agent_runs WHERE id=$1', [deniedRepository.runId])).rows[0].status, 'queued', 'a deny workspace still queues a repository task')
     await store.operate(actor, bot.id, 'wake')
     assert.equal(computerAllowed, false, 'waking a denied desktop cannot re-enable the driver')
     await store.setPolicy(actor.workspaceId, 'allow')
