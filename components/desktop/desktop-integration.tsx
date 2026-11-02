@@ -5,6 +5,8 @@ import { useRouter } from '@/i18n/navigation'
 import useSWR from 'swr'
 
 import { listTaskRuns } from '@/app/actions/task-runs'
+import { listDevices } from '@/app/actions/agents'
+import { localSetupAction } from '@/lib/local-device-setup'
 import { getPreferences } from '@/app/actions/preferences'
 import { chooseDesktopNotifications } from '@/app/actions/desktop-notifications'
 import { desktopRunUpdate, type DesktopRun } from '@/lib/platform/desktop-notifications'
@@ -71,6 +73,23 @@ export function DesktopIntegration() {
       .catch(() => {})
     return unsubscribe
   }, [desktop, router])
+
+  // Installing the app makes this computer a device (Alex, 2026-11-02): once per
+  // launch, when it is not yet one of mine and online, main installs or restarts
+  // its daemon in the background. Progress shows on 设置 › 设备.
+  useEffect(() => {
+    if (!desktop) return
+    const bridge = window.mikka
+    if (!bridge?.ssh?.autoLocal) return
+    let live = true
+    void Promise.all([bridge.device.status(), listDevices()])
+      .then(([local, devices]) => {
+        const action = localSetupAction(local, devices.map(device => device.id))
+        if (live && action !== 'none') return bridge.ssh?.autoLocal?.(action)
+      })
+      .catch(() => {})
+    return () => { live = false }
+  }, [desktop])
 
   return null
 }

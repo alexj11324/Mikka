@@ -253,3 +253,57 @@ test('the login shell is $SHELL when it is a plain path, else the platform defau
   assert.deepEqual(loginShell({}, 'linux').args('mikka daemon status'), ['-lc', 'mikka daemon status'])
 })
 
+test('automatic repair restarts a daemon that is already set up, without installing or signing in again', async () => {
+  const t = localInstaller('prod')
+  const first = await t.installer.repairLocal()
+  assert.equal(first?.target, LOCAL_TARGET)
+  await t.done
+  assert.equal(t.installer.state()?.status, 'online')
+  assert.deepEqual(t.calls.map(call => call.args[1]), ["mikka daemon service install --server 'https://example.com/mikka' --device-type laptop", 'mikka daemon status'])
+  assert.equal(t.minted(), 0)
+})
+
+test('automatic repair installs and signs in when the restart fails (first launch)', async () => {
+  const events: SshInstallState[] = []
+  const scripts: string[] = []
+  let restartFailed = false
+  let finish!: () => void
+  const done = new Promise<void>(resolve => { finish = resolve })
+  const installer = new SshInstaller('https://example.com/mikka', async () => 'private-token', state => {
+    events.push(state)
+    if (state.status === 'online' || state.status === 'failed') finish()
+  }, async (_command, args) => {
+    scripts.push(args[1])
+    if (args[1].startsWith('mikka daemon service install') && !restartFailed) { restartFailed = true; throw new Error('zsh: command not found: mikka') }
+    if (args[1].startsWith('mikka daemon status')) return '{"server":"online","deviceId":"this-mac"}'
+    return ''
+  }, '/home/nobody', undefined, undefined, 'prod', { command: '/bin/zsh', args: script => ['-lc', script] })
+  await installer.repairLocal()
+  await done
+  assert.equal(installer.state()?.status, 'online')
+  assert.ok(scripts.includes('npm install --global @aspectlylabs/mikka'))
+  assert.ok(scripts.some(script => script.startsWith('mikka daemon login')))
+  assert.equal(events.every(state => state.target === LOCAL_TARGET), true)
+})
+
+test('a failed automatic install keeps the reason and 重试 installs again', async () => {
+  let attempt = 0
+  let settle!: (state: SshInstallState) => void
+  let settled = new Promise<SshInstallState>(resolve => { settle = resolve })
+  const installer = new SshInstaller('https://example.com/mikka', async () => 'private-token', state => {
+    if (state.status === 'online' || state.status === 'failed') settle(state)
+  }, async (_command, args) => {
+    if (args[1] === 'npm install --global @aspectlylabs/mikka' && attempt++ === 0) throw new Error('npm ERR! code EACCES')
+    if (args[1].startsWith('mikka daemon status')) return '{"server":"online","deviceId":"this-mac"}'
+    return ''
+  }, '/home/nobody', undefined, undefined, 'prod', { command: '/bin/zsh', args: script => ['-lc', script] })
+  await installer.beginLocal()
+  const failed = await settled
+  assert.equal(failed.status, 'failed')
+  assert.equal(failed.step, 'install')
+  assert.match(failed.reason ?? '', /EACCES/)
+  settled = new Promise<SshInstallState>(resolve => { settle = resolve })
+  await installer.beginLocal()
+  assert.equal((await settled).status, 'online')
+})
+

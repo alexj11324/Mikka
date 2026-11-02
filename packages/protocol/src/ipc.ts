@@ -34,6 +34,8 @@ export const IPC = {
   sshState: "mikka:ssh:state",
   sshLocal: "mikka:ssh:local",
   sshRestartLocal: "mikka:ssh:restart-local",
+  /** Once per launch: make this computer a device (install, or restart then install). */
+  sshAutoLocal: "mikka:ssh:auto-local",
   deviceStatus: "mikka:device:status",
   deviceLink: "mikka:device:link",
   devicePickRepo: "mikka:device:pick-repo",

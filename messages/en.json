@@ -904,9 +904,6 @@
     },
     "ssh": {
       "title": "Add device",
-      "thisComputer": "Add this computer",
-      "remote": "Add a remote computer",
-      "addingThis": "Adding this computer",
       "reconnectingThis": "Reconnecting this computer",
       "sshConfig": "SSH config",
       "otherHost": "Other host",
@@ -934,12 +931,19 @@
       "hide": "Close",
       "retry": "Retry",
       "done": "Done",
-      "cancelled": "Cancelled"
+      "cancelled": "Cancelled",
+      "manual": "Connect manually"
     },
     "runsModels": "Runs {models}",
     "runsCount": "{count, plural, one {Runs # allowed model} other {Runs # allowed models}}",
     "runsNone": "Runs no allowed model",
-    "offlineNoRuns": "Offline · gets no runs"
+    "offlineNoRuns": "Offline · gets no runs",
+    "local": {
+      "adding": "Adding this computer",
+      "online": "This computer is online",
+      "failed": "Couldn't add this computer",
+      "retry": "Retry"
+    }
   },
   "Workspace": {
     "loadingEditor": "Loading task editor",

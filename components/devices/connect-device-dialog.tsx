@@ -25,13 +25,6 @@ export function ConnectDeviceDialog({ open: controlledOpen, onOpenChange, hideTr
   const { mutate } = useSWRConfig()
   const [localOpen, setLocalOpen] = useState(false)
   const open = controlledOpen ?? localOpen
-  const [commands, setCommands] = useState<ReturnType<typeof daemonCommands> | null>(null)
-
-  useEffect(() => {
-    if (!open) return
-    try { setCommands(daemonCommands({ origin: window.location.origin, basePath: BASE_PATH, packageName })) }
-    catch { setCommands(null) }
-  }, [open])
 
   function changeOpen(next: boolean) {
     if (!next) void mutate('devices')
@@ -51,19 +44,35 @@ export function ConnectDeviceDialog({ open: controlledOpen, onOpenChange, hideTr
           {t('title')}
         </DialogTitle>
       </DialogHeader>
-      {commands ? <div className="flex min-w-0 flex-col gap-4">
-        {/* R-39: the dialog is the only container, so each command is a grey block with no border of its own. */}
-        {(['install', 'login', 'start'] as const).map(key => <CodeBlock key={key} code={commands[key]} language="bash" defaultWrap className="border-0 bg-muted [--code-block-bg:var(--muted)]">
-          <CodeBlockHeader className="border-b-0">
-            <CodeBlockTitle>{t(`commands.${key}`)}</CodeBlockTitle>
-            <CodeBlockCopyButton className="ml-auto" labels={{ copy: t('copyCommand'), copied: t('copied') }} />
-          </CodeBlockHeader>
-        </CodeBlock>)}
-        <p className="text-xs text-muted-foreground">{t('requirements')}</p>
-      </div> : <FieldError>{t('configurationFailed')}</FieldError>}
+      <DaemonCommandList open={open} />
       <DialogFooter>
         <Button size="sm" onClick={() => changeOpen(false)}>{t('done')}</Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>
 }
+
+/**
+ * The three commands that install the Mikka client, sign it in and start it on
+ * a computer by hand: the web's 添加设备, and the desktop's 手动连接 fallback.
+ */
+export function DaemonCommandList({ open = true }: { open?: boolean }) {
+  const t = useTranslations('Devices.connect')
+  const [commands, setCommands] = useState<ReturnType<typeof daemonCommands> | null>(null)
+  useEffect(() => {
+    if (!open) return
+    try { setCommands(daemonCommands({ origin: window.location.origin, basePath: BASE_PATH, packageName })) }
+    catch { setCommands(null) }
+  }, [open])
+  return commands ? <div className="flex min-w-0 flex-col gap-4">
+    {/* R-39: the dialog is the only container, so each command is a grey block with no border of its own. */}
+    {(['install', 'login', 'start'] as const).map(key => <CodeBlock key={key} code={commands[key]} language="bash" defaultWrap className="border-0 bg-muted [--code-block-bg:var(--muted)]">
+      <CodeBlockHeader className="border-b-0">
+        <CodeBlockTitle>{t(`commands.${key}`)}</CodeBlockTitle>
+        <CodeBlockCopyButton className="ml-auto" labels={{ copy: t('copyCommand'), copied: t('copied') }} />
+      </CodeBlockHeader>
+    </CodeBlock>)}
+    <p className="text-xs text-muted-foreground">{t('requirements')}</p>
+  </div> : <FieldError>{t('configurationFailed')}</FieldError>
+}
+

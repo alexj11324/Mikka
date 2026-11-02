@@ -108,6 +108,20 @@ export class SshInstaller {
       return this.state()
     })
   }
+  /**
+   * The automatic setup when its daemon does not answer: restart the service,
+   * and only if that fails install and sign in, so an existing device is not
+   * registered again. Reported as 添加这台电脑.
+   */
+  async repairLocal() {
+    return this.launch(async () => {
+      this.local = true
+      this.current = { id: randomUUID(), target: LOCAL_TARGET, step: 'service', status: 'running' }
+      this.report({})
+      this.pending = this.repair()
+      return this.state()
+    })
+  }
   /** 重新连接 for this computer: restart its daemon service and wait until it is online. */
   async restartLocal() {
     return this.launch(async () => {
@@ -223,6 +237,17 @@ export class SshInstaller {
       await this.remote(`mikka daemon login --server ${quote(this.appUrl)} --registration-token-stdin${this.flags()}`, `${token}\n`)
       await this.waitOnline()
     } catch (error) { this.fail(error) }
+  }
+  private async repair() {
+    try {
+      await this.remote(`mikka daemon service install --server ${quote(this.appUrl)} --device-type laptop${this.flags()}`)
+      await this.waitOnline()
+      return
+    } catch {
+      if (this.controller.signal.aborted) return
+    }
+    this.report({ step: 'check' })
+    await this.install('laptop')
   }
   /** Rewrites and restarts the service (`service install` restarts it), then waits until it is online. */
   private async restart() {
