@@ -7,12 +7,9 @@ import type { BotModelMenu } from "@/lib/bot-model-menu-view";
 import { loadWorkspaceContext } from "@/lib/workspace-access";
 import { pool } from "@/lib/db";
 import { ExecutionSettings } from "@/lib/execution-settings";
-import { botModelMenu, botModelScope, refreshBotModelMenu } from "@/lib/bot-model-menu";
+import { botModelMenu, botModelScope, chooseBotModel as chooseBotModelFor, refreshBotModelMenu } from "@/lib/bot-model-menu";
 import { z } from "zod";
 import { chatBotId } from "@/lib/coordinator/coordinator-bot";
-import { parseApiKeyOption } from "@/lib/bot-model-menu-view";
-import { setBotApiKeyChoice } from "@/lib/model-api-keys";
-import { WorkspaceError } from "@/lib/workspace-error";
 async function context(workspaceId?: string) {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user) throw new ActionFailureError("authRequired");
@@ -50,17 +47,7 @@ export async function refreshBotModelMenuAction(chatBot: string | null) {
 export async function chooseBotModel(chatBot: string | null, id: string): Promise<ActionResult<BotModelMenu>> {
   return runAction(async () => {
     const { botId, scope } = await chatScope(chatBot);
-    const settings = new ExecutionSettings(pool);
-    const apiKey = parseApiKeyOption(id);
-    if (apiKey) {
-      try {
-        await setBotApiKeyChoice(pool, scope, botId, apiKey.keyId, apiKey.model);
-      } catch (error) {
-        if (error instanceof WorkspaceError) throw new ActionFailureError(error.code === "botNotFound" ? "botNotFound" : "executionModelUnknown");
-        throw error;
-      }
-    } else await settings.setBotModel(scope, botId, id);
-    return botModelMenu(pool, settings, scope, botId);
+    return chooseBotModelFor(pool, new ExecutionSettings(pool), scope, botId, id);
   });
 }
 

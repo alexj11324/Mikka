@@ -215,3 +215,32 @@ export async function refreshBotModelMenu(
   );
   return botModelMenu(pool, settings, scope, botId);
 }
+
+/**
+ * Saves a chat's model pick for the bot's next runs (a run already going keeps
+ * its model) and returns the menu: a binding id, Mikka 默认 (HOSTED_CHOICE), or
+ * an API key model (`apikey:<keyId>:<model>`, saved as that key's choice). The
+ * web's action and the iOS app's route both save through here, so every option
+ * the menu lists can be picked from either.
+ */
+export async function chooseBotModel(
+  pool: Pool,
+  settings: ExecutionSettings,
+  scope: ExecutionSettingsScope,
+  botId: string | null,
+  id: string,
+): Promise<BotModelMenu> {
+  const { parseApiKeyOption } = await import("./bot-model-menu-view");
+  const apiKey = parseApiKeyOption(id);
+  if (apiKey) {
+    const { setBotApiKeyChoice } = await import("./model-api-keys");
+    const { WorkspaceError } = await import("./workspace-error");
+    try {
+      await setBotApiKeyChoice(pool, scope, botId, apiKey.keyId, apiKey.model);
+    } catch (error) {
+      if (error instanceof WorkspaceError) throw new ActionFailureError(error.code === "botNotFound" ? "botNotFound" : "executionModelUnknown");
+      throw error;
+    }
+  } else await settings.setBotModel(scope, botId, id);
+  return botModelMenu(pool, settings, scope, botId);
+}

@@ -11,6 +11,7 @@ import { BotBubble, CopyButton, EventLine, MyBubble, OutgoingBubble, Reactions, 
 import { myReaction, toggled, withMine } from '@/lib/reactions'
 import { Markdown } from '@/components/Markdown'
 import { OfflineBanner } from '@/components/OfflineBanner'
+import { TopScrim } from '@/components/TopScrim'
 import { OpenUIReply } from '@/components/OpenUI'
 import { PendingActions } from '@/components/PendingActions'
 import { Text } from '@/components/Text'
@@ -24,10 +25,11 @@ import { holdMessage } from '@/lib/message-actions'
 import { plainText, quotable } from '@/lib/quote'
 import { delivered, inFlight, marked, outgoingKey, queued, type Outgoing, type OutgoingImage } from '@/lib/outbox'
 import { askForPush, usePushState } from '@/lib/push-state'
-import { runTitle, type Chat, type CitationSource, type PendingAction } from '@/lib/types'
+import { runTitle, type Chat, type ChatFailure, type CitationSource, type PendingAction } from '@/lib/types'
+import { failureLine } from '@/lib/chat-failure'
 import { useApi } from '@/lib/useApi'
 import { runInfoLine } from '@/lib/run-info'
-import { webChatPath } from '@/lib/web'
+import { openOnWeb, webChatPath } from '@/lib/web'
 import { colors } from '@/lib/theme'
 
 const RUN_ENDED = /^\[Event\] Run ([0-9a-f-]{36}) ended with status (\w+)/i
@@ -204,7 +206,7 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, c
               <CardButton label="重试" onPress={() => void reload()} />
             </View>
           ) : null}
-          {data?.error && !working ? <Text style={styles.error}>{data.error}</Text> : null}
+          {data?.failure && !working ? <FailedReply failure={data.failure} botId={botId} onQueued={() => void reload()} /> : null}
           {pending.data ? (
             <View onLayout={event => { pendingTop.current = event.nativeEvent.layout.y }}>
               <PendingActions items={pending.data} focus={focus} reload={pending.reload} onFocusLayout={focus ? showFocus : undefined} />
@@ -212,9 +214,43 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, c
           ) : null}
         </KeyboardChatScrollView>
       </View>
+      <TopScrim />
       <OfflineBanner top={insets.top + 66} />
       <Composer value={text} onChangeText={setText} placeholder={`给 ${name} 发消息`} onSend={send} attach overlay onHeight={setComposerHeight} autoFocus={compose || Boolean(draft)}
         quote={quote} onClearQuote={() => setQuote(null)} accessory={composerAccessory} onStop={Boolean(data?.working) && !stopping ? () => void stop() : undefined} />
+    </View>
+  )
+}
+
+/**
+ * A reply that did not come: why, in the web's words, with 重试 (the same turn
+ * again, POST /api/mobile/chat/retry) and, when the subscription or the
+ * hosted model needs something, 模型与额度 on the web. Never a raw error.
+ */
+function FailedReply({ failure, botId, onQueued }: { failure: ChatFailure; botId: string | null; onQueued: () => void }) {
+  const line = failureLine(failure)
+  const [busy, setBusy] = useState(false)
+  const [refused, setRefused] = useState(false)
+  const retry = async () => {
+    setBusy(true)
+    setRefused(false)
+    try {
+      const { queued } = await api<{ queued: boolean }>('/api/mobile/chat/retry', { method: 'POST', body: { botId } })
+      if (queued) onQueued()
+      else setRefused(true)
+    } catch {
+      setRefused(true)
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <View style={styles.failed}>
+      <Text style={styles.error}>{refused ? '没能重试' : line.text}</Text>
+      <View style={styles.failedActions}>
+        {line.retry ? <CardButton label="重试" busy={busy} onPress={() => void retry()} /> : null}
+        {line.settings ? <CardButton label="模型与额度" onPress={() => void openOnWeb('/settings?section=models')} /> : null}
+      </View>
     </View>
   )
 }
@@ -228,6 +264,7 @@ const styles = StyleSheet.create({
   stopped: { alignSelf: 'flex-start', fontSize: 12, lineHeight: 17, color: colors.secondary, marginLeft: 4, marginTop: -6 },
   working: { alignSelf: 'flex-start', backgroundColor: colors.bubble, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 12 },
   failed: { alignItems: 'center', gap: 10, marginTop: 24 },
+  failedActions: { flexDirection: 'row', gap: 8 },
   empty: { alignSelf: 'center', color: colors.secondary, marginTop: 40, fontSize: 15 },
   error: { alignSelf: 'center', color: colors.danger, fontSize: 13, textAlign: 'center', marginHorizontal: 24 },
 })
