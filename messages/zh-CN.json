@@ -3451,14 +3451,15 @@
       "create": "创建",
       "creating": "正在创建…"
     },
-    "searchPlaceholder": "搜索 Bot、对话、群聊、任务和项目",
+    "searchPlaceholder": "搜索 Bot、对话、群聊、任务、线程和项目",
     "searchLabel": "全局搜索",
-    "searchDescription": "搜索对话、群聊、任务和项目，用方向键选择，按 Enter 打开。",
+    "searchDescription": "搜索对话、群聊、任务、线程和项目，用方向键选择，按 Enter 打开。",
     "searchEmpty": "没有匹配的结果",
     "groups": {
       "bots": "Bot",
       "conversations": "对话",
       "tasks": "任务",
+      "threads": "线程",
       "projects": "项目",
       "actions": "快捷操作",
       "groupChats": "群聊"
@@ -3551,6 +3552,7 @@
       "promptWithContext": "帮我新建一个任务（{context}）：{text}",
       "contextDevice": "在 {device} 上做",
       "device": "运行的机器",
+      "bot": "交给哪个 Bot",
       "noDevice": "未连接机器",
       "offline": "离线",
       "online": "在线",

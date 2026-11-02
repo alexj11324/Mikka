@@ -30,7 +30,8 @@ export async function openSearch(page: Page) {
 export async function openIssueFromSearch(page: Page, title: string) {
   const dialog = await openSearch(page)
   await dialog.getByRole('combobox', { name: '全局搜索', exact: true }).fill(title)
-  await dialog.getByRole('option').filter({ hasText: title }).click()
+  // A task's threads carry its name too (⌘K's 线程 group): open the task's own row.
+  await dialog.locator('[cmdk-item][data-value^="issue "]').filter({ hasText: title }).click()
 }
 
 /** ⌘K's 新建任务 opens the dialog that hands a sentence to the Coordinator. */

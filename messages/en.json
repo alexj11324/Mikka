@@ -3451,14 +3451,15 @@
       "create": "Create",
       "creating": "Creating…"
     },
-    "searchPlaceholder": "Search bots, chats, groups, tasks and projects",
+    "searchPlaceholder": "Search bots, chats, groups, tasks, threads and projects",
     "searchLabel": "Search everything",
-    "searchDescription": "Search conversations, group chats, tasks and projects. Use the arrow keys to choose and Enter to open.",
+    "searchDescription": "Search conversations, group chats, tasks, threads and projects. Use the arrow keys to choose and Enter to open.",
     "searchEmpty": "Nothing matches",
     "groups": {
       "bots": "Bots",
       "conversations": "Conversations",
       "tasks": "Tasks",
+      "threads": "Threads",
       "projects": "Projects",
       "actions": "Quick actions",
       "groupChats": "Group chats"
@@ -3551,6 +3552,7 @@
       "promptWithContext": "Create a task for me ({context}): {text}",
       "contextDevice": "run it on {device}",
       "device": "Machine",
+      "bot": "Bot to hand it to",
       "noDevice": "No machine connected",
       "offline": "Offline",
       "online": "Online",
