@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { sourcedEventMessage } from './message-safety'
 import { visibleRuns } from '@/lib/agent-runs'
 import { assertCredentialSafeChat } from '@/lib/credentials/chat-guard'
@@ -456,6 +457,44 @@ export async function chatView(userId: string, limit = 200, botId: string): Prom
     sources: await citationSources(userId, [...items.filter(item => item.from === 'coordinator').map(item => item.text),
       ...items.flatMap(item => item.line ? [item.line.runId && `[[run:${item.line.runId}]]`, item.line.issueId && `[[issue:${item.line.issueId}]]`].filter((text): text is string => !!text) : [])], items.flatMap(item => item.threads)),
     artifacts: await artifactSummaries(userId, items.flatMap(item => [...item.artifacts, ...(item.quote ? [item.quote.artifactId] : [])])),
+  }
+}
+
+/** What a chat poll needs to know without reading the conversation: its version and live state. */
+export interface ChatVersion {
+  /** Changes whenever the chat's stored messages (the latest `limit`) or its waiting inbox change. */
+  version: string
+  cursor: number
+  streamRunId?: string
+  working: boolean
+  error: string | null
+}
+
+/**
+ * The chat's version, computed in the database from the same latest `limit`
+ * messages `chatView` shows (a hash of each message), plus its waiting inbox
+ * and state. Only a few dozen bytes leave the database, where `chatView`
+ * sends the messages themselves.
+ */
+export async function chatVersion(userId: string, limit = 200, botId: string): Promise<ChatVersion> {
+  const [session] = await db.select().from(coordinatorSessions).where(sessionOf(userId, botId)).limit(1)
+  const latest = db.select({ id: coordinatorMessages.id, position: coordinatorMessages.position, message: coordinatorMessages.message })
+    .from(coordinatorMessages).where(messagesOf(userId, botId)).orderBy(desc(coordinatorMessages.position)).limit(limit).as('latest')
+  const [stored] = await db.select({
+    last: sql<number>`coalesce(max(${latest.position}), 0)::int`,
+    hash: sql<string>`md5(coalesce(string_agg(${latest.id}::text || ':' || md5(${latest.message}::text), ',' order by ${latest.position}), ''))`,
+    role: sql<string | null>`(array_agg(${latest.message}->>'role' order by ${latest.position} desc))[1]`,
+    streamId: sql<string | null>`(array_agg(${latest.message}->>'mikkaStreamId' order by ${latest.position} desc))[1]`,
+  }).from(latest)
+  const waiting = await db.select().from(coordinatorEvents)
+    .where(and(eventsOf(userId, botId), isNull(coordinatorEvents.deliveredAt)))
+    .orderBy(asc(coordinatorEvents.createdAt)).limit(INBOX_BATCH)
+  const lastMessage = stored.role ? { role: stored.role, ...(stored.streamId ? { streamId: stored.streamId } : {}) } : undefined
+  return {
+    version: createHash('sha256').update(`${limit}|${stored.hash}|${waiting.map(event => event.id).join(',')}`).digest('hex').slice(0, 32),
+    cursor: stored.last,
+    ...(coordinatorLeaseActive(session) && session?.leaseHolder?.startsWith('wrun_') ? { streamRunId: session.leaseHolder } : {}),
+    ...coordinatorChatState(session, waiting, new Date(), lastMessage),
   }
 }
 

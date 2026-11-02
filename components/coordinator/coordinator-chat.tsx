@@ -6,7 +6,8 @@ import { AnimatePresence } from 'motion/react'
 import { withBasePath } from '@/lib/base-path'
 import { checkPageBuildBeforeAction } from '@/lib/app-build'
 import { useTranslations } from 'next-intl'
-import { getCoordinatorChat, stopCoordinatorTurn, welcomeCoordinator, type CoordinatorChat as Chat } from '@/app/actions/coordinator'
+import { pollCoordinatorChat, stopCoordinatorTurn, welcomeCoordinator, type CoordinatorChat as Chat } from '@/app/actions/coordinator'
+import { knownVersion, mergeChat } from '@/lib/coordinator/chat-poll'
 import type { BotView } from '@/app/actions/bots'
 import { BotAvatar, COORDINATOR_AVATAR } from '@/components/nav/bot-avatar'
 import { cn } from '@/lib/utils'
@@ -116,10 +117,17 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const actionError = useActionError()
   const reconnectStream = useRef<() => void>(() => {})
-  const { data, mutate, error: loadError } = useSWR<Chat>(coordinatorChatKey(botId), () => botId ? getCoordinatorChat(botId) : getCoordinatorChat(), {
+  // A poll names the version it shows; an unchanged chat comes back as its live state only (lib/coordinator/chat-poll.ts).
+  const shown = useRef<{ chat?: Chat; fullReadAt: number }>({ fullReadAt: 0 })
+  const { data, mutate, error: loadError } = useSWR<Chat>(coordinatorChatKey(botId), async () => {
+    const next = await pollCoordinatorChat(botId, knownVersion(shown.current.chat, shown.current.fullReadAt, Date.now()))
+    if (!('unchanged' in next)) shown.current.fullReadAt = Date.now()
+    return mergeChat(shown.current.chat, next)
+  }, {
     refreshInterval: latest => latest?.working ? 2000 : 10000,
     onSuccess: () => reconnectStream.current(),
   })
+  useEffect(() => { shown.current.chat = data }, [data])
   const stream = useCoordinatorStream({ botId, runId: data?.streamRunId, cursor: data?.cursor, persistedStreamIds: data?.persistedStreamIds, revalidate: mutate })
   useEffect(() => { reconnectStream.current = stream.reconnect }, [stream.reconnect])
   const [draft, setDraft] = useState('')
