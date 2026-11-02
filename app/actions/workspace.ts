@@ -1,5 +1,6 @@
 'use server'
 
+import { withFreshSession } from '@/lib/fresh-session'
 import { getLocale, getTranslations } from 'next-intl/server'
 import { createHash, randomBytes } from 'node:crypto'
 import { and, eq, gt, ne } from 'drizzle-orm'
@@ -95,7 +96,7 @@ export async function switchWorkspace(input: string | { workspaceId?: string; ac
   })
 }
 
-export async function createWorkspaceInvitation(input: { workspaceId: string; emails: string[]; role: string }) {
+async function createWorkspaceInvitationBody(input: { workspaceId: string; emails: string[]; role: string }) {
   return result(async () => {
     const user = await requireUser()
     const role = roleSchema.parse(input.role)
@@ -126,7 +127,7 @@ export async function createWorkspaceInvitation(input: { workspaceId: string; em
  * Role and status. When suspending, `transferTo` (optional, another active
  * member) takes over the suspended member's bots in this workspace.
  */
-export async function updateWorkspaceMember(input: { workspaceId: string; userId: string; role: string; status: string; transferTo?: string }) {
+async function updateWorkspaceMemberBody(input: { workspaceId: string; userId: string; role: string; status: string; transferTo?: string }) {
   return result(async () => {
     const user = await requireUser()
     const role = roleSchema.parse(input.role)
@@ -155,7 +156,7 @@ export async function updateWorkspaceMember(input: { workspaceId: string; userId
   })
 }
 
-export async function revokeWorkspaceInvitation(workspaceId: string, invitationId: string) {
+async function revokeWorkspaceInvitationBody(workspaceId: string, invitationId: string) {
   return result(async () => {
     const user = await requireUser()
     z.uuid().parse(invitationId)
@@ -168,7 +169,7 @@ export async function revokeWorkspaceInvitation(workspaceId: string, invitationI
   })
 }
 
-export async function acceptWorkspaceInvitation(token: string) {
+async function acceptWorkspaceInvitationBody(token: string) {
   return result(async () => {
     const user = await requireUser()
     tokenSchema.parse(token)
@@ -194,3 +195,9 @@ export async function acceptWorkspaceInvitation(token: string) {
     return { workspaceId }
   })
 }
+
+// Money, permissions, credentials and deletion: the session is read from the database, not the cookie cache.
+export async function createWorkspaceInvitation(...args: Parameters<typeof createWorkspaceInvitationBody>) { return withFreshSession(() => createWorkspaceInvitationBody(...args)) }
+export async function updateWorkspaceMember(...args: Parameters<typeof updateWorkspaceMemberBody>) { return withFreshSession(() => updateWorkspaceMemberBody(...args)) }
+export async function revokeWorkspaceInvitation(...args: Parameters<typeof revokeWorkspaceInvitationBody>) { return withFreshSession(() => revokeWorkspaceInvitationBody(...args)) }
+export async function acceptWorkspaceInvitation(...args: Parameters<typeof acceptWorkspaceInvitationBody>) { return withFreshSession(() => acceptWorkspaceInvitationBody(...args)) }

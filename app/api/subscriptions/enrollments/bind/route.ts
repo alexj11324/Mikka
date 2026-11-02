@@ -1,3 +1,4 @@
+import { freshSessionRoute } from '@/lib/fresh-session'
 import { auth } from '@/lib/api-auth'
 import { pool } from '@/lib/db'
 import { authorizeSubscriptionWorkspace } from '@/lib/subscription-runtime'
@@ -11,7 +12,7 @@ export const runtime = 'nodejs'
 export const maxDuration = 120
 export const GET = () => byosEnrollmentEnabled() ? enrollmentBindingPage() : new Response(null, { status: 404, headers: { 'cache-control': 'no-store' } })
 
-export const POST = enrollmentBindHTTP({
+const POSTBody = enrollmentBindHTTP({
   operator: async request => byosEnrollmentEnabled() ? enrollmentOperator(request, process.env.MIKKA_BYOS_ENROLLMENT_OPERATOR_TOKEN) : null,
   session: async request => {
     const session = await auth.api.getSession({ headers: request.headers })
@@ -34,3 +35,6 @@ export const POST = enrollmentBindHTTP({
     return new EnrollmentClient({ ...enrollmentConfiguration(), databaseUrl, canonicalGrantPath, accessPath, accessProject: process.env.MIKKA_BYOS_ACCESS_INFISICAL_PROJECT })
   },
 })
+
+// Credentials, permissions, money and deletion: the session is read from the database, not the cookie cache.
+export const POST = freshSessionRoute(POSTBody)

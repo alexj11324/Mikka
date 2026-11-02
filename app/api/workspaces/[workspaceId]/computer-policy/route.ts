@@ -1,3 +1,4 @@
+import { freshSessionRoute } from '@/lib/fresh-session'
 import { cloudComputerTasksEnabled } from '@/lib/cloud-computer-flag'
 import { auth, apiWorkspaceAllowed } from '@/lib/api-auth'
 import { pool } from '@/lib/db'
@@ -22,4 +23,7 @@ const handle = createComputerPolicyHandler({
 })
 type Context = { params: Promise<{ workspaceId: string }> }
 export const GET = async (request: Request, { params }: Context) => handle(request, (await params).workspaceId)
-export const POST = GET
+const POSTBody = GET
+
+// Credentials, permissions, money and deletion: the session is read from the database, not the cookie cache.
+export const POST = freshSessionRoute(POSTBody)

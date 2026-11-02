@@ -17,6 +17,7 @@ import { newUserAvatar } from '@/lib/default-avatar'
 import { daemonAuthorizationOptions, exchangeDaemonSession } from '@/lib/daemon-authorization'
 import { issueDeviceToken } from '@/lib/device-link'
 import { auditAuthentication } from '@/lib/audit/authentication'
+import { readFreshSessionsInScope, SESSION_OPTIONS } from '@/lib/fresh-session'
 
 /** The iOS app's URL scheme: OAuth returns here, and its requests carry it as their origin. */
 export const MOBILE_APP_ORIGIN = 'mikka://'
@@ -150,9 +151,14 @@ export const auth = betterAuth({
       })
     }),
   },
-  session: { expiresIn: 60 * 60 * 24 * 7, updateAge: 60 * 60 * 24 },
+  // Polls read the session from a signed cookie for up to 5 minutes instead of two queries each time (Alex
+  // 2026-11-02). Money, permissions, credentials and deletion read it fresh (lib/fresh-session.ts).
+  session: SESSION_OPTIONS,
   ...(process.env.NODE_ENV === 'development' && authBaseURL?.startsWith('https://') ? { advanced: {
     // Partition preview sessions by top-level site when third-party cookies are blocked.
     defaultCookieAttributes: { sameSite: 'none' as const, secure: true, partitioned: true },
   } } : {}),
 })
+
+// Inside withFreshSession (money, permissions, credentials, deletion) a session read skips the cookie cache.
+readFreshSessionsInScope(auth.api)

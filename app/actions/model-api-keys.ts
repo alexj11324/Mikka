@@ -1,5 +1,6 @@
 'use server'
 
+import { withFreshSession } from '@/lib/fresh-session'
 import { and, eq, inArray } from 'drizzle-orm'
 import { pool } from '@/lib/db'
 import { workspaceMembers } from '@/lib/db/workspace-schema'
@@ -27,14 +28,14 @@ export async function getApiKeys(workspaceId?: string): Promise<SettingsActionRe
   })
 }
 
-export async function createApiKey(input: unknown, workspaceId?: string): Promise<SettingsActionResult<ApiKeyView>> {
+async function createApiKeyBody(input: unknown, workspaceId?: string): Promise<SettingsActionResult<ApiKeyView>> {
   return settingsWorkspaceAction(async () => {
     const { userId } = await actor(workspaceId)
     return addApiKey(pool, userId, input)
   })
 }
 
-export async function deleteApiKey(id: string, workspaceId?: string): Promise<SettingsActionResult<{ removed: boolean }>> {
+async function deleteApiKeyBody(id: string, workspaceId?: string): Promise<SettingsActionResult<{ removed: boolean }>> {
   return settingsWorkspaceAction(async () => {
     const { userId } = await actor(workspaceId)
     return removeApiKey(pool, userId, id)
@@ -50,7 +51,7 @@ export async function refetchApiKeyModels(id: string, workspaceId?: string): Pro
   })
 }
 
-export async function updateApiKeyShare(input: { id: string; shared: boolean }, workspaceId?: string): Promise<SettingsActionResult<ApiKeysPage>> {
+async function updateApiKeyShareBody(input: { id: string; shared: boolean }, workspaceId?: string): Promise<SettingsActionResult<ApiKeysPage>> {
   return settingsWorkspaceAction(async () => {
     const { userId, workspace } = await actor(workspaceId)
     await setApiKeyShare(pool, userId, workspace, input.id, input.shared)
@@ -83,3 +84,8 @@ export async function listUsableApiKeys(workspaceId?: string): Promise<SettingsA
     return { keys: keys.filter(key => key.mine || names.has(key.ownerId)).map(key => ({ ...key, ownerName: key.mine ? null : names.get(key.ownerId)! })) }
   })
 }
+
+// Money, permissions, credentials and deletion: the session is read from the database, not the cookie cache.
+export async function createApiKey(...args: Parameters<typeof createApiKeyBody>) { return withFreshSession(() => createApiKeyBody(...args)) }
+export async function deleteApiKey(...args: Parameters<typeof deleteApiKeyBody>) { return withFreshSession(() => deleteApiKeyBody(...args)) }
+export async function updateApiKeyShare(...args: Parameters<typeof updateApiKeyShareBody>) { return withFreshSession(() => updateApiKeyShareBody(...args)) }

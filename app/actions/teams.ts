@@ -1,4 +1,5 @@
 'use server'
+import { withFreshSession } from '@/lib/fresh-session'
 import { getTranslations } from 'next-intl/server'
 
 import { and, asc, count, eq, ne } from 'drizzle-orm'
@@ -77,7 +78,7 @@ export async function listTeamMembers(id: string, tokenWorkspaceId?: string) {
     return { members, canManage, workspaceMembers: availableMembers }
   })
 }
-export async function changeTeamMember(input: { teamId: string; userId?: string; action: 'join' | 'leave' | 'add' | 'remove' | 'owner' | 'member' }) {
+async function changeTeamMemberBody(input: { teamId: string; userId?: string; action: 'join' | 'leave' | 'add' | 'remove' | 'owner' | 'member' }) {
   const i18nText = await getTranslations();
   return result(async () => {
     const user = await requireUser()
@@ -107,6 +108,10 @@ export async function getTeamDeletionImpact(teamId: string): Promise<ActionResul
 }
 
 /** 删除团队 and its tasks and own projects. `confirmName` must equal the team name. Workspace admins only. */
-export async function deleteTeam(teamId: string, confirmName: string): Promise<ActionResult<TeamDeletion>> {
+async function deleteTeamBody(teamId: string, confirmName: string): Promise<ActionResult<TeamDeletion>> {
   return workspaceAction(async () => deleteTeamData((await requireUser()).id, teamId, confirmName))
 }
+
+// Money, permissions, credentials and deletion: the session is read from the database, not the cookie cache.
+export async function changeTeamMember(...args: Parameters<typeof changeTeamMemberBody>) { return withFreshSession(() => changeTeamMemberBody(...args)) }
+export async function deleteTeam(...args: Parameters<typeof deleteTeamBody>) { return withFreshSession(() => deleteTeamBody(...args)) }
