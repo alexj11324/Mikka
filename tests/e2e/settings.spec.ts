@@ -371,7 +371,7 @@ test('团队创建、常规设置与成员管理都在同一设置页内完成',
   // Two groups: 账号, and the current workspace by name (decision 2026-10-31-2130).
   await expectItems(sidebar.locator('[data-slot="sidebar-group-label"]'), ['账号', 'E2E 团队', '你的团队'])
   const administration = sidebar.locator('[data-slot="sidebar-group"]').filter({ has: page.locator('[data-slot="sidebar-group-label"]', { hasText: /^E2E 团队$/ }) })
-  await expectItems(administration.locator('[data-slot="sidebar-menu-button"]'), ['常规', '成员', '团队', 'Bot 与 Agents', '团队权限', '密钥与环境', '审计日志', '用量', '计费'])
+  await expectItems(administration.locator('[data-slot="sidebar-menu-button"]'), ['常规', '成员', '团队', '团队权限', '密钥与环境', '审计日志', '用量', '计费'])
   await expect(sidebar.locator('[data-slot="sidebar-menu-sub"]')).toHaveCount(0)
   await expect(sidebar.getByRole('link', { name: '团队常规设置', exact: true })).toHaveCount(0)
   const settings = page.getByRole('region', { name: '团队设置选项', exact: true })
@@ -519,7 +519,7 @@ test('个人工作区有工作区自身的全部设置，只少成员、团队�
   await register(page, '/settings?section=preferences')
   const sidebar = page.locator('[data-slot="settings-list"]')
   await expect(sidebar.locator('[data-slot="sidebar-group-label"]').first()).toHaveText('账号')
-  for (const name of ['常规', 'Bot 与 Agents', '密钥与环境', '用量', '计费', 'API 与订阅']) await expect(sidebar.getByRole('link', { name, exact: true })).toBeVisible()
+  for (const name of ['常规', '密钥与环境', '用量', '计费', '模型与订阅']) await expect(sidebar.getByRole('link', { name, exact: true })).toBeVisible()
   for (const name of ['成员', '团队', '团队权限', '审计日志']) await expect(sidebar.getByRole('link', { name, exact: true })).toHaveCount(0)
   for (const path of ['/settings/members', '/settings/teams', '/settings?section=permissions', '/settings?section=audit']) {
     await page.goto(app(path))
@@ -528,9 +528,9 @@ test('个人工作区有工作区自身的全部设置，只少成员、团队�
   }
   // 重新播放引导 is the person's: 偏好设置 holds it in every workspace.
   await expect(page.getByRole('button', { name: '重新播放', exact: true })).toBeEnabled()
-  // 「API 与订阅」 keeps the person's own credentials; sharing with a team is a team workspace's.
-  await sidebar.getByRole('link', { name: 'API 与订阅', exact: true }).click()
-  await expect(page.getByRole('heading', { level: 1, name: 'API 与订阅', exact: true })).toBeVisible()
+  // 「模型与订阅」 keeps the person's own credentials; sharing with a team is a team workspace's, 付款 is 计费's.
+  await sidebar.getByRole('link', { name: '模型与订阅', exact: true }).click()
+  await expect(page.getByRole('heading', { level: 1, name: '模型与订阅', exact: true })).toBeVisible()
   await expect(page.getByText('分享给团队成员', { exact: true })).toHaveCount(0)
   await expect(page.getByText('我的点数也可用于这个团队', { exact: true })).toHaveCount(0)
   // 常规: its own name and address; no 转让, and the personal workspace cannot be deleted.
@@ -542,6 +542,8 @@ test('个人工作区有工作区自身的全部设置，只少成员、团队�
   // 密钥与环境: the person's own secrets for their bots' runs.
   await sidebar.getByRole('link', { name: '密钥与环境', exact: true }).click()
   await expect(page.getByRole('heading', { level: 1, name: '密钥与环境', exact: true })).toBeVisible()
-  await sidebar.getByRole('link', { name: 'Bot 与 Agents', exact: true }).click()
-  await expect(page.getByRole('heading', { level: 1, name: 'Bot 与 Agents', exact: true })).toBeVisible()
+  // Bot 与 Agents became 模型与订阅 (decision 2026-11-02-1400): an old link opens it.
+  await expect(sidebar.getByRole('link', { name: 'Bot 与 Agents', exact: true })).toHaveCount(0)
+  await page.goto(app('/settings?section=bots'))
+  await expect(page.getByRole('heading', { level: 1, name: '模型与订阅', exact: true })).toBeVisible()
 })

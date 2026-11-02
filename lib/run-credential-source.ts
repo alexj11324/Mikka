@@ -32,7 +32,7 @@ function firstKey(keys: Pick<ApiKeyView, 'id' | 'protocol' | 'models'>[], harnes
 
 /**
  * A model an API key lists for this Agent and none of the person's connected subscriptions of that
- * Agent's provider lists in its catalogue: a model picked from a key in 「Bot 与 Agents」. It runs on
+ * Agent's provider lists in its catalogue: a key's model in 允许使用的模型. It runs on
  * the key; a subscription is never asked for a model its account does not offer.
  */
 async function keyOnlyModel(query: Query, ownerId: string, keys: Pick<ApiKeyView, 'id' | 'protocol' | 'models'>[], harness: string, model: string): Promise<RunApiKey | undefined> {

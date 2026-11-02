@@ -67,8 +67,8 @@ test('设置预取未返回时，开关仍立即保存', async ({ page }) => {
   await register(page, '/settings?section=notifications')
   const proactive = page.getByRole('switch', { name: '主动消息', exact: true })
   await expect(proactive).toBeChecked()
-  // Pointing at 「API 与订阅」 prefetches that section now, if the idle prefetch has not already.
-  await page.locator('[data-slot="settings-list"]').getByRole('link', { name: 'API 与订阅', exact: true }).hover()
+  // Pointing at 「模型与订阅」 prefetches that section now, if the idle prefetch has not already.
+  await page.locator('[data-slot="settings-list"]').getByRole('link', { name: '模型与订阅', exact: true }).hover()
   await expect.poll(() => held.length).toBeGreaterThan(0)
   const saved = page.waitForResponse(response => {
     const request = response.request()

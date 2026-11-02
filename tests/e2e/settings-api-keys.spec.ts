@@ -3,7 +3,7 @@ import type { AddressInfo } from 'node:net'
 import { test, expect, registerInTeam } from './fixtures'
 import { attachLightDark } from './settings-v4-shots'
 
-// 「API 与订阅」 (orchestration.md § 1, C22): a custom provider is checked against
+// 「模型与订阅」 (orchestration.md § 1, C22): a custom provider is checked against
 // its /models list before it is saved, shown by its last four characters only,
 // shared with the team after a confirmation, and deleted. The provider is a
 // local OpenAI-compatible server; playwright.config.ts lets the app reach
@@ -26,10 +26,10 @@ test.beforeAll(async () => {
 })
 test.afterAll(async () => { await new Promise(resolve => server.close(resolve)) })
 
-test('API 与订阅：添加自定义服务商、校验失败、分享给团队成员、删除', async ({ page }, testInfo) => {
+test('模型与订阅：添加自定义服务商、校验失败、分享给团队成员、删除', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 1440, height: 900 })
   await registerInTeam(page, '/settings?section=models')
-  await expect(page.getByRole('heading', { level: 1, name: 'API 与订阅' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: '模型与订阅' })).toBeVisible()
   const fallback = page.getByRole('switch', { name: '订阅额度用完后，自动改用 API Key', exact: true })
   await expect(fallback).toBeChecked()
   await expect(page.getByText('会按 API 服务商的价格计费', { exact: true })).toBeVisible()
@@ -100,6 +100,6 @@ test('API 与订阅：添加自定义服务商、校验失败、分享给团队�
   await remove.getByRole('button', { name: '删除', exact: true }).click()
   await expect(page.getByText(`${host} · ••••k3y9`, { exact: true })).toHaveCount(0)
   await page.reload()
-  await expect(page.getByRole('heading', { level: 1, name: 'API 与订阅' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: '模型与订阅' })).toBeVisible()
   await expect(page.getByRole('switch', { name: '分享 E2E 网关 给团队成员', exact: true })).toHaveCount(0)
 })

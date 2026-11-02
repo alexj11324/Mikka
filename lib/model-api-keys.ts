@@ -15,7 +15,7 @@ import {
 } from '@/lib/model-api-key-providers'
 
 /**
- * 「API 与订阅」 API keys and custom providers (orchestration.md § 1, § 2, § 6;
+ * 「模型与订阅」 API keys and custom providers (orchestration.md § 1, § 2, § 6;
  * conflict C22). A key belongs to the account. It is checked against the
  * provider's read-only model list before it is saved, sealed with
  * WORKSPACE_SECRETS_KEY, and never returned: views carry its last four

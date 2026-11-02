@@ -1,5 +1,5 @@
 /**
- * 「API 与订阅」: the API key providers a person can add, and the shape the
+ * 「模型与订阅」: the API key providers a person can add, and the shape the
  * page, the model picker and the run injection share (orchestration.md § 1,
  * § 3, § 6). GPT/OpenAI models run on Codex; every other model, including
  * those reached through an API key or an Anthropic-compatible custom
