@@ -49,7 +49,11 @@ export function executionSettingsView(stored: StoredExecutionSettings, places: r
   const fill = <V extends { place?: string; harness?: string; model?: string }>(value: V) => {
     const place = concrete(value.place ?? 'auto') ?? initial.place
     const harness = concrete(value.harness ?? 'auto') ?? (place === initial.place ? initial.harness : '')
-    return retarget(places, { place, harness, model: concrete(value.model ?? 'auto') ?? '' }) as ExecutionChoice
+    const stored = concrete(value.model ?? 'auto') ?? ''
+    const shown = retarget(places, { place, harness, model: stored }) as ExecutionChoice
+    // A saved model stays as saved for its Agent, even when the place no longer reports it: the picker shows it
+    // as unavailable (modelUnavailable) rather than swapping in another model unasked.
+    return stored && shown.harness === harness ? { ...shown, model: stored } : shown
   }
   const defaults = { ...stored.defaults, ...fill(stored.defaults) }
   return {

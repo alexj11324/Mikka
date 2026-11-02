@@ -32,8 +32,8 @@ export async function setMemberSubscriptionPolicy(actor: { id: string; name: str
       ON CONFLICT ("workspaceId") DO UPDATE SET subscriptions=EXCLUDED.subscriptions,"updatedBy"=EXCLUDED."updatedBy","updatedAt"=now()`)
     await recordAudit(tx, { workspaceId, actor: { type: 'user', id: actor.id, name: actor.name }, action: 'integration.permission_changed', target: { type: 'personal', id: 'subscriptions', label: 'subscriptions' }, metadata: { integration: 'personal_subscriptions', capability: 'use', from: previous ? 'allow' : 'deny', to: allowed ? 'allow' : 'deny' } , ...request })
   })
-  // Off: every run here on a member's own subscription stops now.
-  if (!allowed) { await stopRunsUsingSubscriptions(pool, { workspaceId }); await stopRunsUsingApiKeys(pool, { workspaceId }) }
+  // Off: runs here on another member's shared subscription or API key stop now. A member's own runs on their own credentials go on (decision 2026-11-01-2240).
+  if (!allowed) { await stopRunsUsingSubscriptions(pool, { workspaceId, othersOnly: true }); await stopRunsUsingApiKeys(pool, { workspaceId, othersOnly: true }) }
   return getMemberSubscriptionPolicy(actor.id, workspaceId)
 }
 

@@ -18,7 +18,7 @@ import {
   type LabelRule, type StoredExecutionSettings, type TaskDefaults,
 } from '@/lib/execution-settings-client'
 import type { ExecutionRule } from '@/lib/execution-rules'
-import { harnessOptions, modelName, modelOptions, placeKind, redetectTargets, retarget, withCloudModels, type ExecutionChoice, type ExecutionPlace } from '@/lib/execution-settings-view'
+import { harnessOptions, modelName, modelOptions, modelUnavailable, placeKind, redetectTargets, retarget, withCloudModels, type ExecutionChoice, type ExecutionPlace } from '@/lib/execution-settings-view'
 import { cn } from '@/lib/utils'
 import { useOwnE2BKey } from '@/components/settings/e2b-key-dialog'
 import { findLabel, listWorkspaceLabels, matchLabels } from '@/lib/workspace-labels'
@@ -61,6 +61,8 @@ export function BotAgentsSettings() {
   const changeDefaults = (next: TaskDefaults) => {
     const rule = next.place !== defaults.place || next.harness !== defaults.harness || next.model !== defaults.model
     setUnsaved(state => ({ ...state, defaults: next }))
+    // No model reported for this Agent here yet: nothing to save until the person picks one.
+    if (!next.model) return
     void save(async () => {
       if (rule) await saveDefaultRule(next)
       setUnsaved(({ defaults: _saved, ...rest }) => rest)
@@ -72,10 +74,12 @@ export function BotAgentsSettings() {
     await stored.mutate(async (): Promise<StoredExecutionSettings> => { await request(); return readExecutionSettings() },
       { optimisticData: { ...current, rules: next }, rollbackOnError: true, populateCache: true, revalidate: false })
   })
-  const changeRule = (rule: LabelRule, label: string, value: ExecutionChoice) => mutateRules(
-    current.rules.map(item => item.id === rule.id ? { ...item, label, ...value } : item),
-    () => updateRule(rule.id, label, value),
-  )
+  const changeRule = (rule: LabelRule, label: string, value: ExecutionChoice) => {
+    const rules = current.rules.map(item => item.id === rule.id ? { ...item, label, ...value } : item)
+    // No model reported for this Agent here yet: the row shows the choice, and it saves once a model is picked.
+    if (!value.model) return void stored.mutate({ ...current, rules }, { revalidate: false })
+    return mutateRules(rules, () => updateRule(rule.id, label, value))
+  }
   const createRule = (label: string) => {
     // A new rule starts from the task defaults.
     const value: ExecutionChoice = { place: defaults.place, harness: defaults.harness, model: defaults.model }
@@ -165,10 +169,12 @@ function executionPickers({ t, row, value, places, wide, disabled, onChange, onR
   const cloudOnline = places.some(place => placeKind(place) === 'cloud' && place.online)
   const harnesses = harnessOptions(places, value.place)
   const harnessList = harnesses.includes(value.harness) ? harnesses : [...harnesses, value.harness]
+  // Only what the CLI or daemon reported here. A saved model it no longer reports shows as unavailable and is not offered.
   const models = modelOptions(places, value.place, value.harness)
-  const modelList = !value.model || models.some(option => option.value === value.model) ? models : [...models, { value: value.model, name: value.model }]
-  // No model yet (no cloud model list here): the select shows 选择模型, never a bare provider mark.
-  const shownModel = value.model ? modelName(places, value.place, value.harness, value.model) : ''
+  const unavailable = modelUnavailable(places, value.place, value.harness, value.model)
+  // No model yet: the select shows 选择模型 (or 还没有可用模型), never a bare provider mark.
+  const shownModel = value.model && !unavailable ? modelName(places, value.place, value.harness, value.model) : ''
+  const modelCell = unavailable ? `${value.model} · ${t('unavailable')}` : shownModel || (models.length ? t('pickModel') : t('noModels'))
   const cell = (column: string, name: string) => t('cell', { row, column, value: name })
   const refresh = () => onRedetect(redetectTargets(places, value.place))
   const move = (place: string) => onChange(retarget(places, { ...value, place }))
@@ -191,11 +197,14 @@ function executionPickers({ t, row, value, places, wide, disabled, onChange, onR
         {harnessList.map(harness => <CommandItem key={harness} value={harness} keywords={[harnessName(harness)]} data-checked={value.harness === harness} onSelect={() => { close(); onChange(retarget(places, { ...value, harness })) }}><HarnessLabel harness={harness} /></CommandItem>)}
       </CommandGroup>}
     </Picker>,
-    model: <Picker t={t} wide={wide} disabled={disabled} ariaLabel={cell(t('columns.model'), shownModel || t('pickModel'))} heading={t('columns.model')} onRefresh={refresh} search={t('searchModels')}
-      value={shownModel ? <ModelLabel model={shownModel} source={value.harness} /> : <span className="truncate text-muted-foreground">{t('pickModel')}</span>}>
-      {close => <CommandGroup>
-        {modelList.map(option => <CommandItem key={option.value} value={option.value} keywords={[option.name]} data-checked={value.model === option.value} onSelect={() => { close(); onChange({ ...value, model: option.value }) }}><ModelLabel model={option.name} source={value.harness} /></CommandItem>)}
-      </CommandGroup>}
+    model: <Picker t={t} wide={wide} disabled={disabled} ariaLabel={cell(t('columns.model'), modelCell)} heading={t('columns.model')} onRefresh={refresh} search={models.length ? t('searchModels') : undefined}
+      value={shownModel ? <ModelLabel model={shownModel} source={value.harness} />
+        : <span data-slot="model-unset" data-unavailable={unavailable || undefined} className="truncate text-muted-foreground">{modelCell}</span>}>
+      {close => models.length
+        ? <CommandGroup>
+          {models.map(option => <CommandItem key={option.value} value={option.value} keywords={[option.name]} data-checked={value.model === option.value} onSelect={() => { close(); onChange({ ...value, model: option.value }) }}><ModelLabel model={option.name} source={value.harness} /></CommandItem>)}
+        </CommandGroup>
+        : <p role="status" className="px-2 pt-1 pb-2.5 text-sm text-muted-foreground">{t('noModels')}</p>}
     </Picker>,
   }
 }

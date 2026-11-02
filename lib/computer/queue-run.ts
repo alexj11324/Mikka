@@ -7,7 +7,6 @@ import { freezeWorkerDefinition } from '@/lib/agent-kit/worker'
 import type { AgentExecution } from '@/lib/agent-kit/store'
 import { SubscriptionRepository } from '@/lib/subscription-repository'
 import { ComputerError } from './store'
-import { subscriptionsUsableSql } from '@/lib/personal-policy'
 import { runCredentialSource, type RunApiKey } from '@/lib/run-credential-source'
 
 /** Issue access is checked by the caller. Queue and Bot binding are committed
@@ -56,7 +55,7 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
     // Every cloud run freezes its definition (Agent, model, credential source) when it is created (orchestration.md § 5):
     // the Agent's subscription bound here, else the person's API key. The key is opened only when the run is claimed.
     const usable = (await client.query(`SELECT 1 FROM bots b JOIN agents a ON a.id=$3 AND a."userId"=b."ownerId"
-      WHERE b.id=$1 AND b."ownerId"=$2 AND ${subscriptionsUsableSql('b."ownerId"', 'b."workspaceId"')}
+      WHERE b.id=$1 AND b."ownerId"=$2
         AND EXISTS (SELECT 1 FROM byos_bindings s JOIN byos_connections c ON c.id=s."connectionId" AND c."ownerId"=s."ownerId"
           AND c.state='connected' AND c.paused=false AND c.epoch=s."connectionRevision"
           WHERE s.id=(SELECT latest.id FROM byos_bindings latest WHERE latest."ownerId"=b."ownerId" AND latest."consumerId"=a.id::text

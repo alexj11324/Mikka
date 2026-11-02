@@ -2476,7 +2476,9 @@
       "offlineWait": "Wait for it",
       "offlineCloud": "Run in the cloud",
       "labels": "By label",
-      "pickModel": "Choose a model"
+      "pickModel": "Choose a model",
+      "noModels": "No models yet",
+      "unavailable": "Unavailable"
     },
     "searchEmpty": "No matching settings",
     "apiKeys": {

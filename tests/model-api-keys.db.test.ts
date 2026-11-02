@@ -95,12 +95,12 @@ test('API keys: migration replay, sealed storage, shares, picker order and run i
     assert.equal(bobPage.canShare, true)
     assert.ok(!JSON.stringify(bobPage).includes('test-'), 'views never carry the key')
 
-    // The picker: own keys first when allowed here, then teammates' shared keys.
+    // The picker: own keys first, always (decision 2026-11-01-2240), then teammates' shared keys.
     assert.deepEqual((await store.usableApiKeys(pool, 'alice', team.id)).map(key => [key.provider, key.mine]), [['anthropic', true], ['custom', false]])
-    assert.deepEqual((await store.usableApiKeys(pool, 'bob', team.id)).map(key => key.name), [], 'Bob did not share his own credentials here, and nobody shared with him')
+    assert.deepEqual((await store.usableApiKeys(pool, 'bob', team.id)).map(key => [key.name, key.mine]), [['Gateway', true], ['Local', true]], 'Bob\'s own keys are his here without sharing; nobody shared with him')
     assert.deepEqual((await store.usableApiKeys(pool, 'alice', personal.id)).map(key => key.provider), ['anthropic'])
     await pool.query('UPDATE workspace_personal_policies SET subscriptions=false WHERE "workspaceId"=$1', [team.id])
-    assert.deepEqual(await store.usableApiKeys(pool, 'alice', team.id), [], 'the admin switch turns off members\' credentials')
+    assert.deepEqual((await store.usableApiKeys(pool, 'alice', team.id)).map(key => [key.provider, key.mine]), [['anthropic', true]], 'the admin switch turns off teammates\' shared keys, never her own')
     await pool.query('UPDATE workspace_personal_policies SET subscriptions=true WHERE "workspaceId"=$1', [team.id])
 
     // A bot's saved model can be an API key's: usable here, reaching bot chats, a model the key lists.
