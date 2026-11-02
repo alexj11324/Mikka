@@ -154,7 +154,10 @@ export function WorkspaceSettings({ workspaceId }: { userKey?: string; workspace
         <Button type="button" variant="secondary" size="sm" onClick={() => setTransferring(true)}>{t('transfer')}</Button>
       </SettingRow>}
       <SettingRow title={t('deleteWorkspace')}>
-        <Button type="button" variant="destructive" size="sm" onClick={() => setDeleting(true)}>{commonT('delete')}</Button>
+        {/* Every account keeps its personal workspace (decision 2026-11-02-0203): the row names that state. */}
+        {current.personal
+          ? <span className="text-sm text-muted-foreground">{t('personalUndeletable')}</span>
+          : <Button type="button" variant="destructive" size="sm" onClick={() => setDeleting(true)}>{commonT('delete')}</Button>}
       </SettingRow>
     </SettingsSection>
     {transferredTo && <p role="status" className="text-sm text-muted-foreground">{t('transferred', { name: transferredTo })}</p>}

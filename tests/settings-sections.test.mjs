@@ -58,11 +58,11 @@ test('a current id wins over a legacy alias with the same name', () => {
   assert.equal(resolveSettingsSection('/settings', 'profile'), 'account')
 })
 
-test('a personal workspace shows the account group, Bot 与 Agents, 用量 and 计费 only; a team workspace keeps its settings', () => {
-  // Decisions 2026-11-01-2310 and 2026-11-02-0203: personal and team workspaces are kept apart.
+test('a personal workspace has every setting of the workspace itself; only what is between people is a team\'s', () => {
+  // Decision 2026-11-02-0203: the two kinds differ only in 成员, 团队, 团队权限 and 审计日志.
   const personal = visibleSettingsSections({ admin: true, personal: true }).map(s => s.id)
   const account = SETTINGS_SECTIONS.filter(s => s.group === 'personal' && !UNBUILT.includes(s.id)).map(s => s.id)
-  assert.deepEqual(personal, [...account, 'bots', 'usage', 'billing'])
+  assert.deepEqual(personal, [...account, 'general', 'bots', 'secrets', 'usage', 'billing'])
   const team = visibleSettingsSections({ admin: true }).map(s => s.id)
   for (const id of ['general', 'members', 'teams', 'bots', 'permissions', 'secrets', 'audit', 'usage', 'billing']) assert.ok(team.includes(id), id)
 })

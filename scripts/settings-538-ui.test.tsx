@@ -51,7 +51,7 @@ before(async () => {
   ;({ E2BKeySettings } = await import('../components/settings/secrets-settings'))
 })
 beforeEach(() => {
-  general = { id: 'w1', name: 'Acme', slug: 'acme', icon: null, canEdit: false, canTransfer: false }
+  general = { id: 'w1', name: 'Acme', slug: 'acme', icon: null, canEdit: false, canTransfer: false, personal: false }
   capability = { canEdit: true, byoEnabled: true, configured: true, lastErrorCode: null, lastErrorAt: null }
   assigned.length = 0
   reset.mock.resetCalls()
