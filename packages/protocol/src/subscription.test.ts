@@ -22,6 +22,13 @@ describe("subscription policy", () => {
     expect(authorizeSubscriptionUse(use, access, NOW).binding.route).toBe(route)
   })
 
+  it("serves the owner's subscription connected in another of their workspaces", () => {
+    const { use, access } = subscriptionFixture("claude_cpa")
+    access.connection!.workspaceId = "personal"
+    access.backend!.workspaceId = "personal"
+    expect(authorizeSubscriptionUse(use, access, NOW).connection.workspaceId).toBe("personal")
+  })
+
   const refusals: [
     string,
     SubscriptionRefusalCode,
@@ -56,10 +63,17 @@ describe("subscription policy", () => {
       },
     ],
     [
-      "different workspace",
+      "binding made in another workspace",
       "account_unavailable",
       (a) => {
-        a.connection!.workspaceId = "workspace-b"
+        a.binding!.workspaceId = "workspace-b"
+      },
+    ],
+    [
+      "backend for another workspace than the connection",
+      "binding_mismatch",
+      (a) => {
+        a.backend!.workspaceId = "workspace-b"
       },
     ],
     [

@@ -5,6 +5,7 @@ import type { Pool, PoolClient } from "pg";
 import { z } from "zod";
 import { othersMayUse, pooledOwners } from "./personal-policy";
 import { HOSTED_CHOICE } from "./bot-model-menu-view";
+import { subscriptionChatRouteReady } from "./cloud-computer-flag";
 
 export interface ExecutionSettingsScope {
   ownerId: string;
@@ -48,7 +49,7 @@ export class ExecutionSettings {
   async pooledBindings(scope: ExecutionSettingsScope) {
     const rows = [];
     for (const ownerId of await pooledOwners(this.pool, scope.ownerId, scope.workspaceId))
-      rows.push(...(await this.bindingsOf(ownerId, scope.workspaceId)));
+      rows.push(...(await this.bindingsOf(ownerId, scope.workspaceId)).filter((row) => subscriptionChatRouteReady(row.route)));
     return [...rows.filter((row) => row.provider === "claude"), ...rows.filter((row) => row.provider !== "claude")];
   }
   /** Clone another member's binding for this bot only, while they allow it here; never a credential. */
@@ -76,6 +77,15 @@ export class ExecutionSettings {
   /** Execution resolves its saved binding independently of the deduplicated catalogue. */
   async botBinding(scope: ExecutionSettingsScope, bindingId: string) {
     return (await this.connectedBindings(scope, bindingId))[0];
+  }
+  /** A bot chat's subscription options: `botModels` on a route that answers chats (`subscriptionChatRouteReady`). */
+  async chatModels(scope: ExecutionSettingsScope, query: Pick<PoolClient, "query"> = this.pool) {
+    return (await this.botModels(scope, query)).filter((row) => subscriptionChatRouteReady(row.route));
+  }
+  /** A saved chat choice, while its route answers chats. */
+  async chatBinding(scope: ExecutionSettingsScope, bindingId: string) {
+    const row = await this.botBinding(scope, bindingId);
+    return row && subscriptionChatRouteReady(row.route) ? row : undefined;
   }
   /** One option per model/account. Binding lookups remain independent of this presentation deduplication. */
   async botModels(
@@ -233,7 +243,7 @@ export class ExecutionSettings {
     // A saved row without either is Mikka 默认, picked on purpose.
     if (row) return HOSTED_CHOICE;
     // Decision 2026-10-30 (#537): a Claude subscription first, otherwise ChatGPT/Codex, as `suggested` does.
-    const models = await this.botModels(scope);
+    const models = await this.chatModels(scope);
     const first = models.find((m) => m.provider === "claude") ?? models[0];
     if (!first) return undefined;
     const bindingId = await this.bindingForBot(scope, botId, first.bindingId);

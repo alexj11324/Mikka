@@ -259,6 +259,52 @@ test('personal workspaces', { skip: !dbUrl }, async t => {
     assert.equal((await pool.query('SELECT count(*)::int AS n FROM workspace_subscription_shares WHERE "ownerId"=$1 AND "workspaceId"=$2', [owner, team.id])).rows[0].n, 0)
   })
 
+  await t.test('a subscription connected in the personal workspace answers its owner\'s chats in a team; a teammate\'s only once shared', async () => {
+    const { authorizeSubscriptionUse } = await import('../lib/subscription-runtime')
+    const { setSubscriptionShare } = await import('../lib/personal-policy')
+    const { SubscriptionService } = await import('../lib/subscription-service')
+    const { SubscriptionRepository } = await import('../lib/subscription-repository')
+    const { ExecutionSettings } = await import('../lib/execution-settings')
+    const { ensurePersonalWorkspace } = await import('../lib/personal-workspace')
+    const admin = await seedUser(pool, 'admin'), owner = await seedUser(pool, 'owner'), peer = await seedUser(pool, 'peer')
+    const team = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }, { userId: owner, role: 'member' }, { userId: peer, role: 'member' }])
+    const personal = await ensurePersonalWorkspace({ id: owner, email: `${owner}@example.invalid`, name: 'owner' }, 'zh-CN')
+    const connection = randomUUID()
+    const quota = { vendor: 'claude_code', source: 'official', status: 'ok', plan: null, observedAt: new Date().toISOString(), windows: [{ kind: 'five_hour', used: 0.2, resetsAt: null }] }
+    await pool.query(`INSERT INTO byos_connections (id,"ownerId","workspaceId",provider,state,epoch,"secretName","secretDigest","providerSubject",quota) VALUES ($1,$2,$3,'claude','connected',1,$4,$5,'synthetic-subject',$6)`,
+      [connection, owner, personal, `synthetic-${connection}`, 'a'.repeat(64), JSON.stringify(quota)])
+    const ownBot = randomUUID(), peerBot = randomUUID()
+    await pool.query('INSERT INTO bots (id,"ownerId","workspaceId",name) VALUES ($1,$2,$3,$4),($5,$6,$3,$4)', [ownBot, owner, team.id, 'Bot', peerBot, peer])
+    const bind = async (consumerId: string) => {
+      const id = randomUUID()
+      await pool.query(`INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId") VALUES ($1,$2,$3,$4,$5,1,'claude_cpa','claude-test-model')`, [id, owner, team.id, consumerId, connection])
+      return id
+    }
+    const ownBinding = await bind(ownBot), peerBinding = await bind(peerBot)
+    // The runtime's own checks, with no worker: the quota above is fresh, so nothing is probed.
+    const service = new SubscriptionService(new SubscriptionRepository(appPool), () => { throw new Error('no probe expected') },
+      { ready: () => true, oauth: { codex: false, claude: false }, nativeIsolation: 'none' }, undefined, authorizeSubscriptionUse)
+    const use = (consumerId: string, bindingId: string) => ({ ownerId: owner, workspaceId: team.id, consumerId, bindingId, execution: 'model' as const })
+    const allowed = await service.check(use(ownBot, ownBinding))
+    assert.equal(allowed.connection.workspaceId, personal, 'the owner\'s own bot in the team uses the personal subscription')
+    await assert.rejects(service.check(use(peerBot, peerBinding)), { code: 'account_unavailable' }, 'a teammate\'s bot: not shared')
+    await setSubscriptionShare(pool, owner, team.id, true, true)
+    await service.check(use(peerBot, peerBinding))
+    await setSubscriptionShare(pool, owner, team.id, false)
+    await assert.rejects(service.check(use(peerBot, peerBinding)), { code: 'account_unavailable' }, 'un-sharing stops it at once')
+    await service.check(use(ownBot, ownBinding))
+
+    // The menu and the resolver read one readiness: a route that does not answer chats is never offered.
+    const settings = new ExecutionSettings(appPool)
+    const before = process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES
+    t.after(() => { process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES = before })
+    process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES = 'codex_cpa'
+    assert.deepEqual(await settings.chatModels({ ownerId: owner, workspaceId: team.id }), [])
+    assert.equal(await settings.chatBinding({ ownerId: owner, workspaceId: team.id }, ownBinding), undefined)
+    process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES = 'claude_cpa,codex_cpa'
+    assert.deepEqual((await settings.chatModels({ ownerId: owner, workspaceId: team.id })).map(row => row.modelId), ['claude-test-model'])
+  })
+
   await t.test('由我的卡支付这个团队: one member\'s card per team; leaving releases it with a 7-day grace that admins see', async () => {
     const { designateOwnCard, paymentDesignation, PAYMENT_GRACE_DAYS } = await import('../lib/payment-designation')
     const { hostedUsage } = await import('../lib/abuse/runtime')

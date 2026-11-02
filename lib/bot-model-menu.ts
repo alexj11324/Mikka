@@ -33,17 +33,17 @@ const HOSTED = { id: HOSTED_CHOICE, modelId: "", provider: "mikka" } as const;
 /**
  * The composer's model menu for one bot, or the Coordinator (`botId` null),
  * and what its chip shows. It lists only credentials the resolver can use in
- * this workspace (`ExecutionSettings.botModels`), so the menu never offers a
+ * this workspace (`ExecutionSettings.chatModels`), so the menu never offers a
  * model the next run would refuse. It reads; it never saves a default.
  */
 export async function botModelMenu(
   pool: Pick<Pool, "query">,
-  settings: Pick<ExecutionSettings, "botModels" | "botBinding">,
+  settings: Pick<ExecutionSettings, "chatModels" | "chatBinding">,
   scope: ExecutionSettingsScope,
   botId: string | null,
   now = Date.now(),
 ): Promise<BotModelMenu> {
-  const rows = await settings.botModels(scope);
+  const rows = await settings.chatModels(scope);
   const quotas = new Map<string, unknown>(
     rows.length
       ? (
@@ -138,7 +138,7 @@ export async function botModelMenu(
     // Picked before the points ran out here: named, marked unavailable, so the chat says so before sending.
     current = { ...HOSTED, kind: "hosted", chosen: true, available: points > 0 };
   } else if (saved) {
-    const live = await settings.botBinding(scope, saved);
+    const live = await settings.chatBinding(scope, saved);
     if (live)
       current = fromRow(live, true, quotas.get(String(live.connectionId)) ?? (await connectionQuota(pool, live.connectionId)));
     else {
@@ -203,7 +203,7 @@ async function connectionQuota(pool: Pick<Pool, "query">, connectionId: string) 
  */
 export async function refreshBotModelMenu(
   pool: Pick<Pool, "query">,
-  settings: Pick<ExecutionSettings, "botModels" | "botBinding" | "refreshBotModels" | "connectedSubscriptions">,
+  settings: Pick<ExecutionSettings, "chatModels" | "chatBinding" | "refreshBotModels" | "connectedSubscriptions">,
   scope: ExecutionSettingsScope,
   botId: string | null,
   timeoutMs = 8000,

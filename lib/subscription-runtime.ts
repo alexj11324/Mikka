@@ -6,7 +6,7 @@ import { SubscriptionRefusal, type SubscriptionRoute } from '@mikka/protocol/sub
 import { workspaceDb } from './workspace-db'
 import { requireWorkspace } from './workspace-access'
 import { pool } from './db'
-import { byosEnabled, byosEnrollmentEnabled } from './cloud-computer-flag'
+import { byosEnabled, byosEnrollmentEnabled, subscriptionChatRoutes } from './cloud-computer-flag'
 import { SubscriptionRepository } from './subscription-repository'
 import { SubscriptionService } from './subscription-service'
 import { SubscriptionWorkerClient } from '../packages/daemon/src/subscription-worker-client'
@@ -59,7 +59,7 @@ export function subscriptionRuntime(nativeBroker = false, custodyOnly = false, o
   // Built-in CPA inference transports are never registered. The separate plain
   // adapter uses CPA converters with Mikka's identity and no native metadata.
   const ready = new Set((process.env.MIKKA_BYOS_VALIDATED_NATIVE_ROUTES ?? '').split(',').filter(route => ['codex_cli', 'claude_code_cli'].includes(route)))
-  const modelRoutes = new Set((process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES ?? '').split(',').filter(route => ['codex_cpa', 'claude_cpa'].includes(route)))
+  const modelRoutes = subscriptionChatRoutes()
   return new SubscriptionService(new SubscriptionRepository(database), scope => {
     const resolve = sharedCustodyIdentity ? async (executionOnly: boolean, signal?: AbortSignal, use?: { bindingId: string; consumerId: string; runId?: string }, revision?: unknown) => {
       if (!executionOnly) return { workloadToken: await infisicalWorkloadToken(infisicalOrigin, custodyId!, custodySecret!, signal) }
