@@ -68,16 +68,19 @@ async function trial(text: string, context: string, options: { computerEnabled?:
   log.length = 0
   const tools: ToolSet = createRegistry(OWNER, BOT, undefined, { coordinator: true, ...options })
   const result = await generateText({ model: evalModel(), system: `${base}\n${context}`, prompt: `This chat is linked to issue ${ISSUE}.\n\n${text}`, tools, stopWhen: stepCountIs(8) })
-  return { reply: result.text, calls: [...log] }
+  // What the person sees before the first tool runs: the text of the first model call, when it also called a tool.
+  const first = result.steps[0]
+  return { reply: result.text, calls: [...log], opening: first && first.toolCalls.length ? first.text.trim() : null, steps: result.steps.length }
 }
 
 /** Runs `grade` on TRIALS trials; prints each failing transcript. */
-async function passAll(name: string, run: () => Promise<{ reply: string; calls: { step: string; input: unknown }[] }>, grade: (outcome: { reply: string; calls: { step: string; input: unknown }[] }) => string | null) {
+type Outcome = { reply: string; calls: { step: string; input: unknown }[]; opening?: string | null; steps?: number }
+async function passAll(name: string, run: () => Promise<Outcome>, grade: (outcome: Outcome) => string | null) {
   const failures: string[] = []
   for (let index = 0; index < TRIALS; index++) {
     const outcome = await run()
     const why = grade(outcome)
-    if (why) failures.push(`trial ${index + 1}: ${why}\n  calls: ${JSON.stringify(outcome.calls)}\n  reply: ${outcome.reply}`)
+    if (why) failures.push(`trial ${index + 1}: ${why}\n  calls: ${JSON.stringify(outcome.calls)}\n  opening: ${outcome.opening ?? '(none)'}\n  reply: ${outcome.reply}`)
   }
   assert.equal(failures.length, 0, `${name}: ${TRIALS - failures.length}/${TRIALS} passed\n${failures.join('\n')}`)
 }
@@ -140,4 +143,28 @@ test('more work on a task stays in its thread; a new one only when the person as
   results = { getIssue: thread, dispatchRun: { runId: 'run-2', thread: 'new', threadId: 'run-2', replacedThreadId: 'run-1' } }
   await passAll('explicit new thread', async () => trial('另开一个线程，用 Codex 从头重新做这个任务', await facts()), ({ calls }) =>
     calls.some(call => call.step === 'dispatchRun' && (call.input as { newThread?: boolean }).newThread === true) ? null : 'no new thread though the person asked')
+})
+
+test('a turn that needs tools opens with one specific sentence before the first tool, and the reply does not repeat it', { skip }, async () => {
+  results = { getIssue: { id: ISSUE, title: '加 README', thread: null }, findRepository: { match: 'one', repository: 'alexj11324/Mikka_test' }, dispatchRun: { runId: 'run-6', thread: 'new', placement: { kind: 'device', name: 'Alex 的 MacBook' } } }
+  const openings = new Set<string>()
+  await passAll('opening', async () => trial('派发任务，给 Mikka_test 写一个简单的 README', await facts()), ({ reply, calls, opening }) => {
+    if (!called(calls, 'dispatchRun')) return 'no dispatch_run'
+    if (!opening) return 'no sentence before the first tool call'
+    if (opening.length > 80) return 'opening is not short'
+    if (!/README|Mikka_test|任务|派|线程|Claude|Codex/i.test(opening)) return 'opening does not name what it does'
+    if (reply.trim() && reply.includes(opening)) return 'the reply repeats the opening'
+    openings.add(opening)
+    return null
+  })
+})
+
+test('a message that needs no tool is answered at once, with no opening sentence', { skip }, async () => {
+  results = {}
+  await passAll('no tool', async () => trial('谢谢，没别的事了', await facts()), ({ reply, calls, steps }) => {
+    if (calls.length) return 'called a tool'
+    if (!reply.trim()) return 'silent'
+    if ((steps ?? 1) > 1) return 'took more than one model call'
+    return null
+  })
 })
