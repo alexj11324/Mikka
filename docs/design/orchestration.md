@@ -91,10 +91,13 @@ Rules that hold everywhere:
 
 **Model → Agent.** Each entry of 允许使用的模型 names its Agent: a
 subscription model runs on the Agent of its account (Claude → Claude Code,
-ChatGPT → Codex); an API key's model runs on the Agent its protocol can talk
-to (OpenAI-compatible → Codex, Anthropic-compatible → Claude Code). Nothing
-picks an Agent from a model's name
-([1400](decisions/2026-11-02-1400-model-order-dispatch.md)).
+ChatGPT → Codex); an API key's model runs on each Agent a protocol of the key
+can talk to (OpenAI → Codex, Anthropic → Claude Code). A preset provider
+speaks the protocols of its official API, so a DeepSeek or Kimi key runs on
+both Agents and its models are entries on each; a custom provider speaks the
+one protocol the person picked. Nothing picks an Agent from a model's name
+([1400](decisions/2026-11-02-1400-model-order-dispatch.md),
+[1620](decisions/2026-11-02-1620-preset-keys-speak-both-protocols.md)).
 
 「Bot 本身走我们自己的 AI SDK，跑在 Vercel 上。Bot 需要干活时，通过 daemon 把任务派给
 Claude Code 或 Codex。」 (Alex, R-05)

@@ -7,7 +7,7 @@
 import assert from 'node:assert/strict'
 import { randomBytes, randomUUID } from 'node:crypto'
 import { test } from 'node:test'
-import { dbUrl, seedUser, seedWorkspace } from './support/workspace-admin-db'
+import { dbUrl, seedUser, seedWorkspace, useUpFreeMessages } from './support/workspace-admin-db'
 
 test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }, async t => {
   const saved = { key: process.env.WORKSPACE_SECRETS_KEY, byos: process.env.MIKKA_BYOS_ENABLED }
@@ -93,9 +93,12 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
   await t.test('no points for Mikka 默认: the next allowed model a chat can run on, in the person\'s order', async () => {
     const { hostedPointsRefusal, pointsFallback, hostedPointsHere } = await import('../lib/points-fallback')
     const scope = await person('order-points')
-    // A new workspace with nothing bought or verified: Mikka 默认 is refused for points.
+    // A new workspace with nothing bought or verified: its free messages first (TRIAL_MESSAGES), then refused for points.
+    assert.equal(await hostedPointsRefusal(scope.workspaceId), null)
+    assert.deepEqual(await hostedPointsHere(scope.workspaceId), { points: 0, trialLeft: 20 }, 'the menu lists Mikka 默认 with its free messages')
+    await useUpFreeMessages(pool, scope.workspaceId, scope.ownerId)
     assert.equal(await hostedPointsRefusal(scope.workspaceId), 'verification_required')
-    assert.equal(await hostedPointsHere(scope.workspaceId), 0, 'the menu leaves Mikka 默认 out')
+    assert.deepEqual(await hostedPointsHere(scope.workspaceId), { points: 0, trialLeft: 0 }, 'the menu leaves Mikka 默认 out')
     assert.equal(await pointsFallback(pool, scope), null, 'nothing else to run on')
     const claude = await subscribe(scope, 'claude', ['acct-opus-p'])
     const key = await keys.addApiKey(pool, scope.ownerId, { provider: 'deepseek', apiKey: `sk-${randomBytes(12).toString('hex')}` }, { fetch: (async () => Response.json({ data: [{ id: 'key-deepseek-p' }] })) as unknown as typeof fetch })
@@ -114,7 +117,7 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
     // Points bought: Mikka 默认 runs, no fallback asked for.
     await pool.query(`INSERT INTO workspace_credit_grants (id,"workspaceId",bucket,points,reason,"externalId") VALUES ($1,$2,'purchased',100,'pack',$3)`, [randomUUID(), scope.workspaceId, `points-${randomUUID()}`])
     assert.equal(await hostedPointsRefusal(scope.workspaceId), null)
-    assert.equal(await hostedPointsHere(scope.workspaceId), 100, 'the menu shows what this workspace can spend')
+    assert.deepEqual(await hostedPointsHere(scope.workspaceId), { points: 100, trialLeft: 0 }, 'the menu shows what this workspace can spend')
   })
 
   await t.test('edits: the first change stores what was shown; adds must be candidates; reorder, remove and 运行位置 save', async () => {
@@ -200,9 +203,15 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
     // The thread's model is the only one tried; it never falls back to the list, which has a model that runs (opus).
     const notOffered = await resolveModelDispatch(pool, ctx, { harness: 'codex', model: 'acct-opus-c' })
     assert.deepEqual([notOffered.kind, notOffered.kind === 'none' && notOffered.reason, notOffered.kind === 'none' && notOffered.card.description], ['none', 'notOffered', '没有订阅或 Key 能用 Codex 跑 acct-opus-c'])
-    // Only the Agent named (「派给 Codex」): nothing offers Codex yet, so the card names the Agent alone.
+    // Only the Agent named (「派给 Codex」): the DeepSeek key speaks the OpenAI protocol too, so it offers its model on Codex
+    // (decision 2026-11-02-1620); no computer here has Codex, so the card says so for that model.
     const noCodex = await resolveModelDispatch(pool, ctx, { harness: 'codex' })
-    assert.deepEqual([noCodex.kind === 'none' && noCodex.reason, noCodex.kind === 'none' && noCodex.card.description], ['notOffered', '没有订阅或 Key 能用 Codex'])
+    assert.deepEqual([noCodex.kind === 'none' && noCodex.reason, noCodex.kind === 'none' && noCodex.card.description], ['pickedNoDevice', '没有电脑能用 Codex 跑 key-model-c'])
+    // With only a Claude subscription nothing offers Codex at all, so the card names the Agent alone.
+    const claudeOnlyPerson = await person('order-dispatch-claude-only')
+    await subscribe(claudeOnlyPerson, 'claude', ['acct-opus-d'])
+    const nothingOnCodex = await resolveModelDispatch(pool, { ...claudeOnlyPerson, botId: null }, { harness: 'codex' })
+    assert.deepEqual([nothingOnCodex.kind === 'none' && nothingOnCodex.reason, nothingOnCodex.kind === 'none' && nothingOnCodex.card.description], ['notOffered', '没有订阅或 Key 能用 Codex'])
     // Only Claude Code named: its first model in the list, the same one the list would run.
     const claudeOnly = await resolveModelDispatch(pool, ctx, { harness: 'claude_code' })
     assert.equal(claudeOnly.kind === 'device' && claudeOnly.entry.harness, 'claude_code')

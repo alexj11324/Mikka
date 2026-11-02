@@ -75,3 +75,14 @@ export async function seedProject(pool: Pool, userId: string, links: Array<{ tea
 }
 
 export const count = async (pool: Pool, text: string, params: unknown[]) => Number((await pool.query<{ n: string }>(`select count(*)::text as n from ${text}`, params)).rows[0].n)
+
+/**
+ * The workspace's free messages (TRIAL_MESSAGES, no card yet) are used up: one
+ * more message than the trial sent in a chat there, so Mikka 默认 asks for a card.
+ */
+export async function useUpFreeMessages(pool: Pool, workspaceId: string, ownerId: string) {
+  const { TRIAL_MESSAGES } = await import('../../lib/abuse/policy')
+  const bot = await seedBot(pool, workspaceId, ownerId)
+  for (let i = 0; i <= TRIAL_MESSAGES; i++)
+    await pool.query(`insert into coordinator_events (id,"userId","botId",kind,"dedupeKey",payload) values ($1,$2,$3,'user_message',$4,$5)`, [randomUUID(), ownerId, bot, `user_message:${randomUUID()}`, JSON.stringify({ text: `message ${i}` })])
+}

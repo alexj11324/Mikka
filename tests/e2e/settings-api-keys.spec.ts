@@ -1,4 +1,6 @@
+import { randomUUID } from 'node:crypto'
 import { createServer, type Server } from 'node:http'
+import { Pool } from 'pg'
 import type { AddressInfo } from 'node:net'
 import { test, expect, registerInTeam } from './fixtures'
 import { attachLightDark } from './settings-v4-shots'
@@ -44,11 +46,24 @@ test('模型与订阅：添加自定义服务商、校验失败、分享给团�
   // A wrong key is refused by the provider and nothing is saved.
   await page.getByRole('button', { name: '添加 API Key', exact: true }).click()
   const dialog = page.getByRole('dialog', { name: '添加 API Key' })
-  await dialog.getByRole('combobox', { name: '服务商' }).click()
-  await page.getByRole('option', { name: '自定义服务商' }).click()
+  // Presets take only the key; each says which Agents it runs on. DeepSeek and Kimi speak both protocols (Harness draft).
+  const providerList = dialog.getByRole('radiogroup', { name: '服务商' })
+  const providerRow = (name: string) => providerList.locator('label').filter({ has: page.getByText(name, { exact: true }) })
+  await expect(providerRow('Anthropic')).toContainText('Anthropic 协议 · 可用 Claude Code')
+  await expect(providerRow('OpenAI')).toContainText('OpenAI 协议 · 可用 Codex')
+  await expect(providerRow('DeepSeek')).toContainText('Anthropic、OpenAI 协议 · 可用 Claude Code、Codex')
+  await expect(providerRow('Kimi')).toContainText('Anthropic、OpenAI 协议 · 可用 Claude Code、Codex')
+  await expect(providerRow('自定义服务商')).toContainText('选了协议才知道能用哪个 Agent')
+  await providerList.getByRole('radio', { name: /DeepSeek/ }).check()
+  await expect(dialog.getByText('协议', { exact: true })).toHaveCount(0)
+  await attachLightDark(page, testInfo, 'api-keys-add-preset')
+  // Only a custom provider picks its protocol; the options name the Agent.
+  await providerList.getByRole('radio', { name: /自定义服务商/ }).check()
   await dialog.getByRole('textbox', { name: '名称' }).fill('E2E 网关')
   await dialog.getByRole('textbox', { name: 'Base URL' }).fill(baseUrl)
-  await expect(dialog.getByRole('combobox', { name: '协议' })).toContainText('OpenAI 兼容')
+  const protocols = dialog.getByRole('group', { name: '协议' })
+  await expect(protocols.getByRole('button', { name: 'OpenAI 协议 · 可用 Codex' }).or(protocols.getByRole('radio', { name: 'OpenAI 协议 · 可用 Codex' }))).toHaveAttribute('aria-pressed', 'true')
+  await expect(protocols.getByText('Anthropic 协议 · 可用 Claude Code', { exact: true })).toBeVisible()
   await dialog.getByLabel('API Key').fill(`test-${Date.now()}-wrong`)
   await dialog.getByRole('button', { name: '添加', exact: true }).click()
   await expect(dialog.getByText('Key 无效或已被撤销。', { exact: true })).toBeVisible()
@@ -58,8 +73,8 @@ test('模型与订阅：添加自定义服务商、校验失败、分享给团�
   await dialog.getByRole('button', { name: '添加', exact: true }).click()
   await expect(dialog).toHaveCount(0)
   const host = new URL(baseUrl).host
-  await expect(apiKeys.getByText(`${host} · ••••k3y9`, { exact: true })).toBeVisible()
-  await expect(subscriptions.getByText(`${host} · ••••k3y9`, { exact: true })).toHaveCount(0)
+  await expect(apiKeys.getByText(`${host} · ••••k3y9 · OpenAI 协议 · 可用 Codex`, { exact: true })).toBeVisible()
+  await expect(subscriptions.getByText(`${host} · ••••k3y9`, { exact: false })).toHaveCount(0)
   expect(await page.content()).not.toContain(GOOD)
   // The row counts what the provider's /models gave.
   await expect(apiKeys.getByRole('status').filter({ hasText: '2 个模型' })).toBeVisible()
@@ -104,8 +119,35 @@ test('模型与订阅：添加自定义服务商、校验失败、分享给团�
   await page.getByRole('button', { name: '删除 E2E 网关', exact: true }).click()
   const remove = page.getByRole('alertdialog', { name: '删除 E2E 网关？' })
   await remove.getByRole('button', { name: '删除', exact: true }).click()
-  await expect(page.getByText(`${host} · ••••k3y9`, { exact: true })).toHaveCount(0)
+  await expect(page.getByText(`${host} · ••••k3y9`, { exact: false })).toHaveCount(0)
   await page.reload()
   await expect(page.getByRole('heading', { level: 1, name: '模型与订阅' })).toBeVisible()
   await expect(page.getByRole('switch', { name: '分享 E2E 网关 给团队成员', exact: true })).toHaveCount(0)
+})
+
+// A DeepSeek key serves both Agents: its row says so, and 添加模型 lists each of its models once per Agent (model · Agent).
+// The key row is seeded (the real DeepSeek API is never called); its sealed value is never opened here.
+test('模型与订阅：DeepSeek 的 Key 两种 Agent 都能用', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await registerInTeam(page, '/settings?section=models')
+  const pool = new Pool({ connectionString: process.env.E2E_DATABASE_URL, max: 1 })
+  try {
+    const cookie = (await page.context().cookies()).find(item => item.name.endsWith('session_token'))!
+    const { rows: [session] } = await pool.query<{ userId: string }>('SELECT "userId" FROM session WHERE token = $1', [decodeURIComponent(cookie.value).split('.')[0]])
+    await pool.query(`INSERT INTO model_api_keys (id,"ownerId",provider,protocol,ciphertext,iv,"keyVersion",last4,models) VALUES ($1,$2,'deepseek','anthropic','e2e-sealed','e2e-iv',1,'a1b2',$3::jsonb)`,
+      [randomUUID(), session.userId, JSON.stringify(['e2e-deepseek-flash'])])
+  } finally { await pool.end() }
+  await page.reload()
+  const apiKeys = page.getByRole('region', { name: 'API Key', exact: true })
+  await expect(apiKeys.getByText('API Key · ••••a1b2 · Anthropic、OpenAI 协议 · 可用 Claude Code、Codex', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: '添加模型', exact: true }).click()
+  const addModels = page.getByRole('dialog', { name: '添加模型' })
+  const rows = addModels.locator('label').filter({ hasText: 'e2e-deepseek-flash' })
+  await expect(rows).toHaveCount(2)
+  // An untouched list already has it on Claude Code (the default Agent); the Codex row can still be added.
+  await expect(rows.nth(0)).toContainText('Claude Code')
+  await expect(rows.nth(0)).toContainText('已添加')
+  await expect(rows.nth(1)).toContainText('Codex')
+  await expect(rows.nth(1).getByRole('checkbox')).toBeEnabled()
+  await attachLightDark(page, testInfo, 'api-keys-deepseek-models')
 })

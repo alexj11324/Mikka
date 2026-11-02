@@ -8,7 +8,10 @@ import { coordinatorTurn } from '@/workflows/coordinator/workflow'
 import { runTestFixture } from '@/lib/run-test-fixture'
 import { runTriageBatch, TRIAGE_BATCH_BUDGET_MS } from './triage-batch'
 import { pool } from '@/lib/db'
-import { createWakeRecovery, deliverWake, type WakeScope } from './wake-recovery'
+import { createWakeRecovery, deliverWake, type WakeClaim, type WakeScope } from './wake-recovery'
+import { failureLine } from './refusal-line'
+import { pushByDecision } from './push-decision'
+import type { InboxEvent } from '@/lib/push-reasons'
 import { coordinatorBot } from './coordinator-bot'
 
 const recovery = createWakeRecovery(pool)
@@ -78,9 +81,18 @@ async function wakeChat(scope: WakeScope) {
       console.info('Coordinator wake accepted', { workflowRunId: run.runId, eventIds: claim.ids, attempt: claim.attempt })
     },
     failed: recovery.failed,
+    // The last attempt gave up: no turn will run to say so, so the phone gets the line the chat shows (回复重试已停止).
+    exhausted: value => noticeWakeExhausted(value).catch(() => console.error('Wake failure notice failed', { eventIds: value.ids })),
   })
   if (result === 'failed') console.error('Coordinator wake delivery failed', { eventIds: claim.ids, attempt: claim.attempt })
   return result
+}
+
+async function noticeWakeExhausted(claim: WakeClaim) {
+  const line = failureLine('wake_exhausted')
+  if (!line) return
+  const events = (await pool.query<InboxEvent>('SELECT kind,tier FROM coordinator_events WHERE "userId"=$1 AND id=ANY($2::uuid[])', [claim.userId, claim.ids])).rows
+  if (events.length) await pushByDecision(claim.userId, claim.botId, line, events)
 }
 
 /** Called every minute by the existing scheduling Worker. The persisted next

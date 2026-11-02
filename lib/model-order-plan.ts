@@ -193,7 +193,10 @@ export function defaultOrder(candidates: readonly OrderCandidate[]): OrderCandid
       && preference.words.some(word => `${candidate.model} ${candidate.name}`.toLowerCase().includes(word)))
     if (match) picked.push(match)
   }
-  const codex = bySource(candidates).find(candidate => candidate.harness === 'codex')
+  // A key that serves both Agents (DeepSeek, Kimi) counts once, on Claude Code, the preferred Agent by default (Harness draft).
+  const sameOnClaude = (candidate: OrderCandidate) => candidates.some(other => other.harness === 'claude_code' && other.model === candidate.model
+    && other.source.kind === candidate.source.kind && (other.source.kind === 'subscription' ? other.source.connectionId : other.source.keyId) === (candidate.source.kind === 'subscription' ? candidate.source.connectionId : candidate.source.keyId))
+  const codex = bySource(candidates).find(candidate => candidate.harness === 'codex' && !sameOnClaude(candidate))
   if (codex) picked.push(codex)
   if (!picked.length && candidates[0]) picked.push(candidates[0])
   return picked

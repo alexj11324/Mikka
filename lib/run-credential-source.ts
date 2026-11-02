@@ -2,7 +2,7 @@ import 'server-only'
 import type { Pool, PoolClient } from 'pg'
 import { quotaSnapshotSchema } from '@mikka/protocol'
 import { apiKeyAfterQuota, botApiKeyChoice, usableApiKeys } from '@/lib/model-api-keys'
-import { apiKeyHarness, type ApiKeyView } from '@/lib/model-api-key-providers'
+import { apiKeyHarnesses, type ApiKeyView } from '@/lib/model-api-key-providers'
 
 type Query = Pick<Pool | PoolClient, 'query'>
 
@@ -16,15 +16,15 @@ interface Binding { id: string; ownerId: string; connectionId: string; connectio
  * workspace its owner's own keys, then teammates' shared ones; with no bot
  * (the Coordinator), the owner's own keys only.
  */
-async function runKeys(query: Query, ownerId: string, botWorkspaceId: string | null): Promise<Pick<ApiKeyView, 'id' | 'protocol' | 'models'>[]> {
+async function runKeys(query: Query, ownerId: string, botWorkspaceId: string | null): Promise<Pick<ApiKeyView, 'id' | 'provider' | 'protocol' | 'models'>[]> {
   if (botWorkspaceId) return usableApiKeys(query, ownerId, botWorkspaceId)
-  return (await query.query<Pick<ApiKeyView, 'id' | 'protocol' | 'models'>>('SELECT id,protocol,models FROM model_api_keys WHERE "ownerId"=$1 ORDER BY "createdAt",id', [ownerId])).rows
+  return (await query.query<Pick<ApiKeyView, 'id' | 'provider' | 'protocol' | 'models'>>('SELECT id,provider,protocol,models FROM model_api_keys WHERE "ownerId"=$1 ORDER BY "createdAt",id', [ownerId])).rows
 }
 
 /** The first key whose Agent is the run's: the asked model when it serves it, else its first listed model. */
-function firstKey(keys: Pick<ApiKeyView, 'id' | 'protocol' | 'models'>[], harness: string, model?: string): RunApiKey | undefined {
+function firstKey(keys: Pick<ApiKeyView, 'id' | 'provider' | 'protocol' | 'models'>[], harness: string, model?: string): RunApiKey | undefined {
   for (const key of keys) {
-    if (apiKeyHarness(key.protocol) !== harness) continue
+    if (!apiKeyHarnesses(key).includes(harness as never)) continue
     const chosen = model && (!key.models.length || key.models.includes(model)) ? model : key.models[0]
     if (chosen) return { keyId: key.id, model: chosen }
   }
@@ -37,8 +37,8 @@ function firstKey(keys: Pick<ApiKeyView, 'id' | 'protocol' | 'models'>[], harnes
  * An entry of 允许使用的模型 that names its key (`keyId`) runs on that key when
  * the run may use it and it serves the model, whatever other key lists the model too.
  */
-async function keyOnlyModel(query: Query, ownerId: string, keys: Pick<ApiKeyView, 'id' | 'protocol' | 'models'>[], harness: string, model: string, keyId?: string): Promise<RunApiKey | undefined> {
-  const serves = (item: Pick<ApiKeyView, 'protocol' | 'models'>) => apiKeyHarness(item.protocol) === harness && item.models.includes(model)
+async function keyOnlyModel(query: Query, ownerId: string, keys: Pick<ApiKeyView, 'id' | 'provider' | 'protocol' | 'models'>[], harness: string, model: string, keyId?: string): Promise<RunApiKey | undefined> {
+  const serves = (item: Pick<ApiKeyView, 'provider' | 'protocol' | 'models'>) => apiKeyHarnesses(item).includes(harness as never) && item.models.includes(model)
   if (keyId) {
     const named = keys.find(item => item.id === keyId)
     if (named && serves(named)) return { keyId: named.id, model }
@@ -94,7 +94,7 @@ export async function runCredentialSource<S extends Binding>(query: Query, input
   if (!keys.length) return kept
   const choiceWorkspaceId = typeof input.choiceWorkspaceId === 'function' ? await input.choiceWorkspaceId() : input.choiceWorkspaceId
   const saved = choiceWorkspaceId ? await botApiKeyChoice(query, { ownerId: input.ownerId, workspaceId: choiceWorkspaceId }, input.botId) : undefined
-  if (saved && saved.harness === input.harness && keys.some(key => key.id === saved.keyId)) return { subscription: null, apiKey: { keyId: saved.keyId, model: saved.model } }
+  if (saved && saved.harnesses.includes(input.harness) && keys.some(key => key.id === saved.keyId)) return { subscription: null, apiKey: { keyId: saved.keyId, model: saved.model } }
   const keyed = input.model ? await keyOnlyModel(query, input.ownerId, keys, input.harness, input.model, input.keyId) : undefined
   if (keyed) return { subscription: null, apiKey: keyed }
   // The server cannot see whether the device's CLI is signed in, so a free local login is never turned into per-token billing.
@@ -120,7 +120,7 @@ export async function quotaFallbackApiKey(query: Query, input: {
   const keys = await runKeys(query, input.ownerId, input.botWorkspaceId)
   if (!keys.length) return undefined
   const saved = input.choiceWorkspaceId ? await botApiKeyChoice(query, { ownerId: input.ownerId, workspaceId: input.choiceWorkspaceId }, input.botId) : undefined
-  if (saved && saved.harness === input.harness && keys.some(key => key.id === saved.keyId)) return { keyId: saved.keyId, model: saved.model }
+  if (saved && saved.harnesses.includes(input.harness) && keys.some(key => key.id === saved.keyId)) return { keyId: saved.keyId, model: saved.model }
   return firstKey(keys, input.harness, input.model)
 }
 
