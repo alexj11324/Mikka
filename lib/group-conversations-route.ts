@@ -1,7 +1,7 @@
 import { hostedBillingScope } from '@/lib/abuse/context'
 import { groupDirectory } from '@/lib/group-conversations-directory'
 import { after, NextResponse } from 'next/server'
-import { processGroupTurn } from '@/lib/coordinator/group-turns'
+import { groupsWithPendingTurns, hasPendingGroupTurn, processGroupTurn } from '@/lib/coordinator/group-turns'
 import { groupRuntime } from '@/lib/coordinator/group-runtime'
 import { and, eq, inArray } from 'drizzle-orm'
 import { auth, apiWorkspaceAllowed } from '@/lib/api-auth'
@@ -44,16 +44,38 @@ export async function respondGroup(request: Request, resource: GroupRequest['res
     before: url.searchParams.get('before'), limit: url.searchParams.get('limit'), workspaceId: url.searchParams.get('workspaceId') ?? session?.tokenWorkspaceId,
   }, true)
   if (resource === 'messages' && id && result.status < 300) {
+    // A send starts the worker. A history read (polled while a reply is generating) starts it only
+    // when a turn is still pending, instead of taking the group's lock and recovering on every poll.
+    const conversationId = id
     after(async () => {
-      // Bounded request lifetime. Durable queued roots resume on the next history poll/send.
-      try {
-        const deadline = Date.now() + 220000
-        while (Date.now() < deadline - 20000) {
-          const row = (await pool.query('SELECT "workspaceId" FROM conversations WHERE id=$1',[id])).rows[0]
-          if (!row || !await hostedBillingScope.run({workspaceId:row.workspaceId},()=>processGroupTurn(pool, id, groupRuntime, deadline))) break
-        }
-      } catch { console.error('Group turn failed; retained in group_turns without automatic replay') }
+      if (request.method === 'GET' && !await hasPendingGroupTurn(pool, conversationId).catch(() => false)) return
+      await drainGroupTurns(conversationId, Date.now() + 220000)
     })
   }
   return NextResponse.json(result.body, { status: result.status, headers: { 'Cache-Control': 'private, no-store' } })
+}
+
+/** Runs a group's pending turns one after another until none is left or the deadline nears. */
+export async function drainGroupTurns(conversationId: string, deadline: number) {
+  try {
+    while (Date.now() < deadline - 20000) {
+      const row = (await pool.query('SELECT "workspaceId" FROM conversations WHERE id=$1',[conversationId])).rows[0]
+      if (!row || !await hostedBillingScope.run({workspaceId:row.workspaceId},()=>processGroupTurn(pool, conversationId, groupRuntime, deadline))) break
+    }
+  } catch { console.error('Group turn failed; retained in group_turns without automatic replay') }
+}
+
+/**
+ * The minute cron's sweep: a turn whose request ended before it ran (a send whose worker
+ * was cut off, a group nobody is looking at) still runs. One group at a time; a group a
+ * request is already working on keeps its lock and is skipped.
+ */
+export async function resumePendingGroupTurns(deadline: number) {
+  let groups = 0
+  for (const conversationId of await groupsWithPendingTurns(pool)) {
+    if (Date.now() >= deadline - 20000) break
+    await drainGroupTurns(conversationId, deadline)
+    groups++
+  }
+  return { groups }
 }

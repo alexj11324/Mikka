@@ -5,9 +5,12 @@ import { pool } from '@/lib/db'
 import { judgePendingOutcomes } from '@/lib/run-outcome-judge'
 import { endClosedTaskMachines } from '@/lib/cloud-computer/thread-machines'
 import { retrySandboxKills } from '@/lib/cloud-computer/workspace-teardown'
+import { after } from 'next/server'
+import { resumePendingGroupTurns } from '@/lib/group-conversations-route'
 
 export const runtime = 'nodejs'
-export const maxDuration = 60
+// The group-turn sweep keeps generating after the answer, as a message request does.
+export const maxDuration = 300
 const headers = { 'cache-control': 'no-store' }
 
 /** The existing cron Worker calls this independently of owner/device requests. */
@@ -23,6 +26,9 @@ export async function GET(request: Request) {
     const taskMachines = await endClosedTaskMachines(pool).catch(() => null)
     // Sandboxes of deleted workspaces whose kill did not go through are killed again.
     const sandboxKills = await retrySandboxKills(pool).catch(() => null)
+    // Group turns left queued when their request ended: they no longer wait for someone to read the group.
+    const started = Date.now()
+    after(() => resumePendingGroupTurns(started + 220000).catch(() => console.error('Group turn sweep failed')))
     return Response.json({ ...runs, machines, outcomes, taskMachines, sandboxKills }, { headers })
   }
   catch { return Response.json({ error: 'runRecoverySweepFailed' }, { status: 502, headers }) }
