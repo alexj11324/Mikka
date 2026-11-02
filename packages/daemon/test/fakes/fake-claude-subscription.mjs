@@ -70,7 +70,7 @@ lines.on("line", async (line) => {
   }
   if(text==='PROBE_GIT') {
     // Runs use no sandbox (decision 2026-11-01-2335): this probe only checks the run's gh wrapper.
-    if (process.env.GH_REPO && !execFileSync('gh', ['--version'], { encoding: 'utf8' }).startsWith('gh version')) process.exit(2)
+    if (process.env.GH_HOST && !execFileSync('gh', ['--version'], { encoding: 'utf8' }).startsWith('gh version')) process.exit(2)
   }
   out({ type: "system", subtype: "init", session_id: sessionId })
   if (text === "CRASH") {

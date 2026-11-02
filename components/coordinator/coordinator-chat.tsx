@@ -10,7 +10,7 @@ import type { BotView } from '@/app/actions/bots'
 import { BotAvatar, COORDINATOR_AVATAR } from '@/components/nav/bot-avatar'
 import { cn } from '@/lib/utils'
 import { useActionError } from '@/lib/use-action-error'
-import { Alert, AlertAction, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Alert, AlertAction, AlertTitle } from '@/components/ui/alert'
 import { Bubble, BubbleContent } from '@/components/ui/bubble'
 import { Message, MessageContent, MessageFooter } from '@/components/ui/message'
 import { MessageScroller, MessageScrollerButton, MessageScrollerContent, MessageScrollerItem, MessageScrollerProvider, MessageScrollerViewport, useMessageScroller } from '@/components/ui/message-scroller'
@@ -52,6 +52,7 @@ import { SubscriptionRefusalNotice } from './subscription-refusal-notice'
 import { HostedUnavailableNotice } from './hosted-unavailable-notice'
 import { FailureReason } from './failure-reason'
 import { QuotaNotice, QuotaSwitchLine } from './quota-notice'
+import { ChatEventLine } from './chat-event-line'
 import { RetryReplyButton } from './retry-reply-button'
 import { FieldError } from '@/components/ui/field'
 
@@ -202,10 +203,11 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
     welcomed.current = true
     void (botId ? welcomeCoordinator(botId) : welcomeCoordinator()).then(() => mutate())
   })
+  // The raw step error (workflow ids, retries, socket codes) is for the logs, never the chat: 回复失败 and 重试 (review C4).
   const failureNotice = <>
     {refusal && <HostedRefusalNotice code={refusal} botId={botId} retry={retry} onQueued={mutate} />}
     {declined && declined !== 'quotaUsed' && <SubscriptionRefusalNotice notice={declined} retry={retry} />}
-    {data?.error && !data.working && !refusal && !declined && <Alert variant="destructive">{wakeError ? <AlertTitle>{t(`wakeErrors.${wakeError}`)}</AlertTitle> : <><AlertTitle>{t('failedTitle')}</AlertTitle><AlertDescription>{data.error}</AlertDescription><AlertAction>{retry}</AlertAction></>}</Alert>}
+    {data?.error && !data.working && !refusal && !declined && <Alert variant="destructive">{wakeError ? <AlertTitle>{t(`wakeErrors.${wakeError}`)}</AlertTitle> : <><AlertTitle data-chat-failure="failed">{t('failedTitle')}</AlertTitle><AlertAction>{retry}</AlertAction></>}</Alert>}
   </>
   const sentCount = useMemo(() => items.filter(item => item.from === 'person').length, [items])
   const rootRef = useRef<HTMLElement>(null)
@@ -328,7 +330,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
               {item.from === 'event'
                 ? item.notice
                   ? <QuotaSwitchLine notice={item.notice} botId={botId} />
-                  : <p className="mx-auto max-w-full text-center text-xs text-muted-foreground wrap-break-word">{item.text.replace(/^\[Event\]\s*/, '')}</p>
+                  : item.line ? <ChatEventLine line={item.line} citations={citations} /> : null
                 : <Message align={item.from === 'person' ? 'end' : 'start'}><MessageContent>
                     {/* A tapped 建议 card: the same card, then only what it adds (R-21, R-40). */}
                     {item.suggestion && <SentSuggestion card={item.suggestion} compact={compact} />}
@@ -348,7 +350,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
                     {item.stopped && <MessageFooter><p role="status">{t('stopped')}</p></MessageFooter>}
                     {item.failure && (item.position === failedAt
                       ? <div data-message-failure="live" className="flex w-full max-w-md flex-col gap-2 self-end">{failureNotice}</div>
-                      : <MessageFooter className="self-end"><FailureReason failure={item.failure} /></MessageFooter>)}
+                      : <MessageFooter className="self-end"><FailureReason failure={item.failure} botId={botId} sending={sending} onResend={() => { void post(item.text) }} /></MessageFooter>)}
                     {footerTools(item).length > 0 && <MessageFooter><ToolsUsed tools={footerTools(item)} /></MessageFooter>}
                   </MessageContent></Message>}
             </MessageScrollerItem>

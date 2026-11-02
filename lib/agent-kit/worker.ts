@@ -25,7 +25,7 @@ export interface WorkerDefinitionSnapshot {
   mailbox?: WorkerMailboxGrant
   /** Server-owned authority accepted with this local task, preserved by retries. */
   repositoryAdmission?: RepositoryAdmission
-  /** A run that changes nothing (investigation, review): read-only policy, no commit, push or PR, so no push approval. */
+  /** A run that changes nothing (investigation, review): read-only worktree and no task branch. */
   readOnly?: true
 }
 

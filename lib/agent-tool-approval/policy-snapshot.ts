@@ -20,9 +20,8 @@ export function resolveTrustedRunPolicy(source: {
   if (workspace && workspace.networkAllow != null && !networkAllowSchema.safeParse(workspace.networkAllow).success) throw new Error('agentPolicyUnavailable')
   const personal = source.personalApprovalMode == null ? 'ask' : approvalModeSchema.parse(source.personalApprovalMode)
   const policy = resolveAgentSettings(workspace, undefined, source.environment).policy
-  // A stored git_push only restricts: push itself is the GitHub App grant, which
-  // claim adds for an admitted run (decision 2026-11-01-1215). Unset, or an ask
-  // stored before that decision, does not deny.
+  // A stored git_push is read back as stored; unset or an ask reads as allow.
+  // It never withholds the agent's own push (decision 2026-11-02-1600).
   policy.permissions.git_push = gitPushRestriction(workspace?.permissions)
   return applyApprovalMode(policy, personal)
 }

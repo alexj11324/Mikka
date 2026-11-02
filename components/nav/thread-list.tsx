@@ -1,5 +1,6 @@
 'use client'
 
+import { Skeleton } from '@/components/ui/skeleton'
 import { ChevronRight, Hash, Laptop, Server } from 'lucide-react'
 import { useFormatter, useNow, useTranslations } from 'next-intl'
 import type { listIssues } from '@/app/actions/issues'
@@ -100,10 +101,12 @@ function ThreadRow({ thread, group, issues, all, now, onOpenThread }: { thread: 
  * resolved. Picking a thread opens it beside the chat, as a thread card does;
  * the chat stays one click away (R-50, R-66).
  */
-export function ThreadList({ threads, issues, all = false, onOpenThread }: { threads: Thread[]; issues: Issue[]; all?: boolean; onOpenThread: (thread: { issueId: string | null; runId: string }) => void }) {
+export function ThreadList({ threads, issues, all = false, loading = false, onOpenThread }: { threads: Thread[]; issues: Issue[]; all?: boolean; /** The list has not been read yet: rows' shapes, never 还没有线程 (review C7). */ loading?: boolean; onOpenThread: (thread: { issueId: string | null; runId: string }) => void }) {
   const t = useTranslations('Shell.threads')
   // One clock for every row's time.
   const now = useNow({ updateInterval: 60_000 })
+  const tCommon = useTranslations('Common')
+  if (!threads.length && loading) return <div role="status" aria-label={tCommon('loading')} className="flex flex-col gap-2 px-1 py-2">{[0, 1, 2].map(row => <Skeleton key={row} className="h-11 w-full rounded-lg" />)}</div>
   if (!threads.length) return <p className="px-2 py-6 text-center text-xs text-muted-foreground">{t('empty')}</p>
   const groups = groupThreads(threads, id => issues.find(issue => issue.id === id))
   const rows = (list: ThreadRowOf<Thread>[], group: ThreadGroup) => <ul className="flex flex-col gap-2">{list.map(thread => <ThreadRow key={thread.id} thread={thread} group={group} issues={issues} all={all} now={now} onOpenThread={onOpenThread} />)}</ul>

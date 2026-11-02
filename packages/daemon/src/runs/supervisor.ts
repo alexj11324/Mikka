@@ -1294,7 +1294,8 @@ export class RunSupervisor {
       try { checkMailbox() } catch (error) { toolApproval.revoke(); throw error }
     }
     const options = {
-      github: assignment.github && assignment.mcp && (assignment.kind === 'implement' || assignment.kind === 'fix') && !runPolicy(assignment.policy).readOnly
+      // The owner's own GitHub credential reaches every run that was sent one (decision 2026-11-02-1600).
+      github: assignment.github && assignment.mcp
         ? { ...assignment.github, runToken: assignment.mcp.token, issueId: assignment.issueId } : undefined,
       apps: runApps(assignment.mcp),
       toolApproval,

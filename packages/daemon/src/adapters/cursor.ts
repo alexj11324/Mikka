@@ -29,12 +29,6 @@ import {
 } from "../agents/run-context"
 import type { AgentSandbox } from "../agents/sandbox"
 import type { RunChunk } from "../chunks"
-import {
-  classifyCommand,
-  decide,
-  runPolicy,
-  type RunPolicy,
-} from "../permissions"
 import { DAEMON_VERSION } from "../paths"
 import type {
   AgentAdapter,
@@ -61,15 +55,11 @@ type PermissionResponse = Awaited<ReturnType<acp.Client["requestPermission"]>>
 
 /**
  * Answers Cursor's permission request for a tool call (ADR 0028). Nothing is
- * asked per tool (decision 2026-11-01-2335): every call goes ahead except
- * `git push`, which only the daemon does (ADR 0017) unless the agent delivers
- * the run itself.
+ * asked per tool (decision 2026-11-01-2335), and `git push` is the agent's own
+ * judgment with the person's own GitHub credential (decision 2026-11-02-1600):
+ * every call goes ahead.
  */
-export async function acpPermissionResponse(
-  params: PermissionRequest,
-  policy: RunPolicy | undefined,
-  agentDelivers = false,
-): Promise<{ response: PermissionResponse; refused: boolean }> {
+export async function acpPermissionResponse(params: PermissionRequest): Promise<PermissionResponse> {
   const pick = (kinds: readonly string[]): PermissionResponse => {
     for (const kind of kinds) {
       const option = params.options.find((o) => o.kind === kind)
@@ -78,26 +68,11 @@ export async function acpPermissionResponse(
     }
     return { outcome: { outcome: "cancelled" } }
   }
-  const raw = params.toolCall.rawInput as { command?: unknown } | undefined
-  const command = Array.isArray(raw?.command)
-    ? raw.command.join(" ")
-    : typeof raw?.command === "string"
-      ? raw.command
-      : (params.toolCall.title ?? "")
-  const action = classifyCommand(command)
-  const refused = action === "git_push"
-    && (!agentDelivers || decide(action, { policy: runPolicy(policy) }) !== "allow")
-  if (refused)
-    return { response: pick(["reject_once", "reject_always"]), refused }
   const allowed = pick(["allow_always", "allow_once"])
   const first = params.options[0]
-  return {
-    response:
-      allowed.outcome.outcome === "selected" || !first
-        ? allowed
-        : { outcome: { outcome: "selected", optionId: first.optionId } },
-    refused,
-  }
+  return allowed.outcome.outcome === "selected" || !first
+    ? allowed
+    : { outcome: { outcome: "selected", optionId: first.optionId } }
 }
 
 export class AcpChunker {
@@ -299,19 +274,8 @@ export class CursorAdapter implements AgentAdapter {
 
     const conn = new acp.ClientSideConnection(
       () => ({
-        // Only git push is refused (the daemon delivers the run).
         async requestPermission(params) {
-          const { response, refused } = await acpPermissionResponse(
-            params,
-            options.policy,
-            ctx.agentDelivers,
-          )
-          if (refused)
-            log.info(
-              { tool: params.toolCall.title },
-              "tool call refused by the workspace's agent policy"
-            )
-          return response
+          return acpPermissionResponse(params)
         },
         async sessionUpdate(params) {
           if (replaying) return

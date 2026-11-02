@@ -73,7 +73,7 @@ test('quota exhausted mid-run: continue on the person\'s key, else pause with th
     await pool.query('INSERT INTO workspace_subscription_shares ("ownerId","workspaceId") VALUES ($1,$2)', [id, ws.id])
     const botId = await seedBot(pool, ws.id, id)
     const remote = `https://github.com/mikka-ci/run-quota-${randomUUID()}.git`
-    // Push is what the GitHub App grants (lib/github/push-grant.ts); record that grant as a live check would.
+    // An installation row an earlier build recorded; admission no longer reads it (decision 2026-11-02-1600).
     await recordPushGrant(pool, id, normalizeRepository(remote).key)
     const deviceId = randomUUID()
     await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"protocolVersion","lastSeenAt",harnesses) VALUES ($1,$2,'Laptop','local',true,$3,now(),$4)`,

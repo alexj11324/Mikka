@@ -1,6 +1,7 @@
 import { sourcedEventMessage } from './message-safety'
 import { visibleRuns } from '@/lib/agent-runs'
 import { assertCredentialSafeChat } from '@/lib/credentials/chat-guard'
+import { credentialMasker, maskCredentials, maskDeep } from '@/lib/secrets/mask'
 import { issueForUser } from '@/lib/issue-access'
 import { issueVisibility } from '@/lib/issue-visibility'
 import 'server-only'
@@ -8,10 +9,7 @@ import { COORDINATOR_WELCOME_MARK } from '@/lib/agent-welcome'
 import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, lt, ne, notInArray, or, sql } from 'drizzle-orm'
 import type { ModelMessage } from 'ai'
 import { db } from '@/lib/db'
-import { agentRuns, coordinatorEvents, coordinatorMessages, coordinatorSessions, issueMembers, issues, pendingActions, runChunks, type CoordinatorEventTier } from '@/lib/db/schema'
-import { z } from 'zod'
-import { taskDestinationSchema } from '@/lib/task-destination'
-import { validateRepositoryApproval } from '@/lib/repository-approval-proposal'
+import { agentRuns, coordinatorEvents, coordinatorMessages, coordinatorSessions, issueMembers, issues, runChunks, type CoordinatorEventTier } from '@/lib/db/schema'
 import { markTelegramPending, pendingTelegramTargets, type PendingTelegramTarget } from './telegram-pending'
 import { chatItems, eventPrompt, type ChatItem, type StoredMessage } from '@/lib/coordinator/context'
 import { eventsForInbox, isolateTaskRequest } from '@/lib/coordinator/triage'
@@ -97,7 +95,6 @@ export interface InboxTake {
   taskEventId?: string
   sourceEventId?: string
   scheduledRead?: ScheduledRead
-  approvedRepositoryKey?: string
 }
 
 const NO_TAKE = { added: 0, telegramTargets: [], handoffMatterIds: [], handoffOnly: false, pushEvents: [], pushHidesText: false }
@@ -125,24 +122,9 @@ export async function takeInbox(userId: string, holder: string, botId: string): 
     const scheduledRead=scheduled?.scope??undefined
     const due = scheduledRead ? [scheduledCandidate!] : isolateTaskRequest(candidates.filter(event => event.payload.source !== 'schedule_due' || event.id === scheduledCandidate?.id))
     if (!due.length) return { held: true, ...NO_TAKE }
-    let taskEventId = due.length === 1 && due[0].kind === 'user_message' && due[0].payload.taskDestination !== undefined ? due[0].id : undefined
-    let approvedRepositoryKey: string | undefined
-    const approval = due.length === 1 && due[0].kind === 'action_decided' && due[0].payload.action === 'approve_repository_push' && due[0].payload.status === 'done' ? due[0] : undefined
-    if (approval && z.uuid().safeParse(approval.payload.requestEventId).success && z.uuid().safeParse(approval.payload.actionId).success) {
-      const [request] = await tx.select().from(pendingActions).where(and(eq(pendingActions.id, approval.payload.actionId as string), eq(pendingActions.userId, userId), eq(pendingActions.action, 'approve_repository_push'), eq(pendingActions.status, 'done'))).limit(1)
-      const taskIds = z.array(z.uuid()).safeParse(request?.context?.taskEventIds)
-      const binding = validateRepositoryApproval(request?.input)
-      if (binding && taskIds.success && taskIds.data.includes(approval.payload.requestEventId as string)) {
-        const [original] = await tx.select().from(coordinatorEvents).where(and(eq(coordinatorEvents.id, approval.payload.requestEventId as string), eventsOf(userId, botId), eq(coordinatorEvents.kind, 'user_message'))).limit(1)
-        const destination = taskDestinationSchema.safeParse(original?.payload.taskDestination)
-        if (original?.deliveredAt && destination.success && destination.data.kind === 'device') {
-          taskEventId = original.id
-          approvedRepositoryKey = binding.remoteKey
-        }
-      }
-    }
+    const taskEventId = due.length === 1 && due[0].kind === 'user_message' && due[0].payload.taskDestination !== undefined ? due[0].id : undefined
     const sourceEventId = scheduled ? undefined : due.findLast(event => event.kind === 'user_message')?.id
-    const isolatedTask = Boolean(taskEventId) || Boolean(approval) || Boolean(scheduled)
+    const isolatedTask = Boolean(taskEventId) || Boolean(scheduled)
     const backgroundLimit = isolatedTask ? 0 : INBOX_BATCH - due.length
     const background = backgroundLimit ? await tx.select().from(coordinatorEvents)
       .where(and(eventsOf(userId, botId), isNull(coordinatorEvents.deliveredAt), notInArray(coordinatorEvents.id, due.map(event => event.id)), eq(coordinatorEvents.tier, 'background')))
@@ -153,7 +135,8 @@ export async function takeInbox(userId: string, holder: string, botId: string): 
     const first = await nextPosition(tx, userId, botId)
     if (chatEvents.length) await tx.insert(coordinatorMessages).values(chatEvents.map((event, index) => ({
       id: crypto.randomUUID(), userId, botId, position: first + index,
-      message: sourcedEventMessage({ ...event, deliveredAt: now }, scheduledRead ? `[Scheduled read-only task] The person requested this stored task for now: ${scheduledRead.prompt}\nUse only the available allowed read tools. Do not create or change anything, request approval, schedule more work, or claim an external write. Return the result for this original chat.` : eventPrompt(event)),
+      // A GitHub or other token in an event (a run's summary, a tool's text) never reaches the chat.
+      message: maskDeep(sourcedEventMessage({ ...event, deliveredAt: now }, scheduledRead ? `[Scheduled read-only task] The person requested this stored task for now: ${scheduledRead.prompt}\nUse only the available allowed read tools. Do not create or change anything, request approval, schedule more work, or claim an external write. Return the result for this original chat.` : eventPrompt(event)), credentialMasker),
     })))
     await tx.update(coordinatorEvents).set({ deliveredAt: now }).where(inArray(coordinatorEvents.id, events.map(event => event.id)))
     for (const event of events) {
@@ -171,7 +154,6 @@ export async function takeInbox(userId: string, holder: string, botId: string): 
       ...(taskEventId ? { taskEventId } : {}),
       ...(sourceEventId ? { sourceEventId } : {}),
       ...(scheduledRead ? { scheduledRead } : {}),
-      ...(approvedRepositoryKey ? { approvedRepositoryKey } : {}),
       // A verification code is told in the app chat only, never on Telegram.
       telegramTargets: handoffs.some(carriesCode) ? [] : pendingTelegramTargets(pendingReplies),
       handoffMatterIds: handoffs.flatMap(event => typeof event.payload.matterId === 'string' ? [event.payload.matterId] : []),
@@ -254,7 +236,10 @@ export async function completeTriageAttempt(event: TriageEventRecord & { observe
  * Appends the turn's new messages and renews the lease. `warning` says why the
  * reply may be cut short; it shows in the chat until a turn ends cleanly.
  */
-export async function appendMessages(userId: string, holder: string, messages: ModelMessage[], warning: string | null = null, botId: string, streamId?: string, stopped = false): Promise<number> {
+export async function appendMessages(userId: string, holder: string, unmasked: ModelMessage[], warning: string | null = null, botId: string, streamId?: string, stopped = false): Promise<number> {
+  // Safety floor (decision 2026-11-02-1600): a GitHub token or other credential
+  // never persists in chat, a tool result included.
+  const messages = maskDeep(unmasked, credentialMasker)
   await assertCredentialSafeChat(userId, messages)
   return db.transaction(async tx => {
     await tx.execute(sql`SELECT 1 FROM coordinator_sessions WHERE "userId"=${userId} AND "botId"=${botId}::uuid FOR UPDATE`)
@@ -269,7 +254,7 @@ export async function appendMessages(userId: string, holder: string, messages: M
       }))
     }
     const now = new Date()
-    await tx.update(coordinatorSessions).set({ leaseUntil: new Date(now.getTime() + LEASE_MS), lastError: warning, lastErrorAt: warning ? now : null, updatedAt: now })
+    await tx.update(coordinatorSessions).set({ leaseUntil: new Date(now.getTime() + LEASE_MS), lastError: warning && maskCredentials(warning), lastErrorAt: warning ? now : null, updatedAt: now })
       .where(and(sessionOf(userId, botId), eq(coordinatorSessions.leaseHolder, holder)))
     return first + messages.length - 1
   })
@@ -354,7 +339,8 @@ export async function editMemory<T>(userId: string, edit: (memory: string) => { 
       .where(sessionOf(userId, botId)).for('update')
     const outcome = edit(session?.memory ?? '')
     if ('error' in outcome) return outcome
-    await tx.update(coordinatorSessions).set({ memory: outcome.memory, updatedAt: new Date() }).where(sessionOf(userId, botId))
+    // A credential never persists in memory.
+    await tx.update(coordinatorSessions).set({ memory: maskCredentials(outcome.memory), updatedAt: new Date() }).where(sessionOf(userId, botId))
     return outcome.result
   })
 }
@@ -444,7 +430,9 @@ export async function chatView(userId: string, limit = 200, botId: string): Prom
     persistedStreamIds: [...new Set(rows.flatMap(({message}) => message.role === 'assistant' && typeof message.mikkaStreamId === 'string' ? [message.mikkaStreamId] : []))],
     ...(coordinatorLeaseActive(session) && session?.leaseHolder?.startsWith('wrun_') ? { streamRunId: session.leaseHolder } : {}),
     ...coordinatorChatState(session, waiting),
-    sources: await citationSources(userId, items.filter(item => item.from === 'coordinator').map(item => item.text), items.flatMap(item => item.threads)),
+    // An event line names its thread or task as a chip (C1); its stored text is the model's, never shown.
+    sources: await citationSources(userId, [...items.filter(item => item.from === 'coordinator').map(item => item.text),
+      ...items.flatMap(item => item.line ? [item.line.runId && `[[run:${item.line.runId}]]`, item.line.issueId && `[[issue:${item.line.issueId}]]`].filter((text): text is string => !!text) : [])], items.flatMap(item => item.threads)),
     artifacts: await artifactSummaries(userId, items.flatMap(item => [...item.artifacts, ...(item.quote ? [item.quote.artifactId] : [])])),
   }
 }
@@ -476,7 +464,8 @@ export async function botChats(userId: string): Promise<Record<string, BotChatSu
   const lines = latest.flatMap(row => {
     if (!row.botId) return []
     const [item] = chatItems([{ position: 0, message: row.message as unknown as ModelMessage, createdAt: row.createdAt }])
-    return [{ botId: row.botId, text: item?.text || null, from: item?.from, at: row.createdAt.toISOString() }]
+    // An event's stored text is the model's (English, ids): the preview leaves it out (C1).
+    return [{ botId: row.botId, text: item?.from === 'event' ? null : item?.text || null, from: item?.from, at: row.createdAt.toISOString() }]
   })
   // A reply cites threads and tasks by id; the preview names them as the chat's chips do (R-15).
   const sources = await citationSources(userId, lines.flatMap(line => line.from === 'coordinator' && line.text ? [line.text] : []))

@@ -14,10 +14,9 @@ test('machine-selected requests get separate turns in inbox order', () => {
   assert.deepEqual(isolateTaskRequest([first, second, normal]), [first])
   assert.deepEqual(isolateTaskRequest([second, normal]), [second])
   assert.deepEqual(isolateTaskRequest([normal]), [normal])
-  const approval = { kind: 'action_decided', payload: { action: 'approve_repository_push', status: 'done', requestEventId: 'one' } }
-  const otherApproval = { ...approval, payload: { ...approval.payload, requestEventId: 'two' } }
-  assert.deepEqual(isolateTaskRequest([normal, approval, otherApproval]), [normal])
-  assert.deepEqual(isolateTaskRequest([approval, otherApproval, second]), [approval], 'an approved task resumes in its own host turn')
+  // Push needs no approval in Mikka: a decided action is an ordinary event, not a task request.
+  const decided = { kind: 'action_decided', payload: { action: 'approve_repository_push', status: 'done', requestEventId: 'one' } }
+  assert.deepEqual(isolateTaskRequest([decided, normal]), [decided, normal])
 })
 
 test('only direct user delivery has a transport tier; every runtime event needs model judgment', () => {

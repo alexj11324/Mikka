@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import test from 'node:test'
 import type { RunCompleteRequest } from '@mikka/protocol/run'
 import type { PublishedPullRequest } from '../lib/run-publication-result'
-import type { openRunPullRequest } from '../lib/github/run-pull-request'
+import type { OwnerPullRequestOpener } from '../lib/run-publications'
 import { remoteKey as repositoryKey } from '@mikka/protocol/repository'
 import { disposableDatabase } from './helpers/e2e-target.mjs'
 
@@ -21,7 +21,7 @@ type Fixture = {
   /** The receipt admission wrote from the GitHub App grant, when the fixture is admitted to push. */
   admission?: Record<string, unknown>
 }
-type OpenPullRequest = typeof openRunPullRequest
+type OpenPullRequest = OwnerPullRequestOpener
 
 function completion(fixture: Fixture, summary = 'Verified redirect fix'): RunCompleteRequest {
   return {
@@ -116,7 +116,7 @@ test('run result publication commits one owner-scoped result through retries and
       let opened = 0
       const open: OpenPullRequest = async input => {
         opened++
-        assert.equal(input.githubAccountId, f.githubAccountId)
+        assert.equal(input.userId, f.userId, 'the pull request opens with the run owner\'s own credential')
         assert.equal(input.remoteKey, f.remoteKey)
         assert.equal(input.issueId, f.issueId)
         assert.equal(input.branch, f.branch)
@@ -124,7 +124,6 @@ test('run result publication commits one owner-scoped result through retries and
         assert.equal(input.allowCreate, true)
         entered.resolve()
         await release.promise
-        await input.onVerified?.({ installationId: 99, repositoryId: 789, githubAccountId: f.githubAccountId, defaultBranch: 'trunk' })
         return prFor(f)
       }
       const first = publishRunResult(f.runId, open)
@@ -148,9 +147,6 @@ test('run result publication commits one owner-scoped result through retries and
       assert.deepEqual(readIssueMetadata(saved.content).pullRequests, [prFor(f)])
       assert.deepEqual((await event(f)).payload.publication.pullRequest, prFor(f))
       assert.equal((await pool.query('select actor_type,actor_id from issue_versions where "issueId"=$1', [f.issueId])).rows[0].actor_type, 'system')
-      const binding = (await pool.query('select * from github_repository_installations where "userId"=$1 and "remoteKey"=$2', [f.userId, f.remoteKey])).rows[0]
-      assert.equal(binding.githubAccountId, f.githubAccountId)
-      assert.equal(String(binding.installationId), '99')
 
       // Neither an altered retry nor a second worker may overwrite newer human edits.
       const editedContent = withIssueMetadata({ ...saved.content, content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Later human edit' }] }] }, { ...readIssueMetadata(saved.content), labels: [{ name: 'Keep this label', color: 'blue' }] })
@@ -185,9 +181,9 @@ test('run result publication commits one owner-scoped result through retries and
       assert.deepEqual(await counts(f), { versions: 1, events: 1 })
     })
 
-    await t.test('unverified work without an approved matching push cannot succeed or advance the task', async () => {
-      for (const mode of ['unapproved', 'not-pushed', 'wrong-branch'] as const) {
-        const f = await fixture({ approved: mode !== 'unapproved' })
+    await t.test('unverified work without a matching push cannot succeed or advance the task', async () => {
+      for (const mode of ['not-pushed', 'wrong-branch'] as const) {
+        const f = await fixture({ approved: true })
         await prepareRunPublication(assignment(f), f.remoteUrl)
         const submitted = completion(f, 'Unverified submission')
         submitted.report!.verify = { status: 'not_run' }
@@ -200,7 +196,7 @@ test('run result publication commits one owner-scoped result through retries and
         assert.equal((await task(f)).status, 'todo')
         assert.equal((await receipt(f)).status, 'blocked')
         assert.equal((await receipt(f)).pullRequest, null)
-        await publishRunResult(f.runId, async () => { throw new Error('Unapproved or unpushed unverified work must never reach GitHub') })
+        await publishRunResult(f.runId, async () => { throw new Error('Unpushed unverified work must never reach GitHub') })
         assert.deepEqual(await counts(f), { versions: 0, events: 1 })
       }
     })
@@ -266,25 +262,16 @@ test('run result publication commits one owner-scoped result through retries and
       assert.equal((await receipt(github)).errorCode, 'publication_mismatch')
     })
 
-    await t.test('a run admitted without the GitHub App grant cannot push or open a PR, whatever Mikka settings say', async () => {
-      let opened = 0
-      const neverOpen: OpenPullRequest = async () => { opened++; throw new Error('GitHub must not be called without the push grant') }
-      const unadmitted = await fixture()
-      // An earlier per-repository approval in Mikka no longer lends push authority.
-      await pool.query(`insert into repository_settings ("userId","remoteKey",push) values ($1,$2,$3)`, [unadmitted.userId, unadmitted.remoteKey, JSON.stringify({ approved: true, remote: 'origin', approvedByUserId: unadmitted.userId, approvedAt: new Date().toISOString() })])
-      assert.equal((await prepareRunPublication(assignment(unadmitted), unadmitted.remoteUrl)).policy.permissions.git_push, 'deny', 'no push authority: deny, never a card')
-      assert.equal((await persistRunCompletion(unadmitted.userId, unadmitted.runId, completion(unadmitted)))?.publicationPending, false)
-      await publishRunResult(unadmitted.runId, neverOpen)
-      assert.equal((await receipt(unadmitted)).errorCode, 'push_not_approved')
-      assert.equal((await event(unadmitted)).payload.publication.errorCode, 'push_not_approved')
-      // A withdrawn Mikka approval no longer blocks an admitted run either: GitHub decides at the pull request.
-      const admitted = await fixture({ approved: true })
-      await pool.query(`insert into repository_settings ("userId","remoteKey",push) values ($1,$2,$3)`, [admitted.userId, admitted.remoteKey, JSON.stringify({ approved: false })])
-      assert.equal((await prepareRunPublication(assignment(admitted), admitted.remoteUrl)).policy.permissions.git_push, 'allow')
-      assert.equal((await persistRunCompletion(admitted.userId, admitted.runId, completion(admitted)))?.publicationPending, true)
-      assert.deepEqual(await publishRunResult(admitted.runId, async () => prFor(admitted)), { done: true })
-      assert.equal((await receipt(admitted)).status, 'published')
-      assert.equal(opened, 0)
+    await t.test('a run delivers and opens its PR with no grant or approval in Mikka, whatever older Mikka settings say', async () => {
+      // An old per-repository refusal in Mikka withholds nothing (decision 2026-11-02-1600).
+      const f = await fixture()
+      await pool.query(`insert into repository_settings ("userId","remoteKey",push) values ($1,$2,$3)`, [f.userId, f.remoteKey, JSON.stringify({ approved: false })])
+      assert.equal((await prepareRunPublication(assignment(f), f.remoteUrl)).policy.permissions.git_push, 'allow')
+      assert.equal((await persistRunCompletion(f.userId, f.runId, completion(f)))?.publicationPending, true)
+      const owners: string[] = []
+      assert.deepEqual(await publishRunResult(f.runId, async input => { owners.push(input.userId); return prFor(f) }), { done: true })
+      assert.equal((await receipt(f)).status, 'published')
+      assert.deepEqual(owners, [f.userId])
     })
 
     await t.test('an unknown legacy scope pin cannot be inferred from the current task', async () => {
@@ -388,14 +375,13 @@ test('run result publication commits one owner-scoped result through retries and
       assert.deepEqual(await publishRunResult(f.runId, open), { done: true })
       assert.equal(attempts, 2)
     })
-    await t.test('the GitHub App grant freezes admission, a lost grant stops new admissions and never blocks stop', async () => {
+    await t.test('admission needs no grant or approval, replays its accepted execution and never blocks stop', async () => {
       const { queueRun } = await import('../lib/agent-runs')
       const { sendOwnedRunMessage, stopOwnedRun } = await import('../lib/run-control')
       const { db } = await import('../lib/db')
-      const { recordPushGrant } = await import('./support/github-app-stub')
       const { coordinatorEnabled } = await import('../lib/coordinator/wake')
       assert.equal(coordinatorEnabled(), false, 'this DB suite cannot invoke a real model')
-      assert.equal(process.env.GITHUB_APP_ID, undefined, 'GitHub cannot answer here, so the recorded grant decides')
+      assert.equal(process.env.GITHUB_APP_ID, undefined, 'no GitHub App check is needed to admit')
       const f = await fixture({ prefix: 'ADMI' })
       // This fixture supplies historical publication/legacy-alias evidence.
       // The admission under test creates the next run, subject to the real
@@ -409,110 +395,104 @@ test('run result publication commits one owner-scoped result through retries and
       const coordinator = await (await import('../lib/coordinator/coordinator-bot')).chatBotId(f.userId, null, workspace.id)
       await pool.query('insert into coordinator_events (id,"userId","botId",kind,"dedupeKey","issueId",payload,"deliveredAt") values ($1,$2,$6,\'user_message\',$5,$3,$4,now())', [eventId, f.userId, f.issueId, JSON.stringify({ text: 'Synthetic owner task; no provider invocation', taskDestination: { kind: 'device', deviceId: f.deviceId } }), 'admission:' + eventId, coordinator])
       const before = Number((await pool.query('select count(*) as n from agent_runs where "userId"=$1', [f.userId])).rows[0].n)
-      await assert.rejects(queueRun(f.userId, input, coordinator, undefined, eventId), (error: Error & { params?: { reason?: string } }) => error.message === 'runInvalid' && error.params?.reason === 'githubNotConfigured', 'no grant has been checked yet')
-      assert.equal(await recordPushGrant(pool, f.userId, f.remoteKey), f.githubAccountId, 'the grant rests on the person\'s own linked GitHub account')
       const admitted = await Promise.all([queueRun(f.userId, input, coordinator, undefined, eventId), queueRun(f.userId, input, coordinator, undefined, eventId)])
       assert.equal(admitted[0].runId, admitted[1].runId, 'host replay cannot enqueue a second execution')
       const runId = admitted[0].runId
       const accepted = (await pool.query('select * from agent_runs where id=$1', [runId])).rows[0]
-      assert.equal(accepted.agentDefinition.repositoryAdmission.authority, 'github_app')
+      assert.equal(accepted.agentDefinition.repositoryAdmission.authority, 'owner_credential')
+      assert.equal(accepted.agentDefinition.repositoryAdmission.approvedAt, undefined)
       assert.equal(accepted.agentDefinition.repositoryAdmission.requestEventId, eventId)
       assert.equal(accepted.agentDefinition.repositoryAdmission.deviceId, f.deviceId)
       assert.equal(accepted.agentDefinition.repositoryAdmission.targetBranch, f.branch)
       assert.equal(Number((await pool.query('select count(*) as n from agent_runs where "userId"=$1', [f.userId])).rows[0].n), before + 1)
       assert.equal(Number((await pool.query('select count(*) as n from pending_actions where "userId"=$1', [f.userId])).rows[0].n), 0, 'no approval card')
-      await sendOwnedRunMessage(db, f.userId, { runId, text: 'Accepted with the grant' })
+      assert.equal(Number((await pool.query('select count(*) as n from github_repository_installations where "userId"=$1', [f.userId])).rows[0].n), 0, 'no push grant is checked or recorded')
+      await sendOwnedRunMessage(db, f.userId, { runId, text: 'Accepted' })
       await assert.rejects(queueRun(f.userId, input), /runInvalid/, 'attributed tasks cannot omit their host event')
       await assert.rejects(queueRun(f.userId, input, null, undefined, randomUUID()), /runInvalid/)
-      // GitHub later reports the grant gone: the accepted run keeps its receipt, a new admission is refused.
-      await pool.query('update github_repository_installations set "pushGrantedAt"=null where "userId"=$1 and "remoteKey"=$2', [f.userId, f.remoteKey])
-      await sendOwnedRunMessage(db, f.userId, { runId, text: 'Still the accepted run' })
-      assert.equal(Number((await pool.query('select count(*) as n from run_messages where "runId"=$1', [runId])).rows[0].n), 2)
       assert.deepEqual(await queueRun(f.userId, input, coordinator, undefined, eventId), { runId }, 'old host replay preserves the already accepted execution')
-      assert.equal((await prepareRunPublication(accepted, f.remoteUrl)).policy.permissions.git_push, 'allow', 'old admitted scope survives a later loss of the grant; GitHub rechecks at the token and the pull request')
+      assert.equal((await prepareRunPublication(accepted, f.remoteUrl)).policy.permissions.git_push, 'allow')
       await assert.rejects(prepareRunPublication({ ...accepted, deviceId: randomUUID() }, f.remoteUrl), /does not match/)
       await assert.rejects(sendOwnedRunMessage(db, f.userId, { runId: f.runId, text: 'Finished runs cannot be reopened' }), /runNotFound/)
-      const nextIssue = randomUUID(), nextEvent = randomUUID()
-      await pool.query('insert into issues (id,"userId",title,content,status,priority,scope) values ($1,$2,\'New prompt\',$3,\'todo\',\'normal\',\'personal\')', [nextIssue, f.userId, JSON.stringify({ type: 'doc', attrs: { mikka: { number: 2 } }, content: [] })])
-      await pool.query('insert into coordinator_events (id,"userId",kind,"dedupeKey","issueId",payload,"deliveredAt") values ($1,$2,\'user_message\',$5,$3,$4,now())', [nextEvent, f.userId, nextIssue, JSON.stringify({ taskDestination: { kind: 'device', deviceId: f.deviceId } }), 'admission:' + nextEvent])
-      await assert.rejects(queueRun(f.userId, { ...input, issueId: nextIssue }, null, undefined, nextEvent), (error: Error & { params?: { reason?: string } }) => error.params?.reason === 'githubNotConfigured')
-      // A grant older than the recorded window no longer admits.
-      await recordPushGrant(pool, f.userId, f.remoteKey)
-      await pool.query('update github_repository_installations set "pushGrantedAt"=now()-interval \'25 hours\' where "userId"=$1 and "remoteKey"=$2', [f.userId, f.remoteKey])
-      await assert.rejects(queueRun(f.userId, { ...input, issueId: nextIssue }, null, undefined, nextEvent), /runInvalid/)
       await stopOwnedRun(db, f.userId, runId)
       assert.ok((await pool.query('select "stopRequestedAt" from agent_runs where id=$1', [runId])).rows[0].stopRequestedAt)
-
-      // Actual Postgres contention: admission reads the grant under a share lock, so it waits for a concurrent clear.
-      await recordPushGrant(pool, f.userId, f.remoteKey)
-      const locker = await pool.connect()
-      let attempt: Promise<unknown> | undefined
-      try {
-        await locker.query('begin')
-        const pid = (await locker.query('select pg_backend_pid() as pid')).rows[0].pid
-        await locker.query('select 1 from github_repository_installations where "userId"=$1 and "remoteKey"=$2 for update', [f.userId, f.remoteKey])
-        attempt = queueRun(f.userId, { ...input, issueId: nextIssue }, null, undefined, nextEvent)
-        const settled = attempt.then(() => ({ accepted: true }), error => ({ accepted: false, error }))
-        let blocked = false
-        for (let i = 0; i < 100 && !blocked; i++) {
-          blocked = (await pool.query('select exists(select 1 from pg_stat_activity where $1::int=any(pg_blocking_pids(pid))) as blocked', [pid])).rows[0].blocked
-          if (!blocked) await new Promise(resolve => setTimeout(resolve, 10))
-        }
-        assert.equal(blocked, true, 'admission really waits for the grant row')
-        await locker.query('update github_repository_installations set "pushGrantedAt"=null where "userId"=$1 and "remoteKey"=$2', [f.userId, f.remoteKey])
-        await locker.query('commit')
-        const result = await settled
-        assert.equal(result.accepted, false)
-        assert.ok('error' in result && result.error instanceof Error && result.error.message === 'runInvalid')
-      } finally {
-        await locker.query('rollback')
-        locker.release()
-        await attempt?.catch(() => {})
-      }
-      assert.equal(Number((await pool.query('select count(*) as n from agent_runs where "userId"=$1', [f.userId])).rows[0].n), before + 1, 'only the admitted execution was added')
     })
 
-    await t.test('Plugins › GitHub: 推送分支 is the GitHub App grant, not a setting; 创建 Pull Request is allow or deny, never a card', async () => {
-      const { readGitHubPermissions, setGitHubPermissions } = await import('../lib/github/plugin-permissions')
-      // The runs here name no bot; they are the personal workspace's Coordinator's, whose settings these are.
-      const home = async (userId: string) => (await (await import('../lib/coordinator/coordinator-bot')).coordinatorBot(userId, null)).workspaceId
-      const { readCliRunPolicy } = await import('../lib/agent-tool-approval/policy-store')
+    await t.test('opening the owner PR records the repository installation; a failed record never blocks the PR', async () => {
+      const { createOwnerPullRequestOpener } = await import('../lib/run-publications')
+      const github = (f: Fixture, installations: 'ok' | 'down') => {
+        const [, , owner, repo] = f.remoteKey.split('/')
+        const marker = `<!-- mikka-issue:${f.issueId} -->`
+        const pr = { number: 9, html_url: `https://github.com/${owner}/${repo}/pull/9`, state: 'open', draft: false, merged_at: null, body: `Result\n\n${marker}`, head: { ref: f.branch, repo: { id: 4242 } }, base: { repo: { id: 4242 } } }
+        let created = false
+        return (async (input: string | URL | Request, init?: RequestInit) => {
+          const url = new URL(String(input))
+          assert.equal(url.origin, 'https://api.github.com')
+          assert.equal(new Headers(init?.headers).get('authorization'), 'Bearer synthetic-owner-token', 'only the owner\'s own token')
+          if (url.pathname === '/user') return Response.json({ id: Number(f.githubAccountId), login: 'owner-login' })
+          if (url.pathname === `/repos/${owner}/${repo}`) return Response.json({ id: 4242, full_name: `${owner}/${repo}`, default_branch: 'main' })
+          if (url.pathname === '/user/installations') return installations === 'down' ? Response.json({}, { status: 502 })
+            : Response.json({ installations: [{ id: 1, app_id: 999, account: { login: owner }, suspended_at: null }, { id: 77, app_id: 123, account: { login: owner }, suspended_at: null }] })
+          if (url.pathname.endsWith(`/git/ref/heads/${f.branch}`)) return Response.json({ object: { sha: 'a'.repeat(40) } })
+          if (url.pathname.endsWith('/pulls') && (init?.method ?? 'GET') === 'GET') return Response.json(created ? [pr] : [])
+          if (url.pathname.endsWith('/pulls')) { created = true; return Response.json(pr, { status: 201 }) }
+          throw new Error(`Unexpected ${url.pathname}`)
+        }) as typeof fetch
+      }
       const ready = async () => {
         const f = await fixture({ approved: true })
         await prepareRunPublication(assignment(f), f.remoteUrl)
         assert.equal((await persistRunCompletion(f.userId, f.runId, completion(f)))?.publicationPending, true)
         return f
       }
-      const never: OpenPullRequest = async () => { throw new Error('A denied pull request must never reach GitHub') }
+      const row = async (f: Fixture) => (await pool.query('select "githubAccountId","installationId","repositoryId","pushGrantedAt" from github_repository_installations where "userId"=$1 and "remoteKey"=$2', [f.userId, f.remoteKey])).rows[0]
+      const credential = (f: Fixture) => async (userId: string) => { assert.equal(userId, f.userId); return { token: 'synthetic-owner-token', githubAccountId: f.githubAccountId } }
+
+      const f = await ready()
+      assert.deepEqual(await publishRunResult(f.runId, createOwnerPullRequestOpener({ credential: credential(f), fetcher: github(f, 'ok'), env: { GITHUB_APP_ID: '123' } })), { done: true })
+      assert.equal((await receipt(f)).status, 'published')
+      assert.deepEqual(await row(f), { githubAccountId: f.githubAccountId, installationId: '77', repositoryId: '4242', pushGrantedAt: null })
+
+      const down = await ready()
+      const logged: string[] = []
+      const original = console.error
+      console.error = (line: unknown) => { logged.push(String(line)) }
+      try {
+        assert.deepEqual(await publishRunResult(down.runId, createOwnerPullRequestOpener({ credential: credential(down), fetcher: github(down, 'down'), env: { GITHUB_APP_ID: '123' } })), { done: true })
+      } finally { console.error = original }
+      assert.equal((await receipt(down)).status, 'published', 'bookkeeping never blocks the pull request')
+      assert.equal(await row(down), undefined)
+      assert.deepEqual(logged.map(line => JSON.parse(line)), [{ event: 'github_installation_record_failed', code: 'github_502' }])
+      assert.doesNotMatch(logged.join(''), /synthetic-owner-token/)
+    })
+
+    await t.test('Plugins › GitHub settings gate nothing: a stored deny or ask still opens the pull request with no card', async () => {
+      const { readGitHubPermissions, setGitHubPermissions } = await import('../lib/github/plugin-permissions')
+      // The runs here name no bot; they are the personal workspace's Coordinator's, whose settings these are.
+      const home = async (userId: string) => (await (await import('../lib/coordinator/coordinator-bot')).coordinatorBot(userId, null)).workspaceId
+      const ready = async () => {
+        const f = await fixture({ approved: true })
+        await prepareRunPublication(assignment(f), f.remoteUrl)
+        assert.equal((await persistRunCompletion(f.userId, f.runId, completion(f)))?.publicationPending, true)
+        return f
+      }
       const cards = async (f: Fixture) => (await pool.query(`select id from pending_actions where "userId"=$1`, [f.userId])).rows
 
-      // 推送分支 is the GitHub App grant: shown, never set here, and it defaults to allow.
-      const pushed = await ready()
-      assert.equal((await readCliRunPolicy(pool, pushed.runId, pushed.userId)).policy.permissions.git_push, 'allow')
-      const current = await readGitHubPermissions(pool, pushed.userId, await home(pushed.userId))
-      await assert.rejects(setGitHubPermissions(pool, pushed.userId, await home(pushed.userId), { version: current.version, push: 'deny' }), 'push is not a Mikka setting')
-      await assert.rejects(setGitHubPermissions(pool, pushed.userId, await home(pushed.userId), { version: current.version, pullRequest: 'ask' }), 'opening a pull request is never asked')
-      await assert.rejects(setGitHubPermissions(pool, pushed.userId, await home(pushed.userId), { version: '0:1', pullRequest: 'deny' }), { code: 'githubPermissionsChanged' })
-      // Unset 创建 Pull Request opens it.
-      assert.deepEqual(await publishRunResult(pushed.runId, async () => prFor(pushed)), { done: true })
-      assert.equal((await receipt(pushed)).status, 'published')
-
+      // The stored values stay readable and writable (history), and gate nothing.
       const denied = await ready()
       await setGitHubPermissions(pool, denied.userId, await home(denied.userId), { version: '0:0', pullRequest: 'deny' })
-      assert.deepEqual(await publishRunResult(denied.runId, never), { done: true })
-      assert.equal((await receipt(denied)).status, 'blocked')
-      assert.equal((await receipt(denied)).errorCode, 'pull_request_denied')
-      assert.equal((await event(denied)).payload.publication.errorCode, 'pull_request_denied')
+      assert.equal((await readGitHubPermissions(pool, denied.userId, await home(denied.userId))).pullRequest, 'deny')
+      await pool.query(`update agent_kit_heads set cli_run_policy=jsonb_set(coalesce(cli_run_policy,'{}'::jsonb),'{permissions}','{"git_push":"deny"}') where owner_id=$1`, [denied.userId])
+      let opened = 0
+      assert.deepEqual(await publishRunResult(denied.runId, async () => { opened++; return prFor(denied) }), { done: true })
+      assert.equal(opened, 1)
+      assert.equal((await receipt(denied)).status, 'published')
       assert.deepEqual(await cards(denied), [])
 
-      // An ask stored before the decision opens the pull request, with no card.
       const legacy = await ready()
       await setGitHubPermissions(pool, legacy.userId, await home(legacy.userId), { version: '0:0', pullRequest: 'allow' })
       await pool.query(`update agent_kit_heads set external_write_permissions=jsonb_set(coalesce(external_write_permissions,'{}'::jsonb),'{github_pull_request}','"ask"') where owner_id=$1`, [legacy.userId])
-      assert.equal((await readGitHubPermissions(pool, legacy.userId, await home(legacy.userId))).pullRequest, 'allow')
-      let opened = 0
-      assert.deepEqual(await publishRunResult(legacy.runId, async () => { opened++; return prFor(legacy) }), { done: true })
-      assert.equal(opened, 1)
+      assert.deepEqual(await publishRunResult(legacy.runId, async () => prFor(legacy)), { done: true })
       assert.equal((await receipt(legacy)).status, 'published')
       assert.deepEqual(await cards(legacy), [])
     })

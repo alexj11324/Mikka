@@ -1985,13 +1985,6 @@
       "githubVerificationSaved": "验证命令已保存",
       "githubAbilitiesHeading": "能力",
       "githubAbilitiesSummary": "包含 {count} 个能力（{write} 个写入，{read} 个读取）",
-      "githubPermission": {
-        "allow": "允许",
-        "ask": "询问",
-        "deny": "拒绝"
-      },
-      "githubPermissionFailed": "无法保存",
-      "githubPushByApp": "由 GitHub App 授权决定",
       "githubPrivate": "私有",
       "githubTool": {
         "push": "推送分支",
@@ -3023,7 +3016,39 @@
       "refresh": "刷新模型列表",
       "refreshFailed": "刷新失败，重试"
     },
-    "empty": "告诉 {name} 你要做什么"
+    "empty": "告诉 {name} 你要做什么",
+    "events": {
+      "aThread": "一个线程",
+      "aTask": "一个任务",
+      "quoted": "「{title}」",
+      "runEnded": {
+        "succeeded": "已完成",
+        "failed": "失败了",
+        "stopped": "已停止",
+        "cancelled": "已取消",
+        "other": "已结束"
+      },
+      "runRetried": "换了一台机器继续",
+      "runSwitched": "订阅额度用完，改用 API Key 继续",
+      "runPaused": "订阅额度用完，已暂停",
+      "runWaitingDevice": "等设备上线后开始",
+      "runDeviceBack": "设备已上线，即将开始",
+      "issueMoved": "改为{status}",
+      "issueChanged": "状态有变化",
+      "runReport": "汇报了进展",
+      "runQuestion": "在等你回答",
+      "runBlocked": "受阻",
+      "artifact": "交来了一份 Artifact",
+      "artifactTitled": "交来了「{title}」",
+      "action": {
+        "done": "操作已完成",
+        "failed": "操作失败",
+        "declined": "操作已拒绝",
+        "other": "操作有新状态"
+      },
+      "other": "有一条新动态"
+    },
+    "resend": "重新发送"
   },
   "AgentCopy": {
     "pleaseSignInFirst": "请先登录。",

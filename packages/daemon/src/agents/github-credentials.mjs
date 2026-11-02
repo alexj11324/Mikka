@@ -1,5 +1,8 @@
-// Run-local credentials only. The App key and the daemon's credentials never
-// enter this process. stdout in `git` mode is the git credential protocol.
+// The run owner's own GitHub credential, like `gh auth login` on their own
+// computer (decision 2026-11-02-1600): git and gh get it for any github.com
+// repository the person authorized. It is fetched with the run token and kept
+// only in a run-local 0600 cache. stdout in `git` mode is the git credential
+// protocol; the token is never printed anywhere else.
 import { readFile, writeFile, rename, lstat } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
 import { spawn } from 'node:child_process'
@@ -8,21 +11,15 @@ import { pathToFileURL } from 'node:url'
 const MAX_CACHE_AGE = 50 * 60_000
 
 /**
- * The server's reason a run's GitHub token was not issued, in words a person
+ * The server's reason a run's GitHub credential was not given, in words a person
  * can act on, English then Chinese. Only these known codes are shown; any
  * other response says GitHub credentials are unavailable.
  */
 export const RUN_GITHUB_ERROR_MESSAGES = {
-  githubAppNotConfigured: ['The Mikka GitHub App is not set up on this Mikka server.', '这台 Mikka 服务器还没有配置 Mikka GitHub App。'],
-  githubIdentityRequired: ['Connect a GitHub account in Mikka (Plugins › GitHub) to work on this repository.', '在 Mikka 的插件 › GitHub 里连接一个 GitHub 账号后，才能处理这个仓库。'],
-  githubAppNotInstalled: ['Install the Mikka GitHub App on this repository.', '这个仓库还没有安装 Mikka GitHub App。'],
-  githubAppSuspended: ['The Mikka GitHub App is suspended on this repository.', 'Mikka GitHub App 在这个仓库上已被暂停。'],
-  githubAppPermissionRequired: ['Give the Mikka GitHub App pull request write and contents read access on this repository.', 'Mikka GitHub App 在这个仓库上缺少 Pull request 写权限或 Contents 读权限。'],
-  githubAccountNoWriteAccess: ['Your connected GitHub account cannot write to this repository.', '你连接的 GitHub 账号没有这个仓库的写权限。'],
-  githubRepositoryNotSupported: ['Only github.com repositories are supported.', '目前只支持 github.com 上的仓库。'],
-  githubRateLimited: ['GitHub is rate limiting requests. Try again in a few minutes.', 'GitHub 暂时限流，几分钟后再试。'],
+  githubNotConnected: ['Connect GitHub in Mikka (Plugins › GitHub).', '在 Mikka 的插件 › GitHub 里连接 GitHub。'],
+  githubReconnectRequired: ['Reconnect GitHub in Mikka (Plugins › GitHub).', '在 Mikka 的插件 › GitHub 里重新连接 GitHub。'],
   runGitHubUnavailable: ['GitHub is unavailable right now. Try again later.', 'GitHub 暂时不可用，稍后再试。'],
-  runGitHubAccessDenied: ['This run can no longer use GitHub: it ended or changed repository.', '这个线程已结束或换了仓库，不能再使用 GitHub。'],
+  runGitHubAccessDenied: ['This run has ended and can no longer use GitHub.', '这个线程已结束，不能再使用 GitHub。'],
 }
 
 /** A failed token exchange, carrying only the server's known error code. */
@@ -47,9 +44,9 @@ async function errorCode(response) {
   } catch { return null }
 }
 
-export function matchesGitRepository(input, repository) {
-  return input.protocol === 'https' && input.host === 'github.com' &&
-    [repository, `${repository}.git`].some(path => input.path?.toLowerCase() === path.toLowerCase())
+/** Any https://github.com repository: the person's own credential reaches whatever they authorized. */
+export function matchesGitRepository(input) {
+  return input.protocol === 'https' && input.host === 'github.com'
 }
 
 export async function getRunGitHubToken(config, { fetcher = fetch, now = Date.now, minValidityMs = 60_000 } = {}) {
@@ -58,7 +55,7 @@ export async function getRunGitHubToken(config, { fetcher = fetch, now = Date.no
     const stat = await lstat(cachePath)
     if (stat.isFile() && (stat.mode & 0o077) === 0) {
       const cached = JSON.parse(await readFile(cachePath, 'utf8'))
-      if (cached.repository === config.repository && cached.token &&
+      if (cached.token &&
         cached.createdAt <= now() && now() - cached.createdAt < MAX_CACHE_AGE && Date.parse(cached.expiresAt) - now() > minValidityMs) return cached.token
     }
   } catch { /* No reusable run-local token. */ }
@@ -68,10 +65,10 @@ export async function getRunGitHubToken(config, { fetcher = fetch, now = Date.no
   })
   if (!response.ok) throw new RunGitHubCredentialError(await errorCode(response))
   const result = await response.json()
-  if (result.repository?.toLowerCase() !== config.repository.toLowerCase() || typeof result.token !== 'string' || !result.token ||
+  if (typeof result.token !== 'string' || !result.token ||
     !Number.isFinite(Date.parse(result.expiresAt)) || Date.parse(result.expiresAt) - now() <= minValidityMs) throw new Error('Invalid run GitHub credentials')
   const temporary = `${cachePath}.${randomUUID()}`
-  await writeFile(temporary, JSON.stringify({ ...result, createdAt: now() }), { mode: 0o600, flag: 'wx' })
+  await writeFile(temporary, JSON.stringify({ token: result.token, expiresAt: result.expiresAt, createdAt: now() }), { mode: 0o600, flag: 'wx' })
   await rename(temporary, cachePath)
   return result.token
 }
@@ -123,7 +120,7 @@ async function main() {
       if (text.length > 8192) throw new Error('Invalid git credential request')
     }
     const input = Object.fromEntries(text.trim().split('\n').map(line => { const index = line.indexOf('='); return [line.slice(0, index), line.slice(index + 1)] }))
-    if (!matchesGitRepository(input, config.repository)) return
+    if (!matchesGitRepository(input)) return
     process.stdout.write(`username=x-access-token\npassword=${await getRunGitHubToken(config)}\n\n`)
   } else if (mode === 'gh') process.exitCode = await runGh(config, args)
   else throw new Error('Invalid credential helper mode')

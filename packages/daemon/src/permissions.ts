@@ -92,10 +92,9 @@ export function runDomains(
 }
 
 /**
- * Whether the daemon pushes a verified run branch. The server decides push
- * authority at admission (the GitHub App grant, decision 2026-11-01-1215) and
- * sends `allow` in this run's assignment only for an admitted run; anything
- * else does not push and never asks.
+ * Whether the daemon itself pushes a verified run branch, for a run whose agent
+ * does not deliver it: the server sends `allow` for a run with a task branch.
+ * The agent's own push is never withheld (decision 2026-11-02-1600).
  */
 export function pushDecision(policy: RunPolicy): { push: boolean; note?: string } {
   // A read-only check (ADR 0046) never pushes: it exists to look at what the
@@ -106,11 +105,11 @@ export function pushDecision(policy: RunPolicy): { push: boolean; note?: string 
   if (decision === "allow") return { push: true }
   if (decision === "deny")
     return { push: false, note: "Push is turned off for this run" }
-  return { push: false, note: "Push needs the Mikka GitHub App's access on this repository" }
+  return { push: false, note: "This run has no task branch to push" }
 }
 
 /** Shell commands that add or install dependencies (first word, verb), named
- * only in Claude Code's own CLI rules below; Cursor's commands are judged. */
+ * only in Claude Code's own CLI rules below. */
 const INSTALL_COMMANDS: readonly (readonly [string, readonly string[]])[] = [
   ["npm", ["install", "i", "add", "ci"]],
   ["pnpm", ["install", "i", "add"]],
@@ -127,77 +126,13 @@ const INSTALL_COMMANDS: readonly (readonly [string, readonly string[]])[] = [
 ]
 
 /**
- * The hard-boundary action a shell command line falls under, for CLIs that
- * ask before running a command (Cursor): only `git push`, which the daemon
- * owns (ADR 0017). Every other command goes ahead (decision 2026-11-01-2335).
- * Each `&&`, `;` or `|` segment counts.
- * Wrappers (`sudo`, `env`, `command`, `xargs`, `sh -c …`) are unwrapped so
- * `env git push` and `/usr/bin/git push` cannot slip past the git rule.
- */
-export function classifyCommand(command: string, legacy = false): PermissionAction | null {
-  for (const segment of command.split(/&&|\|\||;|\||\n/)) {
-    const action = classifySegment(segment, 0, legacy)
-    if (action) return action
-  }
-  return null
-}
-
-const WRAPPERS = new Set(["sudo", "command", "exec", "env", "nohup", "time", "nice", "xargs"])
-const SHELLS = new Set(["sh", "bash", "zsh", "dash", "fish"])
-/** Wrapper options that take the next word as their value (`sudo -u deploy`). */
-const OPTION_VALUES = new Set(["-u", "-g", "-p", "-C", "-h", "-r", "-t", "-U", "-n", "-P", "-d", "-L", "-s", "-E", "-a", "-I", "-S"])
-
-function classifySegment(segment: string, depth: number, legacy: boolean): PermissionAction | null {
-  const words = segment
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((word) => word.replace(/^['"]+|['"]+$/g, ""))
-  // Skip env assignments and wrappers (`FOO=1 npx …`, `sudo -u x …`).
-  while (words.length) {
-    if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(words[0])) {
-      words.shift()
-      continue
-    }
-    if (WRAPPERS.has(basename(words[0]))) {
-      words.shift()
-      while (words.length && words[0].startsWith("-")) {
-        const option = words.shift() as string
-        if (!option.includes("=") && OPTION_VALUES.has(option)) words.shift()
-      }
-      continue
-    }
-    break
-  }
-  const [tool] = words
-  if (!tool) return null
-  const name = basename(tool)
-  // `sh -c "git push"` keeps the real command in the argument string.
-  if (SHELLS.has(name) && depth < 3) {
-    const index = words.findIndex((word) => word === "--command" || /^-[A-Za-z]*c[A-Za-z]*$/.test(word))
-    if (index !== -1) {
-      const nested = words.slice(index + 1).join(" ").replace(/^['"]|['"]$/g, "")
-      const action = classifyCommand(nested, legacy)
-      if (action) return action
-    }
-  }
-  if (name === "git" && words.slice(1).some((word) => word === "push")) return "git_push"
-  // Only when the Decisions API gave no answer: the classification in force before it, so a fallback never loosens anything.
-  if (legacy) {
-    const entry = INSTALL_COMMANDS.find(([command]) => command === name)
-    if (entry && words[1] && entry[1].includes(words[1])) return "install_dependency"
-  }
-  return null
-}
-
-/**
  * Claude Code permission rules for the run (`--settings` `permissions`).
  * The SDK handles asks through the run-bound host gate. A raw shell whose
  * configurable effects cannot be authorized is unavailable as a capability.
- * `git push` is denied to the agent (the daemon pushes, ADR 0017) unless the
- * agent delivers the run itself with run-scoped GitHub credentials.
+ * `git push` is the agent's own judgment, as with the person's own `gh auth
+ * login` (decision 2026-11-02-1600): no rule withholds it.
  */
-export function claudePermissionRules(policy: RunPolicy, agentDelivers = false): {
+export function claudePermissionRules(policy: RunPolicy): {
   allow: string[]
   ask: string[]
   deny: string[]
@@ -215,7 +150,6 @@ export function claudePermissionRules(policy: RunPolicy, agentDelivers = false):
     ask: decision === "ask" ? install : [],
     deny: [
       ...(!rawCliShellAvailable(policy) ? ['Bash','PowerShell','Monitor'] : []),
-      ...(agentDelivers && !policy.readOnly ? [] : ["Bash(git push:*)"]),
       ...(policy.readOnly ? READ_ONLY_TOOLS : []),
       ...(decision === "deny" ? install : []),
     ],
@@ -231,7 +165,7 @@ export function policyInstructions(policy: RunPolicy): string[] {
   const lines: string[] = []
   if (policy.readOnly)
     lines.push(
-      "- This is a read-only check: you may read the worktree but not change it, and nothing is pushed. Report what you found through `submit`; do not fix anything yourself."
+      "- This is a read-only check: you may read the worktree but not change it. Report what you found through `submit`; do not fix anything yourself."
     )
   if (!rawCliShellAvailable(policy)) lines.push('- Native shell execution is unavailable under the current dependency-installation policy. Use the available file tools; report a blocked operation when a shell is required. A chat response does not grant execution authority.')
   lines.push(

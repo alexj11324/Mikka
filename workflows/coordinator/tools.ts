@@ -24,7 +24,7 @@ import { scheduledReadTools } from '@/lib/coordinator/scheduled-read-tools'
 import { scheduleTools } from '@/lib/schedules/tools'
 
 /** `coordinator`: this chat's bot is the person's Coordinator, which may act on any of their bots and hold the factory tools. */
-export interface CoordinatorToolOptions { coordinator?: boolean; execution?: AgentExecution | null; readOnly?: boolean; readToolIds?: readonly string[]; sourceEventId?: string; writeEnabled?: boolean; taskEventId?: string; approvedRepositoryKey?: string; computerEnabled?: boolean; mailboxEnabled?: boolean; mailboxTools?: readonly MailboxToolName[]; writeTools?: { catalog: readonly ModelWriteTool[]; submit: (call: ModelWriteCall) => Promise<unknown> } }
+export interface CoordinatorToolOptions { coordinator?: boolean; execution?: AgentExecution | null; readOnly?: boolean; readToolIds?: readonly string[]; sourceEventId?: string; writeEnabled?: boolean; taskEventId?: string; computerEnabled?: boolean; mailboxEnabled?: boolean; mailboxTools?: readonly MailboxToolName[]; writeTools?: { catalog: readonly ModelWriteTool[]; submit: (call: ModelWriteCall) => Promise<unknown> } }
 /** One task, one thread (decision 2026-11-01-1330-one-thread-per-task): how both dispatch tools say it. */
 const ONE_THREAD = 'A task has one thread at a time. When the task already has one, this goes to that thread: a thread still working gets `note` as a message; a thread that ended (done, failed or stopped) runs again in the same thread with `note`. Use it to retry or to add information; never to start over. Set newThread only when the person, in their own words, explicitly asked for a new session or thread, or a different agent; the host checks their message and otherwise keeps the existing thread.'
 const newThreadInput = z.boolean().optional().describe('Only when the person explicitly asked for a new session or thread, or a different agent, in their own words. Retries and added information never set it.')
@@ -165,7 +165,7 @@ export function createCoordinatorRegistry(userId: string, botId: string, scope?:
         issueId: id, agentId: id.optional().describe('Deprecated: omit. 模型与订阅 picks the Agent.'),
         repo: z.string().trim().min(1).max(4_000).describe('GitHub owner/repo, an HTTPS/SSH git URL, or just the repository name the person used (e.g. Mikka_test): the host finds it among their authorized repositories. The daemon clones it; no repository registration is needed.'),
         note: z.string().max(10_000).optional().describe('Extra direction for this run, added after the issue text.'),
-        readOnly: z.boolean().optional().describe('true when the task only reads and reports (investigation, review): no file changes, commit, push or PR. A read-only run needs no repository push approval.'),
+        readOnly: z.boolean().optional().describe('true when the task only reads and reports (investigation, review): no file changes, commit, push or PR.'),
         newThread: newThreadInput,
         target: z.union([z.literal('cloud'), z.object({ deviceId: id })]).optional().describe('Only when the person named where to run it: one of their computers by its deviceId from list_agents, or "cloud". Omit to let 模型与订阅 choose. A named computer that is offline or off returns machineUnavailable with result.card; nothing is queued and no other computer is used.'),
         model: z.object({ harness: z.enum(['claude_code', 'codex']), model: z.string().regex(/^[A-Za-z0-9._:-]{1,128}$/).optional() }).optional().describe('Only when the person named the Agent or model for this thread. The Agent alone ("give it to Codex"): pass harness only; the host takes that Agent\'s first model in their allowed models. A model too: its id as one of their subscriptions or API keys lists it. Omit to use their allowed models in order.'),
@@ -173,9 +173,7 @@ export function createCoordinatorRegistry(userId: string, botId: string, scope?:
       execute: (input,call) => {
         const request={...input,requestKey:`dispatch:${call.toolCallId}`,...(sourceEventId ? { sourceEventId } : {})}
         return options.taskEventId
-          ? options.approvedRepositoryKey
-            ? steps.dispatchRun(userId, request, scope, botId, execution ?? undefined, options.taskEventId, options.approvedRepositoryKey)
-            : steps.dispatchRun(userId, request, scope, botId, execution ?? undefined, options.taskEventId)
+          ? steps.dispatchRun(userId, request, scope, botId, execution ?? undefined, options.taskEventId)
           : steps.dispatchRun(userId, request, scope, botId, execution ?? undefined)
       },
     }),

@@ -26,6 +26,7 @@ import { delivered, inFlight, marked, outgoingKey, queued, type Outgoing, type O
 import { askForPush, usePushState } from '@/lib/push-state'
 import { runTitle, type Chat, type ChatFailure, type CitationSource, type PendingAction } from '@/lib/types'
 import { failureLine } from '@/lib/chat-failure'
+import { eventText } from '@/lib/event-line'
 import { waitingLabel } from '@/lib/waiting'
 import { useApi } from '@/lib/useApi'
 import { useStop } from '@/lib/useStop'
@@ -33,17 +34,6 @@ import { StopFailed } from '@/components/StopFailed'
 import { runInfoLine } from '@/lib/run-info'
 import { openOnWeb, webChatPath } from '@/lib/web'
 import { colors } from '@/lib/theme'
-
-const RUN_ENDED = /^\[Event\] Run ([0-9a-f-]{36}) ended with status (\w+)/i
-const ENDED_WORD: Record<string, string> = { succeeded: '完成了', failed: '失败了', stopped: '已停止', cancelled: '已取消' }
-
-/** An event line: a run that ended reads as its thread's name and how it ended; others as the web shows them. */
-function eventText(text: string, sources: Record<string, CitationSource>) {
-  const ended = RUN_ENDED.exec(text)
-  const run = ended ? sources[ended[1].toLowerCase()] : undefined
-  if (ended && run?.kind === 'run') return `${runTitle(run)} ${ENDED_WORD[ended[2]] ?? ended[2]}`
-  return text.replace(/^\[Event\]\s*/, '')
-}
 
 /**
  * A chat with a bot; the Coordinator is one (R-06): the bot's name in a pill,
@@ -173,7 +163,7 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, c
             const time = clockTime(item.createdAt)
             return (
               <Fragment key={item.pending ? `pending-${item.position}` : item.position}>
-                {item.from === 'event' ? <EventLine text={eventText(item.text, sources)} /> : null}
+                {item.from === 'event' ? <EventLine text={eventText(item.line, sources)} /> : null}
                 {item.from === 'person' && (item.text || item.images) ? <TimedRow time={time} offset={offset} align="right" onQuote={item.text ? () => setQuote(quotable(item.text)) : undefined} onLongPress={item.text ? () => actions(item.text, item.id) : undefined}><MyBubble text={item.text} photos={photos(item.id, item.images)} />{chips(item.id, 'right')}</TimedRow> : null}
                 {item.from === 'coordinator' && item.text ? (
                   <TimedRow time={time} offset={offset} onQuote={() => setQuote(quotable(item.text))} onLongPress={() => actions(item.text, item.id)}>

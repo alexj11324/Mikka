@@ -41,6 +41,17 @@ export interface ChatItem {
   images?: number
   /** The person stopped this reply (停止); it keeps what it had said. */
   stopped?: true
+  /** An event, as the line the chat shows; its `text` is for the model only (lib/coordinator/event-line.ts on the server). */
+  line?: EventLine
+}
+
+/** lib/coordinator/event-line.ts on the server. */
+export interface EventLine {
+  kind: 'runFinished' | 'runRetried' | 'runSwitched' | 'runPaused' | 'runWaitingDevice' | 'runDeviceBack' | 'issueStatus' | 'runReport' | 'runQuestion' | 'runBlocked' | 'artifact' | 'action' | 'other'
+  runId: string | null
+  issueId: string | null
+  status: string | null
+  title: string | null
 }
 
 export interface Chat {

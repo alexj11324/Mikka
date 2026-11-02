@@ -14,6 +14,13 @@ describe("4e3 task env channel", () => {
     expect(out.dropped.sort()).toEqual([...hooks].sort());
     expect(JSON.stringify(out.dropped)).not.toContain("secret-value");
   });
+  it("never lets a workspace secret stand in for the run owner's GitHub credential", () => {
+    const names = ["GH_TOKEN", "gh_token", "GITHUB_TOKEN", "GH_ENTERPRISE_TOKEN", "GITHUB_ENTERPRISE_TOKEN", "GH_HOST", "GH_CONFIG_DIR"];
+    const out = withTaskEnv({}, Object.fromEntries(names.map((name) => [name, "ghp_someone_else"])));
+    expect(out.env).toEqual({});
+    expect(out.dropped.sort()).toEqual([...names].sort());
+    expect(withTaskEnv({}, { GITHUB_REPOSITORY_NAME: "x" }).env).toEqual({ GITHUB_REPOSITORY_NAME: "x" });
+  });
   it("keeps look-alike but harmless names", () => {
     expect(withTaskEnv({}, { ENVIRONMENT: "x", MY_PATH: "y", RUBYOPTS_NOTE: "z" }).env).toEqual({ ENVIRONMENT: "x", MY_PATH: "y", RUBYOPTS_NOTE: "z" });
   });
