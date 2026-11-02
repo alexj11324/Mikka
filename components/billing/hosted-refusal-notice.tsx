@@ -14,6 +14,7 @@ import { OpenAI } from '@/components/ui/svgs/openai'
 import { Link } from '@/i18n/navigation'
 import { chooseBotModel, getBotModelMenu } from '@/app/actions/execution-settings'
 import { retryCoordinatorTurn } from '@/app/actions/coordinator'
+import { getCreditShare, updateCreditShare } from '@/app/actions/personal-policy'
 import { botModelMenuKey } from '@/components/coordinator/bot-model-picker'
 import { subscriptionName } from '@/components/coordinator/quota-notice'
 import { getHostedUsage, type HostedRefusal } from '@/lib/billing/verification-client'
@@ -43,6 +44,8 @@ export function HostedRefusalNotice({ code, botId, retry, onQueued }: { code: Ho
   const trialUsed = code === 'verification_required' && read?.trialLeft === 0
   // The model menu's own read (the same SWR key as the composer's chip): its first own subscription.
   const menu = useSWR<BotModelMenu>(transient || billing ? botModelMenuKey(botId) : null, () => getBotModelMenu(botId))
+  // A team with no points: the member's own share turns on right here (decision 2026-11-02-1450).
+  const share = useSWR(billing ? ['credit-share'] : null, () => getCreditShare())
   const own = menu.data ? ownSubscriptionOption(menu.data) : null
   const Icon = transient ? Info : code === 'verification_required' ? CreditCard : code === 'platform_paused' ? Pause : Info
   const title = transient || code === 'usage_in_progress' || code === 'usage_concurrency_limit' || code === 'usage_cost_unavailable' ? t('unavailable')
@@ -57,10 +60,12 @@ export function HostedRefusalNotice({ code, botId, retry, onQueued }: { code: Ho
     <span className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-1">
       {retry}
       {(transient || billing) && own && <UseSubscriptionButton botId={botId} option={own.option} label={t('useSubscription', { name: subscriptionName(own.provider, own.plan) })} onQueued={onQueued} />}
-      {billing && <Button size="sm" variant="outline" nativeButton={false} role="link" render={<Link href={settingsHref('billing')} />}>{t('openBilling')}</Button>}
+      {billing && (share.data && !share.data.error && share.data.canShare && !share.data.mine
+        ? <ShareMyPointsButton botId={botId} label={t('useMyPoints')} onQueued={onQueued} onShared={() => share.mutate()} />
+        : <Button size="sm" variant="outline" nativeButton={false} role="link" render={<Link href={settingsHref('billing')} />}>{t('openBilling')}</Button>)}
       {connect && trialUsed && read?.workspaceId && <ConnectSubscriptionButton workspaceId={read.workspaceId} botId={botId} label={t('bindSubscription')} />}
       {card && <Button size="sm" variant={trialUsed ? 'outline' : 'link'} className={cn(!trialUsed && 'text-muted-foreground')} nativeButton={false} role="link" render={<Link href={settingsHref('billing')} />}>{t('verifyCard')}</Button>}
-      {connect && !trialUsed && <Button size="sm" nativeButton={false} role="link" render={<Link href={settingsHref('models')} />}>
+      {connect && !trialUsed && <Button size="sm" variant={billing ? "outline" : "default"} nativeButton={false} role="link" render={<Link href={settingsHref('models')} />}>
         {t.rich('connect', { claude: () => <Claude aria-hidden="true" />, openai: () => <OpenAI aria-hidden="true" /> })}
       </Button>}
     </span>
@@ -85,4 +90,27 @@ function UseSubscriptionButton({ botId, option, label, onQueued }: { botId: stri
     } catch { toast.error(actionError()) } finally { setPending(false) }
   }
   return <Button type="button" size="sm" disabled={pending} onClick={() => void use()}>{label}</Button>
+}
+
+/**
+ * 把我的点数用于这个团队: turns the member's share on for this team where the
+ * refusal is, then runs the refused turn again, which now spends their points.
+ */
+function ShareMyPointsButton({ botId, label, onQueued, onShared }: { botId: string | null; label: string; onQueued: () => unknown; onShared: () => unknown }) {
+  const actionError = useActionError()
+  const { mutate } = useSWRConfig()
+  const [pending, setPending] = useState(false)
+  async function share() {
+    if (pending) return
+    setPending(true)
+    try {
+      const shared = await updateCreditShare(true)
+      if (shared.error) { toast.error(actionError(shared.error)); return }
+      await Promise.all([onShared(), mutate(botModelMenuKey(botId))])
+      const result = botId ? await retryCoordinatorTurn(botId) : await retryCoordinatorTurn()
+      if (result.error) toast.error(actionError(result.error))
+      else await onQueued()
+    } catch { toast.error(actionError()) } finally { setPending(false) }
+  }
+  return <Button type="button" size="sm" disabled={pending} onClick={() => void share()}>{label}</Button>
 }
