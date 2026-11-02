@@ -32,7 +32,8 @@ async function mockChat(page: Page) {
       return route.fulfill({ response, body })
     }
     if (!state.chatAction && (request.postData() ?? '').trim() !== '[]') return route.fallback()
-    const response = await route.fetch()
+    // A poll names the version it shows; drop it so every poll is a full read to rewrite.
+    const response = await route.fetch({ postData: '[]' })
     const body = await response.text()
     if (!ITEMS.test(body) || !/"working"\s*:/.test(body)) return route.fulfill({ response, body })
     state.chatAction = actionId

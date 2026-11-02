@@ -11,7 +11,8 @@ import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { userMessageEvent } from '@/lib/coordinator-events'
 import type { UserImageInput } from '@/lib/coordinator/user-attachments'
 import { personalSubmissionInput, personalSubmissionRecorded, recordPersonalSubmission, SubmissionConflictError } from '@/lib/coordinator-submission'
-import { botChats, chatView, retryFailedTurn, sendRetryOf, type BotChatSummary, type ChatView } from '@/lib/coordinator/store'
+import { botChats, chatVersion, chatView, retryFailedTurn, sendRetryOf, type BotChatSummary, type ChatView } from '@/lib/coordinator/store'
+import type { UnchangedChat } from '@/lib/coordinator/chat-poll'
 import { and, eq, sql } from 'drizzle-orm'
 import { openChatBotId } from '@/lib/coordinator/coordinator-bot'
 import { bots, devices } from '@/lib/db/schema'
@@ -35,7 +36,7 @@ async function getUserId(): Promise<string> {
 }
 
 /** `botId` is the chat's bot row, the Coordinator's included. */
-export type CoordinatorChat = ChatView & { botId: string; enabled: boolean }
+export type CoordinatorChat = ChatView & { botId: string; enabled: boolean; version?: string }
 
 const botIdSchema = z.uuid().nullable()
 
@@ -65,6 +66,24 @@ export async function getCoordinatorChat(botId: string | null = null): Promise<C
   const chat = await chatView(userId, 200, bot.id)
   // Without a Coordinator here nothing is coming, so do not show one working.
   return { ...chat, botId: bot.id, enabled, working: enabled && chat.working }
+}
+
+const versionSchema = z.string().regex(/^[0-9a-f]{32}$/).optional()
+
+/**
+ * The chat for a poll that already shows version `known`: only its live state
+ * when nothing in the conversation changed, the whole chat otherwise.
+ */
+export async function pollCoordinatorChat(botId: string | null = null, known?: string): Promise<CoordinatorChat | UnchangedChat> {
+  const user = await getUser()
+  const bot = await ownBot(user, botId)
+  const enabled = coordinatorEnabled()
+  const parsed = versionSchema.safeParse(known)
+  const current = await chatVersion(user.id, 200, bot.id)
+  if (parsed.success && parsed.data === current.version) return { unchanged: true, ...current, botId: bot.id, enabled, working: enabled && current.working }
+  const chat = await chatView(user.id, 200, bot.id)
+  // The version read first: a message stored in between makes the next poll read again, never miss it.
+  return { ...chat, version: current.version, botId: bot.id, enabled, working: enabled && chat.working }
 }
 
 const quoteSchema = z.object({
