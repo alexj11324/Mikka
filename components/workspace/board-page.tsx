@@ -6,6 +6,7 @@ import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
 import { Box, Check, CircleUserRound, UserRoundPen, Columns3, Flag, List, ListFilter, PanelRightClose, PanelRightOpen, Plus, RefreshCw, Settings2, SquareKanban, Tag, X } from 'lucide-react'
 import type { listIssues } from '@/app/actions/issues'
+import { listAgents } from '@/app/actions/agents'
 import { listTaskRuns } from '@/app/actions/task-runs'
 import { getLinearBoardSync } from '@/app/actions/linear-sync'
 import { CoordinatorChat } from '@/components/coordinator/coordinator-chat'
@@ -129,7 +130,9 @@ export function BoardPage({ issues, userId, onOpen, onUpdated, onBusyChange }: {
   const { data: linear } = useSWR('linear-board-sync', () => getLinearBoardSync(), { revalidateOnFocus: false })
   // Without a connected Linear team, the button only reloads the board.
   const linearSynced = !!linear && !linear.error && linear.synced
+  const { data: agents } = useSWR('agents', () => listAgents())
   const { data: runs } = useSWR('task-runs', () => listTaskRuns(), { refreshInterval: 15000 })
+  const myAgents = useMemo(() => new Set((agents ?? []).map(agent => agent.id)), [agents])
   const owners = useMemo(() => new Map((runs ?? []).map(run => [run.issueId, { bot: run.bot, harnesses: run.harnesses }] as const)), [runs])
   // listTaskRuns returns each task's newest run once; the card shows that run's group, never its raw status.
   const agentStates = useMemo(() => new Map((runs ?? []).flatMap(run => { const state = agentStateOf(run, issues.find(issue => issue.id === run.issueId)); return state ? [[run.issueId, state] as const] : [] })), [runs, issues])
@@ -147,8 +150,9 @@ export function BoardPage({ issues, userId, onOpen, onUpdated, onBusyChange }: {
     switch (field) {
       case 'status': return [issue.status]
       case 'priority': return [issue.priority]
-      case 'assignee': return [...(personFilters(issue, userId).assignee ? [ME] : []), issue.metadata.assignee?.id ?? NONE]
-      case 'creator': return personFilters(issue, userId).creator ? [ME] : []
+      // listTaskRuns names a run's bot only when it is the person's own.
+      case 'assignee': return [...(personFilters(issue, userId, { agents: myAgents, heldByMyBot: !!owners.get(issue.id)?.bot }).assignee ? [ME] : []), issue.metadata.assignee?.id ?? NONE]
+      case 'creator': return personFilters(issue, userId, { agents: myAgents, heldByMyBot: false }).creator ? [ME] : []
       case 'labels': return issue.metadata.labels.map(label => label.name)
       case 'project': return [issue.metadata.project ?? NONE]
       case 'agentState': return [agentStates.get(issue.id) ?? NONE]

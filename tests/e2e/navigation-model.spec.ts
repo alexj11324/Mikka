@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { Pool } from 'pg'
 import type { Page } from '@playwright/test'
-import { test, expect, register, app, rail, seedTask, openIssueFromSearch, conversationPill, hydrated, showEveryTask } from './fixtures'
+import { test, expect, register, app, rail, seedTask, openIssueFromSearch, conversationPill, hydrated, showCreatedByMe } from './fixtures'
 
 // R-82: one address says what is on screen, every move is a history entry,
 // and back / forward step through it one move at a time without leaving Mikka.
@@ -98,11 +98,14 @@ test('a task opened from the chat is its own page; back returns to the chat, for
 
 test('board → task → back lands on the board; rail → back after a task lands on the task', async ({ page }) => {
   await register(page)
-  await showEveryTask(page)
   const title = `看板任务 ${randomUUID()}`
   await seedTask(page, title)
   await page.goto(app('/?section=all-issues'))
   await hydrated(rail(page, '看板'))
+  // Nobody is on the seeded task: 负责人 我 leaves it out, 我创建的 shows it (decision 2026-11-02-0302).
+  await expect(board(page)).toBeVisible()
+  await expect(board(page).getByText(title, { exact: true })).toHaveCount(0)
+  await showCreatedByMe(page)
   await board(page).getByText(title, { exact: true }).click()
   await expect(taskTitle(page)).toHaveValue(title)
   expect(query(page).get('section')).toBe('all-issues')

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { Pool } from 'pg'
-import { test, expect, register, seedTask, rail, app, showEveryTask } from './fixtures'
+import { test, expect, register, seedTask, rail, app, showCreatedByMe } from './fixtures'
 
 function isolatedPool() {
   const connectionString = process.env.E2E_DATABASE_URL
@@ -40,7 +40,6 @@ for (const width of [1280, 1440]) {
   test(`${width}px，Coordinator 侧栏打开：每一列（含已完成）都固定 300，放不下就横向滚动`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 })
     await register(page)
-    await showEveryTask(page)
     await seedTask(page, '已完成里的任务', { status: 'done' })
     await seedTask(page, '待整理里的任务', { status: 'backlog' })
     await page.goto(app('/'))
@@ -52,6 +51,9 @@ for (const width of [1280, 1440]) {
     // 已完成 is a full column beside the sidebar, never a strip (decisions/2026-11-01-1144-board-done-keeps-its-width.md).
     await expect(board.getByRole('region', { name: '已完成任务列', exact: true })).toBeVisible()
     const done = board.locator('[data-slot="kanban-column"]').last()
+    // Nobody is on the seeded tasks: 负责人 我 leaves them out, 我创建的 shows them (decision 2026-11-02-0302).
+    await expect(board.getByText('已完成里的任务', { exact: true })).toHaveCount(0)
+    await showCreatedByMe(page)
 
     // Every column is 300px (R-25); the board scrolls instead of squeezing or folding them.
     const columns = await board.locator('[data-slot="kanban-column"]').evaluateAll(items => items.map(item => Math.round(item.getBoundingClientRect().width)))
@@ -79,13 +81,16 @@ for (const width of [1280, 1440]) {
 test('1024px：Coordinator 侧栏默认收起，展开时浮在看板上；无编号不占位，列表没有版本号', async ({ page }) => {
   await page.setViewportSize({ width: 1024, height: 768 })
   await register(page)
-  await showEveryTask(page)
   await seedTask(page, '窄窗口里的任务', { status: 'todo' })
   await page.goto(app('/'))
   await rail(page, '看板').click()
 
   // Below 1280 the 360px panel would squeeze the board (R-65): it starts folded.
   const card = page.getByRole('group', { name: '窄窗口里的任务', exact: true })
+  // Nobody is on it: 负责人 我 leaves it out, 我创建的 shows it (decision 2026-11-02-0302).
+  await expect(page.getByRole('toolbar', { name: '看板工具栏', exact: true })).toBeVisible()
+  await expect(card).toHaveCount(0)
+  await showCreatedByMe(page)
   await expect(card).toBeVisible()
   await expect(page.getByRole('complementary', { name: 'Coordinator', exact: true })).toBeHidden()
   await page.getByRole('button', { name: '展开对话', exact: true }).click()
@@ -143,7 +148,6 @@ for (const timezoneId of ['America/Los_Angeles', 'Asia/Shanghai']) test.describe
     await page.setViewportSize({ width: 1440, height: 900 })
     const email = `e2e-${randomUUID()}@example.com`
     await register(page, '/', email)
-    await showEveryTask(page)
     await seedTask(page, 'Bot 负责的看板任务', { status: 'doing' })
     await seedTask(page, '只有 PR 的看板任务', { status: 'todo' })
     const viewerId = await seedCardTasks(email, 'Bot 负责的看板任务', '只有 PR 的看板任务')
@@ -157,6 +161,10 @@ for (const timezoneId of ['America/Los_Angeles', 'Asia/Shanghai']) test.describe
 
     const botCard = page.getByRole('group', { name: 'Bot 负责的看板任务', exact: true })
     const prCard = page.getByRole('group', { name: '只有 PR 的看板任务', exact: true })
+    // 负责人 我 shows the task assigned to the person and held by their bot, not the one they only created (decision 2026-11-02-0302).
+    await expect(botCard).toBeVisible()
+    await expect(prCard).toHaveCount(0)
+    await showCreatedByMe(page)
     await expect(botCard).toBeVisible()
 
     // Row 1: the Bot's own blob on top, the person's letter avatar, two agent marks, then +1.

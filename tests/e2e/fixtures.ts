@@ -52,17 +52,18 @@ function database() {
 }
 
 /**
- * Opens the board with no filters. The board starts on 负责人 我, which matches
- * the assignee only (decision 2026-11-02-0302), so a seeded task (nobody on it)
- * shows only once the filter is off. Call before the next navigation.
+ * On the open board, swaps the default 负责人 我 filter for 我创建的 through the
+ * toolbar. A seeded task has nobody on it, so only 我创建的 shows it
+ * (decision 2026-11-02-0302).
  */
-export async function showEveryTask(page: Page) {
-  await page.addInitScript(() => {
-    if (sessionStorage.getItem('e2e:board-unfiltered')) return
-    sessionStorage.setItem('e2e:board-unfiltered', '1')
-    const stored = JSON.parse(localStorage.getItem('mikka:board-v2') ?? '{}')
-    localStorage.setItem('mikka:board-v2', JSON.stringify({ ...stored, filters: {} }))
-  })
+export async function showCreatedByMe(page: Page) {
+  const toolbar = page.getByRole('toolbar', { name: '看板工具栏', exact: true })
+  await toolbar.getByRole('button', { name: '移除负责人筛选', exact: true }).click()
+  await toolbar.getByRole('button', { name: '筛选', exact: true }).click()
+  await page.getByRole('menu').getByRole('menuitemcheckbox', { name: '我创建的', exact: true }).click()
+  await page.keyboard.press('Escape')
+  await expect(toolbar.getByRole('group', { name: '我创建的', exact: true })).toBeVisible()
+  await expect(toolbar.getByRole('group', { name: '负责人', exact: true })).toHaveCount(0)
 }
 
 /**
