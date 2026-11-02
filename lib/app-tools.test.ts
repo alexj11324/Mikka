@@ -106,3 +106,19 @@ test('listing shows only the app\'s own tools and which ones only read', async (
   assert.deepEqual(result.tools[0].input, { type: 'object' })
   assert.deepEqual(await listAppTools(deps({ resolveAccount: async () => ({ accountId: null, accounts: [] }) }).deps, { toolkit: 'hubspot' }), { error: 'integrationNotConnected' })
 })
+
+test('an app that needs no connection runs on the person alone; any other app still needs its account', async () => {
+  const hn: AppTool = { slug: 'HACKERNEWS_GET_TOP_STORIES', name: 'Top stories', tags: ['readOnlyHint'], version: '20261030_00', toolkit: { slug: 'hackernews' } }
+  const accounts: (string | null)[] = []
+  const { deps: d } = deps({
+    noAuth: async toolkit => toolkit === 'hackernews',
+    resolveAccount: async () => ({ accountId: null, accounts: [] }),
+    getTool: async slug => slug === hn.slug ? hn : tools[slug],
+    execute: async (_call, accountId) => { accounts.push(accountId); return { successful: true, data: { stories: [] } } },
+  })
+  assert.deepEqual(await callAppTool(d, { toolkit: 'hackernews', tool: hn.slug, arguments: {} }), { data: { stories: [] } })
+  assert.deepEqual(accounts, [null])
+  assert.deepEqual(await callAppTool(d, call('HUBSPOT_LIST_CONTACTS')), { error: 'integrationNotConnected' })
+  // Still gated by the Bot's app policy.
+  assert.deepEqual(await callAppTool({ ...d, appAllowed: async () => false }, { toolkit: 'hackernews', tool: hn.slug, arguments: {} }), { error: 'integrationBlockedByWorkspace' })
+})

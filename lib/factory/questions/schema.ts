@@ -25,10 +25,10 @@ export type QuestionHandoff = z.infer<typeof questionHandoffSchema>;
 
 export const questionReferenceSchema = z
   .object({
-    questionId: z.uuid(),
+    questionId: z.uuid().transform(value => value.toLowerCase()),
     questionRevision: z.number().int().positive(),
     binding: bindingSchema,
-    originRunId: z.uuid(),
+    originRunId: z.uuid().transform(value => value.toLowerCase()),
     originSessionId: z.string().min(1).max(1000),
   })
   .strict();
@@ -39,7 +39,7 @@ export const questionFactSchema = z.discriminatedUnion("kind", [
   z
     .object({
       kind: z.literal("request"),
-      sourceEventId: z.uuid(),
+      sourceEventId: z.uuid().transform(value => value.toLowerCase()),
       quote: text,
     })
     .strict(),
@@ -50,15 +50,15 @@ export type QuestionFact = z.infer<typeof questionFactSchema>;
 export const humanQuestionAnswerSchema = z
   .object({
     reference: questionReferenceSchema,
-    answerId: z.uuid(),
+    answerId: z.uuid().transform(value => value.toLowerCase()),
     text,
-    sourceEventId: z.uuid().optional(),
+    sourceEventId: z.uuid().transform(value => value.toLowerCase()).optional(),
   })
   .strict();
 export const contextQuestionAnswerSchema = z
   .object({
     reference: questionReferenceSchema,
-    answerId: z.uuid(),
+    answerId: z.uuid().transform(value => value.toLowerCase()),
     facts: z.array(questionFactSchema).min(1).max(10),
   })
   .strict();
@@ -68,7 +68,7 @@ export type ContextQuestionAnswer = z.infer<typeof contextQuestionAnswerSchema>;
 export const questionEscalationSchema = z
   .object({
     reference: questionReferenceSchema,
-    eventId: z.uuid(),
+    eventId: z.uuid().transform(value => value.toLowerCase()),
     reason: text,
   })
   .strict();

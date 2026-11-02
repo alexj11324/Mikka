@@ -215,9 +215,14 @@ function resultError(message: SDKResultMessage): string {
 function toolResultText(content: unknown): string {
   if (typeof content === "string") return content.slice(-4000)
   if (Array.isArray(content)) {
+    // ToolSearch answers with tool_reference parts only: show the tools it loaded.
     return content
-      .map((part: { text?: unknown }) =>
-        typeof part?.text === "string" ? part.text : "",
+      .map((part: { type?: unknown; text?: unknown; tool_name?: unknown }) =>
+        typeof part?.text === "string"
+          ? part.text
+          : part?.type === "tool_reference" && typeof part.tool_name === "string"
+            ? part.tool_name
+            : "",
       )
       .join("\n")
       .slice(-4000)

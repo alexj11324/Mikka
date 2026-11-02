@@ -12,17 +12,20 @@ import { withBasePath } from '@/lib/base-path'
 import { isToolkitSlug } from '@/lib/composio-accounts'
 import type { SkillsSearchResult } from '@/lib/skills-search'
 import type { StoreApp } from '@/lib/plugins/catalog'
+import type { ConnectKind } from '@/lib/plugins/connect-kind'
 import { matchesStoreQuery, storeItemState, type StoreItemState } from '@/lib/plugins/store-state'
 import { getLinearIntegrationState } from '@/app/actions/linear-sync'
 import { getTelegramIntegrationStatus } from '@/app/actions/telegram'
 import { Link } from '@/i18n/navigation'
 import { AppTile, ConnectedAppDetail, ConnectedAppRow, ConnectedAppsStatus, OWN_APPS, PluginBreadcrumb, PluginRow, isOwnApp, useAppInfo, useConnectedApps, useStoreCatalog, type ConnectedApps, type OwnAppId } from '@/components/plugins/connected-apps'
+import { CredentialDialog, type CredentialTarget } from '@/components/plugins/credential-dialog'
 import { GitHubSettings } from '@/components/plugins/github-settings'
 import { LinearSettings } from '@/components/settings/linear-settings'
 import { TelegramSettings } from '@/components/settings/telegram-settings'
 import { SettingsLoading, SettingsSection } from '@/components/settings/primitives'
 import { IconTile } from '@/components/reui/icon-tile'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -76,7 +79,7 @@ function readLocation() {
   return { app: isToolkitSlug(app) ? app : null, category: category && category.length <= 80 ? category : null }
 }
 
-type StoreEntry = { id: string; name: string; description: string; iconUrl: string | null }
+type StoreEntry = { id: string; name: string; description: string; iconUrl: string | null; connect?: ConnectKind }
 
 /**
  * 插件 and 设置 › 连接 (decision 2026-10-31). The rail's page is the store:
@@ -183,6 +186,7 @@ function Store({ apps, ownStates, category, rootLabel, href, go, tab, setTab, qu
   const catalog = useStoreCatalog()
   const [confirming, setConfirming] = useState<{ id: string; accountId: string } | null>(null)
   const [disconnectError, setDisconnectError] = useState('')
+  const [keyTarget, setKeyTarget] = useState<CredentialTarget | null>(null)
 
   const [debouncedQuery, setDebouncedQuery] = useState(query.trim())
   const trimmedQuery = query.trim()
@@ -213,10 +217,10 @@ function Store({ apps, ownStates, category, rootLabel, href, go, tab, setTab, qu
   const store = catalog.data?.apps ?? []
   const byId = new Map<string, StoreApp>(store.map(item => [item.id, item]))
   const own: StoreEntry[] = OWN_APPS.map(id => ({ id, ...info(id), description: '' }))
-  const entries = (ids: readonly string[]): StoreEntry[] => ids.flatMap(id => { const item = byId.get(id); return item ? [{ id, name: item.name, description: item.description, iconUrl: item.iconUrl }] : [] })
+  const entries = (ids: readonly string[]): StoreEntry[] => ids.flatMap(id => { const item = byId.get(id); return item ? [{ id, name: item.name, description: item.description, iconUrl: item.iconUrl, connect: item.connect }] : [] })
   const stateOf = (id: string) => isOwnApp(id)
     ? storeItemState({ kind: 'own', state: ownStates?.[id] })
-    : storeItemState({ kind: 'composio', accounts: apps.accountsFor(id).length, canLink: apps.canLink, loading: apps.loading })
+    : storeItemState({ kind: 'composio', connect: byId.get(id)?.connect, accounts: apps.accountsFor(id).length, canLink: byId.get(id)?.connect === 'credentials' ? apps.canEnterKey : apps.canLink, loading: apps.loading })
   // The sections, as Codex's: 热门 (ours first, then Composio's usage order), 新品推荐, then Composio's categories.
   const sections: { id: string; name: string; items: StoreEntry[]; preview: number }[] = [
     { id: 'popular', name: t('popular'), items: [...own, ...entries(catalog.data?.popular ?? [])], preview: SECTION_PREVIEW },
@@ -232,10 +236,11 @@ function Store({ apps, ownStates, category, rootLabel, href, go, tab, setTab, qu
 
   function connect(id: string) {
     if (isOwnApp(id)) go({ app: id, category })
+    else if (byId.get(id)?.connect === 'credentials') setKeyTarget({ app: id })
     else void apps.connect(id)
   }
   const grid = (items: StoreEntry[]) => <ul className="grid grid-cols-1 gap-x-6 gap-y-1 sm:grid-cols-2">
-    {items.map(item => <li key={item.id}><StoreItem item={item} state={stateOf(item.id)} apps={apps} href={href({ app: item.id, category })} onOpen={() => go({ app: item.id, category })} onConnect={() => connect(item.id)} onDisconnect={accountId => { setDisconnectError(''); setConfirming({ id: item.id, accountId }) }} /></li>)}
+    {items.map(item => <li key={item.id}><StoreItem item={item} state={stateOf(item.id)} apps={apps} href={href({ app: item.id, category })} onOpen={() => go({ app: item.id, category })} onConnect={() => connect(item.id)} onReplaceKey={accountId => setKeyTarget({ app: item.id, replaceAccountId: accountId })} onDisconnect={accountId => { setDisconnectError(''); setConfirming({ id: item.id, accountId }) }} /></li>)}
   </ul>
 
   return <div className="flex flex-col gap-6">
@@ -343,6 +348,8 @@ function Store({ apps, ownStates, category, rootLabel, href, go, tab, setTab, qu
       </TabsContent>
     </Tabs>
 
+    <CredentialDialog apps={apps} target={keyTarget} onClose={() => setKeyTarget(null)} />
+
     <AlertDialog open={Boolean(confirming)} onOpenChange={open => { if (!open && !apps.pending) setConfirming(null) }}>
       <AlertDialogContent size="sm">
         <AlertDialogHeader>
@@ -384,7 +391,7 @@ function StoreSection({ title, more, children }: { title: string; more?: { label
  * it has one, and on the right `…` when connected or `+` when not. The item is
  * the link to the app's page; the control sits above it.
  */
-function StoreItem({ item, state, apps, href, onOpen, onConnect, onDisconnect }: { item: StoreEntry; state: StoreItemState | null; apps: ConnectedApps; href: string; onOpen: () => void; onConnect: () => void; onDisconnect: (accountId: string) => void }) {
+function StoreItem({ item, state, apps, href, onOpen, onConnect, onReplaceKey, onDisconnect }: { item: StoreEntry; state: StoreItemState | null; apps: ConnectedApps; href: string; onOpen: () => void; onConnect: () => void; onReplaceKey: (accountId: string) => void; onDisconnect: (accountId: string) => void }) {
   const t = useTranslations('Plugins')
   const tApps = useTranslations('Settings.integrations')
   const own = isOwnApp(item.id)
@@ -395,7 +402,11 @@ function StoreItem({ item, state, apps, href, onOpen, onConnect, onDisconnect }:
     <a href={href} aria-label={tApps('openApp', { name: item.name })} onClick={event => { if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return; event.preventDefault(); onOpen() }} className="flex min-w-0 flex-1 items-center gap-3 rounded-xl outline-none after:absolute after:inset-0 after:rounded-xl focus-visible:after:ring-2 focus-visible:after:ring-ring/40 focus-visible:after:ring-inset">
       <AppTile app={item.id} iconUrl={item.iconUrl} />
       <span className="flex min-w-0 flex-col gap-0.5">
-        <span className="truncate text-sm font-medium">{item.name}</span>
+        <span className="flex min-w-0 items-center gap-2">
+          <span className="truncate text-sm font-medium">{item.name}</span>
+          {/* How it connects, from Composio's auth schemes; 不支持 has no tag and no control. */}
+          {item.connect && item.connect !== 'unsupported' && <Badge variant="secondary" className="shrink-0">{t(`connectKind.${item.connect}`)}</Badge>}
+        </span>
         {item.description && <span className="truncate text-xs text-muted-foreground">{item.description}</span>}
       </span>
     </a>
@@ -410,6 +421,7 @@ function StoreItem({ item, state, apps, href, onOpen, onConnect, onDisconnect }:
                 if (ok && on) toast.success(tApps('turnedOff', { name: item.name }))
               })
             }}>{on ? tApps('turnOff') : tApps('turnOn')}</DropdownMenuItem>}
+            {item.connect === 'credentials' && accounts.length === 1 && <DropdownMenuItem disabled={!apps.canEnterKey} onClick={() => onReplaceKey(accounts[0].id)}>{t('key.replace')}</DropdownMenuItem>}
             {/* Several accounts: each is disconnected on the app's page. */}
             {accounts.length === 1 && <DropdownMenuItem variant="destructive" onClick={() => onDisconnect(accounts[0].id)}>{tApps('disconnect')}</DropdownMenuItem>}
           </DropdownMenuGroup>

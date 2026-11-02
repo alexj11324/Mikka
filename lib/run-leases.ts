@@ -191,7 +191,7 @@ async function reclaimLostRun(run: Run, now: Date) {
     if (bound) {
       // Same thread, new sandbox: the retry gets its own thread machine, built from the workspace snapshot.
       await tx.execute(sql`insert into computer_run_bindings ("runId","botId","workspaceId","ownerId") select ${retryId},"botId","workspaceId","ownerId" from computer_run_bindings where "runId"=${run.id} and "ownerId"=${run.userId}`)
-      if (process.env.MIKKA_CLOUD_THREAD_MACHINES === '1') await tx.execute(sql`insert into thread_machines ("runId","workspaceId","ownerId","botId","snapshotId","operationId",state) select ${retryId},"workspaceId","ownerId","botId",'pending',${crypto.randomUUID()},'starting' from computer_run_bindings where "runId"=${run.id} and "ownerId"=${run.userId} on conflict do nothing`)
+      await tx.execute(sql`insert into thread_machines ("runId","workspaceId","ownerId","botId","snapshotId","operationId",state) select ${retryId},"workspaceId","ownerId","botId",'pending',${crypto.randomUUID()},'starting' from computer_run_bindings where "runId"=${run.id} and "ownerId"=${run.userId} on conflict do nothing`)
     }
     await recordCoordinatorEvent(tx, runRetriedEvent(run, { runId: retryId, attempt: outcome.attempt, maxAttempts: MAX_RUN_ATTEMPTS,
       movedToDeviceId: target?.deviceId ?? null, movedTo: bound ? { kind: 'cloud' } : target ? { kind: 'device', deviceId: target.deviceId } : null }))
@@ -249,7 +249,6 @@ async function moveToCloud(run: Run, cloud: CloudTarget, attempt: number, now: D
 
 /** Provisions a queued cloud run's thread machine; a refusal ends that run with the card. */
 export async function startThreadMachine(actor: { userId: string; workspaceId: string }, runId: string) {
-  if (process.env.MIKKA_CLOUD_THREAD_MACHINES !== '1') return
   try {
     await (await import('@/lib/cloud-computer/thread-machines')).ensureThreadMachine(pool, actor, runId)
     const { start } = await import('workflow/api')

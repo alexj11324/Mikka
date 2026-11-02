@@ -7,6 +7,46 @@ import { pathToFileURL } from 'node:url'
 
 const MAX_CACHE_AGE = 50 * 60_000
 
+/**
+ * The server's reason a run's GitHub token was not issued, in words a person
+ * can act on, English then Chinese. Only these known codes are shown; any
+ * other response says GitHub credentials are unavailable.
+ */
+export const RUN_GITHUB_ERROR_MESSAGES = {
+  githubAppNotConfigured: ['The Mikka GitHub App is not set up on this Mikka server.', '这台 Mikka 服务器还没有配置 Mikka GitHub App。'],
+  githubIdentityRequired: ['Connect a GitHub account in Mikka (Plugins › GitHub) to work on this repository.', '在 Mikka 的插件 › GitHub 里连接一个 GitHub 账号后，才能处理这个仓库。'],
+  githubAppNotInstalled: ['Install the Mikka GitHub App on this repository.', '这个仓库还没有安装 Mikka GitHub App。'],
+  githubAppSuspended: ['The Mikka GitHub App is suspended on this repository.', 'Mikka GitHub App 在这个仓库上已被暂停。'],
+  githubAppPermissionRequired: ['Give the Mikka GitHub App pull request write and contents read access on this repository.', 'Mikka GitHub App 在这个仓库上缺少 Pull request 写权限或 Contents 读权限。'],
+  githubAccountNoWriteAccess: ['Your connected GitHub account cannot write to this repository.', '你连接的 GitHub 账号没有这个仓库的写权限。'],
+  githubRepositoryNotSupported: ['Only github.com repositories are supported.', '目前只支持 github.com 上的仓库。'],
+  githubRateLimited: ['GitHub is rate limiting requests. Try again in a few minutes.', 'GitHub 暂时限流，几分钟后再试。'],
+  runGitHubUnavailable: ['GitHub is unavailable right now. Try again later.', 'GitHub 暂时不可用，稍后再试。'],
+  runGitHubAccessDenied: ['This run can no longer use GitHub: it ended or changed repository.', '这个线程已结束或换了仓库，不能再使用 GitHub。'],
+}
+
+/** A failed token exchange, carrying only the server's known error code. */
+export class RunGitHubCredentialError extends Error {
+  constructor(code) {
+    super('Run GitHub credentials unavailable')
+    this.name = 'RunGitHubCredentialError'
+    this.code = Object.hasOwn(RUN_GITHUB_ERROR_MESSAGES, code) ? code : null
+  }
+}
+
+/** The lines a person sees on stderr for a failure; never a response body. */
+export function credentialFailureMessage(error) {
+  const lines = error instanceof RunGitHubCredentialError && error.code ? RUN_GITHUB_ERROR_MESSAGES[error.code] : null
+  return lines ? `Mikka: ${lines[0]}\nMikka：${lines[1]}\n` : 'Mikka GitHub credentials or CI status unavailable.\n'
+}
+
+async function errorCode(response) {
+  try {
+    const body = await response.json()
+    return typeof body?.error === 'string' ? body.error : null
+  } catch { return null }
+}
+
 export function matchesGitRepository(input, repository) {
   return input.protocol === 'https' && input.host === 'github.com' &&
     [repository, `${repository}.git`].some(path => input.path?.toLowerCase() === path.toLowerCase())
@@ -26,7 +66,7 @@ export async function getRunGitHubToken(config, { fetcher = fetch, now = Date.no
     method: 'POST', redirect: 'error', cache: 'no-store',
     headers: { authorization: `Bearer ${config.runToken}` }, signal: AbortSignal.timeout(15_000),
   })
-  if (!response.ok) throw new Error('Run GitHub credentials unavailable')
+  if (!response.ok) throw new RunGitHubCredentialError(await errorCode(response))
   const result = await response.json()
   if (result.repository?.toLowerCase() !== config.repository.toLowerCase() || typeof result.token !== 'string' || !result.token ||
     !Number.isFinite(Date.parse(result.expiresAt)) || Date.parse(result.expiresAt) - now() <= minValidityMs) throw new Error('Invalid run GitHub credentials')
@@ -90,5 +130,5 @@ async function main() {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  main().catch(() => { process.stderr.write('Mikka GitHub credentials or CI status unavailable.\n'); process.exitCode = 1 })
+  main().catch(error => { process.stderr.write(credentialFailureMessage(error)); process.exitCode = 1 })
 }

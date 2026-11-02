@@ -201,7 +201,30 @@
     "storeLoadFailed": "暂时无法加载应用目录。",
     "loadingApps": "正在加载应用…",
     "noConnections": "还没有连接的应用",
-    "openStore": "打开插件"
+    "openStore": "打开插件",
+    "connectKind": {
+      "managed": "一键授权",
+      "credentials": "需要 API Key",
+      "none": "无需连接"
+    },
+    "key": {
+      "title": "连接 {name}",
+      "replaceTitle": "更换 {name} 的 Key",
+      "replace": "更换 Key",
+      "where": "去哪里拿 Key",
+      "scheme": "方式",
+      "schemes": {
+        "API_KEY": "API Key",
+        "BEARER_TOKEN": "Bearer Token",
+        "BASIC": "用户名和密码"
+      },
+      "submit": "连接",
+      "incomplete": "填写不完整",
+      "failed": "没连上，请检查后重试",
+      "connected": "已连接 {name}",
+      "replaced": "已更换 {name} 的 Key",
+      "securedBy": "安全保护"
+    }
   },
   "Auth": {
     "haveAccount": "已经有账号？",
@@ -3379,6 +3402,12 @@
       "expand": "展开",
       "noRoutines": "还没有例行",
       "noLibrary": "还没有资料",
+      "deleteFile": "删除 {name}",
+      "deleteFileTitle": "删除「{name}」？",
+      "deleteFileConfirm": "删除",
+      "deleteFileCancel": "取消",
+      "deleteFileFailed": "「{name}」未删除",
+      "libraryError": "资料库加载失败",
       "noPullRequests": "还没有 PR",
       "noMatches": "无匹配结果",
       "members": "成员（{count}）",

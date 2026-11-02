@@ -11,7 +11,10 @@ import { subscriptionsUsableSql } from '@/lib/personal-policy'
 import { runCredentialSource, type RunApiKey } from '@/lib/run-credential-source'
 
 /** Issue access is checked by the caller. Queue and Bot binding are committed
- * together so the cloud worker never observes an unbound queued run. */
+ * together so the cloud worker never observes an unbound queued run. The
+ * workspace 电脑 policy governs computer use only: a computer task (its
+ * repository has no remote, so it needs the desktop) is refused under deny; a
+ * repository task (a remote, run on a task machine without a desktop) is not. */
 export async function queueCloudRun(pool: Pool, actor: { userId: string; workspaceId: string }, input: {
   botId: string; issueId: string; agentId: string; deviceRepoId: string; title: string; body: string; note?: string
   /** The run keeps no bot of its own, like the run it continues (an MCP client's): it still runs on `botId`'s computer. */
@@ -36,7 +39,7 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
       JOIN agents a ON a.id=$4 AND a."userId"=b."ownerId" AND a."deviceId"=dev.id
       JOIN device_repos repo ON repo.id=$5 AND repo."deviceId"=dev.id AND repo."userId"=b."ownerId"
       WHERE b.id=$1 AND b."ownerId"=$2 AND b."workspaceId"=$3
-        AND NOT EXISTS (SELECT 1 FROM workspace_computer_policies p WHERE p."workspaceId"=b."workspaceId" AND p.permission='deny')`,
+        AND (repo."remoteUrl" IS NOT NULL OR NOT EXISTS (SELECT 1 FROM workspace_computer_policies p WHERE p."workspaceId"=b."workspaceId" AND p.permission='deny'))`,
     [input.botId, actor.userId, actor.workspaceId, input.agentId, input.deviceRepoId])).rows[0]
     if (!target) throw new ComputerError(409, 'Bot computer task is unavailable')
     const prompt = runPrompt(input.title, input.body, target.instructions, input.note)
@@ -74,7 +77,7 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
     if (push) await client.query(`INSERT INTO run_publications ("runId","userId","issueId","scopeVersion","issueTitle","remoteUrl","remoteKey",identifier,branch,"baseBranch","pushApproved")
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,true)`, [runId, push.publication.userId, push.publication.issueId, push.publication.scopeVersion, push.publication.issueTitle, push.publication.remoteUrl, push.publication.remoteKey, push.publication.identifier, push.publication.branch, push.publication.baseBranch])
     await client.query('INSERT INTO computer_run_bindings ("runId","botId","workspaceId","ownerId") VALUES ($1,$2,$3,$4)', [runId, input.botId, actor.workspaceId, actor.userId])
-    if (process.env.MIKKA_CLOUD_THREAD_MACHINES === '1') await client.query(`INSERT INTO thread_machines ("runId","workspaceId","ownerId","botId","snapshotId","operationId",state) VALUES ($1,$2,$3,$4,'pending',$5,'starting') ON CONFLICT DO NOTHING`, [runId, actor.workspaceId, actor.userId, input.botId, randomUUID()])
+    await client.query(`INSERT INTO thread_machines ("runId","workspaceId","ownerId","botId","snapshotId","operationId",state) VALUES ($1,$2,$3,$4,'pending',$5,'starting') ON CONFLICT DO NOTHING`, [runId, actor.workspaceId, actor.userId, input.botId, randomUUID()])
     await client.query('COMMIT')
     return { runId }
   } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }

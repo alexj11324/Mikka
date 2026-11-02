@@ -14,7 +14,7 @@ import {
   ServerUnreachableError,
 } from "../src/errors"
 import { deviceLogin, LoginError } from "../src/login"
-import { HttpServerLink, SessionRejectedError } from "../src/server-link-http"
+import { HttpServerLink, LIVENESS_UNREACHABLE_GRACE_MS, SessionRejectedError } from "../src/server-link-http"
 import { Daemon } from "../src/main"
 import { readJson, writeJsonAtomic } from "../src/fs-util"
 import { createLogger } from "../src/log"
@@ -121,7 +121,7 @@ describe("HttpServerLink", () => {
     } finally { gate.revoke(); vi.useRealTimers() }
   })
 
-  it.each([403,500])('revokes an idle run when its liveness endpoint returns %s', async status => {
+  it.each([403,409])('revokes an idle run when its liveness endpoint returns %s', async status => {
     vi.useFakeTimers()
     let gate: Awaited<ReturnType<HttpServerLink['prepareRunToolApproval']>> | undefined
     try {
@@ -131,6 +131,46 @@ describe("HttpServerLink", () => {
       expect(gate.revoked).toBe(true)
       await vi.advanceTimersByTimeAsync(2000)
       expect(calls).toHaveLength(1)
+    } finally { gate?.revoke(); vi.useRealTimers() }
+  })
+  // Production run 8d45ba93 (2026-11-02): a redeploy's cold start took about
+  // 5 s to answer, the 5 s check timed out and the healthy run was cancelled.
+  it.each([
+    ['a timeout', () => Promise.reject(new DOMException('The operation timed out.', 'TimeoutError'))],
+    ['a 503', () => Promise.resolve(json({ error: 'unavailable' }, 503))],
+  ] as const)('keeps a run whose liveness check meets %s, then answers live', async (_name, fail) => {
+    vi.useFakeTimers()
+    let gate: Awaited<ReturnType<HttpServerLink['prepareRunToolApproval']>> | undefined
+    try {
+      let failing = true
+      const {fetch,calls}=scripted(() => failing ? fail() : json({live:true}))
+      gate=await new HttpServerLink('http://server.test',fetch).prepareRunToolApproval({...assignment('run-1'),harness:'codex',policy:defaultRunPolicy(),policyRevision:'a'.repeat(64)},new AbortController().signal,()=>{})
+      let allowed: boolean | undefined
+      const pending = gate.checkLive().then(value => { allowed = value })
+      await vi.advanceTimersByTimeAsync(5000)
+      expect(allowed).toBeUndefined()
+      expect(gate.revoked).toBe(false)
+      failing = false
+      await vi.advanceTimersByTimeAsync(1000)
+      await pending
+      expect(allowed).toBe(true)
+      expect(gate.revoked).toBe(false)
+      expect(calls.length).toBeGreaterThan(2)
+    } finally { gate?.revoke(); vi.useRealTimers() }
+  })
+  it('revokes an idle run whose liveness endpoint stays unreachable past the grace', async () => {
+    vi.useFakeTimers()
+    let gate: Awaited<ReturnType<HttpServerLink['prepareRunToolApproval']>> | undefined
+    try {
+      const {fetch,calls}=scripted(()=>json({error:'unavailable'},500))
+      gate=await new HttpServerLink('http://server.test',fetch).prepareRunToolApproval({...assignment('run-1'),harness:'codex',policy:defaultRunPolicy(),policyRevision:'a'.repeat(64)},new AbortController().signal,()=>{})
+      await vi.advanceTimersByTimeAsync(LIVENESS_UNREACHABLE_GRACE_MS)
+      expect(gate.revoked).toBe(false)
+      await vi.advanceTimersByTimeAsync(2000)
+      expect(gate.revoked).toBe(true)
+      const made = calls.length
+      await vi.advanceTimersByTimeAsync(2000)
+      expect(calls).toHaveLength(made)
     } finally { gate?.revoke(); vi.useRealTimers() }
   })
   it('bounds liveness requests and aborts an in-flight check when the run is revoked', async () => {

@@ -52,8 +52,13 @@ export function botThreadTitle(input: { issueTitle: string | null; issueVisible:
   return chars.length > BOT_THREAD_TITLE_MAX ? `${chars.slice(0, BOT_THREAD_TITLE_MAX - 1).join('')}…` : line
 }
 
-/** Where a row opens: the task, or the viewer's own chat with the bot. Null when the viewer may not open it. */
-export function botThreadHref(thread: { issueId: string | null; ownerId: string; botId: string }, viewer: { id: string; issueVisible: boolean }): string | null {
-  if (thread.issueId) return viewer.issueVisible ? workspaceLink({ issue: thread.issueId }) : null
+/**
+ * Where a row opens: the task with its newest thread beside it when that run is
+ * the viewer's own (only its owner reads a thread, canReadThread), else the
+ * task alone; or the viewer's own chat with the bot. Null when the viewer may
+ * not open it.
+ */
+export function botThreadHref(thread: { issueId: string | null; ownerId: string; botId: string; runId: string }, viewer: { id: string; issueVisible: boolean }): string | null {
+  if (thread.issueId) return viewer.issueVisible ? workspaceLink({ issue: thread.issueId, thread: thread.ownerId === viewer.id ? thread.runId : null }) : null
   return thread.ownerId === viewer.id ? workspaceLink({ bot: thread.botId }) : null
 }
