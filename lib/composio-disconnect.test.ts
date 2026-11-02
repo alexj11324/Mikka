@@ -3,7 +3,7 @@ import { before, mock, test } from 'node:test'
 import { Composio } from '@composio/core'
 
 const forgotten: string[][] = []
-mock.module(new URL('./composio-account-store.ts', import.meta.url).href, { exports: {
+mock.module(new URL('./composio-account-store.ts', import.meta.url).href, { namedExports: {
   chosenComposioDefault: async () => null,
   forgetComposioAccount: async (userId: string, accountId: string) => { forgotten.push([userId, accountId]) },
 } })
