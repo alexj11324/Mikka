@@ -40,6 +40,8 @@ It identifies the actual credential and fallback; during generation its
 choice is labeled **下一条**. Changing it leaves the current run's snapshot
 intact. Retry distinguishes queued, already working, no reply to retry and
 failure; it does not acknowledge a request that was never queued.
+The failure title and recovery action share a vertically centered, wrapping
+row; retry feedback contributes to its height rather than overlapping content.
 
 Provider errors cross the worker boundary as finite safe reasons. The UI
 offers retry, model choice or the appropriate settings destination without
