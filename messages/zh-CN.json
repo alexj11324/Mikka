@@ -931,7 +931,11 @@
       "retry": "重试",
       "done": "完成",
       "cancelled": "已取消"
-    }
+    },
+    "runsModels": "能跑 {models}",
+    "runsCount": "能跑 {count} 个允许使用的模型",
+    "runsNone": "不能跑允许使用的模型",
+    "offlineNoRuns": "离线 · 不会被派任务"
   },
   "Workspace": {
     "loadingEditor": "正在加载任务编辑器",
@@ -2491,15 +2495,14 @@
       "cloud": "云端",
       "localDevices": "{count} 台电脑参与调度",
       "localFirst": "{count} 台电脑参与调度 · 会先用 {device}",
-      "cloudNoKey": "E2B Key 未设置",
+      "cloudNoKey": "还没有 E2B Key",
       "add": "添加模型",
       "addCount": "添加 {count} 个",
       "empty": "还没有允许使用的模型",
       "noCandidates": "没有可添加的模型",
-      "removeTitle": "移除 {model}？",
-      "remove": "移除",
+      "remove": "移出列表",
       "ready": "可用",
-      "quotaUntil": "额度用完 · {time}恢复",
+      "quotaUntil": "额度用完 · {time} 恢复",
       "noDevice": {
         "none": "还没有连接电脑",
         "off": "{count, plural, =1 {{device} 没参与调度} other {# 台电脑没参与调度}}",
@@ -2535,7 +2538,14 @@
         "deepseek": "DeepSeek",
         "kimi": "Kimi",
         "custom": "自定义服务商"
-      }
+      },
+      "setE2BKey": "填入 E2B Key",
+      "replaceE2BKey": "更换 E2B Key",
+      "openDevices": "打开设备",
+      "moveFirst": "移到最前",
+      "removed": "已移出 {model}",
+      "undo": "撤销",
+      "orderUnsaved": "顺序未保存"
     }
   },
   "TelegramBot": {

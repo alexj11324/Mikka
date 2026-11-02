@@ -77,6 +77,9 @@ test('设备：本机与服务器分组，Agent 图标，重命名、重新检�
   await expect(page.getByText('需要管理员开启 user namespace', { exact: false })).toHaveCount(0)
   await page.keyboard.press('Escape')
   await expect(row(page, 'gpu-box').getByRole('button', { name: '重新连接' })).toBeVisible()
+  // R5: an offline computer gets no runs; an online one with nothing allowed to run says so.
+  await expect(row(page, 'gpu-box')).toContainText('离线 · 不会被派任务')
+  await expect(row(page, 'E2E MacBook')).toContainText('不能跑允许使用的模型')
   // 参与调度 is each computer's one switch (decision 2026-11-02-1400); turning it off is saved and nothing else is offered.
   await expect(row(page, 'gpu-box').getByRole('switch', { name: 'gpu-box 参与调度' })).not.toBeChecked()
   await expect(row(page, 'build-01').getByRole('switch')).toHaveCount(1)

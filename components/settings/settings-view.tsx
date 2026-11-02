@@ -29,7 +29,7 @@ import { MemorySettings } from '@/components/settings/memory-settings'
 import { LocaleSetting } from '@/components/settings/locale-setting'
 import { NotificationSettings } from '@/components/settings/notifications-settings'
 import { AccessTokensSettings } from '@/components/settings/access-tokens-settings'
-import { E2BKeySettings, SecretsSettings } from '@/components/settings/secrets-settings'
+import { SecretsSettings } from '@/components/settings/secrets-settings'
 import { AuditLogSettings } from '@/components/settings/audit-log-settings'
 import { UsageSettings } from '@/components/settings/usage-settings'
 import { BillingSettings } from '@/components/settings/billing-settings'
@@ -103,7 +103,7 @@ export function SettingsView({ user, userKey, googleEnabled = false, onRail, onS
     <AppShellContent parent={t('title')} title={title} variant="settings">
       {accountError && <FieldError className="px-6 py-2">{accountError}</FieldError>}
       {routedBody ? section === 'members' ? <SettingsContent className="gap-6 max-md:pt-1">{children ?? <MembersPanel workspaceId={workspaceId} inviteInitially={inviteInitially} />}</SettingsContent> : children : <SettingsContent key={section} className={cn('gap-6 max-md:pt-1', enter)}>
-        {section === 'computers' ? <DevicesSettings /> : <h1 className="text-xl font-semibold max-md:sr-only">{title}</h1>}
+        {section === 'computers' ? <DevicesSettings workspaceId={resolvedWorkspaceId} /> : <h1 className="text-xl font-semibold max-md:sr-only">{title}</h1>}
         <SectionBody t={t} section={section} user={user} userKey={userKey} googleEnabled={googleEnabled} workspaceId={resolvedWorkspaceId} personal={personal} team={team} admin={admin} workspaceError={Boolean(workspaceError) || (workspace !== undefined && !resolvedWorkspaceId)} linearNotice={linearNotice} preview={preview} onSignOut={onSignOut} signingOut={signingOut} />
       </SettingsContent>}
     </AppShellContent>
@@ -152,8 +152,6 @@ function ApiAndSubscriptions({ workspaceId, team }: { workspaceId: string; team:
     {apiKeys.dialogs}
     <ApiKeyFallbackSetting workspaceId={workspaceId} />
     <ModelOrderSettings key={`order-${workspaceId}`} workspaceId={workspaceId} />
-    {/* The person's own E2B key: account-level, what 云端 runs on. */}
-    <E2BKeySettings key={`e2b-${workspaceId}`} workspaceId={workspaceId} />
     {team && <SubscriptionShareSettings key={`share-${workspaceId}`} workspaceId={workspaceId} />}
   </>
 }
