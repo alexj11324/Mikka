@@ -8,6 +8,7 @@ import { GROUP_ICON } from '@/lib/thread-icon'
 import { Text } from '@/components/Text'
 import { NavBar, underBar } from '@/components/NavBar'
 import { Dot } from '@/components/ui'
+import { CardButton } from '@/components/cards'
 import type { BotPage, Thread, ThreadGroup, Threads } from '@/lib/types'
 import { openChat } from '@/lib/navigate'
 import { useApi, useRefresh } from '@/lib/useApi'
@@ -96,7 +97,12 @@ export function ThreadsScreen({ bot }: { bot?: { id: string; name: string } }) {
             {filter === 'all' ? null : <Text style={styles.section}>{filters.find(f => f.id === filter)?.label}</Text>}
           </View>
         }
-        ListEmptyComponent={loading ? <View style={{ paddingTop: 40, alignItems: 'center' }}><Spinner /></View> : <Text style={styles.empty}>{error ? '线程加载失败。' : '没有线程'}</Text>}
+        ListEmptyComponent={loading ? <View style={{ paddingTop: 40, alignItems: 'center' }}><Spinner /></View> : error ? (
+          <View style={styles.failed}>
+            <Text style={styles.error}>线程加载失败。</Text>
+            <CardButton label="重试" onPress={() => void reload()} />
+          </View>
+        ) : <Text style={styles.empty}>没有线程</Text>}
         renderItem={({ item }) => 'title' in item ? <Text style={styles.section}>{item.title}</Text> : <ThreadRow thread={item} onPress={() => router.push(`/thread/${item.id}`)} />}
       />
       <Modal visible={menu} transparent animationType="fade" onRequestClose={() => setMenu(false)}>
@@ -116,7 +122,7 @@ export function ThreadsScreen({ bot }: { bot?: { id: string; name: string } }) {
   )
 }
 
-/** Status icon, name, one grey line: the Agent running it (R-78) and the machine icon. Only 等你回复 adds a word (mobile.md), and a task's later attempt its number. */
+/** Status icon, name, one grey line: the Agent running it (R-78) and the machine icon. Only 等待你 adds a word (mobile.md), and a task's later attempt its number. */
 export function ThreadRow({ thread, onPress }: { thread: Thread; onPress: () => void }) {
   return (
     <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.pressed }]}>
@@ -124,7 +130,7 @@ export function ThreadRow({ thread, onPress }: { thread: Thread; onPress: () => 
       <View style={{ flex: 1 }}>
         <Text style={styles.rowTitle} numberOfLines={1}>{thread.name}</Text>
         <View style={styles.rowMeta}>
-          <Text style={styles.rowMetaText}>{thread.status === 'waiting' ? '等你回复 · ' : ''}{(thread.attempts ?? 1) > 1 ? `第 ${thread.attempts} 次尝试 · ` : ''}{HARNESS[thread.harness] ?? thread.harness}</Text>
+          <Text style={styles.rowMetaText}>{thread.status === 'waiting' ? '等待你 · ' : ''}{(thread.attempts ?? 1) > 1 ? `第 ${thread.attempts} 次尝试 · ` : ''}{HARNESS[thread.harness] ?? thread.harness}</Text>
           {thread.device ? <MachineIcon machine={thread.device.kind} size={13} /> : null}
         </View>
       </View>
@@ -147,6 +153,8 @@ const styles = StyleSheet.create({
   rowMeta: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 },
   rowMetaText: { fontSize: 12, color: colors.secondary },
   empty: { textAlign: 'center', color: colors.secondary, marginTop: 40 },
+  failed: { alignItems: 'center', gap: 10, marginTop: 40 },
+  error: { fontSize: 13, color: colors.danger },
   menu: { position: 'absolute', right: 16, width: 220, backgroundColor: colors.surface, borderRadius: 18, paddingVertical: 6, ...lift, shadowOpacity: 0.16, shadowRadius: 24 },
   menuRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, height: 44 },
 })

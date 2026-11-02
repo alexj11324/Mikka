@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Alert, RefreshControl, ScrollView, StyleSheet, View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import * as WebBrowser from 'expo-web-browser'
@@ -9,6 +10,7 @@ import { Text } from '@/components/Text'
 import { ThreadRow } from '@/components/ThreadsScreen'
 import { Group } from '@/components/ui'
 import { api } from '@/lib/api'
+import { saveOptimistic } from '@/lib/optimistic'
 import { nextWhen, shortWhen } from '@/lib/clock'
 import { useHome } from '@/lib/home'
 import type { BotPage, ComputerStatus } from '@/lib/types'
@@ -50,13 +52,18 @@ export default function BotInfo() {
   const schedules = page.data?.schedules ?? []
   const library = page.data?.library ?? []
   const home = useHome()
-  // 置顶 and 通知 change at once, then save; the next load has the server's word.
+  // 置顶 and 通知 change at once, then save; a save that fails puts the switch back and says so.
+  const [unsaved, setUnsaved] = useState<'置顶' | '通知' | null>(null)
   const setPreference = async (change: { pinned?: boolean; muted?: boolean }) => {
-    page.setData(current => current && { ...current, ...change })
-    try {
-      await api(`/api/mobile/bots/${id}`, { method: 'PATCH', body: change })
-      if (change.pinned !== undefined) await home.reload()
-    } finally { void page.reload() }
+    const before = page.data && { pinned: page.data.pinned, muted: page.data.muted }
+    setUnsaved(null)
+    const saved = await saveOptimistic(
+      () => page.setData(current => current && { ...current, ...change }),
+      () => api(`/api/mobile/bots/${id}`, { method: 'PATCH', body: change }),
+      () => page.setData(current => current && before ? { ...current, ...before } : current),
+    )
+    if (!saved) setUnsaved(change.pinned !== undefined ? '置顶' : '通知')
+    else if (change.pinned !== undefined) await home.reload()
   }
   // A long press deletes one of the person's own files, after the system's confirmation (R-51, decision 2026-11-01-2255).
   const deleteFile = (item: BotPage['library'][number]) => Alert.alert(`删除「${item.title}」？`, undefined, [
@@ -78,7 +85,7 @@ export default function BotInfo() {
       <ScrollView {...underBar} contentContainerStyle={styles.body} refreshControl={<RefreshControl {...refresh} />}>
         <View style={styles.hero}>
           <BotAvatar color={bot?.color} shape={bot?.shape} size={96} />
-          <Text style={styles.name}>{name}</Text>
+          {name ? <Text style={styles.name}>{name}</Text> : <Spinner />}
         </View>
         {page.loading && !page.data ? <View style={styles.center}><Spinner /></View> : null}
         {page.data ? (
@@ -87,6 +94,7 @@ export default function BotInfo() {
             <ToggleRow label="通知" value={!page.data.muted} onChange={on => void setPreference({ muted: !on })} />
           </Group>
         ) : null}
+        {unsaved ? <Text style={styles.unsaved}>{unsaved}没保存，请稍后重试</Text> : null}
         {threads.length ? (
           <Group label="线程">
             {threads.slice(0, SHOWN).map(thread => <ThreadRow key={thread.id} thread={thread} onPress={() => router.push(`/thread/${thread.id}`)} />)}
@@ -131,4 +139,5 @@ const styles = StyleSheet.create({
   hero: { alignItems: 'center', gap: 12, marginTop: 8, marginBottom: 28 },
   name: { fontSize: 26, fontWeight: '700' },
   center: { paddingVertical: 24, alignItems: 'center' },
+  unsaved: { fontSize: 13, color: colors.danger, marginTop: -12, marginBottom: 20, marginLeft: 16 },
 })

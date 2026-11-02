@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Check, ChevronRight } from 'lucide-react-native'
 import { KeyboardStickyView } from 'react-native-keyboard-controller'
+import { Spinner } from '@/components/icons'
 import { Symbol } from '@/components/Symbol'
 import { Text } from '@/components/Text'
 import { API_URL } from '@/lib/config'
@@ -66,11 +67,12 @@ export function ToggleRow({ label, value, onChange }: { label: string; value: bo
   )
 }
 
-export function ChoiceRow({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
+/** A row to pick one of several; `busy` spins in place of the tick while the pick is saved. */
+export function ChoiceRow({ label, selected, busy = false, onPress }: { label: string; selected: boolean; busy?: boolean; onPress: () => void }) {
   return (
-    <Pressable accessibilityRole="radio" accessibilityState={{ selected }} onPress={onPress} style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.pressed }]}>
+    <Pressable accessibilityRole="radio" accessibilityState={{ selected, busy }} onPress={onPress} style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.pressed }]}>
       <Text style={[styles.label, { flex: 1 }]}>{label}</Text>
-      {selected ? <Symbol name="checkmark" size={15} color={colors.accent} web={<Check size={18} color={colors.accent} strokeWidth={2.4} />} /> : null}
+      {busy ? <Spinner size={15} /> : selected ? <Symbol name="checkmark" size={15} color={colors.accent} web={<Check size={18} color={colors.accent} strokeWidth={2.4} />} /> : null}
     </Pressable>
   )
 }

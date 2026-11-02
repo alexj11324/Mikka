@@ -5,6 +5,7 @@ import { BotAvatar, SourceIcon } from '@/components/icons'
 import { Text } from '@/components/Text'
 import { authClient } from '@/lib/auth'
 import { clearSessionExpired, sessionExpired } from '@/lib/session'
+import { signInErrorLine } from '@/lib/sign-in-error'
 import { colors, font } from '@/lib/theme'
 
 /**
@@ -27,7 +28,7 @@ export function SignIn() {
     clearSessionExpired()
     try {
       const result = await work()
-      if (result && 'error' in result && result.error) setError('操作未成功，请检查填写的信息或稍后重试。')
+      if (result && 'error' in result && result.error) setError(signInErrorLine(result.error as { code?: string; status?: number }))
     } catch {
       setError('暂时无法连接，请稍后重试。')
     } finally {
