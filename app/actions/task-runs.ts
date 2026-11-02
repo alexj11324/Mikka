@@ -6,7 +6,6 @@ import { ActionFailureError } from '@/lib/action-error'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { agents, agentRuns, bots, devices, issues, type RunOutcome, type RunStatus } from '@/lib/db/schema'
-import { reclaimLostRuns } from '@/lib/run-leases'
 import { runAgentName, runBotId, runBotName } from '@/lib/run-bot-name'
 import { replyLine } from '@/lib/thread-groups'
 import { runWaitingDeviceId } from '@/lib/run-waiting-for'
@@ -34,9 +33,8 @@ export interface TaskRun {
 export async function listTaskRuns(): Promise<TaskRun[]> {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) throw new ActionFailureError('authRequired')
-  // The app polls this list, so a run whose device went offline is retried
-  // (or lands in 等你) even when none of the person's devices is online.
-  await reclaimLostRuns(session.user.id).catch((error: unknown) => console.error('Could not reclaim lost runs', error instanceof Error ? error.message : error))
+  // A run whose device went offline is retried (or lands in 等你) by the minute
+  // run-recovery cron (sweepExpiredRunLeases), not by this poll.
   const rows = await db.selectDistinctOn([agentRuns.issueId], {
     issueId: agentRuns.issueId, runId: agentRuns.id, issueTitle: issues.title, agentId: agentRuns.agentId, agentName: runAgentName,
     status: agentRuns.status, outcome: agentRuns.outcome, error: agentRuns.error, finishedAt: agentRuns.finishedAt,

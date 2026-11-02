@@ -23,8 +23,9 @@ const RUN_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
 
 // Run leases on the server (ADR 0012). The heartbeat renews the lease of each
 // run the device reports; a run left out is not renewed, and the daemon stops
-// it once its lease runs out. Owner requests and the independent minute sweep
-// share `reclaimLostRuns`, so recovery does not depend on an open app/device.
+// it once its lease runs out. The independent minute sweep runs `reclaimLostRuns`
+// for each owner, so recovery does not depend on an open app/device (and no
+// app or device poll does it again).
 
 /** A bounded cron pass over persisted work, without relying on owner polling. */
 export async function sweepExpiredRunLeases(now = new Date()): Promise<{ owners: number; failed: number }> {
