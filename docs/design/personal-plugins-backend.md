@@ -25,9 +25,10 @@ be supplied in request bodies; all row operations include the authenticated owne
 | `POST /api/skills` | `{source:"owner/repository",slug:"skill-name"}` from a skills.sh search result | `{skill}`; repeated installation returns the existing pinned version |
 | `PATCH /api/skills` | `{id,enabled}` | `{skill}` |
 | `DELETE /api/skills` | `{id}` | `{deleted:true}` |
-| `GET /api/integrations/composio/catalog` | — | `{configured,apps,popular,latest,categories}`; each app has id, name, one-line description, icon, Composio categories and created date; `popular`, `latest` and each category list app ids |
-| `GET /api/integrations/composio/catalog/{toolkit}` | — | One app's page: `{id,name,description,iconUrl,categories,website,version,tools:{write,read}}` from Composio, cached an hour per app; needs a signed-in person, not a connected account |
-| `POST /api/integrations/composio` | existing `{toolkit,returnTo?}` | Accepts any store toolkit (Composio-managed auth) through the existing Composio hosted connection flow |
+| `GET /api/integrations/composio/catalog` | — | `{configured,apps,popular,latest,categories}`; each app has id, name, one-line description, icon, Composio categories, created date and `connect` (`managed`, `credentials`, `none` or `unsupported`); `popular`, `latest` and each category list app ids |
+| `GET /api/integrations/composio/catalog/{toolkit}` | — | One app's page: `{id,name,description,iconUrl,categories,website,version,auth:{kind,forms,guideUrl},tools:{write,read}}` from Composio, cached an hour per app; needs a signed-in person, not a connected account |
+| `POST /api/integrations/composio` | existing `{toolkit,returnTo?}` | Accepts a store toolkit with Composio-managed auth through the existing Composio hosted connection flow |
+| `POST /api/integrations/composio/credentials` | `{toolkit,scheme,fields,replaceAccountId?}` | `201 {accountId}`; connects an own-credential toolkit for the signed-in person (decision 2026-11-02) |
 
 MCP accepts public HTTPS hostnames on port 443. Credentials in URL userinfo or
 query strings are refused. Authentication headers are Authorization, X-API-Key,
@@ -83,15 +84,46 @@ Literal saved authentication values are masked from remote results.
 
 ## Store directory (decision 2026-10-31)
 
-The 插件 store lists every Composio toolkit a person can connect with
-Composio-managed auth, read from Composio v3 `GET /toolkits?sort_by=usage`
-and cached for an hour per server (`lib/plugins/catalog.ts`). 现状（非决定）：toolkits
-that need the person's own credentials (no managed auth), no-auth and local
-toolkits are left out. Composio's copies of GitHub and Linear are left
+The 插件 store lists every Composio toolkit, read from Composio v3
+`GET /toolkits?sort_by=usage` and cached for an hour per server
+(`lib/plugins/catalog.ts`). Only local toolkits and Composio's copies of
+Mikka's own integrations are left out (decision 2026-11-02). Each app says how
+it connects (`lib/plugins/connect-kind.ts`): `managed` (Composio-managed
+OAuth, one click), `credentials` (an API key, bearer token or login the person
+enters), `none` (no connection; its tools run on the person's id alone) or
+`unsupported` (OAuth without managed auth, which would need a developer app).
+Composio's copies of GitHub and Linear are left
 out: Mikka's own GitHub, Linear and Telegram connections keep their native
 paths. 热门 is the first twelve in Composio's usage order, 新品推荐 the twelve
 with the newest `meta.created_at`, and categories are Composio's own; Mikka
 ranks nothing itself.
+
+### Own-credential apps (decision 2026-11-02)
+
+The form's fields are Composio's own for the toolkit's scheme
+(`auth_config_details[].fields.connected_account_initiation`); nothing is
+written per app. The route checks the submitted values against that form
+(only its fields, strings up to 4096 characters, every required one present,
+Composio's default for an empty optional one), then:
+
+1. finds or creates Mikka's custom auth config for the toolkit and scheme,
+   named `mikka-{toolkit}-{scheme}`, with no credentials of its own;
+2. creates the person's connected account on it with
+   `connectedAccounts.initiate(userId, authConfigId, {config, allowMultiple})`.
+
+The values go from the request straight to Composio, which keeps them with the
+account. Mikka stores none of them, in its database or elsewhere; the request
+log records no bodies; a Composio error is reported as
+`integrationConnectFailed` without its message, which may quote what was sent;
+the response is the account id alone. The form clears what was typed as it is
+sent. A new key (`replaceAccountId`) must name one of the person's own
+accounts on that toolkit (another person's is `integrationNotFound`), and the
+old account is retired with its name and default carried over, as an OAuth
+reconnect. List, switch, rename, default and disconnect are the existing ones.
+Device runs reach the new accounts through the same connected-app injection
+(#679). A no-auth app's tools run through `call_app_tool` without an account;
+an approved card without an account runs only for a no-auth app. No-auth apps
+are not given a device-run MCP entry, which is built from connected accounts.
 
 Connections stay per person (R-35 decision 2026-10-31). A workspace admin can
 turn any store app off for the workspace's Bots through the app-policy API.
