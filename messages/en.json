@@ -304,6 +304,11 @@
       "turnstileUnavailable": "Human verification is unavailable. Please try again later.",
       "emailRegistered": "This email is already registered. Please sign in."
     },
+    "signInRefusal": {
+      "invalidCredentials": "Incorrect email or password",
+      "emailNotVerified": "Email not verified yet",
+      "signInRateLimited": "Too many attempts. Try again later"
+    },
     "nameRequired": "Name is required",
     "emailRequired": "Email is required",
     "emailInvalid": "Enter a valid email address",
@@ -2964,6 +2969,7 @@
       "sources": "{count, plural, one {# source} other {# sources}}"
     },
     "sendUncertain": "Delivery not confirmed",
+    "sendOffline": "No connection. Not sent",
     "lengthCount": "{count} / {max}",
     "modelPicker": {
       "label": "Model: {name}",

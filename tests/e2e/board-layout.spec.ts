@@ -209,3 +209,19 @@ for (const timezoneId of ['America/Los_Angeles', 'Asia/Shanghai']) test.describe
     await expect(list.getByRole('button', { name: /只有 PR 的看板任务/ }).locator('[data-slot="avatar-group"]')).toHaveCount(0)
   })
 })
+
+// Usability review N5: on a phone one column fills the screen; a board whose 待整理 is empty opens on the first column with a task.
+test('390px：看板打开时停在第一个有任务的列', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await register(page)
+  await seedTask(page, '手机看板上的任务', { status: 'doing' })
+  await page.goto(app('/?section=all-issues'))
+  await showCreatedByMe(page)
+  const card = page.getByRole('group', { name: '手机看板上的任务', exact: true })
+  await expect(card).toBeInViewport({ ratio: 0.9 })
+  await expect(page.getByRole('region', { name: '待整理任务列', exact: true })).not.toBeInViewport()
+  for (const scheme of ['light', 'dark'] as const) {
+    await page.emulateMedia({ colorScheme: scheme })
+    await testInfo.attach(`board-mobile-start-${scheme}`, { body: await page.screenshot(), contentType: 'image/png' })
+  }
+})

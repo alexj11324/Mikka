@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { signupRefusal, turnstileHeaders, TURNSTILE_HEADER } from './signup-refusal'
+import { signInRefusal, signupRefusal, turnstileHeaders, TURNSTILE_HEADER } from './signup-refusal'
 
 test('maps the #527 sign-up codes to their messages', () => {
   assert.equal(signupRefusal(400, 'DISPOSABLE_EMAIL'), 'disposableEmail')
@@ -21,4 +21,14 @@ test('sends the Turnstile token only when the widget produced one', () => {
   assert.deepEqual(turnstileHeaders('tok'), { [TURNSTILE_HEADER]: 'tok' })
   assert.equal(TURNSTILE_HEADER, 'x-turnstile-token')
   assert.deepEqual(turnstileHeaders(null), {})
+})
+
+test('a wrong password and an unknown email read the same; only an unverified email offers verification (N4)', () => {
+  assert.equal(signInRefusal(401, 'INVALID_EMAIL_OR_PASSWORD'), 'invalidCredentials')
+  assert.equal(signInRefusal(401, 'USER_EMAIL_NOT_FOUND'), 'invalidCredentials')
+  assert.equal(signInRefusal(401, undefined), 'invalidCredentials')
+  assert.equal(signInRefusal(403, 'EMAIL_NOT_VERIFIED'), 'emailNotVerified')
+  assert.equal(signInRefusal(429, undefined), 'signInRateLimited')
+  assert.equal(signInRefusal(500, undefined), null)
+  assert.equal(signInRefusal(undefined, undefined), null)
 })
