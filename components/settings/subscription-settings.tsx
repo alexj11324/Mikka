@@ -74,7 +74,7 @@ export function SubscriptionSettings({ workspaceId, heading }: { workspaceId: st
   const connectedKey = state?.connections.filter(item => item.state === 'connected').map(item => `${item.id}:${item.revision}`).join(',') ?? ''
   const { mutate } = list
   // The allowed models' candidates follow the connected accounts.
-  // The workspace's own SWR cache (workspace-app.tsx), not swr's global one: 启用 and a disconnect re-read 允许使用的模型.
+  // The workspace's own SWR cache (workspace-app.tsx), not swr's global one: 启用 and a disconnect re-read 优先使用的模型.
   const { mutate: mutateCached } = useSWRConfig()
   const refresh = useCallback(async () => { await mutate(); void mutateCached(modelOrderKey(workspaceId)) }, [mutate, mutateCached, workspaceId])
   const failureMessage = useCallback((failure: unknown, key: 'startFailed' | 'finishFailed', provider: Provider) => {
@@ -265,7 +265,7 @@ export function SubscriptionSettings({ workspaceId, heading }: { workspaceId: st
                       </span>}
                       {mine?.connectionId === connection.id && catching && <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={cancel}>{t('cancel')}</Button>}
                       {(reauth || !live || signingIn) && <SignInButton busy={signingIn} disabled={!canReconnect} label={t('reconnect')} busyLabel={t('connecting')} onClick={() => { void connect(provider, connection) }} />}
-                      {/* 启用, labelled like 设备's 参与调度: off, its models in 允许使用的模型 read 订阅已停用 and no run or chat uses it. */}
+                      {/* 启用, labelled like 设备's 参与调度: off, its models in 优先使用的模型 read 订阅已停用 and no run or chat uses it. */}
                       {live && !reauth && !signingIn && <Label className="flex items-center gap-2 font-normal text-muted-foreground">
                         <span aria-hidden="true" className="max-sm:hidden">{t('enabled')}</span>
                         <Switch checked={!paused} disabled={pending || !!attempt} aria-label={t('useSubscription', { label: account ?? product })} onCheckedChange={checked => { void setPaused(connection, !checked) }} />

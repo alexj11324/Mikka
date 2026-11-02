@@ -110,7 +110,7 @@ export class ExecutionSettings {
       [ownerId, missingOnly])).rows.map((row) => row.id);
   }
   /**
-   * A subscription's models reach the menu, 允许使用的模型 and dispatch only through its catalogue.
+   * A subscription's models reach the menu, 优先使用的模型 and dispatch only through its catalogue.
    * Each connected subscription with none for its current revision asks its account once; one that
    * does not answer in time is asked again on the next read. Never throws.
    */

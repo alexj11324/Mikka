@@ -32,9 +32,9 @@ function firstKey(keys: Pick<ApiKeyView, 'id' | 'provider' | 'protocol' | 'respo
 
 /**
  * A model an API key lists for this Agent and none of the person's connected subscriptions of that
- * Agent's provider lists in its catalogue: a key's model in 允许使用的模型. It runs on
+ * Agent's provider lists in its catalogue: a key's model in 优先使用的模型. It runs on
  * the key; a subscription is never asked for a model its account does not offer.
- * An entry of 允许使用的模型 that names its key (`keyId`) runs on that key when
+ * An entry of 优先使用的模型 that names its key (`keyId`) runs on that key when
  * the run may use it and it serves the model, whatever other key lists the model too.
  */
 async function keyOnlyModel(query: Query, ownerId: string, keys: Pick<ApiKeyView, 'id' | 'provider' | 'protocol' | 'responsesApi' | 'models'>[], harness: string, model: string, keyId?: string): Promise<RunApiKey | undefined> {
@@ -80,7 +80,7 @@ async function subscriptionState(query: Query, binding: Binding): Promise<'usabl
  */
 export async function runCredentialSource<S extends Binding>(query: Query, input: {
   ownerId: string; botId: string | null; harness: string; model?: string
-  /** The key an entry of 允许使用的模型 names (decision 2026-11-02-1400); used only when the run may use it. */
+  /** The key an entry of 优先使用的模型 names (decision 2026-11-02-1400); used only when the run may use it. */
   keyId?: string
   /** The bot's workspace (null with no bot), and where the bot's saved model choice lives. */
   botWorkspaceId: string | null; choiceWorkspaceId: string | null | (() => Promise<string | null>)

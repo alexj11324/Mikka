@@ -38,7 +38,7 @@ test('nothing connected says what dispatch does instead of inviting a question',
   assert.match(text, /No subscription or API key is connected for threads; dispatch_run returns a card/)
   assert.match(text, /no computer connected/)
   assert.doesNotMatch(text, /Mikka 默认/, 'a ready Mikka 默认 is not worth a line')
-  assert.doesNotMatch(text, /Allowed models/)
+  assert.doesNotMatch(text, /Preferred models/)
 })
 
 test('a part that fails or is slow is left out, never claimed missing', async () => {

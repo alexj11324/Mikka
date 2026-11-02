@@ -8,7 +8,7 @@ import { planDispatch, whyNoDevice, type NoDeviceWhy, type NothingReason, type O
 
 /**
  * Where a new run goes and on which model (decision 2026-11-02-1400): the
- * thread's own model when the person picked one, else 允许使用的模型 in order;
+ * thread's own model when the person picked one, else 优先使用的模型 in order;
  * the first that can run now. 本地 picks one of the devices that can run it
  * (servers first, then the least busy; pickDevice); 云端 runs on the person's own E2B machine. Nothing can run: the
  * 没有能跑这个任务的模型 card with the reason. The plan is pure
@@ -30,7 +30,7 @@ export async function resolveModelDispatch(pool: Pool, scope: OrderScope & { bot
   await new (await import('./execution-settings')).ExecutionSettings(pool).ensureCatalogues(scope)
   const candidates = await orderCandidates(pool, scope)
   const stored = await readOrder(pool, scope, candidates)
-  // The person named only the Agent ("派给 Codex"): its first model in 允许使用的模型, else the first one a connected credential offers on it.
+  // The person named only the Agent ("派给 Codex"): its first model in 优先使用的模型, else the first one a connected credential offers on it.
   const agentModel = asked && !asked.model ? (stored.entries.find(entry => entry.harness === asked.harness) ?? candidates.find(candidate => candidate.harness === asked.harness))?.model : undefined
   if (asked && !asked.model && !agentModel) return { kind: 'none', reason: 'notOffered', card: modelUnavailableCard('notOffered', { agent: HARNESS_NAMES[asked.harness], model: '' }) }
   const explicit = asked ? { harness: asked.harness, model: asked.model || agentModel! } : null
@@ -117,7 +117,7 @@ export function modelUnavailableCard(reason: DispatchNothingReason, named?: { ag
   return { title: copy.needsModelTitle, description, options }
 }
 
-/** 允许使用的模型都没有电脑能跑, or what the one computer closest to running it lacks. */
+/** 优先使用的模型都没有电脑能跑, or what the one computer closest to running it lacks. */
 function noDeviceLine(device?: NoDeviceWhy) {
   const copy = defaultAgentCopy
   if (!device) return copy.needsModelNoDevice

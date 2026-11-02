@@ -937,8 +937,8 @@
       "manual": "Connect manually"
     },
     "runsModels": "Runs {models}",
-    "runsCount": "{count, plural, one {Runs # allowed model} other {Runs # allowed models}}",
-    "runsNone": "Runs no allowed model",
+    "runsCount": "{count, plural, one {Runs # preferred model} other {Runs # preferred models}}",
+    "runsNone": "Runs no preferred model",
     "offlineNoRuns": "Offline · gets no runs",
     "local": {
       "adding": "Adding this computer",
@@ -1724,7 +1724,7 @@
       },
       "models": {
         "title": "Models and subscriptions",
-        "keywords": "model subscriptions quota API key provider models allowed order dispatch run location cloud local bots agents"
+        "keywords": "model subscriptions quota API key provider models preferred order dispatch run location cloud local bots agents"
       },
       "logins": {
         "title": "Logins and keys"
@@ -2496,8 +2496,8 @@
       "afterQuotaSection": "When quota runs out"
     },
     "modelOrder": {
-      "title": "Allowed models",
-      "loading": "Loading allowed models…",
+      "title": "Preferred models",
+      "loading": "Loading preferred models…",
       "location": "Run location",
       "local": "Local",
       "cloud": "Cloud",
@@ -2506,7 +2506,7 @@
       "cloudNoKey": "No E2B key yet",
       "add": "Add models",
       "addCount": "{count, plural, one {Add # model} other {Add # models}}",
-      "empty": "No allowed models yet",
+      "empty": "No preferred models yet",
       "remove": "Remove from list",
       "ready": "Available",
       "quotaUntil": "Quota used up · back {time}",
@@ -2557,7 +2557,6 @@
       "e2bKeyMissing": "Not added",
       "e2bKeyFill": "Add",
       "e2bKeyReplace": "Replace",
-      "agentSection": "Agent",
       "preferredAgent": "Preferred Agent",
       "preferredAgentHint": "Models both Agents can run use it first",
       "preferredMark": "Preferred",
@@ -2567,7 +2566,9 @@
       "emptyNoCredential": "No subscription or API key yet",
       "emptyNoModels": "Subscriptions and API keys have reported no models yet",
       "connectCredential": "Connect a subscription or add an API key",
-      "openCredentials": "Go to subscriptions and API keys"
+      "openCredentials": "Go to subscriptions and API keys",
+      "description": "Tasks for Agents pick a model in this order",
+      "agentSection": "Agent"
     },
     "loadingPage": "Loading settings"
   },
@@ -3313,10 +3314,10 @@
     "needsMachineServer": "Connect my server",
     "needsMachineE2B": "Add E2B key",
     "needsModelTitle": "No model can run this task",
-    "needsModelNoModels": "No allowed models yet",
+    "needsModelNoModels": "No preferred models yet",
     "needsModelCloud": "Cloud has no E2B key yet",
-    "needsModelNoDevice": "No computer can run any allowed model",
-    "needsModelUnavailable": "Every allowed model is unavailable right now",
+    "needsModelNoDevice": "No computer can run any preferred model",
+    "needsModelUnavailable": "Every preferred model is unavailable right now",
     "needsModelDeviceAgent": "This computer doesn't have {agent}",
     "needsModelDeviceUpdate": "This computer's Mikka needs an update",
     "needsModelNoComputer": "No computer connected",

@@ -937,8 +937,8 @@
       "manual": "手动连接"
     },
     "runsModels": "能跑 {models}",
-    "runsCount": "能跑 {count} 个允许使用的模型",
-    "runsNone": "不能跑允许使用的模型",
+    "runsCount": "能跑 {count} 个优先使用的模型",
+    "runsNone": "不能跑优先使用的模型",
     "offlineNoRuns": "离线 · 不会被派任务",
     "local": {
       "adding": "正在添加这台电脑",
@@ -1724,7 +1724,7 @@
       },
       "models": {
         "title": "模型与订阅",
-        "keywords": "模型订阅 订阅 额度 API Key 服务商 模型 允许使用的模型 顺序 派发 运行位置 云端 本地 Bot Agent"
+        "keywords": "模型订阅 订阅 额度 API Key 服务商 模型 优先使用的模型 顺序 派发 运行位置 云端 本地 Bot Agent"
       },
       "logins": {
         "title": "登录与密钥"
@@ -2496,8 +2496,8 @@
       "afterQuotaSection": "额度用完时"
     },
     "modelOrder": {
-      "title": "允许使用的模型",
-      "loading": "正在读取允许使用的模型…",
+      "title": "优先使用的模型",
+      "loading": "正在读取优先使用的模型…",
       "location": "运行位置",
       "local": "本地",
       "cloud": "云端",
@@ -2506,7 +2506,7 @@
       "cloudNoKey": "还没有 E2B Key",
       "add": "添加模型",
       "addCount": "添加 {count} 个",
-      "empty": "还没有允许使用的模型",
+      "empty": "还没有优先使用的模型",
       "remove": "移出列表",
       "ready": "可用",
       "quotaUntil": "额度用完 · {time} 恢复",
@@ -2557,7 +2557,6 @@
       "e2bKeyMissing": "未填",
       "e2bKeyFill": "填入",
       "e2bKeyReplace": "更换",
-      "agentSection": "Agent",
       "preferredAgent": "优先使用的 Agent",
       "preferredAgentHint": "两种 Agent 都能跑的模型先用它",
       "preferredMark": "优先",
@@ -2567,7 +2566,9 @@
       "emptyNoCredential": "还没有订阅或 API Key",
       "emptyNoModels": "订阅和 API Key 还没有报告模型",
       "connectCredential": "连接订阅或添加 API Key",
-      "openCredentials": "查看订阅与 API Key"
+      "openCredentials": "查看订阅与 API Key",
+      "description": "派发给 Agent 的任务按这个顺序选模型",
+      "agentSection": "Agent"
     },
     "loadingPage": "正在加载设置"
   },
@@ -3313,10 +3314,10 @@
     "needsMachineServer": "连接我的服务器",
     "needsMachineE2B": "填入 E2B Key",
     "needsModelTitle": "没有能跑这个任务的模型",
-    "needsModelNoModels": "还没有允许使用的模型",
+    "needsModelNoModels": "还没有优先使用的模型",
     "needsModelCloud": "云端还没有 E2B Key",
-    "needsModelNoDevice": "允许使用的模型都没有电脑能跑",
-    "needsModelUnavailable": "允许使用的模型都暂时不可用",
+    "needsModelNoDevice": "优先使用的模型都没有电脑能跑",
+    "needsModelUnavailable": "优先使用的模型都暂时不可用",
     "needsModelDeviceAgent": "这台电脑没装 {agent}",
     "needsModelDeviceUpdate": "这台电脑的 Mikka 需要更新",
     "needsModelNoComputer": "还没有连接电脑",

@@ -66,7 +66,7 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
 
   const order = await import('../lib/model-order')
   // A new workspace: the person's own E2B key and a connected Codex subscription whose account lists gpt-5,
-  // 允许使用的模型 left as filled by default (that model) and 运行位置 云端; no cloud runtime.
+  // 优先使用的模型 left as filled by default (that model) and 运行位置 云端; no cloud runtime.
   const person = async (label: string, e2bKey = true) => {
     const id = await seedUser(pool, label)
     users.push(id)

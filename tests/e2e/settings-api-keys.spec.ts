@@ -82,7 +82,7 @@ test('模型与订阅：添加自定义服务商、校验失败、分享给团�
   expect(await page.content()).not.toContain(GOOD)
   // The row counts what the provider's /models gave.
   await expect(apiKeys.getByRole('status').filter({ hasText: '2 个模型' })).toBeVisible()
-  // 允许使用的模型 offers the new key's models at once, without a reload.
+  // 优先使用的模型 offers the new key's models at once, without a reload.
   await page.getByRole('button', { name: '添加模型', exact: true }).click()
   const addModels = page.getByRole('dialog', { name: '添加模型' })
   await expect(addModels.getByText('e2e-large', { exact: true })).toBeVisible()
@@ -130,7 +130,7 @@ test('模型与订阅：添加自定义服务商、校验失败、分享给团�
 })
 
 // A custom OpenAI-protocol provider without the Responses API (Codex runs on it) is still saved: its row
-// says Codex can't use it, 允许使用的模型 offers none of its models, and bot chats can still pick it.
+// says Codex can't use it, 优先使用的模型 offers none of its models, and bot chats can still pick it.
 test('模型与订阅：不支持 Responses API 的自定义服务商照样保存，Codex 用不了', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 1440, height: 900 })
   responses = false
@@ -149,9 +149,11 @@ test('模型与订阅：不支持 Responses API 的自定义服务商照样保�
     await expect(apiKeys.getByText(`${new URL(baseUrl).host} · ••••k3y9 · OpenAI 协议 · 不支持 Responses API · Codex 用不了`, { exact: true })).toBeVisible()
     await expect(apiKeys.getByRole('status').filter({ hasText: '1 个模型' })).toBeVisible()
     await attachLightDark(page, testInfo, 'api-keys-no-responses')
-    // No Agent runs its models, so 允许使用的模型 has nothing to add.
-    const addModel = page.getByRole('button', { name: '添加模型', exact: true })
-    await expect(addModel).toBeDisabled()
+    // No Agent runs its models, so 优先使用的模型 has nothing to add (C8: it links to the keys instead).
+    const preferred = page.getByRole('region', { name: '优先使用的模型' })
+    const addModel = preferred.getByRole('button', { name: '添加模型', exact: true })
+    await expect(preferred.getByRole('link', { name: '查看订阅与 API Key' })).toBeVisible()
+    await expect(addModel).toHaveCount(0)
 
     // 重新获取模型 asks again: once the provider has it, the row says Codex runs it and 添加模型 offers its model.
     responses = true
@@ -195,7 +197,7 @@ test('模型与订阅：DeepSeek 的 Key 两种 Agent 都能用', async ({ page 
   await page.keyboard.press('Escape')
 
   // The row says both Agents run it and offers the Agent, 优先 marking the preferred one (Harness draft).
-  const list = page.getByRole('list', { name: '允许使用的模型' })
+  const list = page.getByRole('list', { name: '优先使用的模型' })
   const row = list.getByRole('listitem').filter({ hasText: 'e2e-deepseek-flash' })
   await expect(row).toContainText('DeepSeek API Key · 两种 Agent 都能跑')
   await row.getByRole('button', { name: 'e2e-deepseek-flash 的 Agent：Claude Code' }).click()
@@ -207,24 +209,40 @@ test('模型与订阅：DeepSeek 的 Key 两种 Agent 都能用', async ({ page 
   await page.reload()
   await expect(list.getByRole('listitem').filter({ hasText: 'e2e-deepseek-flash' }).getByRole('button', { name: 'e2e-deepseek-flash 的 Agent：Codex' })).toBeVisible()
 
-  // 优先使用的 Agent saves; 额度用完时 is its own section.
-  const agent = page.getByRole('region', { name: 'Agent', exact: true })
-  await expect(agent.getByRole('button', { name: 'Claude Code' }).or(agent.getByRole('radio', { name: 'Claude Code' }))).toHaveAttribute('aria-pressed', 'true')
-  await agent.getByRole('button', { name: 'Codex' }).or(agent.getByRole('radio', { name: 'Codex' })).click()
+  // 优先使用的 Agent sits in 优先使用的模型, with the order (Alex, 2026-11-02), and saves.
+  const preferred = page.getByRole('region', { name: '优先使用的模型' })
+  await expect(preferred.getByText('派发给 Agent 的任务按这个顺序选模型', { exact: true })).toBeVisible()
+  const agent = preferred.getByRole('group', { name: '优先使用的 Agent' })
+  const agentItem = (name: string) => agent.getByRole('button', { name }).or(agent.getByRole('radio', { name }))
+  await expect(agentItem('Claude Code')).toHaveAttribute('aria-pressed', 'true')
+  await agentItem('Codex').click()
+  // The toggle stays disabled while the save is in flight; reload only once it is done.
+  await expect(agentItem('Codex')).toHaveAttribute('aria-pressed', 'true')
+  await expect(agentItem('Codex')).toBeEnabled()
   await page.reload()
-  await expect(page.getByRole('region', { name: 'Agent', exact: true }).getByRole('button', { name: 'Codex' }).or(page.getByRole('region', { name: 'Agent', exact: true }).getByRole('radio', { name: 'Codex' }))).toHaveAttribute('aria-pressed', 'true')
+  await expect(agentItem('Codex')).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByRole('region', { name: 'Agent', exact: true })).toHaveCount(0)
   await expect(page.getByRole('region', { name: '额度用完时' }).getByRole('switch', { name: '订阅额度用完后，自动改用 API Key' })).toBeVisible()
   await attachLightDark(page, testInfo, 'model-order-agent')
+  // Phone width: the Agent row and the order stay one card.
+  await page.setViewportSize({ width: 390, height: 844 })
+  await preferred.scrollIntoViewIfNeeded()
+  await attachLightDark(page, testInfo, 'model-order-agent-phone')
 })
 
-// C8: nothing connected yet, so 允许使用的模型 says what is missing and links to it, instead of a greyed 添加模型.
-test('模型与订阅：没有订阅或 Key 时，允许使用的模型写明缺什么', async ({ page }, testInfo) => {
+// C8: nothing connected yet, so 优先使用的模型 says what is missing and links to it, instead of a greyed 添加模型.
+test('模型与订阅：没有订阅或 Key 时，优先使用的模型写明缺什么', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 1440, height: 900 })
   await registerInTeam(page, '/settings?section=models')
-  const models = page.getByRole('region', { name: '允许使用的模型' })
+  const models = page.getByRole('region', { name: '优先使用的模型' })
   await expect(models.getByText('还没有订阅或 API Key', { exact: true })).toBeVisible()
   const connect = models.getByRole('link', { name: '连接订阅或添加 API Key' })
   await expect(connect).toHaveAttribute('href', '#subscriptions-heading')
   await expect(models.getByRole('button', { name: '添加模型', exact: true })).toHaveCount(0)
+  // 优先使用的 Agent shows whatever the list holds.
+  await expect(models.getByRole('group', { name: '优先使用的 Agent' })).toBeVisible()
   await attachLightDark(page, testInfo, 'model-order-empty')
+  await page.setViewportSize({ width: 390, height: 844 })
+  await models.scrollIntoViewIfNeeded()
+  await attachLightDark(page, testInfo, 'model-order-empty-phone')
 })
