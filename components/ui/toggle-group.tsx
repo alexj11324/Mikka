@@ -5,6 +5,7 @@ import { Toggle as TogglePrimitive } from "@base-ui/react/toggle"
 import { ToggleGroup as ToggleGroupPrimitive } from "@base-ui/react/toggle-group"
 import { type VariantProps } from "class-variance-authority"
 import { cn } from "cn"
+import { touchTarget } from "@/lib/touch-target"
 
 import { SegmentIndicator } from '@/components/ui/segment-indicator'
 import { toggleVariants } from '@/components/ui/toggle'
@@ -89,6 +90,7 @@ function ToggleGroupItem({
           variant: context.variant || variant,
           size: context.size || size,
         }),
+        touchTarget(className),
         className
       )}
       {...props}
