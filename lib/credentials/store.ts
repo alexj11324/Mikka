@@ -2,7 +2,7 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import { recordAudit } from '../audit/write'
-import { canonicalOrigin, CredentialError, type Actor, type BrowserCaller, type Envelope } from './contracts'
+import { canonicalOrigin, CredentialError, secretText, type Actor, type BrowserCaller, type Envelope } from './contracts'
 import { seal, type Kms } from './kms'
 import { fingerprint } from './fingerprint'
 
@@ -43,22 +43,55 @@ export class CredentialStore {
       await this.authorize(caller, client)
       const challenge = await client.query(`UPDATE credential_challenges SET consumed_at=now() WHERE nonce_hash=$1 AND user_id=$2 AND workspace_id=$3 AND bot_id=$4 AND subagent_id IS NOT DISTINCT FROM $5::uuid AND run_id IS NOT DISTINCT FROM $6::uuid AND origin=$7 AND consumed_at IS NULL AND expires_at>now() RETURNING nonce_hash`, [hashNonce(input.nonce), ...callerValues(caller), origin])
       if (!challenge.rowCount) throw denied()
-      // Serializes upserts, use and deletion for this account/site; no workspace credential sharing.
-      await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`credentials:${caller.userId}:${origin}`])
-      const existing = (await client.query('SELECT id FROM credentials WHERE user_id=$1 AND origin=$2 AND username=$3 FOR UPDATE', [caller.userId, origin, input.username])).rows[0]
-      const id = existing?.id ?? randomUUID()
-      const leak = fingerprint(caller.userId, input.password)
-      const envelope = await seal(this.kms, { userId: caller.userId, credentialId: id, origin }, Buffer.from(JSON.stringify({ username: input.username, password: input.password })))
-      await client.query(`INSERT INTO credentials(id,user_id,origin,username) VALUES($1,$2,$3,$4) ON CONFLICT(user_id,origin,username) DO UPDATE SET revoked_at=NULL`, [id, caller.userId, origin, input.username])
-      await client.query(`INSERT INTO credential_secrets(credential_id,wrapped_dek,nonce,ciphertext,leak_hmac,leak_length) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(credential_id) DO UPDATE SET wrapped_dek=$2,nonce=$3,ciphertext=$4,leak_hmac=$5,leak_length=$6`, [id, envelope.wrappedDek, envelope.nonce, envelope.ciphertext, leak.digest, leak.length])
-      // Retain the snapshot but prevent reuse after replacing the secret.
-      // Leases also bind the secret nonce and are rechecked under this lock.
-      await client.query('UPDATE browser_sessions SET expires_at=LEAST(expires_at,now()) WHERE credential_id=$1', [id])
-      await recordAudit(drizzle(client), { workspaceId: caller.workspaceId, actor: caller.auditActor ?? { type: 'system' },
-        action: existing ? 'credential.replaced' : 'credential.created', target: { type: 'credential', id } })
+      await this.write(client, caller, origin, input.username, input.password)
       await client.query('COMMIT')
       return { status: 'saved' as const, origin }
     } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
+  }
+  /**
+   * Settings › 密钥与登录: the owner types the site and account themselves, so
+   * there is no browser form to bind a challenge to. Same write as `save`.
+   */
+  async saveDirect(actor: Actor, input: { origin: string; username: string; password: string }) {
+    const origin = canonicalOrigin(input.origin)
+    if (!secretText.safeParse(input.username).success || !secretText.safeParse(input.password).success) throw new CredentialError('credential_submission_invalid', 400)
+    return this.transaction(async client => ({ status: 'saved' as const, origin, id: await this.write(client, actor, origin, input.username, input.password) }))
+  }
+  /** A new password for one of the owner's saved logins; site and account stay. */
+  async replacePassword(actor: Actor, credentialId: string, password: string) {
+    if (!secretText.safeParse(password).success) throw new CredentialError('credential_submission_invalid', 400)
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(credentialId)) throw denied()
+    return this.transaction(async client => {
+      const row = (await client.query('SELECT origin,username FROM credentials WHERE id=$1 AND user_id=$2 AND revoked_at IS NULL', [credentialId, actor.userId])).rows[0]
+      if (!row) throw denied()
+      return { status: 'saved' as const, origin: row.origin as string, id: await this.write(client, actor, row.origin, row.username, password) }
+    })
+  }
+  private async transaction<T>(work: (client: PoolClient) => Promise<T>): Promise<T> {
+    const client = await this.pool.connect()
+    try {
+      await client.query('BEGIN')
+      const result = await work(client)
+      await client.query('COMMIT')
+      return result
+    } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
+  }
+  /** Seals and stores one login inside the caller's transaction; returns its id. */
+  private async write(client: PoolClient, actor: Actor, origin: string, username: string, password: string): Promise<string> {
+    // Serializes upserts, use and deletion for this account/site; no workspace credential sharing.
+    await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`credentials:${actor.userId}:${origin}`])
+    const existing = (await client.query('SELECT id FROM credentials WHERE user_id=$1 AND origin=$2 AND username=$3 FOR UPDATE', [actor.userId, origin, username])).rows[0]
+    const id: string = existing?.id ?? randomUUID()
+    const leak = fingerprint(actor.userId, password)
+    const envelope = await seal(this.kms, { userId: actor.userId, credentialId: id, origin }, Buffer.from(JSON.stringify({ username, password })))
+    await client.query(`INSERT INTO credentials(id,user_id,origin,username) VALUES($1,$2,$3,$4) ON CONFLICT(user_id,origin,username) DO UPDATE SET revoked_at=NULL`, [id, actor.userId, origin, username])
+    await client.query(`INSERT INTO credential_secrets(credential_id,wrapped_dek,nonce,ciphertext,leak_hmac,leak_length) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(credential_id) DO UPDATE SET wrapped_dek=$2,nonce=$3,ciphertext=$4,leak_hmac=$5,leak_length=$6`, [id, envelope.wrappedDek, envelope.nonce, envelope.ciphertext, leak.digest, leak.length])
+    // Retain the snapshot but prevent reuse after replacing the secret.
+    // Leases also bind the secret nonce and are rechecked under this lock.
+    await client.query('UPDATE browser_sessions SET expires_at=LEAST(expires_at,now()) WHERE credential_id=$1', [id])
+    await recordAudit(drizzle(client), { workspaceId: actor.workspaceId, actor: actor.auditActor ?? { type: 'system' },
+      action: existing ? 'credential.replaced' : 'credential.created', target: { type: 'credential', id } })
+    return id
   }
   async lease(caller: BrowserCaller, origin: string, target: BrowserTarget, username?: string, forcePassword = false, expected?: { credentialId: string; revision: string }) {
     await this.authorize(caller)

@@ -1198,6 +1198,9 @@
     "threadCannotContinue": "这个线程没有关联任务，无法再次运行。",
     "factoryQuestionNeedsAnswerTool": "请使用 Factory 问题回答工具提供可验证的答复。",
     "savedLoginNotFound": "此登录信息不存在或已删除。",
+    "savedLoginSiteInvalid": "网站地址无效，只支持 https。",
+    "savedLoginInvalid": "账号和密码不能为空。",
+    "savedLoginsUnavailable": "网站登录暂时不可用。",
     "deviceHasActiveRuns": "此设备上有正在运行的线程，停止后才能移除。",
     "workspaceSlugTaken": "这个链接地址已被使用，换一个。",
     "workspaceIconInvalid": "图标须为不超过 200 KB 的 PNG、JPEG、WebP 或 GIF 图片。",
@@ -1728,7 +1731,7 @@
         "keywords": "模型订阅 订阅 额度 API Key 服务商 模型 优先使用的模型 顺序 派发 运行位置 云端 本地 Bot Agent"
       },
       "logins": {
-        "title": "登录与密钥"
+        "title": "密钥与登录"
       },
       "privacy": {
         "title": "数据与隐私"
@@ -2142,9 +2145,7 @@
       "usageError": "使用记录没有读出来。",
       "usageEmpty": "还没有使用记录。",
       "delete": "删除",
-      "deleting": "正在删除…",
       "deleteTitle": "删除 {site} 的登录？",
-      "deleteBody": "删除后，Bot 不能再自动填入这个网站。你已经登录的浏览器不受影响。",
       "cancel": "取消",
       "result": {
         "input_inserted_guarded": "已填入，未提交",
@@ -2153,8 +2154,15 @@
         "session_applied": "恢复了登录会话",
         "denied_or_failed": "被拒绝或失败"
       },
-      "emptyHow": "还没有保存的网站登录。",
-      "add": "在对话里添加登录"
+      "add": "添加",
+      "addTitle": "添加网站登录",
+      "site": "网站",
+      "account": "账号",
+      "password": "密码",
+      "newPassword": "新密码",
+      "save": "保存",
+      "changePassword": "改密码",
+      "actions": "{site} 的操作"
     },
     "workspaceLoading": "正在读取工作区…",
     "workspaceUnavailable": "无法读取工作区，请刷新后重试。",

@@ -1198,6 +1198,9 @@
     "threadCannotContinue": "This thread works on no task, so it can’t run again.",
     "factoryQuestionNeedsAnswerTool": "Use the Factory question answer tool to provide a verifiable response.",
     "savedLoginNotFound": "This login does not exist or was already deleted.",
+    "savedLoginSiteInvalid": "Enter an https site address.",
+    "savedLoginInvalid": "Account and password can't be empty.",
+    "savedLoginsUnavailable": "Saved logins are unavailable right now.",
     "deviceHasActiveRuns": "Threads are running on this device. Stop them before removing it.",
     "workspaceSlugTaken": "This URL is already in use. Choose another.",
     "workspaceIconInvalid": "The icon must be a PNG, JPEG, WebP or GIF image of 200 KB or less.",
@@ -1728,7 +1731,7 @@
         "keywords": "model subscriptions quota API key provider models preferred order dispatch run location cloud local bots agents"
       },
       "logins": {
-        "title": "Logins and keys"
+        "title": "Secrets and logins"
       },
       "privacy": {
         "title": "Data and privacy"
@@ -2142,9 +2145,7 @@
       "usageError": "Usage could not be read.",
       "usageEmpty": "No usage yet.",
       "delete": "Delete",
-      "deleting": "Deleting…",
       "deleteTitle": "Delete the sign-in for {site}?",
-      "deleteBody": "After this, bots cannot fill this site. Browsers where you are signed in are not affected.",
       "cancel": "Cancel",
       "result": {
         "input_inserted_guarded": "Filled, not submitted",
@@ -2153,8 +2154,15 @@
         "session_applied": "Session restored",
         "denied_or_failed": "Refused or failed"
       },
-      "emptyHow": "No saved site logins yet.",
-      "add": "Add a login in a chat"
+      "add": "Add",
+      "addTitle": "Add website login",
+      "site": "Site",
+      "account": "Account",
+      "password": "Password",
+      "newPassword": "New password",
+      "save": "Save",
+      "changePassword": "Change password",
+      "actions": "Actions for {site}"
     },
     "workspaceLoading": "Loading the workspace…",
     "workspaceUnavailable": "Couldn't load the workspace. Refresh and try again.",

@@ -168,6 +168,9 @@ export const ACTION_ERROR_CODES = [
   'billingPlanInvalid',
   'billingProviderFailed',
   'savedLoginNotFound',
+  'savedLoginSiteInvalid',
+  'savedLoginInvalid',
+  'savedLoginsUnavailable',
   'deviceHasActiveRuns',
 ] as const
 
