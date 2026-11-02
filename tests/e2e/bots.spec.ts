@@ -112,6 +112,9 @@ test('发送失败的消息留在对话里，点重试后发出', async ({ page 
 })
 
 // Usability review N3: offline, a send says so (「没有网络，未发送」) and keeps 重试; back online, 重试 sends it once.
+test.describe('断网', () => {
+  // Offline, the send's fresh session read cannot load: the browser logs that, which is what this test provokes.
+  test.use({ allowedConsoleErrors: [{ path: '/mikka/api/auth/get-session?disableCookieCache=true', message: 'Failed to load resource: net::ERR_INTERNET_DISCONNECTED' }] })
 test('断网时发送的消息说明没有网络，保留重试', async ({ page, context }, testInfo) => {
   await register(page)
   const composer = page.getByLabel('给 Coordinator 发消息', { exact: true })
@@ -133,6 +136,7 @@ test('断网时发送的消息说明没有网络，保留重试', async ({ page,
   await failed.getByRole('button', { name: '重试', exact: true }).click()
   await expect(failed).toHaveCount(0)
   await expect(page.getByRole('region', { name: '与 Coordinator 的对话', exact: true }).getByText('断网时发出的消息', { exact: true })).toHaveCount(1)
+})
 })
 
 // A28: the limit is visible near the edge, and over-long input is truncated

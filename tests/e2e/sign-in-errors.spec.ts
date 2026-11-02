@@ -15,7 +15,7 @@ test('a failed email sign-in names the problem without saying whether the accoun
       await signIn.getByLabel('邮箱', { exact: true }).fill(address)
       await fillSecretPassword(signIn, randomBytes(24).toString('base64url'))
       await signIn.getByRole('button', { name: '登录工作台', exact: true }).click()
-      await expect(signIn.getByRole('alert')).toHaveText('邮箱或密码不正确')
+      await expect(signIn.locator('#auth-error')).toHaveText('邮箱或密码不正确')
       await expect(signIn.getByRole('link', { name: '验证邮箱或重新发送验证邮件', exact: true })).toHaveCount(0)
       for (const scheme of ['light', 'dark'] as const) {
         await signIn.emulateMedia({ colorScheme: scheme })
