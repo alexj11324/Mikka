@@ -2409,7 +2409,8 @@
       "minutes": "{count} min",
       "hours": "{count} h",
       "balance": "Balance",
-      "points": "{points} points"
+      "points": "{points} points",
+      "awaitingTakeover": "Awaiting takeover"
     },
     "billing": {
       "loading": "Loading billing",
