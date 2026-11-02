@@ -135,9 +135,11 @@ sandbox carries its owner's credentials and app access. A member never runs
 on another member's E2B. In a team, each member brings their own key.
 
 **Scheduling.** Each device has one switch, 参与调度 (Settings › 设备). Off:
-Mikka never sends that device a run. Every device that has a model's Agent
-installed and (for a subscription model) reported that model joins the pool
-for it ([1400](decisions/2026-11-02-1400-model-order-dispatch.md)).
+Mikka never sends that device a run. Every online device that has a model's
+Agent installed and, for a subscription model, can take a subscription run
+(its daemon reports `subscriptionBroker`) joins the pool for it; its CLI need
+not report the model ([1400](decisions/2026-11-02-1400-model-order-dispatch.md),
+[1500](decisions/2026-11-02-1500-subscription-models-need-no-device-report.md)).
 
 **Placing a new run** (decision
 [1400](decisions/2026-11-02-1400-model-order-dispatch.md)):
@@ -146,8 +148,12 @@ for it ([1400](decisions/2026-11-02-1400-model-order-dispatch.md)).
    environment, a device-only source event, or a device the person picked.
 2. Otherwise the thread's own model, when the person picked one, then
    允许使用的模型 in the person's order: the first entry that can run now.
-   运行位置 decides where: 本地 picks at random one of the devices with
-   参与调度 on that can run the entry; 云端 runs on the owner's own E2B key.
+   运行位置 decides where: 本地 picks, among the devices with 参与调度 on
+   that can run the entry, a server before a computer, then the one with the
+   fewest unfinished runs, then the one that joined first
+   ([1530](decisions/2026-11-02-1530-local-server-first.md)); the 本地 line
+   in 模型与订阅 names it (会先用 <设备名>). 云端 runs on the owner's own E2B
+   key.
 3. Otherwise 立即警告: no run is created and the bot at once shows the action
    card 「没有能跑这个任务的模型」 with the reason (no allowed model, no
    device can run any, no E2B key for 云端, every model unavailable now) and

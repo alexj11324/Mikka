@@ -2484,6 +2484,7 @@
       "local": "Local",
       "cloud": "Cloud",
       "localDevices": "{count, plural, one {# computer takes runs} other {# computers take runs}}",
+      "localFirst": "{count, plural, one {# computer takes runs} other {# computers take runs}} · {device} first",
       "cloudNoKey": "No E2B key",
       "add": "Add models",
       "addCount": "{count, plural, one {Add # model} other {Add # models}}",

@@ -420,7 +420,7 @@ async function dispatchByRules(userId: string, input: { issueId: string; agentId
     if (!await issueForUser(userId, input.issueId)) throw new ActionFailureError('issueNotFound')
     const { executionWorkspace } = await import('@/lib/execution-settings')
     const { resolveModelDispatch } = await import('@/lib/model-dispatch')
-    const target = await resolveModelDispatch(pool, { ownerId: userId, workspaceId: await executionWorkspace(userId, botId), botId }, input.model ?? null, undefined, 'local', device.deviceId)
+    const target = await resolveModelDispatch(pool, { ownerId: userId, workspaceId: await executionWorkspace(userId, botId), botId }, input.model ?? null, 'local', device.deviceId)
     if (target.kind !== 'device') return { error: 'machineUnavailable' as const, issueId: input.issueId, ...(target.kind === 'none' ? { reason: target.reason, card: target.card } : {}) }
     const result = await queueRun(userId, { ...input, agentId: target.agentId, model: target.model, pinnedDeviceId: target.deviceId, ...(target.entry.source.kind === 'api_key' ? { apiKeyId: target.entry.source.keyId } : {}) }, botId, execution, requestEventId, null, approvedRepositoryKey)
     return { ...result, status: 'queued' as const }
@@ -433,7 +433,7 @@ async function dispatchByRules(userId: string, input: { issueId: string; agentId
     const { executionWorkspace } = await import('@/lib/execution-settings')
     const workspaceId = await executionWorkspace(userId, botId)
     const { resolveModelDispatch } = await import('@/lib/model-dispatch')
-    const target = await resolveModelDispatch(pool, { ownerId: userId, workspaceId, botId }, input.model ?? null, undefined, place === 'cloud' ? 'cloud' : undefined)
+    const target = await resolveModelDispatch(pool, { ownerId: userId, workspaceId, botId }, input.model ?? null, place === 'cloud' ? 'cloud' : undefined)
     if (target.kind === 'none') return { error: 'machineUnavailable' as const, issueId: input.issueId, reason: target.reason, card: target.card }
     if (target.kind === 'device') {
       const result = await queueRun(userId, { ...input, agentId: target.agentId, model: target.model, pinnedDeviceId: target.deviceId, ...(target.entry.source.kind === 'api_key' ? { apiKeyId: target.entry.source.keyId } : {}) }, botId, execution, requestEventId, null, approvedRepositoryKey)
