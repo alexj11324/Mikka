@@ -1,4 +1,4 @@
-import { modelMessage, summaryMessage, type QuotaSwitchNotice, type SourcedMessage, type SummaryTrust } from './message-safety'
+import { modelMessage, summaryMessage, type SwitchNotice, type SourcedMessage, type SummaryTrust } from './message-safety'
 import { pruneMessages, type ModelMessage } from 'ai'
 import { HANDOFF_PREFIX, handoffPrompt, QUIET_REPLY, type HandoffPayload } from '@/lib/attention/handoff'
 import { COORDINATOR_WELCOME_MARK } from '@/lib/agent-welcome'
@@ -302,7 +302,7 @@ export interface ChatItem {
   /** Artifacts shown as cards under this entry, in order. */
   artifacts: string[]
   /** An event line the chat draws in the person's language: the turn moved to their API key after the subscription ran out. */
-  notice?: QuotaSwitchNotice
+  notice?: SwitchNotice
   /** The person stopped this reply (停止); it keeps what it had said. */
   stopped?: true
 }
