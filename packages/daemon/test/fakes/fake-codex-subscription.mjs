@@ -5,6 +5,11 @@ import { join } from "node:path"
 import { createInterface } from "node:readline"
 import { execFileSync, spawn } from "node:child_process"
 
+if (process.argv.some(arg => arg.startsWith('model_providers.openai.'))) {
+  process.stderr.write('Reserved built-in model provider cannot be overridden\n')
+  process.exit(2)
+}
+
 const send = (value) =>
   process.stdout.write(`${JSON.stringify({ jsonrpc: "2.0", ...value })}\n`)
 const pending = new Map()
@@ -26,6 +31,10 @@ lines.on("line", async (line) => {
     return send({ id, result: { userAgent: process.env.FAKE_CODEX_USER_AGENT ?? "codex_cli_rs/0.163.0 synthetic-fixture" } })
   }
   if (method === "account/login/start") {
+    // Real Codex parses ChatGPT JWT claims. Never conceal the hosted runner's
+    // old bug by accepting its opaque public marker as an OAuth credential.
+    if (params.accessToken === "mikka-native-broker-placeholder")
+      return send({ id, error: { code: -32603, message: "Invalid OAuth token framing" } });
     if (
       !experimental ||
       params.type !== "chatgptAuthTokens" ||
@@ -56,6 +65,14 @@ lines.on("line", async (line) => {
     return send({ id, result: { type: "chatgptAuthTokens" } })
   }
   if (method === "thread/start") {
+    // The owned hosted broker uses Codex's documented custom Responses
+    // provider, independently of the direct/local ChatGPT login fixture.
+    if (!login && process.env.MIKKA_MODEL_API_KEY === "mikka-native-broker-placeholder" &&
+      process.argv.includes('model_provider="mikka"') &&
+      process.argv.includes('model_providers.mikka.requires_openai_auth=false') &&
+      process.argv.some(arg => /^model_providers\.mikka\.base_url="http:\/\/127\.0\.0\.1:\d+"$/.test(arg)) &&
+      !existsSync(join(process.env.CODEX_HOME, "auth.json")) && !process.env.OPENAI_API_KEY)
+      login = { type: "ownedBroker" };
     if (!login)
       return send({
         id,
