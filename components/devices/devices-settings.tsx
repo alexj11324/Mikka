@@ -24,6 +24,7 @@ import { cn } from '@/lib/utils'
 import { ConnectDeviceDialog } from './connect-device-dialog'
 import { AgentMarks, installedAgents, sandboxBlockedAgents } from './agent-marks'
 import { SshAddDialog } from './ssh-add-dialog'
+import { LocalSetupStatus } from './local-setup-status'
 
 type Command = 'redetect' | 'restart' | 'update'
 type Result = { error: string } | object
@@ -242,10 +243,11 @@ function DeviceGroup({ title, devices, deviceModels, onChanged, onReconnect }: {
  * 设置 › 设备 (Figma V09b 683:24269, S-L2 684:24422, S-L3 684:24731): only
  * machines the user connected, laptops under 本机 and SSH-installed servers
  * under Remote control. The bots' cloud computer is ours and never listed.
- * 添加设备 in the desktop app (V09c) offers 添加这台电脑 first and the one-click
- * SSH install for remote computers after it; the web shows the three commands
- * (V09d), where the browser cannot open SSH (#491). In the desktop app,
- * 重新连接 on this computer's own row restarts its daemon (usability C10).
+ * In the desktop app this computer becomes a device by itself, shown here by
+ * LocalSetupStatus; 添加设备 is the one-click SSH install for remote computers
+ * with 手动连接 last (V09c), and the web shows the three commands (V09d), where
+ * the browser cannot open SSH (#491). In the desktop app, 重新连接 on this
+ * computer's own row restarts its daemon (usability C10).
  */
 export function DevicesSettings({ workspaceId }: { workspaceId?: string }) {
   const t = useTranslations('Devices')
@@ -280,6 +282,7 @@ export function DevicesSettings({ workspaceId }: { workspaceId?: string }) {
       <h1 className="text-xl font-semibold">{t('title')}</h1>
       <Button size="sm" variant="secondary" aria-keyshortcuts="Meta+N Control+N" onClick={() => setAdding(true)}><Plus data-icon="inline-start" />{t('add.trigger')}</Button>
     </div>
+    {desktopSsh && <LocalSetupStatus onOnline={changed} />}
     {error && <FieldError className="text-xs">{t('listError')}</FieldError>}
     {devices.length === 0 ? <Empty className="rounded-xl border"><EmptyHeader><EmptyTitle>{t('emptyTitle')}</EmptyTitle></EmptyHeader></Empty> : <>
       <DeviceGroup title={t('thisMachine')} devices={devices.filter(device => device.deviceType !== 'server')} deviceModels={deviceModels} onChanged={changed} onReconnect={reconnect} />

@@ -904,9 +904,6 @@
     },
     "ssh": {
       "title": "添加设备",
-      "thisComputer": "添加这台电脑",
-      "remote": "添加远程电脑",
-      "addingThis": "添加这台电脑",
       "reconnectingThis": "重新连接这台电脑",
       "sshConfig": "SSH 配置",
       "otherHost": "其他主机",
@@ -934,12 +931,19 @@
       "hide": "关闭",
       "retry": "重试",
       "done": "完成",
-      "cancelled": "已取消"
+      "cancelled": "已取消",
+      "manual": "手动连接"
     },
     "runsModels": "能跑 {models}",
     "runsCount": "能跑 {count} 个允许使用的模型",
     "runsNone": "不能跑允许使用的模型",
-    "offlineNoRuns": "离线 · 不会被派任务"
+    "offlineNoRuns": "离线 · 不会被派任务",
+    "local": {
+      "adding": "正在添加这台电脑",
+      "online": "这台电脑已上线",
+      "failed": "无法添加这台电脑",
+      "retry": "重试"
+    }
   },
   "Workspace": {
     "loadingEditor": "正在加载任务编辑器",

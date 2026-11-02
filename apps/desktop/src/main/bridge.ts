@@ -50,6 +50,14 @@ export function registerBridge(options: BridgeOptions, sshInstaller?: SshInstall
   handle(IPC.sshHosts, () => installer.hosts())
   handle(IPC.sshState, () => installer.state())
   handle(IPC.sshLocal, () => installer.beginLocal())
+  // The automatic setup runs once per launch; 重试 goes through sshLocal.
+  let autoLocalStarted = false
+  handle(IPC.sshAutoLocal, action => {
+    if (action !== 'install' && action !== 'repair') throw new Error('Invalid setup')
+    if (autoLocalStarted) return installer.state()
+    autoLocalStarted = true
+    return action === 'install' ? installer.beginLocal() : installer.repairLocal()
+  })
   handle(IPC.sshRestartLocal, () => installer.restartLocal())
   handle(IPC.sshBegin, target => {
     if (typeof target !== 'string' || target.length > 300) throw new Error('Invalid SSH host')
