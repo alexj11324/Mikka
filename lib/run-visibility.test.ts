@@ -16,9 +16,9 @@ test('teammate projection is an allowlist; never spread untyped private fields',
   assert.equal(run.report.summary, 'secret-report')
 })
 test('owners retain access; nonowners require active linked workspace IDs', () => {
-  const { sql, params } = new PgDialect().sqlToQuery(issueVisibilityPredicate('viewer', { linkedIds: ['linked'], allowedIds: ['allowed'] }))
+  const { sql, params } = new PgDialect().sqlToQuery(issueVisibilityPredicate('viewer', { allowedIds: ['allowed'] }))
   assert.doesNotMatch(sql, /issue_members|not in/)
   assert.deepEqual(params, ['viewer', 'workspace', 'allowed'])
-  const denied = new PgDialect().sqlToQuery(issueVisibilityPredicate('viewer', { linkedIds: [], allowedIds: [] }))
+  const denied = new PgDialect().sqlToQuery(issueVisibilityPredicate('viewer', { allowedIds: [] }))
   assert.match(denied.sql, /false/)
 })
