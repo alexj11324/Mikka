@@ -34,3 +34,24 @@ export function reloadOnce(storage: Pick<Storage, 'getItem' | 'setItem'> | null,
 
 /** Next answers a server action it does not have with this response header. */
 export const ACTION_NOT_FOUND_HEADER = 'x-nextjs-action-not-found'
+
+/** Raised when a removed action could not reload the page; VersionGuard offers 刷新. */
+export const STALE_BUILD_EVENT = 'mikka:stale-build'
+
+/**
+ * Watches window.fetch, which every server action goes through, for a removed
+ * action, however its caller handles the error. Installed from
+ * instrumentation-client.ts so it is in place before any component calls one.
+ */
+export function watchRemovedActions(target: Window) {
+  const original = target.fetch.bind(target)
+  const session = () => { try { return target.sessionStorage } catch { return null } }
+  target.fetch = async (...args: Parameters<typeof fetch>) => {
+    const response = await original(...args)
+    if (response.headers.has(ACTION_NOT_FOUND_HEADER) && !reloadOnce(session(), Date.now(), () => { target.location.reload() })) {
+      target.dispatchEvent(new Event(STALE_BUILD_EVENT))
+    }
+    return response
+  }
+}
+

@@ -1,6 +1,10 @@
 import posthog from 'posthog-js'
 import { posthogConfig } from '@/lib/posthog-config'
 import { sanitizeAnalyticsEvent } from '@/lib/analytics-policy'
+import { watchRemovedActions } from '@/lib/app-build'
+
+// A page older than the deployment reloads when it hits a removed server action.
+watchRemovedActions(window)
 
 if (posthogConfig.token) {
   posthog.init(posthogConfig.token, {
