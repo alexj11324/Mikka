@@ -157,6 +157,9 @@ test('managed subscription routes authorize the existing service and native HTTP
     assert.equal(allowed.status, 200)
     assert.match(await allowed.text(), /permitted/)
     assert.equal(providerCalls, before + 1)
+    let rawLauncherCalled = false
+    await assert.rejects(service.launchNative(ownerId, agentId, bindingId, async () => { rawLauncherCalled = true }), /modelRouteDenied/)
+    assert.equal(rawLauncherCalled, false)
     await set(two.id, [rule('codex_cli')], true)
     assert.equal((await post({ action: 'request', payload })).status, 409)
     assert.equal(providerCalls, before + 1)
