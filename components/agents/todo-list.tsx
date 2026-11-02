@@ -271,7 +271,7 @@ const title = titleProp ?? agentCopy.taskPlan
         className,
       )}
     >
-      <Button variant="ghost" size="sm"
+      <Button variant="bare" size="bare"
         id={triggerId}
         type="button"
         aria-expanded={currentOpen}
