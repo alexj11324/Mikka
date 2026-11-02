@@ -221,6 +221,11 @@ jobs:
       - run: pnpm test:account
       - run: pnpm test:issues
       - run: pnpm test:issue-search
+      # Tests that ran in no workflow; they need nothing outside the runner.
+      - name: Shared protocol unit tests
+        run: pnpm --filter @mikka/protocol test
+      - name: E2B local API relay
+        run: node --test scripts/e2b/local-api-relay.test.mjs
       - name: Audit business UI composition
         run: pnpm --silent lint:ui --json > ui-audit.json
       - name: Show audit summary
@@ -287,6 +292,12 @@ jobs:
         run: pnpm --filter @mikka/daemon exec vitest run --no-cache --reporter=default --reporter=github-actions --reporter=json --outputFile.json="$RUNNER_TEMP/pr13-daemon-unit-results.json"
       - name: Existing mailbox CLI integration tests
         run: pnpm --filter @mikka/daemon test:mailbox-cli
+      # Part of the daemon's own test script, which otherwise runs only when main publishes.
+      - name: Daemon repository identity, GitHub credential and trusted endpoint tests
+        run: |
+          pnpm --filter @mikka/daemon test:repository-identity
+          pnpm --filter @mikka/daemon test:github-credentials
+          pnpm --filter @mikka/daemon test:trusted-endpoint
       - name: Local computer authority through actual daemon and adapter protocol
         run: pnpm --filter @mikka/daemon exec node --import tsx --test test/local-computer-adapters.node-test.ts test/local-computer-daemon.node-test.ts src/computer/proxy.test.mjs
         env:
