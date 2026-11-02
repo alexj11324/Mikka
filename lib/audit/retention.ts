@@ -45,7 +45,7 @@ export async function configureAuditRetention(actorId: string, workspaceId: stri
 /**
  * A deleted workspace's audit events stay until this many days after its
  * deletion (workspace_deletions, recorded by lib/workspace-rows.ts), then go,
- * however old they were at deletion (decision 2026-11-02-0230). A retention
+ * however old they were at deletion (decision 2026-11-02-0231). A retention
  * period chosen before deletion applies on top: whichever keeps an event
  * longer wins. A legal hold still holds. A NULL retention period counts as
  * none chosen. A workspace that is not deleted is unaffected.

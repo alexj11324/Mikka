@@ -92,7 +92,7 @@ Who owns what, in the format of the domain-modeling skill's glossary
 (`mattpocock_skills` `GLOSSARY-FORMAT.md`). Each term names the aggregate it
 belongs to (DDD: the consistency boundary that owns it). Where a line below
 and the Workspaces table above differ about 密钥与环境, the line below follows
-[2026-11-02-0230](decisions/2026-11-02-0230-workspace-is-the-tenant.md), which
+[2026-11-02-0231](decisions/2026-11-02-0231-workspace-is-the-tenant.md), which
 waits for Alex's confirmation. Bounded contexts, aggregates and the code that
 stores them: [information-architecture.md](information-architecture.md) § 1.
 

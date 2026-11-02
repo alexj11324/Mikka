@@ -6,7 +6,7 @@ navigation tree. Written 2026-11-02 against `main` at `fa4ac2b`, with PRs #890,
 
 Sources, higher wins (`README.md`): Alex's decisions, `glossary.md`,
 `rules.md`, then code. Tenancy rules T1–T6 are in
-[decision 2026-11-02-0230](decisions/2026-11-02-0230-workspace-is-the-tenant.md),
+[decision 2026-11-02-0231](decisions/2026-11-02-0231-workspace-is-the-tenant.md),
 which waits for Alex's confirmation; where it disagrees with a confirmed
 decision, this page says so.
 
@@ -320,7 +320,7 @@ threads sit only inside the panel of the bot that dispatched them.
 | G6 | 重新播放引导 lived in 常规, a team setting | `workspace-settings.tsx` | P1 | P1 | Move to 偏好设置 | #890 |
 | G7 | An open ended thread had no composer | `issue-thread-panel.tsx` | P1 | R-10 | Composer everywhere a thread opens | #892 |
 | G8 | Members cannot reach their repository-scoped secrets | M6 | P2 | P3 | Member view of 密钥与环境 | Open |
-| G9 | Account deletion deletes team bots; workspace and account deletion leave tenant data | M2, M3, M4 | P1 | T2, T5 | Decided in [0230](decisions/2026-11-02-0230-workspace-is-the-tenant.md) Consequences: pause and keep in shared workspaces; delete all tenant rows. Separate PRs | Open |
+| G9 | Account deletion deletes team bots; workspace and account deletion leave tenant data | M2, M3, M4 | P1 | T2, T5 | Decided in [0231](decisions/2026-11-02-0231-workspace-is-the-tenant.md) Consequences: pause and keep in shared workspaces; delete all tenant rows. Separate PRs | Open |
 | G10 | Label drift L1–L10 | § 6 | P2 | P10 | Fix strings and docs | Open |
 | G11 | A bot's PR tab has no global list | `context-panel.tsx` PR tab | P2 | P5 | 全部线程 rows already link PRs through tasks; a global PR list only if Alex wants one (GitHub precedent) | Ask Alex |
 

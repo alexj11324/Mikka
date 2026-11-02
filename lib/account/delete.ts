@@ -29,7 +29,7 @@ const { projects, projectEvents } = projectSchema
  *   If they are its only active admin, nothing is deleted: someone else has to
  *   be made admin first.
  * - Their bots in a shared workspace are handled as when a member leaves
- *   (releaseDepartingMember, decision 2026-11-02-0230): each is paused for an
+ *   (releaseDepartingMember, decision 2026-11-02-0231): each is paused for an
  *   admin to take over (已暂停的 Bot), and its threads stay with it (KEPT_THREAD_TABLES).
  *   Its owner becomes NULL, 「待接管」, which matches nobody until takeOverBot
  *   writes the new owner. The rows bound to the old owner (desktops, cloud

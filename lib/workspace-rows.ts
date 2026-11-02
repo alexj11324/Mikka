@@ -7,7 +7,7 @@ import * as projectSchema from '@/lib/db/project-schema'
 import { runToFixpoint } from '@/lib/account/delete'
 
 /**
- * A workspace is the tenant (decision 2026-11-02-0230, T1, T5): deleting it
+ * A workspace is the tenant (decision 2026-11-02-0231, T1, T5): deleting it
  * deletes every main-database row keyed by it. Tables are found by their
  * workspace column (WORKSPACE_COLUMNS) at run time, so a table added later is
  * covered without touching this file. Used by 删除工作区 and by account
