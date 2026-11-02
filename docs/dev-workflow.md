@@ -32,11 +32,12 @@ Debugging and pipeline runs use source, not builds:
 | Server | `pnpm dev` (`next dev`, via `scripts/dev-preview.mjs`) |
 | Daemon | `pnpm daemon` (`tsx` on `packages/daemon` source) |
 
-To run the dev server in the background, give it an open stdin:
-`pnpm dev < /dev/null > dev.log 2>&1 &`. If stdin is closed outright (`0<&-`,
-as some agent runners do), the esbuild service that the workflow builder
-starts dies with `fatal error: all goroutines are asleep - deadlock!` and
-`next dev` exits with it. A normal terminal is not affected.
+A `pnpm dev` server peaks near 10.5 GB RSS while compiling the first pages
+(`/[locale]/page`, settings). Cloud containers cap memory at about 14 GB, so run
+one dev server at a time and no build beside it. If `next dev` exits with no
+error and esbuild then prints `fatal error: all goroutines are asleep -
+deadlock!`, the kernel killed `next-server` for memory; `dmesg | grep -i oom`
+shows it. The esbuild message follows the kill; it is not the cause.
 
 Use a production build (`next build` then `next start`) only for production
 screenshots of a UI change. Run `next build`
