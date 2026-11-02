@@ -33,17 +33,17 @@ const HOSTED = { id: HOSTED_CHOICE, modelId: "", provider: "mikka" } as const;
 /**
  * The composer's model menu for one bot, or the Coordinator (`botId` null),
  * and what its chip shows. It lists only credentials the resolver can use in
- * this workspace (`ExecutionSettings.botModels`), so the menu never offers a
+ * this workspace (`ExecutionSettings.chatModels`), so the menu never offers a
  * model the next run would refuse. It reads; it never saves a default.
  */
 export async function botModelMenu(
   pool: Pick<Pool, "query">,
-  settings: Pick<ExecutionSettings, "botModels" | "botBinding">,
+  settings: Pick<ExecutionSettings, "chatModels" | "chatBinding">,
   scope: ExecutionSettingsScope,
   botId: string | null,
   now = Date.now(),
 ): Promise<BotModelMenu> {
-  const rows = await settings.botModels(scope);
+  const rows = await settings.chatModels(scope);
   const quotas = new Map<string, unknown>(
     rows.length
       ? (
@@ -81,9 +81,10 @@ export async function botModelMenu(
   const ownerNames = sharedOwners.length ? await memberNames(scope.workspaceId, sharedOwners) : new Map<string, string>();
   // Mikka 默认 is listed only where this chat's workspace has points for it, with how many (decision 2026-11-02-1450).
   const { hostedPointsHere } = await import("./points-fallback");
-  const points = await hostedPointsHere(scope.workspaceId);
+  const { points, trialLeft } = await hostedPointsHere(scope.workspaceId);
+  const usable = points > 0 || trialLeft > 0;
   const groups: BotModelMenuGroup[] = [
-    ...(points > 0 ? [{ kind: "hosted" as const, points, options: [{ ...HOSTED }] }] : []),
+    ...(usable ? [{ kind: "hosted" as const, points, ...(points > 0 ? {} : { trialLeft }), options: [{ ...HOSTED }] }] : []),
     ...subscriptions.values(),
     ...(ownKeys.length ? [{ kind: "apiKey" as const, options: ownKeys.flatMap(keyOptions) }] : []),
     ...sharedOwners.filter((owner) => ownerNames.has(owner)).map((owner) => ({
@@ -136,9 +137,9 @@ export async function botModelMenu(
     };
   } else if (saved === HOSTED_CHOICE) {
     // Picked before the points ran out here: named, marked unavailable, so the chat says so before sending.
-    current = { ...HOSTED, kind: "hosted", chosen: true, available: points > 0 };
+    current = { ...HOSTED, kind: "hosted", chosen: true, available: usable };
   } else if (saved) {
-    const live = await settings.botBinding(scope, saved);
+    const live = await settings.chatBinding(scope, saved);
     if (live)
       current = fromRow(live, true, quotas.get(String(live.connectionId)) ?? (await connectionQuota(pool, live.connectionId)));
     else {
@@ -164,7 +165,7 @@ export async function botModelMenu(
     const first = ordered[0];
     current = first
       ? fromRow(first, false, quotas.get(String(first.connectionId)))
-      : { ...HOSTED, kind: "hosted", chosen: false, available: points > 0 };
+      : { ...HOSTED, kind: "hosted", chosen: false, available: usable };
   }
   // Out of quota: the key the next turn moves to, when 订阅额度用完后，自动改用 API Key allows it (freezeBotModel decides the same way).
   if (current.quota) {
@@ -203,7 +204,7 @@ async function connectionQuota(pool: Pick<Pool, "query">, connectionId: string) 
  */
 export async function refreshBotModelMenu(
   pool: Pick<Pool, "query">,
-  settings: Pick<ExecutionSettings, "botModels" | "botBinding" | "refreshBotModels" | "connectedSubscriptions">,
+  settings: Pick<ExecutionSettings, "chatModels" | "chatBinding" | "refreshBotModels" | "connectedSubscriptions">,
   scope: ExecutionSettingsScope,
   botId: string | null,
   timeoutMs = 8000,

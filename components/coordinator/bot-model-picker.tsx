@@ -48,7 +48,7 @@ function heading(t: T, group: BotModelMenuGroup) {
 function tag(t: T, group: BotModelMenuGroup) {
   switch (group.kind) {
     // The points it can spend in this chat's workspace, not the person's elsewhere (decision 2026-11-02-1450).
-    case 'hosted': return group.points === undefined ? t('credits') : t('points', { points: group.points })
+    case 'hosted': return group.trialLeft !== undefined ? t('trialLeft', { count: group.trialLeft }) : group.points === undefined ? t('credits') : t('points', { points: group.points })
     case 'apiKey': return t('metered')
     case 'shared': return group.owner ? t('sharedKey', { name: group.owner }) : null
     default: return null

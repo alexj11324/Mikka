@@ -53,7 +53,7 @@ export function threadBots(threads: Thread[]) {
  * groups; each row's second line opens with the mark of the Agent running it
  * (R-78) and 「<Bot> 派出」 (glossary: a bot dispatches a thread, an Agent runs it). A thread opens in this column; ← comes back here.
  */
-export function AllThreadsColumn({ view, threads, issues }: { view: string; threads: Thread[]; issues: Issue[] }) {
+export function AllThreadsColumn({ view, threads, issues, loading = false }: { view: string; threads: Thread[]; issues: Issue[]; /** Not read yet (review C7). */ loading?: boolean }) {
   const t = useTranslations('Shell.panel')
   const bots = threadBots(threads)
   const bot = view === 'all' ? null : view
@@ -77,7 +77,7 @@ export function AllThreadsColumn({ view, threads, issues }: { view: string; thre
         <SearchInput autoFocus aria-label={t('search')} placeholder={t('search')} value={query} onChange={event => setQuery(event.target.value)} onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); setQuery(null) } }} />
       </div>}
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
-        <ThreadResults threads={dispatched} shown={shown} issues={issues} all onOpenThread={thread => openThread(thread.runId)} />
+        <ThreadResults threads={dispatched} shown={shown} issues={issues} all loading={loading} onOpenThread={thread => openThread(thread.runId)} />
       </div>
     </section>
   </RightColumn>

@@ -5,8 +5,9 @@ import { usePathname } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 
-import { APP_BUILD, STALE_BUILD_EVENT, isStaleBuild } from '@/lib/app-build'
+import { APP_BUILD, STALE_BUILD_EVENT, desktopBelowMinimum, isStaleBuild } from '@/lib/app-build'
 import { withBasePath } from '@/lib/base-path'
+import { bridgeFromWindow } from '@/lib/platform/detect'
 
 const CHECK_GAP_MS = 60_000
 
@@ -16,7 +17,8 @@ const CHECK_GAP_MS = 60_000
  * focus or a timer, decision 2026-11-01-0400) it asks which build the server
  * runs and, when newer, shows 「Mikka 已更新 · 刷新」. A call that has already
  * hit a server action the new build removed reloads the page at once
- * (watchRemovedActions, from instrumentation-client.ts).
+ * (watchRemovedActions, from instrumentation-client.ts). In the desktop app,
+ * a build older than the server's minDesktopVersion asks main to update first.
  */
 export function VersionGuard() {
   const t = useTranslations('Common')
@@ -30,11 +32,15 @@ export function VersionGuard() {
   }, [t])
 
   useEffect(() => {
-    if (!APP_BUILD || shown.current || Date.now() - checkedAt.current < CHECK_GAP_MS) return
+    const desktop = bridgeFromWindow(window)?.app
+    if ((!APP_BUILD && !desktop?.requireUpdate) || Date.now() - checkedAt.current < CHECK_GAP_MS) return
     checkedAt.current = Date.now()
     void fetch(withBasePath('/api/version'), { cache: 'no-store' })
-      .then(response => response.ok ? response.json() as Promise<{ build?: unknown }> : null)
-      .then(body => { if (isStaleBuild(APP_BUILD, body?.build)) offer() })
+      .then(response => response.ok ? response.json() as Promise<{ build?: unknown; minDesktopVersion?: unknown }> : null)
+      .then(body => {
+        if (desktop?.requireUpdate && desktopBelowMinimum(desktop.version, body?.minDesktopVersion)) void desktop.requireUpdate().catch(() => {})
+        if (isStaleBuild(APP_BUILD, body?.build)) offer()
+      })
       .catch(() => {})
   }, [pathname, offer])
 

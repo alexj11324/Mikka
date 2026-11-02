@@ -222,8 +222,7 @@ test('Chat creates a task, the selected real daemon runs it, and the pushed PR r
     expect(evidence.pullRequests).toEqual([{ number: 41, url: pr, branch: completed.report!.publish!.branch, draft: false }])
     expect(evidence.observations.filter(item => item.kind === 'pull-request-created')).toEqual([expect.objectContaining({ runId: loop.runId, issueId: completed.issueId, commit: completed.report!.publish!.commit })])
     expect(evidence.observations.filter(item => item.kind === 'tool').map(item => item.toolName)).toEqual(expect.arrayContaining(['create_issue', 'list_agents', 'dispatch_run']))
-    expect(Number((await pool.query('SELECT count(*) FROM pending_actions WHERE "userId" = $1 AND action = $2', [loop.userId, 'approve_repository_push'])).rows[0].count), 'the GitHub App grant pushes without a card in Mikka').toBe(0)
-    expect((await pool.query('SELECT "pushGrantedAt" FROM github_repository_installations WHERE "userId" = $1 AND "remoteKey" = $2', [loop.userId, REPOSITORY_KEY])).rows[0]?.pushGrantedAt).toBeTruthy()
+    expect(Number((await pool.query('SELECT count(*) FROM pending_actions WHERE "userId" = $1 AND action = $2', [loop.userId, 'approve_repository_push'])).rows[0].count), 'pushing needs no card in Mikka').toBe(0)
     expect(evidence.observations.filter(item => item.kind === 'github-request' && item.path === '/repos/mikka-e2e/core-loop/installation').length, 'dispatch checked the App installation on GitHub').toBeGreaterThan(0)
     loop.checkpoint('published', 'Real verification and push completed; GitHub stub confirmed the commit and stored PR on the task')
     // The thread sits beside the chat (R-82); closing it leaves the chat as it was.

@@ -23,8 +23,7 @@ export async function sendOwnedRunMessage(database: RunControlDatabase, userId: 
       if (!repo || !repo.remoteUrl) throw new ActionFailureError('runInvalid')
       let key: string
       try { key = remoteKey(repo.remoteUrl) } catch { throw new ActionFailureError('runInvalid') }
-      // The receipt carries the push authority accepted with the task (the
-      // GitHub App grant); the run's GitHub token rechecks GitHub live.
+      // The receipt binds the task to its repository and branch.
       const receipt = run.agentDefinition?.repositoryAdmission
       if (receipt) {
         const [bot] = run.botId ? await tx.select().from(bots).where(and(eq(bots.id, run.botId), eq(bots.ownerId, userId))).for('share') : []

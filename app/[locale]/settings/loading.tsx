@@ -1,9 +1,12 @@
+import { getTranslations } from 'next-intl/server'
 import { SettingsContent } from '@/components/ui/settings-layout'
 import { Skeleton } from '@/components/ui/skeleton'
 
-export default function SettingsLoading() {
-  return <SettingsContent role="status" aria-label="正在加载设置" aria-busy="true">
-    <span className="sr-only">正在加载设置…</span>
+// The words a screen reader hears follow the page's language (review C12, R-42).
+export default async function SettingsLoading() {
+  const t = await getTranslations('Settings')
+  return <SettingsContent role="status" aria-label={t('loadingPage')} aria-busy="true">
+    <span className="sr-only">{t('loadingPage')}</span>
     <div aria-hidden="true" className="flex flex-col gap-3">
       <Skeleton className="h-8 w-32" />
       <Skeleton className="h-4 w-64 max-w-full" />

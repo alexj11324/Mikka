@@ -48,3 +48,9 @@ test('reserved env names: interpreter / package-manager hooks, any case; look-al
     assert.equal(isReservedEnvName(name), true, name)
   for (const name of ['ENVIRONMENT', 'MY_ENV', 'NPM_TOKEN', 'PIP_EXTRA', 'RUBYOPTS', 'PATHFINDER']) assert.equal(isReservedEnvName(name), false, name)
 })
+
+test('GitHub credential variables are reserved: a run\'s GitHub credential is the owner\'s own, from the run helper only', () => {
+  for (const name of ['GH_TOKEN', 'gh_token', 'GITHUB_TOKEN', 'github_token', 'GH_ENTERPRISE_TOKEN', 'GITHUB_ENTERPRISE_TOKEN', 'GH_HOST', 'GH_REPO', 'GH_CONFIG_DIR'])
+    assert.equal(isReservedEnvName(name), true, name)
+  for (const name of ['GITHUB_REPOSITORY_NAME', 'MY_GH_TOKEN', 'GHOST']) assert.equal(isReservedEnvName(name), false, name)
+})

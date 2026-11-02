@@ -14,6 +14,8 @@ import { isTrustedFrame } from './security'
 
 export interface BridgeOptions {
   appUrl: string
+  /** The desktop's flavor: 添加这台电脑 installs the matching daemon. */
+  flavor?: 'prod' | 'dev'
   mintEnrollment(): Promise<string>
   openExternal(url: string): Promise<void>
   prepareAuth(state: string): Promise<string>
@@ -23,6 +25,8 @@ export interface BridgeOptions {
   notifications: NotificationCenter
   consumePendingClick(): string | null
   updates: Pick<Updates, 'ready' | 'install'>
+  /** The page saw a minimum desktop version above this build; main checks the server itself. */
+  requireUpdate(): Promise<void>
 }
 
 export function registerBridge(options: BridgeOptions, sshInstaller?: SshInstaller): void {
@@ -42,9 +46,19 @@ export function registerBridge(options: BridgeOptions, sshInstaller?: SshInstall
     for (const contents of webContents.getAllWebContents()) {
       if (!contents.isDestroyed() && isTrustedFrame(contents.getURL(), options.appUrl)) contents.send(IPC.sshChanged, state)
     }
-  })
+  }, undefined, undefined, undefined, undefined, options.flavor)
   handle(IPC.sshHosts, () => installer.hosts())
   handle(IPC.sshState, () => installer.state())
+  handle(IPC.sshLocal, () => installer.beginLocal())
+  // The automatic setup runs once per launch; 重试 goes through sshLocal.
+  let autoLocalStarted = false
+  handle(IPC.sshAutoLocal, action => {
+    if (action !== 'install' && action !== 'repair') throw new Error('Invalid setup')
+    if (autoLocalStarted) return installer.state()
+    autoLocalStarted = true
+    return action === 'install' ? installer.beginLocal() : installer.repairLocal()
+  })
+  handle(IPC.sshRestartLocal, () => installer.restartLocal())
   handle(IPC.sshBegin, target => {
     if (typeof target !== 'string' || target.length > 300) throw new Error('Invalid SSH host')
     return installer.begin(target)
@@ -62,6 +76,7 @@ export function registerBridge(options: BridgeOptions, sshInstaller?: SshInstall
   handle(IPC.appClaudeCallback, url => options.claudeCallback(url))
   handle(IPC.appUpdateReady, () => options.updates.ready)
   handle(IPC.appInstallUpdate, () => options.updates.install())
+  handle(IPC.appRequireUpdate, () => options.requireUpdate())
   handle(IPC.deviceStatus, () => options.localDevice())
   handle(IPC.quotaGet, () => options.quota())
   handle(IPC.notificationsShow, notification => options.notifications.show(notification))

@@ -5,7 +5,7 @@ import { billingPortalUrl, planCheckoutUrl, workspaceBillingView, type BillingVi
 import { workspaceAction } from '@/lib/workspace-admin/action'
 import { currentWorkspaceActor } from '@/lib/workspace-admin/current'
 import { getLocale } from 'next-intl/server'
-import { pointsPurchaseUrl } from '@/lib/billing/points-purchase'
+import { pointsPurchase, pointsPurchaseUrl } from '@/lib/billing/points-purchase'
 import { workspaceCreditBillingView, type CreditBillingView } from '@/lib/billing/history'
 
 /** 设置 › 计费. Admins only. */
@@ -47,6 +47,18 @@ export async function startPointsPurchase(workspaceId: string, amount: number): 
   })
 }
 
+/**
+ * 充值 from a chat whose Mikka 默认 turn ran out of points (decision
+ * 2026-11-02-1450): an embedded Checkout for a dialog there, or a hosted one
+ * that comes back to that chat. Amount is USD: 10, 25 or 50.
+ */
+export async function startChatPointsPurchase(amount: number, botId: string | null): Promise<ActionResult<{ url: string } | { clientSecret: string }>> {
+  return workspaceAction(async () => {
+    const actor = await currentWorkspaceActor()
+    return pointsPurchase(actor.userId, actor.workspaceId, amount, await getLocale(), { chat: { botId } })
+  })
+}
+
 /** Stripe hosts card verification and returns to this workspace's billing settings. */
 export async function startCardVerification(workspaceId?: string) {
   return workspaceAction(async () => {
@@ -73,6 +85,6 @@ export async function getHostedUsage(workspaceId?: string) {
     // The person's own subscription serves them in every workspace (#838): with one connected, 连接订阅 is no way on.
     const { pool } = await import('@/lib/db')
     const subscribed = (await pool.query(`SELECT 1 FROM byos_connections WHERE "ownerId"=$1 AND state='connected' AND "removedAt" IS NULL LIMIT 1`, [actor.userId])).rowCount !== 0
-    return { ...await hostedUsage.status(actor.workspaceId), personal, subscribed, recent:actor.role === 'admin' ? await hostedUsage.recent(actor.workspaceId) : [] }
+    return { ...await hostedUsage.status(actor.workspaceId), workspaceId: actor.workspaceId, personal, subscribed, recent:actor.role === 'admin' ? await hostedUsage.recent(actor.workspaceId) : [] }
   })
 }

@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { randomBytes, randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { Pool } from "pg";
+// Subscription chats answer only on validated routes (lib/subscription-routes.ts); these tests run with both on.
+process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES = 'claude_cpa,codex_cpa'
 
 /*
  * The composer's model picker against real Postgres (decision 2026-10-31-2330):
@@ -38,7 +40,8 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
     mock.module(new URL("./db/index.ts", import.meta.url).href, { namedExports: { pool } });
     // Points and their fallback have their own tests: here Mikka 默认 has points.
     let hostedPoints = 98;
-    mock.module(new URL("./points-fallback.ts", import.meta.url).href, { namedExports: { hostedPointsRefusal: async () => null, pointsFallback: async () => null, hostedPointsHere: async () => hostedPoints } });
+    let hostedTrial = 0;
+    mock.module(new URL("./points-fallback.ts", import.meta.url).href, { namedExports: { hostedPointsRefusal: async () => null, pointsFallback: async () => null, hostedPointsHere: async () => ({ points: hostedPoints, trialLeft: hostedTrial }) } });
     const { ExecutionSettings } = await import("./execution-settings");
     const { botModelMenu } = await import("./bot-model-menu");
     const { HOSTED_CHOICE } = await import("./bot-model-menu-view");
@@ -145,8 +148,8 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
     const fresh = await connection("alice", workspace, "claude", "connected");
     assert.ok(!(await botModelMenu(pool, settings, alice, botA)).groups.some((group) => group.options.some((option) => option.modelId === "claude-fresh-fixture")));
     const discovering = {
-      botModels: settings.botModels.bind(settings),
-      botBinding: settings.botBinding.bind(settings),
+      chatModels: settings.chatModels.bind(settings),
+      chatBinding: settings.chatBinding.bind(settings),
       connectedSubscriptions: settings.connectedSubscriptions.bind(settings),
       refreshBotModels: (scope: typeof alice, connectionId: string) =>
         settings.refreshBotModels(scope, connectionId, async () => connectionId === claude ? [{ id: "claude-sonnet-fixture" }, { id: "claude-opus-fixture" }, { id: "claude-new-fixture" }] : connectionId === fresh ? [{ id: "claude-fresh-fixture" }] : []),
@@ -209,6 +212,11 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
     const noPoints = await botModelMenu(pool, settings, alice, null);
     assert.equal(noPoints.groups.some((group) => group.kind === "hosted"), false);
     assert.deepEqual([noPoints.current.id, noPoints.current.chosen, noPoints.current.available], [hostedChoice, true, false]);
+    // No card yet but free messages left: listed, the tag names them.
+    hostedTrial = 12;
+    const trial = await botModelMenu(pool, settings, alice, null);
+    assert.deepEqual([trial.groups.find((group) => group.kind === "hosted")?.trialLeft, trial.current.available], [12, true]);
+    hostedTrial = 0;
     hostedPoints = 98;
     // Picking the key again moves back to it.
     keyMenu = await chooseBotModel(pool, settings, alice, null, keyOption);

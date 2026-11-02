@@ -22,6 +22,10 @@ export interface HostedUsage {
   personal?: boolean
   /** The person has a Claude / ChatGPT subscription connected; it serves them in any workspace (#838). */
   subscribed?: boolean
+  /** No card and nothing bought: the free messages left (TRIAL_MESSAGES); null otherwise. */
+  trialLeft?: number | null
+  /** The workspace this was read for, so a dialog opened from the chat acts there. */
+  workspaceId?: string
 }
 
 /** #558 `cardVerificationStatus`. */
@@ -83,6 +87,8 @@ export function refusalOffer(code: HostedRefusal, usage: HostedUsage | null) {
     billing,
     card: !transient && Boolean(usage?.personal) && (code === 'verification_required' || (usage?.balance.verified === false && (code === 'free_allowance_used' || code === 'points_exhausted'))),
     connect: !transient && usage?.subscribed === false,
+    // A personal workspace with a verified card that ran out: 充值 right there (decision 2026-11-02-1450).
+    topUp: !transient && Boolean(usage?.personal) && usage?.balance.verified === true && (code === 'free_allowance_used' || code === 'points_exhausted'),
   }
 }
 

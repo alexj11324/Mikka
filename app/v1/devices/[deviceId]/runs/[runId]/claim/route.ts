@@ -39,6 +39,7 @@ import { afterRunEnded } from '@/lib/run-completion-effects'
 import { subscriptionRuntime } from '@/lib/subscription-runtime'
 import { sharedNativeBinding } from '@/lib/personal-policy'
 import { PublicationError } from '@/lib/run-publication-result'
+import { linkedGitHubAccountId } from '@/lib/github/repository-installation'
 import { authorizedClaimResponse } from '@/lib/run-claim-response'
 import { personalMailboxEnabled } from '@/lib/personal-mailbox-config'
 import { remoteRepositoryRef, taskSecretInjection } from '@/lib/secrets/runtime'
@@ -177,7 +178,9 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
       return NextResponse.json({ error: 'API key unavailable.', code: 'apiKeyUnavailable' }, { status: 409 })
     }
     let opened: Awaited<ReturnType<typeof apiKeyForRun>>
-    try { opened = await apiKeyForRun(pool, runId, frozenKey.keyId) }
+    // The run's Agent picks the key's endpoint; a key that does not serve it ends the run.
+    if (harness !== 'claude_code' && harness !== 'codex') return refuse()
+    try { opened = await apiKeyForRun(pool, runId, frozenKey.keyId, harness) }
     catch (error) {
       // Secrets briefly unreadable: the run stays queued. A key that is gone, or no longer usable here: the run ends.
       if (!(error instanceof WorkspaceError) || error.code !== 'apiKeyNotFound') return NextResponse.json({ error: 'API key unavailable.' }, { status: 409 })
@@ -206,8 +209,8 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
     // assignment without an encryption key; platform versus BYO billing does not change it.
     try { ({ env: taskEnv, secretNames: taskSecretNames } = await taskSecretInjection(caller.scopeWorkspaceId, remoteRepositoryRef(repo.remoteUrl))) }
     catch { return NextResponse.json({ error: 'Workspace secrets unavailable.' }, { status: 409 }) }
-    // A cloud run admitted to push (its GitHub App grant, decision 2026-11-01-1215)
-    // gets its publication like a local run, before the lease, so a refusal leaves it queued.
+    // A cloud run with a task branch gets its publication like a local run,
+    // before the lease, so a refusal leaves it queued.
     if (run.agentDefinition?.repositoryAdmission && !run.agentDefinition.readOnly) {
       const { prepareRunPublication } = await import('@/lib/run-publications')
       try { publication = await prepareRunPublication(run, repo.remoteUrl!) }
@@ -223,7 +226,7 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
     // Without a desktop the run gets none (the daemon refuses a `computer` it cannot serve).
     computer = desktop ? claimed : null
   } else {
-    // A read-only run (an investigation) publishes nothing: no push branch, no push grant.
+    // A read-only run (an investigation) publishes nothing: no task branch.
     if (!run.agentDefinition?.readOnly) {
       const { prepareRunPublication } = await import('@/lib/run-publications')
       try { publication = await prepareRunPublication(run, repo.remoteUrl!) }
@@ -289,13 +292,12 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
     : {}
   const settings = repo.remoteUrl ? await readRepositorySettings(caller.userId, repo.remoteUrl) : null
   const verifyCommand = settings ? settings.verifyCommand : device.kind === 'cloud' ? repo.verifyCommand : null
-  // Push authority was decided at admission (the GitHub App grant, decision
-  // 2026-11-01-1215), for local and cloud runs alike: `allow` when admitted,
-  // `deny` otherwise. `ask` is never forwarded, so no push card can appear.
-  // An explicit CLI deny or read-only ceiling stays authoritative.
-  const push = publication && !cliPolicy.policy.readOnly && cliPolicy.policy.permissions.git_push !== 'deny' && publication.policy.permissions.git_push === 'allow' ? 'allow' as const : 'deny' as const
+  // Whether the daemon itself pushes the verified task branch: a run with a
+  // task branch does. The agent's own push is never withheld; it works with the
+  // owner's own GitHub credential (decision 2026-11-02-1600). `ask` is never forwarded.
+  const push = publication && !cliPolicy.policy.readOnly && publication.policy.permissions.git_push === 'allow' ? 'allow' as const : 'deny' as const
   const resolvedPolicy = { ...cliPolicy.policy, permissions: { ...cliPolicy.policy.permissions, git_push: push } }
-  // A read-only run (dispatched without push authority) cannot change, commit or push anything.
+  // A read-only run cannot change its worktree.
   const executionPolicy = run.agentDefinition?.readOnly ? applyApprovalMode(resolvedPolicy, 'read_only') : resolvedPolicy
   const computerPermission = computer?.permission ?? localComputer?.permission
   // Computer authority comes from its persisted claim; retain every trusted
@@ -310,6 +312,7 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
     await persistRunCompletion(caller.userId, runId, { stopReason: 'error', report: { summary: 'Frozen execution policy no longer fits the current owner policy.', filesChanged: [], verify: { status: 'not_run' }, openQuestions: [], nextStep: null } }, caller.scopeDeviceId)
     return NextResponse.json({ error: 'Frozen execution policy is no longer permitted.' }, { status: 409 })
   }
+  const githubConnected = repo.repoPath.startsWith('v2/github.com/') && Boolean(await linkedGitHubAccountId(caller.userId))
   const response = await authorizedClaimResponse(caller.userId, run, leaseExpiresAt, current => NextResponse.json({
     ...publication,
     runId, issueId: run.issueId, deviceId, repoId: repo.id,
@@ -319,9 +322,12 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
     ...(runTestFixture(harness) ? { fixture: runTestFixture(harness) } : {}),
     ...(verifyCommand ? { verifyCommand } : {}),
     ...(mcp ? { mcp } : {}),
-    ...(mcp && publication?.pushBranch && /^v2\/github\.com\/[a-z0-9_.-]+\/[a-z0-9_.-]+$/.test(repo.repoPath) &&
-      ['implement', 'fix'].includes(current.kind) && !assignmentPolicy.readOnly && assignmentPolicy.permissions.git_push === 'allow' && harness !== 'mock'
-      ? { github: { endpoint: mcp.url.replace(/\/api\/mcp\/?$/, '/api/runs/github-token'), repository: repo.repoPath.slice('v2/github.com/'.length), branch: publication.pushBranch } } : {}),
+    // The owner's own GitHub credential for every github.com run (decision
+    // 2026-11-02-1600), any kind, read-only included; the branch is the task
+    // branch a delivering run pushes.
+    ...(mcp && githubConnected && /^v2\/github\.com\/[a-z0-9_.-]+\/[a-z0-9_.-]+$/.test(repo.repoPath) && harness !== 'mock'
+      ? { github: { endpoint: mcp.url.replace(/\/api\/mcp\/?$/, '/api/runs/github-token'), repository: repo.repoPath.slice('v2/github.com/'.length),
+        ...(publication?.pushBranch && ['implement', 'fix'].includes(current.kind) && !assignmentPolicy.readOnly ? { branch: publication.pushBranch } : {}) } } : {}),
     ...(run.agentDefinition?.model ? {model:run.agentDefinition.model} : {}),
     ...(modelCredential ? { modelCredential } : {}),
     ...(subscription ? { ...(run.agentDefinition?.cliModelSelection ? {} : {model:subscription.modelId}), subscriptionBinding: { bindingId: subscription.id, ownerId: subscription.ownerId, workspaceId: subscription.workspaceId, consumerId: subscription.consumerId, route: subscription.route } } : {}),

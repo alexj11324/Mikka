@@ -194,6 +194,11 @@ export const pickRepoResult = z.discriminatedUnion("status", [
 ])
 export type PickRepoResult = z.infer<typeof pickRepoResult>
 
+/** The `target` of an install on this computer (添加这台电脑) rather than over SSH. */
+export const LOCAL_TARGET = "this-computer"
+/** The `target` while 重新连接 restarts this computer's daemon. */
+export const LOCAL_RECONNECT = "this-computer-reconnect"
+
 export interface SshInstallState {
   id: string; target: string; step: 'login' | 'check' | 'install' | 'service' | 'connect'
   status: 'fingerprint' | 'running' | 'online' | 'failed'; deviceId?: string; fingerprint?: string; keyType?: string; reason?: string; retryable?: boolean
@@ -207,6 +212,17 @@ export interface MikkaBridge {
     cancel(id: string): Promise<SshInstallState | null>
     accept(id: string): Promise<SshInstallState | null>
     state(): Promise<SshInstallState | null>
+    /** 添加这台电脑: installs, starts and signs in the daemon on this computer. Absent on older desktops. */
+    local?(): Promise<SshInstallState | null>
+    /** 重新连接 for this computer: restarts its daemon and waits until it is online. */
+    restartLocal?(): Promise<SshInstallState | null>
+    /**
+     * Installing the app makes this computer a device: once per launch the
+     * page asks main to install (no device, or someone else's) or repair (the
+     * daemon does not answer: restart, else install). Progress arrives through
+     * onChange as 添加这台电脑.
+     */
+    autoLocal?(action: "install" | "repair"): Promise<SshInstallState | null>
   }
 
   app: {
@@ -237,6 +253,12 @@ export interface MikkaBridge {
     onUpdateReady?(listener: (version: string) => void): () => void
     /** Quits and installs the downloaded update. */
     installUpdate?(): Promise<void>
+    /**
+     * The server requires a newer desktop than this one (/api/version's
+     * minDesktopVersion). Main reads the server itself and, when it agrees,
+     * installs the update before the person can go on.
+     */
+    requireUpdate?(): Promise<void>
   }
   /**
    * Login. The long-lived session token stays in the main process (macOS

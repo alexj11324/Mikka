@@ -7,6 +7,7 @@ import {
   HOSTED_MAX_IN_FLIGHT_PER_WORKSPACE,
   MICRO_USD_PER_POINT,
   PaidResourceError,
+  TRIAL_MESSAGES,
 } from './policy'
 
 type Query = Pick<PoolClient, 'query'>
@@ -115,10 +116,32 @@ export class HostedUsageStore {
     )
     return row as { verified: boolean; free: number; purchased: number }
   }
+  /**
+   * The free messages left before a card is needed (TRIAL_MESSAGES), for a
+   * workspace with no verified card and no purchased points; null for any
+   * other. The allowance is the person's, not the workspace's: it counts the
+   * messages sent in the chats of every workspace created by this workspace's
+   * creator, so a second workspace adds none. Not a 重试, not the welcome
+   * request; the one being answered is included, so its turn is admitted
+   * while this is 0 or more.
+   */
+  async trialLeft(workspaceId: string, balance: { verified: boolean; purchased: number }, tx: Query = this.pool) {
+    if (balance.verified || balance.purchased > 0) return null
+    const { rows: [row] } = await tx.query<{ n: number }>(
+      `SELECT count(*)::int AS n FROM coordinator_events e JOIN bots b ON b.id=e."botId"
+       JOIN mikka_workspaces w ON w.id=b."workspaceId"
+       WHERE w."userId"=(SELECT "userId" FROM mikka_workspaces WHERE id=$1) AND e.kind='user_message' AND e.payload->>'retry' IS NULL AND coalesce(e.payload->>'text','') NOT LIKE '[Welcome]%'`,
+      [workspaceId],
+    )
+    return TRIAL_MESSAGES - Number(row?.n ?? 0)
+  }
   async canUseMikkaPaid(workspaceId: string) {
     const balance = await this.balance(workspaceId)
-    if (!balance.verified && balance.purchased <= 0)
+    if (!balance.verified && balance.purchased <= 0) {
+      const left = await this.trialLeft(workspaceId, balance)
+      if (left !== null && left >= 0) return { ...balance, trialLeft: left }
       throw new PaidResourceError('verification_required')
+    }
     if (balance.free + balance.purchased <= 0)
       throw new PaidResourceError(
         balance.verified ? 'free_allowance_used' : 'points_exhausted',
@@ -159,16 +182,18 @@ export class HostedUsageStore {
       ).rows[0]
       if (prior) throw new PaidResourceError('usage_in_progress') // Never replay a paid provider call.
       const balance = await this.balance(workspaceId, tx)
-      if (!balance.verified && balance.purchased <= 0)
+      // No card and nothing bought: only the first TRIAL_MESSAGES messages' turns, paid by the platform.
+      const trial = await this.trialLeft(workspaceId, balance, tx)
+      if (trial !== null && trial < 0)
         throw new PaidResourceError('verification_required')
       const available = balance.free + balance.purchased
-      if (available <= 0) throw new PaidResourceError('free_allowance_used')
+      if (trial === null && available <= 0) throw new PaidResourceError('free_allowance_used')
       const flight = await this.inFlight(tx, workspaceId)
       if (flight.calls >= HOSTED_MAX_IN_FLIGHT_PER_WORKSPACE)
         throw new PaidResourceError('usage_concurrency_limit')
       // Concurrent calls must fit the balance together. A lone call is admitted
       // on any positive balance, as before, so the last cents stay usable.
-      if (flight.held > 0 && available - flight.held < estimate)
+      if (trial === null && flight.held > 0 && available - flight.held < estimate)
         throw new PaidResourceError('free_allowance_used')
       const limit = abuseLimits(env)
       const spent = Number(
@@ -231,6 +256,16 @@ export class HostedUsageStore {
       if (!Number.isSafeInteger(cost) || cost < 0)
         throw new Error('invalid_usage_cost')
       const available = await this.balance(row.workspaceId, tx)
+      const legacyRow = Number(row.reservedFree) > 0 || Number(row.reservedPurchased) > 0 || Number(row.reservedUnpaid) > 0
+      // A free-message turn (no card, nothing bought): the platform pays, as unpaid spend under its daily cap,
+      // never as a debt the workspace's allowance would repay once a card is verified.
+      if (!legacyRow && !available.verified && available.purchased <= 0) {
+        await tx.query(
+          `UPDATE hosted_usage SET state='settled',"costMicroUsd"=$2,"freeMicroUsd"=0,"purchasedMicroUsd"=0,"inputTokens"=$3,"outputTokens"=$4,"generationId"=COALESCE($5,"generationId"),"unpaidMicroUsd"=$2,"settledAt"=now() WHERE id=$1`,
+          [id, cost, inputTokens, outputTokens, generationId ?? null],
+        )
+        return
+      }
       // Old rows may already have debited free credit or frozen purchased points.
       // Settle those exact rows without charging their prepaid money twice.
       const legacy = Number(row.reservedFree) > 0 || Number(row.reservedPurchased) > 0 || Number(row.reservedUnpaid) > 0
@@ -283,7 +318,10 @@ export class HostedUsageStore {
     )
     // Whether the next call would be admitted, by the same rules as reserve().
     const available = balance.free + balance.purchased
-    const state = !balance.verified
+    const trial = await this.trialLeft(workspaceId, balance)
+    const state = trial !== null
+      ? trial > 0 ? (spent >= abuseLimits(env).dailyMicroUsd ? 'platform_paused' : 'ready') : 'verification_required'
+      : !balance.verified
       ? 'verification_required'
       : available <= 0
         ? 'free_allowance_used'
@@ -294,7 +332,7 @@ export class HostedUsageStore {
             : spent >= abuseLimits(env).dailyMicroUsd && balance.purchased <= 0
               ? 'platform_paused'
               : 'ready'
-    return { state, balance }
+    return { state, balance, trialLeft: trial === null ? null : Math.max(0, trial) }
   }
   async recent(workspaceId: string) {
     return (

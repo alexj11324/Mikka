@@ -113,8 +113,8 @@ it("gives the daemon's own clone and fetch the run's repository token, and nothi
       expect(Object.keys(env).every(key => key.startsWith('GIT_CONFIG_') || key === 'GIT_TERMINAL_PROMPT')).toBe(true)
       // The run's own repository, in any case the remote spells it.
       expect((await fill(env, 'OWNER/Repo.git')).stdout).toContain('password=synthetic-run-repository-token')
-      // Any other repository gets nothing from it.
-      expect((await fill({ ...env, GIT_TERMINAL_PROMPT: '0' }, 'owner/other.git')).stdout).not.toContain('synthetic-run-repository-token')
+      // Any other github.com repository the person authorized gets the same, their own credential.
+      expect((await fill(env, 'other-org/another.git')).stdout).toContain('password=synthetic-run-repository-token')
     })
     expect(seen).toEqual(['Bearer synthetic-run-token'])
     // The run token and the exchanged token leave nothing behind.
@@ -162,17 +162,20 @@ it('lets the agent commit when the person signs commits with a program the sandb
   expect(result.exitCode).toBe(0)
 })
 
-it('does not supply credentials to plan or read-only sessions and respects network deny/ceiling', async () => {
+it('gives plan and read-only sessions the same owner credential, without delivery, and respects network deny/ceiling', async () => {
   const f = await fixture()
   const policy = runPolicy(undefined)
   for (const options of [{ kind: 'plan' as const }, { policy: { ...policy, readOnly: true } }]) {
-    const ctx = new RunContext({ harness: 'codex', worktree: f.worktree, runDir: tempDir(), privateDir: tempDir(), github, childPath: f.path, ...options })
-    // Only the run's own git settings; no credential helper, gh wrapper or GitHub env.
+    const runDir = tempDir()
+    const ctx = new RunContext({ harness: 'codex', worktree: f.worktree, runDir, privateDir: tempDir(), github, childPath: f.path, ...options })
+    // The same helper and gh wrapper as any run; no repository is pinned.
     const env = ctx.tempEnv()
-    expect(Object.fromEntries(Object.entries(env).filter(([key]) => key.startsWith('GIT_') || key.startsWith('GH_') || key === 'PATH'))).toEqual({
-      GIT_CONFIG_COUNT: '2', GIT_CONFIG_KEY_0: 'maintenance.auto', GIT_CONFIG_VALUE_0: 'false', GIT_CONFIG_KEY_1: 'gc.auto', GIT_CONFIG_VALUE_1: '0',
-    })
-    expect(ctx.instructions()).toContain('Do not commit, push')
+    expect(env.PATH.split(delimiter)[0]).toBe(join(runDir, 'github', 'bin'))
+    expect(env.GH_HOST).toBe('github.com')
+    expect(env.GH_REPO).toBeUndefined()
+    expect(Object.values(env).join('\n')).not.toContain(github.runToken)
+    expect(ctx.instructions()).toContain("Git and gh have the person's own GitHub credential")
+    expect(ctx.instructions()).not.toContain('You own delivery')
     expect(ctx.agentDelivers).toBe(false)
   }
   const denied = new RunContext({ harness: 'codex', worktree: f.worktree, runDir: tempDir(), privateDir: tempDir(), github, childPath: f.path,

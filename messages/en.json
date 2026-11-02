@@ -854,10 +854,12 @@
       "commands": {
         "install": "1 Install",
         "login": "2 Sign in",
-        "start": "3 Start"
+        "start": "3 Start",
+        "startAlone": "Start"
       },
       "requirements": "Node.js 24+ · Git",
-      "configurationFailed": "Installation commands are unavailable"
+      "configurationFailed": "Installation commands are unavailable",
+      "reconnectTitle": "Reconnect"
     },
     "setup": "Set up repository and agent",
     "offlineSince": "Offline · {time}",
@@ -904,6 +906,7 @@
     },
     "ssh": {
       "title": "Add device",
+      "reconnectingThis": "Reconnecting this computer",
       "sshConfig": "SSH config",
       "otherHost": "Other host",
       "host": "Host",
@@ -930,12 +933,20 @@
       "hide": "Close",
       "retry": "Retry",
       "done": "Done",
-      "cancelled": "Cancelled"
+      "cancelled": "Cancelled",
+      "manual": "Connect manually"
     },
     "runsModels": "Runs {models}",
     "runsCount": "{count, plural, one {Runs # allowed model} other {Runs # allowed models}}",
     "runsNone": "Runs no allowed model",
-    "offlineNoRuns": "Offline · gets no runs"
+    "offlineNoRuns": "Offline · gets no runs",
+    "local": {
+      "adding": "Adding this computer",
+      "online": "This computer is online",
+      "failed": "Couldn't add this computer",
+      "retry": "Retry"
+    },
+    "loading": "Loading devices"
   },
   "Workspace": {
     "loadingEditor": "Loading task editor",
@@ -1974,13 +1985,6 @@
       "githubVerificationSaved": "Verification command saved",
       "githubAbilitiesHeading": "Abilities",
       "githubAbilitiesSummary": "{count} abilities ({write} write, {read} read)",
-      "githubPermission": {
-        "allow": "Allow",
-        "ask": "Ask",
-        "deny": "Deny"
-      },
-      "githubPermissionFailed": "Could not save",
-      "githubPushByApp": "Set by the GitHub App",
       "githubPrivate": "Private",
       "githubTool": {
         "push": "Push branch",
@@ -2467,10 +2471,6 @@
         "kimi": "Kimi",
         "custom": "Custom provider"
       },
-      "protocol": {
-        "openai": "OpenAI-compatible",
-        "anthropic": "Anthropic-compatible"
-      },
       "shareLabel": "Share {name} with team members",
       "removeLabel": "Delete {name}",
       "removeTitle": "Delete {name}?",
@@ -2485,7 +2485,13 @@
       "modelsInvalid": "Couldn't fetch models · Key invalid or revoked",
       "modelsUnavailable": "Couldn't fetch models · Provider didn't respond",
       "refetch": "Fetch models again",
-      "refetchLabel": "Fetch models for {name} again"
+      "refetchLabel": "Fetch models for {name} again",
+      "protocolName": {
+        "anthropic": "Anthropic",
+        "openai": "OpenAI"
+      },
+      "protocolAgents": "{protocols} protocol · runs on {agents}",
+      "customAgents": "Pick a protocol to see which Agent runs it"
     },
     "modelOrder": {
       "title": "Allowed models",
@@ -2550,7 +2556,8 @@
       "e2bKeyMissing": "Not added",
       "e2bKeyFill": "Add",
       "e2bKeyReplace": "Replace"
-    }
+    },
+    "loadingPage": "Loading settings"
   },
   "TelegramBot": {
     "help": "Mikka Telegram commands:\n/new <title> — start a task draft\nWhile a draft is open, send details, then /confirm to create it in Backlog\nSend other messages to the Orchestrator; replies return here\n/cancel — discard the draft\n/issues — list recent tasks\n/link ORV-123 or /link <issue UUID> — link this chat to a task\n/status — show the linked task\n/unlink — clear the link",
@@ -2994,6 +3001,7 @@
       "hosted": "Mikka Default",
       "credits": "Credits",
       "points": "{points} points",
+      "trialLeft": "{count} free left",
       "hostedUnavailable": "Mikka Default can’t run in this workspace",
       "changeModel": "Change model",
       "useMyPoints": "Use my points for this team",
@@ -3008,7 +3016,39 @@
       "refresh": "Refresh models",
       "refreshFailed": "Refresh failed. Try again"
     },
-    "empty": "Tell {name} what you need"
+    "empty": "Tell {name} what you need",
+    "events": {
+      "aThread": "A thread",
+      "aTask": "A task",
+      "quoted": "“{title}”",
+      "runEnded": {
+        "succeeded": "finished",
+        "failed": "failed",
+        "stopped": "stopped",
+        "cancelled": "was cancelled",
+        "other": "ended"
+      },
+      "runRetried": "moved to another machine",
+      "runSwitched": "ran out of subscription quota and continues on an API key",
+      "runPaused": "ran out of subscription quota and is paused",
+      "runWaitingDevice": "starts when its computer is back online",
+      "runDeviceBack": "starts now: its computer is back online",
+      "issueMoved": "moved to {status}",
+      "issueChanged": "changed status",
+      "runReport": "reported progress",
+      "runQuestion": "is waiting for your answer",
+      "runBlocked": "is blocked",
+      "artifact": "An Artifact was handed over",
+      "artifactTitled": "“{title}” was handed over",
+      "action": {
+        "done": "Action done",
+        "failed": "Action failed",
+        "declined": "Action declined",
+        "other": "Action updated"
+      },
+      "other": "Something new happened"
+    },
+    "resend": "Send again"
   },
   "AgentCopy": {
     "pleaseSignInFirst": "Please sign in first.",
@@ -3820,6 +3860,11 @@
   "DeviceAuthorization": {
     "title": "Connect this computer",
     "code": "Terminal verification code",
+    "device": "Computer",
+    "deviceUnreported": "Name not reported",
+    "clientVersion": "Client {version}",
+    "access": "Access",
+    "codeMatches": "The terminal shows this same code",
     "continue": "Continue",
     "loading": "Loading…",
     "scope": "Run your threads",
@@ -3831,6 +3876,7 @@
     "returnToTerminal": "Return to your terminal to start the Mikka client",
     "done": "Done",
     "invalid": "This code is invalid or expired",
+    "rateLimited": "Too many lookups. Try again in 30 minutes",
     "failed": "Connection failed",
     "enterAgain": "Enter another code",
     "retry": "Retry"
@@ -4115,13 +4161,18 @@
     },
     "refusal": {
       "verificationRequiredPlain": "Mikka Default needs a verified card",
+      "branded": "Mikka Default: {reason}",
       "verification_required": "<model><mark></mark> Mikka Default</model> needs a verified card",
       "free_allowance_used": "Free allowance used up",
       "points_exhausted": "Points used up",
       "platform_paused": "Free allowance paused",
       "unavailable": "Mikka Default is unavailable",
+      "trialUsed": "Free messages used up",
+      "bindSubscription": "Connect a subscription",
+      "topUp": "Top up",
       "verifyCard": "Verify card",
       "teamNoPoints": "This team has no points to use",
+      "useMyPoints": "Use my points for this team",
       "openBilling": "Open billing",
       "useSubscription": "Use my {name} subscription",
       "connect": "Connect <claude></claude> Claude / <openai></openai> ChatGPT subscription"
@@ -4181,6 +4232,12 @@
     "confirm": "Done",
     "nameReply": "Call it {name}",
     "named": "Got it. I'm {name} from now on.",
+    "subscriptionAsk": "Want to bind your Claude or ChatGPT subscription?",
+    "subscriptionHeading": "Bind a subscription",
+    "subscriptionNo": "Not now",
+    "subscriptionContinue": "Continue",
+    "subscriptionReplyDone": "Subscription bound",
+    "subscriptionLater": "OK. You can bind one in Settings later.",
     "computerAsk": "With a cloud computer I can browse the web, and threads can run in the cloud. Turn it on now?",
     "computerYes": "Turn on",
     "computerNo": "Not now",

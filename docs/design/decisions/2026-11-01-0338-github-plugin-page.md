@@ -9,6 +9,8 @@
   [2026-11-01-1310-no-ask-for-app-granted-abilities](2026-11-01-1310-no-ask-for-app-granted-abilities.md)
   (创建 Pull Request offers 允许 / 拒绝). The page shows only what is stored or
   what GitHub grants; it never shows one value while another is saved.
+- Superseded in part by: [2026-11-02-1600-agents-use-own-github-credential](2026-11-02-1600-agents-use-own-github-credential.md) (能力: every
+  ability is listed with no control; neither write is a setting).
 
 Accepted Figma frames (file `zPe5LKycb2XuT1ivCLRw07`, page `773:2`): `773:3`
 connected, `775:4` not connected, `775:131` link failed, `775:240` repository

@@ -1,9 +1,9 @@
 'use client'
 
 import { Fragment, useEffect, useRef, useState } from 'react'
-import { Check, Circle, Loader2, TerminalSquare, X } from 'lucide-react'
+import { Check, ChevronDown, Circle, Loader2, TerminalSquare, X } from 'lucide-react'
 import { useTranslations } from 'next-intl'
-import type { SshInstallState } from '@mikka/protocol/bridge'
+import { LOCAL_RECONNECT, LOCAL_TARGET, type SshInstallState } from '@mikka/protocol/bridge'
 import type { DeviceView } from '@/app/actions/agents'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -12,8 +12,9 @@ import { Input } from '@/components/ui/input'
 import { Item, ItemGroup, ItemSeparator } from '@/components/ui/item'
 import { bridgeFromWindow, type MikkaWindow } from '@/lib/platform/detect'
 import { cn } from '@/lib/utils'
-import { STEPS, addedHost, stepStates, type StepState } from '@/lib/device-ssh-view'
+import { addedHost, stepStates, visibleSteps, type StepState } from '@/lib/device-ssh-view'
 import { AgentMarks, installedAgents } from './agent-marks'
+import { DaemonCommandList } from './connect-device-dialog'
 
 function StepIcon({ state }: { state: StepState }) {
   if (state === 'done') return <Check aria-hidden="true" className="size-4 text-success" />
@@ -34,10 +35,13 @@ function sshHost(host: string | { alias: string; user?: string | null; hostName?
 }
 
 /**
- * 添加设备 in the desktop app (Figma V09c 685:24728 → V09c-5 686:25550): pick a
- * host from `~/.ssh/config` or type one, trust its host key, and Mikka installs
- * and starts the daemon over SSH. The install runs in the desktop main process,
- * so closing this dialog does not stop it; reopening shows where it is.
+ * 添加设备 in the desktop app (Figma V09c 685:24728 → V09c-5 686:25550). This
+ * computer needs no entry here: the app makes it a device by itself
+ * (local-setup-status.tsx). A remote computer goes over SSH first: pick a host
+ * from `~/.ssh/config` or type one, trust its host key, and Mikka installs,
+ * signs in and starts the daemon. 手动连接, last, shows the three terminal
+ * commands for a computer without SSH. The install runs in the desktop main
+ * process, so closing this dialog does not stop it; reopening shows where it is.
  */
 export function SshAddDialog({ open, onOpenChange, devices, onAdded }: {
   open: boolean
@@ -53,6 +57,7 @@ export function SshAddDialog({ open, onOpenChange, devices, onAdded }: {
   const [install, setInstall] = useState<SshInstallState | null>(null)
   const [starting, setStarting] = useState(false)
   const [startError, setStartError] = useState(false)
+  const [manual, setManual] = useState(false)
   const onAddedRef = useRef(onAdded)
   useEffect(() => { onAddedRef.current = onAdded })
 
@@ -62,9 +67,10 @@ export function SshAddDialog({ open, onOpenChange, devices, onAdded }: {
     let live = true
     setStartError(false)
     void ssh.hosts().then(list => { if (live) setHosts((list as Parameters<typeof sshHost>[0][]).map(sshHost)) }, () => { if (live) setHosts([]) })
-    void ssh.state().then(state => { if (live && state && state.status !== 'online') setInstall(state) }, () => {})
+    // This computer's own setup shows on the devices page, not here.
+    void ssh.state().then(state => { if (live && state && state.status !== 'online' && state.target !== LOCAL_TARGET) setInstall(state) }, () => {})
     const unsubscribe = ssh.onChange(state => {
-      if (!live) return
+      if (!live || state.target === LOCAL_TARGET) return
       setInstall(state)
       if (state.status === 'online') onAddedRef.current()
     })
@@ -77,7 +83,9 @@ export function SshAddDialog({ open, onOpenChange, devices, onAdded }: {
     if (!ssh || starting) return
     setStarting(true)
     setStartError(false)
-    try { setInstall(await ssh.begin(next)) } catch { setStartError(true) } finally { setStarting(false) }
+    try {
+      setInstall(next === LOCAL_RECONNECT && ssh.restartLocal ? await ssh.restartLocal() : await ssh.begin(next))
+    } catch { setStartError(true) } finally { setStarting(false) }
   }
   async function accept() {
     const ssh = bridgeFromWindow(window as MikkaWindow)?.ssh
@@ -97,6 +105,7 @@ export function SshAddDialog({ open, onOpenChange, devices, onAdded }: {
       if (install && install.status !== 'running') setInstall(null)
       setSelected(null)
       setOther('')
+      setManual(false)
     }
     onOpenChange(next)
   }
@@ -118,9 +127,9 @@ export function SshAddDialog({ open, onOpenChange, devices, onAdded }: {
           <Button size="sm" onClick={() => { void accept() }}>{t('trustContinue')}</Button>
         </DialogFooter>
       </> : progress ? <>
-        <DialogHeader><DialogTitle>{t('adding', { host: install.target })}</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{install.target === LOCAL_RECONNECT ? t('reconnectingThis') : t('adding', { host: install.target })}</DialogTitle></DialogHeader>
         <ol aria-label={t('progress')} className="flex flex-col gap-3">
-          {STEPS.map(step => {
+          {visibleSteps(install).map(step => {
             const state = stepStates(install)[step]
             return <li key={step} className="flex min-w-0 items-center gap-2.5 text-sm">
               <StepIcon state={state} />
@@ -172,6 +181,11 @@ export function SshAddDialog({ open, onOpenChange, devices, onAdded }: {
               onKeyDown={event => { if (event.key === 'Enter' && target) { event.preventDefault(); void begin(target) } }} />
           </Field></FieldGroup>
           {startError && <FieldError className="text-xs">{t('startFailed')}</FieldError>}
+          {/* The fallback for a computer without SSH: run the three commands there. */}
+          <Button variant="ghost" size="sm" className="-mx-2 self-start text-muted-foreground" aria-expanded={manual} onClick={() => setManual(value => !value)}>
+            {t('manual')}<ChevronDown data-icon="inline-end" className={cn('transition-transform duration-200 motion-reduce:transition-none', manual && 'rotate-180')} />
+          </Button>
+          {manual && <DaemonCommandList />}
         </div>
         <DialogFooter>
           <Button variant="secondary" size="sm" onClick={() => close(false)}>{t('cancel')}</Button>

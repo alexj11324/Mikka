@@ -16,7 +16,6 @@ import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field
 import { Input } from '@/components/ui/input'
 import { InlineLoadError } from '@/components/load-error'
 import { SearchInput } from '@/components/ui/search-input'
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { withBasePath } from '@/lib/base-path'
 import { authClient } from '@/lib/auth-client'
 import { openPathInBrowser } from '@/lib/platform/open-settings'
@@ -27,30 +26,22 @@ type GitHubRepository = { id: string; fullName: string; installationId: string; 
 type GitHubState = { viewerId: string; configured: boolean; connected: boolean; login?: string | null; installed: boolean; repositories: GitHubRepository[] }
 /** A readable state, or an account link GitHub no longer accepts. */
 type GitHubRead = { state: GitHubState; reconnect: false } | { state: null; reconnect: true }
-type Decision = 'allow' | 'ask' | 'deny'
-type Permissions = { pullRequest: Decision; version: string }
-type WriteAbility = keyof Omit<Permissions, 'version'>
 
 const githubKey = (userId: string) => ['integrations:github', userId] as const
-const permissionsKey = (userId: string) => ['integrations:github:permissions', userId] as const
 const CONNECT_PATH = withBasePath('/api/integrations/github/connect')
-const PERMISSIONS_PATH = withBasePath('/api/integrations/github/permissions')
 const VERIFICATION_PATH = withBasePath('/api/integrations/github/repositories/verification')
 const INSTALL_URL = GITHUB_APP_INSTALL_URL
-/** 创建 Pull Request is allow or deny: what the App was granted is never asked again (decision 2026-11-01-1215). */
-const DECISIONS: readonly Decision[] = ['allow', 'deny']
 
 /**
- * What an Agent does through this plugin, from the code that does it. Writes:
- * the pushed branch, which the GitHub App's own access decides (contents:
- * write on the repository, lib/github/push-grant.ts; nothing to set here), and
- * the pull request (lib/github/run-pull-request.ts) with allow / ask / deny.
- * Reads run directly (R-77): cloning, and the readbacks in
- * lib/github/user-access.ts and the run token's checks/actions read.
+ * What an Agent does through this plugin, from the code that does it. Every
+ * ability runs directly with the person's own GitHub credential (R-77,
+ * decision 2026-11-02-1600), so none has a control: pushing the branch, the
+ * pull request (lib/github/run-pull-request.ts), cloning, and the readbacks in
+ * lib/github/user-access.ts and the run's checks/actions read.
  * A new ability lands here with its code.
  */
 const ABILITIES = {
-  write: [{ id: 'push', setting: 'push' }, { id: 'pullRequest', setting: 'pullRequest' }] as const,
+  write: ['push', 'pullRequest'] as const,
   read: ['readCode', 'readPullRequest', 'readIssue', 'readChecks'] as const,
 }
 
@@ -64,18 +55,6 @@ async function readGitHub([, userId]: ReturnType<typeof githubKey>): Promise<Git
   }
   if (typeof next.configured !== 'boolean' || typeof next.connected !== 'boolean' || typeof next.installed !== 'boolean' || !Array.isArray(next.repositories) || next.repositories.some(repository => !repository || typeof repository.id !== 'string' || typeof repository.fullName !== 'string')) throw new Error('shape')
   return { state: next, reconnect: false }
-}
-
-const isDecision = (value: unknown): value is Decision => typeof value === 'string' && (DECISIONS as readonly string[]).includes(value)
-function readPermissions(userId: string, next: Partial<Permissions> & { viewerId?: unknown }): Permissions {
-  // push is shown as the GitHub App's own grant, so its stored value is not read here.
-  if (next.viewerId !== userId || !isDecision(next.pullRequest) || typeof next.version !== 'string') throw new Error('shape')
-  return { pullRequest: next.pullRequest, version: next.version }
-}
-async function fetchPermissions([, userId]: ReturnType<typeof permissionsKey>): Promise<Permissions> {
-  const response = await fetch(PERMISSIONS_PATH, { cache: 'no-store' })
-  if (!response.ok) throw new Error(String(response.status))
-  return readPermissions(userId, await response.json())
 }
 
 /** GitHub's page on 插件: header and link, what it does, the connection, repository access and its abilities. */
@@ -96,14 +75,12 @@ function ViewerGitHubSettings({ userId, isPending }: { userId: string | undefine
   // timer, so a quick revisit could skip the read. A mount effect reads instead.
   const { data, error, mutate } = useSWR(userId ? githubKey(userId) : null, readGitHub, { revalidateOnMount: false, revalidateOnFocus: false, shouldRetryOnError: false, dedupingInterval: 0 })
   useEffect(() => { if (userId) void mutate() }, [userId, mutate])
-  const permissions = useSWR(userId ? permissionsKey(userId) : null, fetchPermissions, { revalidateOnFocus: false, shouldRetryOnError: false })
   const githubState = error ? null : data?.state ?? null
   const githubReconnect = !error && Boolean(data?.reconnect)
   const githubLoading = isPending || (Boolean(userId) && !data && !error)
   const githubError = error ? t('githubLoadFailed') : githubReconnect ? t('githubReconnectRequired') : ''
   const [githubLinking, setGithubLinking] = useState(false)
   const [githubLinkError, setGithubLinkError] = useState('')
-  const [permissionError, setPermissionError] = useState('')
   const [confirming, setConfirming] = useState(false)
   const [browsing, setBrowsing] = useState(false)
 
@@ -154,36 +131,12 @@ function ViewerGitHubSettings({ userId, isPending }: { userId: string | undefine
     }
   }
 
-  /** The segment moves at once; it goes back if the server refuses or the setting changed elsewhere. */
-  async function setPermission(ability: WriteAbility, value: Decision) {
-    const current = permissions.data
-    if (!userId || !current || current[ability] === value) return
-    setPermissionError('')
-    await permissions.mutate(async () => {
-      const response = await fetch(PERMISSIONS_PATH, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ version: current.version, [ability]: value }) })
-      if (!response.ok) throw new Error(String(response.status))
-      return readPermissions(userId, await response.json())
-    }, { optimisticData: { ...current, [ability]: value }, rollbackOnError: true, revalidate: false }).catch(() => {
-      setPermissionError(t('githubPermissionFailed'))
-      void permissions.mutate()
-    })
-  }
-
   const connected = Boolean(githubState?.connected)
   const canLink = !connected && Boolean(githubState?.configured || githubReconnect)
   const status = githubLoading ? null : !userId ? t('githubSignInRequired') : githubState && !githubState.configured ? t('githubNotConfigured') : null
   const login = githubState?.login ? t('githubLogin', { login: githubState.login }) : t('github')
-  const errors = [githubError, githubLinkError, permissionError].filter(Boolean)
-  // 推送分支 is whatever the GitHub App was granted on GitHub: shown, not set (decision 2026-11-01-1215).
-  const control = (setting: WriteAbility | 'push', name: string) => setting === 'push'
-    ? <span className="text-xs text-muted-foreground">{t('githubPushByApp')}</span>
-    : <ToggleGroup aria-label={name} variant="segment" size="sm" spacing={0.5} disabled={!permissions.data} value={permissions.data ? [permissions.data[setting]] : []} onValueChange={values => {
-      const next = values[0]
-      if (isDecision(next) && next !== permissions.data![setting]) void setPermission(setting, next)
-    }}>
-      {DECISIONS.map(value => <ToggleGroupItem key={value} value={value}>{t(`githubPermission.${value}`)}</ToggleGroupItem>)}
-    </ToggleGroup>
-  const writes = ABILITIES.write.map(({ id, setting }) => ({ slug: setting, name: t(`githubTool.${id}`), description: '' }))
+  const errors = [githubError, githubLinkError].filter(Boolean)
+  const writes = ABILITIES.write.map(id => ({ slug: id, name: t(`githubTool.${id}`), description: '' }))
   const reads = ABILITIES.read.map(id => ({ slug: id, name: t(`githubTool.${id}`), description: '' }))
 
   return <div className="flex flex-col gap-8">
@@ -220,8 +173,7 @@ function ViewerGitHubSettings({ userId, isPending }: { userId: string | undefine
     </SettingsSection></PageSection>}
 
     <PageSection id="github-abilities-heading" title={t('githubAbilitiesHeading')} summary={t('githubAbilitiesSummary', { count: writes.length + reads.length, write: writes.length, read: reads.length })}>
-      {/* Rows keep one height in both groups, with or without a control. */}
-      <ToolGroup label={t('writeTools', { count: writes.length })} tools={writes} uniformRows control={tool => control(tool.slug as WriteAbility | 'push', tool.name)} />
+      <ToolGroup label={t('writeTools', { count: writes.length })} tools={writes} uniformRows />
       <ToolGroup label={t('readTools', { count: reads.length })} tools={reads} uniformRows />
     </PageSection>
 

@@ -34,7 +34,8 @@ export const CONFIGURABLE_PERMISSIONS = {
   // Everything outside the worktree is read-only in the sandbox (ADR 0009,
   // Stage 1 isolation), so writing there cannot be allowed wholesale.
   write_outside_repo: ["ask", "deny"],
-  // Push is what the GitHub App grants (decision 2026-11-01-1215): never asked.
+  // Stored for older rows; it never withholds the agent's own push with the
+  // person's own GitHub credential (decision 2026-11-02-1600), and is never asked.
   git_push: ["allow", "deny"],
   network: ["allow", "ask", "deny"],
   computer_use: ["allow", "ask", "deny"],
@@ -62,8 +63,9 @@ export const PERMISSION_DEFAULTS: Readonly<
   ...FIXED_PERMISSIONS,
   install_dependency: "allow",
   write_outside_repo: "ask",
-  // A run pushes only when the server sends allow for an admitted GitHub App
-  // grant (decision 2026-11-01-1215); a policy that does not say so never pushes.
+  // Whether the daemon itself pushes a run's verified task branch: the server
+  // sends allow for a run with a task branch. The agent's own git push is never
+  // withheld (decision 2026-11-02-1600).
   git_push: "deny",
   // Agents reach the open internet unless a person restricts it in settings
   // (decision 2026-11-01-1230-network-open-by-default).
@@ -72,9 +74,8 @@ export const PERMISSION_DEFAULTS: Readonly<
 }
 
 /**
- * A stored layer's `git_push` as a restriction. Push itself is the GitHub App
- * grant the server adds for an admitted run; a stored setting can only deny it.
- * Unset, or an ask stored before decision 2026-11-01-1215, does not deny.
+ * A stored layer's `git_push`, read back as it was stored. Since decision
+ * 2026-11-02-1600 it restricts nothing; unset or an ask reads as allow.
  */
 export function gitPushRestriction(permissions: unknown): "allow" | "deny" {
   return permissions !== null && typeof permissions === "object" &&
@@ -180,7 +181,6 @@ export const READ_ONLY_DENIED: readonly PermissionAction[] = [
   "run_project_script",
   "run_setup_recipe",
   "install_dependency",
-  "git_push",
   "computer_use",
 ]
 
@@ -200,8 +200,9 @@ export const runPolicySchema = z.strictObject({
   /** Host-derived worker/workspace ceiling; even network=allow cannot widen it. */
   networkCeiling: z.array(networkDomainSchema).max(MAX_NETWORK_DOMAINS).optional(),
   /**
-   * The run only reads: the worktree is not writable and nothing is pushed
-   * (ADR 0046). Absent from an older server means a normal, writable run.
+   * The run only reads: the worktree is not writable (ADR 0046). It keeps the
+   * owner's GitHub credential like any run. Absent from an older server means
+   * a normal, writable run.
    */
   readOnly: z.boolean().optional(),
 })

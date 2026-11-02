@@ -10,6 +10,7 @@ import {
   DEFAULT_NETWORK_ALLOW,
   FIXED_PERMISSIONS,
   gitPushRestriction,
+  READ_ONLY_DENIED,
   PERMISSION_ACTIONS,
   PERMISSION_DEFAULTS,
   applyApprovalMode,
@@ -182,6 +183,12 @@ describe("a person's approval mode (ADR 0060)", () => {
     })
     expect(readOnly.readOnly).toBe(true)
     expect(readOnly.networkAllow).toEqual(["example.com"])
+  })
+
+  it("read_only is task intent: it does not take the push with the person's own credential away", () => {
+    const allowed = { ...workspace, permissions: { ...workspace.permissions, git_push: "allow" as const } }
+    expect(READ_ONLY_DENIED).not.toContain("git_push")
+    expect(applyApprovalMode(allowed, "read_only").permissions.git_push).toBe("allow")
   })
 
   it("offers only modes that are no looser than the workspace, whatever it chose", () => {

@@ -854,10 +854,12 @@
       "commands": {
         "install": "1 安装",
         "login": "2 登录",
-        "start": "3 上线"
+        "start": "3 上线",
+        "startAlone": "上线"
       },
       "requirements": "Node.js 24+ · Git",
-      "configurationFailed": "安装命令暂不可用"
+      "configurationFailed": "安装命令暂不可用",
+      "reconnectTitle": "重新连接"
     },
     "setup": "设置仓库和 Agent",
     "offlineSince": "离线 · {time}",
@@ -904,6 +906,7 @@
     },
     "ssh": {
       "title": "添加设备",
+      "reconnectingThis": "重新连接这台电脑",
       "sshConfig": "SSH 配置",
       "otherHost": "其他主机",
       "host": "主机",
@@ -930,12 +933,20 @@
       "hide": "关闭",
       "retry": "重试",
       "done": "完成",
-      "cancelled": "已取消"
+      "cancelled": "已取消",
+      "manual": "手动连接"
     },
     "runsModels": "能跑 {models}",
     "runsCount": "能跑 {count} 个允许使用的模型",
     "runsNone": "不能跑允许使用的模型",
-    "offlineNoRuns": "离线 · 不会被派任务"
+    "offlineNoRuns": "离线 · 不会被派任务",
+    "local": {
+      "adding": "正在添加这台电脑",
+      "online": "这台电脑已上线",
+      "failed": "无法添加这台电脑",
+      "retry": "重试"
+    },
+    "loading": "正在加载设备"
   },
   "Workspace": {
     "loadingEditor": "正在加载任务编辑器",
@@ -1974,13 +1985,6 @@
       "githubVerificationSaved": "验证命令已保存",
       "githubAbilitiesHeading": "能力",
       "githubAbilitiesSummary": "包含 {count} 个能力（{write} 个写入，{read} 个读取）",
-      "githubPermission": {
-        "allow": "允许",
-        "ask": "询问",
-        "deny": "拒绝"
-      },
-      "githubPermissionFailed": "无法保存",
-      "githubPushByApp": "由 GitHub App 授权决定",
       "githubPrivate": "私有",
       "githubTool": {
         "push": "推送分支",
@@ -2467,10 +2471,6 @@
         "kimi": "Kimi",
         "custom": "自定义服务商"
       },
-      "protocol": {
-        "openai": "OpenAI 兼容",
-        "anthropic": "Anthropic 兼容"
-      },
       "shareLabel": "分享 {name} 给团队成员",
       "removeLabel": "删除 {name}",
       "removeTitle": "删除 {name}？",
@@ -2485,7 +2485,13 @@
       "modelsInvalid": "无法获取模型 · Key 无效或已被撤销",
       "modelsUnavailable": "无法获取模型 · 服务商没有响应",
       "refetch": "重新获取模型",
-      "refetchLabel": "重新获取 {name} 的模型"
+      "refetchLabel": "重新获取 {name} 的模型",
+      "protocolName": {
+        "anthropic": "Anthropic",
+        "openai": "OpenAI"
+      },
+      "protocolAgents": "{protocols} 协议 · 可用 {agents}",
+      "customAgents": "选了协议才知道能用哪个 Agent"
     },
     "modelOrder": {
       "title": "允许使用的模型",
@@ -2550,7 +2556,8 @@
       "e2bKeyMissing": "未填",
       "e2bKeyFill": "填入",
       "e2bKeyReplace": "更换"
-    }
+    },
+    "loadingPage": "正在加载设置"
   },
   "TelegramBot": {
     "help": "Mikka Telegram 命令：\n/new <标题> — 新建任务草稿\n草稿进行中时发送详情，然后用 /confirm 创建到待办\n其他消息会发送给 Orchestrator，回复会发回此处\n/cancel — 丢弃草稿\n/issues — 查看最近任务\n/link ORV-123 或 /link <任务 UUID> — 关联任务\n/status — 查看关联任务\n/unlink — 取消关联",
@@ -2994,6 +3001,7 @@
       "hosted": "Mikka 默认",
       "credits": "点数",
       "points": "{points} 点",
+      "trialLeft": "剩 {count} 条免费",
       "hostedUnavailable": "Mikka 默认在这个工作区不可用",
       "changeModel": "换模型",
       "useMyPoints": "把我的点数用于这个团队",
@@ -3008,7 +3016,39 @@
       "refresh": "刷新模型列表",
       "refreshFailed": "刷新失败，重试"
     },
-    "empty": "告诉 {name} 你要做什么"
+    "empty": "告诉 {name} 你要做什么",
+    "events": {
+      "aThread": "一个线程",
+      "aTask": "一个任务",
+      "quoted": "「{title}」",
+      "runEnded": {
+        "succeeded": "已完成",
+        "failed": "失败了",
+        "stopped": "已停止",
+        "cancelled": "已取消",
+        "other": "已结束"
+      },
+      "runRetried": "换了一台机器继续",
+      "runSwitched": "订阅额度用完，改用 API Key 继续",
+      "runPaused": "订阅额度用完，已暂停",
+      "runWaitingDevice": "等设备上线后开始",
+      "runDeviceBack": "设备已上线，即将开始",
+      "issueMoved": "改为{status}",
+      "issueChanged": "状态有变化",
+      "runReport": "汇报了进展",
+      "runQuestion": "在等你回答",
+      "runBlocked": "受阻",
+      "artifact": "交来了一份 Artifact",
+      "artifactTitled": "交来了「{title}」",
+      "action": {
+        "done": "操作已完成",
+        "failed": "操作失败",
+        "declined": "操作已拒绝",
+        "other": "操作有新状态"
+      },
+      "other": "有一条新动态"
+    },
+    "resend": "重新发送"
   },
   "AgentCopy": {
     "pleaseSignInFirst": "请先登录。",
@@ -3820,6 +3860,11 @@
   "DeviceAuthorization": {
     "title": "连接这台电脑",
     "code": "终端验证码",
+    "device": "电脑",
+    "deviceUnreported": "未报告名称",
+    "clientVersion": "客户端 {version}",
+    "access": "权限",
+    "codeMatches": "终端里显示的也是这个验证码",
     "continue": "继续",
     "loading": "正在读取…",
     "scope": "执行你的线程",
@@ -3831,6 +3876,7 @@
     "returnToTerminal": "回到终端启动 Mikka 客户端",
     "done": "完成",
     "invalid": "验证码无效或已过期",
+    "rateLimited": "查询次数过多，30 分钟后再试",
     "failed": "连接失败",
     "enterAgain": "重新输入",
     "retry": "重试"
@@ -4115,13 +4161,18 @@
     },
     "refusal": {
       "verificationRequiredPlain": "使用 Mikka 默认模型前需要验证银行卡",
+      "branded": "Mikka 默认{reason}",
       "verification_required": "使用 <model><mark></mark> Mikka 默认模型</model>前需要验证银行卡",
       "free_allowance_used": "免费额度已用完",
       "points_exhausted": "点数已用完",
       "platform_paused": "免费额度暂时停用",
       "unavailable": "Mikka 默认暂时不可用",
+      "trialUsed": "免费对话已用完",
+      "bindSubscription": "绑定订阅",
+      "topUp": "充值",
       "verifyCard": "验证银行卡",
       "teamNoPoints": "这个团队没有可用点数",
+      "useMyPoints": "把我的点数用于这个团队",
       "openBilling": "打开计费",
       "useSubscription": "改用我的 {name} 订阅",
       "connect": "连接 <claude></claude> Claude / <openai></openai> ChatGPT 订阅"
@@ -4181,6 +4232,12 @@
     "confirm": "确定",
     "nameReply": "就叫{name}",
     "named": "好的，以后我叫{name}。",
+    "subscriptionAsk": "要绑定你的 Claude 或 ChatGPT 订阅吗？",
+    "subscriptionHeading": "绑定订阅",
+    "subscriptionNo": "暂不绑定",
+    "subscriptionContinue": "继续",
+    "subscriptionReplyDone": "已绑定订阅",
+    "subscriptionLater": "好的。之后可以在设置中绑定。",
     "computerAsk": "开通云电脑后，我可以浏览网页，线程也能在云端运行。现在开通吗？",
     "computerYes": "开通",
     "computerNo": "暂不开通",

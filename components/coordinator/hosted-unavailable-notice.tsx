@@ -16,6 +16,7 @@ import { settingsHref } from '@/lib/settings-sections'
 import { useActionError } from '@/lib/use-action-error'
 import { botModelMenuKey, openModelPicker } from './bot-model-picker'
 import { COMPOSER_NOTICE } from './composer-notice'
+import { ConnectSubscriptionButton } from '@/components/billing/connect-subscription-dialog'
 
 /**
  * The chat is on Mikka 默认 but this workspace has no points for it (decision
@@ -53,7 +54,8 @@ export function HostedUnavailableNotice({ botId }: { botId: string | null }) {
     <AlertTitle className="min-w-0 flex-1 basis-48">{t('hostedUnavailable')}</AlertTitle>
     <span className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-1">
       <Button type="button" size="sm" variant="outline" onClick={() => openModelPicker(botId)}>{t('changeModel')}</Button>
-      {own && <Button size="sm" nativeButton={false} role="link" render={<Link href={settingsHref('billing')} />}>{own.balance.verified ? billing('balance.topUp') : billing('refusal.verifyCard')}</Button>}
+      {own && !own.subscribed && own.workspaceId && <ConnectSubscriptionButton workspaceId={own.workspaceId} botId={botId} label={billing('refusal.bindSubscription')} />}
+      {own && <Button size="sm" variant={own.subscribed ? 'default' : 'outline'} nativeButton={false} role="link" render={<Link href={settingsHref('billing')} />}>{own.balance.verified ? billing('balance.topUp') : billing('refusal.verifyCard')}</Button>}
       {canShare && <Button type="button" size="sm" disabled={pending} onClick={() => void shareMyPoints()}>{t('useMyPoints')}</Button>}
     </span>
   </Alert>

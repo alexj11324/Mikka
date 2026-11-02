@@ -280,6 +280,8 @@ export const deviceCodes = pgTable('deviceCode', {
   status: text('status').notNull(),
   lastPolledAt: timestamp('lastPolledAt', { withTimezone: true }),
   pollingInterval: integer('pollingInterval'), clientId: text('clientId'), scope: text('scope'),
+  /** What the daemon asking to connect reports about itself, shown on /device before 允许 (lib/daemon-authorization.ts). */
+  deviceName: text('deviceName'), devicePlatform: text('devicePlatform'), clientVersion: text('clientVersion'),
 }, table => [uniqueIndex('device_code_key').on(table.deviceCode), uniqueIndex('device_user_code_key').on(table.userCode)])
 
 /** A daemon credential. Only the SHA-256 hash is stored. */
@@ -415,7 +417,7 @@ export const githubRepositoryInstallations = pgTable('github_repository_installa
   installationId: bigint('installationId', { mode: 'number' }).notNull(),
   repositoryId: bigint('repositoryId', { mode: 'number' }).notNull(),
   verifiedAt: timestamp('verifiedAt', { withTimezone: true }).notNull().defaultNow(),
-  /** When a live check last found the push granted (App contents:write, the person may write); null once refused (lib/github/push-grant.ts). */
+  /** Written by the push-grant check removed in decision 2026-11-02-1600; kept for old rows, no longer read or written. */
   pushGrantedAt: timestamp('pushGrantedAt', { withTimezone: true }),
 }, table => [primaryKey({ columns: [table.userId, table.remoteKey] })])
 
