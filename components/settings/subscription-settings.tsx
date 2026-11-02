@@ -52,7 +52,8 @@ async function post(body: unknown, signal?: AbortSignal) {
  * The subscriptions are their own group on 「API 与订阅」; API keys are the
  * next one (decision 2026-11-02-1200).
  */
-export function SubscriptionSettings({ workspaceId }: { workspaceId: string }) {
+/** `heading` replaces the section title where the rows appear outside Settings (the first-run guide's 绑定订阅). */
+export function SubscriptionSettings({ workspaceId, heading }: { workspaceId: string; heading?: string }) {
   const t = useTranslations('Settings.subscriptions')
   // Cached per workspace: a return to the page shows the last list at once and re-reads it behind.
   const list = useSWR(subscriptionsKey(workspaceId), () => readSubscriptions(workspaceId), { revalidateOnFocus: false })
@@ -201,12 +202,12 @@ export function SubscriptionSettings({ workspaceId }: { workspaceId: string }) {
       : !state.enabled ? <p role="status" className="px-1 text-sm text-muted-foreground">{t('serviceOff')}</p> : null
   // First visit only: rows the size of the provider rows, so nothing moves when the list arrives.
   if (!state && !loadFailed) return <div role="status" aria-label={t('loading')} className="flex flex-col gap-1">
-    <SettingsSection id="subscriptions-heading" title={t('heading')}>
+    <SettingsSection id="subscriptions-heading" title={heading ?? t('heading')}>
       {(['codex', 'claude'] as const).map(provider => <SubscriptionRowSkeleton key={provider} provider={provider} label={t(provider)} />)}
     </SettingsSection>
   </div>
   if (status || !state) return <section className="flex flex-col gap-1" aria-labelledby="subscriptions-heading">
-    <h2 id="subscriptions-heading" className="pl-1 text-sm font-medium">{t('heading')}</h2>
+    <h2 id="subscriptions-heading" className="pl-1 text-sm font-medium">{heading ?? t('heading')}</h2>
     {status}
   </section>
   // The oldest read on screen, so the line never overstates how fresh a meter is.
@@ -216,7 +217,7 @@ export function SubscriptionSettings({ workspaceId }: { workspaceId: string }) {
   }) : []
   const updated = reads.length > 0 ? Math.max(0, Math.floor((now - Math.min(...reads)) / 60_000)) : null
   return <div className="flex flex-col gap-1">
-    <SettingsSection id="subscriptions-heading" title={t('heading')}>
+    <SettingsSection id="subscriptions-heading" title={heading ?? t('heading')}>
       {(['codex', 'claude'] as const).map(provider => {
         const available = state.providers.some(item => item.provider === provider && item.available)
         const connections = state.connections.filter(item => item.provider === provider)

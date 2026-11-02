@@ -100,8 +100,8 @@ export async function coordinatorTurn(userId: string, botId: string) {
         const denied=error instanceof Error && ['scheduleReadAuthorityLost','scheduleWorkspaceAccessDenied','scheduleConversationUnavailable'].includes(error.message)
         try{await steps.failScheduleRead(inbox.scheduledRead,denied)}catch{/* the durable occurrence lease remains recoverable */}
       }
-      // Mikka 默认 refused it: Telegram and the phone get the same status line the web draws (never a silent failure).
-      if (!inbox.scheduledRead) try { await steps.noticeHostedRefusal(userId,botId,holder,error instanceof Error ? error.message : String(error),inbox.telegramTargets,inbox.pushEvents ?? []) } catch { /* the notice must not mask the turn's own failure */ }
+      // Mikka 默认 or the subscription refused it: Telegram and the phone get the words the web keeps under the message (never a silent failure).
+      if (!inbox.scheduledRead) try { await steps.noticeTurnFailure(userId,botId,holder,error instanceof Error ? error.message : String(error),inbox.telegramTargets,inbox.pushEvents ?? []) } catch { /* the notice must not mask the turn's own failure */ }
       // Finishing telemetry must not mask the original failure or invent a successful outcome.
       try { await kit.finishAgentExecution(userId,botId,execution?.id,'turn_failed') } catch { /* the durable execution remains inspectable */ }
       await steps.failTurn(userId,holder,error instanceof Error ? error.message : String(error),botId)

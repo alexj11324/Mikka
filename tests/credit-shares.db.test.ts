@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
-import { dbUrl, seedUser, seedWorkspace } from './support/workspace-admin-db'
+import { dbUrl, seedUser, seedWorkspace, useUpFreeMessages } from './support/workspace-admin-db'
 
 /*
  * 我的点数也可用于这个团队 against real Postgres (decision 2026-10-31-2300 item 4):
@@ -21,6 +21,8 @@ test('credit shares: opt in, pay order, leave, scope', { skip: !dbUrl }, async t
 
   const owner = await seedUser(pool, 'share-owner'), member = await seedUser(pool, 'share-member'), second = await seedUser(pool, 'share-second'), outsider = await seedUser(pool, 'share-outsider')
   const team = await seedWorkspace(pool, owner, [{ userId: owner, role: 'admin' }, { userId: member, role: 'member' }, { userId: second, role: 'member' }])
+  // Past its free messages (no card): only points can pay here.
+  await useUpFreeMessages(pool, team.id, owner)
   const personal = async (userId: string) => {
     const id = randomUUID()
     await pool.query(`INSERT INTO mikka_workspaces (id,"userId",name,slug,kind) VALUES ($1,$2,'personal',$3,'personal')`, [id, userId, `p-${id.slice(0, 8)}`])
@@ -80,6 +82,7 @@ test('credit shares: opt in, pay order, leave, scope', { skip: !dbUrl }, async t
     const founderOwn = await personal(founder)
     await hostedUsage.verify(founderOwn, null, null)
     const alone = await seedWorkspace(pool, founder, [{ userId: founder, role: 'admin' }])
+    await useUpFreeMessages(pool, alone.id, founder)
     assert.equal(await workspaceSoloMember(alone.id), founder)
     assert.equal(await workspaceSoloMember(founderOwn), founder, 'a personal workspace is one person')
     assert.equal(await workspaceSoloMember(team.id), null)

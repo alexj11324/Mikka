@@ -141,4 +141,8 @@ test('an untouched list: opus first, then the first Codex model reported, else t
   // An OpenAI-compatible key reports Codex models too.
   assert.deepEqual(models([{ harness: 'codex' as const, model: 'key-codex', name: 'key-codex', source: key('o') }]), ['key-codex'])
   assert.deepEqual(models([]), [], 'nothing connected: nothing')
+  // A DeepSeek key serves both Agents: alone, its first model on Claude Code; beside ChatGPT, ChatGPT's Codex model still comes second.
+  const both = deepseek.flatMap(item => [item, { ...item, harness: 'codex' as const }])
+  assert.deepEqual(defaultOrder(both).map(item => [item.model, item.harness]), [['reported-deepseek-chat', 'claude_code']])
+  assert.deepEqual(defaultOrder([...claude, ...chatgpt, ...both]).map(item => [item.model, item.harness]), [['reported-opus-x', 'claude_code'], ['reported-codex-top', 'codex']])
 })

@@ -10,6 +10,7 @@ import { completeOnboarding } from '@/app/actions/onboarding'
 import { BOT_MOOD_SECONDS, BotAvatar, DEFAULT_BOT_COLOR, DEFAULT_BOT_SHAPE, type BotColor, type BotMood, type BotShape } from '@/components/nav/bot-avatar'
 import { BotLookPicker } from '@/components/nav/bot-look-picker'
 import { AppTile, useConnectedApps } from '@/components/plugins/connected-apps'
+import { readSubscriptions, SubscriptionSettings, subscriptionsKey } from '@/components/settings/subscription-settings'
 import { Bubble, BubbleContent } from '@/components/ui/bubble'
 import { Button } from '@/components/ui/button'
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
@@ -34,7 +35,7 @@ export type E2BKeyResult = 'ok' | 'invalid' | 'unavailable'
 
 type Line = { id: number; from: 'bot' | 'person'; text: string }
 type Stage = 'intro' | 'chat' | 'welcome'
-type Card = 'intro' | 'name' | 'computer' | 'key' | 'apps' | 'welcome' | null
+type Card = 'intro' | 'name' | 'subscription' | 'computer' | 'key' | 'apps' | 'welcome' | null
 
 /** The guide's pacing, in ms (docs/design/onboarding.md §5). */
 const PACE = { dim: 3000, autoStart: 8000, travel: 640, firstLine: 400, botGap: 2500, replyBeat: 1000, lastBeat: 1200, rise: 700 }
@@ -43,11 +44,12 @@ const BUBBLE_SPRING = { type: 'spring', stiffness: 520, damping: 27, mass: 0.52 
 
 /**
  * The first-run guide: one conversation with the person's first Bot. It names
- * the Bot and picks its look, asks about the cloud computer, connects apps,
+ * the Bot and picks its look, offers 绑定订阅 (the rows of Settings › 模型订阅,
+ * unchanged), asks about the cloud computer, connects apps,
  * then shows the Bot on a welcome page. Leaving for an app's sign-in reloads
  * the page; the guide picks up after the name, because the Bot already exists.
  */
-export function Onboarding({ computer = 'none', saveKey, onDone }: { computer?: OnboardingComputer; saveKey?: (apiKey: string) => Promise<E2BKeyResult>; onDone: (bot: BotView | null) => void }) {
+export function Onboarding({ computer = 'none', saveKey, workspaceId, onDone }: { computer?: OnboardingComputer; saveKey?: (apiKey: string) => Promise<E2BKeyResult>; workspaceId?: string; onDone: (bot: BotView | null) => void }) {
   const t = useTranslations('Onboarding')
   const tApps = useTranslations('Settings.integrations')
   const locale = useLocale()
@@ -58,6 +60,11 @@ export function Onboarding({ computer = 'none', saveKey, onDone }: { computer?: 
   const apps = useConnectedApps()
   const appsRef = useRef(apps)
   appsRef.current = apps
+  // The same cache as Settings › 模型订阅: the step's rows and this read are one list.
+  const subscriptions = useSWR(workspaceId ? subscriptionsKey(workspaceId) : null, () => readSubscriptions(workspaceId!), { revalidateOnFocus: false })
+  const subscriptionsRef = useRef(subscriptions)
+  subscriptionsRef.current = subscriptions
+  const subscribed = subscriptions.data?.connections.some(item => item.state === 'connected') ?? false
 
   const [stage, setStage] = useState<Stage>('intro')
   const [card, setCard] = useState<Card>(null)
@@ -196,6 +203,27 @@ export function Onboarding({ computer = 'none', saveKey, onDone }: { computer?: 
   }
 
   async function afterName(current: BotView) {
+    // Wait for the list, so the step is not offered where this deployment has no subscriptions.
+    for (let tries = 0; workspaceId && !subscriptionsRef.current.data && !subscriptionsRef.current.error && tries < 50; tries++) await wait(100)
+    if (workspaceId && subscriptionsRef.current.data?.enabled) {
+      await say(t('subscriptionAsk'))
+      setCard('subscription')
+      return
+    }
+    await afterSubscription(current)
+  }
+
+  function doneSubscription() {
+    setCard(null)
+    reply(subscribed ? t('subscriptionReplyDone') : t('subscriptionNo'))
+    void run(async () => {
+      if (subscribed) { act('wink'); hop() }
+      else await say(t('subscriptionLater'))
+      await afterSubscription(bot)
+    })
+  }
+
+  async function afterSubscription(current: BotView | null) {
     if (computer === 'ask' && saveKey) {
       await say(t('computerAsk'))
       setCard('computer')
@@ -334,6 +362,15 @@ export function Onboarding({ computer = 'none', saveKey, onDone }: { computer?: 
               <Button type="submit" disabled={!name.trim() || busy}>{busy && <Spinner data-icon="inline-start" />}{t('confirm')}</Button>
             </div>
           </form>}
+
+          {card === 'subscription' && workspaceId && <div className="flex flex-col gap-4 rounded-xl bg-muted p-4">
+            <SubscriptionSettings workspaceId={workspaceId} heading={t('subscriptionHeading')} />
+            <div className="flex justify-end gap-2">
+              {subscribed
+                ? <Button onClick={doneSubscription}>{t('subscriptionContinue')}</Button>
+                : <Button variant="outline" onClick={doneSubscription}>{t('subscriptionNo')}</Button>}
+            </div>
+          </div>}
 
           {card === 'computer' && <div className="flex gap-2">
             <Button onClick={() => { setCard('key'); reply(t('computerYes')) }}>{t('computerYes')}</Button>

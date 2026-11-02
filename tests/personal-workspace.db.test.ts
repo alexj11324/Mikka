@@ -5,7 +5,7 @@ import assert from 'node:assert/strict'
 import { createHash, randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
-import { dbUrl, seedAgent, seedRun, seedUser, seedWorkspace } from './support/workspace-admin-db'
+import { dbUrl, seedAgent, seedRun, seedUser, seedWorkspace, useUpFreeMessages } from './support/workspace-admin-db'
 
 const uuidFrom = (seed: string) => {
   const hash = createHash('sha256').update(seed).digest('hex')
@@ -120,9 +120,13 @@ test('personal workspaces', { skip: !dbUrl }, async t => {
     // Someone who never verified is told so, never silently stopped.
     const stranger = await seedUser(pool, 'unverified')
     const theirs = await ensurePersonalWorkspace({ id: stranger, email: `${stranger}@example.invalid`, name: 'unverified' }, 'zh-CN')
+    // A new sign-up's first messages are free (TRIAL_MESSAGES); past them, a card.
+    assert.equal(((await canUseMikkaPaid(theirs)) as { trialLeft?: number }).trialLeft, 20)
+    await useUpFreeMessages(pool, theirs, stranger)
     await assert.rejects(canUseMikkaPaid(theirs), { code: 'verification_required' })
     // A peer's verification on a team they do not own does not verify their personal workspace.
     const peerPersonal = await ensurePersonalWorkspace({ id: peer, email: `${peer}@example.invalid`, name: 'peer' }, 'zh-CN')
+    await useUpFreeMessages(pool, peerPersonal, peer)
     await assert.rejects(canUseMikkaPaid(peerPersonal), { code: 'verification_required' })
   })
 

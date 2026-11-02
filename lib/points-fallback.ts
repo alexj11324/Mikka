@@ -60,18 +60,25 @@ export async function pointsFallback(pool: Pool, scope: { ownerId: string; works
 /**
  * The points Mikka 默认 can spend in this workspace now, as the model menu
  * shows them: its own balance and each balance a member shared with it
- * (sharedCreditWorkspaces), counting only those that would admit a call.
- * Never another workspace's points the person merely has.
+ * (sharedCreditWorkspaces), counting only those that would admit a call,
+ * and the free messages left before a card is needed (`trialLeft`). Never
+ * another workspace's points the person merely has.
  */
-export async function hostedPointsHere(workspaceId: string): Promise<number> {
+export async function hostedPointsHere(workspaceId: string): Promise<{ points: number; trialLeft: number }> {
   const [{ sharedCreditWorkspaces }, { canUseMikkaPaid }, { balancePoints }] = await Promise.all([
     import('./credit-shares'), import('./abuse/runtime'), import('./billing/hosted-usage'),
   ])
   let points = 0
-  for (const payer of [workspaceId, ...await sharedCreditWorkspaces(workspaceId)]) {
-    try { points += balancePoints(await canUseMikkaPaid(payer)) } catch (error) {
+  let trialLeft = 0
+  for (const [index, payer] of [workspaceId, ...await sharedCreditWorkspaces(workspaceId)].entries()) {
+    try {
+      const balance = await canUseMikkaPaid(payer)
+      points += balancePoints(balance)
+      // The workspace's own free messages (no card yet, TRIAL_MESSAGES); a sharer's never count here.
+      if (index === 0 && 'trialLeft' in balance) trialLeft = balance.trialLeft
+    } catch (error) {
       if (!(error instanceof PaidResourceError) || !NO_POINTS.has(error.code)) throw error
     }
   }
-  return points
+  return { points, trialLeft }
 }

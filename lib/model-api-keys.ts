@@ -11,8 +11,8 @@ import { stopRunsUsingApiKeys } from '@/lib/model-api-key-runs'
 import { openSecret, sealSecret, SecretsKeyMissingError } from '@/lib/secrets/crypto'
 import { WorkspaceError } from '@/lib/workspace-error'
 import {
-  API_KEY_PRESET_ENDPOINTS, API_KEY_PRESETS, apiKeyChatBaseUrl, apiKeyHarness, customModelsUrl,
-  type ApiKeyProtocol, type ApiKeyProvider, type ApiKeyView,
+  API_KEY_PRESET_ENDPOINTS, API_KEY_PRESETS, apiKeyChatBaseUrl, apiKeyEndpoint, apiKeyHarnesses, apiKeyProtocols, customModelsUrl,
+  type ApiKeyHarness, type ApiKeyProtocol, type ApiKeyProvider, type ApiKeyView,
 } from '@/lib/model-api-key-providers'
 
 /**
@@ -129,7 +129,8 @@ export async function addApiKey(query: Query, ownerId: string, input: unknown, o
   const env = options.env ?? process.env
   const custom = parsed.provider === 'custom' ? parsed : null
   const baseUrl = custom ? await checkBaseUrl(custom.baseUrl, env, options.resolve) : null
-  const protocol: ApiKeyProtocol = custom ? custom.protocol : API_KEY_PRESET_ENDPOINTS[parsed.provider as Exclude<ApiKeyProvider, 'custom'>].protocol
+  // A preset's own protocols are its endpoints (apiKeyProtocols); the column keeps its first, for older readers.
+  const protocol: ApiKeyProtocol = custom ? custom.protocol : apiKeyProtocols({ provider: parsed.provider, protocol: 'anthropic' })[0]
   const target = modelsTarget({ provider: parsed.provider, baseUrl, protocol })
   const existing = custom ? undefined : (await query.query<{ id: string }>('SELECT id FROM model_api_keys WHERE "ownerId"=$1 AND provider=$2', [ownerId, parsed.provider])).rows[0]
   const id = existing?.id ?? randomUUID()
@@ -243,7 +244,7 @@ export type ApiKeyRunCredential =
   | { harness: 'claude_code'; keyId: string; ownerId: string; env: { ANTHROPIC_API_KEY: string; ANTHROPIC_BASE_URL: string } }
   | { harness: 'codex'; keyId: string; ownerId: string; env: { MIKKA_MODEL_API_KEY: string }
     /** Codex config: `model_provider = "mikka"` and `[model_providers.mikka]`. The key stays in the env var named by env_key. */
-    codex: { model_provider: 'mikka'; model_providers: { mikka: { name: string; base_url: string; env_key: 'MIKKA_MODEL_API_KEY'; wire_api: 'responses' | 'chat' } } } }
+    codex: { model_provider: 'mikka'; model_providers: { mikka: { name: string; base_url: string; env_key: 'MIKKA_MODEL_API_KEY'; wire_api: 'responses' } } } }
 
 async function openKey(query: Query, keyId: string, env: Env) {
   const { rows: [row] } = await query.query<Row & { ciphertext: string; iv: string; keyVersion: number }>(`SELECT ${COLUMNS},ciphertext,iv,"keyVersion" FROM model_api_keys WHERE id=$1`, [keyId])
@@ -255,14 +256,14 @@ async function openKey(query: Query, keyId: string, env: Env) {
   }
 }
 
-/** A bot's saved API key model (bot_model_choices), with the Agent its threads run on (§ 3). */
-export interface BotApiKeyChoice { keyId: string; model: string; harness: 'claude_code' | 'codex' }
+/** A bot's saved API key model (bot_model_choices), with the Agents its threads can run on (§ 3). */
+export interface BotApiKeyChoice { keyId: string; model: string; harnesses: ApiKeyHarness[] }
 
 export async function botApiKeyChoice(query: Query, scope: { ownerId: string; workspaceId: string }, botId: string | null): Promise<BotApiKeyChoice | undefined> {
-  const { rows: [row] } = await query.query<{ apiKeyId: string; apiKeyModel: string; protocol: ApiKeyProtocol }>(
-    `SELECT c."apiKeyId",c."apiKeyModel",k.protocol FROM bot_model_choices c JOIN model_api_keys k ON k.id=c."apiKeyId"
+  const { rows: [row] } = await query.query<{ apiKeyId: string; apiKeyModel: string; provider: ApiKeyProvider; protocol: ApiKeyProtocol }>(
+    `SELECT c."apiKeyId",c."apiKeyModel",k.provider,k.protocol FROM bot_model_choices c JOIN model_api_keys k ON k.id=c."apiKeyId"
     WHERE c."ownerId"=$1 AND c."workspaceId"=$2 AND c."botKey"=$3`, [scope.ownerId, scope.workspaceId, botId ?? 'coordinator'])
-  return row && { keyId: row.apiKeyId, model: row.apiKeyModel, harness: apiKeyHarness(row.protocol) }
+  return row && { keyId: row.apiKeyId, model: row.apiKeyModel, harnesses: apiKeyHarnesses(row) }
 }
 
 /**
@@ -283,7 +284,7 @@ export async function setBotApiKeyChoice(query: Query, scope: { ownerId: string;
   await query.query(`INSERT INTO bot_model_choices ("ownerId","workspaceId","botKey","bindingId","apiKeyId","apiKeyModel") VALUES ($1,$2,$3,NULL,$4,$5)
     ON CONFLICT ("ownerId","workspaceId","botKey") DO UPDATE SET "bindingId"=NULL,"apiKeyId"=EXCLUDED."apiKeyId","apiKeyModel"=EXCLUDED."apiKeyModel"`,
   [scope.ownerId, scope.workspaceId, botId ?? 'coordinator', keyId, modelName])
-  return { keyId, model: modelName, harness: apiKeyHarness(key.protocol) }
+  return { keyId, model: modelName, harnesses: apiKeyHarnesses(key) }
 }
 
 /**
@@ -303,13 +304,15 @@ const ACTIVE_RUN = ['queued', 'preparing', 'running', 'paused', 'waiting_input',
 
 /**
  * The key a run uses, opened for injection at the start of that run
- * (orchestration.md § 6). The run must still be active, and the key must be
- * usable by the run's owner in the run's workspace: their own key, or a
- * teammate's shared there with 分享给团队成员. Throws WorkspaceError
- * ('apiKeyNotFound') otherwise, so a withdrawn share or a deleted key stops
- * the run instead of switching (§ 2).
+ * (orchestration.md § 6), for the run's Agent: the endpoint of the protocol
+ * that Agent speaks (a DeepSeek or Kimi key serves both). The run must still
+ * be active, and the key must be usable by the run's owner in the run's
+ * workspace: their own key, or a teammate's shared there with 分享给团队成员,
+ * and it must serve that Agent. Throws WorkspaceError('apiKeyNotFound')
+ * otherwise, so a withdrawn share or a deleted key stops the run instead of
+ * switching (§ 2).
  */
-export async function apiKeyForRun(query: Query, runId: string, keyId: string, env: Env = process.env): Promise<ApiKeyRunCredential> {
+export async function apiKeyForRun(query: Query, runId: string, keyId: string, harness: ApiKeyHarness, env: Env = process.env): Promise<ApiKeyRunCredential> {
   z.uuid().parse(runId); z.uuid().parse(keyId)
   const { rows: [run] } = await query.query<{ userId: string; workspaceId: string | null; status: string }>(
     'SELECT r."userId",b."workspaceId"::text AS "workspaceId",r.status FROM agent_runs r LEFT JOIN bots b ON b.id=r."botId" WHERE r.id=$1', [runId])
@@ -319,13 +322,15 @@ export async function apiKeyForRun(query: Query, runId: string, keyId: string, e
     : Boolean((await query.query('SELECT 1 FROM model_api_keys WHERE id=$1 AND "ownerId"=$2', [keyId, run.userId])).rowCount)
   if (!usable) throw new WorkspaceError('apiKeyNotFound')
   const { row, apiKey } = await openKey(query, keyId, env)
+  const endpoint = apiKeyEndpoint(row, harness)
+  if (!endpoint) throw new WorkspaceError('apiKeyNotFound')
   // Recorded so withdrawing the key or its share stops this run (stopRunsUsingApiKeys).
   await query.query(`INSERT INTO model_api_key_runs ("runId","keyId","workspaceId") VALUES ($1,$2,$3)
     ON CONFLICT ("runId") DO UPDATE SET "keyId"=EXCLUDED."keyId","workspaceId"=EXCLUDED."workspaceId"`, [runId, keyId, run.workspaceId])
-  const baseUrl = row.baseUrl ?? API_KEY_PRESET_ENDPOINTS[row.provider as Exclude<ApiKeyProvider, 'custom'>].baseUrl
-  if (apiKeyHarness(row.protocol) === 'claude_code') return { harness: 'claude_code', keyId: row.id, ownerId: row.ownerId, env: { ANTHROPIC_API_KEY: apiKey, ANTHROPIC_BASE_URL: baseUrl } }
+  if (harness === 'claude_code') return { harness: 'claude_code', keyId: row.id, ownerId: row.ownerId, env: { ANTHROPIC_API_KEY: apiKey, ANTHROPIC_BASE_URL: endpoint.baseUrl } }
   return {
     harness: 'codex', keyId: row.id, ownerId: row.ownerId, env: { MIKKA_MODEL_API_KEY: apiKey },
-    codex: { model_provider: 'mikka', model_providers: { mikka: { name: row.name ?? 'OpenAI', base_url: baseUrl, env_key: 'MIKKA_MODEL_API_KEY', wire_api: row.provider === 'openai' ? 'responses' : 'chat' } } },
+    // The daemon runs Codex on the Responses API (packages/daemon/src/agents/run-credential.ts).
+    codex: { model_provider: 'mikka', model_providers: { mikka: { name: row.name ?? 'OpenAI', base_url: endpoint.baseUrl, env_key: 'MIKKA_MODEL_API_KEY', wire_api: 'responses' } } },
   }
 }

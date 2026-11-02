@@ -2467,10 +2467,6 @@
         "kimi": "Kimi",
         "custom": "Custom provider"
       },
-      "protocol": {
-        "openai": "OpenAI-compatible",
-        "anthropic": "Anthropic-compatible"
-      },
       "shareLabel": "Share {name} with team members",
       "removeLabel": "Delete {name}",
       "removeTitle": "Delete {name}?",
@@ -2485,7 +2481,13 @@
       "modelsInvalid": "Couldn't fetch models · Key invalid or revoked",
       "modelsUnavailable": "Couldn't fetch models · Provider didn't respond",
       "refetch": "Fetch models again",
-      "refetchLabel": "Fetch models for {name} again"
+      "refetchLabel": "Fetch models for {name} again",
+      "protocolName": {
+        "anthropic": "Anthropic",
+        "openai": "OpenAI"
+      },
+      "protocolAgents": "{protocols} protocol · runs on {agents}",
+      "customAgents": "Pick a protocol to see which Agent runs it"
     },
     "modelOrder": {
       "title": "Allowed models",
@@ -2994,6 +2996,7 @@
       "hosted": "Mikka Default",
       "credits": "Credits",
       "points": "{points} points",
+      "trialLeft": "{count} free left",
       "hostedUnavailable": "Mikka Default can’t run in this workspace",
       "changeModel": "Change model",
       "useMyPoints": "Use my points for this team",
@@ -3820,6 +3823,11 @@
   "DeviceAuthorization": {
     "title": "Connect this computer",
     "code": "Terminal verification code",
+    "device": "Computer",
+    "deviceUnreported": "Name not reported",
+    "clientVersion": "Client {version}",
+    "access": "Access",
+    "codeMatches": "The terminal shows this same code",
     "continue": "Continue",
     "loading": "Loading…",
     "scope": "Run your threads",
@@ -4115,11 +4123,14 @@
     },
     "refusal": {
       "verificationRequiredPlain": "Mikka Default needs a verified card",
+      "branded": "Mikka Default: {reason}",
       "verification_required": "<model><mark></mark> Mikka Default</model> needs a verified card",
       "free_allowance_used": "Free allowance used up",
       "points_exhausted": "Points used up",
       "platform_paused": "Free allowance paused",
       "unavailable": "Mikka Default is unavailable",
+      "trialUsed": "Free messages used up",
+      "bindSubscription": "Connect a subscription",
       "verifyCard": "Verify card",
       "teamNoPoints": "This team has no points to use",
       "openBilling": "Open billing",
@@ -4181,6 +4192,12 @@
     "confirm": "Done",
     "nameReply": "Call it {name}",
     "named": "Got it. I'm {name} from now on.",
+    "subscriptionAsk": "Want to bind your Claude or ChatGPT subscription?",
+    "subscriptionHeading": "Bind a subscription",
+    "subscriptionNo": "Not now",
+    "subscriptionContinue": "Continue",
+    "subscriptionReplyDone": "Subscription bound",
+    "subscriptionLater": "OK. You can bind one in Settings later.",
     "computerAsk": "With a cloud computer I can browse the web, and threads can run in the cloud. Turn it on now?",
     "computerYes": "Turn on",
     "computerNo": "Not now",

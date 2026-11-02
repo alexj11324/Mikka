@@ -2467,10 +2467,6 @@
         "kimi": "Kimi",
         "custom": "自定义服务商"
       },
-      "protocol": {
-        "openai": "OpenAI 兼容",
-        "anthropic": "Anthropic 兼容"
-      },
       "shareLabel": "分享 {name} 给团队成员",
       "removeLabel": "删除 {name}",
       "removeTitle": "删除 {name}？",
@@ -2485,7 +2481,13 @@
       "modelsInvalid": "无法获取模型 · Key 无效或已被撤销",
       "modelsUnavailable": "无法获取模型 · 服务商没有响应",
       "refetch": "重新获取模型",
-      "refetchLabel": "重新获取 {name} 的模型"
+      "refetchLabel": "重新获取 {name} 的模型",
+      "protocolName": {
+        "anthropic": "Anthropic",
+        "openai": "OpenAI"
+      },
+      "protocolAgents": "{protocols} 协议 · 可用 {agents}",
+      "customAgents": "选了协议才知道能用哪个 Agent"
     },
     "modelOrder": {
       "title": "允许使用的模型",
@@ -2994,6 +2996,7 @@
       "hosted": "Mikka 默认",
       "credits": "点数",
       "points": "{points} 点",
+      "trialLeft": "剩 {count} 条免费",
       "hostedUnavailable": "Mikka 默认在这个工作区不可用",
       "changeModel": "换模型",
       "useMyPoints": "把我的点数用于这个团队",
@@ -3820,6 +3823,11 @@
   "DeviceAuthorization": {
     "title": "连接这台电脑",
     "code": "终端验证码",
+    "device": "电脑",
+    "deviceUnreported": "未报告名称",
+    "clientVersion": "客户端 {version}",
+    "access": "权限",
+    "codeMatches": "终端里显示的也是这个验证码",
     "continue": "继续",
     "loading": "正在读取…",
     "scope": "执行你的线程",
@@ -4115,11 +4123,14 @@
     },
     "refusal": {
       "verificationRequiredPlain": "使用 Mikka 默认模型前需要验证银行卡",
+      "branded": "Mikka 默认{reason}",
       "verification_required": "使用 <model><mark></mark> Mikka 默认模型</model>前需要验证银行卡",
       "free_allowance_used": "免费额度已用完",
       "points_exhausted": "点数已用完",
       "platform_paused": "免费额度暂时停用",
       "unavailable": "Mikka 默认暂时不可用",
+      "trialUsed": "免费对话已用完",
+      "bindSubscription": "绑定订阅",
       "verifyCard": "验证银行卡",
       "teamNoPoints": "这个团队没有可用点数",
       "openBilling": "打开计费",
@@ -4181,6 +4192,12 @@
     "confirm": "确定",
     "nameReply": "就叫{name}",
     "named": "好的，以后我叫{name}。",
+    "subscriptionAsk": "要绑定你的 Claude 或 ChatGPT 订阅吗？",
+    "subscriptionHeading": "绑定订阅",
+    "subscriptionNo": "暂不绑定",
+    "subscriptionContinue": "继续",
+    "subscriptionReplyDone": "已绑定订阅",
+    "subscriptionLater": "好的。之后可以在设置中绑定。",
     "computerAsk": "开通云电脑后，我可以浏览网页，线程也能在云端运行。现在开通吗？",
     "computerYes": "开通",
     "computerNo": "暂不开通",
