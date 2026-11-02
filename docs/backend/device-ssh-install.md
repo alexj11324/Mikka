@@ -83,8 +83,13 @@ service's Node runtime and existing registry configuration. Checks and installs
 run outside the heartbeat loop. `--no-auto-update` on `daemon service install`
 persists an opt-out; foreground, development and embedded daemons are excluded.
 Service installation preserves an explicit `--data-dir`. Updates preserve the
-device credential and server configuration. Failed automatic attempts wait an
-hour before retrying and do not deliberately restart after installation failure;
+device credential and server configuration. The heartbeat answer also names the
+latest release (`daemonVersions`), which an idle daemon installs at once, and the
+minimum (`MIN_DAEMON_VERSION`): a claim from an older released daemon is refused
+with `daemonUpgradeRequired` and the run ends so the Bot asks for an update.
+Failed automatic installs back off (5 minutes, 30 minutes, then 2 hours) before
+retrying, are reported on the heartbeat by code (`devices.updateFailure`), and do
+not deliberately restart after installation failure;
 the existing in-place npm replacement does not provide rollback.
 
 ## Verification

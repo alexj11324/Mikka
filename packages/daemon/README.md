@@ -46,7 +46,10 @@ mikka daemon service install --server https://app.aspectlylabs.com/mikka --devic
 ```
 
 Public npm installations running under launchd or systemd check for a newer
-stable release once an hour. The daemon finishes its running threads and
+stable release once an hour, and as soon as a heartbeat answer names a newer
+release. A failed install keeps the running version, waits 5 minutes, then 30
+minutes, then 2 hours before retrying that version, and is reported to the server
+by code. The daemon finishes its running threads and
 Coordinator work before installing the exact version and restarting. Version
 checks and installation run in the background so heartbeats remain available.
 The service keeps its server, data directory and device identity. Foreground,
