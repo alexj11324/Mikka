@@ -43,8 +43,9 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
   /** A connected subscription whose account catalogue lists `models` (one binding each, as a refresh stores them). */
   const subscribe = async (scope: { ownerId: string; workspaceId: string }, provider: 'claude' | 'codex', models: string[]) => {
     const connection = randomUUID()
-    await pool.query(`INSERT INTO byos_connections (id,"ownerId","workspaceId",provider,state,epoch,"secretName","secretDigest","providerSubject") VALUES ($1,$2,$3,$4,'connected',1,$5,$6,'synthetic-subject')`,
-      [connection, scope.ownerId, scope.workspaceId, provider, `synthetic-${connection}`, 'a'.repeat(64)])
+    // The catalogue as the account listed it (refreshBotModels stores the same): its order is the account's.
+    await pool.query(`INSERT INTO byos_connections (id,"ownerId","workspaceId",provider,state,epoch,"secretName","secretDigest","providerSubject","modelCatalog") VALUES ($1,$2,$3,$4,'connected',1,$5,$6,'synthetic-subject',$7)`,
+      [connection, scope.ownerId, scope.workspaceId, provider, `synthetic-${connection}`, 'a'.repeat(64), JSON.stringify({ revision: '1', models })])
     for (const model of models) await pool.query(`INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId") VALUES ($1,$2,$3,'catalogue',$4,1,$5,$6)`,
       [randomUUID(), scope.ownerId, scope.workspaceId, connection, provider === 'codex' ? 'codex_cpa' : 'claude_cpa', model])
     return connection
@@ -61,16 +62,25 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
     return { id, agents }
   }
 
-  await t.test('an untouched list is Claude Code\'s opus, then Codex\'s strongest tier, from what the accounts list; nothing is stored', async () => {
+  await t.test('an untouched list: opus, then the first Codex model reported, else the first model anything reported; nothing is stored', async () => {
     const scope = await person('order-default')
     const claude = await subscribe(scope, 'claude', ['acct-sonnet-a', 'acct-opus-a'])
-    await subscribe(scope, 'codex', ['acct-codex-low', 'acct-codex-xhigh'])
+    await subscribe(scope, 'codex', ['acct-codex-top', 'acct-codex-next'])
     const view = await order.orderView(pool, scope)
     assert.equal(view.customized, false)
-    assert.deepEqual(view.entries.map(entry => [entry.harness, entry.model]), [['claude_code', 'acct-opus-a'], ['codex', 'acct-codex-xhigh']])
+    assert.deepEqual(view.entries.map(entry => [entry.harness, entry.model]), [['claude_code', 'acct-opus-a'], ['codex', 'acct-codex-top']])
     assert.deepEqual(view.entries[0].source, { kind: 'subscription', connectionId: claude })
     assert.equal((await pool.query('SELECT count(*)::int AS n FROM model_order_entries WHERE "ownerId"=$1', [scope.ownerId])).rows[0].n, 0)
     assert.equal(view.candidates.length, 4)
+    // Only a ChatGPT subscription: its Codex model.
+    const chatgptOnly = await person('order-default-chatgpt')
+    await subscribe(chatgptOnly, 'codex', ['acct-codex-top', 'acct-codex-next'])
+    assert.deepEqual((await order.orderView(pool, chatgptOnly)).entries.map(entry => [entry.harness, entry.model]), [['codex', 'acct-codex-top']])
+    // Only a DeepSeek key: DeepSeek's first reported model, on the key.
+    const deepseekOnly = await person('order-default-deepseek')
+    const key = await keys.addApiKey(pool, deepseekOnly.ownerId, { provider: 'deepseek', apiKey: `sk-${randomBytes(12).toString('hex')}` }, { fetch: (async () => Response.json({ data: [{ id: 'key-deepseek-first' }, { id: 'key-deepseek-second' }] })) as unknown as typeof fetch })
+    const deepseekView = await order.orderView(pool, deepseekOnly)
+    assert.deepEqual(deepseekView.entries.map(entry => [entry.model, entry.source]), [['key-deepseek-first', { kind: 'api_key', keyId: key.id }]])
   })
 
   await t.test('edits: the first change stores what was shown; adds must be candidates; reorder, remove and 运行位置 save', async () => {

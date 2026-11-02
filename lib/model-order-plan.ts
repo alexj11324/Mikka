@@ -112,31 +112,38 @@ export function planDispatch(input: {
 }
 
 /**
- * The only model words written in code (decision 2026-11-02-1400, Alex): how an
- * untouched list is filled from what the person actually has. They match
- * reported model ids and names; a model nothing reported is never added.
- * Claude Code's opus first, then Codex's strongest reasoning tier.
+ * The only model word written in code (decision 2026-11-02-1400, Alex): how an
+ * untouched list puts Claude Code's opus first. It matches reported model ids
+ * and names; a model nothing reported is never added.
  */
 export const DEFAULT_ORDER_PREFERENCE: readonly { harness: OrderHarness; words: readonly string[] }[] = [
   { harness: 'claude_code', words: ['opus'] },
-  { harness: 'codex', words: ['xhigh', 'extra high'] },
 ]
 
 export interface OrderCandidate { harness: OrderHarness; model: string; name: string; source: EntrySource }
 
 /**
- * The list a person who has not touched it gets: for each preference, the
- * first candidate of a subscription (never an API key, which bills per token)
- * whose id or name holds one of its words. A preference nothing matches is
- * skipped: no Claude subscription starts from Codex, no Codex leaves Claude only.
+ * The list a person who has not touched it gets, from what they connected and
+ * what it reported (Alex, decision 2026-11-02-1400). Candidates come in the
+ * order `orderCandidates` gives: Claude subscriptions, other subscriptions,
+ * then keys, each in the order its account or provider listed its models.
+ * - Claude Code's opus first, from a subscription before a key.
+ * - Then Codex: the first model a subscription or key reported for it (the
+ *   account lists its top model first; no tier word is required).
+ * - Neither: the first model anything else reported, so the list is not empty.
+ * Nothing connected: an empty list.
  */
 export function defaultOrder(candidates: readonly OrderCandidate[]): OrderCandidate[] {
+  const bySource = (items: readonly OrderCandidate[]) => [...items.filter(item => item.source.kind === 'subscription'), ...items.filter(item => item.source.kind !== 'subscription')]
   const picked: OrderCandidate[] = []
   for (const preference of DEFAULT_ORDER_PREFERENCE) {
-    const match = candidates.find(candidate => candidate.source.kind === 'subscription' && candidate.harness === preference.harness
+    const match = bySource(candidates).find(candidate => candidate.harness === preference.harness
       && preference.words.some(word => `${candidate.model} ${candidate.name}`.toLowerCase().includes(word)))
     if (match) picked.push(match)
   }
+  const codex = bySource(candidates).find(candidate => candidate.harness === 'codex')
+  if (codex) picked.push(codex)
+  if (!picked.length && candidates[0]) picked.push(candidates[0])
   return picked
 }
 

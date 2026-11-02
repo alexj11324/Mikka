@@ -53,10 +53,18 @@ export async function orderCandidates(query: Query, scope: OrderScope): Promise<
   const { ExecutionSettings } = await import('./execution-settings')
   const { usableApiKeys } = await import('./model-api-keys')
   const rows = await new ExecutionSettings(query as Pool).botModels(scope, query)
+  // Each account's models in the order the account listed them (its catalogue): the default takes the first Codex model.
+  const connectionIds = [...new Set(rows.map(row => String(row.connectionId)))]
+  const listed = new Map((connectionIds.length ? (await query.query<{ id: string; models: unknown }>(
+    `SELECT id::text AS id,"modelCatalog"->'models' AS models FROM byos_connections WHERE id::text = ANY($1) AND "ownerId"=$2`, [connectionIds, scope.ownerId])).rows : [])
+    .map(row => [row.id, Array.isArray(row.models) ? row.models.map(String) : []]))
+  const rank = (connectionId: string, model: string) => { const at = listed.get(connectionId)?.indexOf(model) ?? -1; return at < 0 ? Number.MAX_SAFE_INTEGER : at }
   const subscriptions = rows.map(row => ({
     harness: (row.provider === 'codex' ? 'codex' : 'claude_code') as OrderHarness, model: String(row.modelId), name: String(row.modelId),
     source: { kind: 'subscription' as const, connectionId: String(row.connectionId) }, provider: String(row.provider),
-  }))
+  })).map((item, at) => ({ item, at })).sort((a, b) => a.item.source.connectionId === b.item.source.connectionId
+    ? rank(a.item.source.connectionId, a.item.model) - rank(b.item.source.connectionId, b.item.model) || a.at - b.at
+    : a.at - b.at).map(({ item }) => item)
   const keys = (await usableApiKeys(query, scope.ownerId, scope.workspaceId)).flatMap(key => key.models.map(model => ({
     harness: apiKeyHarness(key.protocol) as OrderHarness, model, name: model,
     source: { kind: 'api_key' as const, keyId: key.id }, provider: key.provider,

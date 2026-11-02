@@ -70,15 +70,32 @@ test('nothing can run: the card names why', () => {
   assert.deepEqual([spent.kind, spent.kind === 'none' && spent.reason], ['none', 'unavailable'])
 })
 
-test('an untouched list starts with Claude Code\'s opus, then Codex\'s strongest tier, from subscriptions only, and skips what nothing reported', () => {
-  const candidates = [
-    { harness: 'claude_code' as const, model: 'reported-sonnet-x', name: 'Sonnet X', source: { kind: 'subscription' as const, connectionId: 'c' } },
-    { harness: 'claude_code' as const, model: 'reported-opus-x', name: 'Opus X', source: { kind: 'subscription' as const, connectionId: 'c' } },
-    { harness: 'codex' as const, model: 'reported-codex-xhigh', name: 'Codex (Extra High)', source: { kind: 'subscription' as const, connectionId: 'g' } },
-    { harness: 'claude_code' as const, model: 'key-opus', name: 'key-opus', source: { kind: 'api_key' as const, keyId: 'k' } },
+test('an untouched list: opus first, then the first Codex model reported, else the first model anything reported', () => {
+  const sub = (connectionId: string) => ({ kind: 'subscription' as const, connectionId })
+  const key = (keyId: string) => ({ kind: 'api_key' as const, keyId })
+  const claude = [
+    { harness: 'claude_code' as const, model: 'reported-sonnet-x', name: 'Sonnet X', source: sub('c') },
+    { harness: 'claude_code' as const, model: 'reported-opus-x', name: 'Opus X', source: sub('c') },
   ]
-  assert.deepEqual(defaultOrder(candidates).map(item => item.model), ['reported-opus-x', 'reported-codex-xhigh'])
-  assert.deepEqual(defaultOrder(candidates.slice(2)).map(item => item.model), ['reported-codex-xhigh'], 'no Claude subscription: Codex first')
-  assert.deepEqual(defaultOrder(candidates.slice(0, 2)).map(item => item.model), ['reported-opus-x'], 'no Codex: Claude only')
-  assert.deepEqual(defaultOrder(candidates.slice(3)), [], 'an API key is never added on its own')
+  const chatgpt = [
+    { harness: 'codex' as const, model: 'reported-codex-top', name: 'reported-codex-top', source: sub('g') },
+    { harness: 'codex' as const, model: 'reported-codex-next', name: 'reported-codex-next', source: sub('g') },
+  ]
+  const deepseek = [
+    { harness: 'claude_code' as const, model: 'reported-deepseek-chat', name: 'reported-deepseek-chat', source: key('d') },
+    { harness: 'claude_code' as const, model: 'reported-deepseek-reasoner', name: 'reported-deepseek-reasoner', source: key('d') },
+  ]
+  const models = (items: Parameters<typeof defaultOrder>[0]) => defaultOrder(items).map(item => item.model)
+  assert.deepEqual(models(chatgpt), ['reported-codex-top'], 'only ChatGPT: its Codex model, no tier word needed')
+  assert.deepEqual(models([...claude, ...chatgpt]), ['reported-opus-x', 'reported-codex-top'], 'Claude and ChatGPT: opus, then Codex')
+  assert.deepEqual(models(deepseek), ['reported-deepseek-chat'], 'only a DeepSeek key: its first model')
+  assert.deepEqual(models(claude), ['reported-opus-x'], 'no Codex: opus only')
+  assert.deepEqual(models([...claude, ...deepseek]), ['reported-opus-x'], 'opus placed: other keys stay out')
+  // A key that runs Claude Code and reports opus counts; a subscription's opus wins over it.
+  const keyOpus = { harness: 'claude_code' as const, model: 'key-opus', name: 'key-opus', source: key('k') }
+  assert.deepEqual(models([keyOpus]), ['key-opus'])
+  assert.deepEqual(models([keyOpus, ...claude]), ['reported-opus-x'])
+  // An OpenAI-compatible key reports Codex models too.
+  assert.deepEqual(models([{ harness: 'codex' as const, model: 'key-codex', name: 'key-codex', source: key('o') }]), ['key-codex'])
+  assert.deepEqual(models([]), [], 'nothing connected: nothing')
 })

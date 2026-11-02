@@ -38,16 +38,23 @@ An API key's Agent follows its protocol: an OpenAI-compatible key runs on
 Codex, an Anthropic-compatible one on Claude Code. That is what the Agent
 can talk to, not a guess from the model's name.
 
-**Default** (Alex): a list the person never changed is filled at read time
-from their subscriptions: Claude Code's opus first, then Codex's strongest
-reasoning tier (xhigh / Extra High); no Claude subscription starts from
-Codex, no Codex leaves Claude only. The preference words `opus`, `xhigh`
-and `extra high` are matched against reported model ids and names
-(`DEFAULT_ORDER_PREFERENCE` in `lib/model-order-plan.ts`, the one allowlisted
-exception in `lib/model-options-source.test.ts`); a preference nothing
-matches is skipped, and an API key is never added on its own. Today the
-ChatGPT catalogue lists models, not reasoning tiers, so no Codex entry is
-added by default until a reported id or name carries the tier.
+**Default** (Alex, 2026-11-02, revised the same day): a list the person
+never changed is filled at read time from what they connected and what it
+reported, subscriptions and API keys alike:
+
+- A Claude subscription, or a key that runs Claude Code, that reported an
+  opus model: that model first (a subscription's before a key's).
+- A Codex model reported by a subscription or an OpenAI-compatible key: the
+  first one it reported, after opus. The account lists its top model first;
+  no reasoning-tier word is required, and tiers are left out for now.
+- Neither: the first model anything connected reported, so the list is not
+  empty (only a DeepSeek key: DeepSeek's first model).
+- Nothing connected: an empty list.
+
+The one preference word, `opus`, is matched against reported model ids and
+names (`DEFAULT_ORDER_PREFERENCE` in `lib/model-order-plan.ts`, the one
+allowlisted exception in `lib/model-options-source.test.ts`); no model name
+is written in code.
 
 **运行位置**: 云端 or 本地, one choice per list.
 
