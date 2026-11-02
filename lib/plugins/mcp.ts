@@ -23,15 +23,21 @@ export async function runMcpCommand(target: () => Promise<McpTarget>, command: M
   let transport: ReturnType<typeof publicMcpFetch> | undefined
   const signal = AbortSignal.timeout(25_000)
   let dispatched = false
+  let stage: McpStage = 'target'
+  let host: string | undefined
   try {
     const connection = await target()
+    host = new URL(connection.url).host
+    stage = 'connect'
     transport = (dependencies.transport ?? publicMcpFetch)(new URL(connection.url).origin, signal)
     client = await (dependencies.connect ?? createMCPClient)({
       transport: { type: connection.transport, url: connection.url, headers: connection.headers, fetch: transport.fetch, redirect: 'error' },
       initializationOptions: { signal }, protocolVersionDiscovery: false, maxRetries: 0,
       onUncaughtError: () => {},
     })
+    stage = 'ready'
     await hooks.ready?.()
+    stage = 'name' in command ? 'call' : 'list'
     if ('name' in command) {
       dispatched = true
       const result = await abortable(() => client!.callTool({ name: command.name, arguments: command.arguments, options: { signal } }), signal)
@@ -42,12 +48,32 @@ export async function runMcpCommand(target: () => Promise<McpTarget>, command: M
     return redact({ tools: result.tools, nextCursor: result.nextCursor ?? null }, connection.secrets)
   } catch (error) {
     if (dispatched) return { error: 'mcpOutcomeUnknown' }
-    return { error: hooks.code?.(error) ?? 'mcpUnavailable' }
+    const code = hooks.code?.(error)
+    if (code) return { error: code }
+    console.warn(JSON.stringify({ event: 'mcp_unavailable', ...mcpFailure(error, stage, host) }))
+    return { error: 'mcpUnavailable' }
   } finally {
     // Cleanup cannot replace a confirmed result with a retryable failure.
     if (client) await abortable(() => client!.close(), AbortSignal.timeout(2000)).catch(() => {})
     await transport?.close().catch(() => {})
   }
+}
+
+type McpStage = 'target' | 'connect' | 'ready' | 'list' | 'call'
+
+/**
+ * Why an MCP setup failed, as codes only: the stage, the server host, the HTTP
+ * status the SDK reports ("(HTTP 401)") and the network error code
+ * (ECONNRESET…). Never the message text, headers or body, which could carry a
+ * credential.
+ */
+export function mcpFailure(error: unknown, stage: McpStage, host?: string) {
+  const message = error instanceof Error ? error.message : ''
+  const status = Number(/\(HTTP (\d{3})\)/.exec(message)?.[1]) || undefined
+  const cause = (error as { cause?: { code?: unknown } } | null)?.cause?.code
+  const errorCode = typeof cause === 'string' && /^[A-Z_]{2,40}$/.test(cause) ? cause : undefined
+  const errorName = error instanceof Error && /^[A-Za-z]{1,40}$/.test(error.name) ? error.name : 'unknown'
+  return { stage, host, status, errorName, errorCode }
 }
 
 export function createPersonalMcpRuntime(store: Pick<PersonalPluginStore, 'mcpConnection'>, dependencies: McpDependencies = {}) {
