@@ -1,9 +1,17 @@
-import { test, expect, register } from './fixtures'
+import { test, expect, register, registerInTeam } from './fixtures'
 import { attachLightDark } from './settings-v4-shots'
 
 // V14 用量 (Figma 551:8473) for the admin of a fresh workspace: month picker, grouping, chart, empty table.
-test('用量按月显示线程和运行时长，可以按成员分组', async ({ page }, testInfo) => {
+// A personal workspace has one member, so it groups by Bot only (D15).
+test('个人工作区的用量只按 Bot 分组', async ({ page }) => {
   await register(page, '/settings?section=usage')
+  await expect(page.getByRole('heading', { level: 1, name: '用量' })).toBeVisible()
+  await expect(page.getByRole('columnheader', { name: 'Bot' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '按成员', exact: true })).toHaveCount(0)
+})
+
+test('用量按月显示线程和运行时长，可以按成员分组', async ({ page }, testInfo) => {
+  await registerInTeam(page, '/settings?section=usage')
   await expect(page.getByRole('heading', { level: 1, name: '用量' })).toBeVisible()
   await expect(page.getByRole('combobox', { name: '月份' })).toBeVisible()
   await expect(page.getByText('这个月没有线程。')).toBeVisible()

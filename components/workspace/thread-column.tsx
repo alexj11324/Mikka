@@ -25,7 +25,7 @@ const TASK_WIDE = '(min-width: 1024px)'
  * thread lists do); a thread opened from its address alone, or one with no
  * task, looks it up.
  */
-export function ThreadColumn({ runId, issueId: known }: { runId: string; issueId?: string | null }) {
+export function ThreadColumn({ runId, issueId: known, name }: { runId: string; issueId?: string | null; /** Its row's name in the thread list, so the header reads the same. */ name?: string }) {
   const t = useTranslations('IssueThreads')
   const tPanel = useTranslations('Shell.panel')
   const { data: looked, isLoading } = useSWR(known ? null : ['thread-issue', runId], () => findThreadIssue(runId))
@@ -45,7 +45,7 @@ export function ThreadColumn({ runId, issueId: known }: { runId: string; issueId
   )}>
     <ResizeHandle resize={resize} label={tPanel('resize')} edge="start" className="hidden xl:block" />
     {thread
-      ? <IssueThreadPanel key={runId} issueId={issueId} runId={runId} onClose={closeThread} onOpenThread={openThread} onOpenTask={issueId ? () => navigate({ issue: issueId, thread: window.matchMedia(TASK_WIDE).matches ? runId : null }) : undefined} />
+      ? <IssueThreadPanel key={runId} issueId={issueId} runId={runId} name={name} onClose={closeThread} onOpenThread={openThread} onOpenTask={issueId ? () => navigate({ issue: issueId, thread: window.matchMedia(TASK_WIDE).matches ? runId : null }) : undefined} />
       : <div role="status" aria-label={t('loading')} className="flex flex-col gap-3 p-4"><Skeleton className="h-6 w-2/3" /><Skeleton className="h-24 w-full" /></div>}
   </aside>
 }

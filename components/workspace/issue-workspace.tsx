@@ -12,6 +12,7 @@ import { Columns3, List, Plus, Search } from 'lucide-react'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { IconRail, type RailDestination } from '@/components/nav/icon-rail'
 import { BotList, type ChatTarget } from '@/components/nav/bot-list'
+import { threadName } from '@/components/nav/thread-list'
 import { NewBotDialog } from '@/components/nav/new-bot-dialog'
 import { Onboarding, type E2BKeyResult, type OnboardingComputer } from '@/components/onboarding/onboarding'
 import type { LegacyChatRequest } from './legacy-chat-archive'
@@ -466,6 +467,7 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
   const groupPanel = !selected && section === 'group' && groupRequest ? groupRequest : null
   // An open thread takes the right column beside the chat or a page (R-82); a task shows it in its own right column.
   const threadShown = !selected && threadId ? threadId : null
+  const shownThread = threadShown ? threads.find(thread => thread.id === threadShown) : undefined
   // One thing on the right at a time: the thread, else the browser, else 概览.
   const rightTaken = browserShown || !!threadShown
   // On a phone the chat's pill sits in its header and opens the right column as a page over the chat (R-82).
@@ -505,7 +507,7 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
       </>}
     </AppShellContent>
     {browserShown && !threadShown && <BrowserPane onClose={() => showBrowser(false)} />}
-    {threadShown && <ThreadColumn runId={threadShown} issueId={threads.find(thread => thread.id === threadShown)?.issueId} />}
+    {threadShown && <ThreadColumn runId={threadShown} issueId={shownThread?.issueId} name={shownThread ? threadName(shownThread, tasks, '') : undefined} />}
     {/* Opening, closing and handing the column to a thread are instant (R-37). */}
     {isConversation && panelOpen && !rightTaken && <ContextPanel key="context-panel" workspaceId={workspaceData?.workspace.id} issues={tasks} threads={threads} onOpenThread={thread => openThread(thread.runId)} onClose={() => showPanel(false)}
       conversation={activeBot ? { id: activeBot.id, name: activeBot.name, color: activeBot.color, shape: activeBot.shape, kind: 'bot' } : { id: coordinatorBot?.id ?? coordinatorChat?.botId, name: i18nText('Nav.coordinator'), kind: 'coordinator', updatedAt: lastCoordinatorItem?.createdAt }} />}

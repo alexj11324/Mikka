@@ -3550,7 +3550,7 @@
         "delete": "Delete",
         "agent": {
           "running": "Running",
-          "waiting": "Waiting on you",
+          "waiting": "Waiting for you",
           "blocked": "Blocked"
         }
       },

@@ -447,7 +447,9 @@ test('移动端页内创建不横向溢出，返回和侧栏切换保护未保�
   page.once('dialog', confirmation => confirmation.accept())
   await navigation.getByRole('link', { name: '成员', exact: true }).click()
   await expect(navigation).not.toBeVisible()
-  await expect(page.getByRole('heading', { name: '成员', exact: true })).toBeVisible()
+  // On a phone the header bar names the page; the H1 stays for screen readers only (M15, R-40).
+  await expect(page.getByRole('navigation', { name: '当前位置', exact: true }).getByText('成员', { exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '成员', exact: true })).toBeAttached()
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
 })
 
