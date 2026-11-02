@@ -74,7 +74,7 @@ test('lines the diff left out read 「N 行未修改」; files follow in order w
   assert.doesNotMatch(html, /未显示/)
   const order = [...html.matchAll(/<section aria-label="([^"]+)"/g)].map(match => match[1])
   assert.deepEqual(order, ['app/pricing/table.tsx', 'lib/pricing/competitors.ts'])
-  assert.equal(html.match(/sticky top-0/g)?.length, 2)
+  assert.equal(html.match(/sticky -top-3/g)?.length, 2)
 })
 
 test('read-only: nothing to edit, comment on, run or mark as viewed', () => {

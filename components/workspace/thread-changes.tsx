@@ -56,7 +56,7 @@ export function ThreadChangesView({ changes, wrap, onWrapChange, filesOpen, onFi
         <Button variant="ghost" size="sm" className="w-full min-w-0 justify-start gap-2 px-1.5 font-normal"
           onClick={() => sections.current.get(file.path)?.scrollIntoView({ block: 'start' })}>
           <span className="shrink-0">{name}</span>
-          <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{dir}</span>
+          <span className="min-w-0 flex-1 truncate text-left text-xs text-muted-foreground">{dir}</span>
           <Counts additions={file.additions} deletions={file.deletions} />
         </Button>
       </li> })}
@@ -90,7 +90,7 @@ function FileSection({ file, open, wrap, onOpenChange, ref }: { file: ChangedFil
   const { name, dir } = splitPath(file.path)
   return <section ref={ref} aria-label={file.path} data-slot="thread-changes-file" className="shrink-0 overflow-clip rounded-lg border border-border bg-background">
     {/* Sticks to the top of the scrolling list while this file's lines go by. */}
-    <div data-slot="thread-changes-file-header" className="sticky top-0 z-10 flex h-10 items-center gap-2 bg-background pr-1.5 pl-1">
+    <div data-slot="thread-changes-file-header" className="sticky -top-3 z-10 flex h-10 items-center gap-2 bg-background pr-1.5 pl-1">
       <Button variant="ghost" size="icon-sm" className="shrink-0 text-muted-foreground" aria-expanded={open} aria-label={t(open ? 'changesCollapseFile' : 'changesExpandFile', { name })} onClick={() => onOpenChange(!open)}>
         {open ? <ChevronDown data-icon="inline-start" /> : <ChevronRight data-icon="inline-start" />}
       </Button>
