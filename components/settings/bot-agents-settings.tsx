@@ -18,7 +18,7 @@ import {
   type LabelRule, type StoredExecutionSettings, type TaskDefaults,
 } from '@/lib/execution-settings-client'
 import type { ExecutionRule } from '@/lib/execution-rules'
-import { harnessOptions, modelName, modelOptions, modelUnavailable, placeKind, redetectTargets, retarget, withCloudModels, type ExecutionChoice, type ExecutionPlace } from '@/lib/execution-settings-view'
+import { harnessOptions, modelName, modelOptions, modelUnavailable, modelsUnverified, placeKind, redetectTargets, retarget, withAccountModels, withCloudModels, type ExecutionChoice, type ExecutionPlace } from '@/lib/execution-settings-view'
 import { cn } from '@/lib/utils'
 import { useOwnE2BKey } from '@/components/settings/e2b-key-dialog'
 import { findLabel, listWorkspaceLabels, matchLabels } from '@/lib/workspace-labels'
@@ -54,7 +54,7 @@ export function BotAgentsSettings() {
 
   const accountRows = accounts.data
   // Mikka Cloud can run only with the person's own E2B key; a failed read leaves it as the server reports it.
-  const placeList = withCloudModels(places.data, accountRows, keys.data).map(place => placeKind(place) === 'cloud' && e2bKey.configured === false ? { ...place, online: false } : place)
+  const placeList = withCloudModels(withAccountModels(places.data, accountRows), accountRows, keys.data).map(place => placeKind(place) === 'cloud' && e2bKey.configured === false ? { ...place, online: false } : place)
   const view = executionSettingsView(stored.data, placeList, accountRows)
   const defaults = unsaved.defaults ?? view.defaults
   const current = stored.data
@@ -173,6 +173,8 @@ function executionPickers({ t, row, value, places, wide, disabled, onChange, onR
   // Only what the CLI or daemon reported here. A saved model it no longer reports shows as unavailable and is not offered.
   const models = modelOptions(places, value.place, value.harness)
   const unavailable = modelUnavailable(places, value.place, value.harness, value.model)
+  // A device's list not checked against a connected account says so (decision 2026-11-02-1300).
+  const unverified = modelsUnverified(places, value.place, value.harness)
   // No model yet: the select shows 选择模型 (or 还没有可用模型), never a bare provider mark.
   const shownModel = value.model && !unavailable ? modelName(places, value.place, value.harness, value.model) : ''
   const modelCell = unavailable ? `${value.model} · ${t('unavailable')}` : shownModel || (models.length ? t('pickModel') : t('noModels'))
@@ -202,7 +204,7 @@ function executionPickers({ t, row, value, places, wide, disabled, onChange, onR
       value={shownModel ? <ModelLabel model={shownModel} source={models.find(option => option.value === value.model)?.apiKey ? 'api_key' : value.harness} />
         : <span data-slot="model-unset" data-unavailable={unavailable || undefined} className="truncate text-muted-foreground">{modelCell}</span>}>
       {close => models.length
-        ? <CommandGroup>
+        ? <CommandGroup heading={unverified ? t('unverified') : undefined}>
           {models.map(option => <CommandItem key={option.value} value={option.value} keywords={[option.name]} data-checked={value.model === option.value} onSelect={() => { close(); onChange({ ...value, model: option.value }) }}><ModelLabel model={option.name} source={option.apiKey ? 'api_key' : value.harness} /></CommandItem>)}
         </CommandGroup>
         : <p role="status" className="px-2 pt-1 pb-2.5 text-sm text-muted-foreground">{t('noModels')}</p>}

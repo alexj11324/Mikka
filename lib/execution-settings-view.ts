@@ -23,6 +23,8 @@ export interface ExecutionPlace {
   harnesses: HarnessReport[]
   /** Models offered here because an API key lists them (`withCloudModels`), by Agent; the CLI did not report them. */
   keyModels?: Partial<Record<RuleHarness, string[]>>
+  /** Agents whose reported models could not be checked against a connected account (`withAccountModels`). */
+  unverified?: RuleHarness[]
 }
 
 export type DeviceKind = 'laptop' | 'server' | 'cloud' | 'unknown'
@@ -92,6 +94,42 @@ function withKeyModels(place: ExecutionPlace, keyModels: (harness: RuleHarness) 
     }),
   }
 }
+
+/**
+ * A device's CLI reports what it can drive, asked with no login (decision 2026-11-02-1300): an
+ * account may lack some of those models or have more. A run on a device uses the subscription Mikka
+ * hands it, never the device's own login (ADR 0009), so a device's models are those its CLI reported
+ * that the connected account's catalogue also lists. A reported slot counts when its id or the
+ * model it resolves to is in the catalogue. With no account for that Agent's provider, the reported
+ * list stays as reported and the Agent is marked unverified (未与账号核对).
+ */
+export function withAccountModels(places: readonly ExecutionPlace[], accounts: readonly Pick<BotModelRow, 'provider' | 'modelId'>[]): ExecutionPlace[] {
+  return places.map(place => {
+    if (placeKind(place) === 'cloud') return place
+    const unverified: RuleHarness[] = []
+    const harnesses = place.harnesses.map(info => {
+      const provider = CLOUD_PROVIDERS[info.harness as keyof typeof CLOUD_PROVIDERS]
+      if (!provider || !info.installed) return info
+      const catalogue = new Set(accounts.filter(row => row.provider === provider).map(row => row.modelId))
+      if (!catalogue.size) { unverified.push(info.harness as RuleHarness); return info }
+      const slots = info.modelSlots?.filter(slot => catalogue.has(slot.slot) || catalogue.has(slot.model))
+      const models = info.models?.filter(model => catalogue.has(model) || Boolean(slots?.some(slot => slot.slot === model)))
+      const kept = new Set([...(models ?? []), ...(slots ?? []).map(slot => slot.slot)])
+      const { defaultModelSlot, ...rest } = info
+      return {
+        ...rest,
+        ...(info.models ? { models } : {}),
+        ...(info.modelSlots ? { modelSlots: slots } : {}),
+        ...(defaultModelSlot && kept.has(defaultModelSlot) ? { defaultModelSlot } : {}),
+      }
+    })
+    return { ...place, harnesses, ...(unverified.length ? { unverified } : {}) }
+  })
+}
+
+/** Whether a place's models for an Agent were not checked against an account (未与账号核对). */
+export const modelsUnverified = (places: readonly ExecutionPlace[], place: string, harness: string) =>
+  Boolean(places.find(item => item.id === place)?.unverified?.includes(harness as RuleHarness))
 
 /** A model a rule can pick: `value` is stored (a slot or a reported id), `name` is shown; `apiKey` when a key lists it. */
 export interface ModelOption { value: string; name: string; isDefault?: boolean; apiKey?: boolean }
