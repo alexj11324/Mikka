@@ -5,6 +5,9 @@ import { useTranslations } from 'next-intl'
 import { Bot, FolderClosed, ListTodo, Plus, RotateCw, Search, SquarePen, Users } from 'lucide-react'
 import type { listIssues } from '@/app/actions/issues'
 import type { listProjects } from '@/app/actions/projects'
+import type { Thread } from '@/app/actions/task-runs'
+import { threadSearchHits } from '@/lib/thread-search'
+import { threadName, ThreadMark } from './thread-list'
 import type { BotView } from '@/app/actions/bots'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/reui/badge'
@@ -39,7 +42,7 @@ export function SearchPill({ onSearch }: { onSearch: () => void }) {
 }
 
 /**
- * ⌘K over everything (MIK-36): conversations, group chats, tasks and projects.
+ * ⌘K over everything (MIK-36): conversations, group chats, tasks, threads and projects.
  * Built on reUI's command palette (c-command-5 / c-command-8), centered in the
  * window with a fixed-height list so the dialog doesn't jump while filtering.
  *
@@ -49,7 +52,7 @@ export function SearchPill({ onSearch }: { onSearch: () => void }) {
  * stay authorized by the server; opening one goes through the destination's own
  * access check.
  */
-export function GlobalSearch({ open, onOpenChange, onOpenChangeComplete, bots, sessions, coordinatorLine, issues, projects, workspaceId, onChat, onNewBot, onIssue, onProject, onCreateIssue }: {
+export function GlobalSearch({ open, onOpenChange, onOpenChangeComplete, bots, sessions, coordinatorLine, issues, projects, threads = [], workspaceId, onChat, onNewBot, onIssue, onProject, onThread, onCreateIssue }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   onOpenChangeComplete?: (open: boolean) => void
@@ -58,12 +61,15 @@ export function GlobalSearch({ open, onOpenChange, onOpenChangeComplete, bots, s
   coordinatorLine?: string
   issues: Issue[]
   projects: Project[]
+  /** The right column's threads, already loaded by the shell: searched by name, request and last reply (D4/M10). */
+  threads?: Thread[]
   /** Selects the sharing context for group and task search; history needs none. */
   workspaceId: string | null
   onChat: (target: ChatTarget) => void
   onNewBot: () => void
   onIssue: (id: string) => boolean
   onProject: (id: string) => void
+  onThread?: (runId: string) => void
   onCreateIssue: () => void
 }) {
   const t = useTranslations('Shell')
@@ -89,6 +95,7 @@ export function GlobalSearch({ open, onOpenChange, onOpenChangeComplete, bots, s
     issues.filter(issue => shown(`${issue.identifier ?? ''} ${issue.title}`)),
     search.state.tasks.items.filter((item): item is TaskHit => item.type === 'task'),
   )
+  const threadRows = onThread ? threadSearchHits(threads, text, thread => threadName(thread, issues, tNav('untitledConversation'))) : []
   const projectRows = projects.filter(project => shown(`${project.name} ${project.summary}`))
   const actions = [
     // i18n-ignore: bilingual search keywords, not rendered
@@ -102,7 +109,7 @@ export function GlobalSearch({ open, onOpenChange, onOpenChangeComplete, bots, s
 
   const failed = search.sources.filter(source => search.state[source].status === 'error' || search.state[source].error)
   const authLost = failed.some(source => search.state[source].error === 'authRequired')
-  const resultCount = (coordinatorShown ? 1 : 0) + botRows.length + historyRows.length + groupRows.length + taskRows.length + projectRows.length + actions.length
+  const resultCount = (coordinatorShown ? 1 : 0) + botRows.length + historyRows.length + groupRows.length + taskRows.length + threadRows.length + projectRows.length + actions.length
   const announce = search.searching ? t('search.searching')
     : search.query.kind === 'tooLong' ? t('search.tooLong')
       : resultCount === 0 ? t('searchEmpty') : t('search.count', { count: resultCount })
@@ -161,6 +168,12 @@ export function GlobalSearch({ open, onOpenChange, onOpenChangeComplete, bots, s
             </CommandItem>
           })}
           {search.state.tasks.nextCursor && <CommandItem value="more tasks" disabled={search.state.tasks.loadingMore} onSelect={() => search.more('tasks')} className="text-muted-foreground">{moreLabel('tasks')}</CommandItem>}
+        </CommandGroup>}
+        {threadRows.length > 0 && onThread && <CommandGroup heading={t('groups.threads')}>
+          {threadRows.map(({ thread, name }) => <CommandItem key={`thread:${thread.id}`} value={`thread ${thread.id}`} onSelect={() => pick(() => onThread(thread.id))} className="gap-3 py-2">
+            <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted"><ThreadMark size="row" /></span>
+            <span className="flex min-w-0 flex-col"><span className="truncate font-medium">{name}</span><span className="truncate text-xs text-muted-foreground">{thread.lastReply ?? thread.agentName}</span></span>
+          </CommandItem>)}
         </CommandGroup>}
         {projectRows.length > 0 && <CommandGroup heading={t('groups.projects')}>
           {projectRows.map(project => <CommandItem key={project.id} value={`project ${project.id}`} onSelect={() => pick(() => onProject(project.id))} className="gap-3 py-2">

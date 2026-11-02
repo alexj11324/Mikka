@@ -24,6 +24,8 @@ import { cn } from '@/lib/utils'
 import { defaultMachine, machineDot, type PickerMachine } from '@/lib/machine-picker'
 import { E2BKeyDialog, useOwnE2BKey } from '@/components/settings/e2b-key-dialog'
 import { usePresence } from '@/lib/use-presence'
+import { BotAvatar, CoordinatorAvatar } from '@/components/nav/bot-avatar'
+import { newTaskBotChoices } from '@/lib/new-task-bot'
 import { useOpenerFocus } from '@/hooks/use-focus-return'
 
 const MAX_LENGTH = 8000
@@ -48,8 +50,8 @@ function MachineLabel({ machine, cloudBotId }: { machine: Machine; cloudBotId: s
 }
 
 /**
- * 新建任务 the Comma way: say what needs doing in a sentence, on which machine,
- * and the Coordinator turns it into the task (title, status, assignee…). The
+ * 新建任务 the Comma way: say what needs doing in a sentence, on which machine and
+ * for which bot, and that bot (the Coordinator by default) turns it into the task (title, status, assignee…). The
  * request goes into the Coordinator conversation, where its reply shows up.
  */
 export function NewTaskDialog({ open, onOpenChange, onSent, project, initialText = '' }: {
@@ -79,8 +81,13 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, initialText
 
   const { data: devices = [] } = useSWR(open ? 'devices' : null, listDevices)
   const { data: bots = [] } = useSWR(open ? 'bots' : null, listBots)
-  // The Coordinator takes the task on Mikka Cloud, on its own bot's computer.
-  const cloudBotId = (bots.find(bot => bot.coordinator) ?? bots[0])?.id
+  // 交给: the bot the request goes to (usability review T4). The Coordinator by default; a picked bot gets it
+  // in its own chat, creates the task and dispatches it, so the board shows that bot on the card.
+  const [botPick, setBotPick] = useState<string | null>(null)
+  const botChoices = newTaskBotChoices(bots)
+  const handler = botChoices.find(bot => bot.id === botPick) ?? null
+  // The task runs on Mikka Cloud on the computer of the bot it goes to.
+  const cloudBotId = handler?.id ?? (bots.find(bot => bot.coordinator) ?? bots[0])?.id
   // Mikka Cloud first: there the Coordinator picks the bot, so no bot is named. It runs only on the
   // person's own E2B key; a read that failed leaves that to the server. Direct daemon devices are 本机,
   // including Linux. OS is not evidence that a computer is an SSH target reached through another machine (R-23).
@@ -117,13 +124,13 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, initialText
     setSending(true)
     setCoordinatorUnavailable(false)
     try {
-      const key = JSON.stringify([text, picked, project ?? null])
+      const key = JSON.stringify([text, picked, project ?? null, handler?.id ?? null])
       if (composed.current?.key !== key) {
         const context = [device && t('contextDevice', { device: device.label }), project && t('contextProject', { project })].filter(Boolean).join(t('contextSeparator'))
         composed.current = { key, message: context ? t('promptWithContext', { context, text }) : t('prompt', { text }),
           taskDestination: device.cloud ? { kind: 'cloud' } : { kind: 'device', deviceId: device.value } }
       }
-      const outcome = await submitMessage(composed.current.message, { taskDestination: composed.current.taskDestination })
+      const outcome = await submitMessage(composed.current.message, { taskDestination: composed.current.taskDestination, botId: handler?.id ?? null })
       if (outcome.kind === 'rejected' && outcome.error === 'coordinatorUnavailable') { setCoordinatorUnavailable(true); return }
       if (outcome.kind !== 'accepted') { const message = failureMessage(outcome); if (message) toast.error(message); return }
       setDraft('')
@@ -150,6 +157,15 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, initialText
             </SelectContent>
           </Select>
           : <span className="flex h-7 items-center gap-1.5 rounded-full bg-control px-2.5 text-muted-foreground"><Laptop aria-hidden="true" className="size-3.5" />{t('noDevice')}</span>}
+        {botChoices.length > 0 && <Select value={handler?.id ?? 'coordinator'} onValueChange={value => setBotPick(value && value !== 'coordinator' ? value : null)} items={[{ value: 'coordinator', label: 'Coordinator' }, ...botChoices.map(bot => ({ value: bot.id, label: bot.name }))]}>
+          <SelectTrigger size="sm" className="h-7 min-w-28 max-w-48 gap-1.5 rounded-full px-2.5" aria-label={t('bot')}>{handler ? <BotAvatar color={handler.color} shape={handler.shape} size="row" /> : <CoordinatorAvatar size="row" />}<SelectValue className="min-w-0 truncate" /></SelectTrigger>
+          <SelectContent align="start" alignItemWithTrigger={false} className="w-auto min-w-48">
+            <SelectGroup>
+              <SelectItem value="coordinator"><CoordinatorAvatar size="row" /><span className="min-w-0 flex-1 truncate pr-3">Coordinator</span></SelectItem>
+              {botChoices.map(bot => <SelectItem key={bot.id} value={bot.id}><BotAvatar color={bot.color} shape={bot.shape} size="row" /><span className="min-w-0 flex-1 truncate pr-3">{bot.name}</span></SelectItem>)}
+            </SelectGroup>
+          </SelectContent>
+        </Select>}
         <ChevronRight aria-hidden="true" className="size-3.5 text-muted-foreground" />
         <DialogTitle className="text-sm font-medium">{t('title')}</DialogTitle>
         {project && <span className="flex h-7 max-w-40 items-center rounded-full bg-control px-2.5 text-xs text-muted-foreground"><span className="truncate">{project}</span></span>}
