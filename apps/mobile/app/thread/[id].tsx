@@ -15,12 +15,13 @@ import { api, ApiError } from '@/lib/api'
 import { CardButton } from '@/components/cards'
 import { StopFailed } from '@/components/StopFailed'
 import { useStop } from '@/lib/useStop'
+import { threadSendErrorLine } from '@/lib/thread-send-error'
 import type { ThreadDetail } from '@/lib/types'
 import { useApi } from '@/lib/useApi'
 import { colors } from '@/lib/theme'
 import { HARNESS } from '@/lib/harness'
 
-const STATUS_WORD = { running: '运行中', waiting: '等待你', failed: '失败', done: '完成', stopped: '已停止' } as const
+const STATUS_WORD = { running: '运行中', waiting: '等待你', paused: '已暂停', failed: '失败', done: '完成', stopped: '已停止' } as const
 
 /** A thread's own page, pushed from a thread card or the 线程 list; back returns (mobile.md). */
 export default function ThreadScreen() {
@@ -29,7 +30,8 @@ export default function ThreadScreen() {
   const insets = useSafeAreaInsets()
   const { data, error, reload } = useApi<ThreadDetail>(`/api/mobile/threads/${id}`, 4000)
   const [sending, setSending] = useState(false)
-  const [sendFailed, setSendFailed] = useState(false)
+  // What to say when a message was not sent: the server's reason when it gave one (threadReplaced…).
+  const [sendFailed, setSendFailed] = useState<string | null>(null)
   const thread = data?.thread
   // 停止 a working thread, as on the web; a thread that ended meanwhile (409) has nothing left to stop.
   const stopper = useStop(() => api(`/api/mobile/threads/${id}/stop`, { method: 'POST' }).catch(failure => {
@@ -38,14 +40,14 @@ export default function ThreadScreen() {
 
   const send = async (text: string) => {
     setSending(true)
-    setSendFailed(false)
+    setSendFailed(null)
     try {
       await api(`/api/mobile/threads/${id}`, { method: 'POST', body: { text } })
       await reload()
       return true
-    } catch {
+    } catch (failure) {
       // The composer keeps the words, so sending again is one tap.
-      setSendFailed(true)
+      setSendFailed(threadSendErrorLine(failure instanceof ApiError && failure.status < 500 ? failure.code : null))
       return false
     } finally {
       setSending(false)
@@ -93,7 +95,7 @@ export default function ThreadScreen() {
             case 'person': return <View key={item.id} style={{ marginVertical: 4 }}><MyBubble text={item.text} /></View>
           }
         })}
-        {sendFailed ? <Text style={styles.error}>没发出去，再试一次。</Text> : null}
+        {sendFailed ? <Text style={styles.error}>{sendFailed}</Text> : null}
         {stopper.stuck ? <StopFailed busy={stopper.sending} onRetry={() => void stopper.stop()} /> : null}
         {data && !data.active && data.error && !data.items.some(item => item.kind === 'error') ? <Text style={styles.error}>{data.error}</Text> : null}
       </KeyboardChatScrollView>

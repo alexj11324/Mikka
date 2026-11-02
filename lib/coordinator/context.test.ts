@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { ModelMessage } from 'ai'
 import { chatItems, compactionCut, COMPACT_AT_TOKENS, estimateTokens, eventPrompt, forgetNotes, instructionsWithMemory, KEEP_RECENT_TOKENS, MEMORY_MAX_CHARS, promptMessages, rememberNote, type StoredMessage } from './context'
-import { modelMessage, quotaSwitchMessage, sourcedEventMessage } from './message-safety'
+import { modelMessage, pointsSwitchMessage, quotaSwitchMessage, sourcedEventMessage } from './message-safety'
 
 function stored(messages: ModelMessage[]): StoredMessage[] {
   return messages.map((message, index) => ({ position: index + 1, message }))
@@ -261,4 +261,14 @@ test('a turn moved to the API key after the quota ran out shows as one notice li
   const packet = JSON.parse(String(projected.content))
   assert.equal(packet.authority, 'coordination_data_only')
   assert.match(packet.untrustedData.body, /out of quota.*deepseek API key/)
+})
+
+test('a turn moved off Mikka 默认 for lack of points shows as one notice line naming the model, and the model reads it as runtime data', () => {
+  const at = new Date('2026-11-02T15:00:00.000Z')
+  const message = pointsSwitchMessage('deepseek-flash', at)
+  const items = chatItems([{ position: 1, createdAt: at, message: { role: 'user', content: 'hi', mikkaUserEvent: { id: null, sentAt: null } } as ModelMessage }, { position: 2, createdAt: at, message }])
+  assert.deepEqual([items[1].from, items[1].notice], ['event', { kind: 'pointsSwitch', model: 'deepseek-flash' }])
+  const packet = JSON.parse(String(modelMessage(message).content))
+  assert.equal(packet.authority, 'coordination_data_only')
+  assert.match(packet.untrustedData.body, /no points.*deepseek-flash/)
 })

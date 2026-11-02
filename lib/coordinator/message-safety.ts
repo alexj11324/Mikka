@@ -15,7 +15,10 @@ export interface EventSource {
 }
 /** 订阅额度用完后，自动改用 API Key: what the chat's notice line names (see quotaSwitchMessage). */
 export interface QuotaSwitchNotice { kind: 'quotaSwitch'; subscription: 'claude' | 'codex'; plan: string | null; keyProvider: string; keyName: string | null }
-interface EventProvenance { packet: string; eventKind: string; observedState: string | null; notice?: QuotaSwitchNotice }
+/** 点数不足时改用: Mikka 默认 had no points, so this turn runs on `model` (see pointsSwitchMessage). */
+export interface PointsSwitchNotice { kind: 'pointsSwitch'; model: string }
+export type SwitchNotice = QuotaSwitchNotice | PointsSwitchNotice
+interface EventProvenance { packet: string; eventKind: string; observedState: string | null; notice?: SwitchNotice }
 export type SourcedMessage = ModelMessage & { mikkaEvent?: EventProvenance; mikkaUserEvent?: { id: string | null; sentAt: string | null; taskDestination?: TaskDestination } }
 const asTime = (value: Date | string | null | undefined) => value instanceof Date ? value.toISOString() : value ?? null
 
@@ -47,6 +50,12 @@ export function quotaSwitchMessage(notice: Omit<QuotaSwitchNotice, 'kind'>, at: 
   const packet = personalMessagePacket({ messageId: null, senderId: null, sourceSessionId: null, replyToSessionId: null, origin: 'runtime_notification',
     runId: null, taskId: null, sentAt: at.toISOString(), receivedAt: at.toISOString(), pendingCount: null, deliveryState: 'delivered' }, projection)
   return { role: 'user', content: projection, mikkaEvent: { packet, eventKind: 'quota_switch', observedState: null, notice: { kind: 'quotaSwitch', ...notice } } }
+}
+export function pointsSwitchMessage(model: string, at: Date): SourcedMessage {
+  const projection = `[Event] Mikka's hosted model has no points in this workspace, so this turn runs on ${model}, the next model the person allows.`
+  const packet = personalMessagePacket({ messageId: null, senderId: null, sourceSessionId: null, replyToSessionId: null, origin: 'runtime_notification',
+    runId: null, taskId: null, sentAt: at.toISOString(), receivedAt: at.toISOString(), pendingCount: null, deliveryState: 'delivered' }, projection)
+  return { role: 'user', content: projection, mikkaEvent: { packet, eventKind: 'points_switch', observedState: null, notice: { kind: 'pointsSwitch', model } } }
 }
 export function modelMessage(message: ModelMessage): ModelMessage {
   const { mikkaEvent, mikkaUserEvent, ...plain } = message as SourcedMessage

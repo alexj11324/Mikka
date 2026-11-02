@@ -2927,6 +2927,7 @@
       "resets": "{time} 重置",
       "next": "下一条改用 {key} API Key（按 token 计费）",
       "switched": "{name} 额度用完，已改用 {key} API Key 继续（按 token 计费）",
+      "pointsSwitched": "点数不足，已改用 {model}",
       "revert": "改回",
       "addKey": "添加 API Key 继续",
       "useKey": "用 API Key 继续",

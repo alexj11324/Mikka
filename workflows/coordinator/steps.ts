@@ -135,16 +135,19 @@ export async function stoppedStepText(holder: string, streamId: string) {
 }
 
 /**
- * 订阅额度用完后，自动改用 API Key: when this turn was frozen on the person's
- * key because the subscription ran out, the chat says so before the reply.
+ * 订阅额度用完后，自动改用 API Key, or 点数不足时改用: when this turn was
+ * frozen on another model because the subscription or the points ran out,
+ * the chat says so before the reply.
  */
 export async function noteQuotaSwitch(userId: string, holder: string, runtime: { modelSelection?: unknown }, botId: string) {
   'use step'
-  const { hostedApiKeySnapshotSchema } = await import('@/lib/subscription-model-snapshot')
-  const selection = hostedApiKeySnapshotSchema.safeParse(runtime.modelSelection)
-  if (!selection.success || !selection.data.afterQuota) return
-  const { quotaSwitchMessage } = await import('@/lib/coordinator/message-safety')
-  await store.appendMessages(userId, holder, [quotaSwitchMessage(selection.data.afterQuota, new Date())], null, botId)
+  const { hostedModelSelectionSchema } = await import('@/lib/subscription-model-snapshot')
+  const selection = hostedModelSelectionSchema.safeParse(runtime.modelSelection)
+  if (!selection.success) return
+  const { quotaSwitchMessage, pointsSwitchMessage } = await import('@/lib/coordinator/message-safety')
+  // 点数不足时改用 (decision 2026-11-02-1450): Mikka 默认 had no points, this turn runs on the next allowed model.
+  if (selection.data.afterPoints) await store.appendMessages(userId, holder, [pointsSwitchMessage(selection.data.modelId, new Date())], null, botId)
+  else if (selection.data.type === 'api_key' && selection.data.afterQuota) await store.appendMessages(userId, holder, [quotaSwitchMessage(selection.data.afterQuota, new Date())], null, botId)
 }
 
 export async function writeStreamPart(writable: WritableStream<CoordinatorWorkflowStreamPart>, part: CoordinatorWorkflowStreamPart) {

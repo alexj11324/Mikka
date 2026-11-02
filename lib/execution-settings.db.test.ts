@@ -175,6 +175,8 @@ test(
         }),
       });
       stub("./db/index.ts", { pool });
+      // Points and their fallback have their own tests (lib/bot-model-selection.test.ts, lib/points-fallback.db.test.ts): here Mikka 默认 has points.
+      stub("./points-fallback.ts", { hostedPointsRefusal: async () => null, pointsFallback: async () => null });
       const actions = await import("../app/actions/execution-settings");
       const { freezeBotModel } = await import('./bot-model-selection');
       const { SubscriptionRepository } = await import('./subscription-repository');

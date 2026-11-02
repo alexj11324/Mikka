@@ -36,6 +36,8 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
       await pool.query(await readFile(new URL(`../drizzle/${file}`, import.meta.url), "utf8"));
 
     mock.module(new URL("./db/index.ts", import.meta.url).href, { namedExports: { pool } });
+    // Points and their fallback have their own tests: here Mikka 默认 has points.
+    mock.module(new URL("./points-fallback.ts", import.meta.url).href, { namedExports: { hostedPointsRefusal: async () => null, pointsFallback: async () => null } });
     const { ExecutionSettings } = await import("./execution-settings");
     const { botModelMenu } = await import("./bot-model-menu");
     const { HOSTED_CHOICE } = await import("./bot-model-menu-view");

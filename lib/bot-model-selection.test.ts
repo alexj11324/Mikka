@@ -42,6 +42,12 @@ mock.module(new URL('./model-api-keys.ts', import.meta.url).href, { namedExports
 mock.module(new URL('./model-api-key-chat.ts', import.meta.url).href, { namedExports: {
   resolveApiKeyChatModel: async (frozen: unknown) => { chatModels.push(frozen); return { modelId: 'api-key-fixture' } },
 } })
+let pointsRefusal: string | null = null
+let fallback: { kind: 'api_key'; keyId: string; model: string } | { kind: 'subscription'; bindingId: string; model: string } | null = null
+mock.module(new URL('./points-fallback.ts', import.meta.url).href, { namedExports: {
+  hostedPointsRefusal: async (workspaceId: string) => { assert.equal(workspaceId, scope.workspaceId); return pointsRefusal },
+  pointsFallback: async () => fallback,
+} })
 mock.module(new URL('./abuse/resolve.ts', import.meta.url).href, { namedExports: {
   resolveDefaultHostedModel: async (...args: unknown[]) => { hostedCalls.push(args); return hostedModel },
 } })
@@ -66,6 +72,8 @@ beforeEach(() => {
   keyChoice = undefined
   usableKeys = []
   chatModels.length = 0
+  pointsRefusal = null
+  fallback = null
 })
 
 test('A bot saved on an API key model freezes that key and resolves through it; an unusable key falls back', async () => {
@@ -180,4 +188,30 @@ test('an archived bot (its owner left the team) is refused before any model is c
     await assert.rejects(freezeBotModel({ ...scope, botId: id(1) }, noSubscription), { code: 'botNotFound' })
     assert.equal(hostedCalls.length, 0)
   } finally { botActive = true }
+})
+
+test('Mikka 默认 with no points here runs on the next allowed model and says so; with none, it stays and is refused', async () => {
+  selected = '00000000-0000-0000-0000-000000000000'
+  pointsRefusal = 'verification_required'
+  // Nothing else can run: Mikka 默认 stays, and its refusal explains (decision 2026-11-02-1450).
+  assert.deepEqual(await freezeBotModel(scope, noSubscription), { harness: 'ai_sdk', model: COORDINATOR_MODEL })
+  // The person's own key is next in 允许使用的模型: this turn runs on it, marked.
+  fallback = { kind: 'api_key', keyId: id(9), model: 'deepseek-chat' }
+  assert.deepEqual(await freezeBotModel({ ...scope, botId: id(1) }, noSubscription), { harness: 'ai_sdk', model: 'deepseek-chat',
+    modelSelection: { consumerId: id(1), type: 'api_key', keyId: id(9), ownerId: 'alice', workspaceId: id(2), modelId: 'deepseek-chat', afterPoints: true } })
+  // A subscription is next: frozen as usual, marked.
+  fallback = { kind: 'subscription', bindingId: binding.id, model: binding.modelId }
+  const dependencies = {
+    service: () => ({ repository: {
+      binding: async () => ({ ...binding }),
+      connection: async () => ({ ownerId: scope.ownerId, workspaceId: scope.workspaceId, epoch: '7', state: 'connected' }),
+    } }) as unknown as SubscriptionService,
+    workspace: async () => {},
+  }
+  const frozen = await freezeBotModel(scope, dependencies)
+  assert.equal(frozen.model, binding.modelId)
+  assert.deepEqual([(frozen.modelSelection as { bindingId?: string }).bindingId, (frozen.modelSelection as { afterPoints?: true }).afterPoints], [binding.id, true])
+  // Points left: Mikka 默认, whatever else could run.
+  pointsRefusal = null
+  assert.deepEqual(await freezeBotModel(scope, noSubscription), { harness: 'ai_sdk', model: COORDINATOR_MODEL })
 })

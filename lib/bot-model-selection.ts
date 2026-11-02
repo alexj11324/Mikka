@@ -66,9 +66,37 @@ export async function freezeBotModel(
       }),
     } satisfies HostedRuntimeSnapshot;
   };
+  /**
+   * Mikka 默认, unless this workspace has no points for it: then the next
+   * model in 允许使用的模型 that can run, and the chat says so (decision
+   * 2026-11-02-1450). With none, Mikka 默认 stays and its refusal explains.
+   */
+  const hosted = async (): Promise<HostedRuntimeSnapshot> => {
+    const { hostedPointsRefusal, pointsFallback } = await import("./points-fallback");
+    const fallback = (await hostedPointsRefusal(workspaceId)) ? await pointsFallback(pool, settingsScope) : null;
+    if (fallback?.kind === "api_key")
+      return {
+        harness: "ai_sdk",
+        model: fallback.model,
+        modelSelection: hostedApiKeySnapshotSchema.parse({
+          ...(scope.botId === null ? { coordinator: true } : { consumerId: scope.botId }),
+          type: "api_key", keyId: fallback.keyId, ownerId: scope.ownerId, workspaceId, modelId: fallback.model, afterPoints: true,
+        }),
+      };
+    if (fallback?.kind === "subscription") {
+      const frozen = await freezeHostedModelSelection(
+        { ...scope, workspaceId },
+        { harness: "ai_sdk", model: null },
+        { type: "subscription", bindingId: await settings.bindingForBot(settingsScope, scope.botId, fallback.bindingId) },
+        dependencies,
+      );
+      return frozen.modelSelection ? { ...frozen, modelSelection: { ...frozen.modelSelection, afterPoints: true } } : frozen;
+    }
+    return { harness: "ai_sdk", model: COORDINATOR_MODEL };
+  };
   const selected = await settings.botModel(settingsScope, scope.botId);
   // Mikka 默认 picked in the composer: the hosted model, whatever else is connected.
-  if (selected === HOSTED_CHOICE) return { harness: "ai_sdk", model: COORDINATOR_MODEL };
+  if (selected === HOSTED_CHOICE) return hosted();
   const available = await settings.botModels(settingsScope);
   // A saved choice whose account was disconnected or signed in again is no longer bound:
   // take a bound subscription (Claude first), otherwise Mikka 默认, the hosted model (decision 2026-10-31-2110).
@@ -92,7 +120,7 @@ export async function freezeBotModel(
   }
   // No subscription bound: every bot, the Coordinator included, runs on the hosted default
   // through the same admission (verified card, allowance) and workspace billing.
-  if (!binding) return { harness: "ai_sdk", model: COORDINATOR_MODEL };
+  if (!binding) return hosted();
   const switched = await afterQuota(binding);
   if (switched) return switched;
   return freezeHostedModelSelection(
