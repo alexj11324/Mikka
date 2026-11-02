@@ -3,7 +3,8 @@ import { test } from 'node:test'
 import { mkdtemp, readFile, rm, mkdir, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { SshInstaller, parseHostDetails, parseHosts, parseTarget, runProcess, type SshInstallState } from './ssh-install'
+import { LOCAL_RECONNECT, LOCAL_TARGET } from '@mikka/protocol/bridge'
+import { SshInstaller, loginShell, parseHostDetails, parseHosts, parseTarget, runProcess, type SshInstallState } from './ssh-install'
 
 test('SSH host parsing rejects options, commands and invalid ports', () => {
   assert.deepEqual(parseTarget('deploy@build-01:2222'), { destination: 'deploy@build-01', host: 'build-01', port: '2222' })
@@ -188,3 +189,67 @@ test('cancel during host discovery and fingerprint confirmation never installs',
     await assert.rejects(installer.accept(installer.state()!.id))
   }
 })
+
+function localInstaller(flavor: 'prod' | 'dev', status = '{"server":"online","deviceId":"this-mac"}') {
+  const events: SshInstallState[] = []
+  const calls: { command: string; args: string[]; input?: string }[] = []
+  let minted = 0
+  let finish!: () => void
+  const done = new Promise<void>(resolve => { finish = resolve })
+  const installer = new SshInstaller('https://example.com/mikka', async () => { minted++; return 'private-token' }, state => {
+    events.push(state)
+    if (state.status === 'online' || state.status === 'failed') finish()
+  }, async (command, args, input) => {
+    calls.push({ command, args, input })
+    if (args.at(-1)?.startsWith('mikka daemon status')) return status
+    return ''
+  }, '/home/nobody', undefined, undefined, flavor, { command: '/bin/zsh', args: script => ['-lc', script] })
+  return { installer, events, calls, done, minted: () => minted }
+}
+
+test('添加这台电脑 installs, starts and signs in the daemon here as a laptop, with no SSH', async () => {
+  const t = localInstaller('prod')
+  const first = await t.installer.beginLocal()
+  assert.equal(first?.target, LOCAL_TARGET)
+  await t.done
+  assert.equal(t.installer.state()?.status, 'online')
+  assert.equal(t.installer.state()?.deviceId, 'this-mac')
+  assert.ok(t.calls.every(call => call.command === '/bin/zsh' && call.args[0] === '-lc'), 'every step runs in the login shell')
+  assert.equal(t.calls.some(call => ['ssh', 'ssh-keygen', 'ssh-keyscan'].includes(call.command)), false)
+  const scripts = t.calls.map(call => call.args[1])
+  assert.ok(scripts.includes('npm install --global @aspectlylabs/mikka'))
+  assert.ok(scripts.includes("mikka daemon service install --server 'https://example.com/mikka' --device-type laptop"))
+  assert.equal(t.minted(), 1)
+  assert.equal(t.calls.filter(call => call.input === 'private-token\n').length, 1)
+  assert.equal(JSON.stringify(t.calls.map(call => call.args)).includes('private-token'), false)
+  assert.deepEqual([...new Set(t.events.map(state => state.step))], ['check', 'install', 'service', 'connect'])
+})
+
+test('a dev desktop adds its own dev daemon', async () => {
+  const t = localInstaller('dev')
+  await t.installer.beginLocal()
+  await t.done
+  const scripts = t.calls.map(call => call.args[1])
+  assert.ok(scripts.includes("mikka daemon service install --server 'https://example.com/mikka' --device-type laptop --dev"))
+  assert.ok(scripts.includes("mikka daemon login --server 'https://example.com/mikka' --registration-token-stdin --dev"))
+  assert.ok(scripts.includes('mikka daemon status --dev'))
+})
+
+test('重新连接 for this computer restarts its daemon and waits; it neither installs nor signs in again', async () => {
+  const t = localInstaller('prod')
+  const first = await t.installer.restartLocal()
+  assert.equal(first?.target, LOCAL_RECONNECT)
+  await t.done
+  assert.equal(t.installer.state()?.status, 'online')
+  const scripts = t.calls.map(call => call.args[1])
+  assert.deepEqual(scripts, ["mikka daemon service install --server 'https://example.com/mikka' --device-type laptop", 'mikka daemon status'])
+  assert.equal(t.minted(), 0)
+})
+
+test('the login shell is $SHELL when it is a plain path, else the platform default', () => {
+  assert.equal(loginShell({ SHELL: '/opt/homebrew/bin/fish' }, 'darwin').command, '/opt/homebrew/bin/fish')
+  assert.equal(loginShell({}, 'darwin').command, '/bin/zsh')
+  assert.equal(loginShell({ SHELL: '/bin/bash; rm -rf ~' }, 'linux').command, '/bin/sh')
+  assert.deepEqual(loginShell({}, 'linux').args('mikka daemon status'), ['-lc', 'mikka daemon status'])
+})
+

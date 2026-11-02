@@ -115,7 +115,7 @@ function RunsLine({ device, models }: { device: DeviceView; models: string[] | u
   return <span className="truncate text-xs text-muted-foreground">{line}</span>
 }
 
-function DeviceRow({ device, models, onChanged, onReconnect }: { device: DeviceView; models: string[] | undefined; onChanged: () => void; onReconnect: () => void }) {
+function DeviceRow({ device, models, onChanged, onReconnect }: { device: DeviceView; models: string[] | undefined; onChanged: () => void; onReconnect: (device: DeviceView) => void }) {
   const t = useTranslations('Devices')
   const format = useFormatter()
   const now = useNow({ updateInterval: 60_000 })
@@ -159,7 +159,7 @@ function DeviceRow({ device, models, onChanged, onReconnect }: { device: DeviceV
       </span>
       <RunsLine device={device} models={models} />
     </span>
-    {!device.online && <Button variant="secondary" size="sm" onClick={onReconnect}>{t('reconnect')}</Button>}
+    {!device.online && <Button variant="secondary" size="sm" onClick={() => onReconnect(device)}>{t('reconnect')}</Button>}
     {/* 参与调度: the device's one switch (decision 2026-11-02-1400); on a phone it keeps its label on its own line. */}
     <span className="flex items-center gap-2 text-sm text-muted-foreground max-sm:order-last max-sm:basis-full max-sm:pl-8">
       <span aria-hidden="true">{t('allowScheduling')}</span>
@@ -231,7 +231,7 @@ function RenameDialog({ device, open, onOpenChange, onSave }: { device: DeviceVi
   </Dialog>
 }
 
-function DeviceGroup({ title, devices, deviceModels, onChanged, onReconnect }: { title: string; devices: DeviceView[]; deviceModels: Record<string, string[]> | undefined; onChanged: () => void; onReconnect: () => void }) {
+function DeviceGroup({ title, devices, deviceModels, onChanged, onReconnect }: { title: string; devices: DeviceView[]; deviceModels: Record<string, string[]> | undefined; onChanged: () => void; onReconnect: (device: DeviceView) => void }) {
   return devices.length > 0 && <section aria-label={title} className="flex flex-col gap-2">
     <h2 className="px-1 text-sm font-medium text-muted-foreground">{title}</h2>
     <ItemGroup role="list" className="gap-0! overflow-hidden rounded-xl border bg-card">{devices.map((device, index) => <Fragment key={device.id}>{index > 0 && <ItemSeparator className="my-0" />}<DeviceRow device={device} models={deviceModels?.[device.id]} onChanged={onChanged} onReconnect={onReconnect} /></Fragment>)}</ItemGroup>
@@ -242,8 +242,10 @@ function DeviceGroup({ title, devices, deviceModels, onChanged, onReconnect }: {
  * 设置 › 设备 (Figma V09b 683:24269, S-L2 684:24422, S-L3 684:24731): only
  * machines the user connected, laptops under 本机 and SSH-installed servers
  * under Remote control. The bots' cloud computer is ours and never listed.
- * 添加设备 is the one-click SSH install in the desktop app (V09c) and the three
- * commands on the web (V09d), where the browser cannot open SSH (#491).
+ * 添加设备 in the desktop app (V09c) offers 添加这台电脑 first and the one-click
+ * SSH install for remote computers after it; the web shows the three commands
+ * (V09d), where the browser cannot open SSH (#491). In the desktop app,
+ * 重新连接 on this computer's own row restarts its daemon (usability C10).
  */
 export function DevicesSettings({ workspaceId }: { workspaceId?: string }) {
   const t = useTranslations('Devices')
@@ -253,7 +255,12 @@ export function DevicesSettings({ workspaceId }: { workspaceId?: string }) {
   const deviceModels = order.data && !order.data.error ? order.data.deviceModels : undefined
   const [adding, setAdding] = useState(false)
   const [desktopSsh, setDesktopSsh] = useState(false)
-  useEffect(() => { setDesktopSsh(Boolean(bridgeFromWindow(window as MikkaWindow)?.ssh)) }, [])
+  const [thisDevice, setThisDevice] = useState<string | null>(null)
+  useEffect(() => {
+    const bridge = bridgeFromWindow(window as MikkaWindow)
+    setDesktopSsh(Boolean(bridge?.ssh))
+    void bridge?.device?.status().then(status => setThisDevice(status.deviceId), () => {})
+  }, [])
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'n' && !event.shiftKey && !event.altKey) { event.preventDefault(); setAdding(true) }
@@ -262,7 +269,12 @@ export function DevicesSettings({ workspaceId }: { workspaceId?: string }) {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
   const changed = () => { void mutate() }
-  const reconnect = () => setAdding(true)
+  // This computer restarts its own daemon; any other offline device opens 添加设备.
+  const reconnect = (device: DeviceView) => {
+    const ssh = bridgeFromWindow(window as MikkaWindow)?.ssh
+    if (device.id === thisDevice && ssh?.restartLocal) void ssh.restartLocal().catch(() => {})
+    setAdding(true)
+  }
   return <div className="flex flex-col gap-6">
     <div className="flex items-center justify-between gap-3">
       <h1 className="text-xl font-semibold">{t('title')}</h1>

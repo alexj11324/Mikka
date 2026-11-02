@@ -32,6 +32,8 @@ export const IPC = {
   sshCancel: "mikka:ssh:cancel",
   sshAccept: "mikka:ssh:accept",
   sshState: "mikka:ssh:state",
+  sshLocal: "mikka:ssh:local",
+  sshRestartLocal: "mikka:ssh:restart-local",
   deviceStatus: "mikka:device:status",
   deviceLink: "mikka:device:link",
   devicePickRepo: "mikka:device:pick-repo",
