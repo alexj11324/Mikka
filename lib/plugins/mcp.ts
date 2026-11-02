@@ -67,7 +67,9 @@ type McpStage = 'target' | 'connect' | 'ready' | 'list' | 'call'
  * - stage and server host;
  * - reason: the SDK's known failure, matched against its fixed messages
  *   (http, protocolVersion, contentType, invalidInitialize, initTimeout,
- *   initAborted, requestTimeout, parse, sseClosed), else unknown;
+ *   initAborted, requestTimeout, parse, sseClosed) or Mikka's own transport
+ *   refusal (proxyNotAllowed, privateAddress, originChanged,
+ *   responseTooLarge), else unknown;
  * - status: the HTTP status, from the error's statusCode or "(HTTP 401)";
  * - protocolVersion: the date-shaped version a protocol mismatch names;
  * - chain: up to four errors down the cause chain, each with only its name,
@@ -83,6 +85,11 @@ const MCP_REASONS: [RegExp, string][] = [
   [/Request timed out/, 'requestTimeout'],
   [/Failed to parse message/, 'parse'],
   [/Connection closed|text\/event-stream response without body/, 'sseClosed'],
+  // Mikka's own transport refusals (lib/plugins/public-fetch.ts) are already codes.
+  [/^mcpProxyNotAllowed$/, 'proxyNotAllowed'],
+  [/^mcpPrivateAddress$/, 'privateAddress'],
+  [/^mcpOriginChanged$/, 'originChanged'],
+  [/^mcpResponseTooLarge$/, 'responseTooLarge'],
 ]
 const word = (value: unknown, pattern: RegExp) => typeof value === 'string' && pattern.test(value) ? value : undefined
 const httpStatus = (value: unknown) => typeof value === 'number' && Number.isInteger(value) && value >= 100 && value <= 599 ? value : undefined
