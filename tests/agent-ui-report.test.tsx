@@ -74,6 +74,16 @@ test('Report components parse, are detected as OpenUI and render through the rea
   assert.match(render(samples.BeFileDiff), /lib\/report\.ts/)
 })
 
+test('a saved reply\'s file diff shows ✓; only a streaming one spins', () => {
+  const saved = render(samples.BeFileDiff)
+  assert.match(saved, /aria-label="Changes applied"/)
+  assert.doesNotMatch(saved, /aria-label="Applying changes"/)
+  assert.match(saved, /data-state="complete"/)
+  // The header is beUI's plain button: no ghost Button fill when open.
+  assert.doesNotMatch(saved, /aria-expanded:bg-muted/)
+  assert.match(render(samples.BeFileDiff, 'en', true), /aria-label="Applying changes"/)
+})
+
 test('Report components reject invalid props', () => {
   const { DonutChart } = agentComponentCatalog
   assert.equal(DonutChart.props.safeParse({ slices: [{ name: 'A', value: 1 }, { name: 'B', value: 2 }] }).success, true)

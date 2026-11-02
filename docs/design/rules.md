@@ -48,7 +48,11 @@ source wins in a conflict is in [`README.md`](README.md).
   button). Views that are not a conversation never get one: the thread list
   and a bot's computer screen send instructions through the centre composer.
   An open thread is a conversation with the agent running it, so its detail
-  ends in that composer and what is typed there goes to that agent.
+  ends in that composer and what is typed there goes to that agent, whether
+  the thread is running or has ended (an ended one runs again, R-81), wherever
+  it opens: task page, thread column, Artifact window, phone. Only the legacy
+  agent archive is read-only
+  ([decision](decisions/2026-11-02-0220-every-thread-ends-in-the-composer.md)).
 - **R-11** A bot's composer, the Coordinator's included, has one model chip
   (`BotModelPicker`) beside 「+」, saved per bot; it picks a model only, never
   an Agent. Settings has no per-bot model rows
@@ -235,10 +239,17 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   Figma: page 「AI 侧栏 · 全局」.
 - **R-66** When the Coordinator dispatches a thread, the chat shows one
   thread card under its reply: status icon (never the bot's avatar), thread
-  name, then its outputs as chips such as a PR, folding extras into +N. No
-  step or progress line under the name (Alex, 2026-10-27). The card updates in place, so a thread has one
+  name, then on the right one PR badge for the PRs it produced: the summary
+  state's git mark in its GitHub colour (any open: green; else any draft:
+  grey; else any merged: purple; else closed: red) and the count. Hovering
+  the badge, or tapping it on a phone, lists each PR (title; state mark,
+  state, repository #number, and +added −removed lines when known); a row
+  opens the PR. Every thread card carries it, in the chat and in the thread
+  lists ([decision](decisions/2026-11-02-0230-pr-badge-on-thread-cards.md)).
+  No step or progress line under the name (Alex, 2026-10-27). The card updates in place, so a thread has one
   card in a chat; a later change of state is a sentence from the Coordinator,
-  not a second card. The card has no log, input box or buttons. Clicking it
+  not a second card. The card has no log, input box or buttons besides the
+  PR badge. Clicking it
   opens the thread conversation as R-82 says for every thread: on desktop in
   the right column beside the chat, which stays; on a phone it pushes in full
   screen ([decision](decisions/2026-11-01-1320-navigation-model.md)).

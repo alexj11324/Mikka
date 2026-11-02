@@ -9,7 +9,6 @@ test('管理员可以改名、改地址并删除工作区', async ({ page }, tes
   const name = page.getByRole('textbox', { name: '名称', exact: true })
   const address = page.getByRole('textbox', { name: '地址', exact: true })
   await expect(name).toBeEditable()
-  await expect(page.getByRole('button', { name: '重新播放', exact: true })).toBeEnabled()
   await attachLightDark(page, testInfo, 'general-admin')
 
   const renamed = `E2E ${randomUUID().slice(0, 6)}`

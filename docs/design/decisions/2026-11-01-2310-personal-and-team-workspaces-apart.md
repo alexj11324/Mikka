@@ -3,6 +3,7 @@
 - Date: 2026-11-01
 - Source: Alex, relayed by the coordinator session: 「个人工作区归个人工作区，团队工作区归团队工作区，两者互不相干。个人工作区不显示工作区设置……个人工作区不再处理工作相关事件，只处理个人的事件。团队工作区单独分开，专门处理团队相关的工作事项。」 and 「个人还是需要计费的吧。订阅页还是需要的，给个人用的订阅你还加上啊，就是 API 之类的，只不过不分享给团队而已」
 - Rule: R-26
+- Superseded in part by: [2026-11-02-0203](2026-11-02-0203-personal-workspace-keeps-bots.md) (Bot 与 Agents shows in a personal workspace too)
 - Replaces, in part, [2026-10-31-2130-personal-vs-workspace](2026-10-31-2130-personal-vs-workspace.md) (#687, 「一个人也是一个工作区」):
   - level 1: the account level now also holds profile memory (个人资料类记忆), security, 登录与密钥 and 「API 与订阅」 with the E2B key (see 1 below);
   - level 2: a personal workspace hides every team setting, not only 成员, 团队权限 and 审计日志, and keeps personal 计费 and 用量;
