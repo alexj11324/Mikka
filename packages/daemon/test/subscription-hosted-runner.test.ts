@@ -308,8 +308,8 @@ it('a CLI that cannot start keeps its reason, leaves nothing running, and the ne
       return events.at(-1)
     })().then(last => ({ last }), (e: Error) => ({ error: e }))
     if ('error' in error) {
-      expect(error.error.message).toBe('subscription_hosted_runtime_unavailable')
-      expect(String((error.error.cause as Error | undefined)?.message ?? '')).not.toBe('')
+      expect(error.error.message).toBe('claude_code_initialization_failed')
+      expect((error.error.cause as Error | undefined)?.message).toBe('Claude Code initialization failed')
       expect(warn.mock.calls.some(call => String(call[0]).includes('hosted CLI did not start'))).toBe(true)
     } else {
       expect(error.last).toMatchObject({ type: 'exit' })
@@ -444,6 +444,23 @@ it.each(['token', 'verify'] as const)('logs finite startup diagnostics for a ref
     log.mockRestore()
     consoleLog.mockRestore()
   }
+})
+
+it('reports a hung hosted Claude initializer as startup timeout and closes its entire runtime', async () => {
+  const binary = join(tempDir('mnh-init-timeout-'), 'claude')
+  writeFileSync(binary, '#!/bin/sh\nexec sleep 60\n', { mode: 0o700 })
+  const fixture = await revocationFixture(binary)
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+  try {
+    await expect(fixture.runner.start(fixture.assignment, fixture.options)).rejects.toMatchObject({
+      message: 'claude_code_initialization_timeout',
+      cause: { name: 'ClaudeInitializationError', message: 'Claude Code initialization timed out' },
+    })
+    expect(fixture.link.nativeRequest).not.toHaveBeenCalled()
+    expect(fixture.processes()).toEqual([])
+    expect(fixture.socket()).toBeUndefined()
+    expect(fixture.gate.revoked).toBe(true)
+  } finally { fixture.gate.revoke(); warn.mockRestore() }
 })
 
 it('rechecks the owned Codex broker account before the first custom-provider turn', async () => {
