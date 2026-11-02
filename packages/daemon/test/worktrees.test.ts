@@ -4,7 +4,7 @@ import { join } from "node:path"
 
 import { afterEach, describe, expect, it } from "vitest"
 
-import { WorktreeManager, runBranch } from "../src/worktrees"
+import { WorktreeManager, runBranch, withRepoConfig } from "../src/worktrees"
 import { cleanupTempDirs, makeRepo, tempDir } from "./helpers"
 
 afterEach(() => cleanupTempDirs())
@@ -177,5 +177,24 @@ describe("discarding an empty run", () => {
     commit(kept, "d.txt")
     expect(await trees.discardIfEmpty(["gone", "r2"], kept, repo)).toBe(false)
     expect(existsSync(kept)).toBe(true)
+  })
+})
+
+describe("worktree removal", () => {
+  it("waits for a worktree being added to the same repository (git reads every worktree's admin files while adding)", async () => {
+    const repo = await makeRepo()
+    const worktrees = new WorktreeManager(tempDir())
+    const path = await worktrees.create("run-gone", repo, "main")
+    let release!: () => void
+    const adding = withRepoConfig(repo, () => new Promise<void>(resolve => { release = resolve }))
+    let removed = false
+    const removing = worktrees.remove("run-gone", repo).then(() => { removed = true })
+    await new Promise(resolve => setTimeout(resolve, 200))
+    expect(removed).toBe(false)
+    expect(existsSync(join(path, ".git"))).toBe(true)
+    release()
+    await adding
+    await removing
+    expect(existsSync(path)).toBe(false)
   })
 })
