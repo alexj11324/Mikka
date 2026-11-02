@@ -74,9 +74,17 @@ fairness have no counterpart here and are skipped.
   data still goes: name, avatar, devices, connections, model credentials and
   its personal workspace. Today `lib/account/delete.ts` deletes those bots and
   threads; the code change is a separate PR.
+- A bot's owner may be empty: `bots.ownerId` is nullable, and deleting the
+  owner's account sets it to NULL (`ON DELETE SET NULL`) instead of deleting
+  the bot. An empty owner means 「待接管」: the bot is paused, matches no one
+  in permission checks, and an admin's takeover writes the new owner. The bot
+  belongs to the workspace; its owner is a role in it that can be vacant.
+  Work is never handed to someone without their consent.
 - Deleting a workspace or an account removes the encrypted secrets and other
   rows keyed by the workspace it deletes (gap M3, M4); a separate PR, with
-  tests.
+  tests. Its audit events are the exception: they are kept for 90 days after
+  the workspace is deleted, then the audit-retention job removes them. A
+  deleted workspace with no retention setting is treated as 90 days.
 - A per-person object stored per workspace is either a share (T6) or a
   per-workspace preference of that person (Bot 与 Agents rules); anything
   else is moved to the account.
