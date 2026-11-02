@@ -4,6 +4,8 @@ import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { Pool } from "pg";
 import { ExecutionSettings } from "./execution-settings";
+// Subscription chats answer only on validated routes (lib/subscription-routes.ts); these tests run with both on.
+process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES = 'claude_cpa,codex_cpa'
 const databaseURL = process.env.E2E_DATABASE_URL;
 if (process.env.REQUIRE_DB === "1" && !databaseURL)
   throw new Error("Execution settings database test URL required");

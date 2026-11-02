@@ -4135,8 +4135,10 @@
       "unavailable": "Mikka 默认暂时不可用",
       "trialUsed": "免费对话已用完",
       "bindSubscription": "绑定订阅",
+      "topUp": "充值",
       "verifyCard": "验证银行卡",
       "teamNoPoints": "这个团队没有可用点数",
+      "useMyPoints": "把我的点数用于这个团队",
       "openBilling": "打开计费",
       "useSubscription": "改用我的 {name} 订阅",
       "connect": "连接 <claude></claude> Claude / <openai></openai> ChatGPT 订阅"

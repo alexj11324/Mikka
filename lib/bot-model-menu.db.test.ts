@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { randomBytes, randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { Pool } from "pg";
+// Subscription chats answer only on validated routes (lib/subscription-routes.ts); these tests run with both on.
+process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES = 'claude_cpa,codex_cpa'
 
 /*
  * The composer's model picker against real Postgres (decision 2026-10-31-2330):
@@ -146,8 +148,8 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
     const fresh = await connection("alice", workspace, "claude", "connected");
     assert.ok(!(await botModelMenu(pool, settings, alice, botA)).groups.some((group) => group.options.some((option) => option.modelId === "claude-fresh-fixture")));
     const discovering = {
-      botModels: settings.botModels.bind(settings),
-      botBinding: settings.botBinding.bind(settings),
+      chatModels: settings.chatModels.bind(settings),
+      chatBinding: settings.chatBinding.bind(settings),
       connectedSubscriptions: settings.connectedSubscriptions.bind(settings),
       refreshBotModels: (scope: typeof alice, connectionId: string) =>
         settings.refreshBotModels(scope, connectionId, async () => connectionId === claude ? [{ id: "claude-sonnet-fixture" }, { id: "claude-opus-fixture" }, { id: "claude-new-fixture" }] : connectionId === fresh ? [{ id: "claude-fresh-fixture" }] : []),

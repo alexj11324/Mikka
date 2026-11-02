@@ -119,15 +119,18 @@ export class HostedUsageStore {
   /**
    * The free messages left before a card is needed (TRIAL_MESSAGES), for a
    * workspace with no verified card and no purchased points; null for any
-   * other. The messages are the people's own sent in this workspace's chats
-   * (not a 重试, not the welcome request), the one being answered included,
-   * so its turn is admitted while this is 0 or more.
+   * other. The allowance is the person's, not the workspace's: it counts the
+   * messages sent in the chats of every workspace created by this workspace's
+   * creator, so a second workspace adds none. Not a 重试, not the welcome
+   * request; the one being answered is included, so its turn is admitted
+   * while this is 0 or more.
    */
   async trialLeft(workspaceId: string, balance: { verified: boolean; purchased: number }, tx: Query = this.pool) {
     if (balance.verified || balance.purchased > 0) return null
     const { rows: [row] } = await tx.query<{ n: number }>(
       `SELECT count(*)::int AS n FROM coordinator_events e JOIN bots b ON b.id=e."botId"
-       WHERE b."workspaceId"=$1 AND e.kind='user_message' AND e.payload->>'retry' IS NULL AND coalesce(e.payload->>'text','') NOT LIKE '[Welcome]%'`,
+       JOIN mikka_workspaces w ON w.id=b."workspaceId"
+       WHERE w."userId"=(SELECT "userId" FROM mikka_workspaces WHERE id=$1) AND e.kind='user_message' AND e.payload->>'retry' IS NULL AND coalesce(e.payload->>'text','') NOT LIKE '[Welcome]%'`,
       [workspaceId],
     )
     return TRIAL_MESSAGES - Number(row?.n ?? 0)
