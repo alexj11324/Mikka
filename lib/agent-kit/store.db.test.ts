@@ -188,6 +188,52 @@ test('an execution pins exact definitions and host policy across edits and repla
   assert.equal(next.snapshot.effectiveTools.includes('list_computer_bots'),false)
   await assert.rejects(pool.query('update agent_kit_executions set snapshot=$2 where id=$1',[initial.id,'{}']),/agentKitImmutableSnapshot/)
 })
+// Stored versions from before a platform tool joined, inserted with their original creation time.
+async function storedVersions(scope:AgentScope,rows:{source:'builtin'|'user'|'improvement';createdAt:string;tools:readonly string[];base?:number}[]){
+  const botKey=scope.botId ?? 'coordinator',ids=rows.map(()=>randomUUID())
+  await pool.query('insert into agent_kit_heads(owner_id,bot_key,bot_id,workspace_id,next_version) values($1,$2,$3,$4,$5)',[scope.ownerId,botKey,scope.botId,scope.workspaceId,rows.length+1])
+  for(const [index,row] of rows.entries()){
+    const definition={...defaults,tools:row.tools}
+    await pool.query('insert into agent_kit_versions(id,owner_id,bot_key,version,definition,digest,source,request_key,base_version,created_at) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',[ids[index],scope.ownerId,botKey,index+1,JSON.stringify(definition),digest(definition),row.source,`fixture:${index}`,row.base===undefined?null:ids[row.base],row.createdAt])
+  }
+  return async(index:number,key:string)=>{
+    await pool.query('update agent_kit_heads set active_version=$3 where owner_id=$1 and bot_key=$2',[scope.ownerId,botKey,ids[index]])
+    const execution=await store.beginExecution(scope,key,'host',{harness:'codex',model:null},defaults)
+    const {rows:[stored]}=await pool.query('select definition from agent_kit_versions where id=$1',[ids[index]])
+    assert.deepEqual(execution.snapshot.definition,stored.definition)
+    assert.equal(execution.snapshot.definitionDigest,digest(stored.definition))
+    return execution.snapshot.effectiveTools
+  }
+}
+const github=['github_tools','github_call']
+test('已保存的旧定义也能拿到新的平台工具',async()=>{
+  const old=defaults.tools.filter(name=>!github.includes(name))
+  const activate=await storedVersions(await owner(),[
+    {source:'builtin',createdAt:'2026-11-02T16:42:00Z',tools:old},
+    {source:'user',createdAt:'2026-11-02T17:00:00Z',tools:old.filter(name=>name!=='web_search'),base:0},
+    {source:'improvement',createdAt:'2026-11-02T20:00:00Z',tools:old,base:0},
+  ])
+  const builtin=await activate(0,'builtin')
+  assert.deepEqual(builtin,[...defaults.tools])
+  const edited=await activate(1,'edited')
+  for(const name of github) assert.ok(edited.includes(name),name)
+  assert.equal(edited.includes('web_search'),false)
+  // An improvement cannot change tools; its tools were chosen by the old builtin base.
+  const improved=await activate(2,'improved')
+  for(const name of github) assert.ok(improved.includes(name),name)
+})
+test('主人有意去掉的工具不会被加回来',async()=>{
+  const activate=await storedVersions(await owner(),[
+    {source:'builtin',createdAt:'2026-11-02T10:00:00Z',tools:defaults.tools.filter(name=>!github.includes(name)&&name!=='find_repository')},
+    {source:'user',createdAt:'2026-11-02T19:00:00Z',tools:defaults.tools.filter(name=>!github.includes(name)),base:0},
+    {source:'user',createdAt:'2026-11-02T12:00:00Z',tools:defaults.tools.filter(name=>!github.includes(name)&&name!=='find_repository'&&name!=='web_search'),base:0},
+  ])
+  const after=await activate(1,'after')
+  for(const name of github) assert.equal(after.includes(name),false,name)
+  const before=await activate(2,'before')
+  assert.equal(before.includes('web_search'),false)
+  for(const name of [...github,'find_repository']) assert.ok(before.includes(name),name)
+})
 test('audit events are idempotent, immutable, redacted and closed to unassigned tools',async()=>{
   const scope=await owner();const execution=await store.beginExecution(scope,'audit','host',{harness:'codex',model:null},defaults)
   await store.recordTool(scope,execution.id,'call','web_search','start')

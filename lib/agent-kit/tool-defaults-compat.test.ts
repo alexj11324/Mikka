@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { before, mock, test } from 'node:test'
 import { asSchema, type ToolSet } from 'ai'
-import { DEFAULT_AGENT_DEFINITION, builtinAgentDefinition } from './builtin'
+import { DEFAULT_AGENT_DEFINITION, builtinAgentDefinition, platformEffectiveTools } from './builtin'
 import { COMPUTER_TOOL_IDS, FACTORY_TOOL_IDS } from './registry'
 import { makeSnapshot, parseDefinition, exportDefinition, importDefinition, digest } from './definition'
 import { AgentKitStore, type AgentExecution } from './store'
@@ -15,7 +15,7 @@ const capture = (name: string) => async (...args: unknown[]) => { calls.push({na
 const forbidden = () => { throw Error('No DB, provider or device in catalogue tests') }
 stub('../db/index.ts', {db: {select: forbidden}, pool: {connect: forbidden}})
 stub('../workspace-db.ts', {workspaceDb: {select: forbidden}})
-stub('../../workflows/coordinator/steps.ts', {composioAction: capture('read'), accountWrite: capture('write'), wakeComputerBot: capture('wake'), dispatchRun: capture('ordinary-dispatch'), dispatchFactoryRunStep: capture('factory-dispatch'), listFactoryRequestsScoped: capture('factory-read-scoped'), listFactoryRequests: capture('factory-read-legacy')})
+stub('../../workflows/coordinator/steps.ts', {composioAction: capture('read'), accountWrite: capture('write'), wakeComputerBot: capture('wake'), dispatchRun: capture('ordinary-dispatch'), dispatchFactoryRunStep: capture('factory-dispatch'), listFactoryRequestsScoped: capture('factory-read-scoped'), listFactoryRequests: capture('factory-read-legacy'), githubMcp: capture('github'), findRepository: capture('find-repository')})
 stub('../../workflows/coordinator/agent-kit-steps.ts', { beforeAgentTool: async () => {}, afterAgentTool: async () => {}, loadAgentSkill: async () => ({ error: 'notAssigned' }) })
 let registry: typeof import('../../workflows/coordinator/tools')
 let service: typeof import('./service')
@@ -253,4 +253,23 @@ test('Factory dispatch and ordinary dispatch keep separate host entry points and
   } finally {
     factoryGateKeys.forEach((key, i) => { if (previous[i] === undefined) delete process.env[key]; else process.env[key] = previous[i] })
   }
+})
+
+test('tools a saved version gets from the ledger keep the scheduled read-only and native scope limits', async () => {
+  const ledgerTools = ['find_repository', 'github_tools', 'github_call'] as const
+  const saved = parseDefinition({...DEFAULT_AGENT_DEFINITION, tools: DEFAULT_AGENT_DEFINITION.tools.filter(name => !(ledgerTools as readonly string[]).includes(name)), instructions: 'Saved before #990'})
+  const run = execution(saved)
+  run.snapshot.effectiveTools = platformEffectiveTools({source: 'user', createdAt: '2026-11-02T12:00:00Z', tools: saved.tools}, DEFAULT_AGENT_DEFINITION.tools)
+  for (const name of ledgerTools) assert.ok(run.snapshot.effectiveTools.includes(name) && !run.snapshot.definition.tools.includes(name), name)
+  const readOnly = registry.coordinatorTools(owner, bot, undefined, {execution: run, readOnly: true})
+  for (const name of [...ledgerTools, 'send_email', 'call_app_tool', 'dispatch_run', 'schedule_create']) assert.equal(readOnly[name], undefined, `${name} reached a scheduled read-only turn`)
+  assert.ok(readOnly.web_search)
+  calls.length = 0
+  const tools = registry.coordinatorTools(owner, bot, scope, {execution: run})
+  await invoke(tools, 'github_call', {name: 'get_me', arguments: {}})
+  await invoke(tools, 'find_repository', {name: 'mikka'})
+  assert.deepEqual(calls, [
+    {name: 'github', args: [owner, {name: 'get_me', arguments: {}}, scope]},
+    {name: 'find-repository', args: [owner, {name: 'mikka'}, scope]},
+  ])
 })

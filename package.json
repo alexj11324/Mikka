@@ -116,7 +116,7 @@
     "test:test-accounts-db": "node --test tests/test-account-pool.db.test.mjs",
     "test:test-accounts-http": "node scripts/test-accounts/run-http.mjs",
     "test:personal-message-safety": "node --import tsx --test lib/personal-agent-message.test.ts lib/coordinator/message-safety.test.ts && node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/coordinator/message-safety-consumers.test.ts lib/coordinator/message-safety-ingress.test.ts lib/coordinator/message-safety-handler.test.ts",
-    "test:agent-kit": "node --import tsx --test lib/agent-kit/agent-kit.test.ts lib/agent-kit/evals.test.ts lib/agent-kit/http.test.ts",
+    "test:agent-kit": "node --import tsx --test lib/agent-kit/agent-kit.test.ts lib/agent-kit/evals.test.ts lib/agent-kit/http.test.ts lib/agent-kit/platform-tools.test.ts",
     "test:agent-kit-db": "node --import tsx --test lib/agent-kit/store.db.test.ts",
     "check:agent-definitions": "tsx scripts/agent-kit.mts validate agents/default && tsx scripts/agent-kit.mts validate agents/research-example",
     "test:agent-kit-compat": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/cloud-computer-flag.test.ts lib/agent-kit/main-compat.test.ts lib/agent-kit/registry-compat.test.ts lib/agent-tool-approval/policy-layer.test.ts lib/agent-tool-approval/policy-snapshot.test.ts lib/agent-tool-approval/policy-issuer.test.mts tests/run-assignment-policy.test.ts && pnpm test:agent-kit-model",
