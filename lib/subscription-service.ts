@@ -91,9 +91,11 @@ export class SubscriptionService {
                   const { value, done } = await reader.read()
                   if (closed) return
                   if (done) { closed = true; reader.releaseLock(); controller.close(); return }
+                  if (value.type === 'error') logGenerationFailure('stream_part', value.error)
                   controller.enqueue(value.type === 'error' ? { type: 'error', error: new Error('subscription_generation_failed') } : value)
-                } catch {
+                } catch (error) {
                   if (closed) return
+                  logGenerationFailure('stream', error)
                   closed = true; reader.releaseLock()
                   controller.enqueue({ type: 'error', error: new Error('subscription_generation_failed') }); controller.close()
                 }
@@ -101,7 +103,7 @@ export class SubscriptionService {
               async cancel(reason) { closed = true; await reader.cancel(reason); reader.releaseLock() }
             })
             return { ...result, stream }
-          } catch { throw new SubscriptionRefusal('backend_unavailable') }
+          } catch (error) { logGenerationFailure('start', error); throw new SubscriptionRefusal('backend_unavailable') }
         }
         return model
       }
@@ -228,4 +230,19 @@ export class SubscriptionService {
     }
     return { processed: results.length, results }
   }
+}
+
+/**
+ * Why a subscription turn produced no answer, for the logs: the stage and the
+ * fixed refusal code (SubscriptionRefusal, WorkerRefusal) or the error's class
+ * name. Never a message, which can carry provider text.
+ */
+export function generationFailureCode(error: unknown): string {
+  const code = error && typeof error === 'object' && 'code' in error ? (error as { code: unknown }).code : undefined
+  if (typeof code === 'string' && /^[a-z_]{1,60}$/.test(code)) return code
+  if (error instanceof Error && /^[A-Za-z]{1,40}$/.test(error.name)) return error.name
+  return 'unknown'
+}
+function logGenerationFailure(stage: 'start' | 'stream' | 'stream_part', error: unknown) {
+  console.warn(JSON.stringify({ level: 'warn', msg: 'subscription_generation_failed', stage, code: generationFailureCode(error) }))
 }

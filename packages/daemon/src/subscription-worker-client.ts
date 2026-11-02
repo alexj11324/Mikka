@@ -42,7 +42,7 @@ export interface NativeLease { accessToken: string; accountId?: string; chatgptA
 export class WorkerRefusal extends Error {
   constructor(readonly code: string = "subscription_worker_unavailable") { super(code); this.name = "WorkerRefusal" }
 }
-const STORE_FAILURE = /^secret_store_failure (GET|POST|DELETE) (no_token|network|http_\d{3})$/
+const STORE_FAILURE = /^(secret_store_failure (GET|POST|DELETE) (no_token|network|http_\d{3})|subscription_upstream_failure (claude|codex) (transport|response|event|incomplete|convert) \d{1,3} [a-z_]{1,40})$/
 const safeCode = (value: unknown) => typeof value === "string" && /^[a-z_]{1,64}$/.test(value) ? value : "subscription_worker_unavailable"
 
 export class SubscriptionWorkerClient {
