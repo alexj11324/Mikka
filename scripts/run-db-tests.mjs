@@ -26,6 +26,7 @@ export const REQUIRED_SUITES = [
   { marker: 'lib/thread-dispatch.ts', file: 'tests/one-thread-per-task.db.test.ts', script: 'test:bot-threads-db' },
   { marker: 'lib/coordinator/coordinator-bot.ts', file: 'tests/coordinator-bot.db.test.ts', script: 'test:bot-threads-db' },
   { marker: 'lib/run-credential-source.ts', file: 'tests/api-key-runs.db.test.ts', script: 'test:bot-threads-db' },
+  { marker: 'lib/model-order.ts', file: 'tests/model-order.db.test.ts', script: 'test:bot-threads-db' },
   { marker: 'lib/run-quota.ts', file: 'tests/run-quota.db.test.ts', script: 'test:bot-threads-db' },
   { marker: 'lib/artifacts/delete.ts', file: 'tests/artifact-delete.db.test.ts', script: 'test:bot-threads-db' },
   { marker: 'lib/run-publications.ts', file: 'tests/run-publications.db.test.ts', script: 'test:run-publication-db' },

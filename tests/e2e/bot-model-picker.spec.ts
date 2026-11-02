@@ -50,7 +50,7 @@ test('Coordinator 输入框的模型选择器：只列可用的凭据，按 Bot 
   await expect(menu.getByRole('menuitemradio')).toHaveCount(3)
   // A model picker only: no Agent (Claude Code / Codex) in the Coordinator's menu.
   await expect(menu.getByText(/Claude Code|Codex/)).toHaveCount(0)
-  await expect(menu.getByRole('menuitem', { name: /管理 API 与订阅/ })).toBeVisible()
+  await expect(menu.getByRole('menuitem', { name: /管理模型与订阅/ })).toBeVisible()
   // The menu opens right above the chip, left-aligned with it.
   const placement = async () => {
     const [chipBox, menuBox] = [await chip.boundingBox(), await menu.boundingBox()]

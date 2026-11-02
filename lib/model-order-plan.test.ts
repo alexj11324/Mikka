@@ -1,0 +1,101 @@
+import assert from 'node:assert/strict'
+import test from 'node:test'
+import { defaultOrder, deviceModel, planDispatch, type CredentialState, type OrderEntry, type PoolDevice } from './model-order-plan'
+
+// Model names here are fixtures standing for what a CLI or provider reported.
+const sub = (id: string, harness: OrderEntry['harness'], model: string, connectionId = `conn-${harness}`): OrderEntry => ({ id, harness, model, source: { kind: 'subscription', connectionId } })
+const key = (id: string, harness: OrderEntry['harness'], model: string): OrderEntry => ({ id, harness, model, source: { kind: 'api_key', keyId: 'key-1' } })
+const device = (id: string, over: Partial<PoolDevice> = {}): PoolDevice => ({
+  id, online: true, enabled: true,
+  harnesses: [
+    { harness: 'claude_code', installed: true, modelSlots: [{ slot: 'top', model: 'reported-claude-top', name: 'Top' }] },
+    { harness: 'codex', installed: true, models: ['reported-codex-a'] },
+  ],
+  ...over,
+})
+const usable = (): CredentialState => ({ usable: true })
+const first = sub('1', 'claude_code', 'reported-claude-top')
+const second = sub('2', 'codex', 'reported-codex-a')
+const keyed = key('3', 'claude_code', 'key-model')
+
+test('the first allowed model that can run takes the run; the slot its CLI reported is what runs', () => {
+  const plan = planDispatch({ entries: [first, second], location: 'local', devices: [device('mac')], credential: usable, cloudReady: false })
+  assert.deepEqual([plan.kind, plan.kind === 'device' && plan.entry.id, plan.kind === 'device' && plan.model], ['device', '1', 'top'])
+})
+
+test('ordered fallback: quota used up, signed out, or no device moves to the next model, and says why each was skipped', () => {
+  const credential = (entry: OrderEntry): CredentialState => entry.id === '1' ? { usable: false, reason: 'quota', resetsAt: '2026-11-02T14:20:00Z' } : usable()
+  const plan = planDispatch({ entries: [first, second], location: 'local', devices: [device('mac')], credential, cloudReady: false })
+  assert.equal(plan.kind === 'device' && plan.entry.id, '2')
+  assert.deepEqual(plan.skipped.map(item => [item.entry.id, item.block.reason]), [['1', 'quota']])
+  const noClaude = planDispatch({ entries: [first, second], location: 'local', devices: [device('box', { harnesses: [{ harness: 'codex', installed: true, models: ['reported-codex-a'] }] })], credential: usable, cloudReady: false })
+  assert.deepEqual([noClaude.kind === 'device' && noClaude.entry.id, noClaude.skipped.map(item => item.block.reason)], ['2', ['noDevice']])
+  const expired = planDispatch({ entries: [first, second], location: 'local', devices: [device('mac')], credential: entry => entry.id === '2' ? usable() : { usable: false, reason: 'expired' }, cloudReady: false })
+  assert.equal(expired.kind === 'device' && expired.entry.id, '2')
+})
+
+test('本地 picks at random among the devices that can run it, never one with 参与调度 off, offline, or without the model', () => {
+  const devices = [device('a'), device('off', { enabled: false }), device('down', { online: false }), device('b'),
+    device('other', { harnesses: [{ harness: 'claude_code', installed: true, models: ['reported-elsewhere'] }] })]
+  const picked = new Set<string>()
+  for (const value of [0, 0.49, 0.5, 0.99]) {
+    const plan = planDispatch({ entries: [first], location: 'local', devices, credential: usable, cloudReady: false, random: () => value })
+    if (plan.kind === 'device') picked.add(plan.deviceId)
+  }
+  assert.deepEqual([...picked].sort(), ['a', 'b'])
+  assert.equal(deviceModel(device('off', { enabled: false }), first), null, '参与调度 off: never sent a run')
+  assert.equal(deviceModel(device('x'), keyed), 'key-model', 'an API key model runs on any installed Agent of its protocol')
+  assert.equal(deviceModel(device('x', { harnesses: [] }), keyed), null)
+})
+
+test('a model the person picked for the thread goes first, before the list', () => {
+  const plan = planDispatch({ entries: [first, second], explicit: second, location: 'local', devices: [device('mac')], credential: usable, cloudReady: false })
+  assert.equal(plan.kind === 'device' && plan.entry.id, '2')
+  const fallsBack = planDispatch({ entries: [first, second], explicit: second, location: 'local', devices: [device('mac')], credential: entry => entry.id === '2' ? { usable: false, reason: 'quota' } : usable(), cloudReady: false })
+  assert.equal(fallsBack.kind === 'device' && fallsBack.entry.id, '1')
+})
+
+test('云端 runs the first usable model on the person\'s E2B machine', () => {
+  const plan = planDispatch({ entries: [first, second], location: 'cloud', devices: [], credential: entry => entry.id === '1' ? { usable: false, reason: 'paused' } : usable(), cloudReady: true })
+  assert.deepEqual([plan.kind, plan.kind === 'cloud' && plan.entry.id], ['cloud', '2'])
+})
+
+test('nothing can run: the card names why', () => {
+  assert.equal(planDispatch({ entries: [], location: 'local', devices: [device('mac')], credential: usable, cloudReady: true }).kind === 'none' && 'noModels', 'noModels')
+  const cloud = planDispatch({ entries: [first], location: 'cloud', devices: [], credential: usable, cloudReady: false })
+  assert.deepEqual([cloud.kind, cloud.kind === 'none' && cloud.reason], ['none', 'cloudNotConfigured'])
+  const local = planDispatch({ entries: [first, second], location: 'local', devices: [device('off', { enabled: false })], credential: usable, cloudReady: true })
+  assert.deepEqual([local.kind, local.kind === 'none' && local.reason], ['none', 'noDevice'])
+  const spent = planDispatch({ entries: [first, second], location: 'local', devices: [device('mac')], credential: () => ({ usable: false, reason: 'quota' }), cloudReady: true })
+  assert.deepEqual([spent.kind, spent.kind === 'none' && spent.reason], ['none', 'unavailable'])
+})
+
+test('an untouched list: opus first, then the first Codex model reported, else the first model anything reported', () => {
+  const sub = (connectionId: string) => ({ kind: 'subscription' as const, connectionId })
+  const key = (keyId: string) => ({ kind: 'api_key' as const, keyId })
+  const claude = [
+    { harness: 'claude_code' as const, model: 'reported-sonnet-x', name: 'Sonnet X', source: sub('c') },
+    { harness: 'claude_code' as const, model: 'reported-opus-x', name: 'Opus X', source: sub('c') },
+  ]
+  const chatgpt = [
+    { harness: 'codex' as const, model: 'reported-codex-top', name: 'reported-codex-top', source: sub('g') },
+    { harness: 'codex' as const, model: 'reported-codex-next', name: 'reported-codex-next', source: sub('g') },
+  ]
+  const deepseek = [
+    { harness: 'claude_code' as const, model: 'reported-deepseek-chat', name: 'reported-deepseek-chat', source: key('d') },
+    { harness: 'claude_code' as const, model: 'reported-deepseek-reasoner', name: 'reported-deepseek-reasoner', source: key('d') },
+  ]
+  const models = (items: Parameters<typeof defaultOrder>[0]) => defaultOrder(items).map(item => item.model)
+  assert.deepEqual(models(chatgpt), ['reported-codex-top'], 'only ChatGPT: its Codex model, no tier word needed')
+  assert.deepEqual(models([...claude, ...chatgpt]), ['reported-opus-x', 'reported-codex-top'], 'Claude and ChatGPT: opus, then Codex')
+  assert.deepEqual(models(deepseek), ['reported-deepseek-chat'], 'only a DeepSeek key: its first model')
+  assert.deepEqual(models(claude), ['reported-opus-x'], 'no Codex: opus only')
+  assert.deepEqual(models([...claude, ...deepseek]), ['reported-opus-x'], 'opus placed: other keys stay out')
+  // A key that runs Claude Code and reports opus counts; a subscription's opus wins over it.
+  const keyOpus = { harness: 'claude_code' as const, model: 'key-opus', name: 'key-opus', source: key('k') }
+  assert.deepEqual(models([keyOpus]), ['key-opus'])
+  assert.deepEqual(models([keyOpus, ...claude]), ['reported-opus-x'])
+  // An OpenAI-compatible key reports Codex models too.
+  assert.deepEqual(models([{ harness: 'codex' as const, model: 'key-codex', name: 'key-codex', source: key('o') }]), ['key-codex'])
+  assert.deepEqual(models([]), [], 'nothing connected: nothing')
+})

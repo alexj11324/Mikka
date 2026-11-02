@@ -22,7 +22,7 @@ import { ConnectDeviceDialog } from '@/components/devices/connect-device-dialog'
 import { E2BKeyDialog } from '@/components/settings/e2b-key-dialog'
 import { usePresence } from '@/lib/use-presence'
 import { useActionError } from '@/lib/use-action-error'
-import { setDeviceAutoSchedule } from '@/app/actions/agents'
+import { setDeviceEnabled } from '@/app/actions/agents'
 
 export function useAgentDecision() {
   const agentCopy = useAgentCopy()
@@ -184,8 +184,10 @@ export const CLOUD_KEY_SETTINGS = '/settings?section=models'
 
 /** Where the person connects a server: Settings › 电脑 (one-click SSH in the desktop app). */
 export const CONNECT_SERVER_SETTINGS = '/settings?section=computers'
+/** 模型与订阅: where the allowed models and 运行位置 are set (decision 2026-11-02-1400). */
+export const MODEL_SETTINGS = '/settings?section=models'
 
-type ChoiceAction = 'cloudKeySettings' | 'enableThisMac' | 'connectServer' | 'e2bKey' | 'allowAutoSchedule' | 'serverOnline'
+type ChoiceAction = 'cloudKeySettings' | 'enableThisMac' | 'connectServer' | 'e2bKey' | 'allowAutoSchedule' | 'serverOnline' | 'modelSettings'
 
 function ChoiceCard({ title, description, options, task }: { title: string; description?: string; options: { value: string; label: string; action?: ChoiceAction }[]; task?: string }) {
   const agentCopy = useAgentCopy()
@@ -200,7 +202,7 @@ function ChoiceCard({ title, description, options, task }: { title: string; desc
   const [autoError, setAutoError] = useState('')
   async function allowAutoSchedule(deviceId: string, label: string) {
     setAutoError('')
-    const result = await setDeviceAutoSchedule({ deviceId, autoSchedule: true }).catch(() => ({ error: 'deviceSaveFailed' as const }))
+    const result = await setDeviceEnabled({ deviceId, enabled: true }).catch(() => ({ error: 'deviceSaveFailed' as const }))
     if ('error' in result) { setAutoError(actionError(result.error)); return }
     setPicked(deviceId)
     void send(label)
@@ -211,6 +213,7 @@ function ChoiceCard({ title, description, options, task }: { title: string; desc
   const copy = (option: { value: string; label: string; action?: ChoiceAction }) => option.action === 'cloudKeySettings' ? agentCopy.cloudKeySetup
     : option.action === 'enableThisMac' ? agentCopy.needsMachineMac : option.action === 'connectServer' ? agentCopy.needsMachineConnect : option.action === 'e2bKey' ? agentCopy.needsMachineE2B
     : option.action === 'allowAutoSchedule' ? agentCopy.needsMachineAuto : option.action === 'serverOnline' ? agentCopy.needsMachineServerOnline
+    : option.action === 'modelSettings' ? agentCopy.needsModelSettings
     : option.value === 'wait' ? agentCopy.dispatchWait : option.value === 'cloud' ? agentCopy.dispatchCloud : option.label
   return <div role="group" aria-label={title} data-slot="choice-card" className="flex w-full max-w-sm min-w-0 flex-col gap-2">
     <p className={cn('w-fit max-w-full min-w-0', bubbles ? 'rounded-2xl bg-muted px-4 py-2.5' : 'font-medium')}>
@@ -230,15 +233,15 @@ function ChoiceCard({ title, description, options, task }: { title: string; desc
           <ItemContent><ItemTitle>{label}</ItemTitle></ItemContent>
           <ItemActions><ChevronRight aria-hidden="true" /></ItemActions>
         </Item>
-        // 没有可用的电脑: 允许这台电脑自动调度 switches that device on, then tells the bot to dispatch again.
+        // 没有可用的电脑: 让这台电脑参与调度 switches that device on, then tells the bot to dispatch again.
         if (option.action === 'allowAutoSchedule') return <Button key={option.value} type="button" variant={selected ? 'default' : 'secondary'} aria-pressed={selected}
           disabled={answered || status !== 'pending'} onClick={() => { void allowAutoSchedule(option.value, label) }}>
           <Kbd data-icon="inline-start">{letter}</Kbd>{label}
           {selected && (pending ? <Spinner data-icon="inline-end" aria-label={agentCopy.sendingChoice} /> : answered && <Check data-icon="inline-end" aria-hidden="true" />)}
         </Button>
         // The other rows open their setup (a dialog, or Settings › 电脑); a saved E2B key also tells the bot to dispatch again.
-        if (option.action === 'connectServer' || option.action === 'serverOnline') return <Button key={option.value} variant="secondary" nativeButton={false} role="link" aria-disabled={answered || undefined}
-          className={cn(answered && 'pointer-events-none opacity-50')} render={<Link href={CONNECT_SERVER_SETTINGS} />}>
+        if (option.action === 'connectServer' || option.action === 'serverOnline' || option.action === 'modelSettings') return <Button key={option.value} variant="secondary" nativeButton={false} role="link" aria-disabled={answered || undefined}
+          className={cn(answered && 'pointer-events-none opacity-50')} render={<Link href={option.action === 'modelSettings' ? MODEL_SETTINGS : CONNECT_SERVER_SETTINGS} />}>
           <Kbd data-icon="inline-start">{letter}</Kbd>{label}<ChevronRight data-icon="inline-end" aria-hidden="true" />
         </Button>
         if (option.action === 'enableThisMac' || option.action === 'e2bKey') return <Button key={option.value} type="button" variant="secondary" disabled={answered}
