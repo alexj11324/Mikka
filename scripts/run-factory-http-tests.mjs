@@ -27,6 +27,9 @@ async function probeDatabaseUrls(env) {
       await admin.query(`${exists ? 'ALTER' : 'CREATE'} ROLE ${role} LOGIN NOSUPERUSER PASSWORD ${admin.escapeLiteral(password)}`)
       await admin.query(`GRANT USAGE ON SCHEMA public TO ${role}`)
       for (const kind of ['TABLES', 'SEQUENCES', 'FUNCTIONS']) await admin.query(`GRANT ALL ON ALL ${kind} IN SCHEMA public TO ${role}`)
+      // A probe role must never be able to step outside its grants.
+      const { rows: [check] } = await admin.query('SELECT rolsuper, rolcreaterole, rolcreatedb FROM pg_roles WHERE rolname = $1', [role])
+      if (!check || check.rolsuper || check.rolcreaterole || check.rolcreatedb) throw new Error(`${role} must be a plain login role`)
       urls[probe] = roleTargetUrl(base, role, password)
     }
     return urls
@@ -43,7 +46,8 @@ const probes = [
 ]
 // These rollout gates belong to this already-validated ephemeral test process.
 // The built question endpoints exercise the same enabled consumers as dispatch.
-const factoryEnv = { ...process.env, MIKKA_FACTORY_ROUTING_ENABLED: '1', MIKKA_FACTORY_LIFECYCLE_ENABLED: '1' }
+// Locally the built server's auth origin is this runner's own origin (bootstrap-local exports :3000 for next dev).
+const factoryEnv = { ...process.env, MIKKA_FACTORY_ROUTING_ENABLED: '1', MIKKA_FACTORY_LIFECYCLE_ENABLED: '1', ...(localTestAccountsMode(process.env) ? { BETTER_AUTH_URL: origin } : {}) }
 const server = spawn(process.execPath, ['node_modules/next/dist/bin/next', 'start', '--port', '3100'], { stdio: 'inherit', env: factoryEnv })
 try {
   let ready = false
