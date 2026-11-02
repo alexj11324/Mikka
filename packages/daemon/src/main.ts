@@ -88,7 +88,7 @@ import {
 import type { DeviceRepo, MemoryServer, ServerLink } from "./server-link"
 import { SessionRejectedError } from "./server-link-http"
 import { WorktreeManager } from "./worktrees"
-import { RepositoryCache } from "./repositories"
+import { EmptyRepositoryError, RepositoryCache } from "./repositories"
 import { daemonTestMode, normalizeRepository } from "@mikka/protocol/repository"
 import type { RunAssignment } from "./server-link"
 import { createHostedBotRunner } from "./subscription-hosted-runner"
@@ -472,8 +472,21 @@ export class Daemon {
         : undefined,
       repository: assignment => this.repository(assignment),
       prepareRepository: async (assignment, signal) => {
-        if (assignment.remoteUrl) await withRunGitCredentials(assignment, runPaths(this.paths.adapterState, assignment.runId).privateDir,
-          env => this.repositories.prepare(assignment.remoteUrl!, signal, env))
+        const remoteUrl = assignment.remoteUrl
+        if (!remoteUrl) return
+        await withRunGitCredentials(assignment, runPaths(this.paths.adapterState, assignment.runId).privateDir, async (env, github) => {
+          try {
+            await this.repositories.prepare(remoteUrl, signal, env)
+          } catch (error) {
+            if (!(error instanceof EmptyRepositoryError)) throw error
+            // An empty remote: a run that may push gives it a first commit
+            // with no files on its base branch, then works like on any other.
+            if (!pushDecision(runPolicy(assignment.policy)).push) return this.repositories.localEmptyBase(remoteUrl)
+            const branch = assignment.baseBranch && assignment.baseBranch !== 'HEAD' ? assignment.baseBranch : (await github.defaultBranch()) ?? 'main'
+            await this.repositories.seedEmpty(remoteUrl, branch, signal, env)
+            await this.repositories.prepare(remoteUrl, signal, env)
+          }
+        })
       },
       baseRef: assignment => assignment.remoteUrl
         ? this.repositories.baseRef(assignment.remoteUrl, assignment.baseBranch)
