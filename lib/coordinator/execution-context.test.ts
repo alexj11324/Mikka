@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { executionContext, executionContextText, readExecutionFacts, type ExecutionContextSource, type ExecutionFacts } from './execution-context'
-import { deliverRefusalLine, hostedRefusalLine } from './refusal-line'
+import { deliverRefusalLine, failureLine } from './refusal-line'
+import { chatFailure, failureMessageKey } from '../chat-failure'
 
 const facts: ExecutionFacts = {
   workspace: { name: 'Alex', kind: 'personal' },
@@ -59,14 +60,35 @@ test('a part that fails or is slow is left out, never claimed missing', async ()
   assert.equal(executionContextText({ workspace: null, devices: null, order: null, e2b: null, hosted: null }), '')
 })
 
-test('a Mikka 默认 refusal becomes the same status line the web draws', () => {
-  assert.equal(hostedRefusalLine('Error: points_exhausted'), 'Mikka 默认点数已用完')
-  assert.equal(hostedRefusalLine('free_allowance_used'), 'Mikka 默认免费额度已用完')
-  assert.equal(hostedRefusalLine('verification_required'), '使用 Mikka 默认模型前需要验证银行卡')
-  assert.equal(hostedRefusalLine('usage_concurrency_limit'), 'Mikka 默认暂时不可用')
-  assert.equal(hostedRefusalLine('points_exhausted', 'en'), 'Mikka Default: Points used up')
-  assert.equal(hostedRefusalLine('agent_runtime_changed'), null)
-  assert.equal(hostedRefusalLine(null), null)
+test('a failure the person can act on becomes the words the web keeps under the message', () => {
+  assert.equal(failureLine('Error: points_exhausted'), 'Mikka 默认点数已用完')
+  assert.equal(failureLine('free_allowance_used'), 'Mikka 默认免费额度已用完')
+  assert.equal(failureLine('verification_required'), '使用 Mikka 默认模型前需要验证银行卡')
+  assert.equal(failureLine('usage_concurrency_limit'), 'Mikka 默认暂时不可用')
+  assert.equal(failureLine('points_exhausted', 'en'), 'Mikka Default: Points used up')
+  // The person's subscription refused the turn.
+  assert.equal(failureLine('quota_exhausted'), '订阅额度已用完')
+  assert.equal(failureLine('Step "model" failed after 3 retries: reconnect_required'), '订阅需要重新连接')
+  assert.equal(failureLine('binding_required'), '所选订阅不可用')
+  // The wake gave up: no turn ran.
+  assert.equal(failureLine('wake_exhausted'), '回复重试已停止')
+  // A crash is retried and has nothing for the person to do.
+  assert.equal(failureLine('agent_runtime_changed'), null)
+  assert.equal(failureLine(null), null)
+})
+
+test('every failure kind has one message key, the one the web line reads', () => {
+  assert.deepEqual(failureMessageKey({ kind: 'hosted', code: 'usage_in_progress' }), { namespace: 'Billing.refusal', key: 'unavailable' })
+  assert.deepEqual(failureMessageKey({ kind: 'hosted', code: 'verification_required' }), { namespace: 'Billing.refusal', key: 'verificationRequiredPlain' })
+  assert.deepEqual(failureMessageKey({ kind: 'subscription', notice: 'quotaUsed' }), { namespace: 'Coordinator', key: 'subscriptionRefusal.quotaUsed' })
+  assert.deepEqual(failureMessageKey({ kind: 'wake', code: 'wake_failed' }), { namespace: 'Coordinator', key: 'wakeErrors.wake_failed' })
+  assert.deepEqual(failureMessageKey({ kind: 'failed' }), { namespace: 'Coordinator', key: 'failedTitle' })
+  // Every key resolves in both languages, so no surface shows a raw key.
+  for (const error of ['points_exhausted', 'free_allowance_used', 'platform_paused', 'verification_required', 'usage_cost_unavailable', 'binding_required', 'pending_auth', 'quota_exhausted', 'backend_unavailable', 'wake_failed', 'wake_start_unconfirmed', 'wake_exhausted']) {
+    const failure = chatFailure({ working: false, error })!
+    assert.notEqual(failure.kind, 'failed', error)
+    for (const locale of ['zh-CN', 'en'] as const) assert.ok(failureLine(error, locale), `${error} in ${locale}`)
+  }
 })
 
 test('the refusal reaches every Telegram chat and the phone; one failure does not stop the rest', async () => {
