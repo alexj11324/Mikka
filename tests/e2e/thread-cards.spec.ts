@@ -84,9 +84,11 @@ test('A dispatched thread is a card under the reply that opens its conversation 
   const chat = page.getByRole('region', { name: 'Coordinator', exact: true })
   // A thread is named for its task (glossary), on its card and in its header alike (D9).
   const threadName = new RegExp(`^(?:\\S+ )?${title}$`)
-  const card = chat.getByRole('button', { name: new RegExp(`^打开线程 (?:\\S+ )?${title}$`) })
+  const cardName = new RegExp(`^打开线程 (?:\\S+ )?${title}$`)
+  const card = chat.getByRole('button', { name: cardName })
   await expect(card).toBeVisible()
-  const surface = chat.locator('[data-slot="thread-card"]').filter({ has: card })
+  // filter({ has }) searches inside each card, so its locator starts from the page, not from the chat region.
+  const surface = chat.locator('[data-slot="thread-card"]').filter({ has: page.getByRole('button', { name: cardName }) })
   await expect(surface).toContainText(title)
   await expect(surface.getByRole('img', { name: '进行中', exact: true })).toBeVisible()
   // R-66: status icon + title + the PR badge; no avatar or progress row.

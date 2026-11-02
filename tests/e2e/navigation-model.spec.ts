@@ -263,7 +263,8 @@ test('a task page\'s 线程 row opens the thread in the task\'s right column; ba
   const { title, issueId, runId } = await chatWithThread(page)
   await page.goto(app(`/?issue=${issueId}`))
   await expect(taskTitle(page)).toHaveValue(title)
-  await page.getByRole('region', { name: /^线程/ }).getByRole('button', { name: `打开线程 ${THREAD}`, exact: true }).click()
+  // The 线程 section itself (「线程 1」): this test's task title also starts with 线程, and a task page that names its region after the task would match /^线程/ too.
+  await page.getByRole('region', { name: /^线程\s*\d+$/ }).getByRole('button', { name: `打开线程 ${THREAD}`, exact: true }).click()
   const panel = page.getByRole('region', { name: THREAD, exact: true })
   await expect(panel.getByRole('list', { name: '线程对话' })).toContainText('Home page loads in 3.8s.')
   expect(query(page).get('thread')).toBe(runId)

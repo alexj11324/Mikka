@@ -46,7 +46,7 @@ export function ArtifactLibrary({ onOpenIssue }: { onOpenIssue: (id: string) => 
 
   return <div className="flex min-h-0 flex-1 flex-col md:flex-row">
     <ResizablePane render="aside" aria-labelledby="artifact-library-title" storageKey="mikka:artifact-list-width" defaultWidth={272} min={200} max={480} edge="end" from="md" label={tCommon('resize.artifactList')}
-      className="flex shrink-0 flex-col gap-1 border-rule px-2 pt-6 pb-3 md:border-r md:pb-6">
+      className="flex shrink-0 flex-col gap-1 border-rule px-2 pt-6 pb-3 max-md:pt-1 md:border-r md:pb-6">
       <h1 id="artifact-library-title" className="px-2 pb-3 text-xl leading-7 font-semibold max-md:sr-only">{t('title')}</h1>
       <ul className="flex gap-1 overflow-x-auto md:flex-col">
         {CATEGORIES.map(item => <li key={item.id}>
