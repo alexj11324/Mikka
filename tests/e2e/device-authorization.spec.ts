@@ -50,6 +50,7 @@ test('a device grant is reviewed in the browser and exchanged for a daemon crede
   await expect(page.getByRole('button', { name: '允许', exact: true })).toBeDisabled()
   await page.getByRole('checkbox', { name: '终端里显示的也是这个验证码', exact: true }).check()
   await expect(page.getByRole('button', { name: '允许', exact: true })).toBeEnabled()
+  await expect(page.getByRole('button', { name: '允许', exact: true })).toHaveCSS('opacity', '1')
   await testInfo.attach('device-code-review-light', { body: await page.screenshot(), contentType: 'image/png' })
   await page.emulateMedia({ colorScheme: 'dark' })
   await expect(page.locator('html')).toHaveClass(/dark/)
