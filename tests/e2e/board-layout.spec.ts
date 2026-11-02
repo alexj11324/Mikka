@@ -220,6 +220,7 @@ test('390px：看板打开时停在第一个有任务的列', async ({ page }, t
   const card = page.getByRole('group', { name: '手机看板上的任务', exact: true })
   await expect(card).toBeInViewport({ ratio: 0.9 })
   await expect(page.getByRole('region', { name: '待整理任务列', exact: true })).not.toBeInViewport()
+  await expect(page.getByRole('menu')).toHaveCount(0)
   for (const scheme of ['light', 'dark'] as const) {
     await page.emulateMedia({ colorScheme: scheme })
     await testInfo.attach(`board-mobile-start-${scheme}`, { body: await page.screenshot(), contentType: 'image/png' })
