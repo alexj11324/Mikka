@@ -22,13 +22,31 @@ goal. Shared retain scripts belong to #364 and issue-scope logic to #301.
 
 | Responsibility | Consumer and behavior |
 | --- | --- |
-| Business judgment | `triage.ts` asks for an explicit model choice for runtime events; `wake.ts` retains an unavailable judgment as a nullable, undelivered tier. No failed/blocked status automatically means a person is needed. |
+| Business judgment | Server-confirmed completion of a Bot’s own dispatched run returns to that same Bot as request/result transport (see below). Other runtime events use `triage.ts`, which asks for an explicit model choice for runtime events; `wake.ts` retains an unavailable judgment as a nullable, undelivered tier. No failed/blocked status automatically means a person is needed. |
 | Group selection | `route-group.ts` calls the model even with one member. The model chooses selected/everyone/clarify. Missing answers stay pending. Confidence is optional metadata, never a confirmation threshold. Model-selected routes carry the host invocation receipt; mentions do not invent one. Exact authorized mentions remain direct delivery. |
 | Existing execution policy | `judgment-policy.ts`, `instructions.ts`, and `execution-instructions.ts` refer to authoritative allow/ask/deny. They add no universal manual confirmation. Historical snapshot bytes/digests remain intact under an explicit current host-policy overlay. |
 | Visual input | `decision.ts` sends real inline `input_image` parts through the existing Decisions route. Required pixels cannot be replaced by a text assertion, OCR summary, external URL or model-authored approval claim. |
 | Mechanical protection | Event ownership, delivery/tier compare-and-set, group membership, cancellation, request/image limits, execution scope, authorization and idempotency remain program checks. Pending runtime backlogs cannot take priority over new direct user input. |
 | Evaluation quality | Live reports require a structured semantic verdict from the shared vision-capable model, bound to the actual case/trace/definition/effective host-policy digests and host invocation receipt. Fixture regex assertions are used only in fixture mode, which cannot authorize activation. |
 | Frozen subscription | Conversation compaction resolves the same frozen runtime/binding as generation. Subscription calls stream with zero SDK retries. An unconfigured Coordinator or bot with no available subscription freezes the configured hosted default. A saved choice whose binding is missing or revoked freezes another available subscription (Claude first), otherwise the hosted default ([decision](design/decisions/2026-10-31-2110-bots-reply-on-mikka-cloud.md)). A frozen subscription with a missing/revoked binding cannot fall back to a default paid model. |
+
+## Returning a dispatched task result
+
+A `run_finished` event for the same owner and original Bot may return directly
+as a `result` when the existing run-visibility gate and current canonical run
+record confirm its identity, terminal status and finish time. The event's issue,
+status and stop reason must match; its payload remains untrusted agent content.
+A compare-and-set keeps delivery once-only and records
+`method: run_completion_delivery`, with no model execution receipt. Bot ownership
+and active workspace membership are rechecked at the write.
+
+This is the response to the Bot's own request, not semantic classification or
+permission to execute, publish, notify a phone, spend team credits or use someone
+else's subscription. The Bot still handles it with its normal frozen model.
+It does not require another Gateway decision or a team's Mikka-default balance.
+Other runtime events, including arbitrary agent messages and hidden, unrelated,
+nonterminal or contradictory run reports, retain the existing Decisions path.
+Phone notification decisions and existing billing/admission rules are unchanged.
 
 ## Shared server-only model interface
 

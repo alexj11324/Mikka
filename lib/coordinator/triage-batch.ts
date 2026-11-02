@@ -20,6 +20,7 @@ export interface TriageJudgment {
 export interface TriageBatchDependencies<T extends TriageBatchEvent> {
   claim(event: T): Promise<Date | null>
   deliverUser(event: T): Promise<boolean>
+  deliverCompletion?(event: T): Promise<boolean>
   classify(event: T, signal: AbortSignal): Promise<TriageJudgment>
   complete(event: T, attemptedAt: Date, judgment: TriageJudgment & { tier: CoordinatorEventTier; execution: DecisionExecution }): Promise<boolean>
   observe?(event: T, judgment: TriageJudgment, application: 'received' | 'applied' | 'stale' | 'write-unknown'): void
@@ -40,7 +41,7 @@ function hasObservation(value: TriageJudgment): value is TriageJudgment & { tier
 }
 
 /** Actual wake scheduling, independent of framework/loaders. A model chooses
- * every runtime tier. Program checks only transport, budgets and CAS outcomes.
+ * semantic runtime tiers; direct input and canonical task results are transport. Program checks only transport, budgets and CAS outcomes.
  * No model answer, missing receipt or cancellation can manufacture delivery. */
 export async function runTriageBatch<T extends TriageBatchEvent>(
   events: readonly T[], dependencies: TriageBatchDependencies<T>, signal: AbortSignal,
@@ -51,6 +52,12 @@ export async function runTriageBatch<T extends TriageBatchEvent>(
     if (event.kind === 'user_message') {
       const applied = await dependencies.deliverUser(event)
       outcome[applied ? 'classified' : 'stale'].push(event.id)
+      continue
+    }
+    // A canonical result returns to the Bot that requested the work. Its
+    // original subscription can handle it without buying another model call.
+    if (event.kind === 'run_finished' && await dependencies.deliverCompletion?.(event)) {
+      outcome.classified.push(event.id)
       continue
     }
     if (signal.aborted || remainingCalls === 0) { outcome.unattempted.push(event.id); continue }
