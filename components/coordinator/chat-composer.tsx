@@ -34,7 +34,7 @@ const SEND_DISABLED = 'disabled:bg-control disabled:text-muted-foreground disabl
  * The Grok-style composer every chat uses (Coordinator and bots): one rounded
  * bar, attach and the bot's model chip on the left, send on the right.
  */
-export function ChatComposer({ ref, value, onChange, onSubmit, label, placeholder, sending = false, running = false, editableWhileSending = false, submitDisabled = false, disabled = false, onStop, quote, model, sendKey = 'enter' }: {
+export function ChatComposer({ ref, value, onChange, onSubmit, label, placeholder, sending = false, running = false, editableWhileSending = false, submitDisabled = false, disabled = false, onStop, escapeStops = true, quote, model, sendKey = 'enter' }: {
   ref: Ref<HTMLTextAreaElement | null>
   value: string
   onChange: (value: string) => void
@@ -52,6 +52,8 @@ export function ChatComposer({ ref, value, onChange, onSubmit, label, placeholde
   /** The conversation takes no messages at all (a group chat that failed to load): nothing can be typed, attached or sent. */
   disabled?: boolean
   onStop?: () => void
+  /** Esc stops, as the stop button does (a bot chat). Off in a thread (decision K2): Esc only leaves the box; stop is the button. */
+  escapeStops?: boolean
   /** Something quoted into the message (an artifact quote chip): it sits on top, the buttons move to a row below. */
   quote?: ReactNode
   /** A bot chat's model chip (BotModelPicker), beside 「+」. */
@@ -97,8 +99,11 @@ export function ChatComposer({ ref, value, onChange, onSubmit, label, placeholde
   }
   function onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
     const { key, shiftKey, metaKey, ctrlKey } = event
-    // Esc stops the reply, as the stop button does.
-    if (key === 'Escape' && stoppable && !event.nativeEvent.isComposing) { event.preventDefault(); onStop?.(); return }
+    if (key === 'Escape' && !event.nativeEvent.isComposing) {
+      // In a bot chat Esc stops the reply, as the stop button does. In a thread it only leaves the box (K2).
+      if (escapeStops && stoppable) { event.preventDefault(); onStop?.(); return }
+      if (!escapeStops) { event.preventDefault(); event.currentTarget.blur(); return }
+    }
     if (!sendsMessage({ key, shiftKey, metaKey, ctrlKey, isComposing: event.nativeEvent.isComposing }, sendKey)) return
     event.preventDefault()
     if (!sending && !submitDisabled && !disabled && value.trim()) onSubmit()

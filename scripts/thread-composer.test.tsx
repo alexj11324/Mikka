@@ -25,7 +25,7 @@ mock.module(at('app/actions/artifacts.ts'), { namedExports: { listRunArtifacts: 
 mock.module(at('components/workspace/factory-acceptance.tsx'), { namedExports: { useThreadAcceptance: () => null, AcceptanceStateBadge: () => null } })
 mock.module(at('components/workspace/factory-acceptance-pane.tsx'), { namedExports: { FactoryAcceptancePane: () => null } })
 mock.module(at('components/workspace/self-improvement.tsx'), { namedExports: { ThreadFeedback: () => null } })
-mock.module(at('components/coordinator/chat-composer.tsx'), { namedExports: { ChatComposer: ({ label }: { label: string }) => <textarea data-composer="" aria-label={label} /> } })
+mock.module(at('components/coordinator/chat-composer.tsx'), { namedExports: { ChatComposer: ({ label, escapeStops }: { label: string; escapeStops?: boolean }) => <textarea data-composer="" data-escape-stops={String(escapeStops ?? true)} aria-label={label} /> } })
 
 let IssueThreadPanel: typeof import('../components/workspace/issue-thread-panel')['IssueThreadPanel']
 before(async () => { ({ IssueThreadPanel } = await import('../components/workspace/issue-thread-panel')) })
@@ -47,6 +47,11 @@ test('an open thread ends in the composer whether it runs or has ended', () => {
 test('the Artifact window and the thread column keep the composer', () => {
   assert.match(render({ bare: true }), /data-composer=""/, 'Artifact window (bare)')
   assert.match(render({ issueId: null, onOpenTask: undefined }), /data-composer=""/, 'thread column, a thread with no task')
+})
+
+test('a thread\'s composer never stops it on Esc (K2): stop is the button', () => {
+  thread = { ...base, status: 'running' }
+  assert.match(render(), /data-escape-stops="false"/)
 })
 
 test('a thread the viewer cannot read in full has no composer', () => {
