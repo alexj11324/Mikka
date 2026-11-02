@@ -29,6 +29,10 @@ test('a workspace token stays in its workspace on thread, evidence, proposal and
   }
   // Another workspace's run: by its Bot, or (no Bot) by its task.
   const ownRun = await run(ownBot, ownIssue), otherRun = await run(otherBot, otherIssue), otherTaskRun = await run(null, otherIssue)
+  // A task in no workspace: only its run's Bot places the run.
+  const looseIssue = randomUUID()
+  await pool.query(`INSERT INTO issues (id,"userId",title,content,status,priority,scope) VALUES ($1,$2,'Task','{"type":"doc"}','todo','normal','personal')`, [looseIssue, owner])
+  const ownBotLooseRun = await run(ownBot, looseIssue), otherBotLooseRun = await run(otherBot, looseIssue), otherBotNoTaskRun = await run(otherBot, null)
 
   let currentHeaders = new Headers()
   mock.module('next/headers', { namedExports: { headers: async () => currentHeaders, cookies: async () => ({ get: () => undefined }) } })
@@ -159,5 +163,26 @@ test('a workspace token stays in its workspace on thread, evidence, proposal and
     const route = await import('../app/api/self-improvement/route')
     assert.equal((await call(route.GET, `/api/self-improvement?runId=${ownRun}`, {})).status, 200)
     assert.equal((await call(route.GET, `/api/self-improvement?runId=${otherRun}`, {})).status, 404)
+    // A task in no workspace does not open a run whose Bot is in another one.
+    assert.equal((await call(route.GET, `/api/self-improvement?runId=${ownBotLooseRun}`, {})).status, 200)
+    assert.equal((await call(route.GET, `/api/self-improvement?runId=${otherBotLooseRun}`, {})).status, 404)
+    assert.equal((await call(route.POST, '/api/self-improvement', {}, { action: 'propose', runId: otherBotLooseRun })).status, 404)
+    assert.equal((await call(route.POST, '/api/self-improvement', {}, { action: 'feedback', eventId: randomUUID(), runId: otherBotLooseRun, verdict: 'negative' })).status, 404)
+    assert.equal(Number((await pool.query('SELECT count(*) FROM improvement_scores WHERE "runId"=$1', [otherBotLooseRun])).rows[0].count), 0)
+    // A run with no task has no improvement record to reach.
+    assert.equal((await call(route.GET, `/api/self-improvement?runId=${otherBotNoTaskRun}`, {})).status, 404)
+  })
+
+  await t.test('self-improvement keeps a browser session to its owner checks', async () => {
+    const route = await import('../app/api/self-improvement/route')
+    // The mocked cookie session, as the owner's browser.
+    const { api } = (await import('../lib/auth')).auth as unknown as { api: { getSession: () => Promise<unknown> } }
+    const signedOut = api.getSession
+    api.getSession = async () => ({ user: { id: owner }, session: { id: 'browser' } })
+    try {
+      const read = (runId: string) => route.GET(new Request(`${origin}/api/self-improvement?runId=${runId}`, { headers: currentHeaders = new Headers() }))
+      assert.equal((await read(otherBotLooseRun)).status, 200)
+      assert.equal((await read(otherRun)).status, 200)
+    } finally { api.getSession = signedOut }
   })
 })
