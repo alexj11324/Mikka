@@ -54,10 +54,9 @@ test('设备：本机与 Remote control 分组，Agent 图标，重命名、重�
   await expect(row(page, 'E2E MacBook')).toContainText(/Claude Code\s*2\.1\.3/)
   await expect(row(page, 'E2E MacBook')).toContainText(/Codex\s*0\.46\.0/)
   await expect(row(page, 'build-01')).not.toContainText('Cursor')
-  // On a phone the switches keep their labels on a line of their own (D1).
+  // On a phone the switch keeps its label on a line of its own (D1).
   await page.setViewportSize({ width: 390, height: 844 })
-  await expect(row(page, 'E2E MacBook').getByText('允许调度', { exact: true })).toBeVisible()
-  await expect(row(page, 'E2E MacBook').getByText('自动调度', { exact: true })).toBeVisible()
+  await expect(row(page, 'E2E MacBook').getByText('参与调度', { exact: true })).toBeVisible()
   await page.setViewportSize({ width: 1280, height: 800 })
   await expect(row(page, 'dev-vps')).toContainText('未检测到 Agent')
   await row(page, 'dev-vps').getByRole('button', { name: '安装方法' }).click()
