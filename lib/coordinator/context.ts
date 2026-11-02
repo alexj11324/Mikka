@@ -243,7 +243,7 @@ function publicationPrompt(value: unknown): string[] {
 }
 
 /** Internal bookkeeping: attention decisions and execution-identity discovery stay out of the chat. */
-const HIDDEN_TOOLS = new Set(['record_attention', 'list_agents'])
+export const HIDDEN_TOOLS = new Set(['record_attention', 'list_agents'])
 
 /** Longest the memory may grow; past this the Coordinator must forget something first. */
 export const MEMORY_MAX_CHARS = 8000
@@ -281,6 +281,21 @@ export function instructionsWithPersonal(instructions: string, personal: string)
 }
 
 /** One entry in the chat the person sees. */
+/** A tool a reply used, as the chat shows it: `running` until its result is stored. */
+export interface ChatTool { call: string; name: string; state: 'running' | 'done' | 'error'; input?: string; output?: string }
+export interface ChatActivity { tools: ChatTool[]; thought: boolean }
+
+function withPreview<K extends 'input' | 'output'>(key: K, text: string | undefined): Partial<Record<K, string>> {
+  return text ? { [key]: text } as Record<K, string> : {}
+}
+
+/** A tool input or output as the chat's short preview: the compact projection's, or the start of the full value. */
+function toolPreview(compact: unknown, value: unknown): string | undefined {
+  if (typeof compact === 'string') return compact || undefined
+  if (value === undefined || value === null) return undefined
+  return (typeof value === 'string' ? value : JSON.stringify(value) ?? '').slice(0, 200) || undefined
+}
+
 export interface ChatItem {
   /** coordinator_messages.id of the row this item starts at; absent while the message is still pending in the inbox. */
   id?: string
@@ -310,6 +325,8 @@ export interface ChatItem {
   line?: EventLine
   /** The live stream this reply was first shown from, so the chat keeps that row in place when it is stored. */
   streamId?: string
+  /** The tools this reply used, each with how it ended and short previews (chat-projection.ts), and whether it thought first. */
+  activity?: ChatActivity
   /** The person stopped this reply (停止); it keeps what it had said. */
   stopped?: true
   /** Why the turn answering this message of the person's failed; it stays after later turns and reloads. */
@@ -401,21 +418,26 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
       const parts = typeof message.content === 'string' ? [{ type: 'text' as const, text: message.content }] : message.content
       const cited = takeArtifacts(parts.flatMap(part => part.type === 'text' && part.text.trim() && part.text.trim() !== QUIET_REPLY ? [part.text.trim()] : []).join('\n\n'))
       const tools = parts.flatMap(part => part.type === 'tool-call' && !HIDDEN_TOOLS.has(part.toolName) ? [part.toolName] : [])
+      const steps = parts.flatMap((part): ChatTool[] => part.type === 'tool-call' && !HIDDEN_TOOLS.has(part.toolName)
+        ? [{ call: part.toolCallId, name: part.toolName, state: 'running', ...withPreview('input', toolPreview((part as { inputPreview?: unknown }).inputPreview, part.input)) }] : [])
+      const thought = parts.some(part => part.type === 'reasoning' && (Number((part as { chars?: unknown }).chars) > 0 || Boolean((part as { text?: unknown }).text)))
       const last = items.at(-1)
       const shown = [...waiting.ids, ...cited.ids]
       // 停止 cut this reply short (lib/coordinator/stop.ts); the mark may sit on an empty message.
       const stopped = (message as { mikkaStopped?: unknown }).mikkaStopped === true
-      // The stream that first showed this reply's text; a tool step before it has none to show.
+      // The stream that first showed this reply: its first text, tool or thinking.
       const stream = (message as { mikkaStreamId?: unknown }).mikkaStreamId
       const streamId = typeof stream === 'string' ? stream : undefined
+      const shows = Boolean(cited.text || steps.length || thought)
       if (last?.from === 'coordinator' && !waiting.ids.length && !briefingBoundary) {
-        if (!last.text && cited.text && streamId) last.streamId = streamId
+        if (!last.streamId && shows && streamId) last.streamId = streamId
+        if (steps.length || thought) last.activity = { tools: [...last.activity?.tools ?? [], ...steps], thought: Boolean(last.activity?.thought || thought) }
         last.text = [last.text, cited.text].filter(Boolean).join('\n\n')
         last.tools.push(...tools)
         last.artifacts = [...new Set([...last.artifacts, ...cited.ids])]
         if (stopped) last.stopped = true
-      } else if (cited.text || tools.length || shown.length || stopped) {
-        items.push({ ...(id ? { id } : {}), position, from: 'coordinator', text: cited.text, tools, threads: [], createdAt: createdAt.toISOString(), artifacts: [...new Set(shown)], ...(stopped ? { stopped } : {}), ...(streamId && cited.text ? { streamId } : {}) })
+      } else if (cited.text || tools.length || shown.length || stopped || thought) {
+        items.push({ ...(id ? { id } : {}), position, from: 'coordinator', text: cited.text, tools, threads: [], createdAt: createdAt.toISOString(), artifacts: [...new Set(shown)], ...(stopped ? { stopped } : {}), ...(streamId && shows ? { streamId } : {}), ...(steps.length || thought ? { activity: { tools: steps, thought } } : {}) })
         waiting.ids = []
         // Only a reply that shows ends the boundary; hidden tool-only steps do not.
         briefingBoundary = false
@@ -426,6 +448,13 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
       for (const part of message.content) {
         const runId = dispatchedRun(part)
         if (runId && !last.threads.includes(runId)) last.threads.push(runId)
+        const step = part.type === 'tool-result' ? last.activity?.tools.find(tool => tool.call === part.toolCallId) : undefined
+        if (step && part.type === 'tool-result') {
+          const compact = part as { status?: unknown; outputPreview?: unknown }
+          const output = part.output as { type?: string; value?: unknown } | undefined
+          step.state = compact.status === 'error' || output?.type?.startsWith('error') ? 'error' : 'done'
+          Object.assign(step, withPreview('output', toolPreview(compact.outputPreview, compact.status === undefined ? output?.value : undefined)))
+        }
       }
     }
   }

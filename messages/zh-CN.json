@@ -2921,7 +2921,6 @@
     "label": "Coordinator",
     "conversation": "与 Coordinator 的对话",
     "conversationWith": "与 {name} 的对话",
-    "usedTools": "用了 {count} 个工具",
     "pendingActions": {
       "label": "等你确认",
       "send_email": "发送邮件",
@@ -3100,6 +3099,54 @@
       "nothingToRetry": "没有待重试的回复",
       "unconfirmed": "重试未确认",
       "queued": "回复已排队"
+    },
+    "activity": {
+      "thinking": "思考中",
+      "thought": "思考了 {seconds} 秒",
+      "thoughtStored": "已思考",
+      "tool": "使用工具",
+      "input": "输入",
+      "output": "结果",
+      "state": {
+        "running": "进行中",
+        "done": "完成",
+        "error": "失败"
+      },
+      "tools": {
+        "create_issue": "建任务",
+        "create_issue_from_request": "建任务",
+        "update_issue": "改任务",
+        "list_issues": "查看任务",
+        "get_issue": "查看任务",
+        "dispatch_run": "派发线程",
+        "dispatch_bot_computer": "派到电脑",
+        "list_runs": "查看线程",
+        "get_run": "查看线程",
+        "send_to_run": "给线程发消息",
+        "stop_run": "停止线程",
+        "web_search": "搜索网页",
+        "start_web_subagent": "打开浏览器",
+        "remember": "记住",
+        "forget": "忘掉",
+        "find_repository": "找仓库",
+        "github_tools": "查看 GitHub",
+        "github_call": "使用 GitHub",
+        "list_calendar_events": "查看日历",
+        "get_calendar_event": "查看日历",
+        "create_calendar_event": "建日程",
+        "update_calendar_event": "改日程",
+        "cancel_calendar_event": "取消日程",
+        "search_gmail": "查看邮件",
+        "read_gmail_message": "查看邮件",
+        "send_email": "发邮件",
+        "search_slack_messages": "查看 Slack",
+        "read_slack_thread": "查看 Slack",
+        "send_slack_message": "发 Slack 消息",
+        "search_notion_pages": "查看 Notion",
+        "read_notion_page_blocks": "查看 Notion",
+        "append_notion_paragraph": "写 Notion",
+        "list_drive_files": "查看 Drive"
+      }
     }
   },
   "AgentCopy": {

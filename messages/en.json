@@ -2921,7 +2921,6 @@
     "label": "Coordinator",
     "conversation": "Conversation with the Coordinator",
     "conversationWith": "Conversation with {name}",
-    "usedTools": "Used {count, plural, one {# tool} other {# tools}}",
     "pendingActions": {
       "label": "Waiting for your approval",
       "send_email": "Send email",
@@ -3100,6 +3099,54 @@
       "nothingToRetry": "No failed reply to retry",
       "unconfirmed": "Retry unconfirmed",
       "queued": "Reply queued"
+    },
+    "activity": {
+      "thinking": "Thinking",
+      "thought": "Thought for {seconds, plural, one {# second} other {# seconds}}",
+      "thoughtStored": "Thought",
+      "tool": "Use a tool",
+      "input": "Input",
+      "output": "Result",
+      "state": {
+        "running": "Running",
+        "done": "Done",
+        "error": "Failed"
+      },
+      "tools": {
+        "create_issue": "Create task",
+        "create_issue_from_request": "Create task",
+        "update_issue": "Update task",
+        "list_issues": "Look up tasks",
+        "get_issue": "Look up tasks",
+        "dispatch_run": "Start thread",
+        "dispatch_bot_computer": "Start on computer",
+        "list_runs": "Look up threads",
+        "get_run": "Look up threads",
+        "send_to_run": "Message thread",
+        "stop_run": "Stop thread",
+        "web_search": "Search the web",
+        "start_web_subagent": "Open browser",
+        "remember": "Remember",
+        "forget": "Forget",
+        "find_repository": "Find repository",
+        "github_tools": "Look up GitHub",
+        "github_call": "Use GitHub",
+        "list_calendar_events": "Look up calendar",
+        "get_calendar_event": "Look up calendar",
+        "create_calendar_event": "Create event",
+        "update_calendar_event": "Update event",
+        "cancel_calendar_event": "Cancel event",
+        "search_gmail": "Look up email",
+        "read_gmail_message": "Look up email",
+        "send_email": "Send email",
+        "search_slack_messages": "Look up Slack",
+        "read_slack_thread": "Look up Slack",
+        "send_slack_message": "Send Slack message",
+        "search_notion_pages": "Look up Notion",
+        "read_notion_page_blocks": "Look up Notion",
+        "append_notion_paragraph": "Write to Notion",
+        "list_drive_files": "Look up Drive"
+      }
     }
   },
   "AgentCopy": {

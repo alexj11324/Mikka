@@ -1,8 +1,27 @@
 import { assertNoSecret, type SecretFingerprint } from '@/lib/credentials/fingerprint'
 import { QUIET_REPLY } from '@/lib/attention/handoff'
+import { credentialMasker, maskDeep } from '@/lib/secrets/mask'
 import type { CoordinatorStreamEvent, CoordinatorWorkflowStreamPart } from './stream'
+import { TOOL_PREVIEW_CHARS } from './chat-projection'
+import { HIDDEN_TOOLS } from './context'
 
-/** Only assistant text leaves the durable model stream; tools and reasoning stay server-side. */
+/**
+ * The start of a tool's input or output as text, masked as stored messages are; nothing when it would still
+ * carry one of the person's saved secrets.
+ */
+function preview(userId: string, value: unknown, fingerprints: SecretFingerprint[]): string | undefined {
+  if (value === undefined || value === null) return undefined
+  const masked = maskDeep(value, credentialMasker)
+  const text = (typeof masked === 'string' ? masked : JSON.stringify(masked) ?? '').slice(0, TOOL_PREVIEW_CHARS)
+  if (!text) return undefined
+  try { assertNoSecret(userId, text, fingerprints) } catch { return undefined }
+  return text
+}
+
+/**
+ * What leaves the durable model stream: assistant text, each tool's name, state and short masked previews,
+ * and when the model starts and stops thinking. Reasoning text and whole tool inputs and outputs stay server-side.
+ */
 export function coordinatorTextStream(userId: string, fingerprints: SecretFingerprint[]) {
   const holdback = Math.max(0, ...fingerprints.map(entry => entry.length - 1))
   let id: string | null = null
@@ -50,6 +69,16 @@ export function coordinatorTextStream(userId: string, fingerprints: SecretFinger
         if (quietEligible && QUIET_REPLY.startsWith(stepText.trim())) return
         text = text.slice(0, stepStart) + (stepStart ? '\n\n' : '') + stepText
         publish(controller)
+      } else if (id && (part.type === 'tool-call' || part.type === 'tool-result' || part.type === 'tool-error')) {
+        // A hand-off turn may end quiet, leaving nothing in the chat; its steps never show either.
+        if (quietEligible || HIDDEN_TOOLS.has(part.toolName)) return
+        const state = part.type === 'tool-call' ? 'running' : part.type === 'tool-result' ? 'done' : 'error'
+        const input = part.type === 'tool-call' ? preview(userId, part.input, fingerprints) : undefined
+        const output = part.type === 'tool-result' ? preview(userId, part.output, fingerprints) : undefined
+        controller.enqueue({ type: 'tool', id, call: part.toolCallId, name: part.toolName, state, ...(input ? { input } : {}), ...(output ? { output } : {}) })
+      } else if (id && (part.type === 'reasoning-start' || part.type === 'reasoning-end')) {
+        if (quietEligible) return
+        controller.enqueue({ type: 'thinking', id, state: part.type === 'reasoning-start' ? 'start' : 'end' })
       } else if (id && part.type === 'error') {
         controller.enqueue({ type: 'error' })
       }
