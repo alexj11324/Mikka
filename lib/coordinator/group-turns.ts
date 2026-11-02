@@ -33,6 +33,19 @@ export async function stopGroupTurns(client: Pick<PoolClient, 'query'>, conversa
   return rows.length
 }
 
+/** Groups with a turn still to run (queued, or running with no live worker): the minute cron resumes them. */
+export async function groupsWithPendingTurns(client: Pick<PoolClient, 'query'>, limit = 20): Promise<string[]> {
+  const { rows } = await client.query<{ conversationId: string }>(`SELECT "conversationId" FROM group_turns WHERE status IN ('queued','running')
+    GROUP BY "conversationId" ORDER BY min("createdAt") LIMIT $1`, [limit])
+  return rows.map(row => row.conversationId)
+}
+
+/** Whether a group has a turn to run, so a history read starts the worker only then. */
+export async function hasPendingGroupTurn(client: Pick<PoolClient, 'query'>, conversationId: string): Promise<boolean> {
+  const { rows } = await client.query<{ pending: boolean }>(`SELECT EXISTS (SELECT 1 FROM group_turns WHERE "conversationId"=$1 AND status IN ('queued','running')) AS pending`, [conversationId])
+  return Boolean(rows[0]?.pending)
+}
+
 export async function enqueueGroupTurn(client: PoolClient, conversationId: string, messageId: string, userId: string) {
   await client.query('INSERT INTO group_turns ("messageId","conversationId","userId") VALUES ($1,$2,$3)', [messageId, conversationId, userId])
 }
