@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, type FormEvent } from 'react'
+import { useRef, useState, type FormEvent } from 'react'
 import useSWR from 'swr'
 import { useLocale, useTranslations } from 'next-intl'
 import { Ellipsis, EyeIcon, EyeOffIcon, LockIcon, Plus } from 'lucide-react'
@@ -117,6 +117,8 @@ function LoginSheet({ editing, open, onOpenChangeComplete, onClose }: { editing:
   const [reveal, setReveal] = useState(false)
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // A new password starts on its own field; a new login starts on the site.
+  const passwordField = useRef<HTMLInputElement>(null)
   const ready = Boolean(password) && (login !== null || (Boolean(site.trim()) && Boolean(account.trim())))
 
   async function submit(event: FormEvent) {
@@ -137,22 +139,22 @@ function LoginSheet({ editing, open, onOpenChangeComplete, onClose }: { editing:
   }
 
   return <Sheet open={open} onOpenChangeComplete={onOpenChangeComplete} onOpenChange={next => { if (!next && !pending) onClose(false) }}>
-    <SheetContent side="right" className="gap-0">
+    <SheetContent side="right" className="gap-0" initialFocus={login ? passwordField : true}>
       <form onSubmit={submit} autoComplete="off" className="flex h-full flex-col">
         <SheetHeader className="pr-12"><SheetTitle>{login ? withoutScheme(login.site) : t('addTitle')}</SheetTitle></SheetHeader>
         <FieldGroup className="px-4">
           <Field>
             <FieldLabel htmlFor="saved-login-site">{t('site')}</FieldLabel>
-            <Input id="saved-login-site" value={site} readOnly={login !== null} autoComplete="off" spellCheck={false} inputMode="url" placeholder="https://" onChange={event => setSite(event.target.value)} disabled={pending} />
+            <Input id="saved-login-site" value={site} readOnly={login !== null} className={login ? 'text-muted-foreground' : undefined} autoComplete="off" spellCheck={false} inputMode="url" placeholder="https://" onChange={event => setSite(event.target.value)} disabled={pending} />
           </Field>
           <Field>
             <FieldLabel htmlFor="saved-login-account">{t('account')}</FieldLabel>
-            <Input id="saved-login-account" value={account} readOnly={login !== null} autoComplete="off" spellCheck={false} onChange={event => setAccount(event.target.value)} disabled={pending} />
+            <Input id="saved-login-account" value={account} readOnly={login !== null} className={login ? 'text-muted-foreground' : undefined} autoComplete="off" spellCheck={false} onChange={event => setAccount(event.target.value)} disabled={pending} />
           </Field>
           <Field data-invalid={error ? true : undefined}>
             <FieldLabel htmlFor="saved-login-password">{login ? t('newPassword') : t('password')}</FieldLabel>
             <InputGroup>
-              <InputGroupInput id="saved-login-password" type={reveal ? 'text' : 'password'} autoComplete="new-password" spellCheck={false} aria-invalid={error ? true : undefined} value={password} onChange={event => { setPassword(event.target.value); setError(null) }} disabled={pending} />
+              <InputGroupInput ref={passwordField} id="saved-login-password" type={reveal ? 'text' : 'password'} autoComplete="new-password" spellCheck={false} aria-invalid={error ? true : undefined} value={password} onChange={event => { setPassword(event.target.value); setError(null) }} disabled={pending} />
               <InputGroupAddon align="inline-end">
                 <InputGroupButton size="icon-xs" aria-label={reveal ? card('hidePassword') : card('showPassword')} aria-pressed={reveal} onClick={() => setReveal(value => !value)}>{reveal ? <EyeOffIcon /> : <EyeIcon />}</InputGroupButton>
               </InputGroupAddon>

@@ -47,6 +47,7 @@ test('密钥与登录：在设置里添加、改密码、删除网站登录，�
   await expect(edit.getByLabel('网站', { exact: true })).toHaveAttribute('readonly', '')
   await expect(edit.getByLabel('账号', { exact: true })).toHaveAttribute('readonly', '')
   await expect(edit.getByLabel('新密码', { exact: true })).toHaveValue('')
+  await expect(edit.getByLabel('新密码', { exact: true })).toBeFocused()
   await testInfo.attach('logins-edit-sheet', { body: await page.screenshot(), contentType: 'image/png' })
   await edit.getByRole('button', { name: '取消', exact: true }).click()
 
