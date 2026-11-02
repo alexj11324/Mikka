@@ -70,13 +70,13 @@ test('a thread that stopped on a question waits for your reply and takes the ans
   const threads = page.getByRole('region', { name: /^线程/ })
   const row = threads.getByRole('button', { name: '打开线程 Speed up the home page', exact: true })
 
-  // 等你回复 (Figma 382:6469): list row and header read the same state; the composer stays, without a stop button.
-  await expect(row.getByText('等你回复', { exact: true })).toBeVisible()
+  // The list row and the header read the same state: the thread's group, 等待你, as its icon (R-52, #929). The composer stays, without a stop button.
+  await expect(row.getByText('等待你', { exact: true })).toBeVisible()
   await row.click()
   const panel = page.getByRole('region', { name: 'Speed up the home page', exact: true })
-  // The status icon follows the thread's group (R-52): 等待你.
-  await expect(panel.getByRole('img', { name: '等待你', exact: true })).toBeVisible()
-  await expect(panel.getByText('等你回复', { exact: true })).toBeVisible()
+  // The status icon follows the thread's group (R-52): 等待你, beside the title and again in the badge (#929).
+  await expect(panel.getByRole('img', { name: '等待你', exact: true })).toHaveCount(2)
+  await expect(panel.getByText('等待你', { exact: true })).toBeVisible()
   const box = panel.getByRole('textbox', { name: '告诉 Codex 下一步做什么…' })
   await expect(box).toBeVisible()
   await expect(panel.getByRole('button', { name: /停止/ })).toHaveCount(0)
@@ -89,8 +89,10 @@ test('a thread that stopped on a question waits for your reply and takes the ans
   await send.click()
   await expect.poll(() => questionStatus(waiting.questionId)).toBe('resuming')
   await expect(panel.getByText('没发出去，草稿还在')).toHaveCount(0)
-  await expect(panel.getByText('等你回复', { exact: true })).toHaveCount(0)
-  await expect(row.getByText('等你回复', { exact: true })).toHaveCount(0)
+  // The answered question resumes the run: the badge leaves 等待你 for 进行中.
+  await expect(panel.getByText('等待你', { exact: true })).toHaveCount(0)
+  await expect(row.getByText('等待你', { exact: true })).toHaveCount(0)
+  await expect(panel.getByText('进行中', { exact: true })).toBeVisible()
   await expect(panel.getByRole('textbox')).toBeVisible()
   await expect(panel.getByRole('button', { name: '发送', exact: true })).toBeDisabled()
   await expect(panel.getByRole('button', { name: /停止/ })).toHaveCount(0)
@@ -114,11 +116,13 @@ test('a thread that stopped on a question waits for your reply and takes the ans
   await shoot(page, testInfo, 'resumed-mobile')
   await page.setViewportSize({ width: 1440, height: 960 })
 
-  // An expired question takes no answer: an ordinary finished thread.
+  // An expired question takes no answer: an ordinary stopped thread. Nobody judged it, so it is 等待你 (R-52);
+  // like every thread it ends in the composer, where a message runs it again (R-10, #892). Nothing to stop.
   await threads.getByRole('button', { name: '打开线程 Too late to answer', exact: true }).click()
   const expired = page.getByRole('region', { name: 'Too late to answer', exact: true })
   await expect(expired.getByRole('list', { name: '线程对话' })).toBeVisible()
-  await expect(expired.getByText('等你回复', { exact: true })).toHaveCount(0)
-  await expect(expired.getByRole('textbox')).toHaveCount(0)
+  await expect(expired.getByText('等待你', { exact: true })).toBeVisible()
+  await expect(expired.getByRole('textbox', { name: '告诉 Codex 下一步做什么…' })).toBeVisible()
+  await expect(expired.getByRole('button', { name: /停止/ })).toHaveCount(0)
   await shoot(page, testInfo, 'expired')
 })
