@@ -1,0 +1,25 @@
+{
+  "label": "activity-ae",
+  "revision": "e3b20135ab51104df8a94b383adb008207f21c41",
+  "origin": "http://localhost:3000",
+  "database": "mikka_e2e (127.0.0.1, isolated)",
+  "run": "wrun_activitya3387e713157",
+  "at": "2026-11-02T23:06:15.847Z",
+  "shots": {
+    "0-waiting": 49,
+    "1-thinking": 105,
+    "2-tool-running": 225,
+    "3-next-tool": 320,
+    "4-reply-streamed": 448,
+    "5-tool-opened": 471,
+    "6-stored": 515
+  },
+  "commitFrame": 479,
+  "castFrames": 516,
+  "handedOver": true,
+  "sameRow": true,
+  "storedToolStates": [
+    "done",
+    "error"
+  ]
+}
