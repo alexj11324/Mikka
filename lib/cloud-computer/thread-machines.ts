@@ -109,8 +109,10 @@ async function endStopRequestedRun(client: PoolClient, actor: Actor, runId: stri
  * the worker survive. No other task's machine can match. Caller holds BEGIN
  * and the new run's lock.
  */
-async function adoptTaskMachine(client: PoolClient, actor: Actor, runId: string, run: { issueId: string; runtimeBotId: string; repoPath: string; remoteUrl: string | null }) {
+async function adoptTaskMachine(client: PoolClient, actor: Actor, runId: string, run: { issueId: string; runtimeBotId: string; repoPath: string; remoteUrl: string | null }, template: string | null) {
   // The run's bot runtime is recorded on the new row; the old row's bot does not have to match.
+  // A repository task's machine holds only its harness's CLI: a run on another harness (or a
+  // since-released template) starts its own machine, and the old one stays parked for the task.
   const previous = (await client.query(`SELECT m.* FROM thread_machines m
       JOIN agent_runs r ON r.id=m."runId" AND r."userId"=m."ownerId"
       JOIN device_repos repo ON repo.id=m."repoId" AND repo."userId"=m."ownerId"
@@ -118,7 +120,8 @@ async function adoptTaskMachine(client: PoolClient, actor: Actor, runId: string,
       AND m.state='paused' AND m."sandboxId" IS NOT NULL AND m."deviceId" IS NOT NULL
       AND r.status IN ('succeeded','failed','stopped','cancelled')
       AND repo."repoPath"=$5 AND repo."remoteUrl" IS NOT DISTINCT FROM $6
-    ORDER BY m."lastActiveAt" DESC LIMIT 1 FOR UPDATE OF m`, [actor.userId, actor.workspaceId, run.issueId, runId, run.repoPath, run.remoteUrl])).rows[0]
+      AND ($7::text IS NULL OR m."snapshotId"=$7)
+    ORDER BY m."lastActiveAt" DESC LIMIT 1 FOR UPDATE OF m`, [actor.userId, actor.workspaceId, run.issueId, runId, run.repoPath, run.remoteUrl, template])).rows[0]
   if (!previous) return null
   await client.query(`UPDATE thread_machines SET state='ended',"endedAt"=COALESCE("endedAt",now()),"sandboxId"=NULL WHERE "runId"=$1`, [previous.runId])
   return (await client.query(`INSERT INTO thread_machines ("runId","workspaceId","ownerId","botId","issueId","snapshotId","operationId",state,"sandboxId","deviceId","repoId")
@@ -224,10 +227,11 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
       // with Mikka's worker, decision 2026-11-01-2335): the daemon clones its admitted
       // remote and creates the task worktree from the configured base branch.
       // Only non-repository computer work retains the existing desktop snapshot.
-      const adopted = run.issueId ? await adoptTaskMachine(client, actor, runId, run) : null
+      const template = repositoryTask ? taskTemplate(run.runHarness) : null
+      const adopted = run.issueId ? await adoptTaskMachine(client, actor, runId, run, template) : null
       if (adopted) machine = adopted
       else {
-        const snapshotId = repositoryTask ? taskTemplate(run.runHarness) : await provider.snapshot(client, actor, run.botSandboxId, run.snapshotRepoPath)
+        const snapshotId = template ?? await provider.snapshot(client, actor, run.botSandboxId, run.snapshotRepoPath)
         machine = (await client.query(`INSERT INTO thread_machines ("runId","workspaceId","ownerId","botId","issueId","snapshotId","operationId",state)
           VALUES ($1,$2,$3,$4,$5,$6,$7,'starting') ON CONFLICT ("runId") DO UPDATE SET "snapshotId"=EXCLUDED."snapshotId","issueId"=EXCLUDED."issueId" RETURNING *`, [runId, actor.workspaceId, actor.userId, run.runtimeBotId, run.issueId ?? null, snapshotId, randomUUID()])).rows[0]
       }
@@ -346,7 +350,8 @@ export async function openThreadDesktop(pool: Pool, actor: Actor, runId: string,
     await client.query('BEGIN')
     await client.query("SET LOCAL lock_timeout = '5s'")
     await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`computer-policy:${actor.workspaceId}`])
-    const run = (await client.query('SELECT "deviceId" FROM agent_runs WHERE id=$1 AND "userId"=$2 FOR SHARE', [runId, actor.userId])).rows[0]
+    const run = (await client.query(`SELECT r."deviceId",repo."remoteUrl" FROM agent_runs r LEFT JOIN device_repos repo ON repo.id=r."deviceRepoId" AND repo."userId"=r."userId"
+      WHERE r.id=$1 AND r."userId"=$2 FOR SHARE OF r`, [runId, actor.userId])).rows[0]
     if (!run?.deviceId) throw new ComputerError(404, 'Thread unavailable')
     const machine = (await client.query(`SELECT t.* FROM thread_machines t
       JOIN computer_run_bindings bnd ON bnd."runId"=t."runId" AND bnd."botId"=t."botId" AND bnd."workspaceId"=t."workspaceId" AND bnd."ownerId"=t."ownerId"
@@ -355,6 +360,8 @@ export async function openThreadDesktop(pool: Pool, actor: Actor, runId: string,
       WHERE t."runId"=$1 AND t."ownerId"=$2 AND t."workspaceId"=$3 AND t."deviceId"=$4 AND t.state<>'ended' AND t."sandboxId" IS NOT NULL
       FOR UPDATE OF t FOR SHARE OF d`, [runId, actor.userId, actor.workspaceId, run.deviceId])).rows[0]
     if (!machine) throw new ComputerError(404, 'Thread unavailable')
+    // A repository task runs on E2B's claude or codex template, which has no desktop (decision 2026-11-01-2335).
+    if (run.remoteUrl) throw new ComputerError(409, 'No desktop on this thread')
     const policy = (await client.query('SELECT permission,version FROM workspace_computer_policies WHERE "workspaceId"=$1', [actor.workspaceId])).rows[0]
     const permission = computerPermission(policy?.permission), policyVersion = Number(policy?.version ?? 0)
     if (permission === 'deny') throw new ComputerError(403, 'Computer use is disabled')

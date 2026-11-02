@@ -59,13 +59,14 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
       return runId;
     };
     // A finished run whose machine the lifecycle parked: paused, with its own device and repo.
-    const parked = async (issueId: string, opts: { bot?: string; repo?: string; status?: string } = {}) => {
+    // A repository task's machine was started from its harness's ready template.
+    const parked = async (issueId: string, opts: { bot?: string; repo?: string; status?: string; template?: string } = {}) => {
       const runId = await run(issueId, { ...opts, status: opts.status ?? "succeeded" });
       const device = randomUUID(), machineRepo = randomUUID(), sandboxId = `sandbox-${runId}`;
       const repo = (await pool.query(`SELECT "repoPath","remoteUrl" FROM device_repos WHERE id=$1`, [opts.repo ?? repoId])).rows[0];
       await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,"nameLocked") VALUES ($1,$2,'Thread computer','cloud',true)`, [device, owner]);
       await pool.query(`INSERT INTO device_repos (id,"deviceId","userId","repoPath","remoteUrl") VALUES ($1,$2,$3,$4,$5)`, [machineRepo, device, owner, repo.repoPath, repo.remoteUrl]);
-      await pool.query(`INSERT INTO thread_machines ("runId","workspaceId","ownerId","botId","issueId","sandboxId","snapshotId","operationId",state,"deviceId","repoId") VALUES ($1,$2,$3,$4,$5,$6,'snapshot-fixture',$7,'paused',$8,$9)`, [runId, workspaceId, owner, opts.bot ?? botId, issueId, sandboxId, randomUUID(), device, machineRepo]);
+      await pool.query(`INSERT INTO thread_machines ("runId","workspaceId","ownerId","botId","issueId","sandboxId","snapshotId","operationId",state,"deviceId","repoId") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'paused',$9,$10)`, [runId, workspaceId, owner, opts.bot ?? botId, issueId, sandboxId, opts.template ?? 'ready-template-fixture', randomUUID(), device, machineRepo]);
       return { runId, device, sandboxId };
     };
     const fake = () => {
@@ -155,6 +156,19 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
       await assert.rejects(ensureThreadMachine(pool, actor, next, provider));
       assert.deepEqual(calls, [`connect:${before.sandboxId}`]);
       assert.equal((await machine(next)).sandboxId, before.sandboxId);
+    });
+
+    await t.test("a run on another harness never resumes the task's machine: it starts its own from that harness's template", async () => {
+      // The parked machine came from the claude template; the fixture agent runs Codex.
+      const issueId = await task();
+      const before = await parked(issueId, { template: 'claude-template-fixture' });
+      const next = await run(issueId);
+      const { calls, sources, provider } = fake();
+      await assert.rejects(ensureThreadMachine(pool, actor, next, provider));
+      assert.deepEqual(calls, ["create"]);
+      assert.deepEqual(sources, ['ready-template-fixture']);
+      assert.notEqual((await machine(next)).sandboxId, before.sandboxId);
+      assert.deepEqual(await machine(before.runId), { state: "paused", sandboxId: before.sandboxId, deviceId: before.device, issueId }, "the other harness's machine stays parked for the task");
     });
 
     await t.test("a sandbox whose run has not ended is never taken over", async () => {

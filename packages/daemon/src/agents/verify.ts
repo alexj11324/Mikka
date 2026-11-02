@@ -1,8 +1,7 @@
-// The repo's verify command, run by the daemon after a hand-in. It runs
-// code the agent wrote (tests, build scripts), so it gets the agent's
-// boundary: writes only to the worktree and its own temp dir (never the
-// `.git` file or the git dir), no credential stores, and only the repo's
-// own `networkAllow` domains (no model APIs).
+// The repo's verify command, run by the daemon after a hand-in, with the
+// agent's own (unsandboxed) launcher and a fresh temp dir. The write, read
+// and network lists below describe the run's policy; nothing enforces them
+// (decision 2026-11-01-2335): a read-only run's verify can write the worktree.
 import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync } from "node:fs"
 import { join } from "node:path"
 
@@ -25,12 +24,7 @@ export interface VerifyOptions {
   env: Record<string, string>
   timeoutMs: number
   signal?: AbortSignal
-  /**
-   * The run is a read-only check (ADR 0046): verify may not write the
-   * worktree either. A command that needs to (a formatter, a snapshot test)
-   * then fails instead of leaving the tree dirty for the next run — it would
-   * have failed the daemon's own tree comparison anyway.
-   */
+  /** The run is a read-only check (ADR 0046); see the decision above. */
   readOnly?: boolean
 }
 

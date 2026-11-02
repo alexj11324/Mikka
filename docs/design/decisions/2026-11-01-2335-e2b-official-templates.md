@@ -81,6 +81,13 @@ Checked with a real key on 2026-11-01 (each sandbox killed right after):
   broker keeps its own policy and its `computer-action` judgment.
 - **No network ceiling is enforced.** The run's network policy is still in the
   agent's instructions, but nothing filters its connections any more.
+- **A read-only run can write its worktree.** The agent of a read-only check
+  (ADR 0046) and the verify command run after its hand-in
+  (`packages/daemon/src/agents/verify.ts`) are no longer kept from writing
+  the worktree, its `.git` or credential stores. Such a run still never
+  commits or pushes (`packages/daemon/src/runs/supervisor.ts`), so a write
+  stays on that machine; a check whose command changes files reports on the
+  changed tree.
 - Anything a run needs before it starts goes into the template or is passed at
   create time (envs, metadata), so the agent starts when E2B reports the
   machine ready (#843).

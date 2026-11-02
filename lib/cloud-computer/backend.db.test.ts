@@ -37,10 +37,10 @@ test('real DB: additive migration, subagent owner isolation and separate thread 
   const stranger = { ...alice, workspaceId: randomUUID() }
   try {
     await pool.query(`CREATE TABLE "user"(id text PRIMARY KEY);INSERT INTO "user" VALUES('alice'),('bob');
-      CREATE TABLE agent_runs(id uuid PRIMARY KEY,"userId" text,"agentId" uuid,"deviceId" uuid,status text,"stopRequestedAt" timestamptz,"finishedAt" timestamptz,"startedAt" timestamptz,"leaseExpiresAt" timestamptz,"updatedAt" timestamptz);
+      CREATE TABLE agent_runs(id uuid PRIMARY KEY,"userId" text,"agentId" uuid,"deviceId" uuid,status text,"stopRequestedAt" timestamptz,"finishedAt" timestamptz,"startedAt" timestamptz,"leaseExpiresAt" timestamptz,"updatedAt" timestamptz,"deviceRepoId" uuid);
       CREATE TABLE devices(id uuid PRIMARY KEY,"ownerId" text,kind text,enabled boolean DEFAULT true,"removedAt" timestamptz);
       CREATE TABLE device_tokens("boundDeviceId" uuid,"revokedAt" timestamptz);
-      CREATE TABLE device_repos(id uuid PRIMARY KEY);
+      CREATE TABLE device_repos(id uuid PRIMARY KEY,"deviceId" uuid,"userId" text,"repoPath" text,"remoteUrl" text);
       CREATE TABLE suggestions(id uuid PRIMARY KEY,"botId" uuid);
       CREATE TABLE workspace_computer_policies("workspaceId" uuid PRIMARY KEY,permission text,version integer);
       CREATE TABLE byos_connections(id uuid PRIMARY KEY,"ownerId" text,"workspaceId" text,provider text,state text,epoch bigint, paused boolean NOT NULL DEFAULT false);
@@ -162,6 +162,12 @@ test('real DB: additive migration, subagent owner isolation and separate thread 
     assert.deepEqual(desktopCalls, [`connect sandbox-${runA}`, 'start', 'lease', 'gateway', 'viewer'])
     assert.equal((await pool.query('SELECT "targetId" FROM thread_machines WHERE "runId"=$1', [runA])).rows[0].targetId, 'thread-page')
     desktopCalls.length = 0
+    // A repository task's machine (E2B's claude or codex template) has no desktop: refused before E2B.
+    const taskRepo = randomUUID()
+    await pool.query(`INSERT INTO device_repos(id,"deviceId","userId","repoPath","remoteUrl") VALUES ($1,$2,'alice','v2/github.com/acme/app','https://github.com/acme/app.git')`, [taskRepo, deviceB])
+    await pool.query('UPDATE agent_runs SET "deviceRepoId"=$2 WHERE id=$1', [runB, taskRepo])
+    await assert.rejects(openThreadDesktop(pool, alice, runB, desktopRuntime), { status: 409, message: 'No desktop on this thread' })
+    assert.deepEqual(desktopCalls, [], 'no desktop is started on a repository task machine')
     await assert.rejects(openThreadDesktop(pool, bob, runA, desktopRuntime), { status: 404 })
     await assert.rejects(openThreadDesktop(pool, stranger, runA, desktopRuntime), { status: 404 })
     await pool.query('UPDATE devices SET enabled=false WHERE id=$1', [deviceA])
