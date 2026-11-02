@@ -55,7 +55,7 @@ test('reading only the asked-about tasks\' team links gives exactly the full rea
     }
 
     const runIssue = new Map<string, string | null>([[runs.shared, issue.shared], [runs.personal, issue.personal], [runs.unlinked, issue.unlinked], [runs.foreign, issue.foreign], [runs.none, null]])
-    const allIssues = Object.values(issue)
+    const allIssues: string[] = Object.values(issue)
     const subsets: string[][] = [allIssues, ...allIssues.map(id => [id]), [issue.shared, issue.foreign], [issue.personal, issue.unlinked, issue.secondTeam]]
     const visibleWith = async (user: string, ids: string[], narrow: boolean) => (await db.select({ id: issues.id }).from(issues)
       .where(and(inArray(issues.id, ids), (await issueVisibility(user, false, undefined, db, narrow ? { onlyIssueIds: ids } : {})).predicate))).map(row => row.id).sort()
