@@ -43,7 +43,8 @@ export const SETTINGS_SECTIONS: readonly SettingsSectionDef[] = [
   { id: 'members', group: 'workspace', title: 'Members', routed: true },
   { id: 'teams', group: 'workspace', title: 'Teams', routed: true },
   { id: 'permissions', group: 'workspace', title: 'Team permissions', adminOnly: true },
-  { id: 'secrets', group: 'workspace', title: 'Secrets and environment', adminOnly: true },
+  // Members see it too and write repository entries (permissions.ts); one page with 密钥与登录 (decision 2026-11-02-2120).
+  { id: 'secrets', group: 'workspace', title: 'Secrets and environment' },
   { id: 'audit', group: 'workspace', title: 'Audit log', adminOnly: true },
   { id: 'usage', group: 'workspace', title: 'Usage' },
   // Members see 付款 here (their card designation and credit share); plan, balance and top-ups are admins' (C19).

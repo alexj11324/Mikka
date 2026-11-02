@@ -94,6 +94,9 @@ const nextConfig = {
     // Three page-data workers exceeded the standard 8 GB production builder.
     cpus: 1,
     globalNotFound: true,
+    // Bulk add in 设置 › 密钥与环境 sends a .env of up to 2 MB (lib/secrets/dotenv.ts) to a server action;
+    // the default limit is 1 MB. 3 MB leaves room for the multipart envelope.
+    serverActions: { bodySizeLimit: '3mb' },
     // A copied acceptance checkout can invalidate Turbopack's persistent
     // parent graph and abort next dev. Keep this disposable stack in memory.
     ...(localTestAccountsMode(process.env) ? { turbopackFileSystemCacheForDev: false } : {}),
