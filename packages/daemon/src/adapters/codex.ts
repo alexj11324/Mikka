@@ -39,7 +39,6 @@ import type { AgentSandbox } from "../agents/sandbox"
 import { requireRunToolApproval } from "../agents/tool-approval"
 import type { RunApps } from "../agents/run-apps"
 import { rawCliShellAvailable, runPolicy } from "../permissions"
-import { codexHasAuditedDynamicTools, codexSupportsRunApproval } from "./codex-version"
 import type { RunChunk } from "../chunks"
 import { DAEMON_VERSION } from "../paths"
 import { buildChildEnv } from "../env"
@@ -683,10 +682,6 @@ export class CodexAdapter implements AgentAdapter {
         }),
         "initialize",
       )
-      // Public schemas omit the experimental dynamicTools field. Support only
-      // the exact pinned CLI whose Rust protocol and response were audited.
-      if (options.mailbox && !codexHasAuditedDynamicTools(initialized.userAgent)) throw new Error('Run permissions require the audited Codex0.163.0 tool interface')
-      if (!codexSupportsRunApproval(initialized.userAgent)) throw new Error('This Codex version is too old for Mikka; update Codex')
       await rpc.sendNotification("initialized")
       if (externalAuth) {
         try {

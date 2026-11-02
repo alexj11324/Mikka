@@ -32,13 +32,13 @@ BOOTSTRAP_FILES = ('bootstrap.sh', 'bootstrap-desktop.sh')
 RECIPE_PATHS = (*(f'scripts/e2b/{name}' for name in BOOTSTRAP_FILES), 'scripts/e2b/build-template.py',
                 *(f'scripts/e2b/{name}' for name in COMPUTER_FILES))
 # Each kind of machine: the official E2B template it starts from, and the
-# daemon-pinned CLIs installed on it (packages/daemon/harness/pins.json).
-# The `claude` template's worker runs the Agent SDK's own Claude Code build;
-# the `codex` one gets the pinned Codex, whose interface the daemon audited.
+# CLIs installed on it (packages/daemon/harness/pins.json). The `claude` and
+# `codex` templates keep the CLI E2B ships (any Codex works); the desktop one
+# has neither, so it gets both.
 KINDS = {
     'desktop': {'base': 'desktop', 'harnesses': ('claude_code', 'codex')},
     'claude': {'base': 'claude', 'harnesses': ()},
-    'codex': {'base': 'codex', 'harnesses': ('codex',)},
+    'codex': {'base': 'codex', 'harnesses': ()},
 }
 
 NPM_RUNTIME_CHECK = r'''node --input-type=module <<'JS'

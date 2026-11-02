@@ -67,7 +67,6 @@ import { detectHarnesses, deviceCapabilities, dockerAvailable, harnessFingerprin
 import { ensureHarness, type HarnessStore } from "./harness-install"
 import { sweepRunCredentials } from "./agents/harness-home"
 import { createLocalSubscriptionRunner } from "./subscription-local-runner"
-import { codexSupportsRunApproval } from "./adapters/codex-version"
 import { isSafeId } from "./ids"
 import { acquireLock } from "./lock"
 import { closeLogger, createLogger, type Logger } from "./log"
@@ -810,7 +809,7 @@ export class Daemon {
     if (typeof this.options.link.prepareRunToolApproval !== 'function') return undefined
     if (this.options.hostedSubscriptions) return true
     if (!this.sandbox) return undefined
-    return info.harness === 'claude_code' || (info.harness === 'codex' && codexSupportsRunApproval(info.version)) ? true : undefined
+    return info.harness === 'claude_code' || info.harness === 'codex' ? true : undefined
   }
 
   /** A subscription run here takes a per-run access lease (subscription-local-runner.ts). */

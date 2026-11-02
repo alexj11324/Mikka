@@ -97,9 +97,9 @@ Checked with a real key on 2026-11-01 (each sandbox killed right after):
 - `scripts/e2b/build-template.py` builds three templates in one run, each
   `Template().from_template(<official>)` plus the worker: `desktop` (with
   `bootstrap-desktop.sh` and the viewer and preload boot services), `claude`
-  and `codex` (preload service only; the codex one gets the daemon-pinned
-  Codex whose interface the daemon audited, the claude one runs the Agent
-  SDK's own Claude Code build). `scripts/e2b/bootstrap.sh` adds Node 24 and
+  and `codex` (preload service only; the codex one keeps the Codex E2B
+  ships, the claude one runs the Agent SDK's own Claude Code build). Mikka
+  checks no Codex version: any Codex works (Alex, 2026-11-02). `scripts/e2b/bootstrap.sh` adds Node 24 and
   the worker's tools and creates no user.
 - `.github/workflows/e2b-template.yml` builds and publishes them when the
   worker hash changes, and `scripts/e2b/publish-template-env.mjs` sets

@@ -105,9 +105,8 @@ class Publish(unittest.TestCase):
             self.assertFalse(any('bootstrap-desktop' in command for command in called['commands']))
             # The worker's checks run as the template's default user.
             self.assertIn((bt.NPM_RUNTIME_CHECK, 'user'), called['users'])
-        codex = self.fake_build('codex')['commands']
-        self.assertTrue(any('harness/cli.mjs /opt/mikka/harness codex >' in command and command.endswith('codex --version') for command in codex))
-        self.assertFalse(any('harness/cli.mjs' in command for command in self.fake_build('claude')['commands']))
+            # The CLI E2B ships stays: nothing is installed over it.
+            self.assertFalse(any('harness/cli.mjs' in command for command in called['commands']))
 
     def test_bootstrap_adds_no_users_sandbox_tools_or_sudo_changes(self):
         for name in bt.BOOTSTRAP_FILES:

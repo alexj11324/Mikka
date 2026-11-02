@@ -115,10 +115,10 @@ function texts(chunks: RunChunk[]) {
     .join("")
 }
 
-it('advertises the run gate without any sandbox (decision 2026-11-01-2335); Codex needs a supported version', async () => {
+it('advertises the run gate without any sandbox (decision 2026-11-01-2335), for any Codex version', async () => {
   const { server } = await setup()
   const reported = server.devices.get(DEVICE)?.info.harnesses ?? []
-  expect(reported.filter(item => item.toolApproval === true).map(item => item.harness).sort()).toEqual(['claude_code'])
+  expect(reported.filter(item => item.toolApproval === true).map(item => item.harness).sort()).toEqual(['claude_code', 'codex'])
 })
 
 describe.each(["claude_code", "codex", "cursor"] as const)(

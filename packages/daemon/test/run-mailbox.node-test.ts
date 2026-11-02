@@ -331,7 +331,7 @@ test('stop aborts a genuinely pending host request and prevents another request 
   await mailbox.close()
 })
 
-test('Codex unaudited versions and mailbox-enabled history resume fail closed without a fallback thread', async () => {
+test('Codex mailbox-enabled history resume fails closed without a fallback thread, on any Codex version', async () => {
   const f = fixture(), mailbox = (await f.create())!
   const dir = join(retained, 'unsupported'); mkdirSync(dir, { recursive: true, mode: 0o700 })
   const original = readFileSync('test/fakes/fake-codex.mjs', 'utf8')
@@ -344,10 +344,7 @@ test('Codex unaudited versions and mailbox-enabled history resume fail closed wi
       const adapter = new CodexAdapter({ sandbox: new NoSandbox(), stateDir: join(dir, version), binary, userHome: home })
       const runId = randomUUID()
       const options = { runId, toolApproval: syntheticApproval(runId), cwd: resolve('../..'), env: buildChildEnv({ host: { PATH: process.env.PATH, HOME: home } }), log, mailbox, prompt: 'No provider invocation' }
-      await assert.rejects(adapter.start(options), /audited Codex0.163.0/)
-      // The failed start has revoked its gate. Use a new host-owned lifetime
-      // to exercise the separate history guard instead of stopping at revoke.
-      await assert.rejects(adapter.resume('another-history', { ...options, toolApproval: syntheticApproval(runId) }), /fresh Codex thread/)
+      await assert.rejects(adapter.resume('another-history', options), /fresh Codex thread/)
     }
     assert.equal(f.state.writes, 0)
   } finally { await mailbox.close() }
