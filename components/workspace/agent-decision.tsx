@@ -3,7 +3,8 @@
 import { useAgentCopy } from '@/hooks/use-agent-copy'
 import { useLocale, useTranslations } from 'next-intl'
 import { createContext, use, useRef, useState } from 'react'
-import { Check, ChevronRight } from 'lucide-react'
+import { Check, ChevronRight, ExternalLink } from 'lucide-react'
+import { GITHUB_APP_INSTALL_URL } from '@/lib/github/repository-match'
 import { Link } from '@/i18n/navigation'
 import { useIsStreaming } from '@openuidev/react-lang'
 import { ApprovalCard, type ApprovalCardStatus } from '@/components/agents/approval-card'
@@ -187,7 +188,7 @@ export const CONNECT_SERVER_SETTINGS = '/settings?section=computers'
 /** 模型与订阅: where the allowed models and 运行位置 are set (decision 2026-11-02-1400). */
 export const MODEL_SETTINGS = '/settings?section=models'
 
-type ChoiceAction = 'cloudKeySettings' | 'enableThisMac' | 'connectServer' | 'e2bKey' | 'allowAutoSchedule' | 'serverOnline' | 'modelSettings'
+type ChoiceAction = 'cloudKeySettings' | 'enableThisMac' | 'connectServer' | 'e2bKey' | 'allowAutoSchedule' | 'serverOnline' | 'modelSettings' | 'githubInstall'
 
 function ChoiceCard({ title, description, options, task }: { title: string; description?: string; options: { value: string; label: string; action?: ChoiceAction }[]; task?: string }) {
   const agentCopy = useAgentCopy()
@@ -213,7 +214,7 @@ function ChoiceCard({ title, description, options, task }: { title: string; desc
   const copy = (option: { value: string; label: string; action?: ChoiceAction }) => option.action === 'cloudKeySettings' ? agentCopy.cloudKeySetup
     : option.action === 'enableThisMac' ? agentCopy.needsMachineMac : option.action === 'connectServer' ? agentCopy.needsMachineConnect : option.action === 'e2bKey' ? agentCopy.needsMachineE2B
     : option.action === 'allowAutoSchedule' ? agentCopy.needsMachineAuto : option.action === 'serverOnline' ? agentCopy.needsMachineServerOnline
-    : option.action === 'modelSettings' ? agentCopy.needsModelSettings
+    : option.action === 'modelSettings' ? agentCopy.needsModelSettings : option.action === 'githubInstall' ? agentCopy.githubInstallMore
     : option.value === 'wait' ? agentCopy.dispatchWait : option.value === 'cloud' ? agentCopy.dispatchCloud : option.label
   return <div role="group" aria-label={title} data-slot="choice-card" className="flex w-full max-w-sm min-w-0 flex-col gap-2">
     <p className={cn('w-fit max-w-full min-w-0', bubbles ? 'rounded-2xl bg-muted px-4 py-2.5' : 'font-medium')}>
@@ -243,6 +244,11 @@ function ChoiceCard({ title, description, options, task }: { title: string; desc
         if (option.action === 'connectServer' || option.action === 'serverOnline' || option.action === 'modelSettings') return <Button key={option.value} variant="secondary" nativeButton={false} role="link" aria-disabled={answered || undefined}
           className={cn(answered && 'pointer-events-none opacity-50')} render={<Link href={option.action === 'modelSettings' ? MODEL_SETTINGS : CONNECT_SERVER_SETTINGS} />}>
           <Kbd data-icon="inline-start">{letter}</Kbd>{label}<ChevronRight data-icon="inline-end" aria-hidden="true" />
+        </Button>
+        // 已授权的仓库里没有: the GitHub App's page opens in a new tab, where the person adds repositories; nothing is answered.
+        if (option.action === 'githubInstall') return <Button key={option.value} variant="secondary" nativeButton={false} role="link" aria-disabled={answered || undefined}
+          className={cn(answered && 'pointer-events-none opacity-50')} render={<a href={GITHUB_APP_INSTALL_URL} target="_blank" rel="noopener noreferrer" />}>
+          <Kbd data-icon="inline-start">{letter}</Kbd>{label}<ExternalLink data-icon="inline-end" aria-hidden="true" />
         </Button>
         if (option.action === 'enableThisMac' || option.action === 'e2bKey') return <Button key={option.value} type="button" variant="secondary" disabled={answered}
           onClick={() => setDialog(option.action === 'e2bKey' ? 'e2b' : 'mac')}>

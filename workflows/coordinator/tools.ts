@@ -112,6 +112,11 @@ export function createCoordinatorRegistry(userId: string, botId: string, scope?:
       inputSchema: z.object({}),
       execute: () => steps.listAgents(userId, scope),
     }),
+    find_repository: tool({
+      description: 'Look up the person\'s own GitHub repositories that the Mikka GitHub App reaches. With name (the one the person used, with or without owner): match one (result.repository is owner/repo), several (result.candidates and result.card) or none (result.card). Case and -, _, . do not matter. Without name: the first 50 and the total. For several or none, draw result.card as one BeQuestions choice question (title and options as given, each option keeps its value and action), add no explanation. Errors githubNotConnected, githubReconnectRequired: the person connects GitHub in 插件 › GitHub.',
+      inputSchema: z.object({ name: z.string().trim().max(200).optional() }),
+      execute: input => steps.findRepository(userId, input, scope),
+    }),
     ...(computerEnabled ? {
       start_web_subagent: tool({
         description: 'Start web research as this Bot’s own browser sub-agent. It stays in the Bot chat, not the thread list. Pass suggestionId when starting from a suggestion. Never handle credentials; the browser asks through a login card.',
@@ -155,10 +160,10 @@ export function createCoordinatorRegistry(userId: string, botId: string, scope?:
       }),
     } : {}),
     dispatch_run: tool({
-      description: `Give an issue's work to an agent. ${ONE_THREAD} A new thread takes the person's allowed models (Settings › 模型与订阅) in their order: the first that can run now, on a computer that takes part in scheduling (本地) or on their own E2B cloud (云端). Returns the run id, what happened (thread: new, message or continued) and result.placement, where it actually runs (one of the person's computers by name, or the cloud); say only that place, never one you did not get. An [Event] message arrives when the run ends. When nothing can run: error machineUnavailable with result.reason and result.card. Then draw result.card as one BeQuestions choice question (title, description and options as given, each option keeps its value and action), add no explanation, and call dispatch_run again after the person answers.`,
+      description: `Give an issue's work to an agent. ${ONE_THREAD} A new thread takes the person's allowed models (Settings › 模型与订阅) in their order: the first that can run now, on a computer that takes part in scheduling (本地) or on their own E2B cloud (云端). Returns the run id, what happened (thread: new, message or continued) and result.placement, where it actually runs (one of the person's computers by name, or the cloud); say only that place, never one you did not get. An [Event] message arrives when the run ends. When nothing can run: error machineUnavailable with result.reason and result.card. Then draw result.card as one BeQuestions choice question (title, description and options as given, each option keeps its value and action), add no explanation, and call dispatch_run again after the person answers. A repository named without its owner is matched against the person's own authorized repositories: one match runs there; error repositoryAmbiguous (several) or repositoryNotFound (none) comes with result.card, drawn the same way, nothing is queued, and after the person picks a repository call dispatch_run again with it. Error githubNotConnected: the person connects GitHub in 插件 › GitHub.`,
       inputSchema: z.object({
         issueId: id, agentId: id.optional(),
-        repo: z.string().trim().min(1).max(4_000).describe('GitHub owner/repo or an HTTPS/SSH git URL. The daemon clones it; no repository registration is needed.'),
+        repo: z.string().trim().min(1).max(4_000).describe('GitHub owner/repo, an HTTPS/SSH git URL, or just the repository name the person used (e.g. Mikka_test): the host finds it among their authorized repositories. The daemon clones it; no repository registration is needed.'),
         note: z.string().max(10_000).optional().describe('Extra direction for this run, added after the issue text.'),
         readOnly: z.boolean().optional().describe('true when the task only reads and reports (investigation, review): no file changes, commit, push or PR. A read-only run needs no repository push approval.'),
         newThread: newThreadInput,

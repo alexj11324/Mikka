@@ -25,6 +25,7 @@
     "create_issue",
     "update_issue",
     "list_agents",
+    "find_repository",
     "dispatch_run",
     "list_runs",
     "get_run",

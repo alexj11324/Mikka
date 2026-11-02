@@ -21,6 +21,7 @@ import { withBasePath } from '@/lib/base-path'
 import { authClient } from '@/lib/auth-client'
 import { openPathInBrowser } from '@/lib/platform/open-settings'
 import { useCheckOnReturn } from '@/lib/hooks/use-check-on-return'
+import { GITHUB_APP_INSTALL_URL } from '@/lib/github/repository-match'
 
 type GitHubRepository = { id: string; fullName: string; installationId: string; htmlUrl: string; private: boolean }
 type GitHubState = { viewerId: string; configured: boolean; connected: boolean; login?: string | null; installed: boolean; repositories: GitHubRepository[] }
@@ -35,8 +36,7 @@ const permissionsKey = (userId: string) => ['integrations:github:permissions', u
 const CONNECT_PATH = withBasePath('/api/integrations/github/connect')
 const PERMISSIONS_PATH = withBasePath('/api/integrations/github/permissions')
 const VERIFICATION_PATH = withBasePath('/api/integrations/github/repositories/verification')
-/** The Mikka GitHub App's page where a person picks which repositories it may reach. */
-const INSTALL_URL = 'https://github.com/apps/mikka-github/installations/new'
+const INSTALL_URL = GITHUB_APP_INSTALL_URL
 /** 创建 Pull Request is allow or deny: what the App was granted is never asked again (decision 2026-11-01-1215). */
 const DECISIONS: readonly Decision[] = ['allow', 'deny']
 

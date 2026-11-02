@@ -21,8 +21,9 @@ export async function enqueue(userId: string, holder: string, round: number, sel
   const { summary, memory, messages } = await loadConversation(userId, botId)
   const base = snapshot ? withCoordinatorPresentation(executionInstructions(snapshot)) : await botInstructions(userId, botId, personalCoordinatorInstructions())
   const permitted = snapshotMailboxTools(snapshot).filter(name => tools.some(tool => tool.name === name))
+  const { githubContext } = await import('@/lib/coordinator/github-context')
   return nativeCoordinatorStore.enqueue(userId,holder,round,selected,{
-    instructions: instructionsWithMemory(await withPersonalInstructions(userId, personalMailboxEnabled() && snapshot ? personalMailboxInstructions(base, permitted) : base, snapshot ? snapshot.personalPlugins ?? { servers: [], skills: [] } : undefined), memory) + '\n' + SCHEDULE_INSTRUCTIONS,
+    instructions: instructionsWithMemory(await withPersonalInstructions(userId, personalMailboxEnabled() && snapshot ? personalMailboxInstructions(base, permitted) : base, snapshot ? snapshot.personalPlugins ?? { servers: [], skills: [] } : undefined), memory) + '\n' + SCHEDULE_INSTRUCTIONS + '\n' + await githubContext(userId),
     context: nativeCoordinatorContext(promptMessages(summary,messages,{ key: process.env.BETTER_AUTH_SECRET ?? '', scope: JSON.stringify([userId, botId]) })), tools,
   })
 }
