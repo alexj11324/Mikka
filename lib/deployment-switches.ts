@@ -67,6 +67,12 @@ export const DEPLOYMENT_SWITCHES = {
   skillModelEvaluation: { flag: 'mikka-skill-model-evaluation', kind: 'gate', legacy: exact('MIKKA_SKILL_MODEL_EVALUATION'), fallback: false },
   /** Proactive profile building for the whole deployment; each person also needs mikka-proactive-profile. */
   proactiveProfile: { flag: 'mikka-proactive-profile-deployment', kind: 'gate', legacy: truthy('PROACTIVE_PROFILE_ENABLED'), fallback: false },
+  /** The subscription (BYOS) backend. */
+  byos: { flag: 'mikka-byos', kind: 'gate', legacy: exact('MIKKA_BYOS_ENABLED'), fallback: false },
+  /** Connecting a Claude subscription through OAuth. */
+  byosClaudeOAuth: { flag: 'mikka-byos-claude-oauth', kind: 'gate', legacy: exact('MIKKA_BYOS_CLAUDE_OAUTH'), fallback: false },
+  /** Connecting a ChatGPT (Codex) subscription through OAuth. */
+  byosCodexOAuth: { flag: 'mikka-byos-codex-oauth', kind: 'gate', legacy: exact('MIKKA_BYOS_CODEX_OAUTH'), fallback: false },
   /** Subscription (BYOS) enrollment custody. */
   byosEnrollment: { flag: 'mikka-byos-enrollment', kind: 'gate', legacy: exact('MIKKA_BYOS_ENROLLMENT_ENABLED'), fallback: false },
   /** Factory's Vercel deployment publication. */

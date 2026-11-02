@@ -11,9 +11,9 @@ export function cloudComputerTasksEnabled(env: Env = process.env) {
   return deploymentSwitch('cloudComputerTasks', env)
 }
 
-/** `MIKKA_BYOS_ENABLED=1`: the subscription (BYOS) backend is on. */
+/** The subscription (BYOS) backend: PostHog's mikka-byos (lib/deployment-switches.ts). */
 export function byosEnabled(env: Env = process.env) {
-  return env.MIKKA_BYOS_ENABLED === '1'
+  return deploymentSwitch('byos', env)
 }
 
 /** Subscription enrollment custody: PostHog's mikka-byos-enrollment (lib/deployment-switches.ts). */
