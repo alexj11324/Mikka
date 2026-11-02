@@ -1,5 +1,5 @@
 // The oldest daemon the server serves (MIN_DAEMON_VERSION), as released, talks to
-// today's device routes: its HTTP client (tests/fixtures/daemon-<version>/, parsed
+// today's device routes: its HTTP client (packages/daemon/test/fixtures/released-<version>/, parsed
 // with that release's own schemas) registers, heartbeats, lists repositories and
 // queued runs, and claims one. A route answer that drops or reshapes a field the
 // released daemon needs fails here before it reaches people's machines (#1023).

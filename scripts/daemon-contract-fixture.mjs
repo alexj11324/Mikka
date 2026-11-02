@@ -1,4 +1,4 @@
-// Refreshes tests/fixtures/daemon-<version>/ from the npm release named by
+// Refreshes packages/daemon/test/fixtures/released-<version>/ from the npm release named by
 // MIN_DAEMON_VERSION: the released HTTP client and git credential helper,
 // unedited, which tests/daemon-contract*.test.ts run against today's server.
 //
@@ -20,14 +20,12 @@ try {
   const integrity = `sha512-${createHash('sha512').update(readFileSync(tarball)).digest('base64')}`
   if (integrity !== meta.integrity) throw new Error('npm tarball integrity mismatch')
   execFileSync('tar', ['xzf', tarball, '-C', work])
-  const target = join('tests', 'fixtures', `daemon-${version}`)
+  const target = join('packages', 'daemon', 'test', 'fixtures', `released-${version}`)
   mkdirSync(target, { recursive: true })
-  const files = {}
   for (const file of FILES) {
     const body = readFileSync(join(work, 'package', file))
     writeFileSync(join(target, file), body)
-    files[file] = createHash('sha256').update(body).digest('hex')
   }
-  writeFileSync(join(target, 'release.json'), `${JSON.stringify({ package: name, version, integrity, files }, null, 2)}\n`)
+  writeFileSync(join(target, 'release.json'), `${JSON.stringify({ package: name, version }, null, 2)}\n`)
   console.log(`wrote ${target}; point tests/daemon-contract*.test.ts at it and remove the previous fixture`)
 } finally { rmSync(work, { recursive: true, force: true }) }

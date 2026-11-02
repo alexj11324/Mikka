@@ -1,9 +1,0 @@
-{
-  "package": "@aspectlylabs/mikka",
-  "version": "0.0.299",
-  "integrity": "sha512-nDrxEkPaCtjXRKHRLxK8qHeJDnFdz1wZN6OGK9RjiOhIC7I6hQT5cbeY5LjtVExMTu+zJp7+yEmgjaUkIW15Qw==",
-  "files": {
-    "http-link.js": "a2bf670c9848ecfbc2ffdf73ce7c229b961d5f11e5855123f361c32857328c05",
-    "github-credentials.mjs": "21731ffcdd0b1cdf186da62f8f1f808fa0b47a791b09ffc30b9e45f9ad72118a"
-  }
-}
