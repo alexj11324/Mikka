@@ -241,7 +241,8 @@ test('the thread chip and the right panel\'s 线程 row open the same thread col
 
   const panel = page.getByRole('complementary', { name: '右栏', exact: true })
   await panel.getByRole('tab', { name: '线程', exact: true }).click()
-  await panel.getByRole('button').filter({ hasText: /线程任务/ }).first().click()
+  // A thread list entry is the chat's thread card: one button named by the task and thread, its text drawn beside it (#878).
+  await panel.getByRole('button', { name: /线程任务/ }).first().click()
   await expectThreadBesideChat(page, runId)
   await back(page)
   await expect(column(page)).toHaveCount(0)
@@ -286,7 +287,7 @@ test('全部线程: another bot\'s thread opens beside the current chat, naming 
   await hydrated(chat(page))
   const panel = page.getByRole('complementary', { name: '右栏', exact: true })
   await panel.getByRole('tab', { name: '全部线程', exact: true }).click()
-  await panel.getByRole('button').filter({ hasText: /别的 Bot 任务/ }).first().click()
+  await panel.getByRole('button', { name: /别的 Bot 任务/ }).first().click()
   await expectThreadBesideChat(page, runId)
   await expect(conversationPill(page)).toHaveText('Coordinator')
   await expect(threadIn(page)).toContainText('写作助手 派出线程')
@@ -339,7 +340,7 @@ test('phone: the chat\'s pill opens 概览 as a page; its 线程 row pushes the 
   const pageWidth = await page.evaluate(() => document.documentElement.getBoundingClientRect().width)
   await expect.poll(async () => (await overview.boundingBox())?.width).toBe(pageWidth)
   await overview.getByRole('tab', { name: '线程', exact: true }).click()
-  await overview.getByRole('button').filter({ hasText: /线程任务/ }).first().click()
+  await overview.getByRole('button', { name: /线程任务/ }).first().click()
   await expect(overview).toBeHidden()
   await expect(threadIn(page).getByRole('list', { name: '线程对话' })).toContainText('Home page loads in 3.8s.')
   expect(query(page).get('thread')).toBe(runId)
@@ -534,10 +535,9 @@ test('chat → thread → 打开任务: the first crumb names the chat; ✕ brin
   await expect(taskTitle(page)).toHaveValue(title)
   // The address names the chat it came from, so a reload or a copied link knows it too.
   expect(query(page).get('section')).toBe('coordinator')
-  // The thread beside it narrows the page, so the first crumb is folded into 更多位置.
-  await page.getByRole('button', { name: '更多位置', exact: true }).click()
-  await expect(page.getByRole('menuitem', { name: 'Coordinator', exact: true })).toBeVisible()
-  await page.keyboard.press('Escape')
+  // From md up the first crumb names the chat even with the thread beside the task; only a phone folds it into 更多位置 (#826).
+  await expect(originCrumb(page, 'Coordinator')).toBeVisible()
+  await expect(page.getByRole('button', { name: '更多位置', exact: true })).toHaveCount(0)
   await expect(pager(page)).toHaveCount(0)
 
   await closeTask(page)

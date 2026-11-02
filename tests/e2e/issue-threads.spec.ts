@@ -46,11 +46,12 @@ test('Issue threads open on the right as a conversation; comments are cards with
   const feedbackRequests: string[] = []
   page.on('request', request => { if (new URL(request.url()).pathname.endsWith('/api/self-improvement')) feedbackRequests.push(request.url()) })
   await page.route('**/api/self-improvement?runId=*', route => route.fulfill({ status: 500, body: 'Unexpected feedback probe' }))
-  // A finished thread reads as a conversation and takes no message.
+  // A finished thread reads as a conversation and still ends in the composer: a message runs it again (R-10, R-81, #892). Nothing to stop.
   await threads.getByRole('button', { name: '打开线程 Model the routing table', exact: true }).click()
   let panel = page.getByRole('region', { name: 'Model the routing table', exact: true })
   await expect(panel.getByRole('list', { name: '线程对话' })).toContainText('线程回复 for Model the routing table')
-  await expect(panel.getByRole('textbox')).toHaveCount(0)
+  await expect(panel.getByRole('textbox', { name: '告诉 Codex 下一步做什么…' })).toBeVisible()
+  await expect(panel.getByRole('button', { name: '停止', exact: true })).toHaveCount(0)
   expect(feedbackRequests).toEqual([])
 
   // A running thread ends in the composer; what is said there goes to the agent and stays in the thread.
@@ -196,12 +197,16 @@ test(`The owner stops a live thread from its composer; it reads 正在停止… 
     expect(retryResponse).not.toBeNull()
     expect(retryResponse?.status()).toBe(200)
     expect((await check.query('SELECT "stopRequestedAt" FROM agent_runs WHERE id = $1', [runs.running])).rows[0].stopRequestedAt).toEqual(originalStop)
-    // The daemon ends the run: the thread shows it stopped and the composer goes away.
+    // The daemon ends the run.
     await check.query('UPDATE agent_runs SET status = $2, "finishedAt" = now() WHERE id = $1', [runs.running, 'stopped'])
     await page.clock.fastForward(2_100)
   } finally { await check.end() }
-  await expect(panel.getByText('已停止', { exact: true })).toBeVisible()
-  await expect(threads.getByRole('button', { name: '打开线程 Trim the bundle', exact: true })).toContainText('已停止')
-  await expect(panel.getByRole('textbox')).toHaveCount(0)
+  // The badge says the thread's group, as its icon does (R-52, #929): a stopped run nobody judged is 等待你, never 已解决.
+  // It keeps the composer, and the stop button goes (R-10, #892).
+  await expect(panel.getByText('等待你', { exact: true })).toBeVisible()
+  await expect(panel.getByText('正在停止…', { exact: true })).toHaveCount(0)
+  await expect(threads.getByRole('button', { name: '打开线程 Trim the bundle', exact: true })).toContainText('等待你')
+  await expect(composer).toBeEditable()
+  await expect(stop).toHaveCount(0)
 })
 }

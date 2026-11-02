@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import { useTranslations } from 'next-intl'
 import { ArrowDown, ArrowUp, Check, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 import { Breadcrumb, BreadcrumbEllipsis, BreadcrumbItem, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Separator } from '@/components/ui/separator'
@@ -46,10 +47,11 @@ export function IssueDetailHeader({ origin, identifier, title, saveLabel, saved,
           </DropdownMenu>
         </BreadcrumbItem>
         {/* At the list's own size, colour and weight like the crumbs beside it: no button size of its own shrinks the text. */}
-        <BreadcrumbItem className="hidden shrink-0 md:inline-flex"><Button variant="ghost" className="h-6 max-w-40 px-2 font-normal" disabled={pending} onClick={onClose}><span className="truncate">{origin}</span></Button></BreadcrumbItem>
+        {/* A narrow header truncates the origin before the ID: the ID's crumb never shrinks below the ID itself. */}
+        <BreadcrumbItem className="hidden min-w-0 md:inline-flex"><Button variant="ghost" className="h-6 max-w-40 min-w-0 shrink px-2 font-normal" disabled={pending} onClick={onClose}><span className="truncate">{origin}</span></Button></BreadcrumbItem>
         <BreadcrumbSeparator />
-        <BreadcrumbItem className="min-w-0">
-          {identifier ? <><BreadcrumbPage className="shrink-0">{identifier}</BreadcrumbPage>
+        <BreadcrumbItem className={cn(identifier ? 'min-w-min' : 'min-w-0')}>
+          {identifier ? <><BreadcrumbPage className="shrink-0 whitespace-nowrap">{identifier}</BreadcrumbPage>
             <span className="hidden min-w-0 truncate @lg/header:inline" title={title}>{title}</span></>
             : <BreadcrumbPage className="min-w-0 truncate" title={title}>{title}</BreadcrumbPage>}
         </BreadcrumbItem>
