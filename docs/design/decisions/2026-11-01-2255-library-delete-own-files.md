@@ -17,5 +17,6 @@
 - 资料库 lists what the bot's threads handed over (decision
   2026-11-01-0050-mobile-chat-settings); the web reads the same list as the
   phone.
-- 现状（非决定）：the server has no delete for these files yet (backend,
-  open); until it does, 删除 reports that the file was not deleted, on both.
+- 现状（非决定）：both call DELETE /api/mobile/artifacts/<id> (#935). Only
+  the file's owner can delete it; anything else, including a file outside a
+  workspace token's workspace, is 404 and the row stays.
