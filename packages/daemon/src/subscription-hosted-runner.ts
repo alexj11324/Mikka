@@ -33,6 +33,7 @@ import type { spawnCli } from "./agents/child";
 import type { AgentSandbox } from "./agents/sandbox";
 import { requireRunToolApproval } from "./agents/tool-approval";
 import { createNativeSubscriptionBroker } from "./subscription-native-broker";
+import { DaemonError, ServerUnreachableError } from "./errors";
 import { createApiKeyBroker } from "./api-key-broker";
 import type { RunCredential } from "./agents/run-credential";
 import type { ServerLink } from "./server-link";
@@ -267,6 +268,40 @@ export async function createHostedBotRunner(host: {
       )
         throw unavailable();
       const lifetime = new AbortController();
+      // Fixed diagnostic fields only. These callbacks can fail after the first
+      // context succeeds; the adapters deliberately hide their raw errors.
+      type StartupPhase = "context_initial" | "context_check" | "token" | "verify" | "adapter_start";
+      const startup: {
+        phase: StartupPhase;
+        contextReady: boolean;
+        brokerReady: boolean;
+        tokenRequested: boolean;
+        tokenCheckPassed: boolean;
+        verifyRequested: boolean;
+        verifyCheckPassed: boolean;
+        expiryValid?: boolean;
+        expiryFuture?: boolean;
+        sameRevision?: boolean;
+        sameAccount?: boolean;
+        sameRoute?: boolean;
+        sameModel?: boolean;
+      } = { phase: "context_initial", contextReady: false, brokerReady: false, tokenRequested: false, tokenCheckPassed: false, verifyRequested: false, verifyCheckPassed: false };
+      let reported = false;
+      let started = false;
+      const reportStartupFailure = (error: unknown) => {
+        if (!selected || reported || started) return;
+        reported = true;
+        const status = error instanceof DaemonError && error.data && typeof error.data === "object" && "status" in error.data ? error.data.status : undefined;
+        const reason = error instanceof ServerUnreachableError ? "server_unreachable"
+          : error instanceof DaemonError ? "server_refused"
+          : error instanceof Error && error.name === "ZodError" ? "context_invalid"
+          : [startup.sameRevision, startup.sameAccount, startup.sameRoute, startup.sameModel].includes(false) ? "context_changed"
+          : "startup_failed";
+        try {
+          options.log.warn({ event: "subscription_startup_failed", runId: assignment.runId, harness: kind, ...startup, reason,
+            ...(typeof status === "number" && Number.isInteger(status) && status >= 100 && status <= 599 ? { httpStatus: status } : {}) }, "Subscription startup failed");
+        } catch { /* Diagnostics never replace the original refusal. */ }
+      };
       let closed = false;
       let closing: Promise<void> | undefined;
       let computerGrant: ReturnType<ComputerBroker["spec"]>;
@@ -329,21 +364,37 @@ export async function createHostedBotRunner(host: {
             host.link.nativeContext!(assignment.deviceId, assignment.runId, lifetime.signal);
           const first = nativeBrokerContextSchema.parse(await context());
           await live();
+          startup.sameRoute = first.route === selected.route;
+          startup.sameModel = first.modelId === options.model;
           if (first.route !== selected.route || first.modelId !== options.model)
             throw unavailable();
+          startup.contextReady = true;
           const revision = first.revision;
-          const check = async () => {
-            await live();
-            const current = await context();
-            await live();
-            if (
-              current.revision !== revision ||
-              current.accountId !== first.accountId ||
-              current.route !== first.route ||
-              current.modelId !== first.modelId
-            )
-              throw unavailable();
-            return current;
+          const check = async (phase: StartupPhase = "context_check") => {
+            startup.phase = phase;
+            try {
+              await live();
+              const current = await context();
+              await live();
+              startup.sameRevision = current.revision === revision;
+              startup.sameAccount = current.accountId === first.accountId;
+              startup.sameRoute = current.route === first.route;
+              startup.sameModel = current.modelId === first.modelId;
+              const expiry = Date.parse(current.expiresAt);
+              startup.expiryValid = Number.isFinite(expiry);
+              startup.expiryFuture = startup.expiryValid && expiry > Date.now();
+              if (
+                current.revision !== revision ||
+                current.accountId !== first.accountId ||
+                current.route !== first.route ||
+                current.modelId !== first.modelId
+              )
+                throw unavailable();
+              return current;
+            } catch (error) {
+              reportStartupFailure(error);
+              throw error;
+            }
           };
           return { first, revision, check };
         })() : undefined;
@@ -458,6 +509,7 @@ export async function createHostedBotRunner(host: {
           return created;
         });
         const readyBroker = await brokerStarting;
+        startup.brokerReady = true;
         await live();
         const githubCli = options.github ? (process.env.PATH ?? '').split(delimiter).map(dir => join(dir, 'gh')).find(file => existsSync(file)) : undefined;
         if (options.github && !githubCli) throw new Error('Install GitHub CLI (gh) in the cloud worker image');
@@ -563,6 +615,7 @@ export async function createHostedBotRunner(host: {
           };
         };
         try {
+          startup.phase = "adapter_start";
           // The adapter sees a placeholder in the key's place; the broker adds the key.
           const placeholderCredential: RunCredential | undefined = apiKey && kind === "codex"
             ? { kind: "provider", protocol: "openai", baseUrl: apiKey.kind === "provider" ? apiKey.baseUrl : "https://api.openai.com/v1", key: placeholder }
@@ -585,18 +638,13 @@ export async function createHostedBotRunner(host: {
                   spawnCli: codexSpawn,
                   onHostedSession: record,
                   computerMcp,
-                  subscriptionAuth: {
-                    accountId: subscription!.first.accountId,
+                  hostedSubscriptionBroker: {
                     verify: async () => {
-                      await check();
-                    },
-                    token: async () => {
-                      const current = await subscription!.check();
-                      return {
-                        accessToken: placeholder,
-                        chatgptAccountId: current.accountId,
-                        chatgptPlanType: current.plan,
-                      };
+                      startup.verifyRequested = true;
+                      startup.verifyCheckPassed = false;
+                      await subscription!.check("verify");
+                      startup.verifyCheckPassed = true;
+                      startup.phase = "adapter_start";
                     },
                   },
                 })
@@ -612,10 +660,18 @@ export async function createHostedBotRunner(host: {
                     brokered: true,
                     accountId: subscription!.first.accountId,
                     verify: async () => {
-                      await check();
+                      startup.verifyRequested = true;
+                      startup.verifyCheckPassed = false;
+                      await subscription!.check("verify");
+                      startup.verifyCheckPassed = true;
+                      startup.phase = "adapter_start";
                     },
                     token: async () => {
-                      const current = await subscription!.check();
+                      startup.tokenRequested = true;
+                      startup.tokenCheckPassed = false;
+                      const current = await subscription!.check("token");
+                      startup.tokenCheckPassed = true;
+                      startup.phase = "adapter_start";
                       return {
                         accessToken: placeholder,
                         accountId: current.accountId,
@@ -628,6 +684,7 @@ export async function createHostedBotRunner(host: {
           const session = previous
             ? await adapter.resume(previous.sessionId, runtimeOptions)
             : await adapter.start(runtimeOptions);
+          started = true;
           // A quick, successful adapter may already have ended and revoked its
           // gate here. Preserve its terminal events; sends/spawns/provider work
           // remain fenced by close, and do not install a new monitor after it.
@@ -670,6 +727,7 @@ export async function createHostedBotRunner(host: {
             },
           };
         } catch (error) {
+          reportStartupFailure(error);
           // Keep why the CLI did not start: a cleanup failure must not replace it.
           const reason = startFailure(error);
           try {
@@ -682,6 +740,7 @@ export async function createHostedBotRunner(host: {
           throw unavailable(reason);
         }
       } catch (error) {
+        reportStartupFailure(error);
         await close();
         throw error;
       }
