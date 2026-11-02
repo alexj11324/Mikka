@@ -117,7 +117,10 @@ test('对话：Mikka 默认被拒绝的说明留在那条消息下面，下一�
   // A later turn ended cleanly: the actions go, the reason stays under the message.
   await seedCoordinatorError(page, '')
   await page.reload()
-  await expect(page.locator('[data-message-failure="past"]')).toHaveText('点数已用完')
+  const past = page.locator('[data-message-failure="past"]')
+  await expect(past).toContainText('点数已用完')
+  // It keeps one way on (review C5): 充值 opens 计费.
+  await expect(past.getByRole('link', { name: '充值', exact: true })).toBeVisible()
   await expect(page.locator('[data-hosted-refusal]')).toHaveCount(0)
 })
 
