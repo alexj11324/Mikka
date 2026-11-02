@@ -25,7 +25,7 @@ const filters: { id: Filter; label: string; icon: ComponentType<{ size?: number;
 ]
 
 /** The server's group (R-52); an older server sends none, so its status stands in, never as resolved. */
-export const groupOf = (thread: Thread): ThreadGroup => thread.group ?? (thread.status === 'running' ? 'running' : thread.status === 'failed' ? 'blocked' : 'waiting')
+export const groupOf = (thread: Thread): ThreadGroup => thread.group ?? (thread.status === 'running' ? 'running' : thread.status === 'failed' || thread.status === 'paused' ? 'blocked' : 'waiting')
 
 const matches = (thread: Thread, filter: Filter) => filter === 'all' || groupOf(thread) === filter
 

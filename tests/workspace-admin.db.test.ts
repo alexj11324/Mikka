@@ -253,10 +253,20 @@ test('workspace settings backend', { skip: !dbUrl }, async t => {
     const admin = await seedUser(pool, 'admin'), target = await seedUser(pool, 'target'), heir = await seedUser(pool, 'heir')
     const ws = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }, { userId: target, role: 'member' }, { userId: heir, role: 'member' }])
     const bot = await seedBot(pool, ws.id, target)
+    // The bot's hidden cloud runtime agent, with a finished thread on it.
+    const device = randomUUID(), agent = randomUUID(), repo = randomUUID()
+    await pool.query(`insert into devices (id,"ownerId",name,kind) values ($1,$2,'Cloud computer','cloud')`, [device, target])
+    await pool.query(`insert into device_repos (id,"deviceId","userId","repoPath","baseBranch") values ($1,$2,$3,$4,'main')`, [repo, device, target, `/home/user/.mikka/bot-workspaces/${bot}`])
+    await pool.query(`insert into agents (id,"userId",harness,name,"deviceId") values ($1,$2,'codex',$3,$4)`, [agent, target, `Cloud codex ${bot}`, device])
+    await pool.query(`insert into bot_cloud_runtimes ("botId","workspaceId","ownerId",harness,"agentId","repoId") values ($1,$2,$3,'codex',$4,$5)`, [bot, ws.id, target, agent, repo])
+    await seedRun(pool, { userId: target, agentId: agent, botId: bot, status: 'completed' })
     const { workspaceDb } = await import('../lib/workspace-db')
     const moved = await workspaceDb.transaction(tx => members.transferOnSuspend(tx, ws.id, target, heir))
     assert.deepEqual(moved, { bots: 1 })
     assert.equal(await count(pool, 'bots where id=$1 and "ownerId"=$2', [bot, heir]), 1)
+    assert.equal(await count(pool, 'bot_cloud_runtimes where "botId"=$1', [bot]), 0, 'the runtime is made again for the new owner')
+    assert.equal(await count(pool, 'agent_runs where "agentId"=$1', [agent]), 1, 'the thread history stays')
+    assert.equal(await count(pool, 'agents where "userId"=$1 and lower(name)=lower($2)', [target, `Cloud codex ${bot}`]), 0, 'the old agent gives up the runtime name, so the bot can come back to its owner')
   })
 
   await t.test('team deletion: impact counts, name check, scoped delete', async () => {
