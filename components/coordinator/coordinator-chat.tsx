@@ -120,7 +120,8 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   // A poll names the version it shows; an unchanged chat comes back as its live state only (lib/coordinator/chat-poll.ts).
   const shown = useRef<{ chat?: Chat; fullReadAt: number }>({ fullReadAt: 0 })
   const { data, mutate, error: loadError } = useSWR<Chat>(coordinatorChatKey(botId), async () => {
-    const next = await pollCoordinatorChat(botId, knownVersion(shown.current.chat, shown.current.fullReadAt, Date.now()))
+    const known = knownVersion(shown.current.chat, shown.current.fullReadAt, Date.now())
+    const next = await (botId || known ? pollCoordinatorChat(botId, known) : pollCoordinatorChat())
     if (!('unchanged' in next)) shown.current.fullReadAt = Date.now()
     return mergeChat(shown.current.chat, next)
   }, {
