@@ -141,3 +141,19 @@ test('how to draw a card is said once, in the prompt; tools and events only poin
   assert.match(offline, /Draw this card and dispatch the issue again/)
   assert.equal((instructions.match(/R-46/g) ?? []).length, 1, 'the secretary tone rule is stated once')
 })
+
+test('more work on a task goes to its thread; a new thread only when the person asked for one', async () => {
+  const { system, tools } = await play('README 里再加一节安装说明', [{ tool: 'get_issue', input: { issueId: ISSUE } }, { tool: 'dispatch_run', input: { issueId: ISSUE, note: '再加一节安装说明' } }])
+  assert.match(system, /To retry a task, or to give its thread more information, call dispatch_run .* for the same task again: it goes to the existing thread/)
+  assert.match(system, /Never dispatch a second thread for it\. Set newThread only when the person explicitly asked, in their own words/)
+  assert.match(String(tools.dispatch_run.description), /A task has one thread at a time\. When the task already has one, this goes to that thread/)
+  assert.match(system, /When it shows a thread, more work for the task goes to that thread: call dispatch_run without repo .* never look one up or ask the person for one/)
+  assert.match(String(tools.get_issue.description), /its thread \(runId, status, repository\)/)
+  assert.deepEqual(calls.map(call => call.step), ['getIssue', 'dispatchRun'], 'no repository lookup for a task with a thread')
+  const followUp = calls[1].input as { repo?: string; newThread?: boolean; note?: string }
+  assert.deepEqual([followUp.repo, followUp.newThread, followUp.note], [undefined, undefined, '再加一节安装说明'], 'no repo and no new thread: the host keeps the thread and its repository')
+
+  calls.length = 0
+  await play('另开一个线程，用 Codex 重新做', [{ tool: 'dispatch_run', input: { issueId: ISSUE, repo: 'alexj11324/Mikka_test', newThread: true, model: { harness: 'codex' } } }])
+  assert.equal((calls[0].input as { newThread?: boolean }).newThread, true, 'asked in the person\'s own words; the host still checks those words (lib/thread-switch.ts)')
+})

@@ -36,7 +36,7 @@ const notFoundCard = { title: '没找到这个仓库', description: '你的 GitH
 let results: Record<string, unknown> = {}
 const log: { step: string; input: unknown }[] = []
 const step = (name: string) => async (...args: unknown[]) => { log.push({ step: name, input: args[1] }); return results[name] ?? { ok: true } }
-mock.module('@/workflows/coordinator/steps', { namedExports: Object.fromEntries(['dispatchRun', 'findRepository', 'getIssue', 'listIssues', 'listAgents', 'listRuns', 'getRun', 'startWebSubagent', 'wakeComputerBot', 'dispatchComputerThread', 'listComputerBots', 'listBotSubscriptions', 'listComputerWorkspaces', 'scheduleCommand', 'webSearchStep', 'remember', 'forget', 'recordAttention', 'appTools', 'personalMcp'].map(name => [name, step(name)])) })
+mock.module('@/workflows/coordinator/steps', { namedExports: Object.fromEntries(['dispatchRun', 'findRepository', 'getIssue', 'listIssues', 'listAgents', 'listRuns', 'getRun', 'startWebSubagent', 'wakeComputerBot', 'dispatchComputerThread', 'listComputerBots', 'listBotSubscriptions', 'listComputerWorkspaces', 'scheduleCommand', 'webSearchStep', 'sendToRun', 'stopRun', 'remember', 'forget', 'recordAttention', 'appTools', 'personalMcp'].map(name => [name, step(name)])) })
 mock.module('@/workflows/coordinator/agent-kit-steps', { namedExports: {} })
 mock.module('@/lib/composio-actions', { namedExports: { createComposioAITools: () => ({}), createGoogleAITools: () => ({}) } })
 
@@ -126,4 +126,18 @@ test('watching a front-end test uses the Bot computer; a code fix goes to an Age
 test('a repository that does not exist: asking is right (negative case)', { skip }, async () => {
   results = { getIssue: { id: ISSUE, title: '加 README' }, findRepository: { match: 'none', card: notFoundCard }, dispatchRun: { error: 'repositoryNotFound', card: notFoundCard } }
   await passAll('not found', async () => trial('在 Mikka_tset 里加一个 README', await facts()), ({ reply }) => /BeQuestions/.test(reply) ? null : 'did not draw the card')
+})
+
+test('more work on a task stays in its thread; a new one only when the person asks', { skip }, async () => {
+  const thread = { id: ISSUE, title: '加 README', status: 'doing', body: '给 Mikka_test 加一个 README。', runs: [{ id: 'run-1', agent: 'Claude Code', status: 'running' }], thread: { runId: 'run-1', status: 'running', repository: 'https://github.com/alexj11324/Mikka_test' } }
+  results = { getIssue: thread, dispatchRun: { thread: 'message', runId: 'run-1', threadId: 'run-1', status: 'messageSent' }, sendToRun: { sent: true } }
+  await passAll('follow-up', async () => trial('README 里再加一节安装说明', await facts()), ({ calls, reply }) => {
+    if (calls.some(call => call.step === 'dispatchRun' && (call.input as { newThread?: boolean }).newThread === true)) return 'asked for a new thread'
+    if (calls.some(call => call.step === 'findRepository')) return 'looked up a repository for a task that has a thread'
+    if (/哪个仓库|which repositor/i.test(reply)) return 'asked for a repository'
+    return calls.some(call => call.step === 'dispatchRun' || call.step === 'sendToRun') ? null : 'did not pass the work on'
+  })
+  results = { getIssue: thread, dispatchRun: { runId: 'run-2', thread: 'new', threadId: 'run-2', replacedThreadId: 'run-1' } }
+  await passAll('explicit new thread', async () => trial('另开一个线程，用 Codex 从头重新做这个任务', await facts()), ({ calls }) =>
+    calls.some(call => call.step === 'dispatchRun' && (call.input as { newThread?: boolean }).newThread === true) ? null : 'no new thread though the person asked')
 })
