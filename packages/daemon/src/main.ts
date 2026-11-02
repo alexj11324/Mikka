@@ -65,7 +65,7 @@ import { restartService, uninstallService } from "./service"
 import { detectDeviceType } from "./device-type"
 import { detectHarnesses, deviceCapabilities, dockerAvailable, harnessFingerprint } from "./harnesses"
 import { ensureHarness, type HarnessStore } from "./harness-install"
-import { probeHarnessModels, type ModelReport } from "./model-probe"
+import { probeHarnessModels, sweepModelProbeHomes, type ModelReport } from "./model-probe"
 import { sweepRunCredentials } from "./agents/harness-home"
 import { createLocalSubscriptionRunner } from "./subscription-local-runner"
 import { isSafeId } from "./ids"
@@ -561,6 +561,8 @@ export class Daemon {
     }))]
     // A crash or kill skipped the run-end wipe; resumed runs get fresh credentials.
     sweepRunCredentials(paths.adapterState)
+    // Probe homes a crashed daemon left (model-probe.ts).
+    sweepModelProbeHomes(paths.dataDir)
     // Runs survive restarts: pick up what the journal says was active.
     await this.supervisor.resumeAll()
     // The person's own logins are never read (devices are runners), so only

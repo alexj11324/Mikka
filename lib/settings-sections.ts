@@ -6,7 +6,7 @@
 export type SettingsSectionId =
   | 'account' | 'security' | 'preferences' | 'notifications' | 'memory' | 'connections' | 'models'
   | 'logins' | 'privacy' | 'computers' | 'developer'
-  | 'general' | 'members' | 'teams' | 'bots' | 'permissions' | 'secrets' | 'audit' | 'usage' | 'billing'
+  | 'general' | 'members' | 'teams' | 'permissions' | 'secrets' | 'audit' | 'usage' | 'billing'
 
 export interface SettingsSectionDef {
   id: SettingsSectionId
@@ -32,7 +32,8 @@ export const SETTINGS_SECTIONS: readonly SettingsSectionDef[] = [
   { id: 'notifications', group: 'personal', title: 'Notifications' },
   { id: 'memory', group: 'personal', title: 'Memory' },
   { id: 'connections', group: 'personal', title: 'Connections' },
-  { id: 'models', group: 'personal', title: 'API and subscriptions' },
+  // 模型与订阅 (decision 2026-11-02-1400): subscriptions, API keys, 运行位置 and 允许使用的模型 (was API 与订阅 and Bot 与 Agents).
+  { id: 'models', group: 'personal', title: 'Models and subscriptions' },
   { id: 'logins', group: 'personal', title: 'Logins and keys' },
   { id: 'privacy', group: 'personal', title: 'Data and privacy' },
   { id: 'computers', group: 'personal', title: 'Devices' },
@@ -41,7 +42,6 @@ export const SETTINGS_SECTIONS: readonly SettingsSectionDef[] = [
   { id: 'general', group: 'workspace', title: 'General' },
   { id: 'members', group: 'workspace', title: 'Members', routed: true },
   { id: 'teams', group: 'workspace', title: 'Teams', routed: true },
-  { id: 'bots', group: 'workspace', title: 'Bots and agents' },
   { id: 'permissions', group: 'workspace', title: 'Team permissions', adminOnly: true },
   { id: 'secrets', group: 'workspace', title: 'Secrets and environment', adminOnly: true },
   { id: 'audit', group: 'workspace', title: 'Audit log', adminOnly: true },
@@ -58,6 +58,8 @@ const LEGACY: Record<string, SettingsSectionId> = {
   integrations: 'connections',
   devices: 'computers',
   workspace: 'general',
+  // Bot 与 Agents became 模型与订阅 (decision 2026-11-02-1400).
+  bots: 'models',
 }
 
 /** Sections settings can show: every section with a page body. */
@@ -88,8 +90,8 @@ export function settingsHref(id: SettingsSectionId, workspaceId?: string): strin
 
 /**
  * What only a team has: what is between people (decision 2026-11-02-0203). A
- * personal workspace has every setting of the workspace itself (常规, Bot 与
- * Agents, 密钥与环境, 用量, 计费) and none of these: 成员, 团队, 团队权限, 审计日志.
+ * personal workspace has every setting of the workspace itself (常规,
+ * 密钥与环境, 用量, 计费) and none of these: 成员, 团队, 团队权限, 审计日志.
  */
 export const TEAM_ONLY_SECTIONS: ReadonlySet<SettingsSectionId> = new Set(['members', 'teams', 'permissions', 'audit'])
 

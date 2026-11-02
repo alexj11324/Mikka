@@ -6,6 +6,7 @@ import { SubscriptionRefusal, type SubscriptionRoute } from '@mikka/protocol/sub
 import { workspaceDb } from './workspace-db'
 import { requireWorkspace } from './workspace-access'
 import { pool } from './db'
+import { byosEnabled, byosEnrollmentEnabled } from './cloud-computer-flag'
 import { SubscriptionRepository } from './subscription-repository'
 import { SubscriptionService } from './subscription-service'
 import { SubscriptionWorkerClient } from '../packages/daemon/src/subscription-worker-client'
@@ -28,7 +29,7 @@ export async function authorizeSubscriptionUse(userId: string, workspaceId: stri
   }
 }
 export function subscriptionRuntime(nativeBroker = false, custodyOnly = false, options: { exportAccessLease?: boolean } = {}): SubscriptionService {
-  if (process.env.MIKKA_BYOS_ENABLED !== '1' && !(custodyOnly && process.env.MIKKA_BYOS_ENROLLMENT_ENABLED === '1')) throw new SubscriptionRefusal('backend_unavailable')
+  if (!byosEnabled() && !(custodyOnly && byosEnrollmentEnabled())) throw new SubscriptionRefusal('backend_unavailable')
   const binary = process.env.MIKKA_BYOS_WORKER_BINARY ?? join(process.cwd(), 'packages/subscription-worker/bin/mikka-subscription-worker')
   // pool is request-scoped; never send a preview worker to the production DB.
   const databaseUrl = pool.options.connectionString

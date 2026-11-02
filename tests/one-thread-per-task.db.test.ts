@@ -10,7 +10,8 @@ import { normalizeRepository } from '@mikka/protocol/repository'
 import { dbUrl, seedIssue, seedUser, seedWorkspace } from './support/workspace-admin-db'
 import { githubAppStub } from './support/github-app-stub'
 
-const mac = [{ harness: 'codex', installed: true, models: ['gpt-5'], defaultModelSlot: 'default' }]
+// The computer's Codex reported gpt-5, the model the person's ChatGPT account lists (decision 2026-11-02-1400).
+const mac = [{ harness: 'codex', installed: true, modelSlots: [{ slot: 'gpt-5', model: 'gpt-5', name: 'gpt-5' }] }]
 // The Decision API's judgment of the person's message, scripted per case.
 let judged: number | null = null
 const judgments: string[] = []
@@ -41,6 +42,10 @@ test('one task, one thread: dispatch continues the task\'s thread unless the per
     await pool.query('UPDATE agent_runs SET "continuesRunId"=NULL,"threadReplacedBy"=NULL WHERE "userId" = ANY($1)', [users])
     await pool.query('DELETE FROM agent_runs WHERE "userId" = ANY($1)', [users])
     await pool.query('DELETE FROM agents WHERE "userId" = ANY($1)', [users])
+    await pool.query('DELETE FROM model_order_entries WHERE "ownerId" = ANY($1)', [users])
+    await pool.query('DELETE FROM model_order_settings WHERE "ownerId" = ANY($1)', [users])
+    await pool.query('DELETE FROM byos_bindings WHERE "ownerId" = ANY($1)', [users])
+    await pool.query('DELETE FROM byos_connections WHERE "ownerId" = ANY($1)', [users])
     await pool.query('DELETE FROM repository_settings WHERE "userId" = ANY($1)', [users])
     await pool.query('DELETE FROM github_repository_installations WHERE "userId" = ANY($1)', [users])
     await pool.query('DELETE FROM account WHERE "userId" = ANY($1)', [users])
@@ -55,6 +60,11 @@ test('one task, one thread: dispatch continues the task\'s thread unless the per
     github.allowWriter('octo/repo', githubAccountId)
     await pool.query('INSERT INTO repository_settings ("userId","remoteKey",push) VALUES ($1,$2,$3)', [id, normalizeRepository('octo/repo').key, JSON.stringify({ approved: true, remote: 'origin', approvedByUserId: id, approvedAt: new Date().toISOString() })])
     const ws = await seedWorkspace(pool, id, [{ userId: id, role: 'admin' }])
+    // A connected ChatGPT subscription whose account lists gpt-5: 允许使用的模型 is that model by default, 运行位置 本地.
+    const connection = randomUUID()
+    await pool.query(`INSERT INTO byos_connections (id,"ownerId","workspaceId",provider,state,epoch,"secretName","secretDigest","providerSubject","modelCatalog") VALUES ($1,$2,$3,'codex','connected',1,$4,$5,'synthetic-subject',$6)`,
+      [connection, id, ws.id, `synthetic-${connection}`, 'a'.repeat(64), JSON.stringify({ revision: '1', models: ['gpt-5'] })])
+    await pool.query(`INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId") VALUES ($1,$2,$3,'catalogue',$4,1,'codex_cpa','gpt-5')`, [randomUUID(), id, ws.id, connection])
     const issueId = await seedIssue(pool, id)
     // A numbered task gets a publication branch; each person's own number keeps the branches apart.
     await pool.query(`UPDATE issues SET content=$2::jsonb WHERE id=$1`, [issueId, JSON.stringify({ type: 'doc', attrs: { mikka: { number: 1000 + users.length } } })])
@@ -62,10 +72,12 @@ test('one task, one thread: dispatch continues the task\'s thread unless the per
     const botId = await chatBotId(id, null, ws.id)
     return { id, issueId, botId, deviceId }
   }
-  async function computer(userId: string, name: string, state: { online?: boolean; autoSchedule?: boolean; removed?: boolean } = {}) {
+  /** One of the person's computers; `takesPart: false` is 参与调度 off. */
+  async function computer(userId: string, name: string, state: { online?: boolean; takesPart?: boolean; removed?: boolean; reports?: string } = {}) {
     const deviceId = randomUUID()
-    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,"deviceType",enabled,"lastSeenAt",harnesses,"autoSchedule","removedAt") VALUES ($1,$2,$3,'local','laptop',true,$4,$5,$6,$7)`,
-      [deviceId, userId, name, state.online === false ? new Date(Date.now() - 3_600_000) : new Date(), JSON.stringify(mac), state.autoSchedule ?? true, state.removed ? new Date() : null])
+    const harnesses = state.reports ? [{ harness: 'codex', installed: true, modelSlots: [{ slot: state.reports, model: state.reports, name: state.reports }] }] : mac
+    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,"deviceType",enabled,"lastSeenAt",harnesses,"removedAt") VALUES ($1,$2,$3,'local','laptop',$4,$5,$6,$7)`,
+      [deviceId, userId, name, state.takesPart ?? true, state.online === false ? new Date(Date.now() - 3_600_000) : new Date(), JSON.stringify(harnesses), state.removed ? new Date() : null])
     await pool.query(`INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,'codex',$4)`, [randomUUID(), userId, deviceId, `codex-${deviceId.slice(0, 8)}`])
     return deviceId
   }
@@ -165,8 +177,8 @@ test('one task, one thread: dispatch continues the task\'s thread unless the per
 
   await t.test('a named computer: the run is pinned there and the result says so; offline, not theirs or removed is refused', async () => {
     const a = await person()
-    // Not picked by the rules (auto-schedule off), but the person named it.
-    const studio = await computer(a.id, 'Mac Studio', { autoSchedule: false })
+    // Never picked by dispatch (its Codex did not report the allowed model), but the person named it.
+    const studio = await computer(a.id, 'Mac Studio', { reports: 'other-model' })
     const pinned = await dispatch(a, { target: { deviceId: studio } })
     assert.equal(pinned.thread, 'new')
     assert.deepEqual(pinned.placement, { kind: 'device', deviceId: studio, name: 'Mac Studio' })
@@ -178,11 +190,15 @@ test('one task, one thread: dispatch continues the task\'s thread unless the per
     assert.equal(offline.error, 'machineUnavailable')
     assert.ok(offline.card?.title)
     assert.equal((await runs(b.id)).length, 0)
+    // 参与调度 off: Mikka never sends it a run, even when named (decision 2026-11-02-1400).
+    const kept = await dispatch(b, { target: { deviceId: await computer(b.id, 'Kept out', { takesPart: false }) } })
+    assert.equal(kept.error, 'machineUnavailable')
+    assert.equal((await runs(b.id)).length, 0)
     // Someone else's computer, or a removed one: refused.
     assert.equal((await dispatch(b, { target: { deviceId: a.deviceId } })).error, 'deviceNotFound')
     assert.equal((await dispatch(b, { target: { deviceId: await computer(b.id, 'Gone', { removed: true }) } })).error, 'deviceNotFound')
     assert.equal((await runs(b.id)).length, 0)
-    // No target: the saved rules pick (here the auto-schedule MacBook), and the result names it.
+    // No target: 允许使用的模型 picks (here the MacBook, the one computer that takes part and runs gpt-5), and the result names it.
     const ruled = await dispatch(b)
     assert.deepEqual(ruled.placement, { kind: 'device', deviceId: b.deviceId, name: 'MacBook' })
   })

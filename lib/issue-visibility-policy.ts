@@ -1,7 +1,7 @@
 import { and, eq, inArray, or, sql } from 'drizzle-orm'
 import { issues } from './db/schema'
 
-export interface IssueVisibilityLinks { linkedIds: string[]; allowedIds: string[] }
+export interface IssueVisibilityLinks { allowedIds: string[] }
 
 /** Owners retain full access. Nonowners need a workspace-scoped task linked
  * to a workspace where they are active; legacy invitations never grant personal

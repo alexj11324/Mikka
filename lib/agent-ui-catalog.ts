@@ -71,7 +71,7 @@ export const agentComponentCatalog = {
         id: z.string().min(1).max(80),
         title: z.string().min(1).max(200),
         description: z.string().max(300).optional(),
-        options: z.array(z.object({ value: z.string().min(1).max(80), label: z.string().min(1).max(200), description: z.string().max(300).optional(), action: z.enum(['cloudKeySettings', 'enableThisMac', 'connectServer', 'e2bKey', 'allowAutoSchedule', 'serverOnline']).optional() })).min(1).max(6).optional(),
+        options: z.array(z.object({ value: z.string().min(1).max(80), label: z.string().min(1).max(200), description: z.string().max(300).optional(), action: z.enum(['cloudKeySettings', 'enableThisMac', 'connectServer', 'e2bKey', 'allowAutoSchedule', 'serverOnline', 'modelSettings']).optional() })).min(1).max(6).optional(),
         multiple: z.boolean().optional(),
         allowCustom: z.boolean().optional(),
         input: z.enum(['select', 'switch', 'slider', 'dateRange']).optional(),

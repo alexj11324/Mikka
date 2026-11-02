@@ -1,5 +1,5 @@
 import 'server-only'
-import { cloudComputerTasksEnabled } from '@/lib/cloud-computer-flag'
+import { cloudComputerRunsEnabled } from '@/lib/cloud-computer-flag'
 import { and, eq } from 'drizzle-orm'
 import { db, pool } from '@/lib/db'
 import { bots } from '@/lib/db/schema'
@@ -11,7 +11,7 @@ import type { PoolClient } from 'pg'
 
 export { agentKitEnabled } from './config'
 export function agentKitDefaults() {
-  return builtinAgentDefinition({ computerEnabled: cloudComputerTasksEnabled() && process.env.MIKKA_BYOS_ENABLED === '1' })
+  return builtinAgentDefinition({ computerEnabled: cloudComputerRunsEnabled() })
 }
 export const agentKitStore = new AgentKitStore(pool)
 

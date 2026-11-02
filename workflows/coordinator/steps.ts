@@ -1,4 +1,4 @@
-import { cloudComputerTasksEnabled } from '@/lib/cloud-computer-flag'
+import { cloudComputerRunsEnabled } from '@/lib/cloud-computer-flag'
 import { runInvalidDetail } from '@/lib/run-invalid-reason'
 import { FatalError } from 'workflow'
 import type { CoordinatorWorkflowStreamPart } from '@/lib/coordinator/stream'
@@ -59,7 +59,7 @@ type ToolResult<T> = T | { error: string; reason?: string; detail?: string }
 
 export async function computerToolsEnabled() {
   'use step'
-  return cloudComputerTasksEnabled() && process.env.MIKKA_BYOS_ENABLED === '1'
+  return cloudComputerRunsEnabled()
 }
 
 async function asToolResult<T>(fn: () => Promise<T>): Promise<ToolResult<T>> {
@@ -361,7 +361,7 @@ export async function listAgents(userId: string, scope?: NativeToolScope) {
  * One task, one thread (lib/thread-dispatch.ts): a task with a thread gets the dispatch as that thread's work; only
  * `newThread`, when the person's own message (`sourceEventId`, host-supplied) explicitly asked for it, starts another.
  */
-export async function dispatchRun(userId: string, input: { issueId: string; agentId?: string; repo: string; note?: string; requestKey?:string; readOnly?: boolean; newThread?: boolean; sourceEventId?: string; target?: import('@/lib/dispatch-target').DispatchTarget }, scope: NativeToolScope | undefined, botId: string, execution?: AgentExecution, requestEventId?: string, approvedRepositoryKey?: string) {
+export async function dispatchRun(userId: string, input: { issueId: string; agentId?: string; repo: string; note?: string; requestKey?:string; readOnly?: boolean; newThread?: boolean; sourceEventId?: string; target?: import('@/lib/dispatch-target').DispatchTarget; model?: { harness: 'claude_code' | 'codex'; model: string } }, scope: NativeToolScope | undefined, botId: string, execution?: AgentExecution, requestEventId?: string, approvedRepositoryKey?: string) {
   'use step'
   await assertNativeToolScope(userId,scope)
   const { newThread, sourceEventId, target, ...request } = input
@@ -394,7 +394,7 @@ export async function dispatchRun(userId: string, input: { issueId: string; agen
 }
 
 /** Where a new run goes by the saved label execution rules: the workspace's cloud, else an online device. */
-async function dispatchByRules(userId: string, input: { issueId: string; agentId?: string; repo: string; note?: string; requestKey?:string; readOnly?: boolean }, scope: NativeToolScope | undefined, botId: string, execution?: AgentExecution, requestEventId?: string, approvedRepositoryKey?: string, place?: import('@/lib/dispatch-target').DispatchTarget) {
+async function dispatchByRules(userId: string, input: { issueId: string; agentId?: string; repo: string; note?: string; requestKey?:string; readOnly?: boolean; model?: { harness: 'claude_code' | 'codex'; model: string } }, scope: NativeToolScope | undefined, botId: string, execution?: AgentExecution, requestEventId?: string, approvedRepositoryKey?: string, place?: import('@/lib/dispatch-target').DispatchTarget) {
   // A computer the person named: theirs, not removed, online; otherwise refused or the card at once, never another computer.
   if (place && place !== 'cloud') {
     const { targetDevice } = await import('@/lib/dispatch-target')
@@ -406,34 +406,35 @@ async function dispatchByRules(userId: string, input: { issueId: string; agentId
     return { ...result, status: 'queued' as const }
   }
   {
-    const target = await (await import('@/lib/rule-dispatch')).resolveIssueExecution(userId,botId,input.issueId,place === 'cloud' ? 'cloud' : undefined)
-    // No machine can take it (decision 2026-10-31-2200-run-machine-fallback): an error the person can act on.
-    const noMachine = async () => {
-      const card = 'card' in target ? target.card : (await import('@/lib/rule-dispatch')).machineUnavailableCard()
-      return { error: 'machineUnavailable' as const, issueId: input.issueId, card }
+    // 模型与订阅 (decision 2026-11-02-1400): the thread's own model, else 允许使用的模型 in order; 运行位置 says where.
+    // The person asking for the cloud runs it there whatever 运行位置 says.
+    const { issueForUser } = await import('@/lib/issue-access')
+    if (!await issueForUser(userId, input.issueId)) throw new ActionFailureError('issueNotFound')
+    const { executionWorkspace } = await import('@/lib/execution-settings')
+    const workspaceId = await executionWorkspace(userId, botId)
+    const { resolveModelDispatch } = await import('@/lib/model-dispatch')
+    const target = await resolveModelDispatch(pool, { ownerId: userId, workspaceId, botId }, input.model ?? null, undefined, place === 'cloud' ? 'cloud' : undefined)
+    if (target.kind === 'none') return { error: 'machineUnavailable' as const, issueId: input.issueId, reason: target.reason, card: target.card }
+    if (target.kind === 'device') {
+      const result = await queueRun(userId, { ...input, agentId: target.agentId, model: target.model, pinnedDeviceId: target.deviceId, ...(target.entry.source.kind === 'api_key' ? { apiKeyId: target.entry.source.keyId } : {}) }, botId, execution, requestEventId, null, approvedRepositoryKey)
+      return { ...result, status: 'queued' as const }
     }
-    const queueOnDevice = async (device: { agentId: string; model?: string; pinnedDeviceId?: string }) => {
-      const result=await queueRun(userId,{...input,agentId:device.agentId,model:device.model,pinnedDeviceId:device.pinnedDeviceId},botId,execution,requestEventId,null,approvedRepositoryKey)
-      return {...result,status:'queued' as const}
+    if (requestEventId) {
+      const event=(await pool.query('SELECT "userId","botId",payload FROM coordinator_events WHERE id=$1',[requestEventId])).rows[0]
+      if (!event || event.userId!==userId || event.botId!==botId || event.payload?.taskDestination) throw new ActionFailureError('runInvalid')
     }
-    if ('needsMachine' in target) return noMachine()
-    if (!('agentId' in target)) {
-      if (requestEventId) {
-        const event=(await pool.query('SELECT "userId","botId",payload FROM coordinator_events WHERE id=$1',[requestEventId])).rows[0]
-        if (!event || event.userId!==userId || event.botId!==botId || event.payload?.taskDestination) throw new ActionFailureError('runInvalid')
-      }
-      if (approvedRepositoryKey) throw new ActionFailureError('runInvalid')
-      // The bot's own runtime, created on first use; the Coordinator's is its bot row's like any bot's.
-      // An API-key model binds no subscription to it.
-      const autoRuntime=await import('@/lib/computer/auto-runtime')
-      const actor={userId,workspaceId:target.workspaceId}
-      const runtime=await autoRuntime.ensureBotCloudRuntime(pool,actor,botId,{harness:target.harness,model:'apiKey' in target ? undefined : target.model})
-      const cloud = runtime ? await dispatchComputerTask(userId,{botId:runtime.botId,issueId:input.issueId,harness:runtime.harness,note:input.note,model:target.model,repo:input.repo,...(input.readOnly ? {readOnly:true} : {})},`rule:${input.requestKey ?? requestEventId ?? crypto.randomUUID()}`,scope,execution) : { error: 'cloudComputerUnavailable' as const }
-      // The person's own E2B refused (capacity, quota, key): same as no cloud.
-      if (!('error' in cloud) || cloud.error !== 'cloudComputerUnavailable') return cloud
-      return target.fallback ? queueOnDevice(target.fallback) : noMachine()
-    }
-    return queueOnDevice(target)
+    if (approvedRepositoryKey) throw new ActionFailureError('runInvalid')
+    // The bot's own runtime, created on first use; the Coordinator's is its bot row's like any bot's.
+    // An API-key model binds no subscription to it; a subscription model binds the entry's own account.
+    const autoRuntime=await import('@/lib/computer/auto-runtime')
+    const actor={userId,workspaceId}
+    const runtime=await autoRuntime.ensureBotCloudRuntime(pool,actor,botId,{harness:target.harness})
+    if (runtime && target.entry.source.kind === 'subscription') await (await import('@/lib/model-dispatch')).bindAgentToConnection(pool, { ownerId: userId, workspaceId }, runtime.agentId, target.harness, target.entry.source.connectionId, target.model)
+    const cloud = runtime ? await dispatchComputerTask(userId,{botId:runtime.botId,issueId:input.issueId,harness:runtime.harness,note:input.note,model:target.model,repo:input.repo,...(target.entry.source.kind === 'api_key' ? {apiKeyId:target.entry.source.keyId} : {}),...(input.readOnly ? {readOnly:true} : {})},`rule:${input.requestKey ?? requestEventId ?? crypto.randomUUID()}`,scope,execution) : { error: 'cloudComputerUnavailable' as const }
+    if (!('error' in cloud) || cloud.error !== 'cloudComputerUnavailable') return cloud
+    // The person's own E2B refused (capacity, quota, key): nothing else is picked, the card says why.
+    const { modelUnavailableCard } = await import('@/lib/model-dispatch')
+    return { error: 'machineUnavailable' as const, issueId: input.issueId, reason: 'cloudNotConfigured' as const, card: modelUnavailableCard('cloudNotConfigured') }
   }
 }
 
@@ -441,7 +442,7 @@ async function dispatchByRules(userId: string, input: { issueId: string; agentId
 export async function listComputerWorkspaces(userId: string, scope?: NativeToolScope) {
   'use step'
   await assertNativeToolScope(userId, scope)
-  if (!cloudComputerTasksEnabled() || process.env.MIKKA_BYOS_ENABLED !== '1') return { error: 'cloudComputerUnavailable' }
+  if (!cloudComputerRunsEnabled()) return { error: 'cloudComputerUnavailable' }
   const [{ workspaceDb }, { workspaces, workspaceMembers }] = await Promise.all([import('@/lib/workspace-db'), import('@/lib/db/workspace-schema')])
   return workspaceDb.select({ id: workspaces.id, name: workspaces.name }).from(workspaces)
     .innerJoin(workspaceMembers, eq(workspaceMembers.workspaceId, workspaces.id))
@@ -452,7 +453,7 @@ export async function listComputerWorkspaces(userId: string, scope?: NativeToolS
 export async function createComputerBot(userId: string, input: { workspaceId: string; name: string }, toolCallId: string, scope?: NativeToolScope) {
   'use step'
   await assertNativeToolScope(userId, scope)
-  if (!cloudComputerTasksEnabled() || process.env.MIKKA_BYOS_ENABLED !== '1' || !toolCallId || toolCallId.length > 200) return { error: 'cloudComputerUnavailable' }
+  if (!cloudComputerRunsEnabled() || !toolCallId || toolCallId.length > 200) return { error: 'cloudComputerUnavailable' }
   try {
     await (await import('@/lib/subscription-runtime')).authorizeSubscriptionWorkspace(userId, input.workspaceId)
     const hash = createHash('sha256').update(JSON.stringify(['create-bot', userId, toolCallId])).digest('hex')
@@ -466,7 +467,7 @@ export async function createComputerBot(userId: string, input: { workspaceId: st
 export async function listComputerBots(userId: string, scope?: NativeToolScope) {
   'use step'
   await assertNativeToolScope(userId, scope)
-  if (!cloudComputerTasksEnabled() || process.env.MIKKA_BYOS_ENABLED !== '1') return { error: 'cloudComputerUnavailable' }
+  if (!cloudComputerRunsEnabled()) return { error: 'cloudComputerUnavailable' }
   const { authorizeSubscriptionWorkspace } = await import('@/lib/subscription-runtime')
   const { rows } = await pool.query(`SELECT b.id,b.name,b."workspaceId",coalesce(array_agg(r.harness) FILTER (WHERE r.harness IS NOT NULL),'{}') AS harnesses
     FROM bots b LEFT JOIN bot_cloud_runtimes r ON r."botId"=b.id AND r."ownerId"=b."ownerId" AND r."workspaceId"=b."workspaceId"
@@ -493,10 +494,10 @@ export async function dispatchComputerThread(userId: string, input: { botId: str
 }
 
 /** Queue and bind atomically, with a stable tool-call id for workflow retries. */
-export async function dispatchComputerTask(userId: string, input: { botId: string; issueId: string; harness: 'codex' | 'claude_code'; note?: string; model?:string; repo?:string; suggestionId?: string; readOnly?: boolean }, toolCallId: string, scope?: NativeToolScope, execution?: AgentExecution) {
+export async function dispatchComputerTask(userId: string, input: { botId: string; issueId: string; harness: 'codex' | 'claude_code'; note?: string; model?:string; repo?:string; suggestionId?: string; readOnly?: boolean; apiKeyId?: string }, toolCallId: string, scope?: NativeToolScope, execution?: AgentExecution) {
   'use step'
   await assertNativeToolScope(userId, scope)
-  if (!cloudComputerTasksEnabled() || process.env.MIKKA_BYOS_ENABLED !== '1' || !toolCallId || toolCallId.length > 200) return { error: 'cloudComputerUnavailable' }
+  if (!cloudComputerRunsEnabled() || !toolCallId || toolCallId.length > 200) return { error: 'cloudComputerUnavailable' }
   const target = (await pool.query(`SELECT b."workspaceId",r."agentId",r."repoId",a."deviceId" FROM bots b
     JOIN bot_cloud_runtimes r ON r."botId"=b.id AND r."ownerId"=b."ownerId" AND r."workspaceId"=b."workspaceId"
     JOIN agents a ON a.id=r."agentId" AND a."userId"=b."ownerId"
@@ -514,7 +515,7 @@ export async function dispatchComputerTask(userId: string, input: { botId: strin
       const repoPath = (await pool.query<{ repoPath: string }>('SELECT "repoPath" FROM device_repos WHERE id=$1 AND "userId"=$2', [deviceRepoId, userId])).rows[0]?.repoPath
       if (repoPath?.startsWith('v2/github.com/')) await (await import('@/lib/github/push-grant')).verifyPushGrant(userId, repoPath)
     }
-    const result = await queueCloudRun(pool, { userId, workspaceId: target.workspaceId }, { botId: input.botId, issueId: issue.id, agentId: target.agentId, deviceRepoId, title: issue.title, body: tiptapToText(issue.content), note: input.note, model:input.repo ? input.model ?? 'auto' : input.model, idempotencyKey: input.suggestionId ? `suggestion:${input.suggestionId}` : `coordinator:${toolCallId}`, execution, ...(input.readOnly ? { readOnly: true } : {}) })
+    const result = await queueCloudRun(pool, { userId, workspaceId: target.workspaceId }, { botId: input.botId, issueId: issue.id, agentId: target.agentId, deviceRepoId, title: issue.title, body: tiptapToText(issue.content), note: input.note, model:input.repo ? input.model ?? 'auto' : input.model, ...(input.apiKeyId ? { apiKeyId: input.apiKeyId } : {}), idempotencyKey: input.suggestionId ? `suggestion:${input.suggestionId}` : `coordinator:${toolCallId}`, execution, ...(input.readOnly ? { readOnly: true } : {}) })
     if (input.suggestionId) await pool.query('UPDATE suggestion_executions SET "botId"=$4,"runId"=$5,status=\'running\' WHERE "suggestionId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND ("runId" IS NULL OR "runId"=$5)', [input.suggestionId, userId, target.workspaceId, input.botId, result.runId])
     const actor = { userId, workspaceId: target.workspaceId as string }
     queuedRunId = result.runId
@@ -535,7 +536,7 @@ export async function dispatchComputerTask(userId: string, input: { botId: strin
 export async function wakeComputerBot(userId: string, input: { botId: string }, scope?: NativeToolScope) {
   'use step'
   await assertNativeToolScope(userId, scope)
-  if (!cloudComputerTasksEnabled() || process.env.MIKKA_BYOS_ENABLED !== '1') return { error: 'cloudComputerUnavailable' }
+  if (!cloudComputerRunsEnabled()) return { error: 'cloudComputerUnavailable' }
   const bot = (await pool.query('SELECT "workspaceId" FROM bots WHERE id=$1 AND "ownerId"=$2', [input.botId, userId])).rows[0]
   if (!bot) return { error: 'cloudComputerUnavailable' }
   try {
@@ -552,7 +553,7 @@ export async function wakeComputerBot(userId: string, input: { botId: string }, 
 export async function listBotSubscriptions(userId: string, input: { botId: string }, scope?: NativeToolScope) {
   'use step'
   await assertNativeToolScope(userId, scope)
-  if (!cloudComputerTasksEnabled() || process.env.MIKKA_BYOS_ENABLED !== '1') return { error: 'cloudComputerUnavailable' }
+  if (!cloudComputerRunsEnabled()) return { error: 'cloudComputerUnavailable' }
   const bot = (await pool.query('SELECT "workspaceId" FROM bots WHERE id=$1 AND "ownerId"=$2', [input.botId, userId])).rows[0]
   if (!bot) return { error: 'cloudComputerUnavailable' }
   try { await (await import('@/lib/subscription-runtime')).authorizeSubscriptionWorkspace(userId, bot.workspaceId) } catch { return { error: 'cloudComputerUnavailable' } }
@@ -564,7 +565,7 @@ export async function listBotSubscriptions(userId: string, input: { botId: strin
 export async function bindComputerSubscription(userId: string, input: { botId: string; connectionId: string; revision: number; harness: 'codex' | 'claude_code'; modelId: string }, toolCallId: string, scope?: NativeToolScope) {
   'use step'
   await assertNativeToolScope(userId, scope)
-  if (!cloudComputerTasksEnabled() || process.env.MIKKA_BYOS_ENABLED !== '1' || !toolCallId || toolCallId.length > 200) return { error: 'cloudComputerUnavailable' }
+  if (!cloudComputerRunsEnabled() || !toolCallId || toolCallId.length > 200) return { error: 'cloudComputerUnavailable' }
   const bot = (await pool.query('SELECT "workspaceId" FROM bots WHERE id=$1 AND "ownerId"=$2', [input.botId, userId])).rows[0]
   if (!bot) return { error: 'cloudComputerUnavailable' }
   try {
