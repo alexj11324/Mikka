@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { e2eTargetParts, isE2eTarget, assertE2eTarget, disposableDatabase } from './e2e-target.mjs'
+import { e2eTargetParts, isE2eTarget, assertE2eTarget, disposableDatabase, roleTargetUrl } from './e2e-target.mjs'
 
 test('isE2eTarget accepts loopback *_e2e databases on any port', () => {
   for (const ok of [
@@ -58,4 +58,18 @@ test('disposableDatabase needs the target and every application URL to be loopba
   assert.equal(disposableDatabase({}, 'postgres://127.0.0.1/monitor_e2e'), true)
   assert.equal(disposableDatabase(env, 'postgres://127.0.0.1/mikka_monitor_195'), false)
   assert.equal(disposableDatabase({ ...env, CI: 'true', GITHUB_ACTIONS: 'true', DATABASE_URL: 'postgresql://u:p@10.0.0.5/mikka_e2e' }), false)
+})
+
+test('roleTargetUrl keeps the loopback *_e2e target and swaps only the role', () => {
+  const password = 'ab'.repeat(16)
+  const url = new URL(roleTargetUrl('postgresql://e2e:secret@127.0.0.1:5432/mikka_e2e', 'factory192', password))
+  assert.deepEqual([url.protocol, url.hostname, url.port, url.pathname, url.username, url.password],
+    ['postgresql:', '127.0.0.1', '5432', '/mikka_e2e', 'factory192', password])
+  assert.equal(url.toString(), new URL(url.toString()).toString())
+  assert.throws(() => roleTargetUrl('postgresql://e2e:x@db.example.com/mikka_e2e', 'factory192', password), /_e2e/)
+  assert.throws(() => roleTargetUrl('postgresql://e2e:x@127.0.0.1/mikka', 'factory192', password), /_e2e/)
+  for (const role of ['', 'Factory', 'a-b', 'x;drop', 'r'.repeat(64)])
+    assert.throws(() => roleTargetUrl('postgresql://e2e:x@127.0.0.1/mikka_e2e', role, password), /identifier/, role)
+  for (const bad of ['', 'short', "'".repeat(32), 'g'.repeat(32)])
+    assert.throws(() => roleTargetUrl('postgresql://e2e:x@127.0.0.1/mikka_e2e', 'factory192', bad), /hex/)
 })
