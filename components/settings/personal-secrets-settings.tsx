@@ -1,15 +1,15 @@
 'use client'
 
-import { useMemo, useState, type ChangeEvent } from 'react'
+import { useMemo, useRef, useState, type ChangeEvent } from 'react'
 import useSWR from 'swr'
 import { useLocale, useTranslations } from 'next-intl'
-import { Ellipsis, EyeIcon, EyeOffIcon, Plus } from 'lucide-react'
+import { Ellipsis, EyeIcon, EyeOffIcon, FileUp, Plus } from 'lucide-react'
 import { createMySecret, deleteMySecret, importMySecrets, listMySecrets, replaceMySecret } from '@/app/actions/user-secrets'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@/components/ui/input-group'
 import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet'
@@ -212,6 +212,7 @@ function MyBulkSheet({ workspaceId, workspaceName, onClose, open = true, onOpenC
   }, [text])
   const count = preview && preview !== 'tooLarge' ? preview.entries.length : 0
 
+  const fileInput = useRef<HTMLInputElement>(null)
   function pick(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
     event.target.value = ''
@@ -256,8 +257,9 @@ function MyBulkSheet({ workspaceId, workspaceName, onClose, open = true, onOpenC
             {error && <FieldError>{error}</FieldError>}
           </Field>
           <Field>
-            <FieldLabel htmlFor="my-secret-dotenv-file">{t('pickFile')}</FieldLabel>
-            <Input id="my-secret-dotenv-file" type="file" accept=".env,text/plain" disabled={pending} onChange={pick} />
+            <Input ref={fileInput} type="file" accept=".env,text/plain" className="hidden" tabIndex={-1} aria-hidden="true" disabled={pending} onChange={pick} />
+            <div><Button type="button" variant="secondary" size="sm" disabled={pending} onClick={() => fileInput.current?.click()}><FileUp data-icon="inline-start" />{t('pickFile')}</Button></div>
+            <FieldDescription>{t('pickFileLimit')}</FieldDescription>
           </Field>
           {preview && (preview === 'tooLarge'
             ? <FieldError>{actionError('secretImportTooLarge')}</FieldError>
