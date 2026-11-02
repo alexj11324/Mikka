@@ -30,9 +30,9 @@ const matches = (thread: Thread, filter: Filter) => filter === 'all' || groupOf(
 
 /** The web's order and names (R-52); 已解决 last. */
 const GROUPS: { id: ThreadGroup; title: string }[] = [
+  { id: 'waiting', title: '等待你' },
   { id: 'running', title: '进行中' },
   { id: 'blocked', title: '受阻' },
-  { id: 'waiting', title: '等待你' },
   { id: 'idle', title: '空闲' },
   { id: 'resolved', title: '已解决' },
 ]
