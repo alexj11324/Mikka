@@ -553,9 +553,11 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
 - **R-33** Radii: 6 tag, 8 button and input, 9 rail item, 12 card and shell,
   14 approval and list card, 14 dialog (`rounded-xl`, the `DialogContent` /
   `AlertDialogContent` default; a call site does not change it), 999 pill. Spacing is a multiple of 4.
-  Exception: 建议 cards use 16 (R-55). An `icon-sm` button (28px) extends
-  its hit area to 40px on a coarse pointer with an invisible ring
-  (interface-design, Alex 2026-10-31).
+  Exception: 建议 cards use 16 (R-55). On a coarse pointer every `Button`,
+  `Toggle`, `ToggleGroupItem` and `SelectTrigger` extends its hit area to at least 44×44px with
+  an invisible `::after` (`lib/touch-target.ts`), and drawer rows on a phone
+  are 44px tall; the desktop look does not change (interface-design, Alex
+  2026-10-31; WCAG 2.5.5, HCI review M7).
 - **R-34** Status colours come only from the StatusBadge set (Figma
   `99:75`), shared by devices, threads and tasks.
 - **R-35** Shell (Comma): grey window background, 44px top bar (back,

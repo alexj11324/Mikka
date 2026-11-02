@@ -116,7 +116,7 @@ export function GlobalSearch({ open, onOpenChange, onOpenChangeComplete, bots, s
   return <CommandDialog open={open} onOpenChange={onOpenChange} onOpenChangeComplete={onOpenChangeComplete} title={t('searchLabel')} description={t('searchDescription')} className="top-[max(1rem,calc(50svh-15rem))] translate-y-0 sm:max-w-xl">
     {/* Filtering is ours: server hits must not be dropped by cmdk's client-side match. */}
     <Command shouldFilter={false} className="**:data-[selected=true]:bg-muted">
-      <CommandInput aria-label={t('searchLabel')} placeholder={t('searchPlaceholder')} value={query} onValueChange={setQuery} maxLength={400} />
+      <CommandInput className="text-base md:text-sm" aria-label={t('searchLabel')} placeholder={t('searchPlaceholder')} value={query} onValueChange={setQuery} maxLength={400} />
       <p role="status" aria-live="polite" className="sr-only">{text ? announce : ''}</p>
       {/* The dialog's top edge stays put and its height follows the results (Linear, Raycast): no blank block under one empty line. */}
       <CommandList aria-busy={search.searching} className="max-h-[min(26rem,60svh)]">

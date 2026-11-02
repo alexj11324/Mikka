@@ -114,12 +114,12 @@ export function ChatComposer({ ref, value, onChange, onSubmit, label, placeholde
       <InputGroupTextarea ref={setInput} aria-label={label} placeholder={placeholder ?? label} className={cn('max-h-48 min-w-0 overflow-x-hidden px-3.5 pt-3 pb-1 wrap-break-word', quote ? 'min-h-10' : 'min-h-14')} value={value} maxLength={MAX_LENGTH} rows={2} disabled={disabled || undefined} readOnly={sending && !onStop && !editableWhileSending} aria-busy={sending || undefined} onChange={event => onChange(event.target.value)} onKeyDown={onKeyDown} data-chat-composer={thread ? undefined : ''} />
       <InputGroupAddon align="block-end" className="justify-between px-2 pt-0 pb-2">
         <span className="flex min-w-0 items-center gap-1.5">
-          <InputGroupButton type="button" variant="secondary" size="icon-sm" className="rounded-full" aria-label={tShell('attach')} disabled={sending || disabled} onClick={() => fileRef.current?.click()}><Plus /></InputGroupButton>
+          <InputGroupButton type="button" variant="secondary" size="icon-sm" className="rounded-full pointer-coarse:size-11" aria-label={tShell('attach')} disabled={sending || disabled} onClick={() => fileRef.current?.click()}><Plus /></InputGroupButton>
           {model}
         </span>
         {stoppable
-          ? <InputGroupButton type="button" variant="default" size="icon-sm" className="rounded-full" aria-label={t('stop')} onClick={onStop}><Square className="fill-current" /></InputGroupButton>
-          : <InputGroupButton type="submit" variant="default" size="icon-sm" className={cn('rounded-full', SEND_DISABLED)} aria-label={t('send')} disabled={sending || submitDisabled || disabled || !value.trim()}>{sending ? <Spinner /> : <ArrowUp />}</InputGroupButton>}
+          ? <InputGroupButton type="button" variant="default" size="icon-sm" className="rounded-full pointer-coarse:size-11" aria-label={t('stop')} onClick={onStop}><Square className="fill-current" /></InputGroupButton>
+          : <InputGroupButton type="submit" variant="default" size="icon-sm" className={cn('rounded-full pointer-coarse:size-11', SEND_DISABLED)} aria-label={t('send')} disabled={sending || submitDisabled || disabled || !value.trim()}>{sending ? <Spinner /> : <ArrowUp />}</InputGroupButton>}
       </InputGroupAddon>
     </InputGroup>
     {/* The limit is shown only when it is close enough to matter. */}
