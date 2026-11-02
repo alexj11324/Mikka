@@ -1,3 +1,4 @@
+import { deploymentSwitch } from '@/lib/deployment-switches'
 import { FactoryError } from "./contract";
 import type { FactoryDispatchInput, FactoryDispatchResult } from "./dispatch";
 
@@ -16,7 +17,7 @@ export interface FactoryDispatchRequest {
  * Factory flags. Any one off -> 404 factoryLifecycleUnavailable, before dispatch.
  */
 export function factoryDispatchEnabled(issueMutations: boolean, env: Record<string, string | undefined> = process.env): boolean {
-  return issueMutations && env.MIKKA_FACTORY_ROUTING_ENABLED === "1" && env.MIKKA_FACTORY_LIFECYCLE_ENABLED === "1";
+  return issueMutations && deploymentSwitch('factoryRouting', env) && deploymentSwitch('factoryLifecycle', env);
 }
 
 /**

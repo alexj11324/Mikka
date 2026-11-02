@@ -115,9 +115,9 @@ Worker 定时触发，和简报共用一套 cron（`docs/suggestions-cron.md`）
 
 开关分四层，从外到内，任何一层是关，这一部分就不跑：
 
-1. **部署级总开关**（环境变量）：
-   - `PROACTIVE_PROFILE_ENABLED`：控制画像；
-   - `PROACTIVE_RESEARCH_ENABLED`：控制后台调研。
+1. **部署级总开关**（PostHog feature flag，见 `lib/deployment-switches.ts`）：
+   - `mikka-proactive-profile-deployment`：控制画像（PostHog 没有答复时沿用旧的 `PROACTIVE_PROFILE_ENABLED`）；
+   - 后台调研的总开关等第二阶段实现时再加。
 
    自己部署的开源版本两个都默认关，不配就完全不花这部分钱。我们的云服务按需打开。
 2. **谁能用**（名单或套餐）：`proactive_entitlements`，或者复用将来的套餐表，记录每个用户能用哪一部分以及每日上限。

@@ -1,4 +1,5 @@
 import "server-only";
+import { deploymentSwitch } from '@/lib/deployment-switches'
 import { createSkillActivationAdapters } from "../self-improvement/activation";
 import { ImprovementError } from "../self-improvement/contract";
 import { FactoryError } from "./contract";
@@ -154,7 +155,7 @@ export const claimExecutionRun = createExecutionClaim(pool, authorize);
 export const guardExecutionRun=createExecutionClaimGuard(authorize);
 
 export function factoryRoutingEnabled() {
-  return process.env.MIKKA_FACTORY_ROUTING_ENABLED === "1";
+  return deploymentSwitch('factoryRouting');
 }
 export function factoryForBot(botId: string | null) {
   if (!factoryRoutingEnabled())

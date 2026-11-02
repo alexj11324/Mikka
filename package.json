@@ -39,7 +39,7 @@
     "test:thread-changes": "node --import tsx --test lib/thread-changes.test.ts && node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test components/workspace/thread-changes.test.tsx",
     "test:motion": "node --import tsx --test lib/message-navigation.test.ts lib/hooks/use-arrivals.test.ts",
     "test:unread": "node --import tsx --test lib/unread.test.ts",
-    "test:lib-units": "node --import ./scripts/server-test.mjs --import tsx --test lib/safe-url.test.ts lib/board-start-column.test.ts lib/thread-search.test.ts lib/new-task-bot.test.ts lib/mobile-thread-status.test.ts lib/computer/events.test.ts lib/agent-history.test.ts lib/auth-github-profile.test.ts lib/status-appearance.test.ts scripts/project-input.test.ts scripts/node22-test-compat.test.mjs tests/factory-migration-order.test.mjs",
+    "test:lib-units": "node --import ./scripts/server-test.mjs --import tsx --test lib/safe-url.test.ts lib/deployment-switches.test.ts lib/board-start-column.test.ts lib/thread-search.test.ts lib/new-task-bot.test.ts lib/mobile-thread-status.test.ts lib/computer/events.test.ts lib/agent-history.test.ts lib/auth-github-profile.test.ts lib/status-appearance.test.ts scripts/project-input.test.ts scripts/node22-test-compat.test.mjs tests/factory-migration-order.test.mjs",
     "test:i18n": "node --test scripts/check-i18n.test.mjs",
     "i18n:check": "node scripts/check-i18n.mjs",
     "test:ssh-target": "node --import tsx --test lib/ssh-target.test.ts",

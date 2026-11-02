@@ -1,3 +1,4 @@
+import { deploymentSwitch } from '@/lib/deployment-switches'
 import { FactoryError, type FactoryBinding } from "./contract";
 import { maskFactoryNote } from "./note-mask";
 import type { FactorySnapshot } from "./store";
@@ -12,9 +13,9 @@ export interface FactoryRouteRequest {
   enabled: boolean;
 }
 
-/** Issue mutations AND MIKKA_FACTORY_ROUTING_ENABLED=1 AND MIKKA_FACTORY_LIFECYCLE_ENABLED=1 (literal "1"). */
+/** Issue mutations AND the factoryRouting and factoryLifecycle switches (lib/deployment-switches.ts). */
 export function factoryRouteEnabled(issueMutations: boolean, env: Record<string, string | undefined> = process.env): boolean {
-  return issueMutations && env.MIKKA_FACTORY_ROUTING_ENABLED === "1" && env.MIKKA_FACTORY_LIFECYCLE_ENABLED === "1";
+  return issueMutations && deploymentSwitch('factoryRouting', env) && deploymentSwitch('factoryLifecycle', env);
 }
 
 /** Human text the ledger persists (factory_tasks.route/reason, factory_events.request) is masked first. */

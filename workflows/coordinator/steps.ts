@@ -1,3 +1,4 @@
+import { deploymentSwitch } from '@/lib/deployment-switches'
 import { cloudComputerRunsEnabled } from '@/lib/cloud-computer-flag'
 import { runInvalidDetail } from '@/lib/run-invalid-reason'
 import { FatalError } from 'workflow'
@@ -56,6 +57,12 @@ import { systemActor } from '@/lib/activity-actor'
 // expected failures instead of throwing, so a bad id is not retried.
 
 type ToolResult<T> = T | { error: string; reason?: string; detail?: string }
+
+/** The deployment switches the Coordinator's tools depend on, read here because a workflow body never reads one (lib/deployment-switches.ts). */
+export async function coordinatorSwitches() {
+  'use step'
+  return (await import('./tools')).readCoordinatorSwitches()
+}
 
 export async function computerToolsEnabled() {
   'use step'
@@ -217,7 +224,7 @@ export async function preparePrompt(userId: string, botId: string, snapshot?: De
   'use step'
   // Fallback only: run completion already reconciles (lib/run-completion-effects.ts
   // reconcileFactoryAfterCompletion). This catches completions whose hook failed.
-  if (process.env.MIKKA_FACTORY_ROUTING_ENABLED === '1' && process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED === '1') {
+  if (deploymentSwitch('factoryRouting') && deploymentSwitch('factoryLifecycle')) {
     const { factoryRuntimeForBot } = await import('@/lib/factory/runtime')
     await factoryRuntimeForBot(botId).reconcile(userId)
   }
@@ -243,7 +250,7 @@ export async function preparePrompt(userId: string, botId: string, snapshot?: De
   // The hosted Coordinator renders OpenUI like the native one, so it gets the same presentation rules and catalog.
   const base = withCoordinatorPresentation(snapshot ? executionInstructions(snapshot) : await botInstructions(userId, botId, COORDINATOR_INSTRUCTIONS))
   const instructions = personalMailboxEnabled() && snapshot ? personalMailboxInstructions(base, snapshotMailboxTools(snapshot).filter(name => mailboxTools.includes(name))) : base
-  const factoryPolicy = process.env.MIKKA_FACTORY_ROUTING_ENABLED === '1' && process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED === '1' ? FACTORY_QUESTION_INSTRUCTIONS + FACTORY_CHECK_RECOVERY_INSTRUCTIONS : ''
+  const factoryPolicy = deploymentSwitch('factoryRouting') && deploymentSwitch('factoryLifecycle') ? FACTORY_QUESTION_INSTRUCTIONS + FACTORY_CHECK_RECOVERY_INSTRUCTIONS : ''
   // The person's 个人指令 sit after the rules and before the memory, marked as theirs.
   // The person's own GitHub account, so the Bot looks a repository up instead of asking which account it is under.
   const { githubContext } = await import('@/lib/coordinator/github-context')
@@ -365,7 +372,7 @@ export async function getIssue(userId: string, input: { issueId: string }, scope
     id: issue.id, number: readIssueMetadata(issue.content).number ?? null, title: issue.title,
     status: issue.status, priority: issue.priority, body: tiptapToText(issue.content).slice(0, 8000),
     runs: runs.map(run => ({ id: run.id, agent: run.agentName, status: run.status, createdAt: run.createdAt.toISOString() })),
-    ...(process.env.MIKKA_FACTORY_ROUTING_ENABLED === '1' ? { factory: await (await import('@/lib/factory/server')).factoryForBot(botId).listForIssue(userId,issue.id) } : {}),
+    ...(deploymentSwitch('factoryRouting') ? { factory: await (await import('@/lib/factory/server')).factoryForBot(botId).listForIssue(userId,issue.id) } : {}),
   }
 }
 

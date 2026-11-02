@@ -1,4 +1,5 @@
 import 'server-only'
+import { deploymentSwitch } from '@/lib/deployment-switches'
 import type { PoolClient } from 'pg'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import type { RunCompleteRequest } from '@mikka/protocol/run'
@@ -70,7 +71,7 @@ export async function prepareRunCompletionEffects(client: PoolClient, run: RunId
 export async function settleRunCompletionEffects(client: PoolClient, run: RunIdentity, stopReason: RunCompleteRequest['stopReason'], factoryBound: boolean) {
   if (!factoryBound) return
   const { factoryQuestions } = await import('./factory/server')
-  const questions = process.env.MIKKA_FACTORY_ROUTING_ENABLED === '1' && process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED === '1'
+  const questions = deploymentSwitch('factoryRouting') && deploymentSwitch('factoryLifecycle')
     ? (await import('./factory/runtime')).factoryRuntimeForBot(run.botId).questions
     : factoryQuestions
   await optionalFactoryEffect(client, 'completion_question_settle', () => questions.settle(run.userId, run.id, client))
@@ -95,7 +96,7 @@ const defaultReconcileFor: FactoryReconcileFor = botId => async (userId, runId) 
  * Default-off: returns before any SQL unless both Factory flags are on.
  * Best effort: a failure is logged without payload and left to the fallback. */
 export async function reconcileFactoryAfterCompletion(db: Queryable, userId: string, runId: string, reconcileFor: FactoryReconcileFor = defaultReconcileFor) {
-  if (process.env.MIKKA_FACTORY_ROUTING_ENABLED !== '1' || process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED !== '1') return 0
+  if (!deploymentSwitch('factoryRouting') || !deploymentSwitch('factoryLifecycle')) return 0
   let reconciled = 0
   try {
     const { rows } = await db.query(`SELECT DISTINCT t."botId" FROM factory_tasks t WHERE t."userId"=$2 AND (
@@ -123,7 +124,7 @@ export async function reconcileFactoryAfterCompletion(db: Queryable, userId: str
  * completion transaction (claim rejection, lease loss/retry, stop request).
  * Call only after the ending write committed. Default-off and never throws. */
 export async function afterRunEnded(userId: string, runId: string, reconcileFor: FactoryReconcileFor = defaultReconcileFor) {
-  if (process.env.MIKKA_FACTORY_ROUTING_ENABLED !== '1' || process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED !== '1') return 0
+  if (!deploymentSwitch('factoryRouting') || !deploymentSwitch('factoryLifecycle')) return 0
   try {
     const { pool } = await import('./db')
     return await reconcileFactoryAfterCompletion(pool, userId, runId, reconcileFor)

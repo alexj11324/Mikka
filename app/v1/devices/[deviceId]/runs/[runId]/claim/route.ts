@@ -1,3 +1,4 @@
+import { deploymentSwitch } from '@/lib/deployment-switches'
 import { cloudComputerTasksEnabled } from '@/lib/cloud-computer-flag'
 import { withDeviceRoute } from '@/lib/device-route'
 import { after, NextResponse } from 'next/server'
@@ -150,7 +151,7 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
   let factoryClaim: Record<string, unknown> = {}
   let factoryToken: Awaited<ReturnType<typeof issueRunToken>> | undefined
   const beforeClaim = async (tx: import('pg').PoolClient) => {
-    if (process.env.MIKKA_FACTORY_ROUTING_ENABLED !== '1' || process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED !== '1') return true
+    if (!deploymentSwitch('factoryRouting') || !deploymentSwitch('factoryLifecycle')) return true
     const { guardFactoryClaim } = await import('@/lib/factory/runtime')
     try { factoryClaim = await guardFactoryClaim(tx,caller.userId,deviceId,runId,leaseExpiresAt); return true }
     catch (error) { if (error instanceof FactoryError) return false; throw error }

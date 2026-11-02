@@ -1,4 +1,5 @@
 import 'server-only';
+import { deploymentSwitch } from '@/lib/deployment-switches'
 import type { PoolClient } from 'pg';
 import { pool, withDatabaseClient } from '@/lib/db';
 import { issueForUser } from '@/lib/issue-access';
@@ -24,7 +25,7 @@ import { factoryMonitorWorkspaceKey,questionSkillAssignments } from './server';
 import { createFactoryQuestions } from './questions/store';
 
 export function factoryLifecycleEnabled() {
-  return process.env.MIKKA_FACTORY_ROUTING_ENABLED === '1' && process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED === '1';
+  return deploymentSwitch('factoryRouting') && deploymentSwitch('factoryLifecycle');
 }
 export const factoryAuthorize = (userId: string, issueId: string, tx: PoolClient) =>
   withDatabaseClient(tx, async () => Boolean(await issueForUser(userId, issueId)));
