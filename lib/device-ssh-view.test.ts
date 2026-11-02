@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import type { SshInstallState } from '@mikka/protocol/bridge'
-import { addedHost, stepStates } from './device-ssh-view'
+import { LOCAL_RECONNECT, LOCAL_TARGET, type SshInstallState } from '@mikka/protocol/bridge'
+import { STEPS, addedHost, isLocal, stepStates, visibleSteps } from './device-ssh-view'
 
 const state = (step: SshInstallState['step'], status: SshInstallState['status']): SshInstallState => ({ id: 'i', target: 'build-02', step, status })
 
@@ -26,4 +26,18 @@ test('an ssh alias counts as added by device name or host name', () => {
   assert.equal(addedHost('BUILD-01', devices), true)
   assert.equal(addedHost('staging', devices), true)
   assert.equal(addedHost('build-02', devices), false)
+})
+
+test('添加这台电脑 shows 安装 → 启动 → 已上线, with the node check counted as installing', () => {
+  const state = { id: 'l', target: LOCAL_TARGET, step: 'check', status: 'running' } as const
+  assert.deepEqual(visibleSteps(state), ['install', 'start', 'online'])
+  assert.equal(stepStates(state).install, 'running')
+  assert.equal(stepStates({ ...state, step: 'service' }).install, 'done')
+})
+
+test('重新连接 this computer shows 启动 → 已上线; SSH keeps all four steps', () => {
+  assert.deepEqual(visibleSteps({ target: LOCAL_RECONNECT }), ['start', 'online'])
+  assert.equal(stepStates({ id: 'r', target: LOCAL_RECONNECT, step: 'service', status: 'failed', reason: 'x' }).start, 'failed')
+  assert.deepEqual(visibleSteps({ target: 'deploy@build-01' }), STEPS)
+  assert.equal(isLocal({ target: 'deploy@build-01' }), false)
 })

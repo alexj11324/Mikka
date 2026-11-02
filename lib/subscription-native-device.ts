@@ -12,3 +12,21 @@ export function leaseDevice(
 ): boolean {
   return Boolean(device?.enabled && device.kind === 'local' && device.harnesses.some(h => h.subscriptionBroker))
 }
+
+/**
+ * Which devices reach the hosted subscription broker
+ * (`/v1/devices/:id/runs/:runId/subscription`): a Mikka cloud computer whose
+ * device token is bound to this very device (`authenticateDevice` checked the
+ * binding against a live cloud or thread machine), or a device on the
+ * `MIKKA_BYOS_HOSTED_DEVICE_IDS` allow-list. Either way it must be enabled and
+ * report the broker capability.
+ */
+export function hostedBrokerDevice(
+  device: { enabled: boolean; kind: string; harnesses: { subscriptionBroker?: boolean }[] } | null,
+  deviceId: string,
+  scopeDeviceId: string | undefined,
+  allowList = process.env.MIKKA_BYOS_HOSTED_DEVICE_IDS ?? '',
+): boolean {
+  if (!device?.enabled || !device.harnesses.some(h => h.subscriptionBroker)) return false
+  return (device.kind === 'cloud' && scopeDeviceId === deviceId) || allowList.split(',').includes(deviceId)
+}

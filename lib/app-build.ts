@@ -1,3 +1,5 @@
+import { meetsMinimumVersion } from '@mikka/protocol/version'
+
 // Which deployment this page was built by. A page left open across a deploy
 // (a desktop window, a long-lived tab) keeps calling the old deployment's
 // server actions; once the new one has removed them they fail. The page
@@ -53,5 +55,26 @@ export function watchRemovedActions(target: Window) {
     }
     return response
   }
+}
+
+/**
+ * The oldest desktop app the server still serves (ADR 0011's MIN_CLIENT_VERSION),
+ * or null when unset or not a valid version.
+ */
+export function minDesktopVersion(value: string | undefined): string | null {
+  const version = value?.trim()
+  if (!version) return null
+  try {
+    meetsMinimumVersion('0.0.0', version)
+    return version
+  } catch {
+    return null
+  }
+}
+
+/** True when this desktop build is older than the server's minimum. */
+export function desktopBelowMinimum(appVersion: string | undefined, minimum: unknown): boolean {
+  if (typeof minimum !== 'string' || !appVersion || minDesktopVersion(minimum) === null) return false
+  return !meetsMinimumVersion(appVersion, minimum)
 }
 

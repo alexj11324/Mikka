@@ -7,6 +7,8 @@ export const IPC = {
   /** The downloaded update's version, or null; also main -> renderer once it downloads. */
   appUpdateReady: "mikka:app:update-ready",
   appInstallUpdate: "mikka:app:install-update",
+  /** The page saw /api/version require a newer desktop; main verifies and runs the update gate. */
+  appRequireUpdate: "mikka:app:require-update",
   settingsGetAll: "mikka:settings:get-all",
   settingsSet: "mikka:settings:set",
   quotaGet: "mikka:quota:get",
@@ -30,6 +32,8 @@ export const IPC = {
   sshCancel: "mikka:ssh:cancel",
   sshAccept: "mikka:ssh:accept",
   sshState: "mikka:ssh:state",
+  sshLocal: "mikka:ssh:local",
+  sshRestartLocal: "mikka:ssh:restart-local",
   deviceStatus: "mikka:device:status",
   deviceLink: "mikka:device:link",
   devicePickRepo: "mikka:device:pick-repo",
