@@ -24,7 +24,7 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
   await admin.query(`CREATE DATABASE "${database}" TEMPLATE template0`);
   const target = new URL(url!);
   target.pathname = `/${database}`;
-  const saved = { m: process.env.MIKKA_DATABASE_URL, d: process.env.DATABASE_URL, template: process.env.E2B_BYO_COMPUTER_TEMPLATE };
+  const saved = { m: process.env.MIKKA_DATABASE_URL, d: process.env.DATABASE_URL, template: process.env.E2B_CODEX_TEMPLATE };
   const pool = new Pool({ connectionString: target.toString(), max: 4 });
   let appPool: { end: () => Promise<void> } | null = null;
   try {
@@ -32,7 +32,7 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
     for (const f of orderMigrations((await readdir(dir)).filter((f) => f.endsWith(".sql"))))
       await pool.query(await readFile(new URL(f, dir), "utf8"));
     process.env.MIKKA_DATABASE_URL = process.env.DATABASE_URL = target.toString();
-    process.env.E2B_BYO_COMPUTER_TEMPLATE = 'ready-template-fixture';
+    process.env.E2B_CODEX_TEMPLATE = 'ready-template-fixture'; // The fixture agent runs Codex (decision 2026-11-01-2335).
     const db = await import("../db");
     appPool = db.pool;
     const { ensureThreadMachine, parkThreadMachine, endClosedTaskMachines, keepTailBeforeKill, threadMachineProvider } = await import("./thread-machines");
@@ -230,7 +230,7 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
   } finally {
     if (saved.m === undefined) delete process.env.MIKKA_DATABASE_URL; else process.env.MIKKA_DATABASE_URL = saved.m;
     if (saved.d === undefined) delete process.env.DATABASE_URL; else process.env.DATABASE_URL = saved.d;
-    if (saved.template === undefined) delete process.env.E2B_BYO_COMPUTER_TEMPLATE; else process.env.E2B_BYO_COMPUTER_TEMPLATE = saved.template;
+    if (saved.template === undefined) delete process.env.E2B_CODEX_TEMPLATE; else process.env.E2B_CODEX_TEMPLATE = saved.template;
     await appPool?.end().catch(() => undefined);
     await dropTestDatabase(admin, database, pool);
     await admin.end();

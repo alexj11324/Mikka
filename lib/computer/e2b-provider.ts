@@ -76,7 +76,7 @@ ${manifest}
 MIKKA_RUNTIME_HASHES
 then printf 'mikka-runtime-install-required'; exit 0; fi
 set -e
-if getent group mikka-runner >/dev/null; then install -d -m 710 -o root -g mikka-runner /run/mikka-viewer; else install -d -m 700 /run/mikka-viewer; fi
+if getent group user >/dev/null; then install -d -m 710 -o root -g user /run/mikka-viewer; else install -d -m 700 /run/mikka-viewer; fi
 umask 077
 head -c 32 /dev/urandom > /run/mikka-viewer/key
 chmod 0755 /opt/mikka/computer/lease-driver.py
@@ -124,7 +124,7 @@ export async function syncDesktopLease(sandbox: Sandbox, lease: DesktopLease) {
   await sandbox.files.write(`${path}.next`, JSON.stringify(lease), { user: 'root' })
   // A shared lock is held for the whole CUA driver process. Takeover waits
   // until it exits, then publishes the new lease before granting control.
-  await sandbox.commands.run(`touch ${path}.lock; if getent group mikka-runner >/dev/null; then chown root:mikka-runner ${path}.lock ${path}.next; chmod 660 ${path}.lock; chmod 640 ${path}.next; else chmod 600 ${path}.lock ${path}.next; fi; flock -x ${path}.lock mv ${path}.next ${path}.json`, { user: 'root', timeoutMs: 45_000 })
+  await sandbox.commands.run(`touch ${path}.lock; if getent group user >/dev/null; then chown root:user ${path}.lock ${path}.next; chmod 660 ${path}.lock; chmod 640 ${path}.next; else chmod 600 ${path}.lock ${path}.next; fi; flock -x ${path}.lock mv ${path}.next ${path}.json`, { user: 'root', timeoutMs: 45_000 })
 }
 
 export async function viewerGrant(sandbox: Sandbox, lease: DesktopLease, userId: string, mode: 'view' | 'control') {
