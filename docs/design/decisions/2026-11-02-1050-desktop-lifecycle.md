@@ -3,11 +3,8 @@
 - Date: 2026-11-02
 - Source:
   - The coordinating Claude session asked for this record on 2026-11-02 and reviewed the first draft.
-  - Alex then gave three rules, relayed by the coordinating session:
-    - nobody can look at a thread's desktop;
-    - on the Bot's desktop, an open window means watching, not operating;
-    - who operates is decided by mouse and keyboard activity, with a 1-minute idle limit; a chat message to the Bot hands the desktop back at once.
-  - This record writes those rules down for Alex to confirm.
+  - Alex then gave his rules, relayed by the coordinating session: nobody can look at a thread's desktop, and on the Bot's desktop an open window means watching, not operating.
+  - On how a person takes over the Bot's desktop and hands it back, Alex chose, after a comparison with Cursor, Devin, ChatGPT agent, Manus and Cloudflare: 「你按照其他家竞品的接手交还规则来做就行了，我们不额外加规定」. Take over and hand back are explicit actions. There is no idle timer and no activity rule.
   - It builds on [0251](2026-11-02-0251-desktop-runs-get-their-own-machine.md) (a run that needs a desktop gets its own machine) and [0330](2026-11-02-0330-computer-policy-gates-computer-tasks-only.md) (the 电脑 policy gates computer tasks only).
 - Rule: —
 - Replaces: —
@@ -59,29 +56,33 @@ How the machine enforces it:
 ## Watching and operating are two states
 
 These rules apply to the Bot's desktop, the only desktop a person can reach.
+They follow what Cursor, Devin and ChatGPT agent do: the person takes over
+explicitly and hands back explicitly.
 
-- **Watching.** The owner opens the window and sees the desktop. While the window
-  is open, access renews itself. Watching never stops the agent: the agent keeps
-  operating while someone watches.
-- **Operating.** Exactly one party operates the desktop at a time: the Bot's
-  agent, or the person.
-  - The person is operating while their mouse or keyboard has acted on the
-    desktop within the last 60 seconds.
-  - Operation passes back to the agent in either of two cases:
-    1. 60 seconds pass with no mouse or keyboard input from the person;
-    2. the person sends the Bot a chat message that asks it to do something.
-       The agent may then act at once, without waiting the 60 seconds.
+- **Watching.** The owner opens the window and sees the desktop live. Watching
+  never stops the agent: the agent keeps working while someone watches.
+- **Taking over.** The owner chooses to take over. From then on the person
+  operates the desktop and the agent's work on it waits; it does not fail. If
+  someone else already holds it, taking over is refused.
+- **Handing back.** The person hands back, either with the hand-back action or
+  by closing the window. The agent continues where it stopped.
+- **While the window stays open,** the hold stays with the person. Nothing takes
+  it back on a timer or from mouse or keyboard activity.
 
-What follows:
-- **An open window alone is not operating.** Someone who only watches never
-  holds the desktop.
-- **The person needs no take-over button.** Their input takes operation, and
-  their silence or a chat message gives it back.
-- **The agent waits; it does not fail.** While the person is operating, the
-  agent's work on that desktop waits, and it continues once operation passes
-  back.
-- **Only times are reported.** The server learns that input happened, and when.
-  It never receives what was typed or where the pointer went.
+How the code does this today:
+- Take over and hand back are `POST /api/bots/[botId]/computer/{takeover,handback}`
+  (`lib/computer/store.ts:153-159`).
+- Closing the viewer hands back (`components/computer/computer-viewer.tsx:52-54`).
+- The open window renews the hold (`store.ts:160-162`, `hooks/use-computer.ts:30-32`).
+  The 5-minute `controlUntil` only marks how a window that vanished without
+  closing (a crashed tab, a lost connection) is detected. It is not a limit on
+  a person who is still there.
+- The agent's waiting work is `paused` with `pauseReason='human_control'` and
+  resumes on handback (`store.ts:168-174`) or once a vanished window's hold has
+  lapsed (`lib/agent-tool-approval/store.ts:38-41`).
+
+Exactly one party operates the desktop at a time: the Bot's agent, or the person
+who took over.
 
 ## When a desktop is let go
 
@@ -127,8 +128,8 @@ Each of these is a gap to fix in its own PR. None is fixed here.
    to that Bot, including repository tasks on their own machines that never
    touch that desktop (`store.ts:168-170`). The claim likewise refuses a desktop
    run while the Bot's desktop is held (`claim.ts:53-54`), although that run uses
-   its own desktop. By this record, the person operating the Bot's desktop
-   affects only work on the Bot's desktop.
+   its own desktop. By this record, a person holding the Bot's desktop affects
+   only work on the Bot's desktop.
 2. **A thread's desktop may not be started for its agent.** `ensureThreadMachine`
    clears `/run/mikka-viewer` and neither starts the display nor publishes its
    lease. Only `openThreadDesktop` does (`thread-machines.ts:279,368-369`). A
@@ -138,28 +139,9 @@ Each of these is a gap to fix in its own PR. None is fixed here.
    {action:'desktop'}` issues a view grant (`app/api/threads/[runId]/machine/route.ts:17`,
    `thread-machines.ts:362-371`). By this record, nobody watches a thread's
    desktop, so that grant and its route go away.
-4. **Operation is a fixed 5-minute hold, not input activity.**
-   - Today a person explicitly takes over (`…/takeover`). That sets
-     `control='user'` and `controlUntil = now + 5 minutes` (`store.ts:153-156`).
-   - Every viewer refresh in control mode extends it by another 5 minutes
-     (`store.ts:160-162`, `hooks/use-computer.ts:30-32`). So an open window
-     keeps the hold with no input at all.
-   - The viewer reports no input activity.
-   - A chat message to the Bot does not give the desktop back.
-   - By this record:
-     - the viewer reports input times only;
-     - the person operates while their last input is under 60 seconds old;
-     - a chat message to the Bot hands operation back at once;
-     - an open window alone holds nothing.
-5. **A resumed thread machine is not watched by its lifecycle.** Resuming a
+4. **A resumed thread machine is not watched by its lifecycle.** Resuming a
    parked machine does not restart its lifecycle workflow, so it is not parked or
    ended when that run finishes (`thread-machines.ts:417`; #956).
-6. **A machine still running at the 12-hour watch limit is left running.** The
+5. **A machine still running at the 12-hour watch limit is left running.** The
    lifecycle workflow stops watching after 12 hours and only pauses machines that
    are idle and queued (`workflows/thread-machine/workflow.ts:7-12`, `steps.ts:39`; #957).
-
-## Open question for Alex
-
-When the person closes the window while operating, does the agent get the desktop
-back at once, or only after 60 seconds with no input? Today closing the viewer
-hands back at once (`components/computer/computer-viewer.tsx:52-54`).
