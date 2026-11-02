@@ -1,12 +1,15 @@
 import { isToolkitSlug, OWN_INTEGRATIONS } from '@/lib/composio-accounts'
 import { PluginError } from './contracts'
+import { connectKind, type ConnectKind } from './connect-kind'
 
-// The 插件 store: every Composio toolkit a person can connect with
-// Composio-managed auth (decision 2026-10-31). Order, categories and dates
-// are Composio's own (v3 GET /toolkits); nothing here ranks apps itself.
+// The 插件 store: every Composio toolkit (decisions 2026-10-31 and
+// 2026-11-02), whether it connects in one click (Composio-managed auth), with
+// the person's own API key, or needs nothing. Order, categories and dates are
+// Composio's own (v3 GET /toolkits); nothing here ranks apps itself.
 
 export type StoreCategory = { id: string; name: string }
-export type StoreApp = { id: string; name: string; description: string; iconUrl: string | null; categories: StoreCategory[]; createdAt: string | null }
+/** `connect`: one click (managed), the person's own credentials, nothing to connect, or not connectable from Mikka yet. */
+export type StoreApp = { id: string; name: string; description: string; iconUrl: string | null; categories: StoreCategory[]; createdAt: string | null; connect: ConnectKind }
 export type StoreCatalog = {
   /** In Composio's usage order (`sort_by=usage`), most used first. */
   apps: StoreApp[]
@@ -24,6 +27,7 @@ type RawToolkit = {
   is_local_toolkit?: boolean | null
   no_auth?: boolean | null
   composio_managed_auth_schemes?: string[] | null
+  auth_schemes?: string[] | null
   meta?: { description?: string | null; logo?: string | null; created_at?: string | null; categories?: { id?: string | null; name?: string | null }[] | null } | null
 }
 type RawPage = { items: RawToolkit[]; next_cursor?: string | null }
@@ -41,9 +45,9 @@ function publicIcon(value: unknown) {
   try { const url = new URL(typeof value === 'string' ? value : ''); return url.protocol === 'https:' && !url.username && !url.password ? url.href : null } catch { return null }
 }
 
-/** A toolkit the person can connect themselves: Composio manages its auth. Toolkits that need the person's own credentials are left out for now. */
-function connectable(item: RawToolkit) {
-  return isToolkitSlug(item.slug) && !OWN_INTEGRATIONS.has(item.slug) && !item.is_local_toolkit && !item.no_auth && (item.composio_managed_auth_schemes?.length ?? 0) > 0
+/** Every Composio toolkit is in the store, except local ones and Composio's copies of Mikka's own integrations. */
+function listed(item: RawToolkit) {
+  return isToolkitSlug(item.slug) && !OWN_INTEGRATIONS.has(item.slug) && !item.is_local_toolkit
 }
 
 export function toStoreApp(item: RawToolkit): StoreApp {
@@ -52,7 +56,7 @@ export function toStoreApp(item: RawToolkit): StoreApp {
     return id && name ? [{ id, name }] : []
   })
   const created = item.meta?.created_at && !Number.isNaN(Date.parse(item.meta.created_at)) ? new Date(item.meta.created_at).toISOString() : null
-  return { id: item.slug, name: clean(item.name, 200) || item.slug, description: clean(item.meta?.description, 300), iconUrl: publicIcon(item.meta?.logo), categories, createdAt: created }
+  return { id: item.slug, name: clean(item.name, 200) || item.slug, description: clean(item.meta?.description, 300), iconUrl: publicIcon(item.meta?.logo), categories, createdAt: created, connect: connectKind(item) }
 }
 
 /** Sections from Composio's own data. `apps` must already be in usage order. */
@@ -74,7 +78,7 @@ export async function fetchStoreCatalog(list: ToolkitLister): Promise<StoreCatal
   let cursor: string | undefined
   for (let page = 0; page < MAX_PAGES; page++) {
     const result = await list({ sort_by: 'usage', limit: PAGE_LIMIT, ...(cursor ? { cursor } : {}) })
-    for (const item of result.items ?? []) if (connectable(item) && !seen.has(item.slug)) { seen.add(item.slug); apps.push(toStoreApp(item)) }
+    for (const item of result.items ?? []) if (listed(item) && !seen.has(item.slug)) { seen.add(item.slug); apps.push(toStoreApp(item)) }
     cursor = result.next_cursor ?? undefined
     if (!cursor) break
   }
@@ -100,7 +104,12 @@ export function composioToolkitLister(client: { getClient: () => { toolkits: { l
   return query => client.getClient().toolkits.list(query as never, { signal: AbortSignal.timeout(10_000) }) as Promise<RawPage>
 }
 
-/** A new connection must be a store app. */
-export async function assertCatalogToolkit(list: ToolkitLister, id: string) {
-  if (!(await listStoreCatalog(list)).apps.some(app => app.id === id)) throw new PluginError('integrationToolkitNotSupported', 400)
+/** A new connection must be a store app that connects that way. */
+export async function assertCatalogToolkit(list: ToolkitLister, id: string, kind: ConnectKind = 'managed') {
+  if (!(await listStoreCatalog(list)).apps.some(app => app.id === id && app.connect === kind)) throw new PluginError('integrationToolkitNotSupported', 400)
+}
+
+/** Whether an app needs no connection at all (its tools run on the person's id alone). */
+export async function isNoAuthToolkit(list: ToolkitLister, id: string) {
+  return (await listStoreCatalog(list)).apps.some(app => app.id === id && app.connect === 'none')
 }

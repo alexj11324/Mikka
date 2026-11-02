@@ -148,6 +148,21 @@ async function newBot(page: import('@playwright/test').Page, name: string) {
   await expect(conversationPill(page)).toHaveText(name)
 }
 
+// A phone keeps a title bar (MIK-40): in a bot's chat it names that bot, never the Coordinator.
+test('手机顶栏在 Bot 对话里显示 Bot 名字', async ({ page }) => {
+  await register(page)
+  await newBot(page, '前端助手')
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.reload()
+  const title = page.getByRole('navigation', { name: '当前位置', exact: true })
+  await expect(title).toHaveText('前端助手')
+  await expect(page.getByLabel('给 前端助手 发消息', { exact: true })).toBeVisible()
+
+  await page.getByRole('button', { name: '展开或收起侧栏', exact: true }).click()
+  await page.getByRole('list', { name: 'Bot', exact: true }).getByRole('button', { name: 'Coordinator', exact: true }).click()
+  await expect(title).toHaveText('Coordinator')
+})
+
 // The right panel's name edits in place: Enter or leaving the field saves, Esc
 // cancels, and a name that does not save says why and leaves the old one.
 test('右栏点击 Bot 名字直接改名，左侧列表和标题一起更新', async ({ page }) => {

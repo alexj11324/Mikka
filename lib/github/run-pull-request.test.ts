@@ -11,7 +11,7 @@ const input = { remoteKey: 'v2/github.com/owner/repo', githubAccountId: '456', e
 const marker = `<!-- mikka-issue:${issueId} -->`
 const pr = { number: 77, node_id: 'PR_synthetic_77', html_url: 'https://github.com/owner/repo/pull/77', state: 'open', draft: false, merged_at: null, body: `Result\n\n${marker}`, head: { ref: input.branch, repo: { id: 789 } }, base: { repo: { id: 789 } } }
 
-function stub(options: { title?: string; permission?: string; userId?: number; prPermission?: string; installed?: boolean; existing?: unknown[]; create?: 'timeout' | '422' | 'malformed'; head?: string; forbiddenUser?: boolean } = {}) {
+function stub(options: { title?: string; permission?: string; userId?: number; prPermission?: string; installed?: boolean; existing?: unknown[]; create?: 'timeout' | '422' | 'malformed'; head?: string; forbiddenUser?: boolean; lines?: { additions: number; deletions: number } } = {}) {
   const calls: { path: string; method: string; body: Record<string, unknown> | null; authorization: string }[] = []
   let created = false
   const fetcher = (async (url: string | URL | Request, init?: RequestInit) => {
@@ -39,7 +39,7 @@ function stub(options: { title?: string; permission?: string; userId?: number; p
       if (options.create === 'timeout') throw new Error('transport failure containing synthetic-secret')
       if (options.create === '422') return Response.json({ message: 'synthetic-secret' }, { status: 422 })
       if (options.create === 'malformed') return Response.json({}, { status: 201 })
-      return Response.json({ ...pr, ...(options.title ? { title: options.title } : {}), draft: body?.draft === true }, { status: 201 })
+      return Response.json({ ...pr, ...(options.title ? { title: options.title } : {}), ...options.lines, draft: body?.draft === true }, { status: 201 })
     }
     if (path === '/graphql') return authorization === 'Bearer synthetic-installation-token'
       ? Response.json({ data: { convertPullRequestToDraft: { pullRequest: { id: pr.node_id, isDraft: true } } } })
@@ -147,6 +147,13 @@ test('opens one issue-marked PR with default branch, restricted write token and 
   assert.equal(create.body?.title, 'MIK-42: Fix redirect')
   assert.ok(String(create.body?.body).endsWith(marker))
   assert.deepEqual(bindings, [{ installationId: 99, repositoryId: 789, githubAccountId: '456', defaultBranch: 'trunk' }])
+})
+
+test('a created PR carries the line counts GitHub reported; a reply without them stores none', async () => {
+  const { fetcher } = stub({ lines: { additions: 18, deletions: 4 } })
+  assert.deepEqual(await openRunPullRequest({ ...input, fetcher }), { url: pr.html_url, state: 'open', additions: 18, deletions: 4 })
+  const { fetcher: bare } = stub()
+  assert.deepEqual(await openRunPullRequest({ ...input, fetcher: bare }), { url: pr.html_url, state: 'open' })
 })
 
 test('a duplicate completion finds its existing PR without posting', async () => {

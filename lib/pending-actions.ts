@@ -80,10 +80,10 @@ export async function decidePendingAction(userId: string, id: string, approve: b
       ? row.action === 'credential_operation'
         ? await (await import('@/lib/cloud-computer/credential-reviews')).executeCredentialOperation(pool, userId, row.input, approve)
         : await (await import('@/lib/cloud-computer/action-reviews')).executeApprovedBrowserAction(pool, userId, row.input, approve)
-      : !row.connectedAccountId
-        ? { error: 'integrationAccountNotBound' }
-        : row.action === APP_TOOL_ACTION
-          ? await runApprovedAppToolCall(userId, row.input, row.connectedAccountId)
+      : row.action === APP_TOOL_ACTION
+        ? await runApprovedAppToolCall(userId, row.input, row.connectedAccountId ?? null)
+        : !row.connectedAccountId
+          ? { error: 'integrationAccountNotBound' }
           : await runComposioAction(userId, row.action, row.input, row.connectedAccountId)
     if ('error' in result) {
       status = (isApprovalAction(row.action) || row.action === APP_TOOL_ACTION) && result.error === 'operationUncertain' ? 'running' : 'failed'
@@ -104,12 +104,18 @@ export async function decidePendingAction(userId: string, id: string, approve: b
  * version it was proposed with. Anything after dispatch that is not a clear
  * success is uncertain: it may have happened, so it is never resent.
  */
-async function runApprovedAppToolCall(userId: string, input: unknown, accountId: string): Promise<{ data: Record<string, unknown> } | { error: string }> {
+async function runApprovedAppToolCall(userId: string, input: unknown, accountId: string | null): Promise<{ data: Record<string, unknown> } | { error: string }> {
   const call = appToolCallSchema.safeParse(input)
   if (!call.success) return { error: 'invalidIntegrationInput' }
   const [{ getComposio }, { executeAppToolCall }] = await Promise.all([import('@/lib/composio'), import('@/lib/app-tools-server')])
   const client = getComposio()
   if (!client) return { error: 'composioNotConfigured' }
+  // A call proposed without an account runs only for an app that needs none;
+  // anything else stays bound to the account the person approved it in.
+  if (!accountId) {
+    const { composioToolkitLister, isNoAuthToolkit } = await import('@/lib/plugins/catalog')
+    if (!await isNoAuthToolkit(composioToolkitLister(client), call.data.toolkit).catch(() => false)) return { error: 'integrationAccountNotBound' }
+  }
   try {
     const result = await executeAppToolCall(client, userId, call.data, accountId)
     return result.successful ? { data: result.data ?? {} } : { error: 'operationUncertain' }

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { auth, apiWorkspaceAllowed } from '@/lib/api-auth'
+import { actAs } from '@/lib/acting-user'
 import { SearchInputError } from '@/lib/issue-search'
 import { parseInput, UnsupportedSourceError } from '@/lib/federated-search/input'
 import { readSearchPage, SearchAccessError } from '@/lib/federated-search/store'
@@ -14,10 +15,11 @@ export async function GET(request: Request) {
     if (!session?.user) return NextResponse.json({ error: 'authRequired' }, { status: 401, headers })
     const input = parseInput(new URL(request.url).searchParams, session.user.id)
     if (input.workspaceId && !apiWorkspaceAllowed(session, input.workspaceId)) return NextResponse.json({ error: 'searchAccessDenied' }, { status: 403, headers })
-    const read = await readSearchPage(session.user.id, input)
+    // Inside actAs, a workspace token's scope reaches the task visibility check.
+    const read = await actAs(session.user, () => readSearchPage(session.user.id, input))
     const current = await auth.api.getSession({ headers: request.headers, query: { disableCookieCache: true, disableRefresh: true } })
     if (!current?.user || current.user.id !== session.user.id || current.session.id !== session.session.id) return NextResponse.json({ error: 'authRequired' }, { status: 401, headers })
-    return NextResponse.json(await read.revalidate(), { headers })
+    return NextResponse.json(await actAs(session.user, () => read.revalidate()), { headers })
   } catch (error) {
     if (error instanceof SearchInputError) return NextResponse.json({ error: error.code }, { status: 400, headers })
     if (error instanceof UnsupportedSourceError) return NextResponse.json({ error: 'searchSourceUnsupported', sources: unsupportedSources }, { status: 422, headers })

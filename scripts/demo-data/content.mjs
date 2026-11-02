@@ -155,7 +155,7 @@ export const RUNS = [
     prompt: '复现 Safari 17 登录页白屏，写一个失败的 Playwright 用例',
     lastReply: 'Playwright WebKit 浏览器下载失败，没能跑到用例。',
     error: 'browserType.launch: Executable doesn\'t exist at /home/runner/.cache/ms-playwright/webkit-2104/pw_run.sh',
-    chunks: [text('安装 Playwright WebKit。'), tool('a'), { type: 'error', errorText: 'browserType.launch: Executable doesn\'t exist at /home/runner/.cache/ms-playwright/webkit-2104/pw_run.sh' }] },
+    chunks: [text('安装 Playwright WebKit。'), tool('a')] },
   { key: 'r-csv', issue: 'i-csv-garbled', bot: 'frontend', agent: 'ag-claude', status: 'succeeded', minutesAgo: 60 * 20, minutes: 22,
     prompt: '导出的 CSV 在 Excel 里中文乱码', lastReply: 'PR #485 已提交：在文件开头写入 UTF-8 BOM，补了单测。',
     chunks: [text('Excel 默认按系统代码页解析没有 BOM 的 CSV。'), tool('a'), tool('b'), text('PR #485 已提交：在文件开头写入 UTF-8 BOM，补了单测。', 't2')] },

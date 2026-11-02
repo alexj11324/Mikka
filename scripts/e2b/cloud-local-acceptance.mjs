@@ -114,7 +114,6 @@ async function main() {
   void relay.done.catch(error => abort.abort(error))
   process.env.MIKKA_CLOUD_WORKER_URL = `${relayOrigin}/mikka`
   process.env.MIKKA_CLOUD_WORKER_SHA = process.env.E2B_WORKER_SHA
-  process.env.MIKKA_CLOUD_THREAD_MACHINES = '1'
   process.env.E2B_BYO_COMPUTER_TEMPLATE = process.env.E2B_ACCEPTANCE_TEMPLATE
 
   stage = 'signed-route-warmup'
