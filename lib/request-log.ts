@@ -1,23 +1,19 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { createHash, randomUUID } from 'node:crypto'
+import { withRequestRoute } from './request-route'
 
 // Start and completion JSON lines per API request, written to stdout so Vercel Runtime Logs
 // (free on every plan) can search it. Only safe fields: never headers,
 // cookies, tokens, bodies, query strings or emails. The user is a sha256 hash.
 
 export type RequestLogOutcome = 'empty' | 'work' | 'ignored'
-type Store = { route?: string; userId?: string; outcome?: RequestLogOutcome }
+type Store = { userId?: string; outcome?: RequestLogOutcome }
 const requestScope = new AsyncLocalStorage<Store>()
 
 /** Records the signed-in user for the current request's log line. */
 export function noteLogUser(userId: string | null | undefined) {
   const store = requestScope.getStore()
   if (store && userId) store.userId = userId
-}
-
-/** The route template of the request being handled, if it is logged (for the database sample, lib/db/egress-sample.ts). */
-export function currentLogRoute(): string | undefined {
-  return requestScope.getStore()?.route
 }
 
 /** Marks the authenticated business branch without logging response or request data. */
@@ -76,7 +72,7 @@ export function withRequestLog<R extends Request, A extends unknown[], T extends
 ): (request: R, ...rest: A) => Promise<T> {
   return async (request, ...rest) => {
     const started = performance.now()
-    const store: Store = { route }
+    const store: Store = {}
     const requestId = requestIdFor(request), invocationId = randomUUID()
     // A missing completion remains observable when a handler/process is killed.
     try { sink(JSON.stringify({ level: 'info', msg: 'api_request_started', timestamp: new Date().toISOString(),
@@ -99,7 +95,7 @@ export function withRequestLog<R extends Request, A extends unknown[], T extends
       try { sink(JSON.stringify(entry), entry.level) } catch { /* logging never breaks a request */ }
     }
     try {
-      const response = await requestScope.run(store, () => handler(request, ...rest))
+      const response = await requestScope.run(store, () => withRequestRoute(route, () => handler(request, ...rest)))
       write(response.status)
       return response
     } catch (error) {

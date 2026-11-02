@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import type { PoolClient, QueryResult } from 'pg'
-import { currentLogRoute } from '@/lib/request-log'
+import { currentRequestRoute } from '@/lib/request-route'
 import { deploymentSwitch } from '@/lib/deployment-switches'
 
 // Sampled accounting of what queries send back from the database (Neon bills
@@ -47,7 +47,7 @@ export function sampleClient(client: PoolClient, on: () => boolean = sampling, r
     const first = args[0]
     const text = typeof first === 'string' ? first : (first as { text?: unknown } | null)?.text
     if (typeof text !== 'string' || random() >= SAMPLE_RATE || !on()) return query(...args)
-    const route = currentLogRoute() ?? null
+    const route = currentRequestRoute() ?? null
     const record = (result: unknown) => {
       try { sink(JSON.stringify(describeSample(text, result as QueryResult, route))) } catch { /* sampling never breaks a query */ }
     }

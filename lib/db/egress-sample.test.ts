@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { PoolClient } from 'pg'
 import { describeSample, SAMPLE_RATE, sampleClient } from './egress-sample'
+import { withRequestRoute } from '../request-route'
 
 const result = { command: 'SELECT', rowCount: 2, rows: [{ id: 'a', text: 'PRIVATE_TEXT' }, { id: 'b', text: 'x' }], fields: [], oid: 0 }
 function fakeClient() {
@@ -44,4 +45,12 @@ test('unsampled queries and a gate that is off pass straight through', async () 
 test('the gate is off without PostHog', async () => {
   const { deploymentSwitch } = await import('../deployment-switches')
   assert.equal(deploymentSwitch('dbEgressSample', {}), false)
+})
+
+test('a sampled query names the logged route it ran under', async () => {
+  const lines: string[] = []
+  const client = fakeClient()
+  sampleClient(client, () => true, () => 0, line => lines.push(line))
+  await withRequestRoute('/v1/devices/[deviceId]/commands', () => client.query('select id from agent_runs'))
+  assert.equal(JSON.parse(lines[0]).route, '/v1/devices/[deviceId]/commands')
 })
