@@ -239,9 +239,8 @@ export function SubscriptionSettings({ workspaceId, heading }: { workspaceId: st
                 const failed = live && (usage === 'failed' || read?.status === 'unavailable')
                 // reauth: the runtime's own reconnect_required, or the provider refused this read.
                 const reauth = connection.state === 'reconnect_required' || read?.status === 'reauth'
-                const refused = read?.status === 'extra_usage' || read?.status === 'unverified'
                 const paused = connection.paused === true
-                const healthy = live && !reauth && !refused && !paused
+                const healthy = live && !reauth && !paused
                 const account = read?.account ?? connection.account ?? null
                 const plan = read?.plan ? planName(read.plan) : null
                 const product = plan ? t(provider === 'codex' ? 'codexPlan' : 'claudePlan', { plan }) : t(provider === 'codex' ? 'codexProduct' : 'claudeProduct')
@@ -260,8 +259,8 @@ export function SubscriptionSettings({ workspaceId, heading }: { workspaceId: st
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-2 sm:justify-end">
                       {/* The 启用 switch says on or off; the label speaks only for other states. */}
                       {!healthy && !(paused && live && !reauth && !signingIn) && <span className="flex items-center gap-1.5 text-xs whitespace-nowrap text-muted-foreground">
-                        {(reauth || (refused && !paused)) && <span aria-hidden="true" className="size-1.5 rounded-full bg-warning" />}
-                        {reauth ? t('reauth') : paused ? t('paused') : refused ? t('notInUse') : t('notConnected')}
+                        {reauth && <span aria-hidden="true" className="size-1.5 rounded-full bg-warning" />}
+                        {reauth ? t('reauth') : paused ? t('paused') : t('notConnected')}
                       </span>}
                       {mine?.connectionId === connection.id && catching && <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={cancel}>{t('cancel')}</Button>}
                       {(reauth || !live || signingIn) && <SignInButton busy={signingIn} disabled={!canReconnect} label={t('reconnect')} busyLabel={t('connecting')} onClick={() => { void connect(provider, connection) }} />}
@@ -283,7 +282,6 @@ export function SubscriptionSettings({ workspaceId, heading }: { workspaceId: st
                     </div>
                   </div>
                   {(live || reauth) && <div className={cn('flex flex-col gap-2 transition-opacity duration-150 sm:pl-8', paused && 'opacity-50')}>
-                    {refused && <p className="text-xs text-foreground">{read?.status === 'unverified' ? t('extraUsageUnverified') : provider === 'claude' ? `${t('extraUsageOn')} · ${t('extraUsageClaudeFix')}` : t('extraUsageOn')}</p>}
                     {failed
                       ? <span className="flex items-center gap-2 text-xs text-muted-foreground">{t('quotaUnavailable')}<Button type="button" variant="secondary" size="xs" disabled={usageLoading} onClick={reloadUsage}>{t('retry')}</Button></span>
                       : read && read.windows.length > 0 && <QuotaMeters windows={read.windows} now={now} />}

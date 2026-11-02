@@ -59,7 +59,8 @@ export function subscriptionRuntime(nativeBroker = false, custodyOnly = false, o
     ? { accessToken: await infisicalWorkloadToken(infisicalOrigin, accessId!, accessSecret!, signal) }
     : { workloadToken: await infisicalWorkloadToken(infisicalOrigin, custodyId!, custodySecret!, signal) }
   // Built-in CPA inference transports are never registered. The separate plain
-  // adapter uses CPA converters with Mikka's identity and no native metadata.
+  // adapter uses CPA converters and Claude's required OAuth system prefix,
+  // with Mikka's HTTP identity and no synthesized device metadata.
   return new SubscriptionService(new SubscriptionRepository(database), scope => {
     const resolve = sharedCustodyIdentity ? async (executionOnly: boolean, signal?: AbortSignal, use?: { bindingId: string; consumerId: string; runId?: string }, revision?: unknown) => {
       if (!executionOnly) return { workloadToken: await infisicalWorkloadToken(infisicalOrigin, custodyId!, custodySecret!, signal) }

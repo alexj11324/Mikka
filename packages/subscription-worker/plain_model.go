@@ -18,8 +18,10 @@ import (
 )
 
 // CPA's actual conversion functions and ProviderExecutor contract, with Mikka's
-// ordinary HTTPS transport. Never invokes CPA's native identity/cloaking,
-// fingerprint transports, account pool, usage logging or fallback executors.
+// ordinary HTTPS transport. Claude OAuth requires the subscription protocol's
+// opening system block (also used by CPA). Host instructions and tool history
+// follow unchanged. No generated device identity, fingerprint transport,
+// account pool, usage logging or fallback executor is used.
 type CPAPlainModel struct {
 	core.ProviderExecutor
 	Provider string
@@ -108,7 +110,9 @@ func (e CPAPlainModel) ExecuteStream(ctx context.Context, a *core.Auth, request 
 	}
 	body["model"] = request.Model
 	body["stream"] = true
-	if e.Provider == "codex" {
+	if e.Provider == "claude" {
+		body["system"] = claudeSubscriptionSystem(body["system"])
+	} else {
 		body["store"] = false
 	}
 	converted, err = json.Marshal(body)
@@ -221,4 +225,18 @@ func (e CPAPlainModel) ExecuteStream(ctx context.Context, a *core.Auth, request 
 		emit(ex.StreamChunk{Payload: []byte("data: [DONE]\n\n")})
 	}()
 	return &ex.StreamResult{Chunks: chunks}, nil
+}
+
+// Keep the OAuth subscription's required protocol prefix separate from the
+// bot's instructions. Do not replace its prompt or synthesize native metadata.
+func claudeSubscriptionSystem(value any) []any {
+	const prefix = "You are Claude Code, Anthropic's official CLI for Claude."
+	blocks, _ := value.([]any)
+	if text, ok := value.(string); ok && text != "" {
+		blocks = []any{map[string]any{"type": "text", "text": text}}
+	}
+	if len(blocks) > 0 && objectMap(blocks[0])["text"] == prefix {
+		return blocks
+	}
+	return append([]any{map[string]any{"type": "text", "text": prefix}}, blocks...)
 }
