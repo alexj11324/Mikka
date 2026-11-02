@@ -265,3 +265,14 @@ test('a question reaches only its owner, only on an ended run, and only behind t
     assert.equal(current.questionReads.length, 0)
   } finally { restore() }
 })
+
+test('the composer send returns a refusal as its code and still throws unknown failures', async () => {
+  current = fixture(); viewer = 'owner'
+  assert.deepEqual(await actions.sendIssueThreadReply({ issueId, runId, text: 'go on' }), { sent: true })
+  current = fixture(); viewer = 'member'
+  assert.equal((await actions.sendIssueThreadReply({ issueId, runId, text: 'forged' })).error, 'runNotFound')
+  current = fixture(); viewer = 'owner'
+  assert.equal((await actions.sendIssueThreadReply({ issueId, runId, text: ' ' })).error, 'messageRequired')
+  const fault = new Error('synthetic lock failure'); current.fault = fault
+  await assert.rejects(actions.sendIssueThreadReply({ issueId, runId, text: 'retry' }), error => error === fault)
+})

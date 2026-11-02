@@ -1,7 +1,7 @@
 /** The shapes app/api/mobile/* and /api/suggestions return (see those routes on the server). */
 export type Source = 'gmail' | 'github' | 'slack' | 'notion' | 'linear' | 'googlecalendar'
 export type MachineKind = 'cloud' | 'laptop' | 'server'
-export type ThreadStatus = 'running' | 'waiting' | 'failed' | 'done' | 'stopped'
+export type ThreadStatus = 'running' | 'waiting' | 'paused' | 'failed' | 'done' | 'stopped'
 
 export interface Person { id: string; name: string; email: string; image: string | null }
 export interface Workspace { id: string; name: string }
@@ -131,7 +131,9 @@ export type ThreadItem =
   | { kind: 'error'; id: string; text: string; at: number }
   | { kind: 'person'; id: string; text: string; mine: boolean; at: number }
 
-export interface ThreadDetail { thread: Thread; active: boolean; summary: string | null; error: string | null; items: ThreadItem[] }
+/** A thread paused because its subscription ran out (the web's ThreadQuotaPausedCard). */
+export interface ThreadPaused { runId: string; subscription: 'claude' | 'codex'; plan: string | null; resetsAt: string | null; keyReady: boolean }
+export interface ThreadDetail { thread: Thread; active: boolean; paused?: ThreadPaused | null; summary: string | null; error: string | null; items: ThreadItem[] }
 
 export interface Suggestion { id: string; source: Source; action: string; title: string; url: string | null; actor: string | null; occurredAt: string }
 export interface Suggestions { groups: { source: Source; items: Suggestion[] }[] }

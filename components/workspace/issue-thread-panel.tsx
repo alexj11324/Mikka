@@ -5,7 +5,8 @@ import { useEffect, useRef, useState } from 'react'
 import useSWR, { useSWRConfig } from 'swr'
 import { useFormatter, useTranslations } from 'next-intl'
 import { ArrowLeft, SquareKanban, X } from 'lucide-react'
-import { getIssueThread, sendIssueThreadMessage, stopRun } from '@/app/actions/agents'
+import { getIssueThread, sendIssueThreadReply, stopRun } from '@/app/actions/agents'
+import { useActionError } from '@/lib/use-action-error'
 import { runFailureText, runIsActive, runStopTimeoutRemaining, threadItems } from '@/lib/issue-run-conversation'
 import { ThreadSteps } from './thread-steps'
 import { threadQuestionView, type IssueThread } from '@/lib/issue-threads'
@@ -67,7 +68,9 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   const accepting = !bare && Boolean(acceptance) && tab === 'acceptance'
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
-  const [sendFailed, setSendFailed] = useState(false)
+  // false, or what to say: the refusal's reason when the server gave one (threadReplaced…), else 发送失败.
+  const [sendFailed, setSendFailed] = useState<string | false>(false)
+  const actionError = useActionError()
   const [stopAttempt, setStopAttempt] = useState<number | null>(null)
   const [stopFailed, setStopFailed] = useState(false)
   const stopAttemptRef = useRef<number | null>(null)
@@ -104,8 +107,12 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
     const text = draft.trim()
     if (!text || sending || stopRequested || question === 'resuming') return
     setSending(true); setSendFailed(false)
-    try { await sendIssueThreadMessage({ issueId, runId: liveRunId, text }); setDraft(current => current.trim() === text ? '' : current); void mutate() }
-    catch { setSendFailed(true) }
+    try {
+      const result = await sendIssueThreadReply({ issueId, runId: liveRunId, text })
+      if (result.error) { setSendFailed(actionError(result.error)); return }
+      setDraft(current => current.trim() === text ? '' : current); void mutate()
+    }
+    catch { setSendFailed(t('sendFailed')) }
     finally { setSending(false) }
   }
   async function stop() {
@@ -188,7 +195,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
       {/* Keep the draft editable while stop waits for the daemon; do not queue new work after stop. */}
       <ChatComposer ref={inputRef} label={t('composer', { agent: harnessLabel(detail.harness) })} value={draft} onChange={setDraft} onSubmit={() => { void send() }}
         sending={sending || stopPending} editableWhileSending submitDisabled={stopRequested || question === 'resuming'} running={active || question === 'resuming'} thread onStop={active && data.thread.ownedByCurrentUser && !sending && !stopPending ? () => { void stop() } : undefined} />
-      {sendFailed && <FieldError className="px-3 text-xs">{t('sendFailed')}</FieldError>}
+      {sendFailed && <FieldError className="px-3 text-xs">{sendFailed}</FieldError>}
       {stopFailed && <div role="alert" className="flex items-center gap-2 px-3 text-xs"><span className="text-destructive">{t('stopFailed')}</span><Button variant="ghost" size="sm" className="min-w-22 max-sm:h-11" onClick={() => { void stop() }}>{t('retryStop')}</Button></div>}
     </div>}
     </>}
