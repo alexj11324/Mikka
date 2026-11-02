@@ -9,8 +9,10 @@ import { planDispatch, whyNoDevice, type NoDeviceWhy, type NothingReason, type O
 /**
  * Where a new run goes and on which model (decision 2026-11-02-1400): the
  * thread's own model when the person picked one, else 优先使用的模型 in order;
- * the first that can run now. 本地 picks one of the devices that can run it
- * (servers first, then the least busy; pickDevice); 云端 runs on the person's own E2B machine. Nothing can run: the
+ * the first that can run now. 云端 (the default) is the person's own E2B
+ * machine, then a server, then a computer; 本地 a server, then a computer
+ * (decision 2026-11-02-2330); among one kind the least busy (pickDevice). A run
+ * the person put in the cloud (`location` cloud) goes nowhere else. Nothing can run: the
  * 没有能跑这个任务的模型 card with the reason. The plan is pure
  * (lib/model-order-plan.ts); this reads what it needs.
  *
@@ -25,7 +27,7 @@ export type ModelDispatch =
   | { kind: 'cloud'; harness: OrderEntry['harness']; model: string; entry: OrderEntry; apiKey: boolean }
   | { kind: 'none'; reason: DispatchNothingReason; card: ReturnType<typeof modelUnavailableCard> }
 
-export async function resolveModelDispatch(pool: Pool, scope: OrderScope & { botId: string | null }, asked?: { harness: OrderEntry['harness']; model?: string } | null, location?: RunLocation, deviceId?: string, dependencies: { refreshQuota?: RefreshOrderQuota } = {}): Promise<ModelDispatch> {
+export async function resolveModelDispatch(pool: Pool, scope: OrderScope & { botId: string | null }, asked?: { harness: OrderEntry['harness']; model?: string } | null, location?: RunLocation, deviceId?: string, dependencies: { refreshQuota?: RefreshOrderQuota; /** The cloud already failed to start this run: a server or a computer only. */ withoutCloud?: boolean } = {}): Promise<ModelDispatch> {
   // A subscription never asked for its models offers none yet: ask it first (once per revision).
   await new (await import('./execution-settings')).ExecutionSettings(pool).ensureCatalogues(scope)
   const candidates = await orderCandidates(pool, scope)
@@ -34,7 +36,9 @@ export async function resolveModelDispatch(pool: Pool, scope: OrderScope & { bot
   const agentModel = asked && !asked.model ? (stored.entries.find(entry => entry.harness === asked.harness) ?? candidates.find(candidate => candidate.harness === asked.harness))?.model : undefined
   if (asked && !asked.model && !agentModel) return { kind: 'none', reason: 'notOffered', card: modelUnavailableCard('notOffered', { agent: HARNESS_NAMES[asked.harness], model: '' }) }
   const explicit = asked ? { harness: asked.harness, model: asked.model || agentModel! } : null
-  const order = deviceId ? { ...stored, location: 'local' as const } : location ? { ...stored, location } : stored
+  // A named computer, or a run the person put in the cloud, goes only there.
+  const places = deviceId || dependencies.withoutCloud ? 'local' as const : location === 'cloud' ? 'cloudOnly' as const : location ?? stored.location
+  const order = { ...stored, location: places }
   // A model the thread named: the first credential that offers it on that Agent (its own entry if it is listed).
   const picked = explicit ? order.entries.find(entry => entry.harness === explicit.harness && entry.model === explicit.model)
     ?? candidates.filter(candidate => candidate.harness === explicit.harness && candidate.model === explicit.model)
@@ -44,8 +48,8 @@ export async function resolveModelDispatch(pool: Pool, scope: OrderScope & { bot
   if (named && !picked) return { kind: 'none', reason: 'notOffered', card: modelUnavailableCard('notOffered', named) }
   const entries = picked ? [picked] : order.entries
   const states = await credentialStates(pool, scope, entries, candidates, undefined, { refresh: dependencies.refreshQuota })
-  const devices = order.location === 'local' ? (await poolDevices(pool, scope.ownerId)).filter(device => !deviceId || device.id === deviceId) : []
-  const ready = order.location === 'cloud' && await cloudReady(pool, { ownerId: scope.ownerId, workspaceId: scope.workspaceId, botId: scope.botId, harness: entries[0]?.harness ?? 'claude_code' })
+  const devices = places !== 'cloudOnly' ? (await poolDevices(pool, scope.ownerId)).filter(device => !deviceId || device.id === deviceId) : []
+  const ready = places !== 'local' && await cloudReady(pool, { ownerId: scope.ownerId, workspaceId: scope.workspaceId, botId: scope.botId, harness: entries[0]?.harness ?? 'claude_code' })
   const plan = planDispatch({ entries: picked ? [] : order.entries, explicit: picked ?? null, location: order.location, devices, credential: entry => states.get(entry.id)?.credential ?? { usable: false, reason: 'missing' }, cloudReady: ready })
   if (plan.kind === 'none' && deviceId && devices[0] && plan.reason === 'noDevice') {
     // What the named computer lacks for the model that would otherwise run (the thread's own model when it named one).
@@ -54,9 +58,12 @@ export async function resolveModelDispatch(pool: Pool, scope: OrderScope & { bot
     return { kind: 'none', reason: 'namedDevice', card: modelUnavailableCard('namedDevice', { agent: HARNESS_NAMES[wanted.harness], model: wanted.model, installed }) }
   }
   if (plan.kind === 'none' && plan.reason === 'noDevice' && !named) {
+    // 云端 with a key that should run: the cloud being off is the news, not the computers.
+    const keyFixes = places === 'cloud' && !ready && await e2bKeyWouldFix(pool, scope.ownerId)
+    if (places === 'cloud' && !ready && !keyFixes) return { kind: 'none', reason: 'cloudTemporarilyUnavailable', card: modelUnavailableCard('cloudTemporarilyUnavailable') }
     // What the computer closest to running the first allowed model lacks.
     const first = plan.skipped.find(item => item.block.reason === 'noDevice')!.entry
-    return { kind: 'none', reason: 'noDevice', card: modelUnavailableCard('noDevice', { agent: HARNESS_NAMES[first.harness], model: first.model, device: whyNoDevice(devices, first) }) }
+    return { kind: 'none', reason: 'noDevice', card: modelUnavailableCard('noDevice', { agent: HARNESS_NAMES[first.harness], model: first.model, device: whyNoDevice(devices, first) }, { offerE2B: keyFixes }) }
   }
   if (plan.kind === 'none' && named && plan.reason !== 'cloudNotConfigured' && plan.reason !== 'checking') {
     const reason = plan.reason === 'noDevice' ? 'pickedNoDevice' : 'pickedUnavailable'
@@ -108,10 +115,19 @@ export async function bindAgentToConnection(pool: Pick<Pool, 'query'>, scope: Or
   return id
 }
 
+/** No E2B key of their own, or one E2B refused: 填入 E2B Key would let 云端 run. A failed read offers nothing. */
+async function e2bKeyWouldFix(query: Pick<Pool, 'query'>, ownerId: string) {
+  const { ownE2BKeySql } = await import('./secrets/e2b-owner-sql')
+  try {
+    const { rows: [row] } = await query.query<{ fixes: boolean }>(`SELECT NOT ${ownE2BKeySql('$1::text')} OR EXISTS (SELECT 1 FROM user_e2b_keys uk WHERE uk."userId"=$1::text AND uk."lastErrorCode"='invalid') AS fixes`, [ownerId])
+    return row?.fixes === true
+  } catch { return false }
+}
+
 const HARNESS_NAMES: Record<OrderEntry['harness'], string> = { claude_code: 'Claude Code', codex: 'Codex' }
 
 /** 没有能跑这个任务的模型: the reason, and the rows that fix it. A model or computer the thread named is named in it. */
-export function modelUnavailableCard(reason: DispatchNothingReason, named?: { agent: string; model: string; installed?: boolean; device?: NoDeviceWhy }) {
+export function modelUnavailableCard(reason: DispatchNothingReason, named?: { agent: string; model: string; installed?: boolean; device?: NoDeviceWhy }, place: { /** 云端 without a cloud that runs: an E2B key would also fix it. */ offerE2B?: boolean } = {}) {
   const copy = defaultAgentCopy
   const line = {
     noModels: copy.needsModelNoModels, cloudNotConfigured: copy.needsModelCloud, cloudTemporarilyUnavailable: copy.needsModelCloudUnavailable, noDevice: noDeviceLine(named?.device), checking: copy.needsModelChecking, unavailable: copy.needsModelUnavailable,
@@ -124,7 +140,9 @@ export function modelUnavailableCard(reason: DispatchNothingReason, named?: { ag
   const options = reason === 'cloudNotConfigured'
     ? [{ value: 'e2b', label: copy.needsMachineE2B, action: 'e2bKey' as const }, { value: 'models', label: copy.needsModelSettings, action: 'modelSettings' as const }]
     : reason === 'noDevice' || reason === 'pickedNoDevice'
-      ? [{ value: 'computer', label: copy.needsMachineConnect, action: 'connectServer' as const }, { value: 'models', label: copy.needsModelSettings, action: 'modelSettings' as const }]
+      ? [{ value: 'computer', label: copy.needsMachineConnect, action: 'connectServer' as const },
+        ...(place.offerE2B ? [{ value: 'e2b', label: copy.needsMachineE2B, action: 'e2bKey' as const }] : []),
+        { value: 'models', label: copy.needsModelSettings, action: 'modelSettings' as const }]
       : [{ value: 'models', label: copy.needsModelSettings, action: 'modelSettings' as const }]
   return { title: copy.needsModelTitle, description, options }
 }

@@ -4,12 +4,12 @@ import { defaultTaskMachine, pickedTaskDestination, taskMachineUsable } from './
 
 const machines = [{ value: 'cloud', cloud: true, usable: true }, { value: 'laptop', usable: true }, { value: 'server', usable: true }]
 
-test('new task inherits local dispatch settings even when cloud compute is configured', () => {
-  assert.equal(defaultTaskMachine(machines, { location: 'local', firstDeviceId: 'server' })?.value, 'server')
-  assert.equal(defaultTaskMachine(machines, { location: 'cloud', firstDeviceId: null })?.value, 'cloud')
+test('a new task inherits 会先用: the cloud, a server or a computer, whatever 运行位置 is', () => {
+  assert.equal(defaultTaskMachine(machines, { first: { kind: 'device', id: 'server' } })?.value, 'server')
+  assert.equal(defaultTaskMachine(machines, { first: { kind: 'cloud' } })?.value, 'cloud')
   assert.equal(defaultTaskMachine(machines, undefined), undefined, 'do not guess a different place while settings load')
-  assert.equal(defaultTaskMachine(machines, { location: 'local', firstDeviceId: null }), undefined, 'an unchecked local setup does not guess a particular computer')
-  assert.equal(defaultTaskMachine([machines[0]], { location: 'local', firstDeviceId: null }), undefined, 'no local device does not silently choose cloud')
+  assert.equal(defaultTaskMachine(machines, { first: null }), undefined, 'nowhere to run does not guess a particular computer')
+  assert.equal(defaultTaskMachine([machines[0]], { first: null }), undefined, 'nowhere to run does not silently choose cloud')
 })
 
 test('online devices also need scheduling enabled and the dispatch planner to accept their Agent and credential', () => {

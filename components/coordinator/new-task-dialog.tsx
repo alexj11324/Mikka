@@ -96,7 +96,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, initialText
   // The task runs on Mikka Cloud on the computer of the bot it goes to.
   const cloudBotId = handler?.id ?? (bots.find(bot => bot.coordinator) ?? bots[0])?.id
   // The menu's availability comes from the same dispatch planner as Settings. The default inherits
-  // 运行位置; only a destination the person explicitly picks becomes a fixed task destination.
+  // 运行位置 (会先用: the cloud, a server or a computer); only a destination the person explicitly picks becomes a fixed task destination.
   const e2bKey = useOwnE2BKey(open)
   const cloud: Machine = { value: 'cloud', label: t('cloud'), cloud: true, usable: e2bKey.configured !== false }
   const quotaUnchecked = order?.entries.some(entry => entry.block?.reason === 'checking')
@@ -106,7 +106,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, initialText
   const [picked, setPicked] = useState<string | null>(null)
   const inherited = defaultTaskMachine(machines, order)
   const defaults: Machine = { value: 'auto', label: order ? `${t('workspaceDefault')} · ${inherited?.label ?? locationT(order.location)}` : t('workspaceDefault'),
-    cloud: order?.location === 'cloud', usable: inherited?.usable ?? false, status: inherited?.status ?? (inherited?.usable ? t('online') : order ? quotaUnchecked ? t('quotaUnchecked') : t('modelUnavailable') : t('loadingPlacement')) }
+    cloud: inherited?.cloud === true, usable: inherited?.usable ?? false, status: inherited?.status ?? (inherited?.usable ? t('online') : order ? quotaUnchecked ? t('quotaUnchecked') : t('modelUnavailable') : t('loadingPlacement')) }
   const device = machines.find(item => item.value === picked) ?? defaults
   // Picking Mikka Cloud without a key opens 填入 E2B Key; once saved, the task goes to the cloud.
   const [addingKey, setAddingKey] = useState(false)

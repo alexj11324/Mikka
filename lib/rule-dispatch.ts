@@ -13,6 +13,8 @@ type Query = Pick<Pool, "query">;
  * run dispatched here names a repository with a remote (a repository task), and
  * `queueCloudRun` still refuses a computer task under deny. A run with no bot (the Coordinator) uses the owner's hidden Coordinator bot
  * (`ensureCoordinatorBot`) and never borrows another bot's runtime.
+ * A key E2B already refused (lastErrorCode invalid, cleared when the key is
+ * saved again) is not tried: 云端 goes straight to a server or a computer.
  */
 export async function cloudReady(
   query: Query,
@@ -21,6 +23,7 @@ export async function cloudReady(
   if (!cloudComputerRunsEnabled()) return false;
   const { rowCount } = await query.query(
     `SELECT 1 WHERE ${ownE2BKeySql('$3::text')}
+        AND NOT EXISTS (SELECT 1 FROM user_e2b_keys uk WHERE uk."userId"=$3::text AND uk."lastErrorCode"='invalid')
         AND ($2::uuid IS NULL OR EXISTS (SELECT 1 FROM bots b WHERE b.id=$2 AND b."workspaceId"=$1::uuid AND b."ownerId"=$3 AND b."archivedAt" IS NULL))`,
     [scope.workspaceId, scope.botId, scope.ownerId],
   );

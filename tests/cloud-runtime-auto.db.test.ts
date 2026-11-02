@@ -198,16 +198,15 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     assert.deepEqual([(await definitionOf(next.runId)).agentDefinition.readOnly, (await definitionOf(next.runId)).agentDefinition.repositoryAdmission], [true, undefined])
   })
 
-  await t.test('no E2B key of their own: no cloud runtime; the card says so, and 本地 runs on the person\'s own computer', async () => {
+  await t.test('no E2B key of their own: no cloud runtime; with no computer the card offers one or a key, and 云端 then runs on the person\'s own server', async () => {
     const n = await person('no-key', false)
     const before = provisioned
     const result = await dispatch(n.id, n.issueId, n.botId) as unknown as { error: string; reason: string; card: { title: string; options: { action: string }[] } }
     assert.equal(result.error, 'machineUnavailable')
-    assert.deepEqual([result.reason, result.card.title, result.card.options.map(option => option.action)], ['cloudNotConfigured', '没有能跑这个任务的模型', ['e2bKey', 'modelSettings']])
+    assert.deepEqual([result.reason, result.card.title, result.card.options.map(option => option.action)], ['noDevice', '没有能跑这个任务的模型', ['connectServer', 'e2bKey', 'modelSettings']])
     assert.equal(provisioned, before, 'no cloud computer is woken without a key')
     assert.equal(await count('SELECT count(*)::int AS n FROM bot_cloud_runtimes WHERE "botId"=$1', [n.botId]), 0)
-    // 运行位置 本地 and their own server online (参与调度 on), its Codex reporting gpt-5: it takes the run.
-    await order.changeOrder(pool, { ownerId: n.id, workspaceId: n.workspaceId }, { kind: 'location', location: 'local' })
+    // 运行位置 云端 (the default) with no key, and their own server online (参与调度 on), its Codex reporting gpt-5: it takes the run.
     const server = randomUUID()
     await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,"deviceType",enabled,"lastSeenAt",harnesses) VALUES ($1,$2,'Server','local','server',true,now(),$3)`, [server, n.id, JSON.stringify([{ harness: 'codex', installed: true, subscriptionBroker: true, modelSlots: [{ slot: 'gpt-5', model: 'gpt-5', name: 'gpt-5' }] }])])
     await pool.query(`INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,'codex',$4)`, [randomUUID(), n.id, server, `codex-${server.slice(0, 8)}`])

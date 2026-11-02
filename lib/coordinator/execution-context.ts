@@ -94,10 +94,10 @@ export function executionContextText(facts: ExecutionFacts): string {
       : 'No subscription or API key is connected for threads; dispatch_run returns a card that leads to adding one.')
     if (entries.length) {
       const shown = entries.slice(0, SHOWN_MODELS).map(entry => `${entry.agent} ${entry.model}${entry.block ? ` (cannot run now: ${entry.block})` : ''}`)
-      lines.push(`Preferred models in order (优先使用的模型, ${location === 'cloud' ? '运行位置 云端' : '运行位置 本地'}): ${shown.join('; ')}${entries.length > SHOWN_MODELS ? `; and ${entries.length - SHOWN_MODELS} more` : ''}.`)
+      lines.push(`Preferred models in order (优先使用的模型, ${location === 'cloud' ? '运行位置 云端: their E2B cloud, then a server, then a computer' : '运行位置 本地: a server, then a computer'}): ${shown.join('; ')}${entries.length > SHOWN_MODELS ? `; and ${entries.length - SHOWN_MODELS} more` : ''}.`)
     }
   }
-  if (facts.e2b !== null) lines.push(facts.e2b ? 'The person has their own E2B key, so cloud runs are possible.' : 'The person has no E2B key: nothing runs in the cloud until they add one.')
+  if (facts.e2b !== null) lines.push(facts.e2b ? 'The person has their own E2B key, so cloud runs are possible.' : 'The person has no E2B key: nothing runs in the cloud until they add one, so 运行位置 云端 uses a server or a computer.')
   if (facts.hosted && !['ready', 'usage_in_progress', 'usage_concurrency_limit', 'usage_cost_unavailable'].includes(facts.hosted)) lines.push(`Mikka 默认 (the model for Bot chats) cannot answer right now: ${facts.hosted}. The person sees this on the chat.`)
   if (!lines.length) return ''
   lines.push('These are already known: do not ask the person about them; use them, and the tools, to act.')
