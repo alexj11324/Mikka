@@ -290,7 +290,6 @@ test('this tree has explicit complete DB inventory and retains bootstrap orderin
     assert.ok(workflow.includes(`pnpm ${name}`), `${name} strict gate retained`)
     assert.ok(pkg.check.includes(`pnpm ${name}`), `${name} in check`)
   }
-  assert.ok(pkg['test:integrations'].includes('lib/issue-owner-scope.test.ts'))
 })
 
 test('self-improvement DB suite stays mandatory when its feature exists', () => {

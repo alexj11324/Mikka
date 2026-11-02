@@ -5,9 +5,12 @@ type Query = Pick<Pool | PoolClient, 'query'>
 /**
  * Withdrawing an API key stops the runs it was handed to, as
  * stopRunsUsingSubscriptions does for subscriptions (orchestration.md § 2):
- * deleting the key, turning its 分享给团队成员 off (othersOnly), un-sharing
- * the owner's credentials in a workspace, the owner leaving it, or the admin
- * switch going off. The daemon then wipes the injected key.
+ * deleting the key stops every run on it; the owner leaving a workspace stops
+ * that workspace's runs on their keys; turning the key's 分享给团队成员 off, or
+ * the admin's 允许成员使用个人订阅和 API Key going off, stops only other
+ * members' runs (othersOnly): a person's own keys always run their own bots
+ * (decision 2026-11-01-2240). Un-sharing subscriptions no longer touches keys.
+ * The daemon then wipes the injected key.
  */
 export async function stopRunsUsingApiKeys(query: Query, scope: { keyId?: string; ownerId?: string; workspaceId?: string; othersOnly?: boolean }) {
   if (!scope.keyId && !scope.workspaceId) throw new Error('stopRunsUsingApiKeys needs a key or a workspace')

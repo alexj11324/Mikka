@@ -32,7 +32,10 @@ const nextConfig = {
       'react-syntax-highlighter': './components/workspace/agent-syntax-highlighter.tsx',
     },
   },
-  webpack(config) {
+  webpack(config, { dev }) {
+    // The dev filesystem cache serializes the ~24k-module graph into ~2 GB of
+    // buffers and does not make a restart much faster (docs/dev-workflow.md).
+    if (dev) config.cache = { type: 'memory' }
     config.resolve.alias['react-syntax-highlighter$'] = new URL('./components/workspace/agent-syntax-highlighter.tsx', import.meta.url).pathname
     return config
   },

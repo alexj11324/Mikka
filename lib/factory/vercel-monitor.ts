@@ -1,6 +1,7 @@
 import { FactoryError } from "./contract";
 import type { MonitorProbeAdapter, MonitorPublication } from "./monitor-probe";
 import { MIKKA_VERCEL, vercelTarget } from "./vercel-publication";
+import { isLoopbackHost } from "../loopback";
 
 export const FACTORY_HEALTH_PATH = "/mikka/api/health";
 export const MIKKA_PRODUCTION_ORIGIN = "https://app.aspectlylabs.com";
@@ -34,7 +35,7 @@ export function createVercelMonitorProbe(
     const u = new URL(options.testOrigin);
     if (
       u.protocol !== "http:" ||
-      !["127.0.0.1", "localhost", "[::1]"].includes(u.hostname) ||
+      !isLoopbackHost(u.hostname) ||
       u.origin !== options.testOrigin
     )
       throw new FactoryError("factoryMonitorTargetInvalid");
