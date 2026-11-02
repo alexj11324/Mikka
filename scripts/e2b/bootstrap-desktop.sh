@@ -3,8 +3,7 @@
 # plus Mikka's viewer gateway, lease driver and desktop driver.
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
-# Runs use no Docker (decision 2026-11-01-1312); docker.io stays for the bot computer.
-apt-get install -y -qq python3-aiohttp docker.io
+apt-get install -y -qq python3-aiohttp
 # Keep the existing browser launcher path while using the inherited Chrome binary.
 ln -s /usr/bin/google-chrome /usr/bin/chromium
 # Preserve only upstream desktop defaults; displays never copy mutable home data.
