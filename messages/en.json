@@ -2258,7 +2258,8 @@
           "access_changed": "changed access for team {target}"
         },
         "bot": {
-          "permissions_changed": "changed permissions for {target}"
+          "permissions_changed": "changed permissions for {target}",
+          "taken_over": "took over {target}"
         },
         "integration": {
           "permission_changed": "set {integration} to {to}"
@@ -2489,6 +2490,7 @@
       "local": "Local",
       "cloud": "Cloud",
       "localDevices": "{count, plural, one {# computer takes runs} other {# computers take runs}}",
+      "localFirst": "{count, plural, one {# computer takes runs} other {# computers take runs}} · {device} first",
       "cloudNoKey": "No E2B key",
       "add": "Add models",
       "addCount": "{count, plural, one {Add # model} other {Add # models}}",
@@ -2931,6 +2933,7 @@
       "resets": "Resets {time}",
       "next": "Next message uses your {key} API key, billed per token",
       "switched": "{name} quota used up. Continued on your {key} API key, billed per token",
+      "pointsSwitched": "Out of points, switched to {model}",
       "revert": "Switch back",
       "addKey": "Add API key to continue",
       "useKey": "Continue with API key",
@@ -3252,6 +3255,7 @@
     "needsModelNamedAgent": "{device} doesn't have {agent}",
     "needsModelNamedUpdate": "{device}'s Mikka needs an update",
     "needsModelNotOffered": "No subscription or key runs {model} on {agent}",
+    "needsModelAgentNotOffered": "No subscription or key runs {agent}",
     "needsModelPickedNoDevice": "No computer can run {model} on {agent}",
     "needsModelPickedUnavailable": "{model} on {agent} is unavailable right now",
     "needsModelSettings": "Open Models and subscriptions",

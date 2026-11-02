@@ -197,6 +197,9 @@ test('quota exhausted mid-run: continue on the person\'s key, else pause with th
     assert.equal((await row(runId)).status, 'paused')
     const other = await person('quota-intruder')
     await failsWith(quota.resumeQuotaPausedRunOnApiKey(other.id, runId), 'runNotFound')
+    // Someone else's key, not shared with the owner, is never used to continue the owner's run.
+    await addKey(other.id, 'openai', ['intruder-model'])
+    await failsWith(quota.resumeQuotaPausedRunOnApiKey(p.id, runId), 'apiKeyNotFound')
     assert.deepEqual(await threadQuotaView(other.id, [runId], runId), { switched: [], paused: null })
     const key = await addKey(p.id, 'openai', ['key-model-c'])
     assert.equal((await threadQuotaView(p.id, [runId], runId)).paused?.keyReady, true, 'the card offers 用 API Key 继续 once a key exists')

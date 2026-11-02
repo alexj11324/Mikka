@@ -10,7 +10,7 @@ import { planDispatch, whyNoDevice, type NoDeviceWhy, type NothingReason, type O
  * Where a new run goes and on which model (decision 2026-11-02-1400): the
  * thread's own model when the person picked one, else 允许使用的模型 in order;
  * the first that can run now. 本地 picks one of the devices that can run it
- * at random; 云端 runs on the person's own E2B machine. Nothing can run: the
+ * (servers first, then the least busy; pickDevice); 云端 runs on the person's own E2B machine. Nothing can run: the
  * 没有能跑这个任务的模型 card with the reason. The plan is pure
  * (lib/model-order-plan.ts); this reads what it needs.
  *
@@ -25,11 +25,15 @@ export type ModelDispatch =
   | { kind: 'cloud'; harness: OrderEntry['harness']; model: string; entry: OrderEntry; apiKey: boolean }
   | { kind: 'none'; reason: DispatchNothingReason; card: ReturnType<typeof modelUnavailableCard> }
 
-export async function resolveModelDispatch(pool: Pool, scope: OrderScope & { botId: string | null }, explicit?: { harness: OrderEntry['harness']; model: string } | null, random?: () => number, location?: RunLocation, deviceId?: string): Promise<ModelDispatch> {
+export async function resolveModelDispatch(pool: Pool, scope: OrderScope & { botId: string | null }, asked?: { harness: OrderEntry['harness']; model?: string } | null, location?: RunLocation, deviceId?: string): Promise<ModelDispatch> {
   // A subscription never asked for its models offers none yet: ask it first (once per revision).
   await new (await import('./execution-settings')).ExecutionSettings(pool).ensureCatalogues(scope)
   const candidates = await orderCandidates(pool, scope)
   const stored = await readOrder(pool, scope, candidates)
+  // The person named only the Agent ("派给 Codex"): its first model in 允许使用的模型, else the first one a connected credential offers on it.
+  const agentModel = asked && !asked.model ? (stored.entries.find(entry => entry.harness === asked.harness) ?? candidates.find(candidate => candidate.harness === asked.harness))?.model : undefined
+  if (asked && !asked.model && !agentModel) return { kind: 'none', reason: 'notOffered', card: modelUnavailableCard('notOffered', { agent: HARNESS_NAMES[asked.harness], model: '' }) }
+  const explicit = asked ? { harness: asked.harness, model: asked.model || agentModel! } : null
   const order = deviceId ? { ...stored, location: 'local' as const } : location ? { ...stored, location } : stored
   // A model the thread named: the first credential that offers it on that Agent (its own entry if it is listed).
   const picked = explicit ? order.entries.find(entry => entry.harness === explicit.harness && entry.model === explicit.model)
@@ -42,7 +46,7 @@ export async function resolveModelDispatch(pool: Pool, scope: OrderScope & { bot
   const states = await credentialStates(pool, scope, entries, candidates)
   const devices = order.location === 'local' ? (await poolDevices(pool, scope.ownerId)).filter(device => !deviceId || device.id === deviceId) : []
   const ready = order.location === 'cloud' && await cloudReady(pool, { ownerId: scope.ownerId, workspaceId: scope.workspaceId, botId: scope.botId, harness: entries[0]?.harness ?? 'claude_code' })
-  const plan = planDispatch({ entries: picked ? [] : order.entries, explicit: picked ?? null, location: order.location, devices, credential: entry => states.get(entry.id)?.credential ?? { usable: false, reason: 'missing' }, cloudReady: ready, random })
+  const plan = planDispatch({ entries: picked ? [] : order.entries, explicit: picked ?? null, location: order.location, devices, credential: entry => states.get(entry.id)?.credential ?? { usable: false, reason: 'missing' }, cloudReady: ready })
   if (plan.kind === 'none' && deviceId && devices[0] && plan.reason === 'noDevice') {
     // What the named computer lacks for the model that would otherwise run (the thread's own model when it named one).
     const wanted = picked ?? plan.skipped.find(item => item.block.reason === 'noDevice')?.entry ?? order.entries[0]
@@ -103,7 +107,7 @@ export function modelUnavailableCard(reason: DispatchNothingReason, named?: { ag
     notOffered: copy.needsModelNotOffered, namedDevice: named?.installed ? copy.needsModelDeviceUpdate : copy.needsModelDeviceAgent,
     pickedNoDevice: copy.needsModelPickedNoDevice, pickedUnavailable: copy.needsModelPickedUnavailable,
   }[reason]
-  const description = line.replace('{agent}', named?.agent ?? '').replace('{model}', named?.model ?? '')
+  const description = (reason === 'notOffered' && named && !named.model ? copy.needsModelAgentNotOffered : line).replace('{agent}', named?.agent ?? '').replace('{model}', named?.model ?? '')
     .replace('{device}', named?.device && named.device.why !== 'none' ? named.device.device : '')
   const options = reason === 'cloudNotConfigured'
     ? [{ value: 'e2b', label: copy.needsMachineE2B, action: 'e2bKey' as const }, { value: 'models', label: copy.needsModelSettings, action: 'modelSettings' as const }]

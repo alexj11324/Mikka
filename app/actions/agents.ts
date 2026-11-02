@@ -334,6 +334,16 @@ export async function sendIssueThreadMessage(input: { issueId: string | null; ru
 }
 
 /**
+ * The composer's send: the same as sendIssueThreadMessage, with a refusal the
+ * person can act on (threadReplaced, threadCannotContinue, threadStopping, a
+ * dispatch with no machine or model) returned as its code, so the thread says
+ * why instead of 「发送失败」. Other failures still throw.
+ */
+export async function sendIssueThreadReply(input: { issueId: string | null; runId: string; text: string }): Promise<ActionResult<{ sent: true }>> {
+  return runAction(async () => { await sendIssueThreadMessage(input); return { sent: true as const } })
+}
+
+/**
  * A thread's name: the task it works on, as "MIK-11 群聊建表" (glossary:
  * a thread is one run, named for its work, never for its bot). Null when the
  * run is not this person's or works on no task.

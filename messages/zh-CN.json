@@ -2258,7 +2258,8 @@
           "access_changed": "修改了团队 {target} 的权限"
         },
         "bot": {
-          "permissions_changed": "修改了 {target} 的权限"
+          "permissions_changed": "修改了 {target} 的权限",
+          "taken_over": "接管了 {target}"
         },
         "integration": {
           "permission_changed": "把 {integration} 改为{to}"
@@ -2489,6 +2490,7 @@
       "local": "本地",
       "cloud": "云端",
       "localDevices": "{count} 台电脑参与调度",
+      "localFirst": "{count} 台电脑参与调度 · 会先用 {device}",
       "cloudNoKey": "E2B Key 未设置",
       "add": "添加模型",
       "addCount": "添加 {count} 个",
@@ -2931,6 +2933,7 @@
       "resets": "{time} 重置",
       "next": "下一条改用 {key} API Key（按 token 计费）",
       "switched": "{name} 额度用完，已改用 {key} API Key 继续（按 token 计费）",
+      "pointsSwitched": "点数不足，已改用 {model}",
       "revert": "改回",
       "addKey": "添加 API Key 继续",
       "useKey": "用 API Key 继续",
@@ -3252,6 +3255,7 @@
     "needsModelNamedAgent": "{device} 没装 {agent}",
     "needsModelNamedUpdate": "{device} 的 Mikka 需要更新",
     "needsModelNotOffered": "没有订阅或 Key 能用 {agent} 跑 {model}",
+    "needsModelAgentNotOffered": "没有订阅或 Key 能用 {agent}",
     "needsModelPickedNoDevice": "没有电脑能用 {agent} 跑 {model}",
     "needsModelPickedUnavailable": "{agent} 的 {model} 暂时不可用",
     "needsModelSettings": "打开模型与订阅",

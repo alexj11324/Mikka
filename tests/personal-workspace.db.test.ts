@@ -179,6 +179,7 @@ test('personal workspaces', { skip: !dbUrl }, async t => {
     assert.deepEqual((await members.archivedBots(admin, team.id)).map(row => row.id), [bot])
     await assert.rejects(members.archivedBots(leaver, team.id))
     assert.deepEqual(await members.takeOverBot(admin, team.id, bot), { bots: 1 })
+    assert.equal(Number((await pool.query(`SELECT count(*) FROM workspace_audit_outbox WHERE "workspaceId"=$1 AND payload->>'action'='bot.taken_over' AND payload->>'targetId'=$2`, [team.id, bot])).rows[0].count), 1, '接管 is in the activity log')
     assert.deepEqual((await pool.query('SELECT "ownerId","archivedAt" FROM bots WHERE id=$1', [bot])).rows[0], { ownerId: admin, archivedAt: null }, 'it now runs on the admin\'s own resources')
     assert.equal(await executionWorkspace(admin, bot), team.id)
     await assert.rejects(members.takeOverBot(admin, team.id, bot), (error: unknown) => (error as { code?: string }).code === 'botNotFound', 'only a paused bot can be taken over')

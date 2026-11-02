@@ -1,4 +1,4 @@
-import { modelMessage, summaryMessage, type QuotaSwitchNotice, type SourcedMessage, type SummaryTrust } from './message-safety'
+import { modelMessage, summaryMessage, type SwitchNotice, type SourcedMessage, type SummaryTrust } from './message-safety'
 import { pruneMessages, type ModelMessage } from 'ai'
 import { HANDOFF_PREFIX, handoffPrompt, QUIET_REPLY, type HandoffPayload } from '@/lib/attention/handoff'
 import { COORDINATOR_WELCOME_MARK } from '@/lib/agent-welcome'
@@ -219,7 +219,7 @@ export function eventPrompt(event: { kind: CoordinatorEventKind; issueId: string
     case 'run_blocked':
       return [
         `[Event] The agent in run ${event.runId} is blocked: ${payload.reason}`,
-        'Tell the person what it needs. Pass their answer on with send_to_run, or stop_run if they say so.',
+        'Check the current run state and existing task facts first. Resolve it within existing authority when possible and pass that on with send_to_run; ask the person only for a concrete missing decision, information or policy ask, then pass their answer on with send_to_run, or stop_run if they say so.',
         note,
       ].filter(Boolean).join('\n')
     case 'matter_handoff':
@@ -303,7 +303,7 @@ export interface ChatItem {
   /** Artifacts shown as cards under this entry, in order. */
   artifacts: string[]
   /** An event line the chat draws in the person's language: the turn moved to their API key after the subscription ran out. */
-  notice?: QuotaSwitchNotice
+  notice?: SwitchNotice
   /** The person stopped this reply (停止); it keeps what it had said. */
   stopped?: true
   /** Why the turn answering this message of the person's failed; it stays after later turns and reloads. */
