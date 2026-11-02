@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { isDeviceAuthorityRevoked } from './db/device-scope'
+import { isDeviceAuthorityError } from './db/device-scope'
 import type { SubscriptionService } from './subscription-service'
 
 /**
@@ -22,7 +22,7 @@ export function subscriptionNativeLease(deps: {
       return Response.json(await service.nativeLease(use, request.signal), { headers })
     } catch (error) {
       // A revoked device token is an authentication failure: withDeviceRoute answers 401.
-      if (isDeviceAuthorityRevoked(error)) throw error
+      if (isDeviceAuthorityError(error)) throw error
       return Response.json({ error: 'subscription_unavailable' }, { status: 409, headers })
     }
   }
