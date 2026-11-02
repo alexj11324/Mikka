@@ -1,5 +1,5 @@
 import 'server-only'
-import { othersMayUse, subscriptionsUsable } from './personal-policy'
+import { othersMayUse } from './personal-policy'
 import { z } from 'zod'
 import { retainEnrollmentSourcesForAcceptance } from './subscription-enrollment-policy'
 import { SubscriptionRefusal, type SubscriptionRoute } from '@mikka/protocol/subscription'
@@ -16,11 +16,10 @@ import { join } from 'node:path'
 export async function authorizeSubscriptionWorkspace(userId: string, workspaceId: string) {
   await workspaceDb.transaction(tx => requireWorkspace(tx, workspaceId, userId))
 }
-/** A subscription runs in a workspace only for a member who shared it there, and only while that
- * workspace's admin allows it; otherwise a frozen run stops, never falls back (decision 2026-10-31-2225). */
+/** A subscription runs its owner's own bots in every workspace the owner belongs to (decision 2026-11-01-2240);
+ * another member's bot only while the owner shares it there with 分享给团队成员 and the admin allows it. */
 export async function authorizeSubscriptionUse(userId: string, workspaceId: string, consumerId?: string) {
   await authorizeSubscriptionWorkspace(userId, workspaceId)
-  if (!(await subscriptionsUsable(pool, userId, workspaceId))) throw new SubscriptionRefusal('account_unavailable')
   // Another member's bot needs 分享给团队成员 on, checked on every call: un-sharing or leaving stops it at once.
   if (consumerId && z.uuid().safeParse(consumerId).success) {
     const { rows: [bot] } = await pool.query<{ ownerId: string }>('SELECT "ownerId" FROM bots WHERE id=$1 AND "workspaceId"=$2', [consumerId, workspaceId])

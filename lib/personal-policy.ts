@@ -1,25 +1,19 @@
 import { createHash } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
-import { stopRunsUsingApiKeys } from './model-api-key-runs'
 
 /**
- * Decision 2026-10-31-2225: a subscription belongs to its owner. Their personal
- * workspace uses it automatically; a team workspace uses it only after the owner
- * shares it there (在这里使用我的订阅), for the owner's own bots and, if they also
- * turn on 分享给团队成员, other members' bots; and only while that workspace's
- * admin leaves 允许成员使用个人订阅 on (the default).
+ * Decision 2026-11-01-2240: a person's own subscriptions and API keys always run
+ * that person's own bots and runs, in every workspace they belong to. No share
+ * row and no admin switch limits it. What a share row and the admin switch
+ * decide is whether OTHER members' bots may use it there: 分享给团队成员
+ * (`allowOthers`), and only while the admin leaves 允许成员使用个人订阅 on.
  */
 type Query = Pick<Pool | PoolClient, 'query'>
 
-/** The admin switch; an absent row means on. */
+/** The admin switch over other members' use; an absent row means on. It never limits the owner's own use. */
 export async function memberSubscriptionsAllowed(query: Query, workspaceId: string): Promise<boolean> {
   const { rows: [row] } = await query.query<{ subscriptions: boolean }>('SELECT subscriptions FROM workspace_personal_policies WHERE "workspaceId"=$1', [workspaceId])
   return row?.subscriptions ?? true
-}
-
-/** Whether the owner shared their subscriptions into this workspace. */
-export async function subscriptionShared(query: Query, ownerId: string, workspaceId: string): Promise<boolean> {
-  return Boolean((await query.query('SELECT 1 FROM workspace_subscription_shares WHERE "ownerId"=$1 AND "workspaceId"=$2', [ownerId, workspaceId])).rowCount)
 }
 
 /** 分享给团队成员: the owner also lets other members' bots here use it (Alex, 「B」). */
@@ -37,17 +31,15 @@ export async function pooledOwners(query: Query, runOwnerId: string, workspaceId
   return (await query.query<{ ownerId: string }>('SELECT "ownerId" FROM workspace_subscription_shares WHERE "workspaceId"=$1 AND "allowOthers" AND "ownerId"<>$2 ORDER BY "createdAt","ownerId"', [workspaceId, runOwnerId])).rows.map(row => row.ownerId)
 }
 
-/** May the owner's own subscriptions run their bots in this workspace? */
-export async function subscriptionsUsable(query: Query, ownerId: string, workspaceId: string): Promise<boolean> {
-  return (await subscriptionShared(query, ownerId, workspaceId)) && (await memberSubscriptionsAllowed(query, workspaceId))
-}
-
-/** The owner's own choice; the caller has checked membership. `allowOthers` is left as it is when omitted. */
+/**
+ * The owner's own choice; the caller has checked membership. `allowOthers` is left as it is when omitted.
+ * Un-sharing stops only other members' runs on the owner's subscriptions; the owner's own runs go on
+ * (decision 2026-11-01-2240).
+ */
 export async function setSubscriptionShare(query: Query, ownerId: string, workspaceId: string, shared: boolean, allowOthers?: boolean) {
   if (!shared) {
     await query.query('DELETE FROM workspace_subscription_shares WHERE "ownerId"=$1 AND "workspaceId"=$2', [ownerId, workspaceId])
-    await stopRunsUsingSubscriptions(query, { ownerId, workspaceId })
-    await stopRunsUsingApiKeys(query, { ownerId, workspaceId })
+    await stopRunsUsingSubscriptions(query, { ownerId, workspaceId, othersOnly: true })
     return
   }
   await query.query(`INSERT INTO workspace_subscription_shares ("ownerId","workspaceId","allowOthers") VALUES ($1,$2,COALESCE($3::boolean,false))
@@ -56,8 +48,9 @@ export async function setSubscriptionShare(query: Query, ownerId: string, worksp
 }
 
 /**
- * Withdrawing a credential (un-sharing, 分享给团队成员 off, leaving, the admin
- * switch off, disconnecting) stops the runs using it now, through the usual
+ * Withdrawing a credential stops the runs using it now: disconnecting or leaving
+ * stops all of them; un-sharing, 分享给团队成员 off and the admin switch off stop
+ * only other members' runs (`othersOnly`). It goes through the usual
  * stop request and lease cut: the device's daemon ends the run and deletes the
  * short-lived credential it was given, and every credential access or renewal
  * already refuses a run with a stop request. Model calls re-check on their own.
@@ -75,11 +68,6 @@ export async function stopRunsUsingSubscriptions(query: Query, scope: { ownerId?
     [scope.ownerId ?? null, scope.workspaceId ?? null, scope.connectionId ?? null, scope.othersOnly ?? false])
   return rowCount ?? 0
 }
-
-/** SQL fragment for the same rule, with the owner and workspace as SQL expressions. */
-export const subscriptionsUsableSql = (owner: string, workspace: string) =>
-  `EXISTS (SELECT 1 FROM workspace_subscription_shares sh WHERE sh."ownerId"=${owner} AND sh."workspaceId"::text=(${workspace})::text)
-   AND NOT EXISTS (SELECT 1 FROM workspace_personal_policies pp WHERE pp."workspaceId"::text=(${workspace})::text AND NOT pp.subscriptions)`
 
 /**
  * SQL for 分享给团队成员 on a run (orchestration.md §2, §6): may the credential

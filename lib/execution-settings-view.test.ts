@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { botModelChoice, defaultModel, groupBotModels, harnessOptions, initialExecution, modelName, modelOptions, modelProvider, placeKind, redetectTargets, retarget, selectedBotModel, withCloudModels, type ExecutionPlace } from './execution-settings-view'
+import { botModelChoice, defaultModel, groupBotModels, harnessOptions, initialExecution, modelName, modelOptions, modelProvider, modelUnavailable, placeKind, redetectTargets, retarget, selectedBotModel, withCloudModels, type ExecutionPlace } from './execution-settings-view'
 
 const laptop: ExecutionPlace = {
   id: '00000000-0000-4000-8000-000000000001', name: 'Alex MacBook Pro', deviceType: 'laptop', enabled: true, online: true,
@@ -40,60 +40,71 @@ test('models are only what the harness reported there, never a built-in list', (
   // Mikka Cloud runs on the account: its models, never a device's slots, as the server checks.
   assert.deepEqual(names(modelOptions(withCloudModels(places, accounts), 'cloud', 'codex')), ['codex-a', 'codex-b'])
   assert.deepEqual(names(modelOptions(withCloudModels(places, accounts), 'cloud', 'claude_code')), ['claude-e2e'])
-  // #537 shim: Claude Code reports nothing yet, so only its `opus` slot is offered.
-  assert.deepEqual(modelOptions(places, laptop.id, 'claude_code'), [{ value: 'opus', name: 'opus' }])
+  // Claude Code reported nothing: nothing is offered, no slot name stands in (Alex, 2026-11-02).
+  assert.deepEqual(modelOptions(places, laptop.id, 'claude_code'), [])
 })
 
-const slotted = (id: string, deviceType: 'laptop' | 'server', online: boolean, opus: string): ExecutionPlace => ({
+const slotted = (id: string, deviceType: 'laptop' | 'server', online: boolean, resolved: string, claudeDefault?: string): ExecutionPlace => ({
   id, name: id, deviceType, enabled: true, online,
   harnesses: [
-    { harness: 'claude_code', installed: true, version: '1', modelSlots: [{ slot: 'sonnet', model: 'Sonnet X', name: 'Sonnet X' }, { slot: 'opus', model: opus, name: opus }] },
+    { harness: 'claude_code', installed: true, version: '1', modelSlots: [{ slot: 'sonnet', model: 'Sonnet X', name: 'Sonnet X' }, { slot: 'opus', model: resolved, name: resolved }], ...(claudeDefault ? { defaultModelSlot: claudeDefault } : {}) },
     { harness: 'codex', installed: true, version: '1', modelSlots: [{ slot: 'mini', model: 'Mini Y', name: 'Mini Y' }, { slot: 'main', model: 'Codex Default Z', name: 'Codex Default Z' }], defaultModelSlot: 'main' },
   ],
 })
 
-test('a reported slot is stored, and only the model it resolves to is shown', () => {
+test('a reported slot is stored, only the model it resolves to is shown, and the default is the one the CLI marks', () => {
   const mac = slotted('mac', 'laptop', true, 'DS 4.1 Flash')
   const options = modelOptions([mac], 'mac', 'claude_code')
   assert.deepEqual(options.map(option => option.value), ['sonnet', 'opus'])
-  assert.equal(defaultModel(options, 'claude_code')?.value, 'opus')
+  assert.equal(defaultModel(options), undefined, 'no slot marked default: none is picked by its name')
+  assert.equal(defaultModel(modelOptions([slotted('mac', 'laptop', true, 'DS 4.1 Flash', 'sonnet')], 'mac', 'claude_code'))?.value, 'sonnet')
   assert.equal(modelName([mac], 'mac', 'claude_code', 'opus'), 'DS 4.1 Flash')
-  assert.equal(defaultModel(modelOptions([mac], 'mac', 'codex'), 'codex')?.name, 'Codex Default Z')
+  assert.equal(defaultModel(modelOptions([mac], 'mac', 'codex'))?.name, 'Codex Default Z')
+  // A plain reported model list marks its default by id too.
+  assert.equal(defaultModel(modelOptions([{ ...laptop, harnesses: [{ harness: 'codex', installed: true, version: '1', models: ['reported-a', 'reported-b'], defaultModelSlot: 'reported-b' }] }], laptop.id, 'codex'))?.value, 'reported-b')
   assert.equal(modelName([mac], 'mac', 'codex', 'gone-model'), 'gone-model')
+})
+
+test('a saved model the place no longer reports is unavailable, never an option', () => {
+  const mac = slotted('mac', 'laptop', true, 'DS 4.1 Flash')
+  assert.equal(modelUnavailable([mac], 'mac', 'codex', 'main'), false)
+  assert.equal(modelUnavailable([mac], 'mac', 'codex', 'opus'), true, 'a Claude slot saved on Codex is unavailable there')
+  assert.equal(modelUnavailable(places, laptop.id, 'claude_code', 'opus'), true, 'Claude Code reported nothing')
+  assert.equal(modelUnavailable(places, laptop.id, 'codex', ''), false, 'no model is not an unavailable one')
+  assert.ok(!modelOptions(places, laptop.id, 'claude_code').some(option => option.value === 'opus'))
 })
 
 const claude = { provider: 'claude', modelId: 'claude-account-model' }
 const codex = { provider: 'codex', modelId: 'codex-account-model' }
 
-test('initial value: a Claude subscription runs Claude Code on the server first, on its opus slot', () => {
+test('initial value: a Claude subscription runs Claude Code on the server first, on the model its CLI marks default', () => {
   const mac = slotted('mac', 'laptop', true, 'Opus Resolved')
   const box = slotted('box', 'server', true, 'Opus On Box')
-  assert.deepEqual(initialExecution([mac, box, cloud], [codex, claude]), { place: 'box', harness: 'claude_code', model: 'opus' })
-  assert.equal(modelName([mac, box], 'box', 'claude_code', 'opus'), 'Opus On Box')
+  assert.deepEqual(initialExecution([mac, box, cloud], [codex, claude]), { place: 'box', harness: 'claude_code', model: '' }, 'no default marked: the person picks')
+  assert.deepEqual(initialExecution([mac, slotted('box', 'server', true, 'Opus On Box', 'sonnet'), cloud], [codex, claude]), { place: 'box', harness: 'claude_code', model: 'sonnet' })
 })
 
 test('initial value: an offline server is skipped for any online device, then the cloud', () => {
-  const mac = slotted('mac', 'laptop', true, 'Opus Resolved')
-  const box = slotted('box', 'server', false, 'Opus On Box')
+  const mac = slotted('mac', 'laptop', true, 'Opus Resolved', 'opus')
+  const box = slotted('box', 'server', false, 'Opus On Box', 'opus')
   assert.deepEqual(initialExecution([box, mac, cloud], [claude]), { place: 'mac', harness: 'claude_code', model: 'opus' })
-  // On Mikka Cloud the Agent runs on the account, so the model is the account's, not a device slot.
-  assert.deepEqual(initialExecution([box, cloud], [claude]), { place: 'cloud', harness: 'claude_code', model: 'claude-account-model' })
-  assert.deepEqual(initialExecution(withCloudModels([box, cloud], [claude]), [claude]), { place: 'cloud', harness: 'claude_code', model: 'claude-account-model' })
+  // On Mikka Cloud the account lists models but marks none default: the person picks one.
+  assert.deepEqual(initialExecution([box, cloud], [claude]), { place: 'cloud', harness: 'claude_code', model: '' })
+  assert.deepEqual(initialExecution(withCloudModels([box, cloud], [claude]), [claude]), { place: 'cloud', harness: 'claude_code', model: '' })
   assert.deepEqual(initialExecution([{ ...mac, enabled: false }, cloud], [claude]).place, 'cloud')
 })
 
 test('initial value: without Claude, a ChatGPT/Codex subscription runs Codex on its default model', () => {
   const mac = slotted('mac', 'laptop', true, 'Opus Resolved')
   assert.deepEqual(initialExecution([mac, cloud], [codex]), { place: 'mac', harness: 'codex', model: 'main' })
-  // #537 shim: a daemon that marks no default slot falls back to the first model it reports.
-  assert.deepEqual(initialExecution([laptop, cloud], [codex]), { place: laptop.id, harness: 'codex', model: 'reported-a' })
-  // No device reports Codex models: the account's own model.
-  assert.deepEqual(initialExecution([cloud], [codex]), { place: 'cloud', harness: 'codex', model: 'codex-account-model' })
+  // A daemon that marks no default: no model is guessed from the list.
+  assert.deepEqual(initialExecution([laptop, cloud], [codex]), { place: laptop.id, harness: 'codex', model: '' })
+  assert.deepEqual(initialExecution([cloud], [codex]), { place: 'cloud', harness: 'codex', model: '' })
 })
 
 test('initial value: with no subscription, the first online device and a harness installed there', () => {
-  assert.deepEqual(initialExecution([server, laptop, cloud], []), { place: laptop.id, harness: 'claude_code', model: 'opus' })
-  assert.deepEqual(initialExecution([{ ...server, online: true }, cloud], []), { place: server.id, harness: 'codex', model: 'reported-b' })
+  assert.deepEqual(initialExecution([server, laptop, cloud], []), { place: laptop.id, harness: 'claude_code', model: '' })
+  assert.deepEqual(initialExecution([{ ...server, online: true }, cloud], []), { place: server.id, harness: 'codex', model: '' })
 })
 
 test('re-detection asks the chosen device, and every local device for cloud', () => {
@@ -102,13 +113,20 @@ test('re-detection asks the chosen device, and every local device for cloud', ()
   assert.deepEqual(redetectTargets(places, 'missing'), [])
 })
 
-test('moving a rule keeps the harness and model only where the new place has them, else the defaults there', () => {
+test('moving a rule keeps the harness and model only where the new place has them; an old model never carries over', () => {
   const rule = { label: 'backend', place: server.id, harness: 'codex', model: 'reported-c' }
-  assert.deepEqual(retarget(places, { ...rule, place: laptop.id }), { ...rule, place: laptop.id, model: 'reported-a' })
-  assert.deepEqual(retarget(places, { ...rule, harness: 'claude_code', model: 'opus' }), { ...rule, harness: 'codex', model: 'reported-b' })
-  assert.deepEqual(retarget(withCloudModels(places, accounts), { ...rule, place: 'cloud' }), { ...rule, place: 'cloud', model: 'codex-a' })
-  assert.deepEqual(retarget(withCloudModels(places, accounts), { ...rule, place: 'cloud', harness: 'claude_code', model: 'opus' }), { ...rule, place: 'cloud', harness: 'claude_code', model: 'claude-e2e' })
-  assert.deepEqual(retarget(places, { ...rule, place: laptop.id, harness: 'claude_code' }), { ...rule, place: laptop.id, harness: 'claude_code', model: 'opus' })
+  assert.deepEqual(retarget(places, { ...rule, place: laptop.id, model: 'reported-b' }), { ...rule, place: laptop.id, model: 'reported-b' }, 'still reported there: kept')
+  assert.deepEqual(retarget(places, { ...rule, place: laptop.id }), { ...rule, place: laptop.id, model: '' }, 'not reported there and no default: cleared')
+  assert.deepEqual(retarget(places, { ...rule, harness: 'claude_code', model: 'opus' }), { ...rule, harness: 'codex', model: '' })
+  assert.deepEqual(retarget(withCloudModels(places, accounts), { ...rule, place: 'cloud' }), { ...rule, place: 'cloud', model: '' })
+  assert.deepEqual(retarget(withCloudModels(places, accounts), { ...rule, place: 'cloud', model: 'codex-b' }), { ...rule, place: 'cloud', model: 'codex-b' })
+  assert.deepEqual(retarget(withCloudModels(places, accounts), { ...rule, place: 'cloud', harness: 'claude_code', model: 'opus' }), { ...rule, place: 'cloud', harness: 'claude_code', model: '' })
+  // Switching the Agent: Codex reports nothing here, so the Claude model it had is cleared, not shown on Codex.
+  const quiet: ExecutionPlace = { ...laptop, harnesses: [{ harness: 'claude_code', installed: true, version: '1', models: ['claude-x'] }, { harness: 'codex', installed: true, version: '1' }] }
+  assert.deepEqual(retarget([quiet], { place: quiet.id, harness: 'codex', model: 'claude-x' }), { place: quiet.id, harness: 'codex', model: '' })
+  // To a harness whose CLI marks a default: that default.
+  const mac = slotted('mac', 'laptop', true, 'Opus Resolved')
+  assert.deepEqual(retarget([mac], { place: 'mac', harness: 'codex', model: 'sonnet' }), { place: 'mac', harness: 'codex', model: 'main' })
 })
 
 test('the provider mark follows the model id, then the account or harness', () => {
