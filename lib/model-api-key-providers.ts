@@ -61,12 +61,22 @@ export function apiKeyProtocols(key: Pick<ApiKeyView, 'provider' | 'protocol'>):
   return (['anthropic', 'openai'] as const).filter(protocol => endpoints[protocol])
 }
 
+/** The key fields that decide which Agents it serves. */
+export type ApiKeyAgentFields = Pick<ApiKeyView, 'provider' | 'protocol' | 'responsesApi'>
+
+/**
+ * The protocols an Agent can run a key on: Codex runs on the Responses API
+ * only, so an OpenAI-protocol custom provider without it serves bot chats
+ * (Chat Completions) but not Codex.
+ */
+const agentProtocols = (key: ApiKeyAgentFields) => apiKeyProtocols(key).filter(protocol => protocol !== 'openai' || key.responsesApi)
+
 /** The Agents that can run a key's models (Claude Code first). */
-export const apiKeyHarnesses = (key: Pick<ApiKeyView, 'provider' | 'protocol'>): ApiKeyHarness[] => apiKeyProtocols(key).map(protocolHarness)
+export const apiKeyHarnesses = (key: ApiKeyAgentFields): ApiKeyHarness[] => agentProtocols(key).map(protocolHarness)
 
 /** What one Agent talks to with this key, or null when the key does not serve that Agent. */
-export function apiKeyEndpoint(key: Pick<ApiKeyView, 'provider' | 'protocol' | 'baseUrl'>, harness: ApiKeyHarness): { protocol: ApiKeyProtocol; baseUrl: string } | null {
-  const protocol = apiKeyProtocols(key).find(item => protocolHarness(item) === harness)
+export function apiKeyEndpoint(key: ApiKeyAgentFields & Pick<ApiKeyView, 'baseUrl'>, harness: ApiKeyHarness): { protocol: ApiKeyProtocol; baseUrl: string } | null {
+  const protocol = agentProtocols(key).find(item => protocolHarness(item) === harness)
   if (!protocol) return null
   const baseUrl = key.provider === 'custom' ? key.baseUrl : API_KEY_PRESET_ENDPOINTS[key.provider].endpoints[protocol]
   return baseUrl ? { protocol, baseUrl } : null
@@ -87,4 +97,6 @@ export interface ApiKeyView {
   models: string[]
   /** Why the last 重新获取模型 failed (401/403, or anything else); null after a good answer. */
   modelsError: 'invalid' | 'unavailable' | null
+  /** Whether the OpenAI endpoint serves the Responses API, which Codex runs on. Probed for custom providers only; presets serve it. */
+  responsesApi: boolean
 }

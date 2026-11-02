@@ -2491,7 +2491,9 @@
         "openai": "OpenAI"
       },
       "protocolAgents": "{protocols} 协议 · 可用 {agents}",
-      "customAgents": "选了协议才知道能用哪个 Agent"
+      "customAgents": "选了协议才知道能用哪个 Agent",
+      "noResponsesApi": "{protocol} 协议 · 不支持 Responses API · Codex 用不了",
+      "afterQuotaSection": "额度用完时"
     },
     "modelOrder": {
       "title": "允许使用的模型",
@@ -2505,7 +2507,6 @@
       "add": "添加模型",
       "addCount": "添加 {count} 个",
       "empty": "还没有允许使用的模型",
-      "noCandidates": "没有可添加的模型",
       "remove": "移出列表",
       "ready": "可用",
       "quotaUntil": "额度用完 · {time} 恢复",
@@ -2555,7 +2556,18 @@
       "e2bKeySet": "已填",
       "e2bKeyMissing": "未填",
       "e2bKeyFill": "填入",
-      "e2bKeyReplace": "更换"
+      "e2bKeyReplace": "更换",
+      "agentSection": "Agent",
+      "preferredAgent": "优先使用的 Agent",
+      "preferredAgentHint": "两种 Agent 都能跑的模型先用它",
+      "preferredMark": "优先",
+      "onlyAgent": "只能用 {agent}",
+      "bothAgents": "两种 Agent 都能跑",
+      "agentMenu": "{model} 的 Agent：{agent}",
+      "emptyNoCredential": "还没有订阅或 API Key",
+      "emptyNoModels": "订阅和 API Key 还没有报告模型",
+      "connectCredential": "连接订阅或添加 API Key",
+      "openCredentials": "查看订阅与 API Key"
     },
     "loadingPage": "正在加载设置"
   },

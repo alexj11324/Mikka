@@ -56,7 +56,7 @@ test('模型与订阅：默认顺序来自已有订阅，添加、键盘与菜�
   // Untouched: Claude Code's opus from the connected account. The only computer cannot take a subscription run: the row names it and why.
   await expect(list.getByRole('listitem')).toHaveCount(1)
   const opus = list.getByRole('listitem').filter({ hasText: 'e2e-opus-reported' })
-  await expect(opus).toContainText('Claude Code · Claude 订阅')
+  await expect(opus).toContainText('Claude 订阅 · 只能用 Claude Code')
   await expect(opus.getByRole('status')).toHaveText('E2E MacBook 的 Mikka 需要更新')
   await attachLightDark(page, testInfo, 'model-order-needs-update')
   // Its Mikka updated: the subscription's model runs there, though its CLI reported no models.

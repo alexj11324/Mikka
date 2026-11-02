@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { defaultOrder, deviceModel, pickDevice, planDispatch, whyNoDevice, type CredentialState, type OrderEntry, type PoolDevice } from './model-order-plan'
+import { agentsByOffer, defaultOrder, deviceModel, onPreferredAgent, pickDevice, planDispatch, whyNoDevice, type CredentialState, type OrderEntry, type PoolDevice } from './model-order-plan'
 
 // Model names here are fixtures standing for what a CLI or provider reported.
 const sub = (id: string, harness: OrderEntry['harness'], model: string, connectionId = `conn-${harness}`): OrderEntry => ({ id, harness, model, source: { kind: 'subscription', connectionId } })
@@ -145,4 +145,10 @@ test('an untouched list: opus first, then the first Codex model reported, else t
   const both = deepseek.flatMap(item => [item, { ...item, harness: 'codex' as const }])
   assert.deepEqual(defaultOrder(both).map(item => [item.model, item.harness]), [['reported-deepseek-chat', 'claude_code']])
   assert.deepEqual(defaultOrder([...claude, ...chatgpt, ...both]).map(item => [item.model, item.harness]), [['reported-opus-x', 'claude_code'], ['reported-codex-top', 'codex']])
+  // 优先使用的 Agent Codex: the same DeepSeek model lands on Codex instead.
+  assert.deepEqual(defaultOrder(both, 'codex').map(item => [item.model, item.harness]), [['reported-deepseek-chat', 'codex']])
+  assert.deepEqual(defaultOrder([...claude, ...both], 'codex').map(item => [item.model, item.harness]), [['reported-opus-x', 'claude_code'], ['reported-deepseek-chat', 'codex']])
+  // Which Agents run each model and credential; one-Agent credentials are untouched by the preference.
+  assert.deepEqual(agentsByOffer(both).get(`reported-deepseek-chat\u0000d`), ['claude_code', 'codex'])
+  assert.deepEqual(onPreferredAgent([...claude, ...both], 'codex').map(item => item.harness), ['claude_code', 'claude_code', 'codex', 'codex'])
 })

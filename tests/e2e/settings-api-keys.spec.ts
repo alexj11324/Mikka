@@ -15,9 +15,13 @@ let server: Server
 let baseUrl = ''
 /** What the provider's /models answers next: its model ids, or down (503). */
 let listed: string[] | 'down' = ['e2e-large', 'e2e-small']
+/** Whether the provider serves the Responses API, which Codex runs on: an empty POST is refused (400), or the route is missing (404). */
+let responses = true
+
 
 test.beforeAll(async () => {
   server = createServer((request, response) => {
+    if (request.method === 'POST' && request.url === '/v1/responses') { response.writeHead(responses ? 400 : 404, { 'content-type': 'application/json' }).end('{"error":{"message":"model is required"}}'); return }
     if (request.method !== 'GET' || request.url !== '/v1/models') { response.writeHead(404).end(); return }
     if (request.headers.authorization !== `Bearer ${GOOD}`) { response.writeHead(401, { 'content-type': 'application/json' }).end('{"error":"invalid"}'); return }
     if (listed === 'down') { response.writeHead(503).end(); return }
@@ -125,6 +129,43 @@ test('模型与订阅：添加自定义服务商、校验失败、分享给团�
   await expect(page.getByRole('switch', { name: '分享 E2E 网关 给团队成员', exact: true })).toHaveCount(0)
 })
 
+// A custom OpenAI-protocol provider without the Responses API (Codex runs on it) is still saved: its row
+// says Codex can't use it, 允许使用的模型 offers none of its models, and bot chats can still pick it.
+test('模型与订阅：不支持 Responses API 的自定义服务商照样保存，Codex 用不了', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  responses = false
+  listed = ['e2e-chat-only']
+  try {
+    await registerInTeam(page, '/settings?section=models')
+    await page.getByRole('button', { name: '添加 API Key', exact: true }).click()
+    const dialog = page.getByRole('dialog', { name: '添加 API Key' })
+    await dialog.getByRole('radiogroup', { name: '服务商' }).getByRole('radio', { name: /自定义服务商/ }).check()
+    await dialog.getByRole('textbox', { name: '名称' }).fill('只能对话')
+    await dialog.getByRole('textbox', { name: 'Base URL' }).fill(baseUrl)
+    await dialog.getByLabel('API Key').fill(GOOD)
+    await dialog.getByRole('button', { name: '添加', exact: true }).click()
+    await expect(dialog).toHaveCount(0)
+    const apiKeys = page.getByRole('region', { name: 'API Key', exact: true })
+    await expect(apiKeys.getByText(`${new URL(baseUrl).host} · ••••k3y9 · OpenAI 协议 · 不支持 Responses API · Codex 用不了`, { exact: true })).toBeVisible()
+    await expect(apiKeys.getByRole('status').filter({ hasText: '1 个模型' })).toBeVisible()
+    await attachLightDark(page, testInfo, 'api-keys-no-responses')
+    // No Agent runs its models, so 允许使用的模型 has nothing to add.
+    const addModel = page.getByRole('button', { name: '添加模型', exact: true })
+    await expect(addModel).toBeDisabled()
+
+    // 重新获取模型 asks again: once the provider has it, the row says Codex runs it and 添加模型 offers its model.
+    responses = true
+    await apiKeys.getByRole('button', { name: '重新获取 只能对话 的模型', exact: true }).click()
+    await expect(apiKeys.getByText(`${new URL(baseUrl).host} · ••••k3y9 · OpenAI 协议 · 可用 Codex`, { exact: true })).toBeVisible()
+    await addModel.click()
+    await expect(page.getByRole('dialog', { name: '添加模型' }).getByText('e2e-chat-only', { exact: true })).toBeVisible()
+    await page.keyboard.press('Escape')
+  } finally {
+    responses = true
+    listed = ['e2e-large', 'e2e-small']
+  }
+})
+
 // A DeepSeek key serves both Agents: its row says so, and 添加模型 lists each of its models once per Agent (model · Agent).
 // The key row is seeded (the real DeepSeek API is never called); its sealed value is never opened here.
 test('模型与订阅：DeepSeek 的 Key 两种 Agent 都能用', async ({ page }, testInfo) => {
@@ -149,5 +190,41 @@ test('模型与订阅：DeepSeek 的 Key 两种 Agent 都能用', async ({ page 
   await expect(rows.nth(0)).toContainText('已添加')
   await expect(rows.nth(1)).toContainText('Codex')
   await expect(rows.nth(1).getByRole('checkbox')).toBeEnabled()
+  await expect(addModels.getByText('DeepSeek API Key · 两种 Agent 都能跑', { exact: true })).toBeVisible()
   await attachLightDark(page, testInfo, 'api-keys-deepseek-models')
+  await page.keyboard.press('Escape')
+
+  // The row says both Agents run it and offers the Agent, 优先 marking the preferred one (Harness draft).
+  const list = page.getByRole('list', { name: '允许使用的模型' })
+  const row = list.getByRole('listitem').filter({ hasText: 'e2e-deepseek-flash' })
+  await expect(row).toContainText('DeepSeek API Key · 两种 Agent 都能跑')
+  await row.getByRole('button', { name: 'e2e-deepseek-flash 的 Agent：Claude Code' }).click()
+  const codex = page.getByRole('menuitemradio', { name: /Codex/ })
+  await expect(page.getByRole('menuitemradio', { name: /Claude Code/ })).toContainText('优先')
+  await attachLightDark(page, testInfo, 'model-order-agent-menu')
+  await codex.click()
+  await expect(row.getByRole('button', { name: 'e2e-deepseek-flash 的 Agent：Codex' })).toBeVisible()
+  await page.reload()
+  await expect(list.getByRole('listitem').filter({ hasText: 'e2e-deepseek-flash' }).getByRole('button', { name: 'e2e-deepseek-flash 的 Agent：Codex' })).toBeVisible()
+
+  // 优先使用的 Agent saves; 额度用完时 is its own section.
+  const agent = page.getByRole('region', { name: 'Agent', exact: true })
+  await expect(agent.getByRole('button', { name: 'Claude Code' }).or(agent.getByRole('radio', { name: 'Claude Code' }))).toHaveAttribute('aria-pressed', 'true')
+  await agent.getByRole('button', { name: 'Codex' }).or(agent.getByRole('radio', { name: 'Codex' })).click()
+  await page.reload()
+  await expect(page.getByRole('region', { name: 'Agent', exact: true }).getByRole('button', { name: 'Codex' }).or(page.getByRole('region', { name: 'Agent', exact: true }).getByRole('radio', { name: 'Codex' }))).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByRole('region', { name: '额度用完时' }).getByRole('switch', { name: '订阅额度用完后，自动改用 API Key' })).toBeVisible()
+  await attachLightDark(page, testInfo, 'model-order-agent')
+})
+
+// C8: nothing connected yet, so 允许使用的模型 says what is missing and links to it, instead of a greyed 添加模型.
+test('模型与订阅：没有订阅或 Key 时，允许使用的模型写明缺什么', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await registerInTeam(page, '/settings?section=models')
+  const models = page.getByRole('region', { name: '允许使用的模型' })
+  await expect(models.getByText('还没有订阅或 API Key', { exact: true })).toBeVisible()
+  const connect = models.getByRole('link', { name: '连接订阅或添加 API Key' })
+  await expect(connect).toHaveAttribute('href', '#subscriptions-heading')
+  await expect(models.getByRole('button', { name: '添加模型', exact: true })).toHaveCount(0)
+  await attachLightDark(page, testInfo, 'model-order-empty')
 })

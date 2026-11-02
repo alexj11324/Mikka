@@ -179,13 +179,16 @@ export interface OrderCandidate { harness: OrderHarness; model: string; name: st
  * what it reported (Alex, decision 2026-11-02-1400). Candidates come in the
  * order `orderCandidates` gives: Claude subscriptions, other subscriptions,
  * then keys, each in the order its account or provider listed its models.
+ * A model both Agents can run (a DeepSeek or Kimi key) counts once, on the
+ * preferred Agent (优先使用的 Agent, Claude Code unless changed).
  * - Claude Code's opus first, from a subscription before a key.
  * - Then Codex: the first model a subscription or key reported for it (the
  *   account lists its top model first; no tier word is required).
  * - Neither: the first model anything else reported, so the list is not empty.
  * Nothing connected: an empty list.
  */
-export function defaultOrder(candidates: readonly OrderCandidate[]): OrderCandidate[] {
+export function defaultOrder(all: readonly OrderCandidate[], preferred: OrderHarness = 'claude_code'): OrderCandidate[] {
+  const candidates = onPreferredAgent(all, preferred)
   const bySource = (items: readonly OrderCandidate[]) => [...items.filter(item => item.source.kind === 'subscription'), ...items.filter(item => item.source.kind !== 'subscription')]
   const picked: OrderCandidate[] = []
   for (const preference of DEFAULT_ORDER_PREFERENCE) {
@@ -193,13 +196,31 @@ export function defaultOrder(candidates: readonly OrderCandidate[]): OrderCandid
       && preference.words.some(word => `${candidate.model} ${candidate.name}`.toLowerCase().includes(word)))
     if (match) picked.push(match)
   }
-  // A key that serves both Agents (DeepSeek, Kimi) counts once, on Claude Code, the preferred Agent by default (Harness draft).
-  const sameOnClaude = (candidate: OrderCandidate) => candidates.some(other => other.harness === 'claude_code' && other.model === candidate.model
-    && other.source.kind === candidate.source.kind && (other.source.kind === 'subscription' ? other.source.connectionId : other.source.keyId) === (candidate.source.kind === 'subscription' ? candidate.source.connectionId : candidate.source.keyId))
-  const codex = bySource(candidates).find(candidate => candidate.harness === 'codex' && !sameOnClaude(candidate))
+  const codex = bySource(candidates).find(candidate => candidate.harness === 'codex')
   if (codex) picked.push(codex)
   if (!picked.length && candidates[0]) picked.push(candidates[0])
   return picked
+}
+
+/** The model and credential, whatever the Agent. */
+export const offerKey = (entry: Pick<OrderEntry, 'model' | 'source'>) =>
+  `${entry.model}\u0000${entry.source.kind === 'subscription' ? entry.source.connectionId : entry.source.keyId}`
+
+/** Which Agents can run each model and credential (a DeepSeek or Kimi key: both). */
+export function agentsByOffer(candidates: readonly Pick<OrderCandidate, 'harness' | 'model' | 'source'>[]): Map<string, OrderHarness[]> {
+  const agents = new Map<string, OrderHarness[]>()
+  for (const candidate of candidates) {
+    const list = agents.get(offerKey(candidate)) ?? []
+    if (!list.includes(candidate.harness)) list.push(candidate.harness)
+    agents.set(offerKey(candidate), list)
+  }
+  return agents
+}
+
+/** Candidates with a model both Agents run kept once, on the preferred Agent. */
+export function onPreferredAgent<T extends Pick<OrderCandidate, 'harness' | 'model' | 'source'>>(candidates: readonly T[], preferred: OrderHarness): T[] {
+  const agents = agentsByOffer(candidates)
+  return candidates.filter(candidate => (agents.get(offerKey(candidate))?.length ?? 0) < 2 || candidate.harness === preferred)
 }
 
 /** The same Agent, model and credential: one entry. */

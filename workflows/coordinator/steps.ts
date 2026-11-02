@@ -354,10 +354,13 @@ export async function getIssue(userId: string, input: { issueId: string }, scope
   const issue = await issueForUser(userId, input.issueId)
   if (!issue) return { error: 'issueNotFound' }
   const runs = await visibleRuns(userId, { issueId: issue.id, limit: 5 })
+  // The task's one thread, so more work goes to it (decision 2026-11-01-1330): its repository is already known.
+  const latest = await (await import('@/lib/thread-dispatch')).latestTaskRun(pool, userId, issue.id)
   return {
     id: issue.id, number: readIssueMetadata(issue.content).number ?? null, title: issue.title,
     status: issue.status, priority: issue.priority, body: tiptapToText(issue.content).slice(0, 8000),
     runs: runs.map(run => ({ id: run.id, agent: run.agentName, status: run.status, createdAt: run.createdAt.toISOString() })),
+    thread: latest ? { runId: latest.id, status: latest.status, repository: latest.remoteUrl } : null,
     ...(process.env.MIKKA_FACTORY_ROUTING_ENABLED === '1' ? { factory: await (await import('@/lib/factory/server')).factoryForBot(botId).listForIssue(userId,issue.id) } : {}),
   }
 }
@@ -394,7 +397,7 @@ export async function findRepository(userId: string, input: { name?: string }, s
  * One task, one thread (lib/thread-dispatch.ts): a task with a thread gets the dispatch as that thread's work; only
  * `newThread`, when the person's own message (`sourceEventId`, host-supplied) explicitly asked for it, starts another.
  */
-export async function dispatchRun(userId: string, input: { issueId: string; agentId?: string; repo: string; note?: string; requestKey?:string; readOnly?: boolean; newThread?: boolean; sourceEventId?: string; target?: import('@/lib/dispatch-target').DispatchTarget; model?: { harness: 'claude_code' | 'codex'; model?: string } }, scope: NativeToolScope | undefined, botId: string, execution?: AgentExecution, requestEventId?: string) {
+export async function dispatchRun(userId: string, input: { issueId: string; agentId?: string; repo?: string; note?: string; requestKey?:string; readOnly?: boolean; newThread?: boolean; sourceEventId?: string; target?: import('@/lib/dispatch-target').DispatchTarget; model?: { harness: 'claude_code' | 'codex'; model?: string } }, scope: NativeToolScope | undefined, botId: string, execution?: AgentExecution, requestEventId?: string) {
   'use step'
   await assertNativeToolScope(userId,scope)
   const { newThread, sourceEventId, target, ...request } = input
@@ -407,8 +410,12 @@ export async function dispatchRun(userId: string, input: { issueId: string; agen
   }
   // A bare name ("Mikka_test") becomes the one repository this user authorized by that name, or a card; only a new run needs it.
   const { withResolvedRepository } = await import('@/lib/coordinator/repository-resolution')
-  const byRules = (note: string | undefined, place?: import('@/lib/dispatch-target').DispatchTarget) =>
-    withResolvedRepository(userId, request.issueId, request.repo, repo => dispatchByRules(userId, { ...request, repo, note }, scope, botId, execution, requestEventId, place))
+  // More work for a task that has a thread keeps the thread's repository; only a task's first thread needs one named.
+  const byRules = (note: string | undefined, place?: import('@/lib/dispatch-target').DispatchTarget, threadRepo?: string | null) => {
+    const named = request.repo?.trim() || threadRepo
+    if (!named) return Promise.resolve({ error: 'repositoryRequired' as const, issueId: request.issueId })
+    return withResolvedRepository(userId, request.issueId, named, repo => dispatchByRules(userId, { ...request, repo, note }, scope, botId, execution, requestEventId, place))
+  }
   return asToolResult(async () => placed(await dispatchToTask(userId, request.issueId, {
     note: request.note, newThread,
     // A named place other than the thread's own is a move, which only the person's explicit request grants.
@@ -425,7 +432,7 @@ export async function dispatchRun(userId: string, input: { issueId: string; agen
         const result = await queueRun(userId, { issueId: request.issueId, agentId: previous.agentId, repo: previous.remoteUrl, note, readOnly: Boolean(request.readOnly || previous.readOnly), requestKey: `thread:${previous.id}:${request.requestKey ?? crypto.randomUUID()}`.slice(0, 200) }, botId, execution, requestEventId).catch(() => null)
         if (result) return { ...result, status: 'queued' as const }
       }
-      return byRules(note)
+      return byRules(note, undefined, previous.remoteUrl)
     },
   })))
 }

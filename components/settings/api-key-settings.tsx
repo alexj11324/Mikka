@@ -100,8 +100,12 @@ export function useApiKeyList(workspaceId: string) {
     </span>
     return <span role="status" className="flex flex-wrap items-center gap-2 text-xs">{key.models.length ? t('modelCount', { count: key.models.length }) : t('noModels')}{refetchButton}</span>
   }
+  // An OpenAI-protocol provider without the Responses API serves bot chats only (Codex runs on it).
+  const agentsLine = (key: Key) => key.protocol === 'openai' && !key.responsesApi && key.provider === 'custom'
+    ? t('noResponsesApi', { protocol: t('protocolName.openai') })
+    : protocolAgents(t, apiKeyProtocols(key))
   const rows: ReactNode[] = (data?.keys ?? []).map(key => <SettingRow key={key.id} icon={<ProviderIcon provider={key.provider} />} title={title(key)}
-    description={<><span className="block">{`${key.baseUrl ? new URL(key.baseUrl).host : t('apiKey')} · ••••${key.last4} · ${protocolAgents(t, apiKeyProtocols(key))}`}</span>{modelsLine(key)}</>}>
+    description={<><span className="block">{`${key.baseUrl ? new URL(key.baseUrl).host : t('apiKey')} · ••••${key.last4} · ${agentsLine(key)}`}</span>{modelsLine(key)}</>}>
     <span className="flex items-center gap-4">
       {data?.canShare && <Label className="flex items-center gap-2 font-normal text-muted-foreground">
         {shareT('others')}
@@ -169,7 +173,8 @@ export function ApiKeyFallbackSetting({ workspaceId }: { workspaceId: string }) 
   }
   if (!data) return null
   return <>
-    <SettingsSection>
+    {/* Its own policy, apart from the order of 允许使用的模型 (decision 2026-11-02 R, item 1). */}
+    <SettingsSection id="after-quota-heading" title={t('afterQuotaSection')}>
       <SettingRow title={t('afterQuota')} description={t('afterQuotaBilling')}>
         <Switch aria-label={t('afterQuota')} checked={data.apiKeyAfterQuota} onCheckedChange={on => void save(on)} />
       </SettingRow>
