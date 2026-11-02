@@ -19,15 +19,18 @@ import { closeThread, navigate, openThread } from './workspace-navigation'
  * pushed page R-66 describes.
  *
  * `issueId` is the task the thread works on when the caller knows it (the
- * thread lists do); a thread opened from its address alone looks it up.
+ * thread lists do); a thread opened from its address alone, or one with no
+ * task, looks it up.
  */
 export function ThreadColumn({ runId, issueId: known }: { runId: string; issueId?: string | null }) {
   const t = useTranslations('IssueThreads')
   const tPanel = useTranslations('Shell.panel')
   const { data: looked, isLoading } = useSWR(known ? null : ['thread-issue', runId], () => findThreadIssue(runId))
-  const issueId = known ?? looked
-  // A thread the viewer may not read (or that has no task) is not a place: show what is there instead.
+  // A thread with no task opens too, on its own conversation; it just has no task to link to.
+  const thread = known ? { issueId: known } : looked
+  // A thread the viewer may not read is not a place: show what is there instead.
   useEffect(() => { if (!known && !isLoading && looked === null) navigate({ thread: null }, 'replace') }, [known, isLoading, looked])
+  const issueId = thread?.issueId ?? null
   const resize = useResizableWidth(PANEL_WIDTH)
   const ref = useRef<HTMLElement>(null)
   useLayoutEffect(() => { ref.current?.style.setProperty('--thread-column-width', `${resize.width}px`) }, [resize.width])
@@ -38,8 +41,8 @@ export function ThreadColumn({ runId, issueId: known }: { runId: string; issueId
     resize.dragging && 'select-none',
   )}>
     <ResizeHandle resize={resize} label={tPanel('resize')} edge="start" className="hidden xl:block" />
-    {issueId
-      ? <IssueThreadPanel key={runId} issueId={issueId} runId={runId} onClose={closeThread} onOpenThread={openThread} onOpenTask={() => navigate({ issue: issueId, thread: runId })} />
+    {thread
+      ? <IssueThreadPanel key={runId} issueId={issueId} runId={runId} onClose={closeThread} onOpenThread={openThread} onOpenTask={issueId ? () => navigate({ issue: issueId, thread: runId }) : undefined} />
       : <div role="status" aria-label={t('loading')} className="flex flex-col gap-3 p-4"><Skeleton className="h-6 w-2/3" /><Skeleton className="h-24 w-full" /></div>}
   </aside>
 }

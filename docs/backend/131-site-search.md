@@ -140,7 +140,9 @@ renderer is changed. Foreign IDs still return the same 404 as missing IDs.
 Current client-only GlobalSearch still cannot select older server hits until
 Claude wires this API; existing browser cases establish the recent archive path.
 
-The candidate stays draft. Use the existing browser-tests workflow's explicit
+History: `browser-tests.yml` was removed and no browser tests run
+([decision](../design/decisions/2026-11-01-2225-api-cli-acceptance-and-backend-owner.md)); verify through the HTTP/API
+profile. The text below records the original plan. The candidate stays draft. Use the existing browser-tests workflow's explicit
 workflow_dispatch on the frozen candidate to run the same full ready/before-merge
 suite without changing readiness or invoking a merge/deployment. Dedicated dual-PG
 HTTP remains separate from that single-DB browser fixture job. Browser plugin not

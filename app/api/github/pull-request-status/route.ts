@@ -18,7 +18,7 @@ async function handlePOST(request: Request) {
   if (request.headers.get('origin') !== new URL(request.url).origin) return fail('originNotAllowed', 403)
   const input = inputSchema.safeParse(await request.json().catch(() => null))
   if (!input.success) return fail('githubPullRequestInvalid', 400)
-  const issue = await issueForUser(session.user.id, input.data.issueId)
+  const issue = await issueForUser(session.user, input.data.issueId)
   if (!issue) return fail('issueNotFound', 404)
   const linked = readIssueMetadata(issue.content).pullRequests.find(pr => canonicalUrl(pr.url) === canonicalUrl(input.data.url))
   if (!linked) return fail('githubPullRequestNotLinked', 404)

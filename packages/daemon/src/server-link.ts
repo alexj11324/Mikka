@@ -94,7 +94,7 @@ export interface ServerLink {
   /** Ids of queued runs pinned to this device. */
   pendingRuns(deviceId: string): Promise<string[]>
   /** Fails with `RunNotPinnedHereError` for runs pinned elsewhere. */
-  claimRun(deviceId: string, runId: string): Promise<RunAssignment>
+  claimRun(deviceId: string, runId: string, signal?: AbortSignal): Promise<RunAssignment>
   localComputerAuthority?(deviceId: string, runId: string): Promise<NonNullable<RunAssignment['localComputer']>>
   /** Receipted resumes require a current online source/access/lease fence. */
   validateSkillReceipt?(runId:string,receiptId:string):Promise<SkillReceiptRevalidation>
@@ -129,12 +129,14 @@ export interface ServerLink {
   /**
    * Messages people sent this device's runs and stops they asked for
    * (ADR 0018). Long-polls up to `waitSeconds` when nothing is pending;
-   * `signal` ends the wait early (daemon stopping).
+   * `signal` ends the wait early (daemon stopping). A server that also
+   * reports runs queued for this device passes them to `onQueuedRuns`, so
+   * the daemon claims them without waiting for its next heartbeat.
    */
   fetchCommands(
     deviceId: string,
     waitSeconds: number,
-    options?: { signal?: AbortSignal; skipRuns?: readonly string[] }
+    options?: { signal?: AbortSignal; skipRuns?: readonly string[]; onQueuedRuns?: (runIds: string[]) => void }
   ): Promise<RunCommand[]>
   /** Marks messages as handed to their agents. */
   ackCommands(deviceId: string, delivered: string[]): Promise<void>

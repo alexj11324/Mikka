@@ -1,6 +1,7 @@
 import createNextIntlPlugin from 'next-intl/plugin'
 import { withWorkflow } from 'workflow/next'
 import { basePath } from './lib/base-path-config.mjs'
+import { localTestAccountsMode } from './packages/protocol/src/local-test-mode.ts'
 
 const withNextIntl = createNextIntlPlugin('./i18n/request.ts')
 
@@ -9,12 +10,17 @@ const withNextIntl = createNextIntlPlugin('./i18n/request.ts')
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // next dev would rewrite AGENTS.md with its own block; the file is the project's
+  // (https://nextjs.org/docs/app/api-reference/config/next-config-js/agentRules).
+  agentRules: false,
+  // pnpm build runs the CI typechecker after Next generates its route types.
+  typescript: { ignoreBuildErrors: true },
   outputFileTracingIncludes: {
     '/*': ['./lib/abuse/data/disposable-email-domains.txt'],
     '/api/bots/*/subagents/**': ['./scripts/e2b/*.py', './scripts/e2b/*.mjs', './scripts/e2b/*.sh'],
     '/api/threads/**': ['./scripts/e2b/*.py', './scripts/e2b/*.mjs', './scripts/e2b/*.sh'],
     '/.well-known/workflow/**': ['./scripts/e2b/*.py', './scripts/e2b/*.mjs', './scripts/e2b/*.sh'],
-    '/api/bots/*/computer/*': ['./scripts/e2b/start-desktop.sh', './scripts/e2b/viewer-gateway.py', './scripts/e2b/lease-driver.py', './scripts/e2b/start-container-runtime.sh'],
+    '/api/bots/*/computer/*': ['./scripts/e2b/start-desktop.sh', './scripts/e2b/viewer-gateway.py', './scripts/e2b/lease-driver.py'],
     '/api/workspaces/**': ['./scripts/e2b/lease-driver.py'],
     '/v1/runs/*/screen': ['./scripts/e2b/screen-capture.sh'],
     '/api/subscriptions/**': ['./packages/subscription-worker/bin/mikka-subscription-worker', './packages/subscription-worker/bin/mikka-subscription-enrollment'],
@@ -73,7 +79,12 @@ const nextConfig = {
     }))]
   },
   experimental: {
+    // Three page-data workers exceeded the standard 8 GB production builder.
+    cpus: 1,
     globalNotFound: true,
+    // A copied acceptance checkout can invalidate Turbopack's persistent
+    // parent graph and abort next dev. Keep this disposable stack in memory.
+    ...(localTestAccountsMode(process.env) ? { turbopackFileSystemCacheForDev: false } : {}),
   },
   images: {
     unoptimized: true,

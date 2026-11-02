@@ -116,6 +116,12 @@ lines.on("line", async (line) => {
     result()
     return
   }
+  if (message === 'PERMISSION_MODE_TEST') {
+    const settings = JSON.parse(flag('--settings') ?? '{}')
+    text(JSON.stringify({ permissionMode: flag('--permission-mode') ?? null, skipPermissions: argv.includes('--allow-dangerously-skip-permissions') || argv.includes('--dangerously-skip-permissions'), sandbox: settings.sandbox ?? null, permissionPromptTool: flag('--permission-prompt-tool') ?? null }))
+    result()
+    return
+  }
   if (message === 'COMPUTER_CONFIG_TEST') {
     text(JSON.stringify({ computer: mcpServers.mikka_computer ?? null }))
     result()

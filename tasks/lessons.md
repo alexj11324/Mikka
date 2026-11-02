@@ -155,8 +155,8 @@ cp -R "$SRC/Default/Local Storage" "$DST/Default/"
 1. 字典完整性检查必须包含「代码用到的 key 是否存在于字典」，不能只比较两个 locale。
 2. 从 `useTranslations('Ns')` / `getTranslations(...)` 推断命名空间，校验字面量 `t('key')`；
    模板字符串 key 与同名变量多命名空间的情况跳过，避免误报。
-3. 浏览器验收时顺手扫 `\b(Namespace)\.[a-z0-9_.-]+`，这是发现缺 key 最快的手段。
-4. 动态拼接的 key（slash items、枚举）要么列白名单，要么在浏览器里逐项点开确认。
+3. 截图评审或 API 验收时顺手扫 `\b(Namespace)\.[a-z0-9_.-]+`，这是发现缺 key 最快的手段。
+4. 动态拼接的 key（slash items、枚举）要么列白名单，要么在本地截图里逐项确认。
 
 ## 2026-10-21 Turbopack 缓存被强杀后会永远卡在 Starting
 

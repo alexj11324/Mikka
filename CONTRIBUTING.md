@@ -15,7 +15,7 @@ Thank you for helping improve Mikka.
 ## Pull requests
 
 - Branch from `main` and keep each pull request to one change. How work moves
-  from a branch to `main` (local first, hot reload, merge batches, numbers,
+  from a branch to `main` (local first, hot reload, trunk-based merging, module owners, numbers,
   E2B dev templates) is in [`docs/dev-workflow.md`](docs/dev-workflow.md).
 - Write commit messages in English, in the form `<type>: <description>`, where
   the type is one of `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `perf`
@@ -27,9 +27,10 @@ Thank you for helping improve Mikka.
   pnpm check
   ```
 
-- Pull requests merge in batches of five through an `integration/<date>-<n>`
-  branch that the coordinator squash-merges ([`docs/dev-workflow.md`](docs/dev-workflow.md) § 5). The
-  required checks must pass on it. CI evaluates GitHub's
+- Each pull request branches from `main`, changes one thing, and is
+  squash-merged by the coordinator once CI is green
+  ([`docs/dev-workflow.md`](docs/dev-workflow.md) § 5). Backend changes are
+  Codex's; others ask first (the module owners table there). CI evaluates GitHub's
   synthetic PR merge commit (the PR combined with its target branch) rather
   than just the standalone PR head. An unrelated merge to `main` does not
   require rebasing a still-mergeable PR; a real conflict must be resolved and
@@ -65,12 +66,12 @@ cannot.
    succeed. CI runs no production build: Vercel builds `main`, and a failed
    build there leaves production on the last good deployment and is fixed
    forward. Vercel does not build pull requests.
-3. **No browser tests in CI**, not even by hand. Browser and UI acceptance
-   run locally: the specs under `tests/e2e/` against the local application,
-   and UI changes checked with screenshots of a local production build
-   (`next build`, `next start`). `browser-gate.yml` only keeps the protected
+3. **No browser tests**, in CI or locally. Acceptance runs locally through
+   the API and the CLI (`pnpm test:local-loop`), and UI changes are checked
+   with screenshots of a local production build (`next build`, `next start`). `browser-gate.yml` only keeps the protected
    check name "Browser tests (before merge)" and passes at once. Decision:
-   [`design/decisions/2026-11-01-1520-no-browser-tests-in-ci.md`](docs/design/decisions/2026-11-01-1520-no-browser-tests-in-ci.md).
+   [`design/decisions/2026-11-01-1520-no-browser-tests-in-ci.md`](docs/design/decisions/2026-11-01-1520-no-browser-tests-in-ci.md),
+   [`design/decisions/2026-11-01-2225-api-cli-acceptance-and-backend-owner.md`](docs/design/decisions/2026-11-01-2225-api-cli-acceptance-and-backend-owner.md).
 
 A pull request that only changes documentation — non-executable Markdown in
 `docs/` or `tasks/` (excluding nested `AGENTS.md`), root `AGENTS.md`, root README files, `LICENSE`,
@@ -99,21 +100,23 @@ mergeable. Details: `docs/design/decisions/2026-11-01-0330-ui-figma-and-skill-re
 ### Test logins: never ask for a password
 
 Sessions never ask Alex for an account, password or login step. To test
-signed in, create the login yourself: hash a random password with
-`better-auth/crypto`'s `hashPassword`, insert a `credential` row into `account`,
-store the email and password in Infisical (the database's environment), and
-check it through `POST <base>/api/auth/sign-in/email`. Only a click on a
-third-party site under Alex's identity (a GitHub App install, an OAuth consent)
-or a session permission prompt may be asked of him. Details and the current
-test accounts: `docs/design/decisions/2026-11-01-0300-agents-inject-test-logins.md`.
+signed in, take an account from the test-account lease pool
+(`scripts/test-accounts/session.mjs`; `docs/test-accounts.md`), which signs up
+or signs in through the normal email flow. Only a click on a third-party site
+under Alex's identity (a GitHub App install, an OAuth consent) or a session
+permission prompt may be asked of him. The named accounts set up outside the
+pool: `docs/design/decisions/2026-11-01-0300-agents-inject-test-logins.md`.
 
-The cloud worker's E2B template is released by CI, not by hand: a push to `main` that
-changes a path the template packages (`WORKER_PATHS` in `scripts/e2b/build-template.py`)
-or `scripts/e2b/` runs `.github/workflows/e2b-template.yml`, which builds the template,
-makes it public, sets `E2B_BYO_COMPUTER_TEMPLATE` and `MIKKA_CLOUD_WORKER_SHA` together
-in Vercel Production and redeploys. To test worker changes before that, build a
-`-dev` template from the branch with the same script and point only your local
-or test environment at it; never overwrite the production template or Vercel's
+Cloud machines start from E2B's own `desktop`, `claude` and `codex` templates with the
+Mikka worker added ([decision 2026-11-01-2335](docs/design/decisions/2026-11-01-2335-e2b-official-templates.md)).
+The three templates are released by CI, not by hand: a push to `main` that
+changes a path the templates package (`WORKER_PATHS` in `scripts/e2b/build-template.py`)
+or `scripts/e2b/` runs `.github/workflows/e2b-template.yml`, which builds them,
+makes them public, sets `E2B_BYO_COMPUTER_TEMPLATE`, `E2B_CLAUDE_TEMPLATE`,
+`E2B_CODEX_TEMPLATE` and `MIKKA_CLOUD_WORKER_SHA` together
+in Vercel Production and redeploys. To test worker changes before that, build
+`-dev` templates from the branch with the same script and point only your local
+or test environment at them; never overwrite the production templates or Vercel's
 production variables ([`docs/dev-workflow.md`](docs/dev-workflow.md) § 7).
 
 ## License

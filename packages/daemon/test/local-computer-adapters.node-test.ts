@@ -28,7 +28,7 @@ for (const kind of ['claude_code', 'codex', 'cursor'] as const) test(`${kind} re
   for (const runId of ['allowed', 'denied']) {
     // This fixture only inspects configuration; no tool operation is granted.
     const toolApproval = new ToolApprovalGate(runId, {
-      permission: () => 'deny', ask: async () => 'deny', isLive: id => id === runId,
+      isLive: id => id === runId,
     })
     try {
       const session = await adapter.start({ runId, toolApproval, cwd: resolve('../..'), env: buildChildEnv({ host: { PATH: process.env.PATH, HOME: home } }), log: createLogger({ level: 'silent' }), prompt: 'COMPUTER_CONFIG_TEST' })

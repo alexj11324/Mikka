@@ -14,7 +14,7 @@ function e2eDatabase() {
   return new Pool({ connectionString, max: 1 })
 }
 
-test('电脑 tab: no E2B key offers 添加 E2B API Key; adding the key shows the screen, removing it brings the button back, no reload', async ({ page }) => {
+test('电脑 tab: no E2B key offers 添加 E2B API Key; adding the key shows the screen, removing it brings the button back, no reload', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 1440, height: 960 })
   const { email } = await register(page)
   await page.getByRole('button', { name: '新建 Bot', exact: true }).first().click()
@@ -59,6 +59,30 @@ test('电脑 tab: no E2B key offers 添加 E2B API Key; adding the key shows the
     await revisit(() => expect(panel.getByRole('button', { name: '唤醒', exact: true })).toBeVisible())
     await expect(panel.getByText('云端助手 的屏幕', { exact: true })).toBeVisible()
     await expect(add).toHaveCount(0)
+
+    // Hold a controlled wake response while GET still answers sleeping. Rapid
+    // clicks must send one wake and show progress until the server catches up.
+    let wakeRequests = 0
+    let machine: 'sleeping' | 'waking' = 'sleeping'
+    let finishWake: (() => void) | undefined
+    await page.route('**/api/bots/*/computer', route => route.fulfill({ json: { machine, control: 'idle' } }))
+    await page.route('**/api/bots/*/computer/wake', async route => {
+      wakeRequests++
+      await new Promise<void>(resolve => { finishWake = resolve })
+      await route.fulfill({ status: 202, json: null })
+    })
+    try {
+      await panel.getByRole('button', { name: '唤醒', exact: true }).dblclick()
+      await expect.poll(() => wakeRequests).toBe(1)
+      await expect(panel.getByRole('progressbar', { name: '唤醒中', exact: true })).toBeVisible()
+      await expect(panel.getByRole('button', { name: '唤醒', exact: true })).toHaveCount(0)
+      await testInfo.attach('computer-wake-pending', { body: await page.screenshot(), contentType: 'image/png' })
+      machine = 'waking'
+      finishWake!()
+      await expect(panel.getByRole('progressbar', { name: '唤醒中', exact: true })).toBeVisible()
+      await expect(page.getByText('唤醒失败，请重试。', { exact: true })).toHaveCount(0)
+      expect(wakeRequests).toBe(1)
+    } finally { finishWake?.() }
 
     await pool.query('DELETE FROM user_e2b_keys WHERE "userId" = $1', [member.userId])
     await revisit(() => expect(add).toBeVisible())

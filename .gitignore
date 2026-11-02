@@ -26,6 +26,7 @@ yarn-error.log*
 # private temporary test credentials and sessions
 /.cache/e2e/
 /.cache/mvp-retained/
+/.cache/dev-local/
 /playwright-mvp-report/
 /mvp-test-results/
 

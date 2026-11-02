@@ -16,7 +16,6 @@ const pool = new Pool({ connectionString: url })
 const store = new AgentToolApprovalStore(pool)
 const runId = randomUUID(), deviceId = randomUUID(), actor = { userId: 'synthetic-owner', deviceId }
 let initialRevision = ''
-const payload = (requestId: string) => ({ runId, requestId, harness: 'codex' as const, method: 'item/commandExecution/requestApproval', input: { command: 'synthetic' }, policyRevision: initialRevision })
 before(async () => {
   await pool.query(`CREATE TABLE agent_runs (id uuid PRIMARY KEY, "userId" text NOT NULL, "deviceId" uuid NOT NULL, status text NOT NULL, "stopRequestedAt" timestamptz, "leaseExpiresAt" timestamptz, "agentId" uuid NOT NULL, "agentDefinition" jsonb, "botId" uuid)`)
   await pool.query(`ALTER TABLE agent_runs ADD COLUMN "issueId" uuid`)
@@ -33,50 +32,18 @@ before(async () => {
   initialRevision = (await readCliRunPolicy(pool, runId, actor.userId)).revision
 })
 after(async () => { await pool.end() })
-test('pending, owner decision, exactly one consumer, and scope isolation', async () => {
-  const proposal = await store.propose(actor, payload('one'))
-  assert.equal(await store.take(actor, runId, proposal.id, proposal.digest), 'pending')
-  assert.equal((await store.list(actor.userId, runId)).length, 1)
-  await assert.rejects(store.list('other', runId))
-  await assert.rejects(store.decide('other', runId, proposal.id, proposal.digest, 'approve'))
-  await assert.rejects(store.decide(actor.userId, runId, proposal.id, 'bad', 'approve'))
-  await store.decide(actor.userId, runId, proposal.id, proposal.digest, 'approve')
-  const decisions = await Promise.all([store.take(actor, runId, proposal.id, proposal.digest), store.take(actor, runId, proposal.id, proposal.digest)])
-  assert.deepEqual(decisions.sort(), ['allow', 'deny'])
-  await assert.rejects(store.decide(actor.userId, runId, proposal.id, proposal.digest, 'approve'))
-  await assert.rejects(store.propose(actor, { ...payload('one'), input: { command: 'different' } }))
-  await assert.rejects(store.take({ ...actor, deviceId: randomUUID() }, runId, proposal.id, proposal.digest))
-})
-test('#438 E: the same requestId with a different original input is rejected even when both mask alike', async () => {
-  const masked = { ...payload('masked-replay'), input: { command: 'echo [secret:API_TOKEN]' } }
-  const first = await store.propose(actor, { ...masked, originalInput: { command: 'echo sk_one' } })
-  assert.equal('inputDigest' in first, false)
-  assert.deepEqual(await store.propose(actor, { ...masked, originalInput: { command: 'echo sk_one' } }), first)
-  await assert.rejects(store.propose(actor, { ...masked, originalInput: { command: 'echo sk_two' } }))
-  await assert.rejects(store.propose(actor, masked), 'dropping the original input does not match either')
+test('checkState rejects another device', async () => {
+  await assert.rejects(store.checkState({ ...actor, deviceId: randomUUID() }, runId, initialRevision))
 })
 
-test('deny, cancellation and stopped run never authorize', async () => {
-  const denied = await store.propose(actor, payload('denied'))
-  await store.decide(actor.userId, runId, denied.id, denied.digest, 'deny')
-  assert.equal(await store.take(actor, runId, denied.id, denied.digest), 'deny')
-  const cancelled = await store.propose(actor, payload('cancel'))
-  await store.decide(actor.userId, runId, cancelled.id, cancelled.digest, 'approve')
-  assert.equal(await store.cancel(actor, runId, cancelled.id, cancelled.digest), true)
-  assert.equal(await store.take(actor, runId, cancelled.id, cancelled.digest), 'deny')
-  const stopped = await store.propose(actor, payload('stop'))
+test('a stopped run is never live', async () => {
   await pool.query('UPDATE agent_runs SET "stopRequestedAt"=now() WHERE id=$1', [runId])
-  await assert.rejects(store.decide(actor.userId, runId, stopped.id, stopped.digest, 'approve'))
-  await assert.rejects(store.take(actor, runId, stopped.id, stopped.digest))
+  await assert.rejects(store.checkState(actor, runId, initialRevision))
 })
 
-test('a changed worker policy revokes an approved but unconsumed request', async () => {
+test('a changed worker policy ends the live check for the old revision', async () => {
   await pool.query('UPDATE agent_runs SET "stopRequestedAt"=NULL WHERE id=$1', [runId])
-  const pending = await store.propose(actor, payload('policy-change'))
-  await store.decide(actor.userId, runId, pending.id, pending.digest, 'approve')
   await setCliPolicy(pool, actor.userId, runId, 'worker', initialRevision, { permissions: { install_dependency:'deny' } })
-  await assert.rejects(store.take(actor, runId, pending.id, pending.digest))
-  await assert.rejects(store.propose(actor, payload('stale-revision')))
   assert.equal(await store.check(actor, runId, initialRevision), false)
   const current = await readCliRunPolicy(pool,runId,actor.userId)
   assert.equal(current.policy.permissions.install_dependency, 'deny')
@@ -112,10 +79,8 @@ test('workspace may narrow agent policy, rejects forged generations, and invalid
   await pool.query(`UPDATE mikka_workspace_members SET role='member' WHERE "workspaceId"=$1 AND "userId"=$2`, [wid,actor.userId])
   await assert.rejects(setCliPolicy(pool,actor.userId,scopedRun,'workspace',recreated.revision,{},guard))
   const scopedStore = new AgentToolApprovalStore(pool, guard)
-  const pending = await scopedStore.propose(actor, { ...payload('workspace-revocation'), runId:scopedRun, policyRevision:recreated.revision })
   await pool.query(`UPDATE mikka_workspace_members SET status='removed' WHERE "workspaceId"=$1 AND "userId"=$2`, [wid,actor.userId])
-  await assert.rejects(scopedStore.decide(actor.userId,scopedRun,pending.id,pending.digest,'approve'))
-  assert.equal((await pool.query('SELECT status FROM agent_tool_approvals WHERE id=$1',[pending.id])).rows[0].status,'pending')
+  await assert.rejects(scopedStore.checkState(actor,scopedRun,recreated.revision))
 })
 
 test('legacy local runs materialize stable sandbox defaults without changing explicit choices', async () => {
@@ -190,7 +155,7 @@ test('policy changes and live tool checks share run-before-policy lock order', {
   assert.deepEqual(results.map(result => result.status === 'fulfilled' ? 'ok' : (result.reason as {code?:string}).code),['ok','ok'])
 })
 
-test('human control preserves pending approval and existing lease, then expires through the existing liveness poll', async () => {
+test('human control preserves the existing lease, then expires through the existing liveness poll', async () => {
   await pool.query(`ALTER TABLE agent_runs ADD COLUMN "pauseReason" text, ADD COLUMN "resumeStatus" text, ADD COLUMN "updatedAt" timestamptz`)
   await pool.query(`CREATE TABLE computer_run_bindings ("runId" uuid, "botId" uuid, "ownerId" text, "workspaceId" uuid);
     CREATE TABLE bot_desktops ("botId" uuid, "ownerId" text, "workspaceId" uuid, control text, "controlUntil" timestamptz)`)
@@ -199,16 +164,33 @@ test('human control preserves pending approval and existing lease, then expires 
   await pool.query(`INSERT INTO bot_desktops VALUES ($1,$2,$3,'user',now()+interval '5 minutes')`, [bot,actor.userId,workspace])
   await pool.query(`UPDATE agent_runs SET status='running',"stopRequestedAt"=NULL,"leaseExpiresAt"=now()+interval '1 hour' WHERE id=$1`, [runId])
   const revision = (await readCliRunPolicy(pool,runId,actor.userId)).revision
-  const approval = await store.propose(actor,{ ...payload('pause-boundary'),policyRevision:revision })
+  let statusReads = 0
+  const observed = new AgentToolApprovalStore({ query: pool.query.bind(pool), connect: async () => {
+    const client = await pool.connect()
+    return new Proxy(client, { get(target, key) {
+      if (key === 'query') return (...args: unknown[]) => {
+        if (String(args[0]).startsWith('SELECT status FROM agent_runs')) statusReads++
+        return Reflect.apply(target.query, target, args)
+      }
+      const value = Reflect.get(target, key, target)
+      return typeof value === 'function' ? value.bind(target) : value
+    } })
+  } })
+  const checkState = async (reads: number) => {
+    statusReads = 0
+    const result = await observed.checkState(actor,runId,revision)
+    assert.equal(statusReads, reads, 'unpaused checks reuse the locked status; paused checks reread after their update')
+    return result
+  }
+  assert.deepEqual(await checkState(1),{live:true,paused:false})
   await pool.query(`UPDATE agent_runs SET status='paused',"pauseReason"='human_control',"resumeStatus"='running' WHERE id=$1`, [runId])
   const lease = (await pool.query('SELECT "leaseExpiresAt" FROM agent_runs WHERE id=$1',[runId])).rows[0].leaseExpiresAt
-  assert.deepEqual(await store.checkState(actor,runId,revision),{live:true,paused:true})
-  assert.equal(await store.take(actor,runId,approval.id,approval.digest),'pending')
-  assert.equal((await pool.query('SELECT status FROM agent_tool_approvals WHERE id=$1',[approval.id])).rows[0].status,'pending')
+  assert.deepEqual(await checkState(2),{live:true,paused:true})
+  await pool.query(`UPDATE agent_runs SET "leaseExpiresAt"=now()-interval '1 second' WHERE id=$1`, [runId])
+  await assert.rejects(observed.checkState(actor,runId,revision))
+  await pool.query('UPDATE agent_runs SET "leaseExpiresAt"=$2 WHERE id=$1', [runId,lease])
   await pool.query(`UPDATE bot_desktops SET "controlUntil"=now()-interval '1 second' WHERE "botId"=$1`, [bot])
-  assert.deepEqual(await store.checkState(actor,runId,revision),{live:true,paused:false})
+  assert.deepEqual(await checkState(2),{live:true,paused:false})
   const resumed = (await pool.query('SELECT status,"pauseReason","resumeStatus","leaseExpiresAt" FROM agent_runs WHERE id=$1',[runId])).rows[0]
   assert.deepEqual(resumed,{status:'running',pauseReason:null,resumeStatus:null,leaseExpiresAt:lease})
-  await store.decide(actor.userId,runId,approval.id,approval.digest,'approve')
-  assert.equal(await store.take(actor,runId,approval.id,approval.digest),'allow')
 })

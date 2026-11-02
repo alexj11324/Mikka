@@ -11,11 +11,9 @@ import { fixedCheckSnapshot } from "../src/runs/check"
 import { RepositoryCache } from "../src/repositories"
 import { makeRepo, tempDir, waitFor } from "./helpers"
 
-// This process fixture runs only in the existing hosted CI test environment.
-// The user authorized cleanup of newly created hosted temporary resources;
-// preserved local containers/databases/directories are not test targets.
-if (process.env.CI !== "true" || process.env.GITHUB_ACTIONS !== "true")
-  throw new Error("Factory daemon process fixture requires isolated hosted CI")
+// MemoryServer and mkdtemp-owned repositories/data directories isolate this
+// fixture in local runs and CI. It never connects to an application database
+// or a remote server, and never adopts an existing daemon or checkout.
 
 const daemons: Daemon[] = []
 afterEach(async () => {

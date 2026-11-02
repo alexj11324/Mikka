@@ -76,6 +76,23 @@ test('registry-installed tarball runs its CLI and a real mock-daemon git task wi
   for (const asset of ['mikka-mcp.mjs', 'agents/native-container.mjs', 'computer/proxy.mjs', 'computer/driver.mjs', 'fixtures/success-edit.jsonl']) {
     assert.ok((await readFile(join(installed, asset))).length > 0)
   }
+  execFileSync(process.execPath, [join(root, 'scripts/build-cloud-worker.mjs')], { cwd: root, env: runtimeEnv, timeout: 30_000, killSignal: 'SIGKILL' })
+  for (const directory of [installed, join(root, 'dist/cloud')]) {
+    const handoff = join(await mkdtemp(join(scratch, 'mcp-')), 'handoff.json')
+    const requests = [
+      { jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18' } },
+      { jsonrpc: '2.0', id: 2, method: 'tools/list' },
+      { jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'submit', arguments: { summary: 'Packaged MCP submission' } } },
+    ].map(request => JSON.stringify(request)).join('\n') + '\n'
+    const replies = execFileSync(process.execPath, [join(directory, 'mikka-mcp.mjs'), '--handoff', handoff], {
+      cwd: temporary, env: runtimeEnv, input: requests, encoding: 'utf8', timeout: 10_000, killSignal: 'SIGKILL',
+    }).trim().split('\n').map(line => JSON.parse(line))
+    assert.ok(replies.find(reply => reply.id === 2)?.result.tools.some(tool => tool.name === 'submit'))
+    assert.equal(replies.find(reply => reply.id === 3)?.result.isError, undefined)
+    const submitted = JSON.parse(await readFile(handoff, 'utf8'))
+    assert.equal(submitted.kind, 'submit')
+    assert.equal(submitted.summary, 'Packaged MCP submission')
+  }
   const output = execFileSync(process.execPath, [join(root, 'test/package-runtime.mjs'), installed, temporary], { cwd: installation, env: runtimeEnv, encoding: 'utf8', timeout: 45_000, killSignal: 'SIGKILL' })
   assert.match(output, /PACKAGED_MOCK_DAEMON_GIT_TASK_PASSED/)
   assert.ok(!output.includes(token))

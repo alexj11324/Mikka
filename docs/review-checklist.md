@@ -111,14 +111,30 @@ more than once.
 
 1. The checklist above passes.
 2. Alex accepted the review page.
-3. Then e2e tests are written or updated and pass locally (not before
-   acceptance).
+3. Then the flow passes local API/CLI acceptance (not before acceptance of
+   the screens).
 4. CI is green as the final gate (`CONTRIBUTING.md` § How changes are
    tested); do not run builds on the Mac.
 5. Docs updated in the same PR: `rules.md`, `components.md`, `decisions.md`,
    `glossary.md` or the feature spec, whichever the change touches.
-6. Merged to main in the next integration batch ([dev workflow](dev-workflow.md) § 5),
-   after the coordinator reviews the screenshots.
+6. Squash-merged to main by the coordinator on green CI, after the screenshots
+   are reviewed ([dev workflow](dev-workflow.md) § 5).
+
+## Common-sense check (every PR)
+
+Every PR review goes through these one by one, UI or not. For each, compare
+with what Slack, Notion, Cursor and ChatGPT do.
+
+- [ ] A person can always use, delete and manage their own things:
+      subscriptions, keys, computers, bots, files, settings. Switches and
+      admin permissions govern only sharing with others
+      ([decision 2026-11-01-2240](design/decisions/2026-11-01-2240-own-credentials-always-usable.md)).
+- [ ] The value on screen is the value that is stored.
+- [ ] The default works: no unusable option selected by default, and nothing
+      shown online that is not.
+- [ ] The same feature behaves the same on the phone and on the web.
+- [ ] A refusal or error matches the person's real state: someone with a
+      connected subscription is never told to connect one.
 
 ## Pull requests
 

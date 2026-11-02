@@ -44,6 +44,8 @@ export interface RunSource {
   finishedAt: string | null
   /** Task outputs, already filtered through the viewer's task access. */
   pullRequests?: import('@/lib/issue-metadata').IssuePullRequest[]
+  /** 运行信息, for the viewer's own runs: where it ran, on what, who pays (lib/run-info.ts). */
+  info?: import('@/lib/run-info-view').RunInfo
 }
 
 export type CitationSource = IssueSource | RunSource

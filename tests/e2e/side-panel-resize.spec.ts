@@ -1,5 +1,5 @@
 import type { Locator, Page } from '@playwright/test'
-import { test, expect, register, app } from './fixtures'
+import { test, expect, register, registerInTeam, app } from './fixtures'
 
 async function drag(page: Page, handle: Locator, dx: number) {
   const box = await handle.boundingBox()
@@ -123,7 +123,7 @@ async function verticalDividers(page: Page) {
 // Decision 2026-11-01-1310 (R-80): every vertical line between columns resizes them, at Alex's 1000px window too.
 test('Every vertical divider on every rail page drags to resize, with a col-resize cursor', async ({ page }) => {
   await page.setViewportSize({ width: 1000, height: 720 })
-  await register(page)
+  await registerInTeam(page)
   const pages: [string, string][] = [
     ['chat', app('/')],
     ['suggestions', app('/?section=suggestions')],

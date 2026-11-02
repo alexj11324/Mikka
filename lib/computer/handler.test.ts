@@ -51,6 +51,30 @@ test('uses server-derived ownership and the shared request contract', async () =
   assert.deepEqual(f.calls.pop(), [actor, botId, 'viewer', 'view'])
   assert.equal((await f.handle(request(), botId, 'wake')).status, 202)
 })
+test('accepts a duplicate wake while provisioning without starting another worker', async () => {
+  const f = fixture()
+  f.store.operate = async () => { throw new ComputerError(409, 'Computer provisioning in progress') }
+  const handle = createComputerHandler(f.store, async () => actor, async () => { assert.fail('provisioning has not committed a desktop') })
+  const response = await handle(request(), botId, 'wake')
+  assert.equal(response.status, 202)
+  assert.deepEqual(await response.json(), null)
+  assert.equal(response.headers.get('cache-control'), 'private, no-store')
+})
+test('keeps provisioning conflicts for other actions and all other wake conflicts', async () => {
+  const f = fixture()
+  f.store.operate = async () => { throw new ComputerError(409, 'Computer provisioning in progress') }
+  for (const action of ['viewer', 'takeover', 'handback'] as const) {
+    const response = await f.handle(request('POST', { mode: 'view' }), botId, action)
+    assert.equal(response.status, 409)
+    assert.deepEqual(await response.json(), { error: 'Computer provisioning in progress' })
+  }
+  for (const message of ['Computer allocation changed', 'Desktop limit reached', 'Computer is already controlled']) {
+    f.store.operate = async () => { throw new ComputerError(409, message) }
+    const response = await f.handle(request(), botId, 'wake')
+    assert.equal(response.status, 409)
+    assert.deepEqual(await response.json(), { error: message })
+  }
+})
 test('keeps ownership errors but never serializes provider credentials', async () => {
   const f = fixture()
   f.store.operate = async () => { throw new ComputerError(404, 'Computer not found') }

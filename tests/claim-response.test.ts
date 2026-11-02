@@ -237,10 +237,46 @@ test('4e3: a cloud claim reads the task secrets (workspace + repo scope) before 
     const probe=fixture()
     Object.assign(probe,{caller:{userId:'member',scopeDeviceId:'device',scopeWorkspaceId:'ws'},cloud:{subscription:{id:'binding',workspaceId:'ws',route:'codex_cli',modelId:'fixture-subscription-model'}}})
     Object.assign(probe.device,{kind:'cloud',harnesses:[{harness:'codex',installed:true,toolApproval:true,computerBroker:true,subscriptionBroker:true}]})
-    const response=await claim(probe,['skill-preflight','policy','model-admission','secrets','claim','skill-claim','benchmark-claim','token'])
+    const response=await claim(probe,['skill-preflight','policy','model-admission','secrets','claim','skill-claim','benchmark-claim','token','settings'])
     assert.equal(response.status,200)
     assert.deepEqual(probe.subscriptionAdmissionCalls,[{scope:{workspaceId:'ws',ownerId:'member'},model:'fixture-subscription-model',route:'codex_cli'}])
   } finally { for(const key of ['MIKKA_CLOUD_COMPUTER_TASKS','MIKKA_BYOS_ENABLED','MIKKA_BYO_E2B_KEY'])if(saved[key]===undefined)delete process.env[key];else process.env[key]=saved[key] }
+})
+
+test('URL repository settings reach local and cloud claims; an explicit clear suppresses legacy cloud verification', async () => {
+  const keys = ['MIKKA_CLOUD_COMPUTER_TASKS', 'MIKKA_BYOS_ENABLED', 'MIKKA_BYO_E2B_KEY'] as const
+  const saved = keys.map(key => process.env[key])
+  Object.assign(process.env, { MIKKA_CLOUD_COMPUTER_TASKS: '1', MIKKA_BYOS_ENABLED: '1', MIKKA_BYO_E2B_KEY: '1' })
+  try {
+    for (const cloud of [false, true]) {
+      process.env.MIKKA_BYOS_ENABLED = cloud ? '1' : '0'
+      for (const settings of [{ verifyCommand: 'pnpm verify' }, { verifyCommand: null }, null]) {
+        const probe = fixture()
+        Object.assign(probe, { repositorySettings: settings })
+        Object.assign(probe.repo, { verifyCommand: 'legacy cloud command' })
+        if (cloud) {
+          Object.assign(probe, { caller: { userId: 'member', scopeDeviceId: 'device', scopeWorkspaceId: 'ws' }, cloud: { subscription: { id: 'binding', workspaceId: 'ws', route: 'codex_cli', modelId: 'fixture-subscription-model' } } })
+          Object.assign(probe.device, { kind: 'cloud', harnesses: [{ harness: 'codex', installed: true, toolApproval: true, computerBroker: true, subscriptionBroker: true }] })
+        }
+        const response = await claim(probe, cloud
+          ? ['skill-preflight', 'policy', 'model-admission', 'secrets', 'claim', 'skill-claim', 'benchmark-claim', 'token', 'settings']
+          : undefined)
+        assert.equal(response.status, 200)
+        const body = await response.json()
+        assert.equal(body.verifyCommand, settings ? settings.verifyCommand ?? undefined : cloud ? 'legacy cloud command' : undefined)
+        assert.deepEqual((probe as typeof probe & { settingsReads: unknown[][] }).settingsReads, [['member', probe.repo.remoteUrl]])
+      }
+    }
+    const probe = fixture()
+    Object.assign(probe, { caller: { userId: 'member', scopeDeviceId: 'device', scopeWorkspaceId: 'ws' }, cloud: { subscription: { id: 'binding', workspaceId: 'ws', route: 'codex_cli', modelId: 'fixture-subscription-model' } } })
+    Object.assign(probe.device, { kind: 'cloud', harnesses: [{ harness: 'codex', installed: true, toolApproval: true, computerBroker: true, subscriptionBroker: true }] })
+    Object.assign(probe.repo, { remoteUrl: null, verifyCommand: 'private workspace command' })
+    const response = await claim(probe, ['skill-preflight', 'policy', 'model-admission', 'secrets', 'claim', 'skill-claim', 'benchmark-claim', 'token'])
+    assert.equal(response.status, 200)
+    assert.equal((await response.json()).verifyCommand, 'private workspace command')
+  } finally {
+    keys.forEach((key, i) => { if (saved[i] === undefined) delete process.env[key]; else process.env[key] = saved[i] })
+  }
 })
 
 
@@ -255,7 +291,7 @@ test('platform cloud claims inject the configured secret assignment with BYO off
       if(!configured)delete process.env.WORKSPACE_SECRETS_KEY
       Object.assign(probe,{caller:{userId:'member',scopeDeviceId:'device',scopeWorkspaceId:'ws'},cloud:{subscription:{id:'binding',workspaceId:'ws',route:'codex_cli',modelId:'fixture-subscription-model'}},secretInjection:injection,secretReads:[]})
       Object.assign(probe.device,{kind:'cloud',harnesses:[{harness:'codex',installed:true,toolApproval:true,computerBroker:true,subscriptionBroker:true}]})
-      const response=await claim(probe,['skill-preflight','policy','model-admission','secrets','claim','skill-claim','benchmark-claim','token'])
+      const response=await claim(probe,['skill-preflight','policy','model-admission','secrets','claim','skill-claim','benchmark-claim','token','settings'])
       assert.equal(response.status,200)
       assert.deepEqual(probe.subscriptionAdmissionCalls,[{scope:{workspaceId:'ws',ownerId:'member'},model:'fixture-subscription-model',route:'codex_cli'}])
       const body=await response.json()

@@ -163,19 +163,15 @@ test('task workspace policy applies to Coordinator and cross-workspace Bot runs'
     assert.equal((await read(a.run)).policy.permissions.install_dependency, 'deny')
     await pool.query('UPDATE mikka_workspace_members SET status=\'active\' WHERE "workspaceId"=$1 AND "userId"=$2', [workspaceB, owner])
   })
-  await t.test('workspace changes revoke an existing approval and rollback never revives its revision', async () => {
+  await t.test('workspace changes end the live check and rollback never revives its revision', async () => {
     const store = new AgentToolApprovalStore(pool), actor = { userId: owner, deviceId: device }
     const initial = await read(a.run)
     assert.deepEqual(await (await checkHTTP(initial.revision)).json(), { live: true, paused: false })
-    const approval = await store.propose(actor, { runId: a.run, requestId: randomUUID(), harness: 'codex', method: 'item/commandExecution/requestApproval', input: { command: 'synthetic' }, policyRevision: initial.revision })
-    await store.decide(owner, a.run, approval.id, approval.digest, 'approve')
     const changed = await setCliPolicy(pool, owner, a.run, 'workspace', initial.revision, { permissions: { install_dependency: 'deny', git_push: 'deny' } })
     assert.equal(await store.check(actor, a.run, initial.revision), false)
     assert.deepEqual(await (await checkHTTP(initial.revision)).json(), { live: false, paused: false })
-    await assert.rejects(store.take(actor, a.run, approval.id, approval.digest))
     const reverted = await setCliPolicy(pool, owner, a.run, 'workspace', changed.revision, workspacePolicyA)
     assert.notEqual(reverted.revision, initial.revision)
-    await assert.rejects(store.take(actor, a.run, approval.id, approval.digest))
     assert.equal(await store.check(actor, a.run, reverted.revision), true)
   })
   await t.test('a lower agent layer cannot loosen the task workspace limit', async () => {
@@ -197,14 +193,9 @@ test('task workspace policy applies to Coordinator and cross-workspace Bot runs'
     assert.equal((await read(personal.run)).hierarchy,undefined)
     assert.deepEqual(await (await checkHTTP(initial.revision)).json(),{live:false,paused:false})
     assert.deepEqual(await (await checkHTTP(lower.revision)).json(),{live:true,paused:false})
-    const store = new AgentToolApprovalStore(pool), actor = {userId:owner,deviceId:device}
-    const approval = await store.propose(actor,{runId:a.run,requestId:randomUUID(),harness:'codex',method:'item/commandExecution/requestApproval',input:{command:'synthetic'},policyRevision:lower.revision})
-    await store.decide(owner,a.run,approval.id,approval.digest,'approve')
     const changed = await setCliPolicy(pool,owner,a.run,'project',lower.revision,{permissions:{git_push:'deny',install_dependency:'deny'}})
-    await assert.rejects(store.take(actor,a.run,approval.id,approval.digest))
     const rolledBack = await setCliPolicy(pool,owner,a.run,'project',changed.revision,lower.layers.project)
     assert.notEqual(rolledBack.revision,lower.revision)
-    await assert.rejects(store.take(actor,a.run,approval.id,approval.digest))
   })
   await t.test('only a current workspace admin can change team or project ceilings', async () => {
     const before = await read(a.run)
@@ -256,17 +247,14 @@ test('task workspace policy applies to Coordinator and cross-workspace Bot runs'
       await publish(subject.run,'agent',original.layers.agent)
       await publish(subject.run,'team',{defaults:teamDefaults})
       const before=await read(subject.run),store=new AgentToolApprovalStore(pool),actor={userId:owner,deviceId:device}
-      const approval=await store.propose(actor,{runId:subject.run,requestId:randomUUID(),harness:'codex',method:'item/commandExecution/requestApproval',input:{command:'synthetic'},policyRevision:before.revision})
-      await store.decide(owner,subject.run,approval.id,approval.digest,'approve')
       const snapshot=issuePolicySnapshot(policyDistributionContext(origin,owner,device,subject.run,before),before.policy)
       const changed=await publish(subject.run,'project',{defaults:{...projectDefaults,networkAllow:['changed-default.invalid']}})
       assert.notEqual(changed.revision,before.revision)
       assert.notEqual(issuePolicySnapshot(policyDistributionContext(origin,owner,device,subject.run,changed),changed.policy).payload.policyHash,snapshot.payload.policyHash)
       assert.equal(await store.check(actor,subject.run,before.revision),false)
-      await assert.rejects(store.take(actor,subject.run,approval.id,approval.digest))
       assert.equal((await fetch(`${origin}/v1/runs/${subject.run}/policy-snapshot`,{method:'POST',headers:{authorization:`Bearer ${token}`,'content-type':'application/json'},body:JSON.stringify({deviceId:device,snapshot})})).status,409)
       const reverted=await publish(subject.run,'project',{defaults:projectDefaults})
-      assert.notEqual(reverted.revision,before.revision);await assert.rejects(store.take(actor,subject.run,approval.id,approval.digest))
+      assert.notEqual(reverted.revision,before.revision)
       const readResponse=await fetch(`${origin}/api/agent-cli-policy`,{method:'POST',headers:{cookie:'owner=1',origin,'content-type':'application/json'},body:JSON.stringify({operation:'read',runId:subject.run})})
       assert.equal(readResponse.status,200);assert.deepEqual((await readResponse.json()).defaults,reverted.defaults)
       const audits=(await pool.query(`SELECT metadata FROM workspace_audit_events WHERE "workspaceId"=$1 AND action='agent.policy_changed'`,[workspaceA])).rows
@@ -278,38 +266,31 @@ test('task workspace policy applies to Coordinator and cross-workspace Bot runs'
       await setCliPolicy(pool,owner,b.run,'workspace',(await read(b.run)).revision,botOriginal.layers.workspace)
     }
   })
-  await t.test('joining a stricter project invalidates an already admitted run and approval', async () => {
+  await t.test('joining a stricter project invalidates an already admitted run', async () => {
     const control = await fixture(workspaceA), candidate = await fixture(workspaceA), scopedProject = randomUUID()
     await pool.query(`UPDATE mikka_team_issues SET "teamId"=$2 WHERE "issueId"=$1`,[candidate.issue,control.team])
     await pool.query(`INSERT INTO workspace_projects(id,"userId",name,summary,description,status,priority,lead,team,"startDate","targetDate","issueIds",revision) VALUES($1,$2,'Stricter policy project','','','started','none','','','','',$3,1)`,[scopedProject,owner,JSON.stringify([control.issue])])
     await pool.query(`INSERT INTO mikka_team_projects("projectId","teamId","workspaceId","userId") VALUES($1,$2,$3,$4)`,[scopedProject,control.team,workspaceA,owner])
     const controlPolicy = await read(control.run)
     await setCliPolicy(pool,owner,control.run,'project',controlPolicy.revision,{permissions:{git_push:'deny'}})
-    const old = await read(candidate.run), store = new AgentToolApprovalStore(pool), actor = {userId:owner,deviceId:device}
+    const old = await read(candidate.run)
     // The default before the stricter layer: push is the GitHub App grant (allow), never ask.
     assert.equal(old.policy.permissions.git_push,'allow')
-    const approval = await store.propose(actor,{runId:candidate.run,requestId:randomUUID(),harness:'codex',method:'item/commandExecution/requestApproval',input:{command:'synthetic'},policyRevision:old.revision})
-    await store.decide(owner,candidate.run,approval.id,approval.digest,'approve')
     await pool.query(`UPDATE workspace_projects SET "issueIds"=$2,revision=revision+1 WHERE id=$1`,[scopedProject,JSON.stringify([control.issue,candidate.issue])])
-    await assert.rejects(store.take(actor,candidate.run,approval.id,approval.digest),/agentPolicyChanged/)
     await assert.rejects(read(candidate.run),/agentPolicyChanged/)
     assert.equal((await checkHTTP(old.revision,candidate.run)).status,409)
-    assert.equal((await pool.query('SELECT status FROM agent_tool_approvals WHERE id=$1',[approval.id])).rows[0].status,'approved')
     const fresh = randomUUID()
     await pool.query(`INSERT INTO agent_runs(id,"userId","issueId","agentId","deviceId",status,"leaseExpiresAt") VALUES($1,$2,$3,$4,$5,'running',now()+interval '5 minutes')`,[fresh,owner,candidate.issue,agent,device])
     assert.equal((await read(fresh)).policy.permissions.git_push,'deny')
   })
-  await t.test('changing to a stricter team invalidates an admitted run and approval in the same workspace', async () => {
+  await t.test('changing to a stricter team invalidates an admitted run in the same workspace', async () => {
     const control = await fixture(workspaceA), candidate = await fixture(workspaceA)
     const controlPolicy = await read(control.run)
     await setCliPolicy(pool,owner,control.run,'team',controlPolicy.revision,{permissions:{git_push:'deny'}})
-    const old = await read(candidate.run), store = new AgentToolApprovalStore(pool), actor = {userId:owner,deviceId:device}
+    const old = await read(candidate.run)
     // The default before the stricter layer: push is the GitHub App grant (allow), never ask.
     assert.equal(old.policy.permissions.git_push,'allow')
-    const approval = await store.propose(actor,{runId:candidate.run,requestId:randomUUID(),harness:'codex',method:'item/commandExecution/requestApproval',input:{command:'synthetic'},policyRevision:old.revision})
-    await store.decide(owner,candidate.run,approval.id,approval.digest,'approve')
     await pool.query(`UPDATE mikka_team_issues SET "teamId"=$2 WHERE "issueId"=$1`,[candidate.issue,control.team])
-    await assert.rejects(store.take(actor,candidate.run,approval.id,approval.digest),/agentPolicyChanged/)
     await assert.rejects(read(candidate.run),/agentPolicyChanged/)
     assert.equal((await checkHTTP(old.revision,candidate.run)).status,409)
     const fresh = randomUUID()

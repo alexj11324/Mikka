@@ -19,7 +19,7 @@ for (const [name, proto] of [['Pool', pg.Pool.prototype], ['Client', pg.Client.p
 
 test('personal worker mailbox with the flag off returns 503 and never touches the database or the secret set', async () => {
   const saved = process.env.MIKKA_PERSONAL_MAILBOX_ENABLED
-  delete process.env.MIKKA_PERSONAL_MAILBOX_ENABLED
+  process.env.MIKKA_PERSONAL_MAILBOX_ENABLED = '0'
   try {
     const { personalWorkerMailbox } = await import('./personal-mailbox-runtime')
     const result = await personalWorkerMailbox('owner', '00000000-0000-4000-8000-000000000001', { action: 'send', to: 'peer', key: 'k', text: 'sk-synthetic-only' }, 'synthetic-token')

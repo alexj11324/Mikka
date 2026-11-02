@@ -84,7 +84,8 @@ matching schema, fixed Preview and UI acceptance before release.
   edit and owner isolation.
 - The DB suite is in the required inventory; `tests/migrate-empty-db.test.mjs`
   validates the append-only receipt migration and schema during CI.
-- Full chat-to-daemon browser acceptance belongs to #357 item 6. A source test
+- Full chat-to-daemon acceptance belongs to the API/CLI acceptance
+  (`pnpm test:local-loop`). A source test
   or skipped DB test is not evidence that deployed acceptance passed.
 
 No configuration is required: the capability is on once the deploy has

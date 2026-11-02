@@ -6,11 +6,12 @@ import { factory194Target } from "../../tests/helpers/factory194-target";
 import { FactoryError } from "./approval-contract";
 import { handleFactoryApproval } from "./approval-http";
 import { orchestratorSettings } from "@mikka/protocol/orchestrator";
+import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
 
 const ci = process.env.CI === "true" && process.env.GITHUB_ACTIONS === "true";
 const db =
   process.env.FACTORY194_TEST_URL ??
-  (ci ? process.env.E2E_DATABASE_URL : undefined);
+  (disposableDatabase() ? process.env.E2E_DATABASE_URL : undefined);
 if (process.env.REQUIRE_DB === "1" && !db)
   throw new Error("Factory reject DB test requires an explicit disposable database");
 if (db) factory194Target(db, ci);

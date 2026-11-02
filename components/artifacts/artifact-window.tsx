@@ -1,6 +1,7 @@
 'use client'
 
 import dynamic from 'next/dynamic'
+import { useSearchParams } from 'next/navigation'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
 import { getIssueThread } from '@/app/actions/agents'
@@ -37,14 +38,17 @@ const openIssue = (id: string) => navigate({ issue: id })
 export function ArtifactWindow({ artifactId }: { artifactId: string }) {
   const tNav = useTranslations('Nav')
   const tThreads = useTranslations('IssueThreads')
+  const openThreadId = useSearchParams().get('thread')
   // The same key as the reader inside, so both read one request; only the person's own artifact comes back.
   const { data: detail } = useSWR(['artifact', artifactId], () => getArtifact(artifactId))
   const runId = detail?.runId ?? null
   const issueId = detail?.issueId ?? null
   const botId = detail?.botId ?? null
-  const threadMade = Boolean(runId && issueId)
+  // Opened from that thread (it is the open thread in the address), a run with no task sits beside its conversation too.
+  const fromThread = Boolean(runId) && openThreadId === runId
+  const threadMade = Boolean(runId) && (Boolean(issueId) || fromThread)
   // The same key as the thread panel beside it, so both read one request.
-  const { data: thread } = useSWR(threadMade ? ['issue-thread', issueId, runId] : null, () => getIssueThread(issueId!, runId!))
+  const { data: thread } = useSWR(threadMade ? ['issue-thread', issueId, runId] : null, () => getIssueThread(issueId, runId!))
   const { data: bots, error: botsError } = useSWR(botId && !threadMade ? 'bots' : null, listBots)
   // The Coordinator's own bot is the Coordinator chat, never a second bot.
   const bot = botId ? bots?.find(item => item.id === botId && !item.coordinator) : undefined
@@ -58,7 +62,7 @@ export function ArtifactWindow({ artifactId }: { artifactId: string }) {
     bot={{ name: '', avatar: <Skeleton className="size-5 rounded-full" /> }} chat={() => null} />
   if (threadMade) return <ArtifactViewer {...shared} quotes={[]} canQuote={false}
     bot={{ name: thread ? thread.thread.detail?.name ?? tThreads('title') : '', avatar: null }}
-    chat={() => <IssueThreadPanel issueId={issueId!} runId={runId!} onClose={closeArtifact} onOpenThread={openThread} bare />} />
+    chat={() => <IssueThreadPanel issueId={issueId} runId={runId!} onClose={closeArtifact} onOpenThread={openThread} bare />} />
   // A bot that is gone, or a list that failed, falls back to the Coordinator.
   if (bot) return <ArtifactViewer {...shared} quotes={quotes}
     bot={{ name: bot.name, avatar: <BotAvatar color={bot.color} shape={bot.shape} size="pill" /> }}

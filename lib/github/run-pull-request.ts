@@ -34,6 +34,8 @@ const prSchema = z.object({
   title: z.string().max(256).optional(),
   node_id: z.string().min(1).optional(),
   merged_at: z.string().nullable(), body: z.string().nullable(),
+  // A single PR carries its line counts; GitHub's list of PRs leaves them out.
+  additions: z.number().int().nonnegative().optional(), deletions: z.number().int().nonnegative().optional(),
   head: z.object({ ref: z.string(), repo: z.object({ id }).nullable() }),
   base: z.object({ repo: z.object({ id }) }),
 })
@@ -71,7 +73,9 @@ function api(fetcher: typeof fetch) {
       throw new PublicationError('github_unavailable', true)
     }
     if (response.status === 404 && init.missing) throw new PublicationError(init.missing, init.missing === 'branch_not_pushed')
-    if (!response.ok) throw new PublicationError('github_request_failed')
+    // GitHub rejected this server's App JWT or the token it just minted: the App ID, key or clock is wrong here, not a GitHub outage.
+    if (response.status === 401) throw new PublicationError('github_not_configured', false, 401)
+    if (!response.ok) throw new PublicationError('github_request_failed', false, response.status)
     try { return await response.json() as unknown }
     catch { throw new PublicationError('github_request_failed') }
   }
@@ -96,11 +100,15 @@ async function repositoryAccess(options: Options, need: 'push' | 'pull_request' 
   const metadataToken = parse(tokenSchema, await request(`/app/installations/${installation.id}/access_tokens`, jwt, {
     method: 'POST', body: { repositories: [repo.repo], permissions: { metadata: 'read', contents: 'read' } },
   })).token
-  const githubUser = parse(userSchema, await request(`/user/${options.githubAccountId}`, metadataToken, { missing: 'github_access_denied' }))
-  if (String(githubUser.id) !== options.githubAccountId) throw new PublicationError('github_access_denied')
-  const permission = parse(permissionSchema, await request(`${repo.path}/collaborators/${encodeURIComponent(githubUser.login)}/permission`, metadataToken, { missing: 'github_access_denied' }))
-  if (String(permission.user.id) !== options.githubAccountId || !['write', 'admin'].includes(permission.permission)) throw new PublicationError('github_access_denied')
-  const repository = parse(repositorySchema, await request(repo.path, metadataToken, { missing: 'github_not_installed' }))
+  const [repository] = await Promise.all([
+    request(repo.path, metadataToken, { missing: 'github_not_installed' }).then(value => parse(repositorySchema, value)),
+    (async () => {
+      const githubUser = parse(userSchema, await request(`/user/${options.githubAccountId}`, metadataToken, { missing: 'github_access_denied' }))
+      if (String(githubUser.id) !== options.githubAccountId) throw new PublicationError('github_access_denied')
+      const permission = parse(permissionSchema, await request(`${repo.path}/collaborators/${encodeURIComponent(githubUser.login)}/permission`, metadataToken, { missing: 'github_access_denied' }))
+      if (String(permission.user.id) !== options.githubAccountId || !['write', 'admin'].includes(permission.permission)) throw new PublicationError('github_access_denied')
+    })(),
+  ])
   if (repository.full_name.toLowerCase() !== `${repo.owner}/${repo.repo}`.toLowerCase()) throw new PublicationError('github_access_denied')
   const binding: GitHubRepositoryBinding = { installationId: installation.id, repositoryId: repository.id, githubAccountId: options.githubAccountId, defaultBranch: repository.default_branch }
   return { ...repo, request, jwt, metadataToken, binding }
@@ -125,10 +133,7 @@ export async function issueRunGitHubInstallationToken(options: Options) {
   const access = await repositoryAccess(options)
   const result = parse(z.object({ token: z.string().min(1), expires_at: z.iso.datetime() }),
     await access.request(`/app/installations/${access.binding.installationId}/access_tokens`, access.jwt, {
-      method: 'POST', body: {
-        repository_ids: [access.binding.repositoryId],
-        permissions: { contents: 'write', pull_requests: 'write', checks: 'read', actions: 'read', metadata: 'read' },
-      },
+      method: 'POST', body: { repository_ids: [access.binding.repositoryId] },
     }))
   if (Date.parse(result.expires_at) <= Date.now()) throw new PublicationError('github_request_failed')
   return { token: result.token, expiresAt: result.expires_at }
@@ -165,12 +170,13 @@ export async function openRunPullRequest(options: Options & {
   const ref = parse(z.object({ object: z.object({ sha: z.string() }) }), await request(`${path}/git/ref/heads/${options.branch.split('/').map(encodeURIComponent).join('/')}`, access.metadataToken, { missing: 'branch_not_pushed' }))
   if (ref.object.sha.toLowerCase() !== options.commit.toLowerCase()) throw new PublicationError('branch_changed')
   const writeToken = parse(tokenSchema, await request(`/app/installations/${binding.installationId}/access_tokens`, access.jwt, {
-    method: 'POST', body: { repository_ids: [binding.repositoryId], permissions: { metadata: 'read', pull_requests: 'write' } },
+    method: 'POST', body: { repository_ids: [binding.repositoryId] },
   })).token
   const marker = `<!-- mikka-issue:${options.issueId} -->`
   const write = <T>(operation: () => Promise<T>) => options.withWrite ? options.withWrite(operation) : operation()
   const result = async (raw: unknown): Promise<PublishedPullRequest> => {
     const pr = parse(prSchema, raw)
+    const lines = pr.additions !== undefined && pr.deletions !== undefined ? { additions: pr.additions, deletions: pr.deletions } : {}
     if (pr.head.ref !== options.branch || pr.head.repo?.id !== binding.repositoryId || pr.base.repo.id !== binding.repositoryId || !pr.body?.trimEnd().endsWith(marker)) throw new PublicationError('pull_request_conflict')
     const expected = `https://github.com/${access.owner}/${access.repo}/pull/${pr.number}`
     if (pr.html_url.toLowerCase() !== expected.toLowerCase()) throw new PublicationError('github_request_failed')
@@ -185,9 +191,9 @@ export async function openRunPullRequest(options: Options & {
         },
       })))
       if (converted.data.convertPullRequestToDraft.pullRequest.id !== pr.node_id) throw new PublicationError('github_request_failed')
-      return { url: pr.html_url, ...(pr.title ? { title: pr.title } : {}), state: 'draft' }
+      return { url: pr.html_url, ...(pr.title ? { title: pr.title } : {}), state: 'draft', ...lines }
     }
-    return { url: pr.html_url, ...(pr.title ? { title: pr.title } : {}), state: pr.merged_at ? 'merged' : pr.state === 'closed' ? 'closed' : pr.draft ? 'draft' : 'open' }
+    return { url: pr.html_url, ...(pr.title ? { title: pr.title } : {}), state: pr.merged_at ? 'merged' : pr.state === 'closed' ? 'closed' : pr.draft ? 'draft' : 'open', ...lines }
   }
   const find = async () => {
     const query = new URLSearchParams({ state: 'all', head: `${access.owner}:${options.branch}`, per_page: '100', sort: 'created', direction: 'desc' })

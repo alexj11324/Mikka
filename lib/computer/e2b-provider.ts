@@ -1,9 +1,8 @@
 import 'server-only'
-import { createHmac } from 'node:crypto'
+import { createHash, createHmac } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Sandbox, SandboxNotFoundError } from 'e2b'
-import { HOSTED_NATIVE_IMAGE } from '@mikka/protocol/subscription'
 import { computerTemplate, e2bApiKey, sandboxKeyOwner, withE2BErrors } from '@/lib/secrets/e2b-runtime'
 import { E2BKeyError } from '@/lib/secrets/flag'
 
@@ -47,7 +46,7 @@ export async function computerState(workspaceId: string, id: string) {
   return info.state === 'paused' ? 'sleeping' : 'running'
 }
 
-/** Template is built from scripts/e2b/bootstrap.sh, never a third-party CUA image. */
+/** Official E2B desktop base with the Mikka worker and pinned CLIs baked in. */
 export async function createComputer(workspaceId: string, operationId: string) {
   // Flag on: only the public template from E2B_BYO_COMPUTER_TEMPLATE; a 404 becomes e2b_template_unavailable.
   const template = computerTemplate()
@@ -62,33 +61,34 @@ export async function createComputer(workspaceId: string, operationId: string) {
   }))
 }
 
+/** Refresh authorization guards without replacing the desktop script baked
+ * with each template's package set. Hashes also catch partial guard updates. */
 export async function installComputerRuntime(sandbox: Sandbox) {
-  // Created per instance, never baked into a shared template.
-  await sandbox.commands.run("if getent group mikka-runner >/dev/null; then install -d -m 710 -o root -g mikka-runner /run/mikka-viewer; else install -d -m 700 /run/mikka-viewer; fi; umask 077; head -c 32 /dev/urandom > /run/mikka-viewer/key", { user: 'root' })
-  for (const name of ['start-desktop.sh', 'viewer-gateway.py', 'lease-driver.py']) {
-    const content = await readFile(join(process.cwd(), 'scripts/e2b', name), 'utf8')
-    await sandbox.files.write(`/opt/mikka/computer/${name}`, content, { user: 'root' })
-  }
-  await sandbox.commands.run('chmod 0755 /opt/mikka/computer/lease-driver.py', { user: 'root', timeoutMs: 10_000 })
-  await sandbox.commands.run('flock -n /run/mikka-viewer/gateway.lock /usr/bin/python3 /opt/mikka/computer/viewer-gateway.py', { user: 'root', background: true, timeoutMs: 0 })
-  await sandbox.commands.run('for i in $(seq 1 30); do [ "$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:6080/vnc)" = 401 ] && exit 0; sleep .2; done; exit 1', { user: 'root', timeoutMs: 10_000 })
+  const files = await Promise.all(['viewer-gateway.py', 'lease-driver.py'].map(async name => ({
+    path: `/opt/mikka/computer/${name}`, data: await readFile(join(process.cwd(), 'scripts/e2b', name), 'utf8'),
+  })))
+  const manifest = files.map(file => `${createHash('sha256').update(file.data).digest('hex')}  ${file.path}`).join('\n')
+  // Only digests and fixed file names enter the command. The key stays private
+  // to this instance, never baked into the public template or logged.
+  const start = `if ! sha256sum --check --status <<'MIKKA_RUNTIME_HASHES'
+${manifest}
+MIKKA_RUNTIME_HASHES
+then printf 'mikka-runtime-install-required'; exit 0; fi
+set -e
+if getent group user >/dev/null; then install -d -m 710 -o root -g user /run/mikka-viewer; else install -d -m 700 /run/mikka-viewer; fi
+umask 077
+head -c 32 /dev/urandom > /run/mikka-viewer/key
+chmod 0755 /opt/mikka/computer/lease-driver.py
+nohup flock -n /run/mikka-viewer/gateway.lock /usr/bin/python3 /opt/mikka/computer/viewer-gateway.py </dev/null >>/run/mikka-viewer/gateway.log 2>&1 &
+for i in $(seq 1 30); do [ "$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:6080/vnc)" = 401 ] && exit 0; sleep .2; done
+exit 1`
+  const result = await sandbox.commands.run(start, { user: 'root', timeoutMs: 10_000 })
+  if (result.stdout.trim() !== 'mikka-runtime-install-required') return
+  await sandbox.files.write(files, { user: 'root' })
+  const installed = await sandbox.commands.run(start, { user: 'root', timeoutMs: 10_000 })
+  if (installed.stdout.trim() === 'mikka-runtime-install-required') throw new Error('Computer runtime installation failed')
 }
 
-/** Start the container service for a dedicated trusted hosted worker. The
- * task account never receives its socket or E2B control-plane credentials. */
-export async function ensureContainerRuntime(sandbox: Sandbox) {
-  const script = await readFile(join(process.cwd(), 'scripts/e2b/start-container-runtime.sh'), 'utf8')
-  await sandbox.files.write('/opt/mikka/computer/start-container-runtime.sh', script, { user: 'root' })
-  await sandbox.commands.run('bash /opt/mikka/computer/start-container-runtime.sh', { user: 'root', background: true, timeoutMs: 0 })
-  await sandbox.commands.run('for i in $(seq 1 60); do docker --host=unix:///run/mikka-container/docker.sock info >/dev/null 2>&1 && exit 0; sleep .5; done; exit 1', { user: 'root', timeoutMs: 35_000 })
-}
-
-/** Provision only the fixed reviewed runtime image, never a model-supplied image. */
-export async function ensureHostedRunnerImage(sandbox: Sandbox) {
-  await ensureContainerRuntime(sandbox)
-  const image = HOSTED_NATIVE_IMAGE
-  await sandbox.commands.run(`docker --host=unix:///run/mikka-container/docker.sock image inspect ${image} >/dev/null 2>&1 || docker --host=unix:///run/mikka-container/docker.sock pull ${image} >/dev/null`, { user: 'root', timeoutMs: 300_000 })
-}
 
 export async function startDesktop(sandbox: Sandbox, display: number, managedChrome = false) {
   if (!Number.isInteger(display) || display < 1 || display > 999) throw new Error('Invalid display')
@@ -108,7 +108,7 @@ export async function syncDesktopLease(sandbox: Sandbox, lease: DesktopLease) {
   await sandbox.files.write(`${path}.next`, JSON.stringify(lease), { user: 'root' })
   // A shared lock is held for the whole CUA driver process. Takeover waits
   // until it exits, then publishes the new lease before granting control.
-  await sandbox.commands.run(`touch ${path}.lock; if getent group mikka-runner >/dev/null; then chown root:mikka-runner ${path}.lock ${path}.next; chmod 660 ${path}.lock; chmod 640 ${path}.next; else chmod 600 ${path}.lock ${path}.next; fi; flock -x ${path}.lock mv ${path}.next ${path}.json`, { user: 'root', timeoutMs: 45_000 })
+  await sandbox.commands.run(`touch ${path}.lock; if getent group user >/dev/null; then chown root:user ${path}.lock ${path}.next; chmod 660 ${path}.lock; chmod 640 ${path}.next; else chmod 600 ${path}.lock ${path}.next; fi; flock -x ${path}.lock mv ${path}.next ${path}.json`, { user: 'root', timeoutMs: 45_000 })
 }
 
 export async function viewerGrant(sandbox: Sandbox, lease: DesktopLease, userId: string, mode: 'view' | 'control') {

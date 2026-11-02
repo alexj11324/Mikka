@@ -82,11 +82,25 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     assert.deepEqual(await store.state(actor, bot.id), { machine: 'sleeping', control: 'idle' })
     await assert.rejects(store.state(bob, bot.id), { status: 404 })
     await assert.rejects(store.operate(otherWorkspace, bot.id, 'wake'), { status: 404 })
+    await pool.query(`INSERT INTO cloud_machines ("workspaceId","ownerId","operationId",state,"provisionLeaseId","provisionLeaseUntil") VALUES ($1,$2,$3,'waking',$4,now()+interval '3 minutes')`, [actor.workspaceId, actor.userId, randomUUID(), randomUUID()])
+    assert.deepEqual(await store.state(actor, bot.id), { machine: 'waking', control: 'idle' }, 'provisioning is visible before the first desktop exists')
+    await assert.rejects(store.operate(actor, bot.id, 'wake'), { status: 409, message: 'Computer provisioning in progress' })
+    await pool.query(`UPDATE cloud_machines SET "sandboxId"='sandbox-provisioning' WHERE "workspaceId"=$1 AND "ownerId"=$2`, [actor.workspaceId, actor.userId])
+    assert.deepEqual(await store.state(actor, bot.id), { machine: 'waking', control: 'idle' }, 'provider state cannot replace an unfinished runtime installation')
+    await pool.query(`UPDATE cloud_machines SET state='running' WHERE "workspaceId"=$1 AND "ownerId"=$2`, [actor.workspaceId, actor.userId])
+    assert.deepEqual(await store.state(actor, bot.id), { machine: 'sleeping', control: 'idle' }, 'an unallocated desktop stays sleeping when its owner machine is already running')
+    await pool.query('DELETE FROM cloud_machines WHERE "workspaceId"=$1 AND "ownerId"=$2', [actor.workspaceId, actor.userId])
+    await pool.query(`INSERT INTO cloud_machines ("workspaceId","ownerId","operationId",state) VALUES ($1,$2,$3,'waking'),($4,$5,$6,'waking')`, [actor.workspaceId, bob.userId, randomUUID(), otherWorkspace.workspaceId, actor.userId, randomUUID()])
+    assert.deepEqual(await store.state(actor, bot.id), { machine: 'sleeping', control: 'idle' }, 'another owner or workspace machine is not exposed')
+    await pool.query('DELETE FROM cloud_machines')
     const wakes=await Promise.allSettled([store.operate(actor, bot.id, 'wake'), store.operate(actor, bot.id, 'wake')])
     assert.ok(wakes.some(result=>result.status==='fulfilled'))
     for(const result of wakes) if(result.status==='rejected') assert.equal(result.reason.status,409)
     await store.operate(actor,bot.id,'wake')
     assert.equal(created, 1)
+    await pool.query(`UPDATE cloud_machines SET state='waking' WHERE "workspaceId"=$1 AND "ownerId"=$2`, [actor.workspaceId, actor.userId])
+    assert.deepEqual(await store.state(actor, bot.id), { machine: 'waking', control: 'idle' }, 'a resumed desktop stays waking until provisioning completes')
+    await pool.query(`UPDATE cloud_machines SET state='running' WHERE "workspaceId"=$1 AND "ownerId"=$2`, [actor.workspaceId, actor.userId])
     const leaseA = randomUUID(), leaseB = randomUUID()
     const leaseClaims = await Promise.all([claimWorkerLease(pool, actor, 'sandbox-test', leaseA), claimWorkerLease(pool, actor, 'sandbox-test', leaseB)])
     assert.equal(leaseClaims.filter(Boolean).length, 1)
@@ -116,7 +130,7 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
         await pool.query('UPDATE device_tokens SET "lastUsedAt"=now() WHERE "tokenHash"=$1', [createHash('sha256').update(handoff.credential).digest('hex')])
       }
     } } } as unknown as import('e2b').Sandbox
-    const workerRuntime = { ...runtime, ensureHostedRunnerImage: async () => {} } as typeof provider
+    const workerRuntime = runtime
     await assert.rejects(startCloudWorker(pool, bob, sandbox, 'https://mikka.example/mikka', sha, workerRuntime), /busy or unavailable/)
     await assert.rejects(startCloudWorker(pool, actor, sandbox, 'https://mikka.example/mikka', 'b'.repeat(40), workerRuntime), /worker_version_mismatch/)
     const worker = await startCloudWorker(pool, actor, sandbox, 'https://mikka.example/mikka', sha, workerRuntime)
@@ -149,7 +163,7 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     const bobBot = await store.createBot(bob, 'Other owner')
     await pool.query('UPDATE devices SET harnesses=$2 WHERE id=$1', [worker.deviceId, JSON.stringify([{ harness: 'codex', installed: true, computerBroker: true, subscriptionBroker: true }, { harness: 'claude_code', installed: true, computerBroker: true, subscriptionBroker: true }])])
     let repoSetupCalls = 0
-    const botSandbox = { sandboxId: 'sandbox-test', commands: { run: async (_command: string, options: { user: string }) => { assert.equal(options.user, 'mikka-runner'); repoSetupCalls++ } } } as unknown as import('e2b').Sandbox
+    const botSandbox = { sandboxId: 'sandbox-test', commands: { run: async (_command: string, options: { user: string }) => { assert.equal(options.user, 'user'); repoSetupCalls++ } } } as unknown as import('e2b').Sandbox
     await assert.rejects(ensureBotRuntime(pool, bob, bot.id, botSandbox, worker.deviceId), /unavailable/)
     const setups = await Promise.all([ensureBotRuntime(pool, actor, bot.id, botSandbox, worker.deviceId), ensureBotRuntime(pool, actor, bot.id, botSandbox, worker.deviceId)])
     assert.deepEqual(setups[0], setups[1])

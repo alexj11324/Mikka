@@ -1,4 +1,4 @@
-import { coordinatorCapable, runNativeCoordinatorJob } from "./coordinator/runner"
+import { coordinatorCapable } from "./coordinator/runner"
 // Daemon boot, shared by every mode (ADR 0004): started by the desktop app,
 // headless `mikka daemon`, and `tsx watch` in dev.
 //
@@ -20,7 +20,6 @@ import {
   realpathSync,
 } from "node:fs"
 import { arch, hostname, platform } from "node:os"
-import { classifySandboxFailure, type SandboxFailure } from "./sandbox-issue"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -51,8 +50,7 @@ import { agentPublishedReceipt, githubReceiptEnvironment, withRunGitCredentials 
 import { runPaths } from "./agents/run-context"
 import { CAPTURES_DIR, CaptureUploader } from "./captures"
 import { runVerify } from "./agents/verify"
-import { SandboxRuntime, type AgentSandbox } from "./agents/sandbox"
-import { SandboxManager } from '@anthropic-ai/sandbox-runtime'
+import { NoSandbox, type AgentSandbox } from "./agents/sandbox"
 import { buildChildEnv } from "./env"
 import { browseFolder, verifyExpectedOrigin } from "./fs-browse"
 import {
@@ -68,10 +66,7 @@ import { detectDeviceType } from "./device-type"
 import { detectHarnesses, deviceCapabilities, dockerAvailable, harnessFingerprint } from "./harnesses"
 import { ensureHarness, type HarnessStore } from "./harness-install"
 import { sweepRunCredentials } from "./agents/harness-home"
-import { containerOwner, ensureRunnerImage, openRunContainer, selectIsolation, sweepRunContainers, type RunContainerOptions } from "./run-container"
 import { createLocalSubscriptionRunner } from "./subscription-local-runner"
-import { codexSupportsRunApproval } from "./adapters/codex-version"
-import { ensureSandboxTools, missingSandboxTools } from "./sandbox-tools"
 import { isSafeId } from "./ids"
 import { acquireLock } from "./lock"
 import { closeLogger, createLogger, type Logger } from "./log"
@@ -133,8 +128,8 @@ export interface DaemonOptions {
   /** Ignored when it is below the poller's minimum interval. */
   quotaPollMs?: number
   /**
-   * Isolation for real agent CLIs; sandbox-runtime by default. Without a
-   * sandbox (unsupported platform) only the mock harness is offered.
+   * How real agent CLIs start; they run directly by default (decision
+   * 2026-11-01-2335). `null` offers only the mock harness.
    */
   agentSandbox?: AgentSandbox | null
   /** Override a harness CLI binary (tests use fake CLIs). */
@@ -202,14 +197,6 @@ const HARNESS_RESCAN_MS = 5 * 60_000
 function credentialOwner(assignment: RunAssignment): string | undefined {
   return assignment.subscriptionBinding?.ownerId ?? (assignment.modelCredential ? assignment.computer?.ownerId : undefined)
 }
-const SANDBOX_REPAIR_RETRY_MS = 60 * 60_000
-
-/** A person may install a missing tool themselves; that alone is worth a new attempt. */
-type SandboxIssue = { missing: string[] } & SandboxFailure
-
-function missingToolsUnchanged(issue: SandboxIssue | null) {
-  return !issue?.missing.length || missingSandboxTools().length === issue.missing.length
-}
 
 export class Daemon {
   readonly paths: DaemonPaths
@@ -229,6 +216,8 @@ export class Daemon {
   private tick: Promise<void> = Promise.resolve()
   private updating = false
   private claimsInFlight = 0
+  /** Shared by the heartbeat, commands poll and RPC so one run has one claim. */
+  private claims = new Map<string, ReturnType<Daemon['claimAndStartInternal']>>()
   private updateCheck: Promise<void> | null = null
   private maintenance: Promise<void> | null = null
   private updateVersion: string | undefined
@@ -238,11 +227,11 @@ export class Daemon {
   private starting: Promise<Daemon> | null = null
   private adapters = new Map<Harness, AgentAdapter>()
   /** Registered (or re-registered) with the server since this start. */
-  private nativeCoordinator: Promise<void> | null = null
-  private nativeAbort: AbortController | null = null
   private registered = false
   /** Run ids the server sent that were refused as unsafe (reported once). */
   private refusedRuns = new Set<string>()
+  /** Runs the commands poll reported queued: being claimed, or failed until the next heartbeat retries them. */
+  private queuedClaims = new Map<string, "claiming" | "failed">()
   private quota: QuotaPoller | null = null
   /** Ends the commands long-poll when the daemon stops. */
   private commandsAbort = new AbortController()
@@ -310,8 +299,7 @@ export class Daemon {
     )
     this.worktrees = new WorktreeManager(paths.worktrees, this.options.retainResources)
     this.repositories = new RepositoryCache(paths.repos, undefined, this.options.retainResources)
-    // Hosted subscriptions use their dedicated container sandbox. Local
-    // adapters require the separately probed sandbox-runtime from main.
+    // Hosted subscriptions start their CLIs through the hosted runner.
     this.sandbox = this.options.hostedSubscriptions ? null : await this.createAgentSandbox()
     if (this.stopped) throw new Error("daemon stopped during startup")
     if (!this.options.hostedSubscriptions && this.sandbox) this.localComputerDriver = await detectComputerDriver()
@@ -382,11 +370,9 @@ export class Daemon {
         },
       })
     }
-    // Docker decides the run isolation (run-container.ts), so probe it before the adapters exist.
-    // Tests drive fake CLIs on the host.
+    // Reported in the device's capabilities only; runs never use Docker.
     if (!this.options.hostedSubscriptions && !this.options.harnesses && !this.options.harnessBinaries && !daemonTestMode(process.env)) {
       this.docker = await dockerAvailable()
-      if (this.docker) await sweepRunContainers(containerOwner(paths.dataDir)).catch(() => undefined)
     }
     const hosted = this.options.hostedSubscriptions
       ? await createHostedBotRunner({
@@ -558,14 +544,12 @@ export class Daemon {
     if (!hosted && !this.options.harnesses) this.harnessPrint = harnessFingerprint(this.harnessStore())
     this.harnesses = [...detected.filter((info) => this.adapters.has(info.harness)).map(info => ({
       ...info,
-      // Local enforcement requires the successful owned SRT probe. Hosted
-      // enforcement uses its existing network-none/read-only Docker boundary
-      // and gate-bound broker/container teardown; general egress stays outside
-      // that ceiling. Codex also verifies its pinned interface at initialize.
+      // The run's live gate stops a revoked run; Codex also verifies its
+      // pinned interface at initialize.
       toolApproval: this.supportsToolApproval(info),
       coordinator: hosted ? false : coordinatorCapable(info),
       ...(!hosted && this.localSubscriptionCapable(info) ? { subscriptionBroker: true as const } : {}),
-    })), ...this.sandboxBlockedHarnesses(detected)]
+    }))]
     // A crash or kill skipped the run-end wipe; resumed runs get fresh credentials.
     sweepRunCredentials(paths.adapterState)
     // Runs survive restarts: pick up what the journal says was active.
@@ -612,24 +596,38 @@ export class Daemon {
           continue
         }
         if (this.unacked.size > 0) {
-          const ids = [...this.unacked]
+          // One notice may contain several mailbox IDs; keep ACK requests
+          // within the protocol bound even when input and notices arrive together.
+          const ids = [...this.unacked].slice(0, 500)
           await link.ackCommands(deviceId, ids)
           for (const id of ids) this.unacked.delete(id)
         }
         // Runs being stopped or already ended would come back on every
         // answer; leaving them out lets the poll wait for new commands.
-        const skipRuns = [...this.stopping, ...this.ended].slice(
+        // So are queued runs this daemon refused or failed to claim: the
+        // heartbeat retries those, and the poll must not answer them again.
+        const failedClaims = [...this.queuedClaims].flatMap(([id, state]) => state === "failed" ? [id] : [])
+        const skipRuns = [...failedClaims, ...this.refusedRuns, ...this.stopping, ...this.ended].slice(
           0,
           COMMANDS_MAX_SKIP
         )
         const started = performance.now()
+        let queued: string[] = []
         const commands = await link.fetchCommands(deviceId, wait, {
           signal,
           skipRuns,
+          onQueuedRuns: (runIds) => { queued = runIds },
         })
         if (this.stopped || signal.aborted) return
         backoff = 1_000
         const acted = await this.applyCommands(commands)
+        // A new run starts now instead of on the next heartbeat; then poll
+        // again at once. Runs already being claimed only wait for that claim.
+        if (queued.length > 0) {
+          if (this.claimQueued(queued)) continue
+          await this.pauseCommands(500, signal)
+          continue
+        }
         if (this.unacked.size > 0) continue // ack right away
         if (commands.length === 0 && !signal.aborted) {
           const remaining = Math.max(1_000, wait * 1_000) - (performance.now() - started)
@@ -702,6 +700,25 @@ export class Daemon {
     }
   }
 
+  /** Starts claiming the reported queued runs; true when any claim began. */
+  private claimQueued(runIds: string[]): boolean {
+    let started = false
+    for (const runId of runIds) {
+      if (this.draining || this.updating || this.stopped) break
+      if (this.queuedClaims.has(runId) || this.refusedRuns.has(runId) || this.journal.get(runId)) continue
+      this.queuedClaims.set(runId, "claiming")
+      started = true
+      void this.claimAndStart(runId).then(
+        () => { this.queuedClaims.delete(runId) },
+        (error: unknown) => {
+          this.queuedClaims.set(runId, "failed")
+          this.log.warn({ run_id: runId, err: error }, "could not start run")
+        }
+      )
+    }
+    return started
+  }
+
   /** Waits `ms`, or less if the daemon stops or the device registers. */
   private pauseCommands(ms: number, signal: AbortSignal): Promise<void> {
     if (signal.aborted) return Promise.resolve()
@@ -751,6 +768,20 @@ export class Daemon {
           .finally(() => this.stopping.delete(command.runId))
         continue
       }
+      if (command.kind === 'mailbox_notice') {
+        if (this.stopping.has(command.runId)) continue
+        const ids = command.messageIds.filter(id => !this.unacked.has(id))
+        if (!ids.length) continue
+        try {
+          await this.supervisor.notifyMailbox(command.runId, ids)
+          for (const id of ids) this.unacked.add(id)
+          acted = true
+          this.log.info({ run_id: command.runId, count: ids.length }, 'mailbox notice handed to the agent')
+        } catch (error) {
+          if (!(error instanceof RunNotFoundError)) this.log.warn({ run_id: command.runId, err: error }, 'could not notify the agent mailbox')
+        }
+        continue
+      }
       if (this.unacked.has(command.messageId)) continue
       try {
         await this.supervisor.send(command.runId, command.text)
@@ -777,8 +808,8 @@ export class Daemon {
     // boundary and bind its lifetime to the run's authenticated gate.
     if (typeof this.options.link.prepareRunToolApproval !== 'function') return undefined
     if (this.options.hostedSubscriptions) return true
-    if (this.ownedSandbox === null || this.sandbox !== this.ownedSandbox) return undefined
-    return info.harness === 'claude_code' || (info.harness === 'codex' && codexSupportsRunApproval(info.version)) ? true : undefined
+    if (!this.sandbox) return undefined
+    return info.harness === 'claude_code' || info.harness === 'codex' ? true : undefined
   }
 
   /** A subscription run here takes a per-run access lease (subscription-local-runner.ts). */
@@ -787,42 +818,22 @@ export class Daemon {
       this.supportsToolApproval(info) === true && Boolean(this.options.link.nativeLease)
   }
 
-  /** Report a CLI the daemon cannot run as present but not installed, so no run is pinned here. */
-  private sandboxBlockedHarnesses(detected: HarnessInfo[]): HarnessInfo[] {
-    const issue = this.sandboxIssue
-    if (!issue) return []
-    return detected.filter(info => info.installed && !this.adapters.has(info.harness)).map(info => ({
-      harness: info.harness, installed: false, version: info.version,
-      sandboxBlocked: { missing: issue.missing, ...(issue.reason ? { reason: issue.reason } : {}), ...(issue.detail ? { detail: issue.detail } : {}) },
-    }))
-  }
-
   private async redetectHarnesses() {
-    const repairing = this.sandboxIssue?.missing.length
-    if (this.sandboxIssue && repairing) {
-      this.lastSandboxRepair = Date.now()
-      this.sandboxIssue = { missing: await ensureSandboxTools({ dataDir: this.paths.dataDir, log: this.log }) }
-    }
     const detected = detectHarnesses(this.harnessStore())
     this.harnessPrint = harnessFingerprint(this.harnessStore())
     this.docker = await dockerAvailable()
     this.harnesses = [...detected.filter(info => this.adapters.has(info.harness)).map(info => {
       return { ...info, toolApproval: this.supportsToolApproval(info), coordinator: coordinatorCapable(info),
         ...(this.localSubscriptionCapable(info) ? { subscriptionBroker: true as const } : {}) }
-    }), ...this.sandboxBlockedHarnesses(detected)]
-    // Adapters and verification are wired at startup, so a repaired sandbox needs a fresh start.
-    if (repairing && this.sandboxIssue?.missing.length === 0) {
-      this.startMaintenance(() => restartService(false, () => {}, undefined, () => !this.stopped))
-    }
+    })]
   }
 
-  /** Notice an agent installed after startup, or retry a failed tool download, without spawning anything per tick. */
+  /** Notice an agent installed after startup without spawning anything per tick. */
   private rescanHarnesses() {
     const now = Date.now()
     if (this.options.hostedSubscriptions || this.options.harnesses || this.rescanning || now - this.lastHarnessScan < HARNESS_RESCAN_MS) return
     this.lastHarnessScan = now
-    const retryRepair = Boolean(this.sandboxIssue?.missing.length) && now - this.lastSandboxRepair >= SANDBOX_REPAIR_RETRY_MS
-    if (harnessFingerprint(this.harnessStore()) === this.harnessPrint && !retryRepair && missingToolsUnchanged(this.sandboxIssue)) return
+    if (harnessFingerprint(this.harnessStore()) === this.harnessPrint) return
     this.rescanning = true
     void this.redetectHarnesses()
       .then(() => this.syncWithServer())
@@ -844,11 +855,8 @@ export class Daemon {
     return deviceCapabilities(this.harnessStore(), this.paths.dataDir, async () => this.docker)
   }
   private lastHarnessScan = Date.now()
-  private lastSandboxRepair = Date.now()
   private rescanning = false
-  private sandboxIssue: SandboxIssue | null = null
   private sandbox: AgentSandbox | null = null
-  private ownedSandbox: SandboxRuntime | null = null
 
   /** The agent sandbox (one per daemon), or null where there is none. */
   private agentSandbox(): AgentSandbox | null {
@@ -857,40 +865,10 @@ export class Daemon {
 
   private async createAgentSandbox(): Promise<AgentSandbox | null> {
     if (this.options.agentSandbox !== undefined) return this.options.agentSandbox
-    // Tests use the host's tools as they are; fetching them with apt would
-    // make every test daemon's start depend on the network.
-    const missing = daemonTestMode(process.env)
-      ? missingSandboxTools()
-      : await ensureSandboxTools({ dataDir: this.paths.dataDir, log: this.log })
-    if (!SandboxRuntime.supported()) {
-      this.log.warn({ missing }, "agent sandbox unavailable: platform or dependencies unsupported")
-      this.sandboxIssue = { missing }
-      return null
-    }
-    const sandbox = new SandboxRuntime(async ({ host }) => {
-      this.log.warn({ host }, "agent network request denied")
-      return false
-    })
-    try {
-      if (process.platform === 'linux') {
-        const dependencies = SandboxManager.checkDependencies()
-        if (dependencies.warnings.length) throw new Error(`Run sandbox isolation unavailable: ${dependencies.warnings.join('; ')}`)
-      }
-      await sandbox.probe()
-      this.ownedSandbox = sandbox
-      return sandbox
-    } catch (err) {
-      this.log.warn({ err }, "agent sandbox unavailable")
-      // The device page says why and what the person can do (sandbox-issue.ts).
-      this.sandboxIssue = { missing: [], ...classifySandboxFailure(err) }
-      if (!this.options.retainResources) await sandbox.reset().catch((resetError: unknown) => {
-        this.log.warn({ err: resetError }, "agent sandbox cleanup failed")
-      })
-      return null
-    }
+    return new NoSandbox()
   }
 
-  /** Verify inside the agent's sandbox; without one, only mock runs exist. */
+  /** Run the repository's verify command; without a CLI starter, only mock runs exist. */
   private verifier(): SupervisorDeps["verify"] {
     const sandbox = this.agentSandbox()
     if (!sandbox) return undefined
@@ -919,10 +897,6 @@ export class Daemon {
     }
   }
 
-  /**
-   * Claude Code and Codex enclose the whole CLI in a run-owned official
-   * sandbox. Cursor retains the existing daemon AgentSandbox boundary.
-   */
   private realAdapters(): [Harness, AgentAdapter][] {
     const options = this.adapterOptions()
     if (!options) return []
@@ -951,10 +925,6 @@ export class Daemon {
     if (!sandbox) return undefined
     const stateDir = this.paths.adapterState
     const bin = this.options.harnessBinaries ?? {}
-    const openContainer = selectIsolation(process.platform, this.docker)
-      === "container" ? async (run: Omit<RunContainerOptions, "image" | "owner">) =>
-        openRunContainer({ ...run, image: await ensureRunnerImage(), owner: containerOwner(this.paths.dataDir) })
-      : undefined
     const computerProvider = (runId: string) => {
       const assignment = this.journal.get(runId)?.assignment
       if (!assignment?.localComputer || assignment.computer || !assignment.policy?.permissions.computer_use) return undefined
@@ -963,9 +933,9 @@ export class Daemon {
         proxyPath: fileURLToPath(new URL('./computer/proxy.mjs', import.meta.url)), nodeBinary: process.execPath })
     }
     return {
-      claude: { sandbox, stateDir, binary: bin.claude_code, ensureBinary: () => ensureHarness(this.harnessStore(), "claude_code"), openContainer, computerProvider },
-      codex: { sandbox, stateDir, binary: bin.codex, ensureBinary: () => ensureHarness(this.harnessStore(), "codex"), openContainer, computerProvider },
-      cursor: { sandbox, stateDir, binary: bin.cursor, computerProvider, decide: this.serverDecide() },
+      claude: { sandbox, stateDir, binary: bin.claude_code, ensureBinary: () => ensureHarness(this.harnessStore(), "claude_code"), computerProvider },
+      codex: { sandbox, stateDir, binary: bin.codex, ensureBinary: () => ensureHarness(this.harnessStore(), "codex"), computerProvider },
+      cursor: { sandbox, stateDir, binary: bin.cursor, computerProvider },
     }
   }
 
@@ -1149,10 +1119,10 @@ export class Daemon {
                 this.saveDevice({ completedDeviceCommands: [], failedDeviceCommands: [{ id: command.id, error: 'Device command failed; check daemon service logs.' }] })
               })
             }
-          } catch {
+          } catch (err) {
             // Do not leak npm output or host details through the management API.
             this.saveDevice({ completedDeviceCommands: [], failedDeviceCommands: [{ id: command.id, error: 'Device command failed; check daemon service logs.' }] })
-            this.log.warn({ command_id: command.id }, 'Device command failed')
+            this.log.warn({ command_id: command.id, err }, 'Device command failed')
           }
         }
       }
@@ -1169,9 +1139,10 @@ export class Daemon {
         // A receipted run blocked while offline may resume only after its
         // server authorization is available; no second recovery scheduler.
         await this.supervisor.resumeAll(true)
-        this.startCoordinatorPass(deviceId)
+        // Claims that failed after the commands poll reported them are retried here.
+        for (const [runId, state] of this.queuedClaims) if (state === "failed") this.queuedClaims.delete(runId)
         for (const runId of await link.pendingRuns(deviceId)) {
-          if (this.refusedRuns.has(runId)) continue
+          if (this.refusedRuns.has(runId) || this.queuedClaims.has(runId)) continue
           await this.claimAndStart(runId).catch((error: unknown) =>
             this.log.warn({ run_id: runId, err: error }, "could not start run")
           )
@@ -1211,9 +1182,16 @@ export class Daemon {
     if (this.draining || this.updating || this.stopped) {
       throw new DaemonError(DAEMON_RPC_ERRORS.draining, "Daemon is draining")
     }
+    const existing = this.claims.get(runId)
+    if (existing) return await existing
     this.claimsInFlight++
-    try { return await this.claimAndStartInternal(runId) }
-    finally { this.claimsInFlight-- }
+    const claim = this.claimAndStartInternal(runId)
+    this.claims.set(runId, claim)
+    try { return await claim }
+    finally {
+      this.claims.delete(runId)
+      this.claimsInFlight--
+    }
   }
 
   private async claimAndStartInternal(runId: string) {
@@ -1222,10 +1200,12 @@ export class Daemon {
     }
     const deviceId = this.device.deviceId
     if (!deviceId) throw new ServerUnreachableError("device not registered")
+    const credential = this.device.credential
+    const workspaceId = this.device.workspaceId
     if (!isSafeId(runId)) return this.refuseRun(runId)
     const existing = this.journal.get(runId)
     if (existing) return this.supervisor.summary(existing)
-    const assignment = await this.options.link.claimRun(deviceId, runId)
+    const assignment = await this.options.link.claimRun(deviceId, runId, this.commandsAbort.signal)
     if (assignment.runId !== runId) return this.refuseRun(runId)
     if (assignment.expectedRepoRemote) {
       let matches = false
@@ -1254,6 +1234,11 @@ export class Daemon {
       }
     }
     if (assignment.computer && (!this.cloudComputerBroker || assignment.computer.ownerId !== credentialOwner(assignment))) throw new Error('Cloud computer runtime unavailable')
+    // A response may arrive after shutdown began, including while repository
+    // validation awaited I/O. Its server lease can expire; never launch it.
+    if (this.stopped) throw new DaemonError(DAEMON_RPC_ERRORS.draining, "Daemon is draining")
+    if (this.device.deviceId !== deviceId || this.device.credential !== credential || this.device.workspaceId !== workspaceId)
+      throw new ServerUnreachableError('Device session changed while claiming run')
     return await this.supervisor.start(assignment)
   }
 
@@ -1399,7 +1384,6 @@ export class Daemon {
         return { ok: true as const }
       },
       "device.setCredential": (raw) => {
-        this.nativeAbort?.abort()
         this.reviewAbort?.abort()
         this.reviewAbort = null
         const { credential, workspaceId } =
@@ -1417,7 +1401,6 @@ export class Daemon {
         return { ok: true as const }
       },
       "device.clearCredential": () => {
-        this.nativeAbort?.abort()
         this.reviewAbort?.abort()
         this.reviewAbort = null
         // Signed out in the app: stop talking to the server as that person.
@@ -1477,27 +1460,9 @@ export class Daemon {
   }
 
   /** Graceful stop: active runs stay journaled and resume on next start. */
-  /** Never hold up heartbeats, worker cancellation or lease renewal for a chat. */
-  private startCoordinatorPass(deviceId: string) {
-    const link = this.options.link
-    const sandbox = this.agentSandbox()
-    if (this.updating || this.draining || this.nativeCoordinator || !link.claimCoordinator || !sandbox || this.stopped || !this.harnesses.some(info => info.coordinator)) return
-    const controller = new AbortController()
-    this.nativeAbort = controller
-    this.nativeCoordinator = (async () => {
-      const job = await link.claimCoordinator!(deviceId,controller.signal)
-      if (!job || controller.signal.aborted) return
-      await runNativeCoordinatorJob(job,{
-        deviceId, stateDir: join(this.paths.dataDir,"coordinator"),link,signal: controller.signal,sandbox,log: this.log,
-        codexBinary: this.options.harnessBinaries?.codex,claudeBinary: this.options.harnessBinaries?.claude_code,
-      })
-    })().catch(() => {
-      if (!controller.signal.aborted) this.log.warn("native Coordinator failed; no fallback model was used")
-    }).finally(() => { this.nativeCoordinator = null; this.nativeAbort = null })
-  }
 
   private maintenanceIdle() {
-    return !this.stopped && !this.draining && !this.updating && !this.nativeCoordinator && this.claimsInFlight === 0 && this.supervisor.heartbeatRuns().length === 0
+    return !this.stopped && !this.draining && !this.updating && this.claimsInFlight === 0 && this.supervisor.heartbeatRuns().length === 0
   }
 
   private startMaintenance(work: () => Promise<void>, failed: () => void = () => {}) {
@@ -1539,8 +1504,6 @@ export class Daemon {
     await this.starting?.catch(() => undefined)
     await this.updateCheck
     await this.maintenance
-    this.nativeAbort?.abort()
-    await this.nativeCoordinator
     if (this.timer) clearTimeout(this.timer)
     await this.quota?.stop()
     this.commandsAbort.abort()
@@ -1549,20 +1512,15 @@ export class Daemon {
     await this.commandsLoop.catch(() => undefined)
     await this.fsLoop.catch(() => undefined)
     await this.tick
+    // The commands poll starts claims outside the heartbeat tick. Abort their
+    // HTTP requests and settle them before stopping the run supervisor.
+    await Promise.allSettled([...this.claims.values()])
     await this.rpc?.close()
     try {
       await this.supervisor?.stop()
     } finally {
-      try {
-        await this.localComputerBroker?.close()
-        await this.cloudComputerBroker?.close()
-      } finally {
-        const sandbox = this.ownedSandbox
-        this.ownedSandbox = null
-        if (!this.options.retainResources) await sandbox?.reset().catch((err: unknown) => {
-          this.log.warn({ err }, "agent sandbox cleanup failed")
-        })
-      }
+      await this.localComputerBroker?.close()
+      await this.cloudComputerBroker?.close()
     }
     await this.outbox?.close()
     const release = this.releaseLock

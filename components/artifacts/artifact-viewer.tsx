@@ -89,7 +89,7 @@ export function ArtifactViewer({ artifactId, onArtifactChange, onClose, bot, quo
 
   const failed = error || textError || detail === null
   return <Dialog open onOpenChange={open => { if (!open) onClose() }}>
-    <DialogContent showCloseButton={false} aria-describedby={undefined}
+    <DialogContent instant showCloseButton={false} aria-describedby={undefined}
       className="flex h-[min(53.75rem,calc(100dvh-2rem))] w-[min(80rem,calc(100vw-2rem))] max-w-none flex-col gap-0 overflow-hidden p-0 shadow-2xl ring-0 sm:max-w-none">
       <header className="flex h-13 shrink-0 items-center gap-2 px-4">
         {detail && <ArtifactKindIcon kind={detail.kind} className="size-4 shrink-0 text-muted-foreground" />}
@@ -143,7 +143,7 @@ export function ArtifactViewer({ artifactId, onArtifactChange, onClose, bot, quo
                 onSelectOff={() => setSelecting(false)}
                 onQuote={element => { setQuote({ artifactId, version, kind: 'element', text: element.text || element.label, label: element.label, selector: element.selector }); setSelecting(false); setPane('chat') }} />}
         </main>
-        <aside aria-label={bot.name} className={cn('w-full flex-col bg-muted/50 md:flex md:w-[25rem] md:shrink-0', pane === 'chat' ? 'flex' : 'hidden')}>
+        <aside aria-label={bot.name} className={cn('w-full flex-col bg-sidebar md:flex md:w-[25rem] md:shrink-0', pane === 'chat' ? 'flex' : 'hidden')}>
           <div className="flex h-12 shrink-0 items-center gap-2 px-4">
             {bot.avatar}
             {bot.name ? <span className="truncate text-sm font-medium">{bot.name}</span> : <Skeleton className="h-4 w-40" />}

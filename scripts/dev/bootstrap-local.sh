@@ -42,9 +42,9 @@ as_pg() { if [ "$(id -u)" -eq 0 ]; then su postgres -s /bin/bash -c "$*"; else b
 if [ ! -s "$PGDATA_DIR/PG_VERSION" ]; then
   log "creating cluster in $PGDATA_DIR"
   $SUDO mkdir -p "$PGDATA_DIR"
-  [ "$(id -u)" -ne 0 ] || chown postgres:postgres "$PGDATA_DIR"
+  if [ "$(id -u)" -eq 0 ]; then chown postgres:postgres "$PGDATA_DIR"; else $SUDO chown "$(id -u):$(id -g)" "$PGDATA_DIR"; fi
   # Loopback only, trust auth: a disposable test database with no password to print.
-  as_pg "'$PG_BIN/initdb' -D '$PGDATA_DIR' -U postgres --auth=trust >/dev/null"
+  as_pg "'$PG_BIN/initdb' -D '$PGDATA_DIR' -U postgres --encoding=UTF8 --auth=trust >/dev/null"
 fi
 # Already running on another port (an earlier default): restart it on this one.
 if as_pg "'$PG_BIN/pg_ctl' -D '$PGDATA_DIR' status" >/dev/null 2>&1 && [ "$(sed -n 4p "$PGDATA_DIR/postmaster.pid")" != "$PG_PORT" ]; then
@@ -132,5 +132,4 @@ fi
 log "ready"
 # Local registration limits (also the fallback in lib/abuse/signup.ts): every local signup shares one IP,
 # so the production default of 5 an hour turns browser tests into 429s.
-LIMITS="MIKKA_SIGNUP_IP_HOURLY=1000 MIKKA_SIGNUP_GLOBAL_HOURLY=10000 MIKKA_VERIFICATION_IP_HOURLY=1000 MIKKA_VERIFICATION_GLOBAL_HOURLY=10000"
-echo "export PATH=$NODE_DIR:\$PATH E2E_DATABASE_URL=$PRINT_URL MIKKA_DATABASE_URL=$PRINT_URL DATABASE_URL=$PRINT_URL MIKKA_TEST_DB_PORT=$PG_PORT MIKKA_LOCAL_TEST_ACCOUNTS=1 $LIMITS$PW_EXPORTS"
+echo "export PATH=$NODE_DIR:\$PATH E2E_DATABASE_URL=$PRINT_URL MIKKA_DATABASE_URL=$PRINT_URL DATABASE_URL=$PRINT_URL MIKKA_TEST_DB_PORT=$PG_PORT MIKKA_LOCAL_TEST_ACCOUNTS=1$PW_EXPORTS"

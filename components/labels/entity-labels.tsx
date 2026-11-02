@@ -27,14 +27,15 @@ const DEVICE_ICONS: Record<DeviceKind, LucideIcon> = { laptop: Laptop, server: S
 
 /**
  * A device: its type (laptop, server, Mikka Cloud), the online dot, then its name.
- * Mikka Cloud is always available, so it has no dot.
+ * For Mikka Cloud `online` means it can run (the person has their own E2B key); its live
+ * state is not known here, so it shows only the grey dot when it cannot run.
  */
 export function DeviceLabel({ kind, name, online }: { kind: DeviceKind; name: string; online: boolean }) {
   const t = useTranslations('Settings.botAgents')
   return <EntityLabel icon={DEVICE_ICONS[kind]} muted={!online}>
-    {kind !== 'cloud' && <span aria-hidden="true" className={cn('-ml-0.5 size-1.5 shrink-0 rounded-full', online ? 'bg-success' : 'bg-muted-foreground/50')} />}
+    {(kind !== 'cloud' || !online) && <span aria-hidden="true" className={cn('-ml-0.5 size-1.5 shrink-0 rounded-full', online ? 'bg-success' : 'bg-muted-foreground/50')} />}
     <span className="truncate">{name}</span>
-    {kind !== 'cloud' && <span className="sr-only">{online ? t('online') : t('offline')}</span>}
+    {(kind !== 'cloud' || !online) && <span className="sr-only">{online ? t('online') : t('offline')}</span>}
   </EntityLabel>
 }
 

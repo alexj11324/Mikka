@@ -28,7 +28,8 @@ test('the local CLI refuses a non-local database before connecting or writing an
       BETTER_AUTH_URL: 'http://localhost:3100', MIKKA_TEST_DEPLOYMENT_SHA: sha, BETTER_AUTH_SECRET: 'x'.repeat(64) },
   })
   assert.equal(result.status, 1)
-  assert.match(result.stderr, /Test environment bootstrap blocked/)
+  assert.match(result.stderr, /Test environment bootstrap blocked \([A-Z_]+\)/)
+  assert.doesNotMatch(result.stderr, /db\.example\.com/)
   assert.equal(existsSync(output), false)
 })
 

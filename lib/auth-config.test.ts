@@ -51,6 +51,16 @@ test('development and hosted CI allow only HTTP loopback origins; the proxy hub 
   }
 })
 
+test('local test mode allows HTTP loopback origins only with a loopback *_e2e database', () => {
+  const db = 'postgresql://e2e:local@127.0.0.1:5432/mikka_e2e'
+  const local = { NODE_ENV: 'production', MIKKA_LOCAL_TEST_ACCOUNTS: '1', E2E_DATABASE_URL: db, MIKKA_DATABASE_URL: db, BETTER_AUTH_URL: 'http://localhost:3100' }
+  assert.deepEqual(authTrustedOrigins(local), ['http://localhost:3100'])
+  for (const remote of ['postgresql://u:p@db.example.com/mikka_e2e', 'postgresql://u:p@ep-autumn-fire.neon.tech/mikka_e2e', 'postgresql://u:p@127.0.0.1/orvilo_mvp'])
+    assert.throws(() => authTrustedOrigins({ ...local, MIKKA_DATABASE_URL: remote }))
+  for (const patch of [{ MIKKA_LOCAL_TEST_ACCOUNTS: undefined }, { VERCEL: '1' }, { VERCEL_ENV: 'preview' }, { BETTER_AUTH_URL: 'http://preview.example.com' }])
+    assert.throws(() => authTrustedOrigins({ ...local, ...patch }))
+})
+
 function previewAuth() {
   const env = { ...proxyEnv, BETTER_AUTH_URL: preview, AUTH_TRUSTED_ORIGINS: 'https://*.preview.example.com' }
   return betterAuth({

@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic'
 const name = z.string().regex(/^[a-zA-Z][a-zA-Z0-9_]{0,63}$/)
 const instructions = z.string().min(1).max(4000)
 const payload = z.object({
-  purpose: z.enum(['command-action', 'network-destination', 'computer-action', 'tool-access', 'setup-recipe', 'permission-default']),
+  purpose: z.literal('computer-action'),
   input: z.string().max(16000),
   questions: z.array(z.discriminatedUnion('type', [
     z.object({ type: z.literal('predicate'), name, instructions }).strict(),
@@ -24,7 +24,7 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ runI
   const { runId } = await params
   const parsed = payload.safeParse(await request.json().catch(() => null))
   if (!z.uuid().safeParse(runId).success || !parsed.success) return Response.json({ error: 'invalidRequest' }, { status: 400 })
-  // Same liveness as tool approval: the caller's own unpaused, unstopped, leased run on its enabled device.
+  // Same liveness as the run's tool-approval check: the caller's own unpaused, unstopped, leased run on its enabled device.
   const { rows: [run] } = await pool.query<{ botId: string | null }>(`SELECT r."botId" FROM agent_runs r JOIN devices d ON d.id=r."deviceId" AND d."ownerId"=r."userId" AND d.enabled=true
     WHERE r.id=$1 AND r."userId"=$2 AND ($3::uuid IS NULL OR r."deviceId"=$3::uuid) AND r.status=ANY($4::text[]) AND r."stopRequestedAt" IS NULL AND r."leaseExpiresAt">now()`,
   [runId, caller.userId, caller.scopeDeviceId ?? null, ['preparing', 'running', 'waiting_input']])

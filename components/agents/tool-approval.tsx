@@ -195,7 +195,7 @@ export function ToolApproval({
           ) : null}
 
           {parameters.length ? (
-            <Button variant="ghost" size="sm"
+            <Button variant="bare" size="bare"
               type="button"
               aria-expanded={currentOpen}
               aria-controls={detailsId}

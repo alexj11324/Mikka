@@ -168,7 +168,9 @@ is not asserted against the newer version. This change does not edit or claim
 independent acceptance of those files.
 
 The user has selected `deepseek/deepseek-v4.1-flash` as the project default,
-using the team's existing DeepSeek BYOK configuration through Vercel AI Gateway.
+using the team's existing DeepSeek BYOK configuration through Vercel AI Gateway
+(production; local runs use the workspace DeepSeek key directly,
+[local-runtime.md](local-runtime.md#which-model-local-runs-use)).
 `lib/coordinator/model.ts` now selects that exact generative model. The public
 Gateway catalog declares text/image/pdf input; catalog capability is not real
 functional acceptance. Existing frozen runtime/binding selections stay unchanged,

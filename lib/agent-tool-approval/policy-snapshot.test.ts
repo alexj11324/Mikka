@@ -20,5 +20,6 @@ test('invalid stored decisions, domains or personal modes fail closed', () => {
 test('absent settings resolve to documented defaults; push is the GitHub App grant, never ask', () => {
   const policy = resolveTrustedRunPolicy({ workspace:null, personalApprovalMode:null })
   assert.equal(policy.permissions.git_push, 'allow')
-  assert.equal(policy.permissions.network, 'ask')
+  // Decision 2026-11-01-1230-network-open-by-default.
+  assert.equal(policy.permissions.network, 'allow')
 })

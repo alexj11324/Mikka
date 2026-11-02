@@ -125,8 +125,8 @@ after(() => {
 function call(body: unknown = { action: 'inbox' }, token: string | null = bearer) {
   return POST(new Request('http://127.0.0.1/mikka/v1/mailbox', { method: 'POST', headers: { 'content-type': 'application/json', ...(token ? { authorization: 'Bearer ' + token } : {}) }, body: JSON.stringify(body) }))
 }
-test('actual worker HTTP path is default-off and performs no persistence', async () => {
-  delete process.env.MIKKA_PERSONAL_MAILBOX_ENABLED
+test('actual worker HTTP kill switch performs no persistence', async () => {
+  process.env.MIKKA_PERSONAL_MAILBOX_ENABLED = '0'
   const count = connections
   assert.equal((await call()).status, 503)
   assert.equal(connections, count)
@@ -233,7 +233,7 @@ test('actual MCP catalogue never widens historical snapshots or unsupported work
     assert.ok(response.error || response.result?.isError)
   }
   agentDefinition = grantedWorker(); harness = 'codex'
-  delete process.env.MIKKA_PERSONAL_MAILBOX_ENABLED
+  process.env.MIKKA_PERSONAL_MAILBOX_ENABLED = '0'
   const disabled = await packet(await rpc('tools/list', {}))
   assert.equal(disabled.result.tools.some((tool: { name: string }) => tool.name.startsWith('mailbox_')), false)
   process.env.MIKKA_PERSONAL_MAILBOX_ENABLED = '1'

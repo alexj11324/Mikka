@@ -48,18 +48,6 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: node --test packages/daemon/test/release.node-test.mjs
       - run: pnpm --filter @mikka/daemon typecheck
-      - name: Prepare pinned hosted-runner test image
-        run: docker pull node@sha256:6449e19d8184d84062525b6a7524def03146c2cb04a7f08b076680d0e8e4240a
-      - name: Let the hosted runner tests use bubblewrap, as on the E2B machine
-        # Hosted runs execute the CLI under sandbox-runtime, which needs bubblewrap,
-        # socat, ripgrep and capability-bearing user namespaces (sandbox-runtime README,
-        # Ubuntu 24.04+ note). E2B machines (Debian 12) have no such restriction.
-        timeout-minutes: 5
-        run: |
-          apt_options=(-o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30)
-          sudo apt-get "${apt_options[@]}" update
-          sudo apt-get "${apt_options[@]}" install -y bubblewrap socat ripgrep
-          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
       - run: pnpm --filter @mikka/daemon test
       - run: pnpm --filter @mikka/daemon build
         id: daemon-package

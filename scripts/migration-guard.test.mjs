@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { isLoopbackDatabase, migrationGuard } from './migration-guard.mjs'
+import { isLoopbackDatabase, migrationGuard, migrationRequested } from './migration-guard.mjs'
 
 const remote = 'postgresql://ep-example.us-east-2.aws.neon.tech/orvilo_mvp'
 const local = 'postgresql://127.0.0.1:5432/mikka_e2e'
@@ -33,4 +33,17 @@ test('loopback detection', () => {
     assert.equal(isLoopbackDatabase(url), true, url)
   for (const url of [remote, 'postgres://u@127.0.0.1.example.com/db', 'postgres://u@db/db', 'not a url', 'mysql://u@127.0.0.1/db', 'postgres://u@127.0.0.1/db?host=db.example.com'])
     assert.equal(isLoopbackDatabase(url), false, url)
+})
+
+test('migrates unasked only in Vercel production or when every target is loopback off Vercel', () => {
+  const both = { MIKKA_DATABASE_URL: local, DATABASE_URL: local }
+  assert.equal(migrationRequested({}, both), true)
+  assert.equal(migrationRequested({}, { MIKKA_DATABASE_URL: local, DATABASE_URL: undefined }), true)
+  assert.equal(migrationRequested({ MIGRATE: '0' }, both), false)
+  assert.equal(migrationRequested({}, { MIKKA_DATABASE_URL: local, DATABASE_URL: remote }), false)
+  assert.equal(migrationRequested({}, {}), false)
+  assert.equal(migrationRequested({ VERCEL: '1' }, both), false)
+  assert.equal(migrationRequested({ VERCEL_ENV: 'preview' }, both), false)
+  assert.equal(migrationRequested({ VERCEL_ENV: 'production' }, { MIKKA_DATABASE_URL: remote }), true)
+  assert.equal(migrationRequested({ MIGRATE: '1' }, { MIKKA_DATABASE_URL: remote }), true)
 })

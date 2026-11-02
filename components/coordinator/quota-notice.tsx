@@ -12,6 +12,7 @@ import { settingsHref } from '@/lib/settings-sections'
 import type { BotModelMenu } from '@/lib/bot-model-menu-view'
 import type { QuotaSwitchNotice } from '@/lib/coordinator/message-safety'
 import { botModelMenuKey, openModelPicker } from './bot-model-picker'
+import { COMPOSER_NOTICE } from './composer-notice'
 
 const PROVIDERS = ['anthropic', 'openai', 'deepseek', 'kimi'] as const
 
@@ -95,9 +96,9 @@ export function QuotaNotice({ botId, stopped, retry }: {
           {retry(t('retryAfterReset'), !reset)}
         </>
     : quota?.fallback ? null : <Button size="sm" variant="outline" nativeButton={false} role="link" render={<Link href={settingsHref('models')} />}>{t('addKey')}</Button>
-  return <Alert data-quota-notice={stopped ? 'stopped' : 'before-send'} role="status" className="flex flex-wrap items-center gap-x-2 gap-y-1 py-1.5 pr-1.5">
+  return <Alert data-quota-notice={stopped ? 'stopped' : 'before-send'} role="status" className={COMPOSER_NOTICE}>
     <Info aria-hidden="true" className="shrink-0" />
-    <AlertTitle className="min-w-0 flex-1 basis-48 font-normal">{detail ? `${title} · ${detail}` : title}</AlertTitle>
-    {actions && <span className="ml-auto flex shrink-0 items-center gap-1">{actions}</span>}
+    <AlertTitle className="min-w-0 flex-1 basis-48">{detail ? `${title} · ${detail}` : title}</AlertTitle>
+    {actions && <span className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-1">{actions}</span>}
   </Alert>
 }

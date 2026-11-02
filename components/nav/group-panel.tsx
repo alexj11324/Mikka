@@ -1,6 +1,6 @@
 'use client'
 
-import { motion } from 'motion/react'
+import { useLayoutEffect, useRef } from 'react'
 import { useTranslations } from 'next-intl'
 import { X } from 'lucide-react'
 import { InlineLoadError } from '@/components/load-error'
@@ -9,7 +9,6 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { ResizeHandle } from '@/components/ui/resizable-pane'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useResizableWidth } from '@/hooks/use-resizable-width'
-import { SPRING_SIDEBAR } from '@/lib/ease'
 import type { GroupMember } from '@/lib/group-messages'
 import { cn } from '@/lib/utils'
 import { BotAvatar } from './bot-avatar'
@@ -39,9 +38,12 @@ export function GroupPanel({ group, onClose, sheet = false }: { group: { id: str
   const { data: members, error, mutate } = useGroupMembers(group.id)
   const label = members ? t('members', { count: members.length }) : t('membersLoading')
   const resize = useResizableWidth(WIDTH)
+  const asideRef = useRef<HTMLElement>(null)
+  useLayoutEffect(() => { asideRef.current?.style.setProperty('--group-panel-width', `${resize.width}px`) }, [resize.width])
   const tCommon = useTranslations('Common')
-  return <motion.aside aria-label={t('label')} initial={sheet ? false : { width: 0 }} animate={sheet ? undefined : { width: resize.width }} exit={sheet ? undefined : { width: 0 }} transition={resize.instant ? { duration: 0 } : SPRING_SIDEBAR}
-    className={cn('relative min-h-0 shrink-0 flex-col', sheet ? 'flex size-full' : 'hidden overflow-hidden border-l bg-background xl:flex', resize.dragging && 'select-none')}>
+  // R-37: opening and closing are instant, no motion (decision 2026-11-01-2320).
+  return <aside ref={asideRef} aria-label={t('label')}
+    className={cn('relative min-h-0 shrink-0 flex-col', sheet ? 'flex size-full' : 'hidden w-(--group-panel-width) overflow-hidden border-l bg-background xl:flex', resize.dragging && 'select-none')}>
     {!sheet && <ResizeHandle resize={resize} label={tCommon('resize.groupPanel')} edge="start" />}
     <div className={cn('flex min-h-0 flex-1 flex-col', !sheet && 'min-w-80')}>
       <div className="flex h-11 shrink-0 items-center gap-1 px-3">
@@ -59,5 +61,5 @@ export function GroupPanel({ group, onClose, sheet = false }: { group: { id: str
           : <ul className="flex flex-col">{members.map(member => <MemberRow key={`${member.memberType}:${member.id}`} member={member} />)}</ul>}
       </section>
     </div>
-  </motion.aside>
+  </aside>
 }

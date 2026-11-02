@@ -17,13 +17,14 @@ Run it without `eval` to see the line.
 | Node | The version in `.node-version` (a major such as `24`, or an exact `24.22.2`), else 24 as CI's `setup-node`. Uses `node` on PATH, or the image's `/opt/node<major>` (this cloud image puts `/opt/node22` first), when it matches; otherwise installs that release (the latest of a major) from [nodejs.org/dist](https://nodejs.org/dist/), checked against its `SHASUMS256.txt` ([verifying binaries](https://github.com/nodejs/node#verifying-binaries)). |
 | pnpm | Enables pnpm at `packageManager` through [Corepack](https://nodejs.org/docs/latest-v24.x/api/corepack.html) and runs [`pnpm install --frozen-lockfile`](https://pnpm.io/cli/install). It runs again only when `pnpm-lock.yaml`, `package.json` or Node changed. |
 | Sandbox tools | Installs `bubblewrap`, `socat` and `ripgrep` when missing. |
-| Playwright | When the container has `/opt/pw-browsers/chromium`, exports `PLAYWRIGHT_BROWSERS_PATH` and `MIKKA_CHROMIUM_EXECUTABLE_PATH`. The Playwright configs pass the latter as [`launchOptions.executablePath`](https://playwright.dev/docs/api/class-browsertype#browser-type-launch-option-executable-path), so a container whose Chromium revision differs from the pinned Playwright's needs no `playwright install`. Playwright supports only its bundled browsers, so a test that depends on a newer Chromium can still differ from CI. |
+| Chromium (UI screenshots only; no browser tests run) | When the container has `/opt/pw-browsers/chromium`, exports `PLAYWRIGHT_BROWSERS_PATH` and `MIKKA_CHROMIUM_EXECUTABLE_PATH`. The Playwright configs pass the latter as [`launchOptions.executablePath`](https://playwright.dev/docs/api/class-browsertype#browser-type-launch-option-executable-path), so a container whose Chromium revision differs from the pinned Playwright's needs no `playwright install`. Playwright supports only its bundled browsers, so a screenshot can differ from a newer Chromium. |
 | Migrations | Runs `pnpm test:e2e:setup` (every `drizzle/` migration through `scripts/migrate.mjs`, then the auth tables) on `mikka_e2e`. It runs again only when a migration, that setup script or the lockfile changed. |
 
-The export line also carries the local registration limits (`MIKKA_SIGNUP_*_HOURLY`, `MIKKA_VERIFICATION_*_HOURLY`, set in `scripts/dev/bootstrap-local.sh`): outside Vercel every signup counts against one local IP, and the default of 5 an hour makes browser tests fail with 429.
+The export line sets `MIKKA_LOCAL_TEST_ACCOUNTS=1`, which also raises the local registration limits (`lib/abuse/signup.ts`, see `docs/dev-workflow.md`); nothing else needs setting.
 
-It sets no CI variables, so suites gated to GitHub Actions only (such as
-`test:run-publication-db`) still refuse to run locally.
+It sets no CI variables. DB suites such as `test:run-publication-db` run
+because `mikka_e2e` is a loopback `*_e2e` database; suites gated to hosted
+GitHub Actions only still refuse to run locally.
 
 Overrides: `MIKKA_DEV_HOME` (default `/var/lib/mikka-dev`), `MIKKA_PGDATA`,
 `MIKKA_PG_PORT` (default `5432`).

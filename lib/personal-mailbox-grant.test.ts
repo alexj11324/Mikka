@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { makeSnapshot, digest } from './agent-kit/definition'
 import { DEFAULT_AGENT_DEFINITION } from './agent-kit/builtin'
-import { freezeWorkerDefinition, retryWorkerDefinition } from './agent-kit/worker'
+import { freezeWorkerDefinition, retryWorkerDefinition, apiKeyWorkerDefinition } from './agent-kit/worker'
 import { personalWorkerMailboxTools, personalWorkerMailboxScopeMatches, snapshotMailboxTools } from './personal-mailbox-capability'
 import { mailboxGrantTools } from './personal-mailbox-grant'
 import { SessionMailbox } from './session-mailbox'
@@ -33,7 +33,9 @@ test('only new host-enabled explicit parent selections freeze worker mailbox too
   const f = fixture(), input = { harness: 'codex' as const, instructions: 'Bound', prompt: 'Task', parent: f.state.snapshot, executionId }
   const old = freezeWorkerDefinition(input), oldJSON = JSON.stringify(old)
   assert.deepEqual(personalWorkerMailboxTools('codex', old), [])
-  assert.deepEqual(snapshotMailboxTools(makeSnapshot(revision, 1, DEFAULT_AGENT_DEFINITION, 'HOST', { harness: 'ai_sdk', model: 'synthetic' })), [])
+  const historical = { ...DEFAULT_AGENT_DEFINITION, tools: DEFAULT_AGENT_DEFINITION.tools.filter(name => !name.startsWith('mailbox_')) }
+  assert.deepEqual(snapshotMailboxTools(makeSnapshot(revision, 1, historical, 'HOST', { harness: 'ai_sdk', model: 'synthetic' })), [])
+  assert.equal(snapshotMailboxTools(makeSnapshot(revision, 1, DEFAULT_AGENT_DEFINITION, 'HOST', { harness: 'ai_sdk', model: 'synthetic' })).length, 5)
   const granted = freezeWorkerDefinition({ ...input, mailboxEnabled: true, mailboxScope: { botId, workspaceId: namespace } })
   assert.deepEqual(personalWorkerMailboxTools('codex', granted), ['mailbox_inbox'])
   assert.notEqual(old.definitionDigest, granted.definitionDigest)
@@ -51,6 +53,24 @@ test('current prompt overlay retains fixed provenance policy once and names only
   assert.match(prompt, /Available personal mailbox tools: mailbox_inbox\./)
   assert.doesNotMatch(prompt, /mailbox_send/)
   assert.equal(JSON.stringify(f.state.snapshot), before)
+})
+test('mailbox admission validates the full frozen model, credential, device and read-only identity', () => {
+  const f = fixture()
+  const input = { harness: 'codex' as const, instructions: 'Bound', prompt: 'Task', parent: f.state.snapshot, executionId,
+    mailboxEnabled: true, mailboxScope: { botId, workspaceId: namespace }, model: 'deepseek-flash', pinnedDeviceId: revision, readOnly: true }
+  for (const credential of [
+    {},
+    { apiKey: { keyId: revision, model: 'deepseek-flash' } },
+    { subscription: { id: revision, modelId: 'frozen-model', route: 'codex_cli' } },
+  ]) {
+    const worker = freezeWorkerDefinition({ ...input, ...credential })
+    assert.deepEqual(personalWorkerMailboxTools('codex', worker), ['mailbox_inbox'])
+    assert.deepEqual(personalWorkerMailboxTools('codex', retryWorkerDefinition(worker, 'retry')), ['mailbox_inbox'])
+    assert.deepEqual(personalWorkerMailboxTools('codex', apiKeyWorkerDefinition(worker, 'quota fallback', { keyId: revision, model: 'deepseek-flash' })), ['mailbox_inbox'])
+    for (const patch of [{ model: 'changed' }, { pinnedDeviceId: executionId }, { readOnly: undefined }, { apiKey: { keyId: executionId, model: 'changed' } }, { instructions: 'changed' }]) {
+      assert.deepEqual(personalWorkerMailboxTools('codex', { ...worker, ...patch }), [], `Tampered ${Object.keys(patch)[0]} was accepted`)
+    }
+  }
 })
 test('frozen/current intersection preserves replay permissions and immediately reflects current revocation', async () => {
   const f = fixture()

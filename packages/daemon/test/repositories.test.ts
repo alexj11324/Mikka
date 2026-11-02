@@ -145,8 +145,8 @@ describe('daemon-owned clone cache', () => {
     const worktree = await new WorktreeManager(join(root, 'worktrees')).create('git-test', path, await cache.baseRef(pathToFileURL(source).href))
     const gitWritePaths = await worktreeGitWritePaths(path, worktree, 'git-test')
     const context = new RunContext({ harness: 'codex', worktree, gitWritePaths, privateDir: root, runDir: join(root, 'run') })
-    // The repository root, as sandbox-runtime grants a repository: it protects
-    // `.git/config` and `.git/hooks` itself. No file inside `.git` is listed
+    // The repository root, as a run declares a repository writable;
+    // `.git/config` and `.git/hooks` stay declared read-only. No file inside `.git` is listed
     // (each would be its own mount point, and git renames locks over refs).
     expect(gitWritePaths).toEqual([path])
     expect(context.policy().allowWrite).toContain(path)

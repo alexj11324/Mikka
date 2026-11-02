@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import useSWRInfinite from 'swr/infinite'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
@@ -15,6 +15,7 @@ import { GroupAvatar, useGroupMembers } from '@/components/nav/group-avatar'
 import { LetterAvatar } from '@/components/nav/letter-avatar'
 import { BotAvatar } from '@/components/nav/bot-avatar'
 import { UserMessageText } from '@/components/workspace/user-message-text'
+import { MessageReactions, useMessageReactions } from '@/components/workspace/message-reactions'
 import { cn } from '@/lib/utils'
 import { mentionsIn } from '@/lib/group-mentions'
 import { authorRuns, chronological, fetchGroupMessages, GroupMessagesRequestError, postGroupMessage, stopGroupReply, type GroupMessagePage } from '@/lib/group-messages'
@@ -58,6 +59,7 @@ export function GroupChatView({ group, userId, people }: {
     { revalidateOnFocus: false, refreshInterval: answering ? ANSWER_POLL_MS : 0, onSuccess: data => setAnswering(!!data[0]?.agentStatus) },
   )
   const messages = pages ? chronological(pages) : []
+  const reactions = useMessageReactions(messages.map(message => message.id))
   const older = pages?.at(-1)?.nextBefore ?? null
   const loadingOlder = isValidating && !!pages && size > pages.length
   const code = error instanceof GroupMessagesRequestError ? error.code : error ? 'unavailable' : null
@@ -121,9 +123,12 @@ export function GroupChatView({ group, userId, people }: {
                         {!mine && (bot ? <BotAvatar color={bot.color} shape={bot.shape} size="message" still /> : <LetterAvatar name={name} size="message" />)}
                         <div className={cn('flex min-w-0 flex-col gap-1', mine ? 'max-w-[min(26rem,80%)] items-end' : 'max-w-[min(35rem,85%)]')}>
                           {mine ? <span className="sr-only">{name}</span> : <span className="text-xs font-medium text-muted-foreground">{name}</span>}
-                          {run.messages.map(message => <Bubble key={message.id} variant={mine ? 'secondary' : 'muted'} align={mine ? 'end' : 'start'} className={cn('max-w-full', mine && '*:data-[slot=bubble-content]:bg-sidebar-primary *:data-[slot=bubble-content]:text-sidebar-primary-foreground')}>
-                            <BubbleContent className="rounded-2xl px-4 py-3 whitespace-pre-wrap">{run.authorType === 'user' ? <UserMessageText text={message.body} /> : message.body}</BubbleContent>
-                          </Bubble>)}
+                          {run.messages.map(message => <Fragment key={message.id}>
+                            <Bubble variant={mine ? 'secondary' : 'muted'} align={mine ? 'end' : 'start'} className={cn('max-w-full', mine && '*:data-[slot=bubble-content]:bg-sidebar-primary *:data-[slot=bubble-content]:text-sidebar-primary-foreground')}>
+                              <BubbleContent className="rounded-2xl px-4 py-3 whitespace-pre-wrap">{run.authorType === 'user' ? <UserMessageText text={message.body} /> : message.body}</BubbleContent>
+                            </Bubble>
+                            <MessageReactions reactions={reactions[message.id]} align={mine ? 'end' : 'start'} />
+                          </Fragment>)}
                         </div>
                       </li>
                     })}

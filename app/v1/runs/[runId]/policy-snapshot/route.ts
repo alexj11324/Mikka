@@ -3,7 +3,8 @@ import { withDeviceRoute } from '@/lib/device-route'
 import { authenticateDevice } from '@/lib/device-link'
 import { pool } from '@/lib/db'
 import { AgentToolApprovalStore } from '@/lib/agent-tool-approval/store'
-import { issuePolicySnapshot, policyDistributionContext, requestPolicyIssuer } from '@/lib/agent-tool-approval/policy-distribution'
+import { issuePolicySnapshot, policyDistributionContext } from '@/lib/agent-tool-approval/policy-distribution'
+import { requestDevicePolicyIssuer } from '@/lib/agent-tool-approval/local-cloud-issuer'
 import { signedPolicySnapshotSchema } from '@mikka/protocol/policy-snapshot'
 import { verifyPolicySnapshot } from '@mikka/protocol/node-policy-snapshot'
 
@@ -21,7 +22,7 @@ async function handle(request: Request, {params}: {params:Promise<{runId:string}
     const snapshot = 'snapshot' in input.data ? signedPolicySnapshotSchema.parse(input.data.snapshot) : undefined
     const current = await new AgentToolApprovalStore(pool).policyDistribution({userId:caller.userId,deviceId:input.data.deviceId},runId,snapshot?.payload.revision)
     if (caller.scopeWorkspaceId && !current.workspaceIds.includes(caller.scopeWorkspaceId)) throw Error('policyScopeUnavailable')
-    const context = policyDistributionContext(requestPolicyIssuer(request),caller.userId,input.data.deviceId,runId,current)
+    const context = policyDistributionContext(await requestDevicePolicyIssuer(request,caller,input.data.deviceId,runId),caller.userId,input.data.deviceId,runId,current)
     if (!snapshot) return Response.json(context,{headers})
     // Verify the original server signature and retain its exact final composed
     // policy. The current CLI revision alone cannot reconstruct Factory/computer grants.
