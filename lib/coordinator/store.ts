@@ -236,6 +236,13 @@ export async function completeTriageAttempt(event: TriageEventRecord & { observe
  * Appends the turn's new messages and renews the lease. `warning` says why the
  * reply may be cut short; it shows in the chat until a turn ends cleanly.
  */
+/** The kind of host event the last stored message records (lib/coordinator/message-safety.ts), or null. */
+export async function lastEventKind(userId: string, botId: string): Promise<string | null> {
+  const [last] = await db.select({ kind: sql<string | null>`${coordinatorMessages.message}->'mikkaEvent'->>'eventKind'` })
+    .from(coordinatorMessages).where(messagesOf(userId, botId)).orderBy(desc(coordinatorMessages.position)).limit(1)
+  return last?.kind ?? null
+}
+
 export async function appendMessages(userId: string, holder: string, unmasked: ModelMessage[], warning: string | null = null, botId: string, streamId?: string, stopped = false): Promise<number> {
   // Safety floor (decision 2026-11-02-1600): a GitHub token or other credential
   // never persists in chat, a tool result included.
@@ -442,7 +449,8 @@ export async function chatView(userId: string, limit = 200, botId: string): Prom
     .orderBy(asc(coordinatorEvents.createdAt)).limit(INBOX_BATCH)
   const last = rows[0]?.position ?? 0
   const lastMessage = rows[0] && { role: String(rows[0].message.role), ...(typeof rows[0].message.mikkaStreamId === 'string' ? { streamId: rows[0].message.mikkaStreamId } : {}) }
-  const pending = waiting.filter(event => event.kind === 'user_message' && !String(event.payload.text ?? '').startsWith(COORDINATOR_WELCOME_MARK)).map((event, index) => ({
+  // A retry (重试, or an interrupted turn) re-answers a message already in the chat (postedToChat): no second bubble.
+  const pending = waiting.filter(event => event.kind === 'user_message' && event.payload.postedToChat !== true && !String(event.payload.text ?? '').startsWith(COORDINATOR_WELCOME_MARK)).map((event, index) => ({
     position: last + index + 1, createdAt: event.createdAt, message: { role: 'user', content: withImages(eventPrompt(event), event.payload.images) } as ModelMessage, pending: true as const,
   }))
   const items = chatItems([...rows.reverse().map(row => ({ ...row, message: row.message as unknown as ModelMessage })), ...pending])
