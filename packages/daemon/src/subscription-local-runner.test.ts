@@ -13,6 +13,7 @@ import { ToolApprovalGate } from "./agents/tool-approval"
 import { buildChildEnv } from "./env"
 import { createLogger } from "./log"
 import { createLocalSubscriptionRunner } from "./subscription-local-runner"
+import { SessionRejectedError } from "./server-link-http"
 
 afterEach(cleanupTempDirs)
 
@@ -71,6 +72,23 @@ describe("local subscription runs", () => {
     expect(asked).toEqual([`device-1/${RUN}`])
     expect(JSON.stringify(events)).not.toContain(TOKEN)
     for (const file of filesUnder(stateDir)) expect(readFileSync(file, "utf8")).not.toContain(TOKEN)
+  })
+
+  it("fails only this run when the server refuses the lease as unauthorized (401)", async () => {
+    // HttpServerLink turns the device API's 401 into SessionRejectedError; the daemon signs out
+    // (rejectDeviceSession) only on that exact error from its command/sync loops. A run start
+    // must surface its own failure instead, so a refused lease never clears the device credential.
+    const stateDir = join(tempDir(), "adapters")
+    const runner = createLocalSubscriptionRunner({
+      stateDir, link: { nativeLease: async () => { throw new SessionRejectedError() } },
+      claude: { sandbox: new NoSandbox(), stateDir }, codex: { sandbox: new NoSandbox(), stateDir },
+    })
+    const started = runner.start(assignment, { runId: RUN, cwd: await makeRepo(), prompt: "x", model: "claude-test", env: buildChildEnv(),
+      log: createLogger({ level: "silent" }), toolApproval: gate() })
+    const failure = await started.catch((error: unknown) => error)
+    expect(failure).toBeInstanceOf(Error)
+    expect(failure).not.toBeInstanceOf(SessionRejectedError)
+    expect((failure as Error).message).toBe("subscription_local_runtime_unavailable")
   })
 
   it.each([

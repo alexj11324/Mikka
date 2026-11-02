@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { withDeviceRoute } from '@/lib/device-route'
+import { isDeviceAuthorityRevoked } from '@/lib/db/device-scope'
 import { authenticateDevice } from '@/lib/device-link'
 import { pool } from '@/lib/db'
 import { AgentToolApprovalStore } from '@/lib/agent-tool-approval/store'
@@ -28,7 +29,11 @@ async function handle(request: Request, {params}: {params:Promise<{runId:string}
     // policy. The current CLI revision alone cannot reconstruct Factory/computer grants.
     const prior = verifyPolicySnapshot(snapshot,context,{runId,deviceId:input.data.deviceId,revision:current.revision},{allowExpired:true})
     return Response.json(issuePolicySnapshot(context,prior.payload.policy),{headers})
-  } catch { return Response.json({error:'policySnapshotUnavailable'},{status:409,headers}) }
+  } catch (error) {
+    // A revoked token is an authentication failure: withDeviceRoute answers 401, not a policy conflict.
+    if (isDeviceAuthorityRevoked(error)) throw error
+    return Response.json({error:'policySnapshotUnavailable'},{status:409,headers})
+  }
 }
 export const GET = withDeviceRoute(handle)
 export const POST = withDeviceRoute(handle)
