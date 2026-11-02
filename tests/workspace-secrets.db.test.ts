@@ -201,12 +201,12 @@ test('workspace secrets and E2B key', { skip: !dbUrl }, async t => {
     const TOKEN = 'ghp_' + randomBytes(12).toString('hex')
     const keyEnv = { WORKSPACE_SECRETS_KEY: process.env.WORKSPACE_SECRETS_KEY }
     const on = { ...keyEnv, MIKKA_BYO_E2B_KEY: '1' }, off = {}
-    await store.createWorkspaceSecret(admin, third.id, { name: 'GH_TOKEN', kind: 'secret', value: TOKEN })
+    await store.createWorkspaceSecret(admin, third.id, { name: 'DEPLOY_TOKEN', kind: 'secret', value: TOKEN })
     await store.createWorkspaceSecret(admin, third.id, { name: 'SHORT', kind: 'secret', value: 'abc1234' })
     await store.createWorkspaceSecret(admin, third.id, { name: 'REGION', kind: 'env', value: 'us-east-1-long' })
     await store.createWorkspaceSecret(admin, third.id, { name: 'REPO_ONLY', kind: 'secret', value: 'repo-scoped-value', scope: { type: 'repository', repository: 'acme/app' } })
     assert.deepEqual(await runtime.taskSecretEnv(third.id, null, off), {}, 'no encryption key: nothing injected')
-    assert.deepEqual(await runtime.taskSecretEnv(third.id, null, on), { GH_TOKEN: TOKEN, SHORT: 'abc1234', REGION: 'us-east-1-long' }, 'workspace-scoped values are injected; repo-scoped ones only for their repo')
+    assert.deepEqual(await runtime.taskSecretEnv(third.id, null, on), { DEPLOY_TOKEN: TOKEN, SHORT: 'abc1234', REGION: 'us-east-1-long' }, 'workspace-scoped values are injected; repo-scoped ones only for their repo')
     const chunk = { type: 'text-delta', delta: `push ${TOKEN} b64=${Buffer.from(TOKEN).toString('base64')} short=abc1234 region=us-east-1-long`, nested: [{ url: `https://x/?t=${encodeURIComponent(TOKEN)}` }] }
     const offMask = await runtime.workspaceSecretMasker(third.id, off)
     // No encryption key: saved values are not masked (the base64 form stays), but a GitHub-token-shaped
@@ -215,10 +215,10 @@ test('workspace secrets and E2B key', { skip: !dbUrl }, async t => {
     const masked = maskDeep(chunk, await runtime.workspaceSecretMasker(third.id, on))
     const text = JSON.stringify(masked)
     assert.ok(!text.includes(TOKEN) && !text.includes(Buffer.from(TOKEN).toString('base64')))
-    assert.match(masked.delta, /push \[secret:GH_TOKEN\] b64=\[secret:GH_TOKEN\] short=abc1234 region=us-east-1-long/)
-    assert.equal(masked.nested[0].url, 'https://x/?t=[secret:GH_TOKEN]')
+    assert.match(masked.delta, /push \[secret:DEPLOY_TOKEN\] b64=\[secret:DEPLOY_TOKEN\] short=abc1234 region=us-east-1-long/)
+    assert.equal(masked.nested[0].url, 'https://x/?t=[secret:DEPLOY_TOKEN]')
     const otherMask = await runtime.workspaceSecretMasker(other.id, on)
-    // Another workspace never knows this one's values: no [secret:GH_TOKEN] label, only the credential pattern.
+    // Another workspace never knows this one's values: no [secret:DEPLOY_TOKEN] label, only the credential pattern.
     assert.equal(otherMask(TOKEN), '[secret:github-token]', 'another workspace does not mask this one\'s values')
     assert.equal(otherMask(Buffer.from(TOKEN).toString('base64')), Buffer.from(TOKEN).toString('base64'), 'another workspace does not mask this one\'s values')
     assert.equal((await runtime.workspaceSecretMasker(null, on))('x'), 'x')
