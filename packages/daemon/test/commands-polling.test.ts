@@ -3,6 +3,11 @@ import { Daemon } from '../src/main'
 import { createLogger } from '../src/log'
 import { MemoryServer, type RunAssignment, type ServerLink } from '../src/server-link'
 import { ServerUnreachableError } from '../src/errors'
+import { DAEMON_VERSION } from '../src/paths'
+import * as service from '../src/service'
+import { mkdtempSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
 const daemons: Daemon[] = []
 
@@ -305,4 +310,74 @@ it('does not launch an in-flight claim after the device session changes', async 
   finish({ runId: 'run-old-session' } as RunAssignment)
   expect(await pending).toMatchObject({ cause: 'Device session changed while claiming run' })
   expect(start).not.toHaveBeenCalled()
+})
+
+const UPDATE = { id: '6f1c2b8e-2a8e-4c39-9d1a-3b5d7c9e1f20', kind: 'update' as const }
+function pollWithUpdates(fetch: ServerLink['fetchCommands'], runs: unknown[] = []) {
+  const { daemon } = pollCommands(fetch)
+  const install = vi.fn(async (_version: string) => {})
+  const restart = vi.spyOn(service, 'restartService').mockResolvedValue(undefined)
+  const sync = vi.spyOn(daemon, 'syncWithServer').mockResolvedValue(undefined)
+  Reflect.set(daemon, 'options', { ...Reflect.get(daemon, 'options'), autoUpdate: { install } })
+  Reflect.set(daemon, 'paths', { dataDir: mkdtempSync(join(tmpdir(), 'mikka-poll-update-')) })
+  Reflect.set(daemon, 'supervisor', { ...Reflect.get(daemon, 'supervisor'), heartbeatRuns: () => runs })
+  return { daemon, install, restart, sync }
+}
+
+it('a release named on the commands poll installs at once when idle, and later polls say the daemon knows it', async () => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] })
+  const fetch = vi.fn<ServerLink['fetchCommands']>()
+    .mockImplementationOnce(async (_id, _wait, options) => { await Promise.resolve(); options?.onUpdates?.({ daemonVersions: { min: '0.0.299', latest: '999.0.0' }, deviceCommands: [] }); return [] })
+    .mockResolvedValue([])
+  const { daemon, install, restart, sync } = pollWithUpdates(fetch)
+  await vi.advanceTimersByTimeAsync(0)
+  await Reflect.get(daemon, 'maintenance')
+  expect(install).toHaveBeenCalledExactlyOnceWith('999.0.0')
+  expect(restart).toHaveBeenCalledOnce()
+  expect(sync).not.toHaveBeenCalled()
+  expect(fetch.mock.calls[0]![2]?.updates).toEqual({ daemonLatest: DAEMON_VERSION, skipDeviceCommands: [] })
+  expect(fetch).toHaveBeenCalledTimes(2) // polls again at once, so stops and messages are not held back
+  expect(fetch.mock.calls[1]![2]?.updates?.daemonLatest).toBe('999.0.0')
+})
+
+it('a release named while a run is active waits for the run to end, then installs at the next heartbeat', async () => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] })
+  const runs: unknown[] = [{ runId: 'run-1' }]
+  const fetch = vi.fn<ServerLink['fetchCommands']>()
+    .mockImplementationOnce(async (_id, _wait, options) => { await Promise.resolve(); options?.onUpdates?.({ daemonVersions: { min: '0.0.299', latest: '999.0.0' }, deviceCommands: [] }); return [] })
+    .mockResolvedValue([])
+  const { daemon, install } = pollWithUpdates(fetch, runs)
+  await vi.advanceTimersByTimeAsync(0)
+  expect(install).not.toHaveBeenCalled()
+  runs.length = 0
+  Reflect.get(daemon, 'checkAutoUpdate').call(daemon) // the start of every heartbeat pass
+  await Reflect.get(daemon, 'maintenance')
+  expect(install).toHaveBeenCalledExactlyOnceWith('999.0.0')
+})
+
+it('an update a person asked for arrives on the commands poll and is carried out now, then left out of later polls', async () => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] })
+  const fetch = vi.fn<ServerLink['fetchCommands']>()
+    .mockImplementationOnce(async (_id, _wait, options) => { await Promise.resolve(); options?.onUpdates?.({ deviceCommands: [UPDATE] }); return [] })
+    .mockImplementationOnce(async (_id, _wait, options) => { await Promise.resolve(); options?.onUpdates?.({ deviceCommands: [UPDATE] }); return [] })
+    .mockResolvedValue([])
+  const { install, sync } = pollWithUpdates(fetch)
+  await vi.advanceTimersByTimeAsync(0)
+  expect(sync).toHaveBeenCalledOnce()
+  expect(fetch.mock.calls[1]![2]?.updates?.skipDeviceCommands).toEqual([UPDATE.id])
+  expect(sync).toHaveBeenCalledOnce()
+  expect(fetch).toHaveBeenCalledTimes(2) // the same command again is not news: the poll is paced as usual
+  await vi.advanceTimersByTimeAsync(24_999)
+  expect(fetch).toHaveBeenCalledTimes(2)
+  expect(install).not.toHaveBeenCalled()
+})
+
+it('an older server sends neither releases nor device commands: the daemon keeps polling and never updates', async () => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] })
+  const fetch = vi.fn<ServerLink['fetchCommands']>().mockResolvedValue([])
+  const { install, sync } = pollWithUpdates(fetch)
+  await vi.advanceTimersByTimeAsync(50_000)
+  expect(fetch).toHaveBeenCalledTimes(3)
+  expect(install).not.toHaveBeenCalled()
+  expect(sync).not.toHaveBeenCalled()
 })

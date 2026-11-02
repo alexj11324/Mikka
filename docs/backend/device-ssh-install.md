@@ -68,7 +68,10 @@ or `update`. Both enforce ownership and exclude managed cloud devices.
 `createdAt`, `completedAt` and `error`. An offline device leaves the command
 pending until it reconnects. SSH fallback is not implemented.
 
-Commands are delivered serially on heartbeat. Re-detection refreshes the
+Commands are delivered serially on heartbeat. A daemon's commands long-poll
+(`GET /v1/devices/:id/commands` with `daemonLatest`) also ends within one idle
+check (2 s) when a command is pending, and the daemon runs its heartbeat at once
+to carry it out. Re-detection refreshes the
 reported agents. Restart/update wait until no threads are running. Update
 runs the same global npm install and then restarts through the existing service
 manager. The daemon persists a receipt before requesting restart, then reports
@@ -76,17 +79,23 @@ it after startup, preventing replay. A failed update does not restart the
 service; failures become command receipts. `completedAt` records daemon
 acknowledgment, not a promise of subsequent service availability.
 
-Managed public npm installations also check for newer stable versions once an
-hour. Automatic updates wait for threads, Coordinator work and in-flight claims,
+Managed public npm installations update to the release the server names; the
+daemon never asks npm which release is latest. The server reads npm's `latest`
+at most every five minutes per instance and names it on every heartbeat, every
+commands long-poll answer and every `daemonUpgradeRequired` refusal. A waiting
+long-poll compares that cached release with the newest one the daemon says it
+knows (`daemonLatest`) at each idle check, in memory, and answers as soon as it
+is newer. Automatic updates wait for threads, Coordinator work and in-flight claims,
 then stop admitting work until installation and restart finish. npm uses the
-service's Node runtime and existing registry configuration. Checks and installs
-run outside the heartbeat loop. `--no-auto-update` on `daemon service install`
+service's Node runtime and existing registry configuration to install that
+exact version. Installs run outside the heartbeat loop. `--no-auto-update` on `daemon service install`
 persists an opt-out; foreground, development and embedded daemons are excluded.
 Service installation preserves an explicit `--data-dir`. Updates preserve the
-device credential and server configuration. The heartbeat answer also names the
-latest release (`daemonVersions`), which an idle daemon installs at once, and the
-minimum (`MIN_DAEMON_VERSION`): a claim from an older released daemon is refused
-with `daemonUpgradeRequired` and the run ends so the Bot asks for an update.
+device credential and server configuration. The release answers
+(`daemonVersions`) also carry the minimum (`MIN_DAEMON_VERSION`): a claim from an older released daemon is refused
+with `daemonUpgradeRequired` and the run ends so the Bot asks for an update; the
+daemon installs the release named in that refusal once idle. An older server
+names no release on the long-poll and the daemon does not update from it.
 Failed automatic installs back off (5 minutes, 30 minutes, then 2 hours) before
 retrying, are reported on the heartbeat by code (`devices.updateFailure`), and do
 not deliberately restart after installation failure;

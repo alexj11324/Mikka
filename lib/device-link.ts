@@ -7,6 +7,7 @@ import { cloudDeviceScopeAllows } from '@/lib/device-token-scope'
 import { z } from 'zod'
 import { agentRuns, deviceTokens, devices, runMessages } from '@/lib/db/schema'
 import type { RunCommand } from '@mikka/protocol/device'
+import type { DeviceCommandKind } from '@/lib/device-management'
 import { deviceRequestCaller } from '@/lib/device-request-context'
 import { ackMailboxNotices, pendingMailboxNotices } from '@/lib/device-mailbox-notices'
 
@@ -151,20 +152,26 @@ export function waitSeconds(request: Request, max: number): number {
 
 /**
  * Whether `deviceWork` could find anything: one statement, one round trip,
- * returning one boolean, with the credential check inside it (a revoked or
- * expired credential throws, as any fenced query does). A long-poll asks this
- * between full reads, which stay fenced and are the only path that hands over
- * message text or queued runs. Mailbox notices are not modelled: with them on,
- * a live run always counts as possible work and the full read decides.
+ * with the credential check inside it (a revoked or expired credential
+ * throws, as any fenced query does). A long-poll asks this between full
+ * reads, which stay fenced and are the only path that hands over message
+ * text or queued runs. Mailbox notices are not modelled: with them on, a live
+ * run always counts as possible work and the full read decides.
+ * With `skipDeviceCommands` (a daemon that reads them from the poll), the same
+ * statement also returns the oldest pending device command outside that list:
+ * only its id and kind, which the heartbeat hands over too.
  */
-export async function deviceMayHaveWork(deviceId: string, skip: readonly string[], options: { mailboxNotices?: boolean; queued?: boolean } = {}): Promise<boolean> {
-  const skipped = skip.filter(id => z.uuid().safeParse(id).success)
+export async function deviceMayHaveWork(deviceId: string, skip: readonly string[], options: { mailboxNotices?: boolean; queued?: boolean; skipDeviceCommands?: readonly string[] } = {}): Promise<{ work: boolean; deviceCommand: { id: string; kind: DeviceCommandKind } | null }> {
+  const uuid = (id: string) => z.uuid().safeParse(id).success
   const { readUnderDeviceAuthority } = await import('@/lib/db')
-  return readUnderDeviceAuthority<boolean>(`EXISTS (SELECT 1 FROM agent_runs r WHERE r."deviceId"=$1 AND r.status = ANY($2::text[]) AND NOT (r.id = ANY($3::uuid[]))
+  const [work, deviceCommand] = await readUnderDeviceAuthority<[boolean, { id: string; kind: DeviceCommandKind } | null]>(`json_build_array(EXISTS (SELECT 1 FROM agent_runs r WHERE r."deviceId"=$1 AND r.status = ANY($2::text[]) AND NOT (r.id = ANY($3::uuid[]))
     AND (r."stopRequestedAt" IS NOT NULL OR ($4 AND r.status='queued')
       OR ($5 AND r.status IN ('preparing','running','waiting_input'))
-      OR EXISTS (SELECT 1 FROM run_messages m WHERE m."runId"=r.id AND m."deliveredAt" IS NULL)))`,
-  [deviceId, [...LIVE_RUN_STATUSES], skipped, Boolean(options.queued), Boolean(options.mailboxNotices)])
+      OR EXISTS (SELECT 1 FROM run_messages m WHERE m."runId"=r.id AND m."deliveredAt" IS NULL))),
+    CASE WHEN $6 THEN (SELECT json_build_object('id', c.id, 'kind', c.kind) FROM device_management_commands c
+      WHERE c."deviceId"=$1 AND c."completedAt" IS NULL AND NOT (c.id = ANY($7::uuid[])) ORDER BY c."createdAt" LIMIT 1) END)`,
+  [deviceId, [...LIVE_RUN_STATUSES], skip.filter(uuid), Boolean(options.queued), Boolean(options.mailboxNotices), Boolean(options.skipDeviceCommands), (options.skipDeviceCommands ?? []).filter(uuid)])
+  return { work, deviceCommand }
 }
 
 /**

@@ -11,8 +11,13 @@ let actual: typeof import('../../../../../lib/device-link')
 const authenticateDevice = mock.fn(async () => ({ userId: 'owner', tokenId: 'token' }) as object | null)
 const ownsDevice = mock.fn(async () => ({ id: 'device-1', enabled: true }) as object | null)
 type Work = { commands: unknown[]; queuedRuns: string[] }
-const deviceMayHaveWork = mock.fn(async (_deviceId: string, _skip: readonly string[], _options?: { mailboxNotices?: boolean; queued?: boolean }) => true)
+type Check = { work: boolean; deviceCommand: { id: string; kind: 'redetect' | 'restart' | 'update' | 'uninstall' } | null }
+const deviceMayHaveWork = mock.fn(async (_deviceId: string, _skip: readonly string[], _options?: { mailboxNotices?: boolean; queued?: boolean; skipDeviceCommands?: readonly string[] }): Promise<Check> => ({ work: true, deviceCommand: null }))
 const deviceWork = mock.fn(async (_deviceId: string, _skip: readonly string[], _options?: { mailboxNotices?: boolean; queued?: boolean }): Promise<Work> => ({ commands: [], queuedRuns: [] }))
+type Versions = { min: string; latest?: string }
+let releases: Versions | undefined
+const daemonVersions = mock.fn(async (): Promise<Versions> => releases ?? { min: '0.0.299' })
+const cachedDaemonVersions = mock.fn((): Versions | undefined => releases)
 const sleep = mock.fn(async (ms: number, signal?: AbortSignal) => actual.sleep(ms, signal))
 const logs: RequestLogEntry[] = []
 for (const method of ['log', 'warn', 'error'] as const) {
@@ -30,6 +35,10 @@ mock.module('next/server', { namedExports: { NextResponse: Response } })
 let GET: typeof import('./route')['GET']
 before(async () => {
   actual = await import('../../../../../lib/device-link')
+  const { newerDaemonRelease } = await import('../../../../../lib/daemon-release')
+  mock.module(new URL('../../../../../lib/daemon-release.ts', import.meta.url).href, {
+    namedExports: { daemonVersions, cachedDaemonVersions, newerDaemonRelease },
+  })
   mock.module(new URL('../../../../../lib/device-link.ts', import.meta.url).href, {
     namedExports: { authenticateDevice, deviceMayHaveWork, deviceWork, ownsDevice, sleep, waitSeconds: actual.waitSeconds },
   })
@@ -42,7 +51,10 @@ beforeEach(() => {
   ownsDevice.mock.resetCalls()
   ownsDevice.mock.mockImplementation(async () => ({ id: 'device-1', enabled: true }))
   deviceMayHaveWork.mock.resetCalls()
-  deviceMayHaveWork.mock.mockImplementation(async () => true)
+  deviceMayHaveWork.mock.mockImplementation(async () => ({ work: true, deviceCommand: null }))
+  releases = undefined
+  daemonVersions.mock.resetCalls()
+  cachedDaemonVersions.mock.resetCalls()
   deviceWork.mock.resetCalls()
   deviceWork.mock.mockImplementation(async () => ({ commands: [], queuedRuns: [] }))
   sleep.mock.resetCalls()
@@ -50,8 +62,8 @@ beforeEach(() => {
   logs.length = 0
 })
 
-function request(signal?: AbortSignal, wait = 25, skip = '', mailboxNotices = false) {
-  return new Request(`https://preview.example.test/mikka/v1/devices/device-1/commands?wait=${wait}${skip ? `&skip=${skip}` : ''}`, { signal,
+function request(signal?: AbortSignal, wait = 25, skip = '', mailboxNotices = false, updates = '') {
+  return new Request(`https://preview.example.test/mikka/v1/devices/device-1/commands?wait=${wait}${skip ? `&skip=${skip}` : ''}${updates}`, { signal,
     headers: mailboxNotices ? { [MAILBOX_NOTICE_HEADER]: '1' } : {} })
 }
 const params = { params: Promise.resolve({ deviceId: 'device-1' }) }
@@ -143,11 +155,69 @@ test('mailbox notice commands require a capable daemon so older clients keep rec
 })
 
 test('an idle check that finds nothing never runs the full read, and the poll still ends empty at its deadline', async () => {
-  deviceMayHaveWork.mock.mockImplementation(async () => false)
+  deviceMayHaveWork.mock.mockImplementation(async () => ({ work: false, deviceCommand: null }))
   sleep.mock.mockImplementation(async () => {})
   assert.deepEqual(await (await GET(request(undefined, 0), params)).json(), { commands: [] })
   assert.equal(deviceMayHaveWork.mock.callCount(), 1)
   assert.deepEqual(deviceMayHaveWork.mock.calls[0].arguments, ['device-1', [], { mailboxNotices: false, queued: true }])
   assert.equal(deviceWork.mock.callCount(), 0)
   assert.equal(logs[0].outcome, 'empty')
+})
+
+const COMMAND = { id: '6f1c2b8e-2a8e-4c39-9d1a-3b5d7c9e1f20', kind: 'update' as const }
+
+test('a daemon that reads releases from the poll gets one as soon as the server knows a newer one than it has', async () => {
+  releases = { min: '0.0.299', latest: '0.0.401' }
+  deviceMayHaveWork.mock.mockImplementation(async () => ({ work: false, deviceCommand: null }))
+  const started = Date.now()
+  assert.deepEqual(await (await GET(request(undefined, 25, '', false, '&daemonLatest=0.0.400'), params)).json(), { commands: [], daemonVersions: releases })
+  assert.ok(Date.now() - started < 1_000, 'no wait for the deadline or a heartbeat')
+  assert.equal(sleep.mock.callCount(), 0)
+  assert.equal(logs[0].outcome, 'work')
+})
+
+test('a release published while the poll waits ends it at the next idle check, with no extra database read', async () => {
+  releases = { min: '0.0.299', latest: '0.0.400' }
+  deviceMayHaveWork.mock.mockImplementation(async () => ({ work: false, deviceCommand: null }))
+  let checks = 0
+  sleep.mock.mockImplementation(async () => { if (++checks === 3) releases = { min: '0.0.299', latest: '0.0.401' } })
+  assert.deepEqual(await (await GET(request(undefined, 25, '', false, '&daemonLatest=0.0.400'), params)).json(), { commands: [], daemonVersions: { min: '0.0.299', latest: '0.0.401' } })
+  assert.equal(sleep.mock.callCount(), 3)
+  // The db module is mocked as {}: any other query would throw. One statement per check, as without releases.
+  assert.equal(deviceMayHaveWork.mock.callCount(), 4)
+  assert.equal(deviceWork.mock.callCount(), 0)
+  assert.equal(daemonVersions.mock.callCount(), 1, 'the release cache is awaited once per poll, then only peeked')
+})
+
+test('a release the daemon already knows (it is busy or backing off) does not end the poll early, and still rides along', async () => {
+  releases = { min: '0.0.299', latest: '0.0.401' }
+  deviceMayHaveWork.mock.mockImplementation(async () => ({ work: false, deviceCommand: null }))
+  let now = Date.now()
+  const clock = mock.method(Date, 'now', () => now)
+  sleep.mock.mockImplementation(async (ms: number) => { now += ms })
+  try {
+    assert.deepEqual(await (await GET(request(undefined, 25, '', false, '&daemonLatest=0.0.401'), params)).json(), { commands: [], daemonVersions: releases })
+  } finally { clock.mock.restore() }
+  assert.equal(sleep.mock.callCount(), 13, 'waited the whole 25 s, checking every 2 s')
+  assert.equal(logs[0].outcome, 'empty')
+})
+
+test('an older daemon gets no releases or device commands from the poll and never ends it early for them', async () => {
+  releases = { min: '0.0.299', latest: '0.0.401' }
+  deviceMayHaveWork.mock.mockImplementation(async () => ({ work: false, deviceCommand: null }))
+  assert.deepEqual(await (await GET(request(undefined, 0), params)).json(), { commands: [] })
+  assert.equal(deviceMayHaveWork.mock.calls[0].arguments[2]?.skipDeviceCommands, undefined, 'device commands are not looked for')
+  assert.equal(daemonVersions.mock.callCount(), 0)
+})
+
+test('a person\'s update reaches the device at the next idle check of its poll', async () => {
+  let checks = 0
+  deviceMayHaveWork.mock.mockImplementation(async () => ({ work: false, deviceCommand: ++checks >= 2 ? COMMAND : null }))
+  sleep.mock.mockImplementation(async () => {})
+  const held = '0b9d4f6e-7a1c-4e2b-8f3d-5c6a7b8c9d0e'
+  assert.deepEqual(await (await GET(request(undefined, 25, '', false, `&daemonLatest=0.0.400&skipDeviceCommands=${held},not-a-uuid`), params)).json(), { commands: [], deviceCommands: [COMMAND], daemonVersions: { min: '0.0.299' } })
+  assert.equal(sleep.mock.callCount(), 1)
+  assert.deepEqual(deviceMayHaveWork.mock.calls[0].arguments[2]?.skipDeviceCommands, [held, 'not-a-uuid'], 'commands the daemon holds are left out')
+  assert.equal(deviceWork.mock.callCount(), 0, 'no run work: the full read is skipped')
+  assert.equal(logs[0].outcome, 'work')
 })
