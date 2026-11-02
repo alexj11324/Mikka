@@ -8,11 +8,13 @@ import { coordinatorTurn } from '@/workflows/coordinator/workflow'
 import { runTestFixture } from '@/lib/run-test-fixture'
 import { runTriageBatch, TRIAGE_BATCH_BUDGET_MS } from './triage-batch'
 import { pool } from '@/lib/db'
+import { workspacePool } from '@/lib/workspace-db'
 import { createWakeRecovery, deliverWake, type WakeClaim, type WakeScope } from './wake-recovery'
 import { failureLine } from './refusal-line'
 import { pushByDecision } from './push-decision'
 import type { InboxEvent } from '@/lib/push-reasons'
 import { coordinatorBot } from './coordinator-bot'
+import { deliverRunCompletion } from './run-completion-delivery'
 
 const recovery = createWakeRecovery(pool)
 
@@ -35,6 +37,7 @@ export async function triageInbox(userId: string, botId: string): Promise<void> 
   const outcome = await runTriageBatch(await untriagedEvents(userId, botId), {
     claim: event => claimTriageAttempt(event, scope),
     deliverUser: event => setEventTier(event.id, 'attention', scope),
+    deliverCompletion: event => deliverRunCompletion(pool, event, scope, workspacePool),
     classify: async (event, signal) => {
       const result = await hostedBillingScope.run({workspaceId:await executionWorkspace(userId,botId),ownerId:userId},()=>invokeDecision('triage', triageInput(event), triageQuestions(event), signal))
       return { tier: tierFromDecision(result?.answers.get('tier')), execution: result?.execution ?? null }

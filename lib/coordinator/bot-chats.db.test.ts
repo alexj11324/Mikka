@@ -647,3 +647,48 @@ dbTest('a run that dies after taking a message (a replay that fails after a depl
     assert.equal(answered.working, false)
   })
 })
+
+dbTest('own task completion returns to the original Bot with an exhausted team trial', async t => {
+  const [{ createRequestDatabaseScope, db, pool }, schema, store, { runTriageBatch }, { HostedUsageStore }, { deliverRunCompletion }, { eq, sql }] = await Promise.all([
+    import('../db'), import('../db/schema'), import('./store'), import('./triage-batch'), import('../abuse/store'), import('./run-completion-delivery'), import('drizzle-orm'),
+  ])
+  const scope = createRequestDatabaseScope(databaseUrl!), owner = `test-completion-${randomUUID()}`
+  t.after(async () => { t.diagnostic(`Retained completion transport fixture ${owner}`); await scope.close() })
+  await scope.run(async () => {
+    await db.execute(sql`insert into "user"(id,name,email,"emailVerified","createdAt","updatedAt") values(${owner},'Completion fixture',${`${owner}@example.invalid`},false,now(),now())`)
+    const { botId, workspaceId } = await seedCoordinator(owner)
+    await pool.query(`UPDATE mikka_workspaces SET kind='team' WHERE id=$1`, [workspaceId])
+    for (let n = 0; n < 7; n++) await pool.query(`INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,role,status) VALUES ($1,$2,'Member',$3,'member','active')`, [workspaceId, `${owner}-peer-${n}`, `peer-${n}@example.invalid`])
+    await db.insert(schema.coordinatorEvents).values(Array.from({ length: 21 }, (_, n) => ({
+      id: randomUUID(), userId: owner, botId, kind: 'user_message' as const, dedupeKey: `${owner}:${n}`, payload: { text: 'Earlier fixture input' }, tier: 'attention' as const, deliveredAt: new Date(),
+    })))
+    await assert.rejects(new HostedUsageStore(pool).canUseMikkaPaid(workspaceId), { code: 'verification_required' }, 'the original Gateway classification is refused before a model call')
+    const agentId = randomUUID(), runId = randomUUID(), issueId = randomUUID(), eventId = randomUUID()
+    await db.insert(schema.agents).values({ id: agentId, userId: owner, harness: 'claude_code', name: 'Completion fixture' })
+    await db.insert(schema.issues).values({ id: issueId, userId: owner, title: 'Read-only completion', content: { type: 'doc', content: [] }, status: 'todo', priority: 'normal' })
+    await db.insert(schema.agentRuns).values({ id: runId, userId: owner, agentId, botId, issueId, status: 'succeeded', stopReason: 'submitted', finishedAt: sql`'2026-11-02T23:23:56.079887Z'::timestamptz`, report: { summary: 'Fixture task completed' } })
+    await db.insert(schema.coordinatorEvents).values({ id: eventId, userId: owner, botId, issueId, runId, kind: 'run_finished', dedupeKey: `${owner}:result`, payload: { status: 'succeeded', stopReason: 'submitted', summary: 'Untrusted agent report' }, createdAt: sql`'2026-11-02T23:23:56.123456Z'::timestamptz` })
+    await runTriageBatch(await store.untriagedEvents(owner, botId), {
+      deliverUser: event => store.setEventTier(event.id, 'attention', { userId: owner, botId }),
+      deliverCompletion: event => deliverRunCompletion(pool, event, { userId: owner, botId }, pool),
+      claim: async () => { throw new Error('Completion must not claim a paid classification') },
+      classify: async () => { throw new Error('Completion must not call a second model') },
+      complete: async () => { throw new Error('Completion must not invent a model receipt') },
+    }, new AbortController().signal)
+    const [delivered] = await db.select().from(schema.coordinatorEvents).where(eq(schema.coordinatorEvents.id, eventId))
+    assert.equal(delivered.tier, 'result')
+    assert.equal(delivered.triageDecision?.method, 'run_completion_delivery')
+    assert.equal(delivered.triageDecision?.execution, undefined, 'transport never invents a model receipt')
+    assert.equal(delivered.lastTriageAttemptAt, null, 'the paid classifier was never claimed')
+    assert.equal((await pool.query(`SELECT count(*)::int n FROM hosted_usage WHERE "workspaceId"=$1`, [workspaceId])).rows[0].n, 0)
+    const inbox = await store.takeInbox(owner, 'completion-fixture-holder', botId)
+    assert.equal(inbox.added, 1)
+    assert.equal(await store.releaseLease(owner, 'completion-fixture-holder', botId), false)
+    assert.equal((await store.takeInbox(owner, 'next-fixture-holder', botId)).added, 0, 'the result is consumed once')
+    await store.releaseLease(owner, 'next-fixture-holder', botId)
+    const conversation = await store.loadConversation(owner, botId)
+    assert.equal(conversation.messages.length, 1)
+    assert.match(JSON.stringify(conversation.messages), /Untrusted agent report/)
+    assert.equal(await deliverRunCompletion(pool, { ...delivered, observedRun: null }, { userId: owner, botId }, pool), false, 'a missing visibility observation cannot release a result')
+  })
+})
