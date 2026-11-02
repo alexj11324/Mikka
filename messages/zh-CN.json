@@ -747,7 +747,7 @@
     "editorAria": "{label}编辑器"
   },
   "Devices": {
-    "otherDevices": "Remote control",
+    "otherDevices": "服务器",
     "menu": "{name} 的更多操作",
     "add": {
       "title": "添加设备",

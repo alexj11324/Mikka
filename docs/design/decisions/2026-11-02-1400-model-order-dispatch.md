@@ -12,9 +12,13 @@ Two entries replace 「API 与订阅」 and 「Bot 与 Agents」:
 - **设备**: the person's computers, each with one switch, 参与调度. Off: Mikka
   never sends that computer a run. The two old switches (允许调度,
   允许自动调度) are this one now; a computer whose owner had turned
-  允许自动调度 off keeps out, every other one takes part.
+  允许自动调度 off keeps out, every other one takes part. Its groups are
+  本机 and 服务器 (once 「Remote control」; 服务器 is what the rest of the
+  product calls these machines); each computer lists its Agents with their
+  versions (Claude Code 2.1 · Codex 0.9).
 - **模型与订阅**: first the subscriptions and API keys (connect, status, a
-  key's model count, 重新获取模型 and the reason a fetch failed), then
+  key's model count, 重新获取模型 and the reason a fetch failed; each
+  subscription's switch is labelled 启用), then
   运行位置 and 允许使用的模型. 付款 is under 计费 only. Bots of people who
   left moved to 常规.
 
@@ -25,8 +29,9 @@ in code, decision 2026-11-02-1030). The same model under two Agents is two
 entries. The person adds entries from those candidates, removes them (with
 a confirmation), and orders them by drag or from the keyboard (Space to pick
 up, arrows to move, Space to drop) or with 上移 / 下移. Each row shows
-可用, or why it cannot run now: 额度用完 · <when> 恢复, 需要重新连接, 已暂停,
-Key 无效或已被撤销, 已不可用, or 没有电脑能跑 <Agent>. A personal and a team
+可用, or why it cannot run now: 额度用完 · <when> 恢复, 需要重新连接,
+Key 无效或已被撤销, 已不可用, or 没有电脑能跑 <Agent>; a subscription
+turned off (启用 off) reads 订阅已停用 on each of its models. A personal and a team
 workspace each keep their own list.
 
 An API key's Agent follows its protocol: an OpenAI-compatible key runs on

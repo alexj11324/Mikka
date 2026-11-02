@@ -747,7 +747,7 @@
     "editorAria": "{label} editor"
   },
   "Devices": {
-    "otherDevices": "Remote control",
+    "otherDevices": "Servers",
     "menu": "More for {name}",
     "add": {
       "title": "Add device",

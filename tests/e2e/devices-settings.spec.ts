@@ -38,14 +38,14 @@ async function seed(page: Page) {
 
 const row = (page: Page, name: string) => page.getByRole('listitem').filter({ has: page.getByText(name, { exact: true }) })
 
-test('设备：本机与 Remote control 分组，Agent 图标，重命名、重新检测、移除', async ({ page }) => {
+test('设备：本机与服务器分组，Agent 图标，重命名、重新检测、移除', async ({ page }) => {
   await register(page, '/settings?section=devices')
   await expect(page.getByRole('heading', { level: 1, name: '设备' })).toBeVisible()
   const ids = await seed(page)
   await page.reload()
 
   const local = page.getByRole('region', { name: '本机' })
-  const remote = page.getByRole('region', { name: 'Remote control' })
+  const remote = page.getByRole('region', { name: '服务器' })
   await expect(local.getByText('E2E MacBook', { exact: true })).toBeVisible()
   await expect(remote.getByText('build-01', { exact: true })).toBeVisible()
   await expect(page.getByText('这个分区还在设计中', { exact: false })).toHaveCount(0)
