@@ -66,7 +66,7 @@ referenced by id (DDD).
 | Coordinator | The person's ordinary bot in a workspace (R-06) | Bot · workspace, one per person | `coordinator_bots (ownerId, workspaceId) → bots` (`schema.ts:117-122`; `lib/coordinator/coordinator-bot.ts:5-16`) | On first use | As any bot | Bot list, pinned |
 | Group chat | Chat with several bots and people | Conversation · workspace | `conversations.workspaceId`, `createdBy`; `conversation_members` (`schema.ts:822-836`) | Bot list 「+」 | Group panel | Bot list; ⌘K |
 | Agent | Coding worker that runs a thread | Agent · account | `agents.userId`, `deviceId` (`schema.ts:321-328`); choice per person per workspace in `execution_rules (ownerId, workspaceId)` (`schema.ts:126-131`) | Detected on a device | 设置 › Bot 与 Agents | Its mark on 全部线程 rows (R-78) |
-| Thread (run chain) | Work a bot dispatched; a root run and the runs that resume, retry or continue it (`lib/run-chain.ts`) | Thread · workspace of its bot | `agent_runs.userId`, `botId`, `issueId` (`schema.ts:338-398`); no `workspaceId`, reached through `bots.workspaceId` | Dispatched from chat | Its column: 对话, 验收 | 概览 › 线程; 全部线程; chat card; task's 线程 (R-82) |
+| Thread (run chain) | Work a bot dispatched; a root run and the runs that resume, retry or continue it (`lib/run-chain.ts`) | Thread · workspace where it was dispatched (run by an Agent; the bot only dispatches it) | `agent_runs.userId`, `botId`, `issueId` (`schema.ts:338-398`); no `workspaceId`, reached through `bots.workspaceId` | Dispatched from chat | Its column: 对话, 验收 | 概览 › 线程; 全部线程; chat card; task's 线程 (R-82) |
 | Task (issue) | Work to be done (`MIK-xx`) | Task · workspace (team: its team) | `issues.userId`, `scope` (`schema.ts:30-45`); team tasks in `mikka_team_issues (teamId, workspaceId)` (`team-schema.ts:15-18`) | By a bot in chat, or 新建任务 (R-22) | Task page | 看板; ⌘K; chat chips (R-15) |
 | Project | A group of tasks | Project · account, linked to teams | `workspace_projects.userId` (`lib/db/project-schema.ts:4-6`); `mikka_team_projects.workspaceId` (`team-schema.ts:29-32`) | 看板 › 项目 | Project page | 看板 (R-82); ⌘K |
 | Artifact | What a thread produces to look at or accept | Artifact · account, linked to run | `artifacts.userId`, `runId`, `issueId` (`schema.ts:893-904`) | By a thread | Artifact window (R-56) | Artifact rail page; thread header 「Artifact · N」 |
@@ -122,7 +122,7 @@ per AGENTS.md triage is in brackets.
 | M9 | `byos_connections.workspaceId` (drizzle `20261027164503`) | Subscriptions belong to the account (2225 rule 2, T6) | The binding row still carries a workspace | Two sources of truth for where a subscription runs [2×3] | Resolve by owner only; keep sharing in `workspace_subscription_shares` | P2 |
 | M10 | `lib/personal-workspace.ts:35-40` | Own credentials need no share (2240) | `ensurePersonalShare` writes a share row for the personal workspace | Redundant row; harmless [1×1] | Drop when the resolver no longer reads it | P2 |
 | M11 | `lib/workspace-admin/general.ts:114-134` | Transfer hands the workspace on | Only `workspaces.userId` changes; `cloud_machines.ownerId` and the Stripe customer stay with the old owner | Undefined who pays for the workspace's Mikka Cloud machine after transfer [2×4] | Decide with Alex; `cloud_machines` is one row per workspace while E2B keys are personal | P2 |
-| M12 | `members.ts:45-66` | A taken-over bot runs on the new owner's resources | `agent_runs.userId`, `execution_rules`, `bot_model_choices` keep the previous owner | New owner's view of the bot's threads depends on `userId` reads [2×3] | Check `canReadThread` for taken-over bots | P2 |
+| M12 | `members.ts:45-66` | A taken-over bot runs on the new owner's resources | `agent_runs.userId`, `execution_rules`, `bot_model_choices` keep the previous owner | New owner's view of the threads the bot dispatched depends on `userId` reads [2×3] | Check `canReadThread` for taken-over bots | P2 |
 | M13 | `personal_access_tokens (userId, workspaceId)` in 账号 group (`settings-sections.ts:40`) | Account-level objects are stored once (T6) | Tokens are per workspace, listed as an account setting | Unbuilt; decide before shipping | Either a workspace setting or an account token | P2 |
 
 **Verdict.** The principle holds: every capability a single-member workspace
@@ -236,7 +236,7 @@ waiting for the person; clicking a notification opens the task
 
 Tab bar 对话 · 线程 · 搜索; drawer for 设置, 建议, 任务, 插件 (`mobile.md`).
 Threads are a top-level tab there: the web is the only client where all
-threads sit inside a bot's panel.
+threads sit only inside the panel of the bot that dispatched them.
 
 ### Global entries (reachable from anywhere)
 
@@ -313,7 +313,7 @@ threads sit inside a bot's panel.
 | # | Gap | Where | Sev | Breaks | Change | Status |
 | --- | --- | --- | --- | --- | --- | --- |
 | G1 | Bot 与 Agents, 常规, 密钥与环境 hidden in a personal workspace | `lib/settings-sections.ts:94` | P0 | P1, P3; T2, T5 | Remove from `TEAM_ONLY_SECTIONS` | #890, #895 |
-| G2 | Phone web cannot open the right column: no 概览, no 全部线程, no bot threads, PR or 电脑 | `issue-workspace.tsx:180`, `:448`; window bar hidden below `md` | P1 | P9; PM:`persistent-nav` | A header button on phones, as the iOS app's bot page; verify in a browser at < 768px (found from code only) | Open |
+| G2 | Phone web cannot open the right column: no 概览, no 全部线程, no threads a bot dispatched, PR or 电脑 | `issue-workspace.tsx:180`, `:448`; window bar hidden below `md` | P1 | P9; PM:`persistent-nav` | A header button on phones, as the iOS app's bot page; verify in a browser at < 768px (found from code only) | Open |
 | G3 | 全部线程 sits inside one bot's panel | `context-panel.tsx:171` | P1 | P4, P5; NAV | Top-bar global entry | In progress (another session) |
 | G4 | ⌘K finds no threads, Artifacts or settings sections | `lib/site-search.ts:14-16`, `global-search.tsx` | P1 | P6; IA-5 | Add the three sources | Open |
 | G5 | No web inbox for 等你; dead `inbox` section and unused `components/app-sidebar.tsx` | `workspace-navigation.ts:12`, `workspace-overview.tsx:28` | P2 | P4; H-1 | Count on the 全部线程 entry (decided, built in the top-bar 全部线程 PR); remove the dead section and file | Open |
