@@ -262,14 +262,86 @@ test('a workspace token stays in its workspace on thread, evidence, proposal and
     const route = await import('../app/api/self-improvement/route')
     assert.equal((await call(route.GET, `/api/self-improvement?runId=${ownRun}`, {})).status, 200)
     assert.equal((await call(route.GET, `/api/self-improvement?runId=${otherRun}`, {})).status, 404)
-    // A task in no workspace does not open a run whose Bot is in another one.
-    assert.equal((await call(route.GET, `/api/self-improvement?runId=${ownBotLooseRun}`, {})).status, 200)
+    // A team token reaches no task in no workspace (the task allowlist), so neither run on one opens.
+    assert.equal((await call(route.GET, `/api/self-improvement?runId=${ownBotLooseRun}`, {})).status, 404)
     assert.equal((await call(route.GET, `/api/self-improvement?runId=${otherBotLooseRun}`, {})).status, 404)
-    assert.equal((await call(route.POST, '/api/self-improvement', {}, { action: 'propose', runId: otherBotLooseRun })).status, 404)
-    assert.equal((await call(route.POST, '/api/self-improvement', {}, { action: 'feedback', eventId: randomUUID(), runId: otherBotLooseRun, verdict: 'negative' })).status, 404)
-    assert.equal(Number((await pool.query('SELECT count(*) FROM improvement_scores WHERE "runId"=$1', [otherBotLooseRun])).rows[0].count), 0)
+    // The personal token keeps tasks in no workspace, so only the run's Bot keeps it out of a team
+    // workspace's run: a task in no workspace does not open a run whose Bot is in another one.
+    bearer = personalToken.token
+    try {
+      for (const runId of [ownBotLooseRun, otherBotLooseRun]) {
+        assert.equal((await call(route.GET, `/api/self-improvement?runId=${runId}`, {})).status, 404)
+        assert.equal((await call(route.POST, '/api/self-improvement', {}, { action: 'propose', runId })).status, 404)
+        assert.equal((await call(route.POST, '/api/self-improvement', {}, { action: 'feedback', eventId: randomUUID(), runId, verdict: 'negative' })).status, 404)
+        assert.equal(Number((await pool.query('SELECT count(*) FROM improvement_scores WHERE "runId"=$1', [runId])).rows[0].count), 0)
+      }
+    } finally {
+      bearer = token.token
+    }
     // A run with no task has no improvement record to reach.
     assert.equal((await call(route.GET, `/api/self-improvement?runId=${otherBotNoTaskRun}`, {})).status, 404)
+  })
+
+  // Records made from runs: a proposal (its source runs), a benchmark instance (its source run)
+  // and an evaluation (its instance's and its proposal's source runs), all on the task in no workspace.
+  const scorer = randomUUID().replaceAll('-', '')
+  await pool.query(`INSERT INTO improvement_scorers (digest,id,version,definition) VALUES ($1,$1,1,'{}')`, [scorer])
+  const proposal = async (sourceRuns: string[]) => {
+    const id = randomUUID(), bucket = randomUUID(), task = randomUUID(), attempt = randomUUID(), event = randomUUID()
+    await pool.query(`INSERT INTO improvement_proposals (id,"userId",bucket,fingerprint,"issueId","scorerDigest",candidate,result,status)
+      VALUES ($1,$2,$3,$4,$5,$6,'{}','{}','awaiting_model_candidate')`, [id, owner, bucket, randomUUID(), looseIssue, scorer])
+    for (const runId of sourceRuns) {
+      const score = randomUUID()
+      await pool.query(`INSERT INTO improvement_feedback (id,"userId","eventId","runId","issueId",fingerprint,verdict,note) VALUES ($1,$2,$3,$4,$5,'f','negative','')`, [score, owner, randomUUID(), runId, looseIssue])
+      await pool.query(`INSERT INTO improvement_scores (id,"userId","runId",bucket,"scorerDigest",outcome,reason,snapshot) VALUES ($1,$2,$3,$4,$5,'failure','r','{}')`, [score, owner, runId, bucket, scorer])
+      await pool.query('INSERT INTO improvement_proposal_sources ("proposalId","scoreId","userId",bucket,"runId") VALUES ($1,$2,$3,$4,$5)', [id, score, owner, bucket, runId])
+    }
+    // Its Factory handoff, so its status reads. Its Factory task and attempt reference each other (a deferred key), so they go in together.
+    await pool.query(`INSERT INTO coordinator_events (id,"userId",kind,"dedupeKey",payload) VALUES ($1,$2,'user_message',$3,'{}')`, [event, owner, event])
+    await pool.query(`WITH t AS (INSERT INTO factory_tasks (id,"userId","issueId","sourceEventId",route,stage,status,"attemptId",reason)
+      VALUES ($1,$2,$3,$4,'{}','execute','running',$5,'Scope fixture'))
+      INSERT INTO factory_attempts (id,"taskId",stage,ordinal,position,status,reason) VALUES ($5,$1,'execute',1,1,'running','Scope fixture')`, [task, owner, looseIssue, event, attempt])
+    await pool.query(`INSERT INTO improvement_factory_links ("proposalId","userId","issueId","taskId","attemptId","runId",request) VALUES ($1,$2,$3,$4,$5,$6,'{}')`,
+      [id, owner, looseIssue, task, attempt, sourceRuns[0] ?? randomUUID()])
+    return { id, binding: { taskId: task, issueId: looseIssue, attemptId: attempt, revision: 1, candidateId: null } }
+  }
+  // A run with no Bot on a task in no workspace belongs to the owner's personal workspace.
+  const personalLooseRun = await run(null, looseIssue)
+  const ownProposal = await proposal([ownBotLooseRun]), otherProposal = await proposal([otherBotLooseRun]), sourcelessProposal = await proposal([])
+  const personalProposal = await proposal([personalLooseRun])
+  const instance = randomUUID(), candidateVersion = randomUUID(), baselineVersion = randomUUID(), evaluation = randomUUID()
+  await pool.query(`INSERT INTO improvement_benchmark_instances (id,"userId","issueId","agentId","repoId","sourceRunId","sourceCommit","definitionDigest","instanceDigest",seed,settings)
+    VALUES ($1,$2,$3,$4,$5,$6,repeat('a',40),'definition','instance',repeat('b',64),'{}')`, [instance, owner, looseIssue, agent, repo, otherBotLooseRun])
+  await pool.query(`INSERT INTO improvement_skill_versions (id,artifact,markdown) VALUES ($1,'{}',''),($2,'{}','')`, [candidateVersion, baselineVersion])
+  await pool.query(`INSERT INTO improvement_skill_candidates ("versionId","userId","issueId","agentId","repoId","proposalId","factoryTaskId","candidateId",repository,"commitSha",path,"baselineVersionId")
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'repo',repeat('c',40),'SKILL.md',$9)`, [candidateVersion, owner, looseIssue, agent, repo, otherProposal.id, otherProposal.binding.taskId, randomUUID(), baselineVersion])
+  await pool.query(`INSERT INTO improvement_skill_evaluations (id,"instanceId","userId","proposalId","candidateVersionId",scope) VALUES ($1,$2,$3,$4,$5,'{}')`,
+    [evaluation, instance, owner, otherProposal.id, candidateVersion])
+
+  await t.test('self-improvement keeps a token to records made from runs of its workspace', async () => {
+    const route = await import('../app/api/self-improvement/route')
+    const post = (body: unknown) => call(route.POST, '/api/self-improvement', {}, body)
+    const proposalStatus = async (id: string) => (await call(route.GET, `/api/self-improvement?proposalId=${id}`, {})).status
+    // A team token reaches no task in no workspace (the task allowlist), so no proposal on one opens.
+    for (const id of [ownProposal.id, otherProposal.id, personalProposal.id]) assert.equal(await proposalStatus(id), 404)
+    // The personal token keeps tasks in no workspace, so only the records' source runs keep it out.
+    bearer = personalToken.token
+    try {
+      assert.equal(await proposalStatus(personalProposal.id), 200)
+      // A proposal on a task in no workspace whose source run's Bot is in a team workspace.
+      assert.equal(await proposalStatus(otherProposal.id), 404)
+      assert.equal(await proposalStatus(ownProposal.id), 404)
+      assert.equal((await post({ action: 'handoff', proposalId: otherProposal.id, binding: otherProposal.binding, agentId: agent, deviceRepoId: repo })).status, 404)
+      assert.equal((await post({ action: 'register_candidate', proposalId: otherProposal.id, binding: otherProposal.binding })).status, 404)
+      assert.equal((await post({ action: 'dispatch_training', instanceId: instance })).status, 404)
+      assert.equal((await post({ action: 'begin_evaluation', instanceId: instance, proposalId: personalProposal.id, candidateVersionId: candidateVersion })).status, 404)
+      assert.equal((await post({ action: 'dispatch_evaluation', evaluationId: evaluation })).status, 404)
+      assert.equal((await post({ action: 'compare_evaluation', evaluationId: evaluation })).status, 404)
+      // A record with no source run to place it.
+      assert.equal(await proposalStatus(sourcelessProposal.id), 404)
+    } finally {
+      bearer = token.token
+    }
   })
 
   await t.test('self-improvement keeps a browser session to its owner checks', async () => {
@@ -282,6 +354,9 @@ test('a workspace token stays in its workspace on thread, evidence, proposal and
       const read = (runId: string) => route.GET(new Request(`${origin}/api/self-improvement?runId=${runId}`, { headers: currentHeaders = new Headers() }))
       assert.equal((await read(otherBotLooseRun)).status, 200)
       assert.equal((await read(otherRun)).status, 200)
+      const proposalStatus = (id: string) => route.GET(new Request(`${origin}/api/self-improvement?proposalId=${id}`, { headers: currentHeaders = new Headers() }))
+      assert.equal((await proposalStatus(otherProposal.id)).status, 200)
+      assert.equal((await proposalStatus(sourcelessProposal.id)).status, 200)
     } finally { api.getSession = signedOut }
   })
 })
