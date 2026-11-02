@@ -113,7 +113,7 @@
 --color-shell-chrome: var(--shell-chrome);
 --color-shell-panel: var(--shell-panel);
 --color-shell-raised: var(--shell-raised);
-/* macOS translucent window: the veil over the window's material behind the bar, rail and list (docs/design/platforms.md). */
+/* macOS translucent window: the veil over the window's material behind the bot list only (docs/design/platforms.md). */
 --color-shell-material: var(--shell-material);
 --color-avatar-1: var(--avatar-1);
 --color-avatar-2: var(--avatar-2);
