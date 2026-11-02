@@ -1,10 +1,15 @@
+import type { ConnectKind } from './connect-kind'
+
 // What the right side of a 插件 store item shows (decision 2026-10-31, as Codex):
 // `…` once the person has connected the app (a menu to manage it), `+` while
 // they have not (it starts the connect flow). Pure, so the rule is tested alone.
 
-export type StoreItemState = 'connected' | 'add' | 'unavailable'
+export type StoreItemState = 'connected' | 'add' | 'ready' | 'unavailable'
 
 /**
+ * - An app that needs no connection is `ready`: nothing to add or manage.
+ *   One Composio cannot connect for people (OAuth without managed auth) is
+ *   `unavailable`.
  * - A Composio app is connected when the person has any account on it (an
  *   expired one too: they manage it from the menu). Without one it is `+`,
  *   unless connecting is not configured on this deployment.
@@ -13,10 +18,12 @@ export type StoreItemState = 'connected' | 'add' | 'unavailable'
  *   placeholder; not set up on this deployment (null) shows no control.
  */
 export function storeItemState(input:
-  | { kind: 'composio'; accounts: number; canLink: boolean; loading: boolean }
+  | { kind: 'composio'; connect?: ConnectKind; accounts: number; canLink: boolean; loading: boolean }
   | { kind: 'own'; state: 'connected' | 'notConnected' | 'paused' | null | undefined },
 ): StoreItemState | null {
   if (input.kind === 'composio') {
+    if (input.connect === 'none') return 'ready'
+    if (input.connect === 'unsupported') return 'unavailable'
     if (input.loading) return null
     if (input.accounts > 0) return 'connected'
     return input.canLink ? 'add' : 'unavailable'
