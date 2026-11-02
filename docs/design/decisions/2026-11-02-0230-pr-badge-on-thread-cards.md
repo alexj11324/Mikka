@@ -21,6 +21,8 @@ Every thread card (the chat's card under a reply, a bot's 概览 › 线程 and
   the PR in a new tab. A click on the badge never opens the thread.
 - A row shows line counts only when the server supplies them; the task's
   stored PR (url, state, title) has none yet.
-- The board's task cards keep their PR item (the newest PR, coloured only by
-  the state GitHub confirms for the viewer, then +N) until it is decided
-  whether they move to the badge, which colours by the task's stored state.
+- The board's task cards do not use the badge. They keep their PR item: the
+  newest PR, coloured only by the state GitHub confirms for the current
+  viewer (grey until it does), then +N. That a state is confirmed by GitHub
+  for whoever is looking matters more than matching the thread cards, and the
+  badge colours by the task's stored state (coordinating session, 2026-11-02).
