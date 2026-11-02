@@ -1,4 +1,4 @@
-import { verifyBearer } from '@/lib/linear-sync/webhook'
+import { cronUnauthorized } from '@/lib/cron-auth'
 import { sweepExpiredRunLeases } from '@/lib/run-leases'
 import { reconcileCloudMachines } from '@/lib/computer/reconcile'
 import { pool } from '@/lib/db'
@@ -11,9 +11,7 @@ const headers = { 'cache-control': 'no-store' }
 
 /** The existing cron Worker calls this independently of owner/device requests. */
 export async function GET(request: Request) {
-  const secret = process.env.CRON_SECRET
-  if (!secret) return Response.json({ error: 'Cron is not configured' }, { status: 503, headers })
-  if (!await verifyBearer(request.headers.get('authorization'), secret)) return new Response(null, { status: 401, headers })
+  const refused = await cronUnauthorized(request); if (refused) return refused
   try {
     const runs = await sweepExpiredRunLeases()
     // Bot computers whose sandbox E2B no longer has stop claiming to run.

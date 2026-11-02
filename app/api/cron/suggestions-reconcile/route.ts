@@ -1,5 +1,5 @@
 import { withRequestLog } from '@/lib/request-log'
-import { verifyBearer } from '@/lib/linear-sync/webhook'
+import { cronUnauthorized } from '@/lib/cron-auth'
 import { reconcileSuggestions } from '@/lib/suggestions/reconcile'
 import { runFactoryMonitorCron } from '@/lib/factory/monitor-cron'
 
@@ -19,9 +19,7 @@ const FACTORY_MONITOR_BUDGET_MS = 50_000
 // idempotent, so a repeated or overlapping run converges on the same state. See docs/suggestions-cron.md.
 async function handleGET(request: Request) {
   const started = Date.now()
-  const secret = process.env.CRON_SECRET
-  if (!secret) return Response.json({ error: 'Cron is not configured' }, { status: 503 })
-  if (!await verifyBearer(request.headers.get('authorization'), secret)) return new Response(null, { status: 401 })
+  const refused = await cronUnauthorized(request); if (refused) return refused
   // Independent: a throw in one never stops or hides the other. Each failure is logged by name
   // only (no error message, which could carry a secret) and the status is non-2xx.
   const [suggestions, sweep] = await Promise.allSettled([
