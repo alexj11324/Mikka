@@ -1,5 +1,7 @@
 {
   "Common": {
+    "appUpdated": "Mikka 已更新",
+    "refresh": "刷新",
     "close": "关闭",
     "cancel": "取消",
     "save": "保存",

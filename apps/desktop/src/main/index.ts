@@ -15,7 +15,7 @@ import { startLoopbackAuth, type LoopbackAuthServer } from './loopback'
 import { catchClaudeCallback } from './subscription-callback'
 import { NotificationCenter } from './notification-center'
 import { appExternalUrl, desktopAuthState, externalUrl, isTrustedFrame, navigationDecision } from './security'
-import { UPDATE_CHECK_INTERVAL_MS, Updates } from './updates'
+import { UPDATE_CHECK_INTERVAL_MS, Updates, updateCopy } from './updates'
 import { TRANSLUCENT_ARGUMENT, windowAppearance } from './window-appearance'
 
 const APP_URL = __MIKKA_APP_URL__
@@ -260,10 +260,14 @@ function messageBox(options: Electron.MessageBoxOptions): Promise<Electron.Messa
  * available only after the draft is published. A downloaded update is
  * offered by the rail's restart button and installs on the next quit anyway.
  */
+const copy = () => updateCopy(app.getLocale())
 const updates = new Updates(autoUpdater, {
-  available: version => { void messageBox({ type: 'info', message: `Mikka ${version} installs when you restart.`, buttons: ['OK'] }) },
-  upToDate: () => { void messageBox({ type: 'info', message: `Mikka ${APP_VERSION} is up to date.`, buttons: ['OK'] }) },
-  failed: error => { void messageBox({ type: 'error', message: 'Could not check for updates.', detail: error.message, buttons: ['OK'] }) },
+  ready: version => {
+    void messageBox({ type: 'info', message: copy().restart(version), buttons: [copy().restartNow, copy().later], defaultId: 0, cancelId: 1 })
+      .then(({ response }) => { if (response === 0) updates.install() })
+  },
+  upToDate: () => { void messageBox({ type: 'info', message: copy().upToDate(APP_VERSION), buttons: [copy().ok] }) },
+  failed: error => { void messageBox({ type: 'error', message: copy().failed, detail: error.message, buttons: [copy().ok] }) },
 }, version => {
   for (const contents of webContents.getAllWebContents()) {
     if (!contents.isDestroyed() && isTrustedFrame(contents.getURL(), APP_URL)) contents.send(IPC.appUpdateReady, version)
@@ -272,7 +276,7 @@ const updates = new Updates(autoUpdater, {
 
 async function checkForUpdates(interactive: boolean): Promise<void> {
   if (!app.isPackaged) {
-    if (interactive) await messageBox({ type: 'info', message: 'Updates are checked in the installed app.', buttons: ['OK'] })
+    if (interactive) await messageBox({ type: 'info', message: copy().notInstalled, buttons: [copy().ok] })
     return
   }
   await updates.check(interactive)
@@ -305,7 +309,7 @@ function installMenu(): void {
       label: app.name,
       submenu: [
         { role: 'about' },
-        ...(app.isPackaged ? [{ label: 'Check for Updates…', click: () => { void checkForUpdates(true) } }] : []),
+        ...(app.isPackaged ? [{ label: copy().menu, click: () => { void checkForUpdates(true) } }] : []),
         { type: 'separator' },
         { role: 'services' },
         { type: 'separator' },
