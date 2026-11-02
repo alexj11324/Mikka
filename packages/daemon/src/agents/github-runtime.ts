@@ -6,6 +6,7 @@ import { pinnedGit, snapshotTree } from './publish'
 import type { RunPublish } from '@mikka/protocol'
 import { runBranch } from '../worktrees'
 import { localGitConfig } from './local-git-origin'
+import { trustedServerEndpoint } from '../trusted-endpoint'
 
 export type RunGitHub = NonNullable<SessionOptions['github']>
 export const GITHUB_CREDENTIAL_SCRIPT = resolve(import.meta.dirname, 'github-credentials.mjs')
@@ -25,8 +26,7 @@ export function githubReceiptEnvironment(host: NodeJS.ProcessEnv = process.env):
 /** Only run-local configuration is written; never a global gh or git login. */
 export function prepareGitHubEnvironment(runDir: string, github: RunGitHub, path: string, runtime?: { nodeBinary: string; ghBinary: string }): Record<string, string> {
   const endpoint = new URL(github.endpoint)
-  if (!endpoint.pathname.endsWith('/api/runs/github-token') || endpoint.username || endpoint.password ||
-    endpoint.search || endpoint.hash || (endpoint.protocol !== 'https:' && !(endpoint.protocol === 'http:' && ['127.0.0.1', 'localhost', '[::1]'].includes(endpoint.hostname)))) throw new Error('Invalid run GitHub endpoint')
+  if (!endpoint.pathname.endsWith('/api/runs/github-token') || !trustedServerEndpoint(endpoint)) throw new Error('Invalid run GitHub endpoint')
   const gh = runtime?.ghBinary ?? path.split(delimiter).map(dir => join(dir, 'gh')).find(file => existsSync(file))
   const node = runtime?.nodeBinary ?? process.execPath
   if (!gh) throw new Error('Install GitHub CLI (gh) before running GitHub tasks')
