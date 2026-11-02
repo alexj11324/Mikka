@@ -234,4 +234,41 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
     assert.equal(await recorded(runId), key.id)
     assert.equal((await pool.query('SELECT count(*)::int AS n FROM byos_native_runs WHERE "runId"=$1', [runId])).rows[0].n, 0)
   })
+
+  await t.test('task machine without a desktop: the claim succeeds and hands out no desktop', async () => {
+    // A worker on E2B's claude or codex template reports its harness with no computer broker.
+    const p = await person('key-task-machine')
+    const secret = `sk-ant-${randomBytes(16).toString('hex')}`
+    await addKey(p.id, 'anthropic', secret, ['key-model-a'])
+    const cloudDevice = randomUUID(), agentId = randomUUID(), repoId = randomUUID()
+    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,harnesses) VALUES ($1,$2,'Thread computer','cloud',true,$3)`,
+      [cloudDevice, p.id, JSON.stringify([{ harness: 'claude_code', installed: true, toolApproval: true, subscriptionBroker: true }])])
+    await pool.query(`INSERT INTO cloud_machines ("workspaceId","ownerId","operationId","sandboxId","deviceId",state,"runtimeReady") VALUES ($1,$2,$3,$4,$5,'running',true)`, [p.workspaceId, p.id, randomUUID(), `sbx-${randomUUID()}`, cloudDevice])
+    await pool.query(`INSERT INTO bot_desktops ("botId","workspaceId","ownerId",display) VALUES ($1,$2,$3,1)`, [p.botId, p.workspaceId, p.id])
+    await pool.query('INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,\'claude_code\',$4)', [agentId, p.id, cloudDevice, `task-${agentId.slice(0, 8)}`])
+    await pool.query('INSERT INTO device_repos (id,"deviceId","userId","repoPath","remoteUrl") VALUES ($1,$2,$3,$4,$5)', [repoId, cloudDevice, p.id, normalizeRepository(p.remote).key, p.remote])
+    const token = `task-${randomUUID()}`
+    await pool.query(`INSERT INTO device_tokens (id,"userId","tokenHash","boundDeviceId","boundWorkspaceId","expiresAt") VALUES ($1,$2,$3,$4,$5,now()+interval '1 hour')`, [randomUUID(), p.id, hashDeviceToken(token), cloudDevice, p.workspaceId])
+    const queue = (deviceRepoId: string) => queueCloudRun(pool, { userId: p.id, workspaceId: p.workspaceId }, { botId: p.botId, issueId: p.issueId, agentId, deviceRepoId, title: 'Task', body: '', model: 'auto' })
+    const status = async (id: string) => (await pool.query('SELECT status FROM agent_runs WHERE id=$1', [id])).rows[0].status
+
+    // A computer task (no remote) needs a desktop: refused at claim, the run stays queued.
+    const computerRepo = randomUUID()
+    await pool.query('INSERT INTO device_repos (id,"deviceId","userId","repoPath") VALUES ($1,$2,$3,$4)', [computerRepo, cloudDevice, p.id, '/home/user/.mikka/bot-workspaces/fixture'])
+    const computerRun = (await queue(computerRepo)).runId
+    const refused = await claim(cloudDevice, computerRun, token)
+    assert.equal(refused.status, 409, await refused.text())
+    assert.equal(await status(computerRun), 'queued')
+    await pool.query("UPDATE agent_runs SET status='cancelled' WHERE id=$1", [computerRun])
+
+    // A person holding the Bot's desktop does not hold a run on a machine without one.
+    await pool.query(`UPDATE bot_desktops SET control='user',"controlledBy"=$2,"controlUntil"=now()+interval '5 minutes' WHERE "botId"=$1`, [p.botId, p.id])
+    const { runId } = await queue(repoId)
+    const response = await claim(cloudDevice, runId, token)
+    const text = await response.text()
+    assert.equal(response.status, 200, text)
+    const assignment = JSON.parse(text)
+    assert.equal(assignment.modelCredential.key, secret)
+    assert.equal(assignment.computer, undefined, 'a machine with no desktop gets no desktop')
+  })
 })
