@@ -4,6 +4,7 @@ import { reconcileCloudMachines } from '@/lib/computer/reconcile'
 import { pool } from '@/lib/db'
 import { judgePendingOutcomes } from '@/lib/run-outcome-judge'
 import { endClosedTaskMachines } from '@/lib/cloud-computer/thread-machines'
+import { retrySandboxKills } from '@/lib/cloud-computer/workspace-teardown'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -20,7 +21,9 @@ export async function GET(request: Request) {
     const outcomes = await judgePendingOutcomes().catch(() => null)
     // Paused task sandboxes whose task closed are killed (one task, one sandbox).
     const taskMachines = await endClosedTaskMachines(pool).catch(() => null)
-    return Response.json({ ...runs, machines, outcomes, taskMachines }, { headers })
+    // Sandboxes of deleted workspaces whose kill did not go through are killed again.
+    const sandboxKills = await retrySandboxKills(pool).catch(() => null)
+    return Response.json({ ...runs, machines, outcomes, taskMachines, sandboxKills }, { headers })
   }
   catch { return Response.json({ error: 'runRecoverySweepFailed' }, { status: 502, headers }) }
 }
