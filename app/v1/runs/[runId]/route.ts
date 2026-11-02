@@ -5,7 +5,7 @@ import { runPatchSchema } from '@mikka/protocol/device'
 import { db } from '@/lib/db'
 import { agentRuns, devices } from '@/lib/db/schema'
 import { authenticateDevice } from '@/lib/device-link'
-import { maskForWorkspace } from '@/lib/secrets/runtime'
+import { maskFor } from '@/lib/secrets/runtime'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,7 +31,7 @@ async function handlePATCH(request: Request, { params }: { params: Promise<{ run
   const parsed = runPatchSchema.safeParse(await request.json().catch(() => null))
   if (!parsed.success) return NextResponse.json({ error: 'Invalid patch.' }, { status: 400 })
   // 4e2 item 4: the error text is agent/harness output; mask it like run events.
-  const patch = parsed.data.error !== undefined ? { ...parsed.data, error: await maskForWorkspace(caller.scopeWorkspaceId, parsed.data.error) } : parsed.data
+  const patch = parsed.data.error !== undefined ? { ...parsed.data, error: await maskFor({ workspaceId: caller.scopeWorkspaceId, ownerId: caller.userId }, parsed.data.error) } : parsed.data
   if (!(LIVE_STATES as readonly string[]).includes(patch.state)) {
     // The end itself comes through `/complete`, which carries no error. A
     // failed run's reason arrives here, just before it: keep it (the first one

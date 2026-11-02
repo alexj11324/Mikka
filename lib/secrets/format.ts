@@ -47,6 +47,24 @@ export const importSecretsInput = z.object({
 }).strict()
 export const deleteSecretInput = z.object({ id: z.uuid() }).strict()
 
+/** 我的 (user_secrets): no scope; `overrideWorkspace` confirms a name the current workspace already has. */
+export const createUserSecretInput = z.object({
+  name: z.string().trim().regex(SECRET_NAME),
+  kind: z.enum(['secret', 'env']),
+  value,
+  note: note.default(''),
+  overrideWorkspace: z.boolean().default(false),
+}).strict()
+export const replaceUserSecretInput = z.object({ id: z.uuid(), value: value.optional(), note: note.optional() }).strict()
+  .refine(input => input.value !== undefined || input.note !== undefined, 'nothing to change')
+export const importUserSecretsInput = z.object({
+  text: z.string(),
+  masked: z.boolean(),
+  onConflict: z.enum(['replace', 'skip']),
+  overrideWorkspace: z.boolean().default(false),
+}).strict()
+export const USER_SECRETS_LIMIT = 500
+
 export const scopeColumns = (scope: SecretScope) => scope.type === 'workspace'
   ? { scopeType: 'workspace' as const, scopeRef: '' }
   : { scopeType: 'repository' as const, scopeRef: scope.repository }

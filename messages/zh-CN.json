@@ -1246,6 +1246,7 @@
     "secretLimitReached": "此工作区的密钥和环境变量已达 500 个上限。",
     "secretImportEmpty": ".env 里没有可以添加的行。",
     "secretImportTooLarge": ".env 文件超过 2 MB。",
+    "secretNameShadowsWorkspace": "当前工作区已有同名密钥。",
     "secretsUnavailable": "密钥存储暂时不可用，请稍后重试。",
     "e2bKeyInvalid": "Key 无效或已被撤销。",
     "e2bKeyUnverifiable": "暂时无法验证，请稍后重试。",
@@ -2269,12 +2270,18 @@
         "invalidName": "第 {line} 行 · {name} 不是有效的名称",
         "emptyValue": "第 {line} 行 · {name} 没有值",
         "duplicate": "第 {line} 行 · {name} 重复",
-        "reserved": "第 {line} 行 · {name} 是保留名称"
+        "reserved": "第 {line} 行 · {name} 是保留名称",
+        "shadowsWorkspace": "第 {line} 行 · 工作区已有 {name}"
       },
       "side": {
         "label": "密钥归属",
         "mine": "我的"
-      }
+      },
+      "mineHeading": "我的密钥",
+      "addMineTitle": "添加我的密钥",
+      "shadowConfirm": "{workspace} 已有 {name}，在你的运行里用你自己的值？",
+      "shadowConfirmMany": "{workspace} 已有 {names}，在你的运行里用你自己的值？",
+      "useMine": "用我的"
     },
     "audit": {
       "loading": "正在加载审计日志",

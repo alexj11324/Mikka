@@ -5,7 +5,7 @@ import { ensureCloudMachine } from '@/lib/computer/provision'
 import { subagentEventSchema, type SubagentEvent } from '@mikka/protocol/subagent'
 import { ComputerError } from '@/lib/computer/store'
 import { connectComputer } from '@/lib/computer/e2b-provider'
-import { maskForWorkspace } from '@/lib/secrets/runtime'
+import { maskFor } from '@/lib/secrets/runtime'
 import { installSubagentRuntime, runtimeRequest, grant, endpointPath, type BrowserBinding } from './runtime'
 export type Actor = { userId: string; workspaceId: string }
 export type Subagent = BrowserBinding & { task: string; status: SubagentEvent['data']['state']; step: string; needs: SubagentEvent['data']['needs']; targetId: string | null; activeActionId?: string | null; nextAttemptAt?: Date | null; activeSteps?: number; consecutiveFailures?: number }
@@ -26,7 +26,7 @@ export class SubagentStore {
   }
   private async publish(client: Pool | PoolClient, row: Subagent) {
     // 4e2 item 4: subagent_events are persisted and streamed; mask step/needs/task with the workspace's secret set.
-    const event = await maskForWorkspace(row.workspaceId, subagentEventSchema.parse({ type: 'data-subagent', data: { botId: row.botId, subagentId: row.id, task: row.task, state: row.status, step: row.step, needs: row.needs } }))
+    const event = await maskFor({ workspaceId: row.workspaceId, ownerId: row.ownerId }, subagentEventSchema.parse({ type: 'data-subagent', data: { botId: row.botId, subagentId: row.id, task: row.task, state: row.status, step: row.step, needs: row.needs } }))
     await client.query('INSERT INTO subagent_events ("ownerId","workspaceId","botId","subagentId",event) VALUES ($1,$2,$3,$4,$5)', [row.ownerId, row.workspaceId, row.botId, row.id, JSON.stringify(event)])
     return event
   }
@@ -83,7 +83,7 @@ export class SubagentStore {
   }
   async update(actor: Actor, botId: string, id: string, status: Subagent['status'], rawStep: string, rawNeeds: Subagent['needs'] = null) {
     // 4e2 item 4: step / needs come from the visual model and page; bot_subagents keeps them masked.
-    const { step, needs } = await maskForWorkspace(actor.workspaceId, { step: rawStep, needs: rawNeeds })
+    const { step, needs } = await maskFor({ workspaceId: actor.workspaceId, ownerId: actor.userId }, { step: rawStep, needs: rawNeeds })
     const client = await this.pool.connect()
     let changed: Subagent | undefined
     try {
