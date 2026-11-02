@@ -173,11 +173,15 @@ app.run()
       t.after(() => terminal.kill());
       let window = '';
       for (let i = 0; i < 100 && !window; i++) {
-        try { window = execFileSync('xdotool', ['search', '--name', '^Mikka isolated input$'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim().split('\n')[0]; }
+        // --onlyvisible: a window found before xterm maps it cannot take focus (X BadMatch on SetInputFocus).
+        try { window = execFileSync('xdotool', ['search', '--onlyvisible', '--name', '^Mikka isolated input$'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim().split('\n')[0]; }
         catch { await new Promise(resolve => setTimeout(resolve, 100)); }
       }
       assert.ok(window, 'isolated terminal input did not become ready');
-      execFileSync('xdotool', ['windowfocus', '--sync', window]);
+      for (let i = 0; ; i++) {
+        try { execFileSync('xdotool', ['windowfocus', '--sync', window], { stdio: ['ignore', 'ignore', 'pipe'] }); break; }
+        catch (error) { if (i >= 20) throw error; await new Promise(resolve => setTimeout(resolve, 100)); }
+      }
       const typed = await allowed({ name: 'type_text', arguments: { text: marker } });
       assert.notEqual(typed.isError, true, JSON.stringify(typed));
       const enter = await allowed({ name: 'press_key', arguments: { key: 'enter' } });
