@@ -15,7 +15,7 @@ mock.module('swr', {
   defaultExport: (key: unknown) => Array.isArray(key) && key[0] === 'issue-thread'
     ? { data: thread && { thread, chunks: [{ chunk: { type: 'text-delta', id: 'a', delta: 'Done.' }, at: new Date(0) }], messages: [] }, mutate: () => {} }
     : { data: [], mutate: () => {} },
-  namedExports: { useSWRConfig: () => ({ mutate: () => {} }) },
+  namedExports: { useSWRConfig: () => ({ mutate: () => {}, cache: new Map() }), unstable_serialize: (key: unknown) => JSON.stringify(key) },
 })
 mock.module('next/dynamic', { defaultExport: () => () => null })
 mock.module(at('app/actions/agents.ts'), { namedExports: { retryQuotaPausedRun: async () => null, resumeQuotaPausedRunOnApiKey: async () => null, getThreadName: async () => null, listIssueThreads: async () => null, getIssueThread: async () => null, getThreadChanges: async () => ({ state: 'none' }), sendIssueThreadMessage: async () => {}, sendIssueThreadReply: async () => ({ sent: true }), stopRun: async () => ({}) } })
