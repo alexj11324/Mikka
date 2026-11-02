@@ -107,7 +107,11 @@ export class ExecutionSettings {
   async ensureCatalogues(scope: ExecutionSettingsScope, timeoutMs = 8000, discover?: (ownerId: string, connectionId: string) => Promise<{id: string; name?: string}[]>) {
     const missing = await this.connectedSubscriptions(scope.ownerId, true);
     await Promise.allSettled(missing.map((connectionId) => Promise.race([
-      this.refreshBotModels(scope, connectionId, discover),
+      // The reason only (a refusal code or error name), never what the provider answered.
+      this.refreshBotModels(scope, connectionId, discover).catch((error: unknown) => {
+        const code = error && typeof error === "object" && "code" in error ? String((error as { code: unknown }).code) : error instanceof Error ? error.name : "unknown";
+        console.warn(JSON.stringify({ level: "warn", msg: "subscription_catalogue_failed", connection: connectionId.slice(0, 8), code }));
+      }),
       new Promise((resolve) => setTimeout(resolve, timeoutMs).unref?.()),
     ])));
   }
