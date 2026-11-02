@@ -15,8 +15,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { Skeleton } from '@/components/ui/skeleton'
 import { AgentMarkdown } from './agent-markdown'
 import { ComputerCard } from '@/components/computer/computer-card'
-import { ThreadStatus, harnessLabel } from './issue-threads'
-import { ThreadStatusIcon } from './thread-status-icon'
+import { harnessLabel } from './issue-threads'
+import { ThreadStatus, ThreadStatusIcon } from './thread-status-icon'
 import { ThreadQuotaPausedCard, ThreadQuotaSwitchLine } from './thread-quota'
 import { cn } from '@/lib/utils'
 import dynamic from 'next/dynamic'
@@ -140,7 +140,7 @@ function ThreadPanel({ issueId, runId, onClose, bare = false, initialTab = 'chat
         : !data ? <div role="status" aria-label={t('loading')} className="flex flex-col gap-3"><Skeleton className="h-5 w-40" /><Skeleton className="ml-auto h-12 w-3/4" /><Skeleton className="h-12 w-2/3" /></div>
         : <>
           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            <ThreadStatus status={view?.status ?? data.thread.status} stopping={stopRequested} waiting={question === 'waiting'} />
+            <ThreadStatus status={view?.status ?? data.thread.status} outcome={view ? view.outcome : data.thread.outcome} stopping={stopRequested} waiting={question === 'waiting'} />
             <span>{t('started', { time: format.dateTime(new Date(data.thread.createdAt), { hour: '2-digit', minute: '2-digit' }) })}</span>
             {/* The bot that dispatched it, also when it is not the chat beside it (R-78, R-82). */}
             {detail?.agentName && <span>{detail.agentName} {t('dispatched')}</span>}
