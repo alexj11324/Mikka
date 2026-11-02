@@ -18,7 +18,7 @@ import { assertUnmanagedModelTransport, assertSubscriptionModelTransport } from 
 import { ModelAdmissionError } from '@/lib/model-admission/contract'
 import { db, pool } from '@/lib/db'
 import { agentRuns, agents, deviceRepos } from '@/lib/db/schema'
-import { authenticateDevice, ownedDevice } from '@/lib/device-link'
+import { authenticateDevice, ownedDeviceWithReport } from '@/lib/device-link'
 import { withBasePath } from '@/lib/base-path'
 import { mcpResourceURL } from '@/lib/mcp/resource'
 import { issueRunToken } from '@/lib/mcp/worker'
@@ -58,7 +58,7 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
   if (!caller) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { deviceId, runId } = await params
   if (caller.scopeDeviceId && caller.scopeDeviceId !== deviceId) return NextResponse.json({ error: 'Unknown device.' }, { status: 404 })
-  const device = await ownedDevice(deviceId, caller.userId)
+  const device = await ownedDeviceWithReport(deviceId, caller.userId)
   if (!device) return NextResponse.json({ error: 'Unknown device.' }, { status: 404 })
   if ((device.kind === 'local' && (device.protocolVersion ?? 0) < DAEMON_PROTOCOL_VERSION) || daemonTooOld(device)) {
     await failRunForDaemonUpgrade(runId, deviceId, caller.userId)
