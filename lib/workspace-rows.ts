@@ -30,7 +30,7 @@ export const KEPT_WITH_WORKSPACE = new Map<string, string>([
   ['hosted_card_claims', 'card claim'],
   // Unpaid hosted model usage and the free-usage window it counts towards.
   ['hosted_usage', 'billing and abuse evidence'],
-  // Audit evidence: kept 90 days after deletion; the audit-retention job removes them (lib/audit/retention.ts, DELETED_WORKSPACE_RETENTION_DAYS).
+  // Audit evidence: deleteWorkspaceRows records the deletion in workspace_deletions; lib/audit/retention.ts expires both.
   ['workspace_audit_events', 'kept 90 days after deletion; the audit-retention job removes them'],
   ['workspace_audit_retention', 'kept 90 days after deletion; the audit-retention job removes them'],
   // Append-only skill ledgers: triggers reject every DELETE.
@@ -72,7 +72,12 @@ export async function workspaceDeletionStatements(client: Query, workspaceId: st
   return statements
 }
 
-/** Deletes every main-database row keyed by the workspace, in the caller's transaction. */
+/**
+ * Deletes every main-database row keyed by the workspace, in the caller's
+ * transaction, and records when (workspace_deletions), so the audit-retention
+ * job can expire its log 90 days later.
+ */
 export async function deleteWorkspaceRows(client: Query, workspaceId: string): Promise<void> {
   await runToFixpoint(client, await workspaceDeletionStatements(client, workspaceId))
+  await client.query('insert into workspace_deletions (id) values ($1) on conflict (id) do nothing', [workspaceId])
 }

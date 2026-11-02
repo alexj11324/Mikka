@@ -234,6 +234,8 @@ dbTest('deleting an account removes what the person owns, keeps what their team 
       return found.sort()
     }
     assert.deepEqual(await keyedBy(solo), [])
+    assert.equal((await pool.query('select 1 from workspace_deletions where id = $1', [solo])).rowCount, 1, 'her solo workspace\'s deletion is recorded for its audit log')
+    assert.equal((await pool.query('select 1 from workspace_deletions where id = $1', [shared])).rowCount, 0)
     assert.equal((await pool.query('select 1 from bots where id = $1', [formerBot])).rowCount, 0)
     assert.deepEqual(await keyedBy(shared), ['conversations', 'hosted_allowances', 'workspace_e2b_keys', 'workspace_secrets', 'workspace_settings'])
     // Bob's own things are untouched.

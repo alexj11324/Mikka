@@ -54,38 +54,45 @@ test('audit retention requires an explicit admin policy, honors hold/export leas
     await configureAuditRetention(owner, ws.id, { retentionDays: null, legalHold: false }, database)
     assert.deepEqual(await applyAuditRetention(ws.id, new Date(), database), { deleted: 0, skipped: 'retain' })
   })
-  await t.test('a deleted workspace keeps its events 90 days, then the sweep removes them; a hold or a live workspace keeps them', async () => {
-    const drop = async (workspaceId: string) => {
-      await workspace.query('DELETE FROM mikka_workspace_members WHERE "workspaceId"=$1', [workspaceId])
-      await workspace.query('DELETE FROM mikka_workspaces WHERE id=$1', [workspaceId])
+  await t.test('a deleted workspace keeps every event until 90 days after its deletion, then the job removes them', async () => {
+    const day = 86_400_000, deletedAt = new Date(Date.now() - 200 * day), at = (days: number) => new Date(deletedAt.getTime() + days * day)
+    const deletedEvent = async (workspaceId: string, daysBeforeDeletion: number) => (await main.query<{ id: string }>(`INSERT INTO workspace_audit_events("workspaceId","actorType","actorName",action,category,metadata,"createdAt") VALUES($1,'system','Mikka','token.revoked','security','{}',$2) RETURNING id`, [workspaceId, at(-daysBeforeDeletion)])).rows[0].id
+    const markDeleted = async (workspaceId: string, policy?: { retentionDays: number | null; legalHold: boolean }) => {
+      if (policy) await main.query(`INSERT INTO workspace_audit_retention("workspaceId","retentionDays","legalHold","configuredBy") VALUES($1,$2,$3,'fixture-admin')`, [workspaceId, policy.retentionDays, policy.legalHold])
+      await main.query('INSERT INTO workspace_deletions(id,"deletedAt") VALUES($1,$2)', [workspaceId, deletedAt])
     }
-    const seed = async () => seedWorkspace(workspace, other, [{ userId: other, role: 'admin' }])
-    const count = async (id: string) => (await main.query('SELECT count(*)::int n FROM workspace_audit_events WHERE id=$1', [id])).rows[0].n
-    const gone = await seed(), expired = await event(gone.id, 91), recent = await event(gone.id, 89)
-    const swept = await seed(), sweptOld = await event(swept.id, 100)
-    const held = await seed(), heldOld = await event(held.id, 100)
-    const live = await seed(), liveOld = await event(live.id, 400)
-    await configureAuditRetention(other, held.id, { retentionDays: null, legalHold: true }, database)
-    for (const deleted of [gone, swept, held]) await drop(deleted.id)
+    const deletionRecord = async (workspaceId: string) => (await main.query('SELECT 1 FROM workspace_deletions WHERE id=$1', [workspaceId])).rowCount === 1
+    const exists = async (id: string) => (await main.query('SELECT 1 FROM workspace_audit_events WHERE id=$1', [id])).rowCount === 1
+    const policyRow = async (workspaceId: string) => (await main.query('SELECT 1 FROM workspace_audit_retention WHERE "workspaceId"=$1', [workspaceId])).rowCount === 1
 
-    assert.deepEqual(await applyAuditRetention(gone.id, new Date(), database), { deleted: 1, skipped: null })
-    assert.equal(await count(expired), 0, 'expired after 90 days')
-    assert.equal(await count(recent), 1, 'unexpired kept')
-    assert.equal((await main.query('SELECT count(*)::int n FROM workspace_audit_events WHERE "workspaceId"=$1 AND action=\'audit.retention_applied\'', [gone.id])).rows[0].n, 0, 'nothing new is logged into a deleted workspace')
+    // No retention of its own: an event a year older than the deletion is still there at +89 days, gone at +91.
+    const gone = randomUUID(), ancient = await deletedEvent(gone, 365), last = await deletedEvent(gone, 0)
+    await markDeleted(gone)
+    assert.deepEqual(await applyAuditRetention(gone, at(89), database), { deleted: 0, skipped: 'deleted_workspace_grace' })
+    assert.ok(await exists(ancient)); assert.ok(await exists(last))
+    assert.deepEqual(await applyAuditRetention(gone, at(91), database), { deleted: 2, skipped: null })
+    assert.ok(!(await exists(ancient))); assert.ok(!(await exists(last)))
+    assert.ok(!(await deletionRecord(gone)), 'the deletion record goes with the last event')
+    assert.equal((await main.query('SELECT count(*)::int n FROM workspace_audit_events WHERE "workspaceId"=$1', [gone])).rows[0].n, 0, 'nothing is logged into a deleted workspace')
 
+    // A retention chosen before deletion keeps an event longer when it says so; a legal hold keeps everything.
+    const kept = randomUUID(), pastRule = await deletedEvent(kept, 300), withinRule = await deletedEvent(kept, 10)
+    await markDeleted(kept, { retentionDays: 200, legalHold: false })
+    assert.deepEqual(await applyAuditRetention(kept, at(91), database), { deleted: 1, skipped: null })
+    assert.ok(!(await exists(pastRule))); assert.ok(await exists(withinRule)); assert.ok(await policyRow(kept)); assert.ok(await deletionRecord(kept))
+    const held = randomUUID(), heldEvent = await deletedEvent(held, 365)
+    await markDeleted(held, { retentionDays: null, legalHold: true })
+    assert.deepEqual(await applyAuditRetention(held, at(400), database), { deleted: 0, skipped: 'legal_hold' })
+    assert.ok(await exists(heldEvent))
+
+    // The job reaches deleted workspaces (past their 90 days now); a live workspace with no policy is untouched, as before.
+    const swept = randomUUID(), sweptEvent = await deletedEvent(swept, 30)
+    await markDeleted(swept)
+    const live = await seedWorkspace(workspace, other, [{ userId: other, role: 'admin' }]), liveEvent = await event(live.id, 400)
     const result = await sweepAuditRetention(database)
     assert.equal(result.pending, 0)
-    assert.equal(await count(sweptOld), 0, 'the sweep covers deleted workspaces with no setting')
-    assert.equal(await count(heldOld), 1, 'a legal hold still holds')
-    assert.equal(await count(liveOld), 1, 'a live workspace with no setting keeps its log')
-    assert.equal(await count(recent), 1)
-    // Once its last event has expired, its policy row goes too.
-    await configureAuditRetention(other, live.id, { retentionDays: 30, legalHold: false }, database)
-    await drop(live.id)
-    // A retention the admin chose before deleting still applies; its own change event is the last to expire.
-    assert.deepEqual(await applyAuditRetention(live.id, new Date(), database), { deleted: 1, skipped: null })
-    assert.equal((await main.query('SELECT count(*)::int n FROM workspace_audit_retention WHERE "workspaceId"=$1', [live.id])).rows[0].n, 1)
-    assert.deepEqual(await applyAuditRetention(live.id, new Date(Date.now() + 31 * 86_400_000), database), { deleted: 1, skipped: null })
-    assert.equal((await main.query('SELECT count(*)::int n FROM workspace_audit_retention WHERE "workspaceId"=$1', [live.id])).rows[0].n, 0)
+    assert.ok(!(await exists(sweptEvent)))
+    assert.ok(await exists(liveEvent))
+    assert.deepEqual(await applyAuditRetention(live.id, new Date(), database), { deleted: 0, skipped: 'retain' })
   })
 })

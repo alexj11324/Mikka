@@ -190,6 +190,9 @@ test('workspace settings backend', { skip: !dbUrl }, async t => {
     const left = await rowsKeyedBy(keep.id)
     assert.deepEqual(seeded.filter(table => !left.includes(table)), [], 'the other workspace is untouched')
     assert.equal(await count(pool, 'hosted_card_claims where "workspaceId"=$1', [ws.id]), 1, 'a card claim is never released')
+    // Its audit log stays until the retention job expires it, from the recorded deletion time.
+    assert.equal(await count(pool, 'workspace_deletions where id=$1 and "deletedAt" > now() - interval \'1 minute\'', [ws.id]), 1)
+    assert.equal(await count(pool, 'workspace_deletions where id=$1', [keep.id]), 0)
     assert.equal(await count(pool, 'model_api_keys where "ownerId"=$1', [member]), 2, 'the API keys themselves are the member\'s')
   })
 
