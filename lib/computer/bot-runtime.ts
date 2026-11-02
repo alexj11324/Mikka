@@ -43,7 +43,7 @@ export async function ensureBotRuntime(pool: Pool, actor: { userId: string; work
       // name taken, so inserting again fails on agents_user_name_key (23505). Take that agent back only when it is
       // this owner's hidden runtime agent for this bot on this machine's device, and no other runtime holds it.
       const orphan = (await client.query<{ id: string }>(`SELECT a.id FROM agents a
-        WHERE a."userId"=$1 AND a.name=$2 AND a.harness=$3 AND a."deviceId"=$4 AND a.description='' AND a.instructions=''
+        WHERE a."userId"=$1 AND a.name=$2 AND a.harness=$3 AND a."deviceId"=$4 AND a.instructions=''
           AND NOT EXISTS (SELECT 1 FROM bot_cloud_runtimes x WHERE x."agentId"=a.id) FOR UPDATE OF a`,
       [actor.userId, name, info.harness, deviceId])).rows[0]
       const agentId = orphan?.id ?? randomUUID()
