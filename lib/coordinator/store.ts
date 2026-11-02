@@ -279,16 +279,28 @@ export async function appendMessages(userId: string, holder: string, messages: M
  * 重试 on a failed reply: runs the same turn again over the conversation as it
  * stands, so the person's message is not sent twice. The event never becomes a
  * chat message, and one failure can be retried once; a new failure can be
- * retried again. False when nothing failed or a turn is already running.
+ * retried again. A turn that ended with no reply and no recorded error (its
+ * lease ran out) counts as failed too. False when nothing failed or a turn is
+ * already running.
  */
 export async function retryFailedTurn(userId: string, botId: string): Promise<boolean> {
   return db.transaction(async tx => {
     await tx.execute(sql`SELECT 1 FROM coordinator_sessions WHERE "userId"=${userId} AND "botId"=${botId}::uuid FOR UPDATE`)
     const [session] = await tx.select().from(coordinatorSessions).where(sessionOf(userId, botId)).limit(1)
-    if (!session?.lastError || !session.lastErrorAt || coordinatorLeaseActive(session)) return false
+    if (!session || coordinatorLeaseActive(session)) return false
+    // A recorded failure, or a turn that ended with neither a reply nor an error (its lease ran out):
+    // the person's message is the newest one, so nothing answered it.
+    let failure = session.lastError && session.lastErrorAt ? session.lastErrorAt.toISOString() : null
+    if (!failure) {
+      const [last] = await tx.select({ position: coordinatorMessages.position, role: sql<string>`${coordinatorMessages.message}->>'role'` })
+        .from(coordinatorMessages).where(messagesOf(userId, botId)).orderBy(desc(coordinatorMessages.position)).limit(1)
+      const waiting = await tx.select({ id: coordinatorEvents.id }).from(coordinatorEvents).where(and(eventsOf(userId, botId), isNull(coordinatorEvents.deliveredAt))).limit(1)
+      if (last?.role === 'user' && !waiting.length) failure = `unanswered:${last.position}`
+    }
+    if (!failure) return false
     const inserted = await tx.insert(coordinatorEvents).values({
       id: crypto.randomUUID(), userId, botId, kind: 'user_message', issueId: null, runId: null,
-      dedupeKey: `turn_retry:${userId}:${botId}:${session.lastErrorAt.toISOString()}`,
+      dedupeKey: `turn_retry:${userId}:${botId}:${failure}`,
       payload: { text: '', postedToChat: true, retry: true },
     }).onConflictDoNothing({ target: coordinatorEvents.dedupeKey }).returning({ id: coordinatorEvents.id })
     return inserted.length === 1

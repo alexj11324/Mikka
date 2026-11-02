@@ -1,0 +1,28 @@
+import { hostedRefusal } from '@/lib/billing/hosted-usage'
+import { subscriptionRefusal } from '@/lib/subscription-refusal'
+
+/**
+ * Why a chat's last reply did not come, as the web's chat reads it
+ * (components/coordinator/coordinator-chat.tsx): Mikka 默认 refused it, the
+ * chosen subscription refused it, the wake is still being retried or gave up,
+ * or the turn failed, or ended with no reply. Null while a turn is working or
+ * nothing failed. The iOS
+ * app draws its line and 重试 from this, never the raw error.
+ */
+export type ChatFailure =
+  | { kind: 'hosted'; code: NonNullable<ReturnType<typeof hostedRefusal>> }
+  | { kind: 'subscription'; notice: NonNullable<ReturnType<typeof subscriptionRefusal>> }
+  | { kind: 'wake'; code: 'wake_failed' | 'wake_start_unconfirmed' | 'wake_exhausted' }
+  | { kind: 'failed' }
+
+export function chatFailure(chat: { working: boolean; error: string | null; items?: readonly { from: string; pending?: true }[] }): ChatFailure | null {
+  if (chat.working) return null
+  // A turn that ended with no reply and nothing recorded (its lease ran out): the person's message is the newest.
+  if (!chat.error) return chat.items?.findLast(item => item.from !== 'event')?.from === 'person' && !chat.items.at(-1)?.pending ? { kind: 'failed' } : null
+  const hosted = hostedRefusal(chat.error)
+  if (hosted) return { kind: 'hosted', code: hosted }
+  const notice = subscriptionRefusal(chat.error)
+  if (notice) return { kind: 'subscription', notice }
+  if (chat.error === 'wake_failed' || chat.error === 'wake_start_unconfirmed' || chat.error === 'wake_exhausted') return { kind: 'wake', code: chat.error }
+  return { kind: 'failed' }
+}

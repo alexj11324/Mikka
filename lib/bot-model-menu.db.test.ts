@@ -160,7 +160,7 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
     assert.ok((await refreshBotModelMenu(pool, refusing, alice, botA)).groups.length > 1);
 
     // C22: an API key's models are a menu group, and the Coordinator saved on one runs on it.
-    const { addApiKey, setBotApiKeyChoice } = await import("./model-api-keys");
+    const { addApiKey } = await import("./model-api-keys");
     const { apiKeyOptionId } = await import("./bot-model-menu-view");
     const env = { WORKSPACE_SECRETS_KEY: randomBytes(32).toString("hex") };
     const listing = (async () => new Response(JSON.stringify({ data: [{ id: "deepseek-chat" }] }), { status: 200 })) as unknown as typeof fetch;
@@ -168,8 +168,9 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
     const keyOption = apiKeyOptionId(key.id, "deepseek-chat");
     let keyMenu = await botModelMenu(pool, settings, alice, null);
     assert.deepEqual(keyMenu.groups.find((group) => group.kind === "apiKey")?.options, [{ id: keyOption, modelId: "deepseek-chat", provider: "deepseek" }]);
-    await setBotApiKeyChoice(pool, alice, null, key.id, "deepseek-chat");
-    keyMenu = await botModelMenu(pool, settings, alice, null);
+    // Picked by its option id, as the web's action and the iOS app's PUT /api/mobile/model both send it.
+    const { chooseBotModel } = await import("./bot-model-menu");
+    keyMenu = await chooseBotModel(pool, settings, alice, null, keyOption);
     assert.deepEqual([keyMenu.current.id, keyMenu.current.kind, keyMenu.current.chosen, keyMenu.current.available], [keyOption, "apiKey", true, true]);
     assert.deepEqual(await freezeBotModel({ ownerId: "alice", botId: null, workspaceId: workspace }, dependencies), {
       harness: "ai_sdk", model: "deepseek-chat",
