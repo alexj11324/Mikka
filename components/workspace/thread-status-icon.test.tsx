@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict'
 import { before, mock, test } from 'node:test'
-import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 
 // The icon's label reads as its key.
@@ -29,10 +28,10 @@ test('not judged yet: failed is 受阻, any other ended run 等待你, never 已
 // Alex, 2026-11-02: a hollow circle read too close to 进行中's spinner and 空闲's slashed circle.
 test('等待你 raises a hand, in rows and chips and in a header', () => {
   for (const small of [true, false]) {
-    const html = renderToStaticMarkup(createElement(ThreadStatusIcon, { group: 'waiting', small }))
+    const html = renderToStaticMarkup(<ThreadStatusIcon group="waiting" small={small} />)
     assert.match(html, /lucide-hand\b/)
     assert.doesNotMatch(html, /lucide-circle\b/)
   }
-  assert.match(renderToStaticMarkup(createElement(ThreadStatusIcon, { status: 'stopped', waiting: true })), /lucide-hand\b/)
-  assert.doesNotMatch(renderToStaticMarkup(createElement(ThreadStatusIcon, { group: 'running' })), /lucide-hand\b/)
+  assert.match(renderToStaticMarkup(<ThreadStatusIcon status="stopped" waiting />), /lucide-hand\b/)
+  assert.doesNotMatch(renderToStaticMarkup(<ThreadStatusIcon group="running" />), /lucide-hand\b/)
 })
