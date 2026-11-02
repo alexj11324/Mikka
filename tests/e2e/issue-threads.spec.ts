@@ -109,7 +109,7 @@ test('Issue threads open on the right as a conversation; comments are cards with
 for (const view of [{ name: 'desktop', width: 1440, height: 960 }, { name: 'narrow', width: 390, height: 844 }] as const) {
 // Start at the reviewed size: changing the task's desktop/mobile layout mid-run
 // remounts its thread panel and would test a different draft-lifetime behavior.
-test(`The owner stops a live thread from its composer; it reads 正在停止… until the run ends (${view.name})`, async ({ page }, testInfo) => {
+test(`The owner stops a working thread from its composer; one waiting for an answer sends; it reads 正在停止… until the run ends (${view.name})`, async ({ page }, testInfo) => {
   await page.setViewportSize({ width: view.width, height: view.height })
   await page.emulateMedia({ colorScheme: 'light' })
   const { email } = await register(page)
@@ -130,16 +130,32 @@ test(`The owner stops a live thread from its composer; it reads 正在停止… 
   await openIssueFromSearch(page, title)
   const threads = page.getByRole('region', { name: /^线程/ })
 
-  // Waiting for a reply is still live, so it can be stopped too.
+  // Waiting for your answer is live but idle (usability review N1): the composer sends, never stops, even when empty;
+  // stop stays in the header.
   await threads.getByRole('button', { name: '打开线程 Pick a cache key', exact: true }).click()
   let panel = page.getByRole('region', { name: 'Pick a cache key', exact: true })
-  await expect(panel.getByRole('button', { name: '停止', exact: true })).toBeVisible()
+  const waitingComposer = panel.locator('[data-slot="thread-composer"]')
+  await expect(waitingComposer.getByRole('button', { name: '发送', exact: true })).toBeDisabled()
+  await expect(waitingComposer.getByRole('button', { name: '停止', exact: true })).toHaveCount(0)
+  await expect(panel.locator('[data-slot="thread-stop"]')).toBeVisible()
+  await testInfo.attach(`thread-waiting-send-${view.name}-light`, { body: await page.screenshot(), contentType: 'image/png' })
+  await page.emulateMedia({ colorScheme: 'dark' })
+  await expect(page.locator('html')).toHaveClass(/dark/)
+  await testInfo.attach(`thread-waiting-send-${view.name}-dark`, { body: await page.screenshot(), contentType: 'image/png' })
+  await page.emulateMedia({ colorScheme: 'light' })
+  await expect(page.locator('html')).not.toHaveClass(/dark/)
+  await waitingComposer.getByRole('textbox').fill('Use the user id')
+  await expect(waitingComposer.getByRole('button', { name: '发送', exact: true })).toBeEnabled()
+  await waitingComposer.getByRole('textbox').fill('')
+  await expect(waitingComposer.getByRole('button', { name: '停止', exact: true })).toHaveCount(0)
   await panel.getByRole('button', { name: '返回', exact: true }).click()
 
   await threads.getByRole('button', { name: '打开线程 Trim the bundle', exact: true }).click()
   panel = page.getByRole('region', { name: 'Trim the bundle', exact: true })
   const composer = panel.getByRole('textbox', { name: '告诉 Codex 下一步做什么…' })
-  const stop = panel.getByRole('button', { name: '停止', exact: true })
+  const stop = panel.locator('[data-slot="thread-composer"]').getByRole('button', { name: '停止', exact: true })
+  // A working thread: the header keeps stop as well.
+  await expect(panel.locator('[data-slot="thread-stop"]')).toBeVisible()
   // Typing turns stop into send; clearing the draft brings stop back.
   await composer.fill('Keep the polyfills')
   await expect(panel.getByRole('button', { name: '发送', exact: true })).toBeEnabled()
@@ -158,6 +174,7 @@ test(`The owner stops a live thread from its composer; it reads 正在停止… 
   await expect(panel.getByText('正在停止…', { exact: true })).toBeVisible()
   await expect(threads.getByRole('button', { name: '打开线程 Trim the bundle', exact: true })).toContainText('正在停止…')
   await expect(stop).toHaveCount(0)
+  await expect(panel.locator('[data-slot="thread-stop"]')).toHaveCount(0)
   await expect(composer).toBeEditable()
   await composer.fill('Keep this draft while stopping')
   await expect(panel.getByRole('button', { name: '发送', exact: true })).toBeDisabled()

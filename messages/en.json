@@ -3281,6 +3281,7 @@
     "steps": "Handed to {harness} · {count, plural, one {# step} other {# steps}}",
     "composer": "Tell {agent} what to do next…",
     "sendFailed": "Not sent. Draft kept",
+    "stop": "Stop",
     "stopping": "Stopping…",
     "stopFailed": "Stop not confirmed",
     "send": "Send",
