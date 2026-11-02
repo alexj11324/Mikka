@@ -389,13 +389,14 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   only when the board, a list or a project opened it. A notification or an
   admin link to a thread opens it beside its task where the viewer can read
   it. An address with an unknown section or a bot that is not the person's
-  rewrites itself to what is shown, without a new entry. 全部线程, every
-  bot's threads in R-52's groups, each row naming its bot, opens in the right
+  rewrites itself to what is shown, without a new entry. 全部线程, the
+  threads every bot dispatched in R-52's groups, each row's second line opening
+  with the mark of the Agent running it and 「<Bot> 派出」, opens in the right
   column from the window bar's button beside the globe (on a phone, the page
-  header's) on any page (`?threads=all`, `?threads=<bot>` filtered); a bot's
-  panel keeps only that bot's 线程. An open thread's header leads with ←, back
-  to the list it was opened from (全部线程, the bot's 线程, the task's 线程, the
-  chat); Esc and the browser's back do the same; it has no status icon, the
+  header's) on any page (`?threads=all`, `?threads=<bot>` for one dispatcher);
+  a bot's panel keeps only the 线程 it dispatched. An open thread's header leads
+  with ←, back to the list it was opened from (全部线程, a bot's 线程, the task's
+  线程, the chat); Esc and the browser's back do the same; it has no status icon, the
   badge under it says the state. Source: Alex,
   2026-11-01 ([decision](decisions/2026-11-01-1320-navigation-model.md)), 2026-11-02
   ([decision](decisions/2026-11-02-0310-all-threads-from-the-window-bar.md)).

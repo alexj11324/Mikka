@@ -7,16 +7,18 @@
 
 1. **全部线程 is a place of its own.** A button beside the globe in the window
    bar (on a phone, in the page header) opens it in the right column on any
-   page, whichever bot is selected. It lists every bot's threads in R-52's
-   groups; each row's second line opens with the bot that dispatched it, and a
-   menu filters to one bot. Its address is `?threads=all` or
+   page, whichever bot is selected. It lists the threads every bot dispatched in R-52's
+   groups; each row's second line opens with the mark of the Agent running it
+   (R-78) and 「<Bot> 派出」, and 按派出者筛选 filters to the threads one bot
+   dispatched (a bot dispatches a thread, an Agent runs it:
+   decisions/2026-11-02-1010-a-bot-dispatches-threads.md). Its address is `?threads=all` or
    `?threads=<bot>`; opening it is a new entry, the filter replaces it. It
    stays open as the centre changes.
-2. **A bot's panel drops its 全部线程 tab.** Its 线程 tab is that bot's threads.
+2. **A bot's panel drops its 全部线程 tab.** Its 线程 tab lists the threads that bot dispatched.
    Two ways into the same list would break R-82's one place per object, and
    the panel's tab only existed beside a bot's chat.
 3. **An open thread's header leads with ←.** ← goes back to the list it was
-   opened from: 全部线程, the bot's 线程, the task's 线程 or the chat. Opening a
+   opened from: 全部线程, a bot's 线程, the task's 线程 or the chat. Opening a
    thread is a history entry, so ← is the same step as the browser's back; Esc
    inside the thread does the same. A thread opened from a pasted link has no
    step to go back to, so its list replaces it. The spinning status icon left

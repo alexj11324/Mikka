@@ -58,10 +58,10 @@ function WaitingChip({ waiting }: { waiting: NonNullable<ThreadView['waitingFor'
  * group's (R-52), its name, then the opening of its last reply on one line,
  * verbatim. No status word, no bot name. A task's earlier threads fold into
  * its newest; past the first, the line opens with 第 N 次尝试, and the task's
- * page lists them all. In 全部线程 the mark of the Agent running it (R-78; a
- * neutral thread mark when unknown, never the bot's avatar) and the last
- * activity sit beside the name, and the second line opens with the name of
- * the bot that dispatched it. The whole card opens the thread's own
+ * page lists them all. In 全部线程 the last activity sits beside the name, and
+ * the second line opens with the mark of the Agent running it (R-78; a neutral
+ * thread mark when unknown, never the bot's avatar) and 「<Bot> 派出」: a bot
+ * dispatches a thread, an Agent runs it (glossary). The whole card opens the thread's own
  * conversation, task or no task.
  */
 function ThreadRow({ thread, group, issues, all, now, onOpenThread }: { thread: ThreadRowOf<Thread>; group: ThreadGroup; issues: Issue[]; all: boolean; now: Date; onOpenThread: (thread: { issueId: string | null; runId: string }) => void }) {
@@ -79,12 +79,14 @@ function ThreadRow({ thread, group, issues, all, now, onOpenThread }: { thread: 
     <span className="pointer-events-none relative flex min-w-0 flex-1 flex-col gap-0.5">
       <span className="flex w-full min-w-0 items-center gap-2">
         <span className="min-w-0 flex-1 truncate text-sm leading-5 font-medium">{name}</span>
-        {all && <span data-slot="thread-agent" className="flex shrink-0 items-center text-muted-foreground opacity-80 [&_svg]:size-3">{thread.harness ? <HarnessMark harness={thread.harness} /> : <ThreadMark size="row" />}</span>}
         {all && <span className="shrink-0 text-xs text-muted-foreground">{when === 'relative' ? format.relativeTime(at, now) : t(when)}</span>}
       </span>
       {waiting
         ? <WaitingChip waiting={waiting} />
-        : (all || thread.lastReply || thread.attempts > 1) && <span className="block w-full truncate text-xs text-muted-foreground">{[all ? <span key="bot" data-slot="thread-bot" className="text-foreground/80">{thread.agentName}</span> : null, thread.attempts > 1 ? t('attempt', { count: thread.attempts }) : null, thread.lastReply].filter(Boolean).flatMap((part, index) => index ? [' · ', part] : [part])}</span>}
+        : (all || thread.lastReply || thread.attempts > 1) && <span className="flex w-full min-w-0 items-center gap-1 text-xs text-muted-foreground">
+          {all && <span data-slot="thread-agent" className="flex shrink-0 items-center opacity-80 [&_svg]:size-3">{thread.harness ? <HarnessMark harness={thread.harness} /> : <ThreadMark size="row" />}</span>}
+          <span className="min-w-0 flex-1 truncate">{[all ? <span key="bot" data-slot="thread-bot" className="text-foreground/80">{t('dispatchedBy', { bot: thread.agentName })}</span> : null, thread.attempts > 1 ? t('attempt', { count: thread.attempts }) : null, thread.lastReply].filter(Boolean).flatMap((part, index) => index ? [' · ', part] : [part])}</span>
+        </span>}
     </span>
     {pullRequests && <PullRequestsBadge pullRequests={pullRequests} />}
     <ChevronRight aria-hidden="true" className="pointer-events-none relative size-4 shrink-0 text-muted-foreground" />

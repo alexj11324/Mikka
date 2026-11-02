@@ -3323,7 +3323,8 @@
         "idle": "Idle",
         "resolved": "Resolved"
       },
-      "waitingFor": "Waiting for {device} to come online"
+      "waitingFor": "Waiting for {device} to come online",
+      "dispatchedBy": "Dispatched by {bot}"
     },
     "newBot": {
       "title": "New bot",
@@ -3428,8 +3429,8 @@
       "changeAvatar": "Change {name}’s avatar",
       "close": "Close panel",
       "open": "Open panel",
-      "filterBot": "Filter by bot",
-      "allBots": "All bots",
+      "filterBot": "Filter by dispatcher",
+      "allBots": "All dispatchers",
       "closeAllThreads": "Close all threads"
     },
     "suggestions": {

@@ -16,7 +16,8 @@ type Issue = Awaited<ReturnType<typeof listIssues>>[number]
 
 /**
  * 全部线程's button, beside the globe in the window bar and in the phone's
- * header: every bot's threads from any page, not only from a bot's panel (R-82).
+ * header: the threads every bot dispatched, from any page, not only from a
+ * bot's panel (R-82).
  */
 export function AllThreadsToggle({ open, onToggle }: { open: boolean; onToggle: () => void }) {
   const t = useTranslations('Shell.panel')
@@ -24,7 +25,7 @@ export function AllThreadsToggle({ open, onToggle }: { open: boolean; onToggle: 
     className={cn('text-muted-foreground', open && 'bg-muted text-foreground')} />}><MessagesSquare data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{t('allThreads')}</TooltipContent></Tooltip>
 }
 
-/** The bots that dispatched these threads, each once, by name. */
+/** The bots that dispatched these threads, each once, by name: the choices of 按派出者筛选. */
 export function threadBots(threads: Thread[]) {
   const bots = new Map<string, string>()
   for (const thread of threads) if (thread.botId && !bots.has(thread.botId)) bots.set(thread.botId, thread.agentName)
@@ -32,9 +33,10 @@ export function threadBots(threads: Thread[]) {
 }
 
 /**
- * 全部线程 in the right column (?threads=all, or ?threads=<bot> filtered to one
- * bot): every bot's threads in R-52's groups, each row naming the bot that
- * dispatched it. A thread opens in this column; ← comes back here.
+ * 全部线程 in the right column (?threads=all, or ?threads=<bot> filtered to the
+ * threads one bot dispatched): the threads every bot dispatched, in R-52's
+ * groups; each row's second line opens with the mark of the Agent running it
+ * (R-78) and 「<Bot> 派出」 (glossary: a bot dispatches a thread, an Agent runs it). A thread opens in this column; ← comes back here.
  */
 export function AllThreadsColumn({ view, threads, issues }: { view: string; threads: Thread[]; issues: Issue[] }) {
   const t = useTranslations('Shell.panel')

@@ -3323,7 +3323,8 @@
         "idle": "空闲",
         "resolved": "已解决"
       },
-      "waitingFor": "等待 {device} 上线"
+      "waitingFor": "等待 {device} 上线",
+      "dispatchedBy": "{bot} 派出"
     },
     "newBot": {
       "title": "新建 Bot",
@@ -3428,8 +3429,8 @@
       "changeAvatar": "更换 {name} 的头像",
       "close": "关闭右栏",
       "open": "打开右栏",
-      "filterBot": "按 Bot 筛选",
-      "allBots": "全部 Bot",
+      "filterBot": "按派出者筛选",
+      "allBots": "全部派出者",
       "closeAllThreads": "关闭全部线程"
     },
     "suggestions": {
