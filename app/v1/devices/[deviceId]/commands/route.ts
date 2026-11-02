@@ -1,6 +1,7 @@
 import { withDeviceRoute } from '@/lib/device-route'
 import { NextResponse } from 'next/server'
-import { COMMANDS_MAX_SKIP, COMMANDS_MAX_WAIT_SECONDS, COMMANDS_SKIP_PARAM, MAILBOX_NOTICE_HEADER } from '@mikka/protocol/device'
+import { COMMANDS_DAEMON_LATEST_PARAM, COMMANDS_MAX_SKIP, COMMANDS_MAX_SKIP_DEVICE_COMMANDS, COMMANDS_MAX_WAIT_SECONDS, COMMANDS_SKIP_DEVICE_COMMANDS_PARAM, COMMANDS_SKIP_PARAM, MAILBOX_NOTICE_HEADER } from '@mikka/protocol/device'
+import { cachedDaemonVersions, daemonVersions, newerDaemonRelease } from '@/lib/daemon-release'
 import { authenticateDevice, deviceMayHaveWork, deviceWork, ownsDevice, sleep, waitSeconds } from '@/lib/device-link'
 import { noteLogOutcome, withRequestLog } from '@/lib/request-log'
 
@@ -13,7 +14,9 @@ const IDLE_CHECK_MS = 2_000
  * `GET /v1/devices/:deviceId/commands?wait=<seconds>`: messages people sent
  * this device's running agents, stops they asked for, and runs queued for it
  * (so the daemon claims a new run now, not on its next heartbeat). Long-polls
- * when nothing is pending.
+ * when nothing is pending. A daemon that sends `daemonLatest` also gets the
+ * daemon releases and its pending device command (an update a person asked
+ * for), and the poll ends as soon as either is news to it.
  */
 async function handleGET(request: Request, { params }: { params: Promise<{ deviceId: string }> }) {
   const caller = await authenticateDevice(request)
@@ -22,18 +25,31 @@ async function handleGET(request: Request, { params }: { params: Promise<{ devic
   const device = await ownsDevice(deviceId, caller.userId)
   if (!device) return NextResponse.json({ error: 'Unknown device.' }, { status: 404 })
   const wait = waitSeconds(request, COMMANDS_MAX_WAIT_SECONDS)
-  const skip = (new URL(request.url).searchParams.get(COMMANDS_SKIP_PARAM) ?? '')
-    .split(',').filter(Boolean).slice(0, COMMANDS_MAX_SKIP)
+  const search = new URL(request.url).searchParams
+  const list = (name: string, max: number) => (search.get(name) ?? '').split(',').filter(Boolean).slice(0, max)
+  const skip = list(COMMANDS_SKIP_PARAM, COMMANDS_MAX_SKIP)
+  const knownRelease = search.get(COMMANDS_DAEMON_LATEST_PARAM)
+  // Read once per poll from the five-minute registry cache; idle checks below only peek at it.
+  let releases = knownRelease ? await daemonVersions() : undefined
   const deadline = Date.now() + wait * 1000
   while (!request.signal.aborted) {
     // A device with scheduling off gets no work (as GET .../runs).
     const options = { mailboxNotices: request.headers.get(MAILBOX_NOTICE_HEADER) === '1', queued: device.enabled }
     // The cheap check also ends the poll for a revoked credential; the full read hands over work.
-    const { commands, queuedRuns: queued } = await deviceMayHaveWork(deviceId, skip, options) ? await deviceWork(deviceId, skip, options) : { commands: [], queuedRuns: [] }
+    const check = await deviceMayHaveWork(deviceId, skip, knownRelease ? { ...options, skipDeviceCommands: list(COMMANDS_SKIP_DEVICE_COMMANDS_PARAM, COMMANDS_MAX_SKIP_DEVICE_COMMANDS) } : options)
+    const { commands, queuedRuns: queued } = check.work ? await deviceWork(deviceId, skip, options) : { commands: [], queuedRuns: [] }
     if (request.signal.aborted) break
-    if (commands.length > 0 || queued.length > 0 || Date.now() >= deadline) {
-      noteLogOutcome(commands.length > 0 || queued.length > 0 ? 'work' : 'empty')
-      return NextResponse.json(queued.length > 0 ? { commands, queuedRuns: queued } : { commands })
+    // Memory only: a release published mid-poll ends it once this instance's cache has it.
+    if (knownRelease) releases = cachedDaemonVersions() ?? releases
+    const news = check.deviceCommand !== null || (knownRelease !== null && newerDaemonRelease(releases, knownRelease))
+    if (commands.length > 0 || queued.length > 0 || news || Date.now() >= deadline) {
+      noteLogOutcome(commands.length > 0 || queued.length > 0 || news ? 'work' : 'empty')
+      return NextResponse.json({
+        commands,
+        ...(queued.length > 0 ? { queuedRuns: queued } : {}),
+        ...(check.deviceCommand ? { deviceCommands: [check.deviceCommand] } : {}),
+        ...(releases ? { daemonVersions: releases } : {}),
+      })
     }
     // Each check is a database round trip under the device credential fence; every 2 s keeps an idle device cheap and a revoked credential loses a waiting poll within it (lib/device-revocation.db.test.ts).
     await sleep(Math.min(IDLE_CHECK_MS, Math.max(50, deadline - Date.now())), request.signal)
