@@ -43,5 +43,6 @@ const common = {
 await build({ ...common, entryPoints: [resolve(root, 'src/main/index.ts')], outfile: resolve(outdir, 'main.cjs'), sourcemap: flavor === 'dev' })
 await build({ ...common, entryPoints: [resolve(root, 'src/preload/index.ts')], outfile: resolve(outdir, 'preload.cjs'), sourcemap: flavor === 'dev' })
 await cp(resolve(root, 'src/offline.html'), resolve(outdir, 'offline.html'))
+await cp(resolve(root, 'src/update.html'), resolve(outdir, 'update.html'))
 
 console.log(`built @mikka/desktop ${pkg.version} (${flavor}) -> ${appUrl}`)

@@ -23,6 +23,8 @@ export interface BridgeOptions {
   notifications: NotificationCenter
   consumePendingClick(): string | null
   updates: Pick<Updates, 'ready' | 'install'>
+  /** The page saw a minimum desktop version above this build; main checks the server itself. */
+  requireUpdate(): Promise<void>
 }
 
 export function registerBridge(options: BridgeOptions, sshInstaller?: SshInstaller): void {
@@ -62,6 +64,7 @@ export function registerBridge(options: BridgeOptions, sshInstaller?: SshInstall
   handle(IPC.appClaudeCallback, url => options.claudeCallback(url))
   handle(IPC.appUpdateReady, () => options.updates.ready)
   handle(IPC.appInstallUpdate, () => options.updates.install())
+  handle(IPC.appRequireUpdate, () => options.requireUpdate())
   handle(IPC.deviceStatus, () => options.localDevice())
   handle(IPC.quotaGet, () => options.quota())
   handle(IPC.notificationsShow, notification => options.notifications.show(notification))
