@@ -323,6 +323,18 @@ export async function personalMcp(userId: string, botId: string, executionId: st
 // preserve the first uncertain outcome rather than replaying this step.
 personalMcp.maxRetries = 0
 
+/** GitHub's hosted MCP server as the caller, with the caller's own token only (decision 2026-11-02-1730). */
+export async function githubMcp(userId: string, input: import('@/lib/plugins/mcp').McpCommand, scope?: NativeToolScope) {
+  'use step'
+  await assertNativeToolScope(userId, scope)
+  if (scope?.scheduledRead) return { error: 'mcpNotAllowedForScheduledRead' }
+  const { createGitHubMcpRuntime, GITHUB_MCP_MIN_VALIDITY_MS } = await import('@/lib/github/mcp')
+  const { githubTokenForUser } = await import('@/lib/github/user-access')
+  return createGitHubMcpRuntime(owner => githubTokenForUser(owner, { minValidityMs: GITHUB_MCP_MIN_VALIDITY_MS }))(userId, input)
+}
+// A GitHub write has no idempotency key; never replay an uncertain call.
+githubMcp.maxRetries = 0
+
 /** Apps connected from the 插件 store, through the tools Composio lists for them (lib/app-tools.ts). */
 export async function appTools(userId: string, botId: string, operation: 'list' | 'call', input: unknown, scope?: NativeToolScope) {
   'use step'
