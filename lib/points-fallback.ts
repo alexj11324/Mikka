@@ -42,7 +42,7 @@ export async function pointsFallback(pool: Pool, scope: { ownerId: string; works
   if (!entries.length) return null
   const states = await credentialStates(pool, scope, entries, candidates)
   const keys = new Map((await usableApiKeys(pool, scope.ownerId, scope.workspaceId)).map(key => [key.id, key]))
-  const bindings = await new ExecutionSettings(pool).botModels(scope)
+  const bindings = await new ExecutionSettings(pool).chatModels(scope)
   for (const entry of entries) {
     if (!states.get(entry.id)?.credential.usable) continue
     if (entry.source.kind === 'api_key') {

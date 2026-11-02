@@ -11,7 +11,8 @@ import { nativeBrokerContextSchema, nativeLeaseSchema, type NativeBrokerRequest 
 import { accountLabel, failedUsage, parseSubscriptionUsage, type SubscriptionUsage, type WorkerUsage } from './subscription-usage'
 
 export interface SubscriptionCapabilities {
-  ready(route: SubscriptionRoute): boolean
+  /** Whether the route runs for this subscription owner (lib/subscription-routes.ts). */
+  ready(route: SubscriptionRoute, ownerId: string): boolean | Promise<boolean>
   nativeIsolation: 'verified_runtime' | 'none'
   oauth?: Partial<Record<'codex' | 'claude', boolean>>
 }
@@ -35,7 +36,7 @@ export class SubscriptionService {
     const row = await this.repository.connection(use.ownerId, binding.connectionId)
     if (row.paused) throw new SubscriptionRefusal('account_unavailable')
     const revision = Number(row.epoch)
-    const readiness = this.capabilities.ready(binding.route) ? 'ready' : 'unavailable'
+    const readiness = (await this.capabilities.ready(binding.route, use.ownerId)) ? 'ready' : 'unavailable'
     const baseQuota = { vendor: row.provider === 'codex' ? 'codex' : 'claude_code', status: 'unknown', source: 'local_credentials', plan: null, observedAt: new Date().toISOString(), windows: [] }
     let quota = quotaSnapshotSchema.safeParse(row.quota).data ?? quotaSnapshotSchema.parse(baseQuota)
     // Probe only after scope/state/revision and server-side capability checks.

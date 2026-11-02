@@ -201,12 +201,15 @@ export function authorizeSubscriptionUse(
     throw new SubscriptionRefusal(code)
   }
   if (!binding) return refuse("binding_required")
+  // The binding is made in the workspace it is used in; the connection keeps the
+  // workspace it was connected in. An owner's subscription serves them in every
+  // workspace (decision 2026-11-01-2240); the server checks membership and
+  // 分享给团队成员 before access is read.
   if (
     !connection ||
     binding.ownerId !== use.ownerId ||
     connection.ownerId !== use.ownerId ||
-    binding.workspaceId !== use.workspaceId ||
-    connection.workspaceId !== use.workspaceId
+    binding.workspaceId !== use.workspaceId
   )
     return refuse("account_unavailable")
   if (
@@ -236,7 +239,7 @@ export function authorizeSubscriptionUse(
     backend.connectionId !== connection.id ||
     backend.connectionRevision !== connection.revision ||
     backend.ownerId !== use.ownerId ||
-    backend.workspaceId !== use.workspaceId ||
+    backend.workspaceId !== connection.workspaceId ||
     backend.route !== binding.route
   )
     return refuse("binding_mismatch")
