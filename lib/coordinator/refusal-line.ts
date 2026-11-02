@@ -5,8 +5,9 @@ import { hostedRefusal } from '@/lib/billing/hosted-usage'
 /**
  * The status line for a turn Mikka 默认 refused, for places that cannot draw
  * the web's refusal line (components/billing/hosted-refusal-notice.tsx):
- * Telegram and the phone push. It reuses that line's words, so the person
- * reads the same state everywhere. Null when the failure is not a refusal.
+ * Telegram and the phone push. It reuses the keys of the line kept under the
+ * message (components/coordinator/failure-reason.tsx), with Mikka 默认 named
+ * since no mark sits beside it here. Null when the failure is not a refusal.
  */
 export function hostedRefusalLine(error: string | null | undefined, locale: 'zh-CN' | 'en' = 'zh-CN'): string | null {
   const code = hostedRefusal(error)
@@ -14,7 +15,7 @@ export function hostedRefusalLine(error: string | null | undefined, locale: 'zh-
   const copy = (locale === 'en' ? englishMessages : chineseMessages).Billing.refusal
   const brand = locale === 'en' ? 'Mikka Default: ' : 'Mikka 默认'
   switch (code) {
-    case 'verification_required': return copy.verification_required.replace(/<\/?[a-z]+>/g, '').replace(/\s+/g, ' ').trim()
+    case 'verification_required': return copy.verificationRequiredPlain
     case 'free_allowance_used': return brand + copy.free_allowance_used
     case 'points_exhausted': return brand + copy.points_exhausted
     case 'platform_paused': return brand + copy.platform_paused
