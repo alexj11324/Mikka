@@ -8,6 +8,7 @@ import { setChatPreference } from '@/lib/chat-preferences'
 import { mobileBot } from '@/lib/mobile-threads'
 import { coordinatorBot, openChatBotId } from '@/lib/coordinator/coordinator-bot'
 import { loadWorkspaceContext } from '@/lib/workspace-access'
+import { botOutsideToken } from '@/lib/tokens/scope'
 
 export const dynamic = 'force-dynamic'
 
@@ -37,7 +38,7 @@ async function handlePATCH(request: Request, context: { params: Promise<{ id: st
   const { id } = await context.params
   const body = change.safeParse(await request.json().catch(() => null))
   if (!body.success) return json({ error: 'invalidChange' }, 400)
-  if (id !== 'coordinator' && !z.uuid().safeParse(id).success) return json({ error: 'Not found' }, 404)
+  if (id !== 'coordinator' && (!z.uuid().safeParse(id).success || await botOutsideToken(user, id))) return json({ error: 'Not found' }, 404)
   if (!await setChatPreference(user.id, await openChatBotId(user, id === 'coordinator' ? null : id), body.data)) return json({ error: 'Not found' }, 404)
   return json({ ok: true })
 }

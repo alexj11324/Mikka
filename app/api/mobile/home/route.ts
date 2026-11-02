@@ -1,4 +1,4 @@
-import { and, eq, inArray, sql } from 'drizzle-orm'
+import { and, eq, inArray, notInArray, sql } from 'drizzle-orm'
 import { listOwnerBots } from '@/lib/coordinator/coordinator-bot'
 import { withRequestLog, noteLogUser } from '@/lib/request-log'
 import { db } from '@/lib/db'
@@ -9,6 +9,8 @@ import { chatPreferences } from '@/lib/chat-preferences'
 import { listSuggestions } from '@/lib/suggestions/store'
 import { loadWorkspaceContext } from '@/lib/workspace-access'
 import { json, mobileUser, unauthorized } from '@/lib/mobile-api'
+import { runsOutsideToken } from '@/lib/tokens/scope'
+import { tokenWorkspace } from '@/lib/tokens/principal'
 
 export const dynamic = 'force-dynamic'
 
@@ -28,6 +30,10 @@ async function handleGET(request: Request) {
   noteLogUser(user?.id)
   if (!user) return unauthorized()
   const context = await loadWorkspaceContext(undefined, user)
+  const recent = and(eq(agentRuns.userId, user.id), sql`${agentRuns.createdAt} > now() - interval '30 days'`)
+  // A workspace token counts the threads of its workspace only.
+  const outside = user[tokenWorkspace] ? [...await runsOutsideToken(user, (await db.select({ id: agentRuns.id }).from(agentRuns)
+    .where(and(recent, inArray(agentRuns.status, [...RUNNING, 'waiting_input'])))).map(row => row.id))] : []
   const [botRows, chats, suggestions, [counts], preferences] = await Promise.all([
     // The Coordinator first, marked `coordinator` (lib/coordinator/coordinator-bot.ts listOwnerBots).
     listOwnerBots(user.id, context.workspace.id),
@@ -36,7 +42,7 @@ async function handleGET(request: Request) {
     db.select({
       running: sql<number>`count(*) filter (where ${inArray(agentRuns.status, [...RUNNING])})`,
       waiting: sql<number>`count(*) filter (where ${eq(agentRuns.status, 'waiting_input')})`,
-    }).from(agentRuns).where(and(eq(agentRuns.userId, user.id), sql`${agentRuns.createdAt} > now() - interval '30 days'`)),
+    }).from(agentRuns).where(and(recent, outside.length ? notInArray(agentRuns.id, outside) : undefined)),
     chatPreferences(user.id),
   ])
   return json({

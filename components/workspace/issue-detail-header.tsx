@@ -10,9 +10,11 @@ import { Separator } from '@/components/ui/separator'
 import { SidebarTrigger, useSidebar } from '@/components/ui/sidebar'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
-export type IssueDetailNavigation = { index: number; total: number; onOpen: (offset: -1 | 1) => void; /** The first crumb, where closing returns: the chat it was opened from; 看板 when absent. */ parent?: string }
+export type IssueDetailNavigation = { index: number; total: number; onOpen: (offset: -1 | 1) => void }
 
-export function IssueDetailHeader({ identifier, title, saveLabel, saved, pending, navigation, actions, onClose }: {
+export function IssueDetailHeader({ origin, identifier, title, saveLabel, saved, pending, navigation, actions, onClose }: {
+  /** Where the task was opened from: a bot's chat, the Coordinator, 看板, a project. */
+  origin: string
   identifier: string | null; title: string; saveLabel: string; saved: boolean; pending: boolean
   navigation: IssueDetailNavigation; actions: ReactNode
   onClose: () => void
@@ -24,25 +26,27 @@ export function IssueDetailHeader({ identifier, title, saveLabel, saved, pending
   // The header lays itself out by its own width (the sidebar changes it, the viewport doesn't).
   // No workspace name: it cannot be clicked here, and the workspace is switched only from the avatar menu
   // (decision 2026-11-01-1300-no-workspace-name-in-breadcrumbs, R-79).
-  // Narrowing order: the title truncates, then 看板 folds into the ellipsis; then the save
-  // label text and the previous/next arrows go (the list still opens any task). The ID never truncates.
+  // The first crumb is the place the task was opened from and returns there, as ✕ does (R-82).
+  // On a desktop that crumb always shows, as 「Coordinator › NAVA-1」 (the title truncates first); only at
+  // phone width does it fold into the ellipsis. Narrowing then drops the save label text and the
+  // previous/next arrows (the list still opens any task). The ID never truncates.
   return <header className="@container/header sticky top-0 z-10 flex h-12 shrink-0 items-center justify-between gap-3 border-b border-rule bg-background px-3 sm:px-4">
     <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
       <SidebarTrigger className="-ml-1" aria-label={t('toggleSidebar')} aria-expanded={isMobile ? openMobile : open} />
       <Separator orientation="vertical" className="mr-1 data-vertical:h-4 data-vertical:self-auto" />
       <Breadcrumb className="min-w-0" aria-label={t('breadcrumb')}><BreadcrumbList className="min-w-0 flex-nowrap">
-        <BreadcrumbItem className="@2xl/header:hidden">
+        <BreadcrumbItem className="md:hidden">
           <DropdownMenu>
             <DropdownMenuTrigger render={<Button variant="ghost" size="icon-xs" aria-label={tDetail('breadcrumbMore')} />}><BreadcrumbEllipsis /></DropdownMenuTrigger>
             <DropdownMenuContent align="start">
               <DropdownMenuGroup>
-                <DropdownMenuItem disabled={pending} onClick={onClose}>{navigation.parent ?? tDetail('breadcrumbBoard')}</DropdownMenuItem>
+                <DropdownMenuItem disabled={pending} onClick={onClose}>{origin}</DropdownMenuItem>
               </DropdownMenuGroup>
             </DropdownMenuContent>
           </DropdownMenu>
         </BreadcrumbItem>
         {/* At the list's own size, colour and weight like the crumbs beside it: no button size of its own shrinks the text. */}
-        <BreadcrumbItem className="hidden @2xl/header:inline-flex"><Button variant="ghost" className="h-6 px-2 font-normal" disabled={pending} onClick={onClose}>{navigation.parent ?? tDetail('breadcrumbBoard')}</Button></BreadcrumbItem>
+        <BreadcrumbItem className="hidden shrink-0 md:inline-flex"><Button variant="ghost" className="h-6 max-w-40 px-2 font-normal" disabled={pending} onClick={onClose}><span className="truncate">{origin}</span></Button></BreadcrumbItem>
         <BreadcrumbSeparator />
         <BreadcrumbItem className="min-w-0">
           {identifier ? <><BreadcrumbPage className="shrink-0">{identifier}</BreadcrumbPage>

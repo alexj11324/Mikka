@@ -13,7 +13,7 @@ import type { ArtifactKind } from '@/lib/db/schema'
 import type { ArtifactListItem } from '@/lib/artifacts/types'
 import { cn } from '@/lib/utils'
 import { ArtifactKindIcon } from './artifact-card'
-import { ArtifactWindow } from './artifact-window'
+import { openArtifact } from '@/components/workspace/workspace-navigation'
 import { InlineLoadError } from '@/components/load-error'
 import { ResizablePane } from '@/components/ui/resizable-pane'
 
@@ -30,16 +30,16 @@ const COLUMNS = 'grid grid-cols-[minmax(0,1fr)_6rem] items-center gap-4 md:grid-
 
 /**
  * Artifact (rail, Figma F2 `395:27790`): categories on the left; on the right
- * the table 名称 / 状态 / 来源 / 上次活动. A row opens the Artifact window (F4).
+ * the table 名称 / 状态 / 来源 / 上次活动. A row opens the Artifact window (F4)
+ * through the address, so back closes it (R-82).
  */
-export function ArtifactLibrary({ onOpenIssue }: { onOpenIssue: (id: string) => void }) {
+export function ArtifactLibrary() {
   const t = useTranslations('ArtifactsPage')
   const tCommon = useTranslations('Common')
   const format = useFormatter()
   const now = useNow({ updateInterval: 60_000 })
   const { data, error, mutate } = useSWR('artifacts', () => listArtifacts())
   const [category, setCategory] = useState<Category>('all')
-  const [open, setOpen] = useState<Pick<ArtifactListItem, 'id' | 'runId' | 'issueId' | 'botId'> | null>(null)
   const rows = (data ?? []).filter(item => category === 'all' || item.kind === category)
   const current = CATEGORIES.find(item => item.id === category)!
   const source = (item: ArtifactListItem) => [item.authorName, item.issueKey].filter(Boolean).join(' · ') || '—'
@@ -70,7 +70,7 @@ export function ArtifactLibrary({ onOpenIssue }: { onOpenIssue: (id: string) => 
           </div>
           <ul aria-label={t(`category.${current.label}`)} className="flex flex-col">
           {rows.map(item => <li key={item.id}>
-            <Button variant="ghost" onClick={() => setOpen(item)} className={cn(COLUMNS, 'h-13 w-full rounded-none px-2 text-left font-normal')}>
+            <Button variant="ghost" onClick={() => openArtifact(item.id)} className={cn(COLUMNS, 'h-13 w-full rounded-none px-2 text-left font-normal')}>
               <span className="flex min-w-0 items-center gap-3">
                 <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted text-foreground"><ArtifactKindIcon kind={item.kind} className="size-4" /></span>
                 <span className="truncate text-sm leading-5 font-medium">{item.title}</span>
@@ -82,7 +82,5 @@ export function ArtifactLibrary({ onOpenIssue }: { onOpenIssue: (id: string) => 
           </ul>
         </div>}
     </section>
-    {open && <ArtifactWindow artifact={open} onClose={() => setOpen(null)} onOpenIssue={onOpenIssue}
-      onChange={id => setOpen(data?.find(item => item.id === id) ?? { id, runId: null, issueId: null, botId: null })} />}
   </div>
 }

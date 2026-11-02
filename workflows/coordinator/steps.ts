@@ -516,15 +516,13 @@ export async function dispatchComputerTask(userId: string, input: { botId: strin
     }
     const result = await queueCloudRun(pool, { userId, workspaceId: target.workspaceId }, { botId: input.botId, issueId: issue.id, agentId: target.agentId, deviceRepoId, title: issue.title, body: tiptapToText(issue.content), note: input.note, model:input.repo ? input.model ?? 'auto' : input.model, idempotencyKey: input.suggestionId ? `suggestion:${input.suggestionId}` : `coordinator:${toolCallId}`, execution, ...(input.readOnly ? { readOnly: true } : {}) })
     if (input.suggestionId) await pool.query('UPDATE suggestion_executions SET "botId"=$4,"runId"=$5,status=\'running\' WHERE "suggestionId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND ("runId" IS NULL OR "runId"=$5)', [input.suggestionId, userId, target.workspaceId, input.botId, result.runId])
-    if (process.env.MIKKA_CLOUD_THREAD_MACHINES === '1') {
-      const actor = { userId, workspaceId: target.workspaceId as string }
-      queuedRunId = result.runId
-      await (await import('@/lib/cloud-computer/thread-machines')).ensureThreadMachine(pool, actor, result.runId)
-      queuedRunId = null
-      const { start } = await import('workflow/api')
-      const { threadMachineLifecycle } = await import('@/workflows/thread-machine/workflow')
-      await start(threadMachineLifecycle, [actor, result.runId])
-    }
+    const actor = { userId, workspaceId: target.workspaceId as string }
+    queuedRunId = result.runId
+    await (await import('@/lib/cloud-computer/thread-machines')).ensureThreadMachine(pool, actor, result.runId)
+    queuedRunId = null
+    const { start } = await import('workflow/api')
+    const { threadMachineLifecycle } = await import('@/workflows/thread-machine/workflow')
+    await start(threadMachineLifecycle, [actor, result.runId])
     return { ...result, botId: input.botId, task: issue.title, status: 'queued' as const }
   } catch {
     // E2B refused the thread machine: end the queued run so it is not left waiting on a machine that never starts.

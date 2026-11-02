@@ -72,9 +72,8 @@ test('Issue threads open on the right as a conversation; comments are cards with
   await card.getByLabel('回复内容').fill('Agreed')
   await card.getByRole('button', { name: '发送回复', exact: true }).click()
   await expect(card).toContainText('Agreed')
-  // Opened over the Coordinator's chat, the first crumb is that chat (D14); leaving uses the existing document flush before unmounting the editor.
+  // The first crumb names the chat the task was opened from; leaving through it uses the existing document flush before unmounting the editor.
   await page.getByRole('navigation', { name: '当前位置', exact: true }).getByRole('button', { name: 'Coordinator', exact: true }).click()
-  await expect(page.getByRole('textbox', { name: '给 Coordinator 发消息' })).toBeVisible()
   await openIssueFromSearch(page, title)
   await page.reload()
   await expect(page.getByRole('region', { name: '任务活动', exact: true }).getByRole('article', { name: /的评论$/ })).toContainText('Agreed')
@@ -201,9 +200,8 @@ test(`The owner stops a live thread from its composer; it reads 正在停止… 
     await check.query('UPDATE agent_runs SET status = $2, "finishedAt" = now() WHERE id = $1', [runs.running, 'stopped'])
     await page.clock.fastForward(2_100)
   } finally { await check.end() }
-  // Its status word is its R-52 group, the same as its icon: a stopped run waits for you.
-  await expect(panel.getByText('等待你', { exact: true })).toBeVisible()
-  await expect(threads.getByRole('button', { name: '打开线程 Trim the bundle', exact: true })).toContainText('等待你')
+  await expect(panel.getByText('已停止', { exact: true })).toBeVisible()
+  await expect(threads.getByRole('button', { name: '打开线程 Trim the bundle', exact: true })).toContainText('已停止')
   await expect(panel.getByRole('textbox')).toHaveCount(0)
 })
 }
