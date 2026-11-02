@@ -118,7 +118,7 @@ test(
         [agentId, userId, deviceId],
       );
       await pool.query('INSERT INTO issue_prefixes ("userId",prefix) VALUES ($1,\'FQHT\')', [userId]);
-      // Push is what the GitHub App grants (lib/github/push-grant.ts); record that grant as a live check would.
+      // An installation row an earlier build recorded; admission no longer reads it (decision 2026-11-02-1600).
       await recordPushGrant(pool, userId, remoteKey(remoteUrl));
       let number = 0;
       const fixture = async (

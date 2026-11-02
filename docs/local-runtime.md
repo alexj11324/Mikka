@@ -105,7 +105,7 @@ are the following MVP deliverable; this change grants no push approval.
 ## Local development without GitHub (`pnpm dev:local`)
 
 `pnpm dev:local` runs the whole loop on your own machine: Coordinator dispatch,
-the push-grant check, the daemon's push, the GitHub App's pull request and the
+the daemon's push, the pull request and the
 thread showing it, with no request to api.github.com. One command, hot reload,
 no `next build`:
 

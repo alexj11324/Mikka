@@ -379,10 +379,15 @@ export const runAssignmentSchema = z.object({
     /** Apps (Composio toolkits) this run may use through the Mikka server, one MCP entry each. */
     apps: z.array(z.string().regex(/^[a-z][a-z0-9_]{0,63}$/)).max(64).optional(),
   }).optional(),
-  /** Agent-owned GitHub delivery; the same run token exchanges short-lived credentials. */
+  /**
+   * The run owner's own GitHub credential (decision 2026-11-02-1600): the run
+   * token exchanges it at `endpoint` for git and gh, for any github.com
+   * repository the person authorized. `repository` is this run's; `branch`,
+   * when present, is the task branch the agent delivers to.
+   */
   github: z.object({
     endpoint: z.url(), repository: z.string().regex(/^[a-z0-9_.-]+\/[a-z0-9_.-]+$/),
-    branch: z.string().regex(/^mikka\/[a-z0-9-]+-[1-9][0-9]*$/),
+    branch: z.string().regex(/^mikka\/[a-z0-9-]+-[1-9][0-9]*$/).optional(),
   }).strict().optional(),
   /** Question continuation must not silently open a different session. */
   /**

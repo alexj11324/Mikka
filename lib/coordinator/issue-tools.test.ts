@@ -122,10 +122,7 @@ test('dispatch uses the same host event as task creation and exposes no event ar
   const input = { issueId: 'b4000000-0000-4000-8000-000000000005', agentId: 'b4000000-0000-4000-8000-000000000006', repo: 'example/repository' }
   await tools.dispatch_run!.execute!(input, { toolCallId: 'dispatch', messages: [], context: {} })
   assert.deepEqual(dispatched.mock.calls.at(-1)!.arguments, ['owner', {...input,requestKey:'dispatch:dispatch'}, undefined, COORDINATOR_BOT, undefined, eventId])
-  assert.equal(tools.request_repository_push_approval, undefined, 'push is what the GitHub App grants; Mikka asks for no approval of its own')
-  const resumed = registry.createCoordinatorRegistry('owner', COORDINATOR_BOT, undefined, { coordinator: true,  taskEventId: eventId, approvedRepositoryKey: 'v2:github.com/example/repository' })
-  await resumed.dispatch_run!.execute!(input, { toolCallId: 'resumed-dispatch', messages: [], context: {} })
-  assert.deepEqual(dispatched.mock.calls.at(-1)!.arguments, ['owner', {...input,requestKey:'dispatch:resumed-dispatch'}, undefined, COORDINATOR_BOT, undefined, eventId, 'v2:github.com/example/repository'])
+  assert.equal(tools.request_repository_push_approval, undefined, 'agents push with the person\'s own GitHub credential; Mikka asks for no approval')
 })
 
 test('one task, one thread: dispatch takes newThread from the model but the person\'s message only from the host', async () => {

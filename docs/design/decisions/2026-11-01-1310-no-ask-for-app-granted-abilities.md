@@ -6,6 +6,7 @@
   granted is not asked of the person again; any remaining judgment belongs to
   the Decision API, not a coded rule.
 - Rule: —
+- Superseded by: [2026-11-02-1600-agents-use-own-github-credential](2026-11-02-1600-agents-use-own-github-credential.md) (both GitHub abilities: neither has a setting now)
 - Replaces: the 创建 Pull Request line of
   [2026-11-01-1215-push-by-github-app](2026-11-01-1215-push-by-github-app.md)
 

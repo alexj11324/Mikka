@@ -111,15 +111,27 @@ export async function disconnectGitHub(userId: string) {
   await db.delete(githubConnections).where(eq(githubConnections.userId, userId))
 }
 
-/** A usable user token for this user's connection, refreshed when it has expired; null without a connection. */
-export async function githubConnectionToken(userId: string): Promise<{ token: string; githubAccountId: string } | null> {
+/**
+ * A usable user token for this user's connection, refreshed when it expires
+ * within `minValidityMs`; null without a connection. `expiresAt` is null for a
+ * token GitHub gave no expiry.
+ */
+export async function githubConnectionToken(userId: string, { minValidityMs = 60_000 }: { minValidityMs?: number } = {}): Promise<{ token: string; githubAccountId: string; expiresAt: Date | null } | null> {
+  const fresh = (expiresAt: Date | null) => !expiresAt || expiresAt.getTime() > Date.now() + minValidityMs
   const [row] = await db.select().from(githubConnections).where(eq(githubConnections.userId, userId)).limit(1)
   if (!row) return null
-  if (!row.accessTokenExpiresAt || row.accessTokenExpiresAt.getTime() > Date.now() + 60_000) {
-    return { token: await unseal(row.accessToken), githubAccountId: row.githubAccountId }
-  }
-  if (!row.refreshToken || (row.refreshTokenExpiresAt && row.refreshTokenExpiresAt.getTime() <= Date.now())) throw new Error('GitHub connection expired')
-  const token = await postToken({ grant_type: 'refresh_token', refresh_token: await unseal(row.refreshToken) })
-  await db.update(githubConnections).set({ ...await sealedTokens(token), updatedAt: new Date() }).where(eq(githubConnections.userId, userId))
-  return { token: token.access_token, githubAccountId: row.githubAccountId }
+  if (fresh(row.accessTokenExpiresAt)) return { token: await unseal(row.accessToken), githubAccountId: row.githubAccountId, expiresAt: row.accessTokenExpiresAt }
+  // GitHub rotates the refresh token on use, so concurrent refreshes (several
+  // runs of one person) must not each spend it: one holds the row, the others
+  // wait and read the token it saved.
+  return db.transaction(async tx => {
+    const [locked] = await tx.select().from(githubConnections).where(eq(githubConnections.userId, userId)).for('update')
+    if (!locked) return null
+    if (fresh(locked.accessTokenExpiresAt)) return { token: await unseal(locked.accessToken), githubAccountId: locked.githubAccountId, expiresAt: locked.accessTokenExpiresAt }
+    if (!locked.refreshToken || (locked.refreshTokenExpiresAt && locked.refreshTokenExpiresAt.getTime() <= Date.now())) throw new Error('GitHub connection expired')
+    const token = await postToken({ grant_type: 'refresh_token', refresh_token: await unseal(locked.refreshToken) })
+    const sealed = await sealedTokens(token)
+    await tx.update(githubConnections).set({ ...sealed, updatedAt: new Date() }).where(eq(githubConnections.userId, userId))
+    return { token: token.access_token, githubAccountId: locked.githubAccountId, expiresAt: sealed.accessTokenExpiresAt }
+  })
 }

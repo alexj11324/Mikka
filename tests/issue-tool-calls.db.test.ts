@@ -159,7 +159,7 @@ test('actual issue actions commit one issue per tool call, roll back partial wri
     await pool.query('INSERT INTO device_repos(id,"deviceId","userId","repoPath","remoteUrl") VALUES($1,$2,$3,$4,$5)',[repo,device,owner,repository.key,repository.remoteUrl])
     // Only this disposable owner's repository has a synthetic persisted grant.
     // The real dispatch still executes the ordinary admission transaction.
-    // Push is what the GitHub App grants (lib/github/push-grant.ts); record that grant as a live check would.
+    // An installation row an earlier build recorded; admission no longer reads it (decision 2026-11-02-1600).
     await recordPushGrant(pool, owner, repository.key)
     const lifecycleTools=createCoordinatorRegistry(owner,coordinator,undefined,{coordinator:true})
     const first=routed[0];assert.ok('task' in first)

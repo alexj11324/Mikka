@@ -1974,13 +1974,6 @@
       "githubVerificationSaved": "Verification command saved",
       "githubAbilitiesHeading": "Abilities",
       "githubAbilitiesSummary": "{count} abilities ({write} write, {read} read)",
-      "githubPermission": {
-        "allow": "Allow",
-        "ask": "Ask",
-        "deny": "Deny"
-      },
-      "githubPermissionFailed": "Could not save",
-      "githubPushByApp": "Set by the GitHub App",
       "githubPrivate": "Private",
       "githubTool": {
         "push": "Push branch",

@@ -2,14 +2,8 @@ import 'server-only'
 import { auth } from '@/lib/auth'
 import { githubConnectionToken } from './connection'
 
-export type GitHubAccessCode = 'authRequired' | 'githubNotConfigured' | 'githubNotConnected' | 'githubReconnectRequired' | 'githubRepositoryForbidden' | 'githubPullRequestInvalid' | 'githubIssueInvalid' | 'githubUnavailable'
-
-export class GitHubAccessError extends Error {
-  constructor(readonly code: GitHubAccessCode, readonly status: number) {
-    super(code)
-    this.name = 'GitHubAccessError'
-  }
-}
+export { GitHubAccessError, type GitHubAccessCode } from './user-access-error'
+import { GitHubAccessError } from './user-access-error'
 
 export type AuthorizedGitHubRepository = { id: string; installationId: string; fullName: string; htmlUrl: string; private: boolean }
 type Json = Record<string, unknown>
@@ -48,9 +42,9 @@ async function githubGet(token: string, path: string): Promise<{ data: Json; nex
 
 /** The Plugins → GitHub connection first; a GitHub sign-in account linked before connections existed still works.
  * Without request headers (the Coordinator acts for a user id), the legacy account is read server-side for that user only. */
-async function userToken(userId: string, headers?: Headers): Promise<{ token: string; githubAccountId: string }> {
+async function userToken(userId: string, headers?: Headers, minValidityMs?: number): Promise<{ token: string; githubAccountId: string; expiresAt: Date | null }> {
   let connected: Awaited<ReturnType<typeof githubConnectionToken>>
-  try { connected = await githubConnectionToken(userId) }
+  try { connected = await githubConnectionToken(userId, minValidityMs === undefined ? {} : { minValidityMs }) }
   catch { throw new GitHubAccessError('githubReconnectRequired', 401) }
   if (connected) return connected
   const accounts: { id: string; userId: string; providerId: string; accountId: string }[] = headers
@@ -61,13 +55,24 @@ async function userToken(userId: string, headers?: Headers): Promise<{ token: st
   try {
     // Better Auth takes the internal account row id and decrypts its token. With no
     // headers it looks the account up under body.userId, which only the host sets.
-    const token = (await auth.api.getAccessToken(headers ? { headers, body: { accountId: account.id } } : { body: { accountId: account.id, userId } })).accessToken
-    if (!token) throw new Error('missingToken')
-    return { token, githubAccountId: account.accountId }
+    const access = await auth.api.getAccessToken(headers ? { headers, body: { accountId: account.id } } : { body: { accountId: account.id, userId } })
+    if (!access.accessToken) throw new Error('missingToken')
+    return { token: access.accessToken, githubAccountId: account.accountId, expiresAt: access.accessTokenExpiresAt ? new Date(access.accessTokenExpiresAt) : null }
   } catch (error) {
     if (error && typeof error === 'object' && 'statusCode' in error && typeof error.statusCode === 'number' && error.statusCode >= 500) throw new GitHubAccessError('githubUnavailable', 502)
     throw new GitHubAccessError('githubReconnectRequired', 401)
   }
+}
+
+/**
+ * The person's own GitHub user token for server code acting for a user id with
+ * no browser request: their runs, the Coordinator. Checked against their
+ * linked GitHub id. It never reaches chat, logs, memory or an error message.
+ */
+export async function githubTokenForUser(userId: string, options: { minValidityMs?: number } = {}): Promise<{ token: string; githubAccountId: string; expiresAt: Date | null }> {
+  const credential = await userToken(userId, undefined, options.minValidityMs)
+  if (githubId((await githubGet(credential.token, '/user')).data.id) !== credential.githubAccountId) throw new GitHubAccessError('githubReconnectRequired', 401)
+  return credential
 }
 
 /** The signed-in person's own GitHub user token, checked against their GitHub id. Never an app or installation token. */
