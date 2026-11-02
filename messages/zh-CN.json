@@ -2253,7 +2253,8 @@
           "access_changed": "修改了团队 {target} 的权限"
         },
         "bot": {
-          "permissions_changed": "修改了 {target} 的权限"
+          "permissions_changed": "修改了 {target} 的权限",
+          "taken_over": "接管了 {target}"
         },
         "integration": {
           "permission_changed": "把 {integration} 改为{to}"

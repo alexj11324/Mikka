@@ -58,6 +58,10 @@ export async function transferBots(tx: MainTransaction, workspaceId: string, fro
   const clash = await tx.execute<{ id: string }>(sql`select id from bots where "workspaceId" = ${workspaceId} and "ownerId" = ${toUserId} and lower(name) in ${names} limit 1`)
   if (clash.rows.length) throw new WorkspaceError('botTransferNameConflict')
   await tx.execute(sql`delete from bot_desktops where "botId" in ${ids}`)
+  // The runtime's hidden agents stay: their threads' history points at them (agent_runs cascade). They give up
+  // their name, so the next owner of this bot, the previous one included, can make its own (bot-runtime.ts).
+  await tx.execute(sql`update agents a set name = a.name || ' · ' || a.id::text, "updatedAt" = now()
+    from bot_cloud_runtimes x where x."agentId" = a.id and x."botId" in ${ids}`)
   await tx.execute(sql`delete from bot_cloud_runtimes where "botId" in ${ids}`)
   await tx.execute(sql`delete from computer_run_bindings where "botId" in ${ids}`)
   await tx.execute(sql`delete from agent_kit_heads where bot_id in ${ids}`)
@@ -97,16 +101,24 @@ export async function restoreReturningMember(workspaceId: string, userId: string
 export async function takeOverBot(actorId: string, workspaceId: string, botId: string): Promise<AssetTransfer> {
   z.uuid().parse(botId)
   await workspaceDb.transaction(tx => requireWorkspace(tx, workspaceId, actorId, true))
-  return db.transaction(async main => {
-    const [bot] = await main.select({ ownerId: bots.ownerId }).from(bots)
+  let name = ''
+  const transferred = await db.transaction(async main => {
+    const [bot] = await main.select({ ownerId: bots.ownerId, name: bots.name }).from(bots)
       .where(and(eq(bots.id, botId), eq(bots.workspaceId, workspaceId), isNotNull(bots.archivedAt))).for('update').limit(1)
     if (!bot) throw new WorkspaceError('botNotFound')
+    name = bot.name
     if (bot.ownerId === actorId) {
       await main.update(bots).set({ archivedAt: null, updatedAt: new Date() }).where(eq(bots.id, botId))
       return { bots: 1 }
     }
     return transferBots(main, workspaceId, bot.ownerId, actorId, [botId])
   })
+  // 接管 changes who pays for and owns the bot's runs, so it is in the workspace's activity log like 移除 and 停用.
+  await workspaceDb.transaction(async tx => {
+    const { membership } = await requireWorkspace(tx, workspaceId, actorId, true)
+    await enqueueWorkspaceAudit(tx, { workspaceId, actor: { type: 'user', id: actorId, name: membership.name }, action: 'bot.taken_over', target: { type: 'bot', id: botId, label: name } })
+  })
+  return transferred
 }
 
 /** Paused bots in this workspace, for its admins. */

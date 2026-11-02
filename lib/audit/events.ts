@@ -19,6 +19,7 @@ export const AUDIT_ACTIONS = {
   'member.suspended': 'member',
   'member.reactivated': 'member',
   'member.role_changed': 'member',
+  'bot.taken_over': 'member',
   // 权限
   'team.access_changed': 'permission',
   'bot.permissions_changed': 'permission',
@@ -82,6 +83,7 @@ export const AUDIT_METADATA = {
   'member.suspended': none,
   'member.reactivated': none,
   'member.role_changed': z.object({ oldRole: role, newRole: role }).strict(),
+  'bot.taken_over': none,
   'team.access_changed': z.object({ team: label, from: access, to: access }).partial().strict(),
   'bot.permissions_changed': z.object({ capability: label, from: access, to: access }).partial().strict(),
   'integration.permission_changed': z.object({ integration: label, capability: label, from: access, to: access }).strict(),
