@@ -6,7 +6,7 @@ import { auditRequestContext } from '@/lib/audit/events'
 import { secretAuditHook } from '@/lib/secrets/audit'
 import type { SettingsActionResult } from '@/lib/workspace-admin/settings-action'
 import { getE2BKeyCapabilityForUser, getE2BKeyStatus, removeE2BKey, setE2BKey, type E2BKeyStatus } from '@/lib/secrets/e2b'
-import { createWorkspaceSecret, deleteWorkspaceSecret, listWorkspaceSecrets, replaceWorkspaceSecret, workspaceRole, type SavedSecretView, type SecretAuditHook, type WorkspaceSecretView } from '@/lib/secrets/store'
+import { createWorkspaceSecret, deleteWorkspaceSecret, importWorkspaceSecrets, listWorkspaceSecrets, replaceWorkspaceSecret, workspaceRole, type ImportResult, type SavedSecretView, type SecretAuditHook, type WorkspaceSecretView } from '@/lib/secrets/store'
 import type { WorkspaceRole } from '@/lib/secrets/permissions'
 import { settingsWorkspaceAction } from '@/lib/workspace-admin/settings-action'
 import { currentWorkspaceActor } from '@/lib/workspace-admin/current'
@@ -23,11 +23,16 @@ const withActor = <T>(fn: (userId: string, workspaceId: string, audit: SecretAud
 export async function listSecrets(workspaceId?: string): Promise<SettingsActionResult<{ secrets: WorkspaceSecretView[]; role: WorkspaceRole }>> {
   return withActor(async (u, w) => { const [secrets, role] = await Promise.all([listWorkspaceSecrets(u, w), workspaceRole(u, w)]); return { secrets, role } }, workspaceId)
 }
-async function createSecretBody(input: { name: string; kind: 'secret' | 'env'; value: string; scope?: { type: 'workspace' } | { type: 'repository'; repository: string } }, workspaceId?: string): Promise<SettingsActionResult<SavedSecretView>> {
+type ScopeInput = { type: 'workspace' } | { type: 'repository'; repository: string }
+async function createSecretBody(input: { name: string; kind: 'secret' | 'env'; value: string; note?: string; scope?: ScopeInput }, workspaceId?: string): Promise<SettingsActionResult<SavedSecretView>> {
   return withActor((u, w, audit) => createWorkspaceSecret(u, w, input, audit), workspaceId)
 }
-async function replaceSecretBody(input: { id: string; value: string; scope?: { type: 'workspace' } | { type: 'repository'; repository: string } }, workspaceId?: string): Promise<SettingsActionResult<SavedSecretView>> {
+async function replaceSecretBody(input: { id: string; value?: string; note?: string; scope?: ScopeInput }, workspaceId?: string): Promise<SettingsActionResult<SavedSecretView>> {
   return withActor((u, w, audit) => replaceWorkspaceSecret(u, w, input, audit), workspaceId)
+}
+/** Bulk add from a .env text (≤ 2 MB), one kind and scope for all of it. Returns names and line errors, never values. */
+async function importSecretsBody(input: { text: string; masked: boolean; scope: ScopeInput; onConflict: 'replace' | 'skip' }, workspaceId?: string): Promise<SettingsActionResult<ImportResult>> {
+  return withActor((u, w, audit) => importWorkspaceSecrets(u, w, input, audit), workspaceId)
 }
 async function deleteSecretBody(input: { id: string }, workspaceId?: string): Promise<SettingsActionResult<{ id: string }>> {
   return withActor((u, w, audit) => deleteWorkspaceSecret(u, w, input, audit), workspaceId)
@@ -53,6 +58,7 @@ export async function getE2BKeyCapability(workspaceId?: string) {
 // Money, permissions, credentials and deletion: the session is read from the database, not the cookie cache.
 export async function createSecret(...args: Parameters<typeof createSecretBody>) { return withFreshSession(() => createSecretBody(...args)) }
 export async function replaceSecret(...args: Parameters<typeof replaceSecretBody>) { return withFreshSession(() => replaceSecretBody(...args)) }
+export async function importSecrets(...args: Parameters<typeof importSecretsBody>) { return withFreshSession(() => importSecretsBody(...args)) }
 export async function deleteSecret(...args: Parameters<typeof deleteSecretBody>) { return withFreshSession(() => deleteSecretBody(...args)) }
 export async function saveE2BKey(...args: Parameters<typeof saveE2BKeyBody>) { return withFreshSession(() => saveE2BKeyBody(...args)) }
 export async function deleteE2BKey(...args: Parameters<typeof deleteE2BKeyBody>) { return withFreshSession(() => deleteE2BKeyBody(...args)) }

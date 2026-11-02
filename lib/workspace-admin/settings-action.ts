@@ -6,7 +6,7 @@ import { WorkspaceError } from '@/lib/workspace-access'
 /** Backend settings codes remain separate from the existing UI message catalogue. */
 export const SETTINGS_ACTION_ERROR_CODES = [
   'secretNotFound', 'secretPermissionDenied', 'secretNameReserved', 'secretNameTaken',
-  'secretLimitReached', 'secretsUnavailable', 'e2bKeyInvalid', 'e2bKeyUnverifiable',
+  'secretLimitReached', 'secretsUnavailable', 'secretImportEmpty', 'secretImportTooLarge', 'secretNameShadowsWorkspace', 'e2bKeyInvalid', 'e2bKeyUnverifiable',
   'e2bKeyRateLimited', 'botNotFound', 'tokenNotFound', 'tokenLimitReached',
   'apiKeyInvalid', 'apiKeyUnverifiable', 'apiKeyBaseUrlInvalid', 'apiKeyNotFound',
 ] as const

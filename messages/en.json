@@ -1244,6 +1244,9 @@
     "secretPermissionDenied": "Only workspace admins can do this. Members can add and edit repository secrets and variables.",
     "secretNameTaken": "A secret or variable with this name already exists in this scope.",
     "secretLimitReached": "This workspace has reached the limit of 500 secrets and variables.",
+    "secretImportEmpty": "The .env has no lines that can be added.",
+    "secretImportTooLarge": "The .env file is over 2 MB.",
+    "secretNameShadowsWorkspace": "This workspace already has a secret with this name.",
     "secretsUnavailable": "Secret storage isn't available right now. Please try again later.",
     "e2bKeyInvalid": "This E2B key is invalid or has been revoked.",
     "e2bKeyUnverifiable": "Couldn't verify the key right now. Please try again later.",
@@ -2201,14 +2204,11 @@
       "loading": "Loading secrets",
       "empty": "No secrets yet.",
       "workspaceGroup": "Workspace",
-      "repositoryGroup": "Repository {repository}",
       "repository": "Repository",
       "edit": "Edit",
       "editNamed": "Edit {name}",
-      "kind": "Type",
       "kinds": {
-        "secret": "Secret",
-        "env": "Environment variable"
+        "secret": "Secret"
       },
       "name": "Name",
       "value": "Value",
@@ -2235,7 +2235,54 @@
         "remove": "Remove",
         "removing": "Removing…",
         "verifying": "Verifying…"
-      }
+      },
+      "bulkAdd": "Bulk add",
+      "bulkTitle": "Bulk add",
+      "filterLabel": "Filter",
+      "filters": {
+        "all": "All",
+        "workspace": "Workspace",
+        "repository": "Repository"
+      },
+      "columns": {
+        "name": "Name",
+        "type": "Type",
+        "scope": "Scope",
+        "note": "Note",
+        "updatedBy": "Updated by",
+        "updatedAt": "Updated",
+        "actions": "Actions"
+      },
+      "actions": "Actions for {name}",
+      "note": "Note",
+      "masked": "Hide in output",
+      "notMasked": "Not hidden",
+      "confirmWorkspace": "Everyone in {workspace} can use {name}?",
+      "confirmWorkspaceMany": "Everyone in {workspace} can use these {count} secrets?",
+      "paste": ".env",
+      "pickFile": "Choose a .env file",
+      "pickFileLimit": "Up to 2 MB",
+      "willAdd": "{count} can be added",
+      "replaceExisting": "Replace existing names",
+      "addCount": "Add {count}",
+      "importDone": "Added {created}, replaced {replaced}, skipped {kept}.",
+      "lineError": {
+        "invalidLine": "Line {line} is not KEY=value",
+        "invalidName": "Line {line} · {name} is not a valid name",
+        "emptyValue": "Line {line} · {name} has no value",
+        "duplicate": "Line {line} · {name} repeats",
+        "reserved": "Line {line} · {name} is reserved",
+        "shadowsWorkspace": "Line {line} · the workspace already has {name}"
+      },
+      "side": {
+        "label": "Whose secrets",
+        "mine": "Mine"
+      },
+      "mineHeading": "My secrets",
+      "addMineTitle": "Add my secret",
+      "shadowConfirm": "{workspace} already has {name}. Use your own value in your runs?",
+      "shadowConfirmMany": "{workspace} already has {names}. Use your own values in your runs?",
+      "useMine": "Use mine"
     },
     "audit": {
       "loading": "Loading audit log",

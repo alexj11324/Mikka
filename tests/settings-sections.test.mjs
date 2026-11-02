@@ -34,8 +34,9 @@ test('members do not see admin-only sections; admins see every built one', () =>
   const member = visibleSettingsSections({ admin: false }).map(s => s.id)
   assert.equal(member.includes('permissions'), false)
   // 计费: members see 付款 only (their card designation and credit share; C19).
-  for (const id of ['general', 'members', 'teams', 'computers', 'usage', 'billing']) assert.equal(member.includes(id), true, id)
-  for (const id of ['secrets', 'audit']) assert.equal(member.includes(id), false, id)
+  // 密钥与环境: members see every entry and write repository ones (decision 2026-11-02-2120).
+  for (const id of ['general', 'members', 'teams', 'computers', 'usage', 'billing', 'secrets']) assert.equal(member.includes(id), true, id)
+  for (const id of ['audit']) assert.equal(member.includes(id), false, id)
   assert.deepEqual(visibleSettingsSections({ admin: true }).map(s => s.id), SETTINGS_SECTIONS.filter(s => !UNBUILT.includes(s.id)).map(s => s.id))
 })
 

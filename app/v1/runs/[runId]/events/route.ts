@@ -6,7 +6,7 @@ import { db, pool } from '@/lib/db'
 import { agentRuns, devices, runChunks } from '@/lib/db/schema'
 import { authenticateDevice } from '@/lib/device-link'
 import { computerEventsMatch } from '@/lib/computer/events'
-import { workspaceSecretMasker } from '@/lib/secrets/runtime'
+import { secretMaskerFor } from '@/lib/secrets/runtime'
 import { persistRunEventBatch } from '@/lib/secrets/run-events'
 
 export const dynamic = 'force-dynamic'
@@ -42,7 +42,7 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ runI
   }
   // 4e2 ②: chunks from a cloud worker (workspace-scoped token) are masked before they are stored.
   // Identity when the deployment has no workspace encryption key or the workspace has no secret of 8+ characters.
-  const mask = await workspaceSecretMasker(caller.scopeWorkspaceId)
+  const mask = await secretMaskerFor({ workspaceId: caller.scopeWorkspaceId, ownerId: caller.userId })
   await persistRunEventBatch(runId, parsed.data.fromSeq, parsed.data.chunks, mask)
   await db.update(agentRuns)
     .set({ status: 'running', updatedAt: new Date() })
