@@ -136,7 +136,7 @@ async function withIssueKeys(userId: string, rows: (Omit<ArtifactListItem, 'issu
   const issueIds = [...new Set(rows.flatMap(row => row.issueId ? [row.issueId] : []))]
   const tasks = issueIds.length ? await db.selectDistinct({ id: issues.id, ownerId: issues.userId, scope: issues.scope, number: issueNumber })
     .from(issues).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId)))
-    .where(and(inArray(issues.id, issueIds), (await issueVisibility(userId)).predicate)) : []
+    .where(and(inArray(issues.id, issueIds), (await issueVisibility(userId, false, undefined, db, { onlyIssueIds: issueIds })).predicate)) : []
   const identifiers = await taskIdentifiers(tasks)
   const numbers = new Map(tasks.map(task => [task.id, task.number]))
   return rows.map(({ updatedAt, ...row }) => {
