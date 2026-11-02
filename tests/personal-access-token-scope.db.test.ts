@@ -262,12 +262,22 @@ test('a workspace token stays in its workspace on thread, evidence, proposal and
     const route = await import('../app/api/self-improvement/route')
     assert.equal((await call(route.GET, `/api/self-improvement?runId=${ownRun}`, {})).status, 200)
     assert.equal((await call(route.GET, `/api/self-improvement?runId=${otherRun}`, {})).status, 404)
-    // A task in no workspace does not open a run whose Bot is in another one.
-    assert.equal((await call(route.GET, `/api/self-improvement?runId=${ownBotLooseRun}`, {})).status, 200)
+    // A team token reaches no task in no workspace (the task allowlist), so neither run on one opens.
+    assert.equal((await call(route.GET, `/api/self-improvement?runId=${ownBotLooseRun}`, {})).status, 404)
     assert.equal((await call(route.GET, `/api/self-improvement?runId=${otherBotLooseRun}`, {})).status, 404)
-    assert.equal((await call(route.POST, '/api/self-improvement', {}, { action: 'propose', runId: otherBotLooseRun })).status, 404)
-    assert.equal((await call(route.POST, '/api/self-improvement', {}, { action: 'feedback', eventId: randomUUID(), runId: otherBotLooseRun, verdict: 'negative' })).status, 404)
-    assert.equal(Number((await pool.query('SELECT count(*) FROM improvement_scores WHERE "runId"=$1', [otherBotLooseRun])).rows[0].count), 0)
+    // The personal token keeps tasks in no workspace, so only the run's Bot keeps it out of a team
+    // workspace's run: a task in no workspace does not open a run whose Bot is in another one.
+    bearer = personalToken.token
+    try {
+      for (const runId of [ownBotLooseRun, otherBotLooseRun]) {
+        assert.equal((await call(route.GET, `/api/self-improvement?runId=${runId}`, {})).status, 404)
+        assert.equal((await call(route.POST, '/api/self-improvement', {}, { action: 'propose', runId })).status, 404)
+        assert.equal((await call(route.POST, '/api/self-improvement', {}, { action: 'feedback', eventId: randomUUID(), runId, verdict: 'negative' })).status, 404)
+        assert.equal(Number((await pool.query('SELECT count(*) FROM improvement_scores WHERE "runId"=$1', [runId])).rows[0].count), 0)
+      }
+    } finally {
+      bearer = token.token
+    }
     // A run with no task has no improvement record to reach.
     assert.equal((await call(route.GET, `/api/self-improvement?runId=${otherBotNoTaskRun}`, {})).status, 404)
   })
