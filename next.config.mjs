@@ -1,9 +1,18 @@
+import { execFileSync } from 'node:child_process'
 import createNextIntlPlugin from 'next-intl/plugin'
 import { withWorkflow } from 'workflow/next'
 import { basePath } from './lib/base-path-config.mjs'
 import { localTestAccountsMode } from './packages/protocol/src/local-test-mode.ts'
 
 const withNextIntl = createNextIntlPlugin('./i18n/request.ts')
+
+// lib/app-build.ts: the deployment a page was built by. Vercel's deployment id,
+// else the commit; an empty value turns the stale-page check off.
+function appBuild() {
+  if (process.env.VERCEL_DEPLOYMENT_ID) return process.env.VERCEL_DEPLOYMENT_ID
+  if (process.env.VERCEL_GIT_COMMIT_SHA) return process.env.VERCEL_GIT_COMMIT_SHA
+  try { return execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim() } catch { return '' }
+}
 
 // The app lives at app.aspectlylabs.com/mikka. lib/base-path.ts reads this
 // back for the places Next does not prefix on its own.
@@ -44,7 +53,7 @@ const nextConfig = {
     pagesBufferLength: 8,
   },
   basePath,
-  env: { MIKKA_BASE_PATH: basePath, NEXT_PUBLIC_COMPUTER_DEPLOYMENT: process.env.VERCEL_ENV ?? '', MIKKA_TEST_BUILD_SHA: process.env.MIKKA_TEST_DEPLOYMENT_SHA ?? '' },
+  env: { MIKKA_BASE_PATH: basePath, NEXT_PUBLIC_MIKKA_BUILD: appBuild(), NEXT_PUBLIC_COMPUTER_DEPLOYMENT: process.env.VERCEL_ENV ?? '', MIKKA_TEST_BUILD_SHA: process.env.MIKKA_TEST_DEPLOYMENT_SHA ?? '' },
   async redirects() {
     return [
       // The app's previous address; keep its links working.

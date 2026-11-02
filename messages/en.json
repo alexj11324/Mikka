@@ -1,5 +1,7 @@
 {
   "Common": {
+    "appUpdated": "Mikka has been updated",
+    "refresh": "Refresh",
     "close": "Close",
     "cancel": "Cancel",
     "save": "Save",
