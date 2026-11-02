@@ -12,18 +12,8 @@ import { groupThreads, pullRequestsOf, THREAD_GROUPS, threadGroup, type GroupIss
 import { pinnedByDefault } from '@/lib/chat-preferences'
 import { notThreadMachineDevice } from '@/lib/cloud-computer/thread-devices'
 
-/** The app's thread states (docs/design/mobile.md, 线程 screen icons). */
-export type MobileThreadStatus = 'running' | 'waiting' | 'failed' | 'done' | 'stopped'
-
-export function mobileThreadStatus(status: string): MobileThreadStatus {
-  switch (status) {
-    case 'waiting_input': return 'waiting'
-    case 'failed': return 'failed'
-    case 'succeeded': return 'done'
-    case 'stopped': case 'cancelled': return 'stopped'
-    default: return 'running'
-  }
-}
+export { mobileThreadStatus, type MobileThreadStatus } from '@/lib/mobile-thread-status'
+import { mobileThreadStatus, type MobileThreadStatus } from '@/lib/mobile-thread-status'
 
 /** A machine as the app draws it: an icon, never its name as a status (mobile.md). */
 export function machineKind(device: { name: string | null; platform: string | null; kind?: string | null } | null): 'cloud' | 'laptop' | 'server' {
