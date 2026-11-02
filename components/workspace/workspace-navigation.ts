@@ -215,16 +215,36 @@ const DOC = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
 /** The query the workspace last wrote or showed; see queryMoved. */
 let seenQuery: string | null = null
 
+/** History-state key on an entry the workspace pushed: the address it was pushed from (see closeTo). */
+const PUSHED_FROM = 'mikkaPushedFrom'
+
 function write(href: string, mode: 'push' | 'replace', list = false) {
   const current = `${window.location.pathname}${window.location.search}${window.location.hash}`
   if (href !== current) {
     const issue = (url: URL) => readLocation(url.searchParams).issue
     const mark = nextMark(readMark(window.history.state), issue(new URL(window.location.href)), issue(new URL(href, window.location.href)), mode, DOC, list)
-    const state = { ...window.history.state, [MARK]: mark }
+    const state = { ...window.history.state, [MARK]: mark, ...(mode === 'push' ? { [PUSHED_FROM]: current } : {}) }
     if (mode === 'push') window.history.pushState(state, '', href)
     else window.history.replaceState(state, '', href)
   }
   seenQuery = window.location.search
+}
+
+/**
+ * Closing a thread a move opened is the same step as back: when this entry was
+ * pushed from exactly where closing lands, go back, so back afterwards does not
+ * reopen it. Otherwise (a link or a reload opened it) the close replaces the
+ * entry. True when it went back; the popstate that follows shows the place.
+ */
+export function closeTo(change: Partial<WorkspaceLocation>): boolean {
+  const href = workspaceHref(new URL(window.location.href), change)
+  const state: unknown = window.history.state
+  if (state && typeof state === 'object' && (state as Record<string, unknown>)[PUSHED_FROM] === href) {
+    window.history.back()
+    return true
+  }
+  write(href, 'replace')
+  return false
 }
 
 /** True when the task on screen was opened from a list (the board, a list, a project): its ↑↓ step through that list. */
@@ -315,9 +335,9 @@ export function openThread(runId: string) {
   navigate({ thread: runId })
 }
 
-/** Closes the open thread; the right column shows 概览 again. */
+/** Closes the open thread; the right column shows the list it was opened from again. */
 export function closeThread() {
-  navigate({ thread: null })
+  if (!closeTo({ thread: null })) window.dispatchEvent(new Event(NAVIGATE_EVENT))
 }
 
 /** Opens an Artifact in its window over the page (R-56); the centre and the thread under it stay. */

@@ -94,10 +94,13 @@ test('a task opened from the chat is its own page; back returns to the chat, for
   await page.goForward()
   await expect(taskTitle(page)).toHaveValue(title)
 
-  // ✕ steps back to the chat it was opened from, so forward reopens the task.
+  // ✕ steps back to the chat it was opened from: no new entry, and forward reopens the task.
+  const entries = await page.evaluate(() => window.history.length)
   await closeTask(page)
   await expect(chat(page)).toBeVisible()
+  await expect(taskTitle(page)).toHaveCount(0)
   expect(query(page).get('issue')).toBeNull()
+  expect(await page.evaluate(() => window.history.length)).toBe(entries)
   await page.goForward()
   await expect(taskTitle(page)).toHaveValue(title)
 })
@@ -294,6 +297,15 @@ test('全部线程: another bot\'s thread opens beside the current chat, naming 
   await expectThreadBesideChat(page, runId)
   await expect(conversationPill(page)).toHaveText('Coordinator')
   await expect(threadIn(page)).toContainText('写作助手 派出线程')
+
+  // Closing it returns to 全部线程, and it is the same step as back: back does not reopen it.
+  const entries = await page.evaluate(() => window.history.length)
+  await threadIn(page).getByRole('button', { name: '关闭线程', exact: true }).click()
+  await expect(column(page)).toHaveCount(0)
+  await expect(panel.getByRole('tab', { name: '全部线程', exact: true })).toHaveAttribute('aria-selected', 'true')
+  await expect(panel.getByRole('button').filter({ hasText: /别的 Bot 任务/ }).first()).toBeVisible()
+  expect(await page.evaluate(() => window.history.length)).toBe(entries)
+  expect(query(page).get('thread')).toBeNull()
 })
 
 // ── The phone web (PR 5): no rail, so the list's sheet and the chat's pill are the ways in and out ──
