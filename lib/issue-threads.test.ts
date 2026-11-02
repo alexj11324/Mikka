@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { canReadThread, projectIssueThreads, threadName, threadQuestionRunId, threadQuestionView, threadTime, withRunChain } from './issue-threads'
+import { canReadThread, projectIssueThreads, taskFreeThreadMembers, threadName, threadQuestionRunId, threadQuestionView, threadTime, withRunChain } from './issue-threads'
 import type { RunChain } from './run-chain'
 
 const make = (id: string, userId = 'teammate', issueId = 'issue') => ({
@@ -115,4 +115,25 @@ test('a thread time is never in the future relative to now', () => {
   const now = new Date('2026-01-01T00:00:00Z')
   assert.equal(threadTime({ createdAt: new Date('2026-01-01T00:00:01Z'), finishedAt: null }, now).getTime(), now.getTime())
   assert.equal(threadTime({ createdAt: new Date('2025-12-31T23:59:00Z'), finishedAt: null }, now).getTime(), new Date('2025-12-31T23:59:00Z').getTime())
+})
+
+test('a thread with no task: its owner reads it while an active member of its bot\'s workspace; nobody else does', () => {
+  const bot = (members: string[] | null) => ({ workspaceMemberIds: members })
+  // Owner, still an active member of the workspace of the bot that dispatched it.
+  assert.equal(canReadThread('owner', 'owner', taskFreeThreadMembers('owner', bot(['owner', 'teammate']))), true)
+  // A teammate in the same workspace sees no one else's thread (canReadThread, unchanged).
+  assert.equal(canReadThread('owner', 'teammate', taskFreeThreadMembers('owner', bot(['owner', 'teammate']))), false)
+  // The owner left the bot's workspace, or the workspace is gone: no one reads it.
+  assert.equal(canReadThread('owner', 'owner', taskFreeThreadMembers('owner', bot(['teammate']))), false)
+  assert.equal(canReadThread('owner', 'owner', taskFreeThreadMembers('owner', bot(null))), false)
+  // No bot dispatched it: its owner alone.
+  assert.equal(canReadThread('owner', 'owner', taskFreeThreadMembers('owner', null)), true)
+  assert.equal(canReadThread('owner', 'stranger', taskFreeThreadMembers('owner', null)), false)
+})
+
+test('a thread with no task projects as itself, and never into a task\'s list', () => {
+  const row = { id: 'run-free', issueId: null, userId: 'owner', status: 'succeeded', prompt: 'Draft the release notes', createdAt: new Date(0), finishedAt: null, agentName: 'Codex', harness: 'codex', ownerName: null, report: null, error: null, stopRequestedAt: null, outcome: null, botColor: null, botShape: null }
+  const members = new Set(['owner'])
+  assert.deepEqual(projectIssueThreads([row], null, 'owner', members).map(thread => thread.id), ['run-free'])
+  assert.deepEqual(projectIssueThreads([row], 'task-1', 'owner', members), [])
 })

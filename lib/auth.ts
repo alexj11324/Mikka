@@ -12,7 +12,7 @@ import { authOAuthProxyOptions, authTrustedOrigins } from '@/lib/auth-config'
 import { createAuthEmail, type AuthMailContext } from '@/lib/auth-email'
 import { after } from 'next/server'
 import { githubVerifiedProfile } from '@/lib/auth-github-profile'
-import { beforeSignup } from '@/lib/abuse/signup'
+import { beforeSignup, localSignUpRateRules } from '@/lib/abuse/signup'
 import { newUserAvatar } from '@/lib/default-avatar'
 import { daemonAuthorizationOptions, exchangeDaemonSession } from '@/lib/daemon-authorization'
 import { issueDeviceToken } from '@/lib/device-link'
@@ -71,7 +71,7 @@ export const auth = betterAuth({
   basePath: withBasePath('/api/auth'),
   emailAndPassword: email.emailAndPassword,
   emailVerification: email.emailVerification,
-  rateLimit: { ...email.rateLimit, storage: 'database' },
+  rateLimit: { ...email.rateLimit, customRules: { ...email.rateLimit.customRules, ...localSignUpRateRules(process.env) }, storage: 'database' },
   trustedOrigins: [
     ...authTrustedOrigins(process.env),
     ...(process.env.NODE_ENV === 'development' ? ['http://localhost:3000'] : []),

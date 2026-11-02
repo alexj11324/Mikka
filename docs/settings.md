@@ -35,8 +35,9 @@ the sheet behind the header's sidebar button, with the rail items at its foot.
 
 ## Sections
 
-- **Personal:** Preferences, Profile, Memory (记忆), Account (账户), Integrations, Devices (设备).
-- **Administration:** Workspace, Teams, Members.
+- **Personal (account):** Preferences, Profile, profile memory (个人资料类记忆; bot and team memory stay in their workspace), Account (账户), Integrations, Devices (设备), API 与订阅. The same in every workspace.
+- **Personal workspace:** every setting of the workspace itself: 常规 (no 转让; it cannot be deleted), Bot 与 Agents, 密钥与环境 (the person's own secrets for their runs), 用量 and 计费 (without 付款).
+- **Team workspace (administration):** the same, plus what is between people: Members, Teams, 团队权限, 审计日志, 转让, 离开成员的 Bot, 付款 and 分享给团队成员 ([decision 2026-11-02-0216](design/decisions/2026-11-02-0216-personal-workspace-has-workspace-settings.md), with the full table).
 
 Account holds how the person signs in: linking Google to the Mikka account.
 Integrations holds connected apps (Gmail, Calendar, Notion, Slack, Linear,

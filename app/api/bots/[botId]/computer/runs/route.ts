@@ -22,7 +22,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ bot
   const parsed = inputSchema.safeParse((() => { try { return JSON.parse(raw) } catch { return null } })())
   if (!parsed.success) return Response.json({ error: 'Invalid request' }, { status: 400, headers })
   try {
-    const [issue, context] = await Promise.all([issueForUser(session.user.id, parsed.data.issueId), loadWorkspaceContext(undefined, session.user)])
+    const [issue, context] = await Promise.all([issueForUser(session.user, parsed.data.issueId), loadWorkspaceContext(undefined, session.user)])
     if (!issue) return Response.json({ error: 'Task unavailable' }, { status: 404, headers })
     const runtime = (await pool.query('SELECT "agentId","repoId" FROM bot_cloud_runtimes WHERE "botId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND harness=$4', [botId, session.user.id, context.workspace.id, parsed.data.harness])).rows[0]
     if (!runtime) return Response.json({ error: 'Bot computer task is unavailable' }, { status: 409, headers })

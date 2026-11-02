@@ -50,7 +50,7 @@ test('workspace settings backend', { skip: !dbUrl }, async t => {
     const admin = await seedUser(pool, 'admin'), member = await seedUser(pool, 'member'), stranger = await seedUser(pool, 'stranger')
     const ws = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }, { userId: member, role: 'member' }])
     const other = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }])
-    assert.deepEqual(await general.readWorkspaceGeneral(member, ws.id), { id: ws.id, name: ws.name, slug: ws.slug, icon: null, canEdit: false, canTransfer: false })
+    assert.deepEqual(await general.readWorkspaceGeneral(member, ws.id), { id: ws.id, name: ws.name, slug: ws.slug, icon: null, canEdit: false, canTransfer: false, personal: false })
     assert.equal((await general.readWorkspaceGeneral(admin, ws.id)).canEdit, true)
     await rejects(general.readWorkspaceGeneral(stranger, ws.id), 'workspaceAccessDenied')
     await seedBot(pool, ws.id, admin); await seedBot(pool, ws.id, member); await seedBot(pool, other.id, admin)
@@ -95,6 +95,19 @@ test('workspace settings backend', { skip: !dbUrl }, async t => {
     assert.equal((await general.readWorkspaceGeneral(admin, ws.id)).canTransfer, true)
     await general.transferWorkspaceOwnership(admin, ws.id, owner)
     assert.equal(await ownerOf(ws.id), owner)
+  })
+
+  await t.test('a personal workspace has its 常规 but is neither transferred nor deleted (decision 2026-11-02-0203)', async () => {
+    const owner = await seedUser(pool, 'personal-owner')
+    const ws = await seedWorkspace(pool, owner, [{ userId: owner, role: 'admin' }])
+    await pool.query(`UPDATE mikka_workspaces SET kind='personal' WHERE id=$1`, [ws.id])
+    const read = await general.readWorkspaceGeneral(owner, ws.id)
+    assert.equal(read.personal, true)
+    assert.equal(read.canEdit, true, 'its own name, icon and address stay editable')
+    assert.equal(read.canTransfer, false)
+    assert.equal((await general.updateWorkspaceGeneral(owner, ws.id, { name: '林一的工作区' })).name, '林一的工作区')
+    await rejects(general.deleteWorkspaceData(owner, ws.id, '林一的工作区'), 'workspacePersonalDelete')
+    assert.equal(await count(pool, 'mikka_workspaces where id=$1', [ws.id]), 1)
   })
 
   await t.test('deleteWorkspaceData: name check, full cleanup, other workspace untouched, personal data kept', async () => {

@@ -18,7 +18,13 @@ export function createComputerHandler(store: Pick<ComputerStore, 'listBots' | 'c
       z.uuid().parse(botId)
       if (!action) return response(await store.state(actor, botId))
       const mode = action === 'viewer' ? viewerRequestSchema.parse(await request.json()).mode : 'view'
-      const result = await store.operate(actor, botId, action, mode)
+      let result
+      try {
+        result = await store.operate(actor, botId, action, mode)
+      } catch (error) {
+        if (action === 'wake' && error instanceof ComputerError && error.status === 409 && error.message === 'Computer provisioning in progress') return response(null, 202)
+        throw error
+      }
       // Provision after operate commits: worker provisioning takes its own
       // machine lease and must not wait on the desktop transaction's row lock.
       if (action === 'wake' && wakeWorker) await wakeWorker(actor, botId)

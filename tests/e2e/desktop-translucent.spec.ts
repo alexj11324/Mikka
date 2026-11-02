@@ -2,10 +2,10 @@ import type { Page } from '@playwright/test'
 import { test, expect, register } from './fixtures'
 
 // The macOS desktop window (docs/design/platforms.md): under data-desktop-translucent
-// the window bar, the rail and the bot list let the window's material through;
-// the content column stays opaque. A browser has no vibrancy, so a solid body
-// color stands in for the material: wherever the page is see-through, the
-// screenshot shows that color unchanged.
+// the window bar and the rail let the window's material through untinted; the bot
+// list lays a grey veil (--shell-material) over it; the content column stays opaque.
+// A browser has no vibrancy, so a solid color on <html>, behind the page, stands in
+// for the material.
 const MATERIAL = [255, 0, 170] as const
 
 type Point = { x: number; y: number }
@@ -30,7 +30,7 @@ async function translucent(page: Page, on: boolean, background: string) {
     root.dataset.desktopPlatform = 'darwin'
     if (on) root.dataset.desktopTranslucent = ''
     else delete root.dataset.desktopTranslucent
-    document.body.style.background = background
+    root.style.background = background
   }, { on, background })
   // Two frames, so the attribute's styles are painted before the screenshot.
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))))
@@ -59,20 +59,23 @@ test('macOS translucent window: chrome shows the material, content stays opaque'
   await expect(page.locator('[data-slot="bot-list"] [data-active]').first()).toBeVisible()
   const at = await regions(page)
 
-  await translucent(page, true, `rgb(${MATERIAL.join(',')})`)
-  const [bar, rail, list, current, content] = await pixels(page, [at.bar, at.rail, at.list, at.current, at.content])
-  expect(near(bar, MATERIAL), `window bar ${bar}`).toBe(true)
-  expect(near(rail, MATERIAL), `rail ${rail}`).toBe(true)
-  expect(near(list, MATERIAL), `bot list ${list}`).toBe(true)
-  // The current row is a light overlay on the material: it reads, and the material still shows through it.
-  expect(near(current, MATERIAL), `current row ${current}`).toBe(false)
-  expect(current[0] > 200 && current[1] < 40 && current[2] > 130, `current row ${current}`).toBe(true)
-  expect(near(content, [255, 255, 255]), `content ${content}`).toBe(true)
-
   // Reduce transparency, Windows and Linux: no attribute, the opaque frame.
   await translucent(page, false, `rgb(${MATERIAL.join(',')})`)
   const opaque = await pixels(page, [at.bar, at.rail, at.list])
   for (const pixel of opaque) expect(near(pixel, MATERIAL, 40), `opaque ${pixel}`).toBe(false)
+
+  await translucent(page, true, `rgb(${MATERIAL.join(',')})`)
+  const [bar, rail, list, current, content] = await pixels(page, [at.bar, at.rail, at.list, at.current, at.content])
+  // The bar and rail show the material untinted; the bot list is veiled (--shell-material),
+  // so it reads apart from the rail: neither the raw material nor the opaque frame.
+  expect(near(bar, MATERIAL), `window bar ${bar}`).toBe(true)
+  expect(near(rail, MATERIAL), `rail ${rail}`).toBe(true)
+  expect(near(list, MATERIAL, 40), `bot list ${list} is veiled`).toBe(false)
+  expect(near(list, opaque[2], 3), `bot list ${list} still shows the material`).toBe(false)
+  expect(list[0] - list[1] > 8, `bot list ${list} keeps a trace of the material`).toBe(true)
+  // The current row is an overlay on the veil: it reads apart from the list.
+  expect(near(current, list, 6), `current row ${current} vs list ${list}`).toBe(false)
+  expect(near(content, [255, 255, 255]), `content ${content}`).toBe(true)
 
   // Evidence for review: the same window over a gradient, light and dark.
   await translucent(page, true, 'linear-gradient(135deg, #ff3d7f, #ffb03b 45%, #2fd4c4)')

@@ -38,7 +38,7 @@ test('a clean bot machine is snapshotted, after the credential probe', async () 
 
 test('credentials on the bot machine: no new snapshot; the last clean one is reused, or the thread is refused', async () => {
   const { workspaceSnapshot } = await import('./thread-machines')
-  const present = ['/home/mikka-runner/.claude/.credentials.json']
+  const present = ['/home/user/.claude/.credentials.json']
   const reused = fixture(present, { snapshotId: 'clean-earlier' })
   assert.equal(await workspaceSnapshot(reused.pool, actor, reused.source as never, '/repo'), 'clean-earlier')
   assert.deepEqual([reused.calls.snapshots, reused.calls.inserts], [0, 0])
@@ -68,7 +68,7 @@ test('the probe finds and the scrub removes exactly the credential paths, in a r
 })
 
 test('the list covers coding-CLI logins, run GitHub tokens and live brokers, and refuses an unsafe path', () => {
-  for (const path of ['/home/*/.claude/.credentials.json', '/home/*/.codex/auth.json', '/root/.claude/.credentials.json', '/root/.codex/auth.json', '/home/mikka-runner/.mikka/worker/adapters/runs/*/github', '/home/mikka-runner/.mikka/worker/adapters/native-brokers/*'])
+  for (const path of ['/home/*/.claude/.credentials.json', '/home/*/.codex/auth.json', '/root/.claude/.credentials.json', '/root/.codex/auth.json', '/home/user/.mikka/worker/adapters/runs/*/github', '/home/user/.mikka/worker/adapters/native-brokers/*'])
     assert.ok(SNAPSHOT_CREDENTIAL_GLOBS.includes(path), path)
   assert.throws(() => credentialProbeCommand(['/tmp/x; rm -rf /']), /Unsafe/)
 })

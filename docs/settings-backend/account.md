@@ -161,4 +161,4 @@ deleteAccount(input: { email: string }): Promise<ActionResult<{ deleted: true }>
 ## 测试
 
 - `pnpm test:account`：`lib/account/account.test.ts`（UA 解析、头像校验/路径）、`lib/account/mail.test.ts`（邮件只在 provider 接受时算成功）、`tests/account-actions.test.ts`（每个 action 的会话要求、校验、错误码映射）。
-- `pnpm test:account-db`：`lib/account/store.db.test.ts`（设备列表、分享列表、导出频率/归属/过期、导出不含密钥、头像替换、删除账户的范围、唯一管理员拒绝、外键 fixpoint）。CI 通过 `pnpm test:db` 在 `mikka_e2e` 上跑；本地用 `ACCOUNT_DB_TEST=1` + 回环的 `*_e2e` 库。
+- `pnpm test:account-db`：`lib/account/store.db.test.ts`（设备列表、分享列表、导出频率/归属/过期、导出不含密钥、头像替换、删除账户的范围、唯一管理员拒绝、外键 fixpoint）。CI 通过 `pnpm test:db` 在 `mikka_e2e` 上跑；本地把三个数据库 URL 指向同一个回环的 `*_e2e` 库即可。

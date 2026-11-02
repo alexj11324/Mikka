@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, symlinkSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { describe, expect, it, vi } from "vitest"
+import { describe, expect, it } from "vitest"
 
 import {
   PACKAGE_REGISTRY_DOMAINS,
@@ -11,7 +11,7 @@ import {
 } from "@mikka/protocol/agent-policy"
 
 import { acpPermissionResponse } from "./adapters/cursor"
-import { claudeSandboxSettings, claudeSettings } from "./adapters/claude"
+import { claudeSettings } from "./adapters/claude"
 import { runInstructions } from "./agents/run-context"
 import {
   PERMISSION_DEFAULTS,
@@ -19,14 +19,11 @@ import {
   classifyWrite,
   claudePermissionRules,
   decide,
-  decideWithJudgment,
   policyInstructions,
   pushDecision,
   runDomains,
   rawCliShellAvailable,
 } from "./permissions"
-import { judgePermissionDefault } from "./decision-judgments"
-import type { ServerDecide } from "./server-decision"
 
 describe("permission policy (ADR 0009)", () => {
   it.each([
@@ -56,34 +53,6 @@ describe("permission policy (ADR 0009)", () => {
     expect(decide("__proto__")).toBe("ask")
     expect(decide("format_disk", { policy: { ...policy({}), readOnly: true } })).toBe("deny")
     expect(decide("__proto__", { policy: { ...policy({}), readOnly: true } })).toBe("deny")
-  })
-
-  it("asks the Decisions API for unset setup recipes and unknown actions", async () => {
-    const answering = (choice: string | null) => vi.fn<ServerDecide>(async () =>
-      choice === null ? null : new Map([["decision", { type: "choice" as const, name: "decision", choice }]]))
-    const judge = (decideFn: ServerDecide) => (evidence: { action: string; subject?: string }) => judgePermissionDefault(decideFn, "run-1", evidence)
-    const ask = answering("ask")
-    expect(await decideWithJudgment("run_setup_recipe", {}, judge(ask), "abc123")).toBe("ask")
-    expect(ask.mock.calls[0][1]).toMatchObject({ purpose: "setup-recipe" })
-    expect(ask.mock.calls[0][1].input).toContain("abc123")
-    const allow = answering("allow")
-    expect(await decideWithJudgment("format_disk", {}, judge(allow))).toBe("allow")
-    expect(allow.mock.calls[0][1]).toMatchObject({ purpose: "permission-default" })
-    // An approved recipe, a configured action and a read-only run never ask.
-    const unasked = answering("ask")
-    expect(await decideWithJudgment("run_setup_recipe", { setupRecipeApproved: true }, judge(unasked))).toBe("allow")
-    expect(await decideWithJudgment("git_push", { policy: policy({ git_push: "deny" }) }, judge(unasked))).toBe("deny")
-    expect(await decideWithJudgment("format_disk", { policy: { ...policy({}), readOnly: true } }, judge(unasked))).toBe("deny")
-    expect(unasked).not.toHaveBeenCalled()
-    // No answer: the decision this point had before the Decisions API (ask), never allow.
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
-    try {
-      expect(await decideWithJudgment("format_disk", {}, judge(answering(null)))).toBe("ask")
-      expect(await decideWithJudgment("run_setup_recipe", {}, judge(answering(null)))).toBe("ask")
-      expect(warn).toHaveBeenCalledWith(expect.stringMatching(/^Decision fallback: /))
-    } finally {
-      warn.mockRestore()
-    }
   })
 
   it("classifies writes by worktree boundary", () => {
@@ -254,43 +223,13 @@ describe("applying the workspace's policy (ADR 0028)", () => {
       claudePermissionRules(policy({ install_dependency: "allow" }))
     ).toEqual({ allow: [], ask: [], deny: ["Bash(git push:*)"] })
     expect(claudePermissionRules(policy({install_dependency:'allow',git_push:'allow'}))).toEqual({allow:[],ask:[],deny:['Bash(git push:*)']})
-    const settings = claudeSettings(
-      {
-        allowWrite: ["/work"],
-        denyWrite: ["/work/.git"],
-        denyRead: ["/home/me/.ssh"],
-        allowDomains: ["github.com"],
-      },
-      policy({ install_dependency: "deny" })
-    )
-    // The SDK starts the CLI itself, so the run's sandbox is Claude Code's
-    // own (ADR 0009), mapped from the same policy the daemon's took.
-    expect(settings.sandbox).toMatchObject({
-      enabled: true,
-      failIfUnavailable: true,
-      allowUnsandboxedCommands: false,
-      filesystem: {
-        allowWrite: ["/work"],
-        denyWrite: ["/work/.git"],
-        denyRead: ["/home/me/.ssh"],
-      },
-      network: { allowedDomains: ["github.com"], strictAllowlist: true },
-    })
+    const settings = claudeSettings(policy({ install_dependency: "deny" }))
+    // Runs use no sandbox (decision 2026-11-01-2335): Claude Code's own stays off.
+    expect(settings.sandbox).toEqual({ enabled: false })
     expect(settings.permissions?.deny).toContain("Bash(npm install:*)")
   })
 
-  it("leaves the sandbox's network open when the run may reach any host", () => {
-    // A bare `*` is not an allow-list entry the sandbox takes; a host no
-    // list covers is prompted for, which bypass mode allows.
-    const open = claudeSandboxSettings({
-      allowWrite: ["/work"],
-      allowDomains: ["*"],
-    })
-    expect(open.network).toBeUndefined()
-    expect(open.enabled).toBe(true)
-  })
-
-  it("applies the policy for the action the Decisions API names for a Cursor command", async () => {
+  it("lets every Cursor tool call go ahead except a git push the daemon owns", async () => {
     const request = (command: string) =>
       ({
         sessionId: "s",
@@ -300,48 +239,21 @@ describe("applying the workspace's policy (ADR 0028)", () => {
           { optionId: "yes", name: "Allow", kind: "allow_once" },
         ],
       }) as Parameters<typeof acpPermissionResponse>[0]
-    const answering = (choice: string | null) => vi.fn<ServerDecide>(async () =>
-      choice === null ? null : new Map([["action", { type: "choice" as const, name: "action", choice }]]))
-    const chosen = async (command: string, p?: RunPolicy, decideFn: ServerDecide = answering(null), cache = new Map()) => {
-      const { response } = await acpPermissionResponse(request(command), p, false, { decide: decideFn, runId: "run-1", cwd: "/wt", cache })
+    const chosen = async (command: string, p?: RunPolicy) => {
+      const { response } = await acpPermissionResponse(request(command), p, false)
       return response.outcome.outcome === "selected"
         ? response.outcome.optionId
         : null
     }
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
-    try {
-      // The person's settings give every action the same answer: nothing is asked.
-      const unasked = answering("install_dependency")
-      expect(await chosen("npm install zod", undefined, unasked)).toBe("yes")
-      expect(await chosen("npm install zod", policy({ install_dependency: "allow" }), unasked)).toBe("yes")
-      expect(unasked).not.toHaveBeenCalled()
-      // A restricted install setting: the judged action's policy applies.
-      const denied = policy({ install_dependency: "deny" })
-      const install = answering("install_dependency")
-      expect(await chosen("npm install zod", denied, install)).toBe("no")
-      expect(install).toHaveBeenCalledWith("run-1", expect.objectContaining({ purpose: "command-action" }), undefined)
-      expect(install.mock.calls[0][1].input).toContain("npm install zod")
-      expect(await chosen("npm test", denied, answering("run_project_script"))).toBe("yes")
-      expect(await chosen("touch NOTES.md", denied, answering("other"))).toBe("yes")
-      // Answers are cached per run by command digest.
-      const cache = new Map()
-      const once = answering("install_dependency")
-      await chosen("pip install x", denied, once, cache)
-      await chosen("pip install x", denied, once, cache)
-      expect(once).toHaveBeenCalledTimes(1)
-      // No answer: the decision the command had before the Decisions API, never looser.
-      warn.mockClear()
-      expect(await chosen("npm install zod", denied, answering(null))).toBe("no")
-      expect(warn).toHaveBeenCalledWith(expect.stringMatching(/^Decision fallback: /))
-      expect(await chosen("npm test", denied, answering(null))).toBe("yes")
-      // git push stays a hard deny, never asked.
-      const push = answering("other")
-      expect(await chosen("git push", policy({ git_push: "allow" }), push)).toBe("no")
-      expect(await chosen("git push", denied, push)).toBe("no")
-      expect(push).not.toHaveBeenCalled()
-    } finally {
-      warn.mockRestore()
-    }
+    // Nothing is asked per tool (decision 2026-11-01-2335), whatever the install setting.
+    const denied = policy({ install_dependency: "deny" })
+    expect(await chosen("npm install zod")).toBe("yes")
+    expect(await chosen("npm install zod", denied)).toBe("yes")
+    expect(await chosen("npm test", denied)).toBe("yes")
+    expect(await chosen("touch NOTES.md", denied)).toBe("yes")
+    // git push stays a hard deny: the daemon delivers the run.
+    expect(await chosen("git push", policy({ git_push: "allow" }))).toBe("no")
+    expect(await chosen("git push", denied)).toBe("no")
     // Agent-delivered GitHub runs push themselves, still within the policy.
     const delivered = async (command: string, p?: RunPolicy) => {
       const { response } = await acpPermissionResponse(request(command), p, true)

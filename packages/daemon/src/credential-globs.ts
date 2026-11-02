@@ -6,7 +6,7 @@
  * drift. Dependency-free: the web app imports it.
  */
 /** The cloud worker's adapter state dir (`<dataDir>/adapters`; bin/cloud-worker.ts). */
-export const CLOUD_WORKER_STATE_DIR = "/home/mikka-runner/.mikka/worker/adapters"
+export const CLOUD_WORKER_STATE_DIR = "/home/user/.mikka/worker/adapters"
 
 /**
  * Paths inside a run dir that can hold a credential. Each is written again when

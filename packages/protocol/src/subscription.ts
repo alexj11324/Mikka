@@ -4,8 +4,6 @@ import { z } from "zod"
 
 import { quotaSnapshotSchema, type QuotaSnapshot } from "./quota"
 
-export const HOSTED_NATIVE_IMAGE = "node@sha256:6449e19d8184d84062525b6a7524def03146c2cb04a7f08b076680d0e8e4240a"
-
 const id = z.string().min(1).max(128)
 export const subscriptionRouteSchema = z.enum([
   "codex_cli",

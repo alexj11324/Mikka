@@ -8,6 +8,7 @@ import { z } from 'zod'
 import { agentRuns, deviceTokens, devices, runMessages } from '@/lib/db/schema'
 import type { RunCommand } from '@mikka/protocol/device'
 import { deviceRequestCaller } from '@/lib/device-request-context'
+import { ackMailboxNotices, pendingMailboxNotices } from '@/lib/device-mailbox-notices'
 
 /**
  * The single workspace this MVP serves. The protocol's register answer
@@ -143,7 +144,7 @@ export function waitSeconds(request: Request, max: number): number {
  * agent (repeats until acked) and a stop someone asked for (repeats until the
  * run ends). Runs in `skip` are left out so a long-poll can wait for new ones.
  */
-export async function pendingCommands(deviceId: string, skip: readonly string[]): Promise<RunCommand[]> {
+export async function pendingCommands(deviceId: string, skip: readonly string[], mailboxNotices = false): Promise<RunCommand[]> {
   const runs = await db
     .select({ id: agentRuns.id, stopRequestedAt: agentRuns.stopRequestedAt })
     .from(agentRuns)
@@ -158,16 +159,27 @@ export async function pendingCommands(deviceId: string, skip: readonly string[])
     .orderBy(asc(runMessages.createdAt))
     .limit(500)
   // The runId filter above excludes mailbox messages, whose runId is null.
-  const commands: RunCommand[] = messages.flatMap(({ id, runId, text }) => runId ? [{ kind: 'input' as const, runId, messageId: id, text }] : [])
-  for (const run of live) {
-    if (run.stopRequestedAt) commands.push({ kind: 'stop' as const, runId: run.id })
-  }
-  return commands
+  const inputs: RunCommand[] = messages.flatMap(({ id, runId, text }) => runId ? [{ kind: 'input' as const, runId, messageId: id, text }] : [])
+  const stops: RunCommand[] = live.filter(run => run.stopRequestedAt).map(run => ({ kind: 'stop', runId: run.id }))
+  const notices = mailboxNotices ? await pendingMailboxNotices(deviceId, live.filter(run => !run.stopRequestedAt).map(run => run.id)) : []
+  return [...stops, ...notices, ...inputs].slice(0, 500)
+}
+
+/** Runs waiting for this device to claim them, except those in `skip`. */
+export async function queuedRuns(deviceId: string, skip: readonly string[]): Promise<string[]> {
+  const rows = await db
+    .select({ id: agentRuns.id })
+    .from(agentRuns)
+    .where(and(eq(agentRuns.deviceId, deviceId), eq(agentRuns.status, 'queued')))
+    .limit(100 + skip.length)
+  const skipped = new Set(skip)
+  return rows.map(row => row.id).filter(id => !skipped.has(id)).slice(0, 100)
 }
 
 /** Marks messages the agent now holds; called by the daemon's ack. */
 export async function ackCommands(deviceId: string, delivered: readonly string[]): Promise<void> {
   if (delivered.length === 0) return
+  await ackMailboxNotices(deviceId, delivered)
   const owned = await db
     .select({ id: runMessages.id })
     .from(runMessages)

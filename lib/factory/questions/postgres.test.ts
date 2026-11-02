@@ -23,17 +23,16 @@ import {
   BASELINE_ARTIFACT,
   BASELINE_MARKDOWN,
 } from "../../self-improvement/builtin-skill";
+import { disposableDatabase } from '../../../tests/helpers/e2e-target.mjs'
 
 const local = process.env.FACTORY_QUESTION_TEST_URL;
 const dbURL =
   local ??
-  (process.env.CI === "true" && process.env.GITHUB_ACTIONS === "true"
-    ? process.env.E2E_DATABASE_URL
-    : undefined);
+  (disposableDatabase() ? process.env.E2E_DATABASE_URL : undefined);
 if (dbURL) {
   const u = new URL(dbURL);
   assert.equal(u.hostname, "127.0.0.1");
-  assert.equal(u.pathname, "/mikka_e2e");
+  assert.ok(disposableDatabase(process.env, dbURL), "loopback *_e2e only");
   if (local) assert.equal(u.username, "factoryquestions192");
 }
 const rejects = (fn: () => Promise<unknown>, code: string) =>

@@ -2,11 +2,11 @@ import { randomBytes, randomUUID } from 'node:crypto'
 import type { Page } from '@playwright/test'
 import { test, expect, register, registerInTeam, browserClientHeaders, watchRuntime, app, fillSecretPassword, captureAuthenticationCookies, skipOnboarding } from './fixtures'
 
-/** The avatar menu is one flat list: workspaces, 创建工作区, 设置, 添加账户, 退出登录; no submenu. */
+/** The avatar menu is one flat list: workspaces, 创建团队工作区, 设置, 添加账户, 退出登录; no submenu. */
 async function openSwitcher(page: Page) {
   await page.getByRole('button', { name: '工作区菜单', exact: true }).click()
   const menu = page.getByRole('menu', { name: '工作区菜单', exact: true })
-  await expect(menu.getByRole('menuitem', { name: '创建工作区', exact: true })).toBeVisible()
+  await expect(menu.getByRole('menuitem', { name: '创建团队工作区', exact: true })).toBeVisible()
   await expect(menu.getByRole('menuitem', { name: '创建或加入工作区', exact: true })).toHaveCount(0)
   await expect(menu.getByRole('menuitem', { name: '切换工作区', exact: true })).toHaveCount(0)
   return menu
@@ -14,7 +14,7 @@ async function openSwitcher(page: Page) {
 
 async function openWorkspacePage(page: Page) {
   const switcher = await openSwitcher(page)
-  await switcher.getByRole('menuitem', { name: '创建工作区', exact: true }).click()
+  await switcher.getByRole('menuitem', { name: '创建团队工作区', exact: true }).click()
   await expect(page).toHaveURL(/\/workspaces\/new$/)
   await expect(page.getByRole('heading', { name: '创建新的工作区', exact: true })).toBeVisible()
   await expect(page.getByRole('dialog')).toHaveCount(0)
@@ -37,7 +37,7 @@ test('菜单与参考一致，创建持久工作区、切换并同步成员上�
   await form.getByLabel('工作区名称', { exact: true }).fill(name)
   await form.getByLabel('工作区网址', { exact: true }).fill(slug)
   await expect(form.getByLabel('工作区数据区域', { exact: true })).toHaveValue('美国（俄亥俄州）')
-  await form.getByRole('button', { name: '创建工作区', exact: true }).click()
+  await form.getByRole('button', { name: '创建团队工作区', exact: true }).click()
   await expect(page).toHaveURL(url => url.pathname === app('/'))
   await expect(page.getByRole('button', { name: '工作区菜单', exact: true })).toContainText(name)
   const created = await selectedWorkspace(page)
@@ -136,7 +136,7 @@ test('仅从专属邀请页面加入工作区，菜单不再提供手动加入',
 test('菜单里每个操作项都有图标，所有行的文字在同一列', async ({ page }) => {
   await register(page)
   const menu = await openSwitcher(page)
-  const actions = ['创建工作区', '设置', '添加账户', '退出登录']
+  const actions = ['创建团队工作区', '设置', '添加账户', '退出登录']
   for (const name of actions) await expect(menu.getByRole('menuitem', { name, exact: true }).locator('svg').first()).toBeVisible()
   // The text column: where each row's first visible label starts, workspace rows included
   // (a workspace avatar's initial is aria-hidden and is not the label).

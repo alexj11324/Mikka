@@ -25,17 +25,19 @@ const ArtifactViewer = dynamic(() => import('./artifact-viewer').then(module => 
  * goes to the bot that made it (R-56). Only one sent outside a bot's run (an
  * OAuth agent, a Coordinator run) opens beside the Coordinator chat.
  */
-export function ArtifactWindow({ artifact, onChange, onClose, onOpenIssue }: { artifact: Pick<ArtifactListItem, 'id' | 'runId' | 'issueId'> & { botId?: string | null }; onChange: (id: string) => void; onClose: () => void; onOpenIssue?: (id: string) => void }) {
+export function ArtifactWindow({ artifact, onChange, onClose, onOpenIssue, fromThread = false }: { artifact: Pick<ArtifactListItem, 'id' | 'runId' | 'issueId'> & { botId?: string | null }; onChange: (id: string) => void; onClose: () => void; onOpenIssue?: (id: string) => void; /** Opened from an open thread: its conversation sits beside it, task or no task. */ fromThread?: boolean }) {
   const tNav = useTranslations('Nav')
   const tThreads = useTranslations('IssueThreads')
   const { runId, issueId, botId } = artifact
   // The same key as the thread panel beside it, so both read one request.
-  const { data: thread } = useSWR(runId && issueId ? ['issue-thread', issueId, runId] : null, () => getIssueThread(issueId!, runId!))
-  const { data: bots, error: botsError } = useSWR(botId && !(runId && issueId) ? 'bots' : null, listBots)
+  // A thread's artifact sits beside that thread's conversation; one opened from a thread with no task too.
+  const inThread = Boolean(runId) && (Boolean(issueId) || fromThread)
+  const { data: thread } = useSWR(inThread ? ['issue-thread', issueId ?? null, runId] : null, () => getIssueThread(issueId ?? null, runId!))
+  const { data: bots, error: botsError } = useSWR(botId && !inThread ? 'bots' : null, listBots)
   const bot = botId ? bots?.find(item => item.id === botId) : undefined
-  if (runId && issueId) return <ArtifactViewer artifactId={artifact.id} onArtifactChange={onChange} onClose={onClose} quotes={[]} canQuote={false}
+  if (inThread && runId) return <ArtifactViewer artifactId={artifact.id} onArtifactChange={onChange} onClose={onClose} quotes={[]} canQuote={false}
     bot={{ name: thread ? thread.thread.detail?.name ?? tThreads('title') : '', avatar: null }}
-    chat={() => <IssueThreadPanel issueId={issueId} runId={runId} onClose={onClose} bare />} />
+    chat={() => <IssueThreadPanel issueId={issueId ?? null} runId={runId} onClose={onClose} bare />} />
   // The bot's look and name come with the bot list; a bot that is gone, or a list that failed, falls back to the Coordinator.
   if (botId && !bots && !botsError) return <ArtifactViewer artifactId={artifact.id} onArtifactChange={onChange} onClose={onClose} quotes={[]}
     bot={{ name: '', avatar: <Skeleton className="size-5 rounded-full" /> }} chat={() => null} />

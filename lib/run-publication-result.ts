@@ -25,7 +25,8 @@ export const PUBLICATION_ERRORS = {
 export type PublicationErrorCode = keyof typeof PUBLICATION_ERRORS
 
 export class PublicationError extends Error {
-  constructor(readonly code: PublicationErrorCode, readonly retryable = false) {
+  /** `status` is GitHub's HTTP status when GitHub answered, for server logs only. */
+  constructor(readonly code: PublicationErrorCode, readonly retryable = false, readonly status?: number) {
     super(PUBLICATION_ERRORS[code])
     this.name = 'PublicationError'
   }
@@ -36,4 +37,7 @@ export interface PublishedPullRequest {
   title?: string
   url: string
   state: 'open' | 'draft' | 'merged' | 'closed'
+  /** Lines added and removed, when GitHub's reply carried them (a single PR does; a list of PRs does not). */
+  additions?: number
+  deletions?: number
 }

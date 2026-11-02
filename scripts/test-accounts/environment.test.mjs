@@ -7,6 +7,8 @@ import test from 'node:test'
 import { assertDatabaseIdentity, databaseTarget, deploymentAttestation, environmentFingerprint, loadEnvironment, validateEnvironment } from './environment.mjs'
 import { readBoundedBody } from './http-body.mjs'
 import { MVP_DECISION_KEY, installMvpTransport, verifyMvpTransport, hasBoundMvpTransport } from '../../tests/mvp/transport.mjs'
+import { hasBoundDevLocalTransport, installDevLocalTransport, verifyDevLocalTransport } from '../dev-local/transport.mjs'
+import { LOCAL_RESEND_KEY } from '../dev-local/services.mjs'
 
 function withSyntheticCredentials(value) {
   const target = new URL(value)
@@ -161,6 +163,41 @@ test('only the exact isolated MVP key with a proven current loopback transport c
     assert.equal(await verifyMvpTransport(fixtureEnv), false, 'a replacement fetch cannot guess the private challenge response')
     assert.throws(() => validateEnvironment(descriptor, fixtureEnv), /EXTERNAL_SERVICE_CREDENTIALS_FORBIDDEN/)
     await assert.rejects(loadEnvironment(fixtureEnv), /EXTERNAL_SERVICE_CREDENTIALS_FORBIDDEN/)
+  } finally {
+    restore?.()
+    console.error(`Retained test fixture directory: ${directory}`)
+  }
+})
+
+test('local placeholders require a proven active stub transport while real keys remain forbidden', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'mikka-local-environment-guard-'))
+  const file = join(directory, 'environment.json')
+  const local = { ...env, MIKKA_LOCAL_TEST_ACCOUNTS: '1', MIKKA_TEST_ENVIRONMENT_FILE: file, AI_GATEWAY_API_KEY: MVP_DECISION_KEY, RESEND_API_KEY: LOCAL_RESEND_KEY }
+  let upstreamCalls = 0
+  const upstream = async () => { upstreamCalls++; return new Response(null, { status: 204 }) }
+  let restore
+  try {
+    await writeFile(file, JSON.stringify(descriptor), { mode: 0o600 })
+    assert.throws(() => validateEnvironment(descriptor, local), /EXTERNAL_MAIL_FORBIDDEN/)
+    await assert.rejects(loadEnvironment(local), /EXTERNAL_MAIL_FORBIDDEN/)
+    restore = installDevLocalTransport(local, upstream)
+    assert.equal(hasBoundDevLocalTransport(local), false)
+    assert.deepEqual(await loadEnvironment(local), descriptor)
+    assert.equal(hasBoundDevLocalTransport(local), true)
+    assert.equal(upstreamCalls, 0)
+    for (const change of [
+      { MIKKA_LOCAL_TEST_ACCOUNTS: undefined }, { VERCEL_ENV: 'production' },
+      { AI_GATEWAY_API_KEY: 'real-key' }, { RESEND_API_KEY: 'real-mail-key' }, { OPENAI_API_KEY: 'real-key' },
+      { E2E_DATABASE_URL: 'postgresql://outside.invalid/production' },
+    ]) await assert.rejects(loadEnvironment({ ...local, ...change }))
+    const boundary = globalThis.fetch
+    globalThis.fetch = (input, init) => boundary(input, init)
+    assert.equal(hasBoundDevLocalTransport(local), false)
+    assert.deepEqual(await loadEnvironment(local), descriptor)
+    globalThis.fetch = upstream
+    assert.equal(hasBoundDevLocalTransport(local), false)
+    assert.equal(await verifyDevLocalTransport(local), false)
+    await assert.rejects(loadEnvironment(local), /EXTERNAL_MAIL_FORBIDDEN/)
   } finally {
     restore?.()
     console.error(`Retained test fixture directory: ${directory}`)

@@ -179,7 +179,7 @@ test('设置读取接口沿用原来的权限：仅管理员可读的只给管�
 })
 
 test('悬停预取后首次打开与再次打开设置分区都不显示骨架屏', async ({ page }) => {
-  await register(page, '/settings?section=preferences')
+  await registerInTeam(page, '/settings?section=preferences')
   const sidebar = page.locator('[data-slot="settings-list"]')
   const skeleton = page.locator('main [data-slot="skeleton"]')
   let sawSkeleton = false
@@ -206,7 +206,7 @@ test('悬停预取后首次打开与再次打开设置分区都不显示骨架�
 })
 
 test('个人设置切换不请求服务端，并保持 URL、历史记录与跨页导航一致', async ({ page }) => {
-  await register(page, '/settings?section=preferences')
+  await registerInTeam(page, '/settings?section=preferences')
   const sidebar = page.locator('[data-slot="settings-list"]')
   await expect(page.getByRole('button', { name: '浅色', exact: true })).toBeEnabled()
   const serverNavigations: string[] = []
@@ -246,7 +246,7 @@ test('个人设置切换不请求服务端，并保持 URL、历史记录与跨�
 })
 
 test('团队子页切换复用目录，历史记录和刷新可恢复当前视图', async ({ page }) => {
-  await register(page, '/settings/teams')
+  await registerInTeam(page, '/settings/teams')
   await page.getByRole('button', { name: '新建团队', exact: true }).first().click()
   const form = page.getByRole('form', { name: '创建新团队', exact: true })
   await form.getByLabel('团队名称', { exact: true }).fill('导航性能团队')
@@ -510,16 +510,34 @@ test('设置侧栏的搜索框在浅色、深色和半透明窗口里都与侧�
   }
 })
 
-test('个人工作区的设置没有成员、团队权限和审计日志，旧链接打开常规', async ({ page }) => {
-  // Decision 2026-10-31-2130: a new account's own workspace is personal, with only that person in it.
-  await register(page, '/settings?section=general')
+test('个人工作区有工作区自身的全部设置，只少成员、团队、团队权限和审计日志', async ({ page }) => {
+  // Decision 2026-11-02-0203: a new account's own workspace is personal; only what is between people is a team's.
+  await register(page, '/settings?section=preferences')
   const sidebar = page.locator('[data-slot="settings-list"]')
   await expect(sidebar.locator('[data-slot="sidebar-group-label"]').first()).toHaveText('账号')
-  await expect(sidebar.getByRole('link', { name: '常规', exact: true })).toBeVisible()
-  for (const name of ['成员', '团队权限', '审计日志']) await expect(sidebar.getByRole('link', { name, exact: true })).toHaveCount(0)
-  for (const path of ['/settings/members', '/settings?section=permissions', '/settings?section=audit']) {
+  for (const name of ['常规', 'Bot 与 Agents', '密钥与环境', '用量', '计费', 'API 与订阅']) await expect(sidebar.getByRole('link', { name, exact: true })).toBeVisible()
+  for (const name of ['成员', '团队', '团队权限', '审计日志']) await expect(sidebar.getByRole('link', { name, exact: true })).toHaveCount(0)
+  for (const path of ['/settings/members', '/settings/teams', '/settings?section=permissions', '/settings?section=audit']) {
     await page.goto(app(path))
-    await expect(page).toHaveURL(url => url.pathname === app('/settings') && url.searchParams.get('section') === 'general')
-    await expect(page.getByRole('heading', { level: 1, name: '常规', exact: true })).toBeVisible()
+    await expect(page).toHaveURL(url => url.pathname === app('/settings') && url.searchParams.get('section') === 'preferences')
+    await expect(page.getByRole('heading', { level: 1, name: '偏好设置', exact: true })).toBeVisible()
   }
+  // 重新播放引导 is the person's: 偏好设置 holds it in every workspace.
+  await expect(page.getByRole('button', { name: '重新播放', exact: true })).toBeEnabled()
+  // 「API 与订阅」 keeps the person's own credentials; sharing with a team is a team workspace's.
+  await sidebar.getByRole('link', { name: 'API 与订阅', exact: true }).click()
+  await expect(page.getByRole('heading', { level: 1, name: 'API 与订阅', exact: true })).toBeVisible()
+  await expect(page.getByText('分享给团队成员', { exact: true })).toHaveCount(0)
+  await expect(page.getByText('我的点数也可用于这个团队', { exact: true })).toHaveCount(0)
+  // 常规: its own name and address; no 转让, and the personal workspace cannot be deleted.
+  await sidebar.getByRole('link', { name: '常规', exact: true }).click()
+  await expect(page.getByRole('textbox', { name: '名称', exact: true })).toBeEditable()
+  await expect(page.getByRole('button', { name: '转让', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '删除', exact: true })).toHaveCount(0)
+  await expect(page.getByText('个人工作区不能删除', { exact: true })).toBeVisible()
+  // 密钥与环境: the person's own secrets for their bots' runs.
+  await sidebar.getByRole('link', { name: '密钥与环境', exact: true }).click()
+  await expect(page.getByRole('heading', { level: 1, name: '密钥与环境', exact: true })).toBeVisible()
+  await sidebar.getByRole('link', { name: 'Bot 与 Agents', exact: true }).click()
+  await expect(page.getByRole('heading', { level: 1, name: 'Bot 与 Agents', exact: true })).toBeVisible()
 })

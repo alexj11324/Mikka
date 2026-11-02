@@ -115,10 +115,9 @@ export async function worktreeGitDir(
 }
 
 /**
- * The repository the worktree belongs to, as sandbox-runtime expects a
- * repository to be granted: its root directory, with `.git` beneath it. The
- * runtime itself keeps that `.git/config` and `.git/hooks` read-only
- * (mandatory deny paths), so git can take any lock it needs in `.git`
+ * The repository the worktree belongs to, as a run declares it writable:
+ * its root directory, with `.git` beneath it (`.git/config` and `.git/hooks`
+ * stay declared read-only), so git can take any lock it needs in `.git`
  * (refs, packed-refs, logs, objects). Listing files inside `.git` instead
  * makes each one a mount point, and git's rename of a lock over it fails.
  */

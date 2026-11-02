@@ -3,6 +3,7 @@
 import { useAgentCopy } from '@/hooks/use-agent-copy'
 import { useMemo, type ReactNode } from 'react'
 import { useTranslations } from 'next-intl'
+import { useIsStreaming } from '@openuidev/react-lang'
 import { Citations } from '@/components/agents/citations'
 import { FileDiff, type FileDiffLine } from '@/components/agents/file-diff'
 import { FileTree, FileTreeFile, FileTreeFolder } from '@/components/motion/file-tree'
@@ -85,7 +86,9 @@ export function AgentFileDiff({ file, diff = '', language }: { file?: string; di
       return { id: String(index), type: 'context', oldLine: ++oldLine, newLine: ++newLine, content: line.startsWith(' ') ? line.slice(1) : line }
     })
   }, [diff])
-  return <FileDiff file={file} lines={lines} language={language} defaultOpen collapseOnComplete={false} />
+  // Only a reply still streaming is applying its changes; a saved one shows ✓ (FileDiff defaults to streaming).
+  const streaming = useIsStreaming()
+  return <FileDiff file={file} lines={lines} language={language} status={streaming ? 'streaming' : 'complete'} defaultOpen collapseOnComplete={false} />
 }
 
 /** Sources actually read, as beUI Citations. */

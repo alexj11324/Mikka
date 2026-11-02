@@ -132,7 +132,7 @@ test('existing custom and legacy execution snapshots never acquire new capabilit
   process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED = '1'
   for (const definition of [
     parseDefinition({...DEFAULT_AGENT_DEFINITION, tools: ['web_search'], instructions: 'Keep my selected profile'}),
-    parseDefinition({...DEFAULT_AGENT_DEFINITION, tools: DEFAULT_AGENT_DEFINITION.tools.filter(name => name !== 'read_gmail_message')}),
+    parseDefinition({...DEFAULT_AGENT_DEFINITION, tools: DEFAULT_AGENT_DEFINITION.tools.filter(name => name !== 'read_gmail_message' && !name.startsWith('mailbox_'))}),
   ]) {
     const run = execution(definition), before = JSON.stringify(run.snapshot)
     assert.deepEqual(importDefinition(exportDefinition(definition)), definition)
@@ -178,6 +178,7 @@ test('Factory gates narrow frozen grants, preserve ordinary tools and keep named
           ...(lifecycle && coordinator ? FACTORY_TOOL_IDS : []),
         ] : [])
         const expected = definition.tools.filter(name =>
+          !name.startsWith('mailbox_') && // This matrix leaves the independent mailbox host catalogue disabled.
           (issues || (name !== 'create_issue' && name !== 'update_issue')) &&
           (!knownFactoryTools.has(name) || availableFactoryTools.has(name)))
         assert.deepEqual(Object.keys(tools).sort(), expected.sort(), `issues=${issues}, routing=${routing}, lifecycle=${lifecycle}, bot=${botId}`)

@@ -276,7 +276,7 @@ it.each(['codex', 'claude_code'] as const)('only current %s tool activity produc
   const common = { stateDir: join(root, 'adapters'), sandbox: new NoSandbox(), binary }
   const adapter = harness === 'codex' ? new CodexAdapter(common) : new ClaudeAdapter({ ...common, configDir: tempDir() })
   const session = await adapter.start({ runId: 'progress-test', cwd: worktree, prompt: 'TOOL_PROGRESS_TEST', env: buildChildEnv(),
-    log: createLogger({ level: 'silent' }), toolApproval: new ToolApprovalGate('progress-test', { permission: () => 'deny', ask: async () => 'deny', isLive: () => true }) })
+    log: createLogger({ level: 'silent' }), toolApproval: new ToolApprovalGate('progress-test', { isLive: () => true }) })
   const events = []
   try { for await (const event of session.events()) events.push(event) }
   finally { await session.cancel() }

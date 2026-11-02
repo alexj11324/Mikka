@@ -23,6 +23,8 @@ export interface RunSource {
   /** Its group in the thread list (R-52), decided on the server. Absent from a server older than it. */
   group?: ThreadGroup
   issue: { id: string; identifier: string | null; number: number | null; title: string } | null
+  /** 运行信息, on the person's own runs. */
+  info?: import('@/lib/run-info').RunInfo
 }
 export type CitationSource = IssueSource | RunSource
 

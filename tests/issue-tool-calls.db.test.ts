@@ -5,17 +5,13 @@ import { seedCoordinator } from './support/coordinator-bot'
 import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
 import { normalizeRepository } from '@mikka/protocol/repository'
 import { recordPushGrant } from './support/github-app-stub'
+import { disposableDatabase } from './helpers/e2e-target.mjs'
 
 const connection = process.env.E2E_DATABASE_URL
 const required = process.env.REQUIRE_DB === '1'
-const enabled = process.env.CI === 'true' && process.env.GITHUB_ACTIONS === 'true' && !!connection
-if (required && !enabled) throw new Error('Issue mutation DB regression requires GitHub Actions temporary PG17')
+const enabled = disposableDatabase()
+if (required && !enabled) throw new Error('Issue mutation DB regression requires a loopback *_e2e database')
 if (enabled) {
-  const url = new URL(connection!)
-  assert.equal(url.hostname, '127.0.0.1')
-  assert.ok(['postgres:', 'postgresql:'].includes(url.protocol))
-  assert.equal(url.port, '5432')
-  assert.equal(url.pathname, '/mikka_e2e')
   assert.equal(process.env.MIKKA_DATABASE_URL, connection)
   assert.equal(process.env.DATABASE_URL, connection, 'workspace and issue stores must share only this disposable target')
   process.env.MIKKA_ISSUE_TOOLS_ENABLED = '1'

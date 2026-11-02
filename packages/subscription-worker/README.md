@@ -10,7 +10,9 @@ Run on the Agent's cloud Linux machine:
 This verifies the exact official CPA commit, starts disposable loopback Postgres,
 applies all 34 migrations, builds the production and acceptance-only executables,
 runs Go race tests and vet, then runs application/native/browser acceptance and
-migration replay. No real grant, account credentials, Infisical write, provider
+migration replay. 现状（非决定）：the script still includes a browser step,
+although no browser tests are part of acceptance any more
+([decision](../../docs/design/decisions/2026-11-01-2225-api-cli-acceptance-and-backend-owner.md)). No real grant, account credentials, Infisical write, provider
 inference or E2B sandbox is used. Docker images and Go module sums are pinned.
 
 ## Implemented path

@@ -5,6 +5,8 @@ import type { SessionOptions } from '../adapters/types'
 import { pinnedGit, snapshotTree } from './publish'
 import type { RunPublish } from '@mikka/protocol'
 import { runBranch } from '../worktrees'
+import { localGitConfig } from './local-git-origin'
+import { trustedServerEndpoint } from '../trusted-endpoint'
 
 export type RunGitHub = NonNullable<SessionOptions['github']>
 export const GITHUB_CREDENTIAL_SCRIPT = resolve(import.meta.dirname, 'github-credentials.mjs')
@@ -24,8 +26,7 @@ export function githubReceiptEnvironment(host: NodeJS.ProcessEnv = process.env):
 /** Only run-local configuration is written; never a global gh or git login. */
 export function prepareGitHubEnvironment(runDir: string, github: RunGitHub, path: string, runtime?: { nodeBinary: string; ghBinary: string }): Record<string, string> {
   const endpoint = new URL(github.endpoint)
-  if (!endpoint.pathname.endsWith('/api/runs/github-token') || endpoint.username || endpoint.password ||
-    endpoint.search || endpoint.hash || (endpoint.protocol !== 'https:' && !(endpoint.protocol === 'http:' && ['127.0.0.1', 'localhost', '[::1]'].includes(endpoint.hostname)))) throw new Error('Invalid run GitHub endpoint')
+  if (!endpoint.pathname.endsWith('/api/runs/github-token') || !trustedServerEndpoint(endpoint)) throw new Error('Invalid run GitHub endpoint')
   const gh = runtime?.ghBinary ?? path.split(delimiter).map(dir => join(dir, 'gh')).find(file => existsSync(file))
   const node = runtime?.nodeBinary ?? process.execPath
   if (!gh) throw new Error('Install GitHub CLI (gh) before running GitHub tasks')
@@ -40,18 +41,24 @@ export function prepareGitHubEnvironment(runDir: string, github: RunGitHub, path
   if (!lstatSync(bin).isDirectory() || realpathSync(bin) !== join(realpathSync(dir), 'bin')) throw new Error('Invalid run GitHub executable directory')
   const wrapper = join(bin, 'gh')
   rmSync(wrapper, { force: true })
-  writeFileSync(wrapper, `#!/bin/sh\nexec env NODE_USE_ENV_PROXY=1 ${process.versions.electron ? 'ELECTRON_RUN_AS_NODE=1 ' : ''}${quote(node)} ${quote(helper)} gh ${quote(config)} "$@"\n`, { mode: 0o700, flag: 'wx' })
+  const fixtureConfig = localGitConfig()
+  // The official sandbox isolates loopback and installs its authenticated
+  // proxy. Its NO_PROXY localhost default would bypass that only route back
+  // to the local acceptance server. The outer daemon's proxy is preserved.
+  const fixtureProxy = fixtureConfig.length ? 'case "${HTTP_PROXY:-${http_proxy:-}}" in http://*@localhost:*|http://*@127.0.0.1:*) unset NO_PROXY no_proxy ;; esac\n' : ''
+  writeFileSync(wrapper, `#!/bin/sh\n${fixtureProxy}exec env NODE_USE_ENV_PROXY=1 ${process.versions.electron ? 'ELECTRON_RUN_AS_NODE=1 ' : ''}${quote(node)} ${quote(helper)} gh ${quote(config)} "$@"\n`, { mode: 0o700, flag: 'wx' })
   return {
     PATH: `${bin}${delimiter}${path}`, GH_HOST: 'github.com', GH_REPO: github.repository,
     // The agent commits inside the sandbox, where a signing program or agent
     // configured outside it (gpg, ssh-agent, a signing helper) is unreachable.
-    GIT_TERMINAL_PROMPT: '0', GIT_CONFIG_COUNT: '5',
+    GIT_TERMINAL_PROMPT: '0', GIT_CONFIG_COUNT: String(5 + fixtureConfig.length),
     GIT_CONFIG_KEY_0: 'credential.helper', GIT_CONFIG_VALUE_0: '',
     GIT_CONFIG_KEY_1: 'credential.https://github.com.helper',
-    GIT_CONFIG_VALUE_1: `!env NODE_USE_ENV_PROXY=1 ${process.versions.electron ? 'ELECTRON_RUN_AS_NODE=1 ' : ''}${quote(node)} ${quote(helper)} git ${quote(config)}`,
+    GIT_CONFIG_VALUE_1: `!${fixtureProxy}env NODE_USE_ENV_PROXY=1 ${process.versions.electron ? 'ELECTRON_RUN_AS_NODE=1 ' : ''}${quote(node)} ${quote(helper)} git ${quote(config)}`,
     GIT_CONFIG_KEY_2: 'credential.useHttpPath', GIT_CONFIG_VALUE_2: 'true',
     GIT_CONFIG_KEY_3: 'commit.gpgSign', GIT_CONFIG_VALUE_3: 'false',
     GIT_CONFIG_KEY_4: 'tag.gpgSign', GIT_CONFIG_VALUE_4: 'false',
+    ...Object.fromEntries(fixtureConfig.flatMap(([key, value], index) => [[`GIT_CONFIG_KEY_${5 + index}`, key], [`GIT_CONFIG_VALUE_${5 + index}`, value]])),
     GIT_AUTHOR_NAME: 'Mikka Agent', GIT_AUTHOR_EMAIL: 'agent@mikka.invalid',
     GIT_COMMITTER_NAME: 'Mikka Agent', GIT_COMMITTER_EMAIL: 'agent@mikka.invalid',
   }
@@ -109,18 +116,20 @@ export async function agentPublishedReceipt(input: {
     }
     try {
       const gh = (args: string[]) => execa(join(receiptDir, 'github', 'bin', 'gh'), args, { cwd: input.worktree, env, extendEnv: false, stdin: 'ignore' })
-      // Hosted runs commit in a container-private clone. Verify GitHub's exact
-      // commit/tree rather than reading any config from that writable clone.
-      if (input.hosted) {
-        const object = JSON.parse((await gh(['api', `repos/${input.github.repository}/git/commits/${commit}`])).stdout)
-        if (object.sha !== commit || object.tree?.sha !== input.tree) throw new Error('Uncommitted hosted changes')
-      }
-      const pr = JSON.parse((await gh(['pr', 'view', input.github.branch, '--repo', input.github.repository, '--json', 'headRefOid,body'])).stdout)
-      if (pr.headRefOid !== commit || typeof pr.body !== 'string' || !pr.body.trimEnd().endsWith(`<!-- mikka-issue:${input.github.issueId} -->`)) throw new Error('Unbound pull request')
       const [owner, repository] = input.github.repository.split('/')
       const query = 'query($owner:String!,$repository:String!,$commit:GitObjectID!){repository(owner:$owner,name:$repository){object(oid:$commit){... on Commit {oid statusCheckRollup{state}}}}}'
-      const checks = JSON.parse((await gh(['api', 'graphql', '-f', `query=${query}`, '-f', `owner=${owner}`, '-f', `repository=${repository}`, '-f', `commit=${commit}`])).stdout)
-      const checked = checks.data?.repository?.object
+      // These reads share the fixed remote SHA. Settle every child before
+      // removing its private credential helper, including when one fails.
+      const [object, pr, checks] = await Promise.allSettled([
+        // Hosted runs verify GitHub's tree, never the writable clone's config.
+        input.hosted ? gh(['api', `repos/${input.github.repository}/git/commits/${commit}`]).then(result => JSON.parse(result.stdout)) : null,
+        gh(['pr', 'view', input.github.branch, '--repo', input.github.repository, '--json', 'headRefOid,body']).then(result => JSON.parse(result.stdout)),
+        gh(['api', 'graphql', '-f', `query=${query}`, '-f', `owner=${owner}`, '-f', `repository=${repository}`, '-f', `commit=${commit}`]).then(result => JSON.parse(result.stdout)),
+      ])
+      if (object.status === 'rejected' || pr.status === 'rejected' || checks.status === 'rejected') throw new Error('GitHub receipt lookup failed')
+      if (input.hosted && (object.value.sha !== commit || object.value.tree?.sha !== input.tree)) throw new Error('Uncommitted hosted changes')
+      if (pr.value.headRefOid !== commit || typeof pr.value.body !== 'string' || !pr.value.body.trimEnd().endsWith(`<!-- mikka-issue:${input.github.issueId} -->`)) throw new Error('Unbound pull request')
+      const checked = checks.value.data?.repository?.object
       if (checked?.oid !== commit || checked.statusCheckRollup?.state !== 'SUCCESS') throw new Error('Incomplete CI')
     } catch { throw new Error('The task pull request and successful CI must match the submitted commit') }
     if (input.hosted) {

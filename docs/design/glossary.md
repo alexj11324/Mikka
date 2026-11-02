@@ -25,6 +25,16 @@ the 16px mark of the Agent running it (R-50, R-78). A bot does no coding
 work itself: an Agent (Claude Code, Codex) runs every thread. A cloud thread runs on its own thread machine,
 not on its bot's machine (`cloud-computer-backend.md` § 2).
 
+## Workspaces
+
+| Word | 中文 | What it is |
+| --- | --- | --- |
+| **Account** | 账号 | The person: 账户, security, 偏好, 通知, profile memory (个人资料类记忆), 登录与密钥, 设备 and 「API 与订阅」. The same in every workspace. |
+| **Personal workspace** | 个人工作区 | One per person. Only that person's bots, chats, tasks, threads and their memory; personal 计费 and 用量; no team settings. |
+| **Team workspace** | 团队工作区 | Members, 团队权限, 密钥与环境, 审计日志, team 用量 and 计费. Nothing moves between it and a personal workspace. |
+
+Decision: [2026-11-01-2310](decisions/2026-11-01-2310-personal-and-team-workspaces-apart.md).
+
 ## Rules for designs
 
 - The left column is the **bot list**: bots and group chats only. The right
@@ -70,3 +80,20 @@ Decided by Alex, 2026-10-28.
   Code identifiers may keep `harness`.
 - 「Mikka Cloud」 for the hosted model, or 「Mikka 默认」 for the cloud machine.
   Mikka 默认 is a model, Mikka Cloud is a machine ([orchestration](orchestration.md) § 1).
+
+## Known naming debt
+
+Code names that disagree with this file. They stay for now (no large rename,
+2026-11-02). Whoever next changes the related code renames it in that PR,
+with a migration for database names, and deletes the row here. Until then
+read the code name in the sense given below.
+
+| Term in code | Current meaning(s) (where) | Target | Note |
+| --- | --- | --- | --- |
+| `coordinator` (tables, `lib/coordinator/*`, `CoordinatorChat`) | Any bot's chat, not only the Coordinator bot: `coordinator_sessions`, `coordinator_messages`, `coordinator_events` (`lib/db/schema.ts`), `lib/coordinator/*`, `components/coordinator/coordinator-chat.tsx`. | **Bot chat**: `bot_chat_*` tables, `lib/bot-chat/*`. | Tables need a migration. Keep `coordinator` only for the Coordinator bot itself. |
+| `agent` | Three things: an `agents` row is an execution identity, one harness on one device (`lib/db/schema.ts`, `lib/device-agents.ts`); the Agent brand (Claude Code, Codex), stored as `harness`; and a group-chat member/author type `'agent'` plus `conversations.leadAgentId` (`lib/db/schema.ts`, `lib/group-conversations-store.ts`). | Execution identity for the row; `harness` for the brand; **bot** for the group-chat member, author and lead. | The UI word **Agent** above is unchanged. |
+| 团队 / `teams` | Both a team workspace (`workspaces.kind = 'team'`, `lib/db/workspace-schema.ts`) and a sub-team inside a workspace (`mikka_teams`, `lib/db/team-schema.ts`). | **Team** (团队, `mikka_teams`) is only the sub-team inside a workspace, matching Linear's Team, since tasks sync to Linear. The team workspace becomes **shared workspace** (共享工作区) in code and copy, opposite **personal workspace**. | Copy changes when the related UI is next changed, after Figma. |
+| `issues.scope` `'personal'` / `'workspace'` | Linear-sync visibility of an issue (`lib/db/schema.ts`), not the personal workspace. | `'unsynced'` (not synced to Linear) for `'personal'`. | Collides with **Personal workspace**. Renaming needs a migration. |
+| `factory_tasks` | A factory job, not a task (`lib/db/schema.ts`). | `factory_jobs`. | "Task" means only an issue (`MIK-xx`); `TaskDetail` (`components/workspace/task-detail.tsx`) loads a task and keeps its name. |
+| Chat key | One chat, three encodings: `conversation_reads` id `'coordinator'` or `'bot:<uuid>'` (`lib/conversation-reads-store.ts`); `chat_preferences.chatKey` = raw bot id; `bot_model_choices.botKey` = bot id or `'coordinator'` (`lib/model-api-keys.ts`). | One `chatKey(botId)` format. | Remove the `'coordinator'` sentinel with a migration. |
+| `session` | Six things: `coordinator_sessions` (bot chat state); `agent_sessions` (old chat archive); `agent_runs.sessionId` and `factory_attempts.sessionId` (the harness CLI session); `session_mailboxes` (`lib/session-mailbox.ts`); `browser_sessions` (`lib/credentials/store.ts`); and sign-in in `lib/session.ts`. | `harnessSessionId` for the CLI session field; bot chat for `coordinator_sessions` (row 1). Others keep their names. | UI never says 会话 for any of them (see above). |

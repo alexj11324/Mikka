@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Offline official-auth protocol fixture. Contains only synthetic tokens.
-import { existsSync, lstatSync, readFileSync, writeFileSync } from "node:fs"
+import { existsSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { createInterface } from "node:readline"
 import { execFileSync, spawn } from "node:child_process"
@@ -95,12 +95,8 @@ lines.on("line", async (line) => {
       if (fullComputer) await call('mikka', 'submit', { summary: 'Synthetic computer task completed' })
     }
     if(prompt==='PROBE_GIT') {
-      // A host file the run's sandbox must hide (the worker's device credential).
-      // The run's home is <data dir>/adapters/runs/<run>/<home>; the worker's device.json is in <data dir>.
-      if (process.env.HOME) { let content = ""; try { content = readFileSync(join(process.env.HOME, "..", "..", "..", "..", "device.json"), "utf8") } catch {} if (content.includes("fixture-device-credential")) process.exit(2) }
+      // Runs use no sandbox (decision 2026-11-01-2335): this probe only checks the run's gh wrapper.
       if (process.env.GH_REPO && !execFileSync('gh', ['--version'], { encoding: 'utf8' }).startsWith('gh version')) process.exit(2)
-      const target=lstatSync('.git').isFile()?'.git':'.git/guard'
-      try{writeFileSync(target,'synthetic metadata mutation');process.exit(2)}catch(error){if(!['EROFS','EBUSY','EACCES'].includes(error.code))process.exit(2)}
     }
     if (prompt.includes("FAIL")) {
       send({

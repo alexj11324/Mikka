@@ -359,7 +359,7 @@
       "manual": "手动：{state}"
     },
     "prState": {
-      "open": "进行中",
+      "open": "打开",
       "draft": "草稿",
       "merged": "已合并",
       "closed": "已关闭"
@@ -1127,7 +1127,8 @@
     "workspaceAccessDenied": "没有管理此工作区的权限，或成员资格已被停用。",
     "workspaceNotFound": "没有可访问的工作区。",
     "workspacePaymentTaken": "这个团队已经由另一位成员的卡支付。",
-    "workspacePersonal": "个人工作区只有你一人。要邀请成员，请新建工作区。",
+    "workspacePersonal": "个人工作区只有你一人。要邀请成员，请新建团队工作区。",
+    "workspacePersonalDelete": "个人工作区不能删除。",
     "workspaceMemberExists": "其中一个邮箱已经是工作区成员，请在成员列表中管理或恢复。",
     "workspaceMemberNotFound": "成员不存在。",
     "workspaceLastAdmin": "工作区必须保留至少一位启用中的管理员。",
@@ -1150,6 +1151,8 @@
     "runAlreadyActive": "此任务已有正在执行的线程。",
     "runDispatchKeyConflict": "此请求标识已用于不同的运行参数。",
     "runNotActive": "此运行已结束，且没有可回答的问题。",
+    "threadReplaced": "这个任务已经换到新的线程，请在那里发送。",
+    "threadCannotContinue": "这个线程没有关联任务，无法再次运行。",
     "factoryQuestionNeedsAnswerTool": "请使用 Factory 问题回答工具提供可验证的答复。",
     "savedLoginNotFound": "此登录信息不存在或已删除。",
     "deviceHasActiveRuns": "此设备上有正在运行的线程，停止后才能移除。",
@@ -1779,6 +1782,7 @@
       "address": "地址",
       "danger": "危险操作",
       "deleteWorkspace": "删除工作区",
+      "personalUndeletable": "个人工作区不能删除",
       "deleting": "正在删除…",
       "deleteTitle": "删除「{name}」？",
       "deleteLead": "会永久删除，不能恢复：",
@@ -1934,6 +1938,11 @@
       "githubRepositoryAccess": "仓库访问",
       "githubRepositoriesDialog": "已授权的仓库",
       "githubRepositorySearch": "搜索仓库",
+      "githubVerification": "验证命令",
+      "githubVerificationFor": "{repository} 的验证命令",
+      "githubVerificationLoadFailed": "验证命令无法加载",
+      "githubVerificationSaveUnconfirmed": "保存未确认，修改已保留",
+      "githubVerificationSaved": "验证命令已保存",
       "githubAbilitiesHeading": "能力",
       "githubAbilitiesSummary": "包含 {count} 个能力（{write} 个写入，{read} 个读取）",
       "githubPermission": {
@@ -2305,7 +2314,6 @@
     },
     "subscriptionShare": {
       "heading": "这个工作区",
-      "share": "在这里使用我的订阅",
       "blocked": "管理员已关闭",
       "others": "分享给团队成员",
       "othersTitle": "分享 {name} 给团队成员？",
@@ -2635,7 +2643,7 @@
     "c_6dfc6360": "关联未保存，请检查权限并刷新后重试。",
     "c_b8e346ef": "切换未完成，请重试。",
     "c_cb11190c": "创建团队",
-    "c_d92d1b8d": "创建工作区",
+    "c_d92d1b8d": "创建团队工作区",
     "c_63373890": "创建工作区 · Mikka",
     "c_4eec1ff7": "创建新团队",
     "c_4598f1cb": "创建新的 Mikka 工作区，设置名称与专属网址，邀请团队协作。",
@@ -3161,12 +3169,12 @@
     "loadingWorkspace": "正在加载工作区…",
     "switchWorkspace": "切换工作区",
     "reloadWorkspace": "重新加载工作区",
-    "newWorkspace": "新建工作区",
+    "newWorkspace": "新建团队工作区",
     "workspaceName": "工作区名称",
     "forExampleProductTeam": "例如：产品团队",
     "cancel": "取消",
     "creating": "正在创建…",
-    "createWorkspace": "创建工作区",
+    "createWorkspace": "创建团队工作区",
     "sendingChoice": "发送中",
     "cloudKeySetup": "去设置 E2B 密钥",
     "dispatchWait": "等它上线",
@@ -3200,9 +3208,6 @@
     "sendFailed": "发送失败，草稿已保留",
     "stopping": "正在停止…",
     "stopFailed": "停止未确认",
-    "pullRequest": "PR #{number}",
-    "moreOutputs": "+{count}",
-    "moreOutputsAria": "还有 {count} 个输出",
     "send": "发送",
     "retryStop": "重试停止",
     "waiting": "等你回复",
@@ -3213,6 +3218,10 @@
       "worktree": "创建工作区",
       "agent_start": "启动 agent",
       "duration": "{seconds}s"
+    },
+    "runInfo": {
+      "paidBy": "{owner} 的 {plan}",
+      "movedTo": "已换到 {machine} 继续"
     }
   },
   "Computer": {
@@ -3430,6 +3439,7 @@
       "offline": "离线",
       "online": "在线",
       "cloud": "Mikka Cloud",
+      "addE2BKey": "填入 E2B Key",
       "contextProject": "项目：{project}",
       "contextSeparator": "，",
       "prompt": "帮我新建一个任务：{text}",
@@ -3705,6 +3715,11 @@
     "failed": "连接失败",
     "enterAgain": "重新输入",
     "retry": "重试"
+  },
+  "Reactions": {
+    "list": "表情回应",
+    "others": "{emoji}：{count} 人",
+    "mine": "{emoji}：{others, plural, =0 {你} other {你和另外 # 人}}"
   },
   "GroupChat": {
     "untitled": "未命名群聊",
@@ -4008,8 +4023,9 @@
       "free_allowance_used": "免费额度已用完",
       "points_exhausted": "点数已用完",
       "platform_paused": "免费额度暂时停用",
-      "unavailable": "Mikka 默认暂不可用，请稍后重试。",
+      "unavailable": "Mikka 默认暂时不可用",
       "verifyCard": "验证银行卡",
+      "useSubscription": "改用我的 {name} 订阅",
       "connect": "连接 <claude></claude> Claude / <openai></openai> ChatGPT 订阅"
     }
   },
@@ -4094,5 +4110,8 @@
     "appsLater": "好的。之后可以在设置中连接。",
     "welcome": "你的第一个 Bot",
     "enter": "进入 Mikka"
+  },
+  "PullRequestsBadge": {
+    "label": "{count} 个 PR"
   }
 }

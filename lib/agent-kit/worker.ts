@@ -1,3 +1,4 @@
+import { workerDefinitionDigest } from './worker-digest'
 import { z } from 'zod'
 import type { Harness } from '@mikka/protocol/harness'
 import { digest, type DefinitionSnapshot } from './definition'
@@ -46,7 +47,7 @@ export function freezeWorkerDefinition(input: { harness: Harness; instructions: 
     ...(input.pinnedDeviceId ? {pinnedDeviceId:z.uuid().parse(input.pinnedDeviceId)} : {}),
     cliModelSelection: model ? 'explicit' : 'auto',
     schemaVersion: 1, kind: 'worker', harness: input.harness, instructions: input.instructions,
-    definitionDigest: digest({ harness: input.harness, instructions: input.instructions, ...(model ? {model} : {}), ...(input.pinnedDeviceId ? {pinnedDeviceId:input.pinnedDeviceId} : {}), ...(subscription ? { subscription } : {}), ...(apiKey ? { apiKey } : {}), ...(mailbox ? { mailbox } : {}), ...(input.readOnly ? { readOnly: true } : {}) }),
+    definitionDigest: workerDefinitionDigest({ harness: input.harness, instructions: input.instructions, model, pinnedDeviceId: input.pinnedDeviceId, subscription, apiKey, mailbox, readOnly: input.readOnly }),
     promptDigest: digest(input.prompt), modelSource: subscription ? 'subscription' : apiKey ? 'api_key' : 'native-default', ...(subscription ? { subscription } : {}), ...(apiKey ? { apiKey } : {}),
     parent: input.parent && input.executionId ? { executionId: input.executionId,revisionId: input.parent.revisionId,revision: input.parent.revision,definitionDigest: input.parent.definitionDigest } : null,
     ...(mailbox ? { mailbox } : {}),
@@ -68,7 +69,7 @@ export function apiKeyWorkerDefinition(snapshot: WorkerDefinitionSnapshot, promp
   const key = { keyId: z.uuid().parse(apiKey.keyId), model: z.string().trim().min(1).max(128).parse(apiKey.model) }
   return {
     ...rest, model: key.model, cliModelSelection: 'explicit', modelSource: 'api_key', apiKey: key, promptDigest: digest(prompt),
-    definitionDigest: digest({ harness: rest.harness, instructions: rest.instructions, model: key.model, ...(rest.pinnedDeviceId ? { pinnedDeviceId: rest.pinnedDeviceId } : {}), apiKey: key, ...(rest.mailbox ? { mailbox: rest.mailbox } : {}), ...(rest.readOnly ? { readOnly: true } : {}) }),
+    definitionDigest: workerDefinitionDigest({ ...rest, model: key.model, subscription: undefined, apiKey: key }),
   }
 }
 

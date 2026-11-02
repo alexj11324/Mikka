@@ -25,7 +25,7 @@ Use `AUTH_TRUSTED_ORIGINS` only for additional project-controlled HTTPS origins 
 
 For localhost development, set `BETTER_AUTH_URL=http://localhost:3000` and use development mode (`pnpm dev`). HTTP loopback origins are allowed only in development and CI; other origins and the OAuth proxy hub still require HTTPS. Inject the matching provider credentials and both proxy variables to return through the same fixed hub, without adding localhost callbacks in Google Console. Without the proxy variables, use a separate development OAuth client with `http://localhost:3000/mikka/api/auth/callback/google` registered. Local HTTP uses Better Auth's default cookies; HTTPS development previews retain partitioned cookies. Keep real credentials out of local files.
 
-Validate login from each deployed Preview: the provider authorization URL must name the stable hub callback, then return to the originating Preview and create its own session. Confirm a foreign origin cannot initiate a trusted callback. Unit tests validate configuration and real Better Auth request handling without starting a local server; real provider login needs the OAuth proxy described above.
+For OAuth-proxy changes only: validate login from each deployed Preview: the provider authorization URL must name the stable hub callback, then return to the originating Preview and create its own session. Confirm a foreign origin cannot initiate a trusted callback. Unit tests validate configuration and real Better Auth request handling without starting a local server; real provider login needs the OAuth proxy described above.
 
 Runtime acceptance follows [acceptance.md](acceptance.md): use direct Google/GitHub OAuth, reuse authorized sessions, and do not repeatedly ask the user for a Mikka password.
 

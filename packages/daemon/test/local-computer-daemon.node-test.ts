@@ -33,7 +33,6 @@ const link=Object.assign(server.link(),{syncComputerReviews:async()=>[],localCom
 // as production, without granting any real tool action or invoking a driver.
 link.prepareRunToolApproval=async(assignment,signal,check)=>{
  const gate=new ToolApprovalGate(assignment.runId,{
-  permission:()=> 'deny',ask:async()=> 'deny',
   isLive:currentRunId=>{
    if(currentRunId!==assignment.runId||signal.aborted)return false
    try{check();return true}catch{return false}

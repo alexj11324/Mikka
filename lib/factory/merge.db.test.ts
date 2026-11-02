@@ -8,12 +8,13 @@ import { FactoryError } from "./approval-contract";
 import { createFactoryApprovals } from "./approval";
 import { handleFactoryApproval } from "./approval-http";
 import { createFactoryMerges, FactoryMergeRefused, type GitHubMergePort, type GitHubPullRequestView } from "./merge";
+import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
 
 // #528: acceptance is the person's own merge of the candidate PR. Real
 // PostgreSQL (isolated schema); GitHub is a fixture that records every call.
 
 const ci = process.env.CI === "true" && process.env.GITHUB_ACTIONS === "true";
-const db = process.env.FACTORY194_TEST_URL ?? (ci ? process.env.E2E_DATABASE_URL : undefined);
+const db = process.env.FACTORY194_TEST_URL ?? (disposableDatabase() ? process.env.E2E_DATABASE_URL : undefined);
 if (process.env.REQUIRE_DB === "1" && !db) throw new Error("Factory merge DB test requires an explicit disposable database");
 if (db) factory194Target(db, ci);
 

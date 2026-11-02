@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { e2eTargetParts, isE2eTarget, assertE2eTarget } from './e2e-target.mjs'
+import { e2eTargetParts, isE2eTarget, assertE2eTarget, disposableDatabase } from './e2e-target.mjs'
 
 test('isE2eTarget accepts loopback *_e2e databases on any port', () => {
   for (const ok of [
@@ -44,4 +44,18 @@ test('e2e target checks run on decoded host and database', () => {
     'postgres://127.0.0.1/mikka_E2E',
     'postgres://127.0.0.1/MIKKA_e2E',
   ]) assert.equal(isE2eTarget(url), false, url)
+})
+
+test('disposableDatabase needs the target and every application URL to be loopback *_e2e', () => {
+  const db = 'postgresql://e2e:x@127.0.0.1:5432/mikka_e2e'
+  const env = { E2E_DATABASE_URL: db, MIKKA_DATABASE_URL: db, DATABASE_URL: db }
+  assert.equal(disposableDatabase(env), true)
+  assert.equal(disposableDatabase({ ...env, MIKKA_DATABASE_URL: '' }), true)
+  assert.equal(disposableDatabase({}), false)
+  assert.equal(disposableDatabase({ ...env, E2E_DATABASE_URL: 'postgresql://e2e:x@db.example.com/mikka_e2e' }), false)
+  for (const name of ['MIKKA_DATABASE_URL', 'DATABASE_URL', 'ORVILO_DATABASE_URL'])
+    assert.equal(disposableDatabase({ ...env, [name]: 'postgresql://u:p@127.0.0.1/mikka' }), false, name)
+  assert.equal(disposableDatabase({}, 'postgres://127.0.0.1/monitor_e2e'), true)
+  assert.equal(disposableDatabase(env, 'postgres://127.0.0.1/mikka_monitor_195'), false)
+  assert.equal(disposableDatabase({ ...env, CI: 'true', GITHUB_ACTIONS: 'true', DATABASE_URL: 'postgresql://u:p@10.0.0.5/mikka_e2e' }), false)
 })

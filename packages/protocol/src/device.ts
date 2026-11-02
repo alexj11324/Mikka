@@ -507,6 +507,9 @@ export const COMMANDS_MAX_SKIP = 100
  * person sent in the run's chat (a `message` row, delivered at least once
  * until acked); `stop` repeats until the run has ended.
  */
+/** Older daemons reject unknown command kinds; advertise this extension. */
+export const MAILBOX_NOTICE_HEADER = 'x-mikka-mailbox-notices'
+
 export const runCommandSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("input"),
@@ -515,6 +518,9 @@ export const runCommandSchema = z.discriminatedUnion("kind", [
     text: z.string().min(1).max(100_000),
   }),
   z.object({ kind: z.literal("stop"), runId: id }),
+  // A host notification carries addresses only; peer content remains behind
+  // the authenticated mailbox read and retains its original provenance.
+  z.object({ kind: z.literal('mailbox_notice'), runId: id, messageIds: z.array(z.uuid()).min(1).max(50) }),
 ])
 export type RunCommand = z.infer<typeof runCommandSchema>
 
@@ -526,6 +532,12 @@ export type RunCommand = z.infer<typeof runCommandSchema>
  */
 export const runCommandsResponse = z.object({
   commands: z.array(runCommandSchema).max(500),
+  /**
+   * Runs queued for this device (outside `skip`), so it claims them now
+   * instead of on its next heartbeat. A queued run also ends the long-poll.
+   * Absent from older servers; the heartbeat still claims either way.
+   */
+  queuedRuns: z.array(id).max(100).optional(),
 })
 export type RunCommandsResponse = z.infer<typeof runCommandsResponse>
 

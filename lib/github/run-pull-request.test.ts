@@ -11,7 +11,7 @@ const input = { remoteKey: 'v2/github.com/owner/repo', githubAccountId: '456', e
 const marker = `<!-- mikka-issue:${issueId} -->`
 const pr = { number: 77, node_id: 'PR_synthetic_77', html_url: 'https://github.com/owner/repo/pull/77', state: 'open', draft: false, merged_at: null, body: `Result\n\n${marker}`, head: { ref: input.branch, repo: { id: 789 } }, base: { repo: { id: 789 } } }
 
-function stub(options: { title?: string; permission?: string; userId?: number; prPermission?: string; installed?: boolean; existing?: unknown[]; create?: 'timeout' | '422' | 'malformed'; head?: string; forbiddenUser?: boolean } = {}) {
+function stub(options: { title?: string; permission?: string; userId?: number; prPermission?: string; installed?: boolean; existing?: unknown[]; create?: 'timeout' | '422' | 'malformed'; head?: string; forbiddenUser?: boolean; lines?: { additions: number; deletions: number } } = {}) {
   const calls: { path: string; method: string; body: Record<string, unknown> | null; authorization: string }[] = []
   let created = false
   const fetcher = (async (url: string | URL | Request, init?: RequestInit) => {
@@ -23,8 +23,8 @@ function stub(options: { title?: string; permission?: string; userId?: number; p
     const body = init?.body ? JSON.parse(String(init.body)) : null
     const authorization = new Headers(init?.headers).get('authorization') ?? ''
     calls.push({ path, method, body, authorization })
-    if (path.endsWith('/installation')) return options.installed === false ? Response.json({}, { status: 404 }) : Response.json({ id: 99, suspended_at: null, permissions: { pull_requests: options.prPermission ?? 'write', contents: 'read' } })
-    if (path.endsWith('/access_tokens')) return Response.json({ token: body?.permissions?.pull_requests === 'write' ? 'synthetic-write-token' : 'synthetic-read-token', expires_at: '2099-01-01T00:00:00Z' })
+    if (path.endsWith('/installation')) return options.installed === false ? Response.json({}, { status: 404 }) : Response.json({ id: 99, suspended_at: null, permissions: { pull_requests: options.prPermission ?? 'write', contents: 'write' } })
+    if (path.endsWith('/access_tokens')) return Response.json({ token: body?.repository_ids && !body.permissions ? 'synthetic-installation-token' : 'synthetic-read-token', expires_at: '2099-01-01T00:00:00Z' })
     if (path === '/user/456') return options.forbiddenUser ? Response.json({}, { status: 404 }) : Response.json({ id: options.userId ?? 456, login: 'new-login' })
     if (path.endsWith('/collaborators/new-login/permission')) return Response.json({ permission: options.permission ?? 'write', user: { id: options.userId ?? 456, login: 'new-login' } })
     if (path === '/repos/owner/repo') return Response.json({ id: 789, full_name: 'owner/repo', default_branch: 'trunk' })
@@ -39,28 +39,81 @@ function stub(options: { title?: string; permission?: string; userId?: number; p
       if (options.create === 'timeout') throw new Error('transport failure containing synthetic-secret')
       if (options.create === '422') return Response.json({ message: 'synthetic-secret' }, { status: 422 })
       if (options.create === 'malformed') return Response.json({}, { status: 201 })
-      return Response.json({ ...pr, ...(options.title ? { title: options.title } : {}), draft: body?.draft === true }, { status: 201 })
+      return Response.json({ ...pr, ...(options.title ? { title: options.title } : {}), ...options.lines, draft: body?.draft === true }, { status: 201 })
     }
-    if (path === '/graphql') return Response.json({ data: { convertPullRequestToDraft: { pullRequest: { id: pr.node_id, isDraft: true } } } })
+    if (path === '/graphql') return authorization === 'Bearer synthetic-installation-token'
+      ? Response.json({ data: { convertPullRequestToDraft: { pullRequest: { id: pr.node_id, isDraft: true } } } })
+      : Response.json({ data: { convertPullRequestToDraft: null }, errors: [{ type: 'FORBIDDEN', message: 'Resource not accessible by integration' }] })
     throw new Error(`Unexpected test request ${method} ${path}`)
   }) as typeof fetch
   return { calls, fetcher }
 }
 
-test('worker token is limited to the verified repository and can push, create PRs and read CI', async () => {
+test('worker token inherits installation permissions for only the verified repository', async () => {
   const { calls, fetcher } = stub()
-  assert.deepEqual(await issueRunGitHubInstallationToken({ ...input, fetcher }), { token: 'synthetic-write-token', expiresAt: '2099-01-01T00:00:00Z' })
+  assert.deepEqual(await issueRunGitHubInstallationToken({ ...input, fetcher }), { token: 'synthetic-installation-token', expiresAt: '2099-01-01T00:00:00Z' })
   const tokens = calls.filter(call => call.path.endsWith('/access_tokens'))
-  assert.deepEqual(tokens[1].body, { repository_ids: [789], permissions: {
-    contents: 'write', pull_requests: 'write', checks: 'read', actions: 'read', metadata: 'read',
-  } })
+  assert.deepEqual(tokens[1].body, { repository_ids: [789] })
   assert.ok(calls.findIndex(call => call.path.includes('/permission')) < calls.indexOf(tokens[1]))
 })
 
 test('a connected user without repository write access never receives a worker token', async () => {
   const { calls, fetcher } = stub({ permission: 'read' })
   await assert.rejects(issueRunGitHubInstallationToken({ ...input, fetcher }), PublicationError)
-  assert.equal(calls.filter(call => call.body?.permissions && (call.body.permissions as Record<string, unknown>).contents === 'write').length, 0)
+  assert.ok(!calls.some(call => call.body?.repository_ids))
+})
+
+test('overlaps repository metadata with identity checks, then waits for both before issuing a worker token', async () => {
+  const { calls, fetcher } = stub()
+  const userStarted = Promise.withResolvers<void>()
+  const permissionStarted = Promise.withResolvers<void>()
+  const user = Promise.withResolvers<void>()
+  const repository = Promise.withResolvers<void>()
+  const delayed: typeof fetch = async (url, init) => {
+    const response = fetcher(url, init)
+    const path = new URL(String(url)).pathname
+    if (path === '/user/456') { userStarted.resolve(); await user.promise }
+    if (path.endsWith('/permission')) permissionStarted.resolve()
+    if (path === '/repos/owner/repo') await repository.promise
+    return response
+  }
+  const result = issueRunGitHubInstallationToken({ ...input, fetcher: delayed })
+  try {
+    await userStarted.promise
+    assert.ok(calls.some(call => call.path === '/repos/owner/repo'), 'repository lookup must start while identity is pending')
+    assert.ok(!calls.some(call => call.body?.repository_ids))
+    user.resolve()
+    await permissionStarted.promise
+    assert.ok(!calls.some(call => call.body?.repository_ids), 'pending repository metadata must still prevent a worker token')
+    repository.resolve()
+    assert.equal((await result).token, 'synthetic-installation-token')
+  } finally { user.resolve(); repository.resolve(); await result.catch(() => undefined) }
+})
+
+test('failed identity or concurrent repository lookup never issues write authority', async () => {
+  for (const failure of ['identity', 'repository'] as const) {
+    const { calls, fetcher } = stub({ permission: failure === 'identity' ? 'read' : 'write' })
+    const userStarted = Promise.withResolvers<void>()
+    const release = Promise.withResolvers<void>()
+    const delayed: typeof fetch = async (url, init) => {
+      const response = fetcher(url, init)
+      const path = new URL(String(url)).pathname
+      if (path === '/user/456') { userStarted.resolve(); await release.promise }
+      if (failure === 'repository' && path === '/repos/owner/repo') {
+        await release.promise
+        return Response.json({}, { status: 503 })
+      }
+      return response
+    }
+    const result = issueRunGitHubInstallationToken({ ...input, fetcher: delayed })
+    try {
+      await userStarted.promise
+      assert.ok(calls.some(call => call.path === '/repos/owner/repo'))
+      release.resolve()
+      await assert.rejects(result, PublicationError)
+      assert.ok(!calls.some(call => call.body?.repository_ids))
+    } finally { release.resolve(); await result.catch(() => undefined) }
+  }
 })
 
 test('revocation uses the minted token itself and never follows redirects', async () => {
@@ -85,7 +138,7 @@ test('opens one issue-marked PR with default branch, restricted write token and 
   const tokens = calls.filter(call => call.path.endsWith('/access_tokens'))
   assert.deepEqual(tokens.map(call => call.body), [
     { repositories: ['repo'], permissions: { metadata: 'read', contents: 'read' } },
-    { repository_ids: [789], permissions: { metadata: 'read', pull_requests: 'write' } },
+    { repository_ids: [789] },
   ])
   assert.ok(calls.findIndex(call => call.path.includes('/permission')) < calls.indexOf(tokens[1]))
   const create = calls.find(call => call.path.endsWith('/pulls') && call.method === 'POST')!
@@ -94,6 +147,13 @@ test('opens one issue-marked PR with default branch, restricted write token and 
   assert.equal(create.body?.title, 'MIK-42: Fix redirect')
   assert.ok(String(create.body?.body).endsWith(marker))
   assert.deepEqual(bindings, [{ installationId: 99, repositoryId: 789, githubAccountId: '456', defaultBranch: 'trunk' }])
+})
+
+test('a created PR carries the line counts GitHub reported; a reply without them stores none', async () => {
+  const { fetcher } = stub({ lines: { additions: 18, deletions: 4 } })
+  assert.deepEqual(await openRunPullRequest({ ...input, fetcher }), { url: pr.html_url, state: 'open', additions: 18, deletions: 4 })
+  const { fetcher: bare } = stub()
+  assert.deepEqual(await openRunPullRequest({ ...input, fetcher: bare }), { url: pr.html_url, state: 'open' })
 })
 
 test('a duplicate completion finds its existing PR without posting', async () => {
@@ -108,6 +168,7 @@ test('missing verification opens an explicitly unverified draft PR', async () =>
   const create = calls.find(call => call.path.endsWith('/pulls') && call.method === 'POST')!
   assert.equal(create.body?.draft, true)
   assert.match(String(create.body?.body), /Verification was not run/)
+  assert.equal(calls.filter(call => call.path.endsWith('/access_tokens') && call.body?.repository_ids).length, 1)
 })
 
 test('an unverified continuation converts its existing marked open PR to draft', async () => {
@@ -117,6 +178,9 @@ test('an unverified continuation converts its existing marked open PR to draft',
   const convert = calls.find(call => call.path === '/graphql')!
   assert.deepEqual(convert.body?.variables, { id: pr.node_id })
   assert.match(String(convert.body?.query), /convertPullRequestToDraft/)
+  assert.equal(convert.authorization, 'Bearer synthetic-installation-token')
+  const tokens = calls.filter(call => call.path.endsWith('/access_tokens') && call.body?.repository_ids)
+  assert.deepEqual(tokens.map(call => call.body), [{ repository_ids: [789] }], 'conversion reuses the execution token')
 })
 
 test('a full task output list refuses a new external PR before POST', async () => {
@@ -182,7 +246,7 @@ test('installation, permissions and owner identity gates issue no write token or
   ] as const) {
     const { fetcher, calls } = stub(options)
     await assert.rejects(openRunPullRequest({ ...input, fetcher }), { code })
-    assert.ok(!calls.some(call => (call.body?.permissions as Record<string, unknown>)?.pull_requests === 'write'))
+    assert.ok(!calls.some(call => call.body?.repository_ids))
     assert.ok(!calls.some(call => call.path.endsWith('/pulls')))
   }
 })
@@ -224,4 +288,16 @@ test('transport errors become safe retryable codes without leaking request bodie
     const result = await openRunPullRequest({ ...input, fetcher })
     assert.equal(result.title, title)
   }
+})
+
+test('GitHub rejecting the App credentials reads as a configuration problem, other refusals keep their status', async () => {
+  const rejected = (status: number) => (async () => Response.json({ message: 'synthetic-secret' }, { status })) as unknown as typeof fetch
+  await assert.rejects(verifyGitHubRepositoryAccess({ ...input, fetcher: rejected(401) }), { code: 'github_not_configured', retryable: false })
+  await assert.rejects(verifyGitHubRepositoryAccess({ ...input, fetcher: rejected(400) }), error => {
+    assert.ok(error instanceof PublicationError)
+    assert.equal(error.code, 'github_request_failed')
+    assert.equal(error.status, 400)
+    assert.doesNotMatch(error.message, /synthetic-secret/)
+    return true
+  })
 })

@@ -28,7 +28,6 @@ import {
   type RunPolicy,
 } from "@mikka/protocol/agent-policy"
 
-import { decisionFallback } from "./decision-judgments"
 
 export { PERMISSION_ACTIONS, PERMISSION_DEFAULTS }
 export type { PermissionAction, PermissionDecision, RunPolicy }
@@ -56,29 +55,6 @@ export function decide(
     return context.policy.permissions[typed] ?? "ask"
   }
   return PERMISSION_DEFAULTS[typed]
-}
-
-/**
- * `decide`, with the Decisions API in place of the fixed `ask` for an action
- * the person set nothing for: an unknown action, or a setup recipe nobody
- * approved. A read-only run still denies, and an approved recipe or a
- * configured action never asks. No answer keeps the previous decision (ask).
- */
-export async function decideWithJudgment(
-  action: string,
-  context: PermissionContext,
-  judge: (evidence: { action: string; subject?: string }) => Promise<"allow" | "ask" | null>,
-  subject?: string
-): Promise<PermissionDecision> {
-  const fixed = decide(action, context)
-  const unknown = !Object.hasOwn(PERMISSION_DEFAULTS, action)
-  const unapprovedRecipe = action === "run_setup_recipe" && !context.setupRecipeApproved
-  if (fixed === "deny" || !(unknown || unapprovedRecipe)) return fixed
-  const judged = await judge({ action, subject })
-  if (judged) return judged
-  // No answer: what this point did before the Decisions API (ask), never a looser default.
-  decisionFallback(`${action} kept its previous decision (${fixed}) without a judgment`)
-  return fixed
 }
 
 /** The policy a run applies: what the server sent, or the defaults. */
@@ -153,8 +129,8 @@ const INSTALL_COMMANDS: readonly (readonly [string, readonly string[]])[] = [
 /**
  * The hard-boundary action a shell command line falls under, for CLIs that
  * ask before running a command (Cursor): only `git push`, which the daemon
- * owns (ADR 0017). Every other command is judged by the Decisions API
- * (`judgeCommandAction`), never by a list here. Each `&&`, `;` or `|` segment counts.
+ * owns (ADR 0017). Every other command goes ahead (decision 2026-11-01-2335).
+ * Each `&&`, `;` or `|` segment counts.
  * Wrappers (`sudo`, `env`, `command`, `xargs`, `sh -c …`) are unwrapped so
  * `env git push` and `/usr/bin/git push` cannot slip past the git rule.
  */

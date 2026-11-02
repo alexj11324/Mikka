@@ -4,6 +4,7 @@
 - Source: Alex: 「把浏览器测试给我撤了，太费时间了，不值得。…CI 里面直接取消掉浏览器测试。」
 - Replaces: the browser tiers in `CONTRIBUTING.md` ("How changes are tested",
   items 3–5) and the two-level plan in #721.
+- Superseded by: [2026-11-01-1520-no-browser-tests-in-ci](2026-11-01-1520-no-browser-tests-in-ci.md) (no browser tests in CI, not even by hand; rules 2–4 on the gate, the production build and the desktop release gate still describe the current setup)
 - Superseded in part by: [2026-11-01-1440-dev-workflow-local-first](2026-11-01-1440-dev-workflow-local-first.md) (browser acceptance runs locally first)
 
 ## Rule

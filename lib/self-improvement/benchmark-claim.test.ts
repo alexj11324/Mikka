@@ -37,6 +37,7 @@ async function routeFixture(unavailable=false,stopped=false,modelDenied=false,is
     '@mikka/protocol/policy-snapshot':policySnapshotProtocol,
     // This legacy-capability fixture has no managed organization policy.
     '@/lib/agent-tool-approval/policy-distribution':{},
+    '@/lib/agent-tool-approval/local-cloud-issuer':{},
     '@/lib/device-agents':{localExecutionHarnesses:()=>['codex']},
     '@/lib/device-repositories':{readRepositorySettings:async()=>({verifyCommand:repo.verifyCommand})},
     '@/lib/run-test-fixture':{runTestFixture:()=>undefined},

@@ -138,5 +138,6 @@ async function main() {
   console.log(JSON.stringify({ environmentId: descriptor.id, deploymentSha: descriptor.deploymentSha, origin: descriptor.origin, status: 'prepared' }))
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
-  main().catch(() => { console.error('Test environment bootstrap blocked; verify the disposable resource, exact SHA and environment configuration.'); process.exitCode = 1 })
+  // EnvironmentError codes are safe to print by design (database-target.mjs); anything else stays unprinted.
+  main().catch(error => { console.error(`Test environment bootstrap blocked (${error instanceof EnvironmentError ? error.code : 'UNEXPECTED_ERROR'}); verify the disposable resource, exact SHA and environment configuration.`); process.exitCode = 1 })
 }

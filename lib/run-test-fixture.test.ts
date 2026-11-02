@@ -18,3 +18,11 @@ test('a test-mode flag alone cannot enable the browser fixture on a deployment o
     { E2E_DATABASE_URL: `${database}?options=-csearch_path=business` },
   ]) assert.equal(runTestFixture('mock', { ...isolated, ...patch }), undefined)
 })
+
+test('local test mode stands in for the CI job only on the loopback mikka_e2e database (the rule: scripts/test-accounts/local-test-mode.test.mjs)', () => {
+  const local = { ...isolated, CI: undefined, GITHUB_ACTIONS: undefined, MIKKA_LOCAL_TEST_ACCOUNTS: '1' }
+  assert.equal(runTestFixture('mock', local), 'mvp-core-loop')
+  const remote = 'postgresql://u:p@db.example.com:5432/mikka_e2e'
+  for (const patch of [{ MIKKA_LOCAL_TEST_ACCOUNTS: undefined }, { VERCEL_ENV: 'preview' }, { MIKKA_DATABASE_URL: remote }, { E2E_DATABASE_URL: remote, MIKKA_DATABASE_URL: remote, DATABASE_URL: remote }])
+    assert.equal(runTestFixture('mock', { ...local, ...patch }), undefined)
+})
