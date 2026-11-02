@@ -9,6 +9,7 @@ import { KeyboardProvider } from 'react-native-keyboard-controller'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { Spinner } from '@/components/icons'
 import { SignIn } from '@/components/SignIn'
+import { StartupGate } from '@/components/StartupGate'
 import { authClient } from '@/lib/auth'
 import { HomeProvider } from '@/lib/home'
 import { openPush } from '@/lib/navigate'
@@ -20,7 +21,9 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <KeyboardProvider>
           <StatusBar style="auto" />
-          <SessionGate />
+          <StartupGate>
+            <SessionGate />
+          </StartupGate>
         </KeyboardProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

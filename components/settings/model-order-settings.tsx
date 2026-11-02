@@ -1,15 +1,16 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
+import { toast } from 'sonner'
 import useSWR from 'swr'
-import { useFormatter, useNow, useTranslations } from 'next-intl'
+import { useFormatter, useTranslations } from 'next-intl'
 import { GripVertical, KeyRound, MoreHorizontal } from 'lucide-react'
 import { arrayMove } from '@dnd-kit/sortable'
 import { Kanban, KanbanColumnContent, KanbanItem, KanbanItemHandle } from '@/components/reui/kanban'
 import { changeModelOrder, type getModelOrder } from '@/app/actions/model-order'
 import { ModelLabel, harnessName } from '@/components/labels/entity-labels'
 import { SettingRow, SettingsSaveError, SettingsSection, settingsSectionAction } from '@/components/settings/primitives'
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -17,10 +18,12 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem,
 import { FieldError, FieldLegend, FieldSet } from '@/components/ui/field'
 import { Label } from '@/components/ui/label'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import { useOwnE2BKey } from '@/components/settings/e2b-key-dialog'
+import { E2BKeyDialog, useOwnE2BKey } from '@/components/settings/e2b-key-dialog'
 import type { OrderRow, OrderView } from '@/lib/model-order'
 import type { OrderCandidate } from '@/lib/model-order-plan'
 import { settingsRead } from '@/lib/settings-read'
+import { settingsHref } from '@/lib/settings-sections'
+import { usePresence } from '@/lib/use-presence'
 import { useActionError } from '@/lib/use-action-error'
 import { cn } from '@/lib/utils'
 
@@ -35,9 +38,11 @@ const sourceKey = (item: Pick<OrderCandidate, 'harness' | 'model' | 'source'>) =
 /**
  * 模型与订阅 › 运行位置 and 允许使用的模型 (decision 2026-11-02-1400). New runs take
  * the first model here that can run now, on a computer that takes part in
- * scheduling (本地) or the person's own E2B machine (云端). Drag a row, or
- * focus its handle and use Space and the arrow keys, to reorder; each change
- * saves at once and a refused save stays on screen with 重试.
+ * scheduling (本地) or the person's own E2B machine (云端). Drag a row, use
+ * its handle with Space and the arrow keys, or its menu (移到最前, 上移, 下移)
+ * to reorder; each change saves at once. A refused reorder puts the list back
+ * and marks the moved row 顺序未保存 with 重试; 移出列表 can be undone from its
+ * toast (decision 2026-11-02 R1–R3).
  */
 export function ModelOrderSettings({ workspaceId }: { workspaceId: string }) {
   const t = useTranslations('Settings.modelOrder')
@@ -46,29 +51,46 @@ export function ModelOrderSettings({ workspaceId }: { workspaceId: string }) {
   const order = useSWR(modelOrderKey(workspaceId), () => readModelOrder(workspaceId))
   const e2b = useOwnE2BKey()
   const [failed, setFailed] = useState<{ message: string; retry: () => void } | null>(null)
+  // A refused reorder: the list is back as saved and the moved row says so, with 重试 (R3).
+  const [unsaved, setUnsaved] = useState<{ id: string; to: number } | null>(null)
   const [pending, setPending] = useState(false)
   const [adding, setAdding] = useState(false)
-  const [removing, setRemoving] = useState<OrderRow | null>(null)
+  const [keyOpen, setKeyOpen] = useState(false)
+  const keyDialog = usePresence(keyOpen)
   const data = order.data && !order.data.error ? order.data : null
 
-  async function save(change: Change, optimistic?: OrderView) {
-    setPending(true); setFailed(null)
+  /** Saves one change; `onFail` replaces the page's error line for changes with their own place to say so. */
+  async function save(change: Change, optimistic?: OrderView, onFail?: () => void) {
+    setPending(true); setFailed(null); setUnsaved(null)
+    const fail = (error?: string) => onFail ? onFail() : setFailed({ message: actionError(error), retry: () => void save(change, optimistic) })
     try {
       if (optimistic) await order.mutate(optimistic, { revalidate: false })
       const result = await changeModelOrder(change, workspaceId)
-      if (result.error) { setFailed({ message: actionError(result.error), retry: () => void save(change, optimistic) }); await order.mutate(); return false }
+      if (result.error) { fail(result.error); await order.mutate(); return false }
       await order.mutate(result, { revalidate: false })
       return true
     } catch {
-      setFailed({ message: actionError(), retry: () => void save(change, optimistic) })
+      fail()
       await order.mutate()
       return false
     } finally { setPending(false) }
   }
   const move = (from: number, to: number) => {
-    if (!data || to < 0 || to >= data.entries.length || from === to) return
+    if (!data) return
+    // 重试 on a list that changed meanwhile: nothing left to move clears the mark.
+    if (to < 0 || to >= data.entries.length || from === to) { setUnsaved(null); return }
     const entries = arrayMove(data.entries, from, to)
-    void save({ kind: 'reorder', ids: entries.map(entry => entry.id) }, { ...data, entries })
+    const id = data.entries[from].id
+    void save({ kind: 'reorder', ids: entries.map(entry => entry.id) }, { ...data, entries }, () => setUnsaved({ id, to }))
+  }
+  /** 移出列表 at once; the toast's 撤销 puts the same model back where it was (R2). */
+  const remove = async (row: OrderRow) => {
+    if (!data) return
+    const at = data.entries.findIndex(entry => entry.id === row.id)
+    if (!await save({ kind: 'remove', id: row.id }, { ...data, entries: data.entries.filter(entry => entry.id !== row.id) })) return
+    toast(t('removed', { model: row.model }), {
+      action: { label: t('undo'), onClick: () => { void save({ kind: 'add', at, entries: [{ harness: row.harness, model: row.model, source: row.source }] }) } },
+    })
   }
 
   if (order.data?.error || order.error) return <FieldError>{actionError(order.data?.error)}</FieldError>
@@ -77,15 +99,29 @@ export function ModelOrderSettings({ workspaceId }: { workspaceId: string }) {
   const locationLine = data.location === 'local'
     ? data.firstDevice ? t('localFirst', { count: data.devices, device: data.firstDevice }) : t('localDevices', { count: data.devices })
     : e2b.configured === false ? t('cloudNoKey') : null
+  // R1: what fixes or explains the location sits on its row: 打开设备 for 本地; 填入 E2B Key for 云端 without one.
+  const locationAction = data.location === 'local'
+    ? <Button type="button" variant="secondary" size="sm" render={<Link href={settingsHref('computers', workspaceId)} />}>{t('openDevices')}</Button>
+    : e2b.configured === false && <Button type="button" variant="secondary" size="sm" onClick={() => setKeyOpen(true)}>{t('setE2BKey')}</Button>
   return <>
     <SettingsSection id="run-location-heading" title={t('location')}>
       <SettingRow title={data.location === 'local' ? t('local') : t('cloud')} description={locationLine ?? undefined}>
-        <ToggleGroup aria-label={t('location')} variant="segment" spacing={0.5} value={[data.location]} disabled={pending}
-          onValueChange={values => { const next = values[0]; if ((next === 'local' || next === 'cloud') && next !== data.location) void save({ kind: 'location', location: next }, { ...data, location: next }) }}>
-          <ToggleGroupItem value="cloud">{t('cloud')}</ToggleGroupItem>
-          <ToggleGroupItem value="local">{t('local')}</ToggleGroupItem>
-        </ToggleGroup>
+        <span className="flex items-center gap-2">
+          {locationAction}
+          <ToggleGroup aria-label={t('location')} variant="segment" spacing={0.5} value={[data.location]} disabled={pending}
+            onValueChange={values => { const next = values[0]; if ((next === 'local' || next === 'cloud') && next !== data.location) void save({ kind: 'location', location: next }, { ...data, location: next }) }}>
+            <ToggleGroupItem value="cloud">{t('cloud')}</ToggleGroupItem>
+            <ToggleGroupItem value="local">{t('local')}</ToggleGroupItem>
+          </ToggleGroup>
+        </span>
       </SettingRow>
+      {/* The person's own E2B key, whatever the location: 云端 runs and the bot's own cloud computer both use it (coordinator, 2026-11-02). */}
+      {e2b.configured !== undefined && <SettingRow title={t('e2bKey')}>
+        <span className="flex items-center gap-3">
+          <span role="status" className="text-sm text-muted-foreground">{e2b.configured ? t('e2bKeySet') : t('e2bKeyMissing')}</span>
+          <Button type="button" variant="secondary" size="sm" onClick={() => setKeyOpen(true)}>{e2b.configured ? t('e2bKeyReplace') : t('e2bKeyFill')}</Button>
+        </span>
+      </SettingRow>}
     </SettingsSection>
     <SettingsSection id="model-order-heading" title={t('title')}
       action={data.entries.length > 0 && <Button type="button" {...settingsSectionAction} disabled={pending} onClick={() => setAdding(true)}>{t('add')}</Button>}>
@@ -95,29 +131,19 @@ export function ModelOrderSettings({ workspaceId }: { workspaceId: string }) {
           <Button type="button" disabled={pending || data.candidates.length === 0} onClick={() => setAdding(true)}>{t('add')}</Button>
           {data.candidates.length === 0 && <p className="text-xs text-muted-foreground">{t('noCandidates')}</p>}
         </div>
-        : <OrderList rows={data.entries} pending={pending} onMove={move} onRemove={setRemoving} />}
+        : <OrderList rows={data.entries} pending={pending} unsaved={unsaved} onMove={move} onRemove={row => { void remove(row) }} />}
     </SettingsSection>
     {failed && <SettingsSaveError message={failed.message} retryLabel={commonT('retry')} onRetry={failed.retry} />}
     {adding && <AddModelsDialog candidates={data.candidates} onClose={async picked => {
       setAdding(false)
       if (picked.length) await save({ kind: 'add', entries: picked.map(({ harness, model, source }) => ({ harness, model, source })) })
     }} />}
-    <AlertDialog open={removing !== null} onOpenChange={open => { if (!open && !pending) setRemoving(null) }}>
-      <AlertDialogContent>
-        <AlertDialogHeader><AlertDialogTitle>{t('removeTitle', { model: removing?.model ?? '' })}</AlertDialogTitle></AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel disabled={pending}>{commonT('cancel')}</AlertDialogCancel>
-          <AlertDialogAction variant="destructive" disabled={pending} onClick={() => {
-            const target = removing; setRemoving(null)
-            if (target) void save({ kind: 'remove', id: target.id }, { ...data, entries: data.entries.filter(entry => entry.id !== target.id) })
-          }}>{t('remove')}</AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+    {keyDialog.value && e2b.configured !== undefined && <E2BKeyDialog open={keyDialog.open} onOpenChangeComplete={keyDialog.onOpenChangeComplete} configured={e2b.configured}
+      onClose={changed => { setKeyOpen(false); if (changed) void e2b.mutate() }} />}
   </>
 }
 
-function OrderList({ rows, pending, onMove, onRemove }: { rows: OrderRow[]; pending: boolean; onMove: (from: number, to: number) => void; onRemove: (row: OrderRow) => void }) {
+function OrderList({ rows, pending, unsaved, onMove, onRemove }: { rows: OrderRow[]; pending: boolean; unsaved: { id: string; to: number } | null; onMove: (from: number, to: number) => void; onRemove: (row: OrderRow) => void }) {
   const t = useTranslations('Settings.modelOrder')
   // The list as dragged; the saved order comes back from the server.
   const [dragged, setDragged] = useState<OrderRow[] | null>(null)
@@ -145,18 +171,21 @@ function OrderList({ rows, pending, onMove, onRemove }: { rows: OrderRow[]; pend
     }}>
     <KanbanColumnContent value="models" aria-label={t('title')} className="gap-0 divide-y divide-border" render={<ol />}>
       {items.map((row, index) => <OrderItem key={row.id} row={row} index={index} last={index === items.length - 1} pending={pending}
-        onUp={() => onMove(index, index - 1)} onDown={() => onMove(index, index + 1)} onRemove={() => onRemove(row)} />)}
+        retry={unsaved?.id === row.id ? () => onMove(index, Math.min(unsaved.to, items.length - 1)) : undefined}
+        onFirst={() => onMove(index, 0)} onUp={() => onMove(index, index - 1)} onDown={() => onMove(index, index + 1)} onRemove={() => onRemove(row)} />)}
     </KanbanColumnContent>
   </Kanban>
 }
 
-function OrderItem({ row, index, last, pending, onUp, onDown, onRemove }: { row: OrderRow; index: number; last: boolean; pending: boolean; onUp: () => void; onDown: () => void; onRemove: () => void }) {
+function OrderItem({ row, index, last, pending, retry, onFirst, onUp, onDown, onRemove }: { row: OrderRow; index: number; last: boolean; pending: boolean; retry?: () => void; onFirst: () => void; onUp: () => void; onDown: () => void; onRemove: () => void }) {
   const t = useTranslations('Settings.modelOrder')
+  const commonT = useTranslations('Common')
   const format = useFormatter()
-  const now = useNow({ updateInterval: 60_000 })
   const block = row.block
-  const status = !block ? t('ready')
-    : block.reason === 'quota' && block.resetsAt ? t('quotaUntil', { time: format.relativeTime(new Date(block.resetsAt), now) })
+  // 顺序未保存 wins over the row's own state until 重试 or the next change (R3).
+  const warn = Boolean(block || retry)
+  const status = retry ? t('orderUnsaved') : !block ? t('ready')
+    : block.reason === 'quota' && block.resetsAt ? t('quotaUntil', { time: format.dateTime(new Date(block.resetsAt), { month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }) })
       : block.reason === 'noDevice' ? (block.device.why === 'none' ? t('noDevice.none') : t(`noDevice.${block.device.why}`, { device: block.device.device, count: block.device.count, harness: harnessName(row.harness) }))
         : t(`blocked.${block.reason}`)
   // The handle carries the drag semantics; the row stays a list item (the primitive puts role=button on the item too).
@@ -172,13 +201,15 @@ function OrderItem({ row, index, last, pending, onUp, onDown, onRemove }: { row:
       </span>
       <span className="truncate text-xs text-muted-foreground">{`${harnessName(row.harness)} · ${sourceName(t, row)}`}</span>
     </span>
-    <span role="status" className={cn('flex shrink-0 items-center gap-1.5 text-xs', block ? 'text-warning-foreground' : 'text-muted-foreground')}>
-      <span aria-hidden="true" className={cn('size-1.5 rounded-full', block ? 'bg-warning' : 'bg-success')} />{status}
+    <span role="status" className={cn('flex shrink-0 items-center gap-1.5 text-xs', retry ? 'text-destructive' : warn ? 'text-warning-foreground' : 'text-muted-foreground')}>
+      <span aria-hidden="true" className={cn('size-1.5 rounded-full', retry ? 'bg-destructive' : warn ? 'bg-warning' : 'bg-success')} />{status}
     </span>
+    {retry && <Button type="button" variant="secondary" size="sm" disabled={pending} onClick={retry}>{commonT('retry')}</Button>}
     <DropdownMenu>
       <DropdownMenuTrigger disabled={pending} render={<Button variant="ghost" size="icon-sm" aria-label={t('rowMenu', { model: row.model })} />}><MoreHorizontal aria-hidden="true" /></DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuGroup>
+          <DropdownMenuItem disabled={index === 0} onClick={onFirst}>{t('moveFirst')}</DropdownMenuItem>
           <DropdownMenuItem disabled={index === 0} onClick={onUp}>{t('moveUp')}</DropdownMenuItem>
           <DropdownMenuItem disabled={last} onClick={onDown}>{t('moveDown')}</DropdownMenuItem>
         </DropdownMenuGroup>

@@ -91,10 +91,11 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
   })
 
   await t.test('no points for Mikka 默认: the next allowed model a chat can run on, in the person\'s order', async () => {
-    const { hostedPointsRefusal, pointsFallback } = await import('../lib/points-fallback')
+    const { hostedPointsRefusal, pointsFallback, hostedPointsHere } = await import('../lib/points-fallback')
     const scope = await person('order-points')
     // A new workspace with nothing bought or verified: Mikka 默认 is refused for points.
     assert.equal(await hostedPointsRefusal(scope.workspaceId), 'verification_required')
+    assert.equal(await hostedPointsHere(scope.workspaceId), 0, 'the menu leaves Mikka 默认 out')
     assert.equal(await pointsFallback(pool, scope), null, 'nothing else to run on')
     const claude = await subscribe(scope, 'claude', ['acct-opus-p'])
     const key = await keys.addApiKey(pool, scope.ownerId, { provider: 'deepseek', apiKey: `sk-${randomBytes(12).toString('hex')}` }, { fetch: (async () => Response.json({ data: [{ id: 'key-deepseek-p' }] })) as unknown as typeof fetch })
@@ -113,6 +114,7 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
     // Points bought: Mikka 默认 runs, no fallback asked for.
     await pool.query(`INSERT INTO workspace_credit_grants (id,"workspaceId",bucket,points,reason,"externalId") VALUES ($1,$2,'purchased',100,'pack',$3)`, [randomUUID(), scope.workspaceId, `points-${randomUUID()}`])
     assert.equal(await hostedPointsRefusal(scope.workspaceId), null)
+    assert.equal(await hostedPointsHere(scope.workspaceId), 100, 'the menu shows what this workspace can spend')
   })
 
   await t.test('edits: the first change stores what was shown; adds must be candidates; reorder, remove and 运行位置 save', async () => {
@@ -318,5 +320,28 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
     // Nothing can run: no 会先用.
     await pool.query('UPDATE devices SET enabled=false WHERE id=$1', [mac.id])
     assert.equal((await order.orderView(pool, scope)).firstDevice, null)
+  })
+
+  await t.test('移出列表 then 撤销 puts the model back where it was; 设备 › 能跑 lists the allowed models each computer can run', async () => {
+    const scope = await person('order-undo')
+    const claude = await subscribe(scope, 'claude', ['acct-opus-u2', 'acct-sonnet-u2', 'acct-haiku-u2'])
+    const source = { kind: 'subscription' as const, connectionId: claude }
+    await order.changeOrder(pool, scope, { kind: 'add', entries: [{ harness: 'claude_code', model: 'acct-sonnet-u2', source }, { harness: 'claude_code', model: 'acct-haiku-u2', source }] })
+    let view = await order.orderView(pool, scope)
+    assert.deepEqual(view.entries.map(entry => entry.model), ['acct-opus-u2', 'acct-sonnet-u2', 'acct-haiku-u2'])
+    await order.changeOrder(pool, scope, { kind: 'remove', id: view.entries[1].id })
+    await order.changeOrder(pool, scope, { kind: 'add', at: 1, entries: [{ harness: 'claude_code', model: 'acct-sonnet-u2', source }] })
+    view = await order.orderView(pool, scope)
+    assert.deepEqual(view.entries.map(entry => entry.model), ['acct-opus-u2', 'acct-sonnet-u2', 'acct-haiku-u2'], 'back in its place')
+    await order.changeOrder(pool, scope, { kind: 'add', at: 99, entries: [{ harness: 'claude_code', model: 'acct-sonnet-u2', source }] })
+    assert.equal((await order.orderView(pool, scope)).entries.length, 3, 'already listed: nothing added')
+    await assert.rejects(order.changeOrder(pool, scope, { kind: 'add', at: -1, entries: [{ harness: 'claude_code', model: 'acct-opus-u2', source }] }))
+    // 能跑: whatever 参与调度 and online say (they have their own lines), the allowed models each computer's Agents can run.
+    const mac = await device(scope.ownerId, [{ harness: 'claude_code', installed: true }], false, { name: 'Mac', online: false })
+    const codexBox = await device(scope.ownerId, [{ harness: 'codex', installed: true }], true, { name: 'codex-box' })
+    const old = await device(scope.ownerId, [{ harness: 'claude_code', installed: true, subscriptionBroker: false }], true, { name: 'old' })
+    view = await order.orderView(pool, scope)
+    assert.deepEqual([view.deviceModels[mac.id], view.deviceModels[codexBox.id], view.deviceModels[old.id]],
+      [['acct-opus-u2', 'acct-sonnet-u2', 'acct-haiku-u2'], [], []])
   })
 })

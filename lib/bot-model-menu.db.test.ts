@@ -37,7 +37,8 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
 
     mock.module(new URL("./db/index.ts", import.meta.url).href, { namedExports: { pool } });
     // Points and their fallback have their own tests: here Mikka 默认 has points.
-    mock.module(new URL("./points-fallback.ts", import.meta.url).href, { namedExports: { hostedPointsRefusal: async () => null, pointsFallback: async () => null } });
+    let hostedPoints = 98;
+    mock.module(new URL("./points-fallback.ts", import.meta.url).href, { namedExports: { hostedPointsRefusal: async () => null, pointsFallback: async () => null, hostedPointsHere: async () => hostedPoints } });
     const { ExecutionSettings } = await import("./execution-settings");
     const { botModelMenu } = await import("./bot-model-menu");
     const { HOSTED_CHOICE } = await import("./bot-model-menu-view");
@@ -202,6 +203,13 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
     const hostedMenu = await chooseBotModel(pool, settings, alice, null, hostedChoice);
     assert.deepEqual([hostedMenu.current.id, hostedMenu.current.kind, hostedMenu.current.chosen, hostedMenu.current.available], [hostedChoice, "hosted", true, true]);
     assert.notEqual((await freezeBotModel({ ownerId: "alice", botId: null, workspaceId: workspace }, dependencies)).modelSelection?.type, "api_key");
+    assert.equal(hostedMenu.groups.find((group) => group.kind === "hosted")?.points, 98, "the points it can spend in this workspace");
+    // No points in this workspace (decision 2026-11-02-1450): not listed; the pick stays, named and unavailable, so the chat says so before sending.
+    hostedPoints = 0;
+    const noPoints = await botModelMenu(pool, settings, alice, null);
+    assert.equal(noPoints.groups.some((group) => group.kind === "hosted"), false);
+    assert.deepEqual([noPoints.current.id, noPoints.current.chosen, noPoints.current.available], [hostedChoice, true, false]);
+    hostedPoints = 98;
     // Picking the key again moves back to it.
     keyMenu = await chooseBotModel(pool, settings, alice, null, keyOption);
     assert.equal(keyMenu.current.id, keyOption);

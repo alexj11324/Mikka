@@ -931,7 +931,11 @@
       "retry": "Retry",
       "done": "Done",
       "cancelled": "Cancelled"
-    }
+    },
+    "runsModels": "Runs {models}",
+    "runsCount": "{count, plural, one {Runs # allowed model} other {Runs # allowed models}}",
+    "runsNone": "Runs no allowed model",
+    "offlineNoRuns": "Offline · gets no runs"
   },
   "Workspace": {
     "loadingEditor": "Loading task editor",
@@ -2491,13 +2495,12 @@
       "cloud": "Cloud",
       "localDevices": "{count, plural, one {# computer takes runs} other {# computers take runs}}",
       "localFirst": "{count, plural, one {# computer takes runs} other {# computers take runs}} · {device} first",
-      "cloudNoKey": "No E2B key",
+      "cloudNoKey": "No E2B key yet",
       "add": "Add models",
       "addCount": "{count, plural, one {Add # model} other {Add # models}}",
       "empty": "No allowed models yet",
       "noCandidates": "No models to add",
-      "removeTitle": "Remove {model}?",
-      "remove": "Remove",
+      "remove": "Remove from list",
       "ready": "Available",
       "quotaUntil": "Quota used up · back {time}",
       "noDevice": {
@@ -2535,7 +2538,18 @@
         "deepseek": "DeepSeek",
         "kimi": "Kimi",
         "custom": "Custom provider"
-      }
+      },
+      "setE2BKey": "Add E2B key",
+      "openDevices": "Open devices",
+      "moveFirst": "Move to top",
+      "removed": "Removed {model}",
+      "undo": "Undo",
+      "orderUnsaved": "Order not saved",
+      "e2bKey": "E2B key",
+      "e2bKeySet": "Added",
+      "e2bKeyMissing": "Not added",
+      "e2bKeyFill": "Add",
+      "e2bKeyReplace": "Replace"
     }
   },
   "TelegramBot": {
@@ -2979,6 +2993,10 @@
       "labelUnavailable": "Model: {name}, unavailable",
       "hosted": "Mikka Default",
       "credits": "Credits",
+      "points": "{points} points",
+      "hostedUnavailable": "Mikka Default can’t run in this workspace",
+      "changeModel": "Change model",
+      "useMyPoints": "Use my points for this team",
       "apiKey": "API Key",
       "metered": "Pay as you go",
       "shared": "Shared by teammates",
@@ -3433,14 +3451,15 @@
       "create": "Create",
       "creating": "Creating…"
     },
-    "searchPlaceholder": "Search bots, chats, groups, tasks and projects",
+    "searchPlaceholder": "Search bots, chats, groups, tasks, threads and projects",
     "searchLabel": "Search everything",
-    "searchDescription": "Search conversations, group chats, tasks and projects. Use the arrow keys to choose and Enter to open.",
+    "searchDescription": "Search conversations, group chats, tasks, threads and projects. Use the arrow keys to choose and Enter to open.",
     "searchEmpty": "Nothing matches",
     "groups": {
       "bots": "Bots",
       "conversations": "Conversations",
       "tasks": "Tasks",
+      "threads": "Threads",
       "projects": "Projects",
       "actions": "Quick actions",
       "groupChats": "Group chats"
@@ -3533,6 +3552,7 @@
       "promptWithContext": "Create a task for me ({context}): {text}",
       "contextDevice": "run it on {device}",
       "device": "Machine",
+      "bot": "Bot to hand it to",
       "noDevice": "No machine connected",
       "offline": "Offline",
       "online": "Online",
@@ -4161,6 +4181,12 @@
     "confirm": "Done",
     "nameReply": "Call it {name}",
     "named": "Got it. I'm {name} from now on.",
+    "subscriptionAsk": "Want to bind your Claude or ChatGPT subscription?",
+    "subscriptionHeading": "Bind a subscription",
+    "subscriptionNo": "Not now",
+    "subscriptionContinue": "Continue",
+    "subscriptionReplyDone": "Subscription bound",
+    "subscriptionLater": "OK. You can bind one in Settings later.",
     "computerAsk": "With a cloud computer I can browse the web, and threads can run in the cloud. Turn it on now?",
     "computerYes": "Turn on",
     "computerNo": "Not now",

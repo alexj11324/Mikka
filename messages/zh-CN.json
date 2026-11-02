@@ -931,7 +931,11 @@
       "retry": "重试",
       "done": "完成",
       "cancelled": "已取消"
-    }
+    },
+    "runsModels": "能跑 {models}",
+    "runsCount": "能跑 {count} 个允许使用的模型",
+    "runsNone": "不能跑允许使用的模型",
+    "offlineNoRuns": "离线 · 不会被派任务"
   },
   "Workspace": {
     "loadingEditor": "正在加载任务编辑器",
@@ -2491,15 +2495,14 @@
       "cloud": "云端",
       "localDevices": "{count} 台电脑参与调度",
       "localFirst": "{count} 台电脑参与调度 · 会先用 {device}",
-      "cloudNoKey": "E2B Key 未设置",
+      "cloudNoKey": "还没有 E2B Key",
       "add": "添加模型",
       "addCount": "添加 {count} 个",
       "empty": "还没有允许使用的模型",
       "noCandidates": "没有可添加的模型",
-      "removeTitle": "移除 {model}？",
-      "remove": "移除",
+      "remove": "移出列表",
       "ready": "可用",
-      "quotaUntil": "额度用完 · {time}恢复",
+      "quotaUntil": "额度用完 · {time} 恢复",
       "noDevice": {
         "none": "还没有连接电脑",
         "off": "{count, plural, =1 {{device} 没参与调度} other {# 台电脑没参与调度}}",
@@ -2535,7 +2538,18 @@
         "deepseek": "DeepSeek",
         "kimi": "Kimi",
         "custom": "自定义服务商"
-      }
+      },
+      "setE2BKey": "填入 E2B Key",
+      "openDevices": "打开设备",
+      "moveFirst": "移到最前",
+      "removed": "已移出 {model}",
+      "undo": "撤销",
+      "orderUnsaved": "顺序未保存",
+      "e2bKey": "E2B Key",
+      "e2bKeySet": "已填",
+      "e2bKeyMissing": "未填",
+      "e2bKeyFill": "填入",
+      "e2bKeyReplace": "更换"
     }
   },
   "TelegramBot": {
@@ -2979,6 +2993,10 @@
       "labelUnavailable": "模型：{name}，不可用",
       "hosted": "Mikka 默认",
       "credits": "点数",
+      "points": "{points} 点",
+      "hostedUnavailable": "Mikka 默认在这个工作区不可用",
+      "changeModel": "换模型",
+      "useMyPoints": "把我的点数用于这个团队",
       "apiKey": "API Key",
       "metered": "按量",
       "shared": "团队成员分享的",
@@ -3433,14 +3451,15 @@
       "create": "创建",
       "creating": "正在创建…"
     },
-    "searchPlaceholder": "搜索 Bot、对话、群聊、任务和项目",
+    "searchPlaceholder": "搜索 Bot、对话、群聊、任务、线程和项目",
     "searchLabel": "全局搜索",
-    "searchDescription": "搜索对话、群聊、任务和项目，用方向键选择，按 Enter 打开。",
+    "searchDescription": "搜索对话、群聊、任务、线程和项目，用方向键选择，按 Enter 打开。",
     "searchEmpty": "没有匹配的结果",
     "groups": {
       "bots": "Bot",
       "conversations": "对话",
       "tasks": "任务",
+      "threads": "线程",
       "projects": "项目",
       "actions": "快捷操作",
       "groupChats": "群聊"
@@ -3533,6 +3552,7 @@
       "promptWithContext": "帮我新建一个任务（{context}）：{text}",
       "contextDevice": "在 {device} 上做",
       "device": "运行的机器",
+      "bot": "交给哪个 Bot",
       "noDevice": "未连接机器",
       "offline": "离线",
       "online": "在线",
@@ -4161,6 +4181,12 @@
     "confirm": "确定",
     "nameReply": "就叫{name}",
     "named": "好的，以后我叫{name}。",
+    "subscriptionAsk": "要绑定你的 Claude 或 ChatGPT 订阅吗？",
+    "subscriptionHeading": "绑定订阅",
+    "subscriptionNo": "暂不绑定",
+    "subscriptionContinue": "继续",
+    "subscriptionReplyDone": "已绑定订阅",
+    "subscriptionLater": "好的。之后可以在设置中绑定。",
     "computerAsk": "开通云电脑后，我可以浏览网页，线程也能在云端运行。现在开通吗？",
     "computerYes": "开通",
     "computerNo": "暂不开通",
