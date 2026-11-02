@@ -11,3 +11,6 @@ as a team workspace's do. The two kinds differ only in what concerns the team:
 成员, 团队, 团队权限, 密钥与环境, 审计日志, shared credits and shared work. The
 archived bots of people who left (an admin takes one over) are a team's and
 stay in a team workspace only.
+
+重新播放引导 is the person's too: it moves from 常规 (a team setting) to 偏好设置,
+so every workspace, a personal one included, shows it.

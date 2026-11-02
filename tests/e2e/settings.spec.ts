@@ -522,6 +522,8 @@ test('个人工作区的设置有账号、Bot 与 Agents、用量和计费，团
     await expect(page).toHaveURL(url => url.pathname === app('/settings') && url.searchParams.get('section') === 'preferences')
     await expect(page.getByRole('heading', { level: 1, name: '偏好设置', exact: true })).toBeVisible()
   }
+  // 重新播放引导 is the person's: 偏好设置 holds it in every workspace (decision 2026-11-02-0203).
+  await expect(page.getByRole('button', { name: '重新播放', exact: true })).toBeEnabled()
   // 「API 与订阅」 keeps the person's own credentials; sharing with a team is a team workspace's.
   await sidebar.getByRole('link', { name: 'API 与订阅', exact: true }).click()
   await expect(page.getByRole('heading', { level: 1, name: 'API 与订阅', exact: true })).toBeVisible()

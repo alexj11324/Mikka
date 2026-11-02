@@ -10,7 +10,7 @@ import { AppShellContent } from '@/components/app-shell'
 import { SettingsContent } from '@/components/ui/settings-layout'
 import { SettingsSidebar } from './settings-sidebar'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import { WorkspaceSettings } from '@/components/settings/workspace-settings'
+import { ReplayOnboarding, WorkspaceSettings } from '@/components/settings/workspace-settings'
 import { MembersPanel } from '@/components/settings/members-panel'
 import { IssuePrefixSettings } from '@/components/settings/issue-prefix-settings'
 import { PluginsView } from '@/components/plugins/plugins-view'
@@ -120,7 +120,7 @@ function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, pe
     case 'security': return <><SecuritySettings /><GoogleSignInSettings googleEnabled={googleEnabled} /></>
     case 'privacy': return <PrivacySettings />
     case 'logins': return <SavedLoginsSettings />
-    case 'preferences': return <><AppearanceSection /><IssuePrefixSettings /></>
+    case 'preferences': return <><AppearanceSection /><IssuePrefixSettings /><ReplayOnboarding /></>
     case 'notifications': return <NotificationSettings />
     case 'memory': return <MemorySettings />
     case 'connections': return <PluginsView section="connections" rootLabel={t('sections.connections.title')} linearNotice={linearNotice} />
