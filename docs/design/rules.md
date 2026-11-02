@@ -314,6 +314,10 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   - Every row leads with its group's status icon and colour, the phone's set
     (`ThreadStatusIcon`): 进行中 spins, 受阻 a red alert, 等待你 a raised
     hand, 空闲 a slashed circle, 已解决 a green check.
+  - A thread's state badge (an open thread, a task's 线程, a thread chip's
+    card) shows the same icon and the group's word, never the run's raw
+    status: a finished run nobody judged reads 等待你, not 已完成. Only a stop
+    on its way reads 正在停止….
   - A task's existing threads fold into its newest one, which carries
     「第 N 次尝试」 past the first and stays out of 已解决 until the task is
     resolved; the task's own 线程 tab lists every attempt. (New work keeps one
