@@ -38,13 +38,17 @@ test('a device grant is reviewed in the browser and exchanged for a daemon crede
   const before = await (await page.request.get(app('/api/auth/get-session'))).json()
   // The daemon has its own cookie-free HTTP client. page.request shares the
   // browser's session cookies, so its missing Origin correctly fails CSRF.
-  const grantResponse = await request.post(app('/api/auth/device/code'), { data: { client_id: 'mikka-daemon' } })
+  const grantResponse = await request.post(app('/api/auth/device/code'), { data: { client_id: 'mikka-daemon', device_name: 'build-box', device_platform: 'linux', client_version: '0.9.1' } })
   expect(grantResponse.status()).toBe(200)
   const grant = await grantResponse.json()
   expect(new URL(grant.verification_uri).pathname).toBe(app('/device'))
   await page.goto(grant.verification_uri_complete)
   await expect(page.getByRole('heading', { name: '连接这台电脑', exact: true })).toBeVisible()
   await expect(page.getByText(grant.user_code, { exact: true })).toBeVisible()
+  // RFC 8628 §5.4: the page names the machine asking, and a code that came in the link is checked against the terminal first.
+  await expect(page.locator('[data-slot="device-request"]')).toContainText('build-box · Linux · 客户端 0.9.1')
+  await expect(page.getByRole('button', { name: '允许', exact: true })).toBeDisabled()
+  await page.getByRole('checkbox', { name: '终端里显示的也是这个验证码', exact: true }).check()
   await expect(page.getByRole('button', { name: '允许', exact: true })).toBeEnabled()
   await testInfo.attach('device-code-review-light', { body: await page.screenshot(), contentType: 'image/png' })
   await page.emulateMedia({ colorScheme: 'dark' })
@@ -125,8 +129,22 @@ test('a device grant is reviewed in the browser and exchanged for a daemon crede
   await retry.click()
   expect((await reviewed).status()).toBe(200)
   await expect(authorization.getByText(networkFailureGrant.user_code, { exact: true })).toBeVisible()
+  // An older daemon reports no name: the page says so and still asks for the code check.
+  await expect(authorization.locator('[data-slot="device-request"]')).toContainText('未报告名称')
+  await expect(authorization.getByRole('button', { name: '允许', exact: true })).toBeDisabled()
+  await authorization.getByRole('checkbox', { name: '终端里显示的也是这个验证码', exact: true }).check()
   await expect(authorization.getByRole('button', { name: '允许', exact: true })).toBeEnabled()
   await expect(authorization.getByRole('button', { name: '拒绝', exact: true })).toBeEnabled()
   await expect(authorization.getByRole('alert')).toHaveCount(0)
   expect(failedReviews).toBe(1)
+
+  // A code typed in was read off the terminal: no second check.
+  await page.setViewportSize({ width: 1440, height: 960 })
+  const typed = await (await request.post(app('/api/auth/device/code'), { data: { client_id: 'mikka-daemon', device_name: 'mac-mini', device_platform: 'darwin', client_version: '0.9.1' } })).json()
+  await page.goto(app('/device'))
+  await page.getByRole('textbox', { name: '终端验证码', exact: true }).fill(typed.user_code)
+  await page.getByRole('button', { name: '继续', exact: true }).click()
+  await expect(page.locator('[data-slot="device-request"]')).toContainText('mac-mini · macOS')
+  await expect(page.getByRole('checkbox')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '允许', exact: true })).toBeEnabled()
 })
