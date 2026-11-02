@@ -55,3 +55,46 @@ dbTest('one read of a device\'s runs finds its stops, messages and queued runs',
     assert.deepEqual(await deviceWork(other, [ids.elsewhere], { queued: true }), { commands: [], queuedRuns: [] })
   })
 })
+
+dbTest('the idle check answers in one boolean, finds the same work, and refuses a revoked credential', async t => {
+  const [{ createRequestDatabaseScope, pool }, { deviceMayHaveWork }, { withDeviceDatabaseAuthority, DeviceAuthorityRevoked }] = await Promise.all([import('./db'), import('./device-link'), import('./db/device-scope')])
+  const scope = createRequestDatabaseScope(databaseUrl!)
+  const owner = `test-device-idle-${randomUUID()}`
+  const device = randomUUID(), agent = randomUUID(), tokenId = randomUUID(), run = randomUUID()
+  t.after(async () => {
+    await scope.run(async () => {
+      await pool.query('delete from run_messages where "userId"=$1', [owner])
+      await pool.query('delete from agent_runs where "userId"=$1', [owner])
+      await pool.query('delete from agents where "userId"=$1', [owner])
+      await pool.query('delete from device_tokens where "userId"=$1', [owner])
+      await pool.query('delete from devices where "ownerId"=$1', [owner])
+      await pool.query('delete from "user" where id=$1', [owner])
+    })
+    await scope.close()
+  })
+  await scope.run(async () => {
+    await pool.query(`insert into "user" (id, name, email, "emailVerified", "createdAt", "updatedAt") values ($1, 'Idle check fixture', $1 || '@example.invalid', false, now(), now())`, [owner])
+    await pool.query(`insert into devices (id, name, "ownerId") values ($1, 'mine', $2)`, [device, owner])
+    await pool.query(`insert into device_tokens (id, "userId", "tokenHash") values ($1, $2, $3)`, [tokenId, owner, randomUUID()])
+    await pool.query(`insert into agents (id, "userId", harness, name) values ($1, $2, 'codex', 'a')`, [agent, owner])
+    const check = (options: { queued?: boolean; mailboxNotices?: boolean } = {}, skip: string[] = []) =>
+      withDeviceDatabaseAuthority({ tokenId, userId: owner }, () => deviceMayHaveWork(device, skip, options))
+
+    assert.equal(await check({ queued: true }), false, 'no runs: nothing to read')
+    await pool.query(`insert into agent_runs (id, "agentId", "userId", "deviceId", status) values ($1, $2, $3, $4, 'queued')`, [run, agent, owner, device])
+    assert.equal(await check({ queued: true }), true, 'a queued run')
+    assert.equal(await check({ queued: false }), false, 'scheduling off: a queued run is not work')
+    assert.equal(await check({ queued: true }, [run, 'not-a-uuid']), false, 'a skipped run is not work')
+    await pool.query(`update agent_runs set status='running' where id=$1`, [run])
+    assert.equal(await check(), false, 'a running run with nothing for it')
+    assert.equal(await check({ mailboxNotices: true }), true, 'with mailbox notices a live run defers to the full read')
+    await pool.query(`insert into run_messages (id, "runId", "userId", text) values ($1, $2, $3, 'more')`, [randomUUID(), run, owner])
+    assert.equal(await check(), true, 'an undelivered message')
+    await pool.query(`update run_messages set "deliveredAt"=now() where "runId"=$1`, [run])
+    await pool.query(`update agent_runs set "stopRequestedAt"=now() where id=$1`, [run])
+    assert.equal(await check(), true, 'a stop to deliver')
+
+    await pool.query(`update device_tokens set "revokedAt"=now() where id=$1`, [tokenId])
+    await assert.rejects(check(), DeviceAuthorityRevoked, 'a revoked credential ends the poll')
+  })
+})

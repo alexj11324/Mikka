@@ -1,7 +1,7 @@
 import { withDeviceRoute } from '@/lib/device-route'
 import { NextResponse } from 'next/server'
 import { COMMANDS_MAX_SKIP, COMMANDS_MAX_WAIT_SECONDS, COMMANDS_SKIP_PARAM, MAILBOX_NOTICE_HEADER } from '@mikka/protocol/device'
-import { authenticateDevice, deviceWork, ownsDevice, sleep, waitSeconds } from '@/lib/device-link'
+import { authenticateDevice, deviceMayHaveWork, deviceWork, ownsDevice, sleep, waitSeconds } from '@/lib/device-link'
 import { noteLogOutcome, withRequestLog } from '@/lib/request-log'
 
 export const dynamic = 'force-dynamic'
@@ -27,7 +27,9 @@ async function handleGET(request: Request, { params }: { params: Promise<{ devic
   const deadline = Date.now() + wait * 1000
   while (!request.signal.aborted) {
     // A device with scheduling off gets no work (as GET .../runs).
-    const { commands, queuedRuns: queued } = await deviceWork(deviceId, skip, { mailboxNotices: request.headers.get(MAILBOX_NOTICE_HEADER) === '1', queued: device.enabled })
+    const options = { mailboxNotices: request.headers.get(MAILBOX_NOTICE_HEADER) === '1', queued: device.enabled }
+    // The cheap check also ends the poll for a revoked credential; the full read hands over work.
+    const { commands, queuedRuns: queued } = await deviceMayHaveWork(deviceId, skip, options) ? await deviceWork(deviceId, skip, options) : { commands: [], queuedRuns: [] }
     if (request.signal.aborted) break
     if (commands.length > 0 || queued.length > 0 || Date.now() >= deadline) {
       noteLogOutcome(commands.length > 0 || queued.length > 0 ? 'work' : 'empty')
