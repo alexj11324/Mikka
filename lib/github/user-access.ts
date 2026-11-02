@@ -4,6 +4,7 @@ import { githubConnectionToken } from './connection'
 
 export { GitHubAccessError, type GitHubAccessCode } from './user-access-error'
 import { GitHubAccessError } from './user-access-error'
+import { noteGitHubRequest } from '@/lib/dispatch-timing'
 
 export type AuthorizedGitHubRepository = { id: string; installationId: string; fullName: string; htmlUrl: string; private: boolean }
 type Json = Record<string, unknown>
@@ -22,6 +23,11 @@ function githubId(value: unknown): string {
 }
 
 async function githubGet(token: string, path: string): Promise<{ data: Json; next: boolean }> {
+  const started = Date.now()
+  try { return await githubRequest(token, path) } finally { noteGitHubRequest(Date.now() - started) }
+}
+
+async function githubRequest(token: string, path: string): Promise<{ data: Json; next: boolean }> {
   let response: Response
   try {
     response = await fetch(`${API}${path}`, {
