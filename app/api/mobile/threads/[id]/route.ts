@@ -10,6 +10,7 @@ import { ActionFailureError } from '@/lib/action-error'
 import { chainChunks, runIsActive, threadItems } from '@/lib/issue-run-conversation'
 import { forbiddenOrigin, json, mobileUser, unauthorized, writeAllowed } from '@/lib/mobile-api'
 import { mobileThread } from '@/lib/mobile-threads'
+import { runOutsideToken } from '@/lib/tokens/scope'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,7 +22,7 @@ async function handleGET(request: Request, { params }: Params) {
   noteLogUser(user?.id)
   if (!user) return unauthorized()
   const id = z.uuid().safeParse((await params).id)
-  if (!id.success) return json({ error: 'runNotFound' }, 404)
+  if (!id.success || await runOutsideToken(user, id.data)) return json({ error: 'runNotFound' }, 404)
   const [thread, detail] = await Promise.all([mobileThread(user.id, id.data), readRun(user.id, id.data)])
   if (!thread || !detail) return json({ error: 'runNotFound' }, 404)
   // readRun checked access. The thread is its runs from this one on (R-81: an ended thread runs again in it);
@@ -50,9 +51,11 @@ async function handlePOST(request: Request, { params }: Params) {
   if (!writeAllowed(request)) return forbiddenOrigin()
   const body = z.object({ text: z.string().trim().min(1).max(10_000) }).safeParse(await request.json().catch(() => null))
   if (!body.success) return json({ error: 'messageRequired' }, 400)
+  const id = (await params).id
+  if (z.uuid().safeParse(id).success && await runOutsideToken(user, id)) return json({ error: 'runNotFound' }, 404)
   try {
     // A working thread gets it as a message; an ended one runs again in the same thread (R-81).
-    await sendThreadMessage(user.id, (await params).id, body.data.text)
+    await sendThreadMessage(user.id, id, body.data.text)
   } catch (error) {
     if (error instanceof ActionFailureError) return json({ error: error.code }, 400)
     throw error
