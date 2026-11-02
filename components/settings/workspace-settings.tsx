@@ -121,7 +121,7 @@ export function WorkspaceSettings({ workspaceId }: { userKey?: string; workspace
     <SettingRow title={t('icon')}>{icon}</SettingRow>
     <SettingRow title={t('name')}><span>{current.name}</span></SettingRow>
     {current.slug && <SettingRow title={t('address')}><span className="break-all">{host}{current.slug}</span></SettingRow>}
-  </SettingsSection><ReplayOnboarding /></>
+  </SettingsSection></>
 
   return <>
     <SettingsSection id="workspace-general">
@@ -148,7 +148,6 @@ export function WorkspaceSettings({ workspaceId }: { userKey?: string; workspace
       </SettingRow>
     </SettingsSection>
     {failed && <SettingsSaveError message={failed.message} retryLabel={commonT('retry')} onRetry={() => { if (failed.field === 'icon' && failed.value === null) { fileRef.current?.click(); return } void save(failed.field, failed.value) }} />}
-    <ReplayOnboarding />
 
     <SettingsSection id="workspace-danger" title={t('danger')}>
       {current.canTransfer && <SettingRow title={t('transferWorkspace')}>
@@ -167,9 +166,10 @@ export function WorkspaceSettings({ workspaceId }: { userKey?: string; workspace
 
 /**
  * 重新播放引导 (docs/design/onboarding.md §3): clears this person's completion (`resetOnboarding`)
- * and reloads the app, which shows the first-run guide again. Personal, so members see it too.
+ * and reloads the app, which shows the first-run guide again. The person's own, so it sits in
+ * 偏好设置 and shows in every workspace, a personal one too (decision 2026-11-02-0203).
  */
-function ReplayOnboarding() {
+export function ReplayOnboarding() {
   const t = useTranslations('Settings.workspaceForm')
   const commonT = useTranslations('Common')
   const actionError = useActionError()
