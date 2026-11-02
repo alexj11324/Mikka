@@ -70,12 +70,17 @@ export function hostedRefusal(message: string | null | undefined): HostedRefusal
  * state (`usage`, null until read). With a subscription connected it serves
  * them in every workspace (#838), so a refusal is a moment's outage: 暂时不可用
  * and 重试. 连接订阅 only with none connected; 验证银行卡 in a personal workspace
- * with no verified card (C19). Nothing until the state is read.
+ * with no verified card (C19); 打开计费 in a team with no points. Nothing until
+ * the state is read.
  */
 export function refusalOffer(code: HostedRefusal, usage: HostedUsage | null) {
-  const transient = code === 'usage_in_progress' || code === 'usage_concurrency_limit' || code === 'usage_cost_unavailable' || Boolean(usage?.subscribed)
+  const busy = code === 'usage_in_progress' || code === 'usage_concurrency_limit' || code === 'usage_cost_unavailable'
+  // A team with no points of its own: retrying never helps, even with a subscription connected. Its 计费 page buys points or turns on a member's shared credits.
+  const billing = !busy && usage?.personal === false && (code === 'verification_required' || code === 'free_allowance_used' || code === 'points_exhausted')
+  const transient = busy || (Boolean(usage?.subscribed) && !billing)
   return {
     transient,
+    billing,
     card: !transient && Boolean(usage?.personal) && (code === 'verification_required' || (usage?.balance.verified === false && (code === 'free_allowance_used' || code === 'points_exhausted'))),
     connect: !transient && usage?.subscribed === false,
   }

@@ -167,7 +167,8 @@ export class ExecutionSettings {
     // Mikka 默认 picked on purpose: no binding behind it (decision 2026-10-31-2330).
     if (bindingId === HOSTED_CHOICE) {
       await this.pool.query(
-        'INSERT INTO bot_model_choices ("ownerId","workspaceId","botKey","bindingId") VALUES ($1,$2,$3,$4) ON CONFLICT ("ownerId","workspaceId","botKey") DO UPDATE SET "bindingId"=EXCLUDED."bindingId"',
+        // The pick replaces an API key model saved before, as a subscription pick does; else the key choice wins on read.
+        'INSERT INTO bot_model_choices ("ownerId","workspaceId","botKey","bindingId") VALUES ($1,$2,$3,$4) ON CONFLICT ("ownerId","workspaceId","botKey") DO UPDATE SET "bindingId"=EXCLUDED."bindingId","apiKeyId"=NULL,"apiKeyModel"=NULL',
         [scope.ownerId, scope.workspaceId, key, null],
       );
       return;

@@ -194,6 +194,15 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
       harness: "ai_sdk", model: "deepseek-chat",
       modelSelection: { coordinator: true, type: "api_key", keyId: key.id, ownerId: "alice", workspaceId: workspace, modelId: "deepseek-chat" },
     });
+    // Mikka 默认 picked after a key model: it is what the chip shows and what the next turn runs on, not the key
+    // (production, 2026-11-02: the pick saved, but the old key choice won on read and the chip went back to the key).
+    const { HOSTED_CHOICE: hostedChoice } = await import("./bot-model-menu-view");
+    const hostedMenu = await chooseBotModel(pool, settings, alice, null, hostedChoice);
+    assert.deepEqual([hostedMenu.current.id, hostedMenu.current.kind, hostedMenu.current.chosen, hostedMenu.current.available], [hostedChoice, "hosted", true, true]);
+    assert.notEqual((await freezeBotModel({ ownerId: "alice", botId: null, workspaceId: workspace }, dependencies)).modelSelection?.type, "api_key");
+    // Picking the key again moves back to it.
+    keyMenu = await chooseBotModel(pool, settings, alice, null, keyOption);
+    assert.equal(keyMenu.current.id, keyOption);
     // 订阅额度用完后，自动改用 API Key: bot A's Claude subscription is out of quota. The composer names the reset and
     // the key the next turn moves to; that turn is frozen on Alice's own key, marked, and a frozen one never changes.
     await pool.query(`UPDATE byos_connections SET quota=$2::jsonb WHERE id=$1`, [claude, quota(1, FUTURE)]);

@@ -34,12 +34,13 @@ import { useActionError } from '@/lib/use-action-error'
 export function HostedRefusalNotice({ code, botId, retry, onQueued }: { code: HostedRefusal; botId: string | null; retry?: ReactNode; onQueued: () => unknown }) {
   const t = useTranslations('Billing.refusal')
   const usage = useSWR(['hosted-usage'], () => getHostedUsage())
-  const { transient, card, connect } = refusalOffer(code, usage.data && !usage.data.error ? usage.data : null)
+  const { transient, billing, card, connect } = refusalOffer(code, usage.data && !usage.data.error ? usage.data : null)
   // The model menu's own read (the same SWR key as the composer's chip): its first own subscription.
-  const menu = useSWR<BotModelMenu>(transient ? botModelMenuKey(botId) : null, () => getBotModelMenu(botId))
+  const menu = useSWR<BotModelMenu>(transient || billing ? botModelMenuKey(botId) : null, () => getBotModelMenu(botId))
   const own = menu.data ? ownSubscriptionOption(menu.data) : null
   const Icon = transient ? Info : code === 'verification_required' ? CreditCard : code === 'platform_paused' ? Pause : Info
   const title = transient || code === 'usage_in_progress' || code === 'usage_concurrency_limit' || code === 'usage_cost_unavailable' ? t('unavailable')
+    : billing ? t('teamNoPoints')
     : code === 'verification_required'
       ? t.rich('verification_required', { mark: () => <MikkaMarkSmall />, model: chunks => <span className="inline-flex items-center gap-1">{chunks}</span> })
       : t(code)
@@ -48,7 +49,8 @@ export function HostedRefusalNotice({ code, botId, retry, onQueued }: { code: Ho
     <AlertTitle className="min-w-0 flex-1 basis-48">{title}</AlertTitle>
     <span className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-1">
       {transient && retry}
-      {transient && own && <UseSubscriptionButton botId={botId} option={own.option} label={t('useSubscription', { name: subscriptionName(own.provider, own.plan) })} onQueued={onQueued} />}
+      {(transient || billing) && own && <UseSubscriptionButton botId={botId} option={own.option} label={t('useSubscription', { name: subscriptionName(own.provider, own.plan) })} onQueued={onQueued} />}
+      {billing && <Button size="sm" variant="outline" nativeButton={false} role="link" render={<Link href={settingsHref('billing')} />}>{t('openBilling')}</Button>}
       {card && <Button size="sm" variant="link" className="text-muted-foreground" nativeButton={false} role="link" render={<Link href={settingsHref('billing')} />}>{t('verifyCard')}</Button>}
       {connect && <Button size="sm" nativeButton={false} role="link" render={<Link href={settingsHref('models')} />}>
         {t.rich('connect', { claude: () => <Claude aria-hidden="true" />, openai: () => <OpenAI aria-hidden="true" /> })}
