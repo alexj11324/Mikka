@@ -76,7 +76,7 @@ export function createCoordinatorRegistry(userId: string, botId: string, scope?:
       execute: input => steps.listIssues(userId, input, scope),
     }),
     get_issue: tool({
-      description: 'Read one issue: its text, status, priority and latest runs.',
+      description: 'Read one issue: its text, status, priority, latest runs, and its thread (runId, status, repository) when it has one. More work for a task with a thread goes to that thread: dispatch_run without repo, or send_to_run while it runs.',
       inputSchema: z.object({ issueId: id }),
       execute: input => steps.getIssue(userId, input, scope, botId),
     }),
@@ -160,10 +160,12 @@ export function createCoordinatorRegistry(userId: string, botId: string, scope?:
       }),
     } : {}),
     dispatch_run: tool({
-      description: `Give an issue's work to an agent. ${ONE_THREAD} A new thread takes the person's allowed models (Settings › 模型与订阅) in their order: the first that can run now, on a computer that takes part in scheduling (本地) or on their own E2B cloud (云端). Threads never run on Mikka 默认, which only answers in Bot chats. Returns the run id, what happened (thread: new, message or continued) and result.placement, where it actually runs (one of the person's computers by name, or the cloud); say only that place, never one you did not get. An [Event] message arrives when the run ends. When nothing can run (no allowed model, none connected, no computer): error machineUnavailable with result.reason and result.card, whose options lead to adding a subscription or key, a computer or an E2B key. Then draw result.card and call dispatch_run again after the person answers. A repository named without its owner is matched against the person's own authorized repositories: one match runs there; error repositoryAmbiguous (several) or repositoryNotFound (none) comes with result.card, drawn the same way, nothing is queued, and after the person picks a repository call dispatch_run again with it. Error githubNotConnected: the person connects GitHub in 插件 › GitHub.`,
+      description: `Give an issue's work to an agent. ${ONE_THREAD} A new thread takes the person's allowed models (Settings › 模型与订阅) in their order: the first that can run now, on a computer that takes part in scheduling (本地) or on their own E2B cloud (云端). Threads never run on Mikka 默认, which only answers in Bot chats. Returns the run id, what happened (thread: new, message or continued) and result.placement, where it actually runs (one of the person's computers by name, or the cloud); say only that place, never one you did not get. An [Event] message arrives when the run ends. When nothing can run (no allowed model, none connected, no computer): error machineUnavailable with result.reason and result.card, whose options lead to adding a subscription or key, a computer or an E2B key. Then draw result.card and call dispatch_run again after the person answers. A repository named without its owner is matched against the person's own authorized repositories: one match runs there; error repositoryAmbiguous (several) or repositoryNotFound (none) comes with result.card, drawn the same way, nothing is queued, and after the person picks a repository call dispatch_run again with it. Error githubNotConnected: the person connects GitHub in 插件 › GitHub. Error repositoryRequired: the task has no thread yet, so name its repository.`,
       inputSchema: z.object({
         issueId: id, agentId: id.optional().describe('Deprecated: omit. 模型与订阅 picks the Agent.'),
-        repo: z.string().trim().min(1).max(4_000).describe('GitHub owner/repo, an HTTPS/SSH git URL, or just the repository name the person used (e.g. Mikka_test): the host finds it among their authorized repositories. The daemon clones it; no repository registration is needed.'),
+        // A Factory attempt's device repository goes through dispatch_factory_task, never here.
+        deviceRepoId: z.never().optional(),
+        repo: z.string().trim().min(1).max(4_000).optional().describe('Omit when the task already has a thread (get_issue thread): more work keeps that thread\'s repository. For a task\'s first thread: GitHub owner/repo, an HTTPS/SSH git URL, or just the repository name the person used (e.g. Mikka_test); the host finds it among their authorized repositories. The daemon clones it; no repository registration is needed.'),
         note: z.string().max(10_000).optional().describe('Extra direction for this run, added after the issue text.'),
         readOnly: z.boolean().optional().describe('true when the task only reads and reports (investigation, review): no file changes, commit, push or PR. A read-only run needs no repository push approval.'),
         newThread: newThreadInput,

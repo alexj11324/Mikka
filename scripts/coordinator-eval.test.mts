@@ -129,10 +129,12 @@ test('a repository that does not exist: asking is right (negative case)', { skip
 })
 
 test('more work on a task stays in its thread; a new one only when the person asks', { skip }, async () => {
-  const thread = { id: ISSUE, title: '加 README', latestRuns: [{ id: 'run-1', status: 'running', thread: 'run-1' }] }
+  const thread = { id: ISSUE, title: '加 README', status: 'doing', body: '给 Mikka_test 加一个 README。', runs: [{ id: 'run-1', agent: 'Claude Code', status: 'running' }], thread: { runId: 'run-1', status: 'running', repository: 'https://github.com/alexj11324/Mikka_test' } }
   results = { getIssue: thread, dispatchRun: { thread: 'message', runId: 'run-1', threadId: 'run-1', status: 'messageSent' }, sendToRun: { sent: true } }
-  await passAll('follow-up', async () => trial('README 里再加一节安装说明', await facts()), ({ calls }) => {
+  await passAll('follow-up', async () => trial('README 里再加一节安装说明', await facts()), ({ calls, reply }) => {
     if (calls.some(call => call.step === 'dispatchRun' && (call.input as { newThread?: boolean }).newThread === true)) return 'asked for a new thread'
+    if (calls.some(call => call.step === 'findRepository')) return 'looked up a repository for a task that has a thread'
+    if (/哪个仓库|which repositor/i.test(reply)) return 'asked for a repository'
     return calls.some(call => call.step === 'dispatchRun' || call.step === 'sendToRun') ? null : 'did not pass the work on'
   })
   results = { getIssue: thread, dispatchRun: { runId: 'run-2', thread: 'new', threadId: 'run-2', replacedThreadId: 'run-1' } }
