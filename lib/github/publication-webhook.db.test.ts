@@ -5,6 +5,7 @@ import { readFile, readdir } from 'node:fs/promises'
 import { Pool } from 'pg'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
 import { refreshPublishedPullRequest } from './publication-webhook'
+import { dropTestDatabase } from '../../tests/support/drop-test-database'
 
 const base = process.env.E2E_DATABASE_URL
 const required = process.env.REQUIRE_DB === '1' || (process.env.CI === 'true' && process.env.GITHUB_ACTIONS === 'true')
@@ -74,8 +75,8 @@ test('a PR webhook records its line counts on the delivery and on the tasks it b
     assert.deepEqual((await task(delivered)).content.attrs.mikka.pullRequests[1], { url, state: 'open', title: 'Fix the login page', additions: 25, deletions: 6 })
     assert.deepEqual((await versions(delivered)).map(row => row.revision), [2, 3])
   } finally {
-    await pool.end()
-    await adminPool.query(`DROP DATABASE IF EXISTS ${name} WITH (FORCE)`)
+    // Only after every client of this test's own database has closed (#913).
+    await dropTestDatabase(adminPool, name, pool)
     await adminPool.end()
   }
 })
