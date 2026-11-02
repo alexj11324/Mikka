@@ -15,7 +15,8 @@ test('打开很久的页面：新部署后提示「Mikka 已更新 · 刷新」�
   await expect(toast).toHaveCount(0)
 
   await page.route('**/api/version', route => route.fulfill({ json: { build: 'dpl_newer' }, headers: { 'cache-control': 'no-store' } }))
-  await page.evaluate(() => { window.dispatchEvent(new Event('focus')) })
+  // The guard asks on page entry and on navigation, never on focus (decision 2026-11-01-0400).
+  await page.reload()
   await expect(toast).toBeVisible()
   await expect(toast.getByRole('button', { name: '刷新', exact: true })).toBeVisible()
   // Evidence for review: the toast at rest (animations finished), light and dark.
