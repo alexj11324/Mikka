@@ -24,7 +24,7 @@ function lineFor(failure: ChatFailure, locale: 'zh-CN' | 'en'): string {
   const scope: Record<string, unknown> = message.namespace === 'Billing.refusal' ? messages.Billing.refusal : messages.Coordinator
   const text = message.key.split('.').reduce<unknown>((node, part) => (node as Record<string, unknown> | undefined)?.[part], scope)
   if (typeof text !== 'string') throw new Error(`missing message ${message.namespace}.${message.key}`)
-  return message.namespace === 'Billing.refusal' && BRANDED.has(message.key) ? `${locale === 'en' ? 'Mikka Default: ' : 'Mikka 默认'}${text}` : text
+  return message.namespace === 'Billing.refusal' && BRANDED.has(message.key) ? messages.Billing.refusal.branded.replace('{reason}', text) : text
 }
 
 /**
