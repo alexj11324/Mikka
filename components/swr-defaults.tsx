@@ -3,8 +3,6 @@
 import { useRef, type ReactNode } from 'react'
 import { SWRConfig, unstable_serialize, type Middleware, type SWRConfiguration } from 'swr'
 
-import { reportCallError } from '@/lib/app-build'
-
 /** Data younger than this is fresh: focus leaves it alone. A hook may set a longer `focusThrottleInterval`. */
 export const FRESH_FOR_MS = 60_000
 
@@ -51,8 +49,6 @@ export const swrDefaults = {
   focusThrottleInterval: FRESH_FOR_MS,
   refreshWhenHidden: false,
   use: [staleOnFocus],
-  // A read whose server action a newer deployment removed reloads the page (components/version-guard.tsx).
-  onError: reportCallError,
 } satisfies SWRConfiguration
 
 export function SWRDefaults({ children }: { children: ReactNode }) {

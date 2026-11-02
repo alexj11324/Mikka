@@ -2,10 +2,9 @@
 
 import { useEffect } from 'react'
 import { useTranslations } from 'next-intl'
-import { unstable_isUnrecognizedActionError } from 'next/navigation'
 import { toast } from 'sonner'
 
-import { APP_BUILD, isStaleBuild, onCallError, reloadOnce } from '@/lib/app-build'
+import { ACTION_NOT_FOUND_HEADER, APP_BUILD, isStaleBuild, reloadOnce } from '@/lib/app-build'
 import { withBasePath } from '@/lib/base-path'
 
 const CHECK_GAP_MS = 60_000
@@ -38,21 +37,22 @@ export function VersionGuard() {
         .then(body => { if (isStaleBuild(APP_BUILD, body?.build)) offer() })
         .catch(() => {})
     }
-    const failed = (error: unknown) => {
-      if (!unstable_isUnrecognizedActionError(error)) return
-      if (!reloadOnce(sessionStore(), Date.now(), () => { window.location.reload() })) offer()
+    // Server actions go through window.fetch. Watching the response catches a
+    // removed action however its caller handles the error.
+    const original = window.fetch
+    const watched: typeof window.fetch = async (...args) => {
+      const response = await original(...args)
+      if (response.headers.has(ACTION_NOT_FOUND_HEADER) && !reloadOnce(sessionStore(), Date.now(), () => { window.location.reload() })) offer()
+      return response
     }
-    const rejected = (event: PromiseRejectionEvent) => { failed(event.reason) }
-    const off = onCallError(failed)
+    window.fetch = watched
     document.addEventListener('visibilitychange', check)
     window.addEventListener('focus', check)
-    window.addEventListener('unhandledrejection', rejected)
     const timer = window.setInterval(check, POLL_MS)
     return () => {
-      off()
+      if (window.fetch === watched) window.fetch = original
       document.removeEventListener('visibilitychange', check)
       window.removeEventListener('focus', check)
-      window.removeEventListener('unhandledrejection', rejected)
       window.clearInterval(timer)
     }
   }, [t])

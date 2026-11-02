@@ -32,15 +32,5 @@ export function reloadOnce(storage: Pick<Storage, 'getItem' | 'setItem'> | null,
   return true
 }
 
-type Listener = (error: unknown) => void
-const listeners = new Set<Listener>()
-
-/** SWR and unhandled rejections report failed calls here; the guard decides. */
-export function reportCallError(error: unknown) {
-  for (const listener of listeners) listener(error)
-}
-
-export function onCallError(listener: Listener) {
-  listeners.add(listener)
-  return () => { listeners.delete(listener) }
-}
+/** Next answers a server action it does not have with this response header. */
+export const ACTION_NOT_FOUND_HEADER = 'x-nextjs-action-not-found'

@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { isStaleBuild, onCallError, reloadOnce, reportCallError } from './app-build'
+import { isStaleBuild, reloadOnce } from './app-build'
 
 test('a page is stale only when both builds are known and differ', () => {
   assert.equal(isStaleBuild('dpl_old', 'dpl_new'), true)
@@ -24,13 +24,4 @@ test('a missing server action reloads once a minute at most', () => {
   assert.equal(reloadOnce(blocked, 2_000_000, () => { reloads += 1 }), false)
   assert.equal(reloadOnce(null, 2_000_000, () => { reloads += 1 }), false)
   assert.equal(reloads, 2)
-})
-
-test('call errors reach every listener until it unsubscribes', () => {
-  const seen: unknown[] = []
-  const off = onCallError(error => seen.push(error))
-  reportCallError('a')
-  off()
-  reportCallError('b')
-  assert.deepEqual(seen, ['a'])
 })
