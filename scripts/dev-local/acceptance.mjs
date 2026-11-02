@@ -120,7 +120,8 @@ async function setup() {
   await mkdir(directory, { recursive: true, mode: 0o700 })
   // The daemon's unprivileged UID needs traverse permission, never access to
   // account/session files (which remain 0600 inside their own 0700 store).
-  if (process.getuid?.() === 0 && process.env.MIKKA_DEV_DAEMON_USER) await chmod(directory, 0o711)
+  // The private parents (.cache, .cache/dev-local) need the same traverse-only bit, or the daemon cannot reach its data directory.
+  if (process.getuid?.() === 0 && process.env.MIKKA_DEV_DAEMON_USER) for (const path of [resolve(root, '.cache'), resolve(root, '.cache/dev-local'), directory]) await chmod(path, 0o711)
   for (const name of ['BETTER_AUTH_SECRET', 'DEEPSEEK_API_KEY', 'INFISICAL_CLIENT_SECRET']) if (process.env[name]) secrets.add(process.env[name])
   const existing = process.argv.includes('--existing')
   if (selectedItems.includes('8') && !existing) {

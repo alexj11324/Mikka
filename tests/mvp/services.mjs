@@ -12,7 +12,8 @@ import { MVP_SERVICES, REPOSITORY } from './isolated-env.mjs'
 import { finishMvpResources, indexMvpResource } from './retention.mjs'
 
 const execute = promisify(execFile)
-const git = async (cwd, args) => (await execute('git', args, { cwd, env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1', GIT_TERMINAL_PROMPT: '0' } })).stdout.trim()
+// Run as root, dev:local hands the origin to MIKKA_DEV_DAEMON_USER; Git then refuses it as dubious ownership without this exception.
+const git = async (cwd, args) => (await execute('git', ['-c', `safe.directory=${cwd}`, ...args], { cwd, env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1', GIT_TERMINAL_PROMPT: '0' } })).stdout.trim()
 const REPO_PATH = '/repos/mikka-e2e/core-loop'
 const REPOSITORY_ID = 789
 const READ_TOKEN = 'mvp-synthetic-installation-read'
@@ -196,8 +197,9 @@ export async function startMvpServices(port = 3191, { routes } = {}) {
       if (path === '/app/installations/99/access_tokens' && method === 'POST') {
         appAccess()
         const input = await readBody(request)
-        if (input.permissions?.contents === 'write') {
-          assert.deepEqual(input, { repository_ids: [REPOSITORY_ID], permissions: { contents: 'write', pull_requests: 'write', checks: 'read', actions: 'read', metadata: 'read' } })
+        // A run's token names the repository only and inherits the installation's permissions (#853).
+        if (!input.permissions) {
+          assert.deepEqual(input, { repository_ids: [REPOSITORY_ID] })
           return reply({ token: RUN_TOKEN, expires_at: new Date(Date.now() + 3600_000).toISOString() })
         }
         if (input.permissions?.pull_requests === 'write') {
