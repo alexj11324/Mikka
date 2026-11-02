@@ -20,3 +20,12 @@ export function stopStuck(attempt: StopAttempt | null, working: boolean, now: nu
   if (!attempt || !working) return false
   return attempt.failed || now - attempt.at >= cap
 }
+
+/**
+ * A thread's composer button is stop only while the agent is generating or running.
+ * A thread waiting for your answer is live but sends; stop moves to the bar (usability review N1).
+ * A server too old to say `working` gets send: stopping by mistake is the worse error.
+ */
+export function composerStops(detail: { active: boolean; working?: boolean }): boolean {
+  return detail.active && detail.working === true
+}

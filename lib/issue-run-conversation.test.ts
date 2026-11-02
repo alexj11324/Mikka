@@ -1,10 +1,14 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { chainChunks, runFailureText, runIsActive, runListRefreshInterval, runStopTimeoutRemaining, runSummaryText, threadItems } from './issue-run-conversation'
+import { chainChunks, runFailureText, runIsActive, runIsWorking, runListRefreshInterval, runStopTimeoutRemaining, runSummaryText, threadItems } from './issue-run-conversation'
 
 test('only active run states offer messages; completed history stays readable', () => {
   for (const state of ['queued', 'preparing', 'running', 'waiting_input', 'finishing']) assert.equal(runIsActive(state), true)
   for (const state of ['succeeded', 'stopped', 'failed', 'cancelled', 'unknown']) assert.equal(runIsActive(state), false)
+})
+test('a run waiting for the person is live but not working: its composer sends, it does not stop', () => {
+  for (const state of ['queued', 'preparing', 'running', 'finishing']) assert.equal(runIsWorking(state), true)
+  for (const state of ['waiting_input', 'succeeded', 'stopped', 'failed', 'cancelled', 'unknown']) assert.equal(runIsWorking(state), false)
 })
 test('a run row shows the report summary, else the first error line, else nothing', () => {
   assert.equal(runSummaryText({ report: { summary: ' Fixed the login loop. ' }, error: null }), 'Fixed the login loop.')

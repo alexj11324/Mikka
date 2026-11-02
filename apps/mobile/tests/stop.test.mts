@@ -1,7 +1,7 @@
 // 停止 that fails or hangs says 「没停下 · 重试」 instead of leaving the chat stuck (usability review).
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { stopStuck, stopWithin } from '../lib/stop.ts'
+import { composerStops, stopStuck, stopWithin } from '../lib/stop.ts'
 
 test('a stop the server takes in time counts', async () => {
   assert.equal(await stopWithin(async () => ({ stopped: true }), 50), true)
@@ -21,4 +21,11 @@ test('the chat says it did not stop when the request failed or the reply still w
   assert.equal(stopStuck({ at: 0, failed: false }, true, 9_999), false)
   assert.equal(stopStuck({ at: 0, failed: false }, true, 10_000), true)
   assert.equal(stopStuck({ at: 0, failed: true }, false, 20_000), false)
+})
+
+test('a thread waiting for your answer sends; only a working one turns send into stop', () => {
+  assert.equal(composerStops({ active: true, working: true }), true)
+  assert.equal(composerStops({ active: true, working: false }), false, 'waiting_input')
+  assert.equal(composerStops({ active: true }), false, 'a server that does not say working')
+  assert.equal(composerStops({ active: false, working: false }), false)
 })
