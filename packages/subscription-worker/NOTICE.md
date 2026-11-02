@@ -9,5 +9,10 @@ ordinary Mikka OAuth transport, excluding native fingerprint/device generation.
 No upstream tracked file is patched. Built-in CPA model executors, fingerprint
 transports and cloaking configuration are not registered by this worker.
 
+Claude subscription inference prepends the OAuth protocol's required opening
+system block, as CPA does. Mikka's host instructions, tools and conversation
+remain intact. HTTP identifies Mikka; no generated device/session metadata or
+native TLS fingerprint is used.
+
 The build uses official Go module sources and the upstream dependency lock.
 The generated `go.sum` records additional dependencies used by the worker.

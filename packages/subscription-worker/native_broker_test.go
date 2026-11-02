@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -98,6 +99,33 @@ func TestNativeBrokerUsesAccessOnlyCredentialsWithoutExportOrEndpointSelection(t
 			}
 			if access.reads != before || calls.Load() != 1 {
 				t.Fatal("invalid native request reached vault/provider")
+			}
+		})
+	}
+}
+
+func TestNativeBrokerMissingMIMEIsOnlyForCodexStreaming(t *testing.T) {
+	for _, test := range []struct {
+		provider  string
+		stream    bool
+		wantError bool
+	}{
+		{"codex", true, false}, {"codex", false, true}, {"claude", true, true},
+	} {
+		t.Run(fmt.Sprintf("%s/stream=%t", test.provider, test.stream), func(t *testing.T) {
+			w, _, _ := fixtureWorker(t, test.provider)
+			initial := mustAcquire(t, w)
+			route, path := "codex_cli", "/responses"
+			if test.provider == "claude" {
+				route, path = "claude_code_cli", "/v1/messages"
+			}
+			bindNativeRunFixture(t, w, initial.Revision, route)
+			w.NativeClient = &http.Client{Transport: fixedTransport{status: 200, body: "data: {\"native\":true}\n\n"}}
+			body, _ := json.Marshal(map[string]any{"model": "fixture-model", "stream": test.stream})
+			head := false
+			err := w.NativeStream(context.Background(), initial.Revision, NativeRequest{Path: path, Body: body}, func(kind string) error { head = kind == "text/event-stream"; return nil }, func([]byte) error { return nil })
+			if (err != nil) != test.wantError || head == test.wantError {
+				t.Fatalf("err=%v, head=%v", err, head)
 			}
 		})
 	}

@@ -46,7 +46,9 @@ synthetic canonical publication and deletion tests.
 6. The app resolves persisted owner/consumer bindings, checks workspace membership,
    quota/capability/billing policy and streams through the private worker.
    CPA converters run through a separate ordinary Mikka HTTP model adapter;
-   native identity metadata is removed, no native fingerprint executor is used.
+   native device identity metadata is removed, no native fingerprint executor is used.
+   Claude OAuth inference retains its required opening system block before
+   Mikka's host instructions; omitting it returns 429 even with quota available.
    Errors, retries, cancellation and revocation fail closed without paid fallback.
 7. Bot claims pin a native binding to the run. The opt-in hosted Linux daemon
    uses the existing adapters in a network-isolated Docker runtime. Its external

@@ -65,16 +65,16 @@ test('only windows the provider returned are shown', () => {
   assert.deepEqual(empty.windows, [])
 })
 
-test('extra usage on means the runtime will not use it; unstated is unverified, as the runtime guard', () => {
+test('available subscription usage stays usable with extra usage on, off or unstated', () => {
   const windows = { rate_limit: { primary_window: { used_percent: 10, limit_window_seconds: 18000 } } }
-  for (const credits of [{ has_credits: true, unlimited: false }, { has_credits: false, unlimited: true }]) assert.equal(parseSubscriptionUsage(id, 'codex', { status: 200, body: { ...windows, credits } }).status, 'extra_usage')
-  assert.equal(parseSubscriptionUsage(id, 'codex', { status: 200, body: windows }).status, 'unverified')
-  assert.equal(parseSubscriptionUsage(id, 'codex', { status: 200, body: { ...windows, credits: { has_credits: false } } }).status, 'unverified')
+  for (const credits of [{ has_credits: true, unlimited: false }, { has_credits: false, unlimited: true }]) assert.equal(parseSubscriptionUsage(id, 'codex', { status: 200, body: { ...windows, credits } }).status, 'ok')
+  assert.equal(parseSubscriptionUsage(id, 'codex', { status: 200, body: windows }).status, 'ok')
+  assert.equal(parseSubscriptionUsage(id, 'codex', { status: 200, body: { ...windows, credits: { has_credits: false } } }).status, 'ok')
   const five = { five_hour: { utilization: 10 } }
   const on = parseSubscriptionUsage(id, 'claude', { status: 200, body: { ...five, extra_usage: { is_enabled: true } } })
-  assert.equal(on.status, 'extra_usage')
+  assert.equal(on.status, 'ok')
   assert.deepEqual(on.windows, [{ kind: 'five_hour', remaining: 90, resetsAt: null }], 'the windows still show')
-  assert.equal(parseSubscriptionUsage(id, 'claude', { status: 200, body: five }).status, 'unverified')
+  assert.equal(parseSubscriptionUsage(id, 'claude', { status: 200, body: five }).status, 'ok')
   assert.equal(parseSubscriptionUsage(id, 'claude', { status: 200, body: { ...five, extra_usage: { is_enabled: false } } }).status, 'ok')
 })
 

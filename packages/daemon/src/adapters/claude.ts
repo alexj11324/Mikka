@@ -673,7 +673,11 @@ export class ClaudeAdapter implements AgentAdapter {
         if (
           ending ||
           account.apiProvider !== "firstParty" ||
-          account.apiKeySource !== "none"
+          // Current Claude Code omits apiKeySource for the descriptor we
+          // supplied. Require that exact OAuth source when it is absent;
+          // neither an unknown source nor an explicit API key may pass.
+          !(account.apiKeySource === "none" ||
+            (account.apiKeySource === undefined && account.tokenSource === "CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR"))
         )
           throw new Error(SUBSCRIPTION_ERROR)
         await externalAuth.verify?.()

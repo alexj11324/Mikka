@@ -70,7 +70,15 @@ it("delivers an access-only lease through the native input without reading host 
   expect(JSON.stringify(events)).not.toContain("fixture-access")
 })
 
-for (const accessToken of ["fixture-paid", "fixture-gateway"]) {
+it('accepts the older explicit no-API-key response too', async () => {
+  const { adapter, options } = await fixture({ accountId: 'fixture-account', token: async () => ({ accountId: 'fixture-account', accessToken: 'fixture-legacy', expiresAt: new Date(Date.now() + 60_000).toISOString() }) })
+  const session = await adapter.start(options)
+  const events = []
+  for await (const event of session.events()) events.push(event)
+  expect(events.at(-1)).toMatchObject({ type: 'exit', outcome: 'succeeded' })
+})
+
+for (const accessToken of ["fixture-paid", "fixture-gateway", "fixture-unknown", "fixture-environment"]) {
   it(`refuses ${accessToken} mode before delivering a prompt`, async () => {
     const { adapter, options } = await fixture({
       accountId: "fixture-account",
