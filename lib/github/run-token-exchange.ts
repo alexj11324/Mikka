@@ -8,6 +8,7 @@ export interface RunGitHubScope {
   remoteKey?: string
 }
 
+const GITHUB_REMOTE_PREFIX = 'v2/github.com/'
 /** The longest a worker keeps one answer; it asks again after this. */
 const MAX_ANSWER_MS = 60 * 60_000
 /** A gh watch segment needs its credential this long (packages/daemon/src/agents/github-credentials.mjs). */
@@ -47,7 +48,11 @@ export function createRunGitHubTokenExchange(deps: {
       await deps.afterIssue?.(current, issued).catch(() => undefined)
       const cap = now() + MAX_ANSWER_MS
       const expiresAt = new Date(issued.expiresAt ? Math.min(issued.expiresAt.getTime(), cap) : cap).toISOString()
-      return Response.json({ token: issued.token, expiresAt }, { headers })
+      // Daemons up to 0.0.315 check that the answer names the run's repository
+      // (their claim's github.repository) and refuse it otherwise, so a clone
+      // fails with git asking for a username. Keep naming it; it scopes nothing.
+      const repository = current.remoteKey?.startsWith(GITHUB_REMOTE_PREFIX) ? current.remoteKey.slice(GITHUB_REMOTE_PREFIX.length) : undefined
+      return Response.json({ token: issued.token, expiresAt, ...(repository ? { repository } : {}) }, { headers })
     } catch (error) {
       // Never expose a provider body, token or fetch exception to a worker or a log: only the code.
       const failure = classifyRunGitHubFailure(error)
