@@ -62,6 +62,9 @@ dbTest('failed wake state stays with its owner and bot, and recovery keeps the o
     const streamId='wrun_recovered-turn:0'
     assert.equal(await store.appendMessages(owner, 'wrun_recovered-turn', [{ role: 'assistant', content: 'Recovered reply',mikkaStreamId:'forged' } as unknown as import('ai').ModelMessage], null, botId,streamId),2)
     assert.deepEqual((await store.chatView(owner,200,botId)).persistedStreamIds,[streamId],'polling sees persistence before any stream commit marker')
+    const finishing = await store.chatView(owner,200,botId)
+    assert.equal(finishing.streamRunId,'wrun_recovered-turn','the turn still holds its lease while it finishes up')
+    assert.deepEqual([finishing.working,finishing.error],[false,null],'its stored reply ends the working state')
     assert.ok((await store.loadConversation(owner,botId)).messages.every(({message})=>!('mikkaStreamId' in message)),'stream markers never reach the model history')
     assert.equal(await store.appendMessages(owner, 'wrun_recovered-turn', [], null, botId),2,'an empty append returns the existing cursor')
     await db.update(schema.coordinatorSessions).set({leaseUntil:new Date(Date.now()-1)}).where(and(eq(schema.coordinatorSessions.userId,owner),eq(schema.coordinatorSessions.botId,botId)))
@@ -503,5 +506,40 @@ dbTest('重试 also re-runs a turn that ended with no reply and nothing recorded
     const take = await store.takeInbox(owner, 'wrun_retried-lost-turn', botId)
     assert.equal(take.added, 1, 'the retry starts a turn')
     assert.deepEqual((await store.chatView(owner, 200, botId)).items.map(item => [item.from, item.text]), [['person', '介绍一下北京的历史']], 'the message is not sent twice')
+  })
+})
+
+dbTest('a turn that says something, calls a tool and then answers stays working until its final reply is stored', async t => {
+  const [{ createRequestDatabaseScope, db }, schema, store, { recordCoordinatorEvent }, { userMessageEvent }, { sql }] = await Promise.all([
+    import('../db'), import('../db/schema'), import('./store'), import('../coordinator-event-store'), import('../coordinator-events'), import('drizzle-orm'),
+  ])
+  const scope = createRequestDatabaseScope(databaseUrl!)
+  const owner = `test-working-${randomUUID()}`, botId = randomUUID(), holder = 'wrun_multi-step-turn'
+  t.after(async () => {
+    t.diagnostic(JSON.stringify({ event: 'coordinator_db_fixture_retained', fixtureOwnerIds: [owner], database: 'mikka_e2e' }))
+    await scope.close()
+  })
+  await scope.run(async () => {
+    await db.execute(sql`insert into "user" (id, name, email, "emailVerified", "createdAt", "updatedAt") values (${owner}, 'Working fixture', ${`${owner}@example.invalid`}, false, now(), now())`)
+    await db.insert(schema.bots).values({ id: botId, ownerId: owner, workspaceId: randomUUID(), name: 'Dispatch bot' })
+    await recordCoordinatorEvent(db, userMessageEvent(owner, '派发任务，给 Mikka_test 写一个简单的 README', { botId }))
+    assert.equal((await store.chatView(owner, 200, botId)).working, true, 'the message waits for a turn')
+    await store.takeInbox(owner, holder, botId)
+    // While the model speaks, calls dispatch_run and answers, nothing of the round is stored: the chat stays working.
+    assert.equal((await store.chatView(owner, 200, botId)).working, true, 'the turn is answering')
+    // The round is stored once, after the model finished: the words before the tool call, the call, its result, the answer.
+    await store.appendMessages(owner, holder, [
+      { role: 'assistant', content: [{ type: 'text', text: '我去派发一下' }, { type: 'tool-call', toolCallId: 'call-1', toolName: 'dispatch_run', input: { repo: 'Mikka_test' } }] },
+      { role: 'tool', content: [{ type: 'tool-result', toolCallId: 'call-1', toolName: 'dispatch_run', output: { type: 'json', value: { runId: 'run-1' } } }] },
+      { role: 'assistant', content: [{ type: 'text', text: '已派发，写好后告诉你。' }] },
+    ], null, botId, `${holder}:0`)
+    const answered = await store.chatView(owner, 200, botId)
+    assert.equal(answered.streamRunId, holder, 'the turn still holds its lease while it finishes up')
+    assert.deepEqual([answered.working, answered.error], [false, null], 'its final reply ends the working state')
+    // A message sent while the turn finishes up is answered by its next round: still working.
+    await recordCoordinatorEvent(db, userMessageEvent(owner, '再加一个 LICENSE', { botId }))
+    assert.equal((await store.chatView(owner, 200, botId)).working, true, 'the queued message is work still to come')
+    await store.takeInbox(owner, holder, botId)
+    assert.equal((await store.chatView(owner, 200, botId)).working, true, 'the next round of the same turn is answering it')
   })
 })
