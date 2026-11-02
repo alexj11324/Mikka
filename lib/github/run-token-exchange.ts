@@ -1,3 +1,4 @@
+import { isDeviceAuthorityRevoked } from '@/lib/db/device-scope'
 import { classifyRunGitHubFailure, logRunGitHubFailure } from './run-token-failure'
 
 /** The run whose owner's own GitHub credential is asked for. Server-derived; the request names nothing. */
@@ -54,6 +55,8 @@ export function createRunGitHubTokenExchange(deps: {
       const repository = current.remoteKey?.startsWith(GITHUB_REMOTE_PREFIX) ? current.remoteKey.slice(GITHUB_REMOTE_PREFIX.length) : undefined
       return Response.json({ token: issued.token, expiresAt, ...(repository ? { repository } : {}) }, { headers })
     } catch (error) {
+      // A revoked device token (a desktop's worker credential) is an authentication failure: withDeviceRoute answers 401.
+      if (isDeviceAuthorityRevoked(error)) throw error
       // Never expose a provider body, token or fetch exception to a worker or a log: only the code.
       const failure = classifyRunGitHubFailure(error)
       logRunGitHubFailure(failure, { runId, stage }, deps.log)
