@@ -52,7 +52,16 @@ export interface Chat {
   artifacts: Record<string, { id: string; title: string }>
   /** By message id. */
   reactions?: Record<string, Reaction[]>
+  /** Why the last reply did not come (lib/chat-failure.ts on the server); null while working or when nothing failed. */
+  failure?: ChatFailure | null
 }
+
+/** lib/chat-failure.ts on the server. */
+export type ChatFailure =
+  | { kind: 'hosted'; code: string }
+  | { kind: 'subscription'; notice: 'unavailable' | 'reconnect' | 'quotaUsed' | 'retry' }
+  | { kind: 'wake'; code: 'wake_failed' | 'wake_start_unconfirmed' | 'wake_exhausted' }
+  | { kind: 'failed' }
 
 /** Reactions on a message, by emoji (lib/reactions.ts on the server). */
 export interface Reaction { emoji: string; count: number; mine: boolean }

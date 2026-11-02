@@ -6,6 +6,7 @@ import { tokenWorkspace } from '@/lib/tokens/principal'
 import { chatView } from '@/lib/coordinator/store'
 import { openChatBotId } from '@/lib/coordinator/coordinator-bot'
 import { reactionsFor } from '@/lib/reactions'
+import { chatFailure } from '@/lib/chat-failure'
 import { coordinatorEnabled, wakeCoordinator } from '@/lib/coordinator/wake'
 import { recordPersonalSubmission, SubmissionConflictError } from '@/lib/coordinator-submission'
 import { z } from 'zod'
@@ -42,10 +43,11 @@ async function handleGET(request: Request) {
       if (!await tokenBotAllowed(user, bot.data)) return json({ error: 'botNotFound' }, 404)
       const enabled = coordinatorEnabled()
       const chat = await chatView(user.id, 200, await openChatBotId(user, bot.data))
-      return json({ ...chat, enabled, working: enabled && chat.working, reactions: await reactionsOf(user.id, chat.items) })
+      const working = enabled && chat.working
+      return json({ ...chat, enabled, working, failure: enabled ? chatFailure({ working, error: chat.error, items: chat.items }) : null, reactions: await reactionsOf(user.id, chat.items) })
     }
     const chat = await getCoordinatorChat(bot.data)
-    return json({ ...chat, reactions: await reactionsOf(user.id, chat.items) })
+    return json({ ...chat, failure: chat.enabled ? chatFailure(chat) : null, reactions: await reactionsOf(user.id, chat.items) })
   } catch (error) {
     if (error instanceof ActionFailureError) return json({ error: error.code }, 404)
     throw error

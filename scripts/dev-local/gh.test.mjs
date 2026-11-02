@@ -24,7 +24,7 @@ test('real agent-shaped push, gh PR and exact-head receipt use only the fixture 
     git(['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-m', 'Append fixture delivery'])
     git(['push', 'origin', 'HEAD:mikka/fixture-1'])
     const commit = git(['rev-parse', 'HEAD'])
-    const token = await fetch(`${services.origin}/github/app/installations/99/access_tokens`, { method: 'POST', headers: { authorization: 'Bearer a.b.c', 'content-type': 'application/json' }, body: JSON.stringify({ repository_ids: [789], permissions: { contents: 'write', pull_requests: 'write', checks: 'read', actions: 'read', metadata: 'read' } }) })
+    const token = await fetch(`${services.origin}/github/app/installations/99/access_tokens`, { method: 'POST', headers: { authorization: 'Bearer a.b.c', 'content-type': 'application/json' }, body: JSON.stringify({ repository_ids: [789] }) })
     assert.equal(token.status, 200)
     const issued = await token.json()
     assert.equal(issued.token, env.GH_TOKEN)

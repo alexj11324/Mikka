@@ -1,28 +1,90 @@
-import { Platform } from 'react-native'
+import { DynamicColorIOS, Platform, PlatformColor } from 'react-native'
 
-/** Colours from the mobile Figma frames (page 268:4750). Colour is restrained (mobile.md). */
-export const colors = {
-  page: '#FFFFFF',
-  grouped: '#F2F2F7',
-  surface: '#FFFFFF',
-  bubble: '#F2F2F2',
-  chip: '#EBEBEB',
-  ink: '#111111',
-  text: '#1C1C1E',
-  secondary: '#8A8A8E',
-  tertiary: '#B0B0B5',
-  separator: '#E5E5EA',
-  accent: '#3478F6',
-  /** A task or thread named in chat: the accent at 10% (R-15). */
-  objectChip: 'rgba(52, 120, 246, 0.10)',
-  unread: '#3478F6',
-  success: '#34C759',
-  danger: '#E5484D',
-  merged: '#8250DF',
-  prOpen: '#1A7F37',
-  orange: '#E8840C',
-  pressed: '#E8E8EA',
-} as const
+/**
+ * The app's colours. On iOS each one is a system colour (PlatformColor), so it
+ * follows light and dark mode and Increase Contrast by itself (Alex,
+ * 2026-11-02); the few with no system name (an accent tint) are a
+ * DynamicColorIOS with light, dark and high-contrast values. The web build
+ * (screenshot checks) reads CSS variables that switch with
+ * prefers-color-scheme; Android has the light values. Every value is typed as
+ * a string, since components take colours that way; on iOS it is an opaque
+ * colour object, so never build strings from it.
+ */
+type Token = {
+  /** The iOS system colour, a DynamicColorIOS where the system has none, or a fixed hex. */
+  ios: string | { light: string; dark: string; highContrastLight?: string; highContrastDark?: string }
+  light: string
+  dark: string
+  /** The web build's Increase Contrast values (prefers-contrast: more), where iOS has its own. */
+  contrast?: { light: string; dark: string }
+}
+
+const TOKENS = {
+  /** A screen's background. */
+  page: { ios: 'systemBackground', light: '#FFFFFF', dark: '#000000' },
+  /** A grouped list's background (settings, a bot's page, sheets). */
+  grouped: { ios: 'systemGroupedBackground', light: '#F2F2F7', dark: '#000000' },
+  /** A card, a row of a grouped list, the composer's field, the title capsule. */
+  surface: { ios: 'secondarySystemGroupedBackground', light: '#FFFFFF', dark: '#1C1C1E' },
+  /** The bot's message bubble. */
+  bubble: { ios: 'secondarySystemBackground', light: '#F2F2F7', dark: '#1C1C1E' },
+  /** A chip, a segmented control's track, a switch's off track. */
+  chip: { ios: 'tertiarySystemFill', light: '#EBEBF0', dark: 'rgba(118, 118, 128, 0.24)' },
+  /** Code in a reply. */
+  code: { ios: 'quaternarySystemFill', light: 'rgba(116, 116, 128, 0.08)', dark: 'rgba(118, 118, 128, 0.18)' },
+  ink: { ios: 'label', light: '#000000', dark: '#FFFFFF' },
+  text: { ios: 'label', light: '#000000', dark: '#FFFFFF' },
+  /** On an ink button (its words, a tick): the page's colour, so the pair inverts in dark mode. */
+  onInk: { ios: 'systemBackground', light: '#FFFFFF', dark: '#000000' },
+  secondary: { ios: 'secondaryLabel', light: 'rgba(60, 60, 67, 0.6)', dark: 'rgba(235, 235, 245, 0.6)' },
+  /** Icons and disabled fills only; it is under 4.5:1, so no words (placeholders take `secondary`). */
+  tertiary: { ios: 'tertiaryLabel', light: 'rgba(60, 60, 67, 0.3)', dark: 'rgba(235, 235, 245, 0.3)' },
+  separator: { ios: 'separator', light: 'rgba(60, 60, 67, 0.29)', dark: 'rgba(84, 84, 88, 0.65)' },
+  accent: { ios: 'systemBlue', light: '#007AFF', dark: '#0A84FF', contrast: { light: '#0040DD', dark: '#409CFF' } },
+  /**
+   * A filled accent carrying white words (my bubble, the send button). systemBlue under white
+   * reads 4.0:1 in light and 3.7:1 in dark, under the 4.5:1 text minimum, so a deeper blue
+   * here (5.3:1), deeper still with Increase Contrast; tinted text and icons keep systemBlue.
+   */
+  accentFill: { ios: { light: '#0068DA', dark: '#0068DA', highContrastLight: '#0040DD', highContrastDark: '#0050E0' }, light: '#0068DA', dark: '#0068DA', contrast: { light: '#0040DD', dark: '#0050E0' } },
+  /** On the accent fill (my bubble, the send button). */
+  onAccent: { ios: '#FFFFFF', light: '#FFFFFF', dark: '#FFFFFF' },
+  /** A task or thread named in chat, my reaction: the accent at 10% (R-15). */
+  objectChip: { ios: { light: 'rgba(0, 122, 255, 0.10)', dark: 'rgba(10, 132, 255, 0.22)', highContrastLight: 'rgba(0, 64, 221, 0.16)', highContrastDark: 'rgba(64, 156, 255, 0.30)' }, light: 'rgba(0, 122, 255, 0.10)', dark: 'rgba(10, 132, 255, 0.22)' },
+  unread: { ios: 'systemBlue', light: '#007AFF', dark: '#0A84FF', contrast: { light: '#0040DD', dark: '#409CFF' } },
+  success: { ios: 'systemGreen', light: '#34C759', dark: '#30D158', contrast: { light: '#248A3D', dark: '#30DB5B' } },
+  danger: { ios: 'systemRed', light: '#FF3B30', dark: '#FF453A', contrast: { light: '#D70015', dark: '#FF6961' } },
+  merged: { ios: 'systemPurple', light: '#AF52DE', dark: '#BF5AF2' },
+  prOpen: { ios: 'systemGreen', light: '#34C759', dark: '#30D158' },
+  orange: { ios: 'systemOrange', light: '#FF9500', dark: '#FF9F0A', contrast: { light: '#C93400', dark: '#FFB340' } },
+  /** A pressed or selected row. */
+  pressed: { ios: 'systemGray5', light: '#E5E5EA', dark: '#2C2C2E' },
+} satisfies Record<string, Token>
+
+type Name = keyof typeof TOKENS
+
+function resolve(name: Name, token: Token): string {
+  if (Platform.OS === 'ios') return (typeof token.ios === 'string' && token.ios.startsWith('#') ? token.ios : typeof token.ios === 'string' ? PlatformColor(token.ios) : DynamicColorIOS(token.ios)) as unknown as string
+  if (Platform.OS === 'web') return `var(--mk-${name})`
+  return token.light
+}
+
+export const colors = Object.fromEntries(Object.entries(TOKENS).map(([name, token]) => [name, resolve(name as Name, token)])) as Record<Name, string>
+
+// The web build's palette, switched by the browser's colour scheme.
+if (Platform.OS === 'web' && typeof document !== 'undefined') {
+  const tokens: [string, Token][] = Object.entries(TOKENS)
+  const vars = (scheme: 'light' | 'dark', contrast = false) => tokens
+    .flatMap(([name, token]) => contrast ? token.contrast ? [`--mk-${name}: ${token.contrast[scheme]};`] : [] : [`--mk-${name}: ${token[scheme]};`]).join(' ')
+  const style = document.createElement('style')
+  style.textContent = `:root { ${vars('light')} color-scheme: light dark; } @media (prefers-color-scheme: dark) { :root { ${vars('dark')} } }`
+    + ` @media (prefers-contrast: more) { :root { ${vars('light', true)} } } @media (prefers-contrast: more) and (prefers-color-scheme: dark) { :root { ${vars('dark', true)} } }`
+    + ' body { background: var(--mk-page); }'
+  document.head.appendChild(style)
+}
+
+/** The light or dark value of a token, for the few places that build a colour string (a CSS gradient). */
+export const plainColor = (name: Name, scheme: 'light' | 'dark') => TOKENS[name][scheme]
 
 export const font = Platform.select({
   web: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Noto Sans SC", "WenQuanYi Zen Hei", system-ui, sans-serif',

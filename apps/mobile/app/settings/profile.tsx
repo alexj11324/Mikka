@@ -35,7 +35,7 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
   hero: { alignItems: 'center', marginBottom: 20 },
-  row: { flexDirection: 'row', alignItems: 'center', minHeight: 52, paddingHorizontal: 16, gap: 12, backgroundColor: '#fff' },
+  row: { flexDirection: 'row', alignItems: 'center', minHeight: 52, paddingHorizontal: 16, gap: 12, backgroundColor: colors.surface },
   label: { fontSize: 16 },
   input: { flex: 1, minWidth: 0, textAlign: 'right', fontSize: 15, color: colors.secondary, fontFamily: font, outlineStyle: 'none' } as never,
 })

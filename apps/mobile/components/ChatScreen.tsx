@@ -24,10 +24,14 @@ import { holdMessage } from '@/lib/message-actions'
 import { plainText, quotable } from '@/lib/quote'
 import { delivered, inFlight, marked, outgoingKey, queued, type Outgoing, type OutgoingImage } from '@/lib/outbox'
 import { askForPush, usePushState } from '@/lib/push-state'
-import { runTitle, type Chat, type CitationSource, type PendingAction } from '@/lib/types'
+import { runTitle, type Chat, type ChatFailure, type CitationSource, type PendingAction } from '@/lib/types'
+import { failureLine } from '@/lib/chat-failure'
+import { waitingLabel } from '@/lib/waiting'
 import { useApi } from '@/lib/useApi'
+import { useStop } from '@/lib/useStop'
+import { StopFailed } from '@/components/StopFailed'
 import { runInfoLine } from '@/lib/run-info'
-import { webChatPath } from '@/lib/web'
+import { openOnWeb, webChatPath } from '@/lib/web'
 import { colors } from '@/lib/theme'
 
 const RUN_ENDED = /^\[Event\] Run ([0-9a-f-]{36}) ended with status (\w+)/i
@@ -48,7 +52,7 @@ function eventText(text: string, sources: Record<string, CitationSource>) {
  * person (approve or decline, as on the web); `focus` marks the one a push
  * was about. OpenUI cards are drawn natively (components/OpenUI.tsx).
  */
-export function ChatScreen({ botId, name, color, shape, draft, focus, compose, composerAccessory }: { botId: string | null; name: string; color?: string; shape?: string; draft?: string; focus?: string; compose?: boolean; composerAccessory?: ReactNode }) {
+export function ChatScreen({ botId, name, color, shape, draft, focus, compose, composerAccessory, composerNotice }: { botId: string | null; name: string; color?: string; shape?: string; draft?: string; focus?: string; compose?: boolean; composerAccessory?: ReactNode; composerNotice?: ReactNode }) {
   const [quote, setQuote] = useState<string | null>(null)
   const self = botId ?? 'coordinator'
   const router = useRouter()
@@ -122,14 +126,9 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, c
 
   const answer = async (message: string) => send(message)
 
-  // 停止: the turn ends on the server, keeping what it had said; stop stays away until the chat stops working.
-  const [stopping, setStopping] = useState(false)
-  useEffect(() => { if (!working) setStopping(false) }, [working])
-  const stop = async () => {
-    setStopping(true)
-    try { await api('/api/mobile/chat/stop', { method: 'POST', body: { botId } }) } catch { setStopping(false) }
-    await reload()
-  }
+  // 停止: the turn ends on the server, keeping what it had said. Stop is away only while its request is out; one that fails or
+  // leaves the chat working 10 seconds later shows 「没停下 · 重试」.
+  const stopper = useStop(() => api('/api/mobile/chat/stop', { method: 'POST', body: { botId } }), Boolean(data?.working), reload)
 
   const reactions = data?.reactions ?? {}
   // Drawn at once, then saved; the next load has the server's word.
@@ -151,12 +150,13 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, c
   return (
     <View style={styles.screen}>
       {/* Back is the system's (and its edge swipe); the bot's name opens the bot's page. */}
-      <NavBar
+      <NavBar material
         titleView={
-          <Pressable accessibilityRole="button" accessibilityLabel={`${name} 的资料`} onPress={() => router.push(`/bots/${self}/info`)}>
+          <Pressable accessibilityRole="button" accessibilityLabel={name ? `${name} 的资料` : '资料'} onPress={() => router.push(`/bots/${self}/info`)}>
             <Capsule>
               <BotAvatar color={color} shape={shape} size={22} />
-              <Text style={styles.titleText} numberOfLines={1}>{name}</Text>
+              {/* The bot's name is not in yet (opened from a push before 对话 loaded): a spinner, never an empty pill. */}
+              {name ? <Text style={styles.titleText} numberOfLines={1}>{name}</Text> : <Spinner size={14} />}
             </Capsule>
           </Pressable>
         }
@@ -195,7 +195,8 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, c
             )
           })}
           {outbox.map(item => <OutgoingBubble key={item.key} text={item.text} photos={item.images.map(image => image.uri)} failed={item.state === 'failed'} onRetry={() => void retry(item)} />)}
-          {working ? <View style={styles.working}><Spinner size={16} /></View> : null}
+          {working ? <WaitingLine since={outbox.length ? null : waitingSince(items)} /> : null}
+          {stopper.stuck ? <StopFailed busy={stopper.sending} onRetry={() => void stopper.stop()} /> : null}
           {!data && !error ? <View style={styles.loading}><Spinner /></View> : null}
           {data && !items.length && !working ? <Text style={styles.empty}>有什么要我做的，直接说。</Text> : null}
           {error && !data ? (
@@ -204,7 +205,7 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, c
               <CardButton label="重试" onPress={() => void reload()} />
             </View>
           ) : null}
-          {data?.error && !working ? <Text style={styles.error}>{data.error}</Text> : null}
+          {data?.failure && !working ? <FailedReply failure={data.failure} botId={botId} onQueued={() => void reload()} /> : null}
           {pending.data ? (
             <View onLayout={event => { pendingTop.current = event.nativeEvent.layout.y }}>
               <PendingActions items={pending.data} focus={focus} reload={pending.reload} onFocusLayout={focus ? showFocus : undefined} />
@@ -213,8 +214,65 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, c
         </KeyboardChatScrollView>
       </View>
       <OfflineBanner top={insets.top + 66} />
-      <Composer value={text} onChangeText={setText} placeholder={`给 ${name} 发消息`} onSend={send} attach overlay onHeight={setComposerHeight} autoFocus={compose || Boolean(draft)}
-        quote={quote} onClearQuote={() => setQuote(null)} accessory={composerAccessory} onStop={Boolean(data?.working) && !stopping ? () => void stop() : undefined} />
+      <Composer value={text} onChangeText={setText} placeholder={name ? `给 ${name} 发消息` : '发消息'} onSend={send} attach overlay onHeight={setComposerHeight} autoFocus={compose || Boolean(draft)}
+        quote={quote} onClearQuote={() => setQuote(null)} accessory={composerAccessory} notice={composerNotice} onStop={Boolean(data?.working) && !stopper.sending ? () => void stopper.stop() : undefined} />
+    </View>
+  )
+}
+
+/** When the person's unanswered message was sent; a reply is counted from there. Otherwise (an event woke the bot) from when the screen saw it start. */
+function waitingSince(items: Chat['items']) {
+  const last = [...items].reverse().find(item => item.from !== 'event')
+  const at = last?.from === 'person' ? Date.parse(last.createdAt) : NaN
+  return Number.isFinite(at) ? at : null
+}
+
+/** The reply on its way: the spinner, and after 30 seconds what it waits for and for how long (Figma 843:2 #1). */
+function WaitingLine({ since }: { since: number | null }) {
+  const [start] = useState(() => since ?? Date.now())
+  const [now, setNow] = useState(Date.now)
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(timer)
+  }, [])
+  const label = waitingLabel(Math.min(since ?? start, now), now)
+  return (
+    <View style={[styles.working, label ? styles.waiting : null]}>
+      <Spinner size={16} />
+      {label ? <Text style={styles.waitingText}>{label}</Text> : null}
+    </View>
+  )
+}
+
+/**
+ * A reply that did not come: why, in the web's words, with 重试 (the same turn
+ * again, POST /api/mobile/chat/retry) and, when the subscription or the
+ * hosted model needs something, 模型与额度 on the web. Never a raw error.
+ */
+function FailedReply({ failure, botId, onQueued }: { failure: ChatFailure; botId: string | null; onQueued: () => void }) {
+  const line = failureLine(failure)
+  const [busy, setBusy] = useState(false)
+  const [refused, setRefused] = useState(false)
+  const retry = async () => {
+    setBusy(true)
+    setRefused(false)
+    try {
+      const { queued } = await api<{ queued: boolean }>('/api/mobile/chat/retry', { method: 'POST', body: { botId } })
+      if (queued) onQueued()
+      else setRefused(true)
+    } catch {
+      setRefused(true)
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <View style={styles.failed}>
+      <Text style={styles.error}>{refused ? '没能重试' : line.text}</Text>
+      <View style={styles.failedActions}>
+        {line.retry ? <CardButton label="重试" busy={busy} onPress={() => void retry()} /> : null}
+        {line.settings ? <CardButton label="模型与额度" onPress={() => void openOnWeb('/settings?section=models')} /> : null}
+      </View>
     </View>
   )
 }
@@ -226,8 +284,11 @@ const styles = StyleSheet.create({
   list: { paddingHorizontal: 16, gap: 12 },
   loading: { paddingTop: 120, alignItems: 'center' },
   stopped: { alignSelf: 'flex-start', fontSize: 12, lineHeight: 17, color: colors.secondary, marginLeft: 4, marginTop: -6 },
-  working: { alignSelf: 'flex-start', backgroundColor: colors.bubble, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 12 },
+  working: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.bubble, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 12 },
+  waiting: { paddingLeft: 14, paddingVertical: 10 },
+  waitingText: { fontSize: 14, lineHeight: 20, color: colors.secondary },
   failed: { alignItems: 'center', gap: 10, marginTop: 24 },
+  failedActions: { flexDirection: 'row', gap: 8 },
   empty: { alignSelf: 'center', color: colors.secondary, marginTop: 40, fontSize: 15 },
   error: { alignSelf: 'center', color: colors.danger, fontSize: 13, textAlign: 'center', marginHorizontal: 24 },
 })

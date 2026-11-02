@@ -1,19 +1,20 @@
 import { Button, Host, Menu, Section, Text, Toggle } from '@expo/ui/swift-ui'
 import { buttonStyle, controlSize, tint } from '@expo/ui/swift-ui/modifiers'
-import { groupTag, groupTitle, optionName, useModelMenu } from '@/lib/model-menu'
+import { groupTag, groupTitle, optionName, type ModelMenuState } from '@/lib/model-menu'
 import { colors } from '@/lib/theme'
 
 /**
  * The model chip beside the composer's 「+」: a borderless SwiftUI menu like 「+」's
  * (AttachMenu.ios.tsx). Each group is a section; the current model is ticked;
- * who pays shows under the name; 刷新 re-reads the list. Saved per bot for its next runs.
+ * who pays shows under the name; 刷新 re-reads the list. Saved per bot for its next runs;
+ * a pick that does not save keeps the saved model here (ModelNotice says why).
  */
-export function ModelMenu({ botId }: { botId: string | null }) {
-  const { menu, choose, failed, refresh, refreshing, refreshFailed } = useModelMenu(botId)
+export function ModelMenu({ model }: { model: ModelMenuState }) {
+  const { menu, choose, refresh, refreshing, refreshFailed } = model
   if (!menu) return null
   const { current, groups } = menu
   const name = optionName(current)
-  const label = !current.available ? `${name} · 不可用` : failed ? `${name} · 未保存` : name
+  const label = current.available ? name : `${name} · 不可用`
   return (
     <Host matchContents>
       <Menu label={label} systemImage="chevron.down" modifiers={[buttonStyle('borderless'), controlSize('small'), tint(current.available ? colors.ink : colors.secondary)]}>

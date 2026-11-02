@@ -1,4 +1,4 @@
-import { Linking, Platform, ScrollView, StyleSheet, View } from 'react-native'
+import { ActionSheetIOS, Linking, Platform, ScrollView, StyleSheet, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ArrowUpRight, Bell, BookOpen, Blocks, BriefcaseBusiness, Globe, Info, LogOut } from 'lucide-react-native'
@@ -28,9 +28,14 @@ export default function SettingsScreen() {
   const { data, error, reload } = useSettings()
   const close = () => (router.canGoBack() ? router.back() : router.replace('/'))
   const signOut = async () => {
-    if (Platform.OS !== 'web') await (await import('@/lib/push')).unregisterPush()
+    if (Platform.OS !== 'web') await (await import('@/lib/push')).unregisterPush().catch(() => undefined)
     await authClient.signOut()
     clearApiCache()
+  }
+  // Signing out asks first, as the system's action sheet (usability review #6).
+  const confirmSignOut = () => {
+    if (Platform.OS !== 'ios') return void signOut()
+    ActionSheetIOS.showActionSheetWithOptions({ options: ['退出登录', '取消'], destructiveButtonIndex: 0, cancelButtonIndex: 1 }, index => { if (index === 0) void signOut() })
   }
   return (
     <View style={{ flex: 1, backgroundColor: colors.grouped }}>
@@ -63,7 +68,7 @@ export default function SettingsScreen() {
             <Row icon={icon('info.circle', Info)} label="版本" value={versionLabel()} trailing={null} />
           </Group>
           <Group>
-            <Row icon={icon('rectangle.portrait.and.arrow.right', LogOut, colors.danger)} label="退出登录" destructive onPress={() => void signOut()} />
+            <Row icon={icon('rectangle.portrait.and.arrow.right', LogOut, colors.danger)} label="退出登录" destructive onPress={confirmSignOut} />
           </Group>
         </ScrollView>
       )}

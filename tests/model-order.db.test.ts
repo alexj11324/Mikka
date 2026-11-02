@@ -162,6 +162,17 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
     await keys.removeApiKey(pool, scope.ownerId, second.id)
     const named = await resolveModelDispatch(pool, ctx, { harness: 'claude_code', model: 'acct-sonnet-c' })
     assert.equal(named.kind === 'device' && named.model, 'mid')
+    // The thread's model is the only one tried; it never falls back to the list, which has a model that runs (opus).
+    const notOffered = await resolveModelDispatch(pool, ctx, { harness: 'codex', model: 'acct-opus-c' })
+    assert.deepEqual([notOffered.kind, notOffered.kind === 'none' && notOffered.reason, notOffered.kind === 'none' && notOffered.card.description], ['none', 'notOffered', '没有订阅或 Key 能用 Codex 跑 acct-opus-c'])
+    await subscribe(scope, 'codex', ['acct-codex-z'])
+    const noComputer = await resolveModelDispatch(pool, ctx, { harness: 'codex', model: 'acct-codex-z' })
+    assert.deepEqual([noComputer.kind === 'none' && noComputer.reason, noComputer.kind === 'none' && noComputer.card.description, noComputer.kind === 'none' && noComputer.card.options.map(option => option.action)],
+      ['pickedNoDevice', '没有电脑能用 Codex 跑 acct-codex-z', ['connectServer', 'modelSettings']])
+    await pool.query('UPDATE byos_connections SET paused=true WHERE id=$1', [claude])
+    const paused = await resolveModelDispatch(pool, ctx, { harness: 'claude_code', model: 'acct-sonnet-c' })
+    assert.deepEqual([paused.kind === 'none' && paused.reason, paused.kind === 'none' && paused.card.description], ['pickedUnavailable', 'Claude Code 的 acct-sonnet-c 暂时不可用'])
+    await pool.query('UPDATE byos_connections SET paused=false WHERE id=$1', [claude])
     // 云端 without the person's E2B key: the card says so.
     const cloud = await resolveModelDispatch(pool, ctx, null, undefined, 'cloud')
     assert.deepEqual([cloud.kind, cloud.kind === 'none' && cloud.reason, cloud.kind === 'none' && cloud.card.options.map(option => option.action)], ['none', 'cloudNotConfigured', ['e2bKey', 'modelSettings']])
@@ -169,5 +180,41 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
     for (const entry of (await order.orderView(pool, scope)).entries) await order.changeOrder(pool, scope, { kind: 'remove', id: entry.id })
     const none = await resolveModelDispatch(pool, ctx)
     assert.deepEqual([none.kind, none.kind === 'none' && none.reason], ['none', 'noModels'])
+  })
+
+  await t.test('a named computer fixes where, not which model: the thread\'s own model, else the list in order, among what it runs; else it says what it lacks', async () => {
+    const scope = await person('order-named')
+    await subscribe(scope, 'claude', ['acct-opus-n'])
+    const chatgpt = await subscribe(scope, 'codex', ['acct-codex-n'])
+    const ctx = { ...scope, botId: null }
+    // The list (untouched): Claude Code's opus, then Codex.
+    assert.deepEqual((await order.orderView(pool, scope)).entries.map(entry => [entry.harness, entry.model]), [['claude_code', 'acct-opus-n'], ['codex', 'acct-codex-n']])
+    const both = await device(scope.ownerId, [
+      { harness: 'claude_code', installed: true, modelSlots: [{ slot: 'top', model: 'acct-opus-n', name: 'Top' }] },
+      { harness: 'codex', installed: true, modelSlots: [{ slot: 'acct-codex-n', model: 'acct-codex-n', name: 'acct-codex-n' }] },
+    ])
+    const codexOnly = await device(scope.ownerId, [{ harness: 'codex', installed: true, modelSlots: [{ slot: 'acct-codex-n', model: 'acct-codex-n', name: 'acct-codex-n' }] }])
+    const claudeOnly = await device(scope.ownerId, [{ harness: 'claude_code', installed: true, modelSlots: [{ slot: 'top', model: 'acct-opus-n', name: 'Top' }] }])
+    // Named computer and the thread's own Codex model: Codex runs it there, though the list starts with Claude Code.
+    const asked = await resolveModelDispatch(pool, ctx, { harness: 'codex', model: 'acct-codex-n' }, undefined, undefined, both.id)
+    assert.deepEqual(asked.kind === 'device' && [asked.deviceId, asked.agentId, asked.entry.harness, asked.entry.source], [both.id, both.agents.codex, 'codex', { kind: 'subscription', connectionId: chatgpt }])
+    // Named computer that lacks Codex: refused with what it lacks; Claude Code is never put in its place.
+    const lacking = await resolveModelDispatch(pool, ctx, { harness: 'codex', model: 'acct-codex-n' }, undefined, undefined, claudeOnly.id)
+    assert.deepEqual([lacking.kind, lacking.kind === 'none' && lacking.reason, lacking.kind === 'none' && lacking.card.description], ['none', 'namedDevice', '这台电脑没装 Codex'])
+    // No model of the thread's own: the list in order, the first this computer runs (Codex here; opus first elsewhere).
+    const listed = await resolveModelDispatch(pool, ctx, null, undefined, undefined, codexOnly.id)
+    assert.deepEqual(listed.kind === 'device' && [listed.deviceId, listed.entry.harness, listed.model], [codexOnly.id, 'codex', 'acct-codex-n'])
+    const first = await resolveModelDispatch(pool, ctx, null, undefined, undefined, both.id)
+    assert.deepEqual(first.kind === 'device' && [first.deviceId, first.entry.harness], [both.id, 'claude_code'])
+    // Its Codex installed but the model not reported: it says so.
+    const stale = await device(scope.ownerId, [{ harness: 'codex', installed: true, modelSlots: [{ slot: 'other', model: 'other-model', name: 'other' }] }])
+    const unreported = await resolveModelDispatch(pool, ctx, { harness: 'codex', model: 'acct-codex-n' }, undefined, undefined, stale.id)
+    assert.equal(unreported.kind === 'none' && unreported.card.description, '这台电脑的 Codex 没有报告 acct-codex-n')
+    // A model of the thread's own that no subscription or key offers on that Agent (a DeepSeek key runs on Claude Code): refused, not swapped.
+    const notOffered = await resolveModelDispatch(pool, ctx, { harness: 'codex', model: 'deepseek-flash' }, undefined, undefined, both.id)
+    assert.deepEqual([notOffered.kind, notOffered.kind === 'none' && notOffered.card.description], ['none', '没有订阅或 Key 能用 Codex 跑 deepseek-flash'])
+    // 运行位置 云端 does not move a run the person pinned to a computer.
+    await order.changeOrder(pool, scope, { kind: 'location', location: 'cloud' })
+    assert.equal((await resolveModelDispatch(pool, ctx, null, undefined, undefined, codexOnly.id)).kind, 'device')
   })
 })

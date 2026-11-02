@@ -58,7 +58,7 @@ const styles = StyleSheet.create({
   center: { paddingTop: 40, alignItems: 'center' },
   note: { textAlign: 'center', color: colors.secondary, marginTop: 40, fontSize: 15 },
   list: { paddingHorizontal: 16, paddingTop: 8 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#fff', paddingHorizontal: 14, paddingVertical: 10 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.surface, paddingHorizontal: 14, paddingVertical: 10 },
   first: { borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingTop: 14 },
   last: { borderBottomLeftRadius: 16, borderBottomRightRadius: 16, paddingBottom: 14 },
   title: { fontSize: 16 },

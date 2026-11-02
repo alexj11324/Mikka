@@ -36,6 +36,17 @@ const redact = value => {
   for (const secret of secrets) if (secret) result = result.replaceAll(secret, '[redacted]')
   return result.replace(/(?:postgres(?:ql)?:\/\/)[^\s"']+/gi, '[database]').replace(/(?:orv_|mkw_)[A-Za-z0-9_-]+/g, '[credential]').replace(/(authorization|cookie|api.?key|password|secret)\s*[:=]\s*[^\s,]+/gi, '$1=[redacted]')
 }
+/**
+ * The cache directories stay private, but a daemon run as MIKKA_DEV_DAEMON_USER
+ * (root acceptance) must pass through them to its own data directory: they are
+ * created traverse-only (0711), never listable, and account/session files stay
+ * 0600 inside their own 0700 store. One left 0700 by an earlier run gets the same bit.
+ */
+async function privateDirectory(path) {
+  const daemonUser = process.getuid?.() === 0 && process.env.MIKKA_DEV_DAEMON_USER
+  await mkdir(path, { recursive: true, mode: daemonUser ? 0o711 : 0o700 })
+  if (daemonUser) await chmod(path, 0o711)
+}
 async function progress(step, status, detail) {
   const entry = { at: new Date().toISOString(), runId, step, status, elapsedMs: Date.now() - started, ...(detail ? { detail: redact(detail) } : {}) }
   await appendFile(progressFile, `${JSON.stringify(entry)}\n`, { mode: 0o600 })
@@ -117,10 +128,7 @@ async function setup() {
   assertDevLocal(process.env)
   assert.equal(Number(process.versions.node.split('.')[0]), 24, 'Use Node 24')
   for (const name of ['CI', 'GITHUB_ACTIONS', 'RUNNER_ENVIRONMENT', 'GITHUB_RUN_ID']) assert.ok(!process.env[name], 'Local acceptance must not impersonate CI')
-  await mkdir(directory, { recursive: true, mode: 0o700 })
-  // The daemon's unprivileged UID needs traverse permission, never access to
-  // account/session files (which remain 0600 inside their own 0700 store).
-  if (process.getuid?.() === 0 && process.env.MIKKA_DEV_DAEMON_USER) await chmod(directory, 0o711)
+  await privateDirectory(directory)
   for (const name of ['BETTER_AUTH_SECRET', 'DEEPSEEK_API_KEY', 'INFISICAL_CLIENT_SECRET']) if (process.env[name]) secrets.add(process.env[name])
   const existing = process.argv.includes('--existing')
   if (selectedItems.includes('8') && !existing) {
@@ -377,7 +385,8 @@ async function cleanup() {
 process.once('SIGINT', () => { interrupted = true; releaseHold?.(); void cleanup() })
 process.once('SIGTERM', () => { interrupted = true; releaseHold?.(); void cleanup() })
 try {
-  await mkdir(resolve(root, '.cache/dev-local'), { recursive: true, mode: 0o700 })
+  await privateDirectory(resolve(root, '.cache'))
+  await privateDirectory(resolve(root, '.cache/dev-local'))
   const device = await setup()
   await accept(device)
   const finishedFingerprint = await fingerprint()

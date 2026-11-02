@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Check, ChevronRight } from 'lucide-react-native'
 import { KeyboardStickyView } from 'react-native-keyboard-controller'
+import { Spinner } from '@/components/icons'
 import { Symbol } from '@/components/Symbol'
 import { Text } from '@/components/Text'
 import { API_URL } from '@/lib/config'
@@ -61,22 +62,23 @@ export function ToggleRow({ label, value, onChange }: { label: string; value: bo
   return (
     <View style={styles.row}>
       <Text style={[styles.label, { flex: 1 }]}>{label}</Text>
-      <Switch value={value} onValueChange={onChange} trackColor={{ true: colors.success, false: '#E3E3E8' }} thumbColor="#fff" {...{ activeThumbColor: '#fff' }} />
+      <Switch value={value} onValueChange={onChange} trackColor={{ true: colors.success, false: colors.chip }} thumbColor="#fff" {...{ activeThumbColor: '#fff' }} />
     </View>
   )
 }
 
-export function ChoiceRow({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
+/** A row to pick one of several; `busy` spins in place of the tick while the pick is saved. */
+export function ChoiceRow({ label, selected, busy = false, onPress }: { label: string; selected: boolean; busy?: boolean; onPress: () => void }) {
   return (
-    <Pressable accessibilityRole="radio" accessibilityState={{ selected }} onPress={onPress} style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.pressed }]}>
+    <Pressable accessibilityRole="radio" accessibilityState={{ selected, busy }} onPress={onPress} style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.pressed }]}>
       <Text style={[styles.label, { flex: 1 }]}>{label}</Text>
-      {selected ? <Symbol name="checkmark" size={15} color={colors.accent} web={<Check size={18} color={colors.accent} strokeWidth={2.4} />} /> : null}
+      {busy ? <Spinner size={15} /> : selected ? <Symbol name="checkmark" size={15} color={colors.accent} web={<Check size={18} color={colors.accent} strokeWidth={2.4} />} /> : null}
     </Pressable>
   )
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', minHeight: 52, paddingHorizontal: 16, paddingVertical: 10, gap: 12, backgroundColor: '#fff' },
+  row: { flexDirection: 'row', alignItems: 'center', minHeight: 52, paddingHorizontal: 16, paddingVertical: 10, gap: 12, backgroundColor: colors.surface },
   icon: { minWidth: 24, alignItems: 'center' },
   label: { fontSize: 16 },
   detail: { fontSize: 12, color: colors.secondary, marginTop: 2 },
