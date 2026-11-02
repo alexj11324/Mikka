@@ -23,6 +23,8 @@ type SignInCardProps = {
   emailEnabled?: boolean
   showGoogleLinkHint: boolean
   error: string
+  /** The sign-in failed because the email is not verified: offer 验证邮箱. */
+  unverified?: boolean
   notice: string
   next?: string
   onSubmit: FormEventHandler<HTMLFormElement>
@@ -37,7 +39,7 @@ type FieldErrors = Partial<Record<FieldName, string>>
 const FIELD_ORDER: FieldName[] = ['name', 'email', 'password']
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-export function SignInCard({ registering, addAccount = false, pending, googleEnabled, githubEnabled, emailEnabled = true, showGoogleLinkHint, error, notice, next = '/', onSubmit, onGoogleSignIn, onGitHubSignIn, turnstile }: SignInCardProps) {
+export function SignInCard({ registering, addAccount = false, pending, googleEnabled, githubEnabled, emailEnabled = true, showGoogleLinkHint, error, unverified = false, notice, next = '/', onSubmit, onGoogleSignIn, onGitHubSignIn, turnstile }: SignInCardProps) {
   const t = useTranslations('Auth')
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
   const oauthEnabled = googleEnabled || githubEnabled
@@ -114,7 +116,8 @@ export function SignInCard({ registering, addAccount = false, pending, googleEna
           <Separator className="flex-1" />
         </div>}
         {error && <p id="auth-error" role="alert" className="text-destructive text-sm">{error}</p>}
-        {error && <p className="text-muted-foreground text-xs">
+        {/* Only for an email that is not verified yet; a wrong password says nothing about verification (N4). */}
+        {error && unverified && <p className="text-muted-foreground text-xs">
           <Link href="/verify-email" className="text-foreground underline underline-offset-4">{t('verifyEmailLink')}</Link>
         </p>}
         <form className="flex flex-col gap-5" noValidate onSubmit={submit} aria-busy={pending} aria-describedby={error ? 'auth-error' : undefined}>

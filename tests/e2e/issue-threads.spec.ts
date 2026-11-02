@@ -227,3 +227,37 @@ test(`The owner stops a working thread from its composer; one waiting for an ans
   await expect(stop).toHaveCount(0)
 })
 }
+
+// Usability review N2: a failed thread's error line has 重试 beside it, which runs the thread again (R-81).
+test('A failed thread offers 重试 beside its error', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 1440, height: 960 })
+  const { email } = await register(page)
+  const title = `Thread failed ${randomUUID()}`
+  await seedTask(page, title)
+  const pool = isolatedPool()
+  const runId = randomUUID()
+  try {
+    const { rows: [user] } = await pool.query<{ id: string }>('SELECT id FROM "user" WHERE email = $1', [email])
+    const { rows: [issue] } = await pool.query<{ id: string }>('SELECT id FROM issues WHERE "userId" = $1 AND title = $2', [user.id, title])
+    const agentId = randomUUID()
+    await pool.query('INSERT INTO agents (id, "userId", harness, name) VALUES ($1, $2, $3, $4)', [agentId, user.id, 'codex', 'Coordinator'])
+    await pool.query('INSERT INTO agent_runs (id, "userId", "issueId", "agentId", status, prompt, error, "finishedAt") VALUES ($1, $2, $3, $4, $5, $6, $7, now())',
+      [runId, user.id, issue.id, agentId, 'failed', 'Reproduce the Safari crash', "browserType.launch: Executable doesn't exist"])
+  } finally { await pool.end() }
+  await openIssueFromSearch(page, title)
+  await page.getByRole('region', { name: /^线程/ }).getByRole('button', { name: '打开线程 Reproduce the Safari crash', exact: true }).click()
+  const panel = page.getByRole('region', { name: 'Reproduce the Safari crash', exact: true })
+  const failure = panel.locator('[data-slot="thread-failure"]')
+  await expect(failure).toContainText("browserType.launch: Executable doesn't exist")
+  const retry = failure.getByRole('button', { name: '重试', exact: true })
+  await expect(retry).toBeEnabled()
+  for (const scheme of ['light', 'dark'] as const) {
+    await page.emulateMedia({ colorScheme: scheme })
+    await testInfo.attach(`thread-failed-retry-${scheme}`, { body: await page.screenshot(), contentType: 'image/png' })
+  }
+  await page.emulateMedia({ colorScheme: 'light' })
+  // 重试 is a message to the thread, as typing one would be.
+  const request = page.waitForRequest(request => request.method() === 'POST' && !!request.headers()['next-action'] && request.postData()?.includes(runId) === true && request.postData()?.includes('重试') === true)
+  await retry.click()
+  await request
+})
