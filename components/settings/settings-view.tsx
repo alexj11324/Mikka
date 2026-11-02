@@ -132,7 +132,7 @@ function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, pe
     case 'billing': return workspaceId && !preview ? <>{team && <PaymentDesignationSettings key={`payment-${workspaceId}`} workspaceId={workspaceId} />}{admin && <BillingSettings key={workspaceId} workspaceId={workspaceId} personal={personal} />}</> : waiting
     case 'general': return <WorkspaceSettings userKey={userKey ?? user.email} workspaceId={workspaceId} />
     case 'computers': return null
-    case 'bots': return workspaceId && !preview ? <><BotAgentsSettings key={workspaceId} /><ArchivedBotsSettings key={`archived-${workspaceId}`} workspaceId={workspaceId} /></> : waiting
+    case 'bots': return workspaceId && !preview ? <><BotAgentsSettings key={workspaceId} />{/* Bots of people who left are a team's (decision 2026-11-02-0203). */}{team && <ArchivedBotsSettings key={`archived-${workspaceId}`} workspaceId={workspaceId} />}</> : waiting
     case 'permissions': return workspaceId && !preview ? <TeamPermissionsSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
     default: return null
   }
