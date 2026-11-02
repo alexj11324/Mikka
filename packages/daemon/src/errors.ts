@@ -39,12 +39,15 @@ export class ServerUnreachableError extends DaemonError {
 }
 
 export class RunNotPinnedHereError extends DaemonError {
-  constructor(runId: string) {
+  /** The server refused the claim because this daemon is too old (code `daemonUpgradeRequired`). */
+  readonly upgradeRequired: boolean
+  constructor(runId: string, upgradeRequired = false) {
     super(
       DAEMON_RPC_ERRORS.runNotPinnedHere,
       `Run "${runId}" is pinned to another device`,
       { runId }
     )
+    this.upgradeRequired = upgradeRequired
   }
 }
 

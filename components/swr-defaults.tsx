@@ -6,6 +6,9 @@ import { SWRConfig, unstable_serialize, type Middleware, type SWRConfiguration }
 /** Data younger than this is fresh: focus leaves it alone. A hook may set a longer `focusThrottleInterval`. */
 export const FRESH_FOR_MS = 60_000
 
+/** How often the bot, thread and board lists poll while the page is visible; each poll is a database read. */
+export const LIST_POLL_MS = 60_000
+
 const fetchedAt = new WeakMap<object, Map<string, number>>()
 const stamps = (cache: object) => {
   let map = fetchedAt.get(cache)

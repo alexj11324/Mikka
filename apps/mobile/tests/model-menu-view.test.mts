@@ -4,11 +4,8 @@ import { groupTitle, modelMenuLabel, modelStatusLine, type ModelMenu } from '../
 
 const current: ModelMenu['current'] = { id: 'fixture', modelId: 'fixture-model', provider: 'claude', kind: 'subscription', chosen: true, available: false, availability: 'checking', credentialLabel: 'owner@example.test' }
 
-test('an unknown allowance stays selected and reads checking, not unavailable', () => {
-  const label = modelMenuLabel(current)
-  assert.match(label, /待检查/)
-  assert.doesNotMatch(label, /不可用/)
-  assert.match(label, /owner@example.test/)
+test('the collapsed chip names only the model while its allowance is checking', () => {
+  assert.equal(modelMenuLabel(current), 'fixture-model')
 })
 test('same-plan accounts and API keys have distinguishable headings', () => {
   const first = groupTitle({ kind: 'subscription', provider: 'claude', plan: 'Max', credentialLabel: 'first@example.test', options: [] })
@@ -18,8 +15,13 @@ test('same-plan accounts and API keys have distinguishable headings', () => {
 })
 test('a quota fallback names the selected key and its metered billing before sending', () => {
   const fallback: ModelMenu['current'] = { ...current, kind: 'apiKey', available: true, availability: 'available', credentialLabel: 'DeepSeek · ••••799e', fallback: 'quota', quota: { subscription: 'claude', plan: 'Max', resetsAt: null, fallback: { keyProvider: 'deepseek', keyName: 'DeepSeek', model: 'deepseek-chat' } } }
-  assert.match(modelMenuLabel(fallback), /799e.*按量.*已切换/)
-  assert.match(modelStatusLine(fallback) ?? '', /Claude Max.*额度用完.*API Key.*按 token 计费/)
+  assert.equal(modelMenuLabel(fallback), 'fixture-model')
+  assert.match(modelStatusLine(fallback) ?? '', /Claude Max.*额度用完.*799e.*API Key.*按 token 计费/)
+})
+test('a preference fallback keeps its credential and metered billing in the notice', () => {
+  const fallback: ModelMenu['current'] = { ...current, kind: 'apiKey', available: true, availability: 'available', credentialLabel: 'DeepSeek · ••••799e', fallback: 'preference' }
+  assert.equal(modelMenuLabel(fallback), 'fixture-model')
+  assert.match(modelStatusLine(fallback) ?? '', /下一条使用 fixture-model.*799e.*按量.*已切换/)
 })
 test('a used-up subscription without a fallback never claims it switched to a paid key', () => {
   const exhausted: ModelMenu['current'] = { ...current, availability: 'exhausted', quota: { subscription: 'claude', plan: 'Max', resetsAt: null, fallback: null } }

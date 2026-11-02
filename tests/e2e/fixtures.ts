@@ -85,6 +85,22 @@ export async function seedTask(page: Page, title: string, { status = 'todo', pri
   return id
 }
 
+/**
+ * A saved website login for the signed-in person, as the vault stores one. The
+ * secret columns hold synthetic placeholders: the main app never decrypts.
+ */
+export async function seedSavedLogin(page: Page, origin: string, username: string) {
+  const cookie = (await page.context().cookies()).find(item => item.name.endsWith('session_token'))
+  if (!cookie) throw new Error('seedSavedLogin 需要已登录的页面。')
+  const db = database()
+  const { rows: [session] } = await db.query<{ userId: string }>('SELECT "userId" FROM session WHERE token = $1', [decodeURIComponent(cookie.value).split('.')[0]])
+  if (!session) throw new Error('找不到当前登录会话。')
+  const id = randomUUID()
+  await db.query('INSERT INTO credentials (id, user_id, origin, username) VALUES ($1, $2, $3, $4)', [id, session.userId, origin, username])
+  await db.query(`INSERT INTO credential_secrets (credential_id, wrapped_dek, nonce, ciphertext, leak_hmac, leak_length) VALUES ($1, 'synthetic', 'synthetic', 'synthetic', 'synthetic', 8)`, [id])
+  return id
+}
+
 /** A shown 建议 item for the signed-in person. */
 export async function seedSuggestion(page: Page, { source = 'gmail', action = 'reply', title, actionTitle = null }: { source?: string; action?: string; title: string; actionTitle?: string | null }) {
   const cookie = (await page.context().cookies()).find(item => item.name.endsWith('session_token'))

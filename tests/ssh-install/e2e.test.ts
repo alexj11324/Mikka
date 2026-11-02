@@ -135,7 +135,7 @@ test('real SSH install → systemd → automatic npm update → opt-out/failure 
     const savedUnit = await runProcess('docker', ['exec', container, 'cat', '/root/.config/systemd/user/mikka-daemon.service'])
     assert.equal(reportedVersion, '1.0.0')
     await waitUntil(() => registryQueries > 0, 30_000)
-    // The persisted daily deadline is advanced only inside this disposable device.
+    // The persisted hourly deadline is advanced only inside this disposable device.
     const due = () => runProcess('docker', ['exec', container, 'sh', '-c', 'printf \'{"lastAttemptAt":0}\' > /root/.config/Mikka/auto-update.json'])
     latestVersion = '1.0.1'
     await due()
@@ -149,7 +149,7 @@ test('real SSH install → systemd → automatic npm update → opt-out/failure 
     assert.equal(enrollments, 1)
     const queriesAfterUpdate = registryQueries, heartbeatAfterUpdate = heartbeats
     await waitUntil(() => heartbeats >= heartbeatAfterUpdate + 2, 40_000)
-    assert.equal(registryQueries, queriesAfterUpdate, 'successful update must retain its daily deadline across restart')
+    assert.equal(registryQueries, queriesAfterUpdate, 'successful update must retain its hourly deadline across restart')
 
     await ssh("mikka daemon service install --server 'http://127.0.0.1:34991/mikka' --device-type server --no-auto-update")
     const disabledPid = await pid(), queriesBeforeOptOut = registryQueries, heartbeatBeforeOptOut = heartbeats
@@ -171,7 +171,7 @@ test('real SSH install → systemd → automatic npm update → opt-out/failure 
     assert.ok(failedAttempt.lastAttemptAt > Date.now() - 120_000)
     const queriesAfterFailure = registryQueries, heartbeatAfterFailure = heartbeats
     await waitUntil(() => heartbeats >= heartbeatAfterFailure + 2, 40_000)
-    assert.equal(registryQueries, queriesAfterFailure, 'failed update must retain its daily deadline')
+    assert.equal(registryQueries, queriesAfterFailure, 'failed update must retain its hourly deadline')
     assert.equal(await pid(), failedPid)
     console.log(JSON.stringify({ automaticUpdate: { from: '1.0.0', to: reportedVersion, previousPid: reinstalledPid.trim(), updatedPid: updatedPid.trim(), failedPid: failedPid.trim(), enrollments, registrations, heartbeats, failedDownloads } }))
     command = { id: randomUUID(), kind: 'redetect' }

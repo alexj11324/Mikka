@@ -8,6 +8,13 @@ import { daemonTestMode, normalizeRepository } from '@mikka/protocol/repository'
 import { assertBranchName } from './agents/publish'
 import { FETCH_GIT, FETCH_TIMEOUT_MS, isInside, withRepoConfig } from './worktrees'
 
+export class EmptyRepositoryError extends Error {
+  constructor() {
+    super('Repository is empty. Create the first commit before running an Agent.')
+    this.name = 'EmptyRepositoryError'
+  }
+}
+
 /** A standard clone owned by the daemon, shared only through per-run worktrees. */
 export class RepositoryCache {
   constructor(private readonly root: string, private readonly allowFile = daemonTestMode(process.env), private readonly retainResources = false) {}
@@ -53,7 +60,16 @@ export class RepositoryCache {
     }
     this.assertClone(path)
     // Refresh when the host changes its default branch after the first clone.
-    await git(['remote', 'set-head', 'origin', '-a'], path)
+    try {
+      await git(['remote', 'set-head', 'origin', '-a'], path)
+    } catch (error) {
+      // A successful ls-remote with no HEAD or refs confirms an empty remote.
+      // Authentication/network failures still throw; a broken HEAD with real
+      // branches keeps its original error instead of being called empty.
+      const refs = await git(['ls-remote', 'origin'], path)
+      if (!refs.stdout.trim()) throw new EmptyRepositoryError()
+      throw error
+    }
     return path
   }
 

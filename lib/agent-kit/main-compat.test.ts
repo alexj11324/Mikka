@@ -59,7 +59,7 @@ stub('../issue-team-access.ts',{issueTeamAccess:async()=>{throw Error('owner cla
 stub('../mcp/resource.ts',{mcpResourceURL:null})
 stub('../device-repositories.ts',{readRepositorySettings:async()=>null})
 stub('../run-publications.ts',{prepareRunPublication:prepared,persistRunCompletion:completed})
-stub('../run-leases.ts',{latestCheckpoint:async()=>null})
+stub('../run-leases.ts',{latestCheckpoint:async()=>null,failRunForDaemonUpgrade:async()=>false})
 let githubAccount:string|null=null
 stub('../github/repository-installation.ts',{linkedGitHubAccountId:async()=>githubAccount})
 stub('../computer/local-authority.ts',{localComputerAuthority:async()=>({botId,ownerId:owner,workspaceId:workspace,policyVersion:3,permission:'allow'})})

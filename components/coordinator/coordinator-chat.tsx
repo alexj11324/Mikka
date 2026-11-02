@@ -4,6 +4,7 @@ import { Fragment, useEffect, useMemo, useRef, useState, type FormEvent } from '
 import useSWR, { useSWRConfig } from 'swr'
 import { AnimatePresence } from 'motion/react'
 import { withBasePath } from '@/lib/base-path'
+import { checkPageBuildBeforeAction } from '@/lib/app-build'
 import { useTranslations } from 'next-intl'
 import { getCoordinatorChat, stopCoordinatorTurn, welcomeCoordinator, type CoordinatorChat as Chat } from '@/app/actions/coordinator'
 import type { BotView } from '@/app/actions/bots'
@@ -30,6 +31,7 @@ import { ChatComposer } from './chat-composer'
 import { BotModelPicker } from './bot-model-picker'
 import { useCoordinatorSubmit } from './use-coordinator-submit'
 import { useCoordinatorStream } from './use-coordinator-stream'
+import { chatPollInterval } from '@/lib/coordinator/chat-poll-interval'
 import { ThreadCard } from './thread-card'
 import { ToolsUsed } from './tools-used'
 import { MessageReactions, useMessageReactions } from '@/components/workspace/message-reactions'
@@ -116,7 +118,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   const actionError = useActionError()
   const reconnectStream = useRef<() => void>(() => {})
   const { data, mutate, error: loadError } = useSWR<Chat>(coordinatorChatKey(botId), () => botId ? getCoordinatorChat(botId) : getCoordinatorChat(), {
-    refreshInterval: latest => latest?.working ? 2000 : 10000,
+    refreshInterval: chatPollInterval,
     onSuccess: () => reconnectStream.current(),
   })
   const stream = useCoordinatorStream({ botId, runId: data?.streamRunId, cursor: data?.cursor, persistedStreamIds: data?.persistedStreamIds, revalidate: mutate })
@@ -143,6 +145,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
     } catch { /* storage may be unavailable */ }
   }
   const [sending, setSending] = useState(false)
+  const deliveryInFlight = useRef(false)
   // A message that did not go stays in the chat as a failed bubble with 重试, as in iMessage and Slack. Retrying here
   // resends the same submission (same id), so it is stored once.
   // `after`: the last stored position when it failed.
@@ -259,9 +262,8 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
 
   /** Sends `text` to the Coordinator or bot, with the browser's notes when `withNotes`: sent, failed (now a failed bubble), or skipped. */
   async function deliver(text: string, withNotes = false, retryOf?: number): Promise<'sent' | 'failed' | 'skipped'> {
-    if (!text || sending) return 'skipped'
-    setSending(true)
-    if (retryOf !== undefined) setRetrying(current => new Set(current).add(retryOf))
+    if (!text || sending || deliveryInFlight.current) return 'skipped'
+    deliveryInFlight.current = true
     const notes = withNotes && browser?.notes.length ? [...browser.notes] : undefined
     const fail = (message: string | null) => {
       if (!message) return 'skipped' as const
@@ -271,6 +273,9 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
       return 'failed' as const
     }
     try {
+      if (!await checkPageBuildBeforeAction()) return 'skipped'
+      setSending(true)
+      if (retryOf !== undefined) setRetrying(current => new Set(current).add(retryOf))
       const outcome = await submit(text, { quote: embedded?.quote, botId, notes, ...(retryOf !== undefined ? { retryOf } : {}) })
       if (outcome.kind !== 'accepted') return fail(failureMessage(outcome))
       setFailed(current => current?.text === text ? null : current)
@@ -278,7 +283,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
       if (notes) browser?.removeMany(notes.map(note => note.n))
       await mutate()
       return 'sent'
-    } catch { return fail(actionError()) } finally { setSending(false) }
+    } catch { return fail(actionError()) } finally { deliveryInFlight.current = false; setSending(false) }
   }
   /** Sends `text`; false if it did not go. */
   async function post(text: string, withNotes = false) {

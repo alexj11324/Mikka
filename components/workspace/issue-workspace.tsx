@@ -72,6 +72,7 @@ import { useWorkspace } from '@/hooks/use-workspace'
 import { focusChatComposer } from '@/hooks/use-focus-return'
 import { usePresence } from '@/lib/use-presence'
 import { FieldError } from '@/components/ui/field'
+import { LIST_POLL_MS } from '@/components/swr-defaults'
 
 // Start the chunk download during module evaluation, before hydration and its effects.
 if (typeof window !== 'undefined') {
@@ -167,7 +168,7 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
   const { data: botList } = useSWR('bots', listBots, { ...whileSettings })
   const bots = botList ?? []
   const [onboardingOpen, setOnboardingOpen] = useState(Boolean(onboarding))
-  const { data: threadsData, error: threadsError, mutate: refreshThreads } = useSWR('threads', () => listThreads(), { ...whileSettings, refreshInterval: boardBusy || settingsShown ? 0 : 15000 })
+  const { data: threadsData, error: threadsError, mutate: refreshThreads } = useSWR('threads', () => listThreads(), { ...whileSettings, refreshInterval: boardBusy || settingsShown ? 0 : LIST_POLL_MS })
   const threads = useMemo(() => threadsData ?? [], [threadsData])
   // Not read yet: the thread lists show rows' shapes instead of 还没有线程 (review C7).
   const threadsLoading = threadsData === undefined && !threadsError

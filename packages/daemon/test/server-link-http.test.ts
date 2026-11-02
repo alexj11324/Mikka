@@ -302,6 +302,15 @@ describe("HttpServerLink", () => {
     ])
   })
 
+  it("marks a claim refused because the daemon is too old", async () => {
+    for (const [body, upgradeRequired] of [[{ error: "x", code: "daemonUpgradeRequired" }, true], [{ error: "Run is not queued for this device." }, false]] as const) {
+      const { fetch } = scripted(() => json(body, 409))
+      const error = await new HttpServerLink("http://server.test", fetch).claimRun("d", "r").catch((e: unknown) => e)
+      expect(error).toBeInstanceOf(RunNotPinnedHereError)
+      expect((error as RunNotPinnedHereError).upgradeRequired).toBe(upgradeRequired)
+    }
+  })
+
   it("maps statuses: 5xx/429/network retry later, 409 on claim, 401 needs login", async () => {
     const statuses = [503, 429, 409, 401, 400]
     let i = 0
