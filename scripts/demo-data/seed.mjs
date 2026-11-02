@@ -16,6 +16,7 @@
 // Re-running replaces the previous demo rows of the account in one transaction.
 import { connect, countDemoRows, deleteDemoRows, demoId, findOwner, inTransaction, MAIN_TABLES, parseArgs, WORKSPACE_TABLES } from './shared.mjs'
 import { AGENTS, ARTIFACTS, BOT_MEMORY, BOT_THREADS, BOTS, DEVICES, ISSUES, PEOPLE, RUNS, SUGGESTIONS, TEAM, WORKSPACE_NAME, WORKSPACE_SLUG } from './content.mjs'
+import { assertEveryRunHasIssue, threadIssues, withIssues } from './thread-issues.mjs'
 import { CHATS, GROUP } from './chats.mjs'
 import { createHash } from 'node:crypto'
 
@@ -52,7 +53,16 @@ function plan(owner) {
   }
   const paragraph = text => ({ type: 'paragraph', content: [{ type: 'text', text }] })
   // Every task is a team task: personal and team workspaces never mix (decision 2026-11-01-2310).
-  const issueRows = ISSUES.map(issue => ({ ...issue, scope: 'workspace' })).map((issue, index, all) => {
+  // Each bot's extra threads alternate between the two coding agents; running ones stay over 15 minutes old.
+  const threads = Object.entries(BOT_THREADS).flatMap(([bot, list]) => list.map(([title, status, hoursAgo, lastReply], index) => ({
+    key: `t-${bot}-${index}`, issue: null, bot, agent: index % 2 ? 'ag-codex' : 'ag-claude', status,
+    minutesAgo: Math.max(20, Math.round(hoursAgo * 60)), minutes: 6 + (index * 7) % 40, prompt: title, lastReply,
+    error: status === 'failed' ? lastReply : undefined,
+    // The daemon writes no error chunk: a failed run's reason is run.error alone, which the thread shows once.
+    chunks: [{ type: 'text-delta', id: 't1', delta: `开始：${title}。` }, { type: 'tool-input-available', toolCallId: 'a' }, { type: 'tool-input-available', toolCallId: 'b' },
+      ...(status === 'failed' ? [] : [{ type: 'text-delta', id: 't2', delta: lastReply }])],
+  })))
+  const issueRows = [...ISSUES, ...threadIssues([...RUNS, ...threads])].map(issue => ({ ...issue, scope: 'workspace' })).map((issue, index, all) => {
     const metadata = {
       // No number: numbers come from the owner's counter ("user"."lastIssueNumber", advanced by a
       // trigger on insert), and demo rows must not move the account's real numbering.
@@ -74,26 +84,18 @@ function plan(owner) {
   const devices = DEVICES.map(device => ({ ...device, id: id(`device:${device.key}`),
     lastSeenAt: device.online ? new Date(now + 10 * 365 * 86_400_000) : new Date(now - device.lastSeenMinutes * 60_000) }))
   const agents = AGENTS.map(agent => ({ ...agent, id: id(`agent:${agent.key}`), deviceId: id(`device:${agent.device}`) }))
-  // Each bot's extra threads alternate between the two coding agents; running ones stay over 15 minutes old.
-  const threads = Object.entries(BOT_THREADS).flatMap(([bot, list]) => list.map(([title, status, hoursAgo, lastReply], index) => ({
-    key: `t-${bot}-${index}`, issue: null, bot, agent: index % 2 ? 'ag-codex' : 'ag-claude', status,
-    minutesAgo: Math.max(20, Math.round(hoursAgo * 60)), minutes: 6 + (index * 7) % 40, prompt: title, lastReply,
-    error: status === 'failed' ? lastReply : undefined,
-    // The daemon writes no error chunk: a failed run's reason is run.error alone, which the thread shows once.
-    chunks: [{ type: 'text-delta', id: 't1', delta: `开始：${title}。` }, { type: 'tool-input-available', toolCallId: 'a' }, { type: 'tool-input-available', toolCallId: 'b' },
-      ...(status === 'failed' ? [] : [{ type: 'text-delta', id: 't2', delta: lastReply }])],
-  })))
-  const runs = [...RUNS, ...threads].map(run => {
+  const runs = withIssues([...RUNS, ...threads]).map(run => {
     const createdAt = ago(run.minutesAgo)
     const startedAt = new Date(createdAt.getTime() + 40_000)
     const finished = ['succeeded', 'failed', 'stopped', 'cancelled'].includes(run.status)
     const finishedAt = finished ? new Date(startedAt.getTime() + run.minutes * 60_000) : null
     // Live threads replied a few minutes ago, staggered so the list does not read as one batch.
     const lastReplyAt = finishedAt ?? ago(1 + [...run.key].reduce((sum, char) => sum + char.charCodeAt(0), 0) % 14)
-    return { ...run, id: id(`run:${run.key}`), issueId: run.issue ? id(`issue:${run.issue}`) : null, botId: botOf(run.bot).id,
+    return { ...run, id: id(`run:${run.key}`), issueId: id(`issue:${run.issue}`), botId: botOf(run.bot).id,
       agentId: id(`agent:${run.agent}`), deviceId: agents.find(agent => agent.key === run.agent).deviceId,
       createdAt, startedAt, finishedAt, lastReplyAt, chunks: fillDeep(run.chunks) }
   })
+  assertEveryRunHasIssue(runs)
   const artifacts = ARTIFACTS.map(artifact => {
     const run = runs.find(item => item.artifacts?.includes(artifact.key))
     return { ...artifact, id: id(`artifact:${artifact.key}`), runId: run?.id ?? null, issueId: run?.issueId ?? null, createdAt: run?.finishedAt ?? ago(120) }
