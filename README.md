@@ -374,7 +374,7 @@ what they cover.
 
 | Test | Needs | Why not in CI |
 | --- | --- | --- |
-| `pnpm test:factory-http` (`tests/factory-{query,question,monitor-cycle}-http.test.ts`) | A production build (`next build`) of the app and `mikka_e2e`; the runner starts `next start` | CI runs no production build ([decision](docs/design/decisions/2026-11-01-0230-browser-tests-manual-only.md), rule 3) |
+| `pnpm test:factory-http` (`tests/factory-{query,question,monitor-cycle}-http.test.ts`) | A production build (`next build`) of the app and `mikka_e2e`; the runner starts `next start`. Outside GitHub Actions each probe also expects its own database role (`factory192`, `factoryquestions192`, `factorycycle192`), but the runner passes them one URL, so today the full runner passes only in CI | CI runs no production build ([decision](docs/design/decisions/2026-11-01-0230-browser-tests-manual-only.md), rule 3) |
 | `pnpm test:test-accounts-http` (`tests/test-account-pool.http.test.mjs`) | A production build and a disposable test environment registered with `scripts/test-accounts/bootstrap.mjs` | Same: no production build in CI |
 | `pnpm test:local-loop` and its `:mailbox`, `:cloud`, `:worker-mailbox` variants | `dev:local`, a real daemon, a model API key; the cloud item needs an E2B template | Needs real credentials, and it refuses to run under a CI identity |
 | `tests/byos-handoff-browser.test.mjs` | Chromium at `/usr/bin/chromium` | It drives a browser; CI runs no browser tests ([decision](docs/design/decisions/2026-11-01-1520-no-browser-tests-in-ci.md)) |
