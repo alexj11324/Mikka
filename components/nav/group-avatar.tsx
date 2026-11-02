@@ -28,3 +28,9 @@ export function GroupAvatar({ title, members, size = 'pill' }: { title: string; 
     {bots.map(bot => <BotAvatar key={bot.id} color={bot.color} shape={bot.shape} size={size === 'pill' ? 'row' : 'cell'} still />)}
   </span>
 }
+
+/** The avatar for a group's pill, loading its members by the shared key. */
+export function GroupPillAvatar({ id, title }: { id: string; title: string }) {
+  const { data: members } = useGroupMembers(id)
+  return <GroupAvatar title={title} members={members} />
+}
