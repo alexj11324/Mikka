@@ -5,10 +5,14 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	core "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
 	ex "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
 	compat "github.com/router-for-me/CLIProxyAPI/v8/sdk/mikkaadapter"
+	"io"
 	"net/http"
+	"os"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -23,6 +27,39 @@ type CPAPlainModel struct {
 }
 
 func (e CPAPlainModel) Identifier() string { return e.Provider }
+
+var upstreamTypePattern = regexp.MustCompile(`^[a-z_]{1,40}$`)
+
+// upstreamFailure writes one fixed-shape line for the control plane's logs: the
+// provider, the stage, the HTTP status and the provider's error type enum. It
+// never writes a message, body, header or credential.
+func upstreamFailure(provider, stage string, status int, kind string) {
+	if !upstreamTypePattern.MatchString(kind) {
+		kind = "unknown"
+	}
+	fmt.Fprintf(os.Stderr, "subscription_upstream_failure %s %s %d %s\n", provider, stage, status, kind)
+}
+
+// upstreamErrorType reads the error type enum from a provider error body:
+// {"error":{"type":"..."}} (Anthropic, OpenAI) or {"type":"..."}.
+func upstreamErrorType(body []byte) string {
+	var parsed struct {
+		Type  string `json:"type"`
+		Error struct {
+			Type string `json:"type"`
+			Code string `json:"code"`
+		} `json:"error"`
+	}
+	if json.Unmarshal(body, &parsed) != nil {
+		return "unparsed"
+	}
+	for _, value := range []string{parsed.Error.Type, parsed.Error.Code, parsed.Type} {
+		if value != "" && value != "error" {
+			return value
+		}
+	}
+	return "unknown"
+}
 func (e CPAPlainModel) ExecuteStream(ctx context.Context, a *core.Auth, request ex.Request, _ ex.Options) (*ex.StreamResult, error) {
 	if a == nil || core.IsCodexUseSIWC(a) {
 		return nil, ErrUnsupported
@@ -53,6 +90,7 @@ func (e CPAPlainModel) ExecuteStream(ctx context.Context, a *core.Auth, request 
 		return nil, ErrUnsupported
 	}
 	if err != nil {
+		upstreamFailure(e.Provider, "convert", 0, "request_conversion")
 		return nil, ErrProvider
 	}
 	var body map[string]any
@@ -104,10 +142,13 @@ func (e CPAPlainModel) ExecuteStream(ctx context.Context, a *core.Auth, request 
 	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 	response, err := client.Do(req)
 	if err != nil {
+		upstreamFailure(e.Provider, "transport", 0, "network")
 		return nil, ErrProvider
 	}
 	if response.StatusCode != http.StatusOK || !strings.HasPrefix(response.Header.Get("Content-Type"), "text/event-stream") {
+		body, _ := io.ReadAll(io.LimitReader(response.Body, 8192))
 		response.Body.Close()
+		upstreamFailure(e.Provider, "response", response.StatusCode, upstreamErrorType(body))
 		return nil, ErrProvider
 	}
 	chunks := make(chan ex.StreamChunk)
@@ -148,6 +189,7 @@ func (e CPAPlainModel) ExecuteStream(ctx context.Context, a *core.Auth, request 
 			}
 			kind, _ := event["type"].(string)
 			if kind == "error" || kind == "response.failed" || event["error"] != nil {
+				upstreamFailure(e.Provider, "event", 200, upstreamErrorType(raw))
 				emit(ex.StreamChunk{Err: ErrProvider})
 				return
 			}
@@ -172,6 +214,7 @@ func (e CPAPlainModel) ExecuteStream(ctx context.Context, a *core.Auth, request 
 			}
 		}
 		if scanner.Err() != nil || !completed {
+			upstreamFailure(e.Provider, "incomplete", 200, "stream_ended")
 			emit(ex.StreamChunk{Err: ErrProvider})
 			return
 		}
