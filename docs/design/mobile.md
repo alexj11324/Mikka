@@ -76,8 +76,8 @@ into its newest thread (「第 N 次尝试」); 新线程 and the filter menu si
   dispatch work through it.
 
 **Chat** (like the Claude app): the header is the bot's name in a glass
-capsule, which opens the bot's page; 「…」 (top right) opens 资料 and that
-bot's 线程. Dragging a message from left to right quotes it in the composer
+capsule, which opens the bot's page; 「…」 (top right) opens 资料 and the
+线程 that bot dispatched. Dragging a message from left to right quotes it in the composer
 (a reply arrow follows the finger; letting go past the mark quotes it, with a
 tick); only a swipe from the screen's edge goes back. A bot's reply has 复制
 under it. A long press on any message opens a system sheet: 回复 (quote it),

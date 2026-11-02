@@ -1,7 +1,7 @@
 import { withBasePath } from '@/lib/base-path'
 
 // A bot's 资料库 on the web (R-51, decision 2026-11-01-0050-mobile-chat-settings):
-// the person's own documents that the bot's threads handed over, newest first.
+// the person's own documents that the threads the bot dispatched handed over, newest first.
 // Read from GET /api/mobile/bots/<id> (lib/mobile-threads.ts mobileBot), the same
 // list the phone shows; removed with DELETE /api/mobile/artifacts/<id>.
 

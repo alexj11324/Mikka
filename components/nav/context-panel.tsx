@@ -44,7 +44,7 @@ const NO_ITEMS: DetailItem[] = []
 
 /**
  * One list in 详情 (Figma 402:5699). Routines are set up in chat and files come
- * in through the bot's threads, so there is nothing to add here; a list of the
+ * in through the threads the bot dispatched, so there is nothing to add here; a list of the
  * person's own files offers 删除 on each row (R-51).
  */
 function DetailList({ title, empty, items, icon: Icon, onDelete }: { title: string; empty: string; items: DetailItem[]; icon: LucideIcon; onDelete?: (item: DetailItem) => void }) {
@@ -64,7 +64,7 @@ function DetailList({ title, empty, items, icon: Icon, onDelete }: { title: stri
 }
 
 /**
- * 资料库: the documents this bot's threads handed over, the same list as the
+ * 资料库: the documents the threads this bot dispatched handed over, the same list as the
  * phone's (decision 2026-11-01-0050). Each is the person's own, so each can be
  * deleted, after a confirmation, since nothing brings it back.
  */
@@ -147,10 +147,11 @@ export type PanelConversation = { id?: string | null; name: string; color?: stri
 
 /**
  * The right column beside a chat, read-only (Figma 395:27702, 445:6126): 概览,
- * the bot (avatar and name) with 详情 / 线程 / PR / 电脑. 线程 is this bot's
- * threads; every bot's threads are 全部线程, opened from the window bar on any
- * page (R-82), so this column has no tab for them. ⤢ widens just this column.
- * Picking another bot switches its threads, PRs and computer.
+ * the bot (avatar and name) with 详情 / 线程 / PR / 电脑. 线程 lists the threads
+ * this bot dispatched; the threads every bot dispatched are 全部线程, opened
+ * from the window bar on any page (R-82), so this column has no tab for them.
+ * ⤢ widens just this column. Picking another bot switches the threads it
+ * dispatched, its PRs and its computer.
  */
 export function ContextPanel({ issues, threads, conversation, workspaceId, onOpenThread, onClose, sheet = false }: {
   issues: Issue[]
