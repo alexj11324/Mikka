@@ -1,6 +1,6 @@
 'use client'
 
-import { useLayoutEffect, useState, type RefObject } from 'react'
+import { useLayoutEffect, useState, type KeyboardEvent, type RefObject } from 'react'
 
 /** Focus fell to <body>: what held it went away and nothing else took it. */
 function focusLost() {
@@ -34,6 +34,18 @@ export function useFocusReturn(id: string, target: RefObject<HTMLElement | null>
       requestAnimationFrame(attempt)
     }
   }, [id, target, enabled])
+}
+
+/**
+ * Esc in such a view: out of a text field to the view first (a thread's
+ * composer never stops the run, decision 2026-11-02-0301), then it closes.
+ * A menu, dialog or editor above it that took Esc keeps it.
+ */
+export function closeOnEscape(event: KeyboardEvent<HTMLElement>, view: HTMLElement | null, onClose: () => void) {
+  if (event.key !== 'Escape' || event.defaultPrevented || event.nativeEvent.isComposing || !event.currentTarget.contains(event.target as Node)) return
+  event.preventDefault()
+  if ((event.target as Element).closest('textarea, input:not([type]), input[type="text"], [contenteditable="true"]')) view?.focus()
+  else onClose()
 }
 
 /** A controlled dialog's `finalFocus`: the control that had focus when it opened. */

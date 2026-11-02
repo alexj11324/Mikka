@@ -58,7 +58,7 @@ export function ChatComposer({ ref, value, onChange, onSubmit, label, placeholde
   model?: ReactNode
   /** The person's send key (偏好设置); the caller reads it from their preferences. */
   sendKey?: SendKey
-  /** A thread's composer, not a bot chat's: choosing a chat focuses only the latter. */
+  /** A thread's composer, not a bot chat's: choosing a chat focuses only the latter, and Esc never stops the run (decision 2026-11-02-0301). */
   thread?: boolean
 }) {
   const t = useTranslations('Coordinator')
@@ -99,8 +99,8 @@ export function ChatComposer({ ref, value, onChange, onSubmit, label, placeholde
   }
   function onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
     const { key, shiftKey, metaKey, ctrlKey } = event
-    // Esc stops the reply, as the stop button does.
-    if (key === 'Escape' && stoppable && !event.nativeEvent.isComposing) { event.preventDefault(); onStop?.(); return }
+    // In a bot chat Esc stops the reply, as the stop button does.
+    if (key === 'Escape' && stoppable && !thread && !event.nativeEvent.isComposing) { event.preventDefault(); onStop?.(); return }
     if (!sendsMessage({ key, shiftKey, metaKey, ctrlKey, isComposing: event.nativeEvent.isComposing }, sendKey)) return
     event.preventDefault()
     if (!sending && !submitDisabled && !disabled && value.trim()) onSubmit()

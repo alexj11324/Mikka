@@ -31,7 +31,7 @@ import { openArtifact } from './workspace-navigation'
 import { ThreadFeedback } from './self-improvement'
 import { InlineLoadError } from '@/components/load-error'
 import { FieldError } from '@/components/ui/field'
-import { useFocusReturn } from '@/hooks/use-focus-return'
+import { closeOnEscape, useFocusReturn } from '@/hooks/use-focus-return'
 
 // R-32 chat: 13/21 as in Comma, also for the agent's Markdown inside a bubble.
 const BUBBLE = 'max-w-[85%] rounded-2xl bg-muted px-3.5 py-2 text-sm/5.25 whitespace-pre-wrap break-words [&_[data-agent-markdown]]:leading-5.25'
@@ -123,7 +123,7 @@ function ThreadPanel({ issueId, runId, onClose, bare = false, initialTab = 'chat
     }
   }
   const title = listedName || (detail?.name ?? t('title'))
-  return <section aria-label={title} className="flex h-full min-h-0 flex-col">
+  return <section aria-label={title} className="flex h-full min-h-0 flex-col" onKeyDown={bare ? undefined : event => closeOnEscape(event, headingRef.current, onClose)}>
     {!bare && <header className={cn('flex h-12 shrink-0 items-center gap-2 border-b border-rule px-4', acceptance && 'max-sm:h-auto max-sm:flex-wrap max-sm:py-2')}>
       {detail && view && <ThreadStatusIcon status={view.status} outcome={view.outcome} waiting={view.waiting} />}
       <h2 ref={headingRef} tabIndex={-1} className={cn('min-w-0 truncate text-sm font-semibold outline-none', !acceptance && 'flex-1')}>{title}</h2>
