@@ -276,11 +276,13 @@ thumbnail, the chat card and the full-window viewer all use `view`.
 
 ### Takeover
 
-- `POST /api/bots/:botId/computer/takeover` sets `control: "user"`. It pauses
-  the bot's computer tool calls, which wait and do not fail, and returns a
-  control viewer URL.
-- `POST /api/bots/:botId/computer/handback` sets `control: "agent"`. Waiting
-  tool calls resume.
+- `POST /api/bots/:botId/computer/takeover` sets `control: "user"`. It holds
+  only work on the Bot's own desktop, and returns a control viewer URL. Every
+  thread runs on its own machine (decision
+  [0251](decisions/2026-11-02-0251-desktop-runs-get-their-own-machine.md)), so
+  a takeover pauses no thread and a thread's claim does not wait for it.
+- `POST /api/bots/:botId/computer/handback` sets `control: "agent"`. A thread
+  an earlier takeover paused resumes.
 - Only one user can hold control at a time. A second takeover gets `409` with
   `controlledBy`.
 

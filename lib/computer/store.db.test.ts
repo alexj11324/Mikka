@@ -247,10 +247,31 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     assert.equal(await claimLocalRun(pool, queued.runId, worker.deviceId, new Date(Date.now() + 30000)), 'cloud-required')
     assert.equal((await pool.query('SELECT state FROM thread_machines WHERE "runId"=$1', [queued.runId])).rows[0].state, 'starting', 'enqueue writes the run\'s own thread machine')
     const queuedThread = await onThreadMachine(queued.runId)
+    // Holding the Bot's desktop holds only work on that desktop. A repository task on its own task
+    // machine (no desktop) and a computer task on its own thread machine's desktop are neither.
+    const repositoryThread = await onThreadMachine(allowedRepository.runId)
+    assert.deepEqual(await claimCloudRun(pool, actor, allowedRepository.runId, repositoryThread, new Date(Date.now() + 30000), cloudSubscription, undefined, undefined, false), { botId: bot.id, ownerId: actor.userId, display: ':1', policyVersion: 0, permission: 'deny' })
+    await pool.query(`UPDATE agent_runs SET status='running' WHERE id=$1`, [allowedRepository.runId])
     await store.operate(actor, bot.id, 'takeover')
-    assert.equal(await claimCloudRun(pool, actor, queued.runId, queuedThread, new Date(Date.now() + 30000), cloudSubscription), null, 'a queued run cannot claim while its desktop is controlled')
+    const hold = (await pool.query('SELECT control,"controlledBy","controlUntil",epoch FROM bot_desktops WHERE "botId"=$1', [bot.id])).rows[0]
+    assert.equal(hold.control, 'user')
+    assert.equal(hold.controlledBy, actor.userId)
+    assert.ok(new Date(hold.controlUntil).getTime() > Date.now())
+    assert.deepEqual(await claimCloudRun(pool, actor, queued.runId, queuedThread, new Date(Date.now() + 30000), cloudSubscription), { botId: bot.id, ownerId: actor.userId, display: ':1', policyVersion: 0, permission: 'allow' }, 'a computer task on its own thread machine claims while the Bot desktop is held')
+    await store.operate(actor, bot.id, 'takeover')
+    const threadRuns = async () => (await pool.query('SELECT id,status,"pauseReason","resumeStatus" FROM agent_runs WHERE id=ANY($1::uuid[])', [[allowedRepository.runId, queued.runId]])).rows.sort((a, b) => a.id === allowedRepository.runId ? -1 : b.id === allowedRepository.runId ? 1 : 0).map(({ status, pauseReason, resumeStatus }) => ({ status, pauseReason, resumeStatus }))
+    const unpaused = [{ status: 'running', pauseReason: null, resumeStatus: null }, { status: 'preparing', pauseReason: null, resumeStatus: null }]
+    assert.deepEqual(await threadRuns(), unpaused, 'a takeover of the Bot desktop pauses no run on its own thread machine')
+    // Someone else's live hold still refuses this person's takeover and handback.
+    await pool.query(`UPDATE bot_desktops SET "controlledBy"='bob' WHERE "botId"=$1`, [bot.id])
+    await assert.rejects(store.operate(actor, bot.id, 'takeover'), { status: 409, message: 'Computer is already controlled' })
+    await assert.rejects(store.operate(actor, bot.id, 'handback'), { status: 409, message: 'Control is held by another user' })
+    await pool.query(`UPDATE bot_desktops SET "controlledBy"=$2 WHERE "botId"=$1`, [bot.id, actor.userId])
     await store.operate(actor, bot.id, 'handback')
-    assert.deepEqual(await claimCloudRun(pool, actor, queued.runId, queuedThread, new Date(Date.now() + 30000), cloudSubscription), { botId: bot.id, ownerId: actor.userId, display: ':1', policyVersion: 0, permission: 'allow' })
+    const released = (await pool.query('SELECT control,"controlledBy","controlUntil",epoch FROM bot_desktops WHERE "botId"=$1', [bot.id])).rows[0]
+    assert.deepEqual({ control: released.control, controlledBy: released.controlledBy, controlUntil: released.controlUntil }, { control: 'agent', controlledBy: null, controlUntil: null })
+    assert.ok(released.epoch > hold.epoch)
+    assert.deepEqual(await threadRuns(), unpaused)
     const idempotent = { ...cloudInput, idempotencyKey: 'durable-tool-call-1' }
     const [first, retry] = await Promise.all([queueCloudRun(pool, actor, idempotent), queueCloudRun(pool, actor, idempotent)])
     assert.equal(first.runId, retry.runId, 'a retried tool call queues exactly one task')
@@ -412,8 +433,11 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     const beforePause = (await pool.query('SELECT "sessionId","leaseExpiresAt" FROM agent_runs WHERE id=$1', [runId])).rows[0]
     await store.operate(actor, bot.id, 'takeover')
     await store.operate(actor, bot.id, 'takeover')
-    const paused = (await pool.query('SELECT status,"pauseReason","resumeStatus","sessionId","leaseExpiresAt" FROM agent_runs WHERE id=$1', [runId])).rows[0]
-    assert.deepEqual(paused, { status: 'paused', pauseReason: 'human_control', resumeStatus: 'running', ...beforePause })
+    // No run can be claimed onto the Bot's desktop (claimCloudRun needs the run's own thread
+    // machine; claimLocalRun refuses a bound run), so a takeover pauses none, even this bound one.
+    assert.deepEqual((await pool.query('SELECT status,"pauseReason","resumeStatus","sessionId","leaseExpiresAt" FROM agent_runs WHERE id=$1', [runId])).rows[0], { status: 'running', pauseReason: null, resumeStatus: null, ...beforePause })
+    // A run an earlier takeover paused (before this change) still resumes on handback.
+    await pool.query(`UPDATE agent_runs SET "resumeStatus"=status,status='paused',"pauseReason"='human_control' WHERE id=$1`, [runId])
     const taken = epoch
     assert.equal((await store.state(actor, bot.id)).control, 'user')
     // Takeover pauses the bot: the desktop lease names the person, and the
@@ -427,7 +451,7 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     await store.operate(actor, bot.id, 'handback')
     assert.deepEqual((await pool.query('SELECT status,"pauseReason","resumeStatus","sessionId","leaseExpiresAt" FROM agent_runs WHERE id=$1', [runId])).rows[0], { status: 'running', pauseReason: null, resumeStatus: null, ...beforePause })
     await store.operate(actor, bot.id, 'takeover')
-    await pool.query(`UPDATE agent_runs SET status='stopped',"finishedAt"=now() WHERE id=$1`, [runId])
+    await pool.query(`UPDATE agent_runs SET status='stopped',"pauseReason"='human_control',"finishedAt"=now() WHERE id=$1`, [runId])
     await store.operate(actor, bot.id, 'handback')
     assert.equal((await pool.query('SELECT status FROM agent_runs WHERE id=$1', [runId])).rows[0].status, 'stopped', 'handback never revives a run that ended while paused')
     assert.ok(epoch > taken)

@@ -277,6 +277,17 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
       const assignment = JSON.parse(text)
       assert.equal(assignment.modelCredential.key, secret)
       assert.equal(assignment.computer, undefined, 'a machine with no desktop gets no desktop')
+      assert.equal(await status(runId), 'preparing')
+
+      // Nor a computer task on its own thread machine's desktop: it is claimed with that desktop.
+      const desktopRun = (await queueCloudRun(pool, actor, { botId: p.botId, issueId: await task(p.id), agentId, deviceRepoId: computerRepo, title: 'Task', body: '', model: 'auto' })).runId
+      const desktops = await fakeThreadMachines(pool, desktopMachine)
+      const desktopThread = await desktops.start(actor, desktopRun).finally(() => desktops.restore())
+      const desktopResponse = await claim(desktopThread.deviceId, desktopRun, desktopThread.token)
+      const desktopText = await desktopResponse.text()
+      assert.equal(desktopResponse.status, 200, desktopText)
+      assert.equal(JSON.parse(desktopText).computer.botId, p.botId, 'the thread machine\'s own desktop')
+      assert.equal(await status(desktopRun), 'preparing')
     } finally { machines.restore() }
   })
 

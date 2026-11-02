@@ -49,9 +49,7 @@ export async function claimCloudRun(pool: Pool, actor: { userId: string; workspa
       JOIN devices dev ON dev.id=m."deviceId" AND dev."ownerId"=b."ownerId" AND dev.kind='cloud' AND dev.enabled=true
       WHERE b."runId"=$1 AND b."workspaceId"=$3 AND b."ownerId"=$4 AND m.state IN ('starting','running')`, [runId, deviceId, actor.workspaceId, actor.userId])).rows[0]
     if (!binding) { await client.query('COMMIT'); return null }
-    // A person controlling the Bot's desktop holds runs that would use it; a machine without a desktop never does.
-    const held = desktop ? await client.query(`SELECT 1 FROM bot_desktops WHERE "botId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND control='user' AND "controlUntil">now()`, [binding.botId, actor.userId, actor.workspaceId]) : null
-    if (held?.rowCount) { await client.query('COMMIT'); return null }
+    // The run uses its own thread machine's desktop, never the Bot's: a person holding the Bot's desktop does not hold it.
     if (subscriptionBindingId) {
       const subscription = await client.query('SELECT 1 FROM byos_bindings WHERE id=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND "consumerId"=$4', [subscriptionBindingId, actor.userId, actor.workspaceId, run.agentId])
       if (!subscription.rowCount) { await client.query('COMMIT'); return null }
