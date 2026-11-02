@@ -3,6 +3,15 @@ export function runIsActive(status: string) {
   return ['queued', 'preparing', 'running', 'waiting_input', 'finishing'].includes(status)
 }
 
+/**
+ * The agent is generating or running right now: the composer's button is stop.
+ * A run waiting for the person's answer (`waiting_input`) is live but idle, so the
+ * composer sends; stopping it stays in the thread header (usability review N1).
+ */
+export function runIsWorking(status: string) {
+  return runIsActive(status) && status !== 'waiting_input'
+}
+
 export function runListRefreshInterval(runs: readonly { status: string }[] | undefined) {
   return runs?.some(run => runIsActive(run.status)) ? 5000 : 0
 }

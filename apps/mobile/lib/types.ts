@@ -131,7 +131,7 @@ export type ThreadItem =
   | { kind: 'error'; id: string; text: string; at: number }
   | { kind: 'person'; id: string; text: string; mine: boolean; at: number }
 
-export interface ThreadDetail { thread: Thread; active: boolean; summary: string | null; error: string | null; items: ThreadItem[] }
+export interface ThreadDetail { thread: Thread; active: boolean; /** Generating or running, not waiting for an answer: only then does the composer's button stop. */ working?: boolean; summary: string | null; error: string | null; items: ThreadItem[] }
 
 export interface Suggestion { id: string; source: Source; action: string; title: string; url: string | null; actor: string | null; occurredAt: string }
 export interface Suggestions { groups: { source: Source; items: Suggestion[] }[] }

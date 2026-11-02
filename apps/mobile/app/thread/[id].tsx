@@ -3,7 +3,7 @@ import { StyleSheet, View } from 'react-native'
 import { KeyboardChatScrollView } from 'react-native-keyboard-controller'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { Check } from 'lucide-react-native'
+import { Check, Square } from 'lucide-react-native'
 import { BotBubble, MyBubble } from '@/components/chat'
 import { MachineIcon, Spinner, StatusIcon } from '@/components/icons'
 import { Markdown } from '@/components/Markdown'
@@ -15,6 +15,7 @@ import { api, ApiError } from '@/lib/api'
 import { CardButton } from '@/components/cards'
 import { StopFailed } from '@/components/StopFailed'
 import { useStop } from '@/lib/useStop'
+import { composerStops } from '@/lib/stop'
 import type { ThreadDetail } from '@/lib/types'
 import { useApi } from '@/lib/useApi'
 import { colors } from '@/lib/theme'
@@ -68,6 +69,8 @@ export default function ThreadScreen() {
             </View>
           </View>
         ) : undefined}
+        // Stop for every live thread, also one waiting for your answer, whose composer sends (N1).
+        right={data?.active && !stopper.sending ? { icon: 'stop.fill', label: '停止', web: <Square size={18} color={colors.ink} fill={colors.ink} />, onPress: () => void stopper.stop() } : undefined}
       />
       <KeyboardChatScrollView {...underBar} offset={Math.max(insets.bottom, 12) - 8} keyboardDismissMode="interactive" keyboardLiftBehavior="whenAtEnd" contentContainerStyle={styles.body}>
         {!data && !error ? <View style={{ paddingTop: 40, alignItems: 'center' }}><Spinner /></View> : null}
@@ -99,7 +102,7 @@ export default function ThreadScreen() {
       </KeyboardChatScrollView>
       <OfflineBanner top={insets.top + 66} />
       {/* R-10: a thread ends in the composer, finished or not; a message to an ended thread runs it again (R-81). */}
-      {data ? <Composer placeholder="给这个线程发消息" onSend={send} disabled={sending} onStop={data.active && !stopper.sending ? () => void stopper.stop() : undefined} /> : null}
+      {data ? <Composer placeholder="给这个线程发消息" onSend={send} disabled={sending} onStop={composerStops(data) && !stopper.sending ? () => void stopper.stop() : undefined} /> : null}
     </View>
   )
 }
