@@ -55,6 +55,8 @@ async function routeFixture(unavailable=false,stopped=false,modelDenied=false,is
     '@/lib/run-claim-response':{authorizedClaimResponse:async(_user:string,_run:unknown,_lease:string,respond:(current:typeof run)=>Response)=>respond(run)},
     '@/lib/run-publications':{prepareRunPublication:async()=>({policy:{...defaultRunPolicy(),permissions:{...defaultRunPolicy().permissions,git_push:'allow'}}}),persistRunCompletion:async()=>{assert.equal(issueDenied,true);calls.push('rejectPublication')}},
     '@/lib/run-publication-result':{PublicationError:class extends Error {}},
+    // No linked GitHub account in this fixture: the claim attaches no GitHub credential endpoint.
+    '@/lib/github/repository-installation':{linkedGitHubAccountId:async()=>null},
     '@/lib/db':{db,pool:{},withDatabaseClient:async(_tx:unknown,fn:()=>Promise<unknown>)=>fn()},'@/lib/db/schema':{agentRuns:{},agents:{},deviceRepos:{}},
     '@/lib/device-link':{authenticateDevice:async()=>({userId:'owner',tokenId:'synthetic-device-token'}),ownedDevice:async()=>({enabled:true,kind:'local',protocolVersion:daemonProtocol.DAEMON_PROTOCOL_VERSION,harnesses:[{harness:'codex',installed:true,toolApproval:true}]})},
     '@/lib/base-path':{withBasePath:(path:string)=>path},'@/lib/mcp/resource':{},

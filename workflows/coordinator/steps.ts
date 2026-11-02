@@ -394,7 +394,7 @@ export async function findRepository(userId: string, input: { name?: string }, s
  * One task, one thread (lib/thread-dispatch.ts): a task with a thread gets the dispatch as that thread's work; only
  * `newThread`, when the person's own message (`sourceEventId`, host-supplied) explicitly asked for it, starts another.
  */
-export async function dispatchRun(userId: string, input: { issueId: string; agentId?: string; repo: string; note?: string; requestKey?:string; readOnly?: boolean; newThread?: boolean; sourceEventId?: string; target?: import('@/lib/dispatch-target').DispatchTarget; model?: { harness: 'claude_code' | 'codex'; model?: string } }, scope: NativeToolScope | undefined, botId: string, execution?: AgentExecution, requestEventId?: string, approvedRepositoryKey?: string) {
+export async function dispatchRun(userId: string, input: { issueId: string; agentId?: string; repo: string; note?: string; requestKey?:string; readOnly?: boolean; newThread?: boolean; sourceEventId?: string; target?: import('@/lib/dispatch-target').DispatchTarget; model?: { harness: 'claude_code' | 'codex'; model?: string } }, scope: NativeToolScope | undefined, botId: string, execution?: AgentExecution, requestEventId?: string) {
   'use step'
   await assertNativeToolScope(userId,scope)
   const { newThread, sourceEventId, target, ...request } = input
@@ -408,7 +408,7 @@ export async function dispatchRun(userId: string, input: { issueId: string; agen
   // A bare name ("Mikka_test") becomes the one repository this user authorized by that name, or a card; only a new run needs it.
   const { withResolvedRepository } = await import('@/lib/coordinator/repository-resolution')
   const byRules = (note: string | undefined, place?: import('@/lib/dispatch-target').DispatchTarget) =>
-    withResolvedRepository(userId, request.issueId, request.repo, repo => dispatchByRules(userId, { ...request, repo, note }, scope, botId, execution, requestEventId, approvedRepositoryKey, place))
+    withResolvedRepository(userId, request.issueId, request.repo, repo => dispatchByRules(userId, { ...request, repo, note }, scope, botId, execution, requestEventId, place))
   return asToolResult(async () => placed(await dispatchToTask(userId, request.issueId, {
     note: request.note, newThread,
     // A named place other than the thread's own is a move, which only the person's explicit request grants.
@@ -422,7 +422,7 @@ export async function dispatchRun(userId: string, input: { issueId: string; agen
         if (!('error' in cloud)) return cloud
       } else if (previous?.remoteUrl) {
         // Read-only sticks: a read-only request, or a thread that runs read-only, gives a read-only next run.
-        const result = await queueRun(userId, { issueId: request.issueId, agentId: previous.agentId, repo: previous.remoteUrl, note, readOnly: Boolean(request.readOnly || previous.readOnly), requestKey: `thread:${previous.id}:${request.requestKey ?? crypto.randomUUID()}`.slice(0, 200) }, botId, execution, requestEventId, null, approvedRepositoryKey).catch(() => null)
+        const result = await queueRun(userId, { issueId: request.issueId, agentId: previous.agentId, repo: previous.remoteUrl, note, readOnly: Boolean(request.readOnly || previous.readOnly), requestKey: `thread:${previous.id}:${request.requestKey ?? crypto.randomUUID()}`.slice(0, 200) }, botId, execution, requestEventId).catch(() => null)
         if (result) return { ...result, status: 'queued' as const }
       }
       return byRules(note)
@@ -431,7 +431,7 @@ export async function dispatchRun(userId: string, input: { issueId: string; agen
 }
 
 /** Where a new run goes and on which model (decision 2026-11-02-1400): a named computer, else 运行位置; the model by the same rule either way. */
-async function dispatchByRules(userId: string, input: { issueId: string; agentId?: string; repo: string; note?: string; requestKey?:string; readOnly?: boolean; model?: { harness: 'claude_code' | 'codex'; model?: string } }, scope: NativeToolScope | undefined, botId: string, execution?: AgentExecution, requestEventId?: string, approvedRepositoryKey?: string, place?: import('@/lib/dispatch-target').DispatchTarget) {
+async function dispatchByRules(userId: string, input: { issueId: string; agentId?: string; repo: string; note?: string; requestKey?:string; readOnly?: boolean; model?: { harness: 'claude_code' | 'codex'; model?: string } }, scope: NativeToolScope | undefined, botId: string, execution?: AgentExecution, requestEventId?: string, place?: import('@/lib/dispatch-target').DispatchTarget) {
   // A computer the person named: theirs, not removed, online; otherwise refused or the card at once, never another computer.
   if (place && place !== 'cloud') {
     const { targetDevice } = await import('@/lib/dispatch-target')
@@ -446,7 +446,7 @@ async function dispatchByRules(userId: string, input: { issueId: string; agentId
     const { resolveModelDispatch } = await import('@/lib/model-dispatch')
     const target = await resolveModelDispatch(pool, { ownerId: userId, workspaceId: await executionWorkspace(userId, botId), botId }, input.model ?? null, 'local', device.deviceId)
     if (target.kind !== 'device') return { error: 'machineUnavailable' as const, issueId: input.issueId, ...(target.kind === 'none' ? { reason: target.reason, card: target.card } : {}) }
-    const result = await queueRun(userId, { ...input, agentId: target.agentId, model: target.model, pinnedDeviceId: target.deviceId, ...(target.entry.source.kind === 'api_key' ? { apiKeyId: target.entry.source.keyId } : {}) }, botId, execution, requestEventId, null, approvedRepositoryKey)
+    const result = await queueRun(userId, { ...input, agentId: target.agentId, model: target.model, pinnedDeviceId: target.deviceId, ...(target.entry.source.kind === 'api_key' ? { apiKeyId: target.entry.source.keyId } : {}) }, botId, execution, requestEventId)
     return { ...result, status: 'queued' as const }
   }
   {
@@ -460,14 +460,13 @@ async function dispatchByRules(userId: string, input: { issueId: string; agentId
     const target = await resolveModelDispatch(pool, { ownerId: userId, workspaceId, botId }, input.model ?? null, place === 'cloud' ? 'cloud' : undefined)
     if (target.kind === 'none') return { error: 'machineUnavailable' as const, issueId: input.issueId, reason: target.reason, card: target.card }
     if (target.kind === 'device') {
-      const result = await queueRun(userId, { ...input, agentId: target.agentId, model: target.model, pinnedDeviceId: target.deviceId, ...(target.entry.source.kind === 'api_key' ? { apiKeyId: target.entry.source.keyId } : {}) }, botId, execution, requestEventId, null, approvedRepositoryKey)
+      const result = await queueRun(userId, { ...input, agentId: target.agentId, model: target.model, pinnedDeviceId: target.deviceId, ...(target.entry.source.kind === 'api_key' ? { apiKeyId: target.entry.source.keyId } : {}) }, botId, execution, requestEventId)
       return { ...result, status: 'queued' as const }
     }
     if (requestEventId) {
       const event=(await pool.query('SELECT "userId","botId",payload FROM coordinator_events WHERE id=$1',[requestEventId])).rows[0]
       if (!event || event.userId!==userId || event.botId!==botId || event.payload?.taskDestination) throw new ActionFailureError('runInvalid')
     }
-    if (approvedRepositoryKey) throw new ActionFailureError('runInvalid')
     // The bot's own runtime, created on first use; the Coordinator's is its bot row's like any bot's.
     // An API-key model binds no subscription to it; a subscription model binds the entry's own account.
     const autoRuntime=await import('@/lib/computer/auto-runtime')
@@ -554,11 +553,6 @@ export async function dispatchComputerTask(userId: string, input: { botId: strin
   try {
     if (input.suggestionId && !(await pool.query('SELECT 1 FROM suggestion_executions WHERE "suggestionId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND ("botId" IS NULL OR "botId"=$4)', [input.suggestionId, userId, target.workspaceId, input.botId])).rowCount) return { error: 'suggestionUnavailable' }
     const deviceRepoId = input.repo ? (await (await import('@/lib/device-repositories')).ensureDeviceRepository(userId,target.deviceId,input.repo)).id : target.repoId
-    // Push authority is the person's GitHub App grant: ask GitHub now; queueing reads the recorded outcome.
-    if (!input.readOnly) {
-      const repoPath = (await pool.query<{ repoPath: string }>('SELECT "repoPath" FROM device_repos WHERE id=$1 AND "userId"=$2', [deviceRepoId, userId])).rows[0]?.repoPath
-      if (repoPath?.startsWith('v2/github.com/')) await (await import('@/lib/github/push-grant')).verifyPushGrant(userId, repoPath)
-    }
     const result = await queueCloudRun(pool, { userId, workspaceId: target.workspaceId }, { botId: input.botId, issueId: issue.id, agentId: target.agentId, deviceRepoId, title: issue.title, body: tiptapToText(issue.content), note: input.note, model:input.repo ? input.model ?? 'auto' : input.model, ...(input.apiKeyId ? { apiKeyId: input.apiKeyId } : {}), idempotencyKey: input.suggestionId ? `suggestion:${input.suggestionId}` : `coordinator:${toolCallId}`, execution, ...(input.readOnly ? { readOnly: true } : {}) })
     if (input.suggestionId) await pool.query('UPDATE suggestion_executions SET "botId"=$4,"runId"=$5,status=\'running\' WHERE "suggestionId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND ("runId" IS NULL OR "runId"=$5)', [input.suggestionId, userId, target.workspaceId, input.botId, result.runId])
     const actor = { userId, workspaceId: target.workspaceId as string }

@@ -7,17 +7,15 @@ import { writeTransaction } from '@/lib/operations/write-transaction'
 import { coordinatorBot, type CoordinatorBot } from '@/lib/coordinator/coordinator-bot'
 
 /**
- * GitHub's two writes on Plugins › GitHub, for the person's own Coordinator
- * (agent_kit_heads of its bot row, lib/coordinator/coordinator-bot.ts). Neither has a second store:
+ * The two GitHub settings once stored for the person's own Coordinator
+ * (agent_kit_heads of its bot row, lib/coordinator/coordinator-bot.ts). Since
+ * decision 2026-11-02-1600 neither gates anything: agents and the Coordinator
+ * work with the person's own GitHub credential, and Plugins › GitHub lists
+ * every ability without a control. The stored values and this route stay
+ * readable and writable so existing rows keep their history.
  *
- * - 推送分支 is decided by the GitHub App's own access on the repository
- *   (contents: write, lib/github/push-grant.ts; decision 2026-11-01-1215). It
- *   is shown, not set: `push` reads the Coordinator's stored `git_push` only so
- *   an older deny stays visible, and a PATCH can no longer change it.
- * - 创建 Pull Request is `github_pull_request` in `external_write_permissions`,
- *   read by publishRunResult before it opens the pull request: allow or deny,
- *   never asked (decision 2026-11-01-1215). Unset, or an ask stored before
- *   that decision, opens it.
+ * - `push` reads the Coordinator's stored `git_push`.
+ * - `pullRequest` is `github_pull_request` in `external_write_permissions`.
  */
 export const PULL_REQUEST_PERMISSION = 'github_pull_request'
 export const PULL_REQUEST_DEFAULT: PermissionDecision = 'allow'

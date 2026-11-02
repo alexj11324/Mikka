@@ -72,8 +72,8 @@ export const runViewColumns = {
 type LocalDispatchInput = { issueId: string; agentId: string; repo: string; note?: string; requestKey?: string; model?: string; pinnedDeviceId?: string; readOnly?: boolean
   /** The API key the 允许使用的模型 entry names; the run uses it only when it may (lib/run-credential-source.ts). */
   apiKeyId?: string }
-export async function queueRun(userId: string, input: LocalDispatchInput, botId: string | null = null, execution?: AgentExecution, requestEventId?: string, source: 'mcp' | null = null, approvedRepositoryKey?: string) {
-  return queueAdmittedRun(userId, input, botId, execution, requestEventId, source, approvedRepositoryKey)
+export async function queueRun(userId: string, input: LocalDispatchInput, botId: string | null = null, execution?: AgentExecution, requestEventId?: string, source: 'mcp' | null = null) {
+  return queueAdmittedRun(userId, input, botId, execution, requestEventId, source)
 }
 
 /** Only the Factory/Skill host calls this with an already-open transaction.
@@ -106,7 +106,7 @@ export async function queueFactoryRun(tx: import('pg').PoolClient, userId: strin
       botId = source.botId
       requestEventId = source.agentDefinition?.repositoryAdmission?.requestEventId
     }
-    const result = await queueAdmittedRun(userId, { ...parsed.data, repo: repo.remoteUrl, requestKey: parsed.data.requestKey ?? (context ? `factory:${context.attemptId}` : undefined) }, botId, undefined, requestEventId, null, undefined, { executor, repo, client: tx, sourceRunId })
+    const result = await queueAdmittedRun(userId, { ...parsed.data, repo: repo.remoteUrl, requestKey: parsed.data.requestKey ?? (context ? `factory:${context.attemptId}` : undefined) }, botId, undefined, requestEventId, null, { executor, repo, client: tx, sourceRunId })
     const [run] = await executor.select({ status: agentRuns.status }).from(agentRuns).where(and(eq(agentRuns.id, result.runId), eq(agentRuns.userId, userId))).limit(1)
     if (!run) throw new ActionFailureError('runInvalid')
     // BE-13: the target device cannot take the run right now -> one reason-coded event, same transaction.
@@ -117,14 +117,12 @@ export async function queueFactoryRun(tx: import('pg').PoolClient, userId: strin
 }
 
 async function queueAdmittedRun(userId: string, input: LocalDispatchInput, botId: string | null, execution?: AgentExecution,
-  requestEventId?: string, source: 'mcp' | null = null, approvedRepositoryKey?: string,
+  requestEventId?: string, source: 'mcp' | null = null,
   internal?: { executor: Pick<typeof db, 'select' | 'transaction'>; repo: typeof deviceRepos.$inferSelect; client: import('pg').PoolClient; sourceRunId?: string }) {
   const executor = internal?.executor ?? db
   const parsed = z.object({ issueId: z.uuid(), agentId: z.uuid(), repo: z.string().trim().min(1).max(4_000), note: z.string().trim().max(10_000).optional(), requestKey: dispatchRequestKey.optional(), model: z.string().trim().min(1).max(128).optional(), pinnedDeviceId: z.uuid().optional(), readOnly: z.boolean().optional(), apiKeyId: z.uuid().optional() }).safeParse(input)
   if (!parsed.success) throw new ActionFailureError('runInvalid')
-  let requestedRepositoryKey: string
-  try { requestedRepositoryKey = normalizeRepository(parsed.data.repo, { allowFile: daemonTestMode(process.env) }).key } catch { throw new ActionFailureError('repoPathInvalid') }
-  if (approvedRepositoryKey && (!requestEventId || requestedRepositoryKey !== approvedRepositoryKey)) throw new ActionFailureError('runInvalid')
+  try { normalizeRepository(parsed.data.repo, { allowFile: daemonTestMode(process.env) }) } catch { throw new ActionFailureError('repoPathInvalid') }
   const issue = await issueForUser(userId, parsed.data.issueId, false, executor)
   if (!issue) throw new ActionFailureError('issueNotFound')
   const [agent] = await executor.select().from(agents)
@@ -133,10 +131,6 @@ async function queueAdmittedRun(userId: string, input: LocalDispatchInput, botId
   const [device] = await executor.select().from(devices).where(and(eq(devices.id, agent.deviceId), eq(devices.ownerId, userId), eq(devices.kind, 'local'))).limit(1)
   if (!device?.enabled || !localExecutionHarnesses(device.harnesses).includes(agent.harness)) throw new ActionFailureError('agentHarnessMissing')
   const repo = internal?.repo ?? await ensureDeviceRepository(userId, agent.deviceId, parsed.data.repo)
-  // Push authority is the person's GitHub App grant: ask GitHub now, before the
-  // admission transaction, which reads the recorded outcome. A host dispatch
-  // already inside its transaction (Factory) relies on the recorded check.
-  const pushCheck = !internal && !parsed.data.readOnly ? await (await import('@/lib/github/push-grant')).verifyPushGrant(userId, requestedRepositoryKey) : null
   const runId = crypto.randomUUID()
   const prompt = runPrompt(issue.title, tiptapToText(issue.content), agent.instructions, parsed.data.note)
   const captureDefinition = true
@@ -155,7 +149,7 @@ async function queueAdmittedRun(userId: string, input: LocalDispatchInput, botId
     ? freezeWorkerDefinition({ harness: agent.harness, instructions: agent.instructions, prompt, parent: execution?.snapshot ?? null, executionId: execution?.id ?? null,subscription, apiKey, model:parsed.data.model, pinnedDeviceId:parsed.data.pinnedDeviceId, mailboxEnabled, mailboxScope, readOnly: parsed.data.readOnly })
     : null
   return (await import('@/lib/run-admission-store')).acceptLocalRun({ id: runId, userId, botId, issueId: issue.id, agentId: agent.id, deviceId: agent.deviceId,
-    deviceRepoId: repo.id, prompt, source, definition: agentDefinition!, ...(requestEventId ? { requestEventId } : {}), ...(approvedRepositoryKey ? { approvedRepositoryKey } : {}), ...(pushCheck && !pushCheck.granted ? (pushCheck.reason === 'githubUnavailable' || pushCheck.reason === 'githubNotConfigured' ? { pushUnchecked: pushCheck.reason } : { pushRefusal: pushCheck.reason }) : {}), ...(parsed.data.requestKey ? { dispatch: { issueId: issue.id, agentId: agent.id, deviceRepoId: repo.id, note: parsed.data.note, requestKey: parsed.data.requestKey } } : {}), ...(internal ? { continuation: true, sourceRunId: internal.sourceRunId } : {}) }, internal?.client)
+    deviceRepoId: repo.id, prompt, source, definition: agentDefinition!, ...(requestEventId ? { requestEventId } : {}), ...(parsed.data.requestKey ? { dispatch: { issueId: issue.id, agentId: agent.id, deviceRepoId: repo.id, note: parsed.data.note, requestKey: parsed.data.requestKey } } : {}), ...(internal ? { continuation: true, sourceRunId: internal.sourceRunId } : {}) }, internal?.client)
 }
 
 /** A device run's credential source; the bot's workspace decides whose API keys it may use. */

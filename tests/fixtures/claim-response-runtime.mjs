@@ -68,6 +68,8 @@ const sources = new Map([
   ['/lib/computer/native-run-binding.ts', 'export async function nativeRunBinding(){return globalThis.claimResponseProbe.cloud.subscription}'],
   ['/lib/secrets/runtime.ts', 'export function remoteRepositoryRef(url){return url};export async function taskSecretInjection(...args){const p=globalThis.claimResponseProbe;p.preparation.push("secrets");(p.secretReads??=[]).push(args);return p.secretInjection??{env:{},secretNames:[]}}'],
   ['/lib/run-leases.ts', 'export async function latestCheckpoint(){const p=globalThis.claimResponseProbe;p.preparation.push("checkpoint");return structuredClone(p.checkpoint)}'],
+  ['/lib/app-tools-server.ts', 'export async function runAppToolkits(){return []}'],
+  ['/lib/github/repository-installation.ts', 'export async function linkedGitHubAccountId(userId){const p=globalThis.claimResponseProbe;(p.githubLookups??=[]).push(userId);return p.githubAccountId===undefined?"123":p.githubAccountId}'],
   ['/lib/subscription-runtime.ts', 'export function subscriptionRuntime(){throw new Error("unexpected subscription access")}'],
 ])
 registerHooks({

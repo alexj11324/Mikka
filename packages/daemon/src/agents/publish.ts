@@ -43,9 +43,8 @@ export interface PublishOptions {
   /** The branch the run started from; tells an issue commit from base. */
   baseBranch?: string
   /**
-   * Push only when allowed: the repo approved it ("always for this repo")
-   * or the run's assignment, after the server checked that approval,
-   * allows pushes (`pushDecision` in ../permissions).
+   * Push only when the run's assignment allows the daemon to push its task
+   * branch (`pushDecision` in ../permissions).
    * `note` says why not otherwise.
    */
   push: { approved: boolean; remote: string; note?: string }
@@ -310,7 +309,7 @@ export async function publishRun(options: PublishOptions): Promise<RunPublish> {
       pushed: false,
       remote: null,
       skipped: "not_approved",
-      note: options.push.note ?? "Push needs the Mikka GitHub App's access on this repository",
+      note: options.push.note ?? "This run has no task branch to push",
     }
   }
   return push(commit)

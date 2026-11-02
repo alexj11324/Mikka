@@ -97,6 +97,34 @@ test('ordinary retries retain the normal claim path after question lineage valid
   assert.equal((await response.json()).continuesRunId,'ordinary-parent')
 })
 
+test('every github.com run of a connected owner gets the owner credential endpoint, read-only and plan runs included', async () => {
+  const mailbox = process.env.MIKKA_PERSONAL_MAILBOX_ENABLED
+  process.env.MIKKA_PERSONAL_MAILBOX_ENABLED = '0'
+  try { for (const variant of ['implement', 'plan', 'readOnly'] as const) {
+    const probe = fixture()
+    if (variant === 'plan') probe.run.kind = 'plan'
+    if (variant === 'readOnly') Object.assign(probe.run, { agentDefinition: { readOnly: true } })
+    probe.cliPolicy.policy.permissions.git_push = 'deny' as never
+    const response = await claim(probe, variant === 'readOnly' ? ['skill-preflight','policy','claim','skill-claim','benchmark-claim','token','settings'] : undefined)
+    assert.equal(response.status, 200, variant)
+    const body = await response.json()
+    assert.ok(body.mcp, JSON.stringify(Object.keys(body)))
+    assert.equal(body.github?.endpoint, body.mcp.url.replace(/\/api\/mcp\/?$/, '/api/runs/github-token'), variant)
+    assert.equal(body.github?.repository, 'synthetic/claim-fixture', variant)
+    assert.equal(Object.hasOwn(body.github, 'token'), false, 'the credential itself never travels in the claim')
+    assert.equal(body.github?.branch, variant === 'implement' ? 'synthetic-claim-branch' : undefined, variant)
+    assert.deepEqual((probe as unknown as { githubLookups: string[] }).githubLookups, ['member'], 'only the run owner\'s connection is looked up')
+  } } finally { if (mailbox === undefined) delete process.env.MIKKA_PERSONAL_MAILBOX_ENABLED; else process.env.MIKKA_PERSONAL_MAILBOX_ENABLED = mailbox }
+})
+
+test('an owner without a GitHub connection gets no credential endpoint', async () => {
+  const probe = fixture()
+  Object.assign(probe, { githubAccountId: null })
+  const response = await claim(probe)
+  assert.equal(response.status, 200)
+  assert.equal(Object.hasOwn(await response.json(), 'github'), false)
+})
+
 test('known unavailable or stale recovery blocks before leases, worker credentials or an old-client assignment', async () => {
   for (const unavailable of [true, false]) {
     const probe=fixture();probe.run.retryOf='lost-parent'

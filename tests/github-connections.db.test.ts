@@ -32,8 +32,11 @@ test('Plugins → GitHub connections are per Mikka user and leave the login iden
   })
 
   await t.test('each user gets their own token, sealed at rest', async () => {
-    assert.deepEqual(await connection.githubConnectionToken(first), { token: 'token-first', githubAccountId: githubId })
-    assert.deepEqual(await connection.githubConnectionToken(second), { token: 'token-second', githubAccountId: githubId })
+    assert.deepEqual(await connection.githubConnectionToken(first), { token: 'token-first', githubAccountId: githubId, expiresAt: null })
+    const secondToken = await connection.githubConnectionToken(second, { minValidityMs: 45 * 60_000 })
+    assert.equal(secondToken?.token, 'token-second', 'a token valid for longer than asked is used as stored')
+    assert.equal(secondToken?.githubAccountId, githubId)
+    assert.ok(secondToken?.expiresAt && secondToken.expiresAt.getTime() > Date.now() + 7 * 60 * 60_000)
     const stored = (await pool.query('select "accessToken", "refreshToken" from github_connections where "userId" = $1', [second])).rows[0]
     assert.notEqual(stored.accessToken, 'token-second')
     assert.notEqual(stored.refreshToken, 'refresh-second')

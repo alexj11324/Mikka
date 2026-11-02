@@ -1974,13 +1974,6 @@
       "githubVerificationSaved": "验证命令已保存",
       "githubAbilitiesHeading": "能力",
       "githubAbilitiesSummary": "包含 {count} 个能力（{write} 个写入，{read} 个读取）",
-      "githubPermission": {
-        "allow": "允许",
-        "ask": "询问",
-        "deny": "拒绝"
-      },
-      "githubPermissionFailed": "无法保存",
-      "githubPushByApp": "由 GitHub App 授权决定",
       "githubPrivate": "私有",
       "githubTool": {
         "push": "推送分支",

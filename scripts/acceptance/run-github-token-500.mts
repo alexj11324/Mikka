@@ -16,7 +16,7 @@ test('real PostgreSQL run-token authority and exchange (#500)', async t => {
   const { issueRunToken, revokeRunTokens } = await import('../../lib/mcp/worker.ts')
   const { authorizeRunGitHubToken } = await import('../../lib/github/run-token-authority.ts')
   const { createRunGitHubTokenExchange } = await import('../../lib/github/run-token-exchange.ts')
-  const { and, eq } = await import('drizzle-orm')
+  const { eq } = await import('drizzle-orm')
   const scope = createRequestDatabaseScope(target!)
   const owner = `github-500-${randomUUID()}`, peer = `github-peer-${randomUUID()}`
   const retainedRuns: string[] = []
@@ -42,27 +42,27 @@ test('real PostgreSQL run-token authority and exchange (#500)', async t => {
       await db.insert(schema.issues).values({ id: issueId, userId: owner, title: 'Run-token acceptance fixture', content: { type: 'doc', attrs: { mikka: { number } } }, status: 'todo', priority: 'normal', scope: 'personal', scopeSetBy: 'user' })
       await db.insert(schema.agentRuns).values({ id: runId, userId: owner, issueId, agentId, deviceId, deviceRepoId: repoId, status: 'running', kind: 'implement', leaseExpiresAt: new Date(Date.now() + 600_000) })
       await db.insert(schema.runPublications).values({ runId, userId: owner, issueId, remoteKey, remoteUrl, identifier: `MIK-${number}`, branch, pushApproved: true, scopeVersion: 1, issueTitle: 'Run-token acceptance fixture' })
-      await db.insert(schema.repositorySettings).values({ userId: owner, remoteKey, push: { approved: true, approvedByUserId: owner, approvedAt: new Date().toISOString() } })
       const issued = await issueRunToken({ id: runId, userId: owner })
       retainedRuns.push(runId)
       const request = () => new Request('http://127.0.0.1/mikka/api/runs/github-token', { method: 'POST', headers: { authorization: `Bearer ${issued.token}` } })
       return { runId, issueId, deviceId, agentId, repoId, remoteKey, remoteUrl, branch, request }
     }
 
-    await t.test('an actual issued run token authorizes only its persisted repository', async () => {
+    await t.test('an actual issued run token gets only its owner\'s credential, for any run kind', async () => {
       const f = await fixture()
-      assert.deepEqual(await authorizeRunGitHubToken(f.request()), { runId: f.runId, userId: owner, remoteKey: f.remoteKey, branch: f.branch, githubAccountId: '500123' })
-      let issued = 0
-      const exchange = createRunGitHubTokenExchange({ authorize: authorizeRunGitHubToken, issue: async input => {
-        assert.deepEqual(input, { remoteKey: f.remoteKey, githubAccountId: '500123' })
-        issued++
-        return { token: 'synthetic-provider-token', expiresAt: new Date(Date.now() + 3600_000).toISOString() }
-      }, revoke: async () => assert.fail('valid provider fixture revoked') })
-      const response = await exchange(new Request(f.request(), { method: 'POST', body: JSON.stringify({ repository: 'another/repository' }) }))
+      assert.deepEqual(await authorizeRunGitHubToken(f.request()), { runId: f.runId, userId: owner })
+      await db.update(schema.agentRuns).set({ kind: 'plan', agentDefinition: { readOnly: true } as never }).where(eq(schema.agentRuns.id, f.runId))
+      assert.deepEqual(await authorizeRunGitHubToken(f.request()), { runId: f.runId, userId: owner }, 'read-only and plan runs keep the credential')
+      const issued: string[] = []
+      const exchange = createRunGitHubTokenExchange({ authorize: authorizeRunGitHubToken, issue: async userId => {
+        issued.push(userId)
+        return { token: 'synthetic-provider-token', expiresAt: null }
+      } })
+      const response = await exchange(new Request(f.request(), { method: 'POST', body: JSON.stringify({ repository: 'another/repository', userId: peer }) }))
       assert.equal(response.status, 200)
       assert.equal(response.headers.get('cache-control'), 'no-store')
-      assert.equal((await response.json()).repository, f.remoteKey.slice('v2/github.com/'.length))
-      assert.equal(issued, 1)
+      assert.equal((await response.json()).token, 'synthetic-provider-token')
+      assert.deepEqual(issued, [owner])
     })
 
     for (const state of ['succeeded', 'failed', 'cancelled', 'stopped'] as const) {
@@ -87,48 +87,23 @@ test('real PostgreSQL run-token authority and exchange (#500)', async t => {
       await revokeRunTokens(f.runId)
       assert.equal(await authorizeRunGitHubToken(request), null)
     })
-    await t.test('cross-owner token, repository and device rows never grant credentials', async () => {
+    await t.test('a cross-owner token or device never reaches another person\'s credential', async () => {
       const f = await fixture()
       const mismatched = await issueRunToken({ id: f.runId, userId: peer })
       assert.equal(await authorizeRunGitHubToken(new Request(f.request(), { headers: { authorization: `Bearer ${mismatched.token}` } })), null)
-      await db.update(schema.deviceRepos).set({ userId: peer }).where(eq(schema.deviceRepos.id, f.repoId))
-      assert.equal(await authorizeRunGitHubToken(f.request()), null)
-      await db.update(schema.deviceRepos).set({ userId: owner }).where(eq(schema.deviceRepos.id, f.repoId))
       await db.update(schema.devices).set({ ownerId: peer }).where(eq(schema.devices.id, f.deviceId))
       assert.equal(await authorizeRunGitHubToken(f.request()), null)
-      await db.update(schema.devices).set({ ownerId: owner }).where(eq(schema.devices.id, f.deviceId))
-      await db.update(schema.issues).set({ userId: peer }).where(eq(schema.issues.id, f.issueId))
+      await db.update(schema.devices).set({ ownerId: owner, enabled: false }).where(eq(schema.devices.id, f.deviceId))
       assert.equal(await authorizeRunGitHubToken(f.request()), null)
     })
-    await t.test('policy deny and revoked repository approval are read from current actual settings', async () => {
+    await t.test('STOP during the token read returns nothing', async () => {
       const f = await fixture()
-      await pool.query(`UPDATE agents SET cli_run_policy='{"permissions":{"git_push":"deny"}}' WHERE id=$1`, [f.agentId])
-      assert.equal(await authorizeRunGitHubToken(f.request()), null)
-      await pool.query(`UPDATE agents SET cli_run_policy='{"approvalMode":"read_only"}' WHERE id=$1`, [f.agentId])
-      assert.equal(await authorizeRunGitHubToken(f.request()), null)
-      await pool.query(`UPDATE agents SET cli_run_policy='{}' WHERE id=$1`, [f.agentId])
-      await db.update(schema.repositorySettings).set({ push: { approved: false } }).where(and(eq(schema.repositorySettings.userId, owner), eq(schema.repositorySettings.remoteKey, f.remoteKey)))
-      assert.equal(await authorizeRunGitHubToken(f.request()), null)
-    })
-    await t.test('a real frozen verification attempt cannot borrow implementation authority', async () => {
-      const f = await fixture(), eventId = randomUUID(), taskId = randomUUID(), attemptId = randomUUID()
-      await db.insert(schema.coordinatorEvents).values({ id: eventId, userId: owner, kind: 'user_message', dedupeKey: eventId, payload: { text: 'Synthetic frozen check fixture' } })
-      await db.transaction(async tx => {
-        await tx.insert(schema.factoryTasks).values({ id: taskId, userId: owner, issueId: f.issueId, sourceEventId: eventId, route: {}, stage: 'verify', status: 'running', revision: 1, attemptId, reason: 'Frozen check acceptance' })
-        await tx.insert(schema.factoryAttempts).values({ id: attemptId, taskId, stage: 'verify', ordinal: 1, position: 1, status: 'running', runId: f.runId, reason: 'Frozen check acceptance' })
-      })
-      assert.equal(await authorizeRunGitHubToken(f.request()), null)
-    })
-    await t.test('STOP during external token issuance refuses and revokes the minted fixture token', async () => {
-      const f = await fixture()
-      const revoked: string[] = []
       const exchange = createRunGitHubTokenExchange({ authorize: authorizeRunGitHubToken, issue: async () => {
         await db.update(schema.agentRuns).set({ stopRequestedAt: new Date() }).where(eq(schema.agentRuns.id, f.runId))
-        return { token: 'synthetic-raced-provider-token', expiresAt: new Date(Date.now() + 3600_000).toISOString() }
-      }, revoke: async token => { revoked.push(token) } })
+        return { token: 'synthetic-raced-provider-token', expiresAt: null }
+      } })
       const result = await exchange(f.request())
       assert.equal(result.status, 403)
-      assert.deepEqual(revoked, ['synthetic-raced-provider-token'])
       assert.doesNotMatch(await result.text(), /synthetic-raced-provider-token/)
     })
   })

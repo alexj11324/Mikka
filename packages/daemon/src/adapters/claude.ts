@@ -134,11 +134,10 @@ export function claudeProjectDirName(cwd: string): string {
  */
 export function claudeSettings(
   workspace?: RunPolicy,
-  agentDelivers = false,
 ): Settings {
   return {
     sandbox: { enabled: false },
-    permissions: claudePermissionRules(runPolicy(workspace), agentDelivers),
+    permissions: claudePermissionRules(runPolicy(workspace)),
   }
 }
 
@@ -522,7 +521,7 @@ export class ClaudeAdapter implements AgentAdapter {
         },
         settingSources: [],
         settings: {
-          ...claudeSettings(options.policy, ctx.agentDelivers),
+          ...claudeSettings(options.policy),
           ...(externalAuth ? { forceLoginMethod: "claudeai" as const } : {})
         },
         mcpServers: {
