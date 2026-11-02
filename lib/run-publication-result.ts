@@ -37,4 +37,7 @@ export interface PublishedPullRequest {
   title?: string
   url: string
   state: 'open' | 'draft' | 'merged' | 'closed'
+  /** Lines added and removed, when GitHub's reply carried them (a single PR does; a list of PRs does not). */
+  additions?: number
+  deletions?: number
 }
