@@ -94,8 +94,12 @@ export const issueToolCalls = pgTable('issue_tool_calls', {
  */
 export const bots = pgTable('bots', {
   id: uuid('id').primaryKey(),
-  /** Who made it, in which workspace: the identity the cloud computer (bot_desktops, #317) keys on too. */
-  ownerId: text('ownerId').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  /**
+   * Who made it, in which workspace: the identity the cloud computer (bot_desktops, #317) keys on too.
+   * No foreign key: when the owner deletes their account, a bot in a shared workspace stays,
+   * paused under their old id until an admin takes it over (lib/account/delete.ts).
+   */
+  ownerId: text('ownerId').notNull(),
   workspaceId: uuid('workspaceId').notNull(),
   name: text('name').notNull(),
   /** A bloub colour id, see components/nav/bot-avatar.tsx. */

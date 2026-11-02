@@ -123,8 +123,14 @@ dbTest('deleting an account removes what the person owns, keeps what their team 
   const bot = randomUUID(), agent = randomUUID(), device = randomUUID(), run = randomUUID()
   const personalIssue = randomUUID(), teamIssue = randomUUID(), bobIssue = randomUUID()
   const group = randomUUID(), dm = randomUUID(), connection = randomUUID(), artifact = randomUUID()
+  const soloBot = randomUUID(), soloRun = randomUUID(), coordinator = randomUUID(), coordinatorRun = randomUUID(), liveRun = randomUUID()
   t.after(async () => {
     await scope.run(async () => {
+      // The kept bot and its threads have no owner left to cascade from.
+      await pool.query('delete from artifacts where id = $1', [artifact])
+      await pool.query('delete from agent_runs where "botId" = $1', [bot])
+      await pool.query('delete from bots where id = $1', [bot])
+      await pool.query('delete from agents where id = $1', [agent])
       for (const table of ['mikka_team_issues', 'mikka_teams']) await pool.query(`delete from ${table} where "workspaceId" = any($1::uuid[])`, [[solo, shared, carolsTeam]])
       await pool.query('delete from mikka_workspace_members where "workspaceId" = any($1::uuid[])', [[solo, shared, carolsTeam]])
       await pool.query('delete from mikka_workspaces where id = any($1::uuid[])', [[solo, shared, carolsTeam]])
@@ -150,6 +156,9 @@ dbTest('deleting an account removes what the person owns, keeps what their team 
     await pool.query(`insert into session (id, token, "userId", "createdAt", "updatedAt", "expiresAt") values ($1, $1, $2, now(), now(), now() + interval '1 day')`, [`${alice}-s`, alice])
     await pool.query(`insert into account (id, "accountId", "providerId", "userId", "createdAt", "updatedAt") values ($1, $2, 'google', $2, now(), now())`, [randomUUID(), alice])
     await pool.query(`insert into bots (id, "workspaceId", "ownerId", name) values ($1, $2, $3, 'Helper')`, [bot, shared, alice])
+    // Her bot in her own workspace and her Coordinator in the shared one are hers alone.
+    await pool.query(`insert into bots (id, "workspaceId", "ownerId", name) values ($1, $2, $3, 'Mine'), ($4, $5, $3, 'Coordinator')`, [soloBot, solo, alice, coordinator, shared])
+    await pool.query(`insert into coordinator_bots ("ownerId", "workspaceId", "botId") values ($1, $2, $3)`, [alice, shared, coordinator])
     await pool.query(`insert into devices (id, "ownerId", name) values ($1, $2, 'Laptop')`, [device, alice])
     await pool.query(`insert into agents (id, "userId", harness, name, "deviceId") values ($1, $2, 'codex', 'Agent', $3)`, [agent, alice, device])
     const issue = (iid: string, owner: string, scope: string) => pool.query(`insert into issues (id, "userId", title, content, status, priority, scope) values ($1, $2, 'T', '{}'::jsonb, 'todo', 'normal', $3)`, [iid, owner, scope])
@@ -158,7 +167,11 @@ dbTest('deleting an account removes what the person owns, keeps what their team 
     await pool.query(`insert into issue_members ("issueId", "userId", "memberId") values ($1, $2, $3)`, [bobIssue, bob, alice])
     await pool.query(`insert into mikka_team_issues ("issueId", "teamId", "workspaceId", "userId") values ($1, $2, $3, $4)`, [teamIssue, team, shared, alice])
     await pool.query(`insert into agent_runs (id, "userId", "agentId", "botId", "issueId", status) values ($1, $2, $3, $4, $5, 'done')`, [run, alice, agent, bot, teamIssue])
+    await pool.query(`insert into agent_runs (id, "userId", "agentId", "botId", status) values ($1, $2, $3, $4, 'running'), ($5, $2, $3, $6, 'succeeded'), ($7, $2, $3, $8, 'succeeded')`,
+      [liveRun, alice, agent, bot, soloRun, soloBot, coordinatorRun, coordinator])
     await pool.query(`insert into run_messages (id, "runId", "userId", text) values ($1, $2, $3, 'hi')`, [randomUUID(), run, alice])
+    await pool.query(`insert into run_messages (id, "runId", "userId", text) values ($1, $2, $3, 'mine')`, [randomUUID(), soloRun, alice])
+    await pool.query(`insert into run_tokens (id, "runId", "userId", "tokenHash", "expiresAt") values ($1, $2, $3, $4, now() + interval '1 hour')`, [randomUUID(), liveRun, alice, randomUUID()])
     await pool.query(`insert into coordinator_messages (id, "userId", position, message, "botId") values ($1, $2, 1, '{}'::jsonb, $3)`, [randomUUID(), alice, bot])
     await pool.query(`insert into user_facts (id, "userId", kind, subject, "subjectKey", confidence, "firstSeenAt", "lastSeenAt") values ($1, $2, 'interest', 'x', 'x', 0.5, now(), now())`, [randomUUID(), alice])
     await pool.query(`insert into user_preferences ("userId") values ($1)`, [alice])
@@ -183,7 +196,8 @@ dbTest('deleting an account removes what the person owns, keeps what their team 
 
     assert.deepEqual(await deletion.deleteAccount(alice, `${alice}@example.com`, { externalCleanup: async () => [] }), { ok: true })
 
-    // Nothing with Alice as its owner is left, in any table (bar the append-only skill ledgers).
+    // Nothing with Alice as its owner is left, in any table (bar the append-only skill ledgers),
+    // except her bot in the shared workspace and its threads, which stay for the team.
     const { rows: columns } = await pool.query<{ table: string; column: string }>(
       `select table_name as "table", column_name as "column" from information_schema.columns
        where table_schema = current_schema() and column_name = any($1::text[]) and table_name not like 'improvement\\_%'`, [deletion.OWNER_COLUMNS])
@@ -191,6 +205,7 @@ dbTest('deleting an account removes what the person owns, keeps what their team 
     for (const { table, column } of columns) {
       // Team issues of the shared workspace keep their owner column; they stay on purpose.
       if (['issues', 'issue_documents', 'mikka_team_issues', 'mikka_teams', 'mikka_workspaces'].includes(table)) continue
+      if (['bots', 'agent_runs', 'agents', 'run_messages', 'artifacts'].includes(table)) continue
       const { rowCount } = await pool.query(`select 1 from "${table}" where "${column}" = $1 limit 1`, [alice])
       if (rowCount) left.push(`${table}.${column}`)
     }
@@ -200,6 +215,26 @@ dbTest('deleting an account removes what the person owns, keeps what their team 
     assert.equal((await pool.query('select 1 from issue_documents where "issueId" = $1', [personalIssue])).rowCount, 0)
     assert.equal((await pool.query('select 1 from issue_members where "memberId" = $1', [alice])).rowCount, 0)
     assert.equal((await pool.query('select 1 from artifact_shares where "createdBy" = $1', [alice])).rowCount, 0)
+
+    // Her bot in the shared workspace stays, paused, with its threads, their messages and Artifacts and the agent they ran on.
+    const [kept] = (await pool.query<{ ownerId: string; archivedAt: Date | null }>('select "ownerId", "archivedAt" from bots where id = $1', [bot])).rows
+    assert.equal(kept.ownerId, alice); assert.ok(kept.archivedAt, 'paused for an admin to take over')
+    assert.deepEqual((await pool.query('select id, status from agent_runs where "botId" = $1 order by id', [bot])).rows,
+      [{ id: run, status: 'done' }, { id: liveRun, status: 'stopped' }].sort((a, b) => a.id.localeCompare(b.id)))
+    assert.equal((await pool.query('select 1 from run_messages where "runId" = $1', [run])).rowCount, 1)
+    assert.equal((await pool.query('select 1 from artifacts where id = $1', [artifact])).rowCount, 1)
+    assert.equal((await pool.query('select 1 from agents where id = $1', [agent])).rowCount, 1)
+    assert.equal((await pool.query('select 1 from run_tokens where "runId" = $1', [liveRun])).rowCount, 0, 'credentials of a kept thread still go')
+    // Her bot in her own workspace and her Coordinator go with their threads.
+    assert.equal((await pool.query('select 1 from bots where id = any($1::uuid[])', [[soloBot, coordinator]])).rowCount, 0)
+    assert.equal((await pool.query('select 1 from agent_runs where id = any($1::uuid[])', [[soloRun, coordinatorRun]])).rowCount, 0)
+    assert.equal((await pool.query('select 1 from run_messages where "runId" = $1', [soloRun])).rowCount, 0)
+    // Bob, an admin there, takes it over as from any member who left: it runs again, as his, with its threads.
+    const { takeOverBot, archivedBots } = await import('../workspace-admin/members')
+    assert.deepEqual((await archivedBots(bob, shared)).map(row => row.id), [bot])
+    assert.deepEqual(await takeOverBot(bob, shared, bot), { bots: 1 })
+    assert.deepEqual((await pool.query('select "ownerId", "archivedAt" from bots where id = $1', [bot])).rows, [{ ownerId: bob, archivedAt: null }])
+    assert.equal((await pool.query('select 1 from agent_runs where "botId" = $1', [bot])).rowCount, 2)
 
     // Her solo workspace went; the shared one, its team issue and group chat stay for Bob.
     assert.equal((await pool.query('select 1 from mikka_workspaces where id = $1', [solo])).rowCount, 0)
