@@ -1,4 +1,4 @@
-import { test, expect, app, register, registerInTeam, seedCoordinatorError, seedHostedVerification } from './fixtures'
+import { test, expect, app, register, registerInTeam, seedCoordinatorError, seedHostedVerification, useUpFreeMessages } from './fixtures'
 import { attachLightDark } from './settings-v4-shots'
 
 // No Stripe keys: real actions report unavailable and cannot contact Stripe.
@@ -101,4 +101,21 @@ test('对话：Mikka 默认被拒绝的说明留在那条消息下面，下一�
   await page.reload()
   await expect(page.locator('[data-message-failure="past"]')).toHaveText('点数已用完')
   await expect(page.locator('[data-hosted-refusal]')).toHaveCount(0)
+})
+
+test('对话：免费对话用完被拒时，并列绑定订阅和验证银行卡，绑定订阅就地打开', async ({ page }, testInfo) => {
+  await register(page)
+  await expect(page.getByRole('textbox', { name: '给 Coordinator 发消息', exact: true })).toBeVisible()
+  await useUpFreeMessages(page)
+  await seedCoordinatorError(page, 'PaidResourceError: verification_required', undefined, '帮我整理本周的 PR')
+  await page.reload()
+  const notice = page.locator('[data-hosted-refusal="verification_required"]')
+  await expect(notice).toContainText('免费对话已用完')
+  await expect(notice.getByRole('button', { name: '绑定订阅', exact: true })).toBeVisible()
+  await expect(notice.getByRole('link', { name: '验证银行卡', exact: true })).toBeVisible()
+  await attachLightDark(page, testInfo, 'chat-trial-used')
+  const before = page.url()
+  await notice.getByRole('button', { name: '绑定订阅', exact: true }).click()
+  await expect(page.getByRole('dialog', { name: '绑定订阅' })).toBeVisible()
+  expect(page.url()).toBe(before)
 })

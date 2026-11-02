@@ -117,6 +117,22 @@ export async function seedCoordinatorError(page: Page, error: string, workspaceI
   [randomUUID(), session.userId, coordinator?.botId ?? null, JSON.stringify({ role: 'user', content: message, mikkaFailure: error })])
 }
 
+/**
+ * The signed-in person's Coordinator chat has used up its free messages (TRIAL_MESSAGES, no card yet):
+ * one more message than the trial, already answered, so Mikka 默认 asks for a card or a subscription.
+ */
+export async function useUpFreeMessages(page: Page) {
+  const cookie = (await page.context().cookies()).find(item => item.name.endsWith('session_token'))
+  if (!cookie) throw new Error('useUpFreeMessages 需要已登录的页面。')
+  const db = database()
+  const { rows: [session] } = await db.query<{ userId: string }>('SELECT "userId" FROM session WHERE token = $1', [decodeURIComponent(cookie.value).split('.')[0]])
+  const { rows: [coordinator] } = await db.query<{ botId: string }>('SELECT "botId" FROM coordinator_bots WHERE "ownerId" = $1 LIMIT 1', [session.userId])
+  if (!coordinator) throw new Error('还没有 Coordinator。')
+  for (let i = 0; i <= 20; i++)
+    await db.query(`INSERT INTO coordinator_events (id,"userId","botId",kind,"dedupeKey",payload,"deliveredAt") VALUES ($1,$2,$3,'user_message',$4,$5,now())`,
+      [randomUUID(), session.userId, coordinator.botId, `user_message:${randomUUID()}`, JSON.stringify({ text: `message ${i}` })])
+}
+
 /** The signed-in person's workspace has a verified card and `remaining` microdollars of Mikka 默认 allowance (#523, #525). */
 export async function seedHostedVerification(page: Page, remaining: number) {
   const cookie = (await page.context().cookies()).find(item => item.name.endsWith('session_token'))

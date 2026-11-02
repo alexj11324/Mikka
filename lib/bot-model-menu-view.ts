@@ -36,6 +36,8 @@ export interface BotModelMenuGroup {
   owner?: string
   /** Mikka 默认: the points it can spend in this chat's workspace (its own and members' shared ones). */
   points?: number
+  /** Mikka 默认 with no points yet: the free messages left before a card is needed. */
+  trialLeft?: number
   options: BotModelMenuOption[]
 }
 

@@ -22,6 +22,10 @@ export interface HostedUsage {
   personal?: boolean
   /** The person has a Claude / ChatGPT subscription connected; it serves them in any workspace (#838). */
   subscribed?: boolean
+  /** No card and nothing bought: the free messages left (TRIAL_MESSAGES); null otherwise. */
+  trialLeft?: number | null
+  /** The workspace this was read for, so a dialog opened from the chat acts there. */
+  workspaceId?: string
 }
 
 /** #558 `cardVerificationStatus`. */
