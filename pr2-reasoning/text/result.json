@@ -1,0 +1,31 @@
+{
+  "label": "reasoning-text",
+  "revision": "003b42e7996d198d3d48f90fd485ded91fdcf3aa",
+  "origin": "http://localhost:3000",
+  "database": "mikka_e2e (127.0.0.1, isolated)",
+  "run": "wrun_activityda89dd0c48a2",
+  "at": "2026-11-02T23:19:57.563Z",
+  "shots": {
+    "0-waiting": 72,
+    "1-thinking": 126,
+    "2-tool-running": 238,
+    "2b-reasoning-open-live": 277,
+    "3-next-tool": 357,
+    "4-reply-streamed": 632,
+    "5-tool-opened": 664,
+    "6-stored": 707,
+    "7-reasoning-open-stored": 728
+  },
+  "commitFrame": 667,
+  "castFrames": 729,
+  "handedOver": true,
+  "sameRow": true,
+  "storedToolStates": [
+    "done",
+    "done",
+    "error"
+  ],
+  "reasoning": "text",
+  "storedReadable": "readable",
+  "storedOpenText": "登录后跳回首页，多半是登录回调没带上原来的地址。先建个任务记下来，再派到云端去查回调参数。"
+}

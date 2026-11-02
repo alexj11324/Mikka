@@ -1,0 +1,29 @@
+{
+  "label": "reasoning-none",
+  "revision": "003b42e7996d198d3d48f90fd485ded91fdcf3aa",
+  "origin": "http://localhost:3000",
+  "database": "mikka_e2e (127.0.0.1, isolated)",
+  "run": "wrun_activityb9a7675903e1",
+  "at": "2026-11-02T23:20:17.579Z",
+  "shots": {
+    "0-waiting": 77,
+    "1-thinking": 132,
+    "2-tool-running": 244,
+    "3-next-tool": 335,
+    "4-reply-streamed": 609,
+    "5-tool-opened": 642,
+    "6-stored": 687
+  },
+  "commitFrame": 646,
+  "castFrames": 687,
+  "handedOver": true,
+  "sameRow": true,
+  "storedToolStates": [
+    "done",
+    "done",
+    "error"
+  ],
+  "reasoning": "none",
+  "storedReadable": "none",
+  "storedOpenText": "disabled"
+}
