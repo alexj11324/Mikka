@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { botModelChoice, defaultModel, groupBotModels, harnessOptions, initialExecution, modelName, modelOptions, modelProvider, modelUnavailable, placeKind, redetectTargets, retarget, selectedBotModel, withCloudModels, type ExecutionPlace } from './execution-settings-view'
+import { botModelChoice, defaultModel, groupBotModels, harnessOptions, initialExecution, modelName, modelOptions, modelProvider, modelUnavailable, placeKind, redetectTargets, retarget, selectedBotModel, withAccountModels, withCloudModels, modelsUnverified, type ExecutionPlace } from './execution-settings-view'
 
 const laptop: ExecutionPlace = {
   id: '00000000-0000-4000-8000-000000000001', name: 'Alex MacBook Pro', deviceType: 'laptop', enabled: true, online: true,
@@ -42,6 +42,30 @@ test('models are only what the harness reported there, never a built-in list', (
   assert.deepEqual(names(modelOptions(withCloudModels(places, accounts), 'cloud', 'claude_code')), ['claude-e2e'])
   // Claude Code reported nothing: nothing is offered, no slot name stands in (Alex, 2026-11-02).
   assert.deepEqual(modelOptions(places, laptop.id, 'claude_code'), [])
+})
+
+test('a device offers what its CLI reported that the connected account also lists (decision 2026-11-02-1300)', () => {
+  const mac = slotted('mac', 'laptop', true, 'claude-opus-x', 'opus')
+  const catalogue = [{ provider: 'claude', modelId: 'claude-opus-x' }, { provider: 'claude', modelId: 'claude-only-in-account' }, { provider: 'codex', modelId: 'main' }]
+  // Intersection: a slot counts by its id or the model it resolves to; the account's extra model is not added.
+  const checked = withAccountModels([mac], catalogue)
+  assert.deepEqual(modelOptions(checked, 'mac', 'claude_code').map(option => option.value), ['opus'])
+  assert.equal(defaultModel(modelOptions(checked, 'mac', 'claude_code'))?.value, 'opus')
+  assert.deepEqual(modelOptions(checked, 'mac', 'codex').map(option => option.value), ['main'])
+  assert.equal(modelsUnverified(checked, 'mac', 'claude_code'), false)
+  // No subscription for that provider: the CLI's list as reported, marked 未与账号核对.
+  const unchecked = withAccountModels([mac], [])
+  assert.deepEqual(modelOptions(unchecked, 'mac', 'claude_code').map(option => option.value), ['sonnet', 'opus'])
+  assert.equal(modelsUnverified(unchecked, 'mac', 'claude_code'), true)
+  assert.equal(modelsUnverified(unchecked, 'mac', 'codex'), true)
+  // Nothing in common: nothing is offered (还没有可用模型), and a default outside the account is dropped.
+  const none = withAccountModels([mac], [{ provider: 'claude', modelId: 'claude-elsewhere' }])
+  assert.deepEqual(modelOptions(none, 'mac', 'claude_code'), [])
+  assert.equal(defaultModel(modelOptions(none, 'mac', 'claude_code')), undefined)
+  assert.equal(modelsUnverified(none, 'mac', 'claude_code'), false)
+  // A plain models list (no slots) is filtered the same way; Mikka Cloud is left to withCloudModels.
+  assert.deepEqual(modelOptions(withAccountModels(places, [{ provider: 'codex', modelId: 'reported-b' }]), laptop.id, 'codex').map(option => option.value), ['reported-b'])
+  assert.deepEqual(withAccountModels([cloud], catalogue), [cloud])
 })
 
 const slotted = (id: string, deviceType: 'laptop' | 'server', online: boolean, resolved: string, claudeDefault?: string): ExecutionPlace => ({
