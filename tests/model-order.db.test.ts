@@ -18,7 +18,7 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
   const { pool: appPool } = await import('../lib/db')
   const { workspacePool } = await import('../lib/workspace-db')
   const order = await import('../lib/model-order')
-  const { resolveModelDispatch } = await import('../lib/model-dispatch')
+  const { resolveModelDispatch, bindAgentToConnection } = await import('../lib/model-dispatch')
   const keys = await import('../lib/model-api-keys')
   const users: string[] = []
   t.after(async () => {
@@ -114,6 +114,16 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
     // The run's subscription is the entry's: the Agent's latest binding is that account and model.
     const bound = (await pool.query('SELECT "connectionId"::text AS c,"modelId" FROM byos_bindings WHERE "consumerId"=$1 ORDER BY "createdAt" DESC LIMIT 1', [mac.agents.claude_code])).rows[0]
     assert.deepEqual([bound.c, bound.modelId], [claude, 'acct-opus-c'])
+    // Switching back and forth reuses one row per account, revision and model; the last one asked is the latest.
+    const agentBindings = async () => (await pool.query<{ modelId: string }>('SELECT "modelId" FROM byos_bindings WHERE "consumerId"=$1 ORDER BY "createdAt" DESC,id DESC', [mac.agents.claude_code])).rows.map(row => row.modelId)
+    for (const model of ['acct-sonnet-c', 'acct-opus-c', 'acct-sonnet-c', 'acct-opus-c']) await bindAgentToConnection(pool, scope, mac.agents.claude_code, 'claude_code', claude, model)
+    assert.deepEqual(await agentBindings(), ['acct-opus-c', 'acct-sonnet-c'])
+    // A reconnect is a new revision: a new row, the old one left as it was for runs frozen on it.
+    await pool.query('UPDATE byos_connections SET epoch=epoch+1 WHERE id=$1', [claude])
+    await bindAgentToConnection(pool, scope, mac.agents.claude_code, 'claude_code', claude, 'acct-opus-c')
+    const revisions = (await pool.query<{ r: string }>('SELECT "connectionRevision"::text AS r FROM byos_bindings WHERE "consumerId"=$1 AND "modelId"=$2 ORDER BY "createdAt" DESC', [mac.agents.claude_code, 'acct-opus-c'])).rows.map(row => Number(row.r))
+    assert.deepEqual([revisions.length, revisions[0] - revisions[1]], [2, 1])
+    await pool.query('UPDATE byos_connections SET epoch=epoch-1 WHERE id=$1', [claude])
     // Used up: the next allowed model.
     await order.changeOrder(pool, scope, { kind: 'add', entries: [{ harness: 'claude_code', model: 'acct-sonnet-c', source: { kind: 'subscription', connectionId: claude } }] })
     await pool.query('UPDATE byos_connections SET quota=$2 WHERE id=$1', [claude, JSON.stringify({ windows: [{ kind: 'five_hour', used: 1, resetsAt: new Date(Date.now() + 3_600_000).toISOString() }] })])
@@ -130,6 +140,16 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
     // The thread's own model goes first.
     const picked = await resolveModelDispatch(pool, ctx, { harness: 'claude_code', model: 'key-model-c' })
     assert.deepEqual(picked.kind === 'device' && [picked.model, picked.entry.source], ['key-model-c', { kind: 'api_key', keyId: key.id }])
+    // An entry that names its key runs on that key, not on the first key that lists the model too.
+    const second = await keys.addApiKey(pool, scope.ownerId, { provider: 'custom', name: 'Gateway', baseUrl: 'https://gateway.example.com/v1', protocol: 'anthropic', apiKey: `sk-${randomBytes(12).toString('hex')}`, models: ['key-model-c'] },
+      { fetch: (async () => Response.json({ data: [] })) as unknown as typeof fetch, resolve: async () => ['93.184.216.34'] })
+    assert.notEqual(second.id, key.id)
+    const { runCredentialSource } = await import('../lib/run-credential-source')
+    const source = (keyId?: string) => runCredentialSource(pool, { ownerId: scope.ownerId, botId: null, harness: 'claude_code', model: 'key-model-c', keyId, botWorkspaceId: null, choiceWorkspaceId: null, subscription: null, localLogin: true })
+    assert.equal((await source(second.id)).apiKey?.keyId, second.id)
+    assert.equal((await source()).apiKey?.keyId, key.id, 'no key named: the first that lists it')
+    assert.equal((await source(randomUUID())).apiKey?.keyId, key.id, 'a key the run may not use is never taken')
+    await keys.removeApiKey(pool, scope.ownerId, second.id)
     const named = await resolveModelDispatch(pool, ctx, { harness: 'claude_code', model: 'acct-sonnet-c' })
     assert.equal(named.kind === 'device' && named.model, 'mid')
     // 云端 without the person's E2B key: the card says so.

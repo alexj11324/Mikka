@@ -96,7 +96,12 @@ test('API keys: migration replay, sealed storage, shares, picker order and run i
     assert.equal((await store.refreshApiKeyModels(pool, 'alice', anthropic.id, { env, fetch: fetchWith(() => models(['claude-opus-5-5'])) })).modelsError, null)
     // Only the owner asks; a custom provider that lists nothing keeps the models it was added with.
     await assert.rejects(store.refreshApiKeyModels(pool, 'bob', anthropic.id, { env, fetch: fetchWith(() => models(['x'])) }), { code: 'apiKeyNotFound' })
-    assert.deepEqual((await store.refreshApiKeyModels(pool, 'bob', gateway.id, { env, fetch: fetchWith(() => models([])) })).models, ['qwen-max'])
+    assert.deepEqual((await store.refreshApiKeyModels(pool, 'bob', gateway.id, { env, fetch: fetchWith(() => models([])), resolve: async () => ['93.184.216.34'] })).models, ['qwen-max'])
+    // DNS rebinding: the custom provider's name now points inside; the refetch asks nothing and keeps the list.
+    let asked = false
+    const rebound = await store.refreshApiKeyModels(pool, 'bob', gateway.id, { env, fetch: fetchWith(() => { asked = true; return models(['x']) }), resolve: async () => ['10.0.0.8'] })
+    assert.equal(asked, false, 'a provider whose host resolves to a private address is not asked')
+    assert.deepEqual([rebound.models, rebound.modelsError], [['qwen-max'], 'unavailable'])
     assert.deepEqual((await store.refreshApiKeyModels(pool, 'alice', anthropic.id, { env, fetch: fetchWith(() => models([])) })).models, [], 'a preset that lists nothing has nothing')
     await store.refreshApiKeyModels(pool, 'alice', anthropic.id, { env, fetch: fetchWith(() => models(['claude-opus-5-5'])) })
 

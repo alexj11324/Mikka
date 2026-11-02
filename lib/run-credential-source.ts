@@ -34,9 +34,16 @@ function firstKey(keys: Pick<ApiKeyView, 'id' | 'protocol' | 'models'>[], harnes
  * A model an API key lists for this Agent and none of the person's connected subscriptions of that
  * Agent's provider lists in its catalogue: a key's model in 允许使用的模型. It runs on
  * the key; a subscription is never asked for a model its account does not offer.
+ * An entry of 允许使用的模型 that names its key (`keyId`) runs on that key when
+ * the run may use it and it serves the model, whatever other key lists the model too.
  */
-async function keyOnlyModel(query: Query, ownerId: string, keys: Pick<ApiKeyView, 'id' | 'protocol' | 'models'>[], harness: string, model: string): Promise<RunApiKey | undefined> {
-  const key = keys.find(item => apiKeyHarness(item.protocol) === harness && item.models.includes(model))
+async function keyOnlyModel(query: Query, ownerId: string, keys: Pick<ApiKeyView, 'id' | 'protocol' | 'models'>[], harness: string, model: string, keyId?: string): Promise<RunApiKey | undefined> {
+  const serves = (item: Pick<ApiKeyView, 'protocol' | 'models'>) => apiKeyHarness(item.protocol) === harness && item.models.includes(model)
+  if (keyId) {
+    const named = keys.find(item => item.id === keyId)
+    if (named && serves(named)) return { keyId: named.id, model }
+  }
+  const key = keys.find(serves)
   if (!key) return
   const { rowCount } = await query.query(`SELECT 1 FROM byos_connections WHERE "ownerId"=$1 AND provider=$2 AND state='connected' AND "modelCatalog"->'models' ? $3 LIMIT 1`,
     [ownerId, harness === 'codex' ? 'codex' : 'claude', model])
@@ -73,6 +80,8 @@ async function subscriptionState(query: Query, binding: Binding): Promise<'usabl
  */
 export async function runCredentialSource<S extends Binding>(query: Query, input: {
   ownerId: string; botId: string | null; harness: string; model?: string
+  /** The key an entry of 允许使用的模型 names (decision 2026-11-02-1400); used only when the run may use it. */
+  keyId?: string
   /** The bot's workspace (null with no bot), and where the bot's saved model choice lives. */
   botWorkspaceId: string | null; choiceWorkspaceId: string | null | (() => Promise<string | null>)
   subscription: S | null
@@ -86,7 +95,7 @@ export async function runCredentialSource<S extends Binding>(query: Query, input
   const choiceWorkspaceId = typeof input.choiceWorkspaceId === 'function' ? await input.choiceWorkspaceId() : input.choiceWorkspaceId
   const saved = choiceWorkspaceId ? await botApiKeyChoice(query, { ownerId: input.ownerId, workspaceId: choiceWorkspaceId }, input.botId) : undefined
   if (saved && saved.harness === input.harness && keys.some(key => key.id === saved.keyId)) return { subscription: null, apiKey: { keyId: saved.keyId, model: saved.model } }
-  const keyed = input.model ? await keyOnlyModel(query, input.ownerId, keys, input.harness, input.model) : undefined
+  const keyed = input.model ? await keyOnlyModel(query, input.ownerId, keys, input.harness, input.model, input.keyId) : undefined
   if (keyed) return { subscription: null, apiKey: keyed }
   // The server cannot see whether the device's CLI is signed in, so a free local login is never turned into per-token billing.
   if (input.localLogin) return kept

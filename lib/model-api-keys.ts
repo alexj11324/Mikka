@@ -155,12 +155,15 @@ export async function addApiKey(query: Query, ownerId: string, input: unknown, o
  * models it was added with); a failed one keeps the last list and records why,
  * for the key's row. Only the owner refreshes; the key is never returned.
  */
-export async function refreshApiKeyModels(query: Query, ownerId: string, id: string, options: { env?: Env; fetch?: typeof fetch } = {}): Promise<ApiKeyView> {
+export async function refreshApiKeyModels(query: Query, ownerId: string, id: string, options: { env?: Env; fetch?: typeof fetch; resolve?: (host: string) => Promise<string[]> } = {}): Promise<ApiKeyView> {
   z.uuid().parse(id)
   const { rowCount } = await query.query('SELECT 1 FROM model_api_keys WHERE id=$1 AND "ownerId"=$2', [id, ownerId])
   if (!rowCount) throw new WorkspaceError('apiKeyNotFound')
-  const { row, apiKey } = await openKey(query, id, options.env ?? process.env)
-  const result = await verifyApiKey(modelsTarget(row), apiKey, options.fetch)
+  const env = options.env ?? process.env
+  const { row, apiKey } = await openKey(query, id, env)
+  // A custom provider's host is checked again on every refetch: its name may now point at a private address (DNS rebinding).
+  const reachable = row.provider !== 'custom' || await checkBaseUrl(row.baseUrl!, env, options.resolve).then(() => true, () => false)
+  const result: ApiKeyVerifyResult = reachable ? await verifyApiKey(modelsTarget(row), apiKey, options.fetch) : { ok: false, code: 'unavailable' }
   const models = result.ok ? (result.models.length || row.provider !== 'custom' ? result.models : row.models) : row.models
   const { rows: [saved] } = await query.query<Row>(`UPDATE model_api_keys SET models=$3::jsonb,"modelsError"=$4,"updatedAt"=now() WHERE id=$1 AND "ownerId"=$2 RETURNING ${COLUMNS}`,
     [id, ownerId, JSON.stringify(models), result.ok ? null : result.code])

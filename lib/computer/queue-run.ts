@@ -20,6 +20,8 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
   withoutBot?: boolean; model?:string; idempotencyKey?: string; execution?: AgentExecution
   /** A quota continuation's key (lib/run-quota.ts): frozen as given instead of choosing the credential. */
   apiKey?: RunApiKey
+  /** The API key the 允许使用的模型 entry names; used only when the run may use it (lib/run-credential-source.ts). */
+  apiKeyId?: string
   /** An investigation that changes nothing: read-only policy, no push branch, no push authority. */
   readOnly?: boolean
 }) {
@@ -63,7 +65,7 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
             ORDER BY latest."createdAt" DESC,latest.id DESC LIMIT 1) AND s."workspaceId"=b."workspaceId"::text)`, [input.botId, actor.userId, input.agentId])).rowCount
     const binding = usable ? await new SubscriptionRepository(client).nativeBinding(actor.userId,input.agentId,target.harness) : null
     const runBotId = input.withoutBot ? null : input.botId
-    const { subscription, apiKey } = input.apiKey ? { subscription: null, apiKey: input.apiKey } : await runCredentialSource(client, { ownerId: actor.userId, botId: runBotId, harness: target.harness, model: input.model === 'auto' ? undefined : input.model,
+    const { subscription, apiKey } = input.apiKey ? { subscription: null, apiKey: input.apiKey } : await runCredentialSource(client, { ownerId: actor.userId, botId: runBotId, harness: target.harness, model: input.model === 'auto' ? undefined : input.model, keyId: input.apiKeyId,
       botWorkspaceId: runBotId ? actor.workspaceId : null, choiceWorkspaceId: actor.workspaceId, subscription: binding })
     if (!subscription && !apiKey) throw new ComputerError(409,'Bot subscription unavailable')
     const frozen = freezeWorkerDefinition({ harness:target.harness,instructions:target.instructions,prompt,parent:input.execution?.snapshot ?? null,executionId:input.execution?.id ?? null,subscription,apiKey,model:input.model === 'auto' ? undefined : input.model,mailboxEnabled:personalMailboxEnabled(),mailboxScope:{botId:runBotId,workspaceId:actor.workspaceId},readOnly:input.readOnly })

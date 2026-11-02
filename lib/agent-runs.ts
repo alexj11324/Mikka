@@ -68,7 +68,9 @@ export const runViewColumns = {
  * `note` is extra direction for this run only, after the issue.
  */
 /** `botId` is the bot that dispatched the run (null for the Coordinator); the run reports back to that bot's chat. */
-type LocalDispatchInput = { issueId: string; agentId: string; repo: string; note?: string; requestKey?: string; model?: string; pinnedDeviceId?: string; readOnly?: boolean }
+type LocalDispatchInput = { issueId: string; agentId: string; repo: string; note?: string; requestKey?: string; model?: string; pinnedDeviceId?: string; readOnly?: boolean
+  /** The API key the 允许使用的模型 entry names; the run uses it only when it may (lib/run-credential-source.ts). */
+  apiKeyId?: string }
 export async function queueRun(userId: string, input: LocalDispatchInput, botId: string | null = null, execution?: AgentExecution, requestEventId?: string, source: 'mcp' | null = null, approvedRepositoryKey?: string) {
   return queueAdmittedRun(userId, input, botId, execution, requestEventId, source, approvedRepositoryKey)
 }
@@ -117,7 +119,7 @@ async function queueAdmittedRun(userId: string, input: LocalDispatchInput, botId
   requestEventId?: string, source: 'mcp' | null = null, approvedRepositoryKey?: string,
   internal?: { executor: Pick<typeof db, 'select' | 'transaction'>; repo: typeof deviceRepos.$inferSelect; client: import('pg').PoolClient; sourceRunId?: string }) {
   const executor = internal?.executor ?? db
-  const parsed = z.object({ issueId: z.uuid(), agentId: z.uuid(), repo: z.string().trim().min(1).max(4_000), note: z.string().trim().max(10_000).optional(), requestKey: dispatchRequestKey.optional(), model: z.string().trim().min(1).max(128).optional(), pinnedDeviceId: z.uuid().optional(), readOnly: z.boolean().optional() }).safeParse(input)
+  const parsed = z.object({ issueId: z.uuid(), agentId: z.uuid(), repo: z.string().trim().min(1).max(4_000), note: z.string().trim().max(10_000).optional(), requestKey: dispatchRequestKey.optional(), model: z.string().trim().min(1).max(128).optional(), pinnedDeviceId: z.uuid().optional(), readOnly: z.boolean().optional(), apiKeyId: z.uuid().optional() }).safeParse(input)
   if (!parsed.success) throw new ActionFailureError('runInvalid')
   let requestedRepositoryKey: string
   try { requestedRepositoryKey = normalizeRepository(parsed.data.repo, { allowFile: daemonTestMode(process.env) }).key } catch { throw new ActionFailureError('repoPathInvalid') }
@@ -139,7 +141,7 @@ async function queueAdmittedRun(userId: string, input: LocalDispatchInput, botId
   const captureDefinition = true
   const found = captureDefinition && process.env.MIKKA_BYOS_ENABLED === '1' ? await new SubscriptionRepository(pool).nativeBinding(userId,agent.id,agent.harness) : null
   // The run's credential, frozen now: the subscription, else the person's own API key (orchestration.md § 2).
-  const { subscription, apiKey } = await localRunCredential(internal?.client ?? pool, userId, botId, agent.harness, parsed.data.model, found)
+  const { subscription, apiKey } = await localRunCredential(internal?.client ?? pool, userId, botId, agent.harness, parsed.data.model, found, parsed.data.apiKeyId)
   const mailboxEnabled = personalMailboxEnabled()
   let mailboxScope: { botId: string | null; workspaceId: string } | undefined
   if (captureDefinition && mailboxEnabled && snapshotMailboxTools(execution?.snapshot).length) {
@@ -157,10 +159,10 @@ async function queueAdmittedRun(userId: string, input: LocalDispatchInput, botId
 
 /** A device run's credential source; the bot's workspace decides whose API keys it may use. */
 async function localRunCredential<S extends { id: string; ownerId: string; connectionId: string; connectionRevision: number }>(query: import('pg').Pool | import('pg').PoolClient,
-  userId: string, botId: string | null, harness: string, model: string | undefined, subscription: S | null) {
+  userId: string, botId: string | null, harness: string, model: string | undefined, subscription: S | null, keyId?: string) {
   const botWorkspaceId = botId ? (await query.query<{ workspaceId: string }>('SELECT "workspaceId" FROM bots WHERE id=$1 AND "ownerId"=$2', [botId, userId])).rows[0]?.workspaceId ?? null : null
   const choiceWorkspaceId = botWorkspaceId ?? (async () => (await import('@/lib/execution-settings')).executionWorkspace(userId, null).catch(() => null))
-  return (await import('@/lib/run-credential-source')).runCredentialSource(query, { ownerId: userId, botId, harness, model, botWorkspaceId, choiceWorkspaceId, subscription, localLogin: true })
+  return (await import('@/lib/run-credential-source')).runCredentialSource(query, { ownerId: userId, botId, harness, model, keyId, botWorkspaceId, choiceWorkspaceId, subscription, localLogin: true })
 }
 
 /** Every surface uses this gate. Workspace membership never grants run control,

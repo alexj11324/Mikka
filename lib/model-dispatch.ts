@@ -44,20 +44,26 @@ export async function resolveModelDispatch(pool: Pool, scope: OrderScope & { bot
 /**
  * The run's subscription is the entry's: the Agent's latest binding (what
  * `nativeBinding` hands the run) is made the entry's connection and model,
- * unless it already is. Ids are fixed per Agent, connection and model, so a
- * repeated dispatch adds nothing.
+ * unless it already is. The id is fixed per Agent, connection, its revision
+ * and model, so switching back and forth reuses the same rows (it is only made
+ * the latest again); a binding is never moved to another revision, so a run
+ * frozen on an old one stays refused after a reconnect.
  */
 export async function bindAgentToConnection(pool: Pick<Pool, 'query'>, scope: OrderScope, agentId: string, harness: OrderEntry['harness'], connectionId: string, model: string) {
   const route = harness === 'codex' ? 'codex_cli' : 'claude_code_cli'
-  const { rows: [latest] } = await pool.query<{ connectionId: string; modelId: string }>(
-    'SELECT "connectionId"::text AS "connectionId","modelId" FROM byos_bindings WHERE "ownerId"=$1 AND "consumerId"=$2 AND route=$3 ORDER BY "createdAt" DESC,id DESC LIMIT 1',
+  const { rows: [latest] } = await pool.query<{ connectionId: string; modelId: string; connectionRevision: string }>(
+    'SELECT "connectionId"::text AS "connectionId","modelId","connectionRevision"::text AS "connectionRevision" FROM byos_bindings WHERE "ownerId"=$1 AND "consumerId"=$2 AND route=$3 ORDER BY "createdAt" DESC,id DESC LIMIT 1',
     [scope.ownerId, agentId, route])
-  if (latest && latest.connectionId === connectionId && latest.modelId === model) return
-  const hash = createHash('sha256').update(JSON.stringify(['model-order-binding', scope.ownerId, agentId, route, connectionId, model, Date.now()])).digest('hex')
+  const { rows: [connection] } = await pool.query<{ epoch: string }>(
+    `SELECT epoch::text AS epoch FROM byos_connections WHERE id::text=$1 AND "ownerId"=$2 AND state='connected'`, [connectionId, scope.ownerId])
+  if (!connection) return
+  if (latest && latest.connectionId === connectionId && latest.modelId === model && latest.connectionRevision === connection.epoch) return
+  const hash = createHash('sha256').update(JSON.stringify(['model-order-binding', scope.ownerId, agentId, route, connectionId, connection.epoch, model])).digest('hex')
   const id = `${hash.slice(0, 8)}-${hash.slice(8, 12)}-4${hash.slice(13, 16)}-8${hash.slice(17, 20)}-${hash.slice(20, 32)}`
-  await pool.query(`INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId")
-    SELECT $1,$2,$3,$4,c.id,c.epoch,$5,$6 FROM byos_connections c WHERE c.id::text=$7 AND c."ownerId"=$2 AND c.state='connected' ON CONFLICT (id) DO NOTHING`,
-  [id, scope.ownerId, scope.workspaceId, agentId, route, model, connectionId])
+  await pool.query(`INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId","createdAt")
+    SELECT $1,$2,$3,$4,c.id,c.epoch,$5,$6,clock_timestamp() FROM byos_connections c WHERE c.id::text=$7 AND c."ownerId"=$2 AND c.state='connected' AND c.epoch::text=$8
+    ON CONFLICT (id) DO UPDATE SET "createdAt"=clock_timestamp()`,
+  [id, scope.ownerId, scope.workspaceId, agentId, route, model, connectionId, connection.epoch])
 }
 
 /** 没有能跑这个任务的模型: the reason, and the rows that fix it. */
