@@ -5,7 +5,7 @@ import { isIP } from 'node:net'
 import type { Pool, PoolClient } from 'pg'
 import { z } from 'zod'
 import { isPrivateAddress } from '@/lib/link-preview-parse'
-import { memberSubscriptionsAllowed, subscriptionsUsable } from '@/lib/personal-policy'
+import { memberSubscriptionsAllowed } from '@/lib/personal-policy'
 import { stopRunsUsingApiKeys } from '@/lib/model-api-key-runs'
 import { openSecret, sealSecret, SecretsKeyMissingError } from '@/lib/secrets/crypto'
 import { WorkspaceError } from '@/lib/workspace-error'
@@ -202,9 +202,9 @@ export interface UsableApiKey extends ApiKeyView {
  */
 export async function usableApiKeys(query: Query, userId: string, workspaceId: string): Promise<UsableApiKey[]> {
   // One after the other: a dispatch reads this on its transaction's client.
-  const own = await subscriptionsUsable(query, userId, workspaceId)
+  // The person's own keys always (decision 2026-11-01-2240); others' only while the admin allows member credentials.
   const allowed = await memberSubscriptionsAllowed(query, workspaceId)
-  const mine = own ? (await query.query<Row>(`SELECT ${COLUMNS} FROM model_api_keys WHERE "ownerId"=$1 ORDER BY "createdAt",id`, [userId])).rows : []
+  const mine = (await query.query<Row>(`SELECT ${COLUMNS} FROM model_api_keys WHERE "ownerId"=$1 ORDER BY "createdAt",id`, [userId])).rows
   const others = allowed ? (await query.query<Row>(`SELECT ${COLUMNS.split(',').map(column => `k.${column}`).join(',')} FROM model_api_key_shares s JOIN model_api_keys k ON k.id=s."keyId"
     WHERE s."workspaceId"=$1 AND k."ownerId"<>$2 ORDER BY s."createdAt",k.id`, [workspaceId, userId])).rows : []
   return [...mine.map(row => ({ ...view(row), ownerId: row.ownerId, mine: true })), ...others.map(row => ({ ...view(row), ownerId: row.ownerId, mine: false }))]

@@ -2409,7 +2409,8 @@
       "minutes": "{count} 分钟",
       "hours": "{count} 小时",
       "balance": "余额",
-      "points": "{points} 点"
+      "points": "{points} 点",
+      "awaitingTakeover": "待接管"
     },
     "billing": {
       "loading": "正在加载计费",
@@ -2476,7 +2477,10 @@
       "offlineWait": "等它上线",
       "offlineCloud": "改到云端运行",
       "labels": "按标签",
-      "pickModel": "选择模型"
+      "pickModel": "选择模型",
+      "noModels": "还没有可用模型",
+      "unavailable": "不可用",
+      "unverified": "未与账号核对"
     },
     "searchEmpty": "没有匹配的设置",
     "apiKeys": {
@@ -2757,7 +2761,6 @@
     "c_c6492461": "查看全部任务 ·",
     "c_30108106": "查看全部团队",
     "c_4090a5db": "查看全部项目",
-    "c_37ee9ddc": "查看团队层级文档（新窗口）",
     "c_c4c23eda": "查看项目 ·",
     "c_95c35444": "标识须为 2–12 位大写字母或数字，并以字母开头。",
     "c_62e51561": "正在读取",
@@ -3245,7 +3248,8 @@
     "runInfo": {
       "paidBy": "{owner} 的 {plan}",
       "movedTo": "已换到 {machine} 继续"
-    }
+    },
+    "back": "返回"
   },
   "Computer": {
     "status": {
@@ -3322,7 +3326,8 @@
         "idle": "空闲",
         "resolved": "已解决"
       },
-      "waitingFor": "等待 {device} 上线"
+      "waitingFor": "等待 {device} 上线",
+      "dispatchedBy": "{bot} 派出"
     },
     "newBot": {
       "title": "新建 Bot",
@@ -3389,9 +3394,8 @@
     "coordinatorPlaceholder": "问 Coordinator 或布置任务…",
     "panel": {
       "label": "右栏",
-      "views": "右栏视图",
-      "overview": "概览",
       "allThreads": "全部线程",
+      "allThreadsWaiting": "全部线程，{count} 条等你",
       "tabs": "右栏内容",
       "details": "详情",
       "threads": "线程",
@@ -3428,7 +3432,10 @@
       "nameTooLong": "名字最多 {max} 个字",
       "changeAvatar": "更换 {name} 的头像",
       "close": "关闭右栏",
-      "open": "打开右栏"
+      "open": "打开右栏",
+      "filterBot": "按派出者筛选",
+      "allBots": "全部派出者",
+      "closeAllThreads": "关闭全部线程"
     },
     "suggestions": {
       "title": "建议",
@@ -3490,6 +3497,7 @@
         "status": "状态",
         "priority": "优先级",
         "assignee": "负责人",
+        "creator": "我创建的",
         "labels": "标签",
         "project": "项目",
         "agentState": "线程状态"
@@ -3549,8 +3557,8 @@
         "discuss": "讨论",
         "delete": "删除",
         "agent": {
-          "running": "运行中",
-          "waiting": "等你处理",
+          "running": "进行中",
+          "waiting": "等待你",
           "blocked": "受阻"
         }
       },
@@ -3944,35 +3952,11 @@
     "accessibleToAll": "工作区所有成员都可以访问",
     "teamOverview": "团队概览",
     "memberCount": "{count} 名成员",
-    "hierarchy": "团队层级",
-    "docs": "文档",
     "dangerZone": "危险操作",
     "rows": {
       "general": "常规",
       "members": "成员",
-      "slack": "Slack 通知",
-      "issuesSection": "任务、项目和文档",
-      "issueLabels": "任务标签",
-      "projectLabels": "项目标签",
-      "templates": "模板",
-      "recurringIssues": "周期任务",
-      "workflowSection": "工作流",
-      "issueStatuses": "任务状态",
-      "projectStatuses": "项目状态",
-      "workflows": "工作流与自动化",
-      "triage": "分诊",
-      "cycles": "周期",
-      "agentsSection": "AI 与 Bot",
-      "teamAgents": "团队 Bot",
-      "agentSkills": "Bot 技能",
-      "agentConnectors": "Bot 连接器",
-      "projectUpdates": "项目进展",
-      "threadSummaries": "已解决讨论摘要",
-      "parentTeam": "上级团队",
-      "none": "无",
-      "leaveTeam": "退出团队",
-      "retireTeam": "停用团队",
-      "deleteTeam": "删除团队"
+      "leaveTeam": "退出团队"
     }
   },
   "CredentialLogin": {

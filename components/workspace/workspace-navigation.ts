@@ -63,6 +63,8 @@ export type WorkspaceLocation = {
   thread: string | null
   /** The Artifact open in its window over the page (R-56, R-82). */
   artifact: string | null
+  /** 全部线程 in the right column: 'all', or one bot's id when filtered to it. It stays open as the centre changes. */
+  threads: string | null
 }
 
 /** Team pages, under 看板 (R-82); each needs its team. */
@@ -70,7 +72,7 @@ const TEAM_SECTIONS: readonly string[] = ['team-home', 'team-issues', 'team-proj
 /** Pages that can show one project. */
 const PROJECT_SECTIONS: readonly string[] = ['projects', 'team-projects'] satisfies readonly WorkspaceSection[]
 /** Keys this file owns besides `section`, in the order a new address writes them. */
-const PLACE_KEYS = ['bot', 'group', 'session', 'team', 'project', 'issue', 'thread', 'artifact'] as const satisfies readonly (keyof WorkspaceLocation)[]
+const PLACE_KEYS = ['bot', 'group', 'session', 'team', 'project', 'issue', 'thread', 'artifact', 'threads'] as const satisfies readonly (keyof WorkspaceLocation)[]
 /** What is in the centre; the thread sits beside it and the Artifact window over it. */
 const CENTRE_KEYS = ['section', 'bot', 'group', 'session', 'team', 'project', 'issue'] as const satisfies readonly (keyof WorkspaceLocation)[]
 
@@ -97,6 +99,7 @@ export function readLocation(params: URLSearchParams): WorkspaceLocation {
     issue: id('issue'),
     thread: id('thread'),
     artifact: id('artifact'),
+    threads: params.get('threads') === 'all' ? 'all' : id('threads'),
   }
 }
 
@@ -215,12 +218,18 @@ const DOC = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
 /** The query the workspace last wrote or showed; see queryMoved. */
 let seenQuery: string | null = null
 
+/** The entry openThread pushed: the thread it opened and the address it was opened from. */
+type OpenedThread = { runId: string; from: string }
+const OPENED = 'mikkaOpenedThread'
+
 function write(href: string, mode: 'push' | 'replace', list = false) {
   const current = `${window.location.pathname}${window.location.search}${window.location.hash}`
   if (href !== current) {
     const issue = (url: URL) => readLocation(url.searchParams).issue
     const mark = nextMark(readMark(window.history.state), issue(new URL(window.location.href)), issue(new URL(href, window.location.href)), mode, DOC, list)
-    const state = { ...window.history.state, [MARK]: mark }
+    const state: Record<string, unknown> = { ...window.history.state, [MARK]: mark }
+    // Only the entry openThread wrote says where its thread came from; a later entry (an Artifact over it) must not inherit it, or ← would step back onto that entry.
+    if (mode === 'push') delete state[OPENED]
     if (mode === 'push') window.history.pushState(state, '', href)
     else window.history.replaceState(state, '', href)
   }
@@ -310,14 +319,37 @@ export function navigate(change: Partial<WorkspaceLocation>, mode: 'push' | 'rep
   window.dispatchEvent(new Event(NAVIGATE_EVENT))
 }
 
-/** Opens a thread in the right column beside what is in the centre (R-82). */
-export function openThread(runId: string) {
-  navigate({ thread: runId })
+function here() {
+  return `${window.location.pathname}${window.location.search}${window.location.hash}`
 }
 
-/** Closes the open thread; the right column shows 概览 again. */
+/** Opens a thread in the right column beside what is in the centre (R-82). */
+export function openThread(runId: string) {
+  const from = here()
+  goTo({ thread: runId })
+  // Remembers where it came from, so ← steps back to that list as the browser's back does.
+  window.history.replaceState({ ...window.history.state, [OPENED]: { runId, from } satisfies OpenedThread }, '', here())
+  window.dispatchEvent(new Event(NAVIGATE_EVENT))
+}
+
+/**
+ * ← in an open thread: back to the list it was opened from (全部线程, the bot's
+ * 线程, the chat), the same step as the browser's back. A thread opened from
+ * its address alone has no step to go back to, so its list replaces it.
+ */
 export function closeThread() {
-  navigate({ thread: null })
+  const opened = (window.history.state as Record<string, unknown> | null)?.[OPENED] as OpenedThread | undefined
+  const current = readLocation(new URL(window.location.href).searchParams).thread
+  if (opened && opened.runId === current && opened.from === workspaceHref(new URL(window.location.href), { thread: null })) {
+    window.history.back()
+    return
+  }
+  navigate({ thread: null }, 'replace')
+}
+
+/** Opens 全部线程 in the right column, or closes it with any thread open over it. */
+export function toggleAllThreads(open: boolean) {
+  navigate(open ? { threads: 'all', thread: null } : { threads: null, thread: null })
 }
 
 /** Opens an Artifact in its window over the page (R-56); the centre and the thread under it stay. */

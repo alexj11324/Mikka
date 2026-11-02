@@ -1,4 +1,5 @@
 import 'server-only'
+import type { PoolClient } from 'pg'
 import { and, asc, eq, inArray, ne, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@/lib/db'
@@ -9,6 +10,7 @@ import { workspaceInvitations, workspaceMembers, workspaceSlugRedirects, workspa
 import { workspaceDb } from '@/lib/workspace-db'
 import { requireWorkspace, WorkspaceError, type WorkspaceTransaction } from '@/lib/workspace-access'
 import { enqueueWorkspaceAudit, type AuditRequestContext } from '@/lib/audit/delivery'
+import { deleteWorkspaceRows } from '@/lib/workspace-rows'
 import { parseWorkspaceIcon } from './icon'
 
 export type MainTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
@@ -163,10 +165,21 @@ export interface WorkspaceDeletion {
   nextWorkspaceId: string | null
 }
 
+/** Raw SQL in a Drizzle transaction, for deleteWorkspaceRows. */
+const rawQuery = (tx: MainTransaction) => ({
+  query: async (text: string, values: unknown[] = []) => {
+    const query = sql.join(text.split(/(\$\d+)/).map(part => /^\$\d+$/.test(part) ? sql`${sql.param(values[Number(part.slice(1)) - 1])}` : sql.raw(part)))
+    // Drizzle wraps the driver's error; its Postgres code decides whether a delete waits for the next pass.
+    try { return await tx.execute(query) } catch (error) { throw (error as { cause?: unknown }).cause ?? error }
+  },
+}) as unknown as Pick<PoolClient, 'query'>
+
 /**
- * Everything in the app database that belongs to the workspace. Personal data
- * (accounts, personal tasks, personal model subscriptions in byos_*, Linear and
- * GitHub connections, which are per person) is left alone.
+ * Everything in the app database that belongs to the workspace: the steps
+ * below, then every other row keyed by it (deleteWorkspaceRows), its secrets
+ * included. Personal data (accounts, personal tasks, personal model
+ * subscriptions in byos_*, Linear and GitHub connections, which are per
+ * person) is left alone.
  */
 async function deleteAppData(tx: MainTransaction, workspaceId: string, teamIds: string[], issueIds: string[]) {
   const [billing] = await tx.select({ status: workspaceBilling.status }).from(workspaceBilling).where(eq(workspaceBilling.workspaceId, workspaceId)).for('update').limit(1)
@@ -204,6 +217,7 @@ async function deleteAppData(tx: MainTransaction, workspaceId: string, teamIds: 
   await tx.delete(workspaceSettings).where(eq(workspaceSettings.workspaceId, workspaceId))
   await tx.delete(workspaceCreditGrants).where(eq(workspaceCreditGrants.workspaceId, workspaceId))
   await tx.delete(workspaceBilling).where(eq(workspaceBilling.workspaceId, workspaceId))
+  await deleteWorkspaceRows(rawQuery(tx), workspaceId)
   return { bots: deletedBots, threads, tasks }
 }
 

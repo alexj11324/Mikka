@@ -197,7 +197,8 @@ test('A task or run chip is boxed with no underline and only its title; a source
   }
   assert.match(taskChip, />Move the chat to OpenUI</)
   assert.doesNotMatch(taskChip, /MIK-43/)
-  assert.match(runChip, />Fix the shell</)
+  // A thread chip carries the thread's own name, the same as its row and header: task identifier and title (D9).
+  assert.match(runChip, />MIK-43 Move the chat to OpenUI</)
   const sourceClass = sourceChip.match(/class="([^"]*)"/)?.[1] ?? ''
   assert.match(sourceChip, /data-variant="source"/)
   assert.ok(sourceClass.split(' ').includes('underline'), 'source chip keeps its underline')

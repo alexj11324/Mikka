@@ -146,7 +146,7 @@ export async function resumeAccountDeletion(id: string, options: AccountDeletion
         if (!options.replayPlan && ('soleAdminOf' in checked || auditDigest(checked) !== auditDigest(frozen))) throw new Error('accountDeletionWorkspaceChanged')
         // Include objects written before the request's write barrier, and durable old-avatar references.
         await transaction(main, async client => {
-          const objects = await accountStorageKeys(client, job.subjectUserId)
+          const objects = await accountStorageKeys(client, job.subjectUserId, frozen)
           const notBefore = !options.deleteObject && artifactStorage() === 'inline' ? (options.now?.() ?? new Date()) : objects.notBefore
           await deleteMainAccountData(client, job.subjectUserId, frozen)
           await client.query('UPDATE account_deletion_jobs SET stage=\'main_deleted\',plan=$4,"pendingObjects"=$2,"storageNotBefore"=$3,"blockedReasons"=\'[]\',"updatedAt"=now() WHERE id=$1',

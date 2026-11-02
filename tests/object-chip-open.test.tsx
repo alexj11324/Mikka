@@ -52,7 +52,7 @@ test('a thread chip shows its status and opens the thread beside the chat (?thre
     assert.ok(threadChips[0].querySelector('svg')?.getAttribute('class')?.includes('animate-spin'))
     assert.ok(threadChips[1].querySelector('svg')?.getAttribute('class')?.includes('text-destructive'))
     assert.ok(threadChips[2].querySelector('svg')?.getAttribute('class')?.includes('text-success'))
-    assert.equal(threadChips[0].getAttribute('aria-label'), 'Open thread: Thread running')
+    assert.equal(threadChips[0].getAttribute('aria-label'), 'Open thread: ZHIX-4 Rebuild the shell')
     await act(async () => { threadChips[1].click() })
     // The thread's address, written through the navigation module; the workspace shows it in the right column (R-80).
     assert.equal(new URL(browser.location.href).searchParams.get('thread'), RUNS.failed)

@@ -14,21 +14,25 @@ async function seed(page: Page) {
   const cookie = (await page.context().cookies()).find(item => item.name.endsWith('session_token'))
   if (!cookie) throw new Error('需要已登录的页面。')
   const { rows: [session] } = await db().query<{ userId: string }>('SELECT "userId" FROM session WHERE token = $1', [decodeURIComponent(cookie.value).split('.')[0]])
-  const { rows: [member] } = await db().query<{ workspaceId: string }>('SELECT "workspaceId" FROM mikka_workspace_members WHERE "userId" = $1 AND status = $2 LIMIT 1', [session.userId, 'active'])
+  // registerInTeam leaves the person in a personal and a team workspace; the page shows the team.
+  const { rows: [member] } = await db().query<{ workspaceId: string }>(`SELECT m."workspaceId" FROM mikka_workspace_members m JOIN mikka_workspaces w ON w.id = m."workspaceId"
+    WHERE m."userId" = $1 AND m.status = 'active' AND w.kind = 'team' LIMIT 1`, [session.userId])
   // A heartbeat in the future keeps the device online for the whole test. Claude Code reports its
   // slots with what they resolve to; the screen shows only the resolved name.
   // 允许自动调度 is off by default on a personal computer (#703); this one has it on, so the default may place on it.
   await db().query(`INSERT INTO devices (id, "ownerId", name, kind, enabled, "deviceType", "lastSeenAt", harnesses, "autoSchedule") VALUES
     ($1, $3, 'E2E MacBook', 'local', true, 'laptop', now() + interval '1 hour', $4, true),
     ($2, $3, 'gpu-box', 'local', true, 'server', NULL, '[]', NULL)`, [randomUUID(), randomUUID(), session.userId, JSON.stringify([
-    { harness: 'claude_code', installed: true, version: '1.0.0', modelSlots: [{ slot: 'opus', model: 'E2E Opus Resolved', name: 'E2E Opus Resolved' }, { slot: 'sonnet', model: 'E2E Sonnet Resolved', name: 'E2E Sonnet Resolved' }], defaultModelSlot: 'opus' },
-    { harness: 'codex', installed: true, version: '1.0.0', models: ['e2e-reported-model', 'e2e-other-model'] },
+    { harness: 'claude_code', installed: true, version: '1.0.0', modelSlots: [{ slot: 'opus', model: 'claude-e2e-opus', name: 'E2E Opus Resolved' }, { slot: 'sonnet', model: 'claude-e2e-sonnet', name: 'E2E Sonnet Resolved' }], defaultModelSlot: 'opus' },
+    // Codex marks its default too; a model is taken only when the CLI marks it (decision 2026-11-02-1030).
+    { harness: 'codex', installed: true, version: '1.0.0', models: ['e2e-reported-model', 'e2e-other-model'], defaultModelSlot: 'e2e-reported-model' },
   ])])
-  for (const [provider, route, model] of [['claude', 'claude_cpa', 'claude-e2e-model'], ['codex', 'codex_cpa', 'codex-e2e-model']] as const) {
+  // Each account's catalogue lists the device's models too: a device offers only what both list (decision 2026-11-02-1300).
+  for (const [provider, route, models] of [['claude', 'claude_cpa', ['claude-e2e-model', 'claude-e2e-opus', 'claude-e2e-sonnet']], ['codex', 'codex_cpa', ['codex-e2e-model', 'e2e-reported-model', 'e2e-other-model']]] as const) {
     const connection = randomUUID()
     await db().query(`INSERT INTO byos_connections (id, "ownerId", "workspaceId", provider, state, epoch, "secretName", "secretDigest", "providerSubject")
       VALUES ($1, $2, $3, $4, 'connected', 1, $5, $6, 'e2e-subject')`, [connection, session.userId, member.workspaceId, provider, `e2e-fixture-${connection}`, 'a'.repeat(64)])
-    await db().query(`INSERT INTO byos_bindings (id, "ownerId", "workspaceId", "consumerId", "connectionId", "connectionRevision", route, "modelId")
+    for (const model of models) await db().query(`INSERT INTO byos_bindings (id, "ownerId", "workspaceId", "consumerId", "connectionId", "connectionRevision", route, "modelId")
       VALUES ($1, $2, $3, 'e2e-consumer', $4, 1, $5, $6)`, [randomUUID(), session.userId, member.workspaceId, connection, route, model])
   }
 }
@@ -117,7 +121,9 @@ test('Bot 与 Agents：规则标签从工作区已有标签中选，标签带颜
   await expect(page.getByRole('button', { name: '添加规则', exact: true })).toBeVisible()
   const cookie = (await page.context().cookies()).find(item => item.name.endsWith('session_token'))
   const { rows: [session] } = await db().query<{ userId: string }>('SELECT "userId" FROM session WHERE token = $1', [decodeURIComponent(cookie!.value).split('.')[0]])
-  const { rows: [member] } = await db().query<{ workspaceId: string }>('SELECT "workspaceId" FROM mikka_workspace_members WHERE "userId" = $1 AND status = $2 LIMIT 1', [session.userId, 'active'])
+  // registerInTeam leaves the person in a personal and a team workspace; the page shows the team.
+  const { rows: [member] } = await db().query<{ workspaceId: string }>(`SELECT m."workspaceId" FROM mikka_workspace_members m JOIN mikka_workspaces w ON w.id = m."workspaceId"
+    WHERE m."userId" = $1 AND m.status = 'active' AND w.kind = 'team' LIMIT 1`, [session.userId])
   // Workspace labels come from the workspace's team tasks.
   const content = { type: 'doc', attrs: { mikka: { labels: [{ name: '前端', color: 'blue' }, { name: '后端', color: 'green' }] } }, content: [] }
   const [issue, team] = [randomUUID(), randomUUID()]

@@ -24,6 +24,8 @@ test('direct history writes, router moves and hand-built addresses fail', () => 
   assert.deepEqual(rules("router.push('/settings')"), ['navigation/router'])
   assert.deepEqual(rules('const href = `/?issue=${id}`'), ['navigation/address'])
   assert.deepEqual(rules("url.searchParams.set('bot', id)"), ['navigation/address'])
+  assert.deepEqual(rules("const href = '/?threads=all'"), ['navigation/address'])
+  assert.deepEqual(rules("url.searchParams.set('threads', id)"), ['navigation/address'])
   assert.deepEqual(rules("<Link href=\"/?section=artifacts\" />"), ['navigation/address'])
   assert.deepEqual(rules("url.searchParams.set('section', 'all-issues')"), ['navigation/address'])
   assert.deepEqual(rules('const href = `/?team=${id}`'), ['navigation/address'])

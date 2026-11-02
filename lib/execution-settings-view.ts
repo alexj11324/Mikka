@@ -6,7 +6,7 @@ export type RuleHarness = (typeof RULE_HARNESSES)[number]
 
 /**
  * A harness as a device reports it. A model slot carries what it resolves to on that device,
- * e.g. Claude Code's `opus` → whatever `ANTHROPIC_DEFAULT_OPUS_MODEL` maps it to.
+ * e.g. a Claude Code slot → whatever model its environment maps that slot to.
  * Rules store the slot; the screen shows only the resolved model's name.
  */
 export type HarnessReport = HarnessInfo
@@ -20,6 +20,8 @@ export interface ExecutionPlace {
   enabled?: boolean
   online: boolean
   harnesses: HarnessReport[]
+  /** Agents whose reported models could not be checked against a connected account (`withAccountModels`). */
+  unverified?: RuleHarness[]
 }
 
 export type DeviceKind = 'laptop' | 'server' | 'cloud' | 'unknown'
@@ -59,15 +61,49 @@ export function withCloudModels(places: readonly ExecutionPlace[], accounts: rea
   })
 }
 
+/**
+ * A device's CLI reports what it can drive, asked with no login (decision 2026-11-02-1300): an
+ * account may lack some of those models or have more. A run on a device uses the subscription Mikka
+ * hands it, never the device's own login (ADR 0009), so a device's models are those its CLI reported
+ * that the connected account's catalogue also lists. A reported slot counts when its id or the
+ * model it resolves to is in the catalogue. With no account for that Agent's provider, the reported
+ * list stays as reported and the Agent is marked unverified (未与账号核对).
+ */
+export function withAccountModels(places: readonly ExecutionPlace[], accounts: readonly Pick<BotModelRow, 'provider' | 'modelId'>[]): ExecutionPlace[] {
+  return places.map(place => {
+    if (placeKind(place) === 'cloud') return place
+    const unverified: RuleHarness[] = []
+    const harnesses = place.harnesses.map(info => {
+      const provider = CLOUD_PROVIDERS[info.harness as keyof typeof CLOUD_PROVIDERS]
+      if (!provider || !info.installed) return info
+      const catalogue = new Set(accounts.filter(row => row.provider === provider).map(row => row.modelId))
+      if (!catalogue.size) { unverified.push(info.harness as RuleHarness); return info }
+      const slots = info.modelSlots?.filter(slot => catalogue.has(slot.slot) || catalogue.has(slot.model))
+      const models = info.models?.filter(model => catalogue.has(model) || Boolean(slots?.some(slot => slot.slot === model)))
+      const kept = new Set([...(models ?? []), ...(slots ?? []).map(slot => slot.slot)])
+      const { defaultModelSlot, ...rest } = info
+      return {
+        ...rest,
+        ...(info.models ? { models } : {}),
+        ...(info.modelSlots ? { modelSlots: slots } : {}),
+        ...(defaultModelSlot && kept.has(defaultModelSlot) ? { defaultModelSlot } : {}),
+      }
+    })
+    return { ...place, harnesses, ...(unverified.length ? { unverified } : {}) }
+  })
+}
+
+/** Whether a place's models for an Agent were not checked against an account (未与账号核对). */
+export const modelsUnverified = (places: readonly ExecutionPlace[], place: string, harness: string) =>
+  Boolean(places.find(item => item.id === place)?.unverified?.includes(harness as RuleHarness))
+
 /** A model a rule can pick: `value` is stored (a slot or a reported id), `name` is shown. */
 export interface ModelOption { value: string; name: string; isDefault?: boolean }
 
-/** Claude Code's slot a new default uses (Alex, #537). */
-export const CLAUDE_CODE_DEFAULT_SLOT = 'opus'
-
 /**
  * Models a harness reported at a place, by slot when it reports slots; on Mikka Cloud, the
- * connected account's models (`withCloudModels`). Nothing is hard-coded.
+ * connected account's models (`withCloudModels`). Only what the CLI or daemon reported: no
+ * model name is written here, and nothing stands in when it reported none (Alex, 2026-11-02).
  */
 export function modelOptions(places: readonly ExecutionPlace[], place: string, harness: string): ModelOption[] {
   const devices = places.filter(item => item.id === place)
@@ -75,19 +111,20 @@ export function modelOptions(places: readonly ExecutionPlace[], place: string, h
   for (const info of devices.flatMap(device => device.harnesses.filter(item => item.harness === harness && item.installed))) {
     const reported = info.modelSlots?.length
       ? info.modelSlots.map(slot => ({ value: slot.slot, name: slot.name, isDefault: slot.slot === info.defaultModelSlot }))
-      : (info.models ?? []).map(model => ({ value: model, name: model }))
+      : (info.models ?? []).map(model => ({ value: model, name: model, isDefault: model === info.defaultModelSlot }))
     for (const option of reported) if (!options.has(option.value)) options.set(option.value, option)
   }
-  // #537: Claude Code reports no models yet; offer its `opus` slot by name until the daemon reports what it resolves to.
-  if (harness === 'claude_code' && options.size === 0 && place !== 'cloud') options.set(CLAUDE_CODE_DEFAULT_SLOT, { value: CLAUDE_CODE_DEFAULT_SLOT, name: CLAUDE_CODE_DEFAULT_SLOT })
   return [...options.values()]
 }
 
-/** The model a harness uses unless the person picks another: Claude Code's `opus` slot, otherwise the slot the harness marks default. */
-export function defaultModel(options: readonly ModelOption[], harness: string): ModelOption | undefined {
-  if (harness === 'claude_code') return options.find(option => option.value === CLAUDE_CODE_DEFAULT_SLOT) ?? options[0]
-  // #537: until the daemon marks Codex's default slot, the first model it reports stands in for it.
-  return options.find(option => option.isDefault) ?? options[0]
+/** The model a harness uses unless the person picks another: the one its CLI marks default; none when it marks none, so the person picks. */
+export function defaultModel(options: readonly ModelOption[]): ModelOption | undefined {
+  return options.find(option => option.isDefault)
+}
+
+/** A stored model the place no longer reports: shown as unavailable, never offered as a choice. */
+export function modelUnavailable(places: readonly ExecutionPlace[], place: string, harness: string, model: string): boolean {
+  return Boolean(model) && !modelOptions(places, place, harness).some(option => option.value === model)
 }
 
 /** What a stored model value shows: the model its slot resolves to there, or the value itself. */
@@ -103,13 +140,14 @@ export function redetectTargets(places: readonly ExecutionPlace[], place: string
 
 /**
  * After the place or harness changes, keep the harness and model only when the
- * new place still offers them; otherwise take the first harness there and its default model.
+ * new place still offers them; otherwise take the first harness there and its
+ * default model, or no model when it marks none. An old model never carries over.
  */
 export function retarget<V extends { place: string; harness: string; model: string }>(places: readonly ExecutionPlace[], value: V): V {
   const harnesses = harnessOptions(places, value.place)
   const harness = isRuleHarness(value.harness) && harnesses.includes(value.harness) ? value.harness : harnesses[0] ?? value.harness
   const models = modelOptions(places, value.place, harness)
-  const model = models.some(option => option.value === value.model) ? value.model : defaultModel(models, harness)?.value ?? value.model
+  const model = models.some(option => option.value === value.model) ? value.model : defaultModel(models)?.value ?? ''
   return { ...value, harness, model }
 }
 
@@ -117,9 +155,10 @@ export interface ExecutionChoice { place: string; harness: RuleHarness; model: s
 
 /**
  * The concrete default a person starts with (Alex, #537):
- * - a Claude subscription → Claude Code on their server, else any online device, else the cloud; its `opus` slot;
- * - otherwise a ChatGPT/Codex subscription → Codex the same way, with its default model;
+ * - a Claude subscription → Claude Code on their server, else any online device, else the cloud;
+ * - otherwise a ChatGPT/Codex subscription → Codex the same way;
  * - otherwise the first online device with a harness, else the cloud.
+ * The model is the one the harness's CLI marks default there; none when it marks none, so the person picks.
  * `accounts` are the connected subscriptions' bound models (`listBotModels()`).
  */
 export function initialExecution(places: readonly ExecutionPlace[], accounts: readonly Pick<BotModelRow, 'provider' | 'modelId'>[]): ExecutionChoice {
@@ -129,9 +168,7 @@ export function initialExecution(places: readonly ExecutionPlace[], accounts: re
   const harness: RuleHarness = subscription === 'claude' ? 'claude_code' : subscription === 'codex' ? 'codex'
     : RULE_HARNESSES.find(item => ordered.some(device => installed(device, item))) ?? 'claude_code'
   const place = ordered.find(device => installed(device, harness))?.id ?? 'cloud'
-  const model = defaultModel(modelOptions(places, place, harness), harness)?.value
-    // Mikka Cloud with no account model offered here: the account's own model.
-    ?? accounts.find(row => row.provider === subscription)?.modelId ?? ''
+  const model = defaultModel(modelOptions(places, place, harness))?.value ?? ''
   return { place, harness, model }
 }
 

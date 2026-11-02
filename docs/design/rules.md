@@ -278,7 +278,7 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   bot's avatar and name (R-02), then the tabs 详情, 线程, PR, 电脑. 线程
   lists only the threads this bot dispatched (for the Coordinator, the
   threads it dispatched); 电脑 is the bot's cloud computer (`AgentComputer`).
-  全部线程 lists every bot's threads; each row carries the small mark of the
+  全部线程 lists the threads every bot dispatched; each row carries the small mark of the
   Agent running it (R-78), the only thread list that shows one, beside a
   relative time on the right (2 分钟前, 昨天).
 - **R-51** The right panel is read-only. No action buttons anywhere in it (no
@@ -294,8 +294,9 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   2026-11-01: 「自己上传的文件，在资料库里可以删除」;
   [decision](decisions/2026-11-01-2255-library-delete-own-files.md)).
 - **R-52** Every thread list, web and phone, groups its rows in this order:
-  进行中（N）, 受阻（N）, 等待你（N）, 空闲（N）, 已解决（N）
-  (Running, Blocked, Waiting for you, Idle, Resolved). A group header is
+  等待你（N）, 进行中（N）, 受阻（N）, 空闲（N）, 已解决（N）
+  (Waiting for you, Running, Blocked, Idle, Resolved;
+  [order](decisions/2026-11-02-0300-waiting-for-you-first.md)). A group header is
   muted text (「等待你（2）」) followed by a thin rule filling the rest of
   the row. 已解决 is collapsed by default behind a chevron. Never a 「今天」
   or 「今天完成」 group
@@ -389,8 +390,19 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   only when the board, a list or a project opened it. A notification or an
   admin link to a thread opens it beside its task where the viewer can read
   it. An address with an unknown section or a bot that is not the person's
-  rewrites itself to what is shown, without a new entry. Source: Alex,
-  2026-11-01 ([decision](decisions/2026-11-01-1320-navigation-model.md)).
+  rewrites itself to what is shown, without a new entry. 全部线程, the
+  threads every bot dispatched in R-52's groups, each row's second line opening
+  with the mark of the Agent running it and 「<Bot> 派出」, opens in the right
+  column from the window bar's button beside the globe (on a phone, the page
+  header's) on any page (`?threads=all`, `?threads=<bot>` for one dispatcher);
+  while threads wait on you that button carries 等待你's hand and their count
+  (Badge warning-light, 99+ past 99), and none leaves the icon alone;
+  a bot's panel keeps only the 线程 it dispatched. An open thread's header leads
+  with ←, back to the list it was opened from (全部线程, a bot's 线程, the task's
+  线程, the chat); Esc and the browser's back do the same; it has no status icon, the
+  badge under it says the state. Source: Alex,
+  2026-11-01 ([decision](decisions/2026-11-01-1320-navigation-model.md)), 2026-11-02
+  ([decision](decisions/2026-11-02-0310-all-threads-from-the-window-bar.md)).
 
 ## Settings
 
@@ -552,9 +564,11 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
 - **R-33** Radii: 6 tag, 8 button and input, 9 rail item, 12 card and shell,
   14 approval and list card, 14 dialog (`rounded-xl`, the `DialogContent` /
   `AlertDialogContent` default; a call site does not change it), 999 pill. Spacing is a multiple of 4.
-  Exception: 建议 cards use 16 (R-55). An `icon-sm` button (28px) extends
-  its hit area to 40px on a coarse pointer with an invisible ring
-  (interface-design, Alex 2026-10-31).
+  Exception: 建议 cards use 16 (R-55). On a coarse pointer every `Button`,
+  `Toggle`, `ToggleGroupItem` and `SelectTrigger` extends its hit area to at least 44×44px with
+  an invisible `::after` (`lib/touch-target.ts`), and drawer rows on a phone
+  are 44px tall; the desktop look does not change (interface-design, Alex
+  2026-10-31; WCAG 2.5.5, HCI review M7).
 - **R-34** Status colours come only from the StatusBadge set (Figma
   `99:75`), shared by devices, threads and tasks.
 - **R-35** Shell (Comma): grey window background, 44px top bar (back,

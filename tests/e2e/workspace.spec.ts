@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { test, expect, register, rail, app, openCreateIssue, openIssueFromSearch, seedTask, fillSecretPassword, captureAuthenticationCookies } from './fixtures'
+import { test, expect, register, rail, app, openCreateIssue, openIssueFromSearch, seedTask, fillSecretPassword, captureAuthenticationCookies, showCreatedByMe } from './fixtures'
 
 test('未登录访问受保护页面、注册和登录链接', async ({ page }) => {
   await page.goto(app('/settings/members'))
@@ -31,7 +31,9 @@ test('移动端设置菜单和工作区切换保持一致', async ({ page }) => 
     await openSidebar()
     await switcher.click()
     await page.getByRole('menuitem', { name: '设置', exact: true }).click()
-    await expect(page.getByRole('heading', { name: '偏好设置', exact: true })).toBeVisible()
+    // On a phone the header bar names the page; the H1 stays for screen readers only (M15, R-40).
+    await expect(page.getByRole('navigation', { name: '当前位置', exact: true }).getByText('偏好设置', { exact: true })).toBeVisible()
+    await expect(page.getByRole('heading', { name: '偏好设置', exact: true })).toBeAttached()
     await expect(sidebar).not.toBeVisible()
   }
   async function workspaces() {
@@ -54,7 +56,9 @@ test('移动端设置菜单和工作区切换保持一致', async ({ page }) => 
   await settings()
   await openSidebar()
   await page.getByRole('link', { name: '成员', exact: true }).click()
-  await expect(page.getByRole('heading', { name: '成员', exact: true })).toBeVisible()
+  // On a phone the header bar names the page; the H1 stays for screen readers only (M15, R-40).
+  await expect(page.getByRole('navigation', { name: '当前位置', exact: true }).getByText('成员', { exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '成员', exact: true })).toBeAttached()
   await openSidebar()
   await page.getByRole('link', { name: '常规', exact: true }).click()
   await expect(page.getByLabel('名称', { exact: true })).toHaveValue(name)
@@ -92,6 +96,10 @@ test('注册、创建任务、菜单、搜索、视图切换和退出登录', { 
   // The board is in the URL, so a reload reopens it instead of the chat.
   await expect(page).toHaveURL(url => url.searchParams.get('section') === 'all-issues')
   await page.reload()
+  // Nobody is on the seeded task: 负责人 我 leaves it out, 我创建的 shows it (decision 2026-11-02-0302).
+  await expect(page.getByRole('region', { name: '任务看板', exact: true })).toBeVisible()
+  await expect(page.getByRole('region', { name: '任务看板', exact: true }).getByRole('group', { name: title, exact: true })).toHaveCount(0)
+  await showCreatedByMe(page)
   await expect(page.getByRole('region', { name: '任务看板', exact: true }).getByRole('group', { name: title, exact: true })).toBeVisible()
   await openIssueFromSearch(page, title)
   await expect(page.getByLabel('任务标题', { exact: true })).toHaveValue(title)
@@ -115,6 +123,8 @@ test('注册、创建任务、菜单、搜索、视图切换和退出登录', { 
   await expect(page).toHaveURL(url => url.pathname === app('/'))
   await captureAuthenticationCookies(page.context())
   await rail(page, '看板').click()
+  // The board keeps its filters across signing out and in: still 我创建的.
+  await expect(page.getByRole('toolbar', { name: '看板工具栏', exact: true }).getByRole('group', { name: '我创建的', exact: true })).toBeVisible()
   await expect(page.getByRole('region', { name: '任务看板', exact: true }).getByRole('group', { name: title, exact: true })).toBeVisible()
 })
 

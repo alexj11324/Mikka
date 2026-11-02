@@ -34,7 +34,7 @@ export async function issueVisibility(reader: IssueReader, includeDeleted = fals
   const allowedIds = allowed.filter(link => !scopeWorkspace || link.workspaceId === scopeWorkspace).map(link => link.issueId)
   const predicate = issueVisibilityPredicate(userId, { linkedIds: links.map(link => link.issueId), allowedIds }, includeDeleted)
   if (!token) return { predicate, allowedIds }
-  // The workspace is the tenant (decision 0230): a token for a team workspace reaches only tasks linked to it,
+  // The workspace is the tenant (decision 0231): a token for a team workspace reaches only tasks linked to it,
   // never the owner's personal or unlinked tasks. The personal workspace's token keeps those, but not a
   // workspace task linked elsewhere (as lib/issue-access.ts). Browser sessions are unchanged.
   const ids = (match: (workspaceId: string) => boolean) => [...new Set([...links, ...allowed].filter(link => match(link.workspaceId)).map(link => link.issueId))]

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { activityLabel, freshChunks, groupThreads, LAST_REPLY_CHARS, lastActivity, lastReplyUpdate, nextReply, pullRequestsOf, replyLine, threadGroup, type GroupIssue, type StoredReply, type ThreadOutcome } from './thread-groups'
+import { activityLabel, freshChunks, groupThreads, LAST_REPLY_CHARS, lastActivity, lastReplyUpdate, nextReply, pullRequestsOf, replyLine, THREAD_GROUPS, threadGroup, type GroupIssue, type StoredReply, type ThreadOutcome } from './thread-groups'
 
 const thread = (status: string, issueId: string | null = 'task', extra: { outcome?: ThreadOutcome | null; createdAt?: string; id?: string } = {}) =>
   ({ id: extra.id ?? status, status, issueId, createdAt: extra.createdAt ?? '2026-10-28T10:00:00Z', outcome: extra.outcome ?? null })
@@ -8,6 +8,10 @@ const pr = (number: number, state: 'open' | 'merged' | 'closed') => ({ url: `htt
 const task = (status: string, ...pullRequests: ReturnType<typeof pr>[]): GroupIssue => ({ status, metadata: { pullRequests } })
 const group = (t: ReturnType<typeof thread>, issue?: GroupIssue) => threadGroup(t, issue)
 const ENDED = ['succeeded', 'stopped', 'failed', 'cancelled']
+
+test('groups run 等待你 → 进行中 → 受阻 → 空闲 → 已解决: what needs the person comes first (R-52)', () => {
+  assert.deepEqual(THREAD_GROUPS, ['waiting', 'running', 'blocked', 'idle', 'resolved'])
+})
 
 test('进行中: queued, preparing, running, finishing, whatever the task or outcome', () => {
   for (const status of ['queued', 'preparing', 'running', 'finishing']) {

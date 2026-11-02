@@ -1,7 +1,6 @@
 import 'server-only'
 import { createHash, randomUUID } from 'node:crypto'
 import type { Pool } from 'pg'
-import { subscriptionsUsableSql } from '@/lib/personal-policy'
 
 type Actor = { userId: string; workspaceId: string }
 export type BotCloudRuntime = { botId: string; harness: 'codex' | 'claude_code'; agentId: string }
@@ -63,7 +62,7 @@ async function bindOwnSubscription(pool: Pool, actor: Actor, runtime: BotCloudRu
   const id = `${hash.slice(0, 8)}-${hash.slice(8, 12)}-4${hash.slice(13, 16)}-8${hash.slice(17, 20)}-${hash.slice(20, 32)}`
   await pool.query(`INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId")
     SELECT $1,$2,$3,$4,c.id,c.epoch,$5,$6 FROM byos_connections c
-    WHERE c."ownerId"=$2 AND c.provider=$7 AND c.state='connected' AND c.paused=false AND ${subscriptionsUsableSql('$2', '$3')}
+    WHERE c."ownerId"=$2 AND c.provider=$7 AND c.state='connected' AND c.paused=false
       AND NOT EXISTS (SELECT 1 FROM byos_bindings b WHERE b."ownerId"=$2 AND b."consumerId"=$4 AND b.route=$5)
     ORDER BY c."createdAt" DESC,c.id LIMIT 1 ON CONFLICT (id) DO NOTHING`,
   [id, actor.userId, actor.workspaceId, runtime.agentId, route, model, provider])

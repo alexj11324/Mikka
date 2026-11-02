@@ -2,7 +2,7 @@
 
 import { useTranslations } from 'next-intl'
 import { ChevronRight } from 'lucide-react'
-import type { RunSource } from '@/lib/coordinator/citations'
+import { runThreadName, type RunSource } from '@/lib/coordinator/citations'
 import { machineName, runInfoParts } from '@/lib/run-info-view'
 import { Button } from '@/components/ui/button'
 import { PullRequestsBadge } from '@/components/workspace/pull-requests-badge'
@@ -17,11 +17,12 @@ export const THREAD_CARD_BUTTON = 'absolute inset-0 size-full rounded-xl'
 /** R-66 review frame 356:4750: status and title, then the PRs it produced as one badge; one card per thread. A thread with no task opens too. */
 export function ThreadCard({ run, onOpen }: { run: RunSource; onOpen: (thread: { issueId: string | null; runId: string }) => void }) {
   const t = useTranslations('IssueThreads')
+  const name = runThreadName(run)
   return <div data-slot="thread-card" className={cn(THREAD_CARD, 'max-w-md')}>
-    <Button variant="ghost" className={THREAD_CARD_BUTTON} aria-label={t('open', { name: run.name })} onClick={() => onOpen({ issueId: run.issue?.id ?? null, runId: run.id })} />
+    <Button variant="ghost" className={THREAD_CARD_BUTTON} aria-label={t('open', { name })} onClick={() => onOpen({ issueId: run.issue?.id ?? null, runId: run.id })} />
     <ThreadStatusIcon status={run.status} outcome={run.outcome} />
     <div className="pointer-events-none relative flex min-w-0 flex-1 flex-col gap-2">
-      <span className="truncate text-sm leading-5 font-medium">{run.name}</span>
+      <span className="truncate text-sm leading-5 font-medium">{name}</span>
       {run.info && <RunInfoLine info={run.info} />}
     </div>
     {run.pullRequests && <PullRequestsBadge pullRequests={run.pullRequests} />}

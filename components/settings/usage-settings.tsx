@@ -26,7 +26,7 @@ import { FieldError } from '@/components/ui/field'
 type View = 'bots' | 'members'
 
 /** V14 用量 (admins) and S-A (members: their own bots). Threads and run time per month; there is no point meter yet. */
-export function UsageSettings({ workspaceId }: { workspaceId: string }) {
+export function UsageSettings({ workspaceId, personal = false }: { workspaceId: string; /** A personal workspace has one member: no 按成员 grouping. */ personal?: boolean }) {
   const t = useTranslations('Settings.usage')
   const locale = useLocale()
   const actionError = useActionError()
@@ -48,10 +48,12 @@ export function UsageSettings({ workspaceId }: { workspaceId: string }) {
   const admin = data?.scope === 'workspace'
   const rows: Array<UsageRow | BotUsageRow> = data ? admin && view === 'members' ? data.members : data.bots : []
 
+  const rowName = (row: UsageRow | BotUsageRow) => row.awaitingTakeover ? t('awaitingTakeover') : row.name
+
   function exportCsv() {
     if (!data) return
     const header = [view === 'members' ? t('member') : t('bot'), t('threads'), t('runSeconds')]
-    const lines = rows.map(row => [row.name, String(row.threads), String(row.seconds)].map(csvField).join(','))
+    const lines = rows.map(row => [rowName(row), String(row.threads), String(row.seconds)].map(csvField).join(','))
     const link = downloadRef.current
     if (!link) return
     const url = URL.createObjectURL(new Blob([`\uFEFF${[header.map(csvField).join(','), ...lines].join('\r\n')}\r\n`], { type: 'text/csv;charset=utf-8' }))
@@ -68,7 +70,7 @@ export function UsageSettings({ workspaceId }: { workspaceId: string }) {
         <SelectTrigger size="sm" aria-label={t('month')}><SelectValue /></SelectTrigger>
         <SelectContent><SelectGroup>{months.map(item => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectGroup></SelectContent>
       </Select>
-      {admin && <ToggleGroup aria-label={t('groupBy')} variant="segment" size="sm" spacing={0.5} value={[view]} onValueChange={values => { const next = values[0]; if (next === 'bots' || next === 'members') setView(next) }}>
+      {admin && !personal && <ToggleGroup aria-label={t('groupBy')} variant="segment" size="sm" spacing={0.5} value={[view]} onValueChange={values => { const next = values[0]; if (next === 'bots' || next === 'members') setView(next) }}>
         <ToggleGroupItem value="bots">{t('byBot')}</ToggleGroupItem>
         <ToggleGroupItem value="members">{t('byMember')}</ToggleGroupItem>
       </ToggleGroup>}
@@ -106,8 +108,8 @@ export function UsageSettings({ workspaceId }: { workspaceId: string }) {
           </TableRow></TableHeader>
           <TableBody>
             {rows.length === 0 && <TableRow><TableCell colSpan={3} className="pl-5 text-muted-foreground">{t('empty')}</TableCell></TableRow>}
-            {rows.map(row => <TableRow key={row.id}>
-              <TableCell className="pl-5"><span className="flex items-center gap-2">{'color' in row && <BotAvatar size="row" color={row.color} shape={row.shape} />}{row.name}</span></TableCell>
+            {rows.map(row => <TableRow key={row.id || 'awaiting-takeover'}>
+              <TableCell className="pl-5"><span className="flex items-center gap-2">{'color' in row && <BotAvatar size="row" color={row.color} shape={row.shape} />}{rowName(row)}</span></TableCell>
               <TableCell className="text-right text-muted-foreground tabular-nums">{number.format(row.threads)}</TableCell>
               <TableCell className="pr-5 text-right tabular-nums">{duration(row.seconds)}</TableCell>
             </TableRow>)}

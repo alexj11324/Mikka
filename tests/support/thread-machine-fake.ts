@@ -1,7 +1,7 @@
 // A cloud run's own thread machine, as production provisions it, with only E2B
 // replaced: the real ensureThreadMachine records the sandbox, the thread device
 // and its repository, and moves the queued run onto that device. The fake
-// sandbox's worker "registers" when it receives its bootstrap file, reporting
+// sandbox's worker "registers" when it receives its bootstrap handoff, reporting
 // the given harnesses (a task machine reports no computer broker).
 import type { Pool } from 'pg'
 
@@ -20,7 +20,9 @@ export async function fakeThreadMachines(pool: Pool, harnesses: Harness[]) {
     sandboxId,
     files: {
       read: async () => 'fixture-worker-sha',
-      write: async (_path: string, body: string) => {
+      write: async (path: string, body: string) => {
+        // Only the worker's handoff registers it; the desktop lease and runtime files are not a handoff.
+        if (!/^\/run\/mikka-viewer\/thread-[a-f0-9-]+\.json$/.test(path)) return
         const { deviceId, credential } = JSON.parse(body) as { deviceId: string; credential: string }
         credentials.set(deviceId, credential)
         await pool.query('UPDATE devices SET "lastSeenAt"=now(),enabled=true,harnesses=$2 WHERE id=$1', [deviceId, JSON.stringify(harnesses)])

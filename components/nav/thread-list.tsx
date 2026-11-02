@@ -58,9 +58,10 @@ function WaitingChip({ waiting }: { waiting: NonNullable<ThreadView['waitingFor'
  * group's (R-52), its name, then the opening of its last reply on one line,
  * verbatim. No status word, no bot name. A task's earlier threads fold into
  * its newest; past the first, the line opens with 第 N 次尝试, and the task's
- * page lists them all. In 全部线程 the mark of the Agent running it (R-78; a
- * neutral thread mark when unknown, never the bot's avatar) and the last
- * activity sit beside the name. The whole card opens the thread's own
+ * page lists them all. In 全部线程 the last activity sits beside the name, and
+ * the second line opens with the mark of the Agent running it (R-78; a neutral
+ * thread mark when unknown, never the bot's avatar) and 「<Bot> 派出」: a bot
+ * dispatches a thread, an Agent runs it (glossary). The whole card opens the thread's own
  * conversation, task or no task.
  */
 function ThreadRow({ thread, group, issues, all, now, onOpenThread }: { thread: ThreadRowOf<Thread>; group: ThreadGroup; issues: Issue[]; all: boolean; now: Date; onOpenThread: (thread: { issueId: string | null; runId: string }) => void }) {
@@ -73,17 +74,19 @@ function ThreadRow({ thread, group, issues, all, now, onOpenThread }: { thread: 
   // The PRs its task carries, as on the chat's card (R-66).
   const pullRequests = thread.issueId ? issues.find(issue => issue.id === thread.issueId)?.metadata.pullRequests : undefined
   return <li data-slot="thread-card" className={THREAD_CARD}>
-    <Button variant="ghost" className={THREAD_CARD_BUTTON} aria-label={name} onClick={() => onOpenThread({ issueId: thread.issueId ?? null, runId: thread.id })} />
+    <Button variant="ghost" className={THREAD_CARD_BUTTON} aria-label={name} data-focus-id={thread.id} onClick={() => onOpenThread({ issueId: thread.issueId ?? null, runId: thread.id })} />
     <span data-slot="thread-status" className="pointer-events-none relative flex shrink-0 items-center justify-center"><ThreadStatusIcon group={group} /></span>
     <span className="pointer-events-none relative flex min-w-0 flex-1 flex-col gap-0.5">
       <span className="flex w-full min-w-0 items-center gap-2">
         <span className="min-w-0 flex-1 truncate text-sm leading-5 font-medium">{name}</span>
-        {all && <span data-slot="thread-agent" className="flex shrink-0 items-center text-muted-foreground opacity-80 [&_svg]:size-3">{thread.harness ? <HarnessMark harness={thread.harness} /> : <ThreadMark size="row" />}</span>}
         {all && <span className="shrink-0 text-xs text-muted-foreground">{when === 'relative' ? format.relativeTime(at, now) : t(when)}</span>}
       </span>
       {waiting
         ? <WaitingChip waiting={waiting} />
-        : (thread.lastReply || thread.attempts > 1) && <span className="block w-full truncate text-xs text-muted-foreground">{[thread.attempts > 1 ? t('attempt', { count: thread.attempts }) : null, thread.lastReply].filter(Boolean).join(' · ')}</span>}
+        : (all || thread.lastReply || thread.attempts > 1) && <span className="flex w-full min-w-0 items-center gap-1 text-xs text-muted-foreground">
+          {all && <span data-slot="thread-agent" className="flex shrink-0 items-center opacity-80 [&_svg]:size-3">{thread.harness ? <HarnessMark harness={thread.harness} /> : <ThreadMark size="row" />}</span>}
+          <span className="min-w-0 flex-1 truncate">{[all ? <span key="bot" data-slot="thread-bot" className="text-foreground/80">{t('dispatchedBy', { bot: thread.agentName })}</span> : null, thread.attempts > 1 ? t('attempt', { count: thread.attempts }) : null, thread.lastReply].filter(Boolean).flatMap((part, index) => index ? [' · ', part] : [part])}</span>
+        </span>}
     </span>
     {pullRequests && <PullRequestsBadge pullRequests={pullRequests} />}
     <ChevronRight aria-hidden="true" className="pointer-events-none relative size-4 shrink-0 text-muted-foreground" />
@@ -91,7 +94,7 @@ function ThreadRow({ thread, group, issues, all, now, onOpenThread }: { thread: 
 }
 
 /**
- * The right column's thread list (R-52): 进行中 → 受阻 → 等待你 → 空闲 →
+ * The right column's thread list (R-52): 等待你 → 进行中 → 受阻 → 空闲 →
  * 已解决, each with its count; 已解决 starts collapsed. Outside 进行中 the
  * judged outcome places a thread, so a failed or blocked run never reads as
  * resolved. Picking a thread opens it beside the chat, as a thread card does;

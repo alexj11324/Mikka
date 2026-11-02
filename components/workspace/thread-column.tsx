@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useLayoutEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef, type ReactNode } from 'react'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
 import { findThreadIssue } from '@/app/actions/agents'
@@ -10,7 +10,10 @@ import { PANEL_WIDTH } from '@/components/nav/context-panel'
 import { useResizableWidth } from '@/hooks/use-resizable-width'
 import { cn } from '@/lib/utils'
 import { IssueThreadPanel } from './issue-thread-panel'
-import { closeThread, navigate, openThread } from './workspace-navigation'
+import { closeThread, navigate, openThread, toggleAllThreads } from './workspace-navigation'
+
+/** Task detail's own breakpoint: narrower, a thread open on the task covers it, so 打开任务 leaves the thread behind. */
+const TASK_WIDE = '(min-width: 1024px)'
 
 /**
  * An open thread, in the right column beside what is in the centre (R-82): it
@@ -22,27 +25,37 @@ import { closeThread, navigate, openThread } from './workspace-navigation'
  * thread lists do); a thread opened from its address alone, or one with no
  * task, looks it up.
  */
-export function ThreadColumn({ runId, issueId: known }: { runId: string; issueId?: string | null }) {
+export function ThreadColumn({ runId, issueId: known, overList = false, name }: { runId: string; issueId?: string | null; /** Opened from 全部线程: ← goes back to that list, ✕ closes both. */ overList?: boolean; /** Its row's name in the thread list, so the header reads the same. */ name?: string }) {
   const t = useTranslations('IssueThreads')
-  const tPanel = useTranslations('Shell.panel')
   const { data: looked, isLoading } = useSWR(known ? null : ['thread-issue', runId], () => findThreadIssue(runId))
   // A thread with no task opens too, on its own conversation; it just has no task to link to.
   const thread = known ? { issueId: known } : looked
   // A thread the viewer may not read is not a place: show what is there instead.
   useEffect(() => { if (!known && !isLoading && looked === null) navigate({ thread: null }, 'replace') }, [known, isLoading, looked])
   const issueId = thread?.issueId ?? null
+  return <RightColumn slot="thread-column">
+    {thread
+      ? <IssueThreadPanel key={runId} issueId={issueId} runId={runId} name={name} onBack={closeThread} onClose={overList ? () => toggleAllThreads(false) : undefined} onOpenThread={openThread} onOpenTask={issueId ? () => navigate({ issue: issueId, thread: window.matchMedia(TASK_WIDE).matches ? runId : null }) : undefined} />
+      : <div role="status" aria-label={t('loading')} className="flex flex-col gap-3 p-4"><Skeleton className="h-6 w-2/3" /><Skeleton className="h-24 w-full" /></div>}
+  </RightColumn>
+}
+
+/**
+ * The right column's frame for a thread or 全部线程 (R-82): 概览's width, resizable
+ * from its inner edge. Below xl it covers the window; on a phone that is a pushed page.
+ */
+export function RightColumn({ slot, children }: { slot: string; children: ReactNode }) {
+  const tPanel = useTranslations('Shell.panel')
   const resize = useResizableWidth(PANEL_WIDTH)
   const ref = useRef<HTMLElement>(null)
   useLayoutEffect(() => { ref.current?.style.setProperty('--thread-column-width', `${resize.width}px`) }, [resize.width])
-  return <aside ref={ref} aria-label={tPanel('label')} data-slot="thread-column" className={cn(
+  return <aside ref={ref} aria-label={tPanel('label')} data-slot={slot} className={cn(
     'flex min-h-0 flex-col bg-background',
     'max-xl:fixed max-xl:inset-0 max-xl:z-30 md:max-xl:left-auto md:max-xl:w-[min(100%,28rem)] md:max-xl:border-l md:max-xl:shadow-lg',
     'xl:relative xl:w-(--thread-column-width) xl:shrink-0 xl:border-l',
     resize.dragging && 'select-none',
   )}>
     <ResizeHandle resize={resize} label={tPanel('resize')} edge="start" className="hidden xl:block" />
-    {thread
-      ? <IssueThreadPanel key={runId} issueId={issueId} runId={runId} onClose={closeThread} onOpenThread={openThread} onOpenTask={issueId ? () => navigate({ issue: issueId, thread: runId }) : undefined} />
-      : <div role="status" aria-label={t('loading')} className="flex flex-col gap-3 p-4"><Skeleton className="h-6 w-2/3" /><Skeleton className="h-24 w-full" /></div>}
+    {children}
   </aside>
 }

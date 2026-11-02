@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { Pool } from 'pg'
 import type { Page } from '@playwright/test'
-import { test, expect, register, app, rail, seedTask, openIssueFromSearch, openSearch, conversationPill, hydrated } from './fixtures'
+import { test, expect, register, app, rail, seedTask, openIssueFromSearch, openSearch, conversationPill, hydrated, showCreatedByMe } from './fixtures'
 
 // R-82: one address says what is on screen, every move is a history entry,
 // and back / forward step through it one move at a time without leaving Mikka.
@@ -94,10 +94,13 @@ test('a task opened from the chat is its own page; back returns to the chat, for
   await page.goForward()
   await expect(taskTitle(page)).toHaveValue(title)
 
-  // ✕ steps back to the chat it was opened from, so forward reopens the task.
+  // ✕ steps back to the chat it was opened from: no new entry, and forward reopens the task.
+  const entries = await page.evaluate(() => window.history.length)
   await closeTask(page)
   await expect(chat(page)).toBeVisible()
+  await expect(taskTitle(page)).toHaveCount(0)
   expect(query(page).get('issue')).toBeNull()
+  expect(await page.evaluate(() => window.history.length)).toBe(entries)
   await page.goForward()
   await expect(taskTitle(page)).toHaveValue(title)
 })
@@ -108,6 +111,10 @@ test('board → task → back lands on the board; rail → back after a task lan
   await seedTask(page, title)
   await page.goto(app('/?section=all-issues'))
   await hydrated(rail(page, '看板'))
+  // Nobody is on the seeded task: 负责人 我 leaves it out, 我创建的 shows it (decision 2026-11-02-0302).
+  await expect(board(page)).toBeVisible()
+  await expect(board(page).getByText(title, { exact: true })).toHaveCount(0)
+  await showCreatedByMe(page)
   await board(page).getByText(title, { exact: true }).click()
   await expect(taskTitle(page)).toHaveValue(title)
   expect(query(page).get('section')).toBe('all-issues')
@@ -189,7 +196,9 @@ async function seedThread(email: string, issueTitle: string, { otherBot }: { oth
 }
 
 const column = (page: Page) => page.locator('[data-slot="thread-column"]')
-const threadIn = (page: Page) => column(page).getByRole('region', { name: THREAD, exact: true })
+// Beside a chat the thread is named for its task, as its row in the thread list (glossary, D9).
+const threadIn = (page: Page) => column(page).getByRole('region', { name: /^(?:\S+ )?(?:线程任务|别的 Bot 任务) [0-9a-f-]{36}$/ })
+const threadCard = (page: Page, title: string) => page.getByRole('button', { name: new RegExp(`^打开线程 (?:\\S+ )?${title}$`) }).first()
 
 async function chatWithThread(page: Page) {
   const { email } = await register(page)
@@ -210,8 +219,8 @@ async function expectThreadBesideChat(page: Page, runId: string) {
 
 test('a thread card opens the thread beside the chat; back closes it, forward and reload keep it', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 960 })
-  const { runId } = await chatWithThread(page)
-  await page.getByRole('button', { name: `打开线程 ${THREAD}`, exact: true }).first().click()
+  const { title, runId } = await chatWithThread(page)
+  await threadCard(page, title).click()
   await expectThreadBesideChat(page, runId)
   // The bot that dispatched it is named in the thread (R-78, R-82).
   await expect(threadIn(page)).toContainText('Coordinator 派出线程')
@@ -231,12 +240,12 @@ test('a thread card opens the thread beside the chat; back closes it, forward an
 
 test('the thread chip and the right panel\'s 线程 row open the same thread column', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 960 })
-  const { runId } = await chatWithThread(page)
+  const { title, runId } = await chatWithThread(page)
   const reply = page.getByRole('region', { name: 'Coordinator', exact: true })
 
-  await reply.getByRole('button', { name: `打开线程：${THREAD}`, exact: true }).click()
+  await reply.getByRole('button', { name: new RegExp(`^打开线程：(?:\\S+ )?${title}$`) }).click()
   await expectThreadBesideChat(page, runId)
-  await threadIn(page).getByRole('button', { name: '关闭线程', exact: true }).click()
+  await threadIn(page).getByRole('button', { name: '返回', exact: true }).click()
   await expect(column(page)).toHaveCount(0)
 
   const panel = page.getByRole('complementary', { name: '右栏', exact: true })
@@ -251,7 +260,7 @@ test('the thread chip and the right panel\'s 线程 row open the same thread col
 test('打开任务 from a thread opens the task page with the thread still beside it; back returns to the chat and thread', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 960 })
   const { title, issueId, runId } = await chatWithThread(page)
-  await page.getByRole('button', { name: `打开线程 ${THREAD}`, exact: true }).first().click()
+  await threadCard(page, title).click()
   await expectThreadBesideChat(page, runId)
   await threadIn(page).getByRole('button', { name: '打开任务', exact: true }).click()
   await expect(taskTitle(page)).toHaveValue(title)
@@ -268,7 +277,8 @@ test('a task page\'s 线程 row opens the thread in the task\'s right column; ba
   const { title, issueId, runId } = await chatWithThread(page)
   await page.goto(app(`/?issue=${issueId}`))
   await expect(taskTitle(page)).toHaveValue(title)
-  await page.getByRole('region', { name: /^线程/ }).getByRole('button', { name: `打开线程 ${THREAD}`, exact: true }).click()
+  // The 线程 section itself (「线程 1」): this test's task title also starts with 线程, and a task page that names its region after the task would match /^线程/ too.
+  await page.getByRole('region', { name: /^线程\s*\d+$/ }).getByRole('button', { name: `打开线程 ${THREAD}`, exact: true }).click()
   const panel = page.getByRole('region', { name: THREAD, exact: true })
   await expect(panel.getByRole('list', { name: '线程对话' })).toContainText('Home page loads in 3.8s.')
   expect(query(page).get('thread')).toBe(runId)
@@ -286,11 +296,21 @@ test('全部线程: another bot\'s thread opens beside the current chat, naming 
   await page.reload()
   await hydrated(chat(page))
   const panel = page.getByRole('complementary', { name: '右栏', exact: true })
-  await panel.getByRole('tab', { name: '全部线程', exact: true }).click()
+  // 全部线程 opens from the window bar into the right column (decision 2026-11-02-0310).
+  await page.getByRole('button', { name: /^全部线程/ }).click()
   await panel.getByRole('button', { name: /别的 Bot 任务/ }).first().click()
   await expectThreadBesideChat(page, runId)
   await expect(conversationPill(page)).toHaveText('Coordinator')
   await expect(threadIn(page)).toContainText('写作助手 派出线程')
+
+  // Closing it returns to 全部线程, and it is the same step as back: back does not reopen it.
+  const entries = await page.evaluate(() => window.history.length)
+  await threadIn(page).getByRole('button', { name: '返回', exact: true }).click()
+  await expect(column(page)).toHaveCount(0)
+  await expect(panel.getByRole('region', { name: '全部线程', exact: true })).toBeVisible()
+  await expect(panel.getByRole('button', { name: /别的 Bot 任务/ }).first()).toBeVisible()
+  expect(await page.evaluate(() => window.history.length)).toBe(entries)
+  expect(query(page).get('thread')).toBeNull()
 })
 
 // ── The phone web (PR 5): no rail, so the list's sheet and the chat's pill are the ways in and out ──
@@ -346,7 +366,7 @@ test('phone: the chat\'s pill opens 概览 as a page; its 线程 row pushes the 
   expect(query(page).get('thread')).toBe(runId)
   // The thread is the whole screen, its close in reach.
   expect(await column(page).boundingBox()).toEqual({ x: 0, y: 0, width: pageWidth, height: PHONE.height })
-  await expect(threadIn(page).getByRole('button', { name: '关闭线程', exact: true })).toBeInViewport()
+  await expect(threadIn(page).getByRole('button', { name: '返回', exact: true })).toBeInViewport()
 
   await back(page)
   await expect(column(page)).toHaveCount(0)
@@ -519,6 +539,8 @@ test('a team page keeps its address: its 项目 page survives a reload and back 
   await expect(page).toHaveURL(url => url.searchParams.get('section') === 'team-projects')
   await expect(home).toHaveCount(0)
   await expect(rail(page, '看板')).toHaveAttribute('aria-current', 'page')
+  // Back is the person's next step once the reloaded page works, as after the first load above.
+  await hydrated(rail(page, '看板'))
   await back(page)
   await expect(home).toBeVisible()
   expect([...query(page).keys()]).toEqual(['team'])
@@ -529,7 +551,7 @@ test('a team page keeps its address: its 项目 page survives a reload and back 
 test('chat → thread → 打开任务: the first crumb names the chat; ✕ brings back the chat with its thread, no ↑↓', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 960 })
   const { title, runId } = await chatWithThread(page)
-  await page.getByRole('button', { name: `打开线程 ${THREAD}`, exact: true }).first().click()
+  await threadCard(page, title).click()
   await expectThreadBesideChat(page, runId)
   await threadIn(page).getByRole('button', { name: '打开任务', exact: true }).click()
   await expect(taskTitle(page)).toHaveValue(title)
@@ -596,6 +618,10 @@ test('board → task: ↑↓ step through the board and the crumb says 看板; �
   await seedTask(page, second)
   await page.goto(app('/?section=all-issues'))
   await hydrated(rail(page, '看板'))
+  // Nobody is on the seeded tasks: 负责人 我 leaves them out, 我创建的 shows them (decision 2026-11-02-0302).
+  await expect(board(page)).toBeVisible()
+  await expect(board(page).getByText(first, { exact: true })).toHaveCount(0)
+  await showCreatedByMe(page)
   await board(page).getByText(first, { exact: true }).click()
   await expect(taskTitle(page)).toHaveValue(first)
   await expect(originCrumb(page, '看板')).toBeVisible()

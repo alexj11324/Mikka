@@ -7,7 +7,7 @@ import { enqueueDeviceCommand } from "./device-management";
 import { createHash, randomUUID } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
 import { z } from "zod";
-import { othersMayUse, pooledOwners, subscriptionsUsable } from "./personal-policy";
+import { othersMayUse, pooledOwners } from "./personal-policy";
 import {
   DEFAULT_EXECUTION_FALLBACKS,
   type ExecutionFallbacks,
@@ -64,9 +64,8 @@ export class ExecutionSettings {
   ): Promise<ExecutionRule> {
     const places = await this.places(scope, query);
     const models = await this.botModels(scope, query);
-    const providers = (await subscriptionsUsable(query, scope.ownerId, scope.workspaceId))
-      ? (await query.query(`SELECT provider FROM byos_connections WHERE "ownerId"=$1 AND state='connected' AND paused=false`,[scope.ownerId])).rows
-      : [];
+    // The person's own subscriptions, usable in every workspace they belong to (decision 2026-11-01-2240).
+    const providers = (await query.query(`SELECT provider FROM byos_connections WHERE "ownerId"=$1 AND state='connected' AND paused=false`,[scope.ownerId])).rows;
     const preferred = providers.some((m) => m.provider === "claude")
       ? "claude_code"
       : providers.some((m) => m.provider === "codex")
@@ -94,15 +93,14 @@ export class ExecutionSettings {
           Number(b.deviceType === "server") - Number(a.deviceType === "server"),
       );
     for (const device of devices) {
+      // Only a model the CLI reported and marked default there: no model name is chosen here (Alex, 2026-11-02).
       const harness = device.harnesses.find(
         (h: import("@mikka/protocol/harness").HarnessInfo) =>
           h.installed &&
           (!preferred || h.harness === preferred) &&
-          (h.harness === "claude_code"
-            ? h.modelSlots?.some((s) => s.slot === "opus")
-            : h.harness === "codex"
-              ? h.defaultModelSlot
-              : h.models?.length),
+          Boolean(h.defaultModelSlot) &&
+          (h.modelSlots?.some((slot) => slot.slot === h.defaultModelSlot) ||
+            h.models?.includes(h.defaultModelSlot!)),
       );
       if (harness)
         return {
@@ -110,14 +108,7 @@ export class ExecutionSettings {
           label: null,
           place: device.id,
           harness: harness.harness,
-          model:
-            harness.harness === "claude_code"
-              ? (harness.modelSlots?.find(
-                  (s: { slot: string }) => s.slot === "opus",
-                )?.slot ??
-                harness.defaultModelSlot ??
-                harness.models![0])
-              : (harness.defaultModelSlot ?? harness.models![0]),
+          model: harness.defaultModelSlot!,
           position: 2147483647,
         };
     }
@@ -439,14 +430,13 @@ export class ExecutionSettings {
     }
     return [...labels.values()].sort((a,b) => a.name.localeCompare(b.name));
   }
-  /** The owner's connected subscriptions, from any workspace: a subscription belongs to the account.
-   * None unless the owner shared them into this workspace and its admin allows it (decision 2026-10-31-2225). */
+  /** The owner's connected subscriptions, from any workspace: a subscription belongs to the account,
+   * and its owner may always use it here (decision 2026-11-01-2240). Membership is the caller's check. */
   private async connectedBindings(
     scope: ExecutionSettingsScope,
     bindingId?: string,
     query: Pick<PoolClient, "query"> = this.pool,
   ) {
-    if (!(await subscriptionsUsable(query, scope.ownerId, scope.workspaceId))) return [];
     return this.bindingsOf(scope.ownerId, scope.workspaceId, bindingId, query);
   }
   private async bindingsOf(

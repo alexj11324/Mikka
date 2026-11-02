@@ -41,7 +41,8 @@ test('the real events API projects the latest reply into owner-scoped thread lis
     await expect(panel.getByText('Actual route reply', { exact: true })).toBeVisible()
     await expect(panel.getByText(`MCP dispatch ${marker}`, { exact: true })).toHaveCount(0)
     await expect(panel.getByText(`Foreign private ${marker}`, { exact: true })).toHaveCount(0)
-    await panel.getByRole('tab', { name: '全部线程', exact: true }).click()
+    // 全部线程 opens from the window bar into the right column (decision 2026-11-02-0310).
+    await page.getByRole('button', { name: /^全部线程/ }).click()
     const running = panel.getByRole('region', { name: '进行中（3）', exact: true })
     await expect(running.getByRole('listitem')).toHaveCount(3)
     // R-78: each row carries the mark of the Agent running it, never a bot's avatar.

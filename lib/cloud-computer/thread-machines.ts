@@ -175,9 +175,29 @@ export async function endClosedTaskMachines(pool: Pool, end: (actor: Actor, runI
   return { ended, pending: rows.length - ended }
 }
 
+const threadDesktop = { startDesktop, syncDesktopLease }
+/** Display :1 and its driver lease, published under the workspace policy lock so a
+ * concurrent policy change (ComputerStore.setPolicy) cannot be overwritten with an older version.
+ * No person can take over a thread desktop: the lease is never controlled. */
+async function startThreadDesktop(pool: Pool, actor: Actor, runId: string, leaseId: string, sandbox: Sandbox, runtime: typeof threadDesktop) {
+  await runtime.startDesktop(sandbox, 1, true)
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    await client.query("SET LOCAL lock_timeout = '5s'")
+    await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`computer-policy:${actor.workspaceId}`])
+    const machine = (await client.query('SELECT "botId",epoch FROM thread_machines WHERE "runId"=$1 AND "workerLeaseId"=$2 AND state<>\'ended\'', [runId, leaseId])).rows[0]
+    if (!machine) throw new ComputerError(409, 'Thread provisioning cancelled')
+    const policy = (await client.query('SELECT permission,version FROM workspace_computer_policies WHERE "workspaceId"=$1', [actor.workspaceId])).rows[0]
+    const policyVersion = Number(policy?.version ?? 0)
+    await runtime.syncDesktopLease(sandbox, { botId: machine.botId, ownerId: actor.userId, display: 1, epoch: machine.epoch, controlledBy: null, controlUntil: 0, computerAllowed: computerPermission(policy?.permission) === 'allow', policyVersion })
+    await client.query('COMMIT')
+  } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
+}
+
 /** The queued run is moved to a dedicated device before any worker can claim
  * it. Bot workers are denied these runs by claimCloudRun. */
-export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: string, provider = threadMachineProvider) {
+export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: string, provider = threadMachineProvider, desktop = threadDesktop) {
   z.uuid().parse(runId)
   const client = await pool.connect()
   const leaseId = randomUUID()
@@ -292,6 +312,9 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
       repositoryTask ? undefined : installComputerRuntime(sandbox),
     ])
     if (!expectedSha || sourceSha !== expectedSha) throw new Error('Worker version mismatch')
+    // Every computer action runs through lease-driver.py, which needs display :1 and its lease.
+    // A snapshot boots with neither, and a resumed one may hold a lease from an older policy.
+    if (!repositoryTask) await startThreadDesktop(pool, actor, runId, leaseId, sandbox, desktop)
     await client.query('BEGIN')
     // Provision, end and desktop all lock the parent run before its machine.
     const current = (await client.query('SELECT * FROM agent_runs WHERE id=$1 AND "userId"=$2 FOR UPDATE', [runId, actor.userId])).rows[0]

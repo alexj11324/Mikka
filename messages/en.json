@@ -2409,7 +2409,8 @@
       "minutes": "{count} min",
       "hours": "{count} h",
       "balance": "Balance",
-      "points": "{points} points"
+      "points": "{points} points",
+      "awaitingTakeover": "Awaiting takeover"
     },
     "billing": {
       "loading": "Loading billing",
@@ -2476,7 +2477,10 @@
       "offlineWait": "Wait for it",
       "offlineCloud": "Run in the cloud",
       "labels": "By label",
-      "pickModel": "Choose a model"
+      "pickModel": "Choose a model",
+      "noModels": "No models yet",
+      "unavailable": "Unavailable",
+      "unverified": "Not checked against an account"
     },
     "searchEmpty": "No matching settings",
     "apiKeys": {
@@ -2757,7 +2761,6 @@
     "c_c6492461": "View all tasks ·",
     "c_30108106": "View all teams",
     "c_4090a5db": "View all projects",
-    "c_37ee9ddc": "View team hierarchy documentation (opens in a new window)",
     "c_c4c23eda": "View project ·",
     "c_95c35444": "Use 2–12 uppercase letters or digits, starting with a letter.",
     "c_62e51561": "Loading",
@@ -3245,7 +3248,8 @@
     "runInfo": {
       "paidBy": "{owner}'s {plan}",
       "movedTo": "Moved to {machine} to continue"
-    }
+    },
+    "back": "Back"
   },
   "Computer": {
     "status": {
@@ -3322,7 +3326,8 @@
         "idle": "Idle",
         "resolved": "Resolved"
       },
-      "waitingFor": "Waiting for {device} to come online"
+      "waitingFor": "Waiting for {device} to come online",
+      "dispatchedBy": "Dispatched by {bot}"
     },
     "newBot": {
       "title": "New bot",
@@ -3389,9 +3394,8 @@
     "coordinatorPlaceholder": "Ask the Coordinator or hand it a task…",
     "panel": {
       "label": "Right panel",
-      "views": "Right panel views",
-      "overview": "Overview",
       "allThreads": "All threads",
+      "allThreadsWaiting": "All threads, {count} waiting on you",
       "tabs": "Right panel content",
       "details": "Details",
       "threads": "Threads",
@@ -3428,7 +3432,10 @@
       "nameTooLong": "Name can be at most {max} characters",
       "changeAvatar": "Change {name}’s avatar",
       "close": "Close panel",
-      "open": "Open panel"
+      "open": "Open panel",
+      "filterBot": "Filter by dispatcher",
+      "allBots": "All dispatchers",
+      "closeAllThreads": "Close all threads"
     },
     "suggestions": {
       "title": "Suggestions",
@@ -3490,6 +3497,7 @@
         "status": "Status",
         "priority": "Priority",
         "assignee": "Assignee",
+        "creator": "Created by me",
         "labels": "Labels",
         "project": "Project",
         "agentState": "Thread status"
@@ -3550,7 +3558,7 @@
         "delete": "Delete",
         "agent": {
           "running": "Running",
-          "waiting": "Waiting on you",
+          "waiting": "Waiting for you",
           "blocked": "Blocked"
         }
       },
@@ -3944,35 +3952,11 @@
     "accessibleToAll": "Accessible to all workspace members",
     "teamOverview": "Team overview",
     "memberCount": "{count, plural, one {# member} other {# members}}",
-    "hierarchy": "Team hierarchy",
-    "docs": "Docs",
     "dangerZone": "Danger zone",
     "rows": {
       "general": "General",
       "members": "Members",
-      "slack": "Slack notifications",
-      "issuesSection": "Issues, projects, and documents",
-      "issueLabels": "Issue labels",
-      "projectLabels": "Project labels",
-      "templates": "Templates",
-      "recurringIssues": "Recurring issues",
-      "workflowSection": "Workflow",
-      "issueStatuses": "Issue statuses",
-      "projectStatuses": "Project statuses",
-      "workflows": "Workflows & automations",
-      "triage": "Triage",
-      "cycles": "Cycles",
-      "agentsSection": "AI & bots",
-      "teamAgents": "Team bots",
-      "agentSkills": "Bot skills",
-      "agentConnectors": "Bot connectors",
-      "projectUpdates": "Project updates",
-      "threadSummaries": "Resolved thread summaries",
-      "parentTeam": "Parent team",
-      "none": "None",
-      "leaveTeam": "Leave team",
-      "retireTeam": "Retire team",
-      "deleteTeam": "Delete team"
+      "leaveTeam": "Leave team"
     }
   },
   "CredentialLogin": {

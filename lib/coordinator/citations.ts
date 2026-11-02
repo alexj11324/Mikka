@@ -34,7 +34,7 @@ export interface RunSource {
   /** Its group in the thread list (R-52), decided on the server: the phone draws it as is. */
   group?: import('@/lib/thread-groups').ThreadGroup
   issue: { id: string; number: number | null; identifier: string | null; title: string } | null
-  /** The thread's name: the first line of what it was asked to do. */
+  /** The first line of what it was asked to do; its shown name is runThreadName. */
   name: string
   /** How it ended, once it has. */
   summary: string | null
@@ -49,6 +49,11 @@ export interface RunSource {
 }
 
 export type CitationSource = IssueSource | RunSource
+
+/** A thread's own name, as its thread-list row shows it (glossary): its task, as 「MIK-12 标题」, else what it was asked. */
+export function runThreadName(run: Pick<RunSource, 'issue' | 'name'>) {
+  return run.issue ? [run.issue.identifier, run.issue.title].filter(Boolean).join(' ') : run.name
+}
 
 const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
 /** ASCII only, so a URL followed by Chinese text with no space still ends at the URL. */

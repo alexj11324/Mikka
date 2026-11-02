@@ -6,7 +6,7 @@ import { Globe } from 'lucide-react'
 import { GitHubIcon } from '@/components/icons/brand-icons'
 import { useFormatter, useTranslations } from 'next-intl'
 import { getLinkPreview } from '@/app/actions/link-preview'
-import { CITATION_HREF, splitCitations, type CitationKind, type CitationSource, type IssueSource, type RunSource } from '@/lib/coordinator/citations'
+import { CITATION_HREF, splitCitations, type CitationKind, type CitationSource, type IssueSource, type RunSource, runThreadName } from '@/lib/coordinator/citations'
 import type { LinkPreview } from '@/lib/link-preview-parse'
 import { cn } from 'cn'
 import { HarnessMark } from '@/components/labels/entity-labels'
@@ -97,7 +97,7 @@ export function IssueCitation({ issue, onOpen }: { issue: IssueSource; onOpen: (
   const priority = ISSUE_PRIORITIES.find(item => item.value === issue.priority)
   const identifier = issue.identifier
   return <InlineCitation>
-    <InlineCitationTrigger variant="object" aria-label={t('openIssue', { title: issue.title })} onClick={() => onOpen(issue.id)}>
+    <InlineCitationTrigger variant="object" aria-label={t('openIssue', { title: issue.title })} data-focus-id={issue.id} onClick={() => onOpen(issue.id)}>
       <status.icon aria-hidden="true" className={cn('size-3.5 shrink-0', statusIconTints[status.tone])} />
       <InlineCitationLabel>{issue.title}</InlineCitationLabel>
     </InlineCitationTrigger>
@@ -139,14 +139,15 @@ export function RunCitation({ run }: { run: RunSource }) {
   const harness = run.harness === 'claude_code' ? 'Claude Code' : 'Codex'
   // The chip shows the thread's state, as the thread card and the Threads list do; the coding agent's mark is in the hover card (R-78).
   const issue = run.issue
+  const name = runThreadName(run)
   return <InlineCitation>
     <InlineCitationTrigger
       variant="object"
-      aria-label={issue ? t('openThread', { name: run.name }) : t('runOf', { bot: run.agentName })}
+      aria-label={issue ? t('openThread', { name }) : t('runOf', { bot: run.agentName })}
       onClick={issue ? () => openThread(run.id) : undefined}
     >
       <ThreadStatusIcon status={run.status} outcome={run.outcome} small />
-      <InlineCitationLabel>{run.name}</InlineCitationLabel>
+      <InlineCitationLabel>{name}</InlineCitationLabel>
     </InlineCitationTrigger>
     <InlineCitationContent>
       <InlineCitationBody>
