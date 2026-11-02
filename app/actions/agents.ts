@@ -16,7 +16,9 @@ import { removeOwnedDevice, renameOwnedDevice } from '@/lib/device-removal'
 import { enqueueDeviceCommand, type DeviceCommandKind } from '@/lib/device-management'
 import { listSshHosts } from '@/lib/ssh'
 import { citationSources } from '@/lib/coordinator/store'
-import { addRunMessage, requestRunStop } from '@/lib/agent-runs'
+import { requestRunStop } from '@/lib/agent-runs'
+import { sendThreadMessage } from '@/lib/thread-continue'
+import { chainChunks } from '@/lib/issue-run-conversation'
 import { executionBotName, runBotId, runBotName } from '@/lib/run-bot-name'
 import { requireIssueAccess } from '@/lib/issue-access'
 import { workspaceDb } from '@/lib/workspace-db'
@@ -275,14 +277,18 @@ async function threadQuestions(threads: readonly IssueThread[], viewerId: string
 /** One thread as a conversation: what it was asked, what the agent did, and what people said in it. */
 export async function getIssueThread(issueId: string | null, runId: string): Promise<IssueThreadDetail> {
   const { row, user } = await readableThread(issueId, runId)
-  const chunks = await db.select({ chunk: runChunks.chunk, at: runChunks.createdAt }).from(runChunks)
-    .where(eq(runChunks.runId, row.id)).orderBy(asc(runChunks.seq))
-  const messages = await db.select({ id: runMessages.id, text: runMessages.text, at: runMessages.createdAt, userId: runMessages.userId, name: users.name, email: users.email, image: users.image })
-    .from(runMessages).leftJoin(users, eq(users.id, runMessages.userId))
-    .where(eq(runMessages.runId, row.id)).orderBy(asc(runMessages.createdAt))
-  // The run that resumes this one after an answered question is the same thread: its chain (BE-18).
+  // The run that resumes this one after an answered question, or runs it again after it ended (R-81), is the same thread: its chain (BE-18).
   const [projected] = projectIssueThreads([row], row.issueId, user.id, new Set([user.id]))
   const chain = projected ? await readRunChain(pool, row.userId, row.id) : null
+  // The conversation is the thread's, across its runs from this one on, oldest first.
+  const from = chain ? Math.max(0, chain.attempts.findIndex(attempt => attempt.runId === row.id)) : 0
+  const runIds = chain ? chain.attempts.slice(from).map(attempt => attempt.runId) : [row.id]
+  const chunks = chainChunks(await db.select({ runId: runChunks.runId, chunk: runChunks.chunk, at: runChunks.createdAt }).from(runChunks)
+    .innerJoin(agentRuns, eq(agentRuns.id, runChunks.runId))
+    .where(inArray(runChunks.runId, runIds)).orderBy(asc(agentRuns.createdAt), asc(runChunks.seq)))
+  const messages = await db.select({ id: runMessages.id, text: runMessages.text, at: runMessages.createdAt, userId: runMessages.userId, name: users.name, email: users.email, image: users.image })
+    .from(runMessages).leftJoin(users, eq(users.id, runMessages.userId))
+    .where(inArray(runMessages.runId, runIds)).orderBy(asc(runMessages.createdAt))
   const [thread] = projected ? await threadQuestions([withRunChain(projected, chain)], user.id) : []
   if (!thread) throw new ActionFailureError('runNotFound')
   // A stop request belongs to the live run that send and stop address, not to an earlier attempt.
@@ -307,7 +313,8 @@ export async function sendIssueThreadMessage(input: { issueId: string | null; ru
   if(requestHeaders.has('authorization')||!requestHeaders.get('cookie'))throw new ActionFailureError('authRequired')
   const session=await auth.api.getSession({headers:requestHeaders,query:{disableCookieCache:true}})
   if(!session?.user||session.user.id!==user.id)throw new ActionFailureError('authRequired')
-  await addRunMessage(user.id,{runId:row.id,text:text.data},{source:'human',sessionId:session.session.id})
+  // A working thread gets it as a message; an ended one runs again in the same thread (R-81, lib/thread-continue.ts).
+  await sendThreadMessage(user.id,row.id,text.data,{source:'human',sessionId:session.session.id})
 }
 
 /**
