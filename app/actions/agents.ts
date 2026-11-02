@@ -1,5 +1,7 @@
 'use server'
 
+import { createHash } from 'node:crypto'
+import { gunzipSync } from 'node:zlib'
 import { headers } from 'next/headers'
 import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { z } from 'zod'
@@ -28,6 +30,7 @@ import { ISSUE_THREAD_LIMIT, canReadThread, projectIssueThreads, taskFreeThreadM
 import { threadQuestionStates } from '@/lib/issue-thread-questions'
 import { listIssueRunChains, readRunChain } from '@/lib/run-chain'
 import type { HarnessInfo } from '@mikka/protocol/harness'
+import { parseUnifiedDiff, type ThreadChangesResult } from '@/lib/thread-changes'
 
 async function getUserId(): Promise<string> {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -284,6 +287,37 @@ export async function getIssueThread(issueId: string | null, runId: string): Pro
     chunks,
     messages: messages.map(message => ({ id: message.id, text: message.text, at: message.at, author: message.name || message.email || '', image: message.image ?? null, mine: message.userId === user.id })),
   }
+}
+
+/**
+ * The thread's 改动 tab (Figma 820:4843): the newest checkpoint of its run chain, a
+ * gzipped `git diff --binary` with secrets already masked when it was saved
+ * (app/v1/runs/[runId]/checkpoint). Read-only; whoever may read the thread sees it.
+ */
+export async function getThreadChanges(issueId: string | null, runId: string): Promise<ThreadChangesResult> {
+  const { row } = await readableThread(issueId, runId)
+  const chain = await readRunChain(pool, row.userId, row.id)
+  const runIds = chain ? chain.attempts.map(attempt => attempt.runId) : [row.id]
+  const { rows: [checkpoint] } = await pool.query<{ patch: Buffer; unavailableReason: string | null }>(
+    'SELECT patch,"unavailableReason" FROM run_checkpoints WHERE "runId"=ANY($1::uuid[]) ORDER BY "updatedAt" DESC LIMIT 1', [runIds])
+  if (!checkpoint) return { state: 'none' }
+  if (checkpoint.unavailableReason) return { state: 'tooLarge' }
+  let text: string
+  try { text = gunzipSync(checkpoint.patch, { maxOutputLength: THREAD_CHANGES_MAX_TEXT }).toString('utf8') } catch { return { state: 'tooLarge' } }
+  const changes = parseUnifiedDiff(text)
+  if (!changes.files.length) return { state: 'none' }
+  // 在新标签打开: the file in the thread's pull request, on GitHub's files page.
+  const { rows: [published] } = await pool.query<{ url: string }>(
+    `SELECT "pullRequest"->>'url' AS url FROM run_publications WHERE "runId"=ANY($1::uuid[]) AND "pullRequest"->>'url' IS NOT NULL ORDER BY "updatedAt" DESC LIMIT 1`, [runIds])
+  const prUrl = published && safeHttpUrl(published.url)
+  if (prUrl) for (const file of changes.files) file.url = `${prUrl.replace(/\/+$/, '')}/files#diff-${createHash('sha256').update(file.path).digest('hex')}`
+  return { state: 'ready', changes }
+}
+
+const THREAD_CHANGES_MAX_TEXT = 8 * 1024 * 1024
+
+function safeHttpUrl(value: string) {
+  try { const url = new URL(value); return url.protocol === 'https:' ? url.toString() : null } catch { return null }
 }
 
 /** Something a person says in a running thread; the daemon delivers it to the agent. */
