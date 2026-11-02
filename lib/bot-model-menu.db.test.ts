@@ -136,15 +136,17 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
     await pool.query(`UPDATE byos_connections SET quota=$2::jsonb WHERE id=$1`, [claude, quota(1, PAST)]);
     assert.equal((await botModelMenu(pool, settings, alice, botA)).current.available, true);
 
-    // 6. 刷新模型列表: a subscription connected since the menu was read, and a model its provider now offers, show at once.
+    // 6. 刷新模型列表: a subscription connected since the menu was read, never asked for its models (no catalogue,
+    // no binding: production, 2026-11-02), and a model its provider now offers, show at once.
     const { refreshBotModelMenu } = await import("./bot-model-menu");
     const fresh = await connection("alice", workspace, "claude", "connected");
-    await binding("alice", workspace, fresh, "claude-fresh-fixture", "claude_cpa");
+    assert.ok(!(await botModelMenu(pool, settings, alice, botA)).groups.some((group) => group.options.some((option) => option.modelId === "claude-fresh-fixture")));
     const discovering = {
       botModels: settings.botModels.bind(settings),
       botBinding: settings.botBinding.bind(settings),
+      connectedSubscriptions: settings.connectedSubscriptions.bind(settings),
       refreshBotModels: (scope: typeof alice, connectionId: string) =>
-        settings.refreshBotModels(scope, connectionId, async () => connectionId === claude ? [{ id: "claude-sonnet-fixture" }, { id: "claude-opus-fixture" }, { id: "claude-new-fixture" }] : [{ id: "claude-fresh-fixture" }]),
+        settings.refreshBotModels(scope, connectionId, async () => connectionId === claude ? [{ id: "claude-sonnet-fixture" }, { id: "claude-opus-fixture" }, { id: "claude-new-fixture" }] : connectionId === fresh ? [{ id: "claude-fresh-fixture" }] : []),
     };
     const refreshed = await refreshBotModelMenu(pool, discovering, alice, botA);
     const models = refreshed.groups.flatMap((group) => group.options.map((option) => option.modelId));
@@ -158,6 +160,22 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
     // A provider that refuses (signed out, backend down) is skipped the same way.
     const refusing = { ...discovering, refreshBotModels: async () => { throw new Error("provider down"); } };
     assert.ok((await refreshBotModelMenu(pool, refusing, alice, botA)).groups.length > 1);
+
+    // 7. Opening the menu asks a connected subscription that was never asked for its models (no 刷新 needed),
+    // once per revision; a paused one is not asked.
+    const unasked = await connection("alice", workspace, "claude", "connected");
+    const pausedOne = await connection("alice", workspace, "claude", "connected");
+    await pool.query("UPDATE byos_connections SET paused=true WHERE id=$1", [pausedOne]);
+    const asked: string[] = [];
+    await settings.ensureCatalogues(alice, 1000, async (_owner, connectionId) => { asked.push(connectionId); return connectionId === unasked ? [{ id: "claude-unasked-fixture" }] : []; });
+    assert.ok(asked.includes(unasked));
+    assert.ok(!asked.includes(pausedOne));
+    assert.ok((await botModelMenu(pool, settings, alice, botA)).groups.some((group) => group.options.some((option) => option.modelId === "claude-unasked-fixture")));
+    await settings.ensureCatalogues(alice, 1000, async (_owner, connectionId) => { throw new Error(`asked again: ${connectionId}`); });
+    await pool.query("UPDATE byos_connections SET epoch=epoch+1 WHERE id=$1", [unasked]);
+    const again: string[] = [];
+    await settings.ensureCatalogues(alice, 1000, async (_owner, connectionId) => { again.push(connectionId); return []; });
+    assert.deepEqual(again, [unasked], "a reconnect (new revision) is asked again");
 
     // C22: an API key's models are a menu group, and the Coordinator saved on one runs on it.
     const { addApiKey, setBotApiKeyChoice } = await import("./model-api-keys");

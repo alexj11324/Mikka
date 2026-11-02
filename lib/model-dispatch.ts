@@ -20,6 +20,8 @@ export type ModelDispatch =
   | { kind: 'none'; reason: NothingReason; card: ReturnType<typeof modelUnavailableCard> }
 
 export async function resolveModelDispatch(pool: Pool, scope: OrderScope & { botId: string | null }, explicit?: { harness: OrderEntry['harness']; model: string } | null, random?: () => number, location?: RunLocation): Promise<ModelDispatch> {
+  // A subscription never asked for its models offers none yet: ask it first (once per revision).
+  await new (await import('./execution-settings')).ExecutionSettings(pool).ensureCatalogues(scope)
   const candidates = await orderCandidates(pool, scope)
   const stored = await readOrder(pool, scope, candidates)
   const order = location ? { ...stored, location } : stored
