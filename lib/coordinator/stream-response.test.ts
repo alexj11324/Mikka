@@ -112,8 +112,8 @@ test('each tool streams its name, state and short previews; thinking streams as 
   ], 'a hidden tool never shows')
   const created = steps[2] as Extract<CoordinatorStreamEvent, { type: 'tool' }>
   assert.equal(created.input?.length, 200, 'the input preview is as short as the stored one')
-  assert.ok(created.input?.startsWith('{"title":"Fix login"'))
-  assert.equal((steps[3] as Extract<CoordinatorStreamEvent, { type: 'tool' }>).output, '{"id":"i1"}')
+  assert.ok(created.input?.startsWith('{"body": "xxx'), 'printed as the stored chat prints jsonb: keys in its order, ", " and ": "')
+  assert.equal((steps[3] as Extract<CoordinatorStreamEvent, { type: 'tool' }>).output, '{"id": "i1"}')
   assert.equal(JSON.stringify(events).includes('private failure detail'), false, 'tool error details stay on the server')
   assert.deepEqual(steps[1], { type: 'thinking', id: 'run:0', state: 'end', text: 'private reasoning' }, 'readable reasoning arrives whole when its block ends')
 })
