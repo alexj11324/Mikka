@@ -33,8 +33,10 @@ export async function invokeDecision(purpose: string, input: DecisionInput, ques
   await assertUnmanagedModelTransport(scope, DECISION_MODEL, signal)
   const usage = await import('@/lib/abuse/runtime')
   const callId = randomUUID()
-  await usage.canUseMikkaPaid(scope.workspaceId)
-  await usage.hostedUsage.reserve(scope.workspaceId,DECISION_MODEL,callId)
+  // Like every hosted call (lib/abuse/model.ts): the workspace's own balance first, then shared credits.
+  const { withSharedCredits } = await import('@/lib/credit-shares')
+  await withSharedCredits(scope.workspaceId, usage.canUseMikkaPaid)
+  await withSharedCredits(scope.workspaceId, payer => usage.hostedUsage.reserve(payer, DECISION_MODEL, callId))
   let requestStarted = false
   try {
     const requestInput = decisionRequestInput(input)

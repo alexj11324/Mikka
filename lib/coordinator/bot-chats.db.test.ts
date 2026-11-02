@@ -458,6 +458,21 @@ dbTest('重试 re-runs a failed bot turn once, for the message already sent, in 
     assert.equal(waiting.length, 0)
     await store.failTurn(owner, 'wrun_retried-turn', 'binding_required', botId)
     assert.equal(await store.retryFailedTurn(owner, botId), true, 'a new failure can be retried again')
+    // The reason stays under the person's message: after the next turn ends cleanly and after a reload.
+    await store.takeInbox(owner, 'wrun_third-turn', botId)
+    await store.failTurn(owner, 'wrun_third-turn', 'PaidResourceError: verification_required', botId)
+    await recordCoordinatorEvent(db, userMessageEvent(owner, 'Then plan next week', { botId }))
+    await store.takeInbox(owner, 'wrun_answered-turn', botId)
+    await store.appendMessages(owner, 'wrun_answered-turn', [{ role: 'assistant', content: 'Here is the plan.' }], null, botId)
+    const answered = await store.chatView(owner, 200, botId)
+    assert.equal(answered.error, null, 'the chat-wide line clears once a turn ends cleanly')
+    assert.deepEqual(answered.items.map(item => [item.from, item.text, item.failure ?? null]), [
+      ['person', 'Plan my week', { kind: 'hosted', code: 'verification_required' }],
+      ['person', 'Then plan next week', null],
+      ['coordinator', 'Here is the plan.', null],
+    ])
+    const context = await store.loadConversation(owner, botId)
+    assert.ok(context.messages.every(({ message }) => !('mikkaFailure' in message)), 'the model never sees the mark')
   })
 })
 
