@@ -4083,6 +4083,7 @@
       }
     },
     "refusal": {
+      "verificationRequiredPlain": "使用 Mikka 默认模型前需要验证银行卡",
       "verification_required": "使用 <model><mark></mark> Mikka 默认模型</model>前需要验证银行卡",
       "free_allowance_used": "免费额度已用完",
       "points_exhausted": "点数已用完",
