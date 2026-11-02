@@ -5,12 +5,10 @@ import { useFormatter, useNow, useTranslations } from 'next-intl'
 import { ChevronRight } from 'lucide-react'
 import { listIssueThreads } from '@/app/actions/agents'
 import { threadQuestionView, threadTime, type IssueThread } from '@/lib/issue-threads'
-import { runListRefreshInterval, runStatusKey } from '@/lib/issue-run-conversation'
+import { runListRefreshInterval } from '@/lib/issue-run-conversation'
 import { BotAvatar, COORDINATOR_AVATAR, colorFor } from '@/components/nav/bot-avatar'
-import { Badge } from '@/components/reui/badge'
 import { Button } from '@/components/ui/button'
-import { RUN_BADGES } from './agent-citations'
-import { ThreadStatusIcon } from './thread-status-icon'
+import { ThreadStatus, ThreadStatusIcon } from './thread-status-icon'
 import { cn } from '@/lib/utils'
 import { InlineLoadError } from '@/components/load-error'
 
@@ -20,15 +18,6 @@ export function useIssueThreads(issueId: string) {
 
 export function harnessLabel(harness: string) {
   return harness === 'claude_code' ? 'Claude Code' : harness === 'codex' ? 'Codex' : harness
-}
-
-export function ThreadStatus({ status, stopping = false, waiting = false }: { status: string; stopping?: boolean; waiting?: boolean }) {
-  const statusLabel = useTranslations('Coordinator.citation.runStatus')
-  const t = useTranslations('IssueThreads')
-  const key = runStatusKey(status)
-  if (waiting) return <Badge variant="warning-light" size="sm">{t('waiting')}</Badge>
-  if (stopping) return <Badge variant="secondary" size="sm">{t('stopping')}</Badge>
-  return <Badge variant={RUN_BADGES[status] ?? 'secondary'} size="sm">{key ? statusLabel(key) : status}</Badge>
 }
 
 /** 线程: the agent runs working on this issue (R-62). A readable one opens on the right. */
@@ -53,7 +42,7 @@ export function IssueThreads({ issueId, openId, onOpen }: { issueId: string; ope
             <span className="truncate text-sm font-medium">{name}</span>
             {meta && <span className="truncate text-xs font-normal text-muted-foreground">{meta}</span>}
           </span>
-          <ThreadStatus status={view.status} stopping={view.stopping} waiting={view.waiting} />
+          <ThreadStatus status={view.status} outcome={view.outcome} stopping={view.stopping} waiting={view.waiting} icon={false} />
           <time className="min-w-14 shrink-0 whitespace-nowrap text-right text-xs font-normal text-muted-foreground tabular-nums" dateTime={new Date(thread.finishedAt ?? thread.createdAt).toISOString()}>{format.relativeTime(threadTime(thread, now), now)}</time>
         </>
         return <li key={thread.id}>

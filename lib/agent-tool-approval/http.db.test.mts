@@ -36,6 +36,7 @@ mock.module(new URL('../mcp/resource.ts', import.meta.url).href, { namedExports:
 mock.module(new URL('../personal-mailbox-config.ts', import.meta.url).href, { namedExports: { personalMailboxEnabled: () => false } })
 mock.module(new URL('../auth.ts', import.meta.url).href, { namedExports: { auth: { api: { getSession: async ({ headers }: { headers: Headers }) => ({ user: { id: headers.get('cookie') === 'owner=1' ? owner : 'other' } }) } } } })
 let server: Server, origin: string
+let claimed: import('@mikka/protocol/device').RunAssignment | undefined
 const originalFetch = globalThis.fetch
 before(async () => {
   // The preceding policy-store suite retains its deliberately minimal schema.
@@ -147,6 +148,50 @@ test('real HTTP claim carries policy, and its run gate creates no approvals (dec
   assert.equal(await gate.checkLive(), true)
   assert.equal((await pool.query('SELECT count(*)::int n FROM agent_tool_approvals WHERE "runId"=$1',[runId])).rows[0].n,0)
   gate.revoke()
+  claimed = assignment
+})
+
+test('a changed run policy answers live:false, revokes the real daemon gate, and each check logs one line', async () => {
+  assert.ok(claimed, 'the claim test above runs first')
+  const { HttpServerLink } = await import('../../packages/daemon/src/server-link-http')
+  const link = new HttpServerLink(origin)
+  Object.assign(link, { credential: 'synthetic' })
+  const lines: Record<string, unknown>[] = []
+  const restore = (['log','warn','error'] as const).map(level => {
+    const original = console[level]
+    console[level] = (...args: unknown[]) => {
+      if (typeof args[0] === 'string' && args[0].includes('"tool_approval_check"')) lines.push(JSON.parse(args[0]))
+      else original(...args)
+    }
+    return () => { console[level] = original }
+  })
+  const gate = await link.prepareRunToolApproval(claimed, new AbortController().signal, () => {})
+  try {
+    assert.equal(await gate.checkLive(), true)
+    assert.deepEqual(Object.keys(lines.at(-1)!).sort(), ['durationMs','level','live','msg','reason','runId','status','timestamp'])
+    assert.deepEqual({ ...lines.at(-1), timestamp: 0, durationMs: 0 }, { level:'info', msg:'tool_approval_check', timestamp:0, runId, live:true, reason:'ok', status:200, durationMs:0 })
+    const settings = async (payload: object) => fetch(`${origin}/api/agent-cli-policy`, { method:'POST', headers:{cookie:'owner=1',origin,'content-type':'application/json'}, body:JSON.stringify(payload) })
+    const current = await (await settings({operation:'read',runId})).json() as {revision:string}
+    assert.equal(current.revision, claimed.policyRevision, 'nothing changed the run policy since its claim')
+    assert.equal((await settings({operation:'set',runId,target:'worker',expectedRevision:current.revision,policy:{permissions:{install_dependency:'deny'}}})).status,200)
+    // The gate's own 1 s monitor sees the new revision and revokes the run.
+    const deadline = Date.now() + 10_000
+    while (!gate.revoked && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 50))
+    assert.equal(gate.revoked, true)
+    assert.equal(await gate.checkLive(), false)
+    const stale = lines.find(line => line.live === false)
+    assert.deepEqual({ ...stale, timestamp: 0, durationMs: 0 }, { level:'info', msg:'tool_approval_check', timestamp:0, runId, live:false, reason:'policy_revision_mismatch', status:200, durationMs:0 })
+    // Another device's check for this run: the run row is not its own.
+    const foreign = await fetch(`${origin}/v1/runs/${runId}/tool-approval`, { method:'POST', headers:{authorization:'Bearer synthetic','content-type':'application/json'}, body:JSON.stringify({operation:'check',deviceId:randomUUID(),policyRevision:claimed.policyRevision}) })
+    assert.equal(foreign.status, 409)
+    assert.deepEqual({ ...lines.at(-1), timestamp: 0, durationMs: 0 }, { level:'warn', msg:'tool_approval_check', timestamp:0, runId, live:false, reason:'run_unavailable', status:409, durationMs:0 })
+    const invalid = await fetch(`${origin}/v1/runs/${runId}/tool-approval`, { method:'POST', headers:{authorization:'Bearer synthetic','content-type':'application/json'}, body:'{}' })
+    assert.equal(invalid.status, 400)
+    assert.equal(lines.at(-1)?.reason, 'invalid_request')
+    // The log carries no revision, policy or credential.
+    const logged = JSON.stringify(lines)
+    for (const secret of [claimed.policyRevision!, current.revision, 'synthetic', 'install_dependency']) assert.equal(logged.includes(secret), false)
+  } finally { gate.revoke(); for (const undo of restore) undo() }
 })
 
 

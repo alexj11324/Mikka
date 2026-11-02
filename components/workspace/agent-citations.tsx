@@ -10,7 +10,6 @@ import { CITATION_HREF, splitCitations, type CitationKind, type CitationSource, 
 import type { LinkPreview } from '@/lib/link-preview-parse'
 import { cn } from 'cn'
 import { HarnessMark } from '@/components/labels/entity-labels'
-import { Badge } from '@/components/reui/badge'
 import { InlineCitation, InlineCitationBody, InlineCitationContent, InlineCitationDescription, InlineCitationFavicon, InlineCitationFooter, InlineCitationImage, InlineCitationLabel, InlineCitationMeta, InlineCitationSource, InlineCitationTitle, InlineCitationTrigger } from '@/components/ui/inline-citation'
 import { SourceAvatar, SourcesList, SourcesSummary, sourceTileClassName, type StreamingSource } from '@/components/ui/streaming-text'
 import { Claude } from '@/components/ui/svgs/claude'
@@ -18,13 +17,8 @@ import { Mikka } from '@/components/ui/svgs/mikka'
 import { OpenAI } from '@/components/ui/svgs/openai'
 import { statusIconTints } from '@/lib/status-appearance'
 import { ISSUE_PRIORITIES, ISSUE_STATUSES, issueIdentifier } from '@/components/workspace/issue-properties'
-import { ThreadStatusIcon } from '@/components/workspace/thread-status-icon'
+import { ThreadStatus, ThreadStatusIcon } from '@/components/workspace/thread-status-icon'
 import { openThread } from '@/components/workspace/workspace-navigation'
-
-export const RUN_BADGES: Record<string, 'info-light' | 'success-light' | 'destructive-light' | 'warning-light' | 'secondary'> = {
-  queued: 'secondary', preparing: 'success-light', running: 'success-light', waiting_input: 'warning-light', finishing: 'success-light',
-  succeeded: 'info-light', stopped: 'secondary', failed: 'destructive-light', cancelled: 'secondary',
-}
 
 export type LinkPreviews = Record<string, LinkPreview | null>
 
@@ -145,7 +139,6 @@ export function RunCitation({ run }: { run: RunSource }) {
   const harness = run.harness === 'claude_code' ? 'Claude Code' : 'Codex'
   // The chip shows the thread's state, as the thread card and the Threads list do; the coding agent's mark is in the hover card (R-78).
   const issue = run.issue
-  const status = t.has(`runStatus.${run.status}` as never) ? t(`runStatus.${run.status}` as never) : run.status
   return <InlineCitation>
     <InlineCitationTrigger
       variant="object"
@@ -160,7 +153,7 @@ export function RunCitation({ run }: { run: RunSource }) {
         <InlineCitationSource>{run.agentName} · <HarnessIcon />{harness}</InlineCitationSource>
         <InlineCitationTitle>{issue ? `${issue.identifier ? `${issue.identifier} ` : ''}${issue.title}` : t('noIssue')}</InlineCitationTitle>
         <InlineCitationMeta>
-          <Badge variant={RUN_BADGES[run.status] ?? 'secondary'} size="sm">{status}</Badge>
+          <ThreadStatus status={run.status} outcome={run.outcome} />
           <span>{format.dateTime(new Date(run.finishedAt ?? run.createdAt), { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</span>
         </InlineCitationMeta>
       </InlineCitationBody>

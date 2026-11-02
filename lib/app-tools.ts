@@ -57,16 +57,19 @@ export type AppToolDeps = {
   resolveAccount: (toolkit: string, selected?: string) => Promise<{ accountId: string | null; accounts: ComposioAccountChoice[] }>
   listTools: (toolkit: string, query?: string) => Promise<AppTool[]>
   getTool: (slug: string) => Promise<AppTool>
-  execute: (call: AppToolCall, accountId: string) => Promise<AppToolExecution>
+  /** `accountId` is null only for an app that needs no connection (its tools run on the person's id alone). */
+  execute: (call: AppToolCall, accountId: string | null) => Promise<AppToolExecution>
   /** The person's or admin's explicit setting for this tool or app, or null when none names it. */
   setting: (tool: string, toolkit: string) => Promise<AppToolDecision | null>
   /** The shared R-77 judge: `ask` for a destructive, unjudged or refused call. */
   judge: WriteJudge
   /** The record of a direct write, written before dispatch. */
-  recordStart: (call: AppToolCall, accountId: string) => Promise<string>
+  recordStart: (call: AppToolCall, accountId: string | null) => Promise<string>
   recordEnd: (id: string, outcome: { status: 'done' | 'failed' | 'running'; error?: string | null; result?: Record<string, string> }) => Promise<void>
   /** An approval card; nothing runs until the person approves. */
-  propose: (call: AppToolCall, accountId: string) => Promise<unknown>
+  propose: (call: AppToolCall, accountId: string | null) => Promise<unknown>
+  /** An app with nothing to connect (Composio no-auth): its tools need no account. */
+  noAuth?: (toolkit: string) => Promise<boolean>
 }
 
 const decision = z.enum(['allow', 'ask', 'deny'])
@@ -115,6 +118,7 @@ function outcomeOf(data: Record<string, unknown> | undefined): Record<string, st
 async function account(deps: AppToolDeps, toolkit: string, selected?: string) {
   if (OWN_INTEGRATIONS.has(toolkit)) return { error: 'integrationActionNotAllowed' } as const
   if (!(await deps.appAllowed(toolkit))) return { error: 'integrationBlockedByWorkspace' } as const
+  if (await deps.noAuth?.(toolkit)) return { accountId: null }
   const { accountId, accounts } = await deps.resolveAccount(toolkit, selected)
   if (!accountId) return accounts.length ? { error: 'integrationAccountSelectionRequired', accounts } as const : { error: 'integrationNotConnected' } as const
   return { accountId }
@@ -168,7 +172,7 @@ export async function callAppTool(deps: AppToolDeps, raw: unknown) {
 }
 
 /** A direct write: the record exists before dispatch; an unclear outcome stays `running` and is never resent. */
-export async function runRecorded(deps: Pick<AppToolDeps, 'execute' | 'recordStart' | 'recordEnd'>, call: AppToolCall, accountId: string) {
+export async function runRecorded(deps: Pick<AppToolDeps, 'execute' | 'recordStart' | 'recordEnd'>, call: AppToolCall, accountId: string | null) {
   const id = await deps.recordStart(call, accountId)
   let result: AppToolExecution
   try {
