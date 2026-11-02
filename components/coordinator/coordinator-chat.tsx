@@ -49,6 +49,7 @@ import { HostedRefusalNotice } from '@/components/billing/hosted-refusal-notice'
 import { hostedRefusal } from '@/lib/billing/verification-client'
 import { subscriptionRefusal } from '@/lib/subscription-refusal'
 import { SubscriptionRefusalNotice } from './subscription-refusal-notice'
+import { HostedUnavailableNotice } from './hosted-unavailable-notice'
 import { QuotaNotice, QuotaSwitchLine } from './quota-notice'
 import { RetryReplyButton } from './retry-reply-button'
 import { FieldError } from '@/components/ui/field'
@@ -371,6 +372,8 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
       {refusal && <HostedRefusalNotice code={refusal} botId={botId} retry={retry} onQueued={mutate} />}
       {declined && declined !== 'quotaUsed' && <SubscriptionRefusalNotice notice={declined} retry={retry} />}
       {/* Out of quota: after a turn stopped on it, or before the next message is sent. */}
+      {/* On Mikka 默认 with no points here: said before sending (decision 2026-11-02-1450). */}
+      {!data?.error && <HostedUnavailableNotice botId={botId} />}
       {!refusal && (declined === 'quotaUsed' || !data?.error) && <QuotaNotice botId={botId} stopped={declined === 'quotaUsed'}
         retry={(label, disabled) => <RetryReplyButton botId={botId} onQueued={mutate} label={label} disabled={disabled} />} />}
       {data?.error && !data.working && !refusal && !declined && <Alert variant="destructive">{wakeError ? <AlertTitle>{t(`wakeErrors.${wakeError}`)}</AlertTitle> : <><AlertTitle>{t('failedTitle')}</AlertTitle><AlertDescription>{data.error}</AlertDescription><AlertAction>{retry}</AlertAction></>}</Alert>}

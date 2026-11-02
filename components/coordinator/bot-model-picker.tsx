@@ -47,7 +47,8 @@ function heading(t: T, group: BotModelMenuGroup) {
 /** What sits at the right of an item: who pays for it. A subscription item has none. */
 function tag(t: T, group: BotModelMenuGroup) {
   switch (group.kind) {
-    case 'hosted': return t('credits')
+    // The points it can spend in this chat's workspace, not the person's elsewhere (decision 2026-11-02-1450).
+    case 'hosted': return group.points === undefined ? t('credits') : t('points', { points: group.points })
     case 'apiKey': return t('metered')
     case 'shared': return group.owner ? t('sharedKey', { name: group.owner }) : null
     default: return null
