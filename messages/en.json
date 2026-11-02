@@ -2556,7 +2556,7 @@
       "e2bKeyMissing": "Not added",
       "e2bKeyFill": "Add",
       "e2bKeyReplace": "Replace",
-      "agentSection": "Thread Agent",
+      "agentSection": "Agent",
       "preferredAgent": "Preferred Agent",
       "preferredAgentHint": "Models both Agents can run use it first",
       "preferredMark": "Preferred",

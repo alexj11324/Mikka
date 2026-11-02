@@ -70,7 +70,7 @@ export const runViewColumns = {
  */
 /** `botId` is the bot that dispatched the run (null for the Coordinator); the run reports back to that bot's chat. */
 type LocalDispatchInput = { issueId: string; agentId: string; repo: string; note?: string; requestKey?: string; model?: string; pinnedDeviceId?: string; readOnly?: boolean
-  /** The API key the 允许使用的模型 entry names; the run uses it only when it may (lib/run-credential-source.ts). */
+  /** The API key the 优先使用的模型 entry names; the run uses it only when it may (lib/run-credential-source.ts). */
   apiKeyId?: string
   /** Exact server-selected identity; reauthorized for this owner, Agent and workspace at queue time. */
   subscriptionBindingId?: string }

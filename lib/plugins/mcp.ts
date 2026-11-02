@@ -23,15 +23,21 @@ export async function runMcpCommand(target: () => Promise<McpTarget>, command: M
   let transport: ReturnType<typeof publicMcpFetch> | undefined
   const signal = AbortSignal.timeout(25_000)
   let dispatched = false
+  let stage: McpStage = 'target'
+  let host: string | undefined
   try {
     const connection = await target()
+    host = new URL(connection.url).host
+    stage = 'connect'
     transport = (dependencies.transport ?? publicMcpFetch)(new URL(connection.url).origin, signal)
     client = await (dependencies.connect ?? createMCPClient)({
       transport: { type: connection.transport, url: connection.url, headers: connection.headers, fetch: transport.fetch, redirect: 'error' },
       initializationOptions: { signal }, protocolVersionDiscovery: false, maxRetries: 0,
       onUncaughtError: () => {},
     })
+    stage = 'ready'
     await hooks.ready?.()
+    stage = 'name' in command ? 'call' : 'list'
     if ('name' in command) {
       dispatched = true
       const result = await abortable(() => client!.callTool({ name: command.name, arguments: command.arguments, options: { signal } }), signal)
@@ -42,12 +48,58 @@ export async function runMcpCommand(target: () => Promise<McpTarget>, command: M
     return redact({ tools: result.tools, nextCursor: result.nextCursor ?? null }, connection.secrets)
   } catch (error) {
     if (dispatched) return { error: 'mcpOutcomeUnknown' }
-    return { error: hooks.code?.(error) ?? 'mcpUnavailable' }
+    const code = hooks.code?.(error)
+    if (code) return { error: code }
+    console.warn(JSON.stringify({ event: 'mcp_unavailable', ...mcpFailure(error, stage, host) }))
+    return { error: 'mcpUnavailable' }
   } finally {
     // Cleanup cannot replace a confirmed result with a retryable failure.
     if (client) await abortable(() => client!.close(), AbortSignal.timeout(2000)).catch(() => {})
     await transport?.close().catch(() => {})
   }
+}
+
+type McpStage = 'target' | 'connect' | 'ready' | 'list' | 'call'
+
+/**
+ * Why an MCP setup failed, as codes only (never the message text, headers or
+ * body, which could carry a credential):
+ * - stage and server host;
+ * - reason: the SDK's known failure, matched against its fixed messages
+ *   (http, protocolVersion, contentType, invalidInitialize, initTimeout,
+ *   initAborted, requestTimeout, parse, sseClosed), else unknown;
+ * - status: the HTTP status, from the error's statusCode or "(HTTP 401)";
+ * - protocolVersion: the date-shaped version a protocol mismatch names;
+ * - chain: up to four errors down the cause chain, each with only its name,
+ *   code and status (ECONNRESET, a JSON-RPC code, 401…).
+ */
+const MCP_REASONS: [RegExp, string][] = [
+  [/^MCP (?:HTTP|SSE) Transport Error: (?:POSTing to endpoint|GET SSE failed)/, 'http'],
+  [/protocol version/i, 'protocolVersion'],
+  [/Unexpected content type/, 'contentType'],
+  [/invalid initialize result/i, 'invalidInitialize'],
+  [/initialization timed out/, 'initTimeout'],
+  [/initialization was aborted/, 'initAborted'],
+  [/Request timed out/, 'requestTimeout'],
+  [/Failed to parse message/, 'parse'],
+  [/Connection closed|text\/event-stream response without body/, 'sseClosed'],
+]
+const word = (value: unknown, pattern: RegExp) => typeof value === 'string' && pattern.test(value) ? value : undefined
+const httpStatus = (value: unknown) => typeof value === 'number' && Number.isInteger(value) && value >= 100 && value <= 599 ? value : undefined
+function errorCodes(error: unknown) {
+  const value = (error ?? {}) as { name?: unknown; code?: unknown; status?: unknown; statusCode?: unknown }
+  const code = typeof value.code === 'number' && Number.isInteger(value.code) ? value.code : word(value.code, /^[A-Z][A-Z0-9_]{1,40}$/)
+  return { name: word(value.name, /^[A-Za-z]{1,40}$/) ?? 'unknown', code, status: httpStatus(value.statusCode) ?? httpStatus(value.status) }
+}
+
+export function mcpFailure(error: unknown, stage: McpStage, host?: string) {
+  const message = error instanceof Error ? error.message : ''
+  const reason = MCP_REASONS.find(([pattern]) => pattern.test(message))?.[1] ?? 'unknown'
+  const chain: ReturnType<typeof errorCodes>[] = []
+  for (let current: unknown = error; current && chain.length < 4; current = (current as { cause?: unknown }).cause) chain.push(errorCodes(current))
+  const status = chain.find(link => link.status)?.status ?? (Number(/\(HTTP (\d{3})\)/.exec(message)?.[1]) || undefined)
+  const protocolVersion = reason === 'protocolVersion' ? /\b(\d{4}-\d{2}-\d{2})\b/.exec(message)?.[1] : undefined
+  return { stage, host, reason, status, protocolVersion, chain }
 }
 
 export function createPersonalMcpRuntime(store: Pick<PersonalPluginStore, 'mcpConnection'>, dependencies: McpDependencies = {}) {

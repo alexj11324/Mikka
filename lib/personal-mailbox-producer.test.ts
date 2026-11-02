@@ -4,6 +4,7 @@ import { agentRuns, agents, bots, devices } from './db/schema'
 import { DEFAULT_AGENT_DEFINITION } from './agent-kit/builtin'
 import { makeSnapshot } from './agent-kit/definition'
 import { personalWorkerMailboxScopeMatches } from './personal-mailbox-capability'
+import { overrideDeploymentSwitch } from './deployment-switches'
 
 // Real dispatch functions, controlled persistence. These tests never open a
 // database or invoke a provider and do not prove FK/locking behavior.
@@ -48,13 +49,13 @@ mock.module(new URL('./subscription-repository.ts', import.meta.url).href, { nam
     return { id: '28700000-0000-4000-8000-000000000018', ownerId: owner, consumerId: agentId, workspaceId, connectionId, connectionRevision: 1, modelId: 'fixture', route: 'codex_cli' }
   }
 } } })
-const flags = ['MIKKA_PERSONAL_MAILBOX_ENABLED', 'MIKKA_BYOS_ENABLED', 'MIKKA_AGENT_KIT'] as const
+const flags = ['MIKKA_BYOS_ENABLED', 'MIKKA_AGENT_KIT'] as const
 const original = Object.fromEntries(flags.map(key => [key, process.env[key]]))
-after(() => { for (const key of flags) if (original[key] === undefined) delete process.env[key]; else process.env[key] = original[key] })
+after(() => { overrideDeploymentSwitch('personalMailbox', undefined); for (const key of flags) if (original[key] === undefined) delete process.env[key]; else process.env[key] = original[key] })
 
 test('actual personal producer freezes owned Bot workspace or explicit unbound scope and keeps mailbox-off namespace reads query-free', async () => {
   const { queueRun } = await import('./agent-runs')
-  delete process.env.MIKKA_PERSONAL_MAILBOX_ENABLED; delete process.env.MIKKA_BYOS_ENABLED
+  overrideDeploymentSwitch('personalMailbox', undefined); delete process.env.MIKKA_BYOS_ENABLED
   for (const bot of [botId, null]) {
     await queueRun(owner, { issueId, agentId, repo: repoUrl }, bot, execution)
     assert.equal(personalWorkerMailboxScopeMatches('codex', inserted.at(-1)!.agentDefinition, { botId: bot, workspaceId: bot ? workspaceId : globalId }), true)
@@ -63,7 +64,7 @@ test('actual personal producer freezes owned Bot workspace or explicit unbound s
   const count = inserted.length
   await assert.rejects(queueRun(owner, { issueId, agentId, repo: repoUrl }, botId, execution), { code: 'botNotFound' })
   assert.equal(inserted.length, count)
-  process.env.MIKKA_PERSONAL_MAILBOX_ENABLED = '0'
+  overrideDeploymentSwitch('personalMailbox', false)
   // Identity authorization still applies with the mailbox off; only the
   // mailbox namespace projection is skipped.
   ownedBot = true
@@ -75,7 +76,7 @@ test('actual personal producer freezes owned Bot workspace or explicit unbound s
 })
 test('actual cloud producer pins the existing host-authorized Bot/workspace without accepting payload namespace', async () => {
   const { queueCloudRun } = await import('./computer/queue-run')
-  process.env.MIKKA_PERSONAL_MAILBOX_ENABLED = '1'
+  overrideDeploymentSwitch('personalMailbox', true)
   let snapshot: unknown
   const queries: string[] = []
   const client = { release() {}, async query(sql: string, params: unknown[] = []) {

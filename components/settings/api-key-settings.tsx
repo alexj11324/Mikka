@@ -56,7 +56,7 @@ export function useApiKeyList(workspaceId: string) {
   const commonT = useTranslations('Common')
   const actionError = useActionError()
   const keys = useSWR(apiKeysKey(workspaceId), () => readApiKeys(workspaceId))
-  // The workspace's own SWR cache (workspace-app.tsx), where 允许使用的模型 lives: a key change re-reads it.
+  // The workspace's own SWR cache (workspace-app.tsx), where 优先使用的模型 lives: a key change re-reads it.
   const { mutate } = useSWRConfig()
   const [adding, setAdding] = useState(false)
   const [sharing, setSharing] = useState<Key | null>(null)
@@ -173,7 +173,7 @@ export function ApiKeyFallbackSetting({ workspaceId }: { workspaceId: string }) 
   }
   if (!data) return null
   return <>
-    {/* Its own policy, apart from the order of 允许使用的模型 (decision 2026-11-02 R, item 1). */}
+    {/* Its own policy, apart from the order of 优先使用的模型 (decision 2026-11-02 R, item 1). */}
     <SettingsSection id="after-quota-heading" title={t('afterQuotaSection')}>
       <SettingRow title={t('afterQuota')} description={t('afterQuotaBilling')}>
         <Switch aria-label={t('afterQuota')} checked={data.apiKeyAfterQuota} onCheckedChange={on => void save(on)} />

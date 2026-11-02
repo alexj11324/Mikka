@@ -1,4 +1,4 @@
-// 模型与订阅 › 允许使用的模型 against real PostgreSQL (decision 2026-11-02-1400):
+// 模型与订阅 › 优先使用的模型 against real PostgreSQL (decision 2026-11-02-1400):
 // an untouched list is the default preference over what the person has, every
 // change is stored under a per-scope lock, an add must be one of the person's
 // candidates, and dispatch takes the first model that can run now, on a
@@ -161,7 +161,7 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
     // The subscription is out of quota: the next one, the key.
     await pool.query('UPDATE byos_connections SET quota=$2 WHERE id=$1', [claude, allowance('claude', 1)])
     // The untouched list holds only opus here (decision 2026-11-02-1400): the key is not allowed, so nothing runs.
-    assert.equal(await pointsFallback(pool, scope), null, 'a key not in 允许使用的模型 is never used')
+    assert.equal(await pointsFallback(pool, scope), null, 'a key not in 优先使用的模型 is never used')
     const candidate = (await order.orderView(pool, scope)).candidates.find(item => item.source.kind === 'api_key')!
     await order.changeOrder(pool, scope, { kind: 'add', entries: [{ harness: candidate.harness, model: candidate.model, source: candidate.source }] })
     assert.deepEqual(await pointsFallback(pool, scope), { kind: 'api_key', keyId: key.id, model: 'key-deepseek-p' }, 'once added, the key is next')

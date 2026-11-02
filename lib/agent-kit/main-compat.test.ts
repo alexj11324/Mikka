@@ -7,6 +7,7 @@ import {freezeWorkerDefinition, retryWorkerDefinition} from './worker'
 import {runPrompt} from '../run-prompt'
 import {DEFAULT_AGENT_DEFINITION} from './builtin'
 import {makeSnapshot} from './definition'
+import { overrideDeploymentSwitch } from '../deployment-switches'
 
 const owner=randomUUID(),workspace=randomUUID(),agentId=randomUUID(),deviceId=randomUUID(),repoId=randomUUID(),botId=randomUUID(),issueId=randomUUID()
 const binding={id:randomUUID(),ownerId:owner,workspaceId:workspace,consumerId:agentId,connectionId:randomUUID(),connectionRevision:1,route:'codex_cli',modelId:'frozen-model'}
@@ -217,10 +218,10 @@ test('a read-only local run gets no push branch and a read-only policy, but the 
  assert.equal(body.pushBranch,undefined);assert.equal(body.github,undefined,'no GitHub connection: nothing to give')
  assert.equal(body.policy.readOnly,true);assert.equal(body.policy.permissions.git_push,'deny')
  selectIndex=0;githubAccount='123'
- const mailbox=process.env.MIKKA_PERSONAL_MAILBOX_ENABLED;process.env.MIKKA_PERSONAL_MAILBOX_ENABLED='0'
+ overrideDeploymentSwitch('personalMailbox', false)
  try {
   const connected=await (await request()).json()
   assert.ok(connected.mcp,'the run token is issued')
   assert.equal(connected.github?.repository,'example/repo');assert.equal(connected.github?.branch,undefined)
- } finally { githubAccount=null;if(mailbox===undefined)delete process.env.MIKKA_PERSONAL_MAILBOX_ENABLED;else process.env.MIKKA_PERSONAL_MAILBOX_ENABLED=mailbox }
+ } finally { githubAccount=null;overrideDeploymentSwitch('personalMailbox', undefined) }
 })

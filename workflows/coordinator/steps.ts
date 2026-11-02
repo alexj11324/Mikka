@@ -465,7 +465,7 @@ async function dispatchByRules(userId: string, input: { issueId: string; agentId
     if ('error' in device) return device.error === 'notFound'
       ? { error: 'deviceNotFound' as const }
       : { error: 'machineUnavailable' as const, issueId: input.issueId, card: (await import('@/lib/rule-dispatch')).machineUnavailableCard() }
-    // The named computer fixes where; the model is chosen as for any run (the thread's own, else 允许使用的模型 in order), among what this computer runs.
+    // The named computer fixes where; the model is chosen as for any run (the thread's own, else 优先使用的模型 in order), among what this computer runs.
     const { issueForUser } = await import('@/lib/issue-access')
     if (!await issueForUser(userId, input.issueId)) throw new ActionFailureError('issueNotFound')
     const { executionWorkspace } = await import('@/lib/execution-settings')
@@ -476,7 +476,7 @@ async function dispatchByRules(userId: string, input: { issueId: string; agentId
     return { ...result, status: 'queued' as const }
   }
   {
-    // 模型与订阅 (decision 2026-11-02-1400): the thread's own model, else 允许使用的模型 in order; 运行位置 says where.
+    // 模型与订阅 (decision 2026-11-02-1400): the thread's own model, else 优先使用的模型 in order; 运行位置 says where.
     // The person asking for the cloud runs it there whatever 运行位置 says.
     const { issueForUser } = await import('@/lib/issue-access')
     if (!await issueForUser(userId, input.issueId)) throw new ActionFailureError('issueNotFound')

@@ -4,7 +4,7 @@ import { Pool } from 'pg'
 import { test, expect, registerInTeam } from './fixtures'
 import { attachLightDark } from './settings-v4-shots'
 
-// 模型与订阅 › 运行位置 and 允许使用的模型 (decision 2026-11-02-1400). Real
+// 模型与订阅 › 运行位置 and 优先使用的模型 (decision 2026-11-02-1400). Real
 // application, real PostgreSQL, real server actions. Only a connected account's
 // catalogue (its bindings) and a computer's report are seeded: no provider login
 // or daemon runs in the browser suite. Model ids stand for reported values.
@@ -52,7 +52,7 @@ test('模型与订阅：默认顺序来自已有订阅，添加、键盘与菜�
   const device = await seed(page)
   await page.reload()
 
-  const list = page.getByRole('list', { name: '允许使用的模型' })
+  const list = page.getByRole('list', { name: '优先使用的模型' })
   // Untouched: Claude Code's opus from the connected account. The only computer cannot take a subscription run: the row names it and why.
   await expect(list.getByRole('listitem')).toHaveCount(1)
   const opus = list.getByRole('listitem').filter({ hasText: 'e2e-opus-reported' })

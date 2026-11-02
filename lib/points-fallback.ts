@@ -27,7 +27,7 @@ export type PointsFallback =
 
 /**
  * 点数不足时改用本人的模型 (decision 2026-11-02-1450): the first entry of
- * 允许使用的模型 that a bot chat can run on now, in the person's order. Only
+ * 优先使用的模型 that a bot chat can run on now, in the person's order. Only
  * credentials usable in this workspace count (usableApiKeys and botModels
  * already apply the team's sharing switch and an admin's ban on sharing);
  * a key must reach chat and list the model, a subscription must be bound

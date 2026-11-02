@@ -53,7 +53,7 @@ test('run machine fallback: 本地 a computer that takes part, 云端 own E2B, e
     await pool.query(`INSERT INTO account (id,"accountId","providerId","userId","createdAt","updatedAt") VALUES ($1,$2,'github',$3,now(),now())`, [randomUUID(), githubAccountId, id])
     github.allowWriter('octo/repo', githubAccountId)
     const ws = await seedWorkspace(pool, id, [{ userId: id, role: 'admin' }])
-    // A connected ChatGPT subscription whose account lists gpt-5: 允许使用的模型 is that model by default, 运行位置 本地.
+    // A connected ChatGPT subscription whose account lists gpt-5: 优先使用的模型 is that model by default, 运行位置 本地.
     const connection = randomUUID()
     await pool.query(`INSERT INTO byos_connections (id,"ownerId","workspaceId",provider,state,epoch,"secretName","secretDigest","providerSubject","modelCatalog",quota) VALUES ($1,$2,$3,'codex','connected',1,$4,$5,'synthetic-subject',$6,$7)`,
       [connection, id, ws.id, `synthetic-${connection}`, 'a'.repeat(64), JSON.stringify({ revision: '1', models: ['gpt-5'] }), JSON.stringify({ vendor: 'codex', source: 'official', status: 'ok', plan: 'Pro', observedAt: new Date().toISOString(), windows: [{ kind: 'five_hour', used: .2, resetsAt: null }] })])

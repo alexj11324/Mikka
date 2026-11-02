@@ -8,6 +8,7 @@ import { makeSnapshot, digest } from './agent-kit/definition'
 import { DEFAULT_AGENT_DEFINITION } from './agent-kit/builtin'
 import { freezeWorkerDefinition } from './agent-kit/worker'
 import { mailboxInputs } from '@mikka/protocol/mailbox'
+import { overrideDeploymentSwitch } from './deployment-switches'
 
 // Actual exported HTTP handler, runtime namespace resolver, strict action
 // parser and store. Token verification and SQL are controlled fixtures, not
@@ -109,7 +110,6 @@ for (const path of ['./mcp/actions.ts', './mcp/tools.ts', './mcp/artifacts.ts'])
 mock.module(new URL('./composio.ts', import.meta.url).href, { namedExports: { runComposioAction: () => { throw Error('Provider forbidden') } } })
 let POST: typeof import('../app/v1/mailbox/route').POST
 let mcpPOST: typeof import('../app/api/mcp/route').POST
-const previousFlag = process.env.MIKKA_PERSONAL_MAILBOX_ENABLED
 const originalFetch = globalThis.fetch, originalConnect = net.Socket.prototype.connect
 before(async () => {
   globalThis.fetch = (() => { throw Error('Network forbidden in pure worker entry test') }) as typeof fetch
@@ -119,20 +119,19 @@ before(async () => {
 })
 after(() => {
   globalThis.fetch = originalFetch; net.Socket.prototype.connect = originalConnect
-  if (previousFlag === undefined) delete process.env.MIKKA_PERSONAL_MAILBOX_ENABLED
-  else process.env.MIKKA_PERSONAL_MAILBOX_ENABLED = previousFlag
+  overrideDeploymentSwitch('personalMailbox', undefined)
 })
 function call(body: unknown = { action: 'inbox' }, token: string | null = bearer) {
   return POST(new Request('http://127.0.0.1/mikka/v1/mailbox', { method: 'POST', headers: { 'content-type': 'application/json', ...(token ? { authorization: 'Bearer ' + token } : {}) }, body: JSON.stringify(body) }))
 }
 test('actual worker HTTP kill switch performs no persistence', async () => {
-  process.env.MIKKA_PERSONAL_MAILBOX_ENABLED = '0'
+  overrideDeploymentSwitch('personalMailbox', false)
   const count = connections
   assert.equal((await call()).status, 503)
   assert.equal(connections, count)
 })
 test('enabled HTTP path uses verified owner/run and trusted private Bot namespace', async () => {
-  process.env.MIKKA_PERSONAL_MAILBOX_ENABLED = '1'; botId = '28700000-0000-4000-8000-000000000004'
+  overrideDeploymentSwitch('personalMailbox', true); botId = '28700000-0000-4000-8000-000000000004'
   const response = await call()
   assert.equal(response.status, 200)
   assert.equal(response.headers.get('cache-control'), 'private, no-store')
@@ -233,10 +232,10 @@ test('actual MCP catalogue never widens historical snapshots or unsupported work
     assert.ok(response.error || response.result?.isError)
   }
   agentDefinition = grantedWorker(); harness = 'codex'
-  process.env.MIKKA_PERSONAL_MAILBOX_ENABLED = '0'
+  overrideDeploymentSwitch('personalMailbox', false)
   const disabled = await packet(await rpc('tools/list', {}))
   assert.equal(disabled.result.tools.some((tool: { name: string }) => tool.name.startsWith('mailbox_')), false)
-  process.env.MIKKA_PERSONAL_MAILBOX_ENABLED = '1'
+  overrideDeploymentSwitch('personalMailbox', true)
 })
 test('actual same endpoint selects each run frozen subset and rejects grants revoked in the current user definition', async () => {
   const original = parent, originalCurrent = currentDefinition

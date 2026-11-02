@@ -5,6 +5,7 @@ import type { SQL } from 'drizzle-orm'
 import { bots, coordinatorEvents, devices } from './db/schema'
 import type { TaskDestination } from './task-destination'
 import { personalSubmissionInput, recordPersonalSubmission, SubmissionConflictError } from './coordinator-submission'
+import { overrideDeploymentSwitch } from './deployment-switches'
 
 const submissionId = 'a4000000-0000-4000-8000-000000000001'
 /** The owner's Coordinator: an ordinary bot row, resolved where a message enters. */
@@ -388,7 +389,7 @@ test('a changed suggestion after sending conflicts with its immutable receipt', 
 })
 
 test('new-task machine choice is owner-checked, preserved separately from copy and frozen across retries', async () => {
-  process.env.MIKKA_ISSUE_TOOLS_ENABLED = '1'
+  overrideDeploymentSwitch('issueTools', true)
   current = fixture(); callbacks.length = 0; userId = 'owner'
   const deviceId = 'b4000000-0000-4000-8000-000000000004'
   const destination = { kind: 'device' as const, deviceId }
@@ -409,32 +410,32 @@ test('new-task machine choice is owner-checked, preserved separately from copy a
   current.deviceRows.get(deviceId)!.ownerId = 'foreign'
   assert.deepEqual(await sendCoordinatorMessage('do the task', null, null, submissionId, destination), { error: 'deviceNotFound', params: undefined })
   assert.equal(current.rows.size, 1)
-  delete process.env.MIKKA_ISSUE_TOOLS_ENABLED
+  overrideDeploymentSwitch('issueTools', undefined)
 })
 
 test('with the Coordinator off a new task is refused, not queued silently; a chat message still waits', async () => {
-  process.env.MIKKA_ISSUE_TOOLS_ENABLED = '1'
+  overrideDeploymentSwitch('issueTools', true)
   current = fixture(); callbacks.length = 0; userId = 'owner'; enabled = false
   assert.deepEqual(await sendCoordinatorMessage('do the task', null, null, submissionId, { kind: 'cloud' }), { error: 'coordinatorUnavailable', params: undefined })
   assert.equal(current.rows.size, 0)
   assert.deepEqual(await sendCoordinatorMessage('hello', null, null, submissionId), { queued: true })
   assert.equal(current.rows.size, 1)
   enabled = true
-  delete process.env.MIKKA_ISSUE_TOOLS_ENABLED
+  overrideDeploymentSwitch('issueTools', undefined)
 })
 
 test('new-task submission fails closed when the issue-tools kill switch is set', async () => {
   current = fixture(); callbacks.length = 0; userId = 'owner'
-  process.env.MIKKA_ISSUE_TOOLS_ENABLED = '0'
+  overrideDeploymentSwitch('issueTools', false)
   assert.deepEqual(await sendCoordinatorMessage('do the task', null, null, submissionId, { kind: 'cloud' }), { error: 'issueToolsDisabled', params: undefined })
   assert.equal(current.rows.size, 0)
   assert.equal(callbacks.length, 0)
-  delete process.env.MIKKA_ISSUE_TOOLS_ENABLED
+  overrideDeploymentSwitch('issueTools', undefined)
 })
 
 test('new-task submission is on by default with no issue-tools setting', async () => {
   current = fixture(); callbacks.length = 0; userId = 'owner'
-  delete process.env.MIKKA_ISSUE_TOOLS_ENABLED
+  overrideDeploymentSwitch('issueTools', undefined)
   assert.deepEqual(await sendCoordinatorMessage('do the task', null, null, submissionId, { kind: 'cloud' }), { queued: true })
   assert.equal(current.rows.size, 1)
 })
@@ -455,7 +456,7 @@ test('image bytes and machine destination both participate in immutable submissi
 })
 
 test('browser notes and an authorized task destination persist together and remain frozen on retry', async () => {
-  process.env.MIKKA_ISSUE_TOOLS_ENABLED = '1'
+  overrideDeploymentSwitch('issueTools', true)
   current = fixture(); callbacks.length = 0; userId = 'owner'
   const note = { n: 1, kind: 'element' as const, url: 'https://example.org/', label: 'Save', note: 'Keep this selection', selector: 'button' }
   try {
@@ -467,7 +468,7 @@ test('browser notes and an authorized task destination persist together and rema
     assert.deepEqual(await sendCoordinatorMessage('do the task', null, null, submissionId, { kind: 'cloud' }, [note]), { queued: true })
     assert.deepEqual(await sendCoordinatorMessage('do the task', null, null, submissionId, { kind: 'cloud' }, [{ ...note, note: 'Changed' }]), { error: 'submissionConflict', params: undefined })
     assert.equal(current.rows.size, 1)
-  } finally { delete process.env.MIKKA_ISSUE_TOOLS_ENABLED }
+  } finally { overrideDeploymentSwitch('issueTools', undefined) }
 })
 
 test('host browser session provenance is immutable across replays and cannot upgrade a prior API message',async()=>{

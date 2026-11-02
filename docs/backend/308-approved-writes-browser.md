@@ -1,6 +1,6 @@
 # Personal approved-write endpoint
 
-Depends on the transaction foundation in PR373. The endpoint POST `/api/approved-writes` (normal app base path applies), Coordinator tool registry and owner/session approval services share one operation ledger. The feature does not replace existing email/calendar-create/update handlers. Availability defaults on in every deployment scope. The optional server-owned `MIKKA_PERSONAL_WRITES_ENABLED=0` remains an incident kill switch; any explicit value other than `1` closes admission. Request input cannot override it. Disabled calls return 503/approvedWritesDisabled before auth, application Pool or provider runtime loads. Availability grants no provider permission and does not expand existing frozen tool snapshots.
+Depends on the transaction foundation in PR373. The endpoint POST `/api/approved-writes` (normal app base path applies), Coordinator tool registry and owner/session approval services share one operation ledger. The feature does not replace existing email/calendar-create/update handlers. Availability defaults on in every deployment scope. The PostHog flag `mikka-personal-writes-off` is the incident kill switch (`lib/deployment-switches.ts`); the old `MIKKA_PERSONAL_WRITES_ENABLED` variable is no longer read. Request input cannot override it. Disabled calls return 503/approvedWritesDisabled before auth, application Pool or provider runtime loads. Availability grants no provider permission and does not expand existing frozen tool snapshots.
 
 ## Existing-schema compatibility
 

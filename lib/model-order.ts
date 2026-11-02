@@ -13,7 +13,7 @@ import {
 } from './model-order-plan'
 
 /**
- * 模型与订阅 › 允许使用的模型 and 运行位置 (decision 2026-11-02-1400), per
+ * 模型与订阅 › 优先使用的模型 and 运行位置 (decision 2026-11-02-1400), per
  * person and workspace: what dispatch reads (lib/model-dispatch.ts) and what
  * the page shows and edits. Candidates are only what the person actually
  * has here: each connected subscription's catalogue (the models its account
@@ -42,7 +42,7 @@ export interface OrderView {
   customized: boolean
   /** 优先使用的 Agent: where a model both Agents run goes by default. */
   preferredHarness: OrderHarness
-  /** Connected subscriptions and usable API keys here: none means 允许使用的模型 says to connect one (C8). */
+  /** Connected subscriptions and usable API keys here: none means 优先使用的模型 says to connect one (C8). */
   credentials: number
   entries: OrderRow[]
   candidates: (OrderCandidate & { provider: string; added: boolean })[]

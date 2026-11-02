@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import type { createMCPClient } from '@ai-sdk/mcp'
 import { createGitHubMcpRuntime, GITHUB_MCP_URL } from './mcp'
+import { runMcpCommand } from '@/lib/plugins/mcp'
 import { GitHubAccessError } from './user-access-error'
 import { scheduledReadTools } from '@/lib/coordinator/scheduled-read-tools'
 
@@ -88,4 +89,50 @@ test('a server that refuses the token is mcpUnavailable, with no call sent and n
   assert.deepEqual(listed, { error: 'mcpUnavailable' })
   assert.deepEqual(called, { error: 'mcpUnavailable' })
   assert.ok(!JSON.stringify([listed, called]).includes(OWN))
+})
+
+// The real MCP SDK against a local server: the logged fields tell a refused
+// token, a protocol mismatch and a network failure apart, with codes only.
+test('a refused, mismatched or unreachable server logs only codes that tell them apart', async () => {
+  const { createServer } = await import('node:http')
+  const server = createServer((request, response) => {
+    let body = ''
+    request.on('data', chunk => { body += chunk })
+    request.on('end', () => {
+      if (request.url === '/refuse') { response.writeHead(401, { 'content-type': 'text/plain' }); response.end(`unauthorized for ${request.headers.authorization}`); return }
+      const { id } = JSON.parse(body || '{}') as { id?: number }
+      response.writeHead(200, { 'content-type': 'application/json' })
+      response.end(JSON.stringify({ jsonrpc: '2.0', id, result: { protocolVersion: '1999-01-01', capabilities: { tools: {} }, serverInfo: { name: 'x', version: '0' } } }))
+    })
+  })
+  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
+  const port = (server.address() as { port: number }).port
+  const closed = createServer(); await new Promise<void>(resolve => closed.listen(0, '127.0.0.1', resolve))
+  const closedPort = (closed.address() as { port: number }).port; await new Promise(resolve => closed.close(resolve))
+  const plain = { transport: () => ({ fetch: globalThis.fetch, close: async () => {} }) }
+  const logged: string[] = []
+  const warn = console.warn
+  console.warn = (line: unknown) => { logged.push(String(line)) }
+  try {
+    for (const url of [`http://127.0.0.1:${port}/refuse`, `http://127.0.0.1:${port}/old`, `http://127.0.0.1:${closedPort}/`]) {
+      const result = await runMcpCommand(async () => ({ url, transport: 'http', headers: { Authorization: `Bearer ${OWN}` }, secrets: [OWN] }), {}, plain)
+      assert.deepEqual(result, { error: 'mcpUnavailable' })
+    }
+  } finally { console.warn = warn; await new Promise(resolve => server.close(resolve)) }
+  const [refused, mismatch, unreachable] = logged.map(line => JSON.parse(line))
+  assert.equal(refused.reason, 'http'); assert.equal(refused.status, 401); assert.equal(refused.stage, 'connect'); assert.equal(refused.chain[0].name, 'MCPClientError')
+  assert.equal(mismatch.reason, 'protocolVersion'); assert.equal(mismatch.protocolVersion, '1999-01-01'); assert.equal(mismatch.status, undefined)
+  assert.equal(unreachable.reason, 'unknown'); assert.equal(unreachable.status, undefined)
+  assert.ok(unreachable.chain.some((link: { code?: string }) => link.code === 'ECONNREFUSED'), JSON.stringify(unreachable.chain))
+  const text = logged.join('\n')
+  assert.ok(!text.includes(OWN) && !text.includes('unauthorized') && !text.includes('Bearer'))
+})
+
+test('a known code (not connected) is not logged as unavailable', async () => {
+  const { dependencies } = fixture()
+  const logged: string[] = []
+  const warn = console.warn
+  console.warn = (line: unknown) => { logged.push(String(line)) }
+  try { assert.deepEqual(await createGitHubMcpRuntime(tokens([]), dependencies)('stranger', {}), { error: 'githubNotConnected' }) } finally { console.warn = warn }
+  assert.deepEqual(logged, [])
 })

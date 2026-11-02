@@ -2556,7 +2556,7 @@
       "e2bKeyMissing": "未填",
       "e2bKeyFill": "填入",
       "e2bKeyReplace": "更换",
-      "agentSection": "线程 Agent",
+      "agentSection": "Agent",
       "preferredAgent": "优先使用的 Agent",
       "preferredAgentHint": "两种 Agent 都能跑的模型先用它",
       "preferredMark": "优先",

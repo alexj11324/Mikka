@@ -30,7 +30,7 @@ export const hostedApiKeySnapshotSchema = z.strictObject({
     subscription: z.enum(['claude', 'codex']), plan: z.string().max(60).nullable(),
     keyProvider: z.string().min(1).max(20), keyName: z.string().max(60).nullable(),
   }).optional(),
-  /** 点数不足时改用: Mikka 默认 had no points here, so this turn runs on the next model in 允许使用的模型. Also on a subscription snapshot. */
+  /** 点数不足时改用: Mikka 默认 had no points here, so this turn runs on the next model in 优先使用的模型. Also on a subscription snapshot. */
   afterPoints: z.literal(true).optional(),
 })
 export type HostedApiKeySnapshot = z.infer<typeof hostedApiKeySnapshotSchema>

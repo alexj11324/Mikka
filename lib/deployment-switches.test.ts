@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { beforeEach, test } from 'node:test'
-import { DEPLOYMENT_DISTINCT_ID, DEPLOYMENT_SWITCHES, deploymentSwitch, refreshDeploymentSwitches, resetDeploymentSwitches, deploymentName, SWITCH_REFRESH_MS, switchForPerson, type Switch } from './deployment-switches'
+import { execFileSync } from 'node:child_process'
+import { DEPLOYMENT_DISTINCT_ID, DEPLOYMENT_SWITCHES, deploymentSwitch, overrideDeploymentSwitch, refreshDeploymentSwitches, resetDeploymentSwitches, deploymentName, SWITCH_REFRESH_MS, switchForPerson, type Switch } from './deployment-switches'
 
 const posthog = (flags: Record<string, unknown>, extra: Record<string, unknown> = {}) => {
   const requests: unknown[] = []
@@ -12,11 +13,13 @@ const posthog = (flags: Record<string, unknown>, extra: Record<string, unknown> 
 }
 const flag = (enabled: boolean) => ({ enabled, variant: null })
 
-beforeEach(() => resetDeploymentSwitches())
+beforeEach(() => {
+  resetDeploymentSwitches()
+  for (const name of Object.keys(DEPLOYMENT_SWITCHES) as (keyof typeof DEPLOYMENT_SWITCHES)[]) overrideDeploymentSwitch(name, undefined)
+})
 
 test('without PostHog a switch reads the old variable, then its default', () => {
   assert.equal(deploymentSwitch('issueTools', {}), true, 'shipped on')
-  assert.equal(deploymentSwitch('issueTools', { MIKKA_ISSUE_TOOLS_ENABLED: '0' }), false)
   assert.equal(deploymentSwitch('factoryRouting', {}), false, 'ships off')
   assert.equal(deploymentSwitch('factoryRouting', { MIKKA_FACTORY_ROUTING_ENABLED: '1' }), true)
   assert.equal(deploymentSwitch('cloudComputerTasks', { MIKKA_CLOUD_COMPUTER_TASKS: '0' }), false)
@@ -24,6 +27,38 @@ test('without PostHog a switch reads the old variable, then its default', () => 
   assert.equal(deploymentSwitch('proactiveProfile', { PROACTIVE_PROFILE_ENABLED: 'TRUE' }), true)
   assert.equal(deploymentSwitch('credentialVault', {}), true)
   assert.equal(deploymentSwitch('factoryVercelPublication', { FACTORY_VERCEL_PUBLICATION: '1' }), true)
+})
+
+test('a switch whose flag exists decides by PostHog and its default only; its old variable is gone', () => {
+  for (const [name, variable] of [['issueTools', 'MIKKA_ISSUE_TOOLS_ENABLED'], ['personalMailbox', 'MIKKA_PERSONAL_MAILBOX_ENABLED'], ['personalWrites', 'MIKKA_PERSONAL_WRITES_ENABLED']] as const) {
+    assert.equal('legacy' in DEPLOYMENT_SWITCHES[name], false, name)
+    for (const value of ['0', '1', 'false', '']) assert.equal(deploymentSwitch(name, { [variable]: value }), true, `${variable}=${value}`)
+  }
+  // On in production but off by default: keeps its variable so a fresh process does not turn it off.
+  assert.equal(deploymentSwitch('byosEnrollment', {}), false)
+  assert.equal(deploymentSwitch('byosEnrollment', { MIKKA_BYOS_ENROLLMENT_ENABLED: '1' }), true)
+})
+
+test('a test override wins over PostHog and the variable, and clears', async () => {
+  await refreshDeploymentSwitches('phc_test', posthog({ 'mikka-issue-tools-off': flag(false), 'mikka-byos-enrollment': flag(true) }).fetcher)
+  overrideDeploymentSwitch('issueTools', false)
+  overrideDeploymentSwitch('byosEnrollment', false)
+  assert.equal(deploymentSwitch('issueTools', {}), false)
+  assert.equal(deploymentSwitch('byosEnrollment', { MIKKA_BYOS_ENROLLMENT_ENABLED: '1' }), false)
+  overrideDeploymentSwitch('issueTools', undefined)
+  overrideDeploymentSwitch('byosEnrollment', undefined)
+  assert.equal(deploymentSwitch('issueTools', {}), true)
+  assert.equal(deploymentSwitch('byosEnrollment', {}), true)
+})
+
+test('the test override is unreachable in production: it throws in a deployment or a production build, and only test code imports it', () => {
+  for (const env of [{ VERCEL: '1' }, { VERCEL_ENV: 'production' }, { VERCEL_ENV: 'preview' }, { NODE_ENV: 'production' }]) {
+    assert.throws(() => overrideDeploymentSwitch('issueTools', false, env), /tests only/, JSON.stringify(env))
+  }
+  assert.equal(deploymentSwitch('issueTools', {}), true, 'a refused override sets nothing')
+  const files = execFileSync('git', ['grep', '-l', 'overrideDeploymentSwitch', '--', '.', ':!docs'], { encoding: 'utf8' }).trim().split('\n')
+  const productionFiles = files.filter(file => file !== 'lib/deployment-switches.ts' && !/(\.test|\.db)\.(ts|mts|mjs)$/.test(file) && !file.startsWith('tests/'))
+  assert.deepEqual(productionFiles, [])
 })
 
 test('PostHog decides once it answers: a kill flag turns a shipped feature off, a gate flag turns one on', async () => {
@@ -41,7 +76,9 @@ test('PostHog decides once it answers: a kill flag turns a shipped feature off, 
 test('a kill flag created inactive never turns a shipped feature off', async () => {
   await refreshDeploymentSwitches('phc_test', posthog({ 'mikka-personal-mailbox-off': flag(false) }).fetcher)
   assert.equal(deploymentSwitch('personalMailbox', {}), true)
-  assert.equal(deploymentSwitch('personalMailbox', { MIKKA_PERSONAL_MAILBOX_ENABLED: '0' }), true, 'PostHog answered; the old variable no longer decides')
+  assert.equal(deploymentSwitch('cloudComputerTasks', { MIKKA_CLOUD_COMPUTER_TASKS: '0' }), false, 'no flag answer: the old variable still decides')
+  await refreshDeploymentSwitches('phc_test', posthog({ 'mikka-cloud-computer-tasks-off': flag(false) }).fetcher)
+  assert.equal(deploymentSwitch('cloudComputerTasks', { MIKKA_CLOUD_COMPUTER_TASKS: '0' }), true, 'PostHog answered; the old variable no longer decides')
 })
 
 test('an outage, a partial evaluation or a multivariate flag keeps what was known', async () => {
@@ -62,6 +99,7 @@ test('every kill flag ends in -off and ships on; every gate ships off', () => {
   for (const [name, entry] of Object.entries(DEPLOYMENT_SWITCHES)) {
     assert.equal(entry.flag.endsWith('-off'), entry.kind === 'kill', name)
     assert.equal(entry.fallback, entry.kind === 'kill', name)
+    if (!('legacy' in entry)) assert.equal(entry.kind, 'kill', `${name}: a gate without its variable would turn off in every fresh process`)
     assert.match(entry.flag, /^mikka-[a-z0-9-]+$/, name)
   }
 })

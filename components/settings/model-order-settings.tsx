@@ -36,9 +36,8 @@ const sourceKey = (item: Pick<OrderCandidate, 'harness' | 'model' | 'source'>) =
   `${item.harness}:${item.model}:${item.source.kind === 'subscription' ? item.source.connectionId : item.source.keyId}`
 
 /**
- * 模型与订阅 › 线程运行位置 and 线程默认模型 (decision 2026-11-02-1400).
- * Without an explicit thread model, new runs take the first model here that
- * can run now, on a computer that takes part in
+ * 模型与订阅 › 运行位置 and 优先使用的模型 (decision 2026-11-02-1400). New runs take
+ * the first model here that can run now, on a computer that takes part in
  * scheduling (本地) or the person's own E2B machine (云端). Drag a row, use
  * its handle with Space and the arrow keys, or its menu (移到最前, 上移, 下移)
  * to reorder; each change saves at once. A refused reorder puts the list back
@@ -151,7 +150,8 @@ export function ModelOrderSettings({ workspaceId }: { workspaceId: string }) {
         </span>
       </SettingRow>}
     </SettingsSection>
-    {/* CC PR #1053: Agent preference and the task's preferred models share one card. */}
+    {/* What a task dispatched to an Agent runs on (Alex, 2026-11-02): the preferred Agent and the models in
+        order, one card. Bot chats pick their own model; this is a preference order, not a permission. */}
     <SettingsSection id="model-order-heading" title={t('title')} description={t('description')}
       action={data.entries.length > 0 && <Button type="button" {...settingsSectionAction} disabled={pending} onClick={() => setAdding(true)}>{t('add')}</Button>}>
       <SettingRow title={t('preferredAgent')} description={t('preferredAgentHint')}>
@@ -240,6 +240,7 @@ function OrderItem({ row, index, last, pending, preferred, locationState, repair
       </span>
       <span className="truncate text-xs text-muted-foreground">{`${sourceName(t, row)} · ${agentsLine(t, row.agents)}`}</span>
     </span>
+    {/* The row's controls: beside the model where they fit, on their own line on a phone, so the name is never cut to a letter. */}
     <span className="ml-auto flex shrink-0 items-center gap-3">
     {/* A model both Agents run: its Agent here, 优先 marking the preferred one (Harness draft). */}
     {row.agents.length > 1 && <DropdownMenu>
