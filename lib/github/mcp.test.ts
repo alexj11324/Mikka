@@ -89,3 +89,30 @@ test('a server that refuses the token is mcpUnavailable, with no call sent and n
   assert.deepEqual(called, { error: 'mcpUnavailable' })
   assert.ok(!JSON.stringify([listed, called]).includes(OWN))
 })
+
+test('a refused or unreachable server logs only codes: stage, host, HTTP status, error class and network code', async () => {
+  const { dependencies } = fixture()
+  const logged: string[] = []
+  const warn = console.warn
+  console.warn = (line: unknown) => { logged.push(String(line)) }
+  try {
+    const refused = { ...dependencies, connect: (async () => { throw Object.assign(new Error(`MCP HTTP Transport Error: POSTing to endpoint (HTTP 401): unauthorized for Bearer ${OWN}`), { name: 'MCPClientError' }) }) as unknown as typeof createMCPClient }
+    assert.deepEqual(await createGitHubMcpRuntime(tokens([]), refused)('owner', {}), { error: 'mcpUnavailable' })
+    const reset = { ...dependencies, connect: (async () => { throw Object.assign(new TypeError('fetch failed'), { cause: Object.assign(new Error(`read ECONNRESET ${OWN}`), { code: 'ECONNRESET' }) }) }) as unknown as typeof createMCPClient }
+    assert.deepEqual(await createGitHubMcpRuntime(tokens([]), reset)('owner', { name: 'issue_read', arguments: {} }), { error: 'mcpUnavailable' })
+  } finally { console.warn = warn }
+  assert.deepEqual(logged.map(line => JSON.parse(line)), [
+    { event: 'mcp_unavailable', stage: 'connect', host: 'api.githubcopilot.com', status: 401, errorName: 'MCPClientError' },
+    { event: 'mcp_unavailable', stage: 'connect', host: 'api.githubcopilot.com', errorName: 'TypeError', errorCode: 'ECONNRESET' },
+  ])
+  assert.ok(!logged.join('').includes(OWN) && !logged.join('').includes('unauthorized') && !logged.join('').includes('fetch failed'))
+})
+
+test('a known code (not connected) is not logged as unavailable', async () => {
+  const { dependencies } = fixture()
+  const logged: string[] = []
+  const warn = console.warn
+  console.warn = (line: unknown) => { logged.push(String(line)) }
+  try { assert.deepEqual(await createGitHubMcpRuntime(tokens([]), dependencies)('stranger', {}), { error: 'githubNotConnected' }) } finally { console.warn = warn }
+  assert.deepEqual(logged, [])
+})
