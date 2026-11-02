@@ -26,7 +26,10 @@ func (w *Worker) Stream(ctx context.Context, epoch int64, model string, payload 
 	execCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	result, err := w.Executor.ExecuteStream(execCtx, a, exec.Request{Model: model, Payload: payload, Format: translator.FormatOpenAI}, exec.Options{Stream: true, SourceFormat: translator.FormatOpenAI, ResponseFormat: translator.FormatOpenAI})
-	if err != nil || result == nil || result.Chunks == nil {
+	if err != nil {
+		return executionFailure(err)
+	}
+	if result == nil || result.Chunks == nil {
 		return ErrProvider
 	}
 	ticker := time.NewTicker(time.Second)
@@ -43,7 +46,10 @@ func (w *Worker) Stream(ctx context.Context, epoch int64, model string, payload 
 			if !ok {
 				return nil
 			}
-			if chunk.Err != nil || len(chunk.Payload) > 65536 {
+			if chunk.Err != nil {
+				return executionFailure(chunk.Err)
+			}
+			if len(chunk.Payload) > 65536 {
 				return ErrProvider
 			}
 			if _, err = w.activeRuntime(ctx, r.Epoch, model); err != nil {

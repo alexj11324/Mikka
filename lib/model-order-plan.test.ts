@@ -18,9 +18,16 @@ const first = sub('1', 'claude_code', 'reported-claude-top')
 const second = sub('2', 'codex', 'reported-codex-a')
 const keyed = key('3', 'claude_code', 'key-model')
 
-test('the first allowed model that can run takes the run; the slot its CLI reported is what runs', () => {
+test('an allowance check that failed keeps the subscription preference and does not silently charge a key', () => {
+  const plan = planDispatch({ entries: [first, keyed], location: 'local', devices: [device('mac')], credential: entry => entry.id === first.id ? { usable: false, reason: 'checking' } : usable(), cloudReady: false })
+  assert.equal(plan.kind, 'none')
+  assert.equal(plan.kind === 'none' && plan.reason, 'checking')
+  assert.deepEqual(plan.skipped.map(item => item.block.reason), ['checking'])
+})
+
+test('the first allowed model that can run takes the run; the full provider model is what runs despite a CLI slot', () => {
   const plan = planDispatch({ entries: [first, second], location: 'local', devices: [device('mac')], credential: usable, cloudReady: false })
-  assert.deepEqual([plan.kind, plan.kind === 'device' && plan.entry.id, plan.kind === 'device' && plan.model], ['device', '1', 'top'])
+  assert.deepEqual([plan.kind, plan.kind === 'device' && plan.entry.id, plan.kind === 'device' && plan.model], ['device', '1', 'reported-claude-top'])
 })
 
 test('ordered fallback: quota used up, signed out, or no device moves to the next model, and says why each was skipped', () => {
@@ -54,7 +61,7 @@ test('a subscription model runs on any computer whose Agent takes subscription r
   const silent = device('mac', { harnesses: [{ harness: 'claude_code', installed: true, subscriptionBroker: true }] })
   const opus = sub('9', 'claude_code', 'account-opus')
   assert.equal(deviceModel(silent, opus), 'account-opus', 'the subscription\'s model id is what runs')
-  assert.equal(deviceModel(device('mac'), first), 'top', 'a reported slot for it is still used')
+  assert.equal(deviceModel(device('mac'), first), 'reported-claude-top', 'a reported slot cannot replace the provider model identity')
   const plan = planDispatch({ entries: [opus], location: 'local', devices: [silent], credential: usable, cloudReady: false })
   assert.deepEqual([plan.kind, plan.kind === 'device' && plan.model], ['device', 'account-opus'])
   // The claim is refused without a subscription broker, so that computer cannot take it; an API key model still can.

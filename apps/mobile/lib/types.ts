@@ -1,4 +1,5 @@
 /** The shapes app/api/mobile/* and /api/suggestions return (see those routes on the server). */
+import type { SubscriptionRefusalNotice } from '../../../lib/subscription-refusal'
 export type Source = 'gmail' | 'github' | 'slack' | 'notion' | 'linear' | 'googlecalendar'
 export type MachineKind = 'cloud' | 'laptop' | 'server'
 export type ThreadStatus = 'running' | 'waiting' | 'paused' | 'failed' | 'done' | 'stopped'
@@ -24,7 +25,7 @@ export interface RunSource {
   group?: ThreadGroup
   issue: { id: string; identifier: string | null; number: number | null; title: string } | null
   /** 运行信息, on the person's own runs. */
-  info?: import('@/lib/run-info').RunInfo
+  info?: import('./run-info').RunInfo
 }
 export type CitationSource = IssueSource | RunSource
 
@@ -55,6 +56,8 @@ export interface EventLine {
 }
 
 export interface Chat {
+  /** The resolved chat row, including a workspace's Coordinator. Sends freeze this when known. */
+  botId?: string
   enabled: boolean
   working: boolean
   error: string | null
@@ -70,7 +73,7 @@ export interface Chat {
 /** lib/chat-failure.ts on the server. */
 export type ChatFailure =
   | { kind: 'hosted'; code: string }
-  | { kind: 'subscription'; notice: 'unavailable' | 'reconnect' | 'quotaUsed' | 'retry' }
+  | { kind: 'subscription'; notice: SubscriptionRefusalNotice }
   | { kind: 'wake'; code: 'wake_failed' | 'wake_start_unconfirmed' | 'wake_exhausted' }
   | { kind: 'failed' }
 

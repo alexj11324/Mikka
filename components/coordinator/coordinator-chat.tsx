@@ -206,7 +206,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   // The raw step error (workflow ids, retries, socket codes) is for the logs, never the chat: 回复失败 and 重试 (review C4).
   const failureNotice = <>
     {refusal && <HostedRefusalNotice code={refusal} botId={botId} retry={retry} onQueued={mutate} />}
-    {declined && declined !== 'quotaUsed' && <SubscriptionRefusalNotice notice={declined} retry={retry} />}
+    {declined && declined !== 'quotaUsed' && <SubscriptionRefusalNotice notice={declined} retry={retry} botId={botId} />}
     {data?.error && !data.working && !refusal && !declined && <Alert variant="destructive">{wakeError ? <AlertTitle>{t(`wakeErrors.${wakeError}`)}</AlertTitle> : <><AlertTitle data-chat-failure="failed">{t('failedTitle')}</AlertTitle><AlertAction>{retry}</AlertAction></>}</Alert>}
   </>
   const sentCount = useMemo(() => items.filter(item => item.from === 'person').length, [items])
@@ -397,7 +397,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
       <PendingActions />
       <ChatComposer ref={inputRef} label={bot ? t('inputTo', { name: bot.name }) : t('input')} placeholder={placeholder} value={draft} onChange={updateDraft} sending={sending || stopping} editableWhileSending={stopping} onSubmit={() => { void send() }}
         running={working && !stopping} onStop={(working || sending) && !stopping ? () => { void stop() } : undefined}
-        model={<BotModelPicker botId={botId ?? null} />}
+        model={<BotModelPicker botId={botId ?? null} running={working || sending} />}
         quote={embedded?.quote || noteCount ? <div className="flex w-full min-w-0 flex-col items-start gap-0.5">
           {embedded?.quote && <ArtifactQuoteChip quote={embedded.quote} onRemove={embedded.clearQuote} />}
           {browser?.notes.map(note => <BrowserNoteChip key={note.n} note={note} onRemove={() => browser.remove(note.n)} />)}

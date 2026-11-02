@@ -203,7 +203,7 @@ function localInstaller(flavor: 'prod' | 'dev', status = '{"server":"online","de
     calls.push({ command, args, input })
     if (args.at(-1)?.startsWith('mikka daemon status')) return status
     return ''
-  }, '/home/nobody', undefined, undefined, flavor, { command: '/bin/zsh', args: script => ['-lc', script] })
+  }, '/home/nobody', undefined, undefined, flavor, { command: '/bin/zsh', args: script => ['-lc', script] }, async () => true)
   return { installer, events, calls, done, minted: () => minted }
 }
 
@@ -263,6 +263,42 @@ test('automatic repair restarts a daemon that is already set up, without install
   assert.equal(t.minted(), 0)
 })
 
+test('automatic repair never reports another account\'s recovered daemon as this person\'s device', async () => {
+  const events: SshInstallState[] = []
+  let deviceId = 'device-a', minted = 0
+  let finish!: () => void
+  const done = new Promise<void>(resolve => { finish = resolve })
+  const installer = new SshInstaller('https://example.com/mikka', async () => { minted++; return 'private-token-b' }, state => {
+    events.push(state)
+    if (state.status === 'online' || state.status === 'failed') finish()
+  }, async (_command, args) => {
+    const script = args[1]
+    if (script.startsWith('mikka daemon login')) deviceId = 'device-b'
+    if (script.startsWith('mikka daemon status')) return JSON.stringify({ server: 'online', deviceId })
+    return ''
+  }, '/home/nobody', undefined, undefined, 'prod', { command: '/bin/zsh', args: script => ['-lc', script] }, async (id: string) => id === 'device-b')
+  await installer.repairLocal()
+  await done
+  assert.equal(installer.state()?.deviceId, 'device-b')
+  assert.equal(minted, 1)
+  assert.ok(events.every(state => state.status !== 'online' || state.deviceId === 'device-b'))
+})
+
+test('an unconfirmed account fails repair without registering again or reporting online', async () => {
+  let minted = 0
+  let finish!: () => void
+  const done = new Promise<void>(resolve => { finish = resolve })
+  const installer = new SshInstaller('https://example.com/mikka', async () => { minted++; return 'private-token' }, state => {
+    if (state.status === 'online' || state.status === 'failed') finish()
+  }, async (_command, args) => args[1].startsWith('mikka daemon status') ? '{"server":"online","deviceId":"device-a"}' : '',
+  '/home/nobody', undefined, undefined, 'prod', { command: '/bin/sh', args: script => ['-lc', script] }, async () => { throw new Error('session changed or unavailable') })
+  await installer.repairLocal('owner-a')
+  await done
+  assert.equal(installer.state()?.status, 'failed')
+  assert.equal(installer.state()?.reason, 'Device account could not be confirmed')
+  assert.equal(minted, 0)
+})
+
 test('automatic repair installs and signs in when the restart fails (first launch)', async () => {
   const events: SshInstallState[] = []
   const scripts: string[] = []
@@ -277,7 +313,7 @@ test('automatic repair installs and signs in when the restart fails (first launc
     if (args[1].startsWith('mikka daemon service install') && !restartFailed) { restartFailed = true; throw new Error('zsh: command not found: mikka') }
     if (args[1].startsWith('mikka daemon status')) return '{"server":"online","deviceId":"this-mac"}'
     return ''
-  }, '/home/nobody', undefined, undefined, 'prod', { command: '/bin/zsh', args: script => ['-lc', script] })
+  }, '/home/nobody', undefined, undefined, 'prod', { command: '/bin/zsh', args: script => ['-lc', script] }, async () => true)
   await installer.repairLocal()
   await done
   assert.equal(installer.state()?.status, 'online')
@@ -296,7 +332,7 @@ test('a failed automatic install keeps the reason and 重试 installs again', as
     if (args[1] === 'npm install --global @aspectlylabs/mikka' && attempt++ === 0) throw new Error('npm ERR! code EACCES')
     if (args[1].startsWith('mikka daemon status')) return '{"server":"online","deviceId":"this-mac"}'
     return ''
-  }, '/home/nobody', undefined, undefined, 'prod', { command: '/bin/zsh', args: script => ['-lc', script] })
+  }, '/home/nobody', undefined, undefined, 'prod', { command: '/bin/zsh', args: script => ['-lc', script] }, async () => true)
   await installer.beginLocal()
   const failed = await settled
   assert.equal(failed.status, 'failed')

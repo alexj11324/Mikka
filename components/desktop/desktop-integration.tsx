@@ -27,7 +27,7 @@ function appHref(href: string): string | null {
  * system notification (app/actions/desktop-notifications.ts); clicking one
  * opens that thread beside its task. Web renders nothing.
  */
-export function DesktopIntegration() {
+export function DesktopIntegration({ userId }: { userId: string }) {
   const platform = usePlatform()
   const desktop = platform.runtime === 'desktop'
   const router = useRouter()
@@ -75,7 +75,7 @@ export function DesktopIntegration() {
   }, [desktop, router])
 
   // Installing the app makes this computer a device (Alex, 2026-11-02): once per
-  // launch, when it is not yet one of mine and online, main installs or restarts
+  // signed-in account, when it is not yet one of mine and online, main installs or restarts
   // its daemon in the background. Progress shows on 设置 › 设备.
   useEffect(() => {
     if (!desktop) return
@@ -89,7 +89,7 @@ export function DesktopIntegration() {
       })
       .catch(() => {})
     return () => { live = false }
-  }, [desktop])
+  }, [desktop, userId])
 
   return null
 }

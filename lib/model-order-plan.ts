@@ -32,7 +32,7 @@ export interface OrderEntry {
 /** Why a credential cannot run now; `resetsAt` when it comes back on its own. */
 export type CredentialState =
   | { usable: true }
-  | { usable: false; reason: 'quota' | 'expired' | 'paused' | 'missing' | 'keyRefused'; resetsAt?: string | null }
+  | { usable: false; reason: 'checking' | 'quota' | 'expired' | 'paused' | 'missing' | 'keyRefused'; resetsAt?: string | null }
 
 export interface PoolDevice {
   id: string
@@ -67,11 +67,10 @@ export interface SkippedEntry { entry: OrderEntry; block: EntryBlock }
  * that takes part can run any allowed model; unavailable: every allowed
  * model's credential is out of quota, paused or signed out.
  */
-export type NothingReason = 'noModels' | 'cloudNotConfigured' | 'noDevice' | 'unavailable'
+export type NothingReason = 'noModels' | 'cloudNotConfigured' | 'noDevice' | 'checking' | 'unavailable'
 
 /**
- * The model a device runs for an entry: the slot its CLI reported for it, or
- * the model itself. Null when the device cannot run the entry: 参与调度 off,
+ * The provider model a device runs for an entry. Null when the device cannot run the entry: 参与调度 off,
  * offline, the Agent not installed, or (for a subscription model) the daemon
  * cannot take a subscription run (no `subscriptionBroker`: the claim is
  * refused without it). A subscription's model is what its account offers, so
@@ -80,7 +79,7 @@ export type NothingReason = 'noModels' | 'cloudNotConfigured' | 'noDevice' | 'un
  * key is handed to the run.
  */
 export function deviceModel(device: PoolDevice, entry: OrderEntry): string | null {
-  return deviceStage(device, entry) === 'ready' ? runModel(device, entry) : null
+  return deviceStage(device, entry) === 'ready' ? entry.model : null
 }
 
 type DeviceStage = 'off' | 'offline' | 'notInstalled' | 'needsUpdate' | 'ready'
@@ -93,12 +92,6 @@ function deviceStage(device: PoolDevice, entry: OrderEntry): DeviceStage {
   if (!info) return 'notInstalled'
   if (entry.source.kind === 'subscription' && !info.subscriptionBroker) return 'needsUpdate'
   return 'ready'
-}
-
-function runModel(device: PoolDevice, entry: OrderEntry): string {
-  if (entry.source.kind === 'api_key') return entry.model
-  const info = device.harnesses.find(item => item.harness === entry.harness && item.installed)
-  return info?.modelSlots?.find(item => item.slot === entry.model || item.model === entry.model)?.slot ?? entry.model
 }
 
 /**
@@ -149,7 +142,13 @@ export function planDispatch(input: {
   }
   for (const entry of entries) {
     const credential = input.credential(entry)
-    if (!credential.usable) { skipped.push({ entry, block: credential }); continue }
+    if (!credential.usable) {
+      skipped.push({ entry, block: credential })
+      // A failed allowance check is not evidence that a subscription is spent.
+      // Keep the person's preference instead of silently charging a later key.
+      if (credential.reason === 'checking') return { kind: 'none', reason: 'checking', skipped }
+      continue
+    }
     if (input.location === 'cloud') return { kind: 'cloud', entry, model: entry.model, skipped }
     const eligible = input.devices.flatMap(device => {
       const model = deviceModel(device, entry)

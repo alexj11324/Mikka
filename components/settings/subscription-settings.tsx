@@ -53,8 +53,9 @@ async function post(body: unknown, signal?: AbortSignal) {
  * next one (decision 2026-11-02-1200).
  */
 /** `heading` replaces the section title where the rows appear outside Settings (the first-run guide's 绑定订阅). */
-export function SubscriptionSettings({ workspaceId, heading }: { workspaceId: string; heading?: string }) {
+export function SubscriptionSettings({ workspaceId, workspaceName, heading }: { workspaceId: string; workspaceName?: string; heading?: string }) {
   const t = useTranslations('Settings.subscriptions')
+  const scopeT = useTranslations('Settings.modelScope')
   // Cached per workspace: a return to the page shows the last list at once and re-reads it behind.
   const list = useSWR(subscriptionsKey(workspaceId), () => readSubscriptions(workspaceId), { revalidateOnFocus: false })
   const state = list.data ?? null
@@ -244,10 +245,10 @@ export function SubscriptionSettings({ workspaceId, heading }: { workspaceId: st
                 const account = read?.account ?? connection.account ?? null
                 const plan = read?.plan ? planName(read.plan) : null
                 const product = plan ? t(provider === 'codex' ? 'codexPlan' : 'claudePlan', { plan }) : t(provider === 'codex' ? 'codexProduct' : 'claudeProduct')
-                const bots = connection.bots ?? []
+                const bots = connection.bots?.filter(bot => bot.workspaceId === workspaceId) ?? []
                 const signingIn = starting?.id === connection.id || attempt?.connectionId === connection.id
                 const canReconnect = available && !pending && !attempt
-                return <div key={connection.id} className="flex flex-col gap-3 px-5 py-4">
+                return <div key={connection.id} id={`subscription-${connection.id}`} tabIndex={-1} className="flex scroll-mt-6 flex-col gap-3 px-5 py-4">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div className={cn('flex min-w-0 items-center gap-3 transition-opacity duration-150', paused && 'opacity-50')}>
                       <Logo className={cn('size-5 shrink-0 text-foreground', provider === 'claude' && 'text-brand-claude')} />
@@ -286,7 +287,7 @@ export function SubscriptionSettings({ workspaceId, heading }: { workspaceId: st
                       ? <span className="flex items-center gap-2 text-xs text-muted-foreground">{t('quotaUnavailable')}<Button type="button" variant="secondary" size="xs" disabled={usageLoading} onClick={reloadUsage}>{t('retry')}</Button></span>
                       : read && read.windows.length > 0 && <QuotaMeters windows={read.windows} now={now} />}
                     {bots.length > 0 && <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                      {t('usedBy')}
+                      {t('selectedBy', { workspace: workspaceName ?? scopeT('currentWorkspace') })}
                       {bots.map(bot => <span key={bot.id} className="flex items-center gap-1 text-foreground"><BotAvatar color={bot.color} shape={bot.shape} size="row" label={bot.name} />{bot.name}</span>)}
                     </span>}
                   </div>}

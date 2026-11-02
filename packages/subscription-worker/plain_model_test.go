@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -52,8 +53,8 @@ func TestPlainModelUpstreamRefusalIsLoggedByStatusAndTypeOnly(t *testing.T) {
 	request := ex.Request{Model: "claude-haiku-5-5", Payload: []byte(`{"model":"claude-haiku-5-5","stream":true,"messages":[{"role":"user","content":"hi"}]}`)}
 	var err error
 	logged := captureStderr(t, func() { _, err = model.ExecuteStream(context.Background(), auth, request, ex.Options{}) })
-	if !errors.Is(err, ErrProvider) {
-		t.Fatalf("want ErrProvider, got %v", err)
+	if !errors.Is(err, ErrRequestRejected) {
+		t.Fatalf("want ErrRequestRejected, got %v", err)
 	}
 	if logged != "subscription_upstream_failure claude response 400 invalid_request_error\n" {
 		t.Fatalf("unexpected stderr line %q", logged)
@@ -65,10 +66,49 @@ func TestPlainModelUpstreamRefusalIsLoggedByStatusAndTypeOnly(t *testing.T) {
 	}
 }
 
+func TestPlainModelProviderStatusKeepsOnlyActionableRefusal(t *testing.T) {
+	for _, test := range []struct {
+		status int
+		want   string
+	}{
+		{401, "reconnect_required"}, {403, "provider_access_denied"}, {429, "subscription_rate_limited"},
+		{400, "provider_request_rejected"}, {404, "provider_request_rejected"}, {503, "provider_temporarily_unavailable"},
+	} {
+		t.Run(fmt.Sprint(test.status), func(t *testing.T) {
+			model := CPAPlainModel{Provider: "claude", Client: &http.Client{Transport: fixedTransport{status: test.status, contentType: "application/json", body: `{"error":{"message":"fixture-private-provider-text","type":"fixture_secret"}}`}}}
+			_, err := model.ExecuteStream(context.Background(), &core.Auth{Metadata: map[string]any{"access_token": "fixture-private-token"}}, ex.Request{Model: "fixture-model", Payload: []byte(`{"messages":[{"role":"user","content":"hi"}]}`)}, ex.Options{})
+			if err == nil || err.Error() != test.want {
+				t.Fatalf("got %v, want %s", err, test.want)
+			}
+		})
+	}
+}
+
+func TestPlainModelProviderStreamErrorKeepsOnlyKnownTypes(t *testing.T) {
+	for _, test := range []struct{ kind, want string }{
+		{"authentication_error", "reconnect_required"}, {"permission_error", "provider_access_denied"},
+		{"rate_limit_error", "subscription_rate_limited"}, {"overloaded_error", "provider_temporarily_unavailable"},
+		{"fixture_private_token", "provider_operation_failed"},
+	} {
+		t.Run(test.kind, func(t *testing.T) {
+			model := CPAPlainModel{Provider: "claude", Client: &http.Client{Transport: fixedTransport{status: 200, contentType: "text/event-stream", body: fmt.Sprintf("data: {\"type\":\"error\",\"error\":{\"type\":%q,\"message\":\"fixture-private-provider-text\"}}\n\n", test.kind)}}}
+			result, err := model.ExecuteStream(context.Background(), &core.Auth{Metadata: map[string]any{"access_token": "fixture-private-token"}}, ex.Request{Model: "fixture-model", Payload: []byte(`{"messages":[{"role":"user","content":"hi"}]}`)}, ex.Options{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			chunk := <-result.Chunks
+			if chunk.Err == nil || chunk.Err.Error() != test.want {
+				t.Fatalf("got %v, want %s", chunk.Err, test.want)
+			}
+		})
+	}
+}
+
 func TestUpstreamErrorTypeKeepsOnlyTheEnum(t *testing.T) {
 	for body, want := range map[string]string{
-		`{"type":"error","error":{"type":"authentication_error","message":"x"}}`: "authentication_error",
-		`{"error":{"code":"rate_limit_exceeded"}}`:                               "rate_limit_exceeded",
+		`{"type":"error","error":{"type":"authentication_error","message":"x"}}`:                             "authentication_error",
+		`{"error":{"code":"rate_limit_exceeded"}}`:                                                           "rate_limit_exceeded",
+		`{"type":"response.failed","response":{"error":{"code":"rate_limit_exceeded","message":"private"}}}`: "rate_limit_exceeded",
 		`not json`: "unparsed",
 		`{}`:       "unknown",
 	} {
@@ -79,6 +119,10 @@ func TestUpstreamErrorTypeKeepsOnlyTheEnum(t *testing.T) {
 	logged := captureStderr(t, func() { upstreamFailure("claude", "response", 403, "Has Spaces And A Message") })
 	if logged != "subscription_upstream_failure claude response 403 unknown\n" {
 		t.Fatalf("an unexpected type must not pass through: %q", logged)
+	}
+	logged = captureStderr(t, func() { upstreamFailure("claude", "event", 200, "fixture_private_token") })
+	if strings.Contains(logged, "fixture_private_token") {
+		t.Fatal("an enum-shaped unknown provider value reached logs")
 	}
 }
 

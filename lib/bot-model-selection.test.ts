@@ -33,7 +33,7 @@ mock.module(new URL('./execution-settings.ts', import.meta.url).href, { namedExp
   },
 } })
 let keyChoice: { keyId: string; model: string; harness: string } | undefined
-let usableKeys: { id: string; provider: string; baseUrl: string | null; protocol: string }[] = []
+let usableKeys: { id: string; provider: string; baseUrl: string | null; protocol: string; models: string[] }[] = []
 const chatModels: unknown[] = []
 mock.module(new URL('./model-api-keys.ts', import.meta.url).href, { namedExports: {
   botApiKeyChoice: async () => keyChoice,
@@ -79,7 +79,7 @@ beforeEach(() => {
 test('A bot saved on an API key model freezes that key and resolves through it; an unusable key falls back', async () => {
   const botScope = { ...scope, botId: id(1) }
   keyChoice = { keyId: id(9), model: 'deepseek-chat', harness: 'claude_code' }
-  usableKeys = [{ id: id(9), provider: 'deepseek', baseUrl: null, protocol: 'anthropic' }]
+  usableKeys = [{ id: id(9), provider: 'deepseek', baseUrl: null, protocol: 'anthropic', models: ['deepseek-chat'] }]
   const frozen = await freezeBotModel(botScope, noSubscription)
   assert.deepEqual(frozen, { harness: 'ai_sdk', model: 'deepseek-chat', modelSelection: { consumerId: id(1), type: 'api_key', keyId: id(9), ownerId: 'alice', workspaceId: id(2), modelId: 'deepseek-chat' } })
   assert.deepEqual(await resolveFrozenHostedModel(botScope, frozen, noSubscription), { modelId: 'api-key-fixture' })
@@ -89,8 +89,10 @@ test('A bot saved on an API key model freezes that key and resolves through it; 
   // The key was withdrawn: the usual order, here Mikka 默认.
   usableKeys = []
   assert.deepEqual(await freezeBotModel(botScope, noSubscription), { harness: 'ai_sdk', model: COORDINATOR_MODEL })
+  usableKeys = [{ id: id(9), provider: 'deepseek', baseUrl: null, protocol: 'anthropic', models: ['different-model'] }]
+  assert.deepEqual(await freezeBotModel(botScope, noSubscription), { harness: 'ai_sdk', model: COORDINATOR_MODEL })
   // An Anthropic-only custom provider cannot serve a bot chat.
-  usableKeys = [{ id: id(9), provider: 'custom', baseUrl: 'https://llm.example/anthropic', protocol: 'anthropic' }]
+  usableKeys = [{ id: id(9), provider: 'custom', baseUrl: 'https://llm.example/anthropic', protocol: 'anthropic', models: ['deepseek-chat'] }]
   assert.deepEqual(await freezeBotModel(botScope, noSubscription), { harness: 'ai_sdk', model: COORDINATOR_MODEL })
 })
 
@@ -197,10 +199,12 @@ test('Mikka 默认 with no points here runs on the next allowed model and says s
   assert.deepEqual(await freezeBotModel(scope, noSubscription), { harness: 'ai_sdk', model: COORDINATOR_MODEL })
   // The person's own key is next in 允许使用的模型: this turn runs on it, marked.
   fallback = { kind: 'api_key', keyId: id(9), model: 'deepseek-chat' }
+  usableKeys = [{ id: id(9), provider: 'deepseek', baseUrl: null, protocol: 'anthropic', models: ['deepseek-chat'] }]
   assert.deepEqual(await freezeBotModel({ ...scope, botId: id(1) }, noSubscription), { harness: 'ai_sdk', model: 'deepseek-chat',
     modelSelection: { consumerId: id(1), type: 'api_key', keyId: id(9), ownerId: 'alice', workspaceId: id(2), modelId: 'deepseek-chat', afterPoints: true } })
   // A subscription is next: frozen as usual, marked.
   fallback = { kind: 'subscription', bindingId: binding.id, model: binding.modelId }
+  savedBinding = { bindingId: binding.id }
   const dependencies = {
     service: () => ({ repository: {
       binding: async () => ({ ...binding }),

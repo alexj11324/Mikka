@@ -7,7 +7,8 @@ export const subscriptionListSchema = z.object({
     id: z.uuid(), provider: z.enum(['codex', 'claude']), state: z.string(), revision: z.number().int().positive(),
     account: z.string().max(256).nullable().optional(),
     paused: z.boolean().optional(),
-    bots: z.array(z.object({ id: z.uuid(), name: z.string().max(200), color: z.string().max(40), shape: z.string().max(40) })).max(200).optional(),
+    /** The owner's saved chat selections in the requested workspace, never active-use claims. */
+    bots: z.array(z.object({ id: z.uuid(), workspaceId: z.uuid(), name: z.string().max(200), color: z.string().max(40), shape: z.string().max(40) })).max(200).optional(),
   })),
 })
 const startSchema = z.object({

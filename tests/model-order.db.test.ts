@@ -48,10 +48,12 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
     // The catalogue as the account listed it (refreshBotModels stores the same): its order is the account's.
     await pool.query(`INSERT INTO byos_connections (id,"ownerId","workspaceId",provider,state,epoch,"secretName","secretDigest","providerSubject","modelCatalog") VALUES ($1,$2,$3,$4,'connected',1,$5,$6,'synthetic-subject',$7)`,
       [connection, scope.ownerId, scope.workspaceId, provider, `synthetic-${connection}`, 'a'.repeat(64), JSON.stringify({ revision: '1', models })])
+    await pool.query('UPDATE byos_connections SET quota=$2 WHERE id=$1', [connection, allowance(provider)])
     for (const model of models) await pool.query(`INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId") VALUES ($1,$2,$3,'catalogue',$4,1,$5,$6)`,
       [randomUUID(), scope.ownerId, scope.workspaceId, connection, provider === 'codex' ? 'codex_cpa' : 'claude_cpa', model])
     return connection
   }
+  const allowance = (provider: 'claude' | 'codex', used = .2) => JSON.stringify({ vendor: provider === 'claude' ? 'claude_code' : 'codex', source: 'official', status: 'ok', plan: null, observedAt: new Date().toISOString(), windows: [{ kind: 'five_hour', used, resetsAt: new Date(Date.now() + 3_600_000).toISOString() }] })
   /**
    * One of the person's devices, its CLI's report, and an Agent per installed
    * harness. Its daemon takes subscription runs (subscriptionBroker) unless the
@@ -70,6 +72,56 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
     }
     return { id, agents }
   }
+
+  await t.test('a new binding can dispatch before Settings is opened: probe null/stale quota once, and keep paid keys out after a failed check', async () => {
+    const scope = await person('order-first-dispatch')
+    const ctx = { ...scope, botId: null }
+    const connection = await subscribe(scope, 'claude', ['claude-opus-5-5', 'claude-sonnet-5-5'])
+    const mac = await device(scope.ownerId, [{ harness: 'claude_code', installed: true }])
+    await pool.query('UPDATE byos_connections SET quota=NULL WHERE id=$1', [connection])
+    let probes = 0
+    const refreshQuota = async (checked: { ownerId: string; workspaceId: string }, id: string) => {
+      assert.deepEqual(checked, ctx)
+      assert.equal(id, connection)
+      probes++
+      await pool.query('UPDATE byos_connections SET quota=$2 WHERE id=$1 AND "ownerId"=$3', [id, allowance('claude'), scope.ownerId])
+    }
+    const first = await resolveModelDispatch(pool, { ...scope, botId: null }, undefined, undefined, undefined, { refreshQuota })
+    assert.deepEqual(first.kind === 'device' && [first.deviceId, first.model], [mac.id, 'claude-opus-5-5'])
+    assert.equal(probes, 1)
+    const candidates = await order.orderCandidates(pool, scope)
+    const entries = candidates.map((candidate, at) => ({ ...candidate, id: String(at) }))
+    await pool.query(`UPDATE byos_connections SET quota=jsonb_set(quota,'{observedAt}',to_jsonb((now()-interval '61 seconds')::text)) WHERE id=$1`, [connection])
+    const states = await order.credentialStates(pool, ctx, entries, candidates, undefined, { refresh: refreshQuota })
+    assert.equal(probes, 2, 'two model entries refresh their one connection once')
+    assert.ok([...states.values()].every(state => state.credential.usable))
+    const key = await keys.addApiKey(pool, scope.ownerId, { provider: 'deepseek', apiKey: `sk-${randomBytes(12).toString('hex')}` }, { fetch: (async () => Response.json({ data: [{ id: 'key-fallback' }] })) as unknown as typeof fetch })
+    await order.changeOrder(pool, scope, { kind: 'add', entries: [{ harness: 'claude_code', model: 'key-fallback', source: { kind: 'api_key', keyId: key.id } }] })
+    await pool.query('UPDATE byos_connections SET quota=NULL WHERE id=$1', [connection])
+    const { pointsFallback } = await import('../lib/points-fallback')
+    assert.equal(await pointsFallback(pool, scope), null, 'an unconfirmed subscription must not silently charge the later key when Mikka points run out')
+    const failed = await resolveModelDispatch(pool, { ...scope, botId: null }, undefined, undefined, undefined, { refreshQuota: async () => { probes++; throw new Error('fixture unavailable') } })
+    assert.deepEqual([failed.kind, failed.kind === 'none' && failed.reason], ['none', 'checking'])
+    assert.equal(probes, 3)
+    assert.equal((await order.orderView(pool, scope)).entries[0].block?.reason, 'checking')
+    const checked = await order.checkOrderQuota(pool, scope, connection, async (checkedScope, id, _signal, owner) => {
+      assert.deepEqual(checkedScope, scope)
+      assert.equal(owner, scope.ownerId)
+      await pool.query('UPDATE byos_connections SET quota=$2 WHERE id=$1', [id, allowance('claude')])
+    })
+    assert.equal(checked.entries[0].block, null, 'the explicit retry persists new allowance and returns the same real readiness projection')
+    await pool.query('UPDATE byos_connections SET quota=NULL WHERE id=$1', [connection])
+    const revoked = await order.credentialStates(pool, scope, entries, candidates, undefined, { refresh: async () => {
+      await pool.query('UPDATE byos_connections SET paused=true,quota=$2 WHERE id=$1', [connection, allowance('claude')])
+    } })
+    assert.ok([...revoked.values()].every(state => !state.credential.usable && state.credential.reason === 'paused'), 'a pause during the provider read wins over its new quota')
+    const stranger = await person('order-probe-stranger')
+    const foreign = await subscribe(stranger, 'claude', ['claude-opus-5-5'])
+    const forged = { id: 'foreign', harness: 'claude_code' as const, model: 'claude-opus-5-5', source: { kind: 'subscription' as const, connectionId: foreign } }
+    const denied = await order.credentialStates(pool, scope, [forged], [{ ...forged, provider: 'claude', name: forged.model }], undefined, { refresh: async () => { throw new Error('a foreign connection reached quota probe') } })
+    assert.deepEqual(denied.get(forged.id)?.credential, { usable: false, reason: 'missing' })
+    await assert.rejects(order.checkOrderQuota(pool, scope, foreign, async () => { throw new Error('foreign retry reached quota probe') }), { code: 'executionAccountUnavailable' })
+  })
 
   await t.test('an untouched list: opus, then the first Codex model reported, else the first model anything reported; nothing is stored', async () => {
     const scope = await person('order-default')
@@ -107,7 +159,7 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
     const binding = (await pool.query('SELECT id FROM byos_bindings WHERE "connectionId"=$1 AND "modelId"=$2', [claude, 'acct-opus-p'])).rows[0].id
     assert.deepEqual(await pointsFallback(pool, scope), { kind: 'subscription', bindingId: binding, model: 'acct-opus-p' }, 'the first allowed model')
     // The subscription is out of quota: the next one, the key.
-    await pool.query('UPDATE byos_connections SET quota=$2 WHERE id=$1', [claude, JSON.stringify({ windows: [{ kind: 'five_hour', used: 1, resetsAt: new Date(Date.now() + 3_600_000).toISOString() }] })])
+    await pool.query('UPDATE byos_connections SET quota=$2 WHERE id=$1', [claude, allowance('claude', 1)])
     // The untouched list holds only opus here (decision 2026-11-02-1400): the key is not allowed, so nothing runs.
     assert.equal(await pointsFallback(pool, scope), null, 'a key not in 允许使用的模型 is never used')
     const candidate = (await order.orderView(pool, scope)).candidates.find(item => item.source.kind === 'api_key')!
@@ -159,11 +211,12 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
     assert.equal((await resolveModelDispatch(pool, ctx)).kind, 'none', '参与调度 off: never picked')
     const mac = await device(scope.ownerId, [{ harness: 'claude_code', installed: true, modelSlots: [{ slot: 'top', model: 'acct-opus-c', name: 'Top' }, { slot: 'mid', model: 'acct-sonnet-c', name: 'Mid' }] }])
     const first = await resolveModelDispatch(pool, ctx)
-    assert.deepEqual(first.kind === 'device' && [first.deviceId, first.agentId, first.model], [mac.id, mac.agents.claude_code, 'top'])
+    assert.deepEqual(first.kind === 'device' && [first.deviceId, first.agentId, first.model], [mac.id, mac.agents.claude_code, 'acct-opus-c'])
     assert.notEqual(first.kind === 'device' && first.deviceId, off.id)
     // The run's subscription is the entry's: the Agent's latest binding is that account and model.
-    const bound = (await pool.query('SELECT "connectionId"::text AS c,"modelId" FROM byos_bindings WHERE "consumerId"=$1 ORDER BY "createdAt" DESC LIMIT 1', [mac.agents.claude_code])).rows[0]
+    const bound = (await pool.query('SELECT id,"connectionId"::text AS c,"modelId" FROM byos_bindings WHERE "consumerId"=$1 ORDER BY "createdAt" DESC LIMIT 1', [mac.agents.claude_code])).rows[0]
     assert.deepEqual([bound.c, bound.modelId], [claude, 'acct-opus-c'])
+    assert.equal(first.kind === 'device' && first.subscriptionBindingId, bound.id, 'dispatch carries the exact binding, independently of its CLI model slot')
     // Switching back and forth reuses one row per account, revision and model; the last one asked is the latest.
     const agentBindings = async () => (await pool.query<{ modelId: string }>('SELECT "modelId" FROM byos_bindings WHERE "consumerId"=$1 ORDER BY "createdAt" DESC,id DESC', [mac.agents.claude_code])).rows.map(row => row.modelId)
     for (const model of ['acct-sonnet-c', 'acct-opus-c', 'acct-sonnet-c', 'acct-opus-c']) await bindAgentToConnection(pool, scope, mac.agents.claude_code, 'claude_code', claude, model)
@@ -176,7 +229,7 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
     await pool.query('UPDATE byos_connections SET epoch=epoch-1 WHERE id=$1', [claude])
     // Used up: the next allowed model.
     await order.changeOrder(pool, scope, { kind: 'add', entries: [{ harness: 'claude_code', model: 'acct-sonnet-c', source: { kind: 'subscription', connectionId: claude } }] })
-    await pool.query('UPDATE byos_connections SET quota=$2 WHERE id=$1', [claude, JSON.stringify({ windows: [{ kind: 'five_hour', used: 1, resetsAt: new Date(Date.now() + 3_600_000).toISOString() }] })])
+    await pool.query('UPDATE byos_connections SET quota=$2 WHERE id=$1', [claude, allowance('claude', 1)])
     const spent = await resolveModelDispatch(pool, ctx)
     assert.deepEqual([spent.kind, spent.kind === 'none' && spent.reason], ['none', 'unavailable'], 'one account for both: both used up')
     await pool.query('UPDATE byos_connections SET quota=NULL WHERE id=$1', [claude])
@@ -185,6 +238,7 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
     assert.deepEqual((await order.orderView(pool, scope)).entries.map(entry => entry.block?.reason), ['paused', 'paused'])
     assert.equal((await resolveModelDispatch(pool, ctx)).kind, 'none')
     await pool.query('UPDATE byos_connections SET paused=false WHERE id=$1', [claude])
+    await pool.query('UPDATE byos_connections SET quota=$2 WHERE id=$1', [claude, allowance('claude')])
     // A key model on Claude Code: any installed Claude Code runs it.
     const key = await keys.addApiKey(pool, scope.ownerId, { provider: 'deepseek', apiKey: `sk-${randomBytes(12).toString('hex')}` }, { fetch: (async () => Response.json({ data: [{ id: 'key-model-c' }] })) as unknown as typeof fetch })
     // The thread's own model goes first.
@@ -201,7 +255,7 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
     assert.equal((await source(randomUUID())).apiKey?.keyId, key.id, 'a key the run may not use is never taken')
     await keys.removeApiKey(pool, scope.ownerId, second.id)
     const named = await resolveModelDispatch(pool, ctx, { harness: 'claude_code', model: 'acct-sonnet-c' })
-    assert.equal(named.kind === 'device' && named.model, 'mid')
+    assert.equal(named.kind === 'device' && named.model, 'acct-sonnet-c')
     // The thread's model is the only one tried; it never falls back to the list, which has a model that runs (opus).
     const notOffered = await resolveModelDispatch(pool, ctx, { harness: 'codex', model: 'acct-opus-c' })
     assert.deepEqual([notOffered.kind, notOffered.kind === 'none' && notOffered.reason, notOffered.kind === 'none' && notOffered.card.description], ['none', 'notOffered', '没有订阅或 Key 能用 Codex 跑 acct-opus-c'])

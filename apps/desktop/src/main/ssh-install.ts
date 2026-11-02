@@ -58,6 +58,8 @@ export function runProcess(command: string, args: string[], input?: string, time
   })
 }
 
+class LocalAccountUnconfirmed extends Error {}
+
 export class SshInstaller {
   private controller = new AbortController()
   private beginning = false
@@ -68,6 +70,7 @@ export class SshInstaller {
   private destination = ''
   /** Set by beginLocal / restartLocal: the steps run on this computer, not over SSH. */
   private local = false
+  private localOwnerId?: string
   constructor(
     private appUrl: string,
     private mintToken: () => Promise<string>,
@@ -79,6 +82,7 @@ export class SshInstaller {
     /** The desktop's flavor: a dev app talks to the dev daemon's data dir. */
     private flavor: 'prod' | 'dev' = 'prod',
     private shell = loginShell(),
+    private verifyLocalDevice: (deviceId: string, ownerId?: string) => Promise<boolean> = async () => false,
   ) {}
   private report(patch: Partial<SshInstallState>) {
     this.current = { ...this.current!, ...patch }
@@ -99,9 +103,10 @@ export class SshInstaller {
    * 添加这台电脑: the same install, run on this computer through the login
    * shell, registered as a laptop. No SSH, no host key.
    */
-  async beginLocal() {
+  async beginLocal(ownerId?: string) {
     return this.launch(async () => {
       this.local = true
+      this.localOwnerId = ownerId
       this.current = { id: randomUUID(), target: LOCAL_TARGET, step: 'check', status: 'running' }
       this.report({})
       this.pending = this.install('laptop')
@@ -113,9 +118,10 @@ export class SshInstaller {
    * and only if that fails install and sign in, so an existing device is not
    * registered again. Reported as 添加这台电脑.
    */
-  async repairLocal() {
+  async repairLocal(ownerId?: string) {
     return this.launch(async () => {
       this.local = true
+      this.localOwnerId = ownerId
       this.current = { id: randomUUID(), target: LOCAL_TARGET, step: 'service', status: 'running' }
       this.report({})
       this.pending = this.repair()
@@ -123,9 +129,10 @@ export class SshInstaller {
     })
   }
   /** 重新连接 for this computer: restart its daemon service and wait until it is online. */
-  async restartLocal() {
+  async restartLocal(ownerId?: string) {
     return this.launch(async () => {
       this.local = true
+      this.localOwnerId = ownerId
       this.current = { id: randomUUID(), target: LOCAL_RECONNECT, step: 'service', status: 'running' }
       this.report({})
       this.pending = this.restart()
@@ -243,8 +250,9 @@ export class SshInstaller {
       await this.remote(`mikka daemon service install --server ${quote(this.appUrl)} --device-type laptop${this.flags()}`)
       await this.waitOnline()
       return
-    } catch {
+    } catch (error) {
       if (this.controller.signal.aborted) return
+      if (error instanceof LocalAccountUnconfirmed) { this.fail(error); return }
     }
     this.report({ step: 'check' })
     await this.install('laptop')
@@ -261,13 +269,20 @@ export class SshInstaller {
     for (let attempt = 0; attempt < 30; attempt++) {
       this.controller.signal.throwIfAborted()
       const status = await this.remote(`mikka daemon status${this.flags()}`).catch(() => '')
-      try {
-        const remote = JSON.parse(status) as { server?: string; deviceId?: string }
-        if (remote.server === 'online') {
-          this.report({ status: 'online', ...(typeof remote.deviceId === 'string' ? { deviceId: remote.deviceId } : {}) })
-          return
+      let remote: { server?: string; deviceId?: string }
+      try { const parsed = JSON.parse(status); remote = parsed && typeof parsed === 'object' ? parsed : {} } catch { remote = {} }
+      if (remote.server === 'online') {
+        if (this.local) {
+          if (typeof remote.deviceId !== 'string' || !remote.deviceId) throw new Error('Device does not belong to the signed-in account')
+          let owned: boolean
+          try { owned = await this.verifyLocalDevice(remote.deviceId, this.localOwnerId) }
+          catch { throw new LocalAccountUnconfirmed('Device account could not be confirmed') }
+          if (!owned) throw new Error('Device does not belong to the signed-in account')
         }
-      } catch { /* service starting */ }
+        this.controller.signal.throwIfAborted()
+        this.report({ status: 'online', ...(typeof remote.deviceId === 'string' ? { deviceId: remote.deviceId } : {}) })
+        return
+      }
       await new Promise(resolve => setTimeout(resolve, 1000))
     }
     throw new Error('Device did not come online within 30 seconds')

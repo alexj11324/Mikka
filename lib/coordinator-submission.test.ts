@@ -176,7 +176,10 @@ const callbacks: Array<() => unknown> = []
 let POST: (request: Request) => Promise<Response>
 let sendCoordinatorMessage: typeof import('../app/actions/coordinator').sendCoordinatorMessage
 let sendSuggestion: typeof import('../app/actions/coordinator').sendSuggestion
+let retryCoordinatorTurn: typeof import('../app/actions/coordinator').retryCoordinatorTurn
 let enabled = true
+let retryQueued = false
+let retryWorking = false
 const suggestionId = 'b4000000-0000-4000-8000-000000000010'
 type SuggestionRow = { id: string; botId: string | null; source: 'gmail'; action: 'reply'; title: string; actionTitle: string | null; actor: string | null; url: string | null }
 let suggestion: SuggestionRow | null = null
@@ -198,14 +201,29 @@ before(async () => {
   } })
   mock.module('@/lib/coordinator/coordinator-bot', { namedExports: { coordinatorBot: async () => ({ botId: COORDINATOR_BOT, workspaceId: 'a4000000-0000-4000-8000-0000000c0de2' }), chatBotId: async (_owner: string, botId: string | null | undefined) => botId ?? COORDINATOR_BOT, openChatBotId: async (_user: unknown, botId: string | null | undefined) => botId ?? COORDINATOR_BOT } })
   mock.module('@/lib/request-log', { namedExports: { noteLogUser: () => undefined, withRequestLog: (_path: string, handler: unknown) => handler } })
-  mock.module('@/lib/coordinator/store', { namedExports: { chatView: async () => ({}), botChats: async () => ({}), retryFailedTurn: async () => false } })
+  mock.module('@/lib/coordinator/store', { namedExports: { chatView: async () => ({ working: retryWorking }), botChats: async () => ({}), retryFailedTurn: async () => retryQueued } })
   mock.module('@/lib/coordinator/wake', { namedExports: { coordinatorEnabled: () => enabled, wakeCoordinator: () => { throw new Error('test must not execute wake') } } })
   mock.module('next/server', { namedExports: { NextResponse: { json: (body: unknown, options?: ResponseInit) => Response.json(body, options) }, after: (callback: () => unknown) => callbacks.push(callback) } })
   mock.module('next/headers', { namedExports: { headers: async () => actionHeaders, cookies: async () => ({ get: () => undefined }) } })
   ;({ POST } = await import('../app/api/coordinator/messages/route'))
-  ;({ sendCoordinatorMessage, sendSuggestion } = await import('../app/actions/coordinator'))
+  ;({ sendCoordinatorMessage, sendSuggestion, retryCoordinatorTurn } = await import('../app/actions/coordinator'))
 })
 const request = (body: unknown) => new Request('https://synthetic.example/api/coordinator/messages', { method: 'POST', body: JSON.stringify(body) })
+
+test('reply retry reports unavailable, already working and no failed turn without claiming an enqueue', async () => {
+  current = fixture(); userId = 'owner'; callbacks.length = 0; retryQueued = false
+  enabled = false
+  assert.deepEqual(await retryCoordinatorTurn(), { queued: false, reason: 'unavailable' })
+  enabled = true; retryWorking = true
+  assert.deepEqual(await retryCoordinatorTurn(), { queued: false, reason: 'working' })
+  retryWorking = false
+  assert.deepEqual(await retryCoordinatorTurn(), { queued: false, reason: 'nothingToRetry' })
+  assert.equal(callbacks.length, 0)
+  retryQueued = true
+  assert.deepEqual(await retryCoordinatorTurn(), { queued: true })
+  assert.equal(callbacks.length, 1)
+  retryQueued = false; callbacks.length = 0
+})
 
 test('HTTP handler and action share personal submission identity and expose payload conflicts', async () => {
   current = fixture(); callbacks.length = 0; userId = 'owner'

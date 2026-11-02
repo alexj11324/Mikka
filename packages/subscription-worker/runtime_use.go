@@ -2,7 +2,6 @@ package worker
 
 import (
 	"context"
-	"encoding/json"
 	"time"
 )
 
@@ -71,30 +70,8 @@ func (w *Worker) authorizeRuntime(ctx context.Context, epoch int64, execution, m
 		return ErrUnavailable
 	}
 	if execution == "model" || execution == "native" {
-		var q struct {
-			Vendor     string `json:"vendor"`
-			Status     string `json:"status"`
-			ObservedAt string `json:"observedAt"`
-			Windows    []struct {
-				Used  *float64 `json:"used"`
-				Meter string   `json:"meter"`
-			} `json:"windows"`
-		}
-		vendor := "codex"
-		if w.Scope.Provider == "claude" {
-			vendor = "claude_code"
-		}
-		if json.Unmarshal(quota, &q) != nil || q.Status != "ok" || q.Vendor != vendor || len(q.Windows) == 0 {
+		if !runtimeQuotaAvailable(quota, w.Scope.Provider, boundModel, time.Now()) {
 			return ErrUnavailable
-		}
-		observed, err := time.Parse(time.RFC3339Nano, q.ObservedAt)
-		if err != nil || observed.After(time.Now()) || time.Since(observed) > time.Minute {
-			return ErrUnavailable
-		}
-		for _, window := range q.Windows {
-			if window.Used == nil || *window.Used < 0 || *window.Used >= 1 || window.Meter == "api" || window.Meter == "on_demand" || window.Meter == "team_on_demand" {
-				return ErrUnavailable
-			}
 		}
 	}
 	return nil

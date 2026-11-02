@@ -71,25 +71,40 @@ Rules that hold everywhere:
   bots), its owner leaves, or the admin turns 「分享给团队成员」 off there.
 - **Quota exhausted.** The run that hit the limit stops; it never switches.
   - When 「订阅额度用完后，自动改用 API Key」 is on (the default) and the owner has
-    an API key of their own, the next run uses that API key. The chat says so
-    in one line before the reply: 「Claude Max 额度用完，已改用 DeepSeek API Key
+    a compatible API key for the same frozen model, the next run uses that API key. The chat says so
+    in one line before the reply: 「Claude Max 额度用完，已改用 Claude API Key
     继续（按 token 计费）· 改回」; 改回 opens the model picker. Before sending,
     the composer names the used-up subscription and the key the next message
     moves to, or when the quota resets.
   - When nothing is left, the stopped run opens a popup. The person picks the
     model or credential themselves, and 重试 runs the turn on that choice.
     重试 never re-resolves on its own.
+- **Allowance observation.** Unknown, stale or scope-ambiguous quota is 待检查,
+  not available or exhausted. Dispatch refreshes it without requiring a visit
+  to Settings. A failed check offers retry and never silently moves to a paid
+  API key. Model-specific windows affect only the requested model.
 - Conversation compaction uses the same frozen model and credential as the
   turn.
-- This order serves bot chats. A thread takes the person's 允许使用的模型 in
+- This order serves bot chats. A thread takes the person's 优先使用的模型 in
   their order instead (§4,
   [1400](decisions/2026-11-02-1400-model-order-dispatch.md)). The bot itself
   runs on Mikka's own AI SDK on Vercel; a thread goes through the daemon to
   the entry's Agent (§3).
 
+The current label is **优先使用的模型** (Preferred models). This is a
+priority list, not an authorization whitelist: an explicitly requested model
+may still use its authorized credential under decision 1400. The selected
+thread model and credential take precedence over the bot's chat preference.
+The chooser and dispatch use the same credential and machine availability.
+
+Settings keeps account credentials and the person's defaults in the current
+workspace under separate headings. Bot chat choice belongs to that bot.
+[The settings flow](subscription-execution-settings.md) records these scopes
+and the recovery destinations.
+
 ## 3. Agents and runners
 
-**Model → Agent.** Each entry of 允许使用的模型 names its Agent: a
+**Model → Agent.** Each entry of 优先使用的模型 names its Agent: a
 subscription model runs on the Agent of its account (Claude → Claude Code,
 ChatGPT → Codex); an API key's model runs on each Agent a protocol of the key
 can talk to (OpenAI → Codex, Anthropic → Claude Code). A preset provider
@@ -150,7 +165,7 @@ not report the model ([1400](decisions/2026-11-02-1400-model-order-dispatch.md),
 1. A machine the run asks for is used as asked: a thread continuing in its
    environment, a device-only source event, or a device the person picked.
 2. Otherwise the thread's own model, when the person picked one, then
-   允许使用的模型 in the person's order: the first entry that can run now.
+   优先使用的模型 in the person's order: the first entry that can run now.
    运行位置 decides where: 本地 picks, among the devices with 参与调度 on
    that can run the entry, a server before a computer, then the one with the
    fewest unfinished runs, then the one that joined first
@@ -287,7 +302,7 @@ The workspace where the work happens pays.
 | Model → Agent mapping with a per-model override | — |
 | Mikka Cloud on each person's own E2B key, with no Mikka caps | — |
 | Personal computers and daemon servers as runners with the same contract: daemon-managed Agents, a container where Docker exists, otherwise a worktree plus a temporary config dir, one multi-arch image | — |
-| A device capability check and 参与调度 instead of Agent detection and 「设备离线时」; 允许使用的模型 in order instead of label rules and 任务默认 | — |
+| A device capability check and 参与调度 instead of Agent detection and 「设备离线时」; 优先使用的模型 in order instead of label rules and 任务默认 | — |
 | 立即警告 (the action card) when there is no machine; the offline flow of §4 | — |
 | One environment per thread; leases and heartbeats; credentials injected each run and absent while paused | — |
 | Card verification per person; credit and card shares per workspace | — |

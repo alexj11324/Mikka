@@ -80,6 +80,7 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     const botId = await seedBot(pool, ws.id, id)
     const connection = randomUUID()
     await pool.query(`INSERT INTO byos_connections (id,"ownerId","workspaceId",provider,state,epoch,"secretName","secretDigest","providerSubject","modelCatalog") VALUES ($1,$2,$3,'codex','connected',1,$5,$4,'synthetic-subject',$6)`, [connection, id, ws.id, 'a'.repeat(64), `synthetic-${connection}`, JSON.stringify({ revision: '1', models: ['gpt-5'] })])
+    await pool.query('UPDATE byos_connections SET quota=$2::jsonb WHERE id=$1', [connection, JSON.stringify({ vendor: 'codex', source: 'official', status: 'ok', plan: null, observedAt: new Date().toISOString(), windows: [{ kind: 'five_hour', used: .2, resetsAt: new Date(Date.now() + 3_600_000).toISOString() }] })])
     await pool.query(`INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId") VALUES ($1,$2,$3,'catalogue',$4,1,'codex_cpa','gpt-5')`, [randomUUID(), id, ws.id, connection])
     await pool.query(`INSERT INTO workspace_subscription_shares ("ownerId","workspaceId") VALUES ($1,$2)`, [id, ws.id])
     if (e2bKey) await pool.query(`INSERT INTO workspace_e2b_keys ("workspaceId",ciphertext,iv,"keyVersion",last4,"createdBy","updatedBy") VALUES ($1,'x','x',1,'abcd',$2,$2)`, [ws.id, id])
@@ -259,11 +260,24 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
       const before = provisioned
       const result = await dispatch(b.id, b.issueId, b.botId) as unknown as { error: string; reason: string; card: { title: string } }
       assert.equal(result.error, 'machineUnavailable')
-      assert.deepEqual([result.reason, result.card.title], ['cloudNotConfigured', '没有能跑这个任务的模型'])
+      assert.deepEqual([result.reason, result.card.title], ['cloudTemporarilyUnavailable', '没有能跑这个任务的模型'])
       assert.equal(provisioned, before)
       assert.equal(await count('SELECT count(*)::int AS n FROM bot_cloud_runtimes WHERE "botId"=$1', [b.botId]), 0)
       assert.equal(await count('SELECT count(*)::int AS n FROM agent_runs WHERE "userId"=$1', [b.id]), 0)
     } finally { delete process.env.MIKKA_CLOUD_COMPUTER_TASKS }
+  })
+
+  await t.test('a cloud startup refusal with an existing E2B key does not say the key is missing', async () => {
+    const a = await person('cloud-start-refused')
+    const provision = botRuntimeProvisioner.provision
+    botRuntimeProvisioner.provision = async () => { throw new Error('synthetic capacity refusal') }
+    try {
+      const result = await dispatch(a.id, a.issueId, a.botId) as unknown as { error: string; reason: string; card: { description: string; options: { action: string }[] } }
+      assert.equal(result.reason, 'cloudTemporarilyUnavailable')
+      assert.equal(result.card.description, '云端暂时无法启动')
+      assert.deepEqual(result.card.options.map(option => option.action), ['modelSettings'], 'do not ask to fill a key that is already present')
+      assert.equal(await count('SELECT count(*)::int AS n FROM agent_runs WHERE "userId"=$1', [a.id]), 0, 'a failed startup leaves no queued run')
+    } finally { botRuntimeProvisioner.provision = provision }
   })
 
   // The 电脑 policy governs computer use only: a repository task (octo/repo has a remote) runs on a task machine without a desktop.

@@ -10,6 +10,7 @@ import { IPC } from '@mikka/protocol/ipc'
 
 import { registerBridge } from './bridge'
 import { localDeviceStatus, localQuota } from './daemon'
+import { readLocalDeviceAccount } from './local-setup'
 import { AppLoadState, offlineReason, offlineRetryDelay } from './offline'
 import { startLoopbackAuth, type LoopbackAuthServer } from './loopback'
 import { catchClaudeCallback } from './subscription-callback'
@@ -452,6 +453,7 @@ function start(): void {
     prepareAuth,
     claudeCallback: url => catchClaudeCallback(url, page => shell.openExternal(page)),
     localDevice: localDeviceStatus,
+    localAccount: () => readLocalDeviceAccount((url, init) => session.fromPartition(PARTITION).fetch(url, init), APP_URL),
     quota: localQuota,
     notifications,
     consumePendingClick: () => {

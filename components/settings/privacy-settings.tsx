@@ -7,13 +7,14 @@ import { listSharedLinks, requestDataExport } from '@/app/actions/account'
 import { stopSharingArtifact } from '@/app/actions/artifacts'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { SettingRow, SettingsLoading, SettingsSection } from '@/components/settings/primitives'
+import { SettingRow, SettingsLoading, SettingsSaveError, SettingsSection } from '@/components/settings/primitives'
 import { useActionError } from '@/lib/use-action-error'
 import { FieldError } from '@/components/ui/field'
 
 /** N2: the data export, and every link that currently opens one of my artifacts. */
 export function PrivacySettings() {
   const t = useTranslations('Settings.privacy')
+  const commonT = useTranslations('Common')
   const actionError = useActionError()
   const links = useSWR('account:shared-links', listSharedLinks)
   const [exporting, setExporting] = useState(false)
@@ -24,8 +25,10 @@ export function PrivacySettings() {
   const [stopping, setStopping] = useState<string | null>(null)
   const [stopError, setStopError] = useState<string | null>(null)
 
-  const shared = links.data && !('error' in links.data) ? links.data.links : []
-  const total = shared.reduce((sum, link) => sum + link.links, 0)
+  const shared = links.data && !('error' in links.data) ? links.data.links : undefined
+  const readError = links.error || (links.data && 'error' in links.data ? links.data.error : undefined)
+  const total = shared?.reduce((sum, link) => sum + link.links, 0) ?? 0
+  const readFailure = readError ? <SettingsSaveError message={actionError(typeof readError === 'string' ? readError : undefined)} retryLabel={commonT('retry')} onRetry={() => { void links.mutate() }} /> : null
 
   async function exportData() {
     setExporting(true)
@@ -79,11 +82,13 @@ export function PrivacySettings() {
     </SettingsSection>
 
     <SettingsSection id="shared-heading" title={t('sharing')}>
-      <SettingRow title={t('sharedLinks')} description={total > 0 ? t('sharedLinksCount', { count: total }) : t('sharedLinksNone')}>
-        <span title={total === 0 ? t('manageNone') : undefined}>
-          <Button type="button" variant="secondary" size="sm" disabled={total === 0 || links.isLoading} onClick={() => setManaging(true)}>{t('manage')}</Button>
+      <SettingRow title={t('sharedLinks')} description={shared ? total > 0 ? t('sharedLinksCount', { count: total }) : t('sharedLinksNone') : undefined}>
+        <span title={shared && total === 0 ? t('manageNone') : undefined}>
+          <Button type="button" variant="secondary" size="sm" disabled={!shared || total === 0} onClick={() => setManaging(true)}>{t('manage')}</Button>
         </span>
       </SettingRow>
+      {!shared && !readError && <SettingsLoading label={t('linksLoading')} rows={1} bare />}
+      {readFailure}
     </SettingsSection>
 
     <Dialog open={managing} onOpenChange={setManaging}>
@@ -91,10 +96,10 @@ export function PrivacySettings() {
         <DialogHeader>
           <DialogTitle>{t('sharedLinks')}</DialogTitle>
         </DialogHeader>
-        {links.isLoading && <SettingsLoading label={t('linksLoading')} rows={2} bare />}
-        {!links.isLoading && shared.length === 0 && <p className="text-sm text-muted-foreground">{t('sharedLinksNone')}</p>}
+        {!shared && !readError && <SettingsLoading label={t('linksLoading')} rows={2} bare />}
+        {shared?.length === 0 && <p className="text-sm text-muted-foreground">{t('sharedLinksNone')}</p>}
         <div className="flex flex-col divide-y divide-border">
-          {shared.map(link => <div key={link.artifactId} className="flex items-center justify-between gap-3 py-3">
+          {shared?.map(link => <div key={link.artifactId} className="flex items-center justify-between gap-3 py-3">
             <div className="flex min-w-0 flex-col gap-0.5">
               <span className="truncate text-sm font-medium">{link.title}</span>
               <span className="text-xs text-muted-foreground">{t('links', { count: link.links })}</span>
@@ -104,6 +109,7 @@ export function PrivacySettings() {
             </Button>
           </div>)}
         </div>
+        {readFailure}
         {stopError && <FieldError>{stopError}</FieldError>}
       </DialogContent>
     </Dialog>

@@ -44,7 +44,9 @@ export async function pointsFallback(pool: Pool, scope: { ownerId: string; works
   const keys = new Map((await usableApiKeys(pool, scope.ownerId, scope.workspaceId)).map(key => [key.id, key]))
   const bindings = await new ExecutionSettings(pool).chatModels(scope)
   for (const entry of entries) {
-    if (!states.get(entry.id)?.credential.usable) continue
+    const credential = states.get(entry.id)?.credential
+    if (credential && !credential.usable && credential.reason === 'checking') return null
+    if (!credential?.usable) continue
     if (entry.source.kind === 'api_key') {
       const key = keys.get(entry.source.keyId)
       if (key && apiKeyChatBaseUrl(key) && key.models.includes(entry.model)) return { kind: 'api_key', keyId: key.id, model: entry.model }

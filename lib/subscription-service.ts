@@ -1,8 +1,8 @@
 import { workerSubscriptionMatches } from './agent-kit/worker'
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import { quotaSnapshotSchema, type QuotaSnapshot } from '@mikka/protocol'
-import { authorizeSubscriptionUse, SubscriptionRefusal, type SubscriptionAccess, type SubscriptionRoute, type SubscriptionUse } from '@mikka/protocol/subscription'
-import type { SubscriptionWorkerClient, WorkerMetadata } from '../packages/daemon/src/subscription-worker-client'
+import { authorizeSubscriptionUse, subscriptionQuotaState, SubscriptionRefusal, type SubscriptionAccess, type SubscriptionRoute, type SubscriptionUse } from '@mikka/protocol/subscription'
+import { WorkerRefusal, type SubscriptionWorkerClient, type WorkerMetadata } from '../packages/daemon/src/subscription-worker-client'
 import { readSubscriptionQuota } from '../packages/daemon/src/subscription-quota'
 import { SubscriptionRepository } from './subscription-repository'
 import { runMayUseCredentialSql } from './personal-policy'
@@ -29,8 +29,8 @@ export class SubscriptionService {
     /** Active membership in the workspace database; a teammate's shared subscription needs it for both people. */
     readonly member: (userId: string, workspaceId: string) => Promise<void> = async () => { throw new SubscriptionRefusal('account_unavailable') }) {}
 
-  async access(use: SubscriptionUse, signal?: AbortSignal): Promise<SubscriptionAccess> {
-    const { modelId: _, ...binding } = await this.repository.binding(use.ownerId, use.bindingId)
+  async access(use: SubscriptionUse, signal?: AbortSignal, modelOverride?: string | null): Promise<SubscriptionAccess> {
+    const { modelId: boundModelId, ...binding } = await this.repository.binding(use.ownerId, use.bindingId)
     if (binding.workspaceId !== use.workspaceId || binding.consumerId !== use.consumerId) throw new SubscriptionRefusal('binding_mismatch')
     await this.workspace(use.ownerId, binding.workspaceId, binding.consumerId)
     const row = await this.repository.connection(use.ownerId, binding.connectionId)
@@ -40,7 +40,7 @@ export class SubscriptionService {
     const baseQuota = { vendor: row.provider === 'codex' ? 'codex' : 'claude_code', status: 'unknown', source: 'local_credentials', plan: null, observedAt: new Date().toISOString(), windows: [] }
     let quota = quotaSnapshotSchema.safeParse(row.quota).data ?? quotaSnapshotSchema.parse(baseQuota)
     // Probe only after scope/state/revision and server-side capability checks.
-    if ((use.execution !== 'native' || this.capabilities.nativeIsolation === 'verified_runtime') && readiness === 'ready' && row.state === 'connected' && revision === binding.connectionRevision && (quota.status !== 'ok' || Date.now() - Date.parse(quota.observedAt) > 45_000)) {
+    if ((use.execution !== 'native' || this.capabilities.nativeIsolation === 'verified_runtime') && readiness === 'ready' && row.state === 'connected' && revision === binding.connectionRevision && (subscriptionQuotaState(quota, binding.route, Date.now(), modelOverride === null ? undefined : modelOverride ?? boundModelId) === 'unknown' || Date.now() - Date.parse(quota.observedAt) > 45_000)) {
       const client = this.worker(this.repository.scope(row)).forUse(use)
       await client.call('prepare', { revision }, signal)
       const result = await client.call<{status: number; body: unknown}>('quota', { revision }, signal)
@@ -52,6 +52,7 @@ export class SubscriptionService {
     if (current.paused) throw new SubscriptionRefusal('account_unavailable')
     return {
       binding,
+      modelId: modelOverride === null ? undefined : modelOverride ?? boundModelId,
       credentialTransition: current.state === 'refreshing' ? 'refreshing' : current.state === 'publication_pending' ? 'publication_pending' : undefined,
       connection: { id: row.id, ownerId: row.ownerId, workspaceId: row.workspaceId, provider: row.provider === 'codex' ? 'openai' : 'anthropic', revision: Number(current.epoch), state: current.state === 'connected' ? 'connected' : current.state === 'disconnected' ? 'disconnected' : current.state === 'pending' ? 'pending' : 'reconnect_required', quota },
       backend: { connectionId: row.id, connectionRevision: revision, ownerId: row.ownerId, workspaceId: row.workspaceId, route: binding.route, readiness, billing: 'subscription_only', isolation: use.execution === 'native' ? this.capabilities.nativeIsolation : 'credential_broker' }
@@ -92,24 +93,24 @@ export class SubscriptionService {
                   if (closed) return
                   if (done) { closed = true; reader.releaseLock(); controller.close(); return }
                   if (value.type === 'error') logGenerationFailure('stream_part', value.error)
-                  controller.enqueue(value.type === 'error' ? { type: 'error', error: new Error('subscription_generation_failed') } : value)
+                  controller.enqueue(value.type === 'error' ? { type: 'error', error: subscriptionGenerationError(value.error) } : value)
                 } catch (error) {
                   if (closed) return
                   logGenerationFailure('stream', error)
                   closed = true; reader.releaseLock()
-                  controller.enqueue({ type: 'error', error: new Error('subscription_generation_failed') }); controller.close()
+                  controller.enqueue({ type: 'error', error: subscriptionGenerationError(error) }); controller.close()
                 }
               },
               async cancel(reason) { closed = true; await reader.cancel(reason); reader.releaseLock() }
             })
             return { ...result, stream }
-          } catch (error) { logGenerationFailure('start', error); throw new SubscriptionRefusal('backend_unavailable') }
+          } catch (error) { logGenerationFailure('start', error); throw subscriptionGenerationError(error) }
         }
         return model
       }
     })
   }
-  async check(use: SubscriptionUse, signal?: AbortSignal) { return authorizeSubscriptionUse(use, await this.access(use, signal)) }
+  async check(use: SubscriptionUse, signal?: AbortSignal, modelOverride?: string | null) { return authorizeSubscriptionUse(use, await this.access(use, signal, modelOverride)) }
   async nativeRun(ownerId: string, deviceId: string, runId: string) {
     const { rows } = await this.repository.pool.query(`select b.id,b."ownerId",b."workspaceId",b."consumerId",b.route,b."modelId",r."agentDefinition",a.harness from byos_native_runs n join agent_runs r on r.id=n."runId" join agents a on a.id=r."agentId" join devices d on d.id=r."deviceId" and d."ownerId"=r."userId" and d.enabled=true join byos_bindings b on b.id=n."bindingId" where r.id=$1 and r."userId"=$2 and r."deviceId"=$3 and a."userId"=$2 and ${runMayUseCredentialSql('b."ownerId"', '$2', 'b."workspaceId"')} and b."consumerId"=a.id::text and d.harnesses @> jsonb_build_array(jsonb_build_object('harness',coalesce(r."agentDefinition"->>'harness',a.harness),'installed',true,'subscriptionBroker',true)) and r.status in ('preparing','running','paused','waiting_input') and r."leaseExpiresAt">now() and r."stopRequestedAt" is null`, [runId,ownerId,deviceId])
     if (!rows[0]) throw new SubscriptionRefusal('account_unavailable')
@@ -124,10 +125,11 @@ export class SubscriptionService {
   }
   async nativeContext(use: SubscriptionUse, signal?: AbortSignal) {
     const binding=await this.repository.binding(use.ownerId,use.bindingId)
-    const selected = await this.nativeSelectedModel(use, binding.modelId)
-    await this.admitModel({ ownerId: use.ownerId, workspaceId: binding.workspaceId, runId: use.runId }, selected ?? binding.modelId, binding.route, signal)
-    const authorized=await this.check(use,signal)
-    await this.admitModel({ ownerId: use.ownerId, workspaceId: binding.workspaceId, runId: use.runId }, selected ?? binding.modelId, binding.route, signal)
+    const selected = await this.nativeRunSelection(use, binding.modelId)
+    const scope = { ownerId: selected.executionOwnerId, workspaceId: binding.workspaceId, runId: use.runId }
+    await this.admitModel(scope, selected.modelId ?? binding.modelId, binding.route, signal)
+    const authorized=await this.check(use,signal,selected.modelId ?? null)
+    await this.admitModel(scope, selected.modelId ?? binding.modelId, binding.route, signal)
     const row=await this.repository.connection(use.ownerId,binding.connectionId)
     const client=this.worker(this.repository.scope(row)).forUse(use)
     await client.call('prepare',{revision:authorized.binding.connectionRevision},signal)
@@ -145,24 +147,29 @@ export class SubscriptionService {
   async nativeRequest(use: SubscriptionUse, request: NativeBrokerRequest, signal?: AbortSignal) {
     const binding=await this.repository.binding(use.ownerId,use.bindingId)
     if(!request.body || typeof request.body!=='object' || Array.isArray(request.body) || !('model' in request.body) || typeof request.body.model!=='string' || !/^[A-Za-z0-9._:-]{1,128}$/.test(request.body.model))throw new SubscriptionRefusal('binding_mismatch')
-    const selectedModel = await this.nativeSelectedModel(use, binding.modelId)
-    if (selectedModel !== undefined && request.body.model!==selectedModel) throw new SubscriptionRefusal('binding_mismatch')
+    const selected = await this.nativeRunSelection(use, binding.modelId)
+    if (selected.modelId !== undefined && request.body.model!==selected.modelId) throw new SubscriptionRefusal('binding_mismatch')
     if(binding.route==='codex_cli'?request.path!=='/responses':binding.route!=='claude_code_cli'||!['/v1/messages','/v1/messages?beta=true'].includes(request.path))throw new SubscriptionRefusal('backend_unavailable')
-    await this.admitModel({ ownerId: use.ownerId, workspaceId: binding.workspaceId, runId: use.runId }, request.body.model, binding.route, signal)
-    const authorized=await this.check(use,signal)
-    await this.admitModel({ ownerId: use.ownerId, workspaceId: binding.workspaceId, runId: use.runId }, request.body.model, binding.route, signal)
+    const scope = { ownerId: selected.executionOwnerId, workspaceId: binding.workspaceId, runId: use.runId }
+    await this.admitModel(scope, request.body.model, binding.route, signal)
+    const authorized=await this.check(use,signal,request.body.model)
+    await this.admitModel(scope, request.body.model, binding.route, signal)
     const row=await this.repository.connection(use.ownerId,binding.connectionId)
     return this.worker(this.repository.scope(row)).forUse(use).nativeRequest(authorized.binding.connectionRevision,request,signal)
   }
-  private async nativeSelectedModel(use: SubscriptionUse, boundModel: string) {
+  /** Run policy belongs to the executor; credential custody stays with its
+   * lender. Both identities come from the authorized binding/run, never input. */
+  private async nativeRunSelection(use: SubscriptionUse, boundModel: string) {
     let selectedModel: string | undefined = boundModel
+    let executionOwnerId = use.ownerId
     if (use.runId) {
-      const row=(await this.repository.pool.query(`SELECT r."agentDefinition" FROM agent_runs r JOIN byos_native_runs n ON n."runId"=r.id JOIN byos_bindings b ON b.id=n."bindingId" WHERE r.id=$1 AND ${runMayUseCredentialSql('$2', 'r."userId"', 'b."workspaceId"')} AND r."agentId"::text=$3 AND n."bindingId"=$4 AND r.status IN ('preparing','running','paused','waiting_input') AND r."leaseExpiresAt">now() AND r."stopRequestedAt" IS NULL`,[use.runId,use.ownerId,use.consumerId,use.bindingId])).rows[0]
-      if (!row) throw new SubscriptionRefusal('binding_mismatch')
+      const row=(await this.repository.pool.query(`SELECT r."userId",r."agentDefinition" FROM agent_runs r JOIN byos_native_runs n ON n."runId"=r.id JOIN byos_bindings b ON b.id=n."bindingId" WHERE r.id=$1 AND b."ownerId"=$2 AND ${runMayUseCredentialSql('$2', 'r."userId"', 'b."workspaceId"')} AND r."agentId"::text=$3 AND n."bindingId"=$4 AND r.status IN ('preparing','running','paused','waiting_input') AND r."leaseExpiresAt">now() AND r."stopRequestedAt" IS NULL`,[use.runId,use.ownerId,use.consumerId,use.bindingId])).rows[0]
+      if (!row || typeof row.userId !== 'string' || !row.userId) throw new SubscriptionRefusal('binding_mismatch')
+      executionOwnerId = row.userId
       if (row.agentDefinition?.cliModelSelection==='auto') selectedModel=undefined
       if (row.agentDefinition?.cliModelSelection==='explicit') selectedModel=row.agentDefinition.model
     }
-    return selectedModel
+    return { modelId: selectedModel, executionOwnerId }
   }
   /**
    * In-process native launch, used only by the BYOS custody test
@@ -190,6 +197,9 @@ export class SubscriptionService {
     if (row.state !== 'connected') return failedUsage(row.id, 'unavailable', row.accountLabel)
     try {
       const result = await this.worker(this.repository.scope(row)).call<WorkerUsage>('usage', { revision: Number(row.epoch) }, signal)
+      // The same safe provider projection drives Settings and the next Bot/Agent
+      // use. saveQuota fences the read to this owner and connected revision.
+      await this.repository.saveQuota(row, quotaSnapshotSchema.parse(await this.quota(row.provider, result)))
       const usage = parseSubscriptionUsage(row.id, row.provider, result)
       if (usage.account && usage.account !== row.accountLabel) await this.repository.saveAccountLabel(row, usage.account).catch(() => undefined)
       return { ...usage, account: usage.account ?? accountLabel(row.accountLabel) }
@@ -232,14 +242,38 @@ export class SubscriptionService {
   }
 }
 
+const GENERATION_FAILURES = new Set([
+  'binding_required', 'account_unavailable', 'binding_mismatch', 'stale_binding',
+  'pending_auth', 'reconnect_required', 'disconnected', 'quota_unknown', 'quota_exhausted',
+  'provider_approval_required', 'backend_unavailable', 'isolation_required', 'billing_unverified',
+  'subscription_rate_limited', 'provider_access_denied', 'provider_request_rejected',
+  'provider_temporarily_unavailable', 'provider_route_unavailable',
+])
+const BACKEND_FAILURES = new Set(['subscription_timeout', 'subscription_worker_unavailable', 'metadata_unavailable', 'secret_store_unavailable', 'operation_failed'])
+const PRIVATE_FAILURES = new Set(['provider_operation_failed', 'invalid_credential_bundle', 'stale_operation', 'credential_busy', 'secret_create_outcome_unknown', 'secret_not_found', 'credential_integrity_failed', 'subscription_cancelled'])
+
+/** Only fixed, typed refusal codes cross into persisted chat errors. SDK
+ * wrappers may carry the original error in cause; raw provider text cannot. */
+export function subscriptionGenerationError(error: unknown): Error {
+  for (let depth = 0; depth < 4; depth++) {
+    if (error instanceof SubscriptionRefusal || error instanceof WorkerRefusal) {
+      if (GENERATION_FAILURES.has(error.code)) return new Error(error.code)
+      if (error.code === 'invalid_credential_bundle') return new Error('reconnect_required')
+      if (BACKEND_FAILURES.has(error.code)) return new Error('backend_unavailable')
+    }
+    if (!(error instanceof Error)) break
+    error = error.cause
+  }
+  return new Error('subscription_generation_failed')
+}
+
 /**
  * Why a subscription turn produced no answer, for the logs: the stage and the
  * fixed refusal code (SubscriptionRefusal, WorkerRefusal) or the error's class
  * name. Never a message, which can carry provider text.
  */
 export function generationFailureCode(error: unknown): string {
-  const code = error && typeof error === 'object' && 'code' in error ? (error as { code: unknown }).code : undefined
-  if (typeof code === 'string' && /^[a-z_]{1,60}$/.test(code)) return code
+  if ((error instanceof SubscriptionRefusal || error instanceof WorkerRefusal) && (GENERATION_FAILURES.has(error.code) || BACKEND_FAILURES.has(error.code) || PRIVATE_FAILURES.has(error.code))) return error.code
   if (error instanceof Error && /^[A-Za-z]{1,40}$/.test(error.name)) return error.name
   return 'unknown'
 }

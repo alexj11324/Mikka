@@ -69,7 +69,7 @@ test('a failure the person can act on becomes the words the web keeps under the 
   // The person's subscription refused the turn.
   assert.equal(failureLine('quota_exhausted'), '订阅额度已用完')
   assert.equal(failureLine('Step "model" failed after 3 retries: reconnect_required'), '订阅需要重新连接')
-  assert.equal(failureLine('binding_required'), '所选订阅不可用')
+  assert.equal(failureLine('binding_required'), '订阅选择已失效')
   // The wake gave up: no turn ran.
   assert.equal(failureLine('wake_exhausted'), '回复重试已停止')
   // A crash is retried and has nothing for the person to do.

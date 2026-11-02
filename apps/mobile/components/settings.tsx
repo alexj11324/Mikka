@@ -58,11 +58,11 @@ export function Row({ icon, label, detail, value, onPress, onLongPress, trailing
   )
 }
 
-export function ToggleRow({ label, value, onChange }: { label: string; value: boolean; onChange: (next: boolean) => void }) {
+export function ToggleRow({ label, value, onChange, disabled = false }: { label: string; value: boolean; onChange: (next: boolean) => void; disabled?: boolean }) {
   return (
     <View style={styles.row}>
       <Text style={[styles.label, { flex: 1 }]}>{label}</Text>
-      <Switch value={value} onValueChange={onChange} trackColor={{ true: colors.success, false: colors.chip }} thumbColor="#fff" {...{ activeThumbColor: '#fff' }} />
+      <Switch value={value} disabled={disabled} onValueChange={onChange} trackColor={{ true: colors.success, false: colors.chip }} thumbColor="#fff" {...{ activeThumbColor: '#fff' }} />
     </View>
   )
 }

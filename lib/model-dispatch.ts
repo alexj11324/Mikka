@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto'
 import type { Pool } from 'pg'
 import { defaultAgentCopy } from './agent-copy'
 import { cloudReady } from './rule-dispatch'
-import { credentialStates, orderCandidates, poolDevices, readOrder, type OrderScope } from './model-order'
+import { credentialStates, orderCandidates, poolDevices, readOrder, type OrderScope, type RefreshOrderQuota } from './model-order'
 import { planDispatch, whyNoDevice, type NoDeviceWhy, type NothingReason, type OrderEntry, type RunLocation } from './model-order-plan'
 
 /**
@@ -19,13 +19,13 @@ import { planDispatch, whyNoDevice, type NoDeviceWhy, type NothingReason, type O
  * can run: the card says what it lacks; no other Agent is put in its place.
  */
 /** Why nothing runs: the list's reasons, or the model the thread named (decision 2026-11-02-1400). */
-export type DispatchNothingReason = NothingReason | 'notOffered' | 'namedDevice' | 'pickedNoDevice' | 'pickedUnavailable'
+export type DispatchNothingReason = NothingReason | 'cloudTemporarilyUnavailable' | 'notOffered' | 'namedDevice' | 'pickedNoDevice' | 'pickedUnavailable'
 export type ModelDispatch =
-  | { kind: 'device'; deviceId: string; agentId: string; model: string; entry: OrderEntry }
+  | { kind: 'device'; deviceId: string; agentId: string; model: string; entry: OrderEntry; subscriptionBindingId?: string }
   | { kind: 'cloud'; harness: OrderEntry['harness']; model: string; entry: OrderEntry; apiKey: boolean }
   | { kind: 'none'; reason: DispatchNothingReason; card: ReturnType<typeof modelUnavailableCard> }
 
-export async function resolveModelDispatch(pool: Pool, scope: OrderScope & { botId: string | null }, asked?: { harness: OrderEntry['harness']; model?: string } | null, location?: RunLocation, deviceId?: string): Promise<ModelDispatch> {
+export async function resolveModelDispatch(pool: Pool, scope: OrderScope & { botId: string | null }, asked?: { harness: OrderEntry['harness']; model?: string } | null, location?: RunLocation, deviceId?: string, dependencies: { refreshQuota?: RefreshOrderQuota } = {}): Promise<ModelDispatch> {
   // A subscription never asked for its models offers none yet: ask it first (once per revision).
   await new (await import('./execution-settings')).ExecutionSettings(pool).ensureCatalogues(scope)
   const candidates = await orderCandidates(pool, scope)
@@ -43,7 +43,7 @@ export async function resolveModelDispatch(pool: Pool, scope: OrderScope & { bot
   // The thread's model is the only one tried: no subscription or key offers it on that Agent, so nothing runs and the card says so.
   if (named && !picked) return { kind: 'none', reason: 'notOffered', card: modelUnavailableCard('notOffered', named) }
   const entries = picked ? [picked] : order.entries
-  const states = await credentialStates(pool, scope, entries, candidates)
+  const states = await credentialStates(pool, scope, entries, candidates, undefined, { refresh: dependencies.refreshQuota })
   const devices = order.location === 'local' ? (await poolDevices(pool, scope.ownerId)).filter(device => !deviceId || device.id === deviceId) : []
   const ready = order.location === 'cloud' && await cloudReady(pool, { ownerId: scope.ownerId, workspaceId: scope.workspaceId, botId: scope.botId, harness: entries[0]?.harness ?? 'claude_code' })
   const plan = planDispatch({ entries: picked ? [] : order.entries, explicit: picked ?? null, location: order.location, devices, credential: entry => states.get(entry.id)?.credential ?? { usable: false, reason: 'missing' }, cloudReady: ready })
@@ -58,7 +58,7 @@ export async function resolveModelDispatch(pool: Pool, scope: OrderScope & { bot
     const first = plan.skipped.find(item => item.block.reason === 'noDevice')!.entry
     return { kind: 'none', reason: 'noDevice', card: modelUnavailableCard('noDevice', { agent: HARNESS_NAMES[first.harness], model: first.model, device: whyNoDevice(devices, first) }) }
   }
-  if (plan.kind === 'none' && named && plan.reason !== 'cloudNotConfigured') {
+  if (plan.kind === 'none' && named && plan.reason !== 'cloudNotConfigured' && plan.reason !== 'checking') {
     const reason = plan.reason === 'noDevice' ? 'pickedNoDevice' : 'pickedUnavailable'
     return { kind: 'none', reason, card: modelUnavailableCard(reason, named) }
   }
@@ -67,33 +67,45 @@ export async function resolveModelDispatch(pool: Pool, scope: OrderScope & { bot
   const { rows: [agent] } = await pool.query<{ id: string }>('SELECT id FROM agents WHERE "userId"=$1 AND "deviceId"=$2 AND harness=$3 ORDER BY "createdAt",id LIMIT 1',
     [scope.ownerId, plan.deviceId, plan.entry.harness])
   if (!agent) return { kind: 'none', reason: 'noDevice', card: modelUnavailableCard('noDevice') }
-  if (plan.entry.source.kind === 'subscription') await bindAgentToConnection(pool, scope, agent.id, plan.entry.harness, plan.entry.source.connectionId, plan.entry.model)
-  return { kind: 'device', deviceId: plan.deviceId, agentId: agent.id, model: plan.model, entry: plan.entry }
+  const subscriptionBindingId = plan.entry.source.kind === 'subscription' ? await bindAgentToConnection(pool, scope, agent.id, plan.entry.harness, plan.entry.source.connectionId, plan.entry.model) : undefined
+  return { kind: 'device', deviceId: plan.deviceId, agentId: agent.id, model: plan.model, entry: plan.entry, ...(subscriptionBindingId ? { subscriptionBindingId } : {}) }
 }
 
 /**
- * The run's subscription is the entry's: the Agent's latest binding (what
- * `nativeBinding` hands the run) is made the entry's connection and model,
- * unless it already is. The id is fixed per Agent, connection, its revision
+ * The run's subscription is the entry's: return its exact binding id for
+ * queue-time authorization, independent of another task's later choice for
+ * this Agent. The id is fixed per Agent, connection, its revision
  * and model, so switching back and forth reuses the same rows (it is only made
  * the latest again); a binding is never moved to another revision, so a run
  * frozen on an old one stays refused after a reconnect.
  */
 export async function bindAgentToConnection(pool: Pick<Pool, 'query'>, scope: OrderScope, agentId: string, harness: OrderEntry['harness'], connectionId: string, model: string) {
   const route = harness === 'codex' ? 'codex_cli' : 'claude_code_cli'
-  const { rows: [latest] } = await pool.query<{ connectionId: string; modelId: string; connectionRevision: string }>(
-    'SELECT "connectionId"::text AS "connectionId","modelId","connectionRevision"::text AS "connectionRevision" FROM byos_bindings WHERE "ownerId"=$1 AND "consumerId"=$2 AND route=$3 ORDER BY "createdAt" DESC,id DESC LIMIT 1',
-    [scope.ownerId, agentId, route])
-  const { rows: [connection] } = await pool.query<{ epoch: string }>(
-    `SELECT epoch::text AS epoch FROM byos_connections WHERE id::text=$1 AND "ownerId"=$2 AND state='connected'`, [connectionId, scope.ownerId])
-  if (!connection) return
-  if (latest && latest.connectionId === connectionId && latest.modelId === model && latest.connectionRevision === connection.epoch) return
-  const hash = createHash('sha256').update(JSON.stringify(['model-order-binding', scope.ownerId, agentId, route, connectionId, connection.epoch, model])).digest('hex')
+  const { runMayUseCredentialSql } = await import('./personal-policy')
+  const { rows: [connection] } = await pool.query<{ epoch: string; ownerId: string }>(
+    `SELECT c.epoch::text AS epoch,c."ownerId" FROM byos_connections c WHERE c.id::text=$1 AND c.state='connected' AND c.paused=false
+      AND c.provider=$4 AND ${runMayUseCredentialSql('c."ownerId"', '$2', '$3')}
+      AND EXISTS (SELECT 1 FROM agents a WHERE a.id::text=$5 AND a."userId"=$2 AND a.harness=$6)`,
+    [connectionId, scope.ownerId, scope.workspaceId, harness === 'codex' ? 'codex' : 'claude', agentId, harness])
+  if (!connection) throw new (await import('./action-error')).ActionFailureError('executionAccountUnavailable')
+  if (connection.ownerId !== scope.ownerId) {
+    const { authorizeSubscriptionWorkspace } = await import('./subscription-runtime')
+    await authorizeSubscriptionWorkspace(scope.ownerId, scope.workspaceId)
+    await authorizeSubscriptionWorkspace(connection.ownerId, scope.workspaceId)
+  }
+  const { rows: [latest] } = await pool.query<{ id: string; connectionId: string; modelId: string; connectionRevision: string; workspaceId: string }>(
+    'SELECT id,"connectionId"::text AS "connectionId","modelId","connectionRevision"::text AS "connectionRevision","workspaceId" FROM byos_bindings WHERE "ownerId"=$1 AND "consumerId"=$2 AND route=$3 ORDER BY "createdAt" DESC,id DESC LIMIT 1',
+    [connection.ownerId, agentId, route])
+  if (latest && latest.connectionId === connectionId && latest.modelId === model && latest.connectionRevision === connection.epoch && latest.workspaceId === scope.workspaceId) return latest.id
+  const hash = createHash('sha256').update(JSON.stringify(['model-order-binding', connection.ownerId, scope.workspaceId, agentId, route, connectionId, connection.epoch, model])).digest('hex')
   const id = `${hash.slice(0, 8)}-${hash.slice(8, 12)}-4${hash.slice(13, 16)}-8${hash.slice(17, 20)}-${hash.slice(20, 32)}`
-  await pool.query(`INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId","createdAt")
-    SELECT $1,$2,$3,$4,c.id,c.epoch,$5,$6,clock_timestamp() FROM byos_connections c WHERE c.id::text=$7 AND c."ownerId"=$2 AND c.state='connected' AND c.epoch::text=$8
-    ON CONFLICT (id) DO UPDATE SET "createdAt"=clock_timestamp()`,
-  [id, scope.ownerId, scope.workspaceId, agentId, route, model, connectionId, connection.epoch])
+  const inserted = await pool.query(`INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId","createdAt")
+    SELECT $1,$2,$3,$4,c.id,c.epoch,$5,$6,clock_timestamp() FROM byos_connections c WHERE c.id::text=$7 AND c."ownerId"=$2 AND c.state='connected' AND c.paused=false AND c.epoch::text=$8
+      AND ${runMayUseCredentialSql('c."ownerId"', '$9', '$3')}
+    ON CONFLICT (id) DO UPDATE SET "createdAt"=clock_timestamp() RETURNING id`,
+  [id, connection.ownerId, scope.workspaceId, agentId, route, model, connectionId, connection.epoch, scope.ownerId])
+  if (!inserted.rowCount) throw new (await import('./action-error')).ActionFailureError('executionAccountUnavailable')
+  return id
 }
 
 const HARNESS_NAMES: Record<OrderEntry['harness'], string> = { claude_code: 'Claude Code', codex: 'Codex' }
@@ -102,7 +114,7 @@ const HARNESS_NAMES: Record<OrderEntry['harness'], string> = { claude_code: 'Cla
 export function modelUnavailableCard(reason: DispatchNothingReason, named?: { agent: string; model: string; installed?: boolean; device?: NoDeviceWhy }) {
   const copy = defaultAgentCopy
   const line = {
-    noModels: copy.needsModelNoModels, cloudNotConfigured: copy.needsModelCloud, noDevice: noDeviceLine(named?.device), unavailable: copy.needsModelUnavailable,
+    noModels: copy.needsModelNoModels, cloudNotConfigured: copy.needsModelCloud, cloudTemporarilyUnavailable: copy.needsModelCloudUnavailable, noDevice: noDeviceLine(named?.device), checking: copy.needsModelChecking, unavailable: copy.needsModelUnavailable,
     // Installed but nothing it can run: a subscription model on a Mikka too old to take a subscription run.
     notOffered: copy.needsModelNotOffered, namedDevice: named?.installed ? copy.needsModelDeviceUpdate : copy.needsModelDeviceAgent,
     pickedNoDevice: copy.needsModelPickedNoDevice, pickedUnavailable: copy.needsModelPickedUnavailable,

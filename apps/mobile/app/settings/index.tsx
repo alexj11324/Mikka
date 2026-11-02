@@ -6,6 +6,7 @@ import { CardButton } from '@/components/cards'
 import { Spinner } from '@/components/icons'
 import { NavBar, underBar } from '@/components/NavBar'
 import { PushRow } from '@/components/PushRow'
+import { PreferenceSaveNotice } from '@/components/PreferenceSaveNotice'
 import { Avatar, Row } from '@/components/settings'
 import { Symbol, type SymbolName } from '@/components/Symbol'
 import { Text } from '@/components/Text'
@@ -29,8 +30,8 @@ export default function SettingsScreen() {
   const close = () => (router.canGoBack() ? router.back() : router.replace('/'))
   const signOut = async () => {
     if (Platform.OS !== 'web') await (await import('@/lib/push')).unregisterPush().catch(() => undefined)
-    await authClient.signOut()
     clearApiCache()
+    await authClient.signOut()
   }
   // Signing out asks first, as the system's action sheet (usability review #6).
   const confirmSignOut = () => {
@@ -53,6 +54,7 @@ export default function SettingsScreen() {
       ) : !data ? <View style={{ paddingTop: 40, alignItems: 'center' }}><Spinner /></View> : (
         <ScrollView {...underBar} contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 24 }}>
           <PushRow proactive={data.preferences.proactive} />
+          <PreferenceSaveNotice />
           <Group>
             <Row icon={<Avatar name={data.user.name || data.user.email} image={data.user.image} size={40} />} label={data.user.name || data.user.email} detail={data.user.email} onPress={() => router.push('/settings/profile')} />
             <Row icon={icon('briefcase', BriefcaseBusiness)} label="工作区" value={data.workspace.name} onPress={() => router.push('/settings/workspace')} />

@@ -103,7 +103,7 @@ export default function BotInfo() {
         ) : null}
         {computer.data ? (
           <Group>
-            <Row icon={<Symbol name="desktopcomputer" size={19} />} label="电脑" value={computerLabel(computer.data)} onPress={() => void openOnWeb(webChatPath(id))} />
+            <Row icon={<Symbol name="desktopcomputer" size={19} />} label="电脑" value={computerLabel(computer.data)} onPress={() => { const target = webChatPath(id === 'coordinator' ? null : id, home.data?.workspace.id); if (target) void openOnWeb(target) }} />
           </Group>
         ) : null}
         {pullRequests.length ? (

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import useSWR from 'swr'
+import useSWR, { useSWRConfig, type SWRResponse } from 'swr'
 import useSWRInfinite from 'swr/infinite'
 import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
@@ -22,7 +22,7 @@ import { CredentialDialog, type CredentialTarget } from '@/components/plugins/cr
 import { GitHubSettings } from '@/components/plugins/github-settings'
 import { LinearSettings } from '@/components/settings/linear-settings'
 import { TelegramSettings } from '@/components/settings/telegram-settings'
-import { SettingsLoading, SettingsSection } from '@/components/settings/primitives'
+import { SettingsLoading, SettingsSaveError, SettingsSection } from '@/components/settings/primitives'
 import { IconTile } from '@/components/reui/icon-tile'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
@@ -34,6 +34,9 @@ import { SearchInput } from '@/components/ui/search-input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 type OwnAppState = 'connected' | 'notConnected' | 'paused' | null
+interface OwnAppStates { states: Partial<Record<OwnAppId, OwnAppState>>; failed: OwnAppId[] }
+type OwnAppsRead = Pick<SWRResponse<OwnAppStates>, 'data' | 'error' | 'isLoading' | 'isValidating' | 'mutate'>
+const OWN_APP_STATES_KEY = 'plugin-own-app-states'
 /** Items a section shows before its ›. */
 const SECTION_PREVIEW = 6
 const CATEGORY_PREVIEW = 4
@@ -50,26 +53,45 @@ async function fetchSkills([path, query, page]: readonly [string, string, number
   return await response.json() as SkillsPage
 }
 
-/** The state word for GitHub, Linear and Telegram rows; null hides it (not set up, or unreadable). */
-async function fetchOwnAppStates(): Promise<Record<OwnAppId, OwnAppState>> {
-  const github = fetch(withBasePath('/api/integrations/github'), { cache: 'no-store' })
-    .then(async response => {
-      if (!response.ok) return null
-      const state = await response.json() as { configured?: boolean; connected?: boolean; installed?: boolean }
-      return !state.configured ? null : state.connected && state.installed ? 'connected' as const : 'notConnected' as const
-    }).catch(() => null)
-  const linear = fetch(withBasePath('/api/integrations/linear/status'), { cache: 'no-store' })
-    .then(async response => {
-      const availability = response.ok ? await response.json() as { enabled?: boolean } : null
-      if (availability?.enabled !== true) return 'paused' as const
-      const state = await getLinearIntegrationState()
-      return !state.configured ? null : state.connected ? 'connected' as const : 'notConnected' as const
-    }).catch(() => null)
-  const telegram = getTelegramIntegrationStatus()
-    .then(state => !state.configured ? null : state.connected ? 'connected' as const : 'notConnected' as const)
-    .catch(() => null)
-  const [g, l, tg] = await Promise.all([github, linear, telegram])
-  return { github: g, linear: l, telegram: tg }
+/** A successful null means not configured; unreadable state rejects instead. */
+async function fetchOwnAppState(id: OwnAppId): Promise<OwnAppState> {
+  if (id === 'github') {
+    const response = await fetch(withBasePath('/api/integrations/github'), { cache: 'no-store' })
+    if (!response.ok) throw new Error('Connection state unavailable')
+    const state = await response.json() as { configured: boolean; connected: boolean; installed: boolean }
+    return !state.configured ? null : state.connected && state.installed ? 'connected' : 'notConnected'
+  }
+  if (id === 'linear') {
+    const response = await fetch(withBasePath('/api/integrations/linear/status'), { cache: 'no-store' })
+    if (!response.ok) throw new Error('Connection state unavailable')
+    const availability = await response.json() as { enabled?: boolean; state?: string }
+    if (availability.state === 'unavailable' || typeof availability.enabled !== 'boolean') throw new Error('Connection state unavailable')
+    if (!availability.enabled) return 'paused'
+    const state = await getLinearIntegrationState()
+    return !state.configured ? null : state.connected ? 'connected' : 'notConnected'
+  }
+  const state = await getTelegramIntegrationStatus()
+  return !state.configured ? null : state.connected ? 'connected' : 'notConnected'
+}
+
+/** A partial failure keeps that app's last successful state, with a visible error. */
+export async function fetchOwnAppStates(previous: Partial<Record<OwnAppId, OwnAppState>> = {}): Promise<OwnAppStates> {
+  const results = await Promise.allSettled(OWN_APPS.map(fetchOwnAppState))
+  const states = { ...previous }
+  const failed: OwnAppId[] = []
+  results.forEach((result, index) => {
+    const id = OWN_APPS[index]
+    if (result.status === 'fulfilled') states[id] = result.value
+    else failed.push(id)
+  })
+  return { states, failed }
+}
+
+function OwnAppsStatus({ read }: { read: OwnAppsRead }) {
+  const t = useTranslations('Plugins')
+  const info = useAppInfo()
+  const failed = read.error ? OWN_APPS : read.data?.failed ?? []
+  return failed.length > 0 ? <SettingsSaveError message={t('connectionStatusFailed', { names: failed.map(id => info(id).name).join('、') })} retryLabel={t('retry')} onRetry={() => { void read.mutate() }} /> : null
 }
 
 /** Where a page sits: the app (`&app=`) or a store section (`&category=`), from the URL. */
@@ -92,7 +114,8 @@ export function PluginsView({ section, rootLabel, linearNotice = null }: { secti
   const [app, setApp] = useState<string | null>(linearNotice ? 'linear' : null)
   const [category, setCategory] = useState<string | null>(null)
   // Read on the list only; an app's own page reads its full state itself.
-  const { data: ownStates } = useSWR(app ? null : 'plugin-own-app-states', fetchOwnAppStates)
+  const { cache } = useSWRConfig()
+  const ownRead = useSWR<OwnAppStates>(app ? null : OWN_APP_STATES_KEY, () => fetchOwnAppStates((cache.get(OWN_APP_STATES_KEY)?.data as OwnAppStates | undefined)?.states))
   useEffect(() => {
     const read = () => { const next = readLocation(); if (next.app || !linearNotice) setApp(next.app); setCategory(next.category) }
     read()
@@ -135,17 +158,20 @@ export function PluginsView({ section, rootLabel, linearNotice = null }: { secti
         </div>}
     </div>
   }
-  if (section === 'connections') return <ConnectedList apps={apps} ownStates={ownStates} href={id => href({ app: id })} onOpen={openApp} />
-  return <Store apps={apps} ownStates={ownStates} category={category} rootLabel={rootLabel} href={href} go={go} tab={tab} setTab={setTab} query={query} setQuery={setQuery} />
+  if (section === 'connections') return <ConnectedList apps={apps} ownRead={ownRead} href={id => href({ app: id })} onOpen={openApp} />
+  return <Store apps={apps} ownRead={ownRead} category={category} rootLabel={rootLabel} href={href} go={go} tab={tab} setTab={setTab} query={query} setQuery={setQuery} />
 }
 
 /** 设置 › 连接: only what the person has connected, one uniform row each. */
-function ConnectedList({ apps, ownStates, href, onOpen }: { apps: ConnectedApps; ownStates: Record<OwnAppId, OwnAppState> | undefined; href: (id: string) => string; onOpen: (id: string) => void }) {
+function ConnectedList({ apps, ownRead, href, onOpen }: { apps: ConnectedApps; ownRead: OwnAppsRead; href: (id: string) => string; onOpen: (id: string) => void }) {
   const t = useTranslations('Plugins')
   const info = useAppInfo()
   const composio = apps.connectedToolkits()
+  const ownStates = ownRead.data?.states
+  const ownKnown = ownRead.data && !ownRead.data.failed.length && !ownRead.error
+  const loading = apps.loading || (!ownRead.data && !ownRead.error)
   const own = OWN_APPS.filter(id => ownStates?.[id] === 'connected' || ownStates?.[id] === 'paused')
-  if (!apps.loading && ownStates && !composio.length && !own.length) return <div className="flex flex-col gap-4">
+  if (!apps.loading && !apps.error && ownKnown && !composio.length && !own.length) return <div className="flex flex-col gap-4">
     <ConnectedAppsStatus apps={apps} />
     <Empty className="min-h-48">
       <EmptyHeader>
@@ -157,23 +183,24 @@ function ConnectedList({ apps, ownStates, href, onOpen }: { apps: ConnectedApps;
   </div>
   return <div className="flex flex-col gap-4">
     <ConnectedAppsStatus apps={apps} />
-    {apps.loading && !composio.length && !own.length ? <SettingsLoading label={t('loadingApps')} /> : <SettingsSection id="plugin-apps">
+    <OwnAppsStatus read={ownRead} />
+    {loading && !composio.length && !own.length ? <SettingsLoading label={t('loadingApps')} /> : composio.length > 0 || own.length > 0 ? <SettingsSection id="plugin-apps">
       {composio.map(id => <ConnectedAppRow key={id} apps={apps} app={id} href={href(id)} onOpen={() => onOpen(id)} />)}
       {own.map(id => <PluginRow key={id} app={id} name={info(id).name} href={href(id)} onOpen={() => onOpen(id)} dim={ownStates?.[id] === 'paused'}>
         <span className="text-xs text-muted-foreground">{t(`state.${ownStates![id]!}`)}</span>
       </PluginRow>)}
-    </SettingsSection>}
+    </SettingsSection> : null}
   </div>
 }
 
 /** The rail's 插件: the 应用 store and the 技能 tab. */
-function Store({ apps, ownStates, category, rootLabel, href, go, tab, setTab, query, setQuery }: {
+function Store({ apps, ownRead, category, rootLabel, href, go, tab, setTab, query, setQuery }: {
   tab: 'apps' | 'skills'
   setTab: (tab: 'apps' | 'skills') => void
   query: string
   setQuery: (query: string) => void
   apps: ConnectedApps
-  ownStates: Record<OwnAppId, OwnAppState> | undefined
+  ownRead: OwnAppsRead
   category: string | null
   rootLabel: string
   href: (next?: { app?: string | null; category?: string | null }) => string
@@ -219,7 +246,7 @@ function Store({ apps, ownStates, category, rootLabel, href, go, tab, setTab, qu
   const own: StoreEntry[] = OWN_APPS.map(id => ({ id, ...info(id), description: '' }))
   const entries = (ids: readonly string[]): StoreEntry[] => ids.flatMap(id => { const item = byId.get(id); return item ? [{ id, name: item.name, description: item.description, iconUrl: item.iconUrl, connect: item.connect }] : [] })
   const stateOf = (id: string) => isOwnApp(id)
-    ? storeItemState({ kind: 'own', state: ownStates?.[id] })
+    ? ownRead.data?.failed.includes(id) && ownRead.data.states[id] === undefined ? 'unavailable' : storeItemState({ kind: 'own', state: ownRead.data?.states[id] })
     : storeItemState({ kind: 'composio', connect: byId.get(id)?.connect, accounts: apps.accountsFor(id).length, canLink: byId.get(id)?.connect === 'credentials' ? apps.canEnterKey : apps.canLink, loading: apps.loading })
   // The sections, as Codex's: 热门 (ours first, then Composio's usage order), 新品推荐, then Composio's categories.
   const sections: { id: string; name: string; items: StoreEntry[]; preview: number }[] = [
@@ -273,6 +300,7 @@ function Store({ apps, ownStates, category, rootLabel, href, go, tab, setTab, qu
       </div>
       <TabsContent value="apps" className="flex flex-col gap-8 pt-4">
         <ConnectedAppsStatus apps={apps} />
+        <OwnAppsStatus read={ownRead} />
         {results ? results.length ? <StoreSection title={t('results')}>{grid(results)}</StoreSection> : <Empty className="min-h-48">
           <EmptyHeader>
             <EmptyMedia variant="icon"><Search aria-hidden="true" /></EmptyMedia>

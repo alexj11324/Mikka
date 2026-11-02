@@ -34,6 +34,8 @@ export interface BotModelMenuGroup {
   plan?: string | null
   /** For a shared credential: the name of the member it belongs to. */
   owner?: string
+  /** Account label or key name and masked suffix; never a credential value. */
+  credentialLabel?: string
   /** Mikka 默认: the points it can spend in this chat's workspace (its own and members' shared ones). */
   points?: number
   /** Mikka 默认 with no points yet: the free messages left before a card is needed. */
@@ -45,8 +47,13 @@ export interface BotModelCurrent extends BotModelMenuOption {
   kind: BotModelGroupKind
   /** The person picked it. False: it is what the resolution order gives today. */
   chosen: boolean
-  /** False when the chosen credential was removed, unshared or ran out of quota. */
+  /** True only when this credential is confirmed usable. */
   available: boolean
+  /** Unknown or stale subscription quota remains selectable for a new check. */
+  availability?: 'available' | 'checking' | 'exhausted'
+  credentialLabel?: string
+  /** The effective next choice differs from the stored preference. */
+  fallback?: 'preference' | 'points' | 'quota'
   /**
    * Set when the subscription ran out of quota. With a fallback key, the rest
    * of `current` is that key's model, which the next turn uses.
@@ -73,7 +80,7 @@ export interface BotModelMenu {
 
 /** The option the chip and the menu's check mark stand for. */
 export function isCurrent(menu: Pick<BotModelMenu, 'current'>, option: BotModelMenuOption) {
-  return menu.current.available && menu.current.id === option.id
+  return menu.current.id === option.id
 }
 
 /**

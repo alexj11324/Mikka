@@ -3,6 +3,7 @@ import * as SecureStore from 'expo-secure-store'
 import { authClient } from '@/lib/auth'
 import { API_URL } from '@/lib/config'
 import { endLostSession } from '@/lib/session'
+import { apiCache } from './api-cache'
 
 const WORKSPACE_KEY = 'mikka_workspace'
 
@@ -49,6 +50,7 @@ export async function authHeaders(): Promise<Record<string, string>> {
 export const REQUEST_TIMEOUT_MS = 30_000
 
 export async function api<T>(path: string, init: { method?: string; body?: unknown } = {}): Promise<T> {
+  const context = apiCache.context()
   const headers: Record<string, string> = { accept: 'application/json', ...await authHeaders() }
   if (init.body !== undefined) headers['content-type'] = 'application/json'
   const controller = new AbortController()
@@ -60,7 +62,8 @@ export async function api<T>(path: string, init: { method?: string; body?: unkno
     credentials: Platform.OS === 'web' ? 'include' : 'omit',
     signal: controller.signal,
   }).finally(() => clearTimeout(timer))
-  if (response.status === 401) void endLostSession()
+  // A response for a previous identity must not sign the current person out.
+  if (response.status === 401) apiCache.commit(context, () => { void endLostSession() })
   if (response.status === 204) return undefined as T
   const data = await response.json().catch(() => null) as (T & { error?: string }) | null
   if (!response.ok) throw new ApiError(response.status, data?.error ?? `http${response.status}`)

@@ -7,7 +7,7 @@ import { UNFINISHED_RUN_STATUSES } from './agent-run-statuses'
  * dispatch ("continuesRunId", lib/thread-dispatch.ts); a chain is a root and every run reachable from it.
  *
  * No chain column: chains are resolved on the read path with a recursive CTE
- * over those two links. A link counts only between runs of the same owner on the same
+ * over those links. A link counts only between runs of the same owner on the same
  * issue (an issue belongs to exactly one personal or workspace scope, so this also keeps a
  * chain inside one workspace). Recursion has a depth limit of 64. Chains that
  * exceed it are rejected, including corrupt cycles; no path arrays or fallback
@@ -43,6 +43,10 @@ export interface RunChain {
 const UUID = `'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'`
 /** The continuation origin as a uuid, only when well-formed, so it compares to the primary key. */
 const ORIGIN = (alias: string) => `(CASE WHEN ${alias}."questionContinuation"->>'originRunId' ~ ${UUID} THEN (${alias}."questionContinuation"->>'originRunId')::uuid END)`
+/** Both read models follow exactly these links, with the same owner and issue fence. */
+const PARENT = (child: string, parent: string) => `${parent}.id IN (${child}.origin, ${child}."retryOf", ${child}."continuesRunId")
+  AND ${parent}."userId" = ${child}."userId" AND ${parent}."issueId" IS NOT DISTINCT FROM ${child}."issueId"`
+
 
 /**
  * Every run in scope with its chain root. `scope` filters agent_runs aliased `r`;
@@ -54,8 +58,7 @@ function chainSql(scope: string, depth: string) {
       SELECT r.id, r."userId", r."issueId", r."createdAt", ${ORIGIN('r')} AS origin, r."retryOf", r."continuesRunId" FROM agent_runs r WHERE ${scope}
     ), edges AS (
       SELECT DISTINCT c.id AS child, p.id AS parent FROM runs c JOIN runs p
-        ON p.id IN (c.origin, c."retryOf", c."continuesRunId")
-        AND p."userId" = c."userId" AND p."issueId" IS NOT DISTINCT FROM c."issueId"
+        ON ${PARENT('c', 'p')}
     ), up AS (
       SELECT id AS start, id AS node, 0 AS depth FROM runs
       UNION
@@ -87,6 +90,34 @@ export async function listIssueRunChains(q: RunChainQueryable, issueId: string, 
     SELECT ${SELECT_ATTEMPTS}, roots."createdAt" AS "rootCreatedAt"
     FROM assigned a JOIN roots ON roots.root = a.root JOIN agent_runs x ON x.id = a.id`, [issueId, [...userIds], limit, RUN_CHAIN_MAX_DEPTH])
   return foldChains(rows)
+}
+
+/** Roots started in the period, among these bots; retries and continuations share one root. */
+export async function listBotRunRoots(q: RunChainQueryable, botIds: readonly string[], start: Date, end: Date): Promise<Array<{ rootRunId: string; botId: string; createdAt: Date }>> {
+  if (!botIds.length) return []
+  // Only month-local runs seed the walk. Parents may belong to another bot or
+  // month, so resolve them by primary key without widening the visible result.
+  const { rows } = await q.query(`
+    WITH RECURSIVE up AS (
+      SELECT r.id AS start, r.id AS node, r."userId", r."issueId", r."createdAt", ${ORIGIN('r')} AS origin, r."retryOf", r."continuesRunId", 0 AS depth
+      FROM agent_runs r WHERE r."botId" = ANY($1::uuid[]) AND r."createdAt" >= $2::timestamptz AND r."createdAt" < $3::timestamptz
+      UNION
+      SELECT u.start, p.id, p."userId", p."issueId", p."createdAt", ${ORIGIN('p')}, p."retryOf", p."continuesRunId", u.depth + 1
+      FROM up u JOIN agent_runs p ON ${PARENT('u', 'p')}
+      WHERE u.depth < $4
+    ), assigned AS (
+      SELECT DISTINCT ON (u.start) u.node AS root,
+        EXISTS (SELECT 1 FROM up tail JOIN agent_runs p ON ${PARENT('tail', 'p')}
+          WHERE tail.start = u.start AND tail.depth = $4) AS "depthExceeded"
+      FROM up u ORDER BY u.start, u.depth DESC, u."createdAt", u.node
+    )
+    SELECT DISTINCT root.id::text AS "rootRunId", root."botId", root."createdAt", false AS "depthExceeded"
+    FROM assigned a JOIN agent_runs root ON root.id = a.root
+    WHERE NOT a."depthExceeded" AND root."botId" = ANY($1::uuid[]) AND root."createdAt" >= $2::timestamptz AND root."createdAt" < $3::timestamptz
+    UNION ALL
+    SELECT NULL::text, NULL::uuid, NULL::timestamptz, true WHERE EXISTS (SELECT 1 FROM assigned WHERE "depthExceeded")`, [[...botIds], start, end, RUN_CHAIN_MAX_DEPTH])
+  if (rows.some(row => row.depthExceeded)) throw new Error('runChainDepthExceeded')
+  return rows.map(row => ({ rootRunId: String(row.rootRunId), botId: String(row.botId), createdAt: row.createdAt as Date }))
 }
 
 function foldChains(rows: Record<string, unknown>[]): RunChain[] {

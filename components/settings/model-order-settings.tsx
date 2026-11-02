@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import useSWR from 'swr'
@@ -8,7 +8,7 @@ import { useFormatter, useTranslations } from 'next-intl'
 import { ChevronDown, GripVertical, KeyRound, MoreHorizontal } from 'lucide-react'
 import { arrayMove } from '@dnd-kit/sortable'
 import { Kanban, KanbanColumnContent, KanbanItem, KanbanItemHandle } from '@/components/reui/kanban'
-import { changeModelOrder, type getModelOrder } from '@/app/actions/model-order'
+import { changeModelOrder, checkModelOrderQuota, type getModelOrder } from '@/app/actions/model-order'
 import { ModelLabel, harnessName } from '@/components/labels/entity-labels'
 import { SettingRow, SettingsSaveError, SettingsSection, settingsSectionAction } from '@/components/settings/primitives'
 import { Button } from '@/components/ui/button'
@@ -36,8 +36,9 @@ const sourceKey = (item: Pick<OrderCandidate, 'harness' | 'model' | 'source'>) =
   `${item.harness}:${item.model}:${item.source.kind === 'subscription' ? item.source.connectionId : item.source.keyId}`
 
 /**
- * 模型与订阅 › 运行位置 and 允许使用的模型 (decision 2026-11-02-1400). New runs take
- * the first model here that can run now, on a computer that takes part in
+ * 模型与订阅 › 线程运行位置 and 线程默认模型 (decision 2026-11-02-1400).
+ * Without an explicit thread model, new runs take the first model here that
+ * can run now, on a computer that takes part in
  * scheduling (本地) or the person's own E2B machine (云端). Drag a row, use
  * its handle with Space and the arrow keys, or its menu (移到最前, 上移, 下移)
  * to reorder; each change saves at once. A refused reorder puts the list back
@@ -58,6 +59,21 @@ export function ModelOrderSettings({ workspaceId }: { workspaceId: string }) {
   const [keyOpen, setKeyOpen] = useState(false)
   const keyDialog = usePresence(keyOpen)
   const data = order.data && !order.data.error ? order.data : null
+
+  async function checkQuota(connectionId: string) {
+    setPending(true); setFailed(null)
+    try {
+      // The server resolves the credential's owner from authorized candidates,
+      // including a teammate's currently shared subscription.
+      const result = await checkModelOrderQuota(connectionId, workspaceId)
+      if (result.error) throw new Error('Allowance unconfirmed')
+      await order.mutate(result, { revalidate: false })
+      const entries = result.entries.filter(row => row.source.kind === 'subscription' && row.source.connectionId === connectionId)
+      if (!entries.length || entries.some(row => row.block?.reason === 'checking')) throw new Error('Allowance unconfirmed')
+    } catch {
+      setFailed({ message: t('quotaCheckUnconfirmed'), retry: () => void checkQuota(connectionId) })
+    } finally { setPending(false) }
+  }
 
   /** Saves one change; `onFail` replaces the page's error line for changes with their own place to say so. */
   async function save(change: Change, optimistic?: OrderView, onFail?: () => void) {
@@ -101,8 +117,20 @@ export function ModelOrderSettings({ workspaceId }: { workspaceId: string }) {
     : e2b.configured === false ? t('cloudNoKey') : null
   // R1: what fixes or explains the location sits on its row: 打开设备 for 本地; 填入 E2B Key for 云端 without one.
   const locationAction = data.location === 'local'
-    ? <Button type="button" variant="secondary" size="sm" render={<Link href={settingsHref('computers', workspaceId)} />}>{t('openDevices')}</Button>
+    ? <Button nativeButton={false} variant="secondary" size="sm" render={<Link href={settingsHref('computers', workspaceId)} />}>{t('openDevices')}</Button>
     : e2b.configured === false && <Button type="button" variant="secondary" size="sm" onClick={() => setKeyOpen(true)}>{t('setE2BKey')}</Button>
+  const locationState = data.location !== 'cloud' ? undefined : e2b.configured === undefined ? 'checking' : !e2b.configured ? 'missingKey' : undefined
+  const repair = (row: OrderRow) => {
+    const reason = row.block?.reason
+    if (reason === 'checking' && row.source.kind === 'subscription') return <Button type="button" variant="secondary" size="sm" disabled={pending} onClick={() => { if (row.source.kind === 'subscription') void checkQuota(row.source.connectionId) }}>{t('checkQuota')}</Button>
+    if (reason === 'cloudNotConfigured' || (!row.block && locationState === 'missingKey')) return <Button type="button" variant="secondary" size="sm" disabled={pending} onClick={() => setKeyOpen(true)}>{t('setE2BKey')}</Button>
+    if (reason === 'noDevice') return <Button nativeButton={false} variant="secondary" size="sm" render={<Link href={settingsHref('computers', workspaceId)} />}>{t('openDevices')}</Button>
+    if ((reason === 'paused' || reason === 'expired') && row.source.kind === 'subscription') return <Button nativeButton={false} variant="secondary" size="sm" render={<a href={`#subscription-${row.source.connectionId}`} />}>{t(reason === 'paused' ? 'enableSubscription' : 'reconnectSubscription')}</Button>
+    if (reason === 'keyRefused' && row.source.kind === 'api_key') return <Button nativeButton={false} variant="secondary" size="sm" render={<a href={`#api-key-${row.source.keyId}`} />}>{t('openApiKey')}</Button>
+    // A removed source may have no row left: its source section retains the recovery control.
+    if (reason === 'missing') return <Button nativeButton={false} variant="secondary" size="sm" render={<a href={row.source.kind === 'subscription' ? '#subscriptions-heading' : '#api-keys-heading'} />}>{t(row.source.kind === 'subscription' ? 'openSubscription' : 'openApiKey')}</Button>
+    return null
+  }
   return <>
     <SettingsSection id="run-location-heading" title={t('location')}>
       <SettingRow title={data.location === 'local' ? t('local') : t('cloud')} description={locationLine ?? undefined}>
@@ -123,8 +151,9 @@ export function ModelOrderSettings({ workspaceId }: { workspaceId: string }) {
         </span>
       </SettingRow>}
     </SettingsSection>
-    {/* 优先使用的 Agent (Harness draft): where a model both Agents run goes by default. */}
-    <SettingsSection id="agent-heading" title={t('agentSection')}>
+    {/* CC PR #1053: Agent preference and the task's preferred models share one card. */}
+    <SettingsSection id="model-order-heading" title={t('title')} description={t('description')}
+      action={data.entries.length > 0 && <Button type="button" {...settingsSectionAction} disabled={pending} onClick={() => setAdding(true)}>{t('add')}</Button>}>
       <SettingRow title={t('preferredAgent')} description={t('preferredAgentHint')}>
         <ToggleGroup aria-label={t('preferredAgent')} variant="segment" spacing={0.5} value={[data.preferredHarness]} disabled={pending}
           onValueChange={values => { const next = values[0]; if ((next === 'claude_code' || next === 'codex') && next !== data.preferredHarness) void save({ kind: 'preferred', harness: next }, { ...data, preferredHarness: next }) }}>
@@ -132,9 +161,6 @@ export function ModelOrderSettings({ workspaceId }: { workspaceId: string }) {
           <ToggleGroupItem value="codex">{harnessName('codex')}</ToggleGroupItem>
         </ToggleGroup>
       </SettingRow>
-    </SettingsSection>
-    <SettingsSection id="model-order-heading" title={t('title')}
-      action={data.entries.length > 0 && <Button type="button" {...settingsSectionAction} disabled={pending} onClick={() => setAdding(true)}>{t('add')}</Button>}>
       {data.entries.length === 0
         ? <div className="flex flex-col items-center gap-3 px-5 py-7">
           {/* C8: one line naming what is missing, and the one button that gets it (R-41). */}
@@ -142,9 +168,12 @@ export function ModelOrderSettings({ workspaceId }: { workspaceId: string }) {
             ? <><p className="text-sm text-muted-foreground">{t('empty')}</p>
               <Button type="button" disabled={pending} onClick={() => setAdding(true)}>{t('add')}</Button></>
             : <><p className="text-sm text-muted-foreground">{data.credentials === 0 ? t('emptyNoCredential') : t('emptyNoModels')}</p>
-              <Button type="button" variant="secondary" render={<a href="#subscriptions-heading" />}>{data.credentials === 0 ? t('connectCredential') : t('openCredentials')}</Button></>}
+              <span className="flex flex-wrap justify-center gap-2">
+                <Button nativeButton={false} variant="secondary" render={<a href="#subscriptions-heading" />}>{t(data.credentials === 0 ? 'connectSubscription' : 'openSubscription')}</Button>
+                <Button nativeButton={false} variant="secondary" render={<a href="#api-keys-heading" />}>{t(data.credentials === 0 ? 'addApiKey' : 'openApiKey')}</Button>
+              </span></>}
         </div>
-        : <OrderList rows={data.entries} pending={pending} unsaved={unsaved} preferred={data.preferredHarness} onMove={move} onRemove={row => { void remove(row) }}
+        : <OrderList rows={data.entries} pending={pending} unsaved={unsaved} preferred={data.preferredHarness} locationState={locationState} repair={repair} onMove={move} onRemove={row => { void remove(row) }}
           onAgent={(row, harness) => void save({ kind: 'harness', id: row.id, harness }, { ...data, entries: data.entries.map(entry => entry.id === row.id ? { ...entry, harness } : entry) })} />}
     </SettingsSection>
     {failed && <SettingsSaveError message={failed.message} retryLabel={commonT('retry')} onRetry={failed.retry} />}
@@ -153,11 +182,11 @@ export function ModelOrderSettings({ workspaceId }: { workspaceId: string }) {
       if (picked.length) await save({ kind: 'add', entries: picked.map(({ harness, model, source }) => ({ harness, model, source })) })
     }} />}
     {keyDialog.value && e2b.configured !== undefined && <E2BKeyDialog open={keyDialog.open} onOpenChangeComplete={keyDialog.onOpenChangeComplete} configured={e2b.configured}
-      onClose={changed => { setKeyOpen(false); if (changed) void e2b.mutate() }} />}
+      onClose={changed => { setKeyOpen(false); if (changed) void Promise.all([e2b.mutate(), order.mutate()]) }} />}
   </>
 }
 
-function OrderList({ rows, pending, unsaved, preferred, onMove, onRemove, onAgent }: { rows: OrderRow[]; pending: boolean; unsaved: { id: string; to: number } | null; preferred: OrderHarness; onMove: (from: number, to: number) => void; onRemove: (row: OrderRow) => void; onAgent: (row: OrderRow, harness: OrderHarness) => void }) {
+function OrderList({ rows, pending, unsaved, preferred, locationState, repair, onMove, onRemove, onAgent }: { rows: OrderRow[]; pending: boolean; unsaved: { id: string; to: number } | null; preferred: OrderHarness; locationState?: 'checking' | 'missingKey'; repair: (row: OrderRow) => ReactNode; onMove: (from: number, to: number) => void; onRemove: (row: OrderRow) => void; onAgent: (row: OrderRow, harness: OrderHarness) => void }) {
   const t = useTranslations('Settings.modelOrder')
   // No live reorder while dragging (the sortable strategy shows the shift): a live reorder moved the row under
   // the pointer, and a drop before dnd-kit re-measured landed on the stale target and put the row back (#1000).
@@ -177,37 +206,41 @@ function OrderList({ rows, pending, unsaved, preferred, onMove, onRemove, onAgen
       },
     }}>
     <KanbanColumnContent value="models" aria-label={t('title')} className="gap-0 divide-y divide-border" render={<ol />}>
-      {items.map((row, index) => <OrderItem key={row.id} row={row} index={index} last={index === items.length - 1} pending={pending} preferred={preferred} onAgent={harness => onAgent(row, harness)}
+      {items.map((row, index) => <OrderItem key={row.id} row={row} index={index} last={index === items.length - 1} pending={pending} preferred={preferred} locationState={locationState} repair={repair(row)} onAgent={harness => onAgent(row, harness)}
         retry={unsaved?.id === row.id ? () => onMove(index, Math.min(unsaved.to, items.length - 1)) : undefined}
         onFirst={() => onMove(index, 0)} onUp={() => onMove(index, index - 1)} onDown={() => onMove(index, index + 1)} onRemove={() => onRemove(row)} />)}
     </KanbanColumnContent>
   </Kanban>
 }
 
-function OrderItem({ row, index, last, pending, preferred, retry, onAgent, onFirst, onUp, onDown, onRemove }: { row: OrderRow; index: number; last: boolean; pending: boolean; preferred: OrderHarness; retry?: () => void; onAgent: (harness: OrderHarness) => void; onFirst: () => void; onUp: () => void; onDown: () => void; onRemove: () => void }) {
+function OrderItem({ row, index, last, pending, preferred, locationState, repair, retry, onAgent, onFirst, onUp, onDown, onRemove }: { row: OrderRow; index: number; last: boolean; pending: boolean; preferred: OrderHarness; locationState?: 'checking' | 'missingKey'; repair?: ReactNode; retry?: () => void; onAgent: (harness: OrderHarness) => void; onFirst: () => void; onUp: () => void; onDown: () => void; onRemove: () => void }) {
   const t = useTranslations('Settings.modelOrder')
   const commonT = useTranslations('Common')
   const format = useFormatter()
   const block = row.block
   // 顺序未保存 wins over the row's own state until 重试 or the next change (R3).
-  const warn = Boolean(block || retry)
-  const status = retry ? t('orderUnsaved') : !block ? t('ready')
+  const checking = !retry && (block?.reason === 'checking' || (!block && locationState === 'checking'))
+  const warn = Boolean((block && !checking) || retry || (!block && locationState === 'missingKey'))
+  const status = retry ? t('orderUnsaved') : checking ? t('blocked.checking')
+    : block?.reason === 'cloudNotConfigured' || (!block && locationState === 'missingKey') ? t('cloudNoKey')
+    : !block ? t('ready')
     : block.reason === 'quota' && block.resetsAt ? t('quotaUntil', { time: format.dateTime(new Date(block.resetsAt), { month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }) })
       : block.reason === 'noDevice' ? (block.device.why === 'none' ? t('noDevice.none') : t(`noDevice.${block.device.why}`, { device: block.device.device, count: block.device.count, harness: harnessName(row.harness) }))
         : t(`blocked.${block.reason}`)
   // The handle carries the drag semantics; the row stays a list item (the primitive puts role=button on the item too).
-  return <KanbanItem value={row.id} disabled={pending} render={<li />} role="listitem" tabIndex={-1} aria-roledescription={undefined} className="flex items-center gap-3 bg-card py-3 pr-3 pl-2 data-[dragging=true]:relative data-[dragging=true]:z-10 data-[dragging=true]:rounded-xl data-[dragging=true]:shadow-lg data-[dragging=true]:ring-1 data-[dragging=true]:ring-border">
+  return <KanbanItem value={row.id} disabled={pending} render={<li />} role="listitem" tabIndex={-1} aria-roledescription={undefined} className="flex flex-wrap items-center gap-x-3 gap-y-2 bg-card py-3 pr-3 pl-2 data-[dragging=true]:relative data-[dragging=true]:z-10 data-[dragging=true]:rounded-xl data-[dragging=true]:shadow-lg data-[dragging=true]:ring-1 data-[dragging=true]:ring-border">
     <KanbanItemHandle render={<Button type="button" variant="ghost" size="icon-sm" aria-label={t('handle', { model: row.model, position: index + 1 })} />} className="touch-none text-muted-foreground">
       <GripVertical aria-hidden="true" />
     </KanbanItemHandle>
     <span aria-hidden="true" className="w-4 shrink-0 text-center text-xs text-muted-foreground tabular-nums">{index + 1}</span>
-    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+    <span className="flex min-w-0 flex-1 basis-40 flex-col gap-0.5">
       <span className="flex min-w-0 items-center text-sm font-medium">
         {row.source.kind === 'api_key' ? <span className="inline-flex min-w-0 items-center gap-1.5"><KeyRound aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" /><span className="truncate">{row.model}</span></span>
           : <ModelLabel model={row.model} source={row.harness} />}
       </span>
       <span className="truncate text-xs text-muted-foreground">{`${sourceName(t, row)} · ${agentsLine(t, row.agents)}`}</span>
     </span>
+    <span className="ml-auto flex shrink-0 items-center gap-3">
     {/* A model both Agents run: its Agent here, 优先 marking the preferred one (Harness draft). */}
     {row.agents.length > 1 && <DropdownMenu>
       <DropdownMenuTrigger disabled={pending} render={<Button variant="secondary" size="sm" aria-label={t('agentMenu', { model: row.model, agent: harnessName(row.harness) })} />}>
@@ -224,8 +257,11 @@ function OrderItem({ row, index, last, pending, preferred, retry, onAgent, onFir
         </DropdownMenuGroup>
       </DropdownMenuContent>
     </DropdownMenu>}
-    <span role="status" className={cn('flex shrink-0 items-center gap-1.5 text-xs', retry ? 'text-destructive' : warn ? 'text-warning-foreground' : 'text-muted-foreground')}>
-      <span aria-hidden="true" className={cn('size-1.5 rounded-full', retry ? 'bg-destructive' : warn ? 'bg-warning' : 'bg-success')} />{status}
+    <span className="flex shrink-0 flex-col items-end gap-1.5">
+      <span role="status" className={cn('flex items-center gap-1.5 text-xs', retry ? 'text-destructive' : warn ? 'text-warning-foreground' : 'text-muted-foreground')}>
+        <span aria-hidden="true" className={cn('size-1.5 rounded-full', retry ? 'bg-destructive' : warn ? 'bg-warning' : checking ? 'bg-muted-foreground' : 'bg-success')} />{status}
+      </span>
+      {!retry && repair}
     </span>
     {retry && <Button type="button" variant="secondary" size="sm" disabled={pending} onClick={retry}>{commonT('retry')}</Button>}
     <DropdownMenu>
@@ -242,6 +278,7 @@ function OrderItem({ row, index, last, pending, preferred, retry, onAgent, onFir
         </DropdownMenuGroup>
       </DropdownMenuContent>
     </DropdownMenu>
+    </span>
   </KanbanItem>
 }
 

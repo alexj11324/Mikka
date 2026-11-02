@@ -13,9 +13,12 @@ export function mobileWebTarget(value: string | null): string {
   if (!value || !value.startsWith('/') || value.startsWith('//')) return '/'
   const url = new URL(value, 'https://mikka.invalid')
   if (url.origin === 'https://mikka.invalid' && url.pathname === '/settings' && !url.search && !url.hash) return '/settings'
-  // Settings › 电脑 and › 模型 (the E2B key): where a 没有可用的电脑 card's rows lead.
+  // Recovery stays within existing settings sections and one validated
+  // workspace. The settings APIs still authorize that workspace normally.
   const settingsSection = url.searchParams.get('section')
-  if (url.origin === 'https://mikka.invalid' && url.pathname === '/settings' && !url.hash && [...url.searchParams.keys()].length === 1 && (settingsSection === 'computers' || settingsSection === 'models')) return `/settings?section=${settingsSection}`
+  const settingsWorkspace = url.searchParams.get('workspace')
+  const settingsKeys = [...url.searchParams.keys()]
+  if (url.origin === 'https://mikka.invalid' && url.pathname === '/settings' && !url.hash && settingsKeys.every(key => key === 'section' || key === 'workspace') && settingsKeys.length === (settingsWorkspace ? 2 : 1) && (!settingsWorkspace || UUID.test(settingsWorkspace)) && (settingsSection === 'computers' || settingsSection === 'models' || settingsSection === 'billing')) return `/settings?section=${settingsSection}${settingsWorkspace ? `&workspace=${settingsWorkspace.toLowerCase()}` : ''}`
   // An HTML artifact's page (资料库 on a bot's page): the viewer's sandboxed frame.
   const frame = /^\/api\/artifacts\/([0-9a-f-]{36})\/versions\/([1-9][0-9]{0,5})\/frame$/i.exec(url.pathname)
   if (url.origin === 'https://mikka.invalid' && frame && UUID.test(frame[1]) && !url.search && !url.hash) return `/api/artifacts/${frame[1].toLowerCase()}/versions/${frame[2]}/frame`
@@ -23,9 +26,9 @@ export function mobileWebTarget(value: string | null): string {
   const keys = [...url.searchParams.keys()]
   const section = url.searchParams.get('section')
   const bot = url.searchParams.get('bot')
+  const workspace = url.searchParams.get('workspace')
   const issue = url.searchParams.get('issue')
-  if (section === 'coordinator' && keys.length === 1) return '/?section=coordinator'
-  if (section === 'coordinator' && bot && UUID.test(bot) && keys.length === 2) return `/?section=coordinator&bot=${bot.toLowerCase()}`
+  if (section === 'coordinator' && keys.every(key => key === 'section' || key === 'bot' || key === 'workspace') && keys.length === 1 + (bot ? 1 : 0) + (workspace ? 1 : 0) && (!bot || UUID.test(bot)) && (!workspace || UUID.test(workspace))) return `/?section=coordinator${bot ? `&bot=${bot.toLowerCase()}` : ''}${workspace ? `&workspace=${workspace.toLowerCase()}` : ''}`
   if (issue && UUID.test(issue) && keys.length === 1) return `/?issue=${issue.toLowerCase()}`
   const app = url.searchParams.get('app')
   if (section === 'plugins' && keys.length === 1) return '/?section=plugins'

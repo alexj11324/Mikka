@@ -23,6 +23,9 @@ mock.module(new URL('../lib/coordinator/decide.ts', import.meta.url).href, { nam
 } })
 
 test('one task, one thread: dispatch continues the task\'s thread unless the person explicitly asks for a new one', { skip: !dbUrl }, async t => {
+  const priorByos = process.env.MIKKA_BYOS_ENABLED
+  process.env.MIKKA_BYOS_ENABLED = '1'
+  t.after(() => { if (priorByos === undefined) delete process.env.MIKKA_BYOS_ENABLED; else process.env.MIKKA_BYOS_ENABLED = priorByos })
   const { Pool } = await import('pg')
   const pool = new Pool({ connectionString: dbUrl, max: 3 })
   const steps = await import('../workflows/coordinator/steps')
@@ -62,8 +65,8 @@ test('one task, one thread: dispatch continues the task\'s thread unless the per
     const ws = await seedWorkspace(pool, id, [{ userId: id, role: 'admin' }])
     // A connected ChatGPT subscription whose account lists gpt-5: 允许使用的模型 is that model by default, 运行位置 本地.
     const connection = randomUUID()
-    await pool.query(`INSERT INTO byos_connections (id,"ownerId","workspaceId",provider,state,epoch,"secretName","secretDigest","providerSubject","modelCatalog") VALUES ($1,$2,$3,'codex','connected',1,$4,$5,'synthetic-subject',$6)`,
-      [connection, id, ws.id, `synthetic-${connection}`, 'a'.repeat(64), JSON.stringify({ revision: '1', models: ['gpt-5'] })])
+    await pool.query(`INSERT INTO byos_connections (id,"ownerId","workspaceId",provider,state,epoch,"secretName","secretDigest","providerSubject","modelCatalog",quota) VALUES ($1,$2,$3,'codex','connected',1,$4,$5,'synthetic-subject',$6,$7)`,
+      [connection, id, ws.id, `synthetic-${connection}`, 'a'.repeat(64), JSON.stringify({ revision: '1', models: ['gpt-5'] }), JSON.stringify({ vendor: 'codex', source: 'official', status: 'ok', plan: 'Pro', observedAt: new Date().toISOString(), windows: [{ kind: 'five_hour', used: .2, resetsAt: null }] })])
     await pool.query(`INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId") VALUES ($1,$2,$3,'catalogue',$4,1,'codex_cpa','gpt-5')`, [randomUUID(), id, ws.id, connection])
     const issueId = await seedIssue(pool, id)
     // A numbered task gets a publication branch; each person's own number keeps the branches apart.
@@ -96,7 +99,7 @@ test('one task, one thread: dispatch continues the task\'s thread unless the per
   await t.test('dispatching twice leaves one thread; the second note reaches it as a message', async () => {
     const a = await person()
     const first = await dispatch(a)
-    assert.equal(first.thread, 'new')
+    assert.equal(first.thread, 'new', JSON.stringify(first))
     const second = await dispatch(a, { note: 'Also cover the empty input.' })
     assert.deepEqual([second.thread, second.runId, second.threadId, second.status], ['message', first.runId, first.runId, 'messageSent'])
     assert.equal((await runs(a.id)).length, 1, 'still one run, one thread')

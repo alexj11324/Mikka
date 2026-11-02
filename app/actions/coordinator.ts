@@ -158,15 +158,19 @@ export async function stopCoordinatorTurn(botId: string | null = null): Promise<
 }
 
 /** 重试 on a failed reply: the same turn again, once per click; the chat shows its normal working state. */
-export async function retryCoordinatorTurn(botId: string | null = null): Promise<ActionResult<{ queued: boolean }>> {
+export async function retryCoordinatorTurn(botId: string | null = null): Promise<ActionResult<{ queued: true } | { queued: false; reason: 'unavailable' | 'working' | 'nothingToRetry' }>> {
   return runAction(async () => {
     const session = await auth.api.getSession({ headers: await headers() })
     if (!session?.user) throw new ActionFailureError('authRequired')
     const bot = await ownBot(session.user, botId)
-    if (!coordinatorEnabled()) return { queued: false }
+    if (!coordinatorEnabled()) return { queued: false as const, reason: 'unavailable' as const }
     const queued = await retryFailedTurn(session.user.id, bot.id)
-    if (queued) after(() => wakeCoordinator(session.user.id))
-    return { queued }
+    if (queued) {
+      after(() => wakeCoordinator(session.user.id))
+      return { queued: true as const }
+    }
+    const current = await chatView(session.user.id, 1, bot.id)
+    return { queued: false as const, reason: current.working ? 'working' as const : 'nothingToRetry' as const }
   })
 }
 

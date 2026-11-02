@@ -11,16 +11,17 @@ const base = {
   parent: null,
   executionId: null,
 };
-test("automatic workers never request a CLI model, even with a subscription binding", () => {
+test("subscription workers pin the provider model; workers without a credential keep CLI auto", () => {
   const subscription = {
     id: "10000000-0000-4000-8000-000000000001",
     modelId: "bound-model",
     route: "codex_cli",
   };
-  assert.equal(
-    Object.hasOwn(freezeWorkerDefinition({ ...base, subscription }), "model"),
-    false,
-  );
+  const frozen = freezeWorkerDefinition({ ...base, subscription });
+  assert.equal(frozen.model, subscription.modelId);
+  assert.equal(frozen.cliModelSelection, "explicit");
+  assert.equal(Object.hasOwn(freezeWorkerDefinition(base), "model"), false);
+  assert.throws(() => freezeWorkerDefinition({ ...base, subscription, model: "slot-alias" }), /agentWorkerSubscriptionMismatch/);
 });
 test("explicit model and device stay frozen through retries", () => {
   const pinnedDeviceId = "10000000-0000-4000-8000-000000000002";

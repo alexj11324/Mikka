@@ -130,6 +130,10 @@ test('API keys: migration replay, sealed storage, shares, picker order and run i
     assert.deepEqual((await store.usableApiKeys(pool, 'alice', personal.id)).map(key => key.provider), ['anthropic'])
     await pool.query('UPDATE workspace_personal_policies SET subscriptions=false WHERE "workspaceId"=$1', [team.id])
     assert.deepEqual((await store.usableApiKeys(pool, 'alice', team.id)).map(key => [key.provider, key.mine]), [['anthropic', true]], 'the admin switch turns off teammates\' shared keys, never her own')
+    const anotherWorkspace = { id: randomUUID(), kind: 'team' as const }
+    await pool.query('INSERT INTO workspace_personal_policies ("workspaceId",subscriptions) VALUES ($1,false)', [anotherWorkspace.id])
+    assert.deepEqual((await store.usableApiKeys(pool, 'alice', anotherWorkspace.id)).map(key => [key.id, key.mine]), [[anthropic.id, true]], 'an own key works in another workspace with no share rows and sharing disabled')
+    assert.equal((await store.listApiKeys(pool, 'alice', anotherWorkspace)).keys.some(key => key.id === anthropic.id), true, 'the account key is still manageable in the other workspace')
     await pool.query('UPDATE workspace_personal_policies SET subscriptions=true WHERE "workspaceId"=$1', [team.id])
 
     // A bot's saved model can be an API key's: usable here, reaching bot chats, a model the key lists.
@@ -149,6 +153,7 @@ test('API keys: migration replay, sealed storage, shares, picker order and run i
     // Each bot-chat model call opens the key again through the same rule.
     assert.deepEqual(await store.openApiKeyForChat(pool, 'alice', team.id, gateway.id, env), { apiKey: gatewayKey, baseUrl: 'https://gateway.example.com/v1', keyOwnerId: 'bob' })
     assert.equal((await store.openApiKeyForChat(pool, 'alice', team.id, anthropic.id, env)).baseUrl, 'https://api.anthropic.com/v1')
+    assert.equal((await store.openApiKeyForChat(pool, 'alice', anotherWorkspace.id, anthropic.id, env)).keyOwnerId, 'alice', 'Bot chat uses its own key across workspaces without team sharing')
     await assert.rejects(store.openApiKeyForChat(pool, 'carol', team.id, anthropic.id, env), { code: 'apiKeyNotFound' })
 
     // Run injection: only an active run whose owner may use the key here.
@@ -159,6 +164,10 @@ test('API keys: migration replay, sealed storage, shares, picker order and run i
     const stopped = async (id: string) => Boolean((await pool.query('SELECT "stopRequestedAt" FROM agent_runs WHERE id=$1', [id])).rows[0].stopRequestedAt)
     const claude = await store.apiKeyForRun(pool, run, anthropic.id, 'claude_code', env)
     assert.deepEqual(claude, { harness: 'claude_code', keyId: anthropic.id, ownerId: 'alice', env: { ANTHROPIC_API_KEY: newKey, ANTHROPIC_BASE_URL: 'https://api.anthropic.com' } })
+    const otherBot = randomUUID(), otherRun = randomUUID()
+    await pool.query('INSERT INTO bots (id,"workspaceId","ownerId") VALUES ($1,$2,$3)', [otherBot, anotherWorkspace.id, 'alice'])
+    await pool.query('INSERT INTO agent_runs (id,"userId","botId",status) VALUES ($1,$2,$3,\'running\')', [otherRun, 'alice', otherBot])
+    assert.equal((await store.apiKeyForRun(pool, otherRun, anthropic.id, 'claude_code', env)).ownerId, 'alice', 'an Agent uses its own key across workspaces even with sharing disabled')
     const codex = await store.apiKeyForRun(pool, run, gateway.id, 'codex', env)
     assert.equal(codex.harness, 'codex')
     assert.deepEqual(codex.harness === 'codex' && [codex.env, codex.codex.model_providers.mikka], [{ MIKKA_MODEL_API_KEY: gatewayKey }, { name: 'Gateway', base_url: 'https://gateway.example.com/v1', env_key: 'MIKKA_MODEL_API_KEY', wire_api: 'responses' }])

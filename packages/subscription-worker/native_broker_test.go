@@ -131,6 +131,27 @@ func TestNativeBrokerMissingMIMEIsOnlyForCodexStreaming(t *testing.T) {
 	}
 }
 
+func TestNativeBrokerRefusalsPreserveCauseWithoutEmittingProviderBody(t *testing.T) {
+	w, _, _ := fixtureWorker(t, "claude")
+	initial := mustAcquire(t, w)
+	bindNativeRunFixture(t, w, initial.Revision, "claude_code_cli")
+	for _, test := range []struct {
+		status int
+		want   string
+	}{
+		{401, "reconnect_required"}, {403, "provider_access_denied"}, {429, "subscription_rate_limited"}, {503, "provider_temporarily_unavailable"},
+	} {
+		t.Run(fmt.Sprint(test.status), func(t *testing.T) {
+			w.NativeClient = &http.Client{Transport: fixedTransport{status: test.status, contentType: "application/json", body: `{"error":{"message":"fixture-private-provider-text"}}`}}
+			emitted := false
+			err := w.NativeStream(context.Background(), initial.Revision, NativeRequest{Path: "/v1/messages", Body: json.RawMessage(`{"model":"fixture-model","stream":true}`)}, func(string) error { emitted = true; return nil }, func([]byte) error { emitted = true; return nil })
+			if err == nil || err.Error() != test.want || emitted {
+				t.Fatalf("refusal=%v emitted=%v", err, emitted)
+			}
+		})
+	}
+}
+
 func TestNativeBrokerFencesSilentRequestsOnDisconnectAndRefusesEchoedBearer(t *testing.T) {
 	w, _, _ := fixtureWorker(t, "claude")
 	initial := mustAcquire(t, w)

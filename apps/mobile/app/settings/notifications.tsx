@@ -2,6 +2,7 @@ import { View } from 'react-native'
 import { SettingsPage, ToggleRow } from '@/components/settings'
 import { Group } from '@/components/ui'
 import { PushRow } from '@/components/PushRow'
+import { PreferenceSaveNotice } from '@/components/PreferenceSaveNotice'
 import { askForPush } from '@/lib/push-state'
 import { useSettings } from '@/lib/settings'
 import type { Preferences } from '@/lib/types'
@@ -12,7 +13,7 @@ import type { Preferences } from '@/lib/types'
  * whether the computer is in use.
  */
 export default function NotificationsScreen() {
-  const { data, savePreferences } = useSettings()
+  const { data, savePreferences, preferenceSave } = useSettings()
   const p = data?.preferences
   if (!p) return <SettingsPage title="通知"><View /></SettingsPage>
   // Turning a push on is the moment to ask iOS, if it has not been asked yet.
@@ -23,14 +24,15 @@ export default function NotificationsScreen() {
   return (
     <SettingsPage title="通知">
       <PushRow proactive={p.proactive} ask />
-      <Group><ToggleRow label="主动消息" value={p.proactive} onChange={proactive => save({ proactive })} /></Group>
+      <Group><ToggleRow label="主动消息" value={p.proactive} disabled={preferenceSave.status !== 'idle'} onChange={proactive => save({ proactive })} /></Group>
       {p.proactive ? (
         <Group label="推送这些事">
-          <ToggleRow label="需要你决策" value={p.pushDecide} onChange={pushDecide => save({ pushDecide })} />
-          <ToggleRow label="线程完成" value={p.pushFinished} onChange={pushFinished => save({ pushFinished })} />
-          <ToggleRow label="每日简报" value={p.pushBriefing} onChange={pushBriefing => save({ pushBriefing })} />
+          <ToggleRow label="需要你决策" value={p.pushDecide} disabled={preferenceSave.status !== 'idle'} onChange={pushDecide => save({ pushDecide })} />
+          <ToggleRow label="线程完成" value={p.pushFinished} disabled={preferenceSave.status !== 'idle'} onChange={pushFinished => save({ pushFinished })} />
+          <ToggleRow label="每日简报" value={p.pushBriefing} disabled={preferenceSave.status !== 'idle'} onChange={pushBriefing => save({ pushBriefing })} />
         </Group>
       ) : null}
+      <PreferenceSaveNotice />
     </SettingsPage>
   )
 }

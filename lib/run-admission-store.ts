@@ -14,7 +14,7 @@ import { publicationBranch } from './run-publication-policy'
 import { admitRepositoryTask, matchesRepositoryAdmission } from './repository-admission'
 import { lockCliAgentPolicy, lockCliTaskScope } from './agent-tool-approval/policy-store'
 import type { WorkerDefinitionSnapshot } from './agent-kit/worker'
-import { dispatchFingerprint, type DispatchInput } from './run-dispatch'
+import { dispatchFingerprint, type DispatchCredential, type DispatchInput } from './run-dispatch'
 import { UNFINISHED_RUN_STATUSES } from './agent-run-statuses'
 import type { RunInvalidReason } from './run-invalid-reason'
 
@@ -22,7 +22,7 @@ import type { RunInvalidReason } from './run-invalid-reason'
 export async function acceptLocalRun(input: {
   id: string; userId: string; issueId: string; agentId: string; deviceId: string; deviceRepoId: string
   source?: 'mcp' | null; botId: string | null; prompt: string; definition: WorkerDefinitionSnapshot; requestEventId?: string
-  dispatch?: DispatchInput; continuation?: boolean; sourceRunId?: string
+  dispatch?: DispatchInput & DispatchCredential; continuation?: boolean; sourceRunId?: string
 }, existing?: PoolClient): Promise<{ runId: string; status?: typeof agentRuns.$inferSelect.status; replayed?: boolean }> {
   const client = existing ?? await pool.connect()
   try {
