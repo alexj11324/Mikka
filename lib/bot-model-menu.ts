@@ -81,9 +81,10 @@ export async function botModelMenu(
   const ownerNames = sharedOwners.length ? await memberNames(scope.workspaceId, sharedOwners) : new Map<string, string>();
   // Mikka 默认 is listed only where this chat's workspace has points for it, with how many (decision 2026-11-02-1450).
   const { hostedPointsHere } = await import("./points-fallback");
-  const points = await hostedPointsHere(scope.workspaceId);
+  const { points, trialLeft } = await hostedPointsHere(scope.workspaceId);
+  const usable = points > 0 || trialLeft > 0;
   const groups: BotModelMenuGroup[] = [
-    ...(points > 0 ? [{ kind: "hosted" as const, points, options: [{ ...HOSTED }] }] : []),
+    ...(usable ? [{ kind: "hosted" as const, points, ...(points > 0 ? {} : { trialLeft }), options: [{ ...HOSTED }] }] : []),
     ...subscriptions.values(),
     ...(ownKeys.length ? [{ kind: "apiKey" as const, options: ownKeys.flatMap(keyOptions) }] : []),
     ...sharedOwners.filter((owner) => ownerNames.has(owner)).map((owner) => ({
@@ -136,7 +137,7 @@ export async function botModelMenu(
     };
   } else if (saved === HOSTED_CHOICE) {
     // Picked before the points ran out here: named, marked unavailable, so the chat says so before sending.
-    current = { ...HOSTED, kind: "hosted", chosen: true, available: points > 0 };
+    current = { ...HOSTED, kind: "hosted", chosen: true, available: usable };
   } else if (saved) {
     const live = await settings.botBinding(scope, saved);
     if (live)
@@ -164,7 +165,7 @@ export async function botModelMenu(
     const first = ordered[0];
     current = first
       ? fromRow(first, false, quotas.get(String(first.connectionId)))
-      : { ...HOSTED, kind: "hosted", chosen: false, available: points > 0 };
+      : { ...HOSTED, kind: "hosted", chosen: false, available: usable };
   }
   // Out of quota: the key the next turn moves to, when 订阅额度用完后，自动改用 API Key allows it (freezeBotModel decides the same way).
   if (current.quota) {
