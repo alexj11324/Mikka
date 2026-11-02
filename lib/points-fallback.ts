@@ -56,3 +56,22 @@ export async function pointsFallback(pool: Pool, scope: { ownerId: string; works
   }
   return null
 }
+
+/**
+ * The points Mikka 默认 can spend in this workspace now, as the model menu
+ * shows them: its own balance and each balance a member shared with it
+ * (sharedCreditWorkspaces), counting only those that would admit a call.
+ * Never another workspace's points the person merely has.
+ */
+export async function hostedPointsHere(workspaceId: string): Promise<number> {
+  const [{ sharedCreditWorkspaces }, { canUseMikkaPaid }, { balancePoints }] = await Promise.all([
+    import('./credit-shares'), import('./abuse/runtime'), import('./billing/hosted-usage'),
+  ])
+  let points = 0
+  for (const payer of [workspaceId, ...await sharedCreditWorkspaces(workspaceId)]) {
+    try { points += balancePoints(await canUseMikkaPaid(payer)) } catch (error) {
+      if (!(error instanceof PaidResourceError) || !NO_POINTS.has(error.code)) throw error
+    }
+  }
+  return points
+}

@@ -34,6 +34,8 @@ export interface BotModelMenuGroup {
   plan?: string | null
   /** For a shared credential: the name of the member it belongs to. */
   owner?: string
+  /** Mikka 默认: the points it can spend in this chat's workspace (its own and members' shared ones). */
+  points?: number
   options: BotModelMenuOption[]
 }
 

@@ -49,6 +49,7 @@ import { HostedRefusalNotice } from '@/components/billing/hosted-refusal-notice'
 import { hostedRefusal } from '@/lib/billing/verification-client'
 import { subscriptionRefusal } from '@/lib/subscription-refusal'
 import { SubscriptionRefusalNotice } from './subscription-refusal-notice'
+import { HostedUnavailableNotice } from './hosted-unavailable-notice'
 import { FailureReason } from './failure-reason'
 import { QuotaNotice, QuotaSwitchLine } from './quota-notice'
 import { RetryReplyButton } from './retry-reply-button'
@@ -385,6 +386,8 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
       {(loadError || stream.error) && <FieldError className="text-xs">{t('loadError')}</FieldError>}
       {failedAt === null && failureNotice}
       {/* Out of quota: after a turn stopped on it, or before the next message is sent. */}
+      {/* On Mikka 默认 with no points here: said before sending (decision 2026-11-02-1450). */}
+      {!data?.error && <HostedUnavailableNotice botId={botId} />}
       {!refusal && (declined === 'quotaUsed' || !data?.error) && <QuotaNotice botId={botId} stopped={declined === 'quotaUsed'}
         retry={(label, disabled) => <RetryReplyButton botId={botId} onQueued={mutate} label={label} disabled={disabled} />} />}
       {unanswered && <Alert variant="destructive"><AlertTitle>{t('unavailable', { name })}</AlertTitle></Alert>}
