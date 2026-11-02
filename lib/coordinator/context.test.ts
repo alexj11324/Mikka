@@ -281,3 +281,9 @@ test('a turn moved off Mikka 默认 for lack of points shows as one notice line 
   assert.equal(packet.authority, 'coordination_data_only')
   assert.match(packet.untrustedData.body, /no points.*deepseek-flash/)
 })
+
+test('a run ended because its daemon is too old tells the Bot to have the person update Mikka on that device, not reconnect GitHub', () => {
+  const prompt = eventPrompt({ kind: 'run_finished', issueId: 'i1', runId: 'r1', payload: { status: 'failed', stopReason: 'error', daemonUpgradeRequired: true } })
+  assert.match(prompt, /Mikka on that device needs an update/)
+  assert.match(prompt, /Nothing is wrong with their GitHub/)
+})

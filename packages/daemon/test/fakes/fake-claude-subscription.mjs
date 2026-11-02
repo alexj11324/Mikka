@@ -32,6 +32,7 @@ const lines = createInterface({ input: process.stdin })
 lines.on("line", async (line) => {
   const frame = JSON.parse(line)
   if (frame.type === "control_request") {
+    if (token === 'fixture-timeout') return
     out({
       type: "control_response",
       response: {

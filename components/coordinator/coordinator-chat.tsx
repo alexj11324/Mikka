@@ -32,6 +32,7 @@ import { ChatComposer } from './chat-composer'
 import { BotModelPicker } from './bot-model-picker'
 import { useCoordinatorSubmit } from './use-coordinator-submit'
 import { useCoordinatorStream } from './use-coordinator-stream'
+import { chatPollInterval } from '@/lib/coordinator/chat-poll-interval'
 import { ThreadCard } from './thread-card'
 import { ToolsUsed } from './tools-used'
 import { MessageReactions, useMessageReactions } from '@/components/workspace/message-reactions'
@@ -125,7 +126,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
     if (!('unchanged' in next)) shown.current.fullReadAt = Date.now()
     return mergeChat(shown.current.chat, next)
   }, {
-    refreshInterval: latest => latest?.working ? 2000 : 10000,
+    refreshInterval: chatPollInterval,
     onSuccess: () => reconnectStream.current(),
   })
   useEffect(() => { shown.current.chat = data }, [data])

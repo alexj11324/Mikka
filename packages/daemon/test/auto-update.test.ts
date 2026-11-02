@@ -1,9 +1,10 @@
 import { afterEach, expect, it, vi } from 'vitest'
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { checkLatestVersion, managedAutoUpdateRuntime, newerStableVersion } from '../src/auto-update'
+import { checkLatestVersion, managedAutoUpdateRuntime, newerStableVersion, recordUpdateFailure, reportedUpdateFailure, updateAllowed } from '../src/auto-update'
 import { Daemon } from '../src/main'
+import { RunNotPinnedHereError } from '../src/errors'
 import * as service from '../src/service'
 
 const dirs: string[] = []
@@ -19,14 +20,44 @@ it.each([
 ])('stable upgrade %s from %s = %s', (candidate, current, expected) => {
   expect(newerStableVersion(candidate, current)).toBe(expected)
 })
-it('persists failed attempts before I/O and retries only after a day, including across restarts', async () => {
+it('persists failed attempts before I/O and retries only after an hour, including across restarts', async () => {
   const file = stateFile(), now = 1_800_000_000_000
   const runtime = { latest: vi.fn(async (): Promise<string> => { expect(JSON.parse(readFileSync(file, 'utf8')).lastAttemptAt).toBe(now); throw new Error('registry unavailable') }), install: vi.fn() }
   await expect(checkLatestVersion(file, '1.0.0', runtime, now)).rejects.toThrow('unavailable')
   runtime.latest.mockImplementation(async () => '1.0.1')
   expect(await checkLatestVersion(file, '1.0.0', runtime, now + 1)).toBeUndefined()
-  expect(await checkLatestVersion(file, '1.0.0', runtime, now + 86_400_000)).toBe('1.0.1')
+  expect(await checkLatestVersion(file, '1.0.0', runtime, now + 3_599_999)).toBeUndefined()
+  expect(await checkLatestVersion(file, '1.0.0', runtime, now + 3_600_000)).toBe('1.0.1')
   expect(runtime.latest).toHaveBeenCalledTimes(2)
+})
+it('a server asking for a newer daemon shortens the wait to five minutes', async () => {
+  const file = stateFile(), now = 1_800_000_000_000
+  const runtime = { latest: vi.fn(async () => '1.0.1'), install: vi.fn() }
+  expect(await checkLatestVersion(file, '1.0.0', runtime, now)).toBe('1.0.1')
+  expect(await checkLatestVersion(file, '1.0.0', runtime, now + 299_999, true)).toBeUndefined()
+  expect(await checkLatestVersion(file, '1.0.0', runtime, now + 300_000, true)).toBe('1.0.1')
+  expect(runtime.latest).toHaveBeenCalledTimes(2)
+})
+it('a failed install of a version backs off 5 minutes, 30 minutes, then 2 hours, and is reported until a newer daemon runs', () => {
+  const file = stateFile(), now = 1_800_000_000_000
+  expect(updateAllowed(file, '1.0.1', now)).toBe(true)
+  expect(reportedUpdateFailure(file, '1.0.0')).toBeNull()
+  let at = now
+  for (const wait of [300_000, 1_800_000, 7_200_000, 7_200_000]) {
+    recordUpdateFailure(file, '1.0.1', 'install_failed', at)
+    expect(updateAllowed(file, '1.0.1', at + wait - 1)).toBe(false)
+    expect(updateAllowed(file, '1.0.1', at + wait)).toBe(true)
+    at += wait
+  }
+  expect(updateAllowed(file, '1.0.2', now)).toBe(true)
+  expect(reportedUpdateFailure(file, '1.0.0')).toEqual({ version: '1.0.1', code: 'install_failed', at: new Date(at - 7_200_000).toISOString() })
+  expect(reportedUpdateFailure(file, '1.0.1')).toBeNull()
+})
+it('a version check keeps the recorded failure', async () => {
+  const file = stateFile(), now = 1_800_000_000_000
+  recordUpdateFailure(file, '1.0.1', 'restart_failed', now)
+  await checkLatestVersion(file, '1.0.0', { latest: async () => '1.0.1', install: vi.fn() }, now)
+  expect(reportedUpdateFailure(file, '1.0.0')?.code).toBe('restart_failed')
 })
 it('excludes foreground, development, opted-out and source CLIs', async () => {
   vi.stubEnv('MIKKA_SERVICE', '')
@@ -46,7 +77,8 @@ function maintenanceDaemon() {
     maintenance: Promise<void> | null; updateVersion?: string
     options: { autoUpdate?: { latest(): Promise<string>; install(version: string): Promise<void> } }
     startMaintenance(work: () => Promise<void>): void; checkAutoUpdate(): void
-    claimAndStart(id: string): Promise<unknown>
+    claimAndStart(id: string): Promise<unknown>; claimAndStartInternal(id: string): Promise<unknown>; offerUpdate(latest: string | undefined): void
+    updateCheck: Promise<void> | null; paths: { dataDir: string }
   }
   internal.supervisor = { heartbeatRuns: () => [] }
   return { daemon, internal, log }
@@ -78,7 +110,8 @@ it('failed installs reopen admissions and never restart; teardown cannot restart
   expect(restart).not.toHaveBeenCalled()
   let finish!: () => void
   internal.options.autoUpdate.install = () => new Promise<void>(resolve => { finish = resolve })
-  internal.updateVersion = '1.0.1'
+  // 1.0.1 is backing off after its failure; the next release installs.
+  internal.updateVersion = '1.0.2'
   internal.checkAutoUpdate()
   internal.stopped = true
   finish(); await internal.maintenance
@@ -132,6 +165,47 @@ it('counts the whole run claim and start before allowing an update', async () =>
   expect(install).not.toHaveBeenCalled()
   active.length = 0
   internal.startMaintenance(install)
+  await internal.maintenance
+  expect(install).toHaveBeenCalledOnce()
+})
+it('a claim refused as daemonUpgradeRequired checks for an update now, not at the next hourly check', async () => {
+  const { internal } = maintenanceDaemon()
+  writeFileSync(join(internal.paths.dataDir, 'auto-update.json'), JSON.stringify({ lastAttemptAt: Date.now() - 10 * 60_000 }))
+  const latest = vi.fn(async () => '999.0.0')
+  internal.options.autoUpdate = { latest, install: vi.fn(async () => {}) }
+  for (const upgradeRequired of [false, true]) {
+    internal.claimAndStartInternal = async id => { throw new RunNotPinnedHereError(id, upgradeRequired) }
+    await expect(internal.claimAndStart('run-1')).rejects.toBeInstanceOf(RunNotPinnedHereError)
+    await internal.updateCheck
+    expect(latest).toHaveBeenCalledTimes(upgradeRequired ? 1 : 0)
+  }
+  expect(internal.updateVersion).toBe('999.0.0')
+})
+it('a newer release named by the server installs once, when idle; a failure keeps this version running, backs off and is reported', async () => {
+  const restart = vi.spyOn(service, 'restartService').mockResolvedValue(undefined)
+  const { internal } = maintenanceDaemon()
+  const file = join(internal.paths.dataDir, 'auto-update.json')
+  const install = vi.fn(async () => { throw new Error('npm failure') })
+  internal.options.autoUpdate = { latest: vi.fn(async () => '999.0.0'), install }
+  writeFileSync(file, JSON.stringify({ lastAttemptAt: Date.now() }))
+  internal.offerUpdate(undefined)
+  internal.offerUpdate('0.0.1')
+  expect(internal.updateVersion).toBeUndefined()
+  internal.offerUpdate('999.0.0')
+  expect(internal.updateVersion).toBe('999.0.0')
+  internal.supervisor.heartbeatRuns = () => [{}]
+  internal.checkAutoUpdate()
+  expect(install).not.toHaveBeenCalled()
+  internal.supervisor.heartbeatRuns = () => []
+  internal.checkAutoUpdate()
+  await internal.maintenance
+  expect(install).toHaveBeenCalledOnce()
+  expect(restart).not.toHaveBeenCalled()
+  expect(internal.updating).toBe(false)
+  expect(reportedUpdateFailure(file, '0.0.1')).toMatchObject({ version: '999.0.0', code: 'install_failed' })
+  internal.offerUpdate('999.0.0')
+  expect(internal.updateVersion).toBeUndefined()
+  internal.checkAutoUpdate()
   await internal.maintenance
   expect(install).toHaveBeenCalledOnce()
 })

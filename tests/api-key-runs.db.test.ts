@@ -430,4 +430,46 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
       assert.equal((await pool.query('SELECT status FROM agent_runs WHERE id=$1', [computerTask.runId])).rows[0].status, 'queued', 'a computer task stays queued under deny')
     } finally { await pool.query('DELETE FROM workspace_computer_policies WHERE "workspaceId"=$1', [p.workspaceId]) }
   })
+
+  await t.test('a released daemon below the minimum: the claim is refused with daemonUpgradeRequired and the run ends, so the Bot says to update Mikka', async () => {
+    const p = await person('old-daemon')
+    const { MIN_DAEMON_VERSION } = await import('@mikka/protocol/device')
+    const { DAEMON_UPGRADE_REQUIRED } = await import('../lib/run-leases')
+    await pool.query('UPDATE devices SET "daemonVersion"=$2 WHERE id=$1', [p.deviceId, '0.0.298'])
+    const { runId } = await queueRun(p.id, { issueId: p.issueId, agentId: p.agents.claude_code, repo: p.remote }, p.botId)
+    const refused = await claim(p.deviceId, runId, p.token)
+    assert.equal(refused.status, 409)
+    const body = await refused.json()
+    assert.equal(body.code, 'daemonUpgradeRequired')
+    assert.equal(body.minVersion, MIN_DAEMON_VERSION)
+    const run = (await pool.query('SELECT status, "stopReason", error FROM agent_runs WHERE id=$1', [runId])).rows[0]
+    assert.deepEqual(run, { status: 'failed', stopReason: 'error', error: DAEMON_UPGRADE_REQUIRED })
+    const events = (await pool.query('SELECT kind, payload FROM coordinator_events WHERE "runId"=$1', [runId])).rows
+    assert.equal(events.length, 1)
+    assert.equal(events[0].kind, 'run_finished')
+    assert.equal(events[0].payload.daemonUpgradeRequired, true)
+    await pool.query('DELETE FROM coordinator_events WHERE "runId"=$1', [runId])
+
+    await pool.query('UPDATE devices SET "daemonVersion"=$2 WHERE id=$1', [p.deviceId, MIN_DAEMON_VERSION])
+    const { runId: next } = await queueRun(p.id, { issueId: await task(p.id), agentId: p.agents.claude_code, repo: p.remote }, p.botId)
+    const accepted = await claim(p.deviceId, next, p.token)
+    assert.equal(accepted.status, 200, await accepted.text())
+
+    // The heartbeat answer names the releases; a failed automatic update is kept until the daemon clears it.
+    const heartbeatRoute = await import('../app/v1/devices/[deviceId]/heartbeat/route')
+    const beat = (body: Record<string, unknown>) => heartbeatRoute.POST(new Request(`http://127.0.0.1/v1/devices/${p.deviceId}/heartbeat`, {
+      method: 'POST', headers: { authorization: `Bearer ${p.token}` }, body: JSON.stringify({ harnesses: [], runs: [], worktreeDiskBytes: 0, ...body }),
+    }), { params: Promise.resolve({ deviceId: p.deviceId }) })
+    const stored = async () => (await pool.query('SELECT "updateFailure" FROM devices WHERE id=$1', [p.deviceId])).rows[0].updateFailure
+    const failure = { version: '0.0.331', code: 'install_failed', at: '2026-11-02T21:00:00.000Z' }
+    const answer = await beat({ updateFailure: failure })
+    assert.equal(answer.status, 200)
+    assert.equal((await answer.json()).daemonVersions.min, MIN_DAEMON_VERSION)
+    assert.deepEqual(await stored(), failure)
+    assert.equal((await beat({})).status, 200)
+    assert.deepEqual(await stored(), failure, 'a daemon that reports nothing leaves it')
+    assert.equal((await beat({ updateFailure: { ...failure, code: 'npm ERR! 404' } })).status, 400, 'codes only')
+    assert.equal((await beat({ updateFailure: null })).status, 200)
+    assert.equal(await stored(), null)
+  })
 })

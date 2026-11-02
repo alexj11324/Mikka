@@ -58,7 +58,7 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, c
   const [composerHeight, setComposerHeight] = useState(90)
   const path = `/api/mobile/chat${botId ? `?bot=${botId}` : ''}`
   const [fast, setFast] = useState(false)
-  const { data, error, reload, setData } = useApi<Chat>(path, fast ? 2500 : 15000)
+  const { data, error, reload, setData } = useApi<Chat>(path, fast ? 3750 : 45000)
   const pending = useApi<PendingAction[]>('/api/pending-actions', 10000)
   const [outbox, setOutbox] = useState<Outgoing[]>([])
   const pendingSends = useRef<Outgoing[]>([])

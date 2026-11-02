@@ -11,6 +11,31 @@ import { cleanupTempDirs, makeRepo, tempDir } from "./helpers"
 
 afterEach(cleanupTempDirs)
 
+it('does not accept the public broker marker as a direct OAuth credential', async () => {
+  const { adapter, options } = await fixture({ accountId: 'fixture-account', token: async () => ({ accessToken: 'mikka-native-broker-placeholder', chatgptAccountId: 'fixture-account' }) })
+  await expect(adapter.start(options)).rejects.toThrow('Codex subscription authentication unavailable')
+})
+
+it('requires a trusted hosted spawn for the owned subscription broker', async () => {
+  const { options, stateDir } = await fixture()
+  const verify = vi.fn(async () => {})
+  const adapter = new CodexAdapter({ stateDir, sandbox: new NoSandbox(), hostedSubscriptionBroker: { verify } })
+  await expect(adapter.start(options)).rejects.toThrow('Codex subscription authentication unavailable')
+  expect(verify).not.toHaveBeenCalled()
+})
+
+it.each(['api_key', 'provider', 'oauth'] as const)('does not mix owned broker transport with an ordinary %s credential', async kind => {
+  const { options, stateDir, source } = await fixture()
+  const spawn = vi.fn(async () => { throw new Error('must not spawn') })
+  const verify = vi.fn(async () => {})
+  const adapter = new CodexAdapter({ stateDir, sandbox: new NoSandbox(), spawnCli: spawn, hostedSubscriptionBroker: { verify }, ...(kind === 'oauth' ? { subscriptionAuth: source } : {}) })
+  const credential = kind === 'api_key' ? { kind: 'api_key' as const, key: 'synthetic-private-key' }
+    : kind === 'provider' ? { kind: 'provider' as const, protocol: 'openai' as const, baseUrl: 'https://gateway.example.test', key: 'synthetic-private-key' } : undefined
+  await expect(adapter.start({ ...options, credential })).rejects.toThrow('Codex subscription authentication unavailable')
+  expect(spawn).not.toHaveBeenCalled()
+  expect(verify).not.toHaveBeenCalled()
+})
+
 it('rechecks revocation after initialization before starting the first native turn', async () => {
   const verify = vi.fn(async () => { throw new Error('fixture-access revoked') })
   const { adapter, options } = await fixture({ accountId: 'fixture-account', verify, token: async () => ({ accessToken: 'fixture-access', chatgptAccountId: 'fixture-account' }) })

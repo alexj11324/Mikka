@@ -87,8 +87,11 @@ loopback 5432/mikka_e2e and workspace on 5433/mikka_workspace_e2e. It bootstraps
 each from the existing fixture helper. The HTTP profile refuses a single-service
 configuration in this workflow, verifies database identities and opposite-store
 absence, and puts membership/team rows only in workspace PG and tasks/history/
-groups only in application PG. Existing generic browser jobs can run this file
-in their usual single-DB fixture mode; those runs are not dual-PG proof.
+groups only in application PG. It is an HTTP API test: Playwright's request
+client only, no browser installed or launched, so it stands under the decisions
+that run no browser tests ([1520](../design/decisions/2026-11-01-1520-no-browser-tests-in-ci.md),
+[2225](../design/decisions/2026-11-01-2225-api-cli-acceptance-and-backend-owner.md)).
+A single-database local run of this file is not dual-PG proof.
 
 `tests/e2e/site-search.spec.ts` starts a separate built Next process and a loopback
 PG transport proxy. The proxy forwards real protocol frames unchanged; for the
@@ -101,7 +104,7 @@ also cover 130 history/125 group pagination, exact projections, foreign owners/
 workspaces/private DMs, literal wildcards, body exclusion, task owner-wide policy,
 workspace suspension and a token revoked during a blocked real title SELECT.
 
-This is a dedicated post-build Playwright API profile, not a pre-build R0 recipe.
+This is a dedicated post-build HTTP API profile (Playwright's request client, no browser), not a pre-build R0 recipe.
 Fixture source rows and database identities are retained in a new report artifact,
 without tokens/cookies; no fixture DELETE or schema DROP is performed. Normal
 allowed run logs record the dual-store placement and each race outcome. Previously
@@ -145,8 +148,8 @@ History: `browser-tests.yml` was removed and no browser tests run
 profile. The text below records the original plan. The candidate stays draft. Use the existing browser-tests workflow's explicit
 workflow_dispatch on the frozen candidate to run the same full ready/before-merge
 suite without changing readiness or invoking a merge/deployment. Dedicated dual-PG
-HTTP remains separate from that single-DB browser fixture job. Browser plugin not
-available; browser validation uses the repository's regular Playwright CI workflow.
+HTTP remains separate from that single-DB browser fixture job. (That workflow and
+its browser validation no longer exist: CI and local work run no browser tests.)
 
 
 ## Merged #311 composition regression

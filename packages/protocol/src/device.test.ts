@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 
 import {
+  daemonUpdateFailureSchema,
   DEVICE_ONLINE_WINDOW_MS,
   deviceHeartbeatSchema,
   devicePaths,
@@ -100,5 +101,18 @@ describe("device link schemas", () => {
     expect(
       runPatchSchema.parse({ state: "stopped", stopReason: "turn_ended" })
     ).toEqual({ state: "stopped", stopReason: "turn_ended" })
+  })
+})
+
+describe("daemon releases in the heartbeat answer", () => {
+  it("passes plain versions and drops a malformed value instead of failing the heartbeat", () => {
+    expect(heartbeatResultSchema.parse({ leases: {}, daemonVersions: { min: "0.0.299", latest: "0.0.331" } }).daemonVersions).toEqual({ min: "0.0.299", latest: "0.0.331" })
+    for (const daemonVersions of [{ min: "0.0.299", latest: "0.0.332-beta.1" }, { latest: "0.0.331" }, "0.0.331", null])
+      expect(heartbeatResultSchema.parse({ leases: {}, daemonVersions }).daemonVersions).toBeUndefined()
+  })
+  it("reports an update failure by code only", () => {
+    const failure = { version: "0.0.331", code: "install_failed", at: "2026-11-02T21:00:00.000Z" }
+    expect(daemonUpdateFailureSchema.parse(failure)).toEqual(failure)
+    expect(daemonUpdateFailureSchema.safeParse({ ...failure, code: "npm ERR! 404" }).success).toBe(false)
   })
 })

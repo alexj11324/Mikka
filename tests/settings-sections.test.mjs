@@ -50,7 +50,7 @@ test('sections without a page body are hidden until their UI lands, and their li
 
 test('sidebar names follow Figma 设置 v4 in the English search titles', () => {
   const title = id => SETTINGS_SECTIONS.find(s => s.id === id).title
-  assert.deepEqual(['computers', 'developer', 'permissions', 'logins'].map(title), ['Devices', 'Personal access tokens', 'Team permissions', 'Logins and keys'])
+  assert.deepEqual(['computers', 'developer', 'permissions', 'logins'].map(title), ['Devices', 'Personal access tokens', 'Team permissions', 'Secrets and logins'])
 })
 
 test('a current id wins over a legacy alias with the same name', () => {

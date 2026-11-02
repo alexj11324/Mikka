@@ -63,7 +63,7 @@ async function routeFixture(unavailable=false,stopped=false,modelDenied=false,is
     '@/lib/device-link':{authenticateDevice:async()=>({userId:'owner',tokenId:'synthetic-device-token'}),ownedDevice:async()=>({enabled:true,kind:'local',protocolVersion:daemonProtocol.DAEMON_PROTOCOL_VERSION,harnesses:[{harness:'codex',installed:true,toolApproval:true}]})},
     '@/lib/base-path':{withBasePath:(path:string)=>path},'@/lib/mcp/resource':{},
     '@/lib/mcp/worker':{issueRunToken:async()=>{calls.push('token');return {token:'synthetic-test-token'}}},
-    '@/lib/run-leases':{},'@/lib/run-retry':{},
+    '@/lib/run-leases':{failRunForDaemonUpgrade:async()=>false},'@/lib/daemon-release':{daemonTooOld:()=>false},'@/lib/run-retry':{},
     '@/lib/thread-continuation':{continuationFollowUp:()=>null},
     '@/lib/run-completion-effects':{afterRunEnded:async()=>{calls.push('runEnded');return 0}},
     '@/lib/factory/checks':{isFactoryCheckRun:async()=>false},

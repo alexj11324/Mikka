@@ -4,7 +4,7 @@ import { pgTable, text, uuid, varchar, jsonb, bigint, integer, real, date, times
 import { sql } from 'drizzle-orm'
 import type { JSONContent } from '@tiptap/react'
 import type { HarnessInfo } from '@mikka/protocol/harness'
-import type { SetupRecipe } from '@mikka/protocol/device'
+import type { DaemonUpdateFailure, SetupRecipe } from '@mikka/protocol/device'
 import type { CaptureContentType, CaptureKind, CaptureSource } from '@mikka/protocol/capture'
 import type { AttentionLevel } from '@/lib/attention/judgment'
 import type { UserFactKind, UserFactState } from '@/lib/profile/kinds'
@@ -256,6 +256,8 @@ export const devices = pgTable('devices', {
   deviceType: text('deviceType').$type<'laptop' | 'server'>().notNull().default('laptop'),
   platform: text('platform'), arch: text('arch'),
   daemonVersion: text('daemonVersion'), protocolVersion: integer('protocolVersion'),
+  /** The daemon's last failed automatic update (codes only); null after a success. */
+  updateFailure: jsonb('updateFailure').$type<DaemonUpdateFailure | null>(),
   harnesses: jsonb('harnesses').$type<HarnessInfo[]>().notNull().default([]),
   computerUse: jsonb('computerUse').$type<{ installed: boolean; version: string | null }>().notNull().default({ installed: false, version: null }),
   /** Off: the device stays registered but the orchestrator gives it no runs. */
