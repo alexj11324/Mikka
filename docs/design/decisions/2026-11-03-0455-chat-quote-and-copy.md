@@ -1,16 +1,21 @@
 # Quote a reply and copy any message in chat
 
 - Date: 2026-11-03
-- Source: Alex, relayed by the Coordinator session for the chat-components batch: 「在助手回答里选中一段文字，弹出一个小浮层，上面有『引用』按钮，交互参考 Claude 和 Codex……不要做侧边栏里那种 side chat」「每条助手回答、每条用户消息都要有复制按钮。助手回答复制出来的是 markdown 原文」
+- Source: Alex accepted the Figma page 902:2 「待 Alex 确认 · 聊天引用与复制（2026-11-03）」 in file `zPe5LKycb2XuT1ivCLRw07` on 2026-11-03, relayed by the Coordinator session of the chat-components batch. Each frame shows light (left) and dark (right).
 - Rule: —
 - Replaces: —
 
-In the Coordinator or bot chat and in an open thread, selecting words in a reply shows a small 引用 button above
-the selection. It puts the words above the draft as a quote chip (removable, `QuoteChip`); the sent message shows
-them as a quote line (`QuoteLine`, the `ArtifactQuoteLine` look) above the person's words. The quote rides at the head
-of the message as Markdown quote lines (`> …`, `lib/chat-quote.ts`), the format the phone app already sends, so the
-Coordinator and a thread's agent read it in place. There is no side chat.
+Accepted frames:
 
-Every reply and every person's message has 复制 under it (AI Elements `MessageAction`): on hover or focus, always on
-a touch screen and under the newest reply. A reply copies its Markdown as written; a card copies its prose and words.
-The icon turns into a tick for two seconds. Code blocks keep their own 复制.
+| Frame | Node | What it fixes |
+| --- | --- | --- |
+| C1 | `903:2` | Hovering a reply or a person's message shows 复制 under it (ghost `icon-xs`); a reply copies its Markdown as written |
+| C2 | `910:2` | Words selected in a reply show the Artifact reader's 引用 / 复制 popover (`SelectionActions`, one component for both) |
+| C3 | `905:2` | 引用 puts the words above the draft as a removable quote chip (the `ArtifactQuoteChip` look) |
+| C4 | `906:2` | The sent message shows the quote at the top of the blue bubble (`ArtifactQuoteLine`), in the bubble's own text colour so it reads on blue |
+| C5 | `907:2` | After 复制 the icon is a tick and 「已复制」 shows beside it for about two seconds |
+| C6 | `908:2` | Thinking stays as it is |
+
+There is no side chat. Both the Coordinator or bot chat and an open thread have all of it. The quote rides at the head of
+the message as Markdown quote lines (`> …`, `lib/chat-quote.ts`), the format the phone app already sends, so the
+Coordinator and a thread's agent read it in place and no new artifact-quote kind is needed.

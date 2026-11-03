@@ -1,10 +1,7 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
-import { useTranslations } from 'next-intl'
-import { TextQuote } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Popover, PopoverContent } from '@/components/ui/popover'
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
+import { SelectionActions } from '@/components/artifacts/selection-actions'
 import { quotable } from '@/lib/chat-quote'
 
 /** Marks the element whose selected text can be quoted: a reply's words, not the person's own or a card's buttons. */
@@ -25,13 +22,12 @@ export function selectedQuote(root: HTMLElement | null, selection: Selection | n
 }
 
 /**
- * 引用 over a selection in a reply, as Claude and Codex show it: select words in an answer and a small button appears
- * above them (below when there is no room); it puts them in the composer as a quote. It waits for the pointer to let
+ * 引用 / 复制 over a selection in a reply (Figma C2 `910:2`), the Artifact reader's popover (`SelectionActions`):
+ * select words in an answer and it appears above them; 引用 puts them in the composer as a quote. It waits for the pointer to let
  * go, follows the words as the chat scrolls (the popover is anchored to the selected range), and leaves with the
  * selection or on Esc. Only text under `QUOTE_SOURCE_ATTR` inside `root` counts.
  */
 export function SelectionQuote({ root, onQuote }: { root: RefObject<HTMLElement | null>; onQuote: (text: string) => void }) {
-  const t = useTranslations('AiElements.message')
   const [picked, setPicked] = useState<Picked | null>(null)
   const dragging = useRef(false)
   const frame = useRef(0)
@@ -46,7 +42,7 @@ export function SelectionQuote({ root, onQuote }: { root: RefObject<HTMLElement 
   useEffect(() => {
     const down = (event: PointerEvent) => {
       // A press on the button itself keeps the selection; anywhere else starts a new one.
-      if ((event.target as Element | null)?.closest?.('[data-slot=selection-quote]')) return
+      if ((event.target as Element | null)?.closest?.('[data-slot=selection-actions]')) return
       dragging.current = true
       setPicked(null)
     }
@@ -61,15 +57,5 @@ export function SelectionQuote({ root, onQuote }: { root: RefObject<HTMLElement 
       document.removeEventListener('pointerup', up)
     }
   }, [read])
-  // A virtual anchor on the live range: it moves with the words when the chat scrolls.
-  const anchor = useMemo(() => picked && { getBoundingClientRect: () => picked.range.getBoundingClientRect(), contextElement: picked.source }, [picked])
-  return <Popover open={Boolean(picked)} modal={false} onOpenChange={open => { if (!open) setPicked(null) }}>
-    {anchor && <PopoverContent data-slot="selection-quote" role="toolbar" aria-label={t('quote')} anchor={anchor} side="top" sideOffset={8} initialFocus={false} finalFocus={false}
-      className="w-auto gap-0 rounded-lg p-0.5">
-      <Button type="button" variant="ghost" size="xs" onMouseDown={event => event.preventDefault()}
-        onClick={() => { if (picked) onQuote(picked.text); document.getSelection()?.removeAllRanges(); setPicked(null) }}>
-        <TextQuote data-icon="inline-start" />{t('quote')}
-      </Button>
-    </PopoverContent>}
-  </Popover>
+  return <SelectionActions selection={picked} onQuote={onQuote} onClose={() => setPicked(null)} />
 }

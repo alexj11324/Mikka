@@ -4,6 +4,7 @@ import { act, createRef } from 'react'
 import type { Root } from 'react-dom/client'
 import { Window } from 'happy-dom'
 
+mock.module('sonner', { namedExports: { toast: { success: () => {}, error: () => {} } } })
 mock.module('next-intl', { namedExports: { useTranslations: (namespace: string) => (key: string) => `${namespace}.${key}` } })
 
 const browser = new Window({ url: 'https://fixture.example/mikka' })
@@ -41,6 +42,8 @@ test('复制 copies the text and turns into 已复制 for a moment', async () =>
   assert.deepEqual(written, ['**粗体** 和 `code`'])
   assert.equal(container.querySelector('button')!.getAttribute('aria-label'), 'AiElements.message.copied')
   assert.equal(container.querySelector('[data-copy-state]')!.getAttribute('data-copy-state'), 'copied')
+  // 「已复制」 shows beside the tick without a hover (Figma C5).
+  assert.match(document.body.textContent ?? '', /AiElements\.message\.copied/)
 })
 
 test('a refused clipboard says 复制失败, never 已复制', async () => {
@@ -69,27 +72,27 @@ test('only words selected inside a reply can be quoted', async () => {
   assert.equal(selectedQuote(container, document.getSelection()), null)
 })
 
-test('引用 shows once the pointer lets go of a selection and hands the words over', async () => {
+test('引用 / 复制 shows once the pointer lets go of a selection and hands the words over', async () => {
   const quoted: string[] = []
   const holder = createRef<HTMLDivElement>()
   await act(async () => root.render(<div ref={holder}><div data-quote-source=""><p id="reply">要整宽还是半宽</p></div><SelectionQuote root={holder} onQuote={text => quoted.push(text)} /></div>))
   await act(async () => { document.dispatchEvent(new browser.PointerEvent('pointerdown') as unknown as Event); select(container.querySelector('#reply')!); await frame() })
   // Still dragging: nothing shows yet.
-  assert.equal(document.querySelector('[data-slot="selection-quote"]'), null)
+  assert.equal(document.querySelector('[data-slot="selection-actions"]'), null)
   await act(async () => { document.dispatchEvent(new browser.PointerEvent('pointerup') as unknown as Event); await frame() })
-  const button = document.querySelector<HTMLButtonElement>('[data-slot="selection-quote"] button')
-  assert.ok(button)
-  assert.match(button.textContent ?? '', /AiElements\.message\.quote/)
-  await act(async () => { button.click(); await frame() })
+  // The Artifact reader's popover: 引用 and 复制.
+  const buttons = [...document.querySelectorAll<HTMLButtonElement>('[data-slot="selection-actions"] button')]
+  assert.deepEqual(buttons.map(button => button.textContent), ['Artifact.quote', 'Artifact.copy'])
+  await act(async () => { buttons[0].click(); await frame() })
   assert.deepEqual(quoted, ['要整宽还是半宽'])
-  assert.equal(document.querySelector('[data-slot="selection-quote"]'), null)
+  assert.equal(document.querySelector('[data-slot="selection-actions"]'), null)
 })
 
-test('Esc puts 引用 away', async () => {
+test('Esc puts the popover away', async () => {
   const holder = createRef<HTMLDivElement>()
   await act(async () => root.render(<div ref={holder}><div data-quote-source=""><p id="reply">一段回答</p></div><SelectionQuote root={holder} onQuote={() => {}} /></div>))
   await act(async () => { select(container.querySelector('#reply')!); document.dispatchEvent(new browser.PointerEvent('pointerup') as unknown as Event); await frame() })
-  assert.ok(document.querySelector('[data-slot="selection-quote"]'))
-  await act(async () => { document.dispatchEvent(new browser.KeyboardEvent('keydown', { key: 'Escape' }) as unknown as Event) })
-  assert.equal(document.querySelector('[data-slot="selection-quote"]'), null)
+  assert.ok(document.querySelector('[data-slot="selection-actions"]'))
+  await act(async () => { document.dispatchEvent(new browser.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }) as unknown as Event); await frame() })
+  assert.equal(document.querySelector('[data-slot="selection-actions"]'), null)
 })

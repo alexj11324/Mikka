@@ -12,8 +12,8 @@ export const HOVER_ACTIONS = 'opacity-0 transition-opacity duration-150 group-ho
 export const COPIED_MS = 2000
 
 /**
- * 复制 under a message: the text goes to the clipboard and the icon turns into a tick for a moment, its name 已复制.
- * A refused clipboard says 复制失败 the same way; nothing else on the screen moves.
+ * 复制 under a message: the text goes to the clipboard, the icon turns into a tick and 「已复制」 shows beside it
+ * for two seconds (Figma C5 `907:2`). A refused clipboard says 复制失败 the same way; nothing else on the screen moves.
  */
 export function CopyAction({ text }: { text: string }) {
   const t = useTranslations('AiElements.message')
@@ -31,7 +31,7 @@ export function CopyAction({ text }: { text: string }) {
     timer.current = setTimeout(() => setState('idle'), COPIED_MS)
   }
   const label = state === 'copied' ? t('copied') : state === 'failed' ? t('copyFailed') : t('copy')
-  return <MessageAction tooltip={label} data-copy-state={state} onClick={() => { void copy() }}>
+  return <MessageAction tooltip={label} tooltipOpen={state !== 'idle'} data-copy-state={state} onClick={() => { void copy() }}>
     {state === 'copied' ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
   </MessageAction>
 }

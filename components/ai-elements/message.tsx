@@ -6,7 +6,8 @@
 // Differs from upstream only in:
 // - the tooltip uses base-ui's `render` prop instead of Radix's `asChild`, under the app's own TooltipProvider;
 // - MessageAction's default size is `icon-xs` and its icon is muted until hover, as the actions under a Claude or
-//   ChatGPT reply are; `label` is the button's accessible name (`aria-label`), not an sr-only span.
+//   ChatGPT reply are; `label` is the button's accessible name (`aria-label`), not an sr-only span;
+// - `tooltipOpen` keeps the tooltip shown without hover (复制's 「已复制」, Figma C5 `907:2`); it opens to the side.
 
 import { Button } from "@/components/ui/button";
 import {
@@ -15,7 +16,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import type { ComponentProps } from "react";
+import { useState, type ComponentProps } from "react";
 
 export type MessageActionsProps = ComponentProps<"div">;
 
@@ -36,6 +37,8 @@ export const MessageActions = ({
 export type MessageActionProps = ComponentProps<typeof Button> & {
   tooltip?: string;
   label?: string;
+  /** Show the tooltip now, hovered or not. */
+  tooltipOpen?: boolean;
 };
 
 export const MessageAction = ({
@@ -46,8 +49,10 @@ export const MessageAction = ({
   size = "icon-xs",
   className,
   onClick,
+  tooltipOpen = false,
   ...props
 }: MessageActionProps) => {
+  const [hovered, setHovered] = useState(false);
   const button = (
     <Button
       aria-label={label || tooltip}
@@ -63,9 +68,9 @@ export const MessageAction = ({
   if (!tooltip) return <Button {...button.props} onClick={onClick}>{children}</Button>;
 
   return (
-    <Tooltip>
+    <Tooltip open={hovered || tooltipOpen} onOpenChange={setHovered}>
       <TooltipTrigger render={button}>{children}</TooltipTrigger>
-      <TooltipContent>{tooltip}</TooltipContent>
+      <TooltipContent side="right">{tooltip}</TooltipContent>
     </Tooltip>
   );
 };
