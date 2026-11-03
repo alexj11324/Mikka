@@ -357,6 +357,28 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
     assert.equal((await pool.query('SELECT count(*)::int AS n FROM byos_native_runs WHERE "runId"=$1', [runId])).rows[0].n, 0)
   })
 
+  await t.test('read-only cloud file checks get a credential without an unusable interactive desktop grant', async () => {
+    for (const denyComputer of [false, true]) {
+      const p = await person('readonly-cloud-files'), secret = `sk-ant-${randomBytes(16).toString('hex')}`
+      await addKey(p.id, 'anthropic', secret, ['key-model-a'])
+      const { cloudDevice, agentId } = await botComputer(p)
+      const computerRepo = randomUUID(), actor = { userId:p.id, workspaceId:p.workspaceId }
+      await pool.query('INSERT INTO device_repos (id,"deviceId","userId","repoPath") VALUES ($1,$2,$3,$4)', [computerRepo, cloudDevice, p.id, '/home/user/.mikka/bot-workspaces/fixture'])
+      const { runId } = await queueCloudRun(pool, actor, { botId:p.botId, issueId:p.issueId, agentId, deviceRepoId:computerRepo, title:'Inspect files', body:'Read the delivery only', model:'key-model-a', readOnly:true })
+      const machines = await fakeThreadMachines(pool, desktopMachine)
+      const thread = await machines.start(actor,runId).finally(() => machines.restore())
+      if (denyComputer) await pool.query(`INSERT INTO workspace_computer_policies ("workspaceId",permission,version) VALUES ($1,'deny',3)`, [p.workspaceId])
+      const response = await claim(thread.deviceId,runId,thread.token), text = await response.text()
+      assert.equal(response.status,200,text)
+      const assignment = JSON.parse(text)
+      assert.equal(assignment.modelCredential.key,secret)
+      assert.equal(assignment.policy.readOnly,true)
+      assert.equal(assignment.policy.permissions.computer_use,'deny')
+      assert.equal(assignment.computer,undefined,'the hosted runner rejects a computer envelope whose read-only policy cannot obtain a broker grant')
+      assert.equal((await pool.query('SELECT status FROM agent_runs WHERE id=$1',[runId])).rows[0].status,'preparing')
+    }
+  })
+
   await t.test('task machine without a desktop: the claim succeeds and hands out no desktop', async () => {
     // A worker on E2B's claude or codex template reports its harness with no computer broker.
     const p = await person('key-task-machine')

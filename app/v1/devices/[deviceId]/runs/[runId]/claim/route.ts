@@ -229,10 +229,13 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
     }
     const refused = await openRunKey()
     if (refused) return refused
-    const claimed = await claimCloudRun(pool, { userId: caller.userId, workspaceId: caller.scopeWorkspaceId }, runId, deviceId, new Date(leaseExpiresAt), subscription?.id ?? null, beforeClaim, afterClaim, desktop)
+    // Read-only checks inspect the retained files; they cannot use an
+    // interactive desktop. Its policy must not gate their file-only claim.
+    const useComputer = desktop && run.agentDefinition?.readOnly !== true
+    const claimed = await claimCloudRun(pool, { userId: caller.userId, workspaceId: caller.scopeWorkspaceId }, runId, deviceId, new Date(leaseExpiresAt), subscription?.id ?? null, beforeClaim, afterClaim, useComputer)
     if (!claimed) return NextResponse.json({ error: 'Cloud computer run unavailable.' }, { status: 409 })
     // Without a desktop the run gets none (the daemon refuses a `computer` it cannot serve).
-    computer = desktop ? claimed : null
+    computer = useComputer ? claimed : null
   } else {
     // A read-only run (an investigation) publishes nothing: no task branch.
     if (!run.agentDefinition?.readOnly) {
@@ -339,7 +342,7 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
     ...(run.agentDefinition?.model ? {model:run.agentDefinition.model} : {}),
     ...(modelCredential ? { modelCredential } : {}),
     ...(subscription ? { ...(run.agentDefinition?.cliModelSelection ? {} : {model:subscription.modelId}), subscriptionBinding: { bindingId: subscription.id, ownerId: subscription.ownerId, workspaceId: subscription.workspaceId, consumerId: subscription.consumerId, route: subscription.route } } : {}),
-    ...(computer ? { computer: { botId: computer.botId, ownerId: computer.ownerId, display: computer.display, policyVersion: computer.policyVersion } } : {}),
+    ...(computer && assignmentPolicy.permissions.computer_use !== 'deny' ? { computer: { botId: computer.botId, ownerId: computer.ownerId, display: computer.display, policyVersion: computer.policyVersion } } : {}),
     ...(localComputer ? { localComputer } : {}),
     ...(Object.keys(taskEnv).length ? { taskEnv } : {}),
     ...(taskSecretNames.length ? { taskSecretNames } : {}),
