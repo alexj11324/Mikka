@@ -3,7 +3,7 @@ import { File, Paths } from 'expo-file-system'
 import { FileText } from 'lucide-react-native'
 import { Text } from './Text'
 import { API_URL } from '@/lib/config'
-import { authHeaders } from '@/lib/api'
+import { api, authHeaders } from '@/lib/api'
 import { colors } from '@/lib/theme'
 import type { ChatFile } from '@mikka/protocol/chat-attachments'
 
@@ -17,8 +17,16 @@ export function ChatFiles({ files }: { files: Pick<ChatFile, 'id' | 'name'>[] })
     }
     const ext = /\.([a-z0-9]{1,12})$/i.exec(file.name)?.[1] ?? 'bin'
     const target = new File(Paths.cache, `mikka-${file.id}.${ext}`)
-    const downloaded = await File.downloadFileAsync(url, target, {
-      headers: await authHeaders(),
+    const grant = await api<{ downloadUrl: string }>(`/api/chat/attachments/${file.id}?download-url`)
+    const storageUrl = new URL(grant.downloadUrl)
+    const sameOrigin = storageUrl.origin === new URL(API_URL).origin
+    if (
+      !sameOrigin &&
+      (storageUrl.protocol !== 'https:' || !storageUrl.hostname.endsWith('.r2.cloudflarestorage.com'))
+    )
+      throw Error('Invalid file origin')
+    const downloaded = await File.downloadFileAsync(grant.downloadUrl, target, {
+      headers: sameOrigin ? await authHeaders() : {},
       idempotent: true,
     })
     await Share.share({ url: downloaded.uri, title: file.name })

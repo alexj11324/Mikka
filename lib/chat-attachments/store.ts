@@ -20,6 +20,7 @@ import {
   deleteArtifactObject,
   getArtifactObjectStream,
   putArtifactObject,
+  presignArtifactGet,
 } from '@/lib/artifacts/storage'
 import { readRunChain } from '@/lib/run-chain'
 import { boundedChatFileBytes, ChatFileError, extractChatFile } from './extract'
@@ -474,4 +475,14 @@ export async function chatFileContent(
     }
   }
   return parts
+}
+
+export async function chatFileDownloadUrl(file: FileRow, download = true): Promise<string | null> {
+  if (!file.storageKey) return null
+  const inline = !download && /^(image\/(png|jpeg|webp|gif)|application\/pdf|audio\/)/.test(file.mediaType)
+  return presignArtifactGet(
+    file.storageKey,
+    file.mediaType,
+    `${inline ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(file.name)}`,
+  )
 }

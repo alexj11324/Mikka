@@ -3,7 +3,13 @@ import { pool } from '@/lib/db'
 import { withDeviceRoute } from '@/lib/device-route'
 import { authenticateDevice } from '@/lib/device-link'
 import { isDeviceAuthorityError } from '@/lib/db/device-scope'
-import { authorizeFileScope, chatFileBytes, fileScope, readChatFile } from '@/lib/chat-attachments/store'
+import {
+  authorizeFileScope,
+  chatFileBytes,
+  chatFileDownloadUrl,
+  fileScope,
+  readChatFile,
+} from '@/lib/chat-attachments/store'
 
 export const dynamic = 'force-dynamic'
 const headers = { 'Cache-Control': 'private, no-store' }
@@ -36,7 +42,10 @@ async function handleGET(
     const file = await readChatFile(actor.userId, id)
     if ((await authorizeFileScope(actor.userId, fileScope(file))) !== workspace) throw Error('scope')
     if (!file.usedAt) return Response.json({ error: 'Unavailable' }, { status: 404, headers })
-    const data = Buffer.from(await chatFileBytes(file)).toString('base64')
+    const downloadUrl = await chatFileDownloadUrl(file)
+    const transfer = downloadUrl
+      ? { downloadUrl }
+      : { data: Buffer.from(await chatFileBytes(file)).toString('base64') }
     await readChatFile(actor.userId, id)
     return Response.json(
       {
@@ -45,7 +54,7 @@ async function handleGET(
         mediaType: file.mediaType,
         size: file.size,
         sha256: file.sha256,
-        data,
+        ...transfer,
         text: file.textContent,
       },
       { headers },

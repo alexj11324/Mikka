@@ -14,7 +14,7 @@ import { nativeCoordinatorClaimSchema, nativeCoordinatorToolResultSchema, type N
 // `RunNotPinnedHereError`; any other 4xx is a refusal (`DaemonError`) that
 // retrying cannot fix.
 import { z } from "zod"
-import { chatFileDownloadSchema } from '@mikka/protocol/chat-attachments'
+import { chatFileDownloadSchema, chatFileTransferSchema, CHAT_FILE_MAX_BYTES } from '@mikka/protocol/chat-attachments'
 import { ToolApprovalGate } from "./agents/tool-approval"
 import type { ServerDecide, ServerDecisionAnswer } from "./server-decision"
 import { POLICY_SNAPSHOT_HEADER, POLICY_SNAPSHOT_VERSION, POLICY_SNAPSHOT_REFRESH_MS, policyDistributionContextSchema, policyIssuer, signedPolicySnapshotSchema } from '@mikka/protocol/policy-snapshot'
@@ -116,7 +116,18 @@ export function serverUrl(base: string, path: string): URL {
 
 export class HttpServerLink implements ServerLink {
   async downloadChatFile(assignment: RunAssignment, id: string, signal: AbortSignal) {
-    return this.call('GET', `/v1/devices/${seg(assignment.deviceId)}/runs/${seg(assignment.runId)}/attachments/${seg(id)}`, { schema: chatFileDownloadSchema, signal, timeoutMs: 60000 })
+    const transfer = await this.call('GET', `/v1/devices/${seg(assignment.deviceId)}/runs/${seg(assignment.runId)}/attachments/${seg(id)}`, { schema: chatFileTransferSchema, signal, timeoutMs: 60000 })
+    if ('data' in transfer) return transfer
+    const url = new URL(transfer.downloadUrl)
+    if (url.protocol !== 'https:' || !url.hostname.endsWith('.r2.cloudflarestorage.com') || url.username || url.password || url.port) throw Error('Invalid attachment storage origin')
+    // The capability is sufficient: never forward the device session to storage.
+    const response = await this.fetchImpl(url, { redirect: 'error', signal: AbortSignal.any([signal, AbortSignal.timeout(60000)]) })
+    if (!response.ok || !response.body) throw Error('Attachment storage unavailable')
+    const reader = response.body.getReader(), chunks: Uint8Array[] = []
+    let size = 0
+    try { while (true) { const next = await reader.read(); if (next.done) break; size += next.value.length; if (size > transfer.size || size > CHAT_FILE_MAX_BYTES) { await reader.cancel(); throw Error('Attachment content mismatch') }; chunks.push(next.value) } } finally { reader.releaseLock() }
+    if (size !== transfer.size) throw Error('Attachment content mismatch')
+    return chatFileDownloadSchema.parse({ ...transfer, data: Buffer.concat(chunks).toString('base64') })
   }
   /** Run entry and resume both call this before repository/setup execution. */
   async verifyRunPolicy(assignment: RunAssignment, signal: AbortSignal) {

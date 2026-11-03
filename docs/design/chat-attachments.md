@@ -156,3 +156,13 @@ object access. Failed/abandoned partial rows follow the draft cleanup lifecycle.
 
 URL prefix ownership is enforced by
 [the base-path decision](decisions/2026-11-03-1430-base-path-single-owner.md).
+
+Original R2 downloads use an authenticated app route followed by a private
+60-second storage URL, so 25 MiB originals do not traverse the function's
+response-body limit. The device API returns that capability with the verified
+file metadata; the daemon reads it without forwarding its device credential,
+bounds the bytes and verifies their hash before exposing a local path. Native
+sharing likewise sends its session only to Mikka. No bucket CORS or public
+access change is required.
+
+Platform limit: [Vercel Functions payload limits](https://vercel.com/docs/functions/limitations#request-body-size).

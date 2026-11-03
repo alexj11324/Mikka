@@ -74,11 +74,15 @@ try {
   const owner = accounts.owner
   for (const route of ['sign-in', 'sign-up']) {
     const response = await owner.request(
-      `/mikka/zh-CN/${route}?next=${encodeURIComponent('/api/integrations/composio/callback')}`,
+      `/mikka/${route}?next=${encodeURIComponent('/api/integrations/composio/callback')}`,
     )
-    assert.equal(response.status, 307)
+    assert.ok([200, 307].includes(response.status))
+    const destination =
+      response.headers.get('location') ??
+      /<meta[^>]+id="__next-page-redirect"[^>]+content="[^"]*?url=([^"]+)"/.exec(await response.text())?.[1]
+    assert.ok(destination, 'server navigation provides an HTTP or streaming redirect')
     assert.equal(
-      new URL(response.headers.get('location'), environment.origin).pathname,
+      new URL(destination, environment.origin).pathname,
       '/mikka/api/integrations/composio/callback',
     )
   }

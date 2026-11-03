@@ -20,6 +20,10 @@ export const chatFileDownloadSchema = chatFileSchema.extend({
   sha256: z.string().regex(/^[a-f0-9]{64}$/),
   text: z.string().max(CHAT_FILE_MAX_TEXT).nullable(),
 })
+export const chatFileTransferSchema = z.union([
+  chatFileDownloadSchema,
+  chatFileDownloadSchema.omit({ data: true }).extend({ downloadUrl: z.url() }),
+])
 export type ChatFileDownload = z.infer<typeof chatFileDownloadSchema>
 
 const TEXT_EXTENSIONS =

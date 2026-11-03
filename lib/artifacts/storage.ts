@@ -81,3 +81,14 @@ export async function presignArtifactPut(key: string, contentType: string, secon
   const signed = await config.client.sign(url.toString(), { method: 'PUT', headers, aws: { signQuery: true, allHeaders: true } })
   return { url: signed.url, headers }
 }
+
+/** Short-lived private download; large originals bypass the function response-body limit. */
+export async function presignArtifactGet(key: string, contentType: string, disposition: string, seconds = 60): Promise<string> {
+  const config = r2Config()
+  if (!config) throw new Error('R2 is not configured')
+  const url = new URL(objectUrl(config, key))
+  url.searchParams.set('X-Amz-Expires', String(seconds))
+  url.searchParams.set('response-content-type', contentType)
+  url.searchParams.set('response-content-disposition', disposition)
+  return (await config.client.sign(url.toString(), { method: 'GET', aws: { signQuery: true, allHeaders: true } })).url
+}

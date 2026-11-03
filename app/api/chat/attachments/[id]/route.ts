@@ -4,6 +4,7 @@ import { writeAllowed } from '@/lib/mobile-api'
 import {
   authorizeFileScope,
   chatFileBytes,
+  chatFileDownloadUrl,
   fileScope,
   readChatFile,
   removeChatFile,
@@ -25,6 +26,18 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
         { id: file.id, name: file.name, mediaType: file.mediaType, size: file.size },
         { headers },
       )
+    const query = new URL(request.url).searchParams
+    const downloadUrl = await chatFileDownloadUrl(file, query.has('download') || query.has('download-url'))
+    if (query.has('download-url'))
+      return Response.json(
+        {
+          downloadUrl:
+            downloadUrl ?? `${new URL(request.url).origin}${new URL(request.url).pathname}?download`,
+        },
+        { headers },
+      )
+    if (downloadUrl)
+      return new Response(null, { status: 307, headers: { ...headers, Location: downloadUrl } })
     const inline =
       /^(image\/(png|jpeg|webp|gif)|application\/pdf|audio\/)/.test(file.mediaType) &&
       !new URL(request.url).searchParams.has('download')
