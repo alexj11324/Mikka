@@ -5,7 +5,7 @@
 // Real migrations, fake provider; disposable *_e2e PG on loopback.
 import assert from "node:assert/strict";
 import test from "node:test";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { readFile, readdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -87,6 +87,25 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
     };
     const machine = async (runId: string) => (await pool.query('SELECT state,"sandboxId","deviceId","issueId" FROM thread_machines WHERE "runId"=$1', [runId])).rows[0];
 
+    await t.test('a maintenance lease prevents adoption and replacement of the original VM', async () => {
+      const issueId = await task(), previous = await parked(issueId);
+      await pool.query(`UPDATE thread_machines SET "workerLeaseId"=$2,"workerLeaseUntil"=now()+interval '10 minutes' WHERE "runId"=$1`, [previous.runId, randomUUID()]);
+      const next = await run(issueId), fixture = fake();
+      await assert.rejects(ensureThreadMachine(pool, actor, next, fixture.provider), /maintenance in progress/);
+      assert.deepEqual(fixture.calls, []);
+      assert.equal((await machine(previous.runId)).sandboxId, previous.sandboxId);
+      assert.equal(await machine(next), undefined);
+    });
+    await t.test('runtime refresh rejects active native work before any provider call', async () => {
+      const previous = await parked(await task());
+      await pool.query(`UPDATE agent_runs SET "deviceId"=$2 WHERE id=$1`, [previous.runId, previous.device]);
+      const active = await run(await task());
+      await pool.query(`UPDATE agent_runs SET "deviceId"=$2 WHERE id=$1`, [active, previous.device]);
+      const fixture = fake();
+      await assert.rejects(ensureThreadMachine(pool, actor, previous.runId, fixture.provider, undefined, true), /runtime is busy/);
+      assert.deepEqual(fixture.calls, []);
+    });
+
     await t.test('moving a queued repository task binds its existing authority to the owned thread device', async () => {
       const { admitRepositoryTask, matchesRepositoryAdmission } = await import('../repository-admission');
       const savedWorker = { url: process.env.MIKKA_CLOUD_WORKER_URL, sha: process.env.MIKKA_CLOUD_WORKER_SHA };
@@ -118,6 +137,50 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
           }
         }
       } finally {
+        if (savedWorker.url === undefined) delete process.env.MIKKA_CLOUD_WORKER_URL; else process.env.MIKKA_CLOUD_WORKER_URL = savedWorker.url;
+        if (savedWorker.sha === undefined) delete process.env.MIKKA_CLOUD_WORKER_SHA; else process.env.MIKKA_CLOUD_WORKER_SHA = savedWorker.sha;
+      }
+    });
+
+    await t.test('a preloaded worker authenticating on bootstrap publication is ready before explicit start', async () => {
+      const savedWorker = { url: process.env.MIKKA_CLOUD_WORKER_URL, sha: process.env.MIKKA_CLOUD_WORKER_SHA };
+      const realNow = Date.now;
+      process.env.MIKKA_CLOUD_WORKER_URL = 'https://worker.example.invalid/mikka';
+      process.env.MIKKA_CLOUD_WORKER_SHA = 'a'.repeat(40);
+      try {
+        const runId = await run(await task()), fixture = fake();
+        let bootstrap: { deviceId: string; credential: string } | undefined, authenticated = 0;
+        fixture.provider.create = async (_source, op) => ({
+          sandboxId: `sandbox-${op}`,
+          files: {
+            read: async () => 'a'.repeat(40),
+            write: async (path: string, body: string) => {
+              if (path.startsWith('/run/mikka-viewer/thread-')) bootstrap = JSON.parse(body);
+            },
+          },
+          commands: { run: async (command: string) => {
+            if (command.includes('mv /home/user/.mikka/bootstrap.next /home/user/.mikka/bootstrap.json')) {
+              assert.ok(bootstrap);
+              const used = await pool.query(`UPDATE device_tokens SET "lastUsedAt"=clock_timestamp() WHERE "boundDeviceId"=$1 AND "tokenHash"=$2 AND "revokedAt" IS NULL RETURNING id`, [bootstrap.deviceId, createHash('sha256').update(bootstrap.credential).digest('hex')]);
+              assert.equal(used.rowCount, 1);
+              await pool.query(`UPDATE devices SET "lastSeenAt"=clock_timestamp() WHERE id=$1`, [bootstrap.deviceId]);
+              authenticated++;
+              // Make the historical late floor observably later than this real authentication.
+              await pool.query('SELECT pg_sleep(0.02)');
+            }
+            if (command.includes('node dist/cloud/cloud-worker.js')) {
+              // The preloader already authenticated. Production throttles the token
+              // timestamp, so explicit startup must not manufacture another use.
+              let reads = 0;
+              Date.now = () => realNow() + (++reads > 1 ? 31_000 : 0);
+            }
+            return { stdout: '', stderr: '', exitCode: 0 };
+          } },
+        }) as never;
+        assert.deepEqual(await ensureThreadMachine(pool, actor, runId, fixture.provider), { runId, state: 'running' });
+        assert.equal(authenticated, 1);
+      } finally {
+        Date.now = realNow;
         if (savedWorker.url === undefined) delete process.env.MIKKA_CLOUD_WORKER_URL; else process.env.MIKKA_CLOUD_WORKER_URL = savedWorker.url;
         if (savedWorker.sha === undefined) delete process.env.MIKKA_CLOUD_WORKER_SHA; else process.env.MIKKA_CLOUD_WORKER_SHA = savedWorker.sha;
       }

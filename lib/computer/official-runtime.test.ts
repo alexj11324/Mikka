@@ -1,6 +1,8 @@
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { bootstrapOfficialInstance, isOfficialE2BTemplate } from './official-runtime'
+import { bootstrapOfficialInstance, isOfficialE2BTemplate, stageOfficialWorkerRelease, switchOfficialWorkerRelease } from './official-runtime'
 
 const env = { MIKKA_CLOUD_WORKER_SOURCE_COMMIT: 'a'.repeat(40), MIKKA_CLOUD_WORKER_SHA: 'b'.repeat(40) }
 test('official templates are explicit, and missing/invalid releases cannot run a bootstrap', async () => {
@@ -17,4 +19,34 @@ test('a bootstrap names the immutable source and checks a receipt instead of tru
   assert.ok(calls[0].includes(`bash -s -- ${env.MIKKA_CLOUD_WORKER_SOURCE_COMMIT} ${env.MIKKA_CLOUD_WORKER_SHA} codex`))
   assert.equal(calls[1], 'cat /opt/mikka/worker-source-sha')
   await assert.rejects(bootstrapOfficialInstance({ commands: { run: async () => ({ stdout: 'wrong receipt' }) } } as never, 'desktop', env, async () => ''), /receipt mismatch/)
+})
+
+const identity = { deviceId: '11111111-1111-4111-8111-111111111111', workspaceId: '22222222-2222-4222-8222-222222222222', operationId: '33333333-3333-4333-8333-333333333333' }
+const release = { sourceCommit: env.MIKKA_CLOUD_WORKER_SOURCE_COMMIT, workerSha: env.MIKKA_CLOUD_WORKER_SHA, previousSha: 'c'.repeat(40) }
+test('staging requires a fixed release and exact completion receipt', async () => {
+  const calls: string[] = []
+  const sandbox = { commands: { run: async (command: string) => { calls.push(command); return { stdout: `mikka-official-instance-staged ${release.sourceCommit} ${release.workerSha}` } } } } as never
+  assert.deepEqual(await stageOfficialWorkerRelease(sandbox, 'codex', release.previousSha, env, async () => ''), release)
+  assert.ok(calls[0].includes(`codex stage ${release.previousSha}`))
+  await assert.rejects(stageOfficialWorkerRelease(sandbox, 'codex', 'main', env), /not configured/)
+  await assert.rejects(stageOfficialWorkerRelease({ commands: { run: async () => ({ stdout: 'installed' }) } } as never, 'codex', release.previousSha, env, async () => ''), /staging unconfirmed/)
+})
+test('readiness requires the authenticated RPC PID to match the verified new process', async () => {
+  for (const rpc of ['mikka-runtime-process-verified 41', 'mikka-runtime-process-verified 42']) {
+    let count = 0
+    const sandbox = { commands: { run: async () => ({ stdout: ++count === 1 ? JSON.stringify({ status: 'verified_process', workerSourceCommit: release.sourceCommit, workerSha: release.workerSha, pid: 42 }) : rpc }) } } as never
+    const result = switchOfficialWorkerRelease(sandbox, release, identity, 'verify', async () => '')
+    if (rpc.endsWith('42')) await result
+    else await assert.rejects(result, /RPC process unconfirmed/)
+    assert.equal(count, 2)
+  }
+  await assert.rejects(switchOfficialWorkerRelease({ commands: { run: async () => ({ stdout: JSON.stringify({status:'verified_process',workerSourceCommit:release.sourceCommit,workerSha:release.workerSha}) }) } } as never, release, identity, 'verify', async () => ''), /process unavailable/)
+})
+test('rollback explicitly reports restored but not ready', async () => {
+  const sandbox = { commands: { run: async () => ({ stdout: JSON.stringify({status:'restored_not_ready',workerSha:release.previousSha}) }) } } as never
+  assert.equal((await switchOfficialWorkerRelease(sandbox, release, identity, 'rollback', async () => '')).status, 'restored_not_ready')
+})
+
+test('private runtime switch preserves files and refuses unsafe process states', async () => {
+  await promisify(execFile)('python3', ['packages/daemon/scripts/refresh-cloud-worker.test.py'])
 })

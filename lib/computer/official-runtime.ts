@@ -25,3 +25,37 @@ export async function bootstrapOfficialInstance(sandbox: Pick<Sandbox, 'commands
     if (receipt.stdout.trim() !== sha) throw new Error('Official worker receipt mismatch')
   }
 }
+
+/** Stage a fixed public release without changing the running worker, CLI or user home. */
+export async function stageOfficialWorkerRelease(sandbox: Pick<Sandbox, 'commands'>, template: OfficialE2BTemplate, previousSha: string,
+  env: Record<string, string | undefined> = process.env,
+  script = () => readFile(join(process.cwd(), 'packages/daemon/scripts/official-e2b-instance-bootstrap.sh'), 'utf8')) {
+  const commit = env.MIKKA_CLOUD_WORKER_SOURCE_COMMIT, sha = env.MIKKA_CLOUD_WORKER_SHA
+  if (!isOfficialE2BTemplate(template) || !commit || !/^[a-f0-9]{40}$/.test(commit) || !sha || !/^[a-f0-9]{40}$/.test(sha) || !/^[a-f0-9]{40}$/.test(previousSha)) throw new Error('Official worker release is not configured')
+  const source = await script()
+  const result = await sandbox.commands.run(`bash -s -- ${commit} ${sha} ${template} stage ${previousSha} <<'MIKKA_OFFICIAL_WORKER_STAGE'\n${source}\nMIKKA_OFFICIAL_WORKER_STAGE`, { user: 'root', timeoutMs: 180_000 })
+  if (!result.stdout.includes(`mikka-official-instance-staged ${commit} ${sha}`)) throw new Error('Official worker staging unconfirmed')
+  return { sourceCommit: commit, workerSha: sha, previousSha }
+}
+
+/** Called only inside the owner's idle-machine maintenance lease and claim lock. */
+export async function switchOfficialWorkerRelease(sandbox: Pick<Sandbox, 'commands'>, release: { sourceCommit: string; workerSha: string; previousSha: string },
+  identity: { deviceId: string; workspaceId: string; operationId: string }, action: 'switch' | 'rollback' | 'verify' = 'switch',
+  script = () => readFile(join(process.cwd(), 'packages/daemon/scripts/refresh-cloud-worker.py'), 'utf8')) {
+  if (!['switch','rollback','verify'].includes(action) || ![release.sourceCommit, release.workerSha, release.previousSha].every(value => /^[a-f0-9]{40}$/.test(value)) ||
+    ![identity.deviceId, identity.workspaceId, identity.operationId].every(value => /^[a-f0-9-]{36}$/.test(value))) throw new Error('Invalid runtime maintenance identity')
+  const source = await script()
+  const result = await sandbox.commands.run(`python3 - ${action} ${identity.deviceId} ${identity.workspaceId} ${release.previousSha} ${release.sourceCommit} ${release.workerSha} ${identity.operationId} <<'MIKKA_PRIVATE_RUNTIME_SWITCH'\n${source}\nMIKKA_PRIVATE_RUNTIME_SWITCH`, { user: 'root', timeoutMs: 30_000 })
+  const receipt = JSON.parse(result.stdout)
+  if (receipt.status !== (action === 'switch' ? 'switched' : action === 'rollback' ? 'restored_not_ready' : 'verified_process') || receipt.workerSha !== (action === 'rollback' ? release.previousSha : release.workerSha) || (action !== 'rollback' && receipt.workerSourceCommit !== release.sourceCommit)) throw new Error('Worker runtime switch unconfirmed')
+  if (action === 'verify') {
+    if (!Number.isInteger(receipt.pid) || receipt.pid<=1) throw new Error('Worker process unavailable')
+    // Reuse the authenticated local RPC client: the live socket must belong to
+    // that same newly started process, not an old daemon accepting a new token.
+    const code = `(async()=>{const {connectDaemonInDataDir}=await import('./src/rpc/client.ts');const client=await connectDaemonInDataDir('/home/user/.mikka/worker',{name:'runtime-refresh',version:'1.0.0'});try{const status=await client.request('daemon.status');if(status.pid!==${receipt.pid}||status.deviceId!==${JSON.stringify(identity.deviceId)}||status.workspaceId!==${JSON.stringify(identity.workspaceId)})throw Error('runtime process mismatch');console.log('mikka-runtime-process-verified '+status.pid)}finally{client.close()}})().catch(()=>{process.exitCode=1})`
+    const quote = (value:string) => `'${value.replaceAll("'", "'\\''")}'`
+    const verified = await sandbox.commands.run(`cd /opt/mikka/worker/packages/daemon && PATH=/opt/mikka/runtime/node/bin:$PATH ./node_modules/.bin/tsx --eval ${quote(code)}`, {user:'user',timeoutMs:10_000})
+    if (verified.stdout.trim()!==`mikka-runtime-process-verified ${receipt.pid}`) throw new Error('Worker RPC process unconfirmed')
+  }
+  return receipt as { status: string; previousWorkerSha: string; workerSourceCommit: string; workerSha: string }
+}
