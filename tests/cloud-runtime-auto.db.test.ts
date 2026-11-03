@@ -23,7 +23,8 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
   process.env.MIKKA_BYOS_ENABLED = '1'
   // Every cloud thread runs on its own thread machine; its lifecycle workflow is not started here.
   let lifecycleStarts = 0
-  mock.module('workflow/api', { namedExports: { start: async () => { lifecycleStarts++; return { runId: 'synthetic-workflow' } } } })
+  const stageHandoffs: [{userId:string;workspaceId:string},string|null,string][] = []
+  mock.module('workflow/api', { namedExports: { start: async (workflow: {name:string}, args: unknown[]) => { lifecycleStarts++; if (workflow.name === 'factoryCloudStageHandoff') stageHandoffs.push(args as typeof stageHandoffs[number]); return { runId: 'synthetic-workflow' } } } })
   const { Pool } = await import('pg')
   const pool = new Pool({ connectionString: dbUrl, max: 3 })
   const threadMachines = await fakeThreadMachines(pool, [{ harness: 'codex', installed: true, subscriptionBroker: true, toolApproval: true }])
@@ -407,13 +408,36 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
       await runtime.reconcile.run(personState.id, runId)
     }
     const current = async () => (await pool.query(`SELECT t.*,a."runId",c.kind AS "candidateKind",c.sha FROM factory_tasks t JOIN factory_attempts a ON a.id=t."attemptId" LEFT JOIN factory_candidates c ON c.id=t."candidateId" WHERE t."issueId"=$1 AND t."userId"=$2 ORDER BY t."createdAt" DESC LIMIT 1`, [issueId, personState.id])).rows[0]
-    await complete(result.runId!)
+    const { withDeviceDatabaseAuthority, withDeviceUnitFence } = await import('../lib/db/device-scope')
+    const { factoryAutomaticRuntime } = await import('../lib/factory/automatic-dispatch')
+    const { handoffFactoryCloudStage } = await import('../lib/factory/cloud-stage-handoff')
+    const completeFromDevice = async (sourceRunId: string, check: boolean, unit: boolean) => {
+      const sourceToken = (await pool.query(`SELECT token.id FROM device_tokens token JOIN agent_runs r ON r."deviceId"=token."boundDeviceId" WHERE r.id=$1 AND token."revokedAt" IS NULL`, [sourceRunId])).rows[0]
+      assert.ok(sourceToken)
+      const realEnqueue = factoryAutomaticRuntime.enqueue, beforeHandoffs = stageHandoffs.length
+      factoryAutomaticRuntime.enqueue = threadMachines.enqueueDurable
+      try {
+        const fence = unit ? withDeviceUnitFence : withDeviceDatabaseAuthority
+        await fence({ tokenId:sourceToken.id, userId:personState.id }, () => complete(sourceRunId,check))
+      } finally { factoryAutomaticRuntime.enqueue = realEnqueue }
+      assert.equal((await pool.query('SELECT "revokedAt" FROM device_tokens WHERE id=$1',[sourceToken.id])).rows[0].revokedAt,null,'the device request only queues host work; it does not revoke itself')
+      assert.equal(stageHandoffs.length,beforeHandoffs+1,'production enqueue registers durable host work rather than calling provider I/O in the device request')
+      const [actor,previous,runId] = stageHandoffs.at(-1)!
+      assert.equal(await handoffFactoryCloudStage(appPool,{...actor,userId:'foreign-owner'},previous,runId),false)
+      assert.equal(await handoffFactoryCloudStage(appPool,actor,randomUUID(),runId),false,'a mismatched completed source cannot authorize the handoff')
+      assert.equal(await handoffFactoryCloudStage(appPool,actor,previous,runId),true,'the separate host step starts the independent checker after revoking the source worker')
+      assert.ok((await pool.query('SELECT "revokedAt" FROM device_tokens WHERE id=$1',[sourceToken.id])).rows[0].revokedAt)
+    }
+    await completeFromDevice(result.runId!, false, false)
     const review = await current()
+    const reviewDevice = (await pool.query('SELECT "deviceId" FROM agent_runs WHERE id=$1',[review.runId])).rows[0].deviceId
+    assert.equal(reviewDevice,(await pool.query('SELECT "deviceId" FROM thread_machines WHERE "runId"=$1',[review.runId])).rows[0].deviceId)
+
     assert.equal(review.stage, 'review', JSON.stringify(review))
     assert.equal(review.status, 'running')
     assert.equal(review.candidateKind, 'deliverable')
     assert.equal(review.sha, null, 'no invented Git commit')
-    await complete(review.runId, true)
+    await completeFromDevice(review.runId, true, true)
     const verify = await current()
     assert.equal(verify.stage, 'verify', JSON.stringify(verify))
     await complete(verify.runId, true)

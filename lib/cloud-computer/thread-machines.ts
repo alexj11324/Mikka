@@ -140,14 +140,23 @@ async function adoptTaskMachine(client: PoolClient, actor: Actor, runId: string,
 export async function parkThreadMachine(pool: Pool, actor: Actor, runId: string,
   pause: (sandboxId: string) => Promise<unknown> = sandboxId => withE2BErrors(actor.userId, false, async () => Sandbox.pause(sandboxId, await options(actor.userId))),
   readTail: (sandboxId: string) => Promise<string | null> = sandboxId => readWorkerTail(() => connectComputer(actor.workspaceId, sandboxId))) {
-  const machine = (await pool.query(`SELECT "sandboxId","deviceId",state FROM thread_machines WHERE "runId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3`, [runId, actor.userId, actor.workspaceId])).rows[0]
-  if (!machine?.sandboxId || machine.state === 'ended' || machine.state === 'paused') return
-  // What the run's worker printed, kept with the machine before it sleeps. Best effort.
-  await saveWorkerTail(pool, runId, await readTail(machine.sandboxId), await secretMaskerFor({ workspaceId: actor.workspaceId, ownerId: actor.userId })).catch(() => undefined)
-  await pause(machine.sandboxId)
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
+    // Provision/end lock the parent run before its machine. Keep the machine
+    // locked across provider I/O: a second lifecycle callback must observe the
+    // completed park, and adoption must wait until pause/token revocation finish.
+    await client.query('SELECT id FROM agent_runs WHERE id=$1 AND "userId"=$2 FOR UPDATE', [runId, actor.userId])
+    const machine = (await client.query(`SELECT "sandboxId","deviceId",state FROM thread_machines
+      WHERE "runId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 FOR UPDATE`, [runId, actor.userId, actor.workspaceId])).rows[0]
+    if (!machine?.sandboxId || machine.state === 'ended' || machine.state === 'paused') {
+      await client.query('COMMIT')
+      return
+    }
+    // Use this transaction for the tail update too; another connection would
+    // wait on the machine row we hold while we waited for its update.
+    await saveWorkerTail(client, runId, await readTail(machine.sandboxId), await secretMaskerFor({ workspaceId: actor.workspaceId, ownerId: actor.userId })).catch(() => undefined)
+    await pause(machine.sandboxId)
     await client.query(`UPDATE thread_machines SET state='paused',"lastActiveAt"=now(),"computeSeconds"="computeSeconds"+COALESCE(GREATEST(0,EXTRACT(EPOCH FROM (clock_timestamp()-"runningSince")))::bigint,0),"runningSince"=NULL
       WHERE "runId"=$1 AND "sandboxId"=$2 AND state<>'ended'`, [runId, machine.sandboxId])
     await client.query('UPDATE device_tokens SET "revokedAt"=COALESCE("revokedAt",now()) WHERE "boundDeviceId"=$1', [machine.deviceId])
@@ -386,9 +395,13 @@ export async function threadMachineAction(pool: Pool, actor: Actor, runId: strin
       await client.query(`UPDATE agent_runs SET status='stopped',"stopRequestedAt"=COALESCE("stopRequestedAt",now()),"finishedAt"=COALESCE("finishedAt",now())
         WHERE id=$1 AND "userId"=$2 AND status NOT IN ('succeeded','failed','stopped','cancelled')`, [runId, actor.userId])
       await client.query('UPDATE thread_machines SET state=\'ended\',"endedAt"=COALESCE("endedAt",now()),"computeSeconds"="computeSeconds"+GREATEST(0,EXTRACT(EPOCH FROM (clock_timestamp()-"runningSince")))::bigint,"runningSince"=NULL,"workerLeaseId"=NULL,"workerLeaseUntil"=CASE WHEN $2 THEN COALESCE("workerLeaseUntil",now()) ELSE NULL END WHERE "runId"=$1', [runId, creationPending])
-      await client.query('UPDATE device_tokens SET "revokedAt"=COALESCE("revokedAt",now()) WHERE "boundDeviceId"=$1', [locked.deviceId])
-      // An ended machine's device is gone for good: no list shows it, nothing dispatches to it.
-      await client.query('UPDATE devices SET "removedAt"=COALESCE("removedAt",now()) WHERE id=$1 AND "ownerId"=$2 AND kind=\'cloud\'', [locked.deviceId, actor.userId])
+      // An adopted old row has given up its sandbox; its historical device ID
+      // belongs to the new stage now. Only the machine still owning a sandbox
+      // (or an in-flight creation) can revoke/retire that device.
+      if (sandboxId || creationPending) {
+        await client.query('UPDATE device_tokens SET "revokedAt"=COALESCE("revokedAt",now()) WHERE "boundDeviceId"=$1', [locked.deviceId])
+        await client.query('UPDATE devices SET "removedAt"=COALESCE("removedAt",now()) WHERE id=$1 AND "ownerId"=$2 AND kind=\'cloud\'', [locked.deviceId, actor.userId])
+      }
       await client.query('COMMIT')
     } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
     // This is a terminal write outside the daemon completion path: finalize a
