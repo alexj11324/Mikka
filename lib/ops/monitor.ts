@@ -19,7 +19,7 @@ export async function collectOperationalSignals(pool: Pool, options: { sink?: st
     const previous: State = (await client.query('SELECT state FROM ops_monitor_observations ORDER BY "observedAt" DESC,id DESC LIMIT 1')).rows[0]?.state ?? {}
     const state: State = structuredClone(previous), active = new Set(alerts.map((alert: { id: string }) => alert.id))
     const transitions = []
-    for (const id of new Set([...Object.keys(state), ...active])) {
+    for (const id of new Set([...Object.keys(state).filter(id => id !== '__providerEgressCollector'), ...active])) {
       const old = state[id] ?? {}, isActive = active.has(id)
       if (isActive !== Boolean(old.active) || isActive && now.getTime() - (old.lastRecordedAt ?? 0) >= 30 * 60_000) {
         transitions.push({ id, state: isActive ? 'firing' : 'resolved', observedAt: now.toISOString() })
@@ -30,7 +30,7 @@ export async function collectOperationalSignals(pool: Pool, options: { sink?: st
     let deliveryState: State = state
     if (options.sink) {
       // Delivery uses its own successful-send state, not the DB-recorded active state.
-      const priorDelivery = Object.fromEntries(Object.entries(previous).map(([id, value]) => [id, { ...value, active: value.notifiedActive ?? false }]))
+      const priorDelivery = Object.fromEntries(Object.entries(previous).filter(([id]) => id !== '__providerEgressCollector').map(([id, value]) => [id, { ...value, active: value.notifiedActive ?? false }]))
       const result = await notifyAlerts(alerts, { sink: options.sink, now: now.getTime(), state: priorDelivery })
       notificationStatus = result.healthy ? 'delivered' : 'failed'
       deliveryState = structuredClone(state)
