@@ -5,6 +5,7 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { pathToFileURL } from 'node:url'
 import { assertFlashTestModel } from '../test-model-policy.mjs'
 import { isSmokeAccountEmail } from '../../lib/smoke-account.ts'
+import { runGroupFactoryScenario } from './group-factory-acceptance.mjs'
 
 /** A normal owner session and new, private synthetic fixtures. No SQL writes,
  * fabricated sessions, model fallback, existing-Bot edits or third-party posts. */
@@ -15,9 +16,13 @@ export async function runGroupProductionAcceptance({ env = process.env, fetchImp
   const origin = new URL(env.GROUP_ACCEPTANCE_ORIGIN ?? 'https://app.aspectlylabs.com')
   if (origin.origin !== 'https://app.aspectlylabs.com' || origin.pathname !== '/' || origin.search || origin.hash || origin.username || origin.password) throw Error('acceptance_origin_rejected')
   if (!/^dpl_[A-Za-z0-9]+$/.test(env.GROUP_ACCEPTANCE_DEPLOYMENT ?? '') || !/^[a-f0-9]{40}$/.test(env.GROUP_ACCEPTANCE_REVISION ?? '')) throw Error('acceptance_fixed_deployment_required')
+  const taskTimeoutMs = Number(env.GROUP_ACCEPTANCE_TASK_TIMEOUT_MS ?? 1200000)
+  const stopTimeoutMs = Number(env.GROUP_ACCEPTANCE_STOP_TIMEOUT_MS ?? 180000)
+  if (!Number.isSafeInteger(taskTimeoutMs) || taskTimeoutMs < 1000 || taskTimeoutMs > 3600000
+    || !Number.isSafeInteger(stopTimeoutMs) || stopTimeoutMs < 1000 || stopTimeoutMs > 300000) throw Error('acceptance_timeout_invalid')
   const report = { status: 'running', revision: env.GROUP_ACCEPTANCE_REVISION, deploymentId: env.GROUP_ACCEPTANCE_DEPLOYMENT,
     origin: origin.origin, startedAt: new Date().toISOString(), fixtureId: randomUUID(), bots: [], cases: [],
-    scope: 'real group Decision API, public duties, frozen Flash replies, explicit mentions, persistence and human feedback' }
+    scope: 'real group Decision API, public duties, Flash replies, feedback, Factory artifact acceptance, same-Task continuation and stop; no official-subscription claim' }
   let cookie = ''
   async function request(path, body, method = body ? 'POST' : 'GET') {
     const response = await fetchImpl(new URL(`/mikka${path}`, origin), { method, redirect: 'error', signal: AbortSignal.timeout(30000),
@@ -36,6 +41,35 @@ export async function runGroupProductionAcceptance({ env = process.env, fetchImp
     const data = await json('/api/version')
     check(data?.build === report.deploymentId, 'acceptance_deployment_changed')
   }
+  async function guard() {
+    await version()
+    // This guard runs before every prompt, even after the initial selection.
+    for (const bot of report.bots) {
+      const menu = await json(`/api/mobile/model?bot=${bot.id}`)
+      check(menu?.current?.available === true && menu.current.modelId === bot.modelId, 'acceptance_model_changed')
+      assertFlashTestModel(menu.current.modelId)
+    }
+  }
+  async function download(path) {
+    const url = new URL(path, origin)
+    check(url.origin === origin.origin && !url.username && !url.password && !url.search && !url.hash
+      && /^\/mikka\/api\/artifacts\/[a-f0-9-]{36}\/versions\/[1-9][0-9]*\/download$/.test(url.pathname), 'acceptance_artifact_url_rejected')
+    const response = await fetchImpl(url, { method: 'GET', redirect: 'error', signal: AbortSignal.timeout(30000),
+      headers: { origin: origin.origin, 'cache-control': 'no-store', cookie } })
+    check(response.ok && response.body, 'acceptance_artifact_download_failed')
+    const chunks = [], reader = response.body.getReader()
+    let size = 0
+    try {
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        size += value.byteLength
+        check(size <= 65536, 'acceptance_artifact_oversized')
+        chunks.push(value)
+      }
+    } finally { await reader.cancel().catch(() => {}) }
+    return Buffer.concat(chunks)
+  }
   async function readTurn(groupId, messageId) {
     const timeout = Date.now() + 120000
     while (Date.now() < timeout) {
@@ -51,13 +85,7 @@ export async function runGroupProductionAcceptance({ env = process.env, fetchImp
     throw Error('acceptance_turn_timeout')
   }
   async function scenario(groupId, name, body, mentions, expected) {
-    await version()
-    // This guard runs before every prompt, even after the initial selection.
-    for (const bot of report.bots) {
-      const menu = await json(`/api/mobile/model?bot=${bot.id}`)
-      check(menu?.current?.available === true && menu.current.modelId === bot.modelId, 'acceptance_model_changed')
-      assertFlashTestModel(menu.current.modelId)
-    }
+    await guard()
     const message = await json(`/api/conversations/${groupId}/messages`, { body, mentions })
     check(typeof message?.id === 'string', 'acceptance_message_missing')
     const evidence = { name, messageId: message.id, status: 'running' }
@@ -118,6 +146,7 @@ export async function runGroupProductionAcceptance({ env = process.env, fetchImp
     check(feedback.recorded === true && feedback.source === 'human_explicit' && feedback.policyChanged === false, 'acceptance_feedback_not_persisted')
     const forgery = await request(`/api/conversations/${group.id}/decisions`, { messageId: help, kind: 'helpful', source: 'agent_evaluation' })
     check(forgery.response.status === 422, 'acceptance_feedback_source_forgeable')
+    await runGroupFactoryScenario({ report, json, readTurn, guard, download, timeoutMs: taskTimeoutMs, stopTimeoutMs })
     await version()
     report.status = 'pass'
     return report

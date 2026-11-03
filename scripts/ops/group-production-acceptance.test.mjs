@@ -9,6 +9,8 @@ test('production driver requires an authorized test identity and fixed deploymen
   await assert.rejects(runGroupProductionAcceptance({ env: {}, fetchImpl: forbidden }), /account_required/)
   await assert.rejects(runGroupProductionAcceptance({ env: { ...env, MIKKA_TEST_ACCOUNT_EMAIL: 'stranger@example.com' }, fetchImpl: forbidden }), /account_required/)
   await assert.rejects(runGroupProductionAcceptance({ env: { ...env, GROUP_ACCEPTANCE_REVISION: 'main' }, fetchImpl: forbidden }), /fixed_deployment/)
+  await assert.rejects(runGroupProductionAcceptance({ env: { ...env, GROUP_ACCEPTANCE_TASK_TIMEOUT_MS: 'NaN' }, fetchImpl: forbidden }), /timeout_invalid/)
+  await assert.rejects(runGroupProductionAcceptance({ env: { ...env, GROUP_ACCEPTANCE_STOP_TIMEOUT_MS: '3600000' }, fetchImpl: forbidden }), /timeout_invalid/)
   for (const origin of ['https://example.com', 'https://app.aspectlylabs.com/other', 'https://name:pass@app.aspectlylabs.com', 'https://app.aspectlylabs.com?token=x']) {
     await assert.rejects(runGroupProductionAcceptance({ env: { ...env, GROUP_ACCEPTANCE_ORIGIN: origin }, fetchImpl: forbidden }), /origin_rejected/)
   }

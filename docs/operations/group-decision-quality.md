@@ -58,6 +58,14 @@ cancellation separately from the intake turn's `finishedAt`; task end-to-end
 latency remains unknown until that result arrives. Status queries and stop
 commands are not counted as new delegations.
 
+Completion follows the existing Factory outcome: accepted reports/deliverables
+finish at `approval/passed`, merged repository candidates at `publish/passed`,
+and monitored publications at `monitor/passed`. The first two require the
+matching host acceptance/merge ledger, current candidate and current request
+epoch. A stage name or model claim alone cannot mark the task complete. Final
+reports keep the producing thread and current-epoch artifact references;
+merged code is not described as a successful deployment.
+
 ## Fixed regression set
 
 `tests/fixtures/group-decision-cases.json` contains synthetic, manually

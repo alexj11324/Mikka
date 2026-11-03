@@ -9,6 +9,7 @@ import { appendGroupExchange } from './group-exchanges'
 import type { HostedRuntimeSnapshot } from '@/lib/subscription-model-snapshot'
 import { initializeGroupDecisionTrace, recordGroupDecisionRoute, recordGroupTraceEvent, finishGroupDecisionTrace } from './group-decision-trace'
 import { recordGroupFeedback } from './group-decision-feedback'
+import { groupCopy, readGroupLocale } from './group-copy'
 
 export const GROUP_MAX_ROUNDS = 3
 export type GroupAgent = RoutingMember
@@ -165,6 +166,7 @@ export async function processGroupTurn(pool: Pool, conversationId: string, runti
       await runGroupRounds(route, input, {
         eligible,
         stopped,
+        chatUnavailableText:async()=>groupCopy(await readGroupLocale(client,root.userId)).chatUnavailable,
         contribution: runtime.contribution ? (message, member, earlier) => modelScope(()=>runtime.contribution!(message, member, earlier)) : undefined,
         delegate: runtime.delegate ? (reporter, delegation) => runtime.delegate!({ userId:root.userId, workspaceId:root.workspaceId, conversationId, messageId:messageId!, reporter, text:input.text, delegation },client) : undefined,
         generate: (agent, input) => untilStopped(stopped, async signal => {
@@ -291,6 +293,7 @@ export async function runGroupRounds(route: GroupRoute, message: GroupMessage, i
   eligible(): Promise<GroupAgent[]>
   /** 停止: true once the turn was stopped; no further reply is generated. */
   stopped?(): Promise<boolean>
+  chatUnavailableText?(): Promise<string>
   generate: GroupRuntime['generate']
   contribution?: GroupRuntime['contribution']
   delegate?(reporter: GroupAgent, delegation: import('./group-routing').GroupDelegation): Promise<GroupReply>
@@ -322,7 +325,7 @@ export async function runGroupRounds(route: GroupRoute, message: GroupMessage, i
       const agent = current.find(a => a.id === id)
       if (!agent) continue
       if (agent.chatAvailable === false) {
-        const reply={text:'这个 Bot 的聊天模型使用其所有者的个人配置，当前消息无法代用该授权。请使用你自己的 Bot，或请其所有者发起这次聊天；任务委派会另行检查你自己的执行资源。',mentions:[]}
+        const reply={text:await io.chatUnavailableText?.() ?? groupCopy('zh-CN').chatUnavailable,mentions:[]}
         if (await io.publish(id,reply)) earlier.push({author:agent.name,text:reply.text})
         continue
       }

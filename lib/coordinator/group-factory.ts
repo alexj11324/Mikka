@@ -5,10 +5,35 @@ import type { GroupRuntime, GroupReply } from './group-turns'
 import type { GroupTaskReference } from './group-routing'
 import { recordGroupTraceEvent } from './group-decision-trace'
 import { recordGroupFeedback } from './group-decision-feedback'
+import { workspaceLink } from '@/components/workspace/workspace-navigation'
+import { withBasePath } from '@/lib/base-path'
+import { ActionFailureError } from '@/lib/action-error'
+import { groupCopy, readGroupLocale, type GroupLocale } from './group-copy'
 
 type Scope = Parameters<NonNullable<GroupRuntime['delegate']>>[0]
 type Query = Pick<PoolClient,'query'>
-type TaskState = { taskId:string|null; issueId:string; status:string; stage:string; revision:number; runId:string|null; requestEpoch:string|null; artifacts?:{id:string}[] }
+type TaskState = { taskId:string|null; issueId:string; status:string; stage:string; revision:number; runId:string|null; requestEpoch:string|null; acceptedDeliverable?:boolean; mergedCandidate?:boolean; artifacts?:{id:string}[] }
+
+// A no-repository deliverable is terminal at approval/passed. Only the actual
+// acceptance ledger for the current candidate and epoch proves completion;
+// ordinary approval/passed or a model-authored output field is insufficient.
+const acceptedDeliverableSql=`(t.stage='approval' AND t.status='passed' AND EXISTS (
+  SELECT 1 FROM factory_deliverable_acceptances accepted
+  JOIN factory_candidates candidate ON candidate.id=accepted."candidateId" AND candidate."taskId"=accepted."taskId"
+  JOIN factory_attempts approved ON approved.id=t."attemptId" AND approved."taskId"=t.id
+  WHERE accepted."taskId"=t.id AND accepted."candidateId"=t."candidateId" AND accepted."userId"=t."userId"
+    AND candidate.kind IN ('report','deliverable')
+    AND approved.output->>'deliverableAcceptanceId'=accepted.id::text
+    AND approved.output->>'requestEpoch'=t."sourceEventId"::text))`
+const mergedCandidateSql=`(t.stage='publish' AND t.status='passed' AND EXISTS (
+  SELECT 1 FROM factory_merges merged
+  JOIN factory_candidates candidate ON candidate.id=merged."candidateId" AND candidate."taskId"=merged."taskId"
+  JOIN factory_attempts published ON published.id=t."attemptId" AND published."taskId"=t.id
+  WHERE merged."taskId"=t.id AND merged."candidateId"=t."candidateId" AND merged."userId"=t."userId"
+    AND merged.status='merged' AND candidate.kind='repository'
+    AND published.output->>'mergeId'=merged.id::text
+    AND published.output->>'requestEpoch'=t."sourceEventId"::text))`
+const taskSucceeded=(task:TaskState)=>task.status==='passed' && (task.stage==='monitor' || task.acceptedDeliverable===true || task.mergedCandidate===true)
 
 /** Only tasks previously bound by this authenticated participant enter the model's allowlist. */
 export async function groupTaskReferences(client:Query, scope:{userId:string;conversationId:string}):Promise<GroupTaskReference[]> {
@@ -20,23 +45,26 @@ export async function groupTaskReferences(client:Query, scope:{userId:string;con
     WHERE b."conversationId"=$1 AND b."userId"=$2 ORDER BY b."createdAt" DESC LIMIT 20`,[scope.conversationId,scope.userId])).rows
 }
 
-export function groupTaskReport(task:TaskState, prefix?:string):GroupReply {
-  const link=`/?issue=${encodeURIComponent(task.issueId)}`
-  const thread=task.runId ? `${link}&thread=${encodeURIComponent(task.runId)}` : null
-  const stage:Record<string,string>={clarify:'等待补充信息',spec:'制定方案',execute:'执行',review:'独立审查',verify:'验证',approval:'等待人工验收',publish:'发布',monitor:'观察结果'}
-  const status:Record<string,string>={pending:'待处理',running:'进行中',waiting:'等待输入',passed:'本阶段通过',failed:'本阶段未通过',blocked:'被阻塞',cancelled:'已取消',revoked:'授权已撤回'}
-  return {text:[prefix ?? `任务状态：${stage[task.stage] ?? '等待调度'} · ${status[task.status] ?? '待处理'}。`,
-    `[Task](${link})`,...(thread?[`[Thread](${thread}) · [成果与验证证据](${thread})`]:[]),
-    ...(task.artifacts ?? []).map((artifact,i)=>`[Artifact ${i+1}](${link}&artifact=${encodeURIComponent(artifact.id)})`),
-    ...(task.stage==='approval' && ['pending','waiting','blocked'].includes(task.status) ? ['独立审查和验证已交回 Factory；仍需在任务中完成所要求的人工验收。']:[])].join('\n'),mentions:[]}
+export function groupTaskReport(task:TaskState, prefix?:string, locale:GroupLocale='zh-CN'):GroupReply {
+  const copy=groupCopy(locale)
+  const href=(place:Parameters<typeof workspaceLink>[0])=>withBasePath(`${locale==='en'?'/en':''}${workspaceLink(place)}`)
+  const link=href({issue:task.issueId})
+  const thread=task.runId ? href({issue:task.issueId,thread:task.runId}) : null
+  const stage:Record<string,string>=copy.stage
+  const status:Record<string,string>=copy.status
+  return {text:[prefix ?? (task.acceptedDeliverable ? copy.accepted : task.mergedCandidate ? copy.merged : copy.state.replace('{stage}',stage[task.stage] ?? copy.awaitingDispatch).replace('{status}',status[task.status] ?? status.pending)),
+    `[${copy.task}](${link})`,...(thread?[`[${copy.thread}](${thread}) · [${copy.evidence}](${thread})`]:[]),
+    ...(task.artifacts ?? []).map((artifact,i)=>`[${copy.artifact.replace('{number}',String(i+1))}](${href({issue:task.issueId,artifact:artifact.id})})`),
+    ...(task.stage==='approval' && ['pending','waiting','blocked'].includes(task.status) ? [copy.approvalRequired]:[])].join('\n'),mentions:[]}
 }
 
 /** All error text is host-authored. Provider errors, private prompts and raw credentials never enter the group. */
-export function groupExecutionRemedy(reason:string):string {
-  if (['repositoryRequired','agentRepoMissing','repositoryNotFound'].includes(reason)) return '请在 Bot 设置中选择你已授权的仓库后重试。'
-  if (['noDevice','machineUnavailable','deviceOffline','agentNoDevice','cloudComputerUnavailable','cloudNotConfigured','cloudTemporarilyUnavailable'].includes(reason)) return '请连接你的本地 Agent 并保持在线，或在运行设置中配置你有权使用的云端电脑。'
-  if (reason==='task_tool_disabled') return '请由 Bot 所有者在现有 Agent 设置中启用任务委派能力。'
-  return '请检查你自己的模型、订阅或 API Key 授权与运行位置设置后重试；其他成员的个人凭据不会被代用。'
+export function groupExecutionRemedy(reason:string,locale:GroupLocale='zh-CN'):string {
+  const copy=groupCopy(locale)
+  if (['repositoryRequired','agentRepoMissing','repositoryNotFound'].includes(reason)) return copy.repositoryRemedy
+  if (['noDevice','machineUnavailable','deviceOffline','agentNoDevice','cloudComputerUnavailable','cloudNotConfigured','cloudTemporarilyUnavailable'].includes(reason)) return copy.runtimeRemedy
+  if (reason==='task_tool_disabled') return copy.toolRemedy
+  return copy.authorizationRemedy
 }
 
 export type GroupFactoryAdapters = {
@@ -53,13 +81,15 @@ export type GroupFactoryAdapters = {
 export async function delegateGroupTask(client:PoolClient, scope:Scope, adapters?:GroupFactoryAdapters):Promise<GroupReply> {
   const runtime=adapters ?? await productionAdapters()
   await runtime.authorize(scope)
+  const locale=await readGroupLocale(client,scope.userId)
+  const copy=groupCopy(locale)
   if (scope.reporter.memberType !== 'bot') {
-    const reply={text:'请指定本群中具备 Factory 任务能力的 Bot 来执行；此成员只提供回答。',mentions:[]}
+    const reply={text:copy.chooseBot,mentions:[]}
     await traceDelegation(client,scope,reply);return reply
   }
   const {operation}=scope.delegation
   if ((operation==='create' || operation==='continue') && scope.reporter.executionReason==='task_tool_disabled') {
-    const reply={text:`尚未开始执行。${groupExecutionRemedy('task_tool_disabled')}`,mentions:[]}
+    const reply={text:copy.notStarted.replace('{remedy}',groupExecutionRemedy('task_tool_disabled',locale)),mentions:[]}
     await traceDelegation(client,scope,reply);return reply
   }
   const {rows:[existing]}=await client.query(`SELECT * FROM group_task_receipts WHERE "messageId"=$1`,[scope.messageId])
@@ -79,8 +109,8 @@ export async function delegateGroupTask(client:PoolClient, scope:Scope, adapters
       await traceDelegation(client,scope,reply)
       if (operation==='stop' && originMessageId && reply.taskReceipt?.taskId && reply.taskReceipt.outcome==='stopped') {
         await recordGroupFeedback(client,{conversationId:scope.conversationId,messageId:originMessageId,userId:scope.userId,source:'human_cancellation',kind:'cancelled_task',targetId:scope.reporter.id,sourceMessageId:scope.messageId})
-        await recordGroupTraceEvent(client,originMessageId,{id:`task-stop:${scope.messageId}`,type:'task_result',memberId:scope.reporter.id,...(reply.taskReceipt.taskId?{taskId:reply.taskReceipt.taskId}:{}),...(reply.taskReceipt.runId?{runId:reply.taskReceipt.runId}:{}),outcome:'stopped'})
-        await client.query(`UPDATE group_turns SET trace=trace || jsonb_build_object('taskFinishedAt',now()) WHERE "messageId"=$1`,[originMessageId])
+        await recordGroupTraceEvent(client,originMessageId,{id:`task-stop:${reply.taskReceipt.taskId}:${reply.taskReceipt.requestEpoch}`,type:'task_result',memberId:scope.reporter.id,...(reply.taskReceipt.taskId?{taskId:reply.taskReceipt.taskId}:{}),...(reply.taskReceipt.runId?{runId:reply.taskReceipt.runId}:{}),outcome:'stopped'})
+        await client.query(`UPDATE group_turns SET trace=trace || jsonb_build_object('taskFinishedAt',COALESCE(trace->>'taskFinishedAt',now()::text)) WHERE "messageId"=$1`,[originMessageId])
       }
       await client.query('COMMIT')
       return reply
@@ -89,7 +119,7 @@ export async function delegateGroupTask(client:PoolClient, scope:Scope, adapters
   let issueId=scope.delegation.issueId ?? existing?.issueId as string|undefined
   let botId:string, repository:string|null=null
   if (operation==='create') {
-    if (!scope.reporter.executionAvailable) return finish({text:`尚未开始执行。${groupExecutionRemedy(scope.reporter.executionReason ?? 'execution_unavailable')}`,mentions:[]})
+    if (!scope.reporter.executionAvailable) return finish({text:copy.notStarted.replace('{remedy}',groupExecutionRemedy(scope.reporter.executionReason ?? 'execution_unavailable',locale)),mentions:[]})
     const execution=await runtime.executionBot(scope);botId=execution.botId;repository=execution.repository
     const intakeId=factoryEventId('group-intake',scope.messageId)
     await sourceEvent(client,{id:intakeId,userId:scope.userId,botId:null,issueId:null,text:scope.text,conversationId:scope.conversationId,messageId:scope.messageId})
@@ -106,13 +136,16 @@ export async function delegateGroupTask(client:PoolClient, scope:Scope, adapters
   const eventId=factoryEventId('group-delegate',scope.messageId)
   let task=await readTask(client,scope.userId,issueId,botId)
   const reported=async()=>{await client.query(`UPDATE group_task_bindings SET "lastReportedRevision"=GREATEST("lastReportedRevision",$3) WHERE "conversationId"=$1 AND "issueId"=$2`,[scope.conversationId,issueId,task.revision])}
-  if (operation==='status') {await reported();return finish(groupTaskReport(task))}
+  if (operation==='status') {await reported();return finish(groupTaskReport(task,undefined,locale))}
   if (operation==='stop') {
-    if (task.taskId) await runtime.stop(scope.userId,task,botId,eventId)
+    // Factory cancellation commits its stop signals and token revocation with
+    // the task state. Recover that confirmed result if the group receipt was
+    // interrupted; applying another cancel to a terminal task is invalid.
+    if (task.taskId && !['cancelled','revoked'].includes(task.status)) await runtime.stop(scope.userId,task,botId,eventId)
     task=await readTask(client,scope.userId,issueId,botId)
     await reported()
     const confirmed=Boolean(task.taskId && ['cancelled','revoked'].includes(task.status))
-    return finish({...groupTaskReport(task,confirmed?'已记录取消请求；正在运行的执行器会在收到停止信号后退出。':'任务尚未开始执行，没有需要停止的执行器。'),taskReceipt:{taskId:task.taskId,issueId,runId:task.runId,requestEpoch:task.requestEpoch,outcome:confirmed?'stopped':'blocked',reportTiming:'now'}})
+    return finish({...groupTaskReport(task,confirmed?copy.stopRequested:copy.nothingToStop,locale),taskReceipt:{taskId:task.taskId,issueId,runId:task.runId,requestEpoch:task.requestEpoch,outcome:confirmed?'stopped':'blocked',reportTiming:'now'}})
   }
   const previous=operation==='continue' ? await runtime.latest(scope.userId,issueId) : null
   await sourceEvent(client,{id:eventId,userId:scope.userId,botId,issueId,text:scope.text,conversationId:scope.conversationId,messageId:scope.messageId,...(previous?{previousRunId:previous.id}:{})})
@@ -123,7 +156,7 @@ export async function delegateGroupTask(client:PoolClient, scope:Scope, adapters
     const result=await runtime.dispatch(scope.userId,{issueId,...(repository?{repo:repository}:{}),note:scope.text,requestKey:`group:${scope.messageId}`,sourceEventId:eventId},botId)
     if (result.error) {
       task=await readTask(client,scope.userId,issueId,botId);await reported()
-      return finish({...groupTaskReport(task,`尚未开始新的执行。${groupExecutionRemedy(result.error)}`),taskReceipt:{taskId:task.taskId,issueId,runId:task.runId,requestEpoch:task.requestEpoch,outcome:'blocked',reportTiming:'now'}})
+      return finish({...groupTaskReport(task,copy.newRunNotStarted.replace('{remedy}',groupExecutionRemedy(result.error,locale)),locale),taskReceipt:{taskId:task.taskId,issueId,runId:task.runId,requestEpoch:task.requestEpoch,outcome:'blocked',reportTiming:'now'}})
     }
     if (!result.runId) throw Error('group_task_dispatch_unconfirmed')
     if (result.thread==='message' && result.status==='messageSent') await runtime.continuation(scope.userId,result.runId,scope.text,eventId)
@@ -133,7 +166,7 @@ export async function delegateGroupTask(client:PoolClient, scope:Scope, adapters
   }
   await client.query(`UPDATE group_task_bindings SET "sourceEventId"=$3,"sourceMessageId"=$4,"lastReportedRevision"=$5 WHERE "conversationId"=$1 AND "issueId"=$2`,[scope.conversationId,issueId,eventId,scope.messageId,task.revision])
   const reportTiming=scope.delegation.reportTiming ?? 'now'
-  const report=groupTaskReport(task,operation==='continue' ? '新的要求已交给同一任务；Factory 将按最新要求执行、独立审查并验证。' : '任务已交给 Factory，后续由我统一汇报执行、独立审查和验证结果。')
+  const report=groupTaskReport(task,operation==='continue' ? copy.continued : copy.created,locale)
   return finish({...report,...(reportTiming==='on_completion'?{text:''}:{}),taskReceipt:{taskId:task.taskId,issueId,runId:task.runId,requestEpoch:task.requestEpoch,outcome:'succeeded',reportTiming}})
 }
 
@@ -152,7 +185,9 @@ async function sourceEvent(client:Query,input:{id:string;userId:string;botId:str
 }
 
 async function readTask(client:Query,userId:string,issueId:string,botId:string):Promise<TaskState> {
-  const {rows:[row]}=await client.query<TaskState>(`SELECT t.id AS "taskId",t."issueId",t.status,t.stage,t.revision,a."runId",t."sourceEventId" AS "requestEpoch",
+  const {rows:[row]}=await client.query<TaskState>(`SELECT t.id AS "taskId",t."issueId",t.status,t.stage,t.revision,
+    COALESCE(a."runId",(SELECT produced."runId" FROM factory_candidates produced WHERE produced.id=t."candidateId" AND produced."taskId"=t.id)) AS "runId",
+    t."sourceEventId" AS "requestEpoch",${acceptedDeliverableSql} AS "acceptedDeliverable",${mergedCandidateSql} AS "mergedCandidate",
     COALESCE((SELECT jsonb_agg(jsonb_build_object('id',x.id)) FROM (SELECT ar.id FROM artifacts ar JOIN factory_attempts fa ON fa."runId"=ar."runId" AND fa."taskId"=t.id WHERE ar."userId"=t."userId" AND ar."issueId"=t."issueId" AND fa.output->>'requestEpoch'=t."sourceEventId"::text ORDER BY ar."updatedAt" DESC LIMIT 10) x),'[]'::jsonb) AS artifacts
     FROM factory_tasks t LEFT JOIN factory_attempts a ON a.id=t."attemptId" WHERE t."userId"=$1 AND t."issueId"=$2 AND t."botId"=$3 ORDER BY t."createdAt" DESC LIMIT 1`,[userId,issueId,botId])
   return row ?? {taskId:null,issueId,status:'pending',stage:'execute',revision:0,runId:null,requestEpoch:null}
@@ -191,7 +226,10 @@ async function productionAdapters():Promise<GroupFactoryAdapters> {
       const store=factoryRuntimeForBot(botId).store
       const current=await store.read(userId,task.taskId!)
       await store.apply(userId,factoryBinding(current.task),eventId,{action:'cancel',reason:'The authenticated group participant requested cancellation.'})
-      if (task.runId) await (await import('@/lib/agent-runs')).requestRunStop(userId,task.runId)
+      if (task.runId) {
+        try {await (await import('@/lib/agent-runs')).requestRunStop(userId,task.runId)}
+        catch(error) {if (!(error instanceof ActionFailureError && error.code==='runChainEnded')) throw error}
+      }
     },
   }
 }
@@ -201,7 +239,7 @@ async function productionAdapters():Promise<GroupFactoryAdapters> {
 async function dispatchStandaloneTask(userId:string,input:Parameters<GroupFactoryAdapters['dispatch']>[1],botId:string) {
   const {pool}=await import('@/lib/db')
   const {dispatchToTask}=await import('@/lib/thread-dispatch')
-  return dispatchToTask(userId,input.issueId,{note:input.note,start:async(previous,note)=>{
+  return dispatchToTask(userId,input.issueId,{note:input.note,sourceEventId:input.sourceEventId,start:async(previous,note)=>{
     const {executionWorkspace}=await import('@/lib/execution-settings')
     const workspaceId=await executionWorkspace(userId,botId)
     const {resolveModelDispatch,bindAgentToConnection}=await import('@/lib/model-dispatch')
@@ -229,7 +267,7 @@ async function dispatchStandaloneTask(userId:string,input:Parameters<GroupFactor
 export async function groupsWithPendingTaskReports(client:Query):Promise<string[]> {
   return (await client.query<{conversationId:string}>(`SELECT DISTINCT b."conversationId" FROM group_task_bindings b
     JOIN factory_tasks t ON t."issueId"=b."issueId" AND t."userId"=b."userId" AND t."botId"=b."executionBotId" AND t."sourceEventId"=b."sourceEventId"
-    WHERE t.revision>b."lastReportedRevision" AND (t.status IN ('failed','blocked','waiting','cancelled','revoked') OR (t.stage='approval' AND t.status='pending') OR (t.status='passed' AND t.stage='monitor')) LIMIT 20`)).rows.map(row=>row.conversationId)
+    WHERE t.revision>b."lastReportedRevision" AND (t.status IN ('failed','blocked','waiting','cancelled','revoked') OR (t.stage='approval' AND t.status='pending') OR (t.status='passed' AND t.stage='monitor') OR ${acceptedDeliverableSql} OR ${mergedCandidateSql}) LIMIT 20`)).rows.map(row=>row.conversationId)
 }
 
 export async function reconcileGroupTaskReports(conversationId:string, dependencies?:{pool:Pool;authorize:GroupFactoryAdapters['authorize']}):Promise<number> {
@@ -241,7 +279,7 @@ export async function reconcileGroupTaskReports(conversationId:string, dependenc
     const {rows:bindings}=await client.query(`SELECT b.*,c."workspaceId" FROM group_task_bindings b JOIN conversations c ON c.id=b."conversationId" WHERE b."conversationId"=$1`,[conversationId])
     for (const binding of bindings) {
       const task=await readTask(client,binding.userId,binding.issueId,binding.executionBotId)
-      if (!task.taskId || task.requestEpoch!==binding.sourceEventId || task.revision<=binding.lastReportedRevision || !(['failed','blocked','waiting','cancelled','revoked'].includes(task.status) || task.stage==='approval' && task.status==='pending' || task.status==='passed' && task.stage==='monitor')) continue
+      if (!task.taskId || task.requestEpoch!==binding.sourceEventId || task.revision<=binding.lastReportedRevision || !(['failed','blocked','waiting','cancelled','revoked'].includes(task.status) || task.stage==='approval' && task.status==='pending' || taskSucceeded(task))) continue
       try { await authorize({userId:binding.userId,workspaceId:binding.workspaceId,conversationId,messageId:binding.sourceMessageId,reporter:{id:binding.reporterId,name:'',description:'',memberType:'bot'},text:'',delegation:{operation:'status',issueId:binding.issueId}}) }
       catch { continue }
       await client.query('BEGIN')
@@ -256,11 +294,11 @@ export async function reconcileGroupTaskReports(conversationId:string, dependenc
         if (!valid) {await client.query('ROLLBACK');continue}
         const {rows:[position]}=await client.query(`UPDATE conversations SET "lastPosition"="lastPosition"+1 WHERE id=$1 RETURNING "lastPosition"`,[conversationId])
         const id=factoryEventId('group-task-report',`${conversationId}:${task.taskId}:${task.revision}`)
-        const text=groupTaskReport(task).text
+        const text=groupTaskReport(task,undefined,await readGroupLocale(client,binding.userId)).text
         const inserted=await client.query(`INSERT INTO conversation_messages (id,"conversationId",position,"authorType","authorId",body,mentions,"replyToId") VALUES($1,$2,$3,'bot',$4,$5,'[]',$6) ON CONFLICT DO NOTHING RETURNING id`,[id,conversationId,position.lastPosition,binding.reporterId,text,binding.sourceMessageId])
         if (inserted.rowCount) {
           await recordGroupTraceEvent(client,binding.sourceMessageId,{id:`publish:${id}`,type:'publish',memberId:binding.reporterId,taskId:task.taskId,runId:task.runId ?? undefined,contentDigest:createHash('sha256').update(text.trim()).digest('hex')})
-          const outcome=task.status==='passed' && task.stage==='monitor' ? 'succeeded' : ['cancelled','revoked'].includes(task.status) ? 'stopped' : task.status==='failed' ? 'failed' : 'blocked'
+          const outcome=taskSucceeded(task) ? 'succeeded' : ['cancelled','revoked'].includes(task.status) ? 'stopped' : task.status==='failed' ? 'failed' : 'blocked'
           await recordGroupTraceEvent(client,binding.sourceMessageId,{id:`task-result:${id}`,type:'task_result',memberId:binding.reporterId,taskId:task.taskId,runId:task.runId ?? undefined,outcome})
           if (outcome==='succeeded' || outcome==='stopped') await client.query(`UPDATE group_turns SET trace=trace || jsonb_build_object('taskFinishedAt',now()) WHERE "messageId"=$1`,[binding.sourceMessageId])
         }

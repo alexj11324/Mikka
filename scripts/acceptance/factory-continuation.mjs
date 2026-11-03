@@ -7,17 +7,25 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { setTimeout as delay } from 'node:timers/promises'
+import { isSmokeAccountEmail } from '../../lib/smoke-account.ts'
 
 const sha256 = bytes => createHash('sha256').update(bytes).digest('hex')
 const fail = code => { throw new Error(code) }
 
-export async function runContinuationAcceptance(env = process.env) {
+export async function runContinuationAcceptance(env = process.env, { fetchImpl = fetch } = {}) {
   const { MIKKA_TEST_ACCOUNT_EMAIL: email, MIKKA_TEST_ACCOUNT_PASSWORD: password,
     MIKKA_EXPECTED_DEPLOYMENT_SHA: expectedSha, MIKKA_EXPECTED_BUILD: expectedBuild } = env
   if (!email || !password || !/^[a-f0-9]{40}$/.test(expectedSha ?? '') || !expectedBuild) fail('acceptance_configuration_required')
-  const target = new URL(env.MIKKA_ACCEPTANCE_BASE_URL ?? 'https://app.aspectlylabs.com/mikka')
+  const smoke = isSmokeAccountEmail(email)
+  if (!smoke && email.toLowerCase() !== 'alexjiang20232024@gmail.com') fail('acceptance_account_required')
+  let target
+  try { target = new URL(env.MIKKA_ACCEPTANCE_BASE_URL ?? 'https://app.aspectlylabs.com/mikka') }
+  catch { fail('acceptance_origin_invalid') }
+  const production = target.origin === 'https://app.aspectlylabs.com'
+  const localFixture = env.MIKKA_ACCEPTANCE_LOCAL_FIXTURE === '1' && smoke
+    && ['127.0.0.1', 'localhost', '[::1]'].includes(target.hostname) && ['http:', 'https:'].includes(target.protocol)
   if (target.username || target.password || target.search || target.hash || target.pathname.replace(/\/$/, '') !== '/mikka'
-    || (target.protocol !== 'https:' && !['127.0.0.1', 'localhost'].includes(target.hostname))) fail('acceptance_origin_invalid')
+    || (!production && !localFixture)) fail('acceptance_origin_invalid')
   const cases = JSON.parse(await readFile(env.MIKKA_CONTINUATION_CASES_FILE, 'utf8'))
   assert.deepEqual(cases.map(c => c.harness).sort(), ['claude_code', 'codex'])
   for (const c of cases) {
@@ -41,7 +49,7 @@ export async function runContinuationAcceptance(env = process.env) {
     const url = new URL(path.startsWith('/mikka/') ? path : `/mikka${path}`, target.origin)
     if (url.origin !== target.origin || !url.pathname.startsWith('/mikka/')) fail('acceptance_foreign_origin')
     try {
-      return await fetch(url, { ...init, headers: { origin: target.origin, 'cache-control': 'no-store', ...(cookie ? { cookie } : {}), ...init.headers },
+      return await fetchImpl(url, { ...init, headers: { origin: target.origin, 'cache-control': 'no-store', ...(cookie ? { cookie } : {}), ...init.headers },
         redirect: 'error', signal: AbortSignal.timeout(30000) })
     } catch { fail('acceptance_request_failed') }
   }
@@ -68,13 +76,13 @@ export async function runContinuationAcceptance(env = process.env) {
   }
   const post = body => ({ method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
   await pin()
-  const login = await request('/api/auth/sign-in/email', post({ email, password }))
-  if (!login.ok) fail('acceptance_sign_in_failed')
-  cookie = login.headers.getSetCookie().map(value => value.split(';', 1)[0]).join('; ')
-  if (!cookie) fail('acceptance_session_missing')
-  const session = await json('/api/auth/get-session')
-  assert.equal(session?.user?.email?.toLowerCase(), email.toLowerCase())
   try {
+    const login = await request('/api/auth/sign-in/email', post({ email, password }))
+    if (!login.ok) fail('acceptance_sign_in_failed')
+    cookie = login.headers.getSetCookie().map(value => value.split(';', 1)[0]).join('; ')
+    if (!cookie) fail('acceptance_session_missing')
+    const session = await json('/api/auth/get-session')
+    if (session?.user?.email?.toLowerCase() !== email.toLowerCase()) fail('acceptance_session_identity')
     for (const c of cases) {
       await pin()
       const before = await json(`/api/factory/tasks/${c.taskId}`)
@@ -124,7 +132,7 @@ export async function runContinuationAcceptance(env = process.env) {
     report.completedAt = new Date().toISOString()
     return report
   } finally {
-    await request('/api/auth/sign-out', post({})).catch(() => undefined)
+    if (cookie) await request('/api/auth/sign-out', post({})).catch(() => undefined)
     cookie = ''
   }
 }

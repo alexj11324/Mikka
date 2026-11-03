@@ -4478,5 +4478,48 @@
       "copyFailed": "Couldn't copy",
       "quote": "Quote"
     }
+  },
+  "GroupTask": {
+    "stage": {
+      "clarify": "Needs more information",
+      "spec": "Planning",
+      "execute": "Execution",
+      "review": "Independent review",
+      "verify": "Verification",
+      "approval": "Awaiting human acceptance",
+      "publish": "Publishing",
+      "monitor": "Monitoring results"
+    },
+    "status": {
+      "pending": "Pending",
+      "running": "Running",
+      "waiting": "Waiting for input",
+      "passed": "Stage passed",
+      "failed": "Stage failed",
+      "blocked": "Blocked",
+      "cancelled": "Cancelled",
+      "revoked": "Authorization revoked"
+    },
+    "awaitingDispatch": "Awaiting dispatch",
+    "state": "Task status: {stage} · {status}.",
+    "accepted": "Task completed: the deliverable passed independent review and verification, and the requester accepted it.",
+    "merged": "Task completed: the current code candidate has been merged.",
+    "task": "Task",
+    "thread": "Thread",
+    "evidence": "Results and verification evidence",
+    "artifact": "Artifact {number}",
+    "approvalRequired": "Independent review and verification are recorded in Factory. Complete the required human acceptance in the task.",
+    "repositoryRemedy": "Select a repository you have authorized in Bot settings, then try again.",
+    "runtimeRemedy": "Connect your local Agent and keep it online, or configure an authorized cloud computer in runtime settings.",
+    "toolRemedy": "Ask the Bot owner to enable task delegation in the existing Agent settings.",
+    "authorizationRemedy": "Check your model, subscription or API key authorization and runtime settings, then try again. Other members’ personal credentials cannot be used.",
+    "chooseBot": "Choose a Bot in this group with Factory task capabilities. This member can only answer questions.",
+    "notStarted": "Execution has not started. {remedy}",
+    "newRunNotStarted": "A new execution has not started. {remedy}",
+    "stopRequested": "Cancellation recorded. The running executor will exit after receiving the stop signal.",
+    "nothingToStop": "The task has not started; there is no executor to stop.",
+    "continued": "The new request was sent to the same task. Factory will execute, independently review and verify the latest requirements.",
+    "created": "The task was sent to Factory. I will report its execution, independent review and verification results.",
+    "chatUnavailable": "This Bot uses its owner’s personal chat model settings, which this request cannot access. Use your own Bot or ask its owner to start this chat. Task delegation checks your own execution resources separately."
   }
 }

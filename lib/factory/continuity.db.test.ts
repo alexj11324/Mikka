@@ -8,7 +8,7 @@ import { factoryBinding } from './dispatch'
 import { FactoryError } from './contract'
 import { advanceFactoryRequest } from './request-epoch'
 import { currentFactoryRequest } from './checks'
-import { persistFactoryHandoff } from './handoff'
+import { factoryRecoveryHandoff, persistFactoryHandoff } from './handoff'
 import { sweepFactoryWatchdog, type WatchdogDependencies } from './watchdog'
 
 test('PG: request epochs, stale completion fences and unattended handoff are durable', { skip: !dbUrl, timeout: 120000 }, async t => {
@@ -129,13 +129,22 @@ test('PG: request epochs, stale completion fences and unattended handoff are dur
     assert.equal(wakes, 1)
     assert.equal(dispatches, 0)
   })
-  await t.test('an uncertain external receipt survives handoff and is never replayed', async () => {
+  await t.test('an older uncertain receipt survives a full handoff window and blocks lease recovery', async () => {
     const task = await fixture()
     const pending = await advance(task, await followup(task, 'Continue the same work'))
     const operationId = randomUUID()
     await pool.query(`INSERT INTO operation_ledger("operationId","ownerId","workspaceId",binding,"idempotencyKey",status,"attemptToken","runId")
       VALUES($1,$2,$3,$4,$5,'uncertain',$6,$7)`, [operationId, owner, workspace.id,
       JSON.stringify({ executionRunId: task.runId, action: 'send_email', target: 'fixture@example.invalid' }), `continuity:${operationId}`, randomUUID(), task.runId])
+    await pool.query(`UPDATE operation_ledger SET "updatedAt"=now()-interval '1 hour' WHERE "operationId"=$1`, [operationId])
+    for (let index = 0; index < 21; index++) {
+      const completedId = randomUUID()
+      await pool.query(`INSERT INTO operation_ledger("operationId","ownerId","workspaceId",binding,"idempotencyKey",status,"attemptToken","runId",receipt)
+        VALUES($1,$2,$3,$4,$5,'succeeded',$6,$7,$8)`, [completedId, owner, workspace.id,
+        JSON.stringify({ executionRunId: task.runId, action: 'fixture_observation' }), `continuity:${completedId}`, randomUUID(), task.runId, JSON.stringify({ reference: `synthetic-receipt-${index}` })])
+    }
+    const leaseRecovery = await factoryRecoveryHandoff(pool, { id: task.runId, userId: owner }, 'Resume the current request.')
+    assert.match(leaseRecovery.blocked ?? '', /Reconcile its existing receipt/)
     await pool.query(`UPDATE factory_tasks SET "updatedAt"=now()-interval '2 minutes' WHERE id=$1`, [task.id])
     const count = dispatches
     await sweepFactoryWatchdog(pool, dependencies)
@@ -143,6 +152,7 @@ test('PG: request epochs, stale completion fences and unattended handoff are dur
     assert.equal((await pool.query('SELECT status FROM operation_ledger WHERE "operationId"=$1', [operationId])).rows[0].status, 'uncertain')
     assert.equal((await pool.query('SELECT status FROM factory_tasks WHERE id=$1', [task.id])).rows[0].status, 'blocked')
     const handoff = await persistFactoryHandoff(pool, pending)
+    assert.equal(handoff.externalEffects.operations.length, 20, 'handoff remains bounded without hiding unresolved effects')
     assert.equal(handoff.externalEffects.operations[0].operationId, operationId)
     assert.equal(handoff.externalEffects.operations[0].status, 'uncertain')
   })

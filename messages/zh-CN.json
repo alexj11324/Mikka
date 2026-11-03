@@ -4478,5 +4478,48 @@
       "copyFailed": "复制失败",
       "quote": "引用"
     }
+  },
+  "GroupTask": {
+    "stage": {
+      "clarify": "等待补充信息",
+      "spec": "制定方案",
+      "execute": "执行",
+      "review": "独立审查",
+      "verify": "验证",
+      "approval": "等待人工验收",
+      "publish": "发布",
+      "monitor": "观察结果"
+    },
+    "status": {
+      "pending": "待处理",
+      "running": "进行中",
+      "waiting": "等待输入",
+      "passed": "本阶段通过",
+      "failed": "本阶段未通过",
+      "blocked": "被阻塞",
+      "cancelled": "已取消",
+      "revoked": "授权已撤回"
+    },
+    "awaitingDispatch": "等待调度",
+    "state": "任务状态：{stage} · {status}。",
+    "accepted": "任务已完成：交付物已通过独立审查、验证，并获发起人验收。",
+    "merged": "任务已完成：当前候选代码已合并。",
+    "task": "Task",
+    "thread": "Thread",
+    "evidence": "成果与验证证据",
+    "artifact": "Artifact {number}",
+    "approvalRequired": "独立审查和验证已交回 Factory；仍需在任务中完成所要求的人工验收。",
+    "repositoryRemedy": "请在 Bot 设置中选择你已授权的仓库后重试。",
+    "runtimeRemedy": "请连接你的本地 Agent 并保持在线，或在运行设置中配置你有权使用的云端电脑。",
+    "toolRemedy": "请由 Bot 所有者在现有 Agent 设置中启用任务委派能力。",
+    "authorizationRemedy": "请检查你自己的模型、订阅或 API Key 授权与运行位置设置后重试；其他成员的个人凭据不会被代用。",
+    "chooseBot": "请指定本群中具备 Factory 任务能力的 Bot 来执行；此成员只提供回答。",
+    "notStarted": "尚未开始执行。{remedy}",
+    "newRunNotStarted": "尚未开始新的执行。{remedy}",
+    "stopRequested": "已记录取消请求；正在运行的执行器会在收到停止信号后退出。",
+    "nothingToStop": "任务尚未开始执行，没有需要停止的执行器。",
+    "continued": "新的要求已交给同一任务；Factory 将按最新要求执行、独立审查并验证。",
+    "created": "任务已交给 Factory，后续由我统一汇报执行、独立审查和验证结果。",
+    "chatUnavailable": "这个 Bot 的聊天模型使用其所有者的个人配置，当前消息无法代用该授权。请使用你自己的 Bot，或请其所有者发起这次聊天；任务委派会另行检查你自己的执行资源。"
   }
 }

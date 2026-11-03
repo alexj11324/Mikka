@@ -16,7 +16,7 @@ if (connection) {
 if (process.env.REQUIRE_DB === '1' && !enabled) throw new Error('Factory admission DB tests cannot skip in required CI')
 
 type Fixture = {
-  userId: string; issueId: string; deviceId: string; agentId: string; repoId: string
+  userId: string; workspaceId: string; issueId: string; deviceId: string; agentId: string; repoId: string
   remoteUrl: string; remoteKey: string; eventId: string; task: FactoryTask
 }
 
@@ -67,12 +67,12 @@ test('real Factory admission preserves host scope, policy and transaction owners
     await pool.query('INSERT INTO issue_prefixes ("userId",prefix) VALUES ($1,\'FADM\')', [userId])
     await pool.query('INSERT INTO devices (id,"ownerId",name,kind,harnesses,"protocolVersion") VALUES ($1,$2,\'Admission CI computer\',\'local\',$3,3)', [identity.deviceId, userId, JSON.stringify([{ harness: 'codex', installed: true }])])
     await pool.query('INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,\'codex\',\'Admission CI worker\')', [identity.agentId, userId, identity.deviceId])
-    await seedAllowedModel(pool, userId, { deviceIds: [identity.deviceId] })
+    const { workspaceId } = await seedAllowedModel(pool, userId, { deviceIds: [identity.deviceId] })
     await pool.query('INSERT INTO device_repos (id,"deviceId","userId","repoPath","remoteUrl","baseBranch") VALUES ($1,$2,$3,$4,$5,null)', [identity.repoId, identity.deviceId, userId, identity.remoteKey, remoteUrl])
     await pool.query('INSERT INTO issues (id,"userId",title,content,status,priority,scope) VALUES ($1,$2,\'Synthetic admission task\',$3,\'todo\',\'normal\',\'personal\')', [identity.issueId, userId, JSON.stringify({ type: 'doc', attrs: { mikka: { number: 1 } }, content: [] })])
     const eventId = await addEvent(identity, { destination: options.destination === 'selected' ? { kind: 'device', deviceId: identity.deviceId } : options.destination, delivered: options.delivered })
     const routed = await factoryStore.route(userId, { issueId: identity.issueId, eventId: randomUUID(), sourceEventId: eventId, rationale: 'Synthetic requested implementation' })
-    const f = { ...identity, eventId, task: routed.task }
+    const f = { ...identity, workspaceId, eventId, task: routed.task }
     fixtures.push(f)
     await policy(f, options.permission ?? 'allow')
     if (options.approved !== false) await recordPushGrant(pool, userId, identity.remoteKey)
@@ -266,7 +266,7 @@ test('real Factory admission preserves host scope, policy and transaction owners
       const f = await fixture()
       const input = publicInput(f, `scope:${randomUUID()}`)
       const first = await queueRun(f.userId, input)
-      const botId = randomUUID(), workspaceId = randomUUID()
+      const botId = randomUUID(), workspaceId = f.workspaceId
       await pool.query('INSERT INTO bots (id,"ownerId","workspaceId",name) VALUES ($1,$2,$3,\'Synthetic scoped Bot\')', [botId, f.userId, workspaceId])
       await assert.rejects(queueRun(f.userId, input, botId), /runDispatchKeyConflict/)
       const oldScope = (await pool.query('SELECT "scopeVersion" FROM run_publications WHERE "runId"=$1', [first.runId])).rows[0].scopeVersion
