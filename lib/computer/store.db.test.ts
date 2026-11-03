@@ -29,6 +29,11 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
   const pool = new Pool({ connectionString: databaseURL, options: `-c search_path=${schema}` })
   const { workspacePool } = await import('../workspace-db')
   const previousWorkspaceOptions = workspacePool.options.options
+  const previousWorkspaceURL = workspacePool.options.connectionString
+  // This suite declares COMPUTER_TEST_DATABASE_URL / E2E_DATABASE_URL only.
+  // The real workspace membership read must use that same disposable target,
+  // even when app/workspace database environment variables are absent in CI.
+  workspacePool.options.connectionString = databaseURL
   workspacePool.options.options = `-c search_path=${schema}`
   let created = 0, failSync = false, failStart = false, epoch = 0, computerAllowed = true, computerPolicyVersion = 0
   const syncedLeases: { sandboxId: string; policyVersion: number; computerAllowed?: boolean; display: number }[] = []
@@ -557,6 +562,7 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
   } finally {
     console.log(`Retained computer test schema: ${schema}`)
     workspacePool.options.options = previousWorkspaceOptions
+    workspacePool.options.connectionString = previousWorkspaceURL
     await workspacePool.end(); await pool.end(); await admin.end()
   }
 })
