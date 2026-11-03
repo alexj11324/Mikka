@@ -37,7 +37,7 @@ func (w *Worker) Stream(ctx context.Context, epoch int64, model string, payload 
 	for {
 		select {
 		case <-ticker.C:
-			if _, err = w.activeRuntime(ctx, r.Epoch, model); err != nil {
+			if err = w.activeRuntime(ctx, r.Epoch, model); err != nil {
 				return err
 			}
 		case <-ctx.Done():
@@ -52,7 +52,7 @@ func (w *Worker) Stream(ctx context.Context, epoch int64, model string, payload 
 			if len(chunk.Payload) > 65536 {
 				return ErrProvider
 			}
-			if _, err = w.activeRuntime(ctx, r.Epoch, model); err != nil {
+			if err = w.activeRuntime(ctx, r.Epoch, model); err != nil {
 				return err
 			}
 			if err = emit(chunk.Payload); err != nil {
