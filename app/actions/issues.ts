@@ -1,5 +1,7 @@
 'use server'
 
+import { withDatabaseOperation } from '@/lib/db/egress-sample'
+
 import { and, desc, eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { ActionFailureError, runAction } from '@/lib/action-error'
@@ -70,6 +72,10 @@ export async function listWorkspaceIssues(workspaceId: string) {
 }
 
 async function readIssues(workspaceId?: string) {
+  return withDatabaseOperation('/actions/issues/poll', () => readIssueSnapshot(workspaceId))
+}
+
+async function readIssueSnapshot(workspaceId?: string) {
   const userId = await getUserId()
   const context = await loadWorkspaceContext(workspaceId)
   const teams = await accessibleTeams(userId, context.workspace.id)
