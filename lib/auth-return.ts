@@ -43,6 +43,11 @@ export function safeAuthReturn(value?: string) {
     if (url.searchParams.get('section') === 'plugins' && hasOnlyQueryKeys(url, ['section', 'app'])) {
       return app === null ? '/?section=plugins' : isPluginApp(app) ? `/?section=plugins&app=${app}` : '/'
     }
+    // A desktop Link GitHub whose browser had to sign in first: back to GitHub's page with the one-time link token.
+    const intent = url.searchParams.get('intent')
+    if (url.searchParams.get('section') === 'plugins' && app === 'github' && hasOnlyQueryKeys(url, ['section', 'app', 'intent']) && intent && /^ghi_[A-Za-z0-9_-]{43}$/.test(intent)) {
+      return `/?section=plugins&app=github&intent=${intent}`
+    }
     const issue = url.searchParams.get('issue')
     return hasOnlyQueryKeys(url, ['issue']) && issue && uuidPattern.test(issue) ? `/?issue=${issue}` : value === '/' ? '/' : '/'
   }
