@@ -270,16 +270,20 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
       const tx = await pool.connect();
       try {
         await tx.query('BEGIN');
+        const { rows: [retained] } = await tx.query('SELECT "sandboxId",state FROM thread_machines WHERE "runId"=$1 FOR UPDATE', [f.next]);
+        assert.ok(retained?.sandboxId);
         await tx.query(`UPDATE agent_runs current SET "deviceId"=previous."deviceId","deviceRepoId"=previous."deviceRepoId","sessionId"=previous."sessionId","agentDefinition"=previous."agentDefinition","continuesRunId"=previous.id,"questionContinuation"=previous."questionContinuation" FROM agent_runs previous WHERE current.id=$1 AND previous.id=$2`, [next, f.next]);
-        await tx.query(`INSERT INTO thread_machines("runId","workspaceId","ownerId","botId","issueId","sandboxId","snapshotId","operationId",state,"deviceId","repoId")
-          SELECT $1,"workspaceId","ownerId","botId","issueId","sandboxId","snapshotId",$3,state,"deviceId","repoId" FROM thread_machines WHERE "runId"=$2`, [next, f.next, randomUUID()]);
+        // Like the production queue, release the old row's unique sandbox
+        // custody before assigning that same sandbox to its continuation.
         await tx.query(`UPDATE thread_machines SET state='ended',"sandboxId"=NULL WHERE "runId"=$1`, [f.next]);
+        await tx.query(`INSERT INTO thread_machines("runId","workspaceId","ownerId","botId","issueId","sandboxId","snapshotId","operationId",state,"deviceId","repoId")
+          SELECT $1,"workspaceId","ownerId","botId","issueId",$4,"snapshotId",$3,$5,"deviceId","repoId" FROM thread_machines WHERE "runId"=$2`, [next, f.next, randomUUID(), retained.sandboxId, retained.state]);
         await tx.query(`INSERT INTO factory_attempts(id,"taskId",stage,ordinal,position,status,"runId",reason) VALUES($1,$2,'execute',2,2,'blocked',$3,'owner recovery')`, [attemptId, f.taskId, next]);
         await tx.query(`UPDATE factory_tasks SET "attemptId"=$2,revision=revision+1 WHERE id=$1`, [f.taskId, attemptId]);
         await tx.query(`UPDATE factory_questions SET "continuationRunId"=$2,revision=revision+1 WHERE id=$1`, [f.q, next]);
         await tx.query(`INSERT INTO factory_events("taskId","eventId",request,result) VALUES($1,$2,$3,$4)`, [f.taskId, randomUUID(), { kind: 'question_recover', input: { expectedFailedRunId: f.next } }, { continuationRunId: next, historyRunId: f.next, originRunId: f.prior.runId, originSessionId: f.continuation.originSessionId }]);
         await tx.query('COMMIT');
-      } finally { tx.release(); }
+      } catch (error) { await tx.query('ROLLBACK'); throw error; } finally { tx.release(); }
       return { ...f, next, attemptId };
     };
     const questionHistory = async (f: Awaited<ReturnType<typeof failedQuestionMachine>>) => ({
