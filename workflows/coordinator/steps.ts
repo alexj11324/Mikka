@@ -479,10 +479,9 @@ export async function dispatchRun(userId: string, input: { issueId: string; agen
   }
   // A bare name ("Mikka_test") becomes the one repository this user authorized by that name, or a card; only a new run needs it.
   const { withResolvedRepository } = await import('@/lib/coordinator/repository-resolution')
-  // More work for a task that has a thread keeps the thread's repository; only a task's first thread needs one named.
-  const byRules = (note: string | undefined, place?: import('@/lib/dispatch-target').DispatchTarget, threadRepo?: string | null) => {
-    const named = request.repo?.trim() || threadRepo
-    if (!named) return Promise.resolve({ error: 'repositoryRequired' as const, issueId: request.issueId })
+  // A new thread runs in the repository named; the thread's next run only ever in the thread's own (never the one the model passed).
+  const byRules = (note: string | undefined, place: import('@/lib/dispatch-target').DispatchTarget | undefined, named: string | null | undefined) => {
+    if (!named?.trim()) return Promise.resolve({ error: 'repositoryRequired' as const, issueId: request.issueId })
     return withResolvedRepository(userId, request.issueId, named, repo => dispatchByRules(userId, { ...request, repo, note }, scope, botId, execution, requestEventId, place))
   }
   // The thread's repository is not the one named: a different one, or a name that is not one repository yet (its card comes from the new thread's lookup).
@@ -500,8 +499,9 @@ export async function dispatchRun(userId: string, input: { issueId: string; agen
     // repository the person named that is not the thread's ("It's in the mikka-web repo"): the work goes there, in a new thread.
     moves: async previous => movesThread(target, await runPlacement(pool, userId, previous.id)) || await movesRepository(previous),
     explicit: async () => (repositoryMove && await personNamed(userId, botId, sourceEventId, request.repo!)) || explicitNewThread(userId, botId, sourceEventId),
-    start: async (previous, note) => {
-      if (!previous) return byRules(note, target)
+    start: async (previous, note, replaces) => {
+      // A new thread runs in the repository the person named, else in the one of the thread it replaces.
+      if (!previous) return byRules(note, target, request.repo?.trim() || replaces?.remoteUrl)
       // The thread's next run goes where the thread ran, so its session can be resumed; elsewhere it starts fresh with the note's context.
       // It keeps the thread's own model and account, or the one the person just named; never another one silently.
       const { latestThreadRunModel, chooseCloudRunModel, chooseLocalRunModel } = await import('@/lib/computer/run-model')
@@ -523,7 +523,8 @@ export async function dispatchRun(userId: string, input: { issueId: string; agen
         const result = await queueRun(userId, { issueId: request.issueId, agentId: previous.agentId, repo: previous.remoteUrl, note, readOnly: Boolean(request.readOnly || previous.readOnly), requestKey: `thread:${previous.id}:${request.requestKey ?? crypto.randomUUID()}`.slice(0, 200), ...localModel, threadRunId: previous.id }, botId, execution, requestEventId).catch(() => null)
         if (result) return { ...result, status: 'queued' as const }
       }
-      return byRules(note, undefined, previous.remoteUrl)
+      // Where the thread ran could not take it: placed by the rules, in the thread's repository and at the place the person named, if any.
+      return byRules(note, target, previous.remoteUrl)
     },
   }))))
 }

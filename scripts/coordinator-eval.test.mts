@@ -227,7 +227,26 @@ for (const item of moveCases) {
   })
 }
 
-const screenCases: { label: string; text: string; family: Family; mention: RegExp }[] = [
+// A new thread asked for in so many words, in another repository: both newThread and that repository are passed
+// (production, 2026-11-03). Fictional repositories only.
+const newThreadMoveCases: { label: string; text: string; family: Family }[] = [
+  { label: 'en', text: 'On phones, the pricing section of our marketing site (repo octo/octo-web) is cut off. Start a new thread on a cloud computer in octo/octo-web: reproduce it at 390px, fix the layout, run pnpm build, and open a PR.', family: OCTO },
+  { label: 'zh', text: '在 octo-web 仓库另开一个新线程：手机上页脚被截断，修好后跑 pnpm build 并开 PR。', family: OCTO },
+]
+for (const item of newThreadMoveCases) {
+  test(`new thread in a named repository (${item.label}) on a thread bound to ${item.family.app}`, { skip }, async () => {
+    const thread = { id: ISSUE, title: 'Section cut off on phones', status: 'doing', runs: [{ id: 'run-1', agent: 'Claude Code', status: 'failed' }], thread: { runId: 'run-1', status: 'failed', repository: `https://github.com/${item.family.app}` } }
+    results = { getIssue: thread, findRepository: { match: 'one', repository: item.family.site, description: 'The public marketing website', homepage: item.family.siteHome }, dispatchRun: { runId: 'run-8', thread: 'new', threadId: 'run-8', replacedThreadId: 'run-1', placement: { kind: 'cloud' } } }
+    await passAll(`new thread move ${item.label}`, async () => trial(item.text, await facts()), ({ calls }) => {
+      const dispatched = calls.filter(call => call.step === 'dispatchRun')
+      if (!dispatched.length) return 'no dispatch_run'
+      if (!dispatched.some(call => named(repoOf(call), item.family.site))) return 'the named repository was not passed'
+      return dispatched.some(call => (call.input as { newThread?: boolean }).newThread === true) ? null : 'no new thread though the person asked'
+    })
+  })
+}
+
+const screenCases:{ label: string; text: string; family: Family; mention: RegExp }[] = [
   { label: 'Alex', text: 'On phones, the How it works section on the Mikka site is cut off. First show me the page at phone width.', family: MIKKA, mention: /mikka/i },
   { label: 'docs site', text: 'Open our Octo docs site on a narrow browser and show me where the sidebar breaks.', family: OCTO, mention: /octo/i },
   { label: 'zh', text: '先用手机尺寸打开 Octo 官网给我看看导航栏', family: OCTO, mention: /octo/i },
