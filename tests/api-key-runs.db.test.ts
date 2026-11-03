@@ -330,6 +330,30 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
     await assert.rejects(queue(foreign.binding, `foreign:${randomUUID()}`, await task(p.id)), cloud ? { status: 409 } : { code: 'executionAccountUnavailable' }, 'an id never grants access to another Agent or owner’s subscription')
   })
 
+  await t.test('cloud queue refuses a key withdrawn after preflight even when another key serves the same model', async () => {
+    const p = await person('key-withdrawn-before-cloud-queue')
+    const selected = await addKey(p.id, 'anthropic', `sk-ant-${randomBytes(16).toString('hex')}`, ['key-model-a'])
+    const other = await addKey(p.id, 'anthropic', `sk-ant-${randomBytes(16).toString('hex')}`, ['key-model-a'])
+    const { agentId, repoId } = await botComputer(p)
+    const { runCredentialSource } = await import('../lib/run-credential-source')
+    const selection = { ownerId: p.id, botId: p.botId, harness: 'claude_code', model: 'key-model-a', keyId: selected.id, botWorkspaceId: p.workspaceId, choiceWorkspaceId: p.workspaceId, subscription: null }
+    assert.deepEqual((await runCredentialSource(pool, selection)).apiKey, { keyId: selected.id, model: 'key-model-a' })
+    // Deterministic interleaving: preflight chooses A, the owner withdraws A
+    // during wake, then the real queue reauthorizes with usable key B present.
+    await keys.removeApiKey(pool, p.id, selected.id)
+    assert.deepEqual((await runCredentialSource(pool, selection)).apiKey, { keyId: other.id, model: 'key-model-a' })
+    const snapshot = async () => (await pool.query(`SELECT
+      (SELECT count(*) FROM agent_runs WHERE "userId"=$1) AS runs,
+      (SELECT count(*) FROM computer_run_bindings WHERE "ownerId"=$1) AS bindings,
+      (SELECT count(*) FROM thread_machines WHERE "ownerId"=$1) AS machines,
+      (SELECT count(*) FROM run_publications WHERE "userId"=$1) AS publications`, [p.id])).rows[0]
+    const before = await snapshot()
+    await assert.rejects(queueCloudRun(pool, { userId: p.id, workspaceId: p.workspaceId }, {
+      botId: p.botId, issueId: p.issueId, agentId, deviceRepoId: repoId, title: 'Keep selected key', body: '', model: 'key-model-a', apiKeyId: selected.id, readOnly: true,
+    }), { status: 409 })
+    assert.deepEqual(await snapshot(), before, 'a refused credential creates no run, binding, task machine or publication')
+  })
+
   await t.test('cloud computer: queued with no subscription, the claim returns the key', async () => {
     const p = await person('key-cloud')
     const secret = `sk-ant-${randomBytes(16).toString('hex')}`
