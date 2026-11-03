@@ -904,6 +904,38 @@ describe("follow-up runs", () => {
 // reason, and the issue gets a next owner or a named wait reason. Only a
 // submission whose verify passed goes to review.
 describe("run stops", () => {
+  it.each(['blocked', 'cancelled'] as const)('retains a clean repository-selection handoff only when it ended blocked (%s)', async stopReason => {
+    const { repo, server, dataDir } = await setup()
+    // The daemon clones this real local fixture into its own repository cache.
+    const origin = pathToFileURL(repo).href
+    const head = git(repo, 'rev-parse', 'HEAD')
+    const fixtures = tempDir()
+    writeFileSync(join(fixtures, 'repository-selection.jsonl'), JSON.stringify({ t: 0, exit: {
+      outcome: stopReason === 'blocked' ? 'failed' : 'cancelled', stopReason,
+      report: { summary: 'This is the wrong repository.', repositorySelection: {
+        repository: 'example/correct', reason: 'The README identifies the wrong repository.', observedRemote: origin, observedHead: head,
+      } },
+    } }) + '\n')
+    const daemon = await boot(server, dataDir, Number.POSITIVE_INFINITY, undefined, fixtures)
+    const runId = server.queueRun(DEVICE, { issueId: 'repository-selection', repoId: 'repo-1', baseBranch: 'main', harness: 'mock',
+      kind: 'implement', prompt: 'Inspect this checkout', fixture: 'repository-selection', policy: { ...runPolicy(undefined), readOnly: true } })
+    const run = await runToEnd(daemon, server, runId)
+    expect(run).toMatchObject({ state: stopReason === 'blocked' ? 'stopped' : 'cancelled', stopReason })
+    expect(server.runs.get(runId)?.completion?.report.repositorySelection).toMatchObject({ observedRemote: origin, observedHead: head })
+    expect(await daemon.supervisor.discardIfEmpty(runId)).toBe(stopReason !== 'blocked')
+    const worktree = run.worktree as string
+    expect(existsSync(worktree)).toBe(stopReason === 'blocked')
+    if (stopReason === 'blocked') {
+      expect(git(worktree, 'symbolic-ref', '--short', 'HEAD')).toBe(`mikka/run-${runId}`)
+      expect(git(worktree, 'status', '--porcelain')).toBe('')
+      expect(git(worktree, 'rev-parse', 'HEAD')).toBe(head)
+      expect(git(worktree, 'remote', 'get-url', 'origin')).toBe(origin)
+      expect(new RunJournal(join(dataDir, 'runs.json')).get(runId)?.assignment.preserveQuestionWorktree).toBe(true)
+      expect(await daemon.supervisor.discardIfEmpty(runId, runId)).toBe(true)
+      expect(existsSync(worktree)).toBe(false)
+    }
+  })
+
   it("preserves a blocked question's empty worktree durably until explicit cancellation", async () => {
     const { server, dataDir } = await setup()
     const daemon = await boot(server, dataDir)

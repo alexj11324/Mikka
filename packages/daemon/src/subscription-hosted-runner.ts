@@ -38,6 +38,7 @@ import { DaemonError, ServerUnreachableError } from "./errors";
 import { createApiKeyBroker } from "./api-key-broker";
 import type { RunCredential } from "./agents/run-credential";
 import type { ServerLink } from "./server-link";
+import type { RunJournal } from "./runs/journal";
 import { readJson, writeJsonAtomic } from "./fs-util";
 import { withTaskEnv } from "./task-env";
 import type { ComputerBroker } from "./computer/broker.mjs";
@@ -127,6 +128,8 @@ export function hostedBinaries(passed?: Partial<Record<"codex" | "claude_code", 
 export async function createHostedBotRunner(host: {
   stateDir: string;
   link: ServerLink;
+  /** The daemon journal binds question answers to the actual retained run/worktree. */
+  journal?: Pick<RunJournal, "get">;
   binaries?: Partial<Record<"codex" | "claude_code", string>>;
   /**
    * Passed only by trusted E2B infrastructure, never by a task. Unused since
@@ -285,9 +288,26 @@ export async function createHostedBotRunner(host: {
           selected.route !==
             (kind === "codex" ? "codex_cli" : "claude_code_cli"))) ||
         (apiKey?.kind === "provider" && apiKey.protocol !== protocol) ||
-        options.continueSession
+        (assignment.requireSessionResume && !selected) ||
+        (options.continueSession && (!selected || !assignment.requireSessionResume))
       )
         throw unavailable();
+      const continuation = options.continueSession;
+      if (selected && assignment.requireSessionResume) {
+        const sourceId = continuation?.runId ?? assignment.runId;
+        const source = host.journal?.get(sourceId);
+        const binding = source?.assignment.subscriptionBinding;
+        if (!assignment.resumeSessionId || !assignment.continuesRunId || !source?.worktree ||
+          source.sessionId !== assignment.resumeSessionId ||
+          (continuation && (continuation.runId !== assignment.continuesRunId || continuation.sessionId !== assignment.resumeSessionId)) ||
+          (!continuation && source.questionResumeState !== "accepted") ||
+          source.assignment.harness !== kind || source.assignment.model !== assignment.model || options.model !== assignment.model ||
+          source.assignment.deviceId !== assignment.deviceId || source.assignment.issueId !== assignment.issueId ||
+          source.assignment.repoId !== assignment.repoId || realpathSync(source.worktree) !== realpathSync(options.cwd) ||
+          !binding || binding.bindingId !== selected.bindingId || binding.ownerId !== selected.ownerId ||
+          binding.workspaceId !== selected.workspaceId || binding.consumerId !== selected.consumerId || binding.route !== selected.route)
+          throw unavailable();
+      }
       // A subscription model runs only if this machine's CLI reported it; the run fails with the reason, never on another model.
       if (selected && host.reportedModels) {
         const report = await host.reportedModels(kind).catch(() => null);
@@ -500,16 +520,17 @@ export async function createHostedBotRunner(host: {
           accountId: subscription.first.accountId,
           modelId: subscription.first.modelId,
         } : undefined;
-        // Only a subscription session is resumed from its ledger; an API-key run starts fresh.
-        const previous = scope ? readJson(ledger) as
+        // Legacy ledgers are sufficient: their frozen scope is joined to the
+        // daemon's original SID/worktree journal, never inferred from a new run.
+        if (continuation && existsSync(ledger)) throw unavailable();
+        const previousLedger = continuation
+          ? join(host.stateDir, "native-ledgers", continuation.runId + ".json") : ledger;
+        const previous = scope ? readJson(previousLedger) as
           { scope: typeof scope; sessionId: string } | undefined : undefined;
-        if (
-          scope &&
-          existsSync(ledger) &&
-          (!previous ||
-            JSON.stringify(previous.scope) !== JSON.stringify(scope) ||
-            typeof previous.sessionId !== "string")
-        )
+        const expectedScope = scope && continuation ? { ...scope, runId: continuation.runId } : scope;
+        if (scope && ((existsSync(previousLedger) &&
+          (!previous || JSON.stringify(previous.scope) !== JSON.stringify(expectedScope) || typeof previous.sessionId !== "string")) ||
+          (assignment.requireSessionResume && (!previous || previous.sessionId !== assignment.resumeSessionId))))
           throw unavailable();
         if (scope) mkdirSync(dirname(ledger), { recursive: true, mode: 0o700 });
         const record = async (sessionId: string) => {
@@ -718,10 +739,14 @@ export async function createHostedBotRunner(host: {
                     },
                   },
                 });
-          const runtimeOptions = { ...options, credential: placeholderCredential, ...(githubCli ? { githubRuntime: { nodeBinary: process.execPath, ghBinary: githubCli } } : {}) };
-          const session = previous
+          const runtimeOptions = { ...options, ...(continuation ? { continueSession: continuation } : {}), ...(assignment.requireSessionResume ? { requireSessionResume: true } : {}), credential: placeholderCredential, ...(githubCli ? { githubRuntime: { nodeBinary: process.execPath, ghBinary: githubCli } } : {}) };
+          const session = previous && !continuation
             ? await adapter.resume(previous.sessionId, runtimeOptions)
             : await adapter.start(runtimeOptions);
+          if (assignment.requireSessionResume && session.sessionId !== assignment.resumeSessionId) {
+            await session.cancel();
+            throw unavailable();
+          }
           started = true;
           // A quick, successful adapter may already have ended and revoked its
           // gate here. Preserve its terminal events; sends/spawns/provider work

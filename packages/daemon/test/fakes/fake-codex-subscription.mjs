@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Offline official-auth protocol fixture. Contains only synthetic tokens.
-import { existsSync, readFileSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { createInterface } from "node:readline"
 import { execFileSync, spawn } from "node:child_process"
@@ -64,6 +64,14 @@ lines.on("line", async (line) => {
     login = params
     return send({ id, result: { type: "chatgptAuthTokens" } })
   }
+  const historyFile = join(process.env.CODEX_HOME, "sessions", "fixture-subscription-thread.json")
+  if (method === "thread/resume") {
+    if (!existsSync(historyFile)) return send({ id, error: { code: -32600, message: "Original thread unavailable" } })
+    const history = JSON.parse(readFileSync(historyFile, "utf8"))
+    if (params.threadId !== history.sessionId) return send({ id, error: { code: -32600, message: "Original thread unavailable" } })
+    writeFileSync(join(process.env.CODEX_HOME, 'fixture-resume.json'), JSON.stringify({ method, threadId: params.threadId }))
+    return send({ id, result: { thread: { id: history.resumeSessionId ?? history.sessionId } } })
+  }
   if (method === "thread/start") {
     // The owned hosted broker uses Codex's documented custom Responses
     // provider, independently of the direct/local ChatGPT login fixture.
@@ -78,6 +86,8 @@ lines.on("line", async (line) => {
         id,
         error: { code: -1, message: "subscription login required" }
       })
+    mkdirSync(join(process.env.CODEX_HOME, "sessions"), { recursive: true })
+    writeFileSync(historyFile, JSON.stringify({ sessionId: "fixture-subscription-thread", messages: [] }))
     return send({
       id,
       result: { thread: { id: "fixture-subscription-thread" } }
@@ -87,6 +97,14 @@ lines.on("line", async (line) => {
     const turnId = `fixture-turn-${++turn}`
     send({ id, result: { turn: { id: turnId } } })
     const prompt = params.input[0].text
+    if (existsSync(historyFile)) {
+      const history = JSON.parse(readFileSync(historyFile, "utf8")); history.messages.push(prompt)
+      writeFileSync(historyFile, JSON.stringify(history))
+    }
+    if (prompt === 'ORIGINAL_QUESTION') {
+      const args = JSON.parse(process.argv.find(value => value.startsWith('mcp_servers.mikka.args=')).slice('mcp_servers.mikka.args='.length))
+      execFileSync(process.execPath, args, { input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'ask_human', arguments: { question: 'Please provide the owner answer', kind: 'external' } } }) + '\n', stdio: ['pipe', 'pipe', 'pipe'] })
+    }
     const fullComputer = prompt === 'FULL_COMPUTER' || prompt.startsWith('# FULL_COMPUTER\n')
     if (prompt === 'COMPUTER' || fullComputer) {
       async function call(server, name, args) {

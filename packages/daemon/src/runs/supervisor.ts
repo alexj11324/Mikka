@@ -811,6 +811,10 @@ export class RunSupervisor {
     // agent must not be able to make a run read as a planning one (ADR ORV-205).
     const entry = this.deps.journal.get(runId)
     const planning = entry?.assignment.kind === "plan"
+    // A repository handoff, like a blocked question, keeps the original
+    // checkout for continuation/history; explicit cancellation can discard it.
+    if (entry && stopReason === "blocked" && report.repositorySelection)
+      entry.assignment.preserveQuestionWorktree = true
     const readOnlyTask = entry && (isReadOnlyTask(entry.assignment) || entry.assignment.factoryCheck?.reportOnly === true || entry.assignment.factoryExecuteKind === 'deliverable')
     // Never copy trusted evidence from an adapter/model report.
     const { sourceCommit: _source, deliverableCommit: _delivery, skillMount: _mount, execution: _execution, runtime: _runtime, ...content } = report
@@ -1384,7 +1388,7 @@ export class RunSupervisor {
           }
         : undefined
     if (assignment.requireSessionResume &&
-        (assignment.subscriptionBinding || !assignment.resumeSessionId || !assignment.continuesRunId ||
+        (!assignment.resumeSessionId || !assignment.continuesRunId ||
           !adapter.capabilities.supportsResume || (!resuming && !continueSession) ||
           (resuming && entry.sessionId !== assignment.resumeSessionId)))
       throw new Error("factory_question_session_resume_required")
@@ -1410,7 +1414,12 @@ export class RunSupervisor {
       ? await this.deps.startCredential(assignment,{...options,prompt})
       : assignment.subscriptionBinding
       ? this.deps.startSubscription
-        ? await this.deps.startSubscription(assignment,{...options,prompt})
+        ? await (async () => {
+            if (assignment.requireSessionResume && !resuming)
+              this.deps.journal.update(runId, { questionResumeState: "starting" })
+            return this.deps.startSubscription!(assignment, { ...options, prompt,
+              ...(assignment.requireSessionResume && continueSession ? { continueSession } : {}) })
+          })()
         : (()=>{throw new Error('subscription_hosted_runtime_unavailable')})()
       : resuming
       ? await adapter.resume(entry.sessionId as string, options)

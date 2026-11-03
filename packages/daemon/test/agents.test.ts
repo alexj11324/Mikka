@@ -28,13 +28,13 @@ async function worktreeOf(repo: string) {
 }
 
 /** Talks newline-delimited JSON-RPC to the MCP server script. */
-function mcpClient(handoff: string, extraArgs: string[] = []) {
+function mcpClient(handoff: string, extraArgs: string[] = [], env?: NodeJS.ProcessEnv) {
   const child = spawn(process.execPath, [
     MCP_SERVER_SCRIPT,
     "--handoff",
     handoff,
     ...extraArgs,
-  ])
+  ], { env })
   const waiting = new Map<number, (value: unknown) => void>()
   onLines(child.stdout, (line) => {
     const message = JSON.parse(line) as { id: number }
@@ -56,6 +56,26 @@ function mcpClient(handoff: string, extraArgs: string[] = []) {
 }
 
 describe("mikka MCP server", () => {
+  it('reads repository metadata from the bound root despite inherited Git selectors', async () => {
+    const repo = await makeRepo(), other = await makeRepo()
+    await execa('git', ['remote', 'add', 'origin', 'https://github.com/example/wrong.git'], { cwd: repo })
+    await execa('git', ['remote', 'add', 'origin', 'https://github.com/example/redirected.git'], { cwd: other })
+    writeFileSync(join(repo, 'README.md'), 'Bound repository\n')
+    await execa('git', ['add', 'README.md'], { cwd: repo })
+    await execa('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-m', 'bound README'], { cwd: repo })
+    const head = (await execa('git', ['rev-parse', 'HEAD'], { cwd: repo })).stdout
+    const worktree = await worktreeOf(repo)
+    const ctx = new RunContext({ harness: 'codex', kind: 'implement', worktree, runDir: tempDir(), privateDir: tempDir(), policy: { ...defaultRunPolicy(), readOnly: true } })
+    const client = mcpClient(ctx.handoffFile, ctx.mcpServer().args.slice(3), { ...process.env, GIT_DIR: join(other, '.git'), GIT_WORK_TREE: worktree })
+    try {
+      const inspected = await client.request('tools/call', { name: 'inspect_artifact', arguments: { path: 'README.md' } }) as { result: { content: { text: string }[] } }
+      expect(JSON.parse(inspected.result.content[0].text)).toMatchObject({ head, contentUtf8: 'Bound repository\n', contentMatchesGit: true })
+      await client.request('tools/call', { name: 'switch_repository', arguments: { repository: 'example/correct', reason: 'The bound README identifies the wrong repository.' } })
+      expect(ctx.readHandoff()?.report?.repositorySelection).toMatchObject({ observedRemote: 'https://github.com/example/wrong.git', observedHead: head })
+      expect((await execa('git', ['status', '--porcelain'], { cwd: worktree })).stdout).toBe('')
+    } finally { client.close() }
+  })
+
   it('records an execution-side repository switch with actual Git evidence and retains the old checkout', async () => {
     const repo = await makeRepo()
     await execa('git', ['remote', 'add', 'origin', 'https://github.com/example/wrong.git'], { cwd: repo })
@@ -234,6 +254,50 @@ describe("mikka MCP server", () => {
 })
 
 describe("run context", () => {
+  it('keeps artifact-reader advertising unchanged for writable executions, planning and command checks', async () => {
+    const worktree = await worktreeOf(await makeRepo())
+    for (const options of [
+      { kind: 'implement' as const, policy: defaultRunPolicy() },
+      { kind: 'plan' as const, policy: { ...defaultRunPolicy(), readOnly: true } },
+      { kind: 'implement' as const, policy: { ...defaultRunPolicy(), readOnly: true }, factoryCheck: { stage: 'verify' as const, reportOnly: false, inferCommand: false } },
+    ]) {
+      const ctx = new RunContext({ harness: 'codex', worktree, runDir: tempDir(), privateDir: tempDir(), ...options })
+      expect(ctx.mcpServer().args).not.toContain('--factory-artifacts')
+    }
+  })
+
+  it.each([
+    ['claude_code', 'implement'], ['codex', 'implement'], ['claude_code', 'fix'], ['codex', 'fix'],
+  ] as const)('lets a read-only %s %s execution inspect its bound repository before selecting another', async (harness, kind) => {
+    const repo = await makeRepo(), worktree = await worktreeOf(repo)
+    const content = 'This is the wrong repository.\n'
+    writeFileSync(join(worktree, 'README.md'), content)
+    await execa('git', ['add', 'README.md'], { cwd: worktree })
+    await execa('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-m', 'README'], { cwd: worktree })
+    const before = (await execa('git', ['rev-parse', 'HEAD'], { cwd: worktree })).stdout
+    const ctx = new RunContext({ harness, kind, worktree, runDir: tempDir(), privateDir: tempDir(), policy: { ...defaultRunPolicy(), readOnly: true } })
+    const client = mcpClient(ctx.handoffFile, ctx.mcpServer().args.slice(3))
+    try {
+      const tools = JSON.stringify(await client.request('tools/list'))
+      expect(tools).toContain('inspect_artifact')
+      expect(tools).toContain('switch_repository')
+      expect(tools).not.toContain('verify_command')
+      const observed = await client.request('tools/call', { name: 'inspect_artifact', arguments: { path: 'README.md' } }) as { result: { content: { text: string }[] } }
+      expect(JSON.parse(observed.result.content[0].text)).toMatchObject({ path: 'README.md', head: before, contentUtf8: content, contentMatchesGit: true })
+      const outside = join(tempDir(), 'secret.txt')
+      writeFileSync(outside, 'outside-private-value')
+      symlinkSync(outside, join(worktree, 'escape'))
+      for (const path of ['../secret.txt', outside, 'escape', '.git']) {
+        const refused = await client.request('tools/call', { name: 'inspect_artifact', arguments: { path } })
+        expect(refused).toMatchObject({ result: { isError: true } })
+        expect(JSON.stringify(refused)).not.toContain('outside-private-value')
+      }
+      expect((await execa('git', ['status', '--porcelain'], { cwd: worktree })).stdout).toBe('?? escape')
+      expect((await execa('git', ['rev-parse', 'HEAD'], { cwd: worktree })).stdout).toBe(before)
+      expect(existsSync(ctx.handoffFile)).toBe(false)
+    } finally { client.close() }
+  })
+
   it('provides file hashes and fixed Git observations to a report-only check without granting shell commands', async () => {
     const repo = await makeRepo()
     const worktree = await worktreeOf(repo)
