@@ -47,7 +47,13 @@ test('durable fallback survives concurrent ticks, respects due/retry times and n
   const state = (await pool.query('SELECT state FROM ops_monitor_observations ORDER BY "observedAt" DESC,id DESC LIMIT 1')).rows[0].state
   assert.equal(state.unrelated.active, true); assert.equal(state.__providerEgressCollector.lastSucceededAt, at)
   await pool.query(`UPDATE ops_monitor_observations SET state=jsonb_set(state,'{__providerEgressCollector,active}','true')`)
-  const operational = await collectOperationalSignals(pool)
+  const originalFetch = globalThis.fetch
+  let deliveries = 0
+  globalThis.fetch = async () => { deliveries++; return new Response(null, { status: 204 }) }
+  let operational: Awaited<ReturnType<typeof collectOperationalSignals>>
+  try { operational = await collectOperationalSignals(pool, { sink: 'https://fixture.invalid/alerts' }) }
+  finally { globalThis.fetch = originalFetch }
+  assert.equal(deliveries, 0, 'reserved collector metadata cannot produce an operational notification')
   assert.ok(operational.transitions.every(event => event.id !== '__providerEgressCollector'))
   assert.ok(operational.alerts.every((alert: { id: string }) => alert.id !== '__providerEgressCollector'))
   assert.equal((await pool.query('SELECT state FROM ops_monitor_observations ORDER BY "observedAt" DESC,id DESC LIMIT 1')).rows[0].state.__providerEgressCollector.lastSucceededAt, at)
