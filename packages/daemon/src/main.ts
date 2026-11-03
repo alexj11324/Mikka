@@ -391,6 +391,7 @@ export class Daemon {
       ? await createHostedBotRunner({
           stateDir: paths.adapterState,
           link: this.options.link,
+          journal: this.journal,
           binaries: this.options.harnessBinaries,
           ...(this.options.e2bContainerRuntime ? { dockerSocket: "unix:///run/mikka-container/docker.sock" as const } : {}),
           computerBroker: this.cloudComputerBroker ?? this.options.computerBroker,
@@ -419,7 +420,8 @@ export class Daemon {
                   harness,
                   capabilities: {
                     supportsInterject: true,
-                    supportsResume: false,
+                    // The hosted path verifies its ledger/journal before native resume.
+                    supportsResume: true,
                   },
                   envAllow: [],
                   async start() {

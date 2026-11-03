@@ -1388,7 +1388,7 @@ export class RunSupervisor {
           }
         : undefined
     if (assignment.requireSessionResume &&
-        (assignment.subscriptionBinding || !assignment.resumeSessionId || !assignment.continuesRunId ||
+        (!assignment.resumeSessionId || !assignment.continuesRunId ||
           !adapter.capabilities.supportsResume || (!resuming && !continueSession) ||
           (resuming && entry.sessionId !== assignment.resumeSessionId)))
       throw new Error("factory_question_session_resume_required")
@@ -1414,7 +1414,12 @@ export class RunSupervisor {
       ? await this.deps.startCredential(assignment,{...options,prompt})
       : assignment.subscriptionBinding
       ? this.deps.startSubscription
-        ? await this.deps.startSubscription(assignment,{...options,prompt})
+        ? await (async () => {
+            if (assignment.requireSessionResume && !resuming)
+              this.deps.journal.update(runId, { questionResumeState: "starting" })
+            return this.deps.startSubscription!(assignment, { ...options, prompt,
+              ...(assignment.requireSessionResume && continueSession ? { continueSession } : {}) })
+          })()
         : (()=>{throw new Error('subscription_hosted_runtime_unavailable')})()
       : resuming
       ? await adapter.resume(entry.sessionId as string, options)

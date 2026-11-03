@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Synthetic native-auth process only; no provider/network requests.
-import { closeSync, existsSync, readFileSync, writeFileSync } from "node:fs"
+import { closeSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { createInterface } from "node:readline"
 import { execFileSync, spawn } from "node:child_process"
@@ -9,7 +9,8 @@ const args = process.argv.slice(2)
 const flag = (key) => {
   const inline = args.find((arg) => arg.startsWith(`${key}=`))
   if (inline) return inline.slice(key.length + 1)
-  return args[args.indexOf(key) + 1]
+  const at = args.indexOf(key)
+  return at < 0 ? undefined : args[at + 1]
 }
 if (process.env.CLAUDE_CODE_OAUTH_TOKEN || process.env.CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR !== "3") process.exit(2)
 const token = readFileSync(3, "utf8")
@@ -26,7 +27,19 @@ if (
   Object.keys(process.env).some((key) => /REFRESH_TOKEN|INFISICAL/.test(key))
 )
   process.exit(2)
-const sessionId = flag("--session-id") ?? flag("--resume")
+const requestedSession = flag("--session-id") ?? flag("--resume")
+const historyFile = join(config, "projects", "fixture-question.json")
+let history
+if (flag('--resume') !== undefined) {
+  if (!existsSync(historyFile)) process.exit(2)
+  history = JSON.parse(readFileSync(historyFile, "utf8"))
+  if (history.sessionId !== requestedSession) process.exit(2)
+} else {
+  mkdirSync(join(config, "projects"), { recursive: true })
+  history = { sessionId: requestedSession, messages: [] }
+}
+const sessionId = history.resumeSessionId ?? requestedSession
+writeFileSync(historyFile, JSON.stringify(history))
 const processReceipt = join(config, 'fixture-process.json')
 let prompts = 0
 writeFileSync(processReceipt, JSON.stringify({ pid: process.pid, prompts }))
@@ -60,7 +73,12 @@ lines.on("line", async (line) => {
   const text = frame.message?.content?.[0]?.text
   if (typeof text !== "string") return
   prompts++
+  history.messages.push(text); writeFileSync(historyFile, JSON.stringify(history))
   writeFileSync(processReceipt, JSON.stringify({ pid: process.pid, prompts }))
+  if (text === 'ORIGINAL_QUESTION') {
+    const server = JSON.parse(flag('--mcp-config')).mcpServers.mikka
+    execFileSync(server.command, server.args, { input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'ask_human', arguments: { question: 'Please provide the owner answer', kind: 'external' } } }) + '\n', stdio: ['pipe', 'pipe', 'pipe'] })
+  }
   if (text === 'COMPUTER') {
     const config = JSON.parse(flag('--mcp-config') ?? '{}').mcpServers?.mikka_computer
     if (!config || !/(^|\/)node$/.test(config.command)) process.exit(2)
