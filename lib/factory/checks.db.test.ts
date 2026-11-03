@@ -574,6 +574,21 @@ test(
           assert.equal(check.command,null);
         } finally { await db.query('UPDATE device_repos SET "verifyCommand"=$2 WHERE id=$1',[repoId,command]); }
       });
+      await t.test('a real report-only review finding retains trusted provenance without fabricated process fields', async () => {
+        const pending = await pendingReview();
+        await db.query('UPDATE device_repos SET "verifyCommand"=NULL WHERE id=$1',[repoId]);
+        try {
+          const review = await start(pending.task);
+          await terminal(review.runId, `report-only-${review.runId}`, false, report => {
+            report.verify = { status: 'not_run' };
+            report.criteria[0].passed = false;
+          });
+          await reconcile('owner');
+          const failed = await state(pending.task.id);
+          assert.equal(failed.task.status, 'failed');
+          assert.equal((failed.attempts.find(a => a.runId === review.runId)!.output.completion as {trustedFailureProvenance:boolean}).trustedFailureProvenance, true);
+        } finally { await db.query('UPDATE device_repos SET "verifyCommand"=$2 WHERE id=$1',[repoId,command]); }
+      });
       for (const stage of ["review","verify"] as const) await t.test(`${stage} quota fallback restarts independently and preserves the exact candidate assignment`, async () => {
         let pending = await pendingReview();
         if (stage === "verify") {

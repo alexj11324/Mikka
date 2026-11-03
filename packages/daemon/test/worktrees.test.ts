@@ -180,6 +180,19 @@ describe("discarding an empty run", () => {
   })
 })
 
+describe('task change reporting', () => {
+  it('retains paths the CLI already committed before handing back its result', async () => {
+    const repo = await makeRepo(), trees = new WorktreeManager(tempDir())
+    const path = await trees.create('committed-report', repo, 'main')
+    const base = git(path, 'rev-parse', 'HEAD')
+    writeFileSync(join(path, 'DELIVERY.txt'), 'actual delivery\n')
+    git(path, 'add', 'DELIVERY.txt')
+    git(path, '-c', 'user.name=Fixture', '-c', 'user.email=fixture@mikka.invalid', 'commit', '-qm', 'deliver')
+    expect(await trees.changedFiles(path)).toEqual([])
+    expect(await trees.changedFiles(path, base)).toEqual(['DELIVERY.txt'])
+  })
+})
+
 describe("worktree removal", () => {
   it("waits for a worktree being added to the same repository (git reads every worktree's admin files while adding)", async () => {
     const repo = await makeRepo()

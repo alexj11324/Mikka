@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/api-auth";
 import { handleFactory } from "@/lib/factory/http";
-import { factoryStore } from "@/lib/factory/server";
+import { factoryHumanStore } from "@/lib/factory/server";
 
 export const dynamic = "force-dynamic";
 async function respond(
@@ -10,7 +10,7 @@ async function respond(
 ) {
   const session = await auth.api.getSession({ headers: request.headers });
   const { taskId } = await context.params;
-  const result = await handleFactory(factoryStore, {
+  const result = await handleFactory(factoryHumanStore, {
     userId: session?.user?.id ?? null,
     method: request.method,
     taskId,

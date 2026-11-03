@@ -952,7 +952,7 @@ export class RunSupervisor {
       ...pickAgentReport(agent),
     }
     const filesChanged = (
-      await this.deps.worktrees.changedFiles(worktree).catch(() => [])
+      await this.deps.worktrees.changedFiles(worktree, this.deps.journal.get(runId)?.baseCommit).catch(() => [])
     ).slice(0, MAX_REPORTED_FILES)
     const inferred = assignment.factoryCheck?.stage === 'verify' && assignment.factoryCheck.inferCommand && !assignment.factoryCheck.reportOnly ? report.verificationCommand : undefined
     const command = assignment.verifyCommand ?? inferred?.command

@@ -417,7 +417,17 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     await pool.query(`INSERT INTO "session" (id,token,"userId","expiresAt","createdAt","updatedAt") VALUES ($1,$2,$3,now()+interval '1 hour',now(),now())`, [sessionId, randomUUID(), personState.id])
     const { createFactoryMerges } = await import('../lib/factory/merge')
     const noGitHub = async () => { throw new Error('A deliverable must not call GitHub') }
-    const merges = createFactoryMerges(pool, async () => true, runtime.store, { pullRequest: noGitHub, mergeMethods: noGitHub, merge: noGitHub })
+    const { createFactoryHumanStore } = await import('../lib/factory/human-store')
+    const { handleFactory, handleFactoryList } = await import('../lib/factory/http')
+    const humanStore = createFactoryHumanStore(pool, id => factoryRuntimeForBot(id).store)
+    const discovered = await handleFactoryList(humanStore, { userId: personState.id, issueId })
+    assert.equal(discovered.status, 200)
+    assert.ok((discovered.body as {tasks:{id:string}[]}).tasks.some(task => task.id === pending.id))
+    const request = { userId: personState.id, method:'GET', taskId:pending.id, origin:null, url:`http://localhost/api/factory/tasks/${pending.id}` }
+    assert.equal((await handleFactory(humanStore, request)).status, 200)
+    assert.equal((await handleFactory(humanStore, {...request,userId:'another-owner'})).status, 404)
+    assert.equal((await handleFactory(factoryRuntimeForBot(null).store, request)).status, 404, 'runtime scope stays fixed; only human APIs resolve the persisted Bot')
+    const merges = createFactoryMerges(pool, async () => true, humanStore, { pullRequest: noGitHub, mergeMethods: noGitHub, merge: noGitHub })
     const accepted = await merges.accept({ userId: personState.id, sessionId }, { binding: factoryBinding(pending), eventId: randomUUID() }, null)
     assert.equal(accepted.status, 'accepted')
     assert.deepEqual([(await current()).stage, (await current()).status], ['approval', 'passed'])

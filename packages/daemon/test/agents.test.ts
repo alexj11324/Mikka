@@ -204,6 +204,20 @@ describe("mikka MCP server", () => {
 })
 
 describe("run context", () => {
+  it('grants isolated command observations to a report-only repository review with host-enabled inference', async () => {
+    const repo = await makeRepo()
+    const ctx = new RunContext({ harness: 'claude_code', worktree: await worktreeOf(repo), runDir: tempDir(), privateDir: tempDir(),
+      factoryCheck: { stage: 'review', reportOnly: true, inferCommand: true } })
+    const spec = ctx.mcpServer()
+    const at = spec.args.indexOf('--factory-verify')
+    expect(at).toBeGreaterThan(-1)
+    expect(JSON.parse(spec.args[at + 1])).toMatchObject({ command: null, infer: true, cwd: ctx.worktree })
+    const client = mcpClient(ctx.handoffFile, spec.args.slice(at))
+    try {
+      const result = await client.request('tools/call', { name: 'verify_command', arguments: { command: 'git diff --check HEAD', basis: 'Inspect the fixed candidate Git tree without modifying it.' } }) as {result:{content:{text:string}[]}}
+      expect(JSON.parse(result.result.content[0].text).exitCode).toBe(0)
+    } finally { client.close() }
+  })
   it("lets the run write its worktree and run dir, never git's files, and always reach its harness API", async () => {
     const repo = await makeRepo()
     const ctx = new RunContext({

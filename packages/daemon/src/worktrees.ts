@@ -196,10 +196,11 @@ export class WorktreeManager {
     return path
   }
 
-  /** Paths changed in the worktree (tracked and untracked), for the report. */
-  async changedFiles(worktree: string): Promise<string[]> {
+  /** Include commits made by the CLI as well as still-uncommitted task changes. */
+  async changedFiles(worktree: string, baseCommit?: string): Promise<string[]> {
     const status = await simpleGit(worktree).status()
-    return status.files.map((file) => file.path).filter(path => path !== '.verify' && !path.startsWith('.verify/'))
+    const committed = baseCommit ? (await simpleGit(worktree).raw(['diff', '--name-only', '-z', baseCommit, 'HEAD', '--'])).split('\0').filter(Boolean) : []
+    return [...new Set([...committed, ...status.files.map((file) => file.path)])].filter(path => path !== '.verify' && !path.startsWith('.verify/'))
   }
 
   /**

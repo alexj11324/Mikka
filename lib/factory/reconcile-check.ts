@@ -163,9 +163,10 @@ export async function reconcileFactoryCheck(
         !run.startedAt || !run.finishedAt ||
         !Number.isFinite(new Date(run.startedAt).getTime()) || !Number.isFinite(new Date(run.finishedAt).getTime()) ||
         new Date(run.finishedAt).getTime() < new Date(run.startedAt).getTime() ||
-        !(Number.isFinite(run.report.verify.exitCode) || run.report.verify.exitCode === null) ||
-        typeof run.report.verify.timedOut !== "boolean" ||
-        !(run.report.verify.signal === null || typeof run.report.verify.signal === "string")
+        (!assignment.factoryCheck.reportOnly && (
+          !(Number.isFinite(run.report.verify.exitCode) || run.report.verify.exitCode === null) ||
+          typeof run.report.verify.timedOut !== "boolean" ||
+          !(run.report.verify.signal === null || typeof run.report.verify.signal === "string")))
       )
         throw new FactoryError("factoryCheckBindingMismatch");
       output.trustedFailureProvenance = true;
