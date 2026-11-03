@@ -2,8 +2,9 @@ import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
 import { Pool } from 'pg'
+import { pool as activePool } from '@/lib/db'
 import { dbUrl, seedUser } from '../../tests/support/workspace-admin-db'
-import { AccountDeletionBusy, acquireAccountDeletionLock, deletionLockPoolOptions } from './deletion-lock'
+import { AccountDeletionBusy, AccountDeletionLockLost, acquireAccountDeletionLock, deletionLockPoolOptions } from './deletion-lock'
 import { cancelAccountDeletion, requestAccountDeletion, resumeAccountDeletion, sweepAccountDeletions } from './deletion-jobs'
 
 test('only the Neon pooler host changes for a deletion session', () => {
@@ -84,4 +85,54 @@ test('a busy deletion sweep preserves the pending report and retries after closu
   assert.equal(await cancelAccountDeletion(user, id, options), false, 'external cleanup has begun')
   const retryLock = await acquireAccountDeletionLock(main, id)
   await retryLock.close()
+})
+
+test('a socket loss during provider I/O is handled and refuses subsequent deletion stages', { skip: !dbUrl }, async t => {
+  const main = new Pool({ connectionString: dbUrl, max: 5 }), workspace = new Pool({ connectionString: dbUrl, max: 5 })
+  const user = await seedUser(main, 'deletion-socket'), id = randomUUID()
+  t.after(async () => {
+    try {
+      await main.query('DELETE FROM account_deletion_guards WHERE "subjectId"=$1', [user])
+      await workspace.query('DELETE FROM account_deletion_guards WHERE "subjectId"=$1', [user])
+      await main.query('DELETE FROM account_deletion_jobs WHERE id=$1', [id])
+      await main.query('DELETE FROM "user" WHERE id=$1', [user])
+    } finally { await main.end(); await workspace.end() }
+  })
+  const options = { mainPool: main, workspacePool: workspace }
+  assert.equal((await requestAccountDeletion(user, `${user}@example.invalid`, id, options)).ok, true)
+  await assert.rejects(resumeAccountDeletion(id, { ...options, externalCleanup: async () => {
+    // withDatabaseClient makes the normal application pool use this job's
+    // dedicated session. Terminate only this isolated fixture backend.
+    const pid = (await activePool.query('SELECT pg_backend_pid() AS pid')).rows[0].pid
+    assert.equal((await main.query('SELECT pg_terminate_backend($1) AS terminated', [pid])).rows[0].terminated, true)
+    await new Promise(resolve => setTimeout(resolve, 20))
+    return []
+  } }), AccountDeletionLockLost)
+  assert.equal((await main.query('SELECT count(*)::int AS n FROM "user" WHERE id=$1', [user])).rows[0].n, 1, 'loss cannot proceed to local deletion')
+  assert.equal((await main.query('SELECT stage FROM account_deletion_jobs WHERE id=$1', [id])).rows[0].stage, 'external_pending')
+  const reacquired = await acquireAccountDeletionLock(main, id)
+  await reacquired.close()
+})
+
+test('a FATAL response during an active query is lock loss before the socket end event', { skip: !dbUrl }, async t => {
+  const main = new Pool({ connectionString: dbUrl })
+  t.after(() => main.end())
+  const id = randomUUID(), held = await acquireAccountDeletionLock(main, id)
+  const pid = (await held.client.query('SELECT pg_backend_pid() AS pid')).rows[0].pid
+  const waiting = held.client.query('SELECT pg_sleep(30)').catch(error => held.rethrow(error))
+  // Attach the rejection observer before terminating the disposable backend.
+  const refused = assert.rejects(waiting, AccountDeletionLockLost)
+  try {
+    const deadline = Date.now() + 2_000
+    while ((await main.query('SELECT wait_event FROM pg_stat_activity WHERE pid=$1', [pid])).rows[0]?.wait_event !== 'PgSleep') {
+      assert.ok(Date.now() < deadline, 'fixture query did not enter PgSleep')
+      await new Promise(resolve => setTimeout(resolve, 5))
+    }
+    assert.equal((await main.query('SELECT pg_terminate_backend($1) AS terminated', [pid])).rows[0].terminated, true)
+    await refused
+  } finally { await held.close() }
+  const next = await acquireAccountDeletionLock(main, id)
+  try {
+    await assert.rejects(next.rethrow(new Error('ordinary fixture error')), /ordinary fixture error/, 'a healthy session preserves ordinary errors')
+  } finally { await next.close() }
 })
