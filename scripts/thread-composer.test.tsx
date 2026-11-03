@@ -61,3 +61,14 @@ test('every conversation container draws the shared composer, directly or throug
   const panel = readFileSync(new URL('../components/workspace/issue-thread-panel.tsx', import.meta.url), 'utf8')
   assert.doesNotMatch(panel, /\(active \|\| question\) && detail && <div/)
 })
+
+test('an open thread lets the agent’s words be quoted and every message be copied', () => {
+  thread = { ...base, prompt: '> Done.\n\nWhy this way?' }
+  const html = render()
+  // The agent's reply is where 引用 picks words from; the person's own message is not.
+  assert.match(html, /data-quote-source=""[^>]*>[\s\S]*Done\./)
+  // The person's message shows the words it quotes above its own, not as `>` lines.
+  assert.match(html, /data-slot="reply-quote"[^>]*aria-label="[^"]*Done\.[^"]*"/)
+  assert.doesNotMatch(html, /&gt; Done\./)
+  assert.equal(html.match(/data-copy-state="idle"/g)?.length, 2)
+})

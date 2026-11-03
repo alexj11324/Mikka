@@ -4439,6 +4439,12 @@
       "denied": "Denied",
       "parameters": "Input",
       "result": "Result"
+    },
+    "message": {
+      "copy": "Copy",
+      "copied": "Copied",
+      "copyFailed": "Couldn't copy",
+      "quote": "Quote"
     }
   }
 }

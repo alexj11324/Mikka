@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import useSWR, { useSWRConfig } from 'swr'
 import { AnimatePresence } from 'motion/react'
 import { withBasePath } from '@/lib/base-path'
@@ -46,7 +46,12 @@ import { MESSAGE_POSITION_ATTR, useUnreadIndicators } from '@/lib/hooks/use-unre
 import { useArrivals } from '@/lib/hooks/use-arrivals'
 import { openArtifact as openArtifactWindow } from '@/components/workspace/workspace-navigation'
 import { ArtifactCard, ArtifactChip } from '@/components/artifacts/artifact-card'
-import { ArtifactQuoteChip, ArtifactQuoteLine } from '@/components/artifacts/artifact-quote'
+import { ArtifactQuoteChip, ArtifactQuoteLine, QuoteChip, QuoteLine } from '@/components/artifacts/artifact-quote'
+import { MessageActions } from '@/components/ai-elements/message'
+import { CopyAction, HOVER_ACTIONS } from '@/components/chat/copy-action'
+import { SelectionQuote } from '@/components/chat/selection-quote'
+import { splitReplyQuote, withReplyQuote } from '@/lib/chat-quote'
+import { replyCopyText } from '@/lib/chat-copy'
 import type { ArtifactChatSlot } from '@/components/artifacts/artifact-viewer'
 import { BrowserNoteChip, BrowserNoteLine, useBrowserNotesComposer } from '@/components/browser/browser-notes'
 import { SentSuggestion } from '@/components/suggestions/mobile-card'
@@ -91,6 +96,12 @@ function streamedItem(reply: CoordinatorLiveReply): Chat['items'][number] {
 /** A live reply's thinking as the activity shows it: still thinking, or the whole seconds it took (at least one). */
 function liveThinking(reply: CoordinatorLiveReply) {
   return reply.thinking && { active: reply.thinking.since !== undefined, seconds: Math.max(1, Math.round(reply.thinking.ms / 1000)), ...(reply.thinking.text ? { text: reply.thinking.text } : {}) }
+}
+
+/** A sent message's words, under the reply words it quotes (lib/chat-quote.ts) and anything else it carries. */
+function PersonWords({ text, before }: { text: string; before?: ReactNode }) {
+  const { quote, text: words } = splitReplyQuote(text)
+  return <>{quote && <QuoteLine slot="reply-quote" text={quote} />}{before}<UserMessageText text={words} /></>
 }
 
 /** A message the person just sent brings the chat back to its end, wherever they had scrolled. */
@@ -162,6 +173,12 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
     } catch { /* storage may be unavailable */ }
   }
   const [sending, setSending] = useState(false)
+  // Words picked from a reply with 引用: they wait above the draft and head the next message as quote lines.
+  const [replyQuote, setReplyQuote] = useState<string | null>(null)
+  function quoteReply(text: string) {
+    setReplyQuote(text)
+    inputRef.current?.focus()
+  }
   const deliveryInFlight = useRef(false)
   // A message that did not go stays in the chat as a failed bubble with 重试, as in iMessage and Slack. Retrying here
   // resends the same submission (same id), so it is stored once.
@@ -234,6 +251,8 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
     {data?.error && !data.working && !refusal && !declined && <Alert variant="destructive" className={COMPOSER_NOTICE}>{wakeError ? <AlertTitle>{t(`wakeErrors.${wakeError}`)}</AlertTitle> : <><AlertTitle className="min-w-0 flex-1 basis-48" data-chat-failure="failed">{t('failedTitle')}</AlertTitle><span className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-1">{retry}</span></>}</Alert>}
   </>
   const sentCount = useMemo(() => items.filter(item => item.from === 'person').length, [items])
+  // The newest reply keeps its actions in view, as Claude's does; older ones show them on hover.
+  const lastReplyAt = stream.replies.length ? -1 : items.findLast(item => item.from === 'coordinator' && item.text)?.position
   const rootRef = useRef<HTMLElement>(null)
   // Events are system lines, not messages; the person's own messages never count as unread.
   const unreadItems = useMemo(() => items.filter(item => item.from !== 'event').map(item => ({ position: item.position, messageId: item.id ?? String(item.position), own: item.from === 'person', reportable: !item.pending })), [items])
@@ -311,8 +330,9 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   async function send(event?: FormEvent) {
     event?.preventDefault()
     const text = draft.trim()
-    const result = await deliver(text, true)
+    const result = text ? await deliver(withReplyQuote(text, replyQuote), true) : 'skipped'
     if (result === 'skipped') return
+    setReplyQuote(null)
     // Sent or failed, the message leaves the composer. A failed one keeps its stored draft until the person types again,
     // so a reload or a switch to another bot puts it back in the composer.
     setDraft(current => current.trim() === text ? '' : current)
@@ -371,7 +391,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
                     {item.activity && <ReplyActivity tools={item.activity.tools} thinking={live ? liveThinking(live) : undefined} thought={item.activity.thought} reasoningAt={item.activity.reasoningAt} botId={botId} />}
                     {item.text && (item.from === 'coordinator'
                       ? <ReplyAnswer value={live ? null : answers.get(item.position) ?? null}><CoordinatorReply text={item.text} citations={live ? live.committedThrough === undefined ? liveCitations.streaming : liveCitations.settled : citations} isStreaming={Boolean(live && live.committedThrough === undefined)} /></ReplyAnswer>
-                      : <Bubble variant="secondary" align="end" className={personBubble}><BubbleContent className="flex flex-col gap-1.5 rounded-2xl px-4 py-3 whitespace-pre-wrap">{item.quote && <ArtifactQuoteLine quote={item.quote} />}{item.notes?.map(note => <BrowserNoteLine key={note.n} note={note} />)}<UserMessageText text={item.text} /></BubbleContent></Bubble>)}
+                      : <Bubble variant="secondary" align="end" className={personBubble}><BubbleContent className="flex flex-col gap-1.5 rounded-2xl px-4 py-3 whitespace-pre-wrap"><PersonWords text={item.text} before={<>{item.quote && <ArtifactQuoteLine quote={item.quote} />}{item.notes?.map(note => <BrowserNoteLine key={note.n} note={note} />)}</>} /></BubbleContent></Bubble>)}
                     {item.artifacts.length > 0 && <div className={cn('flex flex-col gap-2', embedded ? 'items-start gap-1.5' : 'w-full')}>
                       {item.artifacts.flatMap(id => { const artifact = data?.artifacts[id]; return artifact ? [embedded
                         ? <ArtifactChip key={id} artifact={artifact} active={id === embedded.activeArtifactId} onOpen={openArtifact} />
@@ -381,6 +401,9 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
                       const run = sources?.[id]
                       return run?.kind === 'run' ? <ThreadCard key={id} run={run} onOpen={showThread} /> : null
                     })}
+                    {item.text && !(live && live.committedThrough === undefined) && <MessageActions className={cn('-mt-1.5', item.position !== lastReplyAt && HOVER_ACTIONS)}>
+                      <CopyAction text={item.from === 'coordinator' ? replyCopyText(item.text) : splitReplyQuote(item.text).text} />
+                    </MessageActions>}
                     {item.id && <MessageReactions reactions={reactions[item.id]} align={item.from === 'person' ? 'end' : 'start'} />}
                     {item.stopped && <MessageFooter><p role="status">{t('stopped')}</p></MessageFooter>}
                     {item.failure && (item.position === failedAt
@@ -393,7 +416,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
               <Message align="end"><MessageContent>
                 <span className="flex w-full min-w-0 items-center justify-end gap-2">
                   <CircleAlert aria-hidden="true" className="size-4 shrink-0 text-destructive" />
-                  <Bubble variant="secondary" align="end" className={personBubble}><BubbleContent className="rounded-2xl px-4 py-3 whitespace-pre-wrap"><UserMessageText text={failed.text} /></BubbleContent></Bubble>
+                  <Bubble variant="secondary" align="end" className={personBubble}><BubbleContent className="flex flex-col gap-1.5 rounded-2xl px-4 py-3 whitespace-pre-wrap"><PersonWords text={failed.text} /></BubbleContent></Bubble>
                 </span>
                 <span role="alert" className="flex items-center justify-end gap-1 self-end text-xs text-destructive">
                   {failed.message}
@@ -427,11 +450,13 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
       <ChatComposer ref={inputRef} label={bot ? t('inputTo', { name: bot.name }) : t('input')} placeholder={placeholder} value={draft} onChange={updateDraft} sending={sending || stopping} editableWhileSending={stopping} onSubmit={() => { void send() }}
         running={working && !stopping} onStop={(working || sending) && !stopping ? () => { void stop() } : undefined}
         model={<BotModelPicker botId={botId ?? null} running={working || sending} />}
-        quote={embedded?.quote || noteCount ? <div className="flex w-full min-w-0 flex-col items-start gap-0.5">
+        quote={embedded?.quote || replyQuote || noteCount ? <div className="flex w-full min-w-0 flex-col items-start gap-0.5">
           {embedded?.quote && <ArtifactQuoteChip quote={embedded.quote} onRemove={embedded.clearQuote} />}
+          {replyQuote && <QuoteChip slot="reply-quote-chip" text={replyQuote} onRemove={() => { setReplyQuote(null); inputRef.current?.focus() }} />}
           {browser?.notes.map(note => <BrowserNoteChip key={note.n} note={note} onRemove={() => browser.remove(note.n)} />)}
         </div> : undefined} />
     </div>
+    <SelectionQuote root={rootRef} onQuote={quoteReply} />
   </section>
   </AgentInteractionContext></AgentThemeProvider>
 }

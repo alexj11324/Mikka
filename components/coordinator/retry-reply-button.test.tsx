@@ -62,8 +62,15 @@ for (const [file, names] of [
   ['./hosted-unavailable-notice.tsx', ['HostedUnavailableNotice']], ['./quota-notice.tsx', ['QuotaNotice', 'QuotaSwitchLine']],
   ['../billing/hosted-refusal-notice.tsx', ['HostedRefusalNotice']], ['../nav/bot-avatar.tsx', ['BotAvatar', 'COORDINATOR_AVATAR']],
   ['../suggestions/mobile-card.tsx', ['SentSuggestion']], ['../artifacts/artifact-card.tsx', ['ArtifactCard', 'ArtifactChip']],
-  ['../artifacts/artifact-quote.tsx', ['ArtifactQuoteChip', 'ArtifactQuoteLine']],
 ] as const) mock.module(new URL(file, import.meta.url).href, { namedExports: Object.fromEntries(names.map(name => [name, nothing])) })
+let quoteReply: (text: string) => void = nothing
+let quoteRemovals = 0
+mock.module(new URL('../chat/selection-quote.tsx', import.meta.url).href, { namedExports: { QUOTE_SOURCE_ATTR: 'data-quote-source', SelectionQuote: ({ onQuote }: { onQuote: (text: string) => void }) => { quoteReply = onQuote; return null } } })
+mock.module(new URL('../artifacts/artifact-quote.tsx', import.meta.url).href, { namedExports: {
+  ArtifactQuoteChip: nothing, ArtifactQuoteLine: nothing,
+  QuoteLine: ({ text }: { text: string }) => <span data-slot="reply-quote">{text}</span>,
+  QuoteChip: ({ text, onRemove }: { text: string; onRemove: () => void }) => <span data-slot="reply-quote-chip">{text}<Button onClick={() => { quoteRemovals++; onRemove() }}>fixture-remove-quote</Button></span>,
+} })
 const browser = new Window({ url: 'https://fixture.example/mikka' })
 let container: HTMLDivElement, root: Root
 let createRoot: typeof import('react-dom/client')['createRoot']
@@ -202,4 +209,37 @@ test('a confirmed enqueue survives a refresh error and cannot be submitted twice
   assert.equal(calls, 1)
   await act(async () => finish({ queued: true }))
   assert.match(container.textContent ?? '', /Coordinator.replyRetry.queued/)
+})
+
+test('words quoted from a reply wait above the draft, head the sent message as quote lines and then leave', async () => {
+  await act(async () => root.render(<CoordinatorChat onOpenIssue={nothing} userId="fixture-owner" />))
+  await act(async () => quoteReply('先把首页截图放大\n再换成深色'))
+  assert.equal(container.querySelector('[data-slot="reply-quote-chip"]')?.textContent?.startsWith('先把首页截图放大'), true)
+  await act(async () => composer.onChange('要整宽还是半宽？'))
+  await act(async () => composer.onSubmit())
+  assert.equal(submitted[0].text, '> 先把首页截图放大\n> 再换成深色\n\n要整宽还是半宽？')
+  assert.equal(container.querySelector('[data-slot="reply-quote-chip"]'), null)
+})
+
+test('a removed quote is not sent', async () => {
+  quoteRemovals = 0
+  await act(async () => root.render(<CoordinatorChat onOpenIssue={nothing} userId="fixture-owner" />))
+  await act(async () => quoteReply('不要这段'))
+  await act(async () => [...container.querySelectorAll('button')].find(button => button.textContent === 'fixture-remove-quote')!.click())
+  assert.equal(quoteRemovals, 1)
+  await act(async () => composer.onChange('只发这句'))
+  await act(async () => composer.onSubmit())
+  assert.equal(submitted[0].text, '只发这句')
+})
+
+test('a sent message that quotes a reply shows the quote above its words, and every message has 复制', async () => {
+  chatItems = [
+    { id: 'fixture-reply', position: 1, from: 'coordinator', text: '**首页**已改好', tools: [], threads: [], artifacts: [], createdAt: '2026-11-03T04:00:00Z' },
+    { id: 'fixture-person', position: 2, from: 'person', text: '> 首页已改好\n\n截图呢？', tools: [], threads: [], artifacts: [], createdAt: '2026-11-03T04:01:00Z' },
+  ]
+  await act(async () => root.render(<CoordinatorChat onOpenIssue={nothing} userId="fixture-owner" />))
+  assert.equal(container.querySelector('[data-slot="reply-quote"]')?.textContent, '首页已改好')
+  assert.match(container.textContent ?? '', /截图呢？/)
+  assert.doesNotMatch(container.textContent ?? '', /> 首页/)
+  assert.equal(container.querySelectorAll('[data-slot="message-actions"] [data-copy-state]').length, 2)
 })

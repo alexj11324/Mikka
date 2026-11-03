@@ -11,6 +11,11 @@ import { mergeThreadChunks, runFailureText, runIsActive, runIsWorking, runStopTi
 import { ThreadSteps } from './thread-steps'
 import { threadQuestionView, type IssueThread } from '@/lib/issue-threads'
 import { ChatComposer } from '@/components/coordinator/chat-composer'
+import { QuoteChip, QuoteLine } from '@/components/artifacts/artifact-quote'
+import { MessageActions } from '@/components/ai-elements/message'
+import { CopyAction, HOVER_ACTIONS } from '@/components/chat/copy-action'
+import { QUOTE_SOURCE_ATTR, SelectionQuote } from '@/components/chat/selection-quote'
+import { splitReplyQuote, withReplyQuote } from '@/lib/chat-quote'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -37,6 +42,15 @@ import { closeOnEscape, useFocusReturn } from '@/hooks/use-focus-return'
 
 // R-32 chat: 13/21 as in Comma, also for the agent's Markdown inside a bubble.
 const BUBBLE = 'max-w-[85%] rounded-2xl bg-muted px-3.5 py-2 text-sm/5.25 whitespace-pre-wrap break-words [&_[data-agent-markdown]]:leading-5.25'
+
+/** A person's words in a thread, under the agent's words they quote (lib/chat-quote.ts), and 复制 below on hover. */
+function PersonBubble({ text, mine }: { text: string; mine: boolean }) {
+  const { quote, text: words } = splitReplyQuote(text)
+  return <>
+    <div className={cn(BUBBLE, 'flex flex-col gap-1.5', mine ? 'self-end bg-sidebar-primary text-sidebar-primary-foreground' : 'self-start')}>{quote && <QuoteLine slot="reply-quote" text={quote} />}<span>{words}</span></div>
+    <MessageActions className={cn(HOVER_ACTIONS, mine ? 'self-end' : 'self-start')}><CopyAction text={words} /></MessageActions>
+  </>
+}
 
 /**
  * An open thread: a conversation between people and the agent running it (R-62, R-10).
@@ -78,6 +92,9 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   const hasChanges = !!changes && changes.state !== 'none'
   const viewingChanges = hasChanges && tab === 'changes'
   const [draft, setDraft] = useState('')
+  // Words picked from the agent's reply with 引用: they head the next message as quote lines.
+  const [replyQuote, setReplyQuote] = useState<string | null>(null)
+  const rootRef = useRef<HTMLElement>(null)
   const [sending, setSending] = useState(false)
   // false, or what to say: the refusal's reason when the server gave one (threadReplaced…), else 发送失败.
   const [sendFailed, setSendFailed] = useState<string | false>(false)
@@ -128,9 +145,9 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
     if (!text || sending || stopRequested || question === 'resuming') return
     setSending(true); setSendFailed(false)
     try {
-      const result = await sendIssueThreadReply({ issueId, runId: liveRunId, text })
+      const result = await sendIssueThreadReply({ issueId, runId: liveRunId, text: retry === undefined ? withReplyQuote(text, replyQuote) : text })
       if (result.error) { setSendFailed(actionError(result.error)); return }
-      if (retry === undefined) setDraft(current => current.trim() === text ? '' : current)
+      if (retry === undefined) { setDraft(current => current.trim() === text ? '' : current); setReplyQuote(null) }
       void mutate(); void mutateCache(['issue-threads', issueId])
     }
     catch { setSendFailed(t('sendFailed')) }
@@ -155,7 +172,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   const canStop = active && !!data?.thread.ownedByCurrentUser && !sending && !stopPending
   const title = listedName || (detail?.name ?? t('title'))
   // Esc inside the thread is ←; in its composer or another field it only leaves the field (decision 0301). A window opened from it keeps its own Esc.
-  return <section aria-label={title} className="flex h-full min-h-0 flex-col" onKeyDown={bare || !onBack ? undefined : event => closeOnEscape(event, headingRef.current, onBack)}>
+  return <section ref={rootRef} aria-label={title} className="flex h-full min-h-0 flex-col" onKeyDown={bare || !onBack ? undefined : event => closeOnEscape(event, headingRef.current, onBack)}>
     {!bare && <header className={cn('flex h-12 shrink-0 items-center gap-2 border-b border-rule px-4', onBack && 'pl-2', acceptance && 'max-sm:h-auto max-sm:flex-wrap max-sm:py-2')}>
       {onBack && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className="shrink-0" aria-label={t('back')} aria-keyshortcuts="Escape" onClick={onBack} />}><ArrowLeft data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{t('back')}</TooltipContent></Tooltip>}
       <h2 ref={headingRef} tabIndex={-1} className={cn('min-w-0 truncate text-sm font-semibold outline-none', !acceptance && 'flex-1')}>{title}</h2>
@@ -190,10 +207,13 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
             {/* The bot that dispatched it, also when it is not the chat beside it (R-78, R-82). */}
             {detail?.agentName && <span>{detail.agentName} {t('dispatched')}</span>}
           </div>
-          {data.thread.prompt.trim() && <p className={cn(BUBBLE, data.thread.ownedByCurrentUser ? 'self-end bg-sidebar-primary text-sidebar-primary-foreground' : 'self-start')}>{data.thread.prompt.trim()}</p>}
+          {data.thread.prompt.trim() && <div className="group/message flex flex-col gap-1"><PersonBubble text={data.thread.prompt.trim()} mine={data.thread.ownedByCurrentUser} /></div>}
           <ol aria-label={t('conversation')} className="flex flex-col gap-3">
-            {items.map(item => <li key={item.id} className="flex flex-col gap-1">
-              {item.kind === 'agent' && <div className={cn(BUBBLE, 'self-start whitespace-normal')}><AgentMarkdown text={item.text} isStreaming={active} /></div>}
+            {items.map(item => <li key={item.id} className="group/message flex flex-col gap-1">
+              {item.kind === 'agent' && <>
+                <div {...{ [QUOTE_SOURCE_ATTR]: '' }} className={cn(BUBBLE, 'self-start whitespace-normal')}><AgentMarkdown text={item.text} isStreaming={active} /></div>
+                <MessageActions className={cn('self-start', HOVER_ACTIONS)}><CopyAction text={item.text} /></MessageActions>
+              </>}
               {item.kind === 'steps' && <ThreadSteps harness={detail?.harness ?? ''} steps={item.steps} />}
               {item.kind === 'error' && <FieldError className="text-xs">{item.text}</FieldError>}
               {item.kind === 'stages' && <p className="flex flex-wrap gap-x-3 text-xs text-muted-foreground" data-slot="thread-stages">
@@ -205,11 +225,11 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
               {item.kind === 'computer' && <ComputerCard botId={item.botId} runId={item.runId} task={item.task} state={active ? 'working' : (view?.status ?? data.thread.status) === 'succeeded' ? 'done' : 'failed'} />}
               {item.kind === 'person' && (item.mine
                 // R-14: your own words are the blue bubble on the right.
-                ? <p className={cn(BUBBLE, 'self-end bg-sidebar-primary text-sidebar-primary-foreground')}>{item.text}</p>
+                ? <PersonBubble text={item.text} mine />
                 // A teammate speaks from the left under their name, as in a group chat (R-13).
                 : <>
                   <span className="flex items-center gap-1.5 text-xs"><PersonAvatar name={item.author} image={item.image} /><span className="font-medium">{item.author}</span><span className="text-muted-foreground">{format.dateTime(new Date(item.at), { hour: '2-digit', minute: '2-digit' })}</span></span>
-                  <p className={cn(BUBBLE, 'self-start')}>{item.text}</p>
+                  <PersonBubble text={item.text} mine={false} />
                 </>)}
             </li>)}
           </ol>
@@ -227,11 +247,13 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
     {detail && <div data-slot="thread-composer" className="flex shrink-0 flex-col gap-1 p-3">
       {/* Keep the draft editable while stop waits for the daemon; do not queue new work after stop. */}
       <ChatComposer ref={inputRef} label={t('composer', { agent: harnessLabel(detail.harness) })} value={draft} onChange={setDraft} onSubmit={() => { void send() }}
+        quote={replyQuote ? <QuoteChip slot="reply-quote-chip" text={replyQuote} onRemove={() => { setReplyQuote(null); inputRef.current?.focus() }} /> : undefined}
         sending={sending || stopPending} editableWhileSending submitDisabled={stopRequested || question === 'resuming'} running={working || question === 'resuming'} thread onStop={working && canStop ? () => { void stop() } : undefined} />
       {sendFailed && <FieldError className="px-3 text-xs">{sendFailed}</FieldError>}
       {stopFailed && <div role="alert" className="flex items-center gap-2 px-3 text-xs"><span className="text-destructive">{t('stopFailed')}</span><Button variant="ghost" size="sm" className="min-w-22 max-sm:h-11" onClick={() => { void stop() }}>{t('retryStop')}</Button></div>}
     </div>}
     </>}
+    {detail && <SelectionQuote root={rootRef} onQuote={text => { setReplyQuote(text); inputRef.current?.focus() }} />}
   </section>
 }
 

@@ -3,16 +3,12 @@
 import { Children, isValidElement, useCallback, useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from 'react'
 import Markdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { useTranslations } from 'next-intl'
-import { Copy, TextQuote } from 'lucide-react'
-import { toast } from 'sonner'
-import { Button } from '@/components/ui/button'
-import { Popover, PopoverContent } from '@/components/ui/popover'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { markdownDiff, remarkDiff } from '@/lib/artifacts/diff'
 import { remarkMarks, type TextMark } from '@/lib/artifacts/marks'
 import type { ArtifactVersionInfo } from '@/lib/artifacts/types'
 import { ArtifactAuthorAvatar } from './artifact-card'
+import { SelectionActions } from './selection-actions'
 
 // A Markdown artifact as a page: title, who and when, then the body. Raw
 // HTML in the Markdown stays text (react-markdown never renders it) and links
@@ -59,9 +55,7 @@ const components = (title: string): Components => ({
 } as Components)
 
 /** Where the selection sits on screen, read when the toolbar positions itself. */
-function selectionAnchor(range: Range) {
-  return { getBoundingClientRect: () => range.getBoundingClientRect() }
-}
+
 
 export function ArtifactDocument({ title, markdown, compareWith, author, meta, quoted, quoting, onQuote }: {
   title: string
@@ -78,7 +72,6 @@ export function ArtifactDocument({ title, markdown, compareWith, author, meta, q
   /** Without it (the share page) selecting text offers nothing. */
   onQuote?: (text: string) => void
 }) {
-  const t = useTranslations('Artifact')
   const articleRef = useRef<HTMLDivElement>(null)
   const [selection, setSelection] = useState<{ text: string; range: Range } | null>(null)
   const source = useMemo(() => compareWith != null ? markdownDiff(markdown, compareWith) : markdown, [markdown, compareWith])
@@ -104,18 +97,6 @@ export function ArtifactDocument({ title, markdown, compareWith, author, meta, q
     return () => document.removeEventListener('selectionchange', clear)
   }, [])
 
-  function quote() {
-    if (!selection) return
-    onQuote?.(selection.text)
-    window.getSelection()?.removeAllRanges()
-    setSelection(null)
-  }
-  async function copy() {
-    if (!selection) return
-    try { await navigator.clipboard.writeText(selection.text); toast.success(t('copied')) } catch { /* the browser refused; nothing to undo */ }
-    setSelection(null)
-  }
-
   return <div className="min-h-0 flex-1 overflow-y-auto" onMouseUp={readSelection} onKeyUp={readSelection}>
     <article className="mx-auto w-full max-w-[40rem] px-6 pt-10 pb-16 md:px-10">
       <h1 className="text-2xl font-semibold text-foreground">{title}</h1>
@@ -124,12 +105,6 @@ export function ArtifactDocument({ title, markdown, compareWith, author, meta, q
         <Markdown remarkPlugins={plugins} components={parts}>{source}</Markdown>
       </div>
     </article>
-    {onQuote && <Popover open={selection != null} onOpenChange={open => { if (!open) setSelection(null) }}>
-      {selection && <PopoverContent anchor={selectionAnchor(selection.range)} side="top" sideOffset={8} initialFocus={false} finalFocus={false} aria-label={t('quote')}
-        className="w-auto flex-row gap-0.5 p-1" onMouseUp={event => event.stopPropagation()}>
-        <Button size="sm" variant="ghost" onMouseDown={event => event.preventDefault()} onClick={quote}><TextQuote data-icon="inline-start" />{t('quote')}</Button>
-        <Button size="sm" variant="ghost" onMouseDown={event => event.preventDefault()} onClick={() => void copy()}><Copy data-icon="inline-start" />{t('copy')}</Button>
-      </PopoverContent>}
-    </Popover>}
+    {onQuote && <SelectionActions selection={selection} onQuote={onQuote} onClose={() => setSelection(null)} />}
   </div>
 }
