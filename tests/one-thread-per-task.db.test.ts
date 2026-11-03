@@ -242,4 +242,24 @@ test('one task, one thread: dispatch continues the task\'s thread unless the per
     assert.deepEqual(moved.placement, { kind: 'device', deviceId: studio, name: 'Mac Studio' })
     judged = null
   })
+  await t.test('「It\'s in the mikka-web repo」: a repository the person names that is not the thread\'s starts a new thread there; the old one stops', async () => {
+    // Production (Acme): the thread worked in alexj11324/Mikka; the person said the work is in mikka-web, and the
+    // Coordinator continued the old thread because a task with a thread kept its repository.
+    const a = await person()
+    const first = await dispatch(a)
+    assert.equal(first.thread, 'new')
+    judged = 0.05
+    // The model passes another repository the person never named: the thread keeps its own.
+    const kept = await steps.dispatchRun(a.id, { issueId: a.issueId, repo: 'octo/web', note: 'Look again.', readOnly: true, requestKey: `dispatch:${randomUUID()}`, sourceEventId: await said(a, 'Look again please') }, undefined, a.botId) as unknown as Dispatched
+    assert.deepEqual([kept.thread, kept.runId], ['message', first.runId], JSON.stringify(kept))
+    const moved = await steps.dispatchRun(a.id, { issueId: a.issueId, repo: 'octo/web', readOnly: true, requestKey: `dispatch:${randomUUID()}`, sourceEventId: await said(a, "It's in the octo/web repo") }, undefined, a.botId) as unknown as Dispatched
+    assert.equal(moved.thread, 'new', JSON.stringify(moved))
+    assert.equal(moved.replacedThreadId, first.runId)
+    const rows = (await pool.query('SELECT r.id,r."stopRequestedAt",r."threadReplacedBy",d."remoteUrl" FROM agent_runs r JOIN device_repos d ON d.id=r."deviceRepoId" WHERE r."userId"=$1 ORDER BY r."createdAt"', [a.id])).rows
+    assert.equal(rows.length, 2)
+    assert.ok(rows[0].stopRequestedAt, 'the old thread is asked to stop')
+    assert.equal(rows[0].threadReplacedBy, moved.runId)
+    assert.match(rows[1].remoteUrl, /octo\/web/, 'the new thread works in the named repository')
+    judged = null
+  })
 })

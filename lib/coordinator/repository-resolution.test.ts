@@ -36,6 +36,7 @@ test('several matches return the candidates as one choice card and dispatch noth
   const list = mock.fn<RepositoryLister>(async () => repos('alexj11324/Mikka_test', 'mikka-org/mikka-test'))
   assert.deepEqual(await withResolvedRepository('alex', ISSUE, 'mikka.test', dispatch, list, noContext), {
     error: 'repositoryAmbiguous', issueId: ISSUE,
+    candidates: [{ fullName: 'alexj11324/Mikka_test', description: null, homepage: null, usedByThisWorkspace: false }, { fullName: 'mikka-org/mikka-test', description: null, homepage: null, usedByThisWorkspace: false }],
     card: { title: '多个仓库匹配 mikka.test', options: [{ value: 'alexj11324/Mikka_test', label: 'alexj11324/Mikka_test' }, { value: 'mikka-org/mikka-test', label: 'mikka-org/mikka-test' }] },
   })
   assert.equal(dispatch.mock.callCount(), 0)
@@ -74,38 +75,54 @@ test('GitHub not connected or unavailable is a clear error and dispatches nothin
 })
 
 test('find_repository lists the user\'s own repositories, matches a name, and an owner/repo exactly', async () => {
-  assert.deepEqual(await findRepository('alex', undefined, lister()), { total: 3, repositories: ['alexj11324/Mikka_test', 'alexj11324/Mikka', 'mikka-org/web'] })
-  assert.deepEqual(await findRepository('alex', '  ', lister()), { total: 3, repositories: ['alexj11324/Mikka_test', 'alexj11324/Mikka', 'mikka-org/web'] })
+  assert.deepEqual(await findRepository('alex', undefined, lister()), { total: 3, repositories: [{ fullName: 'alexj11324/Mikka_test', description: null, homepage: null }, { fullName: 'alexj11324/Mikka', description: null, homepage: null }, { fullName: 'mikka-org/web', description: null, homepage: null }] })
+  assert.deepEqual(await findRepository('alex', '  ', lister()), { total: 3, repositories: [{ fullName: 'alexj11324/Mikka_test', description: null, homepage: null }, { fullName: 'alexj11324/Mikka', description: null, homepage: null }, { fullName: 'mikka-org/web', description: null, homepage: null }] })
   const many = mock.fn<RepositoryLister>(async () => repos(...Array.from({ length: 70 }, (_, index) => `o/r${index}`)))
-  const listed = await findRepository('alex', undefined, many) as { total: number; repositories: string[] }
+  const listed = await findRepository('alex', undefined, many) as { total: number; repositories: unknown[] }
   assert.deepEqual([listed.total, listed.repositories.length], [70, 50])
-  assert.deepEqual(await findRepository('alex', 'mikka test', lister()), { match: 'one', repository: 'alexj11324/Mikka_test' })
-  assert.deepEqual(await findRepository('alex', 'ALEXJ11324/mikka_test', lister()), { match: 'one', repository: 'alexj11324/Mikka_test' })
-  assert.deepEqual(await findRepository('alex', 'https://github.com/mikka-org/web.git', lister()), { match: 'one', repository: 'mikka-org/web' })
-  const several = await findRepository('other', 'mikka.test', lister()) as { match: string; candidates: string[] }
-  assert.deepEqual([several.match, several.candidates], ['several', ['someone/Mikka_test', 'org2/mikka-test']])
+  assert.deepEqual(await findRepository('alex', 'mikka test', lister()), { match: 'one', repository: 'alexj11324/Mikka_test', description: null, homepage: null })
+  assert.deepEqual(await findRepository('alex', 'ALEXJ11324/mikka_test', lister()), { match: 'one', repository: 'alexj11324/Mikka_test', description: null, homepage: null })
+  assert.deepEqual(await findRepository('alex', 'https://github.com/mikka-org/web.git', lister()), { match: 'one', repository: 'mikka-org/web', description: null, homepage: null })
+  const several = await findRepository('other', 'mikka.test', lister()) as { match: string; candidates: { fullName: string }[] }
+  assert.deepEqual([several.match, several.candidates.map(item => item.fullName)], ['several', ['someone/Mikka_test', 'org2/mikka-test']])
 })
 
-test('"Mikka site" is mikka-web, not Mikka: qualifying words pick the family member', async () => {
-  // The production case: the person said 「Mikka site」 and both alexj11324/Mikka and alexj11324/mikka-web are authorized.
-  const list = mock.fn<RepositoryLister>(async () => repos('alexj11324/Mikka', 'alexj11324/mikka-web'))
-  for (const name of ['Mikka site', 'mikka web', 'Mikka website'])
-    assert.deepEqual(await resolveRepository('alex', name, list, noContext), { repo: 'alexj11324/mikka-web' }, name)
-  assert.deepEqual(await resolveRepository('alex', 'Mikka', list, noContext), { repo: 'alexj11324/Mikka' }, 'the exact name still wins')
-  assert.deepEqual(await findRepository('alex', 'Mikka site', list), { match: 'one', repository: 'alexj11324/mikka-web' })
+// Production (Acme): find_repository {name:"mikka"} returned match "one" (alexj11324/Mikka, an exact hit) and hid
+// mikka-web, whose homepage is the site the person meant (「the How it works section on the Mikka site」).
+const acme = () => mock.fn<RepositoryLister>(async () => ({ repositories: [
+  { fullName: 'alexj11324/Mikka', private: true, description: 'Mikka app: bots, threads and the Coordinator', homepage: 'https://app.mikka.example' },
+  { fullName: 'alexj11324/mikka-web', private: true, description: 'The Mikka marketing site', homepage: 'https://mikka.example' },
+  { fullName: 'acme/mikka-enterprise', private: true, description: null, homepage: null },
+] }))
+
+test('an exact name never hides the others: every candidate comes back with its description and homepage', async () => {
+  const found = await findRepository('alex', 'mikka', acme())
+  assert.equal((found as { match: string }).match, 'several')
+  assert.deepEqual((found as { candidates: unknown[] }).candidates, [
+    { fullName: 'alexj11324/Mikka', description: 'Mikka app: bots, threads and the Coordinator', homepage: 'https://app.mikka.example', usedByThisWorkspace: false },
+    { fullName: 'alexj11324/mikka-web', description: 'The Mikka marketing site', homepage: 'https://mikka.example', usedByThisWorkspace: false },
+    { fullName: 'acme/mikka-enterprise', description: null, homepage: null, usedByThisWorkspace: false },
+  ])
+  assert.equal((await findRepository('alex', 'Mikka site', acme()) as { match: string }).match, 'several', 'no synonym decides "site"')
+  assert.deepEqual(await findRepository('alex', 'alexj11324/mikka-web', acme()), { match: 'one', repository: 'alexj11324/mikka-web', description: 'The Mikka marketing site', homepage: 'https://mikka.example' })
 })
 
-test('several matches: the task\'s text or its workspace\'s threads choose; otherwise the person is asked', async () => {
-  const list = mock.fn<RepositoryLister>(async () => repos('alexj11324/mikka-web', 'acme/mikka-website'))
+test('dispatch_run with a bare name that several fit dispatches nothing; this workspace\'s repositories only come first', async () => {
   const dispatch = mock.fn(async (repo: string) => ({ runId: 'run', repo }))
-  const context = (text: string, used: string[] = []) => mock.fn(async () => ({ text, used }))
-  const named = context('Fix the hero on acme/mikka-website')
-  assert.deepEqual(await withResolvedRepository('alex', ISSUE, 'Mikka site', dispatch, list, named), { runId: 'run', repo: 'acme/mikka-website' })
-  assert.deepEqual(named.mock.calls.map(call => call.arguments), [['alex', ISSUE]])
-  assert.deepEqual(await withResolvedRepository('alex', ISSUE, 'Mikka site', dispatch, list, context('', ['alexj11324/mikka-web'])), { runId: 'run', repo: 'alexj11324/mikka-web' })
-  // A longer name is not a mention of a shorter one.
-  assert.equal((await withResolvedRepository('alex', ISSUE, 'Mikka site', dispatch, list, context('see acme/mikka-website-old', ['alexj11324/mikka-web', 'acme/mikka-website'])) as { error?: string }).error, 'repositoryAmbiguous')
-  const unsure = await withResolvedRepository('alex', ISSUE, 'Mikka site', dispatch, list, async () => { throw new Error('context unavailable') })
-  assert.equal((unsure as { error?: string }).error, 'repositoryAmbiguous', 'an unreadable context asks instead of guessing')
-  assert.equal(dispatch.mock.callCount(), 2)
+  const result = await withResolvedRepository('alex', ISSUE, 'Mikka', dispatch, acme(), async () => ({ used: ['alexj11324/mikka-web'] })) as { error: string; candidates: { fullName: string; usedByThisWorkspace: boolean }[]; card: { options: { value: string }[] } }
+  assert.equal(result.error, 'repositoryAmbiguous')
+  assert.deepEqual(result.candidates.map(item => [item.fullName, item.usedByThisWorkspace]), [['alexj11324/mikka-web', true], ['alexj11324/Mikka', false], ['acme/mikka-enterprise', false]])
+  assert.deepEqual(result.card.options.map(option => option.value), ['alexj11324/mikka-web', 'alexj11324/Mikka', 'acme/mikka-enterprise'])
+  assert.equal(dispatch.mock.callCount(), 0, 'the workspace\'s own use orders the candidates; it never chooses')
+  // The Coordinator judged them and passes owner/repo: dispatched as named.
+  assert.deepEqual(await withResolvedRepository('alex', ISSUE, 'alexj11324/mikka-web', dispatch, acme(), noContext), { runId: 'run', repo: 'alexj11324/mikka-web' })
+  const unreadable = await withResolvedRepository('alex', ISSUE, 'Mikka', dispatch, acme(), async () => { throw new Error('context unavailable') })
+  assert.equal((unreadable as { error?: string }).error, 'repositoryAmbiguous')
+})
+
+test('sameRepository tells a named repository from the thread\'s', async () => {
+  const { sameRepository } = await import('./repository-resolution')
+  assert.equal(await sameRepository('alex', 'mikka-web', 'https://github.com/alexj11324/Mikka.git', acme()), false)
+  assert.equal(await sameRepository('alex', 'alexj11324/Mikka', 'https://github.com/alexj11324/Mikka.git', acme()), true)
+  assert.equal(await sameRepository('alex', 'Mikka', 'https://github.com/alexj11324/Mikka.git', acme()), null, 'a name several fit is not one repository yet')
 })

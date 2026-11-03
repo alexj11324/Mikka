@@ -6,7 +6,7 @@ export { GitHubAccessError, type GitHubAccessCode } from './user-access-error'
 import { GitHubAccessError } from './user-access-error'
 import { noteGitHubRequest } from '@/lib/dispatch-timing'
 
-export type AuthorizedGitHubRepository = { id: string; installationId: string; fullName: string; htmlUrl: string; private: boolean }
+export type AuthorizedGitHubRepository = { id: string; installationId: string; fullName: string; htmlUrl: string; private: boolean; description?: string | null; homepage?: string | null }
 type Json = Record<string, unknown>
 const API = 'https://api.github.com'
 const REPO_NAME = /^[\w.-]+\/[\w.-]+$/
@@ -125,7 +125,9 @@ async function repositoriesForUser(userId: string, headers?: Headers) {
           if (value == null) continue
           const repo = object(value)
           if (typeof repo.full_name !== 'string' || !REPO_NAME.test(repo.full_name) || typeof repo.private !== 'boolean') throw new GitHubAccessError('githubUnavailable', 502)
-          repositories.push({ id: githubId(repo.id), installationId, fullName: repo.full_name, htmlUrl: `https://github.com/${repo.full_name}`, private: repo.private })
+          // What the repository says it is, so a name shared by several ("Mikka", mikka-web) can be told apart.
+          const text = (field: unknown) => typeof field === 'string' && field.trim() ? field.trim().slice(0, 300) : null
+          repositories.push({ id: githubId(repo.id), installationId, fullName: repo.full_name, htmlUrl: `https://github.com/${repo.full_name}`, private: repo.private, description: text(repo.description), homepage: text(repo.homepage) })
         }
         if (!repos.next) break
       }

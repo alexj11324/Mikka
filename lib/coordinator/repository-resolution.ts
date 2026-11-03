@@ -1,8 +1,8 @@
 import { defaultAgentCopy } from '@/lib/agent-copy'
-import { isBareRepositoryName, matchRepositoryName, matchRepositoryWords, type RepositoryMatch } from '@/lib/github/repository-match'
+import { isBareRepositoryName, relatedRepositories } from '@/lib/github/repository-match'
 import { timedPhase } from '@/lib/dispatch-timing'
 
-type Repository = { fullName: string; private?: boolean }
+type Repository = { fullName: string; private?: boolean; description?: string | null; homepage?: string | null }
 /** Lists one user's own authorized repositories. The host passes the user id; a model never does. */
 export type RepositoryLister = (userId: string) => Promise<{ repositories: readonly Repository[] }>
 type GitHubProblem = 'githubNotConnected' | 'githubNotConfigured' | 'githubReconnectRequired' | 'githubUnavailable' | 'githubRepositoryForbidden'
@@ -35,65 +35,65 @@ async function listFor(userId: string, list: RepositoryLister): Promise<{ reposi
   }
 }
 
+/** One repository a name could mean, with what it says it is, for the Coordinator to judge against the person's words. */
+export type RepositoryCandidate = { fullName: string; description: string | null; homepage: string | null; usedByThisWorkspace: boolean }
+
 type Resolution =
   | { repo: string }
-  | { error: 'repositoryAmbiguous'; card: ReturnType<typeof repositoryAmbiguousCard> }
+  | { error: 'repositoryAmbiguous'; candidates: RepositoryCandidate[]; card: ReturnType<typeof repositoryAmbiguousCard> }
   | { error: 'repositoryNotFound'; card: ReturnType<typeof repositoryNotFoundCard> }
   | { error: GitHubProblem; repository: string }
 
 /**
- * What the task itself says about its repository: the issue's own text, and the repositories
- * (owner/repo) the threads of its workspace already work in. Read only to choose among names
- * that match; it never adds a repository the person did not authorize.
+ * The repositories (owner/repo) the person's threads in this task's workspace already work in. It only
+ * orders the candidates and marks them; it never chooses one, and never adds an unauthorized repository.
  */
-export type RepositoryContext = { text: string; used: readonly string[] }
+export type RepositoryContext = { used: readonly string[] }
 export type RepositoryContextSource = (userId: string, issueId: string) => Promise<RepositoryContext>
 
-/** A name's exact or loose match, else its family-and-qualifier match ("Mikka site" → mikka-web). */
-function matchName<T extends Repository>(name: string, repositories: readonly T[]): RepositoryMatch<T> {
-  const match = matchRepositoryName(name, repositories)
-  return match.kind === 'none' ? matchRepositoryWords(name, repositories) : match
+/** Candidates in the order to show them: those this workspace already uses first, else as matched. */
+function candidatesOf(repositories: readonly Repository[], context: RepositoryContext | null): RepositoryCandidate[] {
+  const used = new Set((context?.used ?? []).map(fullName => fullName.toLowerCase()))
+  const listed = repositories.map(repository => ({ fullName: repository.fullName, description: repository.description ?? null, homepage: repository.homepage ?? null, usedByThisWorkspace: used.has(repository.fullName.toLowerCase()) }))
+  return [...listed.filter(item => item.usedByThisWorkspace), ...listed.filter(item => !item.usedByThisWorkspace)]
 }
 
-/** Among several matches, the one the task names, else the one its workspace's threads already use; else none. */
-function chooseByContext<T extends Repository>(candidates: readonly T[], context: RepositoryContext | null): T | null {
-  if (!context) return null
-  // owner/repo as a whole name: alexj11324/Mikka is not named by alexj11324/mikka-web.
-  const names = (fullName: string) => new RegExp(`(?<![\\w.-])${fullName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w-]|\\.\\w)`, 'i').test(context.text)
-  const named = candidates.filter(repository => names(repository.fullName))
-  if (named.length === 1) return named[0]!
-  const used = new Set(context.used.map(fullName => fullName.toLowerCase()))
-  const known = candidates.filter(repository => used.has(repository.fullName.toLowerCase()))
-  return known.length === 1 ? known[0]! : null
-}
-
-/** owner/repo and URLs pass unchanged; a bare name becomes the one matching repository the user authorized, or a card. */
+/**
+ * owner/repo and URLs pass unchanged. A bare name becomes a repository only when it is the one the person could
+ * mean; whenever another authorized repository's name contains it too ("Mikka" and mikka-web), nothing is chosen:
+ * the candidates come back with their descriptions and homepages for the Coordinator to judge, or to ask with the card.
+ */
 export async function resolveRepository(userId: string, repo: string, list: RepositoryLister = ownRepositories, context?: () => Promise<RepositoryContext | null>): Promise<Resolution> {
   if (!isBareRepositoryName(repo)) return { repo }
   const name = repo.trim()
   const own = await listFor(userId, list)
   if ('error' in own) return { error: own.error, repository: name }
-  const match = matchName(name, own.repositories)
-  if (match.kind === 'one') return { repo: match.repository.fullName }
-  if (match.kind === 'none') return { error: 'repositoryNotFound', card: repositoryNotFoundCard(name) }
-  // Several fit the name: the task's own context may settle it; if not, the person is asked, never guessed for.
-  const chosen = chooseByContext(match.candidates, context ? await context().catch(() => null) : null)
-  return chosen ? { repo: chosen.fullName } : { error: 'repositoryAmbiguous', card: repositoryAmbiguousCard(name, match.candidates) }
+  const related = relatedRepositories(name, own.repositories)
+  if (related.length === 0) return { error: 'repositoryNotFound', card: repositoryNotFoundCard(name) }
+  if (related.length === 1) return { repo: related[0]!.fullName }
+  const candidates = candidatesOf(related, context ? await context().catch(() => null) : null)
+  return { error: 'repositoryAmbiguous', candidates, card: repositoryAmbiguousCard(name, candidates) }
 }
 
 const remoteFullName = (remoteUrl: string) => remoteUrl.trim().replace(/^(?:https:\/\/|git@)github\.com[/:]/i, '').replace(/\.git$/i, '').replace(/\/+$/, '')
 
-/** The issue's text, and the repositories of the person's threads in its team workspace (or, for a personal task, all of theirs). */
+/** The repositories of the person's threads in this task's team workspace (or, for a personal task, all of theirs). */
 const taskContext: RepositoryContextSource = async (userId, issueId) => {
-  const [{ pool }, { workspacePool }, { tiptapToText }] = await Promise.all([import('@/lib/db'), import('@/lib/workspace-db'), import('@/lib/tiptap-text')])
-  const issue = (await pool.query<{ title: string; content: unknown }>('SELECT title,content FROM issues WHERE id=$1', [issueId])).rows[0]
+  const [{ pool }, { workspacePool }] = await Promise.all([import('@/lib/db'), import('@/lib/workspace-db')])
   const team = (await workspacePool.query<{ workspaceId: string }>('SELECT "workspaceId" FROM mikka_team_issues WHERE "issueId"=$1', [issueId])).rows[0]
   const siblings = team ? (await workspacePool.query<{ issueId: string }>('SELECT "issueId" FROM mikka_team_issues WHERE "workspaceId"=$1', [team.workspaceId])).rows.map(row => row.issueId) : null
   const runs = 'SELECT DISTINCT d."remoteUrl" FROM agent_runs r JOIN device_repos d ON d.id=r."deviceRepoId" WHERE r."userId"=$1 AND d."remoteUrl" IS NOT NULL'
   const { rows } = siblings
     ? await pool.query<{ remoteUrl: string }>(`${runs} AND r."issueId"=ANY($2::uuid[]) LIMIT 200`, [userId, siblings])
     : await pool.query<{ remoteUrl: string }>(`${runs} LIMIT 200`, [userId])
-  return { text: issue ? `${issue.title}\n${tiptapToText(issue.content as never)}` : '', used: rows.map(row => remoteFullName(row.remoteUrl)) }
+  return { used: rows.map(row => remoteFullName(row.remoteUrl)) }
+}
+
+/** Whether `named` (as the person said it, or owner/repo) is the repository at `remoteUrl`; null when the name is not one repository. */
+export async function sameRepository(userId: string, named: string, remoteUrl: string, list: RepositoryLister = ownRepositories): Promise<boolean | null> {
+  const resolved = await resolveRepository(userId, named, list)
+  if (!('repo' in resolved)) return null
+  return remoteFullName(resolved.repo).toLowerCase() === remoteFullName(remoteUrl).toLowerCase()
 }
 
 /** Dispatches only with a resolved repository; otherwise nothing is queued and the result carries the card. */
@@ -102,19 +102,23 @@ export async function withResolvedRepository<T>(userId: string, issueId: string,
   return 'repo' in resolved ? dispatch(resolved.repo) : { ...resolved, issueId }
 }
 
-/** find_repository: the user's own authorized repositories matching a name, or the first ones when no name is given. */
+/**
+ * find_repository: the user's own authorized repositories matching a name, with what each says it is, or the first
+ * ones when no name is given. One match only when no other repository's name contains the name too.
+ */
 export async function findRepository(userId: string, name: string | undefined, list: RepositoryLister = ownRepositories) {
   const own = await listFor(userId, list)
   if ('error' in own) return own
   const wanted = name?.trim().replace(/^https:\/\/github\.com\//i, '').replace(/\.git$/i, '') ?? ''
-  if (!wanted) return { total: own.repositories.length, repositories: own.repositories.slice(0, LIST_LIMIT).map(repository => repository.fullName) }
+  const about = (repository: Repository) => ({ description: repository.description ?? null, homepage: repository.homepage ?? null })
+  if (!wanted) return { total: own.repositories.length, repositories: own.repositories.slice(0, LIST_LIMIT).map(repository => ({ fullName: repository.fullName, ...about(repository) })) }
   if (wanted.includes('/')) {
     const exact = own.repositories.find(repository => repository.fullName.toLowerCase() === wanted.toLowerCase())
-    return exact ? { match: 'one' as const, repository: exact.fullName } : { match: 'none' as const, card: repositoryNotFoundCard(wanted) }
+    return exact ? { match: 'one' as const, repository: exact.fullName, ...about(exact) } : { match: 'none' as const, card: repositoryNotFoundCard(wanted) }
   }
-  const match = matchName(wanted, own.repositories)
-  if (match.kind === 'one') return { match: 'one' as const, repository: match.repository.fullName }
-  return match.kind === 'several'
-    ? { match: 'several' as const, candidates: match.candidates.map(repository => repository.fullName), card: repositoryAmbiguousCard(wanted, match.candidates) }
-    : { match: 'none' as const, card: repositoryNotFoundCard(wanted) }
+  const related = relatedRepositories(wanted, own.repositories)
+  if (related.length === 1) return { match: 'one' as const, repository: related[0]!.fullName, ...about(related[0]!) }
+  if (related.length === 0) return { match: 'none' as const, card: repositoryNotFoundCard(wanted) }
+  const candidates = candidatesOf(related, null)
+  return { match: 'several' as const, candidates, card: repositoryAmbiguousCard(wanted, candidates) }
 }

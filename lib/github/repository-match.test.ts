@@ -34,13 +34,11 @@ test('the same name under several owners is several, listed in order', () => {
   assert.deepEqual(matchRepositoryName('Mikka_test', [mine, repo('x/y'), org]), { kind: 'several', candidates: [mine, org] })
 })
 
-test('a name with qualifying words matches the family member that carries them', async () => {
-  const { matchRepositoryWords } = await import('./repository-match')
-  const all = [{ fullName: 'alexj11324/Mikka' }, { fullName: 'alexj11324/mikka-web' }, { fullName: 'alexj11324/mikka-api' }]
-  for (const name of ['Mikka site', 'mikka website', 'Mikka web', 'the Mikka site repo'])
-    assert.deepEqual(matchRepositoryWords(name, all), { kind: 'one', repository: { fullName: 'alexj11324/mikka-web' } }, name)
-  assert.deepEqual(matchRepositoryWords('Mikka backend', all), { kind: 'one', repository: { fullName: 'alexj11324/mikka-api' } })
-  assert.deepEqual(matchRepositoryWords('Mikka', all), { kind: 'none' }, 'one word is left to the exact and loose match')
-  assert.deepEqual(matchRepositoryWords('Other site', all), { kind: 'none' })
-  assert.equal(matchRepositoryWords('Mikka site', [...all, { fullName: 'org/mikka-website' }]).kind, 'several')
+test('every repository whose name contains the name is a candidate, exact first; else those containing its first word', async () => {
+  const { relatedRepositories } = await import('./repository-match')
+  const all = [{ fullName: 'alexj11324/mikka-web' }, { fullName: 'alexj11324/Mikka' }, { fullName: 'acme/mikka-enterprise' }, { fullName: 'alexj11324/Mikka_test' }, { fullName: 'other/web' }]
+  assert.deepEqual(relatedRepositories('mikka', all).map(item => item.fullName), ['alexj11324/Mikka', 'alexj11324/mikka-web', 'acme/mikka-enterprise', 'alexj11324/Mikka_test'], 'an exact hit never hides the others')
+  assert.deepEqual(relatedRepositories('Mikka site', all).map(item => item.fullName), ['alexj11324/mikka-web', 'alexj11324/Mikka', 'acme/mikka-enterprise', 'alexj11324/Mikka_test'], 'no synonyms: the first word lists the family')
+  assert.deepEqual(relatedRepositories('mikka-test', all).map(item => item.fullName), ['alexj11324/Mikka_test'])
+  assert.deepEqual(relatedRepositories('nothing', all), [])
 })
