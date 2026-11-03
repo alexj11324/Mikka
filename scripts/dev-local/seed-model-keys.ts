@@ -1,5 +1,6 @@
 /** Local-only DeepSeek setup. Provider keys stay in process memory. */
 import type { Pool } from 'pg'
+import { assertFlashTestModel } from '../test-model-policy.mjs'
 
 export const DEV_MODEL_PREFERENCE = [/v4\.1.*flash/i, /flash/i]
 interface ModelKey { id: string; models: string[] }
@@ -11,7 +12,13 @@ export interface SeedDeps {
 }
 export type SeedState = Map<string, { failures: number; retryAt: number }>
 export function preferredModel(models: string[]): string | undefined {
-  for (const pattern of DEV_MODEL_PREFERENCE) { const hit = models.find(model => pattern.test(model)); if (hit) return hit }
+  for (const pattern of DEV_MODEL_PREFERENCE) {
+    const hit = models.find(model => {
+      if (!pattern.test(model)) return false
+      try { assertFlashTestModel(model); return true } catch { return false }
+    })
+    if (hit) return hit
+  }
   return undefined
 }
 
