@@ -7,7 +7,7 @@ export interface HarnessArtifact {
   /** The executable inside the tarball. */
   entry: string
 }
-export interface HarnessPin { version: string; command: string; platforms: Record<string, HarnessArtifact> }
+export interface HarnessPin { version: string; command: string; /** Required sibling executables from the same verified platform artifact. */ companions?: string[]; platforms: Record<string, HarnessArtifact> }
 export interface HarnessPins { registry: string; harnesses: Record<ManagedHarness, HarnessPin> }
 export interface HarnessStore {
   /** The daemon's own harness dir. */

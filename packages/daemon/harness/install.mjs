@@ -10,7 +10,7 @@
 import { createHash, randomBytes } from 'node:crypto'
 import { execFile } from 'node:child_process'
 import { createWriteStream, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { Readable, Transform } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import { promisify } from 'node:util'
@@ -42,13 +42,15 @@ export function harnessBinaryPath(store, harness) {
   return join(versionDir(store, harness), 'bin', resolvePin(store, harness).pin.command)
 }
 
+const installMarker = (pin, artifact) => artifact.integrity + (pin.companions?.length ? '\n' + pin.companions.join('\n') : '')
+
 export function harnessInstallState(store, harness) {
   const { pin, artifact } = resolvePin(store, harness)
   if (!artifact) return { state: 'unsupported', version: pin.version }
   let installed = false
   try {
-    installed = readFileSync(join(versionDir(store, harness), MARKER), 'utf8') === artifact.integrity
-      && statSync(harnessBinaryPath(store, harness)).isFile()
+    installed = readFileSync(join(versionDir(store, harness), MARKER), 'utf8') === installMarker(pin, artifact)
+      && [pin.command, ...(pin.companions ?? [])].every(command => statSync(join(versionDir(store, harness), 'bin', command)).isFile())
   } catch {
     // Not installed (or a half-finished one, which is replaced).
   }
@@ -79,11 +81,13 @@ async function install(store, harness) {
   try {
     const tarball = join(staging, 'package.tgz')
     await download(`${(store.pins ?? HARNESS_PINS).registry.replace(/\/$/, '')}/${artifact.tarball}`, tarball, artifact.integrity)
-    await run('tar', ['-xzf', tarball, '-C', staging, artifact.entry])
+    const companions = (pin.companions ?? []).map(command => ({ command, entry: join(dirname(artifact.entry), command) }))
+    await run('tar', ['-xzf', tarball, '-C', staging, artifact.entry, ...companions.map(file => file.entry)])
     renameSync(join(staging, artifact.entry), join(staging, 'bin', pin.command))
+    for (const file of companions) renameSync(join(staging, file.entry), join(staging, 'bin', file.command))
     rmSync(tarball)
     rmSync(join(staging, artifact.entry.split('/')[0]), { recursive: true, force: true })
-    writeFileSync(join(staging, MARKER), artifact.integrity, { mode: 0o600 })
+    writeFileSync(join(staging, MARKER), installMarker(pin, artifact), { mode: 0o600 })
     const target = versionDir(store, harness)
     rmSync(target, { recursive: true, force: true })
     renameSync(staging, target)

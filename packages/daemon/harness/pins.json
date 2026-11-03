@@ -14,6 +14,7 @@
     "codex": {
       "version": "0.163.0",
       "command": "codex",
+      "companions": ["codex-code-mode-host"],
       "platforms": {
         "darwin-arm64": { "tarball": "@openai/codex/-/codex-0.163.0-darwin-arm64.tgz", "integrity": "sha512-i7Dzk2a5aGmuGM9aNZgaUVTojZ/4bc5lRfosz++Y7X2BGhDkz+cySgbD+NYS1pOxfm0VEbLi9PZ3pAulI4kchw==", "entry": "package/vendor/aarch64-apple-darwin/bin/codex" },
         "darwin-x64": { "tarball": "@openai/codex/-/codex-0.163.0-darwin-x64.tgz", "integrity": "sha512-Ioj7h+B1ME9ZU1PH1ATfvFV5DiototEpFFaSSbg3kfDifB9djhl5fcJ++g5mpcL/+uVbcnReei+RiSXEx8o+kw==", "entry": "package/vendor/x86_64-apple-darwin/bin/codex" },
