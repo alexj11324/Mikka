@@ -208,6 +208,21 @@ test('shared subscriptions reach local and cloud claims with current membership 
       if (revoke !== 'runner-left') assert.equal(offered.some(item => item.source.kind === 'subscription' && item.source.connectionId === p.connectionId), false)
     })
   }
+  await t.test('a cloud thread\'s next run, queued without a model, freezes the subscription\'s own model', async () => {
+    // The hosted runner starts only when the run's model equals the subscription context's; a
+    // continuation that left the model out failed every time with subscription_hosted_runtime_unavailable.
+    const p = await seed('claude', true)
+    const issueId = await seedIssue(pool, p.userId)
+    const repoId = (await pool.query('SELECT "deviceRepoId" FROM agent_runs WHERE id=$1', [p.runId])).rows[0].deviceRepoId
+    for (const model of [undefined, 'auto'] as const) {
+      const next = await queueCloudRun(pool, { userId: p.userId, workspaceId: p.workspaceId }, { botId: p.botId, issueId, agentId: p.agentId, deviceRepoId: repoId, title: 'Continue', body: '', readOnly: true, ...(model ? { model } : {}) })
+      const definition = (await pool.query('SELECT "agentDefinition" FROM agent_runs WHERE id=$1', [next.runId])).rows[0].agentDefinition
+      assert.equal(definition.modelSource, 'subscription')
+      assert.equal(definition.subscription.modelId, p.model)
+      assert.equal(definition.model, p.model, `model ${model ?? 'omitted'}`)
+      assert.equal(definition.cliModelSelection, 'explicit')
+    }
+  })
   await t.test('own subscription works across workspaces without a share or admin personal-use gate', async () => {
     const p = await seed('claude', false)
     const other = await seedWorkspace(pool, p.ownerId, [{ userId: p.ownerId, role: 'admin' }])
