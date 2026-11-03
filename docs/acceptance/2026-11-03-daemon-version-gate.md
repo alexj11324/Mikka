@@ -14,9 +14,9 @@ version. A fresh credential with an old or missing version receives426 before
 business operations. A current header cannot disguise an old registration
 body. Current/source clients and scoped cloud workers remain compatible.
 
-Upgrade control (heartbeat and command polling/ack) remains available only with
+Upgrade control (heartbeat and command polling) remains available only with
 valid authentication. An original claim credential with a current live lease
-may finish its existing work; a new login cannot borrow that grace. Existing
+may finish that run's own transport requests; a new login cannot borrow that grace. Existing
 claim checks still refuse new work below the floor. No token is revoked by
 this patch and no production data is changed by its tests.
 
@@ -34,3 +34,10 @@ The active released-client compatibility fixture is fetched from the public
 npm0.0.375 tarball and verified against registry integrity; prior fixture
 history is retained. No browser tests, UI changes, model calls or production
 fixture writes are involved.
+
+Review tightened the grace to the request's specific run ID and its original
+claim token; owning any run does not admit repos, computer, other runs or new
+claims. Obsolete command polls return only update/restart commands and version
+metadata without querying business work. Obsolete heartbeats skip harness
+provisioning and Factory dispatch, and renew only live runs attributed to the
+original token. Business message acknowledgments are not upgrade controls.

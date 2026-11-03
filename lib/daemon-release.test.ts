@@ -85,7 +85,7 @@ test('only update control traffic remains available to an authenticated idle old
   const request = (method: string, path: string) => new Request(`https://app.example/mikka${path}`, { method })
   assert.equal(daemonUpdateControlRequest(request('POST', '/v1/devices/fixture/heartbeat')), true)
   assert.equal(daemonUpdateControlRequest(request('GET', '/v1/devices/fixture/commands')), true)
-  assert.equal(daemonUpdateControlRequest(request('POST', '/v1/devices/fixture/commands/ack')), true)
+  assert.equal(daemonUpdateControlRequest(request('POST', '/v1/devices/fixture/commands/ack')), false)
   for (const path of ['/v1/devices/register', '/v1/devices/fixture/repos', '/v1/devices/fixture/runs', '/v1/devices/fixture/computer'])
     assert.equal(daemonUpdateControlRequest(request('POST', path)), false)
 })

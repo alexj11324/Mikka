@@ -1,5 +1,5 @@
 import { CLIENT_VERSION_HEADER } from '@mikka/protocol/version'
-import { daemonRequestTooOld, daemonUpgradeResponse, daemonUpdateControlRequest } from './daemon-release'
+import { daemonRequestTooOld, daemonUpgradeResponse, daemonUpdateControlRequest, daemonRunRequestId } from './daemon-release'
 import { authenticateDevice } from './device-link'
 import { deviceRequestCaller } from './device-request-context'
 import { withDeviceDatabaseAuthority, withDeviceUnitFence, isDeviceAuthorityRevoked, isDeviceAuthorityError } from './db/device-scope'
@@ -25,8 +25,10 @@ export function withDeviceRoute<Args extends unknown[]>(handler: (request: Reque
       // Do not strand an already leased run while its daemon waits to update.
       // Only the credential that claimed the work gets this grace; a new login
       // cannot use it. The handler's existing fence still rechecks revocation.
-      const live = await pool.query(`SELECT 1 FROM agent_runs WHERE "deviceTokenId"=$1 AND "userId"=$2
-        AND "leaseExpiresAt">now() AND status IN ('preparing','running','waiting_input','finishing') LIMIT 1`, [caller.tokenId, caller.userId])
+      const runId = daemonRunRequestId(request)
+      if (!runId) return daemonUpgradeResponse()
+      const live = await pool.query(`SELECT 1 FROM agent_runs WHERE "deviceTokenId"=$1 AND "userId"=$2 AND id=$3
+        AND "leaseExpiresAt">now() AND status IN ('preparing','running','waiting_input','finishing') LIMIT 1`, [caller.tokenId, caller.userId, runId])
       if (!live.rowCount) return daemonUpgradeResponse()
     }
     try {

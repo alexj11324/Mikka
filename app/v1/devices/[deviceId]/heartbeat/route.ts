@@ -1,3 +1,4 @@
+import { CLIENT_VERSION_HEADER } from '@mikka/protocol/version'
 import { withDeviceRoute } from '@/lib/device-route'
 import { after, NextResponse } from 'next/server'
 import { sql } from 'drizzle-orm'
@@ -13,7 +14,7 @@ import { renewCloudDeviceToken } from '@/lib/computer/cloud-device'
 import { factoryLifecycleEnabled } from '@/lib/factory/runtime'
 import { factoryDispatchRecovery } from '@/lib/factory/dispatch-recovery-server'
 import { factoryDeviceOnline } from '@/lib/factory/dispatch-recovery'
-import { daemonVersions } from '@/lib/daemon-release'
+import { daemonVersions, daemonRequestTooOld } from '@/lib/daemon-release'
 
 export const dynamic = 'force-dynamic'
 
@@ -39,6 +40,19 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
   if (!await linkDeviceToken(caller, deviceId)) return NextResponse.json({ error: 'Unknown device.' }, { status: 404 })
   const parsed = deviceHeartbeatSchema.safeParse(await request.json().catch(() => null))
   if (!parsed.success) return NextResponse.json({ error: 'Invalid heartbeat.' }, { status: 400 })
+  if (daemonRequestTooOld(request.headers.get(CLIENT_VERSION_HEADER), Boolean(caller.scopeDeviceId && caller.scopeWorkspaceId))) {
+    // No harness provisioning, task dispatch or new Skill work while obsolete.
+    // Only renew work held by this original claim credential during its update.
+    const reported = parsed.data.runs.map(run => run.runId)
+    const owned = reported.length ? await pool.query<{ id: string }>(`SELECT id FROM agent_runs WHERE "deviceTokenId"=$1 AND "userId"=$2
+      AND "deviceId"=$3 AND id::text=ANY($4::text[]) AND "leaseExpiresAt">now()
+      AND status IN ('preparing','running','waiting_input','finishing')`, [caller.tokenId, caller.userId, deviceId, reported]) : { rows: [] }
+    const ids = owned.rows.map(run => run.id)
+    const selected = ids.length ? await skillAssignments.renewHeartbeat(caller.userId, deviceId, ids, request.headers.get(SKILL_ARTIFACT_HEADER) === '1', request.headers.get(TEAM_SKILL_HEADER) === '1') : { legacy: [], leases: {}, revoked: [] }
+    const result = await renewRunLeases(deviceId, selected.legacy)
+    const deviceCommands = (await pendingDeviceCommands(deviceId, parsed.data.completedDeviceCommands ?? [], parsed.data.failedDeviceCommands ?? [])).filter(command => command.kind === 'update' || command.kind === 'restart')
+    return NextResponse.json({ ...result, leases: { ...result.leases, ...selected.leases }, revoked: [...new Set([...(result.revoked ?? []), ...selected.revoked, ...reported.filter(id => !ids.includes(id))])], deviceCommands, daemonVersions: await daemonVersions() }, { headers: { 'Cache-Control': 'private, no-store' } })
+  }
   const factoryOn = factoryLifecycleEnabled()
   const { harnesses, deviceType, updateFailure } = parsed.data
   const now = new Date()

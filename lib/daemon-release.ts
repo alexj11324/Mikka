@@ -71,7 +71,13 @@ export function daemonUpdateControlRequest(request: Request): boolean {
   const path = new URL(request.url).pathname.replace(/^\/mikka(?=\/)/, '')
   return (request.method === 'POST' && /^\/v1\/devices\/[^/]+\/heartbeat$/.test(path))
     || (request.method === 'GET' && /^\/v1\/devices\/[^/]+\/commands$/.test(path))
-    || (request.method === 'POST' && /^\/v1\/devices\/[^/]+\/commands\/ack$/.test(path))
+}
+
+/** Only an existing run's own transport can receive lease-scoped grace. */
+export function daemonRunRequestId(request: Request): string | undefined {
+  const path = new URL(request.url).pathname.replace(/^\/mikka(?=\/)/, '')
+  const match = /^\/v1\/(?:devices\/[^/]+\/)?runs\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:\/(.*))?$/i.exec(path)
+  return match && match[2] !== 'claim' ? match[1] : undefined
 }
 
 /** Public upgrade metadata only; never wait for npm on a refused request. */

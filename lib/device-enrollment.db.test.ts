@@ -174,10 +174,13 @@ test('a fresh login cannot admit an old daemon, and updating cannot revive a rev
   // Already claimed work may finish using its original credential. A new
   // credential cannot inherit this grace from merely owning the same device.
   const tokenId = (await pool.query('SELECT id FROM device_tokens WHERE "tokenHash"=$1', [hashDeviceToken(credential)])).rows[0].id
-  await pool.query(`INSERT INTO agent_runs(id,status,"deviceTokenId","userId","leaseExpiresAt") VALUES($1,'running',$2,'version-owner',now()+interval '1 minute')`, [randomUUID(), tokenId])
-  assert.equal((await handler(request('0.0.329'))).status, 200)
+  const claimedRun = randomUUID()
+  await pool.query(`INSERT INTO agent_runs(id,status,"deviceTokenId","userId","leaseExpiresAt") VALUES($1,'running',$2,'version-owner',now()+interval '1 minute')`, [claimedRun, tokenId])
+  assert.equal((await handler(request('0.0.329'))).status, 426, 'a live run does not admit unrelated repos polling')
+  assert.equal((await handler(request('0.0.329', `/v1/runs/${randomUUID()}/events`))).status, 426, 'another run cannot borrow the lease')
+  assert.equal((await handler(request('0.0.329', `/v1/runs/${claimedRun}/events`))).status, 200)
   const fresh = await consumeDeviceEnrollment(await mintDeviceEnrollment('version-owner'))
-  const freshRequest = new Request(request('0.0.329'), { headers: { authorization: `Bearer ${fresh}`, 'x-mikka-client-version': '0.0.329' } })
+  const freshRequest = new Request(request('0.0.329', `/v1/runs/${claimedRun}/events`), { headers: { authorization: `Bearer ${fresh}`, 'x-mikka-client-version': '0.0.329' } })
   assert.equal((await handler(freshRequest)).status, 426)
   await pool.query('UPDATE device_tokens SET "revokedAt"=now() WHERE id=$1', [tokenId])
   assert.equal((await handler(request(MIN_DAEMON_VERSION))).status, 401, 'new binary plus revoked old session is still unauthorized')

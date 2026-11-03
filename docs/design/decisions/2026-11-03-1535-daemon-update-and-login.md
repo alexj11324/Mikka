@@ -20,3 +20,10 @@ remain supported.
 
 The target's production credential was revoked separately under Alex's explicit
 instruction. This code introduces no bulk revocation or production data change.
+
+Review tightened the grace to the request's specific run ID and its original
+claim token; owning any run does not admit repos, computer, other runs or new
+claims. Obsolete command polls return only update/restart commands and version
+metadata without querying business work. Obsolete heartbeats skip harness
+provisioning and Factory dispatch, and renew only live runs attributed to the
+original token. Business message acknowledgments are not upgrade controls.
