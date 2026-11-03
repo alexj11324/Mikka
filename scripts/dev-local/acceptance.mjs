@@ -277,7 +277,7 @@ async function accept(device) {
     await until(signal, async () => JSON.stringify(await json(accounts.owner, '/api/coordinator/messages')).includes(published.pullRequest.url))
     const checked = await factoryApproval(id,signal)
     const acceptance = await json(accounts.owner,`/api/factory/tasks/${checked.id}/approval`)
-    assert.equal(acceptance.candidate.sha,done.report.publish.commit,'the final human gate reads back the exact candidate')
+    assert.equal(acceptance.manifest.candidate.sha,done.report.publish.commit,'the final human gate reads back the exact candidate')
     assert.equal(evidence.pullRequests.find(pr=>pr.url===published.pullRequest.url).draft,false,'Factory verification does not strand the PR in draft')
     await progress('item1-core-loop','factory-approval',checked.id)
     await progress('item1-core-loop', 'evidence', id)

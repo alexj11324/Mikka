@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 import { Pool } from 'pg'
 import { handleGroup, type GroupRequest } from '../group-conversations-store'
-import { GroupJudgmentPendingError, groupsWithPendingTurns, hasPendingGroupTurn, processGroupTurn, runGroupRounds, untilStopped, type GroupAgent, type GroupRuntime } from './group-turns'
+import { groupGenerationFailure, GroupJudgmentPendingError, groupsWithPendingTurns, hasPendingGroupTurn, processGroupTurn, runGroupRounds, untilStopped, type GroupAgent, type GroupRuntime } from './group-turns'
 import { checkedCorrection, checkedRoute } from './group-correction'
 import { createGroupJudgment } from './group-judgment'
 import { DECISION_MODEL, type DecisionAnswer } from './decision'
@@ -16,6 +16,17 @@ const a = randomUUID(), b = randomUUID(), outsider = randomUUID()
 const members: GroupAgent[] = [a,b].map((id,i) => ({ id, name: `Agent ${i}`, description: `role ${i}` }))
 const message = { text: 'everyone', mentions: [] }
 const receipt: DecisionExecution = {executionId:'synthetic-execution',modelId:DECISION_MODEL,providerGenerationId:'synthetic-generation',startedAt:'2026-01-01T00:00:00.000Z',completedAt:'2026-01-01T00:00:01.000Z',requestDigest:'synthetic',imageDigests:[],vision:'no-image-input'}
+test('group failure diagnostics preserve finite underlying causes and never private provider text', () => {
+  const wrapped = (cause:unknown) => Object.assign(new Error('private prompt and credential'), { name:'AI_NoOutputGeneratedError',cause })
+  assert.equal(groupGenerationFailure(wrapped(new DOMException('private upstream URL','TimeoutError'))),'generation_timeout')
+  assert.equal(groupGenerationFailure(wrapped({statusCode:503})),'generation_upstream')
+  assert.equal(groupGenerationFailure(wrapped({statusCode:429})),'generation_rate_limited')
+  assert.equal(groupGenerationFailure(wrapped({statusCode:401})),'generation_authentication')
+  assert.equal(groupGenerationFailure(wrapped(undefined)),'generation_invalid_output')
+  const cycle:any = new Error('private detail'); cycle.cause=cycle
+  assert.equal(groupGenerationFailure(cycle),'generation_failed_not_replayed')
+})
+
 test('serial engine: dedupes each round, caps reciprocal mentions at 3 rounds, later sees previous data', async () => {
   let generating = 0, peak = 0
   const calls: string[] = [], published: string[] = [], statuses: (string|null)[] = []
