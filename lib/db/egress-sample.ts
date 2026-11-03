@@ -25,10 +25,13 @@ function tablesOf(text: string): string[] {
   return [...names].slice(0, 6)
 }
 
-export function describeSample(text: string, result: QueryResult | QueryResult[], route: string | null): DbSample {
+function resultBytes(result: QueryResult | QueryResult[]) {
+  return (Array.isArray(result) ? result : [result]).reduce((sum, one) => sum + (one.rows?.length ? Buffer.byteLength(JSON.stringify(one.rows)) : 0), 0)
+}
+
+export function describeSample(text: string, result: QueryResult | QueryResult[], route: string | null, bytes = resultBytes(result)): DbSample {
   const results = Array.isArray(result) ? result : [result]
   const rows = results.reduce((sum, one) => sum + (one.rows?.length ?? 0), 0)
-  const bytes = results.reduce((sum, one) => sum + (one.rows?.length ? Buffer.byteLength(JSON.stringify(one.rows)) : 0), 0)
   return {
     level: 'info', msg: 'db_sample', timestamp: new Date().toISOString(), sampleRate: SAMPLE_RATE, route,
     command: results.at(-1)?.command ?? text.trim().split(/\s+/, 1)[0].toUpperCase(),
@@ -61,8 +64,10 @@ export function sampleClient(client: PoolClient, on: () => boolean = sampling, r
     const route = routeScope.getStore() ?? null
     const record = (result: unknown) => {
       try {
-        const sample = describeSample(text, result as QueryResult, route)
-        if (sample.bytes >= LARGE_RESULT_BYTES) {
+        const bytes = resultBytes(result as QueryResult)
+        if (!selected && bytes < LARGE_RESULT_BYTES) return
+        const sample = describeSample(text, result as QueryResult, route, bytes)
+        if (bytes >= LARGE_RESULT_BYTES) {
           // Every large result is observed, so the collector must not multiply
           // its bytes by 100 as it does with randomly selected small results.
           sink(JSON.stringify({ ...sample, sampleRate: 1 }))
