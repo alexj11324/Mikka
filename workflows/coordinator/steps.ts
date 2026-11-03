@@ -24,7 +24,7 @@ import type { ModelMessage } from 'ai'
 import { summarizeConversation } from '@/lib/coordinator/summary-model'
 import { and, asc, desc, eq } from 'drizzle-orm'
 import { ActionFailureError } from '@/lib/action-error'
-import { addRunMessage, queueRun, readRun, requestRunStop, visibleRuns } from '@/lib/agent-runs'
+import { addRunMessage, readRun, requestRunStop, visibleRuns } from '@/lib/agent-runs'
 import { compactionCut, forgetNotes, instructionsWithMemory, promptMessages, rememberNote, SUMMARY_INSTRUCTIONS } from '@/lib/coordinator/context'
 import { COORDINATOR_INSTRUCTIONS } from '@/lib/coordinator/instructions'
 import { withPersonalInstructions } from '@/lib/coordinator/personal-instructions'
@@ -45,7 +45,8 @@ import { createTelegramReplies } from '@/lib/coordinator/telegram-replies'
 import { workspacePool } from '@/lib/workspace-db'
 import { postTelegramText } from '@/lib/telegram/client'
 import type { InboxEvent } from '@/lib/push-reasons'
-import { queueCloudRun } from '@/lib/computer/queue-run'
+import { queueFactoryTask, dispatchFactoryTaskRun } from '@/lib/factory/task-dispatch'
+import { factoryLifecycleEnabled } from '@/lib/factory/runtime'
 import { ComputerStore } from '@/lib/computer/store'
 import { bindBotSubscription } from '@/lib/computer/bot-subscription'
 import { recordDecision, settleTurn } from '@/lib/attention/store'
@@ -468,6 +469,8 @@ export async function findRepository(userId: string, input: { name?: string }, s
 export async function dispatchRun(userId: string, input: { issueId: string; agentId?: string; repo?: string; note?: string; requestKey?:string; readOnly?: boolean; newThread?: boolean; sourceEventId?: string; target?: import('@/lib/dispatch-target').DispatchTarget; model?: { harness: 'claude_code' | 'codex'; model?: string } }, scope: NativeToolScope | undefined, botId: string, execution?: AgentExecution, requestEventId?: string) {
   'use step'
   await assertNativeToolScope(userId,scope)
+  if (!factoryLifecycleEnabled()) return { error: 'factoryLifecycleUnavailable' }
+  requestEventId ??= input.sourceEventId
   const { newThread, sourceEventId, target, ...request } = input
   const { dispatchToTask, explicitNewThread } = await import('@/lib/thread-dispatch')
   const { movesThread, runPlacement } = await import('@/lib/dispatch-target')
@@ -510,7 +513,7 @@ export async function dispatchRun(userId: string, input: { issueId: string; agen
         const named = request.model?.model ? await chooseCloudRunModel(pool, { ownerId: userId, workspaceId: previous.cloud.workspaceId, botId: previous.cloud.botId }, previous.agentId, previous.harness, request.model.model) : null
         const runModel = named ?? threadModel
         if (!runModel || 'error' in runModel) return { error: 'threadModelUnavailable' as const, issueId: request.issueId, threadRunId: previous.id }
-        const cloud = await dispatchComputerTask(userId, { botId: previous.cloud.botId, issueId: request.issueId, harness: previous.harness, note, ...runModel, threadRunId: previous.id, ...(previous.remoteUrl ? { repo: previous.remoteUrl } : {}), ...(request.readOnly || previous.readOnly ? { readOnly: true } : {}) }, `thread:${previous.id}:${request.requestKey ?? requestEventId ?? crypto.randomUUID()}`, scope, execution)
+        const cloud = await dispatchComputerTask(userId, { botId: previous.cloud.botId, issueId: request.issueId, harness: previous.harness, note, ...runModel, threadRunId: previous.id, ...(previous.remoteUrl ? { repo: previous.remoteUrl } : {}), ...(request.readOnly || previous.readOnly ? { readOnly: true } : {}) }, `thread:${previous.id}:${request.requestKey ?? requestEventId ?? crypto.randomUUID()}`, scope, execution, botId, requestEventId)
         if (!('error' in cloud)) return cloud
         if (cloud.error !== 'cloudComputerUnavailable') return { ...cloud, issueId: request.issueId }
       } else if (previous?.remoteUrl) {
@@ -520,7 +523,7 @@ export async function dispatchRun(userId: string, input: { issueId: string; agen
         const localModel = named && !('error' in named) ? named : threadModel
         if (!localModel) return { error: 'threadModelUnavailable' as const, issueId: request.issueId, threadRunId: previous.id }
         // Read-only sticks: a read-only request, or a thread that runs read-only, gives a read-only next run.
-        const result = await queueRun(userId, { issueId: request.issueId, agentId: previous.agentId, repo: previous.remoteUrl, note, readOnly: Boolean(request.readOnly || previous.readOnly), requestKey: `thread:${previous.id}:${request.requestKey ?? crypto.randomUUID()}`.slice(0, 200), ...localModel, threadRunId: previous.id }, botId, execution, requestEventId).catch(() => null)
+        const result = await queueFactoryTask(userId, { issueId: request.issueId, agentId: previous.agentId, repo: previous.remoteUrl, note, readOnly: Boolean(request.readOnly || previous.readOnly), requestKey: `thread:${previous.id}:${request.requestKey ?? crypto.randomUUID()}`.slice(0, 200), ...localModel, threadRunId: previous.id }, botId, execution, requestEventId).catch(error => { if (error instanceof FactoryError) throw error; return null })
         if (result) return { ...result, status: 'queued' as const }
       }
       return byRules(note, undefined, previous.remoteUrl)
@@ -553,7 +556,7 @@ async function dispatchByRules(userId: string, input: { issueId: string; agentId
     const { resolveModelDispatch } = await import('@/lib/model-dispatch')
     const target = await resolveModelDispatch(pool, { ownerId: userId, workspaceId: await executionWorkspace(userId, botId), botId }, input.model ?? null, 'local', device.deviceId)
     if (target.kind !== 'device') return { error: 'machineUnavailable' as const, issueId: input.issueId, ...(target.kind === 'none' ? { reason: target.reason, card: target.card } : {}) }
-    const result = await queueRun(userId, { ...input, agentId: target.agentId, model: target.model, pinnedDeviceId: target.deviceId, ...(target.subscriptionBindingId ? { subscriptionBindingId: target.subscriptionBindingId } : {}), ...(target.entry.source.kind === 'api_key' ? { apiKeyId: target.entry.source.keyId } : {}) }, botId, execution, requestEventId)
+    const result = await queueFactoryTask(userId, { ...input, agentId: target.agentId, model: target.model, pinnedDeviceId: target.deviceId, ...(target.subscriptionBindingId ? { subscriptionBindingId: target.subscriptionBindingId } : {}), ...(target.entry.source.kind === 'api_key' ? { apiKeyId: target.entry.source.keyId } : {}) }, botId, execution, requestEventId)
     return { ...result, status: 'queued' as const }
   }
   {
@@ -577,7 +580,7 @@ async function dispatchByRules(userId: string, input: { issueId: string; agentId
       return { error: 'machineUnavailable' as const, issueId: input.issueId, reason: target.reason, card: target.card }
     }
     const onDevice = async (device: Extract<typeof target, { kind: 'device' }>) => {
-      const result = await queueRun(userId, { ...input, agentId: device.agentId, model: device.model, pinnedDeviceId: device.deviceId, ...(device.subscriptionBindingId ? { subscriptionBindingId: device.subscriptionBindingId } : {}), ...(device.entry.source.kind === 'api_key' ? { apiKeyId: device.entry.source.keyId } : {}) }, botId, execution, requestEventId)
+      const result = await queueFactoryTask(userId, { ...input, agentId: device.agentId, model: device.model, pinnedDeviceId: device.deviceId, ...(device.subscriptionBindingId ? { subscriptionBindingId: device.subscriptionBindingId } : {}), ...(device.entry.source.kind === 'api_key' ? { apiKeyId: device.entry.source.keyId } : {}) }, botId, execution, requestEventId)
       return { ...result, status: 'queued' as const }
     }
     if (target.kind === 'device') return onDevice(target)
@@ -593,7 +596,7 @@ async function dispatchByRules(userId: string, input: { issueId: string; agentId
     const { bindAgentToConnection } = await import('@/lib/model-dispatch')
     const source = target.entry.source
     const subscriptionBindingId = runtime && source.kind === 'subscription' ? await timedPhase('bindAgentToConnection', () => bindAgentToConnection(pool, { ownerId: userId, workspaceId }, runtime.agentId, target.harness, source.connectionId, target.model)) : undefined
-    const cloud = runtime ? await dispatchComputerTask(userId,{botId:runtime.botId,issueId:input.issueId,harness:runtime.harness,note:input.note,model:target.model,repo:input.repo,...(subscriptionBindingId ? {subscriptionBindingId} : {}),...(target.entry.source.kind === 'api_key' ? {apiKeyId:target.entry.source.keyId} : {}),...(input.readOnly ? {readOnly:true} : {})},`rule:${input.requestKey ?? requestEventId ?? crypto.randomUUID()}`,scope,execution) : { error: 'cloudComputerUnavailable' as const }
+    const cloud = runtime ? await dispatchComputerTask(userId,{botId:runtime.botId,issueId:input.issueId,harness:runtime.harness,note:input.note,model:target.model,repo:input.repo,...(subscriptionBindingId ? {subscriptionBindingId} : {}),...(target.entry.source.kind === 'api_key' ? {apiKeyId:target.entry.source.keyId} : {}),...(input.readOnly ? {readOnly:true} : {})},`rule:${input.requestKey ?? requestEventId ?? crypto.randomUUID()}`,scope,execution,botId,requestEventId) : { error: 'cloudComputerUnavailable' as const }
     if (!('error' in cloud) || cloud.error !== 'cloudComputerUnavailable') return cloud
     // 云端 could not start it (the key refused, a limit, the template, E2B down, the worker never came up;
     // the queued cloud run is already ended): a server, else a computer, unless the person asked for the cloud.
@@ -655,6 +658,7 @@ export async function listComputerBots(userId: string, scope?: NativeToolScope) 
 export async function dispatchComputerThread(userId: string, input: { botId: string; issueId: string; harness: 'codex' | 'claude_code'; note?: string; suggestionId?: string; readOnly?: boolean; newThread?: boolean; sourceEventId?: string }, toolCallId: string, scope?: NativeToolScope, execution?: AgentExecution, chatBotId?: string) {
   'use step'
   await assertNativeToolScope(userId, scope)
+  if (!factoryLifecycleEnabled()) return { error: 'factoryLifecycleUnavailable' }
   const { newThread, sourceEventId, ...request } = input
   const { dispatchToTask, explicitNewThread } = await import('@/lib/thread-dispatch')
   return asToolResult(() => dispatchToTask(userId, request.issueId, {
@@ -669,15 +673,16 @@ export async function dispatchComputerThread(userId: string, input: { botId: str
       const runModel = previous ? await latestThreadRunModel(pool, userId, request.issueId, previous.agentId) : await chooseCloudRunModel(pool, { ownerId: userId, workspaceId: runtime.workspaceId, botId: request.botId }, runtime.agentId, request.harness)
       if (!runModel) return { error: 'threadModelUnavailable' as const, issueId: request.issueId, threadRunId: previous!.id }
       if ('error' in runModel) return { ...runModel, issueId: request.issueId }
-      return dispatchComputerTask(userId, { ...request, note, ...runModel, ...(previous ? { threadRunId: previous.id } : {}), ...(request.readOnly || previous?.readOnly ? { readOnly: true } : {}) }, previous ? `thread:${previous.id}:${toolCallId}` : toolCallId, scope, execution)
+      return dispatchComputerTask(userId, { ...request, note, ...runModel, ...(previous ? { threadRunId: previous.id } : {}), ...(request.readOnly || previous?.readOnly ? { readOnly: true } : {}) }, previous ? `thread:${previous.id}:${toolCallId}` : toolCallId, scope, execution, chatBotId ?? request.botId, sourceEventId)
     },
   }))
 }
 
 /** Queue and bind atomically, with a stable tool-call id for workflow retries. */
-export async function dispatchComputerTask(userId: string, input: { botId: string; issueId: string; harness: 'codex' | 'claude_code'; note?: string; model: string; threadRunId?: string; repo?:string; suggestionId?: string; readOnly?: boolean; apiKeyId?: string; subscriptionBindingId?: string }, toolCallId: string, scope?: NativeToolScope, execution?: AgentExecution) {
+export async function dispatchComputerTask(userId: string, input: { botId: string; issueId: string; harness: 'codex' | 'claude_code'; note?: string; model: string; threadRunId?: string; repo?:string; suggestionId?: string; readOnly?: boolean; apiKeyId?: string; subscriptionBindingId?: string }, toolCallId: string, scope?: NativeToolScope, execution?: AgentExecution, dispatchBotId?: string, sourceEventId?: string) {
   'use step'
   await assertNativeToolScope(userId, scope)
+  if (!factoryLifecycleEnabled()) return { error: 'factoryLifecycleUnavailable' }
   if (!cloudComputerRunsEnabled() || !toolCallId || toolCallId.length > 200) return { error: 'cloudComputerUnavailable' }
   const target = (await pool.query(`SELECT b."workspaceId",r."agentId",r."repoId",a."deviceId" FROM bots b
     JOIN bot_cloud_runtimes r ON r."botId"=b.id AND r."ownerId"=b."ownerId" AND r."workspaceId"=b."workspaceId"
@@ -692,7 +697,7 @@ export async function dispatchComputerTask(userId: string, input: { botId: strin
   try {
     if (input.suggestionId && !(await pool.query('SELECT 1 FROM suggestion_executions WHERE "suggestionId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND ("botId" IS NULL OR "botId"=$4)', [input.suggestionId, userId, target.workspaceId, input.botId])).rowCount) return { error: 'suggestionUnavailable' }
     const deviceRepoId = input.repo ? (await timedPhase('ensureDeviceRepository', async () => (await import('@/lib/device-repositories')).ensureDeviceRepository(userId,target.deviceId,input.repo!))).id : target.repoId
-    const result = await timedPhase('queueCloudRun', () => queueCloudRun(pool, { userId, workspaceId: target.workspaceId }, { botId: input.botId, issueId: issue.id, agentId: target.agentId, deviceRepoId, title: issue.title, body: tiptapToText(issue.content), note: input.note, model: input.model, ...(input.threadRunId ? { threadRunId: input.threadRunId } : {}), ...(input.apiKeyId ? { apiKeyId: input.apiKeyId } : {}), ...(input.subscriptionBindingId ? { subscriptionBindingId: input.subscriptionBindingId } : {}), idempotencyKey: input.suggestionId ? `suggestion:${input.suggestionId}` : `coordinator:${toolCallId}`, execution, ...(input.readOnly ? { readOnly: true } : {}) }))
+    const result = await timedPhase('factoryDispatch', () => dispatchFactoryTaskRun(userId, dispatchBotId ?? input.botId, { issueId: issue.id, agentId: target.agentId, deviceRepoId, note: input.note, sourceEventId, threadRunId: input.threadRunId, requestKey: input.suggestionId ? `suggestion:${input.suggestionId}` : `coordinator:${toolCallId}` }, { cloud: { botId: input.botId, workspaceId: target.workspaceId }, selection: { model: input.model, apiKeyId: input.apiKeyId, subscriptionBindingId: input.subscriptionBindingId, readOnly: input.readOnly, execution } }))
     if (input.suggestionId) await pool.query('UPDATE suggestion_executions SET "botId"=$4,"runId"=$5,status=\'running\' WHERE "suggestionId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND ("runId" IS NULL OR "runId"=$5)', [input.suggestionId, userId, target.workspaceId, input.botId, result.runId])
     const actor = { userId, workspaceId: target.workspaceId as string }
     queuedRunId = result.runId
@@ -703,6 +708,7 @@ export async function dispatchComputerTask(userId: string, input: { botId: strin
     await timedPhase('startLifecycle', () => start(threadMachineLifecycle, [actor, result.runId]))
     return { ...result, botId: input.botId, task: issue.title, status: 'queued' as const }
   } catch (error) {
+    if (error instanceof (await import('@/lib/factory/contract')).FactoryError) throw error
     const { RunModelMissingError } = await import('@/lib/computer/run-model')
     // Nothing was queued: the run named no model, or the thread's own model and account no longer serve it.
     if (error instanceof RunModelMissingError) return { error: 'runModelMissing' as const, runId: error.runId, threadRunId: error.threadId }
@@ -874,7 +880,7 @@ export async function resolveFactoryTaskScoped(userId:string,input: import('@/li
 export async function stopFactoryTaskScoped(userId:string,input:import('@/lib/factory/intake').StopInput,scope?:NativeToolScope,botId:string|null=null) {
   'use step'
   await assertNativeToolScope(userId,scope)
-  return asToolResult(async()=> (await import('@/lib/factory/server')).factoryForBot(botId).apply(userId,input.binding,input.eventId,{action:input.action,reason:input.reason}))
+  return asToolResult(async()=> (await import('@/lib/factory/runtime')).factoryRuntimeForBot(botId).store.apply(userId,input.binding,input.eventId,{action:input.action,reason:input.reason}))
 }
 
 export async function dispatchFactoryTask(userId:string,input:import('@/lib/factory/dispatch').FactoryDispatchInput,scope?:NativeToolScope,botId:string|null=null) {

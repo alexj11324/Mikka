@@ -65,7 +65,7 @@ export async function handleFactoryApproval(
     const { operation, input } = parsed.data;
     if (operation === "accept") {
       if (!merges) return { status: 409, body: { error: "factoryAcceptanceUnavailable" } };
-      const result = await merges.accept(req.actor, input, (await req.githubToken?.()) ?? null);
+      const result = await merges.accept(req.actor, input, null, req.githubToken);
       return { status: result.status === "merging" ? 202 : 200, body: result };
     }
     return { status: 200, body: await (operation === 'approve' ? service.approveAndPublish(req.actor, input) : service[operation](req.actor, input)) };

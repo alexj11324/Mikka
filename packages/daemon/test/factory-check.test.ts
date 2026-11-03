@@ -50,7 +50,8 @@ it("checks real SHA, blocks dirty/head replacement, and produces actual command/
     join(repo, "acceptance.mjs"),
     "console.error('REAL_ASSERTION_FAILURE expected 2 received 1'); process.exit(17)\n"
   )
-  await git("add", "acceptance.mjs")
+  writeFileSync(join(repo,'package.json'),JSON.stringify({scripts:{test:'node acceptance.mjs'}}))
+  await git("add", "package.json", "acceptance.mjs")
   await git("commit", "-m", "Introduce intentional real test fault")
   const sha1 = await git("rev-parse", "HEAD")
   const server = new MemoryServer("fixture-device")
@@ -66,8 +67,16 @@ it("checks real SHA, blocks dirty/head replacement, and produces actual command/
   })
   const dataDir = tempDir()
   const cachedRepo = new RepositoryCache(join(dataDir, "repos")).pathFor(pathToFileURL(repo).href)
+  const fixturesDir = tempDir()
+  writeFileSync(join(fixturesDir,'check-pass.jsonl'),readFileSync(new URL('../fixtures/check-pass.jsonl',import.meta.url)))
+  writeFileSync(join(fixturesDir,'check-inferred.jsonl'),[
+    {t:0,exec:{toolCallId:'inferred-command',command:'node acceptance.mjs'}},
+    {t:0,submit:{summary:'Inferred from the repository package.json scripts.test',criteria:[{text:'Repository regression command',passed:true,command:'node acceptance.mjs',exitCode:0,evidence:'package.json scripts.test is node acceptance.mjs; it exercises the regression assertion'}]}},
+    {t:0,exit:{outcome:'succeeded'}},
+  ].map(line=>JSON.stringify(line)).join('\n'))
   const daemon = await new Daemon({
     dataDir,
+    fixturesDir,
     flavor: "dev",
     agentSandbox: null,
     link: server.link(),
@@ -78,16 +87,16 @@ it("checks real SHA, blocks dirty/head replacement, and produces actual command/
     heartbeatMs: 50,
   }).start()
   daemons.push(daemon)
-  const check = async (sha: string) => {
+  const check = async (sha: string, infer = false) => {
     const runId = server.queueRun("fixture-device", {
       issueId: "fixture-issue",
       repoId: "fixture-repo",
       baseBranch: sha,
       harness: "mock",
       kind: "acceptance",
-      fixture: "check-pass",
+      fixture: infer ? 'check-inferred' : 'check-pass',
       prompt: "Explicit simulated independent check",
-      verifyCommand: "node acceptance.mjs",
+      ...(infer ? {inferVerifyCommand:true} : {verifyCommand:'node acceptance.mjs'}),
       policy: { ...policy, networkAllow: [] },
     })
     await daemon.syncWithServer()
@@ -131,6 +140,7 @@ it("checks real SHA, blocks dirty/head replacement, and produces actual command/
   ).toBe(3)
   for (const result of [review, verify]) {
     expect(result.run.state).toBe("succeeded")
+    expect(result.completion.report.criteria).toHaveLength(1)
     expect(result.completion.report.check).toEqual({
       sha: sha2,
       readOnly: true,
@@ -151,6 +161,12 @@ it("checks real SHA, blocks dirty/head replacement, and produces actual command/
       /contains changes/
     )
   }
+  const inferred = await check(sha2,true)
+  expect(inferred.completion.report.verify).toMatchObject({status:'passed',command:'node acceptance.mjs',exitCode:0})
+  expect(inferred.completion.report.verify.output).toContain('REAL_ACCEPTANCE_PASS')
+  expect(inferred.completion.report.observedHead).toBe(sha2)
+  expect(inferred.completion.report.check).toEqual({sha:sha2,readOnly:true})
+  expect(inferred.completion.report.criteria?.[0]?.evidence).toContain('package.json scripts.test')
   if (process.env.FACTORY_EVIDENCE_OUT) {
     mkdirSync(process.env.FACTORY_EVIDENCE_OUT, { recursive: true })
     writeFileSync(

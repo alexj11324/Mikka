@@ -151,6 +151,7 @@ function refusalFor(status: number, mergeableState: string | null): MergeRefusal
 
 export type AcceptResult =
   | { status: "merged"; mergeId: string; pullRequestUrl: string; binding: FactoryBinding }
+  | { status: "accepted"; acceptanceId: string; binding: FactoryBinding }
   | { status: "merging"; mergeId: string; pullRequestUrl: string };
 
 export function createFactoryMerges(
@@ -242,7 +243,7 @@ export function createFactoryMerges(
 
   return {
     /** 验收并合并. `token` is the person's own GitHub user token, or null when none is linked. */
-    async accept(actor: FactoryActor, input: unknown, token: string | null): Promise<AcceptResult> {
+    async accept(actor: FactoryActor, input: unknown, token: string | null, tokenProvider?: () => Promise<string | null>): Promise<AcceptResult> {
       const parsed = acceptRequest.safeParse(input);
       if (!parsed.success) fail("factoryInvalid");
       const req = parsed.data;
@@ -255,6 +256,19 @@ export function createFactoryMerges(
           [actor.sessionId, actor.userId],
         );
         if (!live.length) fail("factoryHumanRequired");
+        const candidate = (await tx.query('SELECT kind FROM factory_candidates WHERE id=$1 AND "taskId"=$2',[task.candidateId,task.id])).rows[0];
+        if (candidate && ['report','deliverable'].includes(candidate.kind)) {
+          if (['cancelled','revoked'].includes(task.status)) fail('factoryStopped');
+          const accepted = (await tx.query('SELECT id FROM factory_acceptances WHERE "taskId"=$1 AND "candidateId"=$2',[task.id,task.candidateId])).rows[0];
+          if (accepted && task.stage === 'approval' && task.status === 'passed') return {delivery:accepted.id,task};
+          if (digest(bindingOf(task)) !== digest(req.binding)) fail('factoryStale');
+          if (task.stage !== 'approval' || !['pending','waiting'].includes(task.status)) fail('factoryTransition');
+          const evidence = await approvalEvidence(tx,task);
+          const id = randomUUID();
+          await tx.query('INSERT INTO factory_acceptances (id,"taskId","candidateId","userId","humanSessionId",revision,"eventId") VALUES ($1,$2,$3,$4,$5,$6,$7)',[id,task.id,task.candidateId,actor.userId,actor.sessionId,task.revision,req.eventId]);
+          const result = await store.apply(actor.userId,bindingOf(task),req.eventId,{action:'finish',status:'passed',reason:'The person accepted the report and evidence',evidence:evidence.evidence,output:{deliveryId:id}},tx);
+          return {delivery:id,task:result.task};
+        }
         const {
           rows: [replay],
         } = await tx.query(`SELECT * FROM factory_merges WHERE "taskId"=$1 AND "eventId"=$2`, [task.id, req.eventId]);
@@ -275,6 +289,7 @@ export function createFactoryMerges(
         if (digest(bindingOf(task)) !== digest(req.binding)) fail("factoryStale");
         if (task.stage !== "approval" || !["pending", "waiting"].includes(task.status)) fail("factoryTransition");
         const pull = await candidatePull(tx, task);
+        token ??= await tokenProvider?.() ?? null;
         if (!token) throw new FactoryMergeRefused("githubMergeAuthorizationRequired", pull.url);
         const id = randomUUID();
         await tx.query(
@@ -284,6 +299,7 @@ export function createFactoryMerges(
         return { id, pull };
       });
 
+      if ("delivery" in claim) return {status:"accepted",acceptanceId:claim.delivery!,binding:bindingOf(claim.task!)};
       if ("existing" in claim) {
         const row = claim.existing;
         if (row.status === "merged")

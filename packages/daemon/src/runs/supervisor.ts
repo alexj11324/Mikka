@@ -953,14 +953,25 @@ export class RunSupervisor {
     const filesChanged = (
       await this.deps.worktrees.changedFiles(worktree).catch(() => [])
     ).slice(0, MAX_REPORTED_FILES)
-    const command = assignment.verifyCommand
+    const inferred = assignment.inferVerifyCommand && !assignment.verifyCommand
+      ? report.criteria?.find(criterion => criterion.command?.trim() && criterion.evidence?.trim()) : undefined
+    const command = assignment.verifyCommand ?? inferred?.command
+    if (command && inferred) report = { ...report, verify: { ...report.verify, command } }
     // A `plan` run writes no code: there is nothing for the issue's verify
     // command to check (ADR ORV-205).
     if (stopReason !== "submitted" || assignment.kind === "plan")
       return {
         report: { ...report, filesChanged, verify: { status: "not_run" } },
       }
+    if (stopReason === 'submitted') {
+      const sha = await headCommit(repo.path, worktree)
+      if (sha && /^[a-f0-9]{40}$/.test(sha)) report = { ...report, observedHead: sha }
+    }
     if (!command) {
+      if (fixedCandidateCheck(assignment)) {
+        const fixed = await fixedCheckSnapshot(repo.path,worktree,assignment.baseBranch)
+        report = { ...report, check: {sha:fixed.sha,readOnly:true} }
+      }
       // No command was approved for this repository. Snapshot the submitted
       // tree for an explicitly approved push, while retaining not_run.
       const tree = await this.deps.publisher?.snapshot({ worktree, repo })
@@ -1649,18 +1660,20 @@ function pickAgentReport(agent: AgentReport | undefined): AgentReport {
     for (const entry of agent.criteria) {
       if (criteria.length >= MAX_REPORTED_CRITERIA) break
       if (!entry || typeof entry !== "object") continue
-      const { criterionId, passed, evidence, command, exitCode } = entry as {
+      const { criterionId, text, passed, evidence, command, exitCode } = entry as {
+        text?: unknown
         criterionId?: unknown
         passed?: unknown
         evidence?: unknown
         command?: unknown
         exitCode?: unknown
       }
-      if (typeof criterionId !== "string" || !UUID_RE.test(criterionId))
-        continue
-      if (typeof passed !== "boolean") continue
+      const id = typeof criterionId === 'string' && UUID_RE.test(criterionId) ? criterionId : undefined
+      const description = typeof text === 'string' ? text.trim().slice(0,2000) : undefined
+      if ((!id && !description) || typeof passed !== 'boolean') continue
       criteria.push({
-        criterionId,
+        ...(id ? {criterionId:id} : {}),
+        ...(description ? {text:description} : {}),
         passed,
         ...(typeof command === "string" && command.trim() ? { command: command.trim().slice(0, 2_000), ...(exitCode === null || (typeof exitCode === "number" && Number.isSafeInteger(exitCode)) ? { exitCode } : {}) } : {}),
         ...(typeof evidence === "string"

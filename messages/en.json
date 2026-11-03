@@ -4113,7 +4113,8 @@
       "failed": "Publish failed",
       "invalidated": "Invalidated",
       "merging": "Merging",
-      "merged": "Merged"
+      "merged": "Merged",
+      "accepted": "Accepted"
     },
     "stage": {
       "execute": "Execute",
@@ -4190,6 +4191,7 @@
     },
     "textLabel": "{stage} {kind}",
     "accept": "Accept and merge",
+    "acceptReport": "Accept",
     "openOnGitHub": "Open on GitHub",
     "cannotMerge": "Can't merge",
     "mergeRefusal": {

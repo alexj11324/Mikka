@@ -494,7 +494,7 @@ test(
       for (const stage of ["review", "verify"] as const) {
         for (const prerequisite of ["harness", "command"] as const) {
           await t.test(
-            `${stage} missing ${prerequisite} persists blocked after rollback, without an orphan run`,
+            `${stage} missing ${prerequisite}: harness blocks atomically, command is inferred by the checker`,
             async () => {
               let pending = await pendingReview();
               if (stage === "verify") {
@@ -514,6 +514,16 @@ test(
               else
                 await db.query('UPDATE device_repos SET "verifyCommand"=NULL WHERE id=$1', [repoId]);
               try {
+                if (prerequisite === 'command') {
+                  const inferred = await observeFactoryCheckDispatch(store,dispatch)('owner',{binding:factoryBinding(pending.task),agentId,deviceRepoId:repoId});
+                  const current = await state(pending.task.id);
+                  assert.equal(current.task.status,'running');
+                  assert.equal(current.attempts.at(-1)?.runId,inferred.runId);
+                  assert.equal(current.attempts.at(-1)?.output.check && (current.attempts.at(-1)!.output.check as {inferCommand:boolean}).inferCommand,true);
+                  assert.equal((await factoryCheckAssignment(db,'owner',inferred.runId)).inferVerifyCommand,true);
+                  assert.equal((await db.query('SELECT id FROM agent_runs WHERE "issueId"=$1',[pending.task.issueId])).rows.length,beforeRuns.length+1);
+                  return;
+                }
                 await assert.rejects(
                   observeFactoryCheckDispatch(store, dispatch)("owner", {
                     binding: {

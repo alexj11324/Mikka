@@ -391,6 +391,8 @@ export const runAssignmentSchema = z.object({
   pushBranch: z.string().min(1).max(250).optional(),
   /** Run by the daemon in the worktree after the agent submits. */
   verifyCommand: z.string().max(2_000).optional(),
+  /** Factory host asks the checker to infer a command and record its repository basis. */
+  inferVerifyCommand: z.boolean().optional(),
   /** Run lease; renewed through the device heartbeat. */
   leaseExpiresAt: isoTime.optional(),
   /**

@@ -91,7 +91,7 @@ export async function factoryTaskDetail(
   task: Task,
 ): Promise<FactoryTaskDetail> {
   const { rows } = await tx.query<{ id: string; stage: FactoryCheckResult["stage"]; status: string; candidateId: string | null; candidateSha: string | null; runId: string | null; report: unknown }>(
-    `SELECT a.id,a.stage,a.status,a."candidateId",c.sha AS "candidateSha",a."runId",r.report FROM factory_attempts a
+    `SELECT a.id,a.stage,a.status,a."candidateId",CASE WHEN c.kind='deliverable' THEN NULL ELSE c.sha END AS "candidateSha",a."runId",r.report FROM factory_attempts a
        LEFT JOIN factory_candidates c ON c.id=a."candidateId" AND c."taskId"=a."taskId"
        LEFT JOIN agent_runs r ON r.id=a."runId" AND r."userId"=$2
       WHERE a."taskId"=$1 AND a.stage IN ('review','verify','monitor') ORDER BY a.position`,
@@ -112,7 +112,7 @@ export async function factoryTaskDetail(
     });
   }
   const { rows: [d] } = await tx.query<{ sha: string | null; repository: string | null; environment: string | null; previewDatabaseBranch: string | null; machineName: string | null; pullRequest: FactoryDelivery["pullRequest"]; previewUrl: string | null; deploymentEnvironment: string | null }>(
-    `SELECT c.sha,c.repository,c.environment,c."previewDatabaseBranch",c."machineName",
+    `SELECT CASE WHEN c.kind='deliverable' THEN NULL ELSE c.sha END AS sha,c.repository,c.environment,c."previewDatabaseBranch",c."machineName",
        (SELECT p."pullRequest" FROM run_publications p WHERE p."runId"=c."runId" AND p."userId"=$3) AS "pullRequest",
        f.receipt->'verifiedTarget'->>'reference' AS "previewUrl",
        CASE WHEN f.receipt->'verifiedTarget'->'provider'->>'name'='vercel'

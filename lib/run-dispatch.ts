@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { and, eq, inArray, sql } from 'drizzle-orm'
+import { and, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { ActionFailureError } from './action-error'
 import type { db } from './db'
@@ -49,7 +49,7 @@ export async function insertRunOnce(database: Pick<typeof db, 'transaction'>, us
     // A prompt is advice; this transaction is the actual duplicate-run gate.
     await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${JSON.stringify(['dispatch-issue', userId, input.issueId])}, 0))`)
     const [active] = await tx.select({ id: agentRuns.id }).from(agentRuns)
-      .where(and(eq(agentRuns.userId, userId), eq(agentRuns.issueId, input.issueId), inArray(agentRuns.status, LIVE_STATUSES))).limit(1)
+      .where(and(eq(agentRuns.userId, userId), eq(agentRuns.issueId, input.issueId), inArray(agentRuns.status, LIVE_STATUSES), isNull(agentRuns.stopRequestedAt))).limit(1)
     if (active) throw new ActionFailureError('runAlreadyActive', { runId: active.id })
     const runId = crypto.randomUUID()
     await tx.insert(agentRuns).values({

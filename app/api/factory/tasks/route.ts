@@ -30,7 +30,10 @@ export async function POST(request: Request) {
     async () => {
       const { factoryLifecycleEnabled, factoryRuntimeForBot } = await import("@/lib/factory/runtime");
       if (!factoryLifecycleEnabled()) throw new (await import("@/lib/factory/contract")).FactoryError("factoryLifecycleUnavailable");
-      return factoryRuntimeForBot(null).dispatch;
+      return async (userId,input) => {
+        const {task} = await factoryStore.read(userId,input.binding.taskId);
+        return factoryRuntimeForBot(task.botId).dispatch(userId,input);
+      };
     },
     {
       userId: session?.user?.id ?? null,

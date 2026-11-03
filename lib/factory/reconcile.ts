@@ -61,8 +61,24 @@ export function createFactoryReconciler(
     "record" | "settle">,
   consumers: Partial<Record<"review" | "verify" | "monitor", (tx: PoolClient, store: ReturnType<typeof createFactoryStore>, task: FactoryTask, run: Record<string, any>) => Promise<unknown>>> = {},
   botId: string | null = null,
+  dispatchNext?: (tx: PoolClient, task: FactoryTask) => Promise<void>,
 ) {
-  const PENDING = `t.stage IN ('spec','execute','review','verify','monitor') AND (t.status='running' OR (t.status='failed' AND EXISTS (SELECT 1 FROM factory_attempts a JOIN agent_runs r ON r."retryOf"=a."runId" WHERE a.id=t."attemptId")))`;
+  const advanceDispatch = async (tx: PoolClient, task: FactoryTask) => {
+    if (!dispatchNext || task.status !== 'pending') return;
+    await tx.query('SAVEPOINT factory_next_dispatch');
+    try {
+      await dispatchNext(tx,task);
+      await tx.query('RELEASE SAVEPOINT factory_next_dispatch');
+    } catch (error) {
+      await tx.query('ROLLBACK TO SAVEPOINT factory_next_dispatch');
+      if (!(error instanceof FactoryError) || ['factoryNotFound','factoryStopped','factoryStale'].includes(error.code)) throw error;
+      await store.apply(task.userId,binding(task),factoryEventId('auto-dispatch-blocked',task.attemptId),{action:'finish',status:'blocked',reason:`Factory dispatch unavailable: ${error.code}`,evidence:[],output:{reasonCode:error.code}},tx);
+    }
+  };
+  const startCloud = async (taskId: string, userId: string) => {
+    if (dispatchNext) await (await import('./next-dispatch')).startFactoryCloudRuns(pool,userId,taskId);
+  };
+  const PENDING = `t.stage IN ('spec','execute','review','verify','monitor') AND (t.status='running' OR ${dispatchNext ? "(t.status='pending' AND EXISTS (SELECT 1 FROM factory_attempts p WHERE p.\"taskId\"=t.id AND p.\"runId\" IS NOT NULL)) OR " : ''}(t.status='failed' AND EXISTS (SELECT 1 FROM factory_attempts a JOIN agent_runs r ON r."retryOf"=a."runId" WHERE a.id=t."attemptId")))`;
   const reconcileTasks = async (userId: string, pending: { id: string; attemptId?: string }[]) => {
     let recovered = 0;
     for (const item of pending) {
@@ -77,6 +93,13 @@ export function createFactoryReconciler(
         // A run completion is bound to the attempt that was current when it was
         // selected; if a reject/retry/repair replaced it meanwhile, that old
         // run must not move the task (QA #449-5).
+        if (dispatchNext && task.status === 'pending') {
+          await advanceDispatch(tx,task);
+          await tx.query('COMMIT');
+          await startCloud(task.id,userId);
+          recovered++;
+          continue;
+        }
         if (!["running", "failed"].includes(task.status) || (item.attemptId && task.attemptId !== item.attemptId)) { await tx.query("COMMIT"); continue; }
         let {
           rows: [run],
@@ -155,6 +178,7 @@ export function createFactoryReconciler(
           !["succeeded", "failed", "stopped", "cancelled"].includes(run.status)
         ) {
           await tx.query("COMMIT");
+          await startCloud(task.id,userId);
           continue;
         }
         if (questions) await questions.settle(userId, run.id, tx);
@@ -215,7 +239,9 @@ export function createFactoryReconciler(
           const consumer = consumers[task.stage];
           if (!consumer) throw new FactoryError("factoryDispatchAdapterRequired");
           await consumer(tx, store, task, run);
+          await advanceDispatch(tx, await store.lockTask(tx,userId,task.id));
           await tx.query("COMMIT");
+          await startCloud(task.id,userId);
           recovered++;
           continue;
         }
@@ -243,7 +269,7 @@ export function createFactoryReconciler(
           else
             await failIntoRepairLoop(tx, store, userId, task, `run-completion:${run.id}`, `Run failed: ${String(run.error ?? run.stopReason ?? "unknown")}`, "run_failed", { runId: run.id });
         } else {
-          const sha = run.report?.publish?.commit;
+          const sha = run.report?.publish?.commit ?? run.report?.observedHead;
           const repository = run.remoteUrl ?? run.repoPath;
           if (
             !run.sessionId ||
@@ -279,7 +305,8 @@ export function createFactoryReconciler(
                   action: "candidate",
                   runId: run.id,
                   candidate: {
-                    sha,
+                    sha: !run.remoteUrl && run.repoPath?.includes('/.mikka/bot-workspaces/') ? 'no-repository' : sha,
+                    kind: !run.remoteUrl && run.repoPath?.includes('/.mikka/bot-workspaces/') ? 'deliverable' : !run.remoteUrl || run.agentDefinition?.readOnly ? 'report' : 'code',
                     repository,
                     environment: `device:${run.deviceId}`,
                     scope: `issue:${task.issueId}`,
@@ -295,7 +322,7 @@ export function createFactoryReconciler(
               runId: run.id,
               sessionId: run.sessionId,
               candidateId: current.candidateId,
-              sha: task.stage === "execute" ? sha : null,
+              sha: task.stage === "execute" && !( !run.remoteUrl && run.repoPath?.includes('/.mikka/bot-workspaces/')) ? sha : null,
               environment: `device:${run.deviceId}`,
               recordedAt: (run.finishedAt ?? new Date()).toISOString(),
             };
@@ -329,7 +356,9 @@ export function createFactoryReconciler(
             );
           }
         }
+        await advanceDispatch(tx, await store.lockTask(tx,userId,task.id));
         await tx.query("COMMIT");
+        await startCloud(task.id,userId);
         recovered++;
       } catch (error) {
         await tx.query("ROLLBACK");
@@ -346,7 +375,9 @@ export function createFactoryReconciler(
             else if (current.status === "running") await store.apply(userId,binding(current),
               factoryEventId(`reconcile-blocked:${error.code}`,current.attemptId),
               {action:"finish",status:"blocked",reason:`Reconciliation blocked: ${error.code}`,evidence:[],output:{errorCode:error.code}},tx);
+            await advanceDispatch(tx, await store.lockTask(tx,userId,current.id));
             await tx.query("COMMIT");
+            await startCloud(current.id,userId);
           } catch (blockedError) {
             await tx.query("ROLLBACK");
             if (!(blockedError instanceof FactoryError)) throw blockedError;

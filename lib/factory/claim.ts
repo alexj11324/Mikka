@@ -4,7 +4,7 @@ import type { createFactoryStore, FactoryTask } from './store';
 import type { createFactoryQuestions } from './questions/store';
 
 /** Run lineage lookup is read-only; task lock precedes issue/access and run locks. */
-export async function factoryClaimTask(tx: PoolClient, runId: string) {
+export async function factoryClaimTask(tx: Pick<PoolClient,'query'>, runId: string) {
   const {rows}=await tx.query(`WITH RECURSIVE lineage AS (
     SELECT id,"retryOf",0 AS depth,ARRAY[id] AS seen FROM agent_runs WHERE id=$1
     UNION ALL SELECT r.id,r."retryOf",l.depth+1,l.seen||r.id FROM agent_runs r

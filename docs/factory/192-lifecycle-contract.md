@@ -29,3 +29,14 @@ Candidate intake migration: `20261028182316_factory_192_routing.sql` creates fou
 Candidate migration: `20261028182317_factory_192_questions.sql` creates Factory questions/indexes and adds nullable JSONB `agent_runs.questionContinuation`. ALTER TABLE requires an ACCESS EXCLUSIVE lock even though there is no backfill/default. The new column is accessed only in explicit Factory raw SQL; it is deliberately absent from ordinary Drizzle all-column projections, so default-off ordinary reads/writes do not require it. Historical event references do not block Bot deletion. Existing issue cascades also delete the new Factory state when an issue is deleted; no deletion operation is performed by these migrations.
 
 Both `MIKKA_FACTORY_ROUTING_ENABLED=1` and `MIKKA_FACTORY_LIFECYCLE_ENABLED=1` are necessary for runtime entry. Off returns before Factory SQL in claim, question HTTP and Coordinator preparation. Tool registration does not expand existing frozen grants. No environment flags, credentials, external DB, provider permission or paid operation has been changed. Production approval must name target database, exact two-file manifest/checksums, lock window, backup/recovery expectations and the intended flag/grant rollout separately. Only disposable isolated PostgreSQL was used here.
+
+## Current all-dispatch integration (#1104)
+
+The default-off rollout notes above describe the historical integration. Ordinary
+issue dispatch now requires Factory, which ships on; explicit off refuses both
+new dispatches and claims of queued Factory attempts. Host reconciliation queues
+independent checks and bounded repair; it does not pass human acceptance.
+`store.route` accepts an optional caller-owned transaction. `repair` also accepts
+`approval/pending`. Candidate v1 adds report and no-repository deliverable kinds.
+See [the current implementation contract](all-dispatch.md) for identity,
+placement, command-inference, cloud-question and verification boundaries.

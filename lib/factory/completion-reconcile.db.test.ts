@@ -73,7 +73,7 @@ test("run completion enters review without the Coordinator; replays do not advan
     const pick = (x: { stage: string; status: string; revision: number; attemptId: string | null }) => ({ stage: x.stage, status: x.status, revision: x.revision, attemptId: x.attemptId });
 
     await t.test("flags off: no SQL, no transition", async () => {
-      delete process.env.MIKKA_FACTORY_ROUTING_ENABLED; delete process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED;
+      process.env.MIKKA_FACTORY_ROUTING_ENABLED = "0"; process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED = "0";
       let queried = 0;
       assert.equal(await reconcileFactoryAfterCompletion({ query: async () => { queried++; return { rows: [] }; } }, "owner", d.runId, reconcileFor), 0);
       assert.equal(queried, 0);

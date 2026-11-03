@@ -7,6 +7,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { pool, withDatabaseClient } from "@/lib/db";
 import { issueForUser } from "@/lib/issue-access";
 import { lockCliAgentPolicy, lockCliRunPolicy } from "@/lib/agent-tool-approval/policy-store";
+import { createFactoryBrowserStore } from './browser-store';
 import { createFactoryStore } from "./store";
 import { approvalGate, publishGate, createFactoryApprovals } from "./approval";
 import { createFactoryMerges, githubMergeApi } from "./merge";
@@ -30,7 +31,7 @@ const authorize: FactoryAuthorize = async (userId, issueId, tx) => {
   await tx.query("SELECT id FROM issues WHERE id=$1 FOR SHARE", [issueId]);
   return Boolean(await issueForUser(userId, issueId, false, drizzle(tx)));
 };
-export const factoryStore = createFactoryStore(pool, authorize, {
+export const factoryStore = createFactoryBrowserStore(pool, authorize, {
   ...factoryCheckGates,
   approval: approvalGate,
   publish: publishGate,
@@ -101,6 +102,16 @@ export const dispatchFactoryRun = createFactoryDispatch(
   },
 );
 import { createFactoryQuestions, type QuestionSkillGuards } from "./questions/store";
+async function questionHasSkill(tx: import('pg').PoolClient, userId: string, runId: string) {
+  const result = await tx.query(`WITH RECURSIVE lineage AS (
+    SELECT id,"retryOf","questionContinuation",0 AS depth FROM agent_runs WHERE id=$1 AND "userId"=$2
+    UNION ALL SELECT r.id,r."retryOf",r."questionContinuation",l.depth+1 FROM agent_runs r JOIN lineage l
+      ON r.id::text IN (l."retryOf"::text,l."questionContinuation"->>'originRunId') WHERE r."userId"=$2 AND l.depth<10
+  ) SELECT 1 FROM lineage l LEFT JOIN improvement_skill_selections s ON s."runId"=l.id
+    LEFT JOIN improvement_skill_run_purposes p ON p."runId"=l.id
+    WHERE s."runId" IS NOT NULL OR p."runId" IS NOT NULL OR l.depth=10 LIMIT 1`,[runId,userId]);
+  return Boolean(result.rowCount);
+}
 export const questionSkillAssignments: QuestionSkillGuards = {
   lockAnswer: async (userId,questionId,tx) => {
     // This is only a lock-order hint. owned()/fence() revalidate the exact
@@ -116,6 +127,14 @@ export const questionSkillAssignments: QuestionSkillGuards = {
     }
   },
   lockOrigin: async (...args) => {
+    const [userId,issueId,runId,tx] = args;
+    // Preserve repository -> dispatch-issue -> origin-run ordering even when
+    // this cloud question has no Skill assignment to inherit.
+    const source = (await tx.query('SELECT repo."repoPath" FROM agent_runs r JOIN device_repos repo ON repo.id=r."deviceRepoId" AND repo."userId"=r."userId" WHERE r.id=$1 AND r."userId"=$2 AND r."issueId"=$3 FOR SHARE OF repo',[runId,userId,issueId])).rows[0];
+    if (!source) throw new FactoryError('factoryQuestionRunMismatch');
+    await tx.query('SELECT 1 FROM github_repository_installations WHERE "userId"=$1 AND "remoteKey"=$2 FOR SHARE',[userId,source.repoPath]);
+    await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[JSON.stringify(['dispatch-issue',userId,issueId])]);
+    if (!await questionHasSkill(tx,userId,runId)) return;
     try {
       await (await import("../self-improvement/server")).skillAssignments.lockQuestion(...args);
     } catch (error) {
@@ -125,6 +144,7 @@ export const questionSkillAssignments: QuestionSkillGuards = {
     }
   },
   continueQuestion: async (...args) => {
+    if (!await questionHasSkill(args[2],args[0],args[1])) return;
     try {
       await (await import("../self-improvement/server")).skillAssignments.continueQuestion(...args);
     } catch (error) {

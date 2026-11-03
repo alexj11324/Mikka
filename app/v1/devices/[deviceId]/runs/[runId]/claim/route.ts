@@ -160,7 +160,6 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
     // Scope may change while publication/policy preparation awaits. Recheck the same frozen
     // binding, including both members and the share, before taking the lease.
     if (subscription && !await nativeRunBinding(tx, caller.userId, agent.id, harness, subscription.workspaceId, subscription.id)) return false
-    if (!deploymentSwitch('factoryRouting') || !deploymentSwitch('factoryLifecycle')) return true
     const { guardFactoryClaim } = await import('@/lib/factory/runtime')
     try { factoryClaim = await guardFactoryClaim(tx,caller.userId,deviceId,runId,leaseExpiresAt); return true }
     catch (error) { if (error instanceof FactoryError) return false; throw error }

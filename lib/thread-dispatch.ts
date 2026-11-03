@@ -51,6 +51,7 @@ export async function latestTaskRun(query: Query, userId: string, issueId: strin
     LEFT JOIN device_repos d ON d.id=r."deviceRepoId"
     LEFT JOIN computer_run_bindings b ON b."runId"=r.id AND b."ownerId"=r."userId"
     WHERE r."userId"=$1 AND r."issueId"=$2 AND r.kind<>'group_chat'
+      AND NOT EXISTS (SELECT 1 FROM factory_attempts f WHERE f."runId"=r.id AND f.stage IN ('review','verify','monitor'))
     ORDER BY r."createdAt" DESC,r.id DESC LIMIT 1`, [userId, issueId])
   if (!run) return null
   const { cloudWorkspaceId, cloudBotId, ...rest } = run
@@ -121,7 +122,8 @@ export async function dispatchToTask<R extends { runId: string }, E extends { er
     const wantsNew = input.newThread || (await input.moves?.(previous) ?? false)
     if (wantsNew && await (input.explicit?.() ?? Promise.resolve(false))) {
       // The old thread stops; one thread works on a task at a time.
-      if (working && !previous.stopRequestedAt) await (await import('@/lib/agent-runs')).requestRunStop(userId, previous.id).catch(() => undefined)
+      const factory = await (await import('@/lib/factory/claim')).factoryClaimTask(pool,previous.id)
+      if (!factory && working && !previous.stopRequestedAt) await (await import('@/lib/agent-runs')).requestRunStop(userId, previous.id).catch(() => undefined)
       const result = await input.start(null, input.note)
       if (!queued(result)) return result
       await db.execute((await import('drizzle-orm')).sql`UPDATE agent_runs SET "threadReplacedBy"=${result.runId}::uuid,"updatedAt"=now() WHERE id=${threadId}::uuid AND "userId"=${userId}`)

@@ -60,9 +60,9 @@ export const DEPLOYMENT_SWITCHES = {
   /** The Coordinator's create_issue and update_issue. */
   issueTools: { flag: 'mikka-issue-tools-off', kind: 'kill', fallback: true },
   /** Factory intake and routing. */
-  factoryRouting: { flag: 'mikka-factory-routing', kind: 'gate', legacy: exact('MIKKA_FACTORY_ROUTING_ENABLED'), fallback: false },
+  factoryRouting: { flag: 'mikka-factory-routing', kind: 'gate', legacy: exact('MIKKA_FACTORY_ROUTING_ENABLED'), fallback: true },
   /** Factory run lifecycle (questions, check recovery, dispatch). */
-  factoryLifecycle: { flag: 'mikka-factory-lifecycle', kind: 'gate', legacy: exact('MIKKA_FACTORY_LIFECYCLE_ENABLED'), fallback: false },
+  factoryLifecycle: { flag: 'mikka-factory-lifecycle', kind: 'gate', legacy: exact('MIKKA_FACTORY_LIFECYCLE_ENABLED'), fallback: true },
   /** The personal mailbox tools. */
   personalMailbox: { flag: 'mikka-personal-mailbox-off', kind: 'kill', fallback: true },
   /** Writes to the person's connected apps. */

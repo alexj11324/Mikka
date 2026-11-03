@@ -37,6 +37,7 @@ export function digest(value: unknown): string {
 }
 export const candidateIdentity = (c: FactoryCandidate) => ({
   sha: c.sha,
+  ...(c.kind && c.kind !== 'code' ? {kind:c.kind} : {}),
   repository: c.repository,
   environment: c.environment,
   scope: c.scope,
@@ -237,7 +238,7 @@ export async function approvalEvidence(tx: PoolClient, task: FactoryTask) {
       const ref = parsed.data;
       if (
         ref.candidateId !== candidate.id ||
-        ref.sha !== candidate.sha ||
+        ref.sha !== (candidate.kind === 'deliverable' ? null : candidate.sha) ||
         ref.environment !== candidate.environment ||
         ref.runId !== attempt.runId ||
         ref.sessionId !== attempt.sessionId
@@ -253,8 +254,8 @@ export async function approvalEvidence(tx: PoolClient, task: FactoryTask) {
         );
         if (
           run.stopReason !== "submitted" ||
-          run.report?.publish?.commit !== candidate.sha ||
-          run.report?.verify?.status !== "passed"
+          (candidate.kind === 'deliverable' ? !run.report?.observedHead : (run.report?.publish?.commit ?? run.report?.observedHead) !== candidate.sha) ||
+          !['passed','not_run'].includes(run.report?.verify?.status)
         )
           throw new FactoryError("factoryEvidenceMismatch");
       }

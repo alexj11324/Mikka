@@ -1,4 +1,5 @@
 import type { Pool, PoolClient } from 'pg';
+import type { FactoryRunSelection } from '../agent-runs';
 import { freezeWorkerDefinition, retryWorkerDefinition } from '../agent-kit/worker';
 import { configureFactoryCheck, factoryRepairBrief } from './checks';
 import type { DispatchInput, DispatchResult } from '../run-dispatch';
@@ -9,8 +10,12 @@ import type { createFactoryStore, FactoryTask, FactorySnapshot } from './store';
 import { factoryDispatchSchema, type FactoryDispatchInput } from './dispatch-schema';
 export { factoryDispatchSchema, type FactoryDispatchInput };
 export type QueueFactoryRun = (tx: PoolClient, userId: string, input: DispatchInput, sourceRunId?: string) => Promise<DispatchResult>;
+export type FactoryDispatchOptions = {
+  selection?: FactoryRunSelection;
+  cloud?: { botId: string; workspaceId: string };
+};
 export type FactoryQueue = (tx: PoolClient, userId: string, input: {
-  issueId: string; agentId: string; deviceRepoId: string; note?: string;
+  issueId: string; agentId: string; deviceRepoId: string; note?: string; options?: FactoryDispatchOptions;
 }, botId: string | null, context: { sourceEventId: string; attemptId: string }) => Promise<{ runId: string }>;
 /** Installed by the owning consumer; no model may select a callback or gate. */
 export interface FactoryDispatchAdapters {
@@ -46,13 +51,14 @@ function fail(code: string): never { throw new FactoryError(code); }
 /** Task -> issue/access -> run. The existing queue writes through this transaction.
  * Ledger, queue, server configuration, frozen definition and binding commit together. */
 export function createFactoryDispatch(pool: Pool, store: ReturnType<typeof createFactoryStore>, queue: FactoryQueue, adapters: FactoryDispatchAdapters = defaultFactoryDispatchAdapters) {
-  return async (userId: string, raw: FactoryDispatchInput, existing?: PoolClient): Promise<FactoryDispatchResult> => {
+  return async (userId: string, raw: FactoryDispatchInput, existing?: PoolClient, options?: FactoryDispatchOptions): Promise<FactoryDispatchResult> => {
     const parsed = factoryDispatchSchema.safeParse(raw);
     if (!parsed.success) fail('factoryInvalid');
     // The note is human text that reaches factory_events.request (the idempotency
     // receipt) and, through the queue, the run prompt: mask it once, before either.
     const input = parsed.data.note === undefined ? parsed.data : { ...parsed.data, note: maskFactoryNote(parsed.data.note) };
     const { binding } = input;
+    const request = options ? { ...input, options } : input;
     const tx = existing ?? await pool.connect();
     try {
       if (!existing) await tx.query('BEGIN');
@@ -63,7 +69,7 @@ export function createFactoryDispatch(pool: Pool, store: ReturnType<typeof creat
       const eventId = factoryEventId('dispatch-v2', binding.attemptId);
       const { rows: [receipt] } = await tx.query<{ same: boolean; result: FactoryDispatchResult }>(
         'SELECT request=$3::jsonb AS same,result FROM factory_events WHERE "taskId"=$1 AND "eventId"=$2',
-        [task.id,eventId,JSON.stringify(input)]);
+        [task.id,eventId,JSON.stringify(request)]);
       if (receipt) {
         if (!receipt.same) fail('factoryReplayMismatch');
         if (task.revision !== receipt.result.binding.revision || task.attemptId !== binding.attemptId || task.candidateId !== binding.candidateId) fail('factoryStale');
@@ -79,14 +85,14 @@ export function createFactoryDispatch(pool: Pool, store: ReturnType<typeof creat
       if (task.status !== 'pending' || !['spec','execute','review','verify','monitor'].includes(task.stage)) fail('factoryTransition');
       const configure = adapters.configure[task.stage];
       if (!configure) fail('factoryDispatchAdapterRequired');
-      const queued = await queue(tx,userId,{issueId:task.issueId,agentId:input.agentId,deviceRepoId:input.deviceRepoId,note:input.note},task.botId,{sourceEventId:task.sourceEventId,attemptId:task.attemptId});
+      const queued = await queue(tx,userId,{issueId:task.issueId,agentId:input.agentId,deviceRepoId:input.deviceRepoId,note:input.note,options},task.botId,{sourceEventId:task.sourceEventId,attemptId:task.attemptId});
       await configure(tx,task,queued.runId);
       await adapters.freeze(tx,task,queued.runId);
       const { rows: [run] } = await tx.query('SELECT * FROM agent_runs WHERE id=$1 FOR UPDATE',[queued.runId]);
       if (!run || run.userId !== userId || run.issueId !== task.issueId || run.botId !== task.botId || run.agentId !== input.agentId || run.deviceRepoId !== input.deviceRepoId || run.status !== 'queued' || run.stopRequestedAt || !run.agentDefinition) fail('factoryRunMismatch');
       const state = await store.apply(userId,binding,binding.attemptId,{action:'bind_run',runId:run.id},tx);
       const result = {...state,runId:run.id as string,replayed:false,binding:factoryBinding(state.task)};
-      await tx.query('INSERT INTO factory_events ("taskId","eventId",request,result) VALUES ($1,$2,$3,$4)',[task.id,eventId,JSON.stringify(input),JSON.stringify(result)]);
+      await tx.query('INSERT INTO factory_events ("taskId","eventId",request,result) VALUES ($1,$2,$3,$4)',[task.id,eventId,JSON.stringify(request),JSON.stringify(result)]);
       if (!existing) await tx.query('COMMIT');
       return result;
     } catch (error) { if (!existing) await tx.query('ROLLBACK'); throw error; }

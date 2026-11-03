@@ -12,9 +12,9 @@ export function observeFactoryCheckDispatch(
   store: ReturnType<typeof createFactoryStore>,
   dispatch: ReturnType<typeof createFactoryDispatch>,
 ): ReturnType<typeof createFactoryDispatch> {
-  return async (userId, input, existing) => {
+  return async (userId, input, existing, options) => {
     try {
-      return await dispatch(userId, input, existing);
+      return await dispatch(userId, input, existing, options);
     } catch (error) {
       if (
         existing ||

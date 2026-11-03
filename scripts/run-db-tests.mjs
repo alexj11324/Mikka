@@ -41,6 +41,7 @@ export const REQUIRED_SUITES = [
   { marker: 'lib/factory/store.ts', file: 'lib/factory/postgres.test.ts', script: 'test:factory' },
   { marker: 'lib/self-improvement/store.ts', file: 'lib/self-improvement/postgres.test.ts', script: 'test:self-improvement-db' },
   { marker: 'lib/self-improvement/team-skills.ts', file: 'lib/self-improvement/team-skills.db.test.ts', script: 'test:self-improvement-db' },
+  { marker: 'lib/factory/task-dispatch.ts', file: 'tests/factory-all-dispatch.db.test.ts', script: 'test:bot-threads-db' },
   { marker: 'lib/factory/checks.ts', file: 'lib/factory/checks.db.test.ts', script: 'test:factory-checks-db' },
   { marker: 'lib/factory/monitor-v2-binding.ts', file: 'lib/factory/monitor-v2-binding.db.test.ts', script: 'test:factory-monitor-db' },
   { marker: 'lib/factory/check-independence.ts', file: 'lib/factory/check-independence.db.test.ts', script: 'test:factory-check-independence-db' },

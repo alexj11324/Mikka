@@ -21,12 +21,12 @@ import { PullRequestIcon } from './pull-request-icon'
 import { ShortSha, shortSha } from './short-sha'
 import { FieldError } from '@/components/ui/field'
 
-type Candidate = { sha: string; repository: string; environment: string; scope: string }
+type Candidate = { kind?: 'code'|'report'|'deliverable'; sha: string; repository: string; environment: string; scope: string }
 export type FactoryTask = { id: string; issueId: string; stage: string; status: string; reason: string; candidateId: string | null; candidateRunId: string | null; isSkillCandidate: boolean }
 type Evidence = { binding: { taskId: string; issueId: string; attemptId: string; revision: number; candidateId: string | null }; manifest: { candidate: Candidate; artifacts: EvidenceEntry[] } }
 type Approval = { id: string; candidateId: string; candidate: Candidate; action: string; target: string; targetEnvironment: string; expiresAt: string; revokedAt: string | null; createdAt: string }
 type Publication = { id: string; approvalId: string; status: 'reserved' | 'uncertain' | 'succeeded' | 'failed'; request: Record<string, unknown>; receipt?: { verifiedTarget?: { reference?: string } } }
-type Ledger = { binding: { taskId: string; issueId: string; attemptId: string; revision: number; candidateId: string | null }; approvals: Approval[]; publications: Publication[]; merges?: AcceptanceMerge[]; capabilities?: { reject?: boolean } }
+type Ledger = { candidateKind?: 'code'|'report'|'deliverable'; accepted?: boolean; binding: { taskId: string; issueId: string; attemptId: string; revision: number; candidateId: string | null }; approvals: Approval[]; publications: Publication[]; merges?: AcceptanceMerge[]; capabilities?: { reject?: boolean } }
 
 export class RequestError extends Error {
   constructor(readonly code: string, readonly status: number, readonly body: Record<string, unknown>) { super(code) }
@@ -62,7 +62,7 @@ type Derived = { state: AcceptanceState; active?: unknown; publication?: unknown
 /** List, header and pane read the same ledger and the same state machine, so they always agree. A code candidate is accepted by merging its PR; a skill is enabled. */
 export function useAcceptance(task: FactoryTask) {
   const { data: ledger, mutate: reload, error: ledgerError } = useSWR<Ledger>(`/api/factory/tasks/${task.id}/approval?view=ledger`, request, { refreshInterval: 5000 })
-  const derived: Derived | undefined = !ledger ? undefined : task.isSkillCandidate
+  const derived: Derived | undefined = !ledger ? undefined : ledger.accepted ? {state:'accepted'} : task.isSkillCandidate
     ? acceptanceState({ stage: task.stage, candidateId: task.candidateId, approvals: Array.isArray(ledger.approvals) ? ledger.approvals : [], publications: Array.isArray(ledger.publications) ? ledger.publications : [], now: Date.now() })
     : mergeAcceptance({ stage: task.stage, status: task.status, candidateId: task.candidateId, merges: Array.isArray(ledger.merges) ? ledger.merges : [] })
   return { ledger, reload, ledgerError, derived }
@@ -78,7 +78,7 @@ function CandidateCard({ candidate, detail, environment, isSkill }: { candidate?
   const delivery = detail?.delivery
   const pr = delivery?.pullRequest
   const number = pr ? pullNumber(pr.url) : null
-  const sha = candidate?.sha ?? delivery?.candidateSha ?? undefined
+  const sha = candidate?.kind === 'deliverable' ? undefined : candidate?.sha ?? delivery?.candidateSha ?? undefined
   const repository = candidate?.repository ?? delivery?.repository
   return <section aria-label={t('candidate')} className="flex flex-col gap-2 rounded-xl bg-muted px-4 py-3.5">
     {pr && <div className="flex min-w-0 items-center gap-2 text-sm">
@@ -295,10 +295,10 @@ export function FactoryAcceptancePane({ task, onOpenThread }: { task: FactoryTas
       {error && <FieldError className="text-xs">{t(ERROR_KEYS[error] ?? 'error')}</FieldError>}
     </div>
     {state !== 'unavailable' && <footer className="shrink-0 px-4 pb-4 sm:px-5">
-      <ApprovalBar state={state} isSkill={task.isSkillCandidate} busy={busy} canApprove={task.isSkillCandidate ? Boolean(evidence && environment) : Boolean(pullRequestUrl)}
+      <ApprovalBar state={state} isSkill={task.isSkillCandidate} busy={busy} isReport={ledger?.candidateKind === 'report' || ledger?.candidateKind === 'deliverable'} canApprove={task.isSkillCandidate ? Boolean(evidence && environment) : ledger?.candidateKind === 'report' || ledger?.candidateKind === 'deliverable' ? Boolean(evidence) : Boolean(pullRequestUrl)}
         onAccept={task.isSkillCandidate ? undefined : () => { void accept() }} pullRequestUrl={pullRequestUrl ?? undefined} refusal={refusal ?? undefined} canPublish={Boolean(active && environmentOf(active.candidate) && active.target && active.targetEnvironment)}
         environment={envChip ?? undefined}
-        sha={candidate?.sha} superseded={superseded?.candidate?.sha}
+        sha={candidate?.kind === 'deliverable' ? undefined : candidate?.sha} superseded={superseded?.candidate?.kind === 'deliverable' ? undefined : superseded?.candidate?.sha}
         reference={reference ? { href: reference, label: publication?.request?.targetEnvironment === 'production' ? t('production') : t('preview') } : undefined}
         onApprove={() => { void approve() }}
         onPublish={() => { const approval = active; if (!approval || !ledger) return; void run('publish', { binding: ledger.binding, eventId: crypto.randomUUID(), approvalId: approval.id, action: approval.action, target: approval.target, targetEnvironment: approval.targetEnvironment }) }}

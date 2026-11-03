@@ -70,12 +70,16 @@ export type FactoryRevisionBinding = z.infer<typeof revisionBindingSchema>;
 export type FactoryBindingInput = FactoryRevisionBinding & Partial<Omit<FactoryBinding, keyof FactoryRevisionBinding>>;
 export const candidateSchema = z
   .object({
-    sha: z.string().regex(/^[a-f0-9]{40}$/),
+    sha: z.string(),
+    kind: z.enum(["code", "report", "deliverable"]).optional(),
     repository: reason,
     environment: reason,
     scope: reason,
   })
-  .strict();
+  .strict().superRefine((candidate,ctx) => {
+    if (!(candidate.kind === 'deliverable' ? candidate.sha === 'no-repository' : /^[a-f0-9]{40}$/.test(candidate.sha)))
+      ctx.addIssue({code:'custom',path:['sha'],message:'An exact commit or a no-repository deliverable is required'});
+  });
 export const evidenceSchema = z
   .object({
     // References to existing, access controlled artifacts. No embedded logs or credentials.

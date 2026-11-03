@@ -1,5 +1,5 @@
 /** Client view of a Factory acceptance (R-56). Pure so every state is testable without a server. */
-export type AcceptanceState = 'pending' | 'approved' | 'publishing' | 'checking' | 'failed' | 'live' | 'revoked' | 'expired' | 'invalidated' | 'unavailable' | 'merging' | 'merged'
+export type AcceptanceState = 'pending' | 'approved' | 'publishing' | 'checking' | 'failed' | 'live' | 'revoked' | 'expired' | 'invalidated' | 'unavailable' | 'merging' | 'merged' | 'accepted'
 export type AcceptanceApproval = { id: string; candidateId: string; expiresAt: string; revokedAt: string | null; createdAt: string }
 export type AcceptancePublication = { approvalId: string; status: 'reserved' | 'uncertain' | 'succeeded' | 'failed' }
 

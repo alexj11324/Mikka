@@ -80,6 +80,7 @@ export interface FactoryCandidate {
   id: string;
   taskId: string;
   sha: string;
+  kind?: 'code' | 'report' | 'deliverable';
   repository: string;
   environment: string;
   scope: string;
@@ -266,7 +267,7 @@ export function createFactoryStore(
     lockTask: (tx: PoolClient, userId: string, taskId: string) => owned(tx, userId, taskId),
     /** Read-only GET paths: ownership/scope checked, nothing locked. */
     readTask: (tx: PoolClient, userId: string, taskId: string) => owned(tx, userId, taskId, false),
-    async route(userId: string, input: unknown) {
+    async route(userId: string, input: unknown, existing?: PoolClient) {
       const parsed = routeSchema.safeParse(input);
       if (!parsed.success) fail("factoryInvalid");
       const route = parsed.data;
@@ -339,7 +340,7 @@ export function createFactoryStore(
           [task.attemptId, task.id, task.stage, task.status, task.reason],
         );
         return save(tx, task, route.eventId, route);
-      });
+      }, existing);
     },
     /** Task-detail GET: read-only, no row locks (BE-16). B8/B9 checks and the B11 header are computed, never stored. */
     async read(userId: string, taskId: string): Promise<FactorySnapshot & Partial<FactoryTaskDetail>> {
@@ -357,7 +358,7 @@ export function createFactoryStore(
         const issue = await lockedIssue(tx, issueId, false);
         if (!issue || !(await authorize(userId, issueId, tx))) fail("factoryNotFound");
         const { rows } = await tx.query<FactoryTask & { isSkillCandidate: boolean; candidateRunId: string | null; candidateSha: string | null; publication: PublicationRow | null }>(
-          'SELECT t.*, c."runId" AS "candidateRunId", c.sha AS "candidateSha", (SELECT json_build_object(\'id\',p.id,\'approvalId\',p."approvalId",\'status\',p.status,\'action\',p.action,\'target\',p.target,\'createdAt\',p."createdAt",\'finishedAt\',p."finishedAt") FROM factory_publications p WHERE p."taskId"=t.id AND p."candidateId"=t."candidateId" ORDER BY p."createdAt" DESC,p.id DESC LIMIT 1) AS publication, EXISTS (SELECT 1 FROM improvement_skill_candidates s WHERE s."factoryTaskId"=t.id AND s."candidateId"=t."candidateId" AND s."userId"=t."userId") AS "isSkillCandidate" FROM factory_tasks t JOIN issues i ON i.id=t."issueId" LEFT JOIN factory_candidates c ON c.id=t."candidateId" AND c."taskId"=t.id WHERE t."userId"=$1 AND t."issueId"=$2 AND t."botId" IS NOT DISTINCT FROM $3::uuid AND (i."userId"=$1 OR (i.scope=\'workspace\' AND t."scopeVersion"=i."scopeVersion")) ORDER BY t."updatedAt" DESC,t.id DESC LIMIT 50',
+          'SELECT t.*, c."runId" AS "candidateRunId", CASE WHEN c.kind=\'deliverable\' THEN NULL ELSE c.sha END AS "candidateSha", (SELECT json_build_object(\'id\',p.id,\'approvalId\',p."approvalId",\'status\',p.status,\'action\',p.action,\'target\',p.target,\'createdAt\',p."createdAt",\'finishedAt\',p."finishedAt") FROM factory_publications p WHERE p."taskId"=t.id AND p."candidateId"=t."candidateId" ORDER BY p."createdAt" DESC,p.id DESC LIMIT 1) AS publication, EXISTS (SELECT 1 FROM improvement_skill_candidates s WHERE s."factoryTaskId"=t.id AND s."candidateId"=t."candidateId" AND s."userId"=t."userId") AS "isSkillCandidate" FROM factory_tasks t JOIN issues i ON i.id=t."issueId" LEFT JOIN factory_candidates c ON c.id=t."candidateId" AND c."taskId"=t.id WHERE t."userId"=$1 AND t."issueId"=$2 AND t."botId" IS NOT DISTINCT FROM $3::uuid AND (i."userId"=$1 OR (i.scope=\'workspace\' AND t."scopeVersion"=i."scopeVersion")) ORDER BY t."updatedAt" DESC,t.id DESC LIMIT 50',
           [userId, issueId, botId],
         );
         const tasks: FactoryTaskSummary[] = [];
@@ -445,7 +446,9 @@ export function createFactoryStore(
           task.status = change.action === "cancel" ? "cancelled" : "revoked";
           task.reason = change.reason;
           await tx.query(
-            `UPDATE agent_runs SET "stopRequestedAt"=coalesce("stopRequestedAt",now()),"updatedAt"=now()
+            `UPDATE agent_runs SET "stopRequestedAt"=coalesce("stopRequestedAt",now()),"updatedAt"=now(),
+            status=CASE WHEN status='queued' THEN 'cancelled' ELSE status END,
+            "finishedAt"=CASE WHEN status='queued' THEN clock_timestamp() ELSE "finishedAt" END
             WHERE id IN (SELECT "runId" FROM factory_attempts WHERE "taskId"=$1) AND "userId"=$2 AND "issueId"=$3
             AND status IN ('queued','preparing','running','waiting_input','finishing')`,
             [task.id, userId, task.issueId],
@@ -574,7 +577,7 @@ export function createFactoryStore(
           const candidate = candidateSchema.parse(change.candidate),
             candidateId = randomUUID();
           await tx.query(
-            'INSERT INTO factory_candidates (id,"taskId",sha,repository,environment,scope,"runId","previewDatabaseBranch","machineName") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)',
+            'INSERT INTO factory_candidates (id,"taskId",sha,repository,environment,scope,"runId","previewDatabaseBranch","machineName",kind) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',
             [
               candidateId,
               task.id,
@@ -585,6 +588,7 @@ export function createFactoryStore(
               change.runId,
               branch,
               machine?.name ?? null,
+              candidate.kind ?? 'code',
             ],
           );
           task.candidateId = candidateId;
@@ -645,7 +649,7 @@ export function createFactoryStore(
             for (const evidence of change.evidence) {
               if (
                 evidence.candidateId !== task.candidateId ||
-                evidence.sha !== (candidate?.sha ?? null) ||
+                evidence.sha !== (candidate?.kind === 'deliverable' ? null : candidate?.sha ?? null) ||
                 (candidate && evidence.environment !== candidate.environment)
               )
                 fail("factoryEvidenceMismatch");
@@ -660,9 +664,9 @@ export function createFactoryStore(
                 fail("factoryEvidenceRequired");
               if (
                 task.stage === "execute" &&
-                (run.report?.publish?.commit !== candidate?.sha ||
+                ((candidate?.kind === 'deliverable' ? !/^[a-f0-9]{40}$/.test(run.report?.observedHead ?? '') : (run.report?.publish?.commit ?? run.report?.observedHead) !== candidate?.sha) ||
                   run.stopReason !== "submitted" ||
-                  run.report?.verify?.status !== "passed")
+                  !(run.report?.verify?.status === 'passed' || (run.report?.verify?.status === 'not_run' && !(await tx.query('SELECT "verifyCommand" FROM device_repos WHERE id=$1',[run.deviceRepoId])).rows[0]?.verifyCommand)))
               )
                 fail("factoryEvidenceMismatch");
               for (const evidence of change.evidence) {
@@ -751,6 +755,7 @@ export function createFactoryStore(
             attempt.candidateId === task.candidateId;
           if (
             !nextMonitorCycle &&
+            !(change.action === "repair" && task.stage === "approval" && task.status === "pending") &&
             !["failed", "blocked", "waiting"].includes(task.status)
           )
             fail("factoryTransition");
@@ -769,7 +774,7 @@ export function createFactoryStore(
             );
             if (
               run &&
-              !["succeeded", "failed", "stopped", "cancelled"].includes(
+              !["succeeded", "failed", "stopped", "cancelled", "completed"].includes(
                 run.status,
               )
             )

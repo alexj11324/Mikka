@@ -251,7 +251,7 @@ async function accept(device) {
   const failures = []
   const check = async (...args) => { try { const result = await step(...args); completedItems.push(Number(/^item(\d+)/.exec(args[0])[1])); return result } catch (error) { failures.push(error) } }
   const repo = 'https://github.com/mikka-e2e/core-loop.git'
-  if (only.includes('1')) await check('item1-core-loop', 600_000, async signal => {
+  if (only.includes('1')) await check('item1-core-loop', 900_000, async signal => {
     const id = await dispatch('item1', `创建一个新任务，在本机 ${device.name}（设备ID ${device.id}）用 Claude Code 修改 ${repo}。在 README.md 追加一行 local acceptance ${runId}，提交并开 PR。任务描述完整保留验收标记。`, signal)
     const done = await terminal(id, signal)
     assert.equal(done.status, 'succeeded', redact(done.error ?? 'run did not succeed'))
@@ -262,6 +262,22 @@ async function accept(device) {
     const commit = execFileSync('git', ['--git-dir', runtime.scenario.barePath, 'show', `${done.report.publish.commit}:README.md`], { encoding: 'utf8' })
     assert.ok(commit.includes(runId), 'Remote pushed tree lacks the acceptance marker')
     await until(signal, async () => JSON.stringify(await json(accounts.owner, '/api/coordinator/messages')).includes(published.pullRequest.url))
+    const factory = await until(signal,async () => {
+      const [task] = await query('SELECT id,stage,status,reason FROM factory_tasks WHERE "userId"=$1 AND "issueId"=$2 ORDER BY "createdAt" DESC LIMIT 1',[accounts.owner.userId,done.issueId])
+      if (task && ['blocked','failed','cancelled','revoked'].includes(task.status)) throw new Error(`Factory ${task.stage}/${task.status}: ${redact(task.reason)}`)
+      return task?.stage==='approval' && task.status==='pending' ? task : null
+    })
+    const snapshot = await json(accounts.owner,`/api/factory/tasks/${factory.id}`)
+    const checks = snapshot.attempts.filter(attempt=>attempt.candidateId===snapshot.task.candidateId && ['execute','review','verify'].includes(attempt.stage) && attempt.status==='passed')
+    assert.equal(checks.length,3,'Execute, independent review and independent verification must pass')
+    assert.equal(new Set(checks.map(attempt=>attempt.runId)).size,3,'Factory checks use distinct runs')
+    assert.equal(new Set(checks.map(attempt=>attempt.sessionId)).size,3,'Factory checks use independent sessions')
+    const acceptance = await json(accounts.owner,`/api/factory/tasks/${factory.id}/approval`)
+    const producing = await run(checks.find(attempt=>attempt.stage==='execute').runId)
+    assert.equal(acceptance.manifest.candidate.sha,producing.report.publish.commit,'Acceptance shows the exact reviewed candidate')
+    const acceptedTree = execFileSync('git',['--git-dir',runtime.scenario.barePath,'show',`${acceptance.manifest.candidate.sha}:README.md`],{encoding:'utf8'})
+    assert.ok(acceptedTree.includes(runId),'The reviewed candidate retains the requested change')
+    await writeFile(join(directory,'factory-core-loop.json'),JSON.stringify({taskId:factory.id,stage:factory.stage,status:factory.status,candidateSha:acceptance.manifest.candidate.sha,attempts:checks.map(a=>({id:a.id,stage:a.stage,runId:a.runId,sessionId:a.sessionId}))},null,2),{mode:0o600})
     await progress('item1-core-loop', 'evidence', id)
   })
   if (only.includes('2')) await check('item2-read-only', 600_000, async signal => {

@@ -98,7 +98,7 @@ export async function acceptLocalRun(input: {
     // credential. A read-only run gets no task branch; it is still the
     // owner's run with the owner's credential.
     await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${JSON.stringify(['dispatch-issue', input.userId, task.id])}, 0))`)
-    const [active] = await tx.select({ id: agentRuns.id }).from(agentRuns).where(and(eq(agentRuns.userId, input.userId), eq(agentRuns.issueId, task.id), inArray(agentRuns.status, [...UNFINISHED_RUN_STATUSES]))).limit(1)
+    const [active] = await tx.select({ id: agentRuns.id }).from(agentRuns).where(and(eq(agentRuns.userId, input.userId), eq(agentRuns.issueId, task.id), inArray(agentRuns.status, [...UNFINISHED_RUN_STATUSES]), isNull(agentRuns.stopRequestedAt))).limit(1)
     if (active) throw new ActionFailureError('runAlreadyActive', { runId: active.id })
     if (readOnly) {
       await tx.insert(agentRuns).values({ id: input.id, userId: input.userId, botId: input.botId, issueId: task.id, agentId: input.agentId, deviceId: input.deviceId, deviceRepoId: repo.id, status: 'queued', kind: 'implement', source: input.source ?? null, baseBranch: repo.baseBranch, prompt: input.prompt, agentDefinition: input.definition, dispatchKey: input.dispatch?.requestKey ?? null, dispatchFingerprint: dispatchHash })

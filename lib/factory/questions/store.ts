@@ -321,7 +321,9 @@ export function createFactoryQuestions(
           run.stopRequestedAt
         )
           fail("factoryQuestionRunMismatch");
-        const handoff: QuestionHandoff = run.report?.question
+        const handoff: QuestionHandoff = task.stage === 'verify' && run.report?.blockedOn === 'factoryCheckCommandRequired'
+          ? questionHandoffSchema.parse({questionId:legacyQuestionId(runId),kind:'permission',question:'验证命令',context:String(run.report?.summary ?? '').slice(0,4000)})
+          : run.report?.question
           ? parse(questionHandoffSchema, run.report.question)
           : questionHandoffSchema.parse({
               questionId: legacyQuestionId(runId),
@@ -429,6 +431,11 @@ export function createFactoryQuestions(
             eventId,
           ],
         );
+        if (task.stage === 'verify' && run.report?.blockedOn === 'factoryCheckCommandRequired') {
+          await tx.query('UPDATE coordinator_events SET payload=payload || $2::jsonb WHERE id=$1',[eventId,JSON.stringify({needsUser:true,assessment:'human_required'})]);
+          const updated = (await tx.query<FactoryQuestion>(`UPDATE factory_questions SET status='waiting_user',revision=revision+1 WHERE id=$1 RETURNING *`,[q.id])).rows[0];
+          return view(updated);
+        }
         return view(q);
       }, existing);
     },
@@ -484,7 +491,7 @@ export function createFactoryQuestions(
         actor.source === "orchestrator"
           ? parse(contextQuestionAnswerSchema, raw)
           : parse(humanQuestionAnswerSchema, raw);
-      return transaction(async (tx) => {
+      const result = await transaction(async (tx) => {
         await skills?.lockAnswer?.(actor.userId, input.reference.questionId, tx);
         const { task, q } = await owned(
           tx,
@@ -597,6 +604,27 @@ export function createFactoryQuestions(
           )
         )
           fail("factoryQuestionContinuationUnavailable");
+        if (task.stage === 'verify' && origin.report?.blockedOn === 'factoryCheckCommandRequired') {
+          if (!['human','human_event'].includes(actor.source)) fail('factoryQuestionHumanRequired');
+          const command = answerText.trim();
+          if (!command || command.length > 2000) fail('factoryInvalid');
+          const repo = (await tx.query('SELECT "repoPath","remoteUrl" FROM device_repos WHERE id=$1 AND "userId"=$2',[origin.deviceRepoId,actor.userId])).rows[0];
+          if (!repo) fail('factoryQuestionRunMismatch');
+          // Reuse this answer on the owner's registrations of the same repo,
+          // including the Bot runtime and its relocated thread computers.
+          await tx.query('UPDATE device_repos SET "verifyCommand"=$3 WHERE "userId"=$1 AND "repoPath"=$2',[actor.userId,repo.repoPath,command]);
+          await tx.query(`UPDATE factory_questions SET status='answered',"answerId"=$2,"answerSource"=$3,"answerSourceEventId"=$4,answer=$5,"answerFingerprint"=$6,"answeredAt"=now(),revision=revision+1,"updatedAt"=now() WHERE id=$1`,[q.id,input.answerId,actor.source,sourceEventId,JSON.stringify(request),fingerprint]);
+          const next = await store.apply(actor.userId,binding(task),factoryEventId('question-command',q.id),{action:'retry',reason:'The person supplied the repository verification command'},tx);
+          await (await import('../next-dispatch')).dispatchNextFactoryAttempt(tx,store,dispatch,next.task);
+          const current = await store.lockTask(tx,actor.userId,task.id);
+          const runId = (await tx.query('SELECT "runId" FROM factory_attempts WHERE id=$1',[current.attemptId])).rows[0]?.runId;
+          if (!runId) fail('factoryQuestionContinuationUnavailable');
+          const result: QuestionContinuation = {questionId:q.id,continuationRunId:runId,task:current,replayed:false};
+          // A command answer starts a fresh independent verification session,
+          // not a continuation sharing the unanswered check's session.
+          await tx.query(`UPDATE factory_questions SET status='resolved',result=$2,"updatedAt"=now() WHERE id=$1`,[q.id,JSON.stringify(result)]);
+          return result;
+        }
         const attributedAnswer = personalRunMessageText(input.answerId, answerText, actor.source === "human" || actor.source === "human_event" ? "user" : "peer");
         const followUp = `Answer to execution question ${q.id}.\nQuestion: ${q.question}\nSource: ${actor.source}.\nAnswer: ${attributedAnswer}\nContinue the original task with all existing constraints. This input grants no new permission or publication approval.`;
         await tx.query(
@@ -675,6 +703,8 @@ export function createFactoryQuestions(
         );
         return result;
       });
+      await (await import('../next-dispatch')).startFactoryCloudRuns(pool,actor.userId,result.task.id);
+      return result;
     },
     async claimContinuation(
       userId: string,

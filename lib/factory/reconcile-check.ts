@@ -25,6 +25,7 @@ export async function reconcileFactoryCheck(
   store: ReturnType<typeof createFactoryStore>,
   task: FactoryTask,
   input: Record<string, unknown>,
+  autoRepair = false,
 ) {
   const { rows: [run] } = await tx.query<{
     id: string;
@@ -63,6 +64,17 @@ export async function reconcileFactoryCheck(
     `SELECT * FROM factory_candidates WHERE id=$1 AND "taskId"=$2`,
     [task.candidateId, task.id],
   );
+  // A checker with no configured command may infer one. Freeze only the
+  // daemon's actual command, paired with this run's tool execution and the
+  // checker's repository basis; a model statement alone cannot pass.
+  const currentOutput = (await tx.query('SELECT output FROM factory_attempts WHERE id=$1',[task.attemptId])).rows[0]?.output;
+  if (currentOutput?.check?.inferCommand && !currentOutput.check.command && run.report?.verify?.command) {
+    const command = run.report.verify.command;
+    const basis = run.report.criteria?.find(c=>c.command===command && c.evidence?.trim());
+    if (basis && (await verifierCommandEvidence(tx,run.id,command,true)).length) {
+      await tx.query(`UPDATE factory_attempts SET output=jsonb_set(output,'{check}',(output->'check') || $2::jsonb) WHERE id=$1`,[task.attemptId,JSON.stringify({command,commandBasis:basis.evidence})]);
+    }
+  }
   const evidence: FactoryEvidence[] =
     run.sessionId && run.report && candidate && run.finishedAt && Number.isFinite(new Date(run.finishedAt).getTime())
       ? [
@@ -72,7 +84,7 @@ export async function reconcileFactoryCheck(
             runId: run.id,
             sessionId: run.sessionId,
             candidateId: candidate.id,
-            sha: candidate.sha,
+            sha: candidate.kind === 'deliverable' ? null : candidate.sha,
             environment: candidate.environment,
             recordedAt: new Date(run.finishedAt!).toISOString(),
           },
@@ -91,6 +103,7 @@ export async function reconcileFactoryCheck(
       .map((c) => ({ ...c, evidence: c.evidence?.slice(0, 8000) })),
     knownIssues: run.report?.knownIssues?.slice(0, 5),
     trustedFailureProvenance: false,
+    ...(task.stage === 'verify' && currentOutput?.check?.inferCommand && !run.report?.verify?.command ? { reasonCode: 'factoryCheckCommandRequired' } : {}),
   };
   // Keep the frozen check assignment for gate revalidation and audit.
   const {
@@ -138,6 +151,9 @@ export async function reconcileFactoryCheck(
   ) {
     status = "blocked";
     reason = `Independent check blocked: ${run.error ?? run.report?.blockedOn ?? run.stopReason ?? "missing session/report/candidate"}`;
+  } else if (task.stage === 'verify' && currentOutput?.check?.inferCommand && !run.report.verify?.command) {
+    status = 'blocked';
+    reason = 'factoryCheckCommandRequired';
   } else if (run.stopReason === "asked_human") {
     status = "waiting";
     reason = "Independent check awaits question assessment; gate remains closed";
@@ -239,6 +255,17 @@ export async function reconcileFactoryCheck(
       },
       tx,
     );
+  }
+  if (autoRepair && status === "failed" && output.trustedFailureProvenance) {
+    const { checkFactoryRepairBudget } = await import('./check-recovery-evidence');
+    try { await checkFactoryRepairBudget(tx, finished.task); }
+    catch (error) {
+      if (!(error instanceof FactoryError) || error.code !== 'factoryRecoveryBudgetExceeded') throw error;
+      await tx.query(`UPDATE factory_attempts SET output=output || '{"reasonCode":"repair_budget_exhausted"}'::jsonb WHERE id=$1`,[finished.task.attemptId]);
+      return;
+    }
+    const repaired = await store.apply(task.userId,binding(finished.task),factoryEventId('check-auto-repair',run.id),{action:'repair',reason:`Repair the failed independent ${task.stage}; preserve original evidence`},tx);
+    await tx.query('UPDATE factory_attempts SET output=output || $2::jsonb WHERE id=$1',[repaired.task.attemptId,JSON.stringify({recovery:{choice:'repair_code',failedAttemptId:task.attemptId,failedRunId:run.id,candidateId:task.candidateId,rationale:`Independent ${task.stage} failed with authenticated evidence`}})]);
   }
   // Recovery strategy belongs to the Coordinator model via recover_factory_check.
   // A failed observation is retained here; no program classifies it as transient

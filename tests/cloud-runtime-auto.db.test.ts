@@ -198,6 +198,76 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     assert.deepEqual([(await definitionOf(next.runId)).agentDefinition.readOnly, (await definitionOf(next.runId)).agentDefinition.repositoryAdmission], [true, undefined])
   })
 
+  await t.test('a desktop deliverable with no repository passes independent cloud review and verify before human acceptance', async () => {
+    const personWithDesktop = await person('factory-desktop')
+    await (await import('../lib/computer/auto-runtime')).ensureBotCloudRuntime(appPool,{userId:personWithDesktop.id,workspaceId:personWithDesktop.workspaceId},personWithDesktop.botId,{harness:'codex'})
+    const work = await anotherTask(personWithDesktop.id, Math.floor(Math.random()*1_000_000_000))
+    const first = await steps.dispatchComputerThread(personWithDesktop.id,{botId:personWithDesktop.botId,issueId:work,harness:'codex'},`factory:${randomUUID()}`,undefined,undefined,personWithDesktop.botId) as {runId:string}
+    assert.ok(first.runId,JSON.stringify(first))
+    const {factoryRuntimeForBot} = await import('../lib/factory/runtime')
+    const {factoryBinding} = await import('../lib/factory/dispatch')
+    const {factoryMerges} = await import('../lib/factory/server')
+    const runtime = factoryRuntimeForBot(personWithDesktop.botId)
+    const taskId = (await pool.query('SELECT "taskId" FROM factory_attempts WHERE "runId"=$1',[first.runId])).rows[0].taskId
+    const sha='d'.repeat(40), command='node acceptance.mjs'
+    const finish = async (id:string,check=false,verify=false) => {
+      await pool.query(`UPDATE agent_runs SET status='succeeded',"stopReason"='submitted',"sessionId"=$2,"startedAt"=now()-interval '1 minute',"finishedAt"=clock_timestamp(),report=$3 WHERE id=$1`,[id,`independent-${id}`,JSON.stringify({summary:'Synthetic desktop evidence',observedHead:sha,filesChanged:[],verify:verify?{status:'passed',command,exitCode:0,signal:null,timedOut:false}:{status:'not_run'},...(check?{check:{sha,readOnly:true}}:{}),criteria:[{passed:true,command:verify?command:undefined,evidence:'package.json scripts.test exercises the delivered evidence'}]})])
+      if(verify) for(const [seq,chunk] of [[1,{type:'tool-input-available',toolName:'Bash',toolCallId:'verify',input:{command}}],[2,{type:'tool-output-available',toolCallId:'verify',output:{exitCode:0}}]] as const) await pool.query(`INSERT INTO run_chunks (id,"runId",seq,chunk,"createdAt") SELECT $1,$2,$3,$4,"startedAt"+interval '1 second' FROM agent_runs WHERE id=$2`,[randomUUID(),id,seq,JSON.stringify(chunk)])
+      await runtime.reconcile.run(personWithDesktop.id,id)
+      return runtime.store.read(personWithDesktop.id,taskId)
+    }
+    let snapshot=await finish(first.runId)
+    assert.equal(snapshot.candidates[0]?.kind,'deliverable')
+    assert.equal(snapshot.candidates[0]?.sha,'no-repository')
+    assert.deepEqual([snapshot.task.stage,snapshot.task.status],['review','running'],JSON.stringify(snapshot.task))
+    const review=snapshot.attempts.at(-1)!.runId!
+    snapshot=await finish(review,true)
+    assert.deepEqual([snapshot.task.stage,snapshot.task.status],['verify','running'],JSON.stringify(snapshot.task))
+    const verify=snapshot.attempts.at(-1)!.runId!
+    snapshot=await finish(verify,true,true)
+    assert.deepEqual([snapshot.task.stage,snapshot.task.status],['approval','pending'],JSON.stringify(snapshot.task))
+    const locations=(await pool.query('SELECT "deviceId","agentDefinition","baseBranch" FROM agent_runs WHERE id=ANY($1::uuid[])',[[first.runId,review,verify]])).rows
+    assert.equal(new Set(locations.map(r=>r.deviceId)).size,3,'cloud checks use fresh thread machines')
+    for(const id of [review,verify]) {
+      const row=(await pool.query('SELECT "baseBranch","agentDefinition" FROM agent_runs WHERE id=$1',[id])).rows[0]
+      assert.equal(row.baseBranch,sha)
+      assert.equal(row.agentDefinition.readOnly,true)
+    }
+    const sessionId=randomUUID()
+    await pool.query(`INSERT INTO "session" (id,"userId",token,"expiresAt","createdAt","updatedAt") VALUES ($1,$2,$3,now()+interval '1 hour',now(),now())`,[sessionId,personWithDesktop.id,randomUUID()])
+    const accepted=await factoryMerges.accept({userId:personWithDesktop.id,sessionId},{binding:factoryBinding(snapshot.task),eventId:randomUUID()},null)
+    assert.equal(accepted.status,'accepted')
+  })
+
+  await t.test('a Factory cloud question retains the original machine, model, account and required session resume', async () => {
+    const p=await person('factory-cloud-question')
+    const work=await anotherTask(p.id,Math.floor(Math.random()*1_000_000_000))
+    const started=await dispatch(p.id,work,p.botId) as {runId:string}
+    assert.ok(started.runId,JSON.stringify(started))
+    const {factoryRuntimeForBot}=await import('../lib/factory/runtime')
+    const runtime=factoryRuntimeForBot(p.botId)
+    const original=(await pool.query('SELECT * FROM agent_runs WHERE id=$1',[started.runId])).rows[0]
+    await pool.query(`UPDATE agent_runs SET status='stopped',"stopReason"='asked_human',"sessionId"='cloud-original-session',"startedAt"=now()-interval '1 minute',"finishedAt"=clock_timestamp(),report=$2 WHERE id=$1`,[started.runId,JSON.stringify({summary:'A user decision is needed',filesChanged:[],verify:{status:'not_run'},question:{questionId:randomUUID(),kind:'decision',question:'Which layout?',options:[]}})])
+    // The lifecycle has parked the stopped executor; its storage and session survive.
+    await pool.query(`UPDATE thread_machines SET state='paused',"runningSince"=NULL WHERE "runId"=$1`,[started.runId])
+    await runtime.reconcile.run(p.id,started.runId)
+    const taskId=(await pool.query('SELECT "taskId" FROM factory_attempts WHERE "runId"=$1',[started.runId])).rows[0].taskId
+    const [question]=await runtime.questions.list(p.id,taskId)
+    const sessionId=randomUUID()
+    await pool.query(`INSERT INTO "session" (id,"userId",token,"expiresAt","createdAt","updatedAt") VALUES ($1,$2,$3,now()+interval '1 hour',now(),now())`,[sessionId,p.id,randomUUID()])
+    const answer=await runtime.questions.answer({source:'human',userId:p.id,sessionId},{reference:question.reference,answerId:randomUUID(),text:'Use the mobile layout'})
+    const resumed=(await pool.query('SELECT * FROM agent_runs WHERE id=$1',[answer.continuationRunId])).rows[0]
+    assert.equal(resumed.deviceId,original.deviceId)
+    assert.equal(resumed.deviceRepoId,original.deviceRepoId)
+    assert.equal(resumed.agentDefinition.model,original.agentDefinition.model)
+    assert.deepEqual(resumed.agentDefinition.subscription,original.agentDefinition.subscription)
+    assert.equal(resumed.questionContinuation.originRunId,started.runId)
+    assert.equal(resumed.questionContinuation.requireSessionResume,true)
+    const machines=(await pool.query('SELECT "runId","sandboxId",state FROM thread_machines WHERE "runId"=ANY($1::uuid[])',[[started.runId,resumed.id]])).rows
+    assert.equal(machines.find(m=>m.runId===started.runId).state,'ended')
+    assert.equal(machines.find(m=>m.runId===resumed.id).state,'running')
+  })
+
   await t.test('a cloud thread that stopped to ask continues on its own model and subscription; with none it says so and queues nothing', async () => {
     // Production (Acme): the first run ran on its subscription's model, the continuations were frozen with model null
     // and the hosted runner refused each one (subscription_hosted_runtime_unavailable).

@@ -8,7 +8,10 @@ import { issueForUser } from '@/lib/issue-access'
 import { issueMutationsEnabled } from '@/lib/coordinator/issue-tools-enabled'
 import { actAs } from '@/lib/acting-user'
 import type { ActivityActor } from '@/lib/activity-actor'
-import { addRunMessage, queueRun, requestRunStop } from '@/lib/agent-runs'
+import { queueFactoryTask } from '@/lib/factory/task-dispatch'
+import { factoryLifecycleEnabled } from '@/lib/factory/runtime'
+import { FactoryError } from '@/lib/factory/contract'
+import { addRunMessage, requestRunStop } from '@/lib/agent-runs'
 import { forgetNotes, rememberNote } from '@/lib/coordinator/context'
 import { editMemory } from '@/lib/coordinator/store'
 import { chatBotId } from '@/lib/coordinator/coordinator-bot'
@@ -40,7 +43,7 @@ async function attempt<T>(fn: () => Promise<T>): Promise<T | Failure> {
   try {
     return await fn()
   } catch (error) {
-    if (error instanceof ActionFailureError) return { error: error.code }
+    if (error instanceof ActionFailureError || error instanceof FactoryError) return { error: error.code }
     throw error
   }
 }
@@ -185,13 +188,21 @@ export async function listAgents(userId: string) {
 const MCP_WORKSPACE = null
 
 export async function dispatchRun(userId: string, input: { issueId: string; agentId: string; repo: string; note?: string; requestKey?: string }) {
+  if (!factoryLifecycleEnabled()) return {error:'factoryLifecycleUnavailable'}
   // A run an MCP client dispatches is the person's Coordinator's: its bot row is resolved here, where the run is created.
   // One task, one thread (lib/thread-dispatch.ts): a task with a thread gets this as that thread's work. An MCP client
   // has no chat message of the person's to show an explicit request for a new thread, so it never starts one.
   const { dispatchToTask } = await import('@/lib/thread-dispatch')
   return attempt(async () => dispatchToTask(userId, input.issueId, {
     note: input.note,
-    start: async (previous, note) => ({ status: 'queued' as const, ...(await queueRun(userId, { ...input, note, ...await mcpRunModel(userId, input, previous), ...(previous ? { threadRunId: previous.id } : {}), ...(previous?.readOnly ? { readOnly: true } : {}), ...(previous && input.requestKey ? { requestKey: `thread:${previous.id}:${input.requestKey}`.slice(0, 200) } : {}) }, await chatBotId(userId, null, MCP_WORKSPACE), undefined, undefined, 'mcp')) }),
+    start: async (previous, note) => {
+      if (previous) {
+        const [run] = await db.select().from(agentRuns).where(and(eq(agentRuns.id,previous.id),eq(agentRuns.userId,userId))).limit(1)
+        if (!run) throw new ActionFailureError('runNotFound')
+        return (await import('@/lib/thread-continue')).queueThreadContinuation(userId,run,previous,note,input.requestKey)
+      }
+      return queueFactoryTask(userId,{...input,note,...await mcpRunModel(userId,input,null)},await chatBotId(userId,null,MCP_WORKSPACE))
+    },
   }))
 }
 

@@ -148,6 +148,8 @@ export const runReport = z.object({
     sha: z.string().regex(/^[a-f0-9]{40}$/),
     readOnly: z.literal(true),
   }).optional(),
+  /** Actual HEAD read by the daemon, including investigations with no new commit. */
+  observedHead: z.string().regex(/^[a-f0-9]{40}$/).optional(),
   /** Preview branch created or used by the producing run; descriptive metadata only. */
   previewDatabaseBranch: z.string().trim().min(1).max(500).optional(),
   /** Acceptance criteria the agent checked, with evidence. */

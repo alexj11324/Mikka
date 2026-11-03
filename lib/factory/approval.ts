@@ -214,6 +214,11 @@ async function validApproval(
 function gatesFor() {
   const approvalGate: FactoryGate = async (tx, task, _attempt, change) => {
     // #528: a code candidate is accepted by the person's merge of its PR.
+    const deliveryId = (change.output as {deliveryId?:unknown}|null)?.deliveryId;
+    if (deliveryId !== undefined) {
+      if (task.stage !== 'approval' || typeof deliveryId !== 'string' || !z.uuid().safeParse(deliveryId).success) return false;
+      return (await tx.query(`SELECT 1 FROM factory_acceptances a JOIN factory_candidates c ON c.id=a."candidateId" AND c."taskId"=a."taskId" WHERE a.id=$1 AND a."taskId"=$2 AND a."candidateId"=$3 AND a."userId"=$4 AND a.revision=$5 AND c.kind IN ('report','deliverable')`,[deliveryId,task.id,task.candidateId,task.userId,task.revision])).rowCount===1;
+    }
     const mergeId = (change.output as { mergeId?: unknown } | null)?.mergeId;
     if (mergeId !== undefined) return task.stage === "approval" && mergedFor(tx, task, mergeId);
     const parsed = output.safeParse(change.output);
@@ -464,6 +469,8 @@ export function createFactoryApprovals(
           publications,
           rejections,
           merges,
+          candidateKind: (await tx.query('SELECT kind FROM factory_candidates WHERE id=$1 AND "taskId"=$2',[task.candidateId,task.id])).rows[0]?.kind ?? 'code',
+          accepted: task.stage === 'approval' && task.status === 'passed' && (await tx.query('SELECT 1 FROM factory_acceptances WHERE "taskId"=$1 AND "candidateId"=$2',[task.id,task.candidateId])).rowCount===1,
         };
       });
     },

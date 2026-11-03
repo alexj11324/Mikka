@@ -71,6 +71,7 @@ export async function factory194Fixture(connectionString: string) {
       "utf8",
     ),
   );
+  await pool.query(await readFile(new URL('../../drizzle/20261103050100_factory_deliverables.sql',import.meta.url),'utf8'));
   const actor = {
     userId: "synthetic-owner",
     sessionId: "synthetic-browser-session",
@@ -275,7 +276,7 @@ export async function factory194Fixture(connectionString: string) {
       ],
     );
     await pool.query(
-      "INSERT INTO factory_candidates VALUES ($1,$2,$3,$4,$5,$6)",
+      'INSERT INTO factory_candidates (id,"taskId",sha,repository,environment,scope) VALUES ($1,$2,$3,$4,$5,$6)',
       [
         task.candidateId,
         task.id,

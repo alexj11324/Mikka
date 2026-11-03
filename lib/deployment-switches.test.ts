@@ -20,7 +20,7 @@ beforeEach(() => {
 
 test('without PostHog a switch reads the old variable, then its default', () => {
   assert.equal(deploymentSwitch('issueTools', {}), true, 'shipped on')
-  assert.equal(deploymentSwitch('factoryRouting', {}), false, 'ships off')
+  assert.equal(deploymentSwitch('factoryRouting', {}), true, 'all ordinary dispatches require Factory')
   assert.equal(deploymentSwitch('factoryRouting', { MIKKA_FACTORY_ROUTING_ENABLED: '1' }), true)
   assert.equal(deploymentSwitch('cloudComputerTasks', { MIKKA_CLOUD_COMPUTER_TASKS: '0' }), false)
   assert.equal(deploymentSwitch('cloudComputerTasks', { MIKKA_CLOUD_COMPUTER_TASKS: 'yes' }), true, 'only 0 turned it off')
@@ -98,7 +98,7 @@ test('an outage, a partial evaluation or a multivariate flag keeps what was know
 test('every kill flag ends in -off and ships on; every gate ships off', () => {
   for (const [name, entry] of Object.entries(DEPLOYMENT_SWITCHES)) {
     assert.equal(entry.flag.endsWith('-off'), entry.kind === 'kill', name)
-    assert.equal(entry.fallback, entry.kind === 'kill', name)
+    assert.equal(entry.fallback, entry.kind === 'kill' || name === 'factoryRouting' || name === 'factoryLifecycle', name)
     if (!('legacy' in entry)) assert.equal(entry.kind, 'kill', `${name}: a gate without its variable would turn off in every fresh process`)
     assert.match(entry.flag, /^mikka-[a-z0-9-]+$/, name)
   }

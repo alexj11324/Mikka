@@ -108,7 +108,7 @@ async function endStopRequestedRun(client: PoolClient, actor: Actor, runId: stri
  * the worker survive. No other task's machine can match. Caller holds BEGIN
  * and the new run's lock.
  */
-async function adoptTaskMachine(client: PoolClient, actor: Actor, runId: string, run: { issueId: string; runtimeBotId: string; repoPath: string; remoteUrl: string | null }, template: string | null) {
+async function adoptTaskMachine(client: PoolClient, actor: Actor, runId: string, run: { issueId: string; runtimeBotId: string; repoPath: string; remoteUrl: string | null; questionContinuation?: {originRunId:string} }, template: string | null) {
   // The run's bot runtime is recorded on the new row; the old row's bot does not have to match.
   // A repository task's machine holds only its harness's CLI: a run on another harness (or a
   // since-released template) starts its own machine, and the old one stays parked for the task.
@@ -118,9 +118,10 @@ async function adoptTaskMachine(client: PoolClient, actor: Actor, runId: string,
     WHERE m."ownerId"=$1 AND m."workspaceId"=$2 AND m."issueId"=$3 AND m."runId"<>$4
       AND m.state='paused' AND m."sandboxId" IS NOT NULL AND m."deviceId" IS NOT NULL
       AND r.status IN ('succeeded','failed','stopped','cancelled')
+      AND (r.kind<>'acceptance' OR r.id=$8::uuid) AND ($8::uuid IS NULL OR r.id=$8)
       AND repo."repoPath"=$5 AND repo."remoteUrl" IS NOT DISTINCT FROM $6
       AND ($7::text IS NULL OR m."snapshotId"=$7)
-    ORDER BY m."lastActiveAt" DESC LIMIT 1 FOR UPDATE OF m`, [actor.userId, actor.workspaceId, run.issueId, runId, run.repoPath, run.remoteUrl, template])).rows[0]
+    ORDER BY m."lastActiveAt" DESC LIMIT 1 FOR UPDATE OF m`, [actor.userId, actor.workspaceId, run.issueId, runId, run.repoPath, run.remoteUrl, template,run.questionContinuation?.originRunId ?? null])).rows[0]
   if (!previous) return null
   await client.query(`UPDATE thread_machines SET state='ended',"endedAt"=COALESCE("endedAt",now()),"sandboxId"=NULL WHERE "runId"=$1`, [previous.runId])
   return (await client.query(`INSERT INTO thread_machines ("runId","workspaceId","ownerId","botId","issueId","snapshotId","operationId",state,"sandboxId","deviceId","repoId")
@@ -203,7 +204,7 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
   try {
     await client.query('BEGIN')
     await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`thread-machine:${runId}`])
-    const run = (await client.query(`SELECT r.*,COALESCE(r."agentDefinition"->>'harness',agent.harness) AS "runHarness",b."workspaceId",b."botId" AS "runtimeBotId",repo."repoPath",repo."remoteUrl",repo."baseBranch",repo."verifyCommand",COALESCE(source_repo."repoPath",repo."repoPath") AS "snapshotRepoPath",m."sandboxId" AS "botSandboxId"
+    const run = (await client.query(`SELECT r.*,COALESCE(r."agentDefinition"->>'harness',agent.harness) AS "runHarness",b."workspaceId",b."botId" AS "runtimeBotId",repo."repoPath",repo."remoteUrl",CASE WHEN r.kind='acceptance' THEN r."baseBranch" ELSE repo."baseBranch" END AS "baseBranch",repo."verifyCommand",COALESCE(source_repo."repoPath",repo."repoPath") AS "snapshotRepoPath",m."sandboxId" AS "botSandboxId"
       FROM agent_runs r JOIN computer_run_bindings b ON b."runId"=r.id AND b."ownerId"=r."userId"
       LEFT JOIN agents agent ON agent.id=r."agentId"
       JOIN device_repos repo ON repo.id=r."deviceRepoId" AND repo."userId"=r."userId"
@@ -247,9 +248,10 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
       // remote and creates the task worktree from the configured base branch.
       // Only non-repository computer work retains the existing desktop snapshot.
       const template = repositoryTask ? taskTemplate(run.runHarness) : null
-      const adopted = run.issueId ? await adoptTaskMachine(client, actor, runId, run, template) : null
+      const adopted = run.issueId && (run.kind !== 'acceptance' || run.questionContinuation) ? await adoptTaskMachine(client, actor, runId, run, template) : null
       if (adopted) machine = adopted
       else {
+        if (run.questionContinuation) throw new ComputerError(409,'Original question thread machine unavailable')
         const snapshotId = template ?? await provider.snapshot(client, actor, run.botSandboxId, run.snapshotRepoPath)
         machine = (await client.query(`INSERT INTO thread_machines ("runId","workspaceId","ownerId","botId","issueId","snapshotId","operationId",state)
           VALUES ($1,$2,$3,$4,$5,$6,$7,'starting') ON CONFLICT ("runId") DO UPDATE SET "snapshotId"=EXCLUDED."snapshotId","issueId"=EXCLUDED."issueId" RETURNING *`, [runId, actor.workspaceId, actor.userId, run.runtimeBotId, run.issueId ?? null, snapshotId, randomUUID()])).rows[0]
@@ -338,6 +340,9 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
     await client.query('UPDATE device_tokens SET "revokedAt"=now() WHERE "boundDeviceId"=$1', [deviceId])
     await client.query('INSERT INTO device_tokens (id,"userId",name,"tokenHash","boundDeviceId","boundWorkspaceId","expiresAt") VALUES ($1,$2,$3,$4,$5,$6,now()+interval \'24 hours\')', [randomUUID(), actor.userId, 'Thread worker', createHash('sha256').update(credential).digest('hex'), deviceId, actor.workspaceId])
     await client.query('UPDATE agent_runs SET "deviceId"=$2,"deviceRepoId"=$3,"agentDefinition"=COALESCE($5::jsonb,"agentDefinition") WHERE id=$1 AND "userId"=$4 AND status=\'queued\'', [runId, deviceId, repoId, actor.userId, admission ? JSON.stringify(definition) : null])
+    // Rebind scheduling identity after host-owned cloud relocation. Candidate
+    // SHA/repository/environment stay frozen; only the executor FK changes.
+    await client.query(`UPDATE factory_attempts SET output=jsonb_set(output,'{check,deviceRepoId}',to_jsonb($2::text)) WHERE "runId"=$1 AND output->'check'->>'cloud'='true'`,[runId,repoId])
     await client.query('COMMIT')
     const handoff = `/run/mikka-viewer/thread-${leaseId}.json`
     await sandbox.files.write(handoff, JSON.stringify({ deviceId, workspaceId: actor.workspaceId, credential, server: origin.toString(), ...(process.env.VERCEL_ENV === 'preview' && process.env.MIKKA_CLOUD_PREVIEW_BYPASS ? { protectionBypass: process.env.MIKKA_CLOUD_PREVIEW_BYPASS } : {}) }), { user: 'root' })

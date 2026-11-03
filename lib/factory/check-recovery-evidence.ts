@@ -72,13 +72,13 @@ export async function readFactoryCheckFailure(
     check?.stage !== task.stage ||
     check.candidateId !== candidate.id ||
     run.kind !== "acceptance" ||
-    run.baseBranch !== candidate.sha ||
+    (check.executionSha ?? candidate.sha) !== run.baseBranch ||
     check.sha !== candidate.sha ||
     check.repository !== candidate.repository ||
     check.environment !== candidate.environment ||
     check.deviceRepoId !== run.deviceRepoId ||
     !check.command ||
-    report?.check?.sha !== candidate.sha ||
+    (check.executionSha ?? candidate.sha) !== report?.check?.sha ||
     report.check.readOnly !== true ||
     report.verify?.command !== check.command ||
     !(

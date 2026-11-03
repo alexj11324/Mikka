@@ -4113,7 +4113,8 @@
       "failed": "发布失败",
       "invalidated": "已失效",
       "merging": "合并中",
-      "merged": "已合并"
+      "merged": "已合并",
+      "accepted": "已验收"
     },
     "stage": {
       "execute": "执行",
@@ -4190,6 +4191,7 @@
     },
     "textLabel": "{stage}{kind}",
     "accept": "验收并合并",
+    "acceptReport": "验收",
     "openOnGitHub": "在 GitHub 打开",
     "cannotMerge": "无法合并",
     "mergeRefusal": {

@@ -9,7 +9,7 @@ import { ACTION_ERROR_CODES, type ActionErrorCode } from '@/lib/action-result'
 import { addRunMessage } from '@/lib/agent-runs'
 import { readRunChain } from '@/lib/run-chain'
 import { UNFINISHED_RUN_STATUSES } from '@/lib/agent-run-statuses'
-import { tiptapToText } from '@/lib/tiptap-text'
+import { queueFactoryTask, queueFactoryCloudTask } from '@/lib/factory/task-dispatch'
 
 type Source = Parameters<typeof addRunMessage>[2]
 const isActionErrorCode = (code: string): code is ActionErrorCode => (ACTION_ERROR_CODES as readonly string[]).includes(code)
@@ -52,7 +52,7 @@ export async function sendThreadMessage(userId: string, runId: string, text: str
     note: parsed.data.text,
     start: async (previous, note) => {
       if (previous?.id !== run.id) throw new ActionFailureError('threadReplaced')
-      return queueNextRun(userId, run, previous, note)
+      return queueThreadContinuation(userId, run, previous, note)
     },
   })
   // A dispatch the person can act on (no machine, say) queued nothing.
@@ -64,19 +64,22 @@ export async function sendThreadMessage(userId: string, runId: string, text: str
 }
 
 /** The thread's next run, queued the way its last one was: on the bot's cloud computer, else on the same device. */
-async function queueNextRun(userId: string, run: typeof agentRuns.$inferSelect, previous: TaskThreadRun, note: string | undefined) {
+export async function queueThreadContinuation(userId: string, run: typeof agentRuns.$inferSelect, previous: TaskThreadRun, note: string | undefined, requestKey?: string) {
   const issueId = run.issueId!, deviceRepoId = run.deviceRepoId!
   const readOnly = previous.readOnly ? { readOnly: true } : {}
   if (previous.cloud) {
     const [issue] = await db.select({ title: issues.title, content: issues.content }).from(issues).where(eq(issues.id, issueId)).limit(1)
     if (!issue) throw new ActionFailureError('issueNotFound')
-    const [{ queueCloudRun }, { latestThreadRunModel }] = await Promise.all([import('@/lib/computer/queue-run'), import('@/lib/computer/run-model')])
+    const { latestThreadRunModel } = await import('@/lib/computer/run-model')
     // The thread's own model and account; when it has none left, the person is told instead of another being used.
     const runModel = await latestThreadRunModel(pool, userId, issueId, run.agentId)
     if (!runModel) throw new ActionFailureError('threadModelUnavailable')
     const { ComputerError } = await import('@/lib/computer/store')
-    return queueCloudRun(pool, { userId, workspaceId: previous.cloud.workspaceId }, { botId: previous.cloud.botId, issueId, agentId: run.agentId, deviceRepoId, title: issue.title, body: tiptapToText(issue.content),
-      note, withoutBot: run.botId === null, idempotencyKey: `thread:${run.id}:${crypto.randomUUID()}`, threadRunId: run.id, ...runModel, ...readOnly })
+    const runtime = (await pool.query('SELECT "agentId" FROM bot_cloud_runtimes WHERE "botId"=$1 AND "ownerId"=$2 AND harness=$3',[previous.cloud.botId,userId,previous.harness])).rows[0]
+    if (!runtime) throw new ActionFailureError('threadCannotContinue')
+    const repo = (await pool.query(`SELECT r.id FROM device_repos r JOIN agents a ON a."deviceId"=r."deviceId" WHERE a.id=$1 AND r."userId"=$2 AND r."repoPath"=(SELECT "repoPath" FROM device_repos WHERE id=$3)`,[runtime.agentId,userId,deviceRepoId])).rows[0]
+    if (!repo) throw new ActionFailureError('agentRepoMissing')
+    return queueFactoryCloudTask(userId,run.botId,{issueId,agentId:runtime.agentId,deviceRepoId:repo.id,note,requestKey:`thread:${run.id}:${requestKey ?? crypto.randomUUID()}`,threadRunId:run.id},previous.cloud,{...runModel,...readOnly})
       .catch(error => { throw error instanceof ComputerError && error.message === 'Bot subscription unavailable' ? new ActionFailureError('threadModelUnavailable') : error })
   }
   if (!previous.remoteUrl) throw new ActionFailureError('agentRepoMissing')
@@ -84,6 +87,5 @@ async function queueNextRun(userId: string, run: typeof agentRuns.$inferSelect, 
   const { latestThreadRunModel } = await import('@/lib/computer/run-model')
   const runModel = await latestThreadRunModel(pool, userId, issueId, run.agentId)
   if (!runModel) throw new ActionFailureError('threadModelUnavailable')
-  const { queueRun } = await import('@/lib/agent-runs')
-  return queueRun(userId, { issueId, agentId: run.agentId, repo: previous.remoteUrl, note, ...runModel, threadRunId: run.id, ...readOnly }, run.botId, undefined, undefined, run.source === 'mcp' ? 'mcp' : null)
+  return queueFactoryTask(userId, { issueId, agentId: run.agentId, repo: previous.remoteUrl, note, ...runModel, threadRunId: run.id, ...(requestKey ? {requestKey:`thread:${run.id}:${requestKey}`.slice(0,200)} : {}), ...readOnly }, run.botId)
 }
