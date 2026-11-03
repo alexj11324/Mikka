@@ -120,6 +120,14 @@ test('create tool forwards only the host-provided request event, never a model a
   assert.deepEqual(created.mock.calls.at(-1)!.arguments, ['owner', { title: 'Task' }, 'event-call', undefined, COORDINATOR_BOT, eventId])
 })
 
+test('ordinary issue creation receives the original host request; model input cannot supply it', async () => {
+  const sourceEventId = 'b4000000-0000-4000-8000-000000000007'
+  const tools = registry.createCoordinatorRegistry('owner', COORDINATOR_BOT, undefined, { sourceEventId })
+  await tools.create_issue!.execute!({title:'Requested task'}, {toolCallId:'new-sdk-id',messages:[],context:{}})
+  assert.deepEqual(created.mock.calls.at(-1)!.arguments,['owner',{title:'Requested task'},'new-sdk-id',undefined,COORDINATOR_BOT,undefined,sourceEventId])
+  assert.equal(createIssueInput.safeParse({title:'Task',sourceEventId:'forged'}).success,false)
+})
+
 test('dispatch uses the same host event as task creation and exposes no event argument to the model', async () => {
   const eventId = 'b4000000-0000-4000-8000-000000000004'
   const tools = registry.createCoordinatorRegistry('owner', COORDINATOR_BOT, undefined, { coordinator: true,  taskEventId: eventId })

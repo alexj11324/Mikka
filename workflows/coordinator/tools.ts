@@ -96,7 +96,9 @@ export function createCoordinatorRegistry(userId: string, botId: string, scope?:
       inputSchema: createIssueInput,
       execute: (input, toolOptions) => options.taskEventId
         ? steps.createIssue(userId, input, toolOptions.toolCallId, scope, botId, options.taskEventId)
-        : steps.createIssue(userId, input, toolOptions.toolCallId, scope, botId),
+        : options.sourceEventId
+          ? steps.createIssue(userId, input, toolOptions.toolCallId, scope, botId, undefined, options.sourceEventId)
+          : steps.createIssue(userId, input, toolOptions.toolCallId, scope, botId),
     }),
     update_issue: tool({
       description: 'Update an existing task the person asked to change. Only supplied fields change; labels replaces the full label set. Read the task first. The assignee can only be a person.',

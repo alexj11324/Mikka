@@ -122,10 +122,24 @@ export async function takeInbox(userId: string, holder: string, botId: string): 
       return {held:true,...NO_TAKE}
     }
     const scheduledRead=scheduled?.scope??undefined
-    const due = scheduledRead ? [scheduledCandidate!] : isolateTaskRequest(candidates.filter(event => event.payload.source !== 'schedule_due' || event.id === scheduledCandidate?.id))
+    let due = scheduledRead ? [scheduledCandidate!] : isolateTaskRequest(candidates.filter(event => event.payload.source !== 'schedule_due' || event.id === scheduledCandidate?.id))
     if (!due.length) return { held: true, ...NO_TAKE }
-    const taskEventId = due.length === 1 && due[0].kind === 'user_message' && due[0].payload.taskDestination !== undefined ? due[0].id : undefined
-    const sourceEventId = scheduled ? undefined : due.findLast(event => event.kind === 'user_message')?.id
+    let taskEventId = due.length === 1 && due[0].kind === 'user_message' && due[0].payload.taskDestination !== undefined ? due[0].id : undefined
+    const source = due.findLast(event => event.kind === 'user_message' && event.payload.postedToChat !== true)
+      ?? due.findLast(event => event.kind === 'user_message')
+    let sourceEventId = scheduled ? undefined : source?.id
+    if (!scheduled && source?.payload.retry === true && source.payload.postedToChat === true) {
+      // A retry is a wake, not another human request. Resolve server-written
+      // provenance on the last actual person message, within this owned chat.
+      const [original] = await tx.select({ id: coordinatorEvents.id, payload: coordinatorEvents.payload }).from(coordinatorMessages)
+        .innerJoin(coordinatorEvents, and(eventsOf(userId, botId), eq(coordinatorEvents.kind, 'user_message'),
+          isNotNull(coordinatorEvents.deliveredAt), sql`${coordinatorEvents.id}::text = ${coordinatorMessages.message}->'mikkaUserEvent'->>'id'`))
+        .where(and(messagesOf(userId, botId), sql`${coordinatorMessages.message}->>'role' = 'user'`)).orderBy(desc(coordinatorMessages.position)).limit(1)
+      if (original) {
+        sourceEventId = original.id
+        if (original.payload.taskDestination !== undefined) { taskEventId = original.id; due = [source] }
+      }
+    }
     const isolatedTask = Boolean(taskEventId) || Boolean(scheduled)
     const backgroundLimit = isolatedTask ? 0 : INBOX_BATCH - due.length
     const background = backgroundLimit ? await tx.select().from(coordinatorEvents)

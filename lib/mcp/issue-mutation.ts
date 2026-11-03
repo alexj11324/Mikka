@@ -24,12 +24,27 @@ function canonical(value: unknown): unknown {
  */
 export async function idempotentIssueMutation<T extends { id: string } & Record<string, unknown>>(
   userId: string, operation: 'create_issue' | 'update_issue', toolCallId: string, input: unknown, mutate: () => Promise<T>, taskEvent?: { eventId: string; botId: string | null },
+  chatRequest?: { eventId: string; botId: string | null; teamId: string | null },
 ): Promise<T> {
   if (!toolCallId || toolCallId.length > 200) throw new IssueToolCallConflict()
-  const inputHash = createHash('sha256').update(JSON.stringify(canonical(taskEvent ? { input, taskEvent } : input))).digest('hex')
-  const key = and(eq(issueToolCalls.userId, userId), eq(issueToolCalls.toolCallId, toolCallId))
+  let identity: unknown = taskEvent ? { input, taskEvent } : input
+  if (chatRequest) {
+    const title = (input as { title?: unknown } | null)?.title
+    if (taskEvent || operation !== 'create_issue' || typeof title !== 'string' || !title.trim()) throw new IssueToolCallConflict()
+    // One requested title in one original person request has one frozen
+    // creation receipt. A regenerated body/SDK call ID cannot create it twice.
+    identity = { chatRequest, title: title.trim() }
+    toolCallId = `chat-create:${createHash('sha256').update(JSON.stringify(canonical(identity))).digest('hex')}`
+  }
+  const inputHash = createHash('sha256').update(JSON.stringify(canonical(identity))).digest('hex')
+  let key = and(eq(issueToolCalls.userId, userId), eq(issueToolCalls.toolCallId, toolCallId))
   const committed = await db.transaction(async tx => withDatabaseTransaction(tx, async () => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${'issue-tool:' + JSON.stringify([userId, toolCallId])}, 0))`)
+    if (chatRequest) {
+      const [source] = await tx.select().from(coordinatorEvents).where(and(eq(coordinatorEvents.id, chatRequest.eventId),
+        eq(coordinatorEvents.userId, userId), chatRequest.botId ? eq(coordinatorEvents.botId, chatRequest.botId) : isNull(coordinatorEvents.botId))).for('update')
+      if (!source || source.kind !== 'user_message' || !source.deliveredAt || source.payload.taskDestination !== undefined || source.payload.source === 'schedule_due') throw new IssueToolCallConflict()
+    }
     let event: typeof coordinatorEvents.$inferSelect | undefined
     if (taskEvent) {
       if (operation !== 'create_issue') throw new IssueToolCallConflict()
@@ -41,6 +56,16 @@ export async function idempotentIssueMutation<T extends { id: string } & Record<
         if (!device) throw new IssueToolCallConflict()
       }
     }
+    if (event?.issueId) {
+      // The explicit task request already owns one immutable creation. A new
+      // model call after failure reuses its receipt rather than creating again.
+      const [bound] = await tx.select().from(issueToolCalls).where(and(eq(issueToolCalls.userId, userId),
+        eq(issueToolCalls.operation, 'create_issue'), eq(issueToolCalls.issueId, event.issueId))).limit(1)
+      if (!bound) throw new IssueToolCallConflict()
+      await requireIssueAccess(bound.issueId)
+      key = and(eq(issueToolCalls.userId, userId), eq(issueToolCalls.toolCallId, bound.toolCallId))
+      return { result: bound.result as T, effects: bound.effects }
+    }
     const [prior] = await tx.select().from(issueToolCalls).where(key).limit(1)
     if (prior) {
       if (prior.operation !== operation || prior.inputHash !== inputHash) throw new IssueToolCallConflict()
@@ -48,7 +73,6 @@ export async function idempotentIssueMutation<T extends { id: string } & Record<
       await requireIssueAccess(prior.issueId)
       return { result: prior.result as T, effects: prior.effects }
     }
-    if (event?.issueId) throw new IssueToolCallConflict()
     const effects: IssueEffect[] = []
     const result = await collectIssueEffects(effects, mutate)
     if (event) await tx.update(coordinatorEvents).set({ issueId: result.id }).where(eq(coordinatorEvents.id, event.id))
