@@ -138,27 +138,56 @@ test('when no fence connection can be had the request is refused with 503, never
   for (const answer of await Promise.all(holding)) assert.equal(answer.status, 200)
 })
 
-test('ten concurrent device requests complete with three fence connections; fewer transactions than one fence per statement', { skip: !url }, async t => {
+test('ten concurrent device requests complete with three fence connections; fewer authorization transactions and round trips than one fence per statement', { skip: !url }, async t => {
   const { overrideDeploymentSwitch, runs } = await modules()
   const fs = await Promise.all(Array.from({ length: 10 }, () => fixture()))
   const answers = await Promise.all(fs.map(f => runs.GET(request(f), { params: Promise.resolve({ deviceId: f.device }) })))
   for (const answer of answers) assert.equal(answer.status, 200)
 
-  // Statements the server ran for one queued-runs poll, with and without the unit fence.
-  const count = async (unit: boolean) => {
-    overrideDeploymentSwitch('deviceUnitFence', unit)
-    const f = fs[0]
-    await runs.GET(request(f), { params: Promise.resolve({ deviceId: f.device }) })
-    const before = (await admin!.query(`SELECT coalesce(sum(xact_commit+xact_rollback),0)::bigint n FROM pg_stat_database WHERE datname=current_database()`)).rows[0].n
-    await runs.GET(request(f), { params: Promise.resolve({ deviceId: f.device }) })
-    await delay(1200)  // the fence's own COMMIT lands after the idle window
-    await admin!.query('SELECT pg_stat_clear_snapshot()')
-    const after = (await admin!.query(`SELECT coalesce(sum(xact_commit+xact_rollback),0)::bigint n FROM pg_stat_database WHERE datname=current_database()`)).rows[0].n
-    return Number(after) - Number(before)
+  // Count actual backend transaction completions on the request's checked-out
+  // clients. Database-wide statistics lag each backend and include our reader's
+  // own transactions, so a sleep + pg_stat_clear_snapshot cannot isolate this poll.
+  let completed = 0, roundTrips = 0, explicit = 0
+  type Message = { status?: string; text?: string }
+  type MessageConnection = { on: (event: string, listener: (message: Message) => void) => unknown; removeListener: (event: string, listener: (message: Message) => void) => unknown }
+  const observed = new Map<MessageConnection, { ready: (message: Message) => void; command: (message: Message) => void }>()
+  const emit = Pool.prototype.emit
+  Pool.prototype.emit = function (event: string | symbol, ...args: unknown[]) {
+    if (event === 'acquire') {
+      const connection = (args[0] as unknown as { connection: MessageConnection }).connection
+      if (!observed.has(connection)) {
+        const ready = (message: Message) => { roundTrips++; if (message.status === 'I') completed++ }
+        const command = (message: Message) => { if (message.text === 'BEGIN') explicit++ }
+        observed.set(connection, { ready, command })
+        connection.on('readyForQuery', ready)
+        connection.on('commandComplete', command)
+      }
+    }
+    return emit.call(this, event, ...args)
   }
-  const perStatement = await count(false)
-  const perUnit = await count(true)
-  t.diagnostic(JSON.stringify({ transactionsPerPollWithFencePerStatement: perStatement, transactionsPerPollWithUnitFence: perUnit }))
-  assert.ok(perUnit < perStatement, `unit fence ${perUnit} transactions, per statement ${perStatement}`)
+  try {
+    const count = async (unit: boolean) => {
+      overrideDeploymentSwitch('deviceUnitFence', unit)
+      const f = fs[0]
+      // Warm connections and install the observer before the measured request.
+      assert.equal((await runs.GET(request(f), { params: Promise.resolve({ deviceId: f.device }) })).status, 200)
+      const before = { completed, roundTrips, explicit }
+      assert.equal((await runs.GET(request(f), { params: Promise.resolve({ deviceId: f.device }) })).status, 200)
+      // The route awaits its fence COMMIT in finally. ReadyForQuery(I) includes
+      // both explicit COMMIT/ROLLBACK and implicit autocommit transactions.
+      return { completed: completed - before.completed, roundTrips: roundTrips - before.roundTrips, explicit: explicit - before.explicit }
+    }
+    const perStatement = await count(false)
+    const perUnit = await count(true)
+    t.diagnostic(JSON.stringify({ perStatement, perUnit, measurement: 'backend_command_tags_and_ready_for_query' }))
+    assert.ok(perUnit.explicit < perStatement.explicit, `unit fence ${perUnit.explicit} explicit authorization transactions, per statement ${perStatement.explicit}`)
+    assert.ok(perUnit.roundTrips < perStatement.roundTrips, `unit fence ${perUnit.roundTrips} round trips, per statement ${perStatement.roundTrips}`)
+  } finally {
+    Pool.prototype.emit = emit
+    for (const [connection, listeners] of observed) {
+      connection.removeListener('readyForQuery', listeners.ready)
+      connection.removeListener('commandComplete', listeners.command)
+    }
+  }
   overrideDeploymentSwitch('deviceUnitFence', true)
 })
