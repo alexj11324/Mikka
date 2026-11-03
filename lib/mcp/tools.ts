@@ -14,6 +14,7 @@ import { issueForUser } from '@/lib/issue-access'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 import { tiptapToText } from '@/lib/tiptap-text'
 import { coordinatorLeaseActive } from '@/lib/coordinator/lease'
+import { issueAttrsContent } from '@/lib/issue-summary-columns'
 
 // What the MCP tools read and write, scoped to one person. The Coordinator's
 // own tools (workflows/coordinator/steps.ts) read the same tables.
@@ -54,6 +55,14 @@ function displayMessage(message: ModelMessage): { role: 'user' | 'assistant'; te
   return { role: message.role, text, ...(toolCalls.length ? { toolCalls } : {}) }
 }
 
+/** Whether an assistant reply is past `after`. Only the position comes back; the wait does not transfer message bodies. */
+async function hasAssistantAfter(userId: string, after: number) {
+  const [row] = await db.select({ position: coordinatorMessages.position })
+    .from(coordinatorMessages).where(and(eq(coordinatorMessages.userId, userId), eq(coordinatorMessages.botId, await coordinatorChat(userId)), gt(coordinatorMessages.position, after), sql`${coordinatorMessages.message}->>'role' = 'assistant'`))
+    .limit(1)
+  return Boolean(row)
+}
+
 async function messagesAfter(userId: string, after: number, limit: number) {
   const rows = await db.select({ position: coordinatorMessages.position, message: coordinatorMessages.message, createdAt: coordinatorMessages.createdAt })
     .from(coordinatorMessages).where(and(eq(coordinatorMessages.userId, userId), eq(coordinatorMessages.botId, await coordinatorChat(userId)), gt(coordinatorMessages.position, after)))
@@ -84,11 +93,15 @@ export async function readCoordinatorMessages(userId: string, input: { after?: n
   const limit = input.limit ?? 20
   const started = new Date()
   const deadline = started.getTime() + (input.waitSeconds ?? 0) * 1000
+  const waiting = (input.waitSeconds ?? 0) > 0
   for (;;) {
-    const [messages, turn] = await Promise.all([messagesAfter(userId, after, limit), turnState(userId)])
-    const replied = messages.some(message => message.role === 'assistant')
+    const turn = await turnState(userId)
+    const due = !waiting || Date.now() + REPLY_POLL_MS > deadline
     const failed = Boolean(turn.errorAt && turn.errorAt >= started)
-    if (replied || failed || Date.now() + REPLY_POLL_MS > deadline) {
+    const arrived = !waiting || due || failed || await hasAssistantAfter(userId, after)
+    if (arrived) {
+      const messages = await messagesAfter(userId, after, limit)
+      const replied = messages.some(message => message.role === 'assistant')
       return { messages, replied, last: messages.at(-1)?.position ?? after, working: turn.working, lastError: turn.error, coordinatorRunning: coordinatorEnabled() }
     }
     await new Promise(resolve => { setTimeout(resolve, REPLY_POLL_MS) })
@@ -96,7 +109,7 @@ export async function readCoordinatorMessages(userId: string, input: { after?: n
 }
 
 export async function listIssues(userId: string, input: { status?: string }) {
-  const rows = await db.selectDistinct({ id: issues.id, title: issues.title, status: issues.status, priority: issues.priority, content: issues.content, updatedAt: issues.updatedAt })
+  const rows = await db.selectDistinct({ id: issues.id, title: issues.title, status: issues.status, priority: issues.priority, content: issueAttrsContent, updatedAt: issues.updatedAt })
     .from(issues).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId)))
     .where(and((await issueVisibility(userId)).predicate, input.status ? eq(issues.status, input.status) : undefined))
     .orderBy(desc(issues.updatedAt)).limit(100)
@@ -111,7 +124,7 @@ export async function getIssue(userId: string, issueId: string) {
   const runs = await visibleRuns(userId, { issueId: issue.id, limit: 5 })
   const metadata = readIssueMetadata(issue.content)
   // Children and the issues this one blocks point at it, so they are found by looking the other way.
-  const siblings = await db.select({ id: issues.id, title: issues.title, status: issues.status, content: issues.content }).from(issues)
+  const siblings = await db.select({ id: issues.id, title: issues.title, status: issues.status, content: issueAttrsContent }).from(issues)
     .leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId)))
     .where(and(eq(issues.userId, issue.userId), (await issueVisibility(userId)).predicate))
   const linked = new Map(siblings.filter(row => !readIssueMetadata(row.content).deletedAt).map(row => [row.id, { id: row.id, title: row.title, status: row.status, parentId: readIssueMetadata(row.content).parentId, blockedByIds: readIssueMetadata(row.content).blockedByIds }]))

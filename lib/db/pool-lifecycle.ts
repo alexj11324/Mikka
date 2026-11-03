@@ -11,6 +11,8 @@ export function manageDatabasePool(pool: Pool): Pool {
   // pg removes a failed idle client itself. Consume its error without logging
   // server messages, SQL, parameters or connection credentials.
   pool.on('error', () => console.warn('database_pool_idle_connection_lost'))
-  attachDatabasePool(pool)
+  // Fluid releases idle clients when the isolate suspends. Off Vercel the helper
+  // is not the runtime, and calling it there fails local and CI pools.
+  if (process.env.VERCEL) attachDatabasePool(pool)
   return pool
 }

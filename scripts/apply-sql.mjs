@@ -20,7 +20,7 @@ if (!configuredUrl) {
 
 const directUrl = directDatabaseURL(configuredUrl)
 const pool = new Pool({ connectionString: directUrl, max: 1, connectionTimeoutMillis: 10_000, idleTimeoutMillis: 20_000 })
-pool.on('error', () => console.warn('admin_idle_connection_lost'))
+pool.on?.('error', () => console.warn('admin_idle_connection_lost'))
 try {
   const [{ database, branch }] = (await pool.query("select current_database() as database, current_setting('neon.branch_id', true) as branch")).rows
   console.log(`target ${database} (${branch ?? 'non-Neon Postgres'})`)

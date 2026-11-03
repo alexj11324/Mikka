@@ -2,7 +2,7 @@ import { withDeviceRoute } from '@/lib/device-route'
 import { NextResponse } from 'next/server'
 import { eq } from 'drizzle-orm'
 import { db } from '@/lib/db'
-import { readRepositorySettings } from '@/lib/device-repositories'
+import { readRepositoryDaemonSettings } from '@/lib/device-repositories'
 import { deviceRepos } from '@/lib/db/schema'
 import { authenticateDevice, ownsDevice } from '@/lib/device-link'
 
@@ -14,9 +14,9 @@ async function handleGET(request: Request, { params }: { params: Promise<{ devic
   if (!caller) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { deviceId } = await params
   if (!await ownsDevice(deviceId, caller.userId)) return NextResponse.json({ error: 'Unknown device.' }, { status: 404 })
-  const rows = await db.select().from(deviceRepos).where(eq(deviceRepos.deviceId, deviceId))
+  const rows = await db.select({ id: deviceRepos.id, repoPath: deviceRepos.repoPath, remoteUrl: deviceRepos.remoteUrl }).from(deviceRepos).where(eq(deviceRepos.deviceId, deviceId))
   const repos = await Promise.all(rows.map(async repo => {
-    const settings = repo.remoteUrl ? await readRepositorySettings(caller.userId, repo.remoteUrl) : null
+    const settings = repo.remoteUrl ? await readRepositoryDaemonSettings(caller.userId, repo.remoteUrl) : null
     return {
       repoId: repo.id,
       name: repo.repoPath.split('/').filter(Boolean).pop() ?? repo.repoPath,

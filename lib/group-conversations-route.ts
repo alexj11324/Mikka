@@ -41,7 +41,7 @@ export async function respondGroup(request: Request, resource: GroupRequest['res
     // Do not trust client-controlled x-forwarded-host to satisfy the Origin check.
     host: request.headers.get('host') ?? url.host,
     body: request.method !== 'GET' ? await request.text().catch(() => '') : undefined,
-    before: url.searchParams.get('before'), limit: url.searchParams.get('limit'), workspaceId: url.searchParams.get('workspaceId') ?? session?.tokenWorkspaceId,
+    before: url.searchParams.get('before'), after: url.searchParams.get('after'), limit: url.searchParams.get('limit'), workspaceId: url.searchParams.get('workspaceId') ?? session?.tokenWorkspaceId,
   }, true)
   if (resource === 'messages' && id && result.status < 300) {
     // A send starts the worker. A history read (polled while a reply is generating) starts it only

@@ -58,7 +58,7 @@ try {
   // Commits remain per file/connection, not distributed across targets.
   for (const [target, pending] of byTarget) {
     const pool = new Pool({ connectionString: directDatabaseURL(targets[target]), max: 1, connectionTimeoutMillis: 10_000, idleTimeoutMillis: 20_000 })
-    pool.on('error', () => console.warn('migration_idle_connection_lost'))
+    pool.on?.('error', () => console.warn('migration_idle_connection_lost'))
     const state = { target, pending, pool }
     states.push(state)
     await pool.query('create table if not exists schema_migrations (name text primary key, "appliedAt" timestamptz not null default now())')

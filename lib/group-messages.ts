@@ -18,7 +18,7 @@ export type GroupMessage = {
 }
 /** The first page also says which member is answering (`agentStatus`, null when none) and whether the last message found no taker. */
 /** `stopped`: the latest reply was stopped (停止) by a member. */
-export type GroupMessagePage = { messages: GroupMessage[]; nextBefore: string | null; agentStatus?: { status: string } | null; routingError?: { code: string } | null; stopped?: boolean }
+export type GroupMessagePage = { messages: GroupMessage[]; nextBefore: string | null; agentStatus?: { status: string } | null; routingError?: { code: string } | null; stopped?: boolean; unchanged?: boolean; appended?: boolean }
 export type GroupMessagesError = 'unauthorized' | 'not_found' | 'unavailable'
 
 export class GroupMessagesRequestError extends Error {
@@ -27,15 +27,16 @@ export class GroupMessagesRequestError extends Error {
 
 export const GROUP_PAGE_SIZE = 50
 
-export function groupMessagesUrl(id: string, before?: string | null) {
+export function groupMessagesUrl(id: string, before?: string | null, after?: string | null) {
   const params = new URLSearchParams({ limit: String(GROUP_PAGE_SIZE) })
   if (before) params.set('before', before)
+  if (after) params.set('after', after)
   return withBasePath(`/api/conversations/${encodeURIComponent(id)}/messages?${params}`)
 }
 
-export async function fetchGroupMessages(id: string, before?: string | null, fetcher: typeof fetch = fetch): Promise<GroupMessagePage> {
+export async function fetchGroupMessages(id: string, before?: string | null, fetcher: typeof fetch = fetch, after?: string | null): Promise<GroupMessagePage> {
   let response: Response
-  try { response = await fetcher(groupMessagesUrl(id, before), { cache: 'no-store', credentials: 'same-origin' }) }
+  try { response = await fetcher(groupMessagesUrl(id, before, after), { cache: 'no-store', credentials: 'same-origin' }) }
   catch { throw new GroupMessagesRequestError('unavailable') }
   const body = await response.json().catch(() => null) as GroupMessagePage | null
   if (response.ok && body && Array.isArray(body.messages)) return body
@@ -61,6 +62,22 @@ export async function stopGroupReply(id: string, fetcher: typeof fetch = fetch):
   try { response = await fetcher(withBasePath(`/api/conversations/${encodeURIComponent(id)}/stop`), { method: 'POST', credentials: 'same-origin' }) }
   catch { throw new GroupMessagesRequestError('unavailable') }
   if (!response.ok) throw new GroupMessagesRequestError(response.status === 401 ? 'unauthorized' : response.status === 404 ? 'not_found' : 'unavailable')
+}
+
+/** A poll that already shows the latest message keeps that page. New messages are prepended; a full page replaces it. */
+export function mergeGroupPoll(previous: GroupMessagePage | null, next: GroupMessagePage): GroupMessagePage {
+  if (!previous) return next
+  if (next.unchanged) return { ...previous, agentStatus: next.agentStatus ?? null, routingError: next.routingError ?? null, stopped: next.stopped }
+  if (next.appended) {
+    const seen = new Set(previous.messages.map(message => message.id))
+    const added = next.messages.filter(message => !seen.has(message.id))
+    return { ...previous, ...next, messages: [...added, ...previous.messages], nextBefore: previous.nextBefore, unchanged: undefined, appended: undefined }
+  }
+  return next
+}
+
+export function newestGroupPosition(messages: readonly GroupMessage[]): string | null {
+  return messages.reduce<string | null>((max, message) => max === null || BigInt(message.position) > BigInt(max) ? message.position : max, null)
 }
 
 /** Pages arrive newest first; the chat reads oldest first. Duplicates (a page

@@ -37,6 +37,15 @@ export async function ensureDeviceRepository(userId: string, deviceId: string, i
   return existing ? withDatabaseClient(existing, () => prepare(db)) : db.transaction(prepare)
 }
 
+/** Setup and network allow-list for a daemon heartbeat. Push approval stays on the claim, so this poll does not read it. */
+export async function readRepositoryDaemonSettings(userId: string, remoteUrl: string) {
+  let key: string
+  try { key = remoteKey(remoteUrl) } catch { return null }
+  const [settings] = await db.select({ setup: repositorySettings.setup, networkAllow: repositorySettings.networkAllow }).from(repositorySettings)
+    .where(and(eq(repositorySettings.userId, userId), eq(repositorySettings.remoteKey, key))).limit(1)
+  return settings ?? null
+}
+
 export async function readRepositorySettings(userId: string, remoteUrl: string) {
   let key: string
   try { key = remoteKey(remoteUrl) } catch { return null }

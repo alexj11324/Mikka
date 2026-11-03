@@ -191,6 +191,21 @@ export async function deviceMayHaveWork(deviceId: string, skip: readonly string[
 }
 
 /**
+ * The oldest update or restart still waiting, for a daemon too old to take
+ * device commands from `deviceMayHaveWork`. Same unlocked credential snapshot:
+ * an idle poll must not lock the device row, and a revoked credential returns
+ * nothing before the command id is handed over.
+ */
+export async function deviceUpdateNotice(deviceId: string): Promise<{ id: string; kind: DeviceCommandKind } | null> {
+  const { readUnderDeviceAuthority } = await import('@/lib/db')
+  return readUnderDeviceAuthority<{ id: string; kind: DeviceCommandKind } | null>(
+    `(SELECT json_build_object('id', c.id, 'kind', c.kind) FROM device_management_commands c
+      WHERE c."deviceId"=$1 AND c."completedAt" IS NULL AND c.kind = ANY($2::text[])
+      ORDER BY c."createdAt" LIMIT 1)`,
+    [deviceId, ['update', 'restart']])
+}
+
+/**
  * What a device has waiting, read with one query of its runs per poll:
  * - `commands`: a person's message to a running agent (repeats until acked)
  *   and a stop someone asked for (repeats until the run ends);
