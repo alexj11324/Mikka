@@ -10,7 +10,7 @@ const TEMPLATES = { desktop: 'tpl1', claude: 'tpl2', codex: 'tpl3' }
 const CATALOGUE = JSON.stringify({ version: 1, workerSha: SHA, templates: Object.fromEntries(Object.keys(TEMPLATES).map(kind => [kind, { templateId: TEMPLATES[kind], models: MODELS[kind] }])) })
 const STORED = { MIKKA_CLOUD_TEMPLATE_MODELS: CATALOGUE, E2B_BYO_COMPUTER_TEMPLATE: 'tpl1', E2B_CLAUDE_TEMPLATE: 'tpl2', E2B_CODEX_TEMPLATE: 'tpl3', MIKKA_CLOUD_WORKER_SHA: SHA }
 
-function fakeVercel({ inFlight = 0, stored = STORED, redeploy = 'READY', commit } = {}) {
+function fakeVercel({ inFlight = 0, stored = STORED, redeploy = 'READY', commit, newerCommit } = {}) {
   const calls = []
   let listings = 0
   const fetchImpl = async (url, init) => {
@@ -22,6 +22,7 @@ function fakeVercel({ inFlight = 0, stored = STORED, redeploy = 'READY', commit 
     if (path.includes('/env/id-')) return json({ value: stored[path.split('/env/id-')[1]] })
     if (path === '/v6/deployments') return json({ deployments: [
       ...(listings++ < inFlight ? [{ uid: 'dpl_new', name: 'mikka', state: 'BUILDING' }] : []),
+      ...(newerCommit ? [{ uid: 'dpl_newer', name: 'mikka', state: 'READY', meta: { githubCommitSha: newerCommit } }] : []),
       { uid: 'dpl_live', name: 'mikka', state: 'READY', meta: { githubCommitSha: commit } }] })
     if (method === 'POST' && path === '/v13/deployments') return json({ id: 'dpl_redeploy' })
     if (path === '/v13/deployments/dpl_redeploy') return json({ readyState: redeploy, meta: { githubCommitSha: commit } })
@@ -94,9 +95,18 @@ test('official runtime cannot redeploy a READY application from a different comm
   const stored = Object.fromEntries(pairEnv({ templates, sourceSha: SHA, models: MODELS }).map(row => [row.key, row.value]))
   stored.MIKKA_CLOUD_WORKER_SOURCE_COMMIT = sourceCommit
   const fake = fakeVercel({ stored, commit: 'c'.repeat(40) })
-  await assert.rejects(run(fake, { templates, sourceCommit }), /no_ready_production_deployment/)
+  await assert.rejects(run(fake, { templates, sourceCommit }), /production_source_changed/)
   assert.ok(!fake.calls.some(row => row.method === 'POST' && row.path.endsWith('/env')))
   assert.ok(!fake.calls.some(row => row.method === 'POST' && row.path === '/v13/deployments'))
+})
+
+test('a newer READY main application cannot be replaced by an older matching source', async () => {
+  const sourceCommit = 'b'.repeat(40), templates = { desktop: 'desktop', claude: 'claude', codex: 'codex' }
+  const stored = Object.fromEntries(pairEnv({ templates, sourceSha: SHA, models: MODELS }).map(row => [row.key, row.value]))
+  stored.MIKKA_CLOUD_WORKER_SOURCE_COMMIT = sourceCommit
+  const fake = fakeVercel({ stored, commit: sourceCommit, newerCommit: 'c'.repeat(40) })
+  await assert.rejects(run(fake, { templates, sourceCommit }), /production_source_changed/)
+  assert.equal(fake.calls.filter(row => row.method === 'POST').length, 0, 'keep the newer application and all configuration intact')
 })
 
 test('official runtime refuses custom templates and invalid commits before writing production', async () => {

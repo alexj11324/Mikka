@@ -1,4 +1,5 @@
 import 'server-only'
+import { botWorkspacePath, initializeBotWorkspace } from '@/lib/computer/bot-workspace'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
 import { NotFoundError, Sandbox, SandboxNotFoundError } from 'e2b'
@@ -303,6 +304,11 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
       throw new ComputerError(409, 'Thread stopped')
     }
     await client.query('COMMIT')
+    if (!machine.sandboxId && !repositoryTask && isOfficialE2BTemplate(machine.snapshotId) && run.repoPath === botWorkspacePath(run.runtimeBotId)) {
+      // A fresh official instance never inherits the parent Bot's files. Give
+      // its registered private workspace a Git base before the daemon starts.
+      await initializeBotWorkspace(sandbox, run.runtimeBotId)
+    }
     if (!machine.sandboxId && !repositoryTask && !isOfficialE2BTemplate(machine.snapshotId)) {
       // Filesystem snapshots start no old worker process. Remove copied device
       // identity/capabilities before a new worker can make any network call.
