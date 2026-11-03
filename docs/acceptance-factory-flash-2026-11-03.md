@@ -1,8 +1,8 @@
 # Factory API/CLI acceptance — #1118
 
 The selected Factory acceptance items **1, 2 and 3 passed** on fixed runtime
-commit `2f07e6da05eef3c446e5caf5c11fa23aaaf27dc6`. No product source changes were
-needed. This completes the remaining local acceptance in
+commit `2f07e6da05eef3c446e5caf5c11fa23aaaf27dc6`. That run needed no backend fixes;
+the screenshot follow-up below added three UI corrections. This records the local acceptance in
 [#1118](https://github.com/alexj11324/Mikka/issues/1118).
 
 ## Environment and version
@@ -121,3 +121,88 @@ This proves the selected local API/CLI Factory flow with real model, daemon,
 PostgreSQL and local Git. GitHub API behavior is synthetic. It does not establish
 real E2B, production OAuth, browser UI, production merge, or items 4–8 acceptance.
 No browser tests, production database writes or main pushes were performed.
+
+## Real UI follow-up requested by Alex
+
+Alex required screenshots of the actual acceptance process and the human UI,
+then identified the separated commit icon, duplicate footer SHA and incorrect
+environment label in those screenshots. Changes are on the same handoff branch,
+without a PR or main push:
+
+- `8efe8924931702577322fb206def409d3a5ef87d`: one compact copyable commit label;
+  removed the repeated candidate SHA from the action bar. Browser geometry
+  confirms a 4px icon/text gap, one candidate copy control and zero footer copies.
+- `cc9b2c4e`: actual runtime environment/machine name instead of the approval
+  fallback; keep accepted reports reachable and read the persisted task state.
+  The real UI accept had returned HTTP 200/accepted while the prior view still
+  displayed pending. Three added regressions failed before the fix and pass now.
+
+The repeat owned environment is
+`.cache/dev-local/acceptance-f656a8c50c844a4d`, run
+`f656a8c5-0c84-4a4d-ae4f-c2c77ab1cb87`, database
+`mikka_loop_f656a8c50c84_e2e`, PG17.11 in `mikka-factory-1118-final-db`, same
+loopback origin and automatic test-account mechanism. Fixed model execution was
+on `8efe8924`; its selected item 1 passed and recorded fixed-source evidence.
+The runner's fingerprint covers its enumerated runtime paths, not components;
+the clean Git revision and component hashes additionally identify the UI.
+
+Code task `5f74a62f-be1e-43d1-91e5-f903beb4218b`, candidate
+`d01cd65f-a70e-4605-90bc-235b89d9f986`, SHA
+`aac66e8928cb24214ea22949e7020a7f3eb155e1`:
+
+| Stage | Run | Session | Result |
+| --- | --- | --- | --- |
+| execute | `8ab0c13e-f8cb-48f3-8f31-e929c66dad49` | `98eee8f4-b6ad-4995-9d5b-b2bf4a589710` | passed |
+| review | `5c8de65c-32d6-4584-afd6-9afa4f7e030c` | `068337c2-3323-43ed-a019-3ced25082d56` | passed |
+| verify | `0fd4561f-2412-497f-8221-d0b76b3c9c14` | `203cb733-a7b3-4e4a-930f-7b2d50117880` | passed |
+
+The real pane displays 4/4 criteria, independent results and the human merge
+button. This synthetic code PR remains pending the person's merge.
+
+Report task `c108e2c6-d461-4244-960e-9b970d482e9b`, candidate
+`4c07c637-366a-4ffb-8825-08716836bfec`, inspected SHA
+`f23c2eaee169dc1cdf97c725cad12e783fafd90c`:
+
+| Stage | Run | Session | Result |
+| --- | --- | --- | --- |
+| execute | `d4e393da-dbc0-4a13-868f-735cfa982806` | `0fa09756-ae6f-4757-a3d2-64c78c7169d2` | passed |
+| review | `5c2aeeb3-b5e4-4347-b4c7-b2eb0bf6e7b2` | `e72592e6-1709-490f-be9f-7a1c7f767519` | passed |
+| verify | `95e6dcce-a38c-41cd-aade-7f23785b0d4c` | `e594797c-d654-4c9d-99de-15c613f3755c` | passed |
+
+The report request was entered into the real Coordinator composer. Initial run
+`fa4f93c4-7045-41a0-b9f2-1a26e8604fc8` failed with `Server unreachable` at startup;
+the host's existing bounded repair dispatched the successful execute above.
+This failure is retained. All seven frozen runs/journal assignments and all six
+successful root CLI sessions used `deepseek-flash`. The two nested CLI Agent
+transcripts also record only `deepseek-flash`.
+
+At **12:30:01 UTC / 07:30:01 America/New_York**, the real report UI's 验收 button
+sent its bound accept operation and returned HTTP 200 with `status: accepted`.
+The persisted acceptance row binds that candidate. The UI initially remained
+pending, demonstrating the state bug. All model runs were terminal before the
+subsequent view-only corrections; the corrected UI reloaded the same retained
+data and now shows **已验收**, 5/5 criteria and actual machine name
+`579a43969c3c`. No record was fabricated or rewritten to produce the screenshot.
+
+Screenshot gallery: `/tmp/factory-1118-ui/index.html`. Key original browser
+captures are `07-fixed-code-execution.png`, `11-review-evidence-open.png`,
+`12-report-before-accept.png`, `14-report-accepted-fixed.png` and
+`15-final-environment-and-commit.png`; the bound UI response is recorded in
+`ui-acceptance-receipt.json`. Images are actual 1600×1000 Chromium captures of
+the isolated **development** application, not production-build design approval.
+Browser control tools were not callable; the existing cloud Chromium was used
+through a temporary capture script. No browser test suite was run. Final page
+captures had no page/console errors; an earlier accept captured a development
+React `useInsertionEffect` warning, retained with that earlier capture.
+
+Validation on the final UI: 54 component/state/evidence checks, typecheck,
+UI/interaction policy, i18n and targeted oxlint all passed. Earlier stale
+generated Next route types were retained under `/tmp`, then regenerated; no
+application type was suppressed. Main remains untouched; coordinator integration
+and Alex's visual review are still pending.
+
+Cleanup: all seven runs terminal; device token revoked; lease
+`3e3eca62-1d63-4376-bbff-7de893acb73d` ended/quarantined at 12:38:30 UTC. Owned
+application/fixture/daemon stopped, ports 3110/3191 closed, temporary daemon
+credentials removed. The final PG container was stopped with its data/evidence
+retained. Earlier isolated containers were also stopped and retained.
