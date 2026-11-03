@@ -38,8 +38,11 @@ SQL writes, provider credentials or provider calls occur in these regressions.
 
 - MCP regression failed before implementation and passed after. Real Git
   evidence, retained dirty checkout and absent check-stage capability are checked.
-- 36 daemon Agent/repository tests pass, including fresh A-to-B clone/worktree
+- 49 daemon Agent/repository/Codex transport tests pass, including fresh A-to-B clone/worktree
   origin/HEAD, retained A bytes and rejection of cross-repository continuation.
+  Codex admits only the capabilities in the host-created MCP configuration:
+  execution-side repository selection and fixed-check artifact inspection have
+  separate grants. Both were declined by its previous fixed hand-in allow-list.
 - 19 database tests pass, including normal completion regressions and seven
   selection cases: replay, authorized target, forbidden/invalid target,
   revocation, check-stage refusal, stop precedence, atomic credential-fallback

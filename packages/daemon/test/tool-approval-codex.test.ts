@@ -67,6 +67,25 @@ it.each(['MIKKA_ELICITATION_TEST', 'MIKKA_CONTEXT_ELICITATION_TEST'] as const)('
   expect(existsSync(join(stateDir, 'runs', 'run-1', 'handoff.json'))).toBe(false)
 })
 
+it.each([false, true])('permits repository selection only on an executing Agent (fixed check: %s)', async fixed => {
+  const cwd = await makeRepo(), policy = defaultRunPolicy()
+  const gate = new ToolApprovalGate('run-1', { isLive: () => true })
+  const session = await adapter().start({ runId: 'run-1', kind: 'implement', cwd, prompt: 'MIKKA_REPOSITORY_ELICITATION_TEST', policy,
+    ...(fixed ? { factoryCheck: { stage: 'review' as const, reportOnly: true, inferCommand: false } } : {}),
+    env: { PATH: process.env.PATH ?? '' }, log: createLogger(), toolApproval: gate })
+  const result = await output(session)
+  expect(result.first).toEqual({ action: fixed ? 'decline' : 'accept', ...(fixed ? {} : { content: {} }) })
+  for (const name of ['foreignThread', 'foreignTurn', 'unknownServer', 'replay', 'afterCompletion']) expect(result[name]).toEqual({ action: 'decline' })
+})
+
+it('permits the advertised fixed artifact reader without a repository-switch grant', async () => {
+  const cwd = await makeRepo(), gate = new ToolApprovalGate('run-1', { isLive: () => true })
+  const session = await adapter().start({ runId: 'run-1', kind: 'implement', cwd, prompt: 'MIKKA_ARTIFACT_ELICITATION_TEST',
+    factoryCheck: { stage: 'verify', reportOnly: true, inferCommand: false }, policy: defaultRunPolicy(),
+    env: { PATH: process.env.PATH ?? '' }, log: createLogger(), toolApproval: gate })
+  expect((await output(session)).first).toEqual({ action: 'accept', content: {} })
+})
+
 it('refuses an unregistered Mikka tool', async () => {
   const cwd = await makeRepo(), policy = defaultRunPolicy()
   const gate = new ToolApprovalGate('run-1', { isLive: () => true })
