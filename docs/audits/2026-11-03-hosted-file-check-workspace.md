@@ -8,7 +8,7 @@ The daemon now recognizes read-only Factory review/verify assignments as hosted 
 
 The regression consumes the real daemon claim path without MemoryServer's synthetic remote URL, then checks review and verify against the exact candidate commit. Before the fix both checks completed with an error instead of a submitted report. Afterward both independently created worktrees contain the actual marker file at the pinned Git HEAD. The verify case also exercises the expected-origin check and refuses a mismatched origin before any worktree is created. This uses the real daemon and Git with a synthetic model, not a paid-provider acceptance claim.
 
-Validation: 71 daemon run/native-runner tests pass. Daemon typecheck and targeted lint pass. Reference: [Git worktrees](https://git-scm.com/docs/git-worktree) share repository objects while retaining independent working trees and HEADs. Production acceptance remains a separate step after releasing the updated worker templates.
+Validation: 71 daemon run/native-runner tests pass. Daemon typecheck passes. Explicit lint of the changed daemon files reports only the same three pre-existing `no-useless-spread` warnings as the base revision; repository lint excludes `packages/`. Reference: [Git worktrees](https://git-scm.com/docs/git-worktree) share repository objects while retaining independent working trees and HEADs. Production acceptance remains a separate step after releasing the updated worker templates.
 
 ## Disk recovery boundary
 
