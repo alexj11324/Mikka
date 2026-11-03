@@ -114,11 +114,14 @@ func (w *Worker) PrepareRuntime(ctx context.Context, epoch int64) (Metadata, err
 	_, _ = w.Cleanup(ctx)
 	return w.Status(ctx)
 }
-func (w *Worker) activeRuntime(ctx context.Context, epoch int64, model string) (Record, error) {
-	if err := w.authorizeRuntime(ctx, epoch, "active", model); err != nil {
-		return Record{}, err
+func (w *Worker) activeRuntime(ctx context.Context, epoch int64, model string) error {
+	if !validScope(w.Scope) {
+		return ErrUnavailable
 	}
-	return w.Repo.Lookup(ctx, w.Scope)
+	// Every chunk and heartbeat still rechecks revocation and the exact binding.
+	// The caller never uses a credential record here: fetching its nineteen
+	// columns after authorization only repeats database transfer for each chunk.
+	return w.authorizeRuntime(ctx, epoch, "active", model)
 }
 
 // The credential owner ($2) may serve this run: it is their own, or they share
