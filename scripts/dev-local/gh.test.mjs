@@ -73,6 +73,8 @@ test('real agent-shaped push, gh PR and exact-head receipt use only the fixture 
       assert.equal(evidence.sha,commit);assert.equal(evidence.readOnly,true)
       assert.match(evidence.diff,/Real fixture delivery/)
       assert.equal(evidence.pullRequest.headSha,commit);assert.equal(evidence.pullRequest.taskBound,true)
+      assert.equal(evidence.pullRequest.headRefName,'mikka/fixture-1');assert.equal(evidence.pullRequest.baseRefName,'trunk')
+      assert.deepEqual(evidence.pullRequest.ci,{sha:commit,state:'SUCCESS'})
       assert.ok(evidence.pullRequest.body.endsWith(`<!-- mikka-issue:${issueId} -->`))
       assert.equal(tokenRequests,1)
       const base=git(['rev-parse','HEAD^'])

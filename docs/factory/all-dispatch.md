@@ -111,7 +111,9 @@ not model/provider credentials, and stop when their MCP parent closes.
 Read-only checks also receive `inspect_candidate`: a fixed-candidate Git diff
 and, when the run already has a GitHub connection, an authenticated delivery-PR
 read. PR reads are restricted to the assigned repository, exact candidate head
-and task issue marker. No arbitrary GitHub command or write is exposed. This
+and task issue marker. Branch names and CI status are read for the exact same
+SHA, so verification need not trust the implementation report for those facts.
+No arbitrary GitHub command or write is exposed. This
 closes the real private-PR observation gap that otherwise caused a successful
 implementation to be sent back for repair despite correct code.
 
