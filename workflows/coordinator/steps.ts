@@ -40,6 +40,7 @@ import { runComposioAction } from '@/lib/composio'
 import { writeAccountAction } from '@/lib/pending-action-store'
 import { issueForUser } from '@/lib/issue-access'
 import { readIssueMetadata } from '@/lib/issue-metadata'
+import { issueAttrsContent } from '@/lib/issue-summary-columns'
 import { tiptapToText } from '@/lib/tiptap-text'
 import type { PendingTelegramTarget } from '@/lib/coordinator/telegram-pending'
 import { createTelegramReplies } from '@/lib/coordinator/telegram-replies'
@@ -415,7 +416,7 @@ accountWrite.maxRetries = 0
 export async function listIssues(userId: string, input: { status?: string }, scope?: NativeToolScope) {
   'use step'
   await assertNativeToolScope(userId,scope)
-  const rows = await db.selectDistinct({ id: issues.id, title: issues.title, status: issues.status, priority: issues.priority, content: issues.content, updatedAt: issues.updatedAt })
+  const rows = await db.selectDistinct({ id: issues.id, title: issues.title, status: issues.status, priority: issues.priority, content: issueAttrsContent, updatedAt: issues.updatedAt })
     .from(issues).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId)))
     .where(and((await issueVisibility(userId)).predicate, input.status ? eq(issues.status, input.status) : undefined))
     .orderBy(desc(issues.updatedAt)).limit(100)

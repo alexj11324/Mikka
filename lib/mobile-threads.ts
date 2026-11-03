@@ -8,6 +8,7 @@ import { threadName } from '@/lib/issue-threads'
 import type { RunSource } from '@/lib/coordinator/citations'
 import { runBotName } from '@/lib/run-bot-name'
 import { readIssueMetadata } from '@/lib/issue-metadata'
+import { issueAttrsContent } from '@/lib/issue-summary-columns'
 import { groupThreads, pullRequestsOf, THREAD_GROUPS, threadGroup, type GroupIssue, type PrGroup, type ThreadGroup } from '@/lib/thread-groups'
 import { pinnedByDefault } from '@/lib/chat-preferences'
 import { notThreadMachineDevice } from '@/lib/cloud-computer/thread-devices'
@@ -78,7 +79,7 @@ async function runRows(userId: string, filter: SQL | undefined, limit: number) {
   const sources = rows.length ? await citationSources(userId, [], rows.map(row => row.id)) : {}
   // The tasks' state and PRs, for the group; only tasks the person can see (citationSources checked them).
   const issueIds = [...new Set(Object.values(sources).flatMap(source => source?.kind === 'run' && source.issue ? [source.issue.id] : []))]
-  const tasks = new Map<string, GroupIssue>((issueIds.length ? await db.select({ id: issues.id, status: issues.status, content: issues.content }).from(issues).where(inArray(issues.id, issueIds)) : [])
+  const tasks = new Map<string, GroupIssue>((issueIds.length ? await db.select({ id: issues.id, status: issues.status, content: issueAttrsContent }).from(issues).where(inArray(issues.id, issueIds)) : [])
     .map(issue => [issue.id, { status: issue.status, metadata: { pullRequests: readIssueMetadata(issue.content).pullRequests } }]))
   return rows.map(row => {
     const found = sources[row.id]

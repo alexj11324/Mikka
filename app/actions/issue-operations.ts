@@ -71,7 +71,7 @@ export async function updateIssueRelation(input: z.input<typeof relationSchema>)
           if (![current.id, ...(other ? [other.id] : [])].every(id => memberships.some(member => member.id === id))) return { error: 'issueAccessChanged' }
         }
         const graphRows = value.kind !== 'related' && !value.remove && other
-          ? await tx.select({ id: issues.id, content: issues.content }).from(issues).where(eq(issues.userId, issue.userId))
+          ? await tx.select({ id: issues.id, content: issueAttrsContent }).from(issues).where(eq(issues.userId, issue.userId))
           : []
         const metadata = readIssueMetadata(current.content)
         const targetMetadata = other ? readIssueMetadata(other.content) : null

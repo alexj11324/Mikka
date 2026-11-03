@@ -16,6 +16,7 @@ import { chatItems, eventPrompt, type ChatItem, type StoredMessage } from '@/lib
 import { eventsForInbox, isolateTaskRequest } from '@/lib/coordinator/triage'
 import { citedIds, namedCitations, type CitationSource } from '@/lib/coordinator/citations'
 import { readIssueMetadata } from '@/lib/issue-metadata'
+import { issueAttrsContent } from '@/lib/issue-summary-columns'
 import { threadGroup, type ThreadOutcome } from '@/lib/thread-groups'
 import { taskIdentifiers } from '@/lib/task-identifier-server'
 import { artifactSummaries, type ArtifactSummary } from '@/lib/artifacts/store'
@@ -426,7 +427,7 @@ export async function citationSources(userId: string, texts: readonly string[], 
   const runIds = [...new Set([...cited.runIds, ...threads])]
   const sources: Record<string, CitationSource> = {}
   if (issueIds.length) {
-    const rows = await db.selectDistinct({ id: issues.id, ownerId: issues.userId, scope: issues.scope, title: issues.title, status: issues.status, priority: issues.priority, content: issues.content })
+    const rows = await db.selectDistinct({ id: issues.id, ownerId: issues.userId, scope: issues.scope, title: issues.title, status: issues.status, priority: issues.priority, content: issueAttrsContent })
       .from(issues).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId)))
       .where(and(inArray(issues.id, issueIds), (await issueVisibility(userId, false, undefined, db, { onlyIssueIds: issueIds })).predicate))
     const identifiers = await taskIdentifiers(rows.map(row => ({ id: row.id, ownerId: row.ownerId, scope: row.scope, number: readIssueMetadata(row.content).number })))
