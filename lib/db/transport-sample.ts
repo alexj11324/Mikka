@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import type { Pool } from 'pg'
 import { deploymentSwitch } from '@/lib/deployment-switches'
 
-type Scope = 'default' | 'request' | 'device_fence'
+type Scope = 'default' | 'request' | 'device_fence' | 'workspace'
 type Stream = { bytesRead?: number; once: (event: string, callback: () => void) => unknown; removeListener: (event: string, callback: () => void) => unknown }
 type Entry = { stream: Stream | undefined; last: number | null; scope: Scope; close: () => void }
 type Options = { on: () => boolean; now: () => number; sink: (line: string) => void; schedule: (callback: () => void) => () => void }
