@@ -18,6 +18,10 @@ export async function fakeThreadMachines(pool: Pool, harnesses: Harness[]) {
   const machines = await import('../../lib/cloud-computer/thread-machines')
   const { factoryAutomaticRuntime } = await import('../../lib/factory/automatic-dispatch')
   const realPark = factoryAutomaticRuntime.park
+  const realEnqueue = factoryAutomaticRuntime.enqueue
+  factoryAutomaticRuntime.enqueue = async (database, actor, previousRunId, runId) => {
+    await (await import('../../lib/factory/cloud-stage-handoff')).handoffFactoryCloudStage(database, actor, previousRunId, runId)
+  }
   factoryAutomaticRuntime.park = (database, actor, runId) => machines.parkThreadMachine(database, actor, runId, async () => {}, async () => null)
   const real = { ...machines.threadMachineProvider }
   const credentials = new Map<string, string>()
@@ -42,6 +46,7 @@ export async function fakeThreadMachines(pool: Pool, harnesses: Harness[]) {
     kill: async () => {},
   })
   return {
+    enqueueDurable: realEnqueue,
     /** Provisions a queued cloud run's thread machine; returns its device and the worker's device token. */
     async start(actor: { userId: string; workspaceId: string }, runId: string) {
       await machines.ensureThreadMachine(pool, actor, runId)
@@ -50,6 +55,7 @@ export async function fakeThreadMachines(pool: Pool, harnesses: Harness[]) {
     },
     restore() {
       factoryAutomaticRuntime.park = realPark
+      factoryAutomaticRuntime.enqueue = realEnqueue
       Object.assign(machines.threadMachineProvider, real)
       for (const [name, value] of [['MIKKA_CLOUD_WORKER_URL', saved.url], ['MIKKA_CLOUD_WORKER_SHA', saved.sha], ['E2B_CLAUDE_TEMPLATE', saved.claude], ['E2B_CODEX_TEMPLATE', saved.codex]] as const) {
         if (value === undefined) delete process.env[name]; else process.env[name] = value

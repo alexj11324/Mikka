@@ -15,6 +15,10 @@ import type { FactoryTask, createFactoryStore } from './store'
 export const factoryAutomaticRuntime = {
   park: async (pool: Pool, actor: { userId: string; workspaceId: string }, runId: string) => (await import('@/lib/cloud-computer/thread-machines')).parkThreadMachine(pool, actor, runId),
   start: async (actor: { userId: string; workspaceId: string }, runId: string) => (await import('@/lib/run-leases')).startThreadMachine(actor, runId),
+  enqueue: async (_pool: Pool, actor: { userId: string; workspaceId: string }, previousRunId: string | null, runId: string) => {
+    const [{ start }, { factoryCloudStageHandoff }] = await Promise.all([import('workflow/api'), import('@/workflows/factory-stage/workflow')])
+    await start(factoryCloudStageHandoff, [actor, previousRunId, runId])
+  },
 }
 
 /** The host, rather than a model tool call, queues every independent stage. */
@@ -64,21 +68,11 @@ export function automaticFactoryDispatch(pool: Pool) {
     const result = await dispatch(task.userId, { binding: factoryBinding(task), agentId: runtime.agentId, deviceRepoId: repoId }, tx)
     if (!check) await tx.query('UPDATE agent_runs SET "continuesRunId"=$2 WHERE id=$1', [result.runId, source.id])
     return async () => {
-      // Retain the completed stage's actual filesystem/desktop before the
-      // next independent CLI session adopts the task machine. No session is resumed.
-      try {
-        if (typeof _run.id === 'string') await factoryAutomaticRuntime.park(pool, actor, _run.id)
-      } catch {
-        const { rows: [ended] } = await pool.query(`UPDATE agent_runs SET status='failed',"stopReason"='device_lost',error='Previous stage artifacts could not be retained',"finishedAt"=now(),"updatedAt"=now()
-          WHERE id=$1 AND "userId"=$2 AND status='queued' RETURNING *`, [result.runId, actor.userId])
-        if (ended) {
-          const [{ db }, { recordCoordinatorEvent }, { runFinishedEvent }, { wakeCoordinator }] = await Promise.all([import('@/lib/db'), import('@/lib/coordinator-event-store'), import('@/lib/coordinator-events'), import('@/lib/coordinator/wake')])
-          await recordCoordinatorEvent(db, runFinishedEvent(ended))
-          await wakeCoordinator(actor.userId).catch(() => undefined)
-        }
-        return
-      }
-      await factoryAutomaticRuntime.start(actor, result.runId)
+      // A host workflow owns the handoff. Parking revokes the completed
+      // worker's device token; its request must not perform the next stage's
+      // database work under that now-revoked device authority.
+      try { await factoryAutomaticRuntime.enqueue(pool, actor, typeof _run.id === 'string' ? _run.id : null, result.runId) }
+      catch { await (await import('./cloud-stage-handoff')).failFactoryCloudStage(pool, actor, result.runId, 'Cloud stage handoff could not be queued') }
     }
   }
 }
