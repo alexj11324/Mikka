@@ -12,7 +12,9 @@ export interface ExecutionFacts {
   order: {
     location: 'local' | 'cloud'
     /** 优先使用的模型, every entry in its order: what it is, where it can run, and why it cannot run now (null when it can). */
-    entries: { harness: string; agent: string; model: string; source: 'subscription' | 'api_key'; provider: string; places: string[]; block: string | null }[]
+    entries: { harness: string; agent: string; model: string; source: 'subscription' | 'api_key'; provider: string; places: string[]
+      /** The person's servers and computers whose daemon cannot run it, each with why (from what the daemon reported, not whether it is online). */
+      unsupported?: string[]; block: string | null }[]
     credentials: { kind: 'subscription' | 'api_key'; provider: string }[]
   } | null
   e2b: boolean | null
@@ -24,6 +26,11 @@ export type ExecutionContextSource = { [Key in keyof ExecutionFacts]: (userId: s
 
 const AGENT: Record<string, string> = { claude_code: 'Claude Code', codex: 'Codex' }
 const agentName = (harness: string) => AGENT[harness] ?? harness
+/** Why a server or computer cannot run a model, from what its daemon reported. */
+const WHY: Record<'notInstalled' | 'modelNotReported' | 'needsUpdate' | 'ready', string> = {
+  ready: '',
+  notInstalled: 'Agent not installed', modelNotReported: 'its daemon did not report this model', needsUpdate: 'its Mikka is too old to report its models',
+}
 
 const scopeFor = async (userId: string, botId: string) => ({ ownerId: userId, workspaceId: await (await import('@/lib/execution-settings')).executionWorkspace(userId, botId) })
 
@@ -42,12 +49,16 @@ const source: ExecutionContextSource = {
     const [{ pool }, { orderView, poolDevices }] = await Promise.all([import('@/lib/db'), import('@/lib/model-order')])
     const [view, devices] = await Promise.all([orderView(pool, await scopeFor(userId, botId)), poolDevices(pool, userId)])
     const credentials = new Map(view.candidates.map(candidate => [`${candidate.source.kind}:${candidate.provider}`, { kind: candidate.source.kind, provider: candidate.provider }]))
-    // Where each model can run: the person's own E2B cloud when it takes runs, and each server or computer that runs it.
-    const places = (model: string) => [...(view.cloudReady ? ['cloud'] : []), ...devices.filter(device => device.enabled && view.deviceModels[device.id]?.includes(model))
-      .map(device => `${device.name} (${device.server ? 'server' : 'computer'})`).sort()]
+    // Where each model can run: the person's own E2B cloud when it takes runs, and each server or computer whose daemon
+    // reported it (lib/model-order-plan.ts deviceSupport). Online and 参与调度 change from turn to turn, so they are left to the tail.
+    const { deviceSupport } = await import('@/lib/model-order-plan')
+    const label = (device: (typeof devices)[number]) => `${device.name} (${device.server ? 'server' : 'computer'})`
+    const support = (entry: (typeof view.entries)[number]) => devices.map(device => ({ device, stage: deviceSupport(device, entry) }))
+    const places = (entry: (typeof view.entries)[number]) => [...(view.cloudReady ? ['cloud'] : []), ...support(entry).filter(item => item.stage === 'ready').map(item => label(item.device)).sort()]
+    const unsupported = (entry: (typeof view.entries)[number]) => support(entry).filter(item => item.stage !== 'ready').map(item => `${label(item.device)}: ${WHY[item.stage]}`).sort()
     return {
       location: view.location,
-      entries: view.entries.map(entry => ({ harness: entry.harness, agent: agentName(entry.harness), model: entry.model, source: entry.source.kind, provider: entry.provider, places: places(entry.model), block: entry.block?.reason ?? null })),
+      entries: view.entries.map(entry => ({ harness: entry.harness, agent: agentName(entry.harness), model: entry.model, source: entry.source.kind, provider: entry.provider, places: places(entry), unsupported: unsupported(entry), block: entry.block?.reason ?? null })),
       credentials: [...credentials.values()],
     }
   },
@@ -96,7 +107,7 @@ export function modelListText(facts: Pick<ExecutionFacts, 'order'>): string {
   const place = location === 'cloud' ? '运行位置 云端: their E2B cloud, then a server, then a computer' : '运行位置 本地: a server, then a computer'
   return [
     `Allowed models (优先使用的模型), in the order a new thread tries them (${place}). dispatch_run and dispatch_bot_computer take only these:`,
-    ...entries.map((entry, index) => `${index + 1}. ${entry.agent} (${entry.harness}) ${entry.model} · ${entry.provider} ${entry.source === 'subscription' ? 'subscription' : 'API key'} · runs on: ${entry.places.length ? entry.places.join(', ') : 'nowhere yet'}`),
+    ...entries.map((entry, index) => `${index + 1}. ${entry.agent} (${entry.harness}) ${entry.model} · ${entry.provider} ${entry.source === 'subscription' ? 'subscription' : 'API key'} · runs on: ${entry.places.length ? entry.places.join(', ') : 'nowhere yet'}${entry.unsupported?.length ? ` · not on: ${entry.unsupported.join('; ')}` : ''}`),
   ].join('\n')
 }
 

@@ -2580,6 +2580,7 @@
         "off": "{count, plural, =1 {{device} 没参与调度} other {# 台电脑没参与调度}}",
         "offline": "{count, plural, =1 {{device} 离线} other {# 台电脑离线}}",
         "notInstalled": "{count, plural, =1 {{device} 没装 {harness}} other {# 台电脑没装 {harness}}}",
+        "modelNotReported": "{count, plural, =1 {{device} 没报告能跑这个模型} other {# 台电脑没报告能跑这个模型}}",
         "needsUpdate": "{count, plural, =1 {{device} 的 Mikka 需要更新} other {# 台电脑的 Mikka 需要更新}}"
       },
       "blocked": {
@@ -3458,11 +3459,13 @@
     "needsModelUnavailable": "优先使用的模型都暂时不可用",
     "needsModelDeviceAgent": "这台电脑没装 {agent}",
     "needsModelDeviceUpdate": "这台电脑的 Mikka 需要更新",
+    "needsModelDeviceModel": "这台电脑没报告能跑 {model}",
     "needsModelNoComputer": "还没有连接电脑",
     "needsModelNamedOff": "{device} 没参与调度",
     "needsModelNamedOffline": "{device} 离线",
     "needsModelNamedAgent": "{device} 没装 {agent}",
     "needsModelNamedUpdate": "{device} 的 Mikka 需要更新",
+    "needsModelNamedModel": "{device} 没报告能跑这个模型",
     "needsModelNotOffered": "没有订阅或 Key 能用 {agent} 跑 {model}",
     "needsModelAgentNotOffered": "没有订阅或 Key 能用 {agent}",
     "needsModelPickedNoDevice": "没有电脑能用 {agent} 跑 {model}",

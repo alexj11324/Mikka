@@ -2580,6 +2580,7 @@
         "off": "{count, plural, =1 {{device} isn't in scheduling} other {# computers aren't in scheduling}}",
         "offline": "{count, plural, =1 {{device} is offline} other {# computers are offline}}",
         "notInstalled": "{count, plural, =1 {{device} doesn't have {harness}} other {# computers don't have {harness}}}",
+        "modelNotReported": "{count, plural, =1 {{device} didn't report this model} other {# computers didn't report this model}}",
         "needsUpdate": "{count, plural, =1 {{device}'s Mikka needs an update} other {# computers need a Mikka update}}"
       },
       "blocked": {
@@ -3458,11 +3459,13 @@
     "needsModelUnavailable": "Every preferred model is unavailable right now",
     "needsModelDeviceAgent": "This computer doesn't have {agent}",
     "needsModelDeviceUpdate": "This computer's Mikka needs an update",
+    "needsModelDeviceModel": "This computer didn't report {model}",
     "needsModelNoComputer": "No computer connected",
     "needsModelNamedOff": "{device} isn't in scheduling",
     "needsModelNamedOffline": "{device} is offline",
     "needsModelNamedAgent": "{device} doesn't have {agent}",
     "needsModelNamedUpdate": "{device}'s Mikka needs an update",
+    "needsModelNamedModel": "{device} didn't report this model",
     "needsModelNotOffered": "No subscription or key runs {model} on {agent}",
     "needsModelAgentNotOffered": "No subscription or key runs {agent}",
     "needsModelPickedNoDevice": "No computer can run {model} on {agent}",

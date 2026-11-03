@@ -17,8 +17,6 @@ test('allowed models: every entry in every Bot\'s cached prompt, and a model out
   const steps = await import('../workflows/coordinator/steps')
   const order = await import('../lib/model-order')
   const { chatBotId } = await import('../lib/coordinator/coordinator-bot')
-  const { pool: appPool } = await import('../lib/db')
-  const { workspacePool } = await import('../lib/workspace-db')
   const github = githubAppStub()
   github.install('octo/repo', { contents: 'write', pull_requests: 'write' })
   const users: string[] = []
@@ -26,7 +24,8 @@ test('allowed models: every entry in every Bot\'s cached prompt, and a model out
     github.restore()
     for (const table of ['coordinator_events', 'agent_runs', 'agents', 'repository_settings', 'github_repository_installations', 'account']) await pool.query(`DELETE FROM ${table} WHERE "userId" = ANY($1)`, [users])
     for (const table of ['model_order_entries', 'model_order_settings', 'byos_bindings', 'byos_connections', 'devices']) await pool.query(`DELETE FROM ${table} WHERE "ownerId" = ANY($1)`, [users])
-    await Promise.all([pool.end(), appPool.end(), workspacePool.end()])
+    // The app's own pools are shared with the next test, which ends them.
+    await pool.end()
   })
 
   const userId = await seedUser(pool, 'model-list')
@@ -59,6 +58,11 @@ test('allowed models: every entry in every Bot\'s cached prompt, and a model out
   await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,"deviceType",enabled,"lastSeenAt",harnesses) VALUES ($1,$2,'Fixture Mac','local','laptop',true,now(),$3)`,
     [deviceId, userId, JSON.stringify([{ harness: 'codex', installed: true, subscriptionBroker: true, modelSlots: [{ slot: 'a', model: 'fx-codex-a', name: 'A' }, { slot: 'b', model: 'fx-codex-b', name: 'B' }] }])])
   await pool.query(`INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,'codex',$4)`, [randomUUID(), userId, deviceId, `codex-${deviceId.slice(0, 8)}`])
+  // A second computer with Codex whose daemon is from before the model probe: it reported no models, so it runs none of them.
+  const oldId = randomUUID()
+  await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,"deviceType",enabled,"lastSeenAt",harnesses,"createdAt") VALUES ($1,$2,'Old Mac','local','laptop',true,now(),$3,now()-interval '1 day')`,
+    [oldId, userId, JSON.stringify([{ harness: 'codex', installed: true, subscriptionBroker: true }])])
+  await pool.query(`INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,'codex',$4)`, [randomUUID(), userId, oldId, `codex-${oldId.slice(0, 8)}`])
   const listed = (await order.readOrder(pool, scope)).entries.map(entry => `${entry.harness}:${entry.model}`)
   assert.deepEqual(listed, entries.map(entry => `${entry.harness}:${entry.model}`))
 
@@ -72,8 +76,11 @@ test('allowed models: every entry in every Bot\'s cached prompt, and a model out
       assert.ok(head >= 0, `the list reaches ${botId === bot ? 'the Bot' : 'the Coordinator'}`)
       const lines = instructions.slice(head).split('\n').slice(1, 6)
       assert.deepEqual(lines.map(line => line.replace(/^\d+\. \S+(?: \S+)? \((\w+)\) (\S+) .*$/, '$1:$2')), listed, 'every entry, in order')
-      assert.match(lines.find(line => line.includes('fx-codex-a'))!, /codex subscription · runs on: Fixture Mac \(computer\)$/)
-      assert.match(lines.find(line => line.includes('fx-claude-a'))!, /claude subscription · runs on: nowhere yet$/, 'no computer has Claude Code')
+      // Each entry says which daemons reported it, and why the others cannot run it.
+      const old = 'Old Mac (computer): its Mikka is too old to report its models'
+      assert.equal(lines[0], `1. Codex (codex) fx-codex-a · codex subscription · runs on: Fixture Mac (computer) · not on: ${old}`)
+      assert.equal(lines[2], `3. Codex (codex) fx-codex-c · codex subscription · runs on: nowhere yet · not on: Fixture Mac (computer): its daemon did not report this model; ${old}`)
+      assert.equal(lines[3], '4. Claude Code (claude_code) fx-claude-a · claude subscription · runs on: nowhere yet · not on: Fixture Mac (computer): Agent not installed; Old Mac (computer): Agent not installed')
       assert.ok(head + instructions.slice(head).indexOf(lines[4]!) + lines[4]!.length <= stable, 'the list is inside the cached prefix')
       assert.equal((await steps.preparePrompt(userId, botId)).instructions.slice(0, stable), instructions.slice(0, stable), 'the prefix is stable across turns')
     }
@@ -97,7 +104,13 @@ test('allowed models: every entry in every Bot\'s cached prompt, and a model out
     // A listed model runs.
     const queued = await dispatch({ harness: 'codex', model: 'fx-codex-a' }) as { status?: string; error?: string }
     assert.equal(queued.status, 'queued', JSON.stringify(queued))
-    assert.equal((await pool.query('SELECT "agentDefinition"->>\'model\' AS model FROM agent_runs WHERE "userId"=$1', [userId])).rows[0].model, 'fx-codex-a')
+    assert.deepEqual((await pool.query('SELECT "agentDefinition"->>\'model\' AS model,"deviceId" FROM agent_runs WHERE "userId"=$1', [userId])).rows, [{ model: 'fx-codex-a', deviceId }], 'only the computer whose daemon reported it')
+    // Listed, but no daemon reported it: nothing runs, and it is not swapped for another model.
+    const other = await seedIssue(pool, userId)
+    await pool.query(`UPDATE issues SET content='{"type":"doc","attrs":{"mikka":{"number":8}}}' WHERE id=$1`, [other])
+    const unreported = await steps.dispatchRun(userId, { issueId: other, repo: 'octo/repo', model: { harness: 'codex', model: 'fx-codex-c' }, requestKey: `dispatch:${randomUUID()}` }, undefined, coordinator) as { error: string }
+    assert.equal(unreported.error, 'machineUnavailable')
+    assert.equal(await runs(), 1)
   })
 
   await t.test('dispatch_bot_computer: a model outside the list is refused before anything is queued', async () => {
@@ -107,5 +120,81 @@ test('allowed models: every entry in every Bot\'s cached prompt, and a model out
     assert.equal(refused.error, 'modelNotAllowed')
     assert.ok(refused.allowed.length > 0)
     assert.equal(await runs(), before)
+  })
+})
+
+test('an untouched list is defaultOrder over what was connected, dispatched only where a daemon reported it; nothing connected is noModels', { skip: !dbUrl }, async t => {
+  process.env.MIKKA_BYOS_ENABLED = '1'
+  const { Pool } = await import('pg')
+  const pool = new Pool({ connectionString: dbUrl, max: 3 })
+  const order = await import('../lib/model-order')
+  const { defaultOrder } = await import('../lib/model-order-plan')
+  const { resolveModelDispatch } = await import('../lib/model-dispatch')
+  const { executionContextParts } = await import('../lib/coordinator/execution-context')
+  const { pool: appPool } = await import('../lib/db')
+  const { workspacePool } = await import('../lib/workspace-db')
+  const users: string[] = []
+  t.after(async () => {
+    for (const table of ['agents']) await pool.query(`DELETE FROM ${table} WHERE "userId" = ANY($1)`, [users])
+    for (const table of ['model_order_entries', 'model_order_settings', 'byos_bindings', 'byos_connections', 'devices']) await pool.query(`DELETE FROM ${table} WHERE "ownerId" = ANY($1)`, [users])
+    await Promise.all([pool.end(), appPool.end(), workspacePool.end()])
+  })
+  const person = async (label: string) => {
+    const id = await seedUser(pool, label)
+    users.push(id)
+    // Untouched: 运行位置 stays 云端, and with no E2B key a run goes to a computer.
+    const ws = await seedWorkspace(pool, id, [{ userId: id, role: 'admin' }])
+    return { ownerId: id, workspaceId: ws.id, botId: await seedBot(pool, ws.id, id) }
+  }
+  const subscribe = async (scope: { ownerId: string; workspaceId: string }, provider: 'claude' | 'codex', models: string[]) => {
+    const connection = randomUUID()
+    await pool.query(`INSERT INTO byos_connections (id,"ownerId","workspaceId",provider,state,epoch,"secretName","secretDigest","providerSubject","modelCatalog",quota) VALUES ($1,$2,$3,$4,'connected',1,$5,$6,'synthetic-subject',$7,$8)`,
+      [connection, scope.ownerId, scope.workspaceId, provider, `synthetic-${connection}`, 'a'.repeat(64), JSON.stringify({ revision: '1', models }),
+        JSON.stringify({ vendor: provider === 'claude' ? 'claude_code' : 'codex', source: 'official', status: 'ok', plan: null, observedAt: new Date().toISOString(), windows: [{ kind: 'five_hour', used: .2, resetsAt: null }] })])
+    for (const model of models) await pool.query(`INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId") VALUES ($1,$2,$3,'catalogue',$4,1,$5,$6)`,
+      [randomUUID(), scope.ownerId, scope.workspaceId, connection, provider === 'codex' ? 'codex_cpa' : 'claude_cpa', model])
+  }
+  const computer = async (ownerId: string, name: string, harnesses: object[]) => {
+    const id = randomUUID()
+    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,"deviceType",enabled,"lastSeenAt",harnesses) VALUES ($1,$2,$3,'local','laptop',true,now(),$4)`, [id, ownerId, name, JSON.stringify(harnesses)])
+    for (const info of harnesses as { harness: string }[]) await pool.query(`INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,$4,$5)`, [randomUUID(), ownerId, id, info.harness, `${info.harness}-${id.slice(0, 8)}`])
+    return id
+  }
+  const promptList = async (scope: { ownerId: string; botId: string }) => (await executionContextParts(scope.ownerId, scope.botId)).models
+
+  await t.test('untouched: Claude Code\'s opus, then Codex\'s first model; the prompt and dispatch use that same list', async () => {
+    const p = await person('default-list')
+    await subscribe(p, 'claude', ['fx-sonnet', 'fx-opus'])
+    await subscribe(p, 'codex', ['fx-codex-top', 'fx-codex-mini'])
+    const expected = defaultOrder(await order.orderCandidates(pool, p)).map(item => `${item.harness}:${item.model}`)
+    assert.deepEqual(expected, ['claude_code:fx-opus', 'codex:fx-codex-top'])
+    const stored = await order.readOrder(pool, p)
+    assert.equal(stored.customized, false)
+    assert.deepEqual(stored.entries.map(entry => `${entry.harness}:${entry.model}`), expected)
+    const lines = (await promptList(p)).split('\n').slice(1)
+    assert.deepEqual(lines.map(line => line.replace(/^\d+\. \S+(?: \S+)? \((\w+)\) (\S+) .*$/, '$1:$2')), expected)
+    // Only Codex's model was reported, on the one computer: opus runs nowhere, so the run takes Codex's, on that computer.
+    const mac = await computer(p.ownerId, 'Mac', [{ harness: 'claude_code', installed: true, subscriptionBroker: true, models: ['fx-sonnet'] }, { harness: 'codex', installed: true, subscriptionBroker: true, models: ['fx-codex-top'] }])
+    const target = await resolveModelDispatch(pool, p)
+    assert.deepEqual(target.kind === 'device' && [target.deviceId, target.model], [mac, 'fx-codex-top'])
+  })
+
+  await t.test('nothing connected: the list is empty and dispatch refuses with noModels', async () => {
+    const p = await person('nothing-connected')
+    await computer(p.ownerId, 'Mac', [{ harness: 'claude_code', installed: true, subscriptionBroker: true, models: ['fx-opus'] }])
+    assert.deepEqual((await order.readOrder(pool, p)).entries, [])
+    assert.match(await promptList(p), /^Allowed models \(优先使用的模型\): none yet\./)
+    const target = await resolveModelDispatch(pool, p)
+    assert.deepEqual(target.kind === 'none' && target.reason, 'noModels')
+  })
+
+  await t.test('the default model only on a daemon from before the model probe: needsUpdate, nothing else is picked', async () => {
+    const p = await person('default-old-daemon')
+    await subscribe(p, 'claude', ['fx-opus'])
+    await computer(p.ownerId, 'Old Mac', [{ harness: 'claude_code', installed: true, subscriptionBroker: true }])
+    const target = await resolveModelDispatch(pool, p)
+    assert.equal(target.kind, 'none')
+    assert.equal(target.kind === 'none' && target.card.description, 'Old Mac 的 Mikka 需要更新')
+    assert.match(await promptList(p), /fx-opus · claude subscription · runs on: nowhere yet · not on: Old Mac \(computer\): its Mikka is too old to report its models$/)
   })
 })
