@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { Sandbox, SandboxNotFoundError } from 'e2b'
 import { computerTemplate, e2bApiKey, sandboxKeyOwner, withE2BErrors } from '@/lib/secrets/e2b-runtime'
 import { E2BKeyError } from '@/lib/secrets/flag'
+import { bootstrapOfficialInstance } from './official-runtime'
 
 const lifetime = 15 * 60_000
 export type DesktopLease = { botId: string; ownerId: string; display: number; epoch: number; controlledBy: string | null; controlUntil: number; computerAllowed: boolean; policyVersion: number }
@@ -55,10 +56,12 @@ export async function createComputer(workspaceId: string, operationId: string) {
   const owner = (await pool.query<{ ownerId: string }>('SELECT "ownerId" FROM cloud_machines WHERE "workspaceId"=$1 AND "operationId"=$2', [workspaceId, operationId])).rows[0]?.ownerId
   if (!owner) throw new E2BKeyError('e2b_unavailable', 'cloud machine has no owner record')
   const base = await options(owner)
-  return withE2BErrors(owner, true, () => Sandbox.create(template, { ...base, idempotencyKey: operationId,
+  const sandbox = await withE2BErrors(owner, true, () => Sandbox.create(template, { ...base, idempotencyKey: operationId,
     metadata: { application: 'mikka', workspaceId },
     lifecycle: { onTimeout: 'pause', autoResume: false },
   }))
+  await bootstrapOfficialInstance(sandbox, 'desktop')
+  return sandbox
 }
 
 /** Refresh authorization guards without replacing the desktop script baked

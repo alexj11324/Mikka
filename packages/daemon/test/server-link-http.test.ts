@@ -122,6 +122,25 @@ describe("HttpServerLink", () => {
     } finally { gate.revoke(); vi.useRealTimers() }
   })
 
+  it.each(['local_authority', 'server_check'] as const)('retains bounded %s diagnostics without exception or response bodies', async phase => {
+    const lines: string[] = []
+    const log = vi.spyOn(console, 'warn').mockImplementation(line => { lines.push(String(line)) })
+    const privateText = 'private-exception-and-response-marker'
+    const { fetch } = scripted(() => phase === 'server_check' ? json({ error: privateText }, 403) : json({ live: true }))
+    const run = { ...assignment('8e8a1c58-696a-46ef-b880-888a0bb12599'), harness: 'codex' as const, policy: defaultRunPolicy(), policyRevision: 'a'.repeat(64) }
+    const gate = await new HttpServerLink('http://server.test', fetch).prepareRunToolApproval(run, new AbortController().signal, () => {
+      if (phase === 'local_authority') throw new Error(privateText)
+    })
+    try {
+      expect(await gate.checkLive()).toBe(false)
+      expect(lines).toHaveLength(1)
+      expect(JSON.parse(lines[0]!)).toEqual({ event: 'run_liveness_refused', runId: run.runId, deviceId: run.deviceId,
+        phase, reason: 'check_failed', errorClass: phase === 'server_check' ? 'DaemonError' : 'unknown', status: phase === 'server_check' ? 403 : null })
+      expect(JSON.stringify(lines)).not.toContain(privateText)
+      await gate.checkLive()
+      expect(lines).toHaveLength(1)
+    } finally { gate.revoke(); log.mockRestore() }
+  })
   it.each([403,409])('revokes an idle run when its liveness endpoint returns %s', async status => {
     vi.useFakeTimers()
     let gate: Awaited<ReturnType<HttpServerLink['prepareRunToolApproval']>> | undefined

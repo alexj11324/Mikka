@@ -176,6 +176,15 @@ export class HttpServerLink implements ServerLink {
     const policyRevision = assignment.policyRevision
     const path = `/v1/runs/${seg(assignment.runId)}/tool-approval`
     const liveness = new AbortController()
+    let reported = false
+    const refusal = (phase: string, reason: 'check_failed' | 'run_not_live', error?: unknown) => {
+      if (reported || liveness.signal.aborted || signal.aborted) return
+      reported = true
+      const status = error instanceof DaemonError && error.code >= 100 && error.code <= 599 ? error.code : null
+      try { console.warn(JSON.stringify({ event: 'run_liveness_refused', runId: assignment.runId, deviceId: assignment.deviceId,
+        phase, reason, errorClass: error instanceof ServerUnreachableError ? 'ServerUnreachableError' : error instanceof DaemonError ? 'DaemonError' : reason === 'run_not_live' ? null : 'unknown', status: reason === 'run_not_live' ? 200 : status })) }
+      catch { /* Diagnostics never change whether a run is live. */ }
+    }
     const gate = new ToolApprovalGate(assignment.runId, {
       // A paused run stays pending here; its session and checkpoint remain intact.
       isLive: async () => {
@@ -185,11 +194,14 @@ export class HttpServerLink implements ServerLink {
           liveness.signal.addEventListener('abort',stop,{once:true})
           if (liveness.signal.aborted) stop()
         })
+        let phase = 'local_authority'
         try {
           let unreachableSince: number | undefined
           for (;;) {
+            phase = 'local_authority'
             check()
             if (assignment.policySnapshot) {
+              phase = 'policy_snapshot'
               if (!context) return false
               if (assignment.policySnapshot.payload.expiresAt - Date.now() <= POLICY_SNAPSHOT_REFRESH_MS) context = await this.verifyRunPolicy(assignment,liveness.signal)
               if (!context) return false
@@ -197,6 +209,7 @@ export class HttpServerLink implements ServerLink {
             }
             let current: { live: boolean; paused?: boolean }
             try {
+              phase = 'server_check'
               current = await this.call('POST', path, { body: { operation: 'check', deviceId: assignment.deviceId, policyRevision }, schema: z.object({ live: z.boolean(), paused: z.boolean().optional() }), signal:liveness.signal, timeoutMs:5000 })
             } catch (error) {
               // A timeout, network failure, 5xx or 429 (a cold deployment) is no
@@ -209,11 +222,13 @@ export class HttpServerLink implements ServerLink {
               continue
             }
             unreachableSince = undefined
+            phase = 'local_authority'
             check()
+            if (!current.live) refusal('server_check', 'run_not_live')
             if (!current.live || !current.paused) return current.live
             await pause()
           }
-        } catch { return false }
+        } catch (error) { refusal(phase, 'check_failed', error); return false }
       }
     })
     let checking = false

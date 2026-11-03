@@ -25,7 +25,7 @@ const nextConfig = {
   // pnpm build runs the CI typechecker after Next generates its route types.
   typescript: { ignoreBuildErrors: true },
   outputFileTracingIncludes: {
-    '/*': ['./lib/abuse/data/disposable-email-domains.txt'],
+    '/*': ['./lib/abuse/data/disposable-email-domains.txt', './packages/daemon/scripts/official-e2b-instance-bootstrap.sh'],
     '/api/bots/*/subagents/**': ['./scripts/e2b/*.py', './scripts/e2b/*.mjs', './scripts/e2b/*.sh'],
     '/api/threads/**': ['./scripts/e2b/*.py', './scripts/e2b/*.mjs', './scripts/e2b/*.sh'],
     '/.well-known/workflow/**': ['./scripts/e2b/*.py', './scripts/e2b/*.mjs', './scripts/e2b/*.sh'],

@@ -313,18 +313,18 @@ export async function createHostedBotRunner(host: {
       } = { phase: "context_initial", contextReady: false, brokerReady: false, tokenRequested: false, tokenCheckPassed: false, verifyRequested: false, verifyCheckPassed: false };
       let reported = false;
       let started = false;
-      const reportStartupFailure = (error: unknown) => {
-        if (!selected || reported || started) return;
+      const reportFailure = (error: unknown) => {
+        if (!selected || reported || (started && (closed || lifetime.signal.aborted))) return;
         reported = true;
         const status = error instanceof DaemonError && error.data && typeof error.data === "object" && "status" in error.data ? error.data.status : undefined;
         const reason = error instanceof ServerUnreachableError ? "server_unreachable"
           : error instanceof DaemonError ? "server_refused"
           : error instanceof Error && error.name === "ZodError" ? "context_invalid"
           : [startup.sameRevision, startup.sameAccount, startup.sameRoute, startup.sameModel].includes(false) ? "context_changed"
-          : "startup_failed";
+          : started ? "runtime_failed" : "startup_failed";
         try {
-          options.log.warn({ event: "subscription_startup_failed", runId: assignment.runId, harness: kind, ...startup, reason,
-            ...(typeof status === "number" && Number.isInteger(status) && status >= 100 && status <= 599 ? { httpStatus: status } : {}) }, "Subscription startup failed");
+          options.log.warn({ event: started ? "subscription_runtime_failed" : "subscription_startup_failed", runId: assignment.runId, harness: kind, ...startup, reason,
+            ...(typeof status === "number" && Number.isInteger(status) && status >= 100 && status <= 599 ? { httpStatus: status } : {}) }, started ? "Subscription runtime check failed" : "Subscription startup failed");
         } catch { /* Diagnostics never replace the original refusal. */ }
       };
       let closed = false;
@@ -417,7 +417,7 @@ export async function createHostedBotRunner(host: {
                 throw unavailable();
               return current;
             } catch (error) {
-              reportStartupFailure(error);
+              reportFailure(error);
               throw error;
             }
           };
@@ -718,7 +718,8 @@ export async function createHostedBotRunner(host: {
             if (checking || closed) return;
             checking = true;
             void check()
-              .catch(async () => {
+              .catch(async (error) => {
+                reportFailure(error);
                 try { await session.cancel(); }
                 finally { await close(); }
               })
@@ -752,7 +753,7 @@ export async function createHostedBotRunner(host: {
             },
           };
         } catch (error) {
-          reportStartupFailure(error);
+          reportFailure(error);
           // Keep why the CLI did not start: a cleanup failure must not replace it.
           const reason = startFailure(error);
           try {
@@ -765,7 +766,7 @@ export async function createHostedBotRunner(host: {
           throw unavailable(reason);
         }
       } catch (error) {
-        reportStartupFailure(error);
+        reportFailure(error);
         await close();
         throw error;
       }

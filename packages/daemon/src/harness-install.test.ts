@@ -4,7 +4,7 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSyn
 import { createServer, type Server } from "node:http"
 import type { AddressInfo } from "node:net"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 
@@ -98,6 +98,35 @@ describe("ensureHarness", () => {
     expect(execFileSync(installed, { encoding: 'utf8' }).trim()).toBe('code-mode-ready')
   })
 
+  it('installs the Codex runtime bundle and repairs an older main-binary-only installation', async () => {
+    const src = join(dir, 'src-codex-bundle'), base = 'package/vendor/test-platform'
+    mkdirSync(join(src, base, 'bin'), { recursive: true })
+    writeFileSync(join(src, base, 'bin/codex'), '#!/bin/sh\nexec "$(dirname "$0")/codex-code-mode-host"\n', { mode: 0o755 })
+    writeFileSync(join(src, base, 'bin/codex-code-mode-host'), '#!/bin/sh\nprintf "code-mode-host-running\\n"\n', { mode: 0o755 })
+    mkdirSync(join(src, base, 'codex-path'))
+    writeFileSync(join(src, base, 'codex-path/rg'), 'retained-runtime-resource')
+    writeFileSync(join(src, 'package/README.md'), 'Keep every package file.\n')
+    const file = join(dir, 'codex-bundle.tgz')
+    execFileSync('tar', ['-czf', file, '-C', src, 'package'])
+    const bytes = readFileSync(file), integrity = `sha512-${createHash('sha512').update(bytes).digest('base64')}`
+    tarballs.set('/codex-bundle.tgz', bytes)
+    const pinned = pins('1.0.0', integrity, 'codex-bundle.tgz')
+    pinned.harnesses.codex = { version: '0.163.0', command: 'codex', platforms: { 'test-os': { tarball: 'codex-bundle.tgz', integrity, entry: `${base}/bin/codex` } } }
+    const store = { root: join(dir, 'store-codex-bundle'), platform: 'test-os', pins: pinned }
+    const binary = await ensureHarness(store, 'codex')
+    expect(execFileSync(binary, { encoding: 'utf8' }).trim()).toBe('code-mode-host-running')
+    expect(readFileSync(join(dirname(binary), '../codex-path/rg'), 'utf8')).toBe('retained-runtime-resource')
+    const versionDir = dirname(dirname(binary))
+    expect(readFileSync(join(versionDir, 'package/README.md'), 'utf8')).toBe('Keep every package file.\n')
+    expect(readFileSync(join(versionDir, 'package.tgz'))).toEqual(bytes)
+    rmSync(join(dirname(binary), 'codex-code-mode-host'))
+    expect(harnessInstallState(store, 'codex').state).toBe('not_installed')
+    const repaired = await ensureHarness(store, 'codex')
+    expect(execFileSync(repaired, { encoding: 'utf8' }).trim()).toBe('code-mode-host-running')
+    expect(harnessInstallState(store, 'codex').state).toBe('installed')
+    const retained = readdirSync(join(store.root, 'codex')).find(name => name.startsWith('0.163.0.retained-'))!
+    expect(readFileSync(join(store.root, 'codex', retained, 'package.tgz'))).toEqual(bytes)
+  })
   it("installs the pinned version once, into the daemon's own dir", async () => {
     const root = join(dir, "store-once")
     const store = { root, platform: "test-os", pins: pins("1.0.0", fixture("one", "package/claude", "one"), "one.tgz") }
@@ -113,7 +142,7 @@ describe("ensureHarness", () => {
     expect(readdirSync(join(root, "claude_code"))).toEqual(["1.0.0"])
   })
 
-  it("replaces the old version when the pin moves", async () => {
+  it("installs a new pin while retaining the complete old installation", async () => {
     const root = join(dir, "store-bump")
     const old = { root, platform: "test-os", pins: pins("1.0.0", fixture("old", "package/claude", "old"), "old.tgz") }
     await ensureHarness(old, "claude_code")
@@ -121,7 +150,7 @@ describe("ensureHarness", () => {
     expect(harnessInstallState(bumped, "claude_code").state).toBe("not_installed")
     const binary = await ensureHarness(bumped, "claude_code")
     expect(execFileSync(binary, { encoding: "utf8" }).trim()).toBe("new")
-    expect(readdirSync(join(root, "claude_code"))).toEqual(["2.0.0"])
+    expect(readdirSync(join(root, "claude_code")).sort()).toEqual(["1.0.0", "2.0.0"])
   })
 
   it("refuses a tarball that does not match the pinned integrity, and leaves nothing behind", async () => {
