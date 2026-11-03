@@ -434,14 +434,14 @@ export async function getIssue(userId: string, input: { issueId: string }, scope
   }
 }
 
-export async function createIssue(userId: string, input: CreateIssueInput, toolCallId: string, scope: NativeToolScope | undefined, botId: string, taskEventId?: string) {
+export async function createIssue(userId: string, input: CreateIssueInput, toolCallId: string, scope: NativeToolScope | undefined, botId: string, taskEventId?: string, sourceEventId?: string) {
   'use step'
   await assertNativeToolScope(userId, scope)
   if (!toolCallId || toolCallId.length > 200) return { error: 'issueToolCallConflict' }
   // A team workspace's bot creates the task in that workspace's team, not as its owner's personal task.
   const team = await (await import('@/lib/coordinator/issue-team')).coordinatorIssueTeam(userId, botId, input.teamId)
   if ('error' in team) return team
-  return (await import('@/lib/mcp/actions')).createIssue(userId, input, systemActor(botId), toolCallId, taskEventId ? { eventId: taskEventId, botId } : undefined, team.teamId ?? undefined)
+  return (await import('@/lib/mcp/actions')).createIssue(userId, input, systemActor(botId), toolCallId, taskEventId ? { eventId: taskEventId, botId } : undefined, team.teamId ?? undefined, !taskEventId && sourceEventId ? { eventId: sourceEventId, botId } : undefined)
 }
 
 export async function updateIssue(userId: string, input: UpdateIssueInput, toolCallId: string, scope: NativeToolScope | undefined, botId: string) {

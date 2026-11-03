@@ -108,7 +108,7 @@ function issueResult(issue: { id: string; title: string; status: string; priorit
 }
 
 /** `teamId`, chosen by the host (lib/coordinator/issue-team.ts), creates the task in that team instead of as a personal one. */
-export async function createIssue(userId: string, input: IssueChanges & { title: string; body?: string; teamId?: string }, actor?: ActivityActor, toolCallId?: string, taskEvent?: { eventId: string; botId: string | null }, teamId?: string) {
+export async function createIssue(userId: string, input: IssueChanges & { title: string; body?: string; teamId?: string }, actor?: ActivityActor, toolCallId?: string, taskEvent?: { eventId: string; botId: string | null }, teamId?: string, chatRequest?: { eventId: string; botId: string | null }) {
   return attempt(() => actAs(userId, async () => {
     if (input.assigneeUserId !== undefined && input.assigneeAgentId !== undefined) return { error: 'validationGeneric' }
     // The legacy MCP contract has no human-assignee field. Do not introduce a
@@ -128,7 +128,7 @@ export async function createIssue(userId: string, input: IssueChanges & { title:
     const parsed = createIssueInput.safeParse(input)
     if (!parsed.success) return { error: 'validationGeneric' }
     const { idempotentIssueMutation, IssueToolCallConflict } = await import('./issue-mutation')
-    try { return await idempotentIssueMutation(userId, 'create_issue', toolCallId, parsed.data, mutate, taskEvent) }
+    try { return await idempotentIssueMutation(userId, 'create_issue', toolCallId, parsed.data, mutate, taskEvent, chatRequest ? { ...chatRequest, teamId: teamId ?? parsed.data.teamId ?? null } : undefined) }
     catch (error) { if (error instanceof IssueToolCallConflict) return { error: error.message }; throw error }
   }, actor))
 }
