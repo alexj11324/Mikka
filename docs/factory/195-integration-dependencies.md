@@ -1,5 +1,11 @@
 # Monitor integration checkpoint
 
+> Historical checkpoint (2026-10-28) from before the #195 integration. The
+> seams it lists are now wired: `lib/factory/server.ts` and
+> `lib/factory/runtime.ts` install the monitor gate and consumer, and the
+> incident tables ship in `drizzle/20261029044005_factory_195_monitor.sql`.
+> Current behavior is in `195-monitor.md`.
+
 Base: main 4f52bbb2161d7016e95b95b5db3e3aa05afb89a2.
 This base has no Factory stage store or publication reader. The fingerprint module
 is only an independently tested prerequisite, not a registered validator.

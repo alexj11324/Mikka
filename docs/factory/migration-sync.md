@@ -1,5 +1,12 @@
 # Common Factory migration synchronization
 
+> Historical record (2026-10-25/26) of the candidate renames. The Factory
+> migrations were renamed again before merge. The current names and hashes are
+> in `docs/integration/migration-manifest-20261029.json`, which
+> `tests/factory-migration-order.test.mjs` checks: `20261029044000` routing,
+> `20261029044002` dispatch keys, `20261029044003` stages, `20261029044004`
+> approvals, `20261029044005` monitor, `20261029044006` questions.
+
 The common-baseline maintainer owns naming. Workers change their validators/adapters; they merge the published common baseline and apply only the supplied filename compatibility commits. They do not independently rename shared SQL. The manifest names one SQL file and one ledger identity per component.
 
 Current main snapshot: `8f8484ff3bf9a55f5c759d7e2316ab90c5fb854f`, latest migration `20261025043000_pending_actions.sql`. Reserved ordering slots:
