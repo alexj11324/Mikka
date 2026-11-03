@@ -176,7 +176,7 @@ test(`「${MIKKA_SITE}」: every Mikka repository comes back described; the site
     { tool: 'find_repository', input: { name: 'Mikka site' } },
     { tool: 'dispatch_run', input: { issueId: ISSUE, repo: 'alexj11324/mikka-web' } },
   ])
-  assert.match(system, /every word as they said it \(e\.g\. Mikka_test, Mikka site\)/)
+  assert.match(system, /every word as they said it \(e\.g\. acme_tools, the Acme docs\)/)
   assert.match(system, /Choose by judging them against the person's own words \(a site, an app, a page or a product they named\), each repository's description and homepage, and the task/)
   assert.match(system, /When they still do not settle it, ask which repository/)
   assert.match(system, /Even when the result is one repository, check that it is the thing the person named/)
@@ -221,4 +221,11 @@ test(`screen work on a named site still names it to the sub-agent: 「${MIKKA_SI
   assert.match(system, /do not look up a URL, a repository or a subscription first/, 'starting screen work stays immediate')
   assert.match(system, /When the person named a repository or a site, still pass it to the sub-agent or the thread/)
   assert.match((calls[0].input as { task: string }).task, /Mikka site/)
+})
+
+test('the prompt teaches judgment with neutral names; it never contains the eval\'s sentences or the real repositories', () => {
+  const tools = registry.createCoordinatorRegistry(OWNER, COORDINATOR_BOT, undefined, { coordinator: true, computerEnabled: true })
+  const text = [instructions, ...Object.values(tools).map(tool => String(tool.description ?? '')), JSON.stringify(Object.fromEntries(Object.entries(tools).map(([name, tool]) => [name, (tool.inputSchema as { toJSONSchema?: () => unknown })?.toJSONSchema?.() ?? null])))].join('\n')
+  assert.match(text, /every word kept \(e\.g\. acme_tools, the Acme docs\)/, 'the parameter descriptions are read too')
+  for (const leaked of [/Mikka site/i, /mikka-web/i, /mikka-enterprise/i, /How it works/i, /It's in the/i, /Mikka_test/, /alexj11324\/Mikka/i, /octo-web|octo-api/i, /landing page|docs site/i]) assert.doesNotMatch(text, leaked)
 })

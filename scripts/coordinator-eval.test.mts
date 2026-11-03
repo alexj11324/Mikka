@@ -169,45 +169,76 @@ test('a message that needs no tool is answered at once, with no opening sentence
   })
 })
 
-// Alex's own words, from the Acme production thread (2026-11-03).
-const MIKKA_SITE = 'On phones, the How it works section on the Mikka site is cut off. Can you fix it?'
-const mikkaCandidates = [
-  { fullName: 'alexj11324/Mikka', description: 'Mikka app: bots, threads and the Coordinator', homepage: 'https://app.mikka.example', usedByThisWorkspace: true },
-  { fullName: 'alexj11324/mikka-web', description: 'The Mikka marketing site', homepage: 'https://mikka.example', usedByThisWorkspace: false },
-  { fullName: 'acme/mikka-enterprise', description: null, homepage: null, usedByThisWorkspace: false },
+// Alex's own words, from the Acme production thread (2026-11-03), each with two rewordings on other repositories:
+// none of these sentences or repository names is in the prompt, so passing means judging, not recalling.
+type Family = { app: string; site: string; other: string; siteHome: string }
+const MIKKA: Family = { app: 'alexj11324/Mikka', site: 'alexj11324/mikka-web', other: 'acme/mikka-enterprise', siteHome: 'https://mikka.example' }
+const OCTO: Family = { app: 'octo/octo', site: 'octo/octo-web', other: 'octo/octo-api', siteHome: 'https://octo.example' }
+const candidatesOf = (family: Family) => [
+  { fullName: family.app, description: 'The product: app, API clients and background jobs', homepage: `https://app.${family.siteHome.slice(8)}`, usedByThisWorkspace: true },
+  { fullName: family.site, description: 'The public marketing website', homepage: family.siteHome, usedByThisWorkspace: false },
+  { fullName: family.other, description: null, homepage: null, usedByThisWorkspace: false },
 ]
-const mikkaCard = { title: '多个仓库匹配 Mikka site', options: mikkaCandidates.map(item => ({ value: item.fullName, label: item.fullName })) }
+const cardOf = (family: Family, name: string) => ({ title: `多个仓库匹配 ${name}`, options: candidatesOf(family).map(item => ({ value: item.fullName, label: item.fullName })) })
 const repoOf = (call: { input: unknown }) => String((call.input as { repo?: string }).repo ?? '')
+const named = (repo: string, fullName: string) => {
+  const short = fullName.split('/')[1]!
+  return repo.toLowerCase() === fullName.toLowerCase() || repo.toLowerCase() === short.toLowerCase() || new RegExp(`github\\.com/${fullName}(\\.git)?$`, 'i').test(repo)
+}
 
-test(`「${MIKKA_SITE}」: the site is mikka-web, or the person is asked; never alexj11324/Mikka`, { skip }, async () => {
-  results = {
-    getIssue: { id: ISSUE, title: 'How it works is cut off on phones', thread: null },
-    findRepository: { match: 'several', candidates: mikkaCandidates, card: mikkaCard },
-    dispatchRun: { runId: 'run-7', thread: 'new', placement: { kind: 'cloud' } },
-  }
-  await passAll('mikka site', async () => trial(MIKKA_SITE, await facts()), ({ reply, calls }) => {
-    const dispatched = calls.filter(call => call.step === 'dispatchRun')
-    if (dispatched.some(call => /^alexj11324\/mikka$|github\.com\/alexj11324\/mikka(\.git)?$/i.test(repoOf(call)) || /^mikka$/i.test(repoOf(call)))) return 'dispatched to alexj11324/Mikka'
-    if (dispatched.some(call => /mikka-web/i.test(repoOf(call)))) return null
-    return /BeQuestions/.test(reply) ? null : 'neither mikka-web nor a question'
+const siteCases: { label: string; text: string; family: Family; name: string }[] = [
+  { label: 'Alex', text: 'On phones, the How it works section on the Mikka site is cut off. Can you fix it?', family: MIKKA, name: 'Mikka site' },
+  { label: 'landing page', text: "The pricing table on Octo's landing page overflows on small screens, please fix it.", family: OCTO, name: 'Octo landing page' },
+  { label: 'website', text: 'Octo 官网首页的页脚在手机上被截断了，帮忙修一下', family: OCTO, name: 'Octo 官网' },
+]
+for (const item of siteCases) {
+  test(`site request (${item.label}): 「${item.text}」 goes to the site repository or asks; never to the app`, { skip }, async () => {
+    results = {
+      getIssue: { id: ISSUE, title: item.text.slice(0, 60), thread: null },
+      findRepository: { match: 'several', candidates: candidatesOf(item.family), card: cardOf(item.family, item.name) },
+      dispatchRun: { error: 'repositoryAmbiguous', issueId: ISSUE, candidates: candidatesOf(item.family), card: cardOf(item.family, item.name) },
+    }
+    await passAll(`site ${item.label}`, async () => {
+      const outcome = await trial(item.text, await facts())
+      return outcome
+    }, ({ reply, calls }) => {
+      const dispatched = calls.filter(call => call.step === 'dispatchRun' && repoOf(call))
+      if (dispatched.some(call => named(repoOf(call), item.family.app))) return `dispatched to the app repository ${item.family.app}`
+      if (dispatched.some(call => named(repoOf(call), item.family.site))) return null
+      return /BeQuestions/.test(reply) ? null : 'neither the site repository nor a question'
+    })
   })
-})
+}
 
-test('「It\'s in the mikka-web repo」 on a thread bound to alexj11324/Mikka: the work moves there, the old thread is not continued', { skip }, async () => {
-  const thread = { id: ISSUE, title: 'How it works is cut off on phones', status: 'doing', runs: [{ id: 'run-1', agent: 'Claude Code', status: 'completed' }], thread: { runId: 'run-1', status: 'completed', repository: 'https://github.com/alexj11324/Mikka' } }
-  results = { getIssue: thread, findRepository: { match: 'one', repository: 'alexj11324/mikka-web', description: 'The Mikka marketing site', homepage: 'https://mikka.example' }, dispatchRun: { runId: 'run-8', thread: 'new', threadId: 'run-8', replacedThreadId: 'run-1', placement: { kind: 'cloud' } } }
-  await passAll('named repo', async () => trial("It's in the mikka-web repo", await facts()), ({ calls }) => {
-    const dispatched = calls.filter(call => call.step === 'dispatchRun')
-    if (!dispatched.length) return 'no dispatch_run'
-    return dispatched.some(call => /mikka-web/i.test(repoOf(call))) ? null : 'continued the old thread without the named repository'
+const moveCases: { label: string; text: string; family: Family }[] = [
+  { label: 'Alex', text: "It's in the mikka-web repo", family: MIKKA },
+  { label: 'wrong repo', text: 'Wrong repository — this lives in octo-web, not octo.', family: OCTO },
+  { label: 'zh', text: '这个改动应该在 octo-web 仓库里做', family: OCTO },
+]
+for (const item of moveCases) {
+  test(`named repository (${item.label}): 「${item.text}」 on a thread bound to ${item.family.app} moves the work there`, { skip }, async () => {
+    const thread = { id: ISSUE, title: 'Section cut off on phones', status: 'doing', runs: [{ id: 'run-1', agent: 'Claude Code', status: 'completed' }], thread: { runId: 'run-1', status: 'completed', repository: `https://github.com/${item.family.app}` } }
+    results = { getIssue: thread, findRepository: { match: 'one', repository: item.family.site, description: 'The public marketing website', homepage: item.family.siteHome }, dispatchRun: { runId: 'run-8', thread: 'new', threadId: 'run-8', replacedThreadId: 'run-1', placement: { kind: 'cloud' } } }
+    await passAll(`move ${item.label}`, async () => trial(item.text, await facts()), ({ calls }) => {
+      const dispatched = calls.filter(call => call.step === 'dispatchRun')
+      if (!dispatched.length) return 'no dispatch_run'
+      return dispatched.some(call => named(repoOf(call), item.family.site)) ? null : 'continued the old thread without the named repository'
+    })
   })
-})
+}
 
-test(`screen work on 「${MIKKA_SITE}」 names the site to the sub-agent`, { skip }, async () => {
-  results = { getIssue: { id: ISSUE, title: 'How it works is cut off on phones', thread: null }, startWebSubagent: { subagentId: 'sub-9', state: 'running' }, dispatchComputerThread: { runId: 'run-9' }, listComputerBots: [{ botId: BOT, name: 'Coordinator', harnesses: ['claude_code'] }], wakeComputerBot: { state: 'awake' } }
-  await passAll('screen site', async () => trial(`${MIKKA_SITE} First show me the page at phone width.`, await facts(), { computerEnabled: true }), ({ calls }) => {
-    const started = calls.find(call => call.step === 'startWebSubagent' || call.step === 'dispatchComputerThread')
-    if (!started) return 'did not start screen work'
-    return /mikka/i.test(JSON.stringify(started.input)) ? null : 'the sub-agent was not told which site'
+const screenCases: { label: string; text: string; family: Family; mention: RegExp }[] = [
+  { label: 'Alex', text: 'On phones, the How it works section on the Mikka site is cut off. First show me the page at phone width.', family: MIKKA, mention: /mikka/i },
+  { label: 'docs site', text: 'Open our Octo docs site on a narrow browser and show me where the sidebar breaks.', family: OCTO, mention: /octo/i },
+  { label: 'zh', text: '先用手机尺寸打开 Octo 官网给我看看导航栏', family: OCTO, mention: /octo/i },
+]
+for (const item of screenCases) {
+  test(`screen work (${item.label}) names the site to the sub-agent`, { skip }, async () => {
+    results = { getIssue: { id: ISSUE, title: 'Check on a phone', thread: null }, startWebSubagent: { subagentId: 'sub-9', state: 'running' }, dispatchComputerThread: { runId: 'run-9' }, listComputerBots: [{ botId: BOT, name: 'Coordinator', harnesses: ['claude_code'] }], wakeComputerBot: { state: 'awake' } }
+    await passAll(`screen ${item.label}`, async () => trial(item.text, await facts(), { computerEnabled: true }), ({ calls }) => {
+      const started = calls.find(call => call.step === 'startWebSubagent' || call.step === 'dispatchComputerThread')
+      if (!started) return 'did not start screen work'
+      return item.mention.test(JSON.stringify(started.input)) ? null : 'the sub-agent was not told which site'
+    })
   })
-})
+}
