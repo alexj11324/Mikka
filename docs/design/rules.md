@@ -286,8 +286,12 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   controls are 「展开」 to expand a list and, in a bot's 概览 header, its own name
   and avatar: clicking the name renames it in place (Enter or leaving saves, Esc
   cancels) and clicking the avatar opens the 新建 Bot shape and colour picker
-  (2026-10-31). The Coordinator's header stays read-only. 详情 holds two lists, 例行 (routines)
-  and 资料库 (library). The bot creates routines when asked in chat; files are
+  (2026-10-31). The Coordinator's header stays read-only. An ordinary bot's 详情
+  also lets its owner edit 公开职责 (public role, #1158), with Save and Cancel.
+  This public description guides group routing; it never grants tools or exposes
+  private instructions. The field accepts at most 2,000 characters; saving an
+  empty value clears it. 详情 also holds 例行 (routines) and 资料库 (library).
+  The bot creates routines when asked in chat; files are
   uploaded with the composer's 「+」. 资料库 can delete the person's own files:
   each row has 删除, shown on hover or focus, and confirms first (Alex,
   2026-11-01: 「自己上传的文件，在资料库里可以删除」;

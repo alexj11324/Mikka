@@ -13,19 +13,21 @@ import { acquireTestAccounts, recordAuthenticationSecrets } from '../test-accoun
 import { TestAccountPool } from '../test-accounts/pool.mjs'
 import { verifyMailbox } from './mailbox-acceptance.mjs'
 import { verifyWorkerMailbox } from './worker-mailbox-acceptance.mjs'
+import { assertHandoffConfiguration, verifyFactoryHandoff } from './factory-handoff-acceptance.mjs'
 import { assertFlashTestModel, assertTestModelRequest } from '../test-model-policy.mjs'
 
 const root = resolve(import.meta.dirname, '../..')
 const selectedItems = process.env.LOCAL_LOOP_ITEMS?.split(',') ?? ['1', '2', '3', '4', '5', '6', '7']
-assert.ok(selectedItems.length && selectedItems.every(item => /^[1-8]$/.test(item)) && new Set(selectedItems).size === selectedItems.length, 'LOCAL_LOOP_ITEMS must be unique item numbers 1–8')
-const needsDaemon = selectedItems.some(item => ['1', '2', '3', '7'].includes(item))
+assert.ok(selectedItems.length && selectedItems.every(item => /^[1-9]$/.test(item)) && new Set(selectedItems).size === selectedItems.length, 'LOCAL_LOOP_ITEMS must be unique item numbers 1–9')
+const needsDaemon = selectedItems.some(item => ['1', '2', '3', '7', '9'].includes(item))
 // Keep the daemon Unix socket below Linux's 108-byte pathname limit even in
 // the separate fixed acceptance checkout. Evidence retains the full runId.
 const runId = randomUUID(), directory = resolve(root, '.cache/dev-local', `acceptance-${runId.replaceAll('-', '').slice(0, 16)}`)
 const progressFile = resolve(root, '.cache/dev-local/progress.jsonl')
 const started = Date.now(), children = [], secrets = new Set()
 const completedItems = []
-let pool, accounts, environment, runtime, activeStep, cleanupPromise, sourceFingerprint, serviceFailure, releaseHold, output = '', daemonCode, interrupted = false
+const cleanupHooks = [], daemonDirectories = [join(directory, 'daemon')]
+let pool, accounts, environment, runtime, localStackChild, activeStep, cleanupPromise, sourceFingerprint, serviceFailure, releaseHold, output = '', daemonCode, interrupted = false
 async function fingerprint() {
   const paths = execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', 'app', 'lib', 'packages', 'scripts', 'agents', 'drizzle', 'package.json', 'pnpm-lock.yaml', 'next.config.mjs'], { cwd: root, encoding: 'utf8' }).split('\0').filter(Boolean).sort()
   const hash = createHash('sha256')
@@ -150,6 +152,9 @@ async function setup() {
   const origin = process.env.LOCAL_LOOP_ORIGIN ?? `http://localhost:${process.env.MIKKA_DEV_PORT ?? '3110'}`
   assert.ok(['localhost', '127.0.0.1'].includes(new URL(origin).hostname), 'Only loopback app targets are allowed')
   const driverRevision = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim()
+  if (selectedItems.includes('9')) {
+    assertHandoffConfiguration({ existing, platform: process.platform, revision: driverRevision, expectedSource: process.env.LOCAL_LOOP_EXPECTED_SOURCE_SHA })
+  }
   // An attached runner can contain reviewed harness changes. Bind auth/DB
   // attestation to the existing server's descriptor, recording driver code
   // separately; bootstrap and account acquisition still verify that binding.
@@ -194,7 +199,7 @@ async function setup() {
     await recordAuthenticationSecrets([decodeURIComponent(new URL(process.env.E2E_DATABASE_URL).password)], { environment })
   }
   await new TestAccountPool(pool, environment).prepare({ pairs: 4 })
-  if (!existing) child(process.execPath, ['scripts/dev-local.mjs'], { ...process.env, NEXT_TELEMETRY_DISABLED: '1', MIKKA_DEV_SKIP_ENV_FILES: '1', ...(!needsDaemon ? { MIKKA_DEV_SKIP_DAEMON: '1' } : {}) }, true)
+  if (!existing) localStackChild = child(process.execPath, ['scripts/dev-local.mjs'], { ...process.env, NEXT_TELEMETRY_DISABLED: '1', MIKKA_DEV_SKIP_ENV_FILES: '1', ...(selectedItems.includes('9') ? { MIKKA_DEV_ACCEPTANCE_HANDOFF: '1' } : {}), ...(!needsDaemon ? { MIKKA_DEV_SKIP_DAEMON: '1' } : {}) }, true)
   await step('server-ready', 180_000, signal => until(signal, async () => {
     try { return (await fetch(`${origin}/mikka/sign-in`, { signal: AbortSignal.timeout(5_000) })).ok } catch { return false }
   }))
@@ -268,6 +273,34 @@ async function factoryApproval(runId, signal) {
   assert.deepEqual(stages.slice(-3).map(row=>row.stage),['execute','review','verify'])
   assert.equal(new Set(stages.slice(-3).map(row=>row.sessionId)).size,3,'independent CLI sessions for all three stages')
   return task
+}
+
+async function secondDaemon(signal) {
+  const dataDir = join(directory, 'daemon-b')
+  daemonDirectories.push(dataDir)
+  await mkdir(dataDir, { mode: 0o700 })
+  const daemonUser = process.getuid?.() === 0 && process.env.MIKKA_DEV_DAEMON_USER
+  if (daemonUser) execFileSync('chown', ['-R', daemonUser, dataDir])
+  const tsx = join(root, 'packages/daemon/node_modules/.bin/tsx')
+  const env = { ...process.env, NODE_USE_ENV_PROXY: '1',
+    NO_PROXY: [process.env.NO_PROXY, process.env.no_proxy, 'localhost', '127.0.0.1', '::1'].filter(Boolean).join(','),
+    PATH: `${join(root, '.cache/dev-local/bin')}:${process.env.PATH ?? ''}`,
+    ...(daemonUser ? { HOME: `/home/${daemonUser}` } : {}),
+    MIKKA_TEST_MODE: '1', MIKKA_DEV_GIT_ORIGIN: runtime.scenario.barePath,
+    GIT_CONFIG_GLOBAL: join(directory, 'dev-local.gitconfig'), GIT_TERMINAL_PROMPT: '0' }
+  delete env.DEEPSEEK_API_KEY // The authorized account model is delivered by the host.
+  const launch = (args, persistent = false) => {
+    const argv = [join(root, 'packages/daemon/bin/mikka.ts'), ...args, '--data-dir', dataDir]
+    return child(daemonUser ? 'setpriv' : tsx, daemonUser ? ['--reuid', daemonUser, '--regid', daemonUser, '--init-groups', tsx, ...argv] : argv, env, persistent)
+  }
+  daemonCode = undefined
+  launch(['daemon', 'login', '--server', runtime.server])
+  const code = await until(signal, () => daemonCode)
+  await json(accounts.owner, `/api/auth/device?user_code=${encodeURIComponent(code)}`)
+  await json(accounts.owner, '/api/auth/device/approve', { userCode: code })
+  await until(signal, () => access(join(dataDir, 'device.json')).then(() => true, () => false))
+  const processChild = launch(['daemon', '--no-auto-update', '--server', runtime.server], true)
+  return { dataDir, pid: processChild.pid }
 }
 
 async function accept(device) {
@@ -372,6 +405,13 @@ async function accept(device) {
   })
   if (only.includes('6')) await check('item6-agent-mailbox', 600_000, signal => verifyMailbox({ accounts, pool, progress, signal }))
   if (only.includes('7')) await check('item7-worker-mailbox', 600_000, signal => verifyWorkerMailbox({ accounts, pool, progress, signal, device }))
+  if (only.includes('9')) await check('item9-factory-handoff', 900_000, signal => verifyFactoryHandoff({
+    root, directory, runtime, ownerId: accounts.owner.userId, device, signal, progress,
+    query, json: (path, body) => json(accounts.owner, path, body), until: predicate => until(signal, predicate),
+    run, dispatch: (name, text) => dispatch(name, text, signal), terminal: id => terminal(id, signal),
+    factoryApproval: id => factoryApproval(id, signal), observations, startSecondDaemon: () => secondDaemon(signal),
+    stackPid: localStackChild.pid, registerCleanup: hook => cleanupHooks.push(hook),
+  }))
   if (only.includes('8')) await check('item8-cloud-loop', 900_000, async signal => {
     const reviewed = process.env.LOCAL_LOOP_LOCAL_EVIDENCE_FILE
       ? await (await import('./reviewed-local-evidence.mjs')).verifyReviewedLocalEvidence(process.env.LOCAL_LOOP_LOCAL_EVIDENCE_FILE, { environment, runtime }) : null
@@ -395,6 +435,9 @@ async function accept(device) {
 
 async function cleanup() {
   return cleanupPromise ??= (async () => {
+    for (const hook of cleanupHooks.reverse()) {
+      try { await hook() } catch { await progress('cleanup', 'warning', 'Owned handoff fault cleanup needs inspection; evidence retained') }
+    }
     try {
       if (accounts) {
         const tokens = await json(accounts.owner, '/api/device-tokens')
@@ -412,7 +455,7 @@ async function cleanup() {
     await pool?.end()
     // Only the daemon credential files created by this invocation are removed;
     // repository worktrees and non-secret evidence remain inspectable.
-    for (const name of ['device.json', 'daemon.secret']) await rm(join(directory, 'daemon', name), { force: true }).catch(() => {})
+    for (const dataDir of daemonDirectories) for (const name of ['device.json', 'daemon.secret']) await rm(join(dataDir, name), { force: true }).catch(() => {})
   })()
 }
 

@@ -226,9 +226,12 @@ mkdirSync(fixtureBin, { recursive: true, mode: 0o755 })
 const shellQuote = value => `'${value.replaceAll("'", "'\\''")}'`
 writeFileSync(join(fixtureBin, 'gh'), `#!/bin/sh\nexec ${shellQuote(process.execPath)} ${shellQuote(join(root, 'scripts/dev-local/gh.mjs'))} "$@"\n`, { mode: 0o755 })
 chmodSync(join(fixtureBin, 'gh'), 0o755)
-const daemon = args => spawn(daemonUser ? 'setpriv' : tsx,
+// Only the opt-in, owned local handoff acceptance may suspend this group.
+// Ordinary development keeps its existing lifecycle and failure monitoring.
+const isolateDaemon = process.env.MIKKA_DEV_ACCEPTANCE_HANDOFF === '1'
+const daemon = (args, isolated = false) => spawn(daemonUser ? 'setpriv' : tsx,
   daemonUser ? ['--reuid', daemonUser, '--regid', daemonUser, '--init-groups', tsx, ...args] : args, {
-    cwd: join(root, 'packages/daemon'), stdio: 'inherit',
+    cwd: join(root, 'packages/daemon'), stdio: 'inherit', detached: isolated,
     env: { ...childEnv, PATH: `${fixtureBin}:${childEnv.PATH ?? ''}`, ...(daemonUser ? { HOME: `/home/${daemonUser}` } : {}),
       // File origins are allowed only in local test-account mode (daemonTestMode).
       MIKKA_TEST_MODE: '1', MIKKA_DEV_GIT_ORIGIN: scenario.barePath, GIT_CONFIG_GLOBAL: gitConfig, GIT_TERMINAL_PROMPT: '0' },
@@ -241,7 +244,13 @@ if (process.env.MIKKA_DEV_SKIP_DAEMON !== '1') {
     const status = await new Promise(r => login.once('exit', r))
     if (status !== 0) throw new Error(`Local daemon login exited with code ${status}`)
   }
-  const runningDaemon = daemon(['bin/mikka.ts', 'daemon', '--no-auto-update', '--server', server, '--data-dir', dataDir])
+  const runningDaemon = daemon(['bin/mikka.ts', 'daemon', '--no-auto-update', '--server', server, '--data-dir', dataDir], isolateDaemon)
   watch(runningDaemon, 'daemon')
+  if (isolateDaemon) {
+    writeFileSync(join(root, '.cache/dev-local/owned-daemon.json'), JSON.stringify({ version: 1, server, dataDir, pid: runningDaemon.pid, parentPid: process.pid }), { mode: 0o600 })
+    closers.push(() => {
+      try { process.kill(-runningDaemon.pid, 'SIGCONT'); process.kill(-runningDaemon.pid, 'SIGTERM') } catch { /* Already exited. */ }
+    })
+  }
 }
 log(`ready: ${server} — ask the Coordinator to change ${REPOSITORY.replace('https://github.com/', '').replace('.git', '')}`)

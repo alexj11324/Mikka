@@ -3700,6 +3700,16 @@
       "allThreadsWaiting": "全部线程，{count} 条等你",
       "tabs": "右栏内容",
       "details": "详情",
+      "publicRole": {
+        "label": "公开职责",
+        "hint": "群聊按此公开职责选择 Bot；工具仍需授权。",
+        "placeholder": "在群聊中负责的工作；留空可清除",
+        "count": "{count} / {max}",
+        "tooLong": "公开职责最多 {max} 个字",
+        "loadError": "公开职责加载失败",
+        "saveError": "保存未确认，修改已保留。",
+        "saved": "已保存"
+      },
       "threads": "线程",
       "prs": "PR",
       "computer": "电脑",

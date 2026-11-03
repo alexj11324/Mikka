@@ -3700,6 +3700,16 @@
       "allThreadsWaiting": "All threads, {count} waiting on you",
       "tabs": "Right panel content",
       "details": "Details",
+      "publicRole": {
+        "label": "Public role",
+        "hint": "Group chats use this role to choose the bot. Tools still require authorization.",
+        "placeholder": "Responsibilities in group chats; leave empty to clear",
+        "count": "{count} / {max}",
+        "tooLong": "Public role can be at most {max} characters",
+        "loadError": "Public role failed to load",
+        "saveError": "Save not confirmed. Your draft is kept.",
+        "saved": "Saved"
+      },
       "threads": "Threads",
       "prs": "PRs",
       "computer": "Computer",

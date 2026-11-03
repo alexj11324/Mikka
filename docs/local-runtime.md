@@ -243,3 +243,33 @@ worker hash come from `E2B_ACCEPTANCE_TEMPLATE` / `E2B_WORKER_SHA` or the
 operator's non-secret `LOCAL_LOOP_CLOUD_TEMPLATE_FILE` metadata. Its independent
 normal account lease, restricted HTTPS relay, sandbox cleanup and timing
 evidence are owned by `scripts/e2b/cloud-local-acceptance.mjs`.
+
+Item 9 is an opt-in offline Factory handoff between two real local daemons.
+Run `LOCAL_LOOP_ITEMS=9 LOCAL_LOOP_EXPECTED_SOURCE_SHA=<reviewed-40-character-commit>
+pnpm test:local-loop` on the fixed Linux checkout, with the same normal local
+account-pool/database/Flash environment described above. The source pin must
+match HEAD. This item cannot attach with `--existing`: it must own both daemon
+processes and its fresh disposable database. It adds a 15-minute item budget;
+allow that time in addition to any other selected items and initial setup.
+
+The runner approves two distinct device IDs through the normal owner APIs.
+The dedicated ordinary owner must have no E2B key, so existing cloud-first
+recovery cannot legitimately replace the intended B target. Once A has run
+the real Flash workload and saved a repository checkpoint, the runner checks
+Linux process ancestry and suspends A's isolated process groups, including
+detached native children. Next and the existing local minute cron continue.
+The normal 90-second lease expires without edits to server state or thresholds;
+B must really claim the server-created retry of the same Task and request epoch.
+The test reads the structured Handoff and frozen payer/owner identity, resumes
+A to exercise lease fencing, checks exact artifact bytes/hash and one PR, and
+accepts the independently reviewed/verified candidate through the human API.
+It observes one further minute schedule for duplicate retries or publications.
+
+`item9-handoff.json` retains phase, Task/run/epoch/device identifiers, checkpoint,
+Handoff digest, artifact hash, publication count and failure status. SQL reads
+only evidence in that disposable database; dispatch and acceptance remain
+authenticated API operations. Timeout/interruption restores paused processes
+before ordinary cleanup. This case proves offline local-device handoff only:
+it does not establish the separate 45-minute online-stall watchdog, official
+subscription behavior, or production-provider acceptance. The process and
+receipt guard tests are included in `pnpm test:dev-local` and make no model calls.
