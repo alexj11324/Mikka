@@ -35,9 +35,9 @@ dbTest('a heartbeat re-checks execution identities only when the harnesses chang
   })
   const codex = { harness: 'codex', installed: true, version: '1.0.0' }
   const claude = { harness: 'claude_code', installed: true, version: '2.1.0' }
-  const beat = async (body: Record<string, unknown>) => {
+  const beat = async (body: Record<string, unknown>, version = '0.0.375') => {
     const response = await POST(new Request(`http://127.0.0.1/v1/devices/${device}/heartbeat`, {
-      method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+      method: 'POST', headers: { 'x-mikka-client-version': version, authorization: `Bearer ${token}`, 'content-type': 'application/json' },
       body: JSON.stringify({ runs: [], worktreeDiskBytes: 0, ...body }),
     }), { params: Promise.resolve({ deviceId: device }) })
     assert.equal(response.status, 200)
@@ -95,6 +95,13 @@ dbTest('a heartbeat re-checks execution identities only when the harnesses chang
     // With a run, its lease is renewed; a run the device no longer holds is revoked.
     const [{ id: agent }] = (await pool.query(`select id from agents where "userId"=$1 and "deviceId"=$2`, [owner, device])).rows
     await pool.query(`insert into agent_runs (id, "agentId", "userId", "deviceId", status, "leaseExpiresAt") values ($1, $2, $3, $4, 'running', now() + interval '5 seconds')`, [run, agent, owner, device])
+    const ownToken = (await pool.query('SELECT id FROM device_tokens WHERE "tokenHash"=$1', [createHash('sha256').update(token).digest('hex')])).rows[0].id
+    await pool.query('UPDATE agent_runs SET "deviceTokenId"=$2 WHERE id=$1', [run, ownToken])
+    const old = await beat({ harnesses: [claude, codex], runs: [{ runId: run, lastProgressAt: new Date().toISOString() }, { runId: stranger, lastProgressAt: new Date().toISOString() }, { runId: 'not-a-uuid', lastProgressAt: new Date().toISOString() }] }, '0.0.329')
+    assert.ok(old.leases[run], 'old original claim can finish its own live run')
+    assert.deepEqual(old.revoked?.sort(), ['not-a-uuid', stranger].sort())
+    assert.deepEqual(await identities(), ['claude_code'], 'obsolete heartbeat cannot provision new execution identities')
+    assert.deepEqual((await seen()).harnesses.map((info: { harness: string }) => info.harness), ['claude_code'])
     const leased = await beat({ harnesses: [claude], runs: [{ runId: run, lastProgressAt: new Date().toISOString() }, { runId: stranger, lastProgressAt: new Date().toISOString() }] })
     assert.ok(leased.leases[run], 'the held run\'s lease is renewed')
     assert.deepEqual(leased.revoked, [stranger])

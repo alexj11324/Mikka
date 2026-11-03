@@ -1,3 +1,4 @@
+import { daemonRequestTooOld, daemonUpgradeResponse } from '@/lib/daemon-release'
 import { withDeviceRoute } from '@/lib/device-route'
 import { NextResponse } from 'next/server'
 import { eq, sql } from 'drizzle-orm'
@@ -22,6 +23,9 @@ async function handlePOST(request: Request) {
   const parsed = deviceRegistration.safeParse(await request.json().catch(() => null))
   if (!parsed.success) return NextResponse.json({ error: 'Invalid registration.' }, { status: 400 })
   const info = parsed.data
+  // Also verify registration metadata: a newer/missing transport header cannot
+  // turn an old client into an admitted device.
+  if (daemonRequestTooOld(info.daemonVersion, Boolean(caller.scopeDeviceId && caller.scopeWorkspaceId))) return daemonUpgradeResponse()
   const now = new Date()
   const fields = {
     deviceType: info.deviceType ?? 'laptop',

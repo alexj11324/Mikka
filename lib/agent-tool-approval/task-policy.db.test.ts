@@ -97,11 +97,11 @@ test('task workspace policy applies to Coordinator and cross-workspace Bot runs'
   await new Promise<void>(resolve => server!.listen(0, '127.0.0.1', resolve))
   const address = server.address() as { port: number }
   const checkHTTP = (policyRevision: string, runId = a.run) => fetch(`http://127.0.0.1:${address.port}/v1/runs/${runId}/tool-approval`, {
-    method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+    method: 'POST', headers: { 'x-mikka-client-version': '0.0.375', authorization: `Bearer ${token}`, 'content-type': 'application/json' },
     body: JSON.stringify({ operation: 'check', deviceId: device, policyRevision }),
   })
   await t.test('signed policy HTTP context and renewal bind the current run and retain final restrictions', async () => {
-    const issuer=`http://127.0.0.1:${address.port}`,url=`${issuer}/v1/runs/${a.run}/policy-snapshot`,auth={authorization:`Bearer ${token}`,'content-type':'application/json'}
+    const issuer=`http://127.0.0.1:${address.port}`,url=`${issuer}/v1/runs/${a.run}/policy-snapshot`,auth={'x-mikka-client-version':'0.0.375',authorization:`Bearer ${token}`,'content-type':'application/json'}
     const current=await read(a.run),context=policyDistributionContext(issuer,owner,device,a.run,current)
     const finalPolicy={...current.policy,readOnly:true,permissions:{...current.policy.permissions,computer_use:'deny' as const}}
     const expired=issuePolicySnapshot(context,finalPolicy,Date.now()-POLICY_SNAPSHOT_TTL_MS-1000)
@@ -252,7 +252,7 @@ test('task workspace policy applies to Coordinator and cross-workspace Bot runs'
       assert.notEqual(changed.revision,before.revision)
       assert.notEqual(issuePolicySnapshot(policyDistributionContext(origin,owner,device,subject.run,changed),changed.policy).payload.policyHash,snapshot.payload.policyHash)
       assert.equal(await store.check(actor,subject.run,before.revision),false)
-      assert.equal((await fetch(`${origin}/v1/runs/${subject.run}/policy-snapshot`,{method:'POST',headers:{authorization:`Bearer ${token}`,'content-type':'application/json'},body:JSON.stringify({deviceId:device,snapshot})})).status,409)
+      assert.equal((await fetch(`${origin}/v1/runs/${subject.run}/policy-snapshot`,{method:'POST',headers:{'x-mikka-client-version':'0.0.375',authorization:`Bearer ${token}`,'content-type':'application/json'},body:JSON.stringify({deviceId:device,snapshot})})).status,409)
       const reverted=await publish(subject.run,'project',{defaults:projectDefaults})
       assert.notEqual(reverted.revision,before.revision)
       const readResponse=await fetch(`${origin}/api/agent-cli-policy`,{method:'POST',headers:{cookie:'owner=1',origin,'content-type':'application/json'},body:JSON.stringify({operation:'read',runId:subject.run})})

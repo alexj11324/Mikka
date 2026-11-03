@@ -1,7 +1,9 @@
+import { CLIENT_VERSION_HEADER } from '@mikka/protocol/version'
+import { pendingDeviceCommands } from '@/lib/device-management'
 import { withDeviceRoute } from '@/lib/device-route'
 import { NextResponse } from 'next/server'
 import { COMMANDS_DAEMON_LATEST_PARAM, COMMANDS_MAX_SKIP, COMMANDS_MAX_SKIP_DEVICE_COMMANDS, COMMANDS_MAX_WAIT_SECONDS, COMMANDS_SKIP_DEVICE_COMMANDS_PARAM, COMMANDS_SKIP_PARAM, MAILBOX_NOTICE_HEADER } from '@mikka/protocol/device'
-import { cachedDaemonVersions, daemonVersions, newerDaemonRelease } from '@/lib/daemon-release'
+import { cachedDaemonVersions, daemonVersions, newerDaemonRelease, daemonRequestTooOld } from '@/lib/daemon-release'
 import { authenticateDevice, deviceMayHaveWork, deviceWork, ownsDevice, sleep, waitSeconds } from '@/lib/device-link'
 import { noteLogOutcome, withRequestLog } from '@/lib/request-log'
 
@@ -24,19 +26,22 @@ async function handleGET(request: Request, { params }: { params: Promise<{ devic
   const { deviceId } = await params
   const device = await ownsDevice(deviceId, caller.userId)
   if (!device) return NextResponse.json({ error: 'Unknown device.' }, { status: 404 })
+  const obsolete = daemonRequestTooOld(request.headers.get(CLIENT_VERSION_HEADER), Boolean(caller.scopeDeviceId && caller.scopeWorkspaceId))
   const wait = waitSeconds(request, COMMANDS_MAX_WAIT_SECONDS)
   const search = new URL(request.url).searchParams
   const list = (name: string, max: number) => (search.get(name) ?? '').split(',').filter(Boolean).slice(0, max)
   const skip = list(COMMANDS_SKIP_PARAM, COMMANDS_MAX_SKIP)
   const knownRelease = search.get(COMMANDS_DAEMON_LATEST_PARAM)
   // Read once per poll from the five-minute registry cache; idle checks below only peek at it.
-  let releases = knownRelease ? await daemonVersions() : undefined
+  let releases = knownRelease || obsolete ? await daemonVersions() : undefined
   const deadline = Date.now() + wait * 1000
   while (!request.signal.aborted) {
     // A device with scheduling off gets no work (as GET .../runs).
     const options = { mailboxNotices: request.headers.get(MAILBOX_NOTICE_HEADER) === '1', queued: device.enabled }
     // The cheap check also ends the poll for a revoked credential; the full read hands over work.
-    const check = await deviceMayHaveWork(deviceId, skip, knownRelease ? { ...options, skipDeviceCommands: list(COMMANDS_SKIP_DEVICE_COMMANDS_PARAM, COMMANDS_MAX_SKIP_DEVICE_COMMANDS) } : options)
+    const check = obsolete
+      ? { work: false, deviceCommand: (await pendingDeviceCommands(deviceId, [])).find(command => command.kind === 'update' || command.kind === 'restart') ?? null }
+      : await deviceMayHaveWork(deviceId, skip, knownRelease ? { ...options, skipDeviceCommands: list(COMMANDS_SKIP_DEVICE_COMMANDS_PARAM, COMMANDS_MAX_SKIP_DEVICE_COMMANDS) } : options)
     const { commands, queuedRuns: queued } = check.work ? await deviceWork(deviceId, skip, options) : { commands: [], queuedRuns: [] }
     if (request.signal.aborted) break
     // Memory only: a release published mid-poll ends it once this instance's cache has it.

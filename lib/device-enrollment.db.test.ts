@@ -32,7 +32,7 @@ before(async () => {
     CREATE TABLE device_tokens (id uuid PRIMARY KEY,"userId" text NOT NULL,"tokenHash" text NOT NULL,name text,"lastUsedAt" timestamptz,"revokedAt" timestamptz,"boundDeviceId" uuid,"boundWorkspaceId" uuid,"expiresAt" timestamptz);
     CREATE TABLE device_token_devices ("tokenId" uuid,"deviceId" uuid,"userId" text,PRIMARY KEY("tokenId","deviceId"));
     CREATE TABLE agents (id uuid PRIMARY KEY,"userId" text,"deviceId" uuid,"updatedAt" timestamptz);
-    CREATE TABLE agent_runs (id uuid PRIMARY KEY,"deviceId" uuid,status text);`)
+    CREATE TABLE agent_runs (id uuid PRIMARY KEY,"deviceId" uuid,status text,"deviceTokenId" uuid,"userId" text,"leaseExpiresAt" timestamptz);`)
     await pool.query(await readFile(new URL('../drizzle/20261030193000_device_enrollment_management.sql', import.meta.url), 'utf8'))
     await pool.query(await readFile(new URL('../drizzle/20261030231122_device_uninstall_command.sql', import.meta.url), 'utf8'))
     await pool.query(await readFile(new URL('../drizzle/20261031002605_daemon_credential_revocation.sql', import.meta.url), 'utf8'))
@@ -79,7 +79,7 @@ async function removableDevice(online: boolean) {
   await pool.query(`INSERT INTO devices(id,"ownerId","lastSeenAt") VALUES($1,'owner-a',now()-$2::interval)`, [id, online ? '1 second' : '2 minutes'])
   await pool.query(`INSERT INTO device_tokens(id,"userId","tokenHash") VALUES($1,'owner-a',$2)`, [tokenId, hashDeviceToken(credential)])
   await pool.query(`INSERT INTO device_token_devices VALUES($1,$2,'owner-a')`, [tokenId, id])
-  const request = (path: string, method = 'POST') => new Request(`http://localhost/mikka${path}`, { method, headers: { authorization: `Bearer ${credential}` } })
+  const request = (path: string, method = 'POST') => new Request(`http://localhost/mikka${path}`, { method, headers: { 'x-mikka-client-version': '0.0.375', authorization: `Bearer ${credential}` } })
   return { id, tokenId, request }
 }
 
@@ -149,4 +149,51 @@ test('management queue is owner-scoped, serial and acknowledges only its device'
   await pendingDeviceCommands(a, [third!])
   const replay = await pool.query(`SELECT "completedAt" FROM device_management_commands WHERE id=$1`, [third])
   assert.equal(receipt.rows[0].completedAt.getTime(), replay.rows[0].completedAt.getTime())
+}))
+
+test('a fresh login cannot admit an old daemon, and updating cannot revive a revoked credential', () => run(async () => {
+  const { pool } = await import('./db')
+  const { withDeviceRoute } = await import('./device-route')
+  const { MIN_DAEMON_VERSION } = await import('@mikka/protocol/device')
+  const grant = await mintDeviceEnrollment('version-owner')
+  const credential = await consumeDeviceEnrollment(grant)
+  assert.ok(credential)
+  let invoked = 0
+  const handler = withDeviceRoute(async () => { await pool.query('SELECT 1'); invoked++; return Response.json({ ok: true }) })
+  const request = (version: string | null, path = '/v1/devices/fixture/repos') => new Request(`http://localhost/mikka${path}`, {
+    headers: { authorization: `Bearer ${credential}`, ...(version === null ? {} : { 'x-mikka-client-version': version }) },
+  })
+  for (const version of ['0.0.329', '0.0.374', null]) {
+    const response = await handler(request(version))
+    assert.equal(response.status, 426)
+    assert.equal((await response.json()).minVersion, MIN_DAEMON_VERSION)
+  }
+  assert.equal(invoked, 0, 'fresh authentication does not grant business access to old code')
+  assert.equal((await handler(request(MIN_DAEMON_VERSION))).status, 200)
+  assert.equal(invoked, 1)
+  // Already claimed work may finish using its original credential. A new
+  // credential cannot inherit this grace from merely owning the same device.
+  const tokenId = (await pool.query('SELECT id FROM device_tokens WHERE "tokenHash"=$1', [hashDeviceToken(credential)])).rows[0].id
+  const claimedRun = randomUUID()
+  await pool.query(`INSERT INTO agent_runs(id,status,"deviceTokenId","userId","leaseExpiresAt") VALUES($1,'running',$2,'version-owner',now()+interval '1 minute')`, [claimedRun, tokenId])
+  assert.equal((await handler(request('0.0.329'))).status, 426, 'a live run does not admit unrelated repos polling')
+  assert.equal((await handler(request('0.0.329', `/v1/runs/${randomUUID()}/events`))).status, 426, 'another run cannot borrow the lease')
+  assert.equal((await handler(request('0.0.329', `/v1/runs/${claimedRun}/events`))).status, 200)
+  const fresh = await consumeDeviceEnrollment(await mintDeviceEnrollment('version-owner'))
+  const freshRequest = new Request(request('0.0.329', `/v1/runs/${claimedRun}/events`), { headers: { authorization: `Bearer ${fresh}`, 'x-mikka-client-version': '0.0.329' } })
+  assert.equal((await handler(freshRequest)).status, 426)
+  await pool.query('UPDATE device_tokens SET "revokedAt"=now() WHERE id=$1', [tokenId])
+  assert.equal((await handler(request(MIN_DAEMON_VERSION))).status, 401, 'new binary plus revoked old session is still unauthorized')
+  assert.equal((await handler(request('0.0.329', '/v1/devices/fixture/commands'))).status, 401, 'control traffic does not bypass revocation')
+}))
+
+test('registration metadata cannot disguise an old daemon behind a current header', () => run(async () => {
+  const { POST } = await import('../app/v1/devices/register/route')
+  const { MIN_DAEMON_VERSION } = await import('@mikka/protocol/device')
+  const credential = await consumeDeviceEnrollment(await mintDeviceEnrollment('body-version-owner'))
+  const response = await POST(new Request('http://localhost/mikka/v1/devices/register', {
+    method: 'POST', headers: { authorization: `Bearer ${credential}`, 'x-mikka-client-version': MIN_DAEMON_VERSION, 'content-type': 'application/json' },
+    body: JSON.stringify({ name: 'version fixture', platform: 'linux', arch: 'x64', daemonVersion: '0.0.329', protocolVersion: 1, harnesses: [] }),
+  }))
+  assert.equal(response.status, 426)
 }))
