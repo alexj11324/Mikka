@@ -34,6 +34,20 @@ its existing protected status names and real acceptance coverage.
 
 ## Cloud worker template release
 
+Current replacement: `e2b-official-runtime.yml` validates new official instances
+without building or changing a template. It compares file/link/permission
+manifests, bootstraps the pinned Mikka source beneath `/opt/mikka`, and measures
+the actual CLI model catalogue. Only reviewed `main` runs receive the existing
+E2B validation key and Vercel release token in separate jobs. Publication pairs
+the official template names, worker digest, source commit and model catalogue in
+one request, and redeploys only a READY application of that exact Git commit.
+PR runs have no secrets and run source/publisher checks. This validation does
+not send a model prompt and does not replace real subscription acceptance.
+
+The historical workflow below is retained unchanged and **disabled** after
+[the preservation decision](../../docs/design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md).
+Do not resume it as part of the replacement release.
+
 Cloud machines start from E2B's own `desktop`, `claude` and `codex` templates
 with the Mikka worker added ([decision 2026-11-01-2335](../../docs/design/decisions/2026-11-01-2335-e2b-official-templates.md)).
 

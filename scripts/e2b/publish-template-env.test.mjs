@@ -10,7 +10,7 @@ const TEMPLATES = { desktop: 'tpl1', claude: 'tpl2', codex: 'tpl3' }
 const CATALOGUE = JSON.stringify({ version: 1, workerSha: SHA, templates: Object.fromEntries(Object.keys(TEMPLATES).map(kind => [kind, { templateId: TEMPLATES[kind], models: MODELS[kind] }])) })
 const STORED = { MIKKA_CLOUD_TEMPLATE_MODELS: CATALOGUE, E2B_BYO_COMPUTER_TEMPLATE: 'tpl1', E2B_CLAUDE_TEMPLATE: 'tpl2', E2B_CODEX_TEMPLATE: 'tpl3', MIKKA_CLOUD_WORKER_SHA: SHA }
 
-function fakeVercel({ inFlight = 0, stored = STORED, redeploy = 'READY' } = {}) {
+function fakeVercel({ inFlight = 0, stored = STORED, redeploy = 'READY', commit } = {}) {
   const calls = []
   let listings = 0
   const fetchImpl = async (url, init) => {
@@ -22,9 +22,9 @@ function fakeVercel({ inFlight = 0, stored = STORED, redeploy = 'READY' } = {}) 
     if (path.includes('/env/id-')) return json({ value: stored[path.split('/env/id-')[1]] })
     if (path === '/v6/deployments') return json({ deployments: [
       ...(listings++ < inFlight ? [{ uid: 'dpl_new', name: 'mikka', state: 'BUILDING' }] : []),
-      { uid: 'dpl_live', name: 'mikka', state: 'READY' }] })
+      { uid: 'dpl_live', name: 'mikka', state: 'READY', meta: { githubCommitSha: commit } }] })
     if (method === 'POST' && path === '/v13/deployments') return json({ id: 'dpl_redeploy' })
-    if (path === '/v13/deployments/dpl_redeploy') return json({ readyState: redeploy })
+    if (path === '/v13/deployments/dpl_redeploy') return json({ readyState: redeploy, meta: { githubCommitSha: commit } })
     return { ok: false, status: 404, json: async () => ({}) }
   }
   return { fetchImpl, calls }
@@ -75,4 +75,33 @@ test('reads production\'s current worker hash, empty when unset', async () => {
 test('refuses publishing a template without measured models before any write', () => {
   assert.throws(() => pairEnv({ templates: TEMPLATES, sourceSha: SHA }), /template_models_invalid/)
   assert.throws(() => pairEnv({ templates: TEMPLATES, sourceSha: SHA, models: { ...MODELS, desktop: [report('codex')] } }), /template_models_missing desktop claude_code/)
+})
+
+test('official runtime publishes source, worker and measured capabilities together, redeploying the exact Git commit', async () => {
+  const sourceCommit = 'b'.repeat(40), templates = { desktop: 'desktop', claude: 'claude', codex: 'codex' }
+  const officialEnv = pairEnv({ templates, sourceSha: SHA, models: MODELS })
+  const stored = Object.fromEntries(officialEnv.map(row => [row.key, row.value]))
+  stored.MIKKA_CLOUD_WORKER_SOURCE_COMMIT = sourceCommit
+  const fake = fakeVercel({ stored, commit: sourceCommit })
+  await run(fake, { templates, sourceCommit })
+  const writes = fake.calls.filter(row => row.method === 'POST' && row.path.endsWith('/env'))
+  assert.equal(writes.length, 1)
+  assert.ok(writes[0].body.some(row => row.key === 'MIKKA_CLOUD_WORKER_SOURCE_COMMIT' && row.value === sourceCommit))
+})
+
+test('official runtime cannot redeploy a READY application from a different commit', async () => {
+  const sourceCommit = 'b'.repeat(40), templates = { desktop: 'desktop', claude: 'claude', codex: 'codex' }
+  const stored = Object.fromEntries(pairEnv({ templates, sourceSha: SHA, models: MODELS }).map(row => [row.key, row.value]))
+  stored.MIKKA_CLOUD_WORKER_SOURCE_COMMIT = sourceCommit
+  const fake = fakeVercel({ stored, commit: 'c'.repeat(40) })
+  await assert.rejects(run(fake, { templates, sourceCommit }), /no_ready_production_deployment/)
+  assert.ok(!fake.calls.some(row => row.method === 'POST' && row.path === '/v13/deployments'))
+})
+
+test('official runtime refuses custom templates and invalid commits before writing production', async () => {
+  for (const extra of [{ sourceCommit: 'short' }, { sourceCommit: 'b'.repeat(40) }]) {
+    const fake = fakeVercel()
+    await assert.rejects(run(fake, extra), /official_(source_commit|template)_invalid/)
+    assert.equal(fake.calls.length, 0)
+  }
 })
