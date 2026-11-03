@@ -45,5 +45,9 @@ jobs:
           secret-path: /vercel
           recursive: false
           include-imports: false
-      - name: Verify normal sign-in and authorized model availability
-        run: node scripts/ops/proactive-account-preflight.mjs
+      - name: Verify temporary Flash credential cleanup guards
+        run: node --test scripts/ops/proactive-test-credentials.test.mjs
+      - name: Verify normal Settings setup, Flash availability and cleanup
+        run: node scripts/ops/proactive-flash-preflight.mjs
+        env:
+          PROACTIVE_EXPECT_FLASH: '1'

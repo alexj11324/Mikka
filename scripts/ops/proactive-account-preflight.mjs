@@ -31,6 +31,7 @@ try {
   if (!menu.response.ok || !Array.isArray(menu.data?.groups)) throw Error('preflight_model_menu_failed')
   const api = menu.data.groups.filter(group => group.kind === 'apiKey').flatMap(group => group.options ?? [])
   report.flashApiKeyAvailable = api.some(option => option.provider === 'deepseek' && /flash/i.test(option.modelId ?? ''))
+  if (process.env.PROACTIVE_EXPECT_FLASH === '1' && !report.flashApiKeyAvailable) throw Error('preflight_flash_unavailable')
   report.modelGroupKinds = [...new Set(menu.data.groups.map(group => group.kind))].filter(value => /^[a-zA-Z]+$/.test(value))
   const runtime = await request('/api/coordinator/runtime')
   report.coordinatorAvailable = runtime.response.status === 200 && Boolean(runtime.data?.runtime?.harness)
