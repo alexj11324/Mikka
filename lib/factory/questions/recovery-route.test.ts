@@ -6,6 +6,10 @@ mock.module('@/lib/db',{namedExports:{pool:{query:async()=>{queries++;return {ro
 mock.module('@/lib/factory/runtime',{namedExports:{factoryLifecycleEnabled:()=>enabled,factoryRuntimeForBot:()=>({questions:{recover:async(actor:unknown,body:unknown)=>{calls++;return {actor,body};}}})}});
 const id='00000000-0000-4000-8000-000000000001';
 const body={requestId:id,expectedFailedRunId:id,reference:{questionId:id,questionRevision:3,binding:{taskId:id,issueId:id,attemptId:id,candidateId:null,revision:12},originRunId:id,originSessionId:'sid'}};
+test('owner recovery has a bounded Node runtime budget for retained-machine preparation',async()=>{
+ const route=await import('@/app/api/factory/questions/[questionId]/recover/route');
+ assert.equal(route.runtime,'nodejs');assert.equal(route.maxDuration,300);
+});
 async function call(headers:Record<string,string>={},input:unknown=body){
  const {POST}=await import('@/app/api/factory/questions/[questionId]/recover/route');
  const response=await POST(new Request(`https://mikka.test/api/factory/questions/${id}/recover`,{method:'POST',headers:{origin:'https://mikka.test',...headers},body:JSON.stringify(input)}),{params:Promise.resolve({questionId:id})});

@@ -7,6 +7,7 @@ import { z } from "zod";
 import { DEVICE_ONLINE_WINDOW_MS } from "@mikka/protocol/device";
 import { FactoryError, type FactoryBinding } from "../contract";
 import { factoryEventId } from "../event-id";
+import { admitCloudQuestionContinuation } from "./queue-continuation";
 import type {
   createFactoryStore,
   FactoryAuthorize,
@@ -117,6 +118,7 @@ export function createFactoryQuestions(
   validateCheckOrSkills?: ((tx: PoolClient, task: FactoryTask, runId: string) => Promise<Record<string, unknown>>) | QuestionSkillGuards,
   skillGuards?: QuestionSkillGuards,
   afterContinuation?: (userId: string, result: QuestionContinuation) => Promise<void>,
+  beforeRecovery?: (userId: string, scope: { runId: string; workspaceId: string }) => Promise<void>,
 ) {
   const skills = typeof validateCheckOrSkills === "object" ? validateCheckOrSkills : skillGuards;
   const validateCheck = typeof validateCheckOrSkills === "function" ? validateCheckOrSkills : (tx:PoolClient,task:FactoryTask,id:string) => task.stage === "monitor" ? factoryMonitorDispatchAssignment(tx,task.userId,id) : factoryCheckAssignment(tx,task.userId,id);
@@ -712,7 +714,7 @@ export function createFactoryQuestions(
       const input = parse(questionRecoverySchema, raw);
       const eventId = factoryEventId('question-recover',input.requestId);
       const request = { kind:'question_recover',userId:actor.userId,input };
-      const result = await transaction(async tx => {
+      const prepare = async (tx: PoolClient) => {
         await skills?.lockAnswer?.(actor.userId,input.reference.questionId,tx);
         const {task,q}=await owned(tx,actor.userId,input.reference.questionId);
         await human(tx,actor.userId,actor.sessionId);
@@ -720,7 +722,7 @@ export function createFactoryQuestions(
         const {rows:[receipt]}=await tx.query('SELECT request=$3::jsonb AS same,result FROM factory_events WHERE "taskId"=$1 AND "eventId"=$2',[task.id,eventId,JSON.stringify(request)]);
         if(receipt) {
           if(!receipt.same) fail('factoryReplayMismatch');
-          return {...receipt.result,replayed:true};
+          return { kind:'replay' as const, result:{...receipt.result,replayed:true} as QuestionContinuation };
         }
         if(q.expiresAt && q.expiresAt.getTime()<=Date.now()) fail('factoryQuestionExpired');
         if(q.status!=='blocked' || task.status!=='blocked' || !q.answerId || !q.answerFingerprint || !q.result ||
@@ -742,6 +744,21 @@ export function createFactoryQuestions(
             AND latest."workspaceId"=origin."workspaceId" AND latest."botId"=origin."botId"
           WHERE origin."runId"=$1 AND origin."ownerId"=$3`,[q.originRunId,failed.id,actor.userId]);
         if(!scope) fail('factoryQuestionContinuationUnavailable');
+        const admitted = await admitCloudQuestionContinuation(tx,actor.userId,
+          {issueId:q.issueId,agentId:failed.agentId,deviceRepoId:failed.deviceRepoId},task.botId,
+          {attemptId:task.attemptId,sourceEventId:task.sourceEventId,questionOriginRunId:q.originRunId,questionHistoryRunId:failed.id},'blocked');
+        if(!admitted) fail('factoryQuestionContinuationUnavailable');
+        return { kind:'admitted' as const, task,q,failed,c,scope:{runId:failed.id as string,workspaceId:admitted.binding.workspaceId as string} };
+      };
+      // Validate before provider I/O, then release all transaction locks. The
+      // same admission runs again before dispatch; an old receipt never touches
+      // its now-transferred VM. Only trusted host wiring supplies this hook.
+      const prepared = beforeRecovery ? await transaction(prepare) : null;
+      if(prepared?.kind==='admitted' && beforeRecovery) await beforeRecovery(actor.userId,prepared.scope);
+      const result = prepared?.kind==='replay' ? prepared.result : await transaction(async tx => {
+        const checked = await prepare(tx);
+        if(checked.kind==='replay') return checked.result;
+        const {task,q,failed,c}=checked;
         // Transient answered state reuses the existing dispatch and retry transaction.
         // On any admission/custody failure this entire transition rolls back.
         await tx.query("UPDATE factory_questions SET status='answered' WHERE id=$1",[q.id]);

@@ -1,4 +1,4 @@
-import { queueCloudQuestionContinuation, wakeCloudQuestionContinuation } from './questions/queue-continuation';
+import { prepareCloudQuestionRecovery, queueCloudQuestionContinuation, wakeCloudQuestionContinuation } from './questions/queue-continuation';
 import 'server-only';
 import { deploymentSwitch } from '@/lib/deployment-switches'
 import { automaticFactoryDispatch } from './automatic-dispatch'
@@ -57,7 +57,9 @@ export function factoryRuntimeForBot(botId: string | null, lifecycle: FactoryLif
         await tx.query('UPDATE agent_runs SET "agentDefinition"=$2 WHERE id=$1',[id,JSON.stringify(snapshot)]);
       },
     });
-  const questions = createFactoryQuestions(pool,factoryAuthorize,store,dispatch,validate,questionSkillAssignments,(userId,result)=>wakeCloudQuestionContinuation(pool,userId,result));
+  const questions = createFactoryQuestions(pool,factoryAuthorize,store,dispatch,validate,questionSkillAssignments,
+    (userId,result)=>wakeCloudQuestionContinuation(pool,userId,result),
+    (userId,scope)=>prepareCloudQuestionRecovery(pool,userId,scope));
   const monitor = createFactoryMonitor(pool,store,factoryAuthorize,factoryMonitorWorkspaceKey,appendMonitorEvidence,configuredMonitorProbes(process.env),botId);
   return {store,monitor,dispatch:observeFactoryCheckDispatch(store,dispatch),questions,recoverCheck:createFactoryCheckRecovery(pool,store,recovery),reconcile:createFactoryReconciler(pool,store,questions,{review:reconcileFactoryCheck,verify:reconcileFactoryCheck,monitor:createFactoryMonitorRunConsumer(monitor),...consumers},botId,automaticFactoryDispatch(pool)),claim:createFactoryClaim(store,questions,validate)};
 }
