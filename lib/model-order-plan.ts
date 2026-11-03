@@ -16,7 +16,7 @@
  * first (`pickDevice`). A model the person picked for the thread goes before
  * the list. Once a run starts nothing about it changes.
  */
-import type { HarnessInfo } from '@mikka/protocol/harness'
+import { harnessReportsModel, type HarnessInfo } from '@mikka/protocol/harness'
 
 export type OrderHarness = 'claude_code' | 'codex'
 export type RunLocation = 'cloud' | 'local'
@@ -88,11 +88,8 @@ export function deviceModel(device: PoolDevice, entry: OrderEntry): string | nul
 export type DeviceStage = 'off' | 'offline' | 'notInstalled' | 'modelNotReported' | 'needsUpdate' | 'ready'
 const STAGES: readonly DeviceStage[] = ['off', 'offline', 'notInstalled', 'modelNotReported', 'needsUpdate', 'ready']
 
-/** Whether a harness report lists a model: a reported id (a slot) or a slot's resolved model. Null when it reported none. */
-export function reportsModel(info: Pick<HarnessInfo, 'models' | 'modelSlots'>, model: string): boolean | null {
-  const ids = [...(info.models ?? []), ...(info.modelSlots ?? []).flatMap(slot => [slot.slot, slot.model])]
-  return ids.length ? ids.includes(model) : null
-}
+/** Whether a harness report lists a model (@mikka/protocol harnessReportsModel). Null when it reported none. */
+export const reportsModel = harnessReportsModel
 
 /** What a device can do for an entry whatever its 参与调度 or whether it is online (those come first in deviceStage). */
 export function deviceSupport(device: Pick<PoolDevice, 'harnesses'>, entry: OrderEntry): Exclude<DeviceStage, 'off' | 'offline'> {

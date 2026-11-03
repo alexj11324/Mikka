@@ -24,7 +24,7 @@ import type {
   SpawnOptions,
   SpawnedProcess,
 } from "@anthropic-ai/claude-agent-sdk";
-import { nativeBrokerContextSchema, type RunAssignment } from "@mikka/protocol";
+import { harnessReportsModel, nativeBrokerContextSchema, type HarnessInfo, type RunAssignment } from "@mikka/protocol";
 import { ClaudeAdapter, ClaudeInitializationError } from "./adapters/claude";
 import { CodexAdapter } from "./adapters/codex";
 import type { AgentSession, StartOptions } from "./adapters/types";
@@ -93,6 +93,12 @@ export async function createHostedBotRunner(host: {
   dockerSocket?: "unix:///run/mikka-container/docker.sock";
   /** Optional trusted request-only desktop broker owned by the cloud daemon. */
   computerBroker?: ComputerBroker;
+  /**
+   * The models this machine's CLI reported for a harness (the daemon's model probe, model-probe.ts),
+   * or null when it reported none. Given, a subscription run starts only on a model it lists; otherwise
+   * it fails with subscription_model_not_reported and no other model is put in its place (Alex, 2026-11-03).
+   */
+  reportedModels?: (harness: "codex" | "claude_code") => Promise<Pick<HarnessInfo, "models" | "modelSlots"> | null>;
 }) {
   if (
     process.platform !== "linux" ||
@@ -244,6 +250,8 @@ export async function createHostedBotRunner(host: {
     harnesses: Object.keys(binaries).filter(
       (kind) => binaries[kind as keyof typeof binaries],
     ) as ("codex" | "claude_code")[],
+    /** The CLI each harness runs, so the daemon's model probe asks the same binary. */
+    binaries: { ...binaries } as Partial<Record<"codex" | "claude_code", string>>,
     command,
     async start(
       assignment: RunAssignment,
@@ -268,6 +276,11 @@ export async function createHostedBotRunner(host: {
         options.continueSession
       )
         throw unavailable();
+      // A subscription model runs only if this machine's CLI reported it; the run fails with the reason, never on another model.
+      if (selected && host.reportedModels) {
+        const report = await host.reportedModels(kind).catch(() => null);
+        if (!options.model || !report || harnessReportsModel(report, options.model) !== true) throw new Error("subscription_model_not_reported");
+      }
       const lifetime = new AbortController();
       // Fixed diagnostic fields only. These callbacks can fail after the first
       // context succeeds; the adapters deliberately hide their raw errors.
