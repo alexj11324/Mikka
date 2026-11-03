@@ -61,3 +61,16 @@ test('subscribing while hidden opens nothing until the tab is shown', () => {
   second()
   stop()
 })
+
+test('a required update closes the EventSource and visibility cannot reconnect it', async () => {
+  const stop = listenComputerStream('data-subagent', () => {})
+  assert.equal(FakeSource.opened.length, 1)
+  const { markPageNeedsRefresh } = await import('../app-build')
+  markPageNeedsRefresh()
+  assert.equal(FakeSource.opened[0].readyState, FakeSource.CLOSED)
+  setVisibility('hidden'); setVisibility('visible')
+  const stopAgain = listenComputerStream('data-subagent', () => {})
+  assert.equal(FakeSource.opened.length, 1)
+  stopAgain(); stop()
+  assert.equal(visibilityListeners.size, 0)
+})

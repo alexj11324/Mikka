@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { useComputer, useViewerGrant } from '@/hooks/use-computer'
+import { pageRefreshSignal } from '@/lib/app-build'
 import { withBasePath } from '@/lib/base-path'
 import { ComputerRequestError, computerApi } from '@/lib/computer/client'
 import { MOCK_SCREEN_URL } from '@/lib/computer/mock'
@@ -20,7 +21,8 @@ function NoVncView({ url, mode, label }: { url?: string; mode: ViewerMode; label
   const host = useRef<HTMLDivElement>(null)
   const picture = useRef<HTMLCanvasElement>(null)
   useEffect(() => {
-    if (!url) return
+    const refresh = pageRefreshSignal()
+    if (!url || refresh.aborted) return
     let alive = true
     let client: RFBInstance | undefined
     let disconnected = false
@@ -33,8 +35,15 @@ function NoVncView({ url, mode, label }: { url?: string; mode: ViewerMode; label
       saved.getContext('2d')?.drawImage(canvas, 0, 0)
     }
     function onDisconnect() { disconnected = true; retainFrame() }
+    function stop() {
+      alive = false
+      retainFrame()
+      client?.removeEventListener('disconnect', onDisconnect)
+      if (!disconnected) { disconnected = true; client?.disconnect() }
+    }
+    refresh.addEventListener('abort', stop, { once: true })
     void import('@novnc/novnc/lib/rfb.js').then(({ default: RFB }) => {
-      if (!alive || !host.current) return
+      if (!alive || refresh.aborted || !host.current) return
       client = new RFB(host.current, url, { shared: true }) as RFBInstance
       client.scaleViewport = true
       client.resizeSession = false
@@ -44,10 +53,8 @@ function NoVncView({ url, mode, label }: { url?: string; mode: ViewerMode; label
       client.addEventListener('disconnect', onDisconnect)
     })
     return () => {
-      alive = false
-      retainFrame()
-      client?.removeEventListener('disconnect', onDisconnect)
-      if (!disconnected) client?.disconnect()
+      refresh.removeEventListener('abort', stop)
+      stop()
     }
   }, [url, mode])
   return <div role="img" aria-label={label} className="absolute inset-0">

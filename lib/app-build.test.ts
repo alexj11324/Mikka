@@ -93,7 +93,7 @@ test('a removed server action reloads the page; a second miss within the minute 
   const target = {
     fetch: async (input: unknown) => new Response('', { status: input === '/missing' ? 404 : 200, headers: input === '/missing' ? { 'x-nextjs-action-not-found': '1' } : {} }),
     sessionStorage: { getItem: (key: string) => store.get(key) ?? null, setItem: (key: string, value: string) => { store.set(key, value) } },
-    location: { reload: () => { reloads += 1 } },
+    location: { href: 'https://app.example/', origin: 'https://app.example', reload: () => { reloads += 1 } },
     dispatchEvent: (event: Event) => { events.push(event.type); return true },
   }
   watchRemovedActions(target as unknown as Window)
