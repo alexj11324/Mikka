@@ -385,7 +385,7 @@ export const agentRuns = pgTable('agent_runs', {
   outcomeAt: timestamp('outcomeAt', { withTimezone: true }),
   /** Where the run was dispatched from: 'mcp' for an MCP client, null for the app (the Coordinator, a bot or a task). */
   source: text('source').$type<'mcp' | null>(),
-  questionContinuation: jsonb('questionContinuation').$type<{questionId:string; originRunId:string; originSessionId:string; followUp:string; requireSessionResume:true} | null>(),
+  questionContinuation: jsonb('questionContinuation').$type<{questionId:string; originRunId:string; originSessionId:string; followUp:string; requireSessionResume:true; requiredSandboxId?:string} | null>(),
   leaseExpiresAt: timestamp('leaseExpiresAt', { withTimezone: true }),
   /** 1 for the first run; a retry after the device went offline counts up (lib/run-retry.ts). */
   attempt: integer('attempt').notNull().default(1),

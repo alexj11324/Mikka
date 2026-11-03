@@ -17,6 +17,8 @@ import { threadQuestionStates } from "../../issue-thread-questions";
 import { readRunChain } from "../../run-chain";
 import { createFactoryReconciler } from "../reconcile";
 import { lostRunOutcome } from "../../run-retry";
+import { queueCloudQuestionContinuation } from "./queue-continuation";
+import { freezeWorkerDefinition } from "../../agent-kit/worker";
 import { blockQuestionRetry } from "./retry";
 import { createSkillAssignments } from "../../self-improvement/assignments";
 import {
@@ -228,6 +230,88 @@ test(
             [issueId, originRuns.get(issueId)],
           )
         ).rows[0].n;
+
+      await t.test("cloud question answer keeps the exact task VM, frozen identity and original SID; replay dispatches once", async (t) => {
+        const cloudFixture = async (state = 'running', afterContinuation?: (owner:string,result:{continuationRunId:string})=>Promise<void>, withSkills = false) => {
+          const f = await fixture('context',true,async () => undefined);
+          const workspaceId=randomUUID(),botId=randomUUID(),childDevice=randomUUID(),childRepo=randomUUID(),connectionId=randomUUID(),credentialId=randomUUID();
+          await pool.query(`INSERT INTO bots(id,"workspaceId","ownerId",name) VALUES($1,$2,$3,'Cloud fixture')`,[botId,workspaceId,userId]);
+          await pool.query(`INSERT INTO devices(id,"ownerId",name,kind,"lastSeenAt",harnesses) VALUES($1,$2,'Task VM','cloud',now(),'[{"harness":"codex","installed":true}]')`,[childDevice,userId]);
+          await pool.query(`INSERT INTO device_repos(id,"deviceId","userId","repoPath","remoteUrl","baseBranch") VALUES($1,$2,$3,'/isolated','fixture/repo','main')`,[childRepo,childDevice,userId]);
+          await pool.query(`INSERT INTO byos_connections(id,"ownerId","workspaceId",state,epoch,provider,"secretName","providerSubject","secretDigest") VALUES($1,$2,$3,'connected',2,'codex','synthetic-secret-reference-' || $1::uuid::text,'synthetic-subject',repeat('a',64))`,[connectionId,userId,workspaceId]);
+          await pool.query(`INSERT INTO byos_bindings(id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId") VALUES($1,$2,$3,$4,$5,2,'codex_cli','fixture-model')`,[credentialId,userId,workspaceId,agentId,connectionId]);
+          const definition=freezeWorkerDefinition({harness:'codex',instructions:'frozen original policy',prompt:'Original task',parent:null,executionId:null,model:'fixture-model',subscription:{id:credentialId,modelId:'fixture-model',route:'codex_cli'}});
+          await pool.query(`UPDATE agent_runs SET "deviceId"=$2,"deviceRepoId"=$3,"agentDefinition"=$4,"baseBranch"='main' WHERE id=$1`,[f.runId,childDevice,childRepo,JSON.stringify(definition)]);
+          await pool.query(`INSERT INTO computer_run_bindings("runId","botId","workspaceId","ownerId") VALUES($1,$2,$3,$4)`,[f.runId,botId,workspaceId,userId]);
+          const sandboxId='same-vm-'+f.runId;
+          await pool.query(`INSERT INTO thread_machines("runId","workspaceId","ownerId","botId","issueId","sandboxId","snapshotId","operationId",state,"deviceId","repoId") VALUES($1,$2,$3,$4,$5,$6,'codex',$7,$8,$9,$10)`,[f.runId,workspaceId,userId,botId,f.issueId,sandboxId,randomUUID(),state,childDevice,childRepo]);
+          let fallbackCalls=0;
+          const cloudDispatch=createFactoryDispatch(pool,store,async (tx,owner,input,scopeBot,context) => {
+            const result=await queueCloudQuestionContinuation(tx,owner,input,scopeBot,context);
+            if(result)return result;
+            fallbackCalls++;throw new Error('Cloud question used local fallback');
+          });
+          const service=createFactoryQuestions(pool,authorize,store,cloudDispatch,withSkills ? {lockOrigin:assignments.lockQuestion,continueQuestion:assignments.continueQuestion} : undefined,undefined,afterContinuation);
+          return {...f,workspaceId,botId,childDevice,childRepo,connectionId,credentialId,definition,sandboxId,service,fallbackCalls:()=>fallbackCalls};
+        };
+        await t.test('real Skill guards accept the original cloud identity through answer, transfer and required-SID claim',async()=>{
+          const f=await cloudFixture('running',undefined,true);
+          const answer={reference:questionReference(f.q),answerId:randomUUID(),text:'Continue on the same task machine with the original subscription'};
+          const result=await f.service.answer(human,answer);
+          const claimed=await f.service.claimContinuation(userId,f.childDevice,result.continuationRunId,new Date(Date.now()+60000).toISOString());
+          assert.equal(claimed.resumeSessionId,f.q.originSessionId);
+          assert.equal(claimed.requireSessionResume,true);
+          const replay=await f.service.answer(human,answer);
+          assert.equal(replay.continuationRunId,result.continuationRunId);
+          assert.equal(f.fallbackCalls(),0);
+          assert.equal((await pool.query('SELECT count(*)::int AS n FROM agent_runs WHERE "issueId"=$1',[f.issueId])).rows[0].n,2);
+        });
+        for(const machineState of ['running','paused']) await t.test(machineState+' same VM transfer and replay',async()=>{
+          const f=await cloudFixture(machineState),answer={reference:questionReference(f.q),answerId:randomUUID(),text:'Continue the correct current artifact; preserve all constraints'};
+          await pool.query('UPDATE computer_run_bindings SET "approvedForRun"=true WHERE "runId"=$1',[f.runId]);
+          await pool.query(`INSERT INTO run_publications("runId","userId","issueId","remoteUrl","remoteKey",branch,"baseBranch","pushApproved") VALUES($1,$2,$3,'fixture/repo','/isolated','frozen-branch','main',false)`,[f.runId,userId,f.issueId]);
+          const result=await f.service.answer(human,answer);
+          const replay=await f.service.answer(human,answer);assert.equal(replay.continuationRunId,result.continuationRunId);assert.equal(replay.replayed,true);
+          const {rows:[child]}=await pool.query('SELECT * FROM agent_runs WHERE id=$1',[result.continuationRunId]);
+          assert.equal(child.agentId,agentId);assert.equal(child.deviceId,f.childDevice);assert.equal(child.deviceRepoId,f.childRepo);assert.equal(child.agentDefinition.definitionDigest,f.definition.definitionDigest);assert.deepEqual(child.agentDefinition.subscription,f.definition.subscription);assert.equal(child.questionContinuation.originSessionId,f.q.originSessionId);assert.equal(child.questionContinuation.requireSessionResume,true);
+          const {rows:machines}=await pool.query('SELECT * FROM thread_machines WHERE "runId"=ANY($1::uuid[])',[[f.runId,child.id]]);
+          const old=machines.find(m=>m.runId===f.runId),current=machines.find(m=>m.runId===child.id);
+          const {rows:[grant]}=await pool.query('SELECT "approvedForRun" FROM computer_run_bindings WHERE "runId"=$1',[child.id]);assert.equal(grant.approvedForRun,false);
+          const {rows:[publication]}=await pool.query('SELECT "remoteUrl","remoteKey",branch,"baseBranch","pushApproved" FROM run_publications WHERE "runId"=$1',[child.id]);assert.deepEqual(publication,{remoteUrl:'fixture/repo',remoteKey:'/isolated',branch:'frozen-branch',baseBranch:'main',pushApproved:false});
+          assert.equal(old.state,'ended');assert.equal(old.sandboxId,null);assert.equal(old.deviceId,f.childDevice);assert.equal(current.state,machineState);assert.equal(current.sandboxId,f.sandboxId);assert.equal(current.deviceId,f.childDevice);assert.equal(current.repoId,f.childRepo);assert.equal(f.fallbackCalls(),0);
+          assert.equal((await pool.query('SELECT count(*)::int AS n FROM agent_runs WHERE "issueId"=$1',[f.issueId])).rows[0].n,2);
+          if(machineState==='running') {const claimed=await f.service.claimContinuation(userId,f.childDevice,child.id,new Date(Date.now()+60000).toISOString());assert.equal(claimed.resumeSessionId,f.q.originSessionId);assert.equal(claimed.requireSessionResume,true);}
+        });
+        await t.test('postcommit handoff sees durable answer; enqueue failure replay targets the same paused run',async()=>{
+          let wakes=0;let committedRun:string|undefined;
+          const f=await cloudFixture('paused',async(_owner,result)=>{
+            const {rows:[q]}=await pool.query('SELECT status,"continuationRunId" FROM factory_questions WHERE "continuationRunId"=$1',[result.continuationRunId]);
+            assert.equal(q.status,'resuming');assert.equal(q.continuationRunId,result.continuationRunId);committedRun=result.continuationRunId;
+            if(++wakes===1)throw new Error('Synthetic handoff enqueue unavailable');
+            await pool.query(`UPDATE thread_machines SET state='running' WHERE "runId"=$1`,[result.continuationRunId]);
+          });
+          const answer={reference:questionReference(f.q),answerId:randomUUID(),text:'Continue on the original machine'};
+          const first=await f.service.answer(human,answer);assert.equal(first.continuationRunId,committedRun);assert.equal(wakes,1);
+          const second=await f.service.answer(human,answer);assert.equal(second.continuationRunId,first.continuationRunId);assert.equal(wakes,2);
+          assert.equal((await pool.query('SELECT count(*)::int AS n FROM agent_runs WHERE "issueId"=$1',[f.issueId])).rows[0].n,2);
+          assert.equal((await pool.query('SELECT state,"sandboxId" FROM thread_machines WHERE "runId"=$1',[first.continuationRunId])).rows[0].sandboxId,f.sandboxId);
+        });
+        for(const drift of ['workspace','bot','repo','device','model','account','maintenance','owner']) await t.test(drift+' drift rejects without moving original VM',async()=>{
+          const f=await cloudFixture();
+          if(drift==='workspace')await pool.query('UPDATE thread_machines SET "workspaceId"=$2 WHERE "runId"=$1',[f.runId,randomUUID()]);
+          if(drift==='bot')await pool.query('UPDATE thread_machines SET "botId"=NULL WHERE "runId"=$1',[f.runId]);
+          if(drift==='repo')await pool.query('UPDATE thread_machines SET "repoId"=$2 WHERE "runId"=$1',[f.runId,repoId]);
+          if(drift==='device')await pool.query('UPDATE thread_machines SET "deviceId"=$2 WHERE "runId"=$1',[f.runId,deviceId]);
+          if(drift==='model')await pool.query(`UPDATE byos_bindings SET "modelId"='other-model' WHERE id=$1`,[f.credentialId]);
+          if(drift==='account')await pool.query('UPDATE byos_connections SET epoch=epoch+1 WHERE id=$1',[f.connectionId]);
+          if(drift==='maintenance')await pool.query(`UPDATE thread_machines SET "workerLeaseId"=$2,"workerLeaseUntil"=now()+interval '10 minutes' WHERE "runId"=$1`,[f.runId,randomUUID()]);
+          if(drift==='owner'){ await pool.query(`INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES('other-cloud-owner','Other','other-cloud@example.invalid',true,now(),now()) ON CONFLICT DO NOTHING`);await pool.query(`UPDATE thread_machines SET "ownerId"='other-cloud-owner' WHERE "runId"=$1`,[f.runId]); }
+          await rejects(()=>f.service.answer(human,{reference:questionReference(f.q),answerId:randomUUID(),text:'Keep original constraints'}),'factoryQuestionContinuationUnavailable');
+          assert.equal((await pool.query('SELECT count(*)::int AS n FROM agent_runs WHERE "issueId"=$1',[f.issueId])).rows[0].n,1);
+          assert.equal((await pool.query('SELECT status,"answerId" FROM factory_questions WHERE id=$1',[f.q.id])).rows[0].status,'open');
+          assert.equal((await pool.query('SELECT "sandboxId" FROM thread_machines WHERE "runId"=$1',[f.runId])).rows[0].sandboxId,f.sandboxId);
+        });
+      });
 
       await t.test(
         "issue thread reads: answering shows resuming and folds the resumed run, only for the question and task owner",

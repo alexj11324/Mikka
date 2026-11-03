@@ -46,7 +46,7 @@ function fixture() {
     if (sql.includes('FROM improvement_skill_receipts')) return { rows: state.receipt ? [state.receipt] : [] }
     if (sql.includes('LEFT JOIN improvement_skill_receipts')) return { rows: state.selection ? [{ runId: run.id, id: state.receipt?.id }] : [] }
     if (sql.includes('FROM improvement_skill_selections')) return { rows: state.selection ? [state.selection] : [] }
-    if (sql.includes('FROM agent_runs')) return { rows: [run] }
+    if (sql.includes('FROM agent_runs')) return { rows: [sql.includes('JOIN agents a') ? { ...run, agentDeviceId: run.deviceId, agentHarness: 'codex', deviceKind: 'local' } : run] }
     return { rows: [] }
   } } as unknown as PoolClient
   const pool = { connect: async () => tx, query: tx.query.bind(tx) } as unknown as Pool

@@ -1,3 +1,4 @@
+import { queueCloudQuestionContinuation, wakeCloudQuestionContinuation } from './questions/queue-continuation';
 import 'server-only';
 import { deploymentSwitch } from '@/lib/deployment-switches'
 import { automaticFactoryDispatch } from './automatic-dispatch'
@@ -36,7 +37,7 @@ export function factoryRuntimeForBot(botId: string | null, lifecycle: FactoryLif
   const store = createFactoryStore(pool,factoryAuthorize,botId,{...lifecycle,independent:factoryCheckIndependent,gates:{...factoryCheckGates,approval:approvalGate,publish:publishGate,monitor:monitorGate,...lifecycle.gates}});
   const validate = validateCheck ?? ((tx:PoolClient,task:import('./store').FactoryTask,id:string) => task.stage === 'monitor' ? factoryMonitorDispatchAssignment(tx,task.userId,id) : factoryCheckAssignment(tx,task.userId,id));
   const dispatch = createFactoryDispatch(pool,store,
-    (tx,userId,input,scopeBot,context) => queueFactoryRun(tx,userId,input,scopeBot,context), {
+    async (tx,userId,input,scopeBot,context) => await queueCloudQuestionContinuation(tx,userId,input,scopeBot,context) ?? queueFactoryRun(tx,userId,input,scopeBot,context), {
       lockAdmission: async (tx,userId,input) => { await lockCliAgentPolicy(tx,userId,input.agentId,botId); },
       replay: defaultFactoryDispatchAdapters.replay,
       configure: {
@@ -56,7 +57,7 @@ export function factoryRuntimeForBot(botId: string | null, lifecycle: FactoryLif
         await tx.query('UPDATE agent_runs SET "agentDefinition"=$2 WHERE id=$1',[id,JSON.stringify(snapshot)]);
       },
     });
-  const questions = createFactoryQuestions(pool,factoryAuthorize,store,dispatch,validate,questionSkillAssignments);
+  const questions = createFactoryQuestions(pool,factoryAuthorize,store,dispatch,validate,questionSkillAssignments,(userId,result)=>wakeCloudQuestionContinuation(pool,userId,result));
   const monitor = createFactoryMonitor(pool,store,factoryAuthorize,factoryMonitorWorkspaceKey,appendMonitorEvidence,configuredMonitorProbes(process.env),botId);
   return {store,monitor,dispatch:observeFactoryCheckDispatch(store,dispatch),questions,recoverCheck:createFactoryCheckRecovery(pool,store,recovery),reconcile:createFactoryReconciler(pool,store,questions,{review:reconcileFactoryCheck,verify:reconcileFactoryCheck,monitor:createFactoryMonitorRunConsumer(monitor),...consumers},botId,automaticFactoryDispatch(pool)),claim:createFactoryClaim(store,questions,validate)};
 }

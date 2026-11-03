@@ -21,7 +21,10 @@ export async function handoffFactoryCloudStage(pool: Pool, actor: Actor, previou
     await failFactoryCloudStage(pool, actor, runId, 'Previous stage artifacts could not be retained')
     return false
   }
-  await factoryAutomaticRuntime.start(actor, runId)
+  const started = await factoryAutomaticRuntime.start(actor, runId)
+  // Exact native continuations retain their original VM on transient wake
+  // failure. Retry this existing durable step instead of claiming success.
+  if (started?.state === 'unavailable') throw new Error('Original question machine unavailable')
   return true
 }
 

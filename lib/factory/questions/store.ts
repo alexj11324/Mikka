@@ -80,6 +80,7 @@ type Dispatch = (
   userId: string,
   input: FactoryDispatchInput,
   tx?: PoolClient,
+  questionOriginRunId?: string,
 ) => Promise<{ runId: string; task: FactoryTask }>;
 const binding = (t: FactoryTask): FactoryBinding => ({
   taskId: t.id,
@@ -113,6 +114,7 @@ export function createFactoryQuestions(
   dispatch: Dispatch,
   validateCheckOrSkills?: ((tx: PoolClient, task: FactoryTask, runId: string) => Promise<Record<string, unknown>>) | QuestionSkillGuards,
   skillGuards?: QuestionSkillGuards,
+  afterContinuation?: (userId: string, result: QuestionContinuation) => Promise<void>,
 ) {
   const skills = typeof validateCheckOrSkills === "object" ? validateCheckOrSkills : skillGuards;
   const validateCheck = typeof validateCheckOrSkills === "function" ? validateCheckOrSkills : (tx:PoolClient,task:FactoryTask,id:string) => task.stage === "monitor" ? factoryMonitorDispatchAssignment(tx,task.userId,id) : factoryCheckAssignment(tx,task.userId,id);
@@ -485,7 +487,7 @@ export function createFactoryQuestions(
         actor.source === "orchestrator"
           ? parse(contextQuestionAnswerSchema, raw)
           : parse(humanQuestionAnswerSchema, raw);
-      return transaction(async (tx) => {
+      const result = await transaction(async (tx) => {
         await skills?.lockAnswer?.(actor.userId, input.reference.questionId, tx);
         const { task, q } = await owned(
           tx,
@@ -644,6 +646,7 @@ export function createFactoryQuestions(
             note: followUp,
           },
           tx,
+          q.originRunId,
         );
         const {
           rows: [queued],
@@ -661,7 +664,9 @@ export function createFactoryQuestions(
           queued.status !== "queued"
         )
           fail("factoryQuestionContinuationUnavailable");
+        const { rows: [machine] } = await tx.query('SELECT "sandboxId" FROM thread_machines WHERE "runId"=$1 AND "ownerId"=$2',[run.runId,actor.userId]);
         const continuation = {
+          ...(machine?.sandboxId ? {requiredSandboxId: machine.sandboxId as string} : {}),
           questionId: q.id,
           originRunId: q.originRunId,
           originSessionId: q.originSessionId,
@@ -690,6 +695,11 @@ export function createFactoryQuestions(
         );
         return result;
       });
+      // The answer and its exact continuation are durable before waking a
+      // paused machine. Replaying the same answer may retry this same wake.
+      try { await afterContinuation?.(actor.userId,result); }
+      catch { console.error(JSON.stringify({msg:'factory_question_wake_deferred',runId:result.continuationRunId})); }
+      return result;
     },
     async claimContinuation(
       userId: string,
@@ -719,9 +729,20 @@ export function createFactoryQuestions(
         const {
           rows: [run],
         } = await tx.query(
-          `SELECT r.*,a."runId" AS "boundRunId",origin."deviceId" AS "originDeviceId",origin."sessionId" AS "originSessionId",origin."agentId" AS "originAgentId",origin."deviceRepoId" AS "originRepoId",d.enabled,d."lastSeenAt",d.harnesses,ag.harness FROM agent_runs r JOIN factory_attempts a ON a.id=$3 AND a."taskId"=$4 JOIN agent_runs origin ON origin.id=$5 AND origin."userId"=$2 AND origin."issueId"=$6 JOIN devices d ON d.id=r."deviceId" AND d."ownerId"=$2 JOIN agents ag ON ag.id=r."agentId" AND ag."userId"=$2 AND ag."deviceId"=d.id JOIN device_repos repo ON repo.id=r."deviceRepoId" AND repo."userId"=$2 AND repo."deviceId"=d.id WHERE r.id=$1 AND r."userId"=$2 AND r."issueId"=$6 FOR UPDATE OF r FOR SHARE OF d,ag,repo`,
+          `SELECT r.*,a."runId" AS "boundRunId",origin."deviceId" AS "originDeviceId",origin."sessionId" AS "originSessionId",origin."agentId" AS "originAgentId",origin."deviceRepoId" AS "originRepoId",d.enabled,d."lastSeenAt",d.harnesses,d.kind AS "deviceKind",ag.harness,ag."deviceId" AS "agentDeviceId" FROM agent_runs r JOIN factory_attempts a ON a.id=$3 AND a."taskId"=$4 JOIN agent_runs origin ON origin.id=$5 AND origin."userId"=$2 AND origin."issueId"=$6 JOIN devices d ON d.id=r."deviceId" AND d."ownerId"=$2 JOIN agents ag ON ag.id=r."agentId" AND ag."userId"=$2 JOIN device_repos repo ON repo.id=r."deviceRepoId" AND repo."userId"=$2 AND repo."deviceId"=d.id WHERE r.id=$1 AND r."userId"=$2 AND r."issueId"=$6 FOR UPDATE OF r FOR SHARE OF d,ag,repo`,
           [runId, userId, task.attemptId, task.id, q.originRunId, q.issueId],
         );
+        // Match the execution run before acquiring placement locks, as runtime
+        // maintenance does (run -> machine). A cloud relocation keeps its
+        // frozen configuration identity on the original parent computer.
+        if (run && run.agentDeviceId !== run.deviceId) {
+          if (run.deviceKind !== 'cloud') fail("factoryQuestionContinuationUnavailable");
+          const placement = await tx.query(`SELECT 1 FROM computer_run_bindings b JOIN thread_machines m
+            ON m."runId"=b."runId" AND m."ownerId"=b."ownerId" AND m."workspaceId"=b."workspaceId" AND m."botId"=b."botId"
+            WHERE b."runId"=$1 AND b."ownerId"=$2 AND m."issueId"=$3 AND m."deviceId"=$4 AND m."repoId"=$5
+              AND m.state IN ('starting','running') FOR SHARE OF b,m`,[runId,userId,q.issueId,run.deviceId,run.deviceRepoId]);
+          if (!placement.rowCount) fail("factoryQuestionContinuationUnavailable");
+        }
         const c = run?.questionContinuation;
         if (
           !run ||
