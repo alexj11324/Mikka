@@ -21,6 +21,7 @@ import { queueCloudQuestionContinuation } from "./queue-continuation";
 import { freezeWorkerDefinition } from "../../agent-kit/worker";
 import { blockQuestionRetry } from "./retry";
 import { createSkillAssignments } from "../../self-improvement/assignments";
+import { ImprovementError } from "../../self-improvement/contract";
 import {
   BASELINE_ARTIFACT,
   BASELINE_MARKDOWN,
@@ -251,9 +252,85 @@ test(
             if(result)return result;
             fallbackCalls++;throw new Error('Cloud question used local fallback');
           });
-          const service=createFactoryQuestions(pool,authorize,store,cloudDispatch,withSkills ? {lockOrigin:assignments.lockQuestion,continueQuestion:assignments.continueQuestion} : undefined,undefined,afterContinuation);
+          const service=createFactoryQuestions(pool,authorize,store,cloudDispatch,withSkills ? {lockOrigin:async (...args:Parameters<typeof assignments.lockQuestion>)=>{
+            try { await assignments.lockQuestion(...args); }
+            catch(error) { if(error instanceof ImprovementError) throw new FactoryError('factoryQuestionContinuationUnavailable'); throw error; }
+          },continueQuestion:assignments.continueQuestion} : undefined,undefined,afterContinuation);
           return {...f,workspaceId,botId,childDevice,childRepo,connectionId,credentialId,definition,sandboxId,service,fallbackCalls:()=>fallbackCalls};
         };
+        const failedContinuation = async () => {
+          const f=await cloudFixture('running',undefined,true);
+          const answer={reference:questionReference(f.q),answerId:randomUUID(),text:'Continue once on original SID'};
+          const first=await f.service.answer(human,answer);
+          await pool.query(`UPDATE agent_runs SET status='failed',"stopReason"='error',"sessionId"=$2,"finishedAt"=now() WHERE id=$1`,[first.continuationRunId,f.q.originSessionId]);
+          await f.service.settle(userId,first.continuationRunId);
+          const q=await f.service.read(userId,f.q.id);
+          return {...f,answer,first,recovery:{requestId:randomUUID(),...q.recoverReference!}};
+        };
+        await t.test('owner recovery preserves immutable answer and original identity, selects latest failed history, and replays once',async()=>{
+          const f=await failedContinuation();
+          const before=(await pool.query('SELECT answer,"answerFingerprint",result,"originRunId","originSessionId" FROM factory_questions WHERE id=$1',[f.q.id])).rows[0];
+          for(const action of ['retry','repair'] as const) await rejects(()=>store.apply(userId,f.recovery.reference.binding,randomUUID(),{action,reason:'ordinary retry must preserve SID'}),'factoryQuestionContinuationUnavailable');
+          const [recovered,replayed]=await Promise.all([f.service.recover(human,f.recovery),f.service.recover(human,f.recovery)]);
+          assert.equal(recovered.continuationRunId,replayed.continuationRunId);
+          assert.equal((await pool.query('SELECT count(*)::int n FROM agent_runs WHERE "issueId"=$1',[f.issueId])).rows[0].n,3);
+          assert.deepEqual((await pool.query('SELECT answer,"answerFingerprint",result,"originRunId","originSessionId" FROM factory_questions WHERE id=$1',[f.q.id])).rows[0],before);
+          assert.equal((await f.service.answer(human,f.answer)).continuationRunId,f.first.continuationRunId);
+          const claimed=await f.service.claimContinuation(userId,f.childDevice,recovered.continuationRunId,new Date(Date.now()+60000).toISOString());
+          assert.equal(claimed.continuesRunId,f.first.continuationRunId);assert.equal(claimed.resumeSessionId,f.q.originSessionId);assert.equal(claimed.requireSessionResume,true);
+          assert.equal((await pool.query('SELECT "sandboxId" FROM thread_machines WHERE "runId"=$1',[recovered.continuationRunId])).rows[0].sandboxId,f.sandboxId);
+          await rejects(()=>f.service.recover(human,{...f.recovery,expectedFailedRunId:randomUUID()}),'factoryReplayMismatch');
+        });
+        await t.test('recovery cannot claim without its receipt or redirect its history; latest recovery can itself recover',async()=>{
+          const f=await failedContinuation();
+          const result=await f.service.recover(human,f.recovery);
+          const {rows:[event]}=await pool.query(`SELECT "eventId",request,result FROM factory_events WHERE "taskId"=$1 AND request->>'kind'='question_recover'`,[result.task.id]);
+          await pool.query('DELETE FROM factory_events WHERE "taskId"=$1 AND "eventId"=$2',[result.task.id,event.eventId]);
+          await rejects(()=>f.service.claimContinuation(userId,f.childDevice,result.continuationRunId,new Date(Date.now()+60000).toISOString()),'factoryQuestionContinuationUnavailable');
+          await pool.query('UPDATE agent_runs SET "continuesRunId"=NULL WHERE id=$1',[result.continuationRunId]);
+          await rejects(()=>f.service.claimContinuation(userId,f.childDevice,result.continuationRunId,new Date(Date.now()+60000).toISOString()),'factoryQuestionContinuationUnavailable');
+          await pool.query('INSERT INTO factory_events ("taskId","eventId",request,result) VALUES($1,$2,$3,$4)',[result.task.id,event.eventId,event.request,event.result]);
+          await pool.query('UPDATE agent_runs SET "continuesRunId"=$2 WHERE id=$1',[result.continuationRunId,f.runId]);
+          await rejects(()=>f.service.claimContinuation(userId,f.childDevice,result.continuationRunId,new Date(Date.now()+60000).toISOString()),'factoryQuestionContinuationUnavailable');
+          await pool.query('UPDATE agent_runs SET "continuesRunId"=$2 WHERE id=$1',[result.continuationRunId,f.first.continuationRunId]);
+          await f.service.claimContinuation(userId,f.childDevice,result.continuationRunId,new Date(Date.now()+60000).toISOString());
+          await pool.query(`UPDATE agent_runs SET status='failed',"stopReason"='error',"sessionId"=$2,"finishedAt"=now() WHERE id=$1`,[result.continuationRunId,f.q.originSessionId]);
+          await f.service.settle(userId,result.continuationRunId);
+          const latest=await f.service.read(userId,f.q.id);
+          const next=await f.service.recover(human,{requestId:randomUUID(),...latest.recoverReference!});
+          const claimed=await f.service.claimContinuation(userId,f.childDevice,next.continuationRunId,new Date(Date.now()+60000).toISOString());
+          assert.equal(claimed.continuesRunId,result.continuationRunId);assert.equal(claimed.resumeSessionId,f.q.originSessionId);
+          assert.equal((await f.service.answer(human,f.answer)).continuationRunId,f.first.continuationRunId);
+        });
+        for(const drift of ['qrevision','taskrevision','expectedRun','sid','definition','account','maintenance','active','owner','actor','cancelled','revoked','expired','custody','scope','binding','originscope','consumer','stopped','sandboxMarker']) await t.test('recovery '+drift+' drift rejects atomically',async()=>{
+          const f=await failedContinuation(),request=structuredClone(f.recovery);
+          if(drift==='qrevision')request.reference.questionRevision++;
+          if(drift==='taskrevision')request.reference.binding.revision++;
+          if(drift==='expectedRun')request.expectedFailedRunId=randomUUID();
+          if(drift==='sid')await pool.query('UPDATE agent_runs SET "sessionId"=$2 WHERE id=$1',[f.first.continuationRunId,'wrong-session']);
+          if(drift==='definition')await pool.query(`UPDATE agent_runs SET "agentDefinition"=jsonb_set("agentDefinition",'{definitionDigest}','"changed"') WHERE id=$1`,[f.first.continuationRunId]);
+          if(drift==='account')await pool.query('UPDATE byos_connections SET epoch=epoch+1 WHERE id=$1',[f.connectionId]);
+          if(drift==='maintenance')await pool.query(`UPDATE thread_machines SET "workerLeaseId"=$2,"workerLeaseUntil"=now()+interval '10 minutes' WHERE "runId"=$1`,[f.first.continuationRunId,randomUUID()]);
+          if(drift==='active')await pool.query(`UPDATE agent_runs SET status='running' WHERE id=$1`,[f.first.continuationRunId]);
+          if(drift==='sandboxMarker')await pool.query(`UPDATE agent_runs SET "questionContinuation"=jsonb_set("questionContinuation",'{requiredSandboxId}','"wrong-vm"') WHERE id=$1`,[f.first.continuationRunId]);
+          if(drift==='binding')await pool.query('DELETE FROM computer_run_bindings WHERE "runId"=$1',[f.first.continuationRunId]);
+          if(drift==='originscope') {
+            const otherBot=randomUUID();
+            await pool.query(`INSERT INTO bots(id,"workspaceId","ownerId",name) VALUES($1,$2,$3,'Other scope')`,[otherBot,f.workspaceId,userId]);
+            await pool.query('UPDATE computer_run_bindings SET "botId"=$2 WHERE "runId"=$1',[f.runId,otherBot]);
+          }
+          if(drift==='scope')await pool.query('UPDATE thread_machines SET "workspaceId"=$2 WHERE "runId"=$1',[f.first.continuationRunId,randomUUID()]);
+          if(drift==='consumer')await pool.query('UPDATE byos_bindings SET "consumerId"=$2 WHERE id=$1',[f.credentialId,randomUUID()]);
+          if(drift==='stopped')await pool.query("UPDATE agent_runs SET status='stopped' WHERE id=$1",[f.first.continuationRunId]);
+          if(drift==='revoked')await store.apply(userId,request.reference.binding,randomUUID(),{action:'revoke',reason:'owner revoked'});
+          if(drift==='cancelled')await store.apply(userId,request.reference.binding,randomUUID(),{action:'cancel',reason:'owner cancelled'});
+          if(drift==='expired')await pool.query(`UPDATE factory_questions SET "expiresAt"=now()-interval '1 minute' WHERE id=$1`,[f.q.id]);
+          if(drift==='custody')await pool.query(`UPDATE thread_machines SET state='ended',"sandboxId"=NULL WHERE "runId"=$1`,[f.first.continuationRunId]);
+          await assert.rejects(()=>f.service.recover(drift==='owner'?{...human,userId:'intruder'}:drift==='actor'?{...human,source:'orchestrator' as 'human'}:human,request),e=>e instanceof FactoryError);
+          assert.equal((await pool.query('SELECT count(*)::int n FROM agent_runs WHERE "issueId"=$1',[f.issueId])).rows[0].n,2);
+          assert.equal((await pool.query('SELECT "continuationRunId" FROM factory_questions WHERE id=$1',[f.q.id])).rows[0].continuationRunId,f.first.continuationRunId);
+          if(drift==='sandboxMarker')assert.equal((await pool.query('SELECT "sandboxId" FROM thread_machines WHERE "runId"=$1',[f.first.continuationRunId])).rows[0].sandboxId,f.sandboxId);
+        });
         await t.test('real Skill guards accept the original cloud identity through answer, transfer and required-SID claim',async()=>{
           const f=await cloudFixture('running',undefined,true);
           const answer={reference:questionReference(f.q),answerId:randomUUID(),text:'Continue on the same task machine with the original subscription'};

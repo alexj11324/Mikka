@@ -163,14 +163,70 @@ it.each(["FAIL", "CRASH"])(
   "does not expose auth/provider diagnostics on %s",
   async (prompt) => {
     const { adapter, options } = await fixture()
+    const childLogger=options.log.child<string>({})
+    const warn = vi.spyOn(childLogger, 'warn')
+    vi.spyOn(options.log, 'child').mockReturnValue(childLogger)
     const session = await adapter.start({ ...options, prompt })
     const events = []
     for await (const event of session.events()) events.push(event)
     expect(events.at(-1)).toMatchObject({
       type: "exit",
       outcome: "failed",
-      error: "Codex subscription execution failed"
+      error: prompt === 'FAIL' ? 'Codex subscription execution failed (turn_completed: unknown)' : 'Codex subscription execution failed (child_exit: cli_exited_early)'
     })
-    expect(JSON.stringify(events)).not.toContain("fixture-secret")
+    expect(JSON.stringify({events, logs: warn.mock.calls})).not.toContain("fixture-secret")
+    expect(warn).toHaveBeenCalledWith(expect.objectContaining({event:'codex_subscription_turn_failed',phase:prompt==='FAIL'?'turn_completed':'child_exit'}),'Codex subscription turn failed')
   }
 )
+
+
+it.each([
+  { phase:'turn_completed', category:'responseStreamDisconnected', status:502, scenario:{error:{message:'fixture-secret-provider-body',additionalDetails:'fixture-access',codexErrorInfo:{responseStreamDisconnected:{httpStatusCode:502}}}} },
+  { phase:'turn_completed', category:'unauthorized', scenario:{error:{message:'fixture-secret-provider-body',codexErrorInfo:'unauthorized'}} },
+  { phase:'turn_completed', category:'httpConnectionFailed', status:503, scenario:{notification:{message:'fixture-secret-provider-body',codexErrorInfo:{httpConnectionFailed:{httpStatusCode:503}}}} },
+  { phase:'turn_completed', category:'unknown', scenario:{error:{message:'fixture-secret-provider-body',additionalDetails:'fixture-access',codexErrorInfo:{'fixture-secret-field':{httpStatusCode:503}}}} },
+  { phase:'turn_completed', category:'unknown', scenario:{error:{message:'fixture-secret-provider-body',codexErrorInfo:'fixture-secret-category'}} },
+  { phase:'turn_completed', category:'unknown', scenario:{error:{message:'fixture-secret-provider-body',code:'fixture-secret-code'}} },
+  { phase:'turn_completed', category:'responseStreamDisconnected', scenario:{error:{message:'fixture-secret-provider-body',codexErrorInfo:{responseStreamDisconnected:{httpStatusCode:'fixture-secret-status'}}}} },
+  { phase:'turn_completed', category:'httpConnectionFailed', scenario:{error:{message:'fixture-secret-provider-body',codexErrorInfo:{httpConnectionFailed:{httpStatusCode:700}}}} },
+  { phase:'turn_completed', category:'activeTurnNotSteerable', scenario:{error:{message:'fixture-secret-provider-body',codexErrorInfo:{activeTurnNotSteerable:{turnKind:'fixture-secret-turnkind'}}}} },
+])('retains safe terminal classification $category without provider text', async ({phase,category,status,scenario})=>{
+  const {adapter,options}=await fixture();
+  const childLogger=options.log.child<string>({});const warn=vi.spyOn(childLogger,'warn');
+  vi.spyOn(options.log,'child').mockReturnValue(childLogger);
+  const session=await adapter.start({...options,prompt:'DIAGNOSTIC '+JSON.stringify(scenario)});
+  const events=[];for await(const event of session.events())events.push(event);
+  expect(events.at(-1)).toMatchObject({type:'exit',outcome:'failed',error:`Codex subscription execution failed (${phase}: ${category}${status?`; HTTP ${status}`:''})`});
+  expect(warn).toHaveBeenCalledWith(expect.objectContaining({event:'codex_subscription_turn_failed',phase,category,...(status?{httpStatus:status}:{})}),'Codex subscription turn failed');
+  const retained=JSON.stringify({events,logs:warn.mock.calls});
+  expect(retained).not.toContain('fixture-secret');expect(retained).not.toContain('fixture-access');
+});
+
+it('keeps quota reset metadata and ignores a retrying error as a terminal failure', async()=>{
+  for(const scenario of [
+    {error:{message:'fixture-secret-provider-body',codexErrorInfo:'usageLimitExceeded'},rateLimits:{primary:{usedPercent:100,resetsAt:2000000000}}},
+    {error:{message:'fixture-secret-provider-body',codexErrorInfo:{responseTooManyFailedAttempts:{httpStatusCode:429}}},rateLimits:{primary:{usedPercent:100,resetsAt:2000000000}}},
+    {notification:{message:'fixture-secret-provider-body',codexErrorInfo:'serverOverloaded'},willRetry:true,succeed:true},
+  ]){
+    const {adapter,options}=await fixture();const session=await adapter.start({...options,prompt:'DIAGNOSTIC '+JSON.stringify(scenario)});
+    const events=[];for await(const event of session.events())events.push(event);
+    expect(events.at(-1)).toMatchObject(scenario.succeed?{type:'exit',outcome:'succeeded'}:{type:'exit',outcome:'failed',quota:{resetsAt:new Date(2000000000*1000).toISOString()}});
+    expect(JSON.stringify(events)).not.toContain('fixture-secret');
+  }
+});
+
+it('keeps only a numeric RPC code when turn/start fails', async()=>{
+  const {adapter,options}=await fixture();const childLogger=options.log.child<string>({});const warn=vi.spyOn(childLogger,'warn');vi.spyOn(options.log,'child').mockReturnValue(childLogger);
+  await expect(adapter.start({...options,prompt:'DIAGNOSTIC '+JSON.stringify({rpc:{code:-32603,message:'fixture-secret-provider-body',data:{secret:'fixture-access'}}})})).rejects.toThrow('Codex subscription execution failed (turn_start: rpc_refused; RPC -32603)');
+  expect(warn).toHaveBeenCalledWith(expect.objectContaining({event:'codex_subscription_turn_failed',phase:'turn_start',category:'rpc_refused',rpcCode:-32603}),'Codex subscription turn failed');
+  expect(JSON.stringify(warn.mock.calls)).not.toContain('fixture-secret');expect(JSON.stringify(warn.mock.calls)).not.toContain('fixture-access');
+});
+
+
+it('retains only the JSON-RPC library numeric rejection code when the wire code is invalid',async()=>{
+  const {adapter,options}=await fixture();const childLogger=options.log.child<string>({});const warn=vi.spyOn(childLogger,'warn');vi.spyOn(options.log,'child').mockReturnValue(childLogger);
+  await expect(adapter.start({...options,prompt:'DIAGNOSTIC '+JSON.stringify({rpc:{code:'fixture-secret-code',message:'fixture-secret-body',data:{secret:'fixture-access'}}})})).rejects.toThrow('Codex subscription execution failed (turn_start: rpc_refused; RPC -32001)');
+  const calls=warn.mock.calls.filter(([fields])=>fields && typeof fields==='object' && 'event' in fields && fields.event==='codex_subscription_turn_failed');
+  expect(calls).toHaveLength(1);expect(calls[0][0]).toHaveProperty('rpcCode',-32001);
+  expect(JSON.stringify(warn.mock.calls)).not.toContain('fixture-secret');expect(JSON.stringify(warn.mock.calls)).not.toContain('fixture-access');
+});

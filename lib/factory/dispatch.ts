@@ -13,7 +13,7 @@ export { factoryDispatchSchema, type FactoryDispatchInput };
 export type QueueFactoryRun = (tx: PoolClient, userId: string, input: DispatchInput, sourceRunId?: string) => Promise<DispatchResult>;
 export type FactoryQueue = (tx: PoolClient, userId: string, input: {
   issueId: string; agentId: string; deviceRepoId: string; note?: string;
-}, botId: string | null, context: { sourceEventId: string; attemptId: string; questionOriginRunId?: string }) => Promise<{ runId: string }>;
+}, botId: string | null, context: { sourceEventId: string; attemptId: string; questionOriginRunId?: string; questionHistoryRunId?: string }) => Promise<{ runId: string }>;
 /** Installed by the owning consumer; no model may select a callback or gate. */
 export interface FactoryDispatchAdapters {
   lockAdmission?: (tx: PoolClient, userId: string, input: FactoryDispatchInput) => Promise<void>;
@@ -48,7 +48,7 @@ function fail(code: string): never { throw new FactoryError(code); }
 /** Task -> issue/access -> run. The existing queue writes through this transaction.
  * Ledger, queue, server configuration, frozen definition and binding commit together. */
 export function createFactoryDispatch(pool: Pool, store: ReturnType<typeof createFactoryStore>, queue: FactoryQueue, adapters: FactoryDispatchAdapters = defaultFactoryDispatchAdapters) {
-  return async (userId: string, raw: FactoryDispatchInput, existing?: PoolClient, questionOriginRunId?: string): Promise<FactoryDispatchResult> => {
+  return async (userId: string, raw: FactoryDispatchInput, existing?: PoolClient, questionOriginRunId?: string, questionHistoryRunId?: string): Promise<FactoryDispatchResult> => {
     const parsed = factoryDispatchSchema.safeParse(raw);
     if (!parsed.success) fail('factoryInvalid');
     // The note is human text that reaches factory_events.request (the idempotency
@@ -81,7 +81,7 @@ export function createFactoryDispatch(pool: Pool, store: ReturnType<typeof creat
       if (task.status !== 'pending' || !['spec','execute','review','verify','monitor'].includes(task.stage)) fail('factoryTransition');
       const configure = adapters.configure[task.stage];
       if (!configure) fail('factoryDispatchAdapterRequired');
-      const queued = await queue(tx,userId,{issueId:task.issueId,agentId:input.agentId,deviceRepoId:input.deviceRepoId,note:input.note},task.botId,{sourceEventId:task.sourceEventId,attemptId:task.attemptId,...(questionOriginRunId ? {questionOriginRunId} : {})});
+      const queued = await queue(tx,userId,{issueId:task.issueId,agentId:input.agentId,deviceRepoId:input.deviceRepoId,note:input.note},task.botId,{sourceEventId:task.sourceEventId,attemptId:task.attemptId,...(questionOriginRunId ? {questionOriginRunId} : {}),...(questionHistoryRunId ? {questionHistoryRunId} : {})});
       await tx.query('UPDATE factory_attempts SET output=output || $2::jsonb WHERE id=$1', [task.attemptId, JSON.stringify({ requestEpoch: task.sourceEventId })]);
       await configure(tx,task,queued.runId);
       const handoff = await persistFactoryHandoff(tx, task);
