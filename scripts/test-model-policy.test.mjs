@@ -33,3 +33,17 @@ test('Coordinator evaluation rejects Pro even when credentials are absent', () =
   assert.notEqual(result.status, 0)
   assert.match(result.stdout + result.stderr, /Flash-only test policy/)
 })
+
+
+test('application chat submissions are not mistaken for provider model calls', async () => {
+  for (const path of ['/mikka/api/coordinator/messages', '/mikka/api/mobile/chat']) {
+    await assertTestModelRequest(new Request('http://127.0.0.1:3000' + path, { method: 'POST', body: JSON.stringify({ text: 'Run the Flash acceptance task' }) }))
+  }
+})
+
+test('conflicting Gateway model headers cannot hide Pro behind Flash', async () => {
+  await assert.rejects(() => assertTestModelRequest(new Request('https://ai-gateway.vercel.sh/v4/ai/language-model', {
+    method: 'POST', body: '{}',
+    headers: { 'ai-language-model-id': 'deepseek/deepseek-flash', 'ai-model-id': 'deepseek/deepseek-v4-pro' },
+  })), /Flash-only test policy/)
+})
