@@ -57,7 +57,19 @@ export async function sendThreadMessage(userId: string, runId: string, text: str
     note: parsed.data.text,
     start: async (previous, note) => {
       if (previous?.id !== run.id) throw new ActionFailureError('threadReplaced')
-      return queueNextRun(userId, run, previous, note)
+      // This is provenance for this already authorized thread action, not a
+      // second Bot inbox message. Preserve the raw turn before adding the
+      // execution-only continuation summary to its note.
+      let request: { sourceEventId: string; botId: string | null } | undefined
+      if (source === 'user' || (typeof source === 'object' && source.source === 'human')) {
+        const { rows: [factory] } = await pool.query(`SELECT t."botId" FROM factory_attempts a JOIN factory_tasks t ON t.id=a."taskId" WHERE a."runId"=$1 AND t."userId"=$2 AND t."issueId"=$3 ORDER BY a.position DESC LIMIT 1`, [run.id, userId, issueId])
+        const botId = factory ? factory.botId : run.botId
+        const sourceEventId = crypto.randomUUID()
+        await pool.query(`INSERT INTO coordinator_events (id,"userId","botId","issueId",kind,"dedupeKey",payload,tier,"deliveredAt") VALUES ($1,$2,$3,$4,'user_message',$5,$6,'background',now())`,
+          [sourceEventId, userId, botId, issueId, `thread-continuation:${sourceEventId}`, JSON.stringify({ text: parsed.data.text, source: 'thread_continuation', previousRunId: run.id, postedToChat: true })])
+        request = { sourceEventId, botId }
+      }
+      return queueNextRun(userId, run, previous, note, request)
     },
   })
   // A dispatch the person can act on (no machine, say) queued nothing.
@@ -69,7 +81,7 @@ export async function sendThreadMessage(userId: string, runId: string, text: str
 }
 
 /** The thread's next run, queued the way its last one was: on the bot's cloud computer, else on the same device. */
-async function queueNextRun(userId: string, run: typeof agentRuns.$inferSelect, previous: TaskThreadRun, note: string | undefined) {
+async function queueNextRun(userId: string, run: typeof agentRuns.$inferSelect, previous: TaskThreadRun, note: string | undefined, request?: { sourceEventId: string; botId: string | null }) {
   const issueId = run.issueId!
   const readOnly = previous.readOnly ? { readOnly: true } : {}
   if (previous.cloud) {
@@ -82,13 +94,13 @@ async function queueNextRun(userId: string, run: typeof agentRuns.$inferSelect, 
     // the next task machine and starts its lifecycle before reporting queued.
     const { dispatchComputerTask } = await import('@/workflows/coordinator/steps')
     return dispatchComputerTask(userId, { botId: previous.cloud.botId, issueId, harness: previous.harness,
-      ...(previous.remoteUrl ? { repo: previous.remoteUrl } : {}), note, withoutBot: run.botId === null,
-      ...runModel, threadRunId: run.id, ...readOnly }, `thread:${run.id}:${crypto.randomUUID()}`)
+      ...(previous.remoteUrl ? { repo: previous.remoteUrl } : {}), note, ...(request ? { sourceEventId: request.sourceEventId, factoryBotId: request.botId } : {}), withoutBot: run.botId === null,
+      ...runModel, threadRunId: run.id, ...readOnly }, `thread:${run.id}:${request?.sourceEventId ?? crypto.randomUUID()}`)
   }
   if (!previous.remoteUrl) throw new ActionFailureError('agentRepoMissing')
   // The thread's own model and account, as on the cloud; when it has none left, the person is told instead of the CLI choosing.
   const { latestThreadRunModel } = await import('@/lib/computer/run-model')
   const runModel = await latestThreadRunModel(pool, userId, issueId, run.agentId)
   if (!runModel) throw new ActionFailureError('threadModelUnavailable')
-  return queueTaskRun(userId, { issueId, agentId: run.agentId, repo: previous.remoteUrl, note, ...runModel, threadRunId: run.id, ...readOnly }, run.botId, undefined, undefined, run.source === 'mcp' ? 'mcp' : null)
+  return queueTaskRun(userId, { issueId, agentId: run.agentId, repo: previous.remoteUrl, note, ...runModel, threadRunId: run.id, ...(request ? { requestKey: `thread:${run.id}:${request.sourceEventId}` } : {}), ...readOnly }, request ? request.botId : run.botId, undefined, request?.sourceEventId, run.source === 'mcp' ? 'mcp' : null)
 }
