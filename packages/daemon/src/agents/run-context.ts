@@ -388,6 +388,7 @@ export class RunContext {
         MCP_SERVER_SCRIPT, "--handoff", this.handoffFile,
         "--captures", this.capturesDir, "--capture-root", this.worktree, "--capture-root", this.tmpDir,
         ...(this.options.factoryCheck && (!this.options.factoryCheck.reportOnly || this.options.factoryCheck.inferCommand) ? ['--factory-verify', JSON.stringify({ cwd: this.worktree, command: this.options.verifyCommand ?? null, infer: this.options.factoryCheck.inferCommand })] : []),
+        ...(this.options.factoryCheck?.reportOnly ? ['--factory-artifacts', this.worktree] : []),
       ],
       // Inside Electron, `process.execPath` is the app; run it as plain Node.
       env: process.versions.electron ? { ELECTRON_RUN_AS_NODE: "1" } : {},

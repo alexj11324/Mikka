@@ -1,8 +1,8 @@
 // The pieces real adapters share: Mikka's MCP hand-in server, the run
 // context's handoff file, and the daemon's commit and push of a verified run.
 import { spawn } from "node:child_process"
-import { randomUUID } from "node:crypto"
-import { existsSync, writeFileSync } from "node:fs"
+import { createHash, randomUUID } from "node:crypto"
+import { existsSync, symlinkSync, writeFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { join } from "node:path"
 
@@ -204,6 +204,43 @@ describe("mikka MCP server", () => {
 })
 
 describe("run context", () => {
+  it('provides file hashes and fixed Git observations to a report-only check without granting shell commands', async () => {
+    const repo = await makeRepo()
+    const worktree = await worktreeOf(repo)
+    const content = 'delivery-marker\n'
+    writeFileSync(join(worktree, 'DELIVERY.txt'), content)
+    await execa('git', ['add', 'DELIVERY.txt'], { cwd: worktree })
+    await execa('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-m', 'candidate'], { cwd: worktree })
+    const head = (await execa('git', ['rev-parse', 'HEAD'], { cwd: worktree })).stdout
+    const ctx = new RunContext({ harness: 'claude_code', worktree, runDir: tempDir(), privateDir: tempDir(),
+      factoryCheck: { stage: 'verify', reportOnly: true, inferCommand: false } })
+    const spec = ctx.mcpServer()
+    const client = mcpClient(ctx.handoffFile, spec.args.slice(3))
+    try {
+      const tools = JSON.stringify(await client.request('tools/list'))
+      expect(tools).toContain('inspect_artifact')
+      expect(tools).not.toContain('verify_command')
+      const inspect = async (path: string) => (await client.request('tools/call', { name: 'inspect_artifact', arguments: { path } })) as { result: { isError?: boolean; content: { text: string }[] } }
+      const observed = await inspect('DELIVERY.txt')
+      expect(observed.result.isError).not.toBe(true)
+      expect(JSON.parse(observed.result.content[0].text)).toMatchObject({
+        path: 'DELIVERY.txt', bytes: Buffer.byteLength(content), sha256: createHash('sha256').update(content).digest('hex'),
+        head, committedSha256: createHash('sha256').update(content).digest('hex'), contentMatchesGit: true,
+      })
+      writeFileSync(join(worktree, 'DELIVERY.txt'), 'changed\n')
+      expect(JSON.parse((await inspect('DELIVERY.txt')).result.content[0].text).contentMatchesGit).toBe(false)
+      const outside = join(tempDir(), 'secret.txt')
+      writeFileSync(outside, 'outside-private-value')
+      symlinkSync(outside, join(worktree, 'escape'))
+      for (const path of ['../secret.txt', outside, 'escape', '.git', 'missing']) {
+        const refused = await inspect(path)
+        expect(refused.result.isError).toBe(true)
+        expect(JSON.stringify(refused)).not.toContain('outside-private-value')
+      }
+      expect(existsSync(ctx.handoffFile)).toBe(false)
+    } finally { client.close() }
+  })
+
   it('grants isolated command observations to a report-only repository review with host-enabled inference', async () => {
     const repo = await makeRepo()
     const ctx = new RunContext({ harness: 'claude_code', worktree: await worktreeOf(repo), runDir: tempDir(), privateDir: tempDir(),
