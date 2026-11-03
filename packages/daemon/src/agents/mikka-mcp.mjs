@@ -24,13 +24,15 @@ const factoryVerify = verifyIndex > 0 ? JSON.parse(process.argv[verifyIndex + 1]
 const VERIFY_TOOL = { name: 'verify_command', description: 'Run this Factory check’s frozen command, or the command inferred from repository scripts when the host explicitly enabled inference. Use this tool for real command observations when native shell is unavailable. It does not submit or accept the task.', inputSchema: { type: 'object', properties: { command: { type: 'string' }, basis: { type: 'string' } }, required: ['command'] } }
 const artifactIndex = process.argv.indexOf('--factory-artifacts')
 const artifactRoot = artifactIndex > 0 ? realpathSync(process.argv[artifactIndex + 1]) : null
+// Metadata belongs to the bound worktree, never the CLI's shadow Git context.
+const metadataGitEnv = { PATH: process.env.PATH, LANG: 'C.UTF-8', GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null' }
 const repositoryIndex = process.argv.indexOf('--repository-selection')
 const repositoryRoot = repositoryIndex > 0 ? realpathSync(process.argv[repositoryIndex + 1]) : null
 const REPOSITORY_TOOL = { name: 'switch_repository', description: 'When this checkout does not match the task, choose the correct owner/repo after inspecting the task, Git origin and repository files. The host rechecks your owner’s live GitHub authorization, preserves this checkout, clones the selected repository into a new bound execution, and continues with the same model and credential. End your turn after calling this tool. Do not change origin or clone a nested delivery in the wrong worktree. Independent checks cannot switch their fixed candidate.', inputSchema: { type: 'object', properties: { repository: { type: 'string', description: 'Exact GitHub owner/repo or GitHub clone URL.' }, reason: { type: 'string', description: 'Task and repository evidence explaining the mismatch and chosen target.' } }, required: ['repository', 'reason'], additionalProperties: false } }
 
 function selectRepository(args) {
   if (typeof args.repository !== 'string' || !args.repository.trim() || args.repository.length > 4000 || typeof args.reason !== 'string' || !args.reason.trim() || args.reason.length > 2000) throw new Error('repository_selection')
-  const git = args => spawnSync('git', ['-C', repositoryRoot, ...args], { timeout: 5000, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
+  const git = args => spawnSync('git', ['-C', repositoryRoot, ...args], { env: metadataGitEnv, timeout: 5000, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
   const head = git(['rev-parse', '--verify', 'HEAD'])
   const remote = git(['remote', 'get-url', 'origin'])
   if (head.status !== 0 || !/^[a-f0-9]{40}$/.test(head.stdout.trim())) throw new Error('repository_head')
@@ -63,8 +65,7 @@ function inspectArtifact(args) {
     const after = fstatSync(fd)
     if (bytes.length > limit || before.size !== after.size || before.mtimeMs !== after.mtimeMs) throw new Error('artifact_changed')
   } finally { closeSync(fd) }
-  const env = { PATH: process.env.PATH, LANG: 'C.UTF-8', GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null' }
-  const git = args => spawnSync('git', ['-C', artifactRoot, ...args], { env, timeout: 5000, maxBuffer: limit + 1024, stdio: ['ignore', 'pipe', 'pipe'] })
+  const git = args => spawnSync('git', ['-C', artifactRoot, ...args], { env: metadataGitEnv, timeout: 5000, maxBuffer: limit + 1024, stdio: ['ignore', 'pipe', 'pipe'] })
   const head = git(['rev-parse', '--verify', 'HEAD'])
   if (head.status !== 0 || !/^[a-f0-9]{40}$/.test(head.stdout.toString().trim())) throw new Error('artifact_git')
   const committed = git(['show', `HEAD:${path}`])

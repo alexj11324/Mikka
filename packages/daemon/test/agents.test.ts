@@ -28,13 +28,13 @@ async function worktreeOf(repo: string) {
 }
 
 /** Talks newline-delimited JSON-RPC to the MCP server script. */
-function mcpClient(handoff: string, extraArgs: string[] = []) {
+function mcpClient(handoff: string, extraArgs: string[] = [], env?: NodeJS.ProcessEnv) {
   const child = spawn(process.execPath, [
     MCP_SERVER_SCRIPT,
     "--handoff",
     handoff,
     ...extraArgs,
-  ])
+  ], { env })
   const waiting = new Map<number, (value: unknown) => void>()
   onLines(child.stdout, (line) => {
     const message = JSON.parse(line) as { id: number }
@@ -56,6 +56,26 @@ function mcpClient(handoff: string, extraArgs: string[] = []) {
 }
 
 describe("mikka MCP server", () => {
+  it('reads repository metadata from the bound root despite inherited Git selectors', async () => {
+    const repo = await makeRepo(), other = await makeRepo()
+    await execa('git', ['remote', 'add', 'origin', 'https://github.com/example/wrong.git'], { cwd: repo })
+    await execa('git', ['remote', 'add', 'origin', 'https://github.com/example/redirected.git'], { cwd: other })
+    writeFileSync(join(repo, 'README.md'), 'Bound repository\n')
+    await execa('git', ['add', 'README.md'], { cwd: repo })
+    await execa('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-m', 'bound README'], { cwd: repo })
+    const head = (await execa('git', ['rev-parse', 'HEAD'], { cwd: repo })).stdout
+    const worktree = await worktreeOf(repo)
+    const ctx = new RunContext({ harness: 'codex', kind: 'implement', worktree, runDir: tempDir(), privateDir: tempDir(), policy: { ...defaultRunPolicy(), readOnly: true } })
+    const client = mcpClient(ctx.handoffFile, ctx.mcpServer().args.slice(3), { ...process.env, GIT_DIR: join(other, '.git'), GIT_WORK_TREE: worktree })
+    try {
+      const inspected = await client.request('tools/call', { name: 'inspect_artifact', arguments: { path: 'README.md' } }) as { result: { content: { text: string }[] } }
+      expect(JSON.parse(inspected.result.content[0].text)).toMatchObject({ head, contentUtf8: 'Bound repository\n', contentMatchesGit: true })
+      await client.request('tools/call', { name: 'switch_repository', arguments: { repository: 'example/correct', reason: 'The bound README identifies the wrong repository.' } })
+      expect(ctx.readHandoff()?.report?.repositorySelection).toMatchObject({ observedRemote: 'https://github.com/example/wrong.git', observedHead: head })
+      expect((await execa('git', ['status', '--porcelain'], { cwd: worktree })).stdout).toBe('')
+    } finally { client.close() }
+  })
+
   it('records an execution-side repository switch with actual Git evidence and retains the old checkout', async () => {
     const repo = await makeRepo()
     await execa('git', ['remote', 'add', 'origin', 'https://github.com/example/wrong.git'], { cwd: repo })
