@@ -98,7 +98,9 @@ test('a message to an ended thread runs it again in the same thread; only its ow
   });
 
   await t.test('done, failed, stopped and cancelled threads each run again in the same thread', async () => {
-    let last = first.runId
+    // The preceding owner targets may already have replaced a queued stale
+    // executor. End the current run, while keeping the original thread URL.
+    let last = (await readRunChain(pool, a.id, first.runId))!.latestRunId
     for (const status of ['succeeded', 'failed', 'stopped', 'cancelled']) {
       await end(last, status)
       const text = `Go on after ${status}.`

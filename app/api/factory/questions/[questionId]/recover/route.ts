@@ -6,6 +6,8 @@ import { FactoryError } from '@/lib/factory/contract';
 import { factoryLifecycleEnabled, factoryRuntimeForBot } from '@/lib/factory/runtime';
 import { questionRecoverySchema } from '@/lib/factory/questions/contract';
 export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+export const maxDuration = 300;
 export async function POST(request: Request, {params}: {params:Promise<{questionId:string}>}) {
   if(!factoryLifecycleEnabled()) return NextResponse.json({error:'factoryLifecycleUnavailable'},{status:404});
   if(request.headers.get('authorization')) return NextResponse.json({error:'authRequired'},{status:401});
