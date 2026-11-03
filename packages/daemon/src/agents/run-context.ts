@@ -387,7 +387,7 @@ export class RunContext {
       if (this.options.policy?.readOnly !== true || this.options.kind !== 'acceptance') throw new Error('Check capability requires a fixed read-only Factory run')
       checkFile = join(this.runDir, 'check-command.json')
       rmSync(checkFile, { force: true })
-      writeFileSync(checkFile, JSON.stringify({ ...this.options.verification, worktree: this.worktree, gitDir: this.gitDir }), { mode: 0o600, flag: 'wx' })
+      writeFileSync(checkFile, JSON.stringify({ ...this.options.verification, worktree: this.worktree, gitDir: this.gitDir, ...(this.options.github ? { githubConfig: join(this.runDir,'github','config.json') } : {}) }), { mode: 0o600, flag: 'wx' })
     }
     return {
       command,

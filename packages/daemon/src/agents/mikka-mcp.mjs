@@ -376,8 +376,9 @@ async function handle(message) {
     case "ping":
       return reply(id, {})
     case "tools/list":
-      return reply(id, { tools: [...TOOLS, ...(capturesDir ? [CAPTURE_TOOL] : []), ...(checkCommand ? [checkCommand.tool] : [])] })
+      return reply(id, { tools: [...TOOLS, ...(capturesDir ? [CAPTURE_TOOL] : []), ...(checkCommand ? [checkCommand.tool, checkCommand.inspectTool] : [])] })
     case "tools/call": {
+      if (checkCommand && params?.name === checkCommand.inspectTool.name) return reply(id, await checkCommand.inspect(params.arguments ?? {}))
       if (checkCommand && params?.name === checkCommand.tool.name) return reply(id, await checkCommand.execute(params.arguments ?? {}))
       if (capturesDir && params?.name === CAPTURE_TOOL.name) {
         try {

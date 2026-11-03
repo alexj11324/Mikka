@@ -91,6 +91,10 @@ test(
     try {
       const { tools } = await c.call("tools/list");
       assert.ok(tools.some((tool) => tool.name === "verify_command"));
+    assert.ok(tools.some((tool) => tool.name === "inspect_candidate"));
+    const inspected=await c.call('tools/call',{name:'inspect_candidate',arguments:{}})
+    assert.equal(JSON.parse(inspected.content[0].text).sha,f.sha)
+
       const criterion = tools.find((tool) => tool.name === "submit").inputSchema
         .properties.criteria.items;
       assert.ok(

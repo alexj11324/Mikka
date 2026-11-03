@@ -108,6 +108,13 @@ commands, changed HEAD/worktree, missing host binding and failed/timed-out
 commands cannot establish a pass. Child processes receive routing variables,
 not model/provider credentials, and stop when their MCP parent closes.
 
+Read-only checks also receive `inspect_candidate`: a fixed-candidate Git diff
+and, when the run already has a GitHub connection, an authenticated delivery-PR
+read. PR reads are restricted to the assigned repository, exact candidate head
+and task issue marker. No arbitrary GitHub command or write is exposed. This
+closes the real private-PR observation gap that otherwise caused a successful
+implementation to be sent back for repair despite correct code.
+
 This uses the existing direct host verification executor contract; it does not
 claim OS sandbox containment. Review can pass semantic file/line evidence without
 a command; verification must execute one or ask the person. The hand-in schema
