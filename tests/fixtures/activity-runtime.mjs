@@ -4,10 +4,10 @@ import { registerHooks } from 'node:module'
 import { AsyncLocalStorage } from 'node:async_hooks'
 const sessions = new AsyncLocalStorage()
 export const activityFixtureSession = () => sessions.getStore() ?? null
-export const withActivitySession = (userId, callback) => sessions.run({user:{id:userId,name:'Synthetic',email:`${userId}@example.invalid`}}, callback)
+export const withActivitySession = (userId, callback, workspaceId) => sessions.run({user:{id:userId,name:'Synthetic',email:`${userId}@example.invalid`},workspaceId}, callback)
 const sources = new Map([
   ['server-only', 'export {}'],
-  ['next/headers', 'export async function headers(){return new Headers()} export async function cookies(){return {get(){return undefined},set(){}}}'],
+  ['next/headers', `import { activityFixtureSession } from ${JSON.stringify(import.meta.url)}; export async function headers(){return new Headers()} export async function cookies(){return {get(key){const id=activityFixtureSession()?.workspaceId;return key==='mikka-workspace' && id ? {value:id} : undefined},set(){}}}`],
   ['next/server', 'export function after(){}'],
   ['next-intl/server', 'export async function getLocale(){return "en"} export async function getTranslations(){return (key)=>key}'],
 ])

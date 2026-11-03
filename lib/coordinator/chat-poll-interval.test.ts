@@ -9,10 +9,10 @@ test('the chat polls slowly when quiet, quickly while a turn starts, and leans o
   assert.equal(chatPollInterval({ working: true, streamRunId: 'wrun_1' }), 15_000)
 })
 
-test('the bot, thread and board lists poll once a minute while visible', async () => {
+test('the bot, task, thread and board lists poll once a minute while visible', async () => {
   const { readFileSync } = await import('node:fs')
   assert.match(readFileSync('components/swr-defaults.tsx', 'utf8'), /export const LIST_POLL_MS = 60_000/)
-  for (const [file, uses] of [['components/nav/bot-list.tsx', 2], ['components/workspace/issue-workspace.tsx', 1], ['components/workspace/board-page.tsx', 1]] as const) {
+  for (const [file, uses] of [['components/nav/bot-list.tsx', 2], ['components/workspace/issue-workspace.tsx', 2], ['components/workspace/board-page.tsx', 1]] as const) {
     const source = readFileSync(file, 'utf8')
     assert.equal(source.match(/refreshInterval:[^,}]*LIST_POLL_MS/g)?.length, uses, file)
     assert.doesNotMatch(source, /refreshInterval: 15000/, file)

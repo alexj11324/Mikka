@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
+import { mergeChat } from './chat-poll'
 import { isE2eTarget } from '../../tests/helpers/e2e-target.mjs'
 
 // Database regressions execute only in CI against ephemeral Postgres 17.
@@ -63,5 +64,35 @@ dbTest('the chat version changes exactly when the conversation or its inbox does
     const poll = Buffer.byteLength(JSON.stringify({ unchanged: true, ...waiting }))
     t.diagnostic(JSON.stringify({ event: 'chat_poll_bytes', full, unchanged: poll }))
     assert.ok(poll * 50 < full, `unchanged poll ${poll} bytes, full read ${full}`)
+
+    const previous = await store.chatView(owner, 200, botId)
+    await db.insert(schema.coordinatorMessages).values([
+      { id: randomUUID(), userId: owner, botId, position: 41, message: { role: 'user', content: 'Next question' } },
+      { id: randomUUID(), userId: owner, botId, position: 42, message: { role: 'assistant', content: [{ type: 'tool-call', toolCallId: 'delta-tool', toolName: 'read_file', input: { path: 'fixture' } }] } },
+      { id: randomUUID(), userId: owner, botId, position: 43, message: { role: 'tool', content: [{ type: 'tool-result', toolCallId: 'delta-tool', toolName: 'read_file', output: { type: 'text', value: 'read' } }] } },
+      { id: randomUUID(), userId: owner, botId, position: 44, message: { role: 'assistant', content: 'The new answer' } },
+    ])
+    const delta = await store.chatUpdate(owner, botId, previous.continuation)
+    assert.ok('after' in delta, 'an append reads only the overlapping tail')
+    const complete = await store.chatView(owner, 200, botId)
+    assert.deepEqual(mergeChat(previous, delta).items, complete.items, 'pending input and tool-result grouping match a full read')
+    const deltaBytes = Buffer.byteLength(JSON.stringify(delta))
+    t.diagnostic(JSON.stringify({ event: 'chat_delta_bytes', full: Buffer.byteLength(JSON.stringify(complete)), delta: deltaBytes }))
+    assert.ok(deltaBytes * 10 < Buffer.byteLength(JSON.stringify(complete)))
+
+    await db.update(schema.coordinatorMessages).set({ message: { role: 'assistant', content: 'Earlier reply was corrected' } }).where(and(eq(schema.coordinatorMessages.userId, owner), eq(schema.coordinatorMessages.botId, botId), eq(schema.coordinatorMessages.position, 2)))
+    assert.ok(!('after' in await store.chatUpdate(owner, botId, complete.continuation)), 'rewriting an older message invalidates the prefix proof')
+    assert.ok(!('after' in await store.chatUpdate(owner, otherBot, complete.continuation)), 'another bot cannot reuse this prefix')
+
+    await db.insert(schema.coordinatorMessages).values(Array.from({ length: 210 }, (_, index) => ({ id: randomUUID(), userId: owner, botId, position: 45 + index, message: { role: 'user', content: `Long absence ${index}` } })))
+    const resumed = await store.chatUpdate(owner, botId, complete.continuation)
+    assert.ok(!('after' in resumed), 'more than a window of new messages must resnapshot rather than skip a gap')
+    assert.ok(resumed.historyBefore)
+    const through = resumed.items[1].position - 1
+    const older = await store.chatView(owner, 200, botId, { through })
+    assert.ok(older.items[0].position < resumed.items[0].position, 'older messages are fetched only on request')
+    const paged = [...older.items, ...resumed.items.filter(item => item.pending || item.position > through)]
+    assert.equal(new Set(paged.map(item => item.position)).size, paged.length, 'overlapping pages contain no duplicate rows')
+    assert.ok(!older.items.some(item => item.pending), 'historical pages never repeat the current inbox')
   })
 })

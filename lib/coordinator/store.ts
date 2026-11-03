@@ -405,6 +405,8 @@ export interface ChatView {
   sources: Record<string, CitationSource>
   /** The artifacts shown as cards, by id. */
   artifacts: Record<string, ArtifactSummary>
+  continuation?: { after: number; prefix: string; cursor: number }
+  historyBefore?: number
 }
 
 /** The reasoning text of this person's stored messages at `positions` in one chat, in order; stored messages are already masked (appendMessages). */
@@ -464,23 +466,26 @@ function withImages(text: string, images: unknown): ModelMessage['content'] {
 }
 
 /** The latest of the conversation for the chat, oldest first. */
-export async function chatView(userId: string, limit = 200, botId: string): Promise<ChatView> {
-  const [session] = await db.select().from(coordinatorSessions).where(sessionOf(userId, botId)).limit(1)
+export async function chatView(userId: string, limit = 200, botId: string, window: { after?: number; through?: number } = {}): Promise<ChatView> {
+  const [session] = await db.select({ leaseHolder: coordinatorSessions.leaseHolder, leaseUntil: coordinatorSessions.leaseUntil, lastError: coordinatorSessions.lastError }).from(coordinatorSessions).where(sessionOf(userId, botId)).limit(1)
   // Compact parts: the chat never shows reasoning text or whole tool inputs and outputs (chat-projection.ts).
   const rows = await db.select({ id: coordinatorMessages.id, position: coordinatorMessages.position, message: compactChatMessage, createdAt: coordinatorMessages.createdAt })
-    .from(coordinatorMessages).where(messagesOf(userId, botId))
-    .orderBy(desc(coordinatorMessages.position)).limit(limit)
+    .from(coordinatorMessages).where(and(messagesOf(userId, botId), window.after === undefined ? undefined : gt(coordinatorMessages.position, window.after), window.through === undefined ? undefined : sql`${coordinatorMessages.position} <= ${window.through}`))
+    .orderBy(desc(coordinatorMessages.position)).limit(limit + 1)
+  const hasMore = rows.length > limit
+  rows.splice(limit)
   // Events still in the inbox: the person's own messages show at once, ahead of the turn that takes them.
-  const waiting = await db.select().from(coordinatorEvents)
+  const waiting = window.through !== undefined ? [] : await db.select().from(coordinatorEvents)
     .where(and(eventsOf(userId, botId), isNull(coordinatorEvents.deliveredAt)))
     .orderBy(asc(coordinatorEvents.createdAt)).limit(INBOX_BATCH)
-  const last = rows[0]?.position ?? 0
+  const last = rows[0]?.position ?? window.after ?? 0
   const lastMessage = rows[0] && { role: String(rows[0].message.role), ...(typeof rows[0].message.mikkaStreamId === 'string' ? { streamId: rows[0].message.mikkaStreamId } : {}) }
   // A retry (重试, or an interrupted turn) re-answers a message already in the chat (postedToChat): no second bubble.
   const pending = waiting.filter(event => event.kind === 'user_message' && event.payload.postedToChat !== true && !String(event.payload.text ?? '').startsWith(COORDINATOR_WELCOME_MARK)).map((event, index) => ({
     position: last + index + 1, createdAt: event.createdAt, message: { role: 'user', content: withImages(eventPrompt(event), event.payload.images) } as ModelMessage, pending: true as const,
   }))
   const items = chatItems([...rows.reverse().map(row => ({ ...row, message: row.message as unknown as ModelMessage })), ...pending])
+  const after = Math.max(0, (items.findLast(item => !item.pending)?.position ?? 1) - 1)
   return {
     items,
     cursor: last,
@@ -491,7 +496,30 @@ export async function chatView(userId: string, limit = 200, botId: string): Prom
     sources: await citationSources(userId, [...items.filter(item => item.from === 'coordinator').map(item => item.text),
       ...items.flatMap(item => item.line ? [item.line.runId && `[[run:${item.line.runId}]]`, item.line.issueId && `[[issue:${item.line.issueId}]]`].filter((text): text is string => !!text) : [])], items.flatMap(item => item.threads)),
     artifacts: await artifactSummaries(userId, items.flatMap(item => [...item.artifacts, ...(item.quote ? [item.quote.artifactId] : [])])),
+    continuation: { after, prefix: await chatPrefix(userId, botId, after), cursor: last },
+    ...(hasMore && rows[0] ? { historyBefore: rows[0].position } : {}),
   }
+}
+
+/** Hash only the bounded prefix that preceded the last rendered item; no message body crosses the wire. */
+async function chatPrefix(userId: string, botId: string, through: number) {
+  const rows = db.select({ id: coordinatorMessages.id, position: coordinatorMessages.position, message: coordinatorMessages.message }).from(coordinatorMessages)
+    .where(and(messagesOf(userId, botId), sql`${coordinatorMessages.position} <= ${through}`)).orderBy(desc(coordinatorMessages.position)).limit(200).as('chat_prefix')
+  const [result] = await db.select({ hash: sql<string>`md5(coalesce(string_agg(${rows.id}::text || ':' || md5(${rows.message}::text), ',' order by ${rows.position}), ''))` }).from(rows)
+  return result.hash
+}
+
+/** Replay the last rendered item too, so tool results and multi-step replies merge exactly as a full read. */
+export async function chatUpdate(userId: string, botId: string, continuation?: NonNullable<ChatView['continuation']>) {
+  if (continuation && continuation.after <= continuation.cursor && await chatPrefix(userId, botId, continuation.after) === continuation.prefix) {
+    const latest = await chatVersion(userId, 200, botId)
+    if (continuation.cursor <= latest.cursor) {
+      const tail = await chatView(userId, 200, botId, { after: continuation.after })
+      // A reconnect after a long absence must not silently skip a window of messages.
+      if (!tail.historyBefore) return { ...tail, streamRunId: latest.streamRunId, working: latest.working, error: latest.error, after: continuation.after, baseCursor: continuation.cursor }
+    }
+  }
+  return chatView(userId, 200, botId)
 }
 
 /** What a chat poll needs to know without reading the conversation: its version and live state. */
@@ -511,7 +539,7 @@ export interface ChatVersion {
  * sends the messages themselves.
  */
 export async function chatVersion(userId: string, limit = 200, botId: string): Promise<ChatVersion> {
-  const [session] = await db.select().from(coordinatorSessions).where(sessionOf(userId, botId)).limit(1)
+  const [session] = await db.select({ leaseHolder: coordinatorSessions.leaseHolder, leaseUntil: coordinatorSessions.leaseUntil, lastError: coordinatorSessions.lastError }).from(coordinatorSessions).where(sessionOf(userId, botId)).limit(1)
   const latest = db.select({ id: coordinatorMessages.id, position: coordinatorMessages.position, message: coordinatorMessages.message })
     .from(coordinatorMessages).where(messagesOf(userId, botId)).orderBy(desc(coordinatorMessages.position)).limit(limit).as('latest')
   const [stored] = await db.select({
@@ -520,12 +548,12 @@ export async function chatVersion(userId: string, limit = 200, botId: string): P
     role: sql<string | null>`(array_agg(${latest.message}->>'role' order by ${latest.position} desc))[1]`,
     streamId: sql<string | null>`(array_agg(${latest.message}->>'mikkaStreamId' order by ${latest.position} desc))[1]`,
   }).from(latest)
-  const waiting = await db.select().from(coordinatorEvents)
+  const waiting = await db.select({ id: coordinatorEvents.id, payloadVersion: sql<string>`md5(${coordinatorEvents.payload}::text)`, kind: coordinatorEvents.kind, tier: coordinatorEvents.tier, wakeAttempts: coordinatorEvents.wakeAttempts, wakeLeaseUntil: coordinatorEvents.wakeLeaseUntil, wakeLastError: coordinatorEvents.wakeLastError }).from(coordinatorEvents)
     .where(and(eventsOf(userId, botId), isNull(coordinatorEvents.deliveredAt)))
     .orderBy(asc(coordinatorEvents.createdAt)).limit(INBOX_BATCH)
   const lastMessage = stored.role ? { role: stored.role, ...(stored.streamId ? { streamId: stored.streamId } : {}) } : undefined
   return {
-    version: createHash('sha256').update(`${limit}|${stored.hash}|${waiting.map(event => event.id).join(',')}`).digest('hex').slice(0, 32),
+    version: createHash('sha256').update(`${limit}|${stored.hash}|${waiting.map(event => `${event.id}:${event.payloadVersion}`).join(',')}`).digest('hex').slice(0, 32),
     cursor: stored.last,
     ...(coordinatorLeaseActive(session) && session?.leaseHolder?.startsWith('wrun_') ? { streamRunId: session.leaseHolder } : {}),
     ...coordinatorChatState(session, waiting, new Date(), lastMessage),
@@ -542,10 +570,10 @@ export interface BotChatSummary {
 
 /** Each of the person's own bots' latest line and state, for the bot list (the Coordinator's comes with its chat). */
 export async function botChats(userId: string): Promise<Record<string, BotChatSummary>> {
-  const latest = await db.selectDistinctOn([coordinatorMessages.botId], { botId: coordinatorMessages.botId, message: coordinatorMessages.message, createdAt: coordinatorMessages.createdAt })
+  const latest = await db.selectDistinctOn([coordinatorMessages.botId], { botId: coordinatorMessages.botId, message: compactChatMessage, createdAt: coordinatorMessages.createdAt })
     .from(coordinatorMessages).where(and(eq(coordinatorMessages.userId, userId), isNotNull(coordinatorMessages.botId), sql`${coordinatorMessages.message}->>'role' <> 'tool'`))
     .orderBy(coordinatorMessages.botId, desc(coordinatorMessages.position))
-  const sessions = await db.select().from(coordinatorSessions).where(and(eq(coordinatorSessions.userId, userId), isNotNull(coordinatorSessions.botId)))
+  const sessions = await db.select({ botId: coordinatorSessions.botId, leaseHolder: coordinatorSessions.leaseHolder, leaseUntil: coordinatorSessions.leaseUntil, lastError: coordinatorSessions.lastError }).from(coordinatorSessions).where(and(eq(coordinatorSessions.userId, userId), isNotNull(coordinatorSessions.botId)))
   const waiting = await db.select({ botId: coordinatorEvents.botId, kind: coordinatorEvents.kind, tier: coordinatorEvents.tier, wakeAttempts: coordinatorEvents.wakeAttempts, wakeLeaseUntil: coordinatorEvents.wakeLeaseUntil, wakeLastError: coordinatorEvents.wakeLastError })
     .from(coordinatorEvents).where(and(eq(coordinatorEvents.userId, userId), isNotNull(coordinatorEvents.botId), isNull(coordinatorEvents.deliveredAt)))
   const result: Record<string, BotChatSummary> = {}

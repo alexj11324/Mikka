@@ -6,7 +6,7 @@ import { AnimatePresence } from 'motion/react'
 import { withBasePath } from '@/lib/base-path'
 import { checkPageBuildBeforeAction } from '@/lib/app-build'
 import { useTranslations } from 'next-intl'
-import { pollCoordinatorChat, stopCoordinatorTurn, welcomeCoordinator, type CoordinatorChat as Chat } from '@/app/actions/coordinator'
+import { pollCoordinatorChat, coordinatorHistory, stopCoordinatorTurn, welcomeCoordinator, type CoordinatorChat as Chat } from '@/app/actions/coordinator'
 import { knownVersion, mergeChat } from '@/lib/coordinator/chat-poll'
 import type { BotView } from '@/app/actions/bots'
 import { BotAvatar, COORDINATOR_AVATAR } from '@/components/nav/bot-avatar'
@@ -141,14 +141,27 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   const shown = useRef<{ chat?: Chat; fullReadAt: number }>({ fullReadAt: 0 })
   const { data, mutate, error: loadError } = useSWR<Chat>(coordinatorChatKey(botId), async () => {
     const known = knownVersion(shown.current.chat, shown.current.fullReadAt, Date.now())
-    const next = await (botId || known ? pollCoordinatorChat(botId, known) : pollCoordinatorChat())
-    if (!('unchanged' in next)) shown.current.fullReadAt = Date.now()
+    const previous = shown.current.chat
+    const continuation = previous?.continuation && { ...previous.continuation, sourceIds: Object.keys(previous.sources).slice(0, 400), artifactIds: Object.keys(previous.artifacts).slice(0, 400) }
+    const next = await pollCoordinatorChat(botId, known, continuation)
+    if (!('unchanged' in next) && (next.metadataRefresh || next.after === undefined)) shown.current.fullReadAt = Date.now()
     return mergeChat(shown.current.chat, next)
   }, {
     refreshInterval: chatPollInterval,
     onSuccess: () => reconnectStream.current(),
   })
   useEffect(() => { shown.current.chat = data }, [data])
+  const [loadingHistory, setLoadingHistory] = useState(false)
+  async function loadHistory() {
+    if (!data?.historyBefore || loadingHistory) return
+    setLoadingHistory(true)
+    try {
+      const persisted = data.items.filter(item => !item.pending)
+      const through = persisted[1] ? persisted[1].position - 1 : data.historyBefore - 1
+      const page = await coordinatorHistory(botId, through)
+      await mutate(current => current ? { ...current, items: [...page.items, ...current.items.filter(item => item.pending || item.position > through)], sources: { ...current.sources, ...page.sources }, artifacts: { ...current.artifacts, ...page.artifacts }, historyBefore: page.historyBefore } : current, { revalidate: false })
+    } catch { toast.error(actionError()) } finally { setLoadingHistory(false) }
+  }
   const stream = useCoordinatorStream({ botId, runId: data?.streamRunId, cursor: data?.cursor, persistedStreamIds: data?.persistedStreamIds, revalidate: mutate })
   useEffect(() => { reconnectStream.current = stream.reconnect }, [stream.reconnect])
   const [draft, setDraft] = useState('')
@@ -250,7 +263,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
     {declined && declined !== 'quotaUsed' && <SubscriptionRefusalNotice notice={declined} retry={retry} botId={botId} />}
     {data?.error && !data.working && !refusal && !declined && <Alert variant="destructive" className={COMPOSER_NOTICE}>{wakeError ? <AlertTitle>{t(`wakeErrors.${wakeError}`)}</AlertTitle> : <><AlertTitle className="min-w-0 flex-1 basis-48" data-chat-failure="failed">{t('failedTitle')}</AlertTitle><span className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-1">{retry}</span></>}</Alert>}
   </>
-  const sentCount = useMemo(() => items.filter(item => item.from === 'person').length, [items])
+  const sentCount = useMemo(() => Math.max(0, ...items.filter(item => item.from === 'person').map(item => item.position)), [items])
   // The newest reply keeps its actions in view, as Claude's does; older ones show them on hover.
   const lastReplyAt = stream.replies.length ? -1 : items.findLast(item => item.from === 'coordinator' && item.text)?.position
   const rootRef = useRef<HTMLElement>(null)
@@ -363,6 +376,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
             running under it, so the top reads as a solid band in either theme and in the translucent desktop window (R-35). */}
         <MessageScrollerViewport aria-label={bot ? t('conversationWith', { name: bot.name }) : t('conversation')} className={cn(!compact && HEADER_FADE)}>
           <MessageScrollerContent className={cn('flex w-full min-w-0 max-w-full flex-col gap-5 pb-6', compact ? 'px-3 pt-4' : 'px-4 pt-24 sm:px-6')}>
+            {data?.historyBefore && <Button variant="ghost" size="sm" disabled={loadingHistory} onClick={() => void loadHistory()}>{tCommon('loadMore')}</Button>}
             {/* A slow first load shows the shape of a conversation, not an empty page (state completeness). */}
             {!data && !loadError && <div role="status" aria-label={tCommon('loading')} className="flex flex-col gap-5">
               <Skeleton className="h-16 w-3/5 rounded-2xl" />

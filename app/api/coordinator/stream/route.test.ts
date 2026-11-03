@@ -67,9 +67,23 @@ beforeEach(() => {
   getSession.mock.resetCalls(); loadFingerprints.mock.resetCalls(); getRun.mock.resetCalls(); readStream.mock.resetCalls()
   source = () => partsStream([start(), delta('visible reply'), committed()])
 })
-const call = (params: Record<string, string> = {}) => GET(new Request(`https://mikka.example/mikka/api/coordinator/stream?${new URLSearchParams(params)}`))
-const events = async (response: Response): Promise<CoordinatorStreamEvent[]> => (await response.text()).trim().split('\n').filter(Boolean).map(line => JSON.parse(line))
+const call = (params: Record<string, string> = {}, headers: Record<string, string> = {}) => GET(new Request(`https://mikka.example/mikka/api/coordinator/stream?${new URLSearchParams(params)}`, { headers }))
+const events = async (response: Response): Promise<CoordinatorStreamEvent[]> => (await response.text()).trim().split('\n').filter(Boolean).map(line => { const { sequence: _sequence, ...event } = JSON.parse(line); return event })
 const noStream = () => { assert.equal(getRun.mock.callCount(), 0); assert.equal(loadFingerprints.mock.callCount(), 0) }
+
+test('reconnect sends only events after the acknowledged cursor and resets for a changed stream key', async () => {
+  const first = await call()
+  const key = first.headers.get('x-mikka-stream-key')!
+  const all = (await first.text()).trim().split('\n').map(line => JSON.parse(line))
+  assert.deepEqual(all.map(event => event.sequence), [1, 2, 3])
+  const resumed = await call({ after: '2' }, { 'x-mikka-stream-key': key })
+  assert.equal(resumed.headers.get('x-mikka-stream-reset'), '0')
+  assert.deepEqual((await events(resumed)).map(event => event.type), ['committed'])
+  const reset = await call({ after: '2' }, { 'x-mikka-stream-key': 'stale-policy' })
+  assert.equal(reset.headers.get('x-mikka-stream-reset'), '1')
+  assert.deepEqual((await events(reset)).map(event => event.type), ['start', 'text', 'committed'])
+  assert.equal((await call({ after: '-1' })).status, 400)
+})
 
 test('authentication and malformed bot IDs fail before any chat or stream lookup', async () => {
   session = null

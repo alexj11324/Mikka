@@ -4,6 +4,9 @@ import { auth } from '@/lib/api-auth'
 import { db } from '@/lib/db'
 import { personalSubmissionInput, recordPersonalSubmission, SubmissionConflictError, readPersonalSubmissionBody, PersonalSubmissionBodyError } from '@/lib/coordinator-submission'
 import { chatView } from '@/lib/coordinator/store'
+import * as chatStore from '@/lib/coordinator/store'
+import { z } from 'zod'
+import { createHash } from 'node:crypto'
 import { openChatBotId } from '@/lib/coordinator/coordinator-bot'
 import { coordinatorEnabled, wakeCoordinator } from '@/lib/coordinator/wake'
 
@@ -15,7 +18,19 @@ async function handleGET(request: Request) {
   noteLogUser(session?.user?.id)
   if (!session?.user) return NextResponse.json({ error: 'authRequired' }, { status: 401 })
   const botId = await openChatBotId(session.user, null)
-  return NextResponse.json({ enabled: coordinatorEnabled(), ...(await chatView(session.user.id, 200, botId)) }, { headers: { 'Cache-Control': 'private, no-store' } })
+  const params = new URL(request.url).searchParams
+  const cursor = z.object({ after: z.coerce.number().int().min(0).max(2147483647), cursor: z.coerce.number().int().min(0).max(2147483647), prefix: z.string().regex(/^[0-9a-f]{32}$/) })
+    .safeParse({ after: params.get('after'), cursor: params.get('cursor'), prefix: params.get('prefix') })
+  if (params.has('after') && !cursor.success) return NextResponse.json({ error: 'validationGeneric' }, { status: 400 })
+  const current = await chatStore.chatVersion(session.user.id, 200, botId)
+  const enabled = coordinatorEnabled()
+  const state = { ...current, working: enabled && current.working, enabled, botId }
+  const etag = `"${createHash('sha256').update(JSON.stringify([session.user.id, botId, state])).digest('hex')}"`
+  const headers = { 'Cache-Control': 'private, no-store', ETag: etag, Vary: 'Cookie, Authorization' }
+  if (request.headers.get('if-none-match') === etag) return new Response(null, { status: 304, headers })
+  if (params.get('known') === current.version) return NextResponse.json({ unchanged: true, ...state }, { headers })
+  const chat = cursor.success ? await chatStore.chatUpdate(session.user.id, botId, cursor.data) : await chatView(session.user.id, 200, botId)
+  return NextResponse.json({ ...chat, ...state }, { headers })
 }
 
 /**
