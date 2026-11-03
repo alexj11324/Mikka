@@ -41,6 +41,9 @@ the actual CLI model catalogue. Only reviewed `main` runs receive the existing
 E2B validation key and Vercel release token in separate jobs. Publication pairs
 the official template names, worker digest, source commit and model catalogue in
 one request, and redeploys only a READY application of that exact Git commit.
+The worker digest ignores package.json scripts and lockfile entries outside
+the daemon install. When that digest and the published variables already match
+production, the workflow does not rebuild or redeploy.
 If the latest READY application has moved to another source, publication stops
 before changing configuration; retry against the latest reviewed main rather
 than replacing a newer application with the older release.

@@ -3,6 +3,7 @@ import type { PoolClient } from 'pg'
 import { and, asc, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { ActionFailureError } from '@/lib/action-error'
+import { notifyDeviceWork } from '@/lib/device-gateway-notify'
 import { db, pool, withDatabaseClient } from '@/lib/db'
 import { agentRuns, issues } from '@/lib/db/schema'
 import { apiKeyWorkerDefinition, retryWorkerDefinition, type WorkerDefinitionSnapshot } from '@/lib/agent-kit/worker'
@@ -129,12 +130,14 @@ async function endPausedRun(tx: Tx, runId: string, userId: string): Promise<bool
  * run's continuation and the event. A cloud run with a key returns `cloud`:
  * its continuation is queued after commit (`continueCloudQuotaRun`).
  */
-export async function settleQuotaExhausted(tx: Tx, run: Run, plan: QuotaPlan, resetsAt: string | null): Promise<{ cloud: boolean }> {
+export async function settleQuotaExhausted(tx: Tx, run: Run, plan: QuotaPlan, resetsAt: string | null): Promise<{ cloud: boolean; deviceId?: string | null }> {
   if (plan.key && plan.cloud) return { cloud: true }
   if (plan.key) {
     const retryRunId = await queueDeviceContinuation(tx, run, plan.key)
     await recordCoordinatorEvent(tx, runCredentialSwitchedEvent(run, plan.from, plan.key, retryRunId, resetsAt))
-  } else await recordCoordinatorEvent(tx, runQuotaPausedEvent(run, plan.from, resetsAt, plan.why))
+    return { cloud: false, deviceId: run.deviceId }
+  }
+  await recordCoordinatorEvent(tx, runQuotaPausedEvent(run, plan.from, resetsAt, plan.why))
   return { cloud: false }
 }
 
@@ -182,6 +185,7 @@ async function continuePausedRun(userId: string, runId: string, mode: 'apiKey' |
   const client = await pool.connect()
   let cloud: { run: Run; plan: QuotaScope; key: QuotaApiKey | null } | null = null
   let result: { runId: string } | null = null
+  let wake: string | null | undefined
   try {
     await withDatabaseClient(client, () => db.transaction(async tx => {
       const locked = await lockPaused(tx, userId, runId)
@@ -195,9 +199,11 @@ async function continuePausedRun(userId: string, runId: string, mode: 'apiKey' |
       if (!await endPausedRun(tx, run.id, userId)) throw new ActionFailureError('runNotActive')
       const retryRunId = await queueDeviceContinuation(tx, run, key)
       if (key) await recordCoordinatorEvent(tx, runCredentialSwitchedEvent(run, scope.from, key, retryRunId, run.quotaResetsAt?.toISOString() ?? null))
+      wake = run.deviceId
       result = { runId: retryRunId }
     }))
   } finally { client.release() }
+  if (wake) notifyDeviceWork(wake)
   if (result) return afterContinue(userId, result)
   const pending = cloud as { run: Run; plan: QuotaScope; key: QuotaApiKey | null } | null
   if (!pending) throw new ActionFailureError('runNotActive')

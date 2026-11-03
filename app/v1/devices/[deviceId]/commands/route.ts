@@ -8,7 +8,13 @@ import { noteLogOutcome, withRequestLog } from '@/lib/request-log'
 
 export const dynamic = 'force-dynamic'
 
-/** How often a waiting long-poll looks for new work. */
+/**
+ * How often a waiting long-poll looks for new work. This is the fallback for
+ * an old daemon or a gateway that is down. It stays at 2s so a revoked
+ * credential still fails the next check inside the bound in
+ * lib/device-revocation.db.test.ts. A daemon on the push socket does not
+ * call this route while it is idle.
+ */
 const IDLE_CHECK_MS = 2_000
 
 /**

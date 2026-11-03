@@ -118,11 +118,182 @@ def commit(ref):
         raise ValueError('Invalid source commit')
     return sha
 
+# Root package.json scripts and the web app's own dependencies do not enter
+# `pnpm install --filter @mikka/daemon...`. A script-only edit must not rebuild.
+PACKAGE_KEYS = ('name', 'version', 'private', 'type', 'packageManager', 'engines', 'pnpm',
+                'dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies',
+                'dependenciesMeta', 'peerDependenciesMeta')
+ROOT_PACKAGE_KEYS = ('packageManager', 'engines', 'pnpm')
+DAEMON_IMPORTERS = ('packages/daemon', 'packages/protocol', 'packages/config')
+
+def package_projection(path, raw):
+    """Bytes that affect the daemon install. Invalid JSON is hashed whole so a
+    non-package file still changes the digest."""
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return raw
+    if not isinstance(data, dict):
+        return raw
+    keys = ROOT_PACKAGE_KEYS if path == 'package.json' else PACKAGE_KEYS
+    picked = {key: data[key] for key in keys if key in data}
+    return json.dumps(picked, sort_keys=True, separators=(',', ':')).encode()
+
+def _block_name(line):
+    """A two-space pnpm key, including an empty `key: {}` entry."""
+    if not line.startswith('  ') or line.startswith('   '):
+        return None
+    stripped = line.strip()
+    if stripped.endswith(': {}'):
+        return stripped[:-4].strip().strip("'\"")
+    if stripped.endswith(':'):
+        return stripped[:-1].strip("'\"")
+    return None
+
+def _child_blocks(body):
+    blocks, name, buf = {}, None, []
+    for line in body:
+        key = _block_name(line)
+        if key is not None:
+            if name is not None:
+                blocks[name] = buf
+            name, buf = key, []
+            if line.strip().endswith(': {}'):
+                blocks[name] = []
+                name = None
+        elif name is not None:
+            buf.append(line)
+    if name is not None:
+        blocks[name] = buf
+    return blocks
+
+def _top_sections(text):
+    sections, name, buf = {}, None, []
+    for line in text.splitlines():
+        if line and not line.startswith(' ') and line.endswith(':') and not line[:-1].strip().startswith('#'):
+            if name is not None:
+                sections[name] = buf
+            name = line[:-1]
+            buf = []
+        elif name is not None:
+            buf.append(line)
+        elif ':' in line and not line.startswith(' '):
+            key, value = line.split(':', 1)
+            sections[key.strip()] = [value.strip()]
+    if name is not None:
+        sections[name] = buf
+    return sections
+
+def _importer_snapshots(block):
+    """`name:` then `version:` under an importer. The snapshot key is name@version."""
+    keys, name = [], None
+    for line in block:
+        if line.startswith('      ') and not line.startswith('       ') and line.rstrip().endswith(':'):
+            name = line.strip()[:-1].strip("'\"")
+        elif name and line.strip().startswith('version:'):
+            version = line.strip().split(':', 1)[1].strip().strip("'\"")
+            if not version.startswith('link:'):
+                keys.append(f'{name}@{version}')
+            name = None
+    return keys
+
+def _versions(block):
+    found = []
+    for line in block:
+        stripped = line.strip()
+        if stripped.startswith('version:'):
+            found.append(stripped.split(':', 1)[1].strip().strip("'\""))
+    return found
+
+def _dep_keys(block):
+    """Snapshot dependency lines are `name: version`. The snapshot key is name@version."""
+    keys, section = [], None
+    for line in block:
+        if line.startswith('    ') and not line.startswith('     ') and line.rstrip().endswith(':'):
+            section = line.strip()[:-1]
+            continue
+        if section in ('dependencies', 'optionalDependencies') and line.startswith('      ') and ':' in line:
+            name, value = line.strip().split(':', 1)
+            name, value = name.strip("'\""), value.strip().strip("'\"")
+            if value:
+                keys.append(f'{name}@{value}')
+    return keys
+
+def lock_projection(text):
+    """The lockfile entries `pnpm install --filter @mikka/daemon...` actually installs.
+    A dependency added only to the web app does not change this projection."""
+    sections = _top_sections(text)
+    importers = _child_blocks(sections.get('importers', []))
+    packages = _child_blocks(sections.get('packages', []))
+    snapshots = _child_blocks(sections.get('snapshots', []))
+    wanted = [name for name in DAEMON_IMPORTERS if name in importers]
+    seen = set(wanted)
+    # workspace: links point at another importer, not an npm snapshot.
+    pending = list(wanted)
+    while pending:
+        name = pending.pop()
+        for version in _versions(importers.get(name, [])):
+            if version.startswith('link:'):
+                target = 'packages/' + version.split('/')[-1]
+                if target in importers and target not in seen:
+                    seen.add(target)
+                    pending.append(target)
+    # Importer `version:` is the part after `name@` in the snapshot key.
+    snapshot_keys = []
+    for name in sorted(seen):
+        for key in _importer_snapshots(importers[name]):
+            if key in snapshots:
+                snapshot_keys.append(key)
+    queue = list(snapshot_keys)
+    resolved, resolved_set = [], set()
+    while queue:
+        key = queue.pop()
+        if key in resolved_set or key not in snapshots:
+            continue
+        resolved_set.add(key)
+        resolved.append(key)
+        for dep in _dep_keys(snapshots[key]):
+            if dep in snapshots and dep not in resolved_set:
+                queue.append(dep)
+    package_keys = []
+    for key in resolved:
+        base = key.split('(', 1)[0]
+        if base in packages:
+            package_keys.append(base)
+    parts = []
+    for name in ('lockfileVersion', 'settings', 'overrides', 'patchedDependencies'):
+        if name in sections:
+            body = sections[name]
+            parts.append(name + ':\n' + '\n'.join(body))
+    for name in sorted(seen):
+        parts.append('importer ' + name + '\n' + '\n'.join(importers[name]))
+    for key in sorted(set(package_keys)):
+        parts.append('package ' + key + '\n' + '\n'.join(packages[key]))
+    for key in sorted(resolved_set):
+        parts.append('snapshot ' + key + '\n' + '\n'.join(snapshots[key]))
+    return '\n'.join(parts).encode()
+
 def worker_hash(ref):
-    """A 40-hex digest of the template's inputs at a commit: Git object ids of WORKER_PATHS and
-    RECIPE_PATHS. Commits that leave them alone give the same hash, so nothing is rebuilt."""
-    listing = subprocess.check_output(['git', 'ls-tree', '-r', commit(ref), '--', *WORKER_PATHS, *RECIPE_PATHS], cwd=ROOT)
-    return hashlib.sha1(listing).hexdigest()
+    """Digest of what the template installs and runs. package.json scripts and
+    lockfile entries outside @mikka/daemon's install are left out, so a
+    script-only or web-only edit does not rebuild."""
+    sha = commit(ref)
+    listing = subprocess.check_output(['git', 'ls-tree', '-r', sha, '--', *WORKER_PATHS, *RECIPE_PATHS], cwd=ROOT, text=True)
+    parts = []
+    for line in listing.splitlines():
+        meta, path = line.split('\t', 1)
+        if path == 'pnpm-lock.yaml' or path.endswith('/package.json') or path == 'package.json':
+            continue
+        parts.append(line)
+    for line in listing.splitlines():
+        path = line.split('\t', 1)[1]
+        if path == 'package.json' or path.endswith('/package.json'):
+            raw = subprocess.check_output(['git', 'show', f'{sha}:{path}'], cwd=ROOT)
+            parts.append('package ' + path + '\n' + package_projection(path, raw).decode())
+    if any(line.endswith('\tpnpm-lock.yaml') for line in listing.splitlines()):
+        raw = subprocess.check_output(['git', 'show', f'{sha}:pnpm-lock.yaml'], cwd=ROOT, text=True)
+        parts.append('lock\n' + lock_projection(raw).decode())
+    return hashlib.sha1('\n'.join(parts).encode()).hexdigest()
 
 def source_context(directory, ref):
     """Copy only selected files from an immutable Git commit, never the worktree."""

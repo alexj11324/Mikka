@@ -287,7 +287,9 @@ export function createVercelPublicationAdapter(
       const hash = context(input);
       await project();
       await input.beforeCreate?.();
-      // Do not use branch tips, project/build overrides, files, forceNew or promotion.
+      // Factory publication only. A main push does not call this; the template
+      // workflow is the other production redeploy, and it skips when its env
+      // is unchanged. Do not use branch tips, project/build overrides, files, forceNew or promotion.
       const d = object.parse(
         await client.request(`/v13/deployments?${q}`, "POST", {
           name: c.projectName,

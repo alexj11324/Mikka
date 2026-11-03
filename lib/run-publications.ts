@@ -142,7 +142,9 @@ export async function persistRunCompletion(userId: string, runId: string, comple
 
 async function completionTransaction(userId: string, runId: string, completion: RunCompleteRequest, scopeDeviceId?: string | null) {
   const client = await pool.connect()
-  try { return await withDatabaseClient(client, () => db.transaction(tx => withDatabaseTransaction(tx, async () => {
+  let wakeDevice: string | null | undefined
+  let committed = false
+  try { const result = await withDatabaseClient(client, () => db.transaction(tx => withDatabaseTransaction(tx, async () => {
     // Factory writers take task -> issue -> skill scope -> run; retirement
     // takes issue -> run. Read hints choose locks only; recheck all bindings
     // and authorization after locking, including dedicated-device scope.
@@ -192,7 +194,11 @@ async function completionTransaction(userId: string, runId: string, completion: 
         ...(paused ? { leaseExpiresAt: null, finishedAt: null } : { finishedAt: sql`clock_timestamp()` }), updatedAt: new Date() }).where(eq(agentRuns.id, runId)).returning()
       await tx.update(runTokens).set({ revokedAt: new Date() }).where(and(eq(runTokens.runId, runId), isNull(runTokens.revokedAt)))
       await settleRunCompletionEffects(client, run, completion.stopReason, factoryBound, completion.report)
-      if (quota && (await (await import('./run-quota')).settleQuotaExhausted(tx, run, quota, resetsAt)).cloud) quotaCloud = { run, plan: quota, resetsAt }
+      if (quota) {
+        const settled = await (await import('./run-quota')).settleQuotaExhausted(tx, run, quota, resetsAt)
+        if (settled.cloud) quotaCloud = { run, plan: quota, resetsAt }
+        if (settled.deviceId) wakeDevice = settled.deviceId
+      }
     }
     // A lease-expired/explicitly stopped run cannot be resurrected by a late completion.
     if (!publication) {
@@ -206,7 +212,13 @@ async function completionTransaction(userId: string, runId: string, completion: 
       return { userId, issueId: run.issueId, publicationPending: gate.state === 'pending', review, quotaCloud }
     }
     return { userId, issueId: run.issueId, publicationPending: !TERMINAL_PUBLICATIONS.includes(publication.status), review: null }
-  }))) } finally { client.release() }
+  })))
+    committed = true
+    return result
+  } finally {
+    client.release()
+    if (committed && wakeDevice) (await import('./device-gateway-notify')).notifyDeviceWork(wakeDevice)
+  }
 }
 
 async function claimPublication(runId: string) {

@@ -16,6 +16,7 @@ import { lockCliAgentPolicy, lockCliTaskScope } from './agent-tool-approval/poli
 import type { WorkerDefinitionSnapshot } from './agent-kit/worker'
 import { dispatchFingerprint, type DispatchCredential, type DispatchInput } from './run-dispatch'
 import { UNFINISHED_RUN_STATUSES } from './agent-run-statuses'
+import { notifyDeviceWork } from './device-gateway-notify'
 import type { RunInvalidReason } from './run-invalid-reason'
 
 /** Existing rows and JSON only: admission, run and publication commit together. */
@@ -120,6 +121,7 @@ export async function acceptLocalRun(input: {
     return input.dispatch?.requestKey ? { runId: input.id, status: 'queued' as const, replayed: false } : { runId: input.id }
     })
     if (!existing) await client.query('COMMIT')
+    if (result && !('replayed' in result && result.replayed)) notifyDeviceWork(input.deviceId)
     return result
   } catch (error) { if (!existing) await client.query('ROLLBACK'); throw error }
   finally { if (!existing) client.release() }

@@ -37,6 +37,7 @@ import {
   type FsResult,
   deviceRegistered,
   deviceReposResponse,
+  deviceGatewaySchema,
   heartbeatResultSchema,
   pendingRunsResponse,
   runAssignmentSchema,
@@ -505,6 +506,14 @@ export class HttpServerLink implements ServerLink {
   async updateRun(runId: string, patch: RunPatch) {
     await this.call("PATCH", devicePaths.runPatch(checkId(runId)), {
       body: patch,
+    })
+  }
+
+  async deviceGateway(deviceId: string, signal?: AbortSignal) {
+    return this.call("GET", devicePaths.gateway(checkId(deviceId)), {
+      schema: deviceGatewaySchema,
+      signal,
+      timeoutMs: 10_000,
     })
   }
 
