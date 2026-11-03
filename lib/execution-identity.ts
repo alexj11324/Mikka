@@ -103,9 +103,6 @@ export async function executionIdentityForRun(query: Query, runId: string, userI
   return revalidateExecutionIdentity(query, run, membership)
 }
 
-/** Public audit wording never turns an unknown external bill into a zero-dollar charge. */
-export const executionBillingLabel = (account: ExecutionIdentity['billingAccount']['model']) => account.amount === 'provider_unknown' ? '由供应商计费/金额未知' : account.amount === 'metered' ? '按实际用量计费' : '无平台计算费用'
-
 /** Only the host's device handoff path calls this, after choosing another device owned by the same requester.
  * A dead source device need not be online. All non-device grants are checked again and retain their original identity. */
 export async function rebindExecutionDevice(query: Query, run: RunAuthority, deviceId: string, membership?: Query): Promise<WorkerDefinitionSnapshot | null> {
