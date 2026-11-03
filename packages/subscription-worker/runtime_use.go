@@ -32,7 +32,9 @@ func (w *Worker) authorizeRuntime(ctx context.Context, epoch int64, execution, m
 	var current int64
 	var quota []byte
 	var paused bool
-	err := w.Repo.DB.QueryRowContext(ctx, `select b.route,b."modelId",c.state,c.epoch,c.quota,c.paused from byos_bindings b join byos_connections c on c.id=b."connectionId" where b.id=$1 and b."consumerId"=$2 and b."ownerId"=$3 and c.id=$5 and c."ownerId"=$3 and c."workspaceId"=$4 and c.provider=$6 and b."connectionRevision"=$7 and c.epoch=$7`, w.Use.BindingID, w.Use.ConsumerID, w.Scope.OwnerID, w.Scope.WorkspaceID, w.Scope.ConnectionID, w.Scope.Provider, epoch).Scan(&route, &boundModel, &state, &current, &quota, &paused)
+	requiresQuota := execution == "model" || execution == "native"
+	// Active stream checks keep all live authority fields, but never consume quota.
+	err := w.Repo.DB.QueryRowContext(ctx, `select b.route,b."modelId",c.state,c.epoch,CASE WHEN $8::boolean THEN c.quota ELSE NULL::jsonb END,c.paused from byos_bindings b join byos_connections c on c.id=b."connectionId" where b.id=$1 and b."consumerId"=$2 and b."ownerId"=$3 and c.id=$5 and c."ownerId"=$3 and c."workspaceId"=$4 and c.provider=$6 and b."connectionRevision"=$7 and c.epoch=$7`, w.Use.BindingID, w.Use.ConsumerID, w.Scope.OwnerID, w.Scope.WorkspaceID, w.Scope.ConnectionID, w.Scope.Provider, epoch, requiresQuota).Scan(&route, &boundModel, &state, &current, &quota, &paused)
 	if err != nil || current != epoch || (state != "connected" && state != "refreshing" && state != "publication_pending") {
 		return ErrUnavailable
 	}
@@ -69,7 +71,7 @@ func (w *Worker) authorizeRuntime(ctx context.Context, epoch int64, execution, m
 	if model != "" && model != boundModel {
 		return ErrUnavailable
 	}
-	if execution == "model" || execution == "native" {
+	if requiresQuota {
 		if !runtimeQuotaAvailable(quota, w.Scope.Provider, boundModel, time.Now()) {
 			return ErrUnavailable
 		}
