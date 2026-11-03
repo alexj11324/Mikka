@@ -168,3 +168,46 @@ test('a message that needs no tool is answered at once, with no opening sentence
     return null
   })
 })
+
+// Alex's own words, from the Acme production thread (2026-11-03).
+const MIKKA_SITE = 'On phones, the How it works section on the Mikka site is cut off. Can you fix it?'
+const mikkaCandidates = [
+  { fullName: 'alexj11324/Mikka', description: 'Mikka app: bots, threads and the Coordinator', homepage: 'https://app.mikka.example', usedByThisWorkspace: true },
+  { fullName: 'alexj11324/mikka-web', description: 'The Mikka marketing site', homepage: 'https://mikka.example', usedByThisWorkspace: false },
+  { fullName: 'acme/mikka-enterprise', description: null, homepage: null, usedByThisWorkspace: false },
+]
+const mikkaCard = { title: '多个仓库匹配 Mikka site', options: mikkaCandidates.map(item => ({ value: item.fullName, label: item.fullName })) }
+const repoOf = (call: { input: unknown }) => String((call.input as { repo?: string }).repo ?? '')
+
+test(`「${MIKKA_SITE}」: the site is mikka-web, or the person is asked; never alexj11324/Mikka`, { skip }, async () => {
+  results = {
+    getIssue: { id: ISSUE, title: 'How it works is cut off on phones', thread: null },
+    findRepository: { match: 'several', candidates: mikkaCandidates, card: mikkaCard },
+    dispatchRun: { runId: 'run-7', thread: 'new', placement: { kind: 'cloud' } },
+  }
+  await passAll('mikka site', async () => trial(MIKKA_SITE, await facts()), ({ reply, calls }) => {
+    const dispatched = calls.filter(call => call.step === 'dispatchRun')
+    if (dispatched.some(call => /^alexj11324\/mikka$|github\.com\/alexj11324\/mikka(\.git)?$/i.test(repoOf(call)) || /^mikka$/i.test(repoOf(call)))) return 'dispatched to alexj11324/Mikka'
+    if (dispatched.some(call => /mikka-web/i.test(repoOf(call)))) return null
+    return /BeQuestions/.test(reply) ? null : 'neither mikka-web nor a question'
+  })
+})
+
+test('「It\'s in the mikka-web repo」 on a thread bound to alexj11324/Mikka: the work moves there, the old thread is not continued', { skip }, async () => {
+  const thread = { id: ISSUE, title: 'How it works is cut off on phones', status: 'doing', runs: [{ id: 'run-1', agent: 'Claude Code', status: 'completed' }], thread: { runId: 'run-1', status: 'completed', repository: 'https://github.com/alexj11324/Mikka' } }
+  results = { getIssue: thread, findRepository: { match: 'one', repository: 'alexj11324/mikka-web', description: 'The Mikka marketing site', homepage: 'https://mikka.example' }, dispatchRun: { runId: 'run-8', thread: 'new', threadId: 'run-8', replacedThreadId: 'run-1', placement: { kind: 'cloud' } } }
+  await passAll('named repo', async () => trial("It's in the mikka-web repo", await facts()), ({ calls }) => {
+    const dispatched = calls.filter(call => call.step === 'dispatchRun')
+    if (!dispatched.length) return 'no dispatch_run'
+    return dispatched.some(call => /mikka-web/i.test(repoOf(call))) ? null : 'continued the old thread without the named repository'
+  })
+})
+
+test(`screen work on 「${MIKKA_SITE}」 names the site to the sub-agent`, { skip }, async () => {
+  results = { getIssue: { id: ISSUE, title: 'How it works is cut off on phones', thread: null }, startWebSubagent: { subagentId: 'sub-9', state: 'running' }, dispatchComputerThread: { runId: 'run-9' }, listComputerBots: [{ botId: BOT, name: 'Coordinator', harnesses: ['claude_code'] }], wakeComputerBot: { state: 'awake' } }
+  await passAll('screen site', async () => trial(`${MIKKA_SITE} First show me the page at phone width.`, await facts(), { computerEnabled: true }), ({ calls }) => {
+    const started = calls.find(call => call.step === 'startWebSubagent' || call.step === 'dispatchComputerThread')
+    if (!started) return 'did not start screen work'
+    return /mikka/i.test(JSON.stringify(started.input)) ? null : 'the sub-agent was not told which site'
+  })
+})
