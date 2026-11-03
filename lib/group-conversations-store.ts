@@ -138,7 +138,7 @@ export async function handleGroup(pool: Pool, directory: Directory, req: GroupRe
       } else if (req.resource === 'stop' && req.method === 'POST') {
         // 停止: any member may stop the reply the group is waiting on; what was already posted stays.
         if (!queueAgents) return fail(405)
-        result = { stopped: await stopGroupTurns(client, req.id!) }
+        result = { stopped: await stopGroupTurns(client, req.id!, userId) }
       } else if (req.resource === 'messages' && req.method === 'GET') {
         const before = req.before == null ? null : decimal(req.before, '')
         const after = before == null && req.after != null ? decimal(req.after, '') : null

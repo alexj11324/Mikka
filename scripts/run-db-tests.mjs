@@ -61,6 +61,7 @@ export const REQUIRED_SUITES = [
   { marker: 'lib/group-conversations-store.ts', file: 'lib/group-reads.db.test.ts', script: 'test:conversation-reads' },
   { marker: 'lib/active-agents.ts', file: 'lib/active-agents.test.ts', script: 'test:active-agents' },
   { marker: 'lib/coordinator/group-turns.ts', file: 'lib/coordinator/group-turns.test.ts', script: 'test:group-turns' },
+  { marker: 'lib/coordinator/group-decision-feedback.ts', file: 'lib/coordinator/group-decision-quality.db.test.ts', script: 'test:group-turns' },
   { marker: 'lib/profile/store.ts', file: 'lib/profile/store.db.test.ts', script: 'test:user-facts-db' },
   { marker: 'lib/secrets/store.ts', file: 'tests/workspace-secrets.db.test.ts', script: 'test:secrets-db' },
   { marker: 'lib/session-mailbox.ts', file: 'tests/session-mailbox.db.test.ts', script: 'test:session-mailbox-db' },

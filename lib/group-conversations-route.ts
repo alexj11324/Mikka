@@ -10,6 +10,9 @@ import { agents, bots } from '@/lib/db/schema'
 import { workspaceDb } from '@/lib/workspace-db'
 import { workspaceMembers } from '@/lib/db/workspace-schema'
 import { handleGroup, type GroupRequest } from '@/lib/group-conversations-store'
+import { groupsWithPendingTaskReports, reconcileGroupTaskReports } from '@/lib/coordinator/group-factory'
+import { handleGroupDecisionQuality } from '@/lib/coordinator/group-decision-feedback'
+import { handleGroupDecisionReplay } from '@/lib/coordinator/group-decision-replay-api'
 
 /** Workspace membership grants user-directory access, NOT another user's private agents.
  * Until agents have an explicit workspace sharing model, only caller-owned agents qualify.
@@ -31,6 +34,24 @@ const directory = groupDirectory({
     return rows.map(row => row.id)
   },
 })
+export async function respondGroupDecisionQuality(request: Request, conversationId: string) {
+  const session = await auth.api.getSession({ headers: request.headers })
+  const url = new URL(request.url)
+  const scoped: typeof directory = async (workspaceId, userId, members) => Boolean(session && apiWorkspaceAllowed(session, workspaceId)) && directory(workspaceId, userId, members)
+  const result = await handleGroupDecisionQuality(pool, scoped, { userId: session?.user?.id ?? null, conversationId,
+    method: request.method, origin: request.headers.get('origin'), host: request.headers.get('host') ?? url.host,
+    body: request.method === 'POST' ? await request.text().catch(() => '') : undefined, limit: url.searchParams.get('limit') })
+  return NextResponse.json(result.body, { status: result.status, headers: { 'Cache-Control': 'private, no-store' } })
+}
+export async function respondGroupDecisionReplay(request:Request,conversationId:string) {
+  const session=await auth.api.getSession({headers:request.headers})
+  const url=new URL(request.url)
+  const scoped:typeof directory=async(workspaceId,userId,members)=>Boolean(session && apiWorkspaceAllowed(session,workspaceId)) && directory(workspaceId,userId,members)
+  const {invokeDecision}=await import('@/lib/coordinator/decide')
+  const result=await handleGroupDecisionReplay(pool,scoped,{userId:session?.user?.id ?? null,conversationId,method:request.method,
+    origin:request.headers.get('origin'),host:request.headers.get('host') ?? url.host,body:await request.text().catch(()=>''),signal:request.signal},invokeDecision)
+  return NextResponse.json(result.body,{status:result.status,headers:{'Cache-Control':'private, no-store'}})
+}
 export async function respondGroup(request: Request, resource: GroupRequest['resource'], id?: string) {
   const session = await auth.api.getSession({ headers: request.headers })
   const url = new URL(request.url)
@@ -48,7 +69,7 @@ export async function respondGroup(request: Request, resource: GroupRequest['res
     // when a turn is still pending, instead of taking the group's lock and recovering on every poll.
     const conversationId = id
     after(async () => {
-      if (request.method === 'GET' && !await hasPendingGroupTurn(pool, conversationId).catch(() => false)) return
+      if (request.method === 'GET' && !await hasPendingGroupTurn(pool, conversationId).catch(() => false)) { await reconcileGroupTaskReports(conversationId); return }
       await drainGroupTurns(conversationId, Date.now() + 220000)
     })
   }
@@ -62,6 +83,7 @@ export async function drainGroupTurns(conversationId: string, deadline: number) 
       const row = (await pool.query('SELECT "workspaceId" FROM conversations WHERE id=$1',[conversationId])).rows[0]
       if (!row || !await hostedBillingScope.run({workspaceId:row.workspaceId},()=>processGroupTurn(pool, conversationId, groupRuntime, deadline))) break
     }
+    await reconcileGroupTaskReports(conversationId)
   } catch { console.error('Group turn failed; retained in group_turns without automatic replay') }
 }
 
@@ -72,7 +94,7 @@ export async function drainGroupTurns(conversationId: string, deadline: number) 
  */
 export async function resumePendingGroupTurns(deadline: number) {
   let groups = 0
-  for (const conversationId of await groupsWithPendingTurns(pool)) {
+  for (const conversationId of new Set([...await groupsWithPendingTurns(pool),...await groupsWithPendingTaskReports(pool)])) {
     if (Date.now() >= deadline - 20000) break
     await drainGroupTurns(conversationId, deadline)
     groups++
