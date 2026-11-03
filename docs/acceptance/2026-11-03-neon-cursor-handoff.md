@@ -72,7 +72,7 @@ Do not commit untracked node_modules symlinks or alter the original dirty `/work
 
 ## Measurement facts and limits
 
-Provider public-network UTC hours:11–12=62,894,267B;12–13=89,687,082B;13–14=125,739,216B;14–15=105,027,042B;15–16=119,224,160B.13–14 mixed releases;14–15 still had old routing until14:44.16–17 was still delayed/partial at the last monitoring read (51,142,525B at16:55:54Z); no full comparable post-fix billing result has been established.
+Provider public-network UTC hours:11–12=62,894,267B;12–13=89,687,082B;13–14=125,739,216B;14–15=105,027,042B;15–16=119,224,160B.13–14 mixed releases;14–15 still had old routing until14:44.The last saved provider read at17:03:55.225Z reported53,745,298B for16–17. That hour had ended by the clock, but provider backfill/finality and comparable workload were not established; no verified same-load post-fix billing result has been established.
 
 Neon API supports hourly/daily/monthly consumption, approximately15-minute reporting. Unchanged buckets are not zero-minute traffic. SQL calls/rows were sampled as cumulative differences every60s without reset; rows include affected rows. Upgrade10:56:54Z/statistics start10:57:56Z prevents exact reconstruction of the preceding1GB.
 
@@ -99,3 +99,5 @@ Official proxy source excludes TLS/header overhead from the documented measureme
 Read AGENTS.md, the repository debugging/verification skills and the Neon guides. Preserve other worktrees and unrelated main commits. Continue the draft only after reviewing its unfinished state. Use real isolated Postgres and normal leased test accounts; no production test writes, no stats reset, no secret output. No browser tests; UI changes require reviewed local production-build screenshots. Existing user authorization allowed in-scope fixes to be merged/published after validation, but this author has now stopped and handed control to Cursor: do not auto-resume this Codex goal.
 
 Verify the current deployment contains the intended final merge(s); obtain the actual final billing window and request mix. Do not call an idle/partial window a successful same-load optimization. Review the evidence snapshots beside this file and the linked PRs before changing schema or workload behavior.
+
+Handoff tracking: https://github.com/alexj11324/Mikka/issues/1148. Connection patch source is preserved without additional implementation; subsequent commits only clarify documentation/evidence.
