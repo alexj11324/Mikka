@@ -96,6 +96,30 @@ question card. A browser-authenticated answer is saved on the owner's repository
 registrations and starts fresh independent verification. No default command is
 invented, and a command answer does not grant other execution permissions.
 
+## Read-only command capability
+
+Native shell tools remain disabled for read-only sessions. Factory checks get
+`verify_command` only from the host's fixed candidate assignment, across Claude
+Code, Codex and Cursor. It executes either the frozen repository command or an
+entrypoint declared in the candidate's package scripts, Makefile or CI. Its
+actual output, exit/signal/timeout, source and SHA form paired tool evidence;
+the daemon still independently reruns verification after submission. Wrong
+commands, changed HEAD/worktree, missing host binding and failed/timed-out
+commands cannot establish a pass. Child processes receive routing variables,
+not model/provider credentials, and stop when their MCP parent closes.
+
+This uses the existing direct host verification executor contract; it does not
+claim OS sandbox containment. Review can pass semantic file/line evidence without
+a command; verification must execute one or ask the person. The hand-in schema
+allows text criteria for ordinary issues without criterion UUIDs. The owned local
+Git fixture declares its actual whitespace check in a Makefile so real command
+inference has repository evidence.
+
+Model text is normalized only where PostgreSQL cannot represent it (NUL and
+unpaired UTF-16 surrogates), before masking and event persistence. Literal escaped
+text remains literal. A real review stream previously stalled on NUL until its
+lease expired; the PG17 regression now stores the batch without losing its offset.
+
 ## Verification boundaries
 
 `tests/factory-all-dispatch.db.test.ts` belongs to the required

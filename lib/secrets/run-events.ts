@@ -9,6 +9,15 @@ import { freshChunks, nextReply } from '@/lib/thread-groups'
 import { identityMasker, type Masker } from './mask'
 import { maskStreamedChunks } from './stream-mask'
 
+// PostgreSQL jsonb/text reject NUL and lone UTF-16 surrogates. Normalize only
+// those unrepresentable characters; textual "\\u0000" stays literal data.
+function postgresText<T>(value: T): T {
+  if (typeof value === 'string') return value.replaceAll('\u0000', '\ufffd').toWellFormed() as T
+  if (Array.isArray(value)) return value.map(postgresText) as T
+  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([key, item]) => [postgresText(key), postgresText(item)])) as T
+  return value
+}
+
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0]
 
 /**
@@ -24,13 +33,13 @@ async function recordLastReply(tx: Tx, runId: string, chunks: Record<string, unk
   const next = nextReply(stored, chunks)
   if (!next) return
   // #438 A: nextReply rebuilds the text from stored reply + new deltas; mask the full text again.
-  if (next.lastReply) next.lastReply = mask(next.lastReply)
+  if (next.lastReply) next.lastReply = postgresText(mask(next.lastReply))
   await tx.update(agentRuns).set({ ...next, lastReplyAt: new Date() }).where(eq(agentRuns.id, runId))
 }
 
 export async function persistRunEventBatch(runId: string, fromSeq: number, input: Record<string, unknown>[], mask: Masker) {
   await db.transaction(async tx => {
-    let chunks: Record<string, unknown>[] = input
+    let chunks: Record<string, unknown>[] = postgresText(input)
     if (mask !== identityMasker) chunks = maskStreamedChunks(chunks, mask)
     const inserted = await tx.insert(runChunks)
       .values(chunks.map((chunk, index) => ({

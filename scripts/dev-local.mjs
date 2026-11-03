@@ -74,7 +74,7 @@ const fixtures = await startMvpServices(3191, { routes: async (request, response
 closers.push(() => fixtures.close())
 const scenario = await (await fetch(`${MVP_SERVICES}/scenario`, {
   method: 'POST', headers: { 'content-type': 'application/json' },
-  body: JSON.stringify({ marker: `mvp-${randomUUID()}`, title: 'dev:local', githubAccountId: GITHUB_ACCOUNT_ID, harness: 'any' }),
+  body: JSON.stringify({ marker: `mvp-${randomUUID()}`, title: 'dev:local', githubAccountId: GITHUB_ACCOUNT_ID, harness: 'any', verification: 'git-diff' }),
 })).json()
 // Root containers run the daemon as another user (bubblewrap); it must reach the origin.
 if (daemonUser) execFileSync('chown', ['-R', daemonUser, dirname(dirname(scenario.barePath))])

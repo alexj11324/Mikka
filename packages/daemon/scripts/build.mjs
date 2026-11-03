@@ -36,6 +36,7 @@ for (const path of ['agents/native-container.mjs', 'computer/proxy.mjs', 'comput
 // run-context is bundled into each root entry; its stdio helper is standalone.
 await copyFile(resolve(root, 'src/agents/mikka-mcp.mjs'), resolve(out, 'mikka-mcp.mjs'))
 await copyFile(resolve(root, 'src/agents/capture-copy.mjs'), resolve(out, 'capture-copy.mjs'))
+await copyFile(resolve(root, 'src/agents/check-command.mjs'), resolve(out, 'check-command.mjs'))
 await copyFile(resolve(root, 'src/agents/github-credentials.mjs'), resolve(out, 'github-credentials.mjs'))
 await cp(resolve(root, 'fixtures'), resolve(out, 'fixtures'), { recursive: true })
 // The daemon's harness pins and installer (harness-install.ts).

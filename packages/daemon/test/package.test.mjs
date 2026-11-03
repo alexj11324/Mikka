@@ -73,7 +73,7 @@ test('registry-installed tarball runs its CLI and a real mock-daemon git task wi
   execFileSync(installedCommand, ['daemon', 'login', '--token', token, '--data-dir', data], { cwd: temporary, env: runtimeEnv, stdio: 'pipe', timeout: 20_000, killSignal: 'SIGKILL' })
   assert.equal(JSON.parse(await readFile(join(data, 'device.json'), 'utf8')).credential, token)
   // These child scripts are resolved relative to bundled entries at runtime.
-  for (const asset of ['mikka-mcp.mjs', 'agents/native-container.mjs', 'computer/proxy.mjs', 'computer/driver.mjs', 'fixtures/success-edit.jsonl']) {
+  for (const asset of ['mikka-mcp.mjs', 'check-command.mjs', 'agents/native-container.mjs', 'computer/proxy.mjs', 'computer/driver.mjs', 'fixtures/success-edit.jsonl']) {
     assert.ok((await readFile(join(installed, asset))).length > 0)
   }
   execFileSync(process.execPath, [join(root, 'scripts/build-cloud-worker.mjs')], { cwd: root, env: runtimeEnv, timeout: 30_000, killSignal: 'SIGKILL' })

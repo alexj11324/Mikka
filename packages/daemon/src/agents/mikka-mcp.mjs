@@ -18,6 +18,7 @@ import { closeSync, fstatSync, openSync, readSync, readFileSync, readdirSync, re
 import { join, sep } from "node:path"
 import { createInterface } from "node:readline"
 import { copyCaptureFd } from "./capture-copy.mjs"
+import { createCheckCommand } from "./check-command.mjs"
 
 const handoffIndex = process.argv.indexOf("--handoff")
 const handoffFile = handoffIndex > 0 ? process.argv[handoffIndex + 1] : null
@@ -30,6 +31,11 @@ const capturesDir = flagValues("--captures")[0] ?? null
 const captureRoots = flagValues("--capture-root").flatMap((root) => {
   try { return [realpathSync(root)] } catch { return [] }
 })
+
+const checkFile = flagValues("--check-config")[0]
+const checkCommand = checkFile ? createCheckCommand({ ...JSON.parse(readFileSync(checkFile, 'utf8')), file: checkFile }) : null
+process.once('SIGTERM', () => { checkCommand?.close(); process.exit(0) })
+process.stdin.once('end', () => checkCommand?.close())
 
 const stringArray = { type: "array", items: { type: "string" } }
 
@@ -147,8 +153,9 @@ const TOOLS = [
             properties: {
               criterionId: {
                 type: "string",
-                description: "The criterion's id, as given in your brief.",
+                description: "The criterion UUID, only when given in your brief. Otherwise use text.",
               },
+              text: { type: "string", description: "The acceptance condition checked, when the brief has no criterion UUID." },
               passed: { type: "boolean" },
               command: { type: "string", description: "Exact command used to check this criterion, when one was run." },
               exitCode: { type: ["integer", "null"], description: "Observed exit code of that command." },
@@ -158,7 +165,8 @@ const TOOLS = [
                   "What you saw: the command and its output, or the file and line.",
               },
             },
-            required: ["criterionId", "passed"],
+            required: ["passed"],
+            anyOf: [{ required: ["criterionId"] }, { required: ["text"] }],
           },
         },
       },
@@ -355,7 +363,7 @@ function fail(id, code, message) {
   )
 }
 
-function handle(message) {
+async function handle(message) {
   const { id, method, params } = message
   if (id === undefined || id === null) return // notifications
   switch (method) {
@@ -368,8 +376,9 @@ function handle(message) {
     case "ping":
       return reply(id, {})
     case "tools/list":
-      return reply(id, { tools: capturesDir ? [...TOOLS, CAPTURE_TOOL] : TOOLS })
+      return reply(id, { tools: [...TOOLS, ...(capturesDir ? [CAPTURE_TOOL] : []), ...(checkCommand ? [checkCommand.tool] : [])] })
     case "tools/call": {
+      if (checkCommand && params?.name === checkCommand.tool.name) return reply(id, await checkCommand.execute(params.arguments ?? {}))
       if (capturesDir && params?.name === CAPTURE_TOOL.name) {
         try {
           queueCapture(params.arguments ?? {})

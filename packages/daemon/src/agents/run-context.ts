@@ -123,6 +123,9 @@ export interface RunContextOptions {
   policy?: RunPolicy
   /** Host-verified final policy binding, checked before any run files exist. */
   policyHash?: string
+  /** Trusted Factory fixed-candidate capability; never populated from model arguments. */
+  verification?: { candidateSha: string; command?: string; infer?: boolean }
+
   /** The skills the run was given; none when the assignment carries none. */
   skills?: readonly RunSkill[]
   skillReceipt?: SkillAssignmentReceipt
@@ -379,10 +382,18 @@ export class RunContext {
 
   mcpServer(): McpServerSpec {
     const command = this.options.nodeBinary ?? process.execPath
+    let checkFile: string | undefined
+    if (this.options.verification) {
+      if (this.options.policy?.readOnly !== true || this.options.kind !== 'acceptance') throw new Error('Check capability requires a fixed read-only Factory run')
+      checkFile = join(this.runDir, 'check-command.json')
+      rmSync(checkFile, { force: true })
+      writeFileSync(checkFile, JSON.stringify({ ...this.options.verification, worktree: this.worktree, gitDir: this.gitDir }), { mode: 0o600, flag: 'wx' })
+    }
     return {
       command,
       args: [
         MCP_SERVER_SCRIPT, "--handoff", this.handoffFile,
+        ...(checkFile ? ['--check-config', checkFile] : []),
         "--captures", this.capturesDir, "--capture-root", this.worktree, "--capture-root", this.tmpDir,
       ],
       // Inside Electron, `process.execPath` is the app; run it as plain Node.

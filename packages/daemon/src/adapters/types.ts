@@ -99,6 +99,9 @@ export interface SessionOptions {
   policy?: RunPolicy
   /** Final policy digest from the independently verified server snapshot. */
   policyHash?: string
+  /** Trusted Factory fixed-candidate capability; never populated from model arguments. */
+  verification?: { candidateSha: string; command?: string; infer?: boolean }
+
   /**
    * The skills the run was given (the assignment's `skills`). They are
    * written under the run dir and read into the agent's instructions.

@@ -1323,6 +1323,7 @@ export class RunSupervisor {
       gitWritePaths: await worktreeGitWritePaths(repo.path, worktree, runId),
       policy: assignment.policy,
       policyHash: assignment.policySnapshot?.payload.policyHash,
+      ...(fixedCandidateCheck(assignment) ? { verification: { candidateSha: assignment.baseBranch, command: assignment.verifyCommand, infer: assignment.inferVerifyCommand } } : {}),
       skills: assignment.skills,
       skillReceipt: assignment.skillReceipt,
       onRuntimeModel: assignment.skillReceipt ? (sessionId: string, observedModel: string) => {

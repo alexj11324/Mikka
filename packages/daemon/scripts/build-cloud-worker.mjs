@@ -23,7 +23,7 @@ for (const path of ['agents/native-container.mjs', 'computer/proxy.mjs', 'comput
   await mkdir(dirname(resolve(out, path)), { recursive: true })
   await copyFile(resolve(root, 'src', path), resolve(out, path))
 }
-for (const path of ['mikka-mcp.mjs', 'capture-copy.mjs', 'github-credentials.mjs']) {
+for (const path of ['mikka-mcp.mjs', 'capture-copy.mjs', 'check-command.mjs', 'github-credentials.mjs']) {
   await copyFile(resolve(root, 'src/agents', path), resolve(out, path))
 }
 await cp(resolve(root, 'fixtures'), resolve(out, 'fixtures'), { recursive: true })

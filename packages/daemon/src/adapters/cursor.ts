@@ -234,6 +234,7 @@ export class CursorAdapter implements AgentAdapter {
       networkAllow: options.networkAllow,
       policy: options.policy,
       policyHash: options.policyHash,
+      verification: options.verification,
       skills: options.skills,
       skillReceipt: options.skillReceipt,
       runDir,

@@ -83,7 +83,8 @@ export async function startMvpServices(port = 3191, { routes } = {}) {
         await mkdir(source, { recursive: true })
         await git(source, ['init', '--initial-branch=trunk'])
         await writeFile(join(source, 'README.md'), '# MVP fixture\n')
-        await git(source, ['add', 'README.md'])
+        if (input.verification === 'git-diff') await writeFile(join(source,'Makefile'),'test:\n\tgit diff --check trunk HEAD\n')
+        await git(source, ['add', 'README.md', ...(input.verification === 'git-diff' ? ['Makefile'] : [])])
         await git(source, ['-c', 'user.name=Mikka CI', '-c', 'user.email=mikka-ci@example.com', 'commit', '-m', 'test: seed isolated origin'])
         await git(source, ['clone', '--bare', '--no-hardlinks', '.', barePath])
         // dev:local (scripts/dev-local.mjs) runs a real agent, not the mock harness.

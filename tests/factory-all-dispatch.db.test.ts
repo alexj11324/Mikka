@@ -65,6 +65,11 @@ test('a Coordinator dispatch_run goes through the Factory', { skip: !dbUrl, time
       (SELECT count(*)::int FROM agent_runs WHERE "userId"=$1) AS runs`, [userId])).rows[0]
   console.log(`factory-all-dispatch: dispatch=${JSON.stringify(dispatched)} factory_tasks=${counts.tasks} factory_attempts=${counts.attempts} agent_runs=${counts.runs}`)
   assert.ok(dispatched.runId, `dispatch_run queued a run: ${JSON.stringify(dispatched)}`)
+  const { persistRunEventBatch } = await import('../lib/secrets/run-events')
+  const { identityMasker } = await import('../lib/secrets/mask')
+  await persistRunEventBatch(dispatched.runId!,9000,[{type:'data-note',data:{text:'stream\u0000body',literal:'\\u0000',surrogate:'\ud800'}}],identityMasker)
+  const normalized=(await pool.query('SELECT chunk FROM run_chunks WHERE "runId"=$1 AND seq=9000',[dispatched.runId])).rows[0].chunk
+  assert.deepEqual(normalized.data,{text:'stream\ufffdbody',literal:'\\u0000',surrogate:'\ufffd'})
   assert.equal(counts.tasks, 1, 'one Factory task for the dispatch')
   assert.equal(counts.attempts, 1, 'its execute attempt')
   const { rows: [bound] } = await pool.query(`SELECT t.stage,t.status,a."runId" FROM factory_tasks t JOIN factory_attempts a ON a.id=t."attemptId" WHERE t."userId"=$1`, [userId])
@@ -85,8 +90,8 @@ test('a Coordinator dispatch_run goes through the Factory', { skip: !dbUrl, time
     })])
     if (check && !noCommand) {
       for (const [seq, chunk] of [
-        [1, { type: 'tool-input-available', toolName: 'Bash', toolCallId: 'verify', input: { command } }],
-        [2, { type: 'tool-output-available', toolCallId: 'verify', output: { exitCode: 0, output: 'ok' } }],
+        [1, { type: 'tool-input-available', toolName: 'mcp__mikka__verify_command', toolCallId: 'verify', input: { command } }],
+        [2, { type: 'tool-output-available', toolCallId: 'verify', output: { content: [{type:'text',text:JSON.stringify({executed:true,command,sha,readOnly:true,exitCode:0,signal:null,timedOut:false,output:'ok'})}] } }],
       ] as const) await pool.query(`INSERT INTO run_chunks (id,"runId",seq,chunk,"createdAt") VALUES ($1,$2,$3,$4,(SELECT "startedAt"+interval '1 second' FROM agent_runs WHERE id=$2))`, [randomUUID(), runId, seq, JSON.stringify(chunk)])
     }
     await runtime.reconcile.run(userId, runId)

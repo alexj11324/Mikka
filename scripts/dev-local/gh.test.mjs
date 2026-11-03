@@ -17,7 +17,7 @@ test('real agent-shaped push, gh PR and exact-head receipt use only the fixture 
   const gh = args => fixtureGh(args, { env, origin: services.origin, gitRun: git, output: value => output.push(value) })
   const hostGh = args => fixtureGh(args, { env: { ...env, GH_REPO: undefined }, origin: services.origin, gitRun: git, output: value => output.push(value) })
   try {
-    const fixture = await (await fetch(`${services.origin}/scenario`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ marker: `mvp-${randomUUID()}`, title: 'Agent gh fixture', harness: 'any' }) })).json()
+    const fixture = await (await fetch(`${services.origin}/scenario`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ marker: `mvp-${randomUUID()}`, title: 'Agent gh fixture', harness: 'any', verification: 'git-diff' }) })).json()
     const identity = await fetch(`${services.origin}/github/user`, { headers: { authorization: `Bearer ${env.GH_TOKEN}` } })
     assert.equal(identity.status, 200, 'The run token must resolve its synthetic user identity')
     assert.equal((await identity.json()).id, 456)
@@ -28,6 +28,7 @@ test('real agent-shaped push, gh PR and exact-head receipt use only the fixture 
     git(['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-m', 'Append fixture delivery'])
     git(['push', 'origin', 'HEAD:mikka/fixture-1'])
     const commit = git(['rev-parse', 'HEAD'])
+    execFileSync('make', ['test'], { cwd: directory, stdio: 'pipe' })
     const token = await fetch(`${services.origin}/github/app/installations/99/access_tokens`, { method: 'POST', headers: { authorization: 'Bearer a.b.c', 'content-type': 'application/json' }, body: JSON.stringify({ repository_ids: [789] }) })
     assert.equal(token.status, 200)
     const issued = await token.json()
