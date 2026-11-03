@@ -5,6 +5,9 @@ import { hostedBrokerDevice, leaseDevice } from './subscription-native-device'
 import { subscriptionNativeLease } from './subscription-native-lease'
 import { subscriptionNativeHTTP } from './subscription-native-http'
 import { SubscriptionRefusal } from '@mikka/protocol/subscription'
+import { WorkerRefusal } from '../packages/daemon/src/subscription-worker-client'
+import { DeviceAuthorityRevoked, DeviceFenceUnavailable } from './db/device-scope'
+import { ModelAdmissionError } from './model-admission/contract'
 
 const broker = [{ subscriptionBroker: true }]
 const ids = { deviceId: '11111111-1111-4111-8111-111111111111', runId: '22222222-2222-4222-8222-222222222222' }
@@ -52,6 +55,88 @@ test('hosted context refusals retain a bounded server diagnosis without returnin
   assert.deepEqual(JSON.parse(lines[0]), { event: 'subscription_native_refused', ...ids, operation: 'context', phase: 'context', code: 'account_unavailable', errorClass: 'SubscriptionRefusal' })
   assert.doesNotMatch(lines.join(''), /fixture-private-native-token|cause|stack/)
 })
+
+test('a transient context authorization failure is retryable and a later request rechecks authority', async () => {
+  const lines: string[] = []
+  let attempts = 0
+  let nativeRuns = 0
+  const context = { route: 'claude_code_cli', modelId: 'm', revision: 1, accountId: 'a', expiresAt: '2026-11-01T01:00:00.000Z' }
+  const handler = subscriptionNativeHTTP({
+    authorize: async () => {
+      if (++attempts === 1) throw new Error('fixture-private-infrastructure-detail')
+      return 'o'
+    },
+    service: () => ({
+      nativeRun: async () => { nativeRuns++; return { ownerId: 'o' } },
+      nativeContext: async () => context,
+    }) as never,
+    log: line => { lines.push(line) },
+  })
+  const request = () => new Request('http://local/subscription', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'context' }) })
+  const failed = await handler(request(), { params: Promise.resolve(ids) })
+  assert.equal(failed.status, 503)
+  assert.equal(failed.headers.get('cache-control'), 'private, no-store')
+  assert.deepEqual(await failed.json(), { error: 'subscription_unavailable' })
+  assert.equal(nativeRuns, 0, 'an unavailable authority must not grant access')
+  assert.deepEqual(JSON.parse(lines[0]), { event: 'subscription_native_refused', ...ids, operation: null, phase: 'authorize', code: 'subscription_unavailable', errorClass: 'unknown' })
+  assert.doesNotMatch(lines.join(''), /fixture-private-infrastructure-detail|stack/)
+  const recovered = await handler(request(), { params: Promise.resolve(ids) })
+  assert.equal(recovered.status, 200)
+  assert.deepEqual(await recovered.json(), context)
+  assert.equal(attempts, 2)
+  assert.equal(nativeRuns, 1, 'retry reauthorizes and resolves the current run binding')
+})
+
+test('a hosted context worker refusal remains an authoritative conflict', async () => {
+  const handler = subscriptionNativeHTTP({
+    authorize: async () => 'o',
+    service: () => ({ nativeRun: async () => ({ ownerId: 'o' }), nativeContext: async () => { throw new WorkerRefusal('provider_operation_failed') } }) as never,
+    log: () => {},
+  })
+  const response = await handler(new Request('http://local/subscription', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'context' }) }), { params: Promise.resolve(ids) })
+  assert.equal(response.status, 409)
+  assert.deepEqual(await response.json(), { error: 'subscription_unavailable' })
+})
+
+for (const code of ['modelPolicyRevoked', 'modelRouteDenied'] as const) {
+  test(`hosted context preserves an authoritative ${code} refusal`, async () => {
+    const lines: string[] = []
+    const failure = new ModelAdmissionError(code)
+    failure.cause = { policy: 'fixture-private-model-policy' }
+    const handler = subscriptionNativeHTTP({
+      authorize: async () => 'o',
+      service: () => ({ nativeRun: async () => ({ ownerId: 'o' }), nativeContext: async () => { throw failure } }) as never,
+      log: line => { lines.push(line) },
+    })
+    const request = new Request('http://local/subscription', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'context' }) })
+    const response = await handler(request, { params: Promise.resolve(ids) })
+    assert.equal(response.status, 409)
+    assert.deepEqual(await response.json(), { error: 'subscription_unavailable' })
+    assert.deepEqual(JSON.parse(lines[0]), { event: 'subscription_native_refused', ...ids, operation: 'context', phase: 'context', code: 'model_policy_refused', errorClass: 'ModelAdmissionError' })
+    assert.doesNotMatch(lines.join(''), /fixture-private-model-policy|cause|stack/)
+  })
+}
+
+for (const phase of ['authorize', 'context'] as const) {
+  for (const failure of [new DeviceAuthorityRevoked(), new DeviceFenceUnavailable(new Error('fixture-private-fence-detail'))]) {
+    test(`hosted ${phase} preserves ${failure.constructor.name} for the device route fence`, async () => {
+      let contexts = 0
+      const handler = subscriptionNativeHTTP({
+        authorize: async () => { if (phase === 'authorize') throw failure; return 'o' },
+        service: () => ({
+          nativeRun: async () => ({ ownerId: 'o' }),
+          nativeContext: async () => { contexts++; throw failure },
+        }) as never,
+        log: () => {},
+      })
+      const request = new Request('http://local/subscription', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'context' }) })
+      // The outer withDeviceRoute maps these exact typed errors to 401 and
+      // retryable 503. This handler must not replace either with its own status.
+      await assert.rejects(handler(request, { params: Promise.resolve(ids) }), error => error === failure)
+      assert.equal(contexts, phase === 'authorize' ? 0 : 1)
+    })
+  }
+}
 
 test('the lease is returned uncached to an authorized device', async () => {
   const handler = subscriptionNativeLease({ authorize: async () => 'o', service: service() })

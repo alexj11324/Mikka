@@ -38,10 +38,17 @@ function selectRepository(args) {
     repositorySelection: { repository: args.repository.trim(), reason: args.reason.trim(), observedRemote: remote.status === 0 ? remote.stdout.trim() : null, observedHead: head.stdout.trim() } }, 'switch_repository')
   return { content: [{ type: 'text', text: 'Repository selection recorded for host authorization and a new checkout. End your turn now. This checkout is preserved; no delivery has been submitted.' }] }
 }
-const ARTIFACT_TOOL = { name: 'inspect_artifact', description: 'Independently read a delivery file in this fixed worktree: byte count, SHA256, Git HEAD, committed file SHA256 and whether its bytes match Git. No shell commands, changes, submission or acceptance.', inputSchema: { type: 'object', properties: { path: { type: 'string', description: 'File path relative to this check’s worktree.' } }, required: ['path'], additionalProperties: false } }
+const ARTIFACT_TEXT_LIMIT = 64 * 1024
+const ARTIFACT_TOOL = { name: 'inspect_artifact', description: 'Independently read a delivery file in this fixed worktree: byte count, SHA256, Git HEAD, committed file SHA256, Git comparison and complete UTF8 text up to 64 KiB. Optionally compare exact expected UTF8 bytes, including every newline. Binary or larger files return no text. No shell commands, changes, submission or acceptance.', inputSchema: { type: 'object', properties: { path: { type: 'string', description: 'File path relative to this check’s worktree.' }, expectedUtf8: { type: 'string', maxLength: ARTIFACT_TEXT_LIMIT, description: 'Optional exact expected text, including all whitespace and the final newline; at most 64 KiB as UTF8.' } }, required: ['path'], additionalProperties: false } }
 
 function inspectArtifact(args) {
   const path = args.path
+  let expectedBytes
+  if (args.expectedUtf8 !== undefined) {
+    if (typeof args.expectedUtf8 !== 'string' || Buffer.byteLength(args.expectedUtf8, 'utf8') > ARTIFACT_TEXT_LIMIT) throw new Error('artifact_expected_text')
+    expectedBytes = Buffer.from(args.expectedUtf8, 'utf8')
+    if (expectedBytes.toString('utf8') !== args.expectedUtf8) throw new Error('artifact_expected_text')
+  }
   if (typeof path !== 'string' || !path || path.length > 2000 || isAbsolute(path) || path.includes('\0') ||
     path.split(/[\\/]/).some(part => part === '..' || part === '.git')) throw new Error('artifact_path')
   const resolved = resolve(artifactRoot, path)
@@ -62,9 +69,21 @@ function inspectArtifact(args) {
   if (head.status !== 0 || !/^[a-f0-9]{40}$/.test(head.stdout.toString().trim())) throw new Error('artifact_git')
   const committed = git(['show', `HEAD:${path}`])
   const hash = value => createHash('sha256').update(value).digest('hex')
+  let contentUtf8 = null, textUnavailable = null
+  if (bytes.length > ARTIFACT_TEXT_LIMIT) textUnavailable = 'oversize'
+  else {
+    try {
+      // Fatal decoding never turns invalid bytes into replacement characters;
+      // preserve a BOM too, so the text describes the exact file contents.
+      const text = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes)
+      if (/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/u.test(text)) textUnavailable = 'binary'
+      else contentUtf8 = text
+    } catch { textUnavailable = 'binary' }
+  }
   return { content: [{ type: 'text', text: JSON.stringify({ path, bytes: bytes.length, sha256: hash(bytes),
     head: head.stdout.toString().trim(), committedSha256: committed.status === 0 ? hash(committed.stdout) : null,
-    contentMatchesGit: committed.status === 0 && bytes.equals(committed.stdout) }) }] }
+    contentMatchesGit: committed.status === 0 && bytes.equals(committed.stdout), contentUtf8, textUnavailable,
+    ...(expectedBytes === undefined ? {} : { matchesExpectedUtf8: bytes.equals(expectedBytes) }) }) }] }
 }
 
 function verifyCommand(args) {
