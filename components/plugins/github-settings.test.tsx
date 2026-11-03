@@ -52,7 +52,8 @@ before(async () => {
 beforeEach(() => {
   github = { connected: false }; intent = { state: 'waiting', browserAccount: null }
   requests.length = 0; assigned.length = 0; signOut.mock.resetCalls()
-  container = document.createElement('div'); document.body.append(container); root = createRoot(container)
+  container = browser.document.createElement('div') as unknown as HTMLDivElement
+  document.body.append(container); root = createRoot(container)
 })
 afterEach(async () => { await act(async () => { root.unmount() }); container.remove(); delete (browser as unknown as { mikka?: unknown }).mikka })
 after(() => { browser.close() })
