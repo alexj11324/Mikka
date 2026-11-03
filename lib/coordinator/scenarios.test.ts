@@ -229,3 +229,24 @@ test('the prompt teaches judgment with neutral names; it never contains the eval
   assert.match(text, /every word kept \(e\.g\. acme_tools, the Acme docs\)/, 'the parameter descriptions are read too')
   for (const leaked of [/Mikka site/i, /mikka-web/i, /mikka-enterprise/i, /How it works/i, /It's in the/i, /Mikka_test/, /alexj11324\/Mikka/i, /octo-web|octo-api/i, /landing page|docs site/i]) assert.doesNotMatch(text, leaked)
 })
+
+test('「Octo 官网的导航栏在手机上错位了」 with the authorized list in the turn: chosen from the list, no search needed', async () => {
+  const { githubContext } = await import('./github-context')
+  const listed = await githubContext(OWNER, {
+    connection: async () => ({ githubLogin: 'octo-dev' }),
+    list: async () => ({ login: 'octo-dev', installationAccounts: ['octo'], repositories: [
+      { fullName: 'octo/octo', description: 'The product: app and API clients', homepage: 'https://app.octo.example', pushedAt: null },
+      { fullName: 'octo/octo-web', description: 'The public marketing website', homepage: 'https://octo.example', pushedAt: null },
+      { fullName: 'octo/octo-api', description: null, homepage: null, pushedAt: null },
+    ] }),
+  })
+  assert.match(instructions, /The GitHub lines below list the repositories they authorized, each with its description and homepage: look there first/)
+  assert.match(listed, /^- octo\/octo-web · "The public marketing website" · homepage "https:\/\/octo\.example"$/m)
+  const { reply } = await play('Octo 官网的导航栏在手机上错位了，修一下', [
+    { tool: 'dispatch_run', input: { issueId: ISSUE, repo: 'octo/octo-web' } },
+    { text: '已经派给 Agent 在 octo/octo-web 上修。' },
+  ])
+  assert.deepEqual(calls.map(call => call.step), ['dispatchRun'], 'the list in the turn makes the lookup unnecessary')
+  assert.equal((calls[0].input as { repo: string }).repo, 'octo/octo-web')
+  assert.doesNotMatch(reply, /哪个仓库/)
+})

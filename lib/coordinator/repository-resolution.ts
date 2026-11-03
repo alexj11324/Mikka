@@ -64,7 +64,7 @@ function candidatesOf(repositories: readonly Repository[], context: RepositoryCo
  * the candidates come back with their descriptions and homepages for the Coordinator to judge, or to ask with the card.
  */
 export async function resolveRepository(userId: string, repo: string, list: RepositoryLister = ownRepositories, context?: () => Promise<RepositoryContext | null>): Promise<Resolution> {
-  if (!isBareRepositoryName(repo)) return { repo }
+  if (!isBareRepositoryName(repo)) return authorizedGitHubRepository(userId, repo, list)
   const name = repo.trim()
   const own = await listFor(userId, list)
   if ('error' in own) return { error: own.error, repository: name }
@@ -73,6 +73,28 @@ export async function resolveRepository(userId: string, repo: string, list: Repo
   if (related.length === 1) return { repo: related[0]!.fullName }
   const candidates = candidatesOf(related, context ? await context().catch(() => null) : null)
   return { error: 'repositoryAmbiguous', candidates, card: repositoryAmbiguousCard(name, candidates) }
+}
+
+/** owner/repo of a github.com repository named as owner/repo or by URL; null for any other host. */
+function githubFullName(repo: string): string | null {
+  const value = repo.trim().replace(/\.git$/i, '').replace(/\/+$/, '')
+  const match = /^(?:https:\/\/github\.com\/|git@github\.com:|ssh:\/\/git@github\.com\/)?([\w.-]+\/[\w.-]+)$/i.exec(value)
+  return match ? match[1]! : null
+}
+
+/**
+ * A GitHub repository given by owner/repo or URL is refused when the person's authorized list (the live one, not the
+ * turn's cached copy) does not have it. When there is no list to read (GitHub not connected, to reconnect or down),
+ * it goes on as given, as before: the run clones and pushes with the person's own credential, which is the check then.
+ * Other hosts go on as given.
+ */
+async function authorizedGitHubRepository(userId: string, repo: string, list: RepositoryLister): Promise<Resolution> {
+  const fullName = githubFullName(repo)
+  if (!fullName) return { repo }
+  const own = await listFor(userId, list).catch(() => ({ error: 'githubUnavailable' as const }))
+  if ('error' in own) return { repo }
+  const found = own.repositories.find(repository => repository.fullName.toLowerCase() === fullName.toLowerCase())
+  return found ? { repo } : { error: 'repositoryNotFound', card: repositoryNotFoundCard(fullName) }
 }
 
 const remoteFullName = (remoteUrl: string) => remoteUrl.trim().replace(/^(?:https:\/\/|git@)github\.com[/:]/i, '').replace(/\.git$/i, '').replace(/\/+$/, '')

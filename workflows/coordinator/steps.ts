@@ -295,7 +295,7 @@ export async function preparePrompt(userId: string, botId: string, snapshot?: De
   const executionContextBlock = async (owner: string, bot: string) => { const text = await executionContext(owner, bot); return text ? '\n' + text : '' }
   // Everything up to the memory is the same on every turn; `stable` is where it ends, so a provider can cache it (lib/prompt-cache.ts).
   const rules = await withPersonalInstructions(userId, instructions, snapshot ? snapshot.personalPlugins ?? { servers: [], skills: [] } : undefined)
-  return { stable: rules.length, instructions: instructionsWithMemory(rules, memory) + factoryPolicy + '\n' + SCHEDULE_INSTRUCTIONS + '\n' + await githubContext(userId) + await executionContextBlock(userId, botId), messages: promptMessages(summary, messages, summaryTrust) }
+  return { stable: rules.length, instructions: instructionsWithMemory(rules, memory) + factoryPolicy + '\n' + SCHEDULE_INSTRUCTIONS + '\n' + await githubContext(userId, undefined, undefined, botId) + await executionContextBlock(userId, botId), messages: promptMessages(summary, messages, summaryTrust) }
 }
 
 export async function personalWriteToolsEnabled() { 'use step'; const { personalWritesEnabled } = await import('@/lib/operations/write-feature'); return personalWritesEnabled() }

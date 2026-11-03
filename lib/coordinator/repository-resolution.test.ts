@@ -23,12 +23,22 @@ test('one match dispatches straight away with owner/repo; the lister is asked fo
   }
 })
 
-test('owner/repo and URLs pass unchanged without asking GitHub', async () => {
+test('a GitHub repository named by owner/repo or URL runs only when the person authorized it; other hosts go on as given', async () => {
   for (const repo of ['alexj11324/Mikka_test', 'https://github.com/alexj11324/Mikka_test', 'git@github.com:alexj11324/Mikka_test.git']) {
-    const list = lister(), dispatch = mock.fn(async (value: string) => value)
-    assert.equal(await withResolvedRepository('alex', ISSUE, repo, dispatch, list), repo)
-    assert.equal(list.mock.callCount(), 0)
+    const dispatch = mock.fn(async (value: string) => value)
+    assert.equal(await withResolvedRepository('alex', ISSUE, repo, dispatch, lister(), noContext), repo)
   }
+  const dispatch = mock.fn(async (value: string) => value)
+  const foreign = await withResolvedRepository('alex', ISSUE, 'someone/secret-repo', dispatch, lister(), noContext) as { error?: string }
+  assert.equal(foreign.error, 'repositoryNotFound', 'an owner/repo outside the authorized list is refused')
+  assert.equal(dispatch.mock.callCount(), 0)
+  const elsewhere = mock.fn<RepositoryLister>(async () => repos())
+  assert.equal(await withResolvedRepository('alex', ISSUE, 'https://gitlab.example/team/app.git', dispatch, elsewhere, noContext), 'https://gitlab.example/team/app.git')
+  assert.equal(elsewhere.mock.callCount(), 0, 'another host is not asked of GitHub')
+  // No GitHub connection: no list to check against, the computer clones with its own credentials.
+  assert.equal(await withResolvedRepository('alex', ISSUE, 'octo/repo', dispatch, async () => { throw accessError('githubNotConnected') }, noContext), 'octo/repo')
+  for (const code of ['githubUnavailable', 'githubReconnectRequired'])
+    assert.equal(await withResolvedRepository('alex', ISSUE, 'octo/repo', dispatch, async () => { throw accessError(code) }, noContext), 'octo/repo', `${code}: no list to check, it goes on as before`)
 })
 
 test('several matches return the candidates as one choice card and dispatch nothing', async () => {

@@ -75,7 +75,7 @@ const failure = (code: string, status: number) => (error: unknown) => error inst
 test('only the current session account is selected, and Better Auth receives its internal id', async () => {
   accounts.unshift({ id: 'other-account', userId: 'other-person', providerId: 'github', accountId: '50' })
   const result = await access.listAuthorizedRepositories(requestHeaders)
-  assert.deepEqual(result, { userId: 'person-1', githubAccountId: '42', installations: ['11'], repositories: [{ id: '91', installationId: '11', fullName: 'Owner/Project', htmlUrl: 'https://github.com/Owner/Project', private: true, description: null, homepage: null }] })
+  assert.deepEqual(result, { userId: 'person-1', githubAccountId: '42', installations: ['11'], repositories: [{ id: '91', installationId: '11', fullName: 'Owner/Project', htmlUrl: 'https://github.com/Owner/Project', private: true, description: null, homepage: null, pushedAt: null }] })
   assert.deepEqual(getAccessToken.mock.calls[0].arguments, [{ headers: requestHeaders, body: { accountId: 'internal-account' } }])
   assert.equal(JSON.stringify(result).includes('private-test-token'), false)
 })
@@ -98,7 +98,7 @@ test('a user id with no request reads that user\'s own legacy GitHub account ser
     throw new Error(`Unexpected path ${url.pathname}`)
   }
   const result = await access.listRepositoriesForUser('person-1')
-  assert.deepEqual(result, { githubAccountId: '42', login: 'octo', installationAccounts: ['octo'], installations: ['11'], repositories: [{ id: '91', installationId: '11', fullName: 'Owner/Project', htmlUrl: 'https://github.com/Owner/Project', private: true, description: null, homepage: null }] })
+  assert.deepEqual(result, { githubAccountId: '42', login: 'octo', installationAccounts: ['octo'], installations: ['11'], repositories: [{ id: '91', installationId: '11', fullName: 'Owner/Project', htmlUrl: 'https://github.com/Owner/Project', private: true, description: null, homepage: null, pushedAt: null }] })
   assert.deepEqual(findAccounts.mock.calls.map(call => call.arguments), [['person-1']])
   assert.deepEqual(getAccessToken.mock.calls[0].arguments, [{ body: { accountId: 'internal-account', userId: 'person-1' } }])
   assert.equal(JSON.stringify(result).includes('private-test-token'), false)
