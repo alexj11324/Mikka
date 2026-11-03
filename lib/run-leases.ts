@@ -17,6 +17,7 @@ import { stopRecordingsAfter } from '@/lib/captures/run-end'
 import { DEVICE_STAYED_OFFLINE, LEASED_RUN_STATUSES, lostRunOutcome, MAX_RUN_ATTEMPTS, pickTakeover, retryNote, retryPrompt, type TakeoverCandidate } from '@/lib/run-retry'
 import { tiptapToText } from '@/lib/tiptap-text'
 import { afterRunEnded } from '@/lib/run-completion-effects'
+import { notifyDeviceWork } from '@/lib/device-gateway-notify'
 import { ownE2BKeySql } from './secrets/e2b-owner-sql'
 
 const RUN_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -203,6 +204,7 @@ async function reclaimLostRun(run: Run, now: Date) {
     await afterRunEnded(run.userId, run.id)
     if (bound) await startThreadMachine({ userId: run.userId, workspaceId: bound.workspaceId }, retryId)
     if (cloud) await moveToCloud(run, cloud, outcome.attempt, now)
+    else notifyDeviceWork(target?.deviceId ?? run.deviceId)
   }
 }
 

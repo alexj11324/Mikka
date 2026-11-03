@@ -142,6 +142,14 @@ export interface ServerLink {
     waitSeconds: number,
     options?: FetchCommandsOptions
   ): Promise<RunCommand[]>
+  /**
+   * A short-lived ticket for the device's push socket. Absent on a link
+   * that only long-polls, and null when this server has no gateway.
+   */
+  deviceGateway?(
+    deviceId: string,
+    signal?: AbortSignal
+  ): Promise<{ url: string | null; protocol: string | null }>
   /** Marks messages as handed to their agents. */
   ackCommands(deviceId: string, delivered: string[]): Promise<void>
   /**

@@ -86,6 +86,7 @@ import {
   RunSupervisor,
   type SupervisorDeps,
 } from "./runs/supervisor"
+import { openDeviceGateway, runDeviceGateway } from "./device-gateway"
 import type { DeviceRepo, MemoryServer, ServerLink } from "./server-link"
 import { SessionRejectedError } from "./server-link-http"
 import { WorktreeManager } from "./worktrees"
@@ -248,6 +249,10 @@ export class Daemon {
   private quota: QuotaPoller | null = null
   /** Ends the commands long-poll when the daemon stops. */
   private commandsAbort = new AbortController()
+  /** The push socket is open. An idle device does not heartbeat the database. */
+  private gatewayLive = false
+  /** The server said it has no gateway. Do not ask again on every long-poll. */
+  private gatewayUnavailable = false
   private commandsLoop: Promise<void> = Promise.resolve()
   private fsLoop: Promise<void> = Promise.resolve()
   private reviewAbort: AbortController | null = null
@@ -640,6 +645,12 @@ export class Daemon {
           await link.ackCommands(deviceId, ids)
           for (const id of ids) this.unacked.delete(id)
         }
+        // The push socket is the idle path. A missing gateway, or one that
+        // refuses the connection, falls through to the long-poll below.
+        if (await this.holdGateway(deviceId, signal)) {
+          backoff = 1_000
+          continue
+        }
         // Runs being stopped or already ended would come back on every
         // answer; leaving them out lets the poll wait for new commands.
         // So are queued runs this daemon refused or failed to claim: the
@@ -698,6 +709,64 @@ export class Daemon {
         await this.pauseCommands(backoff, signal)
         backoff = Math.min(backoff * 2, 30_000)
       }
+    }
+  }
+
+  /** One read after a push, or right after the socket opens. Wait is zero: the signal already arrived. */
+  private async pullSignaledWork(deviceId: string, signal: AbortSignal) {
+    const failedClaims = [...this.queuedClaims].flatMap(([id, state]) => state === "failed" ? [id] : [])
+    const skipRuns = [...failedClaims, ...this.refusedRuns, ...this.stopping, ...this.ended].slice(0, COMMANDS_MAX_SKIP)
+    let queued: string[] = []
+    const commands = await this.options.link.fetchCommands(deviceId, 0, {
+      signal,
+      skipRuns,
+      onQueuedRuns: (runIds) => { queued = runIds },
+      updates: { daemonLatest: this.knownLatest ?? DAEMON_VERSION, skipDeviceCommands: this.polledDeviceCommands },
+      onUpdates: ({ daemonVersions, deviceCommands }) => {
+        this.learnRelease(daemonVersions?.latest)
+        this.checkAutoUpdate()
+        const fresh = deviceCommands.filter(command => !this.polledDeviceCommands.includes(command.id))
+        if (fresh.length === 0) return
+        this.polledDeviceCommands = [...this.polledDeviceCommands, ...fresh.map(command => command.id)].slice(-COMMANDS_MAX_SKIP_DEVICE_COMMANDS)
+        void this.syncWithServer().catch(() => undefined)
+      },
+    })
+    if (this.stopped || signal.aborted) return
+    await this.applyCommands(commands)
+    if (queued.length > 0) this.claimQueued(queued)
+  }
+
+  /**
+   * Stay on the device's push socket until it drops. True when a session
+   * existed (reconnect it). False when there is no gateway, so the caller
+   * long-polls.
+   */
+  private async holdGateway(deviceId: string, signal: AbortSignal) {
+    const mint = this.options.link.deviceGateway
+    if (!mint || this.gatewayUnavailable) return false
+    let ticket: { url: string | null; protocol: string | null }
+    try { ticket = await mint.call(this.options.link, deviceId, signal) } catch { return false }
+    if (!ticket.url || !ticket.protocol) { this.gatewayUnavailable = true; return false }
+    if (signal.aborted) return false
+    let opened = false
+    const socket = openDeviceGateway(ticket.url, ticket.protocol)
+    try {
+      await runDeviceGateway(socket, {
+        signal,
+        onWork: async () => {
+          opened = true
+          this.gatewayLive = true
+          await this.pullSignaledWork(deviceId, signal)
+          void this.syncWithServer().catch(() => undefined)
+        },
+      })
+      return true
+    } catch (error) {
+      if (!this.stopped && !signal.aborted && opened) this.log.warn({ err: error }, "device gateway disconnected")
+      return opened
+    } finally {
+      this.gatewayLive = false
+      if (!this.stopped) this.schedule(this.options.heartbeatMs ?? 15_000)
     }
   }
 
@@ -1088,13 +1157,21 @@ export class Daemon {
     writeJsonAtomic(this.paths.device, this.device)
   }
 
-  private schedule(delay: number) {
+  /** Idle on the push socket: no runs, nothing waiting to upload. The database can sleep. */
+  private gatewayIdle() {
+    return this.gatewayLive && this.server === "online" && this.supervisor.heartbeatRuns().length === 0
+      && this.queuedClaims.size === 0 && this.outbox.pending() === 0 && !this.draining && !this.updating
+  }
+
+  private schedule(delay: number | null) {
     if (this.stopped) return
+    if (this.timer) clearTimeout(this.timer)
+    if (delay === null) { this.timer = null; return }
     this.timer = setTimeout(() => {
       // Runs past their lease or watchdog limit stop even while offline.
       this.supervisor.check()
       this.tick = this.syncWithServer().finally(() =>
-        this.schedule(this.options.heartbeatMs ?? 15_000)
+        this.schedule(this.gatewayIdle() ? null : (this.options.heartbeatMs ?? 15_000))
       )
     }, delay)
     this.timer.unref()

@@ -2,13 +2,16 @@ import 'server-only'
 import type { Pool } from 'pg'
 import { randomUUID } from 'node:crypto'
 import { pool } from '@/lib/db'
+import { notifyDeviceWork } from '@/lib/device-gateway-notify'
 
 export type DeviceCommandKind = 'redetect' | 'restart' | 'update' | 'uninstall'
 export const DEVICE_UNINSTALL_GRACE_MS = 10 * 60_000
 export async function enqueueDeviceCommand(userId: string, deviceId: string, kind: DeviceCommandKind, database: Pick<Pool, 'query'> = pool) {
   const result = await database.query(`INSERT INTO device_management_commands (id,"deviceId",kind)
     SELECT $1,id,$4 FROM devices WHERE id=$2 AND "ownerId"=$3 AND kind='local' AND "removedAt" IS NULL RETURNING id`, [randomUUID(), deviceId, userId, kind])
-  return result.rows[0]?.id as string | undefined
+  const id = result.rows[0]?.id as string | undefined
+  if (id) notifyDeviceWork(deviceId)
+  return id
 }
 export async function pendingDeviceCommands(deviceId: string, completed: string[], failed: { id: string; error: string }[] = []) {
   const connection = await pool.connect()
