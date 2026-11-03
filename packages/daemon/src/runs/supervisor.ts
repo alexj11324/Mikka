@@ -811,6 +811,10 @@ export class RunSupervisor {
     // agent must not be able to make a run read as a planning one (ADR ORV-205).
     const entry = this.deps.journal.get(runId)
     const planning = entry?.assignment.kind === "plan"
+    // A repository handoff, like a blocked question, keeps the original
+    // checkout for continuation/history; explicit cancellation can discard it.
+    if (entry && stopReason === "blocked" && report.repositorySelection)
+      entry.assignment.preserveQuestionWorktree = true
     const readOnlyTask = entry && (isReadOnlyTask(entry.assignment) || entry.assignment.factoryCheck?.reportOnly === true || entry.assignment.factoryExecuteKind === 'deliverable')
     // Never copy trusted evidence from an adapter/model report.
     const { sourceCommit: _source, deliverableCommit: _delivery, skillMount: _mount, execution: _execution, runtime: _runtime, ...content } = report
