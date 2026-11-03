@@ -45,6 +45,8 @@ The real worktree produced commit `005d310` and was clean. The CLI then encounte
 repeated HTTP 503 responses, including retries 1 through 9. The run has not
 established execute/review/verify success or human-approval readiness. Do not
 interpret a local commit, healthy lease or synthetic reports as that result.
+The driver ended at 2026-11-03 09:06 UTC after its unchanged 900,000 ms item
+budget expired; the three-stage human-approval proof was not produced.
 The earlier concurrent invocation failed during cold route compilation; it is
 also retained as a failure, not an acceptance pass.
 
@@ -61,6 +63,8 @@ well as its repository-move authorization, full cloud model catalogue and CLI
 stderr-classification fixes. The coordinator can compare this branch's
 host-bound candidate/PR/CI inspection, declared-entrypoint command restriction and
 paired execution-receipt checks against main's protocol and port relevant pieces.
+At 09:06 UTC main had also advanced to `200e2e2f` (PR #1111), preserving successful
+Factory deliverables during server completion; retain that fix as well.
 This record proves only the checks listed for this branch, not upstream rollout.
 Any adopted runtime capability needs the matching daemon released before the
 application starts relying on it. Human acceptance remains a real user's action.
