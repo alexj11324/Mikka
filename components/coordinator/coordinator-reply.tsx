@@ -20,7 +20,7 @@ const ignoreAction = () => {}
 export const CoordinatorReply = memo(function CoordinatorReply({ text, citations, isStreaming = false }: { text: string; citations: AgentCitations; isStreaming?: boolean }) {
   const shown = isStreaming ? withoutPartialCitation(text) : text
   return <AgentCitationsContext value={citations}>
-    <div className="flex w-full min-w-0 flex-col gap-2 break-words">
+    <div data-quote-source="" className="flex w-full min-w-0 flex-col gap-2 break-words">
       <ReplyBubbles value><AgentGenerativeUI response={shown} isStreaming={isStreaming} onAction={ignoreAction} showErrors={false} /></ReplyBubbles>
       {/* A choice card already shows its task chip; no "N sources" footnote under it. */}
       {!/\bBeQuestions\(/.test(shown) && <CitationSources text={shown} />}
