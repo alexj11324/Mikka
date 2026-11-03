@@ -13,6 +13,7 @@ import { mock, test } from 'node:test'
 import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
 import { MODEL_CREDENTIAL_HEADER, REPO_ORIGIN_HEADER } from '@mikka/protocol/device'
 import { normalizeRepository } from '@mikka/protocol/repository'
+import { apiKeyHarnesses } from '../lib/model-api-key-providers'
 import { dbUrl, seedBot, seedIssue, seedUser, seedWorkspace } from './support/workspace-admin-db'
 import { recordPushGrant } from './support/github-app-stub'
 import { fakeThreadMachines } from './support/thread-machine-fake'
@@ -59,7 +60,7 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
   })
 
   const models = (ids: string[]) => (async () => Response.json({ data: ids.map(id => ({ id })) })) as unknown as typeof fetch
-  const addKey = (ownerId: string, provider: 'anthropic' | 'openai', apiKey: string, listed: string[]) =>
+  const addKey = (ownerId: string, provider: 'anthropic' | 'openai' | 'deepseek', apiKey: string, listed: string[]) =>
     keys.addApiKey(pool, ownerId, { provider, apiKey }, { env: process.env, fetch: models(listed) })
   /** One task per run: a person has one unfinished run per task. */
   const task = async (ownerId: string) => {
@@ -333,7 +334,14 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
   await t.test('cloud queue refuses a key withdrawn after preflight even when another key serves the same model', async () => {
     const p = await person('key-withdrawn-before-cloud-queue')
     const selected = await addKey(p.id, 'anthropic', `sk-ant-${randomBytes(16).toString('hex')}`, ['key-model-a'])
-    const other = await addKey(p.id, 'anthropic', `sk-ant-${randomBytes(16).toString('hex')}`, ['key-model-a'])
+    // A preset replaces the owner's existing key. Use another preset that
+    // also serves Claude Code; the model list remains this test's fake fetch.
+    const other = await addKey(p.id, 'deepseek', `sk-${randomBytes(16).toString('hex')}`, ['key-model-a'])
+    assert.notEqual(selected.id, other.id)
+    for (const key of [selected, other]) {
+      assert.ok(apiKeyHarnesses(key).includes('claude_code'))
+      assert.ok(key.models.includes('key-model-a'))
+    }
     const { agentId, repoId } = await botComputer(p)
     const { runCredentialSource } = await import('../lib/run-credential-source')
     const selection = { ownerId: p.id, botId: p.botId, harness: 'claude_code', model: 'key-model-a', keyId: selected.id, botWorkspaceId: p.workspaceId, choiceWorkspaceId: p.workspaceId, subscription: null }
