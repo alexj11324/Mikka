@@ -11,7 +11,7 @@ export function assertFlashTestModel(model) {
 export async function assertTestModelRequest(request) {
   const url = new URL(request.url)
   const selection = request.method === 'PUT' && url.pathname.endsWith('/api/mobile/model')
-  const generation = request.method === 'POST' && /\/(?:chat\/completions|responses|messages|language-model)$/.test(url.pathname)
+  const generation = request.method === 'POST' && /\/(?:chat\/completions|responses|v1\/messages|language-model)$/.test(url.pathname)
   if (!selection && !generation) return
   const body = await request.clone().json()
   if (selection) {
@@ -20,7 +20,7 @@ export async function assertTestModelRequest(request) {
     return
   }
   // AI SDK Gateway carries the effective model in its header, not JSON.
-  const headerModel = request.headers.get('ai-language-model-id') ?? request.headers.get('ai-model-id')
-  if (headerModel) assertFlashTestModel(headerModel)
-  if (body.model !== undefined || !headerModel) assertFlashTestModel(body.model)
+  const headerModels = ['ai-language-model-id', 'ai-model-id'].map(name => request.headers.get(name)).filter(Boolean)
+  for (const model of headerModels) assertFlashTestModel(model)
+  if (body.model !== undefined || !headerModels.length) assertFlashTestModel(body.model)
 }
