@@ -7,7 +7,6 @@ import { mock, test } from 'node:test'
 import { normalizeRepository } from '@mikka/protocol/repository'
 import { dbUrl, seedUser, seedWorkspace } from './support/workspace-admin-db'
 import { connectGitHub, githubAppStub } from './support/github-app-stub'
-import { codexItemChunks } from '../packages/daemon/src/adapters/codex'
 
 mock.module(new URL('../lib/coordinator/decide.ts', import.meta.url).href, { namedExports: { invokeDecision: async () => null } })
 
@@ -20,6 +19,8 @@ test('a Coordinator dispatch_run goes through the Factory', { skip: !dbUrl, time
   const { overrideDeploymentSwitch } = await import('../lib/deployment-switches')
   overrideDeploymentSwitch('factoryRouting', true)
   overrideDeploymentSwitch('factoryLifecycle', true)
+  // Exercise the real daemon format without typechecking its separate package under the web tsconfig.
+  const { codexItemChunks } = await import(new URL('../packages/daemon/src/adapters/codex.ts', import.meta.url).href)
   const { Pool } = await import('pg')
   const pool = new Pool({ connectionString: dbUrl, max: 3 })
   const steps = await import('../workflows/coordinator/steps')
