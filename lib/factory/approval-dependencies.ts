@@ -10,8 +10,10 @@ import type { FactoryRevisionBinding } from './contract';
 /** Consumer views only; no stage/state implementation. #192's lifecycle store
  * supplies this port. Its third argument is botId; lifecycle is the fourth.
  * The older intake-only store cannot perform finish/advance. */
-export interface FactoryCandidate extends z.infer<typeof candidateSchema> {
+export interface FactoryCandidate extends Omit<z.infer<typeof candidateSchema>, 'sha'> {
   id: string;
+  sha: string | null;
+  kind?: 'repository' | 'report' | 'deliverable';
 }
 export interface FactoryTask extends Omit<
   z.infer<typeof bindingSchema>,

@@ -24,13 +24,23 @@ export async function api(path, { token, method = 'GET', body, fetchImpl = fetch
 /** Which variable names each template: the bot's computer, and a task machine per harness. */
 export const TEMPLATE_ENV = { desktop: 'E2B_BYO_COMPUTER_TEMPLATE', claude: 'E2B_CLAUDE_TEMPLATE', codex: 'E2B_CODEX_TEMPLATE' }
 
-export function pairEnv({ templates, sourceSha }) {
+export function pairEnv({ templates, sourceSha, models }) {
   for (const kind of Object.keys(TEMPLATE_ENV))
     if (!/^[A-Za-z0-9_-]+$/.test(templates?.[kind] ?? '')) fail(`template_id_invalid ${kind}`)
   if (!/^[0-9a-f]{40}$/.test(sourceSha ?? '')) fail('source_sha_invalid')
+  const required = { desktop: ['claude_code', 'codex'], claude: ['claude_code'], codex: ['codex'] }
+  for (const [kind, harnesses] of Object.entries(required)) {
+    if (!Array.isArray(models?.[kind])) fail(`template_models_invalid ${kind}`)
+    for (const harness of harnesses) {
+      const report = models[kind].find(row => row?.harness === harness && row.installed === true)
+      if (!report || !(report.models?.length || report.modelSlots?.length)) fail(`template_models_missing ${kind} ${harness}`)
+    }
+  }
+  const catalogue = { version: 1, workerSha: sourceSha, templates: Object.fromEntries(Object.keys(TEMPLATE_ENV).map(kind => [kind, { templateId: templates[kind], models: models[kind] }])) }
   return [
     ...Object.entries(TEMPLATE_ENV).map(([kind, key]) => ({ key, value: templates[kind], type: 'plain', target: ['production'] })),
     { key: 'MIKKA_CLOUD_WORKER_SHA', value: sourceSha, type: 'plain', target: ['production'] },
+    { key: 'MIKKA_CLOUD_TEMPLATE_MODELS', value: JSON.stringify(catalogue), type: 'plain', target: ['production'] },
   ]
 }
 
@@ -45,9 +55,9 @@ export async function currentWorkerSha({ token, fetchImpl = fetch }) {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
-export async function publish({ token, templates, sourceSha, fetchImpl = fetch, wait = sleep, log = console.log, maxPolls = 120 }) {
+export async function publish({ token, templates, sourceSha, models, fetchImpl = fetch, wait = sleep, log = console.log, maxPolls = 120 }) {
   if (!token) fail('vercel_token_unavailable')
-  const env = pairEnv({ templates, sourceSha })
+  const env = pairEnv({ templates, sourceSha, models })
   const call = (path, options = {}) => api(path, { token, fetchImpl, ...options })
 
   await call(`/v10/projects/${PROJECT}/env?upsert=true`, { method: 'POST', body: env })
@@ -90,6 +100,6 @@ if (import.meta.url === `file://${process.argv[1]}` && process.argv.includes('--
   console.log(await currentWorkerSha({ token: process.env.VERCEL_TEAM_TOKEN }))
 } else if (import.meta.url === `file://${process.argv[1]}`) {
   const templates = { desktop: process.env.DESKTOP_TEMPLATE_ID, claude: process.env.CLAUDE_TEMPLATE_ID, codex: process.env.CODEX_TEMPLATE_ID }
-  const result = await publish({ token: process.env.VERCEL_TEAM_TOKEN, templates, sourceSha: process.env.SOURCE_SHA })
+  const result = await publish({ token: process.env.VERCEL_TEAM_TOKEN, templates, sourceSha: process.env.SOURCE_SHA, models: JSON.parse(process.env.TEMPLATE_MODELS ?? '{}') })
   console.log(`production deployment ready: ${result.deploymentId}`)
 }

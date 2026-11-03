@@ -1,5 +1,6 @@
 import 'server-only';
 import { deploymentSwitch } from '@/lib/deployment-switches'
+import { automaticFactoryDispatch } from './automatic-dispatch'
 import type { PoolClient } from 'pg';
 import { pool, withDatabaseClient } from '@/lib/db';
 import { issueForUser } from '@/lib/issue-access';
@@ -57,7 +58,7 @@ export function factoryRuntimeForBot(botId: string | null, lifecycle: FactoryLif
     });
   const questions = createFactoryQuestions(pool,factoryAuthorize,store,dispatch,validate,questionSkillAssignments);
   const monitor = createFactoryMonitor(pool,store,factoryAuthorize,factoryMonitorWorkspaceKey,appendMonitorEvidence,configuredMonitorProbes(process.env),botId);
-  return {store,monitor,dispatch:observeFactoryCheckDispatch(store,dispatch),questions,recoverCheck:createFactoryCheckRecovery(pool,store,recovery),reconcile:createFactoryReconciler(pool,store,questions,{review:reconcileFactoryCheck,verify:reconcileFactoryCheck,monitor:createFactoryMonitorRunConsumer(monitor),...consumers},botId),claim:createFactoryClaim(store,questions,validate)};
+  return {store,monitor,dispatch:observeFactoryCheckDispatch(store,dispatch),questions,recoverCheck:createFactoryCheckRecovery(pool,store,recovery),reconcile:createFactoryReconciler(pool,store,questions,{review:reconcileFactoryCheck,verify:reconcileFactoryCheck,monitor:createFactoryMonitorRunConsumer(monitor),...consumers},botId,automaticFactoryDispatch(pool)),claim:createFactoryClaim(store,questions,validate)};
 }
 
 /** Returns before any Factory SQL when default-off; ordinary claims retain their path. */

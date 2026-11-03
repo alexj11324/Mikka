@@ -8,6 +8,8 @@ import { pool, withDatabaseClient } from "@/lib/db";
 import { issueForUser } from "@/lib/issue-access";
 import { lockCliAgentPolicy, lockCliRunPolicy } from "@/lib/agent-tool-approval/policy-store";
 import { createFactoryStore } from "./store";
+import { createFactoryHumanStore } from './human-store';
+import { factoryCheckIndependent } from './check-independence';
 import { approvalGate, publishGate, createFactoryApprovals } from "./approval";
 import { createFactoryMerges, githubMergeApi } from "./merge";
 import { createFactoryCheckClaim, factoryCheckGates } from "./checks";
@@ -30,19 +32,21 @@ const authorize: FactoryAuthorize = async (userId, issueId, tx) => {
   await tx.query("SELECT id FROM issues WHERE id=$1 FOR SHARE", [issueId]);
   return Boolean(await issueForUser(userId, issueId, false, drizzle(tx)));
 };
-export const factoryStore = createFactoryStore(pool, authorize, {
+const humanGates = {
   ...factoryCheckGates,
   approval: approvalGate,
   publish: publishGate,
   monitor: monitorGate,
-});
+};
+export const factoryStore = createFactoryStore(pool, authorize, humanGates);
+export const factoryHumanStore = createFactoryHumanStore(pool, botId => createFactoryStore(pool, authorize, botId, { independent: factoryCheckIndependent, gates: humanGates }));
 // #528: a code candidate is accepted by the person's merge of its PR
 // (factoryMerges); deploy_preview/deploy_production are not Factory steps. Only a
 // skill candidate, which has no PR, is still approved and activated here.
 export const factoryApprovals = createFactoryApprovals(
   pool,
   authorize,
-  factoryStore,
+  factoryHumanStore,
   [
     ...createSkillActivationAdapters({
       readRegisteredCandidate: async (...args) =>
@@ -57,7 +61,7 @@ export const factoryApprovals = createFactoryApprovals(
   ],
   { codeCandidatesMerge: true },
 );
-export const factoryMerges = createFactoryMerges(pool, authorize, factoryStore, githubMergeApi());
+export const factoryMerges = createFactoryMerges(pool, authorize, factoryHumanStore, githubMergeApi());
 export const claimFactoryCheckRun = createFactoryCheckClaim(pool, authorize);
 export const factoryMonitorWorkspaceKey: Parameters<typeof createFactoryMonitor>[3] = async (userId, issueId, tx) => {
     const [link] = await workspaceDb

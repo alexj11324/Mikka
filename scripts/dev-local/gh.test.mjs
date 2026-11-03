@@ -44,12 +44,17 @@ test('real agent-shaped push, gh PR and exact-head receipt use only the fixture 
     assert.equal(JSON.parse(output.at(-1))[0].number, 41)
     await gh(['pr', 'view', 'mikka/fixture-1', '--repo', env.GH_REPO, '--json', 'headRefOid,body'])
     assert.equal(JSON.parse(output.at(-1)).headRefOid, commit)
+    // The host receipt supplies --repo explicitly and has no GH_REPO env.
+    await fixtureGh(['pr', 'view', 'mikka/fixture-1', '--repo', env.GH_REPO, '--json', 'headRefOid,body'], { env: { ...env, GH_REPO: undefined }, origin: services.origin, gitRun: git, output: value => output.push(value) })
+    assert.equal(JSON.parse(output.at(-1)).headRefOid, commit)
     await gh(['pr', 'checks', 'https://github.com/mikka-e2e/core-loop/pull/41', '--watch'])
     assert.match(output.at(-1), /synthetic CI.*pass/)
     await gh(['api', 'graphql', '-f', 'query=query($owner:String!,$repository:String!,$commit:GitObjectID!){repository(owner:$owner,name:$repository){object(oid:$commit){... on Commit {oid statusCheckRollup{state}}}}}', '-f', 'owner=mikka-e2e', '-f', 'repository=core-loop', '-f', `commit=${commit}`])
     const checked = JSON.parse(output.at(-1)).data.repository.object
     assert.equal(checked.oid, commit)
     assert.equal(checked.statusCheckRollup.state, 'SUCCESS')
+    await fixtureGh(['pr','view','mikka/fixture-1','--repo',env.GH_REPO,'--json','headRefOid,body'],{env:{...env,GH_TOKEN:'mikka-local-synthetic-user-token',GH_REPO:undefined},origin:services.origin,gitRun:git,output:value=>output.push(value)})
+    assert.equal(JSON.parse(output.at(-1)).headRefOid,commit,'the outer receipt uses the owner user credential too')
     // A server without a repository verification command preserves not_run
     // and legitimately downgrades this task's PR after the agent receipt.
     const pr = await (await fetch(`${services.origin}/github/repos/${env.GH_REPO}/pulls/41`, { headers: { authorization: `Bearer ${env.GH_TOKEN}` } })).json()

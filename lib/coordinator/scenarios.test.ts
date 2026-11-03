@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { before, beforeEach, mock, test } from 'node:test'
-import { generateText, stepCountIs, type ToolSet } from 'ai'
+import { asSchema, generateText, stepCountIs, type ToolSet } from 'ai'
 import { MockLanguageModelV3 } from 'ai/test'
 import { overrideDeploymentSwitch } from '../deployment-switches'
 
@@ -40,15 +40,16 @@ before(async () => {
   registry = await import('@/workflows/coordinator/tools')
   instructions = (await import('./instructions')).COORDINATOR_INSTRUCTIONS
   const { githubContext } = await import('./github-context')
-  const { executionContextText } = await import('./execution-context')
+  const { executionContextText, modelListText } = await import('./execution-context')
   const github = await githubContext(OWNER, {
     connection: async () => ({ githubLogin: 'alexj11324' }),
     list: async () => ({ login: 'alexj11324', installationAccounts: ['alexj11324'], repositories: Array.from({ length: 50 }, (_, index) => index) }),
   })
-  const execution = executionContextText({
+  // As in the real prompt: the allowed models list (cached prefix), then what changes per turn.
+  const execution = ((f: Parameters<typeof executionContextText>[0]) => `${modelListText(f)}\n${executionContextText(f)}`)({
     workspace: { name: 'Alex', kind: 'personal' },
     devices: [{ name: 'Alex 的 MacBook', online: true, enabled: true, agents: ['Claude Code', 'Codex'] }],
-    order: { location: 'local', entries: [{ agent: 'Claude Code', model: 'opus', provider: 'anthropic', block: null }, { agent: 'Codex', model: 'gpt-codex', provider: 'openai', block: null }], credentials: [{ kind: 'subscription', provider: 'anthropic' }, { kind: 'subscription', provider: 'openai' }] },
+    order: { location: 'local', entries: [{ harness: 'claude_code', agent: 'Claude Code', model: 'opus', source: 'subscription', provider: 'anthropic', places: ['Alex 的 MacBook (computer)'], block: null }, { harness: 'codex', agent: 'Codex', model: 'gpt-codex', source: 'subscription', provider: 'openai', places: ['Alex 的 MacBook (computer)'], block: null }], credentials: [{ kind: 'subscription', provider: 'anthropic' }, { kind: 'subscription', provider: 'openai' }] },
     e2b: false,
     hosted: 'points_exhausted',
   })
@@ -223,9 +224,30 @@ test(`screen work on a named site still names it to the sub-agent: 「${MIKKA_SI
   assert.match((calls[0].input as { task: string }).task, /Mikka site/)
 })
 
-test('the prompt teaches judgment with neutral names; it never contains the eval\'s sentences or the real repositories', () => {
+test('the prompt teaches judgment with neutral names; it never contains the eval\'s sentences or the real repositories', async () => {
   const tools = registry.createCoordinatorRegistry(OWNER, COORDINATOR_BOT, undefined, { coordinator: true, computerEnabled: true })
-  const text = [instructions, ...Object.values(tools).map(tool => String(tool.description ?? '')), JSON.stringify(Object.fromEntries(Object.entries(tools).map(([name, tool]) => [name, (tool.inputSchema as { toJSONSchema?: () => unknown })?.toJSONSchema?.() ?? null])))].join('\n')
+  const text = [instructions, ...Object.values(tools).map(tool => String(tool.description ?? '')), JSON.stringify(Object.fromEntries(await Promise.all(Object.entries(tools).map(async ([name, tool]) => [name, await asSchema(tool.inputSchema).jsonSchema]))))].join('\n')
   assert.match(text, /every word kept \(e\.g\. acme_tools, the Acme docs\)/, 'the parameter descriptions are read too')
   for (const leaked of [/Mikka site/i, /mikka-web/i, /mikka-enterprise/i, /How it works/i, /It's in the/i, /Mikka_test/, /alexj11324\/Mikka/i, /octo-web|octo-api/i, /landing page|docs site/i]) assert.doesNotMatch(text, leaked)
+})
+
+test('「Octo 官网的导航栏在手机上错位了」 with the authorized list in the turn: chosen from the list, no search needed', async () => {
+  const { githubContext } = await import('./github-context')
+  const listed = await githubContext(OWNER, {
+    connection: async () => ({ githubLogin: 'octo-dev' }),
+    list: async () => ({ login: 'octo-dev', installationAccounts: ['octo'], repositories: [
+      { fullName: 'octo/octo', description: 'The product: app and API clients', homepage: 'https://app.octo.example', pushedAt: null },
+      { fullName: 'octo/octo-web', description: 'The public marketing website', homepage: 'https://octo.example', pushedAt: null },
+      { fullName: 'octo/octo-api', description: null, homepage: null, pushedAt: null },
+    ] }),
+  })
+  assert.match(instructions, /The GitHub lines below list the repositories they authorized, each with its description and homepage: look there first/)
+  assert.match(listed, /^- octo\/octo-web · "The public marketing website" · homepage "https:\/\/octo\.example"$/m)
+  const { reply } = await play('Octo 官网的导航栏在手机上错位了，修一下', [
+    { tool: 'dispatch_run', input: { issueId: ISSUE, repo: 'octo/octo-web' } },
+    { text: '已经派给 Agent 在 octo/octo-web 上修。' },
+  ])
+  assert.deepEqual(calls.map(call => call.step), ['dispatchRun'], 'the list in the turn makes the lookup unnecessary')
+  assert.equal((calls[0].input as { repo: string }).repo, 'octo/octo-web')
+  assert.doesNotMatch(reply, /哪个仓库/)
 })

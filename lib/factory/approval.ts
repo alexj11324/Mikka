@@ -34,7 +34,7 @@ import {
   publicationBindingHash,
   type PublicationInput,
 } from "./publication-operation";
-import { mergedFor } from "./merge";
+import { acceptedDeliverableFor, mergedFor } from "./merge";
 
 const principalId = (actor: FactoryActor) =>
   actor.sessionId ? `session:${actor.sessionId}` : `owner:${actor.userId}`;
@@ -213,6 +213,8 @@ async function validApproval(
 
 function gatesFor() {
   const approvalGate: FactoryGate = async (tx, task, _attempt, change) => {
+    const deliverableId = (change.output as { deliverableAcceptanceId?: unknown } | null)?.deliverableAcceptanceId;
+    if (deliverableId !== undefined) return task.stage === 'approval' && acceptedDeliverableFor(tx, task, deliverableId);
     // #528: a code candidate is accepted by the person's merge of its PR.
     const mergeId = (change.output as { mergeId?: unknown } | null)?.mergeId;
     if (mergeId !== undefined) return task.stage === "approval" && mergedFor(tx, task, mergeId);
@@ -514,7 +516,7 @@ export function createFactoryApprovals(
         if (
           !merged &&
           (task.stage !== "approval" ||
-            !["pending", "waiting"].includes(task.status))
+            !["pending", "waiting", "passed"].includes(task.status))
         )
           fail("factoryTransition");
         const current = await approvalEvidence(tx, task);

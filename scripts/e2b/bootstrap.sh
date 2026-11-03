@@ -7,7 +7,7 @@ export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
 apt-get install -y -qq xz-utils git gh curl
 # Native worker and test tooling require Node 24; use a pinned official build.
-curl -fsSL https://nodejs.org/dist/v24.19.0/node-v24.19.0-linux-x64.tar.xz -o /tmp/mikka-node.tar.xz
+curl -fsSL --retry 3 --retry-all-errors --retry-delay 2 --connect-timeout 20 --max-time 120 https://nodejs.org/dist/v24.19.0/node-v24.19.0-linux-x64.tar.xz -o /tmp/mikka-node.tar.xz
 echo '14b342e71204f811bde6153be8e04b62aef63c236fef92b55f9c83154b409647  /tmp/mikka-node.tar.xz' | sha256sum --check --strict
 # Tar overlays retain incompatible nested npm dependencies from the base image.
 rm -rf /usr/local/lib/node_modules/npm

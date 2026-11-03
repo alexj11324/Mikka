@@ -57,6 +57,8 @@ test("acceptance merges the PR as the person", { skip: !db, timeout: 180000 }, a
     `);
     await pool.query(await readFile(new URL("../../drizzle/20261101121000_factory_merges.sql", import.meta.url), "utf8"));
 
+    await pool.query(await readFile(new URL("../../drizzle/20261103060000_factory_deliverables.sql",import.meta.url),"utf8"));
+
     let nextPull = 418;
     async function prepared(pr = `https://github.com/alexj11324/Mikka/pull/${nextPull++}`) {
       const x = await f.prepare();

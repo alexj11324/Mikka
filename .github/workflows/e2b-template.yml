@@ -97,6 +97,7 @@ jobs:
       claude-template-id: ${{ steps.build.outputs.claude-template-id }}
       codex-template-id: ${{ steps.build.outputs.codex-template-id }}
       source-sha: ${{ steps.build.outputs.source-sha }}
+      template-models: ${{ steps.build.outputs.template-models }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -127,13 +128,17 @@ jobs:
           if (out.sourceCommit !== process.env.GITHUB_SHA) throw new Error('Templates were built from another commit')
           if (!/^[0-9a-f]{40}$/.test(out.workerSha)) throw new Error('Invalid worker hash')
           const lines = [`source-sha=${out.workerSha}`]
+          const models = {}
           for (const kind of ['desktop', 'claude', 'codex']) {
             const template = out.templates?.[kind]
             if (template?.public !== true || template.buildStatus !== 'ready') throw new Error(`Template ${kind} is not public and ready`)
             if (!/^[A-Za-z0-9_-]+$/.test(template.templateId)) throw new Error(`Invalid ${kind} template id`)
             lines.push(`${kind}-template-id=${template.templateId}`)
+            if (!Array.isArray(template.models) || !template.models.length) throw new Error(`Missing ${kind} model probe`)
+            models[kind] = template.models
             console.log(`${kind} template ${template.templateId} (${template.name}) from ${out.sourceCommit}, worker hash ${out.workerSha}: public, ready`)
           }
+          lines.push(`template-models=${JSON.stringify(models)}`)
           appendFileSync(process.env.GITHUB_OUTPUT, lines.join('\n') + '\n')
           JS
 
@@ -170,3 +175,4 @@ jobs:
           CLAUDE_TEMPLATE_ID: ${{ needs.build.outputs.claude-template-id }}
           CODEX_TEMPLATE_ID: ${{ needs.build.outputs.codex-template-id }}
           SOURCE_SHA: ${{ needs.build.outputs.source-sha }}
+          TEMPLATE_MODELS: ${{ needs.build.outputs.template-models }}

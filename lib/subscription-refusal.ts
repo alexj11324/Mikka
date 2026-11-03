@@ -13,6 +13,8 @@ const REFUSALS = {
   provider_route_unavailable: 'runtimeUnavailable', invalid_credential_bundle: 'reconnect',
   subscription_timeout: 'retry', provider_operation_failed: 'retry',
   subscription_generation_failed: 'retry',
+  // A cloud computer's own CLI did not report the run's model (packages/daemon/src/subscription-hosted-runner.ts).
+  subscription_model_not_reported: 'modelNotReported',
 } as const satisfies Record<SubscriptionRefusalCode, string> & Record<string, string>
 
 export type SubscriptionRefusalNotice = (typeof REFUSALS)[keyof typeof REFUSALS]
@@ -20,7 +22,7 @@ export type SubscriptionRefusalNotice = (typeof REFUSALS)[keyof typeof REFUSALS]
 /** One recovery action shared by the live notice and a failed message's footer. */
 export function subscriptionRecovery(notice: SubscriptionRefusalNotice): 'retry' | 'settings' | 'model' {
   if (notice === 'retry' || notice === 'rateLimited' || notice === 'quotaChecking') return 'retry'
-  if (notice === 'reconnect' || notice === 'unavailable') return 'settings'
+  if (notice === 'reconnect' || notice === 'unavailable' || notice === 'modelNotReported') return 'settings'
   return 'model'
 }
 

@@ -1,5 +1,6 @@
 import 'server-only'
 import { randomUUID } from 'node:crypto'
+import { cloudModelSupport, type CloudModelState } from './cloud-template-models'
 import type { Pool, PoolClient } from 'pg'
 import { z } from 'zod'
 import { isDeviceOnline } from '@mikka/protocol/device'
@@ -49,6 +50,7 @@ export interface OrderView {
   devices: number
   /** 云端: the person's own E2B cloud would take a run now. */
   cloudReady: boolean
+  cloudModels: Record<string, CloudModelState>
   /** 会先用: where a new run would go now, by the same plan as dispatch; null when nowhere. */
   first: { kind: 'cloud' } | { kind: 'device'; id: string; name: string; server: boolean } | null
   /** Devices that can run the same list now, including credential readiness. */
@@ -236,7 +238,8 @@ export async function orderView(query: Query, scope: OrderScope): Promise<OrderV
   const ready = order.location === 'cloud' && await (await import('./rule-dispatch')).cloudReady(query, { ...scope, botId: null, harness: order.entries[0]?.harness ?? 'claude_code' })
   const credential = (entry: OrderEntry) => states.get(entry.id)?.credential ?? { usable: false, reason: 'missing' } as const
   // 会先用: what dispatch would pick for a new run now, from the same plan.
-  const plan = planDispatch({ entries: order.entries, location: order.location, devices, credential, cloudReady: ready })
+  const cloudModels = Object.fromEntries(order.entries.map(entry => [entry.id, cloudModelSupport(entry)]))
+  const plan = planDispatch({ entries: order.entries, location: order.location, devices, credential, cloudReady: ready, cloudModel: entry => cloudModels[entry.id] })
   const firstDevice = plan.kind === 'device' ? devices.find(device => device.id === plan.deviceId) : undefined
   return {
     location: order.location,
@@ -245,6 +248,7 @@ export async function orderView(query: Query, scope: OrderScope): Promise<OrderV
     credentials,
     devices: devices.filter(device => device.enabled).length,
     cloudReady: ready,
+    cloudModels,
     first: plan.kind === 'cloud' ? { kind: 'cloud' } : firstDevice ? { kind: 'device', id: firstDevice.id, name: firstDevice.name, server: firstDevice.server } : null,
     readyDeviceIds: devices.filter(device => planDispatch({ entries: order.entries, location: 'local', devices: [device], credential, cloudReady: false }).kind === 'device').map(device => device.id),
     deviceModels: Object.fromEntries(devices.map(device => [device.id,
@@ -253,7 +257,7 @@ export async function orderView(query: Query, scope: OrderScope): Promise<OrderV
       const state = states.get(entry.id)!
       // 云端 that runs takes every model; otherwise a server or a computer must.
       const block: OrderRow['block'] = !state.credential.usable ? { reason: state.credential.reason, ...(state.credential.resetsAt ? { resetsAt: state.credential.resetsAt } : {}) }
-        : !ready && !devices.some(device => deviceModel(device, entry)) ? { reason: 'noDevice', device: whyNoDevice(devices, entry) } : null
+        : !(ready && cloudModels[entry.id] === 'ready') && !devices.some(device => deviceModel(device, entry)) ? { reason: 'noDevice', device: whyNoDevice(devices, entry) } : null
       return { ...entry, provider: state.provider, agents: agents.get(offerKey(entry)) ?? [entry.harness], block }
     }),
     candidates: candidates.map(candidate => ({ ...candidate, added: added.has(entryKey(candidate)) })),

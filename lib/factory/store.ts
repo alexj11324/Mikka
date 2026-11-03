@@ -1,3 +1,6 @@
+import { repositoryExecutionMatches } from './execution-receipt'
+import { apiKeyWorkerDefinition } from "../agent-kit/worker";
+import { factoryRunBotMatches } from './run-scope'
 import { randomUUID } from "node:crypto";
 import { factoryCheckIndependent } from "./check-independence";
 import { maskFactoryNote } from "./note-mask";
@@ -8,7 +11,7 @@ import type { Pool, PoolClient } from "pg";
 import { z } from "zod";
 import {
   revisionBindingSchema,
-  candidateSchema,
+  factoryCandidateSchema,
   nextStage,
   changeSchema,
   FactoryError,
@@ -79,7 +82,8 @@ export interface FactoryAttempt {
 export interface FactoryCandidate {
   id: string;
   taskId: string;
-  sha: string;
+  sha: string | null;
+  kind?: 'repository' | 'report' | 'deliverable';
   repository: string;
   environment: string;
   scope: string;
@@ -243,7 +247,7 @@ export function createFactoryStore(
       'SELECT * FROM agent_runs WHERE id=$1 AND "userId"=$2 AND "issueId"=$3 FOR UPDATE',
       [runId, task.userId, task.issueId],
     );
-    if (!run || run.stopRequestedAt || run.botId !== task.botId) fail("factoryRunMismatch");
+    if (!run || run.stopRequestedAt || !(await factoryRunBotMatches(tx, task, run))) fail("factoryRunMismatch");
     return run;
   }
   async function freshAttempt(
@@ -266,7 +270,7 @@ export function createFactoryStore(
     lockTask: (tx: PoolClient, userId: string, taskId: string) => owned(tx, userId, taskId),
     /** Read-only GET paths: ownership/scope checked, nothing locked. */
     readTask: (tx: PoolClient, userId: string, taskId: string) => owned(tx, userId, taskId, false),
-    async route(userId: string, input: unknown) {
+    async route(userId: string, input: unknown, existing?: PoolClient) {
       const parsed = routeSchema.safeParse(input);
       if (!parsed.success) fail("factoryInvalid");
       const route = parsed.data;
@@ -339,7 +343,7 @@ export function createFactoryStore(
           [task.attemptId, task.id, task.stage, task.status, task.reason],
         );
         return save(tx, task, route.eventId, route);
-      });
+      }, existing);
     },
     /** Task-detail GET: read-only, no row locks (BE-16). B8/B9 checks and the B11 header are computed, never stored. */
     async read(userId: string, taskId: string): Promise<FactorySnapshot & Partial<FactoryTaskDetail>> {
@@ -501,19 +505,22 @@ export function createFactoryStore(
           }
         } else if (change.action === "adopt_retry") {
           if (
-            !["spec", "execute"].includes(task.stage) ||
+            !["spec", "execute", "review", "verify"].includes(task.stage) ||
             !attempt.runId ||
             !["running", "failed"].includes(task.status)
           )
             fail("factoryTransition");
           const prior = await runFor(tx, task, attempt.runId);
           const retry = await runFor(tx, task, change.runId);
+          const quotaRetry = prior.stopReason === "quota_exhausted" && ["failed","paused"].includes(prior.status);
+          const expected = quotaRetry && retry.agentDefinition?.apiKey && prior.agentDefinition
+            ? apiKeyWorkerDefinition(prior.agentDefinition, retry.prompt, retry.agentDefinition.apiKey)
+            : prior.agentDefinition;
           if (
-            prior.stopReason !== "device_lost" ||
-            prior.status !== "failed" ||
+            (!quotaRetry && (prior.stopReason !== "device_lost" || prior.status !== "failed")) ||
             retry.retryOf !== prior.id || retry.agentId !== prior.agentId ||
             retry.kind !== prior.kind || retry.baseBranch !== prior.baseBranch ||
-            retry.agentDefinition?.definitionDigest !== prior.agentDefinition?.definitionDigest
+            retry.agentDefinition?.definitionDigest !== expected?.definitionDigest
           )
             fail("factoryRunMismatch");
           await tx.query(
@@ -531,6 +538,13 @@ export function createFactoryStore(
             'UPDATE factory_attempts SET status=\'running\',"runId"=$2,"sessionId"=$3 WHERE id=$1',
             [task.attemptId, retry.id, retry.sessionId],
           );
+          if (["review","verify"].includes(task.stage)) {
+            // Checks restart independently on the same candidate; they never
+            // resume the failed/paused CLI session or acquire its observations.
+            await tx.query(`UPDATE agent_runs SET "retryOf"=NULL,"sessionId"=NULL,prompt=$2,"agentDefinition"=jsonb_set("agentDefinition",'{promptDigest}',to_jsonb($3::text)) WHERE id=$1`, [retry.id, prior.prompt, (await import('../agent-kit/worker')).retryWorkerDefinition(retry.agentDefinition, prior.prompt)!.promptDigest]);
+            await tx.query('UPDATE factory_attempts SET output=$2 WHERE id=$1', [task.attemptId, JSON.stringify({ check: attempt.output.check })]);
+            await tx.query('INSERT INTO factory_events ("taskId","eventId",request,result) VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING', [task.id, (await import('./event-id')).factoryEventId('quota-check-continuation',prior.id), JSON.stringify({ priorRunId: prior.id }), JSON.stringify({ runId: retry.id })]);
+          }
           task.status = "running";
         } else if (change.action === "bind_run") {
           if (task.status !== "pending" || attempt.runId)
@@ -571,10 +585,10 @@ export function createFactoryStore(
           const producingRun = await runFor(tx, task, change.runId);
           const machine = (await tx.query('SELECT name FROM devices WHERE id=$1 AND "ownerId"=$2', [producingRun.deviceId, task.userId])).rows[0];
           const branch = typeof producingRun.report?.previewDatabaseBranch === "string" ? producingRun.report.previewDatabaseBranch.trim().slice(0, 500) || null : null;
-          const candidate = candidateSchema.parse(change.candidate),
+          const candidate = factoryCandidateSchema.parse(change.candidate),
             candidateId = randomUUID();
           await tx.query(
-            'INSERT INTO factory_candidates (id,"taskId",sha,repository,environment,scope,"runId","previewDatabaseBranch","machineName") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)',
+            'INSERT INTO factory_candidates (id,"taskId",sha,repository,environment,scope,"runId","previewDatabaseBranch","machineName",kind) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',
             [
               candidateId,
               task.id,
@@ -585,6 +599,7 @@ export function createFactoryStore(
               change.runId,
               branch,
               machine?.name ?? null,
+              'kind' in candidate ? candidate.kind : 'repository',
             ],
           );
           task.candidateId = candidateId;
@@ -660,9 +675,12 @@ export function createFactoryStore(
                 fail("factoryEvidenceRequired");
               if (
                 task.stage === "execute" &&
-                (run.report?.publish?.commit !== candidate?.sha ||
-                  run.stopReason !== "submitted" ||
-                  run.report?.verify?.status !== "passed")
+                (run.stopReason !== 'submitted' ||
+                  (candidate?.kind === 'report'
+                    ? run.report?.sourceCommit !== candidate.sha
+                    : candidate?.kind === 'deliverable'
+                      ? candidate.sha !== null || !/^[a-f0-9]{40}$/.test(run.report?.sourceCommit ?? '')
+                      : !repositoryExecutionMatches(run.report,candidate?.sha)))
               )
                 fail("factoryEvidenceMismatch");
               for (const evidence of change.evidence) {
@@ -749,8 +767,10 @@ export function createFactoryStore(
             attempt.stage === "monitor" &&
             attempt.status === "passed" &&
             attempt.candidateId === task.candidateId;
+          const requestedRepair = change.action === 'repair' && task.status === 'pending' && ['review', 'verify', 'approval'].includes(task.stage);
           if (
             !nextMonitorCycle &&
+            !requestedRepair &&
             !["failed", "blocked", "waiting"].includes(task.status)
           )
             fail("factoryTransition");
@@ -769,7 +789,7 @@ export function createFactoryStore(
             );
             if (
               run &&
-              !["succeeded", "failed", "stopped", "cancelled"].includes(
+              !["succeeded", "completed", "failed", "stopped", "cancelled"].includes(
                 run.status,
               )
             )

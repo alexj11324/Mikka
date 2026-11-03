@@ -24,7 +24,7 @@ import type {
   SpawnOptions,
   SpawnedProcess,
 } from "@anthropic-ai/claude-agent-sdk";
-import { nativeBrokerContextSchema, type RunAssignment } from "@mikka/protocol";
+import { harnessReportsModel, nativeBrokerContextSchema, type HarnessInfo, type RunAssignment } from "@mikka/protocol";
 import { ClaudeAdapter, ClaudeInitializationError } from "./adapters/claude";
 import { CodexAdapter } from "./adapters/codex";
 import type { AgentSession, StartOptions } from "./adapters/types";
@@ -82,32 +82,13 @@ const blockedSandbox: AgentSandbox = {
   },
 };
 
-export async function createHostedBotRunner(host: {
-  stateDir: string;
-  link: ServerLink;
-  binaries?: Partial<Record<"codex" | "claude_code", string>>;
-  /**
-   * Passed only by trusted E2B infrastructure, never by a task. Unused since
-   * runs stopped using Docker (decision 2026-11-01-1312); still accepted.
-   */
-  dockerSocket?: "unix:///run/mikka-container/docker.sock";
-  /** Optional trusted request-only desktop broker owned by the cloud daemon. */
-  computerBroker?: ComputerBroker;
-}) {
-  if (
-    process.platform !== "linux" ||
-    process.getuid?.() === 0 ||
-    !host.link.nativeContext ||
-    !host.link.nativeRequest
-  )
-    throw unavailable();
-  if (host.dockerSocket !== undefined && host.dockerSocket !== "unix:///run/mikka-container/docker.sock") throw unavailable();
-  // Runs use no Docker (decision 2026-11-01-1312). The template's worker still
-  // passes its socket; it is accepted and unused.
-  const bareEnv = { PATH: process.env.PATH, LANG: "C.UTF-8" };
-  // Per-run container records from before that decision name nothing this
-  // runner creates; a leftover must not block the machine.
-  rmSync(join(host.stateDir, "native-resources"), { recursive: true, force: true });
+/**
+ * The CLI each harness runs on a cloud machine: the one passed in, else Claude Code from the bundled
+ * agent SDK and Codex from PATH (E2B's own template CLI). The model probe at template build time and
+ * at daemon start asks these same binaries, so what it reports is what a run here uses.
+ */
+export function hostedBinaries(passed?: Partial<Record<"codex" | "claude_code", string>>): Partial<Record<"codex" | "claude_code", string>> {
+  const host = { binaries: passed };
   const require = createRequire(import.meta.url);
   let claude = host.binaries?.claude_code;
   try {
@@ -129,7 +110,7 @@ export async function createHostedBotRunner(host: {
       .split(delimiter)
       .map((dir) => join(dir, "codex"))
       .find((path) => existsSync(path));
-  const binaries = { codex, claude_code: claude };
+  const binaries: Partial<Record<"codex" | "claude_code", string>> = { codex, claude_code: claude };
   for (const kind of ["codex", "claude_code"] as const)
     if (binaries[kind]) {
       try {
@@ -139,6 +120,42 @@ export async function createHostedBotRunner(host: {
         delete binaries[kind];
       }
     }
+  return binaries;
+}
+
+export async function createHostedBotRunner(host: {
+  stateDir: string;
+  link: ServerLink;
+  binaries?: Partial<Record<"codex" | "claude_code", string>>;
+  /**
+   * Passed only by trusted E2B infrastructure, never by a task. Unused since
+   * runs stopped using Docker (decision 2026-11-01-1312); still accepted.
+   */
+  dockerSocket?: "unix:///run/mikka-container/docker.sock";
+  /** Optional trusted request-only desktop broker owned by the cloud daemon. */
+  computerBroker?: ComputerBroker;
+  /**
+   * The models this machine's CLI reported for a harness (the daemon's model probe, model-probe.ts),
+   * or null when it reported none. Given, a subscription run starts only on a model it lists; otherwise
+   * it fails with subscription_model_not_reported and no other model is put in its place (Alex, 2026-11-03).
+   */
+  reportedModels?: (harness: "codex" | "claude_code") => Promise<Pick<HarnessInfo, "models" | "modelSlots"> | null>;
+}) {
+  if (
+    process.platform !== "linux" ||
+    process.getuid?.() === 0 ||
+    !host.link.nativeContext ||
+    !host.link.nativeRequest
+  )
+    throw unavailable();
+  if (host.dockerSocket !== undefined && host.dockerSocket !== "unix:///run/mikka-container/docker.sock") throw unavailable();
+  // Runs use no Docker (decision 2026-11-01-1312). The template's worker still
+  // passes its socket; it is accepted and unused.
+  const bareEnv = { PATH: process.env.PATH, LANG: "C.UTF-8" };
+  // Per-run container records from before that decision name nothing this
+  // runner creates; a leftover must not block the machine.
+  rmSync(join(host.stateDir, "native-resources"), { recursive: true, force: true });
+  const binaries = hostedBinaries(host.binaries);
   if (!binaries.codex && !binaries.claude_code) throw unavailable();
   // A verify command runs directly on the task's machine against a private git
   // copy, so it cannot change the worktree's own `.git`.
@@ -244,6 +261,8 @@ export async function createHostedBotRunner(host: {
     harnesses: Object.keys(binaries).filter(
       (kind) => binaries[kind as keyof typeof binaries],
     ) as ("codex" | "claude_code")[],
+    /** The CLI each harness runs, so the daemon's model probe asks the same binary. */
+    binaries: { ...binaries } as Partial<Record<"codex" | "claude_code", string>>,
     command,
     async start(
       assignment: RunAssignment,
@@ -268,6 +287,11 @@ export async function createHostedBotRunner(host: {
         options.continueSession
       )
         throw unavailable();
+      // A subscription model runs only if this machine's CLI reported it; the run fails with the reason, never on another model.
+      if (selected && host.reportedModels) {
+        const report = await host.reportedModels(kind).catch(() => null);
+        if (!options.model || !report || harnessReportsModel(report, options.model) !== true) throw new Error("subscription_model_not_reported");
+      }
       const lifetime = new AbortController();
       // Fixed diagnostic fields only. These callbacks can fail after the first
       // context succeeds; the adapters deliberately hide their raw errors.

@@ -28,11 +28,12 @@ async function worktreeOf(repo: string) {
 }
 
 /** Talks newline-delimited JSON-RPC to the MCP server script. */
-function mcpClient(handoff: string) {
+function mcpClient(handoff: string, extraArgs: string[] = []) {
   const child = spawn(process.execPath, [
     MCP_SERVER_SCRIPT,
     "--handoff",
     handoff,
+    ...extraArgs,
   ])
   const waiting = new Map<number, (value: unknown) => void>()
   onLines(child.stdout, (line) => {
@@ -55,6 +56,23 @@ function mcpClient(handoff: string) {
 }
 
 describe("mikka MCP server", () => {
+  it('offers a host-bound verify tool with real output, no model credential env and no hand-in side effect', async () => {
+    const root = tempDir()
+    const command = `${JSON.stringify(process.execPath)} -e "console.log('verified'); if(process.env.ANTHROPIC_API_KEY)process.exit(7)"`
+    const previous = process.env.ANTHROPIC_API_KEY
+    process.env.ANTHROPIC_API_KEY = 'fixture-private-key'
+    const client = mcpClient(join(root, 'handoff.json'), ['--factory-verify', JSON.stringify({ cwd: root, command, infer: false })])
+    if (previous === undefined) delete process.env.ANTHROPIC_API_KEY; else process.env.ANTHROPIC_API_KEY = previous
+    try {
+      const list = await client.request('tools/list')
+      expect(JSON.stringify(list)).toContain('verify_command')
+      const refused = await client.request('tools/call', { name: 'verify_command', arguments: { command: 'echo another command' } })
+      expect(refused).toMatchObject({ result: { isError: true } })
+      const result = await client.request('tools/call', { name: 'verify_command', arguments: { command } }) as { result: { content: { text: string }[] } }
+      expect(JSON.parse(result.result.content[0].text)).toMatchObject({ exitCode: 0, stdout: 'verified\n' })
+      expect(existsSync(join(root, 'handoff.json'))).toBe(false)
+    } finally { client.close() }
+  })
   it("lists the hand-in tools and records a submit as the session's exit", async () => {
     const repo = await makeRepo()
     const ctx = new RunContext({
@@ -74,7 +92,7 @@ describe("mikka MCP server", () => {
         result: { serverInfo: { name: "mikka" } },
       })
       const list = (await client.request("tools/list")) as {
-        result: { tools: { name: string }[] }
+        result: { tools: { name: string; description: string }[] }
       }
       expect(list.result.tools.map((t) => t.name)).toEqual([
         "submit",
@@ -82,11 +100,15 @@ describe("mikka MCP server", () => {
         "ask_human",
         "report_blocked",
       ])
+      const submit = list.result.tools.find((tool) => tool.name === "submit")!
+      expect(submit.description).toMatch(/delivery rules supplied for this run/)
+      expect(submit.description).not.toMatch(/Do not commit or push yourself|Mikka then.*commits/)
       expect(ctx.readHandoff()).toBeNull()
-      await client.request("tools/call", {
+      const submitted = await client.request("tools/call", {
         name: "submit",
         arguments: { summary: "Added greet()", nextStep: "Review it" },
       })
+      expect(JSON.stringify(submitted)).not.toMatch(/Mikka verifies, commits and pushes/)
       expect(ctx.readHandoff()).toEqual({
         type: "exit",
         outcome: "succeeded",
@@ -170,6 +192,9 @@ describe("mikka MCP server", () => {
         kind: "context",
         question: "Which existing API should I use?",
       })
+      ctx.clearHandoff()
+      await client.request("tools/call", { name: "request_help", arguments: { question: "Reply with the exact verification command only.", purpose: "verification_command" } })
+      expect(ctx.readHandoff()?.report?.question).toMatchObject({ kind: "decision", purpose: "verification_command" })
       const unknown = await client.request("tools/call", { name: "rm_rf" })
       expect(unknown).toHaveProperty("error")
     } finally {
@@ -179,6 +204,20 @@ describe("mikka MCP server", () => {
 })
 
 describe("run context", () => {
+  it('grants isolated command observations to a report-only repository review with host-enabled inference', async () => {
+    const repo = await makeRepo()
+    const ctx = new RunContext({ harness: 'claude_code', worktree: await worktreeOf(repo), runDir: tempDir(), privateDir: tempDir(),
+      factoryCheck: { stage: 'review', reportOnly: true, inferCommand: true } })
+    const spec = ctx.mcpServer()
+    const at = spec.args.indexOf('--factory-verify')
+    expect(at).toBeGreaterThan(-1)
+    expect(JSON.parse(spec.args[at + 1])).toMatchObject({ command: null, infer: true, cwd: ctx.worktree })
+    const client = mcpClient(ctx.handoffFile, spec.args.slice(at))
+    try {
+      const result = await client.request('tools/call', { name: 'verify_command', arguments: { command: 'git diff --check HEAD', basis: 'Inspect the fixed candidate Git tree without modifying it.' } }) as {result:{content:{text:string}[]}}
+      expect(JSON.parse(result.result.content[0].text).exitCode).toBe(0)
+    } finally { client.close() }
+  })
   it("lets the run write its worktree and run dir, never git's files, and always reach its harness API", async () => {
     const repo = await makeRepo()
     const ctx = new RunContext({

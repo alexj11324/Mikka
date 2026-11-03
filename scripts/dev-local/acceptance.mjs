@@ -246,6 +246,19 @@ async function setup() {
   return device
 }
 
+async function factoryApproval(runId, signal) {
+  const task = await until(signal, async () => {
+    const [row] = await query(`SELECT t.* FROM factory_tasks t JOIN factory_attempts a ON a."taskId"=t.id WHERE a."runId"=$1 AND t."userId"=$2`,[runId,accounts.owner.userId])
+    assert.ok(row,'ordinary dispatch has a Factory task')
+    if (['failed','blocked','cancelled','revoked'].includes(row.status)) throw new Error(`Factory ${row.stage}: ${row.reason}`)
+    return row.stage === 'approval' && row.status === 'pending' ? row : null
+  })
+  const stages = await query(`SELECT a.stage,r."sessionId" FROM factory_attempts a JOIN agent_runs r ON r.id=a."runId" WHERE a."taskId"=$1 AND a.status='passed' ORDER BY a.position`,[task.id])
+  assert.deepEqual(stages.slice(-3).map(row=>row.stage),['execute','review','verify'])
+  assert.equal(new Set(stages.slice(-3).map(row=>row.sessionId)).size,3,'independent CLI sessions for all three stages')
+  return task
+}
+
 async function accept(device) {
   const only = selectedItems
   const failures = []
@@ -262,6 +275,11 @@ async function accept(device) {
     const commit = execFileSync('git', ['--git-dir', runtime.scenario.barePath, 'show', `${done.report.publish.commit}:README.md`], { encoding: 'utf8' })
     assert.ok(commit.includes(runId), 'Remote pushed tree lacks the acceptance marker')
     await until(signal, async () => JSON.stringify(await json(accounts.owner, '/api/coordinator/messages')).includes(published.pullRequest.url))
+    const checked = await factoryApproval(id,signal)
+    const acceptance = await json(accounts.owner,`/api/factory/tasks/${checked.id}/approval`)
+    assert.equal(acceptance.manifest.candidate.sha,done.report.publish.commit,'the final human gate reads back the exact candidate')
+    assert.equal(evidence.pullRequests.find(pr=>pr.url===published.pullRequest.url).draft,false,'Factory verification does not strand the PR in draft')
+    await progress('item1-core-loop','factory-approval',checked.id)
     await progress('item1-core-loop', 'evidence', id)
   })
   if (only.includes('2')) await check('item2-read-only', 600_000, async signal => {
@@ -274,6 +292,11 @@ async function accept(device) {
     assert.ok(!done.report?.publish?.pushed && !done.pullRequest, 'Read-only run published')
     assert.equal(execFileSync('git', ['--git-dir', runtime.scenario.barePath, 'show-ref'], { encoding: 'utf8' }), refs, 'Read-only run changed remote refs')
     assert.equal((await observations()).pullRequests.length, before.pullRequests.length)
+    const checked = await factoryApproval(id,signal)
+    const ledger = await json(accounts.owner,`/api/factory/tasks/${checked.id}/approval?view=ledger`)
+    const accepted = await json(accounts.owner,`/api/factory/tasks/${checked.id}/approval`,{operation:'accept',input:{binding:ledger.binding,eventId:randomUUID()}})
+    assert.equal(accepted.status,'accepted','human accepts a report without a merge')
+    await progress('item2-read-only','factory-accepted',checked.id)
     await progress('item2-read-only', 'evidence', id)
   })
   if (only.includes('3')) await check('item3-failure-stage', 240_000, async signal => {

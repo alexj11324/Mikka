@@ -594,13 +594,11 @@ test(
         `UPDATE device_repos SET "verifyCommand"=NULL WHERE id=$1`,
         [repoId],
       );
-      await rejects(
-        () => dispatch(pending.task),
-        "factoryCheckCommandRequired",
-      );
+      const inferred = await dispatch(pending.task);
+      assert.ok(inferred.runId, "missing command still permits independent review");
       assert.equal(
         (await store.read("owner", pending.task.id)).task.status,
-        "blocked",
+        "running",
       );
       assert.equal(
         (
@@ -609,7 +607,7 @@ test(
             [`factory:${pending.task.attemptId}`],
           )
         ).rows[0].n,
-        0,
+        1,
       );
       // Runtime identities belong only in an explicitly selected private local artifact.
       if (

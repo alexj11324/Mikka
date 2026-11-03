@@ -38,6 +38,8 @@ stub('../lib/coordinator/native.ts',{nativeCoordinatorStore:{assertToolActive:ch
 stub('../lib/coordinator/store.ts',{editMemory:effect})
 stub('../lib/coordinator/issue-create.ts',{createIssueFromRequest:effect})
 stub('../lib/issue-visibility.ts',{issueVisibility:effect})
+stub('../lib/factory/queue-local.ts',{queueTaskRun:effect})
+stub('../lib/factory/queue-cloud.ts',{queueFactoryCloudRun:effect})
 stub('../lib/agent-runs.ts',{addRunMessage:effect,queueRun:effect,readRun:readRunResult,requestRunStop:effect,visibleRuns:effect})
 stub('../lib/db/index.ts',{db:{select:()=>({from:()=>({where:()=>({limit:readUserEvent})})})},pool:null})
 stub('../lib/mcp/actions.ts',{listAgents:effect})

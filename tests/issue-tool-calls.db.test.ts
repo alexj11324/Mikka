@@ -6,6 +6,7 @@ import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
 import { normalizeRepository } from '@mikka/protocol/repository'
 import { recordPushGrant } from './support/github-app-stub'
 import { disposableDatabase } from './helpers/e2e-target.mjs'
+import { seedAllowedModel } from './support/allowed-model'
 import { overrideDeploymentSwitch } from '../lib/deployment-switches'
 
 const connection = process.env.E2E_DATABASE_URL
@@ -162,6 +163,10 @@ test('actual issue actions commit one issue per tool call, roll back partial wri
     // The real dispatch still executes the ordinary admission transaction.
     // An installation row an earlier build recorded; admission no longer reads it (decision 2026-11-02-1600).
     await recordPushGrant(pool, owner, repository.key)
+    // The Factory picks the run's model from 优先使用的模型, in the Coordinator bot's workspace.
+    process.env.MIKKA_BYOS_ENABLED = '1'
+    const botWorkspace = (await pool.query('SELECT "workspaceId" FROM bots WHERE id=$1', [coordinator])).rows[0].workspaceId
+    await seedAllowedModel(pool, owner, { workspaceId: botWorkspace, deviceIds: [device] })
     const lifecycleTools=createCoordinatorRegistry(owner,coordinator,undefined,{coordinator:true})
     const first=routed[0];assert.ok('task' in first)
     const {factoryBinding}=await import('../lib/factory/dispatch')

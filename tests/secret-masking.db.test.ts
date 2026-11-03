@@ -99,6 +99,24 @@ test('#438 masking write-then-read-back', { skip: !dbUrl }, async t => {
     assert.equal(run.lastReply, 'x [secret:API_TOKEN] y')
   })
 
+  await t.test('binary tool output cannot block event delivery or subsequent text', async () => {
+    const { persistRunEventBatch } = await import('../lib/secrets/run-events')
+    const { identityMasker } = await import('../lib/secrets/mask')
+    const runId = await newRun()
+    const chunks = [
+      { type: 'tool-output-available', toolCallId: 'binary', output: { parts: ['DIRC\u0000binary', 'literal \\u0000', 'emoji 🐱'] } },
+      { type: 'text-delta', id: 'p', delta: 'Done\u0000 safely' },
+    ]
+    await persistRunEventBatch(runId, 1, chunks, identityMasker)
+    await persistRunEventBatch(runId, 1, chunks, identityMasker)
+    await persistRunEventBatch(runId, 3, [{ type: 'text-delta', id: 'p', delta: ' and delivered' }], identityMasker)
+    const { rows } = await pool.query('select chunk from run_chunks where "runId"=$1 order by seq', [runId])
+    assert.equal(rows.length, 3)
+    assert.deepEqual(rows[0].chunk.output.parts, ['DIRC�binary', 'literal \\u0000', 'emoji 🐱'])
+    const { rows: [run] } = await pool.query('select "lastReply" from agent_runs where id=$1', [runId])
+    assert.equal(run.lastReply, 'Done� safely and delivered')
+  })
+
   await t.test('F: PATCH error, checkpoint text, report, artifact, read back masked', async () => {
     const runId = await newRun()
     const runRoute = await import('../app/v1/runs/[runId]/route')

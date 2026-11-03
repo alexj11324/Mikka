@@ -8,7 +8,7 @@ import { randomUUID } from 'node:crypto'
 import { mock, test } from 'node:test'
 import { normalizeRepository } from '@mikka/protocol/repository'
 import { dbUrl, seedIssue, seedUser, seedWorkspace } from './support/workspace-admin-db'
-import { githubAppStub } from './support/github-app-stub'
+import { connectGitHub, githubAppStub } from './support/github-app-stub'
 
 // The computer's Codex reported gpt-5, the model the person's ChatGPT account lists (decision 2026-11-02-1400).
 const mac = [{ harness: 'codex', installed: true, subscriptionBroker: true, modelSlots: [{ slot: 'gpt-5', model: 'gpt-5', name: 'gpt-5' }] }]
@@ -41,6 +41,7 @@ test('one task, one thread: dispatch continues the task\'s thread unless the per
   t.after(async () => {
     github.restore()
     await pool.query('DELETE FROM run_messages WHERE "userId" = ANY($1)', [users])
+    await pool.query('DELETE FROM factory_tasks WHERE "userId" = ANY($1)', [users])
     await pool.query('DELETE FROM coordinator_events WHERE "userId" = ANY($1)', [users])
     await pool.query('UPDATE agent_runs SET "continuesRunId"=NULL,"threadReplacedBy"=NULL WHERE "userId" = ANY($1)', [users])
     await pool.query('DELETE FROM agent_runs WHERE "userId" = ANY($1)', [users])
@@ -61,6 +62,8 @@ test('one task, one thread: dispatch continues the task\'s thread unless the per
     const githubAccountId = String(++githubAccount)
     await pool.query(`INSERT INTO account (id,"accountId","providerId","userId","createdAt","updatedAt") VALUES ($1,$2,'github',$3,now(),now())`, [randomUUID(), githubAccountId, id])
     github.allowWriter('octo/repo', githubAccountId)
+    // Connected in 插件 › GitHub, with the App on the repositories these tasks name: dispatch checks the live list.
+    await connectGitHub(github, id, githubAccountId, ['octo/repo', 'octo/web'])
     await pool.query('INSERT INTO repository_settings ("userId","remoteKey",push) VALUES ($1,$2,$3)', [id, normalizeRepository('octo/repo').key, JSON.stringify({ approved: true, remote: 'origin', approvedByUserId: id, approvedAt: new Date().toISOString() })])
     const ws = await seedWorkspace(pool, id, [{ userId: id, role: 'admin' }])
     // A connected ChatGPT subscription whose account lists gpt-5: 优先使用的模型 is that model by default, 运行位置 本地.
@@ -209,9 +212,10 @@ test('one task, one thread: dispatch continues the task\'s thread unless the per
     const stale = await dispatch(b, { target: { deviceId: await computer(b.id, 'Stale', { old: true }) } })
     assert.deepEqual([stale.error, stale.card?.description], ['machineUnavailable', '这台电脑的 Mikka 需要更新'])
     assert.equal((await runs(b.id)).length, 0)
-    // No computer named, a model no subscription or key offers on that Agent: refused with why, not run on the list's model.
-    const unoffered = await dispatch(b, { model: { harness: 'claude_code', model: 'gpt-5' } })
-    assert.deepEqual([unoffered.error, unoffered.card?.description], ['machineUnavailable', '没有订阅或 Key 能用 Claude Code 跑 gpt-5'])
+    // No computer named, a model that is not in 优先使用的模型 on that Agent: refused with the list, not run on the list's model.
+    const unoffered = await dispatch(b, { model: { harness: 'claude_code', model: 'gpt-5' } }) as unknown as { error: string; allowed: { harness: string; model: string }[] }
+    assert.equal(unoffered.error, 'modelNotAllowed')
+    assert.ok(!unoffered.allowed.some(item => item.harness === 'claude_code' && item.model === 'gpt-5'))
     assert.equal((await runs(b.id)).length, 0)
     // 参与调度 off: Mikka never sends it a run, even when named (decision 2026-11-02-1400).
     const kept = await dispatch(b, { target: { deviceId: await computer(b.id, 'Kept out', { takesPart: false }) } })
@@ -262,6 +266,104 @@ test('one task, one thread: dispatch continues the task\'s thread unless the per
     assert.match(rows[1].remoteUrl, /octo\/web/, 'the new thread works in the named repository')
     judged = null
   })
+  await t.test('newThread with a repository the person named: a new thread there even when the Decision API cannot judge', async () => {
+    // Production (2026-11-03): the person asked for a new thread in another repository by name; the model passed
+    // newThread and repo, the Decision API gave no judgment, and the old thread was continued instead.
+    const a = await person()
+    const first = await dispatch(a)
+    await pool.query(`UPDATE agent_runs SET status='failed',"finishedAt"=now() WHERE id=$1`, [first.runId])
+    judged = null
+    const moved = await steps.dispatchRun(a.id, { issueId: a.issueId, repo: 'octo/web', newThread: true, readOnly: true, requestKey: `dispatch:${randomUUID()}`, sourceEventId: await said(a, 'Start a new thread in octo/web: fix the layout and open a PR.') }, undefined, a.botId) as unknown as Dispatched
+    assert.equal(moved.thread, 'new', JSON.stringify(moved))
+    assert.equal(moved.replacedThreadId, first.runId)
+    const rows = (await pool.query('SELECT r.id,r."continuesRunId",r."threadReplacedBy",d."remoteUrl" FROM agent_runs r JOIN device_repos d ON d.id=r."deviceRepoId" WHERE r."userId"=$1 ORDER BY r."createdAt"', [a.id])).rows
+    assert.equal(rows[0].threadReplacedBy, moved.runId, 'the old thread is marked replaced')
+    assert.equal(rows[1].continuesRunId, null, 'the new thread does not continue the old one')
+    assert.match(rows[1].remoteUrl, /octo\/web/)
+  })
+  await t.test('a thread\'s next run never changes its repository, even when it cannot run where the thread ran', async () => {
+    // Production (2026-11-03): the thread's own place could not take its next run, the fallback placed it by the
+    // rules with the repository the model passed, and the thread silently moved to another repository.
+    const a = await person()
+    const first = await dispatch(a)
+    await pool.query(`UPDATE agent_runs SET status='failed',"finishedAt"=now() WHERE id=$1`, [first.runId])
+    // The thread's computer no longer takes part in scheduling; another one can take the next run.
+    await pool.query('UPDATE devices SET enabled=false WHERE id=$1', [a.deviceId])
+    const studio = await computer(a.id, 'Mac Studio')
+    judged = 0.05
+    const next = await steps.dispatchRun(a.id, { issueId: a.issueId, repo: 'octo/web', readOnly: true, note: 'Look again.', requestKey: `dispatch:${randomUUID()}`, sourceEventId: await said(a, 'Look again please') }, undefined, a.botId) as unknown as Dispatched
+    judged = null
+    const rows = (await pool.query('SELECT r.id,r."continuesRunId",d."remoteUrl" FROM agent_runs r LEFT JOIN device_repos d ON d.id=r."deviceRepoId" WHERE r."userId"=$1 ORDER BY r."createdAt"', [a.id])).rows
+    assert.equal(next.thread, 'continued', JSON.stringify(next))
+    assert.deepEqual(next.placement, { kind: 'device', deviceId: studio, name: 'Mac Studio' })
+    assert.equal(rows[1].continuesRunId, first.runId)
+    assert.match(rows[1].remoteUrl, /octo\/repo/, 'the thread keeps its repository')
+  })
+  await t.test('a new thread asked for without a repository runs in the repository of the thread it replaces', async () => {
+    const a = await person()
+    const first = await dispatch(a)
+    await pool.query(`UPDATE agent_runs SET status='failed',"finishedAt"=now() WHERE id=$1`, [first.runId])
+    judged = 0.95
+    const fresh = await steps.dispatchRun(a.id, { issueId: a.issueId, newThread: true, requestKey: `dispatch:${randomUUID()}`, sourceEventId: await said(a, '另开一个线程，从头重新做') }, undefined, a.botId) as unknown as Dispatched
+    judged = null
+    assert.equal(fresh.thread, 'new', JSON.stringify(fresh))
+    assert.equal(fresh.replacedThreadId, first.runId)
+    const rows = (await pool.query('SELECT r.id,r."continuesRunId",r."threadReplacedBy",d."remoteUrl" FROM agent_runs r JOIN device_repos d ON d.id=r."deviceRepoId" WHERE r."userId"=$1 ORDER BY r."createdAt"', [a.id])).rows
+    assert.equal(rows.length, 2)
+    assert.equal(rows[0].threadReplacedBy, fresh.runId, 'the old thread is marked replaced')
+    assert.equal(rows[1].continuesRunId, null)
+    assert.match(rows[1].remoteUrl, /octo\/repo/, 'the new thread keeps the old thread\'s repository')
+  })
+  await t.test('a thread\'s next run that cannot run where the thread ran keeps the place the person named', async () => {
+    // The person named the cloud; the thread's own computer cannot take its next run. The fallback stays in the
+    // cloud (refused here, where no cloud is set up) and never quietly goes to another computer.
+    const a = await person()
+    const first = await dispatch(a)
+    await pool.query(`UPDATE agent_runs SET status='failed',"finishedAt"=now() WHERE id=$1`, [first.runId])
+    await pool.query('UPDATE devices SET enabled=false WHERE id=$1', [a.deviceId])
+    await computer(a.id, 'Mac Studio')
+    judged = 0.05
+    const before = (await runs(a.id)).length
+    const next = await dispatch(a, { note: 'Run it in the cloud.', target: 'cloud', sourceEventId: await said(a, '放到云端再跑一次') })
+    judged = null
+    assert.equal(next.error, 'machineUnavailable', JSON.stringify(next))
+    assert.equal((await runs(a.id)).length, before, 'nothing ran on another computer')
+  })
+  await t.test('no authorized list, no dispatch: not connected, authorization expired, GitHub down (after one retry)', async () => {
+    type Refused = { error?: string; runId?: string; repository?: string }
+    const attempt = async (who: { id: string; issueId: string; botId: string }) => await steps.dispatchRun(who.id, { issueId: who.issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, who.botId) as unknown as Refused
+    const token = (userId: string) => `synthetic-user-token-${userId}`
+    const runCount = async (userId: string) => (await runs(userId)).length
+
+    const notConnected = await person()
+    await pool.query('DELETE FROM github_connections WHERE "userId"=$1', [notConnected.id])
+    await pool.query(`DELETE FROM account WHERE "userId"=$1 AND "providerId"='github'`, [notConnected.id])
+    assert.deepEqual([(await attempt(notConnected)).error, await runCount(notConnected.id)], ['githubNotConnected', 0])
+
+    const revoked = await person()
+    github.fail(token(revoked.id), 401)
+    assert.deepEqual([(await attempt(revoked)).error, await runCount(revoked.id)], ['githubReconnectRequired', 0])
+
+    const down = await person()
+    const before = github.calls.filter(call => call === 'GET /user').length
+    github.fail(token(down.id), 502)
+    const refused = await attempt(down)
+    assert.deepEqual([refused.error, refused.repository, await runCount(down.id)], ['githubUnavailable', 'octo/repo', 0])
+    assert.equal(github.calls.filter(call => call === 'GET /user').length - before, 2, 'asked once more, then told')
+
+    // A rate limit that clears on the retry dispatches as usual.
+    const limited = await person()
+    github.fail(token(limited.id), 403, 1)
+    const queued = await attempt(limited)
+    assert.equal(queued.error, undefined, JSON.stringify(queued))
+    assert.equal(await runCount(limited.id), 1)
+
+    // An authorized list without the repository: refused, nothing queued.
+    const elsewhere = await person()
+    const notListed = await steps.dispatchRun(elsewhere.id, { issueId: elsewhere.issueId, repo: 'someone/private-app', requestKey: `dispatch:${randomUUID()}` }, undefined, elsewhere.botId) as unknown as Refused
+    assert.deepEqual([notListed.error, await runCount(elsewhere.id)], ['repositoryNotFound', 0])
+  })
+
   await t.test('a local run is frozen with its model: none fails at once, a thread keeps its own, an MCP client\'s new run takes 优先使用的模型', async () => {
     const a = await person()
     const agentId = (await pool.query('SELECT id FROM agents WHERE "deviceId"=$1', [a.deviceId])).rows[0].id as string

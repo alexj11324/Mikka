@@ -394,8 +394,11 @@ export class Daemon {
           binaries: this.options.harnessBinaries,
           ...(this.options.e2bContainerRuntime ? { dockerSocket: "unix:///run/mikka-container/docker.sock" as const } : {}),
           computerBroker: this.cloudComputerBroker ?? this.options.computerBroker,
+          // The cloud machine's own probe decides which subscription models a run may use here.
+          ...(this.modelProbeOn() ? { reportedModels: (harness: "codex" | "claude_code") => this.reportedModels(harness) } : {}),
         })
       : undefined
+    this.hostedBinaries = hosted?.binaries
     await this.cloudComputerBroker?.listen()
     if (this.stopped) throw new Error("daemon stopped during startup")
     const adapters = (this.adapters = new Map<Harness, AgentAdapter>([
@@ -883,9 +886,19 @@ export class Daemon {
   private lastModelProbe = 0
   private probingModels: Promise<boolean> | null = null
 
+  /** The hosted runner's CLIs on a cloud machine (subscription-hosted-runner.ts), which its model probe asks. */
+  private hostedBinaries: Partial<Record<"codex" | "claude_code", string>> | undefined
+
   private modelProbeOn() {
-    if (this.options.hostedSubscriptions) return false
+    // A cloud machine probes its own CLIs too (Alex, 2026-11-03): its runs start only on a model they reported.
+    if (this.options.hostedSubscriptions) return this.options.modelProbe ?? !daemonTestMode(process.env)
     return this.options.modelProbe ?? (!this.options.harnesses && !daemonTestMode(process.env))
+  }
+
+  /** What a harness's CLI reported here, probing first when no probe has finished yet. */
+  private async reportedModels(harness: "codex" | "claude_code") {
+    if (!this.modelReports.has(harness)) await this.probeModels().catch((err: unknown) => { this.log.warn({ err }, "model probe failed") })
+    return this.modelReports.get(harness) ?? null
   }
 
   /**
@@ -900,7 +913,10 @@ export class Daemon {
       let changed = false
       for (const harness of ["codex", "claude_code"] as const) {
         if (!this.harnesses.some(info => info.harness === harness && info.installed)) continue
-        const binary = this.options.harnessBinaries?.[harness] ?? await ensureHarness(this.harnessStore(), harness)
+        const binary = this.options.hostedSubscriptions
+          ? this.hostedBinaries?.[harness]
+          : this.options.harnessBinaries?.[harness] ?? await ensureHarness(this.harnessStore(), harness)
+        if (!binary) continue
         const report = await probeHarnessModels(harness, binary, { scratchDir: this.paths.dataDir })
         if (!report) { this.log.warn({ harness }, "harness reported no models"); continue }
         if (JSON.stringify(this.modelReports.get(harness)) === JSON.stringify(report)) continue

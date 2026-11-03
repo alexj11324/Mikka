@@ -53,11 +53,12 @@ before(async () => {
 })
 
 async function facts(overrides: Partial<import('../lib/coordinator/execution-context').ExecutionFacts> = {}) {
-  const { executionContextText } = await import('../lib/coordinator/execution-context')
-  return executionContextText({
+  const { executionContextText, modelListText } = await import('../lib/coordinator/execution-context')
+  // As in the real prompt: the allowed models list (cached prefix), then what changes per turn.
+  return ((f: Parameters<typeof executionContextText>[0]) => `${modelListText(f)}\n${executionContextText(f)}`)({
     workspace: { name: 'Alex', kind: 'personal' },
     devices: [{ name: 'Alex 的 MacBook', online: true, enabled: true, agents: ['Claude Code', 'Codex'] }],
-    order: { location: 'local', entries: [{ agent: 'Claude Code', model: 'opus', provider: 'anthropic', block: null }, { agent: 'Codex', model: 'gpt-codex', provider: 'openai', block: null }], credentials: [{ kind: 'subscription', provider: 'anthropic' }, { kind: 'subscription', provider: 'openai' }] },
+    order: { location: 'local', entries: [{ harness: 'claude_code', agent: 'Claude Code', model: 'opus', source: 'subscription', provider: 'anthropic', places: ['Alex 的 MacBook (computer)'], block: null }, { harness: 'codex', agent: 'Codex', model: 'gpt-codex', source: 'subscription', provider: 'openai', places: ['Alex 的 MacBook (computer)'], block: null }], credentials: [{ kind: 'subscription', provider: 'anthropic' }, { kind: 'subscription', provider: 'openai' }] },
     e2b: false,
     hosted: 'ready',
     ...overrides,
@@ -227,7 +228,26 @@ for (const item of moveCases) {
   })
 }
 
-const screenCases: { label: string; text: string; family: Family; mention: RegExp }[] = [
+// A new thread asked for in so many words, in another repository: both newThread and that repository are passed
+// (production, 2026-11-03). Fictional repositories only.
+const newThreadMoveCases: { label: string; text: string; family: Family }[] = [
+  { label: 'en', text: 'On phones, the pricing section of our marketing site (repo octo/octo-web) is cut off. Start a new thread on a cloud computer in octo/octo-web: reproduce it at 390px, fix the layout, run pnpm build, and open a PR.', family: OCTO },
+  { label: 'zh', text: '在 octo-web 仓库另开一个新线程：手机上页脚被截断，修好后跑 pnpm build 并开 PR。', family: OCTO },
+]
+for (const item of newThreadMoveCases) {
+  test(`new thread in a named repository (${item.label}) on a thread bound to ${item.family.app}`, { skip }, async () => {
+    const thread = { id: ISSUE, title: 'Section cut off on phones', status: 'doing', runs: [{ id: 'run-1', agent: 'Claude Code', status: 'failed' }], thread: { runId: 'run-1', status: 'failed', repository: `https://github.com/${item.family.app}` } }
+    results = { getIssue: thread, findRepository: { match: 'one', repository: item.family.site, description: 'The public marketing website', homepage: item.family.siteHome }, dispatchRun: { runId: 'run-8', thread: 'new', threadId: 'run-8', replacedThreadId: 'run-1', placement: { kind: 'cloud' } } }
+    await passAll(`new thread move ${item.label}`, async () => trial(item.text, await facts()), ({ calls }) => {
+      const dispatched = calls.filter(call => call.step === 'dispatchRun')
+      if (!dispatched.length) return 'no dispatch_run'
+      if (!dispatched.some(call => named(repoOf(call), item.family.site))) return 'the named repository was not passed'
+      return dispatched.some(call => (call.input as { newThread?: boolean }).newThread === true) ? null : 'no new thread though the person asked'
+    })
+  })
+}
+
+const screenCases:{ label: string; text: string; family: Family; mention: RegExp }[] = [
   { label: 'Alex', text: 'On phones, the How it works section on the Mikka site is cut off. First show me the page at phone width.', family: MIKKA, mention: /mikka/i },
   { label: 'docs site', text: 'Open our Octo docs site on a narrow browser and show me where the sidebar breaks.', family: OCTO, mention: /octo/i },
   { label: 'zh', text: '先用手机尺寸打开 Octo 官网给我看看导航栏', family: OCTO, mention: /octo/i },
@@ -242,3 +262,19 @@ for (const item of screenCases) {
     })
   })
 }
+
+test('「Octo 官网的导航栏在手机上错位了」 with the authorized list in the turn: octo-web, or a question; never octo/octo', { skip }, async () => {
+  const { repositoryLines } = await import('../lib/coordinator/github-context')
+  const listed = repositoryLines([
+    { fullName: 'octo/octo', description: 'The product: app and API clients', homepage: 'https://app.octo.example' },
+    { fullName: 'octo/octo-web', description: 'The public marketing website', homepage: 'https://octo.example' },
+    { fullName: 'octo/octo-api', description: null, homepage: null },
+  ], ['octo/octo']).join('\n')
+  results = { getIssue: { id: ISSUE, title: '导航栏错位', thread: null }, dispatchRun: { runId: 'run-10', thread: 'new', placement: { kind: 'cloud' } }, findRepository: { match: 'several', candidates: candidatesOf(OCTO), card: cardOf(OCTO, 'Octo 官网') } }
+  await passAll('listed site', async () => trial('Octo 官网的导航栏在手机上错位了，修一下', `${listed}\n${await facts()}`), ({ reply, calls }) => {
+    const dispatched = calls.filter(call => call.step === 'dispatchRun' && repoOf(call))
+    if (dispatched.some(call => named(repoOf(call), 'octo/octo'))) return 'dispatched to the app repository'
+    if (dispatched.some(call => named(repoOf(call), 'octo/octo-web'))) return null
+    return /BeQuestions/.test(reply) ? null : 'neither octo-web nor a question'
+  })
+})

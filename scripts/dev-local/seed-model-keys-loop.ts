@@ -6,14 +6,24 @@ import { productSeedDeps, seedModelKeys, type SeedState } from './seed-model-key
 
 async function main() {
   assertDevLocal(process.env)
+  const { installDevLocalTransport } = await import('./transport.mjs')
+  installDevLocalTransport()
   const apiKey = process.env.DEEPSEEK_API_KEY
   delete process.env.DEEPSEEK_API_KEY
   const pool = new pg.Pool({ connectionString: process.env.MIKKA_DATABASE_URL ?? process.env.DATABASE_URL, max: 2 })
   const deps = await productSeedDeps(pool)
+  const { saveGitHubConnection } = await import('@/lib/github/connection')
+  const seedGitHub = async () => {
+    // Existing dev:local fixture identity only. This is a sealed synthetic user
+    // token for the loopback provider, never an installation or production grant.
+    const { rows } = await pool.query(`SELECT a."userId" FROM account a LEFT JOIN github_connections c ON c."userId"=a."userId"
+      WHERE a."providerId"='github' AND a."accountId"='4242' AND c."userId" IS NULL`)
+    for (const row of rows) await saveGitHubConnection(row.userId,{githubAccountId:'4242',githubLogin:'mvp-owner-4242'},{access_token:'mikka-local-synthetic-user-token'})
+  }
   const state: SeedState = new Map()
   let running = Promise.resolve()
   const scan = refreshQueue(async () => {
-    try { await seedModelKeys(apiKey, deps, line => console.log(`dev:local ${line}`), state) }
+    try { await seedGitHub(); await seedModelKeys(apiKey, deps, line => console.log(`dev:local ${line}`), state) }
     catch { console.log('dev:local model key setup unavailable; retrying later') }
   })
   const tick = () => running = scan()

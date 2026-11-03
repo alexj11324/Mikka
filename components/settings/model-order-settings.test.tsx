@@ -56,7 +56,7 @@ before(async () => {
 })
 beforeEach(() => {
   configured = true; refreshFails = false; refreshUnconfirmed = false; events.length = 0
-  data = { location: 'cloud', customized: true, preferredHarness: 'claude_code', credentials: 1, entries: [], candidates: [], devices: 0, cloudReady: true, first: { kind: 'cloud' }, readyDeviceIds: [], deviceModels: {} }
+  data = { location: 'cloud', customized: true, preferredHarness: 'claude_code', credentials: 1, entries: [], candidates: [], devices: 0, cloudReady: true, cloudModels: {}, first: { kind: 'cloud' }, readyDeviceIds: [], deviceModels: {} }
   container = browser.document.createElement('div') as unknown as HTMLDivElement
   document.body.append(container)
   root = createRoot(container)

@@ -30,7 +30,12 @@ async function recordLastReply(tx: Tx, runId: string, chunks: Record<string, unk
 
 export async function persistRunEventBatch(runId: string, fromSeq: number, input: Record<string, unknown>[], mask: Masker) {
   await db.transaction(async tx => {
-    let chunks: Record<string, unknown>[] = input
+    // A tool may read binary data (for example .git/index). JSON accepts NUL
+    // and lone surrogates, but PostgreSQL JSONB rejects them, blocking the
+    // daemon's ordered outbox including its completion. Keep the batch and its
+    // sequence numbers, replacing only characters PostgreSQL cannot store.
+    let chunks: Record<string, unknown>[] = JSON.parse(JSON.stringify(input, (_key, value) =>
+      typeof value === 'string' ? value.replaceAll('\u0000', '\uFFFD').toWellFormed() : value))
     if (mask !== identityMasker) chunks = maskStreamedChunks(chunks, mask)
     const inserted = await tx.insert(runChunks)
       .values(chunks.map((chunk, index) => ({

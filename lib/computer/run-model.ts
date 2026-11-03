@@ -42,9 +42,9 @@ export async function latestThreadRunModel(pool: Pick<Pool, 'query'>, userId: st
  * A new cloud run's model by 优先使用的模型 (decision 2026-11-02-1400): the first cloud entry for
  * this harness. A subscription entry is bound to the Agent so the run uses that account.
  */
-export async function chooseCloudRunModel(pool: Pool, scope: { ownerId: string; workspaceId: string; botId: string | null }, agentId: string, harness: 'claude_code' | 'codex', asked?: string): Promise<RunModel | { error: 'machineUnavailable'; reason?: string }> {
+export async function chooseCloudRunModel(pool: Pool, scope: { ownerId: string; workspaceId: string; botId: string | null }, agentId: string, harness: 'claude_code' | 'codex', asked?: string, purpose: 'task' | 'desktop' = 'desktop'): Promise<RunModel | { error: 'machineUnavailable'; reason?: string }> {
   const { resolveModelDispatch, bindAgentToConnection } = await import('@/lib/model-dispatch')
-  const target = await resolveModelDispatch(pool, scope, { harness, ...(asked ? { model: asked } : {}) }, 'cloud')
+  const target = await resolveModelDispatch(pool, scope, { harness, ...(asked ? { model: asked } : {}) }, 'cloud', undefined, { cloudPurpose: purpose })
   if (target.kind !== 'cloud') return { error: 'machineUnavailable', ...(target.kind === 'none' ? { reason: target.reason } : {}) }
   const source = target.entry.source
   if (source.kind === 'api_key') return { model: target.model, apiKeyId: source.keyId }

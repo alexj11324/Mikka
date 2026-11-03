@@ -1,0 +1,26 @@
+import 'server-only'
+import { pool } from '@/lib/db'
+import { queueFactoryRun, type queueRun } from '@/lib/agent-runs'
+import { ensureDeviceRepository } from '@/lib/device-repositories'
+import { ActionFailureError } from '@/lib/action-error'
+import { queueFactoryTask } from './task-dispatch'
+
+export async function queueTaskRun(userId: string, input: Parameters<typeof queueRun>[1], botId: string | null = null,
+  execution?: Parameters<typeof queueRun>[3], sourceEventId?: string, source: 'mcp' | null = null) {
+  const { rows: [agent] } = await pool.query('SELECT "deviceId" FROM agents WHERE id=$1 AND "userId"=$2', [input.agentId, userId])
+  if (!agent?.deviceId) throw new ActionFailureError('agentNoDevice')
+  const repo = await ensureDeviceRepository(userId, agent.deviceId, input.repo)
+  const previous = input.threadRunId ? (await pool.query(`SELECT t."botId",t.status FROM factory_attempts a JOIN factory_tasks t ON t.id=a."taskId" WHERE a."runId"=$1 AND t."userId"=$2 ORDER BY a.position DESC LIMIT 1`, [input.threadRunId, userId])).rows[0] : undefined
+  if (previous && !['passed','cancelled','revoked'].includes(previous.status)) botId = previous.botId
+  return queueFactoryTask(pool, userId, {
+    issueId: input.issueId, botId, agentId: input.agentId, deviceRepoId: repo.id, note: input.note,
+    key: input.requestKey, sourceEventId, previousRunId: input.threadRunId,
+    selection: [input.model, input.apiKeyId, input.subscriptionBindingId, input.pinnedDeviceId, Boolean(input.readOnly), execution?.id, source],
+    queue: async (tx, owner, request, scopeBot, context) => {
+      const result = await queueFactoryRun(tx, owner, request, scopeBot, context, undefined, { model: input.model, apiKeyId: input.apiKeyId,
+        subscriptionBindingId: input.subscriptionBindingId, pinnedDeviceId: input.pinnedDeviceId, readOnly: input.readOnly, execution })
+      if (source) await tx.query('UPDATE agent_runs SET source=$2 WHERE id=$1', [result.runId, source])
+      return result
+    },
+  })
+}

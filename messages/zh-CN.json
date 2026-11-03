@@ -2580,6 +2580,7 @@
         "off": "{count, plural, =1 {{device} 没参与调度} other {# 台电脑没参与调度}}",
         "offline": "{count, plural, =1 {{device} 离线} other {# 台电脑离线}}",
         "notInstalled": "{count, plural, =1 {{device} 没装 {harness}} other {# 台电脑没装 {harness}}}",
+        "modelNotReported": "{count, plural, =1 {{device} 没报告能跑这个模型} other {# 台电脑没报告能跑这个模型}}",
         "needsUpdate": "{count, plural, =1 {{device} 的 Mikka 需要更新} other {# 台电脑的 Mikka 需要更新}}"
       },
       "blocked": {
@@ -3043,7 +3044,8 @@
       "accessDenied": "服务商拒绝订阅访问",
       "modelRejected": "模型请求被拒绝",
       "quotaChecking": "订阅额度待确认",
-      "runtimeUnavailable": "当前环境不支持此订阅"
+      "runtimeUnavailable": "当前环境不支持此订阅",
+      "modelNotReported": "云电脑没报告能跑这个模型"
     },
     "quota": {
       "used": "{name} 额度已用完",
@@ -3458,11 +3460,13 @@
     "needsModelUnavailable": "优先使用的模型都暂时不可用",
     "needsModelDeviceAgent": "这台电脑没装 {agent}",
     "needsModelDeviceUpdate": "这台电脑的 Mikka 需要更新",
+    "needsModelDeviceModel": "这台电脑没报告能跑 {model}",
     "needsModelNoComputer": "还没有连接电脑",
     "needsModelNamedOff": "{device} 没参与调度",
     "needsModelNamedOffline": "{device} 离线",
     "needsModelNamedAgent": "{device} 没装 {agent}",
     "needsModelNamedUpdate": "{device} 的 Mikka 需要更新",
+    "needsModelNamedModel": "{device} 没报告能跑这个模型",
     "needsModelNotOffered": "没有订阅或 Key 能用 {agent} 跑 {model}",
     "needsModelAgentNotOffered": "没有订阅或 Key 能用 {agent}",
     "needsModelPickedNoDevice": "没有电脑能用 {agent} 跑 {model}",
@@ -3471,6 +3475,8 @@
     "repositoryAmbiguousTitle": "多个仓库匹配 {name}",
     "repositoryNotFoundTitle": "已授权的仓库里没有叫 {name} 的",
     "githubInstallMore": "在 GitHub 上授权更多仓库",
+    "needsModelCloudModelsUnknown": "云端模板的模型尚未验证",
+    "needsModelCloudModelNotReported": "云端模板没有上报这个模型",
     "needsModelCloudUnavailable": "云端暂时无法启动",
     "needsModelChecking": "订阅额度暂未确认，请重试"
   },
@@ -4102,6 +4108,7 @@
     "thread": "线程",
     "close": "关闭",
     "state": {
+      "accepted": "已验收",
       "pending": "待你确认",
       "approved": "已批准",
       "publishing": "发布中",
@@ -4189,6 +4196,7 @@
       "production": "Production"
     },
     "textLabel": "{stage}{kind}",
+    "acceptDeliverable": "验收",
     "accept": "验收并合并",
     "openOnGitHub": "在 GitHub 打开",
     "cannotMerge": "无法合并",

@@ -14,3 +14,14 @@ test('a queued GitHub task does not contradict the authenticated agent delivery 
   policy.readOnly = true
   assert.match(runInstructions('/repository', policy), /Do not commit, push or switch branches/)
 })
+
+test('a long issue never removes the current run note, standing instructions or delivery rules', () => {
+  const note = 'Fix the timeout rather than repeating the earlier completed work.'
+  const instructions = 'Use the existing isolated acceptance environment.'
+  const brief = runPrompt('Continue investigation', 'Issue context.\n'.repeat(10_000), instructions, note)
+  assert.ok(brief.length <= 100_000)
+  assert.ok(brief.includes(note))
+  assert.ok(brief.includes(instructions))
+  assert.match(brief, /Follow the delivery rules supplied for this run/)
+  assert.match(brief, /truncated/)
+})

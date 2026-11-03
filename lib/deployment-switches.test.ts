@@ -20,7 +20,7 @@ beforeEach(() => {
 
 test('without PostHog a switch reads the old variable, then its default', () => {
   assert.equal(deploymentSwitch('issueTools', {}), true, 'shipped on')
-  assert.equal(deploymentSwitch('factoryRouting', {}), false, 'ships off')
+  assert.equal(deploymentSwitch('factoryRouting', {}), true, 'all task dispatch ships through Factory')
   assert.equal(deploymentSwitch('factoryRouting', { MIKKA_FACTORY_ROUTING_ENABLED: '1' }), true)
   assert.equal(deploymentSwitch('cloudComputerTasks', { MIKKA_CLOUD_COMPUTER_TASKS: '0' }), false)
   assert.equal(deploymentSwitch('cloudComputerTasks', { MIKKA_CLOUD_COMPUTER_TASKS: 'yes' }), true, 'only 0 turned it off')
@@ -62,7 +62,7 @@ test('the test override is unreachable in production: it throws in a deployment 
 })
 
 test('PostHog decides once it answers: a kill flag turns a shipped feature off, a gate flag turns one on', async () => {
-  const { fetcher, requests } = posthog({ 'mikka-issue-tools-off': flag(true), 'mikka-factory-routing': flag(true), 'mikka-factory-vercel-publication': flag(false) })
+  const { fetcher, requests } = posthog({ 'mikka-issue-tools-off': flag(true), 'mikka-factory-routing-off': flag(false), 'mikka-factory-vercel-publication': flag(false) })
   await refreshDeploymentSwitches('phc_test', fetcher)
   assert.equal(deploymentSwitch('issueTools', {}), false)
   assert.equal(deploymentSwitch('factoryRouting', {}), true)

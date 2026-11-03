@@ -176,10 +176,26 @@ export async function snapshotTree(
   try {
     await git(["read-tree", "HEAD"], index)
     await git(["add", "--all"], index)
+    // Also remove force-staged or already tracked verification downloads from
+    // this temporary index. The agent's real index remains untouched.
+    await git(["rm", "--cached", "-r", "--ignore-unmatch", "--", ".verify"], index)
     return String((await git(["write-tree"], index)).stdout).trim()
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
+}
+
+/** Keep actual delivery files in a local snapshot for a fresh independent session. No remote push. */
+export async function retainDeliverable(repoPath: string, worktree: string, runId: string): Promise<string> {
+  const tree = await snapshotTree(repoPath, worktree)
+  const git = await pinnedGit(repoPath, worktree)
+  const head = String((await git(['rev-parse', 'HEAD'])).stdout).trim()
+  const before = String((await git(['rev-parse', 'HEAD^{tree}'])).stdout).trim()
+  if (tree === before) return head
+  const commit = String((await git([...FALLBACK_IDENTITY, 'commit-tree', tree, '-p', head, '-m', 'Retain task delivery for independent inspection'])).stdout).trim()
+  await git(['update-ref', `refs/heads/${runBranch(runId)}`, commit, head])
+  await git(['read-tree', commit])
+  return commit
 }
 
 export function commitMessage(options: {

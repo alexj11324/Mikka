@@ -1,14 +1,16 @@
+import { queueTaskRun } from '@/lib/factory/queue-local'
 import { localExecutionHarnesses } from '@/lib/device-agents'
 import { issueVisibility } from '@/lib/issue-visibility'
 import 'server-only'
 import { createHash } from 'node:crypto'
 import { and, asc, desc, eq, gt, or, sql } from 'drizzle-orm'
 import { ActionFailureError } from '@/lib/action-error'
+import { FactoryError } from '@/lib/factory/contract'
 import { issueForUser } from '@/lib/issue-access'
 import { issueMutationsEnabled } from '@/lib/coordinator/issue-tools-enabled'
 import { actAs } from '@/lib/acting-user'
 import type { ActivityActor } from '@/lib/activity-actor'
-import { addRunMessage, queueRun, requestRunStop } from '@/lib/agent-runs'
+import { addRunMessage,  requestRunStop } from '@/lib/agent-runs'
 import { forgetNotes, rememberNote } from '@/lib/coordinator/context'
 import { editMemory } from '@/lib/coordinator/store'
 import { chatBotId } from '@/lib/coordinator/coordinator-bot'
@@ -40,7 +42,7 @@ async function attempt<T>(fn: () => Promise<T>): Promise<T | Failure> {
   try {
     return await fn()
   } catch (error) {
-    if (error instanceof ActionFailureError) return { error: error.code }
+    if (error instanceof ActionFailureError || error instanceof FactoryError) return { error: error.code }
     throw error
   }
 }
@@ -188,10 +190,11 @@ export async function dispatchRun(userId: string, input: { issueId: string; agen
   // A run an MCP client dispatches is the person's Coordinator's: its bot row is resolved here, where the run is created.
   // One task, one thread (lib/thread-dispatch.ts): a task with a thread gets this as that thread's work. An MCP client
   // has no chat message of the person's to show an explicit request for a new thread, so it never starts one.
+  if (!(await import('@/lib/factory/runtime')).factoryLifecycleEnabled()) return { error: 'factoryLifecycleUnavailable' }
   const { dispatchToTask } = await import('@/lib/thread-dispatch')
   return attempt(async () => dispatchToTask(userId, input.issueId, {
     note: input.note,
-    start: async (previous, note) => ({ status: 'queued' as const, ...(await queueRun(userId, { ...input, note, ...await mcpRunModel(userId, input, previous), ...(previous ? { threadRunId: previous.id } : {}), ...(previous?.readOnly ? { readOnly: true } : {}), ...(previous && input.requestKey ? { requestKey: `thread:${previous.id}:${input.requestKey}`.slice(0, 200) } : {}) }, await chatBotId(userId, null, MCP_WORKSPACE), undefined, undefined, 'mcp')) }),
+    start: async (previous, note) => ({ status: 'queued' as const, ...(await queueTaskRun(userId, { ...input, ...(previous ? { agentId: previous.agentId, repo: previous.remoteUrl ?? input.repo, threadRunId: previous.id } : {}), note, ...await mcpRunModel(userId, input, previous), ...(previous?.readOnly ? { readOnly: true } : {}), ...(previous && input.requestKey ? { requestKey: `thread:${previous.id}:${input.requestKey}`.slice(0, 200) } : {}) }, await chatBotId(userId, null, MCP_WORKSPACE), undefined, undefined, 'mcp')) }),
   }))
 }
 

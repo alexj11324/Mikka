@@ -101,12 +101,12 @@ export async function reconcileFactoryCheck(
   if (
     task.stage === "verify" &&
     evidence.length &&
-    attempt?.output?.check?.command
+    (attempt?.output?.check?.command || run.report?.verify?.command)
   ) {
     for (const id of await verifierCommandEvidence(
       tx,
       run.id,
-      attempt.output.check.command,
+      attempt.output.check.command ?? run.report!.verify.command!,
       true,
     ))
       evidence.push({
@@ -158,14 +158,15 @@ export async function reconcileFactoryCheck(
         !(await factoryCheckIndependent(tx, task, run.id)) ||
         run.report?.check?.sha !== assignment.baseBranch ||
         run.report.check.readOnly !== true ||
-        run.report.verify.command !== assignment.verifyCommand ||
+        (!assignment.factoryCheck.reportOnly && run.report.verify.command !== (assignment.verifyCommand ?? run.report.verify.command)) ||
         run.report.filesChanged?.length !== 0 ||
         !run.startedAt || !run.finishedAt ||
         !Number.isFinite(new Date(run.startedAt).getTime()) || !Number.isFinite(new Date(run.finishedAt).getTime()) ||
         new Date(run.finishedAt).getTime() < new Date(run.startedAt).getTime() ||
-        !(Number.isFinite(run.report.verify.exitCode) || run.report.verify.exitCode === null) ||
-        typeof run.report.verify.timedOut !== "boolean" ||
-        !(run.report.verify.signal === null || typeof run.report.verify.signal === "string")
+        (!assignment.factoryCheck.reportOnly && (
+          !(Number.isFinite(run.report.verify.exitCode) || run.report.verify.exitCode === null) ||
+          typeof run.report.verify.timedOut !== "boolean" ||
+          !(run.report.verify.signal === null || typeof run.report.verify.signal === "string")))
       )
         throw new FactoryError("factoryCheckBindingMismatch");
       output.trustedFailureProvenance = true;
@@ -240,7 +241,4 @@ export async function reconcileFactoryCheck(
       tx,
     );
   }
-  // Recovery strategy belongs to the Coordinator model via recover_factory_check.
-  // A failed observation is retained here; no program classifies it as transient
-  // or as requiring a source edit, and no executor is opened automatically.
 }

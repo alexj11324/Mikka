@@ -14,8 +14,26 @@
 //
 // Protocol: MCP over stdio, newline-delimited JSON-RPC 2.0.
 import { randomUUID } from "node:crypto"
+import { spawnSync } from 'node:child_process'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { closeSync, fstatSync, openSync, readSync, readFileSync, readdirSync, realpathSync, renameSync, writeFileSync, constants } from "node:fs"
 import { join, sep } from "node:path"
+const verifyIndex = process.argv.indexOf('--factory-verify')
+const factoryVerify = verifyIndex > 0 ? JSON.parse(process.argv[verifyIndex + 1]) : null
+const VERIFY_TOOL = { name: 'verify_command', description: 'Run this Factory check’s frozen command, or the command inferred from repository scripts when the host explicitly enabled inference. Use this tool for real command observations when native shell is unavailable. It does not submit or accept the task.', inputSchema: { type: 'object', properties: { command: { type: 'string' }, basis: { type: 'string' } }, required: ['command'] } }
+
+function verifyCommand(args) {
+  const command = typeof args.command === 'string' ? args.command.trim() : ''
+  if (!command || command.length > 2000 || (factoryVerify.command ? command !== factoryVerify.command.trim() : !factoryVerify.infer || !args.basis?.trim())) throw new Error('Use the frozen command, or provide repository evidence for inference.')
+  const home = mkdtempSync(join(tmpdir(), 'mikka-verify-tool-'))
+  try {
+    const env = { PATH: process.env.PATH, HOME: home, TMPDIR: home, LANG: 'C.UTF-8' }
+    for (const name of ['HTTP_PROXY','HTTPS_PROXY','ALL_PROXY','NO_PROXY','http_proxy','https_proxy','all_proxy','no_proxy','NODE_USE_ENV_PROXY','NODE_EXTRA_CA_CERTS','SSL_CERT_FILE','SSL_CERT_DIR']) if (process.env[name]) env[name] = process.env[name]
+    const result = spawnSync(command, { shell: true, cwd: factoryVerify.cwd, env, timeout: 300000, maxBuffer: 2 * 1024 * 1024, encoding: 'utf8', stdio: ['ignore','pipe','pipe'] })
+    return { isError: result.status !== 0, content: [{ type: 'text', text: JSON.stringify({ command, exitCode: result.status, signal: result.signal, stdout: result.stdout?.slice(-8000) ?? '', stderr: result.stderr?.slice(-4000) ?? '', ...(result.error ? { error: 'verification_process_failed' } : {}) }) }] }
+  } finally { rmSync(home, { recursive: true, force: true }) }
+}
 import { createInterface } from "node:readline"
 import { copyCaptureFd } from "./capture-copy.mjs"
 
@@ -119,7 +137,7 @@ const TOOLS = [
   {
     name: "submit",
     description:
-      "Hand in your finished work. Call this once, as your last action, when the task is done and you checked it. Mikka then runs the verify command, commits your changes and pushes the branch. Do not commit or push yourself. On a planning run, hand in the spec and the split you propose instead of code.",
+      "Hand in your finished work. Follow the delivery rules supplied for this run, including any required commit, push, pull request and successful CI checks, before calling this once as your last action. On a planning run, hand in the spec and the split you propose instead of code.",
     inputSchema: {
       type: "object",
       properties: {
@@ -138,6 +156,7 @@ const TOOLS = [
         spec: SPEC_SCHEMA,
         split: SPLIT_SCHEMA,
         previewDatabaseBranch: { type: "string", description: "Name of the preview database branch you actually created or used; omit when none." },
+        verificationCommand: { type: "object", description: "For a Factory verification with no frozen command: the command inferred from repository scripts, Makefile or CI and its concrete source. Run it and report its actual observations too. If no command can be inferred, request help instead of inventing one.", properties: { command: { type: "string" }, basis: { type: "string" } }, required: ["command", "basis"] },
         criteria: {
           type: "array",
           description:
@@ -149,6 +168,7 @@ const TOOLS = [
                 type: "string",
                 description: "The criterion's id, as given in your brief.",
               },
+              text: { type: "string", description: "The criterion checked, required when the brief provides no criterion UUID." },
               passed: { type: "boolean" },
               command: { type: "string", description: "Exact command used to check this criterion, when one was run." },
               exitCode: { type: ["integer", "null"], description: "Observed exit code of that command." },
@@ -158,7 +178,7 @@ const TOOLS = [
                   "What you saw: the command and its output, or the file and line.",
               },
             },
-            required: ["criterionId", "passed"],
+            required: ["passed"],
           },
         },
       },
@@ -174,6 +194,7 @@ const TOOLS = [
       properties: {
         question: { type: "string" },
         context: { type: "string" },
+        purpose: { type: "string", enum: ["verification_command"] },
         summary: { type: "string" },
       },
       required: ["question"],
@@ -293,6 +314,8 @@ function record(kind, args, toolName) {
   const questionKind =
     kind === "blocked"
       ? "external"
+      : args.purpose === "verification_command"
+        ? "decision"
       : toolName === "request_help"
         ? "context"
         : args.kind === "permission"
@@ -317,6 +340,7 @@ function record(kind, args, toolName) {
           question: {
             questionId,
             kind: questionKind,
+            ...(args.purpose === "verification_command" ? { purpose: args.purpose } : {}),
             question: questionText,
             context: String(args.context ?? args.summary ?? "").slice(0, 4000),
             options: [],
@@ -337,6 +361,7 @@ function record(kind, args, toolName) {
     // Kept as sent; the daemon validates and trims each entry.
     ...(typeof args.previewDatabaseBranch === "string" ? { previewDatabaseBranch: args.previewDatabaseBranch } : {}),
     ...(Array.isArray(args.criteria) ? { criteria: args.criteria } : {}),
+    ...(args.verificationCommand ? { verificationCommand: args.verificationCommand } : {}),
     at: new Date().toISOString(),
   }
   const tmp = `${handoffFile}.${process.pid}.tmp`
@@ -368,8 +393,12 @@ function handle(message) {
     case "ping":
       return reply(id, {})
     case "tools/list":
-      return reply(id, { tools: capturesDir ? [...TOOLS, CAPTURE_TOOL] : TOOLS })
+      return reply(id, { tools: [...TOOLS, ...(capturesDir ? [CAPTURE_TOOL] : []), ...(factoryVerify ? [VERIFY_TOOL] : [])] })
     case "tools/call": {
+      if (factoryVerify && params?.name === VERIFY_TOOL.name) {
+        try { return reply(id, verifyCommand(params.arguments ?? {})) }
+        catch { return reply(id, { isError: true, content: [{ type: 'text', text: 'Verification command refused.' }] }) }
+      }
       if (capturesDir && params?.name === CAPTURE_TOOL.name) {
         try {
           queueCapture(params.arguments ?? {})
@@ -394,7 +423,7 @@ function handle(message) {
           ? "Recorded. End your turn now."
           : planned
             ? "Handed in. End your turn now; a person approves the spec, then the split."
-            : "Handed in. End your turn now; Mikka verifies, commits and pushes."
+            : "Handed in. End your turn now."
       return reply(id, { content: [{ type: "text", text }] })
     }
     default:

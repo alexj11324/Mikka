@@ -11,7 +11,7 @@ import { checkFactoryRepairBudget } from "./check-recovery-evidence";
  * re-enters the existing repair loop (retry at execute, repair from
  * review/verify/monitor) under the check-recovery cap (maxFixAttempts). Past
  * the cap the task stays failed with reasonCode repair_budget_exhausted. */
-async function failIntoRepairLoop(
+export async function failIntoRepairLoop(
   tx: PoolClient,
   store: ReturnType<typeof createFactoryStore>,
   userId: string,
@@ -61,6 +61,7 @@ export function createFactoryReconciler(
     "record" | "settle">,
   consumers: Partial<Record<"review" | "verify" | "monitor", (tx: PoolClient, store: ReturnType<typeof createFactoryStore>, task: FactoryTask, run: Record<string, any>) => Promise<unknown>>> = {},
   botId: string | null = null,
+  dispatchNext?: (tx: PoolClient, store: ReturnType<typeof createFactoryStore>, task: FactoryTask, run: Record<string, any>) => Promise<(() => Promise<void>) | undefined>,
 ) {
   const PENDING = `t.stage IN ('spec','execute','review','verify','monitor') AND (t.status='running' OR (t.status='failed' AND EXISTS (SELECT 1 FROM factory_attempts a JOIN agent_runs r ON r."retryOf"=a."runId" WHERE a.id=t."attemptId")))`;
   const reconcileTasks = async (userId: string, pending: { id: string; attemptId?: string }[]) => {
@@ -119,8 +120,8 @@ export function createFactoryReconciler(
         // Consume the existing bounded run-retry chain; never create a retry here.
         for (
           let retry = 1;
-          ["spec", "execute"].includes(task.stage) &&
-          run?.stopReason === "device_lost" &&
+          ["spec", "execute", "review", "verify"].includes(task.stage) &&
+          ["device_lost","quota_exhausted"].includes(run?.stopReason) &&
           !run.stopRequestedAt &&
           retry < MAX_RUN_ATTEMPTS;
           retry++
@@ -139,7 +140,7 @@ export function createFactoryReconciler(
             {
               action: "adopt_retry",
               runId: child.id,
-              reason: "Resumed the existing device-loss retry; no new dispatch",
+              reason: "Resumed the existing device-loss or quota continuation; no new dispatch",
             },
             tx,
           );
@@ -215,7 +216,9 @@ export function createFactoryReconciler(
           const consumer = consumers[task.stage];
           if (!consumer) throw new FactoryError("factoryDispatchAdapterRequired");
           await consumer(tx, store, task, run);
+          const start = await dispatchNext?.(tx, store, task, run);
           await tx.query("COMMIT");
+          await start?.();
           recovered++;
           continue;
         }
@@ -243,16 +246,16 @@ export function createFactoryReconciler(
           else
             await failIntoRepairLoop(tx, store, userId, task, `run-completion:${run.id}`, `Run failed: ${String(run.error ?? run.stopReason ?? "unknown")}`, "run_failed", { runId: run.id });
         } else {
-          const sha = run.report?.publish?.commit;
+          const sha = run.report?.publish?.commit ?? ((run.agentDefinition?.readOnly || !run.remoteUrl) ? run.report?.sourceCommit : undefined);
           const repository = run.remoteUrl ?? run.repoPath;
+          const deliverable = !run.remoteUrl && typeof run.repoPath === 'string' && run.repoPath.startsWith('/home/user/.mikka/bot-workspaces/');
           if (
             !run.sessionId ||
             !run.report ||
             !run.deviceId ||
             (task.stage === "execute" &&
               (!repository ||
-                typeof sha !== "string" ||
-                !/^[a-f0-9]{40}$/.test(sha)))
+                (!deliverable && (typeof sha !== 'string' || !/^[a-f0-9]{40}$/.test(sha)))))
           ) {
             await store.apply(
               userId,
@@ -279,7 +282,8 @@ export function createFactoryReconciler(
                   action: "candidate",
                   runId: run.id,
                   candidate: {
-                    sha,
+                    sha: deliverable ? null : sha,
+                    ...(deliverable ? { kind: 'deliverable' as const } : run.agentDefinition?.readOnly || !run.remoteUrl ? { kind: 'report' as const } : {}),
                     repository,
                     environment: `device:${run.deviceId}`,
                     scope: `issue:${task.issueId}`,
@@ -295,7 +299,7 @@ export function createFactoryReconciler(
               runId: run.id,
               sessionId: run.sessionId,
               candidateId: current.candidateId,
-              sha: task.stage === "execute" ? sha : null,
+              sha: task.stage === "execute" && !deliverable ? sha : null,
               environment: `device:${run.deviceId}`,
               recordedAt: (run.finishedAt ?? new Date()).toISOString(),
             };
@@ -329,7 +333,9 @@ export function createFactoryReconciler(
             );
           }
         }
+        const start = await dispatchNext?.(tx, store, task, run);
         await tx.query("COMMIT");
+        await start?.();
         recovered++;
       } catch (error) {
         await tx.query("ROLLBACK");
@@ -346,7 +352,9 @@ export function createFactoryReconciler(
             else if (current.status === "running") await store.apply(userId,binding(current),
               factoryEventId(`reconcile-blocked:${error.code}`,current.attemptId),
               {action:"finish",status:"blocked",reason:`Reconciliation blocked: ${error.code}`,evidence:[],output:{errorCode:error.code}},tx);
+            const start = await dispatchNext?.(tx, store, current, {});
             await tx.query("COMMIT");
+            await start?.();
           } catch (blockedError) {
             await tx.query("ROLLBACK");
             if (!(blockedError instanceof FactoryError)) throw blockedError;

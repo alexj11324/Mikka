@@ -26,6 +26,16 @@ export function repositoryNotFoundCard(name: string) {
   }
 }
 
+/**
+ * The live list for a dispatch: a temporary GitHub failure (an outage or a rate limit, githubUnavailable) is asked
+ * once more; any other failure, or a second one, is the answer. Nothing is dispatched without a list.
+ */
+async function listForDispatch(userId: string, list: RepositoryLister): Promise<{ repositories: readonly Repository[] } | { error: GitHubProblem }> {
+  const once = () => listFor(userId, list).catch((): { error: GitHubProblem } => ({ error: 'githubUnavailable' }))
+  const first = await once()
+  return 'error' in first && first.error === 'githubUnavailable' ? once() : first
+}
+
 async function listFor(userId: string, list: RepositoryLister): Promise<{ repositories: readonly Repository[] } | { error: GitHubProblem }> {
   try { return await list(userId) }
   catch (error) {
@@ -64,15 +74,37 @@ function candidatesOf(repositories: readonly Repository[], context: RepositoryCo
  * the candidates come back with their descriptions and homepages for the Coordinator to judge, or to ask with the card.
  */
 export async function resolveRepository(userId: string, repo: string, list: RepositoryLister = ownRepositories, context?: () => Promise<RepositoryContext | null>): Promise<Resolution> {
-  if (!isBareRepositoryName(repo)) return { repo }
+  if (!isBareRepositoryName(repo)) return authorizedGitHubRepository(userId, repo, list)
   const name = repo.trim()
-  const own = await listFor(userId, list)
+  const own = await listForDispatch(userId, list)
   if ('error' in own) return { error: own.error, repository: name }
   const related = relatedRepositories(name, own.repositories)
   if (related.length === 0) return { error: 'repositoryNotFound', card: repositoryNotFoundCard(name) }
   if (related.length === 1) return { repo: related[0]!.fullName }
   const candidates = candidatesOf(related, context ? await context().catch(() => null) : null)
   return { error: 'repositoryAmbiguous', candidates, card: repositoryAmbiguousCard(name, candidates) }
+}
+
+/** owner/repo of a github.com repository named as owner/repo or by URL; null for any other host. */
+function githubFullName(repo: string): string | null {
+  const value = repo.trim().replace(/\.git$/i, '').replace(/\/+$/, '')
+  const match = /^(?:https:\/\/github\.com\/|git@github\.com:|ssh:\/\/git@github\.com\/)?([\w.-]+\/[\w.-]+)$/i.exec(value)
+  return match ? match[1]! : null
+}
+
+/**
+ * A GitHub repository given by owner/repo or URL runs only when the person's live authorized list (not the turn's
+ * cached copy) has it. Without a list nothing runs: GitHub not connected (githubNotConnected), its authorization
+ * expired or revoked (githubReconnectRequired), or GitHub still failing after one retry (githubUnavailable).
+ * Other hosts go on as given.
+ */
+async function authorizedGitHubRepository(userId: string, repo: string, list: RepositoryLister): Promise<Resolution> {
+  const fullName = githubFullName(repo)
+  if (!fullName) return { repo }
+  const own = await listForDispatch(userId, list)
+  if ('error' in own) return { error: own.error, repository: fullName }
+  const found = own.repositories.find(repository => repository.fullName.toLowerCase() === fullName.toLowerCase())
+  return found ? { repo } : { error: 'repositoryNotFound', card: repositoryNotFoundCard(fullName) }
 }
 
 const remoteFullName = (remoteUrl: string) => remoteUrl.trim().replace(/^(?:https:\/\/|git@)github\.com[/:]/i, '').replace(/\.git$/i, '').replace(/\/+$/, '')

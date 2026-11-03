@@ -169,4 +169,24 @@ describe("the device report", () => {
     await waitFor(() => reports.some(report => report.completedDeviceCommands?.includes(commandId)))
     expect(codex.homes().length).toBeGreaterThan(before)
   }, 30_000)
+
+  // A cloud machine (hostedSubscriptions) probes its own CLIs too, so its report says which models its runs may use.
+  it.skipIf(process.getuid?.() === 0 || process.platform !== "linux")("a cloud machine's report carries the models its CLI reported", async () => {
+    const dir = tempDir()
+    const claude = fakeCli(dir, "claude_code")
+    const link = Object.assign(new MemoryServer("cloud-models").link(), {
+      nativeContext: async () => { throw new Error("no run in this test") },
+      nativeRequest: async () => { throw new Error("no run in this test") },
+    })
+    const reports: { harnesses: { harness: string; modelSlots?: { slot: string; model: string }[] }[] }[] = []
+    const heartbeat = link.heartbeat.bind(link)
+    link.heartbeat = async (deviceId, status) => { reports.push(status as never); return heartbeat(deviceId, status) }
+    const daemon = await new Daemon({ dataDir: tempDir(), flavor: "dev", link, credential: "cred", heartbeatMs: 50, hostedSubscriptions: true,
+      harnessBinaries: { claude_code: claude.path }, quotaSource: null, modelProbe: true }).start()
+    daemons.push(daemon)
+    await waitFor(() => reports.some(report => report.harnesses.some(info => info.harness === "claude_code" && info.modelSlots?.length)))
+    const info = reports.at(-1)!.harnesses.find(item => item.harness === "claude_code")!
+    expect(info.modelSlots?.map(slot => slot.slot)).toEqual(parseClaudeInitialize(claudeAnswer.response.response)!.models)
+    expect(claude.homes().length).toBeGreaterThan(0)
+  }, 30_000)
 })

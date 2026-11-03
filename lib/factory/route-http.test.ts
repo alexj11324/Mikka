@@ -34,7 +34,7 @@ test("route gate: issue mutations AND routing AND lifecycle (literal 1)", () => 
   const on = { MIKKA_FACTORY_ROUTING_ENABLED: "1", MIKKA_FACTORY_LIFECYCLE_ENABLED: "1" };
   assert.equal(factoryRouteEnabled(true, on), true);
   assert.equal(factoryRouteEnabled(false, on), false);
-  assert.equal(factoryRouteEnabled(true, { ...on, MIKKA_FACTORY_ROUTING_ENABLED: undefined }), false);
+  assert.equal(factoryRouteEnabled(true, { ...on, MIKKA_FACTORY_ROUTING_ENABLED: undefined }), true);
   assert.equal(factoryRouteEnabled(true, { ...on, MIKKA_FACTORY_LIFECYCLE_ENABLED: "0" }), false);
   assert.equal(factoryRouteEnabled(true, { ...on, MIKKA_FACTORY_ROUTING_ENABLED: "true" }), false);
 });

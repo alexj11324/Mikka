@@ -38,7 +38,7 @@ before(async () => { effects = await import('./run-completion-effects') })
 beforeEach(() => {
   trace.length = 0; mountError = null; monitorError = null; questionError = null
   for (const fn of [mount, monitor, questions.settle, questions.record, scopedQuestions.settle, scopedQuestions.record, runtime, reconcileRun, dbPool.query]) fn.mock.resetCalls()
-  delete process.env.MIKKA_FACTORY_ROUTING_ENABLED; delete process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED
+  process.env.MIKKA_FACTORY_ROUTING_ENABLED='0'; process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED='0'
 })
 after(() => {
   if (environment.routing === undefined) delete process.env.MIKKA_FACTORY_ROUTING_ENABLED; else process.env.MIKKA_FACTORY_ROUTING_ENABLED = environment.routing
