@@ -160,6 +160,21 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     assert.equal(tokenState.rows[0].revokedAt, null)
     assert.ok(new Date(tokenState.rows[0].expiresAt).getTime() > Date.now() + 23 * 60 * 60_000)
     assert.equal((await pool.query('SELECT "revokedAt" FROM device_tokens WHERE id=$1', [tokenId])).rows[0].revokedAt, null, 'lost renewal responses leave the old token usable until expiry')
+    {
+      // A device request holds its own token row FOR SHARE (the authority fence) while the heartbeat
+      // renews that token: the renewal must not need an exclusive lock on it, or it times out every
+      // time and the worker's credential is never renewed. The fence connection sets lock_timeout 5 s;
+      // 2 s here keeps the test short.
+      await pool.query(`UPDATE device_tokens SET "createdAt"=now()-interval '1 minute' WHERE "boundDeviceId"=$1`, [rotatedCredential.deviceId])
+      const fenced = new Pool({ connectionString: databaseURL, max: 2, options: `-c search_path=${schema} -c lock_timeout=2000` })
+      const fence = await pool.connect()
+      try {
+        await fence.query('BEGIN')
+        await fence.query('SELECT id FROM device_tokens WHERE id=$1 FOR SHARE', [tokenId])
+        const renewedUnderFence = await renewCloudDeviceToken(fenced, renewalActor)
+        assert.ok(renewedUnderFence, 'the renewal succeeds while the requesting token is held FOR SHARE')
+      } finally { await fence.query('ROLLBACK'); fence.release(); await fenced.end() }
+    }
     const bobBot = await store.createBot(bob, 'Other owner')
     await pool.query('UPDATE devices SET harnesses=$2 WHERE id=$1', [worker.deviceId, JSON.stringify([{ harness: 'codex', installed: true, computerBroker: true, subscriptionBroker: true }, { harness: 'claude_code', installed: true, computerBroker: true, subscriptionBroker: true }])])
     let repoSetupCalls = 0
