@@ -105,6 +105,54 @@ afterEach(async () => {
 })
 
 describe("mock runs", () => {
+  it.each(['review', 'verify'] as const)('checks a hosted delivery snapshot during %s without interactive computer authority', async stage => {
+    const { server, dataDir, repo } = await setup()
+    writeFileSync(join(repo, 'DELIVERY.txt'), 'hosted-file-check-marker\n')
+    git(repo, 'add', 'DELIVERY.txt')
+    git(repo, '-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-m', 'delivery snapshot')
+    const snapshot = git(repo, 'rev-parse', 'HEAD')
+    const expectedRemote = 'https://github.com/fixture/delivery.git'
+    git(repo, 'remote', 'add', 'origin', expectedRemote)
+    const link = server.link()
+    const claim = link.claimRun.bind(link)
+    link.nativeContext = async () => { throw new Error('Mock file checks must not request a model credential') }
+    link.nativeRequest = async () => { throw new Error('Mock file checks must not call a provider') }
+    // A no-repository cloud workspace has no remote URL. MemoryServer normally
+    // supplies a file URL for local fixtures; reproduce the actual claim instead.
+    link.claimRun = async (...args) => ({ ...await claim(...args), remoteUrl: undefined,
+      ...(stage === 'verify' ? { expectedRepoRemote: expectedRemote } : {}) })
+    const daemon = await new Daemon({ dataDir, flavor: 'dev', agentSandbox: null, link, credential: 'cred-1',
+      hostedSubscriptions: true, harnesses: [{ harness: 'mock', installed: true, version: 'test' }],
+      harnessBinaries: { claude_code: resolve(import.meta.dirname, 'fakes/fake-claude-subscription.mjs') },
+      mockSpeed: Number.POSITIVE_INFINITY, heartbeatMs: 60_000, quotaSource: null }).start()
+    daemons.push(daemon)
+    await daemon.syncWithServer()
+    const runId = server.queueRun(DEVICE, { issueId: 'hosted-delivery', repoId: 'repo-1', baseBranch: snapshot,
+      harness: 'mock', prompt: 'Independently inspect DELIVERY.txt', kind: 'acceptance', fixture: 'check-pass',
+      factoryCheck: { stage, reportOnly: true, inferCommand: false },
+      policy: { ...runPolicy(undefined), readOnly: true, permissions: { ...runPolicy(undefined).permissions, computer_use: 'deny', git_push: 'deny' } } })
+    await daemon.syncWithServer()
+    await waitFor(() => server.runs.get(runId)?.completion)
+    expect(server.runs.get(runId)?.completion, 'File inspection must not require a remote URL or desktop grant').toMatchObject({
+      stopReason: 'submitted', report: { check: { sha: snapshot, readOnly: true }, verify: { status: 'not_run' } },
+    })
+    const run = daemon.supervisor.get(runId)
+    expect(new RunJournal(join(dataDir, 'runs.json')).get(runId)!.assignment.computer).toBeUndefined()
+    expect(readFileSync(join(run.worktree!, 'DELIVERY.txt'), 'utf8')).toBe('hosted-file-check-marker\n')
+    expect(git(run.worktree!, 'rev-parse', 'HEAD')).toBe(snapshot)
+    // Omitting desktop authority must not bypass an approved-origin mismatch.
+    if (stage === 'verify') {
+      link.claimRun = async (...args) => ({ ...await claim(...args), remoteUrl: undefined,
+        expectedRepoRemote: 'https://github.com/fixture/another.git' })
+      const refused = server.queueRun(DEVICE, { ...server.runs.get(runId)!.assignment, runId: undefined })
+      await daemon.syncWithServer()
+      await waitFor(() => server.runs.get(refused)?.completion)
+      expect(server.runs.get(refused)?.completion).toMatchObject({ stopReason: 'error',
+        report: { summary: 'Repository origin does not match the approved repository' } })
+      expect(existsSync(join(dataDir, 'worktrees', refused))).toBe(false)
+    }
+  })
+
   it('retains actual no-repository delivery files for an independent fixed-snapshot check', async () => {
     const { server, dataDir } = await setup()
     const fixturesDir = tempDir()

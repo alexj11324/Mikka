@@ -1334,7 +1334,7 @@ export class Daemon {
           matches = normalizeRepository(assignment.remoteUrl, options).key ===
             normalizeRepository(assignment.expectedRepoRemote, options).key
         } catch { /* Invalid or unsupported identities fail closed. */ }
-      } else if (this.options.hostedSubscriptions && assignment.computer) {
+      } else if (this.usesHostedWorkspace(assignment)) {
         // Hosted subscriptions retain their isolated, registered workspace.
         let repo = this.device.repos?.find(item => item.repoId === assignment.repoId)
         if (!repo) {
@@ -1420,13 +1420,20 @@ export class Daemon {
     }
   }
 
+  private usesHostedWorkspace(assignment: RunAssignment): boolean {
+    // Independent file checks retain the registered isolated workspace while
+    // their read-only policy deliberately omits interactive desktop authority.
+    return Boolean(this.options.hostedSubscriptions &&
+      (assignment.computer || (assignment.factoryCheck && assignment.policy?.readOnly)))
+  }
+
   private repository(assignment: RunAssignment): DeviceRepo {
     const settings = this.device.repos?.find(repo => repo.repoId === assignment.repoId)
     if (assignment.remoteUrl) {
       const { key } = normalizeRepository(assignment.remoteUrl, { allowFile: daemonTestMode(process.env) })
       return { ...settings, repoId: assignment.repoId, name: key.split('/').at(-1)!, path: this.repositories.pathFor(assignment.remoteUrl) }
     }
-    if (this.options.hostedSubscriptions && assignment.computer && settings) return settings
+    if (this.usesHostedWorkspace(assignment) && settings) return settings
     throw new DaemonError(DAEMON_RPC_ERRORS.repoNotAllowed, 'Repository URL required; dispatch a new thread.')
   }
 
