@@ -72,13 +72,16 @@ export async function publish({ token, templates, sourceSha, sourceCommit, model
   for (let poll = 0; ; poll++) {
     const { deployments = [] } = await call(`/v6/deployments?projectId=${PROJECT}&target=production&limit=20`)
     if (!deployments.some((item) => IN_FLIGHT.has(item.state ?? item.readyState))) {
-      latest = deployments.find((item) => (item.state ?? item.readyState) === 'READY' && (!sourceCommit || item.meta?.githubCommitSha === sourceCommit))
+      latest = deployments.find((item) => (item.state ?? item.readyState) === 'READY')
       break
     }
     if (poll >= maxPolls) fail('production_build_still_running')
     await wait(10_000)
   }
   if (!latest) fail('no_ready_production_deployment')
+  // Never search past a newer READY application to redeploy an older matching
+  // commit: another main release may have completed while instances validated.
+  if (sourceCommit && latest.meta?.githubCommitSha !== sourceCommit) fail('production_source_changed')
 
   await call(`/v10/projects/${PROJECT}/env?upsert=true`, { method: 'POST', body: env })
   const listed = await call(`/v10/projects/${PROJECT}/env`)
