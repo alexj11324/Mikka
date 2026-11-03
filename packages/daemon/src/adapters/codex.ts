@@ -1,3 +1,4 @@
+import { codexFailureInfo, codexFailureMessage, type CodexFailureInfo, type CodexFailurePhase } from "./codex-failure"
 import { codexQuotaSignal, mergeQuota, type CodexRateLimits, type QuotaSignal } from "../runs/quota-exhausted"
 // Codex adapter (ADR 0003): the user's own signed-in `codex app-server`,
 // one process per session, run directly (no sandbox; approvals "never" and
@@ -94,7 +95,6 @@ export interface CodexAdapterOptions {
 }
 
 const SUBSCRIPTION_AUTH_ERROR = "Codex subscription authentication unavailable"
-const SUBSCRIPTION_EXECUTION_ERROR = "Codex subscription execution failed"
 
 function subscriptionTokens(
   value: ChatGPTAuthTokens,
@@ -419,6 +419,13 @@ export class CodexAdapter implements AgentAdapter {
     let ending = false
     let cancelling = false
     let lastError: string | undefined
+    let lastFailure: CodexFailureInfo | undefined
+    let turnStartFailure: string | undefined
+    const subscriptionFailure = (phase: CodexFailurePhase, info: CodexFailureInfo) => {
+      try { log.warn({ event: 'codex_subscription_turn_failed', phase, ...info }, 'Codex subscription turn failed') }
+      catch { /* Diagnostics never replace the original terminal outcome. */ }
+      return codexFailureMessage(phase, info)
+    }
     /** The CLI's quota or rate-limit failure seen this turn, and the plan's latest windows. */
     let quota: QuotaSignal | undefined
     let rateLimits: CodexRateLimits | undefined
@@ -590,10 +597,12 @@ export class CodexAdapter implements AgentAdapter {
         case "error": {
           const { error, willRetry } = params as ErrorNotification
           if (!willRetry) quota = mergeQuota(quota, codexQuotaSignal(error, rateLimits))
-          if (!willRetry)
+          if (!willRetry) {
+            lastFailure = codexFailureInfo(error)
             lastError = managedAuth
-              ? SUBSCRIPTION_EXECUTION_ERROR
+              ? subscriptionFailure('error_notification', lastFailure)
               : `Codex: ${error.message}`
+          }
           return
         }
         case "turn/completed":
@@ -635,7 +644,7 @@ export class CodexAdapter implements AgentAdapter {
           finish({
             outcome: "failed",
             error: managedAuth
-              ? SUBSCRIPTION_EXECUTION_ERROR
+              ? turnStartFailure ?? subscriptionFailure('turn_start', codexFailureInfo(error))
               : `Codex: ${errorMessage(error)}`
           })
         )
@@ -643,11 +652,12 @@ export class CodexAdapter implements AgentAdapter {
       }
       if (turn.status === "failed" || lastError) {
         quota = mergeQuota(quota, codexQuotaSignal(turn.error, rateLimits))
+        const failure = codexFailureInfo(turn.error)
         return finish({
           outcome: "failed",
           ...(quota ? { quota } : {}),
           error: managedAuth
-            ? SUBSCRIPTION_EXECUTION_ERROR
+            ? subscriptionFailure('turn_completed', failure.category === 'unknown' && lastFailure ? lastFailure : failure)
             : turn.error?.message
               ? `Codex: ${turn.error.message}`
               : lastError
@@ -660,6 +670,8 @@ export class CodexAdapter implements AgentAdapter {
     let runtimeModel: string | null = null
     const startTurn = async (message: string) => {
       lastError = undefined
+      lastFailure = undefined
+      turnStartFailure = undefined
       quota = undefined
       const verify = externalAuth?.verify ?? brokerAuth?.verify
       if (verify) {
@@ -670,8 +682,9 @@ export class CodexAdapter implements AgentAdapter {
         input: text(message)
       })
       const response = (managedAuth
-        ? result.catch(() => {
-            throw new Error(SUBSCRIPTION_EXECUTION_ERROR)
+        ? result.catch((error: unknown) => {
+            turnStartFailure = subscriptionFailure('turn_start', codexFailureInfo(error))
+            throw new Error(turnStartFailure)
           })
         : result)
       if (options.mailbox) {
@@ -690,7 +703,7 @@ export class CodexAdapter implements AgentAdapter {
       queue.exit({
         outcome: "failed",
         error: managedAuth
-          ? SUBSCRIPTION_EXECUTION_ERROR
+          ? subscriptionFailure('child_exit', { category: 'cli_exited_early' })
           : `codex app-server exited (${signal ?? code}): ${child.stderrTail() || "no output"}`
       })
     })
@@ -785,7 +798,7 @@ export class CodexAdapter implements AgentAdapter {
           ...(typeof code === 'number' && Number.isInteger(code) && code >= -32768 && code <= -32000 ? { rpcCode: code } : {}) }, 'Subscription startup failed') } catch { /* Keep the original refusal. */ }
       }
       await finish(null)
-      if (managedAuth) throw new Error(SUBSCRIPTION_AUTH_ERROR)
+      if (managedAuth) throw new Error(turnStartFailure ?? SUBSCRIPTION_AUTH_ERROR)
       throw new Error(
         `Could not start codex app-server: ${errorMessage(error)}. ${child.stderrTail()}`.trim(),
         { cause: error },

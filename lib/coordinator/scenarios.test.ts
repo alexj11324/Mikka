@@ -128,14 +128,14 @@ test('standalone file work on the Bot computer has a repositoryless route for ei
   for (const harness of ['claude_code', 'codex'] as const) {
     calls.length = 0
     const { system, tools } = await play('在你自己的云端电脑上创建一份纯文本交付，不需要 GitHub 仓库', [
-      { tool: 'wake_bot_computer', input: { botId: COORDINATOR_BOT } },
       { tool: 'dispatch_bot_computer', input: { botId: COORDINATOR_BOT, issueId: ISSUE, harness } },
     ], { computerEnabled: true })
-    assert.deepEqual(calls.map(call => call.step), ['wakeComputerBot', 'dispatchComputerThread'])
-    assert.deepEqual(calls[1].input, { botId: COORDINATOR_BOT, issueId: ISSUE, harness })
+    assert.deepEqual(calls.map(call => call.step), ['dispatchComputerThread'])
+    assert.deepEqual(calls[0].input, { botId: COORDINATOR_BOT, issueId: ISSUE, harness })
     assert.match(system, /standalone file or report.*dispatch_bot_computer/i)
     assert.doesNotMatch(system, /Everything else goes to an Agent with dispatch_run/)
     assert.match(String(tools.dispatch_bot_computer.description), /no repository/i)
+    assert.doesNotMatch(String(tools.dispatch_bot_computer.description), /must be awake/i)
     assert.doesNotMatch(String(tools.dispatch_bot_computer.description), /Work that needs no screen goes to dispatch_run/)
     assert.match(String(tools.dispatch_run.description), /standalone file or report.*dispatch_bot_computer/i)
     assert.match(String(tools.dispatch_factory_task.description), /registered device repository/i)

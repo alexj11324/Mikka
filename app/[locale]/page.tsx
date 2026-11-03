@@ -13,6 +13,9 @@ import { onboardingDone } from '@/lib/onboarding'
 import { byoE2BKeyEnabled, getE2BKeyStatus } from '@/lib/secrets/e2b'
 import { currentWorkspaceActor } from '@/lib/workspace-admin/current'
 
+// Owner Retry may prepare the retained task runtime before resuming its session.
+export const maxDuration = 300
+
 /** Whether the guide asks about the cloud computer: only while the person has no E2B key of their own (keys are personal). */
 async function onboardingComputer(): Promise<OnboardingComputer> {
   if (!byoE2BKeyEnabled()) return 'none'

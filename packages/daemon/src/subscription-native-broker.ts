@@ -5,6 +5,7 @@ import { createServer } from "node:http";
 import { join } from "node:path";
 import { once } from "node:events";
 import type { SubscriptionWorkerClient } from "./subscription-worker-client";
+import type { Logger } from "./log";
 
 // Public protocol marker; authority comes from the private task socket.
 export const NATIVE_AUTH_PLACEHOLDER = "mikka-native-broker-placeholder";
@@ -13,6 +14,7 @@ export async function createNativeSubscriptionBroker(host: {
   root: string;
   revision: number;
   check(): Promise<unknown>;
+  log?: Pick<Logger, 'warn'>;
   worker: Pick<SubscriptionWorkerClient, "nativeRequest">;
 }) {
   await host.check();
@@ -21,34 +23,40 @@ export async function createNativeSubscriptionBroker(host: {
   chmodSync(dir, 0o700);
   const socket = join(dir, "broker.sock");
   const pending = new Set<AbortController>();
-  let halted = false;
+  let closed = false;
+  let firstFailureReported = false;
   const server = createServer(async (request, response) => {
     const abort = new AbortController();
     pending.add(abort);
     response.on("close", () => {
       if (!response.writableFinished) abort.abort();
     });
+    let phase: 'request_headers' | 'body_read' | 'body_parse' | 'authorize' | 'upstream_request' | 'upstream_stream' = 'request_headers';
+    let length = 0;
     try {
       if (
-        halted ||
+        closed ||
         request.method !== "POST" ||
         !request.url ||
         request.url.length > 128
       )
         throw new Error("request refused");
       const chunks: Buffer[] = [];
-      let length = 0;
+      phase = 'body_read';
       for await (const part of request) {
         length += part.length;
         if (length > 262144) throw new Error("request refused");
         chunks.push(part);
       }
+      phase = 'body_parse';
       const body: unknown = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+      phase = 'authorize';
       await host.check();
-      if (halted || abort.signal.aborted) throw new Error("request refused");
+      if (closed || abort.signal.aborted) throw new Error("request refused");
       const headers: Record<string, string> = {};
       for (const [key, value] of Object.entries(request.headers))
         if (typeof value === "string") headers[key] = value;
+      phase = 'upstream_request';
       const upstream = await host.worker.nativeRequest(
         host.revision,
         { path: request.url, headers, body },
@@ -58,6 +66,7 @@ export async function createNativeSubscriptionBroker(host: {
         "content-type": upstream.contentType,
         "cache-control": "no-store",
       });
+      phase = 'upstream_stream';
       const reader = upstream.body.getReader();
       try {
         for (;;) {
@@ -73,9 +82,14 @@ export async function createNativeSubscriptionBroker(host: {
       }
       response.end();
     } catch {
-      // No replay after a provider/store/transport outcome is uncertain. Native
-      // client retries can receive only this fixed local error for the session.
-      halted = true;
+      // Fail this request only. The native CLI owns its bounded retries;
+      // each later request must pass fresh authority, never a cached grant.
+      if (!firstFailureReported) {
+        firstFailureReported = true;
+        try { host.log?.warn({ event: 'subscription_native_broker_failure', phase, body_bytes: length,
+          status_class: response.headersSent ? 'stream_aborted' : 'local_503' }, 'Native subscription request failed'); }
+        catch { /* Diagnostics never change the fixed refusal. */ }
+      }
       abort.abort();
       if (response.headersSent) response.destroy();
       else
@@ -110,7 +124,7 @@ export async function createNativeSubscriptionBroker(host: {
   return {
     socket,
     async close() {
-      halted = true;
+      closed = true;
       for (const abort of pending) abort.abort();
       server.closeAllConnections();
       await new Promise<void>((resolve) => server.close(() => resolve()));

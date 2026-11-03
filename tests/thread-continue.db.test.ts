@@ -110,6 +110,38 @@ test('a message to an ended thread runs it again in the same thread; only its ow
     }
   })
 
+  await t.test('ordinary text cannot cancel a blocked original-session task or queue a fresh continuation', async () => {
+    const b = await person()
+    const initial = await steps.dispatchRun(b.id, { issueId: b.issueId, repo: 'octo/repo', requestKey: `strict:${randomUUID()}` }, undefined, b.botId) as unknown as { runId: string }
+    const task = (await pool.query('SELECT t.* FROM factory_tasks t JOIN factory_attempts a ON a."taskId"=t.id WHERE a."runId"=$1', [initial.runId])).rows[0]
+    const failedId = randomUUID(), failedAttemptId = randomUUID(), questionId = randomUUID(), originalSession = `original:${initial.runId}`
+    const continuation = { questionId, originRunId: initial.runId, originSessionId: originalSession, followUp: 'Previously answered question', requireSessionResume: true }
+    await pool.query(`UPDATE agent_runs SET status='stopped',"stopReason"='asked_human',"sessionId"=$2,"finishedAt"=now() WHERE id=$1`, [initial.runId, originalSession])
+    await pool.query(`INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId",status,prompt,"botId","agentDefinition","baseBranch","sessionId","questionContinuation","continuesRunId","stopReason","createdAt","finishedAt")
+      SELECT $1,"userId","issueId","agentId","deviceId","deviceRepoId",'failed',prompt,"botId","agentDefinition","baseBranch",$2,$3,id,'error',"createdAt"+interval '1 second',now() FROM agent_runs WHERE id=$4`,
+    [failedId, originalSession, JSON.stringify(continuation), initial.runId])
+    await pool.query(`UPDATE factory_attempts SET status='waiting' WHERE id=$1`, [task.attemptId])
+    await pool.query(`INSERT INTO factory_attempts (id,"taskId",stage,ordinal,position,status,"runId",reason)
+      VALUES ($1,$2,'execute',2,2,'blocked',$3,'Original session continuation failed')`, [failedAttemptId, task.id, failedId])
+    await pool.query(`UPDATE factory_tasks SET status='blocked',"attemptId"=$2,revision=revision+2 WHERE id=$1`, [task.id, failedAttemptId])
+    const waitingBinding = { taskId: task.id, issueId: b.issueId, attemptId: task.attemptId, candidateId: null, revision: task.revision }
+    await pool.query(`INSERT INTO factory_questions (id,"userId","issueId","taskId","attemptId",stage,"originRunId","originSessionId","originRevision","waitingBinding",kind,question,request,status,reason,"sourceEventId","answerId","answerSource",answer,"answerFingerprint",result,"continuationRunId")
+      VALUES ($1,$2,$3,$4,$5,'execute',$6,$7,$8,$9,'context','Continue?','{}','blocked','Explicit recovery required',$10,$11,'human',$12,'fixture-fingerprint',$13,$14)`,
+    [questionId, b.id, b.issueId, task.id, task.attemptId, initial.runId, originalSession, task.revision, JSON.stringify(waitingBinding), task.sourceEventId,
+      randomUUID(), JSON.stringify({ text: 'The original answer' }), JSON.stringify({ questionId, continuationRunId: failedId }), failedId])
+    const snapshot = async () => (await pool.query(`SELECT
+      (SELECT count(*)::int FROM agent_runs WHERE "userId"=$1) AS runs,
+      (SELECT count(*)::int FROM coordinator_events WHERE "userId"=$1) AS events,
+      (SELECT count(*)::int FROM run_messages WHERE "userId"=$1) AS messages,
+      (SELECT jsonb_agg(to_jsonb(t) ORDER BY t.id) FROM factory_tasks t WHERE t."userId"=$1) AS tasks,
+      (SELECT to_jsonb(q) FROM factory_questions q WHERE q.id=$2) AS question`, [b.id, questionId])).rows[0]
+    const before = await snapshot()
+    for (const text of ['Retry', '重试', 'Continue the task.']) {
+      await assert.rejects(sendThreadMessage(b.id, initial.runId, text), { code: 'threadCannotContinue' })
+    }
+    assert.deepEqual(await snapshot(), before, 'no replacement task, cancellation, provenance event, message or answer mutation')
+  })
+
   await t.test('a new owner request freezes a new Factory epoch without changing accepted history or waking the Bot', async () => {
     const b = await person()
     const oldText = 'factory-1146-cc-87c38e7e\n2 + 3 = 5\nverified artifact\n'

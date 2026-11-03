@@ -126,13 +126,13 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   const stopPending = stopRequested && !stopFailed
   const items = data ? threadItems(data.chunks, data.messages, runId) : []
   // A failed run says why under the stage that stopped, else at the end of the conversation.
-  const failure = data ? runFailureText(data.thread.status, data.thread.error) : null
+  const failure = data && view ? runFailureText(view.status, data.thread.error) : null
   const failedStagesId = failure ? [...items].reverse().find(item => item.kind === 'stages' && item.stages.some(stage => !stage.ok))?.id : undefined
   // A message to an ended thread runs it again in the same thread (R-81): 重试 is that message, one tap (N2).
   const canRetry = !!failure && !!data?.thread.detail && data.thread.ownedByCurrentUser && !runIsActive(view?.status ?? '')
   const failureLine = failure && <div className="flex items-start gap-2" data-slot="thread-failure">
     <p className="line-clamp-2 min-w-0 flex-1 text-xs break-words text-destructive/80" title={failure}>{failure}</p>
-    {canRetry && <Button variant="outline" size="xs" className="shrink-0 pointer-coarse:h-11" disabled={sending} onClick={() => { void send(t('retry')) }}>{t('retry')}</Button>}
+    {canRetry && <Button variant="outline" size="xs" className="shrink-0 pointer-coarse:h-11" disabled={sending} onClick={() => { void send(t('retry'), true) }}>{t('retry')}</Button>}
   </div>
   useEffect(() => {
     if (!active || requestedAt === null) return
@@ -145,12 +145,12 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
     // Acknowledgement updates the task's thread list as soon as this panel sees it.
     void mutateCache(['issue-threads', issueId])
   }, [issueId, view?.status, view?.stopping, question, mutateCache])
-  async function send(retry?: string) {
+  async function send(retry?: string, retryOriginalSession?: true) {
     const text = retry ?? draft.trim()
     if (!text || sending || stopRequested || question === 'resuming') return
     setSending(true); setSendFailed(false)
     try {
-      const result = await sendIssueThreadReply({ issueId, runId: liveRunId, text: retry === undefined ? withReplyQuote(text, replyQuote) : text })
+      const result = await sendIssueThreadReply({ issueId, runId: liveRunId, text: retry === undefined ? withReplyQuote(text, replyQuote) : text, ...(retryOriginalSession ? { retryOriginalSession } : {}) })
       if (result.error) { setSendFailed(actionError(result.error)); return }
       if (retry === undefined) { setDraft(current => current.trim() === text ? '' : current); setReplyQuote(null) }
       void mutate(); void mutateCache(['issue-threads', issueId])

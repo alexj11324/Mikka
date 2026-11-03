@@ -72,3 +72,10 @@ export const questionEscalationSchema = z
     reason: text,
   })
   .strict();
+
+/** Explicit owner recovery has its own idempotency key; it never re-answers. */
+export const questionRecoverySchema = z.object({
+  requestId: z.uuid().transform(value => value.toLowerCase()),
+  expectedFailedRunId: z.uuid().transform(value => value.toLowerCase()),
+  reference: questionReferenceSchema,
+}).strict();

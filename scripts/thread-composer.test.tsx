@@ -72,3 +72,20 @@ test('an open thread lets the agent’s words be quoted and every message be cop
   assert.doesNotMatch(html, /&gt; Done\./)
   assert.equal(html.match(/data-copy-state="idle"/g)?.length, 2)
 })
+
+test('the original thread shows the latest failed continuation and its existing Retry control', () => {
+  thread = { ...base, status: 'stopped', latestRunId: 'run-2', error: 'Codex subscription execution failed',
+    continuation: { id: 'run-2', status: 'failed', stopping: false } }
+  const html = render()
+  assert.match(html, /data-slot="thread-failure"[\s\S]*Codex subscription execution failed/)
+  assert.match(html, /<button[^>]*>Retry<\/button>/)
+  assert.match(html, /data-slot="thread-composer"/)
+})
+
+test('a historical failure does not offer Retry while the latest continuation works or has succeeded', () => {
+  for (const status of ['running', 'succeeded']) {
+    thread = { ...base, status: 'failed', latestRunId: 'run-2', error: 'Historical failure',
+      continuation: { id: 'run-2', status, stopping: false } }
+    assert.doesNotMatch(render(), /data-slot="thread-failure"/)
+  }
+})

@@ -7,6 +7,7 @@ import { z } from "zod";
 import { DEVICE_ONLINE_WINDOW_MS } from "@mikka/protocol/device";
 import { FactoryError, type FactoryBinding } from "../contract";
 import { factoryEventId } from "../event-id";
+import { admitCloudQuestionContinuation } from "./queue-continuation";
 import type {
   createFactoryStore,
   FactoryAuthorize,
@@ -18,6 +19,7 @@ import {
   contextQuestionAnswerSchema,
   humanQuestionAnswerSchema,
   questionEscalationSchema,
+  questionRecoverySchema,
   questionHandoffSchema,
   legacyQuestionId,
   orchestratorMayAnswer,
@@ -81,6 +83,7 @@ type Dispatch = (
   input: FactoryDispatchInput,
   tx?: PoolClient,
   questionOriginRunId?: string,
+  questionHistoryRunId?: string,
 ) => Promise<{ runId: string; task: FactoryTask }>;
 const binding = (t: FactoryTask): FactoryBinding => ({
   taskId: t.id,
@@ -115,6 +118,7 @@ export function createFactoryQuestions(
   validateCheckOrSkills?: ((tx: PoolClient, task: FactoryTask, runId: string) => Promise<Record<string, unknown>>) | QuestionSkillGuards,
   skillGuards?: QuestionSkillGuards,
   afterContinuation?: (userId: string, result: QuestionContinuation) => Promise<void>,
+  beforeRecovery?: (userId: string, scope: { runId: string; workspaceId: string }) => Promise<void>,
 ) {
   const skills = typeof validateCheckOrSkills === "object" ? validateCheckOrSkills : skillGuards;
   const validateCheck = typeof validateCheckOrSkills === "function" ? validateCheckOrSkills : (tx:PoolClient,task:FactoryTask,id:string) => task.stage === "monitor" ? factoryMonitorDispatchAssignment(tx,task.userId,id) : factoryCheckAssignment(tx,task.userId,id);
@@ -202,7 +206,7 @@ export function createFactoryQuestions(
     );
     if (!rows.length) fail("factoryHumanRequired");
   }
-  const view = (q: FactoryQuestion) => ({
+  const view = (q: FactoryQuestion): FactoryQuestion & { reference: QuestionReference; thread: {taskId:string;originRunId:string}; recoverReference?: {expectedFailedRunId:string;reference:QuestionReference} | null } => ({
     ...q,
     reference: questionReference(q),
     thread: { taskId: q.taskId, originRunId: q.originRunId },
@@ -214,7 +218,7 @@ export function createFactoryQuestions(
     task: FactoryTask,
     q: FactoryQuestion,
     persist = true,
-  ) {
+  ): Promise<ReturnType<typeof view>> {
     let status: QuestionStatus | null = null;
     if (stopped(task) && !["resolved", "cancelled"].includes(q.status))
       status = "cancelled";
@@ -244,7 +248,10 @@ export function createFactoryQuestions(
       );
       q = updated;
     }
-    return view(q);
+    return { ...view(q), recoverReference:
+      q.status === 'blocked' && task.status === 'blocked' && q.answerId && q.continuationRunId && task.candidateId === q.candidateId
+        ? { expectedFailedRunId: q.continuationRunId, reference: { ...questionReference(q), binding: binding(task) } }
+        : null };
   }
   return {
     /** Newest 50 pending questions of this user; `runId` (origin or continuation) is filtered in SQL, before the cap. */
@@ -701,6 +708,77 @@ export function createFactoryQuestions(
       catch { console.error(JSON.stringify({msg:'factory_question_wake_deferred',runId:result.continuationRunId})); }
       return result;
     },
+    /** Recover a failed strict continuation; ordinary answer replay remains immutable. */
+    async recover(actor: { source: "human"; userId: string; sessionId: string }, raw: unknown): Promise<QuestionContinuation> {
+      if(actor.source!=="human") fail("factoryHumanRequired");
+      const input = parse(questionRecoverySchema, raw);
+      const eventId = factoryEventId('question-recover',input.requestId);
+      const request = { kind:'question_recover',userId:actor.userId,input };
+      const prepare = async (tx: PoolClient) => {
+        await skills?.lockAnswer?.(actor.userId,input.reference.questionId,tx);
+        const {task,q}=await owned(tx,actor.userId,input.reference.questionId);
+        await human(tx,actor.userId,actor.sessionId);
+        if(stopped(task)) fail('factoryStopped');
+        const {rows:[receipt]}=await tx.query('SELECT request=$3::jsonb AS same,result FROM factory_events WHERE "taskId"=$1 AND "eventId"=$2',[task.id,eventId,JSON.stringify(request)]);
+        if(receipt) {
+          if(!receipt.same) fail('factoryReplayMismatch');
+          return { kind:'replay' as const, result:{...receipt.result,replayed:true} as QuestionContinuation };
+        }
+        if(q.expiresAt && q.expiresAt.getTime()<=Date.now()) fail('factoryQuestionExpired');
+        if(q.status!=='blocked' || task.status!=='blocked' || !q.answerId || !q.answerFingerprint || !q.result ||
+          q.continuationRunId!==input.expectedFailedRunId || task.candidateId!==q.candidateId ||
+          questionFingerprint(input.reference)!==questionFingerprint({...questionReference(q),binding:binding(task)})) fail('factoryQuestionStale');
+        await skills?.lockOrigin(actor.userId,q.issueId,q.originRunId,tx);
+        const {rows:runs}=await tx.query('SELECT * FROM agent_runs WHERE id=ANY($1::uuid[]) AND "userId"=$2 AND "issueId"=$3 ORDER BY id FOR UPDATE',[[q.originRunId,input.expectedFailedRunId],actor.userId,q.issueId]);
+        const origin=runs.find(r=>r.id===q.originRunId),failed=runs.find(r=>r.id===input.expectedFailedRunId);
+        const {rows:[attempt]}=await tx.query('SELECT "runId" FROM factory_attempts WHERE id=$1 AND "taskId"=$2',[task.attemptId,task.id]);
+        const c=failed?.questionContinuation;
+        if(!origin || !failed || attempt?.runId!==failed.id || failed.status!=='failed' || failed.stopRequestedAt || origin.stopRequestedAt ||
+          failed.sessionId!==q.originSessionId || origin.sessionId!==q.originSessionId ||
+          c?.questionId!==q.id || c.originRunId!==q.originRunId || c.originSessionId!==q.originSessionId || c.requireSessionResume!==true ||
+          ['deviceId','deviceRepoId','agentId','baseBranch'].some(k=>failed[k]!==origin[k]) ||
+          !origin.agentDefinition || !failed.agentDefinition || origin.agentDefinition.definitionDigest!==failed.agentDefinition.definitionDigest ||
+          questionFingerprint(origin.agentDefinition.subscription ?? null)!==questionFingerprint(failed.agentDefinition.subscription ?? null)) fail('factoryQuestionContinuationUnavailable');
+        const {rows:[scope]}=await tx.query(`SELECT 1 FROM computer_run_bindings origin
+          JOIN computer_run_bindings latest ON latest."runId"=$2 AND latest."ownerId"=origin."ownerId"
+            AND latest."workspaceId"=origin."workspaceId" AND latest."botId"=origin."botId"
+          WHERE origin."runId"=$1 AND origin."ownerId"=$3`,[q.originRunId,failed.id,actor.userId]);
+        if(!scope) fail('factoryQuestionContinuationUnavailable');
+        const admitted = await admitCloudQuestionContinuation(tx,actor.userId,
+          {issueId:q.issueId,agentId:failed.agentId,deviceRepoId:failed.deviceRepoId},task.botId,
+          {attemptId:task.attemptId,sourceEventId:task.sourceEventId,questionOriginRunId:q.originRunId,questionHistoryRunId:failed.id},'blocked');
+        if(!admitted) fail('factoryQuestionContinuationUnavailable');
+        return { kind:'admitted' as const, task,q,failed,c,scope:{runId:failed.id as string,workspaceId:admitted.binding.workspaceId as string} };
+      };
+      // Validate before provider I/O, then release all transaction locks. The
+      // same admission runs again before dispatch; an old receipt never touches
+      // its now-transferred VM. Only trusted host wiring supplies this hook.
+      const prepared = beforeRecovery ? await transaction(prepare) : null;
+      if(prepared?.kind==='admitted' && beforeRecovery) await beforeRecovery(actor.userId,prepared.scope);
+      const result = prepared?.kind==='replay' ? prepared.result : await transaction(async tx => {
+        const checked = await prepare(tx);
+        if(checked.kind==='replay') return checked.result;
+        const {task,q,failed,c}=checked;
+        // Transient answered state reuses the existing dispatch and retry transaction.
+        // On any admission/custody failure this entire transition rolls back.
+        await tx.query("UPDATE factory_questions SET status='answered' WHERE id=$1",[q.id]);
+        const next=await store.apply(actor.userId,binding(task),factoryEventId('question-recover-attempt',input.requestId),{action:'retry',reason:'The owner requested recovery of the failed original-session continuation.'},tx);
+        const followUp='Recover the failed continuation of the original task. Preserve all existing constraints. Freshly inspect the retained artifact and actual current repository state before continuing; record these current observations for independent review and verification. Keep completed side effects, and do not repeat the original answer or completed external writes or publication. The answer is already in the original session history. This message only requests explicit recovery of that task and grants no new permission.';
+        const queued=await dispatch(actor.userId,{binding:binding(next.task),agentId:failed.agentId,deviceRepoId:failed.deviceRepoId,note:followUp},tx,q.originRunId,failed.id);
+        const {rows:[run]}=await tx.query('SELECT * FROM agent_runs WHERE id=$1 AND "userId"=$2 FOR UPDATE',[queued.runId,actor.userId]);
+        if(!run || run.status!=='queued' || run.stopRequestedAt || ['deviceId','deviceRepoId','agentId','baseBranch'].some(k=>run[k]!==failed[k]) ||
+          run.agentDefinition?.definitionDigest!==failed.agentDefinition.definitionDigest) fail('factoryQuestionContinuationUnavailable');
+        await tx.query('UPDATE agent_runs SET "continuesRunId"=$2,"questionContinuation"=$3 WHERE id=$1',[run.id,failed.id,JSON.stringify({...c,followUp})]);
+        await tx.query(`UPDATE factory_questions SET status='resuming',"continuationRunId"=$2,revision=revision+1,"updatedAt"=now() WHERE id=$1`,[q.id,run.id]);
+        await skills?.continueQuestion(actor.userId,run.id,tx);
+        const recovered={questionId:q.id,continuationRunId:run.id,task:queued.task,replayed:false,historyRunId:failed.id,originRunId:q.originRunId,originSessionId:q.originSessionId};
+        await tx.query('INSERT INTO factory_events ("taskId","eventId",request,result) VALUES ($1,$2,$3,$4)',[task.id,eventId,JSON.stringify(request),JSON.stringify(recovered)]);
+        return recovered;
+      });
+      try { await afterContinuation?.(actor.userId,result); }
+      catch { console.error(JSON.stringify({msg:'factory_question_wake_deferred',runId:result.continuationRunId})); }
+      return result;
+    },
     async claimContinuation(
       userId: string,
       deviceId: string,
@@ -767,6 +845,31 @@ export function createFactoryQuestions(
           c.requireSessionResume !== true
         )
           fail("factoryQuestionContinuationUnavailable");
+        let historyRunId = q.originRunId;
+        const {rows:[recovery]}=await tx.query(`SELECT e.request,e.result FROM factory_events e
+          WHERE e."taskId"=$1 AND e.request->>'kind'='question_recover'
+            AND e.result->>'continuationRunId'=$2`,[task.id,run.id]);
+        if (run.id !== q.result?.continuationRunId || recovery || (run.continuesRunId && run.continuesRunId !== q.originRunId)) {
+          if(!recovery || recovery.request.userId!==userId || recovery.result.questionId!==q.id ||
+            recovery.result.historyRunId!==run.continuesRunId || recovery.request.input.expectedFailedRunId!==run.continuesRunId ||
+            recovery.result.originRunId!==q.originRunId || recovery.result.originSessionId!==q.originSessionId ||
+            recovery.result.task.attemptId!==task.attemptId || recovery.result.task.candidateId!==task.candidateId)
+            fail('factoryQuestionContinuationUnavailable');
+          const {rows:[source]}=await tx.query('SELECT * FROM agent_runs WHERE id=$1 AND "userId"=$2 AND "issueId"=$3 FOR SHARE',[run.continuesRunId,userId,q.issueId]);
+          const link=source?.questionContinuation;
+          if(!source || source.status!=='failed' || source.stopRequestedAt || source.sessionId!==q.originSessionId ||
+            ['deviceId','deviceRepoId','agentId','baseBranch'].some(k=>source[k]!==run[k]) ||
+            source.agentDefinition?.definitionDigest!==run.agentDefinition?.definitionDigest ||
+            questionFingerprint(source.agentDefinition?.subscription ?? null)!==questionFingerprint(run.agentDefinition?.subscription ?? null) ||
+            link?.questionId!==q.id || link.originRunId!==q.originRunId || link.originSessionId!==q.originSessionId || link.requireSessionResume!==true)
+            fail('factoryQuestionContinuationUnavailable');
+          const {rows:[scope]}=await tx.query(`SELECT 1 FROM computer_run_bindings old
+            JOIN computer_run_bindings current ON current."runId"=$2 AND current."ownerId"=old."ownerId"
+              AND current."workspaceId"=old."workspaceId" AND current."botId"=old."botId"
+            WHERE old."runId"=$1 AND old."ownerId"=$3`,[source.id,run.id,userId]);
+          if(run.deviceKind==='cloud' && !scope) fail('factoryQuestionContinuationUnavailable');
+          historyRunId=source.id;
+        }
         const check =
           run.kind === "acceptance"
             ? validateCheck ? await validateCheck(tx, task, runId) : fail("factoryDispatchAdapterRequired")
@@ -777,7 +880,7 @@ export function createFactoryQuestions(
         }
         return {
           ...check,
-          continuesRunId: q.originRunId,
+          continuesRunId: historyRunId,
           resumeSessionId: q.originSessionId,
           followUp: c.followUp as string,
           requireSessionResume: true as const,
@@ -795,7 +898,7 @@ export function createFactoryQuestions(
         );
         if (!identity) return null;
         const { task, q } = await owned(tx, userId, identity.id);
-        if (questionClosed(q.status)) return view(q);
+        if (questionClosed(q.status)) return currentView(tx,task,q,false);
         const {
           rows: [run],
         } = await tx.query(
@@ -846,7 +949,7 @@ export function createFactoryQuestions(
             await store.apply(
               userId,
               binding(task),
-              factoryEventId("question-resume-failed", q.id),
+              factoryEventId("question-resume-failed", `${q.id}:${runId}`),
               {
                 action: "finish",
                 status: "blocked",

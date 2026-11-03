@@ -1,4 +1,4 @@
-import { queueCloudQuestionContinuation, wakeCloudQuestionContinuation } from './questions/queue-continuation';
+import { prepareCloudQuestionRecovery, queueCloudQuestionContinuation, wakeCloudQuestionContinuation } from './questions/queue-continuation';
 import "server-only";
 import { deploymentSwitch } from '@/lib/deployment-switches'
 import { createSkillActivationAdapters } from "../self-improvement/activation";
@@ -150,6 +150,7 @@ export const factoryQuestions = createFactoryQuestions(
   questionSkillAssignments,
   undefined,
   (userId,result)=>wakeCloudQuestionContinuation(pool,userId,result),
+  (userId,scope)=>prepareCloudQuestionRecovery(pool,userId,scope),
 );
 import { createFactoryReconciler } from "./reconcile";
 export const reconcileFactoryRuns = createFactoryReconciler(
