@@ -9,6 +9,7 @@ import { tiptapToText } from '@/lib/tiptap-text'
 import { createFactoryDispatch, factoryBinding } from './dispatch'
 import { checkFactoryRepairBudget } from './check-recovery-evidence'
 import { FactoryError } from './contract'
+import { notifyDeviceWork } from '../device-gateway-notify'
 import type { FactoryTask, createFactoryStore } from './store'
 
 /** Provider I/O boundary; no model input selects these callbacks. */
@@ -51,7 +52,7 @@ export function automaticFactoryDispatch(pool: Pool) {
       const dispatch = createFactoryDispatch(pool, store, (client, userId, input, botId, context) => queueFactoryRun(client, userId, input, botId, context, undefined, { ...selection, readOnly: check || source.agentDefinition?.readOnly }))
       const result = await dispatch(task.userId, { binding: factoryBinding(task), agentId: source.agentId, deviceRepoId: source.deviceRepoId }, tx)
       if (!check) await tx.query('UPDATE agent_runs SET "continuesRunId"=$2 WHERE id=$1', [result.runId, source.id])
-      return
+      return async () => { notifyDeviceWork(source.deviceId) }
     }
     const { rows: [runtime] } = await tx.query(`SELECT r."agentId",a."deviceId",r."repoId" FROM bot_cloud_runtimes r JOIN agents a ON a.id=r."agentId" WHERE r."botId"=$1 AND r."ownerId"=$2 AND r.harness=$3`, [source.runtimeBotId, task.userId, source.harness])
     if (!runtime) throw new FactoryError('factoryRunMismatch')

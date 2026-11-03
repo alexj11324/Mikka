@@ -79,6 +79,8 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
     const runBotId = input.withoutBot ? null : input.botId
     const { subscription, apiKey } = input.apiKey ? { subscription: null, apiKey: input.apiKey } : await runCredentialSource(client, { ownerId: actor.userId, botId: runBotId, harness: target.harness, model, keyId: input.apiKeyId,
       botWorkspaceId: runBotId ? actor.workspaceId : null, choiceWorkspaceId: actor.workspaceId, subscription: binding })
+    // A key selected before runtime preparation can be withdrawn during wake.
+    if (input.apiKeyId && apiKey?.keyId !== input.apiKeyId) throw new ComputerError(409, 'Bot subscription unavailable')
     if (!subscription && !apiKey) throw new ComputerError(409,'Bot subscription unavailable')
     // The hosted runner starts a subscription run only on that subscription's own model: a different one is refused here, not at startup.
     if (subscription && subscription.modelId !== model) throw new ComputerError(409, 'Bot subscription unavailable')

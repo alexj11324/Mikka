@@ -9,6 +9,7 @@ import { queueFactoryRun } from '@/lib/agent-runs'
 import { tiptapToText } from '@/lib/tiptap-text'
 import { createFactoryDispatch, factoryBinding } from './dispatch'
 import { factoryEventId } from './event-id'
+import { notifyDeviceWork } from '../device-gateway-notify'
 import type { FactoryTask, createFactoryStore } from './store'
 
 /** The model chooses the repository, never the authority or execution callbacks. */
@@ -89,4 +90,5 @@ export async function switchFactoryRepository(pool: Pool, tx: PoolClient, store:
     try { await repositorySelectionRuntime.enqueue(pool, actor, run.id, queued.runId) }
     catch { await (await import('./cloud-stage-handoff')).failFactoryCloudStage(pool, actor, queued.runId, 'Repository handoff could not be queued') }
   }
+  return async () => { notifyDeviceWork(runtime.deviceId) }
 }

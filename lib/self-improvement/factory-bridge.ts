@@ -1,4 +1,5 @@
 import type { Pool } from 'pg'
+import { notifyQueuedLocalRun } from '../device-gateway-notify'
 import type { createFactoryStore } from '../factory/store'
 import type { createFactoryDispatch } from '../factory/dispatch'
 import { bindingSchema } from '../factory/contract'
@@ -22,6 +23,7 @@ export function createImprovementFactoryBridge(pool: Pool, factory: ReturnType<t
         const result=await dispatch(userId,{binding:req.binding,agentId:req.agentId,deviceRepoId:req.deviceRepoId},tx)
         const selection=await assignments.selectBaseline(userId,result.runId,tx)
         await tx.query('COMMIT')
+        if (!result.replayed) await notifyQueuedLocalRun(tx, userId, result.runId)
         return {...result,selection,productionEligible:false}
       } catch(error) {await tx.query('ROLLBACK');throw error} finally {tx.release()}
     },
@@ -72,6 +74,7 @@ export function createImprovementFactoryBridge(pool: Pool, factory: ReturnType<t
         await tx.query(`INSERT INTO improvement_factory_links("proposalId","userId","issueId","taskId","attemptId","runId",request)
           VALUES($1,$2,$3,$4,$5,$6,$7)`, [req.proposalId,userId,proposal.issueId,req.binding.taskId,req.binding.attemptId,result.runId,JSON.stringify(req)])
         await tx.query('COMMIT')
+        if (!result.replayed) await notifyQueuedLocalRun(tx, userId, result.runId)
         return { ...result, proposalId:req.proposalId, productionEligible:false }
       } catch (error) { await tx.query('ROLLBACK'); throw error } finally { tx.release() }
     },

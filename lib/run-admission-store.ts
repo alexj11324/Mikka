@@ -121,7 +121,8 @@ export async function acceptLocalRun(input: {
     return input.dispatch?.requestKey ? { runId: input.id, status: 'queued' as const, replayed: false } : { runId: input.id }
     })
     if (!existing) await client.query('COMMIT')
-    if (result && !('replayed' in result && result.replayed)) notifyDeviceWork(input.deviceId)
+    // A Factory/Skill caller with an existing client owns the commit and wake.
+    if (!existing && result && !('replayed' in result && result.replayed)) notifyDeviceWork(input.deviceId)
     return result
   } catch (error) { if (!existing) await client.query('ROLLBACK'); throw error }
   finally { if (!existing) client.release() }

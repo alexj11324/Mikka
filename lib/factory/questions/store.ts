@@ -1,4 +1,5 @@
 import { remoteKey } from "@mikka/protocol/repository";
+import { notifyQueuedLocalRun } from '../../device-gateway-notify';
 import { factoryCheckAssignment } from "../checks";
 import { factoryMonitorDispatchAssignment } from "../monitor-dispatch";
 import { personalRunMessageText } from "../../personal-run-message";
@@ -704,6 +705,7 @@ export function createFactoryQuestions(
       });
       // The answer and its exact continuation are durable before waking a
       // paused machine. Replaying the same answer may retry this same wake.
+      await notifyQueuedLocalRun(pool, actor.userId, result.continuationRunId);
       try { await afterContinuation?.(actor.userId,result); }
       catch { console.error(JSON.stringify({msg:'factory_question_wake_deferred',runId:result.continuationRunId})); }
       return result;

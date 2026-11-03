@@ -17,9 +17,16 @@ const query = { query: async (sql: string, args: unknown[]) => {
 mock.module(new URL('./model-api-keys.ts', import.meta.url).href, { namedExports: {
   usableApiKeys: async () => keys, botApiKeyChoice: async () => saved, apiKeyAfterQuota: async () => afterQuotaAllowed,
 } })
+mock.module(new URL('./computer/native-run-binding.ts', import.meta.url).href, { namedExports: {
+  nativeRunBinding: async () => ({ ...subscription, workspaceId: id(2), consumerId: id(21), route: 'claude_code_cli' }),
+} })
 let runCredentialSource: typeof import('./run-credential-source')['runCredentialSource']
 let quotaFallbackApiKey: typeof import('./run-credential-source')['quotaFallbackApiKey']
-before(async () => { ({ runCredentialSource, quotaFallbackApiKey } = await import('./run-credential-source')) })
+let queueCloudRun: typeof import('./computer/queue-run')['queueCloudRun']
+before(async () => {
+  ({ runCredentialSource, quotaFallbackApiKey } = await import('./run-credential-source'))
+  ;({ queueCloudRun } = await import('./computer/queue-run'))
+})
 const scope = { ownerId: 'alice', botId: id(1), harness: 'claude_code', botWorkspaceId: id(2), choiceWorkspaceId: id(2) }
 beforeEach(() => {
   keys = [key(3, ['deepseek-chat'], 'deepseek'), key(4, ['claude-sonnet-fixture'])]
@@ -79,4 +86,66 @@ test('an exhausted shared subscription respects disabled paid fallback', async (
   quota = { ...(quota as object), windows: [{ kind: 'five_hour', used: 1, resetsAt: '2099-01-01T00:00:00.000Z' }] }
   const shared = { ...subscription, ownerId: 'bob' }
   assert.deepEqual(await runCredentialSource(query, { ...scope, model: shared.modelId, subscription: shared }), { subscription: shared })
+})
+
+/** Real queue admission and credential selection; only storage reads/writes are replaced. */
+function cloudQueueFixture() {
+  const calls: { sql: string; args: unknown[] }[] = []
+  let released = false
+  const client = {
+    release() { released = true },
+    async query(sql: string, args: unknown[] = []) {
+      calls.push({ sql, args })
+      if (/^(BEGIN|COMMIT|ROLLBACK)$/.test(sql) || sql.startsWith('SELECT pg_advisory_xact_lock') || sql.startsWith('INSERT INTO ')) return { rows: [], rowCount: 0 }
+      if (sql.startsWith('SELECT m.')) return { rows: [{ deviceId: id(23), instructions: '', harness: 'claude_code', baseBranch: 'main' }], rowCount: 1 }
+      return query.query(sql, args)
+    },
+  }
+  return {
+    calls, released: () => released,
+    queue: (selection: { apiKeyId?: string; subscriptionBindingId?: string }) => queueCloudRun(
+      { connect: async () => client } as unknown as Pool,
+      { userId: scope.ownerId, workspaceId: id(2) },
+      { botId: scope.botId, issueId: id(20), agentId: id(21), deviceRepoId: id(22), title: 'Keep selected source', body: '', model: subscription.modelId, readOnly: true, ...selection },
+    ),
+  }
+}
+
+test('cloud queue rejects a selected key removed after preflight instead of freezing another key for that model', async () => {
+  const selected = key(5, [subscription.modelId]), other = key(6, [subscription.modelId])
+  keys = [other, selected]
+  catalogOffers = false
+  const input = { ...scope, model: subscription.modelId, keyId: selected.id, subscription }
+  assert.deepEqual(await runCredentialSource(query, input), { subscription: null, apiKey: { keyId: selected.id, model: subscription.modelId } })
+  // The selected key is withdrawn while the provider is waking the computer.
+  keys = [other]
+  assert.deepEqual(await runCredentialSource(query, input), { subscription: null, apiKey: { keyId: other.id, model: subscription.modelId } }, 'the existing selector can fall back, so queue admission must enforce an explicit choice')
+  const fixture = cloudQueueFixture()
+  await assert.rejects(fixture.queue({ apiKeyId: selected.id }), { status: 409 })
+  assert.equal(fixture.calls.some(call => call.sql.startsWith('INSERT INTO ')), false)
+  assert.equal(fixture.calls.at(-1)?.sql, 'ROLLBACK')
+  assert.equal(fixture.released(), true)
+})
+
+test('cloud queue freezes the explicitly selected key when another key also offers the model', async () => {
+  const selected = key(5, [subscription.modelId])
+  keys = [key(6, [subscription.modelId]), selected]
+  const fixture = cloudQueueFixture()
+  await fixture.queue({ apiKeyId: selected.id })
+  const inserted = fixture.calls.find(call => call.sql.startsWith('INSERT INTO agent_runs'))!
+  const frozen = JSON.parse(inserted.args[9] as string)
+  assert.deepEqual(frozen.apiKey, { keyId: selected.id, model: subscription.modelId })
+  assert.equal(frozen.subscription, undefined)
+  assert.equal(fixture.calls.at(-1)?.sql, 'COMMIT')
+})
+
+test('cloud queue still permits an explicitly selected subscription to use its authorized quota fallback', async () => {
+  quota = { ...(quota as object), windows: [{ kind: 'five_hour', used: 1, resetsAt: '2099-01-01T00:00:00.000Z' }] }
+  const fixture = cloudQueueFixture()
+  await fixture.queue({ subscriptionBindingId: subscription.id })
+  const inserted = fixture.calls.find(call => call.sql.startsWith('INSERT INTO agent_runs'))!
+  const frozen = JSON.parse(inserted.args[9] as string)
+  assert.deepEqual(frozen.apiKey, { keyId: id(4), model: subscription.modelId })
+  assert.equal(frozen.subscription, undefined)
+  assert.equal(fixture.calls.at(-1)?.sql, 'COMMIT')
 })

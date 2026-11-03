@@ -1,4 +1,5 @@
 import { factoryRunBotMatches } from './run-scope'
+import { notifyQueuedLocalRun } from '../device-gateway-notify'
 import type { Pool, PoolClient } from 'pg';
 import { freezeWorkerDefinition, retryWorkerDefinition } from '../agent-kit/worker';
 import { configureFactoryCheck, factoryRepairBrief } from './checks';
@@ -88,7 +89,10 @@ export function createFactoryDispatch(pool: Pool, store: ReturnType<typeof creat
       const state = await store.apply(userId,binding,binding.attemptId,{action:'bind_run',runId:run.id},tx);
       const result = {...state,runId:run.id as string,replayed:false,binding:factoryBinding(state.task)};
       await tx.query('INSERT INTO factory_events ("taskId","eventId",request,result) VALUES ($1,$2,$3,$4)',[task.id,eventId,JSON.stringify(input),JSON.stringify(result)]);
-      if (!existing) await tx.query('COMMIT');
+      if (!existing) {
+        await tx.query('COMMIT');
+        await notifyQueuedLocalRun(tx, userId, run.id);
+      }
       return result;
     } catch (error) { if (!existing) await tx.query('ROLLBACK'); throw error; }
     finally { if (!existing) tx.release(); }

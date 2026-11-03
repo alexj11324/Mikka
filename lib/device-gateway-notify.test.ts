@@ -11,7 +11,7 @@ mock.module('next/server', { namedExports: { after: (callback: () => Promise<voi
 } } })
 const id = '11111111-1111-4111-8111-111111111111'
 
-test('work is sent after the response/commit boundary, with bounded transient retries and no work body', async () => {
+test('committed work survives the response boundary, with bounded transient retries and no work body', async () => {
   const { notifyDeviceWork } = await import('./device-gateway-notify')
   const received: string[] = []
   let committed = false
