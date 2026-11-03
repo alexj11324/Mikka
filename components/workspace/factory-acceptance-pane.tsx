@@ -62,9 +62,11 @@ type Derived = { state: AcceptanceState; active?: unknown; publication?: unknown
 /** List, header and pane read the same ledger and the same state machine, so they always agree. A code candidate is accepted by merging its PR; a skill is enabled. */
 export function useAcceptance(task: FactoryTask) {
   const { data: ledger, mutate: reload, error: ledgerError } = useSWR<Ledger>(`/api/factory/tasks/${task.id}/approval?view=ledger`, request, { refreshInterval: 5000 })
+  const { data: detail } = useSWR<AcceptanceDetail>(`/api/factory/tasks/${task.id}`, request)
+  const current = detail?.task && detail.task.candidateId === task.candidateId ? detail.task : task
   const derived: Derived | undefined = !ledger ? undefined : task.isSkillCandidate
     ? acceptanceState({ stage: task.stage, candidateId: task.candidateId, approvals: Array.isArray(ledger.approvals) ? ledger.approvals : [], publications: Array.isArray(ledger.publications) ? ledger.publications : [], now: Date.now() })
-    : mergeAcceptance({ stage: task.stage, status: task.status, candidateId: task.candidateId, merges: Array.isArray(ledger.merges) ? ledger.merges : [] })
+    : mergeAcceptance({ stage: current.stage, status: current.status, candidateId: current.candidateId, merges: Array.isArray(ledger.merges) ? ledger.merges : [] })
   return { ledger, reload, ledgerError, derived }
 }
 
@@ -80,6 +82,10 @@ function CandidateCard({ candidate, detail, environment, isSkill }: { candidate?
   const number = pr ? pullNumber(pr.url) : null
   const sha = candidate?.sha ?? delivery?.candidateSha ?? undefined
   const repository = candidate?.repository ?? delivery?.repository
+  const sourceEnvironment = candidate?.environment ?? delivery?.environment
+  const runtimeEnvironment = isSkill ? t('internalSkill') : environment ?? (sourceEnvironment?.startsWith('device:')
+    ? delivery?.machine?.name ?? delivery?.machineName ?? t(delivery?.machine?.kind === 'cloud' ? 'envChip.cloud' : 'envChip.device')
+    : sourceEnvironment)
   return <section aria-label={t('candidate')} className="flex flex-col gap-2 rounded-xl bg-muted px-4 py-3.5">
     {pr && <div className="flex min-w-0 items-center gap-2 text-sm">
       <span className="flex size-4 shrink-0 [&_svg]:size-4"><PullRequestIcon state={pr.state} /></span>
@@ -97,11 +103,11 @@ function CandidateCard({ candidate, detail, environment, isSkill }: { candidate?
         <span className="truncate">{bareUrl(delivery.previewUrl)}</span><ExternalLink aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
       </a>
     </div>}
-    <div className="flex min-w-0 items-center gap-2">
+    {runtimeEnvironment && <div className="flex min-w-0 items-center gap-2">
       <Label>{t('environmentLabel')}</Label>
       <Server aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
-      <span className="truncate text-sm">{isSkill ? t('internalSkill') : environment ?? t('state.unavailable')}{!isSkill && delivery?.previewDatabaseBranch && ` · Neon ${delivery.previewDatabaseBranch}`}</span>
-    </div>
+      <span className="truncate text-sm">{runtimeEnvironment}{!isSkill && delivery?.previewDatabaseBranch && ` · Neon ${delivery.previewDatabaseBranch}`}</span>
+    </div>}
     {isSkill && <div className="flex min-w-0 items-center gap-2">
       <Label>{t('target')}</Label>
       <code className="truncate text-xs">mikka-builtin:run-report</code>

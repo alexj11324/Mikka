@@ -4192,6 +4192,8 @@
     "reviewThread": "Independent review",
     "verifyThread": "Independent verify",
     "envChip": {
+      "device": "Device",
+      "cloud": "Cloud",
       "preview": "Preview",
       "production": "Production"
     },

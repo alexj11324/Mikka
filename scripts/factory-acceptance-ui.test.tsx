@@ -186,3 +186,20 @@ test('the header names the machine that produced the candidate, and nothing when
   await act(async () => root.render(<CandidateMachine taskId="t1" />))
   assert.equal(container.textContent, '')
 })
+
+test('a device environment names the device category rather than an approval refusal', async () => {
+  detail = { checks: [], delivery: { ...delivery, machine: null, machineName: null } }
+  evidence = { binding: {}, manifest: { candidate: { sha: delivery.candidateSha, repository: 'r', environment: 'device:local-runner', scope: '' }, artifacts: [] } }
+  await pane()
+  const card = document.querySelector('section[aria-label="候选版本"]')
+  assert.match(card?.textContent ?? '', /设备/)
+  assert.doesNotMatch(card?.textContent ?? '', /不可批准/)
+})
+
+test('the pane reads an accepted report from the persisted task detail after accepting', async () => {
+  detail = { task: task({ status: 'passed' }), checks: [], delivery }
+  evidence = { binding: {}, manifest: { candidate: { kind: 'report', sha: delivery.candidateSha, repository: 'r', environment: 'device:local-runner', scope: '' }, artifacts: [] } }
+  await pane()
+  assert.match(document.body.textContent ?? '', /已验收/)
+  assert.equal(Boolean(button('验收')), false)
+})

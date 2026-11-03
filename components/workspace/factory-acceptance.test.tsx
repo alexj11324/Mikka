@@ -86,6 +86,11 @@ test('an empty list renders nothing', () => {
   assert.equal(list(), '')
 })
 
+test('an accepted report remains reachable and reads 已验收', () => {
+  swr.data = { tasks: [task({ status: 'passed' })] }
+  assert.match(list(), />已验收</)
+})
+
 // The card must survive a 200 response that is not `{ tasks: [...] }`: an HTML
 // fallback parses to `{}`, and an older API may send no `tasks` at all.
 test('a response without a tasks array renders nothing instead of throwing', () => {
