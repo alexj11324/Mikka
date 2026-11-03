@@ -3,6 +3,7 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { setTimeout as delay } from 'node:timers/promises'
+import { assertFlashTestModel } from '../test-model-policy.mjs'
 
 const tools = ['mailbox_recipients', 'mailbox_send', 'mailbox_inbox', 'mailbox_ack', 'mailbox_sent']
 const terminal = new Set(['succeeded', 'failed', 'stopped', 'cancelled'])
@@ -55,6 +56,7 @@ export async function verifyWorkerMailbox({ accounts, pool, progress = async () 
   }
   const senderTurn = async (text, expected) => {
     const since = new Date()
+    assertFlashTestModel((await json(`/api/mobile/model?bot=${bot.id}`)).current?.modelId)
     await json('/api/mobile/chat', { botId: bot.id, text })
     return until(async () => {
       const results = await botEvidence(since)
@@ -75,6 +77,7 @@ On the runtime mailbox notice, at the next safe boundary call mailbox_inbox once
   const created = await until(async () => (await query('SELECT id,status,"agentDefinition","createdAt" FROM agent_runs WHERE "userId"=$1 AND "createdAt">=$2 AND prompt LIKE $3 ORDER BY "createdAt" DESC LIMIT 1', [accounts.owner.userId, since, `%${marker}%`]))[0])
   assert.equal(created.agentDefinition?.readOnly, true, 'Worker was not frozen read-only')
   assert.equal(created.agentDefinition?.harness, 'claude_code')
+  assertFlashTestModel(created.agentDefinition?.model)
   assert.ok(created.agentDefinition?.mailbox?.scope, 'Dispatch did not freeze a real worker mailbox scope')
   for (const tool of tools) assert.ok(created.agentDefinition.mailbox.tools.includes(tool), `Frozen worker lacks ${tool}`)
   const workerId = created.id

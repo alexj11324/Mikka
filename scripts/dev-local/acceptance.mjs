@@ -13,6 +13,7 @@ import { acquireTestAccounts, recordAuthenticationSecrets } from '../test-accoun
 import { TestAccountPool } from '../test-accounts/pool.mjs'
 import { verifyMailbox } from './mailbox-acceptance.mjs'
 import { verifyWorkerMailbox } from './worker-mailbox-acceptance.mjs'
+import { assertFlashTestModel, assertTestModelRequest } from '../test-model-policy.mjs'
 
 const root = resolve(import.meta.dirname, '../..')
 const selectedItems = process.env.LOCAL_LOOP_ITEMS?.split(',') ?? ['1', '2', '3', '4', '5', '6', '7']
@@ -101,12 +102,22 @@ async function command(args) {
   assert.equal(status, 0, `CLI ${args[0]} exited ${status}`)
 }
 async function json(account, path, body, method = body ? 'POST' : 'GET') {
+  await assertTestModelRequest(new Request(`http://127.0.0.1${path}`, { method, ...(body ? { body: JSON.stringify(body) } : {}) }))
+  if (method === 'POST' && ['/api/coordinator/messages', '/api/mobile/chat'].includes(path)) {
+    const modelResponse = await account.request(`/api/mobile/model${body?.botId ? `?bot=${body.botId}` : ''}`)
+    assert.ok(modelResponse.ok, 'Cannot verify the test bot model before submitting a prompt')
+    assertFlashTestModel((await modelResponse.json()).current?.modelId)
+  }
   const response = await account.request(path, { method, ...(body ? { headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) } : {}) })
   assert.ok(response.ok, `${method} ${path}: HTTP ${response.status}`)
   return response.json()
 }
 const query = async (sql, values = []) => (await pool.query(sql, values)).rows
-const run = async id => (await query('SELECT r.*,p.status AS publication,p."pullRequest" FROM agent_runs r LEFT JOIN run_publications p ON p."runId"=r.id WHERE r.id=$1 AND r."userId"=$2', [id, accounts.owner.userId]))[0]
+const run = async id => {
+  const current = (await query('SELECT r.*,p.status AS publication,p."pullRequest" FROM agent_runs r LEFT JOIN run_publications p ON p."runId"=r.id WHERE r.id=$1 AND r."userId"=$2', [id, accounts.owner.userId]))[0]
+  if (current) assertFlashTestModel(current.agentDefinition?.model)
+  return current
+}
 
 async function dispatch(name, text, signal) {
   const since = new Date()

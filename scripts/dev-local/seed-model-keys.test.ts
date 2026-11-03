@@ -66,6 +66,9 @@ test('without a key nothing is seeded; local acceptance never falls back to chat
   assert.deepEqual(choices, [])
   assert.equal(preferredModel(['a', 'deepseek-flash']), 'deepseek-flash')
   assert.equal(preferredModel(['deepseek-chat']), undefined)
+  assert.equal(preferredModel(['deepseek-v4-pro']), undefined)
+  assert.equal(preferredModel(['deepseek-v4-pro-flash']), undefined)
+  assert.equal(preferredModel(['deepseek-v4-pro', 'deepseek-flash']), 'deepseek-flash')
   assert.equal(preferredModel([]), undefined)
 })
 

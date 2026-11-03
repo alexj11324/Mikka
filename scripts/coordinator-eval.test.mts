@@ -5,8 +5,8 @@
 // reply must not say. Tools are stubbed with fixed results; nothing reaches a
 // database, a device or GitHub.
 //
-//   COORDINATOR_EVAL_MODEL=<gateway model id> AI_GATEWAY_API_KEY=… pnpm eval:coordinator
-//   COORDINATOR_EVAL_MODEL=<DeepSeek model id> DEEPSEEK_API_KEY=… pnpm eval:coordinator
+//   COORDINATOR_EVAL_MODEL=deepseek/deepseek-v4.1-flash AI_GATEWAY_API_KEY=… pnpm eval:coordinator
+//   COORDINATOR_EVAL_MODEL=deepseek-flash DEEPSEEK_API_KEY=… pnpm eval:coordinator
 //
 // A DeepSeek key goes to DeepSeek's OpenAI-compatible chat endpoint (the one a
 // bot chat on that key uses, lib/model-api-key-providers.ts); otherwise the AI
@@ -17,8 +17,11 @@ import { before, mock, test } from 'node:test'
 import { gateway, generateText, stepCountIs, type LanguageModel, type ToolSet } from 'ai'
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import { API_KEY_PRESET_ENDPOINTS } from '../lib/model-api-key-providers.ts'
+import { assertFlashTestModel } from './test-model-policy.mjs'
 
 const MODEL = process.env.COORDINATOR_EVAL_MODEL
+// Validate even without credentials: a Pro configuration must fail, not skip.
+if (MODEL) assertFlashTestModel(MODEL)
 const TRIALS = Number(process.env.EVAL_TRIALS ?? 3)
 const DEEPSEEK = process.env.DEEPSEEK_API_KEY
 const skip = !MODEL || !(DEEPSEEK || process.env.AI_GATEWAY_API_KEY) ? 'set COORDINATOR_EVAL_MODEL and DEEPSEEK_API_KEY or AI_GATEWAY_API_KEY to run' : false
