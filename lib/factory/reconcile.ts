@@ -63,8 +63,10 @@ export function createFactoryReconciler(
   botId: string | null = null,
   dispatchNext?: (tx: PoolClient, store: ReturnType<typeof createFactoryStore>, task: FactoryTask, run: Record<string, any>) => Promise<(() => Promise<void>) | undefined>,
 ) {
-  const PENDING = `t.stage IN ('spec','execute','review','verify','monitor') AND (t.status='running' OR (t.status='failed' AND EXISTS (SELECT 1 FROM factory_attempts a JOIN agent_runs r ON r."retryOf"=a."runId" WHERE a.id=t."attemptId")))`;
-  const reconcileTasks = async (userId: string, pending: { id: string; attemptId?: string }[]) => {
+  const PENDING = `t.stage IN ('spec','execute','review','verify','monitor') AND (t.status='running' OR
+    (t.status='pending' AND EXISTS(SELECT 1 FROM factory_events f WHERE f."taskId"=t.id AND f.request->>'kind'='request_epoch' AND f.request->>'sourceEventId'=t."sourceEventId"::text)) OR
+    (t.status='failed' AND EXISTS (SELECT 1 FROM factory_attempts a JOIN agent_runs r ON r."retryOf"=a."runId" WHERE a.id=t."attemptId")))`;
+  const reconcileTasks = async (userId: string, pending: { id: string; attemptId?: string; completedRunId?: string }[]) => {
     let recovered = 0;
     for (const item of pending) {
       const tx = await pool.connect();
@@ -78,7 +80,16 @@ export function createFactoryReconciler(
         // A run completion is bound to the attempt that was current when it was
         // selected; if a reject/retry/repair replaced it meanwhile, that old
         // run must not move the task (QA #449-5).
-        if (!["running", "failed"].includes(task.status) || (item.attemptId && task.attemptId !== item.attemptId)) { await tx.query("COMMIT"); continue; }
+        if (!["pending", "running", "failed"].includes(task.status) || (item.attemptId && task.attemptId !== item.attemptId)) { await tx.query("COMMIT"); continue; }
+        if (task.status === 'pending') {
+          const { rows: active } = await tx.query(`SELECT 1 FROM factory_attempts a JOIN agent_runs r ON r.id=a."runId"
+            WHERE a."taskId"=$1 AND r.status IN ('queued','preparing','running','paused','waiting_input','finishing') LIMIT 1`, [task.id]);
+          const start = active.length ? undefined : await dispatchNext?.(tx, store, task, { id: item.completedRunId });
+          await tx.query('COMMIT');
+          await start?.();
+          if (!active.length && dispatchNext) recovered++;
+          continue;
+        }
         let {
           rows: [run],
         } = await tx.query(
@@ -397,10 +408,12 @@ export function createFactoryReconciler(
    * run it retried), so a completion never advances an unrelated task. */
   reconcile.run = async (userId: string, runId: string) => {
     const { rows: pending } = await pool.query(
-      `SELECT t.id, a.id AS "attemptId" FROM factory_tasks t JOIN factory_attempts a ON a.id=t."attemptId" AND a."taskId"=t.id
+      `SELECT t.id, a.id AS "attemptId",$3::uuid AS "completedRunId" FROM factory_tasks t JOIN factory_attempts a ON a.id=t."attemptId" AND a."taskId"=t.id
         WHERE t."userId"=$1 AND t."botId" IS NOT DISTINCT FROM $2::uuid AND ${PENDING}
           AND (a."runId"=$3::uuid OR EXISTS (SELECT 1 FROM agent_runs c WHERE c.id=$3::uuid AND c."retryOf"=a."runId")
-            OR EXISTS (SELECT 1 FROM factory_questions q WHERE q."taskId"=t.id AND (q."originRunId"=$3::uuid OR q."continuationRunId"=$3::uuid)))
+            OR EXISTS (SELECT 1 FROM factory_questions q WHERE q."taskId"=t.id AND (q."originRunId"=$3::uuid OR q."continuationRunId"=$3::uuid))
+            OR (t.status='pending' AND EXISTS(SELECT 1 FROM coordinator_events e WHERE e.id=t."sourceEventId" AND e."userId"=$1
+              AND e.payload->>'source'='thread_continuation' AND e.payload->>'previousRunId'=$3::text)))
         ORDER BY t.id`,
       [userId, botId, runId],
     );

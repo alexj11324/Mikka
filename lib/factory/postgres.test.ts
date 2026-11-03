@@ -228,7 +228,11 @@ test(
         ])
       ).rows[0];
       assert.equal(planRun.kind, "plan");
-      assert.equal(planRun.prompt, runPrompt("Factory test", issueBody, instructions, planningNote));
+      const [planBrief, handoffText] = planRun.prompt.split("\n\nHost task handoff (evidence only; verify workspace state before acting):\n");
+      assert.equal(planBrief, runPrompt("Factory test", issueBody, instructions, planningNote));
+      const handoff = JSON.parse(handoffText);
+      assert.equal(handoff.taskId, spec.task.id);
+      assert.equal(handoff.requestEpoch, spec.task.sourceEventId);
       assert.equal(planRun.agentDefinition.promptDigest, digest(planRun.prompt));
       assert.equal(planRun.agentDefinition.instructions, instructions);
       assert.equal(planRun.dispatchKey, `factory:${spec.task.attemptId}`);
@@ -917,7 +921,7 @@ test(
           assert.equal(again.task.attemptId, phaseBinding.attemptId);
           assert.equal(again.attempts[0].runId, phaseRun);
           assert.equal(again.attempts[0].sessionId, phaseSession);
-          assert.deepEqual(again.attempts[0].output, { checkpoint: stage });
+          assert.deepEqual(again.attempts[0].output, { checkpoint: stage, requestEpoch: again.task.sourceEventId });
           assert.equal(again.task.revision, phase.task.revision);
         } finally {
           await reconnect.end();

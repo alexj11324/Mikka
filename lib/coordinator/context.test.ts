@@ -4,6 +4,16 @@ import type { ModelMessage } from 'ai'
 import { chatItems, jsonbText, compactionCut, COMPACT_AT_TOKENS, estimateTokens, eventPrompt, forgetNotes, instructionsWithMemory, KEEP_RECENT_TOKENS, MEMORY_MAX_CHARS, promptMessages, rememberNote, type StoredMessage } from './context'
 import { modelMessage, pointsSwitchMessage, quotaSwitchMessage, sourcedEventMessage } from './message-safety'
 
+test('watchdog blocker exposes the actual host facts and never invents a successful handoff', () => {
+  const prompt = eventPrompt({ kind: 'run_report', issueId: 'issue', runId: null, payload: {
+    source: 'task_watchdog', taskId: 'task', requestEpoch: 'epoch', reason: 'Credential revoked on the remaining device', handoffEventId: 'handoff', handoffDigest: 'digest',
+  } })
+  assert.match(prompt, /Credential revoked/)
+  assert.match(prompt, /epoch/)
+  assert.match(prompt, /Do not replay uncertain/)
+  assert.doesNotMatch(prompt, /undefined/)
+})
+
 function stored(messages: ModelMessage[]): StoredMessage[] {
   return messages.map((message, index) => ({ position: index + 1, message }))
 }

@@ -187,6 +187,12 @@ async function reclaimLostRun(run: Run, now: Date) {
   }
   const retryId = crypto.randomUUID()
   const where = bound || cloud ? 'moved to the cloud' : 'handed to another device'
+  const recovery = await (await import('@/lib/factory/handoff')).factoryRecoveryHandoff(pool, run, retryPrompt(run.prompt, outcome.attempt))
+  if (recovery.blocked) {
+    const ended = await endRun(run.id, LEASED_RUN_STATUSES, { status: 'failed', error: recovery.blocked }, now, true)
+    if (ended) await announceEnd({ ...run, status: 'failed' })
+    return
+  }
   const retried = await db.transaction(async tx => {
     const [ended] = await tx.update(agentRuns)
       .set({ status: 'failed', stopReason: 'device_lost', error: `The machine went offline; ${where} as attempt ${outcome.attempt} of ${MAX_RUN_ATTEMPTS}.`, finishedAt: now, updatedAt: now })
@@ -196,9 +202,9 @@ async function reclaimLostRun(run: Run, now: Date) {
     if (cloud) return true
     await tx.insert(agentRuns).values({
       id: retryId, userId: run.userId, issueId: run.issueId, agentId: run.agentId, botId: run.botId, source: run.source,
-      agentDefinition: retryWorkerDefinition(target ? await rebindExecutionDevice(pool, run, target.deviceId) : run.agentDefinition, retryPrompt(run.prompt, outcome.attempt)),
+      agentDefinition: retryWorkerDefinition(target ? await rebindExecutionDevice(pool, run, target.deviceId) : run.agentDefinition, recovery.prompt),
       deviceId: target?.deviceId ?? run.deviceId, deviceRepoId: target?.deviceRepoId ?? run.deviceRepoId, status: 'queued', kind: run.kind, baseBranch: run.baseBranch,
-      prompt: retryPrompt(run.prompt, outcome.attempt), attempt: outcome.attempt, retryOf: run.id,
+      prompt: recovery.prompt, attempt: outcome.attempt, retryOf: run.id,
     })
     if (bound) {
       // Same thread, new sandbox: the retry gets its own thread machine, built from the workspace snapshot.
@@ -214,7 +220,7 @@ async function reclaimLostRun(run: Run, now: Date) {
     stopRecordingsAfter([run.id])
     await afterRunEnded(run.userId, run.id)
     if (bound) await startThreadMachine({ userId: run.userId, workspaceId: bound.workspaceId }, retryId)
-    if (cloud) await moveToCloud(run, cloud, outcome.attempt, now)
+    if (cloud) await moveToCloud(run, cloud, outcome.attempt, now, recovery.briefing)
     else notifyDeviceWork(target?.deviceId ?? run.deviceId)
   }
 }
@@ -249,7 +255,7 @@ async function cloudRetryModel(run: Run, cloud: CloudTarget) {
  * cloud queue, then starts its thread machine. When the cloud refuses, the
  * run's retry ends with the card instead.
  */
-async function moveToCloud(run: Run, cloud: CloudTarget, attempt: number, now: Date) {
+async function moveToCloud(run: Run, cloud: CloudTarget, attempt: number, now: Date, handoff = '') {
   const actor = { userId: run.userId, workspaceId: cloud.workspaceId }
   try {
     const [issue] = run.issueId ? await db.select({ title: issues.title, content: issues.content }).from(issues).where(eq(issues.id, run.issueId)).limit(1) : []
@@ -257,7 +263,7 @@ async function moveToCloud(run: Run, cloud: CloudTarget, attempt: number, now: D
     const { queueCloudRun } = await import('@/lib/computer/queue-run')
     const repo = await ensureDeviceRepository(run.userId, cloud.deviceId, cloud.remoteUrl)
     const { runId } = await queueCloudRun(pool, actor, { botId: cloud.botId, issueId: run.issueId, agentId: cloud.agentId, deviceRepoId: repo.id, title: issue.title, body: tiptapToText(issue.content),
-      note: retryNote(attempt), withoutBot: run.botId === null, idempotencyKey: `retry:${run.id}`, threadRunId: run.id, ...await cloudRetryModel(run, cloud) })
+      note: retryNote(attempt) + handoff, withoutBot: run.botId === null, idempotencyKey: `retry:${run.id}`, threadRunId: run.id, ...await cloudRetryModel(run, cloud) })
     await db.update(agentRuns).set({ retryOf: run.id, attempt, updatedAt: now }).where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, run.userId)))
     await recordCoordinatorEvent(db, runRetriedEvent(run, { runId, attempt, maxAttempts: MAX_RUN_ATTEMPTS, movedTo: { kind: 'cloud' } }))
     await startThreadMachine(actor, runId)

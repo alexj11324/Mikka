@@ -125,4 +125,53 @@ test('a Coordinator dispatch_run goes through the Factory', { skip: !dbUrl, time
   const attempts = (await pool.query('SELECT stage,"runId" FROM factory_attempts WHERE "taskId"=$1 ORDER BY position', [acceptance.id])).rows
   assert.deepEqual(attempts.map(attempt => attempt.stage), ['execute', 'review', 'verify', 'approval'])
   assert.equal(new Set(attempts.slice(0, 3).map(attempt => attempt.runId)).size, 3)
+
+  // An online but unproductive A is stopped, then the actual watchdog consumer
+  // chooses B through normal model selection, repository and credential admission.
+  const nextRequest = randomUUID()
+  await pool.query(`INSERT INTO coordinator_events(id,"userId","botId","issueId",kind,"dedupeKey",payload)
+    VALUES($1,$2,$3,$4,'user_message',$5,$6)`, [nextRequest, userId, botId, issueId, `continuity:${nextRequest}`, JSON.stringify({ text: 'Add a null-input regression while preserving the accepted tax fix.' })])
+  const continued = await steps.dispatchRun(userId, { issueId, note: 'Add the null-input regression.', sourceEventId: nextRequest, requestKey: `continue:${nextRequest}` }, undefined, botId) as unknown as { runId: string }
+  assert.ok(continued.runId)
+  const continuedTask = (await pool.query('SELECT * FROM factory_tasks WHERE id=$1', [acceptance.id])).rows[0]
+  assert.equal(continuedTask.id, acceptance.id)
+  const epoch = continuedTask.sourceEventId
+  const deviceB = randomUUID(), agentB = randomUUID()
+  const { DAEMON_PROTOCOL_VERSION } = await import('@mikka/protocol/daemon')
+  await pool.query(`INSERT INTO devices(id,"ownerId",name,kind,"deviceType",enabled,"lastSeenAt",harnesses,"protocolVersion")
+    VALUES($1,$2,'acme-build-02','local','server',true,now(),$3,$4)`, [deviceB, userId, JSON.stringify(codex), DAEMON_PROTOCOL_VERSION])
+  await pool.query(`INSERT INTO agents(id,"userId","deviceId",harness,name) VALUES($1,$2,$3,'codex','Codex on acme-build-02')`, [agentB, userId, deviceB])
+  await pool.query(`UPDATE devices SET "lastSeenAt"=now() WHERE id=$1`, [deviceId])
+  await pool.query(`UPDATE agent_runs SET status='running',"startedAt"=now()-interval '2 hours',"updatedAt"=now(),"leaseExpiresAt"=now()+interval '1 hour' WHERE id=$1`, [continued.runId])
+  await pool.query(`UPDATE factory_tasks SET "updatedAt"='2000-01-01' WHERE id=$1`, [acceptance.id])
+  await pool.query(`UPDATE factory_attempts SET "createdAt"='2000-01-01' WHERE id=$1`, [continuedTask.attemptId])
+  const { sweepFactoryWatchdog } = await import('../lib/factory/watchdog')
+  const { automaticFactoryDispatch } = await import('../lib/factory/automatic-dispatch')
+  let interruptions = 0
+  const recovery = { runtime: factoryRuntimeForBot, dispatch: automaticFactoryDispatch(pool), wake: async () => { interruptions++ } }
+  await sweepFactoryWatchdog(pool, recovery)
+  const stopped = (await pool.query('SELECT "stopRequestedAt",status FROM agent_runs WHERE id=$1', [continued.runId])).rows[0]
+  assert.ok(stopped.stopRequestedAt)
+  assert.equal(stopped.status, 'running', 'the host must wait for the actual worker stop acknowledgement')
+  assert.equal(interruptions, 0, 'automatic recovery is quiet')
+  await pool.query(`UPDATE agent_runs SET status='stopped',"stopReason"='cancelled',"finishedAt"=now() WHERE id=$1`, [continued.runId])
+  const { afterRunEnded } = await import('../lib/run-completion-effects')
+  await afterRunEnded(userId, continued.runId)
+  const recoveryTime = new Date(Date.now() + 2 * 60_000)
+  const recovered = await sweepFactoryWatchdog(pool, recovery, recoveryTime)
+  assert.equal(recovered.failed, 0)
+  const resumed = (await pool.query(`SELECT t.id,t."sourceEventId",t.status,r.id AS "runId",r."deviceId",r."agentId",r."retryOf",r.prompt,a.output
+    FROM factory_tasks t JOIN factory_attempts a ON a.id=t."attemptId" JOIN agent_runs r ON r.id=a."runId" WHERE t.id=$1`, [acceptance.id])).rows[0]
+  assert.equal(resumed.id, acceptance.id)
+  assert.equal(resumed.sourceEventId, epoch)
+  assert.equal(resumed.status, 'running')
+  assert.equal(resumed.deviceId, deviceB)
+  assert.equal(resumed.agentId, agentB)
+  assert.equal(resumed.retryOf, continued.runId, 'the existing checkpoint restore path follows the original executor')
+  assert.equal(resumed.output.handoff.requestEpoch, epoch)
+  assert.match(resumed.prompt, /null-input regression/)
+  assert.match(resumed.prompt, /externalEffects/)
+  await sweepFactoryWatchdog(pool, recovery, recoveryTime)
+  assert.equal((await pool.query('SELECT count(*)::int AS n FROM agent_runs WHERE "retryOf"=$1', [continued.runId])).rows[0].n, 1)
+  assert.equal(interruptions, 0)
 })

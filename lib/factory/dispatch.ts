@@ -2,6 +2,7 @@ import { factoryRunBotMatches } from './run-scope'
 import type { Pool, PoolClient } from 'pg';
 import { freezeWorkerDefinition, retryWorkerDefinition } from '../agent-kit/worker';
 import { configureFactoryCheck, factoryRepairBrief } from './checks';
+import { factoryHandoffPrompt, persistFactoryHandoff } from './handoff';
 import type { DispatchInput, DispatchResult } from '../run-dispatch';
 import { FactoryError, type FactoryBinding, type FactoryStage } from './contract';
 import { factoryEventId } from './event-id';
@@ -81,7 +82,12 @@ export function createFactoryDispatch(pool: Pool, store: ReturnType<typeof creat
       const configure = adapters.configure[task.stage];
       if (!configure) fail('factoryDispatchAdapterRequired');
       const queued = await queue(tx,userId,{issueId:task.issueId,agentId:input.agentId,deviceRepoId:input.deviceRepoId,note:input.note},task.botId,{sourceEventId:task.sourceEventId,attemptId:task.attemptId,...(questionOriginRunId ? {questionOriginRunId} : {})});
+      await tx.query('UPDATE factory_attempts SET output=output || $2::jsonb WHERE id=$1', [task.attemptId, JSON.stringify({ requestEpoch: task.sourceEventId })]);
       await configure(tx,task,queued.runId);
+      const handoff = await persistFactoryHandoff(tx, task);
+      const handoffText = factoryHandoffPrompt(handoff);
+      await tx.query('UPDATE agent_runs SET prompt=left(prompt,$2) || $3 WHERE id=$1', [queued.runId, 100000 - handoffText.length, handoffText]);
+      await tx.query('UPDATE factory_attempts SET output=output || $2::jsonb WHERE id=$1', [task.attemptId, JSON.stringify({ handoff: { eventId: handoff.eventId, digest: handoff.digest, requestEpoch: task.sourceEventId } })]);
       await adapters.freeze(tx,task,queued.runId);
       const { rows: [run] } = await tx.query('SELECT * FROM agent_runs WHERE id=$1 FOR UPDATE',[queued.runId]);
       if (!run || run.userId !== userId || run.issueId !== task.issueId || !(await factoryRunBotMatches(tx, task, run)) || run.agentId !== input.agentId || run.deviceRepoId !== input.deviceRepoId || run.status !== 'queued' || run.stopRequestedAt || !run.agentDefinition) fail('factoryRunMismatch');

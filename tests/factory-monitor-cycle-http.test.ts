@@ -197,7 +197,7 @@ test(
       );
       assert.equal(current.runId, null);
       assert.equal(current.sessionId, null);
-      assert.deepEqual(current.output, {});
+      assert.deepEqual(current.output, { requestEpoch: next.body.task.sourceEventId });
       assert.deepEqual(current.evidence, []);
       assert.equal(
         (await owner(path(task), "POST", request)).body.task.attemptId,

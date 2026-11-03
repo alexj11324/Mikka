@@ -258,9 +258,9 @@ export function createFactoryStore(
   ) {
     const id = randomUUID();
     await tx.query(
-      `INSERT INTO factory_attempts (id,"taskId",stage,ordinal,position,status,"candidateId",reason)
-      SELECT $1,$2,$3,coalesce(max(ordinal) FILTER (WHERE stage=$3),0)+1,coalesce(max(position),0)+1,'pending',$4,$5 FROM factory_attempts WHERE "taskId"=$2`,
-      [id, task.id, stage, task.candidateId, reason],
+      `INSERT INTO factory_attempts (id,"taskId",stage,ordinal,position,status,"candidateId",reason,output)
+      SELECT $1,$2,$3,coalesce(max(ordinal) FILTER (WHERE stage=$3),0)+1,coalesce(max(position),0)+1,'pending',$4,$5,$6 FROM factory_attempts WHERE "taskId"=$2`,
+      [id, task.id, stage, task.candidateId, reason, JSON.stringify({ requestEpoch: task.sourceEventId })],
     );
     task.attemptId = id;
     task.stage = stage;
@@ -282,7 +282,13 @@ export function createFactoryStore(
         // Replays take task -> issue, like cancellation/dispatch. New routes
         // freeze the issue generation under the same issue lock before INSERT.
         const { rows: [prior] } = await tx.query<FactoryTask>(
-          'SELECT * FROM factory_tasks WHERE "userId"=$1 AND "issueId"=$2 AND "sourceEventId"=$3 FOR UPDATE',
+          `SELECT t.* FROM factory_tasks t WHERE t."userId"=$1 AND t."issueId"=$2 AND
+            (t."sourceEventId"=$3::uuid OR EXISTS(SELECT 1 FROM factory_events e WHERE e."taskId"=t.id
+              AND (e.request->>'sourceEventId'=($3::uuid)::text OR e.result->'task'->>'sourceEventId'=($3::uuid)::text))
+              OR EXISTS(SELECT 1 FROM coordinator_events s JOIN factory_attempts a ON a."taskId"=t.id
+                AND a."runId"::text=s.payload->>'previousRunId'
+                WHERE s.id=$3 AND s.payload->>'source'='thread_continuation'))
+            ORDER BY (t."sourceEventId"=$3::uuid) DESC,t."createdAt" DESC LIMIT 1 FOR UPDATE OF t`,
           [userId, route.issueId, route.sourceEventId],
         );
         const issue = await lockedIssue(tx, route.issueId);
@@ -291,7 +297,7 @@ export function createFactoryStore(
         const {
           rows: [source],
         } = await tx.query(
-          'SELECT id FROM coordinator_events WHERE id=$1 AND "userId"=$2 AND kind=\'user_message\' AND ("issueId" IS NULL OR "issueId"=$3)',
+          'SELECT id,payload FROM coordinator_events WHERE id=$1 AND "userId"=$2 AND kind=\'user_message\' AND ("issueId" IS NULL OR "issueId"=$3)',
           [route.sourceEventId, userId, route.issueId],
         );
         if (
@@ -301,6 +307,11 @@ export function createFactoryStore(
           fail("factorySourceMismatch");
         if (prior) {
           if (prior.botId !== botId) fail("factoryNotFound");
+          if (prior.sourceEventId !== route.sourceEventId) {
+            if (source.payload?.source !== 'thread_continuation') fail("factoryStale");
+            const { advanceFactoryRequest } = await import('./request-epoch');
+            return save(tx, await advanceFactoryRequest(tx, prior, route.sourceEventId), route.eventId, route);
+          }
           if (terminal(prior)) fail("factoryStopped");
           return (
             (await replay(tx, prior.id, route.eventId, route)) ??
@@ -339,8 +350,8 @@ export function createFactoryStore(
           ],
         );
         await tx.query(
-          'INSERT INTO factory_attempts (id,"taskId",stage,ordinal,position,status,reason) VALUES ($1,$2,$3,1,1,$4,$5)',
-          [task.attemptId, task.id, task.stage, task.status, task.reason],
+          'INSERT INTO factory_attempts (id,"taskId",stage,ordinal,position,status,reason,output) VALUES ($1,$2,$3,1,1,$4,$5,$6)',
+          [task.attemptId, task.id, task.stage, task.status, task.reason, JSON.stringify({ requestEpoch: task.sourceEventId })],
         );
         return save(tx, task, route.eventId, route);
       }, existing);
@@ -431,7 +442,10 @@ export function createFactoryStore(
         if (terminal(task)) fail("factoryStopped");
         const request = { binding, change };
         const previous = await replay(tx, task.id, eventId, request);
-        if (previous) return previous;
+        if (previous) {
+          if (previous.task.sourceEventId !== task.sourceEventId) fail("factoryStale");
+          return previous;
+        }
         if (
           task.revision !== binding.revision
         )
@@ -443,6 +457,8 @@ export function createFactoryStore(
           [task.attemptId, task.id],
         );
         if (!attempt) fail("factoryAttemptMissing");
+        if (!["cancel", "revoke"].includes(change.action) && attempt.output?.requestEpoch != null && attempt.output.requestEpoch !== task.sourceEventId)
+          fail("factoryStale");
         if (!["resolve", "cancel", "revoke"].includes(change.action) && !lifecycle)
           fail("factoryTransitionUnavailable");
         if (change.action === "cancel" || change.action === "revoke") {
@@ -462,7 +478,7 @@ export function createFactoryStore(
           const {
             rows: [answer],
           } = await tx.query(
-            'SELECT id FROM coordinator_events WHERE id=$1 AND "userId"=$2 AND kind=\'user_message\' AND ("issueId" IS NULL OR "issueId"=$3) AND "createdAt">=(SELECT "createdAt" FROM coordinator_events WHERE id=$4)',
+            'SELECT id,payload FROM coordinator_events WHERE id=$1 AND "userId"=$2 AND kind=\'user_message\' AND ("issueId" IS NULL OR "issueId"=$3) AND "createdAt">=(SELECT "createdAt" FROM coordinator_events WHERE id=$4)',
             [change.sourceEventId, userId, task.issueId, task.sourceEventId],
           );
           if (

@@ -169,6 +169,12 @@ export function eventPrompt(event: { kind: CoordinatorEventKind; issueId: string
     case 'issue_status_changed':
       return [`[Event] Issue ${event.issueId} "${payload.title}" moved from ${payload.previousStatus} to ${payload.status}.`, note].filter(Boolean).join('\n')
     case 'run_report':
+      if (payload.source === 'task_watchdog') return [
+        `[Event] Task ${payload.taskId} cannot safely continue its current request epoch ${payload.requestEpoch}: ${payload.reason}`,
+        `Structured host handoff: ${payload.handoffEventId}, digest ${payload.handoffDigest}.`,
+        'The host already attempted bounded recovery through authorized executors. Inspect the current task and blockers. Do not replay uncertain external actions; use the Decision API to decide whether an actionable owner notification is needed.',
+        event.issueId ? `Issue: ${event.issueId}.` : null, note,
+      ].filter(Boolean).join('\n')
       return [event.runId ? `[Event] The agent in run ${event.runId} reports progress: ${payload.text}` : `[Event] An Agent reports coordination data: ${payload.text}`, event.issueId ? `Issue: ${event.issueId}.` : null, note].filter(Boolean).join('\n')
     case 'run_question':
       if (typeof payload.taskId === 'string' && typeof payload.questionId === 'string') return [
