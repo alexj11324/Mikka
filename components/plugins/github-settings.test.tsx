@@ -182,4 +182,5 @@ test('a desktop loopback return that was cancelled says so and links nothing', a
   await settle()
   assert.equal(confirms.length, 0)
   assert.ok(container.textContent?.includes('githubLinkCancelled'))
+  assert.ok(!container.textContent?.includes('githubLinkWaiting'), 'no longer waiting for the browser')
 })

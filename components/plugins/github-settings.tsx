@@ -115,20 +115,23 @@ function ViewerGitHubSettings({ userId, email, isPending }: { userId: string | u
   })
   // The desktop's loopback return for the link in progress: its state, and the verifier only this page holds.
   const pendingReturn = useRef<{ returnState: string; verifier: string; token: string } | null>(null)
+  const stopChecks = returns.stop
   useEffect(() => {
+    // Not linked this time: the page stops waiting and says why.
+    const notLinked = (message: string) => { stopChecks(); setLinking(null); setBrowserAccount(null); setGithubLinkError(message) }
     const bridge = bridgeFromWindow(window as MikkaWindow)
     if (!bridge || typeof bridge.app.onReturn !== 'function') return
     return bridge.app.onReturn(({ state, result }) => {
       const pending = pendingReturn.current
       if (!pending || state !== pending.returnState) return
       pendingReturn.current = null
-      if (result !== 'connected') { setGithubLinkError(result === 'cancelled' ? t('githubLinkCancelled') : t('githubLinkFailed')); return }
+      if (result !== 'connected') { notLinked(result === 'cancelled' ? t('githubLinkCancelled') : t('githubLinkFailed')); return }
       void fetch(CONFIRM_PATH, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ token: pending.token, verifier: pending.verifier }) })
         .then(response => { if (!response.ok) throw new Error(String(response.status)) })
         .then(() => mutate())
-        .catch(() => setGithubLinkError(t('githubLinkFailed')))
+        .catch(() => notLinked(t('githubLinkFailed')))
     })
-  }, [mutate, t])
+  }, [mutate, stopChecks, t])
   // In the browser, after a link from the app: the token in the URL, and what it says here.
   const [browserIntent, setBrowserIntent] = useState<{ token: string; view: IntentView } | null>(null)
 
