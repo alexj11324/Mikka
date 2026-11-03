@@ -15,6 +15,7 @@ test('real agent-shaped push, gh PR and exact-head receipt use only the fixture 
   const git = args => execFileSync('git', args, { cwd: directory, encoding: 'utf8', env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1' } }).trim()
   const output = []
   const gh = args => fixtureGh(args, { env, origin: services.origin, gitRun: git, output: value => output.push(value) })
+  const hostGh = args => fixtureGh(args, { env: { ...env, GH_REPO: undefined }, origin: services.origin, gitRun: git, output: value => output.push(value) })
   try {
     const fixture = await (await fetch(`${services.origin}/scenario`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ marker: `mvp-${randomUUID()}`, title: 'Agent gh fixture', harness: 'any' }) })).json()
     const identity = await fetch(`${services.origin}/github/user`, { headers: { authorization: `Bearer ${env.GH_TOKEN}` } })
@@ -32,6 +33,8 @@ test('real agent-shaped push, gh PR and exact-head receipt use only the fixture 
     const issued = await token.json()
     assert.equal(issued.token, env.GH_TOKEN)
     assert.ok(Date.parse(issued.expires_at) > Date.now() + 40 * 60_000)
+    await fixtureGh(['repo', 'view', env.GH_REPO, '--json', 'name'], { env: { GH_TOKEN: env.GH_TOKEN, GH_HOST: env.GH_HOST }, origin: services.origin, gitRun: git, output: value => output.push(value) })
+    assert.equal(JSON.parse(output.at(-1)).name, 'core-loop', 'Host receipts use explicit repository arguments without GH_REPO')
     await gh(['--version'])
     assert.match(output.at(-1), /local-fixture/)
     await gh(['auth', 'status'])
@@ -45,11 +48,11 @@ test('real agent-shaped push, gh PR and exact-head receipt use only the fixture 
     assert.equal(output.at(-1), 'https://github.com/mikka-e2e/core-loop/pull/41')
     await gh(['pr', 'list', '--repo', env.GH_REPO, '--head', 'mikka/fixture-1', '--state', 'all', '--json', 'number,url'])
     assert.equal(JSON.parse(output.at(-1))[0].number, 41)
-    await gh(['pr', 'view', 'mikka/fixture-1', '--repo', env.GH_REPO, '--json', 'headRefOid,body'])
+    await hostGh(['pr', 'view', 'mikka/fixture-1', '--repo', env.GH_REPO, '--json', 'headRefOid,body'])
     assert.equal(JSON.parse(output.at(-1)).headRefOid, commit)
     await gh(['pr', 'checks', 'https://github.com/mikka-e2e/core-loop/pull/41', '--watch'])
     assert.match(output.at(-1), /synthetic CI.*pass/)
-    await gh(['api', 'graphql', '-f', 'query=query($owner:String!,$repository:String!,$commit:GitObjectID!){repository(owner:$owner,name:$repository){object(oid:$commit){... on Commit {oid statusCheckRollup{state}}}}}', '-f', 'owner=mikka-e2e', '-f', 'repository=core-loop', '-f', `commit=${commit}`])
+    await hostGh(['api', 'graphql', '-f', 'query=query($owner:String!,$repository:String!,$commit:GitObjectID!){repository(owner:$owner,name:$repository){object(oid:$commit){... on Commit {oid statusCheckRollup{state}}}}}', '-f', 'owner=mikka-e2e', '-f', 'repository=core-loop', '-f', `commit=${commit}`])
     const checked = JSON.parse(output.at(-1)).data.repository.object
     assert.equal(checked.oid, commit)
     assert.equal(checked.statusCheckRollup.state, 'SUCCESS')

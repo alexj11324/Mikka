@@ -10,7 +10,7 @@ const RUN_TOKEN = 'mvp-synthetic-installation-run'
 const git = args => execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
 
 export async function fixtureGh(args, { env = process.env, origin = MVP_SERVICES, fetcher = fetch, gitRun = git, output = value => process.stdout.write(`${value}\n`) } = {}) {
-  if (env.GH_TOKEN !== RUN_TOKEN || env.GH_REPO !== REPO || (env.GH_HOST && env.GH_HOST !== 'github.com')) throw new Error('Local fixture credentials required')
+  if (env.GH_TOKEN !== RUN_TOKEN || (env.GH_REPO !== undefined && env.GH_REPO !== REPO) || (env.GH_HOST && env.GH_HOST !== 'github.com')) throw new Error('Local fixture credentials required')
   const options = new Map(), positional = []
   for (let index = 0; index < args.length; index++) {
     const value = args[index]
