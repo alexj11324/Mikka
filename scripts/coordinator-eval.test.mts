@@ -36,7 +36,7 @@ const notFoundCard = { title: '没找到这个仓库', description: '你的 GitH
 let results: Record<string, unknown> = {}
 const log: { step: string; input: unknown }[] = []
 const step = (name: string) => async (...args: unknown[]) => { log.push({ step: name, input: args[1] }); return results[name] ?? { ok: true } }
-mock.module('@/workflows/coordinator/steps', { namedExports: Object.fromEntries(['dispatchRun', 'findRepository', 'getIssue', 'listIssues', 'listAgents', 'listRuns', 'getRun', 'startWebSubagent', 'wakeComputerBot', 'dispatchComputerThread', 'listComputerBots', 'listBotSubscriptions', 'listComputerWorkspaces', 'scheduleCommand', 'webSearchStep', 'sendToRun', 'stopRun', 'remember', 'forget', 'recordAttention', 'appTools', 'personalMcp'].map(name => [name, step(name)])) })
+mock.module('@/workflows/coordinator/steps', { namedExports: Object.fromEntries(['dispatchRun', 'findRepository', 'getIssue', 'listIssues', 'createIssue', 'updateIssue', 'bindComputerSubscription', 'createComputerBot', 'githubMcp', 'listAgents', 'listRuns', 'getRun', 'startWebSubagent', 'wakeComputerBot', 'dispatchComputerThread', 'listComputerBots', 'listBotSubscriptions', 'listComputerWorkspaces', 'scheduleCommand', 'webSearchStep', 'sendToRun', 'stopRun', 'remember', 'forget', 'recordAttention', 'appTools', 'personalMcp'].map(name => [name, step(name)])) })
 mock.module('@/workflows/coordinator/agent-kit-steps', { namedExports: {} })
 mock.module('@/lib/composio-actions', { namedExports: { createComposioAITools: () => ({}), createGoogleAITools: () => ({}) } })
 
@@ -119,7 +119,7 @@ test('派给 Codex: the Agent is passed, no model id is asked for', { skip }, as
 })
 
 test('watching a front-end test uses the Bot computer; a code fix goes to an Agent', { skip }, async () => {
-  results = { getIssue: { id: ISSUE, title: '登录流程' }, listComputerBots: [{ botId: BOT, name: 'Coordinator', harnesses: ['claude_code'] }], wakeComputerBot: { state: 'awake' }, dispatchComputerThread: { runId: 'run-4' }, startWebSubagent: { subagentId: 'sub-1', state: 'running' }, dispatchRun: { runId: 'run-5', thread: 'new' } }
+  results = { getIssue: { id: ISSUE, title: '登录流程' }, listComputerBots: [{ botId: BOT, name: 'Coordinator', harnesses: ['claude_code'] }], wakeComputerBot: { state: 'awake' }, dispatchComputerThread: { runId: 'run-4' }, startWebSubagent: { subagentId: 'sub-1', state: 'running' }, dispatchRun: { runId: 'run-5', thread: 'new' }, createIssue: { id: '00000000-0000-4000-8000-0000000000a2', title: '修复 lib/foo.ts 的类型错误', status: 'todo' } }
   await passAll('screen', async () => trial('打开 Mikka 的预览，看着登录流程的前端测试跑一遍', await facts(), { computerEnabled: true }), ({ calls }) =>
     called(calls, 'dispatchRun') ? 'dispatched to an Agent' : !(called(calls, 'startWebSubagent') || called(calls, 'dispatchComputerThread')) ? 'did not use the computer' : null)
   await passAll('code', async () => trial('修复 alexj11324/Mikka 里 lib/foo.ts 的类型错误', await facts(), { computerEnabled: true }), ({ calls }) =>
