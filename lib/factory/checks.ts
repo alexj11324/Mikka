@@ -1,7 +1,7 @@
 import { factoryRunBotMatches } from './run-scope'
 import type { Pool, PoolClient } from "pg";
 import { z } from "zod";
-import { DEVICE_ONLINE_WINDOW_MS } from "@mikka/protocol/device";
+import { deviceIsOnline } from "../device-presence";
 import {
   applyApprovalMode,
   defaultRunPolicy,
@@ -98,7 +98,7 @@ export async function configureFactoryCheck(
     throw new FactoryError("factoryEvidenceMismatch");
   if (
     !row.enabled ||
-    (row.deviceKind === 'cloud' ? !row.cloudOnline : !row.lastSeenAt || Date.now() - row.lastSeenAt.getTime() > DEVICE_ONLINE_WINDOW_MS) ||
+    (row.deviceKind === 'cloud' ? !row.cloudOnline : !await deviceIsOnline({ id: row.deviceId, lastSeenAt: row.lastSeenAt })) ||
     !row.harnesses?.some(
       (h: { harness: string; installed: boolean }) =>
         h.harness === row.harness && h.installed,

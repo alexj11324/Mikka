@@ -14,7 +14,8 @@ import {
   agents, agentRuns, deviceRepos, devices, issueMembers, runMessages, users,
   type SupportedHarness,
 } from '@/lib/db/schema'
-import { DEVICE_ONLINE_WINDOW_MS, issueDeviceToken } from '@/lib/device-link'
+import { issueDeviceToken } from '@/lib/device-link'
+import { deviceOnlineStates } from '@/lib/device-presence'
 import { removeOwnedDevice, renameOwnedDevice } from '@/lib/device-removal'
 import { enqueueDeviceCommand, type DeviceCommandKind } from '@/lib/device-management'
 import { listSshHosts } from '@/lib/ssh'
@@ -85,10 +86,11 @@ export async function listDevices(): Promise<DeviceView[]> {
       id: deviceRepos.id, deviceId: deviceRepos.deviceId, repoPath: deviceRepos.repoPath, baseBranch: deviceRepos.baseBranch, verifyCommand: deviceRepos.verifyCommand,
     }).from(deviceRepos).where(inArray(deviceRepos.deviceId, rows.map(row => row.id)))
     : []
+  const presence = await deviceOnlineStates(rows)
   return rows.map(device => ({
     id: device.id, name: device.name, deviceType: device.deviceType, hostname: device.hostname, platform: device.platform, arch: device.arch,
     harnesses: device.harnesses, lastSeenAt: device.lastSeenAt, enabled: device.enabled,
-    online: device.lastSeenAt ? Date.now() - device.lastSeenAt.getTime() < DEVICE_ONLINE_WINDOW_MS : false,
+    online: presence.get(device.id) ?? false,
     repos: repos.filter(repo => repo.deviceId === device.id).map(repo => ({
       id: repo.id, repoPath: repo.repoPath, baseBranch: repo.baseBranch, verifyCommand: repo.verifyCommand,
     })),

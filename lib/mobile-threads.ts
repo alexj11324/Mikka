@@ -3,7 +3,7 @@ import { and, desc, eq, inArray, isNull, sql, type SQL } from 'drizzle-orm'
 import { db, pool } from '@/lib/db'
 import { agentRuns, agents, devices, issues } from '@/lib/db/schema'
 import { citationSources } from '@/lib/coordinator/store'
-import { DEVICE_ONLINE_WINDOW_MS } from '@/lib/device-link'
+import { deviceOnlineStates } from '@/lib/device-presence'
 import { threadName } from '@/lib/issue-threads'
 import type { RunSource } from '@/lib/coordinator/citations'
 import { runBotName } from '@/lib/run-bot-name'
@@ -108,11 +108,12 @@ export async function mobileThreads(userId: string, limit = 60): Promise<{ threa
     db.select({ id: devices.id, name: devices.name, platform: devices.platform, kind: devices.kind, lastSeenAt: devices.lastSeenAt }).from(devices)
       .where(and(eq(devices.ownerId, userId), isNull(devices.removedAt), notThreadMachineDevice)),
   ])
+  const presence = await deviceOnlineStates(machines)
   return {
     threads,
     devices: machines.map(device => ({
       id: device.id, name: device.name, kind: machineKind(device),
-      online: device.lastSeenAt ? Date.now() - device.lastSeenAt.getTime() < DEVICE_ONLINE_WINDOW_MS : false,
+      online: presence.get(device.id) ?? false,
     })),
   }
 }

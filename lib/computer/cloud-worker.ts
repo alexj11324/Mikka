@@ -8,6 +8,7 @@ import * as provider from './e2b-provider'
 import { CloudWorkerError } from './worker-error'
 import { CLOUD_WORKER_COMMAND } from './worker-command'
 import { desktopGitHubConfig, installDesktopGitHub } from './desktop-github'
+import { deviceIsOnline } from '../device-presence'
 
 type Actor = { userId: string; workspaceId: string }
 
@@ -28,12 +29,11 @@ export async function startCloudWorker(pool: Pool, actor: Actor, sandbox: Sandbo
   try {
     const pinned = await sandbox.files.read('/opt/mikka/worker-source-sha', { user: 'root' })
     if (pinned.trim() !== sourceSha) throw new CloudWorkerError('worker_version_mismatch', sandbox.sandboxId)
-    const existing = await pool.query(`SELECT d.id FROM cloud_machines m JOIN devices d ON d.id=m."deviceId"
+    const existing = await pool.query(`SELECT d.id,d."lastSeenAt" FROM cloud_machines m JOIN devices d ON d.id=m."deviceId"
       JOIN device_tokens t ON t."boundDeviceId"=d.id AND t."boundWorkspaceId"=m."workspaceId" AND t."userId"=m."ownerId"
       WHERE m."workspaceId"=$1 AND m."ownerId"=$2 AND m."sandboxId"=$3 AND d."ownerId"=$2 AND d.kind='cloud'
-        AND d."lastSeenAt">now()-interval '60 seconds' AND t."lastUsedAt">now()-interval '2 minutes'
         AND t."revokedAt" IS NULL AND t."expiresAt">now()+interval '1 hour' LIMIT 1`, [actor.workspaceId, actor.userId, sandbox.sandboxId])
-    if (existing.rowCount) { await github(existing.rows[0].id as string); return { deviceId: existing.rows[0].id as string } }
+    if (existing.rowCount && await deviceIsOnline(existing.rows[0])) { await github(existing.rows[0].id as string); return { deviceId: existing.rows[0].id as string } }
     // Hosted tasks run the CLI directly on the machine (no sandbox, no container).
     // Pulling the obsolete hosted image here added 32s to a cold start.
     if (!await renewWorkerLease(pool, actor, leaseId)) throw new Error('Cloud worker lease expired')

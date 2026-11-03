@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { cloudModelSupport, type CloudModelState } from './cloud-template-models'
 import type { Pool, PoolClient } from 'pg'
 import { z } from 'zod'
-import { isDeviceOnline } from '@mikka/protocol/device'
+import { deviceOnlineStates } from './device-presence'
 import type { HarnessInfo } from '@mikka/protocol/harness'
 import { ActionFailureError } from './action-error'
 import { apiKeyHarnesses } from './model-api-key-providers'
@@ -217,8 +217,9 @@ export async function poolDevices(query: Query, ownerId: string): Promise<PoolDe
     `SELECT d.id,d.name,d.enabled,d."lastSeenAt",d.harnesses,d."deviceType",d."createdAt",
       (SELECT count(*)::int FROM agent_runs r WHERE r."deviceId"=d.id AND r.status IN ('queued','preparing','running','paused','waiting_input','finishing')) AS "activeRuns"
     FROM devices d WHERE d."ownerId"=$1 AND d.kind='local' AND d."removedAt" IS NULL ORDER BY d."lastSeenAt" DESC NULLS LAST,d.id`, [ownerId])
+  const presence = await deviceOnlineStates(rows)
   return rows.map(row => ({
-    id: row.id, name: row.name, enabled: row.enabled, online: isDeviceOnline(row.lastSeenAt), harnesses: row.harnesses ?? [],
+    id: row.id, name: row.name, enabled: row.enabled, online: presence.get(row.id) ?? false, harnesses: row.harnesses ?? [],
     server: row.deviceType === 'server', activeRuns: row.activeRuns, joinedAt: row.createdAt.getTime(),
   }))
 }

@@ -5,7 +5,7 @@ import { daemonTestMode, repositoryBindingMatches } from '@mikka/protocol/reposi
 import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
 import { retryWorkerDefinition } from '@/lib/agent-kit/worker'
 import { after } from 'next/server'
-import { and, desc, eq, gt, inArray, isNotNull, isNull, lt, or, sql } from 'drizzle-orm'
+import { and, desc, eq, inArray, isNotNull, isNull, lt, or, sql } from 'drizzle-orm'
 import { DEVICE_ONLINE_WINDOW_MS, RUN_LEASE_MS, type RunCheckpoint } from '@mikka/protocol/device'
 import { db, pool } from '@/lib/db'
 import { agentRuns, agents, deviceRepos, devices, issues } from '@/lib/db/schema'
@@ -18,6 +18,7 @@ import { DEVICE_STAYED_OFFLINE, LEASED_RUN_STATUSES, lostRunOutcome, MAX_RUN_ATT
 import { tiptapToText } from '@/lib/tiptap-text'
 import { afterRunEnded } from '@/lib/run-completion-effects'
 import { notifyDeviceWork } from '@/lib/device-gateway-notify'
+import { deviceOnlineStates } from '@/lib/device-presence'
 import { ownE2BKeySql } from './secrets/e2b-owner-sql'
 
 const RUN_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -81,24 +82,27 @@ export async function reclaimLostRuns(userId: string, now = new Date()): Promise
 
   // Retries still waiting for a device that is offline go to another
   // machine as soon as one can take them; after a while, to the person.
-  const stranded = await db.select({ run: agentRuns }).from(agentRuns)
+  const stranded = await db.select({ run: agentRuns, lastSeenAt: devices.lastSeenAt }).from(agentRuns)
     .innerJoin(devices, eq(devices.id, agentRuns.deviceId))
     .where(and(
       eq(agentRuns.userId, userId), eq(agentRuns.status, 'queued'), isNotNull(agentRuns.retryOf),
       or(isNull(devices.lastSeenAt), lt(devices.lastSeenAt, new Date(now.getTime() - DEVICE_ONLINE_WINDOW_MS))),
     ))
     .limit(20)
+  const presence = await deviceOnlineStates(stranded.flatMap(({ run, lastSeenAt }) => run.deviceId ? [{ id: run.deviceId, lastSeenAt }] : []), now.getTime())
   for (const { run } of stranded) {
     if (run.stopRequestedAt) {
       const ended = await endRun(run.id, ['queued'], { status: 'stopped', error: null }, now)
       if (ended) await announceEnd({ ...run, status: 'stopped' })
       continue
     }
+    if (run.deviceId && presence.get(run.deviceId)) continue
     // Nothing waits on an offline device (设备离线时 is gone): another device takes it, else the person gets the card.
     const target = await takeoverTarget(run, now)
     if (target) {
       await db.update(agentRuns).set({ deviceId: target.deviceId, deviceRepoId: target.deviceRepoId, updatedAt: now })
         .where(and(eq(agentRuns.id, run.id), eq(agentRuns.status, 'queued'), isNull(agentRuns.stopRequestedAt)))
+      notifyDeviceWork(target.deviceId)
       continue
     }
     const ended = await endRun(run.id, ['queued'], { status: 'failed', error: DEVICE_STAYED_OFFLINE }, now, false, await noMachineCard())
@@ -119,12 +123,13 @@ async function takeoverTarget(run: { id: string; userId: string; agentId: string
   if (!repo?.remoteUrl || !agent || !repositoryBindingMatches(repo.repoPath, repo.remoteUrl, { allowFile: daemonTestMode(process.env) })) return null
   const bound = await db.execute(sql`select 1 from computer_run_bindings where "runId"=${run.id} and "ownerId"=${run.userId}`)
   if (bound.rows.length) return null
-  const online = await db.select({ deviceId: devices.id, harnesses: devices.harnesses, deviceType: devices.deviceType })
+  const available = await db.select({ deviceId: devices.id, harnesses: devices.harnesses, deviceType: devices.deviceType, lastSeenAt: devices.lastSeenAt })
     .from(devices)
-    .where(and(eq(devices.ownerId, run.userId), eq(devices.enabled, true), eq(devices.kind, 'local'), sql`${devices.protocolVersion} >= ${DAEMON_PROTOCOL_VERSION}`, gt(devices.lastSeenAt, new Date(now.getTime() - DEVICE_ONLINE_WINDOW_MS))))
+    .where(and(eq(devices.ownerId, run.userId), eq(devices.enabled, true), eq(devices.kind, 'local'), isNull(devices.removedAt), sql`${devices.protocolVersion} >= ${DAEMON_PROTOCOL_VERSION}`))
     .orderBy(desc(devices.lastSeenAt))
   // Only devices with 参与调度 on (enabled, decision 2026-11-02-1400); servers first.
-  const candidates = online.sort((a, b) => Number(b.deviceType === 'server') - Number(a.deviceType === 'server'))
+  const presence = await deviceOnlineStates(available.map(device => ({ id: device.deviceId, lastSeenAt: device.lastSeenAt })), now.getTime())
+  const candidates = available.filter(device => presence.get(device.deviceId)).sort((a, b) => Number(b.deviceType === 'server') - Number(a.deviceType === 'server'))
   const target = pickTakeover(run.agentDefinition?.subscription ? candidates.filter(candidate => candidate.harnesses.some(info => info.harness === run.agentDefinition?.harness && info.subscriptionBroker)) : candidates, { remoteUrl: repo.remoteUrl, harness: run.agentDefinition?.harness ?? agent.harness, lostDeviceId: run.deviceId })
   if (!target) return null
   const targetRepo = await ensureDeviceRepository(run.userId, target.deviceId, repo.remoteUrl)
