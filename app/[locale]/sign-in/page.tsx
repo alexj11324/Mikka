@@ -31,8 +31,8 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
   const oauthResume = oauthResumePath(query)
   const composioResume = next === COMPOSIO_AUTH_CALLBACK_PATH ? withBasePath(next) : undefined
   const session = await auth.api.getSession({ headers: await headers() })
-  if (session?.user && !addAccount && oauthResume) redirect(withBasePath(oauthResume))
-  if (session?.user && !addAccount && composioResume) redirect(composioResume)
+  if (session?.user && !addAccount && oauthResume) redirect(oauthResume)
+  if (session?.user && !addAccount && composioResume) redirect(next)
   // The return route sends a refused handoff here with oauth=failed: show that, never redirect back to it.
   const desktopRefused = Boolean(desktopFlow && query.oauth)
   if (session?.user && !addAccount && desktopFlow && !desktopRefused) redirect(desktopAuthCallbackPath(desktopFlow.state, desktopFlow.next, desktopFlow.callback))

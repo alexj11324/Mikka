@@ -17,6 +17,8 @@ async function result(response: Response) {
 }
 interface UploadTicket {
   id: string
+  chunkSize?: number
+  nextPart?: number
   uploadUrl?: string
   headers?: Record<string, string>
   uploaded?: boolean
@@ -24,6 +26,46 @@ interface UploadTicket {
   createdAt: number
 }
 const tickets = new WeakMap<File, Map<string, UploadTicket>>()
+
+async function uploadPart(body: Blob, url: string, signal: AbortSignal, progress: (loaded: number) => void) {
+  return new Promise<void>((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    const abort = () => {
+      xhr.abort()
+      reject(new DOMException('Cancelled', 'AbortError'))
+    }
+    const fail = () => {
+      signal.removeEventListener('abort', abort)
+      reject(new ChatUploadError('unavailable'))
+    }
+    xhr.open('POST', url)
+    xhr.withCredentials = true
+    xhr.setRequestHeader('content-type', 'application/octet-stream')
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) progress(event.loaded)
+    }
+    xhr.onerror = fail
+    xhr.timeout = 120_000
+    xhr.ontimeout = fail
+    xhr.onload = () => {
+      signal.removeEventListener('abort', abort)
+      if (xhr.status >= 200 && xhr.status < 300) resolve()
+      else {
+        let code = xhr.status === 413 ? 'tooLarge' : 'unavailable'
+        try {
+          code = JSON.parse(xhr.responseText).error ?? code
+        } catch {}
+        reject(new ChatUploadError(code, true))
+      }
+    }
+    signal.addEventListener('abort', abort, { once: true })
+    if (signal.aborted) {
+      abort()
+      return
+    }
+    xhr.send(body)
+  })
+}
 
 export async function uploadChatFile(
   file: File,
@@ -39,7 +81,7 @@ export async function uploadChatFile(
   if (started) {
     const recovered = await fetch(`${endpoint}/${started.id}?info`, { credentials: 'same-origin', signal })
     if (recovered.ok) return chatFileSchema.parse(await recovered.json())
-    if (!started.completeAttempted && Date.now() - started.createdAt > 240_000) {
+    if (started.uploadUrl && !started.completeAttempted && Date.now() - started.createdAt > 240_000) {
       void fetch(`${endpoint}/${started.id}`, { method: 'DELETE', credentials: 'same-origin' }).catch(
         () => {},
       )
@@ -70,6 +112,32 @@ export async function uploadChatFile(
   const direct = typeof ticket.uploadUrl === 'string'
   let uploaded: unknown
   try {
+    if (ticket.chunkSize) {
+      const chunkSize = ticket.chunkSize
+      for (let part = ticket.nextPart ?? 0; part < Math.ceil(file.size / chunkSize); part++) {
+        const offset = part * chunkSize
+        await uploadPart(
+          file.slice(offset, offset + chunkSize),
+          `${endpoint}?id=${ticket.id}&part=${part}`,
+          signal,
+          (loaded) => progress('uploading', Math.round(((offset + loaded) / file.size) * 100)),
+        )
+        ticket.nextPart = part + 1
+      }
+      ticket.completeAttempted = true
+      progress('processing', 100)
+      return chatFileSchema.parse(
+        await result(
+          await fetch(endpoint, {
+            method: 'POST',
+            credentials: 'same-origin',
+            signal,
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ operation: 'complete', id: ticket.id }),
+          }),
+        ),
+      )
+    }
     if (!ticket.uploaded)
       uploaded = await new Promise<unknown>((resolve, reject) => {
         const xhr = new XMLHttpRequest()

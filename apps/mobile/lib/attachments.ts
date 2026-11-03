@@ -85,7 +85,7 @@ export async function pickChatFile(): Promise<Extract<Attachment, { kind: 'file'
   if (!size || size > CHAT_FILE_MAX_BYTES) throw Error('tooLarge')
   return { key: key(), kind: 'file', name: asset.name, uri: asset.uri, mediaType: asset.mimeType ?? '', size, file: asset.file, state: 'uploading' }
 }
-interface UploadTicket { id: string; uploadUrl?: string; headers?: Record<string, string>; uploaded?: boolean }
+interface UploadTicket { id: string; chunkSize?: number; nextPart?: number; uploadUrl?: string; headers?: Record<string, string>; uploaded?: boolean }
 const uploadTickets = new Map<string, UploadTicket>()
 export async function uploadPickedFile(item: Extract<Attachment, { kind: 'file' }>, scope: ChatFileScope): Promise<ChatFile> {
   const body = item.file ?? new File(item.uri)
@@ -96,6 +96,23 @@ export async function uploadPickedFile(item: Extract<Attachment, { kind: 'file' 
     uploadTickets.set(ticketKey, started)
   } else {
     try { return chatFileSchema.parse(await api(`/api/chat/attachments/${started.id}?info`)) } catch { /* Completion may still be pending. Reuse its identity. */ }
+  }
+  if (started.chunkSize) {
+    const ticket = started, chunkSize = started.chunkSize
+    try {
+      for (let part = ticket.nextPart ?? 0; part < Math.ceil(body.size / chunkSize); part++) {
+        const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 120_000)
+        const response = await nativeFetch(`${API_URL}/api/chat/attachments?id=${ticket.id}&part=${part}`, { method: 'POST', credentials: 'include', headers: { ...await authHeaders(), 'content-type': 'application/octet-stream' }, body: body.slice(part * chunkSize, (part + 1) * chunkSize), signal: controller.signal }).finally(() => clearTimeout(timer))
+        if (!response.ok) { const data = await response.json().catch(() => null) as { error?: string } | null; throw new ApiError(response.status, data?.error ?? 'unavailable') }
+        ticket.nextPart = part + 1
+      }
+      const uploaded = chatFileSchema.parse(await api('/api/chat/attachments', { method: 'POST', body: { operation: 'complete', id: ticket.id }, timeoutMs: 120_000 }))
+      uploadTickets.delete(ticketKey)
+      return uploaded
+    } catch (error) {
+      if (error instanceof ApiError && error.status >= 400 && error.status < 500) { uploadTickets.delete(ticketKey); void api(`/api/chat/attachments/${ticket.id}`, { method: 'DELETE' }).catch(() => {}) }
+      throw error
+    }
   }
   const direct = Boolean(started.uploadUrl)
   const controller = new AbortController()

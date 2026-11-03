@@ -72,6 +72,17 @@ const assertStatus = async (response, expected) => {
 }
 try {
   const owner = accounts.owner
+  for (const route of ['sign-in', 'sign-up']) {
+    const response = await owner.request(
+      `/mikka/zh-CN/${route}?next=${encodeURIComponent('/api/integrations/composio/callback')}`,
+    )
+    assert.equal(response.status, 307)
+    assert.equal(
+      new URL(response.headers.get('location'), environment.origin).pathname,
+      '/mikka/api/integrations/composio/callback',
+    )
+  }
+  checks.push('signed-in redirect targets use the base path once')
   const bot = (
     await database.query(
       'SELECT b.id,b."workspaceId" FROM coordinator_bots cb JOIN bots b ON b.id=cb."botId" WHERE cb."ownerId"=$1',
@@ -102,13 +113,22 @@ try {
       )
     ).json()
     assert.equal(started.uploadUrl, undefined, 'This acceptance owns the isolated inline storage adapter')
-    const file = await (
-      await assertStatus(
-        await owner.request(`/api/chat/attachments?id=${started.id}`, {
+    assert.equal(started.chunkSize, 3 * 1024 * 1024)
+    for (let part = 0; part < Math.ceil(bytes.length / started.chunkSize); part++) {
+      const body = bytes.subarray(part * started.chunkSize, (part + 1) * started.chunkSize)
+      const response = await assertStatus(
+        await owner.request(`/api/chat/attachments?id=${started.id}&part=${part}`, {
           method: 'POST',
           headers: { 'content-type': 'application/octet-stream' },
-          body: bytes,
+          body,
         }),
+        200,
+      )
+      assert.equal((await response.json()).received, Math.min((part + 1) * started.chunkSize, bytes.length))
+    }
+    const file = await (
+      await assertStatus(
+        await owner.request('/api/chat/attachments', json({ operation: 'complete', id: started.id })),
         200,
       )
     ).json()
@@ -141,6 +161,7 @@ try {
     'authenticated downloads',
     'foreign account denied',
     'production Word, spreadsheet, PDF, RTF and PNG processing',
+    'same-origin chunk upload of an image larger than 4.5 MiB',
   )
   const text =
     uploaded.map((file) => `[mikka-file:${file.id}:${encodeURIComponent(file.name)}]`).join('\n') +
@@ -254,6 +275,7 @@ try {
   await writeFile(
     '.cache/attachments/visual-fixture.json',
     JSON.stringify({
+      origin: environment.origin,
       statePath: owner.storageStatePath,
       userId: owner.userId,
       botId: bot.id,

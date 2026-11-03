@@ -30,7 +30,8 @@ function FileCard({
   sent?: boolean
 }) {
   const t = useTranslations('Shell.attachments')
-  const url = withBasePath(`/api/chat/attachments/${file.id}`)
+  const path = `/api/chat/attachments/${file.id}`
+  const url = withBasePath(path)
   const { data } = useSWR<ChatFile>(`${url}?info`, async (path: string) => {
     const response = await fetch(path, { credentials: 'same-origin' })
     if (!response.ok) throw Error('file')
@@ -61,7 +62,7 @@ function FileCard({
       </AttachmentContent>
       <AttachmentTrigger
         aria-label={t('open', { name })}
-        render={<NextLink href={url} target="_blank" prefetch={false} />}
+        render={<NextLink href={path} target="_blank" prefetch={false} />}
       />
       <AttachmentActions>
         {onRemove ? (
@@ -78,7 +79,7 @@ function FileCard({
             <AttachmentAction
               className="pointer-coarse:size-11"
               aria-label={t('download', { name })}
-              render={<NextLink href={`${url}?download`} target="_blank" prefetch={false} />}
+              render={<NextLink href={`${path}?download`} target="_blank" prefetch={false} />}
             >
               <Download />
             </AttachmentAction>

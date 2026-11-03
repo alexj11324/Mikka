@@ -3,6 +3,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import type { PoolClient } from 'pg'
 import type { UserModelMessage } from 'ai'
 import {
+  CHAT_FILE_CHUNK_BYTES,
   CHAT_FILE_MAX_BYTES,
   CHAT_FILE_MAX_COUNT,
   CHAT_FILE_MAX_TEXT,
@@ -18,7 +19,6 @@ import {
   artifactStorage,
   deleteArtifactObject,
   getArtifactObjectStream,
-  presignArtifactPut,
   putArtifactObject,
 } from '@/lib/artifacts/storage'
 import { readRunChain } from '@/lib/run-chain'
@@ -137,11 +137,9 @@ export async function beginChatFile(
     [userId],
   )
   if (count.rows[0].n >= 100) throw new ChatFileError('tooMany')
-  const id = randomUUID(),
-    remote = artifactStorage() === 'r2'
-  const uploadKey = remote ? `chat-uploads/${userId}/${id}` : null
-  const expiresAt = new Date(Date.now() + 5 * 60_000)
-  const signed = uploadKey ? await presignArtifactPut(uploadKey, 'application/octet-stream', 300) : null
+  artifactStorage() // Fail before uploading if production storage is not configured.
+  const id = randomUUID()
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60_000)
   await pool.query(
     `INSERT INTO chat_attachments(id,"userId","botId","conversationId","runId",name,"mediaType",size,"uploadKey","uploadExpiresAt") VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
     [
@@ -153,11 +151,73 @@ export async function beginChatFile(
       name,
       input.mediaType.slice(0, 100),
       input.size,
-      uploadKey,
+      null,
       expiresAt,
     ],
   )
-  return { id, ...(signed ? { uploadUrl: signed.url, headers: signed.headers } : {}) }
+  return { id, chunkSize: CHAT_FILE_CHUNK_BYTES }
+}
+
+/** Same-origin parts stay below the platform's body limit; each accepted offset is immutable on retry. */
+export async function uploadChatFilePart(
+  userId: string,
+  id: string,
+  part: number,
+  bytes: Uint8Array,
+  tokenWorkspaceId?: string,
+) {
+  if (
+    !Number.isSafeInteger(part) ||
+    part < 0 ||
+    part >= Math.ceil(CHAT_FILE_MAX_BYTES / CHAT_FILE_CHUNK_BYTES)
+  )
+    throw new ChatFileError('unreadable')
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    const row = (
+      await client.query<FileRow & { received: number }>(
+        `SELECT ${columns.replace('"inlineData",', '')},coalesce(octet_length("inlineData"),0) AS received FROM chat_attachments WHERE id=$1 AND "userId"=$2 FOR UPDATE`,
+        [id, userId],
+      )
+    ).rows[0]
+    if (
+      !row ||
+      row.removedAt ||
+      row.state !== 'uploading' ||
+      !row.uploadExpiresAt ||
+      row.uploadExpiresAt.getTime() < Date.now()
+    )
+      throw new ChatFileError('notFound')
+    const workspace = await authorizeFileScope(userId, fileScope(row), client)
+    if (tokenWorkspaceId && workspace !== tokenWorkspaceId) throw new ChatFileError('notFound')
+    await client.query('SELECT mikka_account_assert_writable($1)', [userId])
+    const offset = part * CHAT_FILE_CHUNK_BYTES
+    const expected = Math.min(CHAT_FILE_CHUNK_BYTES, row.size - offset)
+    if (expected <= 0 || bytes.length !== expected || offset > row.received)
+      throw new ChatFileError('unreadable')
+    if (offset < row.received) {
+      const same = (
+        await client.query<{ same: boolean }>(
+          'SELECT substring("inlineData" FROM $2 FOR $3)=$4::bytea AS same FROM chat_attachments WHERE id=$1',
+          [id, offset + 1, bytes.length, Buffer.from(bytes)],
+        )
+      ).rows[0]?.same
+      if (!same) throw new ChatFileError('unreadable')
+    } else {
+      await client.query(
+        'UPDATE chat_attachments SET "inlineData"=coalesce("inlineData",\'\'::bytea)||$2::bytea WHERE id=$1',
+        [id, Buffer.from(bytes)],
+      )
+    }
+    await client.query('COMMIT')
+    return { received: Math.max(row.received, offset + bytes.length) }
+  } catch (error) {
+    await client.query('ROLLBACK')
+    throw error
+  } finally {
+    client.release()
+  }
 }
 
 /** Freeze the uploaded object under a new immutable key before making it readable. */
@@ -186,12 +246,15 @@ export async function completeChatFile(
     }
     if (!row.uploadExpiresAt || row.uploadExpiresAt.getTime() < Date.now())
       throw new ChatFileError('unavailable')
-    const bytes = row.uploadKey
-      ? await boundedChatFileBytes(
-          await getArtifactObjectStream(row.uploadKey, AbortSignal.timeout(60_000)),
-          row.size,
-        )
-      : inline
+    const bytes =
+      inline ??
+      row.inlineData ??
+      (row.uploadKey
+        ? await boundedChatFileBytes(
+            await getArtifactObjectStream(row.uploadKey, AbortSignal.timeout(60_000)),
+            row.size,
+          )
+        : undefined)
     if (!bytes || bytes.length !== row.size) throw new ChatFileError('unreadable')
     const extracted = await extractChatFile(row.name, row.mediaType, bytes)
     let { text } = extracted
@@ -202,7 +265,7 @@ export async function completeChatFile(
       if (text.length > CHAT_FILE_MAX_TEXT) throw new ChatFileError('tooLong')
     }
     const hash = createHash('sha256').update(bytes).digest('hex')
-    const key = row.uploadKey ? `chat-files/${userId}/${id}/${hash}` : null
+    const key = artifactStorage() === 'r2' ? `chat-files/${userId}/${id}/${hash}` : null
     if (key) await putArtifactObject(key, new Uint8Array(bytes), mediaType)
     await client.query(
       `UPDATE chat_attachments SET state='ready',sha256=$3,"storageKey"=$4,"inlineData"=$5,"textContent"=$6,"mediaType"=$7 WHERE id=$1 AND "userId"=$2`,

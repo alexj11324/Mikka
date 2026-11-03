@@ -1,5 +1,6 @@
 import { z } from 'zod'
 
+export const CHAT_FILE_CHUNK_BYTES = 3 * 1024 * 1024
 export const CHAT_FILE_MAX_BYTES = 25 * 1024 * 1024
 export const CHAT_FILE_MAX_COUNT = 10
 export const CHAT_FILE_MAX_TEXT = 200_000

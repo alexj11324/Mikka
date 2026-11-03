@@ -4,7 +4,8 @@ Source: branch `work`, based on `c23ff74f921b7951c5d7016c0e0967e3ce6e3e1f`,
 with the attachment changes in the working tree. The final runtime source hash
 is recorded in `.cache/attachments/api-evidence.json`; the API harness checks
 that the source is unchanged during each run. No PR, CI run, merge or production
-deployment was created by this task.
+deployment was created during this initial local implementation phase. The
+subsequent main integration and production verification are recorded separately.
 
 Design: [accepted A1–A10](https://www.figma.com/design/zPe5LKycb2XuT1ivCLRw07?node-id=917-456).
 Alex approved after the long-filename correction: 「现在可以了，继续吧」.
@@ -78,3 +79,17 @@ oversized signed upload cannot be buffered before validation (3 × 7 = 21).
   bucket CORS were not exercised. Production reuses the artifacts bucket; browser
   signed PUT requires that bucket to allow the application origin and Content-Type.
 - Production deployment and Git-linked CI remain outside this local change.
+
+## Release follow-up
+
+After rebasing onto main `6e808103`, the release preparation added a build/CI
+guard for repeated URL prefixes and fixed three existing authentication
+redirect call sites. A real Next Link regression reproduced the attachment
+link defect before the fix and passed afterward.
+
+A production storage preflight returned HTTP 403, with no allowed origin. The
+upload contract therefore now uses same-origin 3 MiB parts rather than relying
+on bucket CORS. The local PostgreSQL selection covers exact part retries,
+rejected gaps/altered bytes/foreign owners, removal and content budgets. A real
+PNG larger than 4.5 MiB is included in the production-build API acceptance.
+No bucket permission or public-access policy was changed.

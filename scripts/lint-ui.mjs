@@ -4,6 +4,7 @@ import { auditSource, auditCss, isComponentLibrarySource } from './ui-policy.mjs
 import { auditInteractions } from './interaction-policy.mjs'
 import { auditSettingsSurface } from './settings-policy.mjs'
 import { auditIconButtons } from './icon-button-policy.mjs'
+import { auditBasePath } from './base-path-policy.mjs'
 import { auditSplitPanes } from './split-pane-policy.mjs'
 
 const policy = JSON.parse(readFileSync('ui-policy.json', 'utf8'))
@@ -15,6 +16,7 @@ const businessFiles = files.filter(file => !isComponentLibrarySource(file, polic
 for (const file of businessFiles) {
   const text = readFileSync(file, 'utf8')
   diagnostics.push(...(file.endsWith('.css') ? auditCss(file, text, policy) : auditSource(file, text, policy)))
+  if (!file.endsWith('.css')) diagnostics.push(...auditBasePath(file, text))
   if (/\.[jt]sx$/.test(file)) diagnostics.push(...auditSettingsSurface(file, text), ...auditSplitPanes(file, text))
 }
 const interactionFiles = files.filter(file => /\.[jt]sx$/.test(file) && !['components/ui/', 'components/reui/'].some(root => file.startsWith(root)))

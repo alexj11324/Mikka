@@ -1,6 +1,7 @@
 import { zipSync, strToU8 } from 'fflate'
 import { utils, write } from '@e965/xlsx'
 import sharp from 'sharp'
+import { randomBytes } from 'node:crypto'
 
 export async function binaryAttachmentFixtures() {
   const docx = zipSync({
@@ -40,11 +41,17 @@ export async function binaryAttachmentFixtures() {
   const png = await sharp({ create: { width: 16, height: 16, channels: 3, background: '#123456' } })
     .png()
     .toBuffer()
+  const largePng = await sharp(randomBytes(1600 * 1200 * 3), {
+    raw: { width: 1600, height: 1200, channels: 3 },
+  })
+    .png()
+    .toBuffer()
   return [
     ['说明.docx', docx, 'Actual Word content'],
     ['预算.xlsx', xlsx, 'Q4'],
     ['参考.pdf', Buffer.from(pdf), 'Project PDF content'],
     ['截图.png', png, null],
+    ['large-image.png', largePng, null],
     ['记录.rtf', Buffer.from('{\\rtf1\\ansi Actual RTF content}'), 'Actual RTF content'],
   ]
 }

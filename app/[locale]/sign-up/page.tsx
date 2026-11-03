@@ -24,7 +24,7 @@ export default async function SignUpPage({ searchParams }: { searchParams: Promi
   const composioResume = next === COMPOSIO_AUTH_CALLBACK_PATH ? withBasePath(next) : undefined
   const session = await auth.api.getSession({ headers: await headers() })
   if (session?.user && !addAccount) {
-    if (composioResume) plainRedirect(composioResume)
+    if (composioResume) plainRedirect(next)
     const locale = await getLocale()
     if (next.startsWith('/?')) plainRedirect(`${getPathname({ locale, href: '/' })}${next.slice(1)}`)
     redirect({ href: next, locale })

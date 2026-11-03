@@ -84,6 +84,36 @@ test(
       return file
     }
     await t.test(
+      'same-origin chunks reject gaps, altered retries and other owners while allowing exact repeats',
+      async () => {
+        const { CHAT_FILE_CHUNK_BYTES } = await import('@mikka/protocol/chat-attachments')
+        const started = await store.beginChatFile(
+          owner,
+          { kind: 'bot', id: bot },
+          { name: 'chunk-budget.md', mediaType: 'text/markdown', size: CHAT_FILE_CHUNK_BYTES + 17 },
+        )
+        const first = Buffer.alloc(CHAT_FILE_CHUNK_BYTES, 65),
+          last = Buffer.alloc(17, 66)
+        await assert.rejects(store.uploadChatFilePart(owner, started.id, 1, last), { code: 'unreadable' })
+        await assert.rejects(store.uploadChatFilePart(peer, started.id, 0, first), { code: 'notFound' })
+        assert.deepEqual(await store.uploadChatFilePart(owner, started.id, 0, first), {
+          received: first.length,
+        })
+        assert.deepEqual(await store.uploadChatFilePart(owner, started.id, 0, first), {
+          received: first.length,
+        })
+        await assert.rejects(store.uploadChatFilePart(owner, started.id, 0, Buffer.alloc(first.length, 67)), {
+          code: 'unreadable',
+        })
+        assert.deepEqual(await store.uploadChatFilePart(owner, started.id, 1, last), {
+          received: first.length + last.length,
+        })
+        await assert.rejects(store.completeChatFile(owner, started.id), { code: 'tooLong' })
+        await store.removeChatFile(owner, started.id)
+        await assert.rejects(store.uploadChatFilePart(owner, started.id, 1, last), { code: 'notFound' })
+      },
+    )
+    await t.test(
       'bot files cannot cross chats or owners, and a sent file survives draft removal',
       async () => {
         const file = await upload({ kind: 'bot', id: bot })

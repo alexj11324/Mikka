@@ -144,3 +144,15 @@ selected implicitly. Historical files retain private authenticated downloads.
 File references are immutable and scope-bound. Agent hosts fetch only files
 actually referenced by the assigned run and write original bytes and extracted
 text under UUID-based local filenames before starting or interjecting.
+
+## Production transport
+
+Browser and native uploads use authenticated same-origin parts of at most
+3 MiB. The server stages parts in the private attachment row, checks ordered
+offsets and exact repeated bytes, then validates the full file and writes its
+immutable original to the existing private R2 store. Each part is below
+Vercel's request-body limit; uploads do not depend on R2 browser CORS or public
+object access. Failed/abandoned partial rows follow the draft cleanup lifecycle.
+
+URL prefix ownership is enforced by
+[the base-path decision](decisions/2026-11-03-1430-base-path-single-owner.md).

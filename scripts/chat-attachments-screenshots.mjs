@@ -34,7 +34,7 @@ try {
       { fixture, theme },
     )
     const page = await context.newPage()
-    await page.goto('http://localhost:3100/mikka/zh-CN', { waitUntil: 'networkidle' })
+    await page.goto(`${fixture.origin}/mikka/zh-CN`, { waitUntil: 'networkidle' })
     await page.locator('[data-slot="chat-file-card"]').first().waitFor({ timeout: 20000 })
     await page.evaluate(() => document.fonts.ready)
     const result = await page.evaluate(() => ({

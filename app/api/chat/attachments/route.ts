@@ -1,8 +1,17 @@
 import { z } from 'zod'
-import { CHAT_FILE_MAX_BYTES, chatFileScopeSchema } from '@mikka/protocol/chat-attachments'
+import {
+  CHAT_FILE_CHUNK_BYTES,
+  CHAT_FILE_MAX_BYTES,
+  chatFileScopeSchema,
+} from '@mikka/protocol/chat-attachments'
 import { auth, apiWorkspaceAllowed } from '@/lib/api-auth'
 import { writeAllowed } from '@/lib/mobile-api'
-import { authorizeFileScope, beginChatFile, completeChatFile } from '@/lib/chat-attachments/store'
+import {
+  authorizeFileScope,
+  beginChatFile,
+  completeChatFile,
+  uploadChatFilePart,
+} from '@/lib/chat-attachments/store'
 import { ChatFileError } from '@/lib/chat-attachments/extract'
 
 export const dynamic = 'force-dynamic'
@@ -24,7 +33,9 @@ export async function POST(request: Request) {
   if (!writeAllowed(request)) return Response.json({ error: 'originNotAllowed' }, { status: 403, headers })
   try {
     if (request.headers.get('content-type')?.startsWith('application/octet-stream')) {
-      const id = z.uuid().parse(new URL(request.url).searchParams.get('id'))
+      const query = new URL(request.url).searchParams
+      const id = z.uuid().parse(query.get('id'))
+      const part = query.has('part') ? z.coerce.number().int().min(0).max(8).parse(query.get('part')) : null
       const reader = request.body?.getReader()
       if (!reader) throw new ChatFileError('unreadable')
       const chunks: Uint8Array[] = []
@@ -34,7 +45,7 @@ export async function POST(request: Request) {
           const next = await reader.read()
           if (next.done) break
           size += next.value.length
-          if (size > CHAT_FILE_MAX_BYTES) {
+          if (size > (part === null ? CHAT_FILE_MAX_BYTES : CHAT_FILE_CHUNK_BYTES)) {
             await reader.cancel()
             throw new ChatFileError('tooLarge')
           }
@@ -44,7 +55,9 @@ export async function POST(request: Request) {
         reader.releaseLock()
       }
       return Response.json(
-        await completeChatFile(session.user.id, id, Buffer.concat(chunks), session.tokenWorkspaceId),
+        await (part === null
+          ? completeChatFile(session.user.id, id, Buffer.concat(chunks), session.tokenWorkspaceId)
+          : uploadChatFilePart(session.user.id, id, part, Buffer.concat(chunks), session.tokenWorkspaceId)),
         { headers },
       )
     }
