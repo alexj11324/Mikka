@@ -105,6 +105,49 @@ afterEach(async () => {
 })
 
 describe("mock runs", () => {
+  it.each([false, true])('executes a read-only hosted delivery without desktop authority (late registration: %s)', async late => {
+    const { server, dataDir, repo } = await setup()
+    const fixturesDir = tempDir()
+    writeFileSync(join(fixturesDir, 'readonly-delivery.jsonl'), JSON.stringify({ t: 0, submit: { summary: 'Inspected the workspace without changes.', nextStep: 'Independent review.' } })+'\n')
+    const link = server.link()
+    const list = link.listRepos.bind(link)
+    let registered = !late
+    link.listRepos = async (...args) => registered ? list(...args) : []
+    const claim = link.claimRun.bind(link)
+    link.claimRun = async (...args) => {
+      const assignment = await claim(...args)
+      registered = true
+      return { ...assignment, remoteUrl: undefined }
+    }
+    link.nativeContext = async () => { throw new Error('Mock delivery must not request a model credential') }
+    link.nativeRequest = async () => { throw new Error('Mock delivery must not call a provider') }
+    const daemon = await new Daemon({ dataDir, flavor: 'dev', agentSandbox: null, link, credential: 'cred-1',
+      hostedSubscriptions: true, harnesses: [{ harness: 'mock', installed: true, version: 'test' }],
+      harnessBinaries: { claude_code: resolve(import.meta.dirname, 'fakes/fake-claude-subscription.mjs') },
+      fixturesDir, mockSpeed: Number.POSITIVE_INFINITY, heartbeatMs: 60_000, quotaSource: null }).start()
+    daemons.push(daemon)
+    await daemon.syncWithServer()
+    const runId = server.queueRun(DEVICE, { issueId: 'readonly-delivery', repoId: 'repo-1', baseBranch: 'main',
+      harness: 'mock', prompt: 'Inspect the registered workspace', fixture: 'readonly-delivery',
+      factoryExecuteKind: 'deliverable',
+      policy: { ...runPolicy(undefined), readOnly: true, permissions: { ...runPolicy(undefined).permissions, computer_use: 'deny', git_push: 'deny' } } })
+    const client = await connectDaemonInDataDir(dataDir, { name: 'hosted-delivery', version: '0' })
+    try { await client.request('runs.start', { runId }) } finally { client.close() }
+    await daemon.supervisor.idle()
+    await daemon.syncWithServer()
+    await waitFor(() => server.runs.get(runId)?.completion)
+    expect(server.runs.get(runId)?.completion).toMatchObject({ stopReason: 'submitted',
+      report: { summary: 'Inspected the workspace without changes.', verify: { status: 'not_run' } } })
+    expect(new RunJournal(join(dataDir, 'runs.json')).get(runId)!.assignment.computer).toBeUndefined()
+    expect(git(repo, 'status', '--porcelain')).toBe('')
+    // A read-only flag alone grants no hosted workspace authority.
+    const refused = server.queueRun(DEVICE, { ...server.runs.get(runId)!.assignment, runId: undefined, factoryExecuteKind: undefined })
+    await daemon.syncWithServer()
+    await waitFor(() => server.runs.get(refused)?.completion)
+    expect(server.runs.get(refused)?.completion).toMatchObject({ stopReason: 'error',
+      report: { summary: 'Repository URL required; dispatch a new thread.' } })
+  })
+
   it.each(['review', 'verify'] as const)('checks a hosted delivery snapshot during %s without interactive computer authority', async stage => {
     const { server, dataDir, repo } = await setup()
     writeFileSync(join(repo, 'DELIVERY.txt'), 'hosted-file-check-marker\n')
