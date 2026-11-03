@@ -202,7 +202,7 @@
     "test:subscription-usability": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test components/coordinator/bot-model-picker.test.tsx components/coordinator/retry-reply-button.test.tsx components/coordinator/subscription-recovery.test.tsx components/settings/model-order-settings.test.tsx components/settings/payment-privacy-read-states.test.tsx lib/cloud-dispatch-failure.test.ts lib/new-task-placement.test.ts lib/run-credential-source.test.ts lib/subscription-quota.test.ts components/plugins/plugins-view.test.tsx components/plugins/github-settings.test.tsx",
     "test:factory-all-dispatch-db": "node --experimental-test-module-mocks --test-force-exit --import ./tests/support/server-only.mjs --import tsx --test tests/factory-all-dispatch.db.test.ts",
     "test:view-state": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/hooks/view-state.test.tsx components/nav/thread-view-state.test.tsx",
-    "test:device-gateway": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/device-presence.test.ts lib/device-gateway-notify.test.ts"
+    "test:device-gateway": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/device-presence.test.ts lib/device-gateway-notify.test.ts && node --import tsx --test lib/device-gateway-ticket.test.ts cloudflare/device-gateway/src/route.test.ts && node --test cloudflare/device-gateway/test/runtime.test.mjs"
   },
   "dependencies": {
     "@ai-sdk/mcp": "2.0.81",

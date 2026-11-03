@@ -24,7 +24,7 @@ const database = {
       from() { return selection }, where() { return selection }, innerJoin() { return selection },
       limit: async () => !fields ? [lost] : 'remoteUrl' in fields ? [{ remoteUrl: 'https://github.com/synthetic/fixture.git', repoPath: remoteKey('https://github.com/synthetic/fixture.git') }] : 'harness' in fields ? [{ harness: 'codex' }] : [],
       // A run only retries where a machine can take it: one online server with Codex (允许自动调度 on by default).
-      orderBy: async () => [{ deviceId: 'other-device', harnesses: [{ harness: 'codex', installed: true }], deviceType: 'server', autoSchedule: null }],
+      orderBy: async () => [{ deviceId: 'other-device', lastSeenAt: new Date(), harnesses: [{ harness: 'codex', installed: true }], deviceType: 'server', autoSchedule: null }],
     }
     return selection
   },
