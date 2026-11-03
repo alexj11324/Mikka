@@ -1,4 +1,5 @@
 import { Pool, type PoolConfig } from 'pg'
+import { directPoolOptions } from '../../scripts/postgres-connection.mjs'
 
 export class AccountDeletionBusy extends Error {
   constructor() { super('accountDeletionBusy') }
@@ -10,15 +11,7 @@ export class AccountDeletionLockLost extends Error {
 /** Session advisory locks cannot use Neon's transaction pooler. Reuse the
  * configured database/credentials, changing only the documented Neon host. */
 export function deletionLockPoolOptions(options: PoolConfig): PoolConfig {
-  const directHost = (host: string) => host.endsWith('.neon.tech')
-    ? host.replace(/-pooler(?=\.)/, '') : host
-  const result = { ...options, max: 1, connectionTimeoutMillis: 5_000, application_name: 'mikka-account-deletion' }
-  if (result.connectionString) {
-    const url = new URL(result.connectionString)
-    url.hostname = directHost(url.hostname)
-    result.connectionString = url.href
-  }
-  if (result.host) result.host = directHost(result.host)
+  const result = { ...directPoolOptions(options), max: 1, connectionTimeoutMillis: 5_000, application_name: 'mikka-account-deletion' }
   return result
 }
 

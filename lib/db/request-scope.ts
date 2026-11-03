@@ -6,11 +6,12 @@ import { mikkaDatabaseURL } from './config'
 import { deviceScopedPool, readUnderAuthority } from './device-scope'
 import { sampleClient } from './egress-sample'
 import { samplePoolTransport } from './transport-sample'
+import { manageDatabasePool } from './pool-lifecycle'
 
 const defaultConnectionString = mikkaDatabaseURL(process.env)
 
 function createPool(connectionString = defaultConnectionString, scope: 'default' | 'request' = 'default') {
-  const pool = new Pool({ connectionString, max: 5, connectionTimeoutMillis: 10000, idleTimeoutMillis: 20000 })
+  const pool = manageDatabasePool(new Pool({ connectionString, max: 5, connectionTimeoutMillis: 10000, idleTimeoutMillis: 20000 }))
   pool.on('connect', client => sampleClient(client))
   samplePoolTransport(pool, scope)
   return pool
