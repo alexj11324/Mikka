@@ -57,6 +57,7 @@ import { mailboxInputs } from '@mikka/protocol/mailbox'
 import { mailboxToolResult, type RunMailbox } from '../run-mailbox'
 import { NATIVE_AUTH_PLACEHOLDER } from '../subscription-native-broker'
 import type { RunChunk } from "../chunks"
+import { CLI_EXITED_EARLY, redactDiagnostic, resultDiagnostics, subscriptionFailureCategory } from "./claude-failure"
 import {
   claudePermissionRules,
   runPolicy,
@@ -493,6 +494,8 @@ export class ClaudeAdapter implements AgentAdapter {
     let runtimeModel: string | null = null
     let ending = false
     let lastError: string | undefined
+    /** The API error the current turn's assistant message carried, if any. */
+    let assistantError: unknown
     /** The CLI's quota or rate-limit failure seen this turn, if any. */
     let quota: QuotaSignal | undefined
     let graceTimer: NodeJS.Timeout | undefined
@@ -557,7 +560,8 @@ export class ClaudeAdapter implements AgentAdapter {
           ? (options:SpawnOptions) => this.options.spawnHosted!(options,nativeToken ?? NATIVE_AUTH_PLACEHOLDER)
           : spawnLocal,
         stderr: (data: string) => {
-          if (!externalAuth) stderr = (stderr + data).slice(-STDERR_TAIL * 4)
+          // Kept in external-auth mode too, but logged only redacted.
+          stderr = (stderr + data).slice(-STDERR_TAIL * 4)
         },
       },
     })
@@ -586,6 +590,21 @@ export class ClaudeAdapter implements AgentAdapter {
           : { outcome: "succeeded" },
       )
     }
+    // The native text can hold the lease: only redacted copies reach the log,
+    // and the run's error names a fixed class.
+    const secrets = nativeToken && nativeToken !== NATIVE_AUTH_PLACEHOLDER ? [nativeToken] : []
+    const subscriptionFailure = (category: string, fields: Record<string, unknown>) => {
+      try {
+        log.warn({
+          event: "claude_subscription_turn_failed",
+          category,
+          ...fields,
+          ...(typeof assistantError === "string" ? { assistant_error: assistantError.slice(0, 64) } : {}),
+          stderr: redactDiagnostic(stderrTail(), secrets),
+        }, "claude subscription turn failed")
+      } catch { /* The run's own failure still ends it. */ }
+      return `${SUBSCRIPTION_EXECUTION_ERROR} (${category})`
+    }
     const diedEarly = (error: string) => {
       ending = true
       const handoff = ctx.readHandoff(log)
@@ -593,7 +612,7 @@ export class ClaudeAdapter implements AgentAdapter {
         handoff ?? {
           outcome: "failed",
           error: externalAuth
-            ? SUBSCRIPTION_EXECUTION_ERROR
+            ? subscriptionFailure(CLI_EXITED_EARLY, { detail: redactDiagnostic(error, secrets, 500) })
             : `claude exited before the turn ended: ${error}`,
           ...(quota ? { quota } : {}),
         }
@@ -621,6 +640,7 @@ export class ClaudeAdapter implements AgentAdapter {
           // A new turn (the queued message) produces its own result.
           if (message.type === "assistant" || message.type === "user")
             clearTimeout(graceTimer)
+          if (message.type === "assistant" && message.error) assistantError = message.error
           if (ending) continue
           quota = mergeQuota(quota, claudeQuotaSignal(message))
           if (message.type === 'tool_progress' && message.session_id === sessionId) queue.progress()
@@ -633,9 +653,10 @@ export class ClaudeAdapter implements AgentAdapter {
           if (!message.is_error) quota = undefined
           lastError = message.is_error
             ? externalAuth
-              ? SUBSCRIPTION_EXECUTION_ERROR
+              ? subscriptionFailure(subscriptionFailureCategory(message, assistantError), resultDiagnostics(message, secrets))
               : `Claude Code: ${resultError(message)}`
             : undefined
+          assistantError = undefined
           if (results >= written) {
             turnEnded()
             continue
