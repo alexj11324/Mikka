@@ -17,6 +17,9 @@ test('real agent-shaped push, gh PR and exact-head receipt use only the fixture 
   const gh = args => fixtureGh(args, { env, origin: services.origin, gitRun: git, output: value => output.push(value) })
   try {
     const fixture = await (await fetch(`${services.origin}/scenario`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ marker: `mvp-${randomUUID()}`, title: 'Agent gh fixture', harness: 'any' }) })).json()
+    const identity = await fetch(`${services.origin}/github/user`, { headers: { authorization: `Bearer ${env.GH_TOKEN}` } })
+    assert.equal(identity.status, 200, 'The run token must resolve its synthetic user identity')
+    assert.equal((await identity.json()).id, 456)
     git(['clone', fixture.barePath, '.'])
     git(['checkout', '-b', 'mikka/fixture-1'])
     await appendFile(join(directory, 'README.md'), '\nReal fixture delivery\n')

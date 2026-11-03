@@ -159,7 +159,8 @@ if (!serverReady) throw new Error('dev:local server did not become ready')
 // Every local account gets the model key through lib/model-api-keys.ts (scripts/dev-local/seed-model-keys.ts).
 let seeder
 let seederReady
-if (deepseekKey) {
+// Synthetic GitHub connection setup is needed even without a model key.
+{
   seeder = spawn(process.execPath, ['--import', './tests/support/server-only.mjs', '--import', 'tsx', 'scripts/dev-local/seed-model-keys-loop.ts'], {
     cwd: root, stdio: ['inherit', 'inherit', 'inherit', 'ipc'], env: { ...childEnv, WORKSPACE_SECRETS_KEY: secretsKey, DEEPSEEK_API_KEY: deepseekKey },
   })

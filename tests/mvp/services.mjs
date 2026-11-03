@@ -209,6 +209,14 @@ export async function startMvpServices(port = 3191, { routes } = {}) {
         assert.deepEqual(input, { repositories: ['core-loop'], permissions: { metadata: 'read', contents: 'read' } })
         return reply({ token: READ_TOKEN })
       }
+      // A run now receives its owner's user token, including the identity check.
+      if (path === '/user' && method === 'GET') { readAccess(); return reply(githubUser) }
+      if (path === '/user/installations' && method === 'GET') {
+        readAccess(); return reply({ installations: [{ id: 99, app_id: 123, suspended_at: null, account: { login: 'mikka-e2e' } }] })
+      }
+      if (path === '/user/installations/99/repositories' && method === 'GET') {
+        readAccess(); return reply({ repositories: [{ id: REPOSITORY_ID, full_name: 'mikka-e2e/core-loop', html_url: 'https://github.com/mikka-e2e/core-loop', private: false }] })
+      }
       if (path === `/user/${githubUser.id}` && method === 'GET') { readAccess(); return reply(githubUser) }
       if (path === `${REPO_PATH}/collaborators/${githubUser.login}/permission` && method === 'GET') { readAccess(); return reply({ permission: 'write', user: githubUser }) }
       if (path === REPO_PATH && method === 'GET') { readAccess(); return reply({ id: REPOSITORY_ID, full_name: 'mikka-e2e/core-loop', default_branch: 'trunk' }) }

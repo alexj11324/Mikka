@@ -201,7 +201,7 @@ async function setup() {
     if (!refreshed.ok) return false
     const keys = await query(`SELECT id FROM model_api_keys WHERE "ownerId"=$1 AND provider='deepseek'`, [accounts.owner.userId])
     assert.ok(keys.length, 'No real DeepSeek key seeded; refusing scripted/default model acceptance')
-    return true
+    return Boolean((await query('SELECT 1 FROM github_connections WHERE "userId"=$1 AND "githubAccountId"=$2', [accounts.owner.userId, '4242'])).length)
   }))
   runtime = await step('runtime-ready', 120_000, signal => until(signal, async () => {
     try {

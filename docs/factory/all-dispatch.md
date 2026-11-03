@@ -121,6 +121,14 @@ environment now retains explicit proxy routing and Node's proxy opt-in, while
 provider/cloud credentials and `NODE_OPTIONS` remain excluded. `src/env.test.ts`
 was first reproduced failing and now verifies both routing and those exclusions.
 
+The local GitHub fixture also follows the current user-token flow: its synthetic
+account gets a connection sealed through `saveGitHubConnection`, and the fake
+API validates that token on `/user` and installation queries. The earlier fixture
+only linked an account id, so real delivery returned `githubReconnectRequired`
+(occurrence 10/10 for a newly leased local account; impact 8/10 because no code
+candidate can publish). No production authentication path is substituted or
+weakened. The fixture identity regression was reproduced failing before repair.
+
 API/CLI acceptance uses `pnpm test:local-loop` in cloud Linux with its normal test
 account lease, local database/application/daemon and provider boundaries recorded
 by that harness. The database and simulated-Harness tests do not establish real
