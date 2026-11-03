@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
-import { ArrowUpRight, ChevronRight } from 'lucide-react'
+import { ArrowUpRight, ChevronRight, TriangleAlert } from 'lucide-react'
 import { toast } from 'sonner'
 import { AppTile, ToolGroup } from '@/components/plugins/connected-apps'
 import { SettingsSection } from '@/components/settings/primitives'
@@ -30,6 +30,8 @@ type GitHubRead = { state: GitHubState; reconnect: false } | { state: null; reco
 
 const githubKey = (userId: string) => ['integrations:github', userId] as const
 const CONNECT_PATH = withBasePath('/api/integrations/github/connect')
+/** A notice, not an error: the browser is signed in as another account and nothing went wrong. */
+const NOTICE = 'border-transparent bg-warning/10'
 const INTENT_PATH = withBasePath('/api/integrations/github/connect/intent')
 /** As long as the link token lives (lib/github/connect-intent.ts). */
 const LINK_WINDOW_MS = 10 * 60_000
@@ -200,12 +202,14 @@ function ViewerGitHubSettings({ userId, email, isPending }: { userId: string | u
     </header>
     {errors.map(message => <Alert key={message} variant="destructive" className="border-transparent bg-destructive/10"><AlertTitle>{message}</AlertTitle></Alert>)}
     {/* The app: its browser is signed in as another account, so nothing was linked. The browser page offers the switch. */}
-    {!connected && linking && browserAccount && <Alert variant="destructive" className="border-transparent bg-destructive/10">
+    {!connected && linking && browserAccount && <Alert role="status" className={NOTICE}>
+      <TriangleAlert aria-hidden="true" className="text-warning-foreground" />
       <AlertTitle>{t('githubLinkOtherAccount', { browser: browserAccount, app: email })}</AlertTitle>
       <AlertAction><Button type="button" variant="secondary" size="sm" disabled={githubLinking} onClick={() => void linkGitHub(linking)}>{t('githubOpenBrowser')}</Button></AlertAction>
     </Alert>}
     {/* The browser: signed in as another account than the app that started the link. */}
-    {!connected && browserIntent && browserView?.state === 'otherAccount' && <Alert variant="destructive" className="border-transparent bg-destructive/10">
+    {!connected && browserIntent && browserView?.state === 'otherAccount' && <Alert role="status" className={NOTICE}>
+      <TriangleAlert aria-hidden="true" className="text-warning-foreground" />
       <AlertTitle>{t('githubLinkOtherAccount', { browser: browserView.browserAccount, app: browserView.appAccount })}</AlertTitle>
       <AlertAction><Button type="button" variant="secondary" size="sm" onClick={() => void switchAccount(browserIntent.token)}>{t('githubSwitchAccount')}</Button></AlertAction>
     </Alert>}
