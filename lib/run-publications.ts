@@ -191,7 +191,7 @@ async function completionTransaction(userId: string, runId: string, completion: 
         ...(quota ? { quotaResetsAt: resetsAt ? new Date(resetsAt) : null } : {}),
         ...(paused ? { leaseExpiresAt: null, finishedAt: null } : { finishedAt: sql`clock_timestamp()` }), updatedAt: new Date() }).where(eq(agentRuns.id, runId)).returning()
       await tx.update(runTokens).set({ revokedAt: new Date() }).where(and(eq(runTokens.runId, runId), isNull(runTokens.revokedAt)))
-      await settleRunCompletionEffects(client, run, completion.stopReason, factoryBound)
+      await settleRunCompletionEffects(client, run, completion.stopReason, factoryBound, completion.report)
       if (quota && (await (await import('./run-quota')).settleQuotaExhausted(tx, run, quota, resetsAt)).cloud) quotaCloud = { run, plan: quota, resetsAt }
     }
     // A lease-expired/explicitly stopped run cannot be resurrected by a late completion.

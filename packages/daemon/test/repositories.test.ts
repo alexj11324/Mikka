@@ -70,6 +70,29 @@ describe('repository URL boundary', () => {
 })
 
 describe('daemon-owned clone cache', () => {
+  it('switches repositories through a fresh clone and worktree while retaining the wrong checkout and its dirty files', async () => {
+    const wrong = await makeRepo(), correct = await makeRepo()
+    writeFileSync(join(correct, 'TARGET.txt'), 'correct repository\n')
+    git(correct, '-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'add', 'TARGET.txt')
+    git(correct, '-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-m', 'target identity')
+    const cache = new RepositoryCache(join(tempDir(), 'clones'), true)
+    const trees = new WorktreeManager(join(tempDir(), 'worktrees'))
+    const wrongUrl = pathToFileURL(wrong).href, correctUrl = pathToFileURL(correct).href
+    const wrongClone = await cache.prepare(wrongUrl)
+    const original = await trees.create('wrong-run', wrongClone, await cache.baseRef(wrongUrl))
+    writeFileSync(join(original, 'unfinished.txt'), 'keep me\n')
+    const previousHead = git(original, 'rev-parse', 'HEAD')
+    const correctClone = await cache.prepare(correctUrl)
+    expect(await trees.continueFrom(correctClone, original, 'correct-run')).toBeNull()
+    const selected = await trees.create('correct-run', correctClone, await cache.baseRef(correctUrl))
+    expect(git(selected, 'remote', 'get-url', 'origin')).toBe(correctUrl)
+    expect(git(selected, 'rev-parse', 'HEAD')).toBe(git(correct, 'rev-parse', 'HEAD'))
+    expect(readFileSync(join(selected, 'TARGET.txt'), 'utf8')).toBe('correct repository\n')
+    expect(existsSync(join(selected, 'unfinished.txt'))).toBe(false)
+    expect(git(original, 'remote', 'get-url', 'origin')).toBe(wrongUrl)
+    expect(git(original, 'rev-parse', 'HEAD')).toBe(previousHead)
+    expect(readFileSync(join(original, 'unfinished.txt'), 'utf8')).toBe('keep me\n')
+  })
   it('reports an empty remote after successful clone and fetch without inventing a first commit', async () => {
     const bare = join(tempDir(), 'empty.git')
     git(tempDir(), 'init', '--bare', '--initial-branch=main', bare)

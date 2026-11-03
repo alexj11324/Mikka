@@ -1,14 +1,15 @@
 import 'server-only'
 import { and, eq, sql } from 'drizzle-orm'
 import { daemonTestMode, normalizeRepository, remoteKey, repositoryBindingMatches } from '@mikka/protocol/repository'
-import { db } from '@/lib/db'
+import type { PoolClient } from 'pg'
+import { db, withDatabaseClient } from '@/lib/db'
 import { deviceRepos, repositorySettings } from '@/lib/db/schema'
 
 /** A scheduling record, not an allow-list or a path on the person's machine. */
-export async function ensureDeviceRepository(userId: string, deviceId: string, input: string) {
+export async function ensureDeviceRepository(userId: string, deviceId: string, input: string, existing?: PoolClient) {
   const options = { allowFile: daemonTestMode(process.env) }
   const repository = normalizeRepository(input, options)
-  return db.transaction(async tx => {
+  const prepare = async (tx: Pick<typeof db, 'execute' | 'select' | 'update' | 'insert'>) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`device-repo:${deviceId}:${repository.key}`},0))`)
     const rows = await tx.select().from(deviceRepos).where(and(eq(deviceRepos.deviceId, deviceId), eq(deviceRepos.userId, userId)))
     const existing = rows.find(row => row.repoPath === repository.key)
@@ -32,7 +33,8 @@ export async function ensureDeviceRepository(userId: string, deviceId: string, i
     }).onConflictDoNothing({ target: [deviceRepos.deviceId, deviceRepos.repoPath] }).returning()
     if (!row) throw new Error('Repository unavailable')
     return row
-  })
+  }
+  return existing ? withDatabaseClient(existing, () => prepare(db)) : db.transaction(prepare)
 }
 
 export async function readRepositorySettings(userId: string, remoteUrl: string) {

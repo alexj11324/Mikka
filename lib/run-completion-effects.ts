@@ -68,14 +68,14 @@ export async function prepareRunCompletionEffects(client: PoolClient, run: RunId
 
 /** Question state and the terminal run commit together; a rollback must never
  * consume an answer while leaving its run live, or record a premature question. */
-export async function settleRunCompletionEffects(client: PoolClient, run: RunIdentity, stopReason: RunCompleteRequest['stopReason'], factoryBound: boolean) {
+export async function settleRunCompletionEffects(client: PoolClient, run: RunIdentity, stopReason: RunCompleteRequest['stopReason'], factoryBound: boolean, report?: RunCompleteRequest['report']) {
   if (!factoryBound) return
   const { factoryQuestions } = await import('./factory/server')
   const questions = deploymentSwitch('factoryRouting') && deploymentSwitch('factoryLifecycle')
     ? (await import('./factory/runtime')).factoryRuntimeForBot(run.botId).questions
     : factoryQuestions
   await optionalFactoryEffect(client, 'completion_question_settle', () => questions.settle(run.userId, run.id, client))
-  if (stopReason === 'asked_human' || stopReason === 'blocked') await optionalFactoryEffect(client, 'completion_question_record', () => questions.record(run.userId, run.id, client))
+  if (!report?.repositorySelection && (stopReason === 'asked_human' || stopReason === 'blocked')) await optionalFactoryEffect(client, 'completion_question_record', () => questions.record(run.userId, run.id, client))
 }
 
 type Queryable = { query: (text: string, values?: unknown[]) => Promise<{ rows: Record<string, unknown>[] }> }

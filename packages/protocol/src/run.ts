@@ -95,6 +95,14 @@ export const runRuntime = runExecution.pick({ harness: true, requestedModel: tru
   policyDigest: true, sourceCommit: true }).strict()
 export type RunRuntime = z.infer<typeof runRuntime>
 
+/** Agent-selected target; the host reauthorizes it before creating another execution. */
+export const runRepositorySelection = z.object({
+  repository: z.string().trim().min(1).max(4_000),
+  reason: z.string().trim().min(1).max(2_000),
+  observedRemote: z.string().max(4_000).nullable(),
+  observedHead: z.string().regex(/^[a-f0-9]{40}$/),
+}).strict()
+
 /** Host reread of the mounted bytes after the actual adapter session opens. */
 export const runSkillMount = z.object({
   receiptId: z.uuid(),
@@ -113,6 +121,7 @@ export type RunSkillMount = z.infer<typeof runSkillMount>
  * cannot report its own verify as passed.
  */
 export const runReport = z.object({
+  repositorySelection: runRepositorySelection.optional(),
   /** Worktree base journaled before the adapter started; never agent-supplied. */
   sourceCommit: z.string().regex(/^[a-f0-9]{40}$/).optional(),
   /** Daemon-created local snapshot of a non-repository delivery; never a published code candidate. */

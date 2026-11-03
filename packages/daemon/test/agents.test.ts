@@ -56,6 +56,36 @@ function mcpClient(handoff: string, extraArgs: string[] = []) {
 }
 
 describe("mikka MCP server", () => {
+  it('records an execution-side repository switch with actual Git evidence and retains the old checkout', async () => {
+    const repo = await makeRepo()
+    await execa('git', ['remote', 'add', 'origin', 'https://github.com/example/wrong.git'], { cwd: repo })
+    const worktree = await worktreeOf(repo)
+    writeFileSync(join(worktree, 'uncommitted.txt'), 'preserve this work\n')
+    const ctx = new RunContext({ harness: 'codex', kind: 'implement', worktree, runDir: tempDir(), privateDir: tempDir() })
+    const client = mcpClient(ctx.handoffFile, ctx.mcpServer().args.slice(3))
+    try {
+      expect(JSON.stringify(await client.request('tools/list'))).toContain('switch_repository')
+      const result = await client.request('tools/call', { name: 'switch_repository', arguments: {
+        repository: 'example/correct', reason: 'Task names the correct repository; this checkout is wrong.',
+      } })
+      expect(result).toMatchObject({ result: { content: expect.any(Array) } })
+      expect(ctx.readHandoff()).toMatchObject({ outcome: 'failed', stopReason: 'blocked', report: {
+        repositorySelection: { repository: 'example/correct', reason: expect.any(String),
+          observedRemote: 'https://github.com/example/wrong.git', observedHead: expect.stringMatching(/^[a-f0-9]{40}$/) },
+      } })
+      expect((await execa('git', ['remote', 'get-url', 'origin'], { cwd: worktree })).stdout).toBe('https://github.com/example/wrong.git')
+      expect(existsSync(join(worktree, 'uncommitted.txt'))).toBe(true)
+    } finally { client.close() }
+    const check = new RunContext({ harness: 'codex', kind: 'implement', worktree, runDir: tempDir(), privateDir: tempDir(),
+      factoryCheck: { stage: 'review', reportOnly: true, inferCommand: false } })
+    const checker = mcpClient(check.handoffFile, check.mcpServer().args.slice(3))
+    try {
+      expect(JSON.stringify(await checker.request('tools/list'))).not.toContain('switch_repository')
+      expect(await checker.request('tools/call', { name: 'switch_repository', arguments: { repository: 'example/correct', reason: 'retarget check' } }))
+        .toMatchObject({ error: { code: -32602 } })
+      expect(check.readHandoff()).toBeNull()
+    } finally { checker.close() }
+  })
   it('offers a host-bound verify tool with real output, no model credential env and no hand-in side effect', async () => {
     const root = tempDir()
     const command = `${JSON.stringify(process.execPath)} -e "console.log('verified'); if(process.env.ANTHROPIC_API_KEY)process.exit(7)"`
