@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { Sandbox, SandboxNotFoundError } from 'e2b'
 import { computerTemplate, e2bApiKey, sandboxKeyOwner, withE2BErrors } from '@/lib/secrets/e2b-runtime'
 import { E2BKeyError } from '@/lib/secrets/flag'
-import { bootstrapOfficialInstance } from './official-runtime'
+import { bootstrapOfficialInstance, runtimeCommandOptions, runtimeRequestOptions, type RuntimeBudget } from './official-runtime'
 
 const lifetime = 15 * 60_000
 export type DesktopLease = { botId: string; ownerId: string; display: number; epoch: number; controlledBy: string | null; controlUntil: number; computerAllowed: boolean; policyVersion: number }
@@ -18,10 +18,12 @@ const ownerOf = async (workspaceId: string, id: string) => {
   return owner
 }
 
-export async function connectComputer(workspaceId: string, id: string, signal?: AbortSignal) {
+export async function connectComputer(workspaceId: string, id: string, signal?: AbortSignal, budget?: RuntimeBudget) {
   const owner = await ownerOf(workspaceId, id)
   const base = await options(owner)
-  return withE2BErrors(owner, false, () => Sandbox.connect(id, { ...base, ...(signal ? { signal, retries: 0 } : {}) }))
+  const request = runtimeRequestOptions(budget)
+  const boundedSignal = signal && request.signal ? AbortSignal.any([signal, request.signal]) : signal ?? request.signal
+  return withE2BErrors(owner, false, () => Sandbox.connect(id, { ...base, ...request, ...(boundedSignal ? { signal: boundedSignal, retries: 0 } : {}) }))
 }
 
 /** The machine's sandbox no longer exists at E2B (killed, or expired while paused). */
@@ -66,7 +68,7 @@ export async function createComputer(workspaceId: string, operationId: string) {
 
 /** Refresh authorization guards without replacing the desktop script baked
  * with each template's package set. Hashes also catch partial guard updates. */
-export async function installComputerRuntime(sandbox: Sandbox) {
+export async function installComputerRuntime(sandbox: Sandbox, budget?: RuntimeBudget) {
   const files = await Promise.all(['viewer-gateway.py', 'lease-driver.py'].map(async name => ({
     path: `/opt/mikka/computer/${name}`, data: await readFile(join(process.cwd(), 'scripts/e2b', name), 'utf8'),
   })))
@@ -85,33 +87,33 @@ chmod 0755 /opt/mikka/computer/lease-driver.py
 nohup flock -n /run/mikka-viewer/gateway.lock /usr/bin/python3 /opt/mikka/computer/viewer-gateway.py </dev/null >>/run/mikka-viewer/gateway.log 2>&1 &
 for i in $(seq 1 30); do [ "$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:6080/vnc)" = 401 ] && exit 0; sleep .2; done
 exit 1`
-  const result = await sandbox.commands.run(start, { user: 'root', timeoutMs: 10_000 })
+  const result = await sandbox.commands.run(start, { user: 'root', ...runtimeCommandOptions(10_000, budget) })
   if (result.stdout.trim() !== 'mikka-runtime-install-required') return
-  await sandbox.files.write(files, { user: 'root' })
-  const installed = await sandbox.commands.run(start, { user: 'root', timeoutMs: 10_000 })
+  await sandbox.files.write(files, { user: 'root', ...runtimeRequestOptions(budget) })
+  const installed = await sandbox.commands.run(start, { user: 'root', ...runtimeCommandOptions(10_000, budget) })
   if (installed.stdout.trim() === 'mikka-runtime-install-required') throw new Error('Computer runtime installation failed')
 }
 
 
-export async function startDesktop(sandbox: Sandbox, display: number, managedChrome = false) {
+export async function startDesktop(sandbox: Sandbox, display: number, managedChrome = false, budget?: RuntimeBudget) {
   if (!Number.isInteger(display) || display < 1 || display > 999) throw new Error('Invalid display')
-  await sandbox.commands.run(`bash /opt/mikka/computer/start-desktop.sh ${display}`, { user: 'user', background: true, timeoutMs: 0, ...(managedChrome ? { envs: { MIKKA_MANAGED_CHROME: '1' } } : {}) })
-  await sandbox.commands.run(`for i in $(seq 1 60); do DISPLAY=:${display} xdpyinfo >/dev/null 2>&1 && test -S /home/user/.mikka/vnc/${display}-view.sock && test -S /home/user/.mikka/vnc/${display}-control.sock && exit 0; sleep .25; done; exit 1`, { user: 'user', timeoutMs: 20_000 })
+  await sandbox.commands.run(`bash /opt/mikka/computer/start-desktop.sh ${display}`, { user: 'user', background: true, timeoutMs: 0, ...runtimeRequestOptions(budget), ...(managedChrome ? { envs: { MIKKA_MANAGED_CHROME: '1' } } : {}) })
+  await sandbox.commands.run(`for i in $(seq 1 60); do DISPLAY=:${display} xdpyinfo >/dev/null 2>&1 && test -S /home/user/.mikka/vnc/${display}-view.sock && test -S /home/user/.mikka/vnc/${display}-control.sock && exit 0; sleep .25; done; exit 1`, { user: 'user', ...runtimeCommandOptions(20_000, budget) })
 }
 
-export async function syncDesktopLease(sandbox: Sandbox, lease: DesktopLease) {
+export async function syncDesktopLease(sandbox: Sandbox, lease: DesktopLease, budget?: RuntimeBudget) {
   // Atomic rename: readers never observe a truncated revocation/control state.
   if (!Number.isInteger(lease.display) || lease.display < 1 || lease.display > 999) throw new Error('Invalid display')
   // Existing sandboxes may have been provisioned by an older deployment.
   // Install the current guard before publishing a policy-bearing lease.
   const guard = await readFile(join(process.cwd(), 'scripts/e2b/lease-driver.py'), 'utf8')
-  await sandbox.files.write('/opt/mikka/computer/lease-driver.py', guard, { user: 'root' })
-  await sandbox.commands.run('chmod 0755 /opt/mikka/computer/lease-driver.py', { user: 'root', timeoutMs: 10_000 })
+  await sandbox.files.write('/opt/mikka/computer/lease-driver.py', guard, { user: 'root', ...runtimeRequestOptions(budget) })
+  await sandbox.commands.run('chmod 0755 /opt/mikka/computer/lease-driver.py', { user: 'root', ...runtimeCommandOptions(10_000, budget) })
   const path = `/run/mikka-viewer/${lease.display}`
-  await sandbox.files.write(`${path}.next`, JSON.stringify(lease), { user: 'root' })
+  await sandbox.files.write(`${path}.next`, JSON.stringify(lease), { user: 'root', ...runtimeRequestOptions(budget) })
   // A shared lock is held for the whole CUA driver process. Takeover waits
   // until it exits, then publishes the new lease before granting control.
-  await sandbox.commands.run(`touch ${path}.lock; if getent group user >/dev/null; then chown root:user ${path}.lock ${path}.next; chmod 660 ${path}.lock; chmod 640 ${path}.next; else chmod 600 ${path}.lock ${path}.next; fi; flock -x ${path}.lock mv ${path}.next ${path}.json`, { user: 'root', timeoutMs: 45_000 })
+  await sandbox.commands.run(`touch ${path}.lock; if getent group user >/dev/null; then chown root:user ${path}.lock ${path}.next; chmod 660 ${path}.lock; chmod 640 ${path}.next; else chmod 600 ${path}.lock ${path}.next; fi; flock -x ${path}.lock mv ${path}.next ${path}.json`, { user: 'root', ...runtimeCommandOptions(45_000, budget) })
 }
 
 export async function viewerGrant(sandbox: Sandbox, lease: DesktopLease, userId: string, mode: 'view' | 'control') {

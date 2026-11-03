@@ -47,6 +47,43 @@ test('rollback explicitly reports restored but not ready', async () => {
   assert.equal((await switchOfficialWorkerRelease(sandbox, release, identity, 'rollback', async () => '')).status, 'restored_not_ready')
 })
 
+test('refresh staging and process verification pass the remaining budget to each SDK call', async () => {
+  let remaining = 9_000
+  const limits: number[] = []
+  const budget = (maximum: number) => Math.min(maximum, remaining)
+  const sandbox = { commands: { run: async (command: string, options: { timeoutMs: number; requestTimeoutMs?: number; signal?: AbortSignal }) => {
+    assert.equal(options.timeoutMs, remaining)
+    assert.equal(options.requestTimeoutMs, remaining)
+    assert.ok(options.signal instanceof AbortSignal)
+    limits.push(options.timeoutMs)
+    remaining -= 2_000
+    if (command.includes('MIKKA_OFFICIAL_WORKER_STAGE') || command.includes('MIKKA_PRIVATE_RUNTIME_SWITCH')) assert.match(command, /^timeout --signal=TERM --kill-after=3s \d+\.\d{3}s /)
+    if (command.includes('MIKKA_PRIVATE_RUNTIME_SWITCH')) assert.match(command, /s flock --exclusive \/opt\/mikka\/runtime-refresh\.lock python3 - verify /)
+    return { stdout: command.includes('MIKKA_OFFICIAL_WORKER_STAGE') ? `mikka-official-instance-staged ${release.sourceCommit} ${release.workerSha}`
+      : command.includes('MIKKA_PRIVATE_RUNTIME_SWITCH') ? JSON.stringify({ status: 'verified_process', workerSourceCommit: release.sourceCommit, workerSha: release.workerSha, pid: 42 })
+      : 'mikka-runtime-process-verified 42' }
+  } } } as never
+  await stageOfficialWorkerRelease(sandbox, 'codex', release.previousSha, env, async () => '', budget)
+  await switchOfficialWorkerRelease(sandbox, release, identity, 'verify', async () => '', budget)
+  assert.deepEqual(limits, [9_000, 7_000, 5_000])
+})
+
+test('an expired refresh budget starts no staging or runtime switch', async () => {
+  const budget = () => { throw new Error('refresh deadline') }
+  const sandbox = { commands: { run: async () => { assert.fail('expired maintenance must not start a remote command') } } } as never
+  await assert.rejects(stageOfficialWorkerRelease(sandbox, 'codex', release.previousSha, env, async () => '', budget), /refresh deadline/)
+  await assert.rejects(switchOfficialWorkerRelease(sandbox, release, identity, 'switch', async () => '', budget), /refresh deadline/)
+})
+
+test('refresh staging terminates a foreground process that ignores TERM before its SDK budget', { timeout: 12_000 }, async () => {
+  const sandbox = { commands: { run: async (command: string) => promisify(execFile)('bash', ['-c', command], { timeout: 8_000, killSignal: 'SIGKILL' }) } } as never
+  await assert.rejects(
+    stageOfficialWorkerRelease(sandbox, 'codex', release.previousSha, env, async () => 'trap "" TERM\nwhile :; do sleep 1; done', () => 5_020),
+    (error: unknown) => Boolean(error && typeof error === 'object' && 'killed' in error && !error.killed &&
+      (('signal' in error && error.signal === 'SIGKILL') || ('code' in error && error.code === 137))),
+  )
+})
+
 test('private runtime switch preserves files and refuses unsafe process states', async () => {
   await promisify(execFile)('python3', ['packages/daemon/scripts/refresh-cloud-worker.test.py'])
 })

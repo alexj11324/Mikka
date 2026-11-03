@@ -8,10 +8,11 @@ import type { FactoryQueue } from '../dispatch';
 /** A question resumes its server-bound executor, not the Bot's local queue.
  * The answer holds computer policy -> task -> origin locks. No provider call,
  * new consumer, model selection or credential authority is introduced here. */
-export async function queueCloudQuestionContinuation(
+export async function admitCloudQuestionContinuation(
   tx: PoolClient, userId: string, input: Parameters<FactoryQueue>[2],
   botId: string | null, context: Parameters<FactoryQueue>[4],
-): Promise<{ runId: string } | null> {
+  questionStatus: 'answered' | 'blocked' = 'answered',
+) {
   const questionOriginId = context.questionOriginRunId;
   const originId = context.questionHistoryRunId ?? questionOriginId;
   if (!originId) return null;
@@ -41,16 +42,26 @@ export async function queueCloudQuestionContinuation(
       AND r."botId" IS NOT DISTINCT FROM $6::uuid AND b."workspaceId"=$7
       AND r.status=CASE WHEN $10::uuid IS NULL THEN 'stopped' ELSE 'failed' END AND r."stopRequestedAt" IS NULL AND r."sessionId" IS NOT NULL
       AND (r."agentDefinition"->'apiKey' IS NULL OR r."agentDefinition"->'apiKey'='null'::jsonb)
-      AND m.state IN ('running','paused') AND m."sandboxId" IS NOT NULL
+      AND (m.state IN ('running','paused') OR ($12='blocked' AND m.state='error')) AND m."sandboxId" IS NOT NULL
       AND ($10::uuid IS NULL OR r."questionContinuation"->>'requiredSandboxId'=m."sandboxId")
       AND (m."workerLeaseUntil" IS NULL OR m."workerLeaseUntil"<=clock_timestamp())
       AND (repo."remoteUrl" IS NOT NULL OR NOT EXISTS(SELECT 1 FROM workspace_computer_policies p WHERE p."workspaceId"=b."workspaceId" AND p.permission='deny'))
       AND NOT EXISTS(SELECT 1 FROM agent_runs active WHERE active."deviceId"=r."deviceId" AND active.status NOT IN ('succeeded','completed','failed','stopped','cancelled'))
       AND EXISTS(SELECT 1 FROM factory_questions q JOIN factory_tasks t ON t.id=q."taskId" AND t."userId"=q."userId"
-        WHERE q."originRunId"=$11 AND (CASE WHEN $10::uuid IS NULL THEN q."originRunId" ELSE q."continuationRunId" END)=r.id AND q."originSessionId"=r."sessionId" AND q."userId"=r."userId" AND q.status='answered'
+        WHERE q."originRunId"=$11 AND (CASE WHEN $10::uuid IS NULL THEN q."originRunId" ELSE q."continuationRunId" END)=r.id AND q."originSessionId"=r."sessionId" AND q."userId"=r."userId" AND q.status=$12
           AND t."issueId"=r."issueId" AND t."attemptId"=$8 AND t."sourceEventId"=$9 AND t."botId" IS NOT DISTINCT FROM r."botId")
-    FOR UPDATE OF r,m FOR SHARE OF b,bot,a,d,repo,credential,c`, [originId,userId,input.issueId,input.agentId,input.deviceRepoId,botId,binding.workspaceId,context.attemptId,context.sourceEventId,context.questionHistoryRunId ?? null,questionOriginId]);
+    FOR UPDATE OF r,m FOR SHARE OF b,bot,a,d,repo,credential,c`, [originId,userId,input.issueId,input.agentId,input.deviceRepoId,botId,binding.workspaceId,context.attemptId,context.sourceEventId,context.questionHistoryRunId ?? null,questionOriginId,questionStatus]);
   if (!origin?.agentDefinition || !origin.sessionId) return fail();
+  return { origin, binding };
+}
+
+export async function queueCloudQuestionContinuation(
+  tx: PoolClient, userId: string, input: Parameters<FactoryQueue>[2],
+  botId: string | null, context: Parameters<FactoryQueue>[4],
+): Promise<{ runId: string } | null> {
+  const admitted = await admitCloudQuestionContinuation(tx,userId,input,botId,context);
+  if (!admitted) return null;
+  const { origin, binding } = admitted, originId = origin.id;
   const runId = randomUUID();
   const prompt = `${origin.prompt}\n\n${input.note ?? ''}`;
   await tx.query(`INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId","botId",source,status,kind,"baseBranch",prompt,"agentDefinition",attempt)
@@ -66,6 +77,15 @@ export async function queueCloudQuestionContinuation(
     SELECT $1,"userId","issueId","scopeVersion","issueTitle","remoteUrl","remoteKey",identifier,branch,"baseBranch","pushApproved"
     FROM run_publications WHERE "runId"=$2 AND "userId"=$3 AND "issueId"=$4`, [runId,originId,userId,origin.issueId]);
   return { runId };
+}
+
+/** Host-only preparation, after admission committed and before recovery dispatch. */
+export async function prepareCloudQuestionRecovery(pool: Pool, userId: string, scope: { runId: string; workspaceId: string }) {
+  try {
+    await (await import('../../cloud-computer/thread-machines')).threadMachineAction(pool,{userId,workspaceId:scope.workspaceId},scope.runId,'refresh_runtime');
+  } catch {
+    throw new FactoryError('factoryQuestionContinuationUnavailable');
+  }
 }
 
 /** Only after the answer transaction committed; a replay wakes the same run. */
