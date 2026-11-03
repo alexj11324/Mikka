@@ -739,10 +739,10 @@ export async function createHostedBotRunner(host: {
                     },
                   },
                 });
-          const runtimeOptions = { ...options, ...(assignment.requireSessionResume ? { requireSessionResume: true } : {}), credential: placeholderCredential, ...(githubCli ? { githubRuntime: { nodeBinary: process.execPath, ghBinary: githubCli } } : {}) };
+          const runtimeOptions = { ...options, ...(continuation ? { continueSession: continuation } : {}), ...(assignment.requireSessionResume ? { requireSessionResume: true } : {}), credential: placeholderCredential, ...(githubCli ? { githubRuntime: { nodeBinary: process.execPath, ghBinary: githubCli } } : {}) };
           const session = previous && !continuation
             ? await adapter.resume(previous.sessionId, runtimeOptions)
-            : await adapter.start({ ...runtimeOptions, ...(continuation ? { continueSession: continuation } : {}) });
+            : await adapter.start(runtimeOptions);
           if (assignment.requireSessionResume && session.sessionId !== assignment.resumeSessionId) {
             await session.cancel();
             throw unavailable();
