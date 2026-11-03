@@ -254,8 +254,10 @@ workflow, each with its own chat, memory and inbox.
 
 Runs execute on your machines. The daemon registers the device, claims runs
 through the device API, and starts the agent CLI in a dedicated git worktree.
-Execution rules choose where a task runs, which Agent and which model, and
-what happens when a device is offline or a quota runs out.
+Each person's preferred model list, in order, and their run location (cloud
+or local) in Settings › Models and subscriptions choose a new thread's model, Agent and machine;
+each computer has one switch to take part in dispatch
+([execution settings](docs/execution-rules.md)).
 Checkpoint-based handover is implemented and tested; a real two-machine
 handover remains to be verified.
 The agent reports progress, questions and blocks through Mikka's MCP worker
@@ -273,8 +275,10 @@ The hosted model runs through Vercel AI Gateway and is metered per call; card
 verification and top-ups go through Stripe Checkout and its webhooks.
 
 A Cloudflare Worker fires every minute and calls the app's cron routes: due
-Coordinator wakes, schedules, run recovery and monitoring, briefings every
-15 minutes, and hourly notification reconciliation. Linear sync runs in a
+Coordinator wakes, schedules, run recovery, account deletions, audit retention
+and operational monitoring every minute, briefings every 15 minutes, hourly
+notification reconciliation and the profile merge
+([suggestions schedules](docs/suggestions-cron.md)). Linear sync runs in a
 second Worker that exchanges changes with Postgres through a durable inbox and
 outbox; it is switched off by a PostHog flag.
 
@@ -390,8 +394,8 @@ Start with these documents:
 - [`docs/acceptance.md`](docs/acceptance.md): how a change is accepted.
 - [`docs/acceptance-mvp-cli-2026-11-01.md`](docs/acceptance-mvp-cli-2026-11-01.md):
   the MVP API/CLI acceptance record.
-- [`docs/dev-workflow.md`](docs/dev-workflow.md): local first, trunk-based
-  merging and module owners.
+- [`docs/dev-workflow.md`](docs/dev-workflow.md): local first, issue
+  ownership and merging, and production acceptance after a merge.
 - [`docs/review-checklist.md`](docs/review-checklist.md): complete before
   presenting UI to others.
 - [`apps/desktop/README.md`](apps/desktop/README.md): running and packaging

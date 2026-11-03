@@ -27,7 +27,7 @@ its existing protected status names and real acceptance coverage.
 - A push to `main` triggers `ui-policy.yml` again. No browser run follows a
   main push or runs nightly; expensive desktop/release workflows stay
   independent.
-- Both workflow concurrency keys include `github.run_id` only on `main`.
+- The `ui-policy.yml` concurrency key includes `github.run_id` only on `main`.
   This prevents GitHub from evicting an older *pending* main verification,
   in addition to not cancelling a running main job. Superseded PR checks may
   still be cancelled.

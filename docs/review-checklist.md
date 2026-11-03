@@ -115,10 +115,13 @@ more than once.
    the screens).
 4. CI is green as the final gate (`CONTRIBUTING.md` § How changes are
    tested); do not run builds on the Mac.
-5. Docs updated in the same PR: `rules.md`, `components.md`, `decisions.md`,
-   `glossary.md` or the feature spec, whichever the change touches.
-6. Squash-merged to main by the coordinator on green CI, after the screenshots
-   are reviewed ([dev workflow](dev-workflow.md) § 5).
+5. Docs updated in the same PR: `rules.md`, `components.md`, a new file in
+   `decisions/`, `glossary.md` or the feature spec, whichever the change
+   touches.
+6. The owning agent squash-merges it once CI is green on the latest head and
+   the PR is mergeable, after it has reviewed the screenshots and attached
+   them to the PR; then it accepts the change in production
+   ([dev workflow](dev-workflow.md) § 5).
 
 ## Common-sense check (every PR)
 
