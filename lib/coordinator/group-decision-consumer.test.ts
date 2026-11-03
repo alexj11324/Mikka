@@ -11,6 +11,7 @@ let billingScope = { workspaceId: 'fixture-workspace', ownerId: 'fixture-owner' 
 mock.module(new URL('../abuse/context.ts',import.meta.url).href,{namedExports:{hostedBillingScope:{getStore:()=>billingScope}}})
 mock.module(new URL('../abuse/runtime.ts',import.meta.url).href,{namedExports:{canUseMikkaPaid:async()=>{},hostedUsage:{reserve:async()=>{},settle:async()=>{}}}})
 mock.module(new URL('../abuse/alerts.ts',import.meta.url).href,{namedExports:{checkAbuseAlerts:async()=>{}}})
+mock.module(new URL('../credit-shares.ts',import.meta.url).href,{namedExports:{withSharedCredits:async(workspaceId:string,attempt:(payer:string)=>unknown)=>attempt(workspaceId)}})
 mock.module(new URL('../model-admission/runtime.ts',import.meta.url).href,{namedExports:{assertUnmanagedModelTransport:async()=>{}}})
 let groupReply: unknown
 const generationInputs: unknown[] = []
@@ -112,10 +113,12 @@ test('Bot group generation reuses frozen binding references and streaming, witho
   // The snapshot has consumerId; botId is a host scope field, not persisted data.
   const { botId: _botId, ...safeSelection } = selection
   let refusal = false, invalid = false, streams = 0
+  let streamError: unknown
   const streamModel = new MockLanguageModelV3({ doStream: async () => {
     streams++
     return { stream: new ReadableStream({ start(controller) {
       controller.enqueue({ type: 'stream-start', warnings: [] })
+      if (streamError) { controller.enqueue({type:'error',error:streamError});controller.close();return }
       controller.enqueue({ type: 'text-start', id: 'fixture' })
       controller.enqueue({ type: 'text-delta', id: 'fixture', delta: JSON.stringify({ text: 'streamed Bot reply', mentions: [], privateTo: null }) })
       controller.enqueue({ type: 'text-end', id: 'fixture' })
@@ -143,10 +146,14 @@ test('Bot group generation reuses frozen binding references and streaming, witho
   assert.deepEqual(frozen, { harness: 'ai_sdk', model: safeSelection.modelId, modelSelection: safeSelection })
   assert.deepEqual(await groupRuntime.generate(bot, { message: { text: 'source group', mentions: [] }, earlier: [], followUp: '', members, modelRuntime: frozen }), { text: 'streamed Bot reply', mentions: [], privateTo: null })
   assert.equal(streams, 1)
+  streamError = Object.assign(new Error('private provider detail'), { statusCode: 503 })
+  await assert.rejects(groupRuntime.generate(bot, { message: { text: 'source group', mentions: [] }, earlier: [], followUp: '', members, modelRuntime: frozen }), error => error === streamError)
+  streamError = undefined
+  const callsBeforeRefusal = streams
   await assert.rejects(groupRuntime.generate(bot, { message: { text: 'source group', mentions: [] }, earlier: [], followUp: '', members }), /model_unavailable/)
   refusal = true
   await assert.rejects(groupRuntime.prepareBot!(bot, { ownerId: scope.ownerId, workspaceId }, client), { code: 'binding_required' })
   refusal = false; invalid = true
   await assert.rejects(groupRuntime.prepareBot!(bot, { ownerId: scope.ownerId, workspaceId }, client))
-  assert.equal(streams, 1, 'refusal or an invalid frozen reference never reaches a fallback model')
+  assert.equal(streams, callsBeforeRefusal, 'refusal or an invalid frozen reference never reaches a fallback model')
 })

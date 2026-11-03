@@ -356,7 +356,7 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
     assert.ok((await renewRunLeases(ownerDevice,[ownerRun])).leases[ownerRun])
     const row = (await pool.query('select status,"leaseExpiresAt","stopRequestedAt" from agent_runs where id=$1',[memberRun])).rows[0]
     assert.equal(row.status,'cancelled'); assert.equal(row.leaseExpiresAt,null); assert.ok(row.stopRequestedAt)
-    await assert.rejects(queueRun(member,{issueId:issue,agentId:agent,repo:'https://github.com/mikka-ci/scope-fixture.git'}),/issueNotFound/)
+    await assert.rejects(queueRun(member,{issueId:issue,agentId:agent,repo:'https://github.com/mikka-ci/scope-fixture.git',model:'fixture-model'}),/issueNotFound/)
     await assert.rejects(issueRunToken({id:memberRun,userId:member}))
     await assert.rejects(pool.query('insert into run_chunks (id,"runId",seq,chunk) values ($1,$2,1,$3)',[randomUUID(),memberRun,JSON.stringify({type:'text-delta',delta:'late'})]),(error:unknown)=>(error as {code:string}).code==='23514')
     await assert.rejects(pool.query('update agent_runs set status=\'running\' where id=$1',[memberRun]),(error: unknown)=>(error as {code:string}).code==='23514')
@@ -598,14 +598,12 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
     await pool.query('insert into linear_issue_links (id,"issueId","ownerId","teamSyncId","linearIssueId","linearIdentifier") values ($1,$2,$3,$4,$5,\'MIK-184\')', [randomUUID(), fixture.id, owner, sync, randomUUID()])
     const remote = `https://github.com/mikka-ci/publication-${randomUUID()}.git`
     const { remoteKey } = await import('@mikka/protocol/repository')
-    // Push is what the GitHub App grants (lib/github/push-grant.ts): admission
-    // writes the receipt and an approved publication; this fixture does the same.
+    // Admission writes the task's receipt and publication; this fixture does the same.
     const reserved = await prepareRunPublication({ id: fixture.run, userId: actor, issueId: fixture.id, baseBranch: null }, remote)
     assert.ok(reserved.pushBranch)
     const { rows: [run] } = await pool.query('select "deviceId","agentId" from agent_runs where id=$1', [fixture.run])
     const now = new Date().toISOString()
-    await pool.query('update agent_runs set "agentDefinition"=$2 where id=$1', [fixture.run, JSON.stringify({ repositoryAdmission: { userId: actor, issueId: fixture.id, deviceId: run.deviceId, agentId: run.agentId, remoteKey: remoteKey(remote), remoteUrl: remote, permission: 'push_to_origin', targetBranch: reserved.pushBranch, approvedAt: now, authority: 'github_app', acceptedAt: now } })])
-    await pool.query('update run_publications set "pushApproved"=true where "runId"=$1', [fixture.run])
+    await pool.query('update agent_runs set "agentDefinition"=$2 where id=$1', [fixture.run, JSON.stringify({ repositoryAdmission: { userId: actor, issueId: fixture.id, deviceId: run.deviceId, agentId: run.agentId, remoteKey: remoteKey(remote), remoteUrl: remote, permission: 'push_to_origin', targetBranch: reserved.pushBranch, authority: 'owner_credential', acceptedAt: now } })])
     const assignment = await prepareRunPublication({ id: fixture.run, userId: actor, issueId: fixture.id, baseBranch: null, deviceId: run.deviceId, agentId: run.agentId, botId: null, agentDefinition: (await pool.query('select "agentDefinition" from agent_runs where id=$1', [fixture.run])).rows[0].agentDefinition }, remote)
     assert.equal(assignment.policy.permissions.git_push, 'allow')
     assert.ok(assignment.pushBranch)
@@ -687,7 +685,7 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
     let retiring: Promise<void> | undefined
     try {
       await Promise.race([entered.promise, publishing.then(() => { throw new Error('Publication ended before its fenced write') })])
-      const holder = (await pool.query("select pid from pg_stat_activity where datname=current_database() and state='idle in transaction' and query like '%external_write_permissions%'")).rows
+      const holder = (await pool.query("select pid from pg_stat_activity where datname=current_database() and state='idle in transaction' and query like '%run_publications%for update%'")).rows
       assert.equal(holder.length, 1, 'one publication transaction stays open through provider IO')
       retiring = retirePublicationFixture(fixture, true).then(() => { retired = true })
       let waiting = false

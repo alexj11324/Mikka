@@ -9,7 +9,7 @@ import { daemonCommands } from '../../../../lib/daemon-commands'
 export const INSTALL_STEPS = ['login', 'check', 'install', 'service', 'connect'] as const
 export type InstallStep = typeof INSTALL_STEPS[number]
 export type { SshInstallState } from '@mikka/protocol/bridge'
-import type { SshInstallState } from '@mikka/protocol/bridge'
+import { LOCAL_RECONNECT, LOCAL_TARGET, type SshInstallState } from '@mikka/protocol/bridge'
 
 export function parseTarget(raw: string) {
   const match = /^(?:([A-Za-z0-9_][A-Za-z0-9_.-]*)@)?([A-Za-z0-9_][A-Za-z0-9_.-]*)(?::([0-9]{1,5}))?$/.exec(raw.trim())
@@ -27,6 +27,13 @@ export function parseHostDetails(config: string) {
   return { user: fields.user ?? '', hostName: fields.hostname ?? '', port: Number(fields.port ?? 22) }
 }
 export const quote = (s: string) => `'${s.replaceAll("'", "'\\''")}'`
+
+/** The person's login shell, so a Finder-launched app sees the PATH where node and npm live. */
+export function loginShell(env: NodeJS.ProcessEnv = process.env, platform: NodeJS.Platform = process.platform) {
+  const shell = env.SHELL && /^\/[\w/.+-]+$/.test(env.SHELL) ? env.SHELL : platform === 'darwin' ? '/bin/zsh' : '/bin/sh'
+  return { command: shell, args: (script: string) => ['-lc', script] }
+}
+
 
 export function runProcess(command: string, args: string[], input?: string, timeout = 60_000, signal?: AbortSignal): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -51,6 +58,8 @@ export function runProcess(command: string, args: string[], input?: string, time
   })
 }
 
+class LocalAccountUnconfirmed extends Error {}
+
 export class SshInstaller {
   private controller = new AbortController()
   private beginning = false
@@ -59,6 +68,9 @@ export class SshInstaller {
   private keyLine?: string
   private options: string[] = []
   private destination = ''
+  /** Set by beginLocal / restartLocal: the steps run on this computer, not over SSH. */
+  private local = false
+  private localOwnerId?: string
   constructor(
     private appUrl: string,
     private mintToken: () => Promise<string>,
@@ -67,6 +79,10 @@ export class SshInstaller {
     private home = homedir(),
     private installCommand?: string,
     private configFile?: string,
+    /** The desktop's flavor: a dev app talks to the dev daemon's data dir. */
+    private flavor: 'prod' | 'dev' = 'prod',
+    private shell = loginShell(),
+    private verifyLocalDevice: (deviceId: string, ownerId?: string) => Promise<boolean> = async () => false,
   ) {}
   private report(patch: Partial<SshInstallState>) {
     this.current = { ...this.current!, ...patch }
@@ -81,12 +97,55 @@ export class SshInstaller {
     }))
   }
   async begin(target: string) {
+    return this.launch(() => { this.local = false; return this.start(target) })
+  }
+  /**
+   * 添加这台电脑: the same install, run on this computer through the login
+   * shell, registered as a laptop. No SSH, no host key.
+   */
+  async beginLocal(ownerId?: string) {
+    return this.launch(async () => {
+      this.local = true
+      this.localOwnerId = ownerId
+      this.current = { id: randomUUID(), target: LOCAL_TARGET, step: 'check', status: 'running' }
+      this.report({})
+      this.pending = this.install('laptop')
+      return this.state()
+    })
+  }
+  /**
+   * The automatic setup when its daemon does not answer: restart the service,
+   * and only if that fails install and sign in, so an existing device is not
+   * registered again. Reported as 添加这台电脑.
+   */
+  async repairLocal(ownerId?: string) {
+    return this.launch(async () => {
+      this.local = true
+      this.localOwnerId = ownerId
+      this.current = { id: randomUUID(), target: LOCAL_TARGET, step: 'service', status: 'running' }
+      this.report({})
+      this.pending = this.repair()
+      return this.state()
+    })
+  }
+  /** 重新连接 for this computer: restart its daemon service and wait until it is online. */
+  async restartLocal(ownerId?: string) {
+    return this.launch(async () => {
+      this.local = true
+      this.localOwnerId = ownerId
+      this.current = { id: randomUUID(), target: LOCAL_RECONNECT, step: 'service', status: 'running' }
+      this.report({})
+      this.pending = this.restart()
+      return this.state()
+    })
+  }
+  private async launch(run: () => Promise<SshInstallState | null>) {
     if (this.beginning || this.current?.status === 'running' || this.current?.status === 'fingerprint') throw new Error('Installation already active')
     this.beginning = true
     try {
       await this.pending
       this.controller = new AbortController()
-      const starting = this.start(target)
+      const starting = run()
       this.pending = starting
       await starting
       return this.state()
@@ -157,11 +216,16 @@ export class SshInstaller {
     if (!this.controller.signal.aborted && this.current) this.report({ status: 'failed', retryable: true, reason: error instanceof Error ? error.message : 'SSH installation failed' })
   }
   private remote(command: string, input?: string, timeout?: number) {
+    if (this.local) return this.run(this.shell.command, this.shell.args(command), input, timeout)
     return this.run('ssh', [...this.options, this.destination, command], input, timeout)
   }
-  private async install() {
+  /** `--dev` for a dev desktop's own daemon on this computer; a remote host runs the production one. */
+  private flags() {
+    return this.local && this.flavor === 'dev' ? ' --dev' : ''
+  }
+  private async install(deviceType: 'server' | 'laptop' = 'server') {
     try {
-      await this.remote('true')
+      if (!this.local) await this.remote('true')
       this.report({ step: 'check' })
       const engine = daemonPackage.engines.node
       const minimum = /^>=(\d+)$/.exec(engine)?.[1]
@@ -172,25 +236,55 @@ export class SshInstaller {
       const commands = daemonCommands({ origin: url.origin, basePath: url.pathname.replace(/\/$/, ''), packageName: '@aspectlylabs/mikka' })
       await this.remote(this.installCommand ?? commands.install, undefined, 300_000)
       this.report({ step: 'service' })
-      await this.remote(`mikka daemon service install --server ${quote(this.appUrl)} --device-type server`)
+      await this.remote(`mikka daemon service install --server ${quote(this.appUrl)} --device-type ${deviceType}${this.flags()}`)
       this.report({ step: 'connect' })
       const token = await this.mintToken()
       this.controller.signal.throwIfAborted()
-      // Token travels only on encrypted stdin, never argv, logs or shell text.
-      await this.remote(`mikka daemon login --server ${quote(this.appUrl)} --registration-token-stdin`, `${token}\n`)
-      for (let attempt = 0; attempt < 30; attempt++) {
-        this.controller.signal.throwIfAborted()
-        const status = await this.remote('mikka daemon status').catch(() => '')
-        try {
-          const remote = JSON.parse(status) as { server?: string; deviceId?: string }
-          if (remote.server === 'online') {
-            this.report({ status: 'online', ...(typeof remote.deviceId === 'string' ? { deviceId: remote.deviceId } : {}) })
-            return
-          }
-        } catch { /* service starting */ }
-        await new Promise(resolve => setTimeout(resolve, 1000))
-      }
-      throw new Error('Device did not come online within 30 seconds')
+      // Token travels only on stdin (encrypted over SSH), never argv, logs or shell text.
+      await this.remote(`mikka daemon login --server ${quote(this.appUrl)} --registration-token-stdin${this.flags()}`, `${token}\n`)
+      await this.waitOnline()
     } catch (error) { this.fail(error) }
+  }
+  private async repair() {
+    try {
+      await this.remote(`mikka daemon service install --server ${quote(this.appUrl)} --device-type laptop${this.flags()}`)
+      await this.waitOnline()
+      return
+    } catch (error) {
+      if (this.controller.signal.aborted) return
+      if (error instanceof LocalAccountUnconfirmed) { this.fail(error); return }
+    }
+    this.report({ step: 'check' })
+    await this.install('laptop')
+  }
+  /** Rewrites and restarts the service (`service install` restarts it), then waits until it is online. */
+  private async restart() {
+    try {
+      await this.remote(`mikka daemon service install --server ${quote(this.appUrl)} --device-type laptop${this.flags()}`)
+      this.report({ step: 'connect' })
+      await this.waitOnline()
+    } catch (error) { this.fail(error) }
+  }
+  private async waitOnline() {
+    for (let attempt = 0; attempt < 30; attempt++) {
+      this.controller.signal.throwIfAborted()
+      const status = await this.remote(`mikka daemon status${this.flags()}`).catch(() => '')
+      let remote: { server?: string; deviceId?: string }
+      try { const parsed = JSON.parse(status); remote = parsed && typeof parsed === 'object' ? parsed : {} } catch { remote = {} }
+      if (remote.server === 'online') {
+        if (this.local) {
+          if (typeof remote.deviceId !== 'string' || !remote.deviceId) throw new Error('Device does not belong to the signed-in account')
+          let owned: boolean
+          try { owned = await this.verifyLocalDevice(remote.deviceId, this.localOwnerId) }
+          catch { throw new LocalAccountUnconfirmed('Device account could not be confirmed') }
+          if (!owned) throw new Error('Device does not belong to the signed-in account')
+        }
+        this.controller.signal.throwIfAborted()
+        this.report({ status: 'online', ...(typeof remote.deviceId === 'string' ? { deviceId: remote.deviceId } : {}) })
+        return
+      }
+      await new Promise(resolve => setTimeout(resolve, 1000))
+    }
+    throw new Error('Device did not come online within 30 seconds')
   }
 }

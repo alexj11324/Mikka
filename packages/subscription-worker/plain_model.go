@@ -5,17 +5,22 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	core "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
 	ex "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
 	compat "github.com/router-for-me/CLIProxyAPI/v8/sdk/mikkaadapter"
+	"io"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 )
 
 // CPA's actual conversion functions and ProviderExecutor contract, with Mikka's
-// ordinary HTTPS transport. Never invokes CPA's native identity/cloaking,
-// fingerprint transports, account pool, usage logging or fallback executors.
+// ordinary HTTPS transport. Claude OAuth requires the subscription protocol's
+// opening system block (also used by CPA). Host instructions and tool history
+// follow unchanged. No generated device identity, fingerprint transport,
+// account pool, usage logging or fallback executor is used.
 type CPAPlainModel struct {
 	core.ProviderExecutor
 	Provider string
@@ -23,6 +28,52 @@ type CPAPlainModel struct {
 }
 
 func (e CPAPlainModel) Identifier() string { return e.Provider }
+
+// upstreamFailure writes one fixed-shape line for the control plane's logs: the
+// provider, the stage, the HTTP status and the provider's error type enum. It
+// never writes a message, body, header or credential.
+func upstreamFailure(provider, stage string, status int, kind string) {
+	if !knownUpstreamType(kind) {
+		kind = "unknown"
+	}
+	fmt.Fprintf(os.Stderr, "subscription_upstream_failure %s %s %d %s\n", provider, stage, status, kind)
+}
+
+func knownUpstreamType(kind string) bool {
+	if providerEventFailure(kind) != ErrProvider {
+		return true
+	}
+	switch kind {
+	case "unknown", "unparsed", "network", "stream_ended", "request_invalid":
+		return true
+	}
+	return false
+}
+
+// upstreamErrorType reads the error type enum from a provider error body:
+// {"error":{"type":"..."}} (Anthropic, OpenAI) or {"type":"..."}.
+func upstreamErrorType(body []byte) string {
+	type providerError struct {
+		Type string `json:"type"`
+		Code string `json:"code"`
+	}
+	var parsed struct {
+		Type     string        `json:"type"`
+		Error    providerError `json:"error"`
+		Response struct {
+			Error providerError `json:"error"`
+		} `json:"response"`
+	}
+	if json.Unmarshal(body, &parsed) != nil {
+		return "unparsed"
+	}
+	for _, value := range []string{parsed.Error.Type, parsed.Error.Code, parsed.Response.Error.Type, parsed.Response.Error.Code, parsed.Type} {
+		if value != "" && value != "error" {
+			return value
+		}
+	}
+	return "unknown"
+}
 func (e CPAPlainModel) ExecuteStream(ctx context.Context, a *core.Auth, request ex.Request, _ ex.Options) (*ex.StreamResult, error) {
 	if a == nil || core.IsCodexUseSIWC(a) {
 		return nil, ErrUnsupported
@@ -53,6 +104,7 @@ func (e CPAPlainModel) ExecuteStream(ctx context.Context, a *core.Auth, request 
 		return nil, ErrUnsupported
 	}
 	if err != nil {
+		upstreamFailure(e.Provider, "convert", 0, "request_conversion")
 		return nil, ErrProvider
 	}
 	var body map[string]any
@@ -70,7 +122,9 @@ func (e CPAPlainModel) ExecuteStream(ctx context.Context, a *core.Auth, request 
 	}
 	body["model"] = request.Model
 	body["stream"] = true
-	if e.Provider == "codex" {
+	if e.Provider == "claude" {
+		body["system"] = claudeSubscriptionSystem(body["system"])
+	} else {
 		body["store"] = false
 	}
 	converted, err = json.Marshal(body)
@@ -104,10 +158,21 @@ func (e CPAPlainModel) ExecuteStream(ctx context.Context, a *core.Auth, request 
 	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 	response, err := client.Do(req)
 	if err != nil {
+		upstreamFailure(e.Provider, "transport", 0, "network")
 		return nil, ErrProvider
 	}
-	if response.StatusCode != http.StatusOK || !strings.HasPrefix(response.Header.Get("Content-Type"), "text/event-stream") {
+	contentType := response.Header.Get("Content-Type")
+	// Codex can omit MIME on a successful streaming response. The parser below
+	// still requires valid SSE JSON and a terminal response event; an HTML/JSON
+	// error page or truncated stream cannot become a successful model reply.
+	streamType := strings.HasPrefix(contentType, "text/event-stream") || (e.Provider == "codex" && contentType == "")
+	if response.StatusCode != http.StatusOK || !streamType {
+		body, _ := io.ReadAll(io.LimitReader(response.Body, 8192))
 		response.Body.Close()
+		upstreamFailure(e.Provider, "response", response.StatusCode, upstreamErrorType(body))
+		if response.StatusCode != http.StatusOK {
+			return nil, providerStatusFailure(response.StatusCode)
+		}
 		return nil, ErrProvider
 	}
 	chunks := make(chan ex.StreamChunk)
@@ -148,7 +213,9 @@ func (e CPAPlainModel) ExecuteStream(ctx context.Context, a *core.Auth, request 
 			}
 			kind, _ := event["type"].(string)
 			if kind == "error" || kind == "response.failed" || event["error"] != nil {
-				emit(ex.StreamChunk{Err: ErrProvider})
+				kind := upstreamErrorType(raw)
+				upstreamFailure(e.Provider, "event", 200, kind)
+				emit(ex.StreamChunk{Err: providerEventFailure(kind)})
 				return
 			}
 			completed = kind == "message_stop" || kind == "response.completed" || kind == "response.incomplete"
@@ -172,10 +239,25 @@ func (e CPAPlainModel) ExecuteStream(ctx context.Context, a *core.Auth, request 
 			}
 		}
 		if scanner.Err() != nil || !completed {
+			upstreamFailure(e.Provider, "incomplete", 200, "stream_ended")
 			emit(ex.StreamChunk{Err: ErrProvider})
 			return
 		}
 		emit(ex.StreamChunk{Payload: []byte("data: [DONE]\n\n")})
 	}()
 	return &ex.StreamResult{Chunks: chunks}, nil
+}
+
+// Keep the OAuth subscription's required protocol prefix separate from the
+// bot's instructions. Do not replace its prompt or synthesize native metadata.
+func claudeSubscriptionSystem(value any) []any {
+	const prefix = "You are Claude Code, Anthropic's official CLI for Claude."
+	blocks, _ := value.([]any)
+	if text, ok := value.(string); ok && text != "" {
+		blocks = []any{map[string]any{"type": "text", "text": text}}
+	}
+	if len(blocks) > 0 && objectMap(blocks[0])["text"] == prefix {
+		return blocks
+	}
+	return append([]any{map[string]any{"type": "text", "text": prefix}}, blocks...)
 }

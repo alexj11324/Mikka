@@ -4,6 +4,8 @@ import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { Pool } from "pg";
 import { ExecutionSettings } from "./execution-settings";
+// Subscription chats answer only on validated routes (lib/subscription-routes.ts); these tests run with both on.
+process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES = 'claude_cpa,codex_cpa'
 const databaseURL = process.env.E2E_DATABASE_URL;
 if (process.env.REQUIRE_DB === "1" && !databaseURL)
   throw new Error("Execution settings database test URL required");
@@ -59,6 +61,9 @@ test(
       );
       await pool.query(
         await readFile(new URL("../drizzle/20261102120000_model_api_key_models_error.sql", import.meta.url), "utf8"),
+      );
+      await pool.query(
+        await readFile(new URL("../drizzle/20261102190000_model_api_key_responses_api.sql", import.meta.url), "utf8"),
       );
       const catalogueMigration = await readFile(new URL('../drizzle/20261030233002_byos_model_catalog.sql',import.meta.url),'utf8');
       await pool.query(catalogueMigration); await pool.query(catalogueMigration);
@@ -175,6 +180,8 @@ test(
         }),
       });
       stub("./db/index.ts", { pool });
+      // Points and their fallback have their own tests (lib/bot-model-selection.test.ts, lib/points-fallback.db.test.ts): here Mikka 默认 has points.
+      stub("./points-fallback.ts", { hostedPointsRefusal: async () => null, pointsFallback: async () => null, hostedPointsHere: async () => ({ points: 98, trialLeft: 0 }) });
       const actions = await import("../app/actions/execution-settings");
       const { freezeBotModel } = await import('./bot-model-selection');
       const { SubscriptionRepository } = await import('./subscription-repository');

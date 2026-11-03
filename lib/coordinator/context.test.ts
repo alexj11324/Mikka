@@ -1,8 +1,8 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { ModelMessage } from 'ai'
-import { chatItems, compactionCut, COMPACT_AT_TOKENS, estimateTokens, eventPrompt, forgetNotes, instructionsWithMemory, KEEP_RECENT_TOKENS, MEMORY_MAX_CHARS, promptMessages, rememberNote, type StoredMessage } from './context'
-import { modelMessage, quotaSwitchMessage, sourcedEventMessage } from './message-safety'
+import { chatItems, jsonbText, compactionCut, COMPACT_AT_TOKENS, estimateTokens, eventPrompt, forgetNotes, instructionsWithMemory, KEEP_RECENT_TOKENS, MEMORY_MAX_CHARS, promptMessages, rememberNote, type StoredMessage } from './context'
+import { modelMessage, pointsSwitchMessage, quotaSwitchMessage, sourcedEventMessage } from './message-safety'
 
 function stored(messages: ModelMessage[]): StoredMessage[] {
   return messages.map((message, index) => ({ position: index + 1, message }))
@@ -118,6 +118,59 @@ test('the chat folds one reply\'s steps together and marks events', () => {
   ])
 })
 
+test('a stored reply carries the stream it was first shown from, so the chat keeps that row when it is stored', () => {
+  const at = new Date('2026-10-22T00:00:00Z')
+  const rows = [
+    { role: 'user', content: 'what is next?' },
+    { role: 'assistant', content: [{ type: 'tool-call', toolCallId: 'c0', toolName: 'record_attention', input: {} }], mikkaStreamId: 'wrun_1:0' },
+    { role: 'assistant', content: [{ type: 'tool-call', toolCallId: 'c1', toolName: 'list_issues', input: {} }], mikkaStreamId: 'wrun_1:1' },
+    { role: 'tool', content: [{ type: 'tool-result', toolCallId: 'c1', toolName: 'list_issues', output: { type: 'json', value: [] } }] },
+    { role: 'assistant', content: [{ type: 'text', text: 'Nothing open.' }], mikkaStreamId: 'wrun_1:1' },
+    { role: 'assistant', content: [{ type: 'text', text: 'Anything else?' }], mikkaStreamId: 'wrun_1:2' },
+    { role: 'user', content: 'thanks' },
+    { role: 'assistant', content: [{ type: 'text', text: 'Any time.' }] },
+  ] as unknown as ModelMessage[]
+  const items = chatItems(rows.map((message, index) => ({ position: index + 1, message, createdAt: at })))
+  // A hidden tool shows nothing; the first tool or text that shows is the stream the person watched.
+  assert.deepEqual(items.map(item => [item.from, item.text, item.streamId ?? null]), [
+    ['person', 'what is next?', null],
+    ['coordinator', 'Nothing open.\n\nAnything else?', 'wrun_1:1'],
+    ['person', 'thanks', null],
+    ['coordinator', 'Any time.', null],
+  ])
+})
+
+test('a stored reply keeps its tools, how each ended and their previews, and whether it thought', () => {
+  const at = new Date('2026-10-22T00:00:00Z')
+  const compact = [
+    { role: 'user', content: 'make a task and start it' },
+    { role: 'assistant', content: [{ type: 'reasoning', chars: 120 }, { type: 'tool-call', toolCallId: 'c1', toolName: 'create_issue', inputPreview: '{"title": "Fix login"}' },
+      { type: 'tool-call', toolCallId: 'c2', toolName: 'record_attention' }] },
+    { role: 'tool', content: [{ type: 'tool-result', toolCallId: 'c1', toolName: 'create_issue', status: 'done', outputPreview: '{"id": "i1"}' }] },
+    { role: 'assistant', content: [{ type: 'tool-call', toolCallId: 'c3', toolName: 'dispatch_run', inputPreview: '{"issueId": "i1"}' }] },
+    { role: 'tool', content: [{ type: 'tool-result', toolCallId: 'c3', toolName: 'dispatch_run', status: 'error', outputPreview: 'no device' }] },
+    { role: 'assistant', content: [{ type: 'tool-call', toolCallId: 'c4', toolName: 'web_search' }] },
+    { role: 'assistant', content: [{ type: 'text', text: 'Made it; the thread could not start.' }] },
+  ] as unknown as ModelMessage[]
+  const [, reply] = chatItems(compact.map((message, index) => ({ position: index + 1, message, createdAt: at })))
+  assert.equal(reply.text, 'Made it; the thread could not start.')
+  assert.deepEqual(reply.activity, { thought: true, reasoningAt: [2], tools: [
+    { call: 'c1', name: 'create_issue', state: 'done', input: '{"title": "Fix login"}', output: '{"id": "i1"}' },
+    { call: 'c3', name: 'dispatch_run', state: 'error', input: '{"issueId": "i1"}', output: 'no device' },
+    // No result stored yet: still running.
+    { call: 'c4', name: 'web_search', state: 'running' },
+  ] })
+  // Full stored messages (not the compact projection) read the same way.
+  const full = chatItems([
+    { position: 1, createdAt: at, message: { role: 'assistant', content: [{ type: 'tool-call', toolCallId: 'c1', toolName: 'list_issues', input: { query: 'login' } }] } as ModelMessage },
+    { position: 2, createdAt: at, message: { role: 'tool', content: [{ type: 'tool-result', toolCallId: 'c1', toolName: 'list_issues', output: { type: 'error-text', value: 'boom' } }] } as ModelMessage },
+  ])
+  assert.deepEqual(full[0].activity?.tools, [{ call: 'c1', name: 'list_issues', state: 'error', input: '{"query": "login"}', output: 'boom' }])
+  // Encrypted or empty reasoning: it thought, but there is nothing to open.
+  const sealed = chatItems([{ position: 1, createdAt: at, message: { role: 'assistant', content: [{ type: 'reasoning', chars: 0 }, { type: 'text', text: 'Done.' }] } as unknown as ModelMessage }])
+  assert.deepEqual(sealed[0].activity, { tools: [], thought: true })
+})
+
 test('a reply that dispatches a run carries it as a thread, once', () => {
   const at = new Date('2026-10-22T00:00:00Z')
   const dispatch = (id: string, value: unknown, toolName = 'dispatch_run'): ModelMessage[] => [
@@ -134,6 +187,15 @@ test('a reply that dispatches a run carries it as a thread, once', () => {
   ] as ModelMessage[]
   const items = chatItems(rows.map((message, index) => ({ position: index + 1, message, createdAt: at })))
   assert.deepEqual(items.map(item => [item.from, item.threads]), [['person', []], ['coordinator', ['r1', 'r2']]])
+})
+
+test('a failed message retried with 重新发送 is left out; the new attempt carries its own failure', () => {
+  const at = new Date()
+  const items = chatItems([
+    { position: 1, createdAt: at, message: { role: 'user', content: '帮我看看 CI', mikkaFailure: 'backend_unavailable', mikkaRetried: true } as unknown as ModelMessage },
+    { position: 2, createdAt: at, message: { role: 'user', content: '帮我看看 CI', mikkaFailure: 'backend_unavailable' } as unknown as ModelMessage },
+  ])
+  assert.deepEqual(items.map(item => [item.position, item.text, item.failure?.kind ?? null]), [[2, '帮我看看 CI', 'subscription']])
 })
 
 test('chatItems marks inbox (pending) user messages so they are never reported as read', () => {
@@ -261,4 +323,41 @@ test('a turn moved to the API key after the quota ran out shows as one notice li
   const packet = JSON.parse(String(projected.content))
   assert.equal(packet.authority, 'coordination_data_only')
   assert.match(packet.untrustedData.body, /out of quota.*deepseek API key/)
+})
+
+test('a turn moved off Mikka 默认 for lack of points shows as one notice line naming the model, and the model reads it as runtime data', () => {
+  const at = new Date('2026-11-02T15:00:00.000Z')
+  const message = pointsSwitchMessage('deepseek-flash', at)
+  const items = chatItems([{ position: 1, createdAt: at, message: { role: 'user', content: 'hi', mikkaUserEvent: { id: null, sentAt: null } } as ModelMessage }, { position: 2, createdAt: at, message }])
+  assert.deepEqual([items[1].from, items[1].notice], ['event', { kind: 'pointsSwitch', model: 'deepseek-flash' }])
+  const packet = JSON.parse(String(modelMessage(message).content))
+  assert.equal(packet.authority, 'coordination_data_only')
+  assert.match(packet.untrustedData.body, /no points.*deepseek-flash/)
+})
+
+test('a run ended because its daemon is too old tells the Bot to have the person update Mikka on that device, not reconnect GitHub', () => {
+  const prompt = eventPrompt({ kind: 'run_finished', issueId: 'i1', runId: 'r1', payload: { status: 'failed', stopReason: 'error', daemonUpgradeRequired: true } })
+  assert.match(prompt, /Mikka on that device needs an update/)
+  assert.match(prompt, /Nothing is wrong with their GitHub/)
+})
+
+test('a preview prints a value as Postgres prints jsonb: its key order, ", " and ": "', () => {
+  assert.equal(jsonbText({ title: 'Fix', id: 2, aa: [1, { é: null, z: true }], skipped: undefined }), '{"aa": [1, {"z": true, "é": null}], "id": 2, "title": "Fix"}')
+  assert.equal(jsonbText('text'), '"text"')
+})
+
+test('a turn that says what it is about to do, calls a tool and then answers is one Coordinator message, the opening first', () => {
+  const at = new Date('2026-11-02T22:00:00Z')
+  const rows: ModelMessage[] = [
+    { role: 'user', content: '派发任务，给 Mikka_test 写一个简单的 README' },
+    { role: 'assistant', content: [{ type: 'text', text: '我先建一个任务，再派给 Claude Code 写 README。' }, { type: 'tool-call', toolCallId: 'c1', toolName: 'dispatch_run', input: { repo: 'Mikka_test' } }] },
+    { role: 'tool', content: [{ type: 'tool-result', toolCallId: 'c1', toolName: 'dispatch_run', output: { type: 'json', value: { runId: '00000000-0000-4000-8000-000000000061' } } }] },
+    { role: 'assistant', content: [{ type: 'text', text: '已经派出去了，写好后告诉你。' }] },
+  ]
+  const items = chatItems(rows.map((message, index) => ({ position: index + 1, message, createdAt: at })))
+  assert.deepEqual(items.map(item => [item.from, item.text]), [
+    ['person', '派发任务，给 Mikka_test 写一个简单的 README'],
+    ['coordinator', '我先建一个任务，再派给 Claude Code 写 README。\n\n已经派出去了，写好后告诉你。'],
+  ])
+  assert.deepEqual(items[1].threads, ['00000000-0000-4000-8000-000000000061'])
 })

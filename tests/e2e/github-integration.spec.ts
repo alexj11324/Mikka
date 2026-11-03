@@ -68,15 +68,11 @@ for (const width of [1280, 402]) {
     await testInfo.attach(`github-settings-repositories-dialog-${width}`, { body: await page.screenshot(), contentType: 'image/png' })
     await page.keyboard.press('Escape')
     await expect(dialog).toHaveCount(0)
-    // 推送分支 is the GitHub App's own grant (decision 2026-11-01-1215): shown, with no switch.
-    // 创建 Pull Request is this person's own setting, saved for real and read back on the next visit.
-    const pullRequest = page.getByRole('group', { name: '创建 Pull Request', exact: true })
+    // Every ability runs with the person's own GitHub credential (decision 2026-11-02-1600): listed, with no control.
+    await expect(page.getByText('推送分支', { exact: true })).toBeVisible()
+    await expect(page.getByText('创建 Pull Request', { exact: true })).toBeVisible()
     await expect(page.getByRole('group', { name: '推送分支', exact: true })).toHaveCount(0)
-    await expect(page.getByText('由 GitHub App 授权决定', { exact: true })).toBeVisible()
-    await expect(pullRequest.getByRole('button', { name: '允许', exact: true })).toHaveAttribute('aria-pressed', 'true')
-    const saved = page.waitForResponse(response => response.url().endsWith('/api/integrations/github/permissions') && response.request().method() === 'PATCH')
-    await pullRequest.getByRole('button', { name: '拒绝', exact: true }).click()
-    expect((await saved).ok()).toBe(true)
+    await expect(page.getByRole('group', { name: '创建 Pull Request', exact: true })).toHaveCount(0)
     await testInfo.attach(`github-settings-authorized-fixture-${width}`, { body: await page.screenshot(), contentType: 'image/png' })
     connected = false
     await refocus()
@@ -84,7 +80,6 @@ for (const width of [1280, 402]) {
     await revisit()
     await expect(access).toHaveCount(0)
     await expect(page.getByRole('button', { name: '关联 GitHub', exact: true })).toBeVisible()
-    await expect(pullRequest.getByRole('button', { name: '拒绝', exact: true })).toHaveAttribute('aria-pressed', 'true')
     await testInfo.attach(`github-settings-revoked-fixture-${width}`, { body: await page.screenshot(), contentType: 'image/png' })
     connected = true
     mismatchedViewer = true

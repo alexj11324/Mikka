@@ -21,7 +21,10 @@ test('real SSH install → systemd → automatic npm update → opt-out/failure 
   const deviceId = randomUUID(), workspaceId = randomUUID()
   const credential = `orv_${'t'.repeat(43)}`
   let enrollments = 0, registrations = 0, heartbeats = 0
-  let reportedVersion = '', latestVersion = '1.0.0', registryQueries = 0, failedDownloads = 0
+  let reportedVersion = '', latestVersion = '1.0.0', registryQueries = 0, downloads = 0, failedDownloads = 0, pollsAskingForReleases = 0
+  let updateFailure: unknown = null
+  // The server names the release; the daemon never asks the registry which one is latest.
+  const daemonVersions = () => ({ min: '1.0.0', latest: latestVersion })
   const tarballs = new Map<string, Buffer>()
   for (const [version, path] of Object.entries(JSON.parse(process.env.MIKKA_SSH_TEST_TARBALLS ?? '{}') as Record<string, string>)) tarballs.set(version, await readFile(path))
   assert.deepEqual([...tarballs.keys()], ['1.0.0', '1.0.1'])
@@ -43,6 +46,7 @@ test('real SSH install → systemd → automatic npm update → opt-out/failure 
         const version = route.split('/').at(-1)!.slice(0, -4)
         const tarball = tarballs.get(version)
         if (!tarball) { failedDownloads++; response.writeHead(503).end('{}'); return }
+        downloads++
         response.setHeader('content-type', 'application/octet-stream')
         response.end(tarball); return
       }
@@ -65,13 +69,19 @@ test('real SSH install → systemd → automatic npm update → opt-out/failure 
       heartbeats++
       if (command) console.log(JSON.stringify({ heartbeat: heartbeats, command: command.kind, acknowledged: (body.completedDeviceCommands ?? []).includes(command.id) }))
       for (const id of body.completedDeviceCommands ?? []) acked.add(id)
+      if (body.updateFailure !== undefined) updateFailure = body.updateFailure
       if (command?.kind === 'uninstall' && acked.has(command.id)) revoked = true
-      response.end(JSON.stringify({ leases: {}, deviceCommands: command && !acked.has(command.id) ? [command] : [] })); return
+      response.end(JSON.stringify({ leases: {}, deviceCommands: command && !acked.has(command.id) ? [command] : [], daemonVersions: daemonVersions() })); return
     }
     if (route.endsWith('/repos')) { response.end('{"repos":[]}'); return }
     if (route.includes('/runs?')) { response.end('{"runIds":[]}'); return }
     if (route.includes('/fs/requests')) { setTimeout(() => response.end('{"requests":[]}'), 500); return }
-    if (route.includes('/commands')) { setTimeout(() => response.end('{"commands":[]}'), 500); return }
+    if (route.includes('/commands')) {
+      // A daemon that sends the newest release it knows reads the releases from this answer.
+      const known = new URL(route, 'http://fixture').searchParams.get('daemonLatest')
+      if (known) pollsAskingForReleases++
+      setTimeout(() => response.end(JSON.stringify({ commands: [], ...(known ? { daemonVersions: daemonVersions() } : {}) })), 500); return
+    }
     response.writeHead(404).end('{}')
   })
   try {
@@ -134,31 +144,36 @@ test('real SSH install → systemd → automatic npm update → opt-out/failure 
     const savedDevice = await runProcess('docker', ['exec', container, 'cat', '/root/.config/Mikka/device.json'])
     const savedUnit = await runProcess('docker', ['exec', container, 'cat', '/root/.config/systemd/user/mikka-daemon.service'])
     assert.equal(reportedVersion, '1.0.0')
-    await waitUntil(() => registryQueries > 0, 30_000)
-    // The persisted daily deadline is advanced only inside this disposable device.
-    const due = () => runProcess('docker', ['exec', container, 'sh', '-c', 'printf \'{"lastAttemptAt":0}\' > /root/.config/Mikka/auto-update.json'])
+    // Already the release the server names: no registry read, no install.
+    const heartbeatsAtStart = heartbeats
+    await waitUntil(() => heartbeats >= heartbeatsAtStart + 2 && pollsAskingForReleases > 0, 40_000)
+    assert.equal(registryQueries, 0, 'the daemon never asks the registry on its own')
+    assert.equal(downloads, 0)
+    // The server names 1.0.1 on its heartbeat and commands poll answers; the idle daemon installs exactly that version.
     latestVersion = '1.0.1'
-    await due()
     const registrationsBeforeUpdate = registrations, heartbeatsBeforeUpdate = heartbeats
     await waitUntil(() => reportedVersion === '1.0.1' && registrations > registrationsBeforeUpdate && heartbeats > heartbeatsBeforeUpdate, 120_000)
+    assert.ok(registryQueries > 0 && downloads > 0, 'npm installs the named version from the registry')
     const updatedPid = await pid()
     assert.notEqual(updatedPid, reinstalledPid)
     assert.equal((await ssh('node -p "require(\'$(npm root -g)/@aspectlylabs/mikka/package.json\').version"')).trim(), '1.0.1')
     assert.ok(await runProcess('docker', ['exec', container, 'cat', '/root/.config/Mikka/device.json']) === savedDevice, 'automatic update must preserve device identity/configuration')
     assert.equal(await runProcess('docker', ['exec', container, 'cat', '/root/.config/systemd/user/mikka-daemon.service']), savedUnit)
     assert.equal(enrollments, 1)
-    const queriesAfterUpdate = registryQueries, heartbeatAfterUpdate = heartbeats
+    const queriesAfterUpdate = registryQueries, downloadsAfterUpdate = downloads, heartbeatAfterUpdate = heartbeats
     await waitUntil(() => heartbeats >= heartbeatAfterUpdate + 2, 40_000)
-    assert.equal(registryQueries, queriesAfterUpdate, 'successful update must retain its daily deadline across restart')
+    assert.equal(registryQueries, queriesAfterUpdate, 'an up-to-date daemon reads nothing from the registry after its restart')
+    assert.equal(downloads, downloadsAfterUpdate)
 
     await ssh("mikka daemon service install --server 'http://127.0.0.1:34991/mikka' --device-type server --no-auto-update")
     const disabledPid = await pid(), queriesBeforeOptOut = registryQueries, heartbeatBeforeOptOut = heartbeats
     latestVersion = '1.0.2'
-    await due()
     await waitUntil(() => heartbeats >= heartbeatBeforeOptOut + 2, 40_000)
-    assert.equal(registryQueries, queriesBeforeOptOut, 'opt-out must not query npm')
+    assert.equal(registryQueries, queriesBeforeOptOut, 'opt-out must not query npm when the server names a newer release')
+    assert.equal(failedDownloads, 0)
     assert.equal(await pid(), disabledPid, 'opt-out must not install/restart')
 
+    // 1.0.2 has no tarball in the registry: the install fails.
     await ssh("mikka daemon service install --server 'http://127.0.0.1:34991/mikka' --device-type server")
     const failedPid = await pid()
     await waitUntil(() => failedDownloads > 0, 45_000)
@@ -168,12 +183,15 @@ test('real SSH install → systemd → automatic npm update → opt-out/failure 
     assert.equal(reportedVersion, '1.0.1')
     assert.ok(await runProcess('docker', ['exec', container, 'cat', '/root/.config/Mikka/device.json']) === savedDevice, 'failed update must preserve device identity/configuration')
     const failedAttempt = JSON.parse(await runProcess('docker', ['exec', container, 'cat', '/root/.config/Mikka/auto-update.json']))
-    assert.ok(failedAttempt.lastAttemptAt > Date.now() - 120_000)
-    const queriesAfterFailure = registryQueries, heartbeatAfterFailure = heartbeats
+    assert.deepEqual({ version: failedAttempt.failure?.version, code: failedAttempt.failure?.code }, { version: '1.0.2', code: 'install_failed' })
+    assert.ok(failedAttempt.failure.at > Date.now() - 120_000)
+    assert.deepEqual({ ...(updateFailure as object), at: undefined }, { version: '1.0.2', code: 'install_failed', at: undefined }, 'the failure is reported on the heartbeat')
+    const queriesAfterFailure = registryQueries, failuresAfterFailure = failedDownloads, heartbeatAfterFailure = heartbeats
     await waitUntil(() => heartbeats >= heartbeatAfterFailure + 2, 40_000)
-    assert.equal(registryQueries, queriesAfterFailure, 'failed update must retain its daily deadline')
+    assert.equal(registryQueries, queriesAfterFailure, 'a failed version backs off although the server keeps naming it')
+    assert.equal(failedDownloads, failuresAfterFailure)
     assert.equal(await pid(), failedPid)
-    console.log(JSON.stringify({ automaticUpdate: { from: '1.0.0', to: reportedVersion, previousPid: reinstalledPid.trim(), updatedPid: updatedPid.trim(), failedPid: failedPid.trim(), enrollments, registrations, heartbeats, failedDownloads } }))
+    console.log(JSON.stringify({ automaticUpdate: { from: '1.0.0', to: reportedVersion, previousPid: reinstalledPid.trim(), updatedPid: updatedPid.trim(), failedPid: failedPid.trim(), enrollments, registrations, heartbeats, pollsAskingForReleases, registryQueries, downloads, failedDownloads } }))
     command = { id: randomUUID(), kind: 'redetect' }
     await waitUntil(() => acked.has(command!.id), 45_000)
     command = { id: randomUUID(), kind: 'restart' }

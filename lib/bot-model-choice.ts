@@ -1,0 +1,91 @@
+import 'server-only'
+import type { Pool } from 'pg'
+import type { ExecutionSettings, ExecutionSettingsScope } from './execution-settings'
+import { HOSTED_CHOICE, type BotModelQuota } from './bot-model-menu-view'
+import { apiKeyChatBaseUrl } from './model-api-key-providers'
+import { usableApiKeys, type UsableApiKey } from './model-api-keys'
+import { subscriptionAvailability } from './subscription-quota'
+
+type Settings = Pick<ExecutionSettings, 'chatModels' | 'chatBinding'> & Partial<Pick<ExecutionSettings, 'pooledBindings'>>
+export interface BotSubscriptionChoice {
+  bindingId: string
+  connectionId: string
+  ownerId: string
+  modelId: string
+  provider: string
+  accountLabel?: string | null
+  plan?: string | null
+  quota?: unknown
+}
+type FallbackReason = 'preference' | 'points' | 'quota'
+interface ChoiceState { chosen: boolean; fallback?: FallbackReason }
+export type BotModelChoice = ChoiceState & (
+  | { kind: 'hosted' }
+  | { kind: 'subscription'; binding: BotSubscriptionChoice; sharedOwnerId?: string; quota?: BotModelQuota }
+  | { kind: 'apiKey'; key: UsableApiKey; model: string; quota?: BotModelQuota }
+)
+
+export function apiKeyServesBotModel(key: UsableApiKey, model: string) {
+  return Boolean(apiKeyChatBaseUrl(key) && key.models.includes(model))
+}
+
+/**
+ * The next turn's read-only choice. The menu and reservation use this same
+ * order; only reservation clones a binding and freezes its authorization.
+ * Reading the menu never replaces the person's saved preference.
+ */
+export async function resolveBotModelChoice(
+  pool: Pick<Pool, 'query'>,
+  settings: Settings,
+  scope: ExecutionSettingsScope,
+  botId: string | null,
+  preference: { selected?: string; key?: { keyId: string; model: string } },
+  cached: { rows?: BotSubscriptionChoice[]; keys?: UsableApiKey[]; now?: number } = {},
+): Promise<BotModelChoice> {
+  const now = cached.now ?? Date.now()
+  const keys = cached.keys ?? await usableApiKeys(pool, scope.ownerId, scope.workspaceId)
+  const key = preference.key && keys.find(item => item.id === preference.key!.keyId && apiKeyServesBotModel(item, preference.key!.model))
+  if (key && preference.key) return { kind: 'apiKey', key, model: preference.key.model, chosen: true }
+  const fallback = preference.key ? 'preference' as const : undefined
+
+  const hosted = async (state: ChoiceState): Promise<BotModelChoice> => {
+    const { hostedPointsRefusal, pointsFallback } = await import('./points-fallback')
+    const next = await hostedPointsRefusal(scope.workspaceId) ? await pointsFallback(pool as Pool, scope) : null
+    if (next?.kind === 'api_key') {
+      const key = keys.find(item => item.id === next.keyId && apiKeyServesBotModel(item, next.model))
+      if (key) return { kind: 'apiKey', key, model: next.model, chosen: false, fallback: 'points' }
+    }
+    if (next?.kind === 'subscription') {
+      const binding = await settings.chatBinding(scope, next.bindingId)
+      if (binding) return { kind: 'subscription', binding, chosen: false, fallback: 'points' }
+    }
+    return { kind: 'hosted', ...state }
+  }
+  if (preference.selected === HOSTED_CHOICE && !preference.key) return hosted({ chosen: true })
+
+  const rows = cached.rows ?? await settings.chatModels(scope)
+  const selected = preference.selected && !preference.key ? await settings.chatBinding(scope, preference.selected) : undefined
+  const binding = selected ?? rows.find(row => row.provider === 'claude') ?? rows[0]
+  const state: ChoiceState = {
+    chosen: Boolean(selected),
+    ...(!selected && (preference.selected || fallback) ? { fallback: 'preference' as const } : {}),
+  }
+  const withQuota = async (binding: BotSubscriptionChoice, sharedOwnerId?: string): Promise<BotModelChoice> => {
+    const availability = subscriptionAvailability(binding.quota, binding.modelId, binding.provider === 'codex' ? 'codex' : 'claude', now)
+    if (availability.status !== 'exhausted') return { kind: 'subscription', binding, ...state, ...(sharedOwnerId ? { sharedOwnerId } : {}) }
+    const quota: BotModelQuota = { subscription: binding.provider, plan: binding.plan ?? null, resetsAt: availability.resetsAt, fallback: null }
+    const { quotaFallbackKey } = await import('./quota-fallback')
+    const next = await quotaFallbackKey(pool, scope.ownerId, scope.workspaceId, binding.modelId)
+    if (next) {
+      quota.fallback = { keyProvider: next.key.provider, keyName: next.key.name, model: next.model }
+      return { kind: 'apiKey', key: next.key, model: next.model, chosen: false, fallback: 'quota', quota }
+    }
+    return { kind: 'subscription', binding, ...state, ...(sharedOwnerId ? { sharedOwnerId } : {}), quota }
+  }
+  if (binding) return withQuota(binding)
+  // A shared subscription is resolved for bots only; it is never listed as an
+  // owner's credential or exposed with another member's private account label.
+  const pooled = botId && settings.pooledBindings ? (await settings.pooledBindings(scope))[0] : undefined
+  if (pooled) return withQuota(pooled, pooled.ownerId)
+  return hosted(state)
+}

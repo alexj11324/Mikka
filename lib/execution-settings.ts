@@ -5,6 +5,7 @@ import type { Pool, PoolClient } from "pg";
 import { z } from "zod";
 import { othersMayUse, pooledOwners } from "./personal-policy";
 import { HOSTED_CHOICE } from "./bot-model-menu-view";
+import { subscriptionRouteReady } from "./subscription-routes";
 
 export interface ExecutionSettingsScope {
   ownerId: string;
@@ -48,7 +49,7 @@ export class ExecutionSettings {
   async pooledBindings(scope: ExecutionSettingsScope) {
     const rows = [];
     for (const ownerId of await pooledOwners(this.pool, scope.ownerId, scope.workspaceId))
-      rows.push(...(await this.bindingsOf(ownerId, scope.workspaceId)));
+      rows.push(...(await chatReady(await this.bindingsOf(ownerId, scope.workspaceId))));
     return [...rows.filter((row) => row.provider === "claude"), ...rows.filter((row) => row.provider !== "claude")];
   }
   /** Clone another member's binding for this bot only, while they allow it here; never a credential. */
@@ -77,6 +78,15 @@ export class ExecutionSettings {
   async botBinding(scope: ExecutionSettingsScope, bindingId: string) {
     return (await this.connectedBindings(scope, bindingId))[0];
   }
+  /** A bot chat's subscription options: `botModels` on a route that answers chats for its owner (`subscriptionRouteReady`). */
+  async chatModels(scope: ExecutionSettingsScope, query: Pick<PoolClient, "query"> = this.pool) {
+    return chatReady(await this.botModels(scope, query));
+  }
+  /** A saved chat choice, while its route answers chats. */
+  async chatBinding(scope: ExecutionSettingsScope, bindingId: string) {
+    const row = await this.botBinding(scope, bindingId);
+    return row && (await chatReady([row])).length ? row : undefined;
+  }
   /** One option per model/account. Binding lookups remain independent of this presentation deduplication. */
   async botModels(
     scope: ExecutionSettingsScope,
@@ -91,6 +101,29 @@ export class ExecutionSettings {
         return true;
       },
     );
+  }
+  /** The owner's connected subscriptions (any workspace); `missingOnly`: those with no catalogue for their current revision yet. */
+  async connectedSubscriptions(ownerId: string, missingOnly = false): Promise<string[]> {
+    return (await this.pool.query<{ id: string }>(
+      `SELECT id::text AS id FROM byos_connections WHERE "ownerId"=$1 AND state='connected' AND paused=false AND "removedAt" IS NULL
+       AND ($2::boolean=false OR "modelCatalog" IS NULL OR "modelCatalog"->>'revision'<>epoch::text) ORDER BY id`,
+      [ownerId, missingOnly])).rows.map((row) => row.id);
+  }
+  /**
+   * A subscription's models reach the menu, 优先使用的模型 and dispatch only through its catalogue.
+   * Each connected subscription with none for its current revision asks its account once; one that
+   * does not answer in time is asked again on the next read. Never throws.
+   */
+  async ensureCatalogues(scope: ExecutionSettingsScope, timeoutMs = 8000, discover?: (ownerId: string, connectionId: string) => Promise<{id: string; name?: string}[]>) {
+    const missing = await this.connectedSubscriptions(scope.ownerId, true);
+    await Promise.allSettled(missing.map((connectionId) => Promise.race([
+      // The reason only (a refusal code or error name), never what the provider answered.
+      this.refreshBotModels(scope, connectionId, discover).catch((error: unknown) => {
+        const code = error && typeof error === "object" && "code" in error ? String((error as { code: unknown }).code) : error instanceof Error ? error.name : "unknown";
+        console.warn(JSON.stringify({ level: "warn", msg: "subscription_catalogue_failed", connection: connectionId.slice(0, 8), code }));
+      }),
+      new Promise((resolve) => setTimeout(resolve, timeoutMs).unref?.()),
+    ])));
   }
   async refreshBotModels(scope: ExecutionSettingsScope, connectionId: string, discover?: (ownerId: string, connectionId: string) => Promise<{id: string; name?: string}[]>) {
     if (!z.uuid().safeParse(connectionId).success) throw new ActionFailureError("executionAccountUnavailable");
@@ -144,7 +177,8 @@ export class ExecutionSettings {
     // Mikka 默认 picked on purpose: no binding behind it (decision 2026-10-31-2330).
     if (bindingId === HOSTED_CHOICE) {
       await this.pool.query(
-        'INSERT INTO bot_model_choices ("ownerId","workspaceId","botKey","bindingId") VALUES ($1,$2,$3,$4) ON CONFLICT ("ownerId","workspaceId","botKey") DO UPDATE SET "bindingId"=EXCLUDED."bindingId"',
+        // The pick replaces an API key model saved before, as a subscription pick does; else the key choice wins on read.
+        'INSERT INTO bot_model_choices ("ownerId","workspaceId","botKey","bindingId") VALUES ($1,$2,$3,$4) ON CONFLICT ("ownerId","workspaceId","botKey") DO UPDATE SET "bindingId"=EXCLUDED."bindingId","apiKeyId"=NULL,"apiKeyModel"=NULL',
         [scope.ownerId, scope.workspaceId, key, null],
       );
       return;
@@ -209,7 +243,7 @@ export class ExecutionSettings {
     // A saved row without either is Mikka 默认, picked on purpose.
     if (row) return HOSTED_CHOICE;
     // Decision 2026-10-30 (#537): a Claude subscription first, otherwise ChatGPT/Codex, as `suggested` does.
-    const models = await this.botModels(scope);
+    const models = await this.chatModels(scope);
     const first = models.find((m) => m.provider === "claude") ?? models[0];
     if (!first) return undefined;
     const bindingId = await this.bindingForBot(scope, botId, first.bindingId);
@@ -265,4 +299,16 @@ export async function executionWorkspace(
     .limit(1);
   if (!workspace) throw new ActionFailureError("workspaceAccessDenied");
   return workspace.id;
+}
+
+/** The rows whose route answers bot chats for the subscription's owner; one check per owner and route. */
+async function chatReady<T extends { route: string; ownerId: string }>(rows: T[]): Promise<T[]> {
+  const ready = new Map<string, Promise<boolean>>();
+  const check = (row: T) => {
+    const key = `${row.ownerId}|${row.route}`;
+    if (!ready.has(key)) ready.set(key, subscriptionRouteReady(row.route, row.ownerId));
+    return ready.get(key)!;
+  };
+  const answers = await Promise.all(rows.map(check));
+  return rows.filter((_, index) => answers[index]);
 }

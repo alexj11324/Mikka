@@ -1,7 +1,8 @@
 /** The shapes app/api/mobile/* and /api/suggestions return (see those routes on the server). */
+import type { SubscriptionRefusalNotice } from '../../../lib/subscription-refusal'
 export type Source = 'gmail' | 'github' | 'slack' | 'notion' | 'linear' | 'googlecalendar'
 export type MachineKind = 'cloud' | 'laptop' | 'server'
-export type ThreadStatus = 'running' | 'waiting' | 'failed' | 'done' | 'stopped'
+export type ThreadStatus = 'running' | 'waiting' | 'paused' | 'failed' | 'done' | 'stopped'
 
 export interface Person { id: string; name: string; email: string; image: string | null }
 export interface Workspace { id: string; name: string }
@@ -24,7 +25,7 @@ export interface RunSource {
   group?: ThreadGroup
   issue: { id: string; identifier: string | null; number: number | null; title: string } | null
   /** 运行信息, on the person's own runs. */
-  info?: import('@/lib/run-info').RunInfo
+  info?: import('./run-info').RunInfo
 }
 export type CitationSource = IssueSource | RunSource
 
@@ -41,9 +42,22 @@ export interface ChatItem {
   images?: number
   /** The person stopped this reply (停止); it keeps what it had said. */
   stopped?: true
+  /** An event, as the line the chat shows; its `text` is for the model only (lib/coordinator/event-line.ts on the server). */
+  line?: EventLine
+}
+
+/** lib/coordinator/event-line.ts on the server. */
+export interface EventLine {
+  kind: 'runFinished' | 'runRetried' | 'runSwitched' | 'runPaused' | 'runWaitingDevice' | 'runDeviceBack' | 'issueStatus' | 'runReport' | 'runQuestion' | 'runBlocked' | 'artifact' | 'action' | 'other'
+  runId: string | null
+  issueId: string | null
+  status: string | null
+  title: string | null
 }
 
 export interface Chat {
+  /** The resolved chat row, including a workspace's Coordinator. Sends freeze this when known. */
+  botId?: string
   enabled: boolean
   working: boolean
   error: string | null
@@ -52,7 +66,16 @@ export interface Chat {
   artifacts: Record<string, { id: string; title: string }>
   /** By message id. */
   reactions?: Record<string, Reaction[]>
+  /** Why the last reply did not come (lib/chat-failure.ts on the server); null while working or when nothing failed. */
+  failure?: ChatFailure | null
 }
+
+/** lib/chat-failure.ts on the server. */
+export type ChatFailure =
+  | { kind: 'hosted'; code: string }
+  | { kind: 'subscription'; notice: SubscriptionRefusalNotice }
+  | { kind: 'wake'; code: 'wake_failed' | 'wake_start_unconfirmed' | 'wake_exhausted' }
+  | { kind: 'failed' }
 
 /** Reactions on a message, by emoji (lib/reactions.ts on the server). */
 export interface Reaction { emoji: string; count: number; mine: boolean }
@@ -122,7 +145,9 @@ export type ThreadItem =
   | { kind: 'error'; id: string; text: string; at: number }
   | { kind: 'person'; id: string; text: string; mine: boolean; at: number }
 
-export interface ThreadDetail { thread: Thread; active: boolean; summary: string | null; error: string | null; items: ThreadItem[] }
+/** A thread paused because its subscription ran out (the web's ThreadQuotaPausedCard). */
+export interface ThreadPaused { runId: string; subscription: 'claude' | 'codex'; plan: string | null; resetsAt: string | null; keyReady: boolean }
+export interface ThreadDetail { thread: Thread; active: boolean; /** Generating or running, not waiting for an answer: only then does the composer's button stop. */ working?: boolean; paused?: ThreadPaused | null; summary: string | null; error: string | null; items: ThreadItem[] }
 
 export interface Suggestion { id: string; source: Source; action: string; title: string; url: string | null; actor: string | null; occurredAt: string }
 export interface Suggestions { groups: { source: Source; items: Suggestion[] }[] }

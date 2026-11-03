@@ -1,7 +1,8 @@
 /* eslint-disable unicorn/no-thenable -- The transport fixture implements Drizzle's awaitable query contract. */
 import assert from 'node:assert/strict'
-import { before, beforeEach, mock, test } from 'node:test'
+import { after, before, beforeEach, mock, test } from 'node:test'
 import { createHash } from 'node:crypto'
+import { overrideDeploymentSwitch } from '../deployment-switches'
 import { PgDialect } from 'drizzle-orm/pg-core'
 import type { SQL } from 'drizzle-orm'
 import { generateText } from 'ai'
@@ -62,7 +63,8 @@ stub('../attention/store.ts',{recordDecision:forbidden,settleTurn:forbidden})
 stub('../../workflows/coordinator/tool-scope.ts',{assertNativeToolScope:async()=>{}})
 mock.module('next/server',{namedExports:{NextResponse:Response,after:()=>{}}})
 let post:typeof import('../../app/api/coordinator/messages/route').POST,store:typeof import('./store'),sdk:typeof import('../../workflows/coordinator/steps')
-before(async()=>{post=(await import('../../app/api/coordinator/messages/route')).POST;store=await import('./store');sdk=await import('../../workflows/coordinator/steps')})
+before(async()=>{overrideDeploymentSwitch('factoryRouting',false);post=(await import('../../app/api/coordinator/messages/route')).POST;store=await import('./store');sdk=await import('../../workflows/coordinator/steps')})
+after(()=>overrideDeploymentSwitch('factoryRouting',undefined))
 beforeEach(()=>{authenticated=true;events=[];messages=[];session={};effects.length=0})
 const request=(body:unknown)=>new Request('https://mikka.example/mikka/api/coordinator/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
 

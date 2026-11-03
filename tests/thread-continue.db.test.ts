@@ -9,13 +9,16 @@ import { randomUUID } from 'node:crypto'
 import { mock, test } from 'node:test'
 import { normalizeRepository } from '@mikka/protocol/repository'
 import { dbUrl, seedIssue, seedUser, seedWorkspace } from './support/workspace-admin-db'
-import { githubAppStub } from './support/github-app-stub'
+import { connectGitHub, githubAppStub } from './support/github-app-stub'
 
 // The computer's Codex reported gpt-5, the model the person's ChatGPT account lists (decision 2026-11-02-1400).
-const mac = [{ harness: 'codex', installed: true, modelSlots: [{ slot: 'gpt-5', model: 'gpt-5', name: 'gpt-5' }] }]
+const mac = [{ harness: 'codex', installed: true, subscriptionBroker: true, modelSlots: [{ slot: 'gpt-5', model: 'gpt-5', name: 'gpt-5' }] }]
 mock.module(new URL('../lib/coordinator/decide.ts', import.meta.url).href, { namedExports: { invokeDecision: async () => null } })
 
 test('a message to an ended thread runs it again in the same thread; only its owner can send', { skip: !dbUrl }, async t => {
+  const priorByos = process.env.MIKKA_BYOS_ENABLED
+  process.env.MIKKA_BYOS_ENABLED = '1'
+  t.after(() => { if (priorByos === undefined) delete process.env.MIKKA_BYOS_ENABLED; else process.env.MIKKA_BYOS_ENABLED = priorByos })
   const { Pool } = await import('pg')
   const pool = new Pool({ connectionString: dbUrl, max: 3 })
   const steps = await import('../workflows/coordinator/steps')
@@ -50,12 +53,14 @@ test('a message to an ended thread runs it again in the same thread; only its ow
     const githubAccountId = String(++githubAccount)
     await pool.query(`INSERT INTO account (id,"accountId","providerId","userId","createdAt","updatedAt") VALUES ($1,$2,'github',$3,now(),now())`, [randomUUID(), githubAccountId, id])
     github.allowWriter('octo/repo', githubAccountId)
+    // Connected in 插件 › GitHub, with the App on the repositories these tasks name: dispatch checks the live list.
+    await connectGitHub(github, id, githubAccountId, ['octo/repo'])
     await pool.query('INSERT INTO repository_settings ("userId","remoteKey",push) VALUES ($1,$2,$3)', [id, normalizeRepository('octo/repo').key, JSON.stringify({ approved: true, remote: 'origin', approvedByUserId: id, approvedAt: new Date().toISOString() })])
     const ws = await seedWorkspace(pool, id, [{ userId: id, role: 'admin' }])
-    // A connected ChatGPT subscription whose account lists gpt-5: 允许使用的模型 is that model by default, 运行位置 本地.
+    // A connected ChatGPT subscription whose account lists gpt-5: 优先使用的模型 is that model by default, 运行位置 本地.
     const connection = randomUUID()
-    await pool.query(`INSERT INTO byos_connections (id,"ownerId","workspaceId",provider,state,epoch,"secretName","secretDigest","providerSubject","modelCatalog") VALUES ($1,$2,$3,'codex','connected',1,$4,$5,'synthetic-subject',$6)`,
-      [connection, id, ws.id, `synthetic-${connection}`, 'a'.repeat(64), JSON.stringify({ revision: '1', models: ['gpt-5'] })])
+    await pool.query(`INSERT INTO byos_connections (id,"ownerId","workspaceId",provider,state,epoch,"secretName","secretDigest","providerSubject","modelCatalog",quota) VALUES ($1,$2,$3,'codex','connected',1,$4,$5,'synthetic-subject',$6,$7)`,
+      [connection, id, ws.id, `synthetic-${connection}`, 'a'.repeat(64), JSON.stringify({ revision: '1', models: ['gpt-5'] }), JSON.stringify({ vendor: 'codex', source: 'official', status: 'ok', plan: 'Pro', observedAt: new Date().toISOString(), windows: [{ kind: 'five_hour', used: .2, resetsAt: null }] })])
     await pool.query(`INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId") VALUES ($1,$2,$3,'catalogue',$4,1,'codex_cpa','gpt-5')`, [randomUUID(), id, ws.id, connection])
     const issueId = await seedIssue(pool, id)
     await pool.query(`UPDATE issues SET content=$2::jsonb WHERE id=$1`, [issueId, JSON.stringify({ type: 'doc', attrs: { mikka: { number: 2000 + users.length } } })])
@@ -70,7 +75,7 @@ test('a message to an ended thread runs it again in the same thread; only its ow
 
   const a = await person()
   const first = await steps.dispatchRun(a.id, { issueId: a.issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, a.botId) as unknown as { runId: string; thread: string }
-  assert.equal(first.thread, 'new')
+  assert.equal(first.thread, 'new', JSON.stringify(first))
 
   await t.test('a working thread gets the words as a message, as before', async () => {
     const sent = await sendThreadMessage(a.id, first.runId, 'Also cover the empty input.')

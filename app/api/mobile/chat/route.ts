@@ -6,6 +6,7 @@ import { tokenWorkspace } from '@/lib/tokens/principal'
 import { chatView } from '@/lib/coordinator/store'
 import { openChatBotId } from '@/lib/coordinator/coordinator-bot'
 import { reactionsFor } from '@/lib/reactions'
+import { chatFailure } from '@/lib/chat-failure'
 import { coordinatorEnabled, wakeCoordinator } from '@/lib/coordinator/wake'
 import { recordPersonalSubmission, SubmissionConflictError } from '@/lib/coordinator-submission'
 import { z } from 'zod'
@@ -42,23 +43,24 @@ async function handleGET(request: Request) {
       if (!await tokenBotAllowed(user, bot.data)) return json({ error: 'botNotFound' }, 404)
       const enabled = coordinatorEnabled()
       const chat = await chatView(user.id, 200, await openChatBotId(user, bot.data))
-      return json({ ...chat, enabled, working: enabled && chat.working, reactions: await reactionsOf(user.id, chat.items) })
+      const working = enabled && chat.working
+      return json({ ...chat, enabled, working, failure: enabled ? chatFailure({ working, error: chat.error, items: chat.items }) : null, reactions: await reactionsOf(user.id, chat.items) })
     }
     const chat = await getCoordinatorChat(bot.data)
-    return json({ ...chat, reactions: await reactionsOf(user.id, chat.items) })
+    return json({ ...chat, failure: chat.enabled ? chatFailure(chat) : null, reactions: await reactionsOf(user.id, chat.items) })
   } catch (error) {
     if (error instanceof ActionFailureError) return json({ error: error.code }, 404)
     throw error
   }
 }
 
-/** `POST /api/mobile/chat` with `{ text, botId?, images? }`: a message, with up to two photos as data URLs; the reply shows up in the chat. */
+/** `submissionId` identifies one immutable send across mobile retries; older clients may omit it. */
 async function handlePOST(request: Request) {
   const user = await mobileUser(request)
   noteLogUser(user?.id)
   if (!user) return unauthorized()
   if (!writeAllowed(request)) return forbiddenOrigin()
-  const parsed = z.object({ text: z.string().trim().max(MESSAGE_MAX), botId: z.uuid().nullable().optional(), images: userImageInputsSchema.optional() })
+  const parsed = z.object({ text: z.string().trim().max(MESSAGE_MAX), botId: z.uuid().nullable().optional(), images: userImageInputsSchema.optional(), submissionId: z.uuid().optional() })
     .refine(value => Boolean(value.text || value.images?.length)).safeParse(await request.json().catch(() => null))
   if (!parsed.success) return json({ error: 'messageRequired' }, 400)
   const images = parsed.data.images?.length ? parsed.data.images : undefined
@@ -66,7 +68,7 @@ async function handlePOST(request: Request) {
     if (!await tokenBotAllowed(user, parsed.data.botId ?? null)) return json({ error: 'botNotFound' }, 404)
     // No bot named: the Coordinator of the token's workspace, resolved here where the message enters.
     const botId = await openChatBotId(user, parsed.data.botId)
-    try { await recordPersonalSubmission(db, user.id, parsed.data.text, { botId, images }) }
+    try { await recordPersonalSubmission(db, user.id, parsed.data.text, { botId, images, submissionId: parsed.data.submissionId }) }
     catch (error) {
       if (error instanceof SubmissionConflictError) return json({ error: 'submissionConflict' }, 409)
       throw error
@@ -74,7 +76,7 @@ async function handlePOST(request: Request) {
     after(() => wakeCoordinator(user.id))
     return json({ queued: true }, 202)
   }
-  const result = await sendCoordinatorMessage(parsed.data.text, null, parsed.data.botId ?? null, undefined, undefined, null, images)
+  const result = await sendCoordinatorMessage(parsed.data.text, null, parsed.data.botId ?? null, parsed.data.submissionId, undefined, null, images)
   return result.error ? json(result, 400) : json(result, 202)
 }
 

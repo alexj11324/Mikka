@@ -1,3 +1,4 @@
+import { deploymentSwitch } from '@/lib/deployment-switches'
 import { cloudComputerTasksEnabled } from '@/lib/cloud-computer-flag'
 import { withDeviceRoute } from '@/lib/device-route'
 import { after, NextResponse } from 'next/server'
@@ -8,7 +9,7 @@ import { readRepositorySettings } from '@/lib/device-repositories'
 import { daemonTestMode, repositoryBindingMatches } from '@mikka/protocol/repository'
 import { localExecutionHarnesses } from '@/lib/device-agents'
 import { runTestFixture } from '@/lib/run-test-fixture'
-import { RUN_LEASE_MS, REPO_ORIGIN_HEADER, RECOVERY_WORKTREE_HEADER, MODEL_CREDENTIAL_HEADER, runModelCredentialSchema, type RunModelCredential } from '@mikka/protocol/device'
+import { MIN_DAEMON_VERSION, RUN_LEASE_MS, REPO_ORIGIN_HEADER, RECOVERY_WORKTREE_HEADER, MODEL_CREDENTIAL_HEADER, runModelCredentialSchema, type RunModelCredential } from '@mikka/protocol/device'
 import { POLICY_SNAPSHOT_HEADER, POLICY_SNAPSHOT_VERSION } from '@mikka/protocol/policy-snapshot'
 import { issuePolicySnapshot, policyDistributionContext } from '@/lib/agent-tool-approval/policy-distribution'
 import { requestDevicePolicyIssuer } from '@/lib/agent-tool-approval/local-cloud-issuer'
@@ -17,12 +18,12 @@ import { assertUnmanagedModelTransport, assertSubscriptionModelTransport } from 
 import { ModelAdmissionError } from '@/lib/model-admission/contract'
 import { db, pool } from '@/lib/db'
 import { agentRuns, agents, deviceRepos } from '@/lib/db/schema'
-import { authenticateDevice, ownedDevice } from '@/lib/device-link'
+import { authenticateDevice, ownedDeviceWithReport } from '@/lib/device-link'
 import { withBasePath } from '@/lib/base-path'
 import { mcpResourceURL } from '@/lib/mcp/resource'
 import { issueRunToken } from '@/lib/mcp/worker'
 import { issueForUser } from '@/lib/issue-access'
-import { latestCheckpoint } from '@/lib/run-leases'
+import { failRunForDaemonUpgrade, latestCheckpoint } from '@/lib/run-leases'
 import { continuationFollowUp } from '@/lib/thread-continuation'
 import { checkpointRecoveryError, quotaContinuationNote, retryNote } from '@/lib/run-retry'
 import { constrainedAssignmentPolicy } from '@/lib/run-assignment-policy'
@@ -38,9 +39,12 @@ import { afterRunEnded } from '@/lib/run-completion-effects'
 import { subscriptionRuntime } from '@/lib/subscription-runtime'
 import { sharedNativeBinding } from '@/lib/personal-policy'
 import { PublicationError } from '@/lib/run-publication-result'
+import { linkedGitHubAccountId } from '@/lib/github/repository-installation'
 import { authorizedClaimResponse } from '@/lib/run-claim-response'
 import { personalMailboxEnabled } from '@/lib/personal-mailbox-config'
 import { remoteRepositoryRef, taskSecretInjection } from '@/lib/secrets/runtime'
+
+import { daemonTooOld, daemonVersions } from '@/lib/daemon-release'
 
 export const dynamic = 'force-dynamic'
 
@@ -54,9 +58,12 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
   if (!caller) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { deviceId, runId } = await params
   if (caller.scopeDeviceId && caller.scopeDeviceId !== deviceId) return NextResponse.json({ error: 'Unknown device.' }, { status: 404 })
-  const device = await ownedDevice(deviceId, caller.userId)
+  const device = await ownedDeviceWithReport(deviceId, caller.userId)
   if (!device) return NextResponse.json({ error: 'Unknown device.' }, { status: 404 })
-  if (device.kind === 'local' && (device.protocolVersion ?? 0) < DAEMON_PROTOCOL_VERSION) return NextResponse.json({ error: 'Upgrade the Mikka daemon before starting this thread.', code: 'daemonUpgradeRequired', protocolVersion: DAEMON_PROTOCOL_VERSION }, { status: 409 })
+  if ((device.kind === 'local' && (device.protocolVersion ?? 0) < DAEMON_PROTOCOL_VERSION) || daemonTooOld(device)) {
+    await failRunForDaemonUpgrade(runId, deviceId, caller.userId)
+    return NextResponse.json({ error: 'Upgrade the Mikka daemon before starting this thread.', code: 'daemonUpgradeRequired', protocolVersion: DAEMON_PROTOCOL_VERSION, minVersion: MIN_DAEMON_VERSION, daemonVersions: await daemonVersions() }, { status: 409 })
+  }
   if (!device.enabled) return NextResponse.json({ error: 'Scheduling is off for this device.' }, { status: 409 })
   const [run] = await db
     .select()
@@ -117,17 +124,17 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
   if ((harness === 'codex' || harness === 'claude_code') && !device.harnesses.some(info => info.harness === harness && info.installed && info.toolApproval === true)) return NextResponse.json({ error: 'Run approval capability unavailable.' }, { status: 409 })
   const pinned = run.agentDefinition?.subscription
   let subscription: Awaited<ReturnType<ReturnType<typeof subscriptionRuntime>['repository']['nativeBinding']>>
-  try { subscription = process.env.MIKKA_BYOS_ENABLED === '1'
+  try { subscription = deploymentSwitch('byos')
     ? run.agentDefinition && !pinned ? null : device.kind === 'cloud'
       ? await nativeRunBinding(pool, caller.userId, agent.id, harness, caller.scopeWorkspaceId, pinned?.bindingId)
-      : pinned ? await subscriptionRuntime().repository.binding(caller.userId,pinned.bindingId) : await localRunBinding(caller.userId, agent.id, harness, run.botId ?? null) : null
+      : pinned ? await nativeRunBinding(pool, caller.userId, agent.id, harness, undefined, pinned.bindingId) : await localRunBinding(caller.userId, agent.id, harness, run.botId ?? null) : null
   } catch { return NextResponse.json({ error:'Subscription unavailable.' },{ status:409 }) }
-  if (pinned && (!subscription || subscription.id !== pinned.bindingId || subscription.modelId !== pinned.modelId || subscription.route !== pinned.route || subscription.consumerId !== agent.id || subscription.ownerId !== caller.userId)) return NextResponse.json({ error:'Pinned subscription unavailable.' },{ status:409 })
+  if (pinned && (!subscription || subscription.id !== pinned.bindingId || subscription.modelId !== pinned.modelId || subscription.route !== pinned.route || subscription.consumerId !== agent.id)) return NextResponse.json({ error:'Pinned subscription unavailable.' },{ status:409 })
   if (subscription && !device.harnesses.some(info => info.harness === harness && info.subscriptionBroker)) return NextResponse.json({ error: 'Subscription requires a broker-enabled hosted runner.' }, { status: 409 })
   // A run frozen on the person's API key goes only to a daemon that injects it; nothing is opened yet.
   const frozenKey = run.agentDefinition?.apiKey
   if (frozenKey && (subscription || pinned)) return NextResponse.json({ error: 'Run credential unavailable.' }, { status: 409 })
-  if (frozenKey && request.headers.get(MODEL_CREDENTIAL_HEADER) !== '1') return NextResponse.json({ error: 'Upgrade the Mikka daemon before starting this thread.', code: 'daemonUpgradeRequired', protocolVersion: DAEMON_PROTOCOL_VERSION }, { status: 409 })
+  if (frozenKey && request.headers.get(MODEL_CREDENTIAL_HEADER) !== '1') return NextResponse.json({ error: 'Upgrade the Mikka daemon before starting this thread.', code: 'daemonUpgradeRequired', protocolVersion: DAEMON_PROTOCOL_VERSION, daemonVersions: await daemonVersions() }, { status: 409 })
   let cliPolicy: Awaited<ReturnType<typeof readCliRunPolicy>>
   try {
     cliPolicy = await readCliRunPolicy(pool, runId, caller.userId)
@@ -150,7 +157,10 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
   let factoryClaim: Record<string, unknown> = {}
   let factoryToken: Awaited<ReturnType<typeof issueRunToken>> | undefined
   const beforeClaim = async (tx: import('pg').PoolClient) => {
-    if (process.env.MIKKA_FACTORY_ROUTING_ENABLED !== '1' || process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED !== '1') return true
+    // Scope may change while publication/policy preparation awaits. Recheck the same frozen
+    // binding, including both members and the share, before taking the lease.
+    if (subscription && !await nativeRunBinding(tx, caller.userId, agent.id, harness, subscription.workspaceId, subscription.id)) return false
+    if (!deploymentSwitch('factoryRouting') || !deploymentSwitch('factoryLifecycle')) return true
     const { guardFactoryClaim } = await import('@/lib/factory/runtime')
     try { factoryClaim = await guardFactoryClaim(tx,caller.userId,deviceId,runId,leaseExpiresAt); return true }
     catch (error) { if (error instanceof FactoryError) return false; throw error }
@@ -176,7 +186,9 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
       return NextResponse.json({ error: 'API key unavailable.', code: 'apiKeyUnavailable' }, { status: 409 })
     }
     let opened: Awaited<ReturnType<typeof apiKeyForRun>>
-    try { opened = await apiKeyForRun(pool, runId, frozenKey.keyId) }
+    // The run's Agent picks the key's endpoint; a key that does not serve it ends the run.
+    if (harness !== 'claude_code' && harness !== 'codex') return refuse()
+    try { opened = await apiKeyForRun(pool, runId, frozenKey.keyId, harness) }
     catch (error) {
       // Secrets briefly unreadable: the run stays queued. A key that is gone, or no longer usable here: the run ends.
       if (!(error instanceof WorkspaceError) || error.code !== 'apiKeyNotFound') return NextResponse.json({ error: 'API key unavailable.' }, { status: 409 })
@@ -203,10 +215,10 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
     // 4e3: the task's explicit user variables (workspace + this repo's secrets/env). Resolved before the
     // claim so a decrypt failure leaves the run queued. The injection helper returns an empty
     // assignment without an encryption key; platform versus BYO billing does not change it.
-    try { ({ env: taskEnv, secretNames: taskSecretNames } = await taskSecretInjection(caller.scopeWorkspaceId, remoteRepositoryRef(repo.remoteUrl))) }
+    try { ({ env: taskEnv, secretNames: taskSecretNames } = await taskSecretInjection(caller.scopeWorkspaceId, remoteRepositoryRef(repo.remoteUrl), process.env, undefined, run.userId)) }
     catch { return NextResponse.json({ error: 'Workspace secrets unavailable.' }, { status: 409 }) }
-    // A cloud run admitted to push (its GitHub App grant, decision 2026-11-01-1215)
-    // gets its publication like a local run, before the lease, so a refusal leaves it queued.
+    // A cloud run with a task branch gets its publication like a local run,
+    // before the lease, so a refusal leaves it queued.
     if (run.agentDefinition?.repositoryAdmission && !run.agentDefinition.readOnly) {
       const { prepareRunPublication } = await import('@/lib/run-publications')
       try { publication = await prepareRunPublication(run, repo.remoteUrl!) }
@@ -217,12 +229,15 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
     }
     const refused = await openRunKey()
     if (refused) return refused
-    const claimed = await claimCloudRun(pool, { userId: caller.userId, workspaceId: caller.scopeWorkspaceId }, runId, deviceId, new Date(leaseExpiresAt), subscription?.id ?? null, beforeClaim, afterClaim, desktop)
+    // Read-only checks inspect the retained files; they cannot use an
+    // interactive desktop. Its policy must not gate their file-only claim.
+    const useComputer = desktop && run.agentDefinition?.readOnly !== true
+    const claimed = await claimCloudRun(pool, { userId: caller.userId, workspaceId: caller.scopeWorkspaceId }, runId, deviceId, new Date(leaseExpiresAt), subscription?.id ?? null, beforeClaim, afterClaim, useComputer)
     if (!claimed) return NextResponse.json({ error: 'Cloud computer run unavailable.' }, { status: 409 })
     // Without a desktop the run gets none (the daemon refuses a `computer` it cannot serve).
-    computer = desktop ? claimed : null
+    computer = useComputer ? claimed : null
   } else {
-    // A read-only run (an investigation) publishes nothing: no push branch, no push grant.
+    // A read-only run (an investigation) publishes nothing: no task branch.
     if (!run.agentDefinition?.readOnly) {
       const { prepareRunPublication } = await import('@/lib/run-publications')
       try { publication = await prepareRunPublication(run, repo.remoteUrl!) }
@@ -288,13 +303,12 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
     : {}
   const settings = repo.remoteUrl ? await readRepositorySettings(caller.userId, repo.remoteUrl) : null
   const verifyCommand = settings ? settings.verifyCommand : device.kind === 'cloud' ? repo.verifyCommand : null
-  // Push authority was decided at admission (the GitHub App grant, decision
-  // 2026-11-01-1215), for local and cloud runs alike: `allow` when admitted,
-  // `deny` otherwise. `ask` is never forwarded, so no push card can appear.
-  // An explicit CLI deny or read-only ceiling stays authoritative.
-  const push = publication && !cliPolicy.policy.readOnly && cliPolicy.policy.permissions.git_push !== 'deny' && publication.policy.permissions.git_push === 'allow' ? 'allow' as const : 'deny' as const
+  // Whether the daemon itself pushes the verified task branch: a run with a
+  // task branch does. The agent's own push is never withheld; it works with the
+  // owner's own GitHub credential (decision 2026-11-02-1600). `ask` is never forwarded.
+  const push = publication && !cliPolicy.policy.readOnly && publication.policy.permissions.git_push === 'allow' ? 'allow' as const : 'deny' as const
   const resolvedPolicy = { ...cliPolicy.policy, permissions: { ...cliPolicy.policy.permissions, git_push: push } }
-  // A read-only run (dispatched without push authority) cannot change, commit or push anything.
+  // A read-only run cannot change its worktree.
   const executionPolicy = run.agentDefinition?.readOnly ? applyApprovalMode(resolvedPolicy, 'read_only') : resolvedPolicy
   const computerPermission = computer?.permission ?? localComputer?.permission
   // Computer authority comes from its persisted claim; retain every trusted
@@ -309,6 +323,7 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
     await persistRunCompletion(caller.userId, runId, { stopReason: 'error', report: { summary: 'Frozen execution policy no longer fits the current owner policy.', filesChanged: [], verify: { status: 'not_run' }, openQuestions: [], nextStep: null } }, caller.scopeDeviceId)
     return NextResponse.json({ error: 'Frozen execution policy is no longer permitted.' }, { status: 409 })
   }
+  const githubConnected = repo.repoPath.startsWith('v2/github.com/') && Boolean(await linkedGitHubAccountId(caller.userId))
   const response = await authorizedClaimResponse(caller.userId, run, leaseExpiresAt, current => NextResponse.json({
     ...publication,
     runId, issueId: run.issueId, deviceId, repoId: repo.id,
@@ -318,13 +333,16 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
     ...(runTestFixture(harness) ? { fixture: runTestFixture(harness) } : {}),
     ...(verifyCommand ? { verifyCommand } : {}),
     ...(mcp ? { mcp } : {}),
-    ...(mcp && publication?.pushBranch && /^v2\/github\.com\/[a-z0-9_.-]+\/[a-z0-9_.-]+$/.test(repo.repoPath) &&
-      ['implement', 'fix'].includes(current.kind) && !assignmentPolicy.readOnly && assignmentPolicy.permissions.git_push === 'allow' && harness !== 'mock'
-      ? { github: { endpoint: mcp.url.replace(/\/api\/mcp\/?$/, '/api/runs/github-token'), repository: repo.repoPath.slice('v2/github.com/'.length), branch: publication.pushBranch } } : {}),
+    // The owner's own GitHub credential for every github.com run (decision
+    // 2026-11-02-1600), any kind, read-only included; the branch is the task
+    // branch a delivering run pushes.
+    ...(mcp && githubConnected && /^v2\/github\.com\/[a-z0-9_.-]+\/[a-z0-9_.-]+$/.test(repo.repoPath) && harness !== 'mock'
+      ? { github: { endpoint: mcp.url.replace(/\/api\/mcp\/?$/, '/api/runs/github-token'), repository: repo.repoPath.slice('v2/github.com/'.length),
+        ...(publication?.pushBranch && ['implement', 'fix'].includes(current.kind) && !assignmentPolicy.readOnly ? { branch: publication.pushBranch } : {}) } } : {}),
     ...(run.agentDefinition?.model ? {model:run.agentDefinition.model} : {}),
     ...(modelCredential ? { modelCredential } : {}),
     ...(subscription ? { ...(run.agentDefinition?.cliModelSelection ? {} : {model:subscription.modelId}), subscriptionBinding: { bindingId: subscription.id, ownerId: subscription.ownerId, workspaceId: subscription.workspaceId, consumerId: subscription.consumerId, route: subscription.route } } : {}),
-    ...(computer ? { computer: { botId: computer.botId, ownerId: computer.ownerId, display: computer.display, policyVersion: computer.policyVersion } } : {}),
+    ...(computer && assignmentPolicy.permissions.computer_use !== 'deny' ? { computer: { botId: computer.botId, ownerId: computer.ownerId, display: computer.display, policyVersion: computer.policyVersion } } : {}),
     ...(localComputer ? { localComputer } : {}),
     ...(Object.keys(taskEnv).length ? { taskEnv } : {}),
     ...(taskSecretNames.length ? { taskSecretNames } : {}),

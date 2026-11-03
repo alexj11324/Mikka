@@ -4,6 +4,7 @@ import { createIssueInput, updateIssueInput } from './issue-input'
 import { DEFAULT_AGENT_DEFINITION } from '@/lib/agent-kit/builtin'
 import { AGENT_TOOL_IDS, SCHEDULE_TOOL_IDS } from '@/lib/agent-kit/registry'
 import { issueMutationsEnabled } from './issue-tools-enabled'
+import { overrideDeploymentSwitch } from '@/lib/deployment-switches'
 import { COORDINATOR_INSTRUCTIONS } from './instructions'
 /** The person's Coordinator: an ordinary bot row, marked as the Coordinator. */
 const COORDINATOR_BOT = '00000000-0000-4000-8000-0000000c0de1'
@@ -18,23 +19,26 @@ mock.module('@/workflows/coordinator/agent-kit-steps', { namedExports: {} })
 mock.module('@/lib/composio-actions', { namedExports: { createComposioAITools: () => ({}), createGoogleAITools: () => ({}) } })
 let registry: typeof import('@/workflows/coordinator/tools')
 before(async () => { registry = await import('@/workflows/coordinator/tools') })
-const previousFlag = process.env.MIKKA_ISSUE_TOOLS_ENABLED
-beforeEach(() => { process.env.MIKKA_ISSUE_TOOLS_ENABLED = '1' })
-afterEach(() => { if (previousFlag === undefined) delete process.env.MIKKA_ISSUE_TOOLS_ENABLED; else process.env.MIKKA_ISSUE_TOOLS_ENABLED = previousFlag })
+beforeEach(() => overrideDeploymentSwitch('issueTools', true))
+afterEach(() => overrideDeploymentSwitch('issueTools', undefined))
 
 test('issue tools default on; only an explicit kill switch turns them off', () => {
-  assert.equal(issueMutationsEnabled({}), true)
-  assert.equal(issueMutationsEnabled({ MIKKA_ISSUE_TOOLS_ENABLED: '1' }), true)
-  assert.equal(issueMutationsEnabled({ MIKKA_ISSUE_TOOLS_ENABLED: '0' }), false)
-  assert.equal(issueMutationsEnabled({ MIKKA_ISSUE_TOOLS_ENABLED: 'true' }), false)
-  delete process.env.MIKKA_ISSUE_TOOLS_ENABLED
+  assert.equal(issueMutationsEnabled(), true)
+  overrideDeploymentSwitch('issueTools', false)
+  assert.equal(issueMutationsEnabled(), false)
+  overrideDeploymentSwitch('issueTools', undefined)
+  assert.equal(issueMutationsEnabled(), true, 'default on')
+  const previous = process.env.MIKKA_ISSUE_TOOLS_ENABLED
+  process.env.MIKKA_ISSUE_TOOLS_ENABLED = '0'
+  try { assert.equal(issueMutationsEnabled(), true, 'the old variable no longer decides') }
+  finally { if (previous === undefined) delete process.env.MIKKA_ISSUE_TOOLS_ENABLED; else process.env.MIKKA_ISSUE_TOOLS_ENABLED = previous }
   const unset = registry.createCoordinatorRegistry('owner', COORDINATOR_BOT, undefined, { coordinator: true })
   assert.ok(unset.create_issue)
   assert.ok(unset.update_issue)
 })
 
 test('the kill switch removes the tools and never widens a frozen execution grant', () => {
-  process.env.MIKKA_ISSUE_TOOLS_ENABLED = '0'
+  overrideDeploymentSwitch('issueTools', false)
   const disabled = registry.createCoordinatorRegistry('owner', COORDINATOR_BOT, undefined, { coordinator: true })
   assert.equal(disabled.create_issue, undefined)
   assert.equal(disabled.update_issue, undefined)
@@ -42,7 +46,7 @@ test('the kill switch removes the tools and never widens a frozen execution gran
   type Execution = NonNullable<NonNullable<Parameters<typeof registry.coordinatorTools>[3]>['execution']>
   const executionFor = (effectiveTools: string[]) => ({ id: 'execution', snapshot: { effectiveTools } }) as unknown as Execution
   assert.deepEqual(Object.keys(registry.coordinatorTools('owner', COORDINATOR_BOT, undefined, { coordinator: true,  execution: executionFor(['create_issue', 'get_issue']) })), ['get_issue'])
-  process.env.MIKKA_ISSUE_TOOLS_ENABLED = '1'
+  overrideDeploymentSwitch('issueTools', true)
   assert.deepEqual(Object.keys(registry.coordinatorTools('owner', COORDINATOR_BOT, undefined, { coordinator: true,  execution: executionFor(['get_issue']) })), ['get_issue'])
   assert.throws(() => registry.coordinatorTools('owner', COORDINATOR_BOT, undefined, { coordinator: true,  execution: executionFor(['unregistered_tool']) }))
 })
@@ -116,16 +120,21 @@ test('create tool forwards only the host-provided request event, never a model a
   assert.deepEqual(created.mock.calls.at(-1)!.arguments, ['owner', { title: 'Task' }, 'event-call', undefined, COORDINATOR_BOT, eventId])
 })
 
+test('ordinary issue creation receives the original host request; model input cannot supply it', async () => {
+  const sourceEventId = 'b4000000-0000-4000-8000-000000000007'
+  const tools = registry.createCoordinatorRegistry('owner', COORDINATOR_BOT, undefined, { sourceEventId })
+  await tools.create_issue!.execute!({title:'Requested task'}, {toolCallId:'new-sdk-id',messages:[],context:{}})
+  assert.deepEqual(created.mock.calls.at(-1)!.arguments,['owner',{title:'Requested task'},'new-sdk-id',undefined,COORDINATOR_BOT,undefined,sourceEventId])
+  assert.equal(createIssueInput.safeParse({title:'Task',sourceEventId:'forged'}).success,false)
+})
+
 test('dispatch uses the same host event as task creation and exposes no event argument to the model', async () => {
   const eventId = 'b4000000-0000-4000-8000-000000000004'
   const tools = registry.createCoordinatorRegistry('owner', COORDINATOR_BOT, undefined, { coordinator: true,  taskEventId: eventId })
   const input = { issueId: 'b4000000-0000-4000-8000-000000000005', agentId: 'b4000000-0000-4000-8000-000000000006', repo: 'example/repository' }
   await tools.dispatch_run!.execute!(input, { toolCallId: 'dispatch', messages: [], context: {} })
   assert.deepEqual(dispatched.mock.calls.at(-1)!.arguments, ['owner', {...input,requestKey:'dispatch:dispatch'}, undefined, COORDINATOR_BOT, undefined, eventId])
-  assert.equal(tools.request_repository_push_approval, undefined, 'push is what the GitHub App grants; Mikka asks for no approval of its own')
-  const resumed = registry.createCoordinatorRegistry('owner', COORDINATOR_BOT, undefined, { coordinator: true,  taskEventId: eventId, approvedRepositoryKey: 'v2:github.com/example/repository' })
-  await resumed.dispatch_run!.execute!(input, { toolCallId: 'resumed-dispatch', messages: [], context: {} })
-  assert.deepEqual(dispatched.mock.calls.at(-1)!.arguments, ['owner', {...input,requestKey:'dispatch:resumed-dispatch'}, undefined, COORDINATOR_BOT, undefined, eventId, 'v2:github.com/example/repository'])
+  assert.equal(tools.request_repository_push_approval, undefined, 'agents push with the person\'s own GitHub credential; Mikka asks for no approval')
 })
 
 test('one task, one thread: dispatch takes newThread from the model but the person\'s message only from the host', async () => {

@@ -58,10 +58,11 @@ test('mailbox admission validates the full frozen model, credential, device and 
   const f = fixture()
   const input = { harness: 'codex' as const, instructions: 'Bound', prompt: 'Task', parent: f.state.snapshot, executionId,
     mailboxEnabled: true, mailboxScope: { botId, workspaceId: namespace }, model: 'deepseek-flash', pinnedDeviceId: revision, readOnly: true }
+  assert.throws(() => freezeWorkerDefinition({ ...input, subscription: { id: revision, modelId: 'frozen-model', route: 'codex_cli' } }), /agentWorkerSubscriptionMismatch/)
   for (const credential of [
     {},
     { apiKey: { keyId: revision, model: 'deepseek-flash' } },
-    { subscription: { id: revision, modelId: 'frozen-model', route: 'codex_cli' } },
+    { model: 'frozen-model', subscription: { id: revision, modelId: 'frozen-model', route: 'codex_cli' } },
   ]) {
     const worker = freezeWorkerDefinition({ ...input, ...credential })
     assert.deepEqual(personalWorkerMailboxTools('codex', worker), ['mailbox_inbox'])

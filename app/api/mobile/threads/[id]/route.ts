@@ -7,10 +7,11 @@ import { readRun } from '@/lib/agent-runs'
 import { readRunChain } from '@/lib/run-chain'
 import { sendThreadMessage } from '@/lib/thread-continue'
 import { ActionFailureError } from '@/lib/action-error'
-import { chainChunks, runIsActive, threadItems } from '@/lib/issue-run-conversation'
+import { chainChunks, runIsActive, runIsWorking, threadItems } from '@/lib/issue-run-conversation'
 import { forbiddenOrigin, json, mobileUser, unauthorized, writeAllowed } from '@/lib/mobile-api'
 import { mobileThread } from '@/lib/mobile-threads'
 import { runOutsideToken } from '@/lib/tokens/scope'
+import { threadQuotaView } from '@/lib/run-quota-view'
 
 export const dynamic = 'force-dynamic'
 
@@ -40,7 +41,10 @@ async function handleGET(request: Request, { params }: Params) {
     detail.run.agentId ? chunks : [],
     messages.map(message => ({ id: message.id, text: message.text, author: user.name, mine: true, at: message.createdAt })),
   )
-  return json({ thread, active: runIsActive(live), summary: detail.run.report && typeof detail.run.report.summary === 'string' ? detail.run.report.summary : null, error: detail.run.error, items })
+  // A run paused on its subscription's quota: when it resets and whether a key can take over (the web's ThreadQuotaPausedCard).
+  const liveRunId = chain?.latestRunId ?? detail.run.id
+  const { paused } = live === 'paused' ? await threadQuotaView(user.id, [liveRunId], liveRunId) : { paused: null }
+  return json({ thread, active: runIsActive(live), working: runIsWorking(live), paused, summary: detail.run.report && typeof detail.run.report.summary === 'string' ? detail.run.report.summary : null, error: detail.run.error, items })
 }
 
 /** `POST /api/mobile/threads/:id` with `{ text }`: a message to the thread; the daemon delivers it, or an ended thread runs again. */

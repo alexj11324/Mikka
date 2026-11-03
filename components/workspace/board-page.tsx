@@ -35,6 +35,7 @@ import { AgentSphere } from './issue-assignee-menu'
 import { LabelDot } from './issue-metadata-controls'
 import { ISSUE_PRIORITIES, ISSUE_STATUSES, type IssueStatus } from './issue-properties'
 import { ResizablePane } from '@/components/ui/resizable-pane'
+import { LIST_POLL_MS } from '@/components/swr-defaults'
 
 type Issue = Awaited<ReturnType<typeof listIssues>>[number]
 type Scope = 'all' | 'workspace' | 'personal'
@@ -145,7 +146,7 @@ export function BoardPage({ issues, userId, onOpen, onUpdated, onBusyChange }: {
   // Without a connected Linear team, the button only reloads the board.
   const linearSynced = !!linear && !linear.error && linear.synced
   const { data: agents } = useSWR('agents', () => listAgents())
-  const { data: runs } = useSWR('task-runs', () => listTaskRuns(), { refreshInterval: 15000 })
+  const { data: runs } = useSWR('task-runs', () => listTaskRuns(), { refreshInterval: LIST_POLL_MS })
   const myAgents = useMemo(() => new Set((agents ?? []).map(agent => agent.id)), [agents])
   const owners = useMemo(() => new Map((runs ?? []).map(run => [run.issueId, { bot: run.bot, harnesses: run.harnesses }] as const)), [runs])
   // listTaskRuns returns each task's newest run once; the card shows that run's group, never its raw status.

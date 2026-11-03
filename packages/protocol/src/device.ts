@@ -91,10 +91,15 @@ export const devicePaths = {
     deviceId: string,
     waitSeconds: number,
     skipRuns: readonly string[] = [],
+    updates?: { daemonLatest: string; skipDeviceCommands?: readonly string[] },
   ) =>
     `/v1/devices/${seg(deviceId)}/commands?wait=${waitSeconds}` +
     (skipRuns.length
       ? `&${COMMANDS_SKIP_PARAM}=${skipRuns.map(seg).join(",")}`
+      : "") +
+    (updates
+      ? `&${COMMANDS_DAEMON_LATEST_PARAM}=${seg(updates.daemonLatest)}` +
+        (updates.skipDeviceCommands?.length ? `&${COMMANDS_SKIP_DEVICE_COMMANDS_PARAM}=${updates.skipDeviceCommands.map(seg).join(",")}` : "")
       : ""),
   commandsAck: (deviceId: string) =>
     `/v1/devices/${seg(deviceId)}/commands/ack`,
@@ -163,8 +168,24 @@ export const heartbeatRunSchema = z.object({
 })
 export type HeartbeatRun = z.infer<typeof heartbeatRunSchema>
 
+/**
+ * Oldest local daemon the server still serves. Raise it only with a change older
+ * daemons cannot handle; a claim from an older one is refused (daemonUpgradeRequired).
+ */
+export const MIN_DAEMON_VERSION = '0.0.299'
+/** packages/daemon/package.json's version: a daemon run from source (dev, E2E). Releases are 0.0.<run number>. */
+export const SOURCE_DAEMON_VERSION = '0.0.1'
+const stableVersion = z.string().regex(/^(0|[1-9]\d{0,8})\.(0|[1-9]\d{0,8})\.(0|[1-9]\d{0,8})$/)
+/** What the server tells a daemon about releases: it updates when idle if `latest` is newer. */
+export const daemonVersionsSchema = z.object({ min: stableVersion, latest: stableVersion.optional() })
+export type DaemonVersions = z.infer<typeof daemonVersionsSchema>
+/** The daemon's last failed automatic update; the old version keeps running. Codes only, never npm output. */
+export const daemonUpdateFailureSchema = z.object({ version: stableVersion, code: z.enum(['install_failed', 'restart_failed']), at: isoTime })
+export type DaemonUpdateFailure = z.infer<typeof daemonUpdateFailureSchema>
+
 /** `POST /v1/devices/:deviceId/heartbeat` */
 export const deviceManagementCommand = z.object({ id: z.uuid(), kind: z.enum(['redetect', 'restart', 'update', 'uninstall']) })
+export type DeviceManagementCommand = z.infer<typeof deviceManagementCommand>
 export const deviceHeartbeatSchema = z.object({
   completedDeviceCommands: z.array(z.uuid()).max(100).optional(),
   failedDeviceCommands: z.array(z.object({ id: z.uuid(), error: z.string().max(500) })).max(100).optional(),
@@ -179,6 +200,8 @@ export const deviceHeartbeatSchema = z.object({
    * polling. Numbers only, never a vendor credential (ADR 0027).
    */
   quotas: z.array(quotaSnapshotSchema).max(6).optional(),
+  /** Null once no automatic update has failed since the last success. */
+  updateFailure: daemonUpdateFailureSchema.nullable().optional(),
 })
 export type DeviceHeartbeat = z.input<typeof deviceHeartbeatSchema>
 
@@ -194,6 +217,8 @@ export const heartbeatResultSchema = z.object({
   revoked: z.array(id).max(500).optional(),
   /** Short-lived cloud device token, returned only over its authenticated link. */
   cloudCredential: z.string().regex(/^orv_[A-Za-z0-9_-]{43}$/).optional(),
+  /** A malformed value is dropped, never a failed heartbeat. */
+  daemonVersions: daemonVersionsSchema.optional().catch(undefined),
 })
 export type HeartbeatResult = z.input<typeof heartbeatResultSchema>
 
@@ -366,6 +391,9 @@ export const runAssignmentSchema = z.object({
   pushBranch: z.string().min(1).max(250).optional(),
   /** Run by the daemon in the worktree after the agent submits. */
   verifyCommand: z.string().max(2_000).optional(),
+  /** Host-owned Factory check mode; the model cannot grant a check or skip verification. */
+  factoryCheck: z.object({ stage: z.enum(['review', 'verify']), inferCommand: z.boolean(), reportOnly: z.boolean() }).strict().optional(),
+  factoryExecuteKind: z.enum(['repository', 'report', 'deliverable']).optional(),
   /** Run lease; renewed through the device heartbeat. */
   leaseExpiresAt: isoTime.optional(),
   /**
@@ -379,10 +407,15 @@ export const runAssignmentSchema = z.object({
     /** Apps (Composio toolkits) this run may use through the Mikka server, one MCP entry each. */
     apps: z.array(z.string().regex(/^[a-z][a-z0-9_]{0,63}$/)).max(64).optional(),
   }).optional(),
-  /** Agent-owned GitHub delivery; the same run token exchanges short-lived credentials. */
+  /**
+   * The run owner's own GitHub credential (decision 2026-11-02-1600): the run
+   * token exchanges it at `endpoint` for git and gh, for any github.com
+   * repository the person authorized. `repository` is this run's; `branch`,
+   * when present, is the task branch the agent delivers to.
+   */
   github: z.object({
     endpoint: z.url(), repository: z.string().regex(/^[a-z0-9_.-]+\/[a-z0-9_.-]+$/),
-    branch: z.string().regex(/^mikka\/[a-z0-9-]+-[1-9][0-9]*$/),
+    branch: z.string().regex(/^mikka\/[a-z0-9-]+-[1-9][0-9]*$/).optional(),
   }).strict().optional(),
   /** Question continuation must not silently open a different session. */
   /**
@@ -501,6 +534,17 @@ export const COMMANDS_MAX_WAIT_SECONDS = 25
  */
 export const COMMANDS_SKIP_PARAM = "skip"
 export const COMMANDS_MAX_SKIP = 100
+/**
+ * The newest daemon release this daemon already knows of (its own version
+ * when none). Sending it says the daemon reads `daemonVersions` and
+ * `deviceCommands` from this answer: the long-poll then ends as soon as the
+ * server knows a newer release, or has a device command outside
+ * `COMMANDS_SKIP_DEVICE_COMMANDS_PARAM`.
+ */
+export const COMMANDS_DAEMON_LATEST_PARAM = "daemonLatest"
+/** Device commands the daemon already holds (comma-separated ids), so a held update does not end every poll. */
+export const COMMANDS_SKIP_DEVICE_COMMANDS_PARAM = "skipDeviceCommands"
+export const COMMANDS_MAX_SKIP_DEVICE_COMMANDS = 10
 
 /**
  * Something a person asked of a run on this device. `input` is a message a
@@ -538,6 +582,10 @@ export const runCommandsResponse = z.object({
    * Absent from older servers; the heartbeat still claims either way.
    */
   queuedRuns: z.array(id).max(100).optional(),
+  /** Only for a daemon that sent `COMMANDS_DAEMON_LATEST_PARAM`; a malformed value is dropped. */
+  daemonVersions: daemonVersionsSchema.optional().catch(undefined),
+  /** The oldest pending device command (as the heartbeat's), so a person's update reaches the device now. */
+  deviceCommands: z.array(deviceManagementCommand).max(1).optional().catch(undefined),
 })
 export type RunCommandsResponse = z.infer<typeof runCommandsResponse>
 

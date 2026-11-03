@@ -42,7 +42,6 @@ export async function exerciseFactoryRecoveryEntry(
       mock.module(new URL(path, import.meta.url).href, { namedExports }),
     );
   const flags = [
-    "MIKKA_ISSUE_TOOLS_ENABLED",
     "MIKKA_FACTORY_ROUTING_ENABLED",
     "MIKKA_FACTORY_LIFECYCLE_ENABLED",
   ] as const;

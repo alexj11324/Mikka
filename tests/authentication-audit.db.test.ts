@@ -32,6 +32,17 @@ test('authentication writes tenant-bound durable intent and withholds every new 
   })
   for (let index = 0; index < 3; index++) workspaces.push((await seedWorkspace(database, userId, [{ userId, role: 'admin', status: index === 2 ? 'suspended' : 'active' }])).id)
   const events = () => database.query('SELECT * FROM workspace_audit_outbox WHERE "workspaceId"=ANY($1::uuid[]) ORDER BY "workspaceId",id', [workspaces]).then(result => result.rows)
+  // The relay delivers any pending row (FOR UPDATE SKIP LOCKED). Rows another suite left pending are
+  // held locked while this test delivers, so it delivers and counts only its own and never touches theirs.
+  const deliverOwn = async () => {
+    const own = (await events()).map(row => row.id)
+    const holder = await database.connect()
+    try {
+      await holder.query('BEGIN')
+      await holder.query('SELECT id FROM workspace_audit_outbox WHERE "deliveredAt" IS NULL AND NOT (id=ANY($1::uuid[])) FOR UPDATE', [own])
+      return await deliverWorkspaceAudits({ main: database, workspace: database })
+    } finally { await holder.query('ROLLBACK'); holder.release() }
+  }
   const post = (body: unknown) => auth.handler(new Request(`${origin}/mikka/api/auth/sign-in/email`, { method: 'POST', headers: { origin, 'content-type': 'application/json' }, body: JSON.stringify(body) }))
   await t.test('wrong passwords name an attempted subject, never a forged authenticated actor or client-selected tenant', async () => {
     const denied = await post({ email, password: 'wrong-fixture-password', userId: 'forged-actor', workspaceId: workspaces[2] })
@@ -59,19 +70,17 @@ test('authentication writes tenant-bound durable intent and withholds every new 
     const count = (await events()).length
     await auth.api.getSession({ headers: new Headers({ cookie: response.headers.getSetCookie().map((value: string) => value.split(';')[0]).join('; ') }) })
     assert.equal((await events()).length, count)
-    // Exercise the production relay without adopting another test's pending intent.
-    const own = new Set((await events()).map(row => row.id))
-    const pending = (await database.query('SELECT id FROM workspace_audit_outbox WHERE "deliveredAt" IS NULL')).rows
-    if (pending.every(row => own.has(row.id))) {
-      const name = `auth_audit_sink_${randomUUID().replaceAll('-', '')}`
-      await database.query(`ALTER TABLE workspace_audit_events ADD CONSTRAINT ${name} CHECK("workspaceId"<> '${workspaces[0]}'::uuid AND "workspaceId"<>'${workspaces[1]}'::uuid) NOT VALID`)
-      try { assert.equal((await deliverWorkspaceAudits({ main: database, workspace: database })).failed, 1) }
-      finally { await database.query(`ALTER TABLE workspace_audit_events DROP CONSTRAINT ${name}`) }
-      assert.equal((await events()).every(row => row.deliveredAt === null), true)
-      assert.equal((await deliverWorkspaceAudits({ main: database, workspace: database })).failed, 0)
-      const sink = (await database.query('SELECT action FROM workspace_audit_events WHERE "workspaceId"=ANY($1::uuid[])', [workspaces])).rows
-      assert.equal(sink.length, 4)
-    }
+    // Exercise the production relay on this test's own pending intent only (deliverOwn).
+    const name = `auth_audit_sink_${randomUUID().replaceAll('-', '')}`
+    await database.query(`ALTER TABLE workspace_audit_events ADD CONSTRAINT ${name} CHECK("workspaceId"<> '${workspaces[0]}'::uuid AND "workspaceId"<>'${workspaces[1]}'::uuid) NOT VALID`)
+    try { assert.equal((await deliverOwn()).failed, 1) }
+    finally { await database.query(`ALTER TABLE workspace_audit_events DROP CONSTRAINT ${name}`) }
+    assert.equal((await events()).every(row => row.deliveredAt === null), true)
+    assert.equal((await deliverOwn()).failed, 0)
+    const own = (await events()).map(row => row.id)
+    assert.equal(own.length, 4)
+    const sink = (await database.query('SELECT id FROM workspace_audit_events WHERE id=ANY($1::uuid[])', [own])).rows
+    assert.equal(sink.length, 4)
   })
   await t.test('actual Better Auth HTTP and nextCookies API paths publish no credential on an outbox error', async () => {
     const name = `auth_audit_source_${randomUUID().replaceAll('-', '')}`
@@ -104,12 +113,14 @@ test('authentication writes tenant-bound durable intent and withholds every new 
     try { await client.query('BEGIN'); await TestAccountPool.prototype.cleanupLoginAudit(client, [{ id: session.id, owner_id: userId }]); await client.query('COMMIT') }
     catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
     assert.equal(await fingerprint(), before)
-    assert.equal((await database.query('SELECT count(*)::int n FROM workspace_audit_events WHERE "workspaceId"=ANY($1::uuid[])', [workspaces])).rows[0].n, 4)
+    // This test's own four earlier rows are delivered, whatever other suites left in the outbox.
+    const delivered = (await events()).filter(row => row.deliveredAt !== null).map(row => row.id)
+    assert.equal(delivered.length, 4)
+    assert.equal((await database.query('SELECT count(*)::int n FROM workspace_audit_events WHERE id=ANY($1::uuid[])', [delivered])).rows[0].n, 4)
     // Exercise a delivered login as well: prior unrelated rows remain untouched.
     const after = await post({ email, password }); assert.equal(after.status, 200)
     const next = await after.json(), nextSession = (await database.query('SELECT id FROM session WHERE token=$1', [next.token])).rows[0]
-    const own = new Set((await events()).map(row => row.id)), pending = (await database.query('SELECT id FROM workspace_audit_outbox WHERE "deliveredAt" IS NULL')).rows
-    if (pending.every(row => own.has(row.id))) await deliverWorkspaceAudits({ main: database, workspace: database })
+    await deliverOwn()
     const cleanup = await database.connect()
     try { await cleanup.query('BEGIN'); await TestAccountPool.prototype.cleanupLoginAudit(cleanup, [{ id: nextSession.id, owner_id: userId }]); await cleanup.query('COMMIT') }
     catch (error) { await cleanup.query('ROLLBACK'); throw error } finally { cleanup.release() }

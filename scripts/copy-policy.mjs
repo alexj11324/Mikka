@@ -24,3 +24,14 @@ export function machineNameProblems(lookup) {
     return []
   })
 }
+
+// The background service on a device is 「daemon」 in both languages, with no
+// 「Mikka」 in front; 「Mikka 客户端」 / "Mikka client" read as the desktop app (glossary: Daemon).
+// Header names such as `x-mikka-client` are identifiers and stay.
+export const bannedDaemonName = /mikka\s*(客户端|client)/i
+// The glossary names the word to avoid.
+export const daemonAllowedPaths = [...allowedPaths, 'docs/design/glossary.md']
+
+export function daemonNameHits(text) {
+  return text.split('\n').flatMap((line, index) => bannedDaemonName.test(line) ? [{ line: index + 1, text: line.trim() }] : [])
+}

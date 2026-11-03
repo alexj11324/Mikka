@@ -8,7 +8,10 @@ const changes = {
   assigneeUserId: z.string().trim().min(1).max(200).nullable().optional().describe('A person who already has access to this task; null unassigns. Never an execution identity.'),
 }
 
-export const createIssueInput = z.object({ title: z.string().trim().min(1).max(200), body: z.string().max(50_000).optional(), ...changes }).strict()
+export const createIssueInput = z.object({
+  title: z.string().trim().min(1).max(200), body: z.string().max(50_000).optional(), ...changes,
+  teamId: z.uuid().optional().describe('Only after create_issue returned issueTeamRequired: the id of the team the person chose among its teams. Otherwise omit; the task goes to this workspace\'s team on its own.'),
+}).strict()
 export const updateIssueInput = z.object({ issueId: z.uuid(), title: z.string().trim().min(1).max(200).optional(), ...changes }).strict()
 export type CreateIssueInput = z.infer<typeof createIssueInput>
 export type UpdateIssueInput = z.infer<typeof updateIssueInput>

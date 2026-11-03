@@ -7,6 +7,7 @@ import {freezeWorkerDefinition, retryWorkerDefinition} from './worker'
 import {runPrompt} from '../run-prompt'
 import {DEFAULT_AGENT_DEFINITION} from './builtin'
 import {makeSnapshot} from './definition'
+import { overrideDeploymentSwitch } from '../deployment-switches'
 
 const owner=randomUUID(),workspace=randomUUID(),agentId=randomUUID(),deviceId=randomUUID(),repoId=randomUUID(),botId=randomUUID(),issueId=randomUUID()
 const binding={id:randomUUID(),ownerId:owner,workspaceId:workspace,consumerId:agentId,connectionId:randomUUID(),connectionRevision:1,route:'codex_cli',modelId:'frozen-model'}
@@ -46,7 +47,7 @@ let protocolVersion=3
 stub('../db/index.ts',{db,pool:{}})
 const cliPolicy: ReturnType<typeof defaultRunPolicy>={...defaultRunPolicy(),permissions:{...defaultRunPolicy().permissions,network:'deny',install_dependency:'deny',git_push:'deny'},networkAllow:['cli-policy.invalid']}
 let cliReadOnly=false
-stub('../device-link.ts',{authenticateDevice:async()=>({userId:owner,scopeDeviceId:deviceId,scopeWorkspaceId:workspace}),ownedDevice:async()=>({enabled:true,protocolVersion,kind:cloud?'cloud':'local',computerUse:{installed:localCapable,version:null},harnesses:[{harness:'codex',installed:true,toolApproval:true,subscriptionBroker:true,computerBroker:true}]})})
+stub('../device-link.ts',{authenticateDevice:async()=>({userId:owner,scopeDeviceId:deviceId,scopeWorkspaceId:workspace}),ownedDevice:async()=>({enabled:true,protocolVersion,kind:cloud?'cloud':'local',computerUse:{installed:localCapable,version:null},harnesses:[{harness:'codex',installed:true,toolApproval:true,subscriptionBroker:true,computerBroker:true}]}),ownedDeviceWithReport:async()=>({enabled:true,protocolVersion,kind:cloud?'cloud':'local',computerUse:{installed:localCapable,version:null},harnesses:[{harness:'codex',installed:true,toolApproval:true,subscriptionBroker:true,computerBroker:true}]})})
 const modelAdmissionCheck=mock.fn(async(_scope:{workspaceId:string;ownerId:string},_model:string,_signal?:AbortSignal)=>undefined)
 stub('../model-admission/runtime.ts',{assertUnmanagedModelTransport:modelAdmissionCheck,assertSubscriptionModelTransport:modelAdmissionCheck})
 stub('../agent-tool-approval/policy-store.ts',{readCliRunPolicy:async()=>({policy:{...cliPolicy,...(cliReadOnly?{readOnly:true}:{})},revision:'a'.repeat(64),workspaceIds:[workspace]})})
@@ -58,7 +59,9 @@ stub('../issue-team-access.ts',{issueTeamAccess:async()=>{throw Error('owner cla
 stub('../mcp/resource.ts',{mcpResourceURL:null})
 stub('../device-repositories.ts',{readRepositorySettings:async()=>null})
 stub('../run-publications.ts',{prepareRunPublication:prepared,persistRunCompletion:completed})
-stub('../run-leases.ts',{latestCheckpoint:async()=>null})
+stub('../run-leases.ts',{latestCheckpoint:async()=>null,failRunForDaemonUpgrade:async()=>false})
+let githubAccount:string|null=null
+stub('../github/repository-installation.ts',{linkedGitHubAccountId:async()=>githubAccount})
 stub('../computer/local-authority.ts',{localComputerAuthority:async()=>({botId,ownerId:owner,workspaceId:workspace,policyVersion:3,permission:'allow'})})
 stub('../computer/claim.ts',{claimLocalRun:claimed,claimCloudRun:cloudClaimed})
 stub('../computer/native-run-binding.ts',{nativeRunBinding:scopedBinding})
@@ -79,13 +82,14 @@ let queue: typeof import('../computer/queue-run').queueCloudRun
 before(async()=>{claim=(await import('../../app/v1/devices/[deviceId]/runs/[runId]/claim/route')).POST;queue=(await import('../computer/queue-run')).queueCloudRun})
 beforeEach(()=>{definition=frozen();subscription={...binding};missing=false;cloud=false;localCapable=false;cliReadOnly=false;cliPolicy.permissions.git_push='deny';publicationPolicy.permissions.git_push='allow';computerPermission='ask';mismatch=undefined;protocolVersion=3;selectIndex=0;stopDuringToken=false;lockOrder.length=0;process.env.MIKKA_BYOS_ENABLED='1';process.env.MIKKA_AGENT_KIT='1';process.env.MIKKA_CLOUD_COMPUTER_TASKS='1';for(const fn of [modelAdmissionCheck,bindingById,latestBinding,scopedBinding,claimed,cloudClaimed,prepared,completed])fn.mock.resetCalls()})
 const request=()=>claim(new Request('https://example.test/v1/devices/'+deviceId+'/runs/'+randomUUID()+'/claim',{method:'POST',headers:{[REPO_ORIGIN_HEADER]:'1'}}),{params:Promise.resolve({deviceId,runId:randomUUID()})})
-const assertCliPolicy=(body:{policy:ReturnType<typeof defaultRunPolicy>;policyRevision:string})=>{assert.equal(body.policy.permissions.network,'deny');assert.equal(body.policy.permissions.install_dependency,'deny');assert.equal(body.policy.permissions.git_push,'deny');assert.deepEqual(body.policy.networkAllow,['cli-policy.invalid']);assert.equal(body.policyRevision,'a'.repeat(64))}
+const assertCliPolicy=(body:{policy:ReturnType<typeof defaultRunPolicy>;policyRevision:string})=>{assert.equal(body.policy.permissions.network,'deny');assert.equal(body.policy.permissions.install_dependency,'deny');assert.deepEqual(body.policy.networkAllow,['cli-policy.invalid']);assert.equal(body.policyRevision,'a'.repeat(64))}
 test('local claim uses frozen harness and exact subscription despite Agent edits',async()=>{
  definition={...frozen(),model:'frozen-model',cliModelSelection:'explicit'}
- const response=await request();assert.equal(response.status,200);const body=await response.json();assert.equal(body.harness,'codex');assert.equal(body.model,'frozen-model');assert.equal(body.remoteUrl,'https://github.com/example/repo.git');assert.equal(body.baseBranch,undefined);assert.deepEqual(bindingById.mock.calls[0].arguments,[owner,binding.id]);assert.equal(latestBinding.mock.callCount(),0);assert.equal(claimed.mock.callCount(),1);assert.equal(typeof (claimed.mock.calls[0].arguments as unknown[])[5],'function','Factory lineage guard remains attached')
+ const response=await request();assert.equal(response.status,200);const body=await response.json();assert.equal(body.harness,'codex');assert.equal(body.model,'frozen-model');assert.equal(body.remoteUrl,'https://github.com/example/repo.git');assert.equal(body.baseBranch,undefined);assert.deepEqual(scopedBinding.mock.calls[0].arguments.slice(1),[owner,agentId,'codex',undefined,binding.id]);assert.equal(bindingById.mock.callCount(),0,'pinned lookup uses the owner/share-aware scope gate');assert.equal(latestBinding.mock.callCount(),0);assert.equal(claimed.mock.callCount(),1);assert.equal(typeof (claimed.mock.calls[0].arguments as unknown[])[5],'function','Factory lineage guard remains attached')
  assert.deepEqual(modelAdmissionCheck.mock.calls[0].arguments.slice(0,2),[{workspaceId:workspace,ownerId:owner},'frozen-model'])
  assert.equal(modelAdmissionCheck.mock.calls[0].arguments[2],binding.route)
  assert.equal(prepared.mock.callCount(),1)
+ assert.equal(body.policy.permissions.git_push,'allow','a stored CLI git_push deny no longer withholds the task branch push (decision 2026-11-02-1600)')
  const [run,remoteUrl]=prepared.mock.calls[0].arguments
  assert.equal(run.userId,owner);assert.equal(run.issueId,issueId);assert.equal(run.baseBranch,null);assert.equal(remoteUrl,'https://github.com/example/repo.git')
  assert.equal(body.pushBranch,publicationAssignment.pushBranch);assertCliPolicy(body);assert.equal(completed.mock.callCount(),0)
@@ -140,34 +144,41 @@ test('cloud queue captures exact worker and parent snapshot in the same transact
  const calls:{sql:string,args:unknown[]}[]=[]
  const client={release(){},async query(sql:string,args:unknown[]=[]){calls.push({sql,args});if(sql.startsWith('SELECT m.'))return {rows:[{deviceId,instructions:'Cloud review',harness:'codex',baseBranch:'main'}]};if(sql.startsWith('SELECT 1 FROM bots b JOIN agents'))return {rows:[{}],rowCount:1};if(sql.startsWith('select id from byos_bindings'))return {rows:[{id:binding.id}]};if(sql.startsWith('select id,"ownerId"'))return {rows:[binding]};return {rows:[]}}}
  const parent={id:randomUUID(),status:'running' as const,snapshot:makeSnapshot(randomUUID(),2,DEFAULT_AGENT_DEFINITION,'HOST',{harness:'codex',model:null})}
- await queue({connect:async()=>client} as unknown as Parameters<typeof queue>[0],{userId:owner,workspaceId:workspace},{botId,issueId,agentId,deviceRepoId:repoId,title:'Review',body:'synthetic',execution:parent})
+ await queue({connect:async()=>client} as unknown as Parameters<typeof queue>[0],{userId:owner,workspaceId:workspace},{botId,issueId,agentId,deviceRepoId:repoId,title:'Review',body:'synthetic',model:binding.modelId,execution:parent})
  const insert=calls.find(c=>c.sql.startsWith('INSERT INTO agent_runs'))!;const snapshot=JSON.parse(insert.args[9] as string);assert.equal(snapshot.harness,'codex');assert.equal(snapshot.subscription.bindingId,binding.id);assert.equal(snapshot.parent.executionId,parent.id);assert.equal(calls.at(-1)!.sql,'COMMIT');assert.ok(calls.some(c=>c.sql.startsWith('INSERT INTO computer_run_bindings')))
 })
 
 
 test('with versioned definitions off, a cloud run still freezes its Agent and credential source',async()=>{
- // Every cloud run freezes its definition when it is queued (orchestration.md § 5), with or without a model in the request.
+ // Every cloud run freezes its definition when it is queued (orchestration.md § 5), with the model its caller chose.
  process.env.MIKKA_AGENT_KIT='0'
  const calls:{sql:string,args:unknown[]}[]=[]
  const client={release(){},async query(sql:string,args:unknown[]=[]){calls.push({sql,args});if(sql.startsWith('SELECT m.'))return {rows:[{deviceId,instructions:'Review',harness:'codex',baseBranch:'main'}]};if(sql.startsWith('SELECT 1 FROM bots b JOIN agents'))return {rows:[{}],rowCount:1};if(sql.startsWith('select id from byos_bindings'))return {rows:[{id:binding.id}]};if(sql.startsWith('select id,"ownerId"'))return {rows:[binding]};return {rows:[]}}}
- await queue({connect:async()=>client} as unknown as Parameters<typeof queue>[0],{userId:owner,workspaceId:workspace},{botId,issueId,agentId,deviceRepoId:repoId,title:'Review',body:''})
+ await queue({connect:async()=>client} as unknown as Parameters<typeof queue>[0],{userId:owner,workspaceId:workspace},{botId,issueId,agentId,deviceRepoId:repoId,title:'Review',body:'',model:binding.modelId})
  const insert=calls.find(c=>c.sql.startsWith('INSERT INTO agent_runs'))!;const snapshot=JSON.parse(insert.args[9] as string)
  assert.equal(snapshot.harness,'codex');assert.equal(snapshot.subscription.bindingId,binding.id);assert.equal(calls.at(-1)!.sql,'COMMIT')
 })
-test('an automatic rule model stays automatic with versioned definitions disabled',async()=>{
+// The hosted runner starts a subscription run only on that subscription's own model: a cloud subscription run
+// is frozen with that model, explicitly, and one queued without it (or with 'auto') fails before anything is written.
+test('a cloud subscription run must name its model explicitly with versioned definitions disabled',async()=>{
  process.env.MIKKA_AGENT_KIT='0'
  const calls:{sql:string,args:unknown[]}[]=[]
  const client={release(){},async query(sql:string,args:unknown[]=[]){calls.push({sql,args});if(sql.startsWith('SELECT m.'))return {rows:[{deviceId,instructions:'Review',harness:'codex',baseBranch:'main'}]};if(sql.startsWith('SELECT 1 FROM bots b JOIN agents'))return {rows:[{}],rowCount:1};if(sql.startsWith('select id from byos_bindings'))return {rows:[{id:binding.id}]};if(sql.startsWith('select id,"ownerId"'))return {rows:[binding]};return {rows:[]}}}
- await queue({connect:async()=>client} as unknown as Parameters<typeof queue>[0],{userId:owner,workspaceId:workspace},{botId,issueId,agentId,deviceRepoId:repoId,title:'Review',body:'',model:'auto'})
+ const pool={connect:async()=>client} as unknown as Parameters<typeof queue>[0]
+ for(const model of ['auto','',undefined]){
+  await assert.rejects(queue(pool,{userId:owner,workspaceId:workspace},{botId,issueId,agentId,deviceRepoId:repoId,title:'Review',body:'',model:model as string,threadRunId:'previous-run'}),/Run model missing \(run .+, thread previous-run\)/)
+ }
+ assert.equal(calls.length,0,'nothing is read or written for a run without its model')
+ await queue(pool,{userId:owner,workspaceId:workspace},{botId,issueId,agentId,deviceRepoId:repoId,title:'Review',body:'',model:binding.modelId})
  const insert=calls.find(call=>call.sql.startsWith('INSERT INTO agent_runs'))!
  const snapshot=JSON.parse(insert.args[9] as string)
- assert.equal(snapshot.cliModelSelection,'auto');assert.equal(Object.hasOwn(snapshot,'model'),false)
+ assert.equal(snapshot.cliModelSelection,'explicit');assert.equal(snapshot.model,binding.modelId);assert.equal(snapshot.subscription.modelId,binding.modelId)
  assert.equal(snapshot.subscription.bindingId,binding.id);assert.equal(calls.at(-1)!.sql,'COMMIT')
 })
 test('cloud request replay cannot substitute another parent execution',async()=>{
  const client={release(){},async query(sql:string){if(sql.startsWith('SELECT m.'))return {rows:[{deviceId,instructions:'Review',harness:'codex',baseBranch:'main'}]};if(sql.startsWith('SELECT r.'))return {rows:[{userId:owner,issueId,agentId,deviceId,deviceRepoId:repoId,runBotId:botId,botId,workspaceId:workspace,prompt:runPrompt('Review','','Review'),agentDefinition:{harness:'codex',parent:{executionId:randomUUID()}}}]};return {rows:[]}}}
  const parent={id:randomUUID(),status:'running' as const,snapshot:makeSnapshot(randomUUID(),2,DEFAULT_AGENT_DEFINITION,'HOST',{harness:'codex',model:null})}
- await assert.rejects(queue({connect:async()=>client} as unknown as Parameters<typeof queue>[0],{userId:owner,workspaceId:workspace},{botId,issueId,agentId,deviceRepoId:repoId,title:'Review',body:'',execution:parent,idempotencyKey:'same-call'}),/Task request changed/)
+ await assert.rejects(queue({connect:async()=>client} as unknown as Parameters<typeof queue>[0],{userId:owner,workspaceId:workspace},{botId,issueId,agentId,deviceRepoId:repoId,title:'Review',body:'',model:binding.modelId,execution:parent,idempotencyKey:'same-call'}),/Task request changed/)
 })
 
 test('local assignment receives only persisted server computer authority',async()=>{localCapable=true;const response=await request();assert.equal(response.status,200);const body=await response.json();assert.equal(body.localComputer.workspaceId,workspace);assert.equal(body.localComputer.ownerId,owner);assert.equal(body.localComputer.policyVersion,3);assert.equal(body.policy.permissions.computer_use,'allow');assert.equal(body.computer,undefined);assertCliPolicy(body)})
@@ -207,10 +218,17 @@ test('a cloud run admitted with the GitHub App grant gets its publication and al
  assert.equal(body.policy.permissions.git_push,'allow')
 })
 
-test('a read-only local run gets no push branch and a read-only policy, whatever git_push says', async () => {
+test('a read-only local run gets no push branch and a read-only policy, but the owner\'s GitHub credential like any run', async () => {
  definition={...frozen(),readOnly:true};cliPolicy.permissions.git_push='allow'
  const response=await request();assert.equal(response.status,200);const body=await response.json()
  assert.equal(prepared.mock.callCount(),0,'a read-only run reserves no publication')
- assert.equal(body.pushBranch,undefined);assert.equal(body.github,undefined)
+ assert.equal(body.pushBranch,undefined);assert.equal(body.github,undefined,'no GitHub connection: nothing to give')
  assert.equal(body.policy.readOnly,true);assert.equal(body.policy.permissions.git_push,'deny')
+ selectIndex=0;githubAccount='123'
+ overrideDeploymentSwitch('personalMailbox', false)
+ try {
+  const connected=await (await request()).json()
+  assert.ok(connected.mcp,'the run token is issued')
+  assert.equal(connected.github?.repository,'example/repo');assert.equal(connected.github?.branch,undefined)
+ } finally { githubAccount=null;overrideDeploymentSwitch('personalMailbox', undefined) }
 })

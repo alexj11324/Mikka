@@ -1,3 +1,5 @@
+import { queueTaskRun } from '@/lib/factory/queue-local'
+import { deploymentSwitch } from '@/lib/deployment-switches'
 import { cloudComputerRunsEnabled } from '@/lib/cloud-computer-flag'
 import { runInvalidDetail } from '@/lib/run-invalid-reason'
 import { FatalError } from 'workflow'
@@ -23,8 +25,8 @@ import type { ModelMessage } from 'ai'
 import { summarizeConversation } from '@/lib/coordinator/summary-model'
 import { and, asc, desc, eq } from 'drizzle-orm'
 import { ActionFailureError } from '@/lib/action-error'
-import { addRunMessage, queueRun, readRun, requestRunStop, visibleRuns } from '@/lib/agent-runs'
-import { compactionCut, forgetNotes, instructionsWithMemory, promptMessages, rememberNote, SUMMARY_INSTRUCTIONS } from '@/lib/coordinator/context'
+import { addRunMessage,  readRun, requestRunStop, visibleRuns } from '@/lib/agent-runs'
+import { compactionCut, forgetNotes, cachedContextLines, promptMessages, promptWithCachedContext, rememberNote, SUMMARY_INSTRUCTIONS } from '@/lib/coordinator/context'
 import { COORDINATOR_INSTRUCTIONS } from '@/lib/coordinator/instructions'
 import { withPersonalInstructions } from '@/lib/coordinator/personal-instructions'
 import { botInstructions } from '@/lib/coordinator/bot-instructions'
@@ -43,8 +45,8 @@ import type { PendingTelegramTarget } from '@/lib/coordinator/telegram-pending'
 import { createTelegramReplies } from '@/lib/coordinator/telegram-replies'
 import { workspacePool } from '@/lib/workspace-db'
 import { postTelegramText } from '@/lib/telegram/client'
-import { pushInput, pushQuestions, readPush, type InboxEvent } from '@/lib/push-reasons'
-import { queueCloudRun } from '@/lib/computer/queue-run'
+import type { InboxEvent } from '@/lib/push-reasons'
+import { queueFactoryCloudRun as queueCloudRun } from '@/lib/factory/queue-cloud'
 import { ComputerStore } from '@/lib/computer/store'
 import { bindBotSubscription } from '@/lib/computer/bot-subscription'
 import { recordDecision, settleTurn } from '@/lib/attention/store'
@@ -56,6 +58,12 @@ import { systemActor } from '@/lib/activity-actor'
 // expected failures instead of throwing, so a bad id is not retried.
 
 type ToolResult<T> = T | { error: string; reason?: string; detail?: string }
+
+/** The deployment switches the Coordinator's tools depend on, read here because a workflow body never reads one (lib/deployment-switches.ts). */
+export async function coordinatorSwitches() {
+  'use step'
+  return (await import('./tools')).readCoordinatorSwitches()
+}
 
 export async function computerToolsEnabled() {
   'use step'
@@ -135,16 +143,63 @@ export async function stoppedStepText(holder: string, streamId: string) {
 }
 
 /**
- * 订阅额度用完后，自动改用 API Key: when this turn was frozen on the person's
- * key because the subscription ran out, the chat says so before the reply.
+ * 订阅额度用完后，自动改用 API Key, or 点数不足时改用: when this turn was
+ * frozen on another model because the subscription or the points ran out,
+ * the chat says so before the reply.
  */
-export async function noteQuotaSwitch(userId: string, holder: string, runtime: { modelSelection?: unknown }, botId: string) {
+/**
+ * Everything a Coordinator run reads once before its first round, in one step
+ * (each step is a durable round trip of about a second): the deployment
+ * switches, whether this chat is the Coordinator's, and the chat runtime.
+ */
+export async function turnSettings(userId: string, botId: string) {
   'use step'
-  const { hostedApiKeySnapshotSchema } = await import('@/lib/subscription-model-snapshot')
-  const selection = hostedApiKeySnapshotSchema.safeParse(runtime.modelSelection)
-  if (!selection.success || !selection.data.afterQuota) return
-  const { quotaSwitchMessage } = await import('@/lib/coordinator/message-safety')
-  await store.appendMessages(userId, holder, [quotaSwitchMessage(selection.data.afterQuota, new Date())], null, botId)
+  const { personalWritesEnabled } = await import('@/lib/operations/write-feature')
+  const { runtime } = await import('./native-steps')
+  const [coordinator, selected] = await Promise.all([
+    (await import('@/lib/coordinator/coordinator-bot')).isCoordinatorBot(pool, userId, botId),
+    runtime(userId),
+  ])
+  return { computerEnabled: cloudComputerRunsEnabled(), mailboxEnabled: personalMailboxEnabled(), writeEnabled: personalWritesEnabled(), switches: (await import('./tools')).readCoordinatorSwitches(), coordinator, runtime: selected }
+}
+
+/**
+ * Everything a round needs between starting its execution and its first model
+ * call, in one step: the mailbox catalogue, the model-switch notice and the
+ * prompt. A retry after the notice was stored finds it as the last message and
+ * does not store it twice.
+ */
+export async function prepareTurn(userId: string, botId: string, holder: string, input: { snapshot?: DefinitionSnapshot; executionId?: string; mailboxEnabled: boolean; runtime: { modelSelection?: unknown } | null }) {
+  'use step'
+  const mailboxTools = input.mailboxEnabled ? await mailboxCatalogue(userId, botId, input.executionId) : []
+  if (input.runtime) await noteQuotaSwitch(userId, holder, input.runtime, botId, true)
+  return { mailboxTools, prompt: await preparePrompt(userId, botId, input.snapshot, mailboxTools) }
+}
+
+export async function noteQuotaSwitch(userId: string, holder: string, runtime: { modelSelection?: unknown }, botId: string, once = false) {
+  'use step'
+  const { hostedModelSelectionSchema } = await import('@/lib/subscription-model-snapshot')
+  const selection = hostedModelSelectionSchema.safeParse(runtime.modelSelection)
+  if (!selection.success) return
+  const kind = selection.data.afterPoints ? 'points_switch' : selection.data.type === 'api_key' && selection.data.afterQuota ? 'quota_switch' : null
+  if (!kind) return
+  // Inside prepareTurn a retried step must not store the notice twice: it would be the last message.
+  if (once && await store.lastEventKind(userId, botId) === kind) return
+  const { quotaSwitchMessage, pointsSwitchMessage } = await import('@/lib/coordinator/message-safety')
+  // 点数不足时改用 (decision 2026-11-02-1450): Mikka 默认 had no points, this turn runs on the next allowed model.
+  if (selection.data.afterPoints) await store.appendMessages(userId, holder, [pointsSwitchMessage(selection.data.modelId, new Date())], null, botId)
+  else if (selection.data.type === 'api_key' && selection.data.afterQuota) await store.appendMessages(userId, holder, [quotaSwitchMessage(selection.data.afterQuota, new Date())], null, botId)
+}
+
+/**
+ * One round's timing as one log line (`turn_timing`): how long from taking the
+ * inbox to storing the reply, how many model calls, and each tool call's name
+ * and duration. Durations and counts only. Each model call logs its own line
+ * (`model_call_timing`, lib/model-call-timing.ts) with the same workflowRunId.
+ */
+export async function logTurnTiming(timing: { workflowRunId: string; round: number; route: 'hosted' | 'subscription' | 'native'; untilStoredMs: number; modelCalls: number | null; tools: { tool: string; ms: number; failed: boolean }[] }) {
+  'use step'
+  try { console.info(JSON.stringify({ msg: 'turn_timing', ...timing })) } catch { /* timing never fails the turn */ }
 }
 
 export async function writeStreamPart(writable: WritableStream<CoordinatorWorkflowStreamPart>, part: CoordinatorWorkflowStreamPart) {
@@ -169,26 +224,45 @@ export async function acknowledgeTelegramReply(userId: string, botId: string, ho
 /** Pushes a reply the Coordinator raised on its own to the person's phones, as their 通知 settings allow (lib/mobile-push.ts). */
 export async function pushToPhones(userId: string, botId: string, text: string | null, events: InboxEvent[]) {
   'use step'
-  // Loaded here, not at the top: only this step needs the push sender, its settings and the Decisions call.
-  const [{ pushReply }, { decide }, { hostedBillingScope }, { executionWorkspace }] = await Promise.all([import('@/lib/mobile-push'), import('@/lib/coordinator/decide'), import('@/lib/abuse/context'), import('@/lib/execution-settings')])
-  let answers = null
-  try { answers = await hostedBillingScope.run({ workspaceId: await executionWorkspace(userId, botId), ownerId: userId }, () => decide('push-reply', pushInput(events, text), pushQuestions())) } catch { answers = null }
-  const reason = readPush(answers)
-  // No answer pushes nothing: the reply is in the chat either way.
-  if (reason === null) { console.warn('Phone push skipped: no Decisions answer'); return }
-  if (reason !== 'none') await pushReply(userId, botId, text, [reason])
+  await (await import('@/lib/coordinator/push-decision')).pushByDecision(userId, botId, text, events)
 }
+
+/**
+ * The turn failed for a reason the person can act on (Mikka 默认 or their
+ * subscription refused it): the web keeps that under their message, but
+ * Telegram and the phone would hear nothing. They get the same words instead
+ * (lib/coordinator/refusal-line.ts). Any other failure, and a scheduled read,
+ * sends nothing here. Never throws: the turn's own failure is what the caller records.
+ */
+export async function noticeTurnFailure(userId: string, botId: string, holder: string, error: string, telegramTargets: readonly PendingTelegramTarget[], pushEvents: readonly InboxEvent[]) {
+  'use step'
+  const { failureLine, deliverRefusalLine } = await import('@/lib/coordinator/refusal-line')
+  const line = failureLine(error)
+  if (!line) return false
+  const replies = createTelegramReplies(pool, workspacePool)
+  const { failed } = await deliverRefusalLine(line, telegramTargets, pushEvents, {
+    telegram: async (target, text) => {
+      await replies.send(userId, botId, holder, target, tx => postTelegramText(target.threadId, text, tx))
+      await replies.acknowledge(userId, botId, holder, target)
+    },
+    push: (text, events) => pushToPhones(userId, botId, text, events),
+  })
+  if (failed.length) console.error('Failure notice failed:', failed.join(', '))
+  return true
+}
+// A sent Telegram line has no idempotency key: never replay it.
+noticeTurnFailure.maxRetries = 0
 
 /**
  * Folds older messages into the summary once the conversation passes the
  * token budget, then returns the prompt for this turn: the instructions with
  * the person's memory, and the messages.
  */
-export async function preparePrompt(userId: string, botId: string, snapshot?: DefinitionSnapshot, mailboxTools: readonly MailboxToolName[] = []): Promise<{ instructions: string; messages: ModelMessage[] }> {
+export async function preparePrompt(userId: string, botId: string, snapshot?: DefinitionSnapshot, mailboxTools: readonly MailboxToolName[] = []): Promise<{ instructions: string; stable: number; messages: ModelMessage[] }> {
   'use step'
   // Fallback only: run completion already reconciles (lib/run-completion-effects.ts
   // reconcileFactoryAfterCompletion). This catches completions whose hook failed.
-  if (process.env.MIKKA_FACTORY_ROUTING_ENABLED === '1' && process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED === '1') {
+  if (deploymentSwitch('factoryRouting') && deploymentSwitch('factoryLifecycle')) {
     const { factoryRuntimeForBot } = await import('@/lib/factory/runtime')
     await factoryRuntimeForBot(botId).reconcile(userId)
   }
@@ -214,9 +288,18 @@ export async function preparePrompt(userId: string, botId: string, snapshot?: De
   // The hosted Coordinator renders OpenUI like the native one, so it gets the same presentation rules and catalog.
   const base = withCoordinatorPresentation(snapshot ? executionInstructions(snapshot) : await botInstructions(userId, botId, COORDINATOR_INSTRUCTIONS))
   const instructions = personalMailboxEnabled() && snapshot ? personalMailboxInstructions(base, snapshotMailboxTools(snapshot).filter(name => mailboxTools.includes(name))) : base
-  const factoryPolicy = process.env.MIKKA_FACTORY_ROUTING_ENABLED === '1' && process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED === '1' ? FACTORY_QUESTION_INSTRUCTIONS + FACTORY_CHECK_RECOVERY_INSTRUCTIONS : ''
+  const factoryPolicy = deploymentSwitch('factoryRouting') && deploymentSwitch('factoryLifecycle') ? FACTORY_QUESTION_INSTRUCTIONS + FACTORY_CHECK_RECOVERY_INSTRUCTIONS : ''
   // The person's 个人指令 sit after the rules and before the memory, marked as theirs.
-  return { instructions: instructionsWithMemory(await withPersonalInstructions(userId, instructions, snapshot ? snapshot.personalPlugins ?? { servers: [], skills: [] } : undefined), memory) + factoryPolicy + '\n' + SCHEDULE_INSTRUCTIONS, messages: promptMessages(summary, messages, summaryTrust) }
+  // The person's own GitHub account, so the Bot looks a repository up instead of asking which account it is under.
+  const { githubContext } = await import('@/lib/coordinator/github-context')
+  const { executionContextParts } = await import('@/lib/coordinator/execution-context')
+  const execution = await executionContextParts(userId, botId)
+  // Everything up to the memory is the same on every turn; `stable` is where it ends, so a provider can cache it (lib/prompt-cache.ts).
+  const rules = await withPersonalInstructions(userId, instructions, snapshot ? snapshot.personalPlugins ?? { servers: [], skills: [] } : undefined)
+  // The GitHub lines (the authorized repository list) and the allowed models list are part of the cached prefix: they change only
+  // when the repositories or 优先使用的模型 do. Which models can run right now changes per turn, so it stays after the memory.
+  const prompt = promptWithCachedContext(rules, cachedContextLines(await githubContext(userId, undefined, undefined, botId), execution.models), memory, factoryPolicy + '\n' + SCHEDULE_INSTRUCTIONS + (execution.live ? '\n' + execution.live : ''))
+  return { ...prompt, messages: promptMessages(summary, messages, summaryTrust) }
 }
 
 export async function personalWriteToolsEnabled() { 'use step'; const { personalWritesEnabled } = await import('@/lib/operations/write-feature'); return personalWritesEnabled() }
@@ -290,6 +373,18 @@ export async function personalMcp(userId: string, botId: string, executionId: st
 // preserve the first uncertain outcome rather than replaying this step.
 personalMcp.maxRetries = 0
 
+/** GitHub's hosted MCP server as the caller, with the caller's own token only (decision 2026-11-02-1730). */
+export async function githubMcp(userId: string, input: import('@/lib/plugins/mcp').McpCommand, scope?: NativeToolScope) {
+  'use step'
+  await assertNativeToolScope(userId, scope)
+  if (scope?.scheduledRead) return { error: 'mcpNotAllowedForScheduledRead' }
+  const { createGitHubMcpRuntime, GITHUB_MCP_MIN_VALIDITY_MS } = await import('@/lib/github/mcp')
+  const { githubTokenForUser } = await import('@/lib/github/user-access')
+  return createGitHubMcpRuntime(owner => githubTokenForUser(owner, { minValidityMs: GITHUB_MCP_MIN_VALIDITY_MS }))(userId, input)
+}
+// A GitHub write has no idempotency key; never replay an uncertain call.
+githubMcp.maxRetries = 0
+
 /** Apps connected from the 插件 store, through the tools Composio lists for them (lib/app-tools.ts). */
 export async function appTools(userId: string, botId: string, operation: 'list' | 'call', input: unknown, scope?: NativeToolScope) {
   'use step'
@@ -328,19 +423,25 @@ export async function getIssue(userId: string, input: { issueId: string }, scope
   const issue = await issueForUser(userId, input.issueId)
   if (!issue) return { error: 'issueNotFound' }
   const runs = await visibleRuns(userId, { issueId: issue.id, limit: 5 })
+  // The task's one thread, so more work goes to it (decision 2026-11-01-1330): its repository is already known.
+  const latest = await (await import('@/lib/thread-dispatch')).latestTaskRun(pool, userId, issue.id)
   return {
     id: issue.id, number: readIssueMetadata(issue.content).number ?? null, title: issue.title,
     status: issue.status, priority: issue.priority, body: tiptapToText(issue.content).slice(0, 8000),
     runs: runs.map(run => ({ id: run.id, agent: run.agentName, status: run.status, createdAt: run.createdAt.toISOString() })),
-    ...(process.env.MIKKA_FACTORY_ROUTING_ENABLED === '1' ? { factory: await (await import('@/lib/factory/server')).factoryForBot(botId).listForIssue(userId,issue.id) } : {}),
+    thread: latest ? { runId: latest.id, status: latest.status, repository: latest.remoteUrl } : null,
+    ...(deploymentSwitch('factoryRouting') ? { factory: await (await import('@/lib/factory/server')).factoryForBot(botId).listForIssue(userId,issue.id) } : {}),
   }
 }
 
-export async function createIssue(userId: string, input: CreateIssueInput, toolCallId: string, scope: NativeToolScope | undefined, botId: string, taskEventId?: string) {
+export async function createIssue(userId: string, input: CreateIssueInput, toolCallId: string, scope: NativeToolScope | undefined, botId: string, taskEventId?: string, sourceEventId?: string) {
   'use step'
   await assertNativeToolScope(userId, scope)
   if (!toolCallId || toolCallId.length > 200) return { error: 'issueToolCallConflict' }
-  return (await import('@/lib/mcp/actions')).createIssue(userId, input, systemActor(botId), toolCallId, taskEventId ? { eventId: taskEventId, botId } : undefined)
+  // A team workspace's bot creates the task in that workspace's team, not as its owner's personal task.
+  const team = await (await import('@/lib/coordinator/issue-team')).coordinatorIssueTeam(userId, botId, input.teamId)
+  if ('error' in team) return team
+  return (await import('@/lib/mcp/actions')).createIssue(userId, input, systemActor(botId), toolCallId, taskEventId ? { eventId: taskEventId, botId } : undefined, team.teamId ?? undefined, !taskEventId && sourceEventId ? { eventId: sourceEventId, botId } : undefined)
 }
 
 export async function updateIssue(userId: string, input: UpdateIssueInput, toolCallId: string, scope: NativeToolScope | undefined, botId: string) {
@@ -356,45 +457,101 @@ export async function listAgents(userId: string, scope?: NativeToolScope) {
   return (await import('@/lib/mcp/actions')).listAgents(userId)
 }
 
+/** The host's user only: their own GitHub token's authorized repositories, never another person's. */
+export async function findRepository(userId: string, input: { name?: string }, scope?: NativeToolScope) {
+  'use step'
+  await assertNativeToolScope(userId,scope)
+  return (await import('@/lib/coordinator/repository-resolution')).findRepository(userId, input.name)
+}
+
 /**
  * The run belongs to the bot that dispatched it, the Coordinator included, so its events come back to that bot's chat.
  * One task, one thread (lib/thread-dispatch.ts): a task with a thread gets the dispatch as that thread's work; only
  * `newThread`, when the person's own message (`sourceEventId`, host-supplied) explicitly asked for it, starts another.
  */
-export async function dispatchRun(userId: string, input: { issueId: string; agentId?: string; repo: string; note?: string; requestKey?:string; readOnly?: boolean; newThread?: boolean; sourceEventId?: string; target?: import('@/lib/dispatch-target').DispatchTarget; model?: { harness: 'claude_code' | 'codex'; model: string } }, scope: NativeToolScope | undefined, botId: string, execution?: AgentExecution, requestEventId?: string, approvedRepositoryKey?: string) {
+export async function dispatchRun(userId: string, input: { issueId: string; agentId?: string; repo?: string; note?: string; requestKey?:string; readOnly?: boolean; newThread?: boolean; sourceEventId?: string; target?: import('@/lib/dispatch-target').DispatchTarget; model?: { harness: 'claude_code' | 'codex'; model?: string } }, scope: NativeToolScope | undefined, botId: string, execution?: AgentExecution, requestEventId?: string) {
   'use step'
   await assertNativeToolScope(userId,scope)
+  if (!(await import('@/lib/factory/runtime')).factoryLifecycleEnabled()) return { error: 'factoryLifecycleUnavailable' as const }
   const { newThread, sourceEventId, target, ...request } = input
+  requestEventId ??= sourceEventId
+  // The Agent or model the Bot named must be one of 优先使用的模型, the list its prompt shows; otherwise nothing is queued.
+  if (request.model) {
+    const { modelNotAllowed } = await import('@/lib/model-dispatch')
+    const refused = await modelNotAllowed(pool, { ownerId: userId, workspaceId: await (await import('@/lib/execution-settings')).executionWorkspace(userId, botId) }, request.model)
+    if (refused) return { ...refused, issueId: request.issueId }
+  }
   const { dispatchToTask, explicitNewThread } = await import('@/lib/thread-dispatch')
   const { movesThread, runPlacement } = await import('@/lib/dispatch-target')
   // The result says where the work actually runs, so the reply names that place and no other (decision 2026-11-01-1330).
   const placed = async <T,>(result: T): Promise<T> => {
     if (!result || typeof result !== 'object' || !('runId' in result) || typeof result.runId !== 'string') return result
-    return { ...result, placement: await runPlacement(pool, userId, result.runId) }
+    const { timedPhase } = await import('@/lib/dispatch-timing')
+    return { ...result, placement: await timedPhase('runPlacement', () => runPlacement(pool, userId, result.runId as string)) }
   }
-  return asToolResult(async () => placed(await dispatchToTask(userId, request.issueId, {
+  // A bare name ("Mikka_test") becomes the one repository this user authorized by that name, or a card; only a new run needs it.
+  const { withResolvedRepository } = await import('@/lib/coordinator/repository-resolution')
+  // A new thread runs in the repository named; the thread's next run only ever in the thread's own (never the one the model passed).
+  const byRules = (note: string | undefined, place: import('@/lib/dispatch-target').DispatchTarget | undefined, named: string | null | undefined, previousRunId?: string) => {
+    if (!named?.trim()) return Promise.resolve({ error: 'repositoryRequired' as const, issueId: request.issueId })
+    return withResolvedRepository(userId, request.issueId, named, repo => dispatchByRules(userId, { ...request, repo, note, threadRunId: previousRunId }, scope, botId, execution, requestEventId, place))
+  }
+  // The thread's repository is not the one named: a different one, or a name that is not one repository yet (its card comes from the new thread's lookup).
+  let repositoryMove = false
+  const movesRepository = async (previous: import('@/lib/thread-dispatch').TaskThreadRun) => {
+    if (!request.repo?.trim() || !previous.remoteUrl) return false
+    const { sameRepository } = await import('@/lib/coordinator/repository-resolution')
+    repositoryMove = (await sameRepository(userId, request.repo, previous.remoteUrl).catch(() => null)) !== true
+    return repositoryMove
+  }
+  const { withDispatchTiming } = await import('@/lib/dispatch-timing')
+  return asToolResult(() => withDispatchTiming(async () => placed(await dispatchToTask(userId, request.issueId, {
     note: request.note, newThread,
-    // A named place other than the thread's own is a move, which only the person's explicit request grants.
-    moves: async previous => movesThread(target, await runPlacement(pool, userId, previous.id)),
-    explicit: () => explicitNewThread(userId, botId, sourceEventId),
-    start: async (previous, note) => {
-      if (!previous) return dispatchByRules(userId, { ...request, note }, scope, botId, execution, requestEventId, approvedRepositoryKey, target)
+    // A named place other than the thread's own is a move, which only the person's explicit request grants. So is a
+    // repository the person named that is not the thread's ("It's in the mikka-web repo"): the work goes there, in a new thread.
+    moves: async previous => movesThread(target, await runPlacement(pool, userId, previous.id)) || await movesRepository(previous),
+    explicit: async () => (repositoryMove && await personNamed(userId, botId, sourceEventId, request.repo!)) || explicitNewThread(userId, botId, sourceEventId),
+    start: async (previous, note, replaces) => {
+      // A new thread runs in the repository the person named, else in the one of the thread it replaces.
+      if (!previous) return byRules(note, target, request.repo?.trim() || replaces?.remoteUrl)
       // The thread's next run goes where the thread ran, so its session can be resumed; elsewhere it starts fresh with the note's context.
+      // It keeps the thread's own model and account, or the one the person just named; never another one silently.
+      const { latestThreadRunModel, chooseCloudRunModel, chooseLocalRunModel } = await import('@/lib/computer/run-model')
+      const threadModel = await latestThreadRunModel(pool, userId, request.issueId, previous.agentId)
       if (previous?.cloud && (previous.harness === 'codex' || previous.harness === 'claude_code')) {
-        const cloud = await dispatchComputerTask(userId, { botId: previous.cloud.botId, issueId: request.issueId, harness: previous.harness, note, ...(previous.remoteUrl ? { repo: previous.remoteUrl } : {}), ...(request.readOnly || previous.readOnly ? { readOnly: true } : {}) }, `thread:${previous.id}:${request.requestKey ?? requestEventId ?? crypto.randomUUID()}`, scope, execution)
+        const named = request.model?.model ? await chooseCloudRunModel(pool, { ownerId: userId, workspaceId: previous.cloud.workspaceId, botId: previous.cloud.botId }, previous.agentId, previous.harness, request.model.model) : null
+        const runModel = named ?? threadModel
+        if (!runModel || 'error' in runModel) return { error: 'threadModelUnavailable' as const, issueId: request.issueId, threadRunId: previous.id }
+        const cloud = await dispatchComputerTask(userId, { botId: previous.cloud.botId, factoryBotId: botId, sourceEventId: requestEventId, issueId: request.issueId, harness: previous.harness, note, ...runModel, threadRunId: previous.id, ...(previous.remoteUrl ? { repo: previous.remoteUrl } : {}), ...(request.readOnly || previous.readOnly ? { readOnly: true } : {}) }, `thread:${previous.id}:${request.requestKey ?? requestEventId ?? crypto.randomUUID()}`, scope, execution)
         if (!('error' in cloud)) return cloud
+        if (cloud.error !== 'cloudComputerUnavailable') return { ...cloud, issueId: request.issueId }
       } else if (previous?.remoteUrl) {
+        // A server or computer thread keeps its own model too; with none left the person is told, never the CLI's pick.
+        const device = request.model?.model ? (await pool.query<{ deviceId: string; harness: 'codex' | 'claude_code'; workspaceId: string }>('SELECT a."deviceId",a.harness FROM agents a WHERE a.id=$1 AND a."userId"=$2', [previous.agentId, userId])).rows[0] : undefined
+        const named = device ? await chooseLocalRunModel(pool, { ownerId: userId, workspaceId: await (await import('@/lib/execution-settings')).executionWorkspace(userId, botId), botId }, { id: previous.agentId, deviceId: device.deviceId, harness: device.harness }, request.model!.model) : null
+        const localModel = named && !('error' in named) ? named : threadModel
+        if (!localModel) return { error: 'threadModelUnavailable' as const, issueId: request.issueId, threadRunId: previous.id }
         // Read-only sticks: a read-only request, or a thread that runs read-only, gives a read-only next run.
-        const result = await queueRun(userId, { issueId: request.issueId, agentId: previous.agentId, repo: previous.remoteUrl, note, readOnly: Boolean(request.readOnly || previous.readOnly), requestKey: `thread:${previous.id}:${request.requestKey ?? crypto.randomUUID()}`.slice(0, 200) }, botId, execution, requestEventId, null, approvedRepositoryKey).catch(() => null)
+        const result = await queueTaskRun(userId, { issueId: request.issueId, agentId: previous.agentId, repo: previous.remoteUrl, note, readOnly: Boolean(request.readOnly || previous.readOnly), requestKey: `thread:${previous.id}:${request.requestKey ?? crypto.randomUUID()}`.slice(0, 200), ...localModel, threadRunId: previous.id }, botId, execution, requestEventId).catch(error => { if (error instanceof FactoryError) throw error; return null })
         if (result) return { ...result, status: 'queued' as const }
       }
-      return dispatchByRules(userId, { ...request, note }, scope, botId, execution, requestEventId, approvedRepositoryKey)
+      // Where the thread ran could not take it: placed by the rules, in the thread's repository and at the place the person named, if any.
+      return byRules(note, target, previous.remoteUrl, previous.id)
     },
-  })))
+  }))))
 }
 
-/** Where a new run goes by the saved label execution rules: the workspace's cloud, else an online device. */
-async function dispatchByRules(userId: string, input: { issueId: string; agentId?: string; repo: string; note?: string; requestKey?:string; readOnly?: boolean; model?: { harness: 'claude_code' | 'codex'; model: string } }, scope: NativeToolScope | undefined, botId: string, execution?: AgentExecution, requestEventId?: string, approvedRepositoryKey?: string, place?: import('@/lib/dispatch-target').DispatchTarget) {
+/** Whether the person's own message (host-supplied event) names this repository: their words, not the model's, grant a move. */
+async function personNamed(userId: string, botId: string, sourceEventId: string | undefined, repo: string) {
+  if (!sourceEventId) return false
+  const { rows: [event] } = await pool.query(`SELECT payload->>'text' AS text FROM coordinator_events WHERE id=$1 AND "userId"=$2 AND kind='user_message' AND "botId" IS NOT DISTINCT FROM $3::uuid`, [sourceEventId, userId, botId])
+  const loose = (value: string) => value.toLowerCase().replace(/[-_. ]+/g, '')
+  const name = repo.trim().replace(/^(?:https:\/\/|git@)github\.com[/:]/i, '').replace(/\.git$/i, '').split('/').pop() ?? ''
+  return typeof event?.text === 'string' && name.length > 0 && loose(event.text).includes(loose(name))
+}
+
+/** Where a new run goes and on which model (decision 2026-11-02-1400): a named computer, else 运行位置; the model by the same rule either way. */
+async function dispatchByRules(userId: string, input: { threadRunId?: string; issueId: string; agentId?: string; repo: string; note?: string; requestKey?:string; readOnly?: boolean; model?: { harness: 'claude_code' | 'codex'; model?: string } }, scope: NativeToolScope | undefined, botId: string, execution?: AgentExecution, requestEventId?: string, place?: import('@/lib/dispatch-target').DispatchTarget) {
   // A computer the person named: theirs, not removed, online; otherwise refused or the card at once, never another computer.
   if (place && place !== 'cloud') {
     const { targetDevice } = await import('@/lib/dispatch-target')
@@ -402,39 +559,67 @@ async function dispatchByRules(userId: string, input: { issueId: string; agentId
     if ('error' in device) return device.error === 'notFound'
       ? { error: 'deviceNotFound' as const }
       : { error: 'machineUnavailable' as const, issueId: input.issueId, card: (await import('@/lib/rule-dispatch')).machineUnavailableCard() }
-    const result = await queueRun(userId, { ...input, agentId: device.agentId, model: device.model, pinnedDeviceId: device.deviceId }, botId, execution, requestEventId, null, approvedRepositoryKey)
-    return { ...result, status: 'queued' as const }
-  }
-  {
-    // 模型与订阅 (decision 2026-11-02-1400): the thread's own model, else 允许使用的模型 in order; 运行位置 says where.
-    // The person asking for the cloud runs it there whatever 运行位置 says.
+    // The named computer fixes where; the model is chosen as for any run (the thread's own, else 优先使用的模型 in order), among what this computer runs.
     const { issueForUser } = await import('@/lib/issue-access')
     if (!await issueForUser(userId, input.issueId)) throw new ActionFailureError('issueNotFound')
     const { executionWorkspace } = await import('@/lib/execution-settings')
-    const workspaceId = await executionWorkspace(userId, botId)
     const { resolveModelDispatch } = await import('@/lib/model-dispatch')
-    const target = await resolveModelDispatch(pool, { ownerId: userId, workspaceId, botId }, input.model ?? null, undefined, place === 'cloud' ? 'cloud' : undefined)
-    if (target.kind === 'none') return { error: 'machineUnavailable' as const, issueId: input.issueId, reason: target.reason, card: target.card }
-    if (target.kind === 'device') {
-      const result = await queueRun(userId, { ...input, agentId: target.agentId, model: target.model, pinnedDeviceId: target.deviceId, ...(target.entry.source.kind === 'api_key' ? { apiKeyId: target.entry.source.keyId } : {}) }, botId, execution, requestEventId, null, approvedRepositoryKey)
+    const target = await resolveModelDispatch(pool, { ownerId: userId, workspaceId: await executionWorkspace(userId, botId), botId }, input.model ?? null, 'local', device.deviceId)
+    if (target.kind !== 'device') return { error: 'machineUnavailable' as const, issueId: input.issueId, ...(target.kind === 'none' ? { reason: target.reason, card: target.card } : {}) }
+    const result = await queueTaskRun(userId, { ...input, agentId: target.agentId, model: target.model, pinnedDeviceId: target.deviceId, ...(target.subscriptionBindingId ? { subscriptionBindingId: target.subscriptionBindingId } : {}), ...(target.entry.source.kind === 'api_key' ? { apiKeyId: target.entry.source.keyId } : {}) }, botId, execution, requestEventId)
+    return { ...result, status: 'queued' as const }
+  }
+  {
+    // 模型与订阅 (decision 2026-11-02-1400): the thread's own model, else 优先使用的模型 in order; 运行位置 says where
+    // (decision 2026-11-02-2330: 云端 the cloud, then a server, then a computer; 本地 a server, then a computer).
+    // The person asking for the cloud runs it there whatever 运行位置 says, and nowhere else.
+    const { timedPhase } = await import('@/lib/dispatch-timing')
+    const { issueForUser } = await import('@/lib/issue-access')
+    if (!await timedPhase('issueForUser', () => issueForUser(userId, input.issueId))) throw new ActionFailureError('issueNotFound')
+    const { executionWorkspace } = await import('@/lib/execution-settings')
+    const workspaceId = await timedPhase('executionWorkspace', () => executionWorkspace(userId, botId))
+    const { resolveModelDispatch } = await import('@/lib/model-dispatch')
+    const target = await timedPhase('resolveModelDispatch', () => resolveModelDispatch(pool, { ownerId: userId, workspaceId, botId }, input.model ?? null, place === 'cloud' ? 'cloud' : undefined))
+    if (target.kind === 'none') {
+      if (target.reason === 'cloudNotConfigured') {
+        const { cloudDispatchFailureReason } = await import('@/lib/cloud-dispatch-failure')
+        const { modelUnavailableCard } = await import('@/lib/model-dispatch')
+        const reason = await cloudDispatchFailureReason(pool, userId)
+        return { error: 'machineUnavailable' as const, issueId: input.issueId, reason, card: modelUnavailableCard(reason) }
+      }
+      return { error: 'machineUnavailable' as const, issueId: input.issueId, reason: target.reason, card: target.card }
+    }
+    const onDevice = async (device: Extract<typeof target, { kind: 'device' }>) => {
+      const result = await queueTaskRun(userId, { ...input, agentId: device.agentId, model: device.model, pinnedDeviceId: device.deviceId, ...(device.subscriptionBindingId ? { subscriptionBindingId: device.subscriptionBindingId } : {}), ...(device.entry.source.kind === 'api_key' ? { apiKeyId: device.entry.source.keyId } : {}) }, botId, execution, requestEventId)
       return { ...result, status: 'queued' as const }
     }
+    if (target.kind === 'device') return onDevice(target)
     if (requestEventId) {
       const event=(await pool.query('SELECT "userId","botId",payload FROM coordinator_events WHERE id=$1',[requestEventId])).rows[0]
       if (!event || event.userId!==userId || event.botId!==botId || event.payload?.taskDestination) throw new ActionFailureError('runInvalid')
     }
-    if (approvedRepositoryKey) throw new ActionFailureError('runInvalid')
     // The bot's own runtime, created on first use; the Coordinator's is its bot row's like any bot's.
     // An API-key model binds no subscription to it; a subscription model binds the entry's own account.
     const autoRuntime=await import('@/lib/computer/auto-runtime')
     const actor={userId,workspaceId}
-    const runtime=await autoRuntime.ensureBotCloudRuntime(pool,actor,botId,{harness:target.harness})
-    if (runtime && target.entry.source.kind === 'subscription') await (await import('@/lib/model-dispatch')).bindAgentToConnection(pool, { ownerId: userId, workspaceId }, runtime.agentId, target.harness, target.entry.source.connectionId, target.model)
-    const cloud = runtime ? await dispatchComputerTask(userId,{botId:runtime.botId,issueId:input.issueId,harness:runtime.harness,note:input.note,model:target.model,repo:input.repo,...(target.entry.source.kind === 'api_key' ? {apiKeyId:target.entry.source.keyId} : {}),...(input.readOnly ? {readOnly:true} : {})},`rule:${input.requestKey ?? requestEventId ?? crypto.randomUUID()}`,scope,execution) : { error: 'cloudComputerUnavailable' as const }
+    const runtime=await timedPhase('ensureBotCloudRuntime', () => autoRuntime.ensureBotCloudRuntime(pool,actor,botId,{harness:target.harness}))
+    const { bindAgentToConnection } = await import('@/lib/model-dispatch')
+    const source = target.entry.source
+    const subscriptionBindingId = runtime && source.kind === 'subscription' ? await timedPhase('bindAgentToConnection', () => bindAgentToConnection(pool, { ownerId: userId, workspaceId }, runtime.agentId, target.harness, source.connectionId, target.model)) : undefined
+    const cloud = runtime ? await dispatchComputerTask(userId,{botId:runtime.botId,issueId:input.issueId,harness:runtime.harness,note:input.note,model:target.model,repo:input.repo,threadRunId:input.threadRunId,sourceEventId:requestEventId,factoryBotId:botId,...(subscriptionBindingId ? {subscriptionBindingId} : {}),...(target.entry.source.kind === 'api_key' ? {apiKeyId:target.entry.source.keyId} : {}),...(input.readOnly ? {readOnly:true} : {})},`rule:${input.requestKey ?? requestEventId ?? crypto.randomUUID()}`,scope,execution) : { error: 'cloudComputerUnavailable' as const }
     if (!('error' in cloud) || cloud.error !== 'cloudComputerUnavailable') return cloud
-    // The person's own E2B refused (capacity, quota, key): nothing else is picked, the card says why.
+    // 云端 could not start it (the key refused, a limit, the template, E2B down, the worker never came up;
+    // the queued cloud run is already ended): a server, else a computer, unless the person asked for the cloud.
+    if (place !== 'cloud') {
+      const fallback = await resolveModelDispatch(pool, { ownerId: userId, workspaceId, botId }, input.model ?? null, undefined, undefined, { withoutCloud: true })
+      if (fallback.kind === 'device') return { ...await onDevice(fallback), fallback: 'cloudUnavailable' as const }
+    }
+    // A startup failure can be capacity, quota, template or service availability. Only a confirmed
+    // missing key offers 填入 E2B Key; an existing key must never be described as absent.
     const { modelUnavailableCard } = await import('@/lib/model-dispatch')
-    return { error: 'machineUnavailable' as const, issueId: input.issueId, reason: 'cloudNotConfigured' as const, card: modelUnavailableCard('cloudNotConfigured') }
+    const { cloudDispatchFailureReason } = await import('@/lib/cloud-dispatch-failure')
+    const reason = await cloudDispatchFailureReason(pool, userId)
+    return { error: 'machineUnavailable' as const, issueId: input.issueId, reason, card: modelUnavailableCard(reason) }
   }
 }
 
@@ -480,52 +665,78 @@ export async function listComputerBots(userId: string, scope?: NativeToolScope) 
 }
 
 /** `dispatch_bot_computer`: on a task that has a thread, that thread's next work (lib/thread-dispatch.ts), on this Bot's computer. */
-export async function dispatchComputerThread(userId: string, input: { botId: string; issueId: string; harness: 'codex' | 'claude_code'; note?: string; suggestionId?: string; readOnly?: boolean; newThread?: boolean; sourceEventId?: string }, toolCallId: string, scope?: NativeToolScope, execution?: AgentExecution, chatBotId?: string) {
+export async function dispatchComputerThread(userId: string, input: { botId: string; issueId: string; harness: 'codex' | 'claude_code'; model?: string; note?: string; suggestionId?: string; readOnly?: boolean; newThread?: boolean; sourceEventId?: string }, toolCallId: string, scope?: NativeToolScope, execution?: AgentExecution, chatBotId?: string) {
   'use step'
   await assertNativeToolScope(userId, scope)
-  const { newThread, sourceEventId, ...request } = input
+  if (!(await import('@/lib/factory/runtime')).factoryLifecycleEnabled()) return { error: 'factoryLifecycleUnavailable' as const }
+  const { newThread, sourceEventId, model: asked, ...request } = input
+  // A model the Bot named must be one of 优先使用的模型 of the computer Bot's workspace, the list its prompt shows; otherwise nothing is queued.
+  if (asked) {
+    const bot = (await pool.query<{ workspaceId: string }>('SELECT "workspaceId" FROM bots WHERE id=$1 AND "ownerId"=$2 AND "archivedAt" IS NULL', [request.botId, userId])).rows[0]
+    if (!bot) return { error: 'cloudComputerUnavailable' as const }
+    const { modelNotAllowed } = await import('@/lib/model-dispatch')
+    const refused = await modelNotAllowed(pool, { ownerId: userId, workspaceId: bot.workspaceId }, { harness: request.harness, model: asked })
+    if (refused) return { ...refused, issueId: request.issueId }
+  }
   const { dispatchToTask, explicitNewThread } = await import('@/lib/thread-dispatch')
   return asToolResult(() => dispatchToTask(userId, request.issueId, {
     note: request.note, newThread,
     explicit: () => explicitNewThread(userId, chatBotId ?? request.botId, sourceEventId),
     // Read-only sticks across the thread's runs, as on a computer.
-    start: (previous, note) => dispatchComputerTask(userId, { ...request, note, ...(request.readOnly || previous?.readOnly ? { readOnly: true } : {}) }, previous ? `thread:${previous.id}:${toolCallId}` : toolCallId, scope, execution),
+    start: async (previous, note) => {
+      // A new thread takes 优先使用的模型's first cloud entry for this harness; the thread's next run keeps its own model.
+      const runtime = (await pool.query<{ workspaceId: string; agentId: string }>('SELECT r."workspaceId",r."agentId" FROM bot_cloud_runtimes r WHERE r."botId"=$1 AND r."ownerId"=$2 AND r.harness=$3', [request.botId, userId, request.harness])).rows[0]
+      if (!runtime) return { error: 'cloudComputerUnavailable' as const }
+      const { latestThreadRunModel, chooseCloudRunModel } = await import('@/lib/computer/run-model')
+      const choose = () => chooseCloudRunModel(pool, { ownerId: userId, workspaceId: runtime.workspaceId, botId: request.botId }, runtime.agentId, request.harness, asked)
+      // The thread keeps its own model unless the person named another one from the list.
+      const named = previous && asked ? await choose() : null
+      const runModel = previous ? (named && !('error' in named) ? named : await latestThreadRunModel(pool, userId, request.issueId, previous.agentId)) : await choose()
+      if (!runModel) return { error: 'threadModelUnavailable' as const, issueId: request.issueId, threadRunId: previous!.id }
+      if ('error' in runModel) return { ...runModel, issueId: request.issueId }
+      return dispatchComputerTask(userId, { ...request, factoryBotId: chatBotId ?? request.botId, sourceEventId, note, ...runModel, ...(previous ? { threadRunId: previous.id } : {}), ...(request.readOnly || previous?.readOnly ? { readOnly: true } : {}) }, previous ? `thread:${previous.id}:${toolCallId}` : toolCallId, scope, execution)
+    },
   }))
 }
 
 /** Queue and bind atomically, with a stable tool-call id for workflow retries. */
-export async function dispatchComputerTask(userId: string, input: { botId: string; issueId: string; harness: 'codex' | 'claude_code'; note?: string; model?:string; repo?:string; suggestionId?: string; readOnly?: boolean; apiKeyId?: string }, toolCallId: string, scope?: NativeToolScope, execution?: AgentExecution) {
+export async function dispatchComputerTask(userId: string, input: { sourceEventId?: string; factoryBotId?: string | null; botId: string; issueId: string; harness: 'codex' | 'claude_code'; note?: string; model: string; threadRunId?: string; repo?:string; suggestionId?: string; readOnly?: boolean; apiKeyId?: string; subscriptionBindingId?: string; /** An MCP-owned thread retains its original result destination. */ withoutBot?: boolean }, toolCallId: string, scope?: NativeToolScope, execution?: AgentExecution) {
   'use step'
   await assertNativeToolScope(userId, scope)
+  if (!(await import('@/lib/factory/runtime')).factoryLifecycleEnabled()) return { error: 'factoryLifecycleUnavailable' as const }
   if (!cloudComputerRunsEnabled() || !toolCallId || toolCallId.length > 200) return { error: 'cloudComputerUnavailable' }
   const target = (await pool.query(`SELECT b."workspaceId",r."agentId",r."repoId",a."deviceId" FROM bots b
     JOIN bot_cloud_runtimes r ON r."botId"=b.id AND r."ownerId"=b."ownerId" AND r."workspaceId"=b."workspaceId"
     JOIN agents a ON a.id=r."agentId" AND a."userId"=b."ownerId"
     WHERE b.id=$1 AND b."ownerId"=$2 AND r.harness=$3`, [input.botId, userId, input.harness])).rows[0]
   if (!target) return { error: 'cloudComputerUnavailable' }
-  try { await (await import('@/lib/subscription-runtime')).authorizeSubscriptionWorkspace(userId, target.workspaceId) } catch { return { error: 'cloudComputerUnavailable' } }
-  const issue = await issueForUser(userId, input.issueId)
+  const { timedPhase } = await import('@/lib/dispatch-timing')
+  try { await timedPhase('authorizeSubscriptionWorkspace', async () => (await import('@/lib/subscription-runtime')).authorizeSubscriptionWorkspace(userId, target.workspaceId)) } catch { return { error: 'cloudComputerUnavailable' } }
+  const issue = await timedPhase('issueForUser', () => issueForUser(userId, input.issueId))
   if (!issue) return { error: 'issueNotFound' }
   let queuedRunId: string | null = null
   try {
     if (input.suggestionId && !(await pool.query('SELECT 1 FROM suggestion_executions WHERE "suggestionId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND ("botId" IS NULL OR "botId"=$4)', [input.suggestionId, userId, target.workspaceId, input.botId])).rowCount) return { error: 'suggestionUnavailable' }
-    const deviceRepoId = input.repo ? (await (await import('@/lib/device-repositories')).ensureDeviceRepository(userId,target.deviceId,input.repo)).id : target.repoId
-    // Push authority is the person's GitHub App grant: ask GitHub now; queueing reads the recorded outcome.
-    if (!input.readOnly) {
-      const repoPath = (await pool.query<{ repoPath: string }>('SELECT "repoPath" FROM device_repos WHERE id=$1 AND "userId"=$2', [deviceRepoId, userId])).rows[0]?.repoPath
-      if (repoPath?.startsWith('v2/github.com/')) await (await import('@/lib/github/push-grant')).verifyPushGrant(userId, repoPath)
-    }
-    const result = await queueCloudRun(pool, { userId, workspaceId: target.workspaceId }, { botId: input.botId, issueId: issue.id, agentId: target.agentId, deviceRepoId, title: issue.title, body: tiptapToText(issue.content), note: input.note, model:input.repo ? input.model ?? 'auto' : input.model, ...(input.apiKeyId ? { apiKeyId: input.apiKeyId } : {}), idempotencyKey: input.suggestionId ? `suggestion:${input.suggestionId}` : `coordinator:${toolCallId}`, execution, ...(input.readOnly ? { readOnly: true } : {}) })
+    const deviceRepoId = input.repo ? (await timedPhase('ensureDeviceRepository', async () => (await import('@/lib/device-repositories')).ensureDeviceRepository(userId,target.deviceId,input.repo!))).id : target.repoId
+    const result = await timedPhase('queueCloudRun', () => queueCloudRun(pool, { userId, workspaceId: target.workspaceId }, { botId: input.botId, factoryBotId: input.factoryBotId, sourceEventId: input.sourceEventId, issueId: issue.id, agentId: target.agentId, deviceRepoId, title: issue.title, body: tiptapToText(issue.content), note: input.note, model: input.model, ...(input.threadRunId ? { threadRunId: input.threadRunId } : {}), ...(input.apiKeyId ? { apiKeyId: input.apiKeyId } : {}), ...(input.subscriptionBindingId ? { subscriptionBindingId: input.subscriptionBindingId } : {}), ...(input.withoutBot ? { withoutBot: true } : {}), idempotencyKey: input.suggestionId ? `suggestion:${input.suggestionId}` : `coordinator:${toolCallId}`, execution, ...(input.readOnly ? { readOnly: true } : {}) }))
     if (input.suggestionId) await pool.query('UPDATE suggestion_executions SET "botId"=$4,"runId"=$5,status=\'running\' WHERE "suggestionId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND ("runId" IS NULL OR "runId"=$5)', [input.suggestionId, userId, target.workspaceId, input.botId, result.runId])
     const actor = { userId, workspaceId: target.workspaceId as string }
     queuedRunId = result.runId
-    await (await import('@/lib/cloud-computer/thread-machines')).ensureThreadMachine(pool, actor, result.runId)
-    queuedRunId = null
+    await timedPhase('ensureThreadMachine', async () => (await import('@/lib/cloud-computer/thread-machines')).ensureThreadMachine(pool, actor, result.runId))
     const { start } = await import('workflow/api')
     const { threadMachineLifecycle } = await import('@/workflows/thread-machine/workflow')
-    await start(threadMachineLifecycle, [actor, result.runId])
+    await timedPhase('startLifecycle', () => start(threadMachineLifecycle, [actor, result.runId]))
+    queuedRunId = null
     return { ...result, botId: input.botId, task: issue.title, status: 'queued' as const }
-  } catch {
+  } catch (error) {
+    const { RunModelMissingError } = await import('@/lib/computer/run-model')
+    // Nothing was queued: the run named no model, or the thread's own model and account no longer serve it.
+    if (error instanceof RunModelMissingError) return { error: 'runModelMissing' as const, runId: error.runId, threadRunId: error.threadId }
+    const { FactoryError } = await import('@/lib/factory/contract')
+    if (error instanceof FactoryError) return { error: error.code }
+    const { ComputerError } = await import('@/lib/computer/store')
+    console.warn('cloud task dispatch refused', { error: error instanceof Error ? error.constructor.name : typeof error, code: error instanceof ComputerError ? error.status : undefined })
+    if (input.threadRunId && error instanceof ComputerError && error.message === 'Bot subscription unavailable') return { error: 'threadModelUnavailable' as const, threadRunId: input.threadRunId }
     // E2B refused the thread machine: end the queued run so it is not left waiting on a machine that never starts.
     if (queuedRunId) await (await import('@/lib/cloud-computer/thread-machines')).threadMachineAction(pool, { userId, workspaceId: target.workspaceId }, queuedRunId, 'end').catch(() => undefined)
     return { error: 'cloudComputerUnavailable' }

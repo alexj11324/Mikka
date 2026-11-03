@@ -1,6 +1,7 @@
 import 'server-only'
 import type { Pool, PoolClient } from 'pg'
 import { computerPermission, type ComputerPermission } from './permission'
+import { runMayUseCredentialSql } from '@/lib/personal-policy'
 
 /** The existing local daemon cannot operate a Bot's cloud desktop. Keep its
  * claim serialized with Bot binding and fail closed until a cloud worker with
@@ -51,7 +52,8 @@ export async function claimCloudRun(pool: Pool, actor: { userId: string; workspa
     if (!binding) { await client.query('COMMIT'); return null }
     // The run uses its own thread machine's desktop, never the Bot's: a person holding the Bot's desktop does not hold it.
     if (subscriptionBindingId) {
-      const subscription = await client.query('SELECT 1 FROM byos_bindings WHERE id=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND "consumerId"=$4', [subscriptionBindingId, actor.userId, actor.workspaceId, run.agentId])
+      const subscription = await client.query(`SELECT 1 FROM byos_bindings b WHERE b.id=$1 AND b."workspaceId"=$3 AND b."consumerId"=$4
+        AND ${runMayUseCredentialSql('b."ownerId"', '$2', '$3')}`, [subscriptionBindingId, actor.userId, actor.workspaceId, run.agentId])
       if (!subscription.rowCount) { await client.query('COMMIT'); return null }
       await client.query('INSERT INTO byos_native_runs ("runId","bindingId") VALUES ($1,$2)', [runId, subscriptionBindingId])
     } else if (!(await client.query('SELECT 1 FROM model_api_key_runs WHERE "runId"=$1', [runId])).rowCount) { await client.query('COMMIT'); return null }

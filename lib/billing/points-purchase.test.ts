@@ -33,7 +33,8 @@ mock.module(new URL('../workspace-access.ts', import.meta.url).href, { namedExpo
 } })
 
 let pointsPurchaseUrl: typeof import('./points-purchase')['pointsPurchaseUrl']
-before(async () => { ({ pointsPurchaseUrl } = await import('./points-purchase')) })
+let pointsPurchase: typeof import('./points-purchase')['pointsPurchase']
+before(async () => { ({ pointsPurchaseUrl, pointsPurchase } = await import('./points-purchase')) })
 beforeEach(() => {
   admin = true
   existingCustomer = 'cus_existing'
@@ -45,7 +46,8 @@ beforeEach(() => {
 })
 const fake = (async (url: string, init?: RequestInit) => {
   requests.push({ url, body: new URLSearchParams(String(init?.body)), idempotencyKey: (init?.headers as Record<string, string> | undefined)?.['idempotency-key'] })
-  return Response.json(url.endsWith('/customers') ? { id: 'cus_new' } : { url: checkoutUrl }, { status: providerStatus })
+  const body = new URLSearchParams(String(init?.body))
+  return Response.json(url.endsWith('/customers') ? { id: 'cus_new' } : body.get('ui_mode') ? { client_secret: 'cs_fixture_secret' } : { url: checkoutUrl }, { status: providerStatus })
 }) as typeof fetch
 
 test('each fixed USD amount creates a payment session with server-owned pricing and matching payment metadata', async () => {
@@ -58,6 +60,8 @@ test('each fixed USD amount creates a payment session with server-owned pricing 
     assert.equal(body.get('line_items[0][price_data][currency]'), 'usd')
     assert.equal(body.get('line_items[0][price_data][unit_amount]'), String(amount * 100))
     assert.equal(body.get('line_items[0][quantity]'), '1')
+    // Managed Payments (on by default for the account) refuses a product without an eligible tax code.
+    assert.equal(body.get('line_items[0][price_data][product_data][tax_code]'), 'txcd_10105002')
     for (const prefix of ['metadata', 'payment_intent_data[metadata]']) {
       assert.equal(body.get(`${prefix}[workspaceId]`), workspaceId)
       assert.equal(body.get(`${prefix}[points]`), String(amount * 100))
@@ -122,4 +126,28 @@ test('provider failures and unsafe Checkout URLs fail without leaking provider r
     checkoutUrl = url
     await assert.rejects(pointsPurchaseUrl('actor', workspaceId, 10, 'en', fake, env), /billingProviderFailed/)
   }
+})
+
+test('from a chat: a dialog session with a publishable key, else a hosted page; both come back to that chat', async () => {
+  const bot = '22222222-2222-4222-8222-222222222222'
+  // No publishable key: the hosted page, coming back to the bot's chat (decision 2026-11-02-1450).
+  assert.deepEqual(await pointsPurchase('actor', workspaceId, 10, 'zh-CN', { chat: { botId: bot } }, fake, env), { url: checkoutUrl })
+  let back = new URL(requests.at(-1)!.body.get('success_url')!)
+  assert.deepEqual([back.pathname, back.searchParams.get('bot'), back.searchParams.get('topup'), back.searchParams.has('section')], [`${BASE_PATH}/`, bot, 'success', false])
+  assert.equal(new URL(requests.at(-1)!.body.get('cancel_url')!).searchParams.get('bot'), bot)
+  // The Coordinator's chat is the bare address.
+  await pointsPurchase('actor', workspaceId, 10, 'en', { chat: { botId: null } }, fake, env)
+  back = new URL(requests.at(-1)!.body.get('success_url')!)
+  assert.deepEqual([back.pathname, back.searchParams.has('bot')], [`${BASE_PATH}/en/`, false])
+  // With the key: an embedded session for the dialog; Stripe returns to the chat only when a payment method must leave the page.
+  assert.deepEqual(await pointsPurchase('actor', workspaceId, 25, 'zh-CN', { chat: { botId: bot } }, fake, { ...env, NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: 'pk_test_fixture' }), { clientSecret: 'cs_fixture_secret' })
+  const { body } = requests.at(-1)!
+  assert.deepEqual([body.get('ui_mode'), body.has('success_url'), body.has('cancel_url'), new URL(body.get('return_url')!).searchParams.get('bot')], ['embedded_page', false, false, bot])
+  assert.equal(body.get('metadata[points]'), '2500')
+  assert.equal(body.get('line_items[0][price_data][product_data][tax_code]'), 'txcd_10105002')
+  // 计费 keeps its hosted page even with the key; a bot id that is not one is refused before Stripe.
+  assert.deepEqual(await pointsPurchaseUrl('actor', workspaceId, 10, 'zh-CN', fake, { ...env, NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: 'pk_test_fixture' }), { url: checkoutUrl })
+  const count = requests.length
+  await assert.rejects(pointsPurchase('actor', workspaceId, 10, 'en', { chat: { botId: 'https://evil.example/' } }, fake, env))
+  assert.equal(requests.length, count)
 })

@@ -1,4 +1,5 @@
 import 'server-only'
+import { deploymentSwitch } from '@/lib/deployment-switches'
 import { cloudComputerRunsEnabled } from '@/lib/cloud-computer-flag'
 import { freezeHostedModelSelection, resolveFrozenHostedModel } from '@/lib/subscription-model-snapshot'
 import { authorizeSubscriptionWorkspace, subscriptionRuntime } from '@/lib/subscription-runtime'
@@ -18,7 +19,7 @@ import { completedEvaluationReply } from './eval-generation'
 
 /** Live means real inference with synthetic, inert tools, not real-account or native-CLI acceptance. */
 export async function evaluateProposal(store: AgentKitStore, scope: AgentScope, proposalId: string, requestId: string, mode: 'fixture' | 'live') {
-  if (mode === 'live' && process.env.MIKKA_AGENT_KIT_LIVE_EVAL !== '1') throw new AgentKitError('agentLiveEvaluationDisabled',409)
+  if (mode === 'live' && !deploymentSwitch('agentKitLiveEval')) throw new AgentKitError('agentLiveEvaluationDisabled',409)
   const model = mode === 'live' ? COORDINATOR_MODEL : null
   const { chatBotId, isCoordinatorBot } = await import('@/lib/coordinator/coordinator-bot')
   const botId = await chatBotId(scope.ownerId, scope.botId, scope.workspaceId)

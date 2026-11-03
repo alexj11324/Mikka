@@ -21,14 +21,19 @@ import { Textarea } from '@/components/ui/textarea'
 import { DeviceIcon } from '@/components/devices/device-icon'
 import { useComputer } from '@/hooks/use-computer'
 import { cn } from '@/lib/utils'
-import { defaultMachine, machineDot, type PickerMachine } from '@/lib/machine-picker'
+import { machineDot, type PickerMachine } from '@/lib/machine-picker'
+import { defaultTaskMachine, pickedTaskDestination, taskMachineUsable } from '@/lib/new-task-placement'
+import { settingsRead } from '@/lib/settings-read'
+import type { getModelOrder } from '@/app/actions/model-order'
 import { E2BKeyDialog, useOwnE2BKey } from '@/components/settings/e2b-key-dialog'
 import { usePresence } from '@/lib/use-presence'
+import { BotAvatar, CoordinatorAvatar } from '@/components/nav/bot-avatar'
+import { newTaskBotChoices } from '@/lib/new-task-bot'
 import { useOpenerFocus } from '@/hooks/use-focus-return'
 
 const MAX_LENGTH = 8000
 
-type Machine = PickerMachine & { label: string }
+type Machine = PickerMachine & { label: string; status?: string }
 
 /** A machine's icon with its state dot (`machineDot`), and the state in words for screen readers. */
 function MachineIcon({ machine, cloudBotId }: { machine: Machine; cloudBotId: string | undefined }) {
@@ -38,18 +43,19 @@ function MachineIcon({ machine, cloudBotId }: { machine: Machine; cloudBotId: st
   const { data: state } = useComputer(machine.cloud && machine.usable ? cloudBotId : null)
   const dot = machineDot(machine, state)
   if (machine.cloud) return <DeviceIcon kind="cloud" state={dot} label={!machine.usable ? `E2B API Key ${e2b('missing')}` : state ? tStatus(state.machine === 'error' ? 'failed' : state.machine) : t('cloud')} />
-  return <DeviceIcon kind="personal" state={dot} label={machine.usable ? t('online') : t('offline')} />
+  return <DeviceIcon kind="personal" state={dot} label={machine.status ?? (machine.usable ? t('online') : t('offline'))} />
 }
 
 function MachineLabel({ machine, cloudBotId }: { machine: Machine; cloudBotId: string | undefined }) {
   const t = useTranslations('Shell.newTaskDialog')
   return <><MachineIcon machine={machine} cloudBotId={cloudBotId} /><span className={cn('min-w-0 flex-1 truncate pr-3', !machine.usable && 'text-muted-foreground')}>{machine.label}</span>
-    {machine.cloud && !machine.usable && <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground"><KeyRound aria-hidden="true" className="size-3" />{t('addE2BKey')}</span>}</>
+    {machine.cloud && !machine.usable && <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground"><KeyRound aria-hidden="true" className="size-3" />{t('addE2BKey')}</span>}
+    {!machine.cloud && !machine.usable && machine.status && <span className="shrink-0 text-xs text-muted-foreground">{machine.status}</span>}</>
 }
 
 /**
- * 新建任务 the Comma way: say what needs doing in a sentence, on which machine,
- * and the Coordinator turns it into the task (title, status, assignee…). The
+ * 新建任务 the Comma way: say what needs doing in a sentence, on which machine and
+ * for which bot, and that bot (the Coordinator by default) turns it into the task (title, status, assignee…). The
  * request goes into the Coordinator conversation, where its reply shows up.
  */
 export function NewTaskDialog({ open, onOpenChange, onSent, project, initialText = '' }: {
@@ -65,6 +71,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, initialText
   const tShell = useTranslations('Shell')
   const tDevices = useTranslations('Devices')
   const tCommon = useTranslations('Common')
+  const locationT = useTranslations('Settings.modelOrder')
   const { submit: submitMessage, failureMessage } = useCoordinatorSubmit()
   const { mutate } = useSWRConfig()
   const [draft, setDraft] = useState('')
@@ -74,28 +81,38 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, initialText
   const tCoordinator = useTranslations('Coordinator')
   const { data: available = true } = useSWR(open ? 'issue-creation-available' : null, () => issueCreationAvailable())
   const fileRef = useRef<HTMLInputElement>(null)
-  const composed = useRef<{ key: string; message: string; taskDestination: TaskDestination } | null>(null)
+  const composed = useRef<{ key: string; message: string; taskDestination?: TaskDestination } | null>(null)
   const fileId = useId()
 
   const { data: devices = [] } = useSWR(open ? 'devices' : null, listDevices)
+  const { data: placement } = useSWR(open ? ['settings:model-order', 'current'] : null, () => settingsRead<Awaited<ReturnType<typeof getModelOrder>>>('model-order'))
+  const order = placement && !placement.error ? placement : undefined
   const { data: bots = [] } = useSWR(open ? 'bots' : null, listBots)
-  // The Coordinator takes the task on Mikka Cloud, on its own bot's computer.
-  const cloudBotId = (bots.find(bot => bot.coordinator) ?? bots[0])?.id
-  // Mikka Cloud first: there the Coordinator picks the bot, so no bot is named. It runs only on the
-  // person's own E2B key; a read that failed leaves that to the server. Direct daemon devices are 本机,
-  // including Linux. OS is not evidence that a computer is an SSH target reached through another machine (R-23).
+  // 交给: the bot the request goes to (usability review T4). The Coordinator by default; a picked bot gets it
+  // in its own chat, creates the task and dispatches it, so the board shows that bot on the card.
+  const [botPick, setBotPick] = useState<string | null>(null)
+  const botChoices = newTaskBotChoices(bots)
+  const handler = botChoices.find(bot => bot.id === botPick) ?? null
+  // The task runs on Mikka Cloud on the computer of the bot it goes to.
+  const cloudBotId = handler?.id ?? (bots.find(bot => bot.coordinator) ?? bots[0])?.id
+  // The menu's availability comes from the same dispatch planner as Settings. The default inherits
+  // 运行位置 (会先用: the cloud, a server or a computer); only a destination the person explicitly picks becomes a fixed task destination.
   const e2bKey = useOwnE2BKey(open)
   const cloud: Machine = { value: 'cloud', label: t('cloud'), cloud: true, usable: e2bKey.configured !== false }
-  const own: Machine[] = devices.map(item => ({ value: item.id, label: item.name, usable: item.online }))
+  const quotaUnchecked = order?.entries.some(entry => entry.block?.reason === 'checking')
+  const own: Machine[] = devices.map(item => ({ value: item.id, label: item.name, usable: taskMachineUsable(item, order?.readyDeviceIds ?? []),
+    status: !item.enabled ? t('notParticipating') : !item.online ? t('offline') : !order ? t('loadingPlacement') : !order.readyDeviceIds.includes(item.id) ? quotaUnchecked ? t('quotaUnchecked') : t('modelUnavailable') : t('online') }))
   const machines: Machine[] = [cloud, ...own]
-  // R-23: the first machine that can run the task now is the default. A chosen destination is kept even
-  // when it cannot run yet; the Coordinator creates the task and reports the missing setup.
   const [picked, setPicked] = useState<string | null>(null)
-  const device = machines.find(item => item.value === picked) ?? defaultMachine(machines)!
+  const inherited = defaultTaskMachine(machines, order)
+  const defaults: Machine = { value: 'auto', label: order ? `${t('workspaceDefault')} · ${inherited?.label ?? locationT(order.location)}` : t('workspaceDefault'),
+    cloud: inherited?.cloud === true, usable: inherited?.usable ?? false, status: inherited?.status ?? (inherited?.usable ? t('online') : order ? quotaUnchecked ? t('quotaUnchecked') : t('modelUnavailable') : t('loadingPlacement')) }
+  const device = machines.find(item => item.value === picked) ?? defaults
   // Picking Mikka Cloud without a key opens 填入 E2B Key; once saved, the task goes to the cloud.
   const [addingKey, setAddingKey] = useState(false)
   const keyDialog = usePresence(addingKey)
   function pick(value: string) {
+    if (value === 'auto') { setPicked(null); return }
     if (value === cloud.value && !cloud.usable) { setAddingKey(true); return }
     setPicked(value)
   }
@@ -117,16 +134,18 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, initialText
     setSending(true)
     setCoordinatorUnavailable(false)
     try {
-      const key = JSON.stringify([text, picked, project ?? null])
+      const key = JSON.stringify([text, picked, project ?? null, handler?.id ?? null])
       if (composed.current?.key !== key) {
-        const context = [device && t('contextDevice', { device: device.label }), project && t('contextProject', { project })].filter(Boolean).join(t('contextSeparator'))
+        const destination = pickedTaskDestination(picked)
+        const context = [destination && device && t('contextDevice', { device: device.label }), project && t('contextProject', { project })].filter(Boolean).join(t('contextSeparator'))
         composed.current = { key, message: context ? t('promptWithContext', { context, text }) : t('prompt', { text }),
-          taskDestination: device.cloud ? { kind: 'cloud' } : { kind: 'device', deviceId: device.value } }
+          ...(destination ? { taskDestination: destination } : {}) }
       }
-      const outcome = await submitMessage(composed.current.message, { taskDestination: composed.current.taskDestination })
+      const outcome = await submitMessage(composed.current.message, { taskDestination: composed.current.taskDestination, botId: handler?.id ?? null })
       if (outcome.kind === 'rejected' && outcome.error === 'coordinatorUnavailable') { setCoordinatorUnavailable(true); return }
       if (outcome.kind !== 'accepted') { const message = failureMessage(outcome); if (message) toast.error(message); return }
       setDraft('')
+      setPicked(null)
       composed.current = null
       onOpenChange(false)
       onSent?.()
@@ -142,14 +161,24 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, initialText
     <DialogContent className="gap-3 p-5 sm:max-w-2xl" closeLabel={tCommon('close')} finalFocus={openerFocus}>
       <div className="flex items-center gap-2 pr-8 text-sm">
         {device
-          ? <Select value={device.value} onValueChange={value => { if (value) pick(value) }} items={machines.map(({ value, label }) => ({ value, label }))}>
+          ? <Select value={picked ?? 'auto'} onValueChange={value => { if (value) pick(value) }} items={[defaults, ...machines].map(({ value, label }) => ({ value, label }))}>
             <SelectTrigger size="sm" className="h-7 min-w-32 max-w-56 gap-1.5 rounded-full px-2.5" aria-label={t('device')}><MachineIcon machine={device} cloudBotId={cloudBotId} /><SelectValue className="min-w-0 truncate" /></SelectTrigger>
             <SelectContent align="start" alignItemWithTrigger={false} className="w-auto min-w-60">
+              <SelectGroup><SelectItem value="auto"><MachineLabel machine={defaults} cloudBotId={cloudBotId} /></SelectItem></SelectGroup>
               <SelectGroup><SelectItem value={cloud.value}><MachineLabel machine={cloud} cloudBotId={cloudBotId} /></SelectItem></SelectGroup>
               {own.length > 0 && <SelectGroup><SelectLabel>{tDevices('thisMachine')}</SelectLabel>{own.map(item => <SelectItem key={item.value} value={item.value}><MachineLabel machine={item} cloudBotId={cloudBotId} /></SelectItem>)}</SelectGroup>}
             </SelectContent>
           </Select>
-          : <span className="flex h-7 items-center gap-1.5 rounded-full bg-control px-2.5 text-muted-foreground"><Laptop aria-hidden="true" className="size-3.5" />{t('noDevice')}</span>}
+          : <span className="flex h-7 items-center gap-1.5 rounded-full bg-control px-2.5 text-muted-foreground"><Laptop aria-hidden="true" className="size-3.5" />{order ? t('noDevice') : t('loadingPlacement')}</span>}
+        {botChoices.length > 0 && <Select value={handler?.id ?? 'coordinator'} onValueChange={value => setBotPick(value && value !== 'coordinator' ? value : null)} items={[{ value: 'coordinator', label: 'Coordinator' }, ...botChoices.map(bot => ({ value: bot.id, label: bot.name }))]}>
+          <SelectTrigger size="sm" className="h-7 min-w-28 max-w-48 gap-1.5 rounded-full px-2.5" aria-label={t('bot')}>{handler ? <BotAvatar color={handler.color} shape={handler.shape} size="row" /> : <CoordinatorAvatar size="row" />}<SelectValue className="min-w-0 truncate" /></SelectTrigger>
+          <SelectContent align="start" alignItemWithTrigger={false} className="w-auto min-w-48">
+            <SelectGroup>
+              <SelectItem value="coordinator"><CoordinatorAvatar size="row" /><span className="min-w-0 flex-1 truncate pr-3">Coordinator</span></SelectItem>
+              {botChoices.map(bot => <SelectItem key={bot.id} value={bot.id}><BotAvatar color={bot.color} shape={bot.shape} size="row" /><span className="min-w-0 flex-1 truncate pr-3">{bot.name}</span></SelectItem>)}
+            </SelectGroup>
+          </SelectContent>
+        </Select>}
         <ChevronRight aria-hidden="true" className="size-3.5 text-muted-foreground" />
         <DialogTitle className="text-sm font-medium">{t('title')}</DialogTitle>
         {project && <span className="flex h-7 max-w-40 items-center rounded-full bg-control px-2.5 text-xs text-muted-foreground"><span className="truncate">{project}</span></span>}

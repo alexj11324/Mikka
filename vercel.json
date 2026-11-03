@@ -1,5 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "pnpm install --filter '!@mikka/mobile'",
   "build": {
     "env": {
       "NEXT_ENABLE_ADAPTER": "0"
@@ -16,8 +17,5 @@
       "*": false,
       "**": false
     }
-  },
-  "crons": [
-    { "path": "/mikka/api/cron/linear-sync", "schedule": "0 4 * * *" }
-  ]
+  }
 }

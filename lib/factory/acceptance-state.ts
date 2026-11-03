@@ -1,5 +1,5 @@
 /** Client view of a Factory acceptance (R-56). Pure so every state is testable without a server. */
-export type AcceptanceState = 'pending' | 'approved' | 'publishing' | 'checking' | 'failed' | 'live' | 'revoked' | 'expired' | 'invalidated' | 'unavailable' | 'merging' | 'merged'
+export type AcceptanceState = 'pending' | 'approved' | 'publishing' | 'checking' | 'failed' | 'live' | 'revoked' | 'expired' | 'invalidated' | 'unavailable' | 'merging' | 'merged' | 'accepted'
 export type AcceptanceApproval = { id: string; candidateId: string; expiresAt: string; revokedAt: string | null; createdAt: string }
 export type AcceptancePublication = { approvalId: string; status: 'reserved' | 'uncertain' | 'succeeded' | 'failed' }
 
@@ -60,6 +60,7 @@ export type AcceptanceMerge = { candidateId: string; status: 'merging' | 'merged
  * current candidate decides; a refused one leaves it waiting (pending) with GitHub's reason.
  */
 export function mergeAcceptance(input: { stage: string; status: string; candidateId: string | null; merges: AcceptanceMerge[] }): { state: AcceptanceState; refusal?: string } {
+  if (input.stage === 'approval' && input.status === 'passed' && input.candidateId) return { state: 'accepted' }
   const time = (merge: AcceptanceMerge) => { const value = Date.parse(merge.createdAt); return Number.isNaN(value) ? -Infinity : value }
   const latest = input.candidateId === null ? undefined : input.merges
     .filter(merge => merge.candidateId === input.candidateId)

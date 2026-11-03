@@ -1,7 +1,9 @@
 import { useLocalSearchParams } from 'expo-router'
 import { ChatScreen } from '@/components/ChatScreen'
 import { ModelMenu } from '@/components/ModelMenu'
+import { ModelNotice } from '@/components/ModelNotice'
 import { useHome } from '@/lib/home'
+import { useModelMenu } from '@/lib/model-menu'
 
 /**
  * A chat with a bot; `coordinator` is the Coordinator's (R-06: an ordinary
@@ -12,6 +14,9 @@ import { useHome } from '@/lib/home'
 export default function BotChat() {
   const { id, action, draft, compose } = useLocalSearchParams<{ id: string; action?: string; draft?: string; compose?: string }>()
   const bot = useHome().data?.bots.find(item => item.id === id)
-  if (id === 'coordinator') return <ChatScreen botId={null} name="Coordinator" draft={draft} focus={action} compose={compose === '1'} composerAccessory={<ModelMenu botId={null} />} />
-  return <ChatScreen botId={id} name={bot?.name ?? ''} color={bot?.color} shape={bot?.shape} draft={draft} focus={action} compose={compose === '1'} composerAccessory={<ModelMenu botId={id} />} />
+  const coordinator = id === 'coordinator'
+  const model = useModelMenu(coordinator ? null : id)
+  const composer = { composerAccessory: (running: boolean) => <ModelMenu model={model} running={running} />, composerNotice: <ModelNotice model={model} /> }
+  if (coordinator) return <ChatScreen botId={null} name="Coordinator" draft={draft} focus={action} compose={compose === '1'} {...composer} />
+  return <ChatScreen botId={id} name={bot?.name ?? ''} color={bot?.color} shape={bot?.shape} draft={draft} focus={action} compose={compose === '1'} {...composer} />
 }

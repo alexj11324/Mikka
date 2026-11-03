@@ -12,7 +12,8 @@ import { MVP_SERVICES, REPOSITORY } from './isolated-env.mjs'
 import { finishMvpResources, indexMvpResource } from './retention.mjs'
 
 const execute = promisify(execFile)
-const git = async (cwd, args) => (await execute('git', args, { cwd, env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1', GIT_TERMINAL_PROMPT: '0' } })).stdout.trim()
+// Run as root, dev:local hands the origin to MIKKA_DEV_DAEMON_USER; Git then refuses it as dubious ownership without this exception.
+const git = async (cwd, args) => (await execute('git', ['-c', `safe.directory=${cwd}`, ...args], { cwd, env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1', GIT_TERMINAL_PROMPT: '0' } })).stdout.trim()
 const REPO_PATH = '/repos/mikka-e2e/core-loop'
 const REPOSITORY_ID = 789
 const READ_TOKEN = 'mvp-synthetic-installation-read'
@@ -82,7 +83,8 @@ export async function startMvpServices(port = 3191, { routes } = {}) {
         await mkdir(source, { recursive: true })
         await git(source, ['init', '--initial-branch=trunk'])
         await writeFile(join(source, 'README.md'), '# MVP fixture\n')
-        await git(source, ['add', 'README.md'])
+        await writeFile(join(source,'package.json'),JSON.stringify({private:true,scripts:{test:'git diff --check origin/trunk HEAD'}})+'\n')
+        await git(source, ['add', 'README.md','package.json'])
         await git(source, ['-c', 'user.name=Mikka CI', '-c', 'user.email=mikka-ci@example.com', 'commit', '-m', 'test: seed isolated origin'])
         await git(source, ['clone', '--bare', '--no-hardlinks', '.', barePath])
         // dev:local (scripts/dev-local.mjs) runs a real agent, not the mock harness.
@@ -186,9 +188,15 @@ export async function startMvpServices(port = 3191, { routes } = {}) {
       const method = request.method ?? 'GET'
       observe({ kind: 'github-request', requestId, method, path })
       const bearer = request.headers.authorization
-      const readAccess = () => assert.ok([READ_TOKEN, RUN_TOKEN].some(token => bearer === `Bearer ${token}`), 'Expected repository read token')
-      const writeAccess = () => assert.ok([WRITE_TOKEN, RUN_TOKEN].some(token => bearer === `Bearer ${token}`), 'Expected repository PR token')
+      const readAccess = () => assert.ok([READ_TOKEN, RUN_TOKEN,'mikka-local-synthetic-user-token'].some(token => bearer === `Bearer ${token}`), 'Expected repository read token')
+      const writeAccess = () => assert.ok([WRITE_TOKEN, RUN_TOKEN,'mikka-local-synthetic-user-token'].some(token => bearer === `Bearer ${token}`), 'Expected repository PR token')
       const appAccess = () => assert.match(bearer ?? '', /^Bearer [A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/, 'Expected an App JWT')
+      if (['/user','/user/installations','/user/installations/99/repositories'].includes(path) && method === 'GET') {
+        assert.equal(bearer,'Bearer mikka-local-synthetic-user-token','Expected local user authorization');
+        if (path === '/user') return reply(githubUser);
+        if (path === '/user/installations') return reply({ installations: [{ id:99,app_id:Number(process.env.GITHUB_APP_ID ?? '123'),account:{login:'mikka-e2e'},suspended_at:null }] });
+        return reply({ repositories: [{id:REPOSITORY_ID,full_name:'mikka-e2e/core-loop',private:false,description:'Disposable local acceptance repository',homepage:null,pushed_at:null}] });
+      }
       if (path === `${REPO_PATH}/installation` && method === 'GET') {
         appAccess()
         return reply({ id: 99, suspended_at: null, permissions: { pull_requests: 'write', contents: 'write' } })
@@ -196,8 +204,9 @@ export async function startMvpServices(port = 3191, { routes } = {}) {
       if (path === '/app/installations/99/access_tokens' && method === 'POST') {
         appAccess()
         const input = await readBody(request)
-        if (input.permissions?.contents === 'write') {
-          assert.deepEqual(input, { repository_ids: [REPOSITORY_ID], permissions: { contents: 'write', pull_requests: 'write', checks: 'read', actions: 'read', metadata: 'read' } })
+        // A run's token names the repository only and inherits the installation's permissions (#853).
+        if (!input.permissions) {
+          assert.deepEqual(input, { repository_ids: [REPOSITORY_ID] })
           return reply({ token: RUN_TOKEN, expires_at: new Date(Date.now() + 3600_000).toISOString() })
         }
         if (input.permissions?.pull_requests === 'write') {

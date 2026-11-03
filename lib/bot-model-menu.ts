@@ -4,7 +4,8 @@ import { z } from "zod";
 import { ActionFailureError } from "./action-error";
 import type { ExecutionSettings, ExecutionSettingsScope } from "./execution-settings";
 import { apiKeyChatBaseUrl } from "./model-api-key-providers";
-import { quotaExhausted, quotaResetsAt } from "./subscription-quota";
+import { subscriptionAvailability } from "./subscription-quota";
+import { resolveBotModelChoice } from "./bot-model-choice";
 
 export { quotaExhausted } from "./subscription-quota";
 import {
@@ -33,27 +34,17 @@ const HOSTED = { id: HOSTED_CHOICE, modelId: "", provider: "mikka" } as const;
 /**
  * The composer's model menu for one bot, or the Coordinator (`botId` null),
  * and what its chip shows. It lists only credentials the resolver can use in
- * this workspace (`ExecutionSettings.botModels`), so the menu never offers a
+ * this workspace (`ExecutionSettings.chatModels`), so the menu never offers a
  * model the next run would refuse. It reads; it never saves a default.
  */
 export async function botModelMenu(
   pool: Pick<Pool, "query">,
-  settings: Pick<ExecutionSettings, "botModels" | "botBinding">,
+  settings: Pick<ExecutionSettings, "chatModels" | "chatBinding"> & Partial<Pick<ExecutionSettings, "pooledBindings">>,
   scope: ExecutionSettingsScope,
   botId: string | null,
   now = Date.now(),
 ): Promise<BotModelMenu> {
-  const rows = await settings.botModels(scope);
-  const quotas = new Map<string, unknown>(
-    rows.length
-      ? (
-          await pool.query<{ id: string; quota: unknown }>(
-            "SELECT id::text AS id,quota FROM byos_connections WHERE id::text=ANY($1::text[])",
-            [[...new Set(rows.map((row) => String(row.connectionId)))]],
-          )
-        ).rows.map((row) => [row.id, row.quota])
-      : [],
-  );
+  const rows = await settings.chatModels(scope);
   // Claude first, then ChatGPT/Codex, as the resolver orders them (orchestration §2).
   const ordered = [
     ...rows.filter((row) => row.provider === "claude"),
@@ -66,6 +57,7 @@ export async function botModelMenu(
       kind: "subscription",
       provider: row.provider,
       plan: row.plan ?? null,
+      credentialLabel: row.accountLabel?.trim() || `…${String(row.connectionId).slice(-6)}`,
       options: [],
     };
     subscriptions.set(key, group);
@@ -76,15 +68,20 @@ export async function botModelMenu(
   const keys = (await usableApiKeys(pool, scope.ownerId, scope.workspaceId)).filter((key) => apiKeyChatBaseUrl(key) && key.models.length);
   const keyOptions = (key: (typeof keys)[number]) =>
     key.models.map((model) => ({ id: apiKeyOptionId(key.id, model), modelId: model, provider: key.provider }));
+  const keyLabel = (key: (typeof keys)[number]) => [key.name, key.last4 ? `····${key.last4}` : null].filter(Boolean).join(" ") || key.provider;
   const ownKeys = keys.filter((key) => key.mine);
   const sharedOwners = [...new Set(keys.filter((key) => !key.mine).map((key) => key.ownerId))];
   const ownerNames = sharedOwners.length ? await memberNames(scope.workspaceId, sharedOwners) : new Map<string, string>();
+  // Mikka 默认 is listed only where this chat's workspace has points for it, with how many (decision 2026-11-02-1450).
+  const { hostedPointsHere } = await import("./points-fallback");
+  const { points, trialLeft } = await hostedPointsHere(scope.workspaceId);
+  const usable = points > 0 || trialLeft > 0;
   const groups: BotModelMenuGroup[] = [
-    { kind: "hosted", options: [{ ...HOSTED }] },
+    ...(usable ? [{ kind: "hosted" as const, points, ...(points > 0 ? {} : { trialLeft }), options: [{ ...HOSTED }] }] : []),
     ...subscriptions.values(),
-    ...(ownKeys.length ? [{ kind: "apiKey" as const, options: ownKeys.flatMap(keyOptions) }] : []),
-    ...sharedOwners.filter((owner) => ownerNames.has(owner)).map((owner) => ({
-      kind: "shared" as const, owner: ownerNames.get(owner)!, options: keys.filter((key) => key.ownerId === owner).flatMap(keyOptions),
+    ...ownKeys.map((key) => ({ kind: "apiKey" as const, credentialLabel: keyLabel(key), options: keyOptions(key) })),
+    ...keys.filter((key) => !key.mine && ownerNames.has(key.ownerId)).map((key) => ({
+      kind: "shared" as const, owner: ownerNames.get(key.ownerId)!, credentialLabel: keyLabel(key), options: keyOptions(key),
     })),
   ];
   const keyChoice = await botApiKeyChoice(pool, scope, botId);
@@ -95,82 +92,34 @@ export async function botModelMenu(
       [scope.ownerId, scope.workspaceId, botId ?? "coordinator"],
     )
   ).rows[0];
-  // A row without a binding is Mikka 默认, picked on purpose.
-  const saved = row ? (row.bindingId ?? HOSTED_CHOICE) : undefined;
-
-  const fromRow = (
-    row: (typeof rows)[number],
-    chosen: boolean,
-    quota: unknown,
-  ): BotModelCurrent => {
-    // A bot's saved binding is its own copy; the menu lists one option per account and model.
-    const option = rows.find(
-      (item) => item.connectionId === row.connectionId && item.modelId === row.modelId,
-    );
-    const exhausted = quotaExhausted(quota, now);
-    return {
-      id: option?.bindingId ?? row.bindingId,
-      modelId: row.modelId,
-      provider: row.provider,
-      kind: "subscription",
-      chosen,
-      available: !exhausted,
-      ...(exhausted ? { quota: { subscription: row.provider, plan: (row as { plan?: string | null }).plan ?? null, resetsAt: quotaResetsAt(quota, now), fallback: null } } : {}),
-    };
-  };
-
+  // A saved key has a null binding too; only a row without either is an
+  // explicit Mikka 默认 preference.
+  const selected = keyChoice ? undefined : row ? (row.bindingId ?? HOSTED_CHOICE) : undefined;
+  const choice = await resolveBotModelChoice(pool, settings, scope, botId,
+    { selected, key: keyChoice }, { rows, keys, now });
+  const state = { chosen: choice.chosen, ...(choice.fallback ? { fallback: choice.fallback } : {}) };
   let current: BotModelCurrent;
-  if (keyChoice) {
-    // A saved API key model; unavailable once the key is deleted, unshared or not allowed here.
-    const key = keys.find((item) => item.id === keyChoice.keyId);
+  if (choice.kind === "hosted") {
+    current = { ...HOSTED, kind: "hosted", ...state, available: usable, availability: usable ? "available" : "exhausted" };
+  } else if (choice.kind === "apiKey") {
     current = {
-      id: apiKeyOptionId(keyChoice.keyId, keyChoice.model),
-      modelId: keyChoice.model,
-      provider: key?.provider ?? "unknown",
-      kind: key && !key.mine ? "shared" : "apiKey",
-      chosen: true,
-      available: Boolean(key),
+      id: apiKeyOptionId(choice.key.id, choice.model), modelId: choice.model, provider: choice.key.provider,
+      kind: choice.key.mine ? "apiKey" : "shared", ...state, available: true, availability: "available",
+      credentialLabel: choice.key.mine ? keyLabel(choice.key) : [ownerNames.get(choice.key.ownerId), keyLabel(choice.key)].filter(Boolean).join(" · "),
+      ...(choice.quota ? { quota: choice.quota } : {}),
     };
-  } else if (saved === HOSTED_CHOICE) {
-    current = { ...HOSTED, kind: "hosted", chosen: true, available: true };
-  } else if (saved) {
-    const live = await settings.botBinding(scope, saved);
-    if (live)
-      current = fromRow(live, true, quotas.get(String(live.connectionId)) ?? (await connectionQuota(pool, live.connectionId)));
-    else {
-      // Disconnected, revoked, unshared or not allowed here any more: name it, marked unavailable.
-      const gone = (
-        await pool.query<{ modelId: string; provider: string }>(
-          `SELECT b."modelId",c.provider FROM byos_bindings b LEFT JOIN byos_connections c ON c.id=b."connectionId"
-           WHERE b.id=$1 AND b."ownerId"=$2`,
-          [saved, scope.ownerId],
-        )
-      ).rows[0];
-      current = {
-        id: saved,
-        modelId: gone?.modelId ?? "",
-        provider: gone?.provider ?? "unknown",
-        kind: "subscription",
-        chosen: true,
-        available: false,
-      };
-    }
   } else {
-    // Nothing picked: what the resolver gives the next run (orchestration §2).
-    const first = ordered[0];
-    current = first
-      ? fromRow(first, false, quotas.get(String(first.connectionId)))
-      : { ...HOSTED, kind: "hosted", chosen: false, available: true };
-  }
-  // Out of quota: the key the next turn moves to, when 订阅额度用完后，自动改用 API Key allows it (freezeBotModel decides the same way).
-  if (current.quota) {
-    const { quotaFallbackKey } = await import("./quota-fallback");
-    const fallback = await quotaFallbackKey(pool, scope.ownerId, scope.workspaceId, current.modelId);
-    if (fallback) {
-      current.quota.fallback = { keyProvider: fallback.key.provider, keyName: fallback.key.name, model: fallback.model };
-      // The chip names what the next turn runs on: the key's model, as freezeBotModel freezes it.
-      current = { ...current, id: apiKeyOptionId(fallback.key.id, fallback.model), modelId: fallback.model, provider: fallback.key.provider, kind: "apiKey", available: true };
-    }
+    const binding = choice.binding;
+    const option = rows.find(item => item.connectionId === binding.connectionId && item.modelId === binding.modelId);
+    const availability = subscriptionAvailability(binding.quota, binding.modelId, binding.provider === "codex" ? "codex" : "claude", now);
+    const sharedOwner = choice.sharedOwnerId ? (await memberNames(scope.workspaceId, [choice.sharedOwnerId])).get(choice.sharedOwnerId) : undefined;
+    current = {
+      id: option?.bindingId ?? binding.bindingId, modelId: binding.modelId, provider: binding.provider,
+      kind: "subscription", ...state, available: availability.status === "available", availability: availability.status,
+      // A pooled subscription never exposes another member's private login.
+      credentialLabel: choice.sharedOwnerId ? sharedOwner : binding.accountLabel?.trim() || `…${String(binding.connectionId).slice(-6)}`,
+      ...(choice.quota ? { quota: choice.quota } : {}),
+    };
   }
   return { groups, current };
 }
@@ -185,33 +134,64 @@ async function memberNames(workspaceId: string, userIds: string[]) {
   return new Map(rows.map((row) => [row.userId, row.name]));
 }
 
-async function connectionQuota(pool: Pick<Pool, "query">, connectionId: string) {
-  return (
-    await pool.query("SELECT quota FROM byos_connections WHERE id::text=$1", [String(connectionId)])
-  ).rows[0]?.quota;
-}
-
 /**
- * 刷新模型列表: asks each subscription the menu lists for its current models
+ * 刷新模型列表: asks each connected subscription for its current models
  * (`refreshBotModels`), then reads the menu again, so a new subscription, a
  * renewed quota or a new model shows at once. A provider that does not answer
  * in time keeps its last catalogue; the menu is still re-read.
  */
 export async function refreshBotModelMenu(
   pool: Pick<Pool, "query">,
-  settings: Pick<ExecutionSettings, "botModels" | "botBinding" | "refreshBotModels">,
+  settings: Pick<ExecutionSettings, "chatModels" | "chatBinding" | "refreshBotModels" | "connectedSubscriptions"> & Partial<Pick<ExecutionSettings, "pooledBindings">>,
   scope: ExecutionSettingsScope,
   botId: string | null,
   timeoutMs = 8000,
+  refreshQuota: (ownerId: string, connectionId: string, signal: AbortSignal) => Promise<unknown> = async (ownerId, connectionId, signal) =>
+    (await import("./subscription-runtime")).subscriptionRuntime().usage(ownerId, connectionId, signal),
 ): Promise<BotModelMenu> {
-  const connections = [...new Set((await settings.botModels(scope)).map((row) => String(row.connectionId)))];
+  // Every connected subscription, not only those already listed: one never asked has no models to list yet.
+  const connections = await settings.connectedSubscriptions(scope.ownerId);
   await Promise.allSettled(
     connections.map((connectionId) =>
       Promise.race([
-        settings.refreshBotModels(scope, connectionId),
+        // A catalogue read alone cannot confirm a stale allowance. The same
+        // refresh checks usage, whose safe snapshot is persisted by the service.
+        Promise.allSettled([
+          settings.refreshBotModels(scope, connectionId),
+          refreshQuota(scope.ownerId, connectionId, AbortSignal.timeout(timeoutMs)),
+        ]),
         new Promise((resolve) => setTimeout(resolve, timeoutMs).unref?.()),
       ]),
     ),
   );
+  return botModelMenu(pool, settings, scope, botId);
+}
+
+/**
+ * Saves a chat's model pick for the bot's next runs (a run already going keeps
+ * its model) and returns the menu: a binding id, Mikka 默认 (HOSTED_CHOICE), or
+ * an API key model (`apikey:<keyId>:<model>`, saved as that key's choice). The
+ * web's action and the iOS app's route both save through here, so every option
+ * the menu lists can be picked from either.
+ */
+export async function chooseBotModel(
+  pool: Pool,
+  settings: ExecutionSettings,
+  scope: ExecutionSettingsScope,
+  botId: string | null,
+  id: string,
+): Promise<BotModelMenu> {
+  const { parseApiKeyOption } = await import("./bot-model-menu-view");
+  const apiKey = parseApiKeyOption(id);
+  if (apiKey) {
+    const { setBotApiKeyChoice } = await import("./model-api-keys");
+    const { WorkspaceError } = await import("./workspace-error");
+    try {
+      await setBotApiKeyChoice(pool, scope, botId, apiKey.keyId, apiKey.model);
+    } catch (error) {
+      if (error instanceof WorkspaceError) throw new ActionFailureError(error.code === "botNotFound" ? "botNotFound" : "executionModelUnknown");
+      throw error;
+    }
+  } else await settings.setBotModel(scope, botId, id);
   return botModelMenu(pool, settings, scope, botId);
 }

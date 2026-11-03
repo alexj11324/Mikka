@@ -36,7 +36,6 @@ before(async () => {
 
 test("actual recovery tool accepts only binding and carries the actual SDK context identity", async () => {
   const keys = [
-    "MIKKA_ISSUE_TOOLS_ENABLED",
     "MIKKA_FACTORY_ROUTING_ENABLED",
     "MIKKA_FACTORY_LIFECYCLE_ENABLED",
   ] as const;
@@ -97,7 +96,6 @@ test("actual recovery tool accepts only binding and carries the actual SDK conte
 
 test("registration does not widen a frozen grant or enable default-off recovery", () => {
   const keys = [
-    "MIKKA_ISSUE_TOOLS_ENABLED",
     "MIKKA_FACTORY_ROUTING_ENABLED",
     "MIKKA_FACTORY_LIFECYCLE_ENABLED",
   ] as const;

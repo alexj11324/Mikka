@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { test } from 'node:test'
-import { InvalidAuthorization, parseSubscriptionStart, planName } from './subscription-ui'
+import { InvalidAuthorization, parseSubscriptionStart, planName, subscriptionListSchema } from './subscription-ui'
 
 test('subscription consent opens only the fixed provider page for its own flow', () => {
   const state = 'a'.repeat(43)
@@ -24,4 +24,12 @@ test('plan names read as the providers write them', () => {
   assert.equal(planName('pro'), 'Pro')
   assert.equal(planName('plus'), 'Plus')
   assert.equal(planName('Max'), 'Max')
+})
+
+test('a selected chat preserves its workspace identity', () => {
+  const workspaceId = randomUUID()
+  const bot = { id: randomUUID(), workspaceId, name: 'Coordinator', color: 'encre', shape: 'cercle' }
+  const list = { enabled: true, providers: [], connections: [{ id: randomUUID(), provider: 'claude', state: 'connected', revision: 1, bots: [bot] }] }
+  assert.deepEqual(subscriptionListSchema.parse(list).connections[0].bots, [bot])
+  assert.equal(subscriptionListSchema.safeParse({ ...list, connections: [{ ...list.connections[0], bots: [{ ...bot, workspaceId: 'not-a-workspace' }] }] }).success, false)
 })

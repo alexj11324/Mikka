@@ -13,7 +13,7 @@ test('the real production build can assign a recording only in the isolated CI f
 test('a test-mode flag alone cannot enable the browser fixture on a deployment or business database', () => {
   for (const patch of [
     { MIKKA_TEST_MODE: undefined }, { MIKKA_MVP_E2E: undefined }, { CI: undefined }, { GITHUB_ACTIONS: undefined },
-    { VERCEL: '1' }, { VERCEL_ENV: 'preview' }, { VERCEL_ENV: 'production' }, { MIKKA_NATIVE_COORDINATOR: '1' },
+    { VERCEL: '1' }, { VERCEL_ENV: 'preview' }, { VERCEL_ENV: 'production' },
     { DATABASE_URL: 'postgresql://localhost/business' }, { MIKKA_DATABASE_URL: undefined },
     { E2E_DATABASE_URL: `${database}?options=-csearch_path=business` },
   ]) assert.equal(runTestFixture('mock', { ...isolated, ...patch }), undefined)

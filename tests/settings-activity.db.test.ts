@@ -32,6 +32,10 @@ before(async () => {
   const intl = await import('next-intl/server')
   mock.module('next-intl/server', { namedExports: { ...intl, getLocale: async () => 'en' } })
   mock.module('@/lib/auth', { namedExports: { auth: { api: { getSession: async () => sessionUser ? { user: { id: sessionUser, name: sessionUser, email: `${sessionUser}@example.invalid` } } : null } } } })
+  // Saving seals with KMS; the fixture key never leaves this process and no AWS call is made.
+  const kmsModule = await import('../lib/credentials/kms')
+  const { randomBytes } = await import('node:crypto')
+  mock.module('@/lib/credentials/kms', { namedExports: { ...kmsModule, awsKms: () => ({ generate: async () => ({ plaintext: randomBytes(32), wrapped: 'synthetic-key' }), decrypt: async () => { throw new Error('settings never decrypt') } }) } })
   ;({ pool } = await import('../lib/db'))
   ;({ workspacePool } = await import('../lib/workspace-db'))
   actions = await import('../app/actions/settings-activity')
@@ -46,7 +50,8 @@ before(async () => {
 
 after(async () => {
   if (!databaseUrl) return
-  await pool.query(`DELETE FROM workspace_audit_events WHERE "workspaceId"=$1 AND "actorType"='user' AND "actorId"=$2 AND action='credential.revoked'`, [workspaceId, A])
+  await pool.query(`DELETE FROM workspace_audit_events WHERE "workspaceId"=$1 AND "actorType"='user' AND "actorId"=$2 AND action LIKE 'credential.%'`, [workspaceId, A])
+  await pool.query('DELETE FROM credentials WHERE user_id = ANY($1)', [[A, B]])
   await workspacePool.query('DELETE FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2', [workspaceId, A])
   await workspacePool.query('DELETE FROM mikka_workspaces WHERE id=$1 AND "userId"=$2', [workspaceId, A])
   await workspacePool.end()
@@ -288,4 +293,45 @@ dbTest('device token links are recorded only for owned, present devices', async 
   const [{ id: aDevice }] = (await pool.query(`SELECT id FROM devices WHERE "ownerId"=$1 AND "removedAt" IS NULL LIMIT 1`, [A])).rows
   assert.equal(await link.linkDeviceToken(caller, aDevice), false, "another person's device")
   assert.equal((await pool.query('SELECT count(*)::int AS n FROM device_token_devices WHERE "tokenId"=$1', [tokenId])).rows[0].n, 0)
+})
+
+dbTest('saved logins: added and re-passworded from settings, owner only, never echoed', async () => {
+  const { overrideDeploymentSwitch } = await import('../lib/deployment-switches')
+  const password = randomUUID(), replacement = randomUUID()
+  sessionUser = null
+  assert.deepEqual(await actions.saveSavedLogin({ site: 'https://figma.com', account: 'a', password }), { error: 'authRequired', params: undefined })
+
+  sessionUser = A
+  assert.deepEqual(await actions.saveSavedLogin({ site: 'http://figma.com', account: 'alex@example.com', password }), { error: 'savedLoginSiteInvalid', params: undefined })
+  assert.deepEqual(await actions.saveSavedLogin({ site: 'https://figma.com', account: '', password }), { error: 'savedLoginInvalid', params: undefined })
+  assert.deepEqual(await actions.saveSavedLogin({ site: 'https://figma.com', account: 'alex@example.com', password: '' }), { error: 'savedLoginInvalid', params: undefined })
+
+  const saved = await actions.saveSavedLogin({ site: 'figma.com/files', account: 'alex@example.com', password })
+  if (saved.error) throw new Error(saved.error)
+  assert.equal(saved.site, 'https://figma.com', 'a bare host is read as https and reduced to its origin')
+  assert.ok(!JSON.stringify(saved).includes(password))
+  const listed = await actions.listSavedLogins()
+  if (listed.error) throw new Error(listed.error)
+  assert.ok(listed.logins.some(login => login.id === saved.id && login.site === 'https://figma.com' && login.account === 'alex@example.com'))
+  assert.ok(!JSON.stringify(listed).includes(password))
+
+  assert.deepEqual(await actions.replaceSavedLoginPassword(saved.id, ''), { error: 'savedLoginInvalid', params: undefined })
+  assert.deepEqual(await actions.replaceSavedLoginPassword('not-a-uuid', replacement), { error: 'savedLoginNotFound', params: undefined })
+  assert.deepEqual(await actions.replaceSavedLoginPassword(saved.id, replacement), { id: saved.id, site: 'https://figma.com' })
+
+  sessionUser = B
+  assert.deepEqual(await actions.replaceSavedLoginPassword(saved.id, password), { error: 'savedLoginNotFound', params: undefined })
+  const others = await actions.listSavedLogins()
+  assert.ok(!others.error && !others.logins.some(login => login.id === saved.id))
+
+  sessionUser = A
+  const audit = (await pool.query(`SELECT "actorId", action FROM workspace_audit_events WHERE "workspaceId"=$1 AND "targetId"=$2 ORDER BY "createdAt"`, [workspaceId, saved.id])).rows
+  assert.deepEqual(audit, [{ actorId: A, action: 'credential.created' }, { actorId: A, action: 'credential.replaced' }])
+
+  // The vault's kill switch stops saving from settings too.
+  overrideDeploymentSwitch('credentialVault', false)
+  try {
+    assert.deepEqual(await actions.saveSavedLogin({ site: 'https://figma.com', account: 'alex@example.com', password }), { error: 'savedLoginsUnavailable', params: undefined })
+    assert.deepEqual(await actions.replaceSavedLoginPassword(saved.id, password), { error: 'savedLoginsUnavailable', params: undefined })
+  } finally { overrideDeploymentSwitch('credentialVault', undefined) }
 })

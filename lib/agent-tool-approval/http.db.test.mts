@@ -25,7 +25,7 @@ const isolatedEnv = {
   MIKKA_DATABASE_URL:application.toString(), DATABASE_URL:application.toString(),
   // This is an ordinary local run with no Factory, Skill or BYOS assignment.
   MIKKA_FACTORY_ROUTING_ENABLED:'0', MIKKA_FACTORY_LIFECYCLE_ENABLED:'0', MIKKA_BYOS_ENABLED:'0',
-  MIKKA_NATIVE_COORDINATOR:'0', AI_GATEWAY_API_KEY:'', VERCEL:'', VERCEL_ENV:'',
+  AI_GATEWAY_API_KEY:'', VERCEL:'', VERCEL_ENV:'',
 }
 const previousEnv = Object.fromEntries(Object.keys(isolatedEnv).map(key=>[key,process.env[key]]))
 Object.assign(process.env,isolatedEnv)
@@ -136,7 +136,7 @@ test('real HTTP claim carries policy, and its run gate creates no approvals (dec
   assert.equal(assignment.prompt,'APPROVAL_TEST')
   assert.equal(assignment.expectedRepoRemote,remoteUrl)
   assert.equal(assignment.pushBranch,'mikka/appr-1')
-  assert.equal((await pool.query('SELECT "scopeVersion","pushApproved" FROM run_publications WHERE "runId"=$1',[runId])).rows[0].pushApproved,false)
+  assert.equal((await pool.query('SELECT "scopeVersion","pushApproved" FROM run_publications WHERE "runId"=$1',[runId])).rows[0].pushApproved,true,'kept for old readers: pushing needs no approval')
   const {verifyRunToken}=await import('../mcp/worker')
   assert.ok(await verifyRunToken(new Request(origin),assignment.mcp?.token),'claim issues a real run-scoped token after its lease commits')
   assert.equal(assignment.policy?.permissions.install_dependency, 'allow')

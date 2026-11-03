@@ -17,6 +17,7 @@ export const RUN_QUESTION_KINDS = [
 export const runQuestion = z
   .object({
     questionId: z.uuid(),
+    purpose: z.literal("verification_command").optional(),
     kind: z.enum(RUN_QUESTION_KINDS).default("decision"),
     question: z.string().trim().min(1).max(4000),
     context: z.string().trim().max(4000).optional(),
@@ -114,17 +115,22 @@ export type RunSkillMount = z.infer<typeof runSkillMount>
 export const runReport = z.object({
   /** Worktree base journaled before the adapter started; never agent-supplied. */
   sourceCommit: z.string().regex(/^[a-f0-9]{40}$/).optional(),
+  /** Daemon-created local snapshot of a non-repository delivery; never a published code candidate. */
+  deliverableCommit: z.string().regex(/^[a-f0-9]{40}$/).optional(),
   skillMount: runSkillMount.optional(),
   execution: runExecution.optional(),
   runtime: runRuntime.optional(),
   /** What was done, in a few sentences. Empty when the run crashed early. */
   summary: z.string().max(10_000),
+  /** A verify Agent's proposed command and repository evidence; the daemon executes it. */
+  verificationCommand: z.object({ command: z.string().trim().min(1).max(2_000), basis: z.string().trim().min(1).max(2_000) }).strict().optional(),
   /** Paths relative to the worktree root (from `git status`). */
   filesChanged: shortList,
   /** The daemon's run of the issue's verify command after a submit. */
   verify: z.object({
     status: verifyStatus,
     command: z.string().max(2_000).optional(),
+    inferredFrom: z.string().max(2_000).optional(),
     /** Actual process outcome from the daemon, never the agent. */
     exitCode: z.number().int().nullable().optional(),
     signal: z.string().max(100).nullable().optional(),

@@ -27,11 +27,16 @@ if (
 )
   process.exit(2)
 const sessionId = flag("--session-id") ?? flag("--resume")
+const processReceipt = join(config, 'fixture-process.json')
+let prompts = 0
+writeFileSync(processReceipt, JSON.stringify({ pid: process.pid, prompts }))
 const out = (value) => process.stdout.write(`${JSON.stringify(value)}\n`)
 const lines = createInterface({ input: process.stdin })
 lines.on("line", async (line) => {
   const frame = JSON.parse(line)
   if (frame.type === "control_request") {
+    if (token === 'fixture-timeout') return
+    if (token.startsWith('fixture-delayed')) await new Promise(resolve => setTimeout(resolve, 12_000))
     out({
       type: "control_response",
       response: {
@@ -42,9 +47,10 @@ lines.on("line", async (line) => {
           agents: [],
           models: [],
           account: {
-            apiProvider: token === "fixture-gateway" ? "gateway" : "firstParty",
-            apiKeySource:
-              token === "fixture-paid" ? "ANTHROPIC_API_KEY" : "none"
+            apiProvider: ["fixture-gateway", "fixture-delayed-gateway"].includes(token) ? "gateway" : "firstParty",
+            // Official 2.1.309 omits apiKeySource for descriptor-delivered OAuth.
+            ...(["fixture-paid", "fixture-delayed-paid"].includes(token) ? { apiKeySource: "ANTHROPIC_API_KEY" } : token === "fixture-legacy" ? { apiKeySource: "none" } : {}),
+            ...(["fixture-unknown", "fixture-delayed-unknown"].includes(token) ? {} : { tokenSource: token === "fixture-environment" ? "CLAUDE_CODE_OAUTH_TOKEN" : "CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR" })
           }
         }
       }
@@ -53,6 +59,8 @@ lines.on("line", async (line) => {
   }
   const text = frame.message?.content?.[0]?.text
   if (typeof text !== "string") return
+  prompts++
+  writeFileSync(processReceipt, JSON.stringify({ pid: process.pid, prompts }))
   if (text === 'COMPUTER') {
     const config = JSON.parse(flag('--mcp-config') ?? '{}').mcpServers?.mikka_computer
     if (!config || !/(^|\/)node$/.test(config.command)) process.exit(2)
@@ -70,7 +78,7 @@ lines.on("line", async (line) => {
   }
   if(text==='PROBE_GIT') {
     // Runs use no sandbox (decision 2026-11-01-2335): this probe only checks the run's gh wrapper.
-    if (process.env.GH_REPO && !execFileSync('gh', ['--version'], { encoding: 'utf8' }).startsWith('gh version')) process.exit(2)
+    if (process.env.GH_HOST && !execFileSync('gh', ['--version'], { encoding: 'utf8' }).startsWith('gh version')) process.exit(2)
   }
   out({ type: "system", subtype: "init", session_id: sessionId })
   if (text === "CRASH") {
@@ -78,6 +86,25 @@ lines.on("line", async (line) => {
     process.exit(1)
   }
   if (text === "HANG") return
+  if (text === "API_ERROR" || text === "MAX_TURNS" || text === "IMAGE_ERROR") {
+    process.stderr.write(`upstream said Authorization: Bearer ${token} sk-ant-oat01-fixturesecret\n`)
+    if (text === "API_ERROR")
+      out({ type: "assistant", session_id: sessionId, error: "overloaded",
+        message: { id: "api", content: [{ type: "text", text: `API Error: 529 ${token}` }] } })
+    out({
+      type: "result",
+      subtype: text === "MAX_TURNS" ? "error_max_turns" : "success",
+      session_id: sessionId,
+      is_error: true,
+      ...(text === "MAX_TURNS" ? { errors: [`private diagnostic ${token}`] } : { result: `API Error: 529 ${token}` }),
+      ...(text === "API_ERROR" ? { api_error_status: 529, terminal_reason: "api_error" } : {}),
+      ...(text === "IMAGE_ERROR" ? { api_error_status: 400, terminal_reason: "image_error" } : {}),
+      ...(text === "MAX_TURNS" ? { terminal_reason: "max_turns" } : {}),
+      total_cost_usd: 0,
+      usage: { input_tokens: 1, output_tokens: 1 }
+    })
+    return
+  }
   if (text === "FAIL") {
     out({
       type: "assistant",

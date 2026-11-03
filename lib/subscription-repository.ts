@@ -3,6 +3,7 @@ import type { Pool } from 'pg'
 import { quotaSnapshotSchema, type QuotaSnapshot } from '@mikka/protocol'
 import { subscriptionBindingSchema, type SubscriptionRoute, SubscriptionRefusal } from '@mikka/protocol/subscription'
 import type { CredentialScope } from '../packages/daemon/src/subscription-worker-client'
+import { runMayUseCredentialSql } from './personal-policy'
 
 export interface ConnectionRow { id: string; ownerId: string; workspaceId: string; provider: 'codex' | 'claude'; state: string; epoch: string; quota: unknown; accountLabel?: string | null; paused?: boolean }
 export class SubscriptionRepository {
@@ -48,29 +49,50 @@ export class SubscriptionRepository {
     const { rowCount } = await this.pool.query('update byos_connections set "removedAt"=now() where id=$1 and "ownerId"=$2 and state=\'disconnected\'', [id, ownerId])
     if (!rowCount) throw new SubscriptionRefusal('account_unavailable')
   }
-  /** Bots whose current binding uses each connection revision (Settings 「使用中」), other members' bots included. */
-  async connectionBots(ownerId: string) {
-    const { rows } = await this.pool.query<{ connectionId: string; id: string; name: string; color: string; shape: string }>(`select u."connectionId",u.id,u.name,u.color,u.shape from (
-        select distinct on (b."consumerId",b.route) b."connectionId",b."connectionRevision",bot.id,bot.name,bot.color,bot.shape
-        from byos_bindings b
-        left join bot_cloud_runtimes r on r."agentId"::text=b."consumerId" and r."ownerId"=b."ownerId" and r."workspaceId"::text=b."workspaceId"
-        -- A cloud computer's runtime (the owner's bot), or a bot using the binding directly: the owner's own,
-        -- or another member's bot on a subscription shared for others too (allowOthers), so the owner sees who used it.
-        join bots bot on (bot.id=r."botId" and bot."ownerId"=b."ownerId") or (r."botId" is null and bot.id::text=b."consumerId" and bot."workspaceId"::text=b."workspaceId")
-        where b."ownerId"=$1
-        order by b."consumerId",b.route,b."createdAt" desc,b.id desc) u
-      join byos_connections c on c.id=u."connectionId" and c.epoch=u."connectionRevision" and c."ownerId"=$1
-      order by u.name limit 200`, [ownerId])
+  /** Saved chat selections for the owner's active bots in the authorized workspace.
+   * A binding is history, not proof of a current choice or an active run. Neither
+   * another workspace nor another member's bot is part of this personal view.
+   * Connections remain account-level: their original workspace does not limit use.
+   * A paused/reconnected account can still be selected; its row states availability.
+   */
+  async connectionBots(ownerId: string, workspaceId: string) {
+    const { rows } = await this.pool.query<{ connectionId: string; id: string; name: string; color: string; shape: string; workspaceId: string }>(`
+      select c.id as "connectionId",bot.id,bot.name,bot.color,bot.shape,bot."workspaceId"::text as "workspaceId"
+      from bot_model_choices choice
+      left join coordinator_bots cb on choice."botKey"='coordinator' and cb."ownerId"=choice."ownerId" and cb."workspaceId"=choice."workspaceId"
+      join bots bot on bot.id::text=case when choice."botKey"='coordinator' then cb."botId"::text else choice."botKey" end
+        and bot."ownerId"=choice."ownerId" and bot."workspaceId"=choice."workspaceId" and bot."archivedAt" is null
+      join byos_bindings b on b.id=choice."bindingId" and b."ownerId"=choice."ownerId"
+      join byos_connections c on c.id=b."connectionId" and c."ownerId"=choice."ownerId" and c."removedAt" is null
+      where choice."ownerId"=$1 and choice."workspaceId"=$2 and choice."apiKeyId" is null
+        and (choice."botKey"<>'coordinator' or not exists (
+          select 1 from bot_model_choices current where current."ownerId"=choice."ownerId"
+            and current."workspaceId"=choice."workspaceId" and current."botKey"=bot.id::text))
+      order by bot.name,bot.id limit 200`, [ownerId, workspaceId])
     return rows
   }
   async defaultModelBinding(ownerId: string, consumerId: string): Promise<string | null> {
     const { rows } = await this.pool.query('select id from byos_bindings where "ownerId"=$1 and "consumerId"=$2 and route in (\'codex_cpa\',\'claude_cpa\') order by "createdAt" desc limit 1', [ownerId, consumerId])
     return rows[0]?.id ?? null
   }
-  async nativeBinding(ownerId: string, consumerId: string, harness: string) {
+  async nativeBinding(ownerId: string, consumerId: string, harness: string, bindingId?: string, workspaceId?: string) {
     if (harness !== 'codex' && harness !== 'claude_code') return null
     const route = harness === 'codex' ? 'codex_cli' : 'claude_code_cli'
-    const { rows } = await this.pool.query('select id from byos_bindings where "ownerId"=$1 and "consumerId"=$2 and route=$3 order by "createdAt" desc,id desc limit 1', [ownerId,consumerId,route])
-    return rows[0] ? this.binding(ownerId, rows[0].id) : null
+    // The task's Agent belongs to the caller. A binding may still belong to a different person
+    // who shared a subscription in this workspace; retain that owner for quota, leases and revocation.
+    const { rows: [row] } = await this.pool.query<{ id: string; ownerId: string; workspaceId: string }>(
+      `SELECT b.id,b."ownerId",b."workspaceId" FROM byos_bindings b JOIN agents a ON a.id::text=b."consumerId" AND a."userId"=$1
+        WHERE b."consumerId"=$2 AND b.route=$3 AND ($4::uuid IS NULL OR b.id=$4) AND ($5::text IS NULL OR b."workspaceId"=$5)
+          AND ${runMayUseCredentialSql('b."ownerId"', '$1', 'b."workspaceId"')}
+        ORDER BY b."createdAt" DESC,b.id DESC LIMIT 1`, [ownerId, consumerId, route, bindingId ?? null, workspaceId ?? null])
+    if (!row) return null
+    if (row.ownerId !== ownerId) {
+      try {
+        const { authorizeSubscriptionWorkspace } = await import('./subscription-runtime')
+        await authorizeSubscriptionWorkspace(ownerId, row.workspaceId)
+        await authorizeSubscriptionWorkspace(row.ownerId, row.workspaceId)
+      } catch { return null }
+    }
+    return this.binding(row.ownerId, row.id)
   }
 }

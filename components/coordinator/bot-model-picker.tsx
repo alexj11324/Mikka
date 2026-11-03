@@ -35,19 +35,21 @@ function providerName(provider: string | undefined) {
 }
 
 function heading(t: T, group: BotModelMenuGroup) {
+  const credential = group.credentialLabel ? ` · ${group.credentialLabel}` : ''
   switch (group.kind) {
     case 'hosted': return 'Mikka'
     // The plan names it (Claude Max, ChatGPT Pro): everything but a share is the person's own (decision 2026-10-31-2330).
-    case 'subscription': return group.plan ? `${providerName(group.provider)} ${group.plan}` : providerName(group.provider)
-    case 'apiKey': return t('apiKey')
-    case 'shared': return t('shared')
+    case 'subscription': return `${group.plan ? `${providerName(group.provider)} ${group.plan}` : providerName(group.provider)}${credential}`
+    case 'apiKey': return `${t('apiKey')}${credential}`
+    case 'shared': return `${t('shared')}${credential}`
   }
 }
 
 /** What sits at the right of an item: who pays for it. A subscription item has none. */
 function tag(t: T, group: BotModelMenuGroup) {
   switch (group.kind) {
-    case 'hosted': return t('credits')
+    // The points it can spend in this chat's workspace, not the person's elsewhere (decision 2026-11-02-1450).
+    case 'hosted': return group.trialLeft !== undefined ? t('trialLeft', { count: group.trialLeft }) : group.points === undefined ? t('credits') : t('points', { points: group.points })
     case 'apiKey': return t('metered')
     case 'shared': return group.owner ? t('sharedKey', { name: group.owner }) : null
     default: return null
@@ -78,7 +80,7 @@ function OptionLabel({ t, option }: { t: T; option: ChipModel }) {
  * menu of what this person can use here. The choice is saved per bot; a run
  * already going keeps its model.
  */
-export function BotModelPicker({ botId }: { botId: string | null }) {
+export function BotModelPicker({ botId, running = false }: { botId: string | null; running?: boolean }) {
   const t = useTranslations('Coordinator.modelPicker')
   const menu = useSWR<BotModelMenu>(botModelMenuKey(botId), () => getBotModelMenu(botId))
   const [failed, setFailed] = useState(false)
@@ -102,16 +104,16 @@ export function BotModelPicker({ botId }: { botId: string | null }) {
   }, [botId, shown, menu.error])
   // Someone else's bot gets no chip; while the menu loads, the chip keeps the model it showed last time (state completeness).
   // It is the chip's look only, not a control, until the menu it opens has arrived.
-  if (!menu.data) return last && !menu.error ? <span role="status" aria-busy="true" data-testid="bot-model-chip-pending" aria-label={t('label', { name: last.id === HOSTED_CHOICE ? t('hosted') : last.modelId || t('unknownModel') })}
+  if (!menu.data) return last && !menu.error ? <span role="status" aria-busy="true" data-testid="bot-model-chip-pending" data-next-message={running || undefined} aria-label={t('label', { name: last.id === HOSTED_CHOICE ? t('hosted') : last.modelId || t('unknownModel') })}
     className="inline-flex h-6 max-w-56 shrink-0 items-center gap-1 rounded-full bg-control px-2 text-sm whitespace-nowrap text-foreground [&_svg]:shrink-0 [&>svg]:size-3.5">
     <span className="flex min-w-0"><OptionLabel t={t} option={last} /></span>
     <ChevronDown className="text-muted-foreground" />
   </span> : null
   const { current, groups } = menu.data
-  const value = current.available ? current.id : ''
+  const value = current.id
 
   async function choose(id: string) {
-    if (id === value) return
+    if (id === value && current.chosen) return
     setFailed(false)
     try {
       // A pick that is not saved comes back as `{ error }`: failing here rolls the chip back and shows 未保存.
@@ -120,10 +122,6 @@ export function BotModelPicker({ botId }: { botId: string | null }) {
         if (error) throw new Error(error)
         return saved as BotModelMenu
       }, {
-        optimisticData: data => {
-          const option = data!.groups.flatMap(group => group.options.map(item => ({ ...item, kind: group.kind }))).find(item => item.id === id)
-          return option ? { ...data!, current: { ...option, chosen: true, available: true } } : data!
-        },
         rollbackOnError: true, populateCache: true, revalidate: false,
       })
     } catch { setFailed(true) }
@@ -140,12 +138,15 @@ export function BotModelPicker({ botId }: { botId: string | null }) {
   }
 
   const name = current.id === HOSTED_CHOICE ? t('hosted') : current.modelId || t('unknownModel')
+  const checking = current.availability === 'checking'
+  const unavailable = !current.available && !checking
+  const label = [name,
+    current.fallback ? t('fallback') : null, checking ? t('checking') : null].filter(Boolean).join(' · ')
   return <DropdownMenu open={open} onOpenChange={next => { setOpen(next); if (next) void refresh() }}>
-    <DropdownMenuTrigger render={<InputGroupButton type="button" variant="secondary" size="xs" data-testid="bot-model-chip" data-unavailable={!current.available || undefined}
-      className={cn('max-w-56 rounded-full px-2 font-normal', current.available ? 'text-foreground' : 'text-muted-foreground')}
-      aria-label={current.available ? t('label', { name }) : t('labelUnavailable', { name })} />}>
+    <DropdownMenuTrigger render={<InputGroupButton type="button" variant="secondary" size="xs" data-testid="bot-model-chip" data-unavailable={unavailable || undefined} data-next-message={running || undefined}
+      className={cn('max-w-56 rounded-full px-2 font-normal', unavailable ? 'text-muted-foreground' : 'text-foreground')}
+      title={label} aria-label={unavailable ? t('labelUnavailable', { name: label }) : t('label', { name: label })} />}>
       <span className="flex min-w-0"><OptionLabel t={t} option={current} /></span>
-      {!current.available && <span className="shrink-0 text-xs">{t('unavailable')}</span>}
       {failed && <span className="shrink-0 text-xs text-destructive">{t('notSaved')}</span>}
       <ChevronDown className="text-muted-foreground" />
     </DropdownMenuTrigger>
@@ -154,8 +155,8 @@ export function BotModelPicker({ botId }: { botId: string | null }) {
         {groups.map((group, index) => <DropdownMenuGroup key={`${group.kind}-${index}`} data-group={group.kind}>
           {/* A rule under Mikka 默认 only; the person's own groups follow one another under their headings. */}
           {index === 1 && <DropdownMenuSeparator />}
-          <DropdownMenuLabel className="font-normal">{heading(t, group)}</DropdownMenuLabel>
-          {group.options.map(option => <DropdownMenuRadioItem key={option.id} value={option.id} closeOnClick>
+          <DropdownMenuLabel className="truncate font-normal" title={heading(t, group)}>{heading(t, group)}</DropdownMenuLabel>
+          {group.options.map(option => <DropdownMenuRadioItem key={option.id} value={option.id} closeOnClick onClick={() => { if (option.id === value && !current.chosen) void choose(option.id) }}>
             <OptionLabel t={t} option={option} />
             {tag(t, group) && <span className="ml-auto shrink-0 pl-3 text-xs text-muted-foreground">{tag(t, group)}</span>}
           </DropdownMenuRadioItem>)}

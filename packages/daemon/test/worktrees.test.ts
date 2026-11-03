@@ -4,7 +4,7 @@ import { join } from "node:path"
 
 import { afterEach, describe, expect, it } from "vitest"
 
-import { WorktreeManager, runBranch } from "../src/worktrees"
+import { WorktreeManager, runBranch, withRepoConfig } from "../src/worktrees"
 import { cleanupTempDirs, makeRepo, tempDir } from "./helpers"
 
 afterEach(() => cleanupTempDirs())
@@ -177,5 +177,37 @@ describe("discarding an empty run", () => {
     commit(kept, "d.txt")
     expect(await trees.discardIfEmpty(["gone", "r2"], kept, repo)).toBe(false)
     expect(existsSync(kept)).toBe(true)
+  })
+})
+
+describe('task change reporting', () => {
+  it('retains paths the CLI already committed before handing back its result', async () => {
+    const repo = await makeRepo(), trees = new WorktreeManager(tempDir())
+    const path = await trees.create('committed-report', repo, 'main')
+    const base = git(path, 'rev-parse', 'HEAD')
+    writeFileSync(join(path, 'DELIVERY.txt'), 'actual delivery\n')
+    git(path, 'add', 'DELIVERY.txt')
+    git(path, '-c', 'user.name=Fixture', '-c', 'user.email=fixture@mikka.invalid', 'commit', '-qm', 'deliver')
+    expect(await trees.changedFiles(path)).toEqual([])
+    expect(await trees.changedFiles(path, base)).toEqual(['DELIVERY.txt'])
+  })
+})
+
+describe("worktree removal", () => {
+  it("waits for a worktree being added to the same repository (git reads every worktree's admin files while adding)", async () => {
+    const repo = await makeRepo()
+    const worktrees = new WorktreeManager(tempDir())
+    const path = await worktrees.create("run-gone", repo, "main")
+    let release!: () => void
+    const adding = withRepoConfig(repo, () => new Promise<void>(resolve => { release = resolve }))
+    let removed = false
+    const removing = worktrees.remove("run-gone", repo).then(() => { removed = true })
+    await new Promise(resolve => setTimeout(resolve, 200))
+    expect(removed).toBe(false)
+    expect(existsSync(join(path, ".git"))).toBe(true)
+    release()
+    await adding
+    await removing
+    expect(existsSync(path)).toBe(false)
   })
 })

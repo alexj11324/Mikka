@@ -31,7 +31,7 @@ async function main() {
       await pool.query(`INSERT INTO devices (id,"ownerId",name,enabled,"lastSeenAt",harnesses) VALUES ($1,$2,'Question device',true,now(),'[{"harness":"codex","installed":true}]')`, [deviceId, user.id])
       await pool.query('INSERT INTO device_repos (id,"deviceId","userId","repoPath","remoteUrl") VALUES ($1,$2,$3,$4,$5)', [repoId, deviceId, user.id, remoteKey(remoteUrl), remoteUrl])
       await pool.query(`INSERT INTO agents (id,"userId",name,harness,"deviceId") VALUES ($1,$2,'Question fixture','codex',$3)`, [agentId, user.id, deviceId])
-      // Push is what the GitHub App grants (lib/github/push-grant.ts); record that grant as a live check would.
+      // An installation row an earlier build recorded; admission no longer reads it (decision 2026-11-02-1600).
       await recordPushGrant(pool, user.id, remoteKey(remoteUrl))
       agent = { id: agentId, deviceRepoId: repoId }
     }

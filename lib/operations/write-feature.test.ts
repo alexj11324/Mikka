@@ -1,18 +1,29 @@
 import assert from 'node:assert/strict'
-import test from 'node:test'
+import test, { afterEach } from 'node:test'
 import { PERSONAL_WRITES_ENABLED, personalWritesEnabled } from './write-feature'
+import { overrideDeploymentSwitch } from '@/lib/deployment-switches'
+
+afterEach(() => overrideDeploymentSwitch('personalWrites', undefined))
 
 test('personal writes ship on in every deployment scope without a Preview opt-in', () => {
   assert.equal(PERSONAL_WRITES_ENABLED,true)
-  for (const VERCEL_ENV of [undefined,'production','preview','development','staging']) {
-    for (const MIKKA_PERSONAL_WRITES_PREVIEW of [undefined,'0','true','1']) assert.equal(personalWritesEnabled({VERCEL_ENV,MIKKA_PERSONAL_WRITES_PREVIEW}),true)
-  }
+  assert.equal(personalWritesEnabled(),true)
 })
 
-test('server rollout configuration admits production and explicitly closes Preview admission', () => {
-  assert.equal(personalWritesEnabled({VERCEL_ENV:'production',MIKKA_PERSONAL_WRITES_ENABLED:'1'}),true)
-  for (const MIKKA_PERSONAL_WRITES_ENABLED of ['0','true','', 'false']) {
-    assert.equal(personalWritesEnabled({VERCEL_ENV:'production',MIKKA_PERSONAL_WRITES_ENABLED}),false)
-    assert.equal(personalWritesEnabled({VERCEL_ENV:'preview',MIKKA_PERSONAL_WRITES_ENABLED,MIKKA_PERSONAL_WRITES_PREVIEW:'1'}),false)
+test('only the kill switch closes admission; the old variable no longer decides', () => {
+  overrideDeploymentSwitch('personalWrites', true)
+  assert.equal(personalWritesEnabled(),true)
+  overrideDeploymentSwitch('personalWrites', false)
+  assert.equal(personalWritesEnabled(),false)
+  overrideDeploymentSwitch('personalWrites', undefined)
+  const previous = process.env.MIKKA_PERSONAL_WRITES_ENABLED
+  try {
+    for (const value of ['0','true','', 'false']) {
+      process.env.MIKKA_PERSONAL_WRITES_ENABLED = value
+      assert.equal(personalWritesEnabled(),true)
+    }
+  } finally {
+    if (previous === undefined) delete process.env.MIKKA_PERSONAL_WRITES_ENABLED
+    else process.env.MIKKA_PERSONAL_WRITES_ENABLED = previous
   }
 })

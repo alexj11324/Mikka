@@ -34,18 +34,21 @@ test('returns the last read when the webhook has not arrived', async () => {
 test('the refusal line offers only what the person\'s state allows', () => {
   const usage = (over: Partial<HostedUsage>): HostedUsage => ({ state: 'verification_required', balance: { verified: false, free: 0, purchased: 0 }, personal: true, subscribed: false, ...over })
   // No subscription, personal, no card: both ways on.
-  assert.deepEqual(refusalOffer('verification_required', usage({})), { transient: false, card: true, connect: true })
-  assert.deepEqual(refusalOffer('free_allowance_used', usage({})), { transient: false, card: true, connect: true })
+  assert.deepEqual(refusalOffer('verification_required', usage({})), { transient: false, billing: false, card: true, connect: true, topUp: false })
+  assert.deepEqual(refusalOffer('free_allowance_used', usage({})), { transient: false, billing: false, card: true, connect: true, topUp: false })
   // A team workspace: verification lands on the personal one, so no 验证银行卡.
-  assert.deepEqual(refusalOffer('verification_required', usage({ personal: false })), { transient: false, card: false, connect: true })
+  assert.deepEqual(refusalOffer('verification_required', usage({ personal: false })), { transient: false, billing: true, card: false, connect: true, topUp: false })
+  // A team with no points: 打开计费, even with a subscription connected, since retrying would not help.
+  assert.deepEqual(refusalOffer('points_exhausted', usage({ personal: false, subscribed: true })), { transient: false, billing: true, card: false, connect: false, topUp: false })
+  assert.deepEqual(refusalOffer('usage_in_progress', usage({ personal: false })), { transient: true, billing: false, card: false, connect: false, topUp: false })
   // A verified card: the used-up allowance is not fixed by verifying again.
-  assert.deepEqual(refusalOffer('points_exhausted', usage({ balance: { verified: true, free: 0, purchased: 0 } })), { transient: false, card: false, connect: true })
-  assert.deepEqual(refusalOffer('platform_paused', usage({})), { transient: false, card: false, connect: true })
+  assert.deepEqual(refusalOffer('points_exhausted', usage({ balance: { verified: true, free: 0, purchased: 0 } })), { transient: false, billing: false, card: false, connect: true, topUp: true })
+  assert.deepEqual(refusalOffer('platform_paused', usage({})), { transient: false, billing: false, card: false, connect: true, topUp: false })
   // A subscription connected: it serves the person anywhere (#838), so only 暂时不可用 and 重试.
-  assert.deepEqual(refusalOffer('verification_required', usage({ subscribed: true })), { transient: true, card: false, connect: false })
-  assert.deepEqual(refusalOffer('usage_in_progress', usage({})), { transient: true, card: false, connect: false })
+  assert.deepEqual(refusalOffer('verification_required', usage({ subscribed: true })), { transient: true, billing: false, card: false, connect: false, topUp: false })
+  assert.deepEqual(refusalOffer('usage_in_progress', usage({})), { transient: true, billing: false, card: false, connect: false, topUp: false })
   // Before the state is read, nothing is offered that may turn out wrong.
-  assert.deepEqual(refusalOffer('verification_required', null), { transient: false, card: false, connect: false })
+  assert.deepEqual(refusalOffer('verification_required', null), { transient: false, billing: false, card: false, connect: false, topUp: false })
 })
 
 test('a refused turn moves to the person\'s own subscription: the first in the menu\'s order', async () => {

@@ -1,7 +1,7 @@
 import { withDeviceRoute } from '@/lib/device-route'
 import { screenCaptureRequest } from '@mikka/protocol/capture'
 import { screenCaptures } from '@/lib/captures/screen'
-import { maskForWorkspace } from '@/lib/secrets/runtime'
+import { maskFor } from '@/lib/secrets/runtime'
 import { captureFailure, captureJson, deviceRun } from '@/lib/captures/device'
 
 export const dynamic = 'force-dynamic'
@@ -21,8 +21,8 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ runI
   if (!parsed.success) return captureJson({ error: 'Invalid request.' }, 400)
   const caller = { userId: found.owner.userId, workspaceId: found.caller.scopeWorkspaceId, deviceId: found.deviceId, tokenId: found.caller.tokenId }
   // 4e2 item 4: capture titles and step labels come from the agent; the pixels themselves cannot be masked.
-  const input = 'title' in parsed.data && typeof parsed.data.title === 'string' ? { ...parsed.data, title: await maskForWorkspace(caller.workspaceId, parsed.data.title) }
-    : parsed.data.action === 'step' ? { ...parsed.data, label: await maskForWorkspace(caller.workspaceId, parsed.data.label) } : parsed.data
+  const input = 'title' in parsed.data && typeof parsed.data.title === 'string' ? { ...parsed.data, title: await maskFor({ workspaceId: caller.workspaceId, ownerId: caller.userId }, parsed.data.title) }
+    : parsed.data.action === 'step' ? { ...parsed.data, label: await maskFor({ workspaceId: caller.workspaceId, ownerId: caller.userId }, parsed.data.label) } : parsed.data
   if (input.action === 'step')
     return captureJson({ action: input.action, recorded: await screenCaptures.step(caller, found.owner.runId, input.label, input.source) })
   if (input.action === 'screenshot') {

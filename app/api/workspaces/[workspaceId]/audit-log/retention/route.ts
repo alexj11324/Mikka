@@ -1,3 +1,4 @@
+import { freshSessionRoute } from '@/lib/fresh-session'
 import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import { WorkspaceError } from '@/lib/workspace-access'
@@ -22,7 +23,7 @@ export async function GET(request: Request, context: Context) {
     return Response.json({ error: 'auditRetentionUnavailable' }, { status: 503, headers })
   }
 }
-export async function PUT(request: Request, context: Context) {
+async function PUTBody(request: Request, context: Context) {
   if (request.headers.get('origin') !== new URL(request.url).origin) return new Response(null, { status: 403, headers })
   const identity = await access(request, context)
   if (identity.response) return identity.response
@@ -34,3 +35,6 @@ export async function PUT(request: Request, context: Context) {
     return Response.json({ error: 'auditRetentionUnavailable' }, { status: 503, headers })
   }
 }
+
+// Credentials, permissions, money and deletion: the session is read from the database, not the cookie cache.
+export const PUT = freshSessionRoute(PUTBody)

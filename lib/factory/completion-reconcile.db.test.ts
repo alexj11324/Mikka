@@ -40,7 +40,7 @@ test("run completion enters review without the Coordinator; replays do not advan
     const deviceId = randomUUID(), agentId = randomUUID(), repoId = randomUUID();
     await pool.query(`INSERT INTO devices (id,"ownerId",name,"lastSeenAt",harnesses) VALUES ($1,'owner','Disposable',now(),'[{"harness":"codex","installed":true}]')`, [deviceId]);
     await pool.query(`INSERT INTO agents (id,"userId",name,harness,"deviceId") VALUES ($1,'owner','Fixture','codex',$2)`, [agentId, deviceId]);
-    await pool.query(`INSERT INTO device_repos (id,"deviceId","userId","repoPath") VALUES ($1,$2,'owner','/fixture/repo')`, [repoId, deviceId]);
+    await pool.query(`INSERT INTO device_repos (id,"deviceId","userId","repoPath","remoteUrl") VALUES ($1,$2,'owner','/fixture/repo','https://github.com/acme/fixture.git')`, [repoId, deviceId]);
     const store = createFactoryStore(pool, authorize, null, { independent: factoryCheckIndependent });
     const queue: FactoryQueue = async (tx, userId, input, botId) => {
       const runId = randomUUID();
@@ -73,7 +73,7 @@ test("run completion enters review without the Coordinator; replays do not advan
     const pick = (x: { stage: string; status: string; revision: number; attemptId: string | null }) => ({ stage: x.stage, status: x.status, revision: x.revision, attemptId: x.attemptId });
 
     await t.test("flags off: no SQL, no transition", async () => {
-      delete process.env.MIKKA_FACTORY_ROUTING_ENABLED; delete process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED;
+      process.env.MIKKA_FACTORY_ROUTING_ENABLED = '0'; process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED = '0';
       let queried = 0;
       assert.equal(await reconcileFactoryAfterCompletion({ query: async () => { queried++; return { rows: [] }; } }, "owner", d.runId, reconcileFor), 0);
       assert.equal(queried, 0);

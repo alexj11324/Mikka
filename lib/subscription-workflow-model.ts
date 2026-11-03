@@ -25,9 +25,17 @@ export class SubscriptionWorkflowModel implements V4Model {
     // The SDK's doStreamStep calls this in Node, where a step-to-step call
     // is a normal call. The directive also removes custody imports from the
     // Workflow VM bundle; no provider backend crosses the serde boundary.
+    const startedAt = Date.now()
     const { resolveSubscriptionWorkflowModel } = await import('./subscription-workflow-model-runtime')
     const model = await resolveSubscriptionWorkflowModel(this.selection, options.abortSignal)
     if (typeof model === 'string' || model.specificationVersion !== 'v4') throw new Error('subscription_model_unavailable')
-    return model.doStream(options)
+    const { stepIdentity, timedModelStream } = await import('./model-call-timing')
+    const requestedAt = Date.now()
+    // Claude caches only at explicit breakpoints (lib/prompt-cache.ts): the broker passes the subscription's on; a person's
+    // own Anthropic key reads the SDK's option, which other providers ignore. Codex and OpenAI cache prefixes themselves.
+    const { withCacheBreakpoints } = await import('./prompt-cache')
+    const key = this.selection.type === 'api_key' ? 'anthropic' : this.selection.route === 'claude_cpa' ? 'openaiCompatible' : null
+    const request = key ? { ...options, prompt: withCacheBreakpoints(options.prompt, key) } : options
+    return timedModelStream(await model.doStream(request), { route: 'subscription', model: this.modelId, tools: options.tools?.length ?? 0, startedAt, requestedAt, ...await stepIdentity() })
   }
 }

@@ -77,6 +77,22 @@ test('设备：本机与服务器分组，Agent 图标，重命名、重新检�
   await expect(page.getByText('需要管理员开启 user namespace', { exact: false })).toHaveCount(0)
   await page.keyboard.press('Escape')
   await expect(row(page, 'gpu-box').getByRole('button', { name: '重新连接' })).toBeVisible()
+  // Review C11: a device paired before only needs its client started again, not install and login.
+  await row(page, 'gpu-box').getByRole('button', { name: '重新连接' }).click()
+  const again = page.getByRole('dialog', { name: '重新连接', exact: true })
+  await expect(again).toContainText('mikka daemon')
+  await expect(again).not.toContainText('mikka daemon login')
+  await expect(again).not.toContainText('npm install')
+  for (const scheme of ['light', 'dark'] as const) {
+    await page.emulateMedia({ colorScheme: scheme })
+    await test.info().attach(`device-reconnect-${scheme}`, { body: await page.screenshot(), contentType: 'image/png' })
+  }
+  await page.emulateMedia({ colorScheme: 'light' })
+  await page.keyboard.press('Escape')
+  await expect(again).toHaveCount(0)
+  // R5: an offline computer gets no runs; an online one with nothing allowed to run says so.
+  await expect(row(page, 'gpu-box')).toContainText('离线 · 不会被派任务')
+  await expect(row(page, 'E2E MacBook')).toContainText('不能跑优先使用的模型')
   // 参与调度 is each computer's one switch (decision 2026-11-02-1400); turning it off is saved and nothing else is offered.
   await expect(row(page, 'gpu-box').getByRole('switch', { name: 'gpu-box 参与调度' })).not.toBeChecked()
   await expect(row(page, 'build-01').getByRole('switch')).toHaveCount(1)
@@ -92,7 +108,7 @@ test('设备：本机与服务器分组，Agent 图标，重命名、重新检�
   await expect.poll(async () => (await db().query('SELECT kind FROM device_management_commands WHERE "deviceId" = $1', [ids.server])).rows.map(item => item.kind)).toEqual(['redetect'])
 
   await row(page, 'gpu-box').getByRole('button', { name: 'gpu-box 的更多操作' }).click()
-  await page.getByRole('menuitem', { name: '重启 Mikka 客户端' }).click()
+  await page.getByRole('menuitem', { name: '重启 daemon' }).click()
   await expect(page.getByText('gpu-box 离线，上线后执行')).toBeVisible()
 
   await row(page, 'build-01').getByRole('button', { name: 'build-01 的更多操作' }).click()
@@ -105,7 +121,7 @@ test('设备：本机与服务器分组，Agent 图标，重命名、重新检�
 
   await row(page, 'dev-vps').getByRole('button', { name: 'dev-vps 的更多操作' }).click()
   await page.getByRole('menuitem', { name: '移除设备' }).click()
-  await expect(page.getByRole('alertdialog', { name: '移除「dev-vps」？' })).toContainText('也会卸载 dev-vps 上的 Mikka 客户端')
+  await expect(page.getByRole('alertdialog', { name: '移除「dev-vps」？' })).toContainText('也会卸载 dev-vps 上的 daemon')
   await page.getByRole('button', { name: '移除', exact: true }).click()
   await expect(page.getByText('dev-vps', { exact: true })).toHaveCount(0)
   await expect.poll(async () => (await db().query('SELECT "removedAt" IS NOT NULL AS removed FROM devices WHERE id = $1', [ids.bare])).rows[0]?.removed).toBe(true)
@@ -163,4 +179,29 @@ test('设备（桌面版）：从 SSH 配置选主机，确认指纹，看安装
   await expect(dialog.getByRole('listitem').filter({ hasText: '已上线' })).toContainText('Claude Code')
   await dialog.getByRole('button', { name: '完成' }).click()
   await expect(dialog).toBeHidden()
+})
+
+// Review C6: until the list is read the page shows its shape, never 还没有设备.
+test('设备：列表读到之前显示加载，读到空列表才说还没有设备', async ({ page }) => {
+  await register(page, '/settings?section=devices')
+  await expect(page.getByRole('heading', { level: 1, name: '设备' })).toBeVisible()
+  let release!: () => void
+  const held = new Promise<void>(resolve => { release = resolve })
+  await page.route('**/*', async route => {
+    if (route.request().method() === 'POST' && route.request().headers()['next-action']) await held
+    await route.fallback()
+  })
+  try {
+    await page.reload()
+    await expect(page.getByRole('status', { name: '正在加载设备', exact: true })).toBeVisible()
+    await expect(page.getByText('还没有设备', { exact: true })).toHaveCount(0)
+    for (const scheme of ['light', 'dark'] as const) {
+      await page.emulateMedia({ colorScheme: scheme })
+      await test.info().attach(`devices-loading-${scheme}`, { body: await page.screenshot(), contentType: 'image/png' })
+    }
+    await page.emulateMedia({ colorScheme: 'light' })
+  } finally { release() }
+  await page.unroute('**/*')
+  await expect(page.getByText('还没有设备', { exact: true })).toBeVisible()
+  await expect(page.getByRole('status', { name: '正在加载设备', exact: true })).toHaveCount(0)
 })

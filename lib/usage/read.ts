@@ -1,8 +1,9 @@
 import 'server-only'
-// 用量 (V14 / S-A) read model from data that exists today: threads (agent_runs)
+// 用量 (V14 / S-A) read model from data that exists today: threads (run chains)
 // per bot and their run time. There is no credit meter yet, so no points.
-import { and, eq, gte, inArray, lt, sql } from 'drizzle-orm'
-import { db } from '@/lib/db'
+import { and, eq, inArray, lt, sql } from 'drizzle-orm'
+import { db, pool } from '@/lib/db'
+import { listBotRunRoots } from '@/lib/run-chain'
 import { agentRuns, bots } from '@/lib/db/schema'
 import { workspaceMembers } from '@/lib/db/workspace-schema'
 import { requireWorkspace } from '@/lib/workspace-access'
@@ -37,15 +38,20 @@ export async function workspaceUsage(actorId: string, workspaceId: string, month
   // Run time is the part of each run that falls inside the month; a run still going counts up to now.
   const seconds = sql<number>`coalesce(sum(case when ${agentRuns.startedAt} is null then 0 else greatest(0, extract(epoch from (least(coalesce(${agentRuns.finishedAt}, now()), ${end}::timestamptz) - greatest(${agentRuns.startedAt}, ${start}::timestamptz)))) end), 0)::float8`
   // Runs that overlap the month: created before its end and not finished before its start.
-  const perBot = ids.length ? await db.select({ botId: agentRuns.botId, threads: sql<number>`(count(*) filter (where ${agentRuns.createdAt} >= ${start}::timestamptz))::int`, seconds })
+  const perBot = ids.length ? await db.select({ botId: agentRuns.botId, seconds })
     .from(agentRuns)
     .where(and(inArray(agentRuns.botId, ids), lt(agentRuns.createdAt, end), sql`(${agentRuns.finishedAt} is null or ${agentRuns.finishedAt} >= ${start}::timestamptz)`))
     .groupBy(agentRuns.botId) : []
-  const daily = ids.length ? await db.select({ date: sql<string>`to_char(${agentRuns.createdAt} at time zone 'UTC', 'YYYY-MM-DD')`, threads: sql<number>`count(*)::int` })
-    .from(agentRuns).where(and(inArray(agentRuns.botId, ids), gte(agentRuns.createdAt, start), lt(agentRuns.createdAt, end)))
-    .groupBy(sql`1`) : []
+  const roots = await listBotRunRoots(pool, ids, start, end)
+  const threadsByBot = new Map<string, number>()
+  const byDay = new Map<string, number>()
+  for (const root of roots) {
+    threadsByBot.set(root.botId, (threadsByBot.get(root.botId) ?? 0) + 1)
+    const day = root.createdAt.toISOString().slice(0, 10)
+    byDay.set(day, (byDay.get(day) ?? 0) + 1)
+  }
   const usage = new Map(perBot.map(row => [row.botId, row]))
-  const botUsage = botRows.map(bot => ({ ...bot, threads: usage.get(bot.id)?.threads ?? 0, seconds: Math.round(Number(usage.get(bot.id)?.seconds ?? 0)) }))
+  const botUsage = botRows.map(bot => ({ ...bot, threads: threadsByBot.get(bot.id) ?? 0, seconds: Math.round(Number(usage.get(bot.id)?.seconds ?? 0)) }))
     .sort((a, b) => b.threads - a.threads || b.seconds - a.seconds || a.name.localeCompare(b.name))
   const owners = [...new Set(botUsage.map(bot => bot.ownerId))]
   const named = owners.filter((owner): owner is string => owner !== null)
@@ -57,7 +63,6 @@ export async function workspaceUsage(actorId: string, workspaceId: string, month
     if (ownerId === null) return { id: '', name: '', awaitingTakeover: true as const, ...totals }
     return { id: ownerId, name: names.get(ownerId) ?? ownerId, threads: mine.reduce((sum, bot) => sum + bot.threads, 0), seconds: mine.reduce((sum, bot) => sum + bot.seconds, 0) }
   }).sort((a, b) => b.threads - a.threads || b.seconds - a.seconds)
-  const byDay = new Map(daily.map(row => [row.date, row.threads]))
   if (admin) await (await import('../abuse/runtime')).ensureLegacyVerification(workspaceId)
   return {
     ...(admin ? {hosted:await (await import('../abuse/runtime')).hostedUsage.status(workspaceId)} : {}),

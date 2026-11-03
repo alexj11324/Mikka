@@ -15,10 +15,10 @@ mock.module('swr', {
   defaultExport: (key: unknown) => Array.isArray(key) && key[0] === 'issue-thread'
     ? { data: thread && { thread, chunks: [{ chunk: { type: 'text-delta', id: 'a', delta: 'Done.' }, at: new Date(0) }], messages: [] }, mutate: () => {} }
     : { data: [], mutate: () => {} },
-  namedExports: { useSWRConfig: () => ({ mutate: () => {} }) },
+  namedExports: { useSWRConfig: () => ({ mutate: () => {}, cache: new Map() }), unstable_serialize: (key: unknown) => JSON.stringify(key) },
 })
 mock.module('next/dynamic', { defaultExport: () => () => null })
-mock.module(at('app/actions/agents.ts'), { namedExports: { retryQuotaPausedRun: async () => null, resumeQuotaPausedRunOnApiKey: async () => null, getThreadName: async () => null, listIssueThreads: async () => null, getIssueThread: async () => null, sendIssueThreadMessage: async () => {}, stopRun: async () => ({}) } })
+mock.module(at('app/actions/agents.ts'), { namedExports: { retryQuotaPausedRun: async () => null, resumeQuotaPausedRunOnApiKey: async () => null, getThreadName: async () => null, listIssueThreads: async () => null, getIssueThread: async () => null, getThreadChanges: async () => ({ state: 'none' }), sendIssueThreadMessage: async () => {}, sendIssueThreadReply: async () => ({ sent: true }), stopRun: async () => ({}) } })
 mock.module(at('app/actions/artifacts.ts'), { namedExports: { listRunArtifacts: async () => [] } })
 mock.module(at('components/workspace/factory-acceptance.tsx'), { namedExports: { useThreadAcceptance: () => null, AcceptanceStateBadge: () => null } })
 mock.module(at('components/workspace/factory-acceptance-pane.tsx'), { namedExports: { FactoryAcceptancePane: () => null } })
@@ -60,4 +60,15 @@ test('every conversation container draws the shared composer, directly or throug
   // The panel's composer is not gated on the run being active again (#708 → this fix).
   const panel = readFileSync(new URL('../components/workspace/issue-thread-panel.tsx', import.meta.url), 'utf8')
   assert.doesNotMatch(panel, /\(active \|\| question\) && detail && <div/)
+})
+
+test('an open thread lets the agent’s words be quoted and every message be copied', () => {
+  thread = { ...base, prompt: '> Done.\n\nWhy this way?' }
+  const html = render()
+  // The agent's reply is where 引用 picks words from; the person's own message is not.
+  assert.match(html, /data-quote-source=""[^>]*>[\s\S]*Done\./)
+  // The person's message shows the words it quotes above its own, not as `>` lines.
+  assert.match(html, /data-slot="reply-quote"[^>]*aria-label="[^"]*Done\.[^"]*"/)
+  assert.doesNotMatch(html, /&gt; Done\./)
+  assert.equal(html.match(/data-copy-state="idle"/g)?.length, 2)
 })

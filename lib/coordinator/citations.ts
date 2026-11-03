@@ -80,7 +80,15 @@ export function splitCitations(text: string): CitationPart[] {
   return parts
 }
 
-/** Every id cited in `texts`: the ones to look up as issues, and as runs. Bare ids go in both. */
+/** The start of a `[[issue:<id>]]` or `[[run:<id>]]` at the very end of the text, up to its last `]`. */
+const PARTIAL_CITATION = /\[(?:\[(?:i(?:s(?:s(?:u(?:e(?::[0-9a-f-]{0,36}\]?)?)?)?)?)?|r(?:u(?:n(?::[0-9a-f-]{0,36}\]?)?)?)?)?)?$/i
+
+/** Streamed text without a citation that has not fully arrived, so its marker never shows before its chip. */
+export function withoutPartialCitation(text: string): string {
+  return text.replace(PARTIAL_CITATION, '')
+}
+
+/** Every id cited in `texts`:the ones to look up as issues, and as runs. Bare ids go in both. */
 export function citedIds(texts: readonly string[]): { issueIds: string[]; runIds: string[] } {
   const issueIds = new Set<string>()
   const runIds = new Set<string>()

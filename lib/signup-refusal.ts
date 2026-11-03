@@ -19,3 +19,17 @@ export function signupRefusal(status: number | undefined, code: string | undefin
 export function turnstileHeaders(token: string | null): Record<string, string> {
   return token ? { [TURNSTILE_HEADER]: token } : {}
 }
+
+export type SignInRefusal = 'invalidCredentials' | 'emailNotVerified' | 'signInRateLimited'
+
+/**
+ * Why an email sign-in failed (usability review N4). A wrong password and an unknown email read the same,
+ * so the line never says whether an account exists (OWASP authentication guidance). Better Auth answers
+ * EMAIL_NOT_VERIFIED only after the password matched, so that refusal leaks nothing either.
+ */
+export function signInRefusal(status: number | undefined, code: string | undefined): SignInRefusal | null {
+  if (code === 'EMAIL_NOT_VERIFIED') return 'emailNotVerified'
+  if (code === 'INVALID_EMAIL_OR_PASSWORD' || code === 'USER_EMAIL_NOT_FOUND' || code === 'INVALID_PASSWORD' || code === 'CREDENTIAL_ACCOUNT_NOT_FOUND' || status === 401) return 'invalidCredentials'
+  if (status === 429) return 'signInRateLimited'
+  return null
+}

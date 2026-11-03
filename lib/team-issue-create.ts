@@ -9,7 +9,7 @@ import { teams, teamIssues, teamIssueCreateReceipts } from '@/lib/db/team-schema
 import { workspaceMembers } from '@/lib/db/workspace-schema'
 import { createIssueForUserInTransaction } from '@/lib/issue-create'
 import { lockTeamRelations } from '@/lib/team-access'
-import { userActor } from '@/lib/activity-actor'
+import { userActor, type ActivityActor } from '@/lib/activity-actor'
 import { issueView } from '@/lib/task-identifier-server'
 import { ISSUE_PRIORITY_CODES, ISSUE_STATUS_CODES } from '@/lib/issue-meta'
 import type { JSONContent } from '@tiptap/core'
@@ -35,7 +35,7 @@ async function lockAllowedTeam(tx: WorkspaceTx, userId: string, teamId: string) 
  * then rechecks membership and that relation under workspace locks while the
  * application transaction promotes it. requestId is an idempotency key, not an
  * issue ID. No provider call is made and failures retain the private issue. */
-export async function createTeamIssueForUser(userId: string, input: unknown) {
+export async function createTeamIssueForUser(userId: string, input: unknown, actor: ActivityActor = userActor(userId)) {
   const parsed = schema.safeParse(input)
   if (!parsed.success) return { error: 'teamIssueInvalid' as const }
   const { requestId, teamId, ...content } = parsed.data
@@ -52,7 +52,7 @@ export async function createTeamIssueForUser(userId: string, input: unknown) {
           return old.issueId
         }
         const id = crypto.randomUUID()
-        const issue = await createIssueForUserInTransaction(tx, userId, content, userActor(userId), { id, linearSyncBlocked: true })
+        const issue = await createIssueForUserInTransaction(tx, userId, content, actor, { id, linearSyncBlocked: true })
         if (!issue) throw new TeamCreateError('teamIssueRequestConflict')
         await tx.insert(teamIssueCreateRequests).values({ requestId, issueId: id, ownerId: userId, teamId, fingerprint })
         return id
@@ -80,7 +80,7 @@ export async function createTeamIssueForUser(userId: string, input: unknown) {
         // Bind the transaction-local database fence to exactly this task.
         await tx.execute(sql`select set_config('mikka.team_scope_verified', ${issueId}, true), set_config('mikka.team_scope_team', ${teamId}, true), set_config('mikka.team_scope_request', ${requestId}, true)`)
         const [saved] = await tx.update(issues).set({ scope: 'workspace', linearSyncBlocked: true, scopeSetBy: 'user', scopeConfidence: null, revision: 2, updatedAt: new Date() }).where(eq(issues.id, issueId)).returning()
-        await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId, userId, revision: saved.revision, title: saved.title, content: saved.content, status: saved.status, priority: saved.priority, ...userActor(userId) })
+        await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId, userId, revision: saved.revision, title: saved.title, content: saved.content, status: saved.status, priority: saved.priority, ...actor })
         await tx.update(teamIssueCreateRequests).set({ status: 'complete' }).where(eq(teamIssueCreateRequests.requestId, requestId))
         return { issue: await issueView(saved, tx), linearSync: { enabled: false as const, reason: 'no_explicit_target' as const } }
       })

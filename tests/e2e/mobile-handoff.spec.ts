@@ -53,7 +53,7 @@ test('mobile decisions enforce owner, origin, expiry and single consumption on r
   const connection = process.env.E2E_DATABASE_URL
   if (!connection) throw new Error('Isolated E2E database is required')
   const database = new URL(connection)
-  if (process.env.GITHUB_ACTIONS !== 'true' || database.hostname !== '127.0.0.1' || database.port !== '5432' || database.pathname !== '/mikka_e2e' || database.search || process.env.VERCEL === '1' || process.env.AI_GATEWAY_API_KEY || process.env.MIKKA_NATIVE_COORDINATOR === '1') throw new Error('Requires Actions loopback database with model execution disabled')
+  if (process.env.GITHUB_ACTIONS !== 'true' || database.hostname !== '127.0.0.1' || database.port !== '5432' || database.pathname !== '/mikka_e2e' || database.search || process.env.VERCEL === '1' || process.env.AI_GATEWAY_API_KEY) throw new Error('Requires Actions loopback database with model execution disabled')
   await register(page)
   const owner = await (await page.request.get(app('/api/auth/get-session'))).json()
   const pool = new Pool({ connectionString: connection, max: 1 })

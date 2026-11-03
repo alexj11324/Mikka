@@ -285,6 +285,10 @@ test(
           return originalFetch(resource, options);
         },
       );
+      // Production bundles these modules. Warm the offline tsx loader before
+      // opening the real ten-second invocation reservation, so cold compilation
+      // under the full source suite is not mistaken for an expired model lease.
+      await Promise.all([import('../abuse/runtime'),import('../abuse/alerts'),import('../credit-shares'),import('../model-admission/runtime')]);
       const modelInvoke: NonNullable<
         FactoryCheckRecoveryDependencies["invoke"]
       > = async (purpose, input, questions, signal) => {
@@ -492,7 +496,7 @@ test(
       }
       const state = (id: string) => store.read("owner", id);
       for (const stage of ["review", "verify"] as const) {
-        for (const prerequisite of ["harness", "command"] as const) {
+        for (const prerequisite of ["harness"] as const) {
           await t.test(
             `${stage} missing ${prerequisite} persists blocked after rollback, without an orphan run`,
             async () => {
@@ -507,8 +511,7 @@ test(
                 'SELECT id FROM agent_runs WHERE "issueId"=$1 ORDER BY id',
                 [pending.task.issueId],
               )).rows;
-              const code = prerequisite === "harness"
-                ? "factoryCheckHarnessUnavailable" : "factoryCheckCommandRequired";
+              const code = "factoryCheckHarnessUnavailable";
               if (prerequisite === "harness")
                 await db.query("UPDATE devices SET harnesses='[]' WHERE id=$1", [deviceId]);
               else
@@ -552,6 +555,64 @@ test(
           );
         }
       }
+      for (const stage of ["review","verify"] as const) await t.test(`${stage} missing command queues an independent inference check instead of blocking dispatch`, async () => {
+        let pending = await pendingReview();
+        if (stage === "verify") {
+          const review = await start(pending.task);
+          await terminal(review.runId, `review-${pending.task.id}`);
+          await reconcile("owner");
+          pending = await state(pending.task.id);
+        }
+        await db.query('UPDATE device_repos SET "verifyCommand"=NULL WHERE id=$1',[repoId]);
+        try {
+          const dispatched = await start(pending.task);
+          const snapshot = await state(pending.task.id);
+          const check = snapshot.attempts.find(a => a.runId === dispatched.runId)!.output.check as {inferCommand:boolean;reportOnly:boolean;command:string|null};
+          assert.equal(snapshot.task.status,"running");
+          assert.equal(check.inferCommand,true);
+          assert.equal(check.reportOnly,stage === "review");
+          assert.equal(check.command,null);
+        } finally { await db.query('UPDATE device_repos SET "verifyCommand"=$2 WHERE id=$1',[repoId,command]); }
+      });
+      await t.test('a real report-only review finding retains trusted provenance without fabricated process fields', async () => {
+        const pending = await pendingReview();
+        await db.query('UPDATE device_repos SET "verifyCommand"=NULL WHERE id=$1',[repoId]);
+        try {
+          const review = await start(pending.task);
+          await terminal(review.runId, `report-only-${review.runId}`, false, report => {
+            report.verify = { status: 'not_run' };
+            report.criteria[0].passed = false;
+          });
+          await reconcile('owner');
+          const failed = await state(pending.task.id);
+          assert.equal(failed.task.status, 'failed');
+          assert.equal((failed.attempts.find(a => a.runId === review.runId)!.output.completion as {trustedFailureProvenance:boolean}).trustedFailureProvenance, true);
+        } finally { await db.query('UPDATE device_repos SET "verifyCommand"=$2 WHERE id=$1',[repoId,command]); }
+      });
+      for (const stage of ["review","verify"] as const) await t.test(`${stage} quota fallback restarts independently and preserves the exact candidate assignment`, async () => {
+        let pending = await pendingReview();
+        if (stage === "verify") {
+          const review = await start(pending.task);
+          await terminal(review.runId, `review-${pending.task.id}`);
+          await reconcile("owner"); pending = await state(pending.task.id);
+        }
+        const original = await start(pending.task);
+        const { rows: [prior] } = await db.query('SELECT * FROM agent_runs WHERE id=$1',[original.runId]);
+        const childId = randomUUID();
+        const definition = (await import('../agent-kit/worker')).apiKeyWorkerDefinition(prior.agentDefinition, prior.prompt, { keyId: randomUUID(), model: prior.agentDefinition.model ?? 'gpt-5' });
+        await db.query(`UPDATE agent_runs SET status='failed',"stopReason"='quota_exhausted',"finishedAt"=now(),"sessionId"='paused-check-session' WHERE id=$1`,[prior.id]);
+        await db.query(`INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId","botId",kind,status,prompt,"baseBranch","agentDefinition","retryOf")
+          SELECT $2,"userId","issueId","agentId","deviceId","deviceRepoId","botId",kind,'queued',prompt,"baseBranch",$3,id FROM agent_runs WHERE id=$1`,[prior.id,childId,JSON.stringify(definition)]);
+        await reconcile("owner");
+        const snapshot = await state(pending.task.id);
+        assert.equal(snapshot.task.stage,stage);assert.equal(snapshot.task.status,'running');
+        assert.equal(snapshot.task.candidateId,pending.task.candidateId);
+        assert.equal(snapshot.attempts.at(-1)!.runId,childId);
+        const assignmentTx = await db.connect();
+        try { const assignment = await factoryCheckAssignment(assignmentTx,'owner',childId);assert.equal(assignment.baseBranch,prior.baseBranch); } finally { assignmentTx.release(); }
+        const { rows: [child] } = await db.query('SELECT "retryOf","sessionId" FROM agent_runs WHERE id=$1',[childId]);
+        assert.equal(child.retryOf,null);assert.equal(child.sessionId,null);
+      });
       for (const race of ["cancel", "access-loss"] as const)
         await t.test(`dispatch blocked observation cannot overwrite ${race}`, async () => {
           // Compare persisted snapshots, including timestamps. apply's return
@@ -838,6 +899,11 @@ test(
                 await reconcile("owner");
                 d = await start((await state(r.task.id)).task);
               }
+              const missingCommand = phase === "verify" && !failed;
+              if (missingCommand) {
+                await db.query('UPDATE device_repos SET "verifyCommand"=NULL WHERE id=$1',[repoId]);
+                await db.query(`UPDATE factory_attempts SET output=jsonb_set(output,'{check,command}','null'::jsonb) || jsonb_build_object('check',(output->'check') || '{"command":null,"inferCommand":true}'::jsonb) WHERE id=$1`,[d.task.attemptId]);
+              }
               const session = `question-${r.task.id}`,
                 questionId = randomUUID();
               await db.query(
@@ -849,7 +915,8 @@ test(
                     question: {
                       questionId,
                       kind: "decision",
-                      question: "Which acceptance path?",
+                      ...(missingCommand ? { purpose: "verification_command" } : {}),
+                      question: missingCommand ? "Reply with the exact verification command only." : "Which acceptance path?",
                       options: ["A", "B"],
                     },
                   }),
@@ -897,12 +964,13 @@ test(
                   body: JSON.stringify({
                     reference: questionReference(q),
                     answerId: randomUUID(),
-                    text: "A",
+                    text: missingCommand ? command : "A",
                   }),
                 });
                 const result = await response.json();
                 assert.equal(response.status, 200, JSON.stringify(result));
                 resumed = result;
+                if (missingCommand) assert.equal((await db.query('SELECT "verifyCommand" FROM device_repos WHERE id=$1',[repoId])).rows[0].verifyCommand,command);
               } finally {
                 server.close();
                 await once(server, "close");

@@ -23,8 +23,9 @@ const RUN_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
 
 // Run leases on the server (ADR 0012). The heartbeat renews the lease of each
 // run the device reports; a run left out is not renewed, and the daemon stops
-// it once its lease runs out. Owner requests and the independent minute sweep
-// share `reclaimLostRuns`, so recovery does not depend on an open app/device.
+// it once its lease runs out. The independent minute sweep runs `reclaimLostRuns`
+// for each owner, so recovery does not depend on an open app/device (and no
+// app or device poll does it again).
 
 /** A bounded cron pass over persisted work, without relying on owner polling. */
 export async function sweepExpiredRunLeases(now = new Date()): Promise<{ owners: number; failed: number }> {
@@ -221,6 +222,15 @@ async function cloudTarget(run: Run): Promise<CloudTarget | null> {
   return row ? { ...row, remoteUrl: repo.remoteUrl } : null
 }
 
+/** The lost run's own model when the cloud runs its Agent; else 优先使用的模型's first cloud entry for that harness. */
+async function cloudRetryModel(run: Run, cloud: CloudTarget) {
+  const { chooseCloudRunModel } = await import('@/lib/computer/run-model')
+  if (run.agentDefinition?.harness === cloud.harness && run.agentDefinition?.model) return { model: run.agentDefinition.model }
+  const chosen = await chooseCloudRunModel(pool, { ownerId: run.userId, workspaceId: cloud.workspaceId, botId: run.botId }, cloud.agentId, cloud.harness)
+  if ('error' in chosen) throw new Error('No cloud model')
+  return chosen
+}
+
 /**
  * Queues the lost run again on the person's own E2B cloud through the normal
  * cloud queue, then starts its thread machine. When the cloud refuses, the
@@ -234,8 +244,7 @@ async function moveToCloud(run: Run, cloud: CloudTarget, attempt: number, now: D
     const { queueCloudRun } = await import('@/lib/computer/queue-run')
     const repo = await ensureDeviceRepository(run.userId, cloud.deviceId, cloud.remoteUrl)
     const { runId } = await queueCloudRun(pool, actor, { botId: cloud.botId, issueId: run.issueId, agentId: cloud.agentId, deviceRepoId: repo.id, title: issue.title, body: tiptapToText(issue.content),
-      note: retryNote(attempt), withoutBot: run.botId === null, idempotencyKey: `retry:${run.id}`,
-      ...(run.agentDefinition?.harness === cloud.harness && run.agentDefinition?.model ? { model: run.agentDefinition.model } : {}) })
+      note: retryNote(attempt), withoutBot: run.botId === null, idempotencyKey: `retry:${run.id}`, threadRunId: run.id, ...await cloudRetryModel(run, cloud) })
     await db.update(agentRuns).set({ retryOf: run.id, attempt, updatedAt: now }).where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, run.userId)))
     await recordCoordinatorEvent(db, runRetriedEvent(run, { runId, attempt, maxAttempts: MAX_RUN_ATTEMPTS, movedTo: { kind: 'cloud' } }))
     await startThreadMachine(actor, runId)
@@ -285,6 +294,29 @@ async function endRun(runId: string, from: readonly Run['status'][], end: { stat
     return true
   })
 }
+
+/**
+ * A queued run whose device's daemon is too old to claim it ends now, so the Bot
+ * says the device needs an update instead of the run waiting for a lease that never comes.
+ */
+export async function failRunForDaemonUpgrade(runId: string, deviceId: string, userId: string, now = new Date()): Promise<boolean> {
+  const ended = await db.transaction(async tx => {
+    const [run] = await tx.update(agentRuns)
+      .set({ status: 'failed', pauseReason: null, resumeStatus: null, stopReason: 'error', error: DAEMON_UPGRADE_REQUIRED, finishedAt: now, updatedAt: now })
+      .where(and(eq(agentRuns.id, runId), eq(agentRuns.deviceId, deviceId), eq(agentRuns.userId, userId), eq(agentRuns.status, 'queued'), isNull(agentRuns.stopRequestedAt)))
+      .returning()
+    if (!run) return null
+    const event = runFinishedEvent({ ...run, stopReason: 'error', report: null })
+    await recordCoordinatorEvent(tx, { ...event, payload: { ...event.payload, daemonUpgradeRequired: true } })
+    return run
+  })
+  if (!ended) return false
+  await announceEnd({ ...ended, status: 'failed' })
+  return true
+}
+
+/** The run error a too-old daemon leaves (lib/coordinator/context.ts tells the person to update). */
+export const DAEMON_UPGRADE_REQUIRED = 'Mikka on this device needs an update.'
 
 /** Same as a completion from the daemon: tokens off, and the Coordinator hears it. A failure lands in 等你. */
 async function announceEnd(run: Run & { status: 'failed' | 'stopped' }) {

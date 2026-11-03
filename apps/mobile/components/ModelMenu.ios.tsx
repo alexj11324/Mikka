@@ -1,28 +1,31 @@
 import { Button, Host, Menu, Section, Text, Toggle } from '@expo/ui/swift-ui'
 import { buttonStyle, controlSize, tint } from '@expo/ui/swift-ui/modifiers'
-import { groupTag, groupTitle, optionName, useModelMenu } from '@/lib/model-menu'
+import { groupTag, groupTitle, modelMenuLabel, modelMenuReadLabel, optionName, type ModelMenuState } from '@/lib/model-menu'
 import { colors } from '@/lib/theme'
 
 /**
  * The model chip beside the composer's 「+」: a borderless SwiftUI menu like 「+」's
  * (AttachMenu.ios.tsx). Each group is a section; the current model is ticked;
- * who pays shows under the name; 刷新 re-reads the list. Saved per bot for its next runs.
+ * who pays shows under the name; 刷新 re-reads the list. Saved per bot for its next runs;
+ * a pick that does not save keeps the saved model here (ModelNotice says why).
  */
-export function ModelMenu({ botId }: { botId: string | null }) {
-  const { menu, choose, failed, refresh, refreshing, refreshFailed } = useModelMenu(botId)
-  if (!menu) return null
+export function ModelMenu({ model, running = false }: { model: ModelMenuState; running?: boolean }) {
+  const { menu, choose, refresh, refreshing, refreshFailed, loading, retryRead } = model
+  if (!menu) return <Host matchContents>{loading
+    ? <Text>{modelMenuReadLabel(true)}</Text>
+    : <Button label={modelMenuReadLabel(false)} systemImage="arrow.clockwise" onPress={() => { void retryRead().catch(() => undefined) }} modifiers={[buttonStyle('borderless'), controlSize('small'), tint(colors.secondary)]} />}</Host>
   const { current, groups } = menu
-  const name = optionName(current)
-  const label = !current.available ? `${name} · 不可用` : failed ? `${name} · 未保存` : name
+  const label = modelMenuLabel(current, running)
+  const unavailable = !current.available && current.availability !== 'checking'
   return (
     <Host matchContents>
-      <Menu label={label} systemImage="chevron.down" modifiers={[buttonStyle('borderless'), controlSize('small'), tint(current.available ? colors.ink : colors.secondary)]}>
+      <Menu label={label} systemImage="chevron.down" modifiers={[buttonStyle('borderless'), controlSize('small'), tint(unavailable ? colors.secondary : colors.ink)]}>
         {groups.map((group, index) => (
           <Section key={`${group.kind}-${index}`} title={groupTitle(group)}>
             {group.options.map(option => {
               const tag = groupTag(group)
               return (
-                <Toggle key={option.id} isOn={current.available && current.id === option.id} onIsOnChange={() => { void choose(option.id) }}>
+                <Toggle key={option.id} isOn={current.id === option.id} onIsOnChange={() => { void choose(option.id) }}>
                   {tag ? [<Text key="name">{optionName(option)}</Text>, <Text key="tag">{tag}</Text>] : <Text>{optionName(option)}</Text>}
                 </Toggle>
               )

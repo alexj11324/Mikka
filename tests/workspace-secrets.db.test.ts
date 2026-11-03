@@ -26,7 +26,7 @@ test('workspace secrets and E2B key', { skip: !dbUrl }, async t => {
   const secretCrypto = await import('../lib/secrets/crypto')
   /** Test-only read-back of the stored value (no endpoint returns it any more). */
   const stored = async (id: string) => { const { rows: [row] } = await pool.query('select * from workspace_secrets where id=$1', [id]); return secretCrypto.openSecret(row, secretCrypto.secretAad(row)) }
-  const META_KEYS = ['id', 'kind', 'name', 'scopeRef', 'scopeType']
+  const META_KEYS = ['id', 'kind', 'name', 'note', 'scopeRef', 'scopeType', 'updatedAt', 'updatedBy']
 
   await t.test('E2B status and capability: everyone edits only their own key, regardless of the legacy flag, and membership still applies', async () => {
     const previous = process.env.MIKKA_BYO_E2B_KEY
@@ -57,7 +57,7 @@ test('workspace secrets and E2B key', { skip: !dbUrl }, async t => {
     const replaced = await store.replaceWorkspaceSecret(admin, ws.id, { id: created.id, value: SECRET + 'x' })
     const listed = await store.listWorkspaceSecrets(admin, ws.id)
     assert.ok(!JSON.stringify([created, replaced, listed]).includes(SECRET))
-    for (const row of listed) assert.deepEqual(Object.keys(row).sort(), META_KEYS, 'list: name/kind/scopeType/scopeRef (+id handle) only')
+    for (const row of listed) assert.deepEqual(Object.keys(row).sort(), META_KEYS, 'list: name/kind/scope/note/updated by and at (+id handle) only')
     const { rows } = await pool.query('select * from workspace_secrets where id=$1', [created.id])
     assert.ok(!JSON.stringify(rows).includes(SECRET), 'no plaintext in the row')
     assert.equal(rows[0].keyVersion, 1)
@@ -201,12 +201,12 @@ test('workspace secrets and E2B key', { skip: !dbUrl }, async t => {
     const TOKEN = 'ghp_' + randomBytes(12).toString('hex')
     const keyEnv = { WORKSPACE_SECRETS_KEY: process.env.WORKSPACE_SECRETS_KEY }
     const on = { ...keyEnv, MIKKA_BYO_E2B_KEY: '1' }, off = {}
-    await store.createWorkspaceSecret(admin, third.id, { name: 'GH_TOKEN', kind: 'secret', value: TOKEN })
+    await store.createWorkspaceSecret(admin, third.id, { name: 'DEPLOY_TOKEN', kind: 'secret', value: TOKEN })
     await store.createWorkspaceSecret(admin, third.id, { name: 'SHORT', kind: 'secret', value: 'abc1234' })
     await store.createWorkspaceSecret(admin, third.id, { name: 'REGION', kind: 'env', value: 'us-east-1-long' })
     await store.createWorkspaceSecret(admin, third.id, { name: 'REPO_ONLY', kind: 'secret', value: 'repo-scoped-value', scope: { type: 'repository', repository: 'acme/app' } })
     assert.deepEqual(await runtime.taskSecretEnv(third.id, null, off), {}, 'no encryption key: nothing injected')
-    assert.deepEqual(await runtime.taskSecretEnv(third.id, null, on), { GH_TOKEN: TOKEN, SHORT: 'abc1234', REGION: 'us-east-1-long' }, 'workspace-scoped values are injected; repo-scoped ones only for their repo')
+    assert.deepEqual(await runtime.taskSecretEnv(third.id, null, on), { DEPLOY_TOKEN: TOKEN, SHORT: 'abc1234', REGION: 'us-east-1-long' }, 'workspace-scoped values are injected; repo-scoped ones only for their repo')
     const chunk = { type: 'text-delta', delta: `push ${TOKEN} b64=${Buffer.from(TOKEN).toString('base64')} short=abc1234 region=us-east-1-long`, nested: [{ url: `https://x/?t=${encodeURIComponent(TOKEN)}` }] }
     const offMask = await runtime.workspaceSecretMasker(third.id, off)
     // No encryption key: saved values are not masked (the base64 form stays), but a GitHub-token-shaped
@@ -215,10 +215,10 @@ test('workspace secrets and E2B key', { skip: !dbUrl }, async t => {
     const masked = maskDeep(chunk, await runtime.workspaceSecretMasker(third.id, on))
     const text = JSON.stringify(masked)
     assert.ok(!text.includes(TOKEN) && !text.includes(Buffer.from(TOKEN).toString('base64')))
-    assert.match(masked.delta, /push \[secret:GH_TOKEN\] b64=\[secret:GH_TOKEN\] short=abc1234 region=us-east-1-long/)
-    assert.equal(masked.nested[0].url, 'https://x/?t=[secret:GH_TOKEN]')
+    assert.match(masked.delta, /push \[secret:DEPLOY_TOKEN\] b64=\[secret:DEPLOY_TOKEN\] short=abc1234 region=us-east-1-long/)
+    assert.equal(masked.nested[0].url, 'https://x/?t=[secret:DEPLOY_TOKEN]')
     const otherMask = await runtime.workspaceSecretMasker(other.id, on)
-    // Another workspace never knows this one's values: no [secret:GH_TOKEN] label, only the credential pattern.
+    // Another workspace never knows this one's values: no [secret:DEPLOY_TOKEN] label, only the credential pattern.
     assert.equal(otherMask(TOKEN), '[secret:github-token]', 'another workspace does not mask this one\'s values')
     assert.equal(otherMask(Buffer.from(TOKEN).toString('base64')), Buffer.from(TOKEN).toString('base64'), 'another workspace does not mask this one\'s values')
     assert.equal((await runtime.workspaceSecretMasker(null, on))('x'), 'x')
@@ -529,5 +529,63 @@ test('workspace secrets and E2B key', { skip: !dbUrl }, async t => {
       await rejects(store.createWorkspaceSecret(admin, w.id, { name, kind: 'env', value: 'value-1234' }), 'secretNameReserved')
     assert.equal((await pool.query('select 1 from workspace_secrets where "workspaceId"=$1', [w.id])).rows.length, 0)
     await store.createWorkspaceSecret(admin, w.id, { name: 'PATHFINDER', kind: 'env', value: 'ok-value' })
+  })
+
+  await t.test('a note and who changed it last are shown; the note changes alone without touching the value', async () => {
+    const w = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }, { userId: member, role: 'member' }])
+    await workspacePool.query('update mikka_workspace_members set name=$3 where "workspaceId"=$1 and "userId"=$2', [w.id, admin, 'Alex'])
+    await workspacePool.query('update mikka_workspace_members set name=$3 where "workspaceId"=$1 and "userId"=$2', [w.id, member, 'Lin'])
+    const created = await store.createWorkspaceSecret(admin, w.id, { name: 'VERCEL_TOKEN', kind: 'secret', value: SECRET, note: '部署预览' })
+    assert.equal(created.note, '部署预览')
+    assert.equal(created.updatedBy, 'Alex')
+    assert.ok(Date.parse(created.updatedAt) > Date.now() - 60_000)
+    await assert.rejects(store.createWorkspaceSecret(admin, w.id, { name: 'TOO_LONG', kind: 'secret', value: SECRET, note: 'x'.repeat(501) }))
+    const before = (await pool.query('select ciphertext from workspace_secrets where id=$1', [created.id])).rows[0].ciphertext
+    const noted = await store.replaceWorkspaceSecret(admin, w.id, { id: created.id, note: '生产部署' })
+    assert.equal(noted.note, '生产部署')
+    assert.equal((await pool.query('select ciphertext from workspace_secrets where id=$1', [created.id])).rows[0].ciphertext, before, 'a note-only edit keeps the value')
+    assert.equal(await stored(created.id), SECRET)
+    assert.equal(noted.warning, null)
+    await assert.rejects(store.replaceWorkspaceSecret(admin, w.id, { id: created.id }), 'an edit changes something')
+    // A member's own repository entry: their name shows; the admin's workspace entry stays the admin's.
+    const repo = await store.createWorkspaceSecret(member, w.id, { name: 'E2E_SEED', kind: 'secret', value: SECRET, scope: { type: 'repository', repository: 'alexj11324/mikka' } })
+    const listed = await store.listWorkspaceSecrets(member, w.id)
+    assert.deepEqual(listed.map(row => [row.name, row.note, row.updatedBy]), [['E2E_SEED', '', 'Lin'], ['VERCEL_TOKEN', '生产部署', 'Alex']])
+    assert.equal(repo.updatedBy, 'Lin')
+    assert.ok(!JSON.stringify(listed).includes(SECRET))
+  })
+
+  await t.test('bulk add: one transaction, reserved and bad lines reported by line, conflicts replaced or kept, scope rules hold', async () => {
+    const w = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }, { userId: member, role: 'member' }])
+    await store.createWorkspaceSecret(admin, w.id, { name: 'EXISTING', kind: 'secret', value: 'old-value-123' })
+    const text = 'NEW_ONE=value-one-123 # 第一个\nPATH=/usr/bin\nEXISTING=new-value-456\n1BAD=x\nNEW_TWO="value two 789"\n'
+    const kept = await store.importWorkspaceSecrets(admin, w.id, { text, masked: true, scope: { type: 'workspace' }, onConflict: 'skip' })
+    assert.deepEqual(kept, { created: ['NEW_ONE', 'NEW_TWO'], replaced: [], kept: ['EXISTING'], errors: [{ line: 2, name: 'PATH', reason: 'reserved' }, { line: 4, name: '1BAD', reason: 'invalidName' }] })
+    assert.equal(await stored((await pool.query(`select id from workspace_secrets where "workspaceId"=$1 and name='EXISTING'`, [w.id])).rows[0].id), 'old-value-123')
+    const notes = (await pool.query(`select name, note, kind from workspace_secrets where "workspaceId"=$1 order by name`, [w.id])).rows
+    assert.deepEqual(notes.map(row => [row.name, row.note, row.kind]), [['EXISTING', '', 'secret'], ['NEW_ONE', '第一个', 'secret'], ['NEW_TWO', '', 'secret']])
+
+    const replaced = await store.importWorkspaceSecrets(admin, w.id, { text: 'EXISTING=new-value-456\nPLAIN=visible-1', masked: false, scope: { type: 'workspace' }, onConflict: 'replace' })
+    assert.deepEqual(replaced, { created: ['PLAIN'], replaced: ['EXISTING'], kept: [], errors: [] })
+    assert.equal(await stored((await pool.query(`select id from workspace_secrets where "workspaceId"=$1 and name='EXISTING'`, [w.id])).rows[0].id), 'new-value-456')
+    assert.equal((await pool.query(`select kind from workspace_secrets where "workspaceId"=$1 and name='PLAIN'`, [w.id])).rows[0].kind, 'env', 'not masked = the env kind')
+    assert.ok(!JSON.stringify([kept, replaced]).includes('value-one-123'))
+
+    // Members bulk-add repository entries only; a workspace-scope import is refused whole.
+    await rejects(store.importWorkspaceSecrets(member, w.id, { text: 'M_ONE=member-value-1', masked: true, scope: { type: 'workspace' }, onConflict: 'skip' }), 'secretPermissionDenied')
+    const memberImport = await store.importWorkspaceSecrets(member, w.id, { text: 'M_ONE=member-value-1', masked: true, scope: { type: 'repository', repository: 'alexj11324/mikka' }, onConflict: 'skip' })
+    assert.deepEqual(memberImport.created, ['M_ONE'])
+    await rejects(store.importWorkspaceSecrets(admin, w.id, { text: 'GARBAGE', masked: true, scope: { type: 'workspace' }, onConflict: 'skip' }), 'secretImportEmpty')
+
+    const { rows: audit } = await pool.query(`select action, "targetLabel" from workspace_audit_events where "workspaceId"=$1 order by "createdAt", id`, [w.id])
+    assert.ok(!JSON.stringify(audit).includes('value'), 'audit rows hold names only')
+  })
+
+  await t.test('bulk add stops whole at the 500 cap: nothing is written', async () => {
+    const w = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }])
+    await pool.query(`insert into workspace_secrets (id,"workspaceId",name,kind,"scopeType","scopeRef",ciphertext,iv,"keyVersion","createdBy","updatedBy")
+      select gen_random_uuid(), $1, 'FILL_' || g, 'secret', 'workspace', '', 'x', 'x', 1, $2, $2 from generate_series(1, 499) g`, [w.id, admin])
+    await rejects(store.importWorkspaceSecrets(admin, w.id, { text: 'LAST_A=value-aaaa-1\nLAST_B=value-bbbb-2', masked: true, scope: { type: 'workspace' }, onConflict: 'skip' }), 'secretLimitReached')
+    assert.equal((await pool.query('select count(*)::int as n from workspace_secrets where "workspaceId"=$1', [w.id])).rows[0].n, 499)
   })
 })

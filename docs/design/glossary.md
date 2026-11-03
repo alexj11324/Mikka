@@ -31,7 +31,7 @@ not on the dispatching bot's machine (`cloud-computer-backend.md` § 2).
 
 | Word | 中文 | What it is |
 | --- | --- | --- |
-| **Account** | 账号 | The person: 账户, security, 偏好, 通知, profile memory (个人资料类记忆), 登录与密钥, 设备 and 「模型与订阅」. The same in every workspace. |
+| **Account** | 账号 | The person: 账户, security, 偏好, 通知, profile memory (个人资料类记忆), 密钥与登录, 设备 and 「模型与订阅」. The same in every workspace. |
 | **Personal workspace** | 个人工作区 | One per person. Only that person's bots, chats, tasks, threads and their memory; personal 计费 and 用量; no team settings. |
 | **Shared workspace** | 共享工作区 (the UI says 团队工作区 until the rename in Known naming debt) | Members, 团队权限, 密钥与环境, 审计日志, team 用量 and 计费. Nothing moves between it and a personal workspace. |
 
@@ -172,6 +172,12 @@ A computer or server of the person's that runs their Agents through the
 desktop app or the daemon. Not a bot's cloud computer (电脑).
 _Owner_: the account (Device aggregate).
 _Avoid_: 电脑 (a bot's cloud computer), machine in the UI, runner.
+
+**Daemon (daemon)**:
+The background service on a device that connects it to Mikka and runs its
+Agents. The UI calls it daemon in both languages, with no 「Mikka」 in front:
+「重启 daemon」, "Update daemon". Not the Mikka desktop app.
+_Avoid_: Mikka 客户端, Mikka client, 客户端 (reads as the desktop app).
 
 **Connection (连接)**:
 The person's authorised link to an outside app (Gmail, GitHub, Linear,

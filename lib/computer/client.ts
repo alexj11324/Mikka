@@ -1,7 +1,6 @@
 import { z } from 'zod'
-import { botViewSchema, computerStateSchema, viewerGrantSchema, computerEventSchema } from '@mikka/protocol/computer'
+import { botViewSchema, computerStateSchema, viewerGrantSchema } from '@mikka/protocol/computer'
 import { withBasePath } from '@/lib/base-path'
-import { listenComputerStream } from '@/lib/computer/event-stream'
 import { MOCK_HOSTS, mockComputer, mockSetup } from './mock'
 import type { ApprovalDecision, ApprovalView, ComputerEvent, ComputerState, KnownHost, SetupStep, SetupStepState, ViewerGrant, ViewerMode } from './types'
 
@@ -42,17 +41,14 @@ export const computerApi = {
 }
 
 /**
- * Workspace-wide pushes. Until GET /api/computer/events exists the stream
- * fails once and closes; callers keep polling every 2s, which the contract
- * allows as the first step.
+ * Workspace-wide computer pushes. Only the mock sends them: GET /api/computer/events
+ * carries sub-agent updates, never computer.* events, so a real bot's computer is
+ * read by useComputer's 2 s poll alone, and opening that stream here (a database
+ * read every second per tab) would deliver nothing.
  */
 export function subscribeComputerEvents(listener: (event: ComputerEvent) => void, mocked = computerMock): () => void {
   if (mocked) return mockComputer.subscribe(listener)
-  const types: ComputerEvent['type'][] = ['computer.machine', 'computer.control', 'computer.action', 'computer.approval']
-  const stops = types.map(type => listenComputerStream(type, data => {
-    try { listener(computerEventSchema.parse({ ...JSON.parse(data), type })) } catch { /* a malformed push; the next poll corrects it */ }
-  }))
-  return () => { for (const stop of stops) stop() }
+  return () => {}
 }
 
 /**

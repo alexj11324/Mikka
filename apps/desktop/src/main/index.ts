@@ -2,7 +2,7 @@
 // the UI reads through `window.mikka`. The renderer is treated as untrusted;
 // every privileged call goes through the validated IPC surface in `./bridge`.
 
-import { app, BrowserWindow, Menu, Notification, dialog, nativeTheme, session, shell, webContents } from 'electron'
+import { app, BrowserWindow, Menu, Notification, dialog, nativeTheme, net, session, shell, webContents } from 'electron'
 import { autoUpdater } from 'electron-updater'
 import { join } from 'node:path'
 
@@ -10,12 +10,17 @@ import { IPC } from '@mikka/protocol/ipc'
 
 import { registerBridge } from './bridge'
 import { localDeviceStatus, localQuota } from './daemon'
-import { AppLoadState, offlineRetryDelay } from './offline'
+import { connectForUpdate, updateLocalDaemon } from './daemon-update'
+import { readLocalDeviceAccount } from './local-setup'
+import { AppLoadState, offlineReason, offlineRetryDelay } from './offline'
 import { startLoopbackAuth, type LoopbackAuthServer } from './loopback'
+import { startReturnListener, type ReturnListener } from './return-listener'
 import { catchClaudeCallback } from './subscription-callback'
 import { NotificationCenter } from './notification-center'
 import { appExternalUrl, desktopAuthState, externalUrl, isTrustedFrame, navigationDecision } from './security'
-import { UPDATE_CHECK_INTERVAL_MS, Updates } from './updates'
+import { UPDATE_CHECK_INTERVAL_MS, Updates, updateCopy } from './updates'
+import { UpdateGate, gateCopy, gateView, type GateState } from './launch-update'
+import { meetsMinimumVersion } from '@mikka/protocol/version'
 import { TRANSLUCENT_ARGUMENT, windowAppearance } from './window-appearance'
 
 const APP_URL = __MIKKA_APP_URL__
@@ -69,6 +74,38 @@ async function prepareAuth(rawState: unknown): Promise<string> {
   authServer = listener
   authTimer = setTimeout(closeAuthServer, 10 * 60_000)
   return listener.callback
+}
+
+let returnListener: ReturnListener | null = null
+let returnTimer: NodeJS.Timeout | null = null
+function closeReturnListener(): void {
+  returnListener?.close(); returnListener = null
+  if (returnTimer) { clearTimeout(returnTimer); returnTimer = null }
+}
+
+/**
+ * A link the page finishes in the system browser (Plugins → GitHub): a
+ * one-shot 127.0.0.1 listener for its return. When it comes, the window comes
+ * forward and the page is told the result, then finishes the link itself.
+ */
+async function prepareReturn(rawState: string): Promise<string> {
+  closeReturnListener()
+  const listener = await startReturnListener({
+    state: rawState,
+    onReturn: result => {
+      returnListener = null
+      if (returnTimer) { clearTimeout(returnTimer); returnTimer = null }
+      if (!mainWindow || mainWindow.isDestroyed()) return
+      if (mainWindow.isMinimized()) mainWindow.restore()
+      mainWindow.show()
+      mainWindow.focus()
+      const contents = mainWindow.webContents
+      if (!contents.isDestroyed() && isTrustedFrame(contents.getURL(), APP_URL)) contents.send(IPC.appReturned, { state: rawState, result })
+    },
+  })
+  returnListener = listener
+  returnTimer = setTimeout(closeReturnListener, 10 * 60_000)
+  return listener.returnTo
 }
 
 function deliverClick(href: string): void {
@@ -170,11 +207,11 @@ function loadApp(): void {
   if (mainWindow && !mainWindow.isDestroyed()) void mainWindow.loadURL(APP_URL)
 }
 
-function showOffline(): void {
+function showOffline(reason: 'network' | 'server'): void {
   if (!mainWindow || mainWindow.isDestroyed()) return
   const delay = offlineRetryDelay(offlineAttempt++)
   if (!mainWindow.webContents.getURL().startsWith('file:')) {
-    void mainWindow.loadFile(join(__dirname, 'offline.html'), { query: { app: APP_URL } })
+    void mainWindow.loadFile(join(__dirname, 'offline.html'), { query: { app: APP_URL, reason } })
   }
   if (retrying) clearTimeout(retrying)
   retrying = setTimeout(() => { retrying = null; loadApp() }, delay)
@@ -243,7 +280,7 @@ function createMainWindow(): void {
   mainWindow.webContents.on('did-fail-load', (_event, errorCode, _description, validatedURL, isMainFrame) => {
     if (!isMainFrame || errorCode === -3 || !validatedURL.startsWith(APP_ORIGIN)) return
     appLoad.failedLoad()
-    showOffline()
+    showOffline(offlineReason(errorCode, net.isOnline()))
   })
   void mainWindow.loadURL(APP_URL)
 }
@@ -260,19 +297,104 @@ function messageBox(options: Electron.MessageBoxOptions): Promise<Electron.Messa
  * available only after the draft is published. A downloaded update is
  * offered by the rail's restart button and installs on the next quit anyway.
  */
+const copy = () => updateCopy(app.getLocale())
 const updates = new Updates(autoUpdater, {
-  available: version => { void messageBox({ type: 'info', message: `Mikka ${version} installs when you restart.`, buttons: ['OK'] }) },
-  upToDate: () => { void messageBox({ type: 'info', message: `Mikka ${APP_VERSION} is up to date.`, buttons: ['OK'] }) },
-  failed: error => { void messageBox({ type: 'error', message: 'Could not check for updates.', detail: error.message, buttons: ['OK'] }) },
+  ready: version => {
+    void messageBox({ type: 'info', message: copy().restart(version), buttons: [copy().restartNow, copy().later], defaultId: 0, cancelId: 1 })
+      .then(({ response }) => { if (response === 0) updates.install() })
+  },
+  upToDate: () => { void messageBox({ type: 'info', message: copy().upToDate(APP_VERSION), buttons: [copy().ok] }) },
+  failed: error => { void messageBox({ type: 'error', message: copy().failed, detail: error.message, buttons: [copy().ok] }) },
 }, version => {
   for (const contents of webContents.getAllWebContents()) {
     if (!contents.isDestroyed() && isTrustedFrame(contents.getURL(), APP_URL)) contents.send(IPC.appUpdateReady, version)
   }
 })
 
+let gateWindow: BrowserWindow | null = null
+let gate: UpdateGate | null = null
+
+/**
+ * The launch gate (launch-update.ts): a small window that checks for an update
+ * and, when there is one, installs it before `open` lets the person in.
+ * Closing the window while it holds the door quits the app; there is no way
+ * in on the old version.
+ */
+function runUpdateGate(open: () => void): void {
+  if (gate) return
+  const copy = gateCopy(app.getLocale())
+  const win = new BrowserWindow({
+    width: 360,
+    height: 200,
+    resizable: false,
+    minimizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    show: false,
+    title: copy.title,
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#171717' : '#f5f5f4',
+    autoHideMenuBar: true,
+    webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false, devTools: !app.isPackaged },
+  })
+  gateWindow = win
+  let loaded = false
+  let pending: GateState | null = null
+  let opened = false
+  const render = (state: GateState) => {
+    if (win.isDestroyed()) return
+    if (!loaded) { pending = state; return }
+    void win.webContents.executeJavaScript(`window.render(${JSON.stringify(gateView(state, copy))}, ${JSON.stringify(copy.lang)})`).catch(() => {})
+  }
+  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+  win.webContents.on('will-navigate', event => event.preventDefault())
+  win.webContents.on('did-navigate-in-page', (_event, url) => { if (new URL(url).hash === '#retry') gate?.retry() })
+  win.webContents.once('did-finish-load', () => {
+    loaded = true
+    if (pending) render(pending)
+    if (!win.isDestroyed()) win.show()
+  })
+  win.on('closed', () => {
+    gateWindow = null
+    if (!opened) app.quit()
+  })
+  gate = new UpdateGate(autoUpdater, {
+    onState: render,
+    onProceed: () => {
+      opened = true
+      gate = null
+      if (!win.isDestroyed()) win.close()
+      open()
+    },
+  })
+  void win.loadFile(join(__dirname, 'update.html'))
+  gate.start()
+}
+
+/**
+ * The server's minimum desktop version (/api/version, MIN_CLIENT_VERSION, ADR
+ * 0011). The page asks when it sees one above this build; main reads it again
+ * itself, so a page cannot force an update the server does not require.
+ */
+async function enforceMinimumVersion(): Promise<void> {
+  if (!app.isPackaged || gate) return
+  try {
+    const response = await session.fromPartition(PARTITION).fetch(`${APP_URL.replace(/\/$/, '')}/api/version`, { headers: { origin: APP_ORIGIN }, redirect: 'error', cache: 'no-store' })
+    if (!response.ok) return
+    const { minDesktopVersion } = await response.json() as { minDesktopVersion?: unknown }
+    if (typeof minDesktopVersion !== 'string' || meetsMinimumVersion(APP_VERSION, minDesktopVersion)) return
+  } catch {
+    return
+  }
+  mainWindow?.hide()
+  runUpdateGate(() => {
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.show()
+    else createMainWindow()
+  })
+}
+
 async function checkForUpdates(interactive: boolean): Promise<void> {
   if (!app.isPackaged) {
-    if (interactive) await messageBox({ type: 'info', message: 'Updates are checked in the installed app.', buttons: ['OK'] })
+    if (interactive) await messageBox({ type: 'info', message: copy().notInstalled, buttons: [copy().ok] })
     return
   }
   await updates.check(interactive)
@@ -305,7 +427,7 @@ function installMenu(): void {
       label: app.name,
       submenu: [
         { role: 'about' },
-        ...(app.isPackaged ? [{ label: 'Check for Updates…', click: () => { void checkForUpdates(true) } }] : []),
+        ...(app.isPackaged ? [{ label: copy().menu, click: () => { void checkForUpdates(true) } }] : []),
         { type: 'separator' },
         { role: 'services' },
         { type: 'separator' },
@@ -347,6 +469,7 @@ function start(): void {
   registerSession()
   registerBridge({
     appUrl: APP_URL,
+    flavor: FLAVOR,
     mintEnrollment: async () => {
       const url = `${APP_URL.replace(/\/$/, '')}/api/devices/enrollment`
       const response = await session.fromPartition(PARTITION).fetch(url, {
@@ -362,8 +485,10 @@ function start(): void {
       return shell.openExternal(target)
     },
     prepareAuth,
+    prepareReturn,
     claudeCallback: url => catchClaudeCallback(url, page => shell.openExternal(page)),
     localDevice: localDeviceStatus,
+    localAccount: () => readLocalDeviceAccount((url, init) => session.fromPartition(PARTITION).fetch(url, init), APP_URL),
     quota: localQuota,
     notifications,
     consumePendingClick: () => {
@@ -372,15 +497,23 @@ function start(): void {
       return href
     },
     updates,
+    requireUpdate: enforceMinimumVersion,
   })
-  createMainWindow()
   installMenu()
-  if (app.isPackaged) {
+  const open = () => {
+    createMainWindow()
+    if (!app.isPackaged) return
+    // This app may just have updated: the daemon on this computer updates too, when idle (daemon-update.ts).
+    void updateLocalDaemon(FLAVOR, { connect: connectForUpdate({ name: 'mikka-desktop', version: APP_VERSION }) })
+    // Background checks start once the app is open, so they never race the launch gate.
     setTimeout(() => { void checkForUpdates(false) }, 15_000)
     setInterval(() => { void checkForUpdates(false) }, UPDATE_CHECK_INTERVAL_MS)
   }
+  // A cold start of the installed app installs any newer version first (launch-update.ts).
+  if (app.isPackaged) runUpdateGate(open)
+  else open()
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createMainWindow()
+    if (BrowserWindow.getAllWindows().length === 0 && !gate) createMainWindow()
   })
 }
 
@@ -388,12 +521,14 @@ if (!app.requestSingleInstanceLock()) {
   app.quit()
 } else {
   app.on('second-instance', () => {
+    if (gateWindow && !gateWindow.isDestroyed()) { gateWindow.show(); gateWindow.focus(); return }
     if (!mainWindow) return
     if (mainWindow.isMinimized()) mainWindow.restore()
     mainWindow.show()
     mainWindow.focus()
   })
   app.on('before-quit', closeAuthServer)
+  app.on('before-quit', closeReturnListener)
   app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') app.quit()
   })

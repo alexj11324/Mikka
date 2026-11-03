@@ -1,3 +1,4 @@
+import { freshSessionRoute } from '@/lib/fresh-session'
 import { auth, apiWorkspaceAllowed } from '@/lib/api-auth'
 import { modelAdmission } from '@/lib/model-admission/runtime'
 import { createModelAdmissionHandler } from '@/lib/model-admission/http'
@@ -13,4 +14,7 @@ const handle = createModelAdmissionHandler({
 })
 type Context = { params: Promise<{ workspaceId: string }> }
 export const GET = async (request: Request, { params }: Context) => handle(request, (await params).workspaceId)
-export const POST = GET
+const POSTBody = GET
+
+// Credentials, permissions, money and deletion: the session is read from the database, not the cookie cache.
+export const POST = freshSessionRoute(POSTBody)

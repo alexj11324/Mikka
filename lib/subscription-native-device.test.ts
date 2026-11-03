@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
-import { leaseDevice } from './subscription-native-device'
+import { hostedBrokerDevice, leaseDevice } from './subscription-native-device'
 import { subscriptionNativeLease } from './subscription-native-lease'
 
 const broker = [{ subscriptionBroker: true }]
@@ -13,6 +13,18 @@ test('only a person\'s own enabled device with the capability takes a lease', ()
   assert.equal(leaseDevice({ enabled: true, kind: 'local', harnesses: [{}] }), false)
   assert.equal(leaseDevice({ enabled: false, kind: 'local', harnesses: broker }), false)
   assert.equal(leaseDevice(null), false)
+})
+
+test('the hosted broker takes a cloud computer bound to its own token, or an allow-listed device', () => {
+  const cloud = { enabled: true, kind: 'cloud', harnesses: broker }
+  assert.equal(hostedBrokerDevice(cloud, ids.deviceId, ids.deviceId, ''), true, 'no id to list: the bound token is enough')
+  assert.equal(hostedBrokerDevice(cloud, ids.deviceId, undefined, ''), false, 'an unbound token is not a cloud computer')
+  assert.equal(hostedBrokerDevice(cloud, ids.deviceId, ids.runId, ''), false, 'a token bound to another machine')
+  assert.equal(hostedBrokerDevice({ ...cloud, kind: 'local' }, ids.deviceId, ids.deviceId, ''), false, 'a person\'s own device uses the lease instead')
+  assert.equal(hostedBrokerDevice({ ...cloud, harnesses: [{}] }, ids.deviceId, ids.deviceId, ''), false)
+  assert.equal(hostedBrokerDevice({ ...cloud, enabled: false }, ids.deviceId, ids.deviceId, ''), false)
+  assert.equal(hostedBrokerDevice({ ...cloud, kind: 'local' }, ids.deviceId, undefined, `x,${ids.deviceId}`), true, 'the allow-list still works')
+  assert.equal(hostedBrokerDevice(null, ids.deviceId, ids.deviceId, ids.deviceId), false)
 })
 
 const lease = { route: 'claude_code_cli', modelId: 'm', revision: 1, accountId: 'a', expiresAt: '2026-11-01T01:00:00.000Z', accessToken: 'fixture-access' }

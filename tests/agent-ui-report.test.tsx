@@ -133,6 +133,19 @@ test('BeQuestions accepts beUI Select, Switch, slider and date range inputs on t
   assert.equal(BeQuestions.props.safeParse({ ...base, questions: [{ id: 'a', title: 'Upload', input: 'file' }] }).success, false)
 })
 
+test('a repository card: candidates answer with owner/repo, githubInstall opens the GitHub App page in a new tab', () => {
+  const card = `root = BeQuestions("Mikka_test", [{id: "repo", title: "No authorized repository named Mikka_test", options: [{value: "githubInstall", label: "x", action: "githubInstall"}]}])`
+  assert.deepEqual(parser.parse(card).meta.errors, [])
+  const html = render(card)
+  const link = /<a[^>]*href="https:\/\/github\.com\/apps\/mikka-github\/installations\/new"[^>]*>/.exec(html)?.[0] ?? ''
+  assert.match(link, /target="_blank"/)
+  assert.match(link, /rel="noopener noreferrer"/)
+  assert.match(html, /Authorize more repositories on GitHub/)
+  const several = render(`root = BeQuestions("Mikka_test", [{id: "repo", title: "Several repositories match Mikka_test", options: [{value: "alexj11324/Mikka_test", label: "alexj11324/Mikka_test"}, {value: "org/mikka-test", label: "org/mikka-test"}]}])`)
+  assert.match(several, /<button[^>]*>.*alexj11324\/Mikka_test/)
+  assert.doesNotMatch(several, /installations\/new/)
+})
+
 test('beUI date range text follows the locale', () => {
   const dates = render('root = BeQuestions("Offsite", [{id: "dates", title: "日期", input: "dateRange"}])', 'zh-CN')
   assert.match(dates, /选择日期/)

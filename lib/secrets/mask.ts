@@ -75,6 +75,9 @@ export function maskCredentials(text: string, replacement?: string) {
   for (const [pattern, label] of CREDENTIAL_PATTERNS) out = out.replace(pattern, replacement ?? label)
   return out
 }
+/** Credential patterns only, for text no workspace secret list applies to (Coordinator chat and memory). */
+export const credentialMasker: Masker = text => (typeof text !== 'string' || !text ? text : maskCredentials(text))
+
 /** Characters at the end of `text` that could still grow into a credential with the next delta. */
 const credentialHoldback = (text: string) => {
   const tail = /[A-Za-z0-9_.-]+$/.exec(text)?.[0]

@@ -43,6 +43,7 @@ import type { RunChunk } from "../chunks"
 import { DAEMON_VERSION } from "../paths"
 import { buildChildEnv } from "../env"
 import { mailboxToolResult } from '../run-mailbox'
+import { NATIVE_AUTH_PLACEHOLDER } from '../subscription-native-broker'
 import type {
   DeltaNotification,
   ErrorNotification,
@@ -79,6 +80,10 @@ export interface CodexAdapterOptions {
   computerProvider?: ComputerSpecProvider
   /** @deprecated Ignored: the person's own `CODEX_HOME` is never read. */
   userHome?: string
+  /** Only the trusted hosted spawn may route a subscription through Mikka's
+   * private run broker. The CLI receives a public transport marker, no OAuth
+   * token or claimed ChatGPT identity. Direct/local OAuth uses subscriptionAuth. */
+  hostedSubscriptionBroker?: { verify(): Promise<void> }
   /** Trusted, owner-bound broker only; never a task/model-supplied credential. */
   subscriptionAuth?: {
     accountId: string
@@ -287,7 +292,10 @@ export class CodexAdapter implements AgentAdapter {
     const paths = runPaths(this.options.stateDir, options.runId)
     const runDir = await claimRunDir(paths)
     const externalAuth = this.options.subscriptionAuth
-    if (externalAuth) {
+    const brokerAuth = this.options.hostedSubscriptionBroker
+    const managedAuth = Boolean(externalAuth || brokerAuth)
+    if (brokerAuth && (!this.options.spawnCli || externalAuth || options.credential)) throw new Error(SUBSCRIPTION_AUTH_ERROR)
+    if (managedAuth) {
       const clean = buildChildEnv({
         host: options.env,
         runId:
@@ -324,7 +332,9 @@ export class CodexAdapter implements AgentAdapter {
     const computerMcp = this.options.computerMcp ?? this.options.computerProvider?.(options.runId, options.policy)
     const binary = this.options.binary ?? await this.options.ensureBinary?.() ?? "codex"
     if (externalAuth && options.credential) throw new Error(SUBSCRIPTION_AUTH_ERROR)
-    const credential = codexCredential(options.credential)
+    const credential = codexCredential(brokerAuth
+      ? { kind: "provider", protocol: "openai", baseUrl: "https://mikka.invalid", key: NATIVE_AUTH_PLACEHOLDER }
+      : options.credential)
     const providerDomain = credentialDomain(options.credential)
     const ctx = new RunContext({
       harnessDomains: providerDomain ? [providerDomain] : undefined,
@@ -335,6 +345,8 @@ export class CodexAdapter implements AgentAdapter {
       mailboxEnabled: Boolean(options.mailbox),
       harness: "codex",
       kind: options.kind,
+      factoryCheck: options.factoryCheck,
+      verifyCommand: options.verifyCommand,
       worktree: options.cwd,
       gitWritePaths: options.gitWritePaths,
       networkAllow: options.networkAllow,
@@ -369,6 +381,10 @@ export class CodexAdapter implements AgentAdapter {
       ] : []),
       ...codexAppArgs(options.apps),
       ...credential.args,
+      ...(brokerAuth ? [
+        "-c", "model_providers.mikka.requires_openai_auth=false",
+        "-c", "model_providers.mikka.supports_websockets=false",
+      ] : []),
       // Its shells get a filtered env; give them writable temp dirs.
       ...Object.entries(ctx.tempEnv()).flatMap(([key, value]) => [
         "-c",
@@ -565,7 +581,7 @@ export class CodexAdapter implements AgentAdapter {
           const { error, willRetry } = params as ErrorNotification
           if (!willRetry) quota = mergeQuota(quota, codexQuotaSignal(error, rateLimits))
           if (!willRetry)
-            lastError = externalAuth
+            lastError = managedAuth
               ? SUBSCRIPTION_EXECUTION_ERROR
               : `Codex: ${error.message}`
           return
@@ -608,7 +624,7 @@ export class CodexAdapter implements AgentAdapter {
         await startTurn(next).catch((error: unknown) =>
           finish({
             outcome: "failed",
-            error: externalAuth
+            error: managedAuth
               ? SUBSCRIPTION_EXECUTION_ERROR
               : `Codex: ${errorMessage(error)}`
           })
@@ -620,7 +636,7 @@ export class CodexAdapter implements AgentAdapter {
         return finish({
           outcome: "failed",
           ...(quota ? { quota } : {}),
-          error: externalAuth
+          error: managedAuth
             ? SUBSCRIPTION_EXECUTION_ERROR
             : turn.error?.message
               ? `Codex: ${turn.error.message}`
@@ -635,14 +651,15 @@ export class CodexAdapter implements AgentAdapter {
     const startTurn = async (message: string) => {
       lastError = undefined
       quota = undefined
-      if (externalAuth?.verify) {
-        try { await externalAuth.verify() } catch { throw new Error(SUBSCRIPTION_AUTH_ERROR) }
+      const verify = externalAuth?.verify ?? brokerAuth?.verify
+      if (verify) {
+        try { await verify() } catch { throw new Error(SUBSCRIPTION_AUTH_ERROR) }
       }
       const result = rpc.sendRequest<{ turn: { id: string } }>("turn/start", {
         threadId: sessionId,
         input: text(message)
       })
-      const response = (externalAuth
+      const response = (managedAuth
         ? result.catch(() => {
             throw new Error(SUBSCRIPTION_EXECUTION_ERROR)
           })
@@ -662,7 +679,7 @@ export class CodexAdapter implements AgentAdapter {
       if (handoff) return queue.exit(handoff)
       queue.exit({
         outcome: "failed",
-        error: externalAuth
+        error: managedAuth
           ? SUBSCRIPTION_EXECUTION_ERROR
           : `codex app-server exited (${signal ?? code}): ${child.stderrTail() || "no output"}`
       })
@@ -670,6 +687,7 @@ export class CodexAdapter implements AgentAdapter {
 
     const ready = <T,>(step: Promise<T>, label: string) =>
       untilReady(child, step, `codex ${label}`)
+    let startupPhase: 'initialize' | 'oauth_login' | 'thread_start' | 'turn_start' = 'initialize'
     try {
       const initialized = await ready(
         rpc.sendRequest<{ userAgent?: string }>("initialize", {
@@ -678,12 +696,13 @@ export class CodexAdapter implements AgentAdapter {
             title: "Mikka",
             version: DAEMON_VERSION,
           },
-          capabilities: externalAuth || options.mailbox ? { experimentalApi: true } : null
+          capabilities: managedAuth || options.mailbox ? { experimentalApi: true } : null
         }),
         "initialize",
       )
       await rpc.sendNotification("initialized")
       if (externalAuth) {
+        startupPhase = 'oauth_login'
         try {
           const auth = subscriptionTokens(
             await externalAuth.token(false),
@@ -718,6 +737,7 @@ export class CodexAdapter implements AgentAdapter {
           "thread/start",
         )
       let response: ThreadResponse
+      startupPhase = 'thread_start'
       if (!threadId) response = await newThread()
       else {
         try {
@@ -729,7 +749,7 @@ export class CodexAdapter implements AgentAdapter {
             "thread/resume",
           )
         } catch (error) {
-          if (externalAuth || mode !== "continue" || ending || options.requireSessionResume) throw error
+          if (managedAuth || mode !== "continue" || ending || options.requireSessionResume) throw error
           log.info(
             { err: error, thread_id: threadId },
             "could not continue the earlier codex thread; starting a new one",
@@ -744,11 +764,18 @@ export class CodexAdapter implements AgentAdapter {
       if (runtimeModel) options.onRuntimeModel?.(sessionId, runtimeModel)
       if (options.requireSessionResume && sessionId !== threadId)
         throw new Error("Codex resumed a different question thread")
-      if(externalAuth)await this.options.onHostedSession?.(sessionId)
+      if(managedAuth)await this.options.onHostedSession?.(sessionId)
+      startupPhase = 'turn_start'
       await ready(startTurn(firstMessage), "turn/start")
     } catch (error) {
+      if (managedAuth) {
+        const code = error && typeof error === 'object' && 'code' in error ? error.code : undefined
+        try { log.warn({ event: 'codex_subscription_startup_failed', phase: startupPhase,
+          reason: typeof code === 'number' ? 'rpc_refused' : 'client_startup_failed',
+          ...(typeof code === 'number' && Number.isInteger(code) && code >= -32768 && code <= -32000 ? { rpcCode: code } : {}) }, 'Subscription startup failed') } catch { /* Keep the original refusal. */ }
+      }
       await finish(null)
-      if (externalAuth) throw new Error(SUBSCRIPTION_AUTH_ERROR)
+      if (managedAuth) throw new Error(SUBSCRIPTION_AUTH_ERROR)
       throw new Error(
         `Could not start codex app-server: ${errorMessage(error)}. ${child.stderrTail()}`.trim(),
         { cause: error },

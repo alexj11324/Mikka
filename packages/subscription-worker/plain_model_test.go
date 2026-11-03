@@ -1,0 +1,215 @@
+package worker
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"reflect"
+	"strings"
+	"testing"
+
+	core "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
+	ex "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
+)
+
+type fixedTransport struct {
+	status      int
+	contentType string
+	body        string
+}
+
+func (t fixedTransport) RoundTrip(*http.Request) (*http.Response, error) {
+	return &http.Response{StatusCode: t.status, Header: http.Header{"Content-Type": []string{t.contentType}}, Body: io.NopCloser(strings.NewReader(t.body))}, nil
+}
+
+// captureStderr runs fn and returns what it wrote to os.Stderr.
+func captureStderr(t *testing.T, fn func()) string {
+	t.Helper()
+	read, write, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	saved := os.Stderr
+	os.Stderr = write
+	fn()
+	os.Stderr = saved
+	write.Close()
+	var out bytes.Buffer
+	_, _ = io.Copy(&out, read)
+	return out.String()
+}
+
+func TestPlainModelUpstreamRefusalIsLoggedByStatusAndTypeOnly(t *testing.T) {
+	model := CPAPlainModel{Provider: "claude", Client: &http.Client{Transport: fixedTransport{
+		status: 400, contentType: "application/json",
+		body: `{"type":"error","error":{"type":"invalid_request_error","message":"fixture-upstream-message"}}`,
+	}}}
+	auth := &core.Auth{Metadata: map[string]any{"access_token": "fixture-access-token"}}
+	request := ex.Request{Model: "claude-haiku-5-5", Payload: []byte(`{"model":"claude-haiku-5-5","stream":true,"messages":[{"role":"user","content":"hi"}]}`)}
+	var err error
+	logged := captureStderr(t, func() { _, err = model.ExecuteStream(context.Background(), auth, request, ex.Options{}) })
+	if !errors.Is(err, ErrRequestRejected) {
+		t.Fatalf("want ErrRequestRejected, got %v", err)
+	}
+	if logged != "subscription_upstream_failure claude response 400 invalid_request_error\n" {
+		t.Fatalf("unexpected stderr line %q", logged)
+	}
+	for _, secret := range []string{"fixture-upstream-message", "fixture-access-token"} {
+		if strings.Contains(logged, secret) {
+			t.Fatalf("stderr leaked %q", secret)
+		}
+	}
+}
+
+func TestPlainModelProviderStatusKeepsOnlyActionableRefusal(t *testing.T) {
+	for _, test := range []struct {
+		status int
+		want   string
+	}{
+		{401, "reconnect_required"}, {403, "provider_access_denied"}, {429, "subscription_rate_limited"},
+		{400, "provider_request_rejected"}, {404, "provider_request_rejected"}, {503, "provider_temporarily_unavailable"},
+	} {
+		t.Run(fmt.Sprint(test.status), func(t *testing.T) {
+			model := CPAPlainModel{Provider: "claude", Client: &http.Client{Transport: fixedTransport{status: test.status, contentType: "application/json", body: `{"error":{"message":"fixture-private-provider-text","type":"fixture_secret"}}`}}}
+			_, err := model.ExecuteStream(context.Background(), &core.Auth{Metadata: map[string]any{"access_token": "fixture-private-token"}}, ex.Request{Model: "fixture-model", Payload: []byte(`{"messages":[{"role":"user","content":"hi"}]}`)}, ex.Options{})
+			if err == nil || err.Error() != test.want {
+				t.Fatalf("got %v, want %s", err, test.want)
+			}
+		})
+	}
+}
+
+func TestPlainModelProviderStreamErrorKeepsOnlyKnownTypes(t *testing.T) {
+	for _, test := range []struct{ kind, want string }{
+		{"authentication_error", "reconnect_required"}, {"permission_error", "provider_access_denied"},
+		{"rate_limit_error", "subscription_rate_limited"}, {"overloaded_error", "provider_temporarily_unavailable"},
+		{"fixture_private_token", "provider_operation_failed"},
+	} {
+		t.Run(test.kind, func(t *testing.T) {
+			model := CPAPlainModel{Provider: "claude", Client: &http.Client{Transport: fixedTransport{status: 200, contentType: "text/event-stream", body: fmt.Sprintf("data: {\"type\":\"error\",\"error\":{\"type\":%q,\"message\":\"fixture-private-provider-text\"}}\n\n", test.kind)}}}
+			result, err := model.ExecuteStream(context.Background(), &core.Auth{Metadata: map[string]any{"access_token": "fixture-private-token"}}, ex.Request{Model: "fixture-model", Payload: []byte(`{"messages":[{"role":"user","content":"hi"}]}`)}, ex.Options{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			chunk := <-result.Chunks
+			if chunk.Err == nil || chunk.Err.Error() != test.want {
+				t.Fatalf("got %v, want %s", chunk.Err, test.want)
+			}
+		})
+	}
+}
+
+func TestUpstreamErrorTypeKeepsOnlyTheEnum(t *testing.T) {
+	for body, want := range map[string]string{
+		`{"type":"error","error":{"type":"authentication_error","message":"x"}}`:                             "authentication_error",
+		`{"error":{"code":"rate_limit_exceeded"}}`:                                                           "rate_limit_exceeded",
+		`{"type":"response.failed","response":{"error":{"code":"rate_limit_exceeded","message":"private"}}}`: "rate_limit_exceeded",
+		`not json`: "unparsed",
+		`{}`:       "unknown",
+	} {
+		if got := upstreamErrorType([]byte(body)); got != want {
+			t.Errorf("%s: got %q, want %q", body, got, want)
+		}
+	}
+	logged := captureStderr(t, func() { upstreamFailure("claude", "response", 403, "Has Spaces And A Message") })
+	if logged != "subscription_upstream_failure claude response 403 unknown\n" {
+		t.Fatalf("an unexpected type must not pass through: %q", logged)
+	}
+	logged = captureStderr(t, func() { upstreamFailure("claude", "event", 200, "fixture_private_token") })
+	if strings.Contains(logged, "fixture_private_token") {
+		t.Fatal("an enum-shaped unknown provider value reached logs")
+	}
+}
+
+func TestClaudeSubscriptionSystemPreservesHostBlocks(t *testing.T) {
+	prefix := map[string]any{"type": "text", "text": "You are Claude Code, Anthropic's official CLI for Claude."}
+	host := map[string]any{"type": "text", "text": "Mikka host instructions", "cache_control": map[string]any{"type": "ephemeral"}}
+	for _, test := range []struct {
+		name  string
+		input any
+		want  []any
+	}{
+		{"absent", nil, []any{prefix}},
+		{"string", "host instructions", []any{prefix, map[string]any{"type": "text", "text": "host instructions"}}},
+		{"blocks", []any{host}, []any{prefix, host}},
+		{"already prefixed", []any{prefix, host}, []any{prefix, host}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if got := claudeSubscriptionSystem(test.input); !reflect.DeepEqual(got, test.want) {
+				t.Fatalf("system blocks changed: got %#v, want %#v", got, test.want)
+			}
+		})
+	}
+}
+
+func TestClaudeSubscriptionRequestPreservesInstructionsAndToolHistory(t *testing.T) {
+	model := CPAPlainModel{Provider: "claude", Client: &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		if r.URL.Host != "api.anthropic.com" || r.URL.Path != "/v1/messages" || r.Header.Get("User-Agent") != "Mikka/1.0" || r.Header.Get("Authorization") != "Bearer fixture-access" {
+			t.Fatal("unexpected subscription destination or credentials")
+		}
+		var body map[string]any
+		if json.NewDecoder(r.Body).Decode(&body) != nil {
+			t.Fatal("invalid request")
+		}
+		system, _ := body["system"].([]any)
+		if len(system) < 2 || objectMap(system[0])["text"] != "You are Claude Code, Anthropic's official CLI for Claude." || objectMap(system[1])["text"] != "You are Mikka. Follow the host's tool permissions." {
+			t.Fatal("subscription protocol block or host instructions missing")
+		}
+		if body["metadata"] != nil {
+			t.Fatal("unexpected synthesized device identity")
+		}
+		tools, _ := body["tools"].([]any)
+		if len(tools) != 1 || objectMap(tools[0])["name"] != "lookup" {
+			t.Fatal("tool schema lost")
+		}
+		raw, _ := json.Marshal(body["messages"])
+		if !strings.Contains(string(raw), "tool_use") || !strings.Contains(string(raw), "tool_result") || !strings.Contains(string(raw), "fixture-result") {
+			t.Fatal("tool history lost")
+		}
+		return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": {"text/event-stream"}}, Body: io.NopCloser(strings.NewReader("data: {\"type\":\"message_stop\"}\n\n"))}, nil
+	})}}
+	payload := []byte(`{"model":"fixture-model","messages":[{"role":"system","content":"You are Mikka. Follow the host's tool permissions."},{"role":"user","content":"Look up the value"},{"role":"assistant","content":null,"tool_calls":[{"id":"call-1","type":"function","function":{"name":"lookup","arguments":"{}"}}]},{"role":"tool","tool_call_id":"call-1","content":"fixture-result"}],"tools":[{"type":"function","function":{"name":"lookup","description":"Read one value","parameters":{"type":"object","properties":{}}}}]}`)
+	result, err := model.ExecuteStream(context.Background(), &core.Auth{Metadata: map[string]any{"access_token": "fixture-access"}}, ex.Request{Model: "fixture-model", Payload: payload}, ex.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for chunk := range result.Chunks {
+		if chunk.Err != nil {
+			t.Fatal(chunk.Err)
+		}
+	}
+}
+
+func TestCodexSubscriptionStreamWithoutContentType(t *testing.T) {
+	for _, test := range []struct {
+		name        string
+		contentType string
+		body        string
+		wantError   bool
+	}{
+		{"valid SSE without MIME", "", "data: {\"type\":\"response.completed\",\"response\":{\"id\":\"fixture-response\",\"model\":\"fixture-model\",\"output\":[],\"usage\":{\"input_tokens\":1,\"output_tokens\":1}}}\n\n", false},
+		{"HTML", "text/html", "<html>not a model reply</html>", true},
+		{"JSON without MIME", "", `{"error":{"type":"invalid_request_error"}}`, true},
+		{"truncated SSE", "", "data: {\"type\":\"response.created\",\"response\":{\"id\":\"fixture-response\",\"output\":[]}}\n\n", true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			model := CPAPlainModel{Provider: "codex", Client: &http.Client{Transport: fixedTransport{status: 200, contentType: test.contentType, body: test.body}}}
+			result, err := model.ExecuteStream(context.Background(), &core.Auth{Metadata: map[string]any{"access_token": "fixture-access", "account_id": "fixture-account"}}, ex.Request{Model: "fixture-model", Payload: []byte(`{"messages":[{"role":"user","content":"hi"}]}`)}, ex.Options{})
+			failed, done := err != nil, false
+			if err == nil {
+				for chunk := range result.Chunks {
+					failed = failed || chunk.Err != nil
+					done = done || strings.Contains(string(chunk.Payload), "[DONE]")
+				}
+			}
+			if failed != test.wantError || (!test.wantError && !done) {
+				t.Fatalf("failed=%v, done=%v", failed, done)
+			}
+		})
+	}
+}

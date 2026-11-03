@@ -42,6 +42,7 @@ export const groupRuntime: GroupRuntime = {
     if (agent.memberType === 'bot' && !scope.ownerId) throw new Error('verification_required')
     // 停止 in the group aborts it too (lib/coordinator/group-turns.ts).
     const signal = input.signal ? AbortSignal.any([AbortSignal.timeout(20000), input.signal]) : AbortSignal.timeout(20000)
+    let streamFailure: unknown
     const options = {
       model: agent.memberType === 'bot'
         ? await resolveGroupBotModel({ ownerId: scope.ownerId!, workspaceId: scope.workspaceId, botId: agent.id }, input.modelRuntime ?? (() => { throw Error('group_bot_model_unavailable') })(), signal)
@@ -50,10 +51,17 @@ export const groupRuntime: GroupRuntime = {
       prompt: JSON.stringify({ message: input.message, currentMembers: input.members, earlierReplies: input.earlier, responseGuidance: input.followUp, clarificationAgentId: input.ask, privatePeer: input.privatePeer }),
       output: Output.object({ schema: z.object({ text: z.string().max(32000), mentions: z.array(z.string().uuid()).max(100), privateTo: z.uuid().nullable() }) }),
       maxOutputTokens: 4000, maxRetries: 0, abortSignal: signal,
+      onError: ({ error }: { error: unknown }) => { streamFailure = error },
     }
     // Existing subscription transports are streaming-only. Never switch the
     // selected Bot to the generic Coordinator's paid model on refusal.
-    if (agent.memberType === 'bot') return await streamText(options).output
-    return (await generateText(options)).output
+    try {
+      if (agent.memberType === 'bot') return await streamText(options).output
+      return (await generateText(options)).output
+    } catch (error) {
+      // The SDK's final NoOutput error can hide the actual stream failure or timeout.
+      if (signal.aborted) throw new Error('group_generation_interrupted', { cause: signal.reason })
+      throw streamFailure ?? error
+    }
   },
 }

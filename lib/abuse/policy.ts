@@ -1,5 +1,12 @@
 /** USD accounting uses integer microdollars; the one-off allowance is fixed. */
 export const FREE_ALLOWANCE_MICRO_USD = 1_000_000
+/**
+ * A workspace with no verified card and no purchased points may still use
+ * Mikka 默认 for its first this-many messages (Alex, 2026-11-02): the turns
+ * answering them are admitted and paid by the platform, under its daily cap.
+ * Counted from the messages sent there, so it is given once per workspace.
+ */
+export const TRIAL_MESSAGES = 20
 export const MICRO_USD_PER_POINT = 10_000 // Billing conversion: 100 points = USD 1.
 export const HOSTED_CALL_TIMEOUT_MS = 60_000
 /**

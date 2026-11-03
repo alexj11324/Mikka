@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 import { Pool } from 'pg'
 import { handleGroup, type GroupRequest } from '../group-conversations-store'
-import { GroupJudgmentPendingError, processGroupTurn, runGroupRounds, untilStopped, type GroupAgent, type GroupRuntime } from './group-turns'
+import { groupGenerationFailure, GroupJudgmentPendingError, groupsWithPendingTurns, hasPendingGroupTurn, processGroupTurn, runGroupRounds, untilStopped, type GroupAgent, type GroupRuntime } from './group-turns'
 import { checkedCorrection, checkedRoute } from './group-correction'
 import { createGroupJudgment } from './group-judgment'
 import { DECISION_MODEL, type DecisionAnswer } from './decision'
@@ -16,6 +16,17 @@ const a = randomUUID(), b = randomUUID(), outsider = randomUUID()
 const members: GroupAgent[] = [a,b].map((id,i) => ({ id, name: `Agent ${i}`, description: `role ${i}` }))
 const message = { text: 'everyone', mentions: [] }
 const receipt: DecisionExecution = {executionId:'synthetic-execution',modelId:DECISION_MODEL,providerGenerationId:'synthetic-generation',startedAt:'2026-01-01T00:00:00.000Z',completedAt:'2026-01-01T00:00:01.000Z',requestDigest:'synthetic',imageDigests:[],vision:'no-image-input'}
+test('group failure diagnostics preserve finite underlying causes and never private provider text', () => {
+  const wrapped = (cause:unknown) => Object.assign(new Error('private prompt and credential'), { name:'AI_NoOutputGeneratedError',cause })
+  assert.equal(groupGenerationFailure(wrapped(new DOMException('private upstream URL','TimeoutError'))),'generation_timeout')
+  assert.equal(groupGenerationFailure(wrapped({statusCode:503})),'generation_upstream')
+  assert.equal(groupGenerationFailure(wrapped({statusCode:429})),'generation_rate_limited')
+  assert.equal(groupGenerationFailure(wrapped({statusCode:401})),'generation_authentication')
+  assert.equal(groupGenerationFailure(wrapped(undefined)),'generation_invalid_output')
+  const cycle:any = new Error('private detail'); cycle.cause=cycle
+  assert.equal(groupGenerationFailure(cycle),'generation_failed_not_replayed')
+})
+
 test('serial engine: dedupes each round, caps reciprocal mentions at 3 rounds, later sees previous data', async () => {
   let generating = 0, peak = 0
   const calls: string[] = [], published: string[] = [], statuses: (string|null)[] = []
@@ -188,7 +199,14 @@ test('PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, ro
     const status = await handleGroup(scoped,directory,{...base,method:'GET',resource:'messages',id},true)
     assert.equal((status.body as {agentStatus:{agentId:string}}).agentStatus.agentId,a)
     assert.equal((await handleGroup(scoped,directory,{...base,userId:'outsider',method:'GET',resource:'messages',id},true)).status,404)
-    await send(other,'independent',[a]); assert.equal(await processGroupTurn(scoped,other,runtime),true)
+    // The minute sweep and a history read see a group's pending turn; once it ran, neither does.
+    assert.equal(await hasPendingGroupTurn(scoped,other),false)
+    await send(other,'independent',[a])
+    assert.equal(await hasPendingGroupTurn(scoped,other),true)
+    assert.ok((await groupsWithPendingTurns(scoped)).includes(other))
+    assert.equal(await processGroupTurn(scoped,other,runtime),true)
+    assert.equal(await hasPendingGroupTurn(scoped,other),false)
+    assert.equal((await groupsWithPendingTurns(scoped)).includes(other),false)
     unblock(); assert.equal(await running,true)
     assert.equal((await activeRuns()).length,0)
     assert.equal((await scoped.query('SELECT status FROM agent_runs WHERE id=$1',[active[0].id])).rows[0].status,'succeeded')

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import {test,before,mock} from 'node:test'
 import {randomUUID} from 'node:crypto'
+import { overrideDeploymentSwitch } from '@/lib/deployment-switches'
 const intake=mock.fn(async()=>({task:{stage:'execute',status:'pending'}}))
 mock.module('@/workflows/coordinator/steps',{namedExports:{intakeFactoryRequest:intake,listFactoryRequests:async()=>[],readFactoryTask:async()=>({}),resolveFactoryTask:async()=>({})}})
 mock.module('@/workflows/coordinator/agent-kit-steps',{namedExports:{}})
@@ -8,18 +9,18 @@ mock.module('@/lib/composio-actions',{namedExports:{createComposioAITools:()=>({
 let registry:typeof import('@/workflows/coordinator/tools')
 before(async()=>{registry=await import('@/workflows/coordinator/tools')})
 test('actual tool adapter keeps host owner/Bot/scope and requires both rollout flags',async()=>{
- const old=[process.env.MIKKA_FACTORY_ROUTING_ENABLED,process.env.MIKKA_ISSUE_TOOLS_ENABLED]
+ const old=process.env.MIKKA_FACTORY_ROUTING_ENABLED
  try{
- delete process.env.MIKKA_FACTORY_ROUTING_ENABLED;process.env.MIKKA_ISSUE_TOOLS_ENABLED='1'
+ process.env.MIKKA_FACTORY_ROUTING_ENABLED='0';overrideDeploymentSwitch('issueTools',true)
  assert.equal(registry.createCoordinatorRegistry('owner','bot').intake_factory_request,undefined)
- process.env.MIKKA_FACTORY_ROUTING_ENABLED='1';process.env.MIKKA_ISSUE_TOOLS_ENABLED='0'
+ process.env.MIKKA_FACTORY_ROUTING_ENABLED='1';overrideDeploymentSwitch('issueTools',false)
  assert.equal(registry.createCoordinatorRegistry('owner','bot').intake_factory_request,undefined)
- process.env.MIKKA_ISSUE_TOOLS_ENABLED='1'
+ overrideDeploymentSwitch('issueTools',true)
  const scope={holder:'host',turnId:'turn',callId:'call'},input={title:'Task',body:'',sourceEventId:randomUUID(),rationale:'User asked',missingInformation:[],missingPermissions:[],needsSpec:false}
  await registry.createCoordinatorRegistry('owner','bot',scope).intake_factory_request!.execute!(input,{toolCallId:'sdk-call',messages:[],context:{}})
  assert.deepEqual(intake.mock.calls[0].arguments,['owner',input,scope,'bot'])
  type Execution=NonNullable<NonNullable<Parameters<typeof registry.coordinatorTools>[3]>['execution']>
  const execution={id:'execution',snapshot:{effectiveTools:['get_issue']}} as unknown as Execution
  assert.deepEqual(Object.keys(registry.coordinatorTools('owner','bot',scope,{execution})),['get_issue'])
- }finally{for(const [i,k] of ['MIKKA_FACTORY_ROUTING_ENABLED','MIKKA_ISSUE_TOOLS_ENABLED'].entries()){if(old[i]===undefined)delete process.env[k];else process.env[k]=old[i]}}
+ }finally{overrideDeploymentSwitch('issueTools',undefined);if(old===undefined)delete process.env.MIKKA_FACTORY_ROUTING_ENABLED;else process.env.MIKKA_FACTORY_ROUTING_ENABLED=old}
 })

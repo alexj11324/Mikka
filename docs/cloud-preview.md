@@ -33,6 +33,8 @@ Google login requests only `openid`, `email`, and `profile`. Google branding ver
 
 ## Composio
 
+Plugins → GitHub (linking a GitHub account for repositories) does not use the proxy: GitHub answers the origin the link started on ([decision](design/decisions/2026-11-03-0315-github-link-callback-origin.md)). A preview that links GitHub needs `https://<preview origin>/mikka/api/auth/callback/github` registered on the GitHub App and a stable `BETTER_AUTH_URL` for its branch; an unregistered origin stops on GitHub's `redirect_uri` error.
+
 Notion and Slack connections use Composio-managed OAuth and the signed-in Mikka user ID. Set `COMPOSIO_API_KEY` on the server. Configure Composio's callback verifier for the intended cloud deployment's `/mikka/api/integrations/composio/callback`, and set that exact URL in `COMPOSIO_CALLBACK_VERIFIER_URL`. Mikka only starts connection flows when those values match, and Composio keeps the connection pending until the signed-in Mikka user completes it. The social-login proxy does not relay Composio or Linear OAuth callbacks.
 
 Composio outbound event delivery uses a webhook subscription. Configure its URL as the intended cloud deployment's `/mikka/api/webhooks/composio`, select event types, and save the signing secret as `COMPOSIO_WEBHOOK_SECRET`. The receiver verifies and acknowledges events; app-specific event actions still need to be selected.

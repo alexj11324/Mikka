@@ -1,9 +1,11 @@
-import { afterEach, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { checkLatestVersion, managedAutoUpdateRuntime, newerStableVersion } from '../src/auto-update'
+import * as autoUpdate from '../src/auto-update'
+import { managedAutoUpdateRuntime, newerStableVersion, recordUpdateFailure, reportedUpdateFailure, updateAllowed } from '../src/auto-update'
 import { Daemon } from '../src/main'
+import { RunNotPinnedHereError } from '../src/errors'
 import * as service from '../src/service'
 
 const dirs: string[] = []
@@ -19,14 +21,27 @@ it.each([
 ])('stable upgrade %s from %s = %s', (candidate, current, expected) => {
   expect(newerStableVersion(candidate, current)).toBe(expected)
 })
-it('persists failed attempts before I/O and retries only after a day, including across restarts', async () => {
+it('the daemon never asks npm which release is latest; the server names it', async () => {
+  expect('checkLatestVersion' in autoUpdate).toBe(false)
+  // The only npm calls left are `root --global` (is this the global CLI?) and `install` of a named version.
+  const source = readFileSync(new URL('../src/auto-update.ts', import.meta.url), 'utf8')
+  expect(source).not.toMatch(/['"]view['"]/)
+  expect(source).toContain("'install', '--global', '--engine-strict', `${PACKAGE}@${version}`")
+})
+it('a failed install of a version backs off 5 minutes, 30 minutes, then 2 hours, and is reported until a newer daemon runs', () => {
   const file = stateFile(), now = 1_800_000_000_000
-  const runtime = { latest: vi.fn(async (): Promise<string> => { expect(JSON.parse(readFileSync(file, 'utf8')).lastAttemptAt).toBe(now); throw new Error('registry unavailable') }), install: vi.fn() }
-  await expect(checkLatestVersion(file, '1.0.0', runtime, now)).rejects.toThrow('unavailable')
-  runtime.latest.mockImplementation(async () => '1.0.1')
-  expect(await checkLatestVersion(file, '1.0.0', runtime, now + 1)).toBeUndefined()
-  expect(await checkLatestVersion(file, '1.0.0', runtime, now + 86_400_000)).toBe('1.0.1')
-  expect(runtime.latest).toHaveBeenCalledTimes(2)
+  expect(updateAllowed(file, '1.0.1', now)).toBe(true)
+  expect(reportedUpdateFailure(file, '1.0.0')).toBeNull()
+  let at = now
+  for (const wait of [300_000, 1_800_000, 7_200_000, 7_200_000]) {
+    recordUpdateFailure(file, '1.0.1', 'install_failed', at)
+    expect(updateAllowed(file, '1.0.1', at + wait - 1)).toBe(false)
+    expect(updateAllowed(file, '1.0.1', at + wait)).toBe(true)
+    at += wait
+  }
+  expect(updateAllowed(file, '1.0.2', now)).toBe(true)
+  expect(reportedUpdateFailure(file, '1.0.0')).toEqual({ version: '1.0.1', code: 'install_failed', at: new Date(at - 7_200_000).toISOString() })
+  expect(reportedUpdateFailure(file, '1.0.1')).toBeNull()
 })
 it('excludes foreground, development, opted-out and source CLIs', async () => {
   vi.stubEnv('MIKKA_SERVICE', '')
@@ -44,9 +59,11 @@ function maintenanceDaemon() {
     supervisor: { heartbeatRuns: () => unknown[] }
     claimsInFlight: number; stopped: boolean; updating: boolean
     maintenance: Promise<void> | null; updateVersion?: string
-    options: { autoUpdate?: { latest(): Promise<string>; install(version: string): Promise<void> } }
+    options: { autoUpdate?: { install(version: string): Promise<void> } }
     startMaintenance(work: () => Promise<void>): void; checkAutoUpdate(): void
-    claimAndStart(id: string): Promise<unknown>
+    claimAndStart(id: string): Promise<unknown>; claimAndStartInternal(id: string): Promise<unknown>; offerUpdate(latest: string | undefined): void
+    knownLatest?: string; paths: { dataDir: string }
+    handlers(): { 'daemon.update'(params: object): Promise<{ state: string }> }
   }
   internal.supervisor = { heartbeatRuns: () => [] }
   return { daemon, internal, log }
@@ -70,7 +87,7 @@ it('waits for runs and in-flight claims, then blocks admissions during backgroun
 it('failed installs reopen admissions and never restart; teardown cannot restart after successful installation', async () => {
   const restart = vi.spyOn(service, 'restartService').mockResolvedValue(undefined)
   const { internal } = maintenanceDaemon()
-  internal.options.autoUpdate = { latest: async () => '1.0.1', install: vi.fn(async () => { throw new Error('npm failure') }) }
+  internal.options.autoUpdate = { install: vi.fn(async () => { throw new Error('npm failure') }) }
   internal.updateVersion = '1.0.1'
   internal.checkAutoUpdate()
   await internal.maintenance
@@ -78,7 +95,8 @@ it('failed installs reopen admissions and never restart; teardown cannot restart
   expect(restart).not.toHaveBeenCalled()
   let finish!: () => void
   internal.options.autoUpdate.install = () => new Promise<void>(resolve => { finish = resolve })
-  internal.updateVersion = '1.0.1'
+  // 1.0.1 is backing off after its failure; the next release installs.
+  internal.updateVersion = '1.0.2'
   internal.checkAutoUpdate()
   internal.stopped = true
   finish(); await internal.maintenance
@@ -88,7 +106,7 @@ it('restarts only after a successful exact-version install', async () => {
   const events: string[] = []
   vi.spyOn(service, 'restartService').mockImplementation(async () => { events.push('restart') })
   const { internal } = maintenanceDaemon()
-  internal.options.autoUpdate = { latest: async () => '1.0.1', install: async version => { events.push(version) } }
+  internal.options.autoUpdate = { install: async version => { events.push(version) } }
   internal.updateVersion = '1.0.1'
   internal.checkAutoUpdate()
   await internal.maintenance
@@ -134,4 +152,121 @@ it('counts the whole run claim and start before allowing an update', async () =>
   internal.startMaintenance(install)
   await internal.maintenance
   expect(install).toHaveBeenCalledOnce()
+})
+it('a claim refused as daemonUpgradeRequired updates to the release that server names, without asking npm', async () => {
+  vi.spyOn(service, 'restartService').mockResolvedValue(undefined)
+  const { internal } = maintenanceDaemon()
+  const install = vi.fn(async () => {})
+  internal.options.autoUpdate = { install }
+  internal.claimAndStartInternal = async id => { throw new RunNotPinnedHereError(id, false, '999.0.0') }
+  await expect(internal.claimAndStart('run-1')).rejects.toBeInstanceOf(RunNotPinnedHereError)
+  expect(install).not.toHaveBeenCalled()
+  internal.claimAndStartInternal = async id => { throw new RunNotPinnedHereError(id, true) }
+  await expect(internal.claimAndStart('run-1')).rejects.toBeInstanceOf(RunNotPinnedHereError)
+  expect(install).not.toHaveBeenCalled()
+  // An older server names no release: nothing to install, nothing breaks.
+  internal.claimAndStartInternal = async id => { throw new RunNotPinnedHereError(id, true, '999.0.0') }
+  await expect(internal.claimAndStart('run-1')).rejects.toBeInstanceOf(RunNotPinnedHereError)
+  await internal.maintenance
+  expect(install).toHaveBeenCalledExactlyOnceWith('999.0.0')
+  expect(internal.knownLatest).toBe('999.0.0')
+})
+it('a newer release named by the server installs once, when idle; a failure keeps this version running, backs off and is reported', async () => {
+  const restart = vi.spyOn(service, 'restartService').mockResolvedValue(undefined)
+  const { internal } = maintenanceDaemon()
+  const file = join(internal.paths.dataDir, 'auto-update.json')
+  const install = vi.fn(async () => { throw new Error('npm failure') })
+  internal.options.autoUpdate = { install }
+  internal.offerUpdate(undefined)
+  internal.offerUpdate('0.0.1')
+  expect(internal.updateVersion).toBeUndefined()
+  internal.offerUpdate('999.0.0')
+  expect(internal.updateVersion).toBe('999.0.0')
+  internal.supervisor.heartbeatRuns = () => [{}]
+  internal.checkAutoUpdate()
+  expect(install).not.toHaveBeenCalled()
+  internal.supervisor.heartbeatRuns = () => []
+  internal.checkAutoUpdate()
+  await internal.maintenance
+  expect(install).toHaveBeenCalledOnce()
+  expect(restart).not.toHaveBeenCalled()
+  expect(internal.updating).toBe(false)
+  expect(reportedUpdateFailure(file, '0.0.1')).toMatchObject({ version: '999.0.0', code: 'install_failed' })
+  internal.offerUpdate('999.0.0')
+  expect(internal.updateVersion).toBeUndefined()
+  internal.checkAutoUpdate()
+  await internal.maintenance
+  expect(install).toHaveBeenCalledOnce()
+})
+
+describe('daemon.update: the desktop app on this computer asks after it starts', () => {
+  const ask = (internal: ReturnType<typeof maintenanceDaemon>['internal']) => internal.handlers()['daemon.update']({})
+  /** The ask runs one heartbeat now; the server's answer names its release (or, from an older server, none). */
+  const serverNames = (daemon: Daemon, latest: string | undefined) => vi.spyOn(daemon, 'syncWithServer')
+    .mockImplementation(async () => { Reflect.get(daemon, 'learnRelease').call(daemon, latest) })
+  it('asks the server now and installs the release it names when idle, never npm', async () => {
+    const restart = vi.spyOn(service, 'restartService').mockResolvedValue(undefined)
+    const { daemon, internal } = maintenanceDaemon()
+    const sync = serverNames(daemon, '999.0.0')
+    const install = vi.fn(async () => {})
+    internal.options.autoUpdate = { install }
+    expect(await ask(internal)).toEqual({ state: 'installing' })
+    expect(sync).toHaveBeenCalledOnce()
+    await internal.maintenance
+    expect(install).toHaveBeenCalledWith('999.0.0')
+    expect(restart).toHaveBeenCalledOnce()
+  })
+  it('does nothing when this daemon is already the latest release, or the server names none', async () => {
+    const restart = vi.spyOn(service, 'restartService').mockResolvedValue(undefined)
+    for (const latest of ['0.0.1', undefined]) {
+      const { daemon, internal } = maintenanceDaemon()
+      serverNames(daemon, latest)
+      const install = vi.fn(async () => {})
+      internal.options.autoUpdate = { install }
+      expect(await ask(internal)).toEqual({ state: 'current' })
+      expect(internal.maintenance).toBeNull()
+      expect(install).not.toHaveBeenCalled()
+    }
+    expect(restart).not.toHaveBeenCalled()
+  })
+  it('an unreachable server leaves this version running', async () => {
+    const { daemon, internal } = maintenanceDaemon()
+    vi.spyOn(daemon, 'syncWithServer').mockRejectedValue(new Error('offline'))
+    internal.options.autoUpdate = { install: vi.fn(async () => {}) }
+    expect(await ask(internal)).toEqual({ state: 'current' })
+  })
+  it('waits for a running run, then installs on the next idle pass', async () => {
+    vi.spyOn(service, 'restartService').mockResolvedValue(undefined)
+    const { daemon, internal } = maintenanceDaemon()
+    serverNames(daemon, '999.0.0')
+    const install = vi.fn(async () => {})
+    internal.options.autoUpdate = { install }
+    internal.supervisor.heartbeatRuns = () => [{}]
+    expect(await ask(internal)).toEqual({ state: 'waiting' })
+    expect(install).not.toHaveBeenCalled()
+    expect(internal.updating).toBe(false)
+    internal.supervisor.heartbeatRuns = () => []
+    internal.checkAutoUpdate()
+    await internal.maintenance
+    expect(install).toHaveBeenCalledWith('999.0.0')
+  })
+  it('a development, foreground or source daemon is not updated and never asks the server', async () => {
+    const { daemon, internal } = maintenanceDaemon()
+    const sync = serverNames(daemon, '999.0.0')
+    internal.options.autoUpdate = undefined
+    expect(await ask(internal)).toEqual({ state: 'unmanaged' })
+    expect(sync).not.toHaveBeenCalled()
+  })
+  it('a failed install keeps this version running and is reported to Settings › Devices', async () => {
+    const restart = vi.spyOn(service, 'restartService').mockResolvedValue(undefined)
+    const { daemon, internal } = maintenanceDaemon()
+    serverNames(daemon, '999.0.0')
+    const file = join(internal.paths.dataDir, 'auto-update.json')
+    internal.options.autoUpdate = { install: vi.fn(async () => { throw new Error('npm failure') }) }
+    expect(await ask(internal)).toEqual({ state: 'installing' })
+    await internal.maintenance
+    expect(restart).not.toHaveBeenCalled()
+    expect(internal.updating).toBe(false)
+    expect(reportedUpdateFailure(file, '0.0.1')).toMatchObject({ version: '999.0.0', code: 'install_failed' })
+  })
 })

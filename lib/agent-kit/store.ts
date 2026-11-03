@@ -2,11 +2,12 @@ import { randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
 import { z } from 'zod'
 import { canonicalJSON, digest, makeSnapshot, parseDefinition, type AgentDefinition, type DefinitionSnapshot } from './definition'
+import { platformEffectiveTools } from './builtin'
 import { compareReports, type EvalReport } from './evals'
 import { assertSafeImprovement, caseFromFailure, proposeImprovement, type FailureCode, type FailureEvidence } from './improvement'
 
 export interface AgentScope { ownerId: string; botId: string | null; workspaceId: string | null }
-export interface DefinitionVersion { id: string; version: number; definition: AgentDefinition; digest: string; source: 'builtin' | 'user' | 'improvement'; base_version: string | null }
+export interface DefinitionVersion { id: string; version: number; definition: AgentDefinition; digest: string; source: 'builtin' | 'user' | 'improvement'; base_version: string | null; created_at?: Date | string }
 export interface AgentExecution { id: string; snapshot: DefinitionSnapshot; status: 'running' | 'completed' | 'failed' }
 export interface ImprovementProposal { id: string; baseline_id: string; candidate_id: string; evidence: FailureEvidence[]; rationale: string; status: 'proposed' | 'approved' | 'rejected' }
 export interface EvaluationRecord { id: string; proposal_id: string; mode: 'fixture' | 'live'; model: string | null; status: 'running' | 'completed' | 'failed'; reports: { baseline: EvalReport; candidate: EvalReport } | null }
@@ -40,7 +41,7 @@ export class AgentKitStore {
     }
   }
   private async version(client: PoolClient, scope: AgentScope, id: string): Promise<DefinitionVersion> {
-    const { rows } = await client.query<DefinitionVersion>('select id,version,definition,digest,source,base_version from agent_kit_versions where owner_id=$1 and bot_key=$2 and id=$3', [...params(scope), uuid(id)])
+    const { rows } = await client.query<DefinitionVersion>('select id,version,definition,digest,source,base_version,created_at from agent_kit_versions where owner_id=$1 and bot_key=$2 and id=$3', [...params(scope), uuid(id)])
     if (!rows[0]) throw new AgentKitError('agentVersionNotFound', 404)
     return { ...rows[0], definition: parseDefinition(rows[0].definition) }
   }
@@ -50,7 +51,7 @@ export class AgentKitStore {
     const version = rows[0].next_version
     const hash = digest(definition)
     await client.query('insert into agent_kit_versions(id,owner_id,bot_key,version,definition,digest,source,request_key,base_version) values($1,$2,$3,$4,$5,$6,$7,$8,$9)', [id,...params(scope),version,JSON.stringify(definition),hash,source,requestKey,baseId])
-    return { id, version, definition, digest: hash, source, base_version: baseId }
+    return { id, version, definition, digest: hash, source, base_version: baseId, created_at: new Date() }
   }
   private async head(client: PoolClient, scope: AgentScope, defaults: AgentDefinition): Promise<DefinitionVersion> {
     await this.authority(client, scope)
@@ -61,6 +62,12 @@ export class AgentKitStore {
     const initial = await this.insertVersion(client,scope,parseDefinition(defaults),'builtin','builtin',null)
     await client.query('update agent_kit_heads set active_version=$3 where owner_id=$1 and bot_key=$2',[...params(scope),initial.id])
     return initial
+  }
+  /** An improvement cannot change tools, so its tools were chosen by its first non-improvement base. */
+  private async toolSource(client: PoolClient, scope: AgentScope, current: DefinitionVersion) {
+    let chosen = current
+    for (let depth = 0; chosen.source === 'improvement' && chosen.base_version && depth < 100; depth++) chosen = await this.version(client,scope,chosen.base_version)
+    return { source: chosen.source, createdAt: chosen.created_at, tools: current.definition.tools }
   }
   async active(scope: AgentScope, defaults: AgentDefinition) { return this.transaction(client => this.head(client,scope,defaults)) }
   async history(scope: AgentScope) {
@@ -119,6 +126,8 @@ export class AgentKitStore {
       if (existing.rows[0]) return existing.rows[0]
       const resolvedRuntime = typeof runtime === 'function' ? await runtime(current.definition) : runtime
       const id = randomUUID(); const snapshot = makeSnapshot(current.id,current.version,current.definition,hostInstructions,resolvedRuntime)
+      // Computed per new execution; the stored version and its digest stay as saved.
+      snapshot.effectiveTools = platformEffectiveTools(await this.toolSource(client,scope,current),defaults.tools)
       if (plugins) {
         snapshot.personalPlugins = await plugins(client)
         // Personal installations are an independent, explicit owner grant; never

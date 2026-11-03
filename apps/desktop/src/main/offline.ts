@@ -28,3 +28,19 @@ export class AppLoadState {
     return url.startsWith(this.appOrigin) && !this.failed
   }
 }
+
+// Chromium net errors that mean this computer has no network, not that Mikka is down
+// (net/base/net_error_list.h): INTERNET_DISCONNECTED, NETWORK_CHANGED, NAME_NOT_RESOLVED and
+// ADDRESS_UNREACHABLE only count when the system also reports no network.
+const NO_NETWORK = new Set([-106, -21])
+const MAYBE_NETWORK = new Set([-105, -109, -137])
+
+/**
+ * Why the app did not load (review C9): this computer is offline, or Mikka's server did not answer.
+ * The page never tells someone to check their network when the server is what failed.
+ */
+export function offlineReason(errorCode: number, online: boolean): 'network' | 'server' {
+  if (NO_NETWORK.has(errorCode)) return 'network'
+  if (!online && MAYBE_NETWORK.has(errorCode)) return 'network'
+  return online ? 'server' : 'network'
+}

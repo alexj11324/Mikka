@@ -2,16 +2,11 @@ import 'server-only'
 import { auth } from '@/lib/auth'
 import { githubConnectionToken } from './connection'
 
-export type GitHubAccessCode = 'authRequired' | 'githubNotConfigured' | 'githubNotConnected' | 'githubReconnectRequired' | 'githubRepositoryForbidden' | 'githubPullRequestInvalid' | 'githubIssueInvalid' | 'githubUnavailable'
+export { GitHubAccessError, type GitHubAccessCode } from './user-access-error'
+import { GitHubAccessError } from './user-access-error'
+import { noteGitHubRequest } from '@/lib/dispatch-timing'
 
-export class GitHubAccessError extends Error {
-  constructor(readonly code: GitHubAccessCode, readonly status: number) {
-    super(code)
-    this.name = 'GitHubAccessError'
-  }
-}
-
-export type AuthorizedGitHubRepository = { id: string; installationId: string; fullName: string; htmlUrl: string; private: boolean }
+export type AuthorizedGitHubRepository = { id: string; installationId: string; fullName: string; htmlUrl: string; private: boolean; description?: string | null; homepage?: string | null; pushedAt?: string | null }
 type Json = Record<string, unknown>
 const API = 'https://api.github.com'
 const REPO_NAME = /^[\w.-]+\/[\w.-]+$/
@@ -28,6 +23,11 @@ function githubId(value: unknown): string {
 }
 
 async function githubGet(token: string, path: string): Promise<{ data: Json; next: boolean }> {
+  const started = Date.now()
+  try { return await githubRequest(token, path) } finally { noteGitHubRequest(Date.now() - started) }
+}
+
+async function githubRequest(token: string, path: string): Promise<{ data: Json; next: boolean }> {
   let response: Response
   try {
     response = await fetch(`${API}${path}`, {
@@ -46,31 +46,46 @@ async function githubGet(token: string, path: string): Promise<{ data: Json; nex
   catch { throw new GitHubAccessError('githubUnavailable', 502) }
 }
 
-/** The Plugins → GitHub connection first; a GitHub sign-in account linked before connections existed still works. */
-async function userToken(headers: Headers, userId: string): Promise<{ token: string; githubAccountId: string }> {
+/** The Plugins → GitHub connection first; a GitHub sign-in account linked before connections existed still works.
+ * Without request headers (the Coordinator acts for a user id), the legacy account is read server-side for that user only. */
+async function userToken(userId: string, headers?: Headers, minValidityMs?: number): Promise<{ token: string; githubAccountId: string; expiresAt: Date | null }> {
   let connected: Awaited<ReturnType<typeof githubConnectionToken>>
-  try { connected = await githubConnectionToken(userId) }
+  try { connected = await githubConnectionToken(userId, minValidityMs === undefined ? {} : { minValidityMs }) }
   catch { throw new GitHubAccessError('githubReconnectRequired', 401) }
   if (connected) return connected
-  const accounts = await auth.api.listUserAccounts({ headers })
+  const accounts: { id: string; userId: string; providerId: string; accountId: string }[] = headers
+    ? await auth.api.listUserAccounts({ headers })
+    : await (await auth.$context).internalAdapter.findAccounts(userId)
   const account = accounts.find(row => row.providerId === 'github' && row.userId === userId)
   if (!account) throw new GitHubAccessError('githubNotConnected', 409)
   try {
-    // Better Auth takes the internal account row id and decrypts its token.
-    const token = (await auth.api.getAccessToken({ headers, body: { accountId: account.id } })).accessToken
-    if (!token) throw new Error('missingToken')
-    return { token, githubAccountId: account.accountId }
+    // Better Auth takes the internal account row id and decrypts its token. With no
+    // headers it looks the account up under body.userId, which only the host sets.
+    const access = await auth.api.getAccessToken(headers ? { headers, body: { accountId: account.id } } : { body: { accountId: account.id, userId } })
+    if (!access.accessToken) throw new Error('missingToken')
+    return { token: access.accessToken, githubAccountId: account.accountId, expiresAt: access.accessTokenExpiresAt ? new Date(access.accessTokenExpiresAt) : null }
   } catch (error) {
     if (error && typeof error === 'object' && 'statusCode' in error && typeof error.statusCode === 'number' && error.statusCode >= 500) throw new GitHubAccessError('githubUnavailable', 502)
     throw new GitHubAccessError('githubReconnectRequired', 401)
   }
 }
 
+/**
+ * The person's own GitHub user token for server code acting for a user id with
+ * no browser request: their runs, the Coordinator. Checked against their
+ * linked GitHub id. It never reaches chat, logs, memory or an error message.
+ */
+export async function githubTokenForUser(userId: string, options: { minValidityMs?: number } = {}): Promise<{ token: string; githubAccountId: string; expiresAt: Date | null }> {
+  const credential = await userToken(userId, undefined, options.minValidityMs)
+  if (githubId((await githubGet(credential.token, '/user')).data.id) !== credential.githubAccountId) throw new GitHubAccessError('githubReconnectRequired', 401)
+  return credential
+}
+
 /** The signed-in person's own GitHub user token, checked against their GitHub id. Never an app or installation token. */
 export async function githubUserToken(headers: Headers) {
   const session = await auth.api.getSession({ headers })
   if (!session?.user) throw new GitHubAccessError('authRequired', 401)
-  const { token, githubAccountId } = await userToken(headers, session.user.id)
+  const { token, githubAccountId } = await userToken(session.user.id, headers)
   if (githubId((await githubGet(token, '/user')).data.id) !== githubAccountId) throw new GitHubAccessError('githubReconnectRequired', 401)
   return { userId: session.user.id, githubAccountId, token }
 }
@@ -78,11 +93,19 @@ export async function githubUserToken(headers: Headers) {
 async function authorizedRepositories(headers: Headers) {
   const session = await auth.api.getSession({ headers })
   if (!session?.user) throw new GitHubAccessError('authRequired', 401)
+  const { login: _login, installationAccounts: _accounts, ...result } = await repositoriesForUser(session.user.id, headers)
+  return { userId: session.user.id, ...result }
+}
+
+/** What this one user's own GitHub token reaches through the Mikka App: the live source the Plugins page shows. */
+async function repositoriesForUser(userId: string, headers?: Headers) {
   const appId = process.env.GITHUB_APP_ID
   if (!appId || !/^[1-9]\d*$/.test(appId)) throw new GitHubAccessError('githubNotConfigured', 503)
-  const { token, githubAccountId } = await userToken(headers, session.user.id)
+  const { token, githubAccountId } = await userToken(userId, headers)
   const identity = (await githubGet(token, '/user')).data
   if (githubId(identity.id) !== githubAccountId) throw new GitHubAccessError('githubReconnectRequired', 401)
+  const login = typeof identity.login === 'string' && identity.login ? identity.login : null
+  const installationAccounts: string[] = []
   const installations: string[] = []
   const repositories: AuthorizedGitHubRepository[] = []
   for (let page = 1; ; page++) {
@@ -93,6 +116,8 @@ async function authorizedRepositories(headers: Headers) {
       if (githubId(installation.app_id) !== appId || installation.suspended_at != null) continue
       const installationId = githubId(installation.id)
       installations.push(installationId)
+      const owner = installation.account && typeof installation.account === 'object' ? (installation.account as Json).login : null
+      if (typeof owner === 'string' && owner) installationAccounts.push(owner)
       for (let repoPage = 1; ; repoPage++) {
         const repos = await githubGet(token, `/user/installations/${installationId}/repositories?per_page=100&page=${repoPage}`)
         if (!Array.isArray(repos.data.repositories)) throw new GitHubAccessError('githubUnavailable', 502)
@@ -100,14 +125,22 @@ async function authorizedRepositories(headers: Headers) {
           if (value == null) continue
           const repo = object(value)
           if (typeof repo.full_name !== 'string' || !REPO_NAME.test(repo.full_name) || typeof repo.private !== 'boolean') throw new GitHubAccessError('githubUnavailable', 502)
-          repositories.push({ id: githubId(repo.id), installationId, fullName: repo.full_name, htmlUrl: `https://github.com/${repo.full_name}`, private: repo.private })
+          // What the repository says it is, so a name shared by several ("Mikka", mikka-web) can be told apart.
+          const text = (field: unknown) => typeof field === 'string' && field.trim() ? field.trim().slice(0, 300) : null
+          repositories.push({ id: githubId(repo.id), installationId, fullName: repo.full_name, htmlUrl: `https://github.com/${repo.full_name}`, private: repo.private, description: text(repo.description), homepage: text(repo.homepage), pushedAt: typeof repo.pushed_at === 'string' ? repo.pushed_at : null })
         }
         if (!repos.next) break
       }
     }
     if (!result.next) break
   }
-  return { userId: session.user.id, githubAccountId, installations, repositories, token }
+  return { githubAccountId, login, installationAccounts, installations, repositories, token }
+}
+
+/** For server code acting for a user id with no browser request (the Coordinator). Never returns the token. */
+export async function listRepositoriesForUser(userId: string) {
+  const { token: _token, ...result } = await repositoriesForUser(userId)
+  return result
 }
 
 /** Live GitHub user/App repository intersection; no access is inferred from installation redirect parameters. */

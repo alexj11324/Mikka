@@ -24,8 +24,8 @@ import type {
   SpawnOptions,
   SpawnedProcess,
 } from "@anthropic-ai/claude-agent-sdk";
-import { nativeBrokerContextSchema, type RunAssignment } from "@mikka/protocol";
-import { ClaudeAdapter } from "./adapters/claude";
+import { harnessReportsModel, nativeBrokerContextSchema, type HarnessInfo, type RunAssignment } from "@mikka/protocol";
+import { ClaudeAdapter, ClaudeInitializationError } from "./adapters/claude";
 import { CodexAdapter } from "./adapters/codex";
 import type { AgentSession, StartOptions } from "./adapters/types";
 import { runPaths } from "./agents/run-context";
@@ -33,6 +33,7 @@ import type { spawnCli } from "./agents/child";
 import type { AgentSandbox } from "./agents/sandbox";
 import { requireRunToolApproval } from "./agents/tool-approval";
 import { createNativeSubscriptionBroker } from "./subscription-native-broker";
+import { DaemonError, ServerUnreachableError } from "./errors";
 import { createApiKeyBroker } from "./api-key-broker";
 import type { RunCredential } from "./agents/run-credential";
 import type { ServerLink } from "./server-link";
@@ -49,9 +50,10 @@ const bootstrap = fileURLToPath(
 const computerProxy = fileURLToPath(new URL("./computer/proxy.mjs", import.meta.url));
 const placeholder = "mikka-native-broker-placeholder";
 const unavailable = (cause?: unknown) =>
-  new Error("subscription_hosted_runtime_unavailable", cause === undefined ? undefined : { cause });
+  new Error(cause instanceof ClaudeInitializationError ? cause.code : "subscription_hosted_runtime_unavailable", cause === undefined ? undefined : { cause });
 /** Why a start failed, in words a person can act on; never argv or env. */
 const startFailure = (error: unknown) => {
+  if (error instanceof ClaudeInitializationError) return error;
   const value = error as { stderr?: unknown; message?: unknown };
   const stderr = String(value.stderr ?? "").trim();
   return new Error((stderr || (error instanceof Error ? error.message : String(error))).slice(-500));
@@ -80,32 +82,13 @@ const blockedSandbox: AgentSandbox = {
   },
 };
 
-export async function createHostedBotRunner(host: {
-  stateDir: string;
-  link: ServerLink;
-  binaries?: Partial<Record<"codex" | "claude_code", string>>;
-  /**
-   * Passed only by trusted E2B infrastructure, never by a task. Unused since
-   * runs stopped using Docker (decision 2026-11-01-1312); still accepted.
-   */
-  dockerSocket?: "unix:///run/mikka-container/docker.sock";
-  /** Optional trusted request-only desktop broker owned by the cloud daemon. */
-  computerBroker?: ComputerBroker;
-}) {
-  if (
-    process.platform !== "linux" ||
-    process.getuid?.() === 0 ||
-    !host.link.nativeContext ||
-    !host.link.nativeRequest
-  )
-    throw unavailable();
-  if (host.dockerSocket !== undefined && host.dockerSocket !== "unix:///run/mikka-container/docker.sock") throw unavailable();
-  // Runs use no Docker (decision 2026-11-01-1312). The template's worker still
-  // passes its socket; it is accepted and unused.
-  const bareEnv = { PATH: process.env.PATH, LANG: "C.UTF-8" };
-  // Per-run container records from before that decision name nothing this
-  // runner creates; a leftover must not block the machine.
-  rmSync(join(host.stateDir, "native-resources"), { recursive: true, force: true });
+/**
+ * The CLI each harness runs on a cloud machine: the one passed in, else Claude Code from the bundled
+ * agent SDK and Codex from PATH (E2B's own template CLI). The model probe at template build time and
+ * at daemon start asks these same binaries, so what it reports is what a run here uses.
+ */
+export function hostedBinaries(passed?: Partial<Record<"codex" | "claude_code", string>>): Partial<Record<"codex" | "claude_code", string>> {
+  const host = { binaries: passed };
   const require = createRequire(import.meta.url);
   let claude = host.binaries?.claude_code;
   try {
@@ -127,7 +110,7 @@ export async function createHostedBotRunner(host: {
       .split(delimiter)
       .map((dir) => join(dir, "codex"))
       .find((path) => existsSync(path));
-  const binaries = { codex, claude_code: claude };
+  const binaries: Partial<Record<"codex" | "claude_code", string>> = { codex, claude_code: claude };
   for (const kind of ["codex", "claude_code"] as const)
     if (binaries[kind]) {
       try {
@@ -137,6 +120,42 @@ export async function createHostedBotRunner(host: {
         delete binaries[kind];
       }
     }
+  return binaries;
+}
+
+export async function createHostedBotRunner(host: {
+  stateDir: string;
+  link: ServerLink;
+  binaries?: Partial<Record<"codex" | "claude_code", string>>;
+  /**
+   * Passed only by trusted E2B infrastructure, never by a task. Unused since
+   * runs stopped using Docker (decision 2026-11-01-1312); still accepted.
+   */
+  dockerSocket?: "unix:///run/mikka-container/docker.sock";
+  /** Optional trusted request-only desktop broker owned by the cloud daemon. */
+  computerBroker?: ComputerBroker;
+  /**
+   * The models this machine's CLI reported for a harness (the daemon's model probe, model-probe.ts),
+   * or null when it reported none. Given, a subscription run starts only on a model it lists; otherwise
+   * it fails with subscription_model_not_reported and no other model is put in its place (Alex, 2026-11-03).
+   */
+  reportedModels?: (harness: "codex" | "claude_code") => Promise<Pick<HarnessInfo, "models" | "modelSlots"> | null>;
+}) {
+  if (
+    process.platform !== "linux" ||
+    process.getuid?.() === 0 ||
+    !host.link.nativeContext ||
+    !host.link.nativeRequest
+  )
+    throw unavailable();
+  if (host.dockerSocket !== undefined && host.dockerSocket !== "unix:///run/mikka-container/docker.sock") throw unavailable();
+  // Runs use no Docker (decision 2026-11-01-1312). The template's worker still
+  // passes its socket; it is accepted and unused.
+  const bareEnv = { PATH: process.env.PATH, LANG: "C.UTF-8" };
+  // Per-run container records from before that decision name nothing this
+  // runner creates; a leftover must not block the machine.
+  rmSync(join(host.stateDir, "native-resources"), { recursive: true, force: true });
+  const binaries = hostedBinaries(host.binaries);
   if (!binaries.codex && !binaries.claude_code) throw unavailable();
   // A verify command runs directly on the task's machine against a private git
   // copy, so it cannot change the worktree's own `.git`.
@@ -242,6 +261,8 @@ export async function createHostedBotRunner(host: {
     harnesses: Object.keys(binaries).filter(
       (kind) => binaries[kind as keyof typeof binaries],
     ) as ("codex" | "claude_code")[],
+    /** The CLI each harness runs, so the daemon's model probe asks the same binary. */
+    binaries: { ...binaries } as Partial<Record<"codex" | "claude_code", string>>,
     command,
     async start(
       assignment: RunAssignment,
@@ -266,7 +287,46 @@ export async function createHostedBotRunner(host: {
         options.continueSession
       )
         throw unavailable();
+      // A subscription model runs only if this machine's CLI reported it; the run fails with the reason, never on another model.
+      if (selected && host.reportedModels) {
+        const report = await host.reportedModels(kind).catch(() => null);
+        if (!options.model || !report || harnessReportsModel(report, options.model) !== true) throw new Error("subscription_model_not_reported");
+      }
       const lifetime = new AbortController();
+      // Fixed diagnostic fields only. These callbacks can fail after the first
+      // context succeeds; the adapters deliberately hide their raw errors.
+      type StartupPhase = "context_initial" | "context_check" | "token" | "verify" | "adapter_start";
+      const startup: {
+        phase: StartupPhase;
+        contextReady: boolean;
+        brokerReady: boolean;
+        tokenRequested: boolean;
+        tokenCheckPassed: boolean;
+        verifyRequested: boolean;
+        verifyCheckPassed: boolean;
+        expiryValid?: boolean;
+        expiryFuture?: boolean;
+        sameRevision?: boolean;
+        sameAccount?: boolean;
+        sameRoute?: boolean;
+        sameModel?: boolean;
+      } = { phase: "context_initial", contextReady: false, brokerReady: false, tokenRequested: false, tokenCheckPassed: false, verifyRequested: false, verifyCheckPassed: false };
+      let reported = false;
+      let started = false;
+      const reportStartupFailure = (error: unknown) => {
+        if (!selected || reported || started) return;
+        reported = true;
+        const status = error instanceof DaemonError && error.data && typeof error.data === "object" && "status" in error.data ? error.data.status : undefined;
+        const reason = error instanceof ServerUnreachableError ? "server_unreachable"
+          : error instanceof DaemonError ? "server_refused"
+          : error instanceof Error && error.name === "ZodError" ? "context_invalid"
+          : [startup.sameRevision, startup.sameAccount, startup.sameRoute, startup.sameModel].includes(false) ? "context_changed"
+          : "startup_failed";
+        try {
+          options.log.warn({ event: "subscription_startup_failed", runId: assignment.runId, harness: kind, ...startup, reason,
+            ...(typeof status === "number" && Number.isInteger(status) && status >= 100 && status <= 599 ? { httpStatus: status } : {}) }, "Subscription startup failed");
+        } catch { /* Diagnostics never replace the original refusal. */ }
+      };
       let closed = false;
       let closing: Promise<void> | undefined;
       let computerGrant: ReturnType<ComputerBroker["spec"]>;
@@ -329,21 +389,37 @@ export async function createHostedBotRunner(host: {
             host.link.nativeContext!(assignment.deviceId, assignment.runId, lifetime.signal);
           const first = nativeBrokerContextSchema.parse(await context());
           await live();
+          startup.sameRoute = first.route === selected.route;
+          startup.sameModel = first.modelId === options.model;
           if (first.route !== selected.route || first.modelId !== options.model)
             throw unavailable();
+          startup.contextReady = true;
           const revision = first.revision;
-          const check = async () => {
-            await live();
-            const current = await context();
-            await live();
-            if (
-              current.revision !== revision ||
-              current.accountId !== first.accountId ||
-              current.route !== first.route ||
-              current.modelId !== first.modelId
-            )
-              throw unavailable();
-            return current;
+          const check = async (phase: StartupPhase = "context_check") => {
+            startup.phase = phase;
+            try {
+              await live();
+              const current = await context();
+              await live();
+              startup.sameRevision = current.revision === revision;
+              startup.sameAccount = current.accountId === first.accountId;
+              startup.sameRoute = current.route === first.route;
+              startup.sameModel = current.modelId === first.modelId;
+              const expiry = Date.parse(current.expiresAt);
+              startup.expiryValid = Number.isFinite(expiry);
+              startup.expiryFuture = startup.expiryValid && expiry > Date.now();
+              if (
+                current.revision !== revision ||
+                current.accountId !== first.accountId ||
+                current.route !== first.route ||
+                current.modelId !== first.modelId
+              )
+                throw unavailable();
+              return current;
+            } catch (error) {
+              reportStartupFailure(error);
+              throw error;
+            }
           };
           return { first, revision, check };
         })() : undefined;
@@ -458,6 +534,7 @@ export async function createHostedBotRunner(host: {
           return created;
         });
         const readyBroker = await brokerStarting;
+        startup.brokerReady = true;
         await live();
         const githubCli = options.github ? (process.env.PATH ?? '').split(delimiter).map(dir => join(dir, 'gh')).find(file => existsSync(file)) : undefined;
         if (options.github && !githubCli) throw new Error('Install GitHub CLI (gh) in the cloud worker image');
@@ -563,6 +640,7 @@ export async function createHostedBotRunner(host: {
           };
         };
         try {
+          startup.phase = "adapter_start";
           // The adapter sees a placeholder in the key's place; the broker adds the key.
           const placeholderCredential: RunCredential | undefined = apiKey && kind === "codex"
             ? { kind: "provider", protocol: "openai", baseUrl: apiKey.kind === "provider" ? apiKey.baseUrl : "https://api.openai.com/v1", key: placeholder }
@@ -585,18 +663,13 @@ export async function createHostedBotRunner(host: {
                   spawnCli: codexSpawn,
                   onHostedSession: record,
                   computerMcp,
-                  subscriptionAuth: {
-                    accountId: subscription!.first.accountId,
+                  hostedSubscriptionBroker: {
                     verify: async () => {
-                      await check();
-                    },
-                    token: async () => {
-                      const current = await subscription!.check();
-                      return {
-                        accessToken: placeholder,
-                        chatgptAccountId: current.accountId,
-                        chatgptPlanType: current.plan,
-                      };
+                      startup.verifyRequested = true;
+                      startup.verifyCheckPassed = false;
+                      await subscription!.check("verify");
+                      startup.verifyCheckPassed = true;
+                      startup.phase = "adapter_start";
                     },
                   },
                 })
@@ -612,10 +685,18 @@ export async function createHostedBotRunner(host: {
                     brokered: true,
                     accountId: subscription!.first.accountId,
                     verify: async () => {
-                      await check();
+                      startup.verifyRequested = true;
+                      startup.verifyCheckPassed = false;
+                      await subscription!.check("verify");
+                      startup.verifyCheckPassed = true;
+                      startup.phase = "adapter_start";
                     },
                     token: async () => {
-                      const current = await subscription!.check();
+                      startup.tokenRequested = true;
+                      startup.tokenCheckPassed = false;
+                      const current = await subscription!.check("token");
+                      startup.tokenCheckPassed = true;
+                      startup.phase = "adapter_start";
                       return {
                         accessToken: placeholder,
                         accountId: current.accountId,
@@ -628,6 +709,7 @@ export async function createHostedBotRunner(host: {
           const session = previous
             ? await adapter.resume(previous.sessionId, runtimeOptions)
             : await adapter.start(runtimeOptions);
+          started = true;
           // A quick, successful adapter may already have ended and revoked its
           // gate here. Preserve its terminal events; sends/spawns/provider work
           // remain fenced by close, and do not install a new monitor after it.
@@ -670,6 +752,7 @@ export async function createHostedBotRunner(host: {
             },
           };
         } catch (error) {
+          reportStartupFailure(error);
           // Keep why the CLI did not start: a cleanup failure must not replace it.
           const reason = startFailure(error);
           try {
@@ -682,6 +765,7 @@ export async function createHostedBotRunner(host: {
           throw unavailable(reason);
         }
       } catch (error) {
+        reportStartupFailure(error);
         await close();
         throw error;
       }

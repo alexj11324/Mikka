@@ -8,8 +8,13 @@ import test, { mock } from 'node:test'
 import type { Pool as PgPool } from 'pg'
 import { normalizeRepository } from '@mikka/protocol/repository'
 import { dbUrl, seedBot, seedIssue, seedUser, seedWorkspace } from './support/workspace-admin-db'
-import { recordPushGrant } from './support/github-app-stub'
+import { connectGitHub, githubAppStub, recordPushGrant } from './support/github-app-stub'
 import { fakeThreadMachines } from './support/thread-machine-fake'
+
+mock.module('next-intl/server',{namedExports:{getLocale:async()=> 'en',getTranslations:async()=> (key:string)=> key}})
+mock.module('next/headers',{namedExports:{cookies:async()=>({get:()=>undefined}),headers:async()=>new Headers()}})
+let httpOwner: string | null = null
+mock.module(new URL('../lib/api-auth.ts',import.meta.url).href,{namedExports:{auth:{api:{getSession:async()=>httpOwner?{user:{id:httpOwner,email:`${httpOwner}@example.test`,name:"Fixture owner"}}:null}}}})
 
 const harnesses = [{ harness: 'codex', installed: true, subscriptionBroker: true, computerBroker: true }]
 
@@ -17,10 +22,15 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
   delete process.env.MIKKA_CLOUD_COMPUTER_TASKS
   process.env.MIKKA_BYOS_ENABLED = '1'
   // Every cloud thread runs on its own thread machine; its lifecycle workflow is not started here.
-  mock.module('workflow/api', { namedExports: { start: async () => ({ runId: 'synthetic-workflow' }) } })
+  let lifecycleStarts = 0
+  const stageHandoffs: [{userId:string;workspaceId:string},string|null,string][] = []
+  mock.module('workflow/api', { namedExports: { start: async (workflow: {name:string}, args: unknown[]) => { lifecycleStarts++; if (workflow.name === 'factoryCloudStageHandoff') stageHandoffs.push(args as typeof stageHandoffs[number]); return { runId: 'synthetic-workflow' } } } })
   const { Pool } = await import('pg')
   const pool = new Pool({ connectionString: dbUrl, max: 3 })
   const threadMachines = await fakeThreadMachines(pool, [{ harness: 'codex', installed: true, subscriptionBroker: true, toolApproval: true }])
+  // The person's live authorized repository list, as GitHub would answer their own token.
+  const github = githubAppStub()
+  let githubAccount = 9_500_000
   const steps = await import('../workflows/coordinator/steps')
   const { botRuntimeProvisioner } = await import('../lib/computer/auto-runtime')
   const { ensureBotRuntime } = await import('../lib/computer/bot-runtime')
@@ -41,11 +51,13 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     await ensureBotRuntime(appDb, actor, botId, sandbox as never, deviceId)
   }
   t.after(async () => {
+    github.restore()
     botRuntimeProvisioner.provision = realProvision
     threadMachines.restore()
     delete process.env.MIKKA_CLOUD_COMPUTER_TASKS
     await pool.query('DELETE FROM model_order_entries WHERE "ownerId" = ANY($1)', [users])
     await pool.query('DELETE FROM model_order_settings WHERE "ownerId" = ANY($1)', [users])
+    await pool.query('DELETE FROM factory_tasks WHERE "userId" = ANY($1)', [users])
     await pool.query('DELETE FROM coordinator_events WHERE "userId" = ANY($1)', [users])
     await pool.query('DELETE FROM coordinator_bots WHERE "ownerId" = ANY($1)', [users])
     await pool.query('DELETE FROM computer_run_bindings WHERE "ownerId" = ANY($1)', [users])
@@ -66,10 +78,12 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
 
   const order = await import('../lib/model-order')
   // A new workspace: the person's own E2B key and a connected Codex subscription whose account lists gpt-5,
-  // 允许使用的模型 left as filled by default (that model) and 运行位置 云端; no cloud runtime.
+  // 优先使用的模型 left as filled by default (that model) and 运行位置 云端; no cloud runtime.
   const person = async (label: string, e2bKey = true) => {
     const id = await seedUser(pool, label)
     users.push(id)
+    // Connected in 插件 › GitHub, with the App on octo/repo: dispatch checks the live list.
+    await connectGitHub(github, id, String(++githubAccount), ['octo/repo'])
     // Push is what the GitHub App grants (lib/github/push-grant.ts); record that grant as a live check would.
     await recordPushGrant(pool, id, normalizeRepository('octo/repo').key)
     const ws = await seedWorkspace(pool, id, [{ userId: id, role: 'admin' }])
@@ -80,6 +94,7 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     const botId = await seedBot(pool, ws.id, id)
     const connection = randomUUID()
     await pool.query(`INSERT INTO byos_connections (id,"ownerId","workspaceId",provider,state,epoch,"secretName","secretDigest","providerSubject","modelCatalog") VALUES ($1,$2,$3,'codex','connected',1,$5,$4,'synthetic-subject',$6)`, [connection, id, ws.id, 'a'.repeat(64), `synthetic-${connection}`, JSON.stringify({ revision: '1', models: ['gpt-5'] })])
+    await pool.query('UPDATE byos_connections SET quota=$2::jsonb WHERE id=$1', [connection, JSON.stringify({ vendor: 'codex', source: 'official', status: 'ok', plan: null, observedAt: new Date().toISOString(), windows: [{ kind: 'five_hour', used: .2, resetsAt: new Date(Date.now() + 3_600_000).toISOString() }] })])
     await pool.query(`INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId") VALUES ($1,$2,$3,'catalogue',$4,1,'codex_cpa','gpt-5')`, [randomUUID(), id, ws.id, connection])
     await pool.query(`INSERT INTO workspace_subscription_shares ("ownerId","workspaceId") VALUES ($1,$2)`, [id, ws.id])
     if (e2bKey) await pool.query(`INSERT INTO workspace_e2b_keys ("workspaceId",ciphertext,iv,"keyVersion",last4,"createdBy","updatedBy") VALUES ($1,'x','x',1,'abcd',$2,$2)`, [ws.id, id])
@@ -118,6 +133,48 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     assert.equal(await count('SELECT count(*)::int AS n FROM cloud_machines WHERE "ownerId"=$1', [a.id]), 1)
   })
 
+  for (const [index, mode] of ['writable', 'readOnly', 'mcp'].entries()) await t.test(`the ${mode} cloud thread composer starts its next task machine and lifecycle on the same repository and model`, async () => {
+    const a = await person(`cloud-composer-${mode}`)
+    const issueId = await anotherTask(a.id, 34 + index)
+    const first = await steps.dispatchRun(a.id, { issueId, repo: 'octo/repo', ...(mode === 'readOnly' ? { readOnly: true } : {}), requestKey: `dispatch:${randomUUID()}` }, undefined, a.botId) as unknown as { runId: string }
+    if (mode === 'mcp') {
+      await pool.query('UPDATE agent_runs SET "botId"=NULL,source=\'mcp\' WHERE id=$1', [first.runId])
+      await pool.query('UPDATE coordinator_events SET "botId"=NULL WHERE id IN (SELECT t."sourceEventId" FROM factory_tasks t JOIN factory_attempts a ON a."taskId"=t.id WHERE a."runId"=$1)', [first.runId])
+      await pool.query('UPDATE factory_tasks SET "botId"=NULL WHERE id IN (SELECT "taskId" FROM factory_attempts WHERE "runId"=$1)', [first.runId])
+    }
+    const original = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [first.runId])).rows[0]
+    const runtime = (await pool.query('SELECT * FROM bot_cloud_runtimes WHERE "botId"=$1', [a.botId])).rows[0]
+    assert.notEqual(original.deviceRepoId, runtime.repoId, 'a task runs on its own machine, not the Bot computer')
+    await pool.query(`UPDATE agent_runs SET status='succeeded',"finishedAt"=now() WHERE id=$1`, [first.runId])
+    const before = lifecycleStarts
+    const { sendThreadMessage } = await import('../lib/thread-continue')
+    const next = await sendThreadMessage(a.id, first.runId, 'Continue with the missing edge case.')
+    assert.equal(next.continued, true)
+    const run = (await pool.query(`SELECT r.*,repo."remoteUrl",m.state AS machine FROM agent_runs r
+      JOIN device_repos repo ON repo.id=r."deviceRepoId" JOIN thread_machines m ON m."runId"=r.id WHERE r.id=$1`, [next.runId])).rows[0]
+    assert.deepEqual([run.status, run.continuesRunId, run.botId, run.remoteUrl, run.machine], ['queued', first.runId, mode === 'mcp' ? null : a.botId, 'https://github.com/octo/repo.git', 'running'])
+    assert.deepEqual(run.agentDefinition.subscription, original.agentDefinition.subscription)
+    assert.equal(run.agentDefinition.model, original.agentDefinition.model)
+    assert.equal(run.agentDefinition.readOnly, original.agentDefinition.readOnly)
+    assert.match(run.prompt, /Continue with the missing edge case/)
+    assert.equal(lifecycleStarts, before + 1)
+  })
+
+  await t.test('the public computer API continues a repository thread on its original repository and starts its task machine', async () => {
+    const a = await person('public-composer');
+    const issueId = await anotherTask(a.id,39);
+    const first = await steps.dispatchRun(a.id,{issueId,repo:'octo/repo',readOnly:true,requestKey:`dispatch:${randomUUID()}`},undefined,a.botId) as unknown as {runId:string};
+    await pool.query(`UPDATE agent_runs SET status='succeeded',"finishedAt"=now() WHERE id=$1`,[first.runId]);
+    const {POST} = await import('../app/api/bots/[botId]/computer/runs/route');
+    httpOwner = a.id;
+    try {
+      const response = await POST(new Request(`https://mikka.example/mikka/api/bots/${a.botId}/computer/runs`,{method:'POST',headers:{origin:'https://mikka.example','content-type':'application/json'},body:JSON.stringify({issueId,harness:'codex',note:'Check the next edge case.'})}),{params:Promise.resolve({botId:a.botId})});
+      const result = await response.json();assert.equal(response.status,202,JSON.stringify(result));
+      const {rows:[run]} = await pool.query(`SELECT r."continuesRunId",r."agentDefinition",repo."remoteUrl",m.state FROM agent_runs r JOIN device_repos repo ON repo.id=r."deviceRepoId" JOIN thread_machines m ON m."runId"=r.id WHERE r.id=$1`,[result.runId]);
+      assert.equal(run.continuesRunId,first.runId);assert.equal(run.remoteUrl,'https://github.com/octo/repo.git');assert.equal(run.agentDefinition.readOnly,true);assert.equal(run.state,'running');
+    } finally { httpOwner=null; }
+  });
+
   await t.test('an existing sleeping or disconnected worker is woken before dispatch', async () => {
     const a = await person('sleeping-runtime')
     await dispatch(a.id, a.issueId, a.botId)
@@ -146,25 +203,17 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     assert.equal(await count('SELECT count(*)::int AS n FROM agent_runs WHERE "issueId"=$1', [a.issueId]), 1)
   })
 
-  await t.test('a cloud run pushes on the GitHub App grant like a local run; without it, or read-only, it cannot push', async () => {
+  await t.test('a cloud run gets its task branch like a local run, with no grant; a read-only run gets none', async () => {
     const g = await person('cloud-grant')
-    const granted = await dispatch(g.id, g.issueId, g.botId) as unknown as { runId: string; status: string }
-    assert.equal(granted.status, 'queued', JSON.stringify(granted))
-    const admitted = (await pool.query(`SELECT r."agentDefinition",p.branch,p."pushApproved" FROM agent_runs r JOIN devices d ON d.id=r."deviceId" AND d.kind='cloud'
-      LEFT JOIN run_publications p ON p."runId"=r.id WHERE r.id=$1`, [granted.runId])).rows[0]
-    assert.equal(admitted.agentDefinition.repositoryAdmission.authority, 'github_app')
+    // No push grant is recorded or read (decision 2026-11-02-1600).
+    await pool.query('DELETE FROM github_repository_installations WHERE "userId"=$1', [g.id])
+    const queued = await dispatch(g.id, g.issueId, g.botId) as unknown as { runId: string; status: string }
+    assert.equal(queued.status, 'queued', JSON.stringify(queued))
+    const admitted = (await pool.query(`SELECT r."agentDefinition",p.branch FROM agent_runs r JOIN devices d ON d.id=r."deviceId" AND d.kind='cloud'
+      LEFT JOIN run_publications p ON p."runId"=r.id WHERE r.id=$1`, [queued.runId])).rows[0]
+    assert.equal(admitted.agentDefinition.repositoryAdmission.authority, 'owner_credential')
     assert.equal(admitted.agentDefinition.repositoryAdmission.targetBranch, admitted.branch)
-    assert.equal(admitted.pushApproved, true)
-    await pool.query('UPDATE agent_runs SET status=\'succeeded\',"finishedAt"=now() WHERE id=$1', [granted.runId])
-
-    await pool.query('UPDATE github_repository_installations SET "pushGrantedAt"=null WHERE "userId"=$1', [g.id])
-    // Each case on its own task of the same person: dispatching the same task again continues its thread (lib/thread-dispatch.ts).
-    const ungranted = await dispatch(g.id, await anotherTask(g.id, 8), g.botId) as unknown as { runId: string; status: string }
-    assert.equal(ungranted.status, 'queued', 'a cloud run without the grant still runs; it just cannot push')
-    const plain = (await pool.query('SELECT r."agentDefinition",(SELECT count(*)::int FROM run_publications p WHERE p."runId"=r.id) AS publications FROM agent_runs r WHERE r.id=$1', [ungranted.runId])).rows[0]
-    assert.equal(plain.agentDefinition.repositoryAdmission, undefined)
-    assert.equal(plain.publications, 0)
-    await pool.query('UPDATE agent_runs SET status=\'succeeded\',"finishedAt"=now() WHERE id=$1', [ungranted.runId])
+    await pool.query('UPDATE agent_runs SET status=\'succeeded\',"finishedAt"=now() WHERE id=$1', [queued.runId])
 
     const readOnly = await steps.dispatchRun(g.id, { issueId: await anotherTask(g.id, 9), repo: 'octo/repo', readOnly: true, requestKey: `dispatch:${randomUUID()}` }, undefined, g.botId) as unknown as { runId: string; status: string }
     assert.equal(readOnly.status, 'queued')
@@ -182,7 +231,7 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     // Its own task numbers: another person's task 7 on octo/repo already holds that publication branch.
     const work = await anotherTask(r.id, 31)
     const writable = await dispatch(r.id, work, r.botId) as unknown as Continued
-    assert.equal((await definitionOf(writable.runId)).agentDefinition.repositoryAdmission?.authority, 'github_app', 'the thread starts writable')
+    assert.equal((await definitionOf(writable.runId)).agentDefinition.repositoryAdmission?.authority, 'owner_credential', 'the thread starts writable')
     await pool.query('UPDATE agent_runs SET status=\'failed\',"finishedAt"=now() WHERE id=$1', [writable.runId])
     const look = await steps.dispatchRun(r.id, { issueId: work, repo: 'octo/repo', readOnly: true, requestKey: `dispatch:${randomUUID()}` }, undefined, r.botId) as unknown as Continued
     assert.deepEqual([look.thread, look.threadId], ['continued', writable.runId])
@@ -205,18 +254,50 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     assert.deepEqual([(await definitionOf(next.runId)).agentDefinition.readOnly, (await definitionOf(next.runId)).agentDefinition.repositoryAdmission], [true, undefined])
   })
 
-  await t.test('no E2B key of their own: no cloud runtime; the card says so, and 本地 runs on the person\'s own computer', async () => {
+  await t.test('a cloud thread that stopped to ask continues on its own model and subscription; with none it says so and queues nothing', async () => {
+    // Production (Acme): the first run ran on its subscription's model, the continuations were frozen with model null
+    // and the hosted runner refused each one (subscription_hosted_runtime_unavailable).
+    const m = await person('cloud-thread-model')
+    type Result = { runId?: string; thread?: string; threadId?: string; error?: string; threadRunId?: string }
+    const frozen = async (runId: string) => (await pool.query('SELECT "agentDefinition" FROM agent_runs WHERE id=$1', [runId])).rows[0].agentDefinition
+    const work = await anotherTask(m.id, 41)
+    const first = await dispatch(m.id, work, m.botId) as unknown as Result
+    const firstDefinition = await frozen(first.runId!)
+    assert.equal(firstDefinition.model, 'gpt-5')
+    // The thread stops to ask the person; the Coordinator continues it.
+    await pool.query('UPDATE agent_runs SET status=\'completed\',"finishedAt"=now() WHERE id=$1', [first.runId])
+    const next = await steps.dispatchRun(m.id, { issueId: work, note: 'The person answered: use the mobile layout.', requestKey: `dispatch:${randomUUID()}` }, undefined, m.botId) as unknown as Result
+    assert.deepEqual([next.thread, next.threadId], ['continued', first.runId], JSON.stringify(next))
+    const nextDefinition = await frozen(next.runId!)
+    assert.equal(nextDefinition.model, 'gpt-5', 'the continuation keeps the thread\'s model')
+    assert.equal(nextDefinition.cliModelSelection, 'explicit')
+    assert.equal(nextDefinition.subscription.bindingId, firstDefinition.subscription.bindingId, 'and its subscription')
+    assert.equal(nextDefinition.subscription.modelId, nextDefinition.model, 'the hosted runner starts it: its model is the subscription context\'s')
+
+    // A thread whose runs were all frozen without a model (before the fix): told, not filled in, nothing queued.
+    await pool.query('UPDATE agent_runs SET status=\'completed\',"finishedAt"=now(),"agentDefinition"="agentDefinition"-\'model\' WHERE "issueId"=$1 AND "userId"=$2', [work, m.id])
+    const runs = async () => Number((await pool.query('SELECT count(*) FROM agent_runs WHERE "userId"=$1', [m.id])).rows[0].count)
+    const before = await runs()
+    const refused = await steps.dispatchRun(m.id, { issueId: work, note: 'Continue.', requestKey: `dispatch:${randomUUID()}` }, undefined, m.botId) as unknown as Result
+    assert.equal(refused.error, 'threadModelUnavailable', JSON.stringify(refused))
+    assert.equal(refused.threadRunId, next.runId)
+    assert.equal(await runs(), before, 'no run is queued with another model')
+    // The person names the model again: the thread continues on it.
+    const named = await steps.dispatchRun(m.id, { issueId: work, note: 'Continue.', model: { harness: 'codex', model: 'gpt-5' }, requestKey: `dispatch:${randomUUID()}` }, undefined, m.botId) as unknown as Result
+    assert.equal(named.thread, 'continued', JSON.stringify(named))
+    assert.equal((await frozen(named.runId!)).model, 'gpt-5')
+  })
+  await t.test('no E2B key of their own: no cloud runtime; with no computer the card offers one or a key, and 云端 then runs on the person\'s own server', async () => {
     const n = await person('no-key', false)
     const before = provisioned
     const result = await dispatch(n.id, n.issueId, n.botId) as unknown as { error: string; reason: string; card: { title: string; options: { action: string }[] } }
     assert.equal(result.error, 'machineUnavailable')
-    assert.deepEqual([result.reason, result.card.title, result.card.options.map(option => option.action)], ['cloudNotConfigured', '没有能跑这个任务的模型', ['e2bKey', 'modelSettings']])
+    assert.deepEqual([result.reason, result.card.title, result.card.options.map(option => option.action)], ['noDevice', '没有能跑这个任务的模型', ['connectServer', 'e2bKey', 'modelSettings']])
     assert.equal(provisioned, before, 'no cloud computer is woken without a key')
     assert.equal(await count('SELECT count(*)::int AS n FROM bot_cloud_runtimes WHERE "botId"=$1', [n.botId]), 0)
-    // 运行位置 本地 and their own server online (参与调度 on), its Codex reporting gpt-5: it takes the run.
-    await order.changeOrder(pool, { ownerId: n.id, workspaceId: n.workspaceId }, { kind: 'location', location: 'local' })
+    // 运行位置 云端 (the default) with no key, and their own server online (参与调度 on), its Codex reporting gpt-5: it takes the run.
     const server = randomUUID()
-    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,"deviceType",enabled,"lastSeenAt",harnesses) VALUES ($1,$2,'Server','local','server',true,now(),$3)`, [server, n.id, JSON.stringify([{ harness: 'codex', installed: true, modelSlots: [{ slot: 'gpt-5', model: 'gpt-5', name: 'gpt-5' }] }])])
+    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,"deviceType",enabled,"lastSeenAt",harnesses) VALUES ($1,$2,'Server','local','server',true,now(),$3)`, [server, n.id, JSON.stringify([{ harness: 'codex', installed: true, subscriptionBroker: true, modelSlots: [{ slot: 'gpt-5', model: 'gpt-5', name: 'gpt-5' }] }])])
     await pool.query(`INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,'codex',$4)`, [randomUUID(), n.id, server, `codex-${server.slice(0, 8)}`])
     const queued = await dispatch(n.id, n.issueId, n.botId) as unknown as { runId: string; status: string }
     assert.equal(queued.status, 'queued')
@@ -267,11 +348,24 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
       const before = provisioned
       const result = await dispatch(b.id, b.issueId, b.botId) as unknown as { error: string; reason: string; card: { title: string } }
       assert.equal(result.error, 'machineUnavailable')
-      assert.deepEqual([result.reason, result.card.title], ['cloudNotConfigured', '没有能跑这个任务的模型'])
+      assert.deepEqual([result.reason, result.card.title], ['cloudTemporarilyUnavailable', '没有能跑这个任务的模型'])
       assert.equal(provisioned, before)
       assert.equal(await count('SELECT count(*)::int AS n FROM bot_cloud_runtimes WHERE "botId"=$1', [b.botId]), 0)
       assert.equal(await count('SELECT count(*)::int AS n FROM agent_runs WHERE "userId"=$1', [b.id]), 0)
     } finally { delete process.env.MIKKA_CLOUD_COMPUTER_TASKS }
+  })
+
+  await t.test('a cloud startup refusal with an existing E2B key does not say the key is missing', async () => {
+    const a = await person('cloud-start-refused')
+    const provision = botRuntimeProvisioner.provision
+    botRuntimeProvisioner.provision = async () => { throw new Error('synthetic capacity refusal') }
+    try {
+      const result = await dispatch(a.id, a.issueId, a.botId) as unknown as { error: string; reason: string; card: { description: string; options: { action: string }[] } }
+      assert.equal(result.reason, 'cloudTemporarilyUnavailable')
+      assert.equal(result.card.description, '云端暂时无法启动')
+      assert.deepEqual(result.card.options.map(option => option.action), ['modelSettings'], 'do not ask to fill a key that is already present')
+      assert.equal(await count('SELECT count(*)::int AS n FROM agent_runs WHERE "userId"=$1', [a.id]), 0, 'a failed startup leaves no queued run')
+    } finally { botRuntimeProvisioner.provision = provision }
   })
 
   // The 电脑 policy governs computer use only: a repository task (octo/repo has a remote) runs on a task machine without a desktop.
@@ -286,4 +380,87 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     assert.equal(run.kind, 'cloud')
     assert.ok(run.remoteUrl, 'the queued run is a repository task')
   })
+  await t.test('a no-repository desktop deliverable gets independent checks and human acceptance without GitHub', async () => {
+    const personState = await person('factory-desktop')
+    await dispatch(personState.id, personState.issueId, personState.botId)
+    const issueId = await seedIssue(pool, personState.id)
+    const result = await steps.dispatchComputerThread(personState.id, { botId: personState.botId, issueId, harness: 'codex' }, `desktop:${randomUUID()}`) as { runId?: string; error?: string }
+    assert.ok(result.runId, JSON.stringify(result))
+    const { factoryRuntimeForBot } = await import('../lib/factory/runtime')
+    const { factoryCheckAssignment } = await import('../lib/factory/checks')
+    const { factoryBinding } = await import('../lib/factory/dispatch')
+    const runtime = factoryRuntimeForBot(personState.botId)
+    const sha = 'b'.repeat(40)
+    const { isCurrentFactoryDeliverable } = await import('../lib/factory/execution-kind')
+    assert.equal(await isCurrentFactoryDeliverable(pool, personState.id, result.runId!),true)
+    assert.equal(await isCurrentFactoryDeliverable(pool, 'another-owner', result.runId!),false)
+    const complete = async (runId: string, check = false) => {
+      const assignment = check ? await factoryCheckAssignment(pool as never, personState.id, runId) : null
+      if (assignment) { assert.equal(assignment.factoryCheck.reportOnly, true); assert.equal(assignment.baseBranch, sha, 'the checker inspects the actual delivery snapshot, not the original source commit') }
+      await pool.query(`UPDATE agent_runs SET status='running',"sessionId"=$2,"startedAt"=clock_timestamp()-interval '1 second' WHERE id=$1`, [runId, `desktop-${runId}`])
+      const { persistRunCompletion } = await import('../lib/run-publications')
+      await persistRunCompletion(personState.id, runId, { stopReason:'submitted', report: {
+        sourceCommit: assignment ? assignment.baseBranch : 'a'.repeat(40), ...(!check ? { deliverableCommit: sha } : {}), summary: 'Inspected the desktop delivery and its evidence.', filesChanged: [], verify: { status: 'not_run' }, openQuestions: [], nextStep: null,
+        criteria: [{ text: 'Requested desktop result exists', passed: true, evidence: 'Inspected the persisted delivery report.' }],
+        ...(assignment ? { check: { sha: assignment.baseBranch, readOnly: true } } : {}),
+      } })
+      assert.equal((await pool.query('SELECT status FROM agent_runs WHERE id=$1',[runId])).rows[0].status,'succeeded','the real server completion path agrees with the daemon for a no-build delivery')
+      await runtime.reconcile.run(personState.id, runId)
+    }
+    const current = async () => (await pool.query(`SELECT t.*,a."runId",c.kind AS "candidateKind",c.sha FROM factory_tasks t JOIN factory_attempts a ON a.id=t."attemptId" LEFT JOIN factory_candidates c ON c.id=t."candidateId" WHERE t."issueId"=$1 AND t."userId"=$2 ORDER BY t."createdAt" DESC LIMIT 1`, [issueId, personState.id])).rows[0]
+    const { withDeviceDatabaseAuthority, withDeviceUnitFence } = await import('../lib/db/device-scope')
+    const { factoryAutomaticRuntime } = await import('../lib/factory/automatic-dispatch')
+    const { handoffFactoryCloudStage } = await import('../lib/factory/cloud-stage-handoff')
+    const completeFromDevice = async (sourceRunId: string, check: boolean, unit: boolean) => {
+      const sourceToken = (await pool.query(`SELECT token.id FROM device_tokens token JOIN agent_runs r ON r."deviceId"=token."boundDeviceId" WHERE r.id=$1 AND token."revokedAt" IS NULL`, [sourceRunId])).rows[0]
+      assert.ok(sourceToken)
+      const realEnqueue = factoryAutomaticRuntime.enqueue, beforeHandoffs = stageHandoffs.length
+      factoryAutomaticRuntime.enqueue = threadMachines.enqueueDurable
+      try {
+        const fence = unit ? withDeviceUnitFence : withDeviceDatabaseAuthority
+        await fence({ tokenId:sourceToken.id, userId:personState.id }, () => complete(sourceRunId,check))
+      } finally { factoryAutomaticRuntime.enqueue = realEnqueue }
+      assert.equal((await pool.query('SELECT "revokedAt" FROM device_tokens WHERE id=$1',[sourceToken.id])).rows[0].revokedAt,null,'the device request only queues host work; it does not revoke itself')
+      assert.equal(stageHandoffs.length,beforeHandoffs+1,'production enqueue registers durable host work rather than calling provider I/O in the device request')
+      const [actor,previous,runId] = stageHandoffs.at(-1)!
+      assert.equal(await handoffFactoryCloudStage(appPool,{...actor,userId:'foreign-owner'},previous,runId),false)
+      assert.equal(await handoffFactoryCloudStage(appPool,actor,randomUUID(),runId),false,'a mismatched completed source cannot authorize the handoff')
+      assert.equal(await handoffFactoryCloudStage(appPool,actor,previous,runId),true,'the separate host step starts the independent checker after revoking the source worker')
+      assert.ok((await pool.query('SELECT "revokedAt" FROM device_tokens WHERE id=$1',[sourceToken.id])).rows[0].revokedAt)
+    }
+    await completeFromDevice(result.runId!, false, false)
+    const review = await current()
+    const reviewDevice = (await pool.query('SELECT "deviceId" FROM agent_runs WHERE id=$1',[review.runId])).rows[0].deviceId
+    assert.equal(reviewDevice,(await pool.query('SELECT "deviceId" FROM thread_machines WHERE "runId"=$1',[review.runId])).rows[0].deviceId)
+
+    assert.equal(review.stage, 'review', JSON.stringify(review))
+    assert.equal(review.status, 'running')
+    assert.equal(review.candidateKind, 'deliverable')
+    assert.equal(review.sha, null, 'no invented Git commit')
+    await completeFromDevice(review.runId, true, true)
+    const verify = await current()
+    assert.equal(verify.stage, 'verify', JSON.stringify(verify))
+    await complete(verify.runId, true)
+    const pending = await current()
+    assert.deepEqual([pending.stage, pending.status], ['approval', 'pending'])
+    const sessionId = randomUUID()
+    await pool.query(`INSERT INTO "session" (id,token,"userId","expiresAt","createdAt","updatedAt") VALUES ($1,$2,$3,now()+interval '1 hour',now(),now())`, [sessionId, randomUUID(), personState.id])
+    const { createFactoryMerges } = await import('../lib/factory/merge')
+    const noGitHub = async () => { throw new Error('A deliverable must not call GitHub') }
+    const { createFactoryHumanStore } = await import('../lib/factory/human-store')
+    const { handleFactory, handleFactoryList } = await import('../lib/factory/http')
+    const humanStore = createFactoryHumanStore(pool, id => factoryRuntimeForBot(id).store)
+    const discovered = await handleFactoryList(humanStore, { userId: personState.id, issueId })
+    assert.equal(discovered.status, 200)
+    assert.ok((discovered.body as {tasks:{id:string}[]}).tasks.some(task => task.id === pending.id))
+    const request = { userId: personState.id, method:'GET', taskId:pending.id, origin:null, url:`http://localhost/api/factory/tasks/${pending.id}` }
+    assert.equal((await handleFactory(humanStore, request)).status, 200)
+    assert.equal((await handleFactory(humanStore, {...request,userId:'another-owner'})).status, 404)
+    assert.equal((await handleFactory(factoryRuntimeForBot(null).store, request)).status, 404, 'runtime scope stays fixed; only human APIs resolve the persisted Bot')
+    const merges = createFactoryMerges(pool, async () => true, humanStore, { pullRequest: noGitHub, mergeMethods: noGitHub, merge: noGitHub })
+    const accepted = await merges.accept({ userId: personState.id, sessionId }, { binding: factoryBinding(pending), eventId: randomUUID() }, null)
+    assert.equal(accepted.status, 'accepted')
+    assert.deepEqual([(await current()).stage, (await current()).status], ['approval', 'passed'])
+  })
+
 })

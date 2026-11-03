@@ -31,6 +31,7 @@
 import { quotaStopApplies } from "./quota-exhausted"
 import { runApps } from '../agents/run-apps'
 import { fixedCheckSnapshot } from "./check"
+import { retainDeliverable } from '../agents/publish'
 import { verifySkillAssignment, verifySkillResume, verifyMountedSkill } from '../agents/skill-artifact'
 import type { SkillReceiptRevalidation } from '@mikka/protocol/skill'
 import { runPaths } from "../agents/run-context"
@@ -802,12 +803,14 @@ export class RunSupervisor {
     // agent must not be able to make a run read as a planning one (ADR ORV-205).
     const entry = this.deps.journal.get(runId)
     const planning = entry?.assignment.kind === "plan"
+    const readOnlyTask = entry && (isReadOnlyTask(entry.assignment) || entry.assignment.factoryCheck?.reportOnly === true || entry.assignment.factoryExecuteKind === 'deliverable')
     // Never copy trusted evidence from an adapter/model report.
-    const { sourceCommit: _source, skillMount: _mount, execution: _execution, runtime: _runtime, ...content } = report
+    const { sourceCommit: _source, deliverableCommit: _delivery, skillMount: _mount, execution: _execution, runtime: _runtime, ...content } = report
     report = {
       ...content,
       ...(entry?.baseCommit && /^[a-f0-9]{40}$/.test(entry.baseCommit)
         ? { sourceCommit: entry.baseCommit } : {}),
+      ...(entry?.assignment.factoryExecuteKind === 'deliverable' && entry.deliverableCommit ? { deliverableCommit: entry.deliverableCommit } : {}),
       ...(entry?.skillMount && entry.skillMount.sessionId === entry.sessionId &&
         entry.skillMount.receiptId === entry.assignment.skillReceipt?.id &&
         entry.skillMount.versionId === entry.assignment.skillReceipt?.artifact.versionId &&
@@ -833,10 +836,10 @@ export class RunSupervisor {
     let state = runStateForStop(stopReason)
     if (stopReason === "submitted" && report.verify.status !== "passed") {
       const failed = report.verify.status === "failed"
-      if (!planning) state = failed ? "failed" : report.publish?.pushed === true ? "succeeded" : "stopped"
+      if (!planning && !readOnlyTask) state = failed ? "failed" : report.publish?.pushed === true ? "succeeded" : "stopped"
       // A `plan` run writes no code, so a verify that did not run says
       // nothing about it.
-      if (!failed && !planning)
+      if (!failed && !planning && !readOnlyTask)
         error ??= "Submitted, but no verify command ran; the work is unverified"
     }
     if (
@@ -951,16 +954,25 @@ export class RunSupervisor {
       ...pickAgentReport(agent),
     }
     const filesChanged = (
-      await this.deps.worktrees.changedFiles(worktree).catch(() => [])
+      await this.deps.worktrees.changedFiles(worktree, this.deps.journal.get(runId)?.baseCommit).catch(() => [])
     ).slice(0, MAX_REPORTED_FILES)
-    const command = assignment.verifyCommand
+    const inferred = assignment.factoryCheck?.stage === 'verify' && assignment.factoryCheck.inferCommand && !assignment.factoryCheck.reportOnly ? report.verificationCommand : undefined
+    const command = assignment.verifyCommand ?? inferred?.command
+    if (stopReason === 'submitted' && assignment.factoryExecuteKind === 'deliverable') {
+      const deliverableCommit = await retainDeliverable(repo.path, worktree, runId)
+      this.deps.journal.update(runId, { deliverableCommit })
+    }
     // A `plan` run writes no code: there is nothing for the issue's verify
     // command to check (ADR ORV-205).
-    if (stopReason !== "submitted" || assignment.kind === "plan")
+    if (stopReason !== "submitted" || assignment.kind === "plan" || isReadOnlyTask(assignment) || assignment.factoryExecuteKind === 'deliverable')
       return {
         report: { ...report, filesChanged, verify: { status: "not_run" } },
       }
     if (!command) {
+      if (fixedCandidateCheck(assignment)) {
+        const fixed = await fixedCheckSnapshot(repo.path, worktree, assignment.baseBranch)
+        report = { ...report, check: { sha: fixed.sha, readOnly: true } }
+      }
       // No command was approved for this repository. Snapshot the submitted
       // tree for an explicitly approved push, while retaining not_run.
       const tree = await this.deps.publisher?.snapshot({ worktree, repo })
@@ -1029,7 +1041,7 @@ export class RunSupervisor {
       report: {
         ...report,
         filesChanged,
-        verify: { status: "passed", command, output, ...execution },
+        verify: { status: "passed", command, output, ...(inferred ? { inferredFrom: inferred.basis } : {}), ...execution },
       },
       tree: before,
     }
@@ -1294,13 +1306,16 @@ export class RunSupervisor {
       try { checkMailbox() } catch (error) { toolApproval.revoke(); throw error }
     }
     const options = {
-      github: assignment.github && assignment.mcp && (assignment.kind === 'implement' || assignment.kind === 'fix') && !runPolicy(assignment.policy).readOnly
+      // The owner's own GitHub credential reaches every run that was sent one (decision 2026-11-02-1600).
+      github: assignment.github && assignment.mcp
         ? { ...assignment.github, runToken: assignment.mcp.token, issueId: assignment.issueId } : undefined,
       apps: runApps(assignment.mcp),
       toolApproval,
       runId,
       requireSessionResume: assignment.requireSessionResume,
       kind: assignment.kind,
+      factoryCheck: assignment.factoryCheck,
+      verifyCommand: assignment.verifyCommand,
       cwd: worktree,
       env: buildChildEnv({
         adapterAllow: adapter.envAllow,
@@ -1617,6 +1632,8 @@ function abortPromise(signal: AbortSignal): Promise<typeof ABORTED> {
 function pickAgentReport(agent: AgentReport | undefined): AgentReport {
   if (!agent) return {}
   const picked: AgentReport = {}
+  if (agent.verificationCommand && typeof agent.verificationCommand.command === 'string' && agent.verificationCommand.command.trim() && typeof agent.verificationCommand.basis === 'string' && agent.verificationCommand.basis.trim())
+    picked.verificationCommand = { command: agent.verificationCommand.command.trim().slice(0, 2000), basis: agent.verificationCommand.basis.trim().slice(0, 2000) }
   if (typeof agent.summary === "string")
     picked.summary = agent.summary.slice(0, 10_000)
   if (
@@ -1648,18 +1665,20 @@ function pickAgentReport(agent: AgentReport | undefined): AgentReport {
     for (const entry of agent.criteria) {
       if (criteria.length >= MAX_REPORTED_CRITERIA) break
       if (!entry || typeof entry !== "object") continue
-      const { criterionId, passed, evidence, command, exitCode } = entry as {
+      const { criterionId, text, passed, evidence, command, exitCode } = entry as {
         criterionId?: unknown
+        text?: unknown
         passed?: unknown
         evidence?: unknown
         command?: unknown
         exitCode?: unknown
       }
-      if (typeof criterionId !== "string" || !UUID_RE.test(criterionId))
+      if (!(typeof criterionId === 'string' && UUID_RE.test(criterionId)) && !(typeof text === 'string' && text.trim()))
         continue
       if (typeof passed !== "boolean") continue
       criteria.push({
-        criterionId,
+        ...(typeof criterionId === 'string' && UUID_RE.test(criterionId) ? { criterionId } : {}),
+        ...(typeof text === 'string' && text.trim() ? { text: text.trim().slice(0, 2000) } : {}),
         passed,
         ...(typeof command === "string" && command.trim() ? { command: command.trim().slice(0, 2_000), ...(exitCode === null || (typeof exitCode === "number" && Number.isSafeInteger(exitCode)) ? { exitCode } : {}) } : {}),
         ...(typeof evidence === "string"
@@ -1731,6 +1750,13 @@ function verifyFailure(
 
 export function baseReport(summary = ""): HandoffReport {
   return emptyRunReport(summary.slice(0, 10_000))
+}
+
+/** Ordinary read-only work delivers a report without a repository build. */
+function isReadOnlyTask(assignment: RunAssignment): boolean {
+  // Investigations hand in a report. Acceptance checks and benchmarks still
+  // run their host-owned verification against the fixed candidate.
+  return runPolicy(assignment.policy).readOnly === true && assignment.kind !== "acceptance" && !assignment.benchmark
 }
 
 /** Existing acceptance runs remain compatible; Factory checks are exact-SHA read-only runs. */

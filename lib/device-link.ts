@@ -1,12 +1,13 @@
 import 'server-only'
 import { createHash, randomBytes } from 'node:crypto'
 import { setTimeout as delay } from 'node:timers/promises'
-import { and, asc, eq, inArray, isNull } from 'drizzle-orm'
+import { and, asc, eq, getTableColumns, inArray, isNull } from 'drizzle-orm'
 import { db, pool } from '@/lib/db'
 import { cloudDeviceScopeAllows } from '@/lib/device-token-scope'
 import { z } from 'zod'
 import { agentRuns, deviceTokens, devices, runMessages } from '@/lib/db/schema'
 import type { RunCommand } from '@mikka/protocol/device'
+import type { DeviceCommandKind } from '@/lib/device-management'
 import { deviceRequestCaller } from '@/lib/device-request-context'
 import { ackMailboxNotices, pendingMailboxNotices } from '@/lib/device-mailbox-notices'
 
@@ -97,8 +98,34 @@ export async function authenticateDevice(request: Request): Promise<DeviceCaller
   return { userId: row.userId, tokenId: row.id, ...(row.boundDeviceId && row.boundWorkspaceId ? { scopeDeviceId: row.boundDeviceId, scopeWorkspaceId: row.boundWorkspaceId } : {}), ...(removingDeviceId ? { removingDeviceId } : {}) }
 }
 
-/** A removed device (a tombstone kept for run history) is no longer owned. */
+/** Whether the caller owns this (not removed) device, reading only what a daemon poll needs. */
+export async function ownsDevice(deviceId: string, userId: string): Promise<{ id: string; enabled: boolean } | null> {
+  const [row] = await db
+    .select({ id: devices.id, enabled: devices.enabled })
+    .from(devices)
+    .where(and(eq(devices.id, deviceId), eq(devices.ownerId, userId), isNull(devices.removedAt)))
+    .limit(1)
+  return row ?? null
+}
+
+const { harnesses: _harnesses, computerUse: _computerUse, updateFailure: _updateFailure, ...deviceColumns } = getTableColumns(devices)
+
+/**
+ * A removed device (a tombstone kept for run history) is no longer owned.
+ * Almost every daemon request asks, so the large report columns (harnesses,
+ * computerUse, updateFailure) are left out; ownedDeviceWithReport reads them.
+ */
 export async function ownedDevice(deviceId: string, userId: string) {
+  const [row] = await db
+    .select(deviceColumns)
+    .from(devices)
+    .where(and(eq(devices.id, deviceId), eq(devices.ownerId, userId), isNull(devices.removedAt)))
+    .limit(1)
+  return row ?? null
+}
+
+/** ownedDevice with the daemon's whole report, for the routes that check its harnesses. */
+export async function ownedDeviceWithReport(deviceId: string, userId: string) {
   const [row] = await db
     .select()
     .from(devices)
@@ -140,18 +167,45 @@ export function waitSeconds(request: Request, max: number): number {
 }
 
 /**
- * The commands a device's runs have waiting: a person's message to a running
- * agent (repeats until acked) and a stop someone asked for (repeats until the
- * run ends). Runs in `skip` are left out so a long-poll can wait for new ones.
+ * Whether `deviceWork` could find anything: one statement, one round trip,
+ * with the credential check inside it (a revoked or expired credential
+ * throws, as any fenced query does). A long-poll asks this between full
+ * reads, which stay fenced and are the only path that hands over message
+ * text or queued runs. Mailbox notices are not modelled: with them on, a live
+ * run always counts as possible work and the full read decides.
+ * With `skipDeviceCommands` (a daemon that reads them from the poll), the same
+ * statement also returns the oldest pending device command outside that list:
+ * only its id and kind, which the heartbeat hands over too.
  */
-export async function pendingCommands(deviceId: string, skip: readonly string[], mailboxNotices = false): Promise<RunCommand[]> {
+export async function deviceMayHaveWork(deviceId: string, skip: readonly string[], options: { mailboxNotices?: boolean; queued?: boolean; skipDeviceCommands?: readonly string[] } = {}): Promise<{ work: boolean; deviceCommand: { id: string; kind: DeviceCommandKind } | null }> {
+  const uuid = (id: string) => z.uuid().safeParse(id).success
+  const { readUnderDeviceAuthority } = await import('@/lib/db')
+  const [work, deviceCommand] = await readUnderDeviceAuthority<[boolean, { id: string; kind: DeviceCommandKind } | null]>(`json_build_array(EXISTS (SELECT 1 FROM agent_runs r WHERE r."deviceId"=$1 AND r.status = ANY($2::text[]) AND NOT (r.id = ANY($3::uuid[]))
+    AND (r."stopRequestedAt" IS NOT NULL OR ($4 AND r.status='queued')
+      OR ($5 AND r.status IN ('preparing','running','waiting_input'))
+      OR EXISTS (SELECT 1 FROM run_messages m WHERE m."runId"=r.id AND m."deliveredAt" IS NULL))),
+    CASE WHEN $6 THEN (SELECT json_build_object('id', c.id, 'kind', c.kind) FROM device_management_commands c
+      WHERE c."deviceId"=$1 AND c."completedAt" IS NULL AND NOT (c.id = ANY($7::uuid[])) ORDER BY c."createdAt" LIMIT 1) END)`,
+  [deviceId, [...LIVE_RUN_STATUSES], skip.filter(uuid), Boolean(options.queued), Boolean(options.mailboxNotices), Boolean(options.skipDeviceCommands), (options.skipDeviceCommands ?? []).filter(uuid)])
+  return { work, deviceCommand }
+}
+
+/**
+ * What a device has waiting, read with one query of its runs per poll:
+ * - `commands`: a person's message to a running agent (repeats until acked)
+ *   and a stop someone asked for (repeats until the run ends);
+ * - `queuedRuns`: runs waiting for it to claim them (only with `queued`).
+ * Runs in `skip` are left out so a long-poll can wait for new ones.
+ */
+export async function deviceWork(deviceId: string, skip: readonly string[], options: { mailboxNotices?: boolean; queued?: boolean } = {}): Promise<{ commands: RunCommand[]; queuedRuns: string[] }> {
   const runs = await db
-    .select({ id: agentRuns.id, stopRequestedAt: agentRuns.stopRequestedAt })
+    .select({ id: agentRuns.id, status: agentRuns.status, stopRequestedAt: agentRuns.stopRequestedAt })
     .from(agentRuns)
     .where(and(eq(agentRuns.deviceId, deviceId), inArray(agentRuns.status, [...LIVE_RUN_STATUSES])))
   const skipped = new Set(skip)
   const live = runs.filter(run => !skipped.has(run.id))
-  if (live.length === 0) return []
+  const queuedRuns = options.queued ? live.filter(run => run.status === 'queued').map(run => run.id).slice(0, 100) : []
+  if (live.length === 0) return { commands: [], queuedRuns }
   const messages = await db
     .select({ id: runMessages.id, runId: runMessages.runId, text: runMessages.text })
     .from(runMessages)
@@ -161,19 +215,8 @@ export async function pendingCommands(deviceId: string, skip: readonly string[],
   // The runId filter above excludes mailbox messages, whose runId is null.
   const inputs: RunCommand[] = messages.flatMap(({ id, runId, text }) => runId ? [{ kind: 'input' as const, runId, messageId: id, text }] : [])
   const stops: RunCommand[] = live.filter(run => run.stopRequestedAt).map(run => ({ kind: 'stop', runId: run.id }))
-  const notices = mailboxNotices ? await pendingMailboxNotices(deviceId, live.filter(run => !run.stopRequestedAt).map(run => run.id)) : []
-  return [...stops, ...notices, ...inputs].slice(0, 500)
-}
-
-/** Runs waiting for this device to claim them, except those in `skip`. */
-export async function queuedRuns(deviceId: string, skip: readonly string[]): Promise<string[]> {
-  const rows = await db
-    .select({ id: agentRuns.id })
-    .from(agentRuns)
-    .where(and(eq(agentRuns.deviceId, deviceId), eq(agentRuns.status, 'queued')))
-    .limit(100 + skip.length)
-  const skipped = new Set(skip)
-  return rows.map(row => row.id).filter(id => !skipped.has(id)).slice(0, 100)
+  const notices = options.mailboxNotices ? await pendingMailboxNotices(deviceId, live.filter(run => !run.stopRequestedAt).map(run => run.id)) : []
+  return { commands: [...stops, ...notices, ...inputs].slice(0, 500), queuedRuns }
 }
 
 /** Marks messages the agent now holds; called by the daemon's ack. */

@@ -11,7 +11,11 @@ import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { userMessageEvent } from '@/lib/coordinator-events'
 import type { UserImageInput } from '@/lib/coordinator/user-attachments'
 import { personalSubmissionInput, personalSubmissionRecorded, recordPersonalSubmission, SubmissionConflictError } from '@/lib/coordinator-submission'
-import { botChats, chatView, retryFailedTurn, type BotChatSummary, type ChatView } from '@/lib/coordinator/store'
+import { botChats, chatVersion, chatView, citationSources, storedReasoning, retryFailedTurn, sendRetryOf, type BotChatSummary, type ChatView } from '@/lib/coordinator/store'
+import type { UnchangedChat } from '@/lib/coordinator/chat-poll'
+import type { CitationSource } from '@/lib/coordinator/citations'
+import { reasoningText } from '@/lib/coordinator/stream-response'
+import { credentialChatFingerprints } from '@/lib/credentials/chat-guard'
 import { and, eq, sql } from 'drizzle-orm'
 import { openChatBotId } from '@/lib/coordinator/coordinator-bot'
 import { bots, devices } from '@/lib/db/schema'
@@ -35,7 +39,7 @@ async function getUserId(): Promise<string> {
 }
 
 /** `botId` is the chat's bot row, the Coordinator's included. */
-export type CoordinatorChat = ChatView & { botId: string; enabled: boolean }
+export type CoordinatorChat = ChatView & { botId: string; enabled: boolean; version?: string }
 
 const botIdSchema = z.uuid().nullable()
 
@@ -67,6 +71,24 @@ export async function getCoordinatorChat(botId: string | null = null): Promise<C
   return { ...chat, botId: bot.id, enabled, working: enabled && chat.working }
 }
 
+const versionSchema = z.string().regex(/^[0-9a-f]{32}$/).optional()
+
+/**
+ * The chat for a poll that already shows version `known`: only its live state
+ * when nothing in the conversation changed, the whole chat otherwise.
+ */
+export async function pollCoordinatorChat(botId: string | null = null, known?: string): Promise<CoordinatorChat | UnchangedChat> {
+  const user = await getUser()
+  const bot = await ownBot(user, botId)
+  const enabled = coordinatorEnabled()
+  const parsed = versionSchema.safeParse(known)
+  const current = await chatVersion(user.id, 200, bot.id)
+  if (parsed.success && parsed.data === current.version) return { unchanged: true, ...current, botId: bot.id, enabled, working: enabled && current.working }
+  const chat = await chatView(user.id, 200, bot.id)
+  // The version read first: a message stored in between makes the next poll read again, never miss it.
+  return { ...chat, version: current.version, botId: bot.id, enabled, working: enabled && chat.working }
+}
+
 const quoteSchema = z.object({
   artifactId: z.uuid(), version: z.number().int().min(1), kind: z.enum(['text', 'element']),
   text: z.string().trim().min(1).max(QUOTE_TEXT_MAX), label: z.string().max(200).optional(), selector: z.string().max(1000).optional(),
@@ -79,13 +101,41 @@ const notesSchema = z.array(z.object({
   rect: z.object({ x: z.number(), y: z.number(), width: z.number().min(0), height: z.number().min(0), viewportWidth: z.number().min(0), viewportHeight: z.number().min(0) }).optional(),
 }).strict()).max(NOTES_MAX)
 
+const citedIdsSchema = z.array(z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/)).min(1).max(50)
+
+/**
+ * The issues and runs a reply still streaming cites, that this person can see: the chat's own sources come
+ * from stored replies only, so a task or thread the reply has just made would otherwise show as its marker.
+ */
+export async function coordinatorCitationSources(ids: readonly string[]): Promise<Record<string, CitationSource>> {
+  const parsed = citedIdsSchema.safeParse(ids)
+  if (!parsed.success) return {}
+  return citationSources(await getUserId(), [parsed.data.join(' ')])
+}
+
+const reasoningPositionsSchema = z.array(z.number().int().min(1).max(Number.MAX_SAFE_INTEGER)).min(1).max(50)
+
+/**
+ * What a stored reply thought, for the chat's 「思考了」 when the person opens it: the readable reasoning of the
+ * person's own messages at `positions` in this bot's chat, masked as the live stream masks it. Null when there is none.
+ */
+export async function coordinatorReasoning(botId: string | null, positions: readonly number[]): Promise<string | null> {
+  const parsed = reasoningPositionsSchema.safeParse(positions)
+  if (!parsed.success) return null
+  const user = await getUser()
+  const bot = await ownBot(user, botId)
+  const fingerprints = await credentialChatFingerprints(user.id)
+  const texts = (await storedReasoning(user.id, bot.id, parsed.data)).flatMap(text => reasoningText(user.id, text, fingerprints) ?? [])
+  return texts.length ? texts.join('\n\n') : null
+}
+
 /** Each bot's latest line and whether it is answering, for the bot list. */
 export async function botChatSummaries(): Promise<Record<string, BotChatSummary>> {
   return botChats(await getUserId())
 }
 
 /** Sends a message to the Coordinator or one of the person's bots, with a quote from an artifact and notes from the browser in front if given; the reply shows up in the chat. */
-export async function sendCoordinatorMessage(text: string, quote?: ArtifactQuote | null, botId: string | null = null, submissionId?: string, taskDestination?: TaskDestination, notes?: readonly BrowserNote[] | null, images?: readonly UserImageInput[]): Promise<ActionResult<{ queued: true }>> {
+export async function sendCoordinatorMessage(text: string, quote?: ArtifactQuote | null, botId: string | null = null, submissionId?: string, taskDestination?: TaskDestination, notes?: readonly BrowserNote[] | null, images?: readonly UserImageInput[], retryOf?: number): Promise<ActionResult<{ queued: true }>> {
   return runAction(async () => {
     const requestHeaders=await headers()
     const session=await auth.api.getSession({headers:requestHeaders})
@@ -117,7 +167,15 @@ export async function sendCoordinatorMessage(text: string, quote?: ArtifactQuote
         .where(and(eq(devices.id, destination.data.deviceId), eq(devices.ownerId, userId), eq(devices.kind, 'local'), eq(devices.enabled, true))).limit(1)
       if (!device) throw new ActionFailureError('deviceNotFound')
     }
-    try { await recordPersonalSubmission(db, userId, withQuote(withNotes, quoted?.data), { botId: bot.id, submissionId: parsed.data.submissionId, images: parsed.data.images, taskDestination: destination.data, ...(humanSessionId ? { humanSessionId } : {}) }) }
+    // 重新发送 on a failed message (retryOf: its position) retries it in place: that message is marked and the
+    // new attempt stands for it (store.sendRetryOf). A position that does not qualify is ignored.
+    const retried = z.number().int().positive().optional().safeParse(retryOf)
+    const record = (executor: Parameters<typeof recordPersonalSubmission>[0]) => recordPersonalSubmission(executor, userId, withQuote(withNotes, quoted?.data), { botId: bot.id, submissionId: parsed.data.submissionId, images: parsed.data.images, taskDestination: destination.data, ...(humanSessionId ? { humanSessionId } : {}) })
+    try {
+      // Already retried (a double click, two sends at once): nothing more is sent.
+      if (retried.success && retried.data !== undefined) { if (await sendRetryOf(userId, bot.id, retried.data, record) === null) return { queued: true as const } }
+      else await record(db)
+    }
     catch (error) {
       if (error instanceof SubmissionConflictError) throw new ActionFailureError('submissionConflict')
       throw error
@@ -158,15 +216,19 @@ export async function stopCoordinatorTurn(botId: string | null = null): Promise<
 }
 
 /** 重试 on a failed reply: the same turn again, once per click; the chat shows its normal working state. */
-export async function retryCoordinatorTurn(botId: string | null = null): Promise<ActionResult<{ queued: boolean }>> {
+export async function retryCoordinatorTurn(botId: string | null = null): Promise<ActionResult<{ queued: true } | { queued: false; reason: 'unavailable' | 'working' | 'nothingToRetry' }>> {
   return runAction(async () => {
     const session = await auth.api.getSession({ headers: await headers() })
     if (!session?.user) throw new ActionFailureError('authRequired')
     const bot = await ownBot(session.user, botId)
-    if (!coordinatorEnabled()) return { queued: false }
+    if (!coordinatorEnabled()) return { queued: false as const, reason: 'unavailable' as const }
     const queued = await retryFailedTurn(session.user.id, bot.id)
-    if (queued) after(() => wakeCoordinator(session.user.id))
-    return { queued }
+    if (queued) {
+      after(() => wakeCoordinator(session.user.id))
+      return { queued: true as const }
+    }
+    const current = await chatView(session.user.id, 1, bot.id)
+    return { queued: false as const, reason: current.working ? 'working' as const : 'nothingToRetry' as const }
   })
 }
 

@@ -1,3 +1,4 @@
+import { overrideDeploymentSwitch } from '../deployment-switches'
 // Combined #331/#374 candidate only. Not executed during preservation hold.
 import assert from 'node:assert/strict'
 import { before, mock, test } from 'node:test'
@@ -16,6 +17,7 @@ const events:Event[] = [], callbacks:Array<() => unknown> = []
 const conversation:{summary:string|null;memory:string;messages:StoredMessage[]} = {summary:null,memory:'',messages:[]}
 let userId:string|null='authenticated-owner'
 const unavailable = () => { throw Error('External effects unavailable in ingress fixture') }
+overrideDeploymentSwitch('factoryRouting',false)
 const stub = (path:string,namedExports:Record<string,unknown>) => mock.module(new URL(path,import.meta.url).href,{namedExports})
 stub('../abuse/resolve.ts',{resolveDefaultHostedModel:async(_scope:unknown,model:string)=>model})
 stub('../auth.ts',{auth:{api:{getSession:async()=>userId?{user:{id:userId}}:null}}})

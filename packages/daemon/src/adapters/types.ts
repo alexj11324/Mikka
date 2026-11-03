@@ -44,7 +44,7 @@ export interface ExitEvent {
 export type AgentReport = Partial<
   Pick<
     HandoffReport,
-    "summary" | "openQuestions" | "nextStep" | "blockedOn" | "plan" | "criteria" | "question" | "previewDatabaseBranch"
+    "summary" | "openQuestions" | "nextStep" | "blockedOn" | "plan" | "criteria" | "question" | "previewDatabaseBranch" | "verificationCommand"
   >
 >
 
@@ -65,7 +65,8 @@ export interface SessionOptions {
   /** API key or custom provider for this run (agents/run-credential.ts), never written to disk. */
   credential?: RunCredential
   /** Trusted server-issued delivery binding, never model-selected. */
-  github?: { endpoint: string; repository: string; branch: string; runToken: string; issueId: string }
+  /** The run owner's own GitHub credential for git and gh; `branch` is the task branch a delivering run pushes. */
+  github?: { endpoint: string; repository: string; branch?: string; runToken: string; issueId: string }
   /** Trusted server-issued app entries (one MCP server each), never model-selected. */
   apps?: RunApps
   /** Fixed container paths supplied by the hosted runner, never by the assignment. */
@@ -82,6 +83,8 @@ export interface SessionOptions {
    * is told to write a spec instead of code (ADR ORV-205).
    */
   kind?: RunKind
+  factoryCheck?: import('@mikka/protocol').RunAssignment['factoryCheck']
+  verifyCommand?: string
   /** The run's worktree; the CLI child runs here. */
   cwd: string
   /** Clean env from `buildChildEnv`; spawn with `extendEnv: false`. */

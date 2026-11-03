@@ -14,6 +14,8 @@ export type CoordinatorMessageContext = {
   botId?: string | null
   taskDestination?: TaskDestination
   notes?: readonly BrowserNote[] | null
+  /** 重新发送 on a failed message: its position, so the server retries it in place. */
+  retryOf?: number
 }
 
 // The account the next request's cookie belongs to, read fresh from the server
@@ -33,7 +35,7 @@ export function useCoordinatorSubmit() {
   const submit = useCallback((text: string, context?: CoordinatorMessageContext) => {
     submitter.current ??= createCoordinatorSubmitter({ currentOwner, transport: async submission => {
       const details = submission.context as CoordinatorMessageContext | undefined
-      const result = await sendCoordinatorMessage(submission.text, details?.quote, details?.botId ?? null, submission.submissionId, details?.taskDestination, details?.notes)
+      const result = await sendCoordinatorMessage(submission.text, details?.quote, details?.botId ?? null, submission.submissionId, details?.taskDestination, details?.notes, undefined, details?.retryOf)
       return readActionOutcome(result)
     } })
     return submitter.current.submit(text, undefined, context)

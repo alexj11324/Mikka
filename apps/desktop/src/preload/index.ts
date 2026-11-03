@@ -36,6 +36,12 @@ if (appOrigin && window.location.origin === appOrigin) {
       zeroUrl: '',
       openExternal: (url: unknown) => ipcRenderer.invoke(IPC.appOpenExternal, url),
       prepareAuth: (state: unknown) => ipcRenderer.invoke(IPC.appPrepareAuth, state),
+      prepareReturn: (state: unknown) => ipcRenderer.invoke(IPC.appPrepareReturn, state),
+      onReturn: (listener: (event: { state: string; result: 'connected' | 'failed' | 'cancelled' }) => void) => {
+        const handler = (_event: IpcRendererEvent, returned: { state: string; result: 'connected' | 'failed' | 'cancelled' }) => listener(returned)
+        ipcRenderer.on(IPC.appReturned, handler)
+        return () => { ipcRenderer.removeListener(IPC.appReturned, handler) }
+      },
       claudeCallback: (authorizationUrl: unknown) => ipcRenderer.invoke(IPC.appClaudeCallback, authorizationUrl),
       updateReady: () => ipcRenderer.invoke(IPC.appUpdateReady),
       onUpdateReady: (listener: (version: string) => void) => {
@@ -44,6 +50,7 @@ if (appOrigin && window.location.origin === appOrigin) {
         return () => { ipcRenderer.removeListener(IPC.appUpdateReady, handler) }
       },
       installUpdate: () => ipcRenderer.invoke(IPC.appInstallUpdate),
+      requireUpdate: () => ipcRenderer.invoke(IPC.appRequireUpdate),
     },
     notifications: {
       show: (notification: unknown) => ipcRenderer.invoke(IPC.notificationsShow, notification),
@@ -62,6 +69,9 @@ if (appOrigin && window.location.origin === appOrigin) {
       cancel: (id: unknown) => ipcRenderer.invoke(IPC.sshCancel, id),
       accept: (id: unknown) => ipcRenderer.invoke(IPC.sshAccept, id),
       state: () => ipcRenderer.invoke(IPC.sshState),
+      local: () => ipcRenderer.invoke(IPC.sshLocal),
+      restartLocal: () => ipcRenderer.invoke(IPC.sshRestartLocal),
+      autoLocal: (action: unknown) => ipcRenderer.invoke(IPC.sshAutoLocal, action),
     },
     device: {
       status: () => ipcRenderer.invoke(IPC.deviceStatus),

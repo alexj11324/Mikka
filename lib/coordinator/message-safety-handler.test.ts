@@ -66,6 +66,7 @@ const transport = {
 }
 const database = { ...transport, async transaction<T>(fn: (tx: typeof transport) => Promise<T>) { return fn(transport) } }
 const stub = (path: string, exports: Record<string, unknown>) => mock.module(new URL(path, import.meta.url).href, { namedExports: exports })
+stub('../factory/queue-local.ts',{queueTaskRun:()=>{throw Error('Dispatch is outside this regression')}})
 stub('../db/index.ts', { db: database, pool: {
   connect: () => { throw Error('No database pool in handler regression') },
   query: async (sql: string) => {

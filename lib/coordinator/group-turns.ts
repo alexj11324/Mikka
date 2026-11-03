@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+
 import { hostedBillingScope } from '@/lib/abuse/context'
 import type { Pool, PoolClient } from 'pg'
 import { checkedCorrection, GroupJudgmentPendingError, type CorrectionInput, type CorrectionJudgment } from './group-correction'
@@ -24,6 +25,24 @@ export const GROUP_TURN_STOPPED = 'stopped'
 /** How often a generation checks whether the turn was stopped. */
 const STOP_POLL_MS = 1000
 
+/** Finite diagnostics only: provider errors may contain private prompts, URLs and credentials. */
+export function groupGenerationFailure(error: unknown) {
+  let invalidOutput = false
+  const seen = new Set<unknown>()
+  for (let current = error, depth = 0; current && typeof current === 'object' && depth < 8 && !seen.has(current); depth++) {
+    seen.add(current)
+    const value = current as { name?: string; statusCode?: number; cause?: unknown }
+    if (value.name === 'TimeoutError') return 'generation_timeout'
+    if (value.name === 'AbortError') return 'generation_aborted'
+    if (value.statusCode === 401 || value.statusCode === 403) return 'generation_authentication'
+    if (value.statusCode === 429) return 'generation_rate_limited'
+    if (typeof value.statusCode === 'number' && value.statusCode >= 500 && value.statusCode <= 599) return 'generation_upstream'
+    invalidOutput ||= ['AI_NoOutputGeneratedError', 'AI_NoObjectGeneratedError', 'AI_TypeValidationError'].includes(value.name ?? '')
+    current = value.cause
+  }
+  return invalidOutput ? 'generation_invalid_output' : 'generation_failed_not_replayed'
+}
+
 /** 停止: ends the group's running and queued turns. The worker sees it, aborts the reply in flight and posts nothing more. */
 export async function stopGroupTurns(client: Pick<PoolClient, 'query'>, conversationId: string): Promise<number> {
   const { rows } = await client.query<{ activeRunId: string | null }>(`UPDATE group_turns SET status='failed',error=$2,"agentId"=NULL,"botId"=NULL,"updatedAt"=now()
@@ -31,6 +50,19 @@ export async function stopGroupTurns(client: Pick<PoolClient, 'query'>, conversa
   const runs = rows.flatMap(row => row.activeRunId ? [row.activeRunId] : [])
   if (runs.length) await client.query(`UPDATE agent_runs SET status='stopped',"finishedAt"=now(),"leaseExpiresAt"=NULL,"updatedAt"=now() WHERE id=ANY($1::uuid[]) AND kind='group_chat' AND status='running'`, [runs])
   return rows.length
+}
+
+/** Groups with a turn still to run (queued, or running with no live worker): the minute cron resumes them. */
+export async function groupsWithPendingTurns(client: Pick<PoolClient, 'query'>, limit = 20): Promise<string[]> {
+  const { rows } = await client.query<{ conversationId: string }>(`SELECT "conversationId" FROM group_turns WHERE status IN ('queued','running')
+    GROUP BY "conversationId" ORDER BY min("createdAt") LIMIT $1`, [limit])
+  return rows.map(row => row.conversationId)
+}
+
+/** Whether a group has a turn to run, so a history read starts the worker only then. */
+export async function hasPendingGroupTurn(client: Pick<PoolClient, 'query'>, conversationId: string): Promise<boolean> {
+  const { rows } = await client.query<{ pending: boolean }>(`SELECT EXISTS (SELECT 1 FROM group_turns WHERE "conversationId"=$1 AND status IN ('queued','running')) AS pending`, [conversationId])
+  return Boolean(rows[0]?.pending)
 }
 
 export async function enqueueGroupTurn(client: PoolClient, conversationId: string, messageId: string, userId: string) {
@@ -194,7 +226,9 @@ export async function processGroupTurn(pool: Pool, conversationId: string, runti
     if (!messageId) throw error
     // Stopped: the abort it caused is the stop, not a failure.
     if ((await client.query(`SELECT error FROM group_turns WHERE "messageId"=$1`, [messageId])).rows[0]?.error === GROUP_TURN_STOPPED) return true
-    await client.query(`UPDATE group_turns SET status='failed',"agentId"=NULL,"botId"=NULL,error=$2,"updatedAt"=now() WHERE "messageId"=$1 AND status='running'`, [messageId, error instanceof GroupJudgmentPendingError ? 'group_judgment_pending' : error instanceof UnknownMentionError ? 'unknown_mention' : 'generation_failed_not_replayed'])
+    const reason = error instanceof GroupJudgmentPendingError ? 'group_judgment_pending' : error instanceof UnknownMentionError ? 'unknown_mention' : groupGenerationFailure(error)
+    await client.query(`UPDATE group_turns SET status='failed',"agentId"=NULL,"botId"=NULL,error=$2,"updatedAt"=now() WHERE "messageId"=$1 AND status='running'`, [messageId, reason])
+    console.error(JSON.stringify({ event: 'group_generation_failed', reason, conversationId, messageId }))
     throw error
   } finally {
     try { if (locked) await client.query(`SELECT pg_advisory_unlock(hashtextextended(current_database() || '.' || current_schema() || '.group-turn.' || $1,0))`, [conversationId]) }

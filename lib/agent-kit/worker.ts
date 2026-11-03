@@ -25,7 +25,7 @@ export interface WorkerDefinitionSnapshot {
   mailbox?: WorkerMailboxGrant
   /** Server-owned authority accepted with this local task, preserved by retries. */
   repositoryAdmission?: RepositoryAdmission
-  /** A run that changes nothing (investigation, review): read-only policy, no commit, push or PR, so no push approval. */
+  /** A run that changes nothing (investigation, review): read-only worktree and no task branch. */
   readOnly?: true
 }
 
@@ -35,10 +35,12 @@ export function freezeWorkerDefinition(input: { harness: Harness; instructions: 
   if (input.subscription && input.apiKey) throw new Error('agentWorkerCredentialConflict')
   if (input.apiKey && input.harness !== 'codex' && input.harness !== 'claude_code') throw new Error('agentWorkerApiKeyMismatch')
   const apiKey = input.apiKey ? { keyId: z.uuid().parse(input.apiKey.keyId), model: z.string().trim().min(1).max(128).parse(input.apiKey.model) } : undefined
-  // An API-key run asks its key's model of the Agent.
-  const model = apiKey?.model ?? input.model
   const subscription = input.subscription ? { bindingId:z.uuid().parse(input.subscription.id),modelId:z.string().regex(/^[A-Za-z0-9._:-]{1,128}$/).parse(input.subscription.modelId),route:input.subscription.route } : undefined
   if (subscription && subscription.route !== (input.harness === 'codex' ? 'codex_cli' : input.harness === 'claude_code' ? 'claude_code_cli' : null)) throw new Error('agentWorkerSubscriptionMismatch')
+  if (subscription && input.model && input.model !== subscription.modelId) throw new Error('agentWorkerSubscriptionMismatch')
+  // Explicit dispatches already carry the provider model from their exact
+  // binding. A subscription alone preserves the existing CLI auto selection.
+  const model = apiKey?.model ?? input.model
   const tools = input.mailboxEnabled ? snapshotMailboxTools(input.parent) : []
   const mailbox = tools.length && input.mailboxScope && ['claude_code', 'codex'].includes(input.harness)
     ? { version: 2 as const, tools, scope: workerMailboxScope.parse(input.mailboxScope) } : undefined

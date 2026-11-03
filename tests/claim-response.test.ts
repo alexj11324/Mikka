@@ -10,6 +10,7 @@ import { POLICY_SNAPSHOT_HEADER } from '@mikka/protocol/policy-snapshot'
 import { policyDistributionContext } from '../lib/agent-tool-approval/policy-distribution'
 import { verifyPolicySnapshot } from '@mikka/protocol/node-policy-snapshot'
 import { POST } from '../app/v1/devices/[deviceId]/runs/[runId]/claim/route'
+import { overrideDeploymentSwitch } from '../lib/deployment-switches'
 
 function fixture() {
   const repository = normalizeRepository('https://github.com/synthetic/claim-fixture.git')
@@ -95,6 +96,33 @@ test('ordinary retries retain the normal claim path after question lineage valid
   assert.equal(response.status,200)
   assert.equal(probe.run.status,'preparing')
   assert.equal((await response.json()).continuesRunId,'ordinary-parent')
+})
+
+test('every github.com run of a connected owner gets the owner credential endpoint, read-only and plan runs included', async () => {
+  overrideDeploymentSwitch('personalMailbox', false)
+  try { for (const variant of ['implement', 'plan', 'readOnly'] as const) {
+    const probe = fixture()
+    if (variant === 'plan') probe.run.kind = 'plan'
+    if (variant === 'readOnly') Object.assign(probe.run, { agentDefinition: { readOnly: true } })
+    probe.cliPolicy.policy.permissions.git_push = 'deny' as never
+    const response = await claim(probe, variant === 'readOnly' ? ['skill-preflight','policy','claim','skill-claim','benchmark-claim','token','settings'] : undefined)
+    assert.equal(response.status, 200, variant)
+    const body = await response.json()
+    assert.ok(body.mcp, JSON.stringify(Object.keys(body)))
+    assert.equal(body.github?.endpoint, body.mcp.url.replace(/\/api\/mcp\/?$/, '/api/runs/github-token'), variant)
+    assert.equal(body.github?.repository, 'synthetic/claim-fixture', variant)
+    assert.equal(Object.hasOwn(body.github, 'token'), false, 'the credential itself never travels in the claim')
+    assert.equal(body.github?.branch, variant === 'implement' ? 'synthetic-claim-branch' : undefined, variant)
+    assert.deepEqual((probe as unknown as { githubLookups: string[] }).githubLookups, ['member'], 'only the run owner\'s connection is looked up')
+  } } finally { overrideDeploymentSwitch('personalMailbox', undefined) }
+})
+
+test('an owner without a GitHub connection gets no credential endpoint', async () => {
+  const probe = fixture()
+  Object.assign(probe, { githubAccountId: null })
+  const response = await claim(probe)
+  assert.equal(response.status, 200)
+  assert.equal(Object.hasOwn(await response.json(), 'github'), false)
 })
 
 test('known unavailable or stale recovery blocks before leases, worker credentials or an old-client assignment', async () => {
@@ -297,7 +325,8 @@ test('platform cloud claims inject the configured secret assignment with BYO off
       const body=await response.json()
       assert.deepEqual(body.taskEnv,configured ? injection.env : undefined)
       assert.deepEqual(body.taskSecretNames,configured ? injection.secretNames : undefined)
-      assert.deepEqual((probe as typeof probe & {secretReads:unknown[][]}).secretReads,[['ws',probe.repo.remoteUrl]])
+      // The run owner's own secrets join the workspace's (decision 2026-11-02-2120): the claim passes run.userId.
+      assert.deepEqual((probe as typeof probe & {secretReads:unknown[][]}).secretReads.map(args=>[args[0],args[1],args[4]]),[['ws',probe.repo.remoteUrl,probe.run.userId]])
     }
     for(const denial of ['authentication','device-scope','workspace-scope'] as const) {
       const probe=fixture()

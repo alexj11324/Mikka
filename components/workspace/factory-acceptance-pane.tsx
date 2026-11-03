@@ -21,7 +21,7 @@ import { PullRequestIcon } from './pull-request-icon'
 import { ShortSha, shortSha } from './short-sha'
 import { FieldError } from '@/components/ui/field'
 
-type Candidate = { sha: string; repository: string; environment: string; scope: string }
+type Candidate = { sha: string | null; kind?: 'repository' | 'report' | 'deliverable'; repository: string; environment: string; scope: string }
 export type FactoryTask = { id: string; issueId: string; stage: string; status: string; reason: string; candidateId: string | null; candidateRunId: string | null; isSkillCandidate: boolean }
 type Evidence = { binding: { taskId: string; issueId: string; attemptId: string; revision: number; candidateId: string | null }; manifest: { candidate: Candidate; artifacts: EvidenceEntry[] } }
 type Approval = { id: string; candidateId: string; candidate: Candidate; action: string; target: string; targetEnvironment: string; expiresAt: string; revokedAt: string | null; createdAt: string }
@@ -295,10 +295,10 @@ export function FactoryAcceptancePane({ task, onOpenThread }: { task: FactoryTas
       {error && <FieldError className="text-xs">{t(ERROR_KEYS[error] ?? 'error')}</FieldError>}
     </div>
     {state !== 'unavailable' && <footer className="shrink-0 px-4 pb-4 sm:px-5">
-      <ApprovalBar state={state} isSkill={task.isSkillCandidate} busy={busy} canApprove={task.isSkillCandidate ? Boolean(evidence && environment) : Boolean(pullRequestUrl)}
+      <ApprovalBar state={state} isSkill={task.isSkillCandidate} isDeliverable={candidate?.kind === 'report' || candidate?.kind === 'deliverable'} busy={busy} canApprove={task.isSkillCandidate ? Boolean(evidence && environment) : Boolean(evidence && (pullRequestUrl || candidate?.kind === 'report' || candidate?.kind === 'deliverable'))}
         onAccept={task.isSkillCandidate ? undefined : () => { void accept() }} pullRequestUrl={pullRequestUrl ?? undefined} refusal={refusal ?? undefined} canPublish={Boolean(active && environmentOf(active.candidate) && active.target && active.targetEnvironment)}
         environment={envChip ?? undefined}
-        sha={candidate?.sha} superseded={superseded?.candidate?.sha}
+        sha={candidate?.sha ?? undefined} superseded={superseded?.candidate?.sha ?? undefined}
         reference={reference ? { href: reference, label: publication?.request?.targetEnvironment === 'production' ? t('production') : t('preview') } : undefined}
         onApprove={() => { void approve() }}
         onPublish={() => { const approval = active; if (!approval || !ledger) return; void run('publish', { binding: ledger.binding, eventId: crypto.randomUUID(), approvalId: approval.id, action: approval.action, target: approval.target, targetEnvironment: approval.targetEnvironment }) }}
@@ -309,6 +309,6 @@ export function FactoryAcceptancePane({ task, onOpenThread }: { task: FactoryTas
     <RejectNote flow={reject} onEdit={note => dispatchReject({ type: 'edit', note })} onSubmit={() => { void sendBack() }} onCancel={() => dispatchReject({ type: 'cancel' })} />
     {viewing && open && open.items[viewing.index] && <EvidenceViewer taskId={task.id} items={open.items} index={viewing.index} title={open.title} passed={open.passed}
       onIndex={index => setViewing({ group: viewing.group, index })} onClose={() => setViewing(null)}
-      readText={readText} sha={candidate?.sha} environment={envChip} />}
+      readText={readText} sha={candidate?.sha ?? undefined} environment={envChip} />}
   </div>
 }

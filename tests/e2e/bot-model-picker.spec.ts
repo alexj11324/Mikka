@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto'
 import type { Page } from '@playwright/test'
 import { Pool } from 'pg'
-import { test, expect, register } from './fixtures'
+import { test, expect, register, seedHostedVerification, useUpFreeMessages } from './fixtures'
+import { attachLightDark } from './settings-v4-shots'
 
 // The model chip in a chat's composer (decision 2026-10-31-2330), against the
 // real application, PostgreSQL and server actions. Only the connected
@@ -33,6 +34,8 @@ const choice = async (userId: string) => (await db().query<{ bindingId: string |
 
 test('Coordinator 输入框的模型选择器：只列可用的凭据，按 Bot 保存，账号断开后显示不可用', async ({ page }, testInfo) => {
   await register(page)
+  // Mikka 默认 is listed where the workspace has points (decision 2026-11-02-1450).
+  await seedHostedVerification(page, 500_000)
   const { userId, connections } = await seed(page)
   await page.reload()
   await page.getByRole('button', { name: 'Coordinator', exact: true }).first().click()
@@ -144,4 +147,44 @@ test('Coordinator 输入框的模型选择器：只列可用的凭据，按 Bot 
   await page.getByTestId('bot-model-chip').click()
   await expect(page.getByRole('menu')).toBeVisible()
   await testInfo.attach('model-menu-dark', { body: await page.screenshot(), contentType: 'image/png' })
+})
+
+test('新用户前 20 条免费：菜单显示剩余条数；用完后打开对话就提示绑定订阅或验证银行卡', async ({ page }, testInfo) => {
+  await register(page)
+  const chip = page.getByTestId('bot-model-chip')
+  await expect(chip).toBeVisible()
+  // A new sign-up, no card yet: Mikka 默认 answers its first 20 messages (Alex, 2026-11-02); the menu says how many are left.
+  const notice = page.locator('[data-hosted-unavailable]')
+  await expect(notice).toHaveCount(0)
+  await chip.click()
+  await expect(page.getByRole('menu').getByRole('menuitemradio', { name: /Mikka 默认/ })).toContainText('剩 20 条免费')
+  await attachLightDark(page, testInfo, 'hosted-menu-trial')
+  await page.keyboard.press('Escape')
+  // Used up: not listed, and the chat says so before anything is sent, with both ways on.
+  await useUpFreeMessages(page)
+  await page.reload()
+  await expect(notice).toContainText('Mikka 默认在这个工作区不可用')
+  await expect(notice.getByRole('link', { name: '验证银行卡', exact: true })).toBeVisible()
+  await expect(notice.getByRole('button', { name: '绑定订阅', exact: true })).toBeVisible()
+  await page.mouse.move(600, 300)
+  await attachLightDark(page, testInfo, 'hosted-unavailable-on-open')
+  await page.getByTestId('bot-model-chip').click()
+  await expect(page.getByRole('menu').getByRole('menuitemradio', { name: /Mikka 默认/ })).toHaveCount(0)
+  await page.keyboard.press('Escape')
+  // 绑定订阅 opens the Claude / ChatGPT sign-in here, not 设置.
+  const before = page.url()
+  await notice.getByRole('button', { name: '绑定订阅', exact: true }).click()
+  await expect(page.getByRole('dialog', { name: '绑定订阅' })).toBeVisible()
+  expect(page.url()).toBe(before)
+  await page.keyboard.press('Escape')
+  await notice.getByRole('button', { name: '换模型', exact: true }).click()
+  await expect(page.getByRole('menu')).toBeVisible()
+  await page.keyboard.press('Escape')
+  // Points here: listed, with this workspace's points, and the notice goes.
+  await seedHostedVerification(page, 500_000)
+  await page.reload()
+  await expect(notice).toHaveCount(0)
+  await page.getByTestId('bot-model-chip').click()
+  await expect(page.getByRole('menu').getByRole('menuitemradio', { name: /Mikka 默认/ })).toContainText('50 点')
+  await attachLightDark(page, testInfo, 'hosted-menu-points')
 })

@@ -46,6 +46,19 @@ Use a production build (`next build` then `next start`) only for production
 screenshots of a UI change. Run `next build`
 directly (`pnpm exec next build`): `pnpm build` also runs lint and migrations.
 
+Vercel builds on a Standard machine: 4 cores, 8 GB. `next build` peaks at
+"Collecting page data", while Turbopack's ~5 GB is still held in the
+`next-build` process. So production builds emit no source maps and stop
+esbuild once the workflow bundles are built (`next.config.mjs`). To check a
+change against the limit, run `next build` in an 8 GB cgroup and read
+`memory.max_usage_in_bytes`.
+
+Vercel keeps every `node_modules` and `.next/cache` between builds, up to
+1.5 GB on that machine; a bigger cache is dropped and the next build starts
+cold. The Expo app's packages (`react-native-skia` alone is ~840 MB) pushed it
+over, so `vercel.json` installs every workspace except `@mikka/mobile`, which
+the web build and typecheck do not use.
+
 ## 3. Environment
 
 One command sets up a container: `eval "$(scripts/dev/bootstrap-local.sh)"`
@@ -103,6 +116,13 @@ Decision: [`2026-11-01-1545-trunk-based`](design/decisions/2026-11-01-1545-trunk
    merging. A UI change merges only after its screenshots are reviewed.
 4. A documentation conflict is resolved by whoever merges: they edit the
    documents directly.
+5. A fix opens no PR ([`2026-11-03-0310`](design/decisions/2026-11-03-0310-fixes-push-to-main.md)):
+   once its local checks are green it is rebased onto `main` and pushed
+   there without force, and the coordinator reviews it on `main`. A fix to
+   credentials or auth is reported to the coordinator, with a diff summary
+   and test results, right after the push. Before any push, the change is
+   verified end to end locally or on a preview deployment with its own
+   database branch; production is never the test environment.
 
 Each of these modules has an owner. Anyone else who needs to change one asks
 its owner first.

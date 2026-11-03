@@ -1,4 +1,4 @@
-import { modelMessage, summaryMessage, type QuotaSwitchNotice, type SourcedMessage, type SummaryTrust } from './message-safety'
+import { modelMessage, summaryMessage, type SwitchNotice, type SourcedMessage, type SummaryTrust } from './message-safety'
 import { pruneMessages, type ModelMessage } from 'ai'
 import { HANDOFF_PREFIX, handoffPrompt, QUIET_REPLY, type HandoffPayload } from '@/lib/attention/handoff'
 import { COORDINATOR_WELCOME_MARK } from '@/lib/agent-welcome'
@@ -8,6 +8,8 @@ import { PUBLICATION_ERRORS, type PublicationErrorCode } from '@/lib/run-publica
 import { pullRequestSchema } from '@/lib/issue-metadata'
 import { splitBrowserNotes, type BrowserNote } from '@/lib/browser/note'
 import { splitSuggestion, type SuggestionCard } from '@/lib/suggestions/card'
+import { chatFailure, type ChatFailure } from '@/lib/chat-failure'
+import { eventLine, type EventLine } from './event-line'
 
 // What the Coordinator's model sees. Everything here depends only on the
 // stored conversation, never on time or on how long the person was away, so
@@ -124,7 +126,8 @@ export function eventPrompt(event: { kind: CoordinatorEventKind; issueId: string
         payload.summary ? `The agent's summary: ${payload.summary}` : null,
         ...publicationPrompt(payload.publication),
         payload.verification === 'not_run' ? 'Verification was not run: no verification command is configured. Never say the changes passed verification. Mention a draft PR only when the server-confirmed publication includes one.' : null,
-        payload.noMachine ? `Its machine went offline and no other machine can continue it. Draw this card as one BeQuestions choice question (title, description and options as given, each option keeps its value and action), add no explanation, and dispatch the issue again after the person answers: ${JSON.stringify(payload.noMachine)}` : null,
+        payload.daemonUpgradeRequired ? 'Mikka on its device is too old to run it. Tell the person that Mikka on that device needs an update, then dispatch the issue again. Nothing is wrong with their GitHub or other connections.' : null,
+        payload.noMachine ? `Its machine went offline and no other machine can continue it. Draw this card and dispatch the issue again after the person answers: ${JSON.stringify(payload.noMachine)}` : null,
         note,
       ].filter(Boolean).join('\n')
     case 'run_retried':
@@ -218,7 +221,7 @@ export function eventPrompt(event: { kind: CoordinatorEventKind; issueId: string
     case 'run_blocked':
       return [
         `[Event] The agent in run ${event.runId} is blocked: ${payload.reason}`,
-        'Tell the person what it needs. Pass their answer on with send_to_run, or stop_run if they say so.',
+        'Check the current run state and existing task facts first. Resolve it within existing authority when possible and pass that on with send_to_run; ask the person only for a concrete missing decision, information or policy ask, then pass their answer on with send_to_run, or stop_run if they say so.',
         note,
       ].filter(Boolean).join('\n')
     case 'matter_handoff':
@@ -240,7 +243,7 @@ function publicationPrompt(value: unknown): string[] {
 }
 
 /** Internal bookkeeping: attention decisions and execution-identity discovery stay out of the chat. */
-const HIDDEN_TOOLS = new Set(['record_attention', 'list_agents'])
+export const HIDDEN_TOOLS = new Set(['record_attention', 'list_agents'])
 
 /** Longest the memory may grow; past this the Coordinator must forget something first. */
 export const MEMORY_MAX_CHARS = 8000
@@ -267,6 +270,21 @@ export function instructionsWithMemory(instructions: string, memory: string): st
 }
 
 /**
+ * The system prompt with its cacheable prefix first: the rules and the GitHub lines (the authorized repository
+ * list), which stay the same from turn to turn, then the memory and what changes each turn. `stable` is where the
+ * prefix ends (lib/prompt-cache.ts), so a turn with the same rules and repositories reuses the cached prefix.
+ */
+/** The cached context after the rules: the GitHub lines, then the allowed models list; empty parts are left out. */
+export function cachedContextLines(...parts: string[]): string {
+  return parts.filter(Boolean).join('\n')
+}
+
+export function promptWithCachedContext(rules: string, github: string, memory: string, tail: string): { instructions: string; stable: number } {
+  const prefix = github ? `${rules}\n${github}` : rules
+  return { stable: prefix.length, instructions: instructionsWithMemory(prefix, memory) + tail }
+}
+
+/**
  * The system prompt with the person's own instructions (Settings, 个人指令)
  * after it, marked as theirs. They shape tone and habits only: the section
  * says they never override the rules above, and the text cannot close its tag early.
@@ -278,6 +296,43 @@ export function instructionsWithPersonal(instructions: string, personal: string)
 }
 
 /** One entry in the chat the person sees. */
+/** A tool a reply used, as the chat shows it: `running` until its result is stored. */
+export interface ChatTool { call: string; name: string; state: 'running' | 'done' | 'error'; input?: string; output?: string }
+/** `reasoningAt`: the stored rows whose reasoning is readable text, fetched only when the person opens it (chat-projection.ts keeps its length). */
+export interface ChatActivity { tools: ChatTool[]; thought: boolean; reasoningAt?: number[] }
+
+function withPreview<K extends 'input' | 'output'>(key: K, text: string | undefined): Partial<Record<K, string>> {
+  return text ? { [key]: text } as Record<K, string> : {}
+}
+
+/** A tool input or output as the chat's short preview: the compact projection's, or the start of the full value. */
+function toolPreview(compact: unknown, value: unknown): string | undefined {
+  if (typeof compact === 'string') return compact || undefined
+  if (value === undefined || value === null) return undefined
+  return (typeof value === 'string' ? value : jsonbText(value)).slice(0, 200) || undefined
+}
+
+const utf8 = new TextEncoder()
+/** jsonb's key order: shorter keys first (in UTF-8 bytes), then bytewise. */
+function jsonbKeyOrder(a: string, b: string): number {
+  const left = utf8.encode(a), right = utf8.encode(b)
+  if (left.length !== right.length) return left.length - right.length
+  for (let i = 0; i < left.length; i++) if (left[i] !== right[i]) return left[i] - right[i]
+  return 0
+}
+
+/**
+ * A value as Postgres prints jsonb (`{"a": 1, "b": [1, 2]}`, keys in jsonb's order), so a preview built from the
+ * full message or the live stream reads the same as the compact projection's `left(p->>'input', 200)`, cut at the
+ * same character.
+ */
+export function jsonbText(value: unknown): string {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value) ?? ''
+  if (Array.isArray(value)) return `[${value.map(item => item === undefined ? 'null' : jsonbText(item)).join(', ')}]`
+  return `{${Object.entries(value).filter(([, item]) => item !== undefined).sort(([a], [b]) => jsonbKeyOrder(a, b))
+    .map(([key, item]) => `${JSON.stringify(key)}: ${jsonbText(item)}`).join(', ')}}`
+}
+
 export interface ChatItem {
   /** coordinator_messages.id of the row this item starts at; absent while the message is still pending in the inbox. */
   id?: string
@@ -302,9 +357,17 @@ export interface ChatItem {
   /** Artifacts shown as cards under this entry, in order. */
   artifacts: string[]
   /** An event line the chat draws in the person's language: the turn moved to their API key after the subscription ran out. */
-  notice?: QuotaSwitchNotice
+  notice?: SwitchNotice
+  /** Any other event, as the line the chat draws in the person's language; its `text` is for the model only (review C1). */
+  line?: EventLine
+  /** The live stream this reply was first shown from, so the chat keeps that row in place when it is stored. */
+  streamId?: string
+  /** The tools this reply used, each with how it ended and short previews (chat-projection.ts), and whether it thought first. */
+  activity?: ChatActivity
   /** The person stopped this reply (停止); it keeps what it had said. */
   stopped?: true
+  /** Why the turn answering this message of the person's failed; it stays after later turns and reloads. */
+  failure?: ChatFailure
 }
 
 /** The run id a successful local or Bot-computer dispatch carries. */
@@ -350,6 +413,8 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
         briefingBoundary = true
         continue
       }
+      // 重新发送 retried this failed message in place (store.sendRetryOf): the new attempt stands for it.
+      if ((message as { mikkaRetried?: unknown }).mikkaRetried === true) continue
       const raw = typeof message.content === 'string' ? message.content : message.content.flatMap(part => part.type === 'text' ? [part.text] : []).join('\n')
       // The request for its welcome is for the Coordinator only.
       if (raw.startsWith(COORDINATOR_WELCOME_MARK)) continue
@@ -374,29 +439,45 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
       flush()
       const base = { ...(id ? { id } : {}), position, tools: [], threads: [], createdAt: createdAt.toISOString(), artifacts: [], ...(pending ? { pending } : {}) }
       // The triage line is for the Coordinator, not the person.
-      if (event) items.push({ ...base, from: 'event', text: raw.split('\n').filter(line => !line.startsWith('Triage:')).join('\n'), ...(source.mikkaEvent?.notice ? { notice: source.mikkaEvent.notice } : {}) })
+      if (event) items.push({ ...base, from: 'event', text: raw.split('\n').filter(line => !line.startsWith('Triage:')).join('\n'),
+        ...(source.mikkaEvent?.notice ? { notice: source.mikkaEvent.notice } : { line: eventLine(source.mikkaEvent?.eventKind, raw, source.mikkaEvent?.observedState ?? null) }) })
       else {
         const { quote, text: unquoted } = splitQuote(raw)
         const { notes, text: rest } = splitBrowserNotes(unquoted)
         const { suggestion, text } = splitSuggestion(rest)
         const images = typeof message.content === 'string' ? 0 : message.content.filter(part => part.type === 'file' && part.mediaType.startsWith('image/')).length
-        items.push({ ...base, from: 'person', text, ...(quote ? { quote } : {}), ...(notes.length ? { notes } : {}), ...(suggestion ? { suggestion } : {}), ...(images ? { images } : {}) })
+        // The turn that answered this message failed (store.failTurn): the reason stays under it.
+        const reason = (message as { mikkaFailure?: unknown }).mikkaFailure
+        const failure = typeof reason === 'string' && reason ? chatFailure({ working: false, error: reason }) : null
+        items.push({ ...base, from: 'person', text, ...(quote ? { quote } : {}), ...(notes.length ? { notes } : {}), ...(suggestion ? { suggestion } : {}), ...(images ? { images } : {}), ...(failure ? { failure } : {}) })
       }
     } else if (message.role === 'assistant') {
       const parts = typeof message.content === 'string' ? [{ type: 'text' as const, text: message.content }] : message.content
       const cited = takeArtifacts(parts.flatMap(part => part.type === 'text' && part.text.trim() && part.text.trim() !== QUIET_REPLY ? [part.text.trim()] : []).join('\n\n'))
       const tools = parts.flatMap(part => part.type === 'tool-call' && !HIDDEN_TOOLS.has(part.toolName) ? [part.toolName] : [])
+      const steps = parts.flatMap((part): ChatTool[] => part.type === 'tool-call' && !HIDDEN_TOOLS.has(part.toolName)
+        ? [{ call: part.toolCallId, name: part.toolName, state: 'running', ...withPreview('input', toolPreview((part as { inputPreview?: unknown }).inputPreview, part.input)) }] : [])
+      // Any reasoning means it thought; only readable text (not encrypted or empty) can be opened.
+      const thought = parts.some(part => part.type === 'reasoning')
+      const readable = parts.some(part => part.type === 'reasoning' && (Number((part as { chars?: unknown }).chars) > 0 || Boolean((part as { text?: unknown }).text?.toString().trim())))
       const last = items.at(-1)
       const shown = [...waiting.ids, ...cited.ids]
       // 停止 cut this reply short (lib/coordinator/stop.ts); the mark may sit on an empty message.
       const stopped = (message as { mikkaStopped?: unknown }).mikkaStopped === true
+      // The stream that first showed this reply: its first text, tool or thinking.
+      const stream = (message as { mikkaStreamId?: unknown }).mikkaStreamId
+      const streamId = typeof stream === 'string' ? stream : undefined
+      const shows = Boolean(cited.text || steps.length || thought)
       if (last?.from === 'coordinator' && !waiting.ids.length && !briefingBoundary) {
+        if (!last.streamId && shows && streamId) last.streamId = streamId
+        if (steps.length || thought) last.activity = { tools: [...last.activity?.tools ?? [], ...steps], thought: Boolean(last.activity?.thought || thought),
+          ...(last.activity?.reasoningAt || readable ? { reasoningAt: [...last.activity?.reasoningAt ?? [], ...(readable ? [position] : [])] } : {}) }
         last.text = [last.text, cited.text].filter(Boolean).join('\n\n')
         last.tools.push(...tools)
         last.artifacts = [...new Set([...last.artifacts, ...cited.ids])]
         if (stopped) last.stopped = true
-      } else if (cited.text || tools.length || shown.length || stopped) {
-        items.push({ ...(id ? { id } : {}), position, from: 'coordinator', text: cited.text, tools, threads: [], createdAt: createdAt.toISOString(), artifacts: [...new Set(shown)], ...(stopped ? { stopped } : {}) })
+      } else if (cited.text || tools.length || shown.length || stopped || thought) {
+        items.push({ ...(id ? { id } : {}), position, from: 'coordinator', text: cited.text, tools, threads: [], createdAt: createdAt.toISOString(), artifacts: [...new Set(shown)], ...(stopped ? { stopped } : {}), ...(streamId && shows ? { streamId } : {}), ...(steps.length || thought ? { activity: { tools: steps, thought, ...(readable ? { reasoningAt: [position] } : {}) } } : {}) })
         waiting.ids = []
         // Only a reply that shows ends the boundary; hidden tool-only steps do not.
         briefingBoundary = false
@@ -407,6 +488,13 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
       for (const part of message.content) {
         const runId = dispatchedRun(part)
         if (runId && !last.threads.includes(runId)) last.threads.push(runId)
+        const step = part.type === 'tool-result' ? last.activity?.tools.find(tool => tool.call === part.toolCallId) : undefined
+        if (step && part.type === 'tool-result') {
+          const compact = part as { status?: unknown; outputPreview?: unknown }
+          const output = part.output as { type?: string; value?: unknown } | undefined
+          step.state = compact.status === 'error' || output?.type?.startsWith('error') ? 'error' : 'done'
+          Object.assign(step, withPreview('output', toolPreview(compact.outputPreview, compact.status === undefined ? output?.value : undefined)))
+        }
       }
     }
   }

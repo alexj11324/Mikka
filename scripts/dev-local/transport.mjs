@@ -2,6 +2,7 @@ import { MVP_SERVICES } from '../../tests/mvp/isolated-env.mjs'
 import { MVP_DECISION_KEY } from '../../tests/mvp/transport.mjs'
 import { assertDevLocal } from './guard.mjs'
 import { LOCAL_RESEND_KEY } from './services.mjs'
+import { assertTestModelRequest } from '../test-model-policy.mjs'
 
 const marker = Symbol.for('mikka.dev-local.loopback-fetch.v1')
 const probeURL = `${MVP_SERVICES}/.mikka-dev-local-transport`
@@ -48,7 +49,7 @@ export function installDevLocalTransport(env = process.env, upstreamFetch = glob
   const previousMarker = Object.getOwnPropertyDescriptor(globalThis, marker)
   const challenges = new Map()
   let verifiedFetch = null
-  const transport = (input, init) => {
+  const transport = async (input, init) => {
     const request = new Request(input, init)
     if (request.url === probeURL) {
       const nonce = request.headers.get(challengeHeader)
@@ -58,6 +59,8 @@ export function installDevLocalTransport(env = process.env, upstreamFetch = glob
       return Promise.resolve(new Response(null, { status: 204, headers: { [responseHeader]: response } }))
     }
     const target = devLocalTarget(request.url, env)
+    // Rewritten gateway calls are the isolated scripted fixture, not live spend.
+    if (!target) await assertTestModelRequest(request)
     return target ? upstreamFetch(new Request(target, request), { redirect: 'error' }) : upstreamFetch(request)
   }
   const installed = Object.freeze({

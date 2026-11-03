@@ -12,6 +12,19 @@ import { revokeDeviceCredential } from './device-revocation'
 import { removeOwnedDevice } from './device-removal'
 import { POST as reportEvents } from '../app/v1/runs/[runId]/events/route'
 import { GET as commands } from '../app/v1/devices/[deviceId]/commands/route'
+import { GET as queuedRuns } from '../app/v1/devices/[deviceId]/runs/route'
+import { Socket } from 'node:net'
+import { withDeviceRoute } from './device-route'
+import { pool as appPool } from './db'
+
+// Every byte the database sends to this process.
+const sockets = new Set<Socket>()
+const connect = Socket.prototype.connect
+Socket.prototype.connect = function (this: Socket, ...args: unknown[]) {
+  sockets.add(this)
+  return Reflect.apply(connect, this, args)
+} as typeof Socket.prototype.connect
+const received = () => [...sockets].reduce((sum, socket) => sum + socket.bytesRead, 0)
 
 const url = process.env.E2E_DATABASE_URL
 if (!url || !['127.0.0.1', 'localhost'].includes(new URL(url).hostname) || !new URL(url).pathname.endsWith('_e2e')) throw new Error('An isolated loopback *_e2e database is required')
@@ -23,7 +36,7 @@ const raw = new Pool({ connectionString: target.toString(), max: 8 })
 const scope = createRequestDatabaseScope(target.toString())
 before(async () => {
   await admin.query(`CREATE SCHEMA ${schema}`)
-  for (const table of ['devices', 'device_tokens', 'device_token_devices', 'agents', 'agent_runs', 'run_tokens', 'run_chunks', 'run_messages']) {
+  for (const table of ['devices', 'device_tokens', 'device_token_devices', 'agents', 'agent_runs', 'run_tokens', 'run_chunks', 'run_messages', 'device_management_commands']) {
     await raw.query(`CREATE TABLE ${table} (LIKE public.${table} INCLUDING DEFAULTS INCLUDING INDEXES)`)
   }
   await raw.query(await readFile(new URL('../drizzle/20261031002605_daemon_credential_revocation.sql', import.meta.url), 'utf8'))
@@ -183,4 +196,29 @@ test('existing device removal still refuses live work, then records revocation w
   assert.equal(stateAfter.receipts, 1)
   assert.ok((await raw.query('SELECT "removedAt" FROM devices WHERE id=$1', [f.device])).rows[0].removedAt)
   assert.equal((await raw.query('SELECT count(*)::int n FROM agent_runs WHERE id=$1', [f.run])).rows[0].n, 1)
+})
+
+test('a device request is fenced by its first statement, with no check up front, and reads no device report it does not use', async t => {
+  const f = await fixture()
+  // A daemon's report: two harnesses with 500 models each, as large as the protocol allows.
+  const models = Array.from({ length: 500 }, (_, index) => ({ id: `model-${index}`, name: `Model ${index} with a long display name` }))
+  await raw.query('UPDATE devices SET harnesses=$2 WHERE id=$1', [f.device, JSON.stringify(['codex', 'claude_code'].map(harness => ({ harness, installed: true, models })))])
+  const get = () => scope.run(() => queuedRuns(new Request(`http://127.0.0.1/mikka/v1/devices/${f.device}/runs?state=queued`, { headers: { authorization: `Bearer ${f.token}` } }), { params: Promise.resolve({ deviceId: f.device }) }))
+  await get()
+  const before = received()
+  const response = await get()
+  const bytes = received() - before
+  assert.equal(response.status, 200)
+  assert.deepEqual(await response.json(), { runIds: [] })
+  t.diagnostic(JSON.stringify({ queuedRunsRequestDbBytes: bytes }))
+  assert.ok(bytes < 8000, `a queued-runs poll read ${bytes} B`)
+
+  // Revoked after authentication, before the handler's first statement: that statement refuses, the route answers 401.
+  const fenced = withDeviceRoute(async () => {
+    await revokeDeviceCredential(raw, f.owner, f.tokenId)
+    await appPool.query('SELECT 1')
+    return Response.json({ reached: true })
+  })
+  const refused = await scope.run(() => fenced(new Request(`http://127.0.0.1/mikka/v1/devices/${f.device}/runs`, { headers: { authorization: `Bearer ${f.token}` } })))
+  assert.equal(refused.status, 401)
 })

@@ -14,6 +14,7 @@ export const hostedSubscriptionSnapshotSchema = z.strictObject({
   runOwnerId: z.string().min(1).optional(),
   connectionRevision: z.number().int().positive(), modelId: z.string().min(1).max(128),
   route: z.enum(['codex_cpa', 'claude_cpa', 'openai_siwc']),
+  afterPoints: z.literal(true).optional(),
 })
 export type HostedSubscriptionSnapshot = z.infer<typeof hostedSubscriptionSnapshotSchema>
 /**
@@ -29,6 +30,8 @@ export const hostedApiKeySnapshotSchema = z.strictObject({
     subscription: z.enum(['claude', 'codex']), plan: z.string().max(60).nullable(),
     keyProvider: z.string().min(1).max(20), keyName: z.string().max(60).nullable(),
   }).optional(),
+  /** 点数不足时改用: Mikka 默认 had no points here, so this turn runs on the next model in 优先使用的模型. Also on a subscription snapshot. */
+  afterPoints: z.literal(true).optional(),
 })
 export type HostedApiKeySnapshot = z.infer<typeof hostedApiKeySnapshotSchema>
 export const hostedModelSelectionSchema = z.discriminatedUnion('type', [hostedSubscriptionSnapshotSchema, hostedApiKeySnapshotSchema])

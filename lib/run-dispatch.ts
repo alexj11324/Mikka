@@ -13,15 +13,19 @@ export const dispatchInput = z.object({
   requestKey: dispatchRequestKey.optional(),
 })
 export type DispatchInput = z.infer<typeof dispatchInput>
+/** Server-selected credential identity; the public Factory dispatch schema stays unchanged. */
+export interface DispatchCredential { subscriptionBindingId?: string }
 export interface DispatchResult { runId: string; status: RunStatus; replayed: boolean }
 
 const LIVE_STATUSES: RunStatus[] = ['queued', 'preparing', 'running', 'waiting_input', 'finishing']
 
 /** Bind caller parameters, not mutable issue text or standing instructions. */
-export function dispatchFingerprint(input: DispatchInput): string {
-  return createHash('sha256').update(JSON.stringify([
+export function dispatchFingerprint(input: DispatchInput & DispatchCredential): string {
+  const identity: unknown[] = [
     input.issueId, input.agentId, input.deviceRepoId, input.note ?? '',
-  ])).digest('hex')
+  ]
+  if (input.subscriptionBindingId) identity.push({ subscriptionBindingId: input.subscriptionBindingId })
+  return createHash('sha256').update(JSON.stringify(identity)).digest('hex')
 }
 
 /**

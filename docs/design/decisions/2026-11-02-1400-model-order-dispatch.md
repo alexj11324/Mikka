@@ -3,6 +3,7 @@
 - Date: 2026-11-02
 - Source: Alex, relayed by the coordinator session: 「就这么去做吧」 on the model-order scheme, then his additions the same day (the default order; two settings entries, 「设备」 and 「模型与订阅」; 「允许使用的模型」 with add/remove and drag order; run location on that page). The coordinator filled in what Alex did not say (marked "coordinator" below).
 - Rule: —
+- Partly superseded by: [2026-11-02-1500](2026-11-02-1500-subscription-models-need-no-device-report.md) (a subscription model needs no report from the computer's CLI); [2026-11-02-1530](2026-11-02-1530-local-server-first.md) (本地 picks a server first, then the least busy device, not at random); [2026-11-02-2330](2026-11-02-2330-cloud-first-dispatch.md) (运行位置: 云端 the default, then a server, then a computer; 本地 a server, then a computer)
 - Replaces: [decisions.md](../decisions.md) rows on label execution rules and 任务默认; [2026-10-31-2200 run machine fallback](2026-10-31-2200-run-machine-fallback.md) as to how a new run picks its machine; the 「允许调度」 / 「允许自动调度」 pair; 「Bot 与 Agents」 and 「API 与订阅」 as settings entries; [2026-11-02-1200](2026-11-02-1200-api-keys-own-group-and-provider-models.md) as to key models in 「Bot 与 Agents」.
 
 ## Settings
@@ -55,6 +56,18 @@ The one preference word, `opus`, is matched against reported model ids and
 names (`DEFAULT_ORDER_PREFERENCE` in `lib/model-order-plan.ts`, the one
 allowlisted exception in `lib/model-options-source.test.ts`); no model name
 is written in code.
+
+**A model the thread names** (coordinator, 2026-11-02) is the only one tried;
+it never falls back to the list. No subscription or key offers it on that
+Agent: 没有订阅或 Key 能用 <Agent> 跑 <model>. Offered but nothing can run it now:
+没有电脑能用 <Agent> 跑 <model>, or <Agent> 的 <model> 暂时不可用.
+
+**A computer the person names** fixes only where the run goes. The model is
+chosen by the same rule: the thread's own model, else 允许使用的模型 in order,
+the first this computer can run (its Agent installed and, for a subscription,
+the model reported). Nothing it can run: the card says what it lacks
+(这台电脑没装 Codex; 这台电脑的 Codex 没有报告 <model>), and no other Agent is
+put in its place.
 
 **运行位置**: 云端 or 本地, one choice per list.
 

@@ -30,7 +30,8 @@ export async function openSearch(page: Page) {
 export async function openIssueFromSearch(page: Page, title: string) {
   const dialog = await openSearch(page)
   await dialog.getByRole('combobox', { name: '全局搜索', exact: true }).fill(title)
-  await dialog.getByRole('option').filter({ hasText: title }).click()
+  // A task's threads carry its name too (⌘K's 线程 group): open the task's own row.
+  await dialog.locator('[cmdk-item][data-value^="issue "]').filter({ hasText: title }).click()
 }
 
 /** ⌘K's 新建任务 opens the dialog that hands a sentence to the Coordinator. */
@@ -84,6 +85,22 @@ export async function seedTask(page: Page, title: string, { status = 'todo', pri
   return id
 }
 
+/**
+ * A saved website login for the signed-in person, as the vault stores one. The
+ * secret columns hold synthetic placeholders: the main app never decrypts.
+ */
+export async function seedSavedLogin(page: Page, origin: string, username: string) {
+  const cookie = (await page.context().cookies()).find(item => item.name.endsWith('session_token'))
+  if (!cookie) throw new Error('seedSavedLogin 需要已登录的页面。')
+  const db = database()
+  const { rows: [session] } = await db.query<{ userId: string }>('SELECT "userId" FROM session WHERE token = $1', [decodeURIComponent(cookie.value).split('.')[0]])
+  if (!session) throw new Error('找不到当前登录会话。')
+  const id = randomUUID()
+  await db.query('INSERT INTO credentials (id, user_id, origin, username) VALUES ($1, $2, $3, $4)', [id, session.userId, origin, username])
+  await db.query(`INSERT INTO credential_secrets (credential_id, wrapped_dek, nonce, ciphertext, leak_hmac, leak_length) VALUES ($1, 'synthetic', 'synthetic', 'synthetic', 'synthetic', 8)`, [id])
+  return id
+}
+
 /** A shown 建议 item for the signed-in person. */
 export async function seedSuggestion(page: Page, { source = 'gmail', action = 'reply', title, actionTitle = null }: { source?: string; action?: string; title: string; actionTitle?: string | null }) {
   const cookie = (await page.context().cookies()).find(item => item.name.endsWith('session_token'))
@@ -97,7 +114,8 @@ export async function seedSuggestion(page: Page, { source = 'gmail', action = 'r
 }
 
 /** The Coordinator's last turn failed with `error`, as a refused hosted-model call leaves it. */
-export async function seedCoordinatorError(page: Page, error: string) {
+/** The chat's last turn failed with `error`. With `message`, the person's message that turn was answering is in the chat, carrying the reason as store.failTurn leaves it. */
+export async function seedCoordinatorError(page: Page, error: string, workspaceId?: string, message?: string) {
   const cookie = (await page.context().cookies()).find(item => item.name.endsWith('session_token'))
   if (!cookie) throw new Error('seedCoordinatorError 需要已登录的页面。')
   const db = database()
@@ -105,8 +123,31 @@ export async function seedCoordinatorError(page: Page, error: string) {
   if (!session) throw new Error('找不到当前登录会话。')
   // The Coordinator's chat lives on its own bot row (coordinator_bots), created when the app first opens. Before
   // that the error goes on the older bot-less session, which that first open moves onto the Coordinator.
-  const { rows: [coordinator] } = await db.query<{ botId: string }>('SELECT "botId" FROM coordinator_bots WHERE "ownerId" = $1 LIMIT 1', [session.userId])
+  const find = async () => (await db.query<{ botId: string }>('SELECT "botId" FROM coordinator_bots WHERE "ownerId" = $1 AND ($2::uuid IS NULL OR "workspaceId" = $2) LIMIT 1', [session.userId, workspaceId ?? null])).rows[0]
+  let coordinator = await find()
+  // A team's Coordinator is made on its first read, which may still be running.
+  for (let tries = 0; workspaceId && !coordinator && tries < 50; tries++) coordinator = await new Promise(resolve => setTimeout(resolve, 200)).then(find)
+  if (workspaceId && !coordinator) throw new Error('这个团队还没有 Coordinator。')
   await db.query('INSERT INTO coordinator_sessions ("userId", "botId", "lastError", "lastErrorAt") VALUES ($1, $2, $3, now()) ON CONFLICT ON CONSTRAINT coordinator_sessions_chat_key DO UPDATE SET "lastError" = $3, "lastErrorAt" = now()', [session.userId, coordinator?.botId ?? null, error])
+  if (message) await db.query(`INSERT INTO coordinator_messages (id, "userId", "botId", position, message)
+    SELECT $1, $2, $3, coalesce(max(position), 0) + 1, $4 FROM coordinator_messages WHERE "userId" = $2 AND "botId" IS NOT DISTINCT FROM $3::uuid`,
+  [randomUUID(), session.userId, coordinator?.botId ?? null, JSON.stringify({ role: 'user', content: message, mikkaFailure: error })])
+}
+
+/**
+ * The signed-in person's Coordinator chat has used up its free messages (TRIAL_MESSAGES, no card yet):
+ * one more message than the trial, already answered, so Mikka 默认 asks for a card or a subscription.
+ */
+export async function useUpFreeMessages(page: Page) {
+  const cookie = (await page.context().cookies()).find(item => item.name.endsWith('session_token'))
+  if (!cookie) throw new Error('useUpFreeMessages 需要已登录的页面。')
+  const db = database()
+  const { rows: [session] } = await db.query<{ userId: string }>('SELECT "userId" FROM session WHERE token = $1', [decodeURIComponent(cookie.value).split('.')[0]])
+  const { rows: [coordinator] } = await db.query<{ botId: string }>('SELECT "botId" FROM coordinator_bots WHERE "ownerId" = $1 LIMIT 1', [session.userId])
+  if (!coordinator) throw new Error('还没有 Coordinator。')
+  for (let i = 0; i <= 20; i++)
+    await db.query(`INSERT INTO coordinator_events (id,"userId","botId",kind,"dedupeKey",payload,"deliveredAt") VALUES ($1,$2,$3,'user_message',$4,$5,now())`,
+      [randomUUID(), session.userId, coordinator.botId, `user_message:${randomUUID()}`, JSON.stringify({ text: `message ${i}` })])
 }
 
 /** The signed-in person's workspace has a verified card and `remaining` microdollars of Mikka 默认 allowance (#523, #525). */

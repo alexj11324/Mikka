@@ -1,5 +1,8 @@
 'use server'
+import { deploymentSwitch } from '@/lib/deployment-switches'
 
+import { createHash } from 'node:crypto'
+import { gunzipSync } from 'node:zlib'
 import { headers } from 'next/headers'
 import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { z } from 'zod'
@@ -8,7 +11,7 @@ import type { ActionResult } from '@/lib/action-result'
 import { auth } from '@/lib/auth'
 import { db, pool } from '@/lib/db'
 import {
-  agents, agentRuns, deviceRepos, devices, issueMembers, runChunks, runMessages, users,
+  agents, agentRuns, deviceRepos, devices, issueMembers, runMessages, users,
   type SupportedHarness,
 } from '@/lib/db/schema'
 import { DEVICE_ONLINE_WINDOW_MS, issueDeviceToken } from '@/lib/device-link'
@@ -18,7 +21,7 @@ import { listSshHosts } from '@/lib/ssh'
 import { citationSources } from '@/lib/coordinator/store'
 import { requestRunStop } from '@/lib/agent-runs'
 import { sendThreadMessage } from '@/lib/thread-continue'
-import { chainChunks } from '@/lib/issue-run-conversation'
+import { readThreadChunks, threadChunkCursor, type ThreadChunkCursor } from '@/lib/thread-chunks'
 import { executionBotName, runBotId, runBotName } from '@/lib/run-bot-name'
 import { requireIssueAccess } from '@/lib/issue-access'
 import { workspaceDb } from '@/lib/workspace-db'
@@ -28,6 +31,7 @@ import { ISSUE_THREAD_LIMIT, canReadThread, projectIssueThreads, taskFreeThreadM
 import { threadQuestionStates } from '@/lib/issue-thread-questions'
 import { listIssueRunChains, readRunChain } from '@/lib/run-chain'
 import type { HarnessInfo } from '@mikka/protocol/harness'
+import { parseUnifiedDiff, type ThreadChangesResult } from '@/lib/thread-changes'
 
 async function getUserId(): Promise<string> {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -237,6 +241,10 @@ export interface IssueThreadDetail {
   thread: IssueThread & { prompt: string; stopRequestedAt: Date | null; feedbackEligible:boolean; /** This run's failure reason, stored masked (agent_runs.error). */ error: string | null; /** The owner's own: quota switches and a quota pause (lib/run-quota-view.ts). */ quota: import('@/lib/run-quota-view').ThreadQuotaView | null }
   chunks: { chunk: Record<string, unknown>; at: Date }[]
   messages: { id: string; text: string; at: Date; author: string; image: string | null; mine: boolean }[]
+  /** Where `chunks` ends; passed back, the next read returns only later chunks. */
+  chunkCursor: ThreadChunkCursor | null
+  /** `chunks` holds only the chunks after the cursor that was passed: append them to the ones held. */
+  chunksAppend: boolean
 }
 
 /**
@@ -251,13 +259,14 @@ async function threadQuestions(threads: readonly IssueThread[], viewerId: string
     const runId = thread.ownedByCurrentUser ? threadQuestionRunId(thread) : null
     return runId ? [[thread.id, runId] as const] : []
   }))
-  if (!asked.size || process.env.MIKKA_FACTORY_ROUTING_ENABLED !== '1' || process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED !== '1') return [...threads]
+  if (!asked.size || !deploymentSwitch('factoryRouting') || !deploymentSwitch('factoryLifecycle')) return [...threads]
   const byRun = await threadQuestionStates(pool, [...new Set(asked.values())], viewerId)
   return threads.map(thread => ({ ...thread, question: byRun.get(asked.get(thread.id) ?? '') ?? null }))
 }
 
 /** One thread as a conversation: what it was asked, what the agent did, and what people said in it. */
-export async function getIssueThread(issueId: string | null, runId: string): Promise<IssueThreadDetail> {
+export async function getIssueThread(issueId: string | null, runId: string, after?: ThreadChunkCursor | null): Promise<IssueThreadDetail> {
+  const cursor = after ? threadChunkCursor.parse(after) : null
   const { row, user } = await readableThread(issueId, runId)
   // The run that resumes this one after an answered question, or runs it again after it ended (R-81), is the same thread: its chain (BE-18).
   const [projected] = projectIssueThreads([row], row.issueId, user.id, new Set([user.id]))
@@ -265,9 +274,9 @@ export async function getIssueThread(issueId: string | null, runId: string): Pro
   // The conversation is the thread's, across its runs from this one on, oldest first.
   const from = chain ? Math.max(0, chain.attempts.findIndex(attempt => attempt.runId === row.id)) : 0
   const runIds = chain ? chain.attempts.slice(from).map(attempt => attempt.runId) : [row.id]
-  const chunks = chainChunks(await db.select({ runId: runChunks.runId, chunk: runChunks.chunk, at: runChunks.createdAt }).from(runChunks)
-    .innerJoin(agentRuns, eq(agentRuns.id, runChunks.runId))
-    .where(inArray(runChunks.runId, runIds)).orderBy(asc(agentRuns.createdAt), asc(runChunks.seq)))
+  // A live run is polled every 2 s; only the chunks after the caller's cursor are read, not the whole chain again.
+  const read = await readThreadChunks(runIds, cursor)
+  const chunks = read.chunks
   const messages = await db.select({ id: runMessages.id, text: runMessages.text, at: runMessages.createdAt, userId: runMessages.userId, name: users.name, email: users.email, image: users.image })
     .from(runMessages).leftJoin(users, eq(users.id, runMessages.userId))
     .where(inArray(runMessages.runId, runIds)).orderBy(asc(runMessages.createdAt))
@@ -283,7 +292,40 @@ export async function getIssueThread(issueId: string | null, runId: string): Pro
     thread: { ...thread, prompt: row.prompt, stopRequestedAt, quota, error: row.status === 'failed' ? row.error ?? null : null, feedbackEligible: row.userId===user.id && ['succeeded','failed'].includes(row.status) && !!row.finishedAt && !!row.sessionId && !!row.deviceRepoId },
     chunks,
     messages: messages.map(message => ({ id: message.id, text: message.text, at: message.at, author: message.name || message.email || '', image: message.image ?? null, mine: message.userId === user.id })),
+    chunkCursor: read.cursor,
+    chunksAppend: read.append,
   }
+}
+
+/**
+ * The thread's 改动 tab (Figma 820:4843): the newest checkpoint of its run chain, a
+ * gzipped `git diff --binary` with secrets already masked when it was saved
+ * (app/v1/runs/[runId]/checkpoint). Read-only; whoever may read the thread sees it.
+ */
+export async function getThreadChanges(issueId: string | null, runId: string): Promise<ThreadChangesResult> {
+  const { row } = await readableThread(issueId, runId)
+  const chain = await readRunChain(pool, row.userId, row.id)
+  const runIds = chain ? chain.attempts.map(attempt => attempt.runId) : [row.id]
+  const { rows: [checkpoint] } = await pool.query<{ patch: Buffer; unavailableReason: string | null }>(
+    'SELECT patch,"unavailableReason" FROM run_checkpoints WHERE "runId"=ANY($1::uuid[]) ORDER BY "updatedAt" DESC LIMIT 1', [runIds])
+  if (!checkpoint) return { state: 'none' }
+  if (checkpoint.unavailableReason) return { state: 'tooLarge' }
+  let text: string
+  try { text = gunzipSync(checkpoint.patch, { maxOutputLength: THREAD_CHANGES_MAX_TEXT }).toString('utf8') } catch { return { state: 'tooLarge' } }
+  const changes = parseUnifiedDiff(text)
+  if (!changes.files.length) return { state: 'none' }
+  // 在新标签打开: the file in the thread's pull request, on GitHub's files page.
+  const { rows: [published] } = await pool.query<{ url: string }>(
+    `SELECT "pullRequest"->>'url' AS url FROM run_publications WHERE "runId"=ANY($1::uuid[]) AND "pullRequest"->>'url' IS NOT NULL ORDER BY "updatedAt" DESC LIMIT 1`, [runIds])
+  const prUrl = published && safeHttpUrl(published.url)
+  if (prUrl) for (const file of changes.files) file.url = `${prUrl.replace(/\/+$/, '')}/files#diff-${createHash('sha256').update(file.path).digest('hex')}`
+  return { state: 'ready', changes }
+}
+
+const THREAD_CHANGES_MAX_TEXT = 8 * 1024 * 1024
+
+function safeHttpUrl(value: string) {
+  try { const url = new URL(value); return url.protocol === 'https:' ? url.toString() : null } catch { return null }
 }
 
 /** Something a person says in a running thread; the daemon delivers it to the agent. */
@@ -297,6 +339,16 @@ export async function sendIssueThreadMessage(input: { issueId: string | null; ru
   if(!session?.user||session.user.id!==user.id)throw new ActionFailureError('authRequired')
   // A working thread gets it as a message; an ended one runs again in the same thread (R-81, lib/thread-continue.ts).
   await sendThreadMessage(user.id,row.id,text.data,{source:'human',sessionId:session.session.id})
+}
+
+/**
+ * The composer's send: the same as sendIssueThreadMessage, with a refusal the
+ * person can act on (threadReplaced, threadCannotContinue, threadStopping, a
+ * dispatch with no machine or model) returned as its code, so the thread says
+ * why instead of 「发送失败」. Other failures still throw.
+ */
+export async function sendIssueThreadReply(input: { issueId: string | null; runId: string; text: string }): Promise<ActionResult<{ sent: true }>> {
+  return runAction(async () => { await sendIssueThreadMessage(input); return { sent: true as const } })
 }
 
 /**

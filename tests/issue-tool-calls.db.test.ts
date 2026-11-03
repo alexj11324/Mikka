@@ -6,6 +6,8 @@ import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
 import { normalizeRepository } from '@mikka/protocol/repository'
 import { recordPushGrant } from './support/github-app-stub'
 import { disposableDatabase } from './helpers/e2e-target.mjs'
+import { seedAllowedModel } from './support/allowed-model'
+import { overrideDeploymentSwitch } from '../lib/deployment-switches'
 
 const connection = process.env.E2E_DATABASE_URL
 const required = process.env.REQUIRE_DB === '1'
@@ -14,7 +16,7 @@ if (required && !enabled) throw new Error('Issue mutation DB regression requires
 if (enabled) {
   assert.equal(process.env.MIKKA_DATABASE_URL, connection)
   assert.equal(process.env.DATABASE_URL, connection, 'workspace and issue stores must share only this disposable target')
-  process.env.MIKKA_ISSUE_TOOLS_ENABLED = '1'
+  overrideDeploymentSwitch('issueTools', true)
 }
 
 test('actual issue actions commit one issue per tool call, roll back partial writes, and preserve history on replay', { skip: !enabled }, async () => {
@@ -38,7 +40,7 @@ test('actual issue actions commit one issue per tool call, roll back partial wri
     // The owner's Coordinator is an ordinary bot row; its tools write as that bot.
     const coordinator = (await seedCoordinator(owner)).botId
     await pool.query('insert into agents (id,"userId",harness,name) values ($1,$2,\'codex\',\'Legacy fixture\')', [legacyAgent, stranger])
-    process.env.MIKKA_ISSUE_TOOLS_ENABLED = '0'
+    overrideDeploymentSwitch('issueTools', false)
     const legacy = await createIssue(stranger, { title: 'Existing MCP path without rollout', assigneeAgentId: null }, actor)
     assert.ok('id' in legacy)
     const assigned = await updateIssue(stranger, { issueId: legacy.id, assigneeAgentId: legacyAgent }, agentActor(legacyAgent))
@@ -54,7 +56,7 @@ test('actual issue actions commit one issue per tool call, roll back partial wri
       assert.equal(await count('issue_versions'), 0)
       assert.equal(await count('issue_tool_calls'), 0)
     }
-    process.env.MIKKA_ISSUE_TOOLS_ENABLED = '1'
+    overrideDeploymentSwitch('issueTools', true)
     // The actual registered Workflow tool invokes its scoped step and shared
     // actions. No test-only issue writer stands in for the Coordinator.
     const tools = createCoordinatorRegistry(owner, coordinator, undefined, { coordinator: true })
@@ -67,13 +69,13 @@ test('actual issue actions commit one issue per tool call, roll back partial wri
     const id = results[0].id as string
     assert.deepEqual(await updateIssue(owner, { issueId: id, assigneeAgentId: legacyAgent }, agentActor(legacyAgent)), { error: 'agentNotFound' }, 'legacy MCP cannot assign another owner’s agent')
     const versions = await count('issue_versions')
-    process.env.MIKKA_ISSUE_TOOLS_ENABLED = '0'
+    overrideDeploymentSwitch('issueTools', false)
     assert.deepEqual(await createIssue(owner, { ...input }, actor, callId), { error: 'issueToolsDisabled' })
     assert.deepEqual(await updateIssue(owner, { issueId: id, title: 'Disabled retry' }, actor, `disabled-update-${randomUUID()}`), { error: 'issueToolsDisabled' })
     assert.equal(await count('issues'), 1)
     assert.equal(await count('issue_versions'), versions)
     assert.equal(await count('issue_tool_calls'), 1)
-    process.env.MIKKA_ISSUE_TOOLS_ENABLED = '1'
+    overrideDeploymentSwitch('issueTools', true)
     assert.deepEqual(await createIssue(owner, { ...input }, actor, callId), results[0])
     assert.equal(await count('issue_versions'), versions)
     assert.deepEqual(await createIssue(owner, { ...input, title: 'Different request' }, actor, callId), { error: 'issueToolCallConflict' })
@@ -159,8 +161,12 @@ test('actual issue actions commit one issue per tool call, roll back partial wri
     await pool.query('INSERT INTO device_repos(id,"deviceId","userId","repoPath","remoteUrl") VALUES($1,$2,$3,$4,$5)',[repo,device,owner,repository.key,repository.remoteUrl])
     // Only this disposable owner's repository has a synthetic persisted grant.
     // The real dispatch still executes the ordinary admission transaction.
-    // Push is what the GitHub App grants (lib/github/push-grant.ts); record that grant as a live check would.
+    // An installation row an earlier build recorded; admission no longer reads it (decision 2026-11-02-1600).
     await recordPushGrant(pool, owner, repository.key)
+    // The Factory picks the run's model from 优先使用的模型, in the Coordinator bot's workspace.
+    process.env.MIKKA_BYOS_ENABLED = '1'
+    const botWorkspace = (await pool.query('SELECT "workspaceId" FROM bots WHERE id=$1', [coordinator])).rows[0].workspaceId
+    await seedAllowedModel(pool, owner, { workspaceId: botWorkspace, deviceIds: [device] })
     const lifecycleTools=createCoordinatorRegistry(owner,coordinator,undefined,{coordinator:true})
     const first=routed[0];assert.ok('task' in first)
     const {factoryBinding}=await import('../lib/factory/dispatch')

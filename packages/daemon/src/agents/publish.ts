@@ -43,9 +43,8 @@ export interface PublishOptions {
   /** The branch the run started from; tells an issue commit from base. */
   baseBranch?: string
   /**
-   * Push only when allowed: the repo approved it ("always for this repo")
-   * or the run's assignment, after the server checked that approval,
-   * allows pushes (`pushDecision` in ../permissions).
+   * Push only when the run's assignment allows the daemon to push its task
+   * branch (`pushDecision` in ../permissions).
    * `note` says why not otherwise.
    */
   push: { approved: boolean; remote: string; note?: string }
@@ -177,10 +176,26 @@ export async function snapshotTree(
   try {
     await git(["read-tree", "HEAD"], index)
     await git(["add", "--all"], index)
+    // Also remove force-staged or already tracked verification downloads from
+    // this temporary index. The agent's real index remains untouched.
+    await git(["rm", "--cached", "-r", "--ignore-unmatch", "--", ".verify"], index)
     return String((await git(["write-tree"], index)).stdout).trim()
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
+}
+
+/** Keep actual delivery files in a local snapshot for a fresh independent session. No remote push. */
+export async function retainDeliverable(repoPath: string, worktree: string, runId: string): Promise<string> {
+  const tree = await snapshotTree(repoPath, worktree)
+  const git = await pinnedGit(repoPath, worktree)
+  const head = String((await git(['rev-parse', 'HEAD'])).stdout).trim()
+  const before = String((await git(['rev-parse', 'HEAD^{tree}'])).stdout).trim()
+  if (tree === before) return head
+  const commit = String((await git([...FALLBACK_IDENTITY, 'commit-tree', tree, '-p', head, '-m', 'Retain task delivery for independent inspection'])).stdout).trim()
+  await git(['update-ref', `refs/heads/${runBranch(runId)}`, commit, head])
+  await git(['read-tree', commit])
+  return commit
 }
 
 export function commitMessage(options: {
@@ -310,7 +325,7 @@ export async function publishRun(options: PublishOptions): Promise<RunPublish> {
       pushed: false,
       remote: null,
       skipped: "not_approved",
-      note: options.push.note ?? "Push needs the Mikka GitHub App's access on this repository",
+      note: options.push.note ?? "This run has no task branch to push",
     }
   }
   return push(commit)

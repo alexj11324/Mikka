@@ -40,6 +40,7 @@ import {
   pendingRunsResponse,
   runAssignmentSchema,
   runCommandsResponse,
+  daemonVersionsSchema,
   runCompletePath,
   runEventsAccepted,
   type HeartbeatResult,
@@ -60,6 +61,7 @@ import { createRunMailbox } from './run-mailbox'
 import type {
   ChunkBatch,
   DeviceInfo,
+  FetchCommandsOptions,
   RunAssignment,
   ServerLink,
 } from "./server-link"
@@ -310,8 +312,11 @@ export class HttpServerLink implements ServerLink {
     if (response.status >= 500 || response.status === 429)
       throw new ServerUnreachableError(response.status)
     if (response.status === 401) throw new SessionRejectedError()
-    if (response.status === 409 && options.claimOf)
-      throw new RunNotPinnedHereError(options.claimOf)
+    if (response.status === 409 && options.claimOf) {
+      const body = await response.json().catch(() => null) as { code?: unknown; daemonVersions?: unknown } | null
+      const upgradeRequired = body?.code === 'daemonUpgradeRequired'
+      throw new RunNotPinnedHereError(options.claimOf, upgradeRequired, upgradeRequired ? daemonVersionsSchema.safeParse(body?.daemonVersions).data?.latest : undefined)
+    }
     if (!response.ok) {
       const detail = await response
         .json()
@@ -480,14 +485,17 @@ export class HttpServerLink implements ServerLink {
       signal,
       skipRuns = [],
       onQueuedRuns,
-    }: { signal?: AbortSignal; skipRuns?: readonly string[]; onQueuedRuns?: (runIds: string[]) => void } = {}
+      updates,
+      onUpdates,
+    }: FetchCommandsOptions = {}
   ): Promise<RunCommand[]> {
     const response = await this.call(
       "GET",
       devicePaths.commands(
         checkId(deviceId),
         waitSeconds,
-        skipRuns.map(checkId)
+        skipRuns.map(checkId),
+        updates && { daemonLatest: updates.daemonLatest, skipDeviceCommands: updates.skipDeviceCommands?.map(checkId) }
       ),
       {
         schema: runCommandsResponse,
@@ -496,6 +504,7 @@ export class HttpServerLink implements ServerLink {
       }
     )
     if (response.queuedRuns?.length) onQueuedRuns?.(response.queuedRuns)
+    if (response.daemonVersions || response.deviceCommands?.length) onUpdates?.({ daemonVersions: response.daemonVersions, deviceCommands: response.deviceCommands ?? [] })
     return response.commands
   }
 

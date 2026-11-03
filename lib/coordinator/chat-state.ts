@@ -7,9 +7,17 @@ type WaitingEvent = {
   wakeLeaseUntil: Date | null; wakeLastError: string | null
 }
 
+/** The last stored message: its role and, for a reply, the turn round that wrote it (`<lease holder>:<round>`). */
+export type LastMessage = { role: string; streamId?: string }
+
+/** Whether the turn holding the lease has stored its reply: what follows (finishing the execution, a phone push, releasing the lease) is not work the person waits for. */
+function replied(session: Session | undefined, last: LastMessage | undefined): boolean {
+  return Boolean(session?.leaseHolder && last?.role === 'assistant' && last.streamId?.startsWith(`${session.leaseHolder}:`))
+}
+
 /** A wake lease acknowledges inbox delivery, not the duration of a model turn. */
-export function coordinatorChatState(session: Session | undefined, waiting: readonly WaitingEvent[], now = new Date()): { working: boolean; error: string | null } {
-  if (coordinatorLeaseActive(session, now)) return { working: true, error: session?.lastError ?? null }
+export function coordinatorChatState(session: Session | undefined, waiting: readonly WaitingEvent[], now = new Date(), last?: LastMessage): { working: boolean; error: string | null } {
+  if (coordinatorLeaseActive(session, now) && !replied(session, last)) return { working: true, error: session?.lastError ?? null }
   const pending = waiting.filter(event => event.tier !== 'background' && event.kind !== 'matter_handoff')
   if (pending.some(event => event.wakeAttempts === 0 || (event.wakeAttempts === 1 && event.wakeLeaseUntil && event.wakeLeaseUntil > now))) {
     return { working: true, error: session?.lastError ?? null }

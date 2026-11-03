@@ -47,6 +47,21 @@ type UsageResult struct {
 }
 
 var emailPattern = regexp.MustCompile(`^[^\s@<>"\x00-\x1f\x7f]{1,64}@[^\s@<>"\x00-\x1f\x7f]{1,190}$`)
+var safeCodexQuotaModel = regexp.MustCompile(`^(?:gpt-\d+(?:-\d+)*(?:-(?:codex|mini|nano|pro|max|chat|latest|spark))*|o\d+(?:-(?:mini|pro|preview))?)$`)
+
+// Preserve only recognized model identifiers, never arbitrary provider text
+// (which can echo a credential). Unknown scope still keeps its numeric window.
+func safeQuotaModel(value any, fallback string) string {
+	text, ok := value.(string)
+	if !ok || len(text) > 80 {
+		return fallback
+	}
+	model := normalizeQuotaModel(text)
+	if len(model) <= 40 && (claudeQuotaScope.MatchString(model) || safeCodexQuotaModel.MatchString(model)) {
+		return model
+	}
+	return fallback
+}
 
 // Usage reads the connection's own allowance for its owner's Settings page. It
 // needs no model binding: the custody scope (owner, workspace, connection) and
@@ -200,8 +215,9 @@ func (w *Worker) fetchQuota(ctx context.Context, auth *core.Auth) (QuotaResult, 
 			}
 			out := []any{}
 			for _, entry := range extra {
-				limits := objectMap(objectMap(entry)["rate_limit"])
-				out = append(out, map[string]any{"limit_name": "Additional", "rate_limit": map[string]any{"primary_window": project(limits["primary_window"], false), "secondary_window": project(limits["secondary_window"], false)}})
+				row := objectMap(entry)
+				limits := objectMap(row["rate_limit"])
+				out = append(out, map[string]any{"limit_name": safeQuotaModel(row["limit_name"], "Additional"), "rate_limit": map[string]any{"primary_window": project(limits["primary_window"], false), "secondary_window": project(limits["secondary_window"], false)}})
 			}
 			result.Body["additional_rate_limits"] = out
 		}
@@ -231,7 +247,8 @@ func (w *Worker) fetchQuota(ctx context.Context, auth *core.Auth) (QuotaResult, 
 				}
 				value := project(row, true)
 				value["kind"] = "weekly_scoped"
-				value["scope"] = map[string]any{"model": map[string]any{"display_name": fmt.Sprintf("Scoped %d", i)}}
+				model := objectMap(objectMap(row["scope"])["model"])
+				value["scope"] = map[string]any{"model": map[string]any{"display_name": safeQuotaModel(model["display_name"], fmt.Sprintf("Scoped %d", i))}}
 				out = append(out, value)
 			}
 			result.Body["limits"] = out

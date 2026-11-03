@@ -1,24 +1,30 @@
-import { createContext, type ReactNode, useContext } from 'react'
+import { createContext, type ReactNode, useContext, useMemo, useRef, useSyncExternalStore } from 'react'
 import { api } from '@/lib/api'
 import type { Preferences, Settings } from '@/lib/types'
 import { useApi } from '@/lib/useApi'
+import { apiCache } from './api-cache'
+import { PreferenceWrites, type PreferenceWriteState } from './preference-writes'
 
-type SettingsState = ReturnType<typeof useApi<Settings>> & { savePreferences: (patch: Partial<Preferences>) => Promise<void> }
+type SettingsState = ReturnType<typeof useApi<Settings>> & { savePreferences: (patch: Partial<Preferences>) => Promise<boolean>; preferenceSave: PreferenceWriteState<Preferences>; retryPreferences: () => Promise<boolean> }
 const SettingsContext = createContext<SettingsState | null>(null)
 
-/** Settings load once for all their pages; a switch changes at once and is saved behind it. */
+/** Settings load once; switches show confirmed values while pending intentions are explicit. */
 export function SettingsProvider({ children }: { children: ReactNode }) {
   const state = useApi<Settings>('/api/mobile/settings')
-  const savePreferences = async (patch: Partial<Preferences>) => {
-    state.setData(current => current && { ...current, preferences: { ...current.preferences, ...patch } })
-    try {
-      const preferences = await api<Preferences>('/api/mobile/preferences', { method: 'PATCH', body: patch })
-      state.setData(current => current && { ...current, preferences })
-    } catch {
-      await state.reload()
-    }
-  }
-  return <SettingsContext.Provider value={{ ...state, savePreferences }}>{children}</SettingsContext.Provider>
+  const identity = apiCache.account()
+  const currentState = useRef(state)
+  currentState.current = state
+  const writer = useMemo(() => new PreferenceWrites<Preferences>({
+    write: patch => api<Preferences>('/api/mobile/preferences', { method: 'PATCH', body: patch }),
+    confirm: preferences => {
+      currentState.current.setData(current => current && { ...current, preferences: { ...current.preferences, ...preferences } })
+      // Preferences follow the account even when this modal switched workspace meanwhile.
+      void currentState.current.reload()
+    },
+    current: () => apiCache.account() === identity,
+  }), [identity])
+  const preferenceSave = useSyncExternalStore(writer.subscribe, writer.snapshot, writer.snapshot)
+  return <SettingsContext.Provider value={{ ...state, savePreferences: patch => writer.save(patch), preferenceSave, retryPreferences: writer.retry }}>{children}</SettingsContext.Provider>
 }
 
 export function useSettings(): SettingsState {

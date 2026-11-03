@@ -1,4 +1,4 @@
-import { Linking, Platform, ScrollView, StyleSheet, View } from 'react-native'
+import { ActionSheetIOS, Linking, Platform, ScrollView, StyleSheet, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ArrowUpRight, Bell, BookOpen, Blocks, BriefcaseBusiness, Globe, Info, LogOut } from 'lucide-react-native'
@@ -6,6 +6,7 @@ import { CardButton } from '@/components/cards'
 import { Spinner } from '@/components/icons'
 import { NavBar, underBar } from '@/components/NavBar'
 import { PushRow } from '@/components/PushRow'
+import { PreferenceSaveNotice } from '@/components/PreferenceSaveNotice'
 import { Avatar, Row } from '@/components/settings'
 import { Symbol, type SymbolName } from '@/components/Symbol'
 import { Text } from '@/components/Text'
@@ -28,9 +29,14 @@ export default function SettingsScreen() {
   const { data, error, reload } = useSettings()
   const close = () => (router.canGoBack() ? router.back() : router.replace('/'))
   const signOut = async () => {
-    if (Platform.OS !== 'web') await (await import('@/lib/push')).unregisterPush()
-    await authClient.signOut()
+    if (Platform.OS !== 'web') await (await import('@/lib/push')).unregisterPush().catch(() => undefined)
     clearApiCache()
+    await authClient.signOut()
+  }
+  // Signing out asks first, as the system's action sheet (usability review #6).
+  const confirmSignOut = () => {
+    if (Platform.OS !== 'ios') return void signOut()
+    ActionSheetIOS.showActionSheetWithOptions({ options: ['退出登录', '取消'], destructiveButtonIndex: 0, cancelButtonIndex: 1 }, index => { if (index === 0) void signOut() })
   }
   return (
     <View style={{ flex: 1, backgroundColor: colors.grouped }}>
@@ -48,6 +54,7 @@ export default function SettingsScreen() {
       ) : !data ? <View style={{ paddingTop: 40, alignItems: 'center' }}><Spinner /></View> : (
         <ScrollView {...underBar} contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 24 }}>
           <PushRow proactive={data.preferences.proactive} />
+          <PreferenceSaveNotice />
           <Group>
             <Row icon={<Avatar name={data.user.name || data.user.email} image={data.user.image} size={40} />} label={data.user.name || data.user.email} detail={data.user.email} onPress={() => router.push('/settings/profile')} />
             <Row icon={icon('briefcase', BriefcaseBusiness)} label="工作区" value={data.workspace.name} onPress={() => router.push('/settings/workspace')} />
@@ -63,7 +70,7 @@ export default function SettingsScreen() {
             <Row icon={icon('info.circle', Info)} label="版本" value={versionLabel()} trailing={null} />
           </Group>
           <Group>
-            <Row icon={icon('rectangle.portrait.and.arrow.right', LogOut, colors.danger)} label="退出登录" destructive onPress={() => void signOut()} />
+            <Row icon={icon('rectangle.portrait.and.arrow.right', LogOut, colors.danger)} label="退出登录" destructive onPress={confirmSignOut} />
           </Group>
         </ScrollView>
       )}

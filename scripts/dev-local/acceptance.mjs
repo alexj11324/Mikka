@@ -13,6 +13,7 @@ import { acquireTestAccounts, recordAuthenticationSecrets } from '../test-accoun
 import { TestAccountPool } from '../test-accounts/pool.mjs'
 import { verifyMailbox } from './mailbox-acceptance.mjs'
 import { verifyWorkerMailbox } from './worker-mailbox-acceptance.mjs'
+import { assertFlashTestModel, assertTestModelRequest } from '../test-model-policy.mjs'
 
 const root = resolve(import.meta.dirname, '../..')
 const selectedItems = process.env.LOCAL_LOOP_ITEMS?.split(',') ?? ['1', '2', '3', '4', '5', '6', '7']
@@ -35,6 +36,17 @@ const redact = value => {
   let result = String(value)
   for (const secret of secrets) if (secret) result = result.replaceAll(secret, '[redacted]')
   return result.replace(/(?:postgres(?:ql)?:\/\/)[^\s"']+/gi, '[database]').replace(/(?:orv_|mkw_)[A-Za-z0-9_-]+/g, '[credential]').replace(/(authorization|cookie|api.?key|password|secret)\s*[:=]\s*[^\s,]+/gi, '$1=[redacted]')
+}
+/**
+ * The cache directories stay private, but a daemon run as MIKKA_DEV_DAEMON_USER
+ * (root acceptance) must pass through them to its own data directory: they are
+ * created traverse-only (0711), never listable, and account/session files stay
+ * 0600 inside their own 0700 store. One left 0700 by an earlier run gets the same bit.
+ */
+async function privateDirectory(path) {
+  const daemonUser = process.getuid?.() === 0 && process.env.MIKKA_DEV_DAEMON_USER
+  await mkdir(path, { recursive: true, mode: daemonUser ? 0o711 : 0o700 })
+  if (daemonUser) await chmod(path, 0o711)
 }
 async function progress(step, status, detail) {
   const entry = { at: new Date().toISOString(), runId, step, status, elapsedMs: Date.now() - started, ...(detail ? { detail: redact(detail) } : {}) }
@@ -90,12 +102,22 @@ async function command(args) {
   assert.equal(status, 0, `CLI ${args[0]} exited ${status}`)
 }
 async function json(account, path, body, method = body ? 'POST' : 'GET') {
+  await assertTestModelRequest(new Request(`http://127.0.0.1${path}`, { method, ...(body ? { body: JSON.stringify(body) } : {}) }))
+  if (method === 'POST' && ['/api/coordinator/messages', '/api/mobile/chat'].includes(path)) {
+    const modelResponse = await account.request(`/api/mobile/model${body?.botId ? `?bot=${body.botId}` : ''}`)
+    assert.ok(modelResponse.ok, 'Cannot verify the test bot model before submitting a prompt')
+    assertFlashTestModel((await modelResponse.json()).current?.modelId)
+  }
   const response = await account.request(path, { method, ...(body ? { headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) } : {}) })
   assert.ok(response.ok, `${method} ${path}: HTTP ${response.status}`)
   return response.json()
 }
 const query = async (sql, values = []) => (await pool.query(sql, values)).rows
-const run = async id => (await query('SELECT r.*,p.status AS publication,p."pullRequest" FROM agent_runs r LEFT JOIN run_publications p ON p."runId"=r.id WHERE r.id=$1 AND r."userId"=$2', [id, accounts.owner.userId]))[0]
+const run = async id => {
+  const current = (await query('SELECT r.*,p.status AS publication,p."pullRequest" FROM agent_runs r LEFT JOIN run_publications p ON p."runId"=r.id WHERE r.id=$1 AND r."userId"=$2', [id, accounts.owner.userId]))[0]
+  if (current) assertFlashTestModel(current.agentDefinition?.model)
+  return current
+}
 
 async function dispatch(name, text, signal) {
   const since = new Date()
@@ -117,10 +139,7 @@ async function setup() {
   assertDevLocal(process.env)
   assert.equal(Number(process.versions.node.split('.')[0]), 24, 'Use Node 24')
   for (const name of ['CI', 'GITHUB_ACTIONS', 'RUNNER_ENVIRONMENT', 'GITHUB_RUN_ID']) assert.ok(!process.env[name], 'Local acceptance must not impersonate CI')
-  await mkdir(directory, { recursive: true, mode: 0o700 })
-  // The daemon's unprivileged UID needs traverse permission, never access to
-  // account/session files (which remain 0600 inside their own 0700 store).
-  if (process.getuid?.() === 0 && process.env.MIKKA_DEV_DAEMON_USER) await chmod(directory, 0o711)
+  await privateDirectory(directory)
   for (const name of ['BETTER_AUTH_SECRET', 'DEEPSEEK_API_KEY', 'INFISICAL_CLIENT_SECRET']) if (process.env[name]) secrets.add(process.env[name])
   const existing = process.argv.includes('--existing')
   if (selectedItems.includes('8') && !existing) {
@@ -238,6 +257,19 @@ async function setup() {
   return device
 }
 
+async function factoryApproval(runId, signal) {
+  const task = await until(signal, async () => {
+    const [row] = await query(`SELECT t.* FROM factory_tasks t JOIN factory_attempts a ON a."taskId"=t.id WHERE a."runId"=$1 AND t."userId"=$2`,[runId,accounts.owner.userId])
+    assert.ok(row,'ordinary dispatch has a Factory task')
+    if (['failed','blocked','cancelled','revoked'].includes(row.status)) throw new Error(`Factory ${row.stage}: ${row.reason}`)
+    return row.stage === 'approval' && row.status === 'pending' ? row : null
+  })
+  const stages = await query(`SELECT a.stage,r."sessionId" FROM factory_attempts a JOIN agent_runs r ON r.id=a."runId" WHERE a."taskId"=$1 AND a.status='passed' ORDER BY a.position`,[task.id])
+  assert.deepEqual(stages.slice(-3).map(row=>row.stage),['execute','review','verify'])
+  assert.equal(new Set(stages.slice(-3).map(row=>row.sessionId)).size,3,'independent CLI sessions for all three stages')
+  return task
+}
+
 async function accept(device) {
   const only = selectedItems
   const failures = []
@@ -254,6 +286,11 @@ async function accept(device) {
     const commit = execFileSync('git', ['--git-dir', runtime.scenario.barePath, 'show', `${done.report.publish.commit}:README.md`], { encoding: 'utf8' })
     assert.ok(commit.includes(runId), 'Remote pushed tree lacks the acceptance marker')
     await until(signal, async () => JSON.stringify(await json(accounts.owner, '/api/coordinator/messages')).includes(published.pullRequest.url))
+    const checked = await factoryApproval(id,signal)
+    const acceptance = await json(accounts.owner,`/api/factory/tasks/${checked.id}/approval`)
+    assert.equal(acceptance.manifest.candidate.sha,done.report.publish.commit,'the final human gate reads back the exact candidate')
+    assert.equal(evidence.pullRequests.find(pr=>pr.url===published.pullRequest.url).draft,false,'Factory verification does not strand the PR in draft')
+    await progress('item1-core-loop','factory-approval',checked.id)
     await progress('item1-core-loop', 'evidence', id)
   })
   if (only.includes('2')) await check('item2-read-only', 600_000, async signal => {
@@ -266,6 +303,11 @@ async function accept(device) {
     assert.ok(!done.report?.publish?.pushed && !done.pullRequest, 'Read-only run published')
     assert.equal(execFileSync('git', ['--git-dir', runtime.scenario.barePath, 'show-ref'], { encoding: 'utf8' }), refs, 'Read-only run changed remote refs')
     assert.equal((await observations()).pullRequests.length, before.pullRequests.length)
+    const checked = await factoryApproval(id,signal)
+    const ledger = await json(accounts.owner,`/api/factory/tasks/${checked.id}/approval?view=ledger`)
+    const accepted = await json(accounts.owner,`/api/factory/tasks/${checked.id}/approval`,{operation:'accept',input:{binding:ledger.binding,eventId:randomUUID()}})
+    assert.equal(accepted.status,'accepted','human accepts a report without a merge')
+    await progress('item2-read-only','factory-accepted',checked.id)
     await progress('item2-read-only', 'evidence', id)
   })
   if (only.includes('3')) await check('item3-failure-stage', 240_000, async signal => {
@@ -377,7 +419,8 @@ async function cleanup() {
 process.once('SIGINT', () => { interrupted = true; releaseHold?.(); void cleanup() })
 process.once('SIGTERM', () => { interrupted = true; releaseHold?.(); void cleanup() })
 try {
-  await mkdir(resolve(root, '.cache/dev-local'), { recursive: true, mode: 0o700 })
+  await privateDirectory(resolve(root, '.cache'))
+  await privateDirectory(resolve(root, '.cache/dev-local'))
   const device = await setup()
   await accept(device)
   const finishedFingerprint = await fingerprint()

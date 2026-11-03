@@ -7,6 +7,7 @@ import { claimWorkerLease, releaseWorkerLease, renewWorkerLease } from './worker
 import * as provider from './e2b-provider'
 import { CloudWorkerError } from './worker-error'
 import { CLOUD_WORKER_COMMAND } from './worker-command'
+import { desktopGitHubConfig, installDesktopGitHub } from './desktop-github'
 
 type Actor = { userId: string; workspaceId: string }
 
@@ -20,6 +21,10 @@ export async function startCloudWorker(pool: Pool, actor: Actor, sandbox: Sandbo
   const leaseId = randomUUID()
   if (!await claimWorkerLease(pool, actor, sandbox.sandboxId, leaseId)) throw new Error('Cloud worker provisioning is busy or unavailable')
   const temporary = `/run/mikka-viewer/worker-${leaseId}.next`
+  // git and gh on the desktop get the owner's own GitHub credential (decision 2026-11-02-1600).
+  // A failure leaves them without it; the desktop itself still starts.
+  const github = (deviceId: string) => installDesktopGitHub(sandbox, desktopGitHubConfig(url.toString(), deviceId, protectionBypass))
+    .catch(() => console.warn('Desktop GitHub credential helper not installed', { sandboxId: sandbox.sandboxId }))
   try {
     const pinned = await sandbox.files.read('/opt/mikka/worker-source-sha', { user: 'root' })
     if (pinned.trim() !== sourceSha) throw new CloudWorkerError('worker_version_mismatch', sandbox.sandboxId)
@@ -28,7 +33,7 @@ export async function startCloudWorker(pool: Pool, actor: Actor, sandbox: Sandbo
       WHERE m."workspaceId"=$1 AND m."ownerId"=$2 AND m."sandboxId"=$3 AND d."ownerId"=$2 AND d.kind='cloud'
         AND d."lastSeenAt">now()-interval '60 seconds' AND t."lastUsedAt">now()-interval '2 minutes'
         AND t."revokedAt" IS NULL AND t."expiresAt">now()+interval '1 hour' LIMIT 1`, [actor.workspaceId, actor.userId, sandbox.sandboxId])
-    if (existing.rowCount) return { deviceId: existing.rows[0].id as string }
+    if (existing.rowCount) { await github(existing.rows[0].id as string); return { deviceId: existing.rows[0].id as string } }
     // Hosted tasks run the CLI directly on the machine (no sandbox, no container).
     // Pulling the obsolete hosted image here added 32s to a cold start.
     if (!await renewWorkerLease(pool, actor, leaseId)) throw new Error('Cloud worker lease expired')
@@ -39,6 +44,7 @@ export async function startCloudWorker(pool: Pool, actor: Actor, sandbox: Sandbo
     // no credential appears in a shell command, argument or environment.
     await sandbox.files.write(temporary, JSON.stringify({ deviceId: credential.deviceId, workspaceId: actor.workspaceId, credential: credential.token, server: url.toString(), ...(protectionBypass ? { protectionBypass } : {}) }), { user: 'root' })
     if (!await renewWorkerLease(pool, actor, leaseId)) throw new Error('Cloud worker lease expired')
+    await github(credential.deviceId)
     await sandbox.commands.run(`install -d -o user -g user -m 0700 /home/user/.mikka && install -o user -g user -m 0600 ${temporary} /home/user/.mikka/bootstrap.next && mv /home/user/.mikka/bootstrap.next /home/user/.mikka/bootstrap.json && unlink ${temporary}`, { user: 'root', timeoutMs: 10_000 })
     // 4e3: the worker process gets no workspace secrets. Each task receives its explicit user
     // variable set in the claim response (taskEnv) and the hosted runner passes only that into the task container.

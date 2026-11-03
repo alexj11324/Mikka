@@ -6,9 +6,9 @@ for (const provider of ['codex','claude'] as const) {
  it(`${provider} decodes credential-free worker quota metadata`,()=>{
   const quota=readSubscriptionQuota(provider,{status:200,body:body()});expect(quota.status).toBe('ok');expect(quota.windows[0]?.used).toBe(.2);expect(quota.source).toBe('official')
  })
- it(`${provider} refuses absent or enabled credit fallback`,()=>{
+ it(`${provider} uses subscription quota regardless of extra-usage settings`,()=>{
   for(const proof of [undefined,provider==='codex'?{has_credits:true,unlimited:false}:{is_enabled:true}]){
-   const data:Record<string,unknown>=body();data[provider==='codex'?'credits':'extra_usage']=proof;expect(readSubscriptionQuota(provider,{status:200,body:data}).status).toBe('unknown')
+   const data:Record<string,unknown>=body();data[provider==='codex'?'credits':'extra_usage']=proof;const quota=readSubscriptionQuota(provider,{status:200,body:data});expect(quota.status).toBe('ok');expect(quota.windows[0]?.used).toBe(.2)
   }
  })
  it(`${provider} handles denied and malformed responses without raw diagnostic output`,()=>{

@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { createHash, randomUUID } from 'node:crypto'
 import { Pool } from 'pg'
-import { decideLocalComputerReview, pendingLocalComputerReviews } from './local-reviews'
+import { decideLocalComputerReview, pendingLocalComputerReviews, syncLocalComputerReviews } from './local-reviews'
 import { localComputerAuthority } from './local-authority'
 import { isE2eTarget } from '../../tests/helpers/e2e-target.mjs'
 
@@ -66,6 +66,13 @@ test('local decisions bind owner, device, live run and exact digest, and cannot 
     await pool.query(`INSERT INTO local_computer_reviews VALUES ($1,$2,$3,'owner','target',NULL,'{"name":"click"}',$4,now()+interval '1 minute',now(),NULL)`, [otherReview, device, run, digest])
     await pool.query('INSERT INTO computer_run_bindings VALUES ($1)', [run])
     assert.equal(await decideLocalComputerReview(pool, 'owner', otherReview, digest, true), false)
+    // The daemon syncs every second: a snapshot without a review expires it once; rows already expired are not written again.
+    const version = async () => (await pool.query('SELECT id,"seenAt"=\'-infinity\'::timestamptz AS expired,xmin::text AS xmin FROM local_computer_reviews ORDER BY id')).rows
+    await syncLocalComputerReviews(pool, device, 'owner', [])
+    const expired = await version()
+    assert.ok(expired.every(row => row.expired))
+    await syncLocalComputerReviews(pool, device, 'owner', [])
+    assert.deepEqual(await version(), expired)
   } finally {
     await pool.end()
     console.log(`Retained local review test schema: ${schema}`)

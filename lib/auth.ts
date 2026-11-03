@@ -17,6 +17,7 @@ import { newUserAvatar } from '@/lib/default-avatar'
 import { daemonAuthorizationOptions, exchangeDaemonSession } from '@/lib/daemon-authorization'
 import { issueDeviceToken } from '@/lib/device-link'
 import { auditAuthentication } from '@/lib/audit/authentication'
+import { readFreshSessionsInScope, SESSION_OPTIONS } from '@/lib/fresh-session'
 
 /** The iOS app's URL scheme: OAuth returns here, and its requests carry it as their origin. */
 export const MOBILE_APP_ORIGIN = 'mikka://'
@@ -45,7 +46,17 @@ export const auth = betterAuth({
   account: { encryptOAuthTokens: true, accountLinking: { trustedProviders: [] } },
   databaseHooks: {
     // A new account without a picture gets a default avatar now; older accounts are left as they are.
-    user: { create: { before: async user => ({ data: { ...user, image: user.image || newUserAvatar(user.name || user.email) } }) } },
+    user: { create: {
+      before: async user => ({ data: { ...user, image: user.image || newUserAvatar(user.name || user.email) } }),
+      // Every person's first workspace is their personal one (decision 2026-11-02-1500). Loading any
+      // workspace page creates it too, so a failure here only delays it.
+      after: async user => {
+        try {
+          const { ensurePersonalWorkspace } = await import('@/lib/personal-workspace')
+          await ensurePersonalWorkspace({ id: user.id, email: user.email, name: user.name }, 'zh-CN')
+        } catch (error) { console.error('Personal workspace at sign-up failed', error instanceof Error ? error.name : 'UnknownError') }
+      },
+    } },
     account: {
       create: { before: async account => ({ data: { ...account, idToken: null } }) },
       update: { before: async account => ({ data: { ...account, idToken: null } }) },
@@ -140,9 +151,19 @@ export const auth = betterAuth({
       })
     }),
   },
-  session: { expiresIn: 60 * 60 * 24 * 7, updateAge: 60 * 60 * 24 },
-  ...(process.env.NODE_ENV === 'development' && authBaseURL?.startsWith('https://') ? { advanced: {
+  // Polls read the session from a signed cookie for up to 5 minutes instead of two queries each time (Alex
+  // 2026-11-02). Money, permissions, credentials and deletion read it fresh (lib/fresh-session.ts).
+  session: SESSION_OPTIONS,
+  advanced: {
+    // Migrations own the schema (scripts/migrate.mjs on every deploy). Better Auth's own check reads
+    // every column of every table from the catalog on each cold start, about 225 KB a time.
+    database: { validateSchema: false },
     // Partition preview sessions by top-level site when third-party cookies are blocked.
-    defaultCookieAttributes: { sameSite: 'none' as const, secure: true, partitioned: true },
-  } } : {}),
+    ...(process.env.NODE_ENV === 'development' && authBaseURL?.startsWith('https://') ? {
+      defaultCookieAttributes: { sameSite: 'none' as const, secure: true, partitioned: true },
+    } : {}),
+  },
 })
+
+// Inside withFreshSession (money, permissions, credentials, deletion) a session read skips the cookie cache.
+readFreshSessionsInScope(auth.api)

@@ -23,6 +23,34 @@ def fake(template):
     return opener, calls
 
 class Publish(unittest.TestCase):
+    def test_model_probe_requires_each_declared_harness_and_kills_only_its_sandbox(self):
+        calls = []
+        class Probe:
+            def __init__(self, reports):
+                self.commands = self
+                self.reports = reports
+            def run(self, command, **options):
+                calls.append((command, options))
+                return SimpleNamespace(exit_code=0, stdout=json.dumps(self.reports))
+            def kill(self): calls.append('killed')
+        reports = [{'harness': 'codex', 'installed': True, 'version': None, 'models': ['fixture-model']}]
+        factory = lambda *args, **kwargs: Probe(reports)
+        self.assertEqual(bt.probe_models('tpl1', 'codex', 'fixture-key', factory), reports)
+        self.assertIn('--probe-models', calls[0][0])
+        self.assertEqual(calls[-1], 'killed')
+        with self.assertRaisesRegex(RuntimeError, 'model_probe_missing claude_code'):
+            bt.probe_models('tpl1', 'desktop', 'fixture-key', factory)
+        self.assertEqual(calls[-1], 'killed')
+
+    def test_capability_manifest_matches_template_kinds_and_task_environment(self):
+        manifest = json.loads((bt.ROOT / 'scripts/e2b/template-capabilities.json').read_text())
+        self.assertEqual(set(manifest), set(bt.KINDS))
+        self.assertEqual(manifest, {'desktop': ['claude_code', 'codex'], 'claude': ['claude_code'], 'codex': ['codex']})
+        runtime = (bt.ROOT / 'lib/secrets/e2b-runtime.ts').read_text()
+        for harness, variable in [('claude_code', 'E2B_CLAUDE_TEMPLATE'), ('codex', 'E2B_CODEX_TEMPLATE')]:
+            self.assertIn(harness, runtime)
+            self.assertIn(variable, runtime)
+
     def test_runtime_files_do_not_replace_requested_template_name(self):
         class Recipe:
             def from_base_image(self): return self

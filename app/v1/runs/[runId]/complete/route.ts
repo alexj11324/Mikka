@@ -13,7 +13,7 @@ import { agentRuns, devices } from '@/lib/db/schema'
 import { dispatchCompletedIssue } from '@/lib/run-completion'
 import { UNFINISHED_RUN_STATUSES } from '@/lib/agent-run-statuses'
 import { ImprovementError } from '@/lib/self-improvement/contract'
-import { workspaceSecretMasker } from '@/lib/secrets/runtime'
+import { secretMaskerFor } from '@/lib/secrets/runtime'
 import { maskDeep } from '@/lib/secrets/mask'
 import { judgeRunOutcome } from '@/lib/run-outcome-judge'
 
@@ -35,7 +35,7 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ runI
   }
   let result: Awaited<ReturnType<typeof persistRunCompletion>>
   // 4e2 ②: report / error text from a cloud worker is masked before it is stored.
-  const completion = maskDeep(parsed.data, await workspaceSecretMasker(caller.scopeWorkspaceId))
+  const completion = maskDeep(parsed.data, await secretMaskerFor({ workspaceId: caller.scopeWorkspaceId, ownerId: caller.userId }))
   try { result = await persistRunCompletion(caller.userId, runId, completion, caller.scopeDeviceId) }
   catch (error) {
     if (error instanceof ImprovementError) return NextResponse.json({ error: error.code }, { status: 409 })

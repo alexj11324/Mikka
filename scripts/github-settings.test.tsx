@@ -366,36 +366,21 @@ test('an old save completing after dialog dismissal cannot discard the reopened 
   assert.equal(dialog.querySelector<HTMLInputElement>('#github-verification-command')?.value, 'pnpm newer')
 })
 
-test('only the pull request carries a control, allow or deny; the push reads as the GitHub App\'s own grant', async () => {
+test('every ability is listed with no control and the page never reads or saves a setting (R-77)', async () => {
   userId = 'viewer-permissions'
-  permissions = { viewerId: 'viewer-permissions', push: 'ask', pullRequest: 'allow', version: '3:4' }
-  await render()
-  await respondNotConnected(0, 'viewer-permissions')
-  await frame()
-  const groups = [...container.querySelectorAll('[role="group"]')]
-  assert.deepEqual(groups.map(group => group.getAttribute('aria-label')), ['githubTool.pullRequest'])
-  assert.ok(container.textContent?.includes('githubPushByApp'), '推送分支 shows 由 GitHub App 授权决定 instead of a switch')
-  const pressed = (group: Element) => [...group.querySelectorAll('button')].filter(button => button.getAttribute('aria-pressed') === 'true' || button.hasAttribute('data-pressed')).map(button => button.textContent)
-  const options = (group: Element) => [...group.querySelectorAll('button')].map(button => button.textContent)
-  assert.deepEqual(options(groups[0]), ['githubPermission.allow', 'githubPermission.deny'], 'what the App grants is never asked: no 询问')
-  assert.deepEqual(pressed(groups[0]), ['githubPermission.allow'])
-  const deny = [...groups[0].querySelectorAll('button')].find(button => button.textContent === 'githubPermission.deny')!
-  await act(async () => { deny.click() })
-  await frame()
-  assert.deepEqual(patches, [{ version: '3:4', pullRequest: 'deny' }])
-  assert.deepEqual(pressed(container.querySelectorAll('[role="group"]')[0]), ['githubPermission.deny'])
-})
-
-test('settings answered for another viewer are never shown or saved', async () => {
-  userId = 'viewer-own'
-  permissions = { viewerId: 'viewer-other', push: 'allow', pullRequest: 'allow', version: '1:1' }
-  await render()
-  await respondNotConnected(0, 'viewer-own')
-  await frame()
-  for (const group of container.querySelectorAll('[role="group"]')) {
-    assert.ok([...group.querySelectorAll('button')].every(button => button.disabled || button.hasAttribute('data-disabled')))
-    assert.ok(![...group.querySelectorAll('button')].some(button => button.getAttribute('aria-pressed') === 'true'))
-  }
+  permissions = { viewerId: 'viewer-permissions', push: 'allow', pullRequest: 'deny', version: '3:4' }
+  const requested: string[] = []
+  const original = globalThis.fetch
+  globalThis.fetch = (input, init) => { requested.push(String(input)); return original(input, init) }
+  try {
+    await render()
+    await respondNotConnected(0, 'viewer-permissions')
+    await frame()
+  } finally { globalThis.fetch = original }
+  assert.equal(container.querySelectorAll('[role="group"]').length, 0, 'no allow / deny segment')
+  for (const name of ['githubTool.push', 'githubTool.pullRequest', 'githubTool.readCode']) assert.ok(container.textContent?.includes(name), name)
+  assert.ok(!container.textContent?.includes('githubPushByApp'))
+  assert.ok(!requested.some(url => url.endsWith('/github/permissions')))
   assert.equal(patches.length, 0)
 })
 

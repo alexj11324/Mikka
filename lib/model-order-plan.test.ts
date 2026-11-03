@@ -1,15 +1,15 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { defaultOrder, deviceModel, planDispatch, type CredentialState, type OrderEntry, type PoolDevice } from './model-order-plan'
+import { agentsByOffer, defaultOrder, deviceModel, onPreferredAgent, pickDevice, planDispatch, whyNoDevice, type CredentialState, type OrderEntry, type PoolDevice } from './model-order-plan'
 
 // Model names here are fixtures standing for what a CLI or provider reported.
 const sub = (id: string, harness: OrderEntry['harness'], model: string, connectionId = `conn-${harness}`): OrderEntry => ({ id, harness, model, source: { kind: 'subscription', connectionId } })
 const key = (id: string, harness: OrderEntry['harness'], model: string): OrderEntry => ({ id, harness, model, source: { kind: 'api_key', keyId: 'key-1' } })
 const device = (id: string, over: Partial<PoolDevice> = {}): PoolDevice => ({
-  id, online: true, enabled: true,
+  id, name: id, online: true, enabled: true, server: false, activeRuns: 0, joinedAt: 0,
   harnesses: [
-    { harness: 'claude_code', installed: true, modelSlots: [{ slot: 'top', model: 'reported-claude-top', name: 'Top' }] },
-    { harness: 'codex', installed: true, models: ['reported-codex-a'] },
+    { harness: 'claude_code', installed: true, subscriptionBroker: true, modelSlots: [{ slot: 'top', model: 'reported-claude-top', name: 'Top' }] },
+    { harness: 'codex', installed: true, subscriptionBroker: true, models: ['reported-codex-a'] },
   ],
   ...over,
 })
@@ -18,9 +18,16 @@ const first = sub('1', 'claude_code', 'reported-claude-top')
 const second = sub('2', 'codex', 'reported-codex-a')
 const keyed = key('3', 'claude_code', 'key-model')
 
-test('the first allowed model that can run takes the run; the slot its CLI reported is what runs', () => {
+test('an allowance check that failed keeps the subscription preference and does not silently charge a key', () => {
+  const plan = planDispatch({ entries: [first, keyed], location: 'local', devices: [device('mac')], credential: entry => entry.id === first.id ? { usable: false, reason: 'checking' } : usable(), cloudReady: false })
+  assert.equal(plan.kind, 'none')
+  assert.equal(plan.kind === 'none' && plan.reason, 'checking')
+  assert.deepEqual(plan.skipped.map(item => item.block.reason), ['checking'])
+})
+
+test('the first allowed model that can run takes the run; the full provider model is what runs despite a CLI slot', () => {
   const plan = planDispatch({ entries: [first, second], location: 'local', devices: [device('mac')], credential: usable, cloudReady: false })
-  assert.deepEqual([plan.kind, plan.kind === 'device' && plan.entry.id, plan.kind === 'device' && plan.model], ['device', '1', 'top'])
+  assert.deepEqual([plan.kind, plan.kind === 'device' && plan.entry.id, plan.kind === 'device' && plan.model], ['device', '1', 'reported-claude-top'])
 })
 
 test('ordered fallback: quota used up, signed out, or no device moves to the next model, and says why each was skipped', () => {
@@ -28,24 +35,75 @@ test('ordered fallback: quota used up, signed out, or no device moves to the nex
   const plan = planDispatch({ entries: [first, second], location: 'local', devices: [device('mac')], credential, cloudReady: false })
   assert.equal(plan.kind === 'device' && plan.entry.id, '2')
   assert.deepEqual(plan.skipped.map(item => [item.entry.id, item.block.reason]), [['1', 'quota']])
-  const noClaude = planDispatch({ entries: [first, second], location: 'local', devices: [device('box', { harnesses: [{ harness: 'codex', installed: true, models: ['reported-codex-a'] }] })], credential: usable, cloudReady: false })
+  const noClaude = planDispatch({ entries: [first, second], location: 'local', devices: [device('box', { harnesses: [{ harness: 'codex', installed: true, subscriptionBroker: true, models: ['reported-codex-a'] }] })], credential: usable, cloudReady: false })
   assert.deepEqual([noClaude.kind === 'device' && noClaude.entry.id, noClaude.skipped.map(item => item.block.reason)], ['2', ['noDevice']])
   const expired = planDispatch({ entries: [first, second], location: 'local', devices: [device('mac')], credential: entry => entry.id === '2' ? usable() : { usable: false, reason: 'expired' }, cloudReady: false })
   assert.equal(expired.kind === 'device' && expired.entry.id, '2')
 })
 
-test('本地 picks at random among the devices that can run it, never one with 参与调度 off, offline, or without the model', () => {
+test('本地 picks only among the devices that can run it, never one with 参与调度 off, offline, or unable to take a subscription run', () => {
   const devices = [device('a'), device('off', { enabled: false }), device('down', { online: false }), device('b'),
-    device('other', { harnesses: [{ harness: 'claude_code', installed: true, models: ['reported-elsewhere'] }] })]
-  const picked = new Set<string>()
-  for (const value of [0, 0.49, 0.5, 0.99]) {
-    const plan = planDispatch({ entries: [first], location: 'local', devices, credential: usable, cloudReady: false, random: () => value })
-    if (plan.kind === 'device') picked.add(plan.deviceId)
-  }
-  assert.deepEqual([...picked].sort(), ['a', 'b'])
+    device('old', { harnesses: [{ harness: 'claude_code', installed: true, modelSlots: [{ slot: 'top', model: 'reported-claude-top', name: 'Top' }] }] })]
+  const busy = devices.map(item => item.id === 'a' ? { ...item, activeRuns: 1 } : item)
+  const plan = planDispatch({ entries: [first], location: 'local', devices: busy, credential: usable, cloudReady: false })
+  assert.equal(plan.kind === 'device' && plan.deviceId, 'b', 'the idle one of the two that can run it')
+  // Off, offline and old devices are never picked, however idle or server they are.
+  const tempting = devices.map(item => item.id === 'a' || item.id === 'b' ? { ...item, activeRuns: 9 } : { ...item, server: true })
+  const still = planDispatch({ entries: [first], location: 'local', devices: tempting, credential: usable, cloudReady: false })
+  assert.equal(still.kind === 'device' && still.deviceId, 'a')
   assert.equal(deviceModel(device('off', { enabled: false }), first), null, '参与调度 off: never sent a run')
   assert.equal(deviceModel(device('x'), keyed), 'key-model', 'an API key model runs on any installed Agent of its protocol')
   assert.equal(deviceModel(device('x', { harnesses: [] }), keyed), null)
+})
+
+test('a subscription model runs only where the daemon reported it; a daemon that reported no models needs an update', () => {
+  // Alex, 2026-11-03: no guessing. Installed with subscriptionBroker but no models reported (a daemon from before the model probe).
+  const silent = device('mac', { harnesses: [{ harness: 'claude_code', installed: true, subscriptionBroker: true }] })
+  const opus = sub('9', 'claude_code', 'account-opus')
+  assert.equal(deviceModel(silent, opus), null)
+  assert.deepEqual(whyNoDevice([silent], opus), { why: 'needsUpdate', device: 'mac', count: 1 })
+  // Reported models without this one: not sent there, and the reason says so.
+  assert.equal(deviceModel(device('mac'), opus), null)
+  assert.deepEqual(whyNoDevice([device('mac')], opus), { why: 'modelNotReported', device: 'mac', count: 1 })
+  // Reported, as a slot's resolved model or as a model id: it runs, and the provider model id is what runs.
+  assert.equal(deviceModel(device('mac'), first), 'reported-claude-top', 'a reported slot cannot replace the provider model identity')
+  assert.equal(deviceModel(device('mac'), sub('8', 'codex', 'reported-codex-a')), 'reported-codex-a')
+  // Two computers: only the one that reported it takes the run.
+  const reporting = device('reporting', { joinedAt: 5, harnesses: [{ harness: 'claude_code', installed: true, subscriptionBroker: true, modelSlots: [{ slot: 'opus', model: 'account-opus', name: 'Opus' }] }] })
+  const plan = planDispatch({ entries: [opus], location: 'local', devices: [silent, device('other'), reporting], credential: usable, cloudReady: false })
+  assert.deepEqual([plan.kind, plan.kind === 'device' && plan.deviceId, plan.kind === 'device' && plan.model], ['device', 'reporting', 'account-opus'])
+  // The claim is refused without a subscription broker; an API key model, which no CLI probe can list, still runs on the installed Agent.
+  const old = device('old', { harnesses: [{ harness: 'claude_code', installed: true }] })
+  assert.equal(deviceModel(old, opus), null)
+  assert.equal(deviceModel(old, keyed), 'key-model')
+})
+
+test('no computer can run it: the reason comes from the computer closest to running it', () => {
+  const opus = sub('9', 'claude_code', 'account-opus')
+  const old = (id: string) => device(id, { harnesses: [{ harness: 'claude_code', installed: true }] })
+  const codexOnly = (id: string) => device(id, { harnesses: [{ harness: 'codex', installed: true, subscriptionBroker: true }] })
+  assert.deepEqual(whyNoDevice([], opus), { why: 'none' })
+  assert.deepEqual(whyNoDevice([device('mac', { enabled: false })], opus), { why: 'off', device: 'mac', count: 1 })
+  assert.deepEqual(whyNoDevice([device('mac', { enabled: false }), device('box', { online: false })], opus), { why: 'offline', device: 'box', count: 1 })
+  assert.deepEqual(whyNoDevice([device('box', { online: false }), codexOnly('mac')], opus), { why: 'notInstalled', device: 'mac', count: 1 })
+  assert.deepEqual(whyNoDevice([codexOnly('mac'), old('MacBook Pro')], opus), { why: 'needsUpdate', device: 'MacBook Pro', count: 1 })
+  assert.deepEqual(whyNoDevice([old('a'), old('b'), device('c', { enabled: false })], opus), { why: 'needsUpdate', device: 'a', count: 2 })
+})
+
+test('本地 order: a server before a computer, then the fewest unfinished runs, then the one that joined first; the same input gives the same device', () => {
+  const mac = device('mac', { joinedAt: 1 })
+  const server = device('server', { server: true, joinedAt: 5 })
+  const plan = (devices: PoolDevice[]) => { const result = planDispatch({ entries: [first], location: 'local', devices, credential: usable, cloudReady: false }); return result.kind === 'device' ? result.deviceId : null }
+  assert.equal(plan([mac, server]), 'server', 'a server first, though the computer joined earlier and is listed first')
+  assert.equal(plan([mac, { ...server, activeRuns: 3 }]), 'server', 'a busy server still goes before an idle computer')
+  assert.equal(plan([mac, { ...server, online: false }]), 'mac', 'no server that can run it: a computer')
+  assert.equal(plan([mac, { ...server, enabled: false }]), 'mac', '参与调度 off: the computer')
+  const second = device('server-2', { server: true, joinedAt: 9 })
+  assert.equal(plan([second, server]), 'server', 'two idle servers: the one that joined first')
+  assert.equal(plan([{ ...server, activeRuns: 2 }, { ...second, activeRuns: 1 }]), 'server-2', 'two servers: the one with fewer unfinished runs')
+  assert.equal(plan([device('b'), device('a')]), 'a', 'a full tie: by id')
+  for (let i = 0; i < 5; i++) assert.equal(plan([mac, second, server]), 'server', 'stable: no randomness')
+  assert.equal(pickDevice([]), undefined)
 })
 
 test('a model the person picked for the thread goes first, before the list', () => {
@@ -56,17 +114,19 @@ test('a model the person picked for the thread goes first, before the list', () 
 })
 
 test('云端 runs the first usable model on the person\'s E2B machine', () => {
-  const plan = planDispatch({ entries: [first, second], location: 'cloud', devices: [], credential: entry => entry.id === '1' ? { usable: false, reason: 'paused' } : usable(), cloudReady: true })
+  const plan = planDispatch({ entries: [first, second], location: 'cloud', devices: [], credential: entry => entry.id === '1' ? { usable: false, reason: 'paused' } : usable(), cloudReady: true, cloudModel: () => 'ready' })
   assert.deepEqual([plan.kind, plan.kind === 'cloud' && plan.entry.id], ['cloud', '2'])
 })
 
 test('nothing can run: the card names why', () => {
-  assert.equal(planDispatch({ entries: [], location: 'local', devices: [device('mac')], credential: usable, cloudReady: true }).kind === 'none' && 'noModels', 'noModels')
+  assert.equal(planDispatch({ entries: [], location: 'local', devices: [device('mac')], credential: usable, cloudReady: true, cloudModel: () => 'ready' }).kind === 'none' && 'noModels', 'noModels')
+  const cloudOnly = planDispatch({ entries: [first], location: 'cloudOnly', devices: [device('mac')], credential: usable, cloudReady: false })
+  assert.deepEqual([cloudOnly.kind, cloudOnly.kind === 'none' && cloudOnly.reason], ['none', 'cloudNotConfigured'])
   const cloud = planDispatch({ entries: [first], location: 'cloud', devices: [], credential: usable, cloudReady: false })
-  assert.deepEqual([cloud.kind, cloud.kind === 'none' && cloud.reason], ['none', 'cloudNotConfigured'])
-  const local = planDispatch({ entries: [first, second], location: 'local', devices: [device('off', { enabled: false })], credential: usable, cloudReady: true })
+  assert.deepEqual([cloud.kind, cloud.kind === 'none' && cloud.reason], ['none', 'noDevice'])
+  const local = planDispatch({ entries: [first, second], location: 'local', devices: [device('off', { enabled: false })], credential: usable, cloudReady: true, cloudModel: () => 'ready' })
   assert.deepEqual([local.kind, local.kind === 'none' && local.reason], ['none', 'noDevice'])
-  const spent = planDispatch({ entries: [first, second], location: 'local', devices: [device('mac')], credential: () => ({ usable: false, reason: 'quota' }), cloudReady: true })
+  const spent = planDispatch({ entries: [first, second], location: 'local', devices: [device('mac')], credential: () => ({ usable: false, reason: 'quota' }), cloudReady: true, cloudModel: () => 'ready' })
   assert.deepEqual([spent.kind, spent.kind === 'none' && spent.reason], ['none', 'unavailable'])
 })
 
@@ -98,4 +158,53 @@ test('an untouched list: opus first, then the first Codex model reported, else t
   // An OpenAI-compatible key reports Codex models too.
   assert.deepEqual(models([{ harness: 'codex' as const, model: 'key-codex', name: 'key-codex', source: key('o') }]), ['key-codex'])
   assert.deepEqual(models([]), [], 'nothing connected: nothing')
+  // A DeepSeek key serves both Agents: alone, its first model on Claude Code; beside ChatGPT, ChatGPT's Codex model still comes second.
+  const both = deepseek.flatMap(item => [item, { ...item, harness: 'codex' as const }])
+  assert.deepEqual(defaultOrder(both).map(item => [item.model, item.harness]), [['reported-deepseek-chat', 'claude_code']])
+  assert.deepEqual(defaultOrder([...claude, ...chatgpt, ...both]).map(item => [item.model, item.harness]), [['reported-opus-x', 'claude_code'], ['reported-codex-top', 'codex']])
+  // 优先使用的 Agent Codex: the same DeepSeek model lands on Codex instead.
+  assert.deepEqual(defaultOrder(both, 'codex').map(item => [item.model, item.harness]), [['reported-deepseek-chat', 'codex']])
+  assert.deepEqual(defaultOrder([...claude, ...both], 'codex').map(item => [item.model, item.harness]), [['reported-opus-x', 'claude_code'], ['reported-deepseek-chat', 'codex']])
+  // Which Agents run each model and credential; one-Agent credentials are untouched by the preference.
+  assert.deepEqual(agentsByOffer(both).get(`reported-deepseek-chat\u0000d`), ['claude_code', 'codex'])
+  assert.deepEqual(onPreferredAgent([...claude, ...both], 'codex').map(item => item.harness), ['claude_code', 'claude_code', 'codex', 'codex'])
+})
+
+test('云端: the cloud, then a server, then a computer; a place is tried only when the one before it can run nothing', () => {
+  const server = device('box', { server: true })
+  const laptop = device('mac')
+  const where = (plan: ReturnType<typeof planDispatch>) => plan.kind === 'device' ? plan.deviceId : plan.kind
+  assert.equal(where(planDispatch({ entries: [first], location: 'cloud', devices: [laptop, server], credential: usable, cloudReady: true, cloudModel: () => 'ready' })), 'cloud')
+  assert.equal(where(planDispatch({ entries: [first], location: 'cloud', devices: [laptop, server], credential: usable, cloudReady: false })), 'box')
+  assert.equal(where(planDispatch({ entries: [first], location: 'cloud', devices: [laptop, device('box', { server: true, online: false })], credential: usable, cloudReady: false })), 'mac')
+  // A computer always comes last: a later model on a server goes before an earlier one on a computer.
+  const codexServer = device('box', { server: true, harnesses: [{ harness: 'codex', installed: true, subscriptionBroker: true, models: ['reported-codex-a'] }] })
+  const later = planDispatch({ entries: [first, second], location: 'cloud', devices: [laptop, codexServer], credential: usable, cloudReady: false })
+  assert.deepEqual([where(later), later.kind === 'device' && later.entry.id, later.skipped.map(item => [item.entry.id, item.block.reason])], ['box', '2', [['1', 'noDevice']]])
+})
+
+test('本地: a server, then a computer, never the cloud', () => {
+  const plan = planDispatch({ entries: [first], location: 'local', devices: [device('mac'), device('box', { server: true })], credential: usable, cloudReady: true, cloudModel: () => 'ready' })
+  assert.equal(plan.kind === 'device' && plan.deviceId, 'box')
+  const none = planDispatch({ entries: [first], location: 'local', devices: [], credential: usable, cloudReady: true, cloudModel: () => 'ready' })
+  assert.deepEqual([none.kind, none.kind === 'none' && none.reason], ['none', 'noDevice'])
+})
+
+test('a run the person put in the cloud goes nowhere else', () => {
+  const plan = planDispatch({ entries: [first], location: 'cloudOnly', devices: [device('box', { server: true })], credential: usable, cloudReady: true, cloudModel: () => 'ready' })
+  assert.equal(plan.kind, 'cloud')
+})
+
+test('a model whose allowance check failed stops the search in every place, unless one before it can run', () => {
+  const checking = (entry: OrderEntry): CredentialState => entry.id === '2' ? { usable: false, reason: 'checking' } : usable()
+  const stops = planDispatch({ entries: [first, second, keyed], location: 'cloud', devices: [device('box', { server: true, harnesses: [] })], credential: checking, cloudReady: false })
+  assert.deepEqual([stops.kind, stops.kind === 'none' && stops.reason], ['none', 'checking'])
+  const runs = planDispatch({ entries: [first, second, keyed], location: 'cloud', devices: [device('mac')], credential: checking, cloudReady: false })
+  assert.equal(runs.kind === 'device' && runs.entry.id, '1')
+})
+
+test('a configured cloud without measured template models cannot take a subscription run', () => {
+  const plan = planDispatch({ entries: [first], location: 'cloudOnly', devices: [], credential: usable, cloudReady: true })
+  assert.equal(plan.kind, 'none')
+  assert.equal(plan.kind === 'none' && plan.reason, 'cloudModelsUnknown')
 })

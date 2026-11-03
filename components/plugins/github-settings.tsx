@@ -3,11 +3,11 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
-import { ArrowUpRight, ChevronRight } from 'lucide-react'
+import { ArrowUpRight, ChevronRight, TriangleAlert } from 'lucide-react'
 import { toast } from 'sonner'
 import { AppTile, ToolGroup } from '@/components/plugins/connected-apps'
 import { SettingsSection } from '@/components/settings/primitives'
-import { Alert, AlertTitle } from '@/components/ui/alert'
+import { Alert, AlertAction, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -16,41 +16,51 @@ import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field
 import { Input } from '@/components/ui/input'
 import { InlineLoadError } from '@/components/load-error'
 import { SearchInput } from '@/components/ui/search-input'
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { withBasePath } from '@/lib/base-path'
 import { authClient } from '@/lib/auth-client'
 import { openPathInBrowser } from '@/lib/platform/open-settings'
-import { useCheckOnReturn } from '@/lib/hooks/use-check-on-return'
+import { useCheckOnReturn, useChecksUntilDone } from '@/lib/hooks/use-check-on-return'
+import { bridgeFromWindow, type MikkaWindow } from '@/lib/platform/detect'
+import { GITHUB_APP_INSTALL_URL } from '@/lib/github/repository-match'
 
 type GitHubRepository = { id: string; fullName: string; installationId: string; htmlUrl: string; private: boolean }
 type GitHubState = { viewerId: string; configured: boolean; connected: boolean; login?: string | null; installed: boolean; repositories: GitHubRepository[] }
 /** A readable state, or an account link GitHub no longer accepts. */
 type GitHubRead = { state: GitHubState; reconnect: false } | { state: null; reconnect: true }
-type Decision = 'allow' | 'ask' | 'deny'
-type Permissions = { pullRequest: Decision; version: string }
-type WriteAbility = keyof Omit<Permissions, 'version'>
 
 const githubKey = (userId: string) => ['integrations:github', userId] as const
-const permissionsKey = (userId: string) => ['integrations:github:permissions', userId] as const
 const CONNECT_PATH = withBasePath('/api/integrations/github/connect')
-const PERMISSIONS_PATH = withBasePath('/api/integrations/github/permissions')
+/** A notice, not an error: the browser is signed in as another account and nothing went wrong. */
+const NOTICE = 'border-transparent bg-warning/10'
+const INTENT_PATH = withBasePath('/api/integrations/github/connect/intent')
+const CONFIRM_PATH = withBasePath('/api/integrations/github/connect/intent/confirm')
+/** As long as the link token lives (lib/github/connect-intent.ts). */
+const LINK_WINDOW_MS = 10 * 60_000
+const INTENT_TOKEN = /^ghi_[A-Za-z0-9_-]{43}$/
+type IntentView = { state: 'expired' } | { state: 'waiting' | 'started'; browserAccount: string | null } | { state: 'otherAccount'; browserAccount: string; appAccount: string }
+
+const base64url = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+const randomKey = () => base64url(crypto.getRandomValues(new Uint8Array(32)))
+const s256 = async (value: string) => base64url(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))))
+
+async function readIntent(token: string): Promise<IntentView> {
+  const response = await fetch(`${INTENT_PATH}?token=${encodeURIComponent(token)}`, { cache: 'no-store' })
+  if (!response.ok) throw new Error(String(response.status))
+  return await response.json() as IntentView
+}
 const VERIFICATION_PATH = withBasePath('/api/integrations/github/repositories/verification')
-/** The Mikka GitHub App's page where a person picks which repositories it may reach. */
-const INSTALL_URL = 'https://github.com/apps/mikka-github/installations/new'
-/** 创建 Pull Request is allow or deny: what the App was granted is never asked again (decision 2026-11-01-1215). */
-const DECISIONS: readonly Decision[] = ['allow', 'deny']
+const INSTALL_URL = GITHUB_APP_INSTALL_URL
 
 /**
- * What an Agent does through this plugin, from the code that does it. Writes:
- * the pushed branch, which the GitHub App's own access decides (contents:
- * write on the repository, lib/github/push-grant.ts; nothing to set here), and
- * the pull request (lib/github/run-pull-request.ts) with allow / ask / deny.
- * Reads run directly (R-77): cloning, and the readbacks in
- * lib/github/user-access.ts and the run token's checks/actions read.
+ * What an Agent does through this plugin, from the code that does it. Every
+ * ability runs directly with the person's own GitHub credential (R-77,
+ * decision 2026-11-02-1600), so none has a control: pushing the branch, the
+ * pull request (lib/github/run-pull-request.ts), cloning, and the readbacks in
+ * lib/github/user-access.ts and the run's checks/actions read.
  * A new ability lands here with its code.
  */
 const ABILITIES = {
-  write: [{ id: 'push', setting: 'push' }, { id: 'pullRequest', setting: 'pullRequest' }] as const,
+  write: ['push', 'pullRequest'] as const,
   read: ['readCode', 'readPullRequest', 'readIssue', 'readChecks'] as const,
 }
 
@@ -66,26 +76,14 @@ async function readGitHub([, userId]: ReturnType<typeof githubKey>): Promise<Git
   return { state: next, reconnect: false }
 }
 
-const isDecision = (value: unknown): value is Decision => typeof value === 'string' && (DECISIONS as readonly string[]).includes(value)
-function readPermissions(userId: string, next: Partial<Permissions> & { viewerId?: unknown }): Permissions {
-  // push is shown as the GitHub App's own grant, so its stored value is not read here.
-  if (next.viewerId !== userId || !isDecision(next.pullRequest) || typeof next.version !== 'string') throw new Error('shape')
-  return { pullRequest: next.pullRequest, version: next.version }
-}
-async function fetchPermissions([, userId]: ReturnType<typeof permissionsKey>): Promise<Permissions> {
-  const response = await fetch(PERMISSIONS_PATH, { cache: 'no-store' })
-  if (!response.ok) throw new Error(String(response.status))
-  return readPermissions(userId, await response.json())
-}
-
 /** GitHub's page on 插件: header and link, what it does, the connection, repository access and its abilities. */
 export function GitHubSettings() {
   const { data: session, isPending } = authClient.useSession()
   const userId = !isPending ? session?.user.id : undefined
-  return <ViewerGitHubSettings key={userId ?? 'unconfirmed'} userId={userId} isPending={isPending} />
+  return <ViewerGitHubSettings key={userId ?? 'unconfirmed'} userId={userId} email={session?.user.email ?? ''} isPending={isPending} />
 }
 
-function ViewerGitHubSettings({ userId, isPending }: { userId: string | undefined; isPending: boolean }) {
+function ViewerGitHubSettings({ userId, email, isPending }: { userId: string | undefined; email: string; isPending: boolean }) {
   const t = useTranslations('Settings.integrations')
   const common = useTranslations('Common')
   // Cached across visits: a revisit shows the last state at once and re-checks it behind.
@@ -96,40 +94,93 @@ function ViewerGitHubSettings({ userId, isPending }: { userId: string | undefine
   // timer, so a quick revisit could skip the read. A mount effect reads instead.
   const { data, error, mutate } = useSWR(userId ? githubKey(userId) : null, readGitHub, { revalidateOnMount: false, revalidateOnFocus: false, shouldRetryOnError: false, dedupingInterval: 0 })
   useEffect(() => { if (userId) void mutate() }, [userId, mutate])
-  const permissions = useSWR(userId ? permissionsKey(userId) : null, fetchPermissions, { revalidateOnFocus: false, shouldRetryOnError: false })
   const githubState = error ? null : data?.state ?? null
   const githubReconnect = !error && Boolean(data?.reconnect)
   const githubLoading = isPending || (Boolean(userId) && !data && !error)
   const githubError = error ? t('githubLoadFailed') : githubReconnect ? t('githubReconnectRequired') : ''
   const [githubLinking, setGithubLinking] = useState(false)
   const [githubLinkError, setGithubLinkError] = useState('')
-  const [permissionError, setPermissionError] = useState('')
   const [confirming, setConfirming] = useState(false)
   const [browsing, setBrowsing] = useState(false)
 
-  // The link or installation finishes in another window: read once on the way back.
+  // From the desktop the link finishes in the system browser: every return reads again until it is done.
+  // `linking` is the app's one-time link token; `browserAccount` the other account the browser was signed in as.
+  const [linking, setLinking] = useState<string | null>(null)
+  const [browserAccount, setBrowserAccount] = useState<string | null>(null)
+  // The GitHub App installation opens in another window: read once on the way back.
   const checkOnReturn = useCheckOnReturn(() => { void mutate() })
+  const returns = useChecksUntilDone(() => {
+    void mutate()
+    if (linking) void readIntent(linking).then(view => setBrowserAccount(view.state === 'waiting' ? view.browserAccount : null)).catch(() => {})
+  })
+  // The desktop's loopback return for the link in progress: its state, and the verifier only this page holds.
+  const pendingReturn = useRef<{ returnState: string; verifier: string; token: string } | null>(null)
+  const stopChecks = returns.stop
+  useEffect(() => {
+    // Not linked this time: the page stops waiting and says why.
+    const notLinked = (message: string) => { stopChecks(); setLinking(null); setBrowserAccount(null); setGithubLinkError(message) }
+    const bridge = bridgeFromWindow(window as MikkaWindow)
+    if (!bridge || typeof bridge.app.onReturn !== 'function') return
+    return bridge.app.onReturn(({ state, result }) => {
+      const pending = pendingReturn.current
+      if (!pending || state !== pending.returnState) return
+      pendingReturn.current = null
+      if (result !== 'connected') { notLinked(result === 'cancelled' ? t('githubLinkCancelled') : t('githubLinkFailed')); return }
+      void fetch(CONFIRM_PATH, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ token: pending.token, verifier: pending.verifier }) })
+        .then(response => { if (!response.ok) throw new Error(String(response.status)) })
+        .then(() => mutate())
+        .catch(() => notLinked(t('githubLinkFailed')))
+    })
+  }, [mutate, stopChecks, t])
+  // In the browser, after a link from the app: the token in the URL, and what it says here.
+  const [browserIntent, setBrowserIntent] = useState<{ token: string; view: IntentView } | null>(null)
 
   useEffect(() => {
     if (!userId) return
     const url = new URL(window.location.href)
-    if (url.searchParams.get('github') !== 'link-failed') return
+    const token = url.searchParams.get('intent')
+    const failed = url.searchParams.get('github') === 'link-failed'
+    if (!failed && !token) return
     const reason = url.searchParams.get('reason')
     // 关联 GitHub in the header is the retry; the message says what happened.
-    setGithubLinkError(reason === 'cancelled' ? t('githubLinkCancelled') : reason === 'account' ? t('githubLinkAccountChanged') : t('githubLinkFailed'))
-    url.searchParams.delete('github')
-    url.searchParams.delete('reason')
+    // A browser signed in as another account: the intent says which two (below).
+    if (failed && reason !== 'browser-account') setGithubLinkError(reason === 'cancelled' ? t('githubLinkCancelled') : reason === 'account' ? t('githubLinkAccountChanged') : reason === 'expired' ? t('githubLinkExpired') : t('githubLinkFailed'))
+    if (token && INTENT_TOKEN.test(token)) void readIntent(token).then(view => setBrowserIntent({ token, view })).catch(() => setGithubLinkError(t('githubLinkFailed')))
+    for (const key of ['github', 'reason', 'intent']) url.searchParams.delete(key)
     window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`)
   }, [t, userId])
 
-  async function linkGitHub() {
+
+  async function linkGitHub(token = linking) {
     setGithubLinking(true); setGithubLinkError('')
     try {
       // The authorization has to finish in a real browser: the desktop hands it
-      // the GitHub start itself, which goes straight on to github.com.
-      const handoff = await openPathInBrowser(CONNECT_PATH)
-      if (handoff === 'desktop') { checkOnReturn(); return }
-      if (handoff === 'unsupported') { setGithubLinkError(t('browserUpdateRequired')); return }
+      // the GitHub start itself, with a one-time token naming this account.
+      // A desktop that takes the return on its loopback (RFC 8252) links this
+      // account whatever the browser is signed in as, and confirms it with a
+      // verifier only it holds once the return reaches this computer. An older
+      // one needs the browser signed in as this account, and otherwise says so.
+      const bridge = bridgeFromWindow(window as MikkaWindow)
+      if (bridge && typeof bridge.app.openExternal !== 'function') { setGithubLinkError(t('browserUpdateRequired')); return }
+      if (bridge) {
+        let loopback: { returnTo: string; returnState: string; challenge: string } | undefined
+        if (typeof bridge.app.prepareReturn === 'function') {
+          const verifier = randomKey(), returnState = randomKey()
+          loopback = { returnTo: await bridge.app.prepareReturn(returnState), returnState, challenge: await s256(verifier) }
+          pendingReturn.current = { returnState, verifier, token: '' }
+          token = null
+        }
+        if (!token) {
+          const response = await fetch(INTENT_PATH, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(loopback ? { loopback } : {}) })
+          if (!response.ok) throw new Error(String(response.status))
+          token = (await response.json() as { token: string }).token
+          if (pendingReturn.current) pendingReturn.current.token = token
+        }
+        await openPathInBrowser(`${CONNECT_PATH}?intent=${encodeURIComponent(token)}`)
+        setLinking(token); setBrowserAccount(null)
+        returns.arm(LINK_WINDOW_MS)
+        return
+      }
       // A plugin connection, not a sign-in link: it never touches the login identity.
       window.location.assign(CONNECT_PATH)
     } catch {
@@ -154,36 +205,23 @@ function ViewerGitHubSettings({ userId, isPending }: { userId: string | undefine
     }
   }
 
-  /** The segment moves at once; it goes back if the server refuses or the setting changed elsewhere. */
-  async function setPermission(ability: WriteAbility, value: Decision) {
-    const current = permissions.data
-    if (!userId || !current || current[ability] === value) return
-    setPermissionError('')
-    await permissions.mutate(async () => {
-      const response = await fetch(PERMISSIONS_PATH, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ version: current.version, [ability]: value }) })
-      if (!response.ok) throw new Error(String(response.status))
-      return readPermissions(userId, await response.json())
-    }, { optimisticData: { ...current, [ability]: value }, rollbackOnError: true, revalidate: false }).catch(() => {
-      setPermissionError(t('githubPermissionFailed'))
-      void permissions.mutate()
-    })
-  }
-
   const connected = Boolean(githubState?.connected)
-  const canLink = !connected && Boolean(githubState?.configured || githubReconnect)
+  // Linked: the returns stop and the page shows the connection at once.
+  const stopReturns = returns.stop
+  useEffect(() => { if (connected && linking) { stopReturns(); setLinking(null); setBrowserAccount(null) } }, [connected, linking, stopReturns])
+
+  /** The browser is signed in as another account: sign out here and back in as the app's, then go on with the same link. */
+  async function switchAccount(token: string) {
+    await authClient.signOut().catch(() => {})
+    window.location.assign(withBasePath(`/sign-in?next=${encodeURIComponent(`/?section=plugins&app=github&intent=${token}`)}`))
+  }
+  const browserView = browserIntent?.view
+  // In the browser during the app's link, the page's own 关联 GitHub would link this browser's account: the link's own buttons take its place.
+  const canLink = !connected && Boolean(githubState?.configured || githubReconnect) && !(browserIntent && (browserIntent.view.state === 'otherAccount' || browserIntent.view.state === 'waiting'))
   const status = githubLoading ? null : !userId ? t('githubSignInRequired') : githubState && !githubState.configured ? t('githubNotConfigured') : null
   const login = githubState?.login ? t('githubLogin', { login: githubState.login }) : t('github')
-  const errors = [githubError, githubLinkError, permissionError].filter(Boolean)
-  // 推送分支 is whatever the GitHub App was granted on GitHub: shown, not set (decision 2026-11-01-1215).
-  const control = (setting: WriteAbility | 'push', name: string) => setting === 'push'
-    ? <span className="text-xs text-muted-foreground">{t('githubPushByApp')}</span>
-    : <ToggleGroup aria-label={name} variant="segment" size="sm" spacing={0.5} disabled={!permissions.data} value={permissions.data ? [permissions.data[setting]] : []} onValueChange={values => {
-      const next = values[0]
-      if (isDecision(next) && next !== permissions.data![setting]) void setPermission(setting, next)
-    }}>
-      {DECISIONS.map(value => <ToggleGroupItem key={value} value={value}>{t(`githubPermission.${value}`)}</ToggleGroupItem>)}
-    </ToggleGroup>
-  const writes = ABILITIES.write.map(({ id, setting }) => ({ slug: setting, name: t(`githubTool.${id}`), description: '' }))
+  const errors = [githubError, githubLinkError, browserView?.state === 'expired' ? t('githubLinkExpired') : ''].filter(Boolean)
+  const writes = ABILITIES.write.map(id => ({ slug: id, name: t(`githubTool.${id}`), description: '' }))
   const reads = ABILITIES.read.map(id => ({ slug: id, name: t(`githubTool.${id}`), description: '' }))
 
   return <div className="flex flex-col gap-8">
@@ -191,10 +229,32 @@ function ViewerGitHubSettings({ userId, isPending }: { userId: string | undefine
       <AppTile app="github" size="xl" />
       <h2 className="min-w-0 flex-1 text-xl font-semibold">{t('github')}</h2>
       {githubLoading ? <span role="status" className="sr-only">{t('githubLoading')}</span>
-        : canLink ? <Button type="button" disabled={githubLinking} onClick={() => void linkGitHub()}>{githubLinking ? t('working') : t('githubLink')}</Button>
+        : canLink ? <span className="flex items-center gap-3">
+          {linking && <span role="status" className="text-xs text-muted-foreground">{t('githubLinkWaiting')}</span>}
+          <Button type="button" disabled={githubLinking} onClick={() => void linkGitHub()}>{githubLinking ? t('working') : t('githubLink')}</Button>
+        </span>
         : status && <span className="text-xs text-muted-foreground">{status}</span>}
     </header>
     {errors.map(message => <Alert key={message} variant="destructive" className="border-transparent bg-destructive/10"><AlertTitle>{message}</AlertTitle></Alert>)}
+    {/* The app: its browser is signed in as another account, so nothing was linked. The browser page offers the switch. */}
+    {!connected && linking && browserAccount && <Alert role="status" className={NOTICE}>
+      <TriangleAlert aria-hidden="true" className="text-warning-foreground" />
+      <AlertTitle>{t('githubLinkOtherAccount', { browser: browserAccount, app: email })}</AlertTitle>
+      <AlertDescription>{t('githubLinkUpdateHint')}</AlertDescription>
+      <AlertAction><Button type="button" variant="secondary" size="sm" disabled={githubLinking} onClick={() => void linkGitHub(linking)}>{t('githubOpenBrowser')}</Button></AlertAction>
+    </Alert>}
+    {/* The browser: signed in as another account than the app that started the link. */}
+    {!connected && browserIntent && browserView?.state === 'otherAccount' && <Alert role="status" className={NOTICE}>
+      <TriangleAlert aria-hidden="true" className="text-warning-foreground" />
+      <AlertTitle>{t('githubLinkOtherAccount', { browser: browserView.browserAccount, app: browserView.appAccount })}</AlertTitle>
+      <AlertDescription>{t('githubLinkUpdateHint')}</AlertDescription>
+      <AlertAction><Button type="button" variant="secondary" size="sm" onClick={() => void switchAccount(browserIntent.token)}>{t('githubSwitchAccount')}</Button></AlertAction>
+    </Alert>}
+    {/* The browser, now signed in as the app's account: the same link goes on. */}
+    {!connected && browserIntent && browserView?.state === 'waiting' && <Alert className="border-transparent bg-muted">
+      <AlertTitle>{t('githubLinkReady')}</AlertTitle>
+      <AlertAction><Button type="button" size="sm" onClick={() => window.location.assign(`${CONNECT_PATH}?intent=${encodeURIComponent(browserIntent.token)}`)}>{t('githubContinueLink')}</Button></AlertAction>
+    </Alert>}
 
     <p className="max-w-prose text-sm text-muted-foreground">{t('githubDescription')}</p>
 
@@ -220,8 +280,7 @@ function ViewerGitHubSettings({ userId, isPending }: { userId: string | undefine
     </SettingsSection></PageSection>}
 
     <PageSection id="github-abilities-heading" title={t('githubAbilitiesHeading')} summary={t('githubAbilitiesSummary', { count: writes.length + reads.length, write: writes.length, read: reads.length })}>
-      {/* Rows keep one height in both groups, with or without a control. */}
-      <ToolGroup label={t('writeTools', { count: writes.length })} tools={writes} uniformRows control={tool => control(tool.slug as WriteAbility | 'push', tool.name)} />
+      <ToolGroup label={t('writeTools', { count: writes.length })} tools={writes} uniformRows />
       <ToolGroup label={t('readTools', { count: reads.length })} tools={reads} uniformRows />
     </PageSection>
 

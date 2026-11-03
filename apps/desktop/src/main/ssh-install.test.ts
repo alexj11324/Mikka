@@ -3,7 +3,8 @@ import { test } from 'node:test'
 import { mkdtemp, readFile, rm, mkdir, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { SshInstaller, parseHostDetails, parseHosts, parseTarget, runProcess, type SshInstallState } from './ssh-install'
+import { LOCAL_RECONNECT, LOCAL_TARGET } from '@mikka/protocol/bridge'
+import { SshInstaller, loginShell, parseHostDetails, parseHosts, parseTarget, runProcess, type SshInstallState } from './ssh-install'
 
 test('SSH host parsing rejects options, commands and invalid ports', () => {
   assert.deepEqual(parseTarget('deploy@build-01:2222'), { destination: 'deploy@build-01', host: 'build-01', port: '2222' })
@@ -188,3 +189,157 @@ test('cancel during host discovery and fingerprint confirmation never installs',
     await assert.rejects(installer.accept(installer.state()!.id))
   }
 })
+
+function localInstaller(flavor: 'prod' | 'dev', status = '{"server":"online","deviceId":"this-mac"}') {
+  const events: SshInstallState[] = []
+  const calls: { command: string; args: string[]; input?: string }[] = []
+  let minted = 0
+  let finish!: () => void
+  const done = new Promise<void>(resolve => { finish = resolve })
+  const installer = new SshInstaller('https://example.com/mikka', async () => { minted++; return 'private-token' }, state => {
+    events.push(state)
+    if (state.status === 'online' || state.status === 'failed') finish()
+  }, async (command, args, input) => {
+    calls.push({ command, args, input })
+    if (args.at(-1)?.startsWith('mikka daemon status')) return status
+    return ''
+  }, '/home/nobody', undefined, undefined, flavor, { command: '/bin/zsh', args: script => ['-lc', script] }, async () => true)
+  return { installer, events, calls, done, minted: () => minted }
+}
+
+test('添加这台电脑 installs, starts and signs in the daemon here as a laptop, with no SSH', async () => {
+  const t = localInstaller('prod')
+  const first = await t.installer.beginLocal()
+  assert.equal(first?.target, LOCAL_TARGET)
+  await t.done
+  assert.equal(t.installer.state()?.status, 'online')
+  assert.equal(t.installer.state()?.deviceId, 'this-mac')
+  assert.ok(t.calls.every(call => call.command === '/bin/zsh' && call.args[0] === '-lc'), 'every step runs in the login shell')
+  assert.equal(t.calls.some(call => ['ssh', 'ssh-keygen', 'ssh-keyscan'].includes(call.command)), false)
+  const scripts = t.calls.map(call => call.args[1])
+  assert.ok(scripts.includes('npm install --global @aspectlylabs/mikka'))
+  assert.ok(scripts.includes("mikka daemon service install --server 'https://example.com/mikka' --device-type laptop"))
+  assert.equal(t.minted(), 1)
+  assert.equal(t.calls.filter(call => call.input === 'private-token\n').length, 1)
+  assert.equal(JSON.stringify(t.calls.map(call => call.args)).includes('private-token'), false)
+  assert.deepEqual([...new Set(t.events.map(state => state.step))], ['check', 'install', 'service', 'connect'])
+})
+
+test('a dev desktop adds its own dev daemon', async () => {
+  const t = localInstaller('dev')
+  await t.installer.beginLocal()
+  await t.done
+  const scripts = t.calls.map(call => call.args[1])
+  assert.ok(scripts.includes("mikka daemon service install --server 'https://example.com/mikka' --device-type laptop --dev"))
+  assert.ok(scripts.includes("mikka daemon login --server 'https://example.com/mikka' --registration-token-stdin --dev"))
+  assert.ok(scripts.includes('mikka daemon status --dev'))
+})
+
+test('重新连接 for this computer restarts its daemon and waits; it neither installs nor signs in again', async () => {
+  const t = localInstaller('prod')
+  const first = await t.installer.restartLocal()
+  assert.equal(first?.target, LOCAL_RECONNECT)
+  await t.done
+  assert.equal(t.installer.state()?.status, 'online')
+  const scripts = t.calls.map(call => call.args[1])
+  assert.deepEqual(scripts, ["mikka daemon service install --server 'https://example.com/mikka' --device-type laptop", 'mikka daemon status'])
+  assert.equal(t.minted(), 0)
+})
+
+test('the login shell is $SHELL when it is a plain path, else the platform default', () => {
+  assert.equal(loginShell({ SHELL: '/opt/homebrew/bin/fish' }, 'darwin').command, '/opt/homebrew/bin/fish')
+  assert.equal(loginShell({}, 'darwin').command, '/bin/zsh')
+  assert.equal(loginShell({ SHELL: '/bin/bash; rm -rf ~' }, 'linux').command, '/bin/sh')
+  assert.deepEqual(loginShell({}, 'linux').args('mikka daemon status'), ['-lc', 'mikka daemon status'])
+})
+
+test('automatic repair restarts a daemon that is already set up, without installing or signing in again', async () => {
+  const t = localInstaller('prod')
+  const first = await t.installer.repairLocal()
+  assert.equal(first?.target, LOCAL_TARGET)
+  await t.done
+  assert.equal(t.installer.state()?.status, 'online')
+  assert.deepEqual(t.calls.map(call => call.args[1]), ["mikka daemon service install --server 'https://example.com/mikka' --device-type laptop", 'mikka daemon status'])
+  assert.equal(t.minted(), 0)
+})
+
+test('automatic repair never reports another account\'s recovered daemon as this person\'s device', async () => {
+  const events: SshInstallState[] = []
+  let deviceId = 'device-a', minted = 0
+  let finish!: () => void
+  const done = new Promise<void>(resolve => { finish = resolve })
+  const installer = new SshInstaller('https://example.com/mikka', async () => { minted++; return 'private-token-b' }, state => {
+    events.push(state)
+    if (state.status === 'online' || state.status === 'failed') finish()
+  }, async (_command, args) => {
+    const script = args[1]
+    if (script.startsWith('mikka daemon login')) deviceId = 'device-b'
+    if (script.startsWith('mikka daemon status')) return JSON.stringify({ server: 'online', deviceId })
+    return ''
+  }, '/home/nobody', undefined, undefined, 'prod', { command: '/bin/zsh', args: script => ['-lc', script] }, async (id: string) => id === 'device-b')
+  await installer.repairLocal()
+  await done
+  assert.equal(installer.state()?.deviceId, 'device-b')
+  assert.equal(minted, 1)
+  assert.ok(events.every(state => state.status !== 'online' || state.deviceId === 'device-b'))
+})
+
+test('an unconfirmed account fails repair without registering again or reporting online', async () => {
+  let minted = 0
+  let finish!: () => void
+  const done = new Promise<void>(resolve => { finish = resolve })
+  const installer = new SshInstaller('https://example.com/mikka', async () => { minted++; return 'private-token' }, state => {
+    if (state.status === 'online' || state.status === 'failed') finish()
+  }, async (_command, args) => args[1].startsWith('mikka daemon status') ? '{"server":"online","deviceId":"device-a"}' : '',
+  '/home/nobody', undefined, undefined, 'prod', { command: '/bin/sh', args: script => ['-lc', script] }, async () => { throw new Error('session changed or unavailable') })
+  await installer.repairLocal('owner-a')
+  await done
+  assert.equal(installer.state()?.status, 'failed')
+  assert.equal(installer.state()?.reason, 'Device account could not be confirmed')
+  assert.equal(minted, 0)
+})
+
+test('automatic repair installs and signs in when the restart fails (first launch)', async () => {
+  const events: SshInstallState[] = []
+  const scripts: string[] = []
+  let restartFailed = false
+  let finish!: () => void
+  const done = new Promise<void>(resolve => { finish = resolve })
+  const installer = new SshInstaller('https://example.com/mikka', async () => 'private-token', state => {
+    events.push(state)
+    if (state.status === 'online' || state.status === 'failed') finish()
+  }, async (_command, args) => {
+    scripts.push(args[1])
+    if (args[1].startsWith('mikka daemon service install') && !restartFailed) { restartFailed = true; throw new Error('zsh: command not found: mikka') }
+    if (args[1].startsWith('mikka daemon status')) return '{"server":"online","deviceId":"this-mac"}'
+    return ''
+  }, '/home/nobody', undefined, undefined, 'prod', { command: '/bin/zsh', args: script => ['-lc', script] }, async () => true)
+  await installer.repairLocal()
+  await done
+  assert.equal(installer.state()?.status, 'online')
+  assert.ok(scripts.includes('npm install --global @aspectlylabs/mikka'))
+  assert.ok(scripts.some(script => script.startsWith('mikka daemon login')))
+  assert.equal(events.every(state => state.target === LOCAL_TARGET), true)
+})
+
+test('a failed automatic install keeps the reason and 重试 installs again', async () => {
+  let attempt = 0
+  let settle!: (state: SshInstallState) => void
+  let settled = new Promise<SshInstallState>(resolve => { settle = resolve })
+  const installer = new SshInstaller('https://example.com/mikka', async () => 'private-token', state => {
+    if (state.status === 'online' || state.status === 'failed') settle(state)
+  }, async (_command, args) => {
+    if (args[1] === 'npm install --global @aspectlylabs/mikka' && attempt++ === 0) throw new Error('npm ERR! code EACCES')
+    if (args[1].startsWith('mikka daemon status')) return '{"server":"online","deviceId":"this-mac"}'
+    return ''
+  }, '/home/nobody', undefined, undefined, 'prod', { command: '/bin/zsh', args: script => ['-lc', script] }, async () => true)
+  await installer.beginLocal()
+  const failed = await settled
+  assert.equal(failed.status, 'failed')
+  assert.equal(failed.step, 'install')
+  assert.match(failed.reason ?? '', /EACCES/)
+  settled = new Promise<SshInstallState>(resolve => { settle = resolve })
+  await installer.beginLocal()
+  assert.equal((await settled).status, 'online')
+})
+

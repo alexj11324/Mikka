@@ -5,6 +5,7 @@ import { auth } from '@/lib/auth'
 import { withBasePath } from '@/lib/base-path'
 import { mobileWebTarget } from '@/lib/mobile-web-target'
 import { handoffSessionCookie, openHandoff, sealHandoff } from '@/lib/mobile-handoff'
+import { mobileWebWorkspace, MobileWebScopeError } from '@/lib/mobile-web-scope'
 import en from '@/messages/en.json'
 import zh from '@/messages/zh-CN.json'
 
@@ -29,17 +30,19 @@ async function handleGET(request: Request) {
       method: 'POST', headers: { 'content-type': 'application/json', origin: url.origin }, body: JSON.stringify({ token }),
     }))
     if (!exchanged.ok) throw new Error('Mobile handoff token unavailable')
-    const session = await exchanged.json() as { user: { email: string } }
+    const session = await exchanged.json() as { user: { id: string; email: string } }
+    const workspaceId = await mobileWebWorkspace(session.user.id, target)
     const headers = exchanged.headers
     const csrf = randomBytes(32).toString('base64url')
-    const state = sealHandoff({ cookies: headers.getSetCookie(), target, origin: url.origin, csrf, expires: Date.now() + 60_000 }, (await auth.$context).secret)
+    const state = sealHandoff({ cookies: headers.getSetCookie(), target, workspaceId, origin: url.origin, csrf, expires: Date.now() + 60_000 }, (await auth.$context).secret)
     if (state.length > 3500) throw new Error('Mobile handoff cookie exceeds browser limit')
     const copy = (request.headers.get('accept-language')?.startsWith('zh') ? zh : en).MobileHandoff
     const html = `<!doctype html><html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escape(copy.title)}</title><main><h1>${escape(copy.title)}</h1><p>${escape(session.user.email)}</p><form method="post" action="${escape(path)}"><input type="hidden" name="csrf" value="${csrf}"><button type="submit">${escape(copy.confirm)}</button></form><a href="${escape(withBasePath(target))}">${escape(copy.cancel)}</a></main></html>`
     const result = new NextResponse(html, { headers: { ...safeHeaders, 'Content-Type': 'text/html; charset=utf-8' } })
     result.cookies.set(pendingCookie, state, cookieOptions(request))
     return result
-  } catch {
+  } catch (error) {
+    if (error instanceof MobileWebScopeError) return new NextResponse(null, { status: 403, headers: safeHeaders })
     return NextResponse.redirect(new URL(withBasePath(target), url.origin), { status: 303, headers: safeHeaders })
   }
 }
@@ -55,9 +58,14 @@ async function handlePOST(request: Request) {
   if (!state || state.origin !== url.origin || typeof csrf !== 'string' || !same(state.csrf, csrf)) return new NextResponse(null, { status: 403, headers: safeHeaders })
   const session = await auth.api.getSession({ headers: new Headers({ cookie: handoffSessionCookie(state.cookies) }), query: { disableCookieCache: true } })
   if (!session) return new NextResponse(null, { status: 403, headers: safeHeaders })
+  let workspaceId: string | null
+  try { workspaceId = await mobileWebWorkspace(session.user.id, state.target) }
+  catch { return new NextResponse(null, { status: 403, headers: safeHeaders }) }
+  if (workspaceId !== (state.workspaceId ?? null)) return new NextResponse(null, { status: 403, headers: safeHeaders })
   const response = NextResponse.redirect(new URL(withBasePath(mobileWebTarget(state.target)), url.origin), { status: 303, headers: safeHeaders })
   // Expire only this ephemeral credential, preserving session revocation semantics.
   response.cookies.set(pendingCookie, '', { ...cookieOptions(request), maxAge: 0 })
+  if (workspaceId) response.cookies.set('mikka-workspace', workspaceId, { httpOnly: true, sameSite: 'lax', secure: url.protocol === 'https:', path: '/', maxAge: 31536000 })
   for (const value of state.cookies) response.headers.append('set-cookie', value)
   return response
 }

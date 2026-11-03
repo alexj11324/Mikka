@@ -69,7 +69,15 @@ export async function deliverWake(claim: WakeClaim, deps: {
   hasWaking(scope: WakeScope): Promise<boolean>
   start(scope: WakeScope): Promise<void>
   failed(claim: WakeClaim, code: 'wake_failed' | 'triage_pending'): Promise<void>
+  /** The last attempt did not start a turn: nothing will run to tell the person, so this does. Its failure never changes the outcome. */
+  exhausted?(claim: WakeClaim): Promise<void>
 }): Promise<'started' | 'deferred' | 'failed'> {
+  const outcome = await attempt(claim, deps)
+  if (outcome !== 'started' && claim.attempt >= MAX_WAKE_ATTEMPTS && deps.exhausted) await deps.exhausted(claim).catch(() => undefined)
+  return outcome
+}
+
+async function attempt(claim: WakeClaim, deps: Parameters<typeof deliverWake>[1]): Promise<'started' | 'deferred' | 'failed'> {
   try {
     await deps.triage(claim)
     if (!await deps.hasWaking(claim)) {

@@ -6,13 +6,13 @@ import { decryptOAuthToken, setTokenUtil } from 'better-auth/oauth2'
 import { db } from '@/lib/db'
 import { githubConnections } from '@/lib/db/schema'
 import { auth } from '@/lib/auth'
-import { authOAuthProxyOptions, resolveAppOrigin } from '@/lib/auth-config'
+import { resolveAppOrigin } from '@/lib/auth-config'
 import { withBasePath } from '@/lib/base-path'
 
 // Plugins → GitHub connects a GitHub account for repository access without
-// touching the Better Auth login identity. It reuses the GitHub App's one
-// registered callback URL; the auth route hands a callback to this module only
-// when its state matches the cookie set here.
+// touching the Better Auth login identity. It reuses the GitHub App's callback
+// path on this deployment's origin; the auth route hands a callback to this
+// module only when its state matches the cookie set here (or a loopback link).
 export const GITHUB_CONNECT_COOKIE = 'mikka-github-connect'
 export const GITHUB_CALLBACK_PATH = withBasePath('/api/auth/callback/github')
 const STATE_TTL_SECONDS = 600
@@ -20,8 +20,11 @@ const STATE_TTL_SECONDS = 600
 export type GitHubConnection = { githubAccountId: string; githubLogin: string }
 type TokenResponse = { access_token: string; expires_in?: number; refresh_token?: string; refresh_token_expires_in?: number }
 
-// The same origin Better Auth registers its GitHub callback on (lib/auth.ts).
-const callbackBase = () => authOAuthProxyOptions(process.env)?.productionURL ?? resolveAppOrigin(process.env)
+// The origin the link starts on, never the sign-in proxy hub: the proxy relays
+// sign-in only, and a preview's link landing on the hub would reach production
+// with a state production does not hold (decision 2026-11-03-0315). An origin
+// the GitHub App has not registered gets GitHub's redirect_uri error.
+const callbackBase = () => resolveAppOrigin(process.env)
 
 function callbackURL() {
   const base = callbackBase()
@@ -41,6 +44,17 @@ export function startGitHubConnect(userId: string) {
     url: url.toString(),
     cookie: { name: GITHUB_CONNECT_COOKIE, value: `${state}.${userId}`, options: { httpOnly: true, sameSite: 'lax' as const, secure: callbackURL().startsWith('https:'), path: GITHUB_CALLBACK_PATH, maxAge: STATE_TTL_SECONDS } },
   }
+}
+
+/**
+ * GitHub's authorization for a desktop link (lib/github/connect-intent.ts): its
+ * own state, and PKCE with S256, which GitHub supports for GitHub App user
+ * authorization ("strongly recommended", plain is not supported).
+ */
+export function githubAuthorizeURL(state: string, codeChallenge: string) {
+  const url = new URL('https://github.com/login/oauth/authorize')
+  url.search = new URLSearchParams({ client_id: process.env.GITHUB_CLIENT_ID!, redirect_uri: callbackURL(), state, allow_signup: 'false', code_challenge: codeChallenge, code_challenge_method: 'S256' }).toString()
+  return url.toString()
 }
 
 /** The user who started this connect flow, when the callback's state is ours. */
@@ -93,9 +107,26 @@ async function sealedTokens(token: TokenResponse) {
 
 /** Store (or replace) this user's connection. Other users' connections to the same GitHub account are untouched. */
 export async function saveGitHubConnection(userId: string, identity: GitHubConnection, token: TokenResponse) {
-  const values = { ...identity, ...await sealedTokens(token), updatedAt: new Date() }
+  await saveSealedGitHubConnection(userId, identity, await sealedTokens(token))
+}
+
+export type SealedGitHubTokens = Awaited<ReturnType<typeof sealedTokens>>
+
+/** The same, from tokens already sealed (a desktop link's answer that waited for the app). */
+export async function saveSealedGitHubConnection(userId: string, identity: GitHubConnection, sealed: SealedGitHubTokens) {
+  const values = { ...identity, ...sealed, updatedAt: new Date() }
   await db.insert(githubConnections).values({ userId, ...values }).onConflictDoUpdate({ target: githubConnections.userId, set: values })
 }
+
+/** A desktop link's code: exchanged with its PKCE verifier; the answer comes back sealed, not stored. */
+export async function exchangeGitHubCode(code: string, codeVerifier: string): Promise<{ identity: GitHubConnection; sealed: SealedGitHubTokens }> {
+  const token = await postToken({ code, redirect_uri: callbackURL(), code_verifier: codeVerifier })
+  return { identity: await githubUser(token.access_token), sealed: await sealedTokens(token) }
+}
+
+/** Sealed like the tokens, for the server's own PKCE verifier while GitHub has the person. */
+export const sealGitHubSecret = (value: string) => seal(value)
+export const unsealGitHubSecret = (value: string) => unseal(value)
 
 export async function completeGitHubConnect(userId: string, code: string) {
   const token = await postToken({ code, redirect_uri: callbackURL() })
@@ -111,15 +142,27 @@ export async function disconnectGitHub(userId: string) {
   await db.delete(githubConnections).where(eq(githubConnections.userId, userId))
 }
 
-/** A usable user token for this user's connection, refreshed when it has expired; null without a connection. */
-export async function githubConnectionToken(userId: string): Promise<{ token: string; githubAccountId: string } | null> {
+/**
+ * A usable user token for this user's connection, refreshed when it expires
+ * within `minValidityMs`; null without a connection. `expiresAt` is null for a
+ * token GitHub gave no expiry.
+ */
+export async function githubConnectionToken(userId: string, { minValidityMs = 60_000 }: { minValidityMs?: number } = {}): Promise<{ token: string; githubAccountId: string; expiresAt: Date | null } | null> {
+  const fresh = (expiresAt: Date | null) => !expiresAt || expiresAt.getTime() > Date.now() + minValidityMs
   const [row] = await db.select().from(githubConnections).where(eq(githubConnections.userId, userId)).limit(1)
   if (!row) return null
-  if (!row.accessTokenExpiresAt || row.accessTokenExpiresAt.getTime() > Date.now() + 60_000) {
-    return { token: await unseal(row.accessToken), githubAccountId: row.githubAccountId }
-  }
-  if (!row.refreshToken || (row.refreshTokenExpiresAt && row.refreshTokenExpiresAt.getTime() <= Date.now())) throw new Error('GitHub connection expired')
-  const token = await postToken({ grant_type: 'refresh_token', refresh_token: await unseal(row.refreshToken) })
-  await db.update(githubConnections).set({ ...await sealedTokens(token), updatedAt: new Date() }).where(eq(githubConnections.userId, userId))
-  return { token: token.access_token, githubAccountId: row.githubAccountId }
+  if (fresh(row.accessTokenExpiresAt)) return { token: await unseal(row.accessToken), githubAccountId: row.githubAccountId, expiresAt: row.accessTokenExpiresAt }
+  // GitHub rotates the refresh token on use, so concurrent refreshes (several
+  // runs of one person) must not each spend it: one holds the row, the others
+  // wait and read the token it saved.
+  return db.transaction(async tx => {
+    const [locked] = await tx.select().from(githubConnections).where(eq(githubConnections.userId, userId)).for('update')
+    if (!locked) return null
+    if (fresh(locked.accessTokenExpiresAt)) return { token: await unseal(locked.accessToken), githubAccountId: locked.githubAccountId, expiresAt: locked.accessTokenExpiresAt }
+    if (!locked.refreshToken || (locked.refreshTokenExpiresAt && locked.refreshTokenExpiresAt.getTime() <= Date.now())) throw new Error('GitHub connection expired')
+    const token = await postToken({ grant_type: 'refresh_token', refresh_token: await unseal(locked.refreshToken) })
+    const sealed = await sealedTokens(token)
+    await tx.update(githubConnections).set({ ...sealed, updatedAt: new Date() }).where(eq(githubConnections.userId, userId))
+    return { token: token.access_token, githubAccountId: locked.githubAccountId, expiresAt: sealed.accessTokenExpiresAt }
+  })
 }

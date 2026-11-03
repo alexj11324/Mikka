@@ -56,7 +56,8 @@ func (w *Worker) NativeStream(ctx context.Context, epoch int64, request NativeRe
 		return ErrUnavailable
 	}
 	var body struct {
-		Model string `json:"model"`
+		Model  string `json:"model"`
+		Stream bool   `json:"stream"`
 	}
 	if len(request.Body) > 262144 || json.Unmarshal(request.Body, &body) != nil || !modelPattern.MatchString(body.Model) || len(request.Headers) > 32 {
 		return ErrUnsupported
@@ -143,9 +144,12 @@ func (w *Worker) NativeStream(ctx context.Context, epoch int64, request NativeRe
 	}
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
-		return ErrProvider
+		return providerStatusFailure(response.StatusCode)
 	}
 	contentType := strings.Split(response.Header.Get("Content-Type"), ";")[0]
+	if contentType == "" && w.Scope.Provider == "codex" && body.Stream {
+		contentType = "text/event-stream"
+	}
 	if contentType != "text/event-stream" && contentType != "application/json" {
 		return ErrProvider
 	}

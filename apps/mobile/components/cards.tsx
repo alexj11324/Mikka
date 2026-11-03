@@ -23,8 +23,8 @@ export function CardButton({ label, onPress, primary, disabled, busy, destructiv
   return (
     <Pressable accessibilityRole="button" accessibilityState={{ disabled: Boolean(disabled), busy: Boolean(busy) }} disabled={disabled || busy} onPress={onPress}
       style={({ pressed }) => [styles.button, primary ? styles.primary : styles.secondary, pressed && { opacity: 0.8 }, disabled && { opacity: 0.4 }]}>
-      {busy ? <Spinner size={14} color={primary ? '#fff' : colors.secondary} /> : null}
-      <Text style={[styles.buttonText, primary ? { color: '#fff' } : destructive ? { color: colors.danger } : null]}>{label}</Text>
+      {busy ? <Spinner size={14} color={primary ? colors.onInk : colors.secondary} /> : null}
+      <Text style={[styles.buttonText, primary ? { color: colors.onInk } : destructive ? { color: colors.danger } : null]}>{label}</Text>
     </Pressable>
   )
 }
@@ -48,7 +48,7 @@ export const cardText = StyleSheet.create({
 })
 
 const styles = StyleSheet.create({
-  card: { alignSelf: 'stretch', backgroundColor: '#fff', borderRadius: 14, padding: 16, gap: 12, ...lift },
+  card: { alignSelf: 'stretch', backgroundColor: colors.surface, borderRadius: 14, padding: 16, gap: 12, ...lift },
   highlighted: { shadowColor: colors.accent, shadowOpacity: 0.35, shadowRadius: 14 },
   button: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 40, paddingHorizontal: 18, borderRadius: 20 },
   primary: { backgroundColor: colors.ink },

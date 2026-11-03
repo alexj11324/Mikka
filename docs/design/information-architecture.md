@@ -75,7 +75,7 @@ referenced by id (DDD).
 | Connection | Link to an outside app | Connection · account | `composio_accounts.userId` (`schema.ts:727-741`), `github_connections.userId` (`:399`), `linear_connections.userId` (`:169`), `telegram_links` | 插件 › an app | 插件, and 设置 › 连接 (same `PluginsView`) | 插件 rail page |
 | App policy | What members' connections may do here | Workspace · workspace | `workspace_app_policies.workspaceId` (`lib/db/app-policy-schema.ts:4`) | — | 设置 › 团队权限 | 设置 › 团队权限 |
 | Secret / env var | Value injected into the workspace's runs | Secret · workspace | `workspace_secrets (workspaceId, scopeType, scopeRef, createdBy)` (`lib/db/secrets-schema.ts:8-23`); injected by `loadWorkspaceRuntimeSecrets` (`lib/secrets/runtime.ts:20`) | 设置 › 密钥与环境 (`lib/secrets/store.ts:124`) | 设置 › 密钥与环境 | 设置 › 密钥与环境 |
-| Model credential | Subscription login or API key | Credentials · account | `byos_connections.ownerId` (+ legacy `workspaceId`), `model_api_keys.ownerId`, `user_e2b_keys.userId`; shares `workspace_subscription_shares`, `model_api_key_shares` (drizzle `20261027164503`, `20261101021000`, `20261101020201`) | 设置 › API 与订阅 | 设置 › API 与订阅 (shares: team only) | 设置 › API 与订阅; bot model chip (R-11) |
+| Model credential | Subscription login or API key | Credentials · account | `byos_connections.ownerId` (+ legacy `workspaceId`), `model_api_keys.ownerId`, `user_e2b_keys.userId`; shares `workspace_subscription_shares`, `model_api_key_shares` (drizzle `20261027164503`, `20261101021000`, `20261101020201`) | 设置 › 模型与订阅 | 设置 › 模型与订阅 (shares: team only) | 设置 › 模型与订阅; bot model chip (R-11) |
 | Credits, allowance, billing | What a workspace spends and pays | Billing · workspace | `workspace_billing`, `workspace_credit_grants` (`schema.ts:1151-1180`), `hosted_allowances`, `hosted_usage` (drizzle `20261030230000`); `workspace_payment_designations`, `workspace_credit_shares` (team) | Stripe webhook (`lib/billing/service.ts:145`); allowance on verification | 设置 › 用量, 计费 | 设置 › 用量, 计费 |
 | Notifications | Pushes and alerts about runs and chats | Account · account | `user_preferences` switches (`components/settings/notifications-settings.tsx:9`), `mobile_push_tokens.userId` (`schema.ts:1071`) | — | 设置 › 通知 | Web: none; desktop: system notification and Dock badge for 等你 (`platforms.md`); phone: push |
 | Memory | Facts about the person | Account · account | `user_facts.userId` (`schema.ts:664`) | Extracted from chats | 设置 › 记忆与建议 | 设置 › 记忆与建议 |
@@ -149,8 +149,8 @@ terms) and tenancy rule.
 | 通知 (`notifications`) | Account | Account | T6 | Account | The person's pushes |
 | 记忆与建议 (`memory`) | Account | Account (profile memory) | T6; 2310 | Account | Facts about the person |
 | 连接 (`connections`) | Account | Connection | T6; 2240 | Account | Runs only the owner's bots |
-| API 与订阅 (`models`) | Account; 分享给团队成员 team-only | Model credential; share | T6, T2 | Matches (`settings-view.tsx:153`) | Credential is the person's, the share is between people |
-| 登录与密钥 (`logins`) | Account | Account | T6 | Account | Saved logins are the person's |
+| 模型与订阅 (`models`) | Account credentials; per-person workspace thread defaults; 分享给团队成员 team-only | Model credential; share | T6, T2 | Matches (`settings-view.tsx:153`) | Credential is the person's, the share is between people |
+| 密钥与登录 (`logins`) | Account | Account | T6 | Account | Saved logins are the person's |
 | 数据与隐私 (`privacy`) | Account | Account | T6 | Account | Export and deletion of the person |
 | 设备 (`computers`) | Account | Device | T6 | Account | The person's machines |
 | 个人访问令牌 (`developer`, unbuilt) | Open | — | T6 vs storage | Unbuilt; stored per workspace (M13) | Decide before shipping |
@@ -169,6 +169,22 @@ related settings by type" (account group vs workspace group); IA-7 (show few
 options: a personal workspace hides only what cannot apply); PM:`empty-nav-state`
 (a destination that does not apply is explained, not silently hidden: the
 personal 常规 row 「个人工作区不能删除」 in #895).
+
+### Model settings within the page
+
+The `models` page has two explicit scopes. **账号** groups subscriptions, API
+keys and the account-wide API-key-after-quota preference. **工作区 · <name>**
+groups this person's thread default order, preferred Agent, run location and
+sharing in that workspace. The E2B key itself still belongs to the account.
+A bot composer's model picker controls the next chat reply for that bot; it
+does not override a dispatched thread's selected model or credential.
+
+Account subscription cards label **聊天已选用** from the current workspace's
+actual bot choices. A historical binding is not current use, and two
+Coordinators in different workspaces are not one bot. Per-row repair links
+land on the matching subscription, API key or devices section; the quota
+check uses server-authorized access, including a current team share. See
+[subscription and execution settings](subscription-execution-settings.md).
 
 ## 5. Navigation tree
 
@@ -207,7 +223,7 @@ Card
     ├── a thread: 对话 / 验收, composer at the bottom, ended or not (#892)
     └── 浏览器
 设置 (same frame, R-35; /settings?section=…, /settings/members, /settings/teams)
-├── 账号: 账户 · 安全 · 偏好设置 · 通知 · 记忆与建议 · 连接 · API 与订阅 · 登录与密钥 · 数据与隐私 · 设备
+├── 账号: 账户 · 安全 · 偏好设置 · 通知 · 记忆与建议 · 连接 · 模型与订阅 · 密钥与登录 · 数据与隐私 · 设备
 ├── <workspace name>: 常规 · 成员* · 团队* · Bot 与 Agents · 团队权限* · 密钥与环境 · 审计日志* · 用量 · 计费   (* team-only)
 └── 你的团队: one row per team, 创建团队 (shared workspace only)
 ```
@@ -272,7 +288,7 @@ threads sit only inside the panel of the bot that dispatched them.
 | Device | 设备 | Device |
 | Connection / plugin store | 连接 / 插件 | Connections / Plugins |
 | Secrets and environment | 密钥与环境 | Secrets and environment |
-| API and subscriptions | API 与订阅 | API and subscriptions |
+| Models and subscriptions | 模型与订阅 | Models and subscriptions |
 | Credits / free allowance / subscription quota | 点数 / 免费额度 / 订阅额度 | Credits / free allowance / subscription quota |
 | Usage / billing | 用量 / 计费 | Usage / Billing |
 | Right panel / overview | 右栏 / 概览 | Right panel / Overview |
@@ -285,7 +301,7 @@ threads sit only inside the panel of the bot that dispatched them.
 | L2 | `lib/settings-sections.ts:44` vs `en.json` | "Bots and agents" (search title) vs "Bots & Agents" | One string; the search reads `title` |
 | L3 | `settings-sections.ts` vs `zh-CN.json` vs `mobile.md` | "Memory" vs 记忆与建议 vs 记忆; 建议 is also a rail page | 记忆 for the section (ChatGPT, Claude) |
 | L4 | Settings vs rail vs `docs/settings.md` | 连接 vs 插件 vs "Integrations" for the same `PluginsView` | Keep 插件 for the store, 连接 for linked apps; fix `docs/settings.md` |
-| L5 | Section id `models`; decisions 2130, 2225; `Coordinator.subscriptionRefusal.open` | 「API 与订阅」 vs 「模型与额度」, which the Coordinator's refusal card still shows as its link | 「API 与订阅」 in the string; old decisions are history |
+| L5 | Section id `models`; decisions 2130, 2225; `Coordinator.subscriptionRefusal.open` | 「模型与订阅」 vs 「模型与额度」, which the Coordinator's refusal card still shows as its link | 「模型与订阅」 in the string; old decisions are history |
 | L11 | `Billing.allowance.section`, `Settings.apiKeys.afterQuota` | 额度 means both the free allowance and a subscription's quota | 免费额度 and 订阅额度, never bare 额度 |
 | L6 | Settings group vs page vs menu | 账号 (group), 账户 (page), 「账户菜单」 (menu that also switches workspaces) | Menu label 账号菜单 |
 | L7 | `zh-CN.json` `Nav.workspace` (`components/nav-main.tsx:43`) | 工作空间 vs 工作区 | 工作区 (C-06) |

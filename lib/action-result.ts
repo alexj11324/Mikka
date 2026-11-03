@@ -9,6 +9,8 @@ export const ACTION_ERROR_CODES = [
   'executionRuleOrderInvalid',
   'executionCommandNotFound',
   'executionAccountUnavailable',
+  'threadModelUnavailable',
+  'runModelMissing',
   'authRequired',
   'SESSION_NOT_FRESH',
   'validationGeneric',
@@ -168,6 +170,9 @@ export const ACTION_ERROR_CODES = [
   'billingPlanInvalid',
   'billingProviderFailed',
   'savedLoginNotFound',
+  'savedLoginSiteInvalid',
+  'savedLoginInvalid',
+  'savedLoginsUnavailable',
   'deviceHasActiveRuns',
 ] as const
 

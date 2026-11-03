@@ -52,8 +52,10 @@ async function post(body: unknown, signal?: AbortSignal) {
  * The subscriptions are their own group on 「API 与订阅」; API keys are the
  * next one (decision 2026-11-02-1200).
  */
-export function SubscriptionSettings({ workspaceId }: { workspaceId: string }) {
+/** `heading` replaces the section title where the rows appear outside Settings (the first-run guide's 绑定订阅). */
+export function SubscriptionSettings({ workspaceId, workspaceName, heading }: { workspaceId: string; workspaceName?: string; heading?: string }) {
   const t = useTranslations('Settings.subscriptions')
+  const scopeT = useTranslations('Settings.modelScope')
   // Cached per workspace: a return to the page shows the last list at once and re-reads it behind.
   const list = useSWR(subscriptionsKey(workspaceId), () => readSubscriptions(workspaceId), { revalidateOnFocus: false })
   const state = list.data ?? null
@@ -73,7 +75,7 @@ export function SubscriptionSettings({ workspaceId }: { workspaceId: string }) {
   const connectedKey = state?.connections.filter(item => item.state === 'connected').map(item => `${item.id}:${item.revision}`).join(',') ?? ''
   const { mutate } = list
   // The allowed models' candidates follow the connected accounts.
-  // The workspace's own SWR cache (workspace-app.tsx), not swr's global one: 启用 and a disconnect re-read 允许使用的模型.
+  // The workspace's own SWR cache (workspace-app.tsx), not swr's global one: 启用 and a disconnect re-read 优先使用的模型.
   const { mutate: mutateCached } = useSWRConfig()
   const refresh = useCallback(async () => { await mutate(); void mutateCached(modelOrderKey(workspaceId)) }, [mutate, mutateCached, workspaceId])
   const failureMessage = useCallback((failure: unknown, key: 'startFailed' | 'finishFailed', provider: Provider) => {
@@ -201,12 +203,12 @@ export function SubscriptionSettings({ workspaceId }: { workspaceId: string }) {
       : !state.enabled ? <p role="status" className="px-1 text-sm text-muted-foreground">{t('serviceOff')}</p> : null
   // First visit only: rows the size of the provider rows, so nothing moves when the list arrives.
   if (!state && !loadFailed) return <div role="status" aria-label={t('loading')} className="flex flex-col gap-1">
-    <SettingsSection id="subscriptions-heading" title={t('heading')}>
+    <SettingsSection id="subscriptions-heading" title={heading ?? t('heading')}>
       {(['codex', 'claude'] as const).map(provider => <SubscriptionRowSkeleton key={provider} provider={provider} label={t(provider)} />)}
     </SettingsSection>
   </div>
   if (status || !state) return <section className="flex flex-col gap-1" aria-labelledby="subscriptions-heading">
-    <h2 id="subscriptions-heading" className="pl-1 text-sm font-medium">{t('heading')}</h2>
+    <h2 id="subscriptions-heading" className="pl-1 text-sm font-medium">{heading ?? t('heading')}</h2>
     {status}
   </section>
   // The oldest read on screen, so the line never overstates how fresh a meter is.
@@ -216,7 +218,7 @@ export function SubscriptionSettings({ workspaceId }: { workspaceId: string }) {
   }) : []
   const updated = reads.length > 0 ? Math.max(0, Math.floor((now - Math.min(...reads)) / 60_000)) : null
   return <div className="flex flex-col gap-1">
-    <SettingsSection id="subscriptions-heading" title={t('heading')}>
+    <SettingsSection id="subscriptions-heading" title={heading ?? t('heading')}>
       {(['codex', 'claude'] as const).map(provider => {
         const available = state.providers.some(item => item.provider === provider && item.available)
         const connections = state.connections.filter(item => item.provider === provider)
@@ -238,16 +240,15 @@ export function SubscriptionSettings({ workspaceId }: { workspaceId: string }) {
                 const failed = live && (usage === 'failed' || read?.status === 'unavailable')
                 // reauth: the runtime's own reconnect_required, or the provider refused this read.
                 const reauth = connection.state === 'reconnect_required' || read?.status === 'reauth'
-                const refused = read?.status === 'extra_usage' || read?.status === 'unverified'
                 const paused = connection.paused === true
-                const healthy = live && !reauth && !refused && !paused
+                const healthy = live && !reauth && !paused
                 const account = read?.account ?? connection.account ?? null
                 const plan = read?.plan ? planName(read.plan) : null
                 const product = plan ? t(provider === 'codex' ? 'codexPlan' : 'claudePlan', { plan }) : t(provider === 'codex' ? 'codexProduct' : 'claudeProduct')
-                const bots = connection.bots ?? []
+                const bots = connection.bots?.filter(bot => bot.workspaceId === workspaceId) ?? []
                 const signingIn = starting?.id === connection.id || attempt?.connectionId === connection.id
                 const canReconnect = available && !pending && !attempt
-                return <div key={connection.id} className="flex flex-col gap-3 px-5 py-4">
+                return <div key={connection.id} id={`subscription-${connection.id}`} tabIndex={-1} className="flex scroll-mt-6 flex-col gap-3 px-5 py-4">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div className={cn('flex min-w-0 items-center gap-3 transition-opacity duration-150', paused && 'opacity-50')}>
                       <Logo className={cn('size-5 shrink-0 text-foreground', provider === 'claude' && 'text-brand-claude')} />
@@ -259,12 +260,12 @@ export function SubscriptionSettings({ workspaceId }: { workspaceId: string }) {
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-2 sm:justify-end">
                       {/* The 启用 switch says on or off; the label speaks only for other states. */}
                       {!healthy && !(paused && live && !reauth && !signingIn) && <span className="flex items-center gap-1.5 text-xs whitespace-nowrap text-muted-foreground">
-                        {(reauth || (refused && !paused)) && <span aria-hidden="true" className="size-1.5 rounded-full bg-warning" />}
-                        {reauth ? t('reauth') : paused ? t('paused') : refused ? t('notInUse') : t('notConnected')}
+                        {reauth && <span aria-hidden="true" className="size-1.5 rounded-full bg-warning" />}
+                        {reauth ? t('reauth') : paused ? t('paused') : t('notConnected')}
                       </span>}
                       {mine?.connectionId === connection.id && catching && <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={cancel}>{t('cancel')}</Button>}
                       {(reauth || !live || signingIn) && <SignInButton busy={signingIn} disabled={!canReconnect} label={t('reconnect')} busyLabel={t('connecting')} onClick={() => { void connect(provider, connection) }} />}
-                      {/* 启用, labelled like 设备's 参与调度: off, its models in 允许使用的模型 read 订阅已停用 and no run or chat uses it. */}
+                      {/* 启用, labelled like 设备's 参与调度: off, its models in 优先使用的模型 read 订阅已停用 and no run or chat uses it. */}
                       {live && !reauth && !signingIn && <Label className="flex items-center gap-2 font-normal text-muted-foreground">
                         <span aria-hidden="true" className="max-sm:hidden">{t('enabled')}</span>
                         <Switch checked={!paused} disabled={pending || !!attempt} aria-label={t('useSubscription', { label: account ?? product })} onCheckedChange={checked => { void setPaused(connection, !checked) }} />
@@ -282,12 +283,11 @@ export function SubscriptionSettings({ workspaceId }: { workspaceId: string }) {
                     </div>
                   </div>
                   {(live || reauth) && <div className={cn('flex flex-col gap-2 transition-opacity duration-150 sm:pl-8', paused && 'opacity-50')}>
-                    {refused && <p className="text-xs text-foreground">{read?.status === 'unverified' ? t('extraUsageUnverified') : provider === 'claude' ? `${t('extraUsageOn')} · ${t('extraUsageClaudeFix')}` : t('extraUsageOn')}</p>}
                     {failed
                       ? <span className="flex items-center gap-2 text-xs text-muted-foreground">{t('quotaUnavailable')}<Button type="button" variant="secondary" size="xs" disabled={usageLoading} onClick={reloadUsage}>{t('retry')}</Button></span>
                       : read && read.windows.length > 0 && <QuotaMeters windows={read.windows} now={now} />}
                     {bots.length > 0 && <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                      {t('usedBy')}
+                      {t('selectedBy', { workspace: workspaceName ?? scopeT('currentWorkspace') })}
                       {bots.map(bot => <span key={bot.id} className="flex items-center gap-1 text-foreground"><BotAvatar color={bot.color} shape={bot.shape} size="row" label={bot.name} />{bot.name}</span>)}
                     </span>}
                   </div>}

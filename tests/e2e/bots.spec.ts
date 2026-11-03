@@ -111,6 +111,34 @@ test('发送失败的消息留在对话里，点重试后发出', async ({ page 
   await expect(page.getByRole('region', { name: '与 Coordinator 的对话', exact: true }).getByText('发送失败时保留', { exact: true })).toHaveCount(1)
 })
 
+// Usability review N3: offline, a send says so (「没有网络，未发送」) and keeps 重试; back online, 重试 sends it once.
+test.describe('断网', () => {
+  // Offline, the send's fresh session read cannot load: the browser logs that, which is what this test provokes.
+  test.use({ allowedConsoleErrors: [{ path: '/mikka/api/auth/get-session?disableCookieCache=true', message: 'Failed to load resource: net::ERR_INTERNET_DISCONNECTED' }] })
+test('断网时发送的消息说明没有网络，保留重试', async ({ page, context }, testInfo) => {
+  await register(page)
+  const composer = page.getByLabel('给 Coordinator 发消息', { exact: true })
+  await hydrated(composer)
+  await composer.fill('断网时发出的消息')
+  await context.setOffline(true)
+  try {
+    await composer.press('Enter')
+    const failed = page.getByTestId('failed-message')
+    await expect(failed.getByRole('alert')).toHaveText(/^没有网络，未发送/)
+    await expect(failed.getByRole('button', { name: '重试', exact: true })).toBeVisible()
+    for (const scheme of ['light', 'dark'] as const) {
+      await page.emulateMedia({ colorScheme: scheme })
+      await testInfo.attach(`chat-offline-${scheme}`, { body: await page.screenshot(), contentType: 'image/png' })
+    }
+    await page.emulateMedia({ colorScheme: 'light' })
+  } finally { await context.setOffline(false) }
+  const failed = page.getByTestId('failed-message')
+  await failed.getByRole('button', { name: '重试', exact: true }).click()
+  await expect(failed).toHaveCount(0)
+  await expect(page.getByRole('region', { name: '与 Coordinator 的对话', exact: true }).getByText('断网时发出的消息', { exact: true })).toHaveCount(1)
+})
+})
+
 // A28: the limit is visible near the edge, and over-long input is truncated
 // without throwing away what the person already typed.
 test('接近长度上限时显示计数，超长输入被截断但不清空', async ({ page }) => {
@@ -154,7 +182,8 @@ test('手机顶栏在 Bot 对话里显示 Bot 名字', async ({ page }) => {
   await newBot(page, '前端助手')
   await page.setViewportSize({ width: 390, height: 844 })
   await page.reload()
-  const title = page.getByRole('navigation', { name: '当前位置', exact: true })
+  // A chat's phone header names it with its pill, in place of a breadcrumb (R-82, #829).
+  const title = page.locator('[data-slot="conversation-pill"]:visible')
   await expect(title).toHaveText('前端助手')
   await expect(page.getByLabel('给 前端助手 发消息', { exact: true })).toBeVisible()
 

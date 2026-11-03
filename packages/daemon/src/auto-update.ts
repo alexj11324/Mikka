@@ -7,7 +7,6 @@ import { readJson, writeJsonAtomic } from './fs-util'
 
 const exec = promisify(execFile)
 const PACKAGE = '@aspectlylabs/mikka'
-const DAY = 24 * 60 * 60 * 1000
 
 export function newerStableVersion(candidate: unknown, current: string): candidate is string {
   const stable = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/
@@ -27,8 +26,8 @@ export async function runServiceNpm(args: string[]): Promise<string> {
   return stdout.trim()
 }
 
+/** The server names the release (heartbeat, commands poll, refused claim); the daemon never asks npm which one is latest. */
 export interface AutoUpdateRuntime {
-  latest(): Promise<string>
   install(version: string): Promise<void>
 }
 
@@ -43,17 +42,35 @@ export async function managedAutoUpdateRuntime(entry: string, flavor: string, en
     const globalRoot = await runServiceNpm(['root', '--global'])
     if (realpathSync(join(globalRoot, PACKAGE)) !== root || file !== join(root, 'mikka.js')) return
     return {
-      latest: async () => JSON.parse(await runServiceNpm(['view', `${PACKAGE}@latest`, 'version', '--json'])) as string,
       install: async version => { await runServiceNpm(['install', '--global', '--engine-strict', `${PACKAGE}@${version}`]) },
     }
   } catch { return undefined }
 }
 
-export async function checkLatestVersion(file: string, current: string, runtime: AutoUpdateRuntime, now = Date.now()): Promise<string | undefined> {
-  const state = readJson(file) as { lastAttemptAt?: number } | undefined
-  if (typeof state?.lastAttemptAt === 'number' && now - state.lastAttemptAt < DAY) return
-  // Persist before network I/O: a failed registry request must not retry after restart.
-  writeJsonAtomic(file, { lastAttemptAt: now })
-  const latest = await runtime.latest()
-  return newerStableVersion(latest, current) ? latest : undefined
+type UpdateFailureCode = 'install_failed' | 'restart_failed'
+interface UpdateState {
+  /** The last failed install of `version`; cleared by the restart into a newer version. */
+  failure?: { version: string; code: UpdateFailureCode; at: number; attempts: number }
+}
+const readState = (file: string) => (readJson(file) ?? {}) as UpdateState
+/** Waits after the 1st, 2nd and later failed installs of the same version. */
+const RETRY_AFTER = [5 * 60_000, 30 * 60_000, 2 * 60 * 60_000]
+
+/** False while a failed install of this version is backing off. */
+export function updateAllowed(file: string, version: string, now = Date.now()): boolean {
+  const failure = readState(file).failure
+  if (failure?.version !== version) return true
+  return now - failure.at >= RETRY_AFTER[Math.min(failure.attempts, RETRY_AFTER.length) - 1]!
+}
+
+export function recordUpdateFailure(file: string, version: string, code: UpdateFailureCode, now = Date.now()) {
+  const state = readState(file)
+  const attempts = state.failure?.version === version ? state.failure.attempts + 1 : 1
+  writeJsonAtomic(file, { ...state, failure: { version, code, at: now, attempts } })
+}
+
+/** What the heartbeat reports: the failure of a version newer than the running one, else null. */
+export function reportedUpdateFailure(file: string, current: string): { version: string; code: UpdateFailureCode; at: string } | null {
+  const failure = readState(file).failure
+  return failure && newerStableVersion(failure.version, current) ? { version: failure.version, code: failure.code, at: new Date(failure.at).toISOString() } : null
 }

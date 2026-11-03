@@ -31,7 +31,7 @@ const sources = new Map([
   ['/lib/device-route.ts', 'export const withDeviceRoute=handler=>handler'],
   ['/lib/model-admission/runtime.ts', `import {ModelAdmissionError} from ${JSON.stringify(modelContract)};export async function assertUnmanagedModelTransport(scope,model){const p=globalThis.claimResponseProbe;p.preparation.push('model-admission');(p.modelAdmissionScopes??=[]).push(scope);(p.modelAdmissionCalls??=[]).push({scope,model});if(p.modelAdmissionDeniedWorkspace===scope.workspaceId)throw new ModelAdmissionError('modelRouteDenied')};export async function assertSubscriptionModelTransport(scope,model,route){const p=globalThis.claimResponseProbe;(p.subscriptionAdmissionCalls??=[]).push({scope,model,route});await assertUnmanagedModelTransport(scope,model)}`],
   ['/lib/db/index.ts', dbSource],
-  ['/lib/device-link.ts', 'export async function authenticateDevice(){const p=globalThis.claimResponseProbe;return Object.hasOwn(p,"caller") ? (p.caller && {tokenId:"synthetic-device-token",...p.caller}) : {userId:"member",tokenId:"synthetic-device-token"}};export async function ownedDevice(){return globalThis.claimResponseProbe.device}'],
+  ['/lib/device-link.ts', 'export async function authenticateDevice(){const p=globalThis.claimResponseProbe;return Object.hasOwn(p,"caller") ? (p.caller && {tokenId:"synthetic-device-token",...p.caller}) : {userId:"member",tokenId:"synthetic-device-token"}};export async function ownedDevice(){return globalThis.claimResponseProbe.device};export async function ownedDeviceWithReport(){return globalThis.claimResponseProbe.device}'],
   ['/lib/device-repositories.ts', 'export async function readRepositorySettings(...args){const p=globalThis.claimResponseProbe;p.preparation.push("settings");(p.settingsReads??=[]).push(args);return p.repositorySettings??null}'],
   ['/lib/agent-tool-approval/policy-store.ts', 'export async function readCliRunPolicy(){const p=globalThis.claimResponseProbe;p.preparation.push("policy");return structuredClone(p.cliPolicy)}'],
   ['/lib/self-improvement/server.ts', 'export const skillAssignments={async preflight(){globalThis.claimResponseProbe.preparation.push("skill-preflight")},async recordClaim(){globalThis.claimResponseProbe.preparation.push("skill-claim")}};export async function claimBenchmarkAssignment(){globalThis.claimResponseProbe.preparation.push("benchmark-claim")}'],
@@ -67,7 +67,9 @@ const sources = new Map([
   `],
   ['/lib/computer/native-run-binding.ts', 'export async function nativeRunBinding(){return globalThis.claimResponseProbe.cloud.subscription}'],
   ['/lib/secrets/runtime.ts', 'export function remoteRepositoryRef(url){return url};export async function taskSecretInjection(...args){const p=globalThis.claimResponseProbe;p.preparation.push("secrets");(p.secretReads??=[]).push(args);return p.secretInjection??{env:{},secretNames:[]}}'],
-  ['/lib/run-leases.ts', 'export async function latestCheckpoint(){const p=globalThis.claimResponseProbe;p.preparation.push("checkpoint");return structuredClone(p.checkpoint)}'],
+  ['/lib/run-leases.ts', 'export async function latestCheckpoint(){const p=globalThis.claimResponseProbe;p.preparation.push("checkpoint");return structuredClone(p.checkpoint)};export async function failRunForDaemonUpgrade(){throw new Error("unexpected daemon upgrade refusal")}'],
+  ['/lib/app-tools-server.ts', 'export async function runAppToolkits(){return []}'],
+  ['/lib/github/repository-installation.ts', 'export async function linkedGitHubAccountId(userId){const p=globalThis.claimResponseProbe;(p.githubLookups??=[]).push(userId);return p.githubAccountId===undefined?"123":p.githubAccountId}'],
   ['/lib/subscription-runtime.ts', 'export function subscriptionRuntime(){throw new Error("unexpected subscription access")}'],
 ])
 registerHooks({

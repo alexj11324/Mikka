@@ -15,7 +15,6 @@ import { claudeSettings } from "./adapters/claude"
 import { runInstructions } from "./agents/run-context"
 import {
   PERMISSION_DEFAULTS,
-  classifyCommand,
   classifyWrite,
   claudePermissionRules,
   decide,
@@ -160,7 +159,8 @@ describe("applying the workspace's policy (ADR 0028)", () => {
     expect(decide("write_outside_repo", { policy: p })).toBe("deny")
     expect(decide("run_project_script", { policy: p })).toBe("deny")
     expect(decide("install_dependency", { policy: p })).toBe("deny")
-    expect(decide("git_push", { policy: p })).toBe("deny")
+    // Read-only is task intent: the agent's own push is not withheld.
+    expect(decide("git_push", { policy: p })).toBe("allow")
     // Reading is the whole point of the check.
     expect(decide("read_in_worktree", { policy: p })).toBe("allow")
     // A read-only check never pushes, even on an approved repo.
@@ -172,64 +172,43 @@ describe("applying the workspace's policy (ADR 0028)", () => {
     expect(claudePermissionRules(p)).toMatchObject({
       ask: [],
       deny: expect.arrayContaining([
-        "Bash(git push:*)",
         "Write",
         "Edit",
         "Bash(npm install:*)",
       ]),
     })
     expect(policyInstructions(p)[0]).toContain("read-only check")
-    // A read-only check never pushes, even when handed GitHub delivery.
-    expect(claudePermissionRules(p, true).deny).toContain("Bash(git push:*)")
+    expect(claudePermissionRules(p).deny).not.toContain("Bash(git push:*)")
   })
 
-  it("lets the agent push only when it delivers the run itself", () => {
-    // The daemon pushes (ADR 0017): every other run denies the agent's push.
-    expect(claudePermissionRules(policy({ git_push: "allow" })).deny).toContain("Bash(git push:*)")
-    // A GitHub delivery run: the server sent run-scoped credentials because
-    // the push is allowed, and the agent is told to push and open the PR.
-    expect(claudePermissionRules(policy({ git_push: "allow" }), true).deny).not.toContain("Bash(git push:*)")
+  it("never withholds the agent's own git push: it works with the person's own credential", () => {
+    for (const git_push of ["allow", "deny"] as const) {
+      expect(claudePermissionRules(policy({ git_push })).deny).not.toContain("Bash(git push:*)")
+      expect(claudePermissionRules({ ...policy({ git_push }), readOnly: true }).deny).not.toContain("Bash(git push:*)")
+    }
   })
 
-  it("detects only git push in code; installs are judged by the Decisions API", () => {
-    expect(classifyCommand("npm install left-pad")).toBeNull()
-    expect(classifyCommand("cd web && pnpm add zod")).toBeNull()
-    expect(classifyCommand("git status; git push origin HEAD")).toBe("git_push")
-    expect(classifyCommand("npm test")).toBeNull()
-    expect(classifyCommand("bun run build")).toBeNull()
-  })
-
-  it("unwraps shells and wrappers before matching git push", () => {
-    expect(classifyCommand("env git push")).toBe("git_push")
-    expect(classifyCommand("command git push origin HEAD")).toBe("git_push")
-    expect(classifyCommand("/usr/bin/git push origin HEAD")).toBe("git_push")
-    expect(classifyCommand("sudo -u deploy git push")).toBe("git_push")
-    expect(classifyCommand("sh -c 'git push origin HEAD'")).toBe("git_push")
-    expect(classifyCommand("bash -lc 'cd app && git push'")).toBe("git_push")
-    expect(classifyCommand("xargs git push")).toBe("git_push")
-  })
-
-  it("gives Claude Code ask or deny rules for explicit install restrictions and always denies git push", () => {
+  it("gives Claude Code ask or deny rules for explicit install restrictions", () => {
     expect(claudePermissionRules(policy({install_dependency: "ask"}))).toMatchObject({
       ask: expect.arrayContaining(["Bash(npm install:*)"]),
-      deny: ['Bash','PowerShell','Monitor',"Bash(git push:*)"],
+      deny: ['Bash','PowerShell','Monitor'],
     })
     const denied = claudePermissionRules(policy({ install_dependency: "deny" }))
     expect(denied.ask).toEqual([])
     expect(denied.deny).toEqual(
-      expect.arrayContaining(["Bash(git push:*)", "Bash(pnpm add:*)"])
+      expect.arrayContaining(["Bash(pnpm add:*)"])
     )
     expect(
       claudePermissionRules(policy({ install_dependency: "allow" }))
-    ).toEqual({ allow: [], ask: [], deny: ["Bash(git push:*)"] })
-    expect(claudePermissionRules(policy({install_dependency:'allow',git_push:'allow'}))).toEqual({allow:[],ask:[],deny:['Bash(git push:*)']})
+    ).toEqual({ allow: [], ask: [], deny: [] })
+    expect(claudePermissionRules(policy({install_dependency:'allow',git_push:'deny'}))).toEqual({allow:[],ask:[],deny:[]})
     const settings = claudeSettings(policy({ install_dependency: "deny" }))
     // Runs use no sandbox (decision 2026-11-01-2335): Claude Code's own stays off.
     expect(settings.sandbox).toEqual({ enabled: false })
     expect(settings.permissions?.deny).toContain("Bash(npm install:*)")
   })
 
-  it("lets every Cursor tool call go ahead except a git push the daemon owns", async () => {
+  it("lets every Cursor tool call go ahead, git push included", async () => {
     const request = (command: string) =>
       ({
         sessionId: "s",
@@ -239,28 +218,31 @@ describe("applying the workspace's policy (ADR 0028)", () => {
           { optionId: "yes", name: "Allow", kind: "allow_once" },
         ],
       }) as Parameters<typeof acpPermissionResponse>[0]
-    const chosen = async (command: string, p?: RunPolicy) => {
-      const { response } = await acpPermissionResponse(request(command), p, false)
-      return response.outcome.outcome === "selected"
-        ? response.outcome.optionId
-        : null
-    }
-    // Nothing is asked per tool (decision 2026-11-01-2335), whatever the install setting.
-    const denied = policy({ install_dependency: "deny" })
-    expect(await chosen("npm install zod")).toBe("yes")
-    expect(await chosen("npm install zod", denied)).toBe("yes")
-    expect(await chosen("npm test", denied)).toBe("yes")
-    expect(await chosen("touch NOTES.md", denied)).toBe("yes")
-    // git push stays a hard deny: the daemon delivers the run.
-    expect(await chosen("git push", policy({ git_push: "allow" }))).toBe("no")
-    expect(await chosen("git push", denied)).toBe("no")
-    // Agent-delivered GitHub runs push themselves, still within the policy.
-    const delivered = async (command: string, p?: RunPolicy) => {
-      const { response } = await acpPermissionResponse(request(command), p, true)
+    const chosen = async (command: string) => {
+      const response = await acpPermissionResponse(request(command))
       return response.outcome.outcome === "selected" ? response.outcome.optionId : null
     }
-    expect(await delivered("git push https://github.com/o/r.git HEAD:refs/heads/mikka/x", policy({ git_push: "allow" }))).toBe("yes")
-    expect(await delivered("git push", policy({ git_push: "deny" }))).toBe("no")
+    for (const command of ["npm install zod", "npm test", "touch NOTES.md", "git push", "env git push origin HEAD", "git push https://github.com/o/r.git HEAD:refs/heads/mikka/x"])
+      expect(await chosen(command)).toBe("yes")
+  })
+
+  it("tells the agent it has the person's own GitHub credential, and how to deliver only when it has a task branch", () => {
+    const github = { endpoint: "https://mikka.test/api/runs/github-token", repository: "o/r", runToken: "mkw_x", issueId: "i" }
+    const credential = "Git and gh have the person's own GitHub credential"
+    const plain = runInstructions("/wt", policy({}), github)
+    expect(plain).toContain(credential)
+    expect(plain).toContain("Never print, copy or store the credential")
+    expect(plain).not.toContain("You own delivery")
+    expect(plain).not.toContain("Do not commit, push")
+    const delivering = runInstructions("/wt", policy({}), { ...github, branch: "mikka/t-1" }, "implement")
+    expect(delivering).toContain(credential)
+    expect(delivering).toContain("push HEAD to mikka/t-1")
+    for (const other of [runInstructions("/wt", { ...policy({}), readOnly: true }, { ...github, branch: "mikka/t-1" }), runInstructions("/wt", policy({}), { ...github, branch: "mikka/t-1" }, "plan")]) {
+      expect(other).toContain(credential)
+      expect(other).not.toContain("You own delivery")
+    }
+    expect(runInstructions("/wt", policy({}))).toContain("Do not commit, push or switch branches")
+    expect(delivering).not.toContain("mkw_x")
   })
 
   it("tells the agent what it may do", () => {

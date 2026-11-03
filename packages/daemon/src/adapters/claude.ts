@@ -19,7 +19,7 @@ import { spawn } from "node:child_process"
 import { randomUUID } from "node:crypto"
 import { realpathSync } from "node:fs"
 import { join } from "node:path"
-import type { Writable } from "node:stream"
+import type { Readable, Writable } from "node:stream"
 
 import {
   query,
@@ -57,6 +57,7 @@ import { mailboxInputs } from '@mikka/protocol/mailbox'
 import { mailboxToolResult, type RunMailbox } from '../run-mailbox'
 import { NATIVE_AUTH_PLACEHOLDER } from '../subscription-native-broker'
 import type { RunChunk } from "../chunks"
+import { CLI_EXITED_EARLY, redactDiagnostic, resultDiagnostics, subscriptionFailureCategory } from "./claude-failure"
 import {
   claudePermissionRules,
   runPolicy,
@@ -83,7 +84,7 @@ export interface ClaudeAdapterOptions {
   /** The daemon's pinned Claude Code, installed on first need. */
   ensureBinary?: () => Promise<string>
   /** Trusted hosted transport; ordinary local sessions retain SDK spawning. */
-  spawnHosted?: (options: SpawnOptions, oauthPlaceholder: string) => SpawnedProcess
+  spawnHosted?: (options: SpawnOptions, oauthPlaceholder: string) => SpawnedProcess & { stderr?: Readable }
   onHostedSession?(sessionId:string):Promise<void>
   /** Supplied only by trusted hosted infrastructure for this run. */
   computerMcp?: McpServerSpec
@@ -105,6 +106,17 @@ export interface ClaudeAdapterOptions {
 }
 
 const SUBSCRIPTION_ERROR = "Claude subscription authentication unavailable"
+const INITIALIZATION_TIMEOUT_MS = 30_000
+
+/** CLI initialization includes local cold startup; it is not a credential check. */
+export class ClaudeInitializationError extends Error {
+  readonly code: "claude_code_initialization_timeout" | "claude_code_initialization_failed"
+  constructor(timeout: boolean) {
+    super(timeout ? "Claude Code initialization timed out" : "Claude Code initialization failed")
+    this.name = "ClaudeInitializationError"
+    this.code = timeout ? "claude_code_initialization_timeout" : "claude_code_initialization_failed"
+  }
+}
 
 /** In-process SDK MCP travels over the existing query control stream. No
  * socket, endpoint, platform bearer or extra filesystem permission in child. */
@@ -134,11 +146,10 @@ export function claudeProjectDirName(cwd: string): string {
  */
 export function claudeSettings(
   workspace?: RunPolicy,
-  agentDelivers = false,
 ): Settings {
   return {
     sandbox: { enabled: false },
-    permissions: claudePermissionRules(runPolicy(workspace), agentDelivers),
+    permissions: claudePermissionRules(runPolicy(workspace)),
   }
 }
 
@@ -446,6 +457,8 @@ export class ClaudeAdapter implements AgentAdapter {
       mailboxEnabled: Boolean(options.mailbox),
       harness: "claude_code",
       kind: options.kind,
+      factoryCheck: options.factoryCheck,
+      verifyCommand: options.verifyCommand,
       worktree: options.cwd,
       gitWritePaths: options.gitWritePaths,
       networkAllow: options.networkAllow,
@@ -483,11 +496,15 @@ export class ClaudeAdapter implements AgentAdapter {
     let runtimeModel: string | null = null
     let ending = false
     let lastError: string | undefined
+    /** The API error the current turn's assistant message carried, if any. */
+    let assistantError: unknown
     /** The CLI's quota or rate-limit failure seen this turn, if any. */
     let quota: QuotaSignal | undefined
     let graceTimer: NodeJS.Timeout | undefined
     let authTimer: NodeJS.Timeout | undefined
     let stderr = ""
+    let stderrArrived: () => void = () => undefined
+    const firstStderr = new Promise<void>(resolve => { stderrArrived = resolve })
     const stderrTail = () => stderr.slice(-STDERR_TAIL).trim() || "no output"
     /** True once the session proved open, false if the CLI failed first. */
     let spoke: (value: boolean) => void = () => undefined
@@ -500,7 +517,7 @@ export class ClaudeAdapter implements AgentAdapter {
       try{await this.options.onHostedSession(sessionId)}catch{throw new Error(SUBSCRIPTION_ERROR)}
     }
     // No sandbox: the CLI starts directly. A revoked run gate stops it.
-    const spawnLocal = (config: SpawnOptions): SpawnedProcess => {
+    const spawnLocal = (config: SpawnOptions): SpawnedProcess & { stderr?: Readable } => {
       const child = spawnBinary(binary, nativeToken)(config)
       const off = options.toolApproval!.onRevoke(() => { child.kill("SIGTERM") })
       child.once("exit", off)
@@ -522,7 +539,7 @@ export class ClaudeAdapter implements AgentAdapter {
         },
         settingSources: [],
         settings: {
-          ...claudeSettings(options.policy, ctx.agentDelivers),
+          ...claudeSettings(options.policy),
           ...(externalAuth ? { forceLoginMethod: "claudeai" as const } : {})
         },
         mcpServers: {
@@ -543,11 +560,17 @@ export class ClaudeAdapter implements AgentAdapter {
         ...(mode === "new" ? { sessionId } : { resume: sessionId }),
         ...(options.model ? { model: options.model } : {}),
         // A hosted run spawns through the hosted runner; an API-key run there holds the placeholder too.
-        spawnClaudeCodeProcess: this.options.spawnHosted
-          ? (options:SpawnOptions) => this.options.spawnHosted!(options,nativeToken ?? NATIVE_AUTH_PLACEHOLDER)
-          : spawnLocal,
-        stderr: (data: string) => {
-          if (!externalAuth) stderr = (stderr + data).slice(-STDERR_TAIL * 4)
+        spawnClaudeCodeProcess: (config: SpawnOptions) => {
+          const child = this.options.spawnHosted
+            ? this.options.spawnHosted(config, nativeToken ?? NATIVE_AUTH_PLACEHOLDER)
+            : spawnLocal(config)
+          // Capture the actual pipe. The SDK's stderr callback can remain
+          // empty for a custom spawn, including when a result precedes exit.
+          child.stderr?.on('data', (data: Buffer | string) => {
+            stderr = (stderr + data.toString()).slice(-STDERR_TAIL * 4)
+            stderrArrived()
+          })
+          return child
         },
       },
     })
@@ -576,6 +599,21 @@ export class ClaudeAdapter implements AgentAdapter {
           : { outcome: "succeeded" },
       )
     }
+    // The native text can hold the lease: only redacted copies reach the log,
+    // and the run's error names a fixed class.
+    const secrets = nativeToken && nativeToken !== NATIVE_AUTH_PLACEHOLDER ? [nativeToken] : []
+    const subscriptionFailure = (category: string, fields: Record<string, unknown>) => {
+      try {
+        log.warn({
+          event: "claude_subscription_turn_failed",
+          category,
+          ...fields,
+          ...(typeof assistantError === "string" ? { assistant_error: assistantError.slice(0, 64) } : {}),
+          stderr: redactDiagnostic(stderrTail(), secrets),
+        }, "claude subscription turn failed")
+      } catch { /* The run's own failure still ends it. */ }
+      return `${SUBSCRIPTION_EXECUTION_ERROR} (${category})`
+    }
     const diedEarly = (error: string) => {
       ending = true
       const handoff = ctx.readHandoff(log)
@@ -583,7 +621,7 @@ export class ClaudeAdapter implements AgentAdapter {
         handoff ?? {
           outcome: "failed",
           error: externalAuth
-            ? SUBSCRIPTION_EXECUTION_ERROR
+            ? subscriptionFailure(CLI_EXITED_EARLY, { detail: redactDiagnostic(error, secrets, 500) })
             : `claude exited before the turn ended: ${error}`,
           ...(quota ? { quota } : {}),
         }
@@ -611,6 +649,7 @@ export class ClaudeAdapter implements AgentAdapter {
           // A new turn (the queued message) produces its own result.
           if (message.type === "assistant" || message.type === "user")
             clearTimeout(graceTimer)
+          if (message.type === "assistant" && message.error) assistantError = message.error
           if (ending) continue
           quota = mergeQuota(quota, claudeQuotaSignal(message))
           if (message.type === 'tool_progress' && message.session_id === sessionId) queue.progress()
@@ -621,11 +660,20 @@ export class ClaudeAdapter implements AgentAdapter {
           if (message.type !== "result") continue
           results++
           if (!message.is_error) quota = undefined
+          // stdout and stderr are separate pipes. A result can be delivered
+          // before an earlier diagnostic's data callback, so briefly drain
+          // that pipe before freezing the failure record.
+          if (message.is_error && externalAuth && !stderr) {
+            let drainTimer: NodeJS.Timeout | undefined
+            await Promise.race([firstStderr, new Promise<void>(resolve => { drainTimer = setTimeout(resolve, 100) })])
+            clearTimeout(drainTimer)
+          }
           lastError = message.is_error
             ? externalAuth
-              ? SUBSCRIPTION_EXECUTION_ERROR
+              ? subscriptionFailure(subscriptionFailureCategory(message, assistantError), resultDiagnostics(message, secrets))
               : `Claude Code: ${resultError(message)}`
             : undefined
+          assistantError = undefined
           if (results >= written) {
             turnEnded()
             continue
@@ -661,28 +709,56 @@ export class ClaudeAdapter implements AgentAdapter {
     authTimer?.unref()
     if (externalAuth) {
       let timer: NodeJS.Timeout | undefined
+      let offRevoke: (() => void) | undefined
+      let authPhase: 'initialization' | 'account_info' | 'external_verify' = 'initialization'
+      let authReason: 'initialization_failed' | 'timeout' | 'revoked' | 'session_closed' | 'provider_refused' | 'source_refused' | 'verify_refused' = 'initialization_failed'
       try {
-        const account = await Promise.race([
-          session.accountInfo(),
+        // accountInfo waits for this same SDK initialization promise. Give the
+        // cold CLI an explicit bounded startup budget before checking its
+        // account; no prompt is released until all checks below pass.
+        await Promise.race([
+          session.initializationResult(),
           new Promise<never>((_, reject) => {
             timer = setTimeout(
-              () => reject(new Error(SUBSCRIPTION_ERROR)),
-              10_000
+              () => { authReason = 'timeout'; reject(new ClaudeInitializationError(true)) },
+              INITIALIZATION_TIMEOUT_MS
             )
-          })
+          }),
+          new Promise<never>((_, reject) => {
+            offRevoke = approval.onRevoke(() => {
+              authReason = 'revoked'
+              reject(new ClaudeInitializationError(false))
+            })
+          }),
         ])
+        clearTimeout(timer)
+        authPhase = 'account_info'
+        const account = await session.accountInfo()
+        authReason = ending ? 'session_closed' : account.apiProvider !== 'firstParty' ? 'provider_refused' : 'source_refused'
         if (
           ending ||
           account.apiProvider !== "firstParty" ||
-          account.apiKeySource !== "none"
+          // Current Claude Code omits apiKeySource for the descriptor we
+          // supplied. Require that exact OAuth source when it is absent;
+          // neither an unknown source nor an explicit API key may pass.
+          !(account.apiKeySource === "none" ||
+            (account.apiKeySource === undefined && account.tokenSource === "CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR"))
         )
           throw new Error(SUBSCRIPTION_ERROR)
+        authPhase = 'external_verify'
+        authReason = 'verify_refused'
         await externalAuth.verify?.()
-      } catch {
+        if (ending || approval.revoked) throw new Error(SUBSCRIPTION_ERROR)
+      } catch (error) {
+        // Cleanup revokes the gate too; detach before preserving the failure.
+        offRevoke?.()
+        try { log.warn({ event: 'claude_subscription_startup_failed', phase: authPhase, reason: authReason }, 'Subscription startup failed') } catch { /* Keep the original refusal. */ }
         await end(null)
+        if (authPhase === 'initialization') throw error instanceof ClaudeInitializationError ? error : new ClaudeInitializationError(false)
         throw new Error(SUBSCRIPTION_ERROR)
       } finally {
         clearTimeout(timer)
+        offRevoke?.()
       }
     }
     prompts.push(firstMessage)

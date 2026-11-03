@@ -90,7 +90,7 @@ export default function GroupChat() {
 
   return (
     <View style={styles.screen}>
-      <NavBar title={title} />
+      <NavBar title={title} material />
       <View style={{ flex: 1, overflow: 'hidden' }} {...handlers}>
         <KeyboardChatScrollView ref={scroll} {...underBar} offset={Math.max(insets.bottom, 12) - 8} keyboardDismissMode="interactive" keyboardLiftBehavior="whenAtEnd"
           contentContainerStyle={[styles.list, { paddingBottom: composerHeight + 16 }]} onContentSizeChange={() => scroll.current?.scrollToEnd({ animated: false })}>

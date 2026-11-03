@@ -6,6 +6,7 @@ import { AGENT_MAX_ROUNDS } from '@/lib/agent-rounds'
 import { COORDINATOR_INSTRUCTIONS } from '@/lib/coordinator/instructions'
 import { coordinatorTools } from '@/workflows/coordinator/workflow'
 import { postSlackReply, slackCoordinatorBot } from './steps'
+import { coordinatorSwitches } from '@/workflows/coordinator/steps'
 
 const SLACK_INSTRUCTIONS = `${COORDINATOR_INSTRUCTIONS}
 
@@ -20,7 +21,7 @@ export async function slackTurn(userId: string, threadId: string, text: string) 
   'use workflow'
   try {
     const botId = await slackCoordinatorBot(userId)
-    const agent = new WorkflowAgent({ model: new HostedWorkflowModel(userId,botId,COORDINATOR_MODEL), tools: coordinatorTools(userId, botId, undefined, { coordinator: true }) })
+    const agent = new WorkflowAgent({ model: new HostedWorkflowModel(userId,botId,COORDINATOR_MODEL), tools: coordinatorTools(userId, botId, undefined, { coordinator: true, switches: await coordinatorSwitches() }) })
     const result = await agent.generate({
       instructions: SLACK_INSTRUCTIONS,
       maxRetries: 0,

@@ -10,6 +10,7 @@ import { type KanbanCommitMeta } from '@/components/reui/kanban'
 import { KanbanBoard, type CardContext } from '@/components/blocks/kanban-board-1/components/kanban-board'
 import { BOARD_COLUMNS, boardColumnOf } from '@/components/blocks/kanban-board-1/components/data'
 import type { IssueStatus } from './issue-properties'
+import { boardScrollTo, boardStartColumn } from '@/lib/board-start-column'
 
 type Issue = Awaited<ReturnType<typeof listIssues>>[number]
 type Columns = Record<string, Issue[]>
@@ -78,6 +79,20 @@ export function IssueBoard({ issues, columns: visibleColumns, hidden, sidebarOpe
     update()
     return () => { observer.disconnect(); viewport.removeEventListener('scroll', update) }
   }, [])
+
+  // Open on the first column with a task when the ones before it are empty (N5), once, before the person scrolls.
+  const started = useRef(false)
+  useEffect(() => {
+    const viewport = viewportRef.current
+    if (started.current || !viewport || !issues.length) return
+    started.current = true
+    const shown = BOARD_COLUMNS.map(column => column.value).filter(value => visibleColumns.includes(value as IssueStatus))
+    const target = boardStartColumn(shown, Object.fromEntries(Object.entries(columns).map(([key, items]) => [key, items.length])))
+    const element = target && viewport.querySelector<HTMLElement>(`[data-slot="kanban-column"][data-value="${CSS.escape(target)}"]`)
+    if (!element) return
+    const left = boardScrollTo(element.getBoundingClientRect(), viewport.getBoundingClientRect(), viewport.scrollLeft)
+    if (left !== null) viewport.scrollTo({ left, behavior: 'instant' })
+  }, [issues.length, columns, visibleColumns])
 
   function scrollBoard(direction: -1 | 1) {
     const viewport = viewportRef.current

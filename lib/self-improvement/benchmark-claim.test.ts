@@ -10,6 +10,8 @@ import * as repositoryProtocol from '@mikka/protocol/repository'
 import { defaultRunPolicy } from '@mikka/protocol/agent-policy'
 import { constrainedAssignmentPolicy } from '../run-assignment-policy'
 import { ModelAdmissionError } from '../model-admission/contract'
+import { deploymentSwitch, type DeploymentSwitch } from '@/lib/deployment-switches'
+const fixtureEnv={MIKKA_BYOS_ENABLED:'0',MIKKA_FACTORY_ROUTING_ENABLED:'1',MIKKA_FACTORY_LIFECYCLE_ENABLED:'1'}
 
 // Execute the actual route in memory, with its database/auth boundaries replaced.
 async function routeFixture(unavailable=false,stopped=false,modelDenied=false,issueDenied=false) {
@@ -55,11 +57,13 @@ async function routeFixture(unavailable=false,stopped=false,modelDenied=false,is
     '@/lib/run-claim-response':{authorizedClaimResponse:async(_user:string,_run:unknown,_lease:string,respond:(current:typeof run)=>Response)=>respond(run)},
     '@/lib/run-publications':{prepareRunPublication:async()=>({policy:{...defaultRunPolicy(),permissions:{...defaultRunPolicy().permissions,git_push:'allow'}}}),persistRunCompletion:async()=>{assert.equal(issueDenied,true);calls.push('rejectPublication')}},
     '@/lib/run-publication-result':{PublicationError:class extends Error {}},
+    // No linked GitHub account in this fixture: the claim attaches no GitHub credential endpoint.
+    '@/lib/github/repository-installation':{linkedGitHubAccountId:async()=>null},
     '@/lib/db':{db,pool:{},withDatabaseClient:async(_tx:unknown,fn:()=>Promise<unknown>)=>fn()},'@/lib/db/schema':{agentRuns:{},agents:{},deviceRepos:{}},
-    '@/lib/device-link':{authenticateDevice:async()=>({userId:'owner',tokenId:'synthetic-device-token'}),ownedDevice:async()=>({enabled:true,kind:'local',protocolVersion:daemonProtocol.DAEMON_PROTOCOL_VERSION,harnesses:[{harness:'codex',installed:true,toolApproval:true}]})},
+    '@/lib/device-link':{authenticateDevice:async()=>({userId:'owner',tokenId:'synthetic-device-token'}),ownedDevice:async()=>({enabled:true,kind:'local',protocolVersion:daemonProtocol.DAEMON_PROTOCOL_VERSION,harnesses:[{harness:'codex',installed:true,toolApproval:true}]}),ownedDeviceWithReport:async()=>({enabled:true,kind:'local',protocolVersion:daemonProtocol.DAEMON_PROTOCOL_VERSION,harnesses:[{harness:'codex',installed:true,toolApproval:true}]})},
     '@/lib/base-path':{withBasePath:(path:string)=>path},'@/lib/mcp/resource':{},
     '@/lib/mcp/worker':{issueRunToken:async()=>{calls.push('token');return {token:'synthetic-test-token'}}},
-    '@/lib/run-leases':{},'@/lib/run-retry':{},
+    '@/lib/run-leases':{failRunForDaemonUpgrade:async()=>false},'@/lib/daemon-release':{daemonTooOld:()=>false},'@/lib/run-retry':{},
     '@/lib/thread-continuation':{continuationFollowUp:()=>null},
     '@/lib/run-completion-effects':{afterRunEnded:async()=>{calls.push('runEnded');return 0}},
     '@/lib/factory/checks':{isFactoryCheckRun:async()=>false},
@@ -75,6 +79,8 @@ async function routeFixture(unavailable=false,stopped=false,modelDenied=false,is
       if(!await guard(tx))return 'unavailable';calls.push('claim');run.status='preparing';await after(tx);return 'claimed'
     }},
     '@/lib/subscription-runtime':{},
+    // The real switch, read against this fixture's environment rather than the test process's.
+    '@/lib/deployment-switches':{deploymentSwitch:(name:DeploymentSwitch)=>deploymentSwitch(name,fixtureEnv)},
     '@/lib/computer/native-run-binding':{},
     '@/lib/personal-policy':{sharedNativeBinding:async()=>null},
     '@/lib/secrets/flag':{byoE2BKeyEnabled:()=>false},
@@ -90,7 +96,7 @@ async function routeFixture(unavailable=false,stopped=false,modelDenied=false,is
   const source=await readFile(new URL('../../app/v1/devices/[deviceId]/runs/[runId]/claim/route.ts',import.meta.url),'utf8')
   const exports:Record<string,unknown>={}
   runInNewContext(transpileModule(source,{compilerOptions:{module:ModuleKind.CommonJS}}).outputText,
-    {exports,require:(name:string)=>{if(!Object.hasOwn(modules,name))throw Error(`Unexpected import ${name}`);return modules[name]},Response,URL,Date,process:{env:{MIKKA_BYOS_ENABLED:'0',MIKKA_FACTORY_ROUTING_ENABLED:'1',MIKKA_FACTORY_LIFECYCLE_ENABLED:'1'}}})
+    {exports,require:(name:string)=>{if(!Object.hasOwn(modules,name))throw Error(`Unexpected import ${name}`);return modules[name]},Response,URL,Date,process:{env:fixtureEnv}})
   return {calls,admissionScopes,run,benchmark,post:exports.POST as (request:Request,context:{params:Promise<{deviceId:string;runId:string}>})=>Promise<Response>}
 }
 

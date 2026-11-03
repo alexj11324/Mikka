@@ -11,7 +11,7 @@ import { harnessLabel } from './issue-threads'
 
 /**
  * 「Handed to Claude Code · N steps」: the harness's tool calls folded into one line;
- * opening it lists each call by its internal name, as the Coordinator's ToolsUsed does (R-40).
+ * opening it lists each call by its internal name (R-40).
  */
 export function ThreadSteps({ harness, steps }: { harness: string; steps: readonly ThreadStep[] }) {
   const t = useTranslations('IssueThreads')

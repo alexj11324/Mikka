@@ -3,7 +3,7 @@ import { executionInstructions } from '@/lib/agent-kit/execution-instructions'
 import type { CoordinatorRuntime, NativeCoordinatorJob } from '@mikka/protocol/coordinator'
 import { nativeCoordinatorEnabled, nativeCoordinatorStore } from '@/lib/coordinator/native'
 import { loadConversation } from '@/lib/coordinator/store'
-import { instructionsWithMemory, promptMessages } from '@/lib/coordinator/context'
+import { cachedContextLines, promptMessages, promptWithCachedContext } from '@/lib/coordinator/context'
 import { nativeCoordinatorContext, personalCoordinatorInstructions, withCoordinatorPresentation } from '@/lib/coordinator/native-prompt'
 import { botInstructions } from '@/lib/coordinator/bot-instructions'
 import { withPersonalInstructions } from '@/lib/coordinator/personal-instructions'
@@ -21,8 +21,12 @@ export async function enqueue(userId: string, holder: string, round: number, sel
   const { summary, memory, messages } = await loadConversation(userId, botId)
   const base = snapshot ? withCoordinatorPresentation(executionInstructions(snapshot)) : await botInstructions(userId, botId, personalCoordinatorInstructions())
   const permitted = snapshotMailboxTools(snapshot).filter(name => tools.some(tool => tool.name === name))
+  const { githubContext } = await import('@/lib/coordinator/github-context')
+  const { executionContextParts } = await import('@/lib/coordinator/execution-context')
+  const execution = await executionContextParts(userId, botId)
   return nativeCoordinatorStore.enqueue(userId,holder,round,selected,{
-    instructions: instructionsWithMemory(await withPersonalInstructions(userId, personalMailboxEnabled() && snapshot ? personalMailboxInstructions(base, permitted) : base, snapshot ? snapshot.personalPlugins ?? { servers: [], skills: [] } : undefined), memory) + '\n' + SCHEDULE_INSTRUCTIONS,
+    // The GitHub lines (the authorized repository list) and the allowed models list come before the memory, so the provider's prefix cache covers them.
+    instructions: promptWithCachedContext(await withPersonalInstructions(userId, personalMailboxEnabled() && snapshot ? personalMailboxInstructions(base, permitted) : base, snapshot ? snapshot.personalPlugins ?? { servers: [], skills: [] } : undefined), cachedContextLines(await githubContext(userId, undefined, undefined, botId), execution.models), memory, '\n' + SCHEDULE_INSTRUCTIONS + (execution.live ? '\n' + execution.live : '')).instructions,
     context: nativeCoordinatorContext(promptMessages(summary,messages,{ key: process.env.BETTER_AUTH_SECRET ?? '', scope: JSON.stringify([userId, botId]) })), tools,
   })
 }

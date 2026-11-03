@@ -1,3 +1,4 @@
+import { repositoryExecutionMatches } from './execution-receipt'
 import { createHash } from "node:crypto";
 import type { PoolClient } from "pg";
 import {
@@ -40,6 +41,7 @@ export const candidateIdentity = (c: FactoryCandidate) => ({
   repository: c.repository,
   environment: c.environment,
   scope: c.scope,
+  ...(c.kind && c.kind !== 'repository' ? { kind: c.kind } : {}),
 });
 
 /** Defense in depth for existing text artifacts; never copy credentials into ledgers. */
@@ -253,8 +255,11 @@ export async function approvalEvidence(tx: PoolClient, task: FactoryTask) {
         );
         if (
           run.stopReason !== "submitted" ||
-          run.report?.publish?.commit !== candidate.sha ||
-          run.report?.verify?.status !== "passed"
+          (candidate.kind === 'report'
+            ? run.report?.sourceCommit !== candidate.sha
+            : candidate.kind === 'deliverable'
+              ? candidate.sha !== null
+              : !repositoryExecutionMatches(run.report,candidate.sha))
         )
           throw new FactoryError("factoryEvidenceMismatch");
       }

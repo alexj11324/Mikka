@@ -33,7 +33,9 @@ test('hosted controls on isolated PostgreSQL', { skip: !url }, async (t) => {
   await pool.query(`CREATE TABLE "user" (id text primary key,email text not null);
     CREATE TABLE workspace_credit_grants (id uuid primary key,"workspaceId" uuid not null,points integer not null,bucket text not null);
     CREATE TABLE workspace_audit_events (id uuid primary key,"workspaceId" uuid,"actorType" text,"actorName" text,action text,category text,metadata jsonb);
-    CREATE TABLE mikka_workspaces(id uuid primary key)`)
+    CREATE TABLE mikka_workspaces(id uuid primary key,"userId" text);
+    CREATE TABLE bots (id uuid primary key,"workspaceId" uuid);
+    CREATE TABLE coordinator_events (id uuid primary key,"botId" uuid,kind text,payload jsonb)`)
   const old = randomUUID()
   await pool.query('INSERT INTO mikka_workspaces VALUES ($1)', [old])
   await pool.query(
@@ -45,11 +47,57 @@ test('hosted controls on isolated PostgreSQL', { skip: !url }, async (t) => {
   )
   await pool.query(readFileSync('drizzle/20261101130000_hosted_usage_concurrent.sql', 'utf8'))
   const store = new HostedUsageStore(pool)
+  /** `n` messages sent in this workspace's chats (created by `creator`), plus a 重试 and a welcome request that never count. */
+  const sent = async (workspaceId: string, n: number, creator = `creator-${workspaceId}`) => {
+    await pool.query('INSERT INTO mikka_workspaces VALUES ($1,$2) ON CONFLICT (id) DO NOTHING', [workspaceId, creator])
+    const bot = randomUUID()
+    await pool.query('INSERT INTO bots VALUES ($1,$2)', [bot, workspaceId])
+    for (let i = 0; i < n; i++) await pool.query(`INSERT INTO coordinator_events VALUES ($1,$2,'user_message',$3)`, [randomUUID(), bot, JSON.stringify({ text: `message ${i}` })])
+    await pool.query(`INSERT INTO coordinator_events VALUES ($1,$2,'user_message',$3),($4,$2,'user_message',$5)`, [randomUUID(), bot, JSON.stringify({ text: '', retry: true }), randomUUID(), JSON.stringify({ text: '[Welcome] hi' })])
+  }
   const verified = async () => {
     const id = randomUUID()
     await store.verify(id, 'cus_fixture', `card_${id}`)
     return id
   }
+  await t.test('no card: the first 20 messages are answered, paid by the platform, once per person; the 21st needs a card', async () => {
+    const fresh = randomUUID()
+    // Nothing sent yet (the welcome turn): admitted, 20 left.
+    assert.deepEqual([(await store.status(fresh)).state, (await store.status(fresh)).trialLeft], ['ready', 20])
+    await sent(fresh, 1)
+    const first = randomUUID()
+    await store.reserve(fresh, 'fixture', first)
+    await store.settle(first, 30_000, 10, 10)
+    // The platform pays: unpaid spend under its daily cap, never a debt the allowance repays after a card.
+    const row = (await pool.query('SELECT "unpaidMicroUsd","purchasedMicroUsd","freeMicroUsd" FROM hosted_usage WHERE id=$1', [first])).rows[0]
+    assert.deepEqual([Number(row.unpaidMicroUsd), Number(row.purchasedMicroUsd), Number(row.freeMicroUsd)], [30_000, 0, 0])
+    assert.deepEqual(await store.balance(fresh), { verified: false, free: 0, purchased: 0 })
+    assert.equal((await store.canUseMikkaPaid(fresh) as { trialLeft?: number }).trialLeft, 19)
+    // The 20th message's turn still runs; the 21st needs a card. 重试 and the welcome request never count.
+    await sent(fresh, 19)
+    await store.reserve(fresh, 'fixture', randomUUID())
+    assert.deepEqual([(await store.status(fresh)).state, (await store.status(fresh)).trialLeft], ['verification_required', 0])
+    await sent(fresh, 1)
+    await assert.rejects(store.reserve(fresh, 'fixture', randomUUID()), /verification_required/)
+    await assert.rejects(store.canUseMikkaPaid(fresh), /verification_required/)
+    // A verified card: the allowance as before, the free messages no longer count, and nothing was owed from them.
+    await store.verify(fresh, 'cus_trial', `card_${fresh}`)
+    assert.equal((await store.balance(fresh)).free, 1e6)
+    assert.equal((await store.status(fresh)).trialLeft, null)
+  })
+  await t.test('the free messages are the person\'s: a second workspace they create shares the same 20', async () => {
+    const first = randomUUID(), second = randomUUID(), someoneElse = randomUUID()
+    await sent(first, 15, 'pat')
+    await sent(second, 0, 'pat')
+    assert.equal((await store.status(second)).trialLeft, 5, 'a new workspace starts where the person is')
+    await sent(second, 5, 'pat')
+    await store.reserve(second, 'fixture', randomUUID())
+    await sent(second, 1, 'pat')
+    await assert.rejects(store.reserve(second, 'fixture', randomUUID()), /verification_required/)
+    await assert.rejects(store.reserve(first, 'fixture', randomUUID()), /verification_required/, 'the first one is used up too')
+    await sent(someoneElse, 0, 'sam')
+    assert.equal((await store.status(someoneElse)).trialLeft, 20, 'another person keeps their own')
+  })
   await t.test(
     'legacy snapshot contains existing workspaces only',
     async () => {
@@ -62,10 +110,12 @@ test('hosted controls on isolated PostgreSQL', { skip: !url }, async (t) => {
     },
   )
   await t.test(
-    'unverified refused; same card concurrent claims one allowance, retained after workspace deletion',
+    'unverified past its free messages refused; same card concurrent claims one allowance, retained after workspace deletion',
     async () => {
+      const past = randomUUID()
+      await sent(past, 21)
       await assert.rejects(
-        store.reserve(randomUUID(), 'fixture', randomUUID()),
+        store.reserve(past, 'fixture', randomUUID()),
         /verification_required/,
       )
       const a = randomUUID(),
@@ -82,12 +132,14 @@ test('hosted controls on isolated PostgreSQL', { skip: !url }, async (t) => {
       )
       const winner = result[0] ? a : b
       await pool.query('DELETE FROM mikka_workspaces WHERE id=$1', [winner])
-      assert.equal(await store.verify(randomUUID(), 'cus_c', card), false)
+      const third = randomUUID()
+      assert.equal(await store.verify(third, 'cus_c', card), false)
       assert.equal(
         Number(
           (
             await pool.query(
-              "SELECT count(*) AS n FROM workspace_audit_events WHERE action='billing.card_verified'",
+              "SELECT count(*) AS n FROM workspace_audit_events WHERE action='billing.card_verified' AND \"workspaceId\"=ANY($1::uuid[])",
+              [[a, b, third]],
             )
           ).rows[0].n,
         ),

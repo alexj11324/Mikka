@@ -5,6 +5,7 @@ import type { SQL } from 'drizzle-orm'
 import { bots, coordinatorEvents, devices } from './db/schema'
 import type { TaskDestination } from './task-destination'
 import { personalSubmissionInput, recordPersonalSubmission, SubmissionConflictError } from './coordinator-submission'
+import { overrideDeploymentSwitch } from './deployment-switches'
 
 const submissionId = 'a4000000-0000-4000-8000-000000000001'
 /** The owner's Coordinator: an ordinary bot row, resolved where a message enters. */
@@ -176,7 +177,10 @@ const callbacks: Array<() => unknown> = []
 let POST: (request: Request) => Promise<Response>
 let sendCoordinatorMessage: typeof import('../app/actions/coordinator').sendCoordinatorMessage
 let sendSuggestion: typeof import('../app/actions/coordinator').sendSuggestion
+let retryCoordinatorTurn: typeof import('../app/actions/coordinator').retryCoordinatorTurn
 let enabled = true
+let retryQueued = false
+let retryWorking = false
 const suggestionId = 'b4000000-0000-4000-8000-000000000010'
 type SuggestionRow = { id: string; botId: string | null; source: 'gmail'; action: 'reply'; title: string; actionTitle: string | null; actor: string | null; url: string | null }
 let suggestion: SuggestionRow | null = null
@@ -198,14 +202,29 @@ before(async () => {
   } })
   mock.module('@/lib/coordinator/coordinator-bot', { namedExports: { coordinatorBot: async () => ({ botId: COORDINATOR_BOT, workspaceId: 'a4000000-0000-4000-8000-0000000c0de2' }), chatBotId: async (_owner: string, botId: string | null | undefined) => botId ?? COORDINATOR_BOT, openChatBotId: async (_user: unknown, botId: string | null | undefined) => botId ?? COORDINATOR_BOT } })
   mock.module('@/lib/request-log', { namedExports: { noteLogUser: () => undefined, withRequestLog: (_path: string, handler: unknown) => handler } })
-  mock.module('@/lib/coordinator/store', { namedExports: { chatView: async () => ({}), botChats: async () => ({}), retryFailedTurn: async () => false } })
+  mock.module('@/lib/coordinator/store', { namedExports: { chatView: async () => ({ working: retryWorking }), chatVersion: async () => ({ version: '', cursor: 0, working: retryWorking, error: null }), botChats: async () => ({}), retryFailedTurn: async () => retryQueued, sendRetryOf: async () => null, citationSources: async () => ({}), storedReasoning: async () => [] } })
   mock.module('@/lib/coordinator/wake', { namedExports: { coordinatorEnabled: () => enabled, wakeCoordinator: () => { throw new Error('test must not execute wake') } } })
   mock.module('next/server', { namedExports: { NextResponse: { json: (body: unknown, options?: ResponseInit) => Response.json(body, options) }, after: (callback: () => unknown) => callbacks.push(callback) } })
   mock.module('next/headers', { namedExports: { headers: async () => actionHeaders, cookies: async () => ({ get: () => undefined }) } })
   ;({ POST } = await import('../app/api/coordinator/messages/route'))
-  ;({ sendCoordinatorMessage, sendSuggestion } = await import('../app/actions/coordinator'))
+  ;({ sendCoordinatorMessage, sendSuggestion, retryCoordinatorTurn } = await import('../app/actions/coordinator'))
 })
 const request = (body: unknown) => new Request('https://synthetic.example/api/coordinator/messages', { method: 'POST', body: JSON.stringify(body) })
+
+test('reply retry reports unavailable, already working and no failed turn without claiming an enqueue', async () => {
+  current = fixture(); userId = 'owner'; callbacks.length = 0; retryQueued = false
+  enabled = false
+  assert.deepEqual(await retryCoordinatorTurn(), { queued: false, reason: 'unavailable' })
+  enabled = true; retryWorking = true
+  assert.deepEqual(await retryCoordinatorTurn(), { queued: false, reason: 'working' })
+  retryWorking = false
+  assert.deepEqual(await retryCoordinatorTurn(), { queued: false, reason: 'nothingToRetry' })
+  assert.equal(callbacks.length, 0)
+  retryQueued = true
+  assert.deepEqual(await retryCoordinatorTurn(), { queued: true })
+  assert.equal(callbacks.length, 1)
+  retryQueued = false; callbacks.length = 0
+})
 
 test('HTTP handler and action share personal submission identity and expose payload conflicts', async () => {
   current = fixture(); callbacks.length = 0; userId = 'owner'
@@ -370,7 +389,7 @@ test('a changed suggestion after sending conflicts with its immutable receipt', 
 })
 
 test('new-task machine choice is owner-checked, preserved separately from copy and frozen across retries', async () => {
-  process.env.MIKKA_ISSUE_TOOLS_ENABLED = '1'
+  overrideDeploymentSwitch('issueTools', true)
   current = fixture(); callbacks.length = 0; userId = 'owner'
   const deviceId = 'b4000000-0000-4000-8000-000000000004'
   const destination = { kind: 'device' as const, deviceId }
@@ -391,32 +410,32 @@ test('new-task machine choice is owner-checked, preserved separately from copy a
   current.deviceRows.get(deviceId)!.ownerId = 'foreign'
   assert.deepEqual(await sendCoordinatorMessage('do the task', null, null, submissionId, destination), { error: 'deviceNotFound', params: undefined })
   assert.equal(current.rows.size, 1)
-  delete process.env.MIKKA_ISSUE_TOOLS_ENABLED
+  overrideDeploymentSwitch('issueTools', undefined)
 })
 
 test('with the Coordinator off a new task is refused, not queued silently; a chat message still waits', async () => {
-  process.env.MIKKA_ISSUE_TOOLS_ENABLED = '1'
+  overrideDeploymentSwitch('issueTools', true)
   current = fixture(); callbacks.length = 0; userId = 'owner'; enabled = false
   assert.deepEqual(await sendCoordinatorMessage('do the task', null, null, submissionId, { kind: 'cloud' }), { error: 'coordinatorUnavailable', params: undefined })
   assert.equal(current.rows.size, 0)
   assert.deepEqual(await sendCoordinatorMessage('hello', null, null, submissionId), { queued: true })
   assert.equal(current.rows.size, 1)
   enabled = true
-  delete process.env.MIKKA_ISSUE_TOOLS_ENABLED
+  overrideDeploymentSwitch('issueTools', undefined)
 })
 
 test('new-task submission fails closed when the issue-tools kill switch is set', async () => {
   current = fixture(); callbacks.length = 0; userId = 'owner'
-  process.env.MIKKA_ISSUE_TOOLS_ENABLED = '0'
+  overrideDeploymentSwitch('issueTools', false)
   assert.deepEqual(await sendCoordinatorMessage('do the task', null, null, submissionId, { kind: 'cloud' }), { error: 'issueToolsDisabled', params: undefined })
   assert.equal(current.rows.size, 0)
   assert.equal(callbacks.length, 0)
-  delete process.env.MIKKA_ISSUE_TOOLS_ENABLED
+  overrideDeploymentSwitch('issueTools', undefined)
 })
 
 test('new-task submission is on by default with no issue-tools setting', async () => {
   current = fixture(); callbacks.length = 0; userId = 'owner'
-  delete process.env.MIKKA_ISSUE_TOOLS_ENABLED
+  overrideDeploymentSwitch('issueTools', undefined)
   assert.deepEqual(await sendCoordinatorMessage('do the task', null, null, submissionId, { kind: 'cloud' }), { queued: true })
   assert.equal(current.rows.size, 1)
 })
@@ -437,7 +456,7 @@ test('image bytes and machine destination both participate in immutable submissi
 })
 
 test('browser notes and an authorized task destination persist together and remain frozen on retry', async () => {
-  process.env.MIKKA_ISSUE_TOOLS_ENABLED = '1'
+  overrideDeploymentSwitch('issueTools', true)
   current = fixture(); callbacks.length = 0; userId = 'owner'
   const note = { n: 1, kind: 'element' as const, url: 'https://example.org/', label: 'Save', note: 'Keep this selection', selector: 'button' }
   try {
@@ -449,7 +468,7 @@ test('browser notes and an authorized task destination persist together and rema
     assert.deepEqual(await sendCoordinatorMessage('do the task', null, null, submissionId, { kind: 'cloud' }, [note]), { queued: true })
     assert.deepEqual(await sendCoordinatorMessage('do the task', null, null, submissionId, { kind: 'cloud' }, [{ ...note, note: 'Changed' }]), { error: 'submissionConflict', params: undefined })
     assert.equal(current.rows.size, 1)
-  } finally { delete process.env.MIKKA_ISSUE_TOOLS_ENABLED }
+  } finally { overrideDeploymentSwitch('issueTools', undefined) }
 })
 
 test('host browser session provenance is immutable across replays and cannot upgrade a prior API message',async()=>{

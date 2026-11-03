@@ -60,7 +60,8 @@ async function quotaScope(query: Query, run: Run): Promise<QuotaScope | null> {
 
 async function quotaKey(query: Query, run: Run, scope: QuotaScope): Promise<QuotaApiKey | undefined> {
   const { quotaFallbackApiKey } = await import('@/lib/run-credential-source')
-  const key = await quotaFallbackApiKey(query, { ownerId: run.userId, botId: run.botId, harness: scope.harness, model: run.agentDefinition?.cliModelSelection === 'explicit' ? run.agentDefinition.model : undefined,
+  const model = run.agentDefinition?.cliModelSelection === 'explicit' ? run.agentDefinition.model : run.agentDefinition?.subscription?.modelId
+  const key = await quotaFallbackApiKey(query, { ownerId: run.userId, botId: run.botId, harness: scope.harness, model,
     botWorkspaceId: scope.botWorkspaceId, choiceWorkspaceId: scope.choiceWorkspaceId })
   if (!key) return undefined
   const { rows: [row] } = await query.query<{ provider: string; name: string | null; last4: string }>('SELECT provider,name,last4 FROM model_api_keys WHERE id=$1', [key.keyId])
@@ -99,13 +100,20 @@ async function queueCloudContinuation(run: Run, cloud: CloudBinding, key: RunApi
   if (!run.issueId || !run.deviceRepoId) throw new ActionFailureError('runInvalid')
   const [issue] = await db.select({ title: issues.title, content: issues.content }).from(issues).where(eq(issues.id, run.issueId)).limit(1)
   if (!issue) throw new ActionFailureError('issueNotFound')
-  const { queueCloudRun } = await import('@/lib/computer/queue-run')
+  const [{ queueCloudRun }, { threadRunModel }] = await Promise.all([import('@/lib/computer/queue-run'), import('@/lib/computer/run-model')])
   const actor = { userId: run.userId, workspaceId: cloud.workspaceId }
-  const { runId } = await queueCloudRun(pool, actor, { botId: cloud.botId, issueId: run.issueId, agentId: run.agentId, deviceRepoId: run.deviceRepoId, title: issue.title, body: tiptapToText(issue.content),
-    note: quotaContinuationNote(), withoutBot: run.botId === null, idempotencyKey: `quota:${run.id}:${key ? 'api_key' : 'original'}`,
-    ...(key ? { apiKey: key } : run.agentDefinition?.model ? { model: run.agentDefinition.model } : {}) })
-  await db.update(agentRuns).set({ retryOf: run.id, attempt: run.attempt, updatedAt: new Date() }).where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, run.userId)))
-  await (await import('@/lib/run-leases')).startThreadMachine(actor, runId)
+  const { rows: [target] } = await pool.query(`SELECT runtime."agentId",runtime."repoId",a."deviceId",repo."remoteUrl"
+    FROM bot_cloud_runtimes runtime JOIN agents a ON a.id=runtime."agentId" JOIN device_repos repo ON repo.id=$4 AND repo."userId"=$2
+    WHERE runtime."botId"=$1 AND runtime."ownerId"=$2 AND runtime.harness=$3`, [cloud.botId, run.userId, run.agentDefinition!.harness, run.deviceRepoId]);
+  if (!target) throw new ActionFailureError('runInvalid');
+  const repoId = target.remoteUrl ? (await (await import('@/lib/device-repositories')).ensureDeviceRepository(run.userId, target.deviceId, target.remoteUrl)).id : target.repoId;
+  const { runId } = await queueCloudRun(pool, actor, { botId: cloud.botId, issueId: run.issueId, agentId: target.agentId, deviceRepoId: repoId, readOnly: run.agentDefinition?.readOnly, title: issue.title, body: tiptapToText(issue.content),
+    note: quotaContinuationNote(), withoutBot: run.botId === null, idempotencyKey: `quota:${run.id}:${key ? 'api_key' : 'original'}`, threadRunId: run.id,
+    // On the person's API key the key's model; else the paused run's own model and account (a missing one fails in queueCloudRun).
+    ...(key ? { apiKey: key, model: key.model } : { ...threadRunModel(run.agentDefinition), model: run.agentDefinition?.model ?? '' }) })
+  const [queued] = await db.select({ prompt: agentRuns.prompt }).from(agentRuns).where(eq(agentRuns.id, runId)).limit(1)
+  await db.update(agentRuns).set({ retryOf: run.id, attempt: run.attempt, kind: run.kind, baseBranch: run.baseBranch,
+    agentDefinition: continuationDefinition(run.agentDefinition!, queued.prompt, key), updatedAt: new Date() }).where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, run.userId)))
   return runId
 }
 
@@ -138,6 +146,8 @@ export async function continueCloudQuotaRun(run: Run, plan: QuotaPlan, resetsAt:
     await db.transaction(async tx => {
       if (await endPausedRun(tx, run.id, run.userId)) await recordCoordinatorEvent(tx, runCredentialSwitchedEvent(run, plan.from, plan.key, retryRunId, resetsAt))
     })
+    await (await import('@/lib/run-completion-effects')).afterRunEnded(run.userId, run.id)
+    await (await import('@/lib/run-leases')).startThreadMachine({ userId: run.userId, workspaceId: plan.cloud.workspaceId }, retryRunId)
   } catch {
     // The cloud refused the continuation: the run stays paused, and the person can resume it on the key.
     await recordCoordinatorEvent(db, runQuotaPausedEvent(run, plan.from, resetsAt, 'noApiKey'))
@@ -152,6 +162,12 @@ async function lockPaused(tx: Tx, userId: string, runId: string): Promise<{ run:
   // Already resumed or retried: the same answer again.
   const [next] = await tx.select({ id: agentRuns.id }).from(agentRuns).where(and(eq(agentRuns.retryOf, runId), eq(agentRuns.userId, userId))).orderBy(asc(agentRuns.createdAt)).limit(1)
   if (next && run.stopReason === 'quota_exhausted') return { continuation: next.id }
+  if (run.stopReason === 'quota_exhausted') {
+    const { sql } = await import('drizzle-orm')
+    const eventId = (await import('@/lib/factory/event-id')).factoryEventId('quota-check-continuation',run.id)
+    const receipt = await tx.execute(sql`SELECT e.result->>'runId' AS id FROM factory_events e JOIN factory_tasks t ON t.id=e."taskId" WHERE t."userId"=${userId} AND e."eventId"=${eventId}::uuid`)
+    if (receipt.rows[0]?.id) return { continuation: String(receipt.rows[0].id) }
+  }
   throw new ActionFailureError('runNotActive')
 }
 
@@ -192,10 +208,14 @@ async function continuePausedRun(userId: string, runId: string, mode: 'apiKey' |
     if (await endPausedRun(tx, pending.run.id, userId) && pending.key)
       await recordCoordinatorEvent(tx, runCredentialSwitchedEvent(pending.run, pending.plan.from, pending.key, retryRunId, pending.run.quotaResetsAt?.toISOString() ?? null))
   })
+  await (await import('@/lib/run-completion-effects')).afterRunEnded(userId, pending.run.id)
+  await (await import('@/lib/run-leases')).startThreadMachine({ userId, workspaceId: pending.plan.cloud!.workspaceId }, retryRunId)
   return afterContinue(userId, { runId: retryRunId })
 }
 
 async function afterContinue(userId: string, result: { runId: string }) {
+  const [next] = await db.select({ retryOf: agentRuns.retryOf }).from(agentRuns).where(and(eq(agentRuns.id, result.runId),eq(agentRuns.userId,userId))).limit(1)
+  if (next?.retryOf) await (await import('@/lib/run-completion-effects')).afterRunEnded(userId, next.retryOf)
   const { wakeCoordinator } = await import('@/lib/coordinator/wake')
   await wakeCoordinator(userId).catch(() => undefined)
   return result

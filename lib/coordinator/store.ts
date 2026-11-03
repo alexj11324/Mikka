@@ -1,6 +1,8 @@
+import { createHash } from 'node:crypto'
 import { sourcedEventMessage } from './message-safety'
 import { visibleRuns } from '@/lib/agent-runs'
 import { assertCredentialSafeChat } from '@/lib/credentials/chat-guard'
+import { credentialMasker, maskCredentials, maskDeep } from '@/lib/secrets/mask'
 import { issueForUser } from '@/lib/issue-access'
 import { issueVisibility } from '@/lib/issue-visibility'
 import 'server-only'
@@ -8,10 +10,7 @@ import { COORDINATOR_WELCOME_MARK } from '@/lib/agent-welcome'
 import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, lt, ne, notInArray, or, sql } from 'drizzle-orm'
 import type { ModelMessage } from 'ai'
 import { db } from '@/lib/db'
-import { agentRuns, coordinatorEvents, coordinatorMessages, coordinatorSessions, issueMembers, issues, pendingActions, runChunks, type CoordinatorEventTier } from '@/lib/db/schema'
-import { z } from 'zod'
-import { taskDestinationSchema } from '@/lib/task-destination'
-import { validateRepositoryApproval } from '@/lib/repository-approval-proposal'
+import { agentRuns, coordinatorEvents, coordinatorMessages, coordinatorSessions, issueMembers, issues, runChunks, type CoordinatorEventTier } from '@/lib/db/schema'
 import { markTelegramPending, pendingTelegramTargets, type PendingTelegramTarget } from './telegram-pending'
 import { chatItems, eventPrompt, type ChatItem, type StoredMessage } from '@/lib/coordinator/context'
 import { eventsForInbox, isolateTaskRequest } from '@/lib/coordinator/triage'
@@ -23,6 +22,7 @@ import { artifactSummaries, type ArtifactSummary } from '@/lib/artifacts/store'
 import { runSummaryText } from '@/lib/issue-run-conversation'
 import { threadName } from '@/lib/issue-threads'
 import { coordinatorChatState } from './chat-state'
+import { compactChatMessage } from './chat-projection'
 import { coordinatorLeaseActive } from './lease'
 import { readPreferences } from '@/lib/preferences'
 import type { InboxEvent } from '@/lib/push-reasons'
@@ -97,7 +97,6 @@ export interface InboxTake {
   taskEventId?: string
   sourceEventId?: string
   scheduledRead?: ScheduledRead
-  approvedRepositoryKey?: string
 }
 
 const NO_TAKE = { added: 0, telegramTargets: [], handoffMatterIds: [], handoffOnly: false, pushEvents: [], pushHidesText: false }
@@ -123,26 +122,25 @@ export async function takeInbox(userId: string, holder: string, botId: string): 
       return {held:true,...NO_TAKE}
     }
     const scheduledRead=scheduled?.scope??undefined
-    const due = scheduledRead ? [scheduledCandidate!] : isolateTaskRequest(candidates.filter(event => event.payload.source !== 'schedule_due' || event.id === scheduledCandidate?.id))
+    let due = scheduledRead ? [scheduledCandidate!] : isolateTaskRequest(candidates.filter(event => event.payload.source !== 'schedule_due' || event.id === scheduledCandidate?.id))
     if (!due.length) return { held: true, ...NO_TAKE }
     let taskEventId = due.length === 1 && due[0].kind === 'user_message' && due[0].payload.taskDestination !== undefined ? due[0].id : undefined
-    let approvedRepositoryKey: string | undefined
-    const approval = due.length === 1 && due[0].kind === 'action_decided' && due[0].payload.action === 'approve_repository_push' && due[0].payload.status === 'done' ? due[0] : undefined
-    if (approval && z.uuid().safeParse(approval.payload.requestEventId).success && z.uuid().safeParse(approval.payload.actionId).success) {
-      const [request] = await tx.select().from(pendingActions).where(and(eq(pendingActions.id, approval.payload.actionId as string), eq(pendingActions.userId, userId), eq(pendingActions.action, 'approve_repository_push'), eq(pendingActions.status, 'done'))).limit(1)
-      const taskIds = z.array(z.uuid()).safeParse(request?.context?.taskEventIds)
-      const binding = validateRepositoryApproval(request?.input)
-      if (binding && taskIds.success && taskIds.data.includes(approval.payload.requestEventId as string)) {
-        const [original] = await tx.select().from(coordinatorEvents).where(and(eq(coordinatorEvents.id, approval.payload.requestEventId as string), eventsOf(userId, botId), eq(coordinatorEvents.kind, 'user_message'))).limit(1)
-        const destination = taskDestinationSchema.safeParse(original?.payload.taskDestination)
-        if (original?.deliveredAt && destination.success && destination.data.kind === 'device') {
-          taskEventId = original.id
-          approvedRepositoryKey = binding.remoteKey
-        }
+    const source = due.findLast(event => event.kind === 'user_message' && event.payload.postedToChat !== true)
+      ?? due.findLast(event => event.kind === 'user_message')
+    let sourceEventId = scheduled ? undefined : source?.id
+    if (!scheduled && source?.payload.retry === true && source.payload.postedToChat === true) {
+      // A retry is a wake, not another human request. Resolve server-written
+      // provenance on the last actual person message, within this owned chat.
+      const [original] = await tx.select({ id: coordinatorEvents.id, payload: coordinatorEvents.payload }).from(coordinatorMessages)
+        .innerJoin(coordinatorEvents, and(eventsOf(userId, botId), eq(coordinatorEvents.kind, 'user_message'),
+          isNotNull(coordinatorEvents.deliveredAt), sql`${coordinatorEvents.id}::text = ${coordinatorMessages.message}->'mikkaUserEvent'->>'id'`))
+        .where(and(messagesOf(userId, botId), sql`${coordinatorMessages.message}->>'role' = 'user'`)).orderBy(desc(coordinatorMessages.position)).limit(1)
+      if (original) {
+        sourceEventId = original.id
+        if (original.payload.taskDestination !== undefined) { taskEventId = original.id; due = [source] }
       }
     }
-    const sourceEventId = scheduled ? undefined : due.findLast(event => event.kind === 'user_message')?.id
-    const isolatedTask = Boolean(taskEventId) || Boolean(approval) || Boolean(scheduled)
+    const isolatedTask = Boolean(taskEventId) || Boolean(scheduled)
     const backgroundLimit = isolatedTask ? 0 : INBOX_BATCH - due.length
     const background = backgroundLimit ? await tx.select().from(coordinatorEvents)
       .where(and(eventsOf(userId, botId), isNull(coordinatorEvents.deliveredAt), notInArray(coordinatorEvents.id, due.map(event => event.id)), eq(coordinatorEvents.tier, 'background')))
@@ -153,7 +151,8 @@ export async function takeInbox(userId: string, holder: string, botId: string): 
     const first = await nextPosition(tx, userId, botId)
     if (chatEvents.length) await tx.insert(coordinatorMessages).values(chatEvents.map((event, index) => ({
       id: crypto.randomUUID(), userId, botId, position: first + index,
-      message: sourcedEventMessage({ ...event, deliveredAt: now }, scheduledRead ? `[Scheduled read-only task] The person requested this stored task for now: ${scheduledRead.prompt}\nUse only the available allowed read tools. Do not create or change anything, request approval, schedule more work, or claim an external write. Return the result for this original chat.` : eventPrompt(event)),
+      // A GitHub or other token in an event (a run's summary, a tool's text) never reaches the chat.
+      message: maskDeep(sourcedEventMessage({ ...event, deliveredAt: now }, scheduledRead ? `[Scheduled read-only task] The person requested this stored task for now: ${scheduledRead.prompt}\nUse only the available allowed read tools. Do not create or change anything, request approval, schedule more work, or claim an external write. Return the result for this original chat.` : eventPrompt(event)), credentialMasker),
     })))
     await tx.update(coordinatorEvents).set({ deliveredAt: now }).where(inArray(coordinatorEvents.id, events.map(event => event.id)))
     for (const event of events) {
@@ -171,7 +170,6 @@ export async function takeInbox(userId: string, holder: string, botId: string): 
       ...(taskEventId ? { taskEventId } : {}),
       ...(sourceEventId ? { sourceEventId } : {}),
       ...(scheduledRead ? { scheduledRead } : {}),
-      ...(approvedRepositoryKey ? { approvedRepositoryKey } : {}),
       // A verification code is told in the app chat only, never on Telegram.
       telegramTargets: handoffs.some(carriesCode) ? [] : pendingTelegramTargets(pendingReplies),
       handoffMatterIds: handoffs.flatMap(event => typeof event.payload.matterId === 'string' ? [event.payload.matterId] : []),
@@ -254,14 +252,24 @@ export async function completeTriageAttempt(event: TriageEventRecord & { observe
  * Appends the turn's new messages and renews the lease. `warning` says why the
  * reply may be cut short; it shows in the chat until a turn ends cleanly.
  */
-export async function appendMessages(userId: string, holder: string, messages: ModelMessage[], warning: string | null = null, botId: string, streamId?: string, stopped = false): Promise<number> {
+/** The kind of host event the last stored message records (lib/coordinator/message-safety.ts), or null. */
+export async function lastEventKind(userId: string, botId: string): Promise<string | null> {
+  const [last] = await db.select({ kind: sql<string | null>`${coordinatorMessages.message}->'mikkaEvent'->>'eventKind'` })
+    .from(coordinatorMessages).where(messagesOf(userId, botId)).orderBy(desc(coordinatorMessages.position)).limit(1)
+  return last?.kind ?? null
+}
+
+export async function appendMessages(userId: string, holder: string, unmasked: ModelMessage[], warning: string | null = null, botId: string, streamId?: string, stopped = false): Promise<number> {
+  // Safety floor (decision 2026-11-02-1600): a GitHub token or other credential
+  // never persists in chat, a tool result included.
+  const messages = maskDeep(unmasked, credentialMasker)
   await assertCredentialSafeChat(userId, messages)
   return db.transaction(async tx => {
     await tx.execute(sql`SELECT 1 FROM coordinator_sessions WHERE "userId"=${userId} AND "botId"=${botId}::uuid FOR UPDATE`)
     const first = await nextPosition(tx, userId, botId)
     if (messages.length) {
       await tx.insert(coordinatorMessages).values(messages.map((message, index) => {
-        const { mikkaStreamId: _untrusted, mikkaStopped: _unmarked, ...plain } = message as unknown as Record<string, unknown>
+        const { mikkaStreamId: _untrusted, mikkaStopped: _unmarked, mikkaFailure: _unfailed, mikkaRetried: _unretried, ...plain } = message as unknown as Record<string, unknown>
         // 停止: the turn's last message carries the mark; the chat shows 已停止 under the reply.
         const stop = stopped && index === messages.length - 1 && message.role === 'assistant'
         return { id: crypto.randomUUID(), userId, botId, position: first + index,
@@ -269,7 +277,7 @@ export async function appendMessages(userId: string, holder: string, messages: M
       }))
     }
     const now = new Date()
-    await tx.update(coordinatorSessions).set({ leaseUntil: new Date(now.getTime() + LEASE_MS), lastError: warning, lastErrorAt: warning ? now : null, updatedAt: now })
+    await tx.update(coordinatorSessions).set({ leaseUntil: new Date(now.getTime() + LEASE_MS), lastError: warning && maskCredentials(warning), lastErrorAt: warning ? now : null, updatedAt: now })
       .where(and(sessionOf(userId, botId), eq(coordinatorSessions.leaseHolder, holder)))
     return first + messages.length - 1
   })
@@ -279,26 +287,69 @@ export async function appendMessages(userId: string, holder: string, messages: M
  * 重试 on a failed reply: runs the same turn again over the conversation as it
  * stands, so the person's message is not sent twice. The event never becomes a
  * chat message, and one failure can be retried once; a new failure can be
- * retried again. False when nothing failed or a turn is already running.
+ * retried again. A turn that ended with no reply and no recorded error (its
+ * lease ran out) counts as failed too. False when nothing failed or a turn is
+ * already running.
  */
 export async function retryFailedTurn(userId: string, botId: string): Promise<boolean> {
   return db.transaction(async tx => {
     await tx.execute(sql`SELECT 1 FROM coordinator_sessions WHERE "userId"=${userId} AND "botId"=${botId}::uuid FOR UPDATE`)
     const [session] = await tx.select().from(coordinatorSessions).where(sessionOf(userId, botId)).limit(1)
-    if (!session?.lastError || !session.lastErrorAt || coordinatorLeaseActive(session)) return false
+    if (!session || coordinatorLeaseActive(session)) return false
+    // A recorded failure, or a turn that ended with neither a reply nor an error (its lease ran out):
+    // the person's message is the newest one, so nothing answered it.
+    let failure = session.lastError && session.lastErrorAt ? session.lastErrorAt.toISOString() : null
+    if (!failure) {
+      const [last] = await tx.select({ position: coordinatorMessages.position, role: sql<string>`${coordinatorMessages.message}->>'role'` })
+        .from(coordinatorMessages).where(messagesOf(userId, botId)).orderBy(desc(coordinatorMessages.position)).limit(1)
+      const waiting = await tx.select({ id: coordinatorEvents.id }).from(coordinatorEvents).where(and(eventsOf(userId, botId), isNull(coordinatorEvents.deliveredAt))).limit(1)
+      if (last?.role === 'user' && !waiting.length) failure = `unanswered:${last.position}`
+    }
+    if (!failure) return false
     const inserted = await tx.insert(coordinatorEvents).values({
       id: crypto.randomUUID(), userId, botId, kind: 'user_message', issueId: null, runId: null,
-      dedupeKey: `turn_retry:${userId}:${botId}:${session.lastErrorAt.toISOString()}`,
+      dedupeKey: `turn_retry:${userId}:${botId}:${failure}`,
       payload: { text: '', postedToChat: true, retry: true },
     }).onConflictDoNothing({ target: coordinatorEvents.dedupeKey }).returning({ id: coordinatorEvents.id })
     return inserted.length === 1
   })
 }
 
-/** Records why a turn failed and lets go of the lease. */
+/**
+ * Records why a turn failed and lets go of the lease. The person's message the
+ * turn was answering keeps the reason too (`mikkaFailure`), so the chat shows it
+ * under that message after the next turn and after a reload.
+ */
 export async function failTurn(userId: string, holder: string, error: string, botId: string): Promise<void> {
-  await db.update(coordinatorSessions).set({ leaseHolder: null, leaseUntil: null, lastError: error.slice(0, 1000), lastErrorAt: new Date(), updatedAt: new Date() })
-    .where(and(sessionOf(userId, botId), eq(coordinatorSessions.leaseHolder, holder)))
+  const reason = error.slice(0, 1000)
+  await db.transaction(async tx => {
+    const released = await tx.update(coordinatorSessions).set({ leaseHolder: null, leaseUntil: null, lastError: reason, lastErrorAt: new Date(), updatedAt: new Date() })
+      .where(and(sessionOf(userId, botId), eq(coordinatorSessions.leaseHolder, holder))).returning({ userId: coordinatorSessions.userId })
+    if (!released.length) return
+    await tx.execute(sql`UPDATE coordinator_messages SET message = message || jsonb_build_object('mikkaFailure', ${reason}::text)
+      WHERE "userId"=${userId} AND "botId"=${botId}::uuid AND message->>'role'='user'
+        AND position=(SELECT max(position) FROM coordinator_messages WHERE "userId"=${userId} AND "botId"=${botId}::uuid)`)
+  })
+}
+
+/**
+ * 重新发送 on a failed message: marks it retried (`mikkaRetried`) and sends its
+ * text again in one transaction, so the chat and the model's history keep only
+ * the new attempt. The mark is set only on this person's own user message in
+ * this chat that carries a failure; any other position is ignored and the send
+ * goes ahead as an ordinary message, saying nothing about what that position
+ * holds. The message and its failure stay stored. A message already retried
+ * (a double click, two sends at once) sends nothing more: null.
+ */
+export async function sendRetryOf<T>(userId: string, botId: string, position: number, send: (tx: Parameters<Parameters<typeof db.transaction>[0]>[0]) => Promise<T>): Promise<T | null> {
+  return db.transaction(async tx => {
+    const target = sql`"userId"=${userId} AND "botId"=${botId}::uuid AND position=${position} AND message->>'role'='user' AND message ? 'mikkaFailure'`
+    // The row lock makes a second send wait, then find the mark and stop.
+    const marked = await tx.execute(sql`UPDATE coordinator_messages SET message = message || '{"mikkaRetried":true}'::jsonb
+      WHERE ${target} AND NOT message ? 'mikkaRetried' RETURNING position`)
+    if (!marked.rows.length && (await tx.execute(sql`SELECT 1 FROM coordinator_messages WHERE ${target} AND message ? 'mikkaRetried'`)).rows.length) return null
+    return send(tx)
+  })
 }
 
 /** The summary so far, the memory, and every message after the summary, oldest first. */
@@ -311,8 +362,9 @@ export async function loadConversation(userId: string, botId: string): Promise<{
     .orderBy(asc(coordinatorMessages.position))
   // 使用记忆 off (the app's 记忆 setting): the prompt leaves the memory out; it stays saved.
   const memory = (await readPreferences(userId)).memoryEnabled ? session?.memory ?? '' : ''
-  return { summary: session?.summary ?? null, memory, messages: rows.map(row => {
-    const { mikkaStreamId: _streamId, mikkaStopped: _stopped, ...message } = row.message
+  // A failed message retried with 重新发送 is not said twice: the new attempt stands for it.
+  return { summary: session?.summary ?? null, memory, messages: rows.filter(row => (row.message as { mikkaRetried?: unknown }).mikkaRetried !== true).map(row => {
+    const { mikkaStreamId: _streamId, mikkaStopped: _stopped, mikkaFailure: _failure, mikkaRetried: _retried, ...message } = row.message
     return { position: row.position, message: message as unknown as ModelMessage }
   }) }
 }
@@ -331,7 +383,8 @@ export async function editMemory<T>(userId: string, edit: (memory: string) => { 
       .where(sessionOf(userId, botId)).for('update')
     const outcome = edit(session?.memory ?? '')
     if ('error' in outcome) return outcome
-    await tx.update(coordinatorSessions).set({ memory: outcome.memory, updatedAt: new Date() }).where(sessionOf(userId, botId))
+    // A credential never persists in memory.
+    await tx.update(coordinatorSessions).set({ memory: maskCredentials(outcome.memory), updatedAt: new Date() }).where(sessionOf(userId, botId))
     return outcome.result
   })
 }
@@ -354,6 +407,16 @@ export interface ChatView {
   artifacts: Record<string, ArtifactSummary>
 }
 
+/** The reasoning text of this person's stored messages at `positions` in one chat, in order; stored messages are already masked (appendMessages). */
+export async function storedReasoning(userId: string, botId: string, positions: readonly number[]): Promise<string[]> {
+  if (!positions.length) return []
+  const rows = await db.select({ message: coordinatorMessages.message }).from(coordinatorMessages)
+    .where(and(messagesOf(userId, botId), inArray(coordinatorMessages.position, [...positions]))).orderBy(asc(coordinatorMessages.position))
+  return rows.flatMap(({ message }) => message.role === 'assistant' && Array.isArray(message.content)
+    ? (message.content as { type?: unknown; text?: unknown }[]).flatMap(part => part.type === 'reasoning' && typeof part.text === 'string' && part.text.trim() ? [part.text] : [])
+    : [])
+}
+
 /** Looks up the issues and runs cited in `texts`, and the `threads` dispatched, keeping only what `userId` may see. */
 export async function citationSources(userId: string, texts: readonly string[], threads: readonly string[] = []): Promise<Record<string, CitationSource>> {
   const cited = citedIds(texts)
@@ -363,7 +426,7 @@ export async function citationSources(userId: string, texts: readonly string[], 
   if (issueIds.length) {
     const rows = await db.selectDistinct({ id: issues.id, ownerId: issues.userId, scope: issues.scope, title: issues.title, status: issues.status, priority: issues.priority, content: issues.content })
       .from(issues).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId)))
-      .where(and(inArray(issues.id, issueIds), (await issueVisibility(userId)).predicate))
+      .where(and(inArray(issues.id, issueIds), (await issueVisibility(userId, false, undefined, db, { onlyIssueIds: issueIds })).predicate))
     const identifiers = await taskIdentifiers(rows.map(row => ({ id: row.id, ownerId: row.ownerId, scope: row.scope, number: readIssueMetadata(row.content).number })))
     for (const { content, ownerId: _owner, scope: _scope, ...row } of rows) {
       const metadata = readIssueMetadata(content)
@@ -403,7 +466,8 @@ function withImages(text: string, images: unknown): ModelMessage['content'] {
 /** The latest of the conversation for the chat, oldest first. */
 export async function chatView(userId: string, limit = 200, botId: string): Promise<ChatView> {
   const [session] = await db.select().from(coordinatorSessions).where(sessionOf(userId, botId)).limit(1)
-  const rows = await db.select({ id: coordinatorMessages.id, position: coordinatorMessages.position, message: coordinatorMessages.message, createdAt: coordinatorMessages.createdAt })
+  // Compact parts: the chat never shows reasoning text or whole tool inputs and outputs (chat-projection.ts).
+  const rows = await db.select({ id: coordinatorMessages.id, position: coordinatorMessages.position, message: compactChatMessage, createdAt: coordinatorMessages.createdAt })
     .from(coordinatorMessages).where(messagesOf(userId, botId))
     .orderBy(desc(coordinatorMessages.position)).limit(limit)
   // Events still in the inbox: the person's own messages show at once, ahead of the turn that takes them.
@@ -411,7 +475,9 @@ export async function chatView(userId: string, limit = 200, botId: string): Prom
     .where(and(eventsOf(userId, botId), isNull(coordinatorEvents.deliveredAt)))
     .orderBy(asc(coordinatorEvents.createdAt)).limit(INBOX_BATCH)
   const last = rows[0]?.position ?? 0
-  const pending = waiting.filter(event => event.kind === 'user_message' && !String(event.payload.text ?? '').startsWith(COORDINATOR_WELCOME_MARK)).map((event, index) => ({
+  const lastMessage = rows[0] && { role: String(rows[0].message.role), ...(typeof rows[0].message.mikkaStreamId === 'string' ? { streamId: rows[0].message.mikkaStreamId } : {}) }
+  // A retry (重试, or an interrupted turn) re-answers a message already in the chat (postedToChat): no second bubble.
+  const pending = waiting.filter(event => event.kind === 'user_message' && event.payload.postedToChat !== true && !String(event.payload.text ?? '').startsWith(COORDINATOR_WELCOME_MARK)).map((event, index) => ({
     position: last + index + 1, createdAt: event.createdAt, message: { role: 'user', content: withImages(eventPrompt(event), event.payload.images) } as ModelMessage, pending: true as const,
   }))
   const items = chatItems([...rows.reverse().map(row => ({ ...row, message: row.message as unknown as ModelMessage })), ...pending])
@@ -420,9 +486,49 @@ export async function chatView(userId: string, limit = 200, botId: string): Prom
     cursor: last,
     persistedStreamIds: [...new Set(rows.flatMap(({message}) => message.role === 'assistant' && typeof message.mikkaStreamId === 'string' ? [message.mikkaStreamId] : []))],
     ...(coordinatorLeaseActive(session) && session?.leaseHolder?.startsWith('wrun_') ? { streamRunId: session.leaseHolder } : {}),
-    ...coordinatorChatState(session, waiting),
-    sources: await citationSources(userId, items.filter(item => item.from === 'coordinator').map(item => item.text), items.flatMap(item => item.threads)),
+    ...coordinatorChatState(session, waiting, new Date(), lastMessage),
+    // An event line names its thread or task as a chip (C1); its stored text is the model's, never shown.
+    sources: await citationSources(userId, [...items.filter(item => item.from === 'coordinator').map(item => item.text),
+      ...items.flatMap(item => item.line ? [item.line.runId && `[[run:${item.line.runId}]]`, item.line.issueId && `[[issue:${item.line.issueId}]]`].filter((text): text is string => !!text) : [])], items.flatMap(item => item.threads)),
     artifacts: await artifactSummaries(userId, items.flatMap(item => [...item.artifacts, ...(item.quote ? [item.quote.artifactId] : [])])),
+  }
+}
+
+/** What a chat poll needs to know without reading the conversation: its version and live state. */
+export interface ChatVersion {
+  /** Changes whenever the chat's stored messages (the latest `limit`) or its waiting inbox change. */
+  version: string
+  cursor: number
+  streamRunId?: string
+  working: boolean
+  error: string | null
+}
+
+/**
+ * The chat's version, computed in the database from the same latest `limit`
+ * messages `chatView` shows (a hash of each message), plus its waiting inbox
+ * and state. Only a few dozen bytes leave the database, where `chatView`
+ * sends the messages themselves.
+ */
+export async function chatVersion(userId: string, limit = 200, botId: string): Promise<ChatVersion> {
+  const [session] = await db.select().from(coordinatorSessions).where(sessionOf(userId, botId)).limit(1)
+  const latest = db.select({ id: coordinatorMessages.id, position: coordinatorMessages.position, message: coordinatorMessages.message })
+    .from(coordinatorMessages).where(messagesOf(userId, botId)).orderBy(desc(coordinatorMessages.position)).limit(limit).as('latest')
+  const [stored] = await db.select({
+    last: sql<number>`coalesce(max(${latest.position}), 0)::int`,
+    hash: sql<string>`md5(coalesce(string_agg(${latest.id}::text || ':' || md5(${latest.message}::text), ',' order by ${latest.position}), ''))`,
+    role: sql<string | null>`(array_agg(${latest.message}->>'role' order by ${latest.position} desc))[1]`,
+    streamId: sql<string | null>`(array_agg(${latest.message}->>'mikkaStreamId' order by ${latest.position} desc))[1]`,
+  }).from(latest)
+  const waiting = await db.select().from(coordinatorEvents)
+    .where(and(eventsOf(userId, botId), isNull(coordinatorEvents.deliveredAt)))
+    .orderBy(asc(coordinatorEvents.createdAt)).limit(INBOX_BATCH)
+  const lastMessage = stored.role ? { role: stored.role, ...(stored.streamId ? { streamId: stored.streamId } : {}) } : undefined
+  return {
+    version: createHash('sha256').update(`${limit}|${stored.hash}|${waiting.map(event => event.id).join(',')}`).digest('hex').slice(0, 32),
+    cursor: stored.last,
+    ...(coordinatorLeaseActive(session) && session?.leaseHolder?.startsWith('wrun_') ? { streamRunId: session.leaseHolder } : {}),
+    ...coordinatorChatState(session, waiting, new Date(), lastMessage),
   }
 }
 
@@ -453,7 +559,8 @@ export async function botChats(userId: string): Promise<Record<string, BotChatSu
   const lines = latest.flatMap(row => {
     if (!row.botId) return []
     const [item] = chatItems([{ position: 0, message: row.message as unknown as ModelMessage, createdAt: row.createdAt }])
-    return [{ botId: row.botId, text: item?.text || null, from: item?.from, at: row.createdAt.toISOString() }]
+    // An event's stored text is the model's (English, ids): the preview leaves it out (C1).
+    return [{ botId: row.botId, text: item?.from === 'event' ? null : item?.text || null, from: item?.from, at: row.createdAt.toISOString() }]
   })
   // A reply cites threads and tasks by id; the preview names them as the chat's chips do (R-15).
   const sources = await citationSources(userId, lines.flatMap(line => line.from === 'coordinator' && line.text ? [line.text] : []))

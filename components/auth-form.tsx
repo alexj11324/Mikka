@@ -12,7 +12,7 @@ import { desktopAuthCallbackURL, desktopAuthReturnPath } from '@/lib/desktop-aut
 import { bridgeFromWindow } from '@/lib/platform/detect'
 import { Button } from '@/components/ui/button'
 import { listIssues, saveIssue } from '@/app/actions/issues'
-import { signupRefusal, turnstileHeaders } from '@/lib/signup-refusal'
+import { signInRefusal, signupRefusal, turnstileHeaders } from '@/lib/signup-refusal'
 import { Turnstile, type TurnstileHandle } from '@/components/auth/turnstile'
 
 const DESKTOP_OAUTH_STATE_KEY = 'mikka:desktop-oauth'
@@ -76,6 +76,7 @@ export function AuthForm({ mode, addAccount = false, googleEnabled = false, gith
     if (!response.ok) throw new Error('desktop handoff registration failed')
     await bridge.app.openExternal(desktopSignInURL(state, returnPath, callback))
   }
+  const [unverified, setUnverified] = useState(false)
   const [error, setError] = useState(oauthAccountNotLinked === 'google' ? t('googleAccountNotLinked') : oauthAccountNotLinked === 'github' ? t('githubAccountNotLinked') : oauthFailed ? t('oauthFailed') : '')
   const [notice, setNotice] = useState(desktopFlow || continueGoogle || continueGitHub || continueComposio ? t('continueNotice') : '')
   function oauthErrorCallbackURL(provider: 'google' | 'github') {
@@ -194,7 +195,9 @@ export function AuthForm({ mode, addAccount = false, googleEnabled = false, gith
         : await authClient.signIn.email(credentials)
       if (result.error) {
         const refusal = registering ? signupRefusal(result.error.status, result.error.code) : null
-        setError(refusal ? t(`signupRefusal.${refusal}`) : t('submitFailed'))
+        const signIn = registering ? null : signInRefusal(result.error.status, result.error.code)
+        setError(refusal ? t(`signupRefusal.${refusal}`) : signIn ? t(`signInRefusal.${signIn}`) : t('submitFailed'))
+        setUnverified(signIn === 'emailNotVerified')
         return
       }
       const session = await authClient.getSession({ query: { disableCookieCache: true } })
@@ -235,7 +238,7 @@ export function AuthForm({ mode, addAccount = false, googleEnabled = false, gith
     }
   }
   return <Auth registering={registering} addAccount={addAccount} next={returnPath}>
-    <SignInCard registering={registering} addAccount={addAccount} pending={pending} googleEnabled={googleEnabled} githubEnabled={githubEnabled} emailEnabled={emailEnabled} showGoogleLinkHint={Boolean(error && googleEnabled)} error={error} notice={notice} next={returnPath} onSubmit={submit} onGoogleSignIn={signInWithGoogle} onGitHubSignIn={signInWithGitHub} turnstile={registering ? <Turnstile ref={turnstile} onToken={setTurnstileToken} /> : undefined} />
+    <SignInCard registering={registering} addAccount={addAccount} pending={pending} googleEnabled={googleEnabled} githubEnabled={githubEnabled} emailEnabled={emailEnabled} showGoogleLinkHint={Boolean(error && googleEnabled)} error={error} unverified={Boolean(error) && unverified} notice={notice} next={returnPath} onSubmit={submit} onGoogleSignIn={signInWithGoogle} onGitHubSignIn={signInWithGitHub} turnstile={registering ? <Turnstile ref={turnstile} onToken={setTurnstileToken} /> : undefined} />
     {testWorkspaceEnabled && !registering && <div className="flex flex-col items-center gap-2">
       <Button type="button" variant="outline" disabled={pending} onClick={enterTestWorkspace}>{t('testWorkspaceCta')}</Button>
       <p className="text-muted-foreground text-xs">{t('testWorkspaceHint')}</p>

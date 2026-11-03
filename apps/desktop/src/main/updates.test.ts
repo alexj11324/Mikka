@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { EventEmitter } from 'node:events'
 
-import { Updates, type Updater } from './updates'
+import { Updates, updateCopy, type Updater } from './updates'
 
 class FakeUpdater extends EventEmitter {
   autoDownload = false
@@ -23,7 +23,7 @@ function setup() {
   const reports: string[] = []
   const ready: string[] = []
   const updates = new Updates(updater as unknown as Updater, {
-    available: version => reports.push(`available ${version}`),
+    ready: version => reports.push(`ready ${version}`),
     upToDate: () => reports.push('up to date'),
     failed: error => reports.push(`failed ${error.message}`),
   }, version => ready.push(version))
@@ -36,7 +36,7 @@ test('downloads in the background and installs on quit', () => {
   assert.equal(updater.autoInstallOnAppQuit, true)
 })
 
-test('a background check is silent and only a downloaded update is surfaced', async () => {
+test('a background check opens no dialog; only a downloaded update reaches the rail', async () => {
   const { updater, updates, reports, ready } = setup()
   updater.next = u => { u.emit('update-available', { version: '0.2.0' }) }
   await updates.check(false)
@@ -54,19 +54,29 @@ test('a background check is silent and only a downloaded update is surfaced', as
   assert.equal(updater.checks, 1)
 })
 
-test('the menu check reports up to date, a new version and errors', async () => {
+test('a menu check that finds a new version says nothing until it has downloaded, then offers the restart', async () => {
+  const { updater, updates, reports } = setup()
+  updater.next = u => { u.emit('update-available', { version: '0.2.0' }) }
+  await updates.check(true)
+  assert.deepEqual(reports, [])
+  updater.emit('update-downloaded', { version: '0.2.0' })
+  assert.deepEqual(reports, ['ready 0.2.0'])
+
+  // Asked again once it is downloaded: the same offer, at once.
+  await updates.check(true)
+  assert.deepEqual(reports, ['ready 0.2.0', 'ready 0.2.0'])
+})
+
+test('a menu check reports up to date and errors, including a failed download it started', async () => {
   const { updater, updates, reports } = setup()
   updater.next = u => { u.emit('update-not-available') }
   await updates.check(true)
-  updater.next = u => { u.emit('update-available', { version: '0.2.0' }) }
-  await updates.check(true)
   updater.next = u => { u.emit('error', new Error('offline')) }
   await updates.check(true)
-  assert.deepEqual(reports, ['up to date', 'available 0.2.0', 'failed offline'])
-
-  updater.emit('update-downloaded', { version: '0.2.0' })
+  updater.next = u => { u.emit('update-available', { version: '0.2.0' }) }
   await updates.check(true)
-  assert.deepEqual(reports.at(-1), 'available 0.2.0')
+  updater.emit('error', new Error('download'))
+  assert.deepEqual(reports, ['up to date', 'failed offline', 'failed download'])
 })
 
 test('install restarts only once an update is downloaded', () => {
@@ -76,4 +86,10 @@ test('install restarts only once an update is downloaded', () => {
   updater.emit('update-downloaded', { version: '0.2.0' })
   updates.install()
   assert.equal(updater.installs, 1)
+})
+
+test('the menu check speaks Chinese unless the system language is not', () => {
+  assert.equal(updateCopy('zh-CN').restart('2026.10000.290'), '重启以更新到 v2026.10000.290')
+  assert.equal(updateCopy('zh-Hans-CN').restartNow, '立即重启')
+  assert.equal(updateCopy('en-US').later, 'Later')
 })

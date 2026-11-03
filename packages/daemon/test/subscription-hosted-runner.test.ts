@@ -7,6 +7,7 @@ import { request } from "node:http";
 import { afterEach, expect, it, vi } from "vitest";
 import { defaultRunPolicy, type RunAssignment } from "@mikka/protocol";
 import { createHostedBotRunner } from "../src/subscription-hosted-runner";
+import { DaemonError } from "../src/errors";
 import { MemoryServer } from "../src/server-link";
 import { createLogger } from "../src/log";
 import { buildChildEnv } from "../src/env";
@@ -220,14 +221,14 @@ function liveRunProcesses(worktree: string, root: string): string[] {
 // These fixtures run the real bootstrap and process groups on this machine
 // with synthetic CLI/auth/provider protocol only. No production liveness or
 // process result is faked.
-async function revocationFixture(binaryName = 'fakes/fake-claude-subscription.mjs') {
+async function revocationFixture(binaryName = 'fakes/fake-claude-subscription.mjs', harness: 'claude_code' | 'codex' = 'claude_code') {
   // Keep audit files outside the shared disposable-directory helper. Its
   // independent owner may recycle fixtures; these records must stay retained.
   const root = mkdtempSync(join(tmpdir(),'mikka-hosted-approval-')), stateDir = join(root, 'adapters')
   console.info(`Retained hosted approval audit: ${root}`)
   mkdirSync(stateDir)
   const runId = randomUUID(), deviceId = randomUUID()
-  const contextValue = { route: 'claude_code_cli' as const, modelId: 'fixture-model', revision: 2, accountId: 'fixture-account', expiresAt: new Date(Date.now() + 60000).toISOString() }
+  const contextValue = { route: harness === 'codex' ? 'codex_cli' as const : 'claude_code_cli' as const, modelId: 'fixture-model', revision: 2, accountId: 'fixture-account', expiresAt: new Date(Date.now() + 60000).toISOString() }
   const link = Object.assign(new MemoryServer(deviceId).link(), {
     nativeContext: vi.fn(async (_device: string, _run: string, _signal?: AbortSignal) => contextValue),
     nativeRequest: vi.fn(async (_device: string, _run: string, _payload: unknown, _signal?: AbortSignal): Promise<{ contentType: string; body: ReadableStream<Uint8Array> }> => { throw new Error('no real provider in hosted fixture') }),
@@ -235,10 +236,10 @@ async function revocationFixture(binaryName = 'fakes/fake-claude-subscription.mj
   const binary = binaryName.startsWith('/') ? binaryName : resolve(import.meta.dirname, binaryName)
   chmodSync(binary, 0o700)
   // A runner on this state directory, as a restarted daemon would open it.
-  const open = () => createHostedBotRunner({ stateDir, link, binaries: { claude_code: binary }, ...(process.env.MIKKA_E2B_TEST_DOCKER === '1' ? { dockerSocket: 'unix:///run/mikka-container/docker.sock' as const } : {}) })
+  const open = () => createHostedBotRunner({ stateDir, link, binaries: { [harness]: binary }, ...(process.env.MIKKA_E2B_TEST_DOCKER === '1' ? { dockerSocket: 'unix:///run/mikka-container/docker.sock' as const } : {}) })
   const runner = await open()
-  const assignment = { runId, deviceId, issueId: randomUUID(), repoId: randomUUID(), baseBranch: 'main', harness: 'claude_code', prompt: 'HANG', model: 'fixture-model',
-    subscriptionBinding: { bindingId: randomUUID(), ownerId: 'fixture-owner', workspaceId: randomUUID(), consumerId: randomUUID(), route: 'claude_code_cli' },
+  const assignment = { runId, deviceId, issueId: randomUUID(), repoId: randomUUID(), baseBranch: 'main', harness, prompt: 'HANG', model: 'fixture-model',
+    subscriptionBinding: { bindingId: randomUUID(), ownerId: 'fixture-owner', workspaceId: randomUUID(), consumerId: randomUUID(), route: contextValue.route },
   } as RunAssignment
   let policyLive = true
   const gate = denyGate(runId, () => policyLive)
@@ -307,8 +308,8 @@ it('a CLI that cannot start keeps its reason, leaves nothing running, and the ne
       return events.at(-1)
     })().then(last => ({ last }), (e: Error) => ({ error: e }))
     if ('error' in error) {
-      expect(error.error.message).toBe('subscription_hosted_runtime_unavailable')
-      expect(String((error.error.cause as Error | undefined)?.message ?? '')).not.toBe('')
+      expect(error.error.message).toBe('claude_code_initialization_failed')
+      expect((error.error.cause as Error | undefined)?.message).toBe('Claude Code initialization failed')
       expect(warn.mock.calls.some(call => String(call[0]).includes('hosted CLI did not start'))).toBe(true)
     } else {
       expect(error.last).toMatchObject({ type: 'exit' })
@@ -417,6 +418,65 @@ it.each(['pending', 'streaming'] as const)('revokes a hosted CLI on the machine 
   }
 }, 60000)
 
+it.each(['token', 'verify'] as const)('logs finite startup diagnostics for a refusal during %s without private values', async phase => {
+  const fixture = await revocationFixture()
+  const log = vi.spyOn(fixture.options.log, 'warn').mockImplementation(() => {})
+  const consoleLog = vi.spyOn(console, 'warn').mockImplementation(() => {})
+  fixture.link.nativeContext.mockImplementation(async () => {
+    if (fixture.link.nativeContext.mock.calls.length === (phase === 'token' ? 3 : 4)) {
+      if (phase === 'token') throw new DaemonError(-32603, 'private-upstream-token-must-not-log', { status: 409, credential: 'private-credential-must-not-log' })
+      return { ...fixture.contextValue, accountId: 'private-account-must-not-log' }
+    }
+    return fixture.contextValue
+  })
+  try {
+    await expect(fixture.runner.start(fixture.assignment, fixture.options)).rejects.toThrow('subscription_hosted_runtime_unavailable')
+    const records = log.mock.calls.map(call => call[0] as unknown as { event?: string })
+    expect(records.filter(record => record.event === 'subscription_startup_failed')).toHaveLength(1)
+    expect(records.find(record => record.event === 'subscription_startup_failed')).toMatchObject({ event: 'subscription_startup_failed', phase, contextReady: true, brokerReady: true, tokenRequested: true,
+      ...(phase === 'token' ? { reason: 'server_refused', httpStatus: 409, tokenCheckPassed: false } : { reason: 'context_changed', tokenCheckPassed: true, verifyRequested: true, verifyCheckPassed: false, sameAccount: false }) })
+    const encoded = JSON.stringify(log.mock.calls)
+    for (const privateValue of ['private-upstream-token', 'private-credential', 'private-account', 'fixture-account']) expect(encoded).not.toContain(privateValue)
+    expect(fixture.processes()).toEqual([])
+    expect(fixture.link.nativeRequest).not.toHaveBeenCalled()
+  } finally {
+    fixture.gate.revoke()
+    log.mockRestore()
+    consoleLog.mockRestore()
+  }
+})
+
+it('reports a hung hosted Claude initializer as startup timeout and closes its entire runtime', async () => {
+  const binary = join(tempDir('mnh-init-timeout-'), 'claude')
+  writeFileSync(binary, '#!/bin/sh\nexec sleep 60\n', { mode: 0o700 })
+  const fixture = await revocationFixture(binary)
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+  try {
+    await expect(fixture.runner.start(fixture.assignment, fixture.options)).rejects.toMatchObject({
+      message: 'claude_code_initialization_timeout',
+      cause: { name: 'ClaudeInitializationError', message: 'Claude Code initialization timed out' },
+    })
+    expect(fixture.link.nativeRequest).not.toHaveBeenCalled()
+    expect(fixture.processes()).toEqual([])
+    expect(fixture.socket()).toBeUndefined()
+    expect(fixture.gate.revoked).toBe(true)
+  } finally { fixture.gate.revoke(); warn.mockRestore() }
+})
+
+it('rechecks the owned Codex broker account before the first custom-provider turn', async () => {
+  const fixture = await revocationFixture('fakes/fake-codex-subscription.mjs', 'codex')
+  const log = vi.spyOn(fixture.options.log, 'warn').mockImplementation(() => {})
+  const consoleLog = vi.spyOn(console, 'warn').mockImplementation(() => {})
+  fixture.link.nativeContext.mockImplementation(async () => fixture.link.nativeContext.mock.calls.length === 4
+    ? { ...fixture.contextValue, accountId: 'another-account' } : fixture.contextValue)
+  try {
+    await expect(fixture.runner.start(fixture.assignment, fixture.options)).rejects.toThrow('subscription_hosted_runtime_unavailable')
+    expect(log.mock.calls[0][0]).toMatchObject({ phase: 'verify', reason: 'context_changed', tokenRequested: false, verifyRequested: true, verifyCheckPassed: false, sameAccount: false })
+    expect(fixture.link.nativeRequest).not.toHaveBeenCalled()
+    expect(fixture.processes()).toEqual([])
+  } finally { fixture.gate.revoke(); log.mockRestore(); consoleLog.mockRestore() }
+})
+
 it.each([true, false])('advertises hosted approval capability only with a prepared host gate factory: %s', async available => {
   const fixture = await revocationFixture()
   fixture.link.prepareRunToolApproval = available ? async assignment => denyGate(assignment.runId) : undefined
@@ -436,3 +496,55 @@ it.each([true, false])('advertises hosted approval capability only with a prepar
     expect(fixture.link.nativeRequest).not.toHaveBeenCalled()
   } finally { await daemon.stop() }
 }, 60000)
+
+// Production (Acme): a thread's continuation was frozen with model null while its subscription context
+// was claude-opus-5-5, and the runner refused it at once (context_initial, sameModel=false,
+// reason=context_changed). The server now freezes every cloud run with its subscription's model.
+it.each([
+  ['the model the bug froze (none)', undefined, false],
+  ['the subscription\'s own model, as the fix freezes it', 'claude-opus-5-5', true],
+] as const)('a hosted claude_code run with %s', async (_label, model, starts) => {
+  const root = tempDir('mnh-model-'), stateDir = join(root, 'adapters')
+  mkdirSync(stateDir)
+  const runId = randomUUID(), deviceId = randomUUID()
+  const link = Object.assign(new MemoryServer(deviceId).link(), {
+    nativeContext: async () => ({ route: 'claude_code_cli' as const, modelId: 'claude-opus-5-5', revision: 2, accountId: 'fixture-account', expiresAt: new Date(Date.now() + 60000).toISOString() }),
+    nativeRequest: async () => { throw new Error('fixture must not call provider') },
+  })
+  const binary = resolve(import.meta.dirname, 'fakes/fake-claude-subscription.mjs')
+  chmodSync(binary, 0o700)
+  const runner = await createHostedBotRunner({ stateDir, link, binaries: { claude_code: binary },
+    ...(process.env.MIKKA_E2B_TEST_DOCKER === '1' ? { dockerSocket: 'unix:///run/mikka-container/docker.sock' as const } : {}) })
+  const assignment = { runId, deviceId, issueId: randomUUID(), repoId: randomUUID(), baseBranch: 'main', harness: 'claude_code', prompt: 'hello', ...(model ? { model } : {}),
+    subscriptionBinding: { bindingId: randomUUID(), ownerId: 'fixture-owner', workspaceId: randomUUID(), consumerId: randomUUID(), route: 'claude_code_cli' },
+  } as RunAssignment
+  const started = runner.start(assignment, { runId, toolApproval: denyGate(runId), cwd: await makeRepo(), prompt: 'hello', ...(model ? { model } : {}), env: buildChildEnv({ host: { PATH: process.env.PATH, HOME: tempDir() } }), log: createLogger({ level: 'silent' }) })
+  if (!starts) {
+    await expect(started).rejects.toThrow('subscription_hosted_runtime_unavailable')
+    return
+  }
+  const session = await started
+  const events = []
+  for await (const event of session.events()) events.push(event)
+  expect(events.at(-1)).toMatchObject({ type: 'exit', outcome: 'succeeded' })
+}, 60000)
+
+it('starts a subscription run only on a model the machine\'s own CLI reported, and fails with the reason otherwise', async () => {
+  const fixture = await revocationFixture()
+  let report: { models?: string[]; modelSlots?: { slot: string; model: string; name: string }[] } | null = { models: ['another-model'] }
+  const reportedModels = vi.fn(async () => report)
+  const runner = await createHostedBotRunner({ stateDir: fixture.stateDir, link: fixture.link, binaries: { claude_code: fixture.binary }, reportedModels })
+  // Reported other models only, or none at all (a probe that got no answer): refused before any context, broker or CLI.
+  for (const value of [{ models: ['another-model'] }, null, {}]) {
+    report = value
+    await expect(runner.start(fixture.assignment, fixture.options)).rejects.toThrow('subscription_model_not_reported')
+  }
+  expect(reportedModels).toHaveBeenCalledWith('claude_code')
+  expect(fixture.link.nativeContext).not.toHaveBeenCalled()
+  expect(fixture.processes()).toEqual([])
+  // Reported as a slot's resolved model: the model check passes and startup goes on (here to a refused context).
+  report = { modelSlots: [{ slot: 'opus', model: 'fixture-model', name: 'Opus' }] }
+  fixture.link.nativeContext.mockImplementation(async () => { throw new Error('fixture context refused') })
+  await expect(runner.start(fixture.assignment, fixture.options)).rejects.toThrow('fixture context refused')
+  expect(fixture.link.nativeContext).toHaveBeenCalled()
+})

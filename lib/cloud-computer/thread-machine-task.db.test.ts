@@ -35,7 +35,7 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
     process.env.E2B_CODEX_TEMPLATE = 'ready-template-fixture'; // The fixture agent runs Codex (decision 2026-11-01-2335).
     const db = await import("../db");
     appPool = db.pool;
-    const { ensureThreadMachine, parkThreadMachine, endClosedTaskMachines, keepTailBeforeKill, threadMachineProvider } = await import("./thread-machines");
+    const { ensureThreadMachine, parkThreadMachine, endClosedTaskMachines, keepTailBeforeKill, threadMachineAction, threadMachineProvider } = await import("./thread-machines");
 
     const owner = "owner", workspaceId = randomUUID(), botId = randomUUID(), otherBot = randomUUID(), botDevice = randomUUID(), agentId = randomUUID(), repoId = randomUUID(), otherRepo = randomUUID();
     await pool.query(`INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES ($1,'Fixture','thr-task@example.invalid',true,now(),now())`, [owner]);
@@ -92,7 +92,7 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
         for (const corrupt of [false, true]) {
           const issueId = await task(), runId = await run(issueId);
           const scope = { userId: owner, issueId, agentId, deviceId: botDevice, workspaceId, remoteKey: 'v2/github.com/acme/app', remoteUrl: 'https://github.com/acme/app.git', targetBranch: `mikka/fixture-${number}` };
-          const admission = admitRepositoryTask({ ...scope, grant: { grantedAt: new Date().toISOString() }, now: new Date() })!;
+          const admission = admitRepositoryTask({ ...scope, now: new Date() })!;
           assert.ok(admission);
           if (corrupt) admission.deviceId = randomUUID();
           await pool.query('UPDATE agent_runs SET "agentDefinition"=$2 WHERE id=$1', [runId, { repositoryAdmission: admission }]);
@@ -257,6 +257,49 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
       assert.deepEqual(await machine(runId), { state: "paused", sandboxId: "sandbox-live", deviceId: device, issueId });
       assert.ok((await pool.query('SELECT "revokedAt" FROM device_tokens WHERE "boundDeviceId"=$1', [device])).rows[0].revokedAt);
       assert.equal((await pool.query('SELECT "removedAt" FROM devices WHERE id=$1', [device])).rows[0].removedAt, null);
+    });
+
+    await t.test('concurrent lifecycle and Factory parking cannot suspend or revoke the next stage', async () => {
+      const issueId = await task(), before = await parked(issueId);
+      await pool.query(`UPDATE thread_machines SET state='running',"runningSince"=now() WHERE "runId"=$1`, [before.runId]);
+      let release!: () => void, entered!: () => void;
+      const held = new Promise<void>(resolve => { release = resolve; });
+      const started = new Promise<void>(resolve => { entered = resolve; });
+      let calls = 0;
+      const pause = async () => { if (++calls === 1) { entered(); await held; } };
+      const first = parkThreadMachine(pool, actor, before.runId, pause, async () => null);
+      await started;
+      const second = parkThreadMachine(pool, actor, before.runId, pause, async () => null);
+      try {
+        const deadline = Date.now() + 5000;
+        while (calls < 2) {
+          const waiting = await pool.query(`SELECT 1 FROM pg_stat_activity WHERE datname=current_database() AND wait_event_type='Lock'`);
+          if (waiting.rowCount) break;
+          assert.ok(Date.now() < deadline, 'second park must finish or wait on the machine owner');
+          await new Promise(resolve => setTimeout(resolve, 10));
+        }
+      } finally { release(); await Promise.all([first, second]); }
+      assert.equal(calls, 1, 'only one caller may pause the physical sandbox');
+      const next = await run(issueId);
+      await assert.rejects(ensureThreadMachine(pool, actor, next, fake().provider));
+      const token = randomUUID();
+      await pool.query(`INSERT INTO device_tokens (id,"userId",name,"tokenHash","boundDeviceId","expiresAt") VALUES ($1,$2,'New stage',$3,$4,now()+interval '1 day')`, [token, owner, randomUUID(), before.device]);
+      await parkThreadMachine(pool, actor, before.runId, pause, async () => null);
+      assert.equal(calls, 1, 'a stale old-run callback cannot pause the adopted sandbox');
+      assert.equal((await pool.query('SELECT "revokedAt" FROM device_tokens WHERE id=$1', [token])).rows[0].revokedAt, null);
+      assert.equal((await machine(next)).sandboxId, before.sandboxId);
+    });
+
+    await t.test('ending an adopted old stage cannot retire the next stage device or credentials', async () => {
+      const issueId = await task(), before = await parked(issueId), next = await run(issueId);
+      await assert.rejects(ensureThreadMachine(pool, actor, next, fake().provider));
+      const token = randomUUID();
+      await pool.query(`INSERT INTO device_tokens (id,"userId",name,"tokenHash","boundDeviceId","expiresAt") VALUES ($1,$2,'New stage',$3,$4,now()+interval '1 day')`, [token, owner, randomUUID(), before.device]);
+      assert.equal((await machine(before.runId)).sandboxId, null);
+      await threadMachineAction(pool, actor, before.runId, 'end');
+      assert.equal((await pool.query('SELECT "revokedAt" FROM device_tokens WHERE id=$1', [token])).rows[0].revokedAt, null, 'the ended row no longer controls this device');
+      assert.equal((await pool.query('SELECT "removedAt" FROM devices WHERE id=$1', [before.device])).rows[0].removedAt, null);
+      assert.equal((await machine(next)).sandboxId, before.sandboxId);
     });
 
     await t.test("before a kill the worker's tail is kept; a failing read never blocks the kill", async () => {

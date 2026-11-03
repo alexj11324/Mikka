@@ -1,15 +1,15 @@
+import { queueTaskRun } from '@/lib/factory/queue-local'
 import 'server-only'
 import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { db, pool } from '@/lib/db'
-import { agentRuns, issues, runMessages } from '@/lib/db/schema'
+import { agentRuns, runMessages } from '@/lib/db/schema'
 import type { TaskThreadRun } from '@/lib/thread-dispatch'
 import { ActionFailureError } from '@/lib/action-error'
 import { ACTION_ERROR_CODES, type ActionErrorCode } from '@/lib/action-result'
 import { addRunMessage } from '@/lib/agent-runs'
 import { readRunChain } from '@/lib/run-chain'
 import { UNFINISHED_RUN_STATUSES } from '@/lib/agent-run-statuses'
-import { tiptapToText } from '@/lib/tiptap-text'
 
 type Source = Parameters<typeof addRunMessage>[2]
 const isActionErrorCode = (code: string): code is ActionErrorCode => (ACTION_ERROR_CODES as readonly string[]).includes(code)
@@ -65,17 +65,25 @@ export async function sendThreadMessage(userId: string, runId: string, text: str
 
 /** The thread's next run, queued the way its last one was: on the bot's cloud computer, else on the same device. */
 async function queueNextRun(userId: string, run: typeof agentRuns.$inferSelect, previous: TaskThreadRun, note: string | undefined) {
-  const issueId = run.issueId!, deviceRepoId = run.deviceRepoId!
+  const issueId = run.issueId!
   const readOnly = previous.readOnly ? { readOnly: true } : {}
   if (previous.cloud) {
-    const [issue] = await db.select({ title: issues.title, content: issues.content }).from(issues).where(eq(issues.id, issueId)).limit(1)
-    if (!issue) throw new ActionFailureError('issueNotFound')
-    const { queueCloudRun } = await import('@/lib/computer/queue-run')
-    return queueCloudRun(pool, { userId, workspaceId: previous.cloud.workspaceId }, { botId: previous.cloud.botId, issueId, agentId: run.agentId, deviceRepoId, title: issue.title, body: tiptapToText(issue.content),
-      note, withoutBot: run.botId === null, idempotencyKey: `thread:${run.id}:${crypto.randomUUID()}`, ...readOnly })
+    if (previous.harness !== 'codex' && previous.harness !== 'claude_code') throw new ActionFailureError('threadCannotContinue')
+    const { latestThreadRunModel } = await import('@/lib/computer/run-model')
+    const runModel = await latestThreadRunModel(pool, userId, issueId, run.agentId)
+    if (!runModel) throw new ActionFailureError('threadModelUnavailable')
+    // The last run's repository belongs to its dedicated task machine. The
+    // ordinary dispatcher resolves it on the Bot computer, then provisions
+    // the next task machine and starts its lifecycle before reporting queued.
+    const { dispatchComputerTask } = await import('@/workflows/coordinator/steps')
+    return dispatchComputerTask(userId, { botId: previous.cloud.botId, issueId, harness: previous.harness,
+      ...(previous.remoteUrl ? { repo: previous.remoteUrl } : {}), note, withoutBot: run.botId === null,
+      ...runModel, threadRunId: run.id, ...readOnly }, `thread:${run.id}:${crypto.randomUUID()}`)
   }
   if (!previous.remoteUrl) throw new ActionFailureError('agentRepoMissing')
-  const model = run.agentDefinition?.cliModelSelection === 'explicit' ? run.agentDefinition.model : undefined
-  const { queueRun } = await import('@/lib/agent-runs')
-  return queueRun(userId, { issueId, agentId: run.agentId, repo: previous.remoteUrl, note, ...(model ? { model } : {}), ...readOnly }, run.botId, undefined, undefined, run.source === 'mcp' ? 'mcp' : null)
+  // The thread's own model and account, as on the cloud; when it has none left, the person is told instead of the CLI choosing.
+  const { latestThreadRunModel } = await import('@/lib/computer/run-model')
+  const runModel = await latestThreadRunModel(pool, userId, issueId, run.agentId)
+  if (!runModel) throw new ActionFailureError('threadModelUnavailable')
+  return queueTaskRun(userId, { issueId, agentId: run.agentId, repo: previous.remoteUrl, note, ...runModel, threadRunId: run.id, ...readOnly }, run.botId, undefined, undefined, run.source === 'mcp' ? 'mcp' : null)
 }

@@ -1,12 +1,14 @@
 // One `git worktree` per run under the daemon's data dir (R4, R11, R12).
 // Local callers pass daemon-owned clone caches, never user checkouts.
 import {
+  appendFileSync,
   copyFileSync,
   existsSync,
   lstatSync,
   mkdirSync,
   readdirSync,
   realpathSync,
+  readFileSync,
   rmSync,
 } from "node:fs"
 import { lstat, readdir } from "node:fs/promises"
@@ -91,6 +93,7 @@ export class WorktreeManager {
     repoPath: string,
     baseBranch: string
   ): Promise<string> {
+    await excludeVerifyArtifacts(repoPath)
     const path = this.pathFor(runId)
     if (existsSync(join(path, ".git"))) return path
     mkdirSync(this.root, { recursive: true })
@@ -169,6 +172,7 @@ export class WorktreeManager {
     previousWorktree: string,
     runId: string
   ): Promise<string | null> {
+    await excludeVerifyArtifacts(repoPath)
     const root = resolve(this.root)
     const path = resolve(previousWorktree)
     if (dirname(path) !== root) return null
@@ -192,10 +196,11 @@ export class WorktreeManager {
     return path
   }
 
-  /** Paths changed in the worktree (tracked and untracked), for the report. */
-  async changedFiles(worktree: string): Promise<string[]> {
+  /** Include commits made by the CLI as well as still-uncommitted task changes. */
+  async changedFiles(worktree: string, baseCommit?: string): Promise<string[]> {
     const status = await simpleGit(worktree).status()
-    return status.files.map((file) => file.path)
+    const committed = baseCommit ? (await simpleGit(worktree).raw(['diff', '--name-only', '-z', baseCommit, 'HEAD', '--'])).split('\0').filter(Boolean) : []
+    return [...new Set([...committed, ...status.files.map((file) => file.path)])].filter(path => path !== '.verify' && !path.startsWith('.verify/'))
   }
 
   /**
@@ -257,14 +262,19 @@ export class WorktreeManager {
 
   private async removePath(path: string, repoPath: string) {
     if (this.retainResources) return
-    try {
-      await simpleGit(repoPath).raw(["worktree", "remove", "--force", path])
-    } catch {
-      rmSync(path, { recursive: true, force: true })
-      await simpleGit(repoPath)
-        .raw(["worktree", "prune"])
-        .catch(() => undefined)
-    }
+    // In the same queue as `worktree add`: git reads every worktree's admin
+    // files while adding one, and fails ("failed to read
+    // .git/worktrees/<id>/commondir") if a removal deletes them meanwhile.
+    await withRepoConfig(repoPath, async () => {
+      try {
+        await simpleGit(repoPath).raw(["worktree", "remove", "--force", path])
+      } catch {
+        rmSync(path, { recursive: true, force: true })
+        await simpleGit(repoPath)
+          .raw(["worktree", "prune"])
+          .catch(() => undefined)
+      }
+    })
   }
 
   /**
@@ -400,6 +410,19 @@ export class WorktreeManager {
     }
     return removed
   }
+}
+
+/** Daemon-owned clone metadata applies to every worktree, including resumed runs. */
+async function excludeVerifyArtifacts(repoPath: string): Promise<void> {
+  await withRepoConfig(repoPath, async () => {
+    const common = (await simpleGit(repoPath).raw(['rev-parse', '--path-format=absolute', '--git-common-dir'])).trim()
+    const info = join(common, 'info')
+    mkdirSync(info, { recursive: true })
+    const file = join(info, 'exclude')
+    if (existsSync(file) && !lstatSync(file).isFile()) throw new Error('Invalid repository exclude file')
+    const existing = existsSync(file) ? readFileSync(file, 'utf8') : ''
+    if (!existing.split(/\r?\n/).includes('/.verify/')) appendFileSync(file, '\n/.verify/\n')
+  })
 }
 
 async function du(path: string): Promise<number> {

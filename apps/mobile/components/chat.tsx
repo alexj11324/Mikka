@@ -29,7 +29,7 @@ export function MyBubble({ text, photos }: { text: string; photos?: ImageURISour
       {text ? (
         <View style={[styles.myBubble, { maxWidth: '100%' }]}>
           {quoted ? <Text numberOfLines={3} style={styles.quoted}>{quoted}</Text> : null}
-          {words ? <Text style={[styles.body, { color: '#fff' }]}>{words}</Text> : null}
+          {words ? <Text style={[styles.body, { color: colors.onAccent }]}>{words}</Text> : null}
         </View>
       ) : null}
     </View>
@@ -68,24 +68,24 @@ export function useChatPhotos(): (messageId: string | undefined, count: number |
 }
 
 /**
- * A message the server has not taken yet: faded while it goes, and when it
- * failed, 「未发送 · 重试」 under it; tapping either sends it again (iMessage).
+ * A pending message keeps its words and its retry action. Missing receipts say
+ * 未确认; only a known server refusal says 未发送.
  */
-export function OutgoingBubble({ text, photos, failed, onRetry }: { text: string; photos?: string[]; failed: boolean; onRetry: () => void }) {
+export function OutgoingBubble({ text, photos, failed, unconfirmed = false, onRetry }: { text: string; photos?: string[]; failed: boolean; unconfirmed?: boolean; onRetry: () => void }) {
   return (
     <Pressable accessibilityRole={failed ? 'button' : undefined} accessibilityHint={failed ? '重试' : undefined} disabled={!failed} onPress={onRetry} style={styles.outgoing}>
       <View style={[{ alignItems: 'flex-end', gap: 4 }, !failed && { opacity: 0.6 }]}>
         {photos?.length ? <Photos photos={photos.map(uri => ({ uri }))} /> : null}
         {text ? (
           <View style={[styles.myBubble, { maxWidth: '100%' }]}>
-            <Text style={[styles.body, { color: '#fff' }]}>{text}</Text>
+            <Text style={[styles.body, { color: colors.onAccent }]}>{text}</Text>
           </View>
         ) : null}
       </View>
       {failed ? (
         <View style={styles.retryRow}>
           <CircleAlert size={14} color={colors.danger} strokeWidth={2.2} />
-          <Text style={styles.retry}>未发送 · 重试</Text>
+          <Text style={styles.retry}>{unconfirmed ? '发送未确认 · 重试' : '未发送 · 重试'}</Text>
         </View>
       ) : null}
     </Pressable>
@@ -209,11 +209,11 @@ export function Reactions({ reactions, align = 'left', onToggle }: { reactions?:
 const styles = StyleSheet.create({
   reactions: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 },
   reaction: { height: 28, paddingHorizontal: 9, borderRadius: 14, justifyContent: 'center', backgroundColor: colors.bubble },
-  reactionMine: { backgroundColor: '#E3EEFD' },
+  reactionMine: { backgroundColor: colors.objectChip },
   reactionText: { fontSize: 14 },
   body: { fontSize: 16, lineHeight: 25 },
   botBubble: { alignSelf: 'flex-start', maxWidth: '86%', backgroundColor: colors.bubble, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 11 },
-  myBubble: { alignSelf: 'flex-end', maxWidth: '78%', backgroundColor: colors.accent, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 10 },
+  myBubble: { alignSelf: 'flex-end', maxWidth: '78%', backgroundColor: colors.accentFill, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 10 },
   quoted: { fontSize: 14, lineHeight: 20, color: 'rgba(255,255,255,0.75)', borderLeftWidth: 2, borderLeftColor: 'rgba(255,255,255,0.6)', paddingLeft: 8, marginBottom: 6 },
   mine: { alignSelf: 'flex-end', alignItems: 'flex-end', maxWidth: '78%', gap: 4 },
   photos: { alignItems: 'flex-end', gap: 4 },
@@ -225,7 +225,7 @@ const styles = StyleSheet.create({
   threadTitle: { fontSize: 16, fontWeight: '500' },
   threadInfo: { fontSize: 12, lineHeight: 16, color: colors.secondary },
   event: { alignSelf: 'center', textAlign: 'center', fontSize: 12, lineHeight: 17, color: colors.secondary, marginHorizontal: 24 },
-  time: { position: 'absolute', right: -REVEAL + 6, bottom: 4, fontSize: 11, color: colors.tertiary },
+  time: { position: 'absolute', right: -REVEAL + 6, bottom: 4, fontSize: 11, color: colors.secondary },
   quoteArrow: { position: 'absolute', left: 4, top: 0, bottom: 0, justifyContent: 'center' },
   copy: { alignSelf: 'flex-start', paddingVertical: 4, paddingHorizontal: 6, marginTop: 2 },
 })

@@ -5,7 +5,8 @@ import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { createMcpSchema, updateMcpSchema } from './contracts'
 import { fetchSkillSource } from './skill-source'
-import { publicMcpFetch } from './public-fetch'
+import { pinnedLookup, publicMcpFetch } from './public-fetch'
+import { runMcpCommand } from './mcp'
 import { createPersonalMcpRuntime } from './mcp'
 import { assertCatalogToolkit, isNoAuthToolkit, listStoreCatalog, resetStoreCatalogCache } from './catalog'
 import { executeComposioAction } from '@/lib/composio-actions'
@@ -24,8 +25,10 @@ test('transport rejects private DNS and origin changes before sending, pins DNS 
     resolve: async () => [{ address: '8.8.8.8' }], proxy: '',
     send: async (url, options) => {
       sent++
-      assert.equal(new URL(String(url)).hostname, '8.8.8.8')
-      assert.equal(new Headers(options?.headers as HeadersInit).get('host'), 'mcp.acme.dev')
+      // The URL keeps its name (Host and SNI); the checked address is pinned in the dispatcher's lookup.
+      assert.equal(new URL(String(url)).hostname, 'mcp.acme.dev')
+      assert.equal(new Headers(options?.headers as HeadersInit).get('host'), null)
+      assert.ok((options as { dispatcher?: unknown })?.dispatcher)
       assert.equal(options?.redirect, 'error')
       return new Response('ok') as never
     },
@@ -149,4 +152,54 @@ test('store lists every Composio toolkit but local ones and own integrations, in
   assert.ok('data' in await executeComposioAction('owner', 'list_drive_files', { query: 'trashed=false', page_size: 10, page_token: 'next' }, client))
   assert.deepEqual(execution, { userId: 'owner', connectedAccountId: 'own', version: '20261022_00', arguments: { q: 'trashed=false', pageSize: 10, pageToken: 'next' } })
   assert.deepEqual(await executeComposioAction('owner', 'GOOGLEDRIVE_DELETE_FILE', {}, client), { error: 'integrationActionNotAllowed' })
+})
+
+test('the pinned lookup connects to the checked address while Host keeps the site name', async () => {
+  const { createServer } = await import('node:http')
+  const { Agent, fetch: undiciFetch } = await import('undici')
+  const hosts: string[] = []
+  const server = createServer((request, response) => { hosts.push(String(request.headers.host)); response.writeHead(200, { 'content-type': 'application/json' }); response.end('{"ok":true}') })
+  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
+  const port = (server.address() as { port: number }).port
+  const agent = new Agent({ connect: { lookup: pinnedLookup('127.0.0.1') } })
+  try {
+    const response = await undiciFetch(`http://mcp.acme.dev:${port}/rpc`, { dispatcher: agent })
+    assert.deepEqual(await response.json(), { ok: true })
+    assert.deepEqual(hosts, [`mcp.acme.dev:${port}`])
+  } finally { await agent.close(); await new Promise(resolve => server.close(resolve)) }
+})
+
+for (const contentType of ['text/event-stream', 'application/json; charset=utf-8']) {
+  test(`the MCP SDK connects through the pinned transport on 200 ${contentType}`, async () => {
+    const reply = (body: unknown) => contentType.startsWith('text/event-stream')
+      ? new Response(`event: message\ndata: ${JSON.stringify(body)}\n\n`, { status: 200, headers: { 'content-type': contentType } })
+      : new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': contentType } })
+    const send = async (_url: unknown, options?: { body?: unknown }) => {
+      const message = JSON.parse(String(options?.body ?? '{}')) as { id?: number; method?: string; params?: { protocolVersion?: string } }
+      if (message.id == null) return new Response(null, { status: 202 }) as never
+      if (message.method === 'initialize') return reply({ jsonrpc: '2.0', id: message.id, result: { protocolVersion: message.params?.protocolVersion, capabilities: { tools: {} }, serverInfo: { name: 'github', version: '1' } } }) as never
+      return reply({ jsonrpc: '2.0', id: message.id, result: { tools: [{ name: 'issue_read', inputSchema: { type: 'object' } }] } }) as never
+    }
+    const transport = (origin: string, signal: AbortSignal) => publicMcpFetch(origin, signal, { resolve: async () => [{ address: '8.8.8.8' }], proxy: '', send: send as never })
+    const result = await runMcpCommand(async () => ({ url: 'https://api.githubcopilot.com/mcp/', transport: 'http', headers: { Authorization: 'Bearer ghu_x' }, secrets: ['ghu_x'] }), {}, { transport })
+    assert.deepEqual((result as { tools: { name: string }[] }).tools.map(tool => tool.name), ['issue_read'])
+  })
+}
+
+test('a Vercel deployment never sends MCP requests through a proxy; development may', async () => {
+  const sent: unknown[] = []
+  const send = async (_url: unknown, options?: { dispatcher?: unknown }) => { sent.push(options?.dispatcher); return new Response('ok') as never }
+  const resolve = async () => [{ address: '8.8.8.8' }]
+  for (const env of [{ VERCEL: '1' }, { VERCEL_ENV: 'production' }]) {
+    const vercel = publicMcpFetch('https://mcp.acme.dev', AbortSignal.timeout(5000), { resolve, send: send as never, proxy: 'http://proxy.dev:8080', env })
+    try { await assert.rejects(vercel.fetch('https://mcp.acme.dev/rpc'), /mcpProxyNotAllowed/) } finally { await vercel.close() }
+  }
+  assert.equal(sent.length, 0)
+  const deployed = publicMcpFetch('https://mcp.acme.dev', AbortSignal.timeout(5000), { resolve, send: send as never, proxy: '', env: { VERCEL: '1' } })
+  const development = publicMcpFetch('https://mcp.acme.dev', AbortSignal.timeout(5000), { resolve, send: send as never, proxy: 'http://proxy.dev:8080', env: {} })
+  try {
+    assert.equal(await (await deployed.fetch('https://mcp.acme.dev/rpc')).text(), 'ok')
+    assert.equal(await (await development.fetch('https://mcp.acme.dev/rpc')).text(), 'ok')
+  } finally { await deployed.close(); await development.close() }
+  assert.equal(sent.length, 2)
 })

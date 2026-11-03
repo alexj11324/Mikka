@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Link } from '@/i18n/navigation'
 import { settingsHref } from '@/lib/settings-sections'
 import type { BotModelMenu } from '@/lib/bot-model-menu-view'
-import type { QuotaSwitchNotice } from '@/lib/coordinator/message-safety'
+import type { SwitchNotice } from '@/lib/coordinator/message-safety'
 import { botModelMenuKey, openModelPicker } from './bot-model-picker'
 import { COMPOSER_NOTICE } from './composer-notice'
 
@@ -40,14 +40,16 @@ export function useResetTime() {
 
 /**
  * The chat's line for a turn that moved to the person's API key because the
- * subscription ran out (订阅额度用完后，自动改用 API Key). 改回 opens the model
+ * subscription ran out (订阅额度用完后，自动改用 API Key), or to the next
+ * allowed model because Mikka 默认 had no points. 改回 opens the model
  * picker, where the person picks what the next turn uses.
  */
-export function QuotaSwitchLine({ notice, botId }: { notice: QuotaSwitchNotice; botId: string | null }) {
+export function QuotaSwitchLine({ notice, botId }: { notice: SwitchNotice; botId: string | null }) {
   const t = useTranslations('Coordinator.quota')
   const keyName = useKeyName()
-  return <p data-quota-switch className="mx-auto max-w-full text-center text-xs text-muted-foreground wrap-break-word">
-    {t('switched', { name: subscriptionName(notice.subscription, notice.plan), key: keyName(notice.keyProvider, notice.keyName) })}
+  return <p data-quota-switch={notice.kind} className="mx-auto max-w-full text-center text-xs text-muted-foreground wrap-break-word">
+    {notice.kind === 'pointsSwitch' ? t('pointsSwitched', { model: notice.model })
+      : t('switched', { name: subscriptionName(notice.subscription, notice.plan), key: keyName(notice.keyProvider, notice.keyName) })}
     {' · '}
     <Button variant="link" size="xs" className="-my-1 h-auto px-0 py-1 text-xs text-foreground underline" onClick={() => openModelPicker(botId)}>{t('revert')}</Button>
   </p>

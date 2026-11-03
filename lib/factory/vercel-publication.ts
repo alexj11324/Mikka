@@ -1,3 +1,4 @@
+import { deploymentSwitch } from '@/lib/deployment-switches'
 import { z } from "zod";
 import { FactoryError } from "./approval-contract";
 import type { PublicationAdapter } from "./approval";
@@ -326,7 +327,7 @@ export function createVercelPublicationAdapter(
 export function configuredVercelPublicationAdapters(
   env: Record<string, string | undefined>,
 ): PublicationAdapter[] {
-  if (env.FACTORY_VERCEL_PUBLICATION !== "1") return [];
+  if (!deploymentSwitch('factoryVercelPublication', env)) return [];
   if (!env.VERCEL_TOKEN)
     throw new FactoryError("factoryVercelCredentialUnavailable");
   const client = createVercelClient(() => env.VERCEL_TOKEN);
@@ -336,7 +337,7 @@ export function configuredVercelPublicationAdapters(
       { ...MIKKA_VERCEL, environment: "preview" },
       client,
     ),
-    ...(env.FACTORY_VERCEL_PRODUCTION === "1"
+    ...(deploymentSwitch('factoryVercelProduction', env)
       ? [
           createVercelPublicationAdapter(
             { ...MIKKA_VERCEL, environment: "production" },

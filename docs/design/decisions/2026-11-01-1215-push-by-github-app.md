@@ -9,6 +9,7 @@
   sent to GitHub to install or widen it; settings that duplicate the App
   permission are removed or shown read-only as 「由 GitHub App 授权决定」.
 - Rule: —
+- Superseded by: [2026-11-02-1600-agents-use-own-github-credential](2026-11-02-1600-agents-use-own-github-credential.md)
 - Replaces: [2026-11-01-0500-push-needs-repository-approval](2026-11-01-0500-push-needs-repository-approval.md),
   and the 2026-10-28 rows on per-repository push approval in `../decisions.md`
 

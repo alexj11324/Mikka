@@ -5,7 +5,7 @@ let signedIn = true, owned = true
 mock.module('next/server', { namedExports: { NextResponse: { json: Response.json } } })
 mock.module(new URL('../../../../../../lib/device-link.ts', import.meta.url).href, { namedExports: {
   authenticateDevice: async () => signedIn ? { userId: 'PRIVATE_USER' } : null,
-  ownedDevice: async () => owned ? { id: 'PRIVATE_DEVICE' } : null,
+  ownsDevice: async () => owned ? { id: 'PRIVATE_DEVICE' } : null,
 } })
 mock.module(new URL('../../../../../../lib/device-route.ts', import.meta.url).href, { namedExports: {
   withDeviceRoute: (handler: unknown) => handler,

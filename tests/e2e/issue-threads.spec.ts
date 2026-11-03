@@ -109,7 +109,7 @@ test('Issue threads open on the right as a conversation; comments are cards with
 for (const view of [{ name: 'desktop', width: 1440, height: 960 }, { name: 'narrow', width: 390, height: 844 }] as const) {
 // Start at the reviewed size: changing the task's desktop/mobile layout mid-run
 // remounts its thread panel and would test a different draft-lifetime behavior.
-test(`The owner stops a live thread from its composer; it reads 正在停止… until the run ends (${view.name})`, async ({ page }, testInfo) => {
+test(`The owner stops a working thread from its composer; one waiting for an answer sends; it reads 正在停止… until the run ends (${view.name})`, async ({ page }, testInfo) => {
   await page.setViewportSize({ width: view.width, height: view.height })
   await page.emulateMedia({ colorScheme: 'light' })
   const { email } = await register(page)
@@ -130,16 +130,32 @@ test(`The owner stops a live thread from its composer; it reads 正在停止… 
   await openIssueFromSearch(page, title)
   const threads = page.getByRole('region', { name: /^线程/ })
 
-  // Waiting for a reply is still live, so it can be stopped too.
+  // Waiting for your answer is live but idle (usability review N1): the composer sends, never stops, even when empty;
+  // stop stays in the header.
   await threads.getByRole('button', { name: '打开线程 Pick a cache key', exact: true }).click()
   let panel = page.getByRole('region', { name: 'Pick a cache key', exact: true })
-  await expect(panel.getByRole('button', { name: '停止', exact: true })).toBeVisible()
+  const waitingComposer = panel.locator('[data-slot="thread-composer"]')
+  await expect(waitingComposer.getByRole('button', { name: '发送', exact: true })).toBeDisabled()
+  await expect(waitingComposer.getByRole('button', { name: '停止', exact: true })).toHaveCount(0)
+  await expect(panel.locator('[data-slot="thread-stop"]')).toBeVisible()
+  await testInfo.attach(`thread-waiting-send-${view.name}-light`, { body: await page.screenshot(), contentType: 'image/png' })
+  await page.emulateMedia({ colorScheme: 'dark' })
+  await expect(page.locator('html')).toHaveClass(/dark/)
+  await testInfo.attach(`thread-waiting-send-${view.name}-dark`, { body: await page.screenshot(), contentType: 'image/png' })
+  await page.emulateMedia({ colorScheme: 'light' })
+  await expect(page.locator('html')).not.toHaveClass(/dark/)
+  await waitingComposer.getByRole('textbox').fill('Use the user id')
+  await expect(waitingComposer.getByRole('button', { name: '发送', exact: true })).toBeEnabled()
+  await waitingComposer.getByRole('textbox').fill('')
+  await expect(waitingComposer.getByRole('button', { name: '停止', exact: true })).toHaveCount(0)
   await panel.getByRole('button', { name: '返回', exact: true }).click()
 
   await threads.getByRole('button', { name: '打开线程 Trim the bundle', exact: true }).click()
   panel = page.getByRole('region', { name: 'Trim the bundle', exact: true })
   const composer = panel.getByRole('textbox', { name: '告诉 Codex 下一步做什么…' })
-  const stop = panel.getByRole('button', { name: '停止', exact: true })
+  const stop = panel.locator('[data-slot="thread-composer"]').getByRole('button', { name: '停止', exact: true })
+  // A working thread: the header keeps stop as well.
+  await expect(panel.locator('[data-slot="thread-stop"]')).toBeVisible()
   // Typing turns stop into send; clearing the draft brings stop back.
   await composer.fill('Keep the polyfills')
   await expect(panel.getByRole('button', { name: '发送', exact: true })).toBeEnabled()
@@ -158,6 +174,7 @@ test(`The owner stops a live thread from its composer; it reads 正在停止… 
   await expect(panel.getByText('正在停止…', { exact: true })).toBeVisible()
   await expect(threads.getByRole('button', { name: '打开线程 Trim the bundle', exact: true })).toContainText('正在停止…')
   await expect(stop).toHaveCount(0)
+  await expect(panel.locator('[data-slot="thread-stop"]')).toHaveCount(0)
   await expect(composer).toBeEditable()
   await composer.fill('Keep this draft while stopping')
   await expect(panel.getByRole('button', { name: '发送', exact: true })).toBeDisabled()
@@ -210,3 +227,37 @@ test(`The owner stops a live thread from its composer; it reads 正在停止… 
   await expect(stop).toHaveCount(0)
 })
 }
+
+// Usability review N2: a failed thread's error line has 重试 beside it, which runs the thread again (R-81).
+test('A failed thread offers 重试 beside its error', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 1440, height: 960 })
+  const { email } = await register(page)
+  const title = `Thread failed ${randomUUID()}`
+  await seedTask(page, title)
+  const pool = isolatedPool()
+  const runId = randomUUID()
+  try {
+    const { rows: [user] } = await pool.query<{ id: string }>('SELECT id FROM "user" WHERE email = $1', [email])
+    const { rows: [issue] } = await pool.query<{ id: string }>('SELECT id FROM issues WHERE "userId" = $1 AND title = $2', [user.id, title])
+    const agentId = randomUUID()
+    await pool.query('INSERT INTO agents (id, "userId", harness, name) VALUES ($1, $2, $3, $4)', [agentId, user.id, 'codex', 'Coordinator'])
+    await pool.query('INSERT INTO agent_runs (id, "userId", "issueId", "agentId", status, prompt, error, "finishedAt") VALUES ($1, $2, $3, $4, $5, $6, $7, now())',
+      [runId, user.id, issue.id, agentId, 'failed', 'Reproduce the Safari crash', "browserType.launch: Executable doesn't exist"])
+  } finally { await pool.end() }
+  await openIssueFromSearch(page, title)
+  await page.getByRole('region', { name: /^线程/ }).getByRole('button', { name: '打开线程 Reproduce the Safari crash', exact: true }).click()
+  const panel = page.getByRole('region', { name: 'Reproduce the Safari crash', exact: true })
+  const failure = panel.locator('[data-slot="thread-failure"]')
+  await expect(failure).toContainText("browserType.launch: Executable doesn't exist")
+  const retry = failure.getByRole('button', { name: '重试', exact: true })
+  await expect(retry).toBeEnabled()
+  for (const scheme of ['light', 'dark'] as const) {
+    await page.emulateMedia({ colorScheme: scheme })
+    await testInfo.attach(`thread-failed-retry-${scheme}`, { body: await page.screenshot(), contentType: 'image/png' })
+  }
+  await page.emulateMedia({ colorScheme: 'light' })
+  // 重试 is a message to the thread, as typing one would be.
+  const request = page.waitForRequest(request => request.method() === 'POST' && !!request.headers()['next-action'] && request.postData()?.includes(runId) === true && request.postData()?.includes('重试') === true)
+  await retry.click()
+  await request
+})

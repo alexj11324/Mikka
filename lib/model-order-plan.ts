@@ -1,5 +1,5 @@
 /**
- * 模型与订阅 › 允许使用的模型 (decision 2026-11-02-1400): which allowed model a new
+ * 模型与订阅 › 优先使用的模型 (decision 2026-11-02-1400): which allowed model a new
  * run takes, and where. Pure: the server reads the list, the credentials and
  * the devices (lib/model-order.ts) and asks this module; nothing here reads a
  * database or names a model.
@@ -7,13 +7,17 @@
  * Each entry is an Agent and a model from one credential (a connected
  * subscription or an API key). A run takes the first entry that can run now:
  * its credential is usable (connected, not paused, quota left, the key not
- * refused), and the run location has a place for it. 本地: a device whose
- * 参与调度 is on, online, with the Agent installed and, for a subscription
- * model, the model among what its CLI reported; one is picked at random. 云端:
- * the person's own E2B key is set. A model the person picked for the thread
- * goes before the list. Once a run starts nothing about it changes.
+ * refused), and 运行位置 has a place for it, tried in order (`PlanPlaces`):
+ * 云端 the person's own E2B cloud, then servers, then computers; 本地 servers,
+ * then computers. A device takes part when its 参与调度 is on, it is online,
+ * the Agent is installed and, for a subscription model, it can take a
+ * subscription run (its daemon brokers the subscription lease); among one
+ * kind, the one with the fewest unfinished runs, then the one that joined
+ * first (`pickDevice`). A model the person picked for the thread goes before
+ * the list. Once a run starts nothing about it changes.
  */
-import type { HarnessInfo } from '@mikka/protocol/harness'
+import { harnessReportsModel, type HarnessInfo } from '@mikka/protocol/harness'
+import type { CloudModelState } from './cloud-template-models'
 
 export type OrderHarness = 'claude_code' | 'codex'
 export type RunLocation = 'cloud' | 'local'
@@ -30,20 +34,28 @@ export interface OrderEntry {
 /** Why a credential cannot run now; `resetsAt` when it comes back on its own. */
 export type CredentialState =
   | { usable: true }
-  | { usable: false; reason: 'quota' | 'expired' | 'paused' | 'missing' | 'keyRefused'; resetsAt?: string | null }
+  | { usable: false; reason: 'checking' | 'quota' | 'expired' | 'paused' | 'missing' | 'keyRefused'; resetsAt?: string | null }
 
 export interface PoolDevice {
   id: string
+  name: string
   online: boolean
   /** 参与调度: off means Mikka never sends a run here. */
   enabled: boolean
-  harnesses: readonly Pick<HarnessInfo, 'harness' | 'installed' | 'models' | 'modelSlots'>[]
+  /** A server (deviceType server) is used before a computer. */
+  server: boolean
+  /** Its runs not yet ended: the fewest goes first among the same kind. */
+  activeRuns: number
+  /** When it joined (ms): the earlier goes first on a tie. */
+  joinedAt: number
+  harnesses: readonly Pick<HarnessInfo, 'harness' | 'installed' | 'models' | 'modelSlots' | 'subscriptionBroker'>[]
 }
 
 export type EntryBlock =
   | CredentialState & { usable: false }
   | { usable: false; reason: 'noDevice' }
   | { usable: false; reason: 'cloudNotConfigured' }
+  | { usable: false; reason: 'cloudModelsUnknown' | 'cloudModelNotReported' }
 
 export type DispatchPlan =
   | { kind: 'device'; entry: OrderEntry; deviceId: string; model: string; skipped: SkippedEntry[] }
@@ -58,57 +70,140 @@ export interface SkippedEntry { entry: OrderEntry; block: EntryBlock }
  * that takes part can run any allowed model; unavailable: every allowed
  * model's credential is out of quota, paused or signed out.
  */
-export type NothingReason = 'noModels' | 'cloudNotConfigured' | 'noDevice' | 'unavailable'
+export type NothingReason = 'noModels' | 'cloudNotConfigured' | 'cloudModelsUnknown' | 'cloudModelNotReported' | 'noDevice' | 'checking' | 'unavailable'
 
 /**
- * The model a device runs for an entry: the slot its CLI reported for it, or
- * the model itself. Null when the device cannot run the entry: 参与调度 off,
- * offline, the Agent not installed, or (for a subscription model) the CLI did
- * not report it. An API key's model runs on any installed Agent of the key's
- * protocol, since the key is handed to the run.
+ * The provider model a device runs for an entry. Null when the device cannot run the entry: 参与调度 off,
+ * offline, the Agent not installed, or (for a subscription model) the daemon cannot take a subscription
+ * run (no `subscriptionBroker`: the claim is refused without it) or did not report the model. A
+ * subscription model runs only where the daemon's own CLI probe (packages/daemon/src/model-probe.ts)
+ * reported it, as a model id or a slot's resolved model (Alex, 2026-11-03: no guessing); a daemon that
+ * reported no models at all is too old to say, so it needs an update. An API key's model runs on any
+ * installed Agent of the key's protocol, since the key is handed to the run and the CLI's probe, run
+ * without the key, cannot list it.
  */
 export function deviceModel(device: PoolDevice, entry: OrderEntry): string | null {
-  if (!device.enabled || !device.online) return null
-  const info = device.harnesses.find(item => item.harness === entry.harness && item.installed)
-  if (!info) return null
-  if (entry.source.kind === 'api_key') return entry.model
-  const slot = info.modelSlots?.find(item => item.slot === entry.model || item.model === entry.model)
-  if (slot) return slot.slot
-  return info.models?.includes(entry.model) ? entry.model : null
+  return deviceStage(device, entry) === 'ready' ? entry.model : null
 }
+
+/** modelNotReported: the daemon reported its models and this one is not among them. */
+export type DeviceStage = 'off' | 'offline' | 'notInstalled' | 'modelNotReported' | 'needsUpdate' | 'ready'
+const STAGES: readonly DeviceStage[] = ['off', 'offline', 'notInstalled', 'modelNotReported', 'needsUpdate', 'ready']
+
+/** Whether a harness report lists a model (@mikka/protocol harnessReportsModel). Null when it reported none. */
+export const reportsModel = harnessReportsModel
+
+/** What a device can do for an entry whatever its 参与调度 or whether it is online (those come first in deviceStage). */
+export function deviceSupport(device: Pick<PoolDevice, 'harnesses'>, entry: OrderEntry): Exclude<DeviceStage, 'off' | 'offline'> {
+  const info = device.harnesses.find(item => item.harness === entry.harness && item.installed)
+  if (!info) return 'notInstalled'
+  if (entry.source.kind !== 'subscription') return 'ready'
+  if (!info.subscriptionBroker) return 'needsUpdate'
+  const reported = reportsModel(info, entry.model)
+  return reported === null ? 'needsUpdate' : reported ? 'ready' : 'modelNotReported'
+}
+
+export function deviceStage(device: PoolDevice, entry: OrderEntry): DeviceStage {
+  if (!device.enabled) return 'off'
+  if (!device.online) return 'offline'
+  return deviceSupport(device, entry)
+}
+
+/**
+ * Why no device can run an entry, told from the device closest to running it:
+ * none connected; 参与调度 off; offline; the Agent not installed; or its Mikka
+ * too old to take a subscription run. `device` names that computer when it is
+ * the only one at that step, `count` how many are.
+ */
+export type NoDeviceWhy = { why: 'none' } | { why: Exclude<DeviceStage, 'ready'>; device: string; count: number }
+
+export function whyNoDevice(devices: readonly PoolDevice[], entry: OrderEntry): NoDeviceWhy {
+  if (!devices.length) return { why: 'none' }
+  const staged = devices.map(device => ({ device, stage: deviceStage(device, entry) }))
+  const best = staged.reduce((top, item) => STAGES.indexOf(item.stage) > STAGES.indexOf(top.stage) ? item : top)
+  const why = best.stage === 'ready' ? 'needsUpdate' : best.stage
+  return { why, device: best.device.name, count: staged.filter(item => item.stage === best.stage).length }
+}
+
+/**
+ * Which of the devices that can run an entry takes it (Alex, 2026-11-02): a
+ * server before a computer, then the one with the fewest unfinished runs
+ * (threads run in parallel and no machine has a cap, so this spreads them),
+ * then the one that joined first, then by id. Stable: the same devices and
+ * runs give the same device, which the settings page shows as 会先用.
+ */
+export function pickDevice<T extends { device: Pick<PoolDevice, 'id' | 'server' | 'activeRuns' | 'joinedAt'> }>(eligible: readonly T[]): T | undefined {
+  return [...eligible].sort((a, b) => Number(b.device.server) - Number(a.device.server)
+    || a.device.activeRuns - b.device.activeRuns
+    || a.device.joinedAt - b.device.joinedAt
+    || (a.device.id < b.device.id ? -1 : a.device.id > b.device.id ? 1 : 0))[0]
+}
+
+/**
+ * Where each 运行位置 looks, in order (Alex, 2026-11-02): 云端 the person's own
+ * E2B cloud, then their servers, then their computers; 本地 servers, then
+ * computers. A computer always comes last. `cloudOnly` is a run the person
+ * asked to put in the cloud: nowhere else.
+ */
+export type PlanPlaces = RunLocation | 'cloudOnly'
 
 export function planDispatch(input: {
   entries: readonly OrderEntry[]
   /** The model the person picked for this thread, when they did. */
   explicit?: OrderEntry | null
-  location: RunLocation
+  location: PlanPlaces
   devices: readonly PoolDevice[]
   credential: (entry: OrderEntry) => CredentialState
-  /** 云端: the person's own E2B key is set and cloud runs are on. */
+  /** The person's own E2B key is set, not known to be refused, and cloud runs are on. */
   cloudReady: boolean
-  random?: () => number
+  cloudModel?: (entry: OrderEntry) => CloudModelState
 }): DispatchPlan {
-  const random = input.random ?? Math.random
   const entries = input.explicit ? [input.explicit, ...input.entries.filter(entry => entry.id !== input.explicit!.id)] : [...input.entries]
   const skipped: SkippedEntry[] = []
   if (!entries.length) return { kind: 'none', reason: 'noModels', skipped }
-  if (input.location === 'cloud' && !input.cloudReady) {
+  if (input.location === 'cloudOnly' && !input.cloudReady) {
     return { kind: 'none', reason: 'cloudNotConfigured', skipped: entries.map(entry => ({ entry, block: { usable: false, reason: 'cloudNotConfigured' } })) }
   }
+  // The models whose credential can run now, in order, up to one whose allowance check failed:
+  // a failed check is not evidence that a subscription is spent, so a later key is not charged instead.
+  const runnable: OrderEntry[] = []
+  let checking = false
   for (const entry of entries) {
     const credential = input.credential(entry)
-    if (!credential.usable) { skipped.push({ entry, block: credential }); continue }
-    if (input.location === 'cloud') return { kind: 'cloud', entry, model: entry.model, skipped }
-    const eligible = input.devices.flatMap(device => {
-      const model = deviceModel(device, entry)
-      return model ? [{ device, model }] : []
-    })
-    if (!eligible.length) { skipped.push({ entry, block: { usable: false, reason: 'noDevice' } }); continue }
-    const pick = eligible[Math.min(eligible.length - 1, Math.floor(random() * eligible.length))]
-    return { kind: 'device', entry, deviceId: pick.device.id, model: pick.model, skipped }
+    if (credential.usable) { runnable.push(entry); continue }
+    skipped.push({ entry, block: credential })
+    if (credential.reason === 'checking') { checking = true; break }
   }
-  const reason: NothingReason = skipped.some(item => item.block.reason === 'noDevice') ? 'noDevice' : 'unavailable'
-  return { kind: 'none', reason, skipped }
+  let cloudFailure: Exclude<CloudModelState, 'ready'> | undefined
+  if (input.location !== 'local' && input.cloudReady) {
+    for (const entry of runnable) {
+      const state = input.cloudModel?.(entry) ?? 'cloudModelsUnknown'
+      if (state === 'ready') return { kind: 'cloud', entry, model: entry.model, skipped }
+      cloudFailure ??= state
+      skipped.push({ entry, block: { usable: false, reason: state } })
+    }
+  }
+  if (input.location !== 'cloudOnly') {
+    // A server before a computer whatever the model: a later model on a server goes before an earlier one on a computer.
+    for (const server of [true, false]) {
+      const tier = input.devices.filter(device => device.server === server)
+      for (const [at, entry] of runnable.entries()) {
+        const eligible = tier.flatMap(device => {
+          const model = deviceModel(device, entry)
+          return model ? [{ device, model }] : []
+        })
+        if (!eligible.length) continue
+        const pick = pickDevice(eligible)!
+        // The models before it that this place cannot run (a place before it ran none of them).
+        for (const earlier of runnable.slice(0, at)) skipped.push({ entry: earlier, block: { usable: false, reason: 'noDevice' } })
+        return { kind: 'device', entry, deviceId: pick.device.id, model: pick.model, skipped }
+      }
+    }
+  }
+  if (checking) return { kind: 'none', reason: 'checking', skipped }
+  if (cloudFailure) return { kind: 'none', reason: cloudFailure, skipped }
+  for (const entry of runnable) skipped.push({ entry, block: { usable: false, reason: 'noDevice' } })
+  return { kind: 'none', reason: runnable.length ? 'noDevice' : 'unavailable', skipped }
 }
 
 /**
@@ -127,13 +222,16 @@ export interface OrderCandidate { harness: OrderHarness; model: string; name: st
  * what it reported (Alex, decision 2026-11-02-1400). Candidates come in the
  * order `orderCandidates` gives: Claude subscriptions, other subscriptions,
  * then keys, each in the order its account or provider listed its models.
+ * A model both Agents can run (a DeepSeek or Kimi key) counts once, on the
+ * preferred Agent (优先使用的 Agent, Claude Code unless changed).
  * - Claude Code's opus first, from a subscription before a key.
  * - Then Codex: the first model a subscription or key reported for it (the
  *   account lists its top model first; no tier word is required).
  * - Neither: the first model anything else reported, so the list is not empty.
  * Nothing connected: an empty list.
  */
-export function defaultOrder(candidates: readonly OrderCandidate[]): OrderCandidate[] {
+export function defaultOrder(all: readonly OrderCandidate[], preferred: OrderHarness = 'claude_code'): OrderCandidate[] {
+  const candidates = onPreferredAgent(all, preferred)
   const bySource = (items: readonly OrderCandidate[]) => [...items.filter(item => item.source.kind === 'subscription'), ...items.filter(item => item.source.kind !== 'subscription')]
   const picked: OrderCandidate[] = []
   for (const preference of DEFAULT_ORDER_PREFERENCE) {
@@ -145,6 +243,27 @@ export function defaultOrder(candidates: readonly OrderCandidate[]): OrderCandid
   if (codex) picked.push(codex)
   if (!picked.length && candidates[0]) picked.push(candidates[0])
   return picked
+}
+
+/** The model and credential, whatever the Agent. */
+export const offerKey = (entry: Pick<OrderEntry, 'model' | 'source'>) =>
+  `${entry.model}\u0000${entry.source.kind === 'subscription' ? entry.source.connectionId : entry.source.keyId}`
+
+/** Which Agents can run each model and credential (a DeepSeek or Kimi key: both). */
+export function agentsByOffer(candidates: readonly Pick<OrderCandidate, 'harness' | 'model' | 'source'>[]): Map<string, OrderHarness[]> {
+  const agents = new Map<string, OrderHarness[]>()
+  for (const candidate of candidates) {
+    const list = agents.get(offerKey(candidate)) ?? []
+    if (!list.includes(candidate.harness)) list.push(candidate.harness)
+    agents.set(offerKey(candidate), list)
+  }
+  return agents
+}
+
+/** Candidates with a model both Agents run kept once, on the preferred Agent. */
+export function onPreferredAgent<T extends Pick<OrderCandidate, 'harness' | 'model' | 'source'>>(candidates: readonly T[], preferred: OrderHarness): T[] {
+  const agents = agentsByOffer(candidates)
+  return candidates.filter(candidate => (agents.get(offerKey(candidate))?.length ?? 0) < 2 || candidate.harness === preferred)
 }
 
 /** The same Agent, model and credential: one entry. */

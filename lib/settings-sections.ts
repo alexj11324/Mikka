@@ -32,9 +32,9 @@ export const SETTINGS_SECTIONS: readonly SettingsSectionDef[] = [
   { id: 'notifications', group: 'personal', title: 'Notifications' },
   { id: 'memory', group: 'personal', title: 'Memory' },
   { id: 'connections', group: 'personal', title: 'Connections' },
-  // 模型与订阅 (decision 2026-11-02-1400): subscriptions, API keys, 运行位置 and 允许使用的模型 (was API 与订阅 and Bot 与 Agents).
+  // 模型与订阅 (decision 2026-11-02-1400): subscriptions, API keys, 运行位置 and 优先使用的模型 (was API 与订阅 and Bot 与 Agents).
   { id: 'models', group: 'personal', title: 'Models and subscriptions' },
-  { id: 'logins', group: 'personal', title: 'Logins and keys' },
+  { id: 'logins', group: 'personal', title: 'Secrets and logins' },
   { id: 'privacy', group: 'personal', title: 'Data and privacy' },
   { id: 'computers', group: 'personal', title: 'Devices' },
   // Hidden until an API accepts the tokens (Alex); the UI and token store are built. Delete `unbuilt` to ship it.
@@ -43,7 +43,8 @@ export const SETTINGS_SECTIONS: readonly SettingsSectionDef[] = [
   { id: 'members', group: 'workspace', title: 'Members', routed: true },
   { id: 'teams', group: 'workspace', title: 'Teams', routed: true },
   { id: 'permissions', group: 'workspace', title: 'Team permissions', adminOnly: true },
-  { id: 'secrets', group: 'workspace', title: 'Secrets and environment', adminOnly: true },
+  // Members see it too and write repository entries (permissions.ts); one page with 密钥与登录 (decision 2026-11-02-2120).
+  { id: 'secrets', group: 'workspace', title: 'Secrets and environment' },
   { id: 'audit', group: 'workspace', title: 'Audit log', adminOnly: true },
   { id: 'usage', group: 'workspace', title: 'Usage' },
   // Members see 付款 here (their card designation and credit share); plan, balance and top-ups are admins' (C19).

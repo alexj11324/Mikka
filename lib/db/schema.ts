@@ -4,7 +4,7 @@ import { pgTable, text, uuid, varchar, jsonb, bigint, integer, real, date, times
 import { sql } from 'drizzle-orm'
 import type { JSONContent } from '@tiptap/react'
 import type { HarnessInfo } from '@mikka/protocol/harness'
-import type { SetupRecipe } from '@mikka/protocol/device'
+import type { DaemonUpdateFailure, SetupRecipe } from '@mikka/protocol/device'
 import type { CaptureContentType, CaptureKind, CaptureSource } from '@mikka/protocol/capture'
 import type { AttentionLevel } from '@/lib/attention/judgment'
 import type { UserFactKind, UserFactState } from '@/lib/profile/kinds'
@@ -256,6 +256,8 @@ export const devices = pgTable('devices', {
   deviceType: text('deviceType').$type<'laptop' | 'server'>().notNull().default('laptop'),
   platform: text('platform'), arch: text('arch'),
   daemonVersion: text('daemonVersion'), protocolVersion: integer('protocolVersion'),
+  /** The daemon's last failed automatic update (codes only); null after a success. */
+  updateFailure: jsonb('updateFailure').$type<DaemonUpdateFailure | null>(),
   harnesses: jsonb('harnesses').$type<HarnessInfo[]>().notNull().default([]),
   computerUse: jsonb('computerUse').$type<{ installed: boolean; version: string | null }>().notNull().default({ installed: false, version: null }),
   /** Off: the device stays registered but the orchestrator gives it no runs. */
@@ -280,6 +282,8 @@ export const deviceCodes = pgTable('deviceCode', {
   status: text('status').notNull(),
   lastPolledAt: timestamp('lastPolledAt', { withTimezone: true }),
   pollingInterval: integer('pollingInterval'), clientId: text('clientId'), scope: text('scope'),
+  /** What the daemon asking to connect reports about itself, shown on /device before 允许 (lib/daemon-authorization.ts). */
+  deviceName: text('deviceName'), devicePlatform: text('devicePlatform'), clientVersion: text('clientVersion'),
 }, table => [uniqueIndex('device_code_key').on(table.deviceCode), uniqueIndex('device_user_code_key').on(table.userCode)])
 
 /** A daemon credential. Only the SHA-256 hash is stored. */
@@ -415,7 +419,7 @@ export const githubRepositoryInstallations = pgTable('github_repository_installa
   installationId: bigint('installationId', { mode: 'number' }).notNull(),
   repositoryId: bigint('repositoryId', { mode: 'number' }).notNull(),
   verifiedAt: timestamp('verifiedAt', { withTimezone: true }).notNull().defaultNow(),
-  /** When a live check last found the push granted (App contents:write, the person may write); null once refused (lib/github/push-grant.ts). */
+  /** Written by the push-grant check removed in decision 2026-11-02-1600; kept for old rows, no longer read or written. */
   pushGrantedAt: timestamp('pushGrantedAt', { withTimezone: true }),
 }, table => [primaryKey({ columns: [table.userId, table.remoteKey] })])
 
@@ -1029,12 +1033,19 @@ export const factoryTasks = pgTable('factory_tasks', {
 }, table => [unique('factory_tasks_source_key').on(table.userId, table.issueId, table.sourceEventId), index('factory_tasks_owner_issue_idx').on(table.userId, table.issueId, table.updatedAt)])
 
 export const factoryCandidates = pgTable('factory_candidates', {
+  kind: text('kind').$type<'repository' | 'report' | 'deliverable'>().notNull().default('repository'),
   previewDatabaseBranch: text('previewDatabaseBranch'), machineName: text('machineName'),
   id: uuid('id').primaryKey(), taskId: uuid('taskId').notNull().references(() => factoryTasks.id, { onDelete: 'cascade' }),
-  sha: text('sha').notNull(), repository: text('repository').notNull(), environment: text('environment').notNull(), scope: text('scope').notNull(),
+  sha: text('sha'), repository: text('repository').notNull(), environment: text('environment').notNull(), scope: text('scope').notNull(),
   runId: uuid('runId').notNull(),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [unique('factory_candidates_task_id_key').on(table.taskId, table.id)])
+
+export const factoryDeliverableAcceptances = pgTable('factory_deliverable_acceptances', {
+  id: uuid('id').primaryKey(), taskId: uuid('taskId').notNull().references(() => factoryTasks.id, { onDelete: 'cascade' }),
+  candidateId: uuid('candidateId').notNull(), userId: text('userId').notNull(), sessionId: text('sessionId').notNull(), eventId: uuid('eventId').notNull(),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [unique('factory_deliverable_acceptances_task_candidate_key').on(table.taskId,table.candidateId),unique('factory_deliverable_acceptances_user_event_key').on(table.userId,table.eventId)])
 
 export const factoryAttempts = pgTable('factory_attempts', {
   id: uuid('id').primaryKey(), taskId: uuid('taskId').notNull().references(() => factoryTasks.id, { onDelete: 'cascade' }),

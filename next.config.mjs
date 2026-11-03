@@ -1,9 +1,18 @@
+import { execFileSync } from 'node:child_process'
 import createNextIntlPlugin from 'next-intl/plugin'
 import { withWorkflow } from 'workflow/next'
 import { basePath } from './lib/base-path-config.mjs'
 import { localTestAccountsMode } from './packages/protocol/src/local-test-mode.ts'
 
 const withNextIntl = createNextIntlPlugin('./i18n/request.ts')
+
+// lib/app-build.ts: the deployment a page was built by. Vercel's deployment id,
+// else the commit; an empty value turns the stale-page check off.
+function appBuild() {
+  if (process.env.VERCEL_DEPLOYMENT_ID) return process.env.VERCEL_DEPLOYMENT_ID
+  if (process.env.VERCEL_GIT_COMMIT_SHA) return process.env.VERCEL_GIT_COMMIT_SHA
+  try { return execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim() } catch { return '' }
+}
 
 // The app lives at app.aspectlylabs.com/mikka. lib/base-path.ts reads this
 // back for the places Next does not prefix on its own.
@@ -44,7 +53,7 @@ const nextConfig = {
     pagesBufferLength: 8,
   },
   basePath,
-  env: { MIKKA_BASE_PATH: basePath, NEXT_PUBLIC_COMPUTER_DEPLOYMENT: process.env.VERCEL_ENV ?? '', MIKKA_TEST_BUILD_SHA: process.env.MIKKA_TEST_DEPLOYMENT_SHA ?? '' },
+  env: { MIKKA_BASE_PATH: basePath, NEXT_PUBLIC_MIKKA_BUILD: appBuild(), NEXT_PUBLIC_COMPUTER_DEPLOYMENT: process.env.VERCEL_ENV ?? '', MIKKA_TEST_BUILD_SHA: process.env.MIKKA_TEST_DEPLOYMENT_SHA ?? '' },
   async redirects() {
     return [
       // The app's previous address; keep its links working.
@@ -85,6 +94,9 @@ const nextConfig = {
     // Three page-data workers exceeded the standard 8 GB production builder.
     cpus: 1,
     globalNotFound: true,
+    // Bulk add in 设置 › 密钥与环境 sends a .env of up to 2 MB (lib/secrets/dotenv.ts) to a server action;
+    // the default limit is 1 MB. 3 MB leaves room for the multipart envelope.
+    serverActions: { bodySizeLimit: '3mb' },
     // A copied acceptance checkout can invalidate Turbopack's persistent
     // parent graph and abort next dev. Keep this disposable stack in memory.
     ...(localTestAccountsMode(process.env) ? { turbopackFileSystemCacheForDev: false } : {}),
@@ -94,4 +106,16 @@ const nextConfig = {
   },
 }
 
-export default withWorkflow(withNextIntl(nextConfig))
+const workflowConfig = withWorkflow(withNextIntl(nextConfig))
+
+export default async function config(phase, context) {
+  const resolved = await workflowConfig(phase, context)
+  if (phase !== 'phase-production-build') return resolved
+  // The 8 GB Vercel build machine runs out of memory at "Collecting page data"
+  // (docs/dev-workflow.md). Nothing reads production source maps, which cost
+  // ~750 MB to generate, and the workflow bundles are built by now, so the
+  // esbuild service need not stay up for the rest of the build.
+  const esbuild = await import('esbuild')
+  esbuild.stop()
+  return { ...resolved, experimental: { ...resolved.experimental, turbopackSourceMaps: false } }
+}

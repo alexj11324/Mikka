@@ -7,14 +7,16 @@ import { randomUUID } from 'node:crypto'
 import test from 'node:test'
 import { normalizeRepository } from '@mikka/protocol/repository'
 import { dbUrl, seedBot, seedIssue, seedUser, seedWorkspace } from './support/workspace-admin-db'
-import { githubAppStub } from './support/github-app-stub'
+import { templateModelsFixture } from './support/template-models'
+import { connectGitHub, githubAppStub } from './support/github-app-stub'
 
 // The computer's Codex reported gpt-5, the model the person's ChatGPT account lists.
-const mac = [{ harness: 'codex', installed: true, modelSlots: [{ slot: 'gpt-5', model: 'gpt-5', name: 'gpt-5' }] }]
+const mac = [{ harness: 'codex', installed: true, subscriptionBroker: true, modelSlots: [{ slot: 'gpt-5', model: 'gpt-5', name: 'gpt-5' }] }]
 
 test('run machine fallback: 本地 a computer that takes part, 云端 own E2B, else an actionable error', { skip: !dbUrl }, async t => {
   process.env.MIKKA_CLOUD_COMPUTER_TASKS = '1'
   process.env.MIKKA_BYOS_ENABLED = '1'
+  const restoreModels = templateModelsFixture()
   const { Pool } = await import('pg')
   const pool = new Pool({ connectionString: dbUrl, max: 3 })
   const steps = await import('../workflows/coordinator/steps')
@@ -28,6 +30,8 @@ test('run machine fallback: 本地 a computer that takes part, 云端 own E2B, e
   let githubAccount = 9_200_000
   t.after(async () => {
     github.restore()
+    restoreModels.restore()
+    await pool.query('DELETE FROM factory_tasks WHERE "userId" = ANY($1)', [users])
     await pool.query('DELETE FROM coordinator_events WHERE "userId" = ANY($1)', [users])
     await pool.query('DELETE FROM model_order_entries WHERE "ownerId" = ANY($1)', [users])
     await pool.query('DELETE FROM model_order_settings WHERE "ownerId" = ANY($1)', [users])
@@ -52,11 +56,13 @@ test('run machine fallback: 本地 a computer that takes part, 云端 own E2B, e
     const githubAccountId = String(++githubAccount)
     await pool.query(`INSERT INTO account (id,"accountId","providerId","userId","createdAt","updatedAt") VALUES ($1,$2,'github',$3,now(),now())`, [randomUUID(), githubAccountId, id])
     github.allowWriter('octo/repo', githubAccountId)
+    // Connected in 插件 › GitHub, with the App on the repositories these tasks name: dispatch checks the live list.
+    await connectGitHub(github, id, githubAccountId, ['octo/repo', 'octo/read-only-app', 'octo/elsewhere'])
     const ws = await seedWorkspace(pool, id, [{ userId: id, role: 'admin' }])
-    // A connected ChatGPT subscription whose account lists gpt-5: 允许使用的模型 is that model by default, 运行位置 本地.
+    // A connected ChatGPT subscription whose account lists gpt-5: 优先使用的模型 is that model by default, 运行位置 云端.
     const connection = randomUUID()
-    await pool.query(`INSERT INTO byos_connections (id,"ownerId","workspaceId",provider,state,epoch,"secretName","secretDigest","providerSubject","modelCatalog") VALUES ($1,$2,$3,'codex','connected',1,$4,$5,'synthetic-subject',$6)`,
-      [connection, id, ws.id, `synthetic-${connection}`, 'a'.repeat(64), JSON.stringify({ revision: '1', models: ['gpt-5'] })])
+    await pool.query(`INSERT INTO byos_connections (id,"ownerId","workspaceId",provider,state,epoch,"secretName","secretDigest","providerSubject","modelCatalog",quota) VALUES ($1,$2,$3,'codex','connected',1,$4,$5,'synthetic-subject',$6,$7)`,
+      [connection, id, ws.id, `synthetic-${connection}`, 'a'.repeat(64), JSON.stringify({ revision: '1', models: ['gpt-5'] }), JSON.stringify({ vendor: 'codex', source: 'official', status: 'ok', plan: 'Pro', observedAt: new Date().toISOString(), windows: [{ kind: 'five_hour', used: .2, resetsAt: null }] })])
     await pool.query(`INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId") VALUES ($1,$2,$3,'catalogue',$4,1,'codex_cpa','gpt-5')`, [randomUUID(), id, ws.id, connection])
     const issueId = await seedIssue(pool, id)
     // A numbered task, so its thread gets a publication branch.
@@ -84,6 +90,13 @@ test('run machine fallback: 本地 a computer that takes part, 云端 own E2B, e
   const order = await import('../lib/model-order')
   const runAt = (who: { id: string; workspaceId: string }, location: 'cloud' | 'local') => order.changeOrder(pool, { ownerId: who.id, workspaceId: who.workspaceId }, { kind: 'location', location })
   const actions = (result: NoMachine) => result.card.options.map(option => option.action)
+  // Another numbered task of theirs, so its thread gets a publication branch.
+  let taskNumber = 100
+  const anotherTask = async (userId: string) => {
+    const issueId = await seedIssue(pool, userId)
+    await pool.query('UPDATE issues SET content=$2::jsonb WHERE id=$1', [issueId, JSON.stringify({ type: 'doc', attrs: { mikka: { number: ++taskNumber } } })])
+    return issueId
+  }
   const runOf = async (runId: string) => (await pool.query('SELECT "deviceId",status FROM agent_runs WHERE id=$1', [runId])).rows[0]
 
   await t.test('(a) no computer: the card says so, then a computer is picked once it takes part', async () => {
@@ -91,37 +104,32 @@ test('run machine fallback: 本地 a computer that takes part, 云端 own E2B, e
     const result = await dispatch(a.id, a.issueId) as unknown as NoMachine
     assert.equal(result.error, 'machineUnavailable')
     assert.deepEqual([result.reason, result.card.title], ['noDevice', '没有能跑这个任务的模型'])
-    // Two rows: 连接电脑 opens 设备, 打开模型与订阅 the list; never Mikka's cloud.
-    assert.deepEqual(actions(result), ['connectServer', 'modelSettings'])
+    // 云端 (the default) with no E2B key and no computer: 连接电脑 opens 设备, 填入 E2B Key their own cloud, 打开模型与订阅 the list; never Mikka's cloud.
+    assert.deepEqual(actions(result), ['connectServer', 'e2bKey', 'modelSettings'])
     assert.equal((await pool.query('SELECT count(*)::int AS n FROM agent_runs WHERE "userId"=$1', [a.id])).rows[0].n, 0, 'nothing is queued')
 
     // A computer comes online with 参与调度 off: it is not picked; the card is the same.
     const deviceId = await onlineMac(a.id, false)
     const offered = await dispatch(a.id, a.issueId) as unknown as NoMachine
     assert.equal(offered.error, 'machineUnavailable')
-    assert.deepEqual([offered.reason, actions(offered)], ['noDevice', ['connectServer', 'modelSettings']])
+    assert.deepEqual([offered.reason, actions(offered)], ['noDevice', ['connectServer', 'e2bKey', 'modelSettings']])
     await pool.query('UPDATE devices SET enabled=true WHERE id=$1', [deviceId])
     const queued = await dispatch(a.id, a.issueId) as unknown as { runId: string; status: string }
     assert.equal(queued.status, 'queued')
     assert.equal((await runOf(queued.runId)).deviceId, deviceId)
   })
 
-  await t.test('a read-only task runs without a repository push approval; a committing one says why it cannot', async () => {
+  await t.test('a read-only task and a committing one both run with no push approval or GitHub App check', async () => {
     const r = await person('readonly')
     const deviceId = await onlineMac(r.id)
     const botId = await chatBotId(r.id, null, await ownWorkspace(r.id))
-    // The App is not installed on octo/elsewhere.
-    const refused = await steps.dispatchRun(r.id, { issueId: r.issueId, repo: 'octo/elsewhere', requestKey: `dispatch:${randomUUID()}` }, undefined, botId) as unknown as { error: string; reason: string; detail: string }
-    assert.equal(refused.error, 'runInvalid')
-    assert.equal(refused.reason, 'githubAppNotInstalled', 'the Coordinator is told the real cause, not left to guess one')
-    assert.match(refused.detail, /readOnly run can go ahead/)
-    assert.equal((await pool.query('SELECT count(*)::int AS n FROM agent_runs WHERE "userId"=$1', [r.id])).rows[0].n, 0)
+    // The App is not installed on octo/elsewhere: nothing in Mikka checks that any more (decision 2026-11-02-1600).
     const queued = await steps.dispatchRun(r.id, { issueId: r.issueId, repo: 'octo/elsewhere', readOnly: true, requestKey: `dispatch:${randomUUID()}` }, undefined, botId) as unknown as { runId: string; status: string }
     assert.equal(queued.status, 'queued')
     const run = (await pool.query('SELECT "deviceId","agentDefinition" FROM agent_runs WHERE id=$1', [queued.runId])).rows[0]
     assert.equal(run.deviceId, deviceId)
     assert.equal(run.agentDefinition.readOnly, true)
-    assert.equal(run.agentDefinition.repositoryAdmission, undefined, 'a read-only run carries no push authority')
+    assert.equal(run.agentDefinition.repositoryAdmission, undefined, 'a read-only run has no task branch')
     assert.equal((await pool.query('SELECT count(*)::int AS n FROM run_publications WHERE "runId"=$1', [queued.runId])).rows[0].n, 0, 'no push branch is reserved')
     assert.equal((await pool.query('SELECT count(*)::int AS n FROM pending_actions WHERE "userId"=$1', [r.id])).rows[0].n, 0, 'nothing asked the person for an approval')
     const { persistRunCompletion } = await import('../lib/run-publications')
@@ -130,44 +138,31 @@ test('run machine fallback: 本地 a computer that takes part, 云端 own E2B, e
     assert.equal((await runOf(queued.runId)).status, 'succeeded', 'a read-only report has nothing to publish, so it is not blocked on a push')
   })
 
-  await t.test('push follows the GitHub App grant: allowed without a card when granted, a clear reason when not', async () => {
+  await t.test('a committing run is admitted with its task branch whatever the GitHub App says, with no card', async () => {
     const g = await person('github-grant')
     await onlineMac(g.id)
     const botId = await chatBotId(g.id, null, await ownWorkspace(g.id))
-    const dispatchTo = (repo: string) => steps.dispatchRun(g.id, { issueId: g.issueId, repo, requestKey: `dispatch:${randomUUID()}` }, undefined, botId) as unknown as Promise<{ error?: string; reason?: string; detail?: string; runId?: string; status?: string }>
-    const runs = async () => (await pool.query('SELECT count(*)::int AS n FROM agent_runs WHERE "userId"=$1', [g.id])).rows[0].n
+    const dispatchTo = (repo: string, issueId: string) => steps.dispatchRun(g.id, { issueId, repo, requestKey: `dispatch:${randomUUID()}` }, undefined, botId) as unknown as Promise<{ error?: string; runId?: string; status?: string }>
     github.install('octo/read-only-app', { contents: 'read', pull_requests: 'write' })
-    const narrow = await dispatchTo('octo/read-only-app')
-    assert.equal(narrow.reason, 'githubAppPermissionRequired')
-    assert.match(narrow.detail!, /contents: write/)
-    assert.match(narrow.detail!, /https:\/\/github\.com\/apps\/mikka-github\/installations\/new/, 'the person is sent to GitHub, not to an approval in Mikka')
-    github.install('octo/suspended', { contents: 'write', suspended: true })
-    assert.equal((await dispatchTo('octo/suspended')).reason, 'githubAppSuspended')
-    github.install('octo/not-mine', { contents: 'write', pull_requests: 'write' })
-    assert.equal((await dispatchTo('octo/not-mine')).reason, 'githubAccessDenied', 'the App grant never lends one person\'s push to another')
-    assert.equal(await runs(), 0)
-    const queued = await dispatchTo('octo/repo')
-    assert.equal(queued.status, 'queued')
+    const queued = await dispatchTo('octo/read-only-app', g.issueId)
+    assert.equal(queued.status, 'queued', JSON.stringify(queued))
     const run = (await pool.query('SELECT "agentDefinition" FROM agent_runs WHERE id=$1', [queued.runId])).rows[0]
-    assert.equal(run.agentDefinition.repositoryAdmission.authority, 'github_app')
-    assert.equal((await pool.query('SELECT "pushApproved" FROM run_publications WHERE "runId"=$1', [queued.runId])).rows[0].pushApproved, true)
-    assert.ok((await pool.query('SELECT "pushGrantedAt" FROM github_repository_installations WHERE "userId"=$1 AND "remoteKey"=$2', [g.id, normalizeRepository('octo/repo').key])).rows[0].pushGrantedAt)
+    assert.equal(run.agentDefinition.repositoryAdmission.authority, 'owner_credential')
+    assert.equal((await pool.query('SELECT count(*)::int AS n FROM run_publications WHERE "runId"=$1 AND branch IS NOT NULL', [queued.runId])).rows[0].n, 1)
     assert.equal((await pool.query('SELECT count(*)::int AS n FROM pending_actions WHERE "userId"=$1', [g.id])).rows[0].n, 0, 'no approval card')
     assert.equal((await pool.query('SELECT count(*)::int AS n FROM repository_settings WHERE "userId"=$1 AND push IS NOT NULL', [g.id])).rows[0].n, 0, 'no Mikka-side push approval is involved')
   })
 
-  await t.test('(b) 云端 with no E2B key: the card says so and the online computer is not used; 本地 runs there', async () => {
+  await t.test('(b) 云端 with no E2B key: the online computer takes the run; 本地 too', async () => {
     const b = await person('mac')
     const deviceId = await onlineMac(b.id)
     await runAt(b, 'cloud')
-    const refused = await dispatch(b.id, b.issueId) as unknown as NoMachine
-    assert.equal(refused.error, 'machineUnavailable')
-    assert.deepEqual([refused.reason, actions(refused)], ['cloudNotConfigured', ['e2bKey', 'modelSettings']])
-    assert.equal((await pool.query('SELECT count(*)::int AS n FROM agent_runs WHERE "userId"=$1', [b.id])).rows[0].n, 0, '运行位置 is never switched for the person')
-    await runAt(b, 'local')
     const result = await dispatch(b.id, b.issueId) as unknown as { runId: string; status: string }
     assert.equal(result.status, 'queued')
     assert.deepEqual(await runOf(result.runId), { deviceId, status: 'queued' })
+    await runAt(b, 'local')
+    const again = await dispatch(b.id, await anotherTask(b.id)) as unknown as { runId: string; status: string }
+    assert.deepEqual(await runOf(again.runId), { deviceId, status: 'queued' })
   })
 
   // The bot's own cloud computer is awake, with its runtime, a bound Codex subscription and the
@@ -182,7 +177,7 @@ test('run machine fallback: 本地 a computer that takes part, 云端 own E2B, e
     await pool.query(`INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,'codex',$4)`, [cloudAgent, c.id, cloudDevice, `cloud-${cloudAgent.slice(0, 8)}`])
     await pool.query(`INSERT INTO device_repos (id,"deviceId","userId","repoPath","baseBranch") VALUES ($1,$2,$3,'/home/user/w','main')`, [repoId, cloudDevice, c.id])
     await pool.query(`INSERT INTO bot_cloud_runtimes ("botId","workspaceId","ownerId",harness,"agentId","repoId") VALUES ($1,$2,$3,'codex',$4,$5)`, [botId, c.workspaceId, c.id, cloudAgent, repoId])
-    await pool.query(`INSERT INTO byos_connections (id,"ownerId","workspaceId",provider,state,epoch,"secretName","secretDigest","providerSubject") VALUES ($1,$2,$3,'codex','connected',1,$5,$4,'synthetic-subject')`, [connection, c.id, c.workspaceId, 'a'.repeat(64), `synthetic-${connection}`])
+    await pool.query(`INSERT INTO byos_connections (id,"ownerId","workspaceId",provider,state,epoch,"secretName","secretDigest","providerSubject",quota,"modelCatalog") VALUES ($1,$2,$3,'codex','connected',1,$5,$4,'synthetic-subject',$6,$7)`, [connection, c.id, c.workspaceId, 'a'.repeat(64), `synthetic-${connection}`, JSON.stringify({ vendor: 'codex', source: 'official', status: 'ok', plan: 'Pro', observedAt: new Date().toISOString(), windows: [{ kind: 'five_hour', used: .2, resetsAt: null }] }), JSON.stringify({ revision: '1', models: ['gpt-5'] })])
     await pool.query(`INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId") VALUES ($1,$2,$3,$4,$5,1,'codex_cli','gpt-5')`, [randomUUID(), c.id, c.workspaceId, cloudAgent, connection])
     // A team workspace uses a member's subscription once they share it there (decision 2026-10-31-2225).
     await pool.query(`INSERT INTO workspace_subscription_shares ("ownerId","workspaceId") VALUES ($1,$2)`, [c.id, c.workspaceId])
@@ -190,7 +185,7 @@ test('run machine fallback: 本地 a computer that takes part, 云端 own E2B, e
     return { botId, cloudDevice }
   }
 
-  await t.test('(c) own E2B refuses (cap, quota, key): the cloud run is ended with the card; 本地 a server takes it', async () => {
+  await t.test('(c) own E2B refuses (cap, quota, key): the cloud run is ended; with no server or computer the card, else 云端 falls back to the server', async () => {
     const c = await person('cloud')
     const { botId } = await cloudReady(c)
     await runAt(c, 'cloud')
@@ -204,18 +199,23 @@ test('run machine fallback: 本地 a computer that takes part, 云端 own E2B, e
     assert.equal((await pool.query('SELECT count(*)::int AS n FROM agent_runs WHERE "userId"=$1', [c.id])).rows[0].n, 0, 'no cloud run on the bot computer')
     const refused = await dispatch(c.id, c.issueId, botId) as unknown as NoMachine
     assert.equal(refused.error, 'machineUnavailable', 'an error the person can act on')
-    assert.deepEqual([refused.reason, actions(refused)], ['cloudNotConfigured', ['e2bKey', 'modelSettings']])
+    assert.deepEqual([refused.reason, actions(refused)], ['cloudTemporarilyUnavailable', ['modelSettings']])
     const cloudRuns = (await pool.query(`SELECT r.status,m.state FROM agent_runs r JOIN thread_machines m ON m."runId"=r.id WHERE r."userId"=$1`, [c.id])).rows
     assert.deepEqual(cloudRuns, [{ status: 'stopped', state: 'ended' }], 'the refused cloud run was queued, then ended instead of left stuck')
     const frozen = (await pool.query(`SELECT r."agentDefinition"->>'harness' AS harness FROM agent_runs r JOIN thread_machines m ON m."runId"=r.id WHERE r."userId"=$1`, [c.id])).rows[0]
     assert.equal(frozen.harness, 'codex', 'every cloud run freezes its definition when it is created')
-    // A server comes online: 云端 still never sends the run there; 本地 does.
+    // A server comes online: 云端 tries the cloud, which refuses again, then the server takes it and the result says so.
     const deviceId = await onlineMac(c.id, true, 'server')
-    assert.equal((await dispatch(c.id, c.issueId, botId) as unknown as NoMachine).error, 'machineUnavailable')
+    const fallback = await dispatch(c.id, await anotherTask(c.id), botId) as unknown as { runId: string; status: string; fallback?: string }
+    assert.deepEqual([fallback.status, fallback.fallback, (await runOf(fallback.runId)).deviceId], ['queued', 'cloudUnavailable', deviceId])
+    assert.equal((await pool.query(`SELECT count(*)::int AS n FROM agent_runs r JOIN thread_machines m ON m."runId"=r.id WHERE r."userId"=$1 AND r.status='stopped' AND m.state='ended'`, [c.id])).rows[0].n, 2, 'the second refused cloud run is ended too')
+    // A run the person put in the cloud goes nowhere else.
+    const pinned = await steps.dispatchRun(c.id, { issueId: await anotherTask(c.id), repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}`, target: 'cloud' }, undefined, botId) as unknown as NoMachine
+    assert.equal(pinned.error, 'machineUnavailable')
+    // 本地 goes straight to the server.
     await runAt(c, 'local')
-    const result = await dispatch(c.id, c.issueId, botId) as unknown as { runId: string; status: string }
-    assert.equal(result.status, 'queued')
-    assert.equal((await runOf(result.runId)).deviceId, deviceId)
+    const result = await dispatch(c.id, await anotherTask(c.id), botId) as unknown as { runId: string; status: string; fallback?: string }
+    assert.deepEqual([result.status, result.fallback, (await runOf(result.runId)).deviceId], ['queued', undefined, deviceId])
   })
 
   await t.test('a server goes offline mid-run: the run moves to the own E2B cloud, which ends it with the card when E2B refuses', async () => {
@@ -260,7 +260,7 @@ test('run machine fallback: 本地 a computer that takes part, 云端 own E2B, e
     assert.deepEqual(retried.payload.movedTo, { kind: 'cloud' })
   })
 
-  await t.test('own devices: 本地 picks one that takes part; a computer with 参与调度 off is never picked, even when named', async () => {
+  await t.test('own devices: 本地 picks the server that takes part; a computer with 参与调度 off is never picked, even when named', async () => {
     const d = await person('devices')
     const mac = await onlineMac(d.id)
     const server = await onlineMac(d.id, true, 'server')
@@ -272,12 +272,13 @@ test('run machine fallback: 本地 a computer that takes part, 云端 own E2B, e
       const result = await dispatch(d.id, issueId) as unknown as { runId: string }
       used.add((await runOf(result.runId)).deviceId)
     }
-    assert.ok([...used].every(deviceId => deviceId === mac || deviceId === server), 'only computers that take part')
-    assert.ok(!used.has(off))
+    // The server goes first, every time (decision 2026-11-02-1530); the computer and the one with 参与调度 off are not used.
+    assert.deepEqual([...used], [server])
+    assert.ok(!used.has(off) && !used.has(mac))
     const e = await person('manual')
     const kept = await onlineMac(e.id, false)
     const none = await dispatch(e.id, e.issueId) as unknown as NoMachine
-    assert.deepEqual([none.reason, actions(none)], ['noDevice', ['connectServer', 'modelSettings']])
+    assert.deepEqual([none.reason, actions(none)], ['noDevice', ['connectServer', 'e2bKey', 'modelSettings']])
     const named = await steps.dispatchRun(e.id, { issueId: e.issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}`, target: { deviceId: kept } }, undefined, await chatBotId(e.id, null, await ownWorkspace(e.id))) as unknown as NoMachine
     assert.equal(named.error, 'machineUnavailable')
     assert.equal((await pool.query('SELECT count(*)::int AS n FROM agent_runs WHERE "userId"=$1', [e.id])).rows[0].n, 0)

@@ -11,6 +11,8 @@ export function githubAppStub() {
   const installations = new Map<string, Installation>()
   const writers = new Map<string, Set<string>>()
   const calls: string[] = []
+  /** Each person's own GitHub user token: their GitHub id and the repositories they authorized the App on. */
+  const people = new Map<string, { id: string; repositories: string[]; failure?: number; failures?: number }>()
   const previous = { fetch: globalThis.fetch, id: process.env.GITHUB_APP_ID, key: process.env.GITHUB_APP_PRIVATE_KEY }
   process.env.GITHUB_APP_ID = '1'
   process.env.GITHUB_APP_PRIVATE_KEY = privateKey
@@ -28,6 +30,16 @@ export function githubAppStub() {
       return json({ id: 77, suspended_at: found.suspended ? '2026-11-01T00:00:00Z' : null, permissions: { contents: found.contents, pull_requests: found.pull_requests } })
     }
     if (url.pathname === '/app/installations/77/access_tokens' && method === 'POST') return json({ token: 'synthetic-installation-token', expires_at: new Date(Date.now() + 3_600_000).toISOString() })
+    // A person's own token (lib/github/user-access.ts repositoriesForUser): who they are and what the App reaches for them.
+    const person = people.get(String(new Headers(init?.headers).get('authorization') ?? '').replace(/^Bearer /, ''))
+    // A token GitHub refuses (401: expired or revoked) or cannot answer for (502/503, or a 403 rate limit), `failures` times.
+    if (person?.failure && (person.failures ?? Infinity) > 0 && url.pathname.startsWith('/user')) {
+      person.failures = (person.failures ?? Infinity) - 1
+      return new Response(JSON.stringify({ message: 'synthetic failure' }), { status: person.failure, headers: { 'content-type': 'application/json', ...(person.failure === 403 ? { 'x-ratelimit-remaining': '0' } : {}) } })
+    }
+    if (person && url.pathname === '/user') return json({ id: Number(person.id), login: `user-${person.id}` })
+    if (person && url.pathname === '/user/installations') return json({ installations: [{ id: 77, app_id: Number(process.env.GITHUB_APP_ID), account: { login: 'octo' }, suspended_at: null }] })
+    if (person && url.pathname === '/user/installations/77/repositories') return json({ repositories: person.repositories.map((fullName, index) => ({ id: 5000 + index, full_name: fullName, private: true, description: null, homepage: null, pushed_at: null })) })
     const user = /^\/user\/(\d+)$/.exec(url.pathname)
     if (user) return json({ id: Number(user[1]), login: `user-${user[1]}` })
     if (repo && repo[3]?.startsWith('/collaborators/')) {
@@ -47,6 +59,10 @@ export function githubAppStub() {
       const key = fullName.toLowerCase()
       writers.set(key, new Set([...(writers.get(key) ?? []), githubAccountId]))
     },
+    /** The person signed in with this user token is GitHub account `githubAccountId` and authorized the App on `repositories`. */
+    authorize(token: string, githubAccountId: string, repositories: string[]) { people.set(token, { id: githubAccountId, repositories }) },
+    /** GitHub answers this person's token with `status`, `times` times (all of them when omitted). */
+    fail(token: string, status: number, times?: number) { const person = people.get(token); if (person) Object.assign(person, { failure: status, failures: times }) },
     restore() {
       globalThis.fetch = previous.fetch
       if (previous.id === undefined) delete process.env.GITHUB_APP_ID; else process.env.GITHUB_APP_ID = previous.id
@@ -65,4 +81,16 @@ export async function recordPushGrant(pool: { query: (sql: string, values: unkno
   await pool.query(`INSERT INTO github_repository_installations ("userId","remoteKey","githubAccountId","installationId","repositoryId","verifiedAt","pushGrantedAt")
     VALUES ($1,$2,$3,77,4242,now(),now()) ON CONFLICT ("userId","remoteKey") DO UPDATE SET "githubAccountId"=excluded."githubAccountId","pushGrantedAt"=now(),"verifiedAt"=now()`, [userId, remoteKey, account])
   return account
+}
+
+/**
+ * Connects GitHub for a fixture person the way 插件 › GitHub does (a sealed user token in github_connections) and
+ * authorizes the App on `repositories`, so dispatch finds them in the person's live authorized list.
+ */
+export async function connectGitHub(stub: ReturnType<typeof githubAppStub>, userId: string, githubAccountId: string, repositories: string[]) {
+  const { saveGitHubConnection } = await import('../../lib/github/connection')
+  const token = `synthetic-user-token-${userId}`
+  await saveGitHubConnection(userId, { githubAccountId, githubLogin: `user-${githubAccountId}` }, { access_token: token })
+  stub.authorize(token, githubAccountId, repositories)
+  return token
 }

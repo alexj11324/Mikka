@@ -17,7 +17,11 @@ async function accept() {
   if (code !== null && code !== 0) throw new Error('Cloud worker failed')
 }
 const failed = () => { process.stderr.write('Cloud worker unavailable\n'); process.exit(1) }
-if (process.argv.includes('--wait-bootstrap')) {
+if (process.argv.includes('--probe-models')) {
+  void import('../src/cloud-model-probe').then(async ({ probeHostedModels }) => {
+    process.stdout.write(JSON.stringify(await probeHostedModels()) + '\n')
+  }).catch(failed)
+} else if (process.argv.includes('--wait-bootstrap')) {
   // The template snapshot contains imported software and an idle watcher,
   // never a device identity, provider key or viewer signing key.
   mkdirSync(root, { recursive: true, mode: 0o700 })

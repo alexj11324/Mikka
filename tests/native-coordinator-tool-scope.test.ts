@@ -38,6 +38,8 @@ stub('../lib/coordinator/native.ts',{nativeCoordinatorStore:{assertToolActive:ch
 stub('../lib/coordinator/store.ts',{editMemory:effect})
 stub('../lib/coordinator/issue-create.ts',{createIssueFromRequest:effect})
 stub('../lib/issue-visibility.ts',{issueVisibility:effect})
+stub('../lib/factory/queue-local.ts',{queueTaskRun:effect})
+stub('../lib/factory/queue-cloud.ts',{queueFactoryCloudRun:effect})
 stub('../lib/agent-runs.ts',{addRunMessage:effect,queueRun:effect,readRun:readRunResult,requestRunStop:effect,visibleRuns:effect})
 stub('../lib/db/index.ts',{db:{select:()=>({from:()=>({where:()=>({limit:readUserEvent})})})},pool:null})
 stub('../lib/mcp/actions.ts',{listAgents:effect})
@@ -110,6 +112,9 @@ const calls = {
   createIssue:()=>steps.createIssue(user,{title:'Task'},'tool-call',scope,COORDINATOR_BOT),
   updateIssue:()=>steps.updateIssue(user,{issueId:'issue',title:'Updated'},'tool-call',scope,COORDINATOR_BOT),
   listAgents:()=>steps.listAgents(user,scope),
+  findRepository:()=>steps.findRepository(user,{name:'repo'},scope),
+  githubTools:()=>steps.githubMcp(user,{},scope),
+  githubCall:()=>steps.githubMcp(user,{name:'get_me',arguments:{}},scope),
   dispatchRun:()=>steps.dispatchRun(user,{issueId:'issue',agentId:'agent',repo:'owner/repo'},scope,COORDINATOR_BOT),
   listComputerWorkspaces:()=>steps.listComputerWorkspaces(user,scope),
   createComputerBot:()=>steps.createComputerBot(user,{workspaceId:'workspace',name:'Bot'},'tool-call',scope),
@@ -117,7 +122,7 @@ const calls = {
   wakeComputerBot:()=>steps.wakeComputerBot(user,{botId:'bot'},scope),
   listBotSubscriptions:()=>steps.listBotSubscriptions(user,{botId:'bot'},scope),
   bindComputerSubscription:()=>steps.bindComputerSubscription(user,{botId:'bot',connectionId:'connection',revision:1,harness:'codex',modelId:'model'},'tool-call',scope),
-  dispatchComputerTask:()=>steps.dispatchComputerTask(user,{botId:'bot',issueId:'issue',harness:'codex'},'tool-call',scope),
+  dispatchComputerTask:()=>steps.dispatchComputerTask(user,{botId:'bot',issueId:'issue',harness:'codex',model:'model'},'tool-call',scope),
   listRuns:()=>steps.listRuns(user,{},scope),
   getRun:()=>steps.getRun(user,{runId:'run'},scope),
   sendToRun:()=>steps.sendToRun(user,{runId:'run',text:'message'},scope),

@@ -8,7 +8,7 @@ import { and, asc, desc, eq, inArray, isNull, or, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { ActionFailureError } from '@/lib/action-error'
 import { db, pool, withDatabaseClient } from '@/lib/db'
-import { SubscriptionRepository } from '@/lib/subscription-repository'
+import { nativeRunBinding } from '@/lib/computer/native-run-binding'
 import { agents, agentRuns, bots, deviceRepos, devices, issues, runChunks, runMessages, type SupportedHarness } from '@/lib/db/schema'
 import { ensureDeviceRepository } from '@/lib/device-repositories'
 import { localExecutionHarnesses } from '@/lib/device-agents'
@@ -69,17 +69,26 @@ export const runViewColumns = {
  * `note` is extra direction for this run only, after the issue.
  */
 /** `botId` is the bot that dispatched the run (null for the Coordinator); the run reports back to that bot's chat. */
-type LocalDispatchInput = { issueId: string; agentId: string; repo: string; note?: string; requestKey?: string; model?: string; pinnedDeviceId?: string; readOnly?: boolean
-  /** The API key the 允许使用的模型 entry names; the run uses it only when it may (lib/run-credential-source.ts). */
-  apiKeyId?: string }
-export async function queueRun(userId: string, input: LocalDispatchInput, botId: string | null = null, execution?: AgentExecution, requestEventId?: string, source: 'mcp' | null = null, approvedRepositoryKey?: string) {
-  return queueAdmittedRun(userId, input, botId, execution, requestEventId, source, approvedRepositoryKey)
+type LocalDispatchInput = { issueId: string; agentId: string; repo: string; note?: string; requestKey?: string
+  /** Required (lib/computer/run-model.ts): a new run's from 优先使用的模型, a thread's next run its own; never left to the CLI. */
+  model: string
+  /** The run this one continues, named when the model is missing. */
+  threadRunId?: string
+  pinnedDeviceId?: string; readOnly?: boolean
+  /** The API key the 优先使用的模型 entry names; the run uses it only when it may (lib/run-credential-source.ts). */
+  apiKeyId?: string
+  /** Exact server-selected identity; reauthorized for this owner, Agent and workspace at queue time. */
+  subscriptionBindingId?: string }
+export async function queueRun(userId: string, input: LocalDispatchInput, botId: string | null = null, execution?: AgentExecution, requestEventId?: string, source: 'mcp' | null = null) {
+  return queueAdmittedRun(userId, input, botId, execution, requestEventId, source)
 }
 
 /** Only the Factory/Skill host calls this with an already-open transaction.
  * Repository ids identify prior scheduling metadata; they confer no authority. */
+/** What the host already decided for a Factory run: its model and credential (lib/computer/run-model.ts), the computer it is pinned to, read-only. */
+export type FactoryRunSelection = { model?: string; subscriptionBindingId?: string; apiKeyId?: string; pinnedDeviceId?: string; readOnly?: boolean; execution?: AgentExecution }
 export async function queueFactoryRun(tx: import('pg').PoolClient, userId: string, input: DispatchInput,
-  botId: string | null = null, context?: { sourceEventId: string; attemptId: string }, sourceRunId?: string): Promise<DispatchResult> {
+  botId: string | null = null, context?: { sourceEventId: string; attemptId: string }, sourceRunId?: string, selection: FactoryRunSelection = {}): Promise<DispatchResult> {
   const parsed = dispatchInput.safeParse(input)
   if (!parsed.success || Boolean(context) === Boolean(sourceRunId)) throw new ActionFailureError('runInvalid')
   const { factoryDispatchDatabase } = await import('./factory/transaction')
@@ -106,7 +115,12 @@ export async function queueFactoryRun(tx: import('pg').PoolClient, userId: strin
       botId = source.botId
       requestEventId = source.agentDefinition?.repositoryAdmission?.requestEventId
     }
-    const result = await queueAdmittedRun(userId, { ...parsed.data, repo: repo.remoteUrl, requestKey: parsed.data.requestKey ?? (context ? `factory:${context.attemptId}` : undefined) }, botId, undefined, requestEventId, null, undefined, { executor, repo, client: tx, sourceRunId })
+    // One place picks the model (lib/computer/run-model.ts): the host's choice, else a rerun's source run's own,
+    // else 优先使用的模型 for this computer's Agent. A Factory run is never queued without one.
+    const { execution, ...chosen } = selection
+    const runModel = await factoryRunModel(userId, botId, parsed.data.agentId, chosen, sourceRunId
+      ? (await executor.select({ agentDefinition: agentRuns.agentDefinition }).from(agentRuns).where(and(eq(agentRuns.id, sourceRunId), eq(agentRuns.userId, userId))).limit(1))[0]?.agentDefinition : null)
+    const result = await queueAdmittedRun(userId, { ...parsed.data, ...runModel, ...(chosen.pinnedDeviceId ? { pinnedDeviceId: chosen.pinnedDeviceId } : {}), ...(chosen.readOnly ? { readOnly: true } : {}), repo: repo.remoteUrl, requestKey: parsed.data.requestKey ?? (context ? `factory:${context.attemptId}` : undefined) }, botId, execution, requestEventId, null, { executor, repo, client: tx, sourceRunId })
     const [run] = await executor.select({ status: agentRuns.status }).from(agentRuns).where(and(eq(agentRuns.id, result.runId), eq(agentRuns.userId, userId))).limit(1)
     if (!run) throw new ActionFailureError('runInvalid')
     // BE-13: the target device cannot take the run right now -> one reason-coded event, same transaction.
@@ -116,15 +130,18 @@ export async function queueFactoryRun(tx: import('pg').PoolClient, userId: strin
   })
 }
 
-async function queueAdmittedRun(userId: string, input: LocalDispatchInput, botId: string | null, execution?: AgentExecution,
-  requestEventId?: string, source: 'mcp' | null = null, approvedRepositoryKey?: string,
+async function queueAdmittedRun(userId: string, input: Omit<LocalDispatchInput, 'model'> & { model?: string }, botId: string | null, execution?: AgentExecution,
+  requestEventId?: string, source: 'mcp' | null = null,
   internal?: { executor: Pick<typeof db, 'select' | 'transaction'>; repo: typeof deviceRepos.$inferSelect; client: import('pg').PoolClient; sourceRunId?: string }) {
   const executor = internal?.executor ?? db
-  const parsed = z.object({ issueId: z.uuid(), agentId: z.uuid(), repo: z.string().trim().min(1).max(4_000), note: z.string().trim().max(10_000).optional(), requestKey: dispatchRequestKey.optional(), model: z.string().trim().min(1).max(128).optional(), pinnedDeviceId: z.uuid().optional(), readOnly: z.boolean().optional(), apiKeyId: z.uuid().optional() }).safeParse(input)
+  // Every local run is frozen with its model, a Factory or Skill run included: a caller that left it out fails here, before anything is read or written.
+  if (typeof input.model !== 'string' || !input.model.trim() || input.model.trim() === 'auto') {
+    console.error(JSON.stringify({ msg: 'local_run_model_missing', threadRunId: input.threadRunId ?? null, issueId: input.issueId, agentId: input.agentId }))
+    throw new ActionFailureError('runModelMissing')
+  }
+  const parsed = z.object({ issueId: z.uuid(), agentId: z.uuid(), repo: z.string().trim().min(1).max(4_000), note: z.string().trim().max(10_000).optional(), requestKey: dispatchRequestKey.optional(), model: z.string().trim().min(1).max(128).optional(), pinnedDeviceId: z.uuid().optional(), readOnly: z.boolean().optional(), apiKeyId: z.uuid().optional(), subscriptionBindingId: z.uuid().optional() }).refine(value => !(value.apiKeyId && value.subscriptionBindingId)).safeParse(input)
   if (!parsed.success) throw new ActionFailureError('runInvalid')
-  let requestedRepositoryKey: string
-  try { requestedRepositoryKey = normalizeRepository(parsed.data.repo, { allowFile: daemonTestMode(process.env) }).key } catch { throw new ActionFailureError('repoPathInvalid') }
-  if (approvedRepositoryKey && (!requestEventId || requestedRepositoryKey !== approvedRepositoryKey)) throw new ActionFailureError('runInvalid')
+  try { normalizeRepository(parsed.data.repo, { allowFile: daemonTestMode(process.env) }) } catch { throw new ActionFailureError('repoPathInvalid') }
   const issue = await issueForUser(userId, parsed.data.issueId, false, executor)
   if (!issue) throw new ActionFailureError('issueNotFound')
   const [agent] = await executor.select().from(agents)
@@ -133,16 +150,19 @@ async function queueAdmittedRun(userId: string, input: LocalDispatchInput, botId
   const [device] = await executor.select().from(devices).where(and(eq(devices.id, agent.deviceId), eq(devices.ownerId, userId), eq(devices.kind, 'local'))).limit(1)
   if (!device?.enabled || !localExecutionHarnesses(device.harnesses).includes(agent.harness)) throw new ActionFailureError('agentHarnessMissing')
   const repo = internal?.repo ?? await ensureDeviceRepository(userId, agent.deviceId, parsed.data.repo)
-  // Push authority is the person's GitHub App grant: ask GitHub now, before the
-  // admission transaction, which reads the recorded outcome. A host dispatch
-  // already inside its transaction (Factory) relies on the recorded check.
-  const pushCheck = !internal && !parsed.data.readOnly ? await (await import('@/lib/github/push-grant')).verifyPushGrant(userId, requestedRepositoryKey) : null
   const runId = crypto.randomUUID()
   const prompt = runPrompt(issue.title, tiptapToText(issue.content), agent.instructions, parsed.data.note)
   const captureDefinition = true
-  const found = captureDefinition && byosEnabled() ? await new SubscriptionRepository(pool).nativeBinding(userId,agent.id,agent.harness) : null
+  const query = internal?.client ?? pool
+  const workspaceId = botId ? (await query.query<{ workspaceId: string }>('SELECT "workspaceId" FROM bots WHERE id=$1 AND "ownerId"=$2', [botId, userId])).rows[0]?.workspaceId : undefined
+  if (botId && !workspaceId) throw new ActionFailureError('botNotFound')
+  const found = captureDefinition && byosEnabled() ? await nativeRunBinding(query, userId, agent.id, agent.harness, workspaceId, parsed.data.subscriptionBindingId) : null
+  if (parsed.data.subscriptionBindingId && (!found || (parsed.data.model && parsed.data.model !== found.modelId))) throw new ActionFailureError('executionAccountUnavailable')
+  const model = parsed.data.subscriptionBindingId ? found?.modelId : parsed.data.model
+  if (!model) throw new ActionFailureError('runModelMissing')
   // The run's credential, frozen now: the subscription, else the person's own API key (orchestration.md § 2).
-  const { subscription, apiKey } = await localRunCredential(internal?.client ?? pool, userId, botId, agent.harness, parsed.data.model, found, parsed.data.apiKeyId)
+  // A subscription's identity is its provider model, including at the CLI boundary.
+  const { subscription, apiKey } = await localRunCredential(internal?.client ?? pool, userId, botId, agent.harness, parsed.data.subscriptionBindingId ? found?.modelId : model, found, parsed.data.apiKeyId)
   const mailboxEnabled = personalMailboxEnabled()
   let mailboxScope: { botId: string | null; workspaceId: string } | undefined
   if (captureDefinition && mailboxEnabled && snapshotMailboxTools(execution?.snapshot).length) {
@@ -152,10 +172,27 @@ async function queueAdmittedRun(userId: string, input: LocalDispatchInput, botId
     mailboxScope = { botId, workspaceId: bot?.workspaceId ?? (await import('@/lib/device-link')).WORKSPACE_ID }
   }
   const agentDefinition = captureDefinition
-    ? freezeWorkerDefinition({ harness: agent.harness, instructions: agent.instructions, prompt, parent: execution?.snapshot ?? null, executionId: execution?.id ?? null,subscription, apiKey, model:parsed.data.model, pinnedDeviceId:parsed.data.pinnedDeviceId, mailboxEnabled, mailboxScope, readOnly: parsed.data.readOnly })
+    ? freezeWorkerDefinition({ harness: agent.harness, instructions: agent.instructions, prompt, parent: execution?.snapshot ?? null, executionId: execution?.id ?? null,subscription, apiKey, model, pinnedDeviceId:parsed.data.pinnedDeviceId, mailboxEnabled, mailboxScope, readOnly: parsed.data.readOnly })
     : null
   return (await import('@/lib/run-admission-store')).acceptLocalRun({ id: runId, userId, botId, issueId: issue.id, agentId: agent.id, deviceId: agent.deviceId,
-    deviceRepoId: repo.id, prompt, source, definition: agentDefinition!, ...(requestEventId ? { requestEventId } : {}), ...(approvedRepositoryKey ? { approvedRepositoryKey } : {}), ...(pushCheck && !pushCheck.granted ? (pushCheck.reason === 'githubUnavailable' || pushCheck.reason === 'githubNotConfigured' ? { pushUnchecked: pushCheck.reason } : { pushRefusal: pushCheck.reason }) : {}), ...(parsed.data.requestKey ? { dispatch: { issueId: issue.id, agentId: agent.id, deviceRepoId: repo.id, note: parsed.data.note, requestKey: parsed.data.requestKey } } : {}), ...(internal ? { continuation: true, sourceRunId: internal.sourceRunId } : {}) }, internal?.client)
+    deviceRepoId: repo.id, prompt, source, definition: agentDefinition!, ...(requestEventId ? { requestEventId } : {}), ...(parsed.data.requestKey ? { dispatch: { issueId: issue.id, agentId: agent.id, deviceRepoId: repo.id, note: parsed.data.note, requestKey: parsed.data.requestKey, ...(parsed.data.subscriptionBindingId ? { subscriptionBindingId: parsed.data.subscriptionBindingId } : {}) } } : {}), ...(internal ? { continuation: true, sourceRunId: internal.sourceRunId } : {}) }, internal?.client)
+}
+
+/** A Factory run's model: the host's choice; else a rerun's source run's own; else 优先使用的模型 for the Agent's computer. */
+async function factoryRunModel(userId: string, botId: string | null, agentId: string, chosen: Omit<FactoryRunSelection, 'execution' | 'pinnedDeviceId' | 'readOnly'>,
+  source: Parameters<typeof import('@/lib/computer/run-model').threadRunModel>[0]) {
+  const { threadRunModel, chooseLocalRunModel } = await import('@/lib/computer/run-model')
+  if (chosen.model?.trim()) return { model: chosen.model, ...(chosen.subscriptionBindingId ? { subscriptionBindingId: chosen.subscriptionBindingId } : {}), ...(chosen.apiKeyId ? { apiKeyId: chosen.apiKeyId } : {}) }
+  const kept = threadRunModel(source)
+  if (kept) return kept
+  const [agent] = await db.select({ id: agents.id, deviceId: agents.deviceId, harness: agents.harness }).from(agents).where(and(eq(agents.id, agentId), eq(agents.userId, userId))).limit(1)
+  if (!agent?.deviceId || (agent.harness !== 'codex' && agent.harness !== 'claude_code')) throw new ActionFailureError('runModelMissing')
+  const { executionWorkspace } = await import('@/lib/execution-settings')
+  const workspaceId = await executionWorkspace(userId, botId).catch(() => null)
+  if (!workspaceId) throw new ActionFailureError('runModelMissing')
+  const picked = await chooseLocalRunModel(pool, { ownerId: userId, workspaceId, botId }, { id: agent.id, deviceId: agent.deviceId, harness: agent.harness })
+  if ('error' in picked) throw new ActionFailureError('runModelMissing')
+  return picked
 }
 
 /** A device run's credential source; the bot's workspace decides whose API keys it may use. */
@@ -171,7 +208,11 @@ async function localRunCredential<S extends { id: string; ownerId: string; conne
 export async function visibleRuns(userId: string, input: { issueId?: string; runIds?: string[]; activeOnly?: boolean; limit?: number } = {}): Promise<RunView[]> {
   if (input.issueId && !z.uuid().safeParse(input.issueId).success) return []
   if (input.runIds && (!input.runIds.length || input.runIds.some(id => !z.uuid().safeParse(id).success))) return []
-  const visibility = await issueVisibility(userId)
+  // Asked about one task or known runs: only their tasks' team links are read.
+  const onlyIssueIds = input.issueId ? [input.issueId]
+    : input.runIds ? [...new Set((await db.select({ issueId: agentRuns.issueId }).from(agentRuns).where(inArray(agentRuns.id, input.runIds))).flatMap(row => row.issueId ? [row.issueId] : []))]
+    : undefined
+  const visibility = await issueVisibility(userId, false, undefined, db, { onlyIssueIds })
   const shared = visibility.allowedIds.length ? and(eq(issues.scope, 'workspace'), inArray(issues.id, visibility.allowedIds)) : sql`false`
   const rows = await db.select({ ...runViewColumns, ownerId: agentRuns.userId, waitDeviceId: agentRuns.deviceId, lastSeenAt:devices.lastSeenAt, deviceEnabled:devices.enabled }).from(agentRuns)
     .innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(issues, eq(issues.id, agentRuns.issueId)).leftJoin(devices,eq(devices.id,agentRuns.deviceId))

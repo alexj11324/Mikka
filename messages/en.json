@@ -1,5 +1,7 @@
 {
   "Common": {
+    "appUpdated": "Mikka has been updated",
+    "refresh": "Refresh",
     "close": "Close",
     "cancel": "Cancel",
     "save": "Save",
@@ -224,7 +226,8 @@
       "connected": "Connected {name}",
       "replaced": "Changed {name} key",
       "securedBy": "Secured by"
-    }
+    },
+    "connectionStatusFailed": "Couldn't read connection status for {names}"
   },
   "Auth": {
     "haveAccount": "Already have an account?",
@@ -301,6 +304,11 @@
       "turnstileFailed": "Human verification failed",
       "turnstileUnavailable": "Human verification is unavailable. Please try again later.",
       "emailRegistered": "This email is already registered. Please sign in."
+    },
+    "signInRefusal": {
+      "invalidCredentials": "Incorrect email or password",
+      "emailNotVerified": "Email not verified yet",
+      "signInRateLimited": "Too many attempts. Try again later"
     },
     "nameRequired": "Name is required",
     "emailRequired": "Email is required",
@@ -799,7 +807,7 @@
     "connect": {
       "trigger": "Connect device",
       "title": "Add device",
-      "description": "A machine you can reach over SSH. Mikka installs and starts the Mikka client there, then brings back the Agents it detected.",
+      "description": "A machine you can reach over SSH. Mikka installs and starts the daemon there, then brings back the Agents it detected.",
       "host": "Host",
       "hostPlaceholder": "SSH host, hostname, or IP[:port]",
       "actAs": "Connect as",
@@ -809,7 +817,7 @@
       "manualToken": "Use a manual token",
       "connect": "Connect",
       "connectingHost": "Connecting to {host}",
-      "progressDescription": "Install and start the Mikka client on this machine, then wait for it to connect.",
+      "progressDescription": "Install and start the daemon on this machine, then wait for it to connect.",
       "interrupted": "The connection was interrupted.",
       "tokenFailed": "Could not create a token. Please try again.",
       "done": "Done",
@@ -831,26 +839,28 @@
       },
       "manual": {
         "loginComment": "# 1. Sign in on this machine (the token is shown only once)",
-        "startComment": "# 2. Start the Mikka client; it reports the Agents installed here"
+        "startComment": "# 2. Start the daemon; it reports the Agents installed here"
       },
       "sshExitCode": "ssh exited with code {code}",
       "noNode": "node is not installed on this machine",
       "noPnpm": "pnpm is not installed on this machine",
-      "copyDaemon": "Copying the Mikka client to ~/.mikka",
+      "copyDaemon": "Copying the daemon to ~/.mikka",
       "rsyncExitCode": "rsync exited with code {code}",
       "installExitCode": "pnpm install exited with code {code}",
       "depsInstalled": "Dependencies installed",
       "startExitCode": "Failed to start; exit code {code}",
-      "daemonRunning": "The Mikka client is running in the background",
-      "heartbeatTimeout": "The Mikka client did not connect. Its log is at ~/.mikka/daemon.log",
+      "daemonRunning": "The daemon is running in the background",
+      "heartbeatTimeout": "The daemon did not connect. Its log is at ~/.mikka/daemon.log",
       "connectionError": "The connection failed",
       "commands": {
         "install": "1 Install",
         "login": "2 Sign in",
-        "start": "3 Start"
+        "start": "3 Start",
+        "startAlone": "Start"
       },
       "requirements": "Node.js 24+ · Git",
-      "configurationFailed": "Installation commands are unavailable"
+      "configurationFailed": "Installation commands are unavailable",
+      "reconnectTitle": "Reconnect"
     },
     "setup": "Set up repository and agent",
     "offlineSince": "Offline · {time}",
@@ -869,15 +879,15 @@
     "commands": {
       "sent": {
         "redetect": "Asked {name} to re-detect agents",
-        "restart": "Asked {name} to restart the Mikka client",
-        "update": "Asked {name} to update the Mikka client"
+        "restart": "Asked {name} to restart the daemon",
+        "update": "Asked {name} to update the daemon"
       },
       "queued": "{name} is offline; it runs when it reconnects"
     },
     "actions": {
       "rename": "Rename",
-      "restart": "Restart Mikka client",
-      "update": "Update Mikka client",
+      "restart": "Restart daemon",
+      "update": "Update daemon",
       "redetect": "Re-detect agents",
       "remove": "Remove device"
     },
@@ -891,12 +901,13 @@
       "title": "Remove “{name}”?",
       "cancel": "Cancel",
       "confirm": "Remove",
-      "uninstall": "This also uninstalls the Mikka client on {name}; its credentials stop working at once.",
-      "offline": "{name} is offline, so its Mikka client can’t be uninstalled; its credentials stop working at once and it gets no more work.",
-      "uninstalling": "Uninstalling the Mikka client on {name}"
+      "uninstall": "This also uninstalls the daemon on {name}; its credentials stop working at once.",
+      "offline": "{name} is offline, so its daemon can’t be uninstalled; its credentials stop working at once and it gets no more work.",
+      "uninstalling": "Uninstalling the daemon on {name}"
     },
     "ssh": {
       "title": "Add device",
+      "reconnectingThis": "Reconnecting this computer",
       "sshConfig": "SSH config",
       "otherHost": "Other host",
       "host": "Host",
@@ -910,7 +921,7 @@
       "progress": "Install progress",
       "steps": {
         "connect": "Connect",
-        "install": "Install Mikka client",
+        "install": "Install daemon",
         "start": "Start",
         "online": "Online"
       },
@@ -923,8 +934,20 @@
       "hide": "Close",
       "retry": "Retry",
       "done": "Done",
-      "cancelled": "Cancelled"
-    }
+      "cancelled": "Cancelled",
+      "manual": "Connect manually"
+    },
+    "runsModels": "Runs {models}",
+    "runsCount": "{count, plural, one {Runs # preferred model} other {Runs # preferred models}}",
+    "runsNone": "Runs no preferred model",
+    "offlineNoRuns": "Offline · gets no runs",
+    "local": {
+      "adding": "Adding this computer",
+      "online": "This computer is online",
+      "failed": "Couldn't add this computer",
+      "retry": "Retry"
+    },
+    "loading": "Loading devices"
   },
   "Workspace": {
     "loadingEditor": "Loading task editor",
@@ -1054,6 +1077,8 @@
     "executionRuleOrderInvalid": "The execution rule order has changed. Reload and retry.",
     "executionCommandNotFound": "This detection command was not found.",
     "executionAccountUnavailable": "This account is unavailable.",
+    "threadModelUnavailable": "The model this thread ran on is no longer available.",
+    "runModelMissing": "This run has no model.",
     "generic": "Something went wrong. Please try again.",
     "authRequired": "Sign in required",
     "validationGeneric": "Please check the information you entered.",
@@ -1175,6 +1200,9 @@
     "threadCannotContinue": "This thread works on no task, so it can’t run again.",
     "factoryQuestionNeedsAnswerTool": "Use the Factory question answer tool to provide a verifiable response.",
     "savedLoginNotFound": "This login does not exist or was already deleted.",
+    "savedLoginSiteInvalid": "Enter an https site address.",
+    "savedLoginInvalid": "Account and password can't be empty.",
+    "savedLoginsUnavailable": "Saved logins are unavailable right now.",
     "deviceHasActiveRuns": "Threads are running on this device. Stop them before removing it.",
     "workspaceSlugTaken": "This URL is already in use. Choose another.",
     "workspaceIconInvalid": "The icon must be a PNG, JPEG, WebP or GIF image of 200 KB or less.",
@@ -1218,6 +1246,9 @@
     "secretPermissionDenied": "Only workspace admins can do this. Members can add and edit repository secrets and variables.",
     "secretNameTaken": "A secret or variable with this name already exists in this scope.",
     "secretLimitReached": "This workspace has reached the limit of 500 secrets and variables.",
+    "secretImportEmpty": "The .env has no lines that can be added.",
+    "secretImportTooLarge": "The .env file is over 2 MB.",
+    "secretNameShadowsWorkspace": "This workspace already has a secret with this name.",
     "secretsUnavailable": "Secret storage isn't available right now. Please try again later.",
     "e2bKeyInvalid": "This E2B key is invalid or has been revoked.",
     "e2bKeyUnverifiable": "Couldn't verify the key right now. Please try again later.",
@@ -1702,10 +1733,10 @@
       },
       "models": {
         "title": "Models and subscriptions",
-        "keywords": "model subscriptions quota API key provider models allowed order dispatch run location cloud local bots agents"
+        "keywords": "model subscriptions quota API key provider models preferred order dispatch run location cloud local bots agents"
       },
       "logins": {
-        "title": "Logins and keys"
+        "title": "Secrets and logins"
       },
       "privacy": {
         "title": "Data and privacy"
@@ -1894,10 +1925,6 @@
       "updatedAgo": "Updated {minutes} min ago",
       "usedBy": "Used by",
       "quotaWeeklyModel": "Weekly · {model}",
-      "notInUse": "Not in use",
-      "extraUsageOn": "Extra usage is on, so Bots won’t use this subscription",
-      "extraUsageClaudeFix": "Turn it off in claude.ai Settings › Usage",
-      "extraUsageUnverified": "Couldn’t confirm extra usage is off, so Bots won’t use this subscription for now",
       "removeFailed": "The connection could not be removed.",
       "loading": "Loading model subscriptions…",
       "serviceOff": "Model subscriptions are off.",
@@ -1921,7 +1948,8 @@
       "pauseFailed": "The subscription could not be changed.",
       "claudePlan": "Claude {plan}",
       "disconnectTitle": "Disconnect {label}?",
-      "enabled": "On"
+      "enabled": "On",
+      "selectedBy": "{workspace} · Selected for chat:"
     },
     "integrations": {
       "googleSignInTitle": "Google sign-in",
@@ -1949,6 +1977,14 @@
       "githubLinkFailed": "GitHub authorization did not finish. The account is not linked.",
       "githubLinkCancelled": "GitHub authorization was cancelled. The account is not linked.",
       "githubLinkAccountChanged": "The Mikka account changed during authorization. GitHub is not linked.",
+      "githubLinkWaiting": "Waiting for the browser",
+      "githubLinkOtherAccount": "The browser is signed in as {browser}; the app as {app}",
+      "githubLinkUpdateHint": "Update the desktop app to link in one step",
+      "githubOpenBrowser": "Open in browser",
+      "githubSwitchAccount": "Switch account",
+      "githubLinkReady": "The browser is signed in as the app's account",
+      "githubContinueLink": "Continue linking GitHub",
+      "githubLinkExpired": "This link expired. GitHub is not linked.",
       "githubDisconnectFailed": "Could not disconnect GitHub.",
       "githubDescription": "Agents read code, push branches and open pull requests in the repositories you authorize, and read issues and CI checks.",
       "githubConnectionHeading": "Connection",
@@ -1963,13 +1999,6 @@
       "githubVerificationSaved": "Verification command saved",
       "githubAbilitiesHeading": "Abilities",
       "githubAbilitiesSummary": "{count} abilities ({write} write, {read} read)",
-      "githubPermission": {
-        "allow": "Allow",
-        "ask": "Ask",
-        "deny": "Deny"
-      },
-      "githubPermissionFailed": "Could not save",
-      "githubPushByApp": "Set by the GitHub App",
       "githubPrivate": "Private",
       "githubTool": {
         "push": "Push branch",
@@ -2129,9 +2158,7 @@
       "usageError": "Usage could not be read.",
       "usageEmpty": "No usage yet.",
       "delete": "Delete",
-      "deleting": "Deleting…",
       "deleteTitle": "Delete the sign-in for {site}?",
-      "deleteBody": "After this, bots cannot fill this site. Browsers where you are signed in are not affected.",
       "cancel": "Cancel",
       "result": {
         "input_inserted_guarded": "Filled, not submitted",
@@ -2140,8 +2167,15 @@
         "session_applied": "Session restored",
         "denied_or_failed": "Refused or failed"
       },
-      "emptyHow": "No saved site logins yet.",
-      "add": "Add a login in a chat"
+      "add": "Add",
+      "addTitle": "Add website login",
+      "site": "Site",
+      "account": "Account",
+      "password": "Password",
+      "newPassword": "New password",
+      "save": "Save",
+      "changePassword": "Change password",
+      "actions": "Actions for {site}"
     },
     "workspaceLoading": "Loading the workspace…",
     "workspaceUnavailable": "Couldn't load the workspace. Refresh and try again.",
@@ -2180,14 +2214,11 @@
       "loading": "Loading secrets",
       "empty": "No secrets yet.",
       "workspaceGroup": "Workspace",
-      "repositoryGroup": "Repository {repository}",
       "repository": "Repository",
       "edit": "Edit",
       "editNamed": "Edit {name}",
-      "kind": "Type",
       "kinds": {
-        "secret": "Secret",
-        "env": "Environment variable"
+        "secret": "Secret"
       },
       "name": "Name",
       "value": "Value",
@@ -2214,7 +2245,54 @@
         "remove": "Remove",
         "removing": "Removing…",
         "verifying": "Verifying…"
-      }
+      },
+      "bulkAdd": "Bulk add",
+      "bulkTitle": "Bulk add",
+      "filterLabel": "Filter",
+      "filters": {
+        "all": "All",
+        "workspace": "Workspace",
+        "repository": "Repository"
+      },
+      "columns": {
+        "name": "Name",
+        "type": "Type",
+        "scope": "Scope",
+        "note": "Note",
+        "updatedBy": "Updated by",
+        "updatedAt": "Updated",
+        "actions": "Actions"
+      },
+      "actions": "Actions for {name}",
+      "note": "Note",
+      "masked": "Hide in output",
+      "notMasked": "Not hidden",
+      "confirmWorkspace": "Everyone in {workspace} can use {name}?",
+      "confirmWorkspaceMany": "Everyone in {workspace} can use these {count} secrets?",
+      "paste": ".env",
+      "pickFile": "Choose a .env file",
+      "pickFileLimit": "Up to 2 MB",
+      "willAdd": "{count} can be added",
+      "replaceExisting": "Replace existing names",
+      "addCount": "Add {count}",
+      "importDone": "Added {created}, replaced {replaced}, skipped {kept}.",
+      "lineError": {
+        "invalidLine": "Line {line} is not KEY=value",
+        "invalidName": "Line {line} · {name} is not a valid name",
+        "emptyValue": "Line {line} · {name} has no value",
+        "duplicate": "Line {line} · {name} repeats",
+        "reserved": "Line {line} · {name} is reserved",
+        "shadowsWorkspace": "Line {line} · the workspace already has {name}"
+      },
+      "side": {
+        "label": "Whose secrets",
+        "mine": "Mine"
+      },
+      "mineHeading": "My secrets",
+      "addMineTitle": "Add my secret",
+      "shadowConfirm": "{workspace} already has {name}. Use your own value in your runs?",
+      "shadowConfirmMany": "{workspace} already has {names}. Use your own values in your runs?",
+      "useMine": "Use mine"
     },
     "audit": {
       "loading": "Loading audit log",
@@ -2251,7 +2329,8 @@
           "access_changed": "changed access for team {target}"
         },
         "bot": {
-          "permissions_changed": "changed permissions for {target}"
+          "permissions_changed": "changed permissions for {target}",
+          "taken_over": "took over {target}"
         },
         "integration": {
           "permission_changed": "set {integration} to {to}"
@@ -2455,10 +2534,6 @@
         "kimi": "Kimi",
         "custom": "Custom provider"
       },
-      "protocol": {
-        "openai": "OpenAI-compatible",
-        "anthropic": "Anthropic-compatible"
-      },
       "shareLabel": "Share {name} with team members",
       "removeLabel": "Delete {name}",
       "removeTitle": "Delete {name}?",
@@ -2473,31 +2548,48 @@
       "modelsInvalid": "Couldn't fetch models · Key invalid or revoked",
       "modelsUnavailable": "Couldn't fetch models · Provider didn't respond",
       "refetch": "Fetch models again",
-      "refetchLabel": "Fetch models for {name} again"
+      "refetchLabel": "Fetch models for {name} again",
+      "protocolName": {
+        "anthropic": "Anthropic",
+        "openai": "OpenAI"
+      },
+      "protocolAgents": "{protocols} protocol · runs on {agents}",
+      "customAgents": "Pick a protocol to see which Agent runs it",
+      "noResponsesApi": "{protocol} protocol · No Responses API · Codex can't use it",
+      "afterQuotaSection": "When quota runs out"
     },
     "modelOrder": {
-      "title": "Allowed models",
-      "loading": "Loading allowed models…",
+      "title": "Preferred models",
+      "loading": "Loading preferred models…",
       "location": "Run location",
       "local": "Local",
       "cloud": "Cloud",
-      "localDevices": "{count, plural, one {# computer takes runs} other {# computers take runs}}",
-      "cloudNoKey": "No E2B key",
+      "orderCloud": "In order: cloud → servers → computers",
+      "orderLocal": "In order: servers → computers",
+      "first": "{place} first",
+      "noKeyFirst": "No E2B key · {place} first",
+      "nowhere": "Nowhere to run",
       "add": "Add models",
       "addCount": "{count, plural, one {Add # model} other {Add # models}}",
-      "empty": "No allowed models yet",
-      "noCandidates": "No models to add",
-      "removeTitle": "Remove {model}?",
-      "remove": "Remove",
+      "empty": "No preferred models yet",
+      "remove": "Remove from list",
       "ready": "Available",
       "quotaUntil": "Quota used up · back {time}",
-      "noDevice": "No computer can run {harness}",
+      "noDevice": {
+        "none": "No computer connected",
+        "off": "{count, plural, =1 {{device} isn't in scheduling} other {# computers aren't in scheduling}}",
+        "offline": "{count, plural, =1 {{device} is offline} other {# computers are offline}}",
+        "notInstalled": "{count, plural, =1 {{device} doesn't have {harness}} other {# computers don't have {harness}}}",
+        "modelNotReported": "{count, plural, =1 {{device} didn't report this model} other {# computers didn't report this model}}",
+        "needsUpdate": "{count, plural, =1 {{device}'s Mikka needs an update} other {# computers need a Mikka update}}"
+      },
       "blocked": {
         "quota": "Quota used up",
         "expired": "Needs reconnecting",
         "paused": "Subscription turned off",
         "missing": "No longer available",
-        "keyRefused": "Key invalid or revoked"
+        "keyRefused": "Key invalid or revoked",
+        "checking": "Needs check"
       },
       "handle": "Drag {model} (position {position})",
       "rowMenu": "More actions for {model}",
@@ -2520,7 +2612,44 @@
         "deepseek": "DeepSeek",
         "kimi": "Kimi",
         "custom": "Custom provider"
-      }
+      },
+      "setE2BKey": "Add E2B key",
+      "openDevices": "Open devices",
+      "moveFirst": "Move to top",
+      "removed": "Removed {model}",
+      "undo": "Undo",
+      "orderUnsaved": "Order not saved",
+      "e2bKey": "Account E2B key",
+      "e2bKeySet": "Added",
+      "e2bKeyMissing": "Not added",
+      "e2bKeyFill": "Add",
+      "e2bKeyReplace": "Replace",
+      "agentSection": "Agent",
+      "preferredAgent": "Preferred Agent",
+      "preferredAgentHint": "Models both Agents can run use it first",
+      "preferredMark": "Preferred",
+      "onlyAgent": "{agent} only",
+      "bothAgents": "Both Agents",
+      "agentMenu": "Agent for {model}: {agent}",
+      "emptyNoCredential": "No subscription or API key yet",
+      "emptyNoModels": "Subscriptions and API keys have reported no models yet",
+      "connectCredential": "Connect a subscription or add an API key",
+      "openCredentials": "Go to subscriptions and API keys",
+      "checkQuota": "Check allowance",
+      "quotaCheckUnconfirmed": "Subscription allowance is still unconfirmed",
+      "connectSubscription": "Connect subscription",
+      "addApiKey": "Add API key",
+      "enableSubscription": "Enable subscription",
+      "reconnectSubscription": "Reconnect",
+      "openApiKey": "Open API key",
+      "openSubscription": "Open subscription",
+      "description": "Tasks for Agents pick a model in this order"
+    },
+    "loadingPage": "Loading settings",
+    "modelScope": {
+      "account": "Account",
+      "workspace": "Workspace · {name}",
+      "currentWorkspace": "Current workspace"
     }
   },
   "TelegramBot": {
@@ -2852,7 +2981,6 @@
     "label": "Coordinator",
     "conversation": "Conversation with the Coordinator",
     "conversationWith": "Conversation with {name}",
-    "usedTools": "Used {count, plural, one {# tool} other {# tools}}",
     "pendingActions": {
       "label": "Waiting for your approval",
       "send_email": "Send email",
@@ -2910,7 +3038,14 @@
       "reconnect": "Subscription needs reconnecting",
       "quotaUsed": "Subscription quota used up",
       "retry": "Subscription temporarily unavailable",
-      "open": "Models and quota"
+      "open": "Models and subscriptions",
+      "selectionChanged": "Subscription selection expired",
+      "rateLimited": "Subscription rate limited",
+      "accessDenied": "Provider denied subscription access",
+      "modelRejected": "Model request rejected",
+      "quotaChecking": "Subscription usage unconfirmed",
+      "runtimeUnavailable": "Subscription unsupported in this runtime",
+      "modelNotReported": "The cloud computer didn't report this model"
     },
     "quota": {
       "used": "{name} quota used up",
@@ -2918,11 +3053,15 @@
       "resets": "Resets {time}",
       "next": "Next message uses your {key} API key, billed per token",
       "switched": "{name} quota used up. Continued on your {key} API key, billed per token",
+      "pointsSwitched": "Out of points, switched to {model}",
       "revert": "Switch back",
       "addKey": "Add API key to continue",
       "useKey": "Continue with API key",
       "retryAfterReset": "Retry after reset",
-      "continueFailed": "Could not continue"
+      "continueFailed": "Could not continue",
+      "keyBilling": "API key billed per token",
+      "continueUnconfirmed": "Continuation unconfirmed",
+      "continueQueued": "Continuation queued"
     },
     "wakeErrors": {
       "wake_failed": "Reply pending retry",
@@ -2956,12 +3095,18 @@
       "sources": "{count, plural, one {# source} other {# sources}}"
     },
     "sendUncertain": "Delivery not confirmed",
+    "sendOffline": "No connection. Not sent",
     "lengthCount": "{count} / {max}",
     "modelPicker": {
       "label": "Model: {name}",
       "labelUnavailable": "Model: {name}, unavailable",
       "hosted": "Mikka Default",
       "credits": "Credits",
+      "points": "{points} points",
+      "trialLeft": "{count} free left",
+      "hostedUnavailable": "Mikka Default can’t run in this workspace",
+      "changeModel": "Change model",
+      "useMyPoints": "Use my points for this team",
       "apiKey": "API Key",
       "metered": "Pay as you go",
       "shared": "Shared by teammates",
@@ -2971,9 +3116,92 @@
       "notSaved": "Not saved",
       "unknownModel": "Unknown model",
       "refresh": "Refresh models",
-      "refreshFailed": "Refresh failed. Try again"
+      "refreshFailed": "Refresh failed. Try again",
+      "nextMessage": "Next message",
+      "fallback": "Fallback",
+      "checking": "Checking"
     },
-    "empty": "Tell {name} what you need"
+    "empty": "Tell {name} what you need",
+    "events": {
+      "aThread": "A thread",
+      "aTask": "A task",
+      "quoted": "“{title}”",
+      "runEnded": {
+        "succeeded": "finished",
+        "failed": "failed",
+        "stopped": "stopped",
+        "cancelled": "was cancelled",
+        "other": "ended"
+      },
+      "runRetried": "moved to another machine",
+      "runSwitched": "ran out of subscription quota and continues on an API key",
+      "runPaused": "ran out of subscription quota and is paused",
+      "runWaitingDevice": "starts when its computer is back online",
+      "runDeviceBack": "starts now: its computer is back online",
+      "issueMoved": "moved to {status}",
+      "issueChanged": "changed status",
+      "runReport": "reported progress",
+      "runQuestion": "is waiting for your answer",
+      "runBlocked": "is blocked",
+      "artifact": "An Artifact was handed over",
+      "artifactTitled": "“{title}” was handed over",
+      "action": {
+        "done": "Action done",
+        "failed": "Action failed",
+        "declined": "Action declined",
+        "other": "Action updated"
+      },
+      "other": "Something new happened"
+    },
+    "resend": "Send again",
+    "replyRetry": {
+      "unavailable": "Reply retry unavailable",
+      "working": "Reply already processing",
+      "nothingToRetry": "No failed reply to retry",
+      "unconfirmed": "Retry unconfirmed",
+      "queued": "Reply queued"
+    },
+    "activity": {
+      "thinking": "Thinking",
+      "thought": "Thought for {seconds, plural, one {# second} other {# seconds}}",
+      "thoughtStored": "Thought",
+      "tool": "Use a tool",
+      "tools": {
+        "create_issue": "Create task",
+        "create_issue_from_request": "Create task",
+        "update_issue": "Update task",
+        "list_issues": "Look up tasks",
+        "get_issue": "Look up tasks",
+        "dispatch_run": "Start thread",
+        "dispatch_bot_computer": "Start on computer",
+        "list_runs": "Look up threads",
+        "get_run": "Look up threads",
+        "send_to_run": "Message thread",
+        "stop_run": "Stop thread",
+        "web_search": "Search the web",
+        "start_web_subagent": "Open browser",
+        "remember": "Remember",
+        "forget": "Forget",
+        "find_repository": "Find repository",
+        "github_tools": "Look up GitHub",
+        "github_call": "Use GitHub",
+        "list_calendar_events": "Look up calendar",
+        "get_calendar_event": "Look up calendar",
+        "create_calendar_event": "Create event",
+        "update_calendar_event": "Update event",
+        "cancel_calendar_event": "Cancel event",
+        "search_gmail": "Look up email",
+        "read_gmail_message": "Look up email",
+        "send_email": "Send email",
+        "search_slack_messages": "Look up Slack",
+        "read_slack_thread": "Look up Slack",
+        "send_slack_message": "Send Slack message",
+        "search_notion_pages": "Look up Notion",
+        "read_notion_page_blocks": "Look up Notion",
+        "append_notion_paragraph": "Write to Notion",
+        "list_drive_files": "Look up Drive"
+      }
+    }
   },
   "AgentCopy": {
     "pleaseSignInFirst": "Please sign in first.",
@@ -3226,11 +3454,31 @@
     "needsMachineServer": "Connect my server",
     "needsMachineE2B": "Add E2B key",
     "needsModelTitle": "No model can run this task",
-    "needsModelNoModels": "No allowed models yet",
+    "needsModelNoModels": "No preferred models yet",
     "needsModelCloud": "Cloud has no E2B key yet",
-    "needsModelNoDevice": "No computer can run any allowed model",
-    "needsModelUnavailable": "Every allowed model is unavailable right now",
-    "needsModelSettings": "Open Models and subscriptions"
+    "needsModelNoDevice": "No computer can run any preferred model",
+    "needsModelUnavailable": "Every preferred model is unavailable right now",
+    "needsModelDeviceAgent": "This computer doesn't have {agent}",
+    "needsModelDeviceUpdate": "This computer's Mikka needs an update",
+    "needsModelDeviceModel": "This computer didn't report {model}",
+    "needsModelNoComputer": "No computer connected",
+    "needsModelNamedOff": "{device} isn't in scheduling",
+    "needsModelNamedOffline": "{device} is offline",
+    "needsModelNamedAgent": "{device} doesn't have {agent}",
+    "needsModelNamedUpdate": "{device}'s Mikka needs an update",
+    "needsModelNamedModel": "{device} didn't report this model",
+    "needsModelNotOffered": "No subscription or key runs {model} on {agent}",
+    "needsModelAgentNotOffered": "No subscription or key runs {agent}",
+    "needsModelPickedNoDevice": "No computer can run {model} on {agent}",
+    "needsModelPickedUnavailable": "{model} on {agent} is unavailable right now",
+    "needsModelSettings": "Open Models and subscriptions",
+    "repositoryAmbiguousTitle": "Several repositories match {name}",
+    "repositoryNotFoundTitle": "No authorized repository named {name}",
+    "githubInstallMore": "Authorize more repositories on GitHub",
+    "needsModelCloudModelsUnknown": "Cloud template models have not been verified",
+    "needsModelCloudModelNotReported": "The cloud template did not report this model",
+    "needsModelCloudUnavailable": "Cloud execution is temporarily unavailable",
+    "needsModelChecking": "Subscription allowance could not be checked. Try again."
   },
   "IssueThreads": {
     "title": "Threads",
@@ -3250,6 +3498,7 @@
     "steps": "Handed to {harness} · {count, plural, one {# step} other {# steps}}",
     "composer": "Tell {agent} what to do next…",
     "sendFailed": "Not sent. Draft kept",
+    "stop": "Stop",
     "stopping": "Stopping…",
     "stopFailed": "Stop not confirmed",
     "send": "Send",
@@ -3257,6 +3506,18 @@
     "waiting": "Waiting for you",
     "chatTab": "Chat",
     "acceptanceTab": "Acceptance",
+    "changesTab": "Changes",
+    "changesFiles": "{count, plural, one {# file} other {# files}}",
+    "changesFileList": "Files",
+    "changesLongLines": "Long lines",
+    "changesWrap": "Wrap",
+    "changesScroll": "Scroll",
+    "changesUnchanged": "{count, plural, one {# unchanged line} other {# unchanged lines}}",
+    "changesOpenFile": "Open in new tab",
+    "changesBinary": "Binary file",
+    "changesTooLarge": "Too many changes to show",
+    "changesExpandFile": "Expand {name}",
+    "changesCollapseFile": "Collapse {name}",
     "stages": {
       "repository": "Repository",
       "worktree": "Worktree",
@@ -3389,14 +3650,15 @@
       "create": "Create",
       "creating": "Creating…"
     },
-    "searchPlaceholder": "Search bots, chats, groups, tasks and projects",
+    "searchPlaceholder": "Search bots, chats, groups, tasks, threads and projects",
     "searchLabel": "Search everything",
-    "searchDescription": "Search conversations, group chats, tasks and projects. Use the arrow keys to choose and Enter to open.",
+    "searchDescription": "Search conversations, group chats, tasks, threads and projects. Use the arrow keys to choose and Enter to open.",
     "searchEmpty": "Nothing matches",
     "groups": {
       "bots": "Bots",
       "conversations": "Conversations",
       "tasks": "Tasks",
+      "threads": "Threads",
       "projects": "Projects",
       "actions": "Quick actions",
       "groupChats": "Group chats"
@@ -3489,6 +3751,7 @@
       "promptWithContext": "Create a task for me ({context}): {text}",
       "contextDevice": "run it on {device}",
       "device": "Machine",
+      "bot": "Bot to hand it to",
       "noDevice": "No machine connected",
       "offline": "Offline",
       "online": "Online",
@@ -3500,7 +3763,12 @@
       "create": "Create task",
       "sending": "Sending…",
       "failed": "Could not send",
-      "unavailable": "Task creation isn’t turned on for this workspace yet. You can hand the work to Coordinator in chat instead."
+      "unavailable": "Task creation isn’t turned on for this workspace yet. You can hand the work to Coordinator in chat instead.",
+      "notParticipating": "Not taking tasks",
+      "modelUnavailable": "No default model can run",
+      "loadingPlacement": "Checking run settings…",
+      "quotaUnchecked": "Model allowance needs checking",
+      "workspaceDefault": "Use workspace defaults"
     },
     "board": {
       "toolbar": "Board toolbar",
@@ -3742,7 +4010,8 @@
   "MobileHandoff": {
     "title": "Sign in to Mikka",
     "confirm": "Continue with this account",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "openUnconfirmed": "Web handoff unconfirmed"
   },
   "DesktopHandoff": {
     "returnTitle": "Return to Mikka",
@@ -3756,6 +4025,11 @@
   "DeviceAuthorization": {
     "title": "Connect this computer",
     "code": "Terminal verification code",
+    "device": "Computer",
+    "deviceUnreported": "Name not reported",
+    "clientVersion": "Daemon {version}",
+    "access": "Access",
+    "codeMatches": "The terminal shows this same code",
     "continue": "Continue",
     "loading": "Loading…",
     "scope": "Run your threads",
@@ -3764,9 +4038,10 @@
     "approving": "Approving…",
     "approved": "Approved",
     "denied": "Denied",
-    "returnToTerminal": "Return to your terminal to start the Mikka client",
+    "returnToTerminal": "Return to your terminal to start the daemon",
     "done": "Done",
     "invalid": "This code is invalid or expired",
+    "rateLimited": "Too many lookups. Try again in 30 minutes",
     "failed": "Connection failed",
     "enterAgain": "Enter another code",
     "retry": "Retry"
@@ -3833,6 +4108,7 @@
     "thread": "Thread",
     "close": "Close",
     "state": {
+      "accepted": "Accepted",
       "pending": "Waiting for you",
       "approved": "Approved",
       "publishing": "Publishing",
@@ -3920,6 +4196,7 @@
       "production": "Production"
     },
     "textLabel": "{stage} {kind}",
+    "acceptDeliverable": "Accept",
     "accept": "Accept and merge",
     "openOnGitHub": "Open on GitHub",
     "cannotMerge": "Can't merge",
@@ -4050,12 +4327,20 @@
       }
     },
     "refusal": {
+      "verificationRequiredPlain": "Mikka Default needs a verified card",
+      "branded": "Mikka Default: {reason}",
       "verification_required": "<model><mark></mark> Mikka Default</model> needs a verified card",
       "free_allowance_used": "Free allowance used up",
       "points_exhausted": "Points used up",
       "platform_paused": "Free allowance paused",
       "unavailable": "Mikka Default is unavailable",
+      "trialUsed": "Free messages used up",
+      "bindSubscription": "Connect a subscription",
+      "topUp": "Top up",
       "verifyCard": "Verify card",
+      "teamNoPoints": "This team has no points to use",
+      "useMyPoints": "Use my points for this team",
+      "openBilling": "Open billing",
       "useSubscription": "Use my {name} subscription",
       "connect": "Connect <claude></claude> Claude / <openai></openai> ChatGPT subscription"
     }
@@ -4114,6 +4399,12 @@
     "confirm": "Done",
     "nameReply": "Call it {name}",
     "named": "Got it. I'm {name} from now on.",
+    "subscriptionAsk": "Want to bind your Claude or ChatGPT subscription?",
+    "subscriptionHeading": "Bind a subscription",
+    "subscriptionNo": "Not now",
+    "subscriptionContinue": "Continue",
+    "subscriptionReplyDone": "Subscription bound",
+    "subscriptionLater": "OK. You can bind one in Settings later.",
     "computerAsk": "With a cloud computer I can browse the web, and threads can run in the cloud. Turn it on now?",
     "computerYes": "Turn on",
     "computerNo": "Not now",
@@ -4144,5 +4435,24 @@
   },
   "PullRequestsBadge": {
     "label": "{count, plural, one {# pull request} other {# pull requests}}"
+  },
+  "AiElements": {
+    "tool": {
+      "pending": "Pending",
+      "running": "Running",
+      "awaitingApproval": "Awaiting approval",
+      "responded": "Responded",
+      "completed": "Done",
+      "error": "Failed",
+      "denied": "Denied",
+      "parameters": "Input",
+      "result": "Result"
+    },
+    "message": {
+      "copy": "Copy",
+      "copied": "Copied",
+      "copyFailed": "Couldn't copy",
+      "quote": "Quote"
+    }
   }
 }

@@ -22,7 +22,7 @@ interface CardContext {
   /** What the person wrote next, if anything: a choice card marks the option it names. */
   reply?: string
   answer: (text: string) => Promise<boolean>
-  webPath: string
+  webPath: string | null
   sources: Record<string, CitationSource>
   onOpen: (source: CitationSource) => void
 }
@@ -202,7 +202,7 @@ function Questions({ value }: { value: Component }) {
               <Pressable key={option.value} accessibilityRole={question.multiple ? 'checkbox' : 'radio'} accessibilityState={{ checked: on, disabled: !open }} disabled={!open}
                 onPress={() => toggle(question, option.value)} style={({ pressed }) => [styles.option, (pressed || on) && { backgroundColor: colors.bubble }]}>
                 <View style={[styles.tick, question.multiple ? { borderRadius: 6 } : null, on && { backgroundColor: colors.ink }]}>
-                  {on ? <Check size={14} color="#fff" strokeWidth={3} /> : null}
+                  {on ? <Check size={14} color={colors.onInk} strokeWidth={3} /> : null}
                 </View>
                 <Text style={[cardText.body, { flex: 1 }]}>{option.label}</Text>
               </Pressable>
@@ -210,7 +210,7 @@ function Questions({ value }: { value: Component }) {
           })}
           {question.allowCustom ? (
             <TextInput value={custom[question.id] ?? ''} onChangeText={text => setCustom(current => ({ ...current, [question.id]: text }))} editable={open}
-              placeholder="补充其他回答…" placeholderTextColor={colors.tertiary} style={styles.input} />
+              placeholder="补充其他回答…" placeholderTextColor={colors.secondary} style={styles.input} />
           ) : null}
         </View>
       ))}
@@ -360,10 +360,10 @@ function WebOnly({ text }: { text: string }) {
   return (
     <ChatCard>
       {text.trim() ? <Markdown text={text} sources={sources} onOpen={onOpen} /> : null}
-      <Pressable accessibilityRole="link" onPress={() => void openOnWeb(webPath)} style={styles.webLink} hitSlop={6}>
+      {webPath ? <Pressable accessibilityRole="link" onPress={() => void openOnWeb(webPath)} style={styles.webLink} hitSlop={6}>
         <Text style={{ color: colors.accent, fontSize: 15 }}>在网页上打开</Text>
         <ArrowUpRight size={16} color={colors.accent} strokeWidth={2} />
-      </Pressable>
+      </Pressable> : null}
     </ChatCard>
   )
 }

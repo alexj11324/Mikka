@@ -1,12 +1,13 @@
 'use server'
 
 import { pool } from '@/lib/db'
+import { ExecutionSettings } from '@/lib/execution-settings'
 import { requireUser } from '@/lib/issue-access'
-import { changeOrder, orderView, type OrderChange, type OrderView } from '@/lib/model-order'
+import { changeOrder, checkOrderQuota, orderView, type OrderChange, type OrderView } from '@/lib/model-order'
 import { loadWorkspaceContext } from '@/lib/workspace-access'
 import { settingsWorkspaceAction, type SettingsActionResult } from '@/lib/workspace-admin/settings-action'
 
-// 设置 › 模型与订阅 › 允许使用的模型 and 运行位置 (decision 2026-11-02-1400): the
+// 设置 › 模型与订阅 › 优先使用的模型 and 运行位置 (decision 2026-11-02-1400): the
 // signed-in person's own list in the workspace the page shows.
 
 async function scope(workspaceId?: string) {
@@ -16,7 +17,17 @@ async function scope(workspaceId?: string) {
 }
 
 export async function getModelOrder(workspaceId?: string): Promise<SettingsActionResult<OrderView>> {
-  return settingsWorkspaceAction(async () => orderView(pool, await scope(workspaceId)))
+  return settingsWorkspaceAction(async () => {
+    const target = await scope(workspaceId)
+    // A subscription never asked for its models has no candidates yet: ask it before reading the list.
+    await new ExecutionSettings(pool).ensureCatalogues(target)
+    return orderView(pool, target)
+  })
+}
+
+/** Checks a currently allowed subscription; its owner is derived server-side. */
+export async function checkModelOrderQuota(connectionId: string, workspaceId?: string): Promise<SettingsActionResult<OrderView>> {
+  return settingsWorkspaceAction(async () => checkOrderQuota(pool, await scope(workspaceId), connectionId))
 }
 
 /** One change (add, remove, reorder, 运行位置); the page gets the list back as saved. */

@@ -51,6 +51,7 @@ export async function latestTaskRun(query: Query, userId: string, issueId: strin
     LEFT JOIN device_repos d ON d.id=r."deviceRepoId"
     LEFT JOIN computer_run_bindings b ON b."runId"=r.id AND b."ownerId"=r."userId"
     WHERE r."userId"=$1 AND r."issueId"=$2 AND r.kind<>'group_chat'
+      AND NOT EXISTS (SELECT 1 FROM factory_attempts fa WHERE fa."runId"=r.id AND fa.stage IN ('review','verify','monitor'))
     ORDER BY r."createdAt" DESC,r.id DESC LIMIT 1`, [userId, issueId])
   if (!run) return null
   const { cloudWorkspaceId, cloudBotId, ...rest } = run
@@ -105,7 +106,8 @@ export async function dispatchToTask<R extends { runId: string }, E extends { er
   /** The dispatch names another place than where the thread ran: moving a thread is a new thread, granted the same way. */
   moves?: (previous: TaskThreadRun) => Promise<boolean>
   explicit?: () => Promise<boolean>
-  start: (previous: TaskThreadRun | null, note: string | undefined) => Promise<R | E>
+  /** `replaces`: the thread a new thread replaces, so it can keep that thread's repository when none is named. */
+  start: (previous: TaskThreadRun | null, note: string | undefined, replaces?: TaskThreadRun) => Promise<R | E>
 }): Promise<ThreadDispatch<R> | E> {
   // An error the caller can act on (no machine, say) queued nothing; it goes back as it is.
   const queued = (result: R | E): result is R => 'runId' in result && typeof result.runId === 'string'
@@ -118,11 +120,13 @@ export async function dispatchToTask<R extends { runId: string }, E extends { er
     const chain = await readRunChain(pool, userId, previous.id)
     const threadId = chain?.rootRunId ?? previous.id
     const working = UNFINISHED_RUN_STATUSES.some(status => status === previous.status)
-    const wantsNew = input.newThread || (await input.moves?.(previous) ?? false)
+    // A move is judged even when the caller asked for a new thread: the person naming the other place is what grants it.
+    const moves = await input.moves?.(previous) ?? false
+    const wantsNew = input.newThread || moves
     if (wantsNew && await (input.explicit?.() ?? Promise.resolve(false))) {
       // The old thread stops; one thread works on a task at a time.
       if (working && !previous.stopRequestedAt) await (await import('@/lib/agent-runs')).requestRunStop(userId, previous.id).catch(() => undefined)
-      const result = await input.start(null, input.note)
+      const result = await input.start(null, input.note, previous)
       if (!queued(result)) return result
       await db.execute((await import('drizzle-orm')).sql`UPDATE agent_runs SET "threadReplacedBy"=${result.runId}::uuid,"updatedAt"=now() WHERE id=${threadId}::uuid AND "userId"=${userId}`)
       return { ...result, thread: 'new' as const, threadId: result.runId, replacedThreadId: threadId }
