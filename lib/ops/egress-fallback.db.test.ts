@@ -51,7 +51,7 @@ test('durable fallback survives concurrent ticks, respects due/retry times and n
   let deliveries = 0
   globalThis.fetch = async () => { deliveries++; return new Response(null, { status: 204 }) }
   let operational: Awaited<ReturnType<typeof collectOperationalSignals>>
-  try { operational = await collectOperationalSignals(pool, { sink: 'https://fixture.invalid/alerts' }) }
+  try { operational = await collectOperationalSignals(pool, { sink: 'http://127.0.0.1:1/alerts' }) }
   finally { globalThis.fetch = originalFetch }
   assert.equal(deliveries, 0, 'reserved collector metadata cannot produce an operational notification')
   assert.ok(operational.transitions.every(event => event.id !== '__providerEgressCollector'))
