@@ -20,6 +20,41 @@ ANCESTOR = "627f9af9e1a1e76154e6343aeb72c110a53f3e28"
 WORKSPACE = "de300000-154f-4875-832f-70e7ffc3b62b"
 SHA = re.compile(r"^[0-9a-f]{64}$")
 COMMIT = re.compile(r"^[0-9a-f]{40}$")
+ERROR_CODES = frozenset((
+    "path_rejected", "file_shape_rejected", "file_changed_during_read",
+    "git_check_failed", "git_output_too_large", "fixed_scope_rejected", "worktree_rejected",
+    "retained_file_changed", "git_head_rejected", "before_git_head_changed", "snapshot_file_changed",
+    "worker_receipt_rejected", "journal_scope_rejected", "ledger_scope_rejected",
+    "prefix_manifest_rejected", "session_folder_rejected", "history_size_rejected",
+    "session_id_rejected", "session_history_missing", "input_rejected", "physical_probe_failed",
+))
+STAGES = frozenset(("worktree", "file", "git", "worker_receipt", "journal", "ledger", "session_history"))
+current_stage = "worktree"
+
+
+def safe_failure(error):
+    # Only fixed classes/codes; never filenames, subprocess output, or str(error)
+    # from an OS/provider exception. JSON syntax errors are ValueError subclasses.
+    code = "physical_probe_failed"
+    if isinstance(error, FileNotFoundError):
+        kind = "missing_file"
+    elif isinstance(error, PermissionError):
+        kind = "permission_denied"
+    elif isinstance(error, subprocess.TimeoutExpired):
+        kind = "command_timeout"
+    elif isinstance(error, json.JSONDecodeError):
+        kind = "invalid_json"
+    elif isinstance(error, UnicodeDecodeError):
+        kind = "invalid_encoding"
+    elif type(error) is ValueError and str(error) in ERROR_CODES:
+        code, kind = str(error), "guard"
+    elif isinstance(error, OSError):
+        kind = "os_error"
+    elif isinstance(error, (KeyError, TypeError, AttributeError)):
+        kind = "invalid_structure"
+    else:
+        kind = "unknown"
+    return {"error": code, "stage": current_stage if current_stage in STAGES else "worktree", "kind": kind}
 
 
 def require(condition, code):
@@ -73,6 +108,8 @@ def git(*args, allowed=(0,)):
 
 
 def collect(config):
+    global current_stage
+    current_stage = "worktree"
     target = config.get("target", {})
     require(config.get("phase") in ("before", "after") and
             target.get("sandboxId") == "itxw486q7r74fasogje2v" and
@@ -80,8 +117,10 @@ def collect(config):
             target.get("sessionId") == SID and target.get("filename") == FILE,
             "fixed_scope_rejected")
     require(WORKTREE.resolve(strict=True) == WORKTREE and WORKTREE.is_dir(), "worktree_rejected")
+    current_stage = "file"
     data = regular_bytes(WORKTREE / FILE, 1024)
     require(len(data) == 85 and digest(data) == FILE_HASH, "retained_file_changed")
+    current_stage = "git"
     head = git("rev-parse", "HEAD").decode("ascii").strip()
     require(COMMIT.fullmatch(head), "git_head_rejected")
     if config["phase"] == "before":
@@ -92,17 +131,20 @@ def collect(config):
     snapshot_file = git("cat-file", "blob", SNAPSHOT + ":" + FILE)
     require(digest(snapshot_file) == FILE_HASH, "snapshot_file_changed")
     tracked_status = git("status", "--porcelain=v1", "--untracked-files=no", "--ignore-submodules=all")
+    current_stage = "worker_receipt"
     worker_sha = regular_bytes(Path("/opt/mikka/worker-source-sha"), 100).decode("ascii").strip()
     require(COMMIT.fullmatch(worker_sha), "worker_receipt_rejected")
 
     # Never select assignment, tokens, raw error, prompt, taskEnv or credentials.
     # runs.json is hashed locally as a whole; only the named safe projection
     # of the two original entries is emitted, not the parsed JSON document.
+    current_stage = "journal"
     journal_bytes = regular_bytes(ROOT / "runs.json")
     journal = json.loads(journal_bytes).get("runs", {})
     journals = []
     ledgers = []
     for index, run_id in enumerate(RUNS):
+        current_stage = "journal"
         entry = journal.get(run_id, {})
         require(entry.get("sessionId") == SID and entry.get("worktree") == str(WORKTREE) and
                 entry.get("state") == ("stopped" if index == 0 else "failed"), "journal_scope_rejected")
@@ -113,6 +155,7 @@ def collect(config):
             "runId": run_id, "state": entry["state"], "sessionId": SID,
             "worktree": str(WORKTREE), "projectionSha256": digest(canonical(projection)),
         })
+        current_stage = "ledger"
         ledger_bytes = regular_bytes(ROOT / "adapters/native-ledgers" / (run_id + ".json"), 1024 * 1024)
         ledger = json.loads(ledger_bytes)
         scope = ledger.get("scope", {})
@@ -129,6 +172,7 @@ def collect(config):
 
     # Only the original SID's JSONL files under C7/e57's two history folders.
     # No auth/config/bootstrap files, log SQLite, or general home directory scan.
+    current_stage = "session_history"
     prefixes = config.get("prefixes", [])
     require(isinstance(prefixes, list) and len(prefixes) <= 64, "prefix_manifest_rejected")
     for row in prefixes:
@@ -185,7 +229,5 @@ if __name__ == "__main__":
         result = collect(json.loads(base64.b64decode(sys.argv[1], validate=True)))
         print(json.dumps(result, separators=(",", ":")))
     except Exception as error:
-        # Never return raw exception text, traceback, filesystem data or stderr.
-        code = str(error) if isinstance(error, ValueError) and re.fullmatch(r"[a-z_]{1,64}", str(error)) else "physical_probe_failed"
-        print(json.dumps({"error": code}, separators=(",", ":")))
+        print(json.dumps(safe_failure(error), separators=(",", ":")))
         sys.exit(1)

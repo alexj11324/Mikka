@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import { CommandExitError, TimeoutError } from 'e2b';
 import {
   TARGET, AUTHORITY, EvidenceError, assertSandbox, executionContext, loadCredentials, readScope, SCOPE_SQL,
-  validateScope, validatePhysical, baselineForAfter, compareAfter, collect,
+  validateScope, validatePhysical, baselineForAfter, compareAfter, collect, runPhysicalCommand,
 } from './issue-1166-physical-evidence.mjs';
 
 const id = '12345678-1234-1234-1234-123456789abc';
@@ -99,7 +100,8 @@ function harness(options = {}) {
         connect: async () => {
           calls.push('connect'); state = 'running';
           options.afterConnect?.();
-          if (options.connectError) throw new Error('secret-provider-response');
+          if (options.connectError) throw options.connectError instanceof Error
+            ? options.connectError : new Error('secret-provider-response');
           return { sandboxId: TARGET.sandboxId };
         },
         pause: async () => {
@@ -253,6 +255,8 @@ test('successful before collection confirms same VM paused before reporting pass
   const result = await collect(h.args);
   assert.equal(result.outcome, 'passed');
   assert.equal(result.restoration, 'confirmed_paused');
+  assert.equal(result.pauseRequested, true);
+  assert.equal(result.finalProvider.state, 'paused');
   assert.deepEqual(h.calls, ['read', 'info', 'read', 'connect', 'read', 'probe',
     'read', 'read', 'info', 'read', 'pause', 'info']);
 });
@@ -272,10 +276,92 @@ test('connect error may have resumed the VM, so unchanged custody still restores
   assert.equal(h.calls.includes('probe'), false);
   assert.equal(h.calls.includes('pause'), true);
 });
+const commandProbe = response => () => runPhysicalCommand({
+  sandboxId: TARGET.sandboxId,
+  commands: { run: async () => typeof response === 'function' ? response() : response },
+}, 'offline-fixture', new AbortController().signal);
+test('actual SDK timeout at connect is distinct from a failed after-connect database read', async () => {
+  const timeout = harness({ connectError: new TimeoutError('secret-provider-response') });
+  const first = await collect(timeout.args);
+  assert.equal(first.failureStage, 'connect');
+  assert.equal(first.errorKind, 'timeout');
+  assert.equal(first.restoration, 'confirmed_paused');
+  const database = harness({ read: n => {
+    if (n === 3) throw new Error('secret-provider-response');
+    return scope();
+  } });
+  const second = await collect(database.args);
+  assert.equal(second.failureStage, 'after_connect_scope');
+  assert.equal(second.errorKind, 'unknown');
+  assert.equal(second.restoration, 'confirmed_paused');
+});
+test('actual SDK CommandExitError preserves only fixed Python stage/kind/code and numeric exit', async () => {
+  const error = new CommandExitError({
+    exitCode: 1, error: 'secret-provider-response', stderr: 'secret-provider-response',
+    stdout: JSON.stringify({ error: 'physical_probe_failed', stage: 'worker_receipt', kind: 'missing_file' }) + '\n',
+  });
+  let stderrRead = false;
+  Object.defineProperty(error, 'stderr', { get() { stderrRead = true; return 'secret-provider-response'; } });
+  const h = harness({ probe: commandProbe(() => { throw error; }) });
+  const result = await collect(h.args);
+  assert.deepEqual({
+    stage: result.failureStage, kind: result.errorKind, code: result.failure,
+    probeStage: result.probeStage, probeKind: result.probeErrorKind, exit: result.commandExitCode,
+  }, { stage: 'probe_exit', kind: 'command_exit', code: 'physical_probe_failed',
+    probeStage: 'worker_receipt', probeKind: 'missing_file', exit: 1 });
+  assert.equal(stderrRead, false);
+  assert.equal(result.restoration, 'confirmed_paused');
+  assert.equal(JSON.stringify(result).includes('secret-provider-response'), false);
+});
+test('probe RPC timeout, invalid JSON and failed physical validation have distinct fixed stages', async () => {
+  for (const [response, stage, kind, code] of [
+    [() => { throw new TimeoutError('secret-provider-response'); }, 'probe_rpc', 'timeout', 'operation_failed'],
+    [{ exitCode: 0, stderr: '', stdout: 'invalid secret-provider-response' }, 'probe_json', 'invalid_json', 'physical_probe_json_invalid'],
+    [{ exitCode: 0, stderr: '', stdout: JSON.stringify({ ...physical(), sessionId: 'wrong' }) }, 'probe_validate', 'guard', 'physical_schema_rejected'],
+  ]) {
+    const h = harness({ probe: commandProbe(response) });
+    const result = await collect(h.args);
+    assert.equal(result.failureStage, stage);
+    assert.equal(result.errorKind, kind);
+    assert.equal(result.failure, code);
+    assert.equal(result.restoration, 'confirmed_paused');
+  }
+});
+test('command stdout must be bounded exact Python failure JSON; arbitrary output never enters reports', async () => {
+  for (const stdout of [
+    JSON.stringify({ error: 'journal_scope_rejected', stage: 'journal', kind: 'guard', extra: 'secret-provider-response' }),
+    JSON.stringify({ error: 'secret_provider_response', stage: 'journal', kind: 'guard' }),
+    JSON.stringify({ error: 'physical_probe_failed', stage: 'secret-provider-response', kind: 'missing_file' }),
+    JSON.stringify({ error: 'physical_probe_failed', stage: 'ledger', kind: 'secret-provider-response' }),
+    'secret-provider-response',
+    ' '.repeat(1024) + '{"error":"path_rejected","stage":"file","kind":"guard"}',
+  ]) {
+    const error = new CommandExitError({ exitCode: 1, error: 'secret-provider-response', stderr: '', stdout });
+    const result = await collect(harness({ probe: commandProbe(() => { throw error; }) }).args);
+    assert.equal(result.failureStage, 'probe_exit');
+    assert.equal(result.failure, 'physical_probe_failed');
+    assert.equal(Object.hasOwn(result, 'probeStage'), false);
+    assert.equal(JSON.stringify(result).includes('secret-provider-response'), false);
+  }
+});
+test('an arbitrary exception cannot impersonate SDK errors or cause provider body/stdout reads', async () => {
+  const error = new Error('secret-provider-response');
+  error.name = 'CommandExitError';
+  let sensitiveRead = false;
+  for (const key of ['stdout', 'stderr', 'body', 'response', 'cause']) {
+    Object.defineProperty(error, key, { get() { sensitiveRead = true; throw new Error('must not read'); } });
+  }
+  const result = await collect(harness({ probe: commandProbe(() => { throw error; }) }).args);
+  assert.equal(result.failureStage, 'probe_rpc');
+  assert.equal(result.errorKind, 'unknown');
+  assert.equal(sensitiveRead, false);
+  assert.equal(result.restoration, 'confirmed_paused');
+});
 test('scope drift after connect aborts before probe and never pauses the new owner', async () => {
   const h = harness({ read: n => ({ ...scope(), taskRevision: n >= 3 ? 14 : 13 }) });
   const result = await collect(h.args);
   assert.equal(result.failure, 'scope_changed');
+  assert.equal(result.failureStage, 'after_connect_scope');
   assert.equal(result.restoration, 'skipped_scope_changed');
   assert.equal(h.calls.includes('probe'), false);
   assert.equal(h.calls.includes('pause'), false);
@@ -303,6 +389,8 @@ test('database unavailable during cleanup never guesses that it still owns the V
   const result = await collect(h.args);
   assert.equal(result.outcome, 'failed');
   assert.equal(result.restoration, 'unconfirmed');
+  assert.equal(result.restorationFailureStage, 'restoration_scope');
+  assert.equal(result.restorationErrorKind, 'unknown');
   assert.equal(h.calls.includes('pause'), false);
 });
 test('a running VM at entry is inspected only, never connected or paused', async () => {
@@ -345,6 +433,8 @@ test('provider accepting pause without paused getInfo is not successful restorat
   assert.equal(result.outcome, 'failed');
   assert.equal(result.restoration, 'unconfirmed');
   assert.equal(result.restorationFailure, 'pause_not_confirmed');
+  assert.equal(result.restorationFailureStage, 'restoration_verify');
+  assert.equal(result.restorationErrorKind, 'guard');
 });
 test('scope watcher aborts a still-running physical probe when business becomes active', async () => {
   const h = harness({
@@ -353,6 +443,7 @@ test('scope watcher aborts a still-running physical probe when business becomes 
   });
   const result = await collect(h.args);
   assert.equal(result.failure, 'scope_not_idle');
+  assert.equal(result.failureStage, 'probe_scope');
   assert.equal(result.restoration, 'skipped_scope_changed');
   assert.equal(h.calls.includes('pause'), false);
 });

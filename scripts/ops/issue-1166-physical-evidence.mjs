@@ -5,6 +5,10 @@ import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { setTimeout as delay } from 'node:timers/promises';
 import { pathToFileURL } from 'node:url';
+import {
+  AuthenticationError, CommandExitError, NotFoundError, RateLimitError,
+  SandboxError, SandboxNotFoundError, SandboxNotRunningError, ServiceBusyError, TimeoutError,
+} from 'e2b';
 
 export const TARGET = Object.freeze({
   repository: 'alexj11324/Mikka',
@@ -54,6 +58,94 @@ const fail = code => { throw new EvidenceError(code); };
 const requireThat = (condition, code) => { if (!condition) fail(code); };
 // Provider/SQL error messages, causes, response bodies and stacks never leave.
 const errorCode = error => error instanceof EvidenceError ? error.code : 'operation_failed';
+class StagedFailure extends EvidenceError {
+  constructor(code, stage, kind, details = {}) {
+    super(code);
+    this.failureStage = stage;
+    this.errorKind = kind;
+    Object.assign(this, details);
+  }
+}
+export function classifyErrorKind(error) {
+  if (error instanceof EvidenceError) return 'guard';
+  if (error instanceof CommandExitError) return 'command_exit';
+  if (error instanceof TimeoutError) return 'timeout';
+  if (error instanceof AuthenticationError) return 'authentication';
+  if (error instanceof RateLimitError) return 'rate_limited';
+  if (error instanceof ServiceBusyError) return 'service_busy';
+  if (error instanceof SandboxNotRunningError) return 'sandbox_not_running';
+  if (error instanceof SandboxNotFoundError || error instanceof NotFoundError) return 'not_found';
+  if (error instanceof SandboxError) return 'sandbox_error';
+  if (error instanceof DOMException && error.name === 'AbortError') return 'aborted';
+  if (error instanceof DOMException && error.name === 'TimeoutError') return 'timeout';
+  return 'unknown';
+}
+async function atStage(stage, action) {
+  try { return await action(); }
+  catch (error) {
+    if (error instanceof StagedFailure) throw error;
+    throw new StagedFailure(errorCode(error), stage, classifyErrorKind(error));
+  }
+}
+function failureFields(error) {
+  const safe = error instanceof StagedFailure ? error
+    : new StagedFailure(errorCode(error), 'collection', classifyErrorKind(error));
+  return {
+    failure: safe.code, failureStage: safe.failureStage, errorKind: safe.errorKind,
+    ...(safe.probeStage ? { probeStage: safe.probeStage, probeErrorKind: safe.probeErrorKind } : {}),
+    ...(safe.commandExitCode !== undefined ? { commandExitCode: safe.commandExitCode } : {}),
+  };
+}
+const PYTHON_ERROR_CODES = new Set([
+  'path_rejected', 'file_shape_rejected', 'file_changed_during_read',
+  'git_check_failed', 'git_output_too_large', 'fixed_scope_rejected', 'worktree_rejected',
+  'retained_file_changed', 'git_head_rejected', 'before_git_head_changed', 'snapshot_file_changed',
+  'worker_receipt_rejected', 'journal_scope_rejected', 'ledger_scope_rejected',
+  'prefix_manifest_rejected', 'session_folder_rejected', 'history_size_rejected',
+  'session_id_rejected', 'session_history_missing', 'input_rejected', 'physical_probe_failed',
+]);
+const PYTHON_STAGES = new Set(['worktree', 'file', 'git', 'worker_receipt', 'journal', 'ledger', 'session_history']);
+const PYTHON_ERROR_KINDS = new Set([
+  'missing_file', 'permission_denied', 'command_timeout', 'invalid_json', 'invalid_encoding',
+  'guard', 'os_error', 'invalid_structure', 'unknown',
+]);
+function pythonFailure(stdout) {
+  if (typeof stdout !== 'string' || Buffer.byteLength(stdout) > 1024) return null;
+  try {
+    const value = JSON.parse(stdout);
+    if (!value || typeof value !== 'object' || Array.isArray(value) ||
+      Object.keys(value).sort().join(',') !== 'error,kind,stage' ||
+      !PYTHON_ERROR_CODES.has(value.error) || !PYTHON_STAGES.has(value.stage) ||
+      !PYTHON_ERROR_KINDS.has(value.kind)) return null;
+    return { code: value.error, probeStage: value.stage, probeErrorKind: value.kind };
+  } catch { return null; }
+}
+export async function runPhysicalCommand(sandbox, command, signal) {
+  assertSandbox(sandbox.sandboxId);
+  let result;
+  try {
+    result = await sandbox.commands.run(command, { user: 'root', timeoutMs: 25_000,
+      requestTimeoutMs: 10_000, signal: AbortSignal.any([signal, AbortSignal.timeout(30_000)]) });
+  } catch (error) {
+    // Only the actual pinned SDK's command-exit type exposes probe stdout.
+    // Other provider exceptions are classified by type, never message/body.
+    if (!(error instanceof CommandExitError)) {
+      throw new StagedFailure(errorCode(error), 'probe_rpc', classifyErrorKind(error));
+    }
+    const parsed = pythonFailure(error.stdout);
+    const exitCode = error.exitCode;
+    throw new StagedFailure(parsed?.code ?? 'physical_probe_failed', 'probe_exit', 'command_exit', {
+      ...(parsed ? { probeStage: parsed.probeStage, probeErrorKind: parsed.probeErrorKind } : {}),
+      ...(Number.isInteger(exitCode) && exitCode >= 0 && exitCode <= 255 ? { commandExitCode: exitCode } : {}),
+    });
+  }
+  return atStage('probe_json', () => {
+    requireThat(result.exitCode === 0 && result.stderr === '' &&
+      typeof result.stdout === 'string' && result.stdout.length <= 128 * 1024, 'physical_probe_failed');
+    try { return JSON.parse(result.stdout); }
+    catch { throw new StagedFailure('physical_probe_json_invalid', 'probe_json', 'invalid_json'); }
+  });
+}
 
 export function assertSandbox(id) {
   requireThat(id !== TARGET.protectedSandboxId && id === TARGET.sandboxId, 'sandbox_not_authorized');
@@ -377,30 +469,32 @@ export async function collect({ context, read, provider, probe, baseline = null,
     version: 1, phase: context.phase, execution: context,
     target: { sandboxId: TARGET.sandboxId, questionId: TARGET.questionId,
       originRunId: TARGET.originRunId, failedRunId: TARGET.failedRunId, sessionId: TARGET.sessionId },
-    outcome: 'failed', restoration: 'not_needed', startedAt: new Date().toISOString(),
+    outcome: 'failed', restoration: 'not_needed', pauseRequested: false, startedAt: new Date().toISOString(),
   };
   let scope, scopeHash, connectAttempted = false;
-  const check = async () => {
+  const check = stage => atStage(stage, async () => {
     const next = validateScope(await read(), context);
     requireThat(fingerprint(next) === scopeHash, 'scope_changed');
     return next;
-  };
+  });
   try {
-    scope = validateScope(await read(), context, { idle: false });
+    scope = await atStage('initial_scope', async () => validateScope(await read(), context, { idle: false }));
     report.scope = scope;
     report.scopeSha256 = scopeHash = fingerprint(scope);
     // For an active after run, getInfo is the only provider call.
-    report.initialProvider = validateInfo(await provider.info());
-    validateScope(scope, context);
-    requireThat(report.initialProvider.state === 'paused', 'provider_not_paused');
-    signal?.throwIfAborted();
-    await check();
+    report.initialProvider = await atStage('provider_info', async () => validateInfo(await provider.info()));
+    await atStage('before_connect_scope', () => {
+      validateScope(scope, context);
+      requireThat(report.initialProvider.state === 'paused', 'provider_not_paused');
+      signal?.throwIfAborted();
+    });
+    await check('before_connect_scope');
     connectAttempted = true; // A lost response may still have resumed the VM.
     report.restoration = 'pending';
-    await checkpoint(report);
-    const sandbox = await provider.connect(signal);
-    signal?.throwIfAborted();
-    await check();
+    await atStage('checkpoint', () => checkpoint(report));
+    const sandbox = await atStage('connect', () => provider.connect(signal));
+    await atStage('after_connect_scope', () => signal?.throwIfAborted());
+    await check('after_connect_scope');
     const monitorAbort = new AbortController();
     const probeAbort = new AbortController();
     const onAbort = () => probeAbort.abort();
@@ -408,51 +502,63 @@ export async function collect({ context, read, provider, probe, baseline = null,
     const monitor = async () => {
       while (!monitorAbort.signal.aborted) {
         await delay(1000, undefined, { signal: monitorAbort.signal });
-        await check();
+        await check('probe_scope');
       }
     };
     const monitorPromise = monitor();
     try {
-      report.physical = validatePhysical(await Promise.race([
-        probe(sandbox, baseline?.physical ?? null, probeAbort.signal), monitorPromise,
-      ]));
+      const raw = await Promise.race([
+        atStage('probe_rpc', () => probe(sandbox, baseline?.physical ?? null, probeAbort.signal)), monitorPromise,
+      ]);
+      report.physical = await atStage('probe_validate', () => validatePhysical(raw));
     } finally {
       probeAbort.abort();
       monitorAbort.abort();
       await monitorPromise.catch(() => {});
       signal?.removeEventListener('abort', onAbort);
     }
-    signal?.throwIfAborted();
-    await check();
-    if (context.phase === 'before') requireThat(report.physical.git.head === TARGET.snapshot, 'before_git_head_changed');
+    await atStage('after_probe_scope', () => signal?.throwIfAborted());
+    await check('after_probe_scope');
+    if (context.phase === 'before') await atStage('probe_validate', () =>
+      requireThat(report.physical.git.head === TARGET.snapshot, 'before_git_head_changed'));
     if (context.phase === 'after') {
-      requireThat(baseline !== null, 'before_report_missing');
-      compareAfter(baseline, scope, report.physical);
+      await atStage('compare_after', () => {
+        requireThat(baseline !== null, 'before_report_missing');
+        compareAfter(baseline, scope, report.physical);
+      });
       report.comparison = 'original_rows_ledgers_journals_and_session_prefixes_preserved';
     }
     report.outcome = 'passed';
   } catch (error) {
-    report.failure = errorCode(error);
+    Object.assign(report, failureFields(error));
   } finally {
     if (connectAttempted) {
       try {
         // No SQL lease/lock is acquired. Never pause if business has taken over.
-        await check();
-        const info = validateInfo(await provider.info());
+        await check('restoration_scope');
+        const info = await atStage('restoration_info', async () => validateInfo(await provider.info()));
         if (info.state !== 'paused') {
-          requireThat(info.state === 'running', 'provider_state_changed');
-          await check(); // Freshest possible read before the external mutation.
-          await provider.pause();
+          await atStage('restoration_info', () => requireThat(info.state === 'running', 'provider_state_changed'));
+          await check('restoration_before_pause_scope'); // Freshest read before the external mutation.
+          report.pauseRequested = true;
+          await atStage('restoration_pause', () => provider.pause());
         }
-        const restored = validateInfo(await provider.info());
-        requireThat(restored.state === 'paused', 'pause_not_confirmed');
+        const restored = await atStage('restoration_verify', async () => {
+          const info = validateInfo(await provider.info());
+          requireThat(info.state === 'paused', 'pause_not_confirmed');
+          return info;
+        });
+        report.finalProvider = restored;
         report.restoration = 'confirmed_paused';
       } catch (error) {
         report.outcome = 'failed';
         report.restoration = error instanceof EvidenceError &&
           (error.code.startsWith('scope_') || error.code === 'sandbox_not_authorized')
           ? 'skipped_scope_changed' : 'unconfirmed';
-        report.restorationFailure = errorCode(error);
+        const diagnostic = failureFields(error);
+        report.restorationFailure = diagnostic.failure;
+        report.restorationFailureStage = diagnostic.failureStage;
+        report.restorationErrorKind = diagnostic.errorKind;
       }
     }
     report.finishedAt = new Date().toISOString();
@@ -511,17 +617,18 @@ async function main() {
           prefixes: before?.sessions ?? [] })).toString('base64');
         const command = "timeout --signal=TERM --kill-after=2s 20s /usr/bin/python3 -B - '" +
           input + "' <<'MIKKA_EVIDENCE_PY'\n" + python + "\nMIKKA_EVIDENCE_PY";
-        const result = await sandbox.commands.run(command, { user: 'root', timeoutMs: 25_000,
-          requestTimeoutMs: 10_000, signal: AbortSignal.any([signal, AbortSignal.timeout(30_000)]) });
-        requireThat(result.exitCode === 0 && result.stderr === '' &&
-          result.stdout.length <= 128 * 1024, 'physical_probe_failed');
-        return JSON.parse(result.stdout);
+        return runPhysicalCommand(sandbox, command, signal);
       },
       checkpoint: report => writeFile('physical-evidence-report/evidence.json',
         JSON.stringify(report, null, 2) + '\n', { mode: 0o600 }),
     });
     console.log(JSON.stringify({ phase: report.phase, outcome: report.outcome,
       failure: report.failure ?? null, restoration: report.restoration,
+      failureStage: report.failureStage ?? null, errorKind: report.errorKind ?? null,
+      probeStage: report.probeStage ?? null, probeErrorKind: report.probeErrorKind ?? null,
+      commandExitCode: report.commandExitCode ?? null, pauseRequested: report.pauseRequested,
+      restorationFailureStage: report.restorationFailureStage ?? null,
+      restorationErrorKind: report.restorationErrorKind ?? null,
       scopeSha256: report.scopeSha256 ?? null }));
     process.exitCode = report.outcome === 'passed' ? 0 : 1;
   } finally {

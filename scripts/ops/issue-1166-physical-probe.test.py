@@ -118,6 +118,50 @@ class PhysicalProbeTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "path_rejected"):
             probe.collect(self.config)
 
+    def test_missing_retained_file_has_only_fixed_file_stage_and_missing_file_kind(self):
+        (self.worktree / probe.FILE).unlink()
+        try:
+            probe.collect(self.config)
+            self.fail("Expected missing file")
+        except FileNotFoundError as error:
+            result = probe.safe_failure(error)
+        self.assertEqual(result, {"error": "physical_probe_failed", "stage": "file", "kind": "missing_file"})
+        self.assertNotIn(str(self.root), json.dumps(result))
+
+    def test_missing_worker_receipt_is_distinct_from_permission_denied_ledger(self):
+        reader = probe.regular_bytes
+        for denied, stage, kind in [
+            ("worker-source-sha", "worker_receipt", "missing_file"),
+            (probe.RUNS[0] + ".json", "ledger", "permission_denied"),
+        ]:
+            def fail_read(path, cap=32 * 1024 * 1024):
+                if path.name == denied:
+                    error = FileNotFoundError if kind == "missing_file" else PermissionError
+                    raise error("secret-provider-response /private/credential-path")
+                return reader(path, cap)
+
+            with patch.object(probe, "regular_bytes", fail_read):
+                try:
+                    probe.collect(self.config)
+                    self.fail("Expected fixed diagnostic")
+                except (FileNotFoundError, PermissionError) as error:
+                    result = probe.safe_failure(error)
+            self.assertEqual(result, {"error": "physical_probe_failed", "stage": stage, "kind": kind})
+            self.assertNotIn("secret-provider-response", json.dumps(result))
+            self.assertNotIn("/private", json.dumps(result))
+
+    def test_safe_failure_never_exports_exception_messages_or_unrecognized_codes(self):
+        probe.current_stage = "journal"
+        for error, kind in [
+            (ValueError("secret_provider_response"), "unknown"),
+            (json.JSONDecodeError("secret-provider-response", "private-document", 1), "invalid_json"),
+            (KeyError("secret-provider-response"), "invalid_structure"),
+            (subprocess.TimeoutExpired(["private-command"], 5, output="secret-provider-response"), "command_timeout"),
+        ]:
+            result = probe.safe_failure(error)
+            self.assertEqual(result, {"error": "physical_probe_failed", "stage": "journal", "kind": kind})
+            self.assertNotIn("secret", json.dumps(result))
+
 
 if __name__ == "__main__":
     unittest.main()
