@@ -56,7 +56,7 @@ before(async () => {
 })
 beforeEach(() => {
   configured = true; refreshFails = false; refreshUnconfirmed = false; events.length = 0
-  data = { location: 'cloud', customized: true, preferredHarness: 'claude_code', credentials: 1, entries: [], candidates: [], devices: 0, firstDevice: null, firstDeviceId: null, readyDeviceIds: [], deviceModels: {} }
+  data = { location: 'cloud', customized: true, preferredHarness: 'claude_code', credentials: 1, entries: [], candidates: [], devices: 0, cloudReady: true, first: { kind: 'cloud' }, readyDeviceIds: [], deviceModels: {} }
   container = browser.document.createElement('div') as unknown as HTMLDivElement
   document.body.append(container)
   root = createRoot(container)
@@ -108,29 +108,31 @@ test('a shared subscription allowance check uses the authorized row action witho
   assert.equal(container.querySelector('li [role="status"]')?.textContent, 'ready')
 })
 
-test('cloud rows without an E2B key name the missing key and open its existing dialog', async () => {
-  configured = false; data.entries = [row(null)]
+test('each 运行位置 says the order it tries, then where a new run goes first', async () => {
   await render()
-  assert.equal(container.querySelector('li [role="status"]')?.textContent, 'cloudNoKey')
-  const fill = container.querySelector<HTMLButtonElement>('li button')
-  assert.equal(fill?.textContent, 'setE2BKey')
-  await act(async () => fill!.click())
+  assert.ok(container.textContent?.includes('orderCloud · first'))
+  await act(async () => root.unmount())
+  root = createRoot(container)
+  data = { ...data, location: 'local', cloudReady: false, first: { kind: 'device', id: randomUUID(), name: 'Box', server: true } }
+  await render()
+  assert.ok(container.textContent?.includes('orderLocal · first'))
+  assert.ok(button('openDevices') === undefined && container.querySelector('a')?.textContent === 'openDevices', '打开设备 sits on the 运行位置 row when a computer takes the run')
+  await act(async () => root.unmount())
+  root = createRoot(container)
+  data = { ...data, first: null }
+  await render()
+  assert.ok(container.textContent?.includes('orderLocal · nowhere'))
+})
+
+test('云端 without an E2B key: rows stay ready, the 运行位置 line says where runs go instead, and its button opens the key dialog', async () => {
+  configured = false
+  data = { ...data, cloudReady: false, first: { kind: 'device', id: randomUUID(), name: 'Box', server: true }, entries: [row(null)] }
+  await render()
+  assert.equal(container.querySelector('li [role="status"]')?.textContent, 'ready')
+  assert.ok(![...container.querySelectorAll('li button')].some(item => item.textContent === 'setE2BKey'), 'the key is the 运行位置 row\'s, not each model\'s')
+  assert.ok(container.textContent?.includes('orderCloud · noKeyFirst'))
+  await act(async () => button('setE2BKey')!.click())
   assert.equal(container.querySelector('[role="dialog"]')?.textContent, 'E2B key')
-})
-
-test('cloud rows waiting for key status do not claim they can run or offer a quota check', async () => {
-  configured = undefined; data.entries = [row(null)]
-  await render()
-  assert.equal(container.querySelector('li [role="status"]')?.textContent, 'blocked.checking')
-  assert.equal(button('checkQuota'), undefined)
-})
-
-test('the server cloud-key block has the same existing repair destination', async () => {
-  configured = false; data.entries = [row({ reason: 'cloudNotConfigured' })]
-  await render()
-  assert.equal(container.querySelector('li [role="status"]')?.textContent, 'cloudNoKey')
-  const fill = container.querySelector('li button')
-  assert.equal(fill?.textContent, 'setE2BKey')
 })
 
 test('a refused allowance check keeps the selection and offers retry', async () => {

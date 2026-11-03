@@ -30,11 +30,10 @@ export interface OrderRow extends OrderEntry {
   provider: string
   /** The Agents this model and credential can run on: one, or both for a DeepSeek or Kimi key (the row's Agent menu). */
   agents: OrderHarness[]
-  /** Why it cannot run now, or null when it can. noDevice only for 本地, with what the closest computer lacks. */
+  /** Why it cannot run now, or null when it can. noDevice when no place of 运行位置 runs it, with what the closest computer lacks. */
   block: null
     | { reason: 'checking' | 'quota' | 'expired' | 'paused' | 'missing' | 'keyRefused'; resetsAt?: string | null }
     | { reason: 'noDevice'; device: NoDeviceWhy }
-    | { reason: 'cloudNotConfigured' }
 }
 
 export interface OrderView {
@@ -46,11 +45,12 @@ export interface OrderView {
   credentials: number
   entries: OrderRow[]
   candidates: (OrderCandidate & { provider: string; added: boolean })[]
-  /** Devices that take part (参与调度 on), for the 本地 line. */
+  /** Devices that take part (参与调度 on). */
   devices: number
-  /** 本地: the device a new run would go to now (会先用), by the same plan as dispatch; null when none. */
-  firstDevice: string | null
-  firstDeviceId: string | null
+  /** 云端: the person's own E2B cloud would take a run now. */
+  cloudReady: boolean
+  /** 会先用: where a new run would go now, by the same plan as dispatch; null when nowhere. */
+  first: { kind: 'cloud' } | { kind: 'device'; id: string; name: string; server: boolean } | null
   /** Devices that can run the same list now, including credential readiness. */
   readyDeviceIds: string[]
   /**
@@ -106,7 +106,7 @@ export async function orderCandidates(query: Query, scope: OrderScope): Promise<
 async function settingsRow(query: Query, scope: OrderScope) {
   const { rows: [row] } = await query.query<{ location: RunLocation; customized: boolean; preferredHarness: OrderHarness }>(
     'SELECT location,customized,"preferredHarness" FROM model_order_settings WHERE "ownerId"=$1 AND "workspaceId"=$2', [scope.ownerId, scope.workspaceId])
-  return row ?? { location: 'local' as RunLocation, customized: false, preferredHarness: 'claude_code' as OrderHarness }
+  return row ?? { location: 'cloud' as RunLocation, customized: false, preferredHarness: 'claude_code' as OrderHarness }
 }
 
 /** The allowed models in order: the stored list, or for an untouched list the default preference (ids are stable per entry). */
@@ -234,26 +234,26 @@ export async function orderView(query: Query, scope: OrderScope): Promise<OrderV
   const subscriptions = new Set([...connected.map(row => row.id), ...candidates.flatMap(candidate => candidate.source.kind === 'subscription' ? [candidate.source.connectionId] : [])])
   const credentials = subscriptions.size + (await usableApiKeys(query, scope.ownerId, scope.workspaceId)).length
   const ready = order.location === 'cloud' && await (await import('./rule-dispatch')).cloudReady(query, { ...scope, botId: null, harness: order.entries[0]?.harness ?? 'claude_code' })
+  const credential = (entry: OrderEntry) => states.get(entry.id)?.credential ?? { usable: false, reason: 'missing' } as const
   // 会先用: what dispatch would pick for a new run now, from the same plan.
-  const plan = order.location === 'local'
-    ? planDispatch({ entries: order.entries, location: 'local', devices, credential: entry => states.get(entry.id)?.credential ?? { usable: false, reason: 'missing' }, cloudReady: false })
-    : null
+  const plan = planDispatch({ entries: order.entries, location: order.location, devices, credential, cloudReady: ready })
+  const firstDevice = plan.kind === 'device' ? devices.find(device => device.id === plan.deviceId) : undefined
   return {
     location: order.location,
     customized: order.customized,
     preferredHarness: order.preferredHarness,
     credentials,
     devices: devices.filter(device => device.enabled).length,
-    firstDevice: plan?.kind === 'device' ? devices.find(device => device.id === plan.deviceId)?.name ?? null : null,
-    firstDeviceId: plan?.kind === 'device' ? plan.deviceId : null,
-    readyDeviceIds: devices.filter(device => planDispatch({ entries: order.entries, location: 'local', devices: [device], credential: entry => states.get(entry.id)?.credential ?? { usable: false, reason: 'missing' }, cloudReady: false }).kind === 'device').map(device => device.id),
+    cloudReady: ready,
+    first: plan.kind === 'cloud' ? { kind: 'cloud' } : firstDevice ? { kind: 'device', id: firstDevice.id, name: firstDevice.name, server: firstDevice.server } : null,
+    readyDeviceIds: devices.filter(device => planDispatch({ entries: order.entries, location: 'local', devices: [device], credential, cloudReady: false }).kind === 'device').map(device => device.id),
     deviceModels: Object.fromEntries(devices.map(device => [device.id,
       [...new Set(order.entries.filter(entry => deviceModel({ ...device, enabled: true, online: true }, entry)).map(entry => entry.model))]])),
     entries: order.entries.map(entry => {
       const state = states.get(entry.id)!
+      // 云端 that runs takes every model; otherwise a server or a computer must.
       const block: OrderRow['block'] = !state.credential.usable ? { reason: state.credential.reason, ...(state.credential.resetsAt ? { resetsAt: state.credential.resetsAt } : {}) }
-        : order.location === 'cloud' && !ready ? { reason: 'cloudNotConfigured' }
-          : order.location === 'local' && !devices.some(device => deviceModel(device, entry)) ? { reason: 'noDevice', device: whyNoDevice(devices, entry) } : null
+        : !ready && !devices.some(device => deviceModel(device, entry)) ? { reason: 'noDevice', device: whyNoDevice(devices, entry) } : null
       return { ...entry, provider: state.provider, agents: agents.get(offerKey(entry)) ?? [entry.harness], block }
     }),
     candidates: candidates.map(candidate => ({ ...candidate, added: added.has(entryKey(candidate)) })),

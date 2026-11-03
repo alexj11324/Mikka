@@ -27,7 +27,7 @@ test('every configured fact reaches the prompt, with the rule not to ask about i
   assert.match(text, /Alex 的 MacBook \(online, Claude Code and Codex\)/)
   assert.match(text, /server \(offline, 参与调度 off, no Agent installed\)/)
   assert.match(text, /anthropic subscription, openai API key/)
-  assert.match(text, /运行位置 本地\): Claude Code opus; Codex gpt-codex \(cannot run now: quota\); Codex gpt-mini; and 1 more/)
+  assert.match(text, /运行位置 本地: a server, then a computer\): Claude Code opus; Codex gpt-codex \(cannot run now: quota\); Codex gpt-mini; and 1 more/)
   assert.match(text, /no E2B key/)
   assert.match(text, /Mikka 默认 .* points_exhausted/)
   assert.match(text, /do not ask the person about them/)

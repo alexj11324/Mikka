@@ -11,6 +11,9 @@ import { dbUrl, seedUser, seedWorkspace, useUpFreeMessages } from './support/wor
 // Subscription chats answer only on validated routes (lib/subscription-routes.ts); these tests run with both on.
 process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES = 'claude_cpa,codex_cpa'
 
+/** 会先用 as the page shows it: the cloud, or a device's name. */
+const firstName = (view: { first: { kind: 'cloud' } | { kind: 'device'; name: string } | null }) => view.first?.kind === 'device' ? view.first.name : view.first?.kind ?? null
+
 test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }, async t => {
   const saved = { key: process.env.WORKSPACE_SECRETS_KEY, byos: process.env.MIKKA_BYOS_ENABLED }
   process.env.WORKSPACE_SECRETS_KEY = randomBytes(32).toString('hex')
@@ -193,11 +196,13 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
     await order.changeOrder(pool, scope, { kind: 'remove', id: (await order.orderView(pool, scope)).entries[0].id })
     view = await order.orderView(pool, scope)
     assert.deepEqual([view.entries, view.customized], [[], true], 'an emptied list stays empty')
-    await order.changeOrder(pool, scope, { kind: 'location', location: 'cloud' })
-    assert.equal((await order.orderView(pool, scope)).location, 'cloud')
+    // 云端 is the default (decision 2026-11-02-2330); 本地 is stored.
+    assert.equal(view.location, 'cloud')
+    await order.changeOrder(pool, scope, { kind: 'location', location: 'local' })
+    assert.equal((await order.orderView(pool, scope)).location, 'local')
     // Another person's list is their own.
     const other = await person('order-other')
-    assert.equal((await order.orderView(pool, other)).location, 'local')
+    assert.equal((await order.orderView(pool, other)).location, 'cloud')
   })
 
   await t.test('dispatch: the first model a device that takes part reported; then the next; a thread\'s own model first; nothing says why', async () => {
@@ -364,27 +369,27 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
     const claude = [{ harness: 'claude_code', installed: true }]
     const mac = await device(scope.ownerId, claude, true, { name: 'Mac', joinedMinutesAgo: 600 })
     let view = await order.orderView(pool, scope)
-    assert.equal(view.firstDevice, 'Mac', 'only a computer: it')
+    assert.equal(firstName(view), 'Mac', 'only a computer: it')
     const server = await device(scope.ownerId, claude, true, { name: 'instance-a', server: true, joinedMinutesAgo: 60 })
     const later = await device(scope.ownerId, claude, true, { name: 'instance-b', server: true, joinedMinutesAgo: 30 })
     view = await order.orderView(pool, scope)
     const run = await resolveModelDispatch(pool, ctx)
-    assert.deepEqual([view.firstDevice, run.kind === 'device' && run.deviceId], ['instance-a', server.id], 'a server before the computer that joined first; of two idle servers, the earlier')
+    assert.deepEqual([firstName(view), run.kind === 'device' && run.deviceId], ['instance-a', server.id], 'a server before the computer that joined first; of two idle servers, the earlier')
     // A run not yet ended on instance-a: the idle server takes the next one; an ended run does not count.
     await pool.query(`INSERT INTO agent_runs (id,"userId","agentId","deviceId",status) VALUES ($1,$2,$3,$4,'running')`, [randomUUID(), scope.ownerId, server.agents.claude_code, server.id])
     await pool.query(`INSERT INTO agent_runs (id,"userId","agentId","deviceId",status) VALUES ($1,$2,$3,$4,'succeeded'),($5,$2,$6,$7,'succeeded')`,
       [randomUUID(), scope.ownerId, later.agents.claude_code, later.id, randomUUID(), later.agents.claude_code, later.id])
     view = await order.orderView(pool, scope)
     const next = await resolveModelDispatch(pool, ctx)
-    assert.deepEqual([view.firstDevice, next.kind === 'device' && next.deviceId], ['instance-b', later.id])
+    assert.deepEqual([firstName(view), next.kind === 'device' && next.deviceId], ['instance-b', later.id])
     // Both servers offline: the computer.
     await pool.query(`UPDATE devices SET "lastSeenAt"=now()-interval '1 hour' WHERE id = ANY($1)`, [[server.id, later.id]])
     view = await order.orderView(pool, scope)
     const fallback = await resolveModelDispatch(pool, ctx)
-    assert.deepEqual([view.firstDevice, fallback.kind === 'device' && fallback.deviceId], ['Mac', mac.id])
+    assert.deepEqual([firstName(view), fallback.kind === 'device' && fallback.deviceId], ['Mac', mac.id])
     // Nothing can run: no 会先用.
     await pool.query('UPDATE devices SET enabled=false WHERE id=$1', [mac.id])
-    assert.equal((await order.orderView(pool, scope)).firstDevice, null)
+    assert.equal(firstName(await order.orderView(pool, scope)), null)
   })
 
   await t.test('移出列表 then 撤销 puts the model back where it was; 设备 › 能跑 lists the allowed models each computer can run', async () => {

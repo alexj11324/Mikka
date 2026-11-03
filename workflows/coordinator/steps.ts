@@ -524,8 +524,9 @@ async function dispatchByRules(userId: string, input: { issueId: string; agentId
     return { ...result, status: 'queued' as const }
   }
   {
-    // 模型与订阅 (decision 2026-11-02-1400): the thread's own model, else 优先使用的模型 in order; 运行位置 says where.
-    // The person asking for the cloud runs it there whatever 运行位置 says.
+    // 模型与订阅 (decision 2026-11-02-1400): the thread's own model, else 优先使用的模型 in order; 运行位置 says where
+    // (decision 2026-11-02-2330: 云端 the cloud, then a server, then a computer; 本地 a server, then a computer).
+    // The person asking for the cloud runs it there whatever 运行位置 says, and nowhere else.
     const { timedPhase } = await import('@/lib/dispatch-timing')
     const { issueForUser } = await import('@/lib/issue-access')
     if (!await timedPhase('issueForUser', () => issueForUser(userId, input.issueId))) throw new ActionFailureError('issueNotFound')
@@ -542,10 +543,11 @@ async function dispatchByRules(userId: string, input: { issueId: string; agentId
       }
       return { error: 'machineUnavailable' as const, issueId: input.issueId, reason: target.reason, card: target.card }
     }
-    if (target.kind === 'device') {
-      const result = await queueRun(userId, { ...input, agentId: target.agentId, model: target.model, pinnedDeviceId: target.deviceId, ...(target.subscriptionBindingId ? { subscriptionBindingId: target.subscriptionBindingId } : {}), ...(target.entry.source.kind === 'api_key' ? { apiKeyId: target.entry.source.keyId } : {}) }, botId, execution, requestEventId)
+    const onDevice = async (device: Extract<typeof target, { kind: 'device' }>) => {
+      const result = await queueRun(userId, { ...input, agentId: device.agentId, model: device.model, pinnedDeviceId: device.deviceId, ...(device.subscriptionBindingId ? { subscriptionBindingId: device.subscriptionBindingId } : {}), ...(device.entry.source.kind === 'api_key' ? { apiKeyId: device.entry.source.keyId } : {}) }, botId, execution, requestEventId)
       return { ...result, status: 'queued' as const }
     }
+    if (target.kind === 'device') return onDevice(target)
     if (requestEventId) {
       const event=(await pool.query('SELECT "userId","botId",payload FROM coordinator_events WHERE id=$1',[requestEventId])).rows[0]
       if (!event || event.userId!==userId || event.botId!==botId || event.payload?.taskDestination) throw new ActionFailureError('runInvalid')
@@ -560,6 +562,12 @@ async function dispatchByRules(userId: string, input: { issueId: string; agentId
     const subscriptionBindingId = runtime && source.kind === 'subscription' ? await timedPhase('bindAgentToConnection', () => bindAgentToConnection(pool, { ownerId: userId, workspaceId }, runtime.agentId, target.harness, source.connectionId, target.model)) : undefined
     const cloud = runtime ? await dispatchComputerTask(userId,{botId:runtime.botId,issueId:input.issueId,harness:runtime.harness,note:input.note,model:target.model,repo:input.repo,...(subscriptionBindingId ? {subscriptionBindingId} : {}),...(target.entry.source.kind === 'api_key' ? {apiKeyId:target.entry.source.keyId} : {}),...(input.readOnly ? {readOnly:true} : {})},`rule:${input.requestKey ?? requestEventId ?? crypto.randomUUID()}`,scope,execution) : { error: 'cloudComputerUnavailable' as const }
     if (!('error' in cloud) || cloud.error !== 'cloudComputerUnavailable') return cloud
+    // 云端 could not start it (the key refused, a limit, the template, E2B down, the worker never came up;
+    // the queued cloud run is already ended): a server, else a computer, unless the person asked for the cloud.
+    if (place !== 'cloud') {
+      const fallback = await resolveModelDispatch(pool, { ownerId: userId, workspaceId, botId }, input.model ?? null, undefined, undefined, { withoutCloud: true })
+      if (fallback.kind === 'device') return { ...await onDevice(fallback), fallback: 'cloudUnavailable' as const }
+    }
     // A startup failure can be capacity, quota, template or service availability. Only a confirmed
     // missing key offers 填入 E2B Key; an existing key must never be described as absent.
     const { modelUnavailableCard } = await import('@/lib/model-dispatch')

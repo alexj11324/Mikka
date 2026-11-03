@@ -166,15 +166,19 @@ not report the model ([1400](decisions/2026-11-02-1400-model-order-dispatch.md),
    environment, a device-only source event, or a device the person picked.
 2. Otherwise the thread's own model, when the person picked one, then
    优先使用的模型 in the person's order: the first entry that can run now.
-   运行位置 decides where: 本地 picks, among the devices with 参与调度 on
-   that can run the entry, a server before a computer, then the one with the
-   fewest unfinished runs, then the one that joined first
-   ([1530](decisions/2026-11-02-1530-local-server-first.md)); the 本地 line
-   in 模型与订阅 names it (会先用 <设备名>). 云端 runs on the owner's own E2B
-   key.
+   运行位置 decides where, trying places in order and moving on only when
+   no allowed model runs in the one before
+   ([2330](decisions/2026-11-02-2330-cloud-first-dispatch.md)): 云端 (the
+   default) the owner's own E2B cloud, then a server, then a computer; 本地 a
+   server, then a computer. Among the devices with 参与调度 on that can run
+   the entry, the one with the fewest unfinished runs goes first, then the one
+   that joined first ([1530](decisions/2026-11-02-1530-local-server-first.md)).
+   A cloud that fails to start the run hands it to a server, then a computer.
+   The 运行位置 line in 模型与订阅 writes the order and names where a run
+   goes now (会先用 云端 / <设备名>).
 3. Otherwise 立即警告: no run is created and the bot at once shows the action
    card 「没有能跑这个任务的模型」 with the reason (no allowed model, no
-   device can run any, no E2B key for 云端, every model unavailable now) and
+   device can run any and 云端 has no E2B key, every model unavailable now) and
    rows that fix it: 打开模型与订阅, 连接电脑, 填入 E2B Key. Answering a row makes
    the bot dispatch again.
 
