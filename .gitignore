@@ -59,3 +59,6 @@ next-env.d.ts
 # Generated standalone credential broker bundles.
 /services/credential-broker/dist/
 /services/credential-broker/public/
+
+# Private chat-attachment acceptance state and generated screenshots.
+/.cache/attachments/

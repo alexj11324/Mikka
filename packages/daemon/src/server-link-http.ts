@@ -14,6 +14,7 @@ import { nativeCoordinatorClaimSchema, nativeCoordinatorToolResultSchema, type N
 // `RunNotPinnedHereError`; any other 4xx is a refusal (`DaemonError`) that
 // retrying cannot fix.
 import { z } from "zod"
+import { chatFileDownloadSchema } from '@mikka/protocol/chat-attachments'
 import { ToolApprovalGate } from "./agents/tool-approval"
 import type { ServerDecide, ServerDecisionAnswer } from "./server-decision"
 import { POLICY_SNAPSHOT_HEADER, POLICY_SNAPSHOT_VERSION, POLICY_SNAPSHOT_REFRESH_MS, policyDistributionContextSchema, policyIssuer, signedPolicySnapshotSchema } from '@mikka/protocol/policy-snapshot'
@@ -114,6 +115,9 @@ export function serverUrl(base: string, path: string): URL {
 }
 
 export class HttpServerLink implements ServerLink {
+  async downloadChatFile(assignment: RunAssignment, id: string, signal: AbortSignal) {
+    return this.call('GET', `/v1/devices/${seg(assignment.deviceId)}/runs/${seg(assignment.runId)}/attachments/${seg(id)}`, { schema: chatFileDownloadSchema, signal, timeoutMs: 60000 })
+  }
   /** Run entry and resume both call this before repository/setup execution. */
   async verifyRunPolicy(assignment: RunAssignment, signal: AbortSignal) {
     if (signal.aborted) throw Error('Run policy cancelled')

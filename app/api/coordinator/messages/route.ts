@@ -1,3 +1,4 @@
+import { ChatFileError } from '@/lib/chat-attachments/extract'
 import { noteLogUser, withRequestLog } from '@/lib/request-log'
 import { after, NextResponse } from 'next/server'
 import { auth } from '@/lib/api-auth'
@@ -51,6 +52,7 @@ async function handlePOST(request: Request) {
   const botId = await openChatBotId(session.user, null)
   try { await recordPersonalSubmission(db, userId, parsed.data.text, { botId, submissionId: parsed.data.submissionId, images:parsed.data.images, ...(!request.headers.has('authorization')&&request.headers.get('cookie')&&request.headers.get('origin')===new URL(request.url).origin?{humanSessionId:session.session.id}:{}) }) }
   catch (error) {
+    if (error instanceof ChatFileError) return Response.json({ error: error.code }, { status: error.code === 'notFound' ? 404 : 400 })
     if (error instanceof SubmissionConflictError) return NextResponse.json({ error: 'submissionConflict' }, { status: 409 })
     throw error
   }

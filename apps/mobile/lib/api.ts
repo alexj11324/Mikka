@@ -49,12 +49,12 @@ export async function authHeaders(): Promise<Record<string, string>> {
 /** A request that has not answered by then fails, so nothing waits on it forever (a send shows 重试). */
 export const REQUEST_TIMEOUT_MS = 30_000
 
-export async function api<T>(path: string, init: { method?: string; body?: unknown } = {}): Promise<T> {
+export async function api<T>(path: string, init: { method?: string; body?: unknown; timeoutMs?: number } = {}): Promise<T> {
   const context = apiCache.context()
   const headers: Record<string, string> = { accept: 'application/json', ...await authHeaders() }
   if (init.body !== undefined) headers['content-type'] = 'application/json'
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+  const timer = setTimeout(() => controller.abort(), init.timeoutMs ?? REQUEST_TIMEOUT_MS)
   const response = await fetch(`${API_URL}${path}`, {
     method: init.method ?? 'GET',
     headers,

@@ -30,6 +30,8 @@
 // its report keeps `not_run`, and the server may open only a draft PR.
 import { quotaStopApplies } from "./quota-exhausted"
 import { runApps } from '../agents/run-apps'
+import { materializeChatFiles } from '../agents/chat-files'
+import { splitChatFiles, type ChatFileDownload } from '@mikka/protocol/chat-attachments'
 import { fixedCheckSnapshot } from "./check"
 import { retainDeliverable } from '../agents/publish'
 import { verifySkillAssignment, verifySkillResume, verifyMountedSkill } from '../agents/skill-artifact'
@@ -102,6 +104,7 @@ import type { ToolApprovalGate } from "../agents/tool-approval"
 import { assertMailboxRunAuthority, mailboxNoticeText, type RunMailbox } from '../run-mailbox'
 
 export interface SupervisorDeps {
+  downloadChatFile?(assignment: RunAssignment, id: string, signal: AbortSignal): Promise<ChatFileDownload>
   journal: RunJournal
   /** Same adapter state root used by RunContext; never supplied by the model. */
   adapterStateDir?: string
@@ -629,6 +632,11 @@ export class RunSupervisor {
     }
     // The agent's answer to this goes in a new message, after the person's.
     if (this.openMessages.has(runId)) this.cutMessages.add(runId)
+    const entry = this.deps.journal.get(runId)
+    if (splitChatFiles(text).files.length) {
+      if (!entry || !this.deps.downloadChatFile || !this.deps.adapterStateDir) throw Error('Run attachments unavailable')
+      text = await materializeChatFiles(text, join(this.deps.adapterStateDir, 'inputs', runId), id => this.deps.downloadChatFile!(entry.assignment, id, run.abort.signal))
+    }
     await run.session.send(text)
   }
 
@@ -1305,6 +1313,15 @@ export class RunSupervisor {
     if (toolApproval) {
       try { checkMailbox() } catch (error) { toolApproval.revoke(); throw error }
     }
+    let prompt = assignment.prompt
+    let followUp = assignment.followUp
+    if (splitChatFiles(prompt).files.length || followUp && splitChatFiles(followUp).files.length) {
+      if (!this.deps.downloadChatFile || !this.deps.adapterStateDir) throw Error('Run attachments unavailable')
+      const directory = join(this.deps.adapterStateDir, 'inputs', runId)
+      const download = (id: string) => this.deps.downloadChatFile!(assignment, id, run.abort.signal)
+      prompt = await materializeChatFiles(prompt, directory, download)
+      if (followUp) followUp = await materializeChatFiles(followUp, directory, download)
+    }
     const options = {
       // The owner's own GitHub credential reaches every run that was sent one (decision 2026-11-02-1600).
       github: assignment.github && assignment.mcp
@@ -1363,7 +1380,7 @@ export class RunSupervisor {
         ? {
             sessionId: assignment.resumeSessionId,
             runId: assignment.continuesRunId,
-            message: assignment.followUp ?? assignment.prompt,
+            message: followUp ?? prompt,
           }
         : undefined
     if (assignment.requireSessionResume &&
@@ -1390,10 +1407,10 @@ export class RunSupervisor {
     if (assignment.subscriptionBinding && assignment.modelCredential) throw new Error("A run has one model credential")
     try {
       session = await this.stage(runId, "agent_start", async () => assignment.modelCredential && this.deps.startCredential
-      ? await this.deps.startCredential(assignment,{...options,prompt:assignment.prompt})
+      ? await this.deps.startCredential(assignment,{...options,prompt})
       : assignment.subscriptionBinding
       ? this.deps.startSubscription
-        ? await this.deps.startSubscription(assignment,{...options,prompt:assignment.prompt})
+        ? await this.deps.startSubscription(assignment,{...options,prompt})
         : (()=>{throw new Error('subscription_hosted_runtime_unavailable')})()
       : resuming
       ? await adapter.resume(entry.sessionId as string, options)
@@ -1404,7 +1421,7 @@ export class RunSupervisor {
             })
           return adapter.start({
             ...options,
-            prompt: assignment.prompt,
+            prompt,
             continueSession,
             requireSessionResume: assignment.requireSessionResume,
           })

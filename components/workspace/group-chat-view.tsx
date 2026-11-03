@@ -148,7 +148,7 @@ export function GroupChatView({ group, userId, people }: {
       </div>
     </div>
     <div className="mx-auto w-full max-w-3xl shrink-0 px-4 pb-4">
-      <ChatComposer ref={null} value={draft} onChange={setDraft} onSubmit={send} label={t('composer', { name: group.title || t('untitled') })} disabled={!!code}
+      <ChatComposer ref={null} value={draft} onChange={setDraft} onSubmit={send} label={t('composer', { name: group.title || t('untitled') })} disabled={!!code} attachmentScope={{ kind: 'group', id: group.id }}
         sending={stopping} editableWhileSending={stopping} running={replying && !stopping} onStop={replying && !stopping ? () => { void stop() } : undefined} />
     </div>
   </section>

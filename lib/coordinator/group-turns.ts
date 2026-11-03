@@ -18,7 +18,7 @@ export type GroupRuntime = {
   authorized(workspaceId: string, userId: string): Promise<boolean>
   route(message: GroupMessage, members: GroupAgent[], leadId: string | null, corrections: RoutingCorrection[]): Promise<GroupRoute>
   correction(input: CorrectionInput): Promise<CorrectionJudgment>
-  generate(agent: GroupAgent, input: { message: GroupMessage; earlier: { author: string; text: string }[]; followUp: string; members: RoutingMember[]; ask?: string; privatePeer?: RoutingMember; modelRuntime?: HostedRuntimeSnapshot; signal?: AbortSignal }): Promise<GroupReply>
+  generate(agent: GroupAgent, input: { message: GroupMessage; earlier: { author: string; text: string }[]; followUp: string; members: RoutingMember[]; ask?: string; privatePeer?: RoutingMember; modelRuntime?: HostedRuntimeSnapshot; signal?: AbortSignal; attachmentContext?: { userId: string; conversationId: string } }): Promise<GroupReply>
 }
 /** 停止 in a group: the turn's error once a member stopped it; it keeps the replies already posted and is never replayed. */
 export const GROUP_TURN_STOPPED = 'stopped'
@@ -146,7 +146,7 @@ export async function processGroupTurn(pool: Pool, conversationId: string, runti
         eligible,
         stopped,
         generate: (agent, input) => untilStopped(stopped, async signal => {
-          input = { ...input, signal }
+          input = { ...input, signal, attachmentContext: { userId: root.userId, conversationId } }
           if (agent.memberType !== 'bot') return modelScope(() => runtime.generate(agent, input))
           const { withDatabaseClient } = await import('@/lib/db')
           return withDatabaseClient(client, async () => {

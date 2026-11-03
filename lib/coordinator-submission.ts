@@ -8,6 +8,7 @@ import { coordinatorEvents } from './db/schema'
 import type { db } from './db'
 import { MESSAGE_MAX } from './message-limits'
 import { taskDestinationSchema, type TaskDestination } from './task-destination'
+import { splitChatFiles } from '@mikka/protocol/chat-attachments'
 
 /** Personal Coordinator HTTP contract. Question/approval fields are not supported. */
 export const personalSubmissionInput = z.object({
@@ -42,9 +43,14 @@ export async function personalSubmissionRecorded(executor: Pick<typeof db, 'sele
  * included (resolved where the message enters), or a suggestion's stored one
  * (null only on a suggestion from before it stored one).
  */
-export async function recordPersonalSubmission(executor: Executor, userId: string, text: string, options: { submissionId?: string; botId: string | null; images?: readonly UserImageInput[]; taskDestination?: TaskDestination; humanSessionId?: string }) {
+export async function recordPersonalSubmission(executor: Executor, userId: string, text: string, options: { submissionId?: string; botId: string | null; images?: readonly UserImageInput[]; taskDestination?: TaskDestination; humanSessionId?: string; filesValidated?: true }) {
   const submissionId = personalSubmissionInput.shape.submissionId.parse(options.submissionId)
   const botId = options.botId
+  if (!options.filesValidated && splitChatFiles(text).files.length) {
+    if (!botId) throw new Error('attachmentChatRequired')
+    const { validateChatFiles } = await import('./chat-attachments/store')
+    await validateChatFiles(userId, { kind: 'bot', id: botId }, text)
+  }
   const images = normalizeUserImages(options.images)
   const taskDestination = options.taskDestination ? taskDestinationSchema.parse(options.taskDestination) : undefined
   const dedupeKey = submissionId

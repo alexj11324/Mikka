@@ -17,6 +17,8 @@ import { MessageActions } from '@/components/ai-elements/message'
 import { CopyAction, HOVER_ACTIONS } from '@/components/chat/copy-action'
 import { QUOTE_SOURCE_ATTR, SelectionQuote } from '@/components/chat/selection-quote'
 import { splitReplyQuote, withReplyQuote } from '@/lib/chat-quote'
+import { splitChatFiles } from '@mikka/protocol/chat-attachments'
+import { ChatFileCards } from '@/components/chat/chat-file-cards'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -47,8 +49,9 @@ const BUBBLE = 'max-w-[85%] rounded-2xl bg-muted px-3.5 py-2 text-sm/5.25 whites
 /** A person's words in a thread, under the agent's words they quote (lib/chat-quote.ts), and 复制 below on hover. */
 function PersonBubble({ text, mine }: { text: string; mine: boolean }) {
   const { quote, text: words } = splitReplyQuote(text)
+  const attached = splitChatFiles(words)
   return <>
-    <div className={cn(BUBBLE, 'flex flex-col gap-1.5', mine ? 'self-end bg-sidebar-primary text-sidebar-primary-foreground' : 'self-start')}>{quote && <QuoteLine slot="reply-quote" text={quote} />}<span>{words}</span></div>
+    <div className={cn(BUBBLE, 'flex flex-col gap-1.5', mine ? 'self-end bg-sidebar-primary text-sidebar-primary-foreground' : 'self-start')}>{quote && <QuoteLine slot="reply-quote" text={quote} />}<ChatFileCards files={attached.files} sent /><span>{attached.text}</span></div>
     <MessageActions className={cn(HOVER_ACTIONS, mine ? 'self-end' : 'self-start')}><CopyAction text={words} /></MessageActions>
   </>
 }
@@ -248,7 +251,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
         again in the same thread (R-81); only a thread the viewer cannot see in full (no `detail`) has none. */}
     {detail && <div data-slot="thread-composer" className="flex shrink-0 flex-col gap-1 p-3">
       {/* Keep the draft editable while stop waits for the daemon; do not queue new work after stop. */}
-      <ChatComposer ref={inputRef} label={t('composer', { agent: harnessLabel(detail.harness) })} value={draft} onChange={setDraft} onSubmit={() => { void send() }}
+      <ChatComposer ref={inputRef} label={t('composer', { agent: harnessLabel(detail.harness) })} value={draft} onChange={setDraft} onSubmit={() => { void send() }} attachmentScope={{ kind: 'thread', id: liveRunId }}
         quote={replyQuote ? <QuoteChip slot="reply-quote-chip" text={replyQuote} onRemove={() => { setReplyQuote(null); inputRef.current?.focus() }} /> : undefined}
         sending={sending || stopPending} editableWhileSending submitDisabled={stopRequested || question === 'resuming'} running={working || question === 'resuming'} thread onStop={working && canStop ? () => { void stop() } : undefined} />
       {sendFailed && <FieldError className="px-3 text-xs">{sendFailed}</FieldError>}

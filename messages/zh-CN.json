@@ -3671,6 +3671,11 @@
     "forward": "前进",
     "window": "应用窗口",
     "attach": "添加文件",
+    "attachments": {
+      "loading": "文件", "processing": "解析中", "uploading": "上传中 · {percent}%",
+      "open": "打开 {name}", "download": "下载 {name}", "remove": "移除 {name}", "retry": "重试上传 {name}",
+      "errors": { "unsupported": "不支持此文件格式", "tooLarge": "文件超过 25 MB", "unreadable": "文件无法读取", "tooLong": "文件内容超过 200,000 字", "tooMany": "最多添加 10 个文件", "notFound": "文件已不可用", "unavailable": "上传失败", "audioKeyRequired": "音频转写需要 OpenAI API Key" }
+    },
     "attachUnsupported": "只能附加 {max} 字以内的文本文件",
     "coordinatorPlaceholder": "问 Coordinator 或布置任务…",
     "panel": {

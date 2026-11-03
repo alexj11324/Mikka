@@ -30,6 +30,9 @@ import { usePresence } from '@/lib/use-presence'
 import { BotAvatar, CoordinatorAvatar } from '@/components/nav/bot-avatar'
 import { newTaskBotChoices } from '@/lib/new-task-bot'
 import { useOpenerFocus } from '@/hooks/use-focus-return'
+import { useChatFiles } from '@/components/chat/use-chat-files'
+import { ChatFileCards } from '@/components/chat/chat-file-cards'
+import { CHAT_FILE_ACCEPT } from '@mikka/protocol/chat-attachments'
 
 const MAX_LENGTH = 8000
 
@@ -95,6 +98,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, initialText
   const handler = botChoices.find(bot => bot.id === botPick) ?? null
   // The task runs on Mikka Cloud on the computer of the bot it goes to.
   const cloudBotId = handler?.id ?? (bots.find(bot => bot.coordinator) ?? bots[0])?.id
+  const attachments = useChatFiles(draft, setDraft, cloudBotId ? { kind: 'bot', id: cloudBotId } : undefined, sending)
   // The menu's availability comes from the same dispatch planner as Settings. The default inherits
   // 运行位置 (会先用: the cloud, a server or a computer); only a destination the person explicitly picks becomes a fixed task destination.
   const e2bKey = useOwnE2BKey(open)
@@ -119,6 +123,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, initialText
   useEffect(() => { if (open && initialText) setDraft(current => current || initialText) }, [open, initialText])
 
   async function attach(files: File[]) {
+    if (cloudBotId) { attachments.add(files); return }
     let next = draft
     for (const file of files) {
       const block = await textAttachment(file, MAX_LENGTH - next.length - 2)
@@ -130,7 +135,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, initialText
 
   async function submit() {
     const text = draft.trim()
-    if (!text || sending || !available) return
+    if (!text || sending || attachments.locked || !available) return
     setSending(true)
     setCoordinatorUnavailable(false)
     try {
@@ -184,20 +189,21 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project, initialText
         {project && <span className="flex h-7 max-w-40 items-center rounded-full bg-control px-2.5 text-xs text-muted-foreground"><span className="truncate">{project}</span></span>}
       </div>
       <DialogDescription className="sr-only">{t('description')}</DialogDescription>
-      <FieldGroup>
+      <FieldGroup onDragOver={event => { if (Array.from(event.dataTransfer.types).includes('Files')) { event.preventDefault(); event.dataTransfer.dropEffect = sending ? 'none' : 'copy' } }} onDrop={event => { if (event.dataTransfer.files.length) { event.preventDefault(); void attach(Array.from(event.dataTransfer.files)) } }} onPaste={event => { if (event.clipboardData.files.length) { event.preventDefault(); void attach(Array.from(event.clipboardData.files)) } }}>
         <Field>
+          <ChatFileCards files={attachments.files} pending={attachments.pending} onRemove={attachments.remove} onRetry={attachments.retry} />
           <FieldLabel htmlFor="new-issue-title" className="sr-only">{t('label')}</FieldLabel>
-          <Textarea id="new-issue-title" autoFocus value={draft} maxLength={MAX_LENGTH} disabled={sending} placeholder={t('placeholder')} className="min-h-32 resize-none border-0 px-0 text-base shadow-none focus-visible:ring-0 bg-transparent" onChange={event => setDraft(event.target.value)} onKeyDown={event => {
+          <Textarea id="new-issue-title" autoFocus value={attachments.text} maxLength={MAX_LENGTH} disabled={sending} placeholder={t('placeholder')} className="min-h-32 resize-none border-0 px-0 text-base shadow-none focus-visible:ring-0 bg-transparent" onChange={event => attachments.edit(event.target.value)} onKeyDown={event => {
             if (event.key === 'Enter' && (event.metaKey || event.ctrlKey) && !event.nativeEvent.isComposing) { event.preventDefault(); void submit() }
           }} />
         </Field>
       </FieldGroup>
-      <FieldGroup className="sr-only w-px"><Field><FieldLabel htmlFor={fileId}>{tShell('attach')}</FieldLabel><Input ref={fileRef} id={fileId} type="file" accept={TEXT_ATTACHMENT_ACCEPT} multiple className="sr-only" tabIndex={-1} onChange={event => { void attach(Array.from(event.target.files ?? [])); event.target.value = '' }} /></Field></FieldGroup>
+      <FieldGroup className="sr-only w-px"><Field><FieldLabel htmlFor={fileId}>{tShell('attach')}</FieldLabel><Input ref={fileRef} id={fileId} type="file" accept={cloudBotId ? CHAT_FILE_ACCEPT : TEXT_ATTACHMENT_ACCEPT} multiple className="sr-only" tabIndex={-1} onChange={event => { void attach(Array.from(event.target.files ?? [])); event.target.value = '' }} /></Field></FieldGroup>
       {!available && <p className="text-sm text-muted-foreground">{t('unavailable')}</p>}
       {coordinatorUnavailable && <Alert variant="destructive"><AlertTitle>{tCoordinator('unavailable', { name: 'Coordinator' })}</AlertTitle></Alert>}
       <div className="flex items-center gap-2">
         <Button variant="outline" size="icon-sm" className="rounded-full" aria-label={tShell('attach')} disabled={sending} onClick={() => fileRef.current?.click()}><Paperclip data-icon="inline-start" /></Button>
-        <Button size="sm" className="ml-auto bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90" disabled={!available || !draft.trim() || sending} aria-keyshortcuts="Control+Enter Meta+Enter" onClick={() => { void submit() }}>{sending ? t('sending') : t('create')}</Button>
+        <Button size="sm" className="ml-auto bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90" disabled={!available || !draft.trim() || sending || attachments.locked} aria-keyshortcuts="Control+Enter Meta+Enter" onClick={() => { void submit() }}>{sending ? t('sending') : t('create')}</Button>
       </div>
       {keyDialog.value && <E2BKeyDialog open={keyDialog.open} onOpenChangeComplete={keyDialog.onOpenChangeComplete} configured={false} onClose={changed => { setAddingKey(false); if (changed) { void e2bKey.mutate(); setPicked(cloud.value) } }} />}
     </DialogContent>

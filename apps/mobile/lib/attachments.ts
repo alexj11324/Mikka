@@ -1,8 +1,14 @@
 import { Platform } from 'react-native'
 import * as DocumentPicker from 'expo-document-picker'
-import { File } from 'expo-file-system'
+import { File, Paths } from 'expo-file-system'
+import { EncodingType, writeAsStringAsync } from 'expo-file-system/legacy'
+import type { ClipboardImage } from 'expo-clipboard'
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator'
 import * as ImagePicker from 'expo-image-picker'
+import { fetch as nativeFetch } from 'expo/fetch'
+import { CHAT_FILE_MAX_BYTES, chatFileSchema, supportedChatFile, type ChatFile, type ChatFileScope } from '@mikka/protocol/chat-attachments'
+import { api, ApiError, authHeaders } from './api'
+import { API_URL } from './config'
 
 /**
  * What the composer's 「+」 attaches. The server takes up to two images, each
@@ -14,6 +20,7 @@ import * as ImagePicker from 'expo-image-picker'
 export type Attachment =
   | { key: string; kind: 'image'; uri: string; dataUrl: string }
   | { key: string; kind: 'text'; name: string; block: string }
+  | { key: string; kind: 'file'; name: string; uri: string; mediaType: string; size: number; file?: globalThis.File; state: 'uploading' | 'ready' | 'error'; uploaded?: ChatFile; error?: string }
 
 export const MAX_IMAGES = 2
 const MAX_IMAGE_BYTES = 1024 * 1024
@@ -66,6 +73,59 @@ export async function pickText(): Promise<Attachment | 'notText' | 'tooLong' | n
   const block = `${asset.name}\n\`\`\`\n${text.replace(/\n$/, '')}\n\`\`\``
   if (block.length > MESSAGE_MAX) return 'tooLong'
   return { key: key(), kind: 'text', name: asset.name, block }
+}
+
+/** The system file picker, shared by bot chats, groups and Agent threads. */
+export async function pickChatFile(): Promise<Extract<Attachment, { kind: 'file' }> | null> {
+  const result = await DocumentPicker.getDocumentAsync({ type: '*/*', copyToCacheDirectory: true, multiple: false })
+  if (result.canceled || !result.assets[0]) return null
+  const asset = result.assets[0]
+  const size = asset.size ?? asset.file?.size ?? new File(asset.uri).size
+  if (!supportedChatFile(asset.name, asset.mimeType)) throw Error('unsupported')
+  if (!size || size > CHAT_FILE_MAX_BYTES) throw Error('tooLarge')
+  return { key: key(), kind: 'file', name: asset.name, uri: asset.uri, mediaType: asset.mimeType ?? '', size, file: asset.file, state: 'uploading' }
+}
+interface UploadTicket { id: string; uploadUrl?: string; headers?: Record<string, string>; uploaded?: boolean }
+const uploadTickets = new Map<string, UploadTicket>()
+export async function uploadPickedFile(item: Extract<Attachment, { kind: 'file' }>, scope: ChatFileScope): Promise<ChatFile> {
+  const body = item.file ?? new File(item.uri)
+  const ticketKey = `${scope.kind}:${scope.id}:${item.key}`
+  let started = uploadTickets.get(ticketKey)
+  if (!started) {
+    started = await api<UploadTicket>('/api/chat/attachments', { method: 'POST', body: { operation: 'init', scope, name: item.name, mediaType: item.mediaType, size: body.size } })
+    uploadTickets.set(ticketKey, started)
+  } else {
+    try { return chatFileSchema.parse(await api(`/api/chat/attachments/${started.id}?info`)) } catch { /* Completion may still be pending. Reuse its identity. */ }
+  }
+  const direct = Boolean(started.uploadUrl)
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 120_000)
+  const response = !started.uploaded ? await nativeFetch(started.uploadUrl ?? `${API_URL}/api/chat/attachments?id=${started.id}`, {
+    method: direct ? 'PUT' : 'POST', headers: direct ? started.headers : { ...await authHeaders(), 'content-type': 'application/octet-stream' }, body, signal: controller.signal,
+  }).finally(() => clearTimeout(timer)) : (clearTimeout(timer), null)
+  if (response && !response.ok) { uploadTickets.delete(ticketKey); void api(`/api/chat/attachments/${started.id}`, { method: 'DELETE' }).catch(() => {}); const data = await response.json().catch(() => null) as { error?: string } | null; throw Error(data?.error ?? 'unavailable') }
+  if (direct) started.uploaded = true
+  let completed: unknown
+  try { completed = direct ? await api('/api/chat/attachments', { method: 'POST', body: { operation: 'complete', id: started.id }, timeoutMs: 120_000 }) : await response!.json() }
+  catch (error) {
+    if (error instanceof ApiError && error.status >= 400 && error.status < 500) {
+      uploadTickets.delete(ticketKey)
+      void api(`/api/chat/attachments/${started.id}`, { method: 'DELETE' }).catch(() => {})
+    }
+    throw error
+  }
+  const uploaded = chatFileSchema.parse(completed)
+  uploadTickets.delete(ticketKey)
+  return uploaded
+}
+export async function pastedChatImage(image: ClipboardImage): Promise<Extract<Attachment, { kind: 'file' }>> {
+  const match = /^data:image\/(png|jpeg);base64,([A-Za-z0-9+/]+={0,2})$/.exec(image.data)
+  if (!match) throw Error('unreadable')
+  const id = key(), name = `clipboard-${id}.${match[1] === 'jpeg' ? 'jpg' : 'png'}`
+  const uri = `${Paths.cache.uri}${name}`
+  await writeAsStringAsync(uri, match[2], { encoding: EncodingType.Base64 })
+  const file = new File(uri)
+  return { key: id, kind: 'file', name, uri, mediaType: `image/${match[1]}`, size: file.size, state: 'uploading' }
 }
 
 /** The message as the server takes it: the words, then each text file; the photos beside them (with their local file, for the sending bubble). */

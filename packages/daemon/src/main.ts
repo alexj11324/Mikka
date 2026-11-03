@@ -436,6 +436,7 @@ export class Daemon {
     this.supervisor = new RunSupervisor({
       journal: this.journal,
       adapterStateDir: this.paths.adapterState,
+      downloadChatFile: this.options.link.downloadChatFile?.bind(this.options.link),
       outbox: this.outbox,
       worktrees: this.worktrees,
       adapters,

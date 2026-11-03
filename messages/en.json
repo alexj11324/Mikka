@@ -3671,6 +3671,11 @@
     "forward": "Forward",
     "window": "App window",
     "attach": "Add file",
+    "attachments": {
+      "loading": "File", "processing": "Processing", "uploading": "Uploading · {percent}%",
+      "open": "Open {name}", "download": "Download {name}", "remove": "Remove {name}", "retry": "Retry uploading {name}",
+      "errors": { "unsupported": "Unsupported file format", "tooLarge": "File exceeds 25 MB", "unreadable": "Unable to read file", "tooLong": "File content exceeds 200,000 characters", "tooMany": "Up to 10 files", "notFound": "File unavailable", "unavailable": "Upload failed", "audioKeyRequired": "Audio transcription requires an OpenAI API key" }
+    },
     "attachUnsupported": "Only text files up to {max} characters can be attached",
     "coordinatorPlaceholder": "Ask the Coordinator or hand it a task…",
     "panel": {

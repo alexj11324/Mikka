@@ -13,7 +13,7 @@ export async function cloudDeviceScopeAllows(request: Request, deviceId: string,
     if (device[1] !== deviceId) return false
     const tail = device[2]
     if (/^(?:heartbeat|repos|runs|commands|commands\/ack|computer|github-token|fs\/requests(?:\/[^/]+)?)$/.test(tail)) return true
-    const nestedRun = /^runs\/([^/]+)\/(?:claim|subscription)$/.exec(tail)
+    const nestedRun = /^runs\/([^/]+)\/(?:claim|subscription|attachments\/[0-9a-f-]{36})$/.exec(tail)
     return nestedRun ? await runBelongs(nestedRun[1], deviceId) : false
   }
   const run = /^\/v1\/runs\/([^/]+)(?:\/(?:events|complete|checkpoint|tool-approval|policy-snapshot|screen|captures(?:\/[0-9a-f-]{36}(?:\/complete)?)?))?$/.exec(path)

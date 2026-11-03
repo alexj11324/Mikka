@@ -1,3 +1,4 @@
+import { ChatFileError } from '@/lib/chat-attachments/extract'
 import { after } from 'next/server'
 import { and, eq } from 'drizzle-orm'
 import { db } from '@/lib/db'
@@ -70,6 +71,7 @@ async function handlePOST(request: Request) {
     const botId = await openChatBotId(user, parsed.data.botId)
     try { await recordPersonalSubmission(db, user.id, parsed.data.text, { botId, images, submissionId: parsed.data.submissionId }) }
     catch (error) {
+      if (error instanceof ChatFileError) return Response.json({ error: error.code }, { status: error.code === 'notFound' ? 404 : 400 })
       if (error instanceof SubmissionConflictError) return json({ error: 'submissionConflict' }, 409)
       throw error
     }

@@ -226,7 +226,7 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, c
         </KeyboardChatScrollView>
       </View>
       <OfflineBanner top={insets.top + 66} />
-      <Composer value={text} onChangeText={setText} placeholder={name ? `给 ${name} 发消息` : '发消息'} onSend={send} attach overlay onHeight={setComposerHeight} autoFocus={compose || Boolean(draft)}
+      <Composer value={text} onChangeText={setText} placeholder={name ? `给 ${name} 发消息` : '发消息'} onSend={send} attach attachmentScope={data?.botId ? { kind: 'bot', id: data.botId } : botId ? { kind: 'bot', id: botId } : undefined} overlay onHeight={setComposerHeight} autoFocus={compose || Boolean(draft)}
         quote={quote} onClearQuote={() => setQuote(null)} accessory={typeof composerAccessory === 'function' ? composerAccessory(working) : composerAccessory} notice={composerNotice} onStop={Boolean(data?.working) && !stopper.sending ? () => void stopper.stop() : undefined} />
     </View>
   )

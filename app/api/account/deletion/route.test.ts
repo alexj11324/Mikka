@@ -14,6 +14,7 @@ before(async () => {
     cancelAccountDeletion: async (...args: unknown[]) => { calls.push(args); return cancellable },
     sweepAccountDeletions: async () => { calls.push(['sweep']); return { scanned: 1, completed: 0, pending: 1 } },
   } })
+  mock.module('@/lib/chat-attachments/store', { namedExports: { cleanupChatFiles: async () => { calls.push(['files']); return { retired: 0 } } } })
   route = await import('./route'); cron = await import('../../cron/account-deletions/route')
 })
 beforeEach(() => { session = { user: { id: 'owner', email: 'Owner@example.invalid' }, session: { id: 'session', createdAt: new Date() } }; unavailable = false; soleAdmin = false; cancellable = true; calls.length = 0 })
@@ -54,7 +55,7 @@ test('cron accepts only its configured workload secret', async t => {
   process.env.CRON_SECRET = 'test-only-account-deletion-secret'
   assert.equal((await cron.GET(request('GET'))).status, 401); assert.equal(calls.length, 0)
   assert.equal((await cron.GET(request('GET', undefined, { authorization: `Bearer ${process.env.CRON_SECRET}` }))).status, 200)
-  assert.deepEqual(calls, [['sweep']])
+  assert.deepEqual(calls, [['sweep'], ['files']])
 })
 
 test('stale sign-in cannot create or reauthorize a deletion even with a known receipt/request UUID', async () => {

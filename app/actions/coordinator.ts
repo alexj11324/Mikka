@@ -198,7 +198,10 @@ export async function sendCoordinatorMessage(text: string, quote?: ArtifactQuote
     // 重新发送 on a failed message (retryOf: its position) retries it in place: that message is marked and the
     // new attempt stands for it (store.sendRetryOf). A position that does not qualify is ignored.
     const retried = z.number().int().positive().optional().safeParse(retryOf)
-    const record = (executor: Parameters<typeof recordPersonalSubmission>[0]) => recordPersonalSubmission(executor, userId, withQuote(withNotes, quoted?.data), { botId: bot.id, submissionId: parsed.data.submissionId, images: parsed.data.images, taskDestination: destination.data, ...(humanSessionId ? { humanSessionId } : {}) })
+    const message = withQuote(withNotes, quoted?.data)
+    // Validate files before a retry holds its message row/connection; concurrent retries must not exhaust the pool.
+    if (message.includes('[mikka-file:')) { const { validateChatFiles } = await import('@/lib/chat-attachments/store'); try { await validateChatFiles(userId, { kind: 'bot', id: bot.id }, message) } catch { throw new ActionFailureError('messageRequired') } }
+    const record = (executor: Parameters<typeof recordPersonalSubmission>[0]) => recordPersonalSubmission(executor, userId, message, { botId: bot.id, submissionId: parsed.data.submissionId, images: parsed.data.images, taskDestination: destination.data, filesValidated: true, ...(humanSessionId ? { humanSessionId } : {}) })
     try {
       // Already retried (a double click, two sends at once): nothing more is sent.
       if (retried.success && retried.data !== undefined) { if (await sendRetryOf(userId, bot.id, retried.data, record) === null) return { queued: true as const } }

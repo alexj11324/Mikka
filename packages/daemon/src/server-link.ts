@@ -41,6 +41,7 @@ import type { RunChunk } from "./chunks"
 import type { ToolApprovalGate } from "./agents/tool-approval"
 import type { RunMailbox } from './run-mailbox'
 import type { ServerDecide } from './server-decision'
+import type { ChatFileDownload } from '@mikka/protocol/chat-attachments'
 import type { NativeBrokerContext, NativeBrokerRequest, NativeLease } from '@mikka/protocol/subscription'
 import { RunNotPinnedHereError, ServerUnreachableError } from "./errors"
 
@@ -68,6 +69,7 @@ export interface ChunkBatch {
  * the daemon keeps running and retries (offline tolerance, R13).
  */
 export interface ServerLink {
+  downloadChatFile?(assignment: RunAssignment, id: string, signal: AbortSignal): Promise<ChatFileDownload>
   /** Authenticated policy validation before repository/setup effects, including resume. */
   verifyRunPolicy?(assignment: RunAssignment, signal: AbortSignal): Promise<unknown>
   prepareRunToolApproval?(assignment: RunAssignment, signal: AbortSignal, check: () => void, worktree?: string): Promise<ToolApprovalGate>

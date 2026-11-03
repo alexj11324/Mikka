@@ -6,6 +6,7 @@ import { Symbol } from '@/components/Symbol'
 import { Text } from '@/components/Text'
 import { heldComposer } from '@/lib/attach-sheet'
 import { colors } from '@/lib/theme'
+import { ClipboardPasteButton, isPasteButtonAvailable } from 'expo-clipboard'
 
 const TILES: { source: AttachSource; label: string; symbol: 'camera' | 'photo.on.rectangle' | 'doc'; web: typeof Camera; image: boolean }[] = [
   { source: 'camera', label: '相机', symbol: 'camera', web: Camera, image: true },
@@ -38,6 +39,7 @@ export default function AttachSheet() {
           </Pressable>
         )
       })}
+      {isPasteButtonAvailable && composer.pasteImage && composer.images ? <ClipboardPasteButton style={{ width: 84, height: 92 }} acceptedContentTypes={['image']} displayMode="iconAndLabel" onPress={image => { if (image.type === 'image') void composer.pasteImage?.(image).then(() => { if (router.canGoBack()) router.back() }) }} /> : null}
     </View>
   )
 }

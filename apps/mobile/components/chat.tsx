@@ -22,9 +22,11 @@ export function BotBubble({ children }: { children: ReactNode }) {
 
 /** The person's words sit in the blue bubble (R-14); photos they sent sit above it, as in Messages. */
 export function MyBubble({ text, photos }: { text: string; photos?: ImageURISource[] }) {
-  const { quoted, words } = splitQuoted(text)
+  const parsed = splitChatFiles(text)
+  const { quoted, words } = splitQuoted(parsed.text)
   return (
     <View style={styles.mine}>
+      <ChatFiles files={parsed.files} />
       {photos?.length ? <Photos photos={photos} /> : null}
       {text ? (
         <View style={[styles.myBubble, { maxWidth: '100%' }]}>
@@ -229,3 +231,5 @@ const styles = StyleSheet.create({
   quoteArrow: { position: 'absolute', left: 4, top: 0, bottom: 0, justifyContent: 'center' },
   copy: { alignSelf: 'flex-start', paddingVertical: 4, paddingHorizontal: 6, marginTop: 2 },
 })
+import { splitChatFiles } from '@mikka/protocol/chat-attachments'
+import { ChatFiles } from './ChatFiles'

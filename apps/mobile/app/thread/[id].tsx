@@ -110,7 +110,7 @@ export default function ThreadScreen() {
       </KeyboardChatScrollView>
       <OfflineBanner top={insets.top + 66} />
       {/* R-10: a thread ends in the composer, finished or not; a message to an ended thread runs it again (R-81). */}
-      {data ? <Composer placeholder="给这个线程发消息" onSend={send} disabled={sending} onStop={composerStops(data) && !stopper.sending ? () => void stopper.stop() : undefined} /> : null}
+      {data ? <Composer placeholder="给这个线程发消息" onSend={send} disabled={sending} attach attachmentScope={{ kind: 'thread', id }} onStop={composerStops(data) && !stopper.sending ? () => void stopper.stop() : undefined} /> : null}
     </View>
   )
 }

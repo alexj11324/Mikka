@@ -73,7 +73,7 @@ const nextConfig = {
   transpilePackages: ['@mikka/protocol'],
   // better-auth/react must share Next's SSR React dispatcher with client components.
   // Externalizing the whole package loads native React and crashes enabled analytics.
-  serverExternalPackages: ['ai', 'drizzle-orm'],
+  serverExternalPackages: ['ai', 'drizzle-orm', 'officeparser', '@e965/xlsx', 'music-metadata'],
   async headers() {
     return [{ source: '/(.*)', headers: [
       { key: 'X-Content-Type-Options', value: 'nosniff' },

@@ -3,10 +3,12 @@ import { Image, Platform, Pressable, StyleSheet, TextInput, useColorScheme, View
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect'
 import { KeyboardStickyView } from 'react-native-keyboard-controller'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { ArrowUp, ChevronLeft, FileText, Square, X } from 'lucide-react-native'
+import { ArrowUp, ChevronLeft, FileText, RotateCw, Square, X } from 'lucide-react-native'
 import { AttachMenu, type AttachSource } from '@/components/AttachMenu'
 import { Text } from '@/components/Text'
-import { MAX_IMAGES, pickImages, pickText, type Attachment } from '@/lib/attachments'
+import { MAX_IMAGES, pickImages, pickText, pickChatFile, uploadPickedFile, pastedChatImage, type Attachment } from '@/lib/attachments'
+import { withChatFiles, CHAT_FILE_MAX_COUNT, type ChatFileScope } from '@mikka/protocol/chat-attachments'
+import { api } from '@/lib/api'
 import { tap } from '@/lib/haptics'
 import { colors, font, lift, plainColor } from '@/lib/theme'
 
@@ -67,7 +69,7 @@ export function Header({ left, title, right, subtitle, style }: { left?: ReactNo
  * them), so a failed send loses nothing. Controlled when `value` and
  * `onChangeText` are passed.
  */
-export function Composer({ placeholder, onSend, initial = '', disabled = false, value, onChangeText, attach = false, overlay = false, onHeight, autoFocus = false, quote, onClearQuote, accessory, notice, onStop }: {
+export function Composer({ placeholder, onSend, initial = '', disabled = false, value, onChangeText, attach = false, overlay = false, onHeight, autoFocus = false, quote, onClearQuote, accessory, notice, onStop, attachmentScope }: {
   placeholder: string
   onSend?: (text: string, attachments: Attachment[]) => boolean | void | Promise<boolean | void>
   initial?: string
@@ -75,6 +77,7 @@ export function Composer({ placeholder, onSend, initial = '', disabled = false, 
   value?: string
   onChangeText?: (text: string) => void
   attach?: boolean
+  attachmentScope?: ChatFileScope
   /** Float over the end of the list, the content fading out beneath it; `onHeight` reports its height so the list leaves room. */
   overlay?: boolean
   onHeight?: (height: number) => void
@@ -99,37 +102,60 @@ export function Composer({ placeholder, onSend, initial = '', disabled = false, 
   const [sending, setSending] = useState(false)
   const [files, setFiles] = useState<Attachment[]>([])
   const [problem, setProblem] = useState<string | null>(null)
+  const scopeKey = attachmentScope ? `${attachmentScope.kind}:${attachmentScope.id}` : ''
+  const currentScope = useRef(scopeKey)
+  currentScope.current = scopeKey
+  useEffect(() => { setFiles([]); setProblem(null) }, [scopeKey])
   const text = value ?? own
   const setText = onChangeText ?? setOwn
   const blocked = disabled || sending
+  const filesBlocked = files.some(file => file.kind === 'file' && file.state !== 'ready')
   const images = files.filter(file => file.kind === 'image').length
   const empty = !text.trim() && !files.length
   const quoted = (words: string) => quote ? `${quote.split('\n').map(line => `> ${line}`).join('\n')}\n\n${words}` : words
   const send = async () => {
-    if (empty || blocked) return
+    if (empty || blocked || filesBlocked) return
     setSending(true)
     tap()
     try {
-      const ok = await onSend?.(quoted(text.trim()), files)
+      const ready = files.flatMap(file => file.kind === 'file' && file.uploaded ? [file.uploaded] : [])
+      const ok = await onSend?.(withChatFiles(quoted(text.trim()), ready), files.filter(file => file.kind !== 'file'))
       if (ok !== false) { setText(''); setFiles([]); onClearQuote?.() }
     } finally {
       setSending(false)
     }
   }
+  const upload = async (item: Extract<Attachment, { kind: 'file' }>) => {
+    if (!attachmentScope || blocked) return
+    const original = scopeKey
+    setFiles(list => [...list.filter(file => file.key !== item.key), { ...item, state: 'uploading', error: undefined }])
+    try {
+      const uploaded = await uploadPickedFile(item, attachmentScope)
+      if (currentScope.current === original) setFiles(list => list.map(file => file.key === item.key ? { ...item, uploaded, state: 'ready' } : file))
+    } catch (error) {
+      const message = error instanceof Error && error.message === 'audioKeyRequired' ? '请先添加可用的 OpenAI API Key' : '上传失败'
+      if (currentScope.current === original) setFiles(list => list.map(file => file.key === item.key ? { ...item, state: 'error', error: message } : file))
+    }
+  }
   const pick = async (source: AttachSource) => {
+    if (blocked) return
     setProblem(null)
     try {
+      if (attachmentScope && files.length >= CHAT_FILE_MAX_COUNT) { setProblem('最多添加 10 个文件'); return }
       if (source === 'file') {
+        if (attachmentScope) { const item = await pickChatFile(); if (item) void upload(item); return }
         const file = await pickText()
         if (file === 'notText') setProblem('只能发文本文件')
         else if (file === 'tooLong') setProblem('文件太长')
         else if (file) setFiles(list => [...list, file])
         return
       }
-      const picked = await pickImages(source, MAX_IMAGES - images)
-      if (picked) setFiles(list => [...list, ...picked])
+      const picked = await pickImages(source, attachmentScope ? Math.min(MAX_IMAGES, CHAT_FILE_MAX_COUNT - files.length) : MAX_IMAGES - images)
+      if (picked && attachmentScope) {
+        for (const photo of picked) if (photo.kind === 'image') void upload({ key: photo.key, kind: 'file', name: `photo-${photo.key}.jpg`, uri: photo.uri, mediaType: 'image/jpeg', size: Math.floor((photo.dataUrl.split(',')[1]?.length ?? 0) * 3 / 4), state: 'uploading' })
+      } else if (picked) setFiles(list => [...list, ...picked])
     } catch {
-      setProblem('没能添加')
+      setProblem('无法添加文件')
     }
   }
   return (
@@ -141,8 +167,8 @@ export function Composer({ placeholder, onSend, initial = '', disabled = false, 
               <View key={file.key} style={file.kind === 'image' ? styles.thumb : styles.fileChip}>
                 {file.kind === 'image'
                   ? <Image source={{ uri: file.uri }} style={styles.thumbImage} accessibilityLabel="照片" />
-                  : <><FileText size={16} color={colors.ink} strokeWidth={1.8} /><Text style={styles.fileName} numberOfLines={1}>{file.name}</Text></>}
-                <Pressable accessibilityRole="button" accessibilityLabel="移除" hitSlop={8} onPress={() => setFiles(list => list.filter(item => item.key !== file.key))} style={styles.remove}>
+                  : <><FileText size={16} color={colors.ink} strokeWidth={1.8} /><View style={{ flex: 1, minWidth: 0 }}><Text style={styles.fileName} numberOfLines={1}>{file.name}</Text>{file.kind === 'file' ? <Text numberOfLines={1} style={styles.problem}>{file.state === 'uploading' ? '上传中' : file.state === 'error' ? file.error : `${Math.ceil(file.size / 1024)} KB`}</Text> : null}</View>{file.kind === 'file' && file.state === 'error' ? <Pressable accessibilityRole="button" accessibilityLabel={`重试上传 ${file.name}`} hitSlop={14} disabled={blocked} onPress={() => void upload(file)}><RotateCw size={16} color={colors.secondary} /></Pressable> : null}</>}
+                <Pressable accessibilityRole="button" accessibilityLabel="移除" hitSlop={12} disabled={blocked} onPress={() => { if (blocked) return; setFiles(list => list.filter(item => item.key !== file.key)); if (file.kind === 'file' && file.uploaded) void api(`/api/chat/attachments/${file.uploaded.id}`, { method: 'DELETE' }).catch(() => {}) }} style={styles.remove}>
                   <X size={12} color={colors.onInk} strokeWidth={3} />
                 </Pressable>
               </View>
@@ -164,7 +190,7 @@ export function Composer({ placeholder, onSend, initial = '', disabled = false, 
           <TextInput ref={input} value={text} onChangeText={setText} placeholder={placeholder} editable={!blocked} multiline autoFocus={autoFocus}
             placeholderTextColor={colors.secondary} style={[styles.input, sending && { color: colors.secondary }]} />
           <View style={styles.fieldRow}>
-            {attach ? <AttachMenu images={images < MAX_IMAGES} onPick={pick} /> : null}
+            {attach ? <AttachMenu images={attachmentScope ? files.length < CHAT_FILE_MAX_COUNT : images < MAX_IMAGES} onPick={pick} onPasteImage={attachmentScope ? async image => { if (!blocked && files.length < CHAT_FILE_MAX_COUNT) { try { void upload(await pastedChatImage(image)) } catch { setProblem('无法粘贴图片') } } } : undefined} /> : null}
             {accessory}
             <View style={{ flex: 1 }} />
             {onStop && empty && !sending ? (
@@ -172,8 +198,8 @@ export function Composer({ placeholder, onSend, initial = '', disabled = false, 
                 <Square size={14} color={colors.onAccent} fill={colors.onAccent} strokeWidth={2.4} />
               </Pressable>
             ) : (
-              <Pressable accessibilityRole="button" accessibilityLabel="发送" accessibilityState={{ disabled: blocked || empty }} onPress={() => void send()} disabled={blocked}
-                style={[styles.send, (blocked || empty) && { backgroundColor: colors.tertiary }]}>
+              <Pressable accessibilityRole="button" accessibilityLabel="发送" accessibilityState={{ disabled: blocked || filesBlocked || empty }} onPress={() => void send()} disabled={blocked || filesBlocked || empty}
+                style={[styles.send, (blocked || filesBlocked || empty) && { backgroundColor: colors.tertiary }]}>
                 <ArrowUp size={20} color={colors.onAccent} strokeWidth={2.4} />
               </Pressable>
             )}

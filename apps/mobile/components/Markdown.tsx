@@ -6,6 +6,8 @@ import { runIcon } from '@/lib/thread-icon'
 import { Text } from '@/components/Text'
 import { runTitle, type CitationSource } from '@/lib/types'
 import { colors, font } from '@/lib/theme'
+import { splitChatFiles } from '@mikka/protocol/chat-attachments'
+import { ChatFiles } from './ChatFiles'
 
 /**
  * The Markdown the Coordinator and agents write, as the app shows it:
@@ -19,9 +21,11 @@ export function Markdown({ text, sources = {}, onOpen, color = colors.text }: {
   onOpen?: (source: CitationSource) => void
   color?: string
 }) {
-  const blocks = parseBlocks(text)
+  const parsed = splitChatFiles(text)
+  const blocks = parseBlocks(parsed.text)
   return (
     <View style={{ gap: 8 }}>
+      <ChatFiles files={parsed.files} />
       {blocks.map((block, index) => {
         switch (block.type) {
           case 'heading': return <Text selectable key={index} style={[styles.heading, { color }]}>{inline(block.text, sources, onOpen, color)}</Text>

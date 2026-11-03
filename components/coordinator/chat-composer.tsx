@@ -12,6 +12,9 @@ import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
 import { MESSAGE_MAX } from '@/lib/message-limits'
 import { sendsMessage, type SendKey } from '@/lib/send-key'
+import { CHAT_FILE_ACCEPT, type ChatFileScope } from '@mikka/protocol/chat-attachments'
+import { useChatFiles } from '@/components/chat/use-chat-files'
+import { ChatFileCards } from '@/components/chat/chat-file-cards'
 
 const MAX_LENGTH = MESSAGE_MAX
 
@@ -34,7 +37,7 @@ const SEND_DISABLED = 'disabled:bg-control disabled:text-muted-foreground disabl
  * The Grok-style composer every chat uses (Coordinator and bots): one rounded
  * bar, attach and the bot's model chip on the left, send on the right.
  */
-export function ChatComposer({ ref, value, onChange, onSubmit, label, placeholder, sending = false, running = false, editableWhileSending = false, submitDisabled = false, disabled = false, onStop, quote, model, sendKey = 'enter', thread = false }: {
+export function ChatComposer({ ref, value, onChange, onSubmit, label, placeholder, sending = false, running = false, editableWhileSending = false, submitDisabled = false, disabled = false, onStop, quote, model, sendKey = 'enter', thread = false, attachmentScope }: {
   ref: Ref<HTMLTextAreaElement | null>
   value: string
   onChange: (value: string) => void
@@ -60,12 +63,14 @@ export function ChatComposer({ ref, value, onChange, onSubmit, label, placeholde
   sendKey?: SendKey
   /** A thread's composer, not a bot chat's: choosing a chat focuses only the latter, and Esc never stops the run (decision 2026-11-02-0301). */
   thread?: boolean
+  attachmentScope?: ChatFileScope
 }) {
   const t = useTranslations('Coordinator')
   const tShell = useTranslations('Shell')
   const fileRef = useRef<HTMLInputElement>(null)
   const inputRef = useRef<HTMLTextAreaElement | null>(null)
   const fileId = useId()
+  const files = useChatFiles(value, onChange, attachmentScope, sending || disabled)
   const stoppable = !!onStop && (sending || (running && !value.trim()))
   const setInput = (node: HTMLTextAreaElement | null) => {
     inputRef.current = node
@@ -88,6 +93,7 @@ export function ChatComposer({ ref, value, onChange, onSubmit, label, placeholde
   }, [value])
 
   async function attach(files: File[]) {
+    if (sending || disabled || !files.length) return
     let next = value
     for (const file of files) {
       const block = await textAttachment(file, MAX_LENGTH - next.length - 2)
@@ -97,21 +103,42 @@ export function ChatComposer({ ref, value, onChange, onSubmit, label, placeholde
     onChange(next)
     inputRef.current?.focus()
   }
+  function addFiles(items: File[]) {
+    if (attachmentScope) files.add(items)
+    else void attach(items)
+  }
   function onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
     const { key, shiftKey, metaKey, ctrlKey } = event
     // In a bot chat Esc stops the reply, as the stop button does.
     if (key === 'Escape' && stoppable && !thread && !event.nativeEvent.isComposing) { event.preventDefault(); onStop?.(); return }
     if (!sendsMessage({ key, shiftKey, metaKey, ctrlKey, isComposing: event.nativeEvent.isComposing }, sendKey)) return
     event.preventDefault()
-    if (!sending && !submitDisabled && !disabled && value.trim()) onSubmit()
+    if (!sending && !submitDisabled && !disabled && !files.locked && value.trim()) onSubmit()
   }
 
-  return <form onSubmit={event => { event.preventDefault(); if (!sending && !submitDisabled && !disabled && value.trim()) onSubmit() }}>
-    <FieldGroup className="sr-only w-px"><Field><FieldLabel htmlFor={fileId}>{tShell('attach')}</FieldLabel><Input ref={fileRef} id={fileId} type="file" accept={TEXT_ATTACHMENT_ACCEPT} multiple className="sr-only" tabIndex={-1} onChange={event => { void attach(Array.from(event.target.files ?? [])); event.target.value = '' }} /></Field></FieldGroup>
-    <InputGroup className={COMPOSER}>
+  return <form onSubmit={event => { event.preventDefault(); if (!sending && !submitDisabled && !disabled && !files.locked && value.trim()) onSubmit() }}>
+    <FieldGroup className="sr-only w-px"><Field><FieldLabel htmlFor={fileId}>{tShell('attach')}</FieldLabel><Input ref={fileRef} id={fileId} type="file" accept={attachmentScope ? CHAT_FILE_ACCEPT : TEXT_ATTACHMENT_ACCEPT} multiple disabled={sending || disabled} className="sr-only" tabIndex={-1} onChange={event => { addFiles(Array.from(event.target.files ?? [])); event.target.value = '' }} /></Field></FieldGroup>
+    <InputGroup className={COMPOSER} onDragOver={event => {
+      if (!Array.from(event.dataTransfer.types).includes('Files')) return
+      event.preventDefault()
+      event.dataTransfer.dropEffect = sending || disabled ? 'none' : 'copy'
+    }} onDrop={event => {
+      const files = Array.from(event.dataTransfer.files)
+      if (!files.length) return
+      event.preventDefault()
+      event.stopPropagation()
+      addFiles(files)
+    }} onPaste={event => {
+      const files = Array.from(event.clipboardData.files)
+      if (!files.length) return
+      event.preventDefault()
+      event.stopPropagation()
+      addFiles(files)
+    }}>
       {quote && <InputGroupAddon align="block-start" className="px-2 pt-2 pb-0">{quote}</InputGroupAddon>}
+      {(files.files.length > 0 || files.pending.length > 0) && <InputGroupAddon align="block-start" className="px-2 pt-2 pb-0"><ChatFileCards files={files.files} pending={files.pending} onRemove={files.remove} onRetry={files.retry} /></InputGroupAddon>}
       {/* readOnly, not disabled: a disabled field drops focus, so the next key went to page shortcuts. */}
-      <InputGroupTextarea ref={setInput} aria-label={label} placeholder={placeholder ?? label} className={cn('max-h-48 min-w-0 overflow-x-hidden px-3.5 pt-3 pb-1 wrap-break-word', quote ? 'min-h-10' : 'min-h-14')} value={value} maxLength={MAX_LENGTH} rows={2} disabled={disabled || undefined} readOnly={sending && !onStop && !editableWhileSending} aria-busy={sending || undefined} onChange={event => onChange(event.target.value)} onKeyDown={onKeyDown} data-chat-composer={thread ? undefined : ''} />
+      <InputGroupTextarea ref={setInput} aria-label={label} placeholder={placeholder ?? label} className={cn('max-h-48 min-w-0 overflow-x-hidden px-3.5 pt-3 pb-1 wrap-break-word', quote ? 'min-h-10' : 'min-h-14')} value={files.text} maxLength={MAX_LENGTH - (value.length - files.text.length)} rows={2} disabled={disabled || undefined} readOnly={sending && !onStop && !editableWhileSending} aria-busy={sending || undefined} onChange={event => files.edit(event.target.value)} onKeyDown={onKeyDown} data-chat-composer={thread ? undefined : ''} />
       <InputGroupAddon align="block-end" className="justify-between px-2 pt-0 pb-2">
         <span className="flex min-w-0 items-center gap-1.5">
           <InputGroupButton type="button" variant="secondary" size="icon-sm" className="rounded-full pointer-coarse:size-11" aria-label={tShell('attach')} disabled={sending || disabled} onClick={() => fileRef.current?.click()}><Plus /></InputGroupButton>
@@ -119,7 +146,7 @@ export function ChatComposer({ ref, value, onChange, onSubmit, label, placeholde
         </span>
         {stoppable
           ? <InputGroupButton type="button" variant="default" size="icon-sm" className="rounded-full pointer-coarse:size-11" aria-label={t('stop')} onClick={onStop}><Square className="fill-current" /></InputGroupButton>
-          : <InputGroupButton type="submit" variant="default" size="icon-sm" className={cn('rounded-full pointer-coarse:size-11', SEND_DISABLED)} aria-label={t('send')} disabled={sending || submitDisabled || disabled || !value.trim()}>{sending ? <Spinner /> : <ArrowUp />}</InputGroupButton>}
+          : <InputGroupButton type="submit" variant="default" size="icon-sm" className={cn('rounded-full pointer-coarse:size-11', SEND_DISABLED)} aria-label={t('send')} disabled={sending || submitDisabled || disabled || files.locked || !value.trim()}>{sending ? <Spinner /> : <ArrowUp />}</InputGroupButton>}
       </InputGroupAddon>
     </InputGroup>
     {/* The limit is shown only when it is close enough to matter. */}

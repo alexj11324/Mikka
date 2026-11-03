@@ -1,3 +1,5 @@
+import { ChatFileError } from '@/lib/chat-attachments/extract'
+import { splitChatFiles } from '@mikka/protocol/chat-attachments'
 import { randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
 import { z } from 'zod'
@@ -167,6 +169,10 @@ export async function handleGroup(pool: Pool, directory: Directory, req: GroupRe
           ...(queueAgents ? { leadAgentId: group.leadAgentId ?? null, leadBotId: group.leadBotId ?? null, routingError: ['group_judgment_pending','group_lead_required'].includes(failed.rows[0]?.error) ? { code: 'group_judgment_pending' } : null, stopped: failed.rows[0]?.error === GROUP_TURN_STOPPED } : {}) }
       } else if (req.resource === 'messages' && req.method === 'POST') {
         const input = parse(message, req.body)
+        if (splitChatFiles(input.body).files.length) {
+          const { validateChatFiles } = await import('./chat-attachments/store')
+          await validateChatFiles(userId, { kind: 'group', id: req.id! }, input.body, client)
+        }
         // Group-selected agents belong to the creator, not necessarily this sender.
         // Caller membership was verified above; directory ownership plus current
         // group membership below still excludes arbitrary/private agent assignment.
@@ -214,6 +220,7 @@ export async function handleGroup(pool: Pool, directory: Directory, req: GroupRe
     return { status, body: result }
   } catch (error) {
     if (client) await client.query('ROLLBACK')
+    if (error instanceof ChatFileError) return { status: error.code === 'notFound' ? 404 : 422, body: { error: error.code } }
     if (error instanceof Failure) return { status: error.status, body: { error: ({ 401: 'unauthorized', 403: 'forbidden', 404: 'not_found', 422: 'invalid_input', 405: 'method_not_allowed' } as Record<number, string>)[error.status] } }
     throw error
   } finally { client?.release() }

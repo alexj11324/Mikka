@@ -10,6 +10,7 @@ import { ACTION_ERROR_CODES, type ActionErrorCode } from '@/lib/action-result'
 import { addRunMessage } from '@/lib/agent-runs'
 import { readRunChain } from '@/lib/run-chain'
 import { UNFINISHED_RUN_STATUSES } from '@/lib/agent-run-statuses'
+import { splitChatFiles } from '@mikka/protocol/chat-attachments'
 
 type Source = Parameters<typeof addRunMessage>[2]
 const isActionErrorCode = (code: string): code is ActionErrorCode => (ACTION_ERROR_CODES as readonly string[]).includes(code)
@@ -29,6 +30,10 @@ export async function sendThreadMessage(userId: string, runId: string, text: str
   // The owner's chain only: a teammate who can see a shared thread cannot run it.
   const chain = await readRunChain(pool, userId, parsed.data.runId)
   if (!chain) throw new ActionFailureError('runNotFound')
+  if (splitChatFiles(parsed.data.text).files.length) {
+    const { validateChatFiles } = await import('@/lib/chat-attachments/store')
+    try { await validateChatFiles(userId, { kind: 'thread', id: parsed.data.runId }, parsed.data.text) } catch { throw new ActionFailureError('messageRequired') }
+  }
   const latest = chain.attempts.find(attempt => attempt.runId === chain.latestRunId)!
   if (UNFINISHED_RUN_STATUSES.some(status => status === latest.status)) {
     await addRunMessage(userId, { runId: latest.runId, text: parsed.data.text }, source)

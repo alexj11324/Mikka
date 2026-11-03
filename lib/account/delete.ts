@@ -180,6 +180,9 @@ export async function accountStorageKeys(client: Pick<PoolClient, 'query'>, user
        CASE "contentType" WHEN 'image/png' THEN 'png' WHEN 'image/jpeg' THEN 'jpg' WHEN 'image/webp' THEN 'webp' WHEN 'video/mp4' THEN 'mp4' WHEN 'video/webm' THEN 'webm' END,"expiresAt"
        from run_captures where "userId"=$1 AND source='local' AND "expiresAt" IS NOT NULL and not ("runId" is not null and "runId" = any($2::uuid[]))
      union all select "storageKey",NULL from user_avatars where "userId"=$1 and "storageKey" is not null
+     union all select "storageKey",NULL from chat_attachments where "userId"=$1 and "storageKey" is not null
+     union all select "uploadKey","uploadExpiresAt" from chat_attachments where "userId"=$1 and "uploadKey" is not null
+     union all select "storageKey","notBefore" from chat_attachment_retirements where "userId"=$1
      union all select "storageKey",NULL from account_storage_retirements where "userId"=$1`, [userId, runs])
   return { keys: [...new Set(rows.map(row => row.key).filter((key): key is string => Boolean(key)))], notBefore: new Date(Math.max(Date.now(), ...rows.map(row => row.expiresAt?.getTime() ?? 0))) }
 }

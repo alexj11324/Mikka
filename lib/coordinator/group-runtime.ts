@@ -12,6 +12,8 @@ import { createGroupJudgment } from './group-judgment'
 import { invokeDecision } from './decide'
 import { freezeGroupBotModel, resolveGroupBotModel } from './group-bot-model'
 import { groupReplySystemPrompt } from './group-reply-prompt'
+import { splitChatFiles } from '@mikka/protocol/chat-attachments'
+import type { UserModelMessage } from 'ai'
 
 /** Chat only: selected owner's public role description only, no private standing instructions, tools or agent sessions,
  * credentials or device/issue execution. Group messages are quoted untrusted data.
@@ -43,12 +45,20 @@ export const groupRuntime: GroupRuntime = {
     // 停止 in the group aborts it too (lib/coordinator/group-turns.ts).
     const signal = input.signal ? AbortSignal.any([AbortSignal.timeout(20000), input.signal]) : AbortSignal.timeout(20000)
     let streamFailure: unknown
+    const prompt = JSON.stringify({ message: input.message, currentMembers: input.members, earlierReplies: input.earlier, responseGuidance: input.followUp, clarificationAgentId: input.ask, privatePeer: input.privatePeer })
+    let content: UserModelMessage['content'] = prompt
+    if (splitChatFiles(input.message.text).files.length) {
+      if (!input.attachmentContext) throw Error('attachmentContextRequired')
+      const { chatFileContent } = await import('@/lib/chat-attachments/store')
+      const parts = await chatFileContent(input.attachmentContext.userId, { kind: 'group', id: input.attachmentContext.conversationId }, input.message.text)
+      content = [{ type: 'text', text: prompt }, ...parts.slice(1)]
+    }
     const options = {
       model: agent.memberType === 'bot'
         ? await resolveGroupBotModel({ ownerId: scope.ownerId!, workspaceId: scope.workspaceId, botId: agent.id }, input.modelRuntime ?? (() => { throw Error('group_bot_model_unavailable') })(), signal)
         : await hostedModel(scope.workspaceId,COORDINATOR_MODEL,undefined,scope.ownerId),
       system: groupReplySystemPrompt(agent),
-      prompt: JSON.stringify({ message: input.message, currentMembers: input.members, earlierReplies: input.earlier, responseGuidance: input.followUp, clarificationAgentId: input.ask, privatePeer: input.privatePeer }),
+      messages: [{ role: 'user' as const, content }],
       output: Output.object({ schema: z.object({ text: z.string().max(32000), mentions: z.array(z.string().uuid()).max(100), privateTo: z.uuid().nullable() }) }),
       maxOutputTokens: 4000, maxRetries: 0, abortSignal: signal,
       onError: ({ error }: { error: unknown }) => { streamFailure = error },

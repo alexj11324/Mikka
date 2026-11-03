@@ -129,7 +129,7 @@ export default function GroupChat() {
           {sendFailed ? <Text style={styles.error}>没发出去</Text> : null}
         </KeyboardChatScrollView>
       </View>
-      <Composer value={text} onChangeText={setText} placeholder={`发到 ${title || '群聊'}`} onSend={words => send(words)} overlay onHeight={setComposerHeight}
+      <Composer value={text} onChangeText={setText} placeholder={`发到 ${title || '群聊'}`} onSend={words => send(words)} attach attachmentScope={{ kind: 'group', id }} overlay onHeight={setComposerHeight}
         quote={quote} onClearQuote={() => setQuote(null)} onStop={working && !stopping ? () => void stop() : undefined} />
     </View>
   )

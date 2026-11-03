@@ -29,3 +29,8 @@ test('a cloud desktop token reaches the GitHub credential route of its own devic
   assert.equal(await cloudDeviceScopeAllows(req(`/mikka/v1/devices/${own}/github-token`, { method: 'POST' }), own, belongs), true)
   for (const path of [`/v1/devices/${other}/github-token`, `/v1/devices/${own}/github-token/extra`]) assert.equal(await cloudDeviceScopeAllows(req(path), own, belongs), false)
 })
+
+test('cloud device attachment reads require its own run and explicit file identity', async () => {
+  assert.equal(await cloudDeviceScopeAllows(req(`/mikka/v1/devices/${own}/runs/${run}/attachments/${other}`), own, belongs), true)
+  for (const path of [`/v1/devices/${other}/runs/${run}/attachments/${other}`, `/v1/devices/${own}/runs/${other}/attachments/${other}`, `/v1/devices/${own}/runs/${run}/attachments/anything`, `/v1/devices/${own}/runs/${run}/attachments/${other}/extra`]) assert.equal(await cloudDeviceScopeAllows(req(path), own, belongs), false)
+})

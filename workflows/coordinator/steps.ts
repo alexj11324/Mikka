@@ -268,6 +268,13 @@ export async function preparePrompt(userId: string, botId: string, snapshot?: De
   }
 
   let { summary, memory, messages } = await store.loadConversation(userId, botId)
+  if (messages.some(row => 'mikkaUserEvent' in row.message && typeof row.message.content === 'string' && row.message.content.includes('[mikka-file:'))) {
+    const { chatFileContent } = await import('@/lib/chat-attachments/store')
+    messages = await Promise.all(messages.map(async row => {
+      if (!('mikkaUserEvent' in row.message) || row.message.role !== 'user' || typeof row.message.content !== 'string' || !row.message.content.includes('[mikka-file:')) return row
+      return { ...row, message: { ...row.message, content: await chatFileContent(userId, { kind: 'bot', id: botId }, row.message.content) } }
+    }))
+  }
   const summaryTrust = { key: process.env.BETTER_AUTH_SECRET ?? '', scope: JSON.stringify([userId, botId]) }
   const cut = compactionCut(summary, messages, summaryTrust)
   if (cut !== null) {

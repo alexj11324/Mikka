@@ -5,6 +5,7 @@
   "private": true,
   "license": "AGPL-3.0-only",
   "exports": {
+    "./chat-attachments": "./src/chat-attachments.ts",
     "./mailbox": "./src/mailbox.ts",
     "./personal-agent-message": "./src/personal-agent-message.ts",
     "./web-url-schema": "./src/web-url-schema.ts",

@@ -459,7 +459,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
       {unanswered && <Alert variant="destructive"><AlertTitle>{t('unavailable', { name })}</AlertTitle></Alert>}
       {botId && <SubagentLoginNeeds botId={botId} />}
       <PendingActions />
-      <ChatComposer ref={inputRef} label={bot ? t('inputTo', { name: bot.name }) : t('input')} placeholder={placeholder} value={draft} onChange={updateDraft} sending={sending || stopping} editableWhileSending={stopping} onSubmit={() => { void send() }}
+      <ChatComposer ref={inputRef} label={bot ? t('inputTo', { name: bot.name }) : t('input')} placeholder={placeholder} value={draft} onChange={updateDraft} sending={sending || stopping} editableWhileSending={stopping} onSubmit={() => { void send() }} attachmentScope={data?.botId ? { kind: 'bot', id: data.botId } : undefined}
         running={working && !stopping} onStop={(working || sending) && !stopping ? () => { void stop() } : undefined}
         model={<BotModelPicker botId={botId ?? null} running={working || sending} />}
         quote={embedded?.quote || replyQuote || noteCount ? <div className="flex w-full min-w-0 flex-col items-start gap-0.5">

@@ -6,7 +6,7 @@ import { artifactFileName } from '@/lib/artifacts/limits'
 import { getArtifactObjectStream } from '@/lib/artifacts/storage'
 import type { AccountExport } from './export'
 
-type FileKind = 'artifact' | 'capture' | 'checkpoint'
+type FileKind = 'artifact' | 'capture' | 'checkpoint' | 'attachment'
 interface File {
   kind: FileKind; id: string; name: string; size: number | null; sha256: string | null
   contentType: string; unavailable?: string; artifactId?: string; version?: number; runId?: string
@@ -17,13 +17,14 @@ const RECHECK_BYTES = 1024 * 1024
 
 /** Select only owned metadata first; load a single file at a time, never all recording/checkpoint bytes. */
 export async function accountExportFiles(userId: string, database: Pool = pool): Promise<File[]> {
-  const [artifacts, captures, checkpoints] = await Promise.all([
+  const [artifacts, captures, checkpoints, attachments] = await Promise.all([
     database.query<{ id: string; artifactId: string; kind: 'html' | 'markdown'; title: string; version: number; size: number; sha256: string }>(`SELECT v.id,v."artifactId",a.kind,a.title,v.version,v.size,v.sha256
       FROM artifact_versions v JOIN artifacts a ON a.id=v."artifactId" WHERE a."userId"=$1 ORDER BY v."artifactId",v.version`, [userId]),
     database.query<{ id: string; runId: string; status: string; contentType: string; size: number | null; sha256: string | null }>(`SELECT c.id,c."runId",c.status,c."contentType",c.size,c.sha256 FROM run_captures c
       JOIN agent_runs r ON r.id=c."runId" WHERE c."userId"=$1 AND r."userId"=$1 ORDER BY c."createdAt",c.id`, [userId]),
     database.query<{ id: string; size: number; sha256: string; baseCommit: string; files: number; takenAt: Date; updatedAt: Date; unavailableReason: string | null }>(`SELECT c."runId" AS id,octet_length(c.patch)::int AS size,encode(sha256(c.patch),'hex') AS sha256,c."baseCommit",c.files,c."takenAt",c."updatedAt",c."unavailableReason" FROM run_checkpoints c
       JOIN agent_runs r ON r.id=c."runId" WHERE c."userId"=$1 AND r."userId"=$1 ORDER BY c."runId"`, [userId]),
+    database.query<{ id: string; name: string; size: number; sha256: string; mediaType: string }>('SELECT id,name,size,sha256,"mediaType" FROM chat_attachments WHERE "userId"=$1 AND state=\'ready\' AND "removedAt" IS NULL ORDER BY "createdAt",id', [userId]),
   ])
   return [
     ...artifacts.rows.map(row => ({ kind: 'artifact' as const, id: row.id, artifactId: row.artifactId, version: row.version,
@@ -33,10 +34,12 @@ export async function accountExportFiles(userId: string, database: Pool = pool):
     ...checkpoints.rows.map(row => ({ kind: 'checkpoint' as const, id: row.id, runId: row.id, name: `run-${row.id}.patch.gz`, contentType: 'application/gzip',
       baseCommit: row.baseCommit, files: row.files, takenAt: row.takenAt.toISOString(), updatedAt: row.updatedAt.toISOString(),
       size: row.size, sha256: row.sha256, ...(row.unavailableReason ? { unavailable: `checkpoint_${row.unavailableReason}` } : {}) })),
+    ...attachments.rows.map(row => ({ kind: 'attachment' as const, id: row.id, name: row.name, contentType: row.mediaType, size: row.size, sha256: row.sha256 })),
   ]
 }
 
 async function ownedFile(database: Pool, userId: string, file: File, content: boolean, includeUnavailable = false) {
+  if (file.kind === 'attachment') return (await database.query<{ storageKey?: string | null; inlineContent?: Buffer | null }>(`SELECT id${content ? ',"storageKey","inlineData" AS "inlineContent"' : ''} FROM chat_attachments WHERE id=$1 AND "userId"=$2 AND state='ready' AND "removedAt" IS NULL`, [file.id, userId])).rows[0]
   const projection = content ? ',v."storageKey",v."inlineContent"' : ''
   if (file.kind === 'artifact') return (await database.query<{ storageKey?: string; inlineContent?: string | null }>(`SELECT v.id${projection} FROM artifact_versions v JOIN artifacts a ON a.id=v."artifactId" WHERE v.id=$1 AND a."userId"=$2`, [file.id, userId])).rows[0]
   if (file.kind === 'capture') return (await database.query<{ storageKey?: string | null; inlineContent?: Buffer | null }>(`SELECT c.id${content ? ',c."storageKey",c."inlineContent"' : ''} FROM run_captures c JOIN agent_runs r ON r.id=c."runId" WHERE c.id=$1 AND c."userId"=$2 AND r."userId"=$2 ${includeUnavailable ? '' : "AND c.status='ready'"}`, [file.id, userId])).rows[0]
