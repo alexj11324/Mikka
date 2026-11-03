@@ -1,3 +1,4 @@
+import 'next/dist/server/node-environment-baseline'
 import assert from 'node:assert/strict'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { spawn } from 'node:child_process'
@@ -22,6 +23,143 @@ const dbTest = databaseUrl ? test : test.skip
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, ...Buffer.from('IHDR-test-image')])
 const MP4 = new Uint8Array([0, 0, 0, 0x18, ...Buffer.from('ftypisom-test-video')])
 const sha = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex')
+
+dbTest('artifact evidence follows each real submission version, not the artifact creator or mutable latest version', async t => {
+  const [{ createRequestDatabaseScope, pool }, { submitArtifact, readArtifactContent }, { runEvidence }, { artifactStorage }, { workAsyncStorage }, { workUnitAsyncStorage }] = await Promise.all([
+    import('../db'), import('../artifacts/store'), import('./store'), import('../artifacts/storage'),
+    import('next/dist/server/app-render/work-async-storage.external'), import('next/dist/server/app-render/work-unit-async-storage.external'),
+  ])
+  const scope = createRequestDatabaseScope(databaseUrl!)
+  const alice = `artifact-versions-${randomUUID()}`, bob = `artifact-foreign-${randomUUID()}`
+  const agentId = randomUUID(), otherAgentId = randomUUID(), issueId = randomUUID(), otherIssueId = randomUUID()
+  const firstRun = randomUUID(), nextRun = randomUUID(), otherRun = randomUUID()
+  // Only the post-response scheduler is a fixture. Submit, receipt, version,
+  // evidence and file reads use their real code and the isolated database.
+  let scheduled = 0
+  const afterContext = { after: () => { scheduled++ } }
+  const request = { type: 'request', phase: 'action' } as NonNullable<ReturnType<typeof workUnitAsyncStorage.getStore>>
+  const submit = (runId: string, input: Parameters<typeof submitArtifact>[1], userId = alice, issue: string = issueId) => workAsyncStorage.run(
+    { afterContext } as unknown as NonNullable<ReturnType<typeof workAsyncStorage.getStore>>,
+    () => workUnitAsyncStorage.run(request, () => submitArtifact({ userId, runId, issueId: issue, authorName: 'Fixture Agent' }, input)),
+  )
+  t.after(async () => {
+    await scope.run(async () => {
+      await pool.query('DELETE FROM coordinator_events WHERE "userId"=ANY($1::text[])', [[alice, bob]])
+      await pool.query('DELETE FROM artifacts WHERE "userId"=ANY($1::text[])', [[alice, bob]])
+      await pool.query('DELETE FROM agent_runs WHERE id=ANY($1::uuid[])', [[firstRun, nextRun, otherRun]])
+      await pool.query('DELETE FROM issues WHERE id=ANY($1::uuid[])', [[issueId, otherIssueId]])
+      await pool.query('DELETE FROM agents WHERE id=ANY($1::uuid[])', [[agentId, otherAgentId]])
+      await pool.query('DELETE FROM "user" WHERE id=ANY($1::text[])', [[alice, bob]])
+    })
+    await scope.close()
+  })
+  await scope.run(async () => {
+    assert.equal(artifactStorage(), 'inline')
+    for (const userId of [alice, bob]) await pool.query('INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES($1,$1,$2,true,now(),now())', [userId, `${userId}@example.invalid`])
+    for (const [id, owner] of [[agentId, alice], [otherAgentId, bob]]) await pool.query(`INSERT INTO agents(id,"userId",harness,name) VALUES($1,$2,'codex','Fixture Agent')`, [id, owner])
+    for (const [id, owner] of [[issueId, alice], [otherIssueId, bob]]) await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority) VALUES($1,$2,'Version fixture','{}','todo','normal')`, [id, owner])
+    for (const [id, owner, agent, issue] of [[firstRun, alice, agentId, issueId], [nextRun, alice, agentId, issueId], [otherRun, bob, otherAgentId, otherIssueId]]) {
+      await pool.query(`INSERT INTO agent_runs(id,"userId","agentId","issueId",status) VALUES($1,$2,$3,$4,'succeeded')`, [id, owner, agent, issue])
+    }
+    const firstBytes = '# Original\nfirst requested file\n', nextBytes = '# Updated\nnew requested file\n'
+    const first = await submit(firstRun, { title: 'Original file', kind: 'markdown', content: firstBytes })
+    assert.ok(!('error' in first))
+    const next = await submit(nextRun, { artifactId: first.artifactId, title: 'Updated file', kind: 'markdown', content: nextBytes })
+    assert.ok(!('error' in next)); assert.equal(next.artifactId, first.artifactId); assert.equal(next.version, 2)
+
+    await t.test('v2 belongs to the continuation and each run downloads its own bytes', async () => {
+      const older = await runEvidence(alice, firstRun), newer = await runEvidence(alice, nextRun)
+      assert.deepEqual(older?.artifacts.map(row => [row.id, row.latestVersion]), [[first.artifactId, 1]])
+      assert.deepEqual(newer?.artifacts.map(row => [row.id, row.latestVersion]), [[first.artifactId, 2]])
+      assert.equal((await readArtifactContent(alice, older!.artifacts[0].id, older!.artifacts[0].latestVersion))?.content, firstBytes)
+      assert.equal((await readArtifactContent(alice, newer!.artifacts[0].id, newer!.artifacts[0].latestVersion))?.content, nextBytes)
+      const original = (await pool.query('SELECT "runId","latestVersion" FROM artifacts WHERE id=$1', [first.artifactId])).rows[0]
+      assert.deepEqual(original, { runId: firstRun, latestVersion: 2 }, 'the creator is immutable, while global latest remains useful outside per-run evidence')
+      const receipts = (await pool.query(`SELECT "runId",payload->>'version' AS version FROM coordinator_events WHERE "dedupeKey" LIKE $1 ORDER BY "dedupeKey"`, [`artifact_submitted:${first.artifactId}:%`])).rows
+      assert.deepEqual(receipts, [{ runId: firstRun, version: '1' }, { runId: nextRun, version: '2' }])
+      assert.equal(scheduled, 2)
+    })
+
+    await t.test('a foreign owner cannot read the run, replace the file, or download its version', async () => {
+      assert.equal(await runEvidence(bob, nextRun), null)
+      assert.equal(await readArtifactContent(bob, first.artifactId, 2), null)
+      const denied = await submit(otherRun, { artifactId: first.artifactId, title: 'Foreign', kind: 'markdown', content: 'must not overwrite' }, bob, otherIssueId)
+      assert.ok('error' in denied); assert.equal(denied.error, 'not_found')
+    })
+
+    const seed = async (owner = alice, runId = firstRun, issue = issueId) => {
+      const id = randomUUID()
+      await pool.query(`INSERT INTO artifacts(id,"userId","runId","issueId",kind,title,"latestVersion") VALUES($1,$2,$3,$4,'markdown','Legacy fixture',2)`, [id, owner, runId, issue])
+      for (const version of [1, 2]) await pool.query(`INSERT INTO artifact_versions(id,"artifactId",version,"storageKey","inlineContent",sha256,size,"authorName") VALUES($1,$2,$3,'fixture',$4,$5,1,'Fixture')`, [randomUUID(), id, version, String(version), sha(Buffer.from(String(version)))])
+      return id
+    }
+    await t.test('legacy creator association falls back only to the original existing v1', async () => {
+      const legacyId = await seed()
+      assert.equal((await runEvidence(alice, firstRun))?.artifacts.find(row => row.id === legacyId)?.latestVersion, 1)
+      assert.ok(!(await runEvidence(alice, nextRun))?.artifacts.some(row => row.id === legacyId))
+    })
+
+    await t.test('unrelated, foreign, malformed and nonexistent-version events cannot forge a current-run artifact', async () => {
+      const id = await seed(), foreignId = await seed(bob, otherRun, otherIssueId)
+      const cases = [
+        { artifactId: id, userId: bob },
+        { artifactId: id, issueId: otherIssueId },
+        { artifactId: id, runId: otherRun },
+        { artifactId: id, kind: 'user_message' },
+        { artifactId: id, dedupeKey: 'model-authored-result' },
+        { artifactId: id, version: 3 },
+        { artifactId: id, version: '2' },
+        { artifactId: id, version: '2 invalid' },
+        { artifactId: foreignId },
+      ]
+      for (const change of cases) {
+        const event = { id: randomUUID(), userId: alice, runId: nextRun, issueId, kind: 'artifact_submitted', version: 2 as number | string, ...change }
+        const dedupeKey = 'dedupeKey' in change ? change.dedupeKey : `artifact_submitted:${event.artifactId}:${event.version}`
+        await pool.query('INSERT INTO coordinator_events(id,"userId","runId","issueId",kind,"dedupeKey",payload) VALUES($1,$2,$3,$4,$5,$6,$7)', [event.id, event.userId, event.runId, event.issueId, event.kind, dedupeKey, JSON.stringify({ artifactId: event.artifactId, version: event.version, title: 'Untrusted result' })])
+        try { assert.deepEqual((await runEvidence(alice, nextRun))?.artifacts.map(row => row.id), [first.artifactId]) }
+        finally { await pool.query('DELETE FROM coordinator_events WHERE id=$1', [event.id]) }
+      }
+    })
+
+    await t.test('a failed receipt write rolls back both the version and mutable latest pointer', async () => {
+      const guard = `artifact_receipt_${randomUUID().replaceAll('-', '')}`
+      await pool.query(`CREATE FUNCTION ${guard}() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'fixture_artifact_receipt_failure'; END $$`)
+      await pool.query(`CREATE TRIGGER ${guard} BEFORE INSERT ON coordinator_events FOR EACH ROW WHEN (NEW."userId"='${alice}' AND NEW.kind='artifact_submitted') EXECUTE FUNCTION ${guard}()`)
+      try {
+        await assert.rejects(submit(nextRun, { artifactId: first.artifactId, title: 'Interrupted file', kind: 'markdown', content: 'uncommitted version' }), error => (error as { cause?: { message?: string } }).cause?.message === 'fixture_artifact_receipt_failure')
+      } finally { await pool.query(`DROP TRIGGER ${guard} ON coordinator_events`); await pool.query(`DROP FUNCTION ${guard}()`) }
+      assert.equal((await pool.query('SELECT "latestVersion" FROM artifacts WHERE id=$1', [first.artifactId])).rows[0].latestVersion, 2)
+      assert.deepEqual((await pool.query('SELECT version FROM artifact_versions WHERE "artifactId"=$1 ORDER BY version', [first.artifactId])).rows.map(row => row.version), [1, 2])
+      assert.equal(scheduled, 2, 'a rolled-back submission never schedules a wake')
+    })
+
+    await t.test('owner evidence exposes only valid frozen execution identity, without credentials or live revalidation', async () => {
+      assert.equal((await runEvidence(alice, nextRun))?.run.executionIdentity, null, 'historical runs are explicitly unknown')
+      const frozen = {
+        version: 1, requester: alice, botId: null, botOwner: null, executionPrincipal: alice,
+        workspaceId: null, outputOwner: alice, personalResourcePolicy: 'requester_only',
+        resourceBindings: [{ kind: 'api_key', id: 'former-key-reference', ownerId: alice, access: 'owner' }],
+        billingAccount: {
+          model: { kind: 'api_key', ownerId: alice, resourceId: 'former-key-reference', amount: 'metered' },
+          runtime: { kind: 'local_device', ownerId: alice, resourceId: 'former-device-reference', amount: 'not_applicable' },
+        },
+      }
+      const secretMarker = 'private-credential-must-not-appear'
+      const definition = { harness: 'codex', model: 'deepseek-flash', instructions: secretMarker, apiKey: { keyId: 'former-key-reference', secret: secretMarker }, executionIdentity: {
+        ...frozen, token: secretMarker,
+        resourceBindings: frozen.resourceBindings.map(resource => ({ ...resource, ciphertext: secretMarker })),
+        billingAccount: { ...frozen.billingAccount, model: { ...frozen.billingAccount.model, secret: secretMarker } },
+      } }
+      await pool.query('UPDATE agent_runs SET "agentDefinition"=$2 WHERE id=$1', [nextRun, JSON.stringify(definition)])
+      const evidence = await runEvidence(alice, nextRun)
+      assert.deepEqual(evidence?.run.executionIdentity, frozen, 'deleted resources do not rewrite historical payer/owner facts')
+      assert.ok(!JSON.stringify(evidence).includes(secretMarker)); assert.ok(!('agentDefinition' in evidence!.run))
+      assert.equal(await runEvidence(bob, nextRun), null)
+      await pool.query(`UPDATE agent_runs SET "agentDefinition"=jsonb_set("agentDefinition",'{executionIdentity,version}','99') WHERE id=$1`, [nextRun])
+      assert.equal((await runEvidence(alice, nextRun))?.run.executionIdentity, null, 'an invalid frozen snapshot is not returned as authority')
+    })
+  })
+})
 
 dbTest('captures stay with their run\'s owner, uploads are checked, and recordings end with their run', async t => {
   const [{ createRequestDatabaseScope, pool }, store, { ScreenCaptures }, { artifactStorage }] = await Promise.all([
@@ -67,6 +205,7 @@ dbTest('captures stay with their run\'s owner, uploads are checked, and recordin
     await pool.query(`UPDATE agent_runs SET "leaseExpiresAt"=now()+interval '5 minutes' WHERE id=$1`, [cloudRun])
     await pool.query(`INSERT INTO computer_run_bindings ("runId","botId","workspaceId","ownerId") VALUES ($1,$2,$3,$4)`, [cloudRun, botId, workspaceId, alice])
     await pool.query(`INSERT INTO artifacts (id,"userId",kind,title,"runId") VALUES ($1,$2,'markdown','Acceptance notes',$3)`, [artifactId, alice, cloudRun])
+    await pool.query(`INSERT INTO artifact_versions(id,"artifactId",version,"storageKey","inlineContent",sha256,size,"authorName") VALUES($1,$2,1,'fixture','Acceptance notes',$3,16,'Fixture')`, [randomUUID(), artifactId, sha(Buffer.from('Acceptance notes'))])
 
     const local = { userId: alice, runId: localRun, issueId: null, botId: null }
 

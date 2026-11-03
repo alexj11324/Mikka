@@ -28,14 +28,16 @@ test('PG: group delegation has one Task/Thread, requester scope, replay receipt,
     await client.query(await readFile(new URL('../../drizzle/20261029043634_group_turns.sql',import.meta.url),'utf8'))
     await client.query(`CREATE TABLE bots (id uuid PRIMARY KEY); CREATE TABLE issues(id uuid PRIMARY KEY,title text,"userId" text);
       CREATE TABLE attention_settings("userId" text PRIMARY KEY,locale text);
-      CREATE TABLE coordinator_events(id uuid PRIMARY KEY,"userId" text,"botId" uuid,"issueId" uuid,kind text,"dedupeKey" text,payload jsonb,tier text,"deliveredAt" timestamptz);
+      CREATE TABLE coordinator_events(id uuid PRIMARY KEY,"userId" text,"botId" uuid,"issueId" uuid,"runId" uuid,kind text,"dedupeKey" text,payload jsonb,tier text,"deliveredAt" timestamptz);
       CREATE TABLE factory_tasks(id uuid PRIMARY KEY,"userId" text,"botId" uuid,"issueId" uuid,"attemptId" uuid,status text,stage text,revision integer,"sourceEventId" uuid,"createdAt" timestamptz DEFAULT now());
       CREATE TABLE factory_attempts(id uuid PRIMARY KEY,"taskId" uuid,"runId" uuid,output jsonb DEFAULT '{}');
       CREATE TABLE factory_candidates(id uuid PRIMARY KEY,"taskId" uuid,"runId" uuid,kind text);
       CREATE TABLE factory_deliverable_acceptances(id uuid PRIMARY KEY,"taskId" uuid,"candidateId" uuid,"userId" text);
       CREATE TABLE factory_merges(id uuid PRIMARY KEY,"taskId" uuid,"candidateId" uuid,"userId" text,status text);
-      CREATE TABLE artifacts(id uuid PRIMARY KEY,"runId" uuid,"issueId" uuid,"userId" text,"updatedAt" timestamptz DEFAULT now());
-      CREATE TABLE test_runs(id uuid PRIMARY KEY,"issueId" uuid,"threadId" uuid,"userId" text,"botId" uuid);`)
+      CREATE TABLE artifacts(id uuid PRIMARY KEY,"runId" uuid,"issueId" uuid,"userId" text,kind text DEFAULT 'markdown',title text DEFAULT 'Fixture',"updatedAt" timestamptz DEFAULT now());
+      CREATE TABLE artifact_versions("artifactId" uuid,version integer,"createdAt" timestamptz DEFAULT now());
+      CREATE TABLE test_runs(id uuid PRIMARY KEY,"issueId" uuid,"threadId" uuid,"userId" text,"botId" uuid);
+      CREATE VIEW agent_runs AS SELECT id,"issueId","userId" FROM test_runs;`)
     await client.query('ALTER TABLE factory_tasks ADD COLUMN "candidateId" uuid')
     await client.query(await readFile(new URL('../../drizzle/20261031153511_group_bot_members.sql',import.meta.url),'utf8'))
     await client.query(await readFile(new URL('../../drizzle/20261103220000_group_factory.sql',import.meta.url),'utf8'))
@@ -112,6 +114,7 @@ test('PG: group delegation has one Task/Thread, requester scope, replay receipt,
     await client.query(`UPDATE factory_tasks SET stage='monitor',status='passed',revision=revision+1`)
     const artifactId=randomUUID()
     await client.query('INSERT INTO artifacts(id,"runId","issueId","userId") VALUES($1,$2,$3,\'requester\')',[artifactId,refs[0].runId,refs[0].issueId])
+    await client.query('INSERT INTO artifact_versions("artifactId",version) VALUES($1,1)',[artifactId])
     assert.equal(await reconcileGroupTaskReports(conversationId,{pool,authorize:adapters.authorize}),1)
     assert.equal(await reconcileGroupTaskReports(conversationId,{pool,authorize:adapters.authorize}),0)
     const reports=(await client.query(`SELECT "authorId",body FROM conversation_messages WHERE "authorType"='bot'`)).rows
@@ -216,8 +219,17 @@ for(const kind of ['deliverable','repository'] as const)test(`PG: real Factory $
       state=await store.apply(userId,binding(state.task),randomUUID(),{action:'finish',status:'passed',reason:'Synthetic independent upstream evidence',evidence:[evidence],output:{}})
       state=await store.apply(userId,binding(state.task),randomUUID(),{action:'advance',stage:stage==='execute'?'review':stage==='review'?'verify':'approval',reason:'Proceed through real store'})
     }
-    const artifactId=randomUUID(),conversationId=randomUUID(),messageId=randomUUID()
-    await pool.query(`INSERT INTO artifacts(id,"userId","runId","issueId",title,kind) VALUES($1,$2,$3,$4,'Accepted file','markdown')`,[artifactId,userId,producerRun,issueId])
+    const artifactId=randomUUID(),staleArtifactId=randomUUID(),oldRun=randomUUID(),conversationId=randomUUID(),messageId=randomUUID()
+    await pool.query(`INSERT INTO agent_runs(id,"userId","botId","issueId","agentId",status) VALUES($1,$2,$3,$4,$5,'succeeded')`,[oldRun,userId,botId,issueId,agentId])
+    // The continuation updates the same artifact created by an earlier run.
+    // Only its v2 host receipt associates it with the current request epoch.
+    for(const id of [artifactId,staleArtifactId]) {
+      await pool.query(`INSERT INTO artifacts(id,"userId","runId","issueId",title,kind,"latestVersion") VALUES($1,$2,$3,$4,'Accepted file','markdown',$5)`,[id,userId,oldRun,issueId,id===artifactId?2:1])
+      for(const [version,runId] of (id===artifactId?[[1,oldRun],[2,producerRun]]:[[1,oldRun]]) as [number,string][]) {
+        await pool.query(`INSERT INTO artifact_versions(id,"artifactId",version,"storageKey","inlineContent",sha256,size,"authorName") VALUES($1,$2,$3,'fixture','accepted bytes',$4,14,'Fixture')`,[randomUUID(),id,version,'a'.repeat(64)])
+        await pool.query(`INSERT INTO coordinator_events(id,"userId","botId","issueId","runId",kind,"dedupeKey",payload) VALUES($1,$2,$3,$4,$5,'artifact_submitted',$6,$7)`,[randomUUID(),userId,botId,issueId,runId,`artifact_submitted:${id}:${version}`,JSON.stringify({artifactId:id,version,title:'Accepted file',artifactKind:'markdown',authorName:'Fixture'})])
+      }
+    }
     await pool.query(`INSERT INTO conversations(id,"workspaceId",kind,title,"createdBy","lastPosition") VALUES($1,$2,'group','Accepted fixture',$3,1)`,[conversationId,workspaceId,userId])
     await pool.query(`INSERT INTO conversation_members("conversationId","memberType","memberId",role) VALUES($1,'user',$2,'owner'),($1,'bot',$3,'member')`,[conversationId,userId,botId])
     await pool.query(`INSERT INTO conversation_messages(id,"conversationId",position,"authorType","authorId",body) VALUES($1,$2,1,'user',$3,'Create a deliverable, report when finished')`,[messageId,conversationId,userId])
@@ -246,6 +258,8 @@ for(const kind of ['deliverable','repository'] as const)test(`PG: real Factory $
     const reports=(await pool.query(`SELECT "authorId","replyToId",body FROM conversation_messages WHERE "authorType"='bot' ORDER BY position`)).rows
     assert.equal(reports.length,2);assert.equal(reports[1].authorId,botId);assert.equal(reports[1].replyToId,messageId)
     assert.match(reports[1].body,locale==='en'?/Task completed:/:/任务已完成/);assert.doesNotMatch(reports[1].body,/已部署|deployed/);assert.ok(reports[1].body.includes(`artifact=${artifactId}`));assert.ok(reports[1].body.includes(`thread=${producerRun}`))
+    assert.ok(!reports[1].body.includes(staleArtifactId),'a prior-epoch artifact cannot be presented as the current accepted result')
+    assert.equal((await pool.query('SELECT "runId" FROM artifacts WHERE id=$1',[artifactId])).rows[0].runId,oldRun,'reporting the submitted v2 never rewrites its creator')
     if(locale==='en')assert.doesNotMatch(reports[1].body,/[\u3400-\u9fff]/)
     const trace=(await pool.query('SELECT trace FROM group_turns WHERE "messageId"=$1',[messageId])).rows[0].trace as GroupDecisionTrace
     assert.equal(trace.events.filter(event=>event.type==='task_result' && event.outcome==='succeeded').length,1);assert.ok(trace.taskFinishedAt)

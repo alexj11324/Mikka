@@ -115,6 +115,8 @@ export async function runGroupProductionAcceptance({ env = process.env, fetchImp
     check(Boolean(cookie), 'acceptance_session_missing')
     const session = await json('/api/auth/get-session')
     check(session?.user?.email?.toLowerCase() === email.toLowerCase(), 'acceptance_session_identity')
+    check(typeof session.user.id === 'string' && session.user.id.length > 0, 'acceptance_session_identity')
+    report.requesterId = session.user.id
     const ownBots = await json('/api/bots')
     check(Array.isArray(ownBots) && ownBots.length > 0, 'acceptance_workspace_missing')
     const workspaceId = ownBots[0].workspaceId
@@ -128,6 +130,10 @@ export async function runGroupProductionAcceptance({ env = process.env, fetchImp
       const profile = await json(`/api/bots/${bot.id}`)
       check(profile?.publicRole === publicRole, 'acceptance_public_role_not_persisted')
       const menu = await json(`/api/mobile/model?bot=${bot.id}`)
+      // Discover only the normal owner's already-authorized native options.
+      // This does not select or invoke a subscription during Flash acceptance.
+      report.subscriptionOptions ??= (menu?.groups ?? []).filter(group => group.kind === 'subscription')
+        .flatMap(group => group.options.map(option => ({ id: option.id, provider: option.provider, modelId: option.modelId })))
       const choices = (menu?.groups ?? []).filter(group => group.kind === 'apiKey').flatMap(group => group.options)
       const option = choices.find(item => { try { assertFlashTestModel(item.modelId); return item.provider === 'deepseek' } catch { return false } })
       check(Boolean(option), 'acceptance_flash_model_unavailable')

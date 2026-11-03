@@ -75,10 +75,13 @@ export async function submitArtifact(submitter: ArtifactSubmitter, input: { titl
       id: crypto.randomUUID(), artifactId, version, storageKey, inlineContent: storage === 'inline' ? content : null,
       sha256: hash, size, authorName: submitter.authorName, executionIdentity: identity,
     })
-    return { artifactId, version, title, kind: input.kind }
+    const submitted = { artifactId, version, title, kind: input.kind }
+    // Version provenance must commit with its bytes and latest pointer. A
+    // response interruption must not leave a visible version without its run.
+    await recordCoordinatorEvent(tx, artifactSubmittedEvent(submitter, submitted))
+    return submitted
   })
   if ('error' in result) return result
-  await recordCoordinatorEvent(db, artifactSubmittedEvent(submitter, result))
   after(() => wakeCoordinator(submitter.userId))
   return result
 }

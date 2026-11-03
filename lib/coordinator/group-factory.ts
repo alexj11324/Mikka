@@ -9,6 +9,7 @@ import { workspaceLink } from '@/components/workspace/workspace-navigation'
 import { withBasePath } from '@/lib/base-path'
 import { ActionFailureError } from '@/lib/action-error'
 import { groupCopy, readGroupLocale, type GroupLocale } from './group-copy'
+import { runArtifactSubmissions } from '@/lib/artifacts/run-submissions'
 
 type Scope = Parameters<NonNullable<GroupRuntime['delegate']>>[0]
 type Query = Pick<PoolClient,'query'>
@@ -185,12 +186,16 @@ async function sourceEvent(client:Query,input:{id:string;userId:string;botId:str
 }
 
 async function readTask(client:Query,userId:string,issueId:string,botId:string):Promise<TaskState> {
-  const {rows:[row]}=await client.query<TaskState>(`SELECT t.id AS "taskId",t."issueId",t.status,t.stage,t.revision,
+  const {rows:[row]}=await client.query<TaskState & {artifactRunIds:string[]}>(`SELECT t.id AS "taskId",t."issueId",t.status,t.stage,t.revision,
     COALESCE(a."runId",(SELECT produced."runId" FROM factory_candidates produced WHERE produced.id=t."candidateId" AND produced."taskId"=t.id)) AS "runId",
     t."sourceEventId" AS "requestEpoch",${acceptedDeliverableSql} AS "acceptedDeliverable",${mergedCandidateSql} AS "mergedCandidate",
-    COALESCE((SELECT jsonb_agg(jsonb_build_object('id',x.id)) FROM (SELECT ar.id FROM artifacts ar JOIN factory_attempts fa ON fa."runId"=ar."runId" AND fa."taskId"=t.id WHERE ar."userId"=t."userId" AND ar."issueId"=t."issueId" AND fa.output->>'requestEpoch'=t."sourceEventId"::text ORDER BY ar."updatedAt" DESC LIMIT 10) x),'[]'::jsonb) AS artifacts
+    ARRAY(SELECT DISTINCT fa."runId" FROM factory_attempts fa JOIN agent_runs r ON r.id=fa."runId" AND r."userId"=t."userId" AND r."issueId"=t."issueId"
+      WHERE fa."taskId"=t.id AND fa.output->>'requestEpoch'=t."sourceEventId"::text) AS "artifactRunIds"
     FROM factory_tasks t LEFT JOIN factory_attempts a ON a.id=t."attemptId" WHERE t."userId"=$1 AND t."issueId"=$2 AND t."botId"=$3 ORDER BY t."createdAt" DESC LIMIT 1`,[userId,issueId,botId])
-  return row ?? {taskId:null,issueId,status:'pending',stage:'execute',revision:0,runId:null,requestEpoch:null}
+  if (!row) return {taskId:null,issueId,status:'pending',stage:'execute',revision:0,runId:null,requestEpoch:null}
+  const {artifactRunIds,...task}=row
+  const artifacts=await runArtifactSubmissions(client,userId,artifactRunIds)
+  return {...task,artifacts:artifacts.slice(-10).reverse().map(({id})=>({id}))}
 }
 
 async function productionAdapters():Promise<GroupFactoryAdapters> {

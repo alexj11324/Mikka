@@ -45,7 +45,7 @@ test('unavailable Flash stops before a prompt; hosted fallback is not selected a
     const path = new URL(url).pathname; calls.push([path, init.method])
     if (path.endsWith('/version')) return Response.json({ build: env.GROUP_ACCEPTANCE_DEPLOYMENT })
     if (path.endsWith('/sign-in/email')) return Response.json({}, { headers: { 'set-cookie': 'synthetic=session; Path=/' } })
-    if (path.endsWith('/get-session')) return Response.json({ user: { email: env.MIKKA_TEST_ACCOUNT_EMAIL } })
+    if (path.endsWith('/get-session')) return Response.json({ user: { id: 'fixture-owner', email: env.MIKKA_TEST_ACCOUNT_EMAIL } })
     if (path === '/mikka/api/bots') return Response.json(init.method === 'GET' ? [{ id: 'existing', workspaceId: 'workspace' }] : { id: 'new-owned-bot', workspaceId: 'workspace' })
     if (path === '/mikka/api/bots/new-owned-bot') {
       if (init.method === 'PATCH') role = JSON.parse(init.body).publicRole

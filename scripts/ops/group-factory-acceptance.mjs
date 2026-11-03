@@ -14,8 +14,8 @@ const stateOf = snapshot => ({ taskId: snapshot.task.id, issueId: snapshot.task.
 /** Paid, real API acceptance when called by the owner-session driver. The unit
  * tests exercise this driver's assertions only; they are not live acceptance.
  * This is Flash API-key execution, never official Codex/Claude subscription
- * acceptance. It accepts the first real artifact, then proves a new epoch can
- * be admitted and stopped without deleting the accepted artifact/history. */
+ * acceptance. It accepts two independently checked artifact versions under
+ * successive request epochs, then stops a third epoch while retaining both. */
 export async function runGroupFactoryScenario({ report, json, readTurn, guard, download,
   wait = delay, now = Date.now, timeoutMs = 1200000, stopTimeoutMs = 180000 }) {
   check(Number.isSafeInteger(timeoutMs) && timeoutMs >= 1000 && timeoutMs <= 3600000, 'timeout_invalid')
@@ -96,8 +96,20 @@ export async function runGroupFactoryScenario({ report, json, readTurn, guard, d
     check(found?.run?.id === runId && found.run.issueId === issueId && found.run.botId === reporter.id, 'run_scope_mismatch')
     try { assertFlashTestModel(found.run.model) } catch { check(false, 'run_model_forbidden') }
     check(found.run.credentialType === 'api_key' && !found.run.subscriptionRoute, 'run_credential_forbidden')
+    const identity = found.run.executionIdentity
+    check(identity?.version === 1 && identity.requester === report.requesterId && identity.executionPrincipal === report.requesterId
+      && identity.outputOwner === report.requesterId && identity.botId === reporter.id && identity.botOwner === report.requesterId
+      && identity.workspaceId === report.workspaceId && identity.personalResourcePolicy === 'requester_only', 'run_identity_mismatch')
+    const payer = identity.billingAccount?.model, runtimePayer = identity.billingAccount?.runtime
+    const modelResource = identity.resourceBindings?.find(resource => resource.kind === 'api_key' && resource.id === payer?.resourceId)
+    check(payer?.kind === 'api_key' && payer.amount === 'provider_unknown' && modelResource?.ownerId === payer.ownerId
+      && (payer.ownerId === report.requesterId ? modelResource.access === 'owner' : modelResource.access === 'workspace_share')
+      && runtimePayer?.kind === 'e2b' && runtimePayer.ownerId === report.requesterId && runtimePayer.amount === 'provider_unknown', 'run_billing_mismatch')
     runs.set(runId, found)
-    evidence.runs = [...runs.values()].map(({ run }) => ({ id: run.id, status: run.status, harness: run.harness, model: run.model, credentialType: run.credentialType }))
+    evidence.runs = [...runs.values()].map(({ run }) => ({ id: run.id, status: run.status, harness: run.harness, model: run.model, credentialType: run.credentialType,
+      requester: run.executionIdentity.requester, executionPrincipal: run.executionIdentity.executionPrincipal, outputOwner: run.executionIdentity.outputOwner,
+      modelAccountOwner: run.executionIdentity.billingAccount.model.ownerId, runtimeAccountOwner: run.executionIdentity.billingAccount.runtime.ownerId,
+      externalCost: 'provider_unknown' }))
     return found
   }
   async function onlyTask(task) {
@@ -115,13 +127,13 @@ export async function runGroupFactoryScenario({ report, json, readTurn, guard, d
     }
     return { messageId, repeatReads: 2, replyIds: before.replyIds, traceEventIds: before.trace.events.map(event => event.id) }
   }
-  async function artifactProof(candidate, task) {
+  async function artifactProof(candidate, task, target = expected) {
     const found = await inspectRun(candidate.runId, task.issueId, true)
     const artifacts = found.artifacts.filter(item => item.title === filename)
     check(artifacts.length === 1 && uuid(artifacts[0].id), 'artifact_missing_or_ambiguous')
     const artifact = artifacts[0]
     const bytes = await download(artifact.url)
-    check(bytes.length === expected.length && hash(bytes) === hash(expected), 'artifact_content_mismatch')
+    check(bytes.length === target.length && hash(bytes) === hash(target), 'artifact_content_mismatch')
     return { artifactId: artifact.id, version: artifact.latestVersion, runId: candidate.runId, title: filename,
       bytes: bytes.length, sha256: hash(bytes), url: artifact.url }
   }
@@ -190,13 +202,73 @@ export async function runGroupFactoryScenario({ report, json, readTurn, guard, d
   await inspectRun(continued.delegated.runId, ready.task.issueId)
   await onlyTask(continuation.task)
   evidence.continuation = { taskId: ready.task.id, runId: continued.delegated.runId, previousEpoch: ready.task.sourceEventId,
-    requestEpoch: continuation.task.sourceEventId, outcome: 'admitted_then_cancelled', updatedArtifactVerified: false }
+    requestEpoch: continuation.task.sourceEventId, outcome: 'running', updatedArtifactVerified: false }
+  evidence.phase = 'continuation-independent-checks'
+  const continuedExpected = Buffer.from(content.replace('status=ready', 'status=continued'), 'utf8')
+  const continuationDeadline = now() + timeoutMs
+  let continuedReady
+  while (now() < continuationDeadline) {
+    await guard()
+    const state = await readTask(ready.task.id)
+    check(state.task.sourceEventId === continuation.task.sourceEventId, 'continuation_epoch_changed')
+    for (const attempt of state.attempts.filter(a => a.runId && a.output?.requestEpoch === state.task.sourceEventId))
+      await inspectRun(attempt.runId, state.task.issueId)
+    check(!['cancelled', 'revoked', 'blocked', 'failed'].includes(state.task.status), 'continuation_blocked')
+    if (state.task.stage === 'approval' && ['pending', 'waiting'].includes(state.task.status)) { continuedReady = state; break }
+    await readTurn(groupId, continued.messageId)
+    await wait(3000)
+  }
+  check(continuedReady, 'continuation_timeout')
+  const continuedCandidate = continuedReady.candidates.find(item => item.id === continuedReady.task.candidateId)
+  check(continuedCandidate && continuedCandidate.id !== candidate.id && ['report', 'deliverable'].includes(continuedCandidate.kind), 'continuation_candidate_missing')
+  const continuedChecks = ['review', 'verify'].map(stage => continuedReady.attempts.findLast(a => a.stage === stage && a.status === 'passed'
+    && a.candidateId === continuedCandidate.id && a.output?.requestEpoch === continuation.task.sourceEventId))
+  check(continuedChecks.every(a => a?.runId && a.output?.check?.requestEpoch === continuation.task.sourceEventId), 'continuation_checks_missing')
+  check(new Set([continuedCandidate.runId, ...continuedChecks.map(a => a.runId)]).size === 3, 'continuation_checks_not_independent')
+  evidence.continuation.checks = continuedChecks.map(a => ({ stage: a.stage, attemptId: a.id, runId: a.runId, candidateId: a.candidateId, requestEpoch: a.output.requestEpoch }))
+  evidence.continuation.artifact = await artifactProof(continuedCandidate, continuedReady.task, continuedExpected)
+  evidence.phase = 'continuation-human-acceptance'
+  const continuationInput = { binding: { taskId: ready.task.id, issueId: ready.task.issueId, attemptId: continuedReady.task.attemptId,
+    revision: continuedReady.task.revision, candidateId: continuedCandidate.id }, eventId: randomUUID() }
+  const continuedAccepted = await json(`/api/factory/tasks/${ready.task.id}/approval`, { operation: 'accept', input: continuationInput })
+  check(continuedAccepted?.status === 'accepted' && uuid(continuedAccepted.acceptanceId)
+    && continuedAccepted.acceptanceId !== accepted.acceptanceId, 'continuation_acceptance_unconfirmed')
+  const continuedReplay = await json(`/api/factory/tasks/${ready.task.id}/approval`, { operation: 'accept', input: continuationInput })
+  check(continuedReplay?.status === 'accepted' && continuedReplay.acceptanceId === continuedAccepted.acceptanceId, 'continuation_duplicate_acceptance')
+  evidence.continuation.acceptance = { acceptanceId: continuedAccepted.acceptanceId, eventId: continuationInput.eventId, replayConfirmed: true }
+  const continuedAcceptedState = await readTask(ready.task.id)
+  check(continuedAcceptedState.task.stage === 'approval' && continuedAcceptedState.task.status === 'passed', 'continuation_acceptance_state_mismatch')
+  for (const old of acceptedState.attempts.filter(a => a.status === 'passed'))
+    check(continuedAcceptedState.attempts.find(a => a.id === old.id)?.status === 'passed', 'accepted_history_changed')
+  const continuedReportDeadline = now() + 120000
+  let continuedFinal
+  while (now() < continuedReportDeadline) {
+    const current = await readTurn(groupId, continued.messageId)
+    const inspected = inspectTurn(current, continued.messageId, 'continue')
+    const finalEvent = inspected.trace.events.find(e => e.type === 'task_result' && e.taskId === ready.task.id && e.outcome === 'succeeded')
+    const linked = current.page.messages.filter(item => item.replyToId === continued.messageId && item.authorType === 'bot'
+      && item.authorId === reporter.id && item.body.includes(`artifact=${evidence.continuation.artifact.artifactId}`) && item.body.includes(`issue=${ready.task.issueId}`))
+    if (finalEvent && inspected.trace.taskFinishedAt && linked.length) { continuedFinal = { eventId: finalEvent.id, messageIds: linked.map(item => item.id), reporterId: reporter.id }; break }
+    await wait(2000)
+  }
+  check(continuedFinal, 'continuation_final_report_timeout')
+  evidence.continuation.finalReport = continuedFinal
+  evidence.continuation.replay = await stable(continued.messageId, 'continue', ready.task.id)
+  evidence.continuation.updatedArtifactVerified = true
+  evidence.continuation.outcome = 'completed_and_accepted'
+  const stopTarget = await post('continue', `继续现有任务 ${ready.task.issueId}，仍由同一 Coding Bot 执行并统一汇报。把文件 ${filename} 的 status=continued 改成 status=stopping，保留其他字节和最终换行，继续使用 DeepSeek Flash。不要创建另一项任务。`)
+  check(stopTarget.delegated.taskId === ready.task.id, 'stop_continuation_changed_task')
+  const stopContinuation = await readTask(ready.task.id)
+  check(stopContinuation.task.sourceEventId && stopContinuation.task.sourceEventId !== continuation.task.sourceEventId, 'stop_continuation_epoch_unchanged')
+  check(stopContinuation.attempts.some(a => a.runId === stopTarget.delegated.runId && a.output?.requestEpoch === stopContinuation.task.sourceEventId), 'stop_continuation_run_missing')
+  evidence.stopContinuation = { taskId: ready.task.id, runId: stopTarget.delegated.runId,
+    previousEpoch: continuation.task.sourceEventId, requestEpoch: stopContinuation.task.sourceEventId, outcome: 'admitted_then_cancelled', updatedArtifactVerified: false }
   const stopped = await post('stop', `请由同一 Coding Bot 立即停止现有任务 ${ready.task.issueId} 的这次续作。只取消当前任务并报告真实停止状态，不创建新任务，不再执行。保留之前已验收的成果。`)
   const stopDeadline = now() + stopTimeoutMs
   let stoppedState
   while (now() < stopDeadline) {
     const state = await readTask(ready.task.id)
-    check(['cancelled', 'revoked'].includes(state.task.status) && state.task.sourceEventId === continuation.task.sourceEventId, 'stop_not_confirmed')
+    check(['cancelled', 'revoked'].includes(state.task.status) && state.task.sourceEventId === stopContinuation.task.sourceEventId, 'stop_not_confirmed')
     const currentRuns = await Promise.all(state.attempts.filter(a => a.output?.requestEpoch === state.task.sourceEventId && a.runId)
       .map(a => inspectRun(a.runId, ready.task.issueId, true)))
     if (currentRuns.every(item => ended.has(item.run.status))) { stoppedState = state; break }
@@ -210,6 +282,10 @@ export async function runGroupFactoryScenario({ report, json, readTurn, guard, d
   check(retained.length === expected.length && hash(retained) === hash(expected), 'accepted_artifact_changed')
   evidence.artifact.retainedAfterStop = true
   delete evidence.artifact.url
+  const continuedRetained = await download(evidence.continuation.artifact.url)
+  check(continuedRetained.length === continuedExpected.length && hash(continuedRetained) === hash(continuedExpected), 'continued_artifact_changed')
+  evidence.continuation.artifact.retainedAfterStop = true
+  delete evidence.continuation.artifact.url
   await guard()
   evidence.phase = 'complete'
   evidence.status = 'pass'
