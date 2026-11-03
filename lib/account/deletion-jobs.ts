@@ -9,6 +9,7 @@ import { auditDigest } from '@/lib/audit/integrity'
 import { accountStorageKeys, deleteMainAccountData, deleteWorkspaceData, planWorkspaces, type Plan } from './delete'
 import type { AccountCleanupReport } from './cleanup-result'
 import { cleanupAccountConnections } from './external-cleanup'
+import { AccountDeletionBusy, AccountDeletionLockLost, acquireAccountDeletionLock } from './deletion-lock'
 import { teardownWorkspaceMachines } from '@/lib/cloud-computer/workspace-teardown'
 
 export type DeletionStage = 'preparing' | 'requested' | 'external_pending' | 'main_deleted' | 'workspace_deleted' | 'storage_pending' | 'completed' | 'cancelled'
@@ -69,22 +70,24 @@ export async function requestAccountDeletion(userId: string, email: string, requ
     await guard(client, userId, requestId, options.now?.() ?? new Date())
     return requestId
   })
-  const lease = await main.connect()
+  const { client: lease, close, assertHeld, rethrow } = await acquireAccountDeletionLock(main, id)
   try {
-    await lease.query('SELECT pg_advisory_lock(hashtextextended($1,0))', [`mikka-account-deletion-job:${id}`])
     const job = await load(lease, id)
+    assertHeld()
     if (job.stage === 'preparing') {
-      const refused = await prepare(job, options)
+      const refused = await prepare(job, options, assertHeld)
       if (refused) return { ok: false, soleAdminOf: refused }
     }
-  } finally { await lease.query('SELECT pg_advisory_unlock(hashtextextended($1,0))', [`mikka-account-deletion-job:${id}`]).finally(() => lease.release()) }
+  } catch (error) { return await rethrow(error) } finally { await close() }
 
   return { ok: true, id }
 }
 
-async function prepare(job: AccountDeletionJob, options: AccountDeletionOptions): Promise<string[] | null> {
+async function prepare(job: AccountDeletionJob, options: AccountDeletionOptions, assertHeld: () => void): Promise<string[] | null> {
   const { main, workspace } = targets(options)
+  assertHeld()
   const plan = await transaction(workspace, async client => {
+    assertHeld()
     await guard(client, job.subjectUserId, job.id, job.requestedAt)
     const planned = await planWorkspaces(drizzle(client), job.subjectUserId)
     if ('soleAdminOf' in planned) {
@@ -94,12 +97,16 @@ async function prepare(job: AccountDeletionJob, options: AccountDeletionOptions)
     if (!('soleAdminOf' in planned) && planned.solo.length) {
       await client.query('INSERT INTO account_deletion_workspace_guards("workspaceId","jobId") SELECT unnest($1::uuid[]),$2 ON CONFLICT DO NOTHING', [planned.solo, job.id])
     }
+    assertHeld()
     return planned
   })
+  assertHeld()
   if ('soleAdminOf' in plan) {
     await transaction(main, async client => {
+      assertHeld()
       await client.query('DELETE FROM account_deletion_guards WHERE "subjectId"=$1 AND "jobId"=$2', [job.subjectUserId, job.id])
       await client.query('UPDATE account_deletion_jobs SET stage=\'cancelled\',"blockedReasons"=\'["sole_workspace_admin"]\',"updatedAt"=now() WHERE id=$1', [job.id])
+      assertHeld()
     })
     return plan.soleAdminOf
   }
@@ -110,13 +117,13 @@ async function prepare(job: AccountDeletionJob, options: AccountDeletionOptions)
 /** Idempotent stages commit separately in the two stores. A workspace failure never rewinds an already committed main-store deletion. */
 export async function resumeAccountDeletion(id: string, options: AccountDeletionOptions = {}): Promise<AccountDeletionJob> {
   const { main, workspace } = targets(options)
-  // Session lock serializes resumption without keeping an SQL transaction open during provider/object I/O.
-  const lease = await main.connect()
+  // A dedicated direct session serializes resumption; stages still commit independently.
+  const { client: lease, close, assertHeld, rethrow } = await acquireAccountDeletionLock(main, id)
   try {
-    await lease.query('SELECT pg_advisory_lock(hashtextextended($1,0))', [`mikka-account-deletion-job:${id}`])
     let job = await load(lease, id)
+    assertHeld()
     if (job.stage === 'completed' || job.stage === 'cancelled') return job
-    if (job.stage === 'preparing') { await prepare(job, options); job = await load(lease, id) }
+    if (job.stage === 'preparing') { await prepare(job, options, assertHeld); job = await load(lease, id) }
     if (job.stage === 'cancelled') return job
     if (job.stage === 'requested' || job.stage === 'external_pending') {
       await lease.query('UPDATE account_deletion_jobs SET stage=\'external_pending\',"updatedAt"=now() WHERE id=$1', [id])
@@ -125,48 +132,68 @@ export async function resumeAccountDeletion(id: string, options: AccountDeletion
         const result = await withDatabaseClient(lease, () => (options.externalCleanup ?? cleanupAccountConnections)(job.subjectUserId, main))
         report = Array.isArray(result) ? { blockedReasons: result, warnings: [] } : result
       } catch { report = { blockedReasons: ['external_cleanup_failed'], warnings: [] } }
+      assertHeld()
       const blocked = report.blockedReasons
       await lease.query('UPDATE account_deletion_jobs SET warnings=$2 WHERE id=$1', [id, JSON.stringify([...new Set([...job.warnings, ...report.warnings])])])
       if (blocked.length) {
         await lease.query('UPDATE account_deletion_jobs SET "blockedReasons"=$2,"updatedAt"=now() WHERE id=$1', [id, JSON.stringify([...new Set(blocked)])])
-        return load(lease, id)
+        return await load(lease, id)
       }
       // Freeze every solo workspace before removing any main-store content. New membership writes
       // are rejected by its durable guard, including after a failed workspace commit/restart.
+      assertHeld()
       const frozen = await transaction(workspace, async client => {
+        assertHeld()
         const plan = options.replayPlan ?? await planWorkspaces(drizzle(client), job.subjectUserId)
         if (!('soleAdminOf' in plan) && plan.solo.length) await client.query('INSERT INTO account_deletion_workspace_guards("workspaceId","jobId") SELECT unnest($1::uuid[]),$2 ON CONFLICT DO NOTHING', [plan.solo, id])
+        assertHeld()
         return plan
       })
+      assertHeld()
       if ('soleAdminOf' in frozen) {
         await lease.query('UPDATE account_deletion_jobs SET "blockedReasons"=\'["sole_workspace_admin"]\',"updatedAt"=now() WHERE id=$1', [id])
-        return load(lease, id)
+        return await load(lease, id)
       }
       // Machines of anyone else left in a workspace that goes (a former member's Bot computer or thread
       // machines) are fenced and killed before their rows go; the person's own went in the external step.
       // A restore replay never reaches a provider.
-      if (!options.replayPlan) for (const workspaceId of frozen.solo) await teardownWorkspaceMachines(main, workspaceId, { exceptOwner: job.subjectUserId })
+      if (!options.replayPlan) for (const workspaceId of frozen.solo) {
+        assertHeld()
+        await teardownWorkspaceMachines(main, workspaceId, { exceptOwner: job.subjectUserId })
+        assertHeld()
+      }
+      assertHeld()
       await transaction(workspace, async workspaceClient => {
+        assertHeld()
         const checked = await planWorkspaces(drizzle(workspaceClient), job.subjectUserId)
         if (!options.replayPlan && ('soleAdminOf' in checked || auditDigest(checked) !== auditDigest(frozen))) throw new Error('accountDeletionWorkspaceChanged')
         // Include objects written before the request's write barrier, and durable old-avatar references.
+        assertHeld()
         await transaction(main, async client => {
+          assertHeld()
           const objects = await accountStorageKeys(client, job.subjectUserId, frozen)
           const notBefore = !options.deleteObject && artifactStorage() === 'inline' ? (options.now?.() ?? new Date()) : objects.notBefore
+          assertHeld()
           await deleteMainAccountData(client, job.subjectUserId, frozen)
           await client.query('UPDATE account_deletion_jobs SET stage=\'main_deleted\',plan=$4,"pendingObjects"=$2,"storageNotBefore"=$3,"blockedReasons"=\'[]\',"updatedAt"=now() WHERE id=$1',
             [id, JSON.stringify(objects.keys), notBefore, JSON.stringify(frozen)])
+          assertHeld()
         })
+        assertHeld()
         // Workspace row locks remain held across the main commit; this is explicitly two commits.
         await deleteWorkspaceData(drizzle(workspaceClient), job.subjectUserId, job.subjectEmailHash, frozen)
+        assertHeld()
       })
       await lease.query('UPDATE account_deletion_jobs SET stage=\'workspace_deleted\',"updatedAt"=now() WHERE id=$1', [id])
       job = await load(lease, id)
     }
     if (job.stage === 'main_deleted') {
+      assertHeld()
       await transaction(workspace, async client => {
+        assertHeld()
         await guard(client, job.subjectUserId, id, job.requestedAt)
         await deleteWorkspaceData(drizzle(client), job.subjectUserId, job.subjectEmailHash, job.plan!)
+        assertHeld()
       })
       await lease.query('UPDATE account_deletion_jobs SET stage=\'workspace_deleted\',"updatedAt"=now() WHERE id=$1', [id])
       job = await load(lease, id)
@@ -175,42 +202,47 @@ export async function resumeAccountDeletion(id: string, options: AccountDeletion
       const notBefore = job.storageNotBefore?.getTime() ?? 0
       if (job.pendingObjects.length && notBefore > (options.now?.() ?? new Date()).getTime()) {
         await lease.query('UPDATE account_deletion_jobs SET stage=\'storage_pending\',"blockedReasons"=\'["upload_grants_not_expired"]\',"updatedAt"=now() WHERE id=$1', [id])
-        return load(lease, id)
+        return await load(lease, id)
       }
       const remove = options.deleteObject ?? (async (key: string) => { if (artifactStorage() === 'r2') await deleteArtifactObject(key) })
       for (const key of job.pendingObjects) {
+        assertHeld()
         try { await remove(key) }
         catch {
           await lease.query('UPDATE account_deletion_jobs SET stage=\'storage_pending\',"blockedReasons"=\'["object_cleanup_failed"]\',"updatedAt"=now() WHERE id=$1', [id])
-          return load(lease, id)
+          return await load(lease, id)
         }
+        assertHeld()
         await lease.query('UPDATE account_deletion_jobs SET "pendingObjects"="pendingObjects" - $2::text,"updatedAt"=now() WHERE id=$1', [id, key])
       }
       await lease.query('UPDATE account_deletion_jobs SET stage=\'completed\',"completedAt"=now(),"blockedReasons"=\'[]\',"updatedAt"=now() WHERE id=$1', [id])
     }
-    return load(lease, id)
-  } finally {
-    await lease.query('SELECT pg_advisory_unlock(hashtextextended($1,0))', [`mikka-account-deletion-job:${id}`]).finally(() => lease.release())
-  }
+    return await load(lease, id)
+  } catch (error) { return await rethrow(error) } finally { await close() }
 }
 
 /** Cancellation is possible only before any external or irreversible step starts. */
 export async function cancelAccountDeletion(userId: string, id: string, options: AccountDeletionOptions = {}): Promise<boolean> {
-  const { main, workspace } = targets(options), lease = await main.connect()
+  const { main, workspace } = targets(options)
+  const { client: lease, close, assertHeld, rethrow } = await acquireAccountDeletionLock(main, id)
   try {
-    await lease.query('SELECT pg_advisory_lock(hashtextextended($1,0))', [`mikka-account-deletion-job:${id}`])
     const job = await load(lease, id)
+    assertHeld()
     if (job.subjectUserId !== userId) throw new Error('accountDeletionUnavailable')
     if (!['preparing', 'requested'].includes(job.stage)) return false
     // Removing the workspace guard first is safe: the main guard still rejects managed writes.
+    assertHeld()
     await workspace.query('DELETE FROM account_deletion_workspace_guards WHERE "jobId"=$1', [id])
+    assertHeld()
     await workspace.query('DELETE FROM account_deletion_guards WHERE "subjectId"=$1 AND "jobId"=$2', [userId, id])
     await transaction(main, async client => {
+      assertHeld()
       await client.query('DELETE FROM account_deletion_guards WHERE "subjectId"=$1 AND "jobId"=$2', [userId, id])
       await client.query('UPDATE account_deletion_jobs SET stage=\'cancelled\',"updatedAt"=now() WHERE id=$1', [id])
+      assertHeld()
     })
     return true
-  } finally { await lease.query('SELECT pg_advisory_unlock(hashtextextended($1,0))', [`mikka-account-deletion-job:${id}`]).finally(() => lease.release()) }
+  } catch (error) { return await rethrow(error) } finally { await close() }
 }
 
 type ManifestJob = Omit<AccountDeletionJob, 'requestedAt' | 'storageNotBefore' | 'completedAt' | 'retentionUntil' | 'updatedAt'> & { requestedAt: string; storageNotBefore: string | null; completedAt: string | null; retentionUntil: string | null; updatedAt: string }
@@ -267,7 +299,7 @@ export async function sweepAccountDeletions(options: AccountDeletionOptions = {}
   let completed = 0, pending = 0
   for (const { id } of jobs) {
     try { if ((await resumeAccountDeletion(id, options)).stage === 'completed') completed++; else pending++ }
-    catch { pending++; await main.query('UPDATE account_deletion_jobs SET "updatedAt"=now(),"blockedReasons"=\'["deletion_step_failed"]\' WHERE id=$1', [id]) }
+    catch (error) { pending++; if (error instanceof AccountDeletionBusy || error instanceof AccountDeletionLockLost) continue; await main.query('UPDATE account_deletion_jobs SET "updatedAt"=now(),"blockedReasons"=\'["deletion_step_failed"]\' WHERE id=$1', [id]) }
   }
   return { scanned: jobs.length, completed, pending }
 }
