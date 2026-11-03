@@ -1,116 +1,80 @@
 name: Production smoke
-# Signs in the tagged smoke account on production and reads (docs/production-smoke.md).
+# TEMPORARY dedicated branch only. Reuses the existing dispatchable workflow ID.
+# Do not merge this replacement to main or run it before explicit review.
 on:
-  schedule:
-    - cron: '17 14 * * *'
-    - cron: '*/15 * * * *'
-  deployment_status:
   workflow_dispatch:
+    inputs:
+      phase:
+        description: Fixed original VM evidence phase
+        type: choice
+        options: [before, after]
+        required: true
+      expected_custody_run_id:
+        description: Before=e57; after=reviewed new continuation UUID on the same VM
+        type: string
+        default: e57a6d03-510e-496f-bd88-97375318cd9e
+        required: true
+      expected_source_sha:
+        description: Exact reviewed evidence-branch commit SHA
+        type: string
+        required: true
+      before_run_id:
+        description: After only; successful before workflow run on the same collector SHA
+        type: string
+        required: false
 permissions:
   contents: read
 concurrency:
-  group: production-smoke
+  group: issue-1166-physical-evidence
   cancel-in-progress: false
 env:
-  # A cache restore that fails (e.g. the account's cache egress limit) would
-  # otherwise hang for actions/cache's 10-minute default before falling back
-  # to a normal install, which outlasts the short jobs' own timeouts.
   SEGMENT_DOWNLOAD_TIMEOUT_MINS: '2'
 
 jobs:
-  smoke:
-    # Only finished production deployments, plus the schedule and manual runs.
-    if: github.repository == 'alexj11324/Mikka' && (github.event_name != 'schedule' || github.event.schedule == '17 14 * * *') && (github.event_name != 'deployment_status' || (github.event.deployment_status.state == 'success' && github.event.deployment.environment == 'Production'))
+  original-vm-evidence:
+    if: github.repository == 'alexj11324/Mikka' && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/ops/issue-1166-physical-evidence' && inputs.expected_source_sha == github.sha
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: read
-      id-token: write
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: 24
-      - run: node --test scripts/ops/production-smoke.test.mjs
-      - name: Read the smoke account through Infisical workload identity
-        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
-        with:
-          method: oidc
-          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
-          oidc-audience: mikka-infisical
-          project-id: 89850d6a-f020-4936-863e-df77380dfe40
-          env-slug: prod
-          # The prod root holds only the smoke account; app secrets live in /vercel and /neon.
-          secret-path: /
-          recursive: false
-          include-imports: false
-      - run: node scripts/ops/production-smoke.mjs
-        env:
-          SMOKE_BASE_URL: https://app.aspectlylabs.com
-          SMOKE_EXPECT_ON: credentialVault,cloudComputer
-      - if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: production-smoke-report
-          path: production-smoke-report
-          retention-days: 7
-
-  deployment-comparison:
-    # No browser/install/wait loop: quarter-hour follow-ups read the same fixed windows.
-    if: github.repository == 'alexj11324/Mikka' && (github.event_name != 'deployment_status' || (github.event.deployment_status.state == 'success' && github.event.deployment.environment == 'Production')) && (github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main')
-    runs-on: ubuntu-latest
-    timeout-minutes: 3
-    permissions:
-      contents: read
+      actions: read
       id-token: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: main
+          ref: ${{ github.sha }}
           persist-credentials: false
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24
-      - name: Read the existing Vercel token through Infisical workload identity
-        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
+      - name: Install locked dependencies before secrets
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Exercise fixed-scope guards and restoration with offline fakes
+        run: |
+          node --test scripts/ops/issue-1166-physical-evidence.test.mjs
+          python3 -B scripts/ops/issue-1166-physical-probe.test.py
+      - name: Read the safe before artifact for prefix verification
+        if: inputs.phase == 'after'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          method: oidc
-          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
-          oidc-audience: mikka-infisical
-          project-id: 89850d6a-f020-4936-863e-df77380dfe40
-          env-slug: prod
-          secret-path: /platform
-          recursive: false
-          include-imports: false
-      - name: Compare fixed production deployment windows
-        run: DEPLOYMENT_COMPARISON_CHECKER_SHA="$(git rev-parse HEAD)" node scripts/ops/deployment-regression.mjs
-      - name: Collect production request outcomes
-        if: always()
-        run: node scripts/ops/runtime-outcomes.mjs
-      - name: Read monitoring ingestion configuration through the existing identity
-        if: always()
-        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
-        with:
-          method: oidc
-          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
-          oidc-audience: mikka-infisical
-          project-id: 89850d6a-f020-4936-863e-df77380dfe40
-          env-slug: prod
-          secret-path: /vercel
-          recursive: false
-          include-imports: false
-      - name: Verify egress collector contracts
-        if: always()
-        run: node --test scripts/ops/egress-monitor.test.mjs
-      - name: Collect database egress and publish aggregate health
-        if: always()
-        run: node scripts/ops/egress-monitor.mjs
+          name: issue-1166-physical-before-${{ inputs.before_run_id }}
+          path: physical-evidence-before
+          run-id: ${{ inputs.before_run_id }}
+          github-token: ${{ github.token }}
+      # The driver obtains OIDC and exactly two named prod:/vercel secrets in
+      # memory. It uses the existing identity and never exports tokens/env files.
+      - name: Collect original VM evidence and conditionally restore paused
+        run: node scripts/ops/issue-1166-physical-evidence.mjs
+        env:
+          EVIDENCE_PHASE: ${{ inputs.phase }}
+          EVIDENCE_CUSTODY_RUN_ID: ${{ inputs.expected_custody_run_id }}
+          EVIDENCE_EXPECTED_SOURCE_SHA: ${{ inputs.expected_source_sha }}
+          EVIDENCE_BEFORE_RUN_ID: ${{ inputs.before_run_id }}
       - if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: deployment-comparison-${{ github.run_id }}
-          path: |
-            deployment-comparison-report
-            runtime-outcomes-report
-            egress-monitor-report
+          name: issue-1166-physical-${{ inputs.phase }}-${{ github.run_id }}
+          path: physical-evidence-report/
+          if-no-files-found: warn
           retention-days: 7
