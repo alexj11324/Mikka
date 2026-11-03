@@ -34,6 +34,12 @@ try {
   if (process.env.PROACTIVE_EXPECT_FLASH === '1' && !report.flashApiKeyAvailable) throw Error('preflight_flash_unavailable')
   report.modelGroupKinds = [...new Set(menu.data.groups.map(group => group.kind))].filter(value => /^[a-zA-Z]+$/.test(value))
   const runtime = await request('/api/coordinator/runtime')
+  const workspaceId = bots.data[0].workspaceId
+  const e2b = await request('/api/settings/e2b-key?workspace=' + encodeURIComponent(workspaceId))
+  report.e2bConfigured = e2b.data?.configured === true
+  const order = await request('/api/settings/model-order?workspace=' + encodeURIComponent(workspaceId))
+  report.executionOrder = Array.isArray(order.data?.entries) ? order.data.entries.map(entry => ({model:entry.model,harness:entry.harness,kind:entry.source?.kind,provider:entry.provider,block:entry.block?.reason??null})) : null
+  report.executionSettings = {customized:order.data?.customized,location:order.data?.location,cloudReady:order.data?.cloudReady}
   report.coordinatorAvailable = runtime.response.status === 200 && Boolean(runtime.data?.runtime?.harness)
   report.status = 'pass'
 } catch(error) {
