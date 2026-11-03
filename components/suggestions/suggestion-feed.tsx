@@ -73,7 +73,7 @@ export function SuggestionFeed({ onOpenIssue, onConnect, onSent }: { onOpenIssue
     try {
       const result = await sendSuggestion(item.id)
       if (result.error && result.error !== 'suggestionNotFound') { setSendError(actionError(result.error)); return }
-      await Promise.all([mutate(), mutateAll(coordinatorChatKey()), mutateAll('threads')])
+      await Promise.all([mutate(), mutateAll(coordinatorChatKey()), mutateAll(key => key === 'threads' || Array.isArray(key) && key[0] === 'threads')])
       onSent?.()
     } catch { setSendError(actionError()) } finally { setSending(null) }
   }

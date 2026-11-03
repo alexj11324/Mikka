@@ -35,7 +35,7 @@ import { AllThreadsColumn, AllThreadsToggle, waitingCount } from '@/components/n
 import { BrowserNotesProvider } from '@/components/browser/browser-notes'
 import { BrowserToggle, useBrowserFits } from '@/components/browser/browser-toggle'
 import { ComputerAgentsProvider } from '@/components/computer/computer-agents'
-import { listThreads } from '@/app/actions/task-runs'
+import { pollThreads, type Thread } from '@/app/actions/task-runs'
 import { listBots, type BotView } from '@/app/actions/bots'
 import { getCoordinatorChat, type CoordinatorChat as CoordinatorChatView } from '@/app/actions/coordinator'
 import { chatPreview } from '@/lib/agent-history'
@@ -183,7 +183,15 @@ function IssueWorkspaceContent({ user, initialIssues, initialSelected = null, in
   const { data: botList } = useSWR('bots', listBots, { ...whileSettings })
   const bots = botList ?? []
   const [onboardingOpen, setOnboardingOpen] = useState(Boolean(onboarding))
-  const { data: threadsData, error: threadsError, mutate: refreshThreads } = useSWR('threads', () => listThreads(), { ...whileSettings, refreshInterval: boardBusy || settingsShown ? 0 : LIST_POLL_MS })
+  const threadSnapshot = useRef<{ userId: string; version?: string; items: Thread[] }>({ userId: user.id, items: [] })
+  const { data: threadsData, error: threadsError, mutate: refreshThreads } = useSWR(['threads', user.id], async () => {
+    if (threadSnapshot.current.userId !== user.id) threadSnapshot.current = { userId: user.id, items: [] }
+    const next = await pollThreads(threadSnapshot.current.version)
+    const items = mergeList(threadSnapshot.current.items, next)
+    threadSnapshot.current = { userId: user.id, version: next.version, items }
+    return items
+  }, { ...whileSettings, refreshInterval: boardBusy || settingsShown ? 0 : LIST_POLL_MS })
+  useEffect(() => { if (threadsData) threadSnapshot.current.items = threadsData }, [threadsData])
   const threads = useMemo(() => threadsData ?? [], [threadsData])
   // Not read yet: the thread lists show rows' shapes instead of 还没有线程 (review C7).
   const threadsLoading = threadsData === undefined && !threadsError

@@ -1,5 +1,7 @@
 'use server'
 
+import { createHash } from 'node:crypto'
+import { DEVICE_ONLINE_WINDOW_MS } from '@mikka/protocol/device'
 import { headers } from 'next/headers'
 import { and, desc, eq, inArray, isNotNull, sql } from 'drizzle-orm'
 import { ActionFailureError } from '@/lib/action-error'
@@ -8,7 +10,8 @@ import { db } from '@/lib/db'
 import { agents, agentRuns, bots, devices, issues, type RunOutcome, type RunStatus } from '@/lib/db/schema'
 import { runAgentName, runBotId, runBotName } from '@/lib/run-bot-name'
 import { replyLine } from '@/lib/thread-groups'
-import { runWaitingDeviceId } from '@/lib/run-waiting-for'
+import { queryVersion } from '@/lib/db/query-version'
+import { withDatabaseOperation } from '@/lib/db/egress-sample'
 
 /** The newest run on each issue, for the right column's 我的任务 groups (MIK-38). */
 export interface TaskRun {
@@ -76,24 +79,45 @@ export interface Thread {
 
 /** The right column's threads: every run the Coordinator or a bot started in the last 30 days, latest activity first. */
 export async function listThreads(): Promise<Thread[]> {
-  const session = await auth.api.getSession({ headers: await headers() })
-  if (!session?.user) throw new ActionFailureError('authRequired')
-  const rows = await db.select({
-    id: agentRuns.id, botId: agentRuns.botId, agentName: runBotName, issueId: agentRuns.issueId, prompt: sql<string>`left(${agentRuns.prompt}, 200)`,
-    status: agentRuns.status, error: agentRuns.error, createdAt: agentRuns.createdAt, updatedAt: agentRuns.updatedAt,
-    lastReply: agentRuns.lastReply, lastReplyAt: agentRuns.lastReplyAt, source: agentRuns.source,
-    ownerId: agentRuns.userId, deviceId: devices.id, deviceName: devices.name, deviceType: devices.deviceType,
-    deviceEnabled: devices.enabled, lastSeenAt: devices.lastSeenAt, deviceKind: devices.kind,
-    harness: sql<string>`coalesce(${agentRuns.agentDefinition}->>'harness', ${agents.harness})`,
-    outcome: agentRuns.outcome,
-  }).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(devices, eq(devices.id, agentRuns.deviceId))
-    .where(and(eq(agentRuns.userId, session.user.id), sql`${agentRuns.createdAt} > now() - interval '30 days'`))
-    .orderBy(desc(sql`greatest(${agentRuns.lastReplyAt}, ${agentRuns.updatedAt})`), desc(agentRuns.createdAt)).limit(200)
-  return rows.map(({ ownerId, deviceId, deviceName, deviceType, deviceEnabled, lastSeenAt, deviceKind, harness, ...row }) => ({
-    // A cloud run waits on its own sandbox, never on a machine the person can turn on.
-    ...(deviceKind === 'local' && runWaitingDeviceId(session.user.id, { ownerId, status: row.status, deviceId, deviceEnabled, lastSeenAt }) && deviceId && deviceName !== null && deviceType
-      ? { waitingFor: { deviceId, deviceName, deviceType, harness } } : {}),
-    ...row, harness: harness ?? null, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(),
-    lastReply: replyLine(row.lastReply), lastReplyAt: row.lastReplyAt?.toISOString() ?? null,
-  }))
+  return (await readThreads()).items!
+}
+
+/** Authorization is checked even when an existing snapshot has not changed. */
+export async function pollThreads(known?: string) {
+  return readThreads(known && /^[0-9a-f]{32}$/.test(known) ? known : undefined)
+}
+
+async function readThreads(known?: string) {
+  return withDatabaseOperation('/actions/threads/poll', async () => {
+    const session = await auth.api.getSession({ headers: await headers() })
+    if (!session?.user) throw new ActionFailureError('authRequired')
+    // Hash the visible waiting state, not a raw heartbeat clock: an ordinary
+    // heartbeat must not invalidate every historic thread on that machine.
+    const waitingForDevice = sql<boolean>`${devices.kind}='local' and ${agentRuns.status}='queued' and
+      (${devices.enabled} is false or ${devices.lastSeenAt} is null or
+       ${devices.lastSeenAt}<statement_timestamp()-(${DEVICE_ONLINE_WINDOW_MS} * interval '1 millisecond'))`.as('waitingForDevice')
+    const snapshot = db.select({
+      id: agentRuns.id, botId: agentRuns.botId, agentName: runBotName.as('agentName'), issueId: agentRuns.issueId, prompt: sql<string>`left(${agentRuns.prompt}, 200)`.as('prompt'),
+      status: agentRuns.status, error: agentRuns.error, createdAt: agentRuns.createdAt, updatedAt: agentRuns.updatedAt,
+      lastReply: agentRuns.lastReply, lastReplyAt: agentRuns.lastReplyAt, source: agentRuns.source,
+      deviceId: sql<string | null>`${devices.id}`.as('deviceId'), deviceName: devices.name, deviceType: devices.deviceType, waitingForDevice,
+      harness: sql<string>`coalesce(${agentRuns.agentDefinition}->>'harness', ${agents.harness})`.as('harness'),
+      outcome: agentRuns.outcome,
+    }).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(devices, eq(devices.id, agentRuns.deviceId))
+      .where(and(eq(agentRuns.userId, session.user.id), sql`${agentRuns.createdAt} > now() - interval '30 days'`))
+      .orderBy(desc(sql`greatest(${agentRuns.lastReplyAt}, ${agentRuns.updatedAt})`), desc(agentRuns.createdAt)).limit(200)
+    const signature = await queryVersion(snapshot)
+    const version = createHash('sha256').update(JSON.stringify([session.user.id, signature])).digest('hex').slice(0, 32)
+    if (known === version) return { unchanged: true, version } as const
+    // Reading the version first makes a concurrent edit visible on the next poll.
+    const rows = await snapshot
+    const items: Thread[] = rows.map(({ deviceId, deviceName, deviceType, waitingForDevice, harness, ...row }) => ({
+      // A cloud run waits on its own sandbox, never on a machine the person can turn on.
+      ...(waitingForDevice && deviceId && deviceName !== null && deviceType
+        ? { waitingFor: { deviceId, deviceName, deviceType, harness } } : {}),
+      ...row, harness: harness ?? null, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(),
+      lastReply: replyLine(row.lastReply), lastReplyAt: row.lastReplyAt?.toISOString() ?? null,
+    }))
+    return { version, items }
+  })
 }
