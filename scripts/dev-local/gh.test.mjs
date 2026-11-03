@@ -53,6 +53,8 @@ test('real agent-shaped push, gh PR and exact-head receipt use only the fixture 
     const checked = JSON.parse(output.at(-1)).data.repository.object
     assert.equal(checked.oid, commit)
     assert.equal(checked.statusCheckRollup.state, 'SUCCESS')
+    await fixtureGh(['pr','view','mikka/fixture-1','--repo',env.GH_REPO,'--json','headRefOid,body'],{env:{...env,GH_TOKEN:'mikka-local-synthetic-user-token',GH_REPO:undefined},origin:services.origin,gitRun:git,output:value=>output.push(value)})
+    assert.equal(JSON.parse(output.at(-1)).headRefOid,commit,'the outer receipt uses the owner user credential too')
     // A server without a repository verification command preserves not_run
     // and legitimately downgrades this task's PR after the agent receipt.
     const pr = await (await fetch(`${services.origin}/github/repos/${env.GH_REPO}/pulls/41`, { headers: { authorization: `Bearer ${env.GH_TOKEN}` } })).json()

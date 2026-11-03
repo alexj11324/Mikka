@@ -83,7 +83,8 @@ export async function startMvpServices(port = 3191, { routes } = {}) {
         await mkdir(source, { recursive: true })
         await git(source, ['init', '--initial-branch=trunk'])
         await writeFile(join(source, 'README.md'), '# MVP fixture\n')
-        await git(source, ['add', 'README.md'])
+        await writeFile(join(source,'package.json'),JSON.stringify({private:true,scripts:{test:'git diff --check origin/trunk HEAD'}})+'\n')
+        await git(source, ['add', 'README.md','package.json'])
         await git(source, ['-c', 'user.name=Mikka CI', '-c', 'user.email=mikka-ci@example.com', 'commit', '-m', 'test: seed isolated origin'])
         await git(source, ['clone', '--bare', '--no-hardlinks', '.', barePath])
         // dev:local (scripts/dev-local.mjs) runs a real agent, not the mock harness.
@@ -187,8 +188,8 @@ export async function startMvpServices(port = 3191, { routes } = {}) {
       const method = request.method ?? 'GET'
       observe({ kind: 'github-request', requestId, method, path })
       const bearer = request.headers.authorization
-      const readAccess = () => assert.ok([READ_TOKEN, RUN_TOKEN].some(token => bearer === `Bearer ${token}`), 'Expected repository read token')
-      const writeAccess = () => assert.ok([WRITE_TOKEN, RUN_TOKEN].some(token => bearer === `Bearer ${token}`), 'Expected repository PR token')
+      const readAccess = () => assert.ok([READ_TOKEN, RUN_TOKEN,'mikka-local-synthetic-user-token'].some(token => bearer === `Bearer ${token}`), 'Expected repository read token')
+      const writeAccess = () => assert.ok([WRITE_TOKEN, RUN_TOKEN,'mikka-local-synthetic-user-token'].some(token => bearer === `Bearer ${token}`), 'Expected repository PR token')
       const appAccess = () => assert.match(bearer ?? '', /^Bearer [A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/, 'Expected an App JWT')
       if (['/user','/user/installations','/user/installations/99/repositories'].includes(path) && method === 'GET') {
         assert.equal(bearer,'Bearer mikka-local-synthetic-user-token','Expected local user authorization');

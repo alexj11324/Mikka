@@ -7,10 +7,11 @@ import { MVP_SERVICES } from '../../tests/mvp/isolated-env.mjs'
 
 const REPO = 'mikka-e2e/core-loop'
 const RUN_TOKEN = 'mvp-synthetic-installation-run'
+const USER_TOKEN = 'mikka-local-synthetic-user-token'
 const git = args => execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
 
 export async function fixtureGh(args, { env = process.env, origin = MVP_SERVICES, fetcher = fetch, gitRun = git, output = value => process.stdout.write(`${value}\n`) } = {}) {
-  if (env.GH_TOKEN !== RUN_TOKEN || (env.GH_REPO && env.GH_REPO !== REPO) || (env.GH_HOST && env.GH_HOST !== 'github.com')) throw new Error('Local fixture credentials required')
+  if (![RUN_TOKEN,USER_TOKEN].includes(env.GH_TOKEN) || (env.GH_REPO && env.GH_REPO !== REPO) || (env.GH_HOST && env.GH_HOST !== 'github.com')) throw new Error('Local fixture credentials required')
   const options = new Map(), positional = []
   for (let index = 0; index < args.length; index++) {
     const value = args[index]
@@ -25,7 +26,7 @@ export async function fixtureGh(args, { env = process.env, origin = MVP_SERVICES
   if (option('--repo', '-R') && option('--repo', '-R') !== REPO) throw new Error('Local fixture repository required')
   const api = async (path, method = 'GET', body) => {
     if (path !== 'graphql' && path !== `repos/${REPO}` && !path.startsWith(`repos/${REPO}/`)) throw new Error('Unsupported local fixture API')
-    const response = await fetcher(`${origin}/github/${path}`, { method, redirect: 'error', signal: AbortSignal.timeout(15_000), headers: { authorization: `Bearer ${RUN_TOKEN}`, 'content-type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) })
+    const response = await fetcher(`${origin}/github/${path}`, { method, redirect: 'error', signal: AbortSignal.timeout(15_000), headers: { authorization: `Bearer ${env.GH_TOKEN}`, 'content-type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) })
     if (!response.ok) throw new Error(`Local fixture API HTTP ${response.status}`)
     return response.json()
   }

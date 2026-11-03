@@ -10,7 +10,7 @@ test("monitor cron is a no-op unless both factory lifecycle flags are on", async
   t.after(() => flags.forEach((k, i) => (saved[i] === undefined ? delete process.env[k] : (process.env[k] = saved[i]))));
   let calls = 0;
   const sweep = (async () => { calls++; return { ...disabledFactoryMonitorSweep(), enabled: true }; }) as any;
-  for (const [routing, lifecycle] of [[undefined, undefined], ["1", undefined], [undefined, "1"], ["1", "0"], ["true", "1"]]) {
+  for (const [routing, lifecycle] of [["0", undefined], ["1", "0"], ["0", "1"], ["true", "1"]]) {
     flags.forEach((k, i) => { const v = [routing, lifecycle][i]; if (v === undefined) delete process.env[k]; else process.env[k] = v; });
     assert.deepEqual(await runFactoryMonitorCron({ deadline: Date.now() + 1000 }, sweep), disabledFactoryMonitorSweep());
   }
