@@ -95,8 +95,16 @@ lines.on("line", async (line) => {
   }
   if (method === "turn/start") {
     const turnId = `fixture-turn-${++turn}`
-    send({ id, result: { turn: { id: turnId } } })
     const prompt = params.input[0].text
+    const diagnostic = prompt.startsWith('DIAGNOSTIC ') ? JSON.parse(prompt.slice('DIAGNOSTIC '.length)) : null
+    if (diagnostic?.rpc) return send({id,error:diagnostic.rpc})
+    send({ id, result: { turn: { id: turnId } } })
+    if (diagnostic) {
+      if(diagnostic.rateLimits) send({method:'account/rateLimits/updated',params:{rateLimits:diagnostic.rateLimits}})
+      if(diagnostic.notification) send({method:'error',params:{threadId:'fixture-subscription-thread',turnId,error:diagnostic.notification,willRetry:diagnostic.willRetry===true}})
+      send({method:'turn/completed',params:{threadId:'fixture-subscription-thread',turn:{id:turnId,status:diagnostic.succeed?'completed':'failed',error:diagnostic.error??null}}})
+      return
+    }
     if (existsSync(historyFile)) {
       const history = JSON.parse(readFileSync(historyFile, "utf8")); history.messages.push(prompt)
       writeFileSync(historyFile, JSON.stringify(history))

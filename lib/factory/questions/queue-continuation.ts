@@ -12,10 +12,14 @@ export async function queueCloudQuestionContinuation(
   tx: PoolClient, userId: string, input: Parameters<FactoryQueue>[2],
   botId: string | null, context: Parameters<FactoryQueue>[4],
 ): Promise<{ runId: string } | null> {
-  const originId = context.questionOriginRunId;
+  const questionOriginId = context.questionOriginRunId;
+  const originId = context.questionHistoryRunId ?? questionOriginId;
   if (!originId) return null;
   const { rows: [binding] } = await tx.query('SELECT "workspaceId","botId" FROM computer_run_bindings WHERE "runId"=$1 AND "ownerId"=$2', [originId,userId]);
-  if (!binding) return null; // The original device continuation keeps its existing adapter.
+  if (!binding) {
+    if (context.questionHistoryRunId) throw new FactoryError('factoryQuestionContinuationUnavailable');
+    return null; // The original device continuation keeps its existing adapter.
+  }
   const fail = (): never => { throw new FactoryError('factoryQuestionContinuationUnavailable'); };
   const { rows: [origin] } = await tx.query<typeof agentRuns.$inferSelect & { machineState: string; sandboxId: string; snapshotId: string; machineEpoch: number; targetId: string | null }>(`SELECT r.*,m.state AS "machineState",m."sandboxId",m."snapshotId",m.epoch AS "machineEpoch",m."targetId"
     FROM agent_runs r
@@ -35,16 +39,17 @@ export async function queueCloudQuestionContinuation(
       AND c.provider=CASE a.harness WHEN 'codex' THEN 'codex' WHEN 'claude_code' THEN 'claude' END
     WHERE r.id=$1 AND r."userId"=$2 AND r."issueId"=$3 AND r."agentId"=$4 AND r."deviceRepoId"=$5
       AND r."botId" IS NOT DISTINCT FROM $6::uuid AND b."workspaceId"=$7
-      AND r.status='stopped' AND r."stopRequestedAt" IS NULL AND r."sessionId" IS NOT NULL
+      AND r.status=CASE WHEN $10::uuid IS NULL THEN 'stopped' ELSE 'failed' END AND r."stopRequestedAt" IS NULL AND r."sessionId" IS NOT NULL
       AND (r."agentDefinition"->'apiKey' IS NULL OR r."agentDefinition"->'apiKey'='null'::jsonb)
       AND m.state IN ('running','paused') AND m."sandboxId" IS NOT NULL
+      AND ($10::uuid IS NULL OR r."questionContinuation"->>'requiredSandboxId'=m."sandboxId")
       AND (m."workerLeaseUntil" IS NULL OR m."workerLeaseUntil"<=clock_timestamp())
       AND (repo."remoteUrl" IS NOT NULL OR NOT EXISTS(SELECT 1 FROM workspace_computer_policies p WHERE p."workspaceId"=b."workspaceId" AND p.permission='deny'))
       AND NOT EXISTS(SELECT 1 FROM agent_runs active WHERE active."deviceId"=r."deviceId" AND active.status NOT IN ('succeeded','completed','failed','stopped','cancelled'))
       AND EXISTS(SELECT 1 FROM factory_questions q JOIN factory_tasks t ON t.id=q."taskId" AND t."userId"=q."userId"
-        WHERE q."originRunId"=r.id AND q."originSessionId"=r."sessionId" AND q."userId"=r."userId" AND q.status='answered'
+        WHERE q."originRunId"=$11 AND (CASE WHEN $10::uuid IS NULL THEN q."originRunId" ELSE q."continuationRunId" END)=r.id AND q."originSessionId"=r."sessionId" AND q."userId"=r."userId" AND q.status='answered'
           AND t."issueId"=r."issueId" AND t."attemptId"=$8 AND t."sourceEventId"=$9 AND t."botId" IS NOT DISTINCT FROM r."botId")
-    FOR UPDATE OF r,m FOR SHARE OF b,bot,a,d,repo,credential,c`, [originId,userId,input.issueId,input.agentId,input.deviceRepoId,botId,binding.workspaceId,context.attemptId,context.sourceEventId]);
+    FOR UPDATE OF r,m FOR SHARE OF b,bot,a,d,repo,credential,c`, [originId,userId,input.issueId,input.agentId,input.deviceRepoId,botId,binding.workspaceId,context.attemptId,context.sourceEventId,context.questionHistoryRunId ?? null,questionOriginId]);
   if (!origin?.agentDefinition || !origin.sessionId) return fail();
   const runId = randomUUID();
   const prompt = `${origin.prompt}\n\n${input.note ?? ''}`;
