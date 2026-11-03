@@ -116,6 +116,13 @@ Decision: [`2026-11-01-1545-trunk-based`](design/decisions/2026-11-01-1545-trunk
    merging. A UI change merges only after its screenshots are reviewed.
 4. A documentation conflict is resolved by whoever merges: they edit the
    documents directly.
+5. A fix opens no PR ([`2026-11-03-0310`](design/decisions/2026-11-03-0310-fixes-push-to-main.md)):
+   once its local checks are green it is rebased onto `main` and pushed
+   there without force, and the coordinator reviews it on `main`. A fix to
+   credentials or auth is reported to the coordinator, with a diff summary
+   and test results, right after the push. Before any push, the change is
+   verified end to end locally or on a preview deployment with its own
+   database branch; production is never the test environment.
 
 Each of these modules has an owner. Anyone else who needs to change one asks
 its owner first.
