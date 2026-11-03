@@ -49,7 +49,9 @@ export async function sendOwnedRunMessage(database: RunControlDatabase, userId: 
  * the caller then runs afterRunEnded after commit.
  */
 export async function stopOwnedRun(database: RunControlDatabase, userId: string, runId: string): Promise<boolean> {
-  const outcome = await database.transaction(async tx => {
+  let ended = false
+  let wake: string | null = null
+  await database.transaction(async tx => {
     const [run] = await tx.select({ id: agentRuns.id, status: agentRuns.status, pauseReason: agentRuns.pauseReason, stopRequestedAt: agentRuns.stopRequestedAt, deviceId: agentRuns.deviceId })
       .from(agentRuns).where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, userId))).limit(1).for('update')
     if (!run || !UNFINISHED_RUN_STATUSES.some(status => status === run.status)) throw new ActionFailureError('runNotFound')
@@ -64,13 +66,15 @@ export async function stopOwnedRun(database: RunControlDatabase, userId: string,
     if ((run.status === 'queued' && !machineBound) || quotaPaused) {
       await tx.update(agentRuns).set({ status: 'stopped', pauseReason: null, stopRequestedAt: run.stopRequestedAt ?? now, finishedAt: now, updatedAt: now })
         .where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, userId)))
-      return { ended: true, deviceId: null as string | null }
+      ended = true
+      return true
     }
-    if (run.stopRequestedAt) return { ended: false, deviceId: null as string | null }
+    if (run.stopRequestedAt) return false
     await tx.update(agentRuns).set({ stopRequestedAt: now, updatedAt: now })
       .where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, userId)))
-    return { ended: false, deviceId: run.deviceId }
+    wake = run.deviceId
+    return false
   })
-  notifyDeviceWork(outcome.deviceId)
-  return outcome.ended
+  notifyDeviceWork(wake)
+  return ended
 }

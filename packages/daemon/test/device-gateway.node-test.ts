@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { DEVICE_GATEWAY_PING, runDeviceGateway, type DeviceGatewaySocket } from "./device-gateway.ts"
+import { DEVICE_GATEWAY_PING, runDeviceGateway, type DeviceGatewaySocket } from "../src/device-gateway.ts"
 
 class FakeSocket implements DeviceGatewaySocket {
   readyState = 1
