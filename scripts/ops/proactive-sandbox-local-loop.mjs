@@ -8,9 +8,9 @@ export const target = Object.freeze({
   teamId: 'team_C7lwxVVvnUicFli6112mvxpv',
   projectId: 'prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH',
   projectName: 'mikka',
-  sessionId: 'sbx_T04DxqVEqf2rMbl7r7SBt9MmUJNg',
+  sessionId: 'sbx_i0JVU4ryiQnowZ6IWX9zrkOdWbHR',
   cwd: '/vercel/Mikka',
-  hardTimeout: 45 * 60_000,
+  hardTimeout: 60 * 60_000,
 })
 
 export function requirePinnedSource(git, sha, root) {
@@ -87,7 +87,8 @@ try {
     E2E_DATABASE_URL: db.href,
     DATABASE_URL: db.href,
     MIKKA_DATABASE_URL: db.href,
-    LOCAL_LOOP_ITEMS: '1,2,3,7',
+    LOCAL_LOOP_ITEMS: '1,2,3,7,9',
+    LOCAL_LOOP_EXPECTED_SOURCE_SHA: sha,
     LOCAL_LOOP_ORIGIN: 'http://localhost:3110',
     MIKKA_DEV_PORT: '3110',
     MIKKA_DEV_SKIP_ENV_FILES: '1',
@@ -97,8 +98,8 @@ try {
   child = spawn(process.execPath, ['--import', './tests/support/server-only.mjs', '--import', 'tsx', 'scripts/dev-local/acceptance.mjs'], {
     cwd: root, env, detached: true, stdio: ['ignore', log.fd, log.fd],
   })
-  const softTimer = setTimeout(stopChild, 42 * 60_000)
-  const killTimer = setTimeout(() => { if (child?.pid) { try { process.kill(-child.pid, 'SIGKILL') } catch {} } }, 43 * 60_000)
+  const softTimer = setTimeout(stopChild, 57 * 60_000)
+  const killTimer = setTimeout(() => { if (child?.pid) { try { process.kill(-child.pid, 'SIGKILL') } catch {} } }, 59 * 60_000)
   process.once('SIGTERM', stopChild)
   process.once('SIGINT', stopChild)
   const result = await new Promise((yes, no) => {
@@ -109,7 +110,7 @@ try {
   requireSource()
   const passed = result.code === 0 && !result.signal && !stopped
   await writeFile(resolve(evidenceDir, 'dispatch-result.json'), JSON.stringify({
-    sourceSha: sha, items: [1, 2, 3, 7], status: passed ? 'passed' : 'failed',
+    sourceSha: sha, items: [1, 2, 3, 7, 9], status: passed ? 'passed' : 'failed',
     exitCode: result.code, interrupted: stopped, completedAt: new Date().toISOString(),
   }, null, 2), { mode: 0o600 })
   process.exitCode = passed ? 0 : 1

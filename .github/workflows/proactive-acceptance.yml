@@ -14,7 +14,7 @@ jobs:
  sandbox-local-loop:
   if: github.event_name == 'push' && github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/acceptance/proactive-1157-1163'
   runs-on: ubuntu-latest
-  timeout-minutes: 50
+  timeout-minutes: 70
   permissions:
     contents: read
     id-token: write
@@ -27,6 +27,8 @@ jobs:
         node-version: 24
     - name: Check dispatcher contract without network access
       run: node --test scripts/ops/proactive-sandbox-local-loop.test.mjs
+    - name: Check migration snapshot cleanup scope without network access
+      run: node --test scripts/ops/cleanup-migration-snapshot.test.mjs
     - name: Read existing sandbox team token
       uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
       with:
@@ -39,6 +41,9 @@ jobs:
         recursive: false
         include-imports: false
         secret-name: VERCEL_TEAM_TOKEN
+    - name: Delete the verified migration snapshot only
+      continue-on-error: true
+      run: node scripts/ops/cleanup-migration-snapshot.mjs
     - name: Read permitted Flash credential
       uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
       with:
@@ -54,4 +59,4 @@ jobs:
     - name: Dispatch bounded real Flash local loop in the existing sandbox
       run: node scripts/ops/proactive-sandbox-local-loop.mjs
       env:
-        MIKKA_ACCEPTANCE_SOURCE_SHA: d61fa0337b62d240cd4db0f396e709cca4c9c760
+        MIKKA_ACCEPTANCE_SOURCE_SHA: bbda9fd1727f9cae2a8d03d2e9a8a9a2922d5a87
