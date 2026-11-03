@@ -82,6 +82,47 @@ const blockedSandbox: AgentSandbox = {
   },
 };
 
+/**
+ * The CLI each harness runs on a cloud machine: the one passed in, else Claude Code from the bundled
+ * agent SDK and Codex from PATH (E2B's own template CLI). The model probe at template build time and
+ * at daemon start asks these same binaries, so what it reports is what a run here uses.
+ */
+export function hostedBinaries(passed?: Partial<Record<"codex" | "claude_code", string>>): Partial<Record<"codex" | "claude_code", string>> {
+  const host = { binaries: passed };
+  const require = createRequire(import.meta.url);
+  let claude = host.binaries?.claude_code;
+  try {
+    const bundled = createRequire(
+      require.resolve("@anthropic-ai/claude-agent-sdk"),
+    );
+    claude ??= join(
+      dirname(
+        bundled.resolve(
+          "@anthropic-ai/claude-agent-sdk-linux-x64/package.json",
+        ),
+      ),
+      "claude",
+    );
+  } catch {}
+  const codex =
+    host.binaries?.codex ??
+    (process.env.PATH ?? "")
+      .split(delimiter)
+      .map((dir) => join(dir, "codex"))
+      .find((path) => existsSync(path));
+  const binaries: Partial<Record<"codex" | "claude_code", string>> = { codex, claude_code: claude };
+  for (const kind of ["codex", "claude_code"] as const)
+    if (binaries[kind]) {
+      try {
+        binaries[kind] = realpathSync(binaries[kind]!);
+        if (!lstatSync(binaries[kind]!).isFile()) delete binaries[kind];
+      } catch {
+        delete binaries[kind];
+      }
+    }
+  return binaries;
+}
+
 export async function createHostedBotRunner(host: {
   stateDir: string;
   link: ServerLink;
@@ -114,37 +155,7 @@ export async function createHostedBotRunner(host: {
   // Per-run container records from before that decision name nothing this
   // runner creates; a leftover must not block the machine.
   rmSync(join(host.stateDir, "native-resources"), { recursive: true, force: true });
-  const require = createRequire(import.meta.url);
-  let claude = host.binaries?.claude_code;
-  try {
-    const bundled = createRequire(
-      require.resolve("@anthropic-ai/claude-agent-sdk"),
-    );
-    claude ??= join(
-      dirname(
-        bundled.resolve(
-          "@anthropic-ai/claude-agent-sdk-linux-x64/package.json",
-        ),
-      ),
-      "claude",
-    );
-  } catch {}
-  const codex =
-    host.binaries?.codex ??
-    (process.env.PATH ?? "")
-      .split(delimiter)
-      .map((dir) => join(dir, "codex"))
-      .find((path) => existsSync(path));
-  const binaries = { codex, claude_code: claude };
-  for (const kind of ["codex", "claude_code"] as const)
-    if (binaries[kind]) {
-      try {
-        binaries[kind] = realpathSync(binaries[kind]!);
-        if (!lstatSync(binaries[kind]!).isFile()) delete binaries[kind];
-      } catch {
-        delete binaries[kind];
-      }
-    }
+  const binaries = hostedBinaries(host.binaries);
   if (!binaries.codex && !binaries.claude_code) throw unavailable();
   // A verify command runs directly on the task's machine against a private git
   // copy, so it cannot change the worktree's own `.git`.

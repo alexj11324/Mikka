@@ -3044,7 +3044,8 @@
       "accessDenied": "Provider denied subscription access",
       "modelRejected": "Model request rejected",
       "quotaChecking": "Subscription usage unconfirmed",
-      "runtimeUnavailable": "Subscription unsupported in this runtime"
+      "runtimeUnavailable": "Subscription unsupported in this runtime",
+      "modelNotReported": "The cloud computer didn't report this model"
     },
     "quota": {
       "used": "{name} quota used up",

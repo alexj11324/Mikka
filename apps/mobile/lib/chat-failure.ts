@@ -5,6 +5,7 @@ const SUBSCRIPTION_LINES = {
   unavailable: '所选订阅不可用', reconnect: '订阅需要重新连接', quotaUsed: '订阅额度已用完', retry: '订阅暂时不可用',
   selectionChanged: '订阅选择已失效', rateLimited: '订阅请求受限', accessDenied: '服务商拒绝订阅访问',
   modelRejected: '模型请求被拒绝', quotaChecking: '订阅额度待确认', runtimeUnavailable: '当前环境不支持此订阅',
+  modelNotReported: '云电脑没报告能跑这个模型',
 } satisfies Record<SubscriptionRefusalNotice, string>
 
 interface FailureLine { text: string; retry: boolean; recovery: 'models' | 'model' | 'billing' | null }
