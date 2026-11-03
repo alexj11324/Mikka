@@ -25,7 +25,7 @@ import { summarizeConversation } from '@/lib/coordinator/summary-model'
 import { and, asc, desc, eq } from 'drizzle-orm'
 import { ActionFailureError } from '@/lib/action-error'
 import { addRunMessage, queueRun, readRun, requestRunStop, visibleRuns } from '@/lib/agent-runs'
-import { compactionCut, forgetNotes, promptMessages, promptWithCachedContext, rememberNote, SUMMARY_INSTRUCTIONS } from '@/lib/coordinator/context'
+import { compactionCut, forgetNotes, cachedContextLines, promptMessages, promptWithCachedContext, rememberNote, SUMMARY_INSTRUCTIONS } from '@/lib/coordinator/context'
 import { COORDINATOR_INSTRUCTIONS } from '@/lib/coordinator/instructions'
 import { withPersonalInstructions } from '@/lib/coordinator/personal-instructions'
 import { botInstructions } from '@/lib/coordinator/bot-instructions'
@@ -291,12 +291,13 @@ export async function preparePrompt(userId: string, botId: string, snapshot?: De
   // The person's 个人指令 sit after the rules and before the memory, marked as theirs.
   // The person's own GitHub account, so the Bot looks a repository up instead of asking which account it is under.
   const { githubContext } = await import('@/lib/coordinator/github-context')
-  const { executionContext } = await import('@/lib/coordinator/execution-context')
-  const executionContextBlock = async (owner: string, bot: string) => { const text = await executionContext(owner, bot); return text ? '\n' + text : '' }
+  const { executionContextParts } = await import('@/lib/coordinator/execution-context')
+  const execution = await executionContextParts(userId, botId)
   // Everything up to the memory is the same on every turn; `stable` is where it ends, so a provider can cache it (lib/prompt-cache.ts).
   const rules = await withPersonalInstructions(userId, instructions, snapshot ? snapshot.personalPlugins ?? { servers: [], skills: [] } : undefined)
-  // The GitHub lines (the authorized repository list) are part of the cached prefix: they change only when the repositories do.
-  const prompt = promptWithCachedContext(rules, await githubContext(userId, undefined, undefined, botId), memory, factoryPolicy + '\n' + SCHEDULE_INSTRUCTIONS + await executionContextBlock(userId, botId))
+  // The GitHub lines (the authorized repository list) and the allowed models list are part of the cached prefix: they change only
+  // when the repositories or 优先使用的模型 do. Which models can run right now changes per turn, so it stays after the memory.
+  const prompt = promptWithCachedContext(rules, cachedContextLines(await githubContext(userId, undefined, undefined, botId), execution.models), memory, factoryPolicy + '\n' + SCHEDULE_INSTRUCTIONS + (execution.live ? '\n' + execution.live : ''))
   return { ...prompt, messages: promptMessages(summary, messages, summaryTrust) }
 }
 
@@ -471,6 +472,12 @@ export async function dispatchRun(userId: string, input: { issueId: string; agen
   'use step'
   await assertNativeToolScope(userId,scope)
   const { newThread, sourceEventId, target, ...request } = input
+  // The Agent or model the Bot named must be one of 优先使用的模型, the list its prompt shows; otherwise nothing is queued.
+  if (request.model) {
+    const { modelNotAllowed } = await import('@/lib/model-dispatch')
+    const refused = await modelNotAllowed(pool, { ownerId: userId, workspaceId: await (await import('@/lib/execution-settings')).executionWorkspace(userId, botId) }, request.model)
+    if (refused) return { ...refused, issueId: request.issueId }
+  }
   const { dispatchToTask, explicitNewThread } = await import('@/lib/thread-dispatch')
   const { movesThread, runPlacement } = await import('@/lib/dispatch-target')
   // The result says where the work actually runs, so the reply names that place and no other (decision 2026-11-01-1330).
@@ -654,10 +661,18 @@ export async function listComputerBots(userId: string, scope?: NativeToolScope) 
 }
 
 /** `dispatch_bot_computer`: on a task that has a thread, that thread's next work (lib/thread-dispatch.ts), on this Bot's computer. */
-export async function dispatchComputerThread(userId: string, input: { botId: string; issueId: string; harness: 'codex' | 'claude_code'; note?: string; suggestionId?: string; readOnly?: boolean; newThread?: boolean; sourceEventId?: string }, toolCallId: string, scope?: NativeToolScope, execution?: AgentExecution, chatBotId?: string) {
+export async function dispatchComputerThread(userId: string, input: { botId: string; issueId: string; harness: 'codex' | 'claude_code'; model?: string; note?: string; suggestionId?: string; readOnly?: boolean; newThread?: boolean; sourceEventId?: string }, toolCallId: string, scope?: NativeToolScope, execution?: AgentExecution, chatBotId?: string) {
   'use step'
   await assertNativeToolScope(userId, scope)
-  const { newThread, sourceEventId, ...request } = input
+  const { newThread, sourceEventId, model: asked, ...request } = input
+  // A model the Bot named must be one of 优先使用的模型 of the computer Bot's workspace, the list its prompt shows; otherwise nothing is queued.
+  if (asked) {
+    const bot = (await pool.query<{ workspaceId: string }>('SELECT "workspaceId" FROM bots WHERE id=$1 AND "ownerId"=$2 AND "archivedAt" IS NULL', [request.botId, userId])).rows[0]
+    if (!bot) return { error: 'cloudComputerUnavailable' as const }
+    const { modelNotAllowed } = await import('@/lib/model-dispatch')
+    const refused = await modelNotAllowed(pool, { ownerId: userId, workspaceId: bot.workspaceId }, { harness: request.harness, model: asked })
+    if (refused) return { ...refused, issueId: request.issueId }
+  }
   const { dispatchToTask, explicitNewThread } = await import('@/lib/thread-dispatch')
   return asToolResult(() => dispatchToTask(userId, request.issueId, {
     note: request.note, newThread,
@@ -668,7 +683,10 @@ export async function dispatchComputerThread(userId: string, input: { botId: str
       const runtime = (await pool.query<{ workspaceId: string; agentId: string }>('SELECT r."workspaceId",r."agentId" FROM bot_cloud_runtimes r WHERE r."botId"=$1 AND r."ownerId"=$2 AND r.harness=$3', [request.botId, userId, request.harness])).rows[0]
       if (!runtime) return { error: 'cloudComputerUnavailable' as const }
       const { latestThreadRunModel, chooseCloudRunModel } = await import('@/lib/computer/run-model')
-      const runModel = previous ? await latestThreadRunModel(pool, userId, request.issueId, previous.agentId) : await chooseCloudRunModel(pool, { ownerId: userId, workspaceId: runtime.workspaceId, botId: request.botId }, runtime.agentId, request.harness)
+      const choose = () => chooseCloudRunModel(pool, { ownerId: userId, workspaceId: runtime.workspaceId, botId: request.botId }, runtime.agentId, request.harness, asked)
+      // The thread keeps its own model unless the person named another one from the list.
+      const named = previous && asked ? await choose() : null
+      const runModel = previous ? (named && !('error' in named) ? named : await latestThreadRunModel(pool, userId, request.issueId, previous.agentId)) : await choose()
       if (!runModel) return { error: 'threadModelUnavailable' as const, issueId: request.issueId, threadRunId: previous!.id }
       if ('error' in runModel) return { ...runModel, issueId: request.issueId }
       return dispatchComputerTask(userId, { ...request, note, ...runModel, ...(previous ? { threadRunId: previous.id } : {}), ...(request.readOnly || previous?.readOnly ? { readOnly: true } : {}) }, previous ? `thread:${previous.id}:${toolCallId}` : toolCallId, scope, execution)

@@ -27,6 +27,19 @@ export type ModelDispatch =
   | { kind: 'cloud'; harness: OrderEntry['harness']; model: string; entry: OrderEntry; apiKey: boolean }
   | { kind: 'none'; reason: DispatchNothingReason; card: ReturnType<typeof modelUnavailableCard> }
 
+/**
+ * The Agent or model a Bot passed for a new thread must be one of 优先使用的模型: the same list its prompt shows
+ * (lib/coordinator/execution-context.ts modelListText). A model only a credential offers, or an Agent with no entry,
+ * is refused before anything is queued. Null when it is listed, or when nothing was named (the list's first runnable entry).
+ */
+export async function modelNotAllowed(pool: Pool, scope: OrderScope, asked?: { harness: OrderEntry['harness']; model?: string } | null): Promise<{ error: 'modelNotAllowed'; asked: { harness: OrderEntry['harness']; model?: string }; allowed: { harness: OrderEntry['harness']; model: string }[] } | null> {
+  if (!asked) return null
+  await new (await import('./execution-settings')).ExecutionSettings(pool).ensureCatalogues(scope)
+  const { entries } = await readOrder(pool, scope)
+  if (entries.some(entry => entry.harness === asked.harness && (!asked.model || entry.model === asked.model))) return null
+  return { error: 'modelNotAllowed', asked, allowed: entries.map(entry => ({ harness: entry.harness, model: entry.model })) }
+}
+
 export async function resolveModelDispatch(pool: Pool, scope: OrderScope & { botId: string | null }, asked?: { harness: OrderEntry['harness']; model?: string } | null, location?: RunLocation, deviceId?: string, dependencies: { refreshQuota?: RefreshOrderQuota; /** The cloud already failed to start this run: a server or a computer only. */ withoutCloud?: boolean } = {}): Promise<ModelDispatch> {
   // A subscription never asked for its models offers none yet: ask it first (once per revision).
   await new (await import('./execution-settings')).ExecutionSettings(pool).ensureCatalogues(scope)

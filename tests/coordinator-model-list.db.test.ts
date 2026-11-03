@@ -1,0 +1,111 @@
+// Every turn the Coordinator and every Bot are told the allowed models (优先使用的模型) before they dispatch, and the
+// host takes only those: against a real PostgreSQL, through preparePrompt and the dispatch steps. Model ids are
+// fixtures standing for what an account reported.
+import assert from 'node:assert/strict'
+import { randomUUID } from 'node:crypto'
+import test from 'node:test'
+import { dbUrl, seedBot, seedIssue, seedUser, seedWorkspace } from './support/workspace-admin-db'
+import { connectGitHub, githubAppStub } from './support/github-app-stub'
+
+process.env.MIKKA_BYOS_VALIDATED_MODEL_ROUTES = 'claude_cpa,codex_cpa'
+
+test('allowed models: every entry in every Bot\'s cached prompt, and a model outside the list queues nothing', { skip: !dbUrl }, async t => {
+  process.env.MIKKA_CLOUD_COMPUTER_TASKS = '1'
+  process.env.MIKKA_BYOS_ENABLED = '1'
+  const { Pool } = await import('pg')
+  const pool = new Pool({ connectionString: dbUrl, max: 3 })
+  const steps = await import('../workflows/coordinator/steps')
+  const order = await import('../lib/model-order')
+  const { chatBotId } = await import('../lib/coordinator/coordinator-bot')
+  const { pool: appPool } = await import('../lib/db')
+  const { workspacePool } = await import('../lib/workspace-db')
+  const github = githubAppStub()
+  github.install('octo/repo', { contents: 'write', pull_requests: 'write' })
+  const users: string[] = []
+  t.after(async () => {
+    github.restore()
+    for (const table of ['coordinator_events', 'agent_runs', 'agents', 'repository_settings', 'github_repository_installations', 'account']) await pool.query(`DELETE FROM ${table} WHERE "userId" = ANY($1)`, [users])
+    for (const table of ['model_order_entries', 'model_order_settings', 'byos_bindings', 'byos_connections', 'devices']) await pool.query(`DELETE FROM ${table} WHERE "ownerId" = ANY($1)`, [users])
+    await Promise.all([pool.end(), appPool.end(), workspacePool.end()])
+  })
+
+  const userId = await seedUser(pool, 'model-list')
+  users.push(userId)
+  const githubAccountId = String(9_300_000 + Math.floor(Math.random() * 1000))
+  await pool.query(`INSERT INTO account (id,"accountId","providerId","userId","createdAt","updatedAt") VALUES ($1,$2,'github',$3,now(),now())`, [randomUUID(), githubAccountId, userId])
+  github.allowWriter('octo/repo', githubAccountId)
+  await connectGitHub(github, userId, githubAccountId, ['octo/repo'])
+  const ws = await seedWorkspace(pool, userId, [{ userId, role: 'admin' }])
+  const scope = { ownerId: userId, workspaceId: ws.id }
+  // Two subscriptions, five models between them: more than the three the prompt used to show.
+  const subscribe = async (provider: 'claude' | 'codex', models: string[]) => {
+    const connection = randomUUID()
+    await pool.query(`INSERT INTO byos_connections (id,"ownerId","workspaceId",provider,state,epoch,"secretName","secretDigest","providerSubject","modelCatalog",quota) VALUES ($1,$2,$3,$4,'connected',1,$5,$6,'synthetic-subject',$7,$8)`,
+      [connection, userId, ws.id, provider, `synthetic-${connection}`, 'a'.repeat(64), JSON.stringify({ revision: '1', models }),
+        JSON.stringify({ vendor: provider === 'claude' ? 'claude_code' : 'codex', source: 'official', status: 'ok', plan: null, observedAt: new Date().toISOString(), windows: [{ kind: 'five_hour', used: .2, resetsAt: null }] })])
+    for (const model of models) await pool.query(`INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId") VALUES ($1,$2,$3,'catalogue',$4,1,$5,$6)`,
+      [randomUUID(), userId, ws.id, connection, provider === 'codex' ? 'codex_cpa' : 'claude_cpa', model])
+    return connection
+  }
+  const codex = await subscribe('codex', ['fx-codex-a', 'fx-codex-b', 'fx-codex-c'])
+  const claude = await subscribe('claude', ['fx-claude-a', 'fx-claude-b'])
+  // The person put all five in 优先使用的模型.
+  const entries = [...['fx-codex-a', 'fx-codex-b', 'fx-codex-c'].map(model => ({ harness: 'codex' as const, model, source: { kind: 'subscription' as const, connectionId: codex } })),
+    ...['fx-claude-a', 'fx-claude-b'].map(model => ({ harness: 'claude_code' as const, model, source: { kind: 'subscription' as const, connectionId: claude } }))]
+  for (const entry of entries) await order.changeOrder(pool, scope, { kind: 'add', entries: [entry] })
+  await order.changeOrder(pool, scope, { kind: 'location', location: 'local' })
+  // A computer whose Codex reported fx-codex-a and fx-codex-b.
+  const deviceId = randomUUID()
+  await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,"deviceType",enabled,"lastSeenAt",harnesses) VALUES ($1,$2,'Fixture Mac','local','laptop',true,now(),$3)`,
+    [deviceId, userId, JSON.stringify([{ harness: 'codex', installed: true, subscriptionBroker: true, modelSlots: [{ slot: 'a', model: 'fx-codex-a', name: 'A' }, { slot: 'b', model: 'fx-codex-b', name: 'B' }] }])])
+  await pool.query(`INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,'codex',$4)`, [randomUUID(), userId, deviceId, `codex-${deviceId.slice(0, 8)}`])
+  const listed = (await order.readOrder(pool, scope)).entries.map(entry => `${entry.harness}:${entry.model}`)
+  assert.deepEqual(listed, entries.map(entry => `${entry.harness}:${entry.model}`))
+
+  const coordinator = await chatBotId(userId, null, ws.id)
+  const bot = await seedBot(pool, ws.id, userId)
+
+  await t.test('the Coordinator and a Bot both get the whole list, in the cached prefix, byte for byte the same on the next turn', async () => {
+    for (const botId of [coordinator, bot]) {
+      const { instructions, stable } = await steps.preparePrompt(userId, botId)
+      const head = instructions.indexOf('Allowed models (优先使用的模型), in the order a new thread tries them')
+      assert.ok(head >= 0, `the list reaches ${botId === bot ? 'the Bot' : 'the Coordinator'}`)
+      const lines = instructions.slice(head).split('\n').slice(1, 6)
+      assert.deepEqual(lines.map(line => line.replace(/^\d+\. \S+(?: \S+)? \((\w+)\) (\S+) .*$/, '$1:$2')), listed, 'every entry, in order')
+      assert.match(lines.find(line => line.includes('fx-codex-a'))!, /codex subscription · runs on: Fixture Mac \(computer\)$/)
+      assert.match(lines.find(line => line.includes('fx-claude-a'))!, /claude subscription · runs on: nowhere yet$/, 'no computer has Claude Code')
+      assert.ok(head + instructions.slice(head).indexOf(lines[4]!) + lines[4]!.length <= stable, 'the list is inside the cached prefix')
+      assert.equal((await steps.preparePrompt(userId, botId)).instructions.slice(0, stable), instructions.slice(0, stable), 'the prefix is stable across turns')
+    }
+  })
+
+  const runs = async () => (await pool.query('SELECT count(*)::int AS n FROM agent_runs WHERE "userId"=$1', [userId])).rows[0].n as number
+
+  await t.test('dispatch_run: a model outside the list, even one an account offers, is refused and nothing is queued', async () => {
+    const issueId = await seedIssue(pool, userId)
+    // A numbered task, so its thread gets a publication branch.
+    await pool.query(`UPDATE issues SET content='{"type":"doc","attrs":{"mikka":{"number":7}}}' WHERE id=$1`, [issueId])
+    const dispatch = (model: { harness: 'codex' | 'claude_code'; model?: string }) => steps.dispatchRun(userId, { issueId, repo: 'octo/repo', model, requestKey: `dispatch:${randomUUID()}` }, undefined, coordinator)
+    const unknown = await dispatch({ harness: 'codex', model: 'fx-not-offered' }) as { error: string; allowed: { harness: string; model: string }[] }
+    assert.equal(unknown.error, 'modelNotAllowed')
+    assert.deepEqual(unknown.allowed.map(item => `${item.harness}:${item.model}`), listed)
+    // Removed from the list, still offered by the account: refused all the same.
+    const view = await order.orderView(pool, scope)
+    await order.changeOrder(pool, scope, { kind: 'remove', id: view.entries.find(entry => entry.model === 'fx-codex-b')!.id })
+    assert.equal((await dispatch({ harness: 'codex', model: 'fx-codex-b' }) as { error: string }).error, 'modelNotAllowed')
+    assert.equal(await runs(), 0, 'nothing is queued')
+    // A listed model runs.
+    const queued = await dispatch({ harness: 'codex', model: 'fx-codex-a' }) as { status?: string; error?: string }
+    assert.equal(queued.status, 'queued', JSON.stringify(queued))
+    assert.equal((await pool.query('SELECT "agentDefinition"->>\'model\' AS model FROM agent_runs WHERE "userId"=$1', [userId])).rows[0].model, 'fx-codex-a')
+  })
+
+  await t.test('dispatch_bot_computer: a model outside the list is refused before anything is queued', async () => {
+    const before = await runs()
+    const issueId = await seedIssue(pool, userId)
+    const refused = await steps.dispatchComputerThread(userId, { botId: bot, issueId, harness: 'codex', model: 'fx-not-offered' }, `call-${randomUUID()}`) as { error: string; allowed: unknown[] }
+    assert.equal(refused.error, 'modelNotAllowed')
+    assert.ok(refused.allowed.length > 0)
+    assert.equal(await runs(), before)
+  })
+})

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { executionContext, executionContextText, readExecutionFacts, type ExecutionContextSource, type ExecutionFacts } from './execution-context'
+import { executionContext, executionContextParts, executionContextText, modelListText, readExecutionFacts, type ExecutionContextSource, type ExecutionFacts } from './execution-context'
 import { deliverRefusalLine, failureLine } from './refusal-line'
 import { chatFailure, failureMessageKey } from '../chat-failure'
 
@@ -10,10 +10,11 @@ const facts: ExecutionFacts = {
   order: {
     location: 'local',
     entries: [
-      { agent: 'Claude Code', model: 'opus', provider: 'anthropic', block: null },
-      { agent: 'Codex', model: 'gpt-codex', provider: 'openai', block: 'quota' },
-      { agent: 'Codex', model: 'gpt-mini', provider: 'openai', block: null },
-      { agent: 'Claude Code', model: 'sonnet', provider: 'anthropic', block: null },
+      { harness: 'claude_code', agent: 'Claude Code', model: 'opus', source: 'subscription', provider: 'anthropic', places: ['Alex 的 MacBook (computer)'], block: null },
+      { harness: 'codex', agent: 'Codex', model: 'gpt-codex', source: 'api_key', provider: 'openai', places: ['Alex 的 MacBook (computer)'], block: 'quota' },
+      { harness: 'codex', agent: 'Codex', model: 'gpt-mini', source: 'api_key', provider: 'openai', places: [], block: null },
+      { harness: 'claude_code', agent: 'Claude Code', model: 'sonnet', source: 'subscription', provider: 'anthropic', places: ['Alex 的 MacBook (computer)', 'build-box (server)'], block: null },
+      { harness: 'claude_code', agent: 'Claude Code', model: 'haiku', source: 'subscription', provider: 'anthropic', places: ['cloud'], block: 'paused' },
     ],
     credentials: [{ kind: 'subscription', provider: 'anthropic' }, { kind: 'api_key', provider: 'openai' }],
   },
@@ -27,7 +28,8 @@ test('every configured fact reaches the prompt, with the rule not to ask about i
   assert.match(text, /Alex 的 MacBook \(online, Claude Code and Codex\)/)
   assert.match(text, /server \(offline, 参与调度 off, no Agent installed\)/)
   assert.match(text, /anthropic subscription, openai API key/)
-  assert.match(text, /运行位置 本地: a server, then a computer\): Claude Code opus; Codex gpt-codex \(cannot run now: quota\); Codex gpt-mini; and 1 more/)
+  assert.match(text, /Allowed models that cannot run right now: 2\. Codex gpt-codex \(quota\); 5\. Claude Code haiku \(paused\)\. The others can\./)
+  assert.doesNotMatch(text, /Allowed models \(优先使用的模型\)/, 'the list itself is in the cached prefix, not the per-turn tail')
   assert.match(text, /no E2B key/)
   assert.match(text, /Mikka 默认 .* points_exhausted/)
   assert.match(text, /do not ask the person about them/)
@@ -38,7 +40,36 @@ test('nothing connected says what dispatch does instead of inviting a question',
   assert.match(text, /No subscription or API key is connected for threads; dispatch_run returns a card/)
   assert.match(text, /no computer connected/)
   assert.doesNotMatch(text, /Mikka 默认/, 'a ready Mikka 默认 is not worth a line')
-  assert.doesNotMatch(text, /Preferred models/)
+  assert.doesNotMatch(text, /Allowed models that cannot run/)
+  assert.match(modelListText({ order: { location: 'cloud', entries: [], credentials: [] } }), /Allowed models \(优先使用的模型\): none yet/)
+})
+
+test('the allowed models list names every entry, past three, with Agent, model id, credential and where it runs', () => {
+  const text = modelListText(facts)
+  const lines = text.split('\n')
+  assert.match(lines[0]!, /^Allowed models \(优先使用的模型\), in the order a new thread tries them \(运行位置 本地: a server, then a computer\)\. dispatch_run and dispatch_bot_computer take only these:$/)
+  assert.deepEqual(lines.slice(1), [
+    '1. Claude Code (claude_code) opus · anthropic subscription · runs on: Alex 的 MacBook (computer)',
+    '2. Codex (codex) gpt-codex · openai API key · runs on: Alex 的 MacBook (computer)',
+    '3. Codex (codex) gpt-mini · openai API key · runs on: nowhere yet',
+    '4. Claude Code (claude_code) sonnet · anthropic subscription · runs on: Alex 的 MacBook (computer), build-box (server)',
+    '5. Claude Code (claude_code) haiku · anthropic subscription · runs on: cloud',
+  ])
+  assert.doesNotMatch(text, /more|quota|paused/, 'no cap, and no per-turn state that would break the cache')
+  // The cached prefix is byte-stable: the same list gives the same bytes whatever can run this turn.
+  const unblocked = { order: { ...facts.order!, entries: facts.order!.entries.map(entry => ({ ...entry, block: null })) } }
+  assert.equal(modelListText(unblocked), text)
+  assert.equal(modelListText({ order: null }), '')
+})
+
+test('executionContextParts gives the list for the prefix and the per-turn rest from one read', async () => {
+  const source: ExecutionContextSource = {
+    workspace: async () => facts.workspace, devices: async () => facts.devices, order: async () => facts.order,
+    e2b: async () => facts.e2b, hosted: async () => facts.hosted,
+  }
+  const parts = await executionContextParts('alex', 'bot', source, 200)
+  assert.equal(parts.models, modelListText(facts))
+  assert.equal(parts.live, executionContextText(facts))
 })
 
 test('a part that fails or is slow is left out, never claimed missing', async () => {

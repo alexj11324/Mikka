@@ -53,11 +53,12 @@ before(async () => {
 })
 
 async function facts(overrides: Partial<import('../lib/coordinator/execution-context').ExecutionFacts> = {}) {
-  const { executionContextText } = await import('../lib/coordinator/execution-context')
-  return executionContextText({
+  const { executionContextText, modelListText } = await import('../lib/coordinator/execution-context')
+  // As in the real prompt: the allowed models list (cached prefix), then what changes per turn.
+  return ((f: Parameters<typeof executionContextText>[0]) => `${modelListText(f)}\n${executionContextText(f)}`)({
     workspace: { name: 'Alex', kind: 'personal' },
     devices: [{ name: 'Alex 的 MacBook', online: true, enabled: true, agents: ['Claude Code', 'Codex'] }],
-    order: { location: 'local', entries: [{ agent: 'Claude Code', model: 'opus', provider: 'anthropic', block: null }, { agent: 'Codex', model: 'gpt-codex', provider: 'openai', block: null }], credentials: [{ kind: 'subscription', provider: 'anthropic' }, { kind: 'subscription', provider: 'openai' }] },
+    order: { location: 'local', entries: [{ harness: 'claude_code', agent: 'Claude Code', model: 'opus', source: 'subscription', provider: 'anthropic', places: ['Alex 的 MacBook (computer)'], block: null }, { harness: 'codex', agent: 'Codex', model: 'gpt-codex', source: 'subscription', provider: 'openai', places: ['Alex 的 MacBook (computer)'], block: null }], credentials: [{ kind: 'subscription', provider: 'anthropic' }, { kind: 'subscription', provider: 'openai' }] },
     e2b: false,
     hosted: 'ready',
     ...overrides,

@@ -40,15 +40,16 @@ before(async () => {
   registry = await import('@/workflows/coordinator/tools')
   instructions = (await import('./instructions')).COORDINATOR_INSTRUCTIONS
   const { githubContext } = await import('./github-context')
-  const { executionContextText } = await import('./execution-context')
+  const { executionContextText, modelListText } = await import('./execution-context')
   const github = await githubContext(OWNER, {
     connection: async () => ({ githubLogin: 'alexj11324' }),
     list: async () => ({ login: 'alexj11324', installationAccounts: ['alexj11324'], repositories: Array.from({ length: 50 }, (_, index) => index) }),
   })
-  const execution = executionContextText({
+  // As in the real prompt: the allowed models list (cached prefix), then what changes per turn.
+  const execution = ((f: Parameters<typeof executionContextText>[0]) => `${modelListText(f)}\n${executionContextText(f)}`)({
     workspace: { name: 'Alex', kind: 'personal' },
     devices: [{ name: 'Alex 的 MacBook', online: true, enabled: true, agents: ['Claude Code', 'Codex'] }],
-    order: { location: 'local', entries: [{ agent: 'Claude Code', model: 'opus', provider: 'anthropic', block: null }, { agent: 'Codex', model: 'gpt-codex', provider: 'openai', block: null }], credentials: [{ kind: 'subscription', provider: 'anthropic' }, { kind: 'subscription', provider: 'openai' }] },
+    order: { location: 'local', entries: [{ harness: 'claude_code', agent: 'Claude Code', model: 'opus', source: 'subscription', provider: 'anthropic', places: ['Alex 的 MacBook (computer)'], block: null }, { harness: 'codex', agent: 'Codex', model: 'gpt-codex', source: 'subscription', provider: 'openai', places: ['Alex 的 MacBook (computer)'], block: null }], credentials: [{ kind: 'subscription', provider: 'anthropic' }, { kind: 'subscription', provider: 'openai' }] },
     e2b: false,
     hosted: 'points_exhausted',
   })

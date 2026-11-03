@@ -274,6 +274,11 @@ export function instructionsWithMemory(instructions: string, memory: string): st
  * list), which stay the same from turn to turn, then the memory and what changes each turn. `stable` is where the
  * prefix ends (lib/prompt-cache.ts), so a turn with the same rules and repositories reuses the cached prefix.
  */
+/** The cached context after the rules: the GitHub lines, then the allowed models list; empty parts are left out. */
+export function cachedContextLines(...parts: string[]): string {
+  return parts.filter(Boolean).join('\n')
+}
+
 export function promptWithCachedContext(rules: string, github: string, memory: string, tail: string): { instructions: string; stable: number } {
   const prefix = github ? `${rules}\n${github}` : rules
   return { stable: prefix.length, instructions: instructionsWithMemory(prefix, memory) + tail }
