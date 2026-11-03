@@ -1,8 +1,8 @@
 'use server'
 
 import { withDatabaseOperation } from '@/lib/db/egress-sample'
-
-import { and, desc, eq, sql } from 'drizzle-orm'
+import { createHash } from 'node:crypto'
+import { and, desc, eq, inArray, or, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { ActionFailureError, runAction } from '@/lib/action-error'
 import type { ActionErrorCode, ActionResult } from '@/lib/action-result'
@@ -31,6 +31,10 @@ import { TASK_SCOPES } from '@/lib/task-identifier'
 import { enrichActivityActors } from '@/lib/activity-actor-server'
 import { actingContext, activityActor } from '@/lib/activity-actor'
 import { requireLockedIssueScope } from '@/lib/issue-scope-authorization'
+import { queryVersion } from '@/lib/db/query-version'
+import { workspaceDb } from '@/lib/workspace-db'
+import { teamIssues } from '@/lib/db/team-schema'
+import { issuePrefixes, linearIssueLinks, linearTeamSyncs } from '@/lib/db/schema'
 
 type IssueRow = typeof issues.$inferSelect
 export type IssueView = IssueRow & { metadata: ReturnType<typeof readIssueMetadata>; identifier: string | null; linearTargetVerified: boolean }
@@ -62,31 +66,52 @@ function validationCode(error: z.ZodError): ActionErrorCode {
 
 // SWR passes its cache key as an argument. Keep this public fetcher zero-argument.
 export async function listIssues() {
-  return readIssues()
+  return (await readIssues()).items!
+}
+
+/** Auth and visibility are checked on every poll, including unchanged results. */
+export async function pollIssues(known?: string) {
+  return readIssues(undefined, known && /^[0-9a-f]{32}$/.test(known) ? known : undefined)
 }
 
 /** Explicit API workspace selection, with the same acting-user/membership checks. */
 export async function listWorkspaceIssues(workspaceId: string) {
   z.uuid().parse(workspaceId)
-  return readIssues(workspaceId)
+  return (await readIssues(workspaceId)).items!
 }
 
-async function readIssues(workspaceId?: string) {
-  return withDatabaseOperation('/actions/issues/poll', () => readIssueSnapshot(workspaceId))
+async function readIssues(workspaceId?: string, known?: string) {
+  return withDatabaseOperation('/actions/issues/poll', () => readIssueSnapshot(workspaceId, known))
 }
 
-async function readIssueSnapshot(workspaceId?: string) {
+async function readIssueSnapshot(workspaceId?: string, known?: string) {
   const userId = await getUserId()
   const context = await loadWorkspaceContext(workspaceId)
   const teams = await accessibleTeams(userId, context.workspace.id)
   const visibility = await issueVisibility(userId)
-  const rows = await db.select({ id: issues.id, ownerId: issues.userId, ownerName: users.name, ownerImage: users.image, title: issues.title, content: issueAttrsContent, checklistTotal: issueChecklistTotal, checklistChecked: issueChecklistChecked, status: issues.status, priority: issues.priority, scope: issues.scope, revision: issues.revision, createdAt: issues.createdAt, updatedAt: issues.updatedAt }).from(issues).leftJoin(users, eq(users.id, issues.userId)).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId))).where(and(visibility.predicate, sql`coalesce(${issues.content}->'attrs'->'mikka', ${issues.content}->'attrs'->'orvilo')->>'deletedAt' is null`)).orderBy(desc(issues.updatedAt)).limit(100)
-  const links = await issueTeamScope(userId, rows.map(row => row.id))
+  const candidates = db.select({ id: issues.id, ownerId: issues.userId, ownerName: users.name, ownerImage: users.image, title: issues.title, content: issueAttrsContent.as('content'), checklistTotal: issueChecklistTotal.as('checklistTotal'), checklistChecked: issueChecklistChecked.as('checklistChecked'), status: issues.status, priority: issues.priority, scope: issues.scope, revision: issues.revision, createdAt: issues.createdAt, updatedAt: issues.updatedAt }).from(issues).leftJoin(users, eq(users.id, issues.userId)).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId))).where(and(visibility.predicate, sql`coalesce(${issues.content}->'attrs'->'mikka', ${issues.content}->'attrs'->'orvilo')->>'deletedAt' is null`)).orderBy(desc(issues.updatedAt), desc(issues.id)).limit(100).as('task_list')
+  // Include identifier dependencies: a prefix, profile or Linear rename can change a list without editing a task.
+  const signature = db.select({ item: sql`to_jsonb(task_list)`.as('item'), identifiers: sql`jsonb_build_array(
+    (select ${users.email} from ${users} where ${users.id}=${candidates.ownerId}),
+    (select ${issuePrefixes.prefix} from ${issuePrefixes} where ${issuePrefixes.userId}=${candidates.ownerId}),
+    (select jsonb_agg(${linearTeamSyncs.linearTeamKey} order by ${linearTeamSyncs.linearTeamKey}) from ${linearTeamSyncs} where ${linearTeamSyncs.ownerId}=${candidates.ownerId}),
+    (select jsonb_agg(${linearIssueLinks.linearIdentifier} order by ${linearIssueLinks.linearIdentifier}) from ${linearIssueLinks} where ${linearIssueLinks.issueId}=${candidates.id})
+  )`.as('identifiers') }).from(candidates)
+  const [tasksVersion, linksVersion] = await Promise.all([
+    queryVersion(signature),
+    queryVersion(workspaceDb.select({ issueId: teamIssues.issueId, teamId: teamIssues.teamId, workspaceId: teamIssues.workspaceId }).from(teamIssues)
+      .where(or(eq(teamIssues.userId, userId), teams.length ? inArray(teamIssues.teamId, teams.map(team => team.id)) : undefined)), workspaceDb),
+  ])
+  const version = createHash('sha256').update(JSON.stringify([userId, context.workspace.id, teams.map(team => team.id).sort(), tasksVersion, linksVersion])).digest('hex').slice(0, 32)
+  if (known === version) return { unchanged: true, version } as const
+  // Read the version first: a concurrent change is picked up on the next poll, never acknowledged unseen.
+  const rows = await db.select().from(candidates).orderBy(desc(candidates.updatedAt), desc(candidates.id))
+  const links = await issueTeamScope(userId, rows.map(row => row.id), { onlyIssueIds: rows.map(row => row.id) })
   const visibleRows = rows.filter(row => { const link = links.find(item => item.issueId === row.id); return row.scope === 'personal' || !link || teams.some(team => team.id === link.teamId) })
   const liveRows = visibleRows.filter(row => !readIssueMetadata(row.content).deletedAt)
   const identifiers = await taskIdentifiers(liveRows.map(row => ({ id: row.id, ownerId: row.ownerId, scope: row.scope, number: readIssueMetadata(row.content).number })))
   // The body stays in Postgres: only its attrs (metadata) and checklist counts are read, not up to 100 whole bodies per poll.
-  return liveRows.map(({ content, checklistTotal, checklistChecked, ...issue }) => ({ ...issue, identifier: identifiers.get(issue.id) ?? null, teamId: links.find(link => link.issueId === issue.id)?.teamId ?? null, metadata: readIssueMetadata(content), checklist: checklistView(checklistTotal, checklistChecked) }))
+  return { version, items: liveRows.map(({ content, checklistTotal, checklistChecked, ...issue }) => ({ ...issue, identifier: identifiers.get(issue.id) ?? null, teamId: links.find(link => link.issueId === issue.id)?.teamId ?? null, metadata: readIssueMetadata(content), checklist: checklistView(checklistTotal, checklistChecked) })) }
 }
 
 /** A missing, deleted or inaccessible task is an expected answer, not a server error. */

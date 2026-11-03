@@ -41,7 +41,8 @@ import { getCoordinatorChat, type CoordinatorChat as CoordinatorChatView } from 
 import { chatPreview } from '@/lib/agent-history'
 import { PanelRight } from 'lucide-react'
 import { ISSUE_STATUSES, type IssueStatus, type IssueView } from './issue-properties'
-import { listIssues } from '@/app/actions/issues'
+import { listIssues, pollIssues } from '@/app/actions/issues'
+import { mergeList } from '@/lib/list-poll'
 import { endSession } from '@/lib/auth-client'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -73,6 +74,7 @@ import { focusChatComposer } from '@/hooks/use-focus-return'
 import { usePresence } from '@/lib/use-presence'
 import { FieldError } from '@/components/ui/field'
 import { LIST_POLL_MS } from '@/components/swr-defaults'
+import { ViewStateProvider, useViewState } from '@/lib/hooks/view-state'
 
 // Start the chunk download during module evaluation, before hydration and its effects.
 if (typeof window !== 'undefined') {
@@ -99,7 +101,12 @@ const SettingsShell = dynamic(() => import('@/components/settings/settings-shell
 const SettingsFrame = dynamic(() => import('@/components/settings/settings-shell').then(module => module.SettingsFrame), { loading: WorkspaceLoading })
 const SettingsView = dynamic(() => import('@/components/settings/settings-view').then(module => module.SettingsView), { loading: WorkspaceContentLoading })
 
-export function IssueWorkspace({ user, initialIssues, initialSelected = null, initialAgentHistory, initialSection = 'coordinator', initialSettingsSection, googleEnabled = false, onboarding }: { onboarding?: { computer: OnboardingComputer }; initialSelected?: string | null; user: { id: string; name: string; email: string; image?: string | null }; initialIssues?: Awaited<ReturnType<typeof listIssues>>; initialAgentHistory?: AgentHistory; initialSection?: WorkspaceSection; initialSettingsSection?: 'integrations' | 'account'; googleEnabled?: boolean }) {
+export function IssueWorkspace(props: Parameters<typeof IssueWorkspaceContent>[0]) {
+  const { data } = useWorkspace(props.user.email)
+  return <ViewStateProvider scope={`${props.user.id}:${data?.workspace.id ?? 'loading'}`}><IssueWorkspaceContent {...props} /></ViewStateProvider>
+}
+
+function IssueWorkspaceContent({ user, initialIssues, initialSelected = null, initialAgentHistory, initialSection = 'coordinator', initialSettingsSection, googleEnabled = false, onboarding }: { onboarding?: { computer: OnboardingComputer }; initialSelected?: string | null; user: { id: string; name: string; email: string; image?: string | null }; initialIssues?: Awaited<ReturnType<typeof listIssues>>; initialAgentHistory?: AgentHistory; initialSection?: WorkspaceSection; initialSettingsSection?: 'integrations' | 'account'; googleEnabled?: boolean }) {
   const i18nText = useTranslations()
   const { data: workspaceData } = useWorkspace(user.email)
   const { data: agentHistory } = useAgentHistory(user.id, initialAgentHistory)
@@ -153,7 +160,15 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
     dropQueryKeys('linear')
   }, [])
   const [boardBusy, setBoardBusy] = useState(false)
-  const { data: tasks = [], mutate, error, isLoading: tasksLoading } = useSWR(['issues', user.id], listIssues, { ...whileSettings, fallbackData: initialIssues, revalidateOnMount: initialIssues === undefined, refreshInterval: boardBusy || settingsShown ? 0 : 10000, revalidateOnFocus: !boardBusy, revalidateOnReconnect: !boardBusy })
+  const taskSnapshot = useRef<{ userId: string; version?: string; items: Awaited<ReturnType<typeof listIssues>> }>({ userId: user.id, items: initialIssues ?? [] })
+  const { data: tasks = [], mutate, error, isLoading: tasksLoading } = useSWR(['issues', user.id], async () => {
+    if (taskSnapshot.current.userId !== user.id) taskSnapshot.current = { userId: user.id, items: [] }
+    const next = await pollIssues(taskSnapshot.current.version)
+    const items = mergeList(taskSnapshot.current.items, next)
+    taskSnapshot.current = { userId: user.id, version: next.version, items }
+    return items
+  }, { ...whileSettings, fallbackData: initialIssues, revalidateOnMount: initialIssues === undefined, refreshInterval: boardBusy || settingsShown ? 0 : LIST_POLL_MS, revalidateOnFocus: !boardBusy, revalidateOnReconnect: !boardBusy })
+  useEffect(() => { taskSnapshot.current.items = tasks }, [tasks])
   // Keep failed refreshes out of document flow so the board/list never jumps.
   const listErrorMessage = t('listError')
   useEffect(() => {
@@ -236,7 +251,7 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
   const lastChat = useRef<ChatTarget>(initialSection === 'agent' ? { kind: 'agent', sessionId: null } : params.get('bot') ? { kind: 'bot', botId: params.get('bot')! } : { kind: 'coordinator' })
   const [projectId, setProjectId] = useState<string | null>(() => readLocation(params).project)
   const [creationProject, setCreationProject] = useState<string | null>(null)
-  const [layout, setLayout] = useState<'board' | 'list'>('board')
+  const [layout, setLayout] = useViewState<'board' | 'list'>('issues:layout', 'board')
   const [selected, setSelected] = useState<string | null>(initialSelected)
   const [pendingSelection, setPendingSelection] = useState<string | null | undefined>(undefined)
   const selectedRef = useRef(selected)
@@ -251,8 +266,11 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
     setSelected(id)
     setDraftKey(value => value + 1)
   }
-  const [query, setQuery] = useState('')
-  const [view, setView] = useState<IssueView>('all')
+  const issueScope = `${section}:${section.startsWith('team-') ? teamId ?? 'all' : 'all'}`
+  const [issueFilters, setIssueFilters] = useViewState<Record<string, { query: string; view: IssueView }>>('issue-filters', {})
+  const { query, view } = issueFilters[issueScope] ?? { query: '', view: section === 'my-issues' ? 'mine' : 'all' }
+  function setQuery(query: string) { setIssueFilters(current => ({ ...current, [issueScope]: { ...(current[issueScope] ?? { view }), query } })) }
+  function setView(view: IssueView, scope = issueScope) { setIssueFilters(current => ({ ...current, [scope]: { ...(current[scope] ?? { query: '' }), view } })) }
   const [creating, setCreating] = useState(false)
   const [typedAhead, setTypedAhead] = useState('')
   const [searchOpen, setSearchOpen] = useState(false)
@@ -325,7 +343,7 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
     const target: ChatTarget = next.bot ? { kind: 'bot', botId: next.bot } : { kind: 'coordinator' }
     if (next.section === 'coordinator') { lastChat.current = target; setActiveBotId(next.bot) }
     changeSection(next.section, next.bot)
-    setTeamId(next.team); setView('all'); setQuery('')
+    setTeamId(next.team)
   }
   const showLocationRef = useRef(showLocation)
   showLocationRef.current = showLocation
@@ -401,14 +419,14 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
   function navigate(next: IssueView) {
     if (boardBusy || leaving.current) return false
     // A filter replaces the entry; leaving a page for the task list is a move.
-    void leave(() => { applySelection(null); const change = ['inbox', 'agent', 'coordinator', 'group', 'views', 'team-home'].includes(section) ? changeSection(sectionFor('team-issues', teamId)) : {}; move({ ...change, issue: null }, 'section' in change ? 'push' : 'replace'); setView(next); setQuery('') })
+    void leave(() => { applySelection(null); const change = ['inbox', 'agent', 'coordinator', 'group', 'views', 'team-home'].includes(section) ? changeSection(sectionFor('team-issues', teamId)) : {}; move({ ...change, issue: null }, 'section' in change ? 'push' : 'replace'); const target = change.section ?? section; setView(next, `${target}:${target.startsWith('team-') ? teamId ?? 'all' : 'all'}`) })
     return true
   }
   function navigateSection(page: WorkspaceSection) {
     if (boardBusy || leaving.current) return false
     // A team page keeps the team in the address; without one it is the workspace's own page.
     const next = sectionFor(page, teamId)
-    void leave(() => { applySelection(null); move({ ...changeSection(next), issue: null, project: null }); if (!next.startsWith('team-')) setTeamId(null); setProjectId(null); setView(next === 'my-issues' ? 'mine' : 'all'); setQuery('') })
+    void leave(() => { applySelection(null); move({ ...changeSection(next), issue: null, project: null }); if (!next.startsWith('team-')) setTeamId(null); setProjectId(null) })
     return true
   }
   /** `created` is a bot made a moment ago that the bot list hasn't loaded yet. */
@@ -508,9 +526,9 @@ export function IssueWorkspace({ user, initialIssues, initialSelected = null, in
     {/* The board keeps only the rail on its left (MIK-45); a phone, with no rail, keeps the list's sheet. */}
     <BotList phoneOnly={fullPage} bots={bots} workspaceId={workspaceContext?.workspace.id ?? workspaceData?.workspace.id ?? null} threads={threads} issues={tasks} active={activeChat} onOpen={openChat} onNewBot={() => setCreatingBot(true)} rail={rail} onRail={openRail} user={user} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut} onBeforeChange={beforeChange} />
     {/* An open issue's header carries its own list toggle, so the floating one would sit on top of it; every other page keeps the phone header and its list button. */}
-    <AppShellContent listToggle={!fullPage && !selected} hideHeader={!!selected} parent={section.startsWith('team-') && activeTeam ? activeTeam.name : undefined} title={section === 'coordinator' ? chatTitle : sectionTitles[section]} heading={chatHeading} actions={<>{section === 'plugins' || section === 'suggestions' || section === 'artifacts' ? null : <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label={i18nText("Workspace.openSearch")} aria-keyshortcuts="Control+k Meta+k" disabled={boardBusy} onClick={() => setSearchOpen(true)} />}><Search data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{i18nText("Workspace.search.title")}<ShortcutKeys keys={['mod', 'K']} /></TooltipContent></Tooltip>}{/* The phone's way to 全部线程; the window bar's is hidden there. */}<AllThreadsToggle open={!!threadsView} waiting={threadsWaiting} onToggle={() => toggleAllThreads(!threadsView)} /></>}>
+    <AppShellContent scrollKey={`page:${section}:${teamId ?? ""}:${selected ?? projectId ?? activeBot?.id ?? groupId ?? ""}:${params.get("app") ?? ""}:${layout}`} listToggle={!fullPage && !selected} hideHeader={!!selected} parent={section.startsWith('team-') && activeTeam ? activeTeam.name : undefined} title={section === 'coordinator' ? chatTitle : sectionTitles[section]} heading={chatHeading} actions={<>{section === 'plugins' || section === 'suggestions' || section === 'artifacts' ? null : <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label={i18nText("Workspace.openSearch")} aria-keyshortcuts="Control+k Meta+k" disabled={boardBusy} onClick={() => setSearchOpen(true)} />}><Search data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{i18nText("Workspace.search.title")}<ShortcutKeys keys={['mod', 'K']} /></TooltipContent></Tooltip>}{/* The phone's way to 全部线程; the window bar's is hidden there. */}<AllThreadsToggle open={!!threadsView} waiting={threadsWaiting} onToggle={() => toggleAllThreads(!threadsView)} /></>}>
       {accountError && <FieldError className="px-6 py-2">{accountError}</FieldError>}
-      {selected ? <TaskDetail key={draftKey} id={selected} thread={threadsView ? null : threadId} origin={originLabel} user={user} onSaved={saved} onDirty={onDirty} onRegisterFlush={registerFlush} onClose={() => open(null)} onDeleted={deleted} onOpen={id => open(id)} navigation={{ index: pagerIndex, total: filtered.length, onOpen: offset => { const index = filtered.findIndex(task => task.id === selected); const next = filtered[index + offset]; if (index >= 0 && next) open(next.id) } }} /> : isProjects ? <ProjectWorkspace projects={scopedProjects} loading={projectsLoading} error={!!projectError} projectId={projectId} team={section === 'team-projects' ? activeTeam?.name : undefined} initialTeamId={section === 'team-projects' ? teamId ?? undefined : undefined} issues={tasks} userName={user.name || user.email} onSelect={id => { setProjectId(id); move({ project: id }) }} onOpenTeam={() => { navigateSection('team-projects') }} onOpenIssue={openFromList} onCreateIssue={() => create()} onUpdated={() => { void refreshProjects(); void refreshProjectTeams() }} /> : section === 'team-home' && activeTeam ? <TeamHome key={activeTeam.id} team={activeTeam} projects={scopedProjects} issueCount={counts.all} onIssues={() => navigate('all')} onProjects={() => navigateSection('team-projects')} onProject={id => { void leave(() => { applySelection(null); move({ ...changeSection('team-projects'), issue: null, project: id }); setProjectId(id) }) }} /> : section === 'group' && groupRequest ? <GroupChatView key={groupRequest.id} group={groupRequest} userId={user.id} people={groupPeople} /> : section === 'group' && groupId && !groupList ? <DetailLoading /> :isOverview ? <WorkspaceOverview section={section} teamName={activeTeam?.name} counts={counts} projectCount={scopedProjects.length} tasks={scopedTasks} userId={user.id} initialAgentHistory={initialAgentHistory} agentRequest={agentRequest} onAgentActive={setActiveAgentId} onAgentSessions={setLiveSessions} bot={activeBot} onOpen={id => open(id)} onProjects={() => navigateSection('team-projects')} onView={navigate} /> : section === 'plugins' ? <PluginsPage key={pluginsVisit} /> : section === 'suggestions' ? <SuggestionFeed onOpenIssue={id => { open(id) }} onConnect={() => openRail('plugins')} onSent={() => { if (window.matchMedia('(max-width: 767px)').matches) openChat({ kind: 'coordinator' }) }} /> : section === 'artifacts' ? <ArtifactLibrary /> : tasksLoading ? <DetailLoading /> : layout === 'board' ? <BoardPage issues={filtered} userId={user.id} onOpen={openFromList} onUpdated={() => mutate()} onBusyChange={setBoardBusy} /> : <>
+      {selected ? <TaskDetail key={draftKey} id={selected} thread={threadsView ? null : threadId} origin={originLabel} user={user} onSaved={saved} onDirty={onDirty} onRegisterFlush={registerFlush} onClose={() => open(null)} onDeleted={deleted} onOpen={id => open(id)} navigation={{ index: pagerIndex, total: filtered.length, onOpen: offset => { const index = filtered.findIndex(task => task.id === selected); const next = filtered[index + offset]; if (index >= 0 && next) open(next.id) } }} /> : isProjects ? <ProjectWorkspace projects={scopedProjects} loading={projectsLoading} error={!!projectError} projectId={projectId} team={section === 'team-projects' ? activeTeam?.name : undefined} initialTeamId={section === 'team-projects' ? teamId ?? undefined : undefined} issues={tasks} userName={user.name || user.email} onSelect={id => { setProjectId(id); move({ project: id }) }} onOpenTeam={() => { navigateSection('team-projects') }} onOpenIssue={openFromList} onCreateIssue={() => create()} onUpdated={() => { void refreshProjects(); void refreshProjectTeams() }} /> : section === 'team-home' && activeTeam ? <TeamHome key={activeTeam.id} team={activeTeam} projects={scopedProjects} issueCount={counts.all} onIssues={() => navigate('all')} onProjects={() => navigateSection('team-projects')} onProject={id => { void leave(() => { applySelection(null); move({ ...changeSection('team-projects'), issue: null, project: id }); setProjectId(id) }) }} /> : section === 'group' && groupRequest ? <GroupChatView key={groupRequest.id} group={groupRequest} userId={user.id} people={groupPeople} /> : section === 'group' && groupId && !groupList ? <DetailLoading /> :isOverview ? <WorkspaceOverview section={section} teamName={activeTeam?.name} counts={counts} projectCount={scopedProjects.length} tasks={scopedTasks} userId={user.id} initialAgentHistory={initialAgentHistory} agentRequest={agentRequest} onAgentActive={setActiveAgentId} onAgentSessions={setLiveSessions} bot={activeBot} onOpen={id => open(id)} onProjects={() => navigateSection('team-projects')} onView={navigate} /> : section === 'plugins' ? <PluginsPage key={pluginsVisit} /> : section === 'suggestions' ? <SuggestionFeed onOpenIssue={id => { open(id) }} onConnect={() => openRail('plugins')} onSent={() => { if (window.matchMedia('(max-width: 767px)').matches) openChat({ kind: 'coordinator' }) }} /> : section === 'artifacts' ? <ArtifactLibrary /> : tasksLoading ? <DetailLoading /> : layout === 'board' ? <BoardPage stateKey={`board:${section}:${teamId ?? "all"}`} issues={filtered} userId={user.id} onOpen={openFromList} onUpdated={() => mutate()} onBusyChange={setBoardBusy} /> : <>
         <div className="flex flex-wrap items-center justify-between gap-4 px-4 py-5 sm:px-6">
           <div className="flex flex-wrap items-center gap-2"><h1 className="text-sm font-semibold">{section === 'my-issues' ? i18nText("Workspace.myCreatedTasks") : viewTitle}</h1><Badge variant="secondary">{filtered.length}</Badge>{section !== 'my-issues' && <NativeSelect aria-label={i18nText("Workspace.filterStatus")} value={view} disabled={boardBusy} onChange={event => navigate(event.target.value as IssueView)}><NativeSelectOption value="all">{i18nText("Projects.allStatuses")}</NativeSelectOption><NativeSelectOption value="favorites">{i18nText("Overview.favorites")}</NativeSelectOption><NativeSelectOption value="following">{i18nText("Overview.following")}</NativeSelectOption>{ISSUE_STATUSES.map(status => <NativeSelectOption key={status.value} value={status.value}>{statusLabel(status.value)}</NativeSelectOption>)}</NativeSelect>}</div>
           <div className="flex w-full min-w-0 items-center justify-between gap-3 sm:w-auto"><SearchInput className="min-w-0 sm:w-48" aria-label={i18nText("Workspace.search.title")} placeholder={i18nText("Projects.issuePicker.searchPlaceholder")} value={query} onChange={event => setQuery(event.target.value)} disabled={boardBusy} /><ToggleGroup aria-label={i18nText("Workspace.taskView")} size="sm" variant="segment" spacing={0.5} disabled={boardBusy} value={[layout]} onValueChange={values => { const next = values[0]; if (next === 'board' || next === 'list') setLayout(next) }}><ToggleGroupItem value="list" aria-label={i18nText("Workspace.listView")}><List /></ToggleGroupItem><ToggleGroupItem value="board" aria-label={i18nText("Workspace.boardView")}><Columns3 /></ToggleGroupItem></ToggleGroup><Button size="sm" disabled={boardBusy} onClick={() => create()}><Plus data-icon="inline-start" />{i18nText("Nav.newTask")}</Button></div>

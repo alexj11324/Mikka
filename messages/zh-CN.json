@@ -11,6 +11,7 @@
     "retry": "重试",
     "create": "创建",
     "loading": "加载中…",
+    "loadMore": "更早的消息",
     "search": "搜索",
     "selected": "已选中",
     "propertyValue": "{label}：{value}",

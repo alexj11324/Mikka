@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, type ComponentType } from 'react'
+import { type ComponentType } from 'react'
+import { useViewScroll, useViewState } from '@/lib/hooks/view-state'
 import useSWR from 'swr'
 import { useFormatter, useNow, useTranslations } from 'next-intl'
 import { AppWindow, FileText } from 'lucide-react'
@@ -39,7 +40,8 @@ export function ArtifactLibrary() {
   const format = useFormatter()
   const now = useNow({ updateInterval: 60_000 })
   const { data, error, mutate } = useSWR('artifacts', () => listArtifacts())
-  const [category, setCategory] = useState<Category>('all')
+  const [category, setCategory] = useViewState<Category>('artifacts:category', 'all')
+  const scroll = useViewScroll<HTMLElement>(`artifacts:${category}`, !!data)
   const rows = (data ?? []).filter(item => category === 'all' || item.kind === category)
   const current = CATEGORIES.find(item => item.id === category)!
   const source = (item: ArtifactListItem) => [item.authorName, item.issueKey].filter(Boolean).join(' · ') || '—'
@@ -58,7 +60,7 @@ export function ArtifactLibrary() {
       </ul>
     </ResizablePane>
     {/* The category is already selected on the left, so the table has no second 20px title (R-32). */}
-    <section aria-label={t(`category.${current.label}`)} className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto px-4 pt-6 pb-6 md:px-12">
+    <section ref={scroll} aria-label={t(`category.${current.label}`)} className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto px-4 pt-6 pb-6 md:px-12">
       {error ? <InlineLoadError message={t('loadError')} retryLabel={t('retry')} onRetry={() => { void mutate() }} />
         : !data ? <div role="status" aria-label={t('loading')} className="flex flex-col gap-2">{[0, 1, 2, 3].map(index => <Skeleton key={index} className="h-12 w-full" />)}</div>
         : !rows.length ? <Empty className="flex-1"><EmptyHeader><EmptyDescription>{t('empty')}</EmptyDescription></EmptyHeader></Empty>

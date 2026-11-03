@@ -3,6 +3,7 @@ import { after, afterEach, before, beforeEach, mock, test } from 'node:test'
 import { act, createContext, type ReactNode, type Ref } from 'react'
 import type { Root } from 'react-dom/client'
 import { Window } from 'happy-dom'
+import { ViewStateProvider } from '@/lib/hooks/view-state'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 
@@ -23,7 +24,7 @@ const plain = ({ children }: { children?: ReactNode }) => <div>{children}</div>
 const nothing = () => null
 mock.module(new URL('../../app/actions/coordinator.ts', import.meta.url).href, { namedExports: {
   retryCoordinatorTurn: async () => { calls++; if (reply instanceof Error) throw reply; if (typeof reply === 'function') return reply(); return reply },
-  getCoordinatorChat: async () => ({}), pollCoordinatorChat: async () => ({}), stopCoordinatorTurn: async () => ({}), welcomeCoordinator: async () => ({}), coordinatorCitationSources: async () => ({}),
+  getCoordinatorChat: async () => ({}), pollCoordinatorChat: async () => ({}), coordinatorHistory: async () => ({}), stopCoordinatorTurn: async () => ({}), welcomeCoordinator: async () => ({}), coordinatorCitationSources: async () => ({}),
 } })
 mock.module('next-intl', { namedExports: { useTranslations: (namespace: string) => (key: string) => `${namespace}.${key}` } })
 mock.module(new URL('../../lib/use-action-error.ts', import.meta.url).href, { namedExports: { useActionError: () => (key: string) => `Errors.${key}` } })
@@ -94,6 +95,23 @@ afterEach(async () => { await act(async () => root.unmount()); container.remove(
 after(() => browser.happyDOM.close())
 const render = async (onQueued = async () => {}) => { await act(async () => root.render(<RetryReplyButton botId={null} onQueued={onQueued} />)) }
 const click = async () => { await act(async () => (container.querySelector('button') as HTMLButtonElement).click()) }
+
+test('existing window drafts migrate once and survive a chat remount in the scoped store', async () => {
+  browser.sessionStorage.clear()
+  browser.sessionStorage.setItem('mikka:draft:fixture-owner:coordinator', 'draft from before this fix')
+  const chat = () => <ViewStateProvider scope="fixture-owner:workspace"><CoordinatorChat onOpenIssue={nothing} userId="fixture-owner" /></ViewStateProvider>
+  await act(async () => root.render(chat()))
+  assert.equal(composer.value, 'draft from before this fix')
+  assert.equal(browser.sessionStorage.getItem('mikka:draft:fixture-owner:coordinator'), null)
+  await act(async () => root.render(null))
+  await act(async () => root.render(chat()))
+  assert.equal(composer.value, 'draft from before this fix')
+  await act(async () => composer.onChange(''))
+  await act(async () => root.render(null))
+  await act(async () => root.render(chat()))
+  assert.equal(composer.value, '')
+  browser.sessionStorage.clear()
+})
 
 for (const valid of [false, true]) test(`retrying a historical failure ${valid ? 'keeps retryOf in the submission' : 'keeps the original bubble when stale'}`, async () => {
   currentBuild = valid

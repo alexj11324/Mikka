@@ -15,6 +15,7 @@ import { GroupHeader } from './group-header'
 import { ThreadStatusIcon } from '@/components/workspace/thread-status-icon'
 import { THREAD_CARD, THREAD_CARD_BUTTON } from '@/components/coordinator/thread-card'
 import { PullRequestsBadge } from '@/components/workspace/pull-requests-badge'
+import { useViewState } from '@/lib/hooks/view-state'
 
 type Issue = Awaited<ReturnType<typeof listIssues>>[number]
 
@@ -101,8 +102,9 @@ function ThreadRow({ thread, group, issues, all, now, onOpenThread }: { thread: 
  * resolved. Picking a thread opens it beside the chat, as a thread card does;
  * the chat stays one click away (R-50, R-66).
  */
-export function ThreadList({ threads, issues, all = false, loading = false, onOpenThread }: { threads: Thread[]; issues: Issue[]; all?: boolean; /** The list has not been read yet: rows' shapes, never 还没有线程 (review C7). */ loading?: boolean; onOpenThread: (thread: { issueId: string | null; runId: string }) => void }) {
+export function ThreadList({ threads, issues, all = false, loading = false, stateKey = 'threads', onOpenThread }: { threads: Thread[]; issues: Issue[]; all?: boolean; stateKey?: string; /** The list has not been read yet: rows' shapes, never 还没有线程 (review C7). */ loading?: boolean; onOpenThread: (thread: { issueId: string | null; runId: string }) => void }) {
   const t = useTranslations('Shell.threads')
+  const [resolvedOpen, setResolvedOpen] = useViewState(`${stateKey}:resolved`, false)
   // One clock for every row's time.
   const now = useNow({ updateInterval: 60_000 })
   const tCommon = useTranslations('Common')
@@ -115,7 +117,7 @@ export function ThreadList({ threads, issues, all = false, loading = false, onOp
       const list = groups[group]
       if (!list.length) return null
       const label = t(`group.${group}`, { count: list.length })
-      if (group === 'resolved') return <Collapsible key={group} className="flex flex-col gap-1">
+      if (group === 'resolved') return <Collapsible key={group} open={resolvedOpen} onOpenChange={setResolvedOpen} className="flex flex-col gap-1">
         <CollapsibleTrigger render={<Button variant="ghost" className="group flex h-auto w-full p-0 text-left font-normal hover:bg-transparent" />}>
           <GroupHeader>{label}<ChevronRight aria-hidden="true" className="size-3.5 transition-transform group-data-panel-open:rotate-90" /></GroupHeader>
         </CollapsibleTrigger>

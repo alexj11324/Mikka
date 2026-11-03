@@ -72,7 +72,7 @@ stop_factory_task: tool({
       inputSchema: z.object({ binding: bindingSchema, reason: z.string().min(1).max(4000), action: z.enum(['cancel','revoke']), }), execute: ( input) => steps.stopFactoryTask(userId, input, scope),
     }),
 dispatch_factory_run: tool({
-      description: 'Queue and bind one Factory run atomically. Use the exact current pending binding from route_factory_task/get_factory_task. Waiting, cancelled, revoked or stale tasks cannot dispatch. Reuse the same binding after a lost response.',
+      description: 'Queue and bind one Factory run on an existing registered device repository atomically. This does not provision a hosted thread. For work on a Bot computer or standalone delivery without a repository, use dispatch_bot_computer, which already routes through Factory. Use the exact current pending binding from route_factory_task/get_factory_task. Waiting, cancelled, revoked or stale tasks cannot dispatch. Reuse the same binding after a lost response.',
       inputSchema: factoryDispatchSchema,
       execute: ( input) => steps.dispatchFactoryRunStep(userId, input, scope),
     }),

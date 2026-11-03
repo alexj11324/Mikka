@@ -23,6 +23,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useShortcutLabel } from '@/components/shortcut-keys'
 import { usePresence } from '@/lib/use-presence'
+import { useViewState } from '@/lib/hooks/view-state'
 import { ResizablePane } from '@/components/ui/resizable-pane'
 
 export function ProjectDetail({ project, projects, issues, userName, onBack, onOpenIssue, onCreateIssue, onUpdated }: { project: Project; projects: Project[]; issues: Awaited<ReturnType<typeof listIssues>>; userName: string; onBack: () => void; onOpenTeam: () => void; onOpenIssue: (id: string) => boolean; onCreateIssue: () => void; onUpdated: () => void }) {
@@ -30,9 +31,9 @@ export function ProjectDetail({ project, projects, issues, userName, onBack, onO
   const [editing, setEditing] = useState(false)
   const editDialog = usePresence(editing)
   const [linking, setLinking] = useState(false)
-  const [showDetails, setShowDetails] = useState(true)
+  const [showDetails, setShowDetails] = useViewState(`project:${project.id}:details`, true)
   const detailsShortcut = useShortcutLabel(['mod', 'I'])
-  const [tab, setTab] = useState('overview')
+  const [tab, setTab] = useViewState(`project:${project.id}:tab`, 'overview')
   const { update, pending, error: saveError } = useProjectUpdate(onUpdated)
   const flushes = useRef(new Map<string, () => Promise<boolean>>())
   async function afterSave(action: () => void) {

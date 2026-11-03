@@ -1,5 +1,6 @@
 'use client'
 
+import { useViewScroll } from '@/lib/hooks/view-state'
 import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
@@ -152,6 +153,7 @@ function BotListBody({ bots, workspaceId, threads, issues, active, onOpen, onNew
     else foldTimer.current = window.setTimeout(toggleSidebar, DOUBLE_CLICK_MS)
   }
   const listRef = useRef<HTMLDivElement>(null)
+  const scroll = useViewScroll<HTMLDivElement>('bot-list')
   // The inner list keeps its full width while the column folds, so rows never squeeze.
   // The desktop column mounts again after the window was phone-sized, so it takes the width again then too.
   useLayoutEffect(() => { listRef.current?.style.setProperty('--bot-list-width', `${width}px`) }, [width, isMobile])
@@ -167,7 +169,7 @@ function BotListBody({ bots, workspaceId, threads, issues, active, onOpen, onNew
         </div>
       </div>
     </SidebarHeader>
-    <SidebarContent>
+    <SidebarContent ref={scroll}>
       <SidebarGroup className="px-2 pt-1"><SidebarMenu aria-label={i18nText('Nav.bots')} className="gap-0.5">
         <Row name={i18nText('Nav.coordinator')} label={coordinator?.working ? i18nText('Nav.coordinatorWorking') : i18nText('Nav.coordinator')} current={active?.kind === 'coordinator'} unread={unread('coordinator')} onClick={() => choose({ kind: 'coordinator' })}
           avatar={<CoordinatorAvatar mood={coordinator?.working ? 'thinking' : 'idle'} />}

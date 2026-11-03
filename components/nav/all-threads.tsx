@@ -1,7 +1,7 @@
 'use client'
 
 import { Hand, MessagesSquare, Search, X } from 'lucide-react'
-import { useState } from 'react'
+import { useViewScroll, useViewState } from '@/lib/hooks/view-state'
 import { useTranslations } from 'next-intl'
 import type { listIssues } from '@/app/actions/issues'
 import type { Thread } from '@/app/actions/task-runs'
@@ -59,7 +59,8 @@ export function AllThreadsColumn({ view, threads, issues, loading = false }: { v
   const bot = view === 'all' ? null : view
   const dispatched = bot ? threads.filter(thread => thread.botId === bot) : threads
   // The header's search filters this column in place (R-50); null while it is closed.
-  const [query, setQuery] = useState<string | null>(null)
+  const [query, setQuery] = useViewState<string | null>(`all-threads:${view}:query`, null)
+  const scroll = useViewScroll<HTMLDivElement>(`all-threads:${view}:${query ?? ''}`, !loading)
   const shown = query ? dispatched.filter(thread => matches(query, threadName(thread, issues, ''), thread.lastReply)) : dispatched
   return <RightColumn slot="all-threads">
     <section aria-labelledby="all-threads-title" className="flex min-h-0 flex-1 flex-col">
@@ -76,8 +77,8 @@ export function AllThreadsColumn({ view, threads, issues, loading = false }: { v
       {query !== null && <div className="shrink-0 px-3 pb-2">
         <SearchInput autoFocus aria-label={t('search')} placeholder={t('search')} value={query} onChange={event => setQuery(event.target.value)} onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); setQuery(null) } }} />
       </div>}
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
-        <ThreadResults threads={dispatched} shown={shown} issues={issues} all loading={loading} onOpenThread={thread => openThread(thread.runId)} />
+      <div ref={scroll} className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+        <ThreadResults stateKey={`all-threads:${view}`} threads={dispatched} shown={shown} issues={issues} all loading={loading} onOpenThread={thread => openThread(thread.runId)} />
       </div>
     </section>
   </RightColumn>

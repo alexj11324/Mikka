@@ -1,5 +1,6 @@
 'use client'
 
+import { useViewScroll, useViewState } from '@/lib/hooks/view-state'
 import { PersonAvatar } from '@/components/person-avatar'
 import { useEffect, useRef, useState } from 'react'
 import useSWR, { unstable_serialize, useSWRConfig } from 'swr'
@@ -85,15 +86,16 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   })
   // Frame 06: a thread whose candidate waits for acceptance has 对话 | 验收 in its header.
   const acceptance = useThreadAcceptance(issueId, runId)
-  const [tab, setTab] = useState<ThreadTab>(initialTab)
+  const [tab, setTab] = useViewState<ThreadTab>(`thread:${runId}:tab:${initialTab}`, initialTab)
   const accepting = !bare && Boolean(acceptance) && tab === 'acceptance'
   // 改动 (Figma 820:4843): the agent's work tree diff, read-only, once the run saved one.
   const { data: changes, mutate: mutateChanges } = useSWR(bare ? null : ['thread-changes', issueId, runId], () => getThreadChanges(issueId, runId))
   const hasChanges = !!changes && changes.state !== 'none'
   const viewingChanges = hasChanges && tab === 'changes'
-  const [draft, setDraft] = useState('')
+  const transcript = useViewScroll<HTMLDivElement>(`thread:${runId}:chat`, !!data && !viewingChanges && !accepting)
+  const [draft, setDraft] = useViewState(`thread:${runId}:draft`, '')
   // Words picked from the agent's reply with 引用: they head the next message as quote lines.
-  const [replyQuote, setReplyQuote] = useState<string | null>(null)
+  const [replyQuote, setReplyQuote] = useViewState<string | null>(`thread:${runId}:quote`, null)
   const rootRef = useRef<HTMLElement>(null)
   const [sending, setSending] = useState(false)
   // false, or what to say: the refusal's reason when the server gave one (threadReplaced…), else 发送失败.
@@ -194,10 +196,10 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
       </Tabs>
     </div>}
     {viewingChanges ? (changes.state === 'ready'
-      ? <ThreadChangesPane changes={changes.changes} />
+      ? <ThreadChangesPane stateKey={`thread:${runId}:changes`} changes={changes.changes} />
       : <p className="p-4 text-sm text-muted-foreground">{t('changesTooLarge')}</p>)
     : accepting && acceptance ? <div className="flex min-h-0 flex-1 flex-col"><FactoryAcceptancePane task={acceptance} onOpenThread={onOpenThread} /></div> : <>
-    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-4">
+    <div ref={transcript} className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-4">
       {error ? <InlineLoadError message={t('loadFailed')} retryLabel={t('retry')} onRetry={() => { void mutate() }} />
         : !data ? <div role="status" aria-label={t('loading')} className="flex flex-col gap-3"><Skeleton className="h-5 w-40" /><Skeleton className="ml-auto h-12 w-3/4" /><Skeleton className="h-12 w-2/3" /></div>
         : <>
@@ -214,7 +216,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
                 <div {...{ [QUOTE_SOURCE_ATTR]: '' }} className={cn(BUBBLE, 'self-start whitespace-normal')}><AgentMarkdown text={item.text} isStreaming={active} /></div>
                 <MessageActions className={cn('self-start', HOVER_ACTIONS)}><CopyAction text={item.text} /></MessageActions>
               </>}
-              {item.kind === 'steps' && <ThreadSteps harness={detail?.harness ?? ''} steps={item.steps} />}
+              {item.kind === 'steps' && <ThreadSteps stateKey={`thread:${runId}:steps:${item.id}`} harness={detail?.harness ?? ''} steps={item.steps} />}
               {item.kind === 'error' && <FieldError className="text-xs">{item.text}</FieldError>}
               {item.kind === 'stages' && <p className="flex flex-wrap gap-x-3 text-xs text-muted-foreground" data-slot="thread-stages">
                 {item.stages.map((stage, index) => <span key={index} className={cn(!stage.ok && 'text-destructive')}>

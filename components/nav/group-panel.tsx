@@ -1,6 +1,7 @@
 'use client'
 
 import { useLayoutEffect, useRef } from 'react'
+import { useViewScroll } from '@/lib/hooks/view-state'
 import { useTranslations } from 'next-intl'
 import { X } from 'lucide-react'
 import { InlineLoadError } from '@/components/load-error'
@@ -36,6 +37,7 @@ function MemberRow({ member }: { member: GroupMember }) {
 export function GroupPanel({ group, onClose, sheet = false }: { group: { id: string; title: string }; onClose: () => void; sheet?: boolean }) {
   const t = useTranslations('Shell.panel')
   const { data: members, error, mutate } = useGroupMembers(group.id)
+  const scroll = useViewScroll<HTMLElement>(`group-panel:${group.id}`, !!members)
   const label = members ? t('members', { count: members.length }) : t('membersLoading')
   const resize = useResizableWidth(WIDTH)
   const asideRef = useRef<HTMLElement>(null)
@@ -54,7 +56,7 @@ export function GroupPanel({ group, onClose, sheet = false }: { group: { id: str
         <GroupAvatar title={group.title} members={members} size="profile" />
         <h2 className="max-w-full truncate text-xl font-semibold">{group.title}</h2>
       </div>
-      <section aria-label={label} className="flex min-h-0 flex-col gap-1 overflow-y-auto px-4 pb-4">
+      <section ref={scroll} aria-label={label} className="flex min-h-0 flex-col gap-1 overflow-y-auto px-4 pb-4">
         <GroupHeader>{label}</GroupHeader>
         {error ? <div className="px-2 py-1.5"><InlineLoadError message={t('membersError')} retryLabel={t('retry')} onRetry={() => { void mutate() }} /></div>
           : !members ? <div aria-busy="true" className="flex flex-col gap-2 px-2 py-1.5">{[0, 1, 2].map(index => <Skeleton key={index} className="h-5 w-40" />)}</div>

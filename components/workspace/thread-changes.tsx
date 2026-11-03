@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
+import { useViewScroll, useViewState } from '@/lib/hooks/view-state'
 import { DIFF_WRAP_KEY, diffWrapFrom, splitPath, type ChangedFile, type DiffBlock, type DiffLine, type DiffWrap, type ThreadChanges } from '@/lib/thread-changes'
 
 /**
@@ -15,10 +16,10 @@ import { DIFF_WRAP_KEY, diffWrapFrom, splitPath, type ChangedFile, type DiffBloc
  * until opened; the files follow one after another, each header sticking to the
  * top while its lines scroll; long lines wrap unless the person picked 横向滚动.
  */
-export function ThreadChangesPane({ changes }: { changes: ThreadChanges }) {
+export function ThreadChangesPane({ changes, stateKey = 'changes' }: { changes: ThreadChanges; stateKey?: string }) {
   const [wrap, setWrap] = useDiffWrap()
-  const [filesOpen, setFilesOpen] = useState(false)
-  return <ThreadChangesView changes={changes} wrap={wrap} onWrapChange={setWrap} filesOpen={filesOpen} onFilesOpenChange={setFilesOpen} />
+  const [filesOpen, setFilesOpen] = useViewState(`${stateKey}:files`, false)
+  return <ThreadChangesView stateKey={stateKey} changes={changes} wrap={wrap} onWrapChange={setWrap} filesOpen={filesOpen} onFilesOpenChange={setFilesOpen} />
 }
 
 /** The person's long-line choice, kept on this device; wrapping until the stored value is read. */
@@ -31,13 +32,14 @@ export function useDiffWrap(): [DiffWrap, (next: DiffWrap) => void] {
   }]
 }
 
-export function ThreadChangesView({ changes, wrap, onWrapChange, filesOpen, onFilesOpenChange }: {
+export function ThreadChangesView({ changes, wrap, onWrapChange, filesOpen, onFilesOpenChange, stateKey = 'changes' }: { stateKey?: string;
   changes: ThreadChanges; wrap: DiffWrap; onWrapChange: (next: DiffWrap) => void; filesOpen: boolean; onFilesOpenChange: (open: boolean) => void
 }) {
   const t = useTranslations('IssueThreads')
   const listId = useId()
   const sections = useRef(new Map<string, HTMLElement>())
-  const [closed, setClosed] = useState<ReadonlySet<string>>(() => new Set())
+  const [closed, setClosed] = useViewState<string[]>(`${stateKey}:closed-files`, [])
+  const scroll = useViewScroll<HTMLDivElement>(stateKey)
   return <div data-slot="thread-changes" data-wrap={wrap} className="flex min-h-0 flex-1 flex-col">
     <div className="flex shrink-0 items-center gap-2 px-3 py-2">
       <Button variant="ghost" size="sm" className="-ml-1.5 gap-1.5 px-1.5" aria-expanded={filesOpen} aria-controls={listId} onClick={() => onFilesOpenChange(!filesOpen)}>
@@ -61,12 +63,12 @@ export function ThreadChangesView({ changes, wrap, onWrapChange, filesOpen, onFi
         </Button>
       </li> })}
     </ul>}
-    <div data-slot="thread-changes-scroll" className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
+    <div ref={scroll} data-slot="thread-changes-scroll" className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
       {changes.files.map(file => {
-        const open = !closed.has(file.path)
+        const open = !closed.includes(file.path)
         return <FileSection key={file.path} file={file} open={open} wrap={wrap}
           ref={node => { if (node) sections.current.set(file.path, node); else sections.current.delete(file.path) }}
-          onOpenChange={next => setClosed(current => { const copy = new Set(current); if (next) copy.delete(file.path); else copy.add(file.path); return copy })} />
+          onOpenChange={next => setClosed(current => next ? current.filter(path => path !== file.path) : [...current, file.path])} />
       })}
     </div>
   </div>

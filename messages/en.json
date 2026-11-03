@@ -11,6 +11,7 @@
     "retry": "Retry",
     "create": "Create",
     "loading": "Loading…",
+    "loadMore": "Earlier messages",
     "search": "Search",
     "selected": "Selected",
     "propertyValue": "{label}: {value}",

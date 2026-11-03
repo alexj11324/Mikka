@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import useSWRInfinite from 'swr/infinite'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
@@ -20,6 +20,7 @@ import { cn } from '@/lib/utils'
 import { mentionsIn } from '@/lib/group-mentions'
 import { authorRuns, chronological, fetchGroupMessages, GroupMessagesRequestError, postGroupMessage, stopGroupReply, type GroupMessagePage } from '@/lib/group-messages'
 import { toast } from 'sonner'
+import { useViewScroll, useViewState } from '@/lib/hooks/view-state'
 import { useActionError } from '@/lib/use-action-error'
 
 /** A message the person sent that the server has not stored yet; a failed one waits for 重试. */
@@ -49,7 +50,7 @@ export function GroupChatView({ group, userId, people }: {
   // The pill's avatar is the members' bloubs (R-36); the right column's 详情 reads the same request.
   const { data: members = [] } = useGroupMembers(group.id)
   const member = (type: 'user' | 'agent' | 'bot', id: string) => members.find(item => item.memberType === type && item.id === id)
-  const [draft, setDraft] = useState('')
+  const [draft, setDraft] = useViewState(`group:${group.id}:draft`, '')
   const [pending, setPending] = useState<Pending[]>([])
   const [answering, setAnswering] = useState(false)
   const { data: pages, error, size, setSize, isValidating, mutate } = useSWRInfinite<GroupMessagePage>(
@@ -96,9 +97,10 @@ export function GroupChatView({ group, userId, people }: {
   }
   const unsent = pending.filter(item => !item.sentId || !messages.some(message => message.id === item.sentId))
   // The newest message, a sent one or a bot answering keeps the chat at its end; loading older ones does not move it.
-  const scroller = useRef<HTMLDivElement>(null)
+  const [following, setFollowing] = useViewState(`group:${group.id}:following`, true)
+  const scroller = useViewScroll<HTMLDivElement>(`group:${group.id}:messages`, !!pages)
   const end = `${messages.at(-1)?.id}:${unsent.length}:${!!first?.agentStatus}`
-  useEffect(() => { scroller.current?.scrollTo({ top: scroller.current.scrollHeight }) }, [end])
+  useEffect(() => { if (following) scroller.current?.scrollTo({ top: scroller.current.scrollHeight }) }, [end, following, scroller])
   const authorName = (type: 'user' | 'agent' | 'bot', id: string) => type === 'user'
     ? id === userId ? t('you') : member(type, id)?.name || people.get(id) || t('member')
     : member(type, id)?.name ?? (type === 'agent' ? agents.find(agent => agent.id === id)?.name : undefined) ?? t('bot')
@@ -106,7 +108,7 @@ export function GroupChatView({ group, userId, people }: {
   return <section aria-label={group.title || t('untitled')} data-testid="group-chat" className="relative flex min-h-0 w-full flex-1 flex-col">
     <ConversationPill name={group.title || t('untitled')} avatar={<GroupAvatar title={group.title || t('untitled')} members={members} />} />
     <div aria-hidden="true" className="hidden h-14 shrink-0 md:block" />
-    <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto">
+    <div ref={scroller} onScroll={event => { const node = event.currentTarget; const next = node.scrollHeight - node.scrollTop - node.clientHeight < 56; if (next !== following) setFollowing(next) }} className="min-h-0 flex-1 overflow-y-auto">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 pb-6">
         {code === 'not_found' ? <p role="alert" className="py-6 text-sm">{t('notFound')}</p>
           : code ? <div role="alert" className="flex items-center gap-3 py-6 text-sm"><span>{code === 'unauthorized' ? t('authRequired') : t('loadError')}</span>{code !== 'unauthorized' && <Button variant="outline" size="sm" onClick={() => { void mutate() }}>{t('retry')}</Button>}</div>

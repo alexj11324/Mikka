@@ -75,10 +75,15 @@ function parseEvent(line: string): CoordinatorStreamEvent {
 }
 
 /** Decode incrementally: a network chunk can end inside UTF-8 or a JSON line. */
-export async function readCoordinatorStream(body: ReadableStream<Uint8Array>, onEvent: (event: CoordinatorStreamEvent) => void, signal?: AbortSignal) {
+export async function readCoordinatorStream(body: ReadableStream<Uint8Array>, onEvent: (event: CoordinatorStreamEvent, sequence?: number) => void, signal?: AbortSignal) {
   const reader = body.getReader()
   const decoder = new TextDecoder()
   let buffered = ''
+  const emit = (line: string) => {
+    const { sequence } = JSON.parse(line) as { sequence?: unknown }
+    if (sequence !== undefined && (!Number.isSafeInteger(sequence) || (sequence as number) < 1)) throw new Error('Invalid Coordinator stream sequence')
+    onEvent(parseEvent(line), sequence as number | undefined)
+  }
   const cancel = () => { void reader.cancel().catch(() => undefined) }
   signal?.addEventListener('abort', cancel, { once: true })
   try {
@@ -90,10 +95,10 @@ export async function readCoordinatorStream(body: ReadableStream<Uint8Array>, on
       while ((newline = buffered.indexOf('\n')) !== -1) {
         const line = buffered.slice(0, newline).trim()
         buffered = buffered.slice(newline + 1)
-        if (line) onEvent(parseEvent(line))
+        if (line) emit(line)
       }
       if (done) {
-        if (buffered.trim()) onEvent(parseEvent(buffered))
+        if (buffered.trim()) emit(buffered)
         break
       }
     }
