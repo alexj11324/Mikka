@@ -1,5 +1,6 @@
 'use client'
 
+import { useViewScroll, useViewState } from '@/lib/hooks/view-state'
 import { Fragment, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import useSWR, { useSWRConfig } from 'swr'
 import { AnimatePresence } from 'motion/react'
@@ -151,30 +152,31 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   useEffect(() => { shown.current.chat = data }, [data])
   const stream = useCoordinatorStream({ botId, runId: data?.streamRunId, cursor: data?.cursor, persistedStreamIds: data?.persistedStreamIds, revalidate: mutate })
   useEffect(() => { reconnectStream.current = stream.reconnect }, [stream.reconnect])
-  const [draft, setDraft] = useState('')
-  // A draft belongs to the bot it was typed for. Switching bots remounts this
-  // component (the page keys it by bot), so keep the text per conversation.
-  const draftKey = userId ? `mikka:draft:${userId}:${botId ?? 'coordinator'}` : null
-  const draftLoaded = useRef(false)
+  const stateKey = `bot-chat:${botId ?? 'coordinator'}:${embedded?.activeArtifactId ?? 'main'}`
+  const [draft, setDraft] = useViewState(`${stateKey}:draft`, '')
+  const updateDraft = setDraft
+  // Carry existing window drafts into the new account/workspace-scoped store once.
   useEffect(() => {
-    if (!draftKey) return
+    if (!userId || embedded) return
+    const legacyKey = `mikka:draft:${userId}:${botId ?? 'coordinator'}`
     try {
-      const saved = sessionStorage.getItem(draftKey)
-      if (saved) setDraft(saved)
-    } catch { /* storage may be unavailable; the draft then lives in memory only */ }
-    draftLoaded.current = true
-  }, [draftKey])
-  function updateDraft(value: string) {
-    setDraft(value)
-    if (!draftKey || !draftLoaded.current) return
-    try {
-      if (value) sessionStorage.setItem(draftKey, value)
-      else sessionStorage.removeItem(draftKey)
-    } catch { /* storage may be unavailable */ }
-  }
+      const legacy = window.sessionStorage.getItem(legacyKey)
+      if (legacy) { setDraft(current => current || legacy); window.sessionStorage.removeItem(legacyKey) }
+    } catch { /* storage unavailable */ }
+  }, [userId, botId, embedded, setDraft])
+  const [following, setFollowing] = useViewState(`${stateKey}:following`, true)
+  // Hydration first exposes server defaults; lock the initial scroll choice only
+  // after the saved session and the transcript have both been read.
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => { setMounted(true) }, [])
+  const initialScroll = useRef<{ key: string; following: boolean | null }>({ key: stateKey, following: null })
+  if (initialScroll.current.key !== stateKey) initialScroll.current = { key: stateKey, following: null }
+  if (mounted && data && initialScroll.current.following === null) initialScroll.current.following = following
+  const startAtEnd = initialScroll.current.following ?? following
+  const transcript = useViewScroll<HTMLDivElement>(`${stateKey}:messages`, !!data, !startAtEnd)
   const [sending, setSending] = useState(false)
   // Words picked from a reply with 引用: they wait above the draft and head the next message as quote lines.
-  const [replyQuote, setReplyQuote] = useState<string | null>(null)
+  const [replyQuote, setReplyQuote] = useViewState<string | null>(`${stateKey}:quote`, null)
   function quoteReply(text: string) {
     setReplyQuote(text)
     inputRef.current?.focus()
@@ -331,13 +333,9 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
     event?.preventDefault()
     const text = draft.trim()
     const result = text ? await deliver(withReplyQuote(text, replyQuote), true) : 'skipped'
-    if (result === 'skipped') return
+    if (result === 'skipped' || result === 'failed') return
     setReplyQuote(null)
-    // Sent or failed, the message leaves the composer. A failed one keeps its stored draft until the person types again,
-    // so a reload or a switch to another bot puts it back in the composer.
     setDraft(current => current.trim() === text ? '' : current)
-    if (result === 'failed') return
-    if (draft.trim() === text && draftKey) { try { sessionStorage.removeItem(draftKey) } catch { /* storage may be unavailable */ } }
     const id = suggestion.current
     suggestion.current = null
     if (id) {
@@ -356,12 +354,12 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
     {/* Follow the end while the person is there, never anchor rows to the top: the scroller re-anchors any person row
         whose element it has not seen, and a stored message remounts its pending row, so the chat jumped up the history.
         Rows render at their real height: an estimated height on a new row shifts the end by the difference. */}
-    <MessageScrollerProvider defaultScrollPosition="end" autoScroll>
+    <MessageScrollerProvider key={stateKey} defaultScrollPosition={startAtEnd ? "end" : "start"} autoScroll>
       <FollowSentMessages count={data ? sentCount : null} />
       <MessageScroller className="min-h-0 flex-1">
         {/* Full size, the header pill floats over the top of the chat: rows scrolled up fade out above it instead of
             running under it, so the top reads as a solid band in either theme and in the translucent desktop window (R-35). */}
-        <MessageScrollerViewport aria-label={bot ? t('conversationWith', { name: bot.name }) : t('conversation')} className={cn(!compact && HEADER_FADE)}>
+        <MessageScrollerViewport ref={transcript} onScroll={event => { const node = event.currentTarget; const next = node.scrollHeight - node.scrollTop - node.clientHeight < 56; if (next !== following) setFollowing(next) }} aria-label={bot ? t('conversationWith', { name: bot.name }) : t('conversation')} className={cn(!compact && HEADER_FADE)}>
           <MessageScrollerContent className={cn('flex w-full min-w-0 max-w-full flex-col gap-5 pb-6', compact ? 'px-3 pt-4' : 'px-4 pt-24 sm:px-6')}>
             {/* A slow first load shows the shape of a conversation, not an empty page (state completeness). */}
             {!data && !loadError && <div role="status" aria-label={tCommon('loading')} className="flex flex-col gap-5">

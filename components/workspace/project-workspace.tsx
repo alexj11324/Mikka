@@ -1,6 +1,7 @@
 'use client'
 import { useTranslations } from 'next-intl'
 
+import { useViewState } from '@/lib/hooks/view-state'
 import { useAgentCopy } from '@/hooks/use-agent-copy'
 import { useState } from 'react'
 import { ArrowDownAZ, ArrowUpAZ, Box, Plus } from 'lucide-react'
@@ -33,14 +34,14 @@ export function ProjectWorkspace({ projects, loading, error, projectId, team, in
   const [creating, setCreating] = useState(false)
   const createDialog = usePresence(creating)
   const { update, pending, error: saveError } = useProjectUpdate(onUpdated)
-  const [query, setQuery] = useState('')
-  const [status, setStatus] = useState('all')
-  const [ascending, setAscending] = useState(true)
+  const [query, setQuery] = useViewState(`projects:${initialTeamId ?? 'all'}:query`, '')
+  const [status, setStatus] = useViewState(`projects:${initialTeamId ?? 'all'}:status`, 'all')
+  const [ascending, setAscending] = useViewState(`projects:${initialTeamId ?? 'all'}:ascending`, true)
   const project = projects.find(item => item.id === projectId)
   const filtered = projects.filter(item => (status === 'all' || item.status === status) && item.name.toLowerCase().includes(query.toLowerCase())).sort((a, b) => a.name.localeCompare(b.name, 'zh-CN') * (ascending ? 1 : -1))
   if (error) return <Empty><EmptyHeader><EmptyTitle>{i18nText("Projects.loadErrorTitle")}</EmptyTitle></EmptyHeader><Button variant="outline" onClick={onUpdated}>{i18nText("Projects.reload")}</Button></Empty>
   if (loading) return <div role="status" aria-label={i18nText("Projects.loading")} className="flex flex-col gap-4 p-6"><Skeleton className="h-8 w-48" /><Skeleton className="h-12 w-full" /><Skeleton className="h-12 w-full" /></div>
-  if (project) return <ProjectDetail key={project.id} project={project} projects={projects} issues={issues} userName={userName} onBack={() => onSelect(null)} onOpenTeam={() => { setQuery(''); setStatus('all'); onOpenTeam() }} onOpenIssue={onOpenIssue} onCreateIssue={onCreateIssue} onUpdated={onUpdated} />
+  if (project) return <ProjectDetail key={project.id} project={project} projects={projects} issues={issues} userName={userName} onBack={() => onSelect(null)} onOpenTeam={onOpenTeam} onOpenIssue={onOpenIssue} onCreateIssue={onCreateIssue} onUpdated={onUpdated} />
   return <div className="flex min-w-0 flex-1 flex-col">
     <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4"><h1 className="text-sm font-medium">{team ? i18nText("FeatureCopy.c_4099b448", { value0: (team) }) : i18nText("Projects.title")}</h1><Button size="sm" variant="ghost" onClick={() => setCreating(true)}><Plus data-icon="inline-start" />{i18nText("Projects.form.createTitle")}</Button></div>
     <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3"><span className="text-sm text-muted-foreground">{i18nText("FeatureCopy.c_e1b94a93")} {filtered.length}</span><div className="flex items-center gap-2"><SearchInput aria-label={i18nText("Projects.search")} placeholder={i18nText("Projects.searchPlaceholder")} className="w-40 sm:w-48" value={query} onChange={event => setQuery(event.target.value)} /><NativeSelect aria-label={i18nText("Projects.filterStatus")} value={status} onChange={event => setStatus(event.target.value)}><NativeSelectOption value="all">{i18nText("Projects.allStatuses")}</NativeSelectOption>{PROJECT_STATUSES.map(item => <NativeSelectOption key={item.value} value={item.value}>{({ backlog: i18nText("Projects.status.backlog"), planned: i18nText("FeatureCopy.c_0e4cd337"), started: i18nText("Projects.status.started"), paused: i18nText("Projects.status.paused"), completed: i18nText("Projects.status.completed"), canceled: i18nText("Projects.status.canceled") } as const)[item.value]}</NativeSelectOption>)}</NativeSelect></div></div>

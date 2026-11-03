@@ -1,5 +1,6 @@
 'use client'
 
+import { useViewScroll, useViewState } from '@/lib/hooks/view-state'
 import { useEffect, useId, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
@@ -22,7 +23,7 @@ function groupIssues(issues: Issue[]): Columns {
 /** The card fade's length, matching `duration-150` on the card. */
 const CARD_MOTION_MS = 150
 
-export function IssueBoard({ issues, columns: visibleColumns, hidden, sidebarOpen, context, onOpen, onDiscuss, onHideColumn, onShowColumn, onUpdated, onBusyChange }: {
+export function IssueBoard({ issues, columns: visibleColumns, hidden, sidebarOpen, context, onOpen, onDiscuss, onHideColumn, onShowColumn, onUpdated, onBusyChange, stateKey = 'board' }: { stateKey?: string;
   issues: Issue[]
   columns: IssueStatus[]
   hidden: { status: IssueStatus; count: number }[]
@@ -59,7 +60,8 @@ export function IssueBoard({ issues, columns: visibleColumns, hidden, sidebarOpe
     return next
   })
   const saving = useRef(false)
-  const viewportRef = useRef<HTMLDivElement>(null)
+  const viewportRef = useViewScroll<HTMLDivElement>(`${stateKey}:horizontal`)
+  const [visited, setVisited] = useViewState(`${stateKey}:visited`, false)
   const viewportId = useId()
   const instructionsId = useId()
   const [, setCanScroll] = useState({ left: false, right: false })
@@ -81,18 +83,19 @@ export function IssueBoard({ issues, columns: visibleColumns, hidden, sidebarOpe
   }, [])
 
   // Open on the first column with a task when the ones before it are empty (N5), once, before the person scrolls.
-  const started = useRef(false)
+  const started = useRef<string | null>(null)
   useEffect(() => {
     const viewport = viewportRef.current
-    if (started.current || !viewport || !issues.length) return
-    started.current = true
+    if (started.current === stateKey || visited || !viewport || !issues.length) return
+    started.current = stateKey
+    setVisited(true)
     const shown = BOARD_COLUMNS.map(column => column.value).filter(value => visibleColumns.includes(value as IssueStatus))
     const target = boardStartColumn(shown, Object.fromEntries(Object.entries(columns).map(([key, items]) => [key, items.length])))
     const element = target && viewport.querySelector<HTMLElement>(`[data-slot="kanban-column"][data-value="${CSS.escape(target)}"]`)
     if (!element) return
     const left = boardScrollTo(element.getBoundingClientRect(), viewport.getBoundingClientRect(), viewport.scrollLeft)
     if (left !== null) viewport.scrollTo({ left, behavior: 'instant' })
-  }, [issues.length, columns, visibleColumns])
+  }, [issues.length, columns, visibleColumns, visited, setVisited, viewportRef, stateKey])
 
   function scrollBoard(direction: -1 | 1) {
     const viewport = viewportRef.current
@@ -178,7 +181,7 @@ export function IssueBoard({ issues, columns: visibleColumns, hidden, sidebarOpe
   return <section aria-label={t('label')} className="flex min-h-0 min-w-0 flex-1 flex-col">
     <p role="status" aria-live="polite" className="sr-only">{message}</p>
     <p id={instructionsId} className="sr-only">{t('keyboardHint')}</p>
-    <KanbanBoard value={columns} columns={visibleColumns} hiddenColumns={hidden} sidebarOpen={sidebarOpen} context={cardMotion.size ? { ...context, motion: cardMotion } : context} onDelete={issue => { void remove(issue) }} onDiscuss={onDiscuss} onHideColumn={onHideColumn} onShowColumn={onShowColumn} onValueChange={setColumns} onValueCommit={commit} restoreOnCancel pending={pending} onOpen={onOpen} onStatusChange={changeStatus} onPriorityChange={changePriority} onMetadataBusy={busy => { saving.current = busy; setPending(busy); onBusyChange(busy) }} onMetadataSaved={savedIssue => {
+    <KanbanBoard stateKey={stateKey} value={columns} columns={visibleColumns} hiddenColumns={hidden} sidebarOpen={sidebarOpen} context={cardMotion.size ? { ...context, motion: cardMotion } : context} onDelete={issue => { void remove(issue) }} onDiscuss={onDiscuss} onHideColumn={onHideColumn} onShowColumn={onShowColumn} onValueChange={setColumns} onValueCommit={commit} restoreOnCancel pending={pending} onOpen={onOpen} onStatusChange={changeStatus} onPriorityChange={changePriority} onMetadataBusy={busy => { saving.current = busy; setPending(busy); onBusyChange(busy) }} onMetadataSaved={savedIssue => {
       setColumns(current => Object.fromEntries(Object.entries(current).map(([key, items]) => [key, items.map(item => item.id === savedIssue.id ? { ...item, metadata: savedIssue.metadata, revision: savedIssue.revision, updatedAt: savedIssue.updatedAt } : item)])))
       setMessage(t('propertiesSaved'))
       void onUpdated().catch(() => {})

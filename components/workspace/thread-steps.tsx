@@ -1,5 +1,6 @@
 'use client'
 
+import { useViewState } from '@/lib/hooks/view-state'
 import { useTranslations } from 'next-intl'
 import { ChevronRight } from 'lucide-react'
 import type { ThreadStep } from '@/lib/issue-run-conversation'
@@ -13,9 +14,10 @@ import { harnessLabel } from './issue-threads'
  * 「Handed to Claude Code · N steps」: the harness's tool calls folded into one line;
  * opening it lists each call by its internal name (R-40).
  */
-export function ThreadSteps({ harness, steps }: { harness: string; steps: readonly ThreadStep[] }) {
+export function ThreadSteps({ harness, steps, stateKey = 'steps' }: { harness: string; steps: readonly ThreadStep[]; stateKey?: string }) {
   const t = useTranslations('IssueThreads')
-  return <Collapsible className="flex min-w-0 flex-col items-start gap-1">
+  const [open, setOpen] = useViewState(`${stateKey}:open`, false)
+  return <Collapsible open={open} onOpenChange={setOpen} className="flex min-w-0 flex-col items-start gap-1">
     <CollapsibleTrigger render={<Button type="button" variant="ghost" size="xs" className="group/steps -ml-2 text-muted-foreground" />}>
       <ChevronRight aria-hidden="true" data-icon="inline-start" className="transition-transform group-data-[panel-open]/steps:rotate-90 motion-reduce:transition-none" />
       <span aria-hidden="true" className="inline-flex"><HarnessMark harness={harness} /></span>

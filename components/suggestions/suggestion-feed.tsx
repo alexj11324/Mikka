@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useViewScroll } from '@/lib/hooks/view-state'
 import dynamic from 'next/dynamic'
 import useSWR, { useSWRConfig } from 'swr'
 import { useLocale, useTranslations } from 'next-intl'
@@ -63,6 +64,7 @@ export function SuggestionFeed({ onOpenIssue, onConnect, onSent }: { onOpenIssue
   const [sendError, setSendError] = useState<string | null>(null)
   // One list, newest first (R-21); the API still groups by app.
   const items = data?.groups.flatMap(group => group.items) ?? []
+  const scroll = useViewScroll<HTMLDivElement>('suggestions', !!data)
 
   async function pick(item: SuggestionItem) {
     if (sending) return
@@ -84,7 +86,7 @@ export function SuggestionFeed({ onOpenIssue, onConnect, onSent }: { onOpenIssue
         <h1 id="suggestions-title" className="text-2xl font-semibold max-md:sr-only">{t('title')}</h1>
         <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label={t('refresh')} disabled={isValidating} onClick={() => { void mutate().then(() => toast.success(t('refreshed')), () => toast.error(t('refreshFailed'))) }} />}><RotateCw data-icon="inline-start" className={cn(isValidating && 'animate-spin')} /></TooltipTrigger><TooltipContent>{t('refresh')}</TooltipContent></Tooltip>
       </header>
-      <div className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto px-6 pb-6 max-md:pt-2">
+      <div ref={scroll} className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto px-6 pb-6 max-md:pt-2">
         {error && <InlineLoadError message={t('loadError')} retryLabel={t('retry')} onRetry={() => { void mutate() }} />}
         {sendError && <FieldError className="text-xs">{sendError}</FieldError>}
         {!data && !error && <div role="status" aria-label={t('loading')} className="flex flex-col gap-2.5">{[0, 1, 2].map(index => <Skeleton key={index} className="h-14 w-full rounded-[16px]" />)}</div>}

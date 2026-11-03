@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useSearchParams } from 'next/navigation'
+import { useViewScroll, useViewState } from '@/lib/hooks/view-state'
 import useSWR, { useSWRConfig, type SWRResponse } from 'swr'
 import useSWRInfinite from 'swr/infinite'
 import { useTranslations } from 'next-intl'
@@ -137,8 +139,8 @@ export function PluginsView({ section, rootLabel, linearNotice = null }: { secti
   }
   const openApp = (next: string | null) => go({ app: next, category: next ? null : category })
   // Kept here, not in the store, so back from an app's page finds the store as it was left.
-  const [tab, setTab] = useState<'apps' | 'skills'>('apps')
-  const [query, setQuery] = useState('')
+  const [tab, setTab] = useViewState<'apps' | 'skills'>(`${section}:tab`, 'apps')
+  const [query, setQuery] = useViewState(`${section}:query`, '')
 
   if (app) {
     const back = () => go({ category })
@@ -466,7 +468,9 @@ function StoreItem({ item, state, apps, href, onOpen, onConnect, onReplaceKey, o
 /** The rail's 插件 page: the store in its own scroll column. */
 export function PluginsPage() {
   const t = useTranslations('Plugins')
-  return <div className="min-h-0 flex-1 overflow-y-auto">
+  const params = useSearchParams()
+  const scroll = useViewScroll<HTMLDivElement>(`plugins:${params.get("app") ?? ''}:${params.get("category") ?? ''}`)
+  return <div ref={scroll} className="min-h-0 flex-1 overflow-y-auto">
     <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-6 sm:px-6">
       <h1 className="sr-only">{t('title')}</h1>
       <PluginsView section="plugins" rootLabel={t('title')} />

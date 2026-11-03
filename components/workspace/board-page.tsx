@@ -1,6 +1,7 @@
 'use client'
 
 import { PersonAvatar } from '@/components/person-avatar'
+import { useViewScroll } from '@/lib/hooks/view-state'
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { ShortcutKeys } from '@/components/shortcut-keys'
 import useSWR from 'swr'
@@ -98,7 +99,7 @@ function useStoredFlag(key: string, fallback: boolean) {
  * Coordinator) over five status columns, with the
  * Coordinator conversation in a sidebar that folds into a pill (MIK-45).
  */
-export function BoardPage({ issues, userId, onOpen, onUpdated, onBusyChange }: {
+export function BoardPage({ issues, userId, onOpen, onUpdated, onBusyChange, stateKey = 'board' }: { stateKey?: string;
   issues: Issue[]
   userId: string
   onOpen: (id: string) => boolean | void
@@ -114,6 +115,7 @@ export function BoardPage({ issues, userId, onOpen, onUpdated, onBusyChange }: {
   const priorityLabel = (value: string) => tIssue.has(`priority.${value}` as never) ? tIssue(`priority.${value}` as never) : value
   const [settings, update] = useBoardSettings()
   const { scope, view, filters, display } = settings
+  const listScroll = useViewScroll<HTMLDivElement>(`${stateKey}:list`, view === 'list')
   const [sidebar, setSidebar] = useStoredFlag(SIDEBAR_KEY, true)
   // Below xl (1280) a 360px panel leaves the board too little room: it starts folded and opens as a sheet over the board, as Linear's side panel does on narrow windows (R-65).
   const [sheet, setSheet] = useState(false)
@@ -270,8 +272,8 @@ export function BoardPage({ issues, userId, onOpen, onUpdated, onBusyChange }: {
         </div>
       </div>
       {view === 'board'
-        ? <div className="flex min-h-0 flex-1 flex-col px-5"><IssueBoard issues={shown} columns={columns} hidden={hidden} sidebarOpen={sidebarShown} context={{ properties: new Set(display.properties), agentStates, subtasks, owners }} onOpen={id => { onOpen(id) }} onDiscuss={issue => { openPanel(); setPrefill({ text: t('discussPrefill', { id: issue.identifier ?? '', title: issue.title }), nonce: Date.now() }) }} onHideColumn={status => setDisplay({ hidden: [...display.hidden, status] })} onShowColumn={status => setDisplay({ hidden: display.hidden.filter(item => item !== status) })} onUpdated={onUpdated} onBusyChange={onBusyChange} /></div>
-        : <div className="min-h-0 flex-1 overflow-y-auto"><IssueList issues={shown} properties={new Set(display.properties)} owners={owners} searching={activeFilters.length > 0 || scope !== 'all'} onOpen={id => { onOpen(id) }} onCreate={() => setNewTask(true)} /></div>}
+        ? <div className="flex min-h-0 flex-1 flex-col px-5"><IssueBoard stateKey={stateKey} issues={shown} columns={columns} hidden={hidden} sidebarOpen={sidebarShown} context={{ properties: new Set(display.properties), agentStates, subtasks, owners }} onOpen={id => { onOpen(id) }} onDiscuss={issue => { openPanel(); setPrefill({ text: t('discussPrefill', { id: issue.identifier ?? '', title: issue.title }), nonce: Date.now() }) }} onHideColumn={status => setDisplay({ hidden: [...display.hidden, status] })} onShowColumn={status => setDisplay({ hidden: display.hidden.filter(item => item !== status) })} onUpdated={onUpdated} onBusyChange={onBusyChange} /></div>
+        : <div ref={listScroll} className="min-h-0 flex-1 overflow-y-auto"><IssueList issues={shown} properties={new Set(display.properties)} owners={owners} searching={activeFilters.length > 0 || scope !== 'all'} onOpen={id => { onOpen(id) }} onCreate={() => setNewTask(true)} /></div>}
     </section>
     {sidebar && <ResizablePane render="aside" aria-label={tNav('coordinator')} storageKey="mikka:board-sidebar-width" defaultWidth={360} min={280} max={560} edge="start" from="xl" label={tCommon('resize.boardSidebar')} className="hidden shrink-0 flex-col border-l xl:flex">
       {/* Same centered pill as the Coordinator page, so the two read as one conversation. */}

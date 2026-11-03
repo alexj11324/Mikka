@@ -1,7 +1,8 @@
 'use client'
+import { useViewScroll } from '@/lib/hooks/view-state'
 import { useTranslations } from 'next-intl'
 
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 import { useRevealLoaded } from '@/lib/hooks/use-reveal-loaded'
 import { SidebarInset, SidebarProvider, SidebarTrigger, useSidebar } from '@/components/ui/sidebar'
@@ -80,11 +81,11 @@ export function SignOutBoundary({ pending, children }: { pending: boolean; child
   </>
 }
 
-export function AppShellContent({ parent, title, heading, actions, children, variant = 'workspace', hideHeader = false, listToggle = true }: { /** A crumb the person can tell apart from the title (a team, 设置); never the workspace name (R-79). */ parent?: string; title: string; /** Stands in the phone header in place of the title: a chat's pill. */ heading?: ReactNode; actions?: ReactNode; children: ReactNode; variant?: 'workspace' | 'settings'; hideHeader?: boolean; listToggle?: boolean }) {
+export function AppShellContent({ parent, title, heading, actions, children, variant = 'workspace', hideHeader = false, listToggle = true, scrollKey = 'shell' }: { scrollKey?: string; /** A crumb the person can tell apart from the title (a team, 设置); never the workspace name (R-79). */ parent?: string; title: string; /** Stands in the phone header in place of the title: a chat's pill. */ heading?: ReactNode; actions?: ReactNode; children: ReactNode; variant?: 'workspace' | 'settings'; hideHeader?: boolean; listToggle?: boolean }) {
   const i18nText = useTranslations();
   const { isMobile, openMobile, open, toggleSidebar } = useSidebar()
   // A section's loading placeholder gives way to its content with a short fade.
-  const contentRef = useRef<HTMLElement>(null)
+  const contentRef = useViewScroll<HTMLElement>(scrollKey)
   useRevealLoaded(contentRef)
   return <SidebarInset ref={contentRef} className={cn('min-h-0 min-w-0', 'overflow-y-auto overscroll-contain')}>
     {/* Desktop has no title bar (MIK-40): the top bar searches and the pill names the conversation. Phones keep it, having no rail. */}

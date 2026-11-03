@@ -27,6 +27,7 @@ import { PullRequestIcon } from '@/components/workspace/pull-request-icon'
 import { useCloudComputer, useComputerTab } from '@/hooks/use-feature-availability'
 import { useResizableWidth } from '@/hooks/use-resizable-width'
 import { ResizeHandle } from '@/components/ui/resizable-pane'
+import { useViewScroll, useViewState } from '@/lib/hooks/view-state'
 
 type Issue = Awaited<ReturnType<typeof listIssues>>[number]
 export type PanelTab = 'details' | 'threads' | 'prs' | 'computer'
@@ -47,9 +48,9 @@ const NO_ITEMS: DetailItem[] = []
  * in through the threads the bot dispatched, so there is nothing to add here; a list of the
  * person's own files offers 删除 on each row (R-51).
  */
-function DetailList({ title, empty, items, icon: Icon, onDelete }: { title: string; empty: string; items: DetailItem[]; icon: LucideIcon; onDelete?: (item: DetailItem) => void }) {
+function DetailList({ title, empty, items, icon: Icon, onDelete, stateKey = 'details' }: { title: string; empty: string; items: DetailItem[]; icon: LucideIcon; onDelete?: (item: DetailItem) => void; stateKey?: string }) {
   const t = useTranslations('Shell.panel')
-  const [expanded, setExpanded] = useState(false)
+  const [expanded, setExpanded] = useViewState(`${stateKey}:expanded`, false)
   const shown = expanded ? items : items.slice(0, COLLAPSED_ROWS)
   // R-52's group header, as in 线程 and PR.
   return <section aria-label={title} className="flex flex-col gap-1">
@@ -86,7 +87,7 @@ function LibraryList({ botId }: { botId: string | null }) {
     } finally { setPending(false) }
   }
   return <>
-    <DetailList title={t('library')} empty={error && !data ? t('libraryError') : t('noLibrary')} items={items} icon={FileText} onDelete={setDeleting} />
+    <DetailList stateKey={`library:${botId ?? 'coordinator'}`} title={t('library')} empty={error && !data ? t('libraryError') : t('noLibrary')} items={items} icon={FileText} onDelete={setDeleting} />
     <AlertDialog open={deleting !== null} onOpenChange={open => { if (!open && !pending) setDeleting(null) }}>
       <AlertDialogContent size="sm">
         <AlertDialogHeader><AlertDialogTitle>{t('deleteFileTitle', { name: deleting?.label ?? '' })}</AlertDialogTitle></AlertDialogHeader>
@@ -168,14 +169,16 @@ export function ContextPanel({ issues, threads, threadsLoading = false, conversa
   sheet?: boolean
 }) {
   const t = useTranslations('Shell.panel')
-  const [tab, setTab] = useState<PanelTab>('threads')
+  const stateKey = `context:${conversation.kind}:${conversation.id ?? 'coordinator'}`
+  const [tab, setTab] = useViewState<PanelTab>(`${stateKey}:tab`, 'threads')
+  const [tabChosen, setTabChosen] = useViewState(`${stateKey}:tab-chosen`, false)
   // The header's search filters this column's lists in place (R-50); null while it is closed.
-  const [query, setQuery] = useState<string | null>(null)
+  const [query, setQuery] = useViewState<string | null>(`${stateKey}:query`, null)
   const filter = (list: Thread[]) => query ? list.filter(thread => matches(query, threadName(thread, issues, ''), thread.lastReply)) : list
   const resize = useResizableWidth(PANEL_WIDTH)
   const { width, max, dragging, resizeTo } = resize
   // 加宽 remembers the width it replaced, and the button puts it back.
-  const [beforeWide, setBeforeWide] = useState<number | null>(null)
+  const [beforeWide, setBeforeWide] = useViewState<number | null>('context:before-wide', null)
   const wide = beforeWide !== null
   function toggleWide() {
     if (wide) { resizeTo(beforeWide); setBeforeWide(null); return }
@@ -199,10 +202,13 @@ export function ContextPanel({ issues, threads, threadsLoading = false, conversa
   const computerTab = useComputerTab()
   const computer = (computerTab ? chatBotId : null) ?? (cloudComputer ? registered?.botId : undefined)
   // A conversation whose bot works on its computer opens on its screen (Figma 103:64).
-  useEffect(() => { if (registered?.runId) setTab('computer') }, [registered?.runId])
+  useEffect(() => { if (registered?.runId && !tabChosen) { setTab('computer'); setTabChosen(true) } }, [registered?.runId, tabChosen, setTab, setTabChosen])
   // No computer here (the kill switch is on): no 电脑 tab.
   const tabs = computer ? TABS : TABS.filter(item => item !== 'computer')
   const shown = tabs.includes(tab) ? tab : 'threads'
+  const detailsScroll = useViewScroll<HTMLDivElement>(`${stateKey}:details`, shown === 'details')
+  const threadsScroll = useViewScroll<HTMLDivElement>(`${stateKey}:threads:${query ?? ''}`, shown === 'threads' && !threadsLoading)
+  const prsScroll = useViewScroll<HTMLDivElement>(`${stateKey}:prs:${query ?? ''}`, shown === 'prs')
 
   const pill = 'h-7 flex-none rounded-full px-2.5 font-normal text-muted-foreground data-active:bg-muted! data-active:text-foreground data-active:shadow-none'
   // The panel keeps its transparent pills while Alex compares them with the shared segmented control (docs/design/decisions/2026-10-31-1814-segmented-control-motion.md);
@@ -223,7 +229,7 @@ export function ContextPanel({ issues, threads, threadsLoading = false, conversa
       {query !== null && <div className="shrink-0 px-3 pb-2">
         <SearchInput autoFocus aria-label={t('search')} placeholder={t('search')} value={query} onChange={event => setQuery(event.target.value)} onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); setQuery(null) } }} />
       </div>}
-      <Tabs value={shown} onValueChange={value => setTab(value as PanelTab)} className="min-h-0 flex-1 gap-0">
+      <Tabs value={shown} onValueChange={value => { setTab(value as PanelTab); setTabChosen(true) }} className="min-h-0 flex-1 gap-0">
           <div className="flex shrink-0 flex-col items-center gap-3 px-4 pt-9 pb-4">
             {/* A bot's name and look are edited in place; the Coordinator keeps its own. */}
             {botId ? <BotLookEditor botId={botId} name={conversation.name} color={conversation.color} shape={conversation.shape} />
@@ -233,15 +239,15 @@ export function ContextPanel({ issues, threads, threadsLoading = false, conversa
               {tabs.map(item => <TabsTrigger key={item} value={item} {...pillTab}>{t(item)}</TabsTrigger>)}
             </TabsList>
           </div>
-          <TabsContent value="details" className="flex min-h-0 flex-col gap-3 overflow-y-auto px-4 pb-4">
+          <TabsContent ref={detailsScroll} value="details" className="flex min-h-0 flex-col gap-3 overflow-y-auto px-4 pb-4">
             <DetailList title={t('routines')} empty={t('noRoutines')} items={NO_ITEMS} icon={Clock} />
             {/* A bot's or the Coordinator's own documents; an agent chat has no library. */}
             {botId || coordinator ? <LibraryList botId={botId} /> : <DetailList title={t('library')} empty={t('noLibrary')} items={NO_ITEMS} icon={FileText} />}
           </TabsContent>
-          <TabsContent value="threads" className="min-h-0 overflow-y-auto px-4 pb-4">
-            <ThreadResults threads={ownThreads} shown={filter(ownThreads)} issues={issues} loading={threadsLoading} onOpenThread={onOpenThread} />
+          <TabsContent ref={threadsScroll} value="threads" className="min-h-0 overflow-y-auto px-4 pb-4">
+            <ThreadResults stateKey={stateKey} threads={ownThreads} shown={filter(ownThreads)} issues={issues} loading={threadsLoading} onOpenThread={onOpenThread} />
           </TabsContent>
-          <TabsContent value="prs" className="min-h-0 overflow-y-auto px-4 pb-4">
+          <TabsContent ref={prsScroll} value="prs" className="min-h-0 overflow-y-auto px-4 pb-4">
             <PullRequests threads={ownThreads} issues={issues} query={query ?? ''} />
           </TabsContent>
           {computer && <TabsContent value="computer" className="min-h-0 overflow-y-auto px-4 pb-4">

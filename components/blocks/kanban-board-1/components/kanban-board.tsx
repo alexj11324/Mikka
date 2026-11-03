@@ -1,5 +1,6 @@
 'use client'
 
+import { useViewScroll } from '@/lib/hooks/view-state'
 import { useState, type ComponentProps, type ReactNode, type Ref } from 'react'
 import { ScrollArea as ScrollAreaPrimitive } from '@base-ui/react/scroll-area'
 import { useFormatter, useNow, useTranslations } from 'next-intl'
@@ -190,7 +191,13 @@ function TaskCard({ task, disabled, isOverlay = false, context, onOpen, onStatus
   </KanbanItem>
 }
 
+function RememberedColumn({ stateKey, ...props }: ComponentProps<typeof KanbanColumnContent> & { stateKey: string }) {
+  const scroll = useViewScroll<HTMLDivElement>(stateKey)
+  return <KanbanColumnContent ref={scroll} {...props} />
+}
+
 type KanbanBoardProps = Omit<ComponentProps<typeof Kanban<BoardTask>>, 'children' | 'getItemValue'> & {
+  stateKey?: string;
   value: BoardColumns
   columns: IssueStatus[]
   hiddenColumns: { status: IssueStatus; count: number }[]
@@ -206,7 +213,7 @@ type KanbanBoardProps = Omit<ComponentProps<typeof Kanban<BoardTask>>, 'children
   sidebarOpen?: boolean
 } & CardHandlers
 
-export function KanbanBoard({ columns, hiddenColumns: hidden, sidebarOpen = false, context, pending = false, viewportRef, viewportId, instructionsId, onViewportKeyDown, onHideColumn, onShowColumn, onOpen, onStatusChange, onPriorityChange, onMetadataSaved, onMetadataBusy, onDelete, onDiscuss, ...props }: KanbanBoardProps) {
+export function KanbanBoard({ stateKey = 'board', columns, hiddenColumns: hidden, sidebarOpen = false, context, pending = false, viewportRef, viewportId, instructionsId, onViewportKeyDown, onHideColumn, onShowColumn, onOpen, onStatusChange, onPriorityChange, onMetadataSaved, onMetadataBusy, onDelete, onDiscuss, ...props }: KanbanBoardProps) {
   const handlers = { onOpen, onStatusChange, onPriorityChange, onMetadataSaved, onMetadataBusy, onDelete, onDiscuss }
   const t = useTranslations('Board')
   const tBoard = useTranslations('Shell.board')
@@ -233,9 +240,9 @@ export function KanbanBoard({ columns, hiddenColumns: hidden, sidebarOpen = fals
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
-              <KanbanColumnContent value={column.value} className="min-h-0 flex-1 gap-1.5 overflow-y-auto overscroll-y-contain p-0.5" aria-label={t('columnContent', { status: statusLabel(column.value) })}>
+              <RememberedColumn stateKey={`${stateKey}:column:${column.value}`} value={column.value} className="min-h-0 flex-1 gap-1.5 overflow-y-auto overscroll-y-contain p-0.5" aria-label={t('columnContent', { status: statusLabel(column.value) })}>
                 {tasks.map(task => <TaskCard key={task.id} task={task} disabled={pending} context={context} {...handlers} />)}
-              </KanbanColumnContent>
+              </RememberedColumn>
             </section>
           </KanbanColumn>
         })}

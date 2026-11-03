@@ -32,6 +32,7 @@ import { Field, FieldGroup, FieldLabel, FieldError } from '@/components/ui/field
 import { Textarea } from '@/components/ui/textarea'
 import { ResizeHandle } from '@/components/ui/resizable-pane'
 import { useResizableWidth } from '@/hooks/use-resizable-width'
+import { useViewState } from '@/lib/hooks/view-state'
 import { closeOnEscape, useFocusReturn } from '@/hooks/use-focus-return'
 
 type Issue = IssueView
@@ -147,7 +148,7 @@ function TaskForm({ initial, thread: openThread, origin, user, onSaved, onDirty,
   const [error, setError] = useState('')
   const [history, setHistory] = useState(false)
   const [members, setMembers] = useState(false)
-  const [documentTools, setDocumentTools] = useState(false)
+  const [documentTools, setDocumentTools] = useViewState(`task:${initial.id}:document-tools`, false)
   const [propertyRequest, setPropertyRequest] = useState<MetadataRequest | null>(null)
   const [actionRequest, setActionRequest] = useState<IssueActionRequest | null>(null)
   const restoration = useRef<{ resolve: (success: boolean) => void } | null>(null)
