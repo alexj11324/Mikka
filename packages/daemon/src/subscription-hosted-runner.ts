@@ -20,6 +20,7 @@ import { createRequire } from "node:module";
 import { delimiter, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
+import { setTimeout as delay } from "node:timers/promises";
 import type {
   SpawnOptions,
   SpawnedProcess,
@@ -385,8 +386,20 @@ export async function createHostedBotRunner(host: {
       try {
         await live();
         const subscription = selected ? await (async () => {
-          const context = () =>
-            host.link.nativeContext!(assignment.deviceId, assignment.runId, lifetime.signal);
+          const context = async () => {
+            // A failed infrastructure query is inconclusive, not revocation.
+            // Admit no work until a fresh context succeeds, and stop after
+            // three attempts. Authoritative refusals are never retried.
+            for (let attempt = 0; ; attempt++) {
+              await live();
+              try {
+                return await host.link.nativeContext!(assignment.deviceId, assignment.runId, lifetime.signal);
+              } catch (error) {
+                if (!(error instanceof ServerUnreachableError) || attempt >= 2) throw error;
+                await delay(250, undefined, { signal: lifetime.signal });
+              }
+            }
+          };
           const first = nativeBrokerContextSchema.parse(await context());
           await live();
           startup.sameRoute = first.route === selected.route;
@@ -398,7 +411,6 @@ export async function createHostedBotRunner(host: {
           const check = async (phase: StartupPhase = "context_check") => {
             startup.phase = phase;
             try {
-              await live();
               const current = await context();
               await live();
               startup.sameRevision = current.revision === revision;
@@ -412,7 +424,8 @@ export async function createHostedBotRunner(host: {
                 current.revision !== revision ||
                 current.accountId !== first.accountId ||
                 current.route !== first.route ||
-                current.modelId !== first.modelId
+                current.modelId !== first.modelId ||
+                !startup.expiryFuture
               )
                 throw unavailable();
               return current;

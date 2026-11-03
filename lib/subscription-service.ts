@@ -22,7 +22,7 @@ export class SubscriptionService {
     readonly capabilities: SubscriptionCapabilities,
     readonly quota: (provider: 'codex' | 'claude', result: {status: number; body: unknown}) => Promise<QuotaSnapshot> | QuotaSnapshot = readSubscriptionQuota,
     readonly workspace: (ownerId: string, workspaceId: string, consumerId?: string) => Promise<void> = async () => { throw new SubscriptionRefusal('account_unavailable') },
-    readonly admitModel: (scope: { ownerId: string; workspaceId: string; runId?: string }, model: string, route: string, signal?: AbortSignal) => Promise<void> = async (...args) => {
+    readonly admitModel: (scope: { ownerId: string; workspaceId: string; runId?: string }, model: string, route: string, signal?: AbortSignal, auditAllowed?: boolean) => Promise<void> = async (...args) => {
       const { assertSubscriptionModelTransport } = await import('./model-admission/runtime')
       await assertSubscriptionModelTransport(...args)
     },
@@ -127,9 +127,10 @@ export class SubscriptionService {
     const binding=await this.repository.binding(use.ownerId,use.bindingId)
     const selected = await this.nativeRunSelection(use, binding.modelId)
     const scope = { ownerId: selected.executionOwnerId, workspaceId: binding.workspaceId, runId: use.runId }
-    await this.admitModel(scope, selected.modelId ?? binding.modelId, binding.route, signal)
+    // Context probes enforce policy without recording a model generation.
+    await this.admitModel(scope, selected.modelId ?? binding.modelId, binding.route, signal, false)
     const authorized=await this.check(use,signal,selected.modelId ?? null)
-    await this.admitModel(scope, selected.modelId ?? binding.modelId, binding.route, signal)
+    await this.admitModel(scope, selected.modelId ?? binding.modelId, binding.route, signal, false)
     const row=await this.repository.connection(use.ownerId,binding.connectionId)
     const client=this.worker(this.repository.scope(row)).forUse(use)
     await client.call('prepare',{revision:authorized.binding.connectionRevision},signal)
