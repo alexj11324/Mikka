@@ -95,6 +95,7 @@ test('official runtime cannot redeploy a READY application from a different comm
   stored.MIKKA_CLOUD_WORKER_SOURCE_COMMIT = sourceCommit
   const fake = fakeVercel({ stored, commit: 'c'.repeat(40) })
   await assert.rejects(run(fake, { templates, sourceCommit }), /no_ready_production_deployment/)
+  assert.ok(!fake.calls.some(row => row.method === 'POST' && row.path.endsWith('/env')))
   assert.ok(!fake.calls.some(row => row.method === 'POST' && row.path === '/v13/deployments'))
 })
 

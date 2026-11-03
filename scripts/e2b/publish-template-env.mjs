@@ -65,18 +65,9 @@ export async function publish({ token, templates, sourceSha, sourceCommit, model
   if (sourceCommit) env.push({ key: 'MIKKA_CLOUD_WORKER_SOURCE_COMMIT', value: sourceCommit, type: 'plain', target: ['production'] })
   const call = (path, options = {}) => api(path, { token, fetchImpl, ...options })
 
-  await call(`/v10/projects/${PROJECT}/env?upsert=true`, { method: 'POST', body: env })
-  const listed = await call(`/v10/projects/${PROJECT}/env`)
-  for (const want of env) {
-    const row = (listed.envs ?? []).find((item) => item.key === want.key && item.target?.includes('production') && !item.gitBranch)
-    if (!row) fail(`env_missing ${want.key}`)
-    const read = await call(`/v1/projects/${PROJECT}/env/${encodeURIComponent(row.id)}`)
-    if (read.value !== want.value) fail(`env_not_updated ${want.key}`)
-  }
-  log(`production env: ${env.map((item) => `${item.key}=${item.value}`).join(' ')}`)
-
   // A production build already running (e.g. the git deploy of this same push) started with the old
-  // pair. Let it finish first, so the redeploy below is the last one and carries the new pair.
+  // pair. Let it finish and identify the exact source before changing configuration.
+  // A missing/failed matching application must not leave production env pointing at another worker.
   let latest
   for (let poll = 0; ; poll++) {
     const { deployments = [] } = await call(`/v6/deployments?projectId=${PROJECT}&target=production&limit=20`)
@@ -88,6 +79,16 @@ export async function publish({ token, templates, sourceSha, sourceCommit, model
     await wait(10_000)
   }
   if (!latest) fail('no_ready_production_deployment')
+
+  await call(`/v10/projects/${PROJECT}/env?upsert=true`, { method: 'POST', body: env })
+  const listed = await call(`/v10/projects/${PROJECT}/env`)
+  for (const want of env) {
+    const row = (listed.envs ?? []).find((item) => item.key === want.key && item.target?.includes('production') && !item.gitBranch)
+    if (!row) fail(`env_missing ${want.key}`)
+    const read = await call(`/v1/projects/${PROJECT}/env/${encodeURIComponent(row.id)}`)
+    if (read.value !== want.value) fail(`env_not_updated ${want.key}`)
+  }
+  log(`production env: ${env.map((item) => `${item.key}=${item.value}`).join(' ')}`)
 
   const created = await call('/v13/deployments?forceNew=1', { method: 'POST',
     body: { name: latest.name, deploymentId: latest.uid ?? latest.id, target: 'production' } })
