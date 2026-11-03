@@ -1,3 +1,4 @@
+import { pageNeedsRefresh } from '@/lib/app-build'
 import { withBasePath } from '@/lib/base-path'
 import { mergeReadPosition } from '@/lib/unread'
 
@@ -49,6 +50,7 @@ export const httpReadSource: ConversationReadSource = {
     return response.json()
   },
   beacon(id, { messageId }) {
+    if (pageNeedsRefresh()) return
     const body = JSON.stringify({ messageId } satisfies MarkReadBody)
     if (typeof navigator !== 'undefined' && navigator.sendBeacon?.(url(id), body)) return
     void fetch(url(id), { method: 'POST', headers: { 'content-type': 'application/json' }, body, keepalive: true }).catch(() => {})

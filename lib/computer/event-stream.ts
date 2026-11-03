@@ -1,13 +1,15 @@
+import { pageNeedsRefresh, pageRefreshSignal } from '@/lib/app-build'
 import { withBasePath } from '@/lib/base-path'
 
 type Subscription = { type: string; handler: (message: Event) => void }
-type Shared = { source: EventSource | null; subscriptions: Set<Subscription>; lastId: string; onVisibility: () => void }
+type Shared = { source: EventSource | null; subscriptions: Set<Subscription>; lastId: string; onVisibility: () => void; onRefresh: () => void }
 
 let shared: Shared | null = null
 
 const hidden = () => typeof document !== 'undefined' && document.visibilityState === 'hidden'
 
 function open(state: Shared) {
+  if (pageNeedsRefresh()) return
   // A reopened stream resumes after the last event this tab received.
   const source = new EventSource(withBasePath(`/api/computer/events${state.lastId ? `?after=${encodeURIComponent(state.lastId)}` : ''}`), { withCredentials: true })
   source.onerror = () => { if (source.readyState === EventSource.CLOSED) source.close() }
@@ -27,12 +29,13 @@ function close(state: Shared) {
  * long as a stream is open.
  */
 export function listenComputerStream(type: string, listener: (data: string) => void): () => void {
-  if (typeof EventSource === 'undefined') return () => {}
+  if (pageNeedsRefresh() || typeof EventSource === 'undefined') return () => {}
   if (!shared) {
     const state: Shared = { source: null, subscriptions: new Set(), lastId: '', onVisibility: () => {
-      if (hidden()) close(state)
+      if (hidden() || pageNeedsRefresh()) close(state)
       else if (!state.source || state.source.readyState === EventSource.CLOSED) open(state)
-    } }
+    }, onRefresh: () => close(state) }
+    pageRefreshSignal().addEventListener('abort', state.onRefresh, { once: true })
     if (typeof document !== 'undefined') document.addEventListener('visibilitychange', state.onVisibility)
     shared = state
   }
@@ -51,6 +54,7 @@ export function listenComputerStream(type: string, listener: (data: string) => v
     if (current.subscriptions.size === 0) {
       close(current)
       if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', current.onVisibility)
+      pageRefreshSignal().removeEventListener('abort', current.onRefresh)
       if (shared === current) shared = null
     }
   }

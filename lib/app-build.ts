@@ -10,8 +10,10 @@ import { withBasePath } from '@/lib/base-path'
 export const APP_BUILD = process.env.NEXT_PUBLIC_MIKKA_BUILD ?? ''
 
 let refreshRequired = false
+const refreshAbort = new AbortController()
+export const pageRefreshSignal = () => refreshAbort.signal
 export const pageNeedsRefresh = () => refreshRequired
-export function markPageNeedsRefresh() { refreshRequired = true }
+export function markPageNeedsRefresh() { refreshRequired = true; refreshAbort.abort() }
 
 /** True only when both builds are known and differ. */
 export function isStaleBuild(page: string, server: unknown): boolean {
@@ -95,12 +97,13 @@ export function watchRemovedActions(target: Window) {
   const original = target.fetch.bind(target)
   const session = () => { try { return target.sessionStorage } catch { return null } }
   target.fetch = async (...args: Parameters<typeof fetch>) => {
-    if (pageNeedsRefresh()) {
-      const input = args[0]
-      const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, target.location.href)
-      if (url.origin === target.location.origin && url.pathname !== withBasePath('/api/version')) throw new Error('App refresh required')
-    }
-    const response = await original(...args)
+    const input = args[0]
+    const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, target.location.href)
+    const business = url.origin === target.location.origin && url.pathname !== withBasePath('/api/version')
+    if (business && pageNeedsRefresh()) throw new Error('App refresh required')
+    const callerSignal = args[1]?.signal ?? (input instanceof Request ? input.signal : undefined)
+    const init = business ? { ...args[1], signal: callerSignal ? AbortSignal.any([callerSignal, pageRefreshSignal()]) : pageRefreshSignal() } : args[1]
+    const response = await original(input, init)
     if (response.headers.has(ACTION_NOT_FOUND_HEADER) && !reloadOnce(session(), Date.now(), () => { target.location.reload() })) {
       target.dispatchEvent(new Event(STALE_BUILD_EVENT))
     }
