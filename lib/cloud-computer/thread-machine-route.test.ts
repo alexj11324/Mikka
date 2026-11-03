@@ -37,13 +37,24 @@ test('the thread machine route refuses a desktop view and issues no grant', asyn
   assert.deepEqual(calls, [], 'the request never reaches a machine action')
 })
 
-test('pause, resume and end still reach the thread machine', async () => {
+test('pause, resume, end and authorized runtime refresh reach the thread machine', async () => {
   calls.length = 0
-  for (const action of ['pause', 'resume', 'end']) {
+  for (const action of ['pause', 'resume', 'end', 'refresh_runtime']) {
     const runId = randomUUID()
     const response = await post(runId, { action })
     assert.equal(response.status, 200)
     assert.deepEqual(await response.json(), { runId, state: action })
   }
-  assert.deepEqual(calls, ['pause', 'resume', 'end'])
+  assert.deepEqual(calls, ['pause', 'resume', 'end', 'refresh_runtime'])
+})
+
+
+test('runtime refresh retains the same-origin request boundary', async () => {
+  calls.length = 0
+  const runId = randomUUID()
+  const response = await route.POST(new Request(`${origin}/api/threads/${runId}/machine`, {
+    method: 'POST', headers: { origin: 'https://foreign.example', 'content-type': 'application/json' }, body: JSON.stringify({action:'refresh_runtime'}),
+  }), {params:Promise.resolve({runId})})
+  assert.equal(response.status,403)
+  assert.deepEqual(calls,[])
 })

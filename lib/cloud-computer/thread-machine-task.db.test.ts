@@ -87,6 +87,25 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
     };
     const machine = async (runId: string) => (await pool.query('SELECT state,"sandboxId","deviceId","issueId" FROM thread_machines WHERE "runId"=$1', [runId])).rows[0];
 
+    await t.test('a maintenance lease prevents adoption and replacement of the original VM', async () => {
+      const issueId = await task(), previous = await parked(issueId);
+      await pool.query(`UPDATE thread_machines SET "workerLeaseId"=$2,"workerLeaseUntil"=now()+interval '10 minutes' WHERE "runId"=$1`, [previous.runId, randomUUID()]);
+      const next = await run(issueId), fixture = fake();
+      await assert.rejects(ensureThreadMachine(pool, actor, next, fixture.provider), /maintenance in progress/);
+      assert.deepEqual(fixture.calls, []);
+      assert.equal((await machine(previous.runId)).sandboxId, previous.sandboxId);
+      assert.equal(await machine(next), undefined);
+    });
+    await t.test('runtime refresh rejects active native work before any provider call', async () => {
+      const previous = await parked(await task());
+      await pool.query(`UPDATE agent_runs SET "deviceId"=$2 WHERE id=$1`, [previous.runId, previous.device]);
+      const active = await run(await task());
+      await pool.query(`UPDATE agent_runs SET "deviceId"=$2 WHERE id=$1`, [active, previous.device]);
+      const fixture = fake();
+      await assert.rejects(ensureThreadMachine(pool, actor, previous.runId, fixture.provider, undefined, true), /runtime is busy/);
+      assert.deepEqual(fixture.calls, []);
+    });
+
     await t.test('moving a queued repository task binds its existing authority to the owned thread device', async () => {
       const { admitRepositoryTask, matchesRepositoryAdmission } = await import('../repository-admission');
       const savedWorker = { url: process.env.MIKKA_CLOUD_WORKER_URL, sha: process.env.MIKKA_CLOUD_WORKER_SHA };
