@@ -10,8 +10,13 @@ export function localExecutionHarnesses(infos: readonly HarnessInfo[], env: Reco
     .map(info => info.harness))].sort()
 }
 
-/** Local execution identities are infrastructure, never user-managed Bots. */
-export async function ensureDeviceAgents(pool: Pool, ownerId: string, deviceId: string, infos: readonly HarnessInfo[]) {
+/**
+ * Local execution identities are infrastructure, never user-managed Bots.
+ * By default they follow the harnesses stored on the device (a newer report
+ * may have won the lock); `reported` makes them follow `infos`, for a caller
+ * that stores those harnesses only after this succeeds.
+ */
+export async function ensureDeviceAgents(pool: Pool, ownerId: string, deviceId: string, infos: readonly HarnessInfo[], { reported = false } = {}) {
   const desired = localExecutionHarnesses(infos)
   const query = `SELECT d.kind,a.harness FROM devices d LEFT JOIN agents a
     ON a."deviceId"=d.id AND a."userId"=d."ownerId" AND a.name=a.harness || ' ' || d.id::text
@@ -29,7 +34,7 @@ export async function ensureDeviceAgents(pool: Pool, ownerId: string, deviceId: 
     const device = (await client.query(`SELECT harnesses FROM devices WHERE id=$1 AND "ownerId"=$2 AND kind='local' FOR UPDATE`, [deviceId, ownerId])).rows[0]
     if (device) {
       // A newer registration/heartbeat may have won while this one waited.
-      const current = localExecutionHarnesses(device.harnesses)
+      const current = reported ? desired : localExecutionHarnesses(device.harnesses)
       for (const harness of current) {
         await client.query(`INSERT INTO agents (id,"userId",harness,name,"deviceId") VALUES ($1,$2,$3,$4,$5)
           ON CONFLICT ("userId",lower(name)) DO UPDATE SET "deviceId"=EXCLUDED."deviceId","updatedAt"=now()
