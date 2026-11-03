@@ -1,5 +1,7 @@
 'use server'
 
+import { withDatabaseOperation } from '@/lib/db/egress-sample'
+
 import { cookies, headers } from 'next/headers'
 import { after } from 'next/server'
 import { z } from 'zod'
@@ -78,6 +80,10 @@ const versionSchema = z.string().regex(/^[0-9a-f]{32}$/).optional()
  * when nothing in the conversation changed, the whole chat otherwise.
  */
 export async function pollCoordinatorChat(botId: string | null = null, known?: string): Promise<CoordinatorChat | UnchangedChat> {
+  return withDatabaseOperation('/actions/coordinator/poll', () => readCoordinatorChat(botId, known))
+}
+
+async function readCoordinatorChat(botId: string | null, known?: string): Promise<CoordinatorChat | UnchangedChat> {
   const user = await getUser()
   const bot = await ownBot(user, botId)
   const enabled = coordinatorEnabled()

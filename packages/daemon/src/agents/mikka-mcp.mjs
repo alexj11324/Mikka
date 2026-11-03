@@ -13,15 +13,45 @@
 // captures dir; the daemon checks it again and uploads it to the run.
 //
 // Protocol: MCP over stdio, newline-delimited JSON-RPC 2.0.
-import { randomUUID } from "node:crypto"
+import { createHash, randomUUID } from "node:crypto"
 import { spawnSync } from 'node:child_process'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { closeSync, fstatSync, openSync, readSync, readFileSync, readdirSync, realpathSync, renameSync, writeFileSync, constants } from "node:fs"
-import { join, sep } from "node:path"
+import { isAbsolute, join, resolve, sep } from "node:path"
 const verifyIndex = process.argv.indexOf('--factory-verify')
 const factoryVerify = verifyIndex > 0 ? JSON.parse(process.argv[verifyIndex + 1]) : null
 const VERIFY_TOOL = { name: 'verify_command', description: 'Run this Factory check’s frozen command, or the command inferred from repository scripts when the host explicitly enabled inference. Use this tool for real command observations when native shell is unavailable. It does not submit or accept the task.', inputSchema: { type: 'object', properties: { command: { type: 'string' }, basis: { type: 'string' } }, required: ['command'] } }
+const artifactIndex = process.argv.indexOf('--factory-artifacts')
+const artifactRoot = artifactIndex > 0 ? realpathSync(process.argv[artifactIndex + 1]) : null
+const ARTIFACT_TOOL = { name: 'inspect_artifact', description: 'Independently read a delivery file in this fixed worktree: byte count, SHA256, Git HEAD, committed file SHA256 and whether its bytes match Git. No shell commands, changes, submission or acceptance.', inputSchema: { type: 'object', properties: { path: { type: 'string', description: 'File path relative to this check’s worktree.' } }, required: ['path'], additionalProperties: false } }
+
+function inspectArtifact(args) {
+  const path = args.path
+  if (typeof path !== 'string' || !path || path.length > 2000 || isAbsolute(path) || path.includes('\0') ||
+    path.split(/[\\/]/).some(part => part === '..' || part === '.git')) throw new Error('artifact_path')
+  const resolved = resolve(artifactRoot, path)
+  if (!resolved.startsWith(artifactRoot + sep) || realpathSync(resolved) !== resolved) throw new Error('artifact_path')
+  const fd = openSync(resolved, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK)
+  let bytes
+  const limit = 16 * 1024 * 1024
+  try {
+    const before = fstatSync(fd)
+    if (!before.isFile() || before.size > limit) throw new Error('artifact_file')
+    bytes = readFileSync(fd)
+    const after = fstatSync(fd)
+    if (bytes.length > limit || before.size !== after.size || before.mtimeMs !== after.mtimeMs) throw new Error('artifact_changed')
+  } finally { closeSync(fd) }
+  const env = { PATH: process.env.PATH, LANG: 'C.UTF-8', GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null' }
+  const git = args => spawnSync('git', ['-C', artifactRoot, ...args], { env, timeout: 5000, maxBuffer: limit + 1024, stdio: ['ignore', 'pipe', 'pipe'] })
+  const head = git(['rev-parse', '--verify', 'HEAD'])
+  if (head.status !== 0 || !/^[a-f0-9]{40}$/.test(head.stdout.toString().trim())) throw new Error('artifact_git')
+  const committed = git(['show', `HEAD:${path}`])
+  const hash = value => createHash('sha256').update(value).digest('hex')
+  return { content: [{ type: 'text', text: JSON.stringify({ path, bytes: bytes.length, sha256: hash(bytes),
+    head: head.stdout.toString().trim(), committedSha256: committed.status === 0 ? hash(committed.stdout) : null,
+    contentMatchesGit: committed.status === 0 && bytes.equals(committed.stdout) }) }] }
+}
 
 function verifyCommand(args) {
   const command = typeof args.command === 'string' ? args.command.trim() : ''
@@ -393,8 +423,12 @@ function handle(message) {
     case "ping":
       return reply(id, {})
     case "tools/list":
-      return reply(id, { tools: [...TOOLS, ...(capturesDir ? [CAPTURE_TOOL] : []), ...(factoryVerify ? [VERIFY_TOOL] : [])] })
+      return reply(id, { tools: [...TOOLS, ...(capturesDir ? [CAPTURE_TOOL] : []), ...(factoryVerify ? [VERIFY_TOOL] : []), ...(artifactRoot ? [ARTIFACT_TOOL] : [])] })
     case "tools/call": {
+      if (artifactRoot && params?.name === ARTIFACT_TOOL.name) {
+        try { return reply(id, inspectArtifact(params.arguments ?? {})) }
+        catch { return reply(id, { isError: true, content: [{ type: 'text', text: 'Artifact inspection refused or unavailable.' }] }) }
+      }
       if (factoryVerify && params?.name === VERIFY_TOOL.name) {
         try { return reply(id, verifyCommand(params.arguments ?? {})) }
         catch { return reply(id, { isError: true, content: [{ type: 'text', text: 'Verification command refused.' }] }) }
