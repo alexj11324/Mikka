@@ -14,6 +14,7 @@ import { userMessageEvent } from '@/lib/coordinator-events'
 import type { UserImageInput } from '@/lib/coordinator/user-attachments'
 import { personalSubmissionInput, personalSubmissionRecorded, recordPersonalSubmission, SubmissionConflictError } from '@/lib/coordinator-submission'
 import { botChats, chatVersion, chatView, citationSources, storedReasoning, retryFailedTurn, sendRetryOf, type BotChatSummary, type ChatView } from '@/lib/coordinator/store'
+import * as chatStore from '@/lib/coordinator/store'
 import type { UnchangedChat } from '@/lib/coordinator/chat-poll'
 import type { CitationSource } from '@/lib/coordinator/citations'
 import { reasoningText } from '@/lib/coordinator/stream-response'
@@ -41,7 +42,7 @@ async function getUserId(): Promise<string> {
 }
 
 /** `botId` is the chat's bot row, the Coordinator's included. */
-export type CoordinatorChat = ChatView & { botId: string; enabled: boolean; version?: string }
+export type CoordinatorChat = ChatView & { botId: string; enabled: boolean; version?: string; after?: number; baseCursor?: number; metadataRefresh?: boolean }
 
 const botIdSchema = z.uuid().nullable()
 
@@ -74,25 +75,46 @@ export async function getCoordinatorChat(botId: string | null = null): Promise<C
 }
 
 const versionSchema = z.string().regex(/^[0-9a-f]{32}$/).optional()
+const continuationSchema = z.object({ after: z.number().int().min(0), cursor: z.number().int().min(0), prefix: z.string().regex(/^[0-9a-f]{32}$/), sourceIds: z.array(z.uuid()).max(400).optional(), artifactIds: z.array(z.uuid()).max(400).optional() }).optional()
 
 /**
  * The chat for a poll that already shows version `known`: only its live state
  * when nothing in the conversation changed, the whole chat otherwise.
  */
-export async function pollCoordinatorChat(botId: string | null = null, known?: string): Promise<CoordinatorChat | UnchangedChat> {
-  return withDatabaseOperation('/actions/coordinator/poll', () => readCoordinatorChat(botId, known))
+export async function pollCoordinatorChat(botId: string | null = null, known?: string, continuation?: z.infer<typeof continuationSchema>): Promise<CoordinatorChat | UnchangedChat> {
+  return withDatabaseOperation('/actions/coordinator/poll', () => readCoordinatorChat(botId, known, continuation))
 }
 
-async function readCoordinatorChat(botId: string | null, known?: string): Promise<CoordinatorChat | UnchangedChat> {
+async function readCoordinatorChat(botId: string | null, known?: string, continuation?: z.infer<typeof continuationSchema>): Promise<CoordinatorChat | UnchangedChat> {
   const user = await getUser()
   const bot = await ownBot(user, botId)
   const enabled = coordinatorEnabled()
   const parsed = versionSchema.safeParse(known)
   const current = await chatVersion(user.id, 200, bot.id)
   if (parsed.success && parsed.data === current.version) return { unchanged: true, ...current, botId: bot.id, enabled, working: enabled && current.working }
-  const chat = await chatView(user.id, 200, bot.id)
+  const proof = continuationSchema.safeParse(continuation)
+  const chat: ChatView & { after?: number; baseCursor?: number } = await chatStore.chatUpdate(user.id, bot.id, proof.success ? proof.data : undefined)
+  // Refresh card names and authorization independently from historical message bodies.
+  if (!known && proof.success && proof.data) {
+    const { artifactSummaries } = await import('@/lib/artifacts/store')
+    const ids = proof.data.sourceIds ?? []
+    const [sources, artifacts] = await Promise.all([
+      citationSources(user.id, ids.map(id => `[[issue:${id}]] [[run:${id}]]`)),
+      artifactSummaries(user.id, proof.data.artifactIds ?? []),
+    ])
+    chat.sources = { ...sources, ...chat.sources }
+    chat.artifacts = { ...artifacts, ...chat.artifacts }
+  }
   // The version read first: a message stored in between makes the next poll read again, never miss it.
-  return { ...chat, version: current.version, botId: bot.id, enabled, working: enabled && chat.working }
+  return { ...chat, ...(!known ? { metadataRefresh: true } : {}), version: current.version, botId: bot.id, enabled, working: enabled && chat.working }
+}
+
+/** A bounded older page overlaps the first rendered item, preserving multi-step reply grouping. */
+export async function coordinatorHistory(botId: string | null, through: number): Promise<ChatView> {
+  z.number().int().min(0).parse(through)
+  const user = await getUser()
+  const bot = await ownBot(user, botId)
+  return chatView(user.id, 200, bot.id, { through })
 }
 
 const quoteSchema = z.object({

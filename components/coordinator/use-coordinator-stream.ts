@@ -25,23 +25,31 @@ export function useCoordinatorStream({ botId, runId, cursor, persistedStreamIds,
     let active = false
     let controller: AbortController | undefined
     const prefix = `${runId}:`
+    let replies: CoordinatorLiveReply[] = []
+    let sequence = 0
+    let streamKey: string | null = null
     async function read() {
       if (disposed || active) return
       active = true
       controller = new AbortController()
       const signal = controller.signal
-      let replies: CoordinatorLiveReply[] = []
       setState(previous => ({ ...previous, error: false }))
       try {
         const query = new URLSearchParams({ runId: streamRunId })
+        if (sequence) query.set('after', String(sequence))
         if (botId) query.set('botId', botId)
-        const response = await fetch(withBasePath(`/api/coordinator/stream?${query}`), { credentials: 'same-origin', signal })
+        const response = await fetch(withBasePath(`/api/coordinator/stream?${query}`), { credentials: 'same-origin', signal, headers: streamKey ? { 'x-mikka-stream-key': streamKey } : undefined })
         if (response.status === 204) return
         if (!response.ok || !response.body) throw new Error('Coordinator stream unavailable')
-        await readCoordinatorStream(response.body, event => {
+        if (response.headers.get('x-mikka-stream-reset') === '1' || !response.headers.has('x-mikka-stream-key')) { replies = []; sequence = 0 }
+        streamKey = response.headers.get('x-mikka-stream-key')
+        await readCoordinatorStream(response.body, (event, nextSequence) => {
           if (disposed || signal.aborted) return
+          if (nextSequence !== undefined && nextSequence <= sequence) return
+          if (nextSequence !== undefined && nextSequence !== sequence + 1) throw new Error('Coordinator stream sequence gap')
           replies = coordinatorStreamReply(replies, event)
-          // A reconnect replays from zero; replace this run instead of appending it.
+          if (nextSequence !== undefined) sequence = nextSequence
+          // Resume this run's acknowledged prefix; its durable reader still reconstructs masking state server-side.
           setState(previous => ({ botId, error: false, replies: [...previous.replies.filter(reply => !reply.id.startsWith(prefix)), ...replies] }))
           if (event.type === 'committed') void refresh.current().catch(() => undefined)
         }, signal)

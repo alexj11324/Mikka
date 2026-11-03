@@ -1,4 +1,5 @@
 import { and, eq } from 'drizzle-orm'
+import { createHash } from 'node:crypto'
 import { openChatBotId } from '@/lib/coordinator/coordinator-bot'
 import { z } from 'zod'
 import { getRun } from 'workflow/api'
@@ -35,17 +36,28 @@ async function handleGET(request: Request) {
   const runId = chat?.leaseHolder
   if (!coordinatorLeaseActive(chat) || !runId?.startsWith('wrun_') || expected && expected !== runId) return new Response(null, { status: 204 })
   const fingerprints = await credentialChatFingerprints(session.user.id)
+  const streamKey = createHash('sha256').update(JSON.stringify([runId, fingerprints])).digest('hex')
+  const offset = z.coerce.number().int().min(0).max(1_000_000).safeParse(params.get('after') ?? 0)
+  if (!offset.success) return Response.json({ error: 'validationGeneric' }, { status: 400 })
+  // A changed masking policy changes chunk boundaries: replay safely instead of skipping under a stale cursor.
+  const after = request.headers.get('x-mikka-stream-key') === streamKey ? offset.data : 0
   const run = getRun<unknown>(runId)
   const reader = run.getReadable<CoordinatorWorkflowStreamPart>().pipeThrough(coordinatorTextStream(session.user.id, fingerprints)).getReader()
   const encoder = new TextEncoder()
   let cancelled = false
+  let sequence = 0
   const body = new ReadableStream<Uint8Array>({
     async pull(controller) {
       try {
-        const next = await reader.read()
-        if (cancelled) return
-        if (next.done) controller.close()
-        else controller.enqueue(encoder.encode(JSON.stringify(next.value) + '\n'))
+        for (;;) {
+          const next = await reader.read()
+          if (cancelled) return
+          if (next.done) { controller.close(); return }
+          sequence++
+          if (sequence <= after) continue
+          controller.enqueue(encoder.encode(JSON.stringify({ ...next.value, sequence }) + '\n'))
+          return
+        }
       } catch {
         if (!cancelled) {
           controller.enqueue(encoder.encode('{"type":"error"}\n'))
@@ -59,6 +71,8 @@ async function handleGET(request: Request) {
     'Content-Type': 'application/x-ndjson; charset=utf-8',
     'Cache-Control': 'private, no-store',
     'X-Content-Type-Options': 'nosniff',
+    'X-Mikka-Stream-Key': streamKey,
+    'X-Mikka-Stream-Reset': offset.data > 0 && after === 0 ? '1' : '0',
   } })
 }
 

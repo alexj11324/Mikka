@@ -41,7 +41,8 @@ import { getCoordinatorChat, type CoordinatorChat as CoordinatorChatView } from 
 import { chatPreview } from '@/lib/agent-history'
 import { PanelRight } from 'lucide-react'
 import { ISSUE_STATUSES, type IssueStatus, type IssueView } from './issue-properties'
-import { listIssues } from '@/app/actions/issues'
+import { listIssues, pollIssues } from '@/app/actions/issues'
+import { mergeList } from '@/lib/list-poll'
 import { endSession } from '@/lib/auth-client'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -159,7 +160,15 @@ function IssueWorkspaceContent({ user, initialIssues, initialSelected = null, in
     dropQueryKeys('linear')
   }, [])
   const [boardBusy, setBoardBusy] = useState(false)
-  const { data: tasks = [], mutate, error, isLoading: tasksLoading } = useSWR(['issues', user.id], listIssues, { ...whileSettings, fallbackData: initialIssues, revalidateOnMount: initialIssues === undefined, refreshInterval: boardBusy || settingsShown ? 0 : 10000, revalidateOnFocus: !boardBusy, revalidateOnReconnect: !boardBusy })
+  const taskSnapshot = useRef<{ userId: string; version?: string; items: Awaited<ReturnType<typeof listIssues>> }>({ userId: user.id, items: initialIssues ?? [] })
+  const { data: tasks = [], mutate, error, isLoading: tasksLoading } = useSWR(['issues', user.id], async () => {
+    if (taskSnapshot.current.userId !== user.id) taskSnapshot.current = { userId: user.id, items: [] }
+    const next = await pollIssues(taskSnapshot.current.version)
+    const items = mergeList(taskSnapshot.current.items, next)
+    taskSnapshot.current = { userId: user.id, version: next.version, items }
+    return items
+  }, { ...whileSettings, fallbackData: initialIssues, revalidateOnMount: initialIssues === undefined, refreshInterval: boardBusy || settingsShown ? 0 : LIST_POLL_MS, revalidateOnFocus: !boardBusy, revalidateOnReconnect: !boardBusy })
+  useEffect(() => { taskSnapshot.current.items = tasks }, [tasks])
   // Keep failed refreshes out of document flow so the board/list never jumps.
   const listErrorMessage = t('listError')
   useEffect(() => {
