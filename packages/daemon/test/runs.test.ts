@@ -104,6 +104,28 @@ afterEach(async () => {
 })
 
 describe("mock runs", () => {
+  it("completes a read-only investigation without running the repository's build or verify command", async () => {
+    const { server, dataDir } = await setup()
+    const fixturesDir = tempDir()
+    writeFileSync(join(fixturesDir, "investigation.jsonl"), JSON.stringify({ t: 0, submit: {
+      summary: "Found the cause; no files changed.",
+    } }) + "\n")
+    const daemon = await boot(server, dataDir, Number.POSITIVE_INFINITY, undefined, fixturesDir)
+    const policy = { ...runPolicy(undefined), readOnly: true }
+    const runId = server.queueRun(DEVICE, {
+      issueId: "issue-investigation", repoId: "repo-1", baseBranch: "main", harness: "mock",
+      prompt: "Investigate and report only", kind: "implement", fixture: "investigation", policy,
+      verifyCommand: "node -e 'process.exit(42)'",
+    })
+    const run = await runToEnd(daemon, server, runId)
+    expect(run.state).toBe("succeeded")
+    expect(run.error).toBeNull()
+    expect(server.runs.get(runId)?.completion).toMatchObject({
+      stopReason: "submitted", report: { summary: "Found the cause; no files changed.", verify: { status: "not_run" } },
+    })
+    expect(server.runs.get(runId)?.completion?.report.publish).toBeUndefined()
+  })
+
   it("keeps criterion commands and preview branch through daemon reporting without trusting the agent verify", async () => {
     const { server, dataDir } = await setup()
     const fixturesDir = tempDir()

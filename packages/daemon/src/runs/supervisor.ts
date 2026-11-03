@@ -802,6 +802,7 @@ export class RunSupervisor {
     // agent must not be able to make a run read as a planning one (ADR ORV-205).
     const entry = this.deps.journal.get(runId)
     const planning = entry?.assignment.kind === "plan"
+    const readOnlyTask = entry && isReadOnlyTask(entry.assignment)
     // Never copy trusted evidence from an adapter/model report.
     const { sourceCommit: _source, skillMount: _mount, execution: _execution, runtime: _runtime, ...content } = report
     report = {
@@ -833,10 +834,10 @@ export class RunSupervisor {
     let state = runStateForStop(stopReason)
     if (stopReason === "submitted" && report.verify.status !== "passed") {
       const failed = report.verify.status === "failed"
-      if (!planning) state = failed ? "failed" : report.publish?.pushed === true ? "succeeded" : "stopped"
+      if (!planning && !readOnlyTask) state = failed ? "failed" : report.publish?.pushed === true ? "succeeded" : "stopped"
       // A `plan` run writes no code, so a verify that did not run says
       // nothing about it.
-      if (!failed && !planning)
+      if (!failed && !planning && !readOnlyTask)
         error ??= "Submitted, but no verify command ran; the work is unverified"
     }
     if (
@@ -956,7 +957,7 @@ export class RunSupervisor {
     const command = assignment.verifyCommand
     // A `plan` run writes no code: there is nothing for the issue's verify
     // command to check (ADR ORV-205).
-    if (stopReason !== "submitted" || assignment.kind === "plan")
+    if (stopReason !== "submitted" || assignment.kind === "plan" || isReadOnlyTask(assignment))
       return {
         report: { ...report, filesChanged, verify: { status: "not_run" } },
       }
@@ -1732,6 +1733,13 @@ function verifyFailure(
 
 export function baseReport(summary = ""): HandoffReport {
   return emptyRunReport(summary.slice(0, 10_000))
+}
+
+/** Ordinary read-only work delivers a report without a repository build. */
+function isReadOnlyTask(assignment: RunAssignment): boolean {
+  // Investigations hand in a report. Acceptance checks and benchmarks still
+  // run their host-owned verification against the fixed candidate.
+  return runPolicy(assignment.policy).readOnly === true && assignment.kind !== "acceptance" && !assignment.benchmark
 }
 
 /** Existing acceptance runs remain compatible; Factory checks are exact-SHA read-only runs. */

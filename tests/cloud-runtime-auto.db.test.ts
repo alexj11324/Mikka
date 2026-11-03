@@ -17,7 +17,8 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
   delete process.env.MIKKA_CLOUD_COMPUTER_TASKS
   process.env.MIKKA_BYOS_ENABLED = '1'
   // Every cloud thread runs on its own thread machine; its lifecycle workflow is not started here.
-  mock.module('workflow/api', { namedExports: { start: async () => ({ runId: 'synthetic-workflow' }) } })
+  let lifecycleStarts = 0
+  mock.module('workflow/api', { namedExports: { start: async () => { lifecycleStarts++; return { runId: 'synthetic-workflow' } } } })
   const { Pool } = await import('pg')
   const pool = new Pool({ connectionString: dbUrl, max: 3 })
   const threadMachines = await fakeThreadMachines(pool, [{ harness: 'codex', installed: true, subscriptionBroker: true, toolApproval: true }])
@@ -117,6 +118,29 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     assert.equal(await count('SELECT count(*)::int AS n FROM bot_cloud_runtimes WHERE "botId"=$1', [a.botId]), 1, 'no duplicate runtime')
     assert.equal(await count('SELECT count(*)::int AS n FROM byos_bindings WHERE "consumerId"=$1', [runtime[0].agentId]), 1, 'no duplicate binding')
     assert.equal(await count('SELECT count(*)::int AS n FROM cloud_machines WHERE "ownerId"=$1', [a.id]), 1)
+  })
+
+  for (const [index, mode] of ['writable', 'readOnly', 'mcp'].entries()) await t.test(`the ${mode} cloud thread composer starts its next task machine and lifecycle on the same repository and model`, async () => {
+    const a = await person(`cloud-composer-${mode}`)
+    const issueId = await anotherTask(a.id, 34 + index)
+    const first = await steps.dispatchRun(a.id, { issueId, repo: 'octo/repo', ...(mode === 'readOnly' ? { readOnly: true } : {}), requestKey: `dispatch:${randomUUID()}` }, undefined, a.botId) as unknown as { runId: string }
+    if (mode === 'mcp') await pool.query('UPDATE agent_runs SET "botId"=NULL,source=\'mcp\' WHERE id=$1', [first.runId])
+    const original = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [first.runId])).rows[0]
+    const runtime = (await pool.query('SELECT * FROM bot_cloud_runtimes WHERE "botId"=$1', [a.botId])).rows[0]
+    assert.notEqual(original.deviceRepoId, runtime.repoId, 'a task runs on its own machine, not the Bot computer')
+    await pool.query(`UPDATE agent_runs SET status='succeeded',"finishedAt"=now() WHERE id=$1`, [first.runId])
+    const before = lifecycleStarts
+    const { sendThreadMessage } = await import('../lib/thread-continue')
+    const next = await sendThreadMessage(a.id, first.runId, 'Continue with the missing edge case.')
+    assert.equal(next.continued, true)
+    const run = (await pool.query(`SELECT r.*,repo."remoteUrl",m.state AS machine FROM agent_runs r
+      JOIN device_repos repo ON repo.id=r."deviceRepoId" JOIN thread_machines m ON m."runId"=r.id WHERE r.id=$1`, [next.runId])).rows[0]
+    assert.deepEqual([run.status, run.continuesRunId, run.botId, run.remoteUrl, run.machine], ['queued', first.runId, mode === 'mcp' ? null : a.botId, 'https://github.com/octo/repo.git', 'running'])
+    assert.deepEqual(run.agentDefinition.subscription, original.agentDefinition.subscription)
+    assert.equal(run.agentDefinition.model, original.agentDefinition.model)
+    assert.equal(run.agentDefinition.readOnly, original.agentDefinition.readOnly)
+    assert.match(run.prompt, /Continue with the missing edge case/)
+    assert.equal(lifecycleStarts, before + 1)
   })
 
   await t.test('an existing sleeping or disconnected worker is woken before dispatch', async () => {

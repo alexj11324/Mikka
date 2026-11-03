@@ -102,6 +102,19 @@ test('run result publication commits one owner-scoped result through retries and
       assert.deepEqual(ended,{status:'failed',pauseReason:null,resumeStatus:null})
     })
 
+    await t.test('a read-only investigation completes and returns one report without a verification or publication receipt', async () => {
+      const f = await fixture()
+      await pool.query('UPDATE agent_runs SET "agentDefinition"=$2 WHERE id=$1', [f.runId, JSON.stringify({ readOnly: true })])
+      const report = { summary: 'Found the root cause; no files changed.', filesChanged: [], verify: { status: 'not_run' as const }, openQuestions: [], nextStep: null }
+      const result = await persistRunCompletion(f.userId, f.runId, { stopReason: 'submitted', report })
+      assert.equal(result?.publicationPending, false)
+      const saved = (await pool.query('SELECT status,report FROM agent_runs WHERE id=$1', [f.runId])).rows[0]
+      assert.deepEqual(saved, { status: 'succeeded', report })
+      assert.equal((await event(f)).payload.summary, report.summary)
+      assert.equal((await counts(f)).events, 1)
+      assert.equal(await receipt(f), undefined)
+    })
+
     await t.test('concurrent completions and workers create one PR, one history row, and one chat event', async () => {
       const f = await fixture({ approved: true })
       const pinned = await prepareRunPublication(assignment(f), f.remoteUrl)

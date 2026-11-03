@@ -119,7 +119,7 @@ const TOOLS = [
   {
     name: "submit",
     description:
-      "Hand in your finished work. Call this once, as your last action, when the task is done and you checked it. Mikka then runs the verify command, commits your changes and pushes the branch. Do not commit or push yourself. On a planning run, hand in the spec and the split you propose instead of code.",
+      "Hand in your finished work. Follow the delivery rules supplied for this run, including any required commit, push, pull request and successful CI checks, before calling this once as your last action. On a planning run, hand in the spec and the split you propose instead of code.",
     inputSchema: {
       type: "object",
       properties: {
@@ -394,7 +394,7 @@ function handle(message) {
           ? "Recorded. End your turn now."
           : planned
             ? "Handed in. End your turn now; a person approves the spec, then the split."
-            : "Handed in. End your turn now; Mikka verifies, commits and pushes."
+            : "Handed in. End your turn now."
       return reply(id, { content: [{ type: "text", text }] })
     }
     default:

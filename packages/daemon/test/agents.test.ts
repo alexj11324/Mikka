@@ -74,7 +74,7 @@ describe("mikka MCP server", () => {
         result: { serverInfo: { name: "mikka" } },
       })
       const list = (await client.request("tools/list")) as {
-        result: { tools: { name: string }[] }
+        result: { tools: { name: string; description: string }[] }
       }
       expect(list.result.tools.map((t) => t.name)).toEqual([
         "submit",
@@ -82,11 +82,15 @@ describe("mikka MCP server", () => {
         "ask_human",
         "report_blocked",
       ])
+      const submit = list.result.tools.find((tool) => tool.name === "submit")!
+      expect(submit.description).toMatch(/delivery rules supplied for this run/)
+      expect(submit.description).not.toMatch(/Do not commit or push yourself|Mikka then.*commits/)
       expect(ctx.readHandoff()).toBeNull()
-      await client.request("tools/call", {
+      const submitted = await client.request("tools/call", {
         name: "submit",
         arguments: { summary: "Added greet()", nextStep: "Review it" },
       })
+      expect(JSON.stringify(submitted)).not.toMatch(/Mikka verifies, commits and pushes/)
       expect(ctx.readHandoff()).toEqual({
         type: "exit",
         outcome: "succeeded",
