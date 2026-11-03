@@ -4,6 +4,10 @@ These are internal objectives, not a contractual SLA. Repository maintainers
 own the alerts and response. Use the existing runtime JSON logs and durable
 PostgreSQL queues rather than adding a second monitoring platform.
 
+[Database transfer monitoring](database-egress.md) connects Neon usage, runtime
+request counts and sampled query bytes to automatic budget and collector-health
+email alerts in the existing PostHog project.
+
 [Runtime request and CPU budgets](runtime-budgets.md) defines executable idle
 budgets, native Vercel monitors, outcome coverage and deployment comparisons.
 

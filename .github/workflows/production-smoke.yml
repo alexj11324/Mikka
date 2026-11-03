@@ -87,6 +87,24 @@ jobs:
       - name: Collect production request outcomes
         if: always()
         run: node scripts/ops/runtime-outcomes.mjs
+      - name: Read monitoring ingestion configuration through the existing identity
+        if: always()
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /vercel
+          recursive: false
+          include-imports: false
+      - name: Verify egress collector contracts
+        if: always()
+        run: node --test scripts/ops/egress-monitor.test.mjs
+      - name: Collect database egress and publish aggregate health
+        if: always()
+        run: node scripts/ops/egress-monitor.mjs
       - if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
@@ -94,4 +112,5 @@ jobs:
           path: |
             deployment-comparison-report
             runtime-outcomes-report
+            egress-monitor-report
           retention-days: 7

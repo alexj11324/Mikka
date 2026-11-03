@@ -14,7 +14,7 @@ export const SAMPLE_RATE = 0.01
 
 const sampling = () => { try { return deploymentSwitch('dbEgressSample') } catch { return false } }
 
-export type DbSample = { level: 'info'; msg: 'db_sample'; route: string | null; command: string; tables: string[]; statement: string; rows: number; bytes: number }
+export type DbSample = { level: 'info'; msg: 'db_sample'; timestamp: string; sampleRate: number; route: string | null; command: string; tables: string[]; statement: string; rows: number; bytes: number }
 
 /** Table names the statement reads or writes; identifiers only. */
 function tablesOf(text: string): string[] {
@@ -28,7 +28,7 @@ export function describeSample(text: string, result: QueryResult | QueryResult[]
   const rows = results.reduce((sum, one) => sum + (one.rows?.length ?? 0), 0)
   const bytes = results.reduce((sum, one) => sum + (one.rows?.length ? Buffer.byteLength(JSON.stringify(one.rows)) : 0), 0)
   return {
-    level: 'info', msg: 'db_sample', route,
+    level: 'info', msg: 'db_sample', timestamp: new Date().toISOString(), sampleRate: SAMPLE_RATE, route,
     command: results.at(-1)?.command ?? text.trim().split(/\s+/, 1)[0].toUpperCase(),
     tables: tablesOf(text),
     statement: createHash('sha256').update(text).digest('hex').slice(0, 12),
@@ -40,6 +40,11 @@ const instrumented = new WeakSet<PoolClient>()
 
 /** The route template lib/request-log.ts runs a request under (shared through a global key). */
 const routeScope: AsyncLocalStorage<string> = ((globalThis as Record<symbol, unknown>)[Symbol.for('mikka.requestRoute')] ??= new AsyncLocalStorage<string>()) as AsyncLocalStorage<string>
+
+/** Fixed Server Action names only; never include arguments or user IDs. */
+export function withDatabaseOperation<T>(operation: string, read: () => T): T {
+  return routeScope.run(operation, read)
+}
 
 /** Wraps a pooled connection's queries with the sample. `Pool.query` calls it with a callback; checked-out clients use promises. */
 export function sampleClient(client: PoolClient, on: () => boolean = sampling, random = Math.random, sink: (line: string) => void = line => console.log(line)) {
