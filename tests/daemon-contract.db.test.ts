@@ -90,7 +90,7 @@ test(`daemon ${MIN_DAEMON_VERSION} as released works against today's device rout
   assert.deepEqual((await link.heartbeat(deviceId, { harnesses, runs: [], worktreeDiskBytes: 0 })).leases, {})
   assert.ok((await link.listRepos(deviceId)).some(repo => repo.repoId === repoId))
 
-  const { runId } = await queueRun(owner, { issueId, agentId, repo: remote }, botId)
+  const { runId } = await queueRun(owner, { issueId, agentId, repo: remote, model: 'fixture-model' }, botId)
   assert.deepEqual(await link.pendingRuns(deviceId), [runId])
   const assignment = await link.claimRun(deviceId, runId)
   assert.equal(assignment.runId, runId)

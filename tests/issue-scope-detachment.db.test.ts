@@ -356,7 +356,7 @@ test('workspace to personal local safety on real PostgreSQL and native HTTP clai
     assert.ok((await renewRunLeases(ownerDevice,[ownerRun])).leases[ownerRun])
     const row = (await pool.query('select status,"leaseExpiresAt","stopRequestedAt" from agent_runs where id=$1',[memberRun])).rows[0]
     assert.equal(row.status,'cancelled'); assert.equal(row.leaseExpiresAt,null); assert.ok(row.stopRequestedAt)
-    await assert.rejects(queueRun(member,{issueId:issue,agentId:agent,repo:'https://github.com/mikka-ci/scope-fixture.git'}),/issueNotFound/)
+    await assert.rejects(queueRun(member,{issueId:issue,agentId:agent,repo:'https://github.com/mikka-ci/scope-fixture.git',model:'fixture-model'}),/issueNotFound/)
     await assert.rejects(issueRunToken({id:memberRun,userId:member}))
     await assert.rejects(pool.query('insert into run_chunks (id,"runId",seq,chunk) values ($1,$2,1,$3)',[randomUUID(),memberRun,JSON.stringify({type:'text-delta',delta:'late'})]),(error:unknown)=>(error as {code:string}).code==='23514')
     await assert.rejects(pool.query('update agent_runs set status=\'running\' where id=$1',[memberRun]),(error: unknown)=>(error as {code:string}).code==='23514')

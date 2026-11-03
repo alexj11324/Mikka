@@ -388,7 +388,7 @@ test('run result publication commits one owner-scoped result through retries and
       // one-live-run gate; keep the original row without leaving it active.
       await pool.query('update agent_runs set status=\'succeeded\',"finishedAt"=clock_timestamp(),"leaseExpiresAt"=NULL where id=$1', [f.runId])
       await pool.query('update devices set "protocolVersion"=3 where id=$1', [f.deviceId])
-      const input = { issueId: f.issueId, agentId: f.agentId, repo: f.remoteUrl }
+      const input = { issueId: f.issueId, agentId: f.agentId, repo: f.remoteUrl, model: 'fixture-model' }
       const eventId = randomUUID()
       const {seedWorkspace}=await import('./support/workspace-admin-db')
       const workspace=await seedWorkspace(pool,f.userId,[{userId:f.userId,role:'admin'}])

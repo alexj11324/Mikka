@@ -10,6 +10,7 @@ export const ACTION_ERROR_CODES = [
   'executionCommandNotFound',
   'executionAccountUnavailable',
   'threadModelUnavailable',
+  'runModelMissing',
   'authRequired',
   'SESSION_NOT_FRESH',
   'validationGeneric',
