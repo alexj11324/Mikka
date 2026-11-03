@@ -15,10 +15,19 @@ test('independent delivery prompt carries host execution observations and usable
       producerExecution: { runId: 'producer', sessionId: 'native-session', status: 'succeeded', model: 'deepseek-flash', harness: 'claude_code', observedModel: null },
       producerDefinition: { apiKey: 'private-key-must-not-appear' }, producerReport: { summary: 'Produced the file.' },
     }] }
+    if (sql.includes('FROM run_chunks i JOIN run_chunks o')) {
+      assert.deepEqual(args, ['producer', 'native-session', 'owner', 'issue', 'candidate', 'task', sha])
+      return { rows: [{ inputChunkId: 'input-id', outputChunkId: 'output-id', seq: 1, toolName: 'bash', inputJson: JSON.stringify({ command: 'git diff --check && git status --short' }), outputType: 'tool-output-available', outputJson: JSON.stringify({ exitCode: 0, output: ' M DELIVERY.txt' }), inputTruncated: false, outputTruncated: false }] }
+    }
     if (sql.includes("UPDATE agent_runs SET kind='acceptance'")) prompt = args[2] as string
     return { rows: [], rowCount: 1 }
   } } as unknown as PoolClient
   await configureFactoryCheck(tx, { stage: 'verify', status: 'pending', candidateId: 'candidate', id: 'task', userId: 'owner', issueId: 'issue', attemptId: 'attempt' } as FactoryTask, 'check-run')
+  assert.match(prompt, /Persisted producer command observations/)
+  assert.match(prompt, /git diff --check/)
+  assert.match(prompt, /input-id/)
+  assert.match(prompt, /not the producer report/)
+  assert.match(prompt, /may precede the host-retained deliverable commit/)
   assert.match(prompt, /mikka\.inspect_artifact/)
   assert.match(prompt, /independent observations from the granted artifact or computer tools/)
   assert.doesNotMatch(prompt, /using real commands and observations/)
