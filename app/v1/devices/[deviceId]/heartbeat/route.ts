@@ -1,10 +1,9 @@
 import { withDeviceRoute } from '@/lib/device-route'
 import { after, NextResponse } from 'next/server'
-import { eq } from 'drizzle-orm'
-import { deviceHeartbeatSchema } from '@mikka/protocol/device'
+import { sql } from 'drizzle-orm'
+import { deviceHeartbeatSchema, isDeviceOnline } from '@mikka/protocol/device'
 import { db, pool } from '@/lib/db'
 import { ensureDeviceAgents } from '@/lib/device-agents'
-import { devices } from '@/lib/db/schema'
 import { authenticateDevice, linkDeviceToken } from '@/lib/device-link'
 import { renewRunLeases } from '@/lib/run-leases'
 import { SKILL_ARTIFACT_HEADER, TEAM_SKILL_HEADER } from '@mikka/protocol/skill'
@@ -41,13 +40,29 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
   const parsed = deviceHeartbeatSchema.safeParse(await request.json().catch(() => null))
   if (!parsed.success) return NextResponse.json({ error: 'Invalid heartbeat.' }, { status: 400 })
   const factoryOn = factoryLifecycleEnabled()
-  const [prior] = factoryOn ? await db.select({ enabled: devices.enabled, lastSeenAt: devices.lastSeenAt, harnesses: devices.harnesses }).from(devices).where(eq(devices.id, deviceId)).limit(1) : []
-  await db.update(devices).set({ ...(parsed.data.deviceType ? { deviceType: parsed.data.deviceType } : {}), ...(parsed.data.updateFailure !== undefined ? { updateFailure: parsed.data.updateFailure } : {}), harnesses: parsed.data.harnesses, computerUse: parsed.data.computerUse ?? { installed: false, version: null }, lastSeenAt: new Date(), updatedAt: new Date() }).where(eq(devices.id, deviceId))
-  await ensureDeviceAgents(pool, caller.userId, deviceId, parsed.data.harnesses)
-  const selected=await skillAssignments.renewHeartbeat(caller.userId,deviceId,parsed.data.runs.map(run=>run.runId),request.headers.get(SKILL_ARTIFACT_HEADER)==='1',request.headers.get(TEAM_SKILL_HEADER)==='1')
-  const result=await renewRunLeases(deviceId,selected.legacy)
-  result.leases={...result.leases,...selected.leases}
-  result.revoked=[...new Set([...(result.revoked??[]),...selected.revoked])]
+  const { harnesses, deviceType, updateFailure } = parsed.data
+  const now = new Date()
+  // One statement records the beat and returns what the device looked like before it.
+  const { rows: [row] } = await db.execute<{ enabled: boolean; lastSeenAt: Date | string | null; harnessesChanged: boolean }>(sql`
+    WITH prior AS (SELECT id, enabled, "lastSeenAt", harnesses FROM devices WHERE id=${deviceId} FOR UPDATE)
+    UPDATE devices d SET "deviceType"=COALESCE(${deviceType ?? null}::text, d."deviceType"),
+      "updateFailure"=CASE WHEN ${updateFailure !== undefined}::boolean THEN ${updateFailure == null ? null : JSON.stringify(updateFailure)}::jsonb ELSE d."updateFailure" END,
+      harnesses=${JSON.stringify(harnesses)}::jsonb, "computerUse"=${JSON.stringify(parsed.data.computerUse ?? { installed: false, version: null })}::jsonb,
+      "lastSeenAt"=${now.toISOString()}::timestamptz, "updatedAt"=${now.toISOString()}::timestamptz
+    FROM prior WHERE d.id=prior.id
+    RETURNING prior.enabled, prior."lastSeenAt", prior.harnesses IS DISTINCT FROM d.harnesses AS "harnessesChanged"`)
+  const prior = row && { ...row, lastSeenAt: row.lastSeenAt === null ? null : new Date(row.lastSeenAt) }
+  // The execution identities follow the harnesses: checked when they change or the
+  // device comes back online (registration checks them too), not on every beat.
+  if (prior && (prior.harnessesChanged || !isDeviceOnline(prior.lastSeenAt, now.getTime()))) await ensureDeviceAgents(pool, caller.userId, deviceId, harnesses)
+  const runIds = parsed.data.runs.map(run => run.runId)
+  // An idle device holds no leases: nothing to renew or revoke.
+  const selected = runIds.length
+    ? await skillAssignments.renewHeartbeat(caller.userId, deviceId, runIds, request.headers.get(SKILL_ARTIFACT_HEADER) === '1', request.headers.get(TEAM_SKILL_HEADER) === '1')
+    : { legacy: [], leases: {}, revoked: [] }
+  const result = await renewRunLeases(deviceId, selected.legacy)
+  result.leases = { ...result.leases, ...selected.leases }
+  result.revoked = [...new Set([...(result.revoked ?? []), ...selected.revoked])]
   const cloudCredential = caller.scopeDeviceId === deviceId && caller.scopeWorkspaceId
     ? await renewCloudDeviceToken(pool, { userId: caller.userId, workspaceId: caller.scopeWorkspaceId, deviceId, tokenId: caller.tokenId }).catch(() => null)
     : null
