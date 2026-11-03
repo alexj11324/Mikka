@@ -5,6 +5,7 @@ import type { PoolClient } from 'pg'
 import { remoteKey } from '@mikka/protocol/repository'
 import type { FactoryTask } from '../lib/factory/store'
 import { disposableDatabase } from './helpers/e2e-target.mjs'
+import { ALLOWED_MODEL, seedAllowedModel } from './support/allowed-model'
 
 const connection = process.env.E2E_DATABASE_URL
 const enabled = disposableDatabase()
@@ -20,6 +21,10 @@ type Fixture = {
 }
 
 test('real Factory admission preserves host scope, policy and transaction ownership', { skip: !enabled, timeout: 120_000 }, async t => {
+  // A Factory run is frozen with a model from 优先使用的模型 like any run: the fixture person has a subscription model.
+  const priorByos = process.env.MIKKA_BYOS_ENABLED
+  process.env.MIKKA_BYOS_ENABLED = '1'
+  t.after(() => { if (priorByos === undefined) delete process.env.MIKKA_BYOS_ENABLED; else process.env.MIKKA_BYOS_ENABLED = priorByos })
   const { pool } = await import('../lib/db')
   const { workspacePool } = await import('../lib/workspace-db')
   const { queueRun, queueFactoryRun } = await import('../lib/agent-runs')
@@ -62,6 +67,7 @@ test('real Factory admission preserves host scope, policy and transaction owners
     await pool.query('INSERT INTO issue_prefixes ("userId",prefix) VALUES ($1,\'FADM\')', [userId])
     await pool.query('INSERT INTO devices (id,"ownerId",name,kind,harnesses,"protocolVersion") VALUES ($1,$2,\'Admission CI computer\',\'local\',$3,3)', [identity.deviceId, userId, JSON.stringify([{ harness: 'codex', installed: true }])])
     await pool.query('INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,\'codex\',\'Admission CI worker\')', [identity.agentId, userId, identity.deviceId])
+    await seedAllowedModel(pool, userId, { deviceIds: [identity.deviceId] })
     await pool.query('INSERT INTO device_repos (id,"deviceId","userId","repoPath","remoteUrl","baseBranch") VALUES ($1,$2,$3,$4,$5,null)', [identity.repoId, identity.deviceId, userId, identity.remoteKey, remoteUrl])
     await pool.query('INSERT INTO issues (id,"userId",title,content,status,priority,scope) VALUES ($1,$2,\'Synthetic admission task\',$3,\'todo\',\'normal\',\'personal\')', [identity.issueId, userId, JSON.stringify({ type: 'doc', attrs: { mikka: { number: 1 } }, content: [] })])
     const eventId = await addEvent(identity, { destination: options.destination === 'selected' ? { kind: 'device', deviceId: identity.deviceId } : options.destination, delivered: options.delivered })
@@ -73,7 +79,7 @@ test('real Factory admission preserves host scope, policy and transaction owners
     return f
   }
   const dispatch = (f: Fixture, tx?: PoolClient) => dispatchFactoryRun(f.userId, { binding: factoryBinding(f.task), agentId: f.agentId, deviceRepoId: f.repoId }, tx)
-  const publicInput = (f: Fixture, requestKey: string) => ({ issueId: f.issueId, agentId: f.agentId, repo: f.remoteUrl, requestKey, model: 'fixture-model' })
+  const publicInput = (f: Fixture, requestKey: string) => ({ issueId: f.issueId, agentId: f.agentId, repo: f.remoteUrl, requestKey, model: ALLOWED_MODEL })
   const internalInput = (f: Fixture, requestKey?: string) => ({ issueId: f.issueId, agentId: f.agentId, deviceRepoId: f.repoId, ...(requestKey ? { requestKey } : {}) })
   const rowsFor = async (f: Fixture) => (await pool.query(`SELECT
     (SELECT count(*)::int FROM agent_runs WHERE "userId"=$1 AND "issueId"=$2) AS runs,
