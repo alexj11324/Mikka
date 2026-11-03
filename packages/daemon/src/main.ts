@@ -807,7 +807,10 @@ export class Daemon {
         const delay = failure instanceof DeviceGatewayClosedError && failure.code === 4000
           ? 60_000 : ceiling * (0.8 + Math.random() * 0.2)
         this.gatewayRetryAt = performance.now() + delay
-        this.schedule(this.options.heartbeatMs ?? 15_000)
+        // Idle push mode clears the timer. Resume it once after disconnect,
+        // preserving a pending or in-flight heartbeat during fallback/active
+        // work: repeated gateway failures must not postpone lease renewals.
+        if (this.timer === null) this.schedule(this.options.heartbeatMs ?? 15_000)
       }
     }
     return false

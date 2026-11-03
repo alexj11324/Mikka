@@ -3,7 +3,7 @@ import { Daemon } from '../src/main'
 import { createLogger } from '../src/log'
 import { MemoryServer, type ServerLink } from '../src/server-link'
 import { runDeviceGateway, type DeviceGatewaySocket } from '../src/device-gateway'
-import { SessionRejectedError } from '../src/server-link-http'
+import { HttpServerLink, SessionRejectedError } from '../src/server-link-http'
 import * as service from '../src/service'
 import { cleanupTempDirs, tempDir } from './helpers'
 
@@ -40,13 +40,16 @@ class Socket implements DeviceGatewaySocket {
 
 const daemons: Daemon[] = []
 
-function polling(fetchCommands = vi.fn<ServerLink['fetchCommands']>().mockResolvedValue([])) {
-  const deviceGateway = vi.fn(async () => ({ url: 'wss://fixture.invalid', protocol: 'fixture-ticket' }))
+function polling(fetchCommands = vi.fn<ServerLink['fetchCommands']>().mockResolvedValue([]), options: {
+  deviceGateway?: NonNullable<ServerLink['deviceGateway']>
+  commandsWaitSeconds?: number
+} = {}) {
+  const deviceGateway = vi.fn<NonNullable<ServerLink['deviceGateway']>>(options.deviceGateway ?? (async () => ({ url: 'wss://fixture.invalid', protocol: 'fixture-ticket' })))
   const ackCommands = vi.fn(async () => {})
   const send = vi.fn(async () => {})
   let active = false
   const daemon = new Daemon({
-    dataDir: tempDir('mikka-gateway-'), flavor: 'dev', commandsWaitSeconds: 1,
+    dataDir: tempDir('mikka-gateway-'), flavor: 'dev', commandsWaitSeconds: options.commandsWaitSeconds ?? 1,
     link: { ...new MemoryServer('device-1').link(), fetchCommands, deviceGateway, ackCommands },
     log: createLogger({ level: 'silent' }),
   })
@@ -171,6 +174,68 @@ it('waits a minute after another connection replaces this daemon', async () => {
   expect(deviceGateway).toHaveBeenCalledOnce()
   await vi.advanceTimersByTimeAsync(1)
   expect(deviceGateway).toHaveBeenCalledTimes(2)
+})
+
+it('preserves heartbeat deadlines when an older HTTP server returns gateway 404 during long-poll fallback', async () => {
+  const requests: string[] = []
+  const http = new HttpServerLink('http://fixture.invalid', async input => {
+    const path = new URL(String(input)).pathname
+    requests.push(path)
+    if (path.endsWith('/gateway')) return new Response('{}', { status: 404 })
+    if (path.endsWith('/commands')) {
+      // The SSH installation fixture returns after 500ms; the daemon must
+      // still pace its requested 25s poll while heartbeating every 15s.
+      await new Promise(resolve => setTimeout(resolve, 500))
+      return new Response(JSON.stringify({ commands: [] }))
+    }
+    throw new Error(`Unexpected fixture request: ${path}`)
+  })
+  const { daemon, sync } = polling(vi.fn(http.fetchCommands.bind(http)), {
+    deviceGateway: http.deviceGateway.bind(http), commandsWaitSeconds: 25,
+  })
+  const heartbeatTimes: number[] = []
+  sync.mockImplementation(async () => { heartbeatTimes.push(performance.now()) })
+  Reflect.get(daemon, 'schedule').call(daemon, 0)
+  await vi.advanceTimersByTimeAsync(15_001)
+  const before = sync.mock.calls.length
+  await vi.advanceTimersByTimeAsync(40_000)
+  expect(sync.mock.calls.length - before).toBeGreaterThanOrEqual(2)
+  expect(heartbeatTimes).toEqual([0, 15_000, 30_000, 45_000])
+  expect(requests.filter(path => path.endsWith('/gateway'))).toHaveLength(3)
+  expect(requests.filter(path => path.endsWith('/commands'))).toHaveLength(3)
+  expect(Socket.instances).toHaveLength(0)
+})
+
+it('restores an idle socket heartbeat once after disconnect without later failed handshakes postponing it', async () => {
+  const { sync } = polling()
+  await vi.advanceTimersByTimeAsync(0)
+  expect(sync).toHaveBeenCalledOnce()
+  await vi.advanceTimersByTimeAsync(60_000)
+  expect(sync).toHaveBeenCalledOnce()
+  Socket.connect = socket => socket.emit('error')
+  Socket.instances[0]!.emit('close')
+  await vi.advanceTimersByTimeAsync(14_999)
+  expect(sync).toHaveBeenCalledOnce()
+  await vi.advanceTimersByTimeAsync(1)
+  expect(sync).toHaveBeenCalledTimes(2)
+  await vi.advanceTimersByTimeAsync(30_000)
+  expect(sync).toHaveBeenCalledTimes(4)
+})
+
+it('preserves the pending active-run lease heartbeat when its open socket disconnects', async () => {
+  const { sync, setActive } = polling()
+  await vi.advanceTimersByTimeAsync(0)
+  setActive(true)
+  Socket.instances[0]!.emit('message', { data: 'work' })
+  await vi.advanceTimersByTimeAsync(0)
+  expect(sync).toHaveBeenCalledTimes(2)
+  await vi.advanceTimersByTimeAsync(10_000)
+  Socket.connect = socket => socket.emit('error')
+  Socket.instances[0]!.emit('close')
+  await vi.advanceTimersByTimeAsync(5_000)
+  expect(sync).toHaveBeenCalledTimes(3)
+  await vi.advanceTimersByTimeAsync(30_000)
+  expect(sync).toHaveBeenCalledTimes(5)
 })
 
 it('times out an incomplete handshake and cleans up all listeners and timers', async () => {

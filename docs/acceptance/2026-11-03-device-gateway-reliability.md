@@ -24,6 +24,7 @@
 | 卸载信号早于数据库提交 | 6 × 7 = 42 | 卸载在同一事务禁用设备并写命令；信号改在 COMMIT 后登记。隔离 Postgres 测试用另一连接读取已提交状态。 |
 | Factory/Skill 外层事务提交前就发出工作信号 | 4 × 7 = 28 | 嵌套 after 或直接 waitUntil 可以立即开始，设备可能在事务提交前拉到空队列。内层 admission 不再通知；七处实际事务宿主在 COMMIT 后通知，已有回调继续由外层提交后调用。真实 Postgres 回归检查回滚、完整提交可见性与重放。 |
 | 断线后立即重新申请票据并连接 | 8 × 6 = 48 | 原 `holdGateway()` 结束后可直接进入下一轮。已实现约 4–60 秒带抖动的指数冷却，期间长轮询继续；连接稳定 60 秒后才重置失败计数。 |
+| 网关失败重试推迟兜底心跳与活动任务续租 | 8 × 6 = 48 | 两次真实 SSH 验收均在“40 秒内再收到两次心跳”失败；票据 404、空闲断线恢复、活动连接断开三条受控时钟回归均复现。恢复调度时保留已有定时器，仅从暂停状态重启心跳，避免失败重试反复延后截止时间。 |
 | 空闲唤醒后没有重新安排周期续租 | 10 × 9 = 90 | 原空闲分支 `schedule(null)` 停表，onWork 只做一次 sync。已恢复唤醒后的周期续租，并在任务完成后再次停掉空闲周期请求。 |
 | 已收到卸载命令后再次请求 commands 提前清凭据 | 7 × 7 = 49 | 实际 daemon 命令循环与真实 setImmediate 顺序回归复现；卸载且无活动任务时结束命令循环，先提交 receipt，再由正常卸载路径清凭据。 |
 | 无关闭码的客户端断开导致关闭回调异常 | 7 × 4 = 28 | workerd 真实回调报告 1005，但不能发送该保留码。对 1005/1006 使用无参数 close；真实 Node 关闭从超时恢复为 clean close。 |
@@ -44,13 +45,15 @@ pnpm test:device-gateway
 node --test cloudflare/device-gateway/test/runtime.test.mjs
 ```
 
-已实跑的整合结果：6 项服务端 presence/推送测试、8 项路由/票据测试、6 项真实 workerd 测试全部通过，无跳过；daemon 相关 34 项、发布顺序 10 项也通过。类型检查和相关 Factory 回归已通过；最终整合版本还须绑定其 CI 结果。
+已实跑的整合结果：6 项服务端 presence/推送测试、8 项路由/票据测试、6 项真实 workerd 测试全部通过，无跳过；daemon 相关 37 项、发布顺序 10 项也通过。daemon 的三项新增回归验证了票据 404、空闲断线及活动连接断开都不能推迟已有心跳；修复前失败、修复后通过。同批自动升级与 HTTP 测试 59 项也通过。类型检查和相关 Factory 回归已通过；最终整合版本还须绑定其 CI 结果。
 
 真实运行时用例验证：精确子协议协商、多个候选协议的选择、错误设备票据拒绝、服务端 status 鉴权、自动 pong 确实抵达、自动应答时间推进、真实 work 推送、正常断开后离线。消息数为零不能替代这些证据。
 
 数据库用例 `lib/device-presence.db.test.ts` 已接入既有 `test:device-revocation-db`，覆盖一小时前的数据库心跳仍可通过网关在线派发、拒绝其他所有者、不写伪心跳，以及卸载提交后可见性和凭据回执宽限。首轮提交 `acef2245e0e8bfea970d3ff2884abbc106567aab` 的 [Postgres CI job 126261383708](https://github.com/alexj11324/Mikka/actions/runs/41734841312/job/126261383708) 已实际通过该用例，无跳过。首轮其他两处失败来自原有测试夹具：重试设备未给 lastSeenAt、native 测试表未给 removedAt；夹具已补齐，未放松实际设备判定。
 
 整合提交 `e0b4c52977b79455f3033eec7de72b5dc5b72b14` 的 [完整 CI 41736452294](https://github.com/alexj11324/Mikka/actions/runs/41736452294) 已通过源码、核心与集成单元、完整 daemon 和全部四组真实 PostgreSQL 检查。随后追加的 Factory 提交顺序修复和 #1172 主干整合须以更新后的 PR head CI 为准，不能借用该绿色结果。新增回归在 `tests/factory-admission.db.test.ts`，由既有 `test:factory-routing-db` 执行：HTTP 接收端以独立数据库连接检查 run、publication、Factory binding 和 receipt 已同时提交；外层回滚及严格重放不得产生额外信号。
+
+`f4701748d6d4bb0bf620c9c369559ecc8db2e1db` 的 [完整 CI 41738562188](https://github.com/alexj11324/Mikka/actions/runs/41738562188) 已通过上述全部检查，新增 Factory 提交顺序用例在 [真实 PostgreSQL job 126274232320](https://github.com/alexj11324/Mikka/actions/runs/41738562188/job/126274232320) 中实际通过。真实生产构建也已通过；Factory 的纯 binding 会被 Workflow 参数 schema 引用，通知生命周期模块在提交后的业务函数体加载，避免让数据库依赖进入 Workflow。该版本单独的 SSH 验收暴露了上表中的定时器回归，因此后续修复须通过最新 head 的完整 CI 和 SSH 流程，不能只凭主 CI 绿色交付。
 
 daemon 的受控时钟测试模拟一小时：真实 polling/gateway/drain/schedule 逻辑，WebSocket 和 sync 的外部边界用 mock；启动后 gateway、commands 和 sync 均没有再调用，发送 120 次 ping，重连 0 次。这验证调度触发逻辑，不是完整 Daemon.start 的实际 HTTP 计数，更不是生产一小时数据。
 
@@ -135,7 +138,7 @@ Cloudflare 将消息量、调用量和账单单位分别记录。官方定价说
 
 目前尚无这一整小时的生产证据，不能宣称连接稳定性、零空闲请求或 Neon 实际休眠已验收。
 
-本轮保留生产 `DEVICE_GATEWAY_URL`。删除环境变量需要重新发布才影响现有部署；旧 daemon 收到“未配置”后会在本进程缓存 `gatewayUnavailable`，恢复环境变量后仍需重启设备进程才能重新接入网关。修复按“Vercel 在线判断 → Worker → daemon 升级”发布，避免在没有配套恢复步骤时临时切换。生产修改与一小时观察须在 PR 审阅合并后完成；本轮遵守 issue 的只推分支、开 PR 边界。
+本轮保留生产 `DEVICE_GATEWAY_URL`。删除环境变量需要重新发布才影响现有部署；旧 daemon 收到“未配置”后会在本进程缓存 `gatewayUnavailable`，恢复环境变量后仍需重启设备进程才能重新接入网关。Vercel 在线判断必须先于 Worker 上线；修复版本的 daemon 也必须实际安装运行，才能开始验收。发布工作流检查 Vercel/Worker 的时序，不证明每台设备已经升级。旧 daemon 连接打开时会补拉版本信息，但空闲停止 HTTP 后未必自动发现稍后才发布的新版本，需通过已有升级/重启机制确认到位。生产修改与一小时观察须在 PR 审阅合并后完成；本轮遵守 issue 的只推分支、开 PR 边界。
 
 ## 重复构建：已找到有效的业务变更样本
 
