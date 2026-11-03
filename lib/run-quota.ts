@@ -100,11 +100,12 @@ async function queueCloudContinuation(run: Run, cloud: CloudBinding, key: RunApi
   if (!run.issueId || !run.deviceRepoId) throw new ActionFailureError('runInvalid')
   const [issue] = await db.select({ title: issues.title, content: issues.content }).from(issues).where(eq(issues.id, run.issueId)).limit(1)
   if (!issue) throw new ActionFailureError('issueNotFound')
-  const { queueCloudRun } = await import('@/lib/computer/queue-run')
+  const [{ queueCloudRun }, { threadRunModel }] = await Promise.all([import('@/lib/computer/queue-run'), import('@/lib/computer/run-model')])
   const actor = { userId: run.userId, workspaceId: cloud.workspaceId }
   const { runId } = await queueCloudRun(pool, actor, { botId: cloud.botId, issueId: run.issueId, agentId: run.agentId, deviceRepoId: run.deviceRepoId, title: issue.title, body: tiptapToText(issue.content),
-    note: quotaContinuationNote(), withoutBot: run.botId === null, idempotencyKey: `quota:${run.id}:${key ? 'api_key' : 'original'}`,
-    ...(key ? { apiKey: key } : run.agentDefinition?.model ? { model: run.agentDefinition.model } : {}) })
+    note: quotaContinuationNote(), withoutBot: run.botId === null, idempotencyKey: `quota:${run.id}:${key ? 'api_key' : 'original'}`, threadRunId: run.id,
+    // On the person's API key the key's model; else the paused run's own model and account (a missing one fails in queueCloudRun).
+    ...(key ? { apiKey: key, model: key.model } : { ...threadRunModel(run.agentDefinition), model: run.agentDefinition?.model ?? '' }) })
   await db.update(agentRuns).set({ retryOf: run.id, attempt: run.attempt, updatedAt: new Date() }).where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, run.userId)))
   await (await import('@/lib/run-leases')).startThreadMachine(actor, runId)
   return runId

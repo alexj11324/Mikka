@@ -6,6 +6,7 @@ import { issueForUser } from '@/lib/issue-access'
 import { tiptapToText } from '@/lib/tiptap-text'
 import { loadWorkspaceContext } from '@/lib/workspace-access'
 import { ComputerError } from '@/lib/computer/store'
+import { chooseCloudRunModel, latestThreadRunModel } from '@/lib/computer/run-model'
 import { queueCloudRun } from '@/lib/computer/queue-run'
 
 const inputSchema = z.object({ issueId: z.uuid(), harness: z.enum(['codex', 'claude_code']), note: z.string().trim().max(10_000).optional() }).strict()
@@ -30,7 +31,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ bot
     const { dispatchToTask } = await import('@/lib/thread-dispatch')
     const result = await dispatchToTask(session.user.id, parsed.data.issueId, {
       note: parsed.data.note,
-      start: (previous, note) => queueCloudRun(pool, { userId: session.user.id, workspaceId: context.workspace.id }, { issueId: parsed.data.issueId, note, botId, agentId: runtime.agentId, deviceRepoId: runtime.repoId, title: issue.title, body: tiptapToText(issue.content), ...(previous?.readOnly ? { readOnly: true } : {}), ...(previous ? { idempotencyKey: `thread:${previous.id}:${crypto.randomUUID()}` } : {}) }),
+      // A new thread takes 优先使用的模型's first cloud entry for this harness; the thread's next run keeps its own model.
+      start: async (previous, note) => {
+        const runModel = previous ? await latestThreadRunModel(pool, session.user.id, parsed.data.issueId, previous.agentId) : await chooseCloudRunModel(pool, { ownerId: session.user.id, workspaceId: context.workspace.id, botId }, runtime.agentId, parsed.data.harness)
+        if (!runModel) throw new ComputerError(409, 'threadModelUnavailable')
+        if ('error' in runModel) throw new ComputerError(409, 'Bot subscription unavailable')
+        return queueCloudRun(pool, { userId: session.user.id, workspaceId: context.workspace.id }, { issueId: parsed.data.issueId, note, botId, agentId: runtime.agentId, deviceRepoId: runtime.repoId, title: issue.title, body: tiptapToText(issue.content), ...(previous?.readOnly ? { readOnly: true } : {}), ...(previous ? { idempotencyKey: `thread:${previous.id}:${crypto.randomUUID()}` } : {}), ...runModel, ...(previous ? { threadRunId: previous.id } : {}) })
+      },
     })
     return Response.json(result, { status: 202, headers })
   } catch (error) {
