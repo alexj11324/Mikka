@@ -2,7 +2,6 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { AuthenticationError, NotFoundError, RateLimitError, SandboxNotFoundError } from 'e2b'
 import { classifyE2BError, computerTemplate, taskTemplate } from './e2b-runtime'
-import { E2BKeyError } from './e2b'
 
 test('new computers use the unchanged official desktop template', () => {
   assert.equal(computerTemplate({}), 'desktop')

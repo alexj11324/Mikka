@@ -80,6 +80,27 @@ dpl_9ggCeiC27PvySzcHEjZpF7ijPoVZ, Git commit
 workflow remains disabled_manually. No rollback or replacement publication has
 been performed by this takeover check.
 
+## Replacement validator on an immutable PR revision
+
+The actual new `validate-official-instances.py` was run against
+5e43c1e13fe1424b41333025e776d3f8d791f2f0, with worker digest
+21946035e2d5d114498b33eb03bc6511ef408134. All three newly created official
+instances passed installation, model probes and matching before/after manifests
+covering paths, regular-file bytes, symlink targets and permission modes in the
+three roots stated above. Each disposable instance was killed in `finally`:
+
+| Kind | Own sandbox | Preserved entries | Matching manifest SHA256 |
+| --- | --- | --- | --- |
+| desktop | idysymc2t47ilr7korb6l | 3827 | ba49f56b33c32b57a41f73098b15df78bc23ffb1270ee8a6d2dd53dc1b4ebeaa |
+| claude | ifjb4kzpmmfeyejbefchh | 2128 | 159f55dae013bb29deade635fb4fbcf0b66c147f52c12757bc2e641d7c985bcb |
+| codex | iqbemycxfqg5qhe914ppo | 9482 | f7eea65345882d2885b1b21468ebf7d67b15e72daaa34301c0b4c0bb2b8972fb |
+
+This validation used the existing platform E2B key only for disposable release
+validation. Production still selects each sandbox owner's E2B key. No model
+prompt or subscription credential was used. Later publisher-only changes add
+a matching-application preflight before any production configuration write;
+the regression failed before the correction and all ten publisher tests pass.
+
 Still required: runtime release
 configuration and publishing without template mutation, complete required CI,
 and fixed-version real official-subscription prompt → dispatch → E2B Agent →
