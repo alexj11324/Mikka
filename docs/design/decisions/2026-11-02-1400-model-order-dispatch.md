@@ -3,6 +3,7 @@
 - Date: 2026-11-02
 - Source: Alex, relayed by the coordinator session: 「就这么去做吧」 on the model-order scheme, then his additions the same day (the default order; two settings entries, 「设备」 and 「模型与订阅」; 「允许使用的模型」 with add/remove and drag order; run location on that page). The coordinator filled in what Alex did not say (marked "coordinator" below).
 - Rule: —
+- Superseded in part by: [2026-11-02-1610](2026-11-02-1610-model-settings-r1-r5.md) (移除 has no confirmation), [2026-11-02-1620](2026-11-02-1620-preset-keys-speak-both-protocols.md) (a preset key speaks both protocols) and [2026-11-02-1830](2026-11-02-1830-preferred-models-and-agent.md) (允许使用的模型 is now 优先使用的模型)
 - Partly superseded by: [2026-11-02-1500](2026-11-02-1500-subscription-models-need-no-device-report.md) (a subscription model needs no report from the computer's CLI); [2026-11-02-1530](2026-11-02-1530-local-server-first.md) (本地 picks a server first, then the least busy device, not at random); [2026-11-02-2330](2026-11-02-2330-cloud-first-dispatch.md) (运行位置: 云端 the default, then a server, then a computer; 本地 a server, then a computer)
 - Replaces: [decisions.md](../decisions.md) rows on label execution rules and 任务默认; [2026-10-31-2200 run machine fallback](2026-10-31-2200-run-machine-fallback.md) as to how a new run picks its machine; the 「允许调度」 / 「允许自动调度」 pair; 「Bot 与 Agents」 and 「API 与订阅」 as settings entries; [2026-11-02-1200](2026-11-02-1200-api-keys-own-group-and-provider-models.md) as to key models in 「Bot 与 Agents」.
 

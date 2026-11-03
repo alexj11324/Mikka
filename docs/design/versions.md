@@ -4,6 +4,12 @@ The single current version of the Mikka interface, as of 2026-10-29. Read this
 before opening Figma: it says which page is authoritative for each area, which
 older pages were archived, and which frames are still waiting on Alex.
 
+Status (2026-11-03): this is the Figma state of 2026-10-29. Since 2026-11-01
+the running app on `main` is the design
+([decision 2026-11-01-0015](decisions/2026-11-01-0015-main-is-the-design.md)).
+Where a page below and `main` disagree, `main` wins. Pages named here may
+since have moved to 归档.
+
 Figma file `zPe5LKycb2XuT1ivCLRw07`. An area's row names the one page (and the
 frames) that count. Anything not listed here is either in `归档` or is a
 component library with no demo frames.

@@ -44,3 +44,5 @@ What follows:
 The safety floor, and the only limits: a credential never appears in chat,
 logs, error messages or memory; and a run, or the Coordinator, only ever gets
 its own person's credential, never someone else's. Nothing else is added.
+
+Earlier rule, from 2026-11-01-0500 (now removed): a push needed both the repository approval and `git_push`; 1215 then let the GitHub App grant decide. Alex dropped both gates because a gate cannot stop a model that holds the credential.

@@ -7,6 +7,7 @@
   Codex's, with [the handoff](../../handoff-codex-to-cc-2026-11-01.md) as the
   starting point.
 - Rule: — (process, not product)
+- Superseded in part by: [2026-11-03-2359](2026-11-03-2359-issue-owner-merges-and-accepts-in-production.md) (item 3: an issue's owner owns any change end to end, backend included; no area is Codex's)
 - Replaces: [2026-11-01-1520-no-browser-tests-in-ci](2026-11-01-1520-no-browser-tests-in-ci.md), the sentence "Browser specs under `tests/e2e/` stay and run locally"
 
 1. **No browser tests anywhere.** CI does not run them (1520), and neither does
