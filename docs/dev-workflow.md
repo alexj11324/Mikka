@@ -108,10 +108,10 @@ loopback `*_e2e` database) is described in
 
 ## 5. Ownership and merging
 
-Alex set these rules on 2026-11-03. They replace the coordinator-merges rule
-of [`2026-11-01-1545-trunk-based`](design/decisions/2026-11-01-1545-trunk-based.md),
-the push-fixes-to-main rule of [`2026-11-03-0310`](design/decisions/2026-11-03-0310-fixes-push-to-main.md)
-and the old module owners (backend was Codex's).
+Alex set these rules on 2026-11-03
+([`2026-11-03-2359`](design/decisions/2026-11-03-2359-issue-owner-merges-and-accepts-in-production.md)).
+They replace the coordinator-merges rule, the push-fixes-to-main rule and the
+old module owners (backend was Codex's).
 
 1. **One owner.** Work is assigned through a GitHub issue to one agent
    (currently ChatGPT Pro sessions; earlier Codex and Cursor). That agent
