@@ -259,6 +259,37 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
       assert.equal((await pool.query('SELECT "removedAt" FROM devices WHERE id=$1', [device])).rows[0].removedAt, null);
     });
 
+    await t.test('concurrent lifecycle and Factory parking cannot suspend or revoke the next stage', async () => {
+      const issueId = await task(), before = await parked(issueId);
+      await pool.query(`UPDATE thread_machines SET state='running',"runningSince"=now() WHERE "runId"=$1`, [before.runId]);
+      let release!: () => void, entered!: () => void;
+      const held = new Promise<void>(resolve => { release = resolve; });
+      const started = new Promise<void>(resolve => { entered = resolve; });
+      let calls = 0;
+      const pause = async () => { if (++calls === 1) { entered(); await held; } };
+      const first = parkThreadMachine(pool, actor, before.runId, pause, async () => null);
+      await started;
+      const second = parkThreadMachine(pool, actor, before.runId, pause, async () => null);
+      try {
+        const deadline = Date.now() + 5000;
+        while (calls < 2) {
+          const waiting = await pool.query(`SELECT 1 FROM pg_stat_activity WHERE datname=current_database() AND wait_event_type='Lock'`);
+          if (waiting.rowCount) break;
+          assert.ok(Date.now() < deadline, 'second park must finish or wait on the machine owner');
+          await new Promise(resolve => setTimeout(resolve, 10));
+        }
+      } finally { release(); await Promise.all([first, second]); }
+      assert.equal(calls, 1, 'only one caller may pause the physical sandbox');
+      const next = await run(issueId);
+      await assert.rejects(ensureThreadMachine(pool, actor, next, fake().provider));
+      const token = randomUUID();
+      await pool.query(`INSERT INTO device_tokens (id,"userId",name,"tokenHash","boundDeviceId","expiresAt") VALUES ($1,$2,'New stage',$3,$4,now()+interval '1 day')`, [token, owner, randomUUID(), before.device]);
+      await parkThreadMachine(pool, actor, before.runId, pause, async () => null);
+      assert.equal(calls, 1, 'a stale old-run callback cannot pause the adopted sandbox');
+      assert.equal((await pool.query('SELECT "revokedAt" FROM device_tokens WHERE id=$1', [token])).rows[0].revokedAt, null);
+      assert.equal((await machine(next)).sandboxId, before.sandboxId);
+    });
+
     await t.test("before a kill the worker's tail is kept; a failing read never blocks the kill", async () => {
       const issueId = await task();
       const kept = await parked(issueId);
