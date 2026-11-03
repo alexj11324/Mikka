@@ -354,7 +354,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
     if (id) {
       await fetch(withBasePath(`/api/suggestions/${id}`), { method: 'DELETE', credentials: 'same-origin' }).catch(() => undefined)
       void mutateAll(key => typeof key === 'string' && key.includes('/api/suggestions'))
-      void mutateAll('threads')
+      void mutateAll(key => key === 'threads' || Array.isArray(key) && key[0] === 'threads')
     }
   }
 
