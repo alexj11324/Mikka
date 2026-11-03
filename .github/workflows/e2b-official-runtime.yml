@@ -1,0 +1,119 @@
+name: E2B official instance runtime
+# The historical e2b-template.yml remains disabled and unchanged. This workflow
+# only creates disposable official instances and publishes matching app config.
+on:
+  push:
+    branches: [main]
+    paths: &runtime_paths
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'packages/daemon/**'
+      - 'packages/protocol/**'
+      - 'packages/config/**'
+      - 'patches/**'
+      - 'scripts/e2b/**'
+      - 'lib/computer/official-runtime.ts'
+      - '.github/workflows/e2b-official-runtime.yml'
+  pull_request:
+    paths: *runtime_paths
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.event_name == 'pull_request' && format('e2b-official-runtime-{0}', github.ref) || 'e2b-official-runtime-release' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      - run: node --test scripts/e2b/publish-template-env.test.mjs
+      - run: python3 -m py_compile scripts/e2b/validate-official-instances.py
+      - run: bash -n packages/daemon/scripts/official-e2b-instance-bootstrap.sh
+  validate:
+    needs: test
+    if: github.repository == 'alexj11324/Mikka' && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      source-sha: ${{ steps.validate.outputs.source-sha }}
+      template-models: ${{ steps.validate.outputs.template-models }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Install the pinned E2B SDK
+        run: |
+          python3 -m venv "$RUNNER_TEMP/e2b"
+          "$RUNNER_TEMP/e2b/bin/pip" install --disable-pip-version-check 'e2b==2.62.0'
+      - name: Read the existing E2B validation key
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /vercel
+          secret-name: E2B_API_KEY
+          include-imports: false
+      - name: Validate new official instances without template mutation
+        id: validate
+        run: |
+          "$RUNNER_TEMP/e2b/bin/python" scripts/e2b/validate-official-instances.py --source-ref "$GITHUB_SHA" --output "$RUNNER_TEMP/official-runtime.json"
+          node --input-type=module - "$RUNNER_TEMP/official-runtime.json" <<'JS'
+          import { readFileSync, appendFileSync } from 'node:fs'
+          const report = JSON.parse(readFileSync(process.argv[2], 'utf8'))
+          if (report.sourceCommit !== process.env.GITHUB_SHA || !/^[a-f0-9]{40}$/.test(report.workerSha)) throw Error('Runtime source mismatch')
+          const models = {}
+          for (const kind of ['desktop', 'claude', 'codex']) {
+            const row = report.templates[kind]
+            if (row.templateId !== kind || JSON.stringify(row.before) !== JSON.stringify(row.after)) throw Error('Official files changed')
+            models[kind] = row.models
+            console.log(`${kind}: ${row.before.entries} preserved entries, manifest ${row.before.sha256}`)
+          }
+          appendFileSync(process.env.GITHUB_OUTPUT, `source-sha=${report.workerSha}\ntemplate-models=${JSON.stringify(models)}\n`)
+          JS
+  publish:
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      - name: Read the existing Vercel release token
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /platform
+          secret-name: VERCEL_TEAM_TOKEN
+          include-imports: false
+      - name: Publish the verified official runtime pair
+        run: node scripts/e2b/publish-template-env.mjs
+        env:
+          DESKTOP_TEMPLATE_ID: desktop
+          CLAUDE_TEMPLATE_ID: claude
+          CODEX_TEMPLATE_ID: codex
+          SOURCE_SHA: ${{ needs.validate.outputs.source-sha }}
+          MIKKA_CLOUD_WORKER_SOURCE_COMMIT: ${{ github.sha }}
+          TEMPLATE_MODELS: ${{ needs.validate.outputs.template-models }}

@@ -9,7 +9,8 @@ import { ComputerError } from '@/lib/computer/store'
 import { computerPermission } from '@/lib/computer/permission'
 import { connectComputer, installComputerRuntime, startDesktop, syncDesktopLease } from '@/lib/computer/e2b-provider'
 import { CLOUD_WORKER_COMMAND } from '@/lib/computer/worker-command'
-import { e2bApiKey, taskTemplate, withE2BErrors } from '@/lib/secrets/e2b-runtime'
+import { computerTemplate, e2bApiKey, taskTemplate, withE2BErrors } from '@/lib/secrets/e2b-runtime'
+import { bootstrapOfficialInstance, isOfficialE2BTemplate } from '@/lib/computer/official-runtime'
 import type { Actor } from './subagents'
 import { afterRunEnded } from '@/lib/run-completion-effects'
 import { secretMaskerFor } from '@/lib/secrets/runtime'
@@ -76,7 +77,9 @@ export const threadMachineProvider = {
   connect: (sandboxId: string, workspaceId: string) => connectComputer(workspaceId, sandboxId),
   create: async (snapshotId: string, operationId: string, metadata: Record<string, string>, ownerId: string) => {
     const base = await options(ownerId)
-    return withE2BErrors(ownerId, true, () => Sandbox.create(snapshotId, { ...base, idempotencyKey: operationId, timeoutMs: 15 * 60_000, metadata, lifecycle: { onTimeout: 'pause', autoResume: false } }))
+    const sandbox = await withE2BErrors(ownerId, true, () => Sandbox.create(snapshotId, { ...base, idempotencyKey: operationId, timeoutMs: 15 * 60_000, metadata, lifecycle: { onTimeout: 'pause', autoResume: false } }))
+    if (isOfficialE2BTemplate(snapshotId)) await bootstrapOfficialInstance(sandbox, snapshotId)
+    return sandbox
   },
   kill: async (sandboxId: string, ownerId: string) => { await Sandbox.kill(sandboxId, await options(ownerId)) },
 }
@@ -255,7 +258,7 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
       // with Mikka's worker, decision 2026-11-01-2335): the daemon clones its admitted
       // remote and creates the task worktree from the configured base branch.
       // Only non-repository computer work retains the existing desktop snapshot.
-      const template = repositoryTask ? taskTemplate(run.runHarness) : null
+      const template = repositoryTask ? taskTemplate(run.runHarness) : computerTemplate()
       const adopted = run.issueId ? await adoptTaskMachine(client, actor, runId, run, template) : null
       if (adopted) machine = adopted
       else {
@@ -300,7 +303,7 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
       throw new ComputerError(409, 'Thread stopped')
     }
     await client.query('COMMIT')
-    if (!machine.sandboxId && !repositoryTask) {
+    if (!machine.sandboxId && !repositoryTask && !isOfficialE2BTemplate(machine.snapshotId)) {
       // Filesystem snapshots start no old worker process. Remove copied device
       // identity/capabilities before a new worker can make any network call.
       // A snapshot never holds a credential; scrub the same list again in case an older snapshot did.

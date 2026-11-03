@@ -418,6 +418,23 @@ it.each(['pending', 'streaming'] as const)('revokes a hosted CLI on the machine 
   }
 }, 60000)
 
+it('retains a post-start subscription context refusal while stopping the real CLI without private values', async () => {
+  const fixture = await revocationFixture()
+  const log = vi.spyOn(fixture.options.log, 'warn').mockImplementation(() => {})
+  let session: AgentSession | undefined
+  try {
+    session = await fixture.runner.start(fixture.assignment, fixture.options)
+    const finished = (async () => { const events = []; for await (const event of session!.events()) events.push(event); return events })()
+    fixture.contextValue.accountId = 'private-runtime-account-must-not-log'
+    await finished
+    const records = log.mock.calls.map(call => call[0] as unknown as { event?: string })
+    expect(records.filter(record => record.event === 'subscription_runtime_failed')).toHaveLength(1)
+    expect(records.find(record => record.event === 'subscription_runtime_failed')).toMatchObject({ phase: 'context_check', sameAccount: false, reason: 'context_changed' })
+    expect(JSON.stringify(log.mock.calls)).not.toMatch(/private-runtime-account|fixture-account/)
+    expect(fixture.processes()).toEqual([])
+  } finally { fixture.gate.revoke(); await session?.cancel(); log.mockRestore() }
+}, 45000)
+
 it.each(['token', 'verify'] as const)('logs finite startup diagnostics for a refusal during %s without private values', async phase => {
   const fixture = await revocationFixture()
   const log = vi.spyOn(fixture.options.log, 'warn').mockImplementation(() => {})

@@ -55,10 +55,30 @@ export async function currentWorkerSha({ token, fetchImpl = fetch }) {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
-export async function publish({ token, templates, sourceSha, models, fetchImpl = fetch, wait = sleep, log = console.log, maxPolls = 120 }) {
+export async function publish({ token, templates, sourceSha, sourceCommit, models, fetchImpl = fetch, wait = sleep, log = console.log, maxPolls = 120 }) {
   if (!token) fail('vercel_token_unavailable')
+  if (sourceCommit !== undefined) {
+    if (!/^[0-9a-f]{40}$/.test(sourceCommit)) fail('official_source_commit_invalid')
+    for (const kind of Object.keys(TEMPLATE_ENV)) if (templates?.[kind] !== kind) fail(`official_template_invalid ${kind}`)
+  }
   const env = pairEnv({ templates, sourceSha, models })
+  if (sourceCommit) env.push({ key: 'MIKKA_CLOUD_WORKER_SOURCE_COMMIT', value: sourceCommit, type: 'plain', target: ['production'] })
   const call = (path, options = {}) => api(path, { token, fetchImpl, ...options })
+
+  // A production build already running (e.g. the git deploy of this same push) started with the old
+  // pair. Let it finish and identify the exact source before changing configuration.
+  // A missing/failed matching application must not leave production env pointing at another worker.
+  let latest
+  for (let poll = 0; ; poll++) {
+    const { deployments = [] } = await call(`/v6/deployments?projectId=${PROJECT}&target=production&limit=20`)
+    if (!deployments.some((item) => IN_FLIGHT.has(item.state ?? item.readyState))) {
+      latest = deployments.find((item) => (item.state ?? item.readyState) === 'READY' && (!sourceCommit || item.meta?.githubCommitSha === sourceCommit))
+      break
+    }
+    if (poll >= maxPolls) fail('production_build_still_running')
+    await wait(10_000)
+  }
+  if (!latest) fail('no_ready_production_deployment')
 
   await call(`/v10/projects/${PROJECT}/env?upsert=true`, { method: 'POST', body: env })
   const listed = await call(`/v10/projects/${PROJECT}/env`)
@@ -70,26 +90,16 @@ export async function publish({ token, templates, sourceSha, models, fetchImpl =
   }
   log(`production env: ${env.map((item) => `${item.key}=${item.value}`).join(' ')}`)
 
-  // A production build already running (e.g. the git deploy of this same push) started with the old
-  // pair. Let it finish first, so the redeploy below is the last one and carries the new pair.
-  let latest
-  for (let poll = 0; ; poll++) {
-    const { deployments = [] } = await call(`/v6/deployments?projectId=${PROJECT}&target=production&limit=20`)
-    if (!deployments.some((item) => IN_FLIGHT.has(item.state ?? item.readyState))) {
-      latest = deployments.find((item) => (item.state ?? item.readyState) === 'READY')
-      break
-    }
-    if (poll >= maxPolls) fail('production_build_still_running')
-    await wait(10_000)
-  }
-  if (!latest) fail('no_ready_production_deployment')
-
   const created = await call('/v13/deployments?forceNew=1', { method: 'POST',
     body: { name: latest.name, deploymentId: latest.uid ?? latest.id, target: 'production' } })
   log(`redeploy: ${created.id} from ${latest.uid ?? latest.id}`)
   for (let poll = 0; ; poll++) {
-    const state = (await call(`/v13/deployments/${encodeURIComponent(created.id)}`)).readyState
-    if (state === 'READY') return { deploymentId: created.id }
+    const deployment = await call(`/v13/deployments/${encodeURIComponent(created.id)}`)
+    const state = deployment.readyState
+    if (state === 'READY') {
+      if (sourceCommit && deployment.meta?.githubCommitSha !== sourceCommit) fail('redeploy_source_commit_mismatch')
+      return { deploymentId: created.id }
+    }
     if (state === 'ERROR' || state === 'CANCELED') fail(`redeploy_${state.toLowerCase()}`)
     if (poll >= maxPolls) fail('redeploy_timeout')
     await wait(10_000)
@@ -100,6 +110,7 @@ if (import.meta.url === `file://${process.argv[1]}` && process.argv.includes('--
   console.log(await currentWorkerSha({ token: process.env.VERCEL_TEAM_TOKEN }))
 } else if (import.meta.url === `file://${process.argv[1]}`) {
   const templates = { desktop: process.env.DESKTOP_TEMPLATE_ID, claude: process.env.CLAUDE_TEMPLATE_ID, codex: process.env.CODEX_TEMPLATE_ID }
-  const result = await publish({ token: process.env.VERCEL_TEAM_TOKEN, templates, sourceSha: process.env.SOURCE_SHA, models: JSON.parse(process.env.TEMPLATE_MODELS ?? '{}') })
+  const result = await publish({ token: process.env.VERCEL_TEAM_TOKEN, templates, sourceSha: process.env.SOURCE_SHA,
+    sourceCommit: process.env.MIKKA_CLOUD_WORKER_SOURCE_COMMIT, models: JSON.parse(process.env.TEMPLATE_MODELS ?? '{}') })
   console.log(`production deployment ready: ${result.deploymentId}`)
 }
