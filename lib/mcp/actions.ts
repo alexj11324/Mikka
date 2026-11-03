@@ -1,6 +1,7 @@
 import { localExecutionHarnesses } from '@/lib/device-agents'
 import { issueVisibility } from '@/lib/issue-visibility'
 import 'server-only'
+import { createHash } from 'node:crypto'
 import { and, asc, desc, eq, gt, or, sql } from 'drizzle-orm'
 import { ActionFailureError } from '@/lib/action-error'
 import { issueForUser } from '@/lib/issue-access'
@@ -42,6 +43,12 @@ async function attempt<T>(fn: () => Promise<T>): Promise<T | Failure> {
     if (error instanceof ActionFailureError) return { error: error.code }
     throw error
   }
+}
+
+/** A stable UUID for one tool call's team request. */
+function requestIdFor(userId: string, toolCallId: string) {
+  const hex = createHash('sha256').update(JSON.stringify(['create_issue:team', userId, toolCallId])).digest('hex')
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-8${hex.slice(17, 20)}-${hex.slice(20, 32)}`
 }
 
 /** Plain text as a TipTap document: one paragraph per line. */
@@ -98,14 +105,20 @@ function issueResult(issue: { id: string; title: string; status: string; priorit
   }
 }
 
-export async function createIssue(userId: string, input: IssueChanges & { title: string; body?: string }, actor?: ActivityActor, toolCallId?: string, taskEvent?: { eventId: string; botId: string | null }) {
+/** `teamId`, chosen by the host (lib/coordinator/issue-team.ts), creates the task in that team instead of as a personal one. */
+export async function createIssue(userId: string, input: IssueChanges & { title: string; body?: string; teamId?: string }, actor?: ActivityActor, toolCallId?: string, taskEvent?: { eventId: string; botId: string | null }, teamId?: string) {
   return attempt(() => actAs(userId, async () => {
     if (input.assigneeUserId !== undefined && input.assigneeAgentId !== undefined) return { error: 'validationGeneric' }
     // The legacy MCP contract has no human-assignee field. Do not introduce a
     // multi-action write without the durable transaction and access checks.
     if (toolCallId === undefined && input.assigneeUserId !== undefined) return { error: 'issueToolsDisabled' }
+    if (teamId && toolCallId === undefined) return { error: 'validationGeneric' }
     const mutate = async () => {
-      const created = unwrap(await saveIssue({ title: input.title, content: textToDoc(input.body ?? ''), status: input.status ?? 'todo', priority: input.priority ?? 'normal' })).issue
+      const fields = { title: input.title, content: textToDoc(input.body ?? ''), status: input.status ?? 'todo', priority: input.priority ?? 'normal' }
+      // One tool call, one team request: a retried call reuses the request instead of creating a second task.
+      const created = teamId
+        ? unwrap(await (await import('@/lib/team-issue-create')).createTeamIssueForUser(userId, { ...fields, teamId, requestId: requestIdFor(userId, toolCallId!) }, actor)).issue
+        : unwrap(await saveIssue(fields)).issue
       return issueResult(await applyChanges(userId, created.id, { projectId: input.projectId, labels: input.labels, assigneeUserId: input.assigneeUserId, assigneeAgentId: input.assigneeAgentId }))
     }
     if (toolCallId === undefined) return mutate()
@@ -178,8 +191,26 @@ export async function dispatchRun(userId: string, input: { issueId: string; agen
   const { dispatchToTask } = await import('@/lib/thread-dispatch')
   return attempt(async () => dispatchToTask(userId, input.issueId, {
     note: input.note,
-    start: async (previous, note) => ({ status: 'queued' as const, ...(await queueRun(userId, { ...input, note, ...(previous?.readOnly ? { readOnly: true } : {}), ...(previous && input.requestKey ? { requestKey: `thread:${previous.id}:${input.requestKey}`.slice(0, 200) } : {}) }, await chatBotId(userId, null, MCP_WORKSPACE), undefined, undefined, 'mcp')) }),
+    start: async (previous, note) => ({ status: 'queued' as const, ...(await queueRun(userId, { ...input, note, ...await mcpRunModel(userId, input, previous), ...(previous ? { threadRunId: previous.id } : {}), ...(previous?.readOnly ? { readOnly: true } : {}), ...(previous && input.requestKey ? { requestKey: `thread:${previous.id}:${input.requestKey}`.slice(0, 200) } : {}) }, await chatBotId(userId, null, MCP_WORKSPACE), undefined, undefined, 'mcp')) }),
   }))
+}
+
+/** A thread's next run keeps its own model; a new one takes 优先使用的模型 on the named Agent's computer. */
+async function mcpRunModel(userId: string, input: { issueId: string; agentId: string }, previous: { id: string; agentId: string } | null) {
+  const { chooseLocalRunModel, latestThreadRunModel } = await import('@/lib/computer/run-model')
+  const { pool } = await import('@/lib/db')
+  if (previous) {
+    const kept = await latestThreadRunModel(pool, userId, input.issueId, previous.agentId)
+    if (!kept) throw new ActionFailureError('threadModelUnavailable')
+    return kept
+  }
+  const [agent] = await db.select({ id: agents.id, deviceId: agents.deviceId, harness: agents.harness }).from(agents).where(and(eq(agents.id, input.agentId), eq(agents.userId, userId))).limit(1)
+  if (!agent?.deviceId || (agent.harness !== 'codex' && agent.harness !== 'claude_code')) throw new ActionFailureError('agentNoDevice')
+  const { executionWorkspace } = await import('@/lib/execution-settings')
+  const botId = await chatBotId(userId, null, MCP_WORKSPACE)
+  const chosen = await chooseLocalRunModel(pool, { ownerId: userId, workspaceId: await executionWorkspace(userId, botId), botId }, { id: agent.id, deviceId: agent.deviceId, harness: agent.harness })
+  if ('error' in chosen) throw new ActionFailureError('runModelMissing')
+  return chosen
 }
 
 export async function sendToRun(userId: string, input: { runId: string; text: string }) {

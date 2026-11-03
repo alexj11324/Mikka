@@ -17,7 +17,9 @@ const COORDINATOR_BOT = '00000000-0000-4000-8000-0000000c0de1'
 const ISSUE = '00000000-0000-4000-8000-0000000000a1'
 
 const calls: { step: string; input: unknown }[] = []
-const step = (name: string, result: unknown = { ok: true }) => async (...args: unknown[]) => { calls.push({ step: name, input: args[1] }); return result }
+const step = (name: string, result: unknown = { ok: true }) => async (...args: unknown[]) => { calls.push({ step: name, input: args[1] }); return results[name] ?? result }
+/** A scenario's own step results, for the steps it needs to answer differently. */
+const results: Record<string, unknown> = {}
 mock.module('@/workflows/coordinator/steps', { namedExports: {
   dispatchRun: step('dispatchRun', { runId: 'run-1', thread: 'new', placement: { kind: 'device', name: 'Alex 的 MacBook' } }),
   findRepository: step('findRepository', { match: 'one', repository: 'alexj11324/Mikka_test' }),
@@ -52,7 +54,7 @@ before(async () => {
   })
   systemPrompt = async () => `${instructions}\n${github}\n${execution}`
 })
-beforeEach(() => { calls.length = 0; overrideDeploymentSwitch('issueTools', true) })
+beforeEach(() => { calls.length = 0; for (const key of Object.keys(results)) delete results[key]; overrideDeploymentSwitch('issueTools', true) })
 
 type Recorded = { tool: string; input: Record<string, unknown> } | { text: string }
 const usage = { inputTokens: { total: 1, noCache: 1, cacheRead: 0, cacheWrite: 0 }, outputTokens: { total: 1, text: 1, reasoning: 0 } }
@@ -146,9 +148,9 @@ test('how to draw a card is said once, in the prompt; tools and events only poin
 test('more work on a task goes to its thread; a new thread only when the person asked for one', async () => {
   const { system, tools } = await play('README 里再加一节安装说明', [{ tool: 'get_issue', input: { issueId: ISSUE } }, { tool: 'dispatch_run', input: { issueId: ISSUE, note: '再加一节安装说明' } }])
   assert.match(system, /To retry a task, or to give its thread more information, call dispatch_run .* for the same task again: it goes to the existing thread/)
-  assert.match(system, /Never dispatch a second thread for it\. Set newThread only when the person explicitly asked, in their own words/)
+  assert.match(system, /Never dispatch a second thread for it\. A new thread is needed when the person explicitly asked, in their own words/)
   assert.match(String(tools.dispatch_run.description), /A task has one thread at a time\. When the task already has one, this goes to that thread/)
-  assert.match(system, /When it shows a thread, more work for the task goes to that thread: call dispatch_run without repo .* never look one up or ask the person for one/)
+  assert.match(system, /When it shows a thread, more work for the task goes to that thread: call dispatch_run without repo .* the thread keeps its repository, as long as the person has not named another one/)
   assert.match(String(tools.get_issue.description), /its thread \(runId, status, repository\)/)
   assert.deepEqual(calls.map(call => call.step), ['getIssue', 'dispatchRun'], 'no repository lookup for a task with a thread')
   const followUp = calls[1].input as { repo?: string; newThread?: boolean; note?: string }
@@ -157,4 +159,73 @@ test('more work on a task goes to its thread; a new thread only when the person 
   calls.length = 0
   await play('另开一个线程，用 Codex 重新做', [{ tool: 'dispatch_run', input: { issueId: ISSUE, repo: 'alexj11324/Mikka_test', newThread: true, model: { harness: 'codex' } } }])
   assert.equal((calls[0].input as { newThread?: boolean }).newThread, true, 'asked in the person\'s own words; the host still checks those words (lib/thread-switch.ts)')
+})
+
+// Alex's own words, from the Acme production thread (2026-11-03). Recorded turns: these check what the model is told
+// and that what it should do reaches the host as it should; the live-model version is scripts/coordinator-eval.mts.
+const MIKKA_SITE = 'On phones, the How it works section on the Mikka site is cut off. Can you fix it?'
+const acmeCandidates = [
+  { fullName: 'alexj11324/Mikka', description: 'Mikka app: bots, threads and the Coordinator', homepage: 'https://app.mikka.example', usedByThisWorkspace: true },
+  { fullName: 'alexj11324/mikka-web', description: 'The Mikka marketing site', homepage: 'https://mikka.example', usedByThisWorkspace: false },
+  { fullName: 'acme/mikka-enterprise', description: null, homepage: null, usedByThisWorkspace: false },
+]
+
+test(`「${MIKKA_SITE}」: every Mikka repository comes back described; the site goes to mikka-web, judged by description and homepage`, async () => {
+  results.findRepository = { match: 'several', candidates: acmeCandidates, card: { title: '多个仓库匹配 Mikka site', options: acmeCandidates.map(item => ({ value: item.fullName, label: item.fullName })) } }
+  const { system, tools } = await play(MIKKA_SITE, [
+    { tool: 'find_repository', input: { name: 'Mikka site' } },
+    { tool: 'dispatch_run', input: { issueId: ISSUE, repo: 'alexj11324/mikka-web' } },
+  ])
+  assert.match(system, /every word as they said it \(e\.g\. acme_tools, the Acme docs\)/)
+  assert.match(system, /Choose by judging them against the person's own words \(a site, an app, a page or a product they named\), each repository's description and homepage, and the task/)
+  assert.match(system, /When they still do not settle it, ask which repository/)
+  assert.match(system, /Even when the result is one repository, check that it is the thing the person named/)
+  assert.doesNotMatch(system, /Never pick one of several similar repositories yourself/, 'the model judges; it is not forbidden to')
+  assert.match(String(tools.find_repository.description), /each with description, homepage and usedByThisWorkspace/)
+  assert.deepEqual(calls.map(call => call.step), ['findRepository', 'dispatchRun'])
+  assert.deepEqual(calls[0].input, { name: 'Mikka site' }, 'every word the person used reaches the lookup')
+  assert.equal((calls[1].input as { repo: string }).repo, 'alexj11324/mikka-web')
+})
+
+test(`「${MIKKA_SITE}」 when the candidates do not settle it: one choice question, nothing dispatched`, async () => {
+  results.findRepository = { match: 'several', candidates: acmeCandidates.map(item => ({ ...item, description: null, homepage: null })), card: { title: '多个仓库匹配 Mikka site', options: acmeCandidates.map(item => ({ value: item.fullName, label: item.fullName })) } }
+  const { reply } = await play(MIKKA_SITE, [
+    { tool: 'find_repository', input: { name: 'Mikka site' } },
+    { text: '<BeQuestions>Mikka site 是哪个仓库？</BeQuestions>' },
+  ])
+  assert.deepEqual(calls.map(call => call.step), ['findRepository'])
+  assert.match(reply, /BeQuestions/)
+})
+
+test('「It\'s in the mikka-web repo」 on a thread working in alexj11324/Mikka: the repository is passed, so the work moves to a new thread there', async () => {
+  results.getIssue = { id: ISSUE, title: 'How it works is cut off on phones', thread: { runId: 'run-old', status: 'completed', repository: 'alexj11324/Mikka' } }
+  results.dispatchRun = { runId: 'run-new', thread: 'new', threadId: 'run-new', replacedThreadId: 'run-old', placement: { kind: 'cloud' } }
+  const { system, tools } = await play("It's in the mikka-web repo", [
+    { tool: 'get_issue', input: { issueId: ISSUE } },
+    { tool: 'dispatch_run', input: { issueId: ISSUE, repo: 'mikka-web' } },
+    { text: '旧线程在 alexj11324/Mikka 上，已经停掉；改在 mikka-web 上开了新线程。' },
+  ])
+  assert.match(system, /and also when the repository or the Agent they name for the work is not the thread's own/)
+  assert.match(system, /the thread keeps its repository, as long as the person has not named another one/)
+  assert.match(system, /you tell the person that the old thread was stopped/)
+  assert.doesNotMatch(system, /the thread already has its repository, so never look one up or ask the person for one/)
+  assert.match(String(tools.dispatch_run.description), /pass repo only when the person named a repository that is not the thread's/)
+  assert.deepEqual(calls.map(call => call.step), ['getIssue', 'dispatchRun'])
+  assert.equal((calls[1].input as { repo?: string }).repo, 'mikka-web')
+})
+
+test(`screen work on a named site still names it to the sub-agent: 「${MIKKA_SITE}」 watched on a phone-sized browser`, async () => {
+  const { system } = await play(`${MIKKA_SITE} Show me on a phone-sized browser first.`, [
+    { tool: 'start_web_subagent', input: { botId: COORDINATOR_BOT, task: 'Open the Mikka site (repository alexj11324/mikka-web) at phone width and check the How it works section' } },
+  ], { computerEnabled: true })
+  assert.match(system, /do not look up a URL, a repository or a subscription first/, 'starting screen work stays immediate')
+  assert.match(system, /When the person named a repository or a site, still pass it to the sub-agent or the thread/)
+  assert.match((calls[0].input as { task: string }).task, /Mikka site/)
+})
+
+test('the prompt teaches judgment with neutral names; it never contains the eval\'s sentences or the real repositories', () => {
+  const tools = registry.createCoordinatorRegistry(OWNER, COORDINATOR_BOT, undefined, { coordinator: true, computerEnabled: true })
+  const text = [instructions, ...Object.values(tools).map(tool => String(tool.description ?? '')), JSON.stringify(Object.fromEntries(Object.entries(tools).map(([name, tool]) => [name, (tool.inputSchema as { toJSONSchema?: () => unknown })?.toJSONSchema?.() ?? null])))].join('\n')
+  assert.match(text, /every word kept \(e\.g\. acme_tools, the Acme docs\)/, 'the parameter descriptions are read too')
+  for (const leaked of [/Mikka site/i, /mikka-web/i, /mikka-enterprise/i, /How it works/i, /It's in the/i, /Mikka_test/, /alexj11324\/Mikka/i, /octo-web|octo-api/i, /landing page|docs site/i]) assert.doesNotMatch(text, leaked)
 })

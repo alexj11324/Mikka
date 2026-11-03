@@ -50,3 +50,14 @@ export async function chooseCloudRunModel(pool: Pool, scope: { ownerId: string; 
   if (source.kind === 'api_key') return { model: target.model, apiKeyId: source.keyId }
   return { model: target.model, subscriptionBindingId: await bindAgentToConnection(pool, { ownerId: scope.ownerId, workspaceId: scope.workspaceId }, agentId, harness, source.connectionId, target.model) }
 }
+
+/**
+ * A new run's model on one computer by 优先使用的模型: the first entry that computer's Agent can run.
+ * A local run is frozen with its model like a cloud one; it is no longer left to the CLI to choose.
+ */
+export async function chooseLocalRunModel(pool: Pool, scope: { ownerId: string; workspaceId: string; botId: string | null }, agent: { id: string; deviceId: string; harness: 'claude_code' | 'codex' }, asked?: string): Promise<RunModel | { error: 'machineUnavailable'; reason?: string }> {
+  const { resolveModelDispatch } = await import('@/lib/model-dispatch')
+  const target = await resolveModelDispatch(pool, scope, { harness: agent.harness, ...(asked ? { model: asked } : {}) }, 'local', agent.deviceId)
+  if (target.kind !== 'device' || target.agentId !== agent.id) return { error: 'machineUnavailable', ...(target.kind === 'none' ? { reason: target.reason } : {}) }
+  return { model: target.model, ...(target.subscriptionBindingId ? { subscriptionBindingId: target.subscriptionBindingId } : {}), ...(target.entry.source.kind === 'api_key' ? { apiKeyId: target.entry.source.keyId } : {}) }
+}

@@ -434,7 +434,10 @@ export async function createIssue(userId: string, input: CreateIssueInput, toolC
   'use step'
   await assertNativeToolScope(userId, scope)
   if (!toolCallId || toolCallId.length > 200) return { error: 'issueToolCallConflict' }
-  return (await import('@/lib/mcp/actions')).createIssue(userId, input, systemActor(botId), toolCallId, taskEventId ? { eventId: taskEventId, botId } : undefined)
+  // A team workspace's bot creates the task in that workspace's team, not as its owner's personal task.
+  const team = await (await import('@/lib/coordinator/issue-team')).coordinatorIssueTeam(userId, botId, input.teamId)
+  if ('error' in team) return team
+  return (await import('@/lib/mcp/actions')).createIssue(userId, input, systemActor(botId), toolCallId, taskEventId ? { eventId: taskEventId, botId } : undefined, team.teamId ?? undefined)
 }
 
 export async function updateIssue(userId: string, input: UpdateIssueInput, toolCallId: string, scope: NativeToolScope | undefined, botId: string) {
@@ -482,17 +485,26 @@ export async function dispatchRun(userId: string, input: { issueId: string; agen
     if (!named) return Promise.resolve({ error: 'repositoryRequired' as const, issueId: request.issueId })
     return withResolvedRepository(userId, request.issueId, named, repo => dispatchByRules(userId, { ...request, repo, note }, scope, botId, execution, requestEventId, place))
   }
+  // The thread's repository is not the one named: a different one, or a name that is not one repository yet (its card comes from the new thread's lookup).
+  let repositoryMove = false
+  const movesRepository = async (previous: import('@/lib/thread-dispatch').TaskThreadRun) => {
+    if (!request.repo?.trim() || !previous.remoteUrl) return false
+    const { sameRepository } = await import('@/lib/coordinator/repository-resolution')
+    repositoryMove = (await sameRepository(userId, request.repo, previous.remoteUrl).catch(() => null)) !== true
+    return repositoryMove
+  }
   const { withDispatchTiming } = await import('@/lib/dispatch-timing')
   return asToolResult(() => withDispatchTiming(async () => placed(await dispatchToTask(userId, request.issueId, {
     note: request.note, newThread,
-    // A named place other than the thread's own is a move, which only the person's explicit request grants.
-    moves: async previous => movesThread(target, await runPlacement(pool, userId, previous.id)),
-    explicit: () => explicitNewThread(userId, botId, sourceEventId),
+    // A named place other than the thread's own is a move, which only the person's explicit request grants. So is a
+    // repository the person named that is not the thread's ("It's in the mikka-web repo"): the work goes there, in a new thread.
+    moves: async previous => movesThread(target, await runPlacement(pool, userId, previous.id)) || await movesRepository(previous),
+    explicit: async () => (repositoryMove && await personNamed(userId, botId, sourceEventId, request.repo!)) || explicitNewThread(userId, botId, sourceEventId),
     start: async (previous, note) => {
       if (!previous) return byRules(note, target)
       // The thread's next run goes where the thread ran, so its session can be resumed; elsewhere it starts fresh with the note's context.
       // It keeps the thread's own model and account, or the one the person just named; never another one silently.
-      const { latestThreadRunModel, chooseCloudRunModel } = await import('@/lib/computer/run-model')
+      const { latestThreadRunModel, chooseCloudRunModel, chooseLocalRunModel } = await import('@/lib/computer/run-model')
       const threadModel = await latestThreadRunModel(pool, userId, request.issueId, previous.agentId)
       if (previous?.cloud && (previous.harness === 'codex' || previous.harness === 'claude_code')) {
         const named = request.model?.model ? await chooseCloudRunModel(pool, { ownerId: userId, workspaceId: previous.cloud.workspaceId, botId: previous.cloud.botId }, previous.agentId, previous.harness, request.model.model) : null
@@ -502,13 +514,27 @@ export async function dispatchRun(userId: string, input: { issueId: string; agen
         if (!('error' in cloud)) return cloud
         if (cloud.error !== 'cloudComputerUnavailable') return { ...cloud, issueId: request.issueId }
       } else if (previous?.remoteUrl) {
+        // A server or computer thread keeps its own model too; with none left the person is told, never the CLI's pick.
+        const device = request.model?.model ? (await pool.query<{ deviceId: string; harness: 'codex' | 'claude_code'; workspaceId: string }>('SELECT a."deviceId",a.harness FROM agents a WHERE a.id=$1 AND a."userId"=$2', [previous.agentId, userId])).rows[0] : undefined
+        const named = device ? await chooseLocalRunModel(pool, { ownerId: userId, workspaceId: await (await import('@/lib/execution-settings')).executionWorkspace(userId, botId), botId }, { id: previous.agentId, deviceId: device.deviceId, harness: device.harness }, request.model!.model) : null
+        const localModel = named && !('error' in named) ? named : threadModel
+        if (!localModel) return { error: 'threadModelUnavailable' as const, issueId: request.issueId, threadRunId: previous.id }
         // Read-only sticks: a read-only request, or a thread that runs read-only, gives a read-only next run.
-        const result = await queueRun(userId, { issueId: request.issueId, agentId: previous.agentId, repo: previous.remoteUrl, note, readOnly: Boolean(request.readOnly || previous.readOnly), requestKey: `thread:${previous.id}:${request.requestKey ?? crypto.randomUUID()}`.slice(0, 200), ...threadModel }, botId, execution, requestEventId).catch(() => null)
+        const result = await queueRun(userId, { issueId: request.issueId, agentId: previous.agentId, repo: previous.remoteUrl, note, readOnly: Boolean(request.readOnly || previous.readOnly), requestKey: `thread:${previous.id}:${request.requestKey ?? crypto.randomUUID()}`.slice(0, 200), ...localModel, threadRunId: previous.id }, botId, execution, requestEventId).catch(() => null)
         if (result) return { ...result, status: 'queued' as const }
       }
       return byRules(note, undefined, previous.remoteUrl)
     },
   }))))
+}
+
+/** Whether the person's own message (host-supplied event) names this repository: their words, not the model's, grant a move. */
+async function personNamed(userId: string, botId: string, sourceEventId: string | undefined, repo: string) {
+  if (!sourceEventId) return false
+  const { rows: [event] } = await pool.query(`SELECT payload->>'text' AS text FROM coordinator_events WHERE id=$1 AND "userId"=$2 AND kind='user_message' AND "botId" IS NOT DISTINCT FROM $3::uuid`, [sourceEventId, userId, botId])
+  const loose = (value: string) => value.toLowerCase().replace(/[-_. ]+/g, '')
+  const name = repo.trim().replace(/^(?:https:\/\/|git@)github\.com[/:]/i, '').replace(/\.git$/i, '').split('/').pop() ?? ''
+  return typeof event?.text === 'string' && name.length > 0 && loose(event.text).includes(loose(name))
 }
 
 /** Where a new run goes and on which model (decision 2026-11-02-1400): a named computer, else 运行位置; the model by the same rule either way. */

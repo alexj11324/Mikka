@@ -4,6 +4,9 @@ export const IPC = {
   appOpenExternal: "mikka:app:open-external",
   appPrepareAuth: "mikka:app:prepare-auth",
   appClaudeCallback: "mikka:app:claude-callback",
+  /** A one-shot loopback for a link finished in the system browser; also main -> renderer with its result. */
+  appPrepareReturn: "mikka:app:prepare-return",
+  appReturned: "mikka:app:returned",
   /** The downloaded update's version, or null; also main -> renderer once it downloads. */
   appUpdateReady: "mikka:app:update-ready",
   appInstallUpdate: "mikka:app:install-update",

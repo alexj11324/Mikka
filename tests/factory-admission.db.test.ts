@@ -73,7 +73,7 @@ test('real Factory admission preserves host scope, policy and transaction owners
     return f
   }
   const dispatch = (f: Fixture, tx?: PoolClient) => dispatchFactoryRun(f.userId, { binding: factoryBinding(f.task), agentId: f.agentId, deviceRepoId: f.repoId }, tx)
-  const publicInput = (f: Fixture, requestKey: string) => ({ issueId: f.issueId, agentId: f.agentId, repo: f.remoteUrl, requestKey })
+  const publicInput = (f: Fixture, requestKey: string) => ({ issueId: f.issueId, agentId: f.agentId, repo: f.remoteUrl, requestKey, model: 'fixture-model' })
   const internalInput = (f: Fixture, requestKey?: string) => ({ issueId: f.issueId, agentId: f.agentId, deviceRepoId: f.repoId, ...(requestKey ? { requestKey } : {}) })
   const rowsFor = async (f: Fixture) => (await pool.query(`SELECT
     (SELECT count(*)::int FROM agent_runs WHERE "userId"=$1 AND "issueId"=$2) AS runs,

@@ -120,7 +120,7 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
     const secret = `sk-ant-${randomBytes(16).toString('hex')}`
     const key = await addKey(p.id, 'anthropic', secret, ['key-model-a', 'key-model-b'])
     await keys.setBotApiKeyChoice(pool, { ownerId: p.id, workspaceId: p.workspaceId }, p.botId, key.id, 'key-model-a')
-    const { runId } = await queueRun(p.id, { issueId: p.issueId, agentId: p.agents.claude_code, repo: p.remote }, p.botId)
+    const { runId } = await queueRun(p.id, { issueId: p.issueId, agentId: p.agents.claude_code, repo: p.remote, model: 'key-model-a' }, p.botId)
     const frozen = await definition(runId)
     assert.deepEqual(frozen.apiKey, { keyId: key.id, model: 'key-model-a' }, 'the bot\'s saved key model')
     assert.equal(frozen.subscription, undefined)
@@ -152,13 +152,13 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
     const secret = `sk-${randomBytes(16).toString('hex')}`
     const key = await addKey(p.id, 'openai', secret, ['key-model-c'])
     await keys.setBotApiKeyChoice(pool, { ownerId: p.id, workspaceId: p.workspaceId }, p.botId, key.id, 'key-model-c')
-    const { runId } = await queueRun(p.id, { issueId: p.issueId, agentId: p.agents.codex, repo: p.remote }, p.botId)
+    const { runId } = await queueRun(p.id, { issueId: p.issueId, agentId: p.agents.codex, repo: p.remote, model: 'key-model-c' }, p.botId)
     assert.deepEqual((await definition(runId)).apiKey, { keyId: key.id, model: 'key-model-c' })
     const response = await claim(p.deviceId, runId, p.token)
     assert.equal(response.status, 200, await response.clone().text())
     assert.deepEqual((await response.json()).modelCredential, { kind: 'provider', protocol: 'openai', baseUrl: 'https://api.openai.com/v1', key: secret })
     // A Claude Code run: the saved key is Codex's, so the device's own login runs it.
-    const other = await queueRun(p.id, { issueId: await task(p.id), agentId: p.agents.claude_code, repo: p.remote }, p.botId)
+    const other = await queueRun(p.id, { issueId: await task(p.id), agentId: p.agents.claude_code, repo: p.remote, model: 'key-model-c' }, p.botId)
     assert.equal((await definition(other.runId)).apiKey, undefined)
   })
 
@@ -166,7 +166,7 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
     const p = await person('key-local-login')
     const secret = `sk-ant-${randomBytes(16).toString('hex')}`
     await addKey(p.id, 'anthropic', secret, ['key-model-a'])
-    const { runId } = await queueRun(p.id, { issueId: p.issueId, agentId: p.agents.claude_code, repo: p.remote }, p.botId)
+    const { runId } = await queueRun(p.id, { issueId: p.issueId, agentId: p.agents.claude_code, repo: p.remote, model: 'login-model' }, p.botId)
     const frozen = await definition(runId)
     assert.equal(frozen.apiKey, undefined, 'frozen on the device\'s own login')
     assert.notEqual(frozen.modelSource, 'api_key')
@@ -183,7 +183,7 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
     const p = await person('key-withdrawn')
     const key = await addKey(p.id, 'anthropic', `sk-ant-${randomBytes(16).toString('hex')}`, ['key-model-a'])
     await keys.setBotApiKeyChoice(pool, { ownerId: p.id, workspaceId: p.workspaceId }, p.botId, key.id, 'key-model-a')
-    const { runId } = await queueRun(p.id, { issueId: p.issueId, agentId: p.agents.claude_code, repo: p.remote }, p.botId)
+    const { runId } = await queueRun(p.id, { issueId: p.issueId, agentId: p.agents.claude_code, repo: p.remote, model: 'key-model-a' }, p.botId)
     assert.equal((await definition(runId)).apiKey.keyId, key.id)
     await keys.removeApiKey(pool, p.id, key.id)
     const response = await claim(p.deviceId, runId, p.token)
@@ -201,7 +201,9 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
     const p = await person('key-and-subscription')
     const key = await addKey(p.id, 'anthropic', `sk-ant-${randomBytes(16).toString('hex')}`, ['key-model-a', 'subscription-model'])
     const { connection, binding } = await subscribe(p)
-    const queue = async () => definition((await queueRun(p.id, { issueId: await task(p.id), agentId: p.agents.claude_code, repo: p.remote }, p.botId)).runId)
+    // The run names its model; the subscription lists it, as a connected account does.
+    await pool.query('UPDATE byos_connections SET "modelCatalog"=$2 WHERE id=$1', [connection, JSON.stringify({ revision: '1', models: ['subscription-model'] })])
+    const queue = async () => definition((await queueRun(p.id, { issueId: await task(p.id), agentId: p.agents.claude_code, repo: p.remote, model: 'subscription-model' }, p.botId)).runId)
     const first = await queue()
     assert.equal(first.subscription?.bindingId, binding)
     assert.equal(first.apiKey, undefined)
@@ -214,9 +216,10 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
     await pool.query('UPDATE byos_connections SET quota=NULL WHERE id=$1', [connection])
 
     await keys.setBotApiKeyChoice(pool, { ownerId: p.id, workspaceId: p.workspaceId }, p.botId, key.id, 'subscription-model')
-    const chosen = await queue()
-    assert.deepEqual(chosen.apiKey, { keyId: key.id, model: 'subscription-model' }, 'the bot\'s saved choice wins (§ 2)')
-    assert.equal(chosen.subscription, undefined)
+    // The dispatcher names the saved key with the model, as dispatch_run does from 优先使用的模型.
+    const chosen = definition((await queueRun(p.id, { issueId: await task(p.id), agentId: p.agents.claude_code, repo: p.remote, model: 'subscription-model', apiKeyId: key.id }, p.botId)).runId)
+    assert.deepEqual((await chosen).apiKey, { keyId: key.id, model: 'subscription-model' }, 'the bot\'s saved choice wins (§ 2)')
+    assert.equal((await chosen).subscription, undefined)
   })
 
   await t.test('a rule\'s model only an API key lists runs on that key, beside a usable subscription; one the subscription lists stays on it', async () => {
@@ -436,7 +439,7 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
     const { MIN_DAEMON_VERSION } = await import('@mikka/protocol/device')
     const { DAEMON_UPGRADE_REQUIRED } = await import('../lib/run-leases')
     await pool.query('UPDATE devices SET "daemonVersion"=$2 WHERE id=$1', [p.deviceId, '0.0.298'])
-    const { runId } = await queueRun(p.id, { issueId: p.issueId, agentId: p.agents.claude_code, repo: p.remote }, p.botId)
+    const { runId } = await queueRun(p.id, { issueId: p.issueId, agentId: p.agents.claude_code, repo: p.remote, model: 'fixture-model' }, p.botId)
     const refused = await claim(p.deviceId, runId, p.token)
     assert.equal(refused.status, 409)
     const body = await refused.json()
@@ -452,7 +455,7 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
     await pool.query('DELETE FROM coordinator_events WHERE "runId"=$1', [runId])
 
     await pool.query('UPDATE devices SET "daemonVersion"=$2 WHERE id=$1', [p.deviceId, MIN_DAEMON_VERSION])
-    const { runId: next } = await queueRun(p.id, { issueId: await task(p.id), agentId: p.agents.claude_code, repo: p.remote }, p.botId)
+    const { runId: next } = await queueRun(p.id, { issueId: await task(p.id), agentId: p.agents.claude_code, repo: p.remote, model: 'fixture-model' }, p.botId)
     const accepted = await claim(p.deviceId, next, p.token)
     assert.equal(accepted.status, 200, await accepted.text())
 
