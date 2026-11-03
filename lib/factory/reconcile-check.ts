@@ -123,7 +123,7 @@ export async function reconcileFactoryCheck(
   const completion = { ...attempt?.output, completion: output };
   let status: "passed" | "failed" | "blocked" | "waiting" = "passed";
   let reason =
-    "Independent read-only session and real command passed on the fixed candidate";
+    "Independent check passed on the fixed candidate";
   if (
     !run.sessionId ||
     !run.startedAt ||
