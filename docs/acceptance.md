@@ -70,11 +70,33 @@ sign-out on the origin being tested; unrelated origins must remain rejected.
 Record the provider-specific result and remaining evidence separately from
 ordinary functional acceptance.
 
+## Production acceptance after a merge
+
+Local acceptance comes first; it does not replace production acceptance. After
+the owning agent merges its PR ([dev workflow](dev-workflow.md) § 5):
+
+1. Watch the Vercel production deployment of the merge commit until it is
+   READY, and confirm the production domain serves that commit.
+2. Pending migrations run through the existing flow (`pnpm build` runs
+   `scripts/migrate.mjs` in Vercel production; [migration bootstrap](migration-bootstrap.md)).
+   Do not apply SQL by hand.
+3. Check each acceptance criterion of the issue in production, with a real
+   account and a real task. Use leased test accounts ([test accounts](test-accounts.md));
+   leave no junk data. A simulated or scripted test is not production
+   acceptance.
+4. Write the evidence on the issue: time, run id and a log summary, with no
+   secrets or personal data. Then close the issue.
+
+If production breaks, fix forward with a new PR or revert through a revert
+PR. Never delete deployments, revoke shared tokens, change production Neon
+settings or create paid resources without Alex.
+
 ## When the check specifically targets a deployed origin
 
 A deployed-origin check records its unique deployment URL and associated code
 version, so another publish cannot replace the reviewed application. A moving
-branch alias, v0 `Latest` or the shared production domain is not a frozen target.
+branch alias, v0 `Latest` or the shared production domain is not a frozen target;
+for production acceptance, first confirm the domain serves the merged commit.
 Deployment is not a general prerequisite for local functional acceptance.
 
 For a GitHub-backed v0 project, its working-branch deployment can be reviewed

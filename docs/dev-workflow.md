@@ -1,7 +1,8 @@
 # Development workflow
 
 Standing rules for how work moves from a branch to `main`. Decision:
-[`2026-11-01-1440-dev-workflow-local-first`](design/decisions/2026-11-01-1440-dev-workflow-local-first.md).
+[`2026-11-01-1440-dev-workflow-local-first`](design/decisions/2026-11-01-1440-dev-workflow-local-first.md);
+ownership and merging as Alex set them on 2026-11-03 (§ 5).
 Where another document disagrees, this page wins; fix the other document.
 
 ## 1. Local first
@@ -105,54 +106,68 @@ Local test accounts: the local mode (`MIKKA_LOCAL_TEST_ACCOUNTS=1` with a
 loopback `*_e2e` database) is described in
 [`test-accounts.md`](test-accounts.md#local-mode-a-developers-own-disposable-database).
 
-## 5. Trunk-based merging
+## 5. Ownership and merging
 
-Decision: [`2026-11-01-1545-trunk-based`](design/decisions/2026-11-01-1545-trunk-based.md).
+Alex set these rules on 2026-11-03. They replace the coordinator-merges rule
+of [`2026-11-01-1545-trunk-based`](design/decisions/2026-11-01-1545-trunk-based.md),
+the push-fixes-to-main rule of [`2026-11-03-0310`](design/decisions/2026-11-03-0310-fixes-push-to-main.md)
+and the old module owners (backend was Codex's).
 
-1. Every PR branches from `main` and changes one thing.
-2. When its CI is green, the coordinator squash-merges it into `main`. There
+1. **One owner.** Work is assigned through a GitHub issue to one agent
+   (currently ChatGPT Pro sessions; earlier Codex and Cursor). That agent
+   owns it end to end: code, PR, merge, deploy check and production
+   acceptance.
+2. **No direct pushes.** Nobody pushes to `main`. Every change goes through a
+   PR from a branch that branches from `main` and changes one thing. There
    are no integration batches.
-3. A change to auth, signup, privilege or credentials is reviewed before
-   merging. A UI change merges only after its screenshots are reviewed.
-4. A documentation conflict is resolved by whoever merges: they edit the
+3. **The owner merges.** When CI is green on the latest head and the PR is
+   mergeable, the owner squash-merges it itself. A UI change merges only
+   after the owner has reviewed its screenshots and attached them to the PR.
+   A change to auth, signup, privilege or credentials says so in the PR.
+4. **Stacked PRs** merge in order. After a base merges, retarget the next PR
+   to `main`.
+5. **After the merge** the owner watches the Vercel production deployment
+   until it is READY and the production domain serves that commit. Pending
+   migrations run through the existing flow (`pnpm build` runs
+   `scripts/migrate.mjs`). Then the owner accepts the change in production
+   against the issue's acceptance criteria, with a real account and task
+   (leased test accounts, [`test-accounts.md`](test-accounts.md); no junk
+   data). A simulated test is not production acceptance. The owner writes
+   the evidence on the issue (time, run id, log summary; no secrets or
+   personal data) and closes the issue.
+6. **If production breaks,** fix forward with a new PR, or revert through a
+   revert PR. Never delete deployments, revoke shared tokens, change
+   production Neon settings or create paid resources without Alex.
+7. **The coordinator** (a Claude Code session) writes issues, reviews and
+   verifies. It does not gate merges.
+8. A documentation conflict is resolved by whoever merges: they edit the
    documents directly.
-5. A fix opens no PR ([`2026-11-03-0310`](design/decisions/2026-11-03-0310-fixes-push-to-main.md)):
-   once its local checks are green it is rebased onto `main` and pushed
-   there without force, and the coordinator reviews it on `main`. A fix to
-   credentials or auth is reported to the coordinator, with a diff summary
-   and test results, right after the push. Before any push, the change is
-   verified end to end locally or on a preview deployment with its own
-   database branch; production is never the test environment.
 
-Each of these modules has an owner. Anyone else who needs to change one asks
-its owner first.
-
-| Module | Covers | Owner |
-| --- | --- | --- |
-| Local development environment and fake services | `scripts/dev/bootstrap-local.sh`, local stand-ins for external services | LSV4 session |
-| Local test-mode rules | Local test accounts and the guards that decide where a suite may run | PFe3 session |
-| MVP acceptance | The MVP API/CLI acceptance (`pnpm test:local-loop`) and its record ([`acceptance-mvp-cli-2026-11-01.md`](acceptance-mvp-cli-2026-11-01.md)) | QUe session |
-| Backend | Server, API, database and daemon changes; start from [`handoff-codex-to-cc-2026-11-01.md`](handoff-codex-to-cc-2026-11-01.md) | Codex ([decision](design/decisions/2026-11-01-2225-api-cli-acceptance-and-backend-owner.md)) |
+Before any merge, the change is verified end to end locally or on a preview
+deployment with its own database branch; production is never the test
+environment.
 
 ## 6. Numbers
 
 Rule ids (`R-xx`) and migration timestamps are assigned by the coordinator
-when the work is dispatched, so parallel branches do not collide. A session
+when it writes the issue, so parallel branches do not collide. A session
 that needs one and has none asks the coordinator. The coordinator assigns
 increasing timestamps. `scripts/check-migrations.mjs` refuses a timestamp at or below the newest one on `main`, so if they merge out
 of order, whoever merges the later one renames it.
 
 ## 7. E2B templates
 
-Cloud machines start from E2B's own `desktop`, `claude` and `codex` templates
-with the Mikka worker added
-([decision 2026-11-01-2335](design/decisions/2026-11-01-2335-e2b-official-templates.md)).
+Cloud machines start from new instances of E2B's official `desktop`, `claude`
+and `codex` templates. The Mikka worker is added in its own directory on the
+instance; the official templates are never changed or deleted
+([decision 2026-11-03-1430](design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md)).
 
-To test worker changes, build `-dev` templates from the branch
-(`python3 scripts/e2b/build-template.py --name <prefix>-dev [--kind claude]`). Do not wait
-for the automatic publish that follows a merge to `main`
-([`e2b-template.yml`](../.github/workflows/README.md#cloud-worker-template-release)).
-Never overwrite the production templates or Vercel's production environment.
+A push to `main` that changes the worker paths runs
+[`e2b-official-runtime.yml`](../.github/workflows/README.md#cloud-worker-template-release).
+It validates the official instances and publishes only the application
+configuration. The older `e2b-template.yml` (derived templates) is paused; do
+not resume it. Never change the production templates or Vercel's production
+environment by hand.
 
 ## 8. Reaching a local service from outside
 
