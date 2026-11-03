@@ -83,6 +83,8 @@ export const DEPLOYMENT_SWITCHES = {
   factoryVercelPublication: { flag: 'mikka-factory-vercel-publication', kind: 'gate', legacy: exact('FACTORY_VERCEL_PUBLICATION'), fallback: false },
   /** Factory publication to the production Vercel target. */
   factoryVercelProduction: { flag: 'mikka-factory-vercel-production', kind: 'gate', legacy: exact('FACTORY_VERCEL_PRODUCTION'), fallback: false },
+  /** Device routes take the credential fence once per burst of statements, not once per statement (lib/db/device-scope.ts). */
+  deviceUnitFence: { flag: 'mikka-device-unit-fence-off', kind: 'kill', fallback: true },
   /** The sampled database egress log (lib/db/egress-sample.ts): 1% of queries write their route, tables, rows and bytes. */
   dbEgressSample: { flag: 'mikka-db-egress-sample', kind: 'gate', legacy: exact('MIKKA_DB_EGRESS_SAMPLE'), fallback: false },
 } as const satisfies Record<string, Switch>

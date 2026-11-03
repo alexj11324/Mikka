@@ -345,3 +345,19 @@ test('a preview prints a value as Postgres prints jsonb: its key order, ", " and
   assert.equal(jsonbText({ title: 'Fix', id: 2, aa: [1, { é: null, z: true }], skipped: undefined }), '{"aa": [1, {"z": true, "é": null}], "id": 2, "title": "Fix"}')
   assert.equal(jsonbText('text'), '"text"')
 })
+
+test('a turn that says what it is about to do, calls a tool and then answers is one Coordinator message, the opening first', () => {
+  const at = new Date('2026-11-02T22:00:00Z')
+  const rows: ModelMessage[] = [
+    { role: 'user', content: '派发任务，给 Mikka_test 写一个简单的 README' },
+    { role: 'assistant', content: [{ type: 'text', text: '我先建一个任务，再派给 Claude Code 写 README。' }, { type: 'tool-call', toolCallId: 'c1', toolName: 'dispatch_run', input: { repo: 'Mikka_test' } }] },
+    { role: 'tool', content: [{ type: 'tool-result', toolCallId: 'c1', toolName: 'dispatch_run', output: { type: 'json', value: { runId: '00000000-0000-4000-8000-000000000061' } } }] },
+    { role: 'assistant', content: [{ type: 'text', text: '已经派出去了，写好后告诉你。' }] },
+  ]
+  const items = chatItems(rows.map((message, index) => ({ position: index + 1, message, createdAt: at })))
+  assert.deepEqual(items.map(item => [item.from, item.text]), [
+    ['person', '派发任务，给 Mikka_test 写一个简单的 README'],
+    ['coordinator', '我先建一个任务，再派给 Claude Code 写 README。\n\n已经派出去了，写好后告诉你。'],
+  ])
+  assert.deepEqual(items[1].threads, ['00000000-0000-4000-8000-000000000061'])
+})

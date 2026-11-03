@@ -111,18 +111,17 @@ export function ModelOrderSettings({ workspaceId }: { workspaceId: string }) {
   if (order.data?.error || order.error) return <FieldError>{actionError(order.data?.error)}</FieldError>
   if (!data) return <SettingsSection id="model-order-heading" title={t('title')}><p role="status" className="px-5 py-4 text-sm text-muted-foreground">{t('loading')}</p></SettingsSection>
 
-  const locationLine = data.location === 'local'
-    ? data.firstDevice ? t('localFirst', { count: data.devices, device: data.firstDevice }) : t('localDevices', { count: data.devices })
-    : e2b.configured === false ? t('cloudNoKey') : null
-  // R1: what fixes or explains the location sits on its row: 打开设备 for 本地; 填入 E2B Key for 云端 without one.
-  const locationAction = data.location === 'local'
-    ? <Button nativeButton={false} variant="secondary" size="sm" render={<Link href={settingsHref('computers', workspaceId)} />}>{t('openDevices')}</Button>
-    : e2b.configured === false && <Button type="button" variant="secondary" size="sm" onClick={() => setKeyOpen(true)}>{t('setE2BKey')}</Button>
-  const locationState = data.location !== 'cloud' ? undefined : e2b.configured === undefined ? 'checking' : !e2b.configured ? 'missingKey' : undefined
+  // The order each location tries (decision 2026-11-02-2330), then where a new run goes now (会先用, the same plan as dispatch).
+  const first = data.first ? data.first.kind === 'cloud' ? t('cloud') : data.first.name : null
+  const noKey = data.location === 'cloud' && e2b.configured === false
+  const locationLine = `${t(data.location === 'cloud' ? 'orderCloud' : 'orderLocal')} · ${first === null ? t('nowhere') : noKey ? t('noKeyFirst', { place: first }) : t('first', { place: first })}`
+  // R1: what fixes or explains the location sits on its row: 填入 E2B Key for 云端 without one; else 打开设备 when a computer would take the run or nothing would.
+  const locationAction = noKey
+    ? <Button type="button" variant="secondary" size="sm" onClick={() => setKeyOpen(true)}>{t('setE2BKey')}</Button>
+    : data.first?.kind !== 'cloud' && <Button nativeButton={false} variant="secondary" size="sm" render={<Link href={settingsHref('computers', workspaceId)} />}>{t('openDevices')}</Button>
   const repair = (row: OrderRow) => {
     const reason = row.block?.reason
     if (reason === 'checking' && row.source.kind === 'subscription') return <Button type="button" variant="secondary" size="sm" disabled={pending} onClick={() => { if (row.source.kind === 'subscription') void checkQuota(row.source.connectionId) }}>{t('checkQuota')}</Button>
-    if (reason === 'cloudNotConfigured' || (!row.block && locationState === 'missingKey')) return <Button type="button" variant="secondary" size="sm" disabled={pending} onClick={() => setKeyOpen(true)}>{t('setE2BKey')}</Button>
     if (reason === 'noDevice') return <Button nativeButton={false} variant="secondary" size="sm" render={<Link href={settingsHref('computers', workspaceId)} />}>{t('openDevices')}</Button>
     if ((reason === 'paused' || reason === 'expired') && row.source.kind === 'subscription') return <Button nativeButton={false} variant="secondary" size="sm" render={<a href={`#subscription-${row.source.connectionId}`} />}>{t(reason === 'paused' ? 'enableSubscription' : 'reconnectSubscription')}</Button>
     if (reason === 'keyRefused' && row.source.kind === 'api_key') return <Button nativeButton={false} variant="secondary" size="sm" render={<a href={`#api-key-${row.source.keyId}`} />}>{t('openApiKey')}</Button>
@@ -132,7 +131,7 @@ export function ModelOrderSettings({ workspaceId }: { workspaceId: string }) {
   }
   return <>
     <SettingsSection id="run-location-heading" title={t('location')}>
-      <SettingRow title={data.location === 'local' ? t('local') : t('cloud')} description={locationLine ?? undefined}>
+      <SettingRow title={data.location === 'local' ? t('local') : t('cloud')} description={locationLine}>
         <span className="flex items-center gap-2">
           {locationAction}
           <ToggleGroup aria-label={t('location')} variant="segment" spacing={0.5} value={[data.location]} disabled={pending}
@@ -173,7 +172,7 @@ export function ModelOrderSettings({ workspaceId }: { workspaceId: string }) {
                 <Button nativeButton={false} variant="secondary" render={<a href="#api-keys-heading" />}>{t(data.credentials === 0 ? 'addApiKey' : 'openApiKey')}</Button>
               </span></>}
         </div>
-        : <OrderList rows={data.entries} pending={pending} unsaved={unsaved} preferred={data.preferredHarness} locationState={locationState} repair={repair} onMove={move} onRemove={row => { void remove(row) }}
+        : <OrderList rows={data.entries} pending={pending} unsaved={unsaved} preferred={data.preferredHarness} repair={repair} onMove={move} onRemove={row => { void remove(row) }}
           onAgent={(row, harness) => void save({ kind: 'harness', id: row.id, harness }, { ...data, entries: data.entries.map(entry => entry.id === row.id ? { ...entry, harness } : entry) })} />}
     </SettingsSection>
     {failed && <SettingsSaveError message={failed.message} retryLabel={commonT('retry')} onRetry={failed.retry} />}
@@ -186,7 +185,7 @@ export function ModelOrderSettings({ workspaceId }: { workspaceId: string }) {
   </>
 }
 
-function OrderList({ rows, pending, unsaved, preferred, locationState, repair, onMove, onRemove, onAgent }: { rows: OrderRow[]; pending: boolean; unsaved: { id: string; to: number } | null; preferred: OrderHarness; locationState?: 'checking' | 'missingKey'; repair: (row: OrderRow) => ReactNode; onMove: (from: number, to: number) => void; onRemove: (row: OrderRow) => void; onAgent: (row: OrderRow, harness: OrderHarness) => void }) {
+function OrderList({ rows, pending, unsaved, preferred, repair, onMove, onRemove, onAgent }: { rows: OrderRow[]; pending: boolean; unsaved: { id: string; to: number } | null; preferred: OrderHarness; repair: (row: OrderRow) => ReactNode; onMove: (from: number, to: number) => void; onRemove: (row: OrderRow) => void; onAgent: (row: OrderRow, harness: OrderHarness) => void }) {
   const t = useTranslations('Settings.modelOrder')
   // No live reorder while dragging (the sortable strategy shows the shift): a live reorder moved the row under
   // the pointer, and a drop before dnd-kit re-measured landed on the stale target and put the row back (#1000).
@@ -206,23 +205,22 @@ function OrderList({ rows, pending, unsaved, preferred, locationState, repair, o
       },
     }}>
     <KanbanColumnContent value="models" aria-label={t('title')} className="gap-0 divide-y divide-border" render={<ol />}>
-      {items.map((row, index) => <OrderItem key={row.id} row={row} index={index} last={index === items.length - 1} pending={pending} preferred={preferred} locationState={locationState} repair={repair(row)} onAgent={harness => onAgent(row, harness)}
+      {items.map((row, index) => <OrderItem key={row.id} row={row} index={index} last={index === items.length - 1} pending={pending} preferred={preferred} repair={repair(row)} onAgent={harness => onAgent(row, harness)}
         retry={unsaved?.id === row.id ? () => onMove(index, Math.min(unsaved.to, items.length - 1)) : undefined}
         onFirst={() => onMove(index, 0)} onUp={() => onMove(index, index - 1)} onDown={() => onMove(index, index + 1)} onRemove={() => onRemove(row)} />)}
     </KanbanColumnContent>
   </Kanban>
 }
 
-function OrderItem({ row, index, last, pending, preferred, locationState, repair, retry, onAgent, onFirst, onUp, onDown, onRemove }: { row: OrderRow; index: number; last: boolean; pending: boolean; preferred: OrderHarness; locationState?: 'checking' | 'missingKey'; repair?: ReactNode; retry?: () => void; onAgent: (harness: OrderHarness) => void; onFirst: () => void; onUp: () => void; onDown: () => void; onRemove: () => void }) {
+function OrderItem({ row, index, last, pending, preferred, repair, retry, onAgent, onFirst, onUp, onDown, onRemove }: { row: OrderRow; index: number; last: boolean; pending: boolean; preferred: OrderHarness; repair?: ReactNode; retry?: () => void; onAgent: (harness: OrderHarness) => void; onFirst: () => void; onUp: () => void; onDown: () => void; onRemove: () => void }) {
   const t = useTranslations('Settings.modelOrder')
   const commonT = useTranslations('Common')
   const format = useFormatter()
   const block = row.block
   // 顺序未保存 wins over the row's own state until 重试 or the next change (R3).
-  const checking = !retry && (block?.reason === 'checking' || (!block && locationState === 'checking'))
-  const warn = Boolean((block && !checking) || retry || (!block && locationState === 'missingKey'))
+  const checking = !retry && block?.reason === 'checking'
+  const warn = Boolean((block && !checking) || retry)
   const status = retry ? t('orderUnsaved') : checking ? t('blocked.checking')
-    : block?.reason === 'cloudNotConfigured' || (!block && locationState === 'missingKey') ? t('cloudNoKey')
     : !block ? t('ready')
     : block.reason === 'quota' && block.resetsAt ? t('quotaUntil', { time: format.dateTime(new Date(block.resetsAt), { month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }) })
       : block.reason === 'noDevice' ? (block.device.why === 'none' ? t('noDevice.none') : t(`noDevice.${block.device.why}`, { device: block.device.device, count: block.device.count, harness: harnessName(row.harness) }))

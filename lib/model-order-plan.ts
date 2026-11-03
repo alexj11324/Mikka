@@ -7,13 +7,14 @@
  * Each entry is an Agent and a model from one credential (a connected
  * subscription or an API key). A run takes the first entry that can run now:
  * its credential is usable (connected, not paused, quota left, the key not
- * refused), and the run location has a place for it. 本地: a device whose
- * 参与调度 is on, online, with the Agent installed and, for a subscription
- * model, able to take a subscription run (its daemon brokers the subscription
- * lease); servers before computers, then the one with the fewest unfinished
- * runs, then the one that joined first (`pickDevice`). 云端:
- * the person's own E2B key is set. A model the person picked for the thread
- * goes before the list. Once a run starts nothing about it changes.
+ * refused), and 运行位置 has a place for it, tried in order (`PlanPlaces`):
+ * 云端 the person's own E2B cloud, then servers, then computers; 本地 servers,
+ * then computers. A device takes part when its 参与调度 is on, it is online,
+ * the Agent is installed and, for a subscription model, it can take a
+ * subscription run (its daemon brokers the subscription lease); among one
+ * kind, the one with the fewest unfinished runs, then the one that joined
+ * first (`pickDevice`). A model the person picked for the thread goes before
+ * the list. Once a run starts nothing about it changes.
  */
 import type { HarnessInfo } from '@mikka/protocol/harness'
 
@@ -124,42 +125,61 @@ export function pickDevice<T extends { device: Pick<PoolDevice, 'id' | 'server' 
     || (a.device.id < b.device.id ? -1 : a.device.id > b.device.id ? 1 : 0))[0]
 }
 
+/**
+ * Where each 运行位置 looks, in order (Alex, 2026-11-02): 云端 the person's own
+ * E2B cloud, then their servers, then their computers; 本地 servers, then
+ * computers. A computer always comes last. `cloudOnly` is a run the person
+ * asked to put in the cloud: nowhere else.
+ */
+export type PlanPlaces = RunLocation | 'cloudOnly'
+
 export function planDispatch(input: {
   entries: readonly OrderEntry[]
   /** The model the person picked for this thread, when they did. */
   explicit?: OrderEntry | null
-  location: RunLocation
+  location: PlanPlaces
   devices: readonly PoolDevice[]
   credential: (entry: OrderEntry) => CredentialState
-  /** 云端: the person's own E2B key is set and cloud runs are on. */
+  /** The person's own E2B key is set, not known to be refused, and cloud runs are on. */
   cloudReady: boolean
 }): DispatchPlan {
   const entries = input.explicit ? [input.explicit, ...input.entries.filter(entry => entry.id !== input.explicit!.id)] : [...input.entries]
   const skipped: SkippedEntry[] = []
   if (!entries.length) return { kind: 'none', reason: 'noModels', skipped }
-  if (input.location === 'cloud' && !input.cloudReady) {
+  if (input.location === 'cloudOnly' && !input.cloudReady) {
     return { kind: 'none', reason: 'cloudNotConfigured', skipped: entries.map(entry => ({ entry, block: { usable: false, reason: 'cloudNotConfigured' } })) }
   }
+  // The models whose credential can run now, in order, up to one whose allowance check failed:
+  // a failed check is not evidence that a subscription is spent, so a later key is not charged instead.
+  const runnable: OrderEntry[] = []
+  let checking = false
   for (const entry of entries) {
     const credential = input.credential(entry)
-    if (!credential.usable) {
-      skipped.push({ entry, block: credential })
-      // A failed allowance check is not evidence that a subscription is spent.
-      // Keep the person's preference instead of silently charging a later key.
-      if (credential.reason === 'checking') return { kind: 'none', reason: 'checking', skipped }
-      continue
-    }
-    if (input.location === 'cloud') return { kind: 'cloud', entry, model: entry.model, skipped }
-    const eligible = input.devices.flatMap(device => {
-      const model = deviceModel(device, entry)
-      return model ? [{ device, model }] : []
-    })
-    if (!eligible.length) { skipped.push({ entry, block: { usable: false, reason: 'noDevice' } }); continue }
-    const pick = pickDevice(eligible)!
-    return { kind: 'device', entry, deviceId: pick.device.id, model: pick.model, skipped }
+    if (credential.usable) { runnable.push(entry); continue }
+    skipped.push({ entry, block: credential })
+    if (credential.reason === 'checking') { checking = true; break }
   }
-  const reason: NothingReason = skipped.some(item => item.block.reason === 'noDevice') ? 'noDevice' : 'unavailable'
-  return { kind: 'none', reason, skipped }
+  if (input.location !== 'local' && input.cloudReady && runnable[0]) return { kind: 'cloud', entry: runnable[0], model: runnable[0].model, skipped }
+  if (input.location !== 'cloudOnly') {
+    // A server before a computer whatever the model: a later model on a server goes before an earlier one on a computer.
+    for (const server of [true, false]) {
+      const tier = input.devices.filter(device => device.server === server)
+      for (const [at, entry] of runnable.entries()) {
+        const eligible = tier.flatMap(device => {
+          const model = deviceModel(device, entry)
+          return model ? [{ device, model }] : []
+        })
+        if (!eligible.length) continue
+        const pick = pickDevice(eligible)!
+        // The models before it that this place cannot run (a place before it ran none of them).
+        for (const earlier of runnable.slice(0, at)) skipped.push({ entry: earlier, block: { usable: false, reason: 'noDevice' } })
+        return { kind: 'device', entry, deviceId: pick.device.id, model: pick.model, skipped }
+      }
+    }
+  }
+  if (checking) return { kind: 'none', reason: 'checking', skipped }
+  for (const entry of runnable) skipped.push({ entry, block: { usable: false, reason: 'noDevice' } })
+  return { kind: 'none', reason: runnable.length ? 'noDevice' : 'unavailable', skipped }
 }
 
 /**

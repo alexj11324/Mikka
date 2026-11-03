@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { withDeviceRoute } from '@/lib/device-route'
-import { isDeviceAuthorityRevoked } from '@/lib/db/device-scope'
+import { isDeviceAuthorityError } from '@/lib/db/device-scope'
 import { authenticateDevice } from '@/lib/device-link'
 import { pool } from '@/lib/db'
 import { AgentToolApprovalStore } from '@/lib/agent-tool-approval/store'
@@ -31,7 +31,7 @@ async function handle(request: Request, {params}: {params:Promise<{runId:string}
     return Response.json(issuePolicySnapshot(context,prior.payload.policy),{headers})
   } catch (error) {
     // A revoked token is an authentication failure: withDeviceRoute answers 401, not a policy conflict.
-    if (isDeviceAuthorityRevoked(error)) throw error
+    if (isDeviceAuthorityError(error)) throw error
     return Response.json({error:'policySnapshotUnavailable'},{status:409,headers})
   }
 }
