@@ -390,14 +390,20 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     const { factoryBinding } = await import('../lib/factory/dispatch')
     const runtime = factoryRuntimeForBot(personState.botId)
     const sha = 'b'.repeat(40)
+    const { isCurrentFactoryDeliverable } = await import('../lib/factory/execution-kind')
+    assert.equal(await isCurrentFactoryDeliverable(pool, personState.id, result.runId!),true)
+    assert.equal(await isCurrentFactoryDeliverable(pool, 'another-owner', result.runId!),false)
     const complete = async (runId: string, check = false) => {
       const assignment = check ? await factoryCheckAssignment(pool as never, personState.id, runId) : null
       if (assignment) { assert.equal(assignment.factoryCheck.reportOnly, true); assert.equal(assignment.baseBranch, sha, 'the checker inspects the actual delivery snapshot, not the original source commit') }
-      await pool.query(`UPDATE agent_runs SET status='succeeded',"stopReason"='submitted',"sessionId"=$2,"startedAt"=clock_timestamp()-interval '1 second',"finishedAt"=clock_timestamp(),report=$3 WHERE id=$1`, [runId, `desktop-${runId}`, JSON.stringify({
+      await pool.query(`UPDATE agent_runs SET status='running',"sessionId"=$2,"startedAt"=clock_timestamp()-interval '1 second' WHERE id=$1`, [runId, `desktop-${runId}`])
+      const { persistRunCompletion } = await import('../lib/run-publications')
+      await persistRunCompletion(personState.id, runId, { stopReason:'submitted', report: {
         sourceCommit: assignment ? assignment.baseBranch : 'a'.repeat(40), ...(!check ? { deliverableCommit: sha } : {}), summary: 'Inspected the desktop delivery and its evidence.', filesChanged: [], verify: { status: 'not_run' }, openQuestions: [], nextStep: null,
         criteria: [{ text: 'Requested desktop result exists', passed: true, evidence: 'Inspected the persisted delivery report.' }],
         ...(assignment ? { check: { sha: assignment.baseBranch, readOnly: true } } : {}),
-      })])
+      } })
+      assert.equal((await pool.query('SELECT status FROM agent_runs WHERE id=$1',[runId])).rows[0].status,'succeeded','the real server completion path agrees with the daemon for a no-build delivery')
       await runtime.reconcile.run(personState.id, runId)
     }
     const current = async () => (await pool.query(`SELECT t.*,a."runId",c.kind AS "candidateKind",c.sha FROM factory_tasks t JOIN factory_attempts a ON a.id=t."attemptId" LEFT JOIN factory_candidates c ON c.id=t."candidateId" WHERE t."issueId"=$1 AND t."userId"=$2 ORDER BY t."createdAt" DESC LIMIT 1`, [issueId, personState.id])).rows[0]

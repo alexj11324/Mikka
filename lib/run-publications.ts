@@ -1,4 +1,5 @@
 import 'server-only'
+import { isCurrentFactoryDeliverable } from './factory/execution-kind'
 import { and, asc, eq, isNull, lte, ne, or, sql } from 'drizzle-orm'
 import { runStateForStop } from '@mikka/protocol/daemon'
 import { reachesReview, runReport, type RunReport, type RunCompleteRequest } from '@mikka/protocol/run'
@@ -177,8 +178,12 @@ async function completionTransaction(userId: string, runId: string, completion: 
       if (completion.stopReason === 'submitted' && run.kind !== 'plan' && !run.agentDefinition?.readOnly) {
         if (report?.verify.status === 'failed') status = 'failed'
         else if (report?.verify.status !== 'passed') {
-          const gate = publicationGate({ stopReason: completion.stopReason, kind: run.kind, report: report ?? null, assignment: publication ?? null })
-          if (gate.state !== 'pending') status = 'stopped'
+          // Match the host's claim purpose. A desktop delivery has no repository
+          // build or publication; its independent checks still gate acceptance.
+          if (!factoryBound || !await isCurrentFactoryDeliverable(client, userId, runId)) {
+            const gate = publicationGate({ stopReason: completion.stopReason, kind: run.kind, report: report ?? null, assignment: publication ?? null })
+            if (gate.state !== 'pending') status = 'stopped'
+          }
         }
       }
       // A paused run holds no lease, so it is never reclaimed as lost; it is not finished yet.

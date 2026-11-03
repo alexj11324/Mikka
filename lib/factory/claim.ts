@@ -1,4 +1,5 @@
 import { factoryRunBotMatches } from './run-scope'
+import { factoryExecutionKind } from './execution-kind'
 import type { PoolClient } from 'pg';
 import { FactoryError } from './contract';
 import type { createFactoryStore, FactoryTask } from './store';
@@ -36,6 +37,6 @@ export function createFactoryClaim(store: ReturnType<typeof createFactoryStore>,
       return {...await validateCheck(tx,task,runId),preserveQuestionWorktree:true};
     }
     const { rows: [repo] } = await tx.query('SELECT "remoteUrl","repoPath" FROM device_repos WHERE id=$1 AND "userId"=$2', [run.deviceRepoId, userId]);
-    return {preserveQuestionWorktree:true, ...(task.stage === 'execute' ? { factoryExecuteKind: !repo?.remoteUrl && repo?.repoPath?.startsWith('/home/user/.mikka/bot-workspaces/') ? 'deliverable' : run.agentDefinition?.readOnly ? 'report' : 'repository' } : {})};
+    return {preserveQuestionWorktree:true, ...(task.stage === 'execute' ? { factoryExecuteKind: factoryExecutionKind(repo, run.agentDefinition?.readOnly) } : {})};
   };
 }

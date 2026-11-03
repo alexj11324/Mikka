@@ -200,6 +200,7 @@ test('run result publication commits one owner-scoped result through retries and
         await prepareRunPublication(assignment(f), f.remoteUrl)
         const submitted = completion(f, 'Unverified submission')
         submitted.report!.verify = { status: 'not_run' }
+        submitted.report!.deliverableCommit = 'f'.repeat(40) // A report cannot turn repository work into a host-authorized deliverable.
         if (mode === 'not-pushed') submitted.report!.publish!.pushed = false
         if (mode === 'wrong-branch') submitted.report!.publish!.branch = 'main'
         assert.equal((await persistRunCompletion(f.userId, f.runId, submitted))?.publicationPending, false)
