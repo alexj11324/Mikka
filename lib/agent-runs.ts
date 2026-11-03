@@ -69,7 +69,12 @@ export const runViewColumns = {
  * `note` is extra direction for this run only, after the issue.
  */
 /** `botId` is the bot that dispatched the run (null for the Coordinator); the run reports back to that bot's chat. */
-type LocalDispatchInput = { issueId: string; agentId: string; repo: string; note?: string; requestKey?: string; model?: string; pinnedDeviceId?: string; readOnly?: boolean
+type LocalDispatchInput = { issueId: string; agentId: string; repo: string; note?: string; requestKey?: string
+  /** Required (lib/computer/run-model.ts): a new run's from 优先使用的模型, a thread's next run its own; never left to the CLI. */
+  model: string
+  /** The run this one continues, named when the model is missing. */
+  threadRunId?: string
+  pinnedDeviceId?: string; readOnly?: boolean
   /** The API key the 优先使用的模型 entry names; the run uses it only when it may (lib/run-credential-source.ts). */
   apiKeyId?: string
   /** Exact server-selected identity; reauthorized for this owner, Agent and workspace at queue time. */
@@ -108,7 +113,9 @@ export async function queueFactoryRun(tx: import('pg').PoolClient, userId: strin
       botId = source.botId
       requestEventId = source.agentDefinition?.repositoryAdmission?.requestEventId
     }
-    const result = await queueAdmittedRun(userId, { ...parsed.data, repo: repo.remoteUrl, requestKey: parsed.data.requestKey ?? (context ? `factory:${context.attemptId}` : undefined) }, botId, undefined, requestEventId, null, { executor, repo, client: tx, sourceRunId })
+    // Its model, chosen here like any run's: a rerun keeps its source run's, a new task takes 优先使用的模型's first entry its Agent runs.
+    const runModel = await factoryRunModel(userId, parsed.data.agentId, botId, sourceRunId ? (await executor.select({ agentDefinition: agentRuns.agentDefinition }).from(agentRuns).where(and(eq(agentRuns.id, sourceRunId), eq(agentRuns.userId, userId))).limit(1))[0]?.agentDefinition : null)
+    const result = await queueAdmittedRun(userId, { ...parsed.data, ...runModel, repo: repo.remoteUrl, requestKey: parsed.data.requestKey ?? (context ? `factory:${context.attemptId}` : undefined) }, botId, undefined, requestEventId, null, { executor, repo, client: tx, sourceRunId })
     const [run] = await executor.select({ status: agentRuns.status }).from(agentRuns).where(and(eq(agentRuns.id, result.runId), eq(agentRuns.userId, userId))).limit(1)
     if (!run) throw new ActionFailureError('runInvalid')
     // BE-13: the target device cannot take the run right now -> one reason-coded event, same transaction.
@@ -122,6 +129,11 @@ async function queueAdmittedRun(userId: string, input: LocalDispatchInput, botId
   requestEventId?: string, source: 'mcp' | null = null,
   internal?: { executor: Pick<typeof db, 'select' | 'transaction'>; repo: typeof deviceRepos.$inferSelect; client: import('pg').PoolClient; sourceRunId?: string }) {
   const executor = internal?.executor ?? db
+  // Every local run is frozen with its model: a caller that left it out fails here, before anything is read or written.
+  if (typeof input.model !== 'string' || !input.model.trim() || input.model.trim() === 'auto') {
+    console.error(JSON.stringify({ msg: 'local_run_model_missing', threadRunId: input.threadRunId ?? null, issueId: input.issueId, agentId: input.agentId }))
+    throw new ActionFailureError('runModelMissing')
+  }
   const parsed = z.object({ issueId: z.uuid(), agentId: z.uuid(), repo: z.string().trim().min(1).max(4_000), note: z.string().trim().max(10_000).optional(), requestKey: dispatchRequestKey.optional(), model: z.string().trim().min(1).max(128).optional(), pinnedDeviceId: z.uuid().optional(), readOnly: z.boolean().optional(), apiKeyId: z.uuid().optional(), subscriptionBindingId: z.uuid().optional() }).refine(value => !(value.apiKeyId && value.subscriptionBindingId)).safeParse(input)
   if (!parsed.success) throw new ActionFailureError('runInvalid')
   try { normalizeRepository(parsed.data.repo, { allowFile: daemonTestMode(process.env) }) } catch { throw new ActionFailureError('repoPathInvalid') }
@@ -142,6 +154,7 @@ async function queueAdmittedRun(userId: string, input: LocalDispatchInput, botId
   const found = captureDefinition && byosEnabled() ? await nativeRunBinding(query, userId, agent.id, agent.harness, workspaceId, parsed.data.subscriptionBindingId) : null
   if (parsed.data.subscriptionBindingId && (!found || (parsed.data.model && parsed.data.model !== found.modelId))) throw new ActionFailureError('executionAccountUnavailable')
   const model = parsed.data.subscriptionBindingId ? found?.modelId : parsed.data.model
+  if (!model) throw new ActionFailureError('runModelMissing')
   // The run's credential, frozen now: the subscription, else the person's own API key (orchestration.md § 2).
   // A subscription's identity is its provider model, including at the CLI boundary.
   const { subscription, apiKey } = await localRunCredential(internal?.client ?? pool, userId, botId, agent.harness, parsed.data.subscriptionBindingId ? found?.modelId : model, found, parsed.data.apiKeyId)
@@ -158,6 +171,19 @@ async function queueAdmittedRun(userId: string, input: LocalDispatchInput, botId
     : null
   return (await import('@/lib/run-admission-store')).acceptLocalRun({ id: runId, userId, botId, issueId: issue.id, agentId: agent.id, deviceId: agent.deviceId,
     deviceRepoId: repo.id, prompt, source, definition: agentDefinition!, ...(requestEventId ? { requestEventId } : {}), ...(parsed.data.requestKey ? { dispatch: { issueId: issue.id, agentId: agent.id, deviceRepoId: repo.id, note: parsed.data.note, requestKey: parsed.data.requestKey, ...(parsed.data.subscriptionBindingId ? { subscriptionBindingId: parsed.data.subscriptionBindingId } : {}) } } : {}), ...(internal ? { continuation: true, sourceRunId: internal.sourceRunId } : {}) }, internal?.client)
+}
+
+/** A Factory run's model: its source run's own when it reruns one, else 优先使用的模型 on its Agent's computer; none left is an error, never the CLI's pick. */
+async function factoryRunModel(userId: string, agentId: string, botId: string | null, source: Parameters<typeof import('@/lib/computer/run-model').threadRunModel>[0]) {
+  const { threadRunModel, chooseLocalRunModel } = await import('@/lib/computer/run-model')
+  const kept = threadRunModel(source)
+  if (kept) return kept
+  const [agent] = await db.select({ id: agents.id, deviceId: agents.deviceId, harness: agents.harness }).from(agents).where(and(eq(agents.id, agentId), eq(agents.userId, userId))).limit(1)
+  if (!agent?.deviceId || (agent.harness !== 'codex' && agent.harness !== 'claude_code')) throw new ActionFailureError('agentNoDevice')
+  const { executionWorkspace } = await import('@/lib/execution-settings')
+  const chosen = await chooseLocalRunModel(pool, { ownerId: userId, workspaceId: await executionWorkspace(userId, botId), botId }, { id: agent.id, deviceId: agent.deviceId, harness: agent.harness })
+  if ('error' in chosen) throw new ActionFailureError('runModelMissing')
+  return chosen
 }
 
 /** A device run's credential source; the bot's workspace decides whose API keys it may use. */

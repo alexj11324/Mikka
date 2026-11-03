@@ -1078,6 +1078,7 @@
     "executionCommandNotFound": "This detection command was not found.",
     "executionAccountUnavailable": "This account is unavailable.",
     "threadModelUnavailable": "The model this thread ran on is no longer available.",
+    "runModelMissing": "This run has no model.",
     "generic": "Something went wrong. Please try again.",
     "authRequired": "Sign in required",
     "validationGeneric": "Please check the information you entered.",

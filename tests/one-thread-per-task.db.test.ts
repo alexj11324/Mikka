@@ -242,4 +242,32 @@ test('one task, one thread: dispatch continues the task\'s thread unless the per
     assert.deepEqual(moved.placement, { kind: 'device', deviceId: studio, name: 'Mac Studio' })
     judged = null
   })
+  await t.test('a local run is frozen with its model: none fails at once, a thread keeps its own, an MCP client\'s new run takes 优先使用的模型', async () => {
+    const a = await person()
+    const agentId = (await pool.query('SELECT id FROM agents WHERE "deviceId"=$1', [a.deviceId])).rows[0].id as string
+    const before = (await runs(a.id)).length
+    const { queueRun } = await import('../lib/agent-runs')
+    for (const model of ['', 'auto', undefined]) await assert.rejects(queueRun(a.id, { issueId: a.issueId, agentId, repo: 'octo/repo', model: model as string }, a.botId), { code: 'runModelMissing' })
+    assert.equal((await runs(a.id)).length, before, 'nothing is written for a run without its model')
+    const model = async (runId: string) => (await pool.query('SELECT "agentDefinition" FROM agent_runs WHERE id=$1', [runId])).rows[0].agentDefinition
+    const first = await dispatch(a)
+    assert.deepEqual([(await model(first.runId)).model, (await model(first.runId)).cliModelSelection], ['gpt-5', 'explicit'])
+    await pool.query(`UPDATE agent_runs SET status='failed',"finishedAt"=now() WHERE id=$1`, [first.runId])
+    const next = await dispatch(a, { note: 'Again.' })
+    assert.equal(next.thread, 'continued')
+    assert.deepEqual([(await model(next.runId)).model, (await model(next.runId)).cliModelSelection], ['gpt-5', 'explicit'], 'the computer thread keeps its model')
+    // A thread whose runs were all frozen without one: told, never left to the CLI.
+    await pool.query(`UPDATE agent_runs SET status='failed',"finishedAt"=now(),"agentDefinition"="agentDefinition"-'model' WHERE "userId"=$1`, [a.id])
+    const count = (await runs(a.id)).length
+    const refused = await dispatch(a, { note: 'Again.' })
+    assert.equal(refused.error, 'threadModelUnavailable', JSON.stringify(refused))
+    assert.equal((await runs(a.id)).length, count)
+    // An MCP client names only the Agent: the run takes the first model 优先使用的模型 allows on that computer.
+    const b = await person()
+    const bAgent = (await pool.query('SELECT id FROM agents WHERE "deviceId"=$1', [b.deviceId])).rows[0].id as string
+    const { dispatchRun: mcpDispatch } = await import('../lib/mcp/actions')
+    const viaMcp = await mcpDispatch(b.id, { issueId: b.issueId, agentId: bAgent, repo: 'octo/repo' }) as { runId?: string; error?: string }
+    assert.ok(viaMcp.runId, JSON.stringify(viaMcp))
+    assert.deepEqual([(await model(viaMcp.runId!)).model, (await model(viaMcp.runId!)).cliModelSelection], ['gpt-5', 'explicit'])
+  })
 })

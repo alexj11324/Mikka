@@ -80,7 +80,10 @@ async function queueNextRun(userId: string, run: typeof agentRuns.$inferSelect, 
       .catch(error => { throw error instanceof ComputerError && error.message === 'Bot subscription unavailable' ? new ActionFailureError('threadModelUnavailable') : error })
   }
   if (!previous.remoteUrl) throw new ActionFailureError('agentRepoMissing')
-  const model = run.agentDefinition?.cliModelSelection === 'explicit' ? run.agentDefinition.model : undefined
+  // The thread's own model and account, as on the cloud; when it has none left, the person is told instead of the CLI choosing.
+  const { latestThreadRunModel } = await import('@/lib/computer/run-model')
+  const runModel = await latestThreadRunModel(pool, userId, issueId, run.agentId)
+  if (!runModel) throw new ActionFailureError('threadModelUnavailable')
   const { queueRun } = await import('@/lib/agent-runs')
-  return queueRun(userId, { issueId, agentId: run.agentId, repo: previous.remoteUrl, note, ...(model ? { model } : {}), ...readOnly }, run.botId, undefined, undefined, run.source === 'mcp' ? 'mcp' : null)
+  return queueRun(userId, { issueId, agentId: run.agentId, repo: previous.remoteUrl, note, ...runModel, threadRunId: run.id, ...readOnly }, run.botId, undefined, undefined, run.source === 'mcp' ? 'mcp' : null)
 }

@@ -178,8 +178,26 @@ export async function dispatchRun(userId: string, input: { issueId: string; agen
   const { dispatchToTask } = await import('@/lib/thread-dispatch')
   return attempt(async () => dispatchToTask(userId, input.issueId, {
     note: input.note,
-    start: async (previous, note) => ({ status: 'queued' as const, ...(await queueRun(userId, { ...input, note, ...(previous?.readOnly ? { readOnly: true } : {}), ...(previous && input.requestKey ? { requestKey: `thread:${previous.id}:${input.requestKey}`.slice(0, 200) } : {}) }, await chatBotId(userId, null, MCP_WORKSPACE), undefined, undefined, 'mcp')) }),
+    start: async (previous, note) => ({ status: 'queued' as const, ...(await queueRun(userId, { ...input, note, ...await mcpRunModel(userId, input, previous), ...(previous ? { threadRunId: previous.id } : {}), ...(previous?.readOnly ? { readOnly: true } : {}), ...(previous && input.requestKey ? { requestKey: `thread:${previous.id}:${input.requestKey}`.slice(0, 200) } : {}) }, await chatBotId(userId, null, MCP_WORKSPACE), undefined, undefined, 'mcp')) }),
   }))
+}
+
+/** A thread's next run keeps its own model; a new one takes 优先使用的模型 on the named Agent's computer. */
+async function mcpRunModel(userId: string, input: { issueId: string; agentId: string }, previous: { id: string; agentId: string } | null) {
+  const { chooseLocalRunModel, latestThreadRunModel } = await import('@/lib/computer/run-model')
+  const { pool } = await import('@/lib/db')
+  if (previous) {
+    const kept = await latestThreadRunModel(pool, userId, input.issueId, previous.agentId)
+    if (!kept) throw new ActionFailureError('threadModelUnavailable')
+    return kept
+  }
+  const [agent] = await db.select({ id: agents.id, deviceId: agents.deviceId, harness: agents.harness }).from(agents).where(and(eq(agents.id, input.agentId), eq(agents.userId, userId))).limit(1)
+  if (!agent?.deviceId || (agent.harness !== 'codex' && agent.harness !== 'claude_code')) throw new ActionFailureError('agentNoDevice')
+  const { executionWorkspace } = await import('@/lib/execution-settings')
+  const botId = await chatBotId(userId, null, MCP_WORKSPACE)
+  const chosen = await chooseLocalRunModel(pool, { ownerId: userId, workspaceId: await executionWorkspace(userId, botId), botId }, { id: agent.id, deviceId: agent.deviceId, harness: agent.harness })
+  if ('error' in chosen) throw new ActionFailureError('runModelMissing')
+  return chosen
 }
 
 export async function sendToRun(userId: string, input: { runId: string; text: string }) {

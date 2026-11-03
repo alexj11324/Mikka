@@ -57,19 +57,19 @@ test('actual personal producer freezes owned Bot workspace or explicit unbound s
   const { queueRun } = await import('./agent-runs')
   overrideDeploymentSwitch('personalMailbox', undefined); delete process.env.MIKKA_BYOS_ENABLED
   for (const bot of [botId, null]) {
-    await queueRun(owner, { issueId, agentId, repo: repoUrl }, bot, execution)
+    await queueRun(owner, { issueId, agentId, repo: repoUrl, model: 'fixture' }, bot, execution)
     assert.equal(personalWorkerMailboxScopeMatches('codex', inserted.at(-1)!.agentDefinition, { botId: bot, workspaceId: bot ? workspaceId : globalId }), true)
   }
   ownedBot = false
   const count = inserted.length
-  await assert.rejects(queueRun(owner, { issueId, agentId, repo: repoUrl }, botId, execution), { code: 'botNotFound' })
+  await assert.rejects(queueRun(owner, { issueId, agentId, repo: repoUrl, model: 'fixture' }, botId, execution), { code: 'botNotFound' })
   assert.equal(inserted.length, count)
   overrideDeploymentSwitch('personalMailbox', false)
   // Identity authorization still applies with the mailbox off; only the
   // mailbox namespace projection is skipped.
   ownedBot = true
   const lookups = botQueries
-  await queueRun(owner, { issueId, agentId, repo: repoUrl }, botId, execution)
+  await queueRun(owner, { issueId, agentId, repo: repoUrl, model: 'fixture' }, botId, execution)
   assert.equal(botQueries, lookups)
   assert.equal((inserted.at(-1)!.agentDefinition as { mailbox?: unknown }).mailbox, undefined)
   ownedBot = true

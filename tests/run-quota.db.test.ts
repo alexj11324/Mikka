@@ -95,7 +95,7 @@ test('quota exhausted mid-run: continue on the person\'s key, else pause with th
   }
   /** A run dispatched the ordinary way, then running on the device with a session, as a claim leaves it. */
   const running = async (p: Person, harness: 'claude_code' | 'codex', model?: string) => {
-    const { runId } = await queueRun(p.id, { issueId: await task(p.id), agentId: p.agents[harness], repo: p.remote, ...(model ? { model } : {}) }, p.botId)
+    const { runId } = await queueRun(p.id, { issueId: await task(p.id), agentId: p.agents[harness], repo: p.remote, model: model ?? (harness === 'claude_code' ? 'subscription-model' : 'gpt-fixture') }, p.botId)
     await pool.query(`UPDATE agent_runs SET status='running',"sessionId"=$2,"worktreePath"='/tmp/wt',"startedAt"=now(),"leaseExpiresAt"=now()+interval '5 minutes' WHERE id=$1`, [runId, `session-${runId}`])
     return runId
   }
@@ -230,8 +230,8 @@ test('quota exhausted mid-run: continue on the person\'s key, else pause with th
   await t.test('automatic subscription quota fallback requires the same frozen model, regardless of the chat Key', async () => {
     const p = await person('quota-same-model')
     await subscribe(p)
-    const runId = await running(p, 'claude_code')
-    assert.equal((await row(runId)).agentDefinition.cliModelSelection, 'auto', 'a subscription without an explicit dispatch model retains CLI auto')
+    const runId = await running(p, 'claude_code', 'subscription-model')
+    assert.deepEqual([(await row(runId)).agentDefinition.cliModelSelection, (await row(runId)).agentDefinition.model], ['explicit', 'subscription-model'], 'a local run is frozen with its model, never left to the CLI')
     const chatKey = await keys.addApiKey(pool, p.id, { provider: 'deepseek', apiKey: `fixture-chat-${randomUUID()}` }, { fetch: models(['deepseek-chat']) })
     await keys.setBotApiKeyChoice(pool, { ownerId: p.id, workspaceId: p.workspaceId }, p.botId, chatKey.id, 'deepseek-chat')
     await quotaEnd(p, runId, resetsAt)
@@ -282,7 +282,7 @@ test('quota exhausted mid-run: continue on the person\'s key, else pause with th
     const p = await person('quota-key-run')
     const key = await addKey(p.id, 'anthropic', ['key-model-a'])
     await keys.setBotApiKeyChoice(pool, { ownerId: p.id, workspaceId: p.workspaceId }, p.botId, key.id, 'key-model-a')
-    const runId = await running(p, 'claude_code')
+    const runId = await running(p, 'claude_code', 'key-model-a')
     assert.equal((await row(runId)).agentDefinition.modelSource, 'api_key')
     await quotaEnd(p, runId, resetsAt)
     const ended = await row(runId)
