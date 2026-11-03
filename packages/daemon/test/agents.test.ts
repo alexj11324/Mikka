@@ -234,6 +234,50 @@ describe("mikka MCP server", () => {
 })
 
 describe("run context", () => {
+  it('keeps artifact-reader advertising unchanged for writable executions, planning and command checks', async () => {
+    const worktree = await worktreeOf(await makeRepo())
+    for (const options of [
+      { kind: 'implement' as const, policy: defaultRunPolicy() },
+      { kind: 'plan' as const, policy: { ...defaultRunPolicy(), readOnly: true } },
+      { kind: 'implement' as const, policy: { ...defaultRunPolicy(), readOnly: true }, factoryCheck: { stage: 'verify' as const, reportOnly: false, inferCommand: false } },
+    ]) {
+      const ctx = new RunContext({ harness: 'codex', worktree, runDir: tempDir(), privateDir: tempDir(), ...options })
+      expect(ctx.mcpServer().args).not.toContain('--factory-artifacts')
+    }
+  })
+
+  it.each([
+    ['claude_code', 'implement'], ['codex', 'implement'], ['claude_code', 'fix'], ['codex', 'fix'],
+  ] as const)('lets a read-only %s %s execution inspect its bound repository before selecting another', async (harness, kind) => {
+    const repo = await makeRepo(), worktree = await worktreeOf(repo)
+    const content = 'This is the wrong repository.\n'
+    writeFileSync(join(worktree, 'README.md'), content)
+    await execa('git', ['add', 'README.md'], { cwd: worktree })
+    await execa('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-m', 'README'], { cwd: worktree })
+    const before = (await execa('git', ['rev-parse', 'HEAD'], { cwd: worktree })).stdout
+    const ctx = new RunContext({ harness, kind, worktree, runDir: tempDir(), privateDir: tempDir(), policy: { ...defaultRunPolicy(), readOnly: true } })
+    const client = mcpClient(ctx.handoffFile, ctx.mcpServer().args.slice(3))
+    try {
+      const tools = JSON.stringify(await client.request('tools/list'))
+      expect(tools).toContain('inspect_artifact')
+      expect(tools).toContain('switch_repository')
+      expect(tools).not.toContain('verify_command')
+      const observed = await client.request('tools/call', { name: 'inspect_artifact', arguments: { path: 'README.md' } }) as { result: { content: { text: string }[] } }
+      expect(JSON.parse(observed.result.content[0].text)).toMatchObject({ path: 'README.md', head: before, contentUtf8: content, contentMatchesGit: true })
+      const outside = join(tempDir(), 'secret.txt')
+      writeFileSync(outside, 'outside-private-value')
+      symlinkSync(outside, join(worktree, 'escape'))
+      for (const path of ['../secret.txt', outside, 'escape', '.git']) {
+        const refused = await client.request('tools/call', { name: 'inspect_artifact', arguments: { path } })
+        expect(refused).toMatchObject({ result: { isError: true } })
+        expect(JSON.stringify(refused)).not.toContain('outside-private-value')
+      }
+      expect((await execa('git', ['status', '--porcelain'], { cwd: worktree })).stdout).toBe('?? escape')
+      expect((await execa('git', ['rev-parse', 'HEAD'], { cwd: worktree })).stdout).toBe(before)
+      expect(existsSync(ctx.handoffFile)).toBe(false)
+    } finally { client.close() }
+  })
+
   it('provides file hashes and fixed Git observations to a report-only check without granting shell commands', async () => {
     const repo = await makeRepo()
     const worktree = await worktreeOf(repo)

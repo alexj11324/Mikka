@@ -86,6 +86,14 @@ it('permits the advertised fixed artifact reader without a repository-switch gra
   expect((await output(session)).first).toEqual({ action: 'accept', content: {} })
 })
 
+it.each(['implement', 'fix'] as const)('permits the advertised artifact reader in a read-only %s execution', async kind => {
+  const cwd = await makeRepo(), gate = new ToolApprovalGate('run-1', { isLive: () => true })
+  const session = await adapter().start({ runId: 'run-1', kind, cwd, prompt: 'MIKKA_ARTIFACT_ELICITATION_TEST',
+    policy: { ...defaultRunPolicy(), readOnly: true },
+    env: { PATH: process.env.PATH ?? '' }, log: createLogger(), toolApproval: gate })
+  expect((await output(session)).first).toEqual({ action: 'accept', content: {} })
+})
+
 it('refuses an unregistered Mikka tool', async () => {
   const cwd = await makeRepo(), policy = defaultRunPolicy()
   const gate = new ToolApprovalGate('run-1', { isLive: () => true })

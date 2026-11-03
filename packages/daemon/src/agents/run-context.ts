@@ -383,14 +383,15 @@ export class RunContext {
 
   mcpServer(): McpServerSpec {
     const command = this.options.nodeBinary ?? process.execPath
+    const repositoryExecution = !this.options.factoryCheck && ['implement', 'fix'].includes(this.options.kind ?? '')
     return {
       command,
       args: [
         MCP_SERVER_SCRIPT, "--handoff", this.handoffFile,
         "--captures", this.capturesDir, "--capture-root", this.worktree, "--capture-root", this.tmpDir,
         ...(this.options.factoryCheck && (!this.options.factoryCheck.reportOnly || this.options.factoryCheck.inferCommand) ? ['--factory-verify', JSON.stringify({ cwd: this.worktree, command: this.options.verifyCommand ?? null, infer: this.options.factoryCheck.inferCommand })] : []),
-        ...(this.options.factoryCheck?.reportOnly ? ['--factory-artifacts', this.worktree] : []),
-        ...(!this.options.factoryCheck && ['implement', 'fix'].includes(this.options.kind ?? '') ? ['--repository-selection', this.worktree] : []),
+        ...(this.options.factoryCheck?.reportOnly || (repositoryExecution && runPolicy(this.options.policy).readOnly === true) ? ['--factory-artifacts', this.worktree] : []),
+        ...(repositoryExecution ? ['--repository-selection', this.worktree] : []),
       ],
       // Inside Electron, `process.execPath` is the app; run it as plain Node.
       env: process.versions.electron ? { ELECTRON_RUN_AS_NODE: "1" } : {},
