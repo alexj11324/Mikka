@@ -2,6 +2,8 @@ import { isSmokeAccountEmail } from '../../lib/smoke-account.ts'
 const email = process.env.MIKKA_TEST_ACCOUNT_EMAIL ?? process.env.SMOKE_OWNER_EMAIL
 const password = process.env.MIKKA_TEST_ACCOUNT_PASSWORD ?? process.env.SMOKE_OWNER_PASSWORD
 const report = { status: 'running', account: email === 'alexjiang20232024@gmail.com' ? 'authorized-main' : 'existing-smoke' }
+report.testFlashKeyConfigured = Boolean(process.env.DEEPSEEK_API_KEY)
+report.existingDecisionKeyConfigured = Boolean(process.env.AI_GATEWAY_API_KEY)
 let cookie = ''
 async function request(path, body) {
   const response = await fetch(new URL('/mikka' + path, 'https://app.aspectlylabs.com'), {
