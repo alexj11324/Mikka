@@ -31,6 +31,7 @@
 import { quotaStopApplies } from "./quota-exhausted"
 import { runApps } from '../agents/run-apps'
 import { fixedCheckSnapshot } from "./check"
+import { retainDeliverable } from '../agents/publish'
 import { verifySkillAssignment, verifySkillResume, verifyMountedSkill } from '../agents/skill-artifact'
 import type { SkillReceiptRevalidation } from '@mikka/protocol/skill'
 import { runPaths } from "../agents/run-context"
@@ -804,11 +805,12 @@ export class RunSupervisor {
     const planning = entry?.assignment.kind === "plan"
     const readOnlyTask = entry && (isReadOnlyTask(entry.assignment) || entry.assignment.factoryCheck?.reportOnly === true || entry.assignment.factoryExecuteKind === 'deliverable')
     // Never copy trusted evidence from an adapter/model report.
-    const { sourceCommit: _source, skillMount: _mount, execution: _execution, runtime: _runtime, ...content } = report
+    const { sourceCommit: _source, deliverableCommit: _delivery, skillMount: _mount, execution: _execution, runtime: _runtime, ...content } = report
     report = {
       ...content,
       ...(entry?.baseCommit && /^[a-f0-9]{40}$/.test(entry.baseCommit)
         ? { sourceCommit: entry.baseCommit } : {}),
+      ...(entry?.assignment.factoryExecuteKind === 'deliverable' && entry.deliverableCommit ? { deliverableCommit: entry.deliverableCommit } : {}),
       ...(entry?.skillMount && entry.skillMount.sessionId === entry.sessionId &&
         entry.skillMount.receiptId === entry.assignment.skillReceipt?.id &&
         entry.skillMount.versionId === entry.assignment.skillReceipt?.artifact.versionId &&
@@ -956,6 +958,10 @@ export class RunSupervisor {
     ).slice(0, MAX_REPORTED_FILES)
     const inferred = assignment.factoryCheck?.stage === 'verify' && assignment.factoryCheck.inferCommand && !assignment.factoryCheck.reportOnly ? report.verificationCommand : undefined
     const command = assignment.verifyCommand ?? inferred?.command
+    if (stopReason === 'submitted' && assignment.factoryExecuteKind === 'deliverable') {
+      const deliverableCommit = await retainDeliverable(repo.path, worktree, runId)
+      this.deps.journal.update(runId, { deliverableCommit })
+    }
     // A `plan` run writes no code: there is nothing for the issue's verify
     // command to check (ADR ORV-205).
     if (stopReason !== "submitted" || assignment.kind === "plan" || isReadOnlyTask(assignment) || assignment.factoryExecuteKind === 'deliverable')

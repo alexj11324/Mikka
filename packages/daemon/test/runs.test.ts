@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process"
 import { existsSync, readFileSync, writeFileSync } from "node:fs"
-import { join } from "node:path"
+import { dirname, join, resolve } from "node:path"
+import { WorktreeManager } from "../src/worktrees"
 import { pathToFileURL } from "node:url"
 import { gzipSync } from 'node:zlib'
 import { RepositoryCache } from "../src/repositories"
@@ -104,6 +105,31 @@ afterEach(async () => {
 })
 
 describe("mock runs", () => {
+  it('retains actual no-repository delivery files for an independent fixed-snapshot check', async () => {
+    const { server, dataDir } = await setup()
+    const fixturesDir = tempDir()
+    writeFileSync(join(fixturesDir, 'delivery.jsonl'), [
+      { t: 0, write: { path: 'DELIVERY.txt', content: 'independent-marker\n' }, chunk: { type: 'text-delta', id: 'delivery', delta: 'Wrote delivery.' } },
+      { t: 1, submit: { summary: 'Wrote DELIVERY.txt.', nextStep: 'Independent inspection.', deliverableCommit: 'f'.repeat(40) } },
+    ].map(line=>JSON.stringify(line)).join('\n')+'\n')
+    const daemon = await boot(server, dataDir, Number.POSITIVE_INFINITY, undefined, fixturesDir)
+    const runId = server.queueRun(DEVICE, { issueId: 'delivery', repoId: 'repo-1', baseBranch: 'main', harness: 'mock', prompt: 'Write DELIVERY.txt', fixture: 'delivery', factoryExecuteKind: 'deliverable' })
+    const run = await runToEnd(daemon, server, runId)
+    expect(run.state).toBe('succeeded')
+    expect(readFileSync(join(run.worktree!, 'DELIVERY.txt'),'utf8')).toBe('independent-marker\n')
+    const report = server.runs.get(runId)!.completion!.report!
+    const snapshot = report.deliverableCommit!
+    expect(snapshot).toMatch(/^[a-f0-9]{40}$/)
+    expect(snapshot).not.toBe('f'.repeat(40))
+    expect(snapshot).not.toBe(report.sourceCommit)
+    expect(report.publish).toBeUndefined()
+    expect(report.verify.status).toBe('not_run')
+    const common = resolve(run.worktree!,git(run.worktree!, 'rev-parse', '--git-common-dir'))
+    const check = await new WorktreeManager(tempDir()).create('independent-delivery', dirname(common), snapshot)
+    expect(existsSync(join(check,'DELIVERY.txt')), 'independent check must receive actual delivery, not just its producing report').toBe(true)
+    expect(readFileSync(join(check,'DELIVERY.txt'),'utf8')).toBe('independent-marker\n')
+  })
+
   it("completes a read-only investigation without running the repository's build or verify command", async () => {
     const { server, dataDir } = await setup()
     const fixturesDir = tempDir()

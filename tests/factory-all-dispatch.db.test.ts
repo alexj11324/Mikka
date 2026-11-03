@@ -21,6 +21,7 @@ test('a Coordinator dispatch_run goes through the Factory', { skip: !dbUrl, time
   overrideDeploymentSwitch('factoryLifecycle', true)
   // Exercise the real daemon format without typechecking its separate package under the web tsconfig.
   const { codexItemChunks } = await import(new URL('../packages/daemon/src/adapters/codex.ts', import.meta.url).href)
+  const { claudeChunks } = await import(new URL('../packages/daemon/src/adapters/claude.ts', import.meta.url).href)
   const { Pool } = await import('pg')
   const pool = new Pool({ connectionString: dbUrl, max: 3 })
   const steps = await import('../workflows/coordinator/steps')
@@ -92,6 +93,10 @@ test('a Coordinator dispatch_run goes through the Factory', { skip: !dbUrl, time
         assert.deepEqual(await verifierCommandEvidence(pool, id, command), []);
       }
       await pool.query(`UPDATE run_chunks SET chunk=jsonb_set(chunk,'{output}', $2::jsonb) WHERE "runId"=$1 AND seq=2`, [id, JSON.stringify(call.result.content)]);
+      assert.equal((await verifierCommandEvidence(pool, id, command)).length, 2, 'actual Codex content blocks');
+      const [claude] = claudeChunks({ type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: call.id, content: call.result.content }] } });
+      await pool.query('UPDATE run_chunks SET chunk=$2 WHERE "runId"=$1 AND seq=2', [id, JSON.stringify(claude)]);
+      assert.equal((await verifierCommandEvidence(pool, id, command)).length, 2, 'actual Claude flattened JSON text');
     }
     await pool.query(`UPDATE agent_runs SET status='succeeded',"stopReason"='submitted',"finishedAt"=clock_timestamp(),report=$2 WHERE id=$1`, [id, JSON.stringify({
       summary: 'Checked tax rounding with concrete evidence.', filesChanged: [], openQuestions: [], nextStep: null, sourceCommit: sha,

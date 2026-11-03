@@ -31,6 +31,7 @@ export interface JournalEntry {
   worktree: string | null
   /** The commit the worktree started from; checkpoints diff against it. */
   baseCommit?: string
+  deliverableCommit?: string
   /** Independent host reread, bound to the actual adapter session. */
   skillMount?: RunSkillMount
   execution?: RunExecution

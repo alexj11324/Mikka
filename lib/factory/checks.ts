@@ -28,7 +28,7 @@ export async function configureFactoryCheck(
   const {
     rows: [row],
   } = await tx.query(
-    `SELECT c.*,producer.report AS "producerReport",(SELECT json_build_object('status',p.status,'pullRequest',p."pullRequest",'branch',p.branch,'baseBranch',p."baseBranch") FROM run_publications p WHERE p."runId"=producer.id AND p."userId"=$4) AS "publicationReceipt",COALESCE(c.sha,producer.report->>'sourceCommit') AS "executionSha",r."deviceId",r."deviceRepoId",COALESCE((SELECT settings."verifyCommand" FROM repository_settings settings WHERE settings."userId"=$4 AND settings."remoteKey"=repo."repoPath"),repo."verifyCommand") AS "verifyCommand",repo."remoteUrl",repo."repoPath",d.enabled,d.kind AS "deviceKind",d."lastSeenAt",d.harnesses,a.harness,
+    `SELECT c.*,producer.report AS "producerReport",(SELECT json_build_object('status',p.status,'pullRequest',p."pullRequest",'branch',p.branch,'baseBranch',p."baseBranch") FROM run_publications p WHERE p."runId"=producer.id AND p."userId"=$4) AS "publicationReceipt",COALESCE(c.sha,CASE WHEN c.kind='deliverable' THEN producer.report->>'deliverableCommit' END,producer.report->>'sourceCommit') AS "executionSha",r."deviceId",r."deviceRepoId",COALESCE((SELECT settings."verifyCommand" FROM repository_settings settings WHERE settings."userId"=$4 AND settings."remoteKey"=repo."repoPath"),repo."verifyCommand") AS "verifyCommand",repo."remoteUrl",repo."repoPath",d.enabled,d.kind AS "deviceKind",d."lastSeenAt",d.harnesses,a.harness,
        (EXISTS(SELECT 1 FROM thread_machines tm WHERE tm."deviceId"=d.id AND tm.state='running') OR EXISTS(SELECT 1 FROM cloud_machines cm WHERE cm."deviceId"=d.id AND cm.state='running')) AS "cloudOnline"
      FROM factory_candidates c JOIN agent_runs r ON r.id=$3
      JOIN agent_runs producer ON producer.id=c."runId" AND producer."userId"=$4
@@ -110,7 +110,7 @@ export async function factoryCheckAssignment(
   const {
     rows: [row],
   } = await tx.query(
-    `SELECT t.stage,t.status,t."candidateId",a.output,r."baseBranch",r.kind,r."deviceRepoId",r."deviceId",r."retryOf",r."stopRequestedAt",r."botId",t."botId" AS "taskBotId",a.status AS "attemptStatus",a."candidateId" AS "attemptCandidateId",c.repository,COALESCE(c.sha,producer.report->>'sourceCommit') AS sha,c.environment,repo."remoteUrl",repo."repoPath"
+    `SELECT t.stage,t.status,t."candidateId",a.output,r."baseBranch",r.kind,r."deviceRepoId",r."deviceId",r."retryOf",r."stopRequestedAt",r."botId",t."botId" AS "taskBotId",a.status AS "attemptStatus",a."candidateId" AS "attemptCandidateId",c.repository,COALESCE(c.sha,CASE WHEN c.kind='deliverable' THEN producer.report->>'deliverableCommit' END,producer.report->>'sourceCommit') AS sha,c.environment,repo."remoteUrl",repo."repoPath"
      FROM factory_attempts a JOIN factory_tasks t ON t."attemptId"=a.id
      JOIN agent_runs r ON r.id=a."runId" JOIN factory_candidates c ON c.id=t."candidateId" AND c."taskId"=t.id
      JOIN agent_runs producer ON producer.id=c."runId" AND producer."userId"=$2
@@ -323,6 +323,10 @@ export async function verifierCommandEvidence(
 
 // Codex preserves MCP content blocks; the verifier returns its exit status as JSON text.
 function verifierMcpResultPassed(result: unknown): boolean {
+  // Claude flattens the same MCP text block into a JSON string.
+  if (typeof result === 'string') {
+    try { return JSON.parse(result)?.exitCode === 0; } catch { return false; }
+  }
   if (!Array.isArray(result) || result.length !== 1) return false;
   const block = result[0];
   if (block?.type !== 'text' || typeof block.text !== 'string') return false;

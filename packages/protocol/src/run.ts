@@ -115,6 +115,8 @@ export type RunSkillMount = z.infer<typeof runSkillMount>
 export const runReport = z.object({
   /** Worktree base journaled before the adapter started; never agent-supplied. */
   sourceCommit: z.string().regex(/^[a-f0-9]{40}$/).optional(),
+  /** Daemon-created local snapshot of a non-repository delivery; never a published code candidate. */
+  deliverableCommit: z.string().regex(/^[a-f0-9]{40}$/).optional(),
   skillMount: runSkillMount.optional(),
   execution: runExecution.optional(),
   runtime: runRuntime.optional(),
