@@ -20,6 +20,8 @@ const TOKEN = `ghi_${'a'.repeat(43)}`
 let github: { connected: boolean } = { connected: false }
 let intent: unknown = { state: 'waiting', browserAccount: null }
 const requests: string[] = []
+const intentBodies: { loopback?: { returnTo: string; returnState: string; challenge: string } }[] = []
+const confirms: { token: string; verifier: string }[] = []
 const browser = new Window({ url: 'https://mikka.test/?section=plugins&app=github' })
 const assigned: string[] = []
 let container: HTMLDivElement, root: Root
@@ -41,7 +43,8 @@ before(async () => {
     const url = String(input)
     requests.push(`${init?.method ?? 'GET'} ${url.replace(/\?.*/, '')}`)
     const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } })
-    if (url.includes('/connect/intent') && init?.method === 'POST') return json({ token: TOKEN, expiresAt: new Date(Date.now() + 600_000).toISOString() })
+    if (url.includes('/connect/intent/confirm')) { confirms.push(JSON.parse(String(init?.body))); github = { connected: true }; return json({ login: 'octo' }) }
+    if (url.includes('/connect/intent') && init?.method === 'POST') { intentBodies.push(JSON.parse(String(init?.body ?? '{}'))); return json({ token: TOKEN, expiresAt: new Date(Date.now() + 600_000).toISOString() }) }
     if (url.includes('/connect/intent')) return json(intent)
     return json({ viewerId: 'app-user', configured: true, connected: github.connected, login: github.connected ? 'octo' : null, installed: false, repositories: [] })
   }) as typeof fetch
@@ -51,7 +54,7 @@ before(async () => {
 })
 beforeEach(() => {
   github = { connected: false }; intent = { state: 'waiting', browserAccount: null }
-  requests.length = 0; assigned.length = 0; signOut.mock.resetCalls()
+  requests.length = 0; assigned.length = 0; intentBodies.length = 0; confirms.length = 0; signOut.mock.resetCalls()
   container = document.createElement('div'); document.body.append(container); root = createRoot(container)
 })
 afterEach(async () => { await act(async () => { root.unmount() }); container.remove(); delete (browser as unknown as { mikka?: unknown }).mikka })
@@ -88,6 +91,8 @@ test('from the desktop: the browser gets a one-time token, every return re-reads
   await settle(1100)
   await comeBack()
   assert.ok(container.textContent?.includes(`githubLinkOtherAccount ${JSON.stringify({ browser: 'other@example.test', app: 'alex@acme.test' })}`))
+  assert.ok(container.textContent?.includes('githubLinkUpdateHint'), 'an older desktop says an update does it in one step')
+  assert.deepEqual(intentBodies, [{}], 'an older desktop sends no loopback')
   assert.ok(button('githubOpenBrowser'))
   // Linked in the browser: the next return shows it, with no refresh button.
   github = { connected: true }
@@ -131,4 +136,49 @@ test('an expired link says so', async () => {
   browser.history.replaceState({}, '', `/?section=plugins&app=github&github=link-failed&reason=expired`)
   await render()
   assert.ok(container.textContent?.includes('githubLinkExpired'))
+})
+
+test('a desktop with a loopback return: the link is confirmed with the page\'s own verifier when the return comes back', async () => {
+  const opened: string[] = []
+  let returned: ((event: { state: string; result: 'connected' | 'failed' | 'cancelled' }) => void) | null = null
+  const states: string[] = []
+  Object.assign(browser, { mikka: { app: {
+    runtime: 'electron', openExternal: async (url: string) => { opened.push(url) },
+    prepareReturn: async (state: string) => { states.push(state); return 'http://127.0.0.1:43123/return' },
+    onReturn: (listener: typeof returned) => { returned = listener; return () => { returned = null } },
+  } } })
+  await render()
+  await act(async () => { button('githubLink')!.click() })
+  await settle()
+  const loopback = intentBodies[0].loopback!
+  assert.deepEqual([loopback.returnTo, loopback.returnState], ['http://127.0.0.1:43123/return', states[0]])
+  assert.equal(new URL(opened[0]).searchParams.get('intent'), TOKEN)
+  // Another link's return, or a failed one, links nothing.
+  await act(async () => { returned!({ state: 'x'.repeat(43), result: 'connected' }) })
+  assert.equal(confirms.length, 0)
+  await act(async () => { returned!({ state: states[0], result: 'connected' }) })
+  await settle()
+  assert.equal(confirms.length, 1)
+  assert.equal(confirms[0].token, TOKEN)
+  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(confirms[0].verifier)))
+  assert.equal(Buffer.from(digest).toString('base64url'), loopback.challenge, 'the verifier is the one behind the challenge')
+  assert.equal(button('githubLink'), undefined)
+  assert.ok(container.textContent?.includes('githubDisconnect'), 'connected at once, with no refresh')
+})
+
+test('a desktop loopback return that was cancelled says so and links nothing', async () => {
+  let returned: ((event: { state: string; result: 'connected' | 'failed' | 'cancelled' }) => void) | null = null
+  const states: string[] = []
+  Object.assign(browser, { mikka: { app: {
+    runtime: 'electron', openExternal: async () => {},
+    prepareReturn: async (state: string) => { states.push(state); return 'http://127.0.0.1:43123/return' },
+    onReturn: (listener: typeof returned) => { returned = listener; return () => { returned = null } },
+  } } })
+  await render()
+  await act(async () => { button('githubLink')!.click() })
+  await settle()
+  await act(async () => { returned!({ state: states[0], result: 'cancelled' }) })
+  await settle()
+  assert.equal(confirms.length, 0)
+  assert.ok(container.textContent?.includes('githubLinkCancelled'))
 })

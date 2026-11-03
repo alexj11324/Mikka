@@ -43,6 +43,17 @@ export function startGitHubConnect(userId: string) {
   }
 }
 
+/**
+ * GitHub's authorization for a desktop link (lib/github/connect-intent.ts): its
+ * own state, and PKCE with S256, which GitHub supports for GitHub App user
+ * authorization ("strongly recommended", plain is not supported).
+ */
+export function githubAuthorizeURL(state: string, codeChallenge: string) {
+  const url = new URL('https://github.com/login/oauth/authorize')
+  url.search = new URLSearchParams({ client_id: process.env.GITHUB_CLIENT_ID!, redirect_uri: callbackURL(), state, allow_signup: 'false', code_challenge: codeChallenge, code_challenge_method: 'S256' }).toString()
+  return url.toString()
+}
+
 /** The user who started this connect flow, when the callback's state is ours. */
 export function githubConnectUser(state: string | null, cookie: string | undefined): string | null {
   if (!state?.startsWith('ghc_') || !cookie) return null
@@ -93,9 +104,26 @@ async function sealedTokens(token: TokenResponse) {
 
 /** Store (or replace) this user's connection. Other users' connections to the same GitHub account are untouched. */
 export async function saveGitHubConnection(userId: string, identity: GitHubConnection, token: TokenResponse) {
-  const values = { ...identity, ...await sealedTokens(token), updatedAt: new Date() }
+  await saveSealedGitHubConnection(userId, identity, await sealedTokens(token))
+}
+
+export type SealedGitHubTokens = Awaited<ReturnType<typeof sealedTokens>>
+
+/** The same, from tokens already sealed (a desktop link's answer that waited for the app). */
+export async function saveSealedGitHubConnection(userId: string, identity: GitHubConnection, sealed: SealedGitHubTokens) {
+  const values = { ...identity, ...sealed, updatedAt: new Date() }
   await db.insert(githubConnections).values({ userId, ...values }).onConflictDoUpdate({ target: githubConnections.userId, set: values })
 }
+
+/** A desktop link's code: exchanged with its PKCE verifier; the answer comes back sealed, not stored. */
+export async function exchangeGitHubCode(code: string, codeVerifier: string): Promise<{ identity: GitHubConnection; sealed: SealedGitHubTokens }> {
+  const token = await postToken({ code, redirect_uri: callbackURL(), code_verifier: codeVerifier })
+  return { identity: await githubUser(token.access_token), sealed: await sealedTokens(token) }
+}
+
+/** Sealed like the tokens, for the server's own PKCE verifier while GitHub has the person. */
+export const sealGitHubSecret = (value: string) => seal(value)
+export const unsealGitHubSecret = (value: string) => unseal(value)
 
 export async function completeGitHubConnect(userId: string, code: string) {
   const token = await postToken({ code, redirect_uri: callbackURL() })
