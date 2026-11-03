@@ -29,7 +29,10 @@ function objectUrl(config: R2Config, key: string): string {
 export async function putArtifactObject(key: string, body: string | Uint8Array<ArrayBuffer>, contentType: string): Promise<void> {
   const config = r2Config()
   if (!config) throw new Error('R2 is not configured')
-  const response = await config.client.fetch(objectUrl(config, key), { method: 'PUT', body, headers: { 'content-type': contentType, 'if-none-match': '*' } })
+  // Next's fetch adapter can stream a signed Request and lose its implicit
+  // body length. R2 rejects that transfer with 411, so carry the byte length.
+  const contentLength = typeof body === 'string' ? Buffer.byteLength(body, 'utf8') : body.byteLength
+  const response = await config.client.fetch(objectUrl(config, key), { method: 'PUT', body, headers: { 'content-type': contentType, 'content-length': String(contentLength), 'if-none-match': '*' } })
   // 412: the object is already there; keys are content-addressed per version, so it is the same file.
   if (!response.ok && response.status !== 412) throw new Error(`R2 put failed: ${response.status}`)
 }

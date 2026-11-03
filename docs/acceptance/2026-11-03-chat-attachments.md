@@ -93,3 +93,23 @@ on bucket CORS. The local PostgreSQL selection covers exact part retries,
 rejected gaps/altered bytes/foreign owners, removal and content budgets. A real
 PNG larger than 4.5 MiB is included in the production-build API acceptance.
 No bucket permission or public-access policy was changed.
+
+Production follow-up isolated a separate storage transport failure: same-origin
+parts and image parsing succeeded, but R2 returned `411 Length Required` on the
+large original PUT. The shared object writer now sets `Content-Length` from
+actual UTF-8/binary bytes before signing; this is transport metadata, not the
+file-size enforcement (which remains checked independently).
+
+A local HTTP regression reproduces R2's 411 when a fetch adapter streams a
+signed Request without an explicit length, and verifies exact bytes and hashes
+for a 6 MiB binary plus Unicode text after the fix. It runs in `test:artifacts`
+and therefore the standard source CI. Operational diagnostics record only the
+failed stage, bounded error labels and storage status, never file contents,
+names, database details or signed URLs.
+
+Specialist guidance requested by Alex was read and applied from
+[file-uploads](https://skills.sh/sickn33/agentic-awesome-skills/file-uploads) and
+[cloudflare-r2](https://skills.sh/jackspace/claudeskillz/cloudflare-r2): validate
+actual bytes and budgets, authorize object access, preserve original byte
+integrity, inspect storage responses and handle CORS separately from signing.
+Reference: [Cloudflare upload objects](https://developers.cloudflare.com/r2/objects/upload-objects/).
