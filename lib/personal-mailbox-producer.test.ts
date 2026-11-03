@@ -96,7 +96,7 @@ test('actual cloud producer pins the existing host-authorized Bot/workspace with
   } }
   const untrusted = { workspaceId: 'forged-body-namespace' }
   await queueCloudRun({ connect: async () => client } as unknown as Parameters<typeof queueCloudRun>[0], { userId: owner, workspaceId },
-    { botId, issueId, agentId, deviceRepoId: repoId, title: 'Fixture', body: '', execution, ...untrusted })
+    { botId, issueId, agentId, deviceRepoId: repoId, title: 'Fixture', body: '', model: 'fixture', execution, ...untrusted })
   assert.equal(personalWorkerMailboxScopeMatches('codex', snapshot, { botId, workspaceId }), true)
   assert.equal(queries.at(-1), 'COMMIT')
 })

@@ -12,6 +12,7 @@ let SWRConfig: typeof import('swr')['SWRConfig']
 let useSWR: typeof import('swr')['default']
 let SWRDefaults: typeof import('../components/swr-defaults')['SWRDefaults']
 let useCheckOnReturn: typeof import('../lib/hooks/use-check-on-return')['useCheckOnReturn']
+let useChecksUntilDone: typeof import('../lib/hooks/use-check-on-return')['useChecksUntilDone']
 
 before(async () => {
   Object.defineProperty(globalThis, 'window', { configurable: true, value: browser })
@@ -20,7 +21,7 @@ before(async () => {
   ;({ createRoot } = await import('react-dom/client'))
   ;({ SWRConfig, default: useSWR } = await import('swr'))
   ;({ SWRDefaults } = await import('../components/swr-defaults'))
-  ;({ useCheckOnReturn } = await import('../lib/hooks/use-check-on-return'))
+  ;({ useCheckOnReturn, useChecksUntilDone } = await import('../lib/hooks/use-check-on-return'))
 })
 beforeEach(() => { container = document.createElement('div'); document.body.append(container); root = createRoot(container) })
 afterEach(async () => { await act(async () => { root.unmount() }); container.remove() })
@@ -134,4 +135,31 @@ test('a return check armed twice still runs once and unmounting cancels it', asy
   root = createRoot(container)
   await comeBack()
   assert.equal(checks, 1)
+})
+
+let clock = 0
+let watch: { arm: (forMs: number) => void; stop: () => void } = { arm: () => {}, stop: () => {} }
+function LinkHandOff() {
+  watch = useChecksUntilDone(() => { checks++ }, () => clock)
+  return null
+}
+
+test('a link hand-off checks on every return until it is done or its time is up, and never before', async () => {
+  checks = 0; clock = 0
+  await act(async () => { root.render(<LinkHandOff />) })
+  await comeBack()
+  assert.equal(checks, 0, 'plain focus never checks')
+  await act(async () => { watch.arm(60_000) })
+  clock = 2_000; await comeBack()
+  // focus and visibilitychange of the same return count once
+  assert.equal(checks, 1)
+  clock = 4_000; await comeBack()
+  assert.equal(checks, 2)
+  await act(async () => { watch.stop() })
+  clock = 6_000; await comeBack()
+  assert.equal(checks, 2, 'done: no more checks')
+  await act(async () => { watch.arm(10_000) })
+  clock = 20_000; await comeBack()
+  clock = 22_000; await comeBack()
+  assert.equal(checks, 2, 'time up: no more checks')
 })

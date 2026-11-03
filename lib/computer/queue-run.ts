@@ -7,6 +7,7 @@ import { runPrompt } from '@/lib/run-prompt'
 import { freezeWorkerDefinition } from '@/lib/agent-kit/worker'
 import type { AgentExecution } from '@/lib/agent-kit/store'
 import { ComputerError } from './store'
+import { RunModelMissingError } from './run-model'
 import { runCredentialSource, type RunApiKey } from '@/lib/run-credential-source'
 
 /** Issue access is checked by the caller. Queue and Bot binding are committed
@@ -17,7 +18,12 @@ import { runCredentialSource, type RunApiKey } from '@/lib/run-credential-source
 export async function queueCloudRun(pool: Pool, actor: { userId: string; workspaceId: string }, input: {
   botId: string; issueId: string; agentId: string; deviceRepoId: string; title: string; body: string; note?: string
   /** The run keeps no bot of its own, like the run it continues (an MCP client's): it still runs on `botId`'s computer. */
-  withoutBot?: boolean; model?:string; idempotencyKey?: string; execution?: AgentExecution
+  withoutBot?: boolean
+  /** Required (lib/computer/run-model.ts): a new run's from 优先使用的模型, a thread's next run its own. Never 'auto' or empty. */
+  model: string
+  /** The run this one continues, named in the error when the model is missing. */
+  threadRunId?: string
+  idempotencyKey?: string; execution?: AgentExecution
   /** A quota continuation's key (lib/run-quota.ts): frozen as given instead of choosing the credential. */
   apiKey?: RunApiKey
   /** The API key the 优先使用的模型 entry names; used only when the run may use it (lib/run-credential-source.ts). */
@@ -30,8 +36,15 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
   if (input.idempotencyKey !== undefined && (input.idempotencyKey.length < 1 || input.idempotencyKey.length > 256)) throw new ComputerError(400, 'Invalid task request')
   if (input.subscriptionBindingId !== undefined && (!z.uuid().safeParse(input.subscriptionBindingId).success || input.apiKeyId || input.apiKey)) throw new ComputerError(400, 'Invalid task request')
   const digest = input.idempotencyKey === undefined ? undefined : createHash('sha256').update(JSON.stringify([actor.userId, input.idempotencyKey])).digest('hex')
-  const selectionFingerprint = createHash('sha256').update(JSON.stringify([input.subscriptionBindingId ?? null, input.model === 'auto' ? null : input.model ?? null, input.apiKeyId ?? null, input.apiKey ?? null])).digest('hex')
   const runId = digest ? `${digest.slice(0, 8)}-${digest.slice(8, 12)}-4${digest.slice(13, 16)}-8${digest.slice(17, 20)}-${digest.slice(20, 32)}` : randomUUID()
+  // A run is never frozen without its model: a caller that left it out fails here, before anything is written.
+  const model = typeof input.model === 'string' ? input.model.trim() : ''
+  if (!model || model === 'auto' || (input.apiKey && input.apiKey.model !== model)) {
+    const error = new RunModelMissingError(runId, input.threadRunId ?? null)
+    console.error(JSON.stringify({ msg: 'cloud_run_model_missing', runId, threadRunId: input.threadRunId ?? null, issueId: input.issueId, agentId: input.agentId }))
+    throw error
+  }
+  const selectionFingerprint = createHash('sha256').update(JSON.stringify([input.subscriptionBindingId ?? null, model, input.apiKeyId ?? null, input.apiKey ?? null])).digest('hex')
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
@@ -62,16 +75,14 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
     // Every cloud run freezes its definition (Agent, model, credential source) when it is created (orchestration.md § 5):
     // the Agent's subscription bound here, else the person's API key. The key is opened only when the run is claimed.
     const binding = await (await import('./native-run-binding')).nativeRunBinding(client, actor.userId, input.agentId, target.harness, actor.workspaceId, input.subscriptionBindingId)
-    if (input.subscriptionBindingId && (!binding || (input.model && input.model !== 'auto' && input.model !== binding.modelId))) throw new ComputerError(409, 'Bot subscription unavailable')
-    const model = input.subscriptionBindingId ? binding?.modelId : input.model === 'auto' ? undefined : input.model
+    if (input.subscriptionBindingId && (!binding || model !== binding.modelId)) throw new ComputerError(409, 'Bot subscription unavailable')
     const runBotId = input.withoutBot ? null : input.botId
-    const { subscription, apiKey } = input.apiKey ? { subscription: null, apiKey: input.apiKey } : await runCredentialSource(client, { ownerId: actor.userId, botId: runBotId, harness: target.harness, model: input.subscriptionBindingId ? binding?.modelId : model, keyId: input.apiKeyId,
+    const { subscription, apiKey } = input.apiKey ? { subscription: null, apiKey: input.apiKey } : await runCredentialSource(client, { ownerId: actor.userId, botId: runBotId, harness: target.harness, model, keyId: input.apiKeyId,
       botWorkspaceId: runBotId ? actor.workspaceId : null, choiceWorkspaceId: actor.workspaceId, subscription: binding })
     if (!subscription && !apiKey) throw new ComputerError(409,'Bot subscription unavailable')
-    // A cloud run on a subscription starts only on that subscription's own model (the hosted runner
-    // refuses any other), so a run queued without one, a thread's next run included, takes the subscription's.
-    const runModel = model ?? subscription?.modelId
-    const frozen = freezeWorkerDefinition({ harness:target.harness,instructions:target.instructions,prompt,parent:input.execution?.snapshot ?? null,executionId:input.execution?.id ?? null,subscription,apiKey,model:runModel,mailboxEnabled:personalMailboxEnabled(),mailboxScope:{botId:runBotId,workspaceId:actor.workspaceId},readOnly:input.readOnly })
+    // The hosted runner starts a subscription run only on that subscription's own model: a different one is refused here, not at startup.
+    if (subscription && subscription.modelId !== model) throw new ComputerError(409, 'Bot subscription unavailable')
+    const frozen = freezeWorkerDefinition({ harness:target.harness,instructions:target.instructions,prompt,parent:input.execution?.snapshot ?? null,executionId:input.execution?.id ?? null,subscription,apiKey,model,mailboxEnabled:personalMailboxEnabled(),mailboxScope:{botId:runBotId,workspaceId:actor.workspaceId},readOnly:input.readOnly })
     // A writable github.com run gets its task branch here, like a local run's (decision 2026-11-02-1600).
     const github = input.readOnly ? false : (await client.query('SELECT 1 FROM device_repos WHERE id=$1 AND "userId"=$2 AND "repoPath" LIKE \'v2/github.com/%\'', [input.deviceRepoId, actor.userId])).rowCount === 1
     const push = !github ? null : await (await import('./cloud-push')).admitCloudPush(client, { userId: actor.userId, issueId: input.issueId, agentId: input.agentId, deviceId: target.deviceId, deviceRepoId: input.deviceRepoId, ...(runBotId ? { workspaceId: actor.workspaceId } : {}), now: new Date() })

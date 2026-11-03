@@ -70,9 +70,14 @@ async function queueNextRun(userId: string, run: typeof agentRuns.$inferSelect, 
   if (previous.cloud) {
     const [issue] = await db.select({ title: issues.title, content: issues.content }).from(issues).where(eq(issues.id, issueId)).limit(1)
     if (!issue) throw new ActionFailureError('issueNotFound')
-    const { queueCloudRun } = await import('@/lib/computer/queue-run')
+    const [{ queueCloudRun }, { latestThreadRunModel }] = await Promise.all([import('@/lib/computer/queue-run'), import('@/lib/computer/run-model')])
+    // The thread's own model and account; when it has none left, the person is told instead of another being used.
+    const runModel = await latestThreadRunModel(pool, userId, issueId, run.agentId)
+    if (!runModel) throw new ActionFailureError('threadModelUnavailable')
+    const { ComputerError } = await import('@/lib/computer/store')
     return queueCloudRun(pool, { userId, workspaceId: previous.cloud.workspaceId }, { botId: previous.cloud.botId, issueId, agentId: run.agentId, deviceRepoId, title: issue.title, body: tiptapToText(issue.content),
-      note, withoutBot: run.botId === null, idempotencyKey: `thread:${run.id}:${crypto.randomUUID()}`, ...readOnly })
+      note, withoutBot: run.botId === null, idempotencyKey: `thread:${run.id}:${crypto.randomUUID()}`, threadRunId: run.id, ...runModel, ...readOnly })
+      .catch(error => { throw error instanceof ComputerError && error.message === 'Bot subscription unavailable' ? new ActionFailureError('threadModelUnavailable') : error })
   }
   if (!previous.remoteUrl) throw new ActionFailureError('agentRepoMissing')
   const model = run.agentDefinition?.cliModelSelection === 'explicit' ? run.agentDefinition.model : undefined

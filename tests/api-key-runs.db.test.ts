@@ -333,7 +333,7 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
     const key = await addKey(p.id, 'anthropic', secret, ['key-model-a'])
     const { cloudDevice, agentId, repoId } = await botComputer(p)
 
-    const { runId } = await queueCloudRun(pool, { userId: p.id, workspaceId: p.workspaceId }, { botId: p.botId, issueId: p.issueId, agentId, deviceRepoId: repoId, title: 'Task', body: '', model: 'auto' })
+    const { runId } = await queueCloudRun(pool, { userId: p.id, workspaceId: p.workspaceId }, { botId: p.botId, issueId: p.issueId, agentId, deviceRepoId: repoId, title: 'Task', body: '', model: 'key-model-a' })
     const frozen = await definition(runId)
     assert.deepEqual(frozen.apiKey, { keyId: key.id, model: 'key-model-a' })
     assert.equal(frozen.subscription, undefined, 'no subscription is needed for a cloud run')
@@ -361,7 +361,7 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
     await addKey(p.id, 'anthropic', secret, ['key-model-a'])
     const { cloudDevice, agentId, repoId } = await botComputer(p)
     const actor = { userId: p.id, workspaceId: p.workspaceId }
-    const queue = (deviceRepoId: string) => queueCloudRun(pool, actor, { botId: p.botId, issueId: p.issueId, agentId, deviceRepoId, title: 'Task', body: '', model: 'auto' })
+    const queue = (deviceRepoId: string) => queueCloudRun(pool, actor, { botId: p.botId, issueId: p.issueId, agentId, deviceRepoId, title: 'Task', body: '', model: 'key-model-a' })
     const status = async (id: string) => (await pool.query('SELECT status FROM agent_runs WHERE id=$1', [id])).rows[0].status
     const machines = await fakeThreadMachines(pool, taskMachine)
     try {
@@ -388,7 +388,7 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
       assert.equal(await status(runId), 'preparing')
 
       // Nor a computer task on its own thread machine's desktop: it is claimed with that desktop.
-      const desktopRun = (await queueCloudRun(pool, actor, { botId: p.botId, issueId: await task(p.id), agentId, deviceRepoId: computerRepo, title: 'Task', body: '', model: 'auto' })).runId
+      const desktopRun = (await queueCloudRun(pool, actor, { botId: p.botId, issueId: await task(p.id), agentId, deviceRepoId: computerRepo, title: 'Task', body: '', model: 'key-model-a' })).runId
       const desktops = await fakeThreadMachines(pool, desktopMachine)
       const desktopThread = await desktops.start(actor, desktopRun).finally(() => desktops.restore())
       const desktopResponse = await claim(desktopThread.deviceId, desktopRun, desktopThread.token)
@@ -406,7 +406,7 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
     const { cloudDevice, agentId, repoId } = await botComputer(p)
     const actor = { userId: p.id, workspaceId: p.workspaceId }
     const queue = async (deviceRepoId: string, harnesses: Record<string, unknown>[]) => {
-      const { runId } = await queueCloudRun(pool, actor, { botId: p.botId, issueId: await task(p.id), agentId, deviceRepoId, title: 'Task', body: '', model: 'auto' })
+      const { runId } = await queueCloudRun(pool, actor, { botId: p.botId, issueId: await task(p.id), agentId, deviceRepoId, title: 'Task', body: '', model: 'key-model-a' })
       const machines = await fakeThreadMachines(pool, harnesses)
       try { return { runId, ...(await machines.start(actor, runId)) } } finally { machines.restore() }
     }

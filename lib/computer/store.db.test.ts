@@ -204,7 +204,7 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     await pool.query('INSERT INTO byos_connections (id,"ownerId","workspaceId",state,epoch,provider) VALUES ($1,$2,$3,$4,$5,$6)', [connectionId, actor.userId, actor.workspaceId, 'connected', 1, 'codex'])
     // Shared where it was connected, as the migration does for existing subscriptions (decision 2026-10-31-2225).
     await pool.query('INSERT INTO workspace_subscription_shares ("ownerId","workspaceId") VALUES ($1,$2)', [actor.userId, actor.workspaceId])
-    await pool.query('UPDATE byos_bindings SET route=$2,"connectionId"=$3,"connectionRevision"=1 WHERE id=$1', [cloudSubscription, 'codex_cli', connectionId])
+    await pool.query('UPDATE byos_bindings SET route=$2,"connectionId"=$3,"connectionRevision"=1,"modelId"=$4 WHERE id=$1', [cloudSubscription, 'codex_cli', connectionId, 'fixture-model'])
     const projectionName = `mikka-byos-${randomUUID()}`
     await pool.query('UPDATE byos_connections SET "accessSecretName"=$2 WHERE id=$1', [connectionId, projectionName])
     const credentialScope = { ownerId: actor.userId, workspaceId: actor.workspaceId, connectionId, provider: 'codex' as const }
@@ -230,13 +230,13 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     assert.deepEqual(linked[0], linked[1], 'a retried bind selects the same subscription binding')
     await assert.rejects(bindBotSubscription(pool, actor, { ...botBinding, modelId: 'changed-model' }), /unavailable/)
     const managedCodex = setups[0].find(row => row.harness === 'codex')!
-    const managedRun = await queueCloudRun(pool, actor, { botId: bot.id, issueId: randomUUID(), agentId: managedCodex.agentId, deviceRepoId: managedCodex.repoId, title: 'Computer task', body: '' })
+    const managedRun = await queueCloudRun(pool, actor, { botId: bot.id, issueId: randomUUID(), agentId: managedCodex.agentId, deviceRepoId: managedCodex.repoId, title: 'Computer task', body: '', model: 'fixture-model' })
     assert.equal((await pool.query('SELECT "botId" FROM computer_run_bindings WHERE "runId"=$1', [managedRun.runId])).rows[0].botId, bot.id)
     assert.equal((await pool.query('SELECT "botId" FROM agent_runs WHERE id=$1', [managedRun.runId])).rows[0].botId, bot.id, 'the cloud thread belongs to its Bot in the product chat')
     const cloudRepo = randomUUID()
     await pool.query('INSERT INTO agents (id,"userId","deviceId",harness,instructions,name) VALUES ($1,$2,$3,$4,$5,$6)', [consumer, actor.userId, worker.deviceId, 'codex', 'Follow the task', 'Fixture'])
     await pool.query('INSERT INTO device_repos (id,"userId","deviceId","baseBranch","repoPath") VALUES ($1,$2,$3,$4,$5)', [cloudRepo, actor.userId, worker.deviceId, 'main', '/tmp/cloud-repo'])
-    const cloudInput = { botId: bot.id, issueId: randomUUID(), agentId: consumer, deviceRepoId: cloudRepo, title: 'Task', body: 'Use the desktop' }
+    const cloudInput = { botId: bot.id, issueId: randomUUID(), agentId: consumer, deviceRepoId: cloudRepo, title: 'Task', body: 'Use the desktop', model: 'fixture-model' }
     // A repository task: its repository has a remote, so it runs on a task machine and the 电脑 policy does not gate it.
     const remoteRepo = randomUUID()
     await pool.query('INSERT INTO device_repos (id,"userId","deviceId","baseBranch","repoPath","remoteUrl") VALUES ($1,$2,$3,$4,$5,$6)', [remoteRepo, actor.userId, worker.deviceId, 'main', 'v2/example.test/octo/repo', 'https://example.test/octo/repo.git'])
@@ -254,6 +254,12 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     await pool.query('UPDATE byos_connections SET state=$2,epoch=2 WHERE id=$1', [connectionId, 'connected'])
     await assert.rejects(queueCloudRun(pool, actor, cloudInput), { status: 409 })
     await pool.query('UPDATE byos_connections SET epoch=1 WHERE id=$1', [connectionId])
+    // No model, or 'auto', fails before anything is written; another model than the subscription's is refused.
+    const runCount = async () => Number((await pool.query('SELECT count(*) FROM agent_runs WHERE "userId"=$1', [actor.userId])).rows[0].count)
+    const beforeMissing = await runCount()
+    for (const model of ['', '  ', 'auto', undefined]) await assert.rejects(queueCloudRun(pool, actor, { ...cloudInput, model: model as string, threadRunId: 'thread-fixture' }), /Run model missing \(run [0-9a-f-]+, thread thread-fixture\)/)
+    await assert.rejects(queueCloudRun(pool, actor, { ...cloudInput, model: 'other-model' }), { status: 409 })
+    assert.equal(await runCount(), beforeMissing, 'a run without its model writes nothing')
     const queued = await queueCloudRun(pool, actor, cloudInput)
     const queuedBinding = (await pool.query('SELECT b."botId",r.status,r.prompt FROM computer_run_bindings b JOIN agent_runs r ON r.id=b."runId" WHERE r.id=$1', [queued.runId])).rows[0]
     assert.equal(queuedBinding.botId, bot.id)

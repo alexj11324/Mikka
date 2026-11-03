@@ -496,3 +496,35 @@ it.each([true, false])('advertises hosted approval capability only with a prepar
     expect(fixture.link.nativeRequest).not.toHaveBeenCalled()
   } finally { await daemon.stop() }
 }, 60000)
+
+// Production (Acme): a thread's continuation was frozen with model null while its subscription context
+// was claude-opus-5-5, and the runner refused it at once (context_initial, sameModel=false,
+// reason=context_changed). The server now freezes every cloud run with its subscription's model.
+it.each([
+  ['the model the bug froze (none)', undefined, false],
+  ['the subscription\'s own model, as the fix freezes it', 'claude-opus-5-5', true],
+] as const)('a hosted claude_code run with %s', async (_label, model, starts) => {
+  const root = tempDir('mnh-model-'), stateDir = join(root, 'adapters')
+  mkdirSync(stateDir)
+  const runId = randomUUID(), deviceId = randomUUID()
+  const link = Object.assign(new MemoryServer(deviceId).link(), {
+    nativeContext: async () => ({ route: 'claude_code_cli' as const, modelId: 'claude-opus-5-5', revision: 2, accountId: 'fixture-account', expiresAt: new Date(Date.now() + 60000).toISOString() }),
+    nativeRequest: async () => { throw new Error('fixture must not call provider') },
+  })
+  const binary = resolve(import.meta.dirname, 'fakes/fake-claude-subscription.mjs')
+  chmodSync(binary, 0o700)
+  const runner = await createHostedBotRunner({ stateDir, link, binaries: { claude_code: binary },
+    ...(process.env.MIKKA_E2B_TEST_DOCKER === '1' ? { dockerSocket: 'unix:///run/mikka-container/docker.sock' as const } : {}) })
+  const assignment = { runId, deviceId, issueId: randomUUID(), repoId: randomUUID(), baseBranch: 'main', harness: 'claude_code', prompt: 'hello', ...(model ? { model } : {}),
+    subscriptionBinding: { bindingId: randomUUID(), ownerId: 'fixture-owner', workspaceId: randomUUID(), consumerId: randomUUID(), route: 'claude_code_cli' },
+  } as RunAssignment
+  const started = runner.start(assignment, { runId, toolApproval: denyGate(runId), cwd: await makeRepo(), prompt: 'hello', ...(model ? { model } : {}), env: buildChildEnv({ host: { PATH: process.env.PATH, HOME: tempDir() } }), log: createLogger({ level: 'silent' }) })
+  if (!starts) {
+    await expect(started).rejects.toThrow('subscription_hosted_runtime_unavailable')
+    return
+  }
+  const session = await started
+  const events = []
+  for await (const event of session.events()) events.push(event)
+  expect(events.at(-1)).toMatchObject({ type: 'exit', outcome: 'succeeded' })
+}, 60000)
