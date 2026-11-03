@@ -140,7 +140,7 @@ export function createCoordinatorRegistry(userId: string, botId: string, scope?:
     }),
     ...(computerEnabled ? {
       start_web_subagent: tool({
-        description: 'Start web research or a browser check (opening a page, watching a front-end flow) as this Bot’s own browser sub-agent. It stays in the Bot chat, not the thread list. Pass suggestionId when starting from a suggestion. Never handle credentials; the browser asks through a login card.',
+        description: 'Start web research or a browser check (opening a page, watching a front-end flow) as this Bot’s own browser sub-agent. It finds the page itself: pass what the person asked, and a URL only when you already have one. It stays in the Bot chat, not the thread list. Pass suggestionId when starting from a suggestion. Never handle credentials; the browser asks through a login card.',
         inputSchema: z.object({ botId: botInput, task: z.string().trim().min(1).max(2000), suggestionId: id.optional() }),
         execute: (input, options) => { const target = targetBot(input.botId); return target ? steps.startWebSubagent(userId, { ...input, botId: target }, options.toolCallId, scope) : { error: 'botMismatch' } },
       }),
