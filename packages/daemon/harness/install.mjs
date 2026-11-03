@@ -2,15 +2,16 @@
 // Codex, never a CLI the person installed. Each is the official npm
 // platform package, checked against the integrity pinned in `pins.json`
 // (the registry is never trusted for it) and unpacked into
-// `<root>/<harness>/<version>/bin/<command>`. A daemon release that bumps a
-// pin installs the new version on its next run and removes the old.
+// `<root>/<harness>/<version>/bin/<command>`. Preserve the complete verified
+// archive and extracted package; expose the runtime through local symlinks.
+// Replaced installations and older pins remain available for inspection.
 //
 // Plain JavaScript with no local imports beyond the pins: the E2B templates
 // run it through `cli.mjs`.
 import { createHash, randomBytes } from 'node:crypto'
 import { execFile } from 'node:child_process'
-import { createWriteStream, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { createWriteStream, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
+import { dirname, join, relative } from 'node:path'
 import { Readable, Transform } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import { promisify } from 'node:util'
@@ -21,6 +22,8 @@ export const MANAGED_HARNESSES = ['claude_code', 'codex']
 export const HARNESS_PINS = pins
 
 const MARKER = '.mikka-installed'
+const INSTALL_FORMAT = 'complete-package-v1\n'
+const installMarker = (pin, artifact) => INSTALL_FORMAT + artifact.integrity + (pin.companions?.length ? '\n' + pin.companions.join('\n') : '')
 const run = promisify(execFile)
 const inflight = new Map()
 
@@ -42,19 +45,24 @@ export function harnessBinaryPath(store, harness) {
   return join(versionDir(store, harness), 'bin', resolvePin(store, harness).pin.command)
 }
 
-const installMarker = (pin, artifact) => artifact.integrity + (pin.companions?.length ? '\n' + pin.companions.join('\n') : '')
-
 export function harnessInstallState(store, harness) {
   const { pin, artifact } = resolvePin(store, harness)
   if (!artifact) return { state: 'unsupported', version: pin.version }
   let installed = false
   try {
     installed = readFileSync(join(versionDir(store, harness), MARKER), 'utf8') === installMarker(pin, artifact)
-      && [pin.command, ...(pin.companions ?? [])].every(command => statSync(join(versionDir(store, harness), 'bin', command)).isFile())
+      && runtimeFiles(store, harness).every(path => { const stat = statSync(path); return stat.isFile() && (stat.mode & 0o111) !== 0 })
   } catch {
     // Not installed (or a half-finished one, which is replaced).
   }
   return { state: installed ? 'installed' : 'not_installed', version: pin.version }
+}
+
+/** Codex starts its code-mode host beside the main binary. A version/integrity
+ * marker from the old single-binary installer is not a usable installation. */
+function runtimeFiles(store, harness) {
+  const binary = harnessBinaryPath(store, harness)
+  return harness === 'codex' ? [binary, join(dirname(binary), 'codex-code-mode-host')] : [binary]
 }
 
 /** The pinned binary, downloaded and verified on first need. */
@@ -77,26 +85,37 @@ async function install(store, harness) {
   const parent = join(store.root, harness)
   mkdirSync(parent, { recursive: true, mode: 0o700 })
   const staging = join(parent, `.staging-${randomBytes(6).toString('hex')}`)
-  mkdirSync(join(staging, 'bin'), { recursive: true, mode: 0o700 })
+  mkdirSync(staging, { recursive: true, mode: 0o700 })
   try {
     const tarball = join(staging, 'package.tgz')
     await download(`${(store.pins ?? HARNESS_PINS).registry.replace(/\/$/, '')}/${artifact.tarball}`, tarball, artifact.integrity)
-    const companions = (pin.companions ?? []).map(command => ({ command, entry: join(dirname(artifact.entry), command) }))
-    await run('tar', ['-xzf', tarball, '-C', staging, artifact.entry, ...companions.map(file => file.entry)])
-    renameSync(join(staging, artifact.entry), join(staging, 'bin', pin.command))
-    for (const file of companions) renameSync(join(staging, file.entry), join(staging, 'bin', file.command))
-    rmSync(tarball)
-    rmSync(join(staging, artifact.entry.split('/')[0]), { recursive: true, force: true })
+    // Extract the complete integrity-checked package, including metadata and
+    // documentation. Never strip the official package to one executable.
+    await run('tar', ['-xzf', tarball, '-C', staging])
+    if (harness === 'codex') {
+      if (!artifact.entry.endsWith('/bin/codex')) throw new Error('Invalid Codex bundle entry')
+      const bundle = dirname(dirname(artifact.entry))
+      // Preserve the verified platform bundle's relative layout: the code-mode
+      // host, bundled search binary and other native resources live beside it.
+      for (const name of readdirSync(join(staging, bundle))) symlinkSync(relative(staging, join(staging, bundle, name)), join(staging, name))
+      for (const name of ['codex', 'codex-code-mode-host']) {
+        const stat = statSync(join(staging, 'bin', name))
+        if (!stat.isFile() || (stat.mode & 0o111) === 0) throw new Error('Incomplete Codex runtime bundle')
+      }
+    } else {
+      mkdirSync(join(staging, 'bin'), { mode: 0o700 })
+      symlinkSync(relative(join(staging, 'bin'), join(staging, artifact.entry)), join(staging, 'bin', pin.command))
+    }
     writeFileSync(join(staging, MARKER), installMarker(pin, artifact), { mode: 0o600 })
     const target = versionDir(store, harness)
-    rmSync(target, { recursive: true, force: true })
-    renameSync(staging, target)
+    const retained = existsSync(target) ? `${target}.retained-${randomBytes(6).toString('hex')}` : null
+    if (retained) renameSync(target, retained)
+    try { renameSync(staging, target) }
+    catch (error) { if (retained) renameSync(retained, target); throw error }
   } catch (error) {
     rmSync(staging, { recursive: true, force: true })
     throw error
   }
-  // Older pins and interrupted downloads.
-  for (const name of readdirSync(parent)) if (name !== pin.version) rmSync(join(parent, name), { recursive: true, force: true })
   return binary
 }
 
