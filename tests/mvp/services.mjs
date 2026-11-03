@@ -190,6 +190,12 @@ export async function startMvpServices(port = 3191, { routes } = {}) {
       const readAccess = () => assert.ok([READ_TOKEN, RUN_TOKEN].some(token => bearer === `Bearer ${token}`), 'Expected repository read token')
       const writeAccess = () => assert.ok([WRITE_TOKEN, RUN_TOKEN].some(token => bearer === `Bearer ${token}`), 'Expected repository PR token')
       const appAccess = () => assert.match(bearer ?? '', /^Bearer [A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/, 'Expected an App JWT')
+      if (['/user','/user/installations','/user/installations/99/repositories'].includes(path) && method === 'GET') {
+        assert.equal(bearer,'Bearer mikka-local-synthetic-user-token','Expected local user authorization');
+        if (path === '/user') return reply(githubUser);
+        if (path === '/user/installations') return reply({ installations: [{ id:99,app_id:Number(process.env.GITHUB_APP_ID ?? '123'),account:{login:'mikka-e2e'},suspended_at:null }] });
+        return reply({ repositories: [{id:REPOSITORY_ID,full_name:'mikka-e2e/core-loop',private:false,description:'Disposable local acceptance repository',homepage:null,pushed_at:null}] });
+      }
       if (path === `${REPO_PATH}/installation` && method === 'GET') {
         appAccess()
         return reply({ id: 99, suspended_at: null, permissions: { pull_requests: 'write', contents: 'write' } })

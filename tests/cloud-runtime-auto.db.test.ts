@@ -11,6 +11,11 @@ import { dbUrl, seedBot, seedIssue, seedUser, seedWorkspace } from './support/wo
 import { connectGitHub, githubAppStub, recordPushGrant } from './support/github-app-stub'
 import { fakeThreadMachines } from './support/thread-machine-fake'
 
+mock.module('next-intl/server',{namedExports:{getLocale:async()=> 'en',getTranslations:async()=> (key:string)=> key}})
+mock.module('next/headers',{namedExports:{cookies:async()=>({get:()=>undefined}),headers:async()=>new Headers()}})
+let httpOwner: string | null = null
+mock.module(new URL('../lib/api-auth.ts',import.meta.url).href,{namedExports:{auth:{api:{getSession:async()=>httpOwner?{user:{id:httpOwner,email:`${httpOwner}@example.test`,name:"Fixture owner"}}:null}}}})
+
 const harnesses = [{ harness: 'codex', installed: true, subscriptionBroker: true, computerBroker: true }]
 
 test('cloud runs: the bot runtime is created on dispatch, once; the kill switch falls back to the card', { skip: !dbUrl }, async t => {
@@ -153,6 +158,21 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     assert.match(run.prompt, /Continue with the missing edge case/)
     assert.equal(lifecycleStarts, before + 1)
   })
+
+  await t.test('the public computer API continues a repository thread on its original repository and starts its task machine', async () => {
+    const a = await person('public-composer');
+    const issueId = await anotherTask(a.id,39);
+    const first = await steps.dispatchRun(a.id,{issueId,repo:'octo/repo',readOnly:true,requestKey:`dispatch:${randomUUID()}`},undefined,a.botId) as unknown as {runId:string};
+    await pool.query(`UPDATE agent_runs SET status='succeeded',"finishedAt"=now() WHERE id=$1`,[first.runId]);
+    const {POST} = await import('../app/api/bots/[botId]/computer/runs/route');
+    httpOwner = a.id;
+    try {
+      const response = await POST(new Request(`https://mikka.example/mikka/api/bots/${a.botId}/computer/runs`,{method:'POST',headers:{origin:'https://mikka.example','content-type':'application/json'},body:JSON.stringify({issueId,harness:'codex',note:'Check the next edge case.'})}),{params:Promise.resolve({botId:a.botId})});
+      const result = await response.json();assert.equal(response.status,202,JSON.stringify(result));
+      const {rows:[run]} = await pool.query(`SELECT r."continuesRunId",r."agentDefinition",repo."remoteUrl",m.state FROM agent_runs r JOIN device_repos repo ON repo.id=r."deviceRepoId" JOIN thread_machines m ON m."runId"=r.id WHERE r.id=$1`,[result.runId]);
+      assert.equal(run.continuesRunId,first.runId);assert.equal(run.remoteUrl,'https://github.com/octo/repo.git');assert.equal(run.agentDefinition.readOnly,true);assert.equal(run.state,'running');
+    } finally { httpOwner=null; }
+  });
 
   await t.test('an existing sleeping or disconnected worker is woken before dispatch', async () => {
     const a = await person('sleeping-runtime')

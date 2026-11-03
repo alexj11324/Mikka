@@ -186,7 +186,7 @@ const seedNow = async () => {
   })
 }
 // A request after signup must scan after the previous owner's snapshot.
-refresh = refreshQueue(() => Promise.all([linkAccounts(), grantCredits(), seedNow()]).then(() => {}))
+refresh = refreshQueue(async () => { await linkAccounts(); await Promise.all([grantCredits(), seedNow()]) })
 await refresh()
 let periodicRefresh
 const linking = setInterval(() => {

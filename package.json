@@ -197,7 +197,8 @@
     "test:local-loop:mailbox": "LOCAL_LOOP_ITEMS=6 node --import ./tests/support/server-only.mjs --import tsx scripts/dev-local/acceptance.mjs",
     "test:local-loop:cloud": "LOCAL_LOOP_ITEMS=8 node --import ./tests/support/server-only.mjs --import tsx scripts/dev-local/acceptance.mjs",
     "test:local-loop:worker-mailbox": "LOCAL_LOOP_ITEMS=7 node --import ./tests/support/server-only.mjs --import tsx scripts/dev-local/acceptance.mjs",
-    "test:subscription-usability": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test components/coordinator/bot-model-picker.test.tsx components/coordinator/retry-reply-button.test.tsx components/coordinator/subscription-recovery.test.tsx components/settings/model-order-settings.test.tsx components/settings/payment-privacy-read-states.test.tsx lib/cloud-dispatch-failure.test.ts lib/new-task-placement.test.ts lib/run-credential-source.test.ts lib/subscription-quota.test.ts components/plugins/plugins-view.test.tsx components/plugins/github-settings.test.tsx"
+    "test:subscription-usability": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test components/coordinator/bot-model-picker.test.tsx components/coordinator/retry-reply-button.test.tsx components/coordinator/subscription-recovery.test.tsx components/settings/model-order-settings.test.tsx components/settings/payment-privacy-read-states.test.tsx lib/cloud-dispatch-failure.test.ts lib/new-task-placement.test.ts lib/run-credential-source.test.ts lib/subscription-quota.test.ts components/plugins/plugins-view.test.tsx components/plugins/github-settings.test.tsx",
+    "test:factory-all-dispatch-db": "node --experimental-test-module-mocks --test-force-exit --import ./tests/support/server-only.mjs --import tsx --test tests/factory-all-dispatch.db.test.ts"
   },
   "dependencies": {
     "@ai-sdk/mcp": "2.0.81",

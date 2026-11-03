@@ -11,7 +11,7 @@ before(async()=>{registry=await import('@/workflows/coordinator/tools')})
 test('actual tool adapter keeps host owner/Bot/scope and requires both rollout flags',async()=>{
  const old=process.env.MIKKA_FACTORY_ROUTING_ENABLED
  try{
- delete process.env.MIKKA_FACTORY_ROUTING_ENABLED;overrideDeploymentSwitch('issueTools',true)
+ process.env.MIKKA_FACTORY_ROUTING_ENABLED='0';overrideDeploymentSwitch('issueTools',true)
  assert.equal(registry.createCoordinatorRegistry('owner','bot').intake_factory_request,undefined)
  process.env.MIKKA_FACTORY_ROUTING_ENABLED='1';overrideDeploymentSwitch('issueTools',false)
  assert.equal(registry.createCoordinatorRegistry('owner','bot').intake_factory_request,undefined)

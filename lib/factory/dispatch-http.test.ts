@@ -35,7 +35,7 @@ test("route gate (route.ts): issue mutations AND routing AND lifecycle flags", (
   const on = { MIKKA_FACTORY_ROUTING_ENABLED: "1", MIKKA_FACTORY_LIFECYCLE_ENABLED: "1" };
   assert.equal(factoryDispatchEnabled(true, on), true);
   assert.equal(factoryDispatchEnabled(false, on), false, "issue mutations off");
-  assert.equal(factoryDispatchEnabled(true, { ...on, MIKKA_FACTORY_ROUTING_ENABLED: undefined }), false, "routing off");
+  assert.equal(factoryDispatchEnabled(true, { ...on, MIKKA_FACTORY_ROUTING_ENABLED: undefined }), true, "routing ships on without a legacy variable");
   assert.equal(factoryDispatchEnabled(true, { ...on, MIKKA_FACTORY_LIFECYCLE_ENABLED: "0" }), false, "lifecycle off");
   assert.equal(factoryDispatchEnabled(true, { ...on, MIKKA_FACTORY_ROUTING_ENABLED: "true" }), false, "only the literal 1 enables");
 });
