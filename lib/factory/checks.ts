@@ -1,3 +1,4 @@
+import { readVerificationReceipt } from '@mikka/protocol/run'
 import type { Pool, PoolClient } from "pg";
 import { z } from "zod";
 import { DEVICE_ONLINE_WINDOW_MS } from "@mikka/protocol/device";
@@ -74,7 +75,7 @@ export async function configureFactoryCheck(
       ? "Review the fixed candidate for correctness and regressions. Record each material finding as a failed criterion; explicitly pass a criterion only with concrete evidence."
       : "Independently exercise the acceptance criteria against this fixed candidate using real commands and observations. Record every criterion with its evidence. Code inspection alone is not verification.",
     "Use inspect_candidate for the pinned Git diff and changed files. For a delivery PR, pass its pullRequest URL from delivery evidence to inspect_candidate: the host authenticates the read with this run's existing GitHub connection and checks the PR head/task marker and returns branch names plus the CI state for the exact candidate SHA. If an external read remains unavailable, report blocked rather than diagnosing a source-code defect from missing access.",
-    "Native shell tools stay disabled for this read-only session. Use the host-provided verify_command tool for actual command execution. Use criterionId only when the brief supplies a UUID; otherwise record a nonempty text criterion, passed, command/exitCode when applicable, and concrete evidence.",
+    "Native shell tools stay disabled for this read-only session. Use the host-provided verify_command tool for actual command execution. Use criterionId only when the brief supplies a UUID; otherwise record a nonempty text criterion, passed, command/exitCode when applicable, and concrete evidence. Put tool names and observation descriptions in evidence; command must be the exact executable command actually run by verify_command.",
     row.verifyCommand
       ? `Do not change files or git state. Call verify_command with the frozen command exactly: ${row.verifyCommand}. Submit criteria with the command, actual exitCode and observations. The daemon separately executes it; self-report cannot replace that receipt.`
       : task.stage === 'review'
@@ -300,23 +301,15 @@ export async function verifierCommandEvidence(
     AND o.chunk->>'type' IN ('tool-output-available','tool-output-error') ORDER BY i.seq LIMIT 1000`,
     [runId],
   );
-  const receipt = (value: unknown): Record<string, unknown> | null => {
-    if (typeof value === 'string') { try { return receipt(JSON.parse(value)) } catch { return null } }
-    if (Array.isArray(value)) { for (const block of value) { const found=receipt(block); if (found) return found }; return null }
-    if (!value || typeof value !== 'object') return null
-    const object=value as Record<string, unknown>
-    if (object.executed===true) return object
-    return receipt(object.text ?? object.content ?? object.structuredContent)
-  }
   const matching = rows.filter((r) => {
     if (!sameCommand(r.command, command)) return false
     if (r.toolName !== 'mcp__mikka__verify_command') return true
-    const actual=receipt(r.result)
+    const actual=readVerificationReceipt(r.result)
     return r.outputType==='tool-output-available' && actual?.executed===true && actual.command===command && actual.sha===r.sha && actual.readOnly===true
   });
   const passed = matching.filter((r) => {
     if (r.toolName === 'mcp__mikka__verify_command') {
-      const actual=receipt(r.result)
+      const actual=readVerificationReceipt(r.result)
       return actual?.exitCode===0 && actual.timedOut===false && actual.signal===null
     }
     return r.outputType === "tool-output-available" && (typeof r.result === "string" || r.result?.exitCode === 0)

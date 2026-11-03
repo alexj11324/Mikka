@@ -103,6 +103,8 @@ Native shell tools remain disabled for read-only sessions. Factory checks get
 Code, Codex and Cursor. It executes either the frozen repository command or an
 entrypoint declared in the candidate's package scripts, Makefile or CI. Its
 actual output, exit/signal/timeout, source and SHA form paired tool evidence;
+post-submit command selection requires a paired adapter-observed execution on
+this exact candidate. Descriptive criterion annotations never become commands;
 the daemon still independently reruns verification after submission. Wrong
 commands, changed HEAD/worktree, missing host binding and failed/timed-out
 commands cannot establish a pass. Child processes receive routing variables,

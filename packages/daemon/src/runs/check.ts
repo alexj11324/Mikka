@@ -1,4 +1,5 @@
 // Daemon-owned receipt for the existing read-only check. Agent reports cannot set it.
+import { readVerificationReceipt } from '@mikka/protocol/run'
 import { execa } from "execa"
 import { worktreeGitDir } from "../agents/publish"
 
@@ -35,4 +36,31 @@ export async function fixedCheckSnapshot(
       "Check worktree contains changes outside the fixed candidate"
     )
   return { sha, tree: await git("rev-parse", `${sha}^{tree}`) }
+}
+
+
+/** Only adapter-observed executions may select an inferred post-submit command.
+ * Criterion annotations and other tools' prose never grant shell execution. */
+export class CheckCommandEvidence {
+  private calls = new Map<string,{command:string;host:boolean}>()
+  private executed = new Set<string>()
+  constructor(private readonly sha: string) {}
+  observe(chunk: import('../chunks').RunChunk) {
+    if(chunk.type==='tool-input-available') {
+      const name=chunk.toolName.toLowerCase()
+      if(!['bash','shell','mcp__mikka__verify_command'].includes(name) || this.calls.size>=1000)return
+      const input=chunk.input && typeof chunk.input==='object' ? chunk.input as Record<string,unknown> : null
+      if(typeof input?.command==='string' && input.command.trim() && input.command.length<=4000)this.calls.set(chunk.toolCallId,{command:input.command.trim(),host:name==='mcp__mikka__verify_command'})
+      return
+    }
+    if(chunk.type!=='tool-output-available' && chunk.type!=='tool-output-error')return
+    const call=this.calls.get(chunk.toolCallId);this.calls.delete(chunk.toolCallId)
+    if(!call || chunk.type!=='tool-output-available' || this.executed.size>=200)return
+    if(call.host) {
+      const actual=readVerificationReceipt(chunk.output)
+      if(!actual || actual.sha!==this.sha || actual.command!==call.command)return
+    }
+    this.executed.add(call.command)
+  }
+  has(command: string) { return this.executed.has(command.trim()) }
 }

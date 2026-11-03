@@ -8,6 +8,28 @@
 // and `agent_run.report` stores exactly this shape.
 import { z } from "zod"
 
+const verificationReceipt = z.object({
+  executed: z.literal(true), command: z.string().min(1).max(4000),
+  sha: z.string().regex(/^[a-f0-9]{40}$/), readOnly: z.literal(true),
+  exitCode: z.number().int().nullable(), signal: z.string().nullable(), timedOut: z.boolean(),
+  basis: z.string().optional(), output: z.string().optional(),
+})
+
+/** Decode an MCP text/content wrapper. The caller must independently bind
+ * its authenticated tool namespace, command and candidate SHA. */
+export function readVerificationReceipt(value: unknown): z.infer<typeof verificationReceipt> | null {
+  const read = (node: unknown, depth: number): z.infer<typeof verificationReceipt> | null => {
+    if (depth > 8) return null
+    const parsed=verificationReceipt.safeParse(node)
+    if (parsed.success) return parsed.data
+    if (typeof node==='string') { try { return read(JSON.parse(node),depth+1) } catch { return null } }
+    if (Array.isArray(node)) { for (const item of node) { const found=read(item,depth+1); if(found)return found };return null }
+    if (node && typeof node==='object') {const record=node as Record<string,unknown>;return read(record.text ?? record.content ?? record.structuredContent,depth+1)}
+    return null
+  }
+  return read(value,0)
+}
+
 export const RUN_QUESTION_KINDS = [
   "context",
   "decision",

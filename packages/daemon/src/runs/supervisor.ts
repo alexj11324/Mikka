@@ -30,7 +30,7 @@
 // its report keeps `not_run`, and the server may open only a draft PR.
 import { quotaStopApplies } from "./quota-exhausted"
 import { runApps } from '../agents/run-apps'
-import { fixedCheckSnapshot } from "./check"
+import { fixedCheckSnapshot, CheckCommandEvidence } from "./check"
 import { verifySkillAssignment, verifySkillResume, verifyMountedSkill } from '../agents/skill-artifact'
 import type { SkillReceiptRevalidation } from '@mikka/protocol/skill'
 import { runPaths } from "../agents/run-context"
@@ -180,7 +180,7 @@ const VERIFY_TIMEOUT_MS = 30 * 60_000
 const MAX_REPORTED_FILES = 5_000
 /** `runReport.criteria` holds at most this many verdicts (the schema's cap). */
 const MAX_REPORTED_CRITERIA = 200
-/** The server validates `criterionId` as a uuid; anything else is dropped. */
+/** Preserve valid criterion UUIDs; ordinary criteria may instead have text. */
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -193,6 +193,7 @@ interface ActiveRun {
   /** Set when the watchdog or the lease stopped the run. */
   forcedStop?: StopReason
   lastProgressAt: number
+  verificationCommands?: CheckCommandEvidence
   done: Promise<void>
   /** Aborted by `stop()`, or when a cancelled session does not exit. */
   abort: AbortController
@@ -954,7 +955,7 @@ export class RunSupervisor {
       await this.deps.worktrees.changedFiles(worktree).catch(() => [])
     ).slice(0, MAX_REPORTED_FILES)
     const inferred = assignment.inferVerifyCommand && !assignment.verifyCommand
-      ? report.criteria?.find(criterion => criterion.command?.trim() && criterion.evidence?.trim()) : undefined
+      ? report.criteria?.find(criterion => criterion.command?.trim() && criterion.evidence?.trim() && this.active.get(runId)?.verificationCommands?.has(criterion.command)) : undefined
     const command = assignment.verifyCommand ?? inferred?.command
     if (command && inferred) report = { ...report, verify: { ...report.verify, command } }
     // A `plan` run writes no code: there is nothing for the issue's verify
@@ -1496,6 +1497,9 @@ export class RunSupervisor {
               : next.value
         if (event.type === 'progress') { run.lastProgressAt = Date.now(); continue }
         if (event.type === "chunk") {
+          if (fixedCandidateCheck(assignment) && assignment.inferVerifyCommand && !assignment.verifyCommand) {
+            (run.verificationCommands ??= new CheckCommandEvidence(assignment.baseBranch)).observe(event.chunk)
+          }
           // Streamed text is not progress; tool calls, steps and files are.
           if (!event.chunk.type.endsWith("-delta"))
             run.lastProgressAt = Date.now()

@@ -71,7 +71,7 @@ it("checks real SHA, blocks dirty/head replacement, and produces actual command/
   writeFileSync(join(fixturesDir,'check-pass.jsonl'),readFileSync(new URL('../fixtures/check-pass.jsonl',import.meta.url)))
   writeFileSync(join(fixturesDir,'check-inferred.jsonl'),[
     {t:0,exec:{toolCallId:'inferred-command',command:'node acceptance.mjs'}},
-    {t:0,submit:{summary:'Inferred from the repository package.json scripts.test',criteria:[{text:'Repository regression command',passed:true,command:'node acceptance.mjs',exitCode:0,evidence:'package.json scripts.test is node acceptance.mjs; it exercises the regression assertion'}]}},
+    {t:0,submit:{summary:'Inferred from the repository package.json scripts.test',criteria:[{text:'Read the diff',passed:true,command:'inspect_candidate + Read README.md',evidence:'A descriptive tool observation is not an executed shell command'},{text:'Repository regression command',passed:true,command:'node acceptance.mjs',exitCode:0,evidence:'package.json scripts.test is node acceptance.mjs; it exercises the regression assertion'}]}},
     {t:0,exit:{outcome:'succeeded'}},
   ].map(line=>JSON.stringify(line)).join('\n'))
   const daemon = await new Daemon({
@@ -166,7 +166,7 @@ it("checks real SHA, blocks dirty/head replacement, and produces actual command/
   expect(inferred.completion.report.verify.output).toContain('REAL_ACCEPTANCE_PASS')
   expect(inferred.completion.report.observedHead).toBe(sha2)
   expect(inferred.completion.report.check).toEqual({sha:sha2,readOnly:true})
-  expect(inferred.completion.report.criteria?.[0]?.evidence).toContain('package.json scripts.test')
+  expect(inferred.completion.report.criteria?.find(criterion=>criterion.command==='node acceptance.mjs')?.evidence).toContain('package.json scripts.test')
   if (process.env.FACTORY_EVIDENCE_OUT) {
     mkdirSync(process.env.FACTORY_EVIDENCE_OUT, { recursive: true })
     writeFileSync(
