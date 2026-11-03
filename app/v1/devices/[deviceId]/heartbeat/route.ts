@@ -43,18 +43,21 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
   const { harnesses, deviceType, updateFailure } = parsed.data
   const now = new Date()
   // One statement records the beat and returns what the device looked like before it.
+  // The harnesses are stored only once their execution identities exist (below), so a
+  // failed check leaves them changed for the next beat, which checks again.
   const { rows: [row] } = await db.execute<{ enabled: boolean; lastSeenAt: Date | string | null; harnessesChanged: boolean }>(sql`
     WITH prior AS (SELECT id, enabled, "lastSeenAt", harnesses FROM devices WHERE id=${deviceId} FOR UPDATE)
     UPDATE devices d SET "deviceType"=COALESCE(${deviceType ?? null}::text, d."deviceType"),
       "updateFailure"=CASE WHEN ${updateFailure !== undefined}::boolean THEN ${updateFailure == null ? null : JSON.stringify(updateFailure)}::jsonb ELSE d."updateFailure" END,
-      harnesses=${JSON.stringify(harnesses)}::jsonb, "computerUse"=${JSON.stringify(parsed.data.computerUse ?? { installed: false, version: null })}::jsonb,
+      "computerUse"=${JSON.stringify(parsed.data.computerUse ?? { installed: false, version: null })}::jsonb,
       "lastSeenAt"=${now.toISOString()}::timestamptz, "updatedAt"=${now.toISOString()}::timestamptz
     FROM prior WHERE d.id=prior.id
-    RETURNING prior.enabled, prior."lastSeenAt", prior.harnesses IS DISTINCT FROM d.harnesses AS "harnessesChanged"`)
+    RETURNING prior.enabled, prior."lastSeenAt", prior.harnesses IS DISTINCT FROM ${JSON.stringify(harnesses)}::jsonb AS "harnessesChanged"`)
   const prior = row && { ...row, lastSeenAt: row.lastSeenAt === null ? null : new Date(row.lastSeenAt) }
   // The execution identities follow the harnesses: checked when they change or the
   // device comes back online (registration checks them too), not on every beat.
-  if (prior && (prior.harnessesChanged || !isDeviceOnline(prior.lastSeenAt, now.getTime()))) await ensureDeviceAgents(pool, caller.userId, deviceId, harnesses)
+  if (prior && (prior.harnessesChanged || !isDeviceOnline(prior.lastSeenAt, now.getTime()))) await ensureDeviceAgents(pool, caller.userId, deviceId, harnesses, { reported: true })
+  if (prior?.harnessesChanged) await db.execute(sql`UPDATE devices SET harnesses=${JSON.stringify(harnesses)}::jsonb WHERE id=${deviceId}`)
   const runIds = parsed.data.runs.map(run => run.runId)
   // An idle device holds no leases: nothing to renew or revoke.
   const selected = runIds.length

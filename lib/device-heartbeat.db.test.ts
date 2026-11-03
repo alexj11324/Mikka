@@ -60,7 +60,21 @@ dbTest('a heartbeat re-checks execution identities only when the harnesses chang
     assert.deepEqual(after.updateFailure, { code: 'download_failed' }, 'a beat without an update result keeps the last one')
     assert.deepEqual(await identities(), [], 'unchanged harnesses on an online device: no re-check')
 
-    // A harness appears: the identities follow at once.
+    // The identity check fails: the beat fails (Next answers 500) and the new harnesses
+    // are not stored, so the next beat still sees a change and checks again.
+    const guard = `heartbeat_test_${randomUUID().replaceAll('-', '')}`
+    await pool.query(`create function ${guard}() returns trigger language plpgsql as $$ begin raise exception 'identity check failed'; end $$`)
+    await pool.query(`create trigger ${guard} before insert on agents for each row when (NEW."userId" = '${owner}') execute function ${guard}()`)
+    try {
+      await assert.rejects(beat({ harnesses: [codex, claude] }), /identity check failed/)
+    } finally {
+      await pool.query(`drop trigger ${guard} on agents`)
+      await pool.query(`drop function ${guard}()`)
+    }
+    assert.deepEqual((await seen()).harnesses.map((info: { harness: string }) => info.harness), ['codex'], 'the harnesses stay as last checked')
+    assert.deepEqual(await identities(), [])
+
+    // A harness appears (the beat after the failure): the identities follow at once.
     await beat({ harnesses: [codex, claude], deviceType: 'server', updateFailure: null })
     assert.deepEqual(await identities(), ['claude_code', 'codex'])
     const changed = await seen()
