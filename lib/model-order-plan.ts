@@ -16,7 +16,7 @@
  * first (`pickDevice`). A model the person picked for the thread goes before
  * the list. Once a run starts nothing about it changes.
  */
-import type { HarnessInfo } from '@mikka/protocol/harness'
+import { harnessReportsModel, type HarnessInfo } from '@mikka/protocol/harness'
 
 export type OrderHarness = 'claude_code' | 'codex'
 export type RunLocation = 'cloud' | 'local'
@@ -72,27 +72,39 @@ export type NothingReason = 'noModels' | 'cloudNotConfigured' | 'noDevice' | 'ch
 
 /**
  * The provider model a device runs for an entry. Null when the device cannot run the entry: 参与调度 off,
- * offline, the Agent not installed, or (for a subscription model) the daemon
- * cannot take a subscription run (no `subscriptionBroker`: the claim is
- * refused without it). A subscription's model is what its account offers, so
- * the CLI need not have reported it; the run passes the model to the CLI. An
- * API key's model runs on any installed Agent of the key's protocol, since the
- * key is handed to the run.
+ * offline, the Agent not installed, or (for a subscription model) the daemon cannot take a subscription
+ * run (no `subscriptionBroker`: the claim is refused without it) or did not report the model. A
+ * subscription model runs only where the daemon's own CLI probe (packages/daemon/src/model-probe.ts)
+ * reported it, as a model id or a slot's resolved model (Alex, 2026-11-03: no guessing); a daemon that
+ * reported no models at all is too old to say, so it needs an update. An API key's model runs on any
+ * installed Agent of the key's protocol, since the key is handed to the run and the CLI's probe, run
+ * without the key, cannot list it.
  */
 export function deviceModel(device: PoolDevice, entry: OrderEntry): string | null {
   return deviceStage(device, entry) === 'ready' ? entry.model : null
 }
 
-type DeviceStage = 'off' | 'offline' | 'notInstalled' | 'needsUpdate' | 'ready'
-const STAGES: readonly DeviceStage[] = ['off', 'offline', 'notInstalled', 'needsUpdate', 'ready']
+/** modelNotReported: the daemon reported its models and this one is not among them. */
+export type DeviceStage = 'off' | 'offline' | 'notInstalled' | 'modelNotReported' | 'needsUpdate' | 'ready'
+const STAGES: readonly DeviceStage[] = ['off', 'offline', 'notInstalled', 'modelNotReported', 'needsUpdate', 'ready']
 
-function deviceStage(device: PoolDevice, entry: OrderEntry): DeviceStage {
-  if (!device.enabled) return 'off'
-  if (!device.online) return 'offline'
+/** Whether a harness report lists a model (@mikka/protocol harnessReportsModel). Null when it reported none. */
+export const reportsModel = harnessReportsModel
+
+/** What a device can do for an entry whatever its 参与调度 or whether it is online (those come first in deviceStage). */
+export function deviceSupport(device: Pick<PoolDevice, 'harnesses'>, entry: OrderEntry): Exclude<DeviceStage, 'off' | 'offline'> {
   const info = device.harnesses.find(item => item.harness === entry.harness && item.installed)
   if (!info) return 'notInstalled'
-  if (entry.source.kind === 'subscription' && !info.subscriptionBroker) return 'needsUpdate'
-  return 'ready'
+  if (entry.source.kind !== 'subscription') return 'ready'
+  if (!info.subscriptionBroker) return 'needsUpdate'
+  const reported = reportsModel(info, entry.model)
+  return reported === null ? 'needsUpdate' : reported ? 'ready' : 'modelNotReported'
+}
+
+export function deviceStage(device: PoolDevice, entry: OrderEntry): DeviceStage {
+  if (!device.enabled) return 'off'
+  if (!device.online) return 'offline'
+  return deviceSupport(device, entry)
 }
 
 /**

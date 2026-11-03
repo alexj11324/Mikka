@@ -66,3 +66,15 @@ export const harnessInfoSchema = z.object({
   version: z.string().nullable(),
 })
 export type HarnessInfo = z.infer<typeof harnessInfoSchema>
+
+/**
+ * Whether a harness's own report lists a model: a reported id (a CLI model
+ * slot) or a slot's resolved model. Null when it reported no models at all (a
+ * daemon from before the model probe, or a probe that got no answer). The one
+ * rule for "this machine can run this model" (Alex, 2026-11-03: no guessing),
+ * used by dispatch on the server and by the cloud daemon before a run starts.
+ */
+export function harnessReportsModel(info: Pick<HarnessInfo, "models" | "modelSlots">, model: string): boolean | null {
+  const ids = [...(info.models ?? []), ...(info.modelSlots ?? []).flatMap((slot) => [slot.slot, slot.model])]
+  return ids.length ? ids.includes(model) : null
+}

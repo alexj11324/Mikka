@@ -7,7 +7,7 @@ import { randomUUID } from 'node:crypto'
 import test from 'node:test'
 import { normalizeRepository } from '@mikka/protocol/repository'
 import { dbUrl, seedBot, seedIssue, seedUser, seedWorkspace } from './support/workspace-admin-db'
-import { githubAppStub } from './support/github-app-stub'
+import { connectGitHub, githubAppStub } from './support/github-app-stub'
 
 // The computer's Codex reported gpt-5, the model the person's ChatGPT account lists.
 const mac = [{ harness: 'codex', installed: true, subscriptionBroker: true, modelSlots: [{ slot: 'gpt-5', model: 'gpt-5', name: 'gpt-5' }] }]
@@ -52,6 +52,8 @@ test('run machine fallback: 本地 a computer that takes part, 云端 own E2B, e
     const githubAccountId = String(++githubAccount)
     await pool.query(`INSERT INTO account (id,"accountId","providerId","userId","createdAt","updatedAt") VALUES ($1,$2,'github',$3,now(),now())`, [randomUUID(), githubAccountId, id])
     github.allowWriter('octo/repo', githubAccountId)
+    // Connected in 插件 › GitHub, with the App on the repositories these tasks name: dispatch checks the live list.
+    await connectGitHub(github, id, githubAccountId, ['octo/repo', 'octo/read-only-app', 'octo/elsewhere'])
     const ws = await seedWorkspace(pool, id, [{ userId: id, role: 'admin' }])
     // A connected ChatGPT subscription whose account lists gpt-5: 优先使用的模型 is that model by default, 运行位置 云端.
     const connection = randomUUID()

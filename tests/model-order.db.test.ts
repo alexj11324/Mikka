@@ -80,7 +80,7 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
     const scope = await person('order-first-dispatch')
     const ctx = { ...scope, botId: null }
     const connection = await subscribe(scope, 'claude', ['claude-opus-5-5', 'claude-sonnet-5-5'])
-    const mac = await device(scope.ownerId, [{ harness: 'claude_code', installed: true }])
+    const mac = await device(scope.ownerId, [{ harness: 'claude_code', installed: true, models: ['claude-opus-5-5', 'claude-sonnet-5-5'] }])
     await pool.query('UPDATE byos_connections SET quota=NULL WHERE id=$1', [connection])
     let probes = 0
     const refreshQuota = async (checked: { ownerId: string; workspaceId: string }, id: string) => {
@@ -322,10 +322,14 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
     assert.deepEqual(listed.kind === 'device' && [listed.deviceId, listed.entry.harness, listed.model], [codexOnly.id, 'codex', 'acct-codex-n'])
     const first = await resolveModelDispatch(pool, ctx, null, undefined, both.id)
     assert.deepEqual(first.kind === 'device' && [first.deviceId, first.entry.harness], [both.id, 'claude_code'])
-    // Its Codex installed and reporting other models: the subscription's model runs there all the same.
+    // Its Codex installed and reporting other models only: not sent there (Alex, 2026-11-03: no guessing), and the card says why.
     const elsewhere = await device(scope.ownerId, [{ harness: 'codex', installed: true, modelSlots: [{ slot: 'other', model: 'other-model', name: 'other' }] }])
     const unreported = await resolveModelDispatch(pool, ctx, { harness: 'codex', model: 'acct-codex-n' }, undefined, elsewhere.id)
-    assert.deepEqual(unreported.kind === 'device' && [unreported.deviceId, unreported.model], [elsewhere.id, 'acct-codex-n'])
+    assert.deepEqual([unreported.kind, unreported.kind === 'none' && unreported.card.description], ['none', '这台电脑没报告能跑 acct-codex-n'])
+    // Its daemon from before the model probe (no models reported): it needs an update.
+    const silent = await device(scope.ownerId, [{ harness: 'codex', installed: true }])
+    const silentRun = await resolveModelDispatch(pool, ctx, { harness: 'codex', model: 'acct-codex-n' }, undefined, silent.id)
+    assert.equal(silentRun.kind === 'none' && silentRun.card.description, '这台电脑的 Mikka 需要更新')
     // Its Mikka too old to take a subscription run (no subscriptionBroker): it says so.
     const old = await device(scope.ownerId, [{ harness: 'codex', installed: true, subscriptionBroker: false }])
     const stale = await resolveModelDispatch(pool, ctx, { harness: 'codex', model: 'acct-codex-n' }, undefined, old.id)
@@ -338,8 +342,8 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
     assert.equal((await resolveModelDispatch(pool, ctx, null, undefined, codexOnly.id)).kind, 'device')
   })
 
-  await t.test('a subscription model runs on a computer that takes subscription runs, whether or not its CLI reported the model; else the row says what is missing', async () => {
-    // Production 2026-11-02: Claude Max connected, 本地, two computers online and taking part, Claude Code installed, no models reported.
+  await t.test('a subscription model runs only on a computer whose daemon reported it; else the row says what is missing', async () => {
+    // Claude Max connected, 本地, computers online and taking part with Claude Code installed; models reported or not (Alex, 2026-11-03).
     const scope = await person('order-unreported')
     await subscribe(scope, 'claude', ['acct-opus-u'])
     const ctx = { ...scope, botId: null }
@@ -355,18 +359,24 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
     assert.deepEqual(await row(), { reason: 'noDevice', device: { why: 'needsUpdate', device: 'Old Mac', count: 1 } })
     const card = await resolveModelDispatch(pool, ctx)
     assert.deepEqual([card.kind === 'none' && card.reason, card.kind === 'none' && card.card.description], ['noDevice', 'Old Mac 的 Mikka 需要更新'])
-    const mac = await device(scope.ownerId, [{ harness: 'claude_code', installed: true }], true, { name: 'Mac' })
+    // Claude Code reporting other models, and one from before the model probe: neither runs it.
+    await device(scope.ownerId, [{ harness: 'claude_code', installed: true, models: ['acct-other-u'] }], true, { name: 'Elsewhere' })
+    const silent = await device(scope.ownerId, [{ harness: 'claude_code', installed: true }], true, { name: 'Silent Mac' })
+    assert.equal((await row())?.reason, 'noDevice')
+    assert.equal((await resolveModelDispatch(pool, ctx)).kind, 'none')
+    const mac = await device(scope.ownerId, [{ harness: 'claude_code', installed: true, modelSlots: [{ slot: 'opus', model: 'acct-opus-u', name: 'Opus' }] }], true, { name: 'Mac' })
     assert.equal(await row(), null, '可用')
     const run = await resolveModelDispatch(pool, ctx)
     assert.deepEqual(run.kind === 'device' && [run.deviceId, run.agentId, run.model], [mac.id, mac.agents.claude_code, 'acct-opus-u'])
     assert.notEqual(run.kind === 'device' && run.deviceId, old.id, 'a daemon that cannot take a subscription run is never picked for one')
+    assert.notEqual(run.kind === 'device' && run.deviceId, silent.id, 'nor one that did not report the model')
   })
 
   await t.test('本地: a server before a computer, then the least busy, then the one that joined first; 会先用 names the same device dispatch picks', async () => {
     const scope = await person('order-server-first')
     await subscribe(scope, 'claude', ['acct-opus-s'])
     const ctx = { ...scope, botId: null }
-    const claude = [{ harness: 'claude_code', installed: true }]
+    const claude = [{ harness: 'claude_code', installed: true, models: ['acct-opus-s'] }]
     const mac = await device(scope.ownerId, claude, true, { name: 'Mac', joinedMinutesAgo: 600 })
     let view = await order.orderView(pool, scope)
     assert.equal(firstName(view), 'Mac', 'only a computer: it')
@@ -406,13 +416,13 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
     await order.changeOrder(pool, scope, { kind: 'add', at: 99, entries: [{ harness: 'claude_code', model: 'acct-sonnet-u2', source }] })
     assert.equal((await order.orderView(pool, scope)).entries.length, 3, 'already listed: nothing added')
     await assert.rejects(order.changeOrder(pool, scope, { kind: 'add', at: -1, entries: [{ harness: 'claude_code', model: 'acct-opus-u2', source }] }))
-    // 能跑: whatever 参与调度 and online say (they have their own lines), the allowed models each computer's Agents can run.
-    const mac = await device(scope.ownerId, [{ harness: 'claude_code', installed: true }], false, { name: 'Mac', online: false })
+    // 能跑: whatever 参与调度 and online say (they have their own lines), the allowed models each computer's daemon reported.
+    const mac = await device(scope.ownerId, [{ harness: 'claude_code', installed: true, models: ['acct-opus-u2', 'acct-sonnet-u2'] }], false, { name: 'Mac', online: false })
     const codexBox = await device(scope.ownerId, [{ harness: 'codex', installed: true }], true, { name: 'codex-box' })
     const old = await device(scope.ownerId, [{ harness: 'claude_code', installed: true, subscriptionBroker: false }], true, { name: 'old' })
     view = await order.orderView(pool, scope)
     assert.deepEqual([view.deviceModels[mac.id], view.deviceModels[codexBox.id], view.deviceModels[old.id]],
-      [['acct-opus-u2', 'acct-sonnet-u2', 'acct-haiku-u2'], [], []])
+      [['acct-opus-u2', 'acct-sonnet-u2'], [], []], 'haiku was not reported by Mac\'s daemon')
   })
 
   await t.test('优先使用的 Agent and a row\'s Agent: a DeepSeek model both Agents run goes on the preferred one; a row switches; 0 credentials for the empty state', async () => {

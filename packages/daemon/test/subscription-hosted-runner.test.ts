@@ -528,3 +528,23 @@ it.each([
   for await (const event of session.events()) events.push(event)
   expect(events.at(-1)).toMatchObject({ type: 'exit', outcome: 'succeeded' })
 }, 60000)
+
+it('starts a subscription run only on a model the machine\'s own CLI reported, and fails with the reason otherwise', async () => {
+  const fixture = await revocationFixture()
+  let report: { models?: string[]; modelSlots?: { slot: string; model: string; name: string }[] } | null = { models: ['another-model'] }
+  const reportedModels = vi.fn(async () => report)
+  const runner = await createHostedBotRunner({ stateDir: fixture.stateDir, link: fixture.link, binaries: { claude_code: fixture.binary }, reportedModels })
+  // Reported other models only, or none at all (a probe that got no answer): refused before any context, broker or CLI.
+  for (const value of [{ models: ['another-model'] }, null, {}]) {
+    report = value
+    await expect(runner.start(fixture.assignment, fixture.options)).rejects.toThrow('subscription_model_not_reported')
+  }
+  expect(reportedModels).toHaveBeenCalledWith('claude_code')
+  expect(fixture.link.nativeContext).not.toHaveBeenCalled()
+  expect(fixture.processes()).toEqual([])
+  // Reported as a slot's resolved model: the model check passes and startup goes on (here to a refused context).
+  report = { modelSlots: [{ slot: 'opus', model: 'fixture-model', name: 'Opus' }] }
+  fixture.link.nativeContext.mockImplementation(async () => { throw new Error('fixture context refused') })
+  await expect(runner.start(fixture.assignment, fixture.options)).rejects.toThrow('fixture context refused')
+  expect(fixture.link.nativeContext).toHaveBeenCalled()
+})

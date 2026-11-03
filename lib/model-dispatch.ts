@@ -4,7 +4,7 @@ import type { Pool } from 'pg'
 import { defaultAgentCopy } from './agent-copy'
 import { cloudReady } from './rule-dispatch'
 import { credentialStates, orderCandidates, poolDevices, readOrder, type OrderScope, type RefreshOrderQuota } from './model-order'
-import { planDispatch, whyNoDevice, type NoDeviceWhy, type NothingReason, type OrderEntry, type RunLocation } from './model-order-plan'
+import { deviceSupport, planDispatch, whyNoDevice, type NoDeviceWhy, type NothingReason, type OrderEntry, type RunLocation } from './model-order-plan'
 
 /**
  * Where a new run goes and on which model (decision 2026-11-02-1400): the
@@ -26,6 +26,19 @@ export type ModelDispatch =
   | { kind: 'device'; deviceId: string; agentId: string; model: string; entry: OrderEntry; subscriptionBindingId?: string }
   | { kind: 'cloud'; harness: OrderEntry['harness']; model: string; entry: OrderEntry; apiKey: boolean }
   | { kind: 'none'; reason: DispatchNothingReason; card: ReturnType<typeof modelUnavailableCard> }
+
+/**
+ * The Agent or model a Bot passed for a new thread must be one of 优先使用的模型: the same list its prompt shows
+ * (lib/coordinator/execution-context.ts modelListText). A model only a credential offers, or an Agent with no entry,
+ * is refused before anything is queued. Null when it is listed, or when nothing was named (the list's first runnable entry).
+ */
+export async function modelNotAllowed(pool: Pool, scope: OrderScope, asked?: { harness: OrderEntry['harness']; model?: string } | null): Promise<{ error: 'modelNotAllowed'; asked: { harness: OrderEntry['harness']; model?: string }; allowed: { harness: OrderEntry['harness']; model: string }[] } | null> {
+  if (!asked) return null
+  await new (await import('./execution-settings')).ExecutionSettings(pool).ensureCatalogues(scope)
+  const { entries } = await readOrder(pool, scope)
+  if (entries.some(entry => entry.harness === asked.harness && (!asked.model || entry.model === asked.model))) return null
+  return { error: 'modelNotAllowed', asked, allowed: entries.map(entry => ({ harness: entry.harness, model: entry.model })) }
+}
 
 export async function resolveModelDispatch(pool: Pool, scope: OrderScope & { botId: string | null }, asked?: { harness: OrderEntry['harness']; model?: string } | null, location?: RunLocation, deviceId?: string, dependencies: { refreshQuota?: RefreshOrderQuota; /** The cloud already failed to start this run: a server or a computer only. */ withoutCloud?: boolean } = {}): Promise<ModelDispatch> {
   // A subscription never asked for its models offers none yet: ask it first (once per revision).
@@ -55,7 +68,9 @@ export async function resolveModelDispatch(pool: Pool, scope: OrderScope & { bot
     // What the named computer lacks for the model that would otherwise run (the thread's own model when it named one).
     const wanted = picked ?? plan.skipped.find(item => item.block.reason === 'noDevice')?.entry ?? order.entries[0]
     const installed = devices[0].harnesses.some(item => item.harness === wanted.harness && item.installed)
-    return { kind: 'none', reason: 'namedDevice', card: modelUnavailableCard('namedDevice', { agent: HARNESS_NAMES[wanted.harness], model: wanted.model, installed }) }
+    // Its daemon reported its models and this one is not among them (an older daemon that reported none needs an update).
+    const unreported = installed && deviceSupport(devices[0], wanted) === 'modelNotReported'
+    return { kind: 'none', reason: 'namedDevice', card: modelUnavailableCard('namedDevice', { agent: HARNESS_NAMES[wanted.harness], model: wanted.model, installed, unreported }) }
   }
   if (plan.kind === 'none' && plan.reason === 'noDevice' && !named) {
     // 云端 with a key that should run: the cloud being off is the news, not the computers.
@@ -127,12 +142,12 @@ async function e2bKeyWouldFix(query: Pick<Pool, 'query'>, ownerId: string) {
 const HARNESS_NAMES: Record<OrderEntry['harness'], string> = { claude_code: 'Claude Code', codex: 'Codex' }
 
 /** 没有能跑这个任务的模型: the reason, and the rows that fix it. A model or computer the thread named is named in it. */
-export function modelUnavailableCard(reason: DispatchNothingReason, named?: { agent: string; model: string; installed?: boolean; device?: NoDeviceWhy }, place: { /** 云端 without a cloud that runs: an E2B key would also fix it. */ offerE2B?: boolean } = {}) {
+export function modelUnavailableCard(reason: DispatchNothingReason, named?: { agent: string; model: string; installed?: boolean; unreported?: boolean; device?: NoDeviceWhy }, place: { /** 云端 without a cloud that runs: an E2B key would also fix it. */ offerE2B?: boolean } = {}) {
   const copy = defaultAgentCopy
   const line = {
     noModels: copy.needsModelNoModels, cloudNotConfigured: copy.needsModelCloud, cloudTemporarilyUnavailable: copy.needsModelCloudUnavailable, noDevice: noDeviceLine(named?.device), checking: copy.needsModelChecking, unavailable: copy.needsModelUnavailable,
     // Installed but nothing it can run: a subscription model on a Mikka too old to take a subscription run.
-    notOffered: copy.needsModelNotOffered, namedDevice: named?.installed ? copy.needsModelDeviceUpdate : copy.needsModelDeviceAgent,
+    notOffered: copy.needsModelNotOffered, namedDevice: named?.unreported ? copy.needsModelDeviceModel : named?.installed ? copy.needsModelDeviceUpdate : copy.needsModelDeviceAgent,
     pickedNoDevice: copy.needsModelPickedNoDevice, pickedUnavailable: copy.needsModelPickedUnavailable,
   }[reason]
   const description = (reason === 'notOffered' && named && !named.model ? copy.needsModelAgentNotOffered : line).replace('{agent}', named?.agent ?? '').replace('{model}', named?.model ?? '')
@@ -153,5 +168,5 @@ function noDeviceLine(device?: NoDeviceWhy) {
   if (!device) return copy.needsModelNoDevice
   if (device.why === 'none') return copy.needsModelNoComputer
   if (device.count !== 1) return copy.needsModelNoDevice
-  return { off: copy.needsModelNamedOff, offline: copy.needsModelNamedOffline, notInstalled: copy.needsModelNamedAgent, needsUpdate: copy.needsModelNamedUpdate }[device.why]
+  return { off: copy.needsModelNamedOff, offline: copy.needsModelNamedOffline, notInstalled: copy.needsModelNamedAgent, modelNotReported: copy.needsModelNamedModel, needsUpdate: copy.needsModelNamedUpdate }[device.why]
 }

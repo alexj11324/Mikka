@@ -53,7 +53,8 @@ test('shared subscriptions reach local and cloud claims with current membership 
       },
     }
   } }) as never, { ready: () => true, nativeIsolation: 'verified_runtime' }, undefined, authorizeSubscriptionUse, undefined, authorizeSubscriptionWorkspace)
-  const harnesses = ['claude_code', 'codex'].map(harness => ({ harness, installed: true, toolApproval: true, subscriptionBroker: true }))
+  // Each daemon reports the fixture model its CLI offers; a subscription model runs only where it was reported.
+  const harnesses = ['claude_code', 'codex'].map(harness => ({ harness, installed: true, toolApproval: true, subscriptionBroker: true, models: [harness === 'claude_code' ? 'shared-opus' : 'shared-gpt'] }))
   const threadMachines = await fakeThreadMachines(pool, harnesses)
   const users: string[] = []
   t.after(async () => {

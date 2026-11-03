@@ -56,15 +56,23 @@ test('本地 picks only among the devices that can run it, never one with 参与
   assert.equal(deviceModel(device('x', { harnesses: [] }), keyed), null)
 })
 
-test('a subscription model runs on any computer whose Agent takes subscription runs, reported by its CLI or not', () => {
-  // Production 2026-11-02: online, 参与调度 on, Claude Code installed with subscriptionBroker, and no models reported at all.
+test('a subscription model runs only where the daemon reported it; a daemon that reported no models needs an update', () => {
+  // Alex, 2026-11-03: no guessing. Installed with subscriptionBroker but no models reported (a daemon from before the model probe).
   const silent = device('mac', { harnesses: [{ harness: 'claude_code', installed: true, subscriptionBroker: true }] })
   const opus = sub('9', 'claude_code', 'account-opus')
-  assert.equal(deviceModel(silent, opus), 'account-opus', 'the subscription\'s model id is what runs')
+  assert.equal(deviceModel(silent, opus), null)
+  assert.deepEqual(whyNoDevice([silent], opus), { why: 'needsUpdate', device: 'mac', count: 1 })
+  // Reported models without this one: not sent there, and the reason says so.
+  assert.equal(deviceModel(device('mac'), opus), null)
+  assert.deepEqual(whyNoDevice([device('mac')], opus), { why: 'modelNotReported', device: 'mac', count: 1 })
+  // Reported, as a slot's resolved model or as a model id: it runs, and the provider model id is what runs.
   assert.equal(deviceModel(device('mac'), first), 'reported-claude-top', 'a reported slot cannot replace the provider model identity')
-  const plan = planDispatch({ entries: [opus], location: 'local', devices: [silent], credential: usable, cloudReady: false })
-  assert.deepEqual([plan.kind, plan.kind === 'device' && plan.model], ['device', 'account-opus'])
-  // The claim is refused without a subscription broker, so that computer cannot take it; an API key model still can.
+  assert.equal(deviceModel(device('mac'), sub('8', 'codex', 'reported-codex-a')), 'reported-codex-a')
+  // Two computers: only the one that reported it takes the run.
+  const reporting = device('reporting', { joinedAt: 5, harnesses: [{ harness: 'claude_code', installed: true, subscriptionBroker: true, modelSlots: [{ slot: 'opus', model: 'account-opus', name: 'Opus' }] }] })
+  const plan = planDispatch({ entries: [opus], location: 'local', devices: [silent, device('other'), reporting], credential: usable, cloudReady: false })
+  assert.deepEqual([plan.kind, plan.kind === 'device' && plan.deviceId, plan.kind === 'device' && plan.model], ['device', 'reporting', 'account-opus'])
+  // The claim is refused without a subscription broker; an API key model, which no CLI probe can list, still runs on the installed Agent.
   const old = device('old', { harnesses: [{ harness: 'claude_code', installed: true }] })
   assert.equal(deviceModel(old, opus), null)
   assert.equal(deviceModel(old, keyed), 'key-model')
