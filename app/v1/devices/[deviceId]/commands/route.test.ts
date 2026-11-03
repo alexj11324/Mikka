@@ -7,6 +7,8 @@ import { MAILBOX_NOTICE_HEADER } from '@mikka/protocol/device'
 mock.module(new URL('../../../../../lib/db/index.ts', import.meta.url).href, {
   namedExports: { db: {}, pool: {} },
 })
+const pendingDeviceCommands = mock.fn(async (_id: string, _completed: string[]) => [{ id: 'update-command', kind: 'update' }])
+mock.module(new URL('../../../../../lib/device-management.ts', import.meta.url).href, { namedExports: { pendingDeviceCommands } })
 let actual: typeof import('../../../../../lib/device-link')
 const authenticateDevice = mock.fn(async () => ({ userId: 'owner', tokenId: 'token' }) as object | null)
 const ownsDevice = mock.fn(async () => ({ id: 'device-1', enabled: true }) as object | null)
@@ -35,9 +37,9 @@ mock.module('next/server', { namedExports: { NextResponse: Response } })
 let GET: typeof import('./route')['GET']
 before(async () => {
   actual = await import('../../../../../lib/device-link')
-  const { newerDaemonRelease } = await import('../../../../../lib/daemon-release')
+  const { newerDaemonRelease, daemonRequestTooOld } = await import('../../../../../lib/daemon-release')
   mock.module(new URL('../../../../../lib/daemon-release.ts', import.meta.url).href, {
-    namedExports: { daemonVersions, cachedDaemonVersions, newerDaemonRelease },
+    namedExports: { daemonVersions, cachedDaemonVersions, newerDaemonRelease, daemonRequestTooOld },
   })
   mock.module(new URL('../../../../../lib/device-link.ts', import.meta.url).href, {
     namedExports: { authenticateDevice, deviceMayHaveWork, deviceWork, ownsDevice, sleep, waitSeconds: actual.waitSeconds },
@@ -64,7 +66,7 @@ beforeEach(() => {
 
 function request(signal?: AbortSignal, wait = 25, skip = '', mailboxNotices = false, updates = '') {
   return new Request(`https://preview.example.test/mikka/v1/devices/device-1/commands?wait=${wait}${skip ? `&skip=${skip}` : ''}${updates}`, { signal,
-    headers: mailboxNotices ? { [MAILBOX_NOTICE_HEADER]: '1' } : {} })
+    headers: { 'x-mikka-client-version': '0.0.375', ...(mailboxNotices ? { [MAILBOX_NOTICE_HEADER]: '1' } : {}) } })
 }
 const params = { params: Promise.resolve({ deviceId: 'device-1' }) }
 
@@ -220,4 +222,17 @@ test('a person\'s update reaches the device at the next idle check of its poll',
   assert.deepEqual(deviceMayHaveWork.mock.calls[0].arguments[2]?.skipDeviceCommands, [held, 'not-a-uuid'], 'commands the daemon holds are left out')
   assert.equal(deviceWork.mock.callCount(), 0, 'no run work: the full read is skipped')
   assert.equal(logs[0].outcome, 'work')
+})
+
+
+test('obsolete daemon commands poll serves upgrade metadata without reading business work', async () => {
+  const req = new Request(request(undefined, 0), { headers: { 'x-mikka-client-version': '0.0.329' } })
+  const response = await GET(req, params)
+  assert.equal(response.status, 200)
+  const body = await response.json()
+  assert.deepEqual(body.commands, [])
+  assert.equal(body.queuedRuns, undefined)
+  assert.deepEqual(body.deviceCommands, [{ id: 'update-command', kind: 'update' }])
+  assert.equal(deviceMayHaveWork.mock.callCount(), 0)
+  assert.equal(deviceWork.mock.callCount(), 0)
 })

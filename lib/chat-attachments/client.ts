@@ -1,4 +1,5 @@
 import { chatFileSchema, type ChatFile, type ChatFileScope } from '@mikka/protocol/chat-attachments'
+import { pageRefreshSignal } from '@/lib/app-build'
 import { withBasePath } from '@/lib/base-path'
 
 export class ChatUploadError extends Error {
@@ -73,6 +74,9 @@ export async function uploadChatFile(
   signal: AbortSignal,
   progress: (state: 'uploading' | 'processing', percent: number) => void,
 ): Promise<ChatFile> {
+  const refresh = pageRefreshSignal()
+  signal = AbortSignal.any([signal, refresh])
+  signal.throwIfAborted()
   const endpoint = withBasePath('/api/chat/attachments')
   const scopeKey = `${scope.kind}:${scope.id}`
   const scopes = tickets.get(file) ?? new Map<string, UploadTicket>()
@@ -209,7 +213,7 @@ export async function uploadChatFile(
       ),
     )
   } catch (error) {
-    if (signal.aborted || (error instanceof ChatUploadError && error.definitive)) {
+    if (!refresh.aborted && (signal.aborted || (error instanceof ChatUploadError && error.definitive))) {
       scopes.delete(scopeKey)
       void fetch(`${endpoint}/${ticket.id}`, { method: 'DELETE', credentials: 'same-origin' }).catch(() => {})
     }

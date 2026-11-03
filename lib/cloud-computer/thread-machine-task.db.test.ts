@@ -6,7 +6,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { randomUUID } from "node:crypto";
-import { readFile, readdir } from "node:fs/promises";
+import { readFile, readdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { Pool } from "pg";
 import { orderMigrations } from "../../scripts/migration-order.mjs";
 import { dropTestDatabase } from '../../tests/support/drop-test-database';
@@ -154,6 +158,44 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
         assert.deepEqual(JSON.parse(files.get('/run/mikka-viewer/1.next')!), { botId, ownerId: owner, display: 1, epoch, controlledBy: null, controlUntil: 0, computerAllowed: true, policyVersion: 3 });
       } finally {
         await pool.query('DELETE FROM workspace_computer_policies WHERE "workspaceId"=$1', [workspaceId]);
+        if (savedWorker.url === undefined) delete process.env.MIKKA_CLOUD_WORKER_URL; else process.env.MIKKA_CLOUD_WORKER_URL = savedWorker.url;
+        if (savedWorker.sha === undefined) delete process.env.MIKKA_CLOUD_WORKER_SHA; else process.env.MIKKA_CLOUD_WORKER_SHA = savedWorker.sha;
+      }
+    });
+
+    await t.test('a fresh official instance initializes its registered private Bot workspace before worktree creation', async () => {
+      const savedWorker = { url: process.env.MIKKA_CLOUD_WORKER_URL, sha: process.env.MIKKA_CLOUD_WORKER_SHA };
+      const root = await mkdtemp(join(tmpdir(), 'mikka-fresh-hosted-workspace-'));
+      const local = join(root, 'registered'), remote = `/home/user/.mikka/bot-workspaces/${botId}`;
+      const execute = promisify(execFile);
+      process.env.MIKKA_CLOUD_WORKER_URL = 'https://worker.example.invalid/mikka';
+      process.env.MIKKA_CLOUD_WORKER_SHA = 'a'.repeat(40);
+      try {
+        const workspaceRepo = randomUUID();
+        await pool.query(`INSERT INTO device_repos (id,"deviceId","userId","repoPath","baseBranch") VALUES ($1,$2,$3,$4,'main')`, [workspaceRepo, botDevice, owner, remote]);
+        const runId = await run(await task(), { repo: workspaceRepo });
+        const { provider } = fake();
+        const commands = { run: async (command: string) => {
+          if (command.includes(remote)) await execute('bash', ['-c', command.replaceAll(remote, local)]);
+          return { stdout: '', stderr: '', exitCode: 0 };
+        } };
+        provider.create = async (_source, op) => ({
+          sandboxId: `sandbox-${op}`,
+          files: { read: async () => 'a'.repeat(40), write: async (path: string) => { if (path.startsWith('/run/mikka-viewer/thread-')) throw new Error('fixture reached worker handoff'); } },
+          commands,
+        }) as never;
+        await assert.rejects(ensureThreadMachine(pool, actor, runId, provider), /fixture reached worker handoff/);
+        const { WorktreeManager } = await import('../../packages/daemon/src/worktrees');
+        const worktree = await new WorktreeManager(join(root, 'worktrees'), true).create(runId, local, 'main');
+        assert.match((await execute('git', ['-C', worktree, 'rev-parse', '--verify', 'HEAD'])).stdout.trim(), /^[a-f0-9]{40}$/);
+        await writeFile(join(local, 'unsubmitted.txt'), 'retain uncommitted bytes\n');
+        const before = (await execute('git', ['-C', local, 'rev-parse', 'HEAD'])).stdout;
+        const { initializeBotWorkspace } = await import('../computer/bot-workspace');
+        await initializeBotWorkspace({ commands } as never, botId);
+        assert.equal(await readFile(join(local, 'unsubmitted.txt'), 'utf8'), 'retain uncommitted bytes\n');
+        assert.equal((await execute('git', ['-C', local, 'rev-parse', 'HEAD'])).stdout, before, 'an existing workspace is not reset or recommitted');
+      } finally {
+        await rm(root, { recursive: true, force: true });
         if (savedWorker.url === undefined) delete process.env.MIKKA_CLOUD_WORKER_URL; else process.env.MIKKA_CLOUD_WORKER_URL = savedWorker.url;
         if (savedWorker.sha === undefined) delete process.env.MIKKA_CLOUD_WORKER_SHA; else process.env.MIKKA_CLOUD_WORKER_SHA = savedWorker.sha;
       }

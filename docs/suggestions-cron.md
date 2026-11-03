@@ -72,6 +72,26 @@ People are those in `suggestion_trigger_checks` (opened the list or connected an
 
 ## Deployment and credentials
 
+The existing minute `/api/cron/ops-monitor` tick also provides supplier-egress
+collection independently of GitHub Actions schedules. It uses only the app's
+existing `NEON_API_KEY` and PostHog ingestion key. A dedicated
+`state.__providerEgressCollector` key in the latest operational observation
+claims work in a short transaction; Neon reads and PostHog delivery run outside
+the lock, followed by a short completion transaction. Successful collection is
+due again after 15 minutes, failures retry after one minute, and abandoned claims
+expire after two minutes. The ordinary operational collector persists separately
+even if supplier collection fails. No supplier bytes or credentials are returned
+by the cron endpoint.
+
+Fallback snapshots have `collector_source=cloudflare_provider_fallback` and
+`collection_scope=provider`. They omit runtime sample/request fields; they do
+not prove GitHub runtime-log sampling recovered. Use `provider_healthy` for
+supplier coverage and restrict runtime analysis to
+`collection_scope=provider_and_runtime`. Existing budget insights retain the
+latest known supplier value and the separate heartbeat detects absent/failed
+collection. Do not interpret missing snapshots or stale supplier reports as zero
+usage.
+
 The Worker logs each endpoint path, HTTP status, and whitelisted numeric summary counts; request failures reject the scheduled run. Public Worker and version preview URLs are disabled.
 
 Upload `cloudflare/suggestions-cron/src/index.mjs` as an ES module from the

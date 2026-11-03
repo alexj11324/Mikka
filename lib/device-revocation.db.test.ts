@@ -61,7 +61,7 @@ async function state(f: Fixture) {
 function caller(f: Fixture) { return { userId: f.owner, tokenId: f.tokenId } }
 async function report(f: Fixture) {
   return scope.run(() => reportEvents(new Request(`http://127.0.0.1/mikka/v1/runs/${f.run}/events`, {
-    method: 'POST', headers: { authorization: `Bearer ${f.token}`, 'content-type': 'application/json' },
+    method: 'POST', headers: { 'x-mikka-client-version': '0.0.375', authorization: `Bearer ${f.token}`, 'content-type': 'application/json' },
     body: JSON.stringify({ fromSeq: 1, chunks: [{ type: 'text-delta', id: 'part', delta: 'controlled report' }] }),
   }), { params: Promise.resolve({ runId: f.run }) }))
 }
@@ -137,7 +137,7 @@ test('revocation while the real event handler waits for its body prevents the la
   const stream = new ReadableStream<Uint8Array>({ start(controller) { body = controller } })
   body.enqueue(new TextEncoder().encode('{"fromSeq":1,"chunks":'))
   const request = new Request(`http://127.0.0.1/mikka/v1/runs/${f.run}/events`, {
-    method: 'POST', headers: { authorization: `Bearer ${f.token}`, 'content-type': 'application/json' }, body: stream, duplex: 'half',
+    method: 'POST', headers: { 'x-mikka-client-version': '0.0.375', authorization: `Bearer ${f.token}`, 'content-type': 'application/json' }, body: stream, duplex: 'half',
   } as RequestInit & { duplex: string })
   const writing = scope.run(() => reportEvents(request, { params: Promise.resolve({ runId: f.run }) }))
   await delay(100)
@@ -175,7 +175,7 @@ test('a long poll loses token authority within its one-second database polling i
   const f = await fixture()
   const started = Date.now()
   const poll = scope.run(() => commands(new Request(`http://127.0.0.1/mikka/v1/devices/${f.device}/commands?wait=20`, {
-    headers: { authorization: `Bearer ${f.token}` },
+    headers: { 'x-mikka-client-version': '0.0.375', authorization: `Bearer ${f.token}` },
   }), { params: Promise.resolve({ deviceId: f.device }) }))
   await delay(150)
   await revokeDeviceCredential(raw, f.owner, f.tokenId)
@@ -203,7 +203,7 @@ test('a device request is fenced by its first statement, with no check up front,
   // A daemon's report: two harnesses with 500 models each, as large as the protocol allows.
   const models = Array.from({ length: 500 }, (_, index) => ({ id: `model-${index}`, name: `Model ${index} with a long display name` }))
   await raw.query('UPDATE devices SET harnesses=$2 WHERE id=$1', [f.device, JSON.stringify(['codex', 'claude_code'].map(harness => ({ harness, installed: true, models })))])
-  const get = () => scope.run(() => queuedRuns(new Request(`http://127.0.0.1/mikka/v1/devices/${f.device}/runs?state=queued`, { headers: { authorization: `Bearer ${f.token}` } }), { params: Promise.resolve({ deviceId: f.device }) }))
+  const get = () => scope.run(() => queuedRuns(new Request(`http://127.0.0.1/mikka/v1/devices/${f.device}/runs?state=queued`, { headers: { 'x-mikka-client-version': '0.0.375', authorization: `Bearer ${f.token}` } }), { params: Promise.resolve({ deviceId: f.device }) }))
   await get()
   const before = received()
   const response = await get()
@@ -219,6 +219,6 @@ test('a device request is fenced by its first statement, with no check up front,
     await appPool.query('SELECT 1')
     return Response.json({ reached: true })
   })
-  const refused = await scope.run(() => fenced(new Request(`http://127.0.0.1/mikka/v1/devices/${f.device}/runs`, { headers: { authorization: `Bearer ${f.token}` } })))
+  const refused = await scope.run(() => fenced(new Request(`http://127.0.0.1/mikka/v1/devices/${f.device}/runs`, { headers: { 'x-mikka-client-version': '0.0.375', authorization: `Bearer ${f.token}` } })))
   assert.equal(refused.status, 401)
 })

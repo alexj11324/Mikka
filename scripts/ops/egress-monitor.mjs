@@ -72,10 +72,11 @@ export function summarize(events, deploymentId, now = Date.now()) {
     measurement: 'sampled_json_result_bytes_not_wire_bytes', collection: 'best_effort' }
 }
 
-export async function run({ vercelToken, neonToken, now = Date.now(), fetchImpl = fetch }) {
-  const report = { version: 1, observedAt: iso(now), windowStart: iso(now-WINDOW_MS), environment: 'production', reasons: [], status: 'insufficient' }
+export async function run({ vercelToken, neonToken, now = Date.now(), fetchImpl = fetch, providerOnly = false }) {
+  const report = { version: 1, observedAt: iso(now), windowStart: iso(now-WINDOW_MS), environment: 'production', reasons: [], status: 'insufficient',
+    collectorSource: providerOnly ? 'cloudflare_provider_fallback' : 'github_runtime_collector', collectionScope: providerOnly ? 'provider' : 'provider_and_runtime' }
   const read = (path, body) => api(path, { token: vercelToken, body, fetchImpl, headers: { 'x-vercel-observability-query-reason': 'cli/logs-runtime' } })
-  try {
+  if (!providerOnly) try {
     if (!vercelToken) fail('vercel_token_unavailable')
     const alias = activeAlias(await read(`/v4/aliases/${PRODUCTION_ALIAS}`)), events = [], cursors = new Set()
     report.deploymentId = alias.deploymentId
@@ -129,8 +130,11 @@ export async function run({ vercelToken, neonToken, now = Date.now(), fetchImpl 
 export async function publish(report, token, fetchImpl = fetch) {
   if (!token) fail('posthog_token_unavailable')
   const properties = { distinct_id: 'mikka-operations', $process_person_profile: false, environment: 'production',
-    collection_healthy: report.reasons.every(reason => reason === 'no_database_samples') ? 1 : 0, samples: report.runtime?.samples ?? 0,
-    sampled_bytes: report.runtime?.sampledBytes ?? 0, request_count: report.runtime?.requests.reduce((n,r)=>n+r.count,0) ?? 0,
+    collector_source: report.collectorSource, collection_scope: report.collectionScope,
+    collection_healthy: report.reasons.every(reason => reason === 'no_database_samples') ? 1 : 0,
+    provider_healthy: report.neon && !report.neon.stale ? 1 : 0,
+    ...(report.collectionScope === 'provider' ? {} : { samples: report.runtime?.samples ?? 0,
+      sampled_bytes: report.runtime?.sampledBytes ?? 0, request_count: report.runtime?.requests.reduce((n,r)=>n+r.count,0) ?? 0 }),
     ...(report.neon ? { period_bytes: report.neon.periodBytes, today_bytes: report.neon.todayBytes,
       latest_hour_bytes: report.neon.latestHourBytes,
       daily_budget_ratio: report.neon.todayBytes / DAILY_BUDGET_BYTES,

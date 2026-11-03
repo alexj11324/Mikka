@@ -162,7 +162,7 @@ test(
         const request = (fileId: string, deviceId = device, credential = token) =>
           GET(
             new Request(`http://localhost/mikka/v1/devices/${deviceId}/runs/${run}/attachments/${fileId}`, {
-              headers: { authorization: `Bearer ${credential}` },
+              headers: { 'x-mikka-client-version': '0.0.375', authorization: `Bearer ${credential}` },
             }),
             { params: Promise.resolve({ deviceId, runId: run, id: fileId }) },
           )

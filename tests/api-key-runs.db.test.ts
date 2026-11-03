@@ -89,7 +89,7 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
   }
   const definition = async (runId: string) => (await pool.query('SELECT "agentDefinition" FROM agent_runs WHERE id=$1', [runId])).rows[0].agentDefinition
   const claim = (deviceId: string, runId: string, token: string, credentialHeader = true) => claimRoute.POST(new Request(`http://127.0.0.1/v1/devices/${deviceId}/runs/${runId}/claim`, {
-    method: 'POST', headers: { authorization: `Bearer ${token}`, [REPO_ORIGIN_HEADER]: '1', ...(credentialHeader ? { [MODEL_CREDENTIAL_HEADER]: '1' } : {}) },
+    method: 'POST', headers: { 'x-mikka-client-version': '0.0.375', authorization: `Bearer ${token}`, [REPO_ORIGIN_HEADER]: '1', ...(credentialHeader ? { [MODEL_CREDENTIAL_HEADER]: '1' } : {}) },
   }), { params: Promise.resolve({ deviceId, runId }) })
   const recorded = async (runId: string) => (await pool.query('SELECT "keyId" FROM model_api_key_runs WHERE "runId"=$1', [runId])).rows[0]?.keyId ?? null
   /** A connected Claude subscription bound to the person's Claude Code Agent. */
@@ -484,7 +484,7 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
     // The heartbeat answer names the releases; a failed automatic update is kept until the daemon clears it.
     const heartbeatRoute = await import('../app/v1/devices/[deviceId]/heartbeat/route')
     const beat = (body: Record<string, unknown>) => heartbeatRoute.POST(new Request(`http://127.0.0.1/v1/devices/${p.deviceId}/heartbeat`, {
-      method: 'POST', headers: { authorization: `Bearer ${p.token}` }, body: JSON.stringify({ harnesses: [], runs: [], worktreeDiskBytes: 0, ...body }),
+      method: 'POST', headers: { 'x-mikka-client-version': '0.0.375', authorization: `Bearer ${p.token}` }, body: JSON.stringify({ harnesses: [], runs: [], worktreeDiskBytes: 0, ...body }),
     }), { params: Promise.resolve({ deviceId: p.deviceId }) })
     const stored = async () => (await pool.query('SELECT "updateFailure" FROM devices WHERE id=$1', [p.deviceId])).rows[0].updateFailure
     const failure = { version: '0.0.331', code: 'install_failed', at: '2026-11-02T21:00:00.000Z' }

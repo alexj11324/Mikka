@@ -123,3 +123,80 @@ test('same-origin parts remain below the platform body limit and a lost part res
     Buffer.from(await parts[1].body.arrayBuffer()),
   )
 })
+
+test('caller cancellation aborts the upload and keeps the existing cleanup behavior', async t => {
+  let started!: () => void
+  const sent = new Promise<void>(resolve => { started = resolve })
+  let aborted = 0, deletes = 0
+  class Upload {
+    upload = { onprogress: undefined }
+    open() {}
+    setRequestHeader() {}
+    abort() { aborted++ }
+    send() { started() }
+  }
+  const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'XMLHttpRequest')
+  Object.defineProperty(globalThis, 'XMLHttpRequest', { configurable: true, value: Upload })
+  t.after(() => { if (descriptor) Object.defineProperty(globalThis, 'XMLHttpRequest', descriptor); else Reflect.deleteProperty(globalThis, 'XMLHttpRequest') })
+  t.mock.method(globalThis, 'fetch', async (_url: RequestInfo | URL, init?: RequestInit) => {
+    if (init?.method === 'DELETE') { deletes++; return Response.json({}) }
+    return Response.json({ id: '30000000-0000-4000-8000-000000000001', uploadUrl: 'https://storage.example/upload' })
+  })
+  const caller = new AbortController()
+  const upload = uploadChatFile(new File(['hello'], 'cancel.md'), { kind: 'bot', id: '30000000-0000-4000-8000-000000000001' }, caller.signal, () => {})
+  await sent
+  const rejected = assert.rejects(upload, { name: 'AbortError' })
+  caller.abort()
+  await rejected
+  assert.deepEqual({ aborted, deletes }, { aborted: 1, deletes: 1 })
+})
+
+test('requiring refresh aborts same-origin parts and direct uploads without cleanup requests or new work', async t => {
+  const uploads: { url: string; aborted: boolean }[] = []
+  let fetches = 0, deletes = 0, completions = 0
+  class Upload {
+    upload = { onprogress: undefined }
+    url = ''
+    entry: { url: string; aborted: boolean } | undefined
+    open(_method: string, url: string) { this.url = url }
+    setRequestHeader() {}
+    abort() { if (this.entry) this.entry.aborted = true }
+    send() { this.entry = { url: this.url, aborted: false }; uploads.push(this.entry) }
+  }
+  const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'XMLHttpRequest')
+  Object.defineProperty(globalThis, 'XMLHttpRequest', { configurable: true, value: Upload })
+  t.after(() => { if (descriptor) Object.defineProperty(globalThis, 'XMLHttpRequest', descriptor); else Reflect.deleteProperty(globalThis, 'XMLHttpRequest') })
+  t.mock.method(globalThis, 'fetch', async (_url: RequestInfo | URL, init?: RequestInit) => {
+    fetches++
+    if (init?.method === 'DELETE') { deletes++; return Response.json({}) }
+    const data = JSON.parse(String(init?.body))
+    if (data.operation === 'complete') { completions++; return Response.json({}) }
+    return Response.json(data.name === 'parts.md'
+      ? { id: '40000000-0000-4000-8000-000000000001', chunkSize: 2 }
+      : { id: '50000000-0000-4000-8000-000000000001', uploadUrl: 'https://storage.example/upload' })
+  })
+  const scope = { kind: 'bot' as const, id: '40000000-0000-4000-8000-000000000001' }
+  const partFile = new File(['hello'], 'parts.md')
+  const directFile = new File(['hello'], 'direct.md')
+  const parts = uploadChatFile(partFile, scope, new AbortController().signal, () => {})
+  const direct = uploadChatFile(directFile, scope, new AbortController().signal, () => {})
+  for (let n = 0; n < 100 && uploads.length < 2; n++) await new Promise(resolve => setTimeout(resolve, 1))
+  assert.equal(uploads.length, 2)
+  const partsRejected = assert.rejects(parts, { name: 'AbortError' })
+  const directRejected = assert.rejects(direct, { name: 'AbortError' })
+  const { markPageNeedsRefresh } = await import('../app-build')
+  markPageNeedsRefresh()
+  // A missing pause must fail the test rather than hang both pending uploads.
+  let deadline!: ReturnType<typeof setTimeout>
+  const expired = new Promise((_, reject) => { deadline = setTimeout(() => reject(Error('uploads did not abort for refresh')), 150) })
+  t.after(() => clearTimeout(deadline))
+  await Promise.race([Promise.all([partsRejected, directRejected]), expired])
+  assert.ok(uploads.every(upload => upload.aborted))
+  assert.equal(uploads.filter(upload => upload.url.startsWith('https://storage.example')).length, 1)
+  assert.equal(uploads.filter(upload => upload.url.includes('part=0')).length, 1)
+  assert.deepEqual({ deletes, completions }, { deletes: 0, completions: 0 })
+  const previousFetches = fetches
+  await assert.rejects(uploadChatFile(partFile, scope, new AbortController().signal, () => {}), { name: 'AbortError' })
+  assert.equal(fetches, previousFetches)
+  assert.equal(uploads.length, 2)
+})

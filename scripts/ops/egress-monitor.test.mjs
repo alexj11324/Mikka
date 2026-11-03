@@ -36,6 +36,29 @@ test('missing inputs publish unhealthy coverage, never successful zero; delivery
   await assert.rejects(()=>publish(report,'token',async()=>new Response(null,{status:503})),/telemetry_delivery_failed/)
 })
 
+test('minute-cron provider fallback never requires Vercel privileges or invents runtime samples',async()=>{
+  const report=await run({now,providerOnly:true,neonToken:'fixture-private-key',fetchImpl:async(url,options)=>{
+    assert.equal(new URL(url).hostname,'console.neon.tech');assert.equal(options.redirect,'error')
+    return Response.json(usage())
+  }})
+  assert.equal(report.status,'ok');assert.equal(report.neon.latestHourBytes,1000)
+  assert.equal(report.runtime,undefined);assert.equal(report.collectionScope,'provider')
+  let payload
+  await publish(report,'public-ingestion-key',async(_url,options)=>{payload=JSON.parse(options.body);return Response.json({})})
+  assert.equal(payload.batch[0].properties.collection_healthy,1)
+  assert.equal(payload.batch[0].properties.collection_scope,'provider')
+  assert.equal(payload.batch[0].properties.collector_source,'cloudflare_provider_fallback')
+  assert.equal(payload.batch[0].properties.provider_healthy,1)
+  assert.equal(payload.batch[0].properties.samples,undefined)
+  assert.equal(payload.batch[0].properties.sampled_bytes,undefined)
+  assert.equal(payload.batch[0].properties.request_count,undefined)
+  assert.ok(!JSON.stringify(payload).includes('fixture-private-key'))
+  const failed=await run({now,providerOnly:true,neonToken:'fixture-private-key',fetchImpl:async()=>new Response(null,{status:503})})
+  await publish(failed,'public-ingestion-key',async(_url,options)=>{payload=JSON.parse(options.body);return Response.json({})})
+  assert.equal(payload.batch[0].properties.collection_healthy,0)
+  assert.equal(payload.batch[0].properties.latest_hour_bytes,undefined)
+})
+
 test('large-result census and random small samples retain separate inclusion weights',()=>{
   const common={msg:'db_sample',timestamp:new Date(now-1000).toISOString(),statement:'abc123def456',route:'/actions/coordinator/poll',rows:1}
   const events=[{deploymentId:'dpl_test',environment:'production',message:[
