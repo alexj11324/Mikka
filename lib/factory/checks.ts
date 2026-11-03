@@ -29,6 +29,9 @@ export async function configureFactoryCheck(
     rows: [row],
   } = await tx.query(
     `SELECT c.*,producer.report AS "producerReport",(SELECT json_build_object('status',p.status,'pullRequest',p."pullRequest",'branch',p.branch,'baseBranch',p."baseBranch") FROM run_publications p WHERE p."runId"=producer.id AND p."userId"=$4) AS "publicationReceipt",COALESCE(c.sha,CASE WHEN c.kind='deliverable' THEN producer.report->>'deliverableCommit' END,producer.report->>'sourceCommit') AS "executionSha",r."deviceId",r."deviceRepoId",COALESCE((SELECT settings."verifyCommand" FROM repository_settings settings WHERE settings."userId"=$4 AND settings."remoteKey"=repo."repoPath"),repo."verifyCommand") AS "verifyCommand",repo."remoteUrl",repo."repoPath",d.enabled,d.kind AS "deviceKind",d."lastSeenAt",d.harnesses,a.harness,
+       json_build_object('runId',producer.id,'sessionId',producer."sessionId",'status',producer.status,
+         'model',producer."agentDefinition"->>'model','harness',producer."agentDefinition"->>'harness',
+         'observedModel',producer.report->'runtime'->>'observedModel') AS "producerExecution",
        (EXISTS(SELECT 1 FROM thread_machines tm WHERE tm."deviceId"=d.id AND tm.state='running') OR EXISTS(SELECT 1 FROM cloud_machines cm WHERE cm."deviceId"=d.id AND cm.state='running')) AS "cloudOnline"
      FROM factory_candidates c JOIN agent_runs r ON r.id=$3
      JOIN agent_runs producer ON producer.id=c."runId" AND producer."userId"=$4
@@ -77,13 +80,16 @@ export async function configureFactoryCheck(
       ? "Review the fixed candidate for correctness and regressions. Record each material finding as a failed criterion; explicitly pass a criterion only with concrete evidence."
       : "Independently exercise the acceptance criteria against this fixed candidate using real commands and observations. Record every criterion with its evidence. Code inspection alone is not verification.",
     row.kind === 'deliverable' || row.kind === 'report'
-      ? 'This candidate is a no-repository deliverable. Independently inspect the producing report and actual artifacts or desktop observations. Record criteria and concrete evidence through the granted tools. No code merge or build is required; do not invent a repository command.'
+      ? 'This candidate is a no-repository deliverable. Independently inspect the producing report and actual artifacts or desktop observations. Use mikka.inspect_artifact with a worktree-relative file path for real byte counts, SHA256, Git HEAD and comparison with the committed file; it requires no shell. Record criteria and concrete evidence through the granted tools. No code merge or build is required; do not invent a repository command.'
       : row.verifyCommand?.trim()
       ? `Do not change files or git state. For verification, execute the frozen command exactly: ${row.verifyCommand}. Include its real observations in your criteria; inspection alone cannot pass. Submit your criteria and evidence, including the exact command and observed exitCode for each criterion you checked. The daemon separately executes the frozen verify command; your self-report cannot replace it.`
       : task.stage === 'review'
         ? 'Review the fixed candidate and its producing report. Use verify_command with a concrete repository basis for read-only git diff/show or repository-script observations when native shell is unavailable. Record concrete criteria and evidence; use criterion text when no UUID was supplied. Do not modify source or git state.'
         : 'Infer a verification command from package.json scripts, Makefile or CI configuration. Execute it, record actual command observations in your criteria, and submit verificationCommand:{command,basis} naming its repository source. The daemon runs it independently. If no meaningful command can be inferred, request_help with purpose:"verification_command", asking the person to reply with the exact command only. The host saves that human answer as this repository’s verifyCommand. Never invent a default. Do not modify source or git state.',
     'Use the granted mikka.verify_command tool for command observations when native Bash/shell is unavailable. Report criterion text when no UUID was supplied.',
+    'When a required observation is unavailable, report_blocked or request_help with the missing evidence. Missing observations are not observed mismatches; do not turn them into failed correctness criteria or claim they passed.',
+    'Host-recorded producer execution assignment (frozen model/harness and actual run/session; not a provider billing log or proof of an alias version):',
+    redactFactoryCheckText(JSON.stringify(row.producerExecution ?? null)),
     'The host checks push and PR publication separately at human acceptance. Review code and exercise its behavior here; do not replace private-repository publication evidence with an unauthenticated public WebFetch or demand another GitHub login.',
     'Host publication observation (not a code-correctness verdict):',
     redactFactoryCheckText(JSON.stringify({ push: row.producerReport?.publish, publication: row.publicationReceipt })).slice(0, 4000),
