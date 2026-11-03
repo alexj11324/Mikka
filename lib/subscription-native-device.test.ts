@@ -3,6 +3,8 @@ import { test } from 'node:test'
 
 import { hostedBrokerDevice, leaseDevice } from './subscription-native-device'
 import { subscriptionNativeLease } from './subscription-native-lease'
+import { subscriptionNativeHTTP } from './subscription-native-http'
+import { SubscriptionRefusal } from '@mikka/protocol/subscription'
 
 const broker = [{ subscriptionBroker: true }]
 const ids = { deviceId: '11111111-1111-4111-8111-111111111111', runId: '22222222-2222-4222-8222-222222222222' }
@@ -33,6 +35,23 @@ const service = (fail = false) => () => ({
   nativeLease: async () => { if (fail) throw new Error('fixture-refusal-detail'); return lease as never },
 })
 const post = () => new Request('http://local/lease', { method: 'POST' })
+
+test('hosted context refusals retain a bounded server diagnosis without returning private details', async () => {
+  const lines: string[] = []
+  const failure = new SubscriptionRefusal('account_unavailable')
+  failure.cause = { token: 'fixture-private-native-token' }
+  const handler = subscriptionNativeHTTP({
+    authorize: async () => 'o',
+    service: () => ({ nativeRun: async () => ({ ownerId: 'o' }), nativeContext: async () => { throw failure } }) as never,
+    log: (line: string) => { lines.push(line) },
+  })
+  const response = await handler(new Request('http://local/subscription', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'context' }) }), { params: Promise.resolve(ids) })
+  assert.equal(response.status, 409)
+  assert.deepEqual(await response.json(), { error: 'subscription_unavailable' })
+  assert.equal(lines.length, 1)
+  assert.deepEqual(JSON.parse(lines[0]), { event: 'subscription_native_refused', ...ids, operation: 'context', phase: 'context', code: 'account_unavailable', errorClass: 'SubscriptionRefusal' })
+  assert.doesNotMatch(lines.join(''), /fixture-private-native-token|cause|stack/)
+})
 
 test('the lease is returned uncached to an authorized device', async () => {
   const handler = subscriptionNativeLease({ authorize: async () => 'o', service: service() })

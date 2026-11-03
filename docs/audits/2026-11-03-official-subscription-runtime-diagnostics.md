@@ -1,0 +1,15 @@
+# Official subscription runtime refusal diagnostics
+
+The real official-subscription run on revision `47286cc30cb03c567d8918360f266478dacb434d`, deployment `dpl_5TJMia7nZ4GJsEW4Z839RB7UvVSg`, worker `69673aa579c9242bbb0446dda8ca178c209dfd32` progressed beyond Bot chat. The actual E2B journals prove owner-bound `claude_code_cli` / `codex_cli` subscription bindings and no API-key credential.
+
+- Claude execute `28906207-883b-4914-8726-0dcbdfb9e45a`, native session `7d04bc1e-ad6b-4741-b370-dc58f30a0ba3`, succeeded and handed in `subscription-smoke-7107460e-claude.txt`. It is not a completed Factory acceptance.
+- Independent Claude review `b9f4b836-14f6-4c17-87a4-e756a62deaae`, native session `f2252a4a-1c45-443f-b3ea-f531ff283a32`, started successfully then ended cancelled without a recorded error. Task `0587e4aa-5195-4835-bb30-fb6bff7b3a8a` cancelled at review.
+- Codex's natural-language Bot again chose the repository-only Factory tool. The existing normal owner cloud-runs API then dispatched the same application issue through Factory (no test bypass), execute `986ebd95-8205-4964-8550-3eb21acbcfa1`, actual native session `01a1a198-1df5-7782-9baa-66eba23f5c88`. It too started and ended cancelled with no error; task `4f318ca8-dc27-4a34-8a38-fb810af6f7eb` did not pass.
+
+The failed native runs and their subscribed assignments remain intact. The native runner polls its live subscription context after startup; its existing monitor closes the session on a refused check, while startup diagnostics deliberately stop logging once started. The server's native endpoint also maps every exception to the same `subscription_unavailable` response and logs no cause. This combination leaves no evidence of the precise refusal. It is not enough to guess whether credentials, policy, transport or another condition caused these cancellations.
+
+Add one bounded server diagnostic on a refused native request: operation, processing phase, validated device/run IDs, an allowlisted typed refusal code and fixed error-class label. Keep the public response generic; never serialize exception messages, stack, cause, provider bodies, request headers or credentials. Logging failures cannot alter refusal behavior. This is diagnostic instrumentation, not a claim that the runtime cancellation is fixed or a reason to ignore an authorization failure.
+
+A real-handler regression first failed because no diagnostic was emitted, then passed after the change. Thirteen related native/device/service/route tests pass; the original 409 body stays generic and a private cause marker never enters the diagnostic. Fresh real-provider reproduction is still required to obtain the actual cause, fix it and complete both subscription execution chains and continuation. #1124 remains open.
+
+The user's subsequent execution-side requirement is separately tracked in #1126: the Agent itself must determine whether it is in the correct repository, find/clone an authorized target and switch the host-tracked execution worktree. Prompt-only routing guidance or a nested clone in the wrong delivery root does not satisfy that requirement.
