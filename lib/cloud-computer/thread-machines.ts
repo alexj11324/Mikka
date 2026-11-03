@@ -413,18 +413,20 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
     await client.query(`UPDATE factory_attempts SET output=jsonb_set(jsonb_set(output,'{check,deviceRepoId}',to_jsonb($2::text)),'{check,environment}',to_jsonb($3::text))
       WHERE "runId"=$1 AND stage IN ('review','verify') AND output ? 'check'`, [runId, repoId, `device:${deviceId}`])
     await client.query('COMMIT')
+    // Publishing bootstrap wakes an existing preloader before the explicit start
+    // command. Count only this credential's use since its handoff began.
+    const handoffStartedAt = (await pool.query('SELECT clock_timestamp() AS now')).rows[0].now as Date
     const handoff = `/run/mikka-viewer/thread-${leaseId}.json`
     await sandbox.files.write(handoff, JSON.stringify({ deviceId, workspaceId: actor.workspaceId, credential, server: origin.toString(), ...(process.env.VERCEL_ENV === 'preview' && process.env.MIKKA_CLOUD_PREVIEW_BYPASS ? { protectionBypass: process.env.MIKKA_CLOUD_PREVIEW_BYPASS } : {}) }), { user: 'root' })
     await sandbox.commands.run(`install -d -o user -g user -m 700 /home/user/.mikka; install -o user -g user -m 600 ${handoff} /home/user/.mikka/bootstrap.next; mv /home/user/.mikka/bootstrap.next /home/user/.mikka/bootstrap.json; unlink ${handoff}`, { user: 'root', timeoutMs: 10_000 })
     // The worker's output streams into the server logs only while this invocation lives;
     // the tee'd file in the sandbox keeps it for later reads (park, failure, end).
     const mask = await secretMaskerFor({ workspaceId: actor.workspaceId, ownerId: actor.userId })
-    const workerStartedAt = (await pool.query('SELECT clock_timestamp() AS now')).rows[0].now as Date
     await sandbox.commands.run(workerCommand(CLOUD_WORKER_COMMAND), { user: 'user', background: true, timeoutMs: 0, ...workerOutputForwarder(runId, mask) })
     const deadline = Date.now() + 30_000
     let ready = false
     do {
-      ready = Boolean((await pool.query('SELECT 1 FROM devices d JOIN device_tokens t ON t."boundDeviceId"=d.id WHERE d.id=$1 AND d."ownerId"=$2 AND d."lastSeenAt">=$3 AND t."tokenHash"=$4 AND t."revokedAt" IS NULL AND t."lastUsedAt">=$3', [deviceId, actor.userId, workerStartedAt, createHash('sha256').update(credential).digest('hex')])).rowCount)
+      ready = Boolean((await pool.query('SELECT 1 FROM devices d JOIN device_tokens t ON t."boundDeviceId"=d.id WHERE d.id=$1 AND d."ownerId"=$2 AND d."lastSeenAt">=$3 AND t."tokenHash"=$4 AND t."revokedAt" IS NULL AND t."lastUsedAt">=$3', [deviceId, actor.userId, handoffStartedAt, createHash('sha256').update(credential).digest('hex')])).rowCount)
       if (!ready) await new Promise(resolve => setTimeout(resolve, 500))
     } while (!ready && Date.now() < deadline)
     if (!ready) {
