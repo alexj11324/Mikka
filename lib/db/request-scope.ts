@@ -5,12 +5,14 @@ import * as schema from './schema'
 import { mikkaDatabaseURL } from './config'
 import { deviceScopedPool, readUnderAuthority } from './device-scope'
 import { sampleClient } from './egress-sample'
+import { samplePoolTransport } from './transport-sample'
 
 const defaultConnectionString = mikkaDatabaseURL(process.env)
 
-function createPool(connectionString = defaultConnectionString) {
+function createPool(connectionString = defaultConnectionString, scope: 'default' | 'request' = 'default') {
   const pool = new Pool({ connectionString, max: 5, connectionTimeoutMillis: 10000, idleTimeoutMillis: 20000 })
   pool.on('connect', client => sampleClient(client))
+  samplePoolTransport(pool, scope)
   return pool
 }
 
@@ -70,7 +72,7 @@ export function readUnderDeviceAuthority<T>(select: string, params: readonly unk
 }
 
 export function createRequestDatabaseScope(connectionString: string) {
-  const requestPool = createPool(connectionString)
+  const requestPool = createPool(connectionString, 'request')
   const requestDb = createDatabase(requestPool)
   let closePromise: Promise<void> | undefined
 
