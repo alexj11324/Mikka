@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "preparedAt": "2026-11-03T19:40:39.578304+00:00",
+  "repositoryRoot": "docs/acceptance/2026-11-03-official-subscriptions",
+  "scope": "Actual saved evidence only; incomplete overall acceptance; no production operation during packaging.",
+  "entries": [
+    {
+      "path": "README.md",
+      "repositoryPath": "docs/acceptance/2026-11-03-official-subscriptions/README.md",
+      "bytes": 4020,
+      "sha256": "9691fe580503f814a02370fc63f42fe59ce71ed7fe8ad4fe485323e3e8325956",
+      "gitBlobSha1": "36ba4f2d880782e3bddd7ae7b190719897ad5c79"
+    },
+    {
+      "path": "cases/claude-continuation-82.json",
+      "repositoryPath": "docs/acceptance/2026-11-03-official-subscriptions/cases/claude-continuation-82.json",
+      "bytes": 8339,
+      "sha256": "6e521f21fce4bf4ba905ef65fe03e3c9e6d4695e2e33beabdb34c9014e4e6380",
+      "gitBlobSha1": "1f57fb58098db70f0b22fff11e59286985467197"
+    },
+    {
+      "path": "cases/claude-initial.json",
+      "repositoryPath": "docs/acceptance/2026-11-03-official-subscriptions/cases/claude-initial.json",
+      "bytes": 3817,
+      "sha256": "05ca7b5deb4e1389cb65e9d37977758419b01dcf827704684b133feb2c8f108b",
+      "gitBlobSha1": "e8f8e7a0ae14b5bed72397f0251655cb3f81208c"
+    },
+    {
+      "path": "cases/codex-initial.json",
+      "repositoryPath": "docs/acceptance/2026-11-03-official-subscriptions/cases/codex-initial.json",
+      "bytes": 3763,
+      "sha256": "596d1a064d86f55a1481ce73d4e5d961f6ef7cced0645f2958d0743e3a794e2c",
+      "gitBlobSha1": "0f3a78f8cd53d4887009ea9e004660916c3fb2d8"
+    },
+    {
+      "path": "cases/historical-incomplete-rounds.json",
+      "repositoryPath": "docs/acceptance/2026-11-03-official-subscriptions/cases/historical-incomplete-rounds.json",
+      "bytes": 3290,
+      "sha256": "bf56087a9ba49e2bbd3a29d5ea9ffb365fc2aae872537c6784846cd277da0207",
+      "gitBlobSha1": "f04ee259e96a201b00d3727424942cb2c4e00e3e"
+    },
+    {
+      "path": "screenshots/claude-continuation-accepted.png",
+      "repositoryPath": "docs/acceptance/2026-11-03-official-subscriptions/screenshots/claude-continuation-accepted.png",
+      "bytes": 235113,
+      "sha256": "da62a35b810c31bb64978575184a0f84acad9b628e775363c25db263041521d6",
+      "gitBlobSha1": "474b96c325953a34ef8235f7188b5da9111bbbd0",
+      "originalSourceFilename": "1134-ui-1146-claude-continuation-recheck-accepted.png"
+    },
+    {
+      "path": "screenshots/claude-continuation-pending.png",
+      "repositoryPath": "docs/acceptance/2026-11-03-official-subscriptions/screenshots/claude-continuation-pending.png",
+      "bytes": 235374,
+      "sha256": "76ed6a5d627699b7274bcb3145f8dcf38bf08a6b052e5790316c48f4424270c6",
+      "gitBlobSha1": "f8c23eb8d283827323a6032f477f2733120b0b80",
+      "originalSourceFilename": "1134-ui-1146-claude-continuation-recheck-pending.png"
+    },
+    {
+      "path": "screenshots/claude-initial-accepted.png",
+      "repositoryPath": "docs/acceptance/2026-11-03-official-subscriptions/screenshots/claude-initial-accepted.png",
+      "bytes": 210462,
+      "sha256": "e401504e9cbe898a3a42e8c6874e44b773cb5594c353d68d7f76a818694be2b3",
+      "gitBlobSha1": "8aa1d78e22a316183e74c94c6dd0207e96463bb8",
+      "originalSourceFilename": "1134-ui-1146-claude-initial-accepted-clean.png"
+    },
+    {
+      "path": "screenshots/codex-initial-accepted.png",
+      "repositoryPath": "docs/acceptance/2026-11-03-official-subscriptions/screenshots/codex-initial-accepted.png",
+      "bytes": 218273,
+      "sha256": "468e5a24a64e6ef7a2499cf63cac024e60214cfe881392e0eb05f4ff43eab2a1",
+      "gitBlobSha1": "c0a1441b7b0ece6321c61a562861352d228ca48f",
+      "originalSourceFilename": "1134-ui-1146-codex-initial-accepted-clean.png"
+    }
+  ]
+}

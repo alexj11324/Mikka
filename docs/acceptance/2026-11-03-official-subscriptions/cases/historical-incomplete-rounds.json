@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "scope": "Selected saved pre-recheck Factory snapshots; not a complete production error log.",
+  "rounds": [
+    {
+      "provider": "claude",
+      "kind": "superseded-continuation",
+      "taskId": "48c6e3a9-4814-4c04-8231-7c471aada8a4",
+      "taskStatusAtStoredSnapshot": "cancelled",
+      "stageAtStoredSnapshot": "execute",
+      "stages": [
+        {
+          "stage": "execute",
+          "status": "passed",
+          "runId": "334c7282-5db5-4fd2-8c49-e629e526018e",
+          "sessionId": "94026159-1be4-48e5-9699-beea5ca12f86",
+          "candidateId": "3a7617fc-1d0c-4622-80cb-1dc3634bec86"
+        },
+        {
+          "stage": "review",
+          "status": "failed",
+          "runId": "2ad30216-aa0d-4d51-8ee4-730c61ab1aae",
+          "sessionId": "5f5344a6-af90-415a-8c1d-e5031e218948",
+          "candidateId": "3a7617fc-1d0c-4622-80cb-1dc3634bec86"
+        },
+        {
+          "stage": "execute",
+          "status": "cancelled",
+          "runId": "d2904776-ef39-4fa6-8524-841b12ec3c47",
+          "sessionId": null,
+          "candidateId": null
+        }
+      ],
+      "release": {
+        "revision": "d07e4897d9578f33a7828d6fc0fda16373380a67",
+        "deploymentId": "dpl_Fu3c5yqyB4K1SgQS4wNCodM1HKc5",
+        "workerSourceCommit": "d07e4897d9578f33a7828d6fc0fda16373380a67",
+        "workerSha": "1691367c6dff1cc36cde72b702bc2c8a7a31c48e"
+      },
+      "ownerAccepted": false
+    },
+    {
+      "provider": "codex",
+      "kind": "superseded-continuation",
+      "taskId": "3283b970-ff1d-4ccd-8972-2cee38400ef2",
+      "taskStatusAtStoredSnapshot": "cancelled",
+      "stageAtStoredSnapshot": "execute",
+      "stages": [
+        {
+          "stage": "execute",
+          "status": "passed",
+          "runId": "182ebd2e-566d-46ad-8b7d-6977b71d9860",
+          "sessionId": "01a1a27b-575d-78a2-9705-ccfa564201c9",
+          "candidateId": "fbb61204-de4c-4461-b4ac-0ac21ebc8fec"
+        },
+        {
+          "stage": "review",
+          "status": "failed",
+          "runId": "2fe52073-76ac-45c0-8f96-6e8e18965d36",
+          "sessionId": "01a1a27e-5b2f-7fb3-9527-2ec5ed8eb8dd",
+          "candidateId": "fbb61204-de4c-4461-b4ac-0ac21ebc8fec"
+        },
+        {
+          "stage": "execute",
+          "status": "passed",
+          "runId": "f197de37-a7c5-4a38-818c-3f3620beb2b5",
+          "sessionId": "01a1a280-3bc1-7fe0-a3c6-a8aa0bd3897c",
+          "candidateId": "81594c81-cdaa-4ad4-ac73-3861d4f9f8fe"
+        },
+        {
+          "stage": "review",
+          "status": "failed",
+          "runId": "fa6884e2-11bd-4fa2-80d7-8013dbf17e40",
+          "sessionId": "01a1a282-a6f3-7e23-bd30-1d0336094c2b",
+          "candidateId": "81594c81-cdaa-4ad4-ac73-3861d4f9f8fe"
+        },
+        {
+          "stage": "execute",
+          "status": "cancelled",
+          "runId": "87fe63f0-05db-4d6b-862f-bcae5956def5",
+          "sessionId": null,
+          "candidateId": null
+        }
+      ],
+      "release": {
+        "revision": "d07e4897d9578f33a7828d6fc0fda16373380a67",
+        "deploymentId": "dpl_Fu3c5yqyB4K1SgQS4wNCodM1HKc5",
+        "workerSourceCommit": "d07e4897d9578f33a7828d6fc0fda16373380a67",
+        "workerSha": "1691367c6dff1cc36cde72b702bc2c8a7a31c48e"
+      },
+      "ownerAccepted": false
+    }
+  ]
+}

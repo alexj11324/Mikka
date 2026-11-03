@@ -1,0 +1,98 @@
+{
+  "schemaVersion": 1,
+  "provider": "codex",
+  "kind": "initial",
+  "outcome": "passed-with-normal-owner-ui-acceptance",
+  "taskId": "d9f8b65f-e096-4983-a8e9-438e531a7b42",
+  "candidateId": "154e70f3-ad62-44ca-b543-a7fef21f81fd",
+  "credentialKind": "subscription",
+  "harness": "codex",
+  "model": "gpt-5.6-luna",
+  "release": {
+    "applicationSourceCommit": "d07e4897d9578f33a7828d6fc0fda16373380a67",
+    "applicationDeploymentId": "dpl_Fu3c5yqyB4K1SgQS4wNCodM1HKc5",
+    "workerSourceCommit": "d07e4897d9578f33a7828d6fc0fda16373380a67",
+    "workerSha": "1691367c6dff1cc36cde72b702bc2c8a7a31c48e"
+  },
+  "stages": [
+    {
+      "stage": "execute",
+      "status": "passed",
+      "candidateId": "154e70f3-ad62-44ca-b543-a7fef21f81fd",
+      "runId": "e2cc22fa-5644-4fad-8d98-070472e609d2",
+      "state": "succeeded",
+      "sessionId": "01a1a26f-f26a-7570-8f09-916aebe3acad",
+      "model": "gpt-5.6-luna",
+      "harness": "codex",
+      "worktree": "/home/user/.mikka/worker/worktrees/e2cc22fa-5644-4fad-8d98-070472e609d2",
+      "continuesRunId": null,
+      "resumeSessionId": null,
+      "credentialKind": "subscription",
+      "subscriptionRoute": "codex_cli",
+      "ownerAndWorkspaceBindingMatched": true,
+      "apiKeyCredentialPresent": false,
+      "apiKeyCredentialWithheld": false
+    },
+    {
+      "stage": "review",
+      "status": "passed",
+      "candidateId": "154e70f3-ad62-44ca-b543-a7fef21f81fd",
+      "runId": "51e2aeb7-498d-4713-86c4-00871c4eb653",
+      "state": "succeeded",
+      "sessionId": "01a1a272-c574-7f13-a546-aaa25da1a697",
+      "model": "gpt-5.6-luna",
+      "harness": "codex",
+      "worktree": "/home/user/.mikka/worker/worktrees/51e2aeb7-498d-4713-86c4-00871c4eb653",
+      "continuesRunId": null,
+      "resumeSessionId": null,
+      "credentialKind": "subscription",
+      "subscriptionRoute": "codex_cli",
+      "ownerAndWorkspaceBindingMatched": true,
+      "apiKeyCredentialPresent": false,
+      "apiKeyCredentialWithheld": false
+    },
+    {
+      "stage": "verify",
+      "status": "passed",
+      "candidateId": "154e70f3-ad62-44ca-b543-a7fef21f81fd",
+      "runId": "a7223186-487c-4acc-8141-7f5e812e18fa",
+      "state": "succeeded",
+      "sessionId": "01a1a274-f9a9-7801-b734-b08a9a110f05",
+      "model": "gpt-5.6-luna",
+      "harness": "codex",
+      "worktree": "/home/user/.mikka/worker/worktrees/a7223186-487c-4acc-8141-7f5e812e18fa",
+      "continuesRunId": null,
+      "resumeSessionId": null,
+      "credentialKind": "subscription",
+      "subscriptionRoute": "codex_cli",
+      "ownerAndWorkspaceBindingMatched": true,
+      "apiKeyCredentialPresent": false,
+      "apiKeyCredentialWithheld": false
+    }
+  ],
+  "independentNativeSessionCount": 3,
+  "artifact": {
+    "filename": "factory-1146-codex-d8f3d3f2.txt",
+    "gitCommit": "627f9af9e1a1e76154e6343aeb72c110a53f3e28",
+    "verifierWorktree": "/home/user/.mikka/worker/worktrees/a7223186-487c-4acc-8141-7f5e812e18fa",
+    "bytes": 56,
+    "sha256": "e8d1f4b2708a0b8b48ccab9a66362ee8f80183a21104767a131eea13cc8d5f55",
+    "committedSha256": "e8d1f4b2708a0b8b48ccab9a66362ee8f80183a21104767a131eea13cc8d5f55",
+    "contentMatchesGit": true
+  },
+  "ownerAcceptance": {
+    "status": "accepted",
+    "method": "normal-owner-ui-button",
+    "taskId": "d9f8b65f-e096-4983-a8e9-438e531a7b42",
+    "candidateId": "154e70f3-ad62-44ca-b543-a7fef21f81fd",
+    "acceptanceId": "4dd12f53-36db-4e3e-bceb-c372bbfa6365",
+    "httpStatus": 200,
+    "persistedTaskStatus": "passed",
+    "at": "2026-11-03T17:35:16.641725+00:00",
+    "acceptedScreenshot": "screenshots/codex-initial-accepted.png"
+  },
+  "sourceProof": {
+    "filename": "proof-codex-initial.json",
+    "sha256": "d4aba489a7d5eeb77115c904aa3a01949bc3bf075d52ed17a6a2d8a46982f3cd"
+  }
+}

@@ -1,0 +1,98 @@
+{
+  "schemaVersion": 1,
+  "provider": "claude",
+  "kind": "initial",
+  "outcome": "passed-with-normal-owner-ui-acceptance",
+  "taskId": "c305859b-3243-4ec6-ba32-f6b65aae5d18",
+  "candidateId": "5edf8cc8-6d19-4cae-b016-8d6492de69be",
+  "credentialKind": "subscription",
+  "harness": "claude_code",
+  "model": "claude-opus-5-5",
+  "release": {
+    "applicationSourceCommit": "d07e4897d9578f33a7828d6fc0fda16373380a67",
+    "applicationDeploymentId": "dpl_Fu3c5yqyB4K1SgQS4wNCodM1HKc5",
+    "workerSourceCommit": "d07e4897d9578f33a7828d6fc0fda16373380a67",
+    "workerSha": "1691367c6dff1cc36cde72b702bc2c8a7a31c48e"
+  },
+  "stages": [
+    {
+      "stage": "execute",
+      "status": "passed",
+      "candidateId": "5edf8cc8-6d19-4cae-b016-8d6492de69be",
+      "runId": "26619fe9-e250-442f-8d27-9c187f86e553",
+      "state": "succeeded",
+      "sessionId": "42e0809a-8c2a-4e25-994b-47f86a5b8a99",
+      "model": "claude-opus-5-5",
+      "harness": "claude_code",
+      "worktree": "/home/user/.mikka/worker/worktrees/26619fe9-e250-442f-8d27-9c187f86e553",
+      "continuesRunId": null,
+      "resumeSessionId": null,
+      "credentialKind": "subscription",
+      "subscriptionRoute": "claude_code_cli",
+      "ownerAndWorkspaceBindingMatched": true,
+      "apiKeyCredentialPresent": false,
+      "apiKeyCredentialWithheld": false
+    },
+    {
+      "stage": "review",
+      "status": "passed",
+      "candidateId": "5edf8cc8-6d19-4cae-b016-8d6492de69be",
+      "runId": "ad4c7ce2-0514-497a-8828-1ca4fc06dee1",
+      "state": "succeeded",
+      "sessionId": "23252624-8872-4056-8b19-cc3450696342",
+      "model": "claude-opus-5-5",
+      "harness": "claude_code",
+      "worktree": "/home/user/.mikka/worker/worktrees/ad4c7ce2-0514-497a-8828-1ca4fc06dee1",
+      "continuesRunId": null,
+      "resumeSessionId": null,
+      "credentialKind": "subscription",
+      "subscriptionRoute": "claude_code_cli",
+      "ownerAndWorkspaceBindingMatched": true,
+      "apiKeyCredentialPresent": false,
+      "apiKeyCredentialWithheld": false
+    },
+    {
+      "stage": "verify",
+      "status": "passed",
+      "candidateId": "5edf8cc8-6d19-4cae-b016-8d6492de69be",
+      "runId": "bdad49f5-25ac-4e7b-8a9c-2eb4e019080c",
+      "state": "succeeded",
+      "sessionId": "28277a67-41c8-448a-ba4b-ebb52aee143e",
+      "model": "claude-opus-5-5",
+      "harness": "claude_code",
+      "worktree": "/home/user/.mikka/worker/worktrees/bdad49f5-25ac-4e7b-8a9c-2eb4e019080c",
+      "continuesRunId": null,
+      "resumeSessionId": null,
+      "credentialKind": "subscription",
+      "subscriptionRoute": "claude_code_cli",
+      "ownerAndWorkspaceBindingMatched": true,
+      "apiKeyCredentialPresent": false,
+      "apiKeyCredentialWithheld": false
+    }
+  ],
+  "independentNativeSessionCount": 3,
+  "artifact": {
+    "filename": "factory-1146-cc-87c38e7e.txt",
+    "gitCommit": "b56ebd93e55ba6749954e1648639810da59d572a",
+    "verifierWorktree": "/home/user/.mikka/worker/worktrees/bdad49f5-25ac-4e7b-8a9c-2eb4e019080c",
+    "bytes": 53,
+    "sha256": "9b337028283b8c7e5e268690874455cdef4b40cf257427b753fd0b375df51deb",
+    "committedSha256": "9b337028283b8c7e5e268690874455cdef4b40cf257427b753fd0b375df51deb",
+    "contentMatchesGit": true
+  },
+  "ownerAcceptance": {
+    "status": "accepted",
+    "method": "normal-owner-ui-button",
+    "taskId": "c305859b-3243-4ec6-ba32-f6b65aae5d18",
+    "candidateId": "5edf8cc8-6d19-4cae-b016-8d6492de69be",
+    "acceptanceId": "e9e56580-6848-442b-97ff-cf67f3ed713f",
+    "httpStatus": 200,
+    "persistedTaskStatus": "passed",
+    "at": "2026-11-03T17:33:22.526880+00:00",
+    "acceptedScreenshot": "screenshots/claude-initial-accepted.png"
+  },
+  "sourceProof": {
+    "filename": "proof-claude-initial.json",
+    "sha256": "fb6198347af55570a85ef8d9baf09e710dc2b2be69dac00fc3f86a380e8a2458"
+  }
+}
