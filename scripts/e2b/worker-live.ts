@@ -152,7 +152,7 @@ async function main() {
       const bindingInput = { botId: bot.id, connectionId, revision: 1, harness: 'codex' as const, modelId: 'fixture-model', idempotencyKey: 'synthetic-bind' }
       const { bindingId } = await bindBotSubscription(pool, actor, bindingInput)
       assert.equal((await bindBotSubscription(pool, actor, bindingInput)).bindingId, bindingId)
-      const { runId } = await queueCloudRun(pool, actor, { botId: bot.id, issueId, agentId, deviceRepoId: repoId, title: 'FULL_COMPUTER', body: '' })
+      const { runId } = await queueCloudRun(pool, actor, { botId: bot.id, issueId, agentId, deviceRepoId: repoId, title: 'FULL_COMPUTER', body: '', model: bindingInput.modelId })
       const prompt = (await pool.query('SELECT prompt FROM agent_runs WHERE id=$1', [runId])).rows[0].prompt as string
       const leaseExpiresAt = new Date(Date.now() + 180_000).toISOString()
       const computer = await claimCloudRun(pool, actor, runId, worker.deviceId, new Date(leaseExpiresAt), bindingId)

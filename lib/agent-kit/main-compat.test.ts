@@ -144,34 +144,41 @@ test('cloud queue captures exact worker and parent snapshot in the same transact
  const calls:{sql:string,args:unknown[]}[]=[]
  const client={release(){},async query(sql:string,args:unknown[]=[]){calls.push({sql,args});if(sql.startsWith('SELECT m.'))return {rows:[{deviceId,instructions:'Cloud review',harness:'codex',baseBranch:'main'}]};if(sql.startsWith('SELECT 1 FROM bots b JOIN agents'))return {rows:[{}],rowCount:1};if(sql.startsWith('select id from byos_bindings'))return {rows:[{id:binding.id}]};if(sql.startsWith('select id,"ownerId"'))return {rows:[binding]};return {rows:[]}}}
  const parent={id:randomUUID(),status:'running' as const,snapshot:makeSnapshot(randomUUID(),2,DEFAULT_AGENT_DEFINITION,'HOST',{harness:'codex',model:null})}
- await queue({connect:async()=>client} as unknown as Parameters<typeof queue>[0],{userId:owner,workspaceId:workspace},{botId,issueId,agentId,deviceRepoId:repoId,title:'Review',body:'synthetic',execution:parent})
+ await queue({connect:async()=>client} as unknown as Parameters<typeof queue>[0],{userId:owner,workspaceId:workspace},{botId,issueId,agentId,deviceRepoId:repoId,title:'Review',body:'synthetic',model:binding.modelId,execution:parent})
  const insert=calls.find(c=>c.sql.startsWith('INSERT INTO agent_runs'))!;const snapshot=JSON.parse(insert.args[9] as string);assert.equal(snapshot.harness,'codex');assert.equal(snapshot.subscription.bindingId,binding.id);assert.equal(snapshot.parent.executionId,parent.id);assert.equal(calls.at(-1)!.sql,'COMMIT');assert.ok(calls.some(c=>c.sql.startsWith('INSERT INTO computer_run_bindings')))
 })
 
 
 test('with versioned definitions off, a cloud run still freezes its Agent and credential source',async()=>{
- // Every cloud run freezes its definition when it is queued (orchestration.md § 5), with or without a model in the request.
+ // Every cloud run freezes its definition when it is queued (orchestration.md § 5), with the model its caller chose.
  process.env.MIKKA_AGENT_KIT='0'
  const calls:{sql:string,args:unknown[]}[]=[]
  const client={release(){},async query(sql:string,args:unknown[]=[]){calls.push({sql,args});if(sql.startsWith('SELECT m.'))return {rows:[{deviceId,instructions:'Review',harness:'codex',baseBranch:'main'}]};if(sql.startsWith('SELECT 1 FROM bots b JOIN agents'))return {rows:[{}],rowCount:1};if(sql.startsWith('select id from byos_bindings'))return {rows:[{id:binding.id}]};if(sql.startsWith('select id,"ownerId"'))return {rows:[binding]};return {rows:[]}}}
- await queue({connect:async()=>client} as unknown as Parameters<typeof queue>[0],{userId:owner,workspaceId:workspace},{botId,issueId,agentId,deviceRepoId:repoId,title:'Review',body:''})
+ await queue({connect:async()=>client} as unknown as Parameters<typeof queue>[0],{userId:owner,workspaceId:workspace},{botId,issueId,agentId,deviceRepoId:repoId,title:'Review',body:'',model:binding.modelId})
  const insert=calls.find(c=>c.sql.startsWith('INSERT INTO agent_runs'))!;const snapshot=JSON.parse(insert.args[9] as string)
  assert.equal(snapshot.harness,'codex');assert.equal(snapshot.subscription.bindingId,binding.id);assert.equal(calls.at(-1)!.sql,'COMMIT')
 })
-test('an automatic rule model stays automatic with versioned definitions disabled',async()=>{
+// The hosted runner starts a subscription run only on that subscription's own model: a cloud subscription run
+// is frozen with that model, explicitly, and one queued without it (or with 'auto') fails before anything is written.
+test('a cloud subscription run must name its model explicitly with versioned definitions disabled',async()=>{
  process.env.MIKKA_AGENT_KIT='0'
  const calls:{sql:string,args:unknown[]}[]=[]
  const client={release(){},async query(sql:string,args:unknown[]=[]){calls.push({sql,args});if(sql.startsWith('SELECT m.'))return {rows:[{deviceId,instructions:'Review',harness:'codex',baseBranch:'main'}]};if(sql.startsWith('SELECT 1 FROM bots b JOIN agents'))return {rows:[{}],rowCount:1};if(sql.startsWith('select id from byos_bindings'))return {rows:[{id:binding.id}]};if(sql.startsWith('select id,"ownerId"'))return {rows:[binding]};return {rows:[]}}}
- await queue({connect:async()=>client} as unknown as Parameters<typeof queue>[0],{userId:owner,workspaceId:workspace},{botId,issueId,agentId,deviceRepoId:repoId,title:'Review',body:'',model:'auto'})
+ const pool={connect:async()=>client} as unknown as Parameters<typeof queue>[0]
+ for(const model of ['auto','',undefined]){
+  await assert.rejects(queue(pool,{userId:owner,workspaceId:workspace},{botId,issueId,agentId,deviceRepoId:repoId,title:'Review',body:'',model:model as string,threadRunId:'previous-run'}),/Run model missing \(run .+, thread previous-run\)/)
+ }
+ assert.equal(calls.length,0,'nothing is read or written for a run without its model')
+ await queue(pool,{userId:owner,workspaceId:workspace},{botId,issueId,agentId,deviceRepoId:repoId,title:'Review',body:'',model:binding.modelId})
  const insert=calls.find(call=>call.sql.startsWith('INSERT INTO agent_runs'))!
  const snapshot=JSON.parse(insert.args[9] as string)
- assert.equal(snapshot.cliModelSelection,'auto');assert.equal(Object.hasOwn(snapshot,'model'),false)
+ assert.equal(snapshot.cliModelSelection,'explicit');assert.equal(snapshot.model,binding.modelId);assert.equal(snapshot.subscription.modelId,binding.modelId)
  assert.equal(snapshot.subscription.bindingId,binding.id);assert.equal(calls.at(-1)!.sql,'COMMIT')
 })
 test('cloud request replay cannot substitute another parent execution',async()=>{
  const client={release(){},async query(sql:string){if(sql.startsWith('SELECT m.'))return {rows:[{deviceId,instructions:'Review',harness:'codex',baseBranch:'main'}]};if(sql.startsWith('SELECT r.'))return {rows:[{userId:owner,issueId,agentId,deviceId,deviceRepoId:repoId,runBotId:botId,botId,workspaceId:workspace,prompt:runPrompt('Review','','Review'),agentDefinition:{harness:'codex',parent:{executionId:randomUUID()}}}]};return {rows:[]}}}
  const parent={id:randomUUID(),status:'running' as const,snapshot:makeSnapshot(randomUUID(),2,DEFAULT_AGENT_DEFINITION,'HOST',{harness:'codex',model:null})}
- await assert.rejects(queue({connect:async()=>client} as unknown as Parameters<typeof queue>[0],{userId:owner,workspaceId:workspace},{botId,issueId,agentId,deviceRepoId:repoId,title:'Review',body:'',execution:parent,idempotencyKey:'same-call'}),/Task request changed/)
+ await assert.rejects(queue({connect:async()=>client} as unknown as Parameters<typeof queue>[0],{userId:owner,workspaceId:workspace},{botId,issueId,agentId,deviceRepoId:repoId,title:'Review',body:'',model:binding.modelId,execution:parent,idempotencyKey:'same-call'}),/Task request changed/)
 })
 
 test('local assignment receives only persisted server computer authority',async()=>{localCapable=true;const response=await request();assert.equal(response.status,200);const body=await response.json();assert.equal(body.localComputer.workspaceId,workspace);assert.equal(body.localComputer.ownerId,owner);assert.equal(body.localComputer.policyVersion,3);assert.equal(body.policy.permissions.computer_use,'allow');assert.equal(body.computer,undefined);assertCliPolicy(body)})

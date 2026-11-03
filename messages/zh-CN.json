@@ -1077,6 +1077,7 @@
     "executionRuleOrderInvalid": "执行规则顺序已更改，请刷新后重试。",
     "executionCommandNotFound": "找不到这次检测。",
     "executionAccountUnavailable": "此账号不可用。",
+    "threadModelUnavailable": "这个线程原来的模型已不可用。",
     "generic": "操作未成功，请稍后重试。",
     "authRequired": "需要先登录",
     "validationGeneric": "请检查填写内容。",

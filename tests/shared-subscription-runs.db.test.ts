@@ -114,7 +114,7 @@ test('shared subscriptions reach local and cloud claims with current membership 
     assert.equal(frozen?.ownerId, ownerId, 'the lender remains the credential owner')
     const worker = cloud ? await threadMachines.start({ userId, workspaceId }, queued.runId) : { deviceId, token }
     const claim = () => claimRoute.POST(new Request(`http://127.0.0.1/v1/devices/${worker.deviceId}/runs/${queued.runId}/claim`, { method: 'POST', headers: { authorization: `Bearer ${worker.token}`, [REPO_ORIGIN_HEADER]: '1' } }), { params: Promise.resolve({ deviceId: worker.deviceId, runId: queued.runId }) })
-    return { ownerId, userId, workspaceId, botId, agentId, harness, connectionId, model, scope, worker, runId: queued.runId, claim }
+    return { ownerId, userId, workspaceId, botId, agentId, harness, connectionId, model, scope, worker, runId: queued.runId, repoId, claim }
   }
   await t.test('unknown shared quota refresh uses the lender owner, not the task owner', async () => {
     const p = await seed('codex', false)
@@ -208,20 +208,30 @@ test('shared subscriptions reach local and cloud claims with current membership 
       if (revoke !== 'runner-left') assert.equal(offered.some(item => item.source.kind === 'subscription' && item.source.connectionId === p.connectionId), false)
     })
   }
-  await t.test('a cloud thread\'s next run, queued without a model, freezes the subscription\'s own model', async () => {
-    // The hosted runner starts only when the run's model equals the subscription context's; a
-    // continuation that left the model out failed every time with subscription_hosted_runtime_unavailable.
+  await t.test('a cloud thread\'s next run keeps the thread\'s own model and subscription; one queued without a model fails', async () => {
+    // The hosted runner starts only when the run's model equals the subscription context's; a continuation
+    // queued without one was frozen with model null and failed every time with subscription_hosted_runtime_unavailable.
+    const { latestThreadRunModel } = await import('../lib/computer/run-model')
     const p = await seed('claude', true)
-    const issueId = await seedIssue(pool, p.userId)
-    const repoId = (await pool.query('SELECT "deviceRepoId" FROM agent_runs WHERE id=$1', [p.runId])).rows[0].deviceRepoId
-    for (const model of [undefined, 'auto'] as const) {
-      const next = await queueCloudRun(pool, { userId: p.userId, workspaceId: p.workspaceId }, { botId: p.botId, issueId, agentId: p.agentId, deviceRepoId: repoId, title: 'Continue', body: '', readOnly: true, ...(model ? { model } : {}) })
-      const definition = (await pool.query('SELECT "agentDefinition" FROM agent_runs WHERE id=$1', [next.runId])).rows[0].agentDefinition
-      assert.equal(definition.modelSource, 'subscription')
-      assert.equal(definition.subscription.modelId, p.model)
-      assert.equal(definition.model, p.model, `model ${model ?? 'omitted'}`)
-      assert.equal(definition.cliModelSelection, 'explicit')
+    const first = (await pool.query('SELECT "issueId","agentDefinition" FROM agent_runs WHERE id=$1', [p.runId])).rows[0]
+    const input = { botId: p.botId, issueId: first.issueId, agentId: p.agentId, deviceRepoId: p.repoId, title: 'Continue', body: '', readOnly: true, threadRunId: p.runId }
+    const runs = async () => Number((await pool.query('SELECT count(*) FROM agent_runs WHERE "userId"=$1', [p.userId])).rows[0].count)
+    const before = await runs()
+    for (const model of [undefined, '', 'auto']) {
+      await assert.rejects(queueCloudRun(pool, { userId: p.userId, workspaceId: p.workspaceId }, { ...input, model: model as string }), new RegExp(`Run model missing \\(run [0-9a-f-]+, thread ${p.runId}\\)`))
     }
+    assert.equal(await runs(), before, 'nothing is written for a run without its model')
+    const runModel = await latestThreadRunModel(pool, p.userId, first.issueId, p.agentId)
+    assert.deepEqual(runModel, { model: p.model, subscriptionBindingId: first.agentDefinition.subscription.bindingId })
+    const next = await queueCloudRun(pool, { userId: p.userId, workspaceId: p.workspaceId }, { ...input, ...runModel! })
+    const definition = (await pool.query('SELECT "agentDefinition" FROM agent_runs WHERE id=$1', [next.runId])).rows[0].agentDefinition
+    assert.equal(definition.modelSource, 'subscription')
+    assert.equal(definition.subscription.bindingId, first.agentDefinition.subscription.bindingId)
+    assert.equal(definition.subscription.modelId, p.model)
+    assert.equal(definition.model, p.model)
+    assert.equal(definition.cliModelSelection, 'explicit')
+    // The thread's model no longer served by its subscription: refused, never swapped for another model.
+    await assert.rejects(queueCloudRun(pool, { userId: p.userId, workspaceId: p.workspaceId }, { ...input, ...runModel!, model: 'another-model' }), { status: 409 })
   })
   await t.test('own subscription works across workspaces without a share or admin personal-use gate', async () => {
     const p = await seed('claude', false)

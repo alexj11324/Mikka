@@ -198,6 +198,39 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     assert.deepEqual([(await definitionOf(next.runId)).agentDefinition.readOnly, (await definitionOf(next.runId)).agentDefinition.repositoryAdmission], [true, undefined])
   })
 
+  await t.test('a cloud thread that stopped to ask continues on its own model and subscription; with none it says so and queues nothing', async () => {
+    // Production (Acme): the first run ran on its subscription's model, the continuations were frozen with model null
+    // and the hosted runner refused each one (subscription_hosted_runtime_unavailable).
+    const m = await person('cloud-thread-model')
+    type Result = { runId?: string; thread?: string; threadId?: string; error?: string; threadRunId?: string }
+    const frozen = async (runId: string) => (await pool.query('SELECT "agentDefinition" FROM agent_runs WHERE id=$1', [runId])).rows[0].agentDefinition
+    const work = await anotherTask(m.id, 41)
+    const first = await dispatch(m.id, work, m.botId) as unknown as Result
+    const firstDefinition = await frozen(first.runId!)
+    assert.equal(firstDefinition.model, 'gpt-5')
+    // The thread stops to ask the person; the Coordinator continues it.
+    await pool.query('UPDATE agent_runs SET status=\'completed\',"finishedAt"=now() WHERE id=$1', [first.runId])
+    const next = await steps.dispatchRun(m.id, { issueId: work, note: 'The person answered: use the mobile layout.', requestKey: `dispatch:${randomUUID()}` }, undefined, m.botId) as unknown as Result
+    assert.deepEqual([next.thread, next.threadId], ['continued', first.runId], JSON.stringify(next))
+    const nextDefinition = await frozen(next.runId!)
+    assert.equal(nextDefinition.model, 'gpt-5', 'the continuation keeps the thread\'s model')
+    assert.equal(nextDefinition.cliModelSelection, 'explicit')
+    assert.equal(nextDefinition.subscription.bindingId, firstDefinition.subscription.bindingId, 'and its subscription')
+    assert.equal(nextDefinition.subscription.modelId, nextDefinition.model, 'the hosted runner starts it: its model is the subscription context\'s')
+
+    // A thread whose runs were all frozen without a model (before the fix): told, not filled in, nothing queued.
+    await pool.query('UPDATE agent_runs SET status=\'completed\',"finishedAt"=now(),"agentDefinition"="agentDefinition"-\'model\' WHERE "issueId"=$1 AND "userId"=$2', [work, m.id])
+    const runs = async () => Number((await pool.query('SELECT count(*) FROM agent_runs WHERE "userId"=$1', [m.id])).rows[0].count)
+    const before = await runs()
+    const refused = await steps.dispatchRun(m.id, { issueId: work, note: 'Continue.', requestKey: `dispatch:${randomUUID()}` }, undefined, m.botId) as unknown as Result
+    assert.equal(refused.error, 'threadModelUnavailable', JSON.stringify(refused))
+    assert.equal(refused.threadRunId, next.runId)
+    assert.equal(await runs(), before, 'no run is queued with another model')
+    // The person names the model again: the thread continues on it.
+    const named = await steps.dispatchRun(m.id, { issueId: work, note: 'Continue.', model: { harness: 'codex', model: 'gpt-5' }, requestKey: `dispatch:${randomUUID()}` }, undefined, m.botId) as unknown as Result
+    assert.equal(named.thread, 'continued', JSON.stringify(named))
+    assert.equal((await frozen(named.runId!)).model, 'gpt-5')
+  })
   await t.test('no E2B key of their own: no cloud runtime; with no computer the card offers one or a key, and 云端 then runs on the person\'s own server', async () => {
     const n = await person('no-key', false)
     const before = provisioned
