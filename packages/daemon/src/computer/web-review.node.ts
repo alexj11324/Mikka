@@ -80,3 +80,39 @@ test('review polling retries transport failures without granting and stops on ab
   assert.equal(attempts, 2)
   assert.equal(executed, 1)
 })
+
+test('idle review sync sends one cleanup, resumes for a pending call and retries the final cleanup', async t => {
+  const dir = await mkdtemp(join(tmpdir(), 'cua-idle-'))
+  let executed = 0, attempts = 0, emptyAttempts = 0
+  let completed = false
+  const broker = new ComputerBroker({ socketPath: join(dir, 'socket'),
+    driver: { installed: true, path: '/fake', version: 'test', fingerprint: 'f'.repeat(64) }, permitted: () => true,
+    execute: async () => { executed++; return 'ok' },
+  })
+  const abort = new AbortController()
+  let polling: Promise<void> | undefined
+  t.after(async () => { abort.abort(); await polling; await broker.close(); await rm(dir, { recursive: true, force: true }) })
+  polling = pollWebComputerReviews(broker, 'device', { async syncComputerReviews(_id, requests) {
+    attempts++
+    if (!requests.length) {
+      emptyAttempts++
+      if (completed && emptyAttempts === 2) throw new Error('cleanup offline')
+      return []
+    }
+    return [{ id: requests[0].id, digest: requests[0].digest, approve: true }]
+  } }, abort.signal, 5)
+  await new Promise(resolve => setTimeout(resolve, 40))
+  assert.equal(attempts, 1, 'an empty broker must not generate periodic network traffic')
+  const grant = broker.spec(randomUUID(), 'ask')!
+  const result = broker.request(grant.token, { name: 'click', arguments: { x: 1, y: 2 } })
+  assert.equal(await result, 'ok')
+  completed = true
+  for (let n = 0; n < 100 && emptyAttempts < 3; n++) await new Promise(resolve => setTimeout(resolve, 5))
+  assert.equal(emptyAttempts, 3, 'failed final empty snapshot must be retried')
+  assert.equal(executed, 1)
+  const settledAttempts = attempts
+  await new Promise(resolve => setTimeout(resolve, 40))
+  assert.equal(attempts, settledAttempts, 'idle sync stops after successful cleanup')
+  abort.abort()
+  await polling
+})

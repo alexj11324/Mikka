@@ -26,8 +26,19 @@ export async function syncWebComputerReviews(broker: ComputerBroker, deviceId: s
  * call; retrying preserves the original pending request and digest. */
 export async function pollWebComputerReviews(broker: ComputerBroker, deviceId: string, link: { syncComputerReviews?(deviceId: string, requests: LocalComputerRequest[], signal?: AbortSignal): Promise<LocalComputerDecision[]> }, signal: AbortSignal, intervalMs = 1000) {
   if (!link.syncComputerReviews) throw new Error('Computer review transport unavailable')
+  // Clear stale server requests once on startup and after a nonempty snapshot.
+  // A failed upload may have reached the server, so retry cleanup until it
+  // succeeds. Empty brokers still check locally at the existing cadence.
+  let needsCleanup = true
   while (!signal.aborted) {
-    try { await syncWebComputerReviews(broker, deviceId, link, signal) } catch { /* pending calls remain unapproved */ }
+    const pending = broker.list().length > 0
+    if (pending || needsCleanup) {
+      needsCleanup = true
+      try {
+        await syncWebComputerReviews(broker, deviceId, link, signal)
+        needsCleanup = pending
+      } catch { /* pending calls remain unapproved; failed cleanup retries */ }
+    }
     if (signal.aborted) break
     await new Promise<void>(resolve => {
       const done = () => { clearTimeout(timer); signal.removeEventListener('abort', done); resolve() }
