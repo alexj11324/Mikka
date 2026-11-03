@@ -7,7 +7,7 @@ import { ArrowUpRight, ChevronRight, TriangleAlert } from 'lucide-react'
 import { toast } from 'sonner'
 import { AppTile, ToolGroup } from '@/components/plugins/connected-apps'
 import { SettingsSection } from '@/components/settings/primitives'
-import { Alert, AlertAction, AlertTitle } from '@/components/ui/alert'
+import { Alert, AlertAction, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -33,10 +33,15 @@ const CONNECT_PATH = withBasePath('/api/integrations/github/connect')
 /** A notice, not an error: the browser is signed in as another account and nothing went wrong. */
 const NOTICE = 'border-transparent bg-warning/10'
 const INTENT_PATH = withBasePath('/api/integrations/github/connect/intent')
+const CONFIRM_PATH = withBasePath('/api/integrations/github/connect/intent/confirm')
 /** As long as the link token lives (lib/github/connect-intent.ts). */
 const LINK_WINDOW_MS = 10 * 60_000
 const INTENT_TOKEN = /^ghi_[A-Za-z0-9_-]{43}$/
 type IntentView = { state: 'expired' } | { state: 'waiting' | 'started'; browserAccount: string | null } | { state: 'otherAccount'; browserAccount: string; appAccount: string }
+
+const base64url = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+const randomKey = () => base64url(crypto.getRandomValues(new Uint8Array(32)))
+const s256 = async (value: string) => base64url(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))))
 
 async function readIntent(token: string): Promise<IntentView> {
   const response = await fetch(`${INTENT_PATH}?token=${encodeURIComponent(token)}`, { cache: 'no-store' })
@@ -108,6 +113,22 @@ function ViewerGitHubSettings({ userId, email, isPending }: { userId: string | u
     void mutate()
     if (linking) void readIntent(linking).then(view => setBrowserAccount(view.state === 'waiting' ? view.browserAccount : null)).catch(() => {})
   })
+  // The desktop's loopback return for the link in progress: its state, and the verifier only this page holds.
+  const pendingReturn = useRef<{ returnState: string; verifier: string; token: string } | null>(null)
+  useEffect(() => {
+    const bridge = bridgeFromWindow(window as MikkaWindow)
+    if (!bridge || typeof bridge.app.onReturn !== 'function') return
+    return bridge.app.onReturn(({ state, result }) => {
+      const pending = pendingReturn.current
+      if (!pending || state !== pending.returnState) return
+      pendingReturn.current = null
+      if (result !== 'connected') { setGithubLinkError(result === 'cancelled' ? t('githubLinkCancelled') : t('githubLinkFailed')); return }
+      void fetch(CONFIRM_PATH, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ token: pending.token, verifier: pending.verifier }) })
+        .then(response => { if (!response.ok) throw new Error(String(response.status)) })
+        .then(() => mutate())
+        .catch(() => setGithubLinkError(t('githubLinkFailed')))
+    })
+  }, [mutate, t])
   // In the browser, after a link from the app: the token in the URL, and what it says here.
   const [browserIntent, setBrowserIntent] = useState<{ token: string; view: IntentView } | null>(null)
 
@@ -131,15 +152,26 @@ function ViewerGitHubSettings({ userId, email, isPending }: { userId: string | u
     setGithubLinking(true); setGithubLinkError('')
     try {
       // The authorization has to finish in a real browser: the desktop hands it
-      // the GitHub start itself, with a one-time token naming this account, so a
-      // browser signed in as someone else links nothing and says so.
+      // the GitHub start itself, with a one-time token naming this account.
+      // A desktop that takes the return on its loopback (RFC 8252) links this
+      // account whatever the browser is signed in as, and confirms it with a
+      // verifier only it holds once the return reaches this computer. An older
+      // one needs the browser signed in as this account, and otherwise says so.
       const bridge = bridgeFromWindow(window as MikkaWindow)
       if (bridge && typeof bridge.app.openExternal !== 'function') { setGithubLinkError(t('browserUpdateRequired')); return }
       if (bridge) {
+        let loopback: { returnTo: string; returnState: string; challenge: string } | undefined
+        if (typeof bridge.app.prepareReturn === 'function') {
+          const verifier = randomKey(), returnState = randomKey()
+          loopback = { returnTo: await bridge.app.prepareReturn(returnState), returnState, challenge: await s256(verifier) }
+          pendingReturn.current = { returnState, verifier, token: '' }
+          token = null
+        }
         if (!token) {
-          const response = await fetch(INTENT_PATH, { method: 'POST' })
+          const response = await fetch(INTENT_PATH, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(loopback ? { loopback } : {}) })
           if (!response.ok) throw new Error(String(response.status))
           token = (await response.json() as { token: string }).token
+          if (pendingReturn.current) pendingReturn.current.token = token
         }
         await openPathInBrowser(`${CONNECT_PATH}?intent=${encodeURIComponent(token)}`)
         setLinking(token); setBrowserAccount(null)
@@ -205,12 +237,14 @@ function ViewerGitHubSettings({ userId, email, isPending }: { userId: string | u
     {!connected && linking && browserAccount && <Alert role="status" className={NOTICE}>
       <TriangleAlert aria-hidden="true" className="text-warning-foreground" />
       <AlertTitle>{t('githubLinkOtherAccount', { browser: browserAccount, app: email })}</AlertTitle>
+      <AlertDescription>{t('githubLinkUpdateHint')}</AlertDescription>
       <AlertAction><Button type="button" variant="secondary" size="sm" disabled={githubLinking} onClick={() => void linkGitHub(linking)}>{t('githubOpenBrowser')}</Button></AlertAction>
     </Alert>}
     {/* The browser: signed in as another account than the app that started the link. */}
     {!connected && browserIntent && browserView?.state === 'otherAccount' && <Alert role="status" className={NOTICE}>
       <TriangleAlert aria-hidden="true" className="text-warning-foreground" />
       <AlertTitle>{t('githubLinkOtherAccount', { browser: browserView.browserAccount, app: browserView.appAccount })}</AlertTitle>
+      <AlertDescription>{t('githubLinkUpdateHint')}</AlertDescription>
       <AlertAction><Button type="button" variant="secondary" size="sm" onClick={() => void switchAccount(browserIntent.token)}>{t('githubSwitchAccount')}</Button></AlertAction>
     </Alert>}
     {/* The browser, now signed in as the app's account: the same link goes on. */}

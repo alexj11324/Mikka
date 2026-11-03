@@ -3,7 +3,9 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { resolveAppOrigin } from '@/lib/auth-config'
 import { withBasePath } from '@/lib/base-path'
-import { completeGitHubConnect, GITHUB_CALLBACK_PATH, GITHUB_CONNECT_COOKIE, githubConnectUser } from './connection'
+import { completeGitHubConnect, exchangeGitHubCode, GITHUB_CALLBACK_PATH, GITHUB_CONNECT_COOKIE, githubConnectUser, unsealGitHubSecret } from './connection'
+import { finishLoopbackIntent, isLoopbackState } from './connect-intent'
+import { pool } from '@/lib/db'
 
 /** Plugins → GitHub. */
 export const GITHUB_PLUGIN_PATH = withBasePath('/?section=plugins&app=github')
@@ -21,6 +23,13 @@ function cookieValue(request: Request, name: string) {
 export async function handleGitHubConnectCallback(request: Request): Promise<Response | null> {
   const url = new URL(request.url)
   if (url.pathname !== GITHUB_CALLBACK_PATH) return null
+  // A desktop link (lib/github/connect-intent.ts): its state names the link, not this browser's session.
+  const state = url.searchParams.get('state')
+  if (isLoopbackState(state)) {
+    const code = url.searchParams.get('code')
+    const finished = await finishLoopbackIntent(pool, state, code && code.length <= 512 ? code : null, { exchange: exchangeGitHubCode, unseal: unsealGitHubSecret })
+    if (finished) return NextResponse.redirect(finished.returnURL)
+  }
   const starter = githubConnectUser(url.searchParams.get('state'), cookieValue(request, GITHUB_CONNECT_COOKIE))
   if (!starter) return null
   /** Why a link failed, when the callback can tell: cancelled on GitHub, or the Mikka account changed meanwhile. */

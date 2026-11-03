@@ -1977,6 +1977,7 @@
       "githubLinkAccountChanged": "The Mikka account changed during authorization. GitHub is not linked.",
       "githubLinkWaiting": "Waiting for the browser",
       "githubLinkOtherAccount": "The browser is signed in as {browser}; the app as {app}",
+      "githubLinkUpdateHint": "Update the desktop app to link in one step",
       "githubOpenBrowser": "Open in browser",
       "githubSwitchAccount": "Switch account",
       "githubLinkReady": "The browser is signed in as the app's account",
