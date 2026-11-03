@@ -128,8 +128,8 @@ test('a message to an ended thread runs it again in the same thread; only its ow
     await pool.query(`INSERT INTO factory_candidates (id,"taskId",kind,sha,repository,environment,scope,"runId") VALUES ($1,$2,'deliverable',NULL,'https://github.com/octo/repo.git','fixture','fixture',$3)`, [oldCandidateId, oldTask.id, initial.runId])
     await pool.query(`UPDATE factory_tasks SET stage='approval',status='passed',"candidateId"=$2 WHERE id=$1`, [oldTask.id, oldCandidateId])
     await pool.query(`INSERT INTO factory_deliverable_acceptances (id,"taskId","candidateId","userId","sessionId","eventId") VALUES ($1,$2,$3,$4,'synthetic-owner-session',$5)`, [randomUUID(), oldTask.id, oldCandidateId, b.id, randomUUID()])
-    await pool.query(`UPDATE coordinator_events SET tier='background',\"deliveredAt\"=now() WHERE id=$1`, [oldTask.sourceEventId])
-    const accepted = async () => (await pool.query(`SELECT jsonb_build_object('task',to_jsonb(t),'source',to_jsonb(e),'candidate',to_jsonb(c),'acceptance',to_jsonb(a),'report',r.report,'issueContent',i.content) AS value FROM factory_tasks t JOIN issues i ON i.id=t.\"issueId\" JOIN coordinator_events e ON e.id=t."sourceEventId" JOIN factory_candidates c ON c.id=t."candidateId" JOIN factory_deliverable_acceptances a ON a."taskId"=t.id JOIN agent_runs r ON r.id=c."runId" WHERE t.id=$1`, [oldTask.id])).rows[0].value
+    await pool.query(`UPDATE coordinator_events SET tier='background',"deliveredAt"=now() WHERE id=$1`, [oldTask.sourceEventId])
+    const accepted = async () => (await pool.query(`SELECT jsonb_build_object('task',to_jsonb(t),'source',to_jsonb(e),'candidate',to_jsonb(c),'acceptance',to_jsonb(a),'report',r.report,'issueContent',i.content) AS value FROM factory_tasks t JOIN issues i ON i.id=t."issueId" JOIN coordinator_events e ON e.id=t."sourceEventId" JOIN factory_candidates c ON c.id=t."candidateId" JOIN factory_deliverable_acceptances a ON a."taskId"=t.id JOIN agent_runs r ON r.id=c."runId" WHERE t.id=$1`, [oldTask.id])).rows[0].value
     const before = await accepted()
     const botMessages = async () => (await pool.query('SELECT count(*)::int AS n FROM coordinator_messages WHERE "userId"=$1 AND "botId"=$2', [b.id, b.botId])).rows[0].n
     const messagesBefore = await botMessages()
@@ -157,7 +157,7 @@ test('a message to an ended thread runs it again in the same thread; only its ow
     const prompt = (await pool.query('SELECT prompt FROM agent_runs WHERE id=$1', [sent.runId])).rows[0].prompt
     assert.match(prompt, /Current owner request for this Factory task/)
     assert.ok(prompt.indexOf(request) < prompt.indexOf('Initial exact 53-byte file'))
-    const counts = (await pool.query(`SELECT (SELECT count(*)::int FROM factory_tasks WHERE \"userId\"=$1) tasks,(SELECT count(*)::int FROM agent_runs WHERE \"userId\"=$1) runs`, [b.id])).rows[0]
+    const counts = (await pool.query(`SELECT (SELECT count(*)::int FROM factory_tasks WHERE "userId"=$1) tasks,(SELECT count(*)::int FROM agent_runs WHERE "userId"=$1) runs`, [b.id])).rows[0]
     assert.deepEqual(counts, { tasks: 2, runs: 2 }, 'one owner turn creates exactly one additional execute and task')
     const { queueTaskRun } = await import('../lib/factory/queue-local')
     const replay = await queueTaskRun(b.id, { issueId: b.issueId, agentId: previous.agentId, repo: previous.remoteUrl!,
@@ -243,7 +243,7 @@ test('a message to an ended thread runs it again in the same thread; only its ow
     assert.equal(after, before, 'no run was started for them')
     const { rows } = await pool.query('SELECT 1 FROM run_messages WHERE "userId" = ANY($1)', [[stranger.id, teammate.id]])
     assert.equal(rows.length, 0, 'no message was stored for them')
-    const deniedSources = await pool.query(`SELECT 1 FROM coordinator_events WHERE \"userId\"=ANY($1) AND payload->>'source'='thread_continuation'`, [[stranger.id, teammate.id]])
+    const deniedSources = await pool.query(`SELECT 1 FROM coordinator_events WHERE "userId"=ANY($1) AND payload->>'source'='thread_continuation'`, [[stranger.id, teammate.id]])
     assert.equal(deniedSources.rows.length, 0, 'no owner continuation provenance was created for unauthorized callers')
   })
 
