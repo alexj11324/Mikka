@@ -195,12 +195,30 @@ test('OIDC failure never reads response bodies and never retries with another id
     assert.equal(h.errorBodyRead(), false);
   }
 });
+test('runner-issued modern OIDC routes retain opaque parameters and force the fixed audience', async () => {
+  const h = credentialFetch();
+  const url = 'https://run-actions-2-azure-eastus.actions.githubusercontent.com/42//idtoken/' +
+    id + '/' + id + '?service-parameter=opaque&audience=wrong&audience=also-wrong';
+  assert.deepEqual(await loadCredentials({ ...runnerEnv, ACTIONS_ID_TOKEN_REQUEST_URL: url }, h.request), h.values);
+  assert.equal(h.calls[0].url.hostname, 'run-actions-2-azure-eastus.actions.githubusercontent.com');
+  assert.equal(h.calls[0].url.pathname, '/42//idtoken/' + id + '/' + id);
+  assert.equal(h.calls[0].url.searchParams.get('service-parameter'), 'opaque');
+  assert.deepEqual(h.calls[0].url.searchParams.getAll('audience'), [AUTHORITY.audience]);
+  assert.equal(h.calls[0].options.redirect, 'error');
+});
 test('wrong OIDC authority or database endpoint fails before any VM access', async () => {
   for (const url of [
     'http://pipelines.actions.githubusercontent.com/idtoken',
     'https://attacker.example.invalid/idtoken',
-    'https://pipelines.actions.githubusercontent.com/arbitrary-endpoint',
-    runnerEnv.ACTIONS_ID_TOKEN_REQUEST_URL + '&redirect=elsewhere',
+    'https://run-actions-2-azure-eastus.actions.githubusercontent.com.attacker.invalid/idtoken',
+    'https://nested.run-actions-2-azure-eastus.actions.githubusercontent.com/idtoken',
+    'https://-invalid.actions.githubusercontent.com/idtoken',
+    'https://invalid-.actions.githubusercontent.com/idtoken',
+    'https://user:password@run-actions-2-azure-eastus.actions.githubusercontent.com/idtoken',
+    'https://run-actions-2-azure-eastus.actions.githubusercontent.com:8443/idtoken',
+    'https://run-actions-2-azure-eastus.actions.githubusercontent.com/',
+    'https://run-actions-2-azure-eastus.actions.githubusercontent.com/' + 'x'.repeat(2048),
+    runnerEnv.ACTIONS_ID_TOKEN_REQUEST_URL + '#fragment',
   ]) {
     const h = credentialFetch();
     await assert.rejects(loadCredentials({ ...runnerEnv, ACTIONS_ID_TOKEN_REQUEST_URL: url }, h.request), /oidc_url_rejected/);

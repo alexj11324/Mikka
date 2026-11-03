@@ -85,10 +85,14 @@ export async function loadCredentials(env, request = fetch) {
   executionContext(env);
   let tokenUrl;
   try { tokenUrl = new URL(env.ACTIONS_ID_TOKEN_REQUEST_URL); } catch { fail('oidc_url_rejected'); }
-  requireThat(tokenUrl.protocol === 'https:' && tokenUrl.hostname === 'pipelines.actions.githubusercontent.com' &&
+  // GitHub documents *.actions.githubusercontent.com for OIDC and injects the
+  // complete job URL. Its service routing path/query are not a public contract.
+  // https://docs.github.com/en/actions/reference/runners/github-hosted-runners
+  // https://docs.github.com/en/actions/reference/security/oidc
+  requireThat(tokenUrl.protocol === 'https:' &&
+    /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.actions\.githubusercontent\.com$/.test(tokenUrl.hostname) &&
     tokenUrl.port === '' && tokenUrl.username === '' && tokenUrl.password === '' && tokenUrl.hash === '' &&
-    /^\/[A-Za-z0-9_-]+\/_apis\/distributedtask\/hubs\/build\/plans\/[0-9a-f-]+\/jobs\/[0-9a-f-]+\/idtoken$/.test(tokenUrl.pathname) &&
-    [...tokenUrl.searchParams.keys()].every(key => key === 'api-version') &&
+    tokenUrl.pathname.length > 1 && tokenUrl.pathname.length <= 2048 &&
     typeof env.ACTIONS_ID_TOKEN_REQUEST_TOKEN === 'string' && env.ACTIONS_ID_TOKEN_REQUEST_TOKEN.length > 0,
   'oidc_url_rejected');
   tokenUrl.searchParams.set('audience', AUTHORITY.audience);
