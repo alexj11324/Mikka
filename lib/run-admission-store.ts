@@ -1,4 +1,5 @@
 import 'server-only'
+import { freezeExecutionIdentity, revalidateExecutionIdentity, ExecutionIdentityError } from './execution-identity'
 import type { PoolClient } from 'pg'
 import { and, asc, desc, eq, inArray, isNull, ne, sql } from 'drizzle-orm'
 import { db, pool, withDatabaseClient } from './db'
@@ -64,8 +65,12 @@ export async function acceptLocalRun(input: {
     if (!repo?.remoteUrl || !repositoryBindingMatches(repo.repoPath, repo.remoteUrl, { allowFile: daemonTestMode(process.env) })) throw invalid('repositoryMismatch')
     const [bot] = input.botId ? await tx.select().from(bots).where(and(eq(bots.id, input.botId), eq(bots.ownerId, input.userId))).for('share') : []
     if (input.botId && !bot) throw invalid('botUnavailable')
+    // Server-selected references, never the Bot owner's personal credentials.
+    const executionIdentity = await freezeExecutionIdentity(client, { userId: input.userId, botId: input.botId, deviceId: input.deviceId, agentDefinition: input.definition }).catch(error => { if (error instanceof ExecutionIdentityError) throw new ActionFailureError('executionAccountUnavailable'); throw error })
+    const definition = { ...input.definition, executionIdentity }
     const context = { ...(bot ? { workspaceId: bot.workspaceId } : {}), ...(input.requestEventId ? { requestEventId: input.requestEventId } : {}) }
     const replayMatches = async (prior: typeof agentRuns.$inferSelect) => {
+      await revalidateExecutionIdentity(client, prior)
       const accepted = prior.agentDefinition?.repositoryAdmission
       const sameRun = prior.userId === input.userId && prior.botId === input.botId && prior.issueId === task.id && prior.deviceId === input.deviceId && prior.agentId === input.agentId && prior.deviceRepoId === repo.id
       // A read-only run has no task branch to compare: it matches only another read-only run.
@@ -102,7 +107,7 @@ export async function acceptLocalRun(input: {
     const [active] = await tx.select({ id: agentRuns.id }).from(agentRuns).where(and(eq(agentRuns.userId, input.userId), eq(agentRuns.issueId, task.id), inArray(agentRuns.status, [...UNFINISHED_RUN_STATUSES]))).limit(1)
     if (active) throw new ActionFailureError('runAlreadyActive', { runId: active.id })
     if (readOnly) {
-      await tx.insert(agentRuns).values({ id: input.id, userId: input.userId, botId: input.botId, issueId: task.id, agentId: input.agentId, deviceId: input.deviceId, deviceRepoId: repo.id, status: 'queued', kind: 'implement', source: input.source ?? null, baseBranch: repo.baseBranch, prompt: input.prompt, agentDefinition: input.definition, dispatchKey: input.dispatch?.requestKey ?? null, dispatchFingerprint: dispatchHash })
+      await tx.insert(agentRuns).values({ id: input.id, userId: input.userId, botId: input.botId, issueId: task.id, agentId: input.agentId, deviceId: input.deviceId, deviceRepoId: repo.id, status: 'queued', kind: 'implement', source: input.source ?? null, baseBranch: repo.baseBranch, prompt: input.prompt, agentDefinition: definition, dispatchKey: input.dispatch?.requestKey ?? null, dispatchFingerprint: dispatchHash })
       return input.dispatch?.requestKey ? { runId: input.id, status: 'queued' as const, replayed: false } : { runId: input.id }
     }
     await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${'issue-publication:' + task.id}, 0))`)
@@ -116,7 +121,7 @@ export async function acceptLocalRun(input: {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${'repository-branch:' + repo.repoPath + ':' + branch}, 0))`)
     const [collision] = await tx.select({ runId: runPublications.runId }).from(runPublications).where(and(eq(runPublications.remoteKey, repo.repoPath), eq(runPublications.branch, branch), ne(runPublications.issueId, task.id))).limit(1)
     if (collision) throw invalid('branchInUse')
-    await tx.insert(agentRuns).values({ id: input.id, userId: input.userId, botId: input.botId, issueId: task.id, agentId: input.agentId, deviceId: input.deviceId, deviceRepoId: repo.id, status: 'queued', kind: 'implement', source: input.source ?? null, baseBranch: repo.baseBranch, prompt: input.prompt, agentDefinition: { ...input.definition, repositoryAdmission: admission }, dispatchKey: input.dispatch?.requestKey ?? null, dispatchFingerprint: dispatchHash })
+    await tx.insert(agentRuns).values({ id: input.id, userId: input.userId, botId: input.botId, issueId: task.id, agentId: input.agentId, deviceId: input.deviceId, deviceRepoId: repo.id, status: 'queued', kind: 'implement', source: input.source ?? null, baseBranch: repo.baseBranch, prompt: input.prompt, agentDefinition: { ...definition, repositoryAdmission: admission }, dispatchKey: input.dispatch?.requestKey ?? null, dispatchFingerprint: dispatchHash })
     await tx.insert(runPublications).values({ runId: input.id, userId: input.userId, issueId: task.id, scopeVersion: task.scopeVersion, issueTitle: task.title, remoteUrl: repo.remoteUrl, remoteKey: repo.repoPath, identifier, branch, baseBranch: repo.baseBranch, pushApproved: true })
     return input.dispatch?.requestKey ? { runId: input.id, status: 'queued' as const, replayed: false } : { runId: input.id }
     })

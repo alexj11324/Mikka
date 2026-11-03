@@ -1,4 +1,5 @@
 import 'server-only'
+import { executionIdentityForRun, ExecutionIdentityError } from '../execution-identity'
 import type { Pool, PoolClient } from 'pg'
 import { computerPermission, type ComputerPermission } from './permission'
 import { runMayUseCredentialSql } from '@/lib/personal-policy'
@@ -10,6 +11,7 @@ export async function claimLocalRun(pool: Pool, runId: string, deviceId: string,
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
+    await executionIdentityForRun(client, runId)
     if (beforeClaim && (await beforeClaim(client)) === false) { await client.query('ROLLBACK'); return 'unavailable' }
     const run = (await client.query('SELECT id FROM agent_runs WHERE id=$1 AND "deviceId"=$2 AND status=$3 AND "stopRequestedAt" IS NULL FOR UPDATE', [runId, deviceId, 'queued'])).rows[0]
     if (!run) { await client.query('COMMIT'); return 'unavailable' }
@@ -20,6 +22,7 @@ export async function claimLocalRun(pool: Pool, runId: string, deviceId: string,
     return 'claimed'
   } catch (error) {
     await client.query('ROLLBACK')
+    if (error instanceof ExecutionIdentityError) return 'unavailable'
     throw error
   } finally { client.release() }
 }
@@ -35,12 +38,14 @@ export async function claimCloudRun(pool: Pool, actor: { userId: string; workspa
     // Bot binding takes policy -> run locks. Acquire that same policy lock
     // before either Factory authorization check can lock its task/run.
     await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`computer-policy:${actor.workspaceId}`])
+    await executionIdentityForRun(client, runId)
     if (beforeClaim && (await beforeClaim(client)) === false) { await client.query('ROLLBACK'); return null }
     const policy = (await client.query('SELECT permission,version FROM workspace_computer_policies WHERE "workspaceId"=$1', [actor.workspaceId])).rows[0]
     // The workspace computer policy governs computer use only: a machine without a desktop takes
     // repository tasks under any policy, and its claim never carries a computer grant.
     if (desktop && computerPermission(policy?.permission) !== 'allow') { await client.query('COMMIT'); return null }
     const permission: ComputerPermission = desktop ? 'allow' : 'deny'
+    await executionIdentityForRun(client, runId)
     if (beforeClaim && (await beforeClaim(client)) === false) { await client.query('ROLLBACK'); return null }
     const run = (await client.query('SELECT id,"agentId" FROM agent_runs WHERE id=$1 AND "deviceId"=$2 AND "userId"=$3 AND status=$4 AND "stopRequestedAt" IS NULL FOR UPDATE', [runId, deviceId, actor.userId, 'queued'])).rows[0]
     if (!run) { await client.query('COMMIT'); return null }
@@ -61,7 +66,7 @@ export async function claimCloudRun(pool: Pool, actor: { userId: string; workspa
     if (afterClaim) await afterClaim(client)
     await client.query('COMMIT')
     return { botId: binding.botId, ownerId: actor.userId, display: `:${binding.display}`, policyVersion: policy?.version ?? 0, permission }
-  } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
+  } catch (error) { await client.query('ROLLBACK'); if (error instanceof ExecutionIdentityError) return null; throw error } finally { client.release() }
 }
 
 /** Existing local binding checks shared with Factory's already-fenced CAS. */

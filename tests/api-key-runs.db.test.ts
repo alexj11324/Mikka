@@ -15,6 +15,7 @@ import { MODEL_CREDENTIAL_HEADER, REPO_ORIGIN_HEADER } from '@mikka/protocol/dev
 import { normalizeRepository } from '@mikka/protocol/repository'
 import { dbUrl, seedBot, seedIssue, seedUser, seedWorkspace } from './support/workspace-admin-db'
 import { recordPushGrant } from './support/github-app-stub'
+import { sealSecret, userE2bKeyAad } from '../lib/secrets/crypto'
 import { fakeThreadMachines } from './support/thread-machine-fake'
 
 test('API-key runs: frozen by id at dispatch, opened only at claim, subscription first, withdrawn key refused', { skip: !dbUrl }, async t => {
@@ -45,6 +46,7 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
     await pool.query('DELETE FROM agent_runs WHERE "userId" = ANY($1)', [users])
     await pool.query('DELETE FROM bot_model_choices WHERE "ownerId" = ANY($1)', [users])
     await pool.query('DELETE FROM model_api_keys WHERE "ownerId" = ANY($1)', [users])
+    await pool.query('DELETE FROM user_e2b_keys WHERE "userId" = ANY($1)', [users])
     await pool.query('DELETE FROM byos_bindings WHERE "ownerId" = ANY($1)', [users])
     await pool.query('DELETE FROM byos_connections WHERE "ownerId" = ANY($1)', [users])
     await pool.query('DELETE FROM workspace_subscription_shares WHERE "ownerId" = ANY($1)', [users])
@@ -107,6 +109,8 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
   /** The Bot's own computer, which dispatch queues against; each cloud thread then runs on its own thread machine. */
   const botComputer = async (p: Awaited<ReturnType<typeof person>>) => {
     const cloudDevice = randomUUID(), agentId = randomUUID(), repoId = randomUUID()
+    const sealed = sealSecret('synthetic-e2b-fixture', userE2bKeyAad(p.id))
+    await pool.query('INSERT INTO user_e2b_keys("userId",ciphertext,iv,"keyVersion",last4) VALUES($1,$2,$3,$4,\'test\') ON CONFLICT DO NOTHING', [p.id, sealed.ciphertext, sealed.iv, sealed.keyVersion])
     await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,harnesses) VALUES ($1,$2,'Cloud computer','cloud',true,$3)`, [cloudDevice, p.id, JSON.stringify(desktopMachine)])
     await pool.query(`INSERT INTO cloud_machines ("workspaceId","ownerId","operationId","sandboxId","deviceId",state,"runtimeReady") VALUES ($1,$2,$3,$4,$5,'running',true)`, [p.workspaceId, p.id, randomUUID(), `sbx-${randomUUID()}`, cloudDevice])
     await pool.query(`INSERT INTO bot_desktops ("botId","workspaceId","ownerId",display) VALUES ($1,$2,$3,1)`, [p.botId, p.workspaceId, p.id])

@@ -1,6 +1,7 @@
 import 'server-only'
 import { and, eq } from 'drizzle-orm'
-import { db } from '@/lib/db'
+import { db, pool } from '@/lib/db'
+import { revalidateExecutionIdentity, ExecutionIdentityError } from '@/lib/execution-identity'
 import { agentRuns, devices, issues } from '@/lib/db/schema'
 import { issueTeamAccess } from '@/lib/issue-team-access'
 import { readIssueMetadata } from '@/lib/issue-metadata'
@@ -38,6 +39,8 @@ async function claimResponseTransaction(userId: string, hint: Pick<Run, 'id' | '
     const run = row.run
     if (run.issueId !== issue.id || run.deviceId !== hint.deviceId || run.agentId !== hint.agentId || run.deviceRepoId !== hint.deviceRepoId || run.status !== 'preparing' || run.stopRequestedAt || !run.leaseExpiresAt || run.leaseExpiresAt.toISOString() !== leaseExpiresAt || run.leaseExpiresAt.getTime() <= Date.now()) return null
     if (issue.userId !== userId && (issue.scope !== 'workspace' || !(await issueTeamAccess(issue.id, userId)).allowed)) return null
+    try { await revalidateExecutionIdentity(pool, run) }
+    catch (error) { if (error instanceof ExecutionIdentityError) return null; throw error }
     return respond(run)
   })
 }
