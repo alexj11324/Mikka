@@ -1,22 +1,26 @@
-# Chat quote, copy and AI Elements coverage
+# Chat quote and copy, against Figma C1–C6
 
-Local run on cloud Linux, `pnpm dev:local` (next dev, Node 24.22.1), isolated PostgreSQL 16 database
-`mikka_shots2_e2e`, real DeepSeek flash model (workspace key from Infisical `dev:/vercel`), no daemon,
-automatic test-account lease (`scripts/test-accounts/session.mjs`). Revision under test:
-`58d898037787f347c77287c18ead3c7f428fd807` (CSS-only quote-line fix after `134e49e`). Playwright, `zh-CN`, 1280×860.
+Accepted frames: Figma `zPe5LKycb2XuT1ivCLRw07`, page `902:2` (decision `docs/design/decisions/2026-11-03-0455-chat-quote-and-copy.md`).
 
-| Shot | What it shows |
-| --- | --- |
-| `01a-working-before-reply.png` | While the reply is on its way: 「Coordinator 正在处理…」 (the live stream never reached the page in this run, see below) |
-| `02-reply-done-thinking-collapsed.png` | Stored reply: 「已思考」, actions under the newest reply |
-| `03-thinking-open.png` | 「已思考」 opened: the model's own reasoning, loaded on open |
-| `04-copy-hover.png`, `05-copy-copied.png` | 复制 under the reply; after a click the icon is a tick. The clipboard held the Markdown (`**…**`, list markers, the fenced block) |
-| `06-selection-quote-popover.png` | Words selected in a reply, 引用 above them |
-| `07-composer-quote-chip.png` | The quote above the draft, with ✕ |
-| `08-sent-with-quote.png`, `09-quoted-answer.png` | The sent message: quote line above the words; the Coordinator answers about that part |
-| `10-copy-person-message.png` | 复制 under the person's own message |
-| `11-code-block-copy.png` | A code block's own 复制 (copied the code as written) |
+Local run on cloud Linux: `pnpm dev:local` (next dev, Node 24.22.1), isolated PostgreSQL 16 database `mikka_shots3_e2e`,
+real DeepSeek flash model (workspace key from Infisical `dev:/vercel`), no daemon, automatic test-account lease
+(`scripts/test-accounts/session.mjs`). C1–C5 were shot at revision `13dfcc7e16ea1bd7114f0d66b60576a0cb2e901e`, using
+Playwright with `zh-CN` at 1280×860, light and dark (`colorScheme`).
 
-Not covered here: the live 「思考中」 line. In this dev:local run the page only showed 「正在处理…」 and then the stored reply,
-so no live stream (and no live thinking) was drawn; the code path is covered by `tests/coordinator-streaming-render.test.tsx`.
-The thread chat's quote and copy are covered by `scripts/thread-composer.test.tsx` (no daemon was run for a live thread).
+| Frame | Light | Dark | What it shows |
+| --- | --- | --- | --- |
+| C1 `903:2` | `C1-reply-copy-light.png`, `C1-person-copy-light.png` | `…-dark.png` | 复制 under a hovered reply and under the person's message |
+| C2 `910:2` | `C2-selection-popover-light.png` | `…-dark.png` | Words selected in a reply: 引用 / 复制, the Artifact reader's popover (`SelectionActions`) |
+| C3 `905:2` | `C3-composer-chip-light.png` | `…-dark.png` | The quote above the draft, removable |
+| C4 `906:2` | `C4-sent-quote-light.png` | `C4-sent-quote-dark.png` (top bubble) | The quote at the top of the blue bubble, in the bubble's own text colour |
+| C5 `907:2` | `C5-copied-light.png` | `…-dark.png` | Tick and 「已复制」 beside it; the clipboard held the reply's Markdown |
+| C6 `908:2` | `C6-*.png` (earlier run at `58d8980`, unchanged code) | — | Thinking as it is: 「已思考」 collapsed and opened, 「正在处理…」 while waiting |
+
+`code-block-copy.png`: a code block's own 复制, which copied the code as written.
+
+In the dark pass the Coordinator was still busy, so the second quoted message was not sent. The dark C4 shot shows the
+quoted message sent during the light pass, at the top of the chat.
+
+Not covered here: the live 「思考中」 line. In these dev:local runs the page only showed 「正在处理…」 and then the stored
+reply, with no live stream drawn. The thread chat's quote and copy are covered by `scripts/thread-composer.test.tsx`;
+no daemon was run, so there is no live thread.
