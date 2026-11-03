@@ -1,5 +1,4 @@
 import { factoryRunBotMatches } from './run-scope'
-import { notifyQueuedLocalRun } from '../device-gateway-notify'
 import type { Pool, PoolClient } from 'pg';
 import { freezeWorkerDefinition, retryWorkerDefinition } from '../agent-kit/worker';
 import { configureFactoryCheck, factoryRepairBrief } from './checks';
@@ -91,7 +90,9 @@ export function createFactoryDispatch(pool: Pool, store: ReturnType<typeof creat
       await tx.query('INSERT INTO factory_events ("taskId","eventId",request,result) VALUES ($1,$2,$3,$4)',[task.id,eventId,JSON.stringify(input),JSON.stringify(result)]);
       if (!existing) {
         await tx.query('COMMIT');
-        await notifyQueuedLocalRun(tx, userId, run.id);
+        // Workflow schemas import factoryBinding from this module. Load the
+        // Node lifecycle helper only inside the committed dispatch operation.
+        await (await import('../device-gateway-notify')).notifyQueuedLocalRun(tx, userId, run.id);
       }
       return result;
     } catch (error) { if (!existing) await tx.query('ROLLBACK'); throw error; }
