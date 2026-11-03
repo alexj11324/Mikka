@@ -3,7 +3,7 @@
 import { useCallback, useReducer, useState } from 'react'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
-import { CircleCheck, CircleDashed, CircleX, Cloud, ExternalLink, GitCommitHorizontal, Laptop, Server } from 'lucide-react'
+import { CircleCheck, CircleDashed, CircleX, Cloud, ExternalLink, Laptop, Server } from 'lucide-react'
 import { Alert, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
@@ -88,8 +88,7 @@ function CandidateCard({ candidate, detail, environment, isSkill }: { candidate?
     </div>}
     {sha && <div className="flex min-w-0 items-center gap-2">
       <Label>{t('commitLabel')}</Label>
-      <GitCommitHorizontal aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
-      <ShortSha sha={sha} />
+      <ShortSha sha={sha} icon />
       {!pr && repository && <span className="min-w-0 truncate text-xs text-muted-foreground">{repository}</span>}
     </div>}
     {delivery?.previewUrl && <div className="flex min-w-0 items-center gap-2">
@@ -298,7 +297,7 @@ export function FactoryAcceptancePane({ task, onOpenThread }: { task: FactoryTas
       <ApprovalBar state={state} isSkill={task.isSkillCandidate} isDeliverable={candidate?.kind === 'report' || candidate?.kind === 'deliverable'} busy={busy} canApprove={task.isSkillCandidate ? Boolean(evidence && environment) : Boolean(evidence && (pullRequestUrl || candidate?.kind === 'report' || candidate?.kind === 'deliverable'))}
         onAccept={task.isSkillCandidate ? undefined : () => { void accept() }} pullRequestUrl={pullRequestUrl ?? undefined} refusal={refusal ?? undefined} canPublish={Boolean(active && environmentOf(active.candidate) && active.target && active.targetEnvironment)}
         environment={envChip ?? undefined}
-        sha={candidate?.sha ?? undefined} superseded={superseded?.candidate?.sha ?? undefined}
+        superseded={superseded?.candidate?.sha ?? undefined}
         reference={reference ? { href: reference, label: publication?.request?.targetEnvironment === 'production' ? t('production') : t('preview') } : undefined}
         onApprove={() => { void approve() }}
         onPublish={() => { const approval = active; if (!approval || !ledger) return; void run('publish', { binding: ledger.binding, eventId: crypto.randomUUID(), approvalId: approval.id, action: approval.action, target: approval.target, targetEnvironment: approval.targetEnvironment }) }}
