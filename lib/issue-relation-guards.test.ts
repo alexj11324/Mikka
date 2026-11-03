@@ -47,7 +47,11 @@ function select(fields?: Record<string, { name: string }>) {
   const run = () => {
     const source = (table === schema.issueMembers ? members : rows) as unknown as Record<string, unknown>[]
     const hit = source.filter(record => matches(record, conds))
-    return fields ? hit.map(record => Object.fromEntries(Object.entries(fields).map(([key, column]) => [key, record[column.name]]))) : hit
+    return fields ? hit.map(record => Object.fromEntries(Object.entries(fields).map(([key, column]) => {
+      // Attrs-only SQL has no column name. The stub still has the stored document, whose attrs are what that SQL returns.
+      const value = column?.name ? record[column.name] : undefined
+      return [key, value === undefined && key === 'content' ? record.content : value]
+    }))) : hit
   }
   const builder = {
     from: (t: unknown) => { table = t; return builder },

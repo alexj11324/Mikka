@@ -19,6 +19,7 @@ import { agentRuns, agents, coordinatorSessions, devices, issueMembers, issues, 
 import { DEVICE_ONLINE_WINDOW_MS } from '@/lib/device-link'
 import type { IssueLabel } from '@/lib/issue-metadata'
 import { readIssueMetadata } from '@/lib/issue-metadata'
+import { issueAttrsContent } from '@/lib/issue-summary-columns'
 import { getIssue, saveIssue } from '@/app/actions/issues'
 import { updateIssueMetadata, type IssueMetadataPatch } from '@/app/actions/issue-metadata'
 import { updateIssueRelation } from '@/app/actions/issue-operations'
@@ -61,7 +62,7 @@ function textToDoc(text: string) {
 
 /** The labels the person already uses, so a label named by an agent keeps its color. */
 async function knownLabels(userId: string): Promise<Map<string, IssueLabel>> {
-  const rows = await db.select({ content: issues.content }).from(issues).where(eq(issues.userId, userId))
+  const rows = await db.select({ content: issueAttrsContent }).from(issues).where(eq(issues.userId, userId))
   return new Map(rows.flatMap(row => readIssueMetadata(row.content).labels).map(label => [label.name.toLowerCase(), label]))
 }
 
@@ -160,7 +161,7 @@ export async function linkIssues(userId: string, input: { issueId: string; kind:
 /** Issues whose title or text contains `query`, most recently updated first. */
 export async function searchIssues(userId: string, input: { query: string; status?: string }) {
   const pattern = `%${input.query.replace(/[\\%_]/g, char => `\\${char}`)}%`
-  const rows = await db.selectDistinct({ id: issues.id, title: issues.title, status: issues.status, priority: issues.priority, content: issues.content, updatedAt: issues.updatedAt })
+  const rows = await db.selectDistinct({ id: issues.id, title: issues.title, status: issues.status, priority: issues.priority, content: issueAttrsContent, updatedAt: issues.updatedAt })
     .from(issues).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId)))
     .where(and(
       (await issueVisibility(userId)).predicate,
@@ -251,7 +252,7 @@ export async function listProjects(userId: string) {
 
 /** Every label on the person's issues, with how many issues carry it. */
 export async function listLabels(userId: string) {
-  const rows = await db.select({ content: issues.content }).from(issues).where(eq(issues.userId, userId))
+  const rows = await db.select({ content: issueAttrsContent }).from(issues).where(eq(issues.userId, userId))
   const counts = new Map<string, { name: string; color: string; issues: number }>()
   for (const row of rows) {
     const metadata = readIssueMetadata(row.content)

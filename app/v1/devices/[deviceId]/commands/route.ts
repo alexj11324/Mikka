@@ -1,10 +1,9 @@
 import { CLIENT_VERSION_HEADER } from '@mikka/protocol/version'
-import { pendingDeviceCommands } from '@/lib/device-management'
 import { withDeviceRoute } from '@/lib/device-route'
 import { NextResponse } from 'next/server'
 import { COMMANDS_DAEMON_LATEST_PARAM, COMMANDS_MAX_SKIP, COMMANDS_MAX_SKIP_DEVICE_COMMANDS, COMMANDS_MAX_WAIT_SECONDS, COMMANDS_SKIP_DEVICE_COMMANDS_PARAM, COMMANDS_SKIP_PARAM, MAILBOX_NOTICE_HEADER } from '@mikka/protocol/device'
 import { cachedDaemonVersions, daemonVersions, newerDaemonRelease, daemonRequestTooOld } from '@/lib/daemon-release'
-import { authenticateDevice, deviceMayHaveWork, deviceWork, ownsDevice, sleep, waitSeconds } from '@/lib/device-link'
+import { authenticateDevice, deviceMayHaveWork, deviceUpdateNotice, deviceWork, ownsDevice, sleep, waitSeconds } from '@/lib/device-link'
 import { noteLogOutcome, withRequestLog } from '@/lib/request-log'
 
 export const dynamic = 'force-dynamic'
@@ -40,7 +39,7 @@ async function handleGET(request: Request, { params }: { params: Promise<{ devic
     const options = { mailboxNotices: request.headers.get(MAILBOX_NOTICE_HEADER) === '1', queued: device.enabled }
     // The cheap check also ends the poll for a revoked credential; the full read hands over work.
     const check = obsolete
-      ? { work: false, deviceCommand: (await pendingDeviceCommands(deviceId, [])).find(command => command.kind === 'update' || command.kind === 'restart') ?? null }
+      ? { work: false, deviceCommand: await deviceUpdateNotice(deviceId) }
       : await deviceMayHaveWork(deviceId, skip, knownRelease ? { ...options, skipDeviceCommands: list(COMMANDS_SKIP_DEVICE_COMMANDS_PARAM, COMMANDS_MAX_SKIP_DEVICE_COMMANDS) } : options)
     const { commands, queuedRuns: queued } = check.work ? await deviceWork(deviceId, skip, options) : { commands: [], queuedRuns: [] }
     if (request.signal.aborted) break
@@ -56,7 +55,7 @@ async function handleGET(request: Request, { params }: { params: Promise<{ devic
         ...(releases ? { daemonVersions: releases } : {}),
       })
     }
-    // Each check is a database round trip under the device credential fence; every 2 s keeps an idle device cheap and a revoked credential loses a waiting poll within it (lib/device-revocation.db.test.ts).
+    // One unlocked read per wait. It does not take the credential lock; a revoked credential fails that read before any message text is loaded (lib/device-revocation.db.test.ts).
     await sleep(Math.min(IDLE_CHECK_MS, Math.max(50, deadline - Date.now())), request.signal)
   }
   noteLogOutcome('ignored')

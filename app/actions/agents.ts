@@ -74,9 +74,14 @@ export interface AgentView {
 /** Every local device this person owns, with its repository history. */
 export async function listDevices(): Promise<DeviceView[]> {
   const userId = await getUserId()
-  const rows = await db.select().from(devices).where(and(eq(devices.ownerId, userId), eq(devices.kind, 'local'), isNull(devices.removedAt))).orderBy(desc(devices.lastSeenAt))
+  const rows = await db.select({
+    id: devices.id, name: devices.name, deviceType: devices.deviceType, hostname: devices.hostname, platform: devices.platform, arch: devices.arch,
+    harnesses: devices.harnesses, lastSeenAt: devices.lastSeenAt, enabled: devices.enabled,
+  }).from(devices).where(and(eq(devices.ownerId, userId), eq(devices.kind, 'local'), isNull(devices.removedAt))).orderBy(desc(devices.lastSeenAt))
   const repos = rows.length
-    ? await db.select().from(deviceRepos).where(inArray(deviceRepos.deviceId, rows.map(row => row.id)))
+    ? await db.select({
+      id: deviceRepos.id, deviceId: deviceRepos.deviceId, repoPath: deviceRepos.repoPath, baseBranch: deviceRepos.baseBranch, verifyCommand: deviceRepos.verifyCommand,
+    }).from(deviceRepos).where(inArray(deviceRepos.deviceId, rows.map(row => row.id)))
     : []
   return rows.map(device => ({
     id: device.id, name: device.name, deviceType: device.deviceType, hostname: device.hostname, platform: device.platform, arch: device.arch,

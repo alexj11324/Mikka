@@ -1,6 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { Pool as PoolClass, type Pool, type PoolClient } from 'pg'
 import { samplePoolTransport } from './transport-sample'
+import { manageDatabasePool } from './pool-lifecycle'
 
 export class DeviceAuthorityRevoked extends Error {
   constructor() { super('Device authority revoked') }
@@ -72,8 +73,8 @@ function fencePool(base: Pool): Pool {
   if (!fenced) {
     const { connectionString, ssl, host, port, database, user, password } = base.options
     fenced = new PoolClass({ connectionString, ssl, host, port, database, user, password, max: FENCE_POOL_MAX, connectionTimeoutMillis: FENCE_CONNECT_TIMEOUT_MS, idleTimeoutMillis: 20_000 })
+    manageDatabasePool(fenced)
     samplePoolTransport(fenced, 'device_fence')
-    fenced.on('error', () => { /* a dropped idle fence connection; the next burst takes another */ })
     fencePools.set(base, fenced)
   }
   return fenced

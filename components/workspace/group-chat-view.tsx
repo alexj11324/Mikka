@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useEffect, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import useSWRInfinite from 'swr/infinite'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
@@ -18,7 +18,7 @@ import { UserMessageText } from '@/components/workspace/user-message-text'
 import { MessageReactions, useMessageReactions } from '@/components/workspace/message-reactions'
 import { cn } from '@/lib/utils'
 import { mentionsIn } from '@/lib/group-mentions'
-import { authorRuns, chronological, fetchGroupMessages, GroupMessagesRequestError, postGroupMessage, stopGroupReply, type GroupMessagePage } from '@/lib/group-messages'
+import { authorRuns, chronological, fetchGroupMessages, mergeGroupPoll, newestGroupPosition, GroupMessagesRequestError, postGroupMessage, stopGroupReply, type GroupMessagePage } from '@/lib/group-messages'
 import { toast } from 'sonner'
 import { useViewScroll, useViewState } from '@/lib/hooks/view-state'
 import { useActionError } from '@/lib/use-action-error'
@@ -53,9 +53,18 @@ export function GroupChatView({ group, userId, people }: {
   const [draft, setDraft] = useViewState(`group:${group.id}:draft`, '')
   const [pending, setPending] = useState<Pending[]>([])
   const [answering, setAnswering] = useState(false)
+  const shown = useRef<{ id: string; page: GroupMessagePage } | null>(null)
   const { data: pages, error, size, setSize, isValidating, mutate } = useSWRInfinite<GroupMessagePage>(
     (index, previous: GroupMessagePage | null) => index === 0 ? ['group-messages', group.id, null] : previous?.nextBefore ? ['group-messages', group.id, previous.nextBefore] : null,
-    ([, id, before]: [string, string, string | null]) => fetchGroupMessages(id, before),
+    async ([, id, before]: [string, string, string | null]) => {
+      if (before) return fetchGroupMessages(id, before)
+      const known = shown.current?.id === id ? shown.current.page : null
+      const after = known ? newestGroupPosition(known.messages) : null
+      const page = await fetchGroupMessages(id, null, fetch, after)
+      const merged = mergeGroupPoll(known, page)
+      shown.current = { id, page: merged }
+      return merged
+    },
     // The first page carries new messages and who is answering; only it is read again while a bot answers.
     { revalidateOnFocus: false, refreshInterval: answering ? ANSWER_POLL_MS : 0, onSuccess: data => setAnswering(!!data[0]?.agentStatus) },
   )

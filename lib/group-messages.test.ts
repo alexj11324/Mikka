@@ -46,6 +46,21 @@ test('newest-first pages read oldest first, by bigint position, without duplicat
   assert.deepEqual(group.chronological(huge).map(item => item.position), ['9007199254740992', '9007199254740993'])
 })
 
+test('an idle poll keeps the page, and a short page of new messages is prepended', () => {
+  const previous = { messages: [message('4', 'u1'), message('3', 'a1', 'agent')], nextBefore: '3', agentStatus: { status: 'running' } }
+  const idle = group.mergeGroupPoll(previous, { messages: [], nextBefore: null, unchanged: true, agentStatus: null, stopped: true })
+  assert.equal(idle.messages.length, 2)
+  assert.equal(idle.nextBefore, '3')
+  assert.equal(idle.agentStatus, null)
+  assert.equal(idle.stopped, true)
+  const added = group.mergeGroupPoll(previous, { messages: [message('5', 'a1', 'agent')], nextBefore: null, appended: true, agentStatus: { status: 'running' } })
+  assert.deepEqual(added.messages.map(item => item.position), ['5', '4', '3'])
+  assert.equal(added.nextBefore, '3')
+  assert.equal(added.appended, undefined)
+  assert.equal(group.newestGroupPosition(added.messages), '5')
+  assert.equal(group.mergeGroupPoll(null, previous), previous)
+})
+
 test('consecutive messages from one author form one run', () => {
   const runs = group.authorRuns([message('1', 'u1'), message('2', 'u1'), message('3', 'a1', 'agent'), message('4', 'u1')])
   assert.deepEqual(runs.map(run => [run.authorType, run.authorId, run.messages.length]), [['user', 'u1', 2], ['agent', 'a1', 1], ['user', 'u1', 1]])

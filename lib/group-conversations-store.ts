@@ -13,7 +13,7 @@ const message = z.object({ body: z.string().trim().min(1).max(32000), mentions: 
 const read = z.object({ messageId: z.string().min(1).max(64) }).strict()
 export type Member = z.infer<typeof member>
 export type Directory = (workspaceId: string, userId: string, members: Member[]) => Promise<boolean>
-export type GroupRequest = { userId: string | null; method: 'GET' | 'POST' | 'DELETE' | 'PATCH'; resource: 'conversations' | 'messages' | 'members' | 'read' | 'links' | 'stop'; id?: string; origin: string | null; host: string; body?: string; before?: string | null; limit?: string | null; workspaceId?: string | null }
+export type GroupRequest = { userId: string | null; method: 'GET' | 'POST' | 'DELETE' | 'PATCH'; resource: 'conversations' | 'messages' | 'members' | 'read' | 'links' | 'stop'; id?: string; origin: string | null; host: string; body?: string; before?: string | null; after?: string | null; limit?: string | null; workspaceId?: string | null }
 class Failure extends Error { constructor(readonly status: number) { super(String(status)) } }
 const fail = (status: number): never => { throw new Failure(status) }
 function parse<T>(schema: z.ZodType<T>, body?: string): T {
@@ -81,9 +81,9 @@ export async function handleGroup(pool: Pool, directory: Directory, req: GroupRe
         if (!link) return fail(404)
         groupId = link.sourceConversationId
       }
-      // Acquire the serialization lock before reading membership in a new statement.
-      // A joined SELECT FOR UPDATE can retain a pre-wait membership snapshot.
-      const { rows: groups } = await q(`SELECT * FROM conversations WHERE id=$1 AND kind='group' FOR UPDATE`, [groupId])
+      // Writes serialize on the conversation row. A history read uses the committed
+      // snapshot and does not take that lock, so an idle poll does not block a send.
+      const { rows: groups } = await q(`SELECT * FROM conversations WHERE id=$1 AND kind='group'${req.method === 'GET' ? '' : ' FOR UPDATE'}`, [groupId])
       const group = groups[0]
       const { rows: memberships } = await q(`SELECT role FROM conversation_members WHERE "conversationId"=$1 AND "memberType"='user' AND "memberId"=$2 AND "leftAt" IS NULL`, [groupId, userId])
       if (!group || !memberships.length || !await directory(group.workspaceId, userId, [])) return fail(404)
@@ -141,11 +141,23 @@ export async function handleGroup(pool: Pool, directory: Directory, req: GroupRe
         result = { stopped: await stopGroupTurns(client, req.id!) }
       } else if (req.resource === 'messages' && req.method === 'GET') {
         const before = req.before == null ? null : decimal(req.before, '')
+        const after = before == null && req.after != null ? decimal(req.after, '') : null
         const limit = Number(decimal(req.limit, '50'))
         if (limit > 100) return fail(422)
-        const { rows } = await q('SELECT * FROM conversation_messages WHERE "conversationId"=$1 AND ($2::bigint IS NULL OR position < $2) ORDER BY position DESC LIMIT $3', [req.id, before, limit + 1])
-        const more = rows.length > limit
-        const messages = rows.slice(0, limit)
+        // A poll that already has the latest message reads who is answering, not the page again.
+        const tip = after == null ? null : (await q(`SELECT "lastPosition"::text AS position FROM conversations WHERE id=$1`, [req.id])).rows[0]
+        const idle = after != null && tip != null && BigInt(tip.position) <= BigInt(after)
+        let messages: { position: string }[] = []
+        let more = false
+        let appended = false
+        const delta = !idle && after != null ? await q('SELECT * FROM conversation_messages WHERE "conversationId"=$1 AND position > $2::bigint ORDER BY position DESC LIMIT $3', [req.id, after, limit + 1]) : null
+        if (idle) messages = []
+        else if (delta && delta.rows.length <= limit) { messages = delta.rows; appended = true }
+        else {
+          const loaded = await q('SELECT * FROM conversation_messages WHERE "conversationId"=$1 AND ($2::bigint IS NULL OR position < $2) ORDER BY position DESC LIMIT $3', [req.id, before, limit + 1])
+          more = loaded.rows.length > limit
+          messages = loaded.rows.slice(0, limit)
+        }
         // Read existing links only; this is not the private-exchange producer.
         // Links share their source message's page/cursor. They add no message
         // position or unread event, and never expose the private DM transcript.
@@ -166,6 +178,8 @@ export async function handleGroup(pool: Pool, directory: Directory, req: GroupRe
         const active = queueAgents ? await q(`SELECT "agentId","botId",status,"updatedAt" FROM group_turns WHERE "conversationId"=$1 AND status IN ('queued','running') ORDER BY "createdAt" LIMIT 1`, [req.id]) : { rows: [] }
         const failed = queueAgents ? await q(`SELECT error FROM group_turns WHERE "conversationId"=$1 ORDER BY "createdAt" DESC,"messageId" DESC LIMIT 1`, [req.id]) : { rows: [] }
         result = { messages, timeline, nextBefore: more ? messages.at(-1)?.position : null, agentStatus: active.rows[0] ?? null,
+          ...(idle ? { unchanged: true } : {}),
+          ...(appended ? { appended: true } : {}),
           ...(queueAgents ? { leadAgentId: group.leadAgentId ?? null, leadBotId: group.leadBotId ?? null, routingError: ['group_judgment_pending','group_lead_required'].includes(failed.rows[0]?.error) ? { code: 'group_judgment_pending' } : null, stopped: failed.rows[0]?.error === GROUP_TURN_STOPPED } : {}) }
       } else if (req.resource === 'messages' && req.method === 'POST') {
         const input = parse(message, req.body)

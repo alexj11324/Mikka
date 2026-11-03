@@ -4,6 +4,7 @@
 //   node --env-file=.env.local scripts/apply-sql.mjs drizzle/0001_agents_devices.sql
 import { readFileSync } from 'node:fs'
 import { Pool } from 'pg'
+import { directDatabaseURL } from './postgres-connection.mjs'
 
 const file = process.argv[2]
 if (!file) {
@@ -17,9 +18,9 @@ if (!configuredUrl) {
   process.exit(1)
 }
 
-const directUrl = new URL(configuredUrl)
-directUrl.hostname = directUrl.hostname.replace(/-pooler(?=\.)/, '')
-const pool = new Pool({ connectionString: directUrl.toString(), max: 1 })
+const directUrl = directDatabaseURL(configuredUrl)
+const pool = new Pool({ connectionString: directUrl, max: 1, connectionTimeoutMillis: 10_000, idleTimeoutMillis: 20_000 })
+pool.on?.('error', () => console.warn('admin_idle_connection_lost'))
 try {
   const [{ database, branch }] = (await pool.query("select current_database() as database, current_setting('neon.branch_id', true) as branch")).rows
   console.log(`target ${database} (${branch ?? 'non-Neon Postgres'})`)

@@ -116,6 +116,13 @@ test('Postgres17 migration, atomic history, pagination, unread counts, membershi
     assert.equal(page.messages.length, 5); assert.equal(page.nextBefore, '14')
     const secondPage = (await run({ id, resource: 'messages', limit: '5', before: page.nextBefore })).body as typeof page
     assert.equal(secondPage.messages[0].position, '13')
+    const caughtUp = (await run({ id, resource: 'messages', after: page.messages[0].position })).body as { unchanged?: boolean; messages: unknown[] }
+    assert.equal(caughtUp.unchanged, true)
+    assert.equal(caughtUp.messages.length, 0)
+    const newer = (await run({ id, resource: 'messages', after: '1' })).body as { appended?: boolean; messages: { position: string }[] }
+    assert.equal(newer.appended, true)
+    assert.equal(newer.messages[0].position, page.messages[0].position)
+    assert.ok(newer.messages.every(message => BigInt(message.position) > BigInt(1)))
     for (const limit of ['0', '-1', '101', 'NaN', '1.5']) assert.equal((await run({ id, resource: 'messages', limit })).status, 422)
     assert.equal((await run({ workspaceId: undefined })).status, 200)
     const list = (await run({ userId: 'member' })).body as { conversations: { unreadCount: string; lastMessage: { position: string } }[] }

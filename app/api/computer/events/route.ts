@@ -1,4 +1,5 @@
 import { auth } from '@/lib/api-auth'
+import { computerEventPollDelay } from '@/lib/computer/event-poll'
 import { pool } from '@/lib/db'
 import { loadWorkspaceContext } from '@/lib/workspace-access'
 export const runtime = 'nodejs'
@@ -19,7 +20,7 @@ export async function GET(request: Request) {
         const { rows } = await pool.query('SELECT seq,event FROM subagent_events WHERE "ownerId"=$1 AND "workspaceId"=$2 AND seq>$3 ORDER BY seq LIMIT 100', [session.user.id, context.workspace.id, cursor])
         for (const row of rows) { cursor = String(row.seq); controller.enqueue(encoder.encode(`id: ${cursor}\nevent: data-subagent\ndata: ${JSON.stringify(row.event.data)}\n\n`)) }
         if (!rows.length) controller.enqueue(encoder.encode(': keepalive\n\n'))
-        await new Promise(resolve => setTimeout(resolve, 1000))
+        await new Promise(resolve => setTimeout(resolve, computerEventPollDelay(rows.length)))
       }
     } catch { /* Client disconnect and database failures close the stream. */ }
     finally { try { controller.close() } catch { /* Already cancelled. */ } }

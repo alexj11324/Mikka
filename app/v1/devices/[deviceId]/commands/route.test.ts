@@ -9,6 +9,7 @@ mock.module(new URL('../../../../../lib/db/index.ts', import.meta.url).href, {
 })
 const pendingDeviceCommands = mock.fn(async (_id: string, _completed: string[]) => [{ id: 'update-command', kind: 'update' }])
 mock.module(new URL('../../../../../lib/device-management.ts', import.meta.url).href, { namedExports: { pendingDeviceCommands } })
+const deviceUpdateNotice = mock.fn(async () => ({ id: 'update-command', kind: 'update' as const }))
 let actual: typeof import('../../../../../lib/device-link')
 const authenticateDevice = mock.fn(async () => ({ userId: 'owner', tokenId: 'token' }) as object | null)
 const ownsDevice = mock.fn(async () => ({ id: 'device-1', enabled: true }) as object | null)
@@ -42,7 +43,7 @@ before(async () => {
     namedExports: { daemonVersions, cachedDaemonVersions, newerDaemonRelease, daemonRequestTooOld },
   })
   mock.module(new URL('../../../../../lib/device-link.ts', import.meta.url).href, {
-    namedExports: { authenticateDevice, deviceMayHaveWork, deviceWork, ownsDevice, sleep, waitSeconds: actual.waitSeconds },
+    namedExports: { authenticateDevice, deviceMayHaveWork, deviceUpdateNotice, deviceWork, ownsDevice, sleep, waitSeconds: actual.waitSeconds },
   })
   GET = (await import('./route')).GET
 })
@@ -59,6 +60,8 @@ beforeEach(() => {
   cachedDaemonVersions.mock.resetCalls()
   deviceWork.mock.resetCalls()
   deviceWork.mock.mockImplementation(async () => ({ commands: [], queuedRuns: [] }))
+  deviceUpdateNotice.mock.resetCalls()
+  deviceUpdateNotice.mock.mockImplementation(async () => ({ id: 'update-command', kind: 'update' as const }))
   sleep.mock.resetCalls()
   sleep.mock.mockImplementation(actual.sleep)
   logs.length = 0
@@ -235,4 +238,6 @@ test('obsolete daemon commands poll serves upgrade metadata without reading busi
   assert.deepEqual(body.deviceCommands, [{ id: 'update-command', kind: 'update' }])
   assert.equal(deviceMayHaveWork.mock.callCount(), 0)
   assert.equal(deviceWork.mock.callCount(), 0)
+  assert.equal(pendingDeviceCommands.mock.callCount(), 0, 'an idle upgrade check does not lock the device row')
+  assert.equal(deviceUpdateNotice.mock.callCount(), 1)
 })

@@ -69,7 +69,7 @@ export async function exchangeDocument(input: z.infer<typeof syncSchema>): Promi
 export async function listMembers(id: string) {
   const { issue, user } = await requireIssueAccess(id)
   return db.transaction(async tx => {
-  const [locked] = await tx.select().from(issues).where(eq(issues.id, id)).for('share')
+  const [locked] = await tx.select({ userId: issues.userId, scope: issues.scope, scopeVersion: issues.scopeVersion }).from(issues).where(eq(issues.id, id)).for('share')
   requireLockedIssueScope(locked, user.id, issue.scopeVersion)
   const members = await tx.select({ id: users.id, name: users.name, email: users.email, image: users.image, createdAt: issueMembers.createdAt }).from(issueMembers)
     .innerJoin(users, eq(users.id, issueMembers.memberId)).where(and(eq(issueMembers.issueId, id), eq(issueMembers.userId, issue.userId))).orderBy(issueMembers.createdAt, users.id)
