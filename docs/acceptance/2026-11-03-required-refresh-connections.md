@@ -30,3 +30,10 @@ all four upload tests passed.
 The final PR records current source checks, production-build and API acceptance
 results. Normal conversation history remains server-durable, with the existing
 sequence/cursor resume after refresh. No production data is written by tests.
+
+The independent NoVNC viewer WebSocket now also disconnects on the update
+signal, retaining its final frame. An already-aborted signal and an update
+while the module loads cannot create a late connection. The existing viewer
+unmount path removes the listener and does not issue a device-stop command.
+Four regression cases plus the two existing cases pass (6 total), with a
+verified red run against the prior implementation. Typecheck passes.

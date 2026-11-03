@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { getEventListeners } from 'node:events'
 import { after, afterEach, before, beforeEach, mock, test } from 'node:test'
 import { act, type ComponentProps } from 'react'
 import type { Root } from 'react-dom/client'
@@ -8,6 +9,17 @@ import { ComputerRequestError } from '@/lib/computer/client'
 
 let state: ComputerState = { machine: 'sleeping', control: 'idle' }
 let requests = 0
+let refreshController = new AbortController()
+let viewer: { url: string } | undefined
+class FakeRFB extends EventTarget {
+  static instances: FakeRFB[] = []
+  viewOnly = false; scaleViewport = false; resizeSession = false; background = ''; disconnects = 0
+  constructor(_host: HTMLElement, _url: string) { super(); FakeRFB.instances.push(this) }
+  disconnect() { this.disconnects++; this.dispatchEvent(new Event('disconnect')) }
+  focus() {}
+}
+mock.module('@novnc/novnc/lib/rfb.js', { defaultExport: FakeRFB })
+mock.module(new URL('../lib/app-build.ts', import.meta.url).href, { namedExports: { pageRefreshSignal: () => refreshController.signal } })
 let finishWake: (value: null) => void
 let failWake: (error: Error) => void
 const failures: string[] = []
@@ -15,7 +27,7 @@ mock.module('next-intl', { namedExports: { useTranslations: () => (key: string) 
 mock.module('sonner', { namedExports: { toast: { error: (message: string) => failures.push(message) } } })
 mock.module(new URL('../hooks/use-computer.ts', import.meta.url).href, { namedExports: {
   useComputer: () => ({ data: state, mutate: async () => state }),
-  useViewerGrant: () => ({}),
+  useViewerGrant: () => ({ data: viewer }),
 } })
 mock.module(new URL('../lib/computer/client.ts', import.meta.url).href, { namedExports: { ComputerRequestError, computerApi: {
   wake: () => { requests++; return new Promise<null>((resolve, reject) => { finishWake = resolve; failWake = reject }) },
@@ -37,6 +49,7 @@ before(async () => {
 })
 beforeEach(() => {
   state = { machine: 'sleeping', control: 'idle' }; requests = 0; failures.length = 0
+  refreshController = new AbortController(); viewer = undefined; FakeRFB.instances.length = 0
   container = document.createElement('div'); document.body.append(container); root = createRoot(container)
 })
 afterEach(async () => { await act(async () => root.unmount()); container.remove() })
@@ -66,4 +79,53 @@ test('a real wake failure is visible and releases the button for an explicit ret
   assert.equal(requests, 2)
   state = { machine: 'waking', control: 'idle' }
   await act(async () => finishWake(null))
+})
+
+
+const showRunning = () => { state = { machine: 'running', control: 'idle' }; viewer = { url: 'wss://viewer.example/fixture' } }
+const settleViewer = async () => { await act(async () => { await new Promise(resolve => setTimeout(resolve, 5)) }) }
+
+test('a required refresh disconnects the active viewer once and removes its listener on unmount', async () => {
+  showRunning()
+  await render()
+  for (let n = 0; n < 100 && FakeRFB.instances.length === 0; n++) await settleViewer()
+  assert.equal(FakeRFB.instances.length, 1)
+  assert.equal(getEventListeners(refreshController.signal, 'abort').length, 1)
+  const client = FakeRFB.instances[0]
+  refreshController.abort()
+  assert.equal(client.disconnects, 1)
+  await act(async () => root.render(null))
+  assert.equal(client.disconnects, 1)
+  assert.equal(getEventListeners(refreshController.signal, 'abort').length, 0)
+  assert.equal(requests, 0, 'disconnecting the viewer performs no device operation')
+})
+
+test('a page already requiring refresh never creates the viewer connection', async () => {
+  showRunning()
+  refreshController.abort()
+  await render()
+  await settleViewer()
+  assert.equal(FakeRFB.instances.length, 0)
+})
+
+test('refresh while the viewer module loads prevents its eventual connection', async () => {
+  showRunning()
+  act(() => root.render(<ComputerScreen botId="fixture-bot" name="Fixture" />))
+  refreshController.abort()
+  await settleViewer()
+  assert.equal(FakeRFB.instances.length, 0)
+})
+
+test('normal viewer unmount removes the update listener and does not stop the device', async () => {
+  showRunning()
+  await render()
+  for (let n = 0; n < 100 && FakeRFB.instances.length === 0; n++) await settleViewer()
+  const client = FakeRFB.instances[0]
+  assert.ok(client)
+  await act(async () => root.render(null))
+  assert.equal(client.disconnects, 1)
+  assert.equal(getEventListeners(refreshController.signal, 'abort').length, 0)
+  refreshController.abort()
+  assert.equal(client.disconnects, 1)
+  assert.equal(requests, 0)
 })
