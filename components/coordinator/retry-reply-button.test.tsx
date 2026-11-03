@@ -22,6 +22,13 @@ const notes = [{ n: 1, kind: 'region' as const, url: 'https://example.com', labe
 let composer: { value: string; onChange: (value: string) => void; onSubmit: () => void }
 const plain = ({ children }: { children?: ReactNode }) => <div>{children}</div>
 const nothing = () => null
+// Portal primitives cache DOM availability on import; this fixture imports the
+// shared Button before happy-dom. Keep this unit focused on guard state; the
+// real portal is reviewed in the production-build screenshots.
+mock.module(new URL('../ui/alert-dialog.tsx', import.meta.url).href, { namedExports: {
+  AlertDialog: ({ open, children }: { open: boolean; children: ReactNode }) => open ? <div role="alertdialog">{children}</div> : null,
+  AlertDialogContent: plain, AlertDialogHeader: plain, AlertDialogTitle: plain, AlertDialogFooter: plain,
+} })
 mock.module(new URL('../../app/actions/coordinator.ts', import.meta.url).href, { namedExports: {
   retryCoordinatorTurn: async () => { calls++; if (reply instanceof Error) throw reply; if (typeof reply === 'function') return reply(); return reply },
   getCoordinatorChat: async () => ({}), pollCoordinatorChat: async () => ({}), coordinatorHistory: async () => ({}), stopCoordinatorTurn: async () => ({}), welcomeCoordinator: async () => ({}), coordinatorCitationSources: async () => ({}),
@@ -31,7 +38,7 @@ mock.module(new URL('../../lib/use-action-error.ts', import.meta.url).href, { na
 mock.module(new URL('../../lib/billing/verification-client.ts', import.meta.url).href, { namedExports: { hostedRefusal: () => null } })
 mock.module(new URL('../../lib/app-build.ts', import.meta.url).href, { namedExports: {
   checkPageBuildBeforeAction: () => buildCheck(),
-  APP_BUILD: 'fixture-current', STALE_BUILD_EVENT: 'mikka:stale-build',
+  markPageNeedsRefresh: () => {}, pageNeedsRefresh: () => false, APP_BUILD: 'fixture-current', STALE_BUILD_EVENT: 'mikka:stale-build',
   isStaleBuild: (page: string, server: string) => Boolean(page && server && page !== server),
   desktopBelowMinimum: () => false,
   readAppVersion: async () => { versionReads++; return serverVersion },
@@ -179,7 +186,7 @@ test('a stale send does not clear an artifact quote', async () => {
   assert.equal(composer.value, 'keep the quote attached')
 })
 
-test('switching only the Bot search parameter checks the page version and offers a refresh', async () => {
+test('switching only the Bot search parameter checks the page version and requires a refresh', async () => {
   await act(async () => root.render(<VersionGuard />))
   assert.equal(versionReads, 1)
   assert.equal(notices.length, 0)
@@ -187,7 +194,7 @@ test('switching only the Bot search parameter checks the page version and offers
   serverVersion = { build: 'fixture-new' }
   await act(async () => root.render(<VersionGuard />))
   assert.equal(versionReads, 2)
-  assert.equal(notices.length, 1)
+  assert.match(document.body.textContent ?? '', /Common.appUpdated/)
 })
 
 test('a stale page does not retry the old action or claim it queued a reply', async () => {
@@ -260,4 +267,21 @@ test('a sent message that quotes a reply shows the quote above its words, and ev
   assert.match(container.textContent ?? '', /截图呢？/)
   assert.doesNotMatch(container.textContent ?? '', /> 首页/)
   assert.equal(container.querySelectorAll('[data-slot="message-actions"] [data-copy-state]').length, 2)
+})
+
+
+test('an idle page detects the new build on its minute probe and keeps the draft mounted', async t => {
+  t.mock.timers.enable({ apis: ['setInterval'] })
+  const page = () => <><VersionGuard /><Textarea defaultValue="keep this draft" /></>
+  await act(async () => root.render(page()))
+  const draft = container.querySelector('textarea')!
+  serverVersion = { build: 'fixture-new' }
+  await act(async () => t.mock.timers.tick(60_000))
+  assert.equal(versionReads, 2)
+  assert.match(document.querySelector('[role="alertdialog"]')?.textContent ?? '', /Common.refresh/)
+  assert.equal(container.querySelector('textarea'), draft)
+  assert.equal(draft.value, 'keep this draft')
+  await act(async () => root.render(null))
+  await act(async () => t.mock.timers.tick(60_000))
+  assert.equal(versionReads, 2, 'unmount clears the probe')
 })
