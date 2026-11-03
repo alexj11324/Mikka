@@ -21,6 +21,8 @@ import { listSshHosts } from '@/lib/ssh'
 import { citationSources } from '@/lib/coordinator/store'
 import { requestRunStop } from '@/lib/agent-runs'
 import { sendThreadMessage } from '@/lib/thread-continue'
+import { factoryEventId } from '@/lib/factory/event-id'
+import { FactoryError } from '@/lib/factory/contract'
 import { readThreadChunks, threadChunkCursor, type ThreadChunkCursor } from '@/lib/thread-chunks'
 import { executionBotName, runBotId, runBotName } from '@/lib/run-bot-name'
 import { requireIssueAccess } from '@/lib/issue-access'
@@ -243,7 +245,7 @@ export async function findThreadIssue(runId: string): Promise<{ issueId: string 
 
 export interface IssueThreadDetail {
   /** The owner sees the stop deadline too, so a reload does not reset the timeout. */
-  thread: IssueThread & { prompt: string; stopRequestedAt: Date | null; feedbackEligible:boolean; /** This run's failure reason, stored masked (agent_runs.error). */ error: string | null; /** The owner's own: quota switches and a quota pause (lib/run-quota-view.ts). */ quota: import('@/lib/run-quota-view').ThreadQuotaView | null }
+  thread: IssueThread & { prompt: string; stopRequestedAt: Date | null; feedbackEligible:boolean; /** The latest run's failure reason, stored masked (agent_runs.error). */ error: string | null; /** The owner's own: quota switches and a quota pause (lib/run-quota-view.ts). */ quota: import('@/lib/run-quota-view').ThreadQuotaView | null }
   chunks: { chunk: Record<string, unknown>; at: Date }[]
   messages: { id: string; text: string; at: Date; author: string; image: string | null; mine: boolean }[]
   /** Where `chunks` ends; passed back, the next read returns only later chunks. */
@@ -290,11 +292,23 @@ export async function getIssueThread(issueId: string | null, runId: string, afte
   // A stop request belongs to the live run that send and stop address, not to an earlier attempt.
   const live = chain?.attempts.find(attempt => attempt.runId === thread.latestRunId)
   const stopRequestedAt = live && live.runId !== row.id ? live.stopRequestedAt : row.stopRequestedAt
+  // Failure and Retry address that same run. Keep the root's name, prompt and
+  // identity while reading the latest failed continuation's masked error.
+  let error: string | null = null
+  if ((live?.status ?? row.status) === 'failed') {
+    if (!live || live.runId === row.id) error = row.error ?? null
+    else {
+      const [failed] = await db.select({ error: agentRuns.error }).from(agentRuns)
+        .where(and(eq(agentRuns.id, live.runId), eq(agentRuns.userId, row.userId),
+          row.issueId === null ? isNull(agentRuns.issueId) : eq(agentRuns.issueId, row.issueId), eq(agentRuns.status, 'failed'))).limit(1)
+      error = failed?.error ?? null
+    }
+  }
   const quota = row.userId === user.id
     ? await (await import('@/lib/run-quota-view')).threadQuotaView(user.id, chain?.attempts.map(attempt => attempt.runId) ?? [row.id], thread.latestRunId)
     : null
   return {
-    thread: { ...thread, prompt: row.prompt, stopRequestedAt, quota, error: row.status === 'failed' ? row.error ?? null : null, feedbackEligible: row.userId===user.id && ['succeeded','failed'].includes(row.status) && !!row.finishedAt && !!row.sessionId && !!row.deviceRepoId },
+    thread: { ...thread, prompt: row.prompt, stopRequestedAt, quota, error, feedbackEligible: row.userId===user.id && ['succeeded','failed'].includes(row.status) && !!row.finishedAt && !!row.sessionId && !!row.deviceRepoId },
     chunks,
     messages: messages.map(message => ({ id: message.id, text: message.text, at: message.at, author: message.name || message.email || '', image: message.image ?? null, mine: message.userId === user.id })),
     chunkCursor: read.cursor,
@@ -334,16 +348,50 @@ function safeHttpUrl(value: string) {
 }
 
 /** Something a person says in a running thread; the daemon delivers it to the agent. */
-export async function sendIssueThreadMessage(input: { issueId: string | null; runId: string; text: string }): Promise<void> {
+export async function sendIssueThreadMessage(input: { issueId: string | null; runId: string; text: string; retryOriginalSession?: true }): Promise<{ runId: string; continued: boolean }> {
   const text = z.string().trim().min(1).max(10_000).safeParse(input.text)
   if (!text.success) throw new ActionFailureError('messageRequired')
   const { row, user } = await readableThread(input.issueId, input.runId)
   const requestHeaders=await headers()
   if(requestHeaders.has('authorization')||!requestHeaders.get('cookie'))throw new ActionFailureError('authRequired')
   const session=await auth.api.getSession({headers:requestHeaders,query:{disableCookieCache:true}})
-  if(!session?.user||session.user.id!==user.id)throw new ActionFailureError('authRequired')
+  if(!session?.user||!session.session?.id||session.user.id!==user.id)throw new ActionFailureError('authRequired')
+  if(row.userId!==user.id)throw new ActionFailureError('runNotFound')
+  if(input.retryOriginalSession!==undefined && input.retryOriginalSession!==true)throw new ActionFailureError('runInvalid')
+  if(input.retryOriginalSession && row.issueId) {
+    // Only the existing owner Retry control requests recovery. A typed label,
+    // Bot message or ordinary send never acquires this authority.
+    const requestId=factoryEventId('question-owner-retry',row.id)
+    const eventId=factoryEventId('question-recover',requestId)
+    const {rows:[question]}=await pool.query(`SELECT q.id AS "questionId",q.revision AS "questionRevision",
+      q.status AS "questionStatus",q."continuationRunId",q."originRunId",q."originSessionId",t."botId",t.status AS "taskStatus",r.status AS "runStatus",
+      jsonb_build_object('taskId',t.id,'issueId',t."issueId",'attemptId',t."attemptId",'candidateId',t."candidateId",'revision',t.revision) AS binding,
+      e.request AS "recoveryRequest"
+      FROM factory_questions q JOIN factory_tasks t ON t.id=q."taskId" AND t."userId"=$1
+      JOIN agent_runs r ON r.id=$2 AND r."userId"=$1 AND r."issueId"=$3
+      LEFT JOIN factory_events e ON e."taskId"=t.id AND e."eventId"=$4 AND e.request->>'kind'='question_recover'
+        AND e.request->>'userId'=$1 AND e.request->'input'->>'expectedFailedRunId'=r.id::text
+        AND e.request->'input'->'reference'->>'questionId'=q.id::text
+      WHERE q."userId"=$1 AND q."issueId"=$3 AND t."issueId"=$3
+        AND r."questionContinuation"->>'requireSessionResume'='true'
+        AND (q."continuationRunId"=r.id OR e."eventId" IS NOT NULL OR q.id::text=r."questionContinuation"->>'questionId')`,[user.id,row.id,row.issueId,eventId])
+    if(question) {
+      if(!question.recoveryRequest && (question.questionStatus!=='blocked'||question.taskStatus!=='blocked'||question.runStatus!=='failed'||question.continuationRunId!==row.id))throw new ActionFailureError('threadCannotContinue')
+      // One SQL snapshot selects either the original receipt input or the
+      // current reference. Concurrent clicks therefore send the same request.
+      const input=question.recoveryRequest?.input ?? {requestId,expectedFailedRunId:row.id,reference:{questionId:question.questionId,questionRevision:question.questionRevision,binding:question.binding,originRunId:question.originRunId,originSessionId:question.originSessionId}}
+      try {
+        const {factoryRuntimeForBot}=await import('@/lib/factory/runtime')
+        const recovered=await factoryRuntimeForBot(question.botId).questions.recover({source:'human',userId:user.id,sessionId:session.session.id},input)
+        return {runId:recovered.continuationRunId,continued:true}
+      } catch(error) {
+        if(error instanceof FactoryError)throw new ActionFailureError(error.code==='factoryNotFound'?'runNotFound':'threadCannotContinue')
+        throw error
+      }
+    }
+  }
   // A working thread gets it as a message; an ended one runs again in the same thread (R-81, lib/thread-continue.ts).
-  await sendThreadMessage(user.id,row.id,text.data,{source:'human',sessionId:session.session.id})
+  return sendThreadMessage(user.id,row.id,text.data,{source:'human',sessionId:session.session.id})
 }
 
 /**
@@ -352,8 +400,8 @@ export async function sendIssueThreadMessage(input: { issueId: string | null; ru
  * dispatch with no machine or model) returned as its code, so the thread says
  * why instead of 「发送失败」. Other failures still throw.
  */
-export async function sendIssueThreadReply(input: { issueId: string | null; runId: string; text: string }): Promise<ActionResult<{ sent: true }>> {
-  return runAction(async () => { await sendIssueThreadMessage(input); return { sent: true as const } })
+export async function sendIssueThreadReply(input: { issueId: string | null; runId: string; text: string; retryOriginalSession?: true }): Promise<ActionResult<{ sent: true; runId: string; continued: boolean }>> {
+  return runAction(async () => { const result=await sendIssueThreadMessage(input); return { sent: true as const,...result } })
 }
 
 /**

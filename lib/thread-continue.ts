@@ -47,6 +47,10 @@ export async function sendThreadMessage(userId: string, runId: string, text: str
   }
   const [run] = await db.select().from(agentRuns).where(and(eq(agentRuns.id, latest.runId), eq(agentRuns.userId, userId))).limit(1)
   if (!run) throw new ActionFailureError('runNotFound')
+  // A failed required-SID continuation belongs to its original Factory task.
+  // Ordinary text must not cancel that task and create a fresh request epoch;
+  // only the explicit owner recovery path can resume its retained session.
+  if (run.status === 'failed' && run.questionContinuation?.requireSessionResume === true) throw new ActionFailureError('threadCannotContinue')
   // The next run is the task's (one task, one thread); a thread with no task has nothing to run again.
   if (!run.issueId || !run.deviceRepoId) throw new ActionFailureError('threadCannotContinue')
   const issueId = run.issueId

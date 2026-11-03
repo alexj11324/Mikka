@@ -544,6 +544,7 @@ export async function createHostedBotRunner(host: {
           check,
         }) : createNativeSubscriptionBroker({
           root: join(host.stateDir, "native-brokers"),
+          log: options.log,
           revision: subscription!.revision,
           check,
           worker: {
