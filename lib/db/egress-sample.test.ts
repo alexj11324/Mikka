@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { PoolClient } from 'pg'
-import { describeSample, SAMPLE_RATE, sampleClient, withDatabaseOperation } from './egress-sample'
+import { describeSample, LARGE_RESULT_BYTES, SAMPLE_RATE, sampleClient, withDatabaseOperation } from './egress-sample'
 import { withRequestLog } from '../request-log'
 
 const result = { command: 'SELECT', rowCount: 2, rows: [{ id: 'a', text: 'PRIVATE_TEXT' }, { id: 'b', text: 'x' }], fields: [], oid: 0 }
@@ -46,6 +46,25 @@ test('unsampled queries and a gate that is off pass straight through', async () 
 test('the gate is off without PostHog', async () => {
   const { deploymentSwitch } = await import('../deployment-switches')
   assert.equal(deploymentSwitch('dbEgressSample', {}), false)
+})
+
+test('large reads outside the random sample are recorded exactly once with their actual inclusion rate', async () => {
+  const lines: string[] = []
+  const large = { ...result, rows: [{ text: 'PRIVATE_TEXT'.repeat(LARGE_RESULT_BYTES) }] }
+  const client = { query: () => Promise.resolve(large) } as unknown as PoolClient
+  sampleClient(client, () => true, () => 0.9, line => lines.push(line))
+  assert.equal(await client.query('select payload from run_chunks'), large)
+  assert.equal(lines.length, 1)
+  const sample = JSON.parse(lines[0])
+  assert.equal(sample.sampleRate, 1)
+  assert.equal(sample.bytes, Buffer.byteLength(JSON.stringify(large.rows)))
+  assert.ok(!lines[0].includes('PRIVATE'))
+
+  const selected = { query: () => Promise.resolve(large) } as unknown as PoolClient
+  sampleClient(selected, () => true, () => 0, line => lines.push(line))
+  await selected.query('select payload from run_chunks')
+  assert.equal(lines.length, 2, 'large reads selected randomly are not counted twice')
+  assert.equal(JSON.parse(lines[1]).sampleRate, 1)
 })
 
 test('a sampled query names the logged route it ran under', async () => {

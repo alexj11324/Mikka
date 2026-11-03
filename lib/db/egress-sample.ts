@@ -3,14 +3,16 @@ import type { PoolClient, QueryResult } from 'pg'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { deploymentSwitch } from '@/lib/deployment-switches'
 
-// Sampled accounting of what queries send back from the database (Neon bills
-// that transfer). A sampled query writes one JSON line: the request's route
+// JSON-result diagnostics, separate from Neon's actual billed wire transfer.
+// A sampled query writes one JSON line: the request's route
 // template, the tables and a hash of the SQL text, the row count and the
 // result's size as JSON. Never parameters, values or row content. Off unless
 // the PostHog gate is on.
 
-/** Share of queries sampled while the PostHog gate `mikka-db-egress-sample` is on (off by default). */
+/** Share of small queries sampled while `mikka-db-egress-sample` is on (off by default). */
 export const SAMPLE_RATE = 0.01
+/** Rare large reads must not disappear between random samples during an incident. */
+export const LARGE_RESULT_BYTES = 64 * 1024
 
 const sampling = () => { try { return deploymentSwitch('dbEgressSample') } catch { return false } }
 
@@ -54,10 +56,18 @@ export function sampleClient(client: PoolClient, on: () => boolean = sampling, r
   ;(client as { query: unknown }).query = (...args: unknown[]) => {
     const first = args[0]
     const text = typeof first === 'string' ? first : (first as { text?: unknown } | null)?.text
-    if (typeof text !== 'string' || random() >= SAMPLE_RATE || !on()) return query(...args)
+    if (typeof text !== 'string' || !on()) return query(...args)
+    const selected = random() < SAMPLE_RATE
     const route = routeScope.getStore() ?? null
     const record = (result: unknown) => {
-      try { sink(JSON.stringify(describeSample(text, result as QueryResult, route))) } catch { /* sampling never breaks a query */ }
+      try {
+        const sample = describeSample(text, result as QueryResult, route)
+        if (sample.bytes >= LARGE_RESULT_BYTES) {
+          // Every large result is observed, so the collector must not multiply
+          // its bytes by 100 as it does with randomly selected small results.
+          sink(JSON.stringify({ ...sample, sampleRate: 1 }))
+        } else if (selected) sink(JSON.stringify(sample))
+      } catch { /* sampling never breaks a query */ }
     }
     const callback = args.at(-1)
     if (typeof callback === 'function') {

@@ -36,6 +36,18 @@ test('missing inputs publish unhealthy coverage, never successful zero; delivery
   await assert.rejects(()=>publish(report,'token',async()=>new Response(null,{status:503})),/telemetry_delivery_failed/)
 })
 
+test('large-result census and random small samples retain separate inclusion weights',()=>{
+  const common={msg:'db_sample',timestamp:new Date(now-1000).toISOString(),statement:'abc123def456',route:'/actions/coordinator/poll',rows:1}
+  const events=[{deploymentId:'dpl_test',environment:'production',message:[
+    {...common,sampleRate:.01,bytes:100},
+    {...common,sampleRate:1,bytes:100000},
+  ].map(e=>JSON.stringify(e)).join('\n')}]
+  const report=summarize(events,'dpl_test',now)
+  assert.equal(report.queries[0].samples,2)
+  assert.equal(report.queries[0].estimatedBytes,110000)
+  assert.equal(report.sampledBytes,100100)
+})
+
 test('real collector contract combines closed daily usage and current-day hourly usage without double counting',async()=>{
   const alias={alias:'app.aspectlylabs.com',projectId:'prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH',deploymentId:'dpl_test',updatedAt:1}
   const sample={msg:'db_sample',timestamp:new Date(now-1000).toISOString(),sampleRate:.01,statement:'abc123def456',route:'/actions/issues/poll',rows:1,bytes:100}
