@@ -3,6 +3,13 @@
 //   MIKKA_DATABASE_URL=… DATABASE_URL=… node scripts/demo-data/seed.mjs --email you@example.com          # dry run
 //   MIKKA_DATABASE_URL=… DATABASE_URL=… node scripts/demo-data/seed.mjs --email you@example.com --apply  # write
 //
+// Options (cleanup.mjs and backfill-issues.mjs take the same --prefix / --user-id):
+//   --content zh|en      which content set to write (sets.mjs); default zh
+//   --prefix de300001-   the id prefix of this set's rows; default de300000-
+//   --user-id <id>       refuse unless --email is exactly this account
+//   --refresh-times      write nothing new: move every timestamp of the seeded
+//                        rows so the newest reads "a few minutes ago" again
+//
 // It writes rows directly and calls no API, so nothing it writes is sent anywhere:
 // - no coordinator_events (nothing wakes a model), no group_turns, no schedules;
 // - threads are finished, or running/waiting with no lease on a disabled demo
@@ -12,15 +19,15 @@
 // - tasks are workspace tasks with linearSyncBlocked, so the Linear outbox
 //   trigger drops them;
 // - no pending_actions, billing, usage, Composio or Linear rows.
-// Every row id starts with de300000- (shared.mjs); cleanup.mjs removes exactly those.
-// Re-running replaces the previous demo rows of the account in one transaction.
-import { connect, countDemoRows, deleteDemoRows, demoId, findOwner, inTransaction, MAIN_TABLES, parseArgs, WORKSPACE_TABLES } from './shared.mjs'
-import { AGENTS, ARTIFACTS, BOT_MEMORY, BOT_THREADS, BOTS, DEVICES, ISSUES, PEOPLE, RUNS, SUGGESTIONS, TEAM, WORKSPACE_NAME, WORKSPACE_SLUG } from './content.mjs'
+// Every row id starts with the prefix (de300000- unless --prefix; shared.mjs); cleanup.mjs
+// removes exactly those. Re-running replaces the previous rows of that prefix in one transaction.
+import { connect, countDemoRows, deleteDemoRows, demoId, findOwner, inTransaction, MAIN_TABLES, parseArgs, shiftDemoTimes, WORKSPACE_TABLES } from './shared.mjs'
+import { loadContent } from './sets.mjs'
 import { assertEveryRunHasIssue, threadIssues, withIssues } from './thread-issues.mjs'
-import { CHATS, GROUP } from './chats.mjs'
 import { createHash } from 'node:crypto'
 
 const args = parseArgs(process.argv.slice(2))
+const { AGENTS, ARTIFACTS, BOT_MEMORY, BOT_THREADS, BOTS, CHATS, DEVICES, GROUP, ISSUES, PEOPLE, RUNS, SUGGESTIONS, TEAM, WORKSPACE_NAME, WORKSPACE_SLUG, threadOpening } = await loadContent(args.content)
 const db = connect(args)
 const now = Date.now()
 const ago = minutes => new Date(now - minutes * 60_000)
@@ -37,7 +44,7 @@ function defaultAvatar(key) {
 }
 
 function plan(owner) {
-  const id = key => demoId(owner.id, key)
+  const id = key => demoId(owner.id, key, args.prefix)
   const people = PEOPLE.map(person => ({ ...person, id: id(`person:${person.key}`), email: person.email }))
   const person = key => key === 'me' ? { id: owner.id, name: owner.name } : people.find(item => item.key === key)
   const bots = BOTS.map(bot => ({ ...bot, id: id(`bot:${bot.key}`) }))
@@ -59,7 +66,7 @@ function plan(owner) {
     minutesAgo: Math.max(20, Math.round(hoursAgo * 60)), minutes: 6 + (index * 7) % 40, prompt: title, lastReply,
     error: status === 'failed' ? lastReply : undefined,
     // The daemon writes no error chunk: a failed run's reason is run.error alone, which the thread shows once.
-    chunks: [{ type: 'text-delta', id: 't1', delta: `开始：${title}。` }, { type: 'tool-input-available', toolCallId: 'a' }, { type: 'tool-input-available', toolCallId: 'b' },
+    chunks: [{ type: 'text-delta', id: 't1', delta: threadOpening(title) }, { type: 'tool-input-available', toolCallId: 'a' }, { type: 'tool-input-available', toolCallId: 'b' },
       ...(status === 'failed' ? [] : [{ type: 'text-delta', id: 't2', delta: lastReply }])],
   })))
   const issueRows = [...ISSUES, ...threadIssues([...RUNS, ...threads])].map(issue => ({ ...issue, scope: 'workspace' })).map((issue, index, all) => {
@@ -207,22 +214,43 @@ async function writeMain(client, owner, p, workspaceId) {
   }
 }
 
+/**
+ * --refresh-times: the seed dates the workspace 14 days before the seed, so
+ * that row says when it ran. Every timestamp moves forward by the time since.
+ */
+async function refreshTimes(owner) {
+  const workspaceId = demoId(owner.id, 'workspace', args.prefix)
+  const { rows } = await db.workspace.query('SELECT "createdAt" FROM mikka_workspaces WHERE id = $1 AND "userId" = $2', [workspaceId, owner.id])
+  if (!rows.length) throw new Error(`No ${args.prefix} workspace for ${owner.email}; seed first.`)
+  const shiftMs = now - (rows[0].createdAt.getTime() + 14 * 86_400_000)
+  console.log(JSON.stringify({ mode: args.apply ? 'refresh-times' : 'refresh-times dry-run', targets: db.targets, owner: { id: owner.id, email: owner.email }, prefix: args.prefix, shiftMinutes: Math.round(shiftMs / 60_000) }, null, 2))
+  if (!args.apply) return
+  const shifted = {
+    main: await inTransaction(db.main, client => shiftDemoTimes(client, MAIN_TABLES, owner.id, shiftMs, args.prefix)),
+    workspace: await inTransaction(db.workspace, client => shiftDemoTimes(client, WORKSPACE_TABLES, owner.id, shiftMs, args.prefix)),
+  }
+  console.log(JSON.stringify({ shifted }, null, 2))
+}
+
 try {
-  const owner = await findOwner(db.main, args.email)
-  const p = plan(owner)
-  const existing = { main: await countDemoRows(db.main, MAIN_TABLES, owner.id), workspace: await countDemoRows(db.workspace, WORKSPACE_TABLES, owner.id) }
-  console.log(JSON.stringify({ mode: args.apply ? 'apply' : 'dry-run', targets: db.targets, owner: { id: owner.id, email: owner.email }, replaces: existing, writes: summary(p) }, null, 2))
-  if (args.apply) {
-    // Workspace rows first: the app reads bots and tasks only through a workspace the person belongs to.
-    const workspaceId = await inTransaction(db.workspace, async client => { await deleteDemoRows(client, WORKSPACE_TABLES, owner.id); return writeWorkspace(client, owner, p) })
-    try {
-      await inTransaction(db.main, async client => { await deleteDemoRows(client, MAIN_TABLES, owner.id); await writeMain(client, owner, p, workspaceId) })
-    } catch (error) {
-      // Leave no half-seeded workspace behind.
-      await inTransaction(db.workspace, client => deleteDemoRows(client, WORKSPACE_TABLES, owner.id))
-      throw error
+  const owner = await findOwner(db.main, args.email, args.userId)
+  if (args.refreshTimes) await refreshTimes(owner)
+  else {
+    const p = plan(owner)
+    const existing = { main: await countDemoRows(db.main, MAIN_TABLES, owner.id, args.prefix), workspace: await countDemoRows(db.workspace, WORKSPACE_TABLES, owner.id, args.prefix) }
+    console.log(JSON.stringify({ mode: args.apply ? 'apply' : 'dry-run', targets: db.targets, owner: { id: owner.id, email: owner.email }, content: args.content, prefix: args.prefix, replaces: existing, writes: summary(p) }, null, 2))
+    if (args.apply) {
+      // Workspace rows first: the app reads bots and tasks only through a workspace the person belongs to.
+      const workspaceId = await inTransaction(db.workspace, async client => { await deleteDemoRows(client, WORKSPACE_TABLES, owner.id, args.prefix); return writeWorkspace(client, owner, p) })
+      try {
+        await inTransaction(db.main, async client => { await deleteDemoRows(client, MAIN_TABLES, owner.id, args.prefix); await writeMain(client, owner, p, workspaceId) })
+      } catch (error) {
+        // Leave no half-seeded workspace behind.
+        await inTransaction(db.workspace, client => deleteDemoRows(client, WORKSPACE_TABLES, owner.id, args.prefix))
+        throw error
+      }
+      console.log(JSON.stringify({ written: true, workspace: { id: workspaceId, name: WORKSPACE_NAME } }))
     }
-    console.log(JSON.stringify({ written: true, workspace: { id: workspaceId, name: WORKSPACE_NAME } }))
   }
 } finally {
   await Promise.all([db.main.end(), db.workspace.end()])
