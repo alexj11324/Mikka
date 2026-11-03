@@ -2,6 +2,7 @@
 
 import { useRef, type ReactNode } from 'react'
 import { SWRConfig, unstable_serialize, type Middleware, type SWRConfiguration } from 'swr'
+import { pageNeedsRefresh } from '@/lib/app-build'
 
 /** Data younger than this is fresh: focus leaves it alone. A hook may set a longer `focusThrottleInterval`. */
 export const FRESH_FOR_MS = 60_000
@@ -39,7 +40,8 @@ export const staleOnFocus: Middleware = useSWRNext => (key, fetcher, config) => 
     }
     : fetcher
   const allowed = config.revalidateOnFocus
-  const gated = Object.defineProperty({ ...config }, 'revalidateOnFocus', {
+  // Hook-level pauses (for example Settings) must not override a required update.
+  const gated = Object.defineProperty({ ...config, isPaused: () => pageNeedsRefresh() || Boolean(config.isPaused?.()) }, 'revalidateOnFocus', {
     enumerable: true,
     // SWR reads this when the focus event fires.
     get: () => Boolean(allowed) && Date.now() - (stamps(cache).get(id) ?? mountedAt.current) >= (config.focusThrottleInterval ?? FRESH_FOR_MS),
@@ -48,6 +50,7 @@ export const staleOnFocus: Middleware = useSWRNext => (key, fetcher, config) => 
 }
 
 export const swrDefaults = {
+  isPaused: pageNeedsRefresh,
   revalidateOnFocus: true,
   focusThrottleInterval: FRESH_FOR_MS,
   refreshWhenHidden: false,

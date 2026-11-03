@@ -1,22 +1,17 @@
 'use client'
 
-import { Suspense, useCallback, useEffect, useRef } from 'react'
+import { Suspense, useCallback, useEffect, useState } from 'react'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { toast } from 'sonner'
 
-import { APP_BUILD, STALE_BUILD_EVENT, desktopBelowMinimum, isStaleBuild, readAppVersion } from '@/lib/app-build'
+import { APP_BUILD, STALE_BUILD_EVENT, desktopBelowMinimum, isStaleBuild, readAppVersion, markPageNeedsRefresh } from '@/lib/app-build'
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogFooter } from '@/components/ui/alert-dialog'
+import { Button } from '@/components/ui/button'
 import { bridgeFromWindow } from '@/lib/platform/detect'
 
-/**
- * Keeps a page from outliving its deployment (web and desktop alike). On page
- * entry and on the person's own navigation (at most once a minute; never on
- * focus or a timer, decision 2026-11-01-0400) it asks which build the server
- * runs and, when newer, shows 「Mikka 已更新 · 刷新」. A call that has already
- * hit a server action the new build removed reloads the page at once
- * (watchRemovedActions, from instrumentation-client.ts). In the desktop app,
- * a build older than the server's minDesktopVersion asks main to update first.
- */
+/** A known stale page stops application fetches and requires refresh. The public
+ * version probe runs once a minute; drafts stay mounted until the person reloads.
+ * Desktop binary minimum-version enforcement remains separate. */
 export function VersionGuard() {
   return <Suspense fallback={null}><VersionGuardContent /></Suspense>
 }
@@ -25,22 +20,27 @@ function VersionGuardContent() {
   const t = useTranslations('Common')
   const pathname = usePathname()
   const search = useSearchParams()?.toString()
-  const shown = useRef(false)
+  const [required, setRequired] = useState(false)
   const offer = useCallback(() => {
-    if (shown.current) return
-    shown.current = true
-    toast(t('appUpdated'), { id: 'app-updated', duration: Infinity, action: { label: t('refresh'), onClick: () => { window.location.reload() } } })
-  }, [t])
+    markPageNeedsRefresh()
+    setRequired(true)
+  }, [])
 
   useEffect(() => {
     const desktop = bridgeFromWindow(window)?.app
     if (!APP_BUILD && !desktop?.requireUpdate) return
-    void readAppVersion()
+    let disposed = false
+    const check = () => { void readAppVersion()
       .then(body => {
+        if (disposed) return
         if (desktop?.requireUpdate && desktopBelowMinimum(desktop.version, body?.minDesktopVersion)) void desktop.requireUpdate().catch(() => {})
         if (isStaleBuild(APP_BUILD, body?.build)) offer()
       })
-      .catch(() => {})
+      .catch(() => {}) }
+    check()
+    // Public build metadata only: no database or third-party connection-status query.
+    const timer = setInterval(check, 60_000)
+    return () => { disposed = true; clearInterval(timer) }
   }, [pathname, search, offer])
 
   // lib/app-build.ts watchRemovedActions raises this when it could not reload.
@@ -48,5 +48,10 @@ function VersionGuardContent() {
     window.addEventListener(STALE_BUILD_EVENT, offer)
     return () => { window.removeEventListener(STALE_BUILD_EVENT, offer) }
   }, [offer])
-  return null
+  return <AlertDialog open={required} onOpenChange={() => {}}>
+    <AlertDialogContent size="sm">
+      <AlertDialogHeader><AlertDialogTitle>{t('appUpdated')}</AlertDialogTitle></AlertDialogHeader>
+      <AlertDialogFooter><Button className="col-span-full" onClick={() => window.location.reload()}>{t('refresh')}</Button></AlertDialogFooter>
+    </AlertDialogContent>
+  </AlertDialog>
 }

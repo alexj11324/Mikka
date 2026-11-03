@@ -9,6 +9,10 @@ import { withBasePath } from '@/lib/base-path'
 /** Inlined at build time (next.config.mjs); empty in a build without one. */
 export const APP_BUILD = process.env.NEXT_PUBLIC_MIKKA_BUILD ?? ''
 
+let refreshRequired = false
+export const pageNeedsRefresh = () => refreshRequired
+export function markPageNeedsRefresh() { refreshRequired = true }
+
 /** True only when both builds are known and differ. */
 export function isStaleBuild(page: string, server: unknown): boolean {
   return Boolean(page) && typeof server === 'string' && server !== '' && server !== page
@@ -50,6 +54,7 @@ export async function checkPageBuildBeforeAction(): Promise<boolean> {
   if (!APP_BUILD || typeof window === 'undefined') return true
   const version = await readAppVersion()
   if (!isStaleBuild(APP_BUILD, version?.build)) return true
+  markPageNeedsRefresh()
   window.dispatchEvent(new Event(STALE_BUILD_EVENT))
   return false
 }
@@ -90,6 +95,11 @@ export function watchRemovedActions(target: Window) {
   const original = target.fetch.bind(target)
   const session = () => { try { return target.sessionStorage } catch { return null } }
   target.fetch = async (...args: Parameters<typeof fetch>) => {
+    if (pageNeedsRefresh()) {
+      const input = args[0]
+      const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, target.location.href)
+      if (url.origin === target.location.origin && url.pathname !== withBasePath('/api/version')) throw new Error('App refresh required')
+    }
     const response = await original(...args)
     if (response.headers.has(ACTION_NOT_FOUND_HEADER) && !reloadOnce(session(), Date.now(), () => { target.location.reload() })) {
       target.dispatchEvent(new Event(STALE_BUILD_EVENT))

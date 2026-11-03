@@ -163,3 +163,16 @@ test('a link hand-off checks on every return until it is done or its time is up,
   clock = 22_000; await comeBack()
   assert.equal(checks, 2, 'time up: no more checks')
 })
+
+test('a required update pauses reads even when a hook supplies its own settings pause', async () => {
+  reads = 0
+  await act(async () => root.render(<SWRDefaults><SWRConfig value={{ provider: fresh }}><Reader options={{ isPaused: () => false }} /></SWRConfig></SWRDefaults>))
+  await wait()
+  assert.equal(reads, 1)
+  const { markPageNeedsRefresh } = await import('../lib/app-build')
+  markPageNeedsRefresh()
+  await act(async () => { await poke() })
+  await comeBack()
+  assert.equal(reads, 1)
+  assert.equal(container.textContent, 'read 1')
+})

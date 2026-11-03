@@ -1,7 +1,8 @@
 import test from 'node:test'
+import { withBasePath } from './base-path'
 import assert from 'node:assert/strict'
 
-import { STALE_BUILD_EVENT, createAppVersionReader, desktopBelowMinimum, isStaleBuild, minDesktopVersion, reloadOnce, watchRemovedActions } from './app-build'
+import { STALE_BUILD_EVENT, createAppVersionReader, desktopBelowMinimum, isStaleBuild, minDesktopVersion, reloadOnce, watchRemovedActions, markPageNeedsRefresh } from './app-build'
 
 test('navigation and action probes share one public read, then reuse it until stale', async () => {
   let calls = 0, now = 1_000
@@ -123,3 +124,16 @@ test('a desktop build below the minimum must update; at or above it, or without 
   assert.equal(desktopBelowMinimum(undefined, '2026.10000.300'), false)
 })
 
+
+test('a required refresh stops same-origin application traffic while the public version probe remains available', async () => {
+  let reads = 0
+  const target = { location: { href: 'https://app.example/mikka/en', origin: 'https://app.example' }, fetch: async () => { reads++; return Response.json({ build: 'latest' }) } } as unknown as Window
+  watchRemovedActions(target)
+  await target.fetch('/mikka/api/workspace')
+  markPageNeedsRefresh()
+  await assert.rejects(target.fetch('/mikka/api/workspace'), /App refresh required/)
+  await assert.rejects(target.fetch('/mikka/en', { method: 'POST', headers: { 'next-action': 'old-action' } }), /App refresh required/)
+  assert.equal(reads, 1)
+  await target.fetch(withBasePath('/api/version'))
+  assert.equal(reads, 2)
+})

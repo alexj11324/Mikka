@@ -4,6 +4,7 @@
 - Source: Alex, on the GitHub plugin page flashing on every screenshot or window switch: 「每次进这个窗口，他都要重新查一次这个情况。这是绝对禁止的行为，严查」; refined the same day to follow what Linear, Slack, GitHub and Figma do
 - Rule: —
 - Replaces: —
+- Partly superseded by: [2026-11-03-1437](2026-11-03-1437-required-app-refresh.md) (one public build-metadata check per minute to require stale web builds to refresh)
 - Partly superseded by: [2026-11-03-0230](2026-11-03-0230-github-link-from-desktop.md) (the GitHub link from the desktop checks on every return until it is done)
 
 On web, the desktop shell and mobile, coming back to a window, tab or app
