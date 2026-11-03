@@ -2,12 +2,13 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { Pool } from 'pg'
 import { PgReceiveCollector } from './transport-sample'
+import { assertE2eTarget } from '../../tests/helpers/e2e-target.mjs'
 
 const connectionString = process.env.MIKKA_TRANSPORT_TEST_DATABASE_URL ?? process.env.E2E_DATABASE_URL
 if (process.env.REQUIRE_DB === '1' && !connectionString) throw new Error('Isolated transport test database is required')
 
 test('isolated Postgres: queued queries and two clients equal socket counter deltas, including errors', { skip: !connectionString }, async () => {
-  const target = new URL(connectionString!)
+  const target = assertE2eTarget(connectionString!)
   assert.ok(['localhost', '127.0.0.1'].includes(target.hostname))
   assert.match(target.pathname, /^\/mikka_(transport_)?e2e$/)
   const pool = new Pool({ connectionString, max: 2 })
