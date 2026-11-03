@@ -199,6 +199,7 @@ closers.push(() => clearInterval(linking))
 const warmId = '00000000-0000-4000-8000-000000000000'
 await Promise.all([
   [`/v1/runs/${warmId}/tool-approval`, 'POST'], [`/v1/runs/${warmId}/policy-snapshot`, 'GET'],
+  [`/v1/runs/${warmId}`, 'PATCH'],
   [`/v1/devices/${warmId}/heartbeat`, 'POST'], [`/v1/devices/${warmId}/commands`, 'GET'],
   [`/v1/devices/${warmId}/runs/${warmId}/claim`, 'POST'], ['/api/coordinator/messages', 'POST'], ['/api/mcp', 'POST'],
   [`/v1/runs/${warmId}/events`, 'POST'], [`/v1/runs/${warmId}/checkpoint`, 'POST'], [`/v1/runs/${warmId}/complete`, 'POST'],

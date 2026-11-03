@@ -129,6 +129,11 @@ only linked an account id, so real delivery returned `githubReconnectRequired`
 candidate can publish). No production authentication path is substituted or
 weakened. The fixture identity regression was reproduced failing before repair. The fixture CLI also accepts an omitted `GH_REPO` when its explicit arguments identify the fixture repository, matching native gh and the daemon’s host-owned receipt reader; a non-fixture repository still fails.
 
+Local startup also warms the existing unauthenticated PATCH run handler before
+starting the daemon. Its first compilation had delayed a live authorization
+probe past the client's deadline; the server subsequently reported `live=true`.
+No authorization or policy timeout is extended.
+
 API/CLI acceptance uses `pnpm test:local-loop` in cloud Linux with its normal test
 account lease, local database/application/daemon and provider boundaries recorded
 by that harness. The database and simulated-Harness tests do not establish real
