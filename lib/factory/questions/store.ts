@@ -1,3 +1,4 @@
+import messages from "@/messages/zh-CN.json";
 import { factoryCheckAssignment } from "../checks";
 import { factoryMonitorDispatchAssignment } from "../monitor-dispatch";
 import { personalRunMessageText } from "../../personal-run-message";
@@ -322,7 +323,7 @@ export function createFactoryQuestions(
         )
           fail("factoryQuestionRunMismatch");
         const handoff: QuestionHandoff = task.stage === 'verify' && run.report?.blockedOn === 'factoryCheckCommandRequired'
-          ? questionHandoffSchema.parse({questionId:legacyQuestionId(runId),kind:'permission',question:'验证命令',context:String(run.report?.summary ?? '').slice(0,4000)})
+          ? questionHandoffSchema.parse({questionId:legacyQuestionId(runId),kind:'permission',question:messages.DeviceSetup.verify,context:String(run.report?.summary ?? '').slice(0,4000)})
           : run.report?.question
           ? parse(questionHandoffSchema, run.report.question)
           : questionHandoffSchema.parse({
