@@ -89,6 +89,7 @@ export const MAIN_TABLES = [
   { table: 'conversation_messages', column: 'id' },
   { table: 'conversation_members', column: 'conversationId' },
   { table: 'conversations', column: 'id', owner: 'createdBy' },
+  { table: 'coordinator_bots', column: 'botId', owner: 'ownerId' },
   { table: 'bots', column: 'id', owner: 'ownerId' },
   // The seed no longer writes facts; cleanup still removes those earlier seeds wrote.
   { table: 'user_facts', column: 'id', owner: 'userId' },

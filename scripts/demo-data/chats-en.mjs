@@ -4,18 +4,32 @@
 
 const user = content => ({ role: 'user', content })
 const bot = content => ({ role: 'assistant', content: [{ type: 'text', text: content }] })
-/** An assistant turn that used tools; stored rows only list the tool names under the reply. */
-const botWithTools = (text, tools) => ({ role: 'assistant', content: [...tools.map(toolName => ({ type: 'tool-call', toolCallId: `call_${toolName}`, toolName, input: {} })), { type: 'text', text }] })
-const toolResult = (toolName, value) => ({ role: 'tool', content: [{ type: 'tool-result', toolCallId: `call_${toolName}`, toolName, output: { type: 'json', value } }] })
+/**
+ * An assistant turn that used tools, followed by the tool row with every call's
+ * result, so each step reads as finished rather than still running.
+ */
+const botWithTools = (text, tools, results = {}) => [
+  { role: 'assistant', content: [...tools.map(toolName => ({ type: 'tool-call', toolCallId: `call_${toolName}`, toolName, input: {} })), { type: 'text', text }] },
+  { role: 'tool', content: tools.map(toolName => ({ type: 'tool-result', toolCallId: `call_${toolName}`, toolName, output: { type: 'json', value: results[toolName] ?? { ok: true } } })) },
+]
 
 // A 1×1 PNG: the chat shows an image count on the user's message.
 const PIXEL = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
 
 export const CHATS = {
+  coordinator: [
+    user('Morning. What needs me today?'),
+    bot(`root = Stack([intro, list])
+intro = TextContent("Four threads are waiting on you, and v2.4 still has two blockers for Friday.")
+list = BeTodoList("Today", [{id: "1", title: "Decide how the iOS 16 crash fix moves the Keychain read", status: "pending", detail: "iOS bot is waiting"}, {id: "2", title: "Pick msw or a two-test patch for the axios bump", status: "pending", detail: "Frontend is waiting"}, {id: "3", title: "Review #216, the Stripe webhook fix", status: "in-progress", detail: "Blocks Friday's release"}, {id: "4", title: "Approve tonight's index migration", status: "pending", detail: "10 PM window"}])`),
+    user('What happened overnight?'),
+    ...botWithTools('Quiet night overall:\n\n- **Sentry**: the `amount` TypeError on Bill Details is still the top error. Marcus owns the fix ({{issue:i-sentry-spike}}).\n- **Support**: 14 new tickets, mostly garbled CSV exports. Support is answering them with the canned reply.\n- **Billing**: Backend On-call has replayed 112 of the 186 failed `invoice.paid` events, with no double charges.\n\nNothing is down.', ['list_runs', 'list_issues']),
+    user('Is v2.4 still on track for Friday?'),
+    bot('Yes, if #216 merges today. Release Manager has the checklist in the v2.4 release group, and web ships first with iOS following next week. I\'ll flag it here if anything slips.'),
+  ],
   frontend: [
     user('A customer says the sign-in page is blank on their Mac. Can you look into {{issue:i-safari-blank}}?'),
-    botWithTools('I can reproduce it on Safari 17.0–17.3; Chrome is fine. The console shows:\n\n```text\nSyntaxError: Invalid regular expression: invalid group specifier name\n```\n\nThat\'s a lookbehind regex, which Safari didn\'t support before 17.4. The only dependency bump in v2.3.2 was `date-fns-tz` from 3.0 to 3.1, so that\'s the likely culprit. I\'m starting a thread to write a WebKit spec that reproduces it.', ['get_issue', 'dispatch_run']),
-    toolResult('dispatch_run', { runId: '{{run:r-safari}}' }),
+    ...botWithTools('I can reproduce it on Safari 17.0–17.3; Chrome is fine. The console shows:\n\n```text\nSyntaxError: Invalid regular expression: invalid group specifier name\n```\n\nThat\'s a lookbehind regex, which Safari didn\'t support before 17.4. The only dependency bump in v2.3.2 was `date-fns-tz` from 3.0 to 3.1, so that\'s the likely culprit. I\'m starting a thread to write a WebKit spec that reproduces it.', ['get_issue', 'dispatch_run'], { dispatch_run: { runId: '{{run:r-safari}}' } }),
     user([{ type: 'text', text: 'Here\'s the screenshot the customer sent' }, { type: 'file', mediaType: 'image/png', data: PIXEL }]),
     bot('Matches what I see. The thread failed because WebKit didn\'t install in CI, but I\'ve confirmed the root cause and written it up: [[artifact:{{artifact:a-safari-rca}}]]\n\nLet\'s ship a hotfix first and pin `date-fns-tz` back to 3.0.1.\n\n```diff\n-    "date-fns-tz": "^3.1.0",\n+    "date-fns-tz": "3.0.1",\n```'),
     user('Where are this week\'s frontend PRs at?'),
@@ -33,7 +47,7 @@ note = BeAlert("Line endings changed too", "Excel handles CRLF better; Numbers a
 
   backend: [
     user('Stripe renewals haven\'t been recorded since yesterday. What happened?'),
-    botWithTools('Found it: since 2:20 PM yesterday every `invoice.paid` webhook has returned 400.\n\n```text\nStripeSignatureVerificationError: No signatures found matching the expected signature for payload.\n```\n\nAfter yesterday\'s gateway upgrade, the body gets parsed to JSON before it reaches us. Re-serializing it changes the key order, so the signature no longer matches. Jordan already has a PR up that verifies against the raw body.', ['search_logs', 'read_file']),
+    ...botWithTools('Found it: since 2:20 PM yesterday every `invoice.paid` webhook has returned 400.\n\n```text\nStripeSignatureVerificationError: No signatures found matching the expected signature for payload.\n```\n\nAfter yesterday\'s gateway upgrade, the body gets parsed to JSON before it reaches us. Re-serializing it changes the key order, so the signature no longer matches. Jordan already has a PR up that verifies against the raw body.', ['github_tools', 'github_call']),
     user('How many customers are affected, and how do we catch up on the ones we missed?'),
     bot(`root = Stack([stats, chart, steps])
 stats = Stack([BeStat("Failed events", 186), BeStat("Customers", 171), BeStat("Unrecorded revenue", 7840, "USD", 0)], "row")
@@ -48,7 +62,7 @@ tabs = BeTabs([{title: "What's happening", children: [TextContent("Cartwheel Com
 
   ops: [
     user('The monthly report has been really slow the last couple of days, customers are complaining in Slack'),
-    botWithTools('p95 for `/api/reports/monthly` went from 1.2s to 8s. From the slow query log:\n\n```sql\nSELECT date_trunc(\'day\', created_at), sum(amount)\nFROM transactions\nWHERE account_id = $1 AND created_at >= $2 AND created_at < $3\nGROUP BY 1;\n-- Seq Scan on transactions  (rows=2104331)  7612 ms\n```\n\n`transactions` has no composite index on `(account_id, created_at)`. The table passed 2 million rows last week, and that\'s when the full scans started. A thread is already adding the index on staging to compare: {{run:r-slow-report}}', ['query_metrics', 'read_slow_log']),
+    ...botWithTools('p95 for `/api/reports/monthly` went from 1.2s to 8s. From the slow query log:\n\n```sql\nSELECT date_trunc(\'day\', created_at), sum(amount)\nFROM transactions\nWHERE account_id = $1 AND created_at >= $2 AND created_at < $3\nGROUP BY 1;\n-- Seq Scan on transactions  (rows=2104331)  7612 ms\n```\n\n`transactions` has no composite index on `(account_id, created_at)`. The table passed 2 million rows last week, and that\'s when the full scans started. A thread is already adding the index on staging to compare: {{run:r-slow-report}}', ['list_runs', 'get_run']),
     bot(`root = Stack([line, collapse])
 line = LineChart(["10/25", "10/26", "10/27", "10/28", "10/29", "10/30", "10/31"], [{name: "p95 (s)", values: [1.2, 1.3, 1.8, 3.4, 5.9, 7.6, 8.1]}], "s")
 collapse = BeCollapsible("Slowest 4 queries", [BeTable(["Query", "Calls/hour", "Avg time"], [["monthly report aggregate", "1,240", "7.6s"], ["invoice list by account", "3,980", "820ms"], ["export csv", "96", "2.1s"], ["dashboard summary", "8,410", "140ms"]])], false)`),
@@ -58,7 +72,7 @@ tree = BeFileTree(["db/migrations/20261031_transactions_account_created_idx.sql"
 diff = BeFileDiff("db/migrations/20261031_transactions_account_created_idx.sql", "+CREATE INDEX CONCURRENTLY IF NOT EXISTS transactions_account_created_idx\\n+  ON transactions (account_id, created_at);", "diff")
 approve = BeApproval("Run it in production at 10 PM tonight?", "CONCURRENTLY doesn't block writes and should take about 6 minutes. On staging, p95 dropped to 0.9s.", "acme-inc/ledger-api#217")`),
     user('What about the amount error in Sentry last night?'),
-    bot('`TypeError: Cannot read properties of undefined (reading \'amount\')`: 200+ an hour since 9 PM last night, all from new accounts with no transactions. The Bill Details page reads `transactions[0].amount` without checking.\n\nI filed {{issue:i-sentry-spike}} and assigned it to Marcus. The fix is a one-liner: show the empty state when the list is empty.'),
+    bot('It\'s all coming from new accounts with no transactions: `TypeError: Cannot read properties of undefined (reading \'amount\')`, 200+ an hour since 9 PM last night. The Bill Details page reads `transactions[0].amount` without checking.\n\nI filed {{issue:i-sentry-spike}} and assigned it to Marcus. The fix is a one-liner: show the empty state when the list is empty.'),
   ],
 
   data: [

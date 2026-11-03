@@ -36,8 +36,9 @@ test('every content set has the same bots, tasks and threads, so one seed writes
   assert.deepEqual(keys(en.PEOPLE), keys(zh.PEOPLE))
   assert.deepEqual(keys(en.DEVICES), keys(zh.DEVICES))
   assert.deepEqual(keys(en.AGENTS), keys(zh.AGENTS))
-  assert.deepEqual(Object.keys(en.CHATS).sort(), Object.keys(zh.CHATS).sort())
-  assert.deepEqual(Object.keys(en.BOT_THREADS).sort(), Object.keys(zh.BOT_THREADS).sort())
+  const own = list => list.filter(key => key !== 'coordinator').sort()
+  assert.deepEqual(own(Object.keys(en.CHATS)), Object.keys(zh.CHATS).sort())
+  assert.deepEqual(own(Object.keys(en.BOT_THREADS)), Object.keys(zh.BOT_THREADS).sort())
   for (const bot of Object.keys(zh.BOT_THREADS)) assert.equal(en.BOT_THREADS[bot].length, zh.BOT_THREADS[bot].length, bot)
   assert.equal(en.ISSUES.length, zh.ISSUES.length)
   assert.equal(en.RUNS.length, zh.RUNS.length)
@@ -53,7 +54,7 @@ test('the en set references only keys it defines', () => {
   assert.equal(allIssues.size, en.ISSUES.length + created.length, 'task keys stay unique')
   assert.ok(withIssues([...en.RUNS, ...threads(en)]).every(run => allIssues.has(run.issue)), 'each run points at a task that will be seeded')
   const runs = new Set(en.RUNS.map(run => run.key))
-  const bots = new Set(en.BOTS.map(bot => bot.key))
+  const bots = new Set([...en.BOTS, en.COORDINATOR].map(bot => bot.key))
   const artifacts = new Set(en.ARTIFACTS.map(artifact => artifact.key))
   const people = new Set(en.PEOPLE.map(person => person.key))
   const text = JSON.stringify([en.CHATS, en.RUNS])
@@ -71,7 +72,7 @@ test('the en set references only keys it defines', () => {
 
 test('the en set is English only, and no visible name calls it a sample', () => {
   const en = sets.en
-  const visible = JSON.stringify([en.WORKSPACE_NAME, en.TEAM, en.PEOPLE, en.BOTS, en.ISSUES, en.DEVICES, en.AGENTS, en.RUNS, en.ARTIFACTS, en.SUGGESTIONS, en.BOT_MEMORY, en.BOT_THREADS, en.CHATS, en.GROUP, en.threadOpening('x')])
+  const visible = JSON.stringify([en.WORKSPACE_NAME, en.TEAM, en.PEOPLE, en.BOTS, en.ISSUES, en.DEVICES, en.AGENTS, en.RUNS, en.ARTIFACTS, en.SUGGESTIONS, en.COORDINATOR, en.BOT_MEMORY, en.BOT_THREADS, en.CHATS, en.GROUP, en.threadOpening('x')])
   const cjk = visible.match(/[　-〿㐀-鿿＀-￯]/g)
   assert.equal(cjk, null, `CJK characters: ${cjk?.join('')}`)
   const names = [en.WORKSPACE_NAME, en.TEAM.name, ...en.PEOPLE.flatMap(person => [person.name, person.email]), ...en.BOTS.map(bot => bot.name), ...en.DEVICES.flatMap(device => [device.name, device.hostname]), ...en.AGENTS.map(agent => agent.name), en.GROUP.title]

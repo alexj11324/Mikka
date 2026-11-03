@@ -32,6 +32,12 @@ export const BOTS = [
   { key: 'support', name: 'Support', color: 'ambre', shape: 'nuage', model: 'mikka', repository: null },
 ]
 
+/**
+ * The workspace's Coordinator (one per person per workspace, normally created by
+ * the app on first visit). Seeding it gives the landing chat its own history.
+ */
+export const COORDINATOR = { key: 'coordinator', name: 'Coordinator' }
+
 const pr = (n, state, title, repo = 'acme-inc/ledger-web') => ({ url: `https://github.com/${repo}/pull/${n}`, state, title })
 const API = 'acme-inc/ledger-api'
 const IOS = 'acme-inc/ledger-ios'
@@ -53,7 +59,7 @@ export const ISSUES = [
     body: ['In dark mode the grid lines and axis labels on the Cash Flow chart almost match the background.', 'Design has dark tokens for it; the frontend hasn\'t picked them up yet.'] },
   { key: 'i-invoice-rounding', status: 'backlog', priority: 'normal', title: 'Multi-currency invoice PDFs total $0.01 more than their line items; a customer caught it during reconciliation, so we need to round at the same step', labels: [L.bug, L.payments, L.customer, L.api], assignee: 'bot:backend',
     body: ['Bluebird Coffee reported that the invoice PDF total is one cent higher than the sum of the line items.', 'Line items are rounded one by one, but the total uses the unrounded amounts. Both should round at the same step.'] },
-  { key: 'i-apple-pay-refund', status: 'backlog', priority: 'low', title: 'Partial Apple Pay refunds show the bill as Refunded', labels: [L.payments], assignee: null, due: 14,
+  { key: 'i-apple-pay-refund', status: 'backlog', priority: 'low', title: 'Partial Apple Pay refunds show the bill as Refunded', labels: [L.payments], assignee: 'me', due: 14,
     body: ['A partial refund should show Partially refunded and keep the remaining balance.'] },
 
   // —— Todo
@@ -65,7 +71,7 @@ export const ISSUES = [
     pullRequests: [pr(214, 'draft', 'feat(api): per-route rate limits', API)] },
   { key: 'i-dependabot', status: 'todo', priority: 'high', title: 'Dependabot: axios 1.6.x SSRF vulnerability (CVE-2024-39338)', labels: [L.security, L.web], assignee: 'bot:frontend', run: 'waiting',
     body: ['Dependabot opened a PR to bump to 1.7.4, but two API mock tests fail in CI.', 'Need to figure out whether the mocks are wrong or axios changed behavior.'] },
-  { key: 'i-sentry-spike', status: 'todo', priority: 'normal', title: 'Sentry: spike in `TypeError: Cannot read properties of undefined (reading \'amount\')`', labels: [L.bug, L.web], assignee: 'liu', due: 2,
+  { key: 'i-sentry-spike', status: 'todo', priority: 'normal', title: 'Sentry: spike in TypeError reading "amount" on Bill Details', labels: [L.bug, L.web], assignee: 'liu', due: 2,
     body: ['200+ events an hour since 9 p.m. last night, all on the Bill Details page.', 'Every one comes from a brand-new account with no transactions yet.'] },
 
   // —— Doing
@@ -217,6 +223,13 @@ export const BOT_MEMORY = {
  */
 const R = 'running', S = 'succeeded', C = 'cancelled'
 export const BOT_THREADS = {
+  coordinator: [
+    ['Morning triage: overnight alerts and tickets', R, 0.3, 'Sorted 9 alerts and 14 tickets; 2 need a person, the rest are routed to their bots.'],
+    ['Weekly engineering update for Sarah', R, 1.9, 'Shipped, in flight and at risk are drafted; adding the v2.4 release status.'],
+    ['Check that every v2.4 blocker has an owner', S, 5, 'All 4 blockers have an owner and a date; the Stripe fix is the one to watch.'],
+    ['Find PRs waiting on review for more than a day', S, 23, '3 PRs waiting: #216 (Jordan), #485 (Frontend), #97 (Ryan). Pinged the reviewers.'],
+    ['Plan this week\'s on-call handoff', S, 49, 'Marcus takes primary from Monday, Jordan is secondary; the runbook links are updated.'],
+  ],
   frontend: [
     ['Add virtual scrolling to the bills list', R, 0.6, 'Moved the list to @tanstack/react-virtual; measuring scroll frame rate with 5,000 rows.'],
     ['Move settings forms to react-hook-form', R, 1.2, '4 of 6 forms migrated, validation rules unchanged.'],

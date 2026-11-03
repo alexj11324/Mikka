@@ -27,7 +27,7 @@ import { assertEveryRunHasIssue, threadIssues, withIssues } from './thread-issue
 import { createHash } from 'node:crypto'
 
 const args = parseArgs(process.argv.slice(2))
-const { AGENTS, ARTIFACTS, BOT_MEMORY, BOT_THREADS, BOTS, CHATS, DEVICES, GROUP, ISSUES, PEOPLE, RUNS, SUGGESTIONS, TEAM, WORKSPACE_NAME, WORKSPACE_SLUG, threadOpening } = await loadContent(args.content)
+const { AGENTS, ARTIFACTS, BOT_MEMORY, BOT_THREADS, BOTS, CHATS, COORDINATOR, DEVICES, GROUP, ISSUES, PEOPLE, RUNS, SUGGESTIONS, TEAM, WORKSPACE_NAME, WORKSPACE_SLUG, threadOpening } = await loadContent(args.content)
 const db = connect(args)
 const now = Date.now()
 const ago = minutes => new Date(now - minutes * 60_000)
@@ -47,7 +47,8 @@ function plan(owner) {
   const id = key => demoId(owner.id, key, args.prefix)
   const people = PEOPLE.map(person => ({ ...person, id: id(`person:${person.key}`), email: person.email }))
   const person = key => key === 'me' ? { id: owner.id, name: owner.name } : people.find(item => item.key === key)
-  const bots = BOTS.map(bot => ({ ...bot, id: id(`bot:${bot.key}`) }))
+  // A set may also seed the workspace's Coordinator (content-en.mjs COORDINATOR); zh leaves it to the app.
+  const bots = [...BOTS, ...(COORDINATOR ? [{ ...COORDINATOR, coordinator: true }] : [])].map(bot => ({ ...bot, id: id(`bot:${bot.key}`) }))
   const botOf = key => bots.find(bot => bot.key === key)
   const fill = text => text.replace(/\{\{(issue|run|bot|artifact):([\w-]+)\}\}/g, (_, kind, key) => kind === 'bot' ? botOf(key).id : id(`${kind}:${key}`))
   const fillDeep = value => JSON.parse(fill(JSON.stringify(value)))
@@ -130,7 +131,7 @@ function summary(p) {
   return {
     workspace: { mikka_workspaces: 1, mikka_workspace_members: 1 + p.people.length, mikka_teams: 1, mikka_team_members: 1 + p.people.length, mikka_team_issues: ISSUES.length },
     main: {
-      user: p.people.length, bots: p.bots.length, coordinator_sessions: Object.keys(BOT_MEMORY).length, coordinator_messages: p.chats.reduce((n, chat) => n + chat.messages.length, 0),
+      user: p.people.length, bots: p.bots.length, coordinator_bots: p.bots.filter(bot => bot.coordinator).length, coordinator_sessions: Object.keys(BOT_MEMORY).length, coordinator_messages: p.chats.reduce((n, chat) => n + chat.messages.length, 0),
       conversations: 1, conversation_members: p.group.members.length, conversation_messages: p.group.messages.length,
       issues: p.issueRows.length, issue_versions: p.issueRows.length, devices: p.devices.length, agents: p.agents.length, agent_runs: p.runs.length,
       run_chunks: p.runs.reduce((n, run) => n + run.chunks.length, 0), artifacts: p.artifacts.length, artifact_versions: versions,
@@ -159,7 +160,14 @@ async function writeWorkspace(client, owner, p) {
 
 async function writeMain(client, owner, p, workspaceId) {
   for (const person of p.people) await client.query('INSERT INTO "user" (id, name, email, image, "emailVerified", "createdAt", "updatedAt") VALUES ($1, $2, $3, $4, false, $5, $5)', [person.id, person.name, person.email, defaultAvatar(person.name || person.email), ago(60 * 24 * 20)])
-  for (const bot of p.bots) {
+  for (const bot of p.bots.filter(item => item.coordinator)) {
+    // The app makes a workspace's Coordinator on first visit; if it already did, that one stays and this set stops.
+    const { rows } = await client.query('SELECT "botId" FROM coordinator_bots WHERE "ownerId" = $1 AND "workspaceId" = $2', [owner.id, workspaceId])
+    if (rows.length) throw new Error(`This workspace already has a Coordinator (${rows[0].botId}); nothing written.`)
+    await client.query('INSERT INTO bots (id, "ownerId", "workspaceId", name, "createdAt") VALUES ($1, $2, $3, $4, $5)', [bot.id, owner.id, workspaceId, bot.name, ago(60 * 24 * 14)])
+    await client.query('INSERT INTO coordinator_bots ("ownerId", "workspaceId", "botId", "createdAt") VALUES ($1, $2, $3, $4)', [owner.id, workspaceId, bot.id, ago(60 * 24 * 14)])
+  }
+  for (const bot of p.bots.filter(item => !item.coordinator)) {
     await client.query('INSERT INTO bots (id, "ownerId", "workspaceId", name, color, shape, model, repository, "createdAt") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)', [bot.id, owner.id, workspaceId, bot.name, bot.color, bot.shape, bot.model, bot.repository, ago(60 * 24 * 10)])
   }
   for (const [key, memory] of Object.entries(BOT_MEMORY)) {
