@@ -17,11 +17,15 @@ const served: string[] = []
 const tarballs = new Map<string, Buffer>()
 
 /** An npm-style tarball holding one fake executable at `entry`. */
-function fixture(name: string, entry: string, body: string) {
+function fixture(name: string, entry: string, body: string, companions: Record<string, string> = {}) {
   const src = join(dir, `src-${name}`)
   mkdirSync(join(src, entry, ".."), { recursive: true })
   writeFileSync(join(src, entry), `#!/bin/sh\necho ${body}\n`)
   chmodSync(join(src, entry), 0o755)
+  for (const [path, text] of Object.entries(companions)) {
+    mkdirSync(join(src, path, '..'), { recursive: true })
+    writeFileSync(join(src, path), `#!/bin/sh\necho ${text}\n`, { mode: 0o755 })
+  }
   const file = join(dir, `${name}.tgz`)
   execFileSync("tar", ["-czf", file, "-C", src, entry.split("/")[0]])
   const bytes = readFileSync(file)
@@ -72,6 +76,28 @@ describe("pins", () => {
 })
 
 describe("ensureHarness", () => {
+  it('retains Codex code-mode tools from the same integrity-verified platform artifact and repairs a main-only install', async () => {
+    const entry = 'package/vendor/test/bin/codex'
+    const helper = 'codex-code-mode-host'
+    const integrity = fixture('codex-tools', entry, 'codex', { ['package/vendor/test/bin/'+helper]: 'code-mode-ready' })
+    const selected = pins('1.0.0', integrity, 'codex-tools.tgz')
+    selected.harnesses.codex = { version: '0.0.1', command: 'codex', platforms: { 'test-os': { tarball: 'codex-tools.tgz', integrity, entry } } }
+    const root = join(dir, 'store-codex-tools')
+    const store = { root, platform: 'test-os', pins: selected }
+    const binary = await ensureHarness(store, 'codex')
+    selected.harnesses.codex.companions = [helper]
+    expect(harnessInstallState(store, 'codex').state, 'the old main-only marker cannot satisfy the new tool bundle').toBe('not_installed')
+    await ensureHarness(store, 'codex')
+    const installed = join(root, 'codex', '0.0.1', 'bin', helper)
+    expect(execFileSync(installed, { encoding: 'utf8' }).trim()).toBe('code-mode-ready')
+    expect(execFileSync(binary, { encoding: 'utf8' }).trim()).toBe('codex')
+    expect(harnessInstallState(store, 'codex').state).toBe('installed')
+    rmSync(installed)
+    expect(harnessInstallState(store, 'codex').state).toBe('not_installed')
+    await ensureHarness(store, 'codex')
+    expect(execFileSync(installed, { encoding: 'utf8' }).trim()).toBe('code-mode-ready')
+  })
+
   it("installs the pinned version once, into the daemon's own dir", async () => {
     const root = join(dir, "store-once")
     const store = { root, platform: "test-os", pins: pins("1.0.0", fixture("one", "package/claude", "one"), "one.tgz") }

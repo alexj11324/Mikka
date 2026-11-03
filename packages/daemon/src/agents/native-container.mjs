@@ -68,7 +68,7 @@ async function start(config, remainder) {
   }
   delete config.env.CLAUDE_CODE_OAUTH_TOKEN;
   if (config.githubBin !== undefined && (typeof config.githubBin !== 'string' || !config.githubBin.startsWith('/') || !config.githubBin.endsWith('/github/bin') || config.githubBin.includes(':') || config.githubBin.includes('\n'))) fail();
-  config.env.PATH = `${config.githubBin ? config.githubBin + ':' : ''}${dirname(config.node)}:/usr/local/bin:/usr/bin:/bin`;
+  config.env.PATH = `${config.githubBin ? config.githubBin + ':' : ''}${dirname(config.cli)}:${dirname(config.node)}:/usr/local/bin:/usr/bin:/bin`;
   mkdirSync(config.env.HOME, { recursive: true, mode: 0o700 });
   // The model transport remains bound to the mounted task broker socket.
   const proxy = createServer((request, response) => {

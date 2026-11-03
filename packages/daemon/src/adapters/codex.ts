@@ -7,7 +7,7 @@ import { codexQuotaSignal, mergeQuota, type CodexRateLimits, type QuotaSignal } 
 // `turn/steer`, one between turns starts the next turn. Threads live in the
 // run's `CODEX_HOME`, so a follow-up run copies the earlier run's
 // `sessions` into its own before `thread/resume`.
-import { isAbsolute, join, relative } from "node:path"
+import { delimiter, dirname, isAbsolute, join, relative } from "node:path"
 
 import type { MessageConnection } from "vscode-jsonrpc/node"
 
@@ -331,6 +331,9 @@ export class CodexAdapter implements AgentAdapter {
     const codexHome = prepareCodexHome(join(runDir, "codex-home"), log)
     const computerMcp = this.options.computerMcp ?? this.options.computerProvider?.(options.runId, options.policy)
     const binary = this.options.binary ?? await this.options.ensureBinary?.() ?? "codex"
+    // The official platform package includes code-mode helpers beside Codex.
+    // Only an absolute host-selected CLI directory enters the filtered PATH.
+    const childPath = isAbsolute(binary) ? dirname(binary) + delimiter + (options.env.PATH ?? '') : options.env.PATH
     if (externalAuth && options.credential) throw new Error(SUBSCRIPTION_AUTH_ERROR)
     const credential = codexCredential(brokerAuth
       ? { kind: "provider", protocol: "openai", baseUrl: "https://mikka.invalid", key: NATIVE_AUTH_PLACEHOLDER }
@@ -341,7 +344,7 @@ export class CodexAdapter implements AgentAdapter {
       github: options.github,
       apps: options.apps,
       githubRuntime: options.githubRuntime,
-      childPath: options.env.PATH,
+      childPath,
       mailboxEnabled: Boolean(options.mailbox),
       harness: "codex",
       kind: options.kind,
@@ -393,7 +396,7 @@ export class CodexAdapter implements AgentAdapter {
     ]
     const spawnOptions = {
       cwd: ctx.worktree,
-      env: { ...options.env, ...ctx.tempEnv(), ...credential.env, CODEX_HOME: codexHome.home },
+      env: { ...options.env, ...(childPath ? { PATH: childPath } : {}), ...ctx.tempEnv(), ...credential.env, CODEX_HOME: codexHome.home },
       policy: ctx.policy(),
       pidFile: paths.pidFile,
       marker: ctx.runDir,
