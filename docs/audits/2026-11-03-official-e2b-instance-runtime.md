@@ -107,3 +107,18 @@ and fixed-version real official-subscription prompt → dispatch → E2B Agent �
 independent review/verify → owner acceptance and continuation. #1129 additionally
 needs a real wrong-repository-to-correct-repository Agent run. A successful model
 probe or deterministic regression is not a completed subscription delivery.
+
+## Integrated CI fixture correction
+
+After merging #1129 and newer main changes, head 96a41b2e passed source/unit/
+daemon and the first two database CI shards. Shards three/four exposed remaining
+old fixtures: synthetic derived template IDs were refused by the official-only
+selector, and stop tests still expected a parent snapshot before creation.
+Update those fixtures to the new official kinds and fresh-instance behavior,
+retaining the stop/token/authorization assertions and legacy snapshot-resume
+coverage. The full Bot/thread database group then passed 159 tests locally on
+the real isolated, migrated PostgreSQL 17 target, and the stop group passed six.
+Integrated app/daemon typechecks, root lint, 114 daemon tests and the preceding
+36 completion/repository/machine tests passed with dependencies installed for
+this actual source. Final PR CI remains required; none of these results are
+relabeled as paid subscription or production acceptance.

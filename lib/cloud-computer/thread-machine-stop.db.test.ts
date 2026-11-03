@@ -55,7 +55,7 @@ test("a stop-requested queued run ends instead of provisioning, at both check po
       const provider: typeof threadMachineProvider = {
         snapshot: async () => { calls.push("snapshot"); return "snapshot-fixture"; },
         connect: async (id) => { calls.push(`connect:${id}`); return { sandboxId: id } as never; },
-        create: async (_s, op) => { calls.push("create"); await onCreate(); return { sandboxId: `sandbox-${op}` } as never; },
+        create: async (template, op) => { assert.ok(["desktop", "snapshot-fixture"].includes(template)); calls.push("create"); await onCreate(); return { sandboxId: `sandbox-${op}` } as never; },
         kill: async (id) => { calls.push(`kill:${id}`); },
       };
       return { calls, provider };
@@ -96,7 +96,7 @@ test("a stop-requested queued run ends instead of provisioning, at both check po
       const { calls, provider } = fake(async () => { assert.equal(await stopOwnedRun(db.db, owner, runId), false, "bound: stop is only requested"); });
       await assert.rejects(ensureThreadMachine(pool, actor, runId, provider), { status: 409, message: "Thread stopped" });
       const created = (await pool.query('SELECT "operationId" FROM thread_machines WHERE "runId"=$1', [runId])).rows[0].operationId;
-      assert.deepEqual(calls, ["snapshot", "create", `kill:sandbox-${created}`]);
+      assert.deepEqual(calls, ["create", `kill:sandbox-${created}`]);
       const s = await state(runId);
       assert.deepEqual(s.run, { status: "stopped", stop: true, finished: true });
       assert.equal(s.machine.state, "ended");
@@ -125,7 +125,7 @@ test("a stop-requested queued run ends instead of provisioning, at both check po
       const runId = await queuedRun();
       const { calls, provider } = fake();
       await assert.rejects(ensureThreadMachine(pool, actor, runId, provider), (e: Error) => e.message !== "Thread stopped");
-      assert.deepEqual(calls.slice(0, 2), ["snapshot", "create"]);
+      assert.deepEqual(calls, ["create"], "new threads start from the official template without snapshotting parent files");
       assert.ok(!calls.some((c) => c.startsWith("kill:")));
       assert.equal((await state(runId)).run.status, "queued");
     });
