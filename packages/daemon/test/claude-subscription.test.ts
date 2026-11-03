@@ -203,17 +203,35 @@ it("ends at access expiry without independent refresh or a paid fallback", async
   expect(token).toHaveBeenCalledOnce()
 })
 
-for (const prompt of ["FAIL", "CRASH"]) {
-  it(`redacts native ${prompt} diagnostics`, async () => {
+for (const [prompt, category] of [
+  ["FAIL", "api_error:authentication_failed"],
+  ["CRASH", "cli_exited_early"],
+  ["API_ERROR", "api_error:overloaded"],
+  ["MAX_TURNS", "max_turns"],
+  ["IMAGE_ERROR", "image_error"],
+]) {
+  it(`names the ${prompt} failure class and redacts its native diagnostics`, async () => {
     const { adapter, options } = await fixture()
-    const session = await adapter.start({ ...options, prompt })
-    const events = []
-    for await (const event of session.events()) events.push(event)
-    expect(events.at(-1)).toMatchObject({
-      type: "exit",
-      outcome: "failed",
-      error: "Claude subscription execution failed"
-    })
-    expect(JSON.stringify(events)).not.toContain("fixture-access")
+    const childLogger = options.log.child<string>({})
+    const child = vi.spyOn(options.log, 'child').mockReturnValue(childLogger)
+    const warn = vi.spyOn(childLogger, 'warn').mockImplementation(() => {})
+    try {
+      const session = await adapter.start({ ...options, prompt })
+      const events = []
+      for await (const event of session.events()) events.push(event)
+      expect(events.at(-1)).toMatchObject({
+        type: "exit",
+        outcome: "failed",
+        error: `Claude subscription execution failed (${category})`
+      })
+      expect(JSON.stringify(events)).not.toMatch(/fixture-access|fixturesecret|private/)
+      const logged = warn.mock.calls.find(([entry]) => (entry as { event?: string }).event === 'claude_subscription_turn_failed')
+      expect(logged?.[0]).toMatchObject({ category })
+      if (prompt !== "CRASH") expect(logged?.[0]).toMatchObject({ is_error: true, subtype: prompt === "MAX_TURNS" ? "error_max_turns" : expect.any(String) })
+      if (prompt === "API_ERROR") expect(logged?.[0]).toMatchObject({ subtype: "success", api_error_status: 529, terminal_reason: "api_error", assistant_error: "overloaded" })
+      if (prompt === "CRASH") expect((logged?.[0] as { stderr: string }).stderr).toContain("private upstream diagnostic [REDACTED]")
+      if (prompt === "API_ERROR") expect((logged?.[0] as { stderr: string }).stderr).toContain("upstream said Authorization: Bearer [REDACTED]")
+      expect(JSON.stringify(warn.mock.calls)).not.toMatch(/fixture-access|fixturesecret/)
+    } finally { warn.mockRestore(); child.mockRestore() }
   })
 }

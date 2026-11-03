@@ -86,6 +86,25 @@ lines.on("line", async (line) => {
     process.exit(1)
   }
   if (text === "HANG") return
+  if (text === "API_ERROR" || text === "MAX_TURNS" || text === "IMAGE_ERROR") {
+    process.stderr.write(`upstream said Authorization: Bearer ${token} sk-ant-oat01-fixturesecret\n`)
+    if (text === "API_ERROR")
+      out({ type: "assistant", session_id: sessionId, error: "overloaded",
+        message: { id: "api", content: [{ type: "text", text: `API Error: 529 ${token}` }] } })
+    out({
+      type: "result",
+      subtype: text === "MAX_TURNS" ? "error_max_turns" : "success",
+      session_id: sessionId,
+      is_error: true,
+      ...(text === "MAX_TURNS" ? { errors: [`private diagnostic ${token}`] } : { result: `API Error: 529 ${token}` }),
+      ...(text === "API_ERROR" ? { api_error_status: 529, terminal_reason: "api_error" } : {}),
+      ...(text === "IMAGE_ERROR" ? { api_error_status: 400, terminal_reason: "image_error" } : {}),
+      ...(text === "MAX_TURNS" ? { terminal_reason: "max_turns" } : {}),
+      total_cost_usd: 0,
+      usage: { input_tokens: 1, output_tokens: 1 }
+    })
+    return
+  }
   if (text === "FAIL") {
     out({
       type: "assistant",
