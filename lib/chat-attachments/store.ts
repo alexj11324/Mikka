@@ -229,6 +229,7 @@ export async function completeChatFile(
   tokenWorkspaceId?: string,
 ): Promise<ChatFile> {
   const client = await pool.connect()
+  let stage = 'read'
   try {
     await client.query('BEGIN')
     const row = (
@@ -257,17 +258,21 @@ export async function completeChatFile(
           )
         : undefined)
     if (!bytes || bytes.length !== row.size) throw new ChatFileError('unreadable')
+    stage = 'extract'
     const extracted = await extractChatFile(row.name, row.mediaType, bytes)
     let { text } = extracted
     const { mediaType } = extracted
     if (mediaType.startsWith('audio/')) {
+      stage = 'transcribe'
       const { transcribeChatAudio } = await import('./transcribe')
       text = await transcribeChatAudio(userId, workspaceId, bytes, client)
       if (text.length > CHAT_FILE_MAX_TEXT) throw new ChatFileError('tooLong')
     }
     const hash = createHash('sha256').update(bytes).digest('hex')
     const key = artifactStorage() === 'r2' ? `chat-files/${userId}/${id}/${hash}` : null
+    stage = 'store'
     if (key) await putArtifactObject(key, new Uint8Array(bytes), mediaType)
+    stage = 'commit'
     await client.query(
       `UPDATE chat_attachments SET state='ready',sha256=$3,"storageKey"=$4,"inlineData"=$5,"textContent"=$6,"mediaType"=$7 WHERE id=$1 AND "userId"=$2`,
       [id, userId, hash, key, key ? null : Buffer.from(bytes), text, mediaType],
@@ -275,6 +280,18 @@ export async function completeChatFile(
     await client.query('COMMIT')
     return publicFile({ ...row, mediaType })
   } catch (error) {
+    if (!(error instanceof ChatFileError)) {
+      // Do not log file names, contents, database details or signed storage URLs.
+      const diagnostic = error as { name?: unknown; code?: unknown; cause?: { code?: unknown }; message?: unknown }
+      const label = (value: unknown) => typeof value === 'string' && /^[A-Za-z0-9_]{1,64}$/.test(value) ? value : undefined
+      console.error('Chat attachment completion failed', {
+        stage,
+        name: label(diagnostic?.name),
+        code: label(diagnostic?.code),
+        causeCode: label(diagnostic?.cause?.code),
+        storageStatus: typeof diagnostic?.message === 'string' ? /^R2 put failed: (\d{3})$/.exec(diagnostic.message)?.[1] : undefined,
+      })
+    }
     await client.query('ROLLBACK')
     throw error
   } finally {
