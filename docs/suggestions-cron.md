@@ -35,12 +35,13 @@ The briefing is delivered by the Coordinator, not shown in 建议 (R-21). Writin
 
 ## Nightly profile merge from 04:00 local time
 
-Each stored notification is read once for facts about the person after it is rated (`lib/profile/extract.ts`, R-73, `docs/design/proactive.md` § 2.2); the facts go to `user_facts` (`drizzle/20261027231815_user_facts.sql`). Once a local day the merge (`lib/profile/facts.ts` `planConsolidation`, no model call):
+Each stored notification is read once for facts about the person after it is rated (`lib/profile/extract.ts`, R-73, `docs/design/proactive.md` § 2.2); the facts go to `user_facts` (`drizzle/20261027231815_user_facts.sql`). Once a local day the merge (`lib/profile/facts.ts` `planConsolidation`) runs a few code rules and asks the Decision API the rest (decision 2026-11-01-1500):
 
-- turns scattered purchases into patterns: three or more on one topic become an interest (川菜调料 ×3 → 川菜), three or more orders from one merchant at one time of day become a routine, two or more places in one area become a place;
-- expires deadlines and subscriptions past `expiresAt`;
-- fades facts not seen for 30 days (confidence × 0.95 a night, expired below 0.2);
-- keeps one answer per slot (for example `home_city`): the person's correction, else the newest.
+- code rule: a deadline or subscription past `expiresAt` expires;
+- Decision API: whether a group of purchases, orders or places is a lasting pattern (interest, routine, place); a count alone never makes one;
+- Decision API: whether a fact not seen for a while is kept, lowered or expired; the person's corrections never fade;
+- one answer per slot (for example `home_city`): the person's correction wins, otherwise the Decision API picks;
+- a call without an answer changes nothing; those items are asked again the next night.
 
 Proactive work is behind four switches (`docs/design/proactive.md` § 3), and any one of them off stops it:
 
