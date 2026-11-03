@@ -8,7 +8,7 @@ import { randomUUID } from 'node:crypto'
 import { mock, test } from 'node:test'
 import { normalizeRepository } from '@mikka/protocol/repository'
 import { dbUrl, seedIssue, seedUser, seedWorkspace } from './support/workspace-admin-db'
-import { githubAppStub } from './support/github-app-stub'
+import { connectGitHub, githubAppStub } from './support/github-app-stub'
 
 // The computer's Codex reported gpt-5, the model the person's ChatGPT account lists (decision 2026-11-02-1400).
 const mac = [{ harness: 'codex', installed: true, subscriptionBroker: true, modelSlots: [{ slot: 'gpt-5', model: 'gpt-5', name: 'gpt-5' }] }]
@@ -61,6 +61,8 @@ test('one task, one thread: dispatch continues the task\'s thread unless the per
     const githubAccountId = String(++githubAccount)
     await pool.query(`INSERT INTO account (id,"accountId","providerId","userId","createdAt","updatedAt") VALUES ($1,$2,'github',$3,now(),now())`, [randomUUID(), githubAccountId, id])
     github.allowWriter('octo/repo', githubAccountId)
+    // Connected in 插件 › GitHub, with the App on the repositories these tasks name: dispatch checks the live list.
+    await connectGitHub(github, id, githubAccountId, ['octo/repo', 'octo/web'])
     await pool.query('INSERT INTO repository_settings ("userId","remoteKey",push) VALUES ($1,$2,$3)', [id, normalizeRepository('octo/repo').key, JSON.stringify({ approved: true, remote: 'origin', approvedByUserId: id, approvedAt: new Date().toISOString() })])
     const ws = await seedWorkspace(pool, id, [{ userId: id, role: 'admin' }])
     // A connected ChatGPT subscription whose account lists gpt-5: 优先使用的模型 is that model by default, 运行位置 本地.
@@ -261,5 +263,39 @@ test('one task, one thread: dispatch continues the task\'s thread unless the per
     assert.equal(rows[0].threadReplacedBy, moved.runId)
     assert.match(rows[1].remoteUrl, /octo\/web/, 'the new thread works in the named repository')
     judged = null
+  })
+  await t.test('no authorized list, no dispatch: not connected, authorization expired, GitHub down (after one retry)', async () => {
+    type Refused = { error?: string; runId?: string; repository?: string }
+    const attempt = async (who: { id: string; issueId: string; botId: string }) => await steps.dispatchRun(who.id, { issueId: who.issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, who.botId) as unknown as Refused
+    const token = (userId: string) => `synthetic-user-token-${userId}`
+    const runCount = async (userId: string) => (await runs(userId)).length
+
+    const notConnected = await person()
+    await pool.query('DELETE FROM github_connections WHERE "userId"=$1', [notConnected.id])
+    await pool.query(`DELETE FROM account WHERE "userId"=$1 AND "providerId"='github'`, [notConnected.id])
+    assert.deepEqual([(await attempt(notConnected)).error, await runCount(notConnected.id)], ['githubNotConnected', 0])
+
+    const revoked = await person()
+    github.fail(token(revoked.id), 401)
+    assert.deepEqual([(await attempt(revoked)).error, await runCount(revoked.id)], ['githubReconnectRequired', 0])
+
+    const down = await person()
+    const before = github.calls.filter(call => call === 'GET /user').length
+    github.fail(token(down.id), 502)
+    const refused = await attempt(down)
+    assert.deepEqual([refused.error, refused.repository, await runCount(down.id)], ['githubUnavailable', 'octo/repo', 0])
+    assert.equal(github.calls.filter(call => call === 'GET /user').length - before, 2, 'asked once more, then told')
+
+    // A rate limit that clears on the retry dispatches as usual.
+    const limited = await person()
+    github.fail(token(limited.id), 403, 1)
+    const queued = await attempt(limited)
+    assert.equal(queued.error, undefined, JSON.stringify(queued))
+    assert.equal(await runCount(limited.id), 1)
+
+    // An authorized list without the repository: refused, nothing queued.
+    const elsewhere = await person()
+    const notListed = await steps.dispatchRun(elsewhere.id, { issueId: elsewhere.issueId, repo: 'someone/private-app', requestKey: `dispatch:${randomUUID()}` }, undefined, elsewhere.botId) as unknown as Refused
+    assert.deepEqual([notListed.error, await runCount(elsewhere.id)], ['repositoryNotFound', 0])
   })
 })

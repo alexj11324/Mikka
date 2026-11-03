@@ -3,7 +3,7 @@ import { executionInstructions } from '@/lib/agent-kit/execution-instructions'
 import type { CoordinatorRuntime, NativeCoordinatorJob } from '@mikka/protocol/coordinator'
 import { nativeCoordinatorEnabled, nativeCoordinatorStore } from '@/lib/coordinator/native'
 import { loadConversation } from '@/lib/coordinator/store'
-import { instructionsWithMemory, promptMessages } from '@/lib/coordinator/context'
+import { promptMessages, promptWithCachedContext } from '@/lib/coordinator/context'
 import { nativeCoordinatorContext, personalCoordinatorInstructions, withCoordinatorPresentation } from '@/lib/coordinator/native-prompt'
 import { botInstructions } from '@/lib/coordinator/bot-instructions'
 import { withPersonalInstructions } from '@/lib/coordinator/personal-instructions'
@@ -25,7 +25,8 @@ export async function enqueue(userId: string, holder: string, round: number, sel
   const { executionContext } = await import('@/lib/coordinator/execution-context')
   const executionContextBlock = async (owner: string, bot: string) => { const text = await executionContext(owner, bot); return text ? '\n' + text : '' }
   return nativeCoordinatorStore.enqueue(userId,holder,round,selected,{
-    instructions: instructionsWithMemory(await withPersonalInstructions(userId, personalMailboxEnabled() && snapshot ? personalMailboxInstructions(base, permitted) : base, snapshot ? snapshot.personalPlugins ?? { servers: [], skills: [] } : undefined), memory) + '\n' + SCHEDULE_INSTRUCTIONS + '\n' + await githubContext(userId, undefined, undefined, botId) + await executionContextBlock(userId, botId),
+    // The GitHub lines (the authorized repository list) come before the memory, so the provider's prefix cache covers them.
+    instructions: promptWithCachedContext(await withPersonalInstructions(userId, personalMailboxEnabled() && snapshot ? personalMailboxInstructions(base, permitted) : base, snapshot ? snapshot.personalPlugins ?? { servers: [], skills: [] } : undefined), await githubContext(userId, undefined, undefined, botId), memory, '\n' + SCHEDULE_INSTRUCTIONS + await executionContextBlock(userId, botId)).instructions,
     context: nativeCoordinatorContext(promptMessages(summary,messages,{ key: process.env.BETTER_AUTH_SECRET ?? '', scope: JSON.stringify([userId, botId]) })), tools,
   })
 }

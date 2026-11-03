@@ -106,3 +106,24 @@ test('the list is asked of GitHub at most once every few minutes per person; a f
   assert.equal(failing.mock.callCount(), 2)
   clearRepositoryCache()
 })
+
+test('the same repositories give the same bytes, whatever order GitHub lists them in, so the cached prefix is reused', async () => {
+  const { promptWithCachedContext } = await import('./context')
+  const turn = async (repositories: typeof octo, memory: string) => {
+    const github = await githubContext('alex', { connection: async () => ({ githubLogin: 'octo-dev' }), list: async () => ({ login: 'octo-dev', installationAccounts: ['octo'], repositories }), used: async () => ['octo/octo'] }, undefined, 'bot-1')
+    return promptWithCachedContext('RULES', github, memory, '\nTAIL')
+  }
+  const first = await turn(octo, 'remember A')
+  const second = await turn([...octo].reverse(), 'remember B, a later turn')
+  assert.equal(first.instructions.slice(0, first.stable), second.instructions.slice(0, second.stable), 'two turns share a byte-identical prefix')
+  assert.equal(first.stable, second.stable)
+  const prefix = first.instructions.slice(0, first.stable)
+  assert.ok(prefix.startsWith('RULES\nGitHub: '), 'the rules, then the GitHub lines')
+  assert.match(prefix, /^- octo\/octo-api$/m, 'the repository list is inside the cached prefix')
+  assert.doesNotMatch(prefix, /remember|TAIL/, 'memory and the per-turn context come after it')
+  assert.match(first.instructions.slice(first.stable), /remember A[\s\S]*TAIL$/)
+  // A tie on use and push time is broken by owner/repo, not by GitHub's order.
+  const tied = [{ fullName: 'octo/b', pushedAt: null }, { fullName: 'octo/a', pushedAt: null }]
+  const lines = (await import('./github-context')).repositoryLines(tied, [])
+  assert.deepEqual(lines.slice(1), ['- octo/a', '- octo/b'])
+})

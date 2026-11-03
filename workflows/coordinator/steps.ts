@@ -25,7 +25,7 @@ import { summarizeConversation } from '@/lib/coordinator/summary-model'
 import { and, asc, desc, eq } from 'drizzle-orm'
 import { ActionFailureError } from '@/lib/action-error'
 import { addRunMessage, queueRun, readRun, requestRunStop, visibleRuns } from '@/lib/agent-runs'
-import { compactionCut, forgetNotes, instructionsWithMemory, promptMessages, rememberNote, SUMMARY_INSTRUCTIONS } from '@/lib/coordinator/context'
+import { compactionCut, forgetNotes, promptMessages, promptWithCachedContext, rememberNote, SUMMARY_INSTRUCTIONS } from '@/lib/coordinator/context'
 import { COORDINATOR_INSTRUCTIONS } from '@/lib/coordinator/instructions'
 import { withPersonalInstructions } from '@/lib/coordinator/personal-instructions'
 import { botInstructions } from '@/lib/coordinator/bot-instructions'
@@ -295,7 +295,9 @@ export async function preparePrompt(userId: string, botId: string, snapshot?: De
   const executionContextBlock = async (owner: string, bot: string) => { const text = await executionContext(owner, bot); return text ? '\n' + text : '' }
   // Everything up to the memory is the same on every turn; `stable` is where it ends, so a provider can cache it (lib/prompt-cache.ts).
   const rules = await withPersonalInstructions(userId, instructions, snapshot ? snapshot.personalPlugins ?? { servers: [], skills: [] } : undefined)
-  return { stable: rules.length, instructions: instructionsWithMemory(rules, memory) + factoryPolicy + '\n' + SCHEDULE_INSTRUCTIONS + '\n' + await githubContext(userId, undefined, undefined, botId) + await executionContextBlock(userId, botId), messages: promptMessages(summary, messages, summaryTrust) }
+  // The GitHub lines (the authorized repository list) are part of the cached prefix: they change only when the repositories do.
+  const prompt = promptWithCachedContext(rules, await githubContext(userId, undefined, undefined, botId), memory, factoryPolicy + '\n' + SCHEDULE_INSTRUCTIONS + await executionContextBlock(userId, botId))
+  return { ...prompt, messages: promptMessages(summary, messages, summaryTrust) }
 }
 
 export async function personalWriteToolsEnabled() { 'use step'; const { personalWritesEnabled } = await import('@/lib/operations/write-feature'); return personalWritesEnabled() }

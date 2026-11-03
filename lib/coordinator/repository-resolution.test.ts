@@ -23,7 +23,7 @@ test('one match dispatches straight away with owner/repo; the lister is asked fo
   }
 })
 
-test('a GitHub repository named by owner/repo or URL runs only when the person authorized it; other hosts go on as given', async () => {
+test('a GitHub repository named by owner/repo or URL runs only when the person\'s live list has it; no list, no dispatch; other hosts go on as given', async () => {
   for (const repo of ['alexj11324/Mikka_test', 'https://github.com/alexj11324/Mikka_test', 'git@github.com:alexj11324/Mikka_test.git']) {
     const dispatch = mock.fn(async (value: string) => value)
     assert.equal(await withResolvedRepository('alex', ISSUE, repo, dispatch, lister(), noContext), repo)
@@ -35,10 +35,11 @@ test('a GitHub repository named by owner/repo or URL runs only when the person a
   const elsewhere = mock.fn<RepositoryLister>(async () => repos())
   assert.equal(await withResolvedRepository('alex', ISSUE, 'https://gitlab.example/team/app.git', dispatch, elsewhere, noContext), 'https://gitlab.example/team/app.git')
   assert.equal(elsewhere.mock.callCount(), 0, 'another host is not asked of GitHub')
-  // No GitHub connection: no list to check against, the computer clones with its own credentials.
-  assert.equal(await withResolvedRepository('alex', ISSUE, 'octo/repo', dispatch, async () => { throw accessError('githubNotConnected') }, noContext), 'octo/repo')
-  for (const code of ['githubUnavailable', 'githubReconnectRequired'])
-    assert.equal(await withResolvedRepository('alex', ISSUE, 'octo/repo', dispatch, async () => { throw accessError(code) }, noContext), 'octo/repo', `${code}: no list to check, it goes on as before`)
+  // No list, no dispatch: not connected, authorization expired or revoked, GitHub down after one retry.
+  const refused = mock.fn(async (value: string) => value)
+  for (const code of ['githubNotConnected', 'githubReconnectRequired', 'githubUnavailable'])
+    assert.deepEqual(await withResolvedRepository('alex', ISSUE, 'octo/repo', refused, async () => { throw accessError(code) }, noContext), { error: code, repository: 'octo/repo', issueId: ISSUE })
+  assert.equal(refused.mock.callCount(), 0)
 })
 
 test('several matches return the candidates as one choice card and dispatch nothing', async () => {
@@ -81,7 +82,17 @@ test('GitHub not connected or unavailable is a clear error and dispatches nothin
     assert.deepEqual(await findRepository('alex', 'Mikka_test', list), { error: code })
   }
   assert.equal(dispatch.mock.callCount(), 0)
-  await assert.rejects(resolveRepository('alex', 'Mikka_test', async () => { throw new Error('boom') }), /boom/)
+  // A dispatch asks GitHub once more on a temporary failure, then says so; anything unexpected is that too.
+  const flaky = mock.fn<RepositoryLister>(async () => { throw accessError('githubUnavailable') })
+  assert.deepEqual(await resolveRepository('alex', 'Mikka_test', flaky), { error: 'githubUnavailable', repository: 'Mikka_test' })
+  assert.equal(flaky.mock.callCount(), 2)
+  let calls = 0
+  const recovers: RepositoryLister = async userId => { if (calls++ === 0) throw accessError('githubUnavailable'); return lister()(userId) }
+  assert.deepEqual(await resolveRepository('alex', 'Mikka_test', recovers), { repo: 'alexj11324/Mikka_test' })
+  const revoked = mock.fn<RepositoryLister>(async () => { throw accessError('githubReconnectRequired') })
+  await resolveRepository('alex', 'Mikka_test', revoked)
+  assert.equal(revoked.mock.callCount(), 1, 'an expired authorization is not retried')
+  assert.deepEqual(await resolveRepository('alex', 'Mikka_test', async () => { throw new Error('boom') }), { error: 'githubUnavailable', repository: 'Mikka_test' })
 })
 
 test('find_repository lists the user\'s own repositories, matches a name, and an owner/repo exactly', async () => {

@@ -8,7 +8,7 @@ import test, { mock } from 'node:test'
 import type { Pool as PgPool } from 'pg'
 import { normalizeRepository } from '@mikka/protocol/repository'
 import { dbUrl, seedBot, seedIssue, seedUser, seedWorkspace } from './support/workspace-admin-db'
-import { recordPushGrant } from './support/github-app-stub'
+import { connectGitHub, githubAppStub, recordPushGrant } from './support/github-app-stub'
 import { fakeThreadMachines } from './support/thread-machine-fake'
 
 const harnesses = [{ harness: 'codex', installed: true, subscriptionBroker: true, computerBroker: true }]
@@ -21,6 +21,9 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
   const { Pool } = await import('pg')
   const pool = new Pool({ connectionString: dbUrl, max: 3 })
   const threadMachines = await fakeThreadMachines(pool, [{ harness: 'codex', installed: true, subscriptionBroker: true, toolApproval: true }])
+  // The person's live authorized repository list, as GitHub would answer their own token.
+  const github = githubAppStub()
+  let githubAccount = 9_500_000
   const steps = await import('../workflows/coordinator/steps')
   const { botRuntimeProvisioner } = await import('../lib/computer/auto-runtime')
   const { ensureBotRuntime } = await import('../lib/computer/bot-runtime')
@@ -41,6 +44,7 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     await ensureBotRuntime(appDb, actor, botId, sandbox as never, deviceId)
   }
   t.after(async () => {
+    github.restore()
     botRuntimeProvisioner.provision = realProvision
     threadMachines.restore()
     delete process.env.MIKKA_CLOUD_COMPUTER_TASKS
@@ -70,6 +74,8 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
   const person = async (label: string, e2bKey = true) => {
     const id = await seedUser(pool, label)
     users.push(id)
+    // Connected in 插件 › GitHub, with the App on octo/repo: dispatch checks the live list.
+    await connectGitHub(github, id, String(++githubAccount), ['octo/repo'])
     // Push is what the GitHub App grants (lib/github/push-grant.ts); record that grant as a live check would.
     await recordPushGrant(pool, id, normalizeRepository('octo/repo').key)
     const ws = await seedWorkspace(pool, id, [{ userId: id, role: 'admin' }])
