@@ -118,7 +118,9 @@ export async function dispatchToTask<R extends { runId: string }, E extends { er
     const chain = await readRunChain(pool, userId, previous.id)
     const threadId = chain?.rootRunId ?? previous.id
     const working = UNFINISHED_RUN_STATUSES.some(status => status === previous.status)
-    const wantsNew = input.newThread || (await input.moves?.(previous) ?? false)
+    // A move is judged even when the caller asked for a new thread: the person naming the other place is what grants it.
+    const moves = await input.moves?.(previous) ?? false
+    const wantsNew = input.newThread || moves
     if (wantsNew && await (input.explicit?.() ?? Promise.resolve(false))) {
       // The old thread stops; one thread works on a task at a time.
       if (working && !previous.stopRequestedAt) await (await import('@/lib/agent-runs')).requestRunStop(userId, previous.id).catch(() => undefined)

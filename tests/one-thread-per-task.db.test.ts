@@ -262,6 +262,39 @@ test('one task, one thread: dispatch continues the task\'s thread unless the per
     assert.match(rows[1].remoteUrl, /octo\/web/, 'the new thread works in the named repository')
     judged = null
   })
+  await t.test('newThread with a repository the person named: a new thread there even when the Decision API cannot judge', async () => {
+    // Production (2026-11-03): the person asked for a new thread in another repository by name; the model passed
+    // newThread and repo, the Decision API gave no judgment, and the old thread was continued instead.
+    const a = await person()
+    const first = await dispatch(a)
+    await pool.query(`UPDATE agent_runs SET status='failed',"finishedAt"=now() WHERE id=$1`, [first.runId])
+    judged = null
+    const moved = await steps.dispatchRun(a.id, { issueId: a.issueId, repo: 'octo/web', newThread: true, readOnly: true, requestKey: `dispatch:${randomUUID()}`, sourceEventId: await said(a, 'Start a new thread in octo/web: fix the layout and open a PR.') }, undefined, a.botId) as unknown as Dispatched
+    assert.equal(moved.thread, 'new', JSON.stringify(moved))
+    assert.equal(moved.replacedThreadId, first.runId)
+    const rows = (await pool.query('SELECT r.id,r."continuesRunId",r."threadReplacedBy",d."remoteUrl" FROM agent_runs r JOIN device_repos d ON d.id=r."deviceRepoId" WHERE r."userId"=$1 ORDER BY r."createdAt"', [a.id])).rows
+    assert.equal(rows[0].threadReplacedBy, moved.runId, 'the old thread is marked replaced')
+    assert.equal(rows[1].continuesRunId, null, 'the new thread does not continue the old one')
+    assert.match(rows[1].remoteUrl, /octo\/web/)
+  })
+  await t.test('a thread\'s next run never changes its repository, even when it cannot run where the thread ran', async () => {
+    // Production (2026-11-03): the thread's own place could not take its next run, the fallback placed it by the
+    // rules with the repository the model passed, and the thread silently moved to another repository.
+    const a = await person()
+    const first = await dispatch(a)
+    await pool.query(`UPDATE agent_runs SET status='failed',"finishedAt"=now() WHERE id=$1`, [first.runId])
+    // The thread's computer no longer takes part in scheduling; another one can take the next run.
+    await pool.query('UPDATE devices SET enabled=false WHERE id=$1', [a.deviceId])
+    const studio = await computer(a.id, 'Mac Studio')
+    judged = 0.05
+    const next = await steps.dispatchRun(a.id, { issueId: a.issueId, repo: 'octo/web', readOnly: true, note: 'Look again.', requestKey: `dispatch:${randomUUID()}`, sourceEventId: await said(a, 'Look again please') }, undefined, a.botId) as unknown as Dispatched
+    judged = null
+    const rows = (await pool.query('SELECT r.id,r."continuesRunId",d."remoteUrl" FROM agent_runs r LEFT JOIN device_repos d ON d.id=r."deviceRepoId" WHERE r."userId"=$1 ORDER BY r."createdAt"', [a.id])).rows
+    assert.equal(next.thread, 'continued', JSON.stringify(next))
+    assert.deepEqual(next.placement, { kind: 'device', deviceId: studio, name: 'Mac Studio' })
+    assert.equal(rows[1].continuesRunId, first.runId)
+    assert.match(rows[1].remoteUrl, /octo\/repo/, 'the thread keeps its repository')
+  })
   await t.test('a local run is frozen with its model: none fails at once, a thread keeps its own, an MCP client\'s new run takes 优先使用的模型', async () => {
     const a = await person()
     const agentId = (await pool.query('SELECT id FROM agents WHERE "deviceId"=$1', [a.deviceId])).rows[0].id as string
