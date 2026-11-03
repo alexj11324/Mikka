@@ -6,13 +6,13 @@ import { decryptOAuthToken, setTokenUtil } from 'better-auth/oauth2'
 import { db } from '@/lib/db'
 import { githubConnections } from '@/lib/db/schema'
 import { auth } from '@/lib/auth'
-import { authOAuthProxyOptions, resolveAppOrigin } from '@/lib/auth-config'
+import { resolveAppOrigin } from '@/lib/auth-config'
 import { withBasePath } from '@/lib/base-path'
 
 // Plugins → GitHub connects a GitHub account for repository access without
-// touching the Better Auth login identity. It reuses the GitHub App's one
-// registered callback URL; the auth route hands a callback to this module only
-// when its state matches the cookie set here.
+// touching the Better Auth login identity. It reuses the GitHub App's callback
+// path on this deployment's origin; the auth route hands a callback to this
+// module only when its state matches the cookie set here (or a loopback link).
 export const GITHUB_CONNECT_COOKIE = 'mikka-github-connect'
 export const GITHUB_CALLBACK_PATH = withBasePath('/api/auth/callback/github')
 const STATE_TTL_SECONDS = 600
@@ -20,8 +20,11 @@ const STATE_TTL_SECONDS = 600
 export type GitHubConnection = { githubAccountId: string; githubLogin: string }
 type TokenResponse = { access_token: string; expires_in?: number; refresh_token?: string; refresh_token_expires_in?: number }
 
-// The same origin Better Auth registers its GitHub callback on (lib/auth.ts).
-const callbackBase = () => authOAuthProxyOptions(process.env)?.productionURL ?? resolveAppOrigin(process.env)
+// The origin the link starts on, never the sign-in proxy hub: the proxy relays
+// sign-in only, and a preview's link landing on the hub would reach production
+// with a state production does not hold (decision 2026-11-03-0315). An origin
+// the GitHub App has not registered gets GitHub's redirect_uri error.
+const callbackBase = () => resolveAppOrigin(process.env)
 
 function callbackURL() {
   const base = callbackBase()

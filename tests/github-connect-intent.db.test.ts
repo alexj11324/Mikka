@@ -84,6 +84,19 @@ test('Link GitHub from the desktop links the app\'s account, never the browser\'
     assert.equal((await open(app)).location.hostname, 'github.com')
   })
 
+  await t.test('GitHub answers the origin the link started on, never the sign-in proxy hub', async () => {
+    Object.assign(process.env, { BETTER_AUTH_OAUTH_PROXY_URL: 'https://hub.mikka.test', BETTER_AUTH_OAUTH_PROXY_SECRET: randomBytes(32).toString('hex') })
+    try {
+      const web = new URL((await open(app)).location.searchParams.get('redirect_uri')!)
+      assert.equal(web.origin, 'https://mikka.test')
+      const { token } = await intents.createConnectIntent(pool, app, new Date(), { returnTo: 'http://127.0.0.1:43123/return', returnState: randomBytes(32).toString('base64url'), challenge: randomBytes(32).toString('base64url') })
+      assert.equal(new URL((await open(browser, token)).location.searchParams.get('redirect_uri')!).origin, 'https://mikka.test')
+    } finally {
+      delete process.env.BETTER_AUTH_OAUTH_PROXY_URL
+      delete process.env.BETTER_AUTH_OAUTH_PROXY_SECRET
+    }
+  })
+
   // RFC 8252: an app that takes the return on its own loopback (127.0.0.1) links its own account
   // whatever the browser is signed in as; GitHub's answer waits until the app proves the return
   // reached this computer with the verifier only it holds. PKCE (S256) runs between server and GitHub.
