@@ -10,7 +10,7 @@
   `dispatchComputerThread`, `dispatchComputerTask`) and `lib/mcp/actions.ts`
   (`dispatchRun`) take today; the exemption in 8196fae1 (a new Factory task is
   admitted with no model).
-- Status: **draft for review** — no code changed yet.
+- Status: direction and the six open questions decided by the coordinator session (2026-11-03 04:15 UTC); see Decisions.
 
 ## Where things stand
 
@@ -55,8 +55,7 @@ Three gaps follow from the code as it stands, and this design closes them:
    no Factory run, is queued without one. 8196fae1 is reverted.
 5. With the lifecycle switches off, `dispatch_run` refuses
    (`factoryLifecycleUnavailable`) rather than queue a run around the Factory.
-   The switches stay as a stop control, not as a bypass. *(Decision needed — see
-   Open questions 1.)*
+   The switches stay as a stop control, not as a bypass (Decisions 1).
 
 ## The mapping
 
@@ -70,7 +69,7 @@ stage. "Thread" is `lib/thread-dispatch.ts`'s: one task, one thread.
 | **Continue, thread running** — more work while the run works | Same task | No new attempt: the text goes to the running run (`send_to_run`), as now | — |
 | **Continue, thread ended** — task at `execute` failed/blocked | Same task | `retry` → a fresh execute attempt (existing action) | Factory queue, on the thread's own place, model and session (resumed where the thread ran, as now) |
 | **Continue, thread ended** — task waiting in review/verify (failed/blocked) or monitor | Same task | `repair` → a fresh execute attempt, candidate cleared (existing action) | As above |
-| **Continue while awaiting acceptance** — task in `approval/pending` | Same task | `repair` from `approval/pending` → fresh execute attempt, candidate cleared. **Additive contract change** (repair today accepts only review/verify/monitor) *(Open questions 2)* | As above |
+| **Continue while awaiting acceptance** — task in `approval/pending` | Same task | `repair` from `approval/pending` → fresh execute attempt, candidate cleared. **Additive contract change** (repair today accepts only review/verify/monitor) (Decisions 2) | As above |
 | **Continue after acceptance** — task passed/merged | New task on the same issue; the new thread is the old thread's next run (same place, model, session) | First execute attempt | As above |
 | **Change repository / explicit new thread** (`newThread` with the person's own words) | The current task is cancelled (`cancel`, which stops its live runs in the same transaction); a new task is routed from this message | First execute attempt | Factory queue, by 运行位置, for the named repository |
 | **Cloud** (运行位置 云端, or `target: "cloud"`) | As the row above it says | As the row above it says | New Factory queue adapter `queueFactoryCloudRun`: today's `queueCloudRun` body taking the caller's transaction, plus thread machine and lifecycle start after commit |
@@ -103,7 +102,7 @@ same way.
   task branch (`run_publications`), so its report carries the commit.
 - **Source event.** A task's `sourceEventId` must be a personal `user_message`.
   `dispatch_run` already has the host-supplied `requestEventId`. An MCP client
-  has none; *(Open questions 3)*.
+  has none, so its request is recorded as one (Decisions 3).
 
 ## One place picks the model
 
@@ -152,31 +151,31 @@ a verify command, an issue and a `user_message`):
 3. Continue, retry, repair and new-thread cases keep their thread behaviour
    (existing thread-dispatch tests) and each lands on the expected attempt.
 
-## Open questions for the coordinator
+## Decisions
 
-1. **Switch off.** With `mikka-factory-lifecycle` off, refuse dispatch (proposed),
-   or keep the old direct path as a fallback? Refusing is the only reading of
-   「不能跳过」; it means every environment with the switch off cannot dispatch.
-2. **Follow-up while awaiting acceptance.** Allow `repair` from
-   `approval/pending` (proposed, additive to contract v1), or cancel the task and
-   start a new one?
-3. **MCP client source event.** An MCP dispatch has no chat message. Record its
-   request as a host `user_message` event in the Coordinator's chat (proposed;
-   the MCP request is the person's own, through their OAuth grant), or add a new
-   source kind to the Factory contract?
-4. **Work with no commit.** Read-only investigations (`readOnly`) and desktop
-   tasks on a repository with no remote produce no candidate SHA, and execute
-   requires one. Proposed: the candidate is the exact commit the run read (its
-   `baseBranch` HEAD), review and verify judge the report and evidence, and
-   acceptance is 验收 without a merge (as a skill candidate is accepted today).
-   For a desktop task with no repository at all there is no commit to pin;
-   proposed: the same flow with the evidence bundle as the candidate, which is a
-   contract change. Alternatively these stay outside the Factory for now — but
-   that is a skip.
-5. **No verify command.** `configureFactoryCheck` blocks a repository with no
-   `verifyCommand` (`factoryCheckCommandRequired`), so most repositories would
-   stop at verify. Proposed: the task blocks with a card asking for the command
-   (one-time per repository), rather than inventing a default.
-6. **`start_web_subagent`** (browser checks) is a subagent, not an `agent_runs`
-   run. Proposed: out of scope here, since it produces no code candidate; it is
-   the evidence a verify run may use.
+Decided by the coordinator session on 2026-11-03:
+
+1. **Switch off.** With `mikka-factory-lifecycle` (or routing) off, `dispatch_run`
+   and `dispatch_bot_computer` refuse with an explicit error
+   (`factoryLifecycleUnavailable`). There is no fallback to the old direct path.
+2. **Follow-up while awaiting acceptance.** `repair` is allowed from
+   `approval/pending`: a fresh execute attempt, candidate cleared, revision
+   bumped. This is an additive change to contract v1.
+3. **MCP client source.** An MCP client's dispatch is recorded as a host
+   `user_message` event in the person's Coordinator chat. That event is the
+   task's `sourceEventId`.
+4. **Work with no commit.** For a read-only investigation, or a desktop task on
+   a repository with no remote, the candidate is the exact HEAD the run read.
+   Review and verify judge the report and evidence, and acceptance is 验收
+   without a merge. A desktop task with no repository at all gets a new
+   candidate kind, a **no-repository deliverable**, added to the contract. It
+   goes through the same review, verify and acceptance stages. None of this
+   work stays outside the Factory.
+5. **No verify command.** The person is not asked first. The verify agent infers
+   the command from the repository (`package.json` scripts, `Makefile`, CI
+   configuration) and records the command and its basis in the evidence, which
+   the acceptance page shows. Only when nothing can be inferred does the task
+   block with a card that asks the person once; the answer is stored on the
+   repository and reused. No default is ever made up.
+6. **`start_web_subagent`** is not included in this change. Its results are
+   evidence a verify run may use.
