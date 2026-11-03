@@ -499,8 +499,9 @@ export async function dispatchRun(userId: string, input: { issueId: string; agen
     // repository the person named that is not the thread's ("It's in the mikka-web repo"): the work goes there, in a new thread.
     moves: async previous => movesThread(target, await runPlacement(pool, userId, previous.id)) || await movesRepository(previous),
     explicit: async () => (repositoryMove && await personNamed(userId, botId, sourceEventId, request.repo!)) || explicitNewThread(userId, botId, sourceEventId),
-    start: async (previous, note) => {
-      if (!previous) return byRules(note, target, request.repo)
+    start: async (previous, note, replaces) => {
+      // A new thread runs in the repository the person named, else in the one of the thread it replaces.
+      if (!previous) return byRules(note, target, request.repo?.trim() || replaces?.remoteUrl)
       // The thread's next run goes where the thread ran, so its session can be resumed; elsewhere it starts fresh with the note's context.
       // It keeps the thread's own model and account, or the one the person just named; never another one silently.
       const { latestThreadRunModel, chooseCloudRunModel, chooseLocalRunModel } = await import('@/lib/computer/run-model')
@@ -522,7 +523,8 @@ export async function dispatchRun(userId: string, input: { issueId: string; agen
         const result = await queueRun(userId, { issueId: request.issueId, agentId: previous.agentId, repo: previous.remoteUrl, note, readOnly: Boolean(request.readOnly || previous.readOnly), requestKey: `thread:${previous.id}:${request.requestKey ?? crypto.randomUUID()}`.slice(0, 200), ...localModel, threadRunId: previous.id }, botId, execution, requestEventId).catch(() => null)
         if (result) return { ...result, status: 'queued' as const }
       }
-      return byRules(note, undefined, previous.remoteUrl)
+      // Where the thread ran could not take it: placed by the rules, in the thread's repository and at the place the person named, if any.
+      return byRules(note, target, previous.remoteUrl)
     },
   }))))
 }

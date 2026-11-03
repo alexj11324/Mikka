@@ -295,6 +295,36 @@ test('one task, one thread: dispatch continues the task\'s thread unless the per
     assert.equal(rows[1].continuesRunId, first.runId)
     assert.match(rows[1].remoteUrl, /octo\/repo/, 'the thread keeps its repository')
   })
+  await t.test('a new thread asked for without a repository runs in the repository of the thread it replaces', async () => {
+    const a = await person()
+    const first = await dispatch(a)
+    await pool.query(`UPDATE agent_runs SET status='failed',"finishedAt"=now() WHERE id=$1`, [first.runId])
+    judged = 0.95
+    const fresh = await steps.dispatchRun(a.id, { issueId: a.issueId, newThread: true, requestKey: `dispatch:${randomUUID()}`, sourceEventId: await said(a, '另开一个线程，从头重新做') }, undefined, a.botId) as unknown as Dispatched
+    judged = null
+    assert.equal(fresh.thread, 'new', JSON.stringify(fresh))
+    assert.equal(fresh.replacedThreadId, first.runId)
+    const rows = (await pool.query('SELECT r.id,r."continuesRunId",r."threadReplacedBy",d."remoteUrl" FROM agent_runs r JOIN device_repos d ON d.id=r."deviceRepoId" WHERE r."userId"=$1 ORDER BY r."createdAt"', [a.id])).rows
+    assert.equal(rows.length, 2)
+    assert.equal(rows[0].threadReplacedBy, fresh.runId, 'the old thread is marked replaced')
+    assert.equal(rows[1].continuesRunId, null)
+    assert.match(rows[1].remoteUrl, /octo\/repo/, 'the new thread keeps the old thread\'s repository')
+  })
+  await t.test('a thread\'s next run that cannot run where the thread ran keeps the place the person named', async () => {
+    // The person named the cloud; the thread's own computer cannot take its next run. The fallback stays in the
+    // cloud (refused here, where no cloud is set up) and never quietly goes to another computer.
+    const a = await person()
+    const first = await dispatch(a)
+    await pool.query(`UPDATE agent_runs SET status='failed',"finishedAt"=now() WHERE id=$1`, [first.runId])
+    await pool.query('UPDATE devices SET enabled=false WHERE id=$1', [a.deviceId])
+    await computer(a.id, 'Mac Studio')
+    judged = 0.05
+    const before = (await runs(a.id)).length
+    const next = await dispatch(a, { note: 'Run it in the cloud.', target: 'cloud', sourceEventId: await said(a, '放到云端再跑一次') })
+    judged = null
+    assert.equal(next.error, 'machineUnavailable', JSON.stringify(next))
+    assert.equal((await runs(a.id)).length, before, 'nothing ran on another computer')
+  })
   await t.test('a local run is frozen with its model: none fails at once, a thread keeps its own, an MCP client\'s new run takes 优先使用的模型', async () => {
     const a = await person()
     const agentId = (await pool.query('SELECT id FROM agents WHERE "deviceId"=$1', [a.deviceId])).rows[0].id as string

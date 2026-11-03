@@ -105,7 +105,8 @@ export async function dispatchToTask<R extends { runId: string }, E extends { er
   /** The dispatch names another place than where the thread ran: moving a thread is a new thread, granted the same way. */
   moves?: (previous: TaskThreadRun) => Promise<boolean>
   explicit?: () => Promise<boolean>
-  start: (previous: TaskThreadRun | null, note: string | undefined) => Promise<R | E>
+  /** `replaces`: the thread a new thread replaces, so it can keep that thread's repository when none is named. */
+  start: (previous: TaskThreadRun | null, note: string | undefined, replaces?: TaskThreadRun) => Promise<R | E>
 }): Promise<ThreadDispatch<R> | E> {
   // An error the caller can act on (no machine, say) queued nothing; it goes back as it is.
   const queued = (result: R | E): result is R => 'runId' in result && typeof result.runId === 'string'
@@ -124,7 +125,7 @@ export async function dispatchToTask<R extends { runId: string }, E extends { er
     if (wantsNew && await (input.explicit?.() ?? Promise.resolve(false))) {
       // The old thread stops; one thread works on a task at a time.
       if (working && !previous.stopRequestedAt) await (await import('@/lib/agent-runs')).requestRunStop(userId, previous.id).catch(() => undefined)
-      const result = await input.start(null, input.note)
+      const result = await input.start(null, input.note, previous)
       if (!queued(result)) return result
       await db.execute((await import('drizzle-orm')).sql`UPDATE agent_runs SET "threadReplacedBy"=${result.runId}::uuid,"updatedAt"=now() WHERE id=${threadId}::uuid AND "userId"=${userId}`)
       return { ...result, thread: 'new' as const, threadId: result.runId, replacedThreadId: threadId }
