@@ -252,6 +252,13 @@ export interface MikkaBridge {
     /** Absent on older desktop builds. Opens the sign-in page and returns its callback URL. */
     claudeCallback?(authorizationUrl: string): Promise<string | null>
     /**
+     * Absent on older desktop builds. A one-shot loopback (http://127.0.0.1:<port>/return)
+     * for a link the app finishes in the system browser, such as Plugins → GitHub.
+     */
+    prepareReturn?(state: string): Promise<string>
+    /** Called with that link's state and result when the browser comes back; returns an unsubscribe. */
+    onReturn?(listener: (event: { state: string; result: 'connected' | 'failed' | 'cancelled' }) => void): () => void
+    /**
      * The version of an update already downloaded in the background, or null.
      * Only a downloaded update is surfaced. Absent on older desktop builds.
      */

@@ -1,7 +1,7 @@
 import { auth } from '@/lib/auth'
 import { pool } from '@/lib/db'
 import { freshSessionRoute } from '@/lib/fresh-session'
-import { createConnectIntent, readConnectIntent } from '@/lib/github/connect-intent'
+import { createConnectIntent, loopbackStart, readConnectIntent } from '@/lib/github/connect-intent'
 import { withRequestLog } from '@/lib/request-log'
 
 export const runtime = 'nodejs'
@@ -11,7 +11,9 @@ const headers = { 'Cache-Control': 'private, no-store' }
 async function handlePOST(request: Request) {
   const session = await auth.api.getSession({ headers: request.headers })
   if (!session?.user) return Response.json({ error: 'authRequired' }, { status: 401, headers })
-  return Response.json(await createConnectIntent(pool, session.user.id), { headers })
+  // A desktop app with a loopback return sends where to return and S256 of its own verifier; an older one sends nothing.
+  const body = await request.json().catch(() => null) as { loopback?: unknown } | null
+  return Response.json(await createConnectIntent(pool, session.user.id, new Date(), loopbackStart(body?.loopback)), { headers })
 }
 
 /** Where that link stands, for the app that started it or for a browser signed in as another account. */

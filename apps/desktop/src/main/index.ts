@@ -14,6 +14,7 @@ import { connectForUpdate, updateLocalDaemon } from './daemon-update'
 import { readLocalDeviceAccount } from './local-setup'
 import { AppLoadState, offlineReason, offlineRetryDelay } from './offline'
 import { startLoopbackAuth, type LoopbackAuthServer } from './loopback'
+import { startReturnListener, type ReturnListener } from './return-listener'
 import { catchClaudeCallback } from './subscription-callback'
 import { NotificationCenter } from './notification-center'
 import { appExternalUrl, desktopAuthState, externalUrl, isTrustedFrame, navigationDecision } from './security'
@@ -73,6 +74,38 @@ async function prepareAuth(rawState: unknown): Promise<string> {
   authServer = listener
   authTimer = setTimeout(closeAuthServer, 10 * 60_000)
   return listener.callback
+}
+
+let returnListener: ReturnListener | null = null
+let returnTimer: NodeJS.Timeout | null = null
+function closeReturnListener(): void {
+  returnListener?.close(); returnListener = null
+  if (returnTimer) { clearTimeout(returnTimer); returnTimer = null }
+}
+
+/**
+ * A link the page finishes in the system browser (Plugins → GitHub): a
+ * one-shot 127.0.0.1 listener for its return. When it comes, the window comes
+ * forward and the page is told the result, then finishes the link itself.
+ */
+async function prepareReturn(rawState: string): Promise<string> {
+  closeReturnListener()
+  const listener = await startReturnListener({
+    state: rawState,
+    onReturn: result => {
+      returnListener = null
+      if (returnTimer) { clearTimeout(returnTimer); returnTimer = null }
+      if (!mainWindow || mainWindow.isDestroyed()) return
+      if (mainWindow.isMinimized()) mainWindow.restore()
+      mainWindow.show()
+      mainWindow.focus()
+      const contents = mainWindow.webContents
+      if (!contents.isDestroyed() && isTrustedFrame(contents.getURL(), APP_URL)) contents.send(IPC.appReturned, { state: rawState, result })
+    },
+  })
+  returnListener = listener
+  returnTimer = setTimeout(closeReturnListener, 10 * 60_000)
+  return listener.returnTo
 }
 
 function deliverClick(href: string): void {
@@ -452,6 +485,7 @@ function start(): void {
       return shell.openExternal(target)
     },
     prepareAuth,
+    prepareReturn,
     claudeCallback: url => catchClaudeCallback(url, page => shell.openExternal(page)),
     localDevice: localDeviceStatus,
     localAccount: () => readLocalDeviceAccount((url, init) => session.fromPartition(PARTITION).fetch(url, init), APP_URL),
@@ -494,6 +528,7 @@ if (!app.requestSingleInstanceLock()) {
     mainWindow.focus()
   })
   app.on('before-quit', closeAuthServer)
+  app.on('before-quit', closeReturnListener)
   app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') app.quit()
   })

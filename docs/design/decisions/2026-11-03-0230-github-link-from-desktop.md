@@ -4,6 +4,7 @@
 - Source: Alex hit both bugs on Plugins → GitHub, relayed by the coordinator session: the link went to the Mikka account signed in to the system browser instead of the one in the desktop app, with nothing on screen; and back in the app the page kept showing 关联 GitHub with no way to refresh. 「连接必须落到发起这次连接的那个账号上」; 两者不一致时明确提示「浏览器登录的是 X，App 里是 Y」并给切换入口; 连接进行中窗口重新获得焦点或可见时重新拉取状态。
 - Rule: —
 - Partly replaces: [2026-11-01-0400](2026-11-01-0400-no-refetch-on-focus.md) as to the GitHub link hand-off (one check on return)
+- Partly superseded by: [2026-11-03-0300](2026-11-03-0300-github-link-loopback.md) for desktop builds with the loopback return
 
 **The account.** The desktop app takes a one-time token naming its own account
 (ten minutes, single use, stored as a hash) and opens the GitHub start in the

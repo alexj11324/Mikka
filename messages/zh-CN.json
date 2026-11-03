@@ -1979,6 +1979,7 @@
       "githubLinkAccountChanged": "授权期间切换了 Mikka 账号，GitHub 未关联。",
       "githubLinkWaiting": "等待浏览器授权",
       "githubLinkOtherAccount": "浏览器登录的是 {browser}，App 里是 {app}",
+      "githubLinkUpdateHint": "更新桌面版可以一步完成",
       "githubOpenBrowser": "在浏览器中打开",
       "githubSwitchAccount": "切换账号",
       "githubLinkReady": "浏览器已登录 App 里的账号",
