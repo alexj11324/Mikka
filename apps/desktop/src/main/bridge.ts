@@ -20,6 +20,7 @@ export interface BridgeOptions {
   mintEnrollment(): Promise<string>
   openExternal(url: string): Promise<void>
   prepareAuth(state: string): Promise<string>
+  prepareReturn(state: string): Promise<string>
   claudeCallback(authorizationUrl: unknown): Promise<string | null>
   localDevice(): Promise<LocalDevice>
   localAccount(): Promise<LocalDeviceAccount>
@@ -77,6 +78,7 @@ export function registerBridge(options: BridgeOptions, sshInstaller?: SshInstall
   })
   handle(IPC.appOpenExternal, url => options.openExternal(typeof url === 'string' ? url : ''))
   handle(IPC.appPrepareAuth, state => options.prepareAuth(typeof state === 'string' ? state : ''))
+  handle(IPC.appPrepareReturn, state => options.prepareReturn(typeof state === 'string' ? state : ''))
   handle(IPC.appClaudeCallback, url => options.claudeCallback(url))
   handle(IPC.appUpdateReady, () => options.updates.ready)
   handle(IPC.appInstallUpdate, () => options.updates.install())

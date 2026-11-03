@@ -36,6 +36,12 @@ if (appOrigin && window.location.origin === appOrigin) {
       zeroUrl: '',
       openExternal: (url: unknown) => ipcRenderer.invoke(IPC.appOpenExternal, url),
       prepareAuth: (state: unknown) => ipcRenderer.invoke(IPC.appPrepareAuth, state),
+      prepareReturn: (state: unknown) => ipcRenderer.invoke(IPC.appPrepareReturn, state),
+      onReturn: (listener: (event: { state: string; result: 'connected' | 'failed' | 'cancelled' }) => void) => {
+        const handler = (_event: IpcRendererEvent, returned: { state: string; result: 'connected' | 'failed' | 'cancelled' }) => listener(returned)
+        ipcRenderer.on(IPC.appReturned, handler)
+        return () => { ipcRenderer.removeListener(IPC.appReturned, handler) }
+      },
       claudeCallback: (authorizationUrl: unknown) => ipcRenderer.invoke(IPC.appClaudeCallback, authorizationUrl),
       updateReady: () => ipcRenderer.invoke(IPC.appUpdateReady),
       onUpdateReady: (listener: (version: string) => void) => {

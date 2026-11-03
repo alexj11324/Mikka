@@ -7,6 +7,9 @@ export const WORKSPACE_NAME = '青柠科技'
 export const WORKSPACE_SLUG = 'qingning'
 export const TEAM = { key: 'team-ledger', name: '青柠账本', identifier: 'QN', description: '' }
 
+/** The first chunk of each bot thread's log. */
+export const threadOpening = title => `开始：${title}。`
+
 /** The other seven people at the company (users with reserved .example emails; nobody can sign in as them). */
 export const PEOPLE = [
   { key: 'lin', name: '林晓', role: 'member', email: 'lin.xiao@qingning-tech.example' },
