@@ -35,7 +35,7 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
     process.env.E2B_CODEX_TEMPLATE = 'ready-template-fixture'; // The fixture agent runs Codex (decision 2026-11-01-2335).
     const db = await import("../db");
     appPool = db.pool;
-    const { ensureThreadMachine, parkThreadMachine, endClosedTaskMachines, keepTailBeforeKill, threadMachineProvider } = await import("./thread-machines");
+    const { ensureThreadMachine, parkThreadMachine, endClosedTaskMachines, keepTailBeforeKill, threadMachineAction, threadMachineProvider } = await import("./thread-machines");
 
     const owner = "owner", workspaceId = randomUUID(), botId = randomUUID(), otherBot = randomUUID(), botDevice = randomUUID(), agentId = randomUUID(), repoId = randomUUID(), otherRepo = randomUUID();
     await pool.query(`INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES ($1,'Fixture','thr-task@example.invalid',true,now(),now())`, [owner]);
@@ -287,6 +287,18 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
       await parkThreadMachine(pool, actor, before.runId, pause, async () => null);
       assert.equal(calls, 1, 'a stale old-run callback cannot pause the adopted sandbox');
       assert.equal((await pool.query('SELECT "revokedAt" FROM device_tokens WHERE id=$1', [token])).rows[0].revokedAt, null);
+      assert.equal((await machine(next)).sandboxId, before.sandboxId);
+    });
+
+    await t.test('ending an adopted old stage cannot retire the next stage device or credentials', async () => {
+      const issueId = await task(), before = await parked(issueId), next = await run(issueId);
+      await assert.rejects(ensureThreadMachine(pool, actor, next, fake().provider));
+      const token = randomUUID();
+      await pool.query(`INSERT INTO device_tokens (id,"userId",name,"tokenHash","boundDeviceId","expiresAt") VALUES ($1,$2,'New stage',$3,$4,now()+interval '1 day')`, [token, owner, randomUUID(), before.device]);
+      assert.equal((await machine(before.runId)).sandboxId, null);
+      await threadMachineAction(pool, actor, before.runId, 'end');
+      assert.equal((await pool.query('SELECT "revokedAt" FROM device_tokens WHERE id=$1', [token])).rows[0].revokedAt, null, 'the ended row no longer controls this device');
+      assert.equal((await pool.query('SELECT "removedAt" FROM devices WHERE id=$1', [before.device])).rows[0].removedAt, null);
       assert.equal((await machine(next)).sandboxId, before.sandboxId);
     });
 
