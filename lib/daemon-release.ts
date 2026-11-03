@@ -1,5 +1,5 @@
 import { MIN_DAEMON_VERSION, SOURCE_DAEMON_VERSION, type DaemonVersions } from '@mikka/protocol/device'
-import { meetsMinimumVersion } from '@mikka/protocol/version'
+import { UPDATE_REQUIRED_STATUS, meetsMinimumVersion } from '@mikka/protocol/version'
 import { daemonTestMode } from '@mikka/protocol/repository'
 
 const REGISTRY_LATEST = 'https://registry.npmjs.org/@aspectlylabs%2fmikka/latest'
@@ -56,6 +56,29 @@ export function daemonTooOld(device: { kind: string; daemonVersion: string | nul
   const version = device.daemonVersion
   if (device.kind !== 'local' || !version || version === SOURCE_DAEMON_VERSION) return false
   return !meetsMinimumVersion(version, MIN_DAEMON_VERSION)
+}
+
+/** Device API admission uses the same floor as claims. Source workers retain
+ * the existing source-version contract; an absent/malformed released version
+ * cannot bypass admission by signing in again. */
+export function daemonRequestTooOld(version: string | null, cloud = false): boolean {
+  if (cloud || version === SOURCE_DAEMON_VERSION) return false
+  return !meetsMinimumVersion(version, MIN_DAEMON_VERSION)
+}
+
+/** Upgrade transport only; these cannot claim a new run. */
+export function daemonUpdateControlRequest(request: Request): boolean {
+  const path = new URL(request.url).pathname.replace(/^\/mikka(?=\/)/, '')
+  return (request.method === 'POST' && /^\/v1\/devices\/[^/]+\/heartbeat$/.test(path))
+    || (request.method === 'GET' && /^\/v1\/devices\/[^/]+\/commands$/.test(path))
+    || (request.method === 'POST' && /^\/v1\/devices\/[^/]+\/commands\/ack$/.test(path))
+}
+
+/** Public upgrade metadata only; never wait for npm on a refused request. */
+export function daemonUpgradeResponse(): Response {
+  return Response.json({ error: 'update_required', code: 'daemonUpgradeRequired', minVersion: MIN_DAEMON_VERSION,
+    daemonVersions: { min: MIN_DAEMON_VERSION }, message: 'Update the Mikka daemon and sign in again.' },
+  { status: UPDATE_REQUIRED_STATUS, headers: { 'Cache-Control': 'private, no-store' } })
 }
 
 export function resetDaemonVersionCacheForTest() { cached = null; pending = null }

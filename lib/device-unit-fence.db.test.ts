@@ -33,7 +33,7 @@ async function fixture() {
   return f
 }
 type Fixture = Awaited<ReturnType<typeof fixture>>
-const request = (f: Fixture, path = `/v1/devices/${f.device}/runs?state=queued`) => new Request(`http://127.0.0.1/mikka${path}`, { headers: { authorization: `Bearer ${f.token}` } })
+const request = (f: Fixture, path = `/v1/devices/${f.device}/runs?state=queued`) => new Request(`http://127.0.0.1/mikka${path}`, { headers: { 'x-mikka-client-version': '0.0.375', authorization: `Bearer ${f.token}` } })
 /** A revocation, as every revocation path does it: an UPDATE of the token row. */
 const revoke = async (f: Fixture, lockTimeoutMs?: number) => {
   const client = await admin!.connect()

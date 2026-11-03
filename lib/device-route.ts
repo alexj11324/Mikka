@@ -1,6 +1,9 @@
+import { CLIENT_VERSION_HEADER } from '@mikka/protocol/version'
+import { daemonRequestTooOld, daemonUpgradeResponse, daemonUpdateControlRequest } from './daemon-release'
 import { authenticateDevice } from './device-link'
 import { deviceRequestCaller } from './device-request-context'
 import { withDeviceDatabaseAuthority, withDeviceUnitFence, isDeviceAuthorityRevoked, isDeviceAuthorityError } from './db/device-scope'
+import { pool } from './db'
 import { deploymentSwitch } from './deployment-switches'
 
 /** Reuse each statement/transaction's write connection for the credential
@@ -16,6 +19,16 @@ export function withDeviceRoute<Args extends unknown[]>(handler: (request: Reque
     const unauthorized = () => Response.json({ error: 'Unauthorized' }, { status: 401, headers: { 'Cache-Control': 'no-store' } })
     const caller = await authenticateDevice(request)
     if (!caller) return unauthorized()
+    // Authentication remains first: updating alone must not revive a revoked
+    // credential. Conversely, a fresh login must not admit an old binary.
+    if (daemonRequestTooOld(request.headers.get(CLIENT_VERSION_HEADER), Boolean(caller.scopeDeviceId && caller.scopeWorkspaceId)) && !daemonUpdateControlRequest(request)) {
+      // Do not strand an already leased run while its daemon waits to update.
+      // Only the credential that claimed the work gets this grace; a new login
+      // cannot use it. The handler's existing fence still rechecks revocation.
+      const live = await pool.query(`SELECT 1 FROM agent_runs WHERE "deviceTokenId"=$1 AND "userId"=$2
+        AND "leaseExpiresAt">now() AND status IN ('preparing','running','waiting_input','finishing') LIMIT 1`, [caller.tokenId, caller.userId])
+      if (!live.rowCount) return daemonUpgradeResponse()
+    }
     try {
       const run = () => deviceRequestCaller.run(caller, () => handler(request, ...args))
       // One fence per burst of statements (lib/db/device-scope.ts) unless its kill switch is on: then one per statement.

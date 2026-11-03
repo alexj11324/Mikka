@@ -1,25 +1,25 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { MIN_DAEMON_VERSION, SOURCE_DAEMON_VERSION } from '@mikka/protocol/device'
-import { cachedDaemonVersions, daemonTooOld, daemonVersions, newerDaemonRelease, readLatestDaemonVersion, resetDaemonVersionCacheForTest } from './daemon-release'
+import { cachedDaemonVersions, daemonRequestTooOld, daemonUpgradeResponse, daemonUpdateControlRequest, daemonTooOld, daemonVersions, newerDaemonRelease, readLatestDaemonVersion, resetDaemonVersionCacheForTest } from './daemon-release'
 import daemonPackage from '../packages/daemon/package.json' with { type: 'json' }
 
 const registry = (body: unknown, status = 200) => (async () => new Response(JSON.stringify(body), { status })) as unknown as typeof fetch
 
 test('only a plain release at or above the minimum is passed on from npm', async () => {
-  assert.equal(await readLatestDaemonVersion(registry({ version: '0.0.331' })), '0.0.331')
-  for (const body of [{ version: '0.0.332-beta.1' }, { version: '0.0.1' }, { version: '01.0.0' }, { version: 331 }, {}, null])
+  assert.equal(await readLatestDaemonVersion(registry({ version: '0.0.378' })), '0.0.378')
+  for (const body of [{ version: '0.0.379-beta.1' }, { version: '0.0.1' }, { version: '01.0.0' }, { version: 331 }, {}, null])
     assert.equal(await readLatestDaemonVersion(registry(body)), undefined, JSON.stringify(body))
-  assert.equal(await readLatestDaemonVersion(registry({ version: '0.0.331' }, 503)), undefined)
+  assert.equal(await readLatestDaemonVersion(registry({ version: '0.0.378' }, 503)), undefined)
   assert.equal(await readLatestDaemonVersion((async () => { throw new TypeError('offline') }) as unknown as typeof fetch), undefined)
 })
 
 test('the registry is read once per five minutes; no answer still sends the minimum', async () => {
   resetDaemonVersionCacheForTest()
   let reads = 0
-  const read = async () => { reads++; return reads === 1 ? '0.0.331' : undefined }
-  assert.deepEqual(await daemonVersions(0, read), { min: MIN_DAEMON_VERSION, latest: '0.0.331' })
-  assert.deepEqual(await daemonVersions(299_999, read), { min: MIN_DAEMON_VERSION, latest: '0.0.331' })
+  const read = async () => { reads++; return reads === 1 ? '0.0.378' : undefined }
+  assert.deepEqual(await daemonVersions(0, read), { min: MIN_DAEMON_VERSION, latest: '0.0.378' })
+  assert.deepEqual(await daemonVersions(299_999, read), { min: MIN_DAEMON_VERSION, latest: '0.0.378' })
   assert.equal(reads, 1)
   assert.deepEqual(await daemonVersions(300_000, read), { min: MIN_DAEMON_VERSION })
   assert.equal(reads, 2)
@@ -30,7 +30,7 @@ test('only released local daemons below the minimum are too old', () => {
   assert.equal(daemonTooOld({ kind: 'local', daemonVersion: '0.0.298' }), true)
   assert.equal(daemonTooOld({ kind: 'local', daemonVersion: 'garbage' }), true)
   assert.equal(daemonTooOld({ kind: 'local', daemonVersion: MIN_DAEMON_VERSION }), false)
-  assert.equal(daemonTooOld({ kind: 'local', daemonVersion: '0.0.331' }), false)
+  assert.equal(daemonTooOld({ kind: 'local', daemonVersion: '0.0.378' }), false)
   assert.equal(daemonTooOld({ kind: 'local', daemonVersion: SOURCE_DAEMON_VERSION }), false, 'run from source')
   assert.equal(daemonTooOld({ kind: 'local', daemonVersion: null }), false)
   assert.equal(daemonTooOld({ kind: 'cloud', daemonVersion: '0.0.1' }), false)
@@ -65,4 +65,27 @@ test('a release is news only when newer than what the daemon already knows', () 
   assert.equal(newerDaemonRelease({ min: MIN_DAEMON_VERSION }, '0.0.399'), false)
   assert.equal(newerDaemonRelease(undefined, '0.0.399'), false)
   assert.equal(newerDaemonRelease(versions, 'garbage'), false)
+})
+
+
+test('device admission requires a fixed binary independently of the login credential', async () => {
+  for (const version of ['0.0.329', '0.0.374', 'garbage', null]) assert.equal(daemonRequestTooOld(version), true)
+  assert.equal(daemonRequestTooOld(MIN_DAEMON_VERSION), false)
+  assert.equal(daemonRequestTooOld('0.0.378'), false)
+  assert.equal(daemonRequestTooOld(SOURCE_DAEMON_VERSION), false)
+  assert.equal(daemonRequestTooOld(null, true), false, 'authenticated scoped cloud worker')
+  const response = daemonUpgradeResponse()
+  assert.equal(response.status, 426)
+  assert.equal(response.headers.get('Cache-Control'), 'private, no-store')
+  assert.equal((await response.json()).minVersion, MIN_DAEMON_VERSION)
+})
+
+
+test('only update control traffic remains available to an authenticated idle old daemon', () => {
+  const request = (method: string, path: string) => new Request(`https://app.example/mikka${path}`, { method })
+  assert.equal(daemonUpdateControlRequest(request('POST', '/v1/devices/fixture/heartbeat')), true)
+  assert.equal(daemonUpdateControlRequest(request('GET', '/v1/devices/fixture/commands')), true)
+  assert.equal(daemonUpdateControlRequest(request('POST', '/v1/devices/fixture/commands/ack')), true)
+  for (const path of ['/v1/devices/register', '/v1/devices/fixture/repos', '/v1/devices/fixture/runs', '/v1/devices/fixture/computer'])
+    assert.equal(daemonUpdateControlRequest(request('POST', path)), false)
 })

@@ -37,7 +37,7 @@ dbTest('a heartbeat re-checks execution identities only when the harnesses chang
   const claude = { harness: 'claude_code', installed: true, version: '2.1.0' }
   const beat = async (body: Record<string, unknown>) => {
     const response = await POST(new Request(`http://127.0.0.1/v1/devices/${device}/heartbeat`, {
-      method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+      method: 'POST', headers: { 'x-mikka-client-version': '0.0.375', authorization: `Bearer ${token}`, 'content-type': 'application/json' },
       body: JSON.stringify({ runs: [], worktreeDiskBytes: 0, ...body }),
     }), { params: Promise.resolve({ deviceId: device }) })
     assert.equal(response.status, 200)
