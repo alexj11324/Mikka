@@ -7,6 +7,7 @@
   (on branch `claude/information-architecture`, not yet on main) and
   [2026-11-02-0251](2026-11-02-0251-desktop-runs-get-their-own-machine.md).
 - Rule: —
+- Superseded in part by: [2026-11-02-1232](2026-11-02-1232-computer-policy-binds-agents-not-people.md) (the policy no longer gates a person opening a thread desktop)
 - Replaces: —
 
 A workspace's 电脑 policy (`workspace_computer_policies.permission`, allow or

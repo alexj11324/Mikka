@@ -3,6 +3,7 @@
 - Date: 2026-11-01
 - Source: Alex, cloud computer chat, approving official template reuse: “可以复用”.
 - Rule: —
+- Superseded in part by: [2026-11-03-1430-official-e2b-templates-unchanged](2026-11-03-1430-official-e2b-templates-unchanged.md) (no derived image; the worker goes in its own directory on an instance; not yet in code, #1131)
 - Replaces: [A usable Linux desktop on the Bot computer](2026-11-01-2236-cloud-linux-desktop.md).
 
 Use E2B's official `desktop` template for the basic Linux desktop and its XFCE
@@ -27,3 +28,5 @@ they must not replace an old image's desktop startup script.
 The recipe can be reused with another E2B instance when that instance provides
 the official `desktop` parent template. A saved cloud template ID does not
 identify an image on another instance; build the official parent there first.
+
+Earlier rule, from 2026-11-01-2236 (now removed): Mikka kept Openbox and added its own taskbar (Tint2), file manager (PCManFM), terminal (XTerm) and desktop icons in its template. Alex approved reusing E2B's official XFCE desktop instead, so Mikka no longer assembles a desktop.

@@ -5,6 +5,7 @@
   资料库, per-bot notifications and pinning, because the server had none of
   them. He said: 「那你服务器你这后端该加的加，好吧？你没有东西你就加。」
 - Rule: —
+- Superseded in part by: [2026-11-01-1215-star-is-the-pin](2026-11-01-1215-star-is-the-pin.md) (the star is every bot's pin; the Coordinator can be unpinned)
 - Replaces: —
 
 - A bot's page has two switches:

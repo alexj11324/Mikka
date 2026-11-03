@@ -37,7 +37,10 @@ GitHub、Linear 或 Notion 事件，就判断一次要不要告诉人。Hark 和
 
 每条进来的内容在现有的打分步骤之后，再用一个便宜的模型提炼出零到几条**事实**，写进
 `user_facts`。另外每天夜里再做一次合并：把多条零散事实归纳成规律（「8 次川菜调料」→ 兴趣：川菜），
-过期的降低可信度，矛盾的以最新为准。
+处理过期和矛盾的事实。合并时代码只把候选归组；归纳成兴趣、习惯还是地点，久没见到的事实保留、降低还是过期，
+一个槽位留哪个答案，都由 Decision API 决定（`lib/profile/facts.ts` 的 `planConsolidation`，
+[决定 2026-11-01-1500](decisions/2026-11-01-1500-self-improvement-and-profile-decided-by-decision-api.md)）。
+过了日期的事实由代码作废，用户改过的事实以用户为准。
 
 `user_facts`（新表）：
 
@@ -58,8 +61,16 @@ GitHub、Linear 或 Notion 事件，就判断一次要不要告诉人。Hark 和
 
 ### 2.3 生成候选卡片
 
-每个用户每天夜里跑一次**后台调研**，时间在本地 05:00 左右，赶在 08:00 简报之前。由 Cloudflare
-Worker 定时触发，和简报共用一套 cron（`docs/suggestions-cron.md`）。有四类来源：
+设计是每个用户每天夜里跑一次**后台调研**，时间在本地 05:00 左右，赶在 08:00 简报之前。
+
+现状（2026-11-03）：**后台调研还没有做**。没有对应的 cron 端点，PostHog 的 `mikka-proactive-research`
+只是预留。Cloudflare Worker `cloudflare/suggestions-cron` 只有一个每分钟触发的 cron（`* * * * *`），
+在 Worker 里按 UTC 时间分发：每 15 分钟调 `/api/cron/briefings` 写简报，每小时整点调
+`/api/cron/suggestions-reconcile` 补漏，每小时 30 分调 `/api/cron/user-facts` 合并画像；
+每分钟还调 Coordinator 唤醒、定时任务等端点（`docs/suggestions-cron.md`）。计划让后台调研也由这个
+Worker 触发。
+
+计划中有四类来源：
 
 1. **截止日期**：从 `deadline` 和 `subscription` 事实里，挑出未来 7 天内的续费、到期、自动扣款、退货期限。
 2. **习惯时间窗**：从 `routine` 事实里得出「工作日 11:45 左右可能要点午饭」这类时间窗，
