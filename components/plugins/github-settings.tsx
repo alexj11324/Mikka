@@ -179,7 +179,8 @@ function ViewerGitHubSettings({ userId, email, isPending }: { userId: string | u
     window.location.assign(withBasePath(`/sign-in?next=${encodeURIComponent(`/?section=plugins&app=github&intent=${token}`)}`))
   }
   const browserView = browserIntent?.view
-  const canLink = !connected && Boolean(githubState?.configured || githubReconnect)
+  // In the browser during the app's link, the page's own 关联 GitHub would link this browser's account: the link's own buttons take its place.
+  const canLink = !connected && Boolean(githubState?.configured || githubReconnect) && !(browserIntent && (browserIntent.view.state === 'otherAccount' || browserIntent.view.state === 'waiting'))
   const status = githubLoading ? null : !userId ? t('githubSignInRequired') : githubState && !githubState.configured ? t('githubNotConfigured') : null
   const login = githubState?.login ? t('githubLogin', { login: githubState.login }) : t('github')
   const errors = [githubError, githubLinkError, browserView?.state === 'expired' ? t('githubLinkExpired') : ''].filter(Boolean)

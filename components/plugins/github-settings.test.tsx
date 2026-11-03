@@ -110,6 +110,7 @@ test('in the browser signed in as another account: both accounts are named and t
   await render()
   assert.ok(container.textContent?.includes(`githubLinkOtherAccount ${JSON.stringify({ browser: 'other@example.test', app: 'al•••@acme.test' })}`))
   assert.ok(!container.textContent?.includes('githubLinkFailed'), 'the two accounts are the message')
+  assert.equal(button('githubLink'), undefined, 'the page\'s own link would link this browser\'s account')
   assert.equal(browser.location.search, '?section=plugins&app=github', 'the token leaves the address')
   await act(async () => { button('githubSwitchAccount')!.click() })
   await settle()
