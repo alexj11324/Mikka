@@ -412,6 +412,9 @@ export function createFactoryReconciler(
         WHERE t."userId"=$1 AND t."botId" IS NOT DISTINCT FROM $2::uuid AND ${PENDING}
           AND (a."runId"=$3::uuid OR EXISTS (SELECT 1 FROM agent_runs c WHERE c.id=$3::uuid AND c."retryOf"=a."runId")
             OR EXISTS (SELECT 1 FROM factory_questions q WHERE q."taskId"=t.id AND (q."originRunId"=$3::uuid OR q."continuationRunId"=$3::uuid))
+            OR (t.status='pending' AND EXISTS(SELECT 1 FROM factory_events f WHERE f."taskId"=t.id
+              AND f.request->>'kind'='request_epoch' AND f.request->>'sourceEventId'=t."sourceEventId"::text
+              AND f.request->'supersededRunIds' ? $3::text))
             OR (t.status='pending' AND EXISTS(SELECT 1 FROM coordinator_events e WHERE e.id=t."sourceEventId" AND e."userId"=$1
               AND e.payload->>'source'='thread_continuation' AND e.payload->>'previousRunId'=$3::text)))
         ORDER BY t.id`,

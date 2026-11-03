@@ -127,7 +127,12 @@ export async function dispatchToTask<R extends { runId: string }, E extends { er
     const wantsNew = input.newThread || moves
     if (wantsNew && await (input.explicit?.() ?? Promise.resolve(false))) {
       // The old thread stops; one thread works on a task at a time.
-      if (working && !previous.stopRequestedAt) await (await import('@/lib/agent-runs')).requestRunStop(userId, previous.id).catch(() => undefined)
+      if (working) {
+        // A previous epoch may already have requested this stop. Queued runs
+        // still need the canonical stop to finish; a flag alone is not an ack.
+        try { await (await import('@/lib/agent-runs')).requestRunStop(userId, previous.id) }
+        catch (error) { if (!(error instanceof ActionFailureError && error.code === 'runChainEnded')) throw error }
+      }
       const result = await input.start(null, input.note, previous)
       if (!queued(result)) return result
       await db.execute((await import('drizzle-orm')).sql`UPDATE agent_runs SET "threadReplacedBy"=${result.runId}::uuid,"updatedAt"=now() WHERE id=${threadId}::uuid AND "userId"=${userId}`)

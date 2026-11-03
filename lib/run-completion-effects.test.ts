@@ -24,6 +24,7 @@ const reconcileRun = mock.fn(async (_userId: string, _runId: string) => {})
 const runtime = mock.fn((_botId: string | null) => ({ questions: scopedQuestions, reconcile: { run: reconcileRun } }))
 const dbRows: { botId: string | null }[] = []
 const dbPool = { query: mock.fn(async (_q: string, _p?: unknown[]) => ({ rows: dbRows })) }
+const sweepWatchdog = mock.fn(async (..._args: unknown[]) => {})
 const stub = (path: string, exports: Record<string, unknown>) => mock.module(new URL(path, import.meta.url).href, { namedExports: exports })
 stub('./self-improvement/registry.ts', { lockSkillScope: async () => {} })
 stub('./self-improvement/skill-mounts.ts', { recordCompletionSkillMount: mount })
@@ -31,13 +32,14 @@ stub('./self-improvement/server.ts', { skillEvaluations: { authorizeEvaluation, 
 stub('./issue-access.ts', { issueForUser: async () => ({ id: 'issue' }) })
 stub('./factory/server.ts', { factoryMonitor: { probeRun: monitor }, factoryQuestions: questions })
 stub('./factory/runtime.ts', { factoryRuntimeForBot: runtime })
+stub('./factory/watchdog.ts', { sweepFactoryWatchdog: sweepWatchdog })
 stub('./db/index.ts', { pool: dbPool })
 let effects: typeof import('./run-completion-effects')
 const environment = { routing: process.env.MIKKA_FACTORY_ROUTING_ENABLED, lifecycle: process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED }
 before(async () => { effects = await import('./run-completion-effects') })
 beforeEach(() => {
   trace.length = 0; mountError = null; monitorError = null; questionError = null
-  for (const fn of [mount, monitor, questions.settle, questions.record, scopedQuestions.settle, scopedQuestions.record, runtime, reconcileRun, dbPool.query]) fn.mock.resetCalls()
+  for (const fn of [mount, monitor, questions.settle, questions.record, scopedQuestions.settle, scopedQuestions.record, runtime, reconcileRun, dbPool.query, sweepWatchdog]) fn.mock.resetCalls()
   process.env.MIKKA_FACTORY_ROUTING_ENABLED='0'; process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED='0'
 })
 after(() => {
@@ -111,6 +113,11 @@ test('afterRunEnded: flags off touches no pool; on, reconciles only the run per 
   assert.deepEqual(dbPool.query.mock.calls[0].arguments[1], ['run-1', 'owner'])
   assert.deepEqual(runtime.mock.calls.map((c) => c.arguments[0]), ['bot-a', null])
   assert.deepEqual(reconcileRun.mock.calls.map((c) => c.arguments), [['owner', 'run-1'], ['owner', 'run-1']])
+  assert.equal(sweepWatchdog.mock.callCount(), 2)
+  for (const call of sweepWatchdog.mock.calls) {
+    assert.equal(call.arguments[0], dbPool)
+    assert.deepEqual(call.arguments[4], { userId: 'owner', runId: 'run-1' })
+  }
 })
 
 test('afterRunEnded never throws: a reconcile failure is logged by class/code only and deferred', async () => {

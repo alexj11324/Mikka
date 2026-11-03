@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
+import { ActionFailureError } from '../action-error'
 import { FactoryError } from './contract'
 import { factoryEventId } from './event-id'
 import type { FactoryTask } from './store'
@@ -42,10 +43,24 @@ export async function recordOwnerFactoryContinuation(pool: Pool, userId: string,
 /** An epoch is the immutable, authenticated owner event UUID, not the stage revision.
  * Call with the authorized task locked. History, candidates and external receipts
  * remain immutable; replacing the attempt fences callbacks from the old target. */
-export async function advanceFactoryRequest(tx: PoolClient, task: FactoryTask, sourceEventId: string) {
-  if (task.sourceEventId === sourceEventId) return task
-  if (['cancelled', 'revoked'].includes(task.status)) throw new FactoryError('factoryStopped')
+export async function advanceFactoryRequest(tx: PoolClient, task: FactoryTask, sourceEventId: string, supersededRunIds?: string[]) {
   const eventId = factoryEventId('request-epoch', sourceEventId)
+  if (task.sourceEventId === sourceEventId) {
+    if (supersededRunIds) {
+      const { rows: [receipt] } = await tx.query('SELECT request FROM factory_events WHERE "taskId"=$1 AND "eventId"=$2', [task.id, eventId])
+      if (Array.isArray(receipt?.request?.supersededRunIds)) supersededRunIds.push(...receipt.request.supersededRunIds)
+      else {
+        // Compatibility for epochs admitted before the cleanup receipt existed.
+        // The current epoch's new executor is never part of this stop set.
+        const { rows } = await tx.query(`SELECT r.id FROM factory_attempts a JOIN agent_runs r ON r.id=a."runId"
+          WHERE a."taskId"=$1 AND a.id<>$2 AND a.output->>'requestEpoch' IS DISTINCT FROM $3
+            AND r."userId"=$4 AND r."stopRequestedAt" IS NOT NULL`, [task.id, task.attemptId, sourceEventId, task.userId])
+        supersededRunIds.push(...rows.map(row => row.id as string))
+      }
+    }
+    return task
+  }
+  if (['cancelled', 'revoked'].includes(task.status)) throw new FactoryError('factoryStopped')
   const { rows: [used] } = await tx.query('SELECT 1 FROM factory_events WHERE "taskId"=$1 AND "eventId"=$2', [task.id, eventId])
   if (used) throw new FactoryError('factoryStale')
   const { rows: [source] } = await tx.query(`SELECT e.payload FROM coordinator_events e
@@ -62,9 +77,11 @@ export async function advanceFactoryRequest(tx: PoolClient, task: FactoryTask, s
   await tx.query(`UPDATE factory_attempts SET output=output || $2::jsonb WHERE "taskId"=$1 AND NOT(output ? 'requestEpoch')`, [task.id, JSON.stringify({ requestEpoch: previousEpoch })])
   // The old worker cannot publish or submit for the new request. A still-running
   // executor is stopped before the existing dispatcher may start the next one.
-  await tx.query(`UPDATE agent_runs SET "stopRequestedAt"=COALESCE("stopRequestedAt",now()),"updatedAt"=now()
+  const { rows: fencedRuns } = await tx.query<{ id: string }>(`UPDATE agent_runs SET "stopRequestedAt"=COALESCE("stopRequestedAt",now()),"updatedAt"=now()
     WHERE id IN (SELECT "runId" FROM factory_attempts WHERE "taskId"=$1)
-      AND "userId"=$2 AND "issueId"=$3 AND status IN ('queued','preparing','running','paused','waiting_input','finishing')`, [task.id, task.userId, task.issueId])
+      AND "userId"=$2 AND "issueId"=$3 AND status IN ('queued','preparing','running','paused','waiting_input','finishing') RETURNING id`, [task.id, task.userId, task.issueId])
+  const stoppedRunIds = fencedRuns.map(run => run.id)
+  supersededRunIds?.push(...stoppedRunIds)
   await tx.query(`UPDATE run_tokens SET "revokedAt"=COALESCE("revokedAt",now())
     WHERE "userId"=$2 AND "runId" IN (SELECT "runId" FROM factory_attempts WHERE "taskId"=$1)`, [task.id, task.userId])
   await tx.query(`UPDATE factory_attempts SET status='cancelled',"finishedAt"=COALESCE("finishedAt",now()),
@@ -82,7 +99,7 @@ export async function advanceFactoryRequest(tx: PoolClient, task: FactoryTask, s
     "candidateId"=NULL,stage='execute',status='pending',revision=revision+1,
     reason='Owner continued this task with a new request',"updatedAt"=now() WHERE id=$1 RETURNING *`, [task.id, sourceEventId, attemptId])
   await tx.query('INSERT INTO factory_events("taskId","eventId",request,result) VALUES($1,$2,$3,$4)',
-    [task.id, eventId, JSON.stringify({ kind: 'request_epoch', sourceEventId, previousEpoch, previousRunId: source.payload.previousRunId }),
+    [task.id, eventId, JSON.stringify({ kind: 'request_epoch', sourceEventId, previousEpoch, previousRunId: source.payload.previousRunId, supersededRunIds: stoppedRunIds }),
       JSON.stringify({ task: next, requestEpoch: sourceEventId })])
   return next
 }
@@ -96,6 +113,7 @@ export async function continueActiveFactoryRequest(pool: Pool, userId: string, r
   const { factoryRuntimeForBot } = await import('./runtime')
   const store = factoryRuntimeForBot(identity.botId).store
   const tx = await pool.connect()
+  const supersededRunIds: string[] = []
   try {
     await tx.query('BEGIN')
     const task = await store.lockTask(tx, userId, identity.id)
@@ -103,10 +121,32 @@ export async function continueActiveFactoryRequest(pool: Pool, userId: string, r
     if (!sourceEventId) await tx.query(`INSERT INTO coordinator_events(id,"userId","botId","issueId",kind,"dedupeKey",payload,tier,"deliveredAt")
       VALUES($1,$2,$3,$4,'user_message',$5,$6,'background',now()) ON CONFLICT DO NOTHING`, [id, userId, task.botId, task.issueId, `thread-continuation:${id}`,
       JSON.stringify({ text, source: 'thread_continuation', previousRunId: runId, postedToChat: true })])
-    await advanceFactoryRequest(tx, task, id)
+    await advanceFactoryRequest(tx, task, id, supersededRunIds)
     if (!sourceEventId) await tx.query(`INSERT INTO run_messages(id,"runId","userId",text,origin,"mailboxWakeDepth","deliveredAt")
       VALUES($1,$2,$3,$4,'owner',-1,now()) ON CONFLICT DO NOTHING`, [id, runId, userId, text])
     await tx.query('COMMIT')
-    return true
   } catch (error) { await tx.query('ROLLBACK'); throw error } finally { tx.release() }
+  // A fenced queued run can no longer be claimed, so no executor will acknowledge
+  // its stop. Use the ordinary exact-run stop after the epoch commits; its end
+  // hook can then admit the current epoch through the normal reconciler. Never
+  // use the chain-stop helper here: a replay may arrive after that hook already
+  // created a new continuation, which must not be stopped by the old request.
+  const [{ db }, { stopOwnedRun }, { afterRunEnded }] = await Promise.all([
+    import('../db'), import('../run-control'), import('../run-completion-effects'),
+  ])
+  for (const supersededRunId of new Set(supersededRunIds)) {
+    let ended = false
+    try { ended = await stopOwnedRun(db, userId, supersededRunId) }
+    catch (error) {
+      if (!(error instanceof ActionFailureError && error.code === 'runNotFound')) throw error
+      ended = true // The exact old run already ended; its hook is safe to replay.
+    }
+    if (ended) await afterRunEnded(userId, supersededRunId)
+  }
+  // The observed run may have ended (and completed its old hook) before this
+  // transaction acquired the task lock, leaving no newly fenced runs. Re-read
+  // the admitted epoch now; the reconciler's active-run guard keeps this safe
+  // when an executor is still acknowledging its stop or a new one already ran.
+  await afterRunEnded(userId, runId)
+  return true
 }

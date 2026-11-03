@@ -16,7 +16,7 @@ let sessionUser: string | null = null
 let freshSession = true
 function fixture() {
   const run = { id: runId, issueId, deviceRepoId:undefined as string|undefined, userId: 'owner', botId, status: 'running', stopRequestedAt: null as Date | null, prompt: 'Private thread', report: null, error: null as string | null, questionContinuation: null as (typeof agentRuns.$inferSelect)['questionContinuation'], createdAt: new Date(), finishedAt: null, agentName: 'Owned Bot', harness: 'codex', ownerName: 'Owner' }
-  return { questions: new Map<string, string>(), questionOwners: new Map<string, string>(), questionReads: [] as unknown[][], run, continuation: null as typeof run | null, members: new Set(['owner', 'member', botId]), messages: [] as Array<{ id: string; runId: string; userId: string; text: string }>, updates: 0, transactions: 0, ordinaryDispatches: 0, beforeLock: undefined as (() => void) | undefined, fault: undefined as Error | undefined, recovery: null as Record<string,unknown> | null, recoveryReads: 0, recoveryCalls: [] as Array<{actor:unknown;input:unknown}> }
+  return { questions: new Map<string, string>(), questionOwners: new Map<string, string>(), questionReads: [] as unknown[][], epochReads: [] as unknown[][], run, continuation: null as typeof run | null, members: new Set(['owner', 'member', botId]), messages: [] as Array<{ id: string; runId: string; userId: string; text: string }>, updates: 0, transactions: 0, ordinaryDispatches: 0, beforeLock: undefined as (() => void) | undefined, fault: undefined as Error | undefined, recovery: null as Record<string,unknown> | null, recoveryReads: 0, recoveryCalls: [] as Array<{actor:unknown;input:unknown}> }
 }
 let current = fixture()
 class Selection {
@@ -106,6 +106,15 @@ before(async () => {
   } } } } })
   mock.module('next/headers', { namedExports: { headers: async () => requestHeaders } })
   mock.module('@/lib/db', { namedExports: { db: database, withDatabaseClient: () => { throw Error('Factory dispatch is outside thread-control fixture') }, pool: { async query(sql: string, params: unknown[]) {
+    // Running owner messages first check for a Factory target to advance.
+    // These ordinary-thread fixtures have no Factory binding; keep the actual
+    // epoch function in the call path and verify its owner/run constraints.
+    if (sql.startsWith('SELECT t.id,t."botId",t."issueId" FROM factory_attempts a')) {
+      assert.match(sql,/JOIN factory_tasks t ON t\.id=a\."taskId" WHERE a\."runId"=\$1 AND t\."userId"=\$2/)
+      assert.deepEqual(params,[current.continuation?.id ?? current.run.id,current.run.userId])
+      current.epochReads.push(params)
+      return {rows:[]}
+    }
     // Run chains (BE-18) fold a resumed-question continuation into its thread; covered against real PG in
     // tests/run-chain.db.test.ts and lib/factory/questions/postgres.test.ts.
     if (/SELECT q.id AS "questionId"/.test(sql)) {
@@ -157,6 +166,7 @@ test('actual thread actions preserve owner detail/Bot display and attribute an a
   await actions.sendIssueThreadMessage({ issueId, runId, text: '  continue  ' })
   assert.deepEqual(current.messages.map(({ runId: run, userId, text }) => ({ run, userId, text })), [{ run: runId, userId: 'owner', text: 'continue' }])
   assert.equal(current.transactions, 1)
+  assert.deepEqual(current.epochReads,[[runId,'owner']])
 })
 
 test('actual actions deny member/Bot-ID authority for content, messages and stop while retaining metadata', async () => {
@@ -168,6 +178,7 @@ test('actual actions deny member/Bot-ID authority for content, messages and stop
     await assert.rejects(actions.sendIssueThreadMessage({ issueId, runId, text: 'forged' }), rejected('runNotFound'))
     await assert.rejects(actions.stopRun(runId), rejected('runNotFound'))
     assert.equal(current.messages.length + current.updates, 0)
+    assert.equal(current.epochReads.length,0,'a collaborator cannot reach the owner target probe')
   }
 })
 
@@ -301,6 +312,7 @@ test('only the explicit owner Retry intent recovers a blocked original-session q
   const result=await actions.sendIssueThreadReply({issueId,runId,text:'Arbitrary translated button label',retryOriginalSession:true});
   assert.deepEqual(result,{sent:true,runId:'owner-recovery-run',continued:true});
   assert.equal(current.recoveryCalls.length,1);assert.equal(current.messages.length,0);
+  assert.equal(current.epochReads.length,0,'explicit native-question recovery must not create a new owner target')
   const first=current.recoveryCalls[0];
   assert.deepEqual(first.actor,{source:'human',userId:'owner',sessionId:'synthetic-session'});
   const expected={requestId:factoryEventId('question-owner-retry',runId),expectedFailedRunId:runId,reference:{questionId:current.recovery.questionId,questionRevision:13,binding:current.recovery.binding,originRunId:current.recovery.originRunId,originSessionId:current.recovery.originSessionId}};
@@ -313,6 +325,7 @@ test('typed Retry text is ordinary messaging, and explicit retry never grants a 
   current=fixture();viewer='owner';current.recovery=recoveryRow();
   await actions.sendIssueThreadReply({issueId,runId,text:'Retry'});
   assert.equal(current.recoveryReads,0);assert.equal(current.recoveryCalls.length,0);assert.equal(current.messages.length,1);
+  assert.deepEqual(current.epochReads,[[runId,'owner']])
   for(const mode of ['member','api','expired']) {
     current=fixture();current.run.status='failed';current.recovery=recoveryRow();viewer=mode==='member'?'member':'owner';
     if(mode==='api')requestHeaders=new Headers({cookie:'synthetic-session',authorization:'Bearer synthetic'});
