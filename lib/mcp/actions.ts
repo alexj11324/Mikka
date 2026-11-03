@@ -1,6 +1,7 @@
 import { localExecutionHarnesses } from '@/lib/device-agents'
 import { issueVisibility } from '@/lib/issue-visibility'
 import 'server-only'
+import { createHash } from 'node:crypto'
 import { and, asc, desc, eq, gt, or, sql } from 'drizzle-orm'
 import { ActionFailureError } from '@/lib/action-error'
 import { issueForUser } from '@/lib/issue-access'
@@ -42,6 +43,12 @@ async function attempt<T>(fn: () => Promise<T>): Promise<T | Failure> {
     if (error instanceof ActionFailureError) return { error: error.code }
     throw error
   }
+}
+
+/** A stable UUID for one tool call's team request. */
+function requestIdFor(userId: string, toolCallId: string) {
+  const hex = createHash('sha256').update(JSON.stringify(['create_issue:team', userId, toolCallId])).digest('hex')
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-8${hex.slice(17, 20)}-${hex.slice(20, 32)}`
 }
 
 /** Plain text as a TipTap document: one paragraph per line. */
@@ -98,14 +105,20 @@ function issueResult(issue: { id: string; title: string; status: string; priorit
   }
 }
 
-export async function createIssue(userId: string, input: IssueChanges & { title: string; body?: string }, actor?: ActivityActor, toolCallId?: string, taskEvent?: { eventId: string; botId: string | null }) {
+/** `teamId`, chosen by the host (lib/coordinator/issue-team.ts), creates the task in that team instead of as a personal one. */
+export async function createIssue(userId: string, input: IssueChanges & { title: string; body?: string; teamId?: string }, actor?: ActivityActor, toolCallId?: string, taskEvent?: { eventId: string; botId: string | null }, teamId?: string) {
   return attempt(() => actAs(userId, async () => {
     if (input.assigneeUserId !== undefined && input.assigneeAgentId !== undefined) return { error: 'validationGeneric' }
     // The legacy MCP contract has no human-assignee field. Do not introduce a
     // multi-action write without the durable transaction and access checks.
     if (toolCallId === undefined && input.assigneeUserId !== undefined) return { error: 'issueToolsDisabled' }
+    if (teamId && toolCallId === undefined) return { error: 'validationGeneric' }
     const mutate = async () => {
-      const created = unwrap(await saveIssue({ title: input.title, content: textToDoc(input.body ?? ''), status: input.status ?? 'todo', priority: input.priority ?? 'normal' })).issue
+      const fields = { title: input.title, content: textToDoc(input.body ?? ''), status: input.status ?? 'todo', priority: input.priority ?? 'normal' }
+      // One tool call, one team request: a retried call reuses the request instead of creating a second task.
+      const created = teamId
+        ? unwrap(await (await import('@/lib/team-issue-create')).createTeamIssueForUser(userId, { ...fields, teamId, requestId: requestIdFor(userId, toolCallId!) }, actor)).issue
+        : unwrap(await saveIssue(fields)).issue
       return issueResult(await applyChanges(userId, created.id, { projectId: input.projectId, labels: input.labels, assigneeUserId: input.assigneeUserId, assigneeAgentId: input.assigneeAgentId }))
     }
     if (toolCallId === undefined) return mutate()

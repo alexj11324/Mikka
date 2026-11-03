@@ -92,7 +92,7 @@ export function createCoordinatorRegistry(userId: string, botId: string, scope?:
       execute: input => steps.getIssue(userId, input, scope, botId),
     }),
     ...(switches.issueTools ? { create_issue: tool({
-      description: 'Create the task the person asked for, including requests from the new-task dialog. Write a short title and put details in body. The assignee can only be a person; dispatching a thread is a separate action. Defaults to todo and normal priority.',
+      description: 'Create the task the person asked for, including requests from the new-task dialog. Write a short title and put details in body. The assignee can only be a person; dispatching a thread is a separate action. Defaults to todo and normal priority. In a team workspace the task goes to its team; issueTeamRequired means it has several of the person\'s teams: ask which, by drawing result.teams as one choice question, then call again with that teamId.',
       inputSchema: createIssueInput,
       execute: (input, toolOptions) => options.taskEventId
         ? steps.createIssue(userId, input, toolOptions.toolCallId, scope, botId, options.taskEventId)
@@ -124,7 +124,7 @@ export function createCoordinatorRegistry(userId: string, botId: string, scope?:
       execute: () => steps.listAgents(userId, scope),
     }),
     find_repository: tool({
-      description: 'Look up the person\'s own GitHub repositories that the Mikka GitHub App reaches. With name (the one the person used, with or without owner): match one (result.repository is owner/repo), several (result.candidates and result.card) or none (result.card). Case and -, _, . do not matter. Without name: the first 50 and the total. For several or none, draw result.card. Errors githubNotConnected, githubReconnectRequired: the person connects GitHub in 插件 › GitHub. mcpUnavailable: GitHub could not be reached just now; the cause is recorded for Mikka, not known to you, so never state or guess one. Dispatch an Agent for the work instead.',
+      description: 'Look up the person\'s own GitHub repositories that the Mikka GitHub App reaches. With name (the one the person used, every word as they said it, with or without owner): match one (result.repository is owner/repo), several (result.candidates and result.card) or none (result.card). Case and -, _, . do not matter. Without name: the first 50 and the total. For several or none, draw result.card. Errors githubNotConnected, githubReconnectRequired: the person connects GitHub in 插件 › GitHub. mcpUnavailable: GitHub could not be reached just now; the cause is recorded for Mikka, not known to you, so never state or guess one. Dispatch an Agent for the work instead.',
       inputSchema: z.object({ name: z.string().trim().max(200).optional() }),
       execute: input => steps.findRepository(userId, input, scope),
     }),
@@ -186,7 +186,7 @@ export function createCoordinatorRegistry(userId: string, botId: string, scope?:
         issueId: id, agentId: id.optional().describe('Deprecated: omit. 模型与订阅 picks the Agent.'),
         // A Factory attempt's device repository goes through dispatch_factory_task, never here.
         deviceRepoId: z.never().optional(),
-        repo: z.string().trim().min(1).max(4_000).optional().describe('Omit when the task already has a thread (get_issue thread): more work keeps that thread\'s repository. For a task\'s first thread: GitHub owner/repo, an HTTPS/SSH git URL, or just the repository name the person used (e.g. Mikka_test); the host finds it among their authorized repositories. The daemon clones it; no repository registration is needed.'),
+        repo: z.string().trim().min(1).max(4_000).optional().describe('Omit when the task already has a thread (get_issue thread): more work keeps that thread\'s repository. For a task\'s first thread: GitHub owner/repo, an HTTPS/SSH git URL, or just the repository name the person used, every word kept (e.g. Mikka_test, Mikka site); the host finds it among their authorized repositories and asks with a card when several fit. The daemon clones it; no repository registration is needed.'),
         note: z.string().max(10_000).optional().describe('Extra direction for this run, added after the issue text.'),
         readOnly: z.boolean().optional().describe('true when the task only reads and reports (investigation, review): no file changes, commit, push or PR.'),
         newThread: newThreadInput,

@@ -25,3 +25,30 @@ export function matchRepositoryName<T extends { fullName: string }>(name: string
   if (found.length === 1) return { kind: 'one', repository: found[0]! }
   return found.length ? { kind: 'several', candidates: found } : { kind: 'none' }
 }
+
+/** Words a person adds to a name that say which of a family of repositories they mean ("Mikka site" → mikka-web). */
+const QUALIFIERS = [
+  ['site', 'web', 'website', 'www', 'homepage', 'landing', 'frontend', '网站', '官网', '前端'],
+  ['app', 'application', 'client', '应用'],
+  ['api', 'backend', 'server', '后端', '服务端'],
+  ['docs', 'doc', 'documentation', '文档'],
+]
+const FILLER = new Set(['the', 'repo', 'repository', 'project', 'code', '仓库', '项目', '代码'])
+const words = (name: string) => plain(name).split(/[-_. ]+/).filter(word => word && !FILLER.has(word))
+const sameWord = (a: string, b: string) => a === b || QUALIFIERS.some(group => group.includes(a) && group.includes(b))
+
+/**
+ * A name of several words, the first naming the repository family and the rest qualifying it
+ * ("Mikka site", "mikka web"): the repositories of that family whose own name carries every
+ * qualifier, or one of its synonyms. A single word is never matched this way.
+ */
+export function matchRepositoryWords<T extends { fullName: string }>(name: string, repositories: readonly T[]): RepositoryMatch<T> {
+  const [stem, ...qualifiers] = words(name)
+  if (!stem || qualifiers.length === 0) return { kind: 'none' }
+  const found = repositories.filter(repository => {
+    const [first, ...rest] = words(repository.fullName.slice(repository.fullName.indexOf('/') + 1))
+    return first === stem && qualifiers.every(qualifier => rest.some(word => sameWord(word, qualifier)))
+  })
+  if (found.length === 1) return { kind: 'one', repository: found[0]! }
+  return found.length ? { kind: 'several', candidates: found } : { kind: 'none' }
+}

@@ -11,6 +11,7 @@ const byUser: Record<string, ReturnType<typeof repos>> = {
   other: repos('someone/secret-repo', 'someone/Mikka_test', 'org2/mikka-test'),
 }
 const lister = () => mock.fn<RepositoryLister>(async userId => byUser[userId] ?? repos())
+const noContext = async () => ({ text: '', used: [] })
 const accessError = (code: string) => Object.assign(new Error(code), { name: 'GitHubAccessError', code, status: 409 })
 
 test('one match dispatches straight away with owner/repo; the lister is asked for the dispatching user only', async () => {
@@ -33,7 +34,7 @@ test('owner/repo and URLs pass unchanged without asking GitHub', async () => {
 test('several matches return the candidates as one choice card and dispatch nothing', async () => {
   const dispatch = mock.fn(async () => ({ runId: 'run' }))
   const list = mock.fn<RepositoryLister>(async () => repos('alexj11324/Mikka_test', 'mikka-org/mikka-test'))
-  assert.deepEqual(await withResolvedRepository('alex', ISSUE, 'mikka.test', dispatch, list), {
+  assert.deepEqual(await withResolvedRepository('alex', ISSUE, 'mikka.test', dispatch, list, noContext), {
     error: 'repositoryAmbiguous', issueId: ISSUE,
     card: { title: '多个仓库匹配 mikka.test', options: [{ value: 'alexj11324/Mikka_test', label: 'alexj11324/Mikka_test' }, { value: 'mikka-org/mikka-test', label: 'mikka-org/mikka-test' }] },
   })
@@ -83,4 +84,28 @@ test('find_repository lists the user\'s own repositories, matches a name, and an
   assert.deepEqual(await findRepository('alex', 'https://github.com/mikka-org/web.git', lister()), { match: 'one', repository: 'mikka-org/web' })
   const several = await findRepository('other', 'mikka.test', lister()) as { match: string; candidates: string[] }
   assert.deepEqual([several.match, several.candidates], ['several', ['someone/Mikka_test', 'org2/mikka-test']])
+})
+
+test('"Mikka site" is mikka-web, not Mikka: qualifying words pick the family member', async () => {
+  // The production case: the person said 「Mikka site」 and both alexj11324/Mikka and alexj11324/mikka-web are authorized.
+  const list = mock.fn<RepositoryLister>(async () => repos('alexj11324/Mikka', 'alexj11324/mikka-web'))
+  for (const name of ['Mikka site', 'mikka web', 'Mikka website'])
+    assert.deepEqual(await resolveRepository('alex', name, list, noContext), { repo: 'alexj11324/mikka-web' }, name)
+  assert.deepEqual(await resolveRepository('alex', 'Mikka', list, noContext), { repo: 'alexj11324/Mikka' }, 'the exact name still wins')
+  assert.deepEqual(await findRepository('alex', 'Mikka site', list), { match: 'one', repository: 'alexj11324/mikka-web' })
+})
+
+test('several matches: the task\'s text or its workspace\'s threads choose; otherwise the person is asked', async () => {
+  const list = mock.fn<RepositoryLister>(async () => repos('alexj11324/mikka-web', 'acme/mikka-website'))
+  const dispatch = mock.fn(async (repo: string) => ({ runId: 'run', repo }))
+  const context = (text: string, used: string[] = []) => mock.fn(async () => ({ text, used }))
+  const named = context('Fix the hero on acme/mikka-website')
+  assert.deepEqual(await withResolvedRepository('alex', ISSUE, 'Mikka site', dispatch, list, named), { runId: 'run', repo: 'acme/mikka-website' })
+  assert.deepEqual(named.mock.calls.map(call => call.arguments), [['alex', ISSUE]])
+  assert.deepEqual(await withResolvedRepository('alex', ISSUE, 'Mikka site', dispatch, list, context('', ['alexj11324/mikka-web'])), { runId: 'run', repo: 'alexj11324/mikka-web' })
+  // A longer name is not a mention of a shorter one.
+  assert.equal((await withResolvedRepository('alex', ISSUE, 'Mikka site', dispatch, list, context('see acme/mikka-website-old', ['alexj11324/mikka-web', 'acme/mikka-website'])) as { error?: string }).error, 'repositoryAmbiguous')
+  const unsure = await withResolvedRepository('alex', ISSUE, 'Mikka site', dispatch, list, async () => { throw new Error('context unavailable') })
+  assert.equal((unsure as { error?: string }).error, 'repositoryAmbiguous', 'an unreadable context asks instead of guessing')
+  assert.equal(dispatch.mock.callCount(), 2)
 })
