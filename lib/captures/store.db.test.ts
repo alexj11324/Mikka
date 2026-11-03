@@ -115,7 +115,7 @@ dbTest('captures stay with their run\'s owner, uploads are checked, and recordin
       assert.ok(!('error' in pending))
       const url = `http://localhost/v1/runs/${localRun}/captures/${pending.captureId}`
       const params = Promise.resolve({ runId: localRun, captureId: pending.captureId })
-      const headers = { authorization: `Bearer ${token}` }
+      const headers = { 'x-mikka-client-version': '0.0.375', authorization: `Bearer ${token}` }
       const ending = await pool.connect()
       await ending.query('BEGIN')
       await ending.query("UPDATE agent_runs SET status='succeeded', \"finishedAt\"=now() WHERE id=$1", [localRun])

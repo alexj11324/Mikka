@@ -101,7 +101,7 @@ test('task workspace policy applies to Coordinator and cross-workspace Bot runs'
     body: JSON.stringify({ operation: 'check', deviceId: device, policyRevision }),
   })
   await t.test('signed policy HTTP context and renewal bind the current run and retain final restrictions', async () => {
-    const issuer=`http://127.0.0.1:${address.port}`,url=`${issuer}/v1/runs/${a.run}/policy-snapshot`,auth={authorization:`Bearer ${token}`,'content-type':'application/json'}
+    const issuer=`http://127.0.0.1:${address.port}`,url=`${issuer}/v1/runs/${a.run}/policy-snapshot`,auth={'x-mikka-client-version':'0.0.375',authorization:`Bearer ${token}`,'content-type':'application/json'}
     const current=await read(a.run),context=policyDistributionContext(issuer,owner,device,a.run,current)
     const finalPolicy={...current.policy,readOnly:true,permissions:{...current.policy.permissions,computer_use:'deny' as const}}
     const expired=issuePolicySnapshot(context,finalPolicy,Date.now()-POLICY_SNAPSHOT_TTL_MS-1000)
