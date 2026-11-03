@@ -158,6 +158,25 @@ export function createFactoryReconciler(
           await tx.query("COMMIT");
           continue;
         }
+        if (run.report?.repositorySelection && !run.stopRequestedAt && run.stopReason === 'blocked') {
+          const { switchFactoryRepository } = await import('./repository-selection');
+          await tx.query('SAVEPOINT repository_selection');
+          let start: (() => Promise<void>) | undefined;
+          try { start = await switchFactoryRepository(pool, tx, store, task, run); }
+          catch (error) {
+            await tx.query('ROLLBACK TO SAVEPOINT repository_selection');
+            if (error instanceof FactoryError && ['factoryNotFound', 'factoryStopped', 'factoryStale'].includes(error.code)) throw error;
+            await store.apply(userId, binding(task), factoryEventId('repository-selection-unavailable', run.id), {
+              action: 'finish', status: 'blocked', reason: 'The selected repository could not be admitted with the original runtime and credential; previous work is retained.',
+              evidence: [], output: { runId: run.id, reasonCode: 'repository_selection_unavailable' },
+            }, tx);
+          }
+          await tx.query('RELEASE SAVEPOINT repository_selection');
+          await tx.query('COMMIT');
+          await start?.();
+          recovered++;
+          continue;
+        }
         if (questions) await questions.settle(userId, run.id, tx);
         task = await store.lockTask(tx, userId, task.id);
         if (task.status !== "running") { await tx.query("COMMIT"); continue; }

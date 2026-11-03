@@ -1649,6 +1649,7 @@ function abortPromise(signal: AbortSignal): Promise<typeof ABORTED> {
 function pickAgentReport(agent: AgentReport | undefined): AgentReport {
   if (!agent) return {}
   const picked: AgentReport = {}
+  if (agent.repositorySelection) picked.repositorySelection = agent.repositorySelection
   if (agent.verificationCommand && typeof agent.verificationCommand.command === 'string' && agent.verificationCommand.command.trim() && typeof agent.verificationCommand.basis === 'string' && agent.verificationCommand.basis.trim())
     picked.verificationCommand = { command: agent.verificationCommand.command.trim().slice(0, 2000), basis: agent.verificationCommand.basis.trim().slice(0, 2000) }
   if (typeof agent.summary === "string")

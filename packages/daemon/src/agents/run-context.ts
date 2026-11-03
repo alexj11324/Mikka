@@ -19,7 +19,7 @@ import { homedir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 
 import type { Harness, RunKind } from "@mikka/protocol"
-import { runQuestion, type RunQuestion } from "@mikka/protocol/run"
+import { runQuestion, runRepositorySelection, type RunQuestion } from "@mikka/protocol/run"
 import { planHandoff, planSplitProblem } from "@mikka/protocol/plan"
 import {
   SKILL_BODY_FILE,
@@ -146,6 +146,7 @@ export interface RunContextOptions {
 
 /** Recorded by `mikka-mcp.mjs`. */
 interface HandoffFile {
+  repositorySelection?: unknown
   verificationCommand?: AgentReport['verificationCommand']
   kind: "submit" | "ask" | "blocked"
   summary?: string
@@ -389,6 +390,7 @@ export class RunContext {
         "--captures", this.capturesDir, "--capture-root", this.worktree, "--capture-root", this.tmpDir,
         ...(this.options.factoryCheck && (!this.options.factoryCheck.reportOnly || this.options.factoryCheck.inferCommand) ? ['--factory-verify', JSON.stringify({ cwd: this.worktree, command: this.options.verifyCommand ?? null, infer: this.options.factoryCheck.inferCommand })] : []),
         ...(this.options.factoryCheck?.reportOnly ? ['--factory-artifacts', this.worktree] : []),
+        ...(!this.options.factoryCheck && ['implement', 'fix'].includes(this.options.kind ?? '') ? ['--repository-selection', this.worktree] : []),
       ],
       // Inside Electron, `process.execPath` is the app; run it as plain Node.
       env: process.versions.electron ? { ELECTRON_RUN_AS_NODE: "1" } : {},
@@ -435,7 +437,10 @@ export class RunContext {
     const plan =
       this.options.kind === "plan" ? planFromHandoff(file.plan, log) : null
     const question = runQuestion.safeParse(file.question)
+    const repositorySelection = !this.options.factoryCheck && ['implement', 'fix'].includes(this.options.kind ?? '')
+      ? runRepositorySelection.safeParse(file.repositorySelection) : null
     const report: AgentReport = {
+      ...(file.kind === 'blocked' && repositorySelection?.success ? { repositorySelection: repositorySelection.data } : {}),
       ...(question.success ? { question: question.data } : {}),
       summary: file.summary ?? "",
       openQuestions: file.openQuestions ?? [],

@@ -424,8 +424,15 @@ export class CodexAdapter implements AgentAdapter {
     let rateLimits: CodexRateLimits | undefined
     let usage = { inputTokens: 0, outputTokens: 0 }
     const pendingMcp = new Map<string,{turnId:string;server:string;tool:string;attempted:boolean}>()
+    // Match the host-created MCP server's advertised capabilities. A fixed
+    // check may inspect its artifact, but cannot select another repository.
+    const handInTools = new Set(['submit', 'request_help', 'ask_human', 'report_blocked', 'submit_capture',
+      ...(mcp.args.includes('--repository-selection') ? ['switch_repository'] : []),
+      ...(mcp.args.includes('--factory-artifacts') ? ['inspect_artifact'] : []),
+      ...(mcp.args.includes('--factory-verify') ? ['verify_command'] : []),
+    ])
     const registeredMcpTool = (server: string, tool: string) =>
-      (server === MCP_SERVER_NAME && ['submit','request_help','ask_human','report_blocked'].includes(tool)) ||
+      (server === MCP_SERVER_NAME && handInTools.has(tool)) ||
       (Boolean(computerMcp) && server === COMPUTER_MCP_SERVER_NAME && ['get_desktop_state','click','type_text','press_key','scroll'].includes(tool)) ||
       Boolean(options.apps?.apps.some(app => app.name === server))
 

@@ -44,7 +44,7 @@ export interface ExitEvent {
 export type AgentReport = Partial<
   Pick<
     HandoffReport,
-    "summary" | "openQuestions" | "nextStep" | "blockedOn" | "plan" | "criteria" | "question" | "previewDatabaseBranch" | "verificationCommand"
+    "summary" | "openQuestions" | "nextStep" | "blockedOn" | "plan" | "criteria" | "question" | "previewDatabaseBranch" | "verificationCommand" | "repositorySelection"
   >
 >
 

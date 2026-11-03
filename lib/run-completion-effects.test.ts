@@ -86,6 +86,15 @@ test('question settlement and handoff use the existing completion transaction an
   assert.deepEqual(trace, ['SAVEPOINT completion_question_settle', 'bot-settle', 'RELEASE SAVEPOINT completion_question_settle', 'SAVEPOINT completion_question_record', 'bot-record', 'RELEASE SAVEPOINT completion_question_record'])
 })
 
+test('an Agent repository selection is handled by the host without opening a human question', async () => {
+  process.env.MIKKA_FACTORY_ROUTING_ENABLED = '1'; process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED = '1'
+  await effects.settleRunCompletionEffects(client, run, 'blocked', true, { ...emptyRunReport(), repositorySelection: {
+    repository: 'example/correct', reason: 'Task and origin disagree.', observedRemote: 'https://github.com/example/wrong.git', observedHead: 'a'.repeat(40),
+  } })
+  assert.equal(scopedQuestions.settle.mock.callCount(), 1)
+  assert.equal(scopedQuestions.record.mock.callCount(), 0)
+})
+
 test('known stale question state can settle without consuming a new handoff on submissions', async () => {
   questionError = new FactoryError('factoryQuestionClosed')
   await effects.settleRunCompletionEffects(client, run, 'submitted', true)
