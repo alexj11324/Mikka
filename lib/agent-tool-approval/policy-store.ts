@@ -35,7 +35,11 @@ async function lockCliHierarchy(tx: PoolClient, userId: string, runId: string, t
   return hierarchy
 }
 export async function lockCliTaskScope(tx: PoolClient, userId: string, issueId: string): Promise<CliTaskScope> {
-  const { rows: [task] } = await tx.query<{ userId: string; scope: string; scopeVersion: number; content: JSONContent }>('SELECT "userId",scope,"scopeVersion",content FROM issues WHERE id=$1', [issueId])
+  // Authority needs the complete metadata schema, never the document body.
+  // Preserve non-object roots so malformed/null content keeps its old behavior.
+  const { rows: [task] } = await tx.query<{ userId: string; scope: string; scopeVersion: number; content: JSONContent }>(`SELECT "userId",scope,"scopeVersion",
+    CASE WHEN jsonb_typeof(content)='object' THEN jsonb_build_object('attrs',content->'attrs') ELSE content END AS content
+    FROM issues WHERE id=$1`, [issueId])
   if (!task || readIssueMetadata(task.content).deletedAt) throw new Error('agentPolicyUnavailable')
   if (task.scope === 'personal') {
     if (task.userId !== userId) throw new Error('agentPolicyUnavailable')
