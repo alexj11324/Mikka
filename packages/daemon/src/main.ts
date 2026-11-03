@@ -1323,6 +1323,10 @@ export class Daemon {
     if (existing) return this.supervisor.summary(existing)
     const assignment = await this.options.link.claimRun(deviceId, runId, this.commandsAbort.signal)
     if (assignment.runId !== runId) return this.refuseRun(runId)
+    // A hosted workspace can be registered after this daemon starts. Resolve
+    // that server-owned registration before the synchronous repository check.
+    if (this.usesHostedWorkspace(assignment) && !this.device.repos?.some(repo => repo.repoId === assignment.repoId))
+      this.saveDevice({ repos: await this.options.link.listRepos(deviceId) })
     if (assignment.expectedRepoRemote) {
       let matches = false
       if (assignment.remoteUrl) {
@@ -1421,10 +1425,10 @@ export class Daemon {
   }
 
   private usesHostedWorkspace(assignment: RunAssignment): boolean {
-    // Independent file checks retain the registered isolated workspace while
-    // their read-only policy deliberately omits interactive desktop authority.
+    // File checks and delivery reports retain their registered isolated
+    // workspace while read-only policy omits interactive desktop authority.
     return Boolean(this.options.hostedSubscriptions &&
-      (assignment.computer || (assignment.factoryCheck && assignment.policy?.readOnly)))
+      (assignment.computer || ((assignment.factoryCheck || assignment.factoryExecuteKind === 'deliverable') && assignment.policy?.readOnly)))
   }
 
   private repository(assignment: RunAssignment): DeviceRepo {

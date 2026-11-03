@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { SubscriptionRefusal } from "@mikka/protocol/subscription";
+import { WorkerRefusal } from "../packages/daemon/src/subscription-worker-client";
 import type { SubscriptionService } from "./subscription-service";
 
 const input = z.discriminatedUnion("action", [
@@ -21,12 +23,17 @@ const input = z.discriminatedUnion("action", [
 export function subscriptionNativeHTTP(deps: {
   authorize(request: Request, deviceId: string): Promise<string | null>;
   service(): SubscriptionService;
+  /** Fixed refusal metadata only; never a provider response, URL, message or credential. */
+  log?(line: string): void;
 }) {
   return async (
     request: Request,
     context: { params: Promise<{ deviceId: string; runId: string }> },
   ): Promise<Response> => {
     const headers = { "cache-control": "private, no-store" };
+    let identity: { deviceId: string; runId: string } | undefined;
+    let operation: "context" | "request" | null = null;
+    let phase = "input";
     try {
       const { deviceId, runId } = await context.params;
       if (
@@ -34,8 +41,11 @@ export function subscriptionNativeHTTP(deps: {
         !z.uuid().safeParse(runId).success
       )
         return new Response(null, { status: 404, headers });
+      identity = { deviceId, runId };
+      phase = "authorize";
       const owner = await deps.authorize(request, deviceId);
       if (!owner) return new Response(null, { status: 401, headers });
+      phase = "input";
       if (!request.headers.get("content-type")?.startsWith("application/json"))
         return new Response(null, { status: 415, headers });
       const reader = request.body?.getReader();
@@ -63,12 +73,18 @@ export function subscriptionNativeHTTP(deps: {
         offset += part.length;
       }
       const body = input.parse(JSON.parse(new TextDecoder().decode(bytes)));
+      operation = body.action;
+      phase = "runtime";
       const service = deps.service();
+      phase = "binding";
       const use = await service.nativeRun(owner, deviceId, runId);
-      if (body.action === "context")
+      if (body.action === "context") {
+        phase = "context";
         return Response.json(await service.nativeContext(use, request.signal), {
           headers,
         });
+      }
+      phase = "request";
       const upstream = await service.nativeRequest(
         use,
         body.payload,
@@ -77,7 +93,17 @@ export function subscriptionNativeHTTP(deps: {
       return new Response(upstream.body, {
         headers: { ...headers, "content-type": upstream.contentType },
       });
-    } catch {
+    } catch (error) {
+      const subscription = error instanceof SubscriptionRefusal;
+      const worker = error instanceof WorkerRefusal;
+      const code = subscription || worker ? error.code : "subscription_unavailable";
+      try {
+        (deps.log ?? console.warn)(JSON.stringify({
+          event: "subscription_native_refused", ...identity, operation, phase,
+          code: typeof code === "string" && /^[a-z_]{1,64}$/.test(code) ? code : "subscription_unavailable",
+          errorClass: subscription ? "SubscriptionRefusal" : worker ? "WorkerRefusal" : error instanceof z.ZodError ? "ZodError" : "unknown",
+        }));
+      } catch { /* A diagnostic failure cannot replace the refusal. */ }
       return Response.json(
         { error: "subscription_unavailable" },
         { status: 409, headers },
