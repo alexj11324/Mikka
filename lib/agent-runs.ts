@@ -113,8 +113,8 @@ export async function queueFactoryRun(tx: import('pg').PoolClient, userId: strin
       botId = source.botId
       requestEventId = source.agentDefinition?.repositoryAdmission?.requestEventId
     }
-    // Its model, chosen here like any run's: a rerun keeps its source run's, a new task takes 优先使用的模型's first entry its Agent runs.
-    const runModel = await factoryRunModel(userId, parsed.data.agentId, botId, sourceRunId ? (await executor.select({ agentDefinition: agentRuns.agentDefinition }).from(agentRuns).where(and(eq(agentRuns.id, sourceRunId), eq(agentRuns.userId, userId))).limit(1))[0]?.agentDefinition : null)
+    // A rerun keeps its source run's model.
+    const runModel = await factoryRunModel(sourceRunId ? (await executor.select({ agentDefinition: agentRuns.agentDefinition }).from(agentRuns).where(and(eq(agentRuns.id, sourceRunId), eq(agentRuns.userId, userId))).limit(1))[0]?.agentDefinition : null)
     const result = await queueAdmittedRun(userId, { ...parsed.data, ...runModel, repo: repo.remoteUrl, requestKey: parsed.data.requestKey ?? (context ? `factory:${context.attemptId}` : undefined) }, botId, undefined, requestEventId, null, { executor, repo, client: tx, sourceRunId })
     const [run] = await executor.select({ status: agentRuns.status }).from(agentRuns).where(and(eq(agentRuns.id, result.runId), eq(agentRuns.userId, userId))).limit(1)
     if (!run) throw new ActionFailureError('runInvalid')
@@ -125,12 +125,13 @@ export async function queueFactoryRun(tx: import('pg').PoolClient, userId: strin
   })
 }
 
-async function queueAdmittedRun(userId: string, input: LocalDispatchInput, botId: string | null, execution?: AgentExecution,
+async function queueAdmittedRun(userId: string, input: Omit<LocalDispatchInput, 'model'> & { model?: string }, botId: string | null, execution?: AgentExecution,
   requestEventId?: string, source: 'mcp' | null = null,
   internal?: { executor: Pick<typeof db, 'select' | 'transaction'>; repo: typeof deviceRepos.$inferSelect; client: import('pg').PoolClient; sourceRunId?: string }) {
   const executor = internal?.executor ?? db
   // Every local run is frozen with its model: a caller that left it out fails here, before anything is read or written.
-  if (typeof input.model !== 'string' || !input.model.trim() || input.model.trim() === 'auto') {
+  // A Factory or Skill run (internal) carries its source run's model when it has one; the Factory picks none yet (#1102).
+  if (!internal && (typeof input.model !== 'string' || !input.model.trim() || input.model.trim() === 'auto')) {
     console.error(JSON.stringify({ msg: 'local_run_model_missing', threadRunId: input.threadRunId ?? null, issueId: input.issueId, agentId: input.agentId }))
     throw new ActionFailureError('runModelMissing')
   }
@@ -154,7 +155,7 @@ async function queueAdmittedRun(userId: string, input: LocalDispatchInput, botId
   const found = captureDefinition && byosEnabled() ? await nativeRunBinding(query, userId, agent.id, agent.harness, workspaceId, parsed.data.subscriptionBindingId) : null
   if (parsed.data.subscriptionBindingId && (!found || (parsed.data.model && parsed.data.model !== found.modelId))) throw new ActionFailureError('executionAccountUnavailable')
   const model = parsed.data.subscriptionBindingId ? found?.modelId : parsed.data.model
-  if (!model) throw new ActionFailureError('runModelMissing')
+  if (!model && !internal) throw new ActionFailureError('runModelMissing')
   // The run's credential, frozen now: the subscription, else the person's own API key (orchestration.md § 2).
   // A subscription's identity is its provider model, including at the CLI boundary.
   const { subscription, apiKey } = await localRunCredential(internal?.client ?? pool, userId, botId, agent.harness, parsed.data.subscriptionBindingId ? found?.modelId : model, found, parsed.data.apiKeyId)
@@ -173,17 +174,10 @@ async function queueAdmittedRun(userId: string, input: LocalDispatchInput, botId
     deviceRepoId: repo.id, prompt, source, definition: agentDefinition!, ...(requestEventId ? { requestEventId } : {}), ...(parsed.data.requestKey ? { dispatch: { issueId: issue.id, agentId: agent.id, deviceRepoId: repo.id, note: parsed.data.note, requestKey: parsed.data.requestKey, ...(parsed.data.subscriptionBindingId ? { subscriptionBindingId: parsed.data.subscriptionBindingId } : {}) } } : {}), ...(internal ? { continuation: true, sourceRunId: internal.sourceRunId } : {}) }, internal?.client)
 }
 
-/** A Factory run's model: its source run's own when it reruns one, else 优先使用的模型 on its Agent's computer; none left is an error, never the CLI's pick. */
-async function factoryRunModel(userId: string, agentId: string, botId: string | null, source: Parameters<typeof import('@/lib/computer/run-model').threadRunModel>[0]) {
-  const { threadRunModel, chooseLocalRunModel } = await import('@/lib/computer/run-model')
-  const kept = threadRunModel(source)
-  if (kept) return kept
-  const [agent] = await db.select({ id: agents.id, deviceId: agents.deviceId, harness: agents.harness }).from(agents).where(and(eq(agents.id, agentId), eq(agents.userId, userId))).limit(1)
-  if (!agent?.deviceId || (agent.harness !== 'codex' && agent.harness !== 'claude_code')) throw new ActionFailureError('agentNoDevice')
-  const { executionWorkspace } = await import('@/lib/execution-settings')
-  const chosen = await chooseLocalRunModel(pool, { ownerId: userId, workspaceId: await executionWorkspace(userId, botId), botId }, { id: agent.id, deviceId: agent.deviceId, harness: agent.harness })
-  if ('error' in chosen) throw new ActionFailureError('runModelMissing')
-  return chosen
+/** A Factory run's model: its source run's own when it reruns one. A new Factory task names none yet (its schema has no model). */
+async function factoryRunModel(source: Parameters<typeof import('@/lib/computer/run-model').threadRunModel>[0]) {
+  const { threadRunModel } = await import('@/lib/computer/run-model')
+  return threadRunModel(source) ?? {}
 }
 
 /** A device run's credential source; the bot's workspace decides whose API keys it may use. */
