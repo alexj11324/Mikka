@@ -158,14 +158,16 @@ test('with versioned definitions off, a cloud run still freezes its Agent and cr
  const insert=calls.find(c=>c.sql.startsWith('INSERT INTO agent_runs'))!;const snapshot=JSON.parse(insert.args[9] as string)
  assert.equal(snapshot.harness,'codex');assert.equal(snapshot.subscription.bindingId,binding.id);assert.equal(calls.at(-1)!.sql,'COMMIT')
 })
-test('an automatic rule model stays automatic with versioned definitions disabled',async()=>{
+// The hosted runner starts a subscription run only on that subscription's own model, so an automatic
+// cloud run freezes it explicitly; leaving it automatic failed every continuation (subscription_hosted_runtime_unavailable).
+test('an automatic cloud rule model freezes the subscription\'s own model with versioned definitions disabled',async()=>{
  process.env.MIKKA_AGENT_KIT='0'
  const calls:{sql:string,args:unknown[]}[]=[]
  const client={release(){},async query(sql:string,args:unknown[]=[]){calls.push({sql,args});if(sql.startsWith('SELECT m.'))return {rows:[{deviceId,instructions:'Review',harness:'codex',baseBranch:'main'}]};if(sql.startsWith('SELECT 1 FROM bots b JOIN agents'))return {rows:[{}],rowCount:1};if(sql.startsWith('select id from byos_bindings'))return {rows:[{id:binding.id}]};if(sql.startsWith('select id,"ownerId"'))return {rows:[binding]};return {rows:[]}}}
  await queue({connect:async()=>client} as unknown as Parameters<typeof queue>[0],{userId:owner,workspaceId:workspace},{botId,issueId,agentId,deviceRepoId:repoId,title:'Review',body:'',model:'auto'})
  const insert=calls.find(call=>call.sql.startsWith('INSERT INTO agent_runs'))!
  const snapshot=JSON.parse(insert.args[9] as string)
- assert.equal(snapshot.cliModelSelection,'auto');assert.equal(Object.hasOwn(snapshot,'model'),false)
+ assert.equal(snapshot.cliModelSelection,'explicit');assert.equal(snapshot.model,binding.modelId)
  assert.equal(snapshot.subscription.bindingId,binding.id);assert.equal(calls.at(-1)!.sql,'COMMIT')
 })
 test('cloud request replay cannot substitute another parent execution',async()=>{

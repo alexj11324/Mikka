@@ -114,7 +114,7 @@ test('shared subscriptions reach local and cloud claims with current membership 
     assert.equal(frozen?.ownerId, ownerId, 'the lender remains the credential owner')
     const worker = cloud ? await threadMachines.start({ userId, workspaceId }, queued.runId) : { deviceId, token }
     const claim = () => claimRoute.POST(new Request(`http://127.0.0.1/v1/devices/${worker.deviceId}/runs/${queued.runId}/claim`, { method: 'POST', headers: { authorization: `Bearer ${worker.token}`, [REPO_ORIGIN_HEADER]: '1' } }), { params: Promise.resolve({ deviceId: worker.deviceId, runId: queued.runId }) })
-    return { ownerId, userId, workspaceId, botId, agentId, harness, connectionId, model, scope, worker, runId: queued.runId, claim }
+    return { ownerId, userId, workspaceId, botId, agentId, harness, connectionId, model, scope, worker, runId: queued.runId, repoId, claim }
   }
   await t.test('unknown shared quota refresh uses the lender owner, not the task owner', async () => {
     const p = await seed('codex', false)
@@ -213,7 +213,8 @@ test('shared subscriptions reach local and cloud claims with current membership 
     // continuation that left the model out failed every time with subscription_hosted_runtime_unavailable.
     const p = await seed('claude', true)
     const issueId = await seedIssue(pool, p.userId)
-    const repoId = (await pool.query('SELECT "deviceRepoId" FROM agent_runs WHERE id=$1', [p.runId])).rows[0].deviceRepoId
+    // The bot computer's own repository: the first run has moved onto its thread machine's device and repository.
+    const repoId = p.repoId
     for (const model of [undefined, 'auto'] as const) {
       const next = await queueCloudRun(pool, { userId: p.userId, workspaceId: p.workspaceId }, { botId: p.botId, issueId, agentId: p.agentId, deviceRepoId: repoId, title: 'Continue', body: '', readOnly: true, ...(model ? { model } : {}) })
       const definition = (await pool.query('SELECT "agentDefinition" FROM agent_runs WHERE id=$1', [next.runId])).rows[0].agentDefinition
