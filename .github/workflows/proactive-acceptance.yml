@@ -45,6 +45,17 @@ jobs:
           secret-path: /vercel
           recursive: false
           include-imports: false
+      - name: Read the existing cloud runtime test configuration
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /vercel
+          recursive: false
+          include-imports: false
       - name: Verify temporary Flash credential cleanup guards
         run: node --test scripts/ops/proactive-test-credentials.test.mjs
       - name: Verify normal Settings setup, Flash availability and cleanup
