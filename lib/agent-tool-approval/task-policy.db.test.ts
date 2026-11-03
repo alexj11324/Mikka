@@ -8,7 +8,8 @@ import { z } from 'zod'
 import test from 'node:test'
 import { assertE2eTarget } from '../../tests/helpers/e2e-target.mjs'
 import { Pool } from 'pg'
-import { readCliRunPolicy, readCliAgentPolicy } from './policy-store'
+import { readCliRunPolicy, readCliAgentPolicy, lockCliTaskScope } from './policy-store'
+import { readIssueMetadata } from '../issue-metadata'
 import { setCliPolicy, setCliAgentPolicy } from './policy-settings'
 import { AgentToolApprovalStore } from './store'
 import { issuePolicySnapshot, policyDistributionContext } from './policy-distribution'
@@ -325,4 +326,62 @@ test('task workspace policy applies to Coordinator and cross-workspace Bot runs'
     assert.equal((await read(b.run)).policy.permissions.git_push, 'deny')
     assert.equal((await read(personal.run)).workspaceId, null)
   })
+})
+
+test('task policy transfers metadata without document bodies and retains complete metadata parsing', { skip: !target }, async t => {
+  const admin = new Pool({ connectionString: target })
+  const schema = `policy_projection_${randomUUID().replaceAll('-', '')}`
+  await admin.query(`CREATE SCHEMA "${schema}"`)
+  await admin.query(`CREATE TABLE "${schema}".issues (id uuid PRIMARY KEY,"userId" text,scope text,"scopeVersion" int,content jsonb)`)
+  const database = new Pool({ connectionString: target, options: `-c search_path=${schema}` })
+  t.after(async () => { client.release(); await database.end(); await admin.query(`DROP SCHEMA "${schema}" CASCADE`); await admin.end() })
+  const id = randomUUID(), owner = randomUUID()
+  const client = await database.connect()
+  const marker = 'SYNTHETIC_DOCUMENT_BODY_'
+  const document = { type: 'doc', attrs: { mikka: { labels: [{ name: 'fixture', color: 'blue' }] } }, content: [{ type: 'paragraph', content: [{ type: 'text', text: marker.repeat(50000) }] }] }
+  await client.query('INSERT INTO issues VALUES($1,$2,\'personal\',1,$3)', [id,owner,document])
+  const original = client.query.bind(client)
+  let returned: { content: unknown }[] = []
+  const measured = new Proxy(client, { get(object, key) {
+    if (key === 'query') return async (text: string, args: unknown[]) => {
+      const result = await original(text,args); returned = result.rows; return result
+    }
+    const value = Reflect.get(object,key,object)
+    return typeof value === 'function' ? value.bind(object) : value
+  } })
+  const stream = (client as unknown as { connection: { stream: { bytesRead: number } } }).connection.stream
+  const fullStart = stream.bytesRead
+  await client.query('SELECT "userId",scope,"scopeVersion",content FROM issues WHERE id=$1',[id])
+  const fullBytes = stream.bytesRead-fullStart
+  const projectedStart = stream.bytesRead
+  assert.deepEqual(await lockCliTaskScope(measured,owner,id), { issueId:id,scopeVersion:1,workspaceId:null })
+  const projectedBytes = stream.bytesRead-projectedStart
+  assert.equal(JSON.stringify(returned).includes(marker),false,'policy authorization must not fetch a document body')
+  assert.ok(projectedBytes < fullBytes/100, 'large synthetic documents must not cross the policy connection')
+  t.diagnostic(JSON.stringify({ fullDocumentProtocolBytes:fullBytes,metadataProtocolBytes:projectedBytes }))
+
+  const deleted = '2026-11-03T12:00:00.000Z'
+  const fixtures: unknown[] = [
+    { type:'doc',attrs:{mikka:{deletedAt:deleted}} },
+    { type:'doc',attrs:{orvilo:{deletedAt:deleted}} },
+    { type:'doc',attrs:{mikka:null,orvilo:{deletedAt:deleted}} },
+    { type:'doc',attrs:{mikka:{},orvilo:{deletedAt:deleted}} },
+    { type:'doc',attrs:{mikka:{deletedAt:deleted,labels:'invalid-entire-metadata'}} },
+    { type:'doc',attrs:{mikka:0,orvilo:{deletedAt:deleted}} },
+    { type:'doc',attrs:null }, { type:'doc',attrs:'invalid-attrs' }, {}, [], 'invalid-root', 17, null,
+  ]
+  for (const content of fixtures) {
+    await client.query('UPDATE issues SET content=$2 WHERE id=$1',[id,JSON.stringify(content)])
+    let expected = 'allowed'
+    try { if (readIssueMetadata(content as Parameters<typeof readIssueMetadata>[0]).deletedAt) expected = 'Error' }
+    catch (error) { expected = (error as Error).name }
+    let actual = 'allowed'
+    try { await lockCliTaskScope(measured,owner,id) }
+    catch (error) { actual = (error as Error).name }
+    assert.equal(actual,expected,'projection must preserve legacy/null/invalid metadata semantics')
+    if (content !== null) assert.deepEqual(readIssueMetadata(returned[0].content as Parameters<typeof readIssueMetadata>[0]),readIssueMetadata(content as Parameters<typeof readIssueMetadata>[0]))
+  }
+  await client.query('UPDATE issues SET content=\'{"type":"doc"}\' WHERE id=$1',[id])
+  await assert.rejects(lockCliTaskScope(measured,'another-owner',id),/agentPolicyUnavailable/)
+  await assert.rejects(lockCliTaskScope(measured,owner,randomUUID()),/agentPolicyUnavailable/)
 })
