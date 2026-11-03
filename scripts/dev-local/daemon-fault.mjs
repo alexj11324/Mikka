@@ -1,7 +1,8 @@
 // Local acceptance only: suspend a verified, isolated daemon tree without
 // terminating the watched service or stopping Next/the independent cron.
 import assert from 'node:assert/strict'
-import { readFile, readdir } from 'node:fs/promises'
+import { readFile, readdir, stat } from 'node:fs/promises'
+import { join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 
 export async function processTable() {
@@ -33,6 +34,7 @@ export function ownedDaemonGroups(rows, { pid, parentPid, daemonPid, forbiddenPi
 export async function suspendOwnedDaemon(identity) {
   assert.equal(process.platform, 'linux', 'Handoff fault injection requires Linux process ownership evidence')
   const original = ownedDaemonGroups(await processTable(), identity)
+  if (identity.start !== undefined) assert.equal(original.root.start, identity.start, 'Owned process PID was reused before suspension')
   const paused = new Map()
   let resumePromise
   const resume = () => resumePromise ??= (async () => {
@@ -64,4 +66,23 @@ export async function suspendOwnedDaemon(identity) {
     }
     throw new Error('A process tree did not reach a fully suspended state')
   } catch (error) { await resume(); throw error }
+}
+
+/** spawnCli records this numeric PGID under adapters/pids, outside the agent's
+ * sandbox. Read only that run's process metadata, never its credential journal. */
+export async function nativeRunIdentity(daemonIdentity, { dataDir, runId, worktree }) {
+  assert.match(runId, /^[a-f0-9-]{36}$/)
+  const value = (await readFile(join(dataDir, 'adapters', 'pids', `${runId}.pgid`), 'utf8')).trim()
+  assert.match(value, /^[1-9][0-9]*$/, 'The owned native run needs its recorded process group')
+  const rows = await processTable()
+  const owned = ownedDaemonGroups(rows, daemonIdentity)
+  const pid = Number(value), leader = owned.members.find(row => row.pid === pid)
+  assert.ok(leader && leader.pgid === pid && pid !== daemonIdentity.pid && pid !== daemonIdentity.daemonPid, 'Native PGID must be an isolated descendant of this daemon')
+  const [cwd, target] = await Promise.all([stat(`/proc/${pid}/cwd`), stat(worktree)])
+  assert.equal(cwd.dev, target.dev, 'Native process cwd is outside the current run worktree')
+  assert.equal(cwd.ino, target.ino, 'Native process cwd is outside the current run worktree')
+  const result = { pid, parentPid: leader.ppid, daemonPid: pid, start: leader.start,
+    forbiddenPids: [...(daemonIdentity.forbiddenPids ?? []), daemonIdentity.pid, daemonIdentity.daemonPid] }
+  ownedDaemonGroups(rows, result)
+  return result
 }

@@ -229,6 +229,7 @@ chmodSync(join(fixtureBin, 'gh'), 0o755)
 // Only the opt-in, owned local handoff acceptance may suspend this group.
 // Ordinary development keeps its existing lifecycle and failure monitoring.
 const isolateDaemon = process.env.MIKKA_DEV_ACCEPTANCE_HANDOFF === '1'
+const onlineWatchdogAcceptance = process.env.MIKKA_DEV_ACCEPTANCE_ONLINE_WATCHDOG === '1'
 const daemon = (args, isolated = false) => spawn(daemonUser ? 'setpriv' : tsx,
   daemonUser ? ['--reuid', daemonUser, '--regid', daemonUser, '--init-groups', tsx, ...args] : args, {
     cwd: join(root, 'packages/daemon'), stdio: 'inherit', detached: isolated,
@@ -244,10 +245,11 @@ if (process.env.MIKKA_DEV_SKIP_DAEMON !== '1') {
     const status = await new Promise(r => login.once('exit', r))
     if (status !== 0) throw new Error(`Local daemon login exited with code ${status}`)
   }
-  const runningDaemon = daemon(['bin/mikka.ts', 'daemon', '--no-auto-update', '--server', server, '--data-dir', dataDir], isolateDaemon)
+  const runningDaemon = daemon(['bin/mikka.ts', 'daemon', '--no-auto-update', '--server', server, '--data-dir', dataDir,
+    ...(onlineWatchdogAcceptance ? ['--stall-minutes', '60'] : [])], isolateDaemon)
   watch(runningDaemon, 'daemon')
   if (isolateDaemon) {
-    writeFileSync(join(root, '.cache/dev-local/owned-daemon.json'), JSON.stringify({ version: 1, server, dataDir, pid: runningDaemon.pid, parentPid: process.pid }), { mode: 0o600 })
+    writeFileSync(join(root, '.cache/dev-local/owned-daemon.json'), JSON.stringify({ version: 1, server, dataDir, pid: runningDaemon.pid, parentPid: process.pid, stallMinutes: onlineWatchdogAcceptance ? 60 : 10 }), { mode: 0o600 })
     closers.push(() => {
       try { process.kill(-runningDaemon.pid, 'SIGCONT'); process.kill(-runningDaemon.pid, 'SIGTERM') } catch { /* Already exited. */ }
     })

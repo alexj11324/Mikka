@@ -1,8 +1,11 @@
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { once } from 'node:events'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import test from 'node:test'
-import { ownedDaemonGroups, processTable, suspendOwnedDaemon } from './daemon-fault.mjs'
+import { nativeRunIdentity, ownedDaemonGroups, processTable, suspendOwnedDaemon } from './daemon-fault.mjs'
 
 const rows = [
   { pid: 10, ppid: 1, pgid: 10, start: '1' },
@@ -34,7 +37,9 @@ test('real isolated process trees pause and resume without suspending the indepe
     process.on('SIGTERM',()=>{try{process.kill(-worker.pid,'SIGTERM')}catch{};process.exit(0)});`
   const a = spawn(process.execPath, ['-e', source], { detached: true, stdio: ['ignore', 'pipe', 'pipe'] })
   const b = spawn(process.execPath, ['-e', 'setInterval(()=>{},1000)'], { detached: true, stdio: 'ignore' })
-  let nativePid, fault
+  const dataDir = await mkdtemp(join(tmpdir(), 'mikka-native-fault-'))
+  const runId = '11111111-1111-4111-8111-111111111111'
+  let nativePid, fault, nativeFault
   try {
     nativePid = Number(String((await once(a.stdout, 'data'))[0]).trim())
     assert.ok(nativePid > 1)
@@ -48,10 +53,27 @@ test('real isolated process trees pause and resume without suspending the indepe
     const resumed = await processTable()
     assert.notEqual(resumed.find(row => row.pid === a.pid).state, 'T')
     assert.notEqual(resumed.find(row => row.pid === nativePid).state, 'T')
+    const owner = { pid: a.pid, parentPid: process.pid, daemonPid: a.pid, forbiddenPids: [process.pid, b.pid] }
+    await mkdir(join(dataDir, 'adapters/pids'), { recursive: true })
+    const pidFile = join(dataDir, 'adapters/pids', `${runId}.pgid`)
+    await writeFile(pidFile, String(b.pid))
+    await assert.rejects(() => nativeRunIdentity(owner, { dataDir, runId, worktree: process.cwd() }), /isolated descendant/)
+    await writeFile(pidFile, String(nativePid))
+    await assert.rejects(() => nativeRunIdentity(owner, { dataDir, runId, worktree: dataDir }), /cwd/)
+    const native = await nativeRunIdentity(owner, { dataDir, runId, worktree: process.cwd() })
+    await assert.rejects(() => suspendOwnedDaemon({ ...native, start: 'reused-pid' }), /reused/)
+    nativeFault = await suspendOwnedDaemon(native)
+    const nativePaused = await processTable()
+    assert.equal(nativePaused.find(row => row.pid === nativePid).state, 'T')
+    assert.notEqual(nativePaused.find(row => row.pid === a.pid).state, 'T', 'The daemon must keep its heartbeat/lease loop')
+    assert.notEqual(nativePaused.find(row => row.pid === b.pid).state, 'T')
+    await nativeFault.resume()
   } finally {
+    await nativeFault?.resume()
     await fault?.resume()
     for (const pid of [a.pid, b.pid, nativePid]) if (pid) {
       try { process.kill(-pid, 'SIGCONT'); process.kill(-pid, 'SIGTERM') } catch { /* Already ended. */ }
     }
+    await rm(dataDir, { recursive: true, force: true })
   }
 })

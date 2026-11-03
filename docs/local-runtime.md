@@ -273,3 +273,37 @@ before ordinary cleanup. This case proves offline local-device handoff only:
 it does not establish the separate 45-minute online-stall watchdog, official
 subscription behavior, or production-provider acceptance. The process and
 receipt guard tests are included in `pnpm test:dev-local` and make no model calls.
+
+Item 10 isolates the server's real online-stall watchdog. Select
+`LOCAL_LOOP_ITEMS=10` or `LOCAL_LOOP_ITEMS=9,10` with the same immutable
+`LOCAL_LOOP_EXPECTED_SOURCE_SHA`; it also requires the owned fresh Linux stack.
+The selected item configures these dedicated local daemons using the existing
+formal CLI option `--stall-minutes 60`. The normal daemon default is 10 minutes,
+which would stop a silent executor before the server's unchanged 45-minute
+execute window. Evidence states this isolation explicitly. When 9 and 10 run
+together, they share the already approved second daemon; item 10 starts only
+after item 9 passes. The 60-minute daemon setting is recorded for both cases.
+
+After the real Flash run creates a file and uploads a checkpoint, item 10 reads
+only its daemon-owned numeric `adapters/pids/<runId>.pgid` process metadata.
+It verifies ancestry, isolated group, PID start time and the current worktree's
+inode, then pauses that native tree alone. A's daemon, real heartbeat/lease and
+the independent minute cron keep running. Once per minute, evidence records
+that no tool result or new checkpoint has reset persisted progress. It does not
+alter database times, production defaults or the server sweep schedule. At the
+real watchdog stop request, it resumes native processes so the ordinary
+stop/ack path runs, then observes one automatic admission on authorized B.
+
+This case deliberately preserves the original checkpoint. After 45 minutes it
+is outside the existing 30-minute recovery window, so the expected result is
+`bounded_checkpoint_block`: B refuses it before native/model execution. The
+test requires the same Task/epoch, the current Handoff, the stale-checkpoint
+summary through the ordinary owner Thread API, one blocked-run notification
+event/inbox delivery, and no publication or repeated admission across two
+further minute schedules. It does not call that outcome successful recovery.
+`item10-watchdog.json` retains timing, heartbeat/lease samples, Handoff identity,
+retry and notification counts, the public blocker and failure status. Timeout
+or interruption restores every paused native group before ordinary cleanup.
+The item budget is 60 minutes; allow setup and selected item 9 in addition.
+This is not a default-daemon latency measurement, a before/after benchmark or
+cloud-device acceptance. Its offline guards make no model calls.

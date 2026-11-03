@@ -14,12 +14,13 @@ import { TestAccountPool } from '../test-accounts/pool.mjs'
 import { verifyMailbox } from './mailbox-acceptance.mjs'
 import { verifyWorkerMailbox } from './worker-mailbox-acceptance.mjs'
 import { assertHandoffConfiguration, verifyFactoryHandoff } from './factory-handoff-acceptance.mjs'
+import { verifyFactoryWatchdog } from './factory-watchdog-acceptance.mjs'
 import { assertFlashTestModel, assertTestModelRequest } from '../test-model-policy.mjs'
 
 const root = resolve(import.meta.dirname, '../..')
 const selectedItems = process.env.LOCAL_LOOP_ITEMS?.split(',') ?? ['1', '2', '3', '4', '5', '6', '7']
-assert.ok(selectedItems.length && selectedItems.every(item => /^[1-9]$/.test(item)) && new Set(selectedItems).size === selectedItems.length, 'LOCAL_LOOP_ITEMS must be unique item numbers 1–9')
-const needsDaemon = selectedItems.some(item => ['1', '2', '3', '7', '9'].includes(item))
+assert.ok(selectedItems.length && selectedItems.every(item => /^(?:[1-9]|10)$/.test(item)) && new Set(selectedItems).size === selectedItems.length, 'LOCAL_LOOP_ITEMS must be unique item numbers 1–10')
+const needsDaemon = selectedItems.some(item => ['1', '2', '3', '7', '9', '10'].includes(item))
 // Keep the daemon Unix socket below Linux's 108-byte pathname limit even in
 // the separate fixed acceptance checkout. Evidence retains the full runId.
 const runId = randomUUID(), directory = resolve(root, '.cache/dev-local', `acceptance-${runId.replaceAll('-', '').slice(0, 16)}`)
@@ -27,7 +28,7 @@ const progressFile = resolve(root, '.cache/dev-local/progress.jsonl')
 const started = Date.now(), children = [], secrets = new Set()
 const completedItems = []
 const cleanupHooks = [], daemonDirectories = [join(directory, 'daemon')]
-let pool, accounts, environment, runtime, localStackChild, activeStep, cleanupPromise, sourceFingerprint, serviceFailure, releaseHold, output = '', daemonCode, interrupted = false
+let pool, accounts, environment, runtime, localStackChild, secondDaemonPromise, activeStep, cleanupPromise, sourceFingerprint, serviceFailure, releaseHold, output = '', daemonCode, interrupted = false
 async function fingerprint() {
   const paths = execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', 'app', 'lib', 'packages', 'scripts', 'agents', 'drizzle', 'package.json', 'pnpm-lock.yaml', 'next.config.mjs'], { cwd: root, encoding: 'utf8' }).split('\0').filter(Boolean).sort()
   const hash = createHash('sha256')
@@ -152,7 +153,7 @@ async function setup() {
   const origin = process.env.LOCAL_LOOP_ORIGIN ?? `http://localhost:${process.env.MIKKA_DEV_PORT ?? '3110'}`
   assert.ok(['localhost', '127.0.0.1'].includes(new URL(origin).hostname), 'Only loopback app targets are allowed')
   const driverRevision = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim()
-  if (selectedItems.includes('9')) {
+  if (selectedItems.includes('9') || selectedItems.includes('10')) {
     assertHandoffConfiguration({ existing, platform: process.platform, revision: driverRevision, expectedSource: process.env.LOCAL_LOOP_EXPECTED_SOURCE_SHA })
   }
   // An attached runner can contain reviewed harness changes. Bind auth/DB
@@ -199,7 +200,9 @@ async function setup() {
     await recordAuthenticationSecrets([decodeURIComponent(new URL(process.env.E2E_DATABASE_URL).password)], { environment })
   }
   await new TestAccountPool(pool, environment).prepare({ pairs: 4 })
-  if (!existing) localStackChild = child(process.execPath, ['scripts/dev-local.mjs'], { ...process.env, NEXT_TELEMETRY_DISABLED: '1', MIKKA_DEV_SKIP_ENV_FILES: '1', ...(selectedItems.includes('9') ? { MIKKA_DEV_ACCEPTANCE_HANDOFF: '1' } : {}), ...(!needsDaemon ? { MIKKA_DEV_SKIP_DAEMON: '1' } : {}) }, true)
+  if (!existing) localStackChild = child(process.execPath, ['scripts/dev-local.mjs'], { ...process.env, NEXT_TELEMETRY_DISABLED: '1', MIKKA_DEV_SKIP_ENV_FILES: '1',
+    ...(selectedItems.some(item => ['9', '10'].includes(item)) ? { MIKKA_DEV_ACCEPTANCE_HANDOFF: '1' } : {}),
+    ...(selectedItems.includes('10') ? { MIKKA_DEV_ACCEPTANCE_ONLINE_WATCHDOG: '1' } : {}), ...(!needsDaemon ? { MIKKA_DEV_SKIP_DAEMON: '1' } : {}) }, true)
   await step('server-ready', 180_000, signal => until(signal, async () => {
     try { return (await fetch(`${origin}/mikka/sign-in`, { signal: AbortSignal.timeout(5_000) })).ok } catch { return false }
   }))
@@ -276,6 +279,10 @@ async function factoryApproval(runId, signal) {
 }
 
 async function secondDaemon(signal) {
+  return secondDaemonPromise ??= startSecondDaemon(signal)
+}
+
+async function startSecondDaemon(signal) {
   const dataDir = join(directory, 'daemon-b')
   daemonDirectories.push(dataDir)
   await mkdir(dataDir, { mode: 0o700 })
@@ -299,7 +306,8 @@ async function secondDaemon(signal) {
   await json(accounts.owner, `/api/auth/device?user_code=${encodeURIComponent(code)}`)
   await json(accounts.owner, '/api/auth/device/approve', { userCode: code })
   await until(signal, () => access(join(dataDir, 'device.json')).then(() => true, () => false))
-  const processChild = launch(['daemon', '--no-auto-update', '--server', runtime.server], true)
+  const processChild = launch(['daemon', '--no-auto-update', '--server', runtime.server,
+    ...(selectedItems.includes('10') ? ['--stall-minutes', '60'] : [])], true)
   return { dataDir, pid: processChild.pid }
 }
 
@@ -410,8 +418,15 @@ async function accept(device) {
     query, json: (path, body) => json(accounts.owner, path, body), until: predicate => until(signal, predicate),
     run, dispatch: (name, text) => dispatch(name, text, signal), terminal: id => terminal(id, signal),
     factoryApproval: id => factoryApproval(id, signal), observations, startSecondDaemon: () => secondDaemon(signal),
-    stackPid: localStackChild.pid, registerCleanup: hook => cleanupHooks.push(hook),
+    stackPid: localStackChild.pid, registerCleanup: hook => cleanupHooks.push(hook), daemonStallMinutes: selectedItems.includes('10') ? 60 : 10,
   }))
+  if (only.includes('10')) await check('item10-online-watchdog', 3_600_000, signal => {
+    assert.ok(!only.includes('9') || completedItems.includes(9), 'Complete the selected offline handoff case before reusing its devices for the hour-long watchdog case')
+    return verifyFactoryWatchdog({ root, directory, runtime, ownerId: accounts.owner.userId, device, signal, progress,
+      query, json: (path, body) => json(accounts.owner, path, body), until: predicate => until(signal, predicate), run,
+      dispatch: (name, text) => dispatch(name, text, signal), observations, startSecondDaemon: () => secondDaemon(signal),
+      stackPid: localStackChild.pid, registerCleanup: hook => cleanupHooks.push(hook) })
+  })
   if (only.includes('8')) await check('item8-cloud-loop', 900_000, async signal => {
     const reviewed = process.env.LOCAL_LOOP_LOCAL_EVIDENCE_FILE
       ? await (await import('./reviewed-local-evidence.mjs')).verifyReviewedLocalEvidence(process.env.LOCAL_LOOP_LOCAL_EVIDENCE_FILE, { environment, runtime }) : null

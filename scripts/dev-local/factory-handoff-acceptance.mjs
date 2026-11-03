@@ -13,11 +13,26 @@ import { ownedDaemonGroups, processTable, suspendOwnedDaemon } from './daemon-fa
 const ended = new Set(['succeeded', 'failed', 'stopped', 'cancelled'])
 const sha256 = value => createHash('sha256').update(value).digest('hex')
 
+export const daemonStatus = (root, dataDir) => JSON.parse(execFileSync(join(root, 'packages/daemon/node_modules/.bin/tsx'),
+  [join(root, 'packages/daemon/bin/mikka.ts'), 'daemon', 'status', '--data-dir', dataDir],
+  { cwd: root, encoding: 'utf8', timeout: 10_000, maxBuffer: 1_000_000, stdio: ['ignore', 'pipe', 'pipe'] }))
+
 export function assertHandoffConfiguration({ existing, platform, revision, expectedSource }) {
   assert.ok(!existing, 'Item 9 must own its fresh local stack; --existing cannot suspend another runner\'s daemon')
   assert.equal(platform, 'linux', 'Item 9 requires Linux process-tree ownership evidence')
   assert.match(revision, /^[a-f0-9]{40}$/, 'Item 9 source must be an immutable commit')
   assert.equal(expectedSource, revision, 'Item 9 requires the reviewed immutable LOCAL_LOOP_EXPECTED_SOURCE_SHA')
+}
+
+/** daemon.status.server is a connectivity enum, not the configured URL.
+ * The owned launcher/descriptor pins the URL; RPC binds this process to its
+ * private data directory and the device returned by the normal owner API. */
+export function assertOnlineDaemonStatus(status, { dataDir, deviceId }) {
+  assert.equal(status.server, 'online', 'The daemon must be connected to its configured server')
+  assert.equal(status.signedIn, true)
+  assert.equal(resolve(status.dataDir), resolve(dataDir), 'Daemon RPC returned another data directory')
+  assert.ok(typeof status.deviceId === 'string' && status.deviceId.length, 'The daemon needs its own approved device')
+  if (deviceId !== undefined) assert.equal(status.deviceId, deviceId)
 }
 
 export function assertHandoffEvidence({ original, retry, task, receipt, ownerId, deviceB, marker }) {
@@ -61,6 +76,7 @@ export async function verifyFactoryHandoff(context) {
     factoryApproval, observations, startSecondDaemon, stackPid, registerCleanup } = context
   const marker = `handoff-${randomUUID()}`, filename = `${marker}.txt`, expected = Buffer.from(`${marker}\n`)
   const evidence = { version: 1, marker, status: 'running', startedAt: new Date().toISOString(),
+    daemonStallMinutes: context.daemonStallMinutes ?? 10,
     boundaries: ['Real DeepSeek Flash via normal account authorization', 'Real daemons and unchanged 90s leases/minute cron',
       'Disposable local database; SELECT evidence only', 'Local fixture GitHub and real bare Git publication',
       'Offline handoff only; not the 45-minute online-stall watchdog or production acceptance'] }
@@ -69,9 +85,7 @@ export async function verifyFactoryHandoff(context) {
     await writeFile(join(directory, 'item9-handoff.json'), JSON.stringify(evidence, null, 2), { mode: 0o600 })
     await progress('item9-factory-handoff', phase)
   }
-  const status = dataDir => JSON.parse(execFileSync(join(root, 'packages/daemon/node_modules/.bin/tsx'),
-    [join(root, 'packages/daemon/bin/mikka.ts'), 'daemon', 'status', '--data-dir', dataDir],
-    { cwd: root, encoding: 'utf8', timeout: 10_000, maxBuffer: 1_000_000, stdio: ['ignore', 'pipe', 'pipe'] }))
+  const status = dataDir => daemonStatus(root, dataDir)
   let fault
   registerCleanup(() => fault?.resume())
   try {
@@ -80,8 +94,7 @@ export async function verifyFactoryHandoff(context) {
     assert.equal(owned.server, runtime.server)
     assert.equal(resolve(owned.dataDir), resolve(runtime.daemonDataDir))
     const aStatus = status(runtime.daemonDataDir)
-    assert.equal(aStatus.deviceId, device.id)
-    assert.equal(aStatus.signedIn, true)
+    assertOnlineDaemonStatus(aStatus, { dataDir: runtime.daemonDataDir, deviceId: device.id })
     ownedDaemonGroups(await processTable(), { ...owned, daemonPid: aStatus.pid, forbiddenPids: [process.pid, stackPid] })
     // A cloud source would legitimately take precedence over local B. Do not
     // disable or edit one merely to force this acceptance outcome.
@@ -93,11 +106,11 @@ export async function verifyFactoryHandoff(context) {
       try {
         const value = status(b.dataDir)
         const devices = (await json('/api/mobile/threads')).devices ?? []
-        return value.signedIn && devices.some(entry => entry.id === value.deviceId && entry.online) ? value : null
+        return value.signedIn && value.server === 'online' && devices.some(entry => entry.id === value.deviceId && entry.online) ? value : null
       } catch (error) { if (error.code === 'ETIMEDOUT') throw error; return null }
     })
     assert.notEqual(bStatus.deviceId, aStatus.deviceId, 'A and B need independent approved device IDs')
-    assert.equal(new URL(bStatus.server).origin, new URL(runtime.server).origin)
+    assertOnlineDaemonStatus(bStatus, { dataDir: b.dataDir })
     await record('two-authorized-devices', { deviceA: device.id, deviceB: bStatus.deviceId })
     const priorPrs = new Set((await observations()).pullRequests.map(pr => pr.number))
     const brief = `Create a new task on device ${device.name} (deviceId ${device.id}), harness Claude Code, repository https://github.com/mikka-e2e/core-loop.git, newThread:true, readOnly:false. Preserve the entire brief in the worker prompt and dispatch now.
