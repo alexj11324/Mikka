@@ -23,11 +23,12 @@ function readerTokenWorkspace(reader: IssueReader) {
  * No request/global cache: suspension/removal takes effect on the next read. */
 /** `onlyIssueIds`: the caller asks only about these issues (its query filters by them), so only their
  * team links are read; the predicate is exact for them and must not be used for any other issue. */
-/** A list already filters in SQL. Team access is an EXISTS on the team id, so a poll does not transfer every linked task. */
-async function listPredicate(userId: string, includeDeleted: boolean) {
-  const teamIds = (await accessibleTeams(userId)).map(team => team.id)
-  const linked = teamIds.length
-    ? and(eq(issues.scope, 'workspace'), sql`exists (select 1 from mikka_team_issues l where l."issueId" = ${issues.id} and l."teamId" in (${sql.join(teamIds.map(id => sql`${id}::uuid`), sql`, `)}))`)
+/** A list already filters in SQL. Team access is an EXISTS on the team, so a poll does not transfer every linked task. */
+async function listPredicate(userId: string, includeDeleted: boolean, workspaceId?: string) {
+  const teams = await accessibleTeams(userId, workspaceId)
+  const pairs = teams.map(team => sql`(${team.id}::uuid, ${team.workspaceId}::uuid)`)
+  const linked = pairs.length
+    ? and(eq(issues.scope, 'workspace'), sql`exists (select 1 from mikka_team_issues l where l."issueId" = ${issues.id} and (l."teamId", l."workspaceId") in (${sql.join(pairs, sql`, `)}))`)
     : and(eq(issues.scope, 'workspace'), sql`false`)
   return and(includeDeleted ? undefined : sql`coalesce(${issues.content}->'attrs'->'mikka', ${issues.content}->'attrs'->'orvilo')->>'deletedAt' is null`, or(eq(issues.userId, userId), linked))!
 }
@@ -37,7 +38,7 @@ export async function issueVisibility(reader: IssueReader, includeDeleted = fals
   const token = readerTokenWorkspace(reader)
   const only = options.onlyIssueIds
   // A browser list does not name tasks yet. Reading every team link (one row per task) is the transfer the list poll was paying.
-  if (!token && only === undefined) return { predicate: await listPredicate(userId, includeDeleted), allowedIds: [] as string[] }
+  if (!token && only === undefined) return { predicate: await listPredicate(userId, includeDeleted, workspaceId), allowedIds: [] as string[] }
   const allowed = await issueTeamScope(userId, [], { onlyIssueIds: only })
   const scopeWorkspace = token ?? workspaceId
   const allowedIds = allowed.filter(link => !scopeWorkspace || link.workspaceId === scopeWorkspace).map(link => link.issueId)
