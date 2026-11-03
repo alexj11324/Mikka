@@ -111,8 +111,8 @@ note = InlineText(["Thread ", RunChip("{{run:r-ios-crash}}"), " is waiting on yo
     user('Move it, but read the session token first'),
     bot('Got it: the session token is read synchronously in `application(_:didFinishLaunchingWithOptions:)`, and the rest of the preferences load after the first frame. I passed that on to the thread.\n\n```swift\n// AppDelegate.swift\nfunc application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: ...) -> Bool {\n    Session.shared.restoreToken()          // only this one\n    DispatchQueue.main.async { Preferences.shared.load() }\n    return true\n}\n```'),
     user('Which devices should the regression pass cover?'),
-    bot(`root = Stack([grid])
-grid = BeCardGrid([BeImageCard("iPhone 13", "iPhone 13", "Our main device, iOS 17.6.", ["Baseline"]), BeImageCard("iPhone SE", "iPhone SE 2020", "iOS 16.7, the device that crashed.", ["iOS 16", "Small screen"]), BeImageCard("iPad Air", "iPad Air 2020", "Checks split view and the widget.", ["Tablet"])])`),
+    bot(`root = Stack([table])
+table = BeTable(["Device", "iOS", "Why"], [["iPhone 13", "17.6", "Our main device, the baseline"], ["iPhone SE (2020)", "16.7", "The device that crashed"], ["iPad Air (2020)", "17.6", "Split view and the widget"]])`),
     user('Ryan has the iPhone SE. Have him test it first thing tomorrow.'),
     bot('Done. I tagged Ryan Brooks in the thread; results by 10 AM tomorrow.'),
   ],
