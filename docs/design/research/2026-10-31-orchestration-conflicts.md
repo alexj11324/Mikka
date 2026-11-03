@@ -47,7 +47,7 @@ spec. `decisions.md` is frozen: its rows are superseded by
 | D6 | `docs/local-runtime.md:3-10, 43-45` | Runs the installed Claude Code / Codex and detects them | Daemon-managed Agents, capability check | **done** (banner; code C16–C18) |
 | D7 | `docs/design/decisions/2026-10-31-1834-every-bot-replies.md` | Order without shares | §2 | **done** (`Superseded in part by`) |
 | D8 | `docs/design/decisions/2026-10-31-2130-personal-vs-workspace.md:26-27, 36-37` | A credential never runs another member's bot; 「Mikka Cloud bills the workspace」 | allowOthers exception; E2B bills the workspace, Mikka charges nothing | **done** (`Superseded in part by`) |
-| D9 | `docs/design/research/2026-10-31-personal-vs-workspace.md:263-267` (§6.3) | Switch off → refuse, no fallback | Mikka 默认 | Doc-only history; #692 already falls back. Left as research record |
+| D9 | personal-vs-workspace research §6.3 (deleted 2026-11-03; git history) | Switch off → refuse, no fallback | Mikka 默认 | Doc-only history; #692 already falls back. Left as research record |
 | D10 | `docs/design/decisions.md` rows 2026-10-30 「No 自动」 (line 69), 2026-10-30 E2B on the workspace's key (line 65), 2026-10-31 电脑 tab E2B dialog (line 35) and 2026-10-29 spend guards (line 83) | Device-first initial values; `换用另一个账号`; 429 caps | §4, §5 | Frozen; superseded by the decision file |
 | D11 | `docs/backend/hosted-abuse-controls.md:9-23` | Card verification per workspace, admin-only | Per person | **done** (card verification per person; credit shares follow) |
 | D12 | `docs/factory/warp-aligned-factory.md:125-132` | Runner shapes and `workerHost` for per-thread machines | Runners per §3 | **done** (pointer) |

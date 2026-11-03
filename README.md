@@ -392,8 +392,6 @@ Start with these documents:
 - [`docs/design/glossary.md`](docs/design/glossary.md): what bot, thread and
   chat mean.
 - [`docs/acceptance.md`](docs/acceptance.md): how a change is accepted.
-- [`docs/acceptance-mvp-cli-2026-11-01.md`](docs/acceptance-mvp-cli-2026-11-01.md):
-  the MVP API/CLI acceptance record.
 - [`docs/dev-workflow.md`](docs/dev-workflow.md): local first, issue
   ownership and merging, and production acceptance after a merge.
 - [`docs/review-checklist.md`](docs/review-checklist.md): complete before

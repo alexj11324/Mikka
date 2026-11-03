@@ -230,7 +230,6 @@ pnpm desktop:dev
 - [`docs/design/README.md`](docs/design/README.md)：进行任何设计、spec 或 UI 工作前必读。
 - [`docs/design/glossary.md`](docs/design/glossary.md)：bot、线程与对话的定义。
 - [`docs/acceptance.md`](docs/acceptance.md)：变更的验收流程。
-- [`docs/acceptance-mvp-cli-2026-11-01.md`](docs/acceptance-mvp-cli-2026-11-01.md)：MVP 的 API/CLI 验收记录。
 - [`docs/dev-workflow.md`](docs/dev-workflow.md)：本地优先、按 issue 归属与合并，以及合并后的生产验收。
 - [`docs/review-checklist.md`](docs/review-checklist.md)：向他人展示 UI 前须完成的检查项。
 - [`apps/desktop/README.md`](apps/desktop/README.md)：桌面应用的运行与打包。

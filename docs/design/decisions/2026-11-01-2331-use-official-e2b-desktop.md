@@ -4,7 +4,7 @@
 - Source: Alex, cloud computer chat, approving official template reuse: “可以复用”.
 - Rule: —
 - Superseded in part by: [2026-11-03-1430-official-e2b-templates-unchanged](2026-11-03-1430-official-e2b-templates-unchanged.md) (no derived image; the worker goes in its own directory on an instance; not yet in code, #1131)
-- Replaces: [A usable Linux desktop on the Bot computer](2026-11-01-2236-cloud-linux-desktop.md).
+- Replaces: A usable Linux desktop on the Bot computer.
 
 Use E2B's official `desktop` template for the basic Linux desktop and its XFCE
 applications. Preserve its desktop defaults instead of assembling an Openbox

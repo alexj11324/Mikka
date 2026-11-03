@@ -7,7 +7,7 @@
   model's own judgment. You set it too tight, give it the credential.")
 - Rule: R-77 (every GitHub ability is listed with no control)
 - Replaces: [2026-11-01-1215-push-by-github-app](2026-11-01-1215-push-by-github-app.md),
-  [2026-11-01-0500-push-needs-repository-approval](2026-11-01-0500-push-needs-repository-approval.md),
+  2026-11-01-0500-push-needs-repository-approval,
   the GitHub part of [2026-11-01-1310-no-ask-for-app-granted-abilities](2026-11-01-1310-no-ask-for-app-granted-abilities.md),
   and the 能力 section of [2026-11-01-0338-github-plugin-page](2026-11-01-0338-github-plugin-page.md)
 - Superseded by: [2026-11-02-1730-coordinator-github-mcp](2026-11-02-1730-coordinator-github-mcp.md),
