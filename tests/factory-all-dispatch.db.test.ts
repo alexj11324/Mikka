@@ -7,6 +7,7 @@ import { mock, test } from 'node:test'
 import { normalizeRepository } from '@mikka/protocol/repository'
 import { dbUrl, seedUser, seedWorkspace } from './support/workspace-admin-db'
 import { connectGitHub, githubAppStub } from './support/github-app-stub'
+import { codexItemChunks } from '../packages/daemon/src/adapters/codex'
 
 mock.module(new URL('../lib/coordinator/decide.ts', import.meta.url).href, { namedExports: { invokeDecision: async () => null } })
 
@@ -77,13 +78,23 @@ test('a Coordinator dispatch_run goes through the Factory', { skip: !dbUrl, time
   const sha = 'a'.repeat(40)
   const finish = async (id: string, check: boolean) => {
     await pool.query(`UPDATE agent_runs SET status='running',"sessionId"=$2,"startedAt"=clock_timestamp()-interval '1 second' WHERE id=$1`, [id, `independent-${id}`])
-    if (check) for (const [seq, chunk] of [
-      [1, { type: 'tool-input-available', toolCallId: `check-${id}`, toolName: 'Bash', input: { command } }],
-      [2, { type: 'tool-output-available', toolCallId: `check-${id}`, output: { exitCode: 0 } }],
-    ] as const) await pool.query('INSERT INTO run_chunks (id,"runId",seq,chunk) VALUES ($1,$2,$3,$4)', [randomUUID(), id, seq, JSON.stringify(chunk)])
+    if (check) {
+      const call = { id: `check-${id}`, type: 'mcpToolCall' as const, server: 'mikka', tool: 'verify_command', arguments: { command }, status: 'completed' as const,
+        result: { content: [{ type: 'text', text: JSON.stringify({ exitCode: 0 }) }], structuredContent: null }, error: null };
+      const chunks = [...codexItemChunks('started', call, new Set(), '/tmp'), ...codexItemChunks('completed', call, new Set(), '/tmp')];
+      for (const [seq, chunk] of chunks.entries()) await pool.query('INSERT INTO run_chunks (id,"runId",seq,chunk) VALUES ($1,$2,$3,$4)', [randomUUID(), id, seq + 1, JSON.stringify(chunk)])
+      const { verifierCommandEvidence } = await import('../lib/factory/checks');
+      // A failed or malformed MCP response cannot attest a passing command.
+      for (const text of [JSON.stringify({ exitCode: 1 }), 'not-json']) {
+        await pool.query(`UPDATE run_chunks SET chunk=jsonb_set(chunk,'{output}', $2::jsonb) WHERE "runId"=$1 AND seq=2`, [id, JSON.stringify([{ type: 'text', text }])]);
+        await pool.query(`UPDATE agent_runs SET "finishedAt"=clock_timestamp() WHERE id=$1`, [id]);
+        assert.deepEqual(await verifierCommandEvidence(pool, id, command), []);
+      }
+      await pool.query(`UPDATE run_chunks SET chunk=jsonb_set(chunk,'{output}', $2::jsonb) WHERE "runId"=$1 AND seq=2`, [id, JSON.stringify(call.result.content)]);
+    }
     await pool.query(`UPDATE agent_runs SET status='succeeded',"stopReason"='submitted',"finishedAt"=clock_timestamp(),report=$2 WHERE id=$1`, [id, JSON.stringify({
       summary: 'Checked tax rounding with concrete evidence.', filesChanged: [], openQuestions: [], nextStep: null, sourceCommit: sha,
-      verify: { status: 'passed', command, exitCode: 0, signal: null, timedOut: false, output: 'passed' },
+      verify: check ? { status: 'passed', command, exitCode: 0, signal: null, timedOut: false, output: 'passed' } : { status: 'not_run' },
       ...(check ? { check: { sha, readOnly: true }, criteria: [{ text: 'Tax rounds to the cent', passed: true, evidence: 'The fixture command passed.', command, exitCode: 0 }] } : { publish: { commit: sha, pushed: true, branch: 'mikka/fixture', remote: 'origin' } }),
     })])
     await runtime.reconcile.run(userId, id)

@@ -250,7 +250,7 @@ test('a question reaches only its owner, only on an ended run, and only behind t
     assert.equal(current.questionReads.length, 0)
 
     // Routing on but lifecycle off: no question, and the store is never asked.
-    delete process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED
+    process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED = '0'
     current = fixture(); viewer = 'owner'; current.run.status = 'succeeded'; current.questions.set(runId, 'waiting_user')
     assert.equal((await actions.getIssueThread(issueId, runId)).thread.question, null)
     assert.equal((await actions.listIssueThreads(issueId))[0].question, null)
@@ -258,7 +258,7 @@ test('a question reaches only its owner, only on an ended run, and only behind t
 
     // Flags off: no question, and the store is never asked.
     process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED = '1'
-    delete process.env.MIKKA_FACTORY_ROUTING_ENABLED
+    process.env.MIKKA_FACTORY_ROUTING_ENABLED = '0'
     current = fixture(); viewer = 'owner'; current.run.status = 'succeeded'; current.questions.set(runId, 'waiting_user')
     assert.equal((await actions.getIssueThread(issueId, runId)).thread.question, null)
     assert.equal((await actions.listIssueThreads(issueId))[0].question, null)

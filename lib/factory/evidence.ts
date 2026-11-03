@@ -1,3 +1,4 @@
+import { repositoryExecutionMatches } from './execution-receipt'
 import { createHash } from "node:crypto";
 import type { PoolClient } from "pg";
 import {
@@ -258,7 +259,7 @@ export async function approvalEvidence(tx: PoolClient, task: FactoryTask) {
             ? run.report?.sourceCommit !== candidate.sha
             : candidate.kind === 'deliverable'
               ? candidate.sha !== null
-              : run.report?.publish?.commit !== candidate.sha || run.report?.verify?.status !== 'passed')
+              : !repositoryExecutionMatches(run.report,candidate.sha))
         )
           throw new FactoryError("factoryEvidenceMismatch");
       }

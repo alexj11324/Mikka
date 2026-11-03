@@ -1,3 +1,4 @@
+import { repositoryExecutionMatches } from './execution-receipt'
 import { apiKeyWorkerDefinition } from "../agent-kit/worker";
 import { factoryRunBotMatches } from './run-scope'
 import { randomUUID } from "node:crypto";
@@ -679,7 +680,7 @@ export function createFactoryStore(
                     ? run.report?.sourceCommit !== candidate.sha
                     : candidate?.kind === 'deliverable'
                       ? candidate.sha !== null || !/^[a-f0-9]{40}$/.test(run.report?.sourceCommit ?? '')
-                      : run.report?.publish?.commit !== candidate?.sha || run.report?.verify?.status !== 'passed'))
+                      : !repositoryExecutionMatches(run.report,candidate?.sha)))
               )
                 fail("factoryEvidenceMismatch");
               for (const evidence of change.evidence) {

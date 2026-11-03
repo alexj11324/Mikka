@@ -297,7 +297,7 @@ export async function verifierCommandEvidence(
   includeFailure = false,
 ) {
   const { rows } = await tx.query(
-    `SELECT i.id AS input,o.id AS output,i.chunk->'input'->'command' AS command,o.chunk->>'type' AS "outputType",o.chunk->'output' AS result
+    `SELECT i.id AS input,o.id AS output,i.chunk->'input'->'command' AS command,i.chunk->>'toolName' AS "toolName",o.chunk->>'type' AS "outputType",o.chunk->'output' AS result
     FROM run_chunks i JOIN run_chunks o ON o."runId"=i."runId" AND o.seq>i.seq AND o.chunk->>'toolCallId'=i.chunk->>'toolCallId'
     JOIN agent_runs r ON r.id=i."runId" AND i."createdAt">=r."startedAt" AND o."createdAt">=i."createdAt" AND o."createdAt"<=r."finishedAt"
     WHERE i."runId"=$1 AND i.chunk->>'type'='tool-input-available' AND lower(i.chunk->>'toolName') IN ('bash','shell','mcp__mikka__verify_command')
@@ -308,12 +308,26 @@ export async function verifierCommandEvidence(
   const passed = matching.filter(
     (r) =>
       r.outputType === "tool-output-available" &&
-      (typeof r.result === "string" || r.result?.exitCode === 0),
+      (r.toolName.toLowerCase() === 'mcp__mikka__verify_command'
+        ? verifierMcpResultPassed(r.result)
+        : typeof r.result === "string" || r.result?.exitCode === 0),
   );
   const selected = includeFailure
     ? [...passed, ...matching.filter((r) => !passed.includes(r))].slice(0, 10)
     : passed.slice(0, 1);
   return selected.flatMap((row) => [row.input as string, row.output as string]);
+}
+
+// Codex preserves MCP content blocks; the verifier returns its exit status as JSON text.
+function verifierMcpResultPassed(result: unknown): boolean {
+  if (!Array.isArray(result) || result.length !== 1) return false;
+  const block = result[0];
+  if (block?.type !== 'text' || typeof block.text !== 'string') return false;
+  try {
+    return JSON.parse(block.text)?.exitCode === 0;
+  } catch {
+    return false;
+  }
 }
 
 /** Legacy callers share the current canonical claim, owner/Bot/source and cancellation fences. */

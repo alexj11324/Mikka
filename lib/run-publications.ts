@@ -310,9 +310,13 @@ export async function publishRunResult(runId: string, openPullRequest: OwnerPull
     return { done: !row || WORKFLOW_DONE.includes(row.status) }
   }
   try {
+    // Factory owns the final independent verify gate. Preserve the agent's PR
+    // readiness instead of forcing a draft solely because execution had no
+    // preconfigured command; the person's merge still requires both checks.
+    const factoryBound = (await pool.query(`SELECT 1 FROM factory_attempts a JOIN factory_tasks t ON t.id=a."taskId" WHERE a."runId"=$1 AND a.stage='execute' AND t."userId"=$2 AND t."issueId"=$3`,[runId,claim.userId,claim.issueId])).rowCount === 1
     const snapshot = await withPublicationAuthority(claim, async ({ publication, report, allowCreate }) => ({
       remoteKey: publication.remoteKey, issueId: publication.issueId, identifier: publication.identifier!, title: publication.issueTitle!, summary: report.summary,
-      branch: publication.branch!, commit: report.publish!.commit!, baseBranch: publication.baseBranch, draft: report.verify.status === 'not_run', allowCreate,
+      branch: publication.branch!, commit: report.publish!.commit!, baseBranch: publication.baseBranch, draft: report.verify.status === 'not_run' && !factoryBound, allowCreate,
     }))
     const pullRequest = await openPullRequest({ ...snapshot, userId: claim.userId, withWrite: write => withPublicationAuthority(claim, () => write()) })
     return { done: await settlePublication(claim, { pullRequest }) }
