@@ -32,3 +32,30 @@ deletions, authentication and owner isolation. The related activity/document/
 task/thread database group passed seven tests. Existing waiting-device
 regressions, types, lint, library and thread DOM checks are recorded with the
 version-bound production-build/HTTP acceptance below and in the PR.
+
+## Version-bound acceptance
+
+Runtime revision `c64eea6319485f3f01e609a572b8ce2772685add` passed a fresh
+production build, lint and typecheck, 72 library units, five thread DOM checks,
+and the seven existing waiting-device cases against real isolated Postgres.
+The final evidence commit changes only this document and reviewed screenshots.
+
+A local production server at `http://localhost:3124/mikka`, backed by
+`mikka_thread_egress_e2e` on loopback port 55432, passed six normal leased-account
+HTTP checks. The test obtains actual owner/peer sessions via the existing
+email signup/signin helper, reads the built server-action manifest, and POSTs
+the real pollThreads action. It covers the full snapshot, unchanged result,
+heartbeat stability, visible updates, peer isolation and unauthenticated
+rejection. Full application HTTP response: 88,416 bytes; unchanged: 125 bytes.
+These are fixture application HTTP bytes, not database socket or supplier bytes.
+No model calls, external provider calls or browser tests ran.
+
+Capture-only local production-build screenshots were reviewed in
+[light](../screenshots/2026-11-03-thread-list-egress/thread-list-light.png),
+[dark](../screenshots/2026-11-03-thread-list-egress/thread-list-dark.png) and
+[narrow](../screenshots/2026-11-03-thread-list-egress/thread-list-narrow.png)
+layouts using that leased synthetic owner and the 119-row fixture. The existing
+thread list remains readable in each, without new copy, controls or layout.
+
+Git-linked CI and formal deployment are tracked on the PR; actual supplier
+flow still requires post-deployment observation, separately from these fixtures.
