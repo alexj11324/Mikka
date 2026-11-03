@@ -113,6 +113,14 @@ text-only criteria. A pre-fix reproduction dropped the fixture's text criterion
 review cannot pass). The regression now retains that criterion without trusting
 agent-reported verification.
 
+A real API/CLI run exposed the runner proxy being removed by the child
+allow-list: Claude Code exhausted ten retries with `ECONNREFUSED` before any
+model tool event (occurrence 10/10 on proxy-required runners; impact 8/10 because
+execute and both independent checks cannot reach their provider). The child
+environment now retains explicit proxy routing and Node's proxy opt-in, while
+provider/cloud credentials and `NODE_OPTIONS` remain excluded. `src/env.test.ts`
+was first reproduced failing and now verifies both routing and those exclusions.
+
 API/CLI acceptance uses `pnpm test:local-loop` in cloud Linux with its normal test
 account lease, local database/application/daemon and provider boundaries recorded
 by that harness. The database and simulated-Harness tests do not establish real

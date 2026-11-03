@@ -13,6 +13,17 @@ export const BASE_ENV_ALLOW = [
   "LC_CTYPE",
   "TERM",
   "TMPDIR",
+  // Network routing belongs to the runner. Managed cloud runners require it
+  // for real provider calls; credentials and preload code remain excluded.
+  "HTTP_PROXY",
+  "HTTPS_PROXY",
+  "ALL_PROXY",
+  "NO_PROXY",
+  "http_proxy",
+  "https_proxy",
+  "all_proxy",
+  "no_proxy",
+  "NODE_USE_ENV_PROXY",
 ] as const
 
 /**

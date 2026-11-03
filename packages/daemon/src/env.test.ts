@@ -51,6 +51,23 @@ describe("buildChildEnv", () => {
     expect(env).not.toHaveProperty("CLAUDE_CONFIG_DIR")
   })
 
+  it("preserves the runner network proxy without inheriting provider credentials or Node preload code", () => {
+    const routing = {
+      HTTP_PROXY: "http://proxy.invalid:8080",
+      HTTPS_PROXY: "http://proxy.invalid:8080",
+      ALL_PROXY: "socks5://proxy.invalid:1080",
+      NO_PROXY: "localhost,127.0.0.1,::1",
+      http_proxy: "http://proxy.invalid:8080",
+      https_proxy: "http://proxy.invalid:8080",
+      all_proxy: "socks5://proxy.invalid:1080",
+      no_proxy: "localhost,127.0.0.1,::1",
+      NODE_USE_ENV_PROXY: "1",
+    }
+    const env = buildChildEnv({ host: { ...host, ...routing } })
+    for (const [name, value] of Object.entries(routing)) expect(env[name]).toBe(value)
+    for (const name of Object.keys(PLANTED)) expect(env).not.toHaveProperty(name)
+  })
+
   it("classifies names", () => {
     expect(isDeniedEnvName("MCP_ANYTHING")).toBe(true)
     expect(isDeniedEnvName("PATH")).toBe(false)
