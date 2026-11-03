@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { SubscriptionRefusal } from "@mikka/protocol/subscription";
 import { WorkerRefusal } from "../packages/daemon/src/subscription-worker-client";
+import { isDeviceAuthorityError } from "./db/device-scope";
+import { ModelAdmissionError } from "./model-admission/contract";
 import type { SubscriptionService } from "./subscription-service";
 
 const input = z.discriminatedUnion("action", [
@@ -94,19 +96,24 @@ export function subscriptionNativeHTTP(deps: {
         headers: { ...headers, "content-type": upstream.contentType },
       });
     } catch (error) {
+      // Preserve the outer device route's revoked 401 / unavailable 503 fence.
+      if (isDeviceAuthorityError(error)) throw error;
       const subscription = error instanceof SubscriptionRefusal;
       const worker = error instanceof WorkerRefusal;
-      const code = subscription || worker ? error.code : "subscription_unavailable";
+      const model = error instanceof ModelAdmissionError;
+      const code = subscription || worker ? error.code : model ? "model_policy_refused" : "subscription_unavailable";
       try {
         (deps.log ?? console.warn)(JSON.stringify({
           event: "subscription_native_refused", ...identity, operation, phase,
           code: typeof code === "string" && /^[a-z_]{1,64}$/.test(code) ? code : "subscription_unavailable",
-          errorClass: subscription ? "SubscriptionRefusal" : worker ? "WorkerRefusal" : error instanceof z.ZodError ? "ZodError" : "unknown",
+          errorClass: subscription ? "SubscriptionRefusal" : worker ? "WorkerRefusal" : model ? "ModelAdmissionError" : error instanceof z.ZodError ? "ZodError" : "unknown",
         }));
       } catch { /* A diagnostic failure cannot replace the refusal. */ }
       return Response.json(
         { error: "subscription_unavailable" },
-        { status: 409, headers },
+        // A failed authority/database lookup is unavailable, not a revoked grant.
+        // Keep explicit refusals and invalid input on their existing conflict path.
+        { status: subscription || worker || model || phase === "input" ? 409 : 503, headers },
       );
     }
   };

@@ -20,6 +20,13 @@ test('independent delivery prompt carries host execution observations and usable
   } } as unknown as PoolClient
   await configureFactoryCheck(tx, { stage: 'verify', status: 'pending', candidateId: 'candidate', id: 'task', userId: 'owner', issueId: 'issue', attemptId: 'attempt' } as FactoryTask, 'check-run')
   assert.match(prompt, /mikka\.inspect_artifact/)
+  assert.match(prompt, /independent observations from the granted artifact or computer tools/)
+  assert.doesNotMatch(prompt, /using real commands and observations/)
+  assert.match(prompt, /If a criterion explicitly requires independent command execution, report the missing capability/)
+  assert.match(prompt, /contentUtf8/)
+  assert.match(prompt, /expectedUtf8/)
+  assert.match(prompt, /Do not pass a criterion from the producer report alone/)
+  assert.doesNotMatch(prompt, /Use the granted mikka\.verify_command tool/)
   assert.match(prompt, /"runId":"producer".*"sessionId":"native-session".*"model":"deepseek-flash".*"harness":"claude_code"/)
   assert.match(prompt, /not a provider billing log or proof of an alias version/)
   assert.match(prompt, /Missing observations are not observed mismatches/)

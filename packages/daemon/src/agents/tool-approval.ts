@@ -21,6 +21,7 @@ async function abortable<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
 
 export class ToolApprovalGate {
   private readonly stop = new AbortController()
+  private checking?: Promise<boolean>
   constructor(readonly runId: string, private readonly host: ToolApprovalHost) {}
   revoke() { this.stop.abort() }
   get revoked(): boolean { return this.stop.signal.aborted }
@@ -31,8 +32,13 @@ export class ToolApprovalGate {
   }
   async checkLive(): Promise<boolean> {
     if (this.revoked) return false
-    try { return await abortable(Promise.resolve(this.host.isLive(this.runId)), this.stop.signal) && !this.revoked }
-    catch { return false }
+    if (!this.checking) {
+      const work = Promise.resolve().then(() => this.revoked ? false : this.host.isLive(this.runId))
+      this.checking = abortable(work, this.stop.signal)
+        .then(live => live && !this.revoked, () => false)
+        .finally(() => { this.checking = undefined })
+    }
+    return this.checking
   }
 }
 

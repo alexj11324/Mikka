@@ -2,7 +2,7 @@
 // context's handoff file, and the daemon's commit and push of a verified run.
 import { spawn } from "node:child_process"
 import { createHash, randomUUID } from "node:crypto"
-import { existsSync, symlinkSync, writeFileSync } from "node:fs"
+import { existsSync, symlinkSync, truncateSync, writeFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { join } from "node:path"
 
@@ -267,6 +267,47 @@ describe("run context", () => {
         expect(refused.result.isError).toBe(true)
         expect(JSON.stringify(refused)).not.toContain('outside-private-value')
       }
+      expect(existsSync(ctx.handoffFile)).toBe(false)
+    } finally { client.close() }
+  })
+
+  it('reads bounded UTF8 delivery contents and compares exact expected bytes without hiding extra lines', async () => {
+    const repo = await makeRepo(), worktree = await worktreeOf(repo)
+    // The actual failed production candidate retained two extra blank lines.
+    const expected = 'factory-1136-codex-63a84557\n7 - 4 = 3\nverified artifact\n'
+    const actual = 'factory-1136-codex-63a84557\n\n7 - 4 = 3\n\nverified artifact\n'
+    expect(Buffer.byteLength(expected)).toBe(56)
+    expect(Buffer.byteLength(actual)).toBe(58)
+    const unicode = '\ufeff你好🌍\n'
+    writeFileSync(join(worktree, 'DELIVERY.txt'), actual)
+    writeFileSync(join(worktree, 'UNICODE.txt'), unicode)
+    writeFileSync(join(worktree, 'BINARY.bin'), Buffer.from([0xff, 0xfe, 0x61]))
+    writeFileSync(join(worktree, 'NUL.bin'), Buffer.from([0x61, 0, 0x62]))
+    writeFileSync(join(worktree, 'LARGE.txt'), 'x'.repeat(64 * 1024 + 1))
+    await execa('git', ['add', '.'], { cwd: worktree })
+    await execa('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-m', 'candidate'], { cwd: worktree })
+    const ctx = new RunContext({ harness: 'codex', worktree, runDir: tempDir(), privateDir: tempDir(),
+      factoryCheck: { stage: 'verify', reportOnly: true, inferCommand: false } })
+    const client = mcpClient(ctx.handoffFile, ctx.mcpServer().args.slice(3))
+    const call = async (path: string, expectedUtf8?: string) => (await client.request('tools/call', {
+      name: 'inspect_artifact', arguments: { path, ...(expectedUtf8 === undefined ? {} : { expectedUtf8 }) },
+    })) as { result: { isError?: boolean; content: { text: string }[] } }
+    const inspect = async (path: string, expectedUtf8?: string) => {
+      const response = await call(path, expectedUtf8)
+      expect(response.result.isError).not.toBe(true)
+      return JSON.parse(response.result.content[0].text)
+    }
+    try {
+      expect(await inspect('DELIVERY.txt', expected)).toMatchObject({ bytes: 58, contentUtf8: actual, matchesExpectedUtf8: false, contentMatchesGit: true })
+      expect(await inspect('DELIVERY.txt', actual)).toMatchObject({ matchesExpectedUtf8: true })
+      expect(await inspect('DELIVERY.txt', actual.slice(0, -1))).toMatchObject({ matchesExpectedUtf8: false })
+      expect(await inspect('UNICODE.txt', unicode)).toMatchObject({ contentUtf8: unicode, matchesExpectedUtf8: true })
+      for (const path of ['BINARY.bin', 'NUL.bin']) expect(await inspect(path)).toMatchObject({ contentUtf8: null, textUnavailable: 'binary', contentMatchesGit: true })
+      expect(await inspect('LARGE.txt')).toMatchObject({ bytes: 64 * 1024 + 1, contentUtf8: null, textUnavailable: 'oversize', contentMatchesGit: true })
+      expect((await call('DELIVERY.txt', 'x'.repeat(64 * 1024 + 1))).result.isError).toBe(true)
+      writeFileSync(join(worktree, 'TOO-LARGE.bin'), '')
+      truncateSync(join(worktree, 'TOO-LARGE.bin'), 16 * 1024 * 1024 + 1)
+      expect((await call('TOO-LARGE.bin')).result.isError).toBe(true)
       expect(existsSync(ctx.handoffFile)).toBe(false)
     } finally { client.close() }
   })

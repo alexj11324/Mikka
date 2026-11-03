@@ -61,3 +61,42 @@ for (const route of ['codex_cpa', 'claude_cpa', 'codex_cli', 'claude_code_cli'] 
     await assert.rejects(service.check(use), /membership revoked/)
   })
 }
+
+for (const route of ['codex_cli', 'claude_code_cli'] as const) {
+  test(`${route}: context checks both admissions without generation audit; actual requests retain audit`, async () => {
+    const { use, access } = subscriptionFixture(route)
+    access.connection!.quota.observedAt = new Date().toISOString()
+    const row = { id: access.connection!.id, ownerId: use.ownerId, workspaceId: use.workspaceId,
+      provider: route === 'codex_cli' ? 'codex' : 'claude', state: 'connected', epoch: '1', quota: access.connection!.quota }
+    const repository = { binding: async () => ({ ...access.binding!, modelId: 'fixture-model' }),
+      connection: async () => row, scope: () => ({}) } as unknown as SubscriptionService['repository']
+    const admissions: Array<boolean | undefined> = [], methods: string[] = []
+    let denyAt = 0
+    const refusal = new Error('modelPolicyRevoked')
+    const worker = { forUse() { return this }, async call(method: string) {
+      methods.push(method)
+      return { accountId: 'fixture-account', expiresAt: new Date(Date.now() + 60_000).toISOString() }
+    }, async nativeRequest() { methods.push('request'); return { contentType: 'text/event-stream', body: new ReadableStream() } } }
+    const service = new SubscriptionService(repository, () => worker as never,
+      { ready: () => true, nativeIsolation: 'verified_runtime' }, undefined, async () => undefined,
+      async (_scope, _model, _route, _signal, auditAllowed?: boolean) => {
+        admissions.push(auditAllowed)
+        if (admissions.length === denyAt) throw refusal
+      })
+    await service.nativeContext(use)
+    await service.nativeContext(use)
+    assert.deepEqual(admissions, [false, false, false, false])
+    assert.deepEqual(methods, ['prepare', 'nativeContext', 'prepare', 'nativeContext'])
+    admissions.length = 0; methods.length = 0
+    await service.nativeRequest(use, { path: route === 'codex_cli' ? '/responses' : '/v1/messages', headers: {}, body: { model: 'fixture-model' } })
+    assert.deepEqual(admissions, [undefined, undefined], 'real generation keeps default audit semantics')
+    assert.deepEqual(methods, ['request'])
+    for (denyAt of [1, 2]) {
+      admissions.length = 0; methods.length = 0
+      await assert.rejects(service.nativeContext(use), error => error === refusal)
+      assert.equal(admissions.length, denyAt, 'neither pre-access nor post-access admission can be skipped')
+      assert.ok(admissions.every(value => value === false))
+      assert.deepEqual(methods, [], 'a denied context cannot prepare or invoke the provider worker')
+    }
+  })
+}

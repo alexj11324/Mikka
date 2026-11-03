@@ -6,9 +6,10 @@ import { chmodSync } from "node:fs"
 import { join, resolve } from "node:path"
 
 import { resolveAgentSettings } from "@mikka/protocol/agent-policy"
-import { afterEach, expect, it } from "vitest"
+import { afterEach, expect, it, vi } from "vitest"
 
 import { NoSandbox } from "../src/agents/sandbox"
+import { ToolApprovalGate } from "../src/agents/tool-approval"
 import { Daemon } from "../src/main"
 import { MemoryServer } from "../src/server-link"
 import { HttpServerLink } from "../src/server-link-http"
@@ -53,6 +54,62 @@ async function boot(answer: (body: { policyRevision: string }) => Response | Pro
 }
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } })
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>(done => { resolve = done })
+  return { promise, resolve }
+}
+
+it("coalesces only in-flight liveness checks and never caches a settled success", async () => {
+  const pending = deferred<boolean>()
+  const host = { isLive: vi.fn(() => pending.promise) }
+  const gate = new ToolApprovalGate("run-a", host)
+  const waiters = Array.from({ length: 12 }, () => gate.checkLive())
+  await Promise.resolve()
+  expect(host.isLive).toHaveBeenCalledTimes(1)
+  pending.resolve(true)
+  expect(await Promise.all(waiters)).toEqual(Array(12).fill(true))
+  expect(await gate.checkLive()).toBe(true)
+  expect(host.isLive).toHaveBeenCalledTimes(2)
+})
+
+it("releases all pending waiters on revocation and an old success cannot revive the gate", async () => {
+  const pending = deferred<boolean>()
+  const host = { isLive: vi.fn(() => pending.promise) }
+  const gate = new ToolApprovalGate("run-a", host)
+  const waiters = Array.from({ length: 5 }, () => gate.checkLive())
+  await Promise.resolve()
+  gate.revoke()
+  expect(await Promise.all(waiters)).toEqual(Array(5).fill(false))
+  pending.resolve(true)
+  expect(await gate.checkLive()).toBe(false)
+  expect(host.isLive).toHaveBeenCalledTimes(1)
+})
+
+it("checks the host again after false or rejected checks and fails closed on a synchronous throw", async () => {
+  const host = { isLive: vi.fn<() => boolean | Promise<boolean>>()
+    .mockReturnValueOnce(false)
+    .mockRejectedValueOnce(new Error("unavailable"))
+    .mockImplementationOnce(() => { throw new Error("synchronous failure") })
+    .mockReturnValueOnce(true) }
+  const gate = new ToolApprovalGate("run-a", host)
+  expect(await gate.checkLive()).toBe(false)
+  expect(await gate.checkLive()).toBe(false)
+  expect(await gate.checkLive()).toBe(false)
+  expect(await gate.checkLive()).toBe(true)
+  expect(host.isLive).toHaveBeenCalledTimes(4)
+})
+
+it("does not share an in-flight check across gates or run identities", async () => {
+  const pending = deferred<boolean>()
+  const host = { isLive: vi.fn(() => pending.promise) }
+  const gates = [new ToolApprovalGate("run-a", host), new ToolApprovalGate("run-a", host), new ToolApprovalGate("run-b", host)]
+  const waiters = gates.map(gate => gate.checkLive())
+  await Promise.resolve()
+  expect(host.isLive.mock.calls).toEqual([["run-a"], ["run-a"], ["run-b"]])
+  pending.resolve(true)
+  expect(await Promise.all(waiters)).toEqual([true, true, true])
+})
 
 it("ends a running run when the server says its policy revision is no longer live", async () => {
   let live = true

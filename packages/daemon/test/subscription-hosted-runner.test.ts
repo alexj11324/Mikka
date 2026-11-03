@@ -7,7 +7,7 @@ import { request } from "node:http";
 import { afterEach, expect, it, vi } from "vitest";
 import { defaultRunPolicy, type RunAssignment } from "@mikka/protocol";
 import { createHostedBotRunner } from "../src/subscription-hosted-runner";
-import { DaemonError } from "../src/errors";
+import { DaemonError, ServerUnreachableError } from "../src/errors";
 import { MemoryServer } from "../src/server-link";
 import { createLogger } from "../src/log";
 import { buildChildEnv } from "../src/env";
@@ -433,6 +433,121 @@ it('retains a post-start subscription context refusal while stopping the real CL
     expect(JSON.stringify(log.mock.calls)).not.toMatch(/private-runtime-account|fixture-account/)
     expect(fixture.processes()).toEqual([])
   } finally { fixture.gate.revoke(); await session?.cancel(); log.mockRestore() }
+}, 45000)
+
+it('recovers a transient post-start context outage before admitting another native send', async () => {
+  const fixture = await revocationFixture()
+  const log = vi.spyOn(fixture.options.log, 'warn').mockImplementation(() => {})
+  let session: AgentSession | undefined
+  try {
+    session = await fixture.runner.start(fixture.assignment, fixture.options)
+    let attempts = 0
+    fixture.link.nativeContext.mockImplementation(async () => {
+      if (++attempts === 1) throw new ServerUnreachableError(503)
+      return fixture.contextValue
+    })
+    await session.send('HANG')
+    // The adapter independently verifies the admitted send as well.
+    expect(attempts).toBeGreaterThanOrEqual(2)
+    expect(fixture.processes().length).toBeGreaterThan(0)
+    expect(fixture.link.nativeRequest).not.toHaveBeenCalled()
+    expect(log).not.toHaveBeenCalled()
+  } finally { fixture.gate.revoke(); await session?.cancel(); log.mockRestore() }
+}, 45000)
+
+it('blocks a broker request until fresh authority succeeds after a transient context outage', async () => {
+  const fixture = await revocationFixture()
+  let session: AgentSession | undefined
+  let transport: ReturnType<typeof request> | undefined
+  const resume = deferred<void>()
+  try {
+    session = await fixture.runner.start(fixture.assignment, fixture.options)
+    const checking = deferred<void>()
+    let attempts = 0
+    fixture.link.nativeContext.mockImplementation(async () => {
+      if (++attempts === 1) throw new ServerUnreachableError(503)
+      checking.resolve()
+      await resume.promise
+      return fixture.contextValue
+    })
+    fixture.link.nativeRequest.mockImplementation(async () => ({ contentType: 'application/json', body: new ReadableStream({ start(controller) {
+      controller.enqueue(new TextEncoder().encode('{"content":[]}'))
+      controller.close()
+    } }) }))
+    const response = new Promise<string>((resolveResponse, reject) => {
+      transport = request({ socketPath: fixture.socket()!, method: 'POST', path: '/v1/messages' }, reply => {
+        let body = ''
+        reply.on('data', chunk => { body += chunk })
+        reply.on('end', () => resolveResponse(body))
+        reply.on('error', reject)
+      })
+      transport.on('error', reject)
+      transport.end(JSON.stringify({ model: 'fixture-model', messages: [] }))
+    })
+    await bounded(checking.promise, 'fresh authority pending')
+    expect(fixture.link.nativeRequest).not.toHaveBeenCalled()
+    resume.resolve()
+    expect(await bounded(response, 'authorized broker response')).toBe('{"content":[]}')
+    expect(fixture.link.nativeRequest).toHaveBeenCalledTimes(1)
+  } finally { resume.resolve(); fixture.gate.revoke(); transport?.destroy(); await session?.cancel() }
+}, 45000)
+
+it.each([
+  ['persistent outage', () => new ServerUnreachableError(503), 3],
+  ['authoritative refusal', () => new DaemonError(-32603, 'refused', { status: 409 }), 1],
+] as const)('stops the real hosted CLI after %s without forwarding provider work', async (_label, failure, expectedAttempts) => {
+  const fixture = await revocationFixture()
+  const log = vi.spyOn(fixture.options.log, 'warn').mockImplementation(() => {})
+  let session: AgentSession | undefined
+  try {
+    session = await fixture.runner.start(fixture.assignment, fixture.options)
+    let attempts = 0
+    fixture.link.nativeContext.mockImplementation(async () => { attempts++; throw failure() })
+    const finished = (async () => { for await (const _event of session!.events()) { /* drain actual process exit */ } })()
+    await bounded(finished, 'context refusal closes CLI')
+    expect(attempts).toBe(expectedAttempts)
+    expect(fixture.processes()).toEqual([])
+    expect(fixture.link.nativeRequest).not.toHaveBeenCalled()
+    const records = log.mock.calls.map(call => call[0] as unknown as { event?: string })
+    expect(records.filter(record => record.event === 'subscription_runtime_failed')).toHaveLength(1)
+  } finally { fixture.gate.revoke(); await session?.cancel(); log.mockRestore() }
+}, 45000)
+
+it('revokes during context retry backoff without another authority request or provider call', async () => {
+  const fixture = await revocationFixture()
+  let session: AgentSession | undefined
+  try {
+    session = await fixture.runner.start(fixture.assignment, fixture.options)
+    const entered = deferred<void>()
+    let attempts = 0
+    fixture.link.nativeContext.mockImplementation(async () => {
+      attempts++; entered.resolve(); throw new ServerUnreachableError(503)
+    })
+    const finished = (async () => { for await (const _event of session!.events()) { /* drain actual process exit */ } })()
+    await bounded(entered.promise, 'first context outage')
+    await new Promise(resolve => setTimeout(resolve, 50))
+    fixture.gate.revoke()
+    await bounded(finished, 'revoked retry closes CLI')
+    expect(attempts).toBe(1)
+    expect(fixture.link.nativeRequest).not.toHaveBeenCalled()
+    expect(fixture.processes()).toEqual([])
+  } finally { fixture.gate.revoke(); await session?.cancel() }
+}, 45000)
+
+it.each(['expired', 'invalid'] as const)('rejects a successful but %s post-start context without retry', async kind => {
+  const fixture = await revocationFixture()
+  let session: AgentSession | undefined
+  try {
+    session = await fixture.runner.start(fixture.assignment, fixture.options)
+    let attempts = 0
+    fixture.link.nativeContext.mockImplementation(async () => {
+      attempts++
+      return { ...fixture.contextValue, expiresAt: kind === 'expired' ? new Date(Date.now() - 1000).toISOString() : 'invalid' }
+    })
+    await expect(session.send('HANG')).rejects.toThrow('subscription_hosted_runtime_unavailable')
+    expect(attempts).toBe(1)
+    expect(fixture.link.nativeRequest).not.toHaveBeenCalled()
+  } finally { fixture.gate.revoke(); await session?.cancel() }
 }, 45000)
 
 it.each(['token', 'verify'] as const)('logs finite startup diagnostics for a refusal during %s without private values', async phase => {

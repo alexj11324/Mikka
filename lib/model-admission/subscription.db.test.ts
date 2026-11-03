@@ -130,6 +130,28 @@ test('managed subscription routes authorize the existing service and native HTTP
     await assert.rejects(service.model(use, controller.signal), { name: 'AbortError' })
     assert.equal(providerCalls, before)
   })
+  await t.test('context probes enforce policy without admitted audits; requests and denials remain audited', async () => {
+    const workspace = await seedWorkspace(pool, ownerId, [{ userId: ownerId, role: 'admin' }])
+    await set(workspace.id, [rule('codex_cli')])
+    const consumerId = randomUUID(), bindingId = await bind(workspace.id, consumerId, 'codex_cli')
+    const use = { ownerId, workspaceId: workspace.id, consumerId, bindingId, execution: 'native' as const }
+    const count = async (action: string) => Number((await pool.query(
+      'SELECT count(*) AS count FROM workspace_audit_events WHERE "workspaceId"=$1 AND action=$2', [workspace.id, action])).rows[0].count)
+    const before = await count('model.admitted')
+    await service.nativeContext(use)
+    await service.nativeContext(use)
+    assert.equal(await count('model.admitted'), before, 'successful probes must not masquerade as model generations')
+    const calls = providerCalls
+    const response = await service.nativeRequest(use, { path: '/responses', headers: {}, body: { model: 'fixture-model', stream: true } })
+    await new Response(response.body).text()
+    assert.equal(providerCalls, calls + 1)
+    assert.equal(await count('model.admitted'), before + 2, 'both actual-request admissions retain their audit semantics')
+    await set(workspace.id, [rule('codex_cli')], true)
+    const denied = await count('model.denied'), workerBefore = workerCalls
+    await assert.rejects(service.nativeContext(use), /modelPolicyRevoked/)
+    assert.equal(await count('model.denied'), denied + 1, 'suppressing allowed audits never suppresses a denial')
+    assert.equal(workerCalls, workerBefore, 'revoked probes cannot reach the worker')
+  })
   await t.test('native HTTP uses only a bound broker and intersects current Bot and task workspaces on every request', async () => {
     const botId = await seedBot(pool, one.id, ownerId)
     const team = await seedTeam(pool, two.id, ownerId)
@@ -145,6 +167,7 @@ test('managed subscription routes authorize the existing service and native HTTP
     const payload = { path: '/responses', headers: {}, body: { model: 'fixture-model', stream: true } }
     const post = (body: unknown) => fetch(`${origin}/native/${deviceId}/${runId}`, { method: 'POST', body: JSON.stringify(body) })
     const before = providerCalls
+    // A typed model-policy denial is authoritative and must remain a conflict.
     assert.equal((await post({ action: 'request', payload })).status, 409)
     assert.equal(providerCalls, before)
     await set(two.id, [rule('codex_cli')])
@@ -167,7 +190,9 @@ test('managed subscription routes authorize the existing service and native HTTP
     for (const changed of [{ ...payload, path: 'https://proxy.invalid/responses' }, { ...payload, body: { model: 'denied-model', stream: true } }])
       assert.equal((await post({ action: 'request', payload: changed })).status, 409)
     await pool.query(`UPDATE mikka_workspace_members SET status='suspended' WHERE "workspaceId"=$1 AND "userId"=$2`, [two.id, ownerId])
-    assert.equal((await post({ action: 'request', payload })).status, 409)
+    // This membership guard currently throws an unclassified plain error,
+    // not a typed authority refusal. It fails closed without a provider call.
+    assert.equal((await post({ action: 'request', payload })).status, 503)
     assert.equal(providerCalls, before + 1)
     await pool.query(`UPDATE mikka_workspace_members SET status='active' WHERE "workspaceId"=$1 AND "userId"=$2`, [two.id, ownerId])
     await pool.query(`UPDATE agent_runs SET status='stopped',"stopRequestedAt"=now(),"finishedAt"=now() WHERE id=$1`, [runId])
