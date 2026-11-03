@@ -4516,8 +4516,8 @@
     "chooseBot": "请指定本群中具备 Factory 任务能力的 Bot 来执行；此成员只提供回答。",
     "notStarted": "尚未开始执行。{remedy}",
     "newRunNotStarted": "尚未开始新的执行。{remedy}",
-    "stopRequested": "已记录取消请求；正在运行的执行器会在收到停止信号后退出。",
-    "nothingToStop": "任务尚未开始执行，没有需要停止的执行器。",
+    "stopRequested": "已取消任务，正在停止运行中的 Agent。",
+    "nothingToStop": "任务尚未开始执行。",
     "continued": "新的要求已交给同一任务；Factory 将按最新要求执行、独立审查并验证。",
     "created": "任务已交给 Factory，后续由我统一汇报执行、独立审查和验证结果。",
     "chatUnavailable": "这个 Bot 的聊天模型使用其所有者的个人配置，当前消息无法代用该授权。请使用你自己的 Bot，或请其所有者发起这次聊天；任务委派会另行检查你自己的执行资源。"

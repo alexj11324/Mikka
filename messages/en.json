@@ -4516,8 +4516,8 @@
     "chooseBot": "Choose a Bot in this group with Factory task capabilities. This member can only answer questions.",
     "notStarted": "Execution has not started. {remedy}",
     "newRunNotStarted": "A new execution has not started. {remedy}",
-    "stopRequested": "Cancellation recorded. The running executor will exit after receiving the stop signal.",
-    "nothingToStop": "The task has not started; there is no executor to stop.",
+    "stopRequested": "Cancellation recorded; stopping the running Agent.",
+    "nothingToStop": "The task has not started.",
     "continued": "The new request was sent to the same task. Factory will execute, independently review and verify the latest requirements.",
     "created": "The task was sent to Factory. I will report its execution, independent review and verification results.",
     "chatUnavailable": "This Bot uses its owner’s personal chat model settings, which this request cannot access. Use your own Bot or ask its owner to start this chat. Task delegation checks your own execution resources separately."

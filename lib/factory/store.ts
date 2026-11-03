@@ -773,6 +773,13 @@ export function createFactoryStore(
             [task.id, attempt.id],
           );
           if (pendingQuestion.rows.length) fail("factoryQuestionPending");
+          // A failed strict question can only continue through owner recovery,
+          // which validates custody and transitions the question in this transaction.
+          const strictQuestion = await tx.query(`SELECT 1 FROM factory_questions q
+            JOIN agent_runs r ON r.id=q."continuationRunId" AND r."userId"=q."userId"
+            WHERE q."taskId"=$1 AND q.status='blocked' AND q."continuationRunId"=$2
+              AND r."questionContinuation"->>'requireSessionResume'='true' LIMIT 1`, [task.id,attempt.runId]);
+          if (strictQuestion.rowCount) fail("factoryQuestionContinuationUnavailable");
           // A completed monitor observation can open another observation of the
           // same candidate. freshAttempt retains the candidate, never run evidence.
           const nextMonitorCycle =

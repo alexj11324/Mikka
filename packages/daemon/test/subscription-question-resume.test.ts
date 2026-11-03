@@ -129,3 +129,50 @@ for (const harness of ['codex', 'claude_code'] as const) {
     } finally { await daemon.stop() }
   }, 45000)
 }
+
+it.each(['latest-history', 'stale-ledger-run', 'missing-latest-history'] as const)(
+  'codex: explicit recovery of an accepted failed continuation preserves exact SID and scope: %s',
+  async mode => {
+    const f = await fixture('codex')
+    const answered = await f.runner.start(f.next, f.resumedOptions)
+    try { for await (const _event of answered.events()) { /* local protocol only */ } }
+    finally { await answered.cancel() }
+    // Model a transport failure after the answer and a completed tool result.
+    // These are disposable journal/history fixtures, not production changes.
+    const sourceHistory = JSON.parse(readFileSync(f.history(f.next.runId), 'utf8'))
+    sourceHistory.messages.push('LATEST_FAILED_TOOL_RESULT')
+    writeFileSync(f.history(f.next.runId), JSON.stringify(sourceHistory))
+    f.journal.put({ assignment: f.next, state: 'failed', sessionId: f.original.sessionId, worktree: f.cwd,
+      questionResumeState: 'accepted', lastSeq: 0, error: 'synthetic stream interruption', stopReason: 'error', updatedAt: new Date().toISOString() })
+    const sourceLedgerPath = join(f.stateDir, 'native-ledgers', f.next.runId + '.json')
+    const sourceLedger = JSON.parse(readFileSync(sourceLedgerPath, 'utf8'))
+    expect(sourceLedger.scope).toMatchObject({ runId: f.next.runId, bindingId: f.next.subscriptionBinding!.bindingId,
+      ownerId: f.next.subscriptionBinding!.ownerId, workspaceId: f.next.subscriptionBinding!.workspaceId,
+      consumerId: f.next.subscriptionBinding!.consumerId, modelId: f.next.model, revision: 2 })
+    const originalBytes = readFileSync(f.history(f.assignment.runId), 'utf8')
+    const recoveryId = randomUUID(), message = 'RECOVER_WITHOUT_REANSWER'
+    const assignment = { ...f.next, runId: recoveryId, continuesRunId: f.next.runId, followUp: message }
+    const options = { ...f.resumedOptions, runId: recoveryId, toolApproval: new ToolApprovalGate(recoveryId, { isLive: () => true }),
+      continueSession: { runId: f.next.runId, sessionId: f.original.sessionId, message } }
+    if (mode === 'stale-ledger-run') {
+      writeFileSync(sourceLedgerPath, JSON.stringify({ ...sourceLedger, scope: { ...sourceLedger.scope, runId: f.assignment.runId } }))
+    }
+    if (mode === 'missing-latest-history') rmSync(f.history(f.next.runId))
+    if (mode !== 'latest-history') {
+      await expect(f.runner.start(assignment, options)).rejects.toThrow()
+      expect(existsSync(join(runPaths(f.stateDir, recoveryId).runDir, 'handoff.json'))).toBe(false)
+    } else {
+      const resumed = await f.runner.start(assignment, options)
+      try {
+        expect(resumed.sessionId).toBe(f.original.sessionId)
+        for await (const _event of resumed.events()) { /* existing official adapter path */ }
+        expect(JSON.parse(readFileSync(f.history(recoveryId), 'utf8')).messages)
+          .toEqual(['ORIGINAL_QUESTION', 'OWNER_ANSWER', 'LATEST_FAILED_TOOL_RESULT', message])
+        const recoveredLedger = JSON.parse(readFileSync(join(f.stateDir, 'native-ledgers', recoveryId + '.json'), 'utf8'))
+        expect(recoveredLedger).toEqual({ ...sourceLedger, scope: { ...sourceLedger.scope, runId: recoveryId } })
+        expect(JSON.parse(readFileSync(sourceLedgerPath, 'utf8'))).toEqual(sourceLedger)
+        expect(JSON.parse(readFileSync(f.history(f.next.runId), 'utf8'))).toEqual(sourceHistory)
+      } finally { await resumed.cancel() }
+    }
+    expect(readFileSync(f.history(f.assignment.runId), 'utf8')).toBe(originalBytes)
+  }, 45000)
