@@ -27,15 +27,16 @@ export async function persistFactoryHandoff(tx: Pick<PoolClient, 'query'>, task:
     LEFT JOIN run_checkpoints cp ON cp."runId"=r.id AND cp."userId"=$2
     WHERE a."taskId"=$1 ORDER BY a.position DESC LIMIT 20`, [task.id, task.userId, task.issueId])
   const { rows: effects } = await tx.query(`SELECT id,status,action,target,receipt,"candidateId","finishedAt"
-    FROM factory_publications WHERE "taskId"=$1 ORDER BY "createdAt" DESC LIMIT 20`, [task.id])
+    FROM factory_publications WHERE "taskId"=$1 ORDER BY (status IN ('reserved','uncertain')) DESC,"createdAt" DESC LIMIT 20`, [task.id])
   const { rows: publications } = await tx.query(`SELECT p."runId",p.status,p."remoteKey",p.branch,p."pullRequest",p."errorCode",p."updatedAt"
     FROM run_publications p WHERE p."userId"=$2 AND p."issueId"=$3
       AND EXISTS(SELECT 1 FROM factory_attempts a WHERE a."taskId"=$1 AND a."runId"=p."runId")
-    ORDER BY p."updatedAt" DESC LIMIT 20`, [task.id, task.userId, task.issueId])
+    ORDER BY (p.status='processing') DESC,p."updatedAt" DESC LIMIT 20`, [task.id, task.userId, task.issueId])
   const { rows: operations } = await tx.query(`SELECT o."operationId",o.status,o."runId",o.binding->>'action' AS action,
     o.binding->>'target' AS target,o.receipt,o."updatedAt" FROM operation_ledger o WHERE o."ownerId"=$2
       AND EXISTS(SELECT 1 FROM factory_attempts a WHERE a."taskId"=$1
-        AND (a."runId"=o."runId" OR a."runId"::text=o.binding->>'executionRunId')) ORDER BY o."updatedAt" DESC LIMIT 20`, [task.id, task.userId])
+        AND (a."runId"=o."runId" OR a."runId"::text=o.binding->>'executionRunId'))
+    ORDER BY (o.status IN ('executing','uncertain')) DESC,o."updatedAt" DESC LIMIT 20`, [task.id, task.userId])
   const { rows: dependencies } = await tx.query(`SELECT id,status,"originRunId",kind FROM factory_questions
     WHERE "taskId"=$1 AND "userId"=$2 AND status NOT IN ('resolved','cancelled','expired','superseded') ORDER BY "createdAt" DESC LIMIT 10`, [task.id, task.userId])
   const latest = attempts.find(a => a.runId)

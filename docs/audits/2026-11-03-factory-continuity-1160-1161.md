@@ -94,6 +94,10 @@ production credentials. Tests do not claim production success.
 
 `scripts/acceptance/factory-continuation.mjs` uses ordinary email/password login,
 keeps credentials and cookies only in memory, and signs out afterward. It
+accepts the explicitly authorized main account or a normal Smoke test account,
+and sends production credentials only to `https://app.aspectlylabs.com/mikka`.
+Loopback fixtures additionally require a Smoke account and
+`MIKKA_ACCEPTANCE_LOCAL_FIXTURE=1`; main-account credentials never go to them. It
 requires two already accepted, disposable owner tasks with downloadable
 artifacts: Claude Code 53 → 74 bytes and Codex 56 → 77 bytes. It asserts both
 byte count and precomputed SHA-256 of the exact expected artifact contents.

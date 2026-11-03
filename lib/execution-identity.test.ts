@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import type { Pool } from 'pg'
 import { freezeWorkerDefinition, retryWorkerDefinition } from './agent-kit/worker'
-import { freezeExecutionIdentity, revalidateExecutionIdentity, rebindExecutionDevice, executionBillingLabel, ExecutionIdentityError } from './execution-identity'
+import { freezeExecutionIdentity, revalidateExecutionIdentity, rebindExecutionDevice, ExecutionIdentityError } from './execution-identity'
 
 const id = (last: number) => `10000000-0000-4000-8000-${String(last).padStart(12, '0')}`
 function fixture() {
@@ -34,7 +34,7 @@ test('borrowing a Bot uses the requester, their own device/account, and their pr
   assert.equal(identity.personalResourcePolicy, 'requester_only')
   assert.equal(identity.billingAccount.model.ownerId, 'requester')
   assert.equal(identity.billingAccount.runtime.ownerId, 'requester')
-  assert.equal(executionBillingLabel(identity.billingAccount.model), '由供应商计费/金额未知')
+  assert.equal(identity.billingAccount.model.amount, 'provider_unknown')
   assert.equal(JSON.stringify(identity).includes('ciphertext'), false)
 })
 
