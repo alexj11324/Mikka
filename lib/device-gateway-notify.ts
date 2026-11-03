@@ -1,5 +1,3 @@
-import 'server-only'
-
 /**
  * Tells the device gateway that this device has work. The body is empty:
  * the device reads the work through its existing authenticated route.
