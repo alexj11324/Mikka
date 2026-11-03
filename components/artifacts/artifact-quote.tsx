@@ -22,10 +22,10 @@ export function QuoteChip({ text, icon = <TextQuote aria-hidden="true" className
   </div>
 }
 
-/** A quote at the top of a sent message. */
+/** A quote at the top of a sent message, in the bubble's own text colour (muted grey was unreadable on the blue bubble). */
 export function QuoteLine({ text, icon, slot = 'quote' }: { text: string; icon?: ReactNode; slot?: string }) {
   const t = useTranslations('Artifact')
-  return <span data-slot={slot} aria-label={t('quoteLabel', { text })} className="flex min-w-0 items-center gap-1.5 border-l-2 border-foreground/15 pl-2 text-xs text-muted-foreground">
+  return <span data-slot={slot} aria-label={t('quoteLabel', { text })} className="flex min-w-0 items-center gap-1.5 border-l-2 border-current/40 pl-2 text-xs opacity-80">
     {icon}
     <span className="truncate">{text}</span>
   </span>
