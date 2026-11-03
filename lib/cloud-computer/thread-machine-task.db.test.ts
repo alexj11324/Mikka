@@ -87,6 +87,155 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
     };
     const machine = async (runId: string) => (await pool.query('SELECT state,"sandboxId","deviceId","issueId" FROM thread_machines WHERE "runId"=$1', [runId])).rows[0];
 
+    const questionMachine = async (state = 'paused') => {
+      const issueId = await task(), prior = await parked(issueId, { status: 'stopped' });
+      const next = await run(issueId), q = randomUUID(), taskId = randomUUID(), attemptId = randomUUID();
+      const originMachine = (await pool.query('SELECT * FROM thread_machines WHERE "runId"=$1',[prior.runId])).rows[0];
+      const continuation = { questionId:q, originRunId:prior.runId,originSessionId:'original-native-session',followUp:'owner answer',requireSessionResume:true,requiredSandboxId:prior.sandboxId };
+      await pool.query(`UPDATE agent_runs SET "deviceId"=$2,"deviceRepoId"=$3,"sessionId"=$4 WHERE id=$1`,[prior.runId,prior.device,originMachine.repoId,continuation.originSessionId]);
+      await pool.query(`UPDATE agent_runs SET "deviceId"=$2,"deviceRepoId"=$3,"questionContinuation"=$4 WHERE id=$1`,[next,prior.device,originMachine.repoId,JSON.stringify(continuation)]);
+      await pool.query(`UPDATE thread_machines SET state='ended',"sandboxId"=NULL WHERE "runId"=$1`,[prior.runId]);
+      await pool.query(`INSERT INTO thread_machines ("runId","workspaceId","ownerId","botId","issueId","sandboxId","snapshotId","operationId",state,"deviceId","repoId")
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,[next,workspaceId,owner,botId,issueId,prior.sandboxId,originMachine.snapshotId,randomUUID(),state,prior.device,originMachine.repoId]);
+      const tx = await pool.connect();
+      try {
+        await tx.query('BEGIN');
+        await tx.query(`INSERT INTO factory_tasks(id,"userId","issueId","sourceEventId",route,stage,status,"attemptId",reason) VALUES ($1,$2,$3,$4,'{}','execute','running',$5,'fixture')`,[taskId,owner,issueId,randomUUID(),attemptId]);
+        await tx.query(`INSERT INTO factory_attempts(id,"taskId",stage,ordinal,position,status,"runId",reason) VALUES ($1,$2,'execute',1,1,'running',$3,'fixture')`,[attemptId,taskId,next]);
+        await tx.query(`INSERT INTO factory_questions(id,"userId","issueId","taskId","attemptId",stage,"originRunId","originSessionId","originRevision","waitingBinding",kind,question,request,status,reason,"sourceEventId","continuationRunId") VALUES ($1,$2,$3,$4,$5,'execute',$6,$7,1,'{}','context','fixture','{}','resuming','fixture',$8,$9)`,[q,owner,issueId,taskId,attemptId,prior.runId,continuation.originSessionId,randomUUID(),next]);
+        await tx.query('COMMIT');
+      } finally { tx.release(); }
+      return { prior, next, q, continuation };
+    };
+    const exactFake = (state = 'paused') => {
+      const fixture = fake();
+      return { ...fixture, provider: { ...fixture.provider, state: async (_id: string, _owner: string) => {
+        fixture.calls.push('state');
+        // A separate transaction can take the run lock during provider I/O.
+        return state;
+      } } };
+    };
+
+    await t.test('an exact question wake observes a running original worker without bootstrap or token rotation', async () => {
+      const f = await questionMachine('running'), fixture = exactFake('running');
+      assert.deepEqual(await ensureThreadMachine(pool,actor,f.next,fixture.provider),{runId:f.next,state:'running'});
+      assert.deepEqual(fixture.calls,['state']);
+      assert.equal((await machine(f.next)).sandboxId,f.prior.sandboxId);
+      assert.equal((await pool.query('SELECT count(*)::int AS n FROM device_tokens WHERE "boundDeviceId"=$1',[f.prior.device])).rows[0].n,0);
+    });
+    await t.test('original VM provider loss never creates or adopts a replacement and releases only its own wake lease', async () => {
+      const f = await questionMachine(), fixture = exactFake();
+      fixture.provider.connect = async (id) => {fixture.calls.push(`connect:${id}`); throw {status:404};};
+      await assert.rejects(ensureThreadMachine(pool,actor,f.next,fixture.provider),/Original question machine unavailable/);
+      assert.deepEqual(fixture.calls,['state',`connect:${f.prior.sandboxId}`]);
+      const m=(await pool.query('SELECT * FROM thread_machines WHERE "runId"=$1',[f.next])).rows[0];
+      assert.equal(m.sandboxId,f.prior.sandboxId); assert.equal(m.state,'paused'); assert.equal(m.workerLeaseId,null);
+      assert.equal((await pool.query('SELECT "questionContinuation" FROM agent_runs WHERE id=$1',[f.next])).rows[0].questionContinuation.originSessionId,f.continuation.originSessionId);
+    });
+    await t.test('an exact paused wake uses only the original VM and performs provider I/O after commit', async () => {
+      const f = await questionMachine(), fixture = exactFake();
+      fixture.provider.state = async () => {
+        fixture.calls.push('state');
+        const tx=await pool.connect();
+        try {await tx.query('BEGIN'); await tx.query(`SET LOCAL lock_timeout='250ms'`); await tx.query('SELECT id FROM agent_runs WHERE id=$1 FOR UPDATE',[f.next]); await tx.query('ROLLBACK');} finally {tx.release();}
+        return 'paused';
+      };
+      fixture.provider.connect=async id=>{fixture.calls.push(`connect:${id}`);throw new Error('fixture exact original connect');};
+      await assert.rejects(ensureThreadMachine(pool,actor,f.next,fixture.provider),/fixture exact original connect/);
+      assert.deepEqual(fixture.calls,['state',`connect:${f.prior.sandboxId}`]);
+      assert.equal((await machine(f.next)).sandboxId,f.prior.sandboxId);
+    });
+    await t.test('a resumed provider VM with paused DB placement retries bootstrap instead of falsely returning ready', async () => {
+      const f=await questionMachine(),fixture=exactFake('running');
+      fixture.provider.connect=async id=>{fixture.calls.push(`connect:${id}`);throw new Error('fixture retry original bootstrap');};
+      await assert.rejects(ensureThreadMachine(pool,actor,f.next,fixture.provider),/fixture retry original bootstrap/);
+      assert.deepEqual(fixture.calls,['state',`connect:${f.prior.sandboxId}`]);
+      assert.equal((await machine(f.next)).state,'paused');
+    });
+    await t.test('a worker that already claimed the continuation keeps its token and native process on replay', async () => {
+      const f=await questionMachine('running'),fixture=exactFake('running');
+      await pool.query(`UPDATE agent_runs SET status='running',"leaseExpiresAt"=now()+interval '1 minute' WHERE id=$1`,[f.next]);
+      assert.deepEqual(await ensureThreadMachine(pool,actor,f.next,fixture.provider),{runId:f.next,state:'running'});
+      assert.deepEqual(fixture.calls,[]);
+    });
+    await t.test('a paused question VM resumes and registers on the same device without replacing its native session', async () => {
+      const f=await questionMachine(),fixture=exactFake();
+      const savedWorker={url:process.env.MIKKA_CLOUD_WORKER_URL,sha:process.env.MIKKA_CLOUD_WORKER_SHA};
+      process.env.MIKKA_CLOUD_WORKER_URL='https://worker.example.invalid/mikka';process.env.MIKKA_CLOUD_WORKER_SHA='a'.repeat(40);
+      let bootstrap:{deviceId:string;credential:string}|undefined;
+      try {
+        fixture.provider.connect=async id=>{
+          fixture.calls.push(`connect:${id}`);
+          return {sandboxId:id,files:{read:async()=> 'a'.repeat(40),write:async(path:string,body:string)=>{if(path.startsWith('/run/mikka-viewer/thread-'))bootstrap=JSON.parse(body);}},
+            commands:{run:async(command:string)=>{
+              if(command.includes('mv /home/user/.mikka/bootstrap.next /home/user/.mikka/bootstrap.json')){
+                assert.ok(bootstrap);assert.equal(bootstrap.deviceId,f.prior.device);
+                await pool.query(`UPDATE device_tokens SET "lastUsedAt"=clock_timestamp() WHERE "boundDeviceId"=$1 AND "tokenHash"=$2 AND "revokedAt" IS NULL`,[bootstrap.deviceId,createHash('sha256').update(bootstrap.credential).digest('hex')]);
+                await pool.query(`UPDATE devices SET "lastSeenAt"=clock_timestamp() WHERE id=$1`,[bootstrap.deviceId]);
+              }
+              return {stdout:'',stderr:'',exitCode:0};
+            }}} as never;
+        };
+        assert.deepEqual(await ensureThreadMachine(pool,actor,f.next,fixture.provider),{runId:f.next,state:'running'});
+        assert.deepEqual(fixture.calls,['state',`connect:${f.prior.sandboxId}`]);
+        assert.equal((await machine(f.next)).state,'running');assert.equal((await machine(f.next)).sandboxId,f.prior.sandboxId);
+        assert.equal((await pool.query('SELECT "sessionId" FROM agent_runs WHERE id=$1',[f.prior.runId])).rows[0].sessionId,f.continuation.originSessionId);
+      } finally { if(savedWorker.url===undefined)delete process.env.MIKKA_CLOUD_WORKER_URL;else process.env.MIKKA_CLOUD_WORKER_URL=savedWorker.url;if(savedWorker.sha===undefined)delete process.env.MIKKA_CLOUD_WORKER_SHA;else process.env.MIKKA_CLOUD_WORKER_SHA=savedWorker.sha; }
+    });
+
+    await t.test('gone or unknown provider state never creates a replacement or claims readiness', async () => {
+      for (const state of ['gone','unknown']) {
+        const f=await questionMachine(),fixture=exactFake(state);
+        if(state==='gone')fixture.provider.state=async()=>{fixture.calls.push('state');throw {status:404};};
+        await assert.rejects(ensureThreadMachine(pool,actor,f.next,fixture.provider));
+        assert.deepEqual(fixture.calls,['state']);
+        assert.equal((await machine(f.next)).sandboxId,f.prior.sandboxId);
+      }
+    });
+    await t.test('source SID, snapshot and transferred sandbox mismatches refuse before provider I/O', async () => {
+      for (const field of ['session','snapshot','sandbox','source']) {
+        const f=await questionMachine(), fixture=exactFake();
+        if(field==='session') await pool.query(`UPDATE agent_runs SET "sessionId"='changed' WHERE id=$1`,[f.prior.runId]);
+        if(field==='snapshot') await pool.query(`UPDATE thread_machines SET "snapshotId"='another-snapshot' WHERE "runId"=$1`,[f.next]);
+        if(field==='sandbox') await pool.query(`UPDATE thread_machines SET "sandboxId"='another-vm' WHERE "runId"=$1`,[f.next]);
+        if(field==='source') await pool.query(`UPDATE factory_questions SET "continuationRunId"=NULL WHERE id=$1`,[f.q]);
+        await assert.rejects(ensureThreadMachine(pool,actor,f.next,fixture.provider),/Original question machine unavailable/);
+        assert.deepEqual(fixture.calls,[]);
+      }
+    });
+
+    await t.test('the normal start wrapper retains an unavailable exact question run and its original VM', async () => {
+      const f=await questionMachine();
+      await pool.query(`UPDATE agent_runs SET "sessionId"='changed' WHERE id=$1`,[f.prior.runId]);
+      const {startThreadMachine}=await import('../run-leases');
+      assert.deepEqual(await startThreadMachine(actor,f.next),{state:'unavailable'});
+      assert.equal((await machine(f.next)).state,'paused');
+      assert.equal((await machine(f.next)).sandboxId,f.prior.sandboxId);
+      assert.equal((await pool.query('SELECT status FROM agent_runs WHERE id=$1',[f.next])).rows[0].status,'queued');
+    });
+    await t.test('durable question handoff retries an unavailable original VM instead of reporting false success', async () => {
+      const f=await questionMachine();
+      const {factoryAutomaticRuntime}=await import('../factory/automatic-dispatch');
+      const {handoffFactoryCloudStage}=await import('../factory/cloud-stage-handoff');
+      const start=factoryAutomaticRuntime.start;
+      try {
+        factoryAutomaticRuntime.start=async()=>({state:'unavailable' as const});
+        await assert.rejects(handoffFactoryCloudStage(pool,actor,null,f.next),/Original question machine unavailable/);
+        assert.equal((await pool.query('SELECT status FROM agent_runs WHERE id=$1',[f.next])).rows[0].status,'queued');
+        assert.equal((await machine(f.next)).sandboxId,f.prior.sandboxId);
+      } finally {factoryAutomaticRuntime.start=start;}
+    });
+
+    await t.test('required question wake refuses a machine without authoritative question provenance', async () => {
+      const prior = await parked(await task());
+      await pool.query(`UPDATE agent_runs r SET status='queued',"deviceId"=m."deviceId","deviceRepoId"=m."repoId" FROM thread_machines m WHERE r.id=$1 AND m."runId"=r.id`, [prior.runId]);
+      await pool.query(`UPDATE agent_runs SET "questionContinuation"='{"requireSessionResume":true}' WHERE id=$1`,[prior.runId]);
+      const fixture = fake();
+      await assert.rejects(ensureThreadMachine(pool, actor, prior.runId, fixture.provider), /Original question machine unavailable/);
+      assert.deepEqual(fixture.calls, []);
+      assert.equal((await machine(prior.runId)).sandboxId, prior.sandboxId);
+    });
+
     await t.test('a maintenance lease prevents adoption and replacement of the original VM', async () => {
       const issueId = await task(), previous = await parked(issueId);
       await pool.query(`UPDATE thread_machines SET "workerLeaseId"=$2,"workerLeaseUntil"=now()+interval '10 minutes' WHERE "runId"=$1`, [previous.runId, randomUUID()]);

@@ -1,3 +1,4 @@
+import { queueCloudQuestionContinuation, wakeCloudQuestionContinuation } from './questions/queue-continuation';
 import "server-only";
 import { deploymentSwitch } from '@/lib/deployment-switches'
 import { createSkillActivationAdapters } from "../self-improvement/activation";
@@ -98,7 +99,7 @@ import { createFactoryDispatch, defaultFactoryDispatchAdapters } from "./dispatc
 export const dispatchFactoryRun = createFactoryDispatch(
   pool,
   factoryStore,
-  (tx, userId, input, botId, context) => queueFactoryRun(tx, userId, input, botId, context),
+  async (tx, userId, input, botId, context) => await queueCloudQuestionContinuation(tx,userId,input,botId,context) ?? queueFactoryRun(tx, userId, input, botId, context),
   {
     ...defaultFactoryDispatchAdapters,
     lockAdmission: async (tx,userId,input) => { await lockCliAgentPolicy(tx,userId,input.agentId,null); },
@@ -111,6 +112,9 @@ export const questionSkillAssignments: QuestionSkillGuards = {
     // question, task and origin before a continuation can be created.
     const {rows:[question]}=await tx.query('SELECT "originRunId" FROM factory_questions WHERE id=$1 AND "userId"=$2',[questionId,userId]);
     if (!question) throw new FactoryError("factoryNotFound");
+    const {rows:[cloud]}=await tx.query('SELECT "workspaceId" FROM computer_run_bindings WHERE "runId"=$1 AND "ownerId"=$2',[question.originRunId,userId]);
+    // Cloud claim and runtime maintenance acquire policy before task/run locks.
+    if (cloud) await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`computer-policy:${cloud.workspaceId}`]);
     try {
       await lockCliRunPolicy(tx,question.originRunId,userId);
     } catch (error) {
@@ -144,6 +148,8 @@ export const factoryQuestions = createFactoryQuestions(
   factoryStore,
   dispatchFactoryRun,
   questionSkillAssignments,
+  undefined,
+  (userId,result)=>wakeCloudQuestionContinuation(pool,userId,result),
 );
 import { createFactoryReconciler } from "./reconcile";
 export const reconcileFactoryRuns = createFactoryReconciler(

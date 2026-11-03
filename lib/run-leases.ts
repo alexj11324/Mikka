@@ -255,14 +255,20 @@ async function moveToCloud(run: Run, cloud: CloudTarget, attempt: number, now: D
   }
 }
 
-/** Provisions a queued cloud run's thread machine; a refusal ends that run with the card. */
+/** Provisions a queued cloud run; exact native continuation failures retain its original VM. */
 export async function startThreadMachine(actor: { userId: string; workspaceId: string }, runId: string) {
   try {
     await (await import('@/lib/cloud-computer/thread-machines')).ensureThreadMachine(pool, actor, runId)
     const { start } = await import('workflow/api')
     const { threadMachineLifecycle } = await import('@/workflows/thread-machine/workflow')
     await start(threadMachineLifecycle, [actor, runId])
+    return { state: 'running' as const }
   } catch {
+    // A question continuation cannot replace its original native session VM.
+    // Keep the committed answer/run and placement for the same answer's retry.
+    const [continuation] = await db.select({ question: agentRuns.questionContinuation }).from(agentRuns)
+      .where(and(eq(agentRuns.id,runId),eq(agentRuns.userId,actor.userId))).limit(1)
+    if (continuation?.question?.requireSessionResume) return { state: 'unavailable' as const }
     await (await import('@/lib/cloud-computer/thread-machines')).threadMachineAction(pool, actor, runId, 'end').catch(() => undefined)
     const [run] = await db.update(agentRuns).set({ status: 'failed', stopReason: 'device_lost', error: DEVICE_STAYED_OFFLINE, updatedAt: new Date() })
       .where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, actor.userId), inArray(agentRuns.status, ['queued', 'stopped']))).returning()

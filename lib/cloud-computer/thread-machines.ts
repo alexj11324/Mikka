@@ -217,10 +217,11 @@ async function startThreadDesktop(pool: Pool, actor: Actor, runId: string, lease
 
 /** The queued run is moved to a dedicated device before any worker can claim
  * it. Bot workers are denied these runs by claimCloudRun. */
-export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: string, provider = threadMachineProvider, desktop = threadDesktop, refreshRuntime = false) {
+export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: string, provider: typeof threadMachineProvider & { state?: (sandboxId: string, ownerId: string) => Promise<string> } = threadMachineProvider, desktop = threadDesktop, refreshRuntime = false) {
   z.uuid().parse(runId)
   const client = await pool.connect()
   const leaseId = randomUUID()
+  let exactQuestionMachine = false
   let runtimeRollback: (() => Promise<void>) | undefined
   let verifyRefreshedRuntime: (() => Promise<unknown>) | undefined
   try {
@@ -235,8 +236,10 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
       LEFT JOIN device_repos source_repo ON source_repo.id=runtime."repoId" AND source_repo."userId"=r."userId"
       WHERE r.id=$1 AND r."userId"=$2 AND b."workspaceId"=$3 FOR UPDATE OF r`, [runId, actor.userId, actor.workspaceId])).rows[0]
     if (!run || !run.botSandboxId || !(refreshRuntime ? ['succeeded','failed','stopped','cancelled'] : ['queued', 'preparing', 'running', 'waiting_input']).includes(run.status)) throw new ComputerError(404, 'Thread unavailable')
+    exactQuestionMachine = run.questionContinuation?.requireSessionResume === true
     const repositoryTask = Boolean(run.remoteUrl)
     // Stop check 1, before any provider call, under the run lock stopOwnedRun also takes.
+    if (exactQuestionMachine && run.stopRequestedAt) throw new ComputerError(409, 'Thread stopped')
     if (run.status === 'queued' && run.stopRequestedAt) {
       const stale = await endStopRequestedRun(client, actor, runId)
       await afterRunEnded(actor.userId, runId)
@@ -245,6 +248,32 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
     }
     if (repositoryTask && !repositoryBindingMatches(run.repoPath, run.remoteUrl)) throw new ComputerError(409, 'Repository identity unavailable')
     let machine = (await client.query('SELECT * FROM thread_machines WHERE "runId"=$1 FOR UPDATE', [runId])).rows[0]
+    if (exactQuestionMachine) {
+      const continuation = run.questionContinuation
+      if (!continuation?.requireSessionResume || typeof continuation.requiredSandboxId !== 'string' ||
+        !machine?.sandboxId || machine.sandboxId !== continuation.requiredSandboxId ||
+        machine.ownerId !== actor.userId || machine.workspaceId !== actor.workspaceId ||
+        machine.deviceId !== run.deviceId || machine.repoId !== run.deviceRepoId || machine.issueId !== run.issueId ||
+        machine.botId !== run.runtimeBotId) throw new ComputerError(409, 'Original question machine unavailable')
+      const source = await client.query(`SELECT 1 FROM factory_questions q
+        JOIN agent_runs origin ON origin.id=q."originRunId" AND origin."userId"=q."userId" AND origin."issueId"=q."issueId"
+        JOIN computer_run_bindings b ON b."runId"=origin.id AND b."ownerId"=origin."userId"
+        JOIN thread_machines m ON m."runId"=origin.id AND m."ownerId"=b."ownerId" AND m."workspaceId"=b."workspaceId" AND m."botId"=b."botId"
+        WHERE q.id=$1 AND q."userId"=$2 AND q."continuationRunId"=$3 AND q.status='resuming'
+          AND q."originRunId"=$4 AND q."originSessionId"=$5 AND origin."sessionId"=$5
+          AND origin.status='stopped' AND origin."agentId"=$6 AND origin."deviceId"=$7 AND origin."deviceRepoId"=$8
+          AND b."workspaceId"=$9 AND b."botId"=$10 AND m.state='ended' AND m."sandboxId" IS NULL
+          AND m."deviceId"=$7 AND m."repoId"=$8 AND m."issueId"=$11 AND m."snapshotId"=$12
+        FOR SHARE OF q,origin,b,m`, [continuation.questionId,actor.userId,runId,continuation.originRunId,continuation.originSessionId,
+        run.agentId,run.deviceId,run.deviceRepoId,actor.workspaceId,run.runtimeBotId,run.issueId,machine.snapshotId])
+      if (!source.rowCount) throw new ComputerError(409, 'Original question machine unavailable')
+      // A live worker may have claimed between answer commit and this wake.
+      // Its lease, credentials and native process must remain untouched.
+      if (['preparing','running','waiting_input'].includes(run.status) && run.leaseExpiresAt && new Date(run.leaseExpiresAt).getTime()>Date.now()) {
+        await client.query('COMMIT'); return { runId, state: 'running' }
+      }
+      if (machine.workerLeaseUntil && new Date(machine.workerLeaseUntil).getTime()>Date.now()) throw new ComputerError(409,'Thread provisioning in progress')
+    }
     if (refreshRuntime && (!machine?.sandboxId || !machine.deviceId || !isOfficialE2BTemplate(machine.snapshotId))) throw new ComputerError(409, 'Existing official task runtime required')
     if (refreshRuntime) {
       if (machine.ownerId!==actor.userId || machine.workspaceId!==actor.workspaceId || machine.deviceId!==run.deviceId) throw new ComputerError(404,'Thread unavailable')
@@ -254,7 +283,7 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
     }
     if (refreshRuntime && machine.workerLeaseUntil && new Date(machine.workerLeaseUntil).getTime() > Date.now()) throw new ComputerError(409, 'Thread provisioning in progress')
     if (machine?.state === 'ended') throw new ComputerError(409, 'Thread ended')
-    if (machine?.state === 'running' && machine.sandboxId) {
+    if (!exactQuestionMachine && machine?.state === 'running' && machine.sandboxId) {
       const base = await options(actor.userId)
       const state = await withE2BErrors(actor.userId, false, () => Sandbox.getInfo(machine.sandboxId, base)).catch((error: unknown) => {
         if (sandboxGone(error)) return null
@@ -268,7 +297,7 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
         await client.query('COMMIT'); return { runId, state: 'running' }
       }
     }
-    if (machine?.state === 'running' && machine.sandboxId) {
+    if (!exactQuestionMachine && machine?.state === 'running' && machine.sandboxId) {
       // The provider paused this sandbox on its own timeout. E2B stops billing
       // at pause, so persist the end of the running interval before resuming.
       await client.query(`UPDATE thread_machines SET "computeSeconds"="computeSeconds"+GREATEST(0,EXTRACT(EPOCH FROM (clock_timestamp()-"runningSince")))::bigint,"runningSince"=NULL,state='paused' WHERE "runId"=$1 AND "runningSince" IS NOT NULL`, [runId])
@@ -294,10 +323,22 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
     // Persist snapshot and operation ID before provider requests.
     await client.query('UPDATE thread_machines SET "workerLeaseId"=$2,"workerLeaseUntil"=now()+interval \'15 minutes\' WHERE "runId"=$1', [runId, leaseId])
     await client.query('COMMIT')
+    if (exactQuestionMachine) {
+      // Provider I/O happens after the lease transaction. A running original VM
+      // already has its worker; only a paused VM needs bootstrap after connect.
+      const state = provider.state ? await provider.state(machine.sandboxId, actor.userId) :
+        (await withE2BErrors(actor.userId, false, async () => Sandbox.getInfo(machine.sandboxId, await options(actor.userId)))).state
+      if (state !== 'running' && state !== 'paused') throw new ComputerError(409,'Original question machine unavailable')
+      if (state === 'running' && machine.state === 'running') {
+        await pool.query('UPDATE thread_machines SET "workerLeaseId"=NULL,"workerLeaseUntil"=NULL WHERE "runId"=$1 AND "workerLeaseId"=$2',[runId,leaseId])
+        return { runId, state: 'running' }
+      }
+    }
     let connected = machine.sandboxId ? await provider.connect(machine.sandboxId, actor.workspaceId).catch((error: unknown) => {
       if (sandboxGone(error)) return null
       throw error
     }) : null
+    if (exactQuestionMachine && (!connected || connected.sandboxId !== machine.sandboxId)) throw new ComputerError(409, 'Original question machine unavailable')
     if (refreshRuntime && !connected) throw new ComputerError(409, 'Original task machine unavailable')
     if (machine.sandboxId && !connected) {
       // The paused sandbox is gone at the provider: the same thread starts a new one from the workspace snapshot.
@@ -321,6 +362,7 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
     // sandbox was being created. Re-take the run lock and check again before the worker starts.
     await client.query('BEGIN')
     const again = (await client.query('SELECT status,"stopRequestedAt" FROM agent_runs WHERE id=$1 AND "userId"=$2 FOR UPDATE', [runId, actor.userId])).rows[0]
+    if (exactQuestionMachine && again?.stopRequestedAt) throw new ComputerError(409, 'Thread stopped')
     if (again?.status === 'queued' && again.stopRequestedAt) {
       const stale = await endStopRequestedRun(client, actor, runId)
       await afterRunEnded(actor.userId, runId)
@@ -389,6 +431,12 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
     const current = (await client.query('SELECT * FROM agent_runs WHERE id=$1 AND "userId"=$2 FOR UPDATE', [runId, actor.userId])).rows[0]
     const activeLease = await client.query('SELECT 1 FROM thread_machines WHERE "runId"=$1 AND "workerLeaseId"=$2 AND state<>\'ended\' FOR UPDATE', [runId, leaseId])
     if (!activeLease.rowCount) throw new ComputerError(409, 'Thread provisioning cancelled')
+    if (exactQuestionMachine && current.stopRequestedAt) throw new ComputerError(409, 'Thread stopped')
+    if (exactQuestionMachine && current.status !== 'queued') {
+      if (!['preparing','running','waiting_input'].includes(current.status) || !current.leaseExpiresAt || new Date(current.leaseExpiresAt).getTime()<=Date.now()) throw new ComputerError(409,'Question continuation unavailable')
+      await client.query('UPDATE thread_machines SET "workerLeaseId"=NULL,"workerLeaseUntil"=NULL WHERE "runId"=$1 AND "workerLeaseId"=$2',[runId,leaseId])
+      await client.query('COMMIT'); return { runId, state: 'running' }
+    }
     const definition = current.agentDefinition
     const admission = definition?.repositoryAdmission
     if (current.status === 'queued' && admission) {
@@ -443,6 +491,7 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
     if (runtimeRollback) {
       try { await runtimeRollback() } catch { console.warn('Idle task runtime rollback unconfirmed', {runId}) }
     }
+    if (exactQuestionMachine) await pool.query('UPDATE thread_machines SET "workerLeaseId"=NULL,"workerLeaseUntil"=NULL WHERE "runId"=$1 AND "workerLeaseId"=$2',[runId,leaseId]).catch(()=>undefined)
     if (refreshRuntime) await pool.query(`UPDATE thread_machines SET state='error',"workerLeaseId"=NULL,"workerLeaseUntil"=NULL WHERE "runId"=$1 AND "ownerId"=$2 AND "workerLeaseId"=$3 AND state<>'ended'`,[runId,actor.userId,leaseId]).catch(()=>undefined)
     throw error
   } finally { client.release() }

@@ -96,6 +96,61 @@ test('PG17/HTTP assignment provenance and existing Factory gates', {skip:!databa
   }
   let firstRun='',proposalId=''
   let firstReceiptId=''
+  // A hosted question hit this on every answer (occurrence 10/10, impact 8/10):
+  // the real task device differs from its stable Agent/subscription consumer.
+  await t.test('cloud skill ownership follows exact recorded placement without rebinding the frozen Agent',async()=>{
+    const userId=`synthetic-cloud-${randomUUID()}`,issueId=randomUUID()
+    const assignments=createSkillAssignments(pool,async(owner,issue)=>owner===userId&&issue===issueId)
+    await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority) VALUES($1,$2,'Synthetic cloud','{}','todo','normal')`,[issueId,userId])
+    const parent=randomUUID(),child=randomUUID(),otherDevice=randomUUID(),parentRepo=randomUUID(),childRepo=randomUUID(),cloudAgent=randomUUID(),cloudRun=randomUUID(),workspace=randomUUID(),bot=randomUUID(),otherBot=randomUUID(),foreign=`synthetic-${randomUUID()}`
+    for(const id of [userId,foreign])await pool.query(`INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES($1,'Synthetic',$2,true,now(),now()) ON CONFLICT DO NOTHING`,[id,`${id}@example.invalid`])
+    for(const id of [parent,child,otherDevice])await pool.query(`INSERT INTO devices(id,"ownerId",name,kind,enabled) VALUES($1,$2,'Synthetic cloud','cloud',true)`,[id,userId])
+    await pool.query(`INSERT INTO agents(id,"userId",name,harness,"deviceId") VALUES($1,$2,$3,'codex',$4)`,[cloudAgent,userId,cloudAgent,parent])
+    for(const [repo,device] of [[parentRepo,parent],[childRepo,child]])await pool.query(`INSERT INTO device_repos(id,"deviceId","userId","repoPath") VALUES($1,$2,$3,'/synthetic/cloud')`,[repo,device,userId])
+    for(const id of [bot,otherBot])await pool.query(`INSERT INTO bots(id,"ownerId","workspaceId",name) VALUES($1,$2,$3,$4)`,[id,userId,workspace,`Synthetic ${id}`])
+    await pool.query(`INSERT INTO bot_cloud_runtimes("botId","ownerId","workspaceId",harness,"agentId","repoId") VALUES($1,$2,$3,'codex',$4,$5)`,[bot,userId,workspace,cloudAgent,parentRepo])
+    await pool.query(`INSERT INTO agent_runs(id,"userId","issueId","agentId","deviceId","deviceRepoId","botId",status,"sessionId","agentDefinition") VALUES($1,$2,$3,$4,$5,$6,$7,'stopped','original-sdk-session','{"harness":"codex","model":"synthetic-frozen"}')`,[cloudRun,userId,issueId,cloudAgent,child,childRepo,bot])
+    await pool.query(`INSERT INTO computer_run_bindings("runId","ownerId","workspaceId","botId") VALUES($1,$2,$3,$4)`,[cloudRun,userId,workspace,bot])
+    await pool.query(`INSERT INTO thread_machines("runId","ownerId","workspaceId","botId","issueId","deviceId","repoId","sandboxId","snapshotId","operationId",state) VALUES($1,$2,$3,$4,$5,$6,$7,'synthetic-original-vm','codex',$8,'running')`,[cloudRun,userId,workspace,bot,issueId,child,childRepo,randomUUID()])
+    const inspect=async(sql?:string,values:unknown[]=[],refuse=false)=>{
+      const tx=await pool.connect()
+      try{
+        await tx.query('BEGIN');if(sql)await tx.query(sql,values)
+        if(refuse)await assert.rejects(assignments.lockQuestion(userId,issueId,cloudRun,tx),/notFound/)
+        else await assignments.lockQuestion(userId,issueId,cloudRun,tx)
+      }finally{await tx.query('ROLLBACK');tx.release()}
+    }
+    assert.equal((await pool.query('SELECT 1 FROM agent_runs r JOIN agents a ON a.id=r."agentId" AND a."deviceId"=r."deviceId" WHERE r.id=$1',[cloudRun])).rowCount,0,'the old local-only ownership join rejects this actual cloud placement')
+    await inspect() // Previously notFound: the physical task runs on the child.
+    // Queue-time skill selection precedes host relocation to the task machine.
+    const preparing=randomUUID()
+    await pool.query(`INSERT INTO agent_runs(id,"userId","issueId","agentId","deviceId","deviceRepoId","botId",status) VALUES($1,$2,$3,$4,$5,$6,$7,'queued')`,[preparing,userId,issueId,cloudAgent,parent,parentRepo,bot])
+    await pool.query(`INSERT INTO computer_run_bindings("runId","ownerId","workspaceId","botId") VALUES($1,$2,$3,$4)`,[preparing,userId,workspace,bot])
+    await pool.query(`INSERT INTO thread_machines("runId","ownerId","workspaceId","botId","snapshotId","operationId",state) VALUES($1,$2,$3,$4,'pending',$5,'starting')`,[preparing,userId,workspace,bot,randomUUID()])
+    await assignments.selectBaseline(userId,preparing)
+    for(const [column,value] of [['ownerId',foreign],['workspaceId',randomUUID()],['botId',otherBot],['issueId',randomUUID()],['deviceId',parent],['repoId',parentRepo]])
+      await inspect(`UPDATE thread_machines SET "${column}"=$2 WHERE "runId"=$1`,[cloudRun,value],true)
+    await inspect('DELETE FROM computer_run_bindings WHERE "runId"=$1',[cloudRun],true)
+    await inspect(`UPDATE devices SET kind='local' WHERE id=$1`,[child],true)
+    await inspect('UPDATE devices SET enabled=false WHERE id=$1',[child],true)
+    await inspect('UPDATE devices SET "ownerId"=$2 WHERE id=$1',[child,foreign],true)
+    await inspect('UPDATE device_repos SET "deviceId"=$2 WHERE id=$1',[childRepo,otherDevice],true)
+    await inspect(`UPDATE agents SET harness='claude_code' WHERE id=$1`,[cloudAgent],true)
+    await inspect('UPDATE agent_runs SET "botId"=$2 WHERE id=$1',[cloudRun,otherBot],true)
+    await inspect(`UPDATE thread_machines SET state='ended',"sandboxId"=NULL WHERE "runId"=$1`,[cloudRun])
+    // A Bot's current parent configuration may change; it is not the old run's identity.
+    await inspect('DELETE FROM bot_cloud_runtimes WHERE "botId"=$1',[bot])
+    await inspect('UPDATE agents SET "deviceId"=NULL WHERE id=$1',[cloudAgent])
+    const queued=randomUUID()
+    await pool.query(`UPDATE thread_machines SET state='ended',"sandboxId"=NULL WHERE "runId"=$1`,[cloudRun])
+    await pool.query(`INSERT INTO agent_runs(id,"userId","issueId","agentId","deviceId","deviceRepoId","botId",status,"agentDefinition") SELECT $2,"userId","issueId","agentId","deviceId","deviceRepoId","botId",'queued',"agentDefinition" FROM agent_runs WHERE id=$1`,[cloudRun,queued])
+    await pool.query(`INSERT INTO computer_run_bindings("runId","ownerId","workspaceId","botId") VALUES($1,$2,$3,$4)`,[queued,userId,workspace,bot])
+    await pool.query(`INSERT INTO thread_machines("runId","ownerId","workspaceId","botId","issueId","deviceId","repoId","sandboxId","snapshotId","operationId",state) VALUES($1,$2,$3,$4,$5,$6,$7,'synthetic-original-vm','codex',$8,'running')`,[queued,userId,workspace,bot,issueId,child,childRepo,randomUUID()])
+    await assignments.selectBaseline(userId,queued)
+    await inspect() // The old origin keeps its recorded identity after transfer.
+    const original=(await pool.query('SELECT "agentId","deviceId","sessionId","agentDefinition" FROM agent_runs WHERE id=$1',[cloudRun])).rows[0]
+    assert.equal(original.agentId,cloudAgent);assert.equal(original.deviceId,child);assert.equal(original.sessionId,'original-sdk-session');assert.deepEqual(original.agentDefinition,{harness:'codex',model:'synthetic-frozen'})
+  })
   await t.test('atomic real queue/selection and immutable claim receipt; old worker denied',async()=>{
     const p=await prepare();firstRun=p.result.runId
     assert.equal((await pool.query('SELECT * FROM improvement_skill_receipts')).rowCount,0)

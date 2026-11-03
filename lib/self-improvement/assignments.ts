@@ -26,12 +26,29 @@ export function createSkillAssignments(pool: Pool, authorize: Authorize, authori
     await tx.query('SELECT id FROM issues WHERE id=$1 FOR SHARE', [source.issueId])
     if (!await authorize(userId, source.issueId, tx)) throw new ImprovementError('notFound')
     await lockSkillScope(tx, userId, source.issueId, source.deviceRepoId)
-    const { rows: [run] } = await tx.query(`SELECT r.* FROM agent_runs r
-      JOIN agents a ON a.id=r."agentId" AND a."userId"=$2 AND a."deviceId"=r."deviceId"
+    const { rows: [run] } = await tx.query(`SELECT r.*,a."deviceId" AS "agentDeviceId",a.harness AS "agentHarness",d.kind AS "deviceKind" FROM agent_runs r
+      JOIN agents a ON a.id=r."agentId" AND a."userId"=$2
       JOIN device_repos repo ON repo.id=r."deviceRepoId" AND repo."userId"=$2 AND repo."deviceId"=r."deviceId"
       JOIN devices d ON d.id=r."deviceId" AND d."ownerId"=$2 AND d.enabled=true
       WHERE r.id=$1 AND r."userId"=$2 ${lockRun?'FOR UPDATE OF r FOR SHARE OF a,repo,d':'FOR SHARE OF r,a,repo,d'}`, [runId, userId])
     if (!run?.issueId || run.issueId !== source.issueId || run.deviceRepoId !== source.deviceRepoId) throw new ImprovementError('notFound')
+    // Same-device ownership also covers queue-time configuration before the
+    // host provisions a task machine; cloud claim separately requires placement.
+    if (run.agentDeviceId !== run.deviceId) {
+      // A cloud worker claims its task device, while the frozen Agent remains
+      // the subscription consumer. Historical placement survives a Bot runtime
+      // rebuild and a same-machine continuation ending the origin machine row.
+      if (run.deviceKind !== 'cloud' || !['codex','claude_code'].includes(run.agentHarness) ||
+        (run.agentDefinition?.harness ?? run.agentHarness) !== run.agentHarness) throw new ImprovementError('notFound')
+      // Lock the run above before its placement, matching cloud claim/transfer.
+      const placement = await tx.query(`SELECT 1 FROM computer_run_bindings b
+        JOIN thread_machines m ON m."runId"=b."runId" AND m."ownerId"=b."ownerId"
+          AND m."workspaceId"=b."workspaceId" AND m."botId"=b."botId"
+        WHERE b."runId"=$1 AND b."ownerId"=$2 AND m."issueId"=$3
+          AND m."repoId"=$4 AND m."deviceId"=$5 AND ($6::uuid IS NULL OR b."botId"=$6)
+        FOR SHARE OF b,m`, [runId,userId,run.issueId,run.deviceRepoId,run.deviceId,run.botId])
+      if (!placement.rowCount) throw new ImprovementError('notFound')
+    }
     if (run.stopRequestedAt || run.status === 'cancelled') throw new ImprovementError('runUnavailable')
     return run
   }
