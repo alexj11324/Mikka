@@ -6,7 +6,7 @@ import { randomUUID } from 'node:crypto'
 import { mock, test } from 'node:test'
 import { normalizeRepository } from '@mikka/protocol/repository'
 import { dbUrl, seedUser, seedWorkspace } from './support/workspace-admin-db'
-import { githubAppStub } from './support/github-app-stub'
+import { connectGitHub, githubAppStub } from './support/github-app-stub'
 
 mock.module(new URL('../lib/coordinator/decide.ts', import.meta.url).href, { namedExports: { invokeDecision: async () => null } })
 
@@ -41,6 +41,7 @@ test('a Coordinator dispatch_run goes through the Factory', { skip: !dbUrl, time
   const githubAccountId = String(9_700_000 + Math.floor(Math.random() * 100_000))
   await pool.query(`INSERT INTO account (id,"accountId","providerId","userId","createdAt","updatedAt") VALUES ($1,$2,'github',$3,now(),now())`, [randomUUID(), githubAccountId, userId])
   github.allowWriter(REPO, githubAccountId)
+  await connectGitHub(github, userId, githubAccountId, [REPO])
   await pool.query('INSERT INTO repository_settings ("userId","remoteKey",push) VALUES ($1,$2,$3)', [userId, normalizeRepository(REPO).key, JSON.stringify({ approved: true, remote: 'origin', approvedByUserId: userId, approvedAt: new Date().toISOString() })])
   const ws = await seedWorkspace(pool, userId, [{ userId, role: 'admin' }], 'Acme')
   const connection = randomUUID()
@@ -52,7 +53,7 @@ test('a Coordinator dispatch_run goes through the Factory', { skip: !dbUrl, time
   await pool.query(`INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,'codex','Codex on acme-build-01')`, [randomUUID(), userId, deviceId])
   const issueId = randomUUID()
   await pool.query(`INSERT INTO issues (id,"userId",title,content,status,priority) VALUES ($1,$2,'Checkout rounds sales tax down on multi-item carts',$3,'todo','high')`,
-    [issueId, userId, JSON.stringify({ type: 'doc', attrs: { mikka: { number: 4211 } }, content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Acme storefront: a cart of 3 x $19.99 in CA shows $5.24 tax instead of $5.25.' }] }] })])
+    [issueId, userId, JSON.stringify({ type: 'doc', attrs: { mikka: { number: Math.floor(Math.random() * 1000000000) } }, content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Acme storefront: a cart of 3 x $19.99 in CA shows $5.24 tax instead of $5.25.' }] }] })])
   const botId = await chatBotId(userId, null, ws.id)
   const sourceEventId = randomUUID()
   await pool.query(`INSERT INTO coordinator_events (id,"userId","botId",kind,"dedupeKey",payload) VALUES ($1,$2,$3,'user_message',$4,$5)`,
@@ -69,4 +70,42 @@ test('a Coordinator dispatch_run goes through the Factory', { skip: !dbUrl, time
   assert.equal(counts.attempts, 1, 'its execute attempt')
   const { rows: [bound] } = await pool.query(`SELECT t.stage,t.status,a."runId" FROM factory_tasks t JOIN factory_attempts a ON a.id=t."attemptId" WHERE t."userId"=$1`, [userId])
   assert.deepEqual({ stage: bound.stage, status: bound.status, runId: bound.runId }, { stage: 'execute', status: 'running', runId: dispatched.runId })
+  const command = 'node --test'
+  await pool.query('UPDATE device_repos SET "verifyCommand"=$2 WHERE "userId"=$1', [userId, command])
+  const { factoryRuntimeForBot } = await import('../lib/factory/runtime')
+  const runtime = factoryRuntimeForBot(botId)
+  const sha = 'a'.repeat(40)
+  const finish = async (id: string, check: boolean) => {
+    await pool.query(`UPDATE agent_runs SET status='running',"sessionId"=$2,"startedAt"=clock_timestamp()-interval '1 second' WHERE id=$1`, [id, `independent-${id}`])
+    if (check) for (const [seq, chunk] of [
+      [1, { type: 'tool-input-available', toolCallId: `check-${id}`, toolName: 'Bash', input: { command } }],
+      [2, { type: 'tool-output-available', toolCallId: `check-${id}`, output: { exitCode: 0 } }],
+    ] as const) await pool.query('INSERT INTO run_chunks (id,"runId",seq,chunk) VALUES ($1,$2,$3,$4)', [randomUUID(), id, seq, JSON.stringify(chunk)])
+    await pool.query(`UPDATE agent_runs SET status='succeeded',"stopReason"='submitted',"finishedAt"=clock_timestamp(),report=$2 WHERE id=$1`, [id, JSON.stringify({
+      summary: 'Checked tax rounding with concrete evidence.', filesChanged: [], openQuestions: [], nextStep: null, sourceCommit: sha,
+      verify: { status: 'passed', command, exitCode: 0, signal: null, timedOut: false, output: 'passed' },
+      ...(check ? { check: { sha, readOnly: true }, criteria: [{ text: 'Tax rounds to the cent', passed: true, evidence: 'The fixture command passed.', command, exitCode: 0 }] } : { publish: { commit: sha, pushed: true, branch: 'mikka/fixture', remote: 'origin' } }),
+    })])
+    await runtime.reconcile.run(userId, id)
+  }
+  await finish(dispatched.runId!, false)
+  const current = async () => (await pool.query(`SELECT t.id,t.stage,t.status,a."runId",r.kind,r."baseBranch",r."agentDefinition" FROM factory_tasks t JOIN factory_attempts a ON a.id=t."attemptId" LEFT JOIN agent_runs r ON r.id=a."runId" WHERE t."userId"=$1`, [userId])).rows[0]
+  const review = await current()
+  assert.equal(review.stage, 'review')
+  assert.equal(review.status, 'running')
+  assert.equal(review.baseBranch, sha)
+  assert.equal(review.agentDefinition.readOnly, true)
+  assert.notEqual(review.runId, dispatched.runId)
+  await finish(review.runId, true)
+  const verify = await current()
+  assert.equal(verify.stage, 'verify')
+  assert.equal(verify.status, 'running')
+  assert.notEqual(verify.runId, review.runId)
+  await finish(verify.runId, true)
+  const acceptance = await current()
+  assert.equal(acceptance.stage, 'approval')
+  assert.equal(acceptance.status, 'pending', 'only the person may accept')
+  const attempts = (await pool.query('SELECT stage,"runId" FROM factory_attempts WHERE "taskId"=$1 ORDER BY position', [acceptance.id])).rows
+  assert.deepEqual(attempts.map(attempt => attempt.stage), ['execute', 'review', 'verify', 'approval'])
+  assert.equal(new Set(attempts.slice(0, 3).map(attempt => attempt.runId)).size, 3)
 })

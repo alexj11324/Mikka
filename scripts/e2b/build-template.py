@@ -30,6 +30,7 @@ WORKER_PATHS = ('package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml',
 COMPUTER_FILES = ('start-desktop.sh', 'viewer-gateway.py', 'lease-driver.py')
 BOOTSTRAP_FILES = ('bootstrap.sh', 'bootstrap-desktop.sh')
 RECIPE_PATHS = (*(f'scripts/e2b/{name}' for name in BOOTSTRAP_FILES), 'scripts/e2b/build-template.py',
+                'scripts/e2b/template-capabilities.json',
                 *(f'scripts/e2b/{name}' for name in COMPUTER_FILES))
 # Each kind of machine: the official E2B template it starts from, and the
 # CLIs installed on it (packages/daemon/harness/pins.json). The `claude` and
@@ -204,6 +205,29 @@ def _request(method, path, api_key, body=None, opener=urllib.request.urlopen):
         raw = response.read()
         return json.loads(raw) if raw else None
 
+def probe_models(template_id, kind, api_key, sandbox_factory=None):
+    """Read the built image's actual CLI catalogues, never a handwritten model list."""
+    if sandbox_factory is None:
+        from e2b import Sandbox
+        sandbox_factory = Sandbox.create
+    required = json.loads((ROOT / 'scripts/e2b/template-capabilities.json').read_text())[kind]
+    sandbox = sandbox_factory(template_id, api_key=api_key, timeout=60)
+    try:
+        result = sandbox.commands.run('node /opt/mikka/worker/packages/daemon/dist/cloud/cloud-worker.js --probe-models', user='user', timeout=45)
+        if result.exit_code != 0:
+            raise RuntimeError('model_probe_failed')
+        reports = json.loads(result.stdout)
+        if not isinstance(reports, list):
+            raise RuntimeError('model_probe_invalid')
+        for harness in required:
+            found = next((row for row in reports if isinstance(row, dict) and row.get('harness') == harness and row.get('installed') is True), None)
+            if not found or not (found.get('models') or found.get('modelSlots')):
+                raise RuntimeError(f'model_probe_missing {harness}')
+        return [row for row in reports if row.get('harness') in required]
+    finally:
+        # This probe created this disposable sandbox; no existing worker is touched.
+        sandbox.kill()
+
 def publish(template_id, build_id, api_key, opener=urllib.request.urlopen):
     """Make the template public, then read it back: it must be public and this build ready."""
     if not re.fullmatch(r'[A-Za-z0-9_-]+', template_id):
@@ -243,6 +267,7 @@ def main(argv=None):
         logs = (lambda entry: print(f'[{kind}] {entry}', file=sys.stderr, flush=True)) if args.json else None
         _, result = build(name, sha, api_key=api_key, on_build_logs=logs, kind=kind)
         entry = {'templateId': result.template_id, 'buildId': result.build_id, 'name': name}
+        entry['models'] = probe_models(result.template_id, kind, api_key)
         if args.public:
             entry.update(publish(result.template_id, result.build_id, api_key))
         return kind, entry

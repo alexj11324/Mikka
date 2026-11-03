@@ -391,6 +391,9 @@ export const runAssignmentSchema = z.object({
   pushBranch: z.string().min(1).max(250).optional(),
   /** Run by the daemon in the worktree after the agent submits. */
   verifyCommand: z.string().max(2_000).optional(),
+  /** Host-owned Factory check mode; the model cannot grant a check or skip verification. */
+  factoryCheck: z.object({ stage: z.enum(['review', 'verify']), inferCommand: z.boolean(), reportOnly: z.boolean() }).strict().optional(),
+  factoryExecuteKind: z.enum(['repository', 'report', 'deliverable']).optional(),
   /** Run lease; renewed through the device heartbeat. */
   leaseExpiresAt: isoTime.optional(),
   /**

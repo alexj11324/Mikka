@@ -76,6 +76,12 @@ export const candidateSchema = z
     scope: reason,
   })
   .strict();
+/** Report/deliverable candidates never acquire repository publication authority. */
+export const factoryCandidateSchema = z.union([
+  candidateSchema,
+  candidateSchema.extend({ kind: z.literal('report') }),
+  candidateSchema.extend({ kind: z.literal('deliverable'), sha: z.null() }),
+])
 export const evidenceSchema = z
   .object({
     // References to existing, access controlled artifacts. No embedded logs or credentials.
@@ -111,7 +117,7 @@ export const changeSchema = z.discriminatedUnion("action", [
   z
     .object({
       action: z.literal("candidate"),
-      candidate: candidateSchema,
+      candidate: factoryCandidateSchema,
       runId: canonicalUuid,
     })
     .strict(),

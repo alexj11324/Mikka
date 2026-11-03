@@ -114,6 +114,8 @@ export interface RunContextOptions {
   harness: Exclude<Harness, "mock">
   /** What the run is for; `plan` runs are told to write a spec (ADR ORV-205). */
   kind?: RunKind
+  factoryCheck?: import('@mikka/protocol').RunAssignment['factoryCheck']
+  verifyCommand?: string
   worktree: string
   /** Extra domains for this run (the repo's allow-list). */
   networkAllow?: readonly string[]
@@ -144,6 +146,7 @@ export interface RunContextOptions {
 
 /** Recorded by `mikka-mcp.mjs`. */
 interface HandoffFile {
+  verificationCommand?: AgentReport['verificationCommand']
   kind: "submit" | "ask" | "blocked"
   summary?: string
   nextStep?: string | null
@@ -384,6 +387,7 @@ export class RunContext {
       args: [
         MCP_SERVER_SCRIPT, "--handoff", this.handoffFile,
         "--captures", this.capturesDir, "--capture-root", this.worktree, "--capture-root", this.tmpDir,
+        ...(this.options.factoryCheck && !this.options.factoryCheck.reportOnly ? ['--factory-verify', JSON.stringify({ cwd: this.worktree, command: this.options.verifyCommand ?? null, infer: this.options.factoryCheck.inferCommand })] : []),
       ],
       // Inside Electron, `process.execPath` is the app; run it as plain Node.
       env: process.versions.electron ? { ELECTRON_RUN_AS_NODE: "1" } : {},
@@ -439,6 +443,7 @@ export class RunContext {
       ...(plan ? { plan } : {}),
       ...(typeof file.previewDatabaseBranch === "string" ? { previewDatabaseBranch: file.previewDatabaseBranch } : {}),
       ...(Array.isArray(file.criteria) ? { criteria: file.criteria } : {}),
+      ...(file.verificationCommand ? { verificationCommand: file.verificationCommand } : {}),
       ...(runQuestion.safeParse(file.question).success
         ? { question: runQuestion.parse(file.question) }
         : {}),

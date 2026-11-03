@@ -44,7 +44,7 @@ export interface ExitEvent {
 export type AgentReport = Partial<
   Pick<
     HandoffReport,
-    "summary" | "openQuestions" | "nextStep" | "blockedOn" | "plan" | "criteria" | "question" | "previewDatabaseBranch"
+    "summary" | "openQuestions" | "nextStep" | "blockedOn" | "plan" | "criteria" | "question" | "previewDatabaseBranch" | "verificationCommand"
   >
 >
 
@@ -83,6 +83,8 @@ export interface SessionOptions {
    * is told to write a spec instead of code (ADR ORV-205).
    */
   kind?: RunKind
+  factoryCheck?: import('@mikka/protocol').RunAssignment['factoryCheck']
+  verifyCommand?: string
   /** The run's worktree; the CLI child runs here. */
   cwd: string
   /** Clean env from `buildChildEnv`; spawn with `extendEnv: false`. */

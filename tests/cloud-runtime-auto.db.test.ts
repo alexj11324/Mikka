@@ -51,6 +51,7 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     delete process.env.MIKKA_CLOUD_COMPUTER_TASKS
     await pool.query('DELETE FROM model_order_entries WHERE "ownerId" = ANY($1)', [users])
     await pool.query('DELETE FROM model_order_settings WHERE "ownerId" = ANY($1)', [users])
+    await pool.query('DELETE FROM factory_tasks WHERE "userId" = ANY($1)', [users])
     await pool.query('DELETE FROM coordinator_events WHERE "userId" = ANY($1)', [users])
     await pool.query('DELETE FROM coordinator_bots WHERE "ownerId" = ANY($1)', [users])
     await pool.query('DELETE FROM computer_run_bindings WHERE "ownerId" = ANY($1)', [users])
@@ -130,7 +131,11 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     const a = await person(`cloud-composer-${mode}`)
     const issueId = await anotherTask(a.id, 34 + index)
     const first = await steps.dispatchRun(a.id, { issueId, repo: 'octo/repo', ...(mode === 'readOnly' ? { readOnly: true } : {}), requestKey: `dispatch:${randomUUID()}` }, undefined, a.botId) as unknown as { runId: string }
-    if (mode === 'mcp') await pool.query('UPDATE agent_runs SET "botId"=NULL,source=\'mcp\' WHERE id=$1', [first.runId])
+    if (mode === 'mcp') {
+      await pool.query('UPDATE agent_runs SET "botId"=NULL,source=\'mcp\' WHERE id=$1', [first.runId])
+      await pool.query('UPDATE coordinator_events SET "botId"=NULL WHERE id IN (SELECT t."sourceEventId" FROM factory_tasks t JOIN factory_attempts a ON a."taskId"=t.id WHERE a."runId"=$1)', [first.runId])
+      await pool.query('UPDATE factory_tasks SET "botId"=NULL WHERE id IN (SELECT "taskId" FROM factory_attempts WHERE "runId"=$1)', [first.runId])
+    }
     const original = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [first.runId])).rows[0]
     const runtime = (await pool.query('SELECT * FROM bot_cloud_runtimes WHERE "botId"=$1', [a.botId])).rows[0]
     assert.notEqual(original.deviceRepoId, runtime.repoId, 'a task runs on its own machine, not the Bot computer')
@@ -354,4 +359,48 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     assert.equal(run.kind, 'cloud')
     assert.ok(run.remoteUrl, 'the queued run is a repository task')
   })
+  await t.test('a no-repository desktop deliverable gets independent checks and human acceptance without GitHub', async () => {
+    const personState = await person('factory-desktop')
+    await dispatch(personState.id, personState.issueId, personState.botId)
+    const issueId = await seedIssue(pool, personState.id)
+    const result = await steps.dispatchComputerThread(personState.id, { botId: personState.botId, issueId, harness: 'codex' }, `desktop:${randomUUID()}`) as { runId?: string; error?: string }
+    assert.ok(result.runId, JSON.stringify(result))
+    const { factoryRuntimeForBot } = await import('../lib/factory/runtime')
+    const { factoryCheckAssignment } = await import('../lib/factory/checks')
+    const { factoryBinding } = await import('../lib/factory/dispatch')
+    const runtime = factoryRuntimeForBot(personState.botId)
+    const sha = 'b'.repeat(40)
+    const complete = async (runId: string, check = false) => {
+      const assignment = check ? await factoryCheckAssignment(pool as never, personState.id, runId) : null
+      if (assignment) assert.equal(assignment.factoryCheck.reportOnly, true)
+      await pool.query(`UPDATE agent_runs SET status='succeeded',"stopReason"='submitted',"sessionId"=$2,"startedAt"=clock_timestamp()-interval '1 second',"finishedAt"=clock_timestamp(),report=$3 WHERE id=$1`, [runId, `desktop-${runId}`, JSON.stringify({
+        sourceCommit: sha, summary: 'Inspected the desktop delivery and its evidence.', filesChanged: [], verify: { status: 'not_run' }, openQuestions: [], nextStep: null,
+        criteria: [{ text: 'Requested desktop result exists', passed: true, evidence: 'Inspected the persisted delivery report.' }],
+        ...(assignment ? { check: { sha: assignment.baseBranch, readOnly: true } } : {}),
+      })])
+      await runtime.reconcile.run(personState.id, runId)
+    }
+    const current = async () => (await pool.query(`SELECT t.*,a."runId",c.kind AS "candidateKind",c.sha FROM factory_tasks t JOIN factory_attempts a ON a.id=t."attemptId" LEFT JOIN factory_candidates c ON c.id=t."candidateId" WHERE t."issueId"=$1 AND t."userId"=$2 ORDER BY t."createdAt" DESC LIMIT 1`, [issueId, personState.id])).rows[0]
+    await complete(result.runId!)
+    const review = await current()
+    assert.equal(review.stage, 'review', JSON.stringify(review))
+    assert.equal(review.status, 'running')
+    assert.equal(review.candidateKind, 'deliverable')
+    assert.equal(review.sha, null, 'no invented Git commit')
+    await complete(review.runId, true)
+    const verify = await current()
+    assert.equal(verify.stage, 'verify', JSON.stringify(verify))
+    await complete(verify.runId, true)
+    const pending = await current()
+    assert.deepEqual([pending.stage, pending.status], ['approval', 'pending'])
+    const sessionId = randomUUID()
+    await pool.query(`INSERT INTO "session" (id,token,"userId","expiresAt","createdAt","updatedAt") VALUES ($1,$2,$3,now()+interval '1 hour',now(),now())`, [sessionId, randomUUID(), personState.id])
+    const { createFactoryMerges } = await import('../lib/factory/merge')
+    const noGitHub = async () => { throw new Error('A deliverable must not call GitHub') }
+    const merges = createFactoryMerges(pool, async () => true, runtime.store, { pullRequest: noGitHub, mergeMethods: noGitHub, merge: noGitHub })
+    const accepted = await merges.accept({ userId: personState.id, sessionId }, { binding: factoryBinding(pending), eventId: randomUUID() }, null)
+    assert.equal(accepted.status, 'accepted')
+    assert.deepEqual([(await current()).stage, (await current()).status], ['approval', 'passed'])
+  })
+
 })

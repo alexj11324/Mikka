@@ -13,6 +13,7 @@ import { acceptanceStateKey, type AcceptanceState } from '@/lib/factory/acceptan
 export type ApprovalBarProps = {
   state: AcceptanceState
   isSkill: boolean
+  isDeliverable?: boolean
   /** Where it ships, as Figma's chip names it (Preview / Production / 内置技能). */
   environment?: string
   /** The candidate's full sha, shown short (hover for full, click to copy). */
@@ -43,7 +44,7 @@ function StateIcon({ state, refused }: { state: AcceptanceState; refused: boolea
   if (state === 'publishing' || state === 'checking' || state === 'merging') return <Spinner />
   // A merged PR reads as GitHub draws it, the same mark as the candidate card's PR.
   if (state === 'merged') return <PullRequestIcon state="merged" />
-  if (state === 'approved' || state === 'live') return <CircleCheck aria-hidden="true" />
+  if (state === 'approved' || state === 'live' || state === 'accepted') return <CircleCheck aria-hidden="true" />
   if (state === 'failed') return <CircleX aria-hidden="true" />
   if (state === 'expired') return <Clock aria-hidden="true" />
   if (state === 'revoked' || state === 'invalidated' || state === 'unavailable') return <Ban aria-hidden="true" />
@@ -61,7 +62,7 @@ function ActionIcon({ icon: Icon, busy }: { icon: LucideIcon; busy: boolean }) {
  * the right. While it waits for you the header's state chip says so, so the
  * bar carries no title; every later state names itself. Purely presentational.
  */
-export function ApprovalBar({ state, isSkill, environment, sha, busy = false, canApprove = true, canPublish = true, reference, superseded, onApprove, onPublish, onRevoke, onReconcile, onReject, onAccept, pullRequestUrl, refusal }: ApprovalBarProps) {
+export function ApprovalBar({ state, isSkill, isDeliverable = false, environment, sha, busy = false, canApprove = true, canPublish = true, reference, superseded, onApprove, onPublish, onRevoke, onReconcile, onReject, onAccept, pullRequestUrl, refusal }: ApprovalBarProps) {
   const t = useTranslations('FactoryAcceptance')
   const refused = state === 'pending' && Boolean(refusal)
   const icon = StateIcon({ state, refused })
@@ -81,7 +82,7 @@ export function ApprovalBar({ state, isSkill, environment, sha, busy = false, ca
     <ItemActions>
       {state === 'pending' && !refused && onReject && <Button size="sm" variant="secondary" disabled={busy} onClick={onReject}>{t('reject')}</Button>}
       {state === 'pending' && canApprove && (onAccept
-        ? <Button size="sm" variant={refused && pullRequestUrl ? 'secondary' : 'default'} disabled={busy} aria-busy={busy} onClick={onAccept}><ActionIcon icon={GitMerge} busy={busy} />{t('accept')}</Button>
+        ? <Button size="sm" variant={refused && pullRequestUrl ? 'secondary' : 'default'} disabled={busy} aria-busy={busy} onClick={onAccept}><ActionIcon icon={isDeliverable ? Check : GitMerge} busy={busy} />{t(isDeliverable ? 'acceptDeliverable' : 'accept')}</Button>
         : <Button size="sm" disabled={busy} aria-busy={busy} onClick={onApprove}><ActionIcon icon={Check} busy={busy} />{t('enable')}</Button>)}
       {(state === 'merged' || refused) && openPullRequest}
       {state === 'approved' && <>

@@ -338,6 +338,10 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
     await client.query('UPDATE device_tokens SET "revokedAt"=now() WHERE "boundDeviceId"=$1', [deviceId])
     await client.query('INSERT INTO device_tokens (id,"userId",name,"tokenHash","boundDeviceId","boundWorkspaceId","expiresAt") VALUES ($1,$2,$3,$4,$5,$6,now()+interval \'24 hours\')', [randomUUID(), actor.userId, 'Thread worker', createHash('sha256').update(credential).digest('hex'), deviceId, actor.workspaceId])
     await client.query('UPDATE agent_runs SET "deviceId"=$2,"deviceRepoId"=$3,"agentDefinition"=COALESCE($5::jsonb,"agentDefinition") WHERE id=$1 AND "userId"=$4 AND status=\'queued\'', [runId, deviceId, repoId, actor.userId, admission ? JSON.stringify(definition) : null])
+    // The host relocates a check to its dedicated machine before claim. Its
+    // candidate remains fixed; only execution placement changes.
+    await client.query(`UPDATE factory_attempts SET output=jsonb_set(jsonb_set(output,'{check,deviceRepoId}',to_jsonb($2::text)),'{check,environment}',to_jsonb($3::text))
+      WHERE "runId"=$1 AND stage IN ('review','verify') AND output ? 'check'`, [runId, repoId, `device:${deviceId}`])
     await client.query('COMMIT')
     const handoff = `/run/mikka-viewer/thread-${leaseId}.json`
     await sandbox.files.write(handoff, JSON.stringify({ deviceId, workspaceId: actor.workspaceId, credential, server: origin.toString(), ...(process.env.VERCEL_ENV === 'preview' && process.env.MIKKA_CLOUD_PREVIEW_BYPASS ? { protectionBypass: process.env.MIKKA_CLOUD_PREVIEW_BYPASS } : {}) }), { user: 'root' })

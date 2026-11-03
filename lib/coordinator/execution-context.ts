@@ -54,7 +54,7 @@ const source: ExecutionContextSource = {
     const { deviceSupport } = await import('@/lib/model-order-plan')
     const label = (device: (typeof devices)[number]) => `${device.name} (${device.server ? 'server' : 'computer'})`
     const support = (entry: (typeof view.entries)[number]) => devices.map(device => ({ device, stage: deviceSupport(device, entry) }))
-    const places = (entry: (typeof view.entries)[number]) => [...(view.cloudReady ? ['cloud'] : []), ...support(entry).filter(item => item.stage === 'ready').map(item => label(item.device)).sort()]
+    const places = (entry: (typeof view.entries)[number]) => [...(view.cloudReady && view.cloudModels[entry.id] === 'ready' ? ['cloud'] : []), ...support(entry).filter(item => item.stage === 'ready').map(item => label(item.device)).sort()]
     const unsupported = (entry: (typeof view.entries)[number]) => support(entry).filter(item => item.stage !== 'ready').map(item => `${label(item.device)}: ${WHY[item.stage]}`).sort()
     return {
       location: view.location,

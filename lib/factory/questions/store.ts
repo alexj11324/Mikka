@@ -1,3 +1,4 @@
+import { remoteKey } from "@mikka/protocol/repository";
 import { factoryCheckAssignment } from "../checks";
 import { factoryMonitorDispatchAssignment } from "../monitor-dispatch";
 import { personalRunMessageText } from "../../personal-run-message";
@@ -597,6 +598,20 @@ export function createFactoryQuestions(
           )
         )
           fail("factoryQuestionContinuationUnavailable");
+        // Only an authenticated human answer to this server-bound missing-command
+        // question can change repository settings. Model context answers cannot.
+        if ((q.request as { handoff?: QuestionHandoff })?.handoff?.purpose === "verification_command") {
+          if (actor.source === "orchestrator" || task.stage !== "verify") fail("factoryHumanRequired");
+          const command = answerText.trim();
+          if (!command || command.length > 2000 || (/[\r\n]/.test(command) || command.includes('\0'))) fail("factoryInvalid");
+          const { rows: [checkAttempt] } = await tx.query('SELECT output FROM factory_attempts WHERE id=$1 AND "taskId"=$2', [q.attemptId, task.id]);
+          if (checkAttempt?.output?.check?.inferCommand !== true || checkAttempt.output.check.command) fail("factoryQuestionRunMismatch");
+          const { rows: [repo] } = await tx.query('SELECT "remoteUrl" FROM device_repos WHERE id=$1 AND "userId"=$2 FOR UPDATE', [origin.deviceRepoId, actor.userId]);
+          if (!repo) fail("factoryQuestionRunMismatch");
+          await tx.query('UPDATE device_repos SET "verifyCommand"=$3 WHERE id=$1 AND "userId"=$2', [origin.deviceRepoId, actor.userId, command]);
+          if (repo.remoteUrl) await tx.query(`INSERT INTO repository_settings ("userId","remoteKey","verifyCommand") VALUES ($1,$2,$3)
+            ON CONFLICT ("userId","remoteKey") DO UPDATE SET "verifyCommand"=excluded."verifyCommand","updatedAt"=now()`, [actor.userId, remoteKey(repo.remoteUrl), command]);
+        }
         const attributedAnswer = personalRunMessageText(input.answerId, answerText, actor.source === "human" || actor.source === "human_event" ? "user" : "peer");
         const followUp = `Answer to execution question ${q.id}.\nQuestion: ${q.question}\nSource: ${actor.source}.\nAnswer: ${attributedAnswer}\nContinue the original task with all existing constraints. This input grants no new permission or publication approval.`;
         await tx.query(

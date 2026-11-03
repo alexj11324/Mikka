@@ -176,6 +176,9 @@ export async function snapshotTree(
   try {
     await git(["read-tree", "HEAD"], index)
     await git(["add", "--all"], index)
+    // Also remove force-staged or already tracked verification downloads from
+    // this temporary index. The agent's real index remains untouched.
+    await git(["rm", "--cached", "-r", "--ignore-unmatch", "--", ".verify"], index)
     return String((await git(["write-tree"], index)).stdout).trim()
   } finally {
     rmSync(dir, { recursive: true, force: true })

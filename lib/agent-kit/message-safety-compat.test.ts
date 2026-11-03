@@ -1,3 +1,4 @@
+import { overrideDeploymentSwitch } from '../deployment-switches'
 import assert from 'node:assert/strict'
 import { makeSnapshot } from './definition'
 import { COORDINATOR_JUDGMENT_POLICY } from '../coordinator/judgment-policy'
@@ -12,6 +13,7 @@ import { PERSONAL_MESSAGE_INSTRUCTIONS } from '../personal-agent-message'
 
 // Actual durable prompt functions, with every external/DB/model effect replaced
 // by explicit fixtures. No database, provider or native job is started.
+overrideDeploymentSwitch('factoryRouting',false)
 const stub = (path: string, namedExports: Record<string, unknown>) => mock.module(new URL(path, import.meta.url).href, { namedExports })
 const conversation: { summary: string | null; memory: string; messages: StoredMessage[] } = { summary: null, memory: '', messages: [] }
 const saved: unknown[][] = [], enqueued: unknown[][] = [], forwarded: unknown[][] = []

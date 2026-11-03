@@ -41,6 +41,7 @@ test('one task, one thread: dispatch continues the task\'s thread unless the per
   t.after(async () => {
     github.restore()
     await pool.query('DELETE FROM run_messages WHERE "userId" = ANY($1)', [users])
+    await pool.query('DELETE FROM factory_tasks WHERE "userId" = ANY($1)', [users])
     await pool.query('DELETE FROM coordinator_events WHERE "userId" = ANY($1)', [users])
     await pool.query('UPDATE agent_runs SET "continuesRunId"=NULL,"threadReplacedBy"=NULL WHERE "userId" = ANY($1)', [users])
     await pool.query('DELETE FROM agent_runs WHERE "userId" = ANY($1)', [users])

@@ -3475,6 +3475,8 @@
     "repositoryAmbiguousTitle": "Several repositories match {name}",
     "repositoryNotFoundTitle": "No authorized repository named {name}",
     "githubInstallMore": "Authorize more repositories on GitHub",
+    "needsModelCloudModelsUnknown": "Cloud template models have not been verified",
+    "needsModelCloudModelNotReported": "The cloud template did not report this model",
     "needsModelCloudUnavailable": "Cloud execution is temporarily unavailable",
     "needsModelChecking": "Subscription allowance could not be checked. Try again."
   },
@@ -4106,6 +4108,7 @@
     "thread": "Thread",
     "close": "Close",
     "state": {
+      "accepted": "Accepted",
       "pending": "Waiting for you",
       "approved": "Approved",
       "publishing": "Publishing",
@@ -4193,6 +4196,7 @@
       "production": "Production"
     },
     "textLabel": "{stage} {kind}",
+    "acceptDeliverable": "Accept",
     "accept": "Accept and merge",
     "openOnGitHub": "Open on GitHub",
     "cannotMerge": "Can't merge",

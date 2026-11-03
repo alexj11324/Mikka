@@ -345,6 +345,8 @@ export class CodexAdapter implements AgentAdapter {
       mailboxEnabled: Boolean(options.mailbox),
       harness: "codex",
       kind: options.kind,
+      factoryCheck: options.factoryCheck,
+      verifyCommand: options.verifyCommand,
       worktree: options.cwd,
       gitWritePaths: options.gitWritePaths,
       networkAllow: options.networkAllow,

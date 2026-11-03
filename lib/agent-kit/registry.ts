@@ -68,6 +68,7 @@ export const BASELINE_PLATFORM_TOOL_IDS = [
  * tool. A stored owner version created before that time gets the tool at execution;
  * one created after it and lacking the tool had it removed on purpose. */
 const PLATFORM_TOOL_ADDITIONS: readonly (readonly [string, readonly AgentToolId[]])[] = [
+  ['2026-11-03T06:00:00Z', ['dispatch_factory_task', 'recover_factory_check', 'intake_factory_request']],
   ['2026-10-28T02:15:12Z', ['read_gmail_message', ...COMPUTER_TOOL_IDS.filter(id => id !== 'start_web_subagent')]], // b536db95
   ['2026-10-28T11:25:47Z', ['create_issue', 'update_issue']], // bf3ae75c
   ['2026-10-29T05:02:48Z', [...FACTORY_TOOL_IDS, 'start_web_subagent']], // 73c002f5

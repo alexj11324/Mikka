@@ -1033,12 +1033,19 @@ export const factoryTasks = pgTable('factory_tasks', {
 }, table => [unique('factory_tasks_source_key').on(table.userId, table.issueId, table.sourceEventId), index('factory_tasks_owner_issue_idx').on(table.userId, table.issueId, table.updatedAt)])
 
 export const factoryCandidates = pgTable('factory_candidates', {
+  kind: text('kind').$type<'repository' | 'report' | 'deliverable'>().notNull().default('repository'),
   previewDatabaseBranch: text('previewDatabaseBranch'), machineName: text('machineName'),
   id: uuid('id').primaryKey(), taskId: uuid('taskId').notNull().references(() => factoryTasks.id, { onDelete: 'cascade' }),
-  sha: text('sha').notNull(), repository: text('repository').notNull(), environment: text('environment').notNull(), scope: text('scope').notNull(),
+  sha: text('sha'), repository: text('repository').notNull(), environment: text('environment').notNull(), scope: text('scope').notNull(),
   runId: uuid('runId').notNull(),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [unique('factory_candidates_task_id_key').on(table.taskId, table.id)])
+
+export const factoryDeliverableAcceptances = pgTable('factory_deliverable_acceptances', {
+  id: uuid('id').primaryKey(), taskId: uuid('taskId').notNull().references(() => factoryTasks.id, { onDelete: 'cascade' }),
+  candidateId: uuid('candidateId').notNull(), userId: text('userId').notNull(), sessionId: text('sessionId').notNull(), eventId: uuid('eventId').notNull(),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [unique('factory_deliverable_acceptances_task_candidate_key').on(table.taskId,table.candidateId),unique('factory_deliverable_acceptances_user_event_key').on(table.userId,table.eventId)])
 
 export const factoryAttempts = pgTable('factory_attempts', {
   id: uuid('id').primaryKey(), taskId: uuid('taskId').notNull().references(() => factoryTasks.id, { onDelete: 'cascade' }),

@@ -4,8 +4,11 @@ import { currentWorkerSha, pairEnv, publish } from './publish-template-env.mjs'
 
 const SHA = 'a'.repeat(40)
 
+const report = harness => ({ harness, installed: true, version: null, models: ['fixture-model'] })
+const MODELS = { desktop: [report('claude_code'), report('codex')], claude: [report('claude_code')], codex: [report('codex')] }
 const TEMPLATES = { desktop: 'tpl1', claude: 'tpl2', codex: 'tpl3' }
-const STORED = { E2B_BYO_COMPUTER_TEMPLATE: 'tpl1', E2B_CLAUDE_TEMPLATE: 'tpl2', E2B_CODEX_TEMPLATE: 'tpl3', MIKKA_CLOUD_WORKER_SHA: SHA }
+const CATALOGUE = JSON.stringify({ version: 1, workerSha: SHA, templates: Object.fromEntries(Object.keys(TEMPLATES).map(kind => [kind, { templateId: TEMPLATES[kind], models: MODELS[kind] }])) })
+const STORED = { MIKKA_CLOUD_TEMPLATE_MODELS: CATALOGUE, E2B_BYO_COMPUTER_TEMPLATE: 'tpl1', E2B_CLAUDE_TEMPLATE: 'tpl2', E2B_CODEX_TEMPLATE: 'tpl3', MIKKA_CLOUD_WORKER_SHA: SHA }
 
 function fakeVercel({ inFlight = 0, stored = STORED, redeploy = 'READY' } = {}) {
   const calls = []
@@ -27,7 +30,7 @@ function fakeVercel({ inFlight = 0, stored = STORED, redeploy = 'READY' } = {}) 
   return { fetchImpl, calls }
 }
 
-const run = (fake, extra = {}) => publish({ token: 't', templates: TEMPLATES, sourceSha: SHA, fetchImpl: fake.fetchImpl, wait: async () => {}, log: () => {}, ...extra })
+const run = (fake, extra = {}) => publish({ token: 't', templates: TEMPLATES, sourceSha: SHA, models: MODELS, fetchImpl: fake.fetchImpl, wait: async () => {}, log: () => {}, ...extra })
 
 test('every template and the worker hash go to production in one upsert, then production is redeployed', async () => {
   const fake = fakeVercel()
@@ -37,7 +40,7 @@ test('every template and the worker hash go to production in one upsert, then pr
   assert.match(writes[0].search, /upsert=true/)
   assert.deepEqual(writes[0].body.map((e) => [e.key, e.value, e.target]), [
     ['E2B_BYO_COMPUTER_TEMPLATE', 'tpl1', ['production']], ['E2B_CLAUDE_TEMPLATE', 'tpl2', ['production']],
-    ['E2B_CODEX_TEMPLATE', 'tpl3', ['production']], ['MIKKA_CLOUD_WORKER_SHA', SHA, ['production']]])
+    ['E2B_CODEX_TEMPLATE', 'tpl3', ['production']], ['MIKKA_CLOUD_WORKER_SHA', SHA, ['production']], ['MIKKA_CLOUD_TEMPLATE_MODELS', CATALOGUE, ['production']]])
   const redeploy = fake.calls.find((c) => c.method === 'POST' && c.path === '/v13/deployments')
   assert.deepEqual(redeploy.body, { name: 'mikka', deploymentId: 'dpl_live', target: 'production' })
 })
@@ -67,4 +70,9 @@ test('refuses a short SHA, an odd or a missing template id before any write', ()
 test('reads production\'s current worker hash, empty when unset', async () => {
   assert.equal(await currentWorkerSha({ token: 't', fetchImpl: fakeVercel().fetchImpl }), SHA)
   assert.equal(await currentWorkerSha({ token: 't', fetchImpl: fakeVercel({ stored: {} }).fetchImpl }), '')
+})
+
+test('refuses publishing a template without measured models before any write', () => {
+  assert.throws(() => pairEnv({ templates: TEMPLATES, sourceSha: SHA }), /template_models_invalid/)
+  assert.throws(() => pairEnv({ templates: TEMPLATES, sourceSha: SHA, models: { ...MODELS, desktop: [report('codex')] } }), /template_models_missing desktop claude_code/)
 })

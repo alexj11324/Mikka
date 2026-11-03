@@ -51,6 +51,7 @@ export async function latestTaskRun(query: Query, userId: string, issueId: strin
     LEFT JOIN device_repos d ON d.id=r."deviceRepoId"
     LEFT JOIN computer_run_bindings b ON b."runId"=r.id AND b."ownerId"=r."userId"
     WHERE r."userId"=$1 AND r."issueId"=$2 AND r.kind<>'group_chat'
+      AND NOT EXISTS (SELECT 1 FROM factory_attempts fa WHERE fa."runId"=r.id AND fa.stage IN ('review','verify','monitor'))
     ORDER BY r."createdAt" DESC,r.id DESC LIMIT 1`, [userId, issueId])
   if (!run) return null
   const { cloudWorkspaceId, cloudBotId, ...rest } = run

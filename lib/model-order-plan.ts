@@ -17,6 +17,7 @@
  * the list. Once a run starts nothing about it changes.
  */
 import { harnessReportsModel, type HarnessInfo } from '@mikka/protocol/harness'
+import type { CloudModelState } from './cloud-template-models'
 
 export type OrderHarness = 'claude_code' | 'codex'
 export type RunLocation = 'cloud' | 'local'
@@ -54,6 +55,7 @@ export type EntryBlock =
   | CredentialState & { usable: false }
   | { usable: false; reason: 'noDevice' }
   | { usable: false; reason: 'cloudNotConfigured' }
+  | { usable: false; reason: 'cloudModelsUnknown' | 'cloudModelNotReported' }
 
 export type DispatchPlan =
   | { kind: 'device'; entry: OrderEntry; deviceId: string; model: string; skipped: SkippedEntry[] }
@@ -68,7 +70,7 @@ export interface SkippedEntry { entry: OrderEntry; block: EntryBlock }
  * that takes part can run any allowed model; unavailable: every allowed
  * model's credential is out of quota, paused or signed out.
  */
-export type NothingReason = 'noModels' | 'cloudNotConfigured' | 'noDevice' | 'checking' | 'unavailable'
+export type NothingReason = 'noModels' | 'cloudNotConfigured' | 'cloudModelsUnknown' | 'cloudModelNotReported' | 'noDevice' | 'checking' | 'unavailable'
 
 /**
  * The provider model a device runs for an entry. Null when the device cannot run the entry: 参与调度 off,
@@ -154,6 +156,7 @@ export function planDispatch(input: {
   credential: (entry: OrderEntry) => CredentialState
   /** The person's own E2B key is set, not known to be refused, and cloud runs are on. */
   cloudReady: boolean
+  cloudModel?: (entry: OrderEntry) => CloudModelState
 }): DispatchPlan {
   const entries = input.explicit ? [input.explicit, ...input.entries.filter(entry => entry.id !== input.explicit!.id)] : [...input.entries]
   const skipped: SkippedEntry[] = []
@@ -171,7 +174,15 @@ export function planDispatch(input: {
     skipped.push({ entry, block: credential })
     if (credential.reason === 'checking') { checking = true; break }
   }
-  if (input.location !== 'local' && input.cloudReady && runnable[0]) return { kind: 'cloud', entry: runnable[0], model: runnable[0].model, skipped }
+  let cloudFailure: Exclude<CloudModelState, 'ready'> | undefined
+  if (input.location !== 'local' && input.cloudReady) {
+    for (const entry of runnable) {
+      const state = input.cloudModel?.(entry) ?? 'cloudModelsUnknown'
+      if (state === 'ready') return { kind: 'cloud', entry, model: entry.model, skipped }
+      cloudFailure ??= state
+      skipped.push({ entry, block: { usable: false, reason: state } })
+    }
+  }
   if (input.location !== 'cloudOnly') {
     // A server before a computer whatever the model: a later model on a server goes before an earlier one on a computer.
     for (const server of [true, false]) {
@@ -190,6 +201,7 @@ export function planDispatch(input: {
     }
   }
   if (checking) return { kind: 'none', reason: 'checking', skipped }
+  if (cloudFailure) return { kind: 'none', reason: cloudFailure, skipped }
   for (const entry of runnable) skipped.push({ entry, block: { usable: false, reason: 'noDevice' } })
   return { kind: 'none', reason: runnable.length ? 'noDevice' : 'unavailable', skipped }
 }

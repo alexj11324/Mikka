@@ -74,6 +74,14 @@ export async function mergedFor(tx: PoolClient, task: FactoryTask, mergeId: unkn
   return rows.length > 0;
 }
 
+/** A real browser-session acceptance of a report or no-repository deliverable. */
+export async function acceptedDeliverableFor(tx: PoolClient, task: FactoryTask, acceptanceId: unknown) {
+  if (typeof acceptanceId !== 'string' || !z.uuid().safeParse(acceptanceId).success) return false;
+  const { rowCount } = await tx.query(`SELECT 1 FROM factory_deliverable_acceptances a JOIN factory_candidates c ON c.id=a."candidateId" AND c."taskId"=a."taskId"
+    WHERE a.id=$1 AND a."taskId"=$2 AND a."candidateId"=$3 AND a."userId"=$4 AND c.kind IN ('report','deliverable')`, [acceptanceId, task.id, task.candidateId, task.userId]);
+  return rowCount === 1;
+}
+
 /** Real GitHub REST calls with the person's token. */
 export function githubMergeApi(fetcher: typeof fetch = fetch): GitHubMergePort {
   async function call(token: string, method: "GET" | "PUT", path: string, body?: unknown) {
@@ -150,6 +158,7 @@ function refusalFor(status: number, mergeableState: string | null): MergeRefusal
 }
 
 export type AcceptResult =
+  | { status: 'accepted'; acceptanceId: string; binding: FactoryBinding }
   | { status: "merged"; mergeId: string; pullRequestUrl: string; binding: FactoryBinding }
   | { status: "merging"; mergeId: string; pullRequestUrl: string };
 
@@ -242,11 +251,12 @@ export function createFactoryMerges(
 
   return {
     /** 验收并合并. `token` is the person's own GitHub user token, or null when none is linked. */
-    async accept(actor: FactoryActor, input: unknown, token: string | null): Promise<AcceptResult> {
+    async accept(actor: FactoryActor, input: unknown, token: string | null | (() => Promise<string | null>)): Promise<AcceptResult> {
       const parsed = acceptRequest.safeParse(input);
       if (!parsed.success) fail("factoryInvalid");
       const req = parsed.data;
       if (!actor?.userId || !actor.sessionId) fail("factoryHumanRequired");
+      let credential = typeof token === 'string' ? token : null;
       const claim = await transaction(async (tx) => {
         const task = await store.lockTask(tx, actor.userId, req.binding.taskId);
         if (!task || !(await authorize(actor.userId, task.issueId, tx))) fail("factoryNotFound");
@@ -255,6 +265,18 @@ export function createFactoryMerges(
           [actor.sessionId, actor.userId],
         );
         if (!live.length) fail("factoryHumanRequired");
+        const { rows: [deliverable] } = await tx.query(`SELECT kind FROM factory_candidates WHERE id=$1 AND "taskId"=$2 AND kind IN ('report','deliverable')`, [task.candidateId, task.id]);
+        if (deliverable) {
+          const { rows: [prior] } = await tx.query('SELECT id FROM factory_deliverable_acceptances WHERE "taskId"=$1 AND "candidateId"=$2 AND "userId"=$3 AND "eventId"=$4', [task.id, task.candidateId, actor.userId, req.eventId]);
+          if (prior) return { accepted: prior.id as string, task };
+          if (digest(bindingOf(task)) !== digest(req.binding)) fail('factoryStale');
+          if (task.stage !== 'approval' || !['pending','waiting'].includes(task.status)) fail('factoryTransition');
+          const evidence = await approvalEvidence(tx, task);
+          const id = randomUUID();
+          await tx.query('INSERT INTO factory_deliverable_acceptances (id,"taskId","candidateId","userId","sessionId","eventId") VALUES ($1,$2,$3,$4,$5,$6)', [id, task.id, task.candidateId, actor.userId, actor.sessionId, req.eventId]);
+          const accepted = await store.apply(actor.userId, bindingOf(task), req.eventId, { action: 'finish', status: 'passed', reason: 'The person accepted the report and its independently checked evidence.', evidence: evidence.evidence, output: { deliverableAcceptanceId: id } }, tx);
+          return { accepted: id, task: accepted.task };
+        }
         const {
           rows: [replay],
         } = await tx.query(`SELECT * FROM factory_merges WHERE "taskId"=$1 AND "eventId"=$2`, [task.id, req.eventId]);
@@ -275,7 +297,8 @@ export function createFactoryMerges(
         if (digest(bindingOf(task)) !== digest(req.binding)) fail("factoryStale");
         if (task.stage !== "approval" || !["pending", "waiting"].includes(task.status)) fail("factoryTransition");
         const pull = await candidatePull(tx, task);
-        if (!token) throw new FactoryMergeRefused("githubMergeAuthorizationRequired", pull.url);
+        if (!credential && typeof token === 'function') credential = await token();
+        if (!credential) throw new FactoryMergeRefused("githubMergeAuthorizationRequired", pull.url);
         const id = randomUUID();
         await tx.query(
           `INSERT INTO factory_merges (id,"taskId","candidateId","userId","eventId","pullRequestUrl",sha,status,source) VALUES ($1,$2,$3,$4,$5,$6,$7,'merging','mikka')`,
@@ -284,15 +307,17 @@ export function createFactoryMerges(
         return { id, pull };
       });
 
+      if (typeof claim.accepted === 'string' && claim.task) return { status: 'accepted', acceptanceId: claim.accepted, binding: bindingOf(claim.task) };
       if ("existing" in claim) {
         const row = claim.existing;
         if (row.status === "merged")
           return { status: "merged", mergeId: row.id, pullRequestUrl: row.pullRequestUrl, binding: bindingOf(claim.task!) };
         // Another request is merging. Only a stale claim is re-read from GitHub, and never merged again.
-        if (!token || Date.now() - new Date(row.createdAt).getTime() < STALE_MERGING_MS)
+        const replayToken = typeof token === "function" ? await token() : token;
+        if (!replayToken || Date.now() - new Date(row.createdAt).getTime() < STALE_MERGING_MS)
           return { status: "merging", mergeId: row.id, pullRequestUrl: row.pullRequestUrl };
         const match = PULL.exec(row.pullRequestUrl)!;
-        const view = await github.pullRequest(token, match[1], Number(match[2])).catch(() => null);
+        const view = await github.pullRequest(replayToken, match[1], Number(match[2])).catch(() => null);
         if (!view) return { status: "merging", mergeId: row.id, pullRequestUrl: row.pullRequestUrl };
         return settle(actor, row.id,
           view.merged ? { merged: true, headSha: view.headSha, mergeCommitSha: view.mergeCommitSha } : { merged: false, code: "githubUnavailable" },
@@ -302,7 +327,7 @@ export function createFactoryMerges(
       const { id, pull } = claim;
       let view: GitHubPullRequestView;
       try {
-        view = await github.pullRequest(token!, pull.repo, pull.number);
+        view = await github.pullRequest(credential!, pull.repo, pull.number);
       } catch (error) {
         return settle(actor, id, { merged: false, code: error instanceof FactoryMergeRefused ? error.code : "githubUnavailable" }, pull.url);
       }
@@ -312,14 +337,14 @@ export function createFactoryMerges(
       if (view.mergeableState === "dirty") return settle(actor, id, { merged: false, code: "githubMergeConflict" }, pull.url);
       let result: Awaited<ReturnType<GitHubMergePort["merge"]>>;
       try {
-        const methods = await github.mergeMethods(token!, pull.repo);
+        const methods = await github.mergeMethods(credential!, pull.repo);
         if (!methods.length) return settle(actor, id, { merged: false, code: "githubMergeBlocked" }, pull.url);
-        result = await github.merge(token!, pull.repo, pull.number, { sha: pull.sha, method: methods[0] });
+        result = await github.merge(credential!, pull.repo, pull.number, { sha: pull.sha, method: methods[0] });
       } catch (error) {
         if (error instanceof FactoryMergeRefused && error.code !== "githubUnavailable")
           return settle(actor, id, { merged: false, code: error.code }, pull.url);
         // The outcome is unknown: read it back rather than guess.
-        const after = await github.pullRequest(token!, pull.repo, pull.number).catch(() => null);
+        const after = await github.pullRequest(credential!, pull.repo, pull.number).catch(() => null);
         if (!after) return { status: "merging", mergeId: id, pullRequestUrl: pull.url };
         return settle(actor, id,
           after.merged ? { merged: true, headSha: after.headSha, mergeCommitSha: after.mergeCommitSha } : { merged: false, code: "githubUnavailable" },

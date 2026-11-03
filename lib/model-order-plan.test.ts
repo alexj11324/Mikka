@@ -114,19 +114,19 @@ test('a model the person picked for the thread goes first, before the list', () 
 })
 
 test('云端 runs the first usable model on the person\'s E2B machine', () => {
-  const plan = planDispatch({ entries: [first, second], location: 'cloud', devices: [], credential: entry => entry.id === '1' ? { usable: false, reason: 'paused' } : usable(), cloudReady: true })
+  const plan = planDispatch({ entries: [first, second], location: 'cloud', devices: [], credential: entry => entry.id === '1' ? { usable: false, reason: 'paused' } : usable(), cloudReady: true, cloudModel: () => 'ready' })
   assert.deepEqual([plan.kind, plan.kind === 'cloud' && plan.entry.id], ['cloud', '2'])
 })
 
 test('nothing can run: the card names why', () => {
-  assert.equal(planDispatch({ entries: [], location: 'local', devices: [device('mac')], credential: usable, cloudReady: true }).kind === 'none' && 'noModels', 'noModels')
+  assert.equal(planDispatch({ entries: [], location: 'local', devices: [device('mac')], credential: usable, cloudReady: true, cloudModel: () => 'ready' }).kind === 'none' && 'noModels', 'noModels')
   const cloudOnly = planDispatch({ entries: [first], location: 'cloudOnly', devices: [device('mac')], credential: usable, cloudReady: false })
   assert.deepEqual([cloudOnly.kind, cloudOnly.kind === 'none' && cloudOnly.reason], ['none', 'cloudNotConfigured'])
   const cloud = planDispatch({ entries: [first], location: 'cloud', devices: [], credential: usable, cloudReady: false })
   assert.deepEqual([cloud.kind, cloud.kind === 'none' && cloud.reason], ['none', 'noDevice'])
-  const local = planDispatch({ entries: [first, second], location: 'local', devices: [device('off', { enabled: false })], credential: usable, cloudReady: true })
+  const local = planDispatch({ entries: [first, second], location: 'local', devices: [device('off', { enabled: false })], credential: usable, cloudReady: true, cloudModel: () => 'ready' })
   assert.deepEqual([local.kind, local.kind === 'none' && local.reason], ['none', 'noDevice'])
-  const spent = planDispatch({ entries: [first, second], location: 'local', devices: [device('mac')], credential: () => ({ usable: false, reason: 'quota' }), cloudReady: true })
+  const spent = planDispatch({ entries: [first, second], location: 'local', devices: [device('mac')], credential: () => ({ usable: false, reason: 'quota' }), cloudReady: true, cloudModel: () => 'ready' })
   assert.deepEqual([spent.kind, spent.kind === 'none' && spent.reason], ['none', 'unavailable'])
 })
 
@@ -174,7 +174,7 @@ test('云端: the cloud, then a server, then a computer; a place is tried only w
   const server = device('box', { server: true })
   const laptop = device('mac')
   const where = (plan: ReturnType<typeof planDispatch>) => plan.kind === 'device' ? plan.deviceId : plan.kind
-  assert.equal(where(planDispatch({ entries: [first], location: 'cloud', devices: [laptop, server], credential: usable, cloudReady: true })), 'cloud')
+  assert.equal(where(planDispatch({ entries: [first], location: 'cloud', devices: [laptop, server], credential: usable, cloudReady: true, cloudModel: () => 'ready' })), 'cloud')
   assert.equal(where(planDispatch({ entries: [first], location: 'cloud', devices: [laptop, server], credential: usable, cloudReady: false })), 'box')
   assert.equal(where(planDispatch({ entries: [first], location: 'cloud', devices: [laptop, device('box', { server: true, online: false })], credential: usable, cloudReady: false })), 'mac')
   // A computer always comes last: a later model on a server goes before an earlier one on a computer.
@@ -184,14 +184,14 @@ test('云端: the cloud, then a server, then a computer; a place is tried only w
 })
 
 test('本地: a server, then a computer, never the cloud', () => {
-  const plan = planDispatch({ entries: [first], location: 'local', devices: [device('mac'), device('box', { server: true })], credential: usable, cloudReady: true })
+  const plan = planDispatch({ entries: [first], location: 'local', devices: [device('mac'), device('box', { server: true })], credential: usable, cloudReady: true, cloudModel: () => 'ready' })
   assert.equal(plan.kind === 'device' && plan.deviceId, 'box')
-  const none = planDispatch({ entries: [first], location: 'local', devices: [], credential: usable, cloudReady: true })
+  const none = planDispatch({ entries: [first], location: 'local', devices: [], credential: usable, cloudReady: true, cloudModel: () => 'ready' })
   assert.deepEqual([none.kind, none.kind === 'none' && none.reason], ['none', 'noDevice'])
 })
 
 test('a run the person put in the cloud goes nowhere else', () => {
-  const plan = planDispatch({ entries: [first], location: 'cloudOnly', devices: [device('box', { server: true })], credential: usable, cloudReady: true })
+  const plan = planDispatch({ entries: [first], location: 'cloudOnly', devices: [device('box', { server: true })], credential: usable, cloudReady: true, cloudModel: () => 'ready' })
   assert.equal(plan.kind, 'cloud')
 })
 
@@ -201,4 +201,10 @@ test('a model whose allowance check failed stops the search in every place, unle
   assert.deepEqual([stops.kind, stops.kind === 'none' && stops.reason], ['none', 'checking'])
   const runs = planDispatch({ entries: [first, second, keyed], location: 'cloud', devices: [device('mac')], credential: checking, cloudReady: false })
   assert.equal(runs.kind === 'device' && runs.entry.id, '1')
+})
+
+test('a configured cloud without measured template models cannot take a subscription run', () => {
+  const plan = planDispatch({ entries: [first], location: 'cloudOnly', devices: [], credential: usable, cloudReady: true })
+  assert.equal(plan.kind, 'none')
+  assert.equal(plan.kind === 'none' && plan.reason, 'cloudModelsUnknown')
 })

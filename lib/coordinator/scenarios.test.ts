@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { before, beforeEach, mock, test } from 'node:test'
-import { generateText, stepCountIs, type ToolSet } from 'ai'
+import { asSchema, generateText, stepCountIs, type ToolSet } from 'ai'
 import { MockLanguageModelV3 } from 'ai/test'
 import { overrideDeploymentSwitch } from '../deployment-switches'
 
@@ -224,9 +224,9 @@ test(`screen work on a named site still names it to the sub-agent: 「${MIKKA_SI
   assert.match((calls[0].input as { task: string }).task, /Mikka site/)
 })
 
-test('the prompt teaches judgment with neutral names; it never contains the eval\'s sentences or the real repositories', () => {
+test('the prompt teaches judgment with neutral names; it never contains the eval\'s sentences or the real repositories', async () => {
   const tools = registry.createCoordinatorRegistry(OWNER, COORDINATOR_BOT, undefined, { coordinator: true, computerEnabled: true })
-  const text = [instructions, ...Object.values(tools).map(tool => String(tool.description ?? '')), JSON.stringify(Object.fromEntries(Object.entries(tools).map(([name, tool]) => [name, (tool.inputSchema as { toJSONSchema?: () => unknown })?.toJSONSchema?.() ?? null])))].join('\n')
+  const text = [instructions, ...Object.values(tools).map(tool => String(tool.description ?? '')), JSON.stringify(Object.fromEntries(await Promise.all(Object.entries(tools).map(async ([name, tool]) => [name, await asSchema(tool.inputSchema).jsonSchema]))))].join('\n')
   assert.match(text, /every word kept \(e\.g\. acme_tools, the Acme docs\)/, 'the parameter descriptions are read too')
   for (const leaked of [/Mikka site/i, /mikka-web/i, /mikka-enterprise/i, /How it works/i, /It's in the/i, /Mikka_test/, /alexj11324\/Mikka/i, /octo-web|octo-api/i, /landing page|docs site/i]) assert.doesNotMatch(text, leaked)
 })

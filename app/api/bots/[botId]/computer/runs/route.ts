@@ -5,9 +5,10 @@ import { pool } from '@/lib/db'
 import { issueForUser } from '@/lib/issue-access'
 import { tiptapToText } from '@/lib/tiptap-text'
 import { loadWorkspaceContext } from '@/lib/workspace-access'
+import { FactoryError } from '@/lib/factory/contract'
 import { ComputerError } from '@/lib/computer/store'
 import { chooseCloudRunModel, latestThreadRunModel } from '@/lib/computer/run-model'
-import { queueCloudRun } from '@/lib/computer/queue-run'
+import { queueFactoryCloudRun } from '@/lib/factory/queue-cloud'
 
 const inputSchema = z.object({ issueId: z.uuid(), harness: z.enum(['codex', 'claude_code']), note: z.string().trim().max(10_000).optional() }).strict()
 const headers = { 'Cache-Control': 'private, no-store' }
@@ -36,11 +37,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ bot
         const runModel = previous ? await latestThreadRunModel(pool, session.user.id, parsed.data.issueId, previous.agentId) : await chooseCloudRunModel(pool, { ownerId: session.user.id, workspaceId: context.workspace.id, botId }, runtime.agentId, parsed.data.harness)
         if (!runModel) throw new ComputerError(409, 'threadModelUnavailable')
         if ('error' in runModel) throw new ComputerError(409, 'Bot subscription unavailable')
-        return queueCloudRun(pool, { userId: session.user.id, workspaceId: context.workspace.id }, { issueId: parsed.data.issueId, note, botId, agentId: runtime.agentId, deviceRepoId: runtime.repoId, title: issue.title, body: tiptapToText(issue.content), ...(previous?.readOnly ? { readOnly: true } : {}), ...(previous ? { idempotencyKey: `thread:${previous.id}:${crypto.randomUUID()}` } : {}), ...runModel, ...(previous ? { threadRunId: previous.id } : {}) })
+        return queueFactoryCloudRun(pool, { userId: session.user.id, workspaceId: context.workspace.id }, { issueId: parsed.data.issueId, note, botId, agentId: runtime.agentId, deviceRepoId: runtime.repoId, title: issue.title, body: tiptapToText(issue.content), ...(previous?.readOnly ? { readOnly: true } : {}), ...(previous ? { idempotencyKey: `thread:${previous.id}:${crypto.randomUUID()}` } : {}), ...runModel, ...(previous ? { threadRunId: previous.id } : {}) })
       },
     })
+    if ('runId' in result && result.thread !== 'message') await (await import('@/lib/run-leases')).startThreadMachine({ userId: session.user.id, workspaceId: context.workspace.id }, result.runId)
     return Response.json(result, { status: 202, headers })
   } catch (error) {
+    if (error instanceof FactoryError) return Response.json({ error: error.code }, { status: 409, headers })
     if (error instanceof ComputerError) return Response.json({ error: error.message }, { status: error.status, headers })
     return Response.json({ error: 'Cloud computer task unavailable' }, { status: 503, headers })
   }

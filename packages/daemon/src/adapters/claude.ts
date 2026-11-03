@@ -19,7 +19,7 @@ import { spawn } from "node:child_process"
 import { randomUUID } from "node:crypto"
 import { realpathSync } from "node:fs"
 import { join } from "node:path"
-import type { Writable } from "node:stream"
+import type { Readable, Writable } from "node:stream"
 
 import {
   query,
@@ -84,7 +84,7 @@ export interface ClaudeAdapterOptions {
   /** The daemon's pinned Claude Code, installed on first need. */
   ensureBinary?: () => Promise<string>
   /** Trusted hosted transport; ordinary local sessions retain SDK spawning. */
-  spawnHosted?: (options: SpawnOptions, oauthPlaceholder: string) => SpawnedProcess
+  spawnHosted?: (options: SpawnOptions, oauthPlaceholder: string) => SpawnedProcess & { stderr?: Readable }
   onHostedSession?(sessionId:string):Promise<void>
   /** Supplied only by trusted hosted infrastructure for this run. */
   computerMcp?: McpServerSpec
@@ -457,6 +457,8 @@ export class ClaudeAdapter implements AgentAdapter {
       mailboxEnabled: Boolean(options.mailbox),
       harness: "claude_code",
       kind: options.kind,
+      factoryCheck: options.factoryCheck,
+      verifyCommand: options.verifyCommand,
       worktree: options.cwd,
       gitWritePaths: options.gitWritePaths,
       networkAllow: options.networkAllow,
@@ -501,6 +503,8 @@ export class ClaudeAdapter implements AgentAdapter {
     let graceTimer: NodeJS.Timeout | undefined
     let authTimer: NodeJS.Timeout | undefined
     let stderr = ""
+    let stderrArrived: () => void = () => undefined
+    const firstStderr = new Promise<void>(resolve => { stderrArrived = resolve })
     const stderrTail = () => stderr.slice(-STDERR_TAIL).trim() || "no output"
     /** True once the session proved open, false if the CLI failed first. */
     let spoke: (value: boolean) => void = () => undefined
@@ -513,7 +517,7 @@ export class ClaudeAdapter implements AgentAdapter {
       try{await this.options.onHostedSession(sessionId)}catch{throw new Error(SUBSCRIPTION_ERROR)}
     }
     // No sandbox: the CLI starts directly. A revoked run gate stops it.
-    const spawnLocal = (config: SpawnOptions): SpawnedProcess => {
+    const spawnLocal = (config: SpawnOptions): SpawnedProcess & { stderr?: Readable } => {
       const child = spawnBinary(binary, nativeToken)(config)
       const off = options.toolApproval!.onRevoke(() => { child.kill("SIGTERM") })
       child.once("exit", off)
@@ -556,12 +560,17 @@ export class ClaudeAdapter implements AgentAdapter {
         ...(mode === "new" ? { sessionId } : { resume: sessionId }),
         ...(options.model ? { model: options.model } : {}),
         // A hosted run spawns through the hosted runner; an API-key run there holds the placeholder too.
-        spawnClaudeCodeProcess: this.options.spawnHosted
-          ? (options:SpawnOptions) => this.options.spawnHosted!(options,nativeToken ?? NATIVE_AUTH_PLACEHOLDER)
-          : spawnLocal,
-        stderr: (data: string) => {
-          // Kept in external-auth mode too, but logged only redacted.
-          stderr = (stderr + data).slice(-STDERR_TAIL * 4)
+        spawnClaudeCodeProcess: (config: SpawnOptions) => {
+          const child = this.options.spawnHosted
+            ? this.options.spawnHosted(config, nativeToken ?? NATIVE_AUTH_PLACEHOLDER)
+            : spawnLocal(config)
+          // Capture the actual pipe. The SDK's stderr callback can remain
+          // empty for a custom spawn, including when a result precedes exit.
+          child.stderr?.on('data', (data: Buffer | string) => {
+            stderr = (stderr + data.toString()).slice(-STDERR_TAIL * 4)
+            stderrArrived()
+          })
+          return child
         },
       },
     })
@@ -651,6 +660,14 @@ export class ClaudeAdapter implements AgentAdapter {
           if (message.type !== "result") continue
           results++
           if (!message.is_error) quota = undefined
+          // stdout and stderr are separate pipes. A result can be delivered
+          // before an earlier diagnostic's data callback, so briefly drain
+          // that pipe before freezing the failure record.
+          if (message.is_error && externalAuth && !stderr) {
+            let drainTimer: NodeJS.Timeout | undefined
+            await Promise.race([firstStderr, new Promise<void>(resolve => { drainTimer = setTimeout(resolve, 100) })])
+            clearTimeout(drainTimer)
+          }
           lastError = message.is_error
             ? externalAuth
               ? subscriptionFailure(subscriptionFailureCategory(message, assistantError), resultDiagnostics(message, secrets))

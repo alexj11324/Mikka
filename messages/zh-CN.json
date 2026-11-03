@@ -3475,6 +3475,8 @@
     "repositoryAmbiguousTitle": "多个仓库匹配 {name}",
     "repositoryNotFoundTitle": "已授权的仓库里没有叫 {name} 的",
     "githubInstallMore": "在 GitHub 上授权更多仓库",
+    "needsModelCloudModelsUnknown": "云端模板的模型尚未验证",
+    "needsModelCloudModelNotReported": "云端模板没有上报这个模型",
     "needsModelCloudUnavailable": "云端暂时无法启动",
     "needsModelChecking": "订阅额度暂未确认，请重试"
   },
@@ -4106,6 +4108,7 @@
     "thread": "线程",
     "close": "关闭",
     "state": {
+      "accepted": "已验收",
       "pending": "待你确认",
       "approved": "已批准",
       "publishing": "发布中",
@@ -4193,6 +4196,7 @@
       "production": "Production"
     },
     "textLabel": "{stage}{kind}",
+    "acceptDeliverable": "验收",
     "accept": "验收并合并",
     "openOnGitHub": "在 GitHub 打开",
     "cannotMerge": "无法合并",

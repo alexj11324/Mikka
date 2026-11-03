@@ -1,3 +1,4 @@
+import { queueTaskRun } from '@/lib/factory/queue-local'
 import 'server-only'
 import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
@@ -84,6 +85,5 @@ async function queueNextRun(userId: string, run: typeof agentRuns.$inferSelect, 
   const { latestThreadRunModel } = await import('@/lib/computer/run-model')
   const runModel = await latestThreadRunModel(pool, userId, issueId, run.agentId)
   if (!runModel) throw new ActionFailureError('threadModelUnavailable')
-  const { queueRun } = await import('@/lib/agent-runs')
-  return queueRun(userId, { issueId, agentId: run.agentId, repo: previous.remoteUrl, note, ...runModel, threadRunId: run.id, ...readOnly }, run.botId, undefined, undefined, run.source === 'mcp' ? 'mcp' : null)
+  return queueTaskRun(userId, { issueId, agentId: run.agentId, repo: previous.remoteUrl, note, ...runModel, threadRunId: run.id, ...readOnly }, run.botId, undefined, undefined, run.source === 'mcp' ? 'mcp' : null)
 }

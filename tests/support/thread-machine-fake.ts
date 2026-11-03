@@ -1,3 +1,4 @@
+import { templateModelsFixture } from './template-models'
 // A cloud run's own thread machine, as production provisions it, with only E2B
 // replaced: the real ensureThreadMachine records the sandbox, the thread device
 // and its repository, and moves the queued run onto that device. The fake
@@ -8,18 +9,22 @@ import type { Pool } from 'pg'
 type Harness = Record<string, unknown>
 
 export async function fakeThreadMachines(pool: Pool, harnesses: Harness[]) {
+  const catalogue = templateModelsFixture()
   const saved = { url: process.env.MIKKA_CLOUD_WORKER_URL, sha: process.env.MIKKA_CLOUD_WORKER_SHA, claude: process.env.E2B_CLAUDE_TEMPLATE, codex: process.env.E2B_CODEX_TEMPLATE }
   process.env.MIKKA_CLOUD_WORKER_URL = 'https://worker.invalid/mikka'
-  process.env.MIKKA_CLOUD_WORKER_SHA = 'fixture-worker-sha'
+  process.env.MIKKA_CLOUD_WORKER_SHA = catalogue.sha
   process.env.E2B_CLAUDE_TEMPLATE = 'claude-template-fixture'
   process.env.E2B_CODEX_TEMPLATE = 'codex-template-fixture'
   const machines = await import('../../lib/cloud-computer/thread-machines')
+  const { factoryAutomaticRuntime } = await import('../../lib/factory/automatic-dispatch')
+  const realPark = factoryAutomaticRuntime.park
+  factoryAutomaticRuntime.park = (database, actor, runId) => machines.parkThreadMachine(database, actor, runId, async () => {}, async () => null)
   const real = { ...machines.threadMachineProvider }
   const credentials = new Map<string, string>()
   const sandbox = (sandboxId: string) => ({
     sandboxId,
     files: {
-      read: async () => 'fixture-worker-sha',
+      read: async () => catalogue.sha,
       write: async (path: string, body: string) => {
         // Only the worker's handoff registers it; the desktop lease and runtime files are not a handoff.
         if (!/^\/run\/mikka-viewer\/thread-[a-f0-9-]+\.json$/.test(path)) return
@@ -44,10 +49,12 @@ export async function fakeThreadMachines(pool: Pool, harnesses: Harness[]) {
       return { deviceId, token: credentials.get(deviceId)! }
     },
     restore() {
+      factoryAutomaticRuntime.park = realPark
       Object.assign(machines.threadMachineProvider, real)
       for (const [name, value] of [['MIKKA_CLOUD_WORKER_URL', saved.url], ['MIKKA_CLOUD_WORKER_SHA', saved.sha], ['E2B_CLAUDE_TEMPLATE', saved.claude], ['E2B_CODEX_TEMPLATE', saved.codex]] as const) {
         if (value === undefined) delete process.env[name]; else process.env[name] = value
       }
+      catalogue.restore()
     },
   }
 }

@@ -1,3 +1,4 @@
+import { factoryRunBotMatches } from './run-scope'
 import type { Pool, PoolClient } from 'pg';
 import { freezeWorkerDefinition, retryWorkerDefinition } from '../agent-kit/worker';
 import { configureFactoryCheck, factoryRepairBrief } from './checks';
@@ -83,7 +84,7 @@ export function createFactoryDispatch(pool: Pool, store: ReturnType<typeof creat
       await configure(tx,task,queued.runId);
       await adapters.freeze(tx,task,queued.runId);
       const { rows: [run] } = await tx.query('SELECT * FROM agent_runs WHERE id=$1 FOR UPDATE',[queued.runId]);
-      if (!run || run.userId !== userId || run.issueId !== task.issueId || run.botId !== task.botId || run.agentId !== input.agentId || run.deviceRepoId !== input.deviceRepoId || run.status !== 'queued' || run.stopRequestedAt || !run.agentDefinition) fail('factoryRunMismatch');
+      if (!run || run.userId !== userId || run.issueId !== task.issueId || !(await factoryRunBotMatches(tx, task, run)) || run.agentId !== input.agentId || run.deviceRepoId !== input.deviceRepoId || run.status !== 'queued' || run.stopRequestedAt || !run.agentDefinition) fail('factoryRunMismatch');
       const state = await store.apply(userId,binding,binding.attemptId,{action:'bind_run',runId:run.id},tx);
       const result = {...state,runId:run.id as string,replayed:false,binding:factoryBinding(state.task)};
       await tx.query('INSERT INTO factory_events ("taskId","eventId",request,result) VALUES ($1,$2,$3,$4)',[task.id,eventId,JSON.stringify(input),JSON.stringify(result)]);

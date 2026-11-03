@@ -13,7 +13,8 @@ stub('../lib/db/index.ts', { db: {}, pool: { query: async () => ({ rows: [{ work
 stub('../lib/agent-runs.ts', { queueRun: unused, queueFactoryRun: unused, addRunMessage: unused, readRun: unused, requestRunStop: unused, visibleRuns: unused })
 stub('../lib/issue-access.ts', { issueForUser: async () => ({ id: issueId, title: 'Task', content: { type: 'doc' } }), requireUser: async () => {} })
 stub('../lib/subscription-runtime.ts', { authorizeSubscriptionWorkspace: async () => {}, subscriptionRuntime: {} })
-stub('../lib/computer/queue-run.ts', { queueCloudRun: async () => { calls.push('queue'); return { runId } } })
+stub('../lib/computer/queue-run.ts', { queueCloudRun: unused })
+stub('../lib/factory/queue-cloud.ts', { queueFactoryCloudRun: async () => { calls.push('queue'); return { runId } } })
 stub('../lib/cloud-computer/thread-machines.ts', {
   ensureThreadMachine: async () => { calls.push('machine'); if (failure === 'machine') throw new Error('Synthetic machine failure') },
   threadMachineAction: async (_pool: unknown, actor: unknown, id: string, action: string) => {

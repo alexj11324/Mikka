@@ -28,11 +28,12 @@ async function worktreeOf(repo: string) {
 }
 
 /** Talks newline-delimited JSON-RPC to the MCP server script. */
-function mcpClient(handoff: string) {
+function mcpClient(handoff: string, extraArgs: string[] = []) {
   const child = spawn(process.execPath, [
     MCP_SERVER_SCRIPT,
     "--handoff",
     handoff,
+    ...extraArgs,
   ])
   const waiting = new Map<number, (value: unknown) => void>()
   onLines(child.stdout, (line) => {
@@ -55,6 +56,23 @@ function mcpClient(handoff: string) {
 }
 
 describe("mikka MCP server", () => {
+  it('offers a host-bound verify tool with real output, no model credential env and no hand-in side effect', async () => {
+    const root = tempDir()
+    const command = `${JSON.stringify(process.execPath)} -e "console.log('verified'); if(process.env.ANTHROPIC_API_KEY)process.exit(7)"`
+    const previous = process.env.ANTHROPIC_API_KEY
+    process.env.ANTHROPIC_API_KEY = 'fixture-private-key'
+    const client = mcpClient(join(root, 'handoff.json'), ['--factory-verify', JSON.stringify({ cwd: root, command, infer: false })])
+    if (previous === undefined) delete process.env.ANTHROPIC_API_KEY; else process.env.ANTHROPIC_API_KEY = previous
+    try {
+      const list = await client.request('tools/list')
+      expect(JSON.stringify(list)).toContain('verify_command')
+      const refused = await client.request('tools/call', { name: 'verify_command', arguments: { command: 'echo another command' } })
+      expect(refused).toMatchObject({ result: { isError: true } })
+      const result = await client.request('tools/call', { name: 'verify_command', arguments: { command } }) as { result: { content: { text: string }[] } }
+      expect(JSON.parse(result.result.content[0].text)).toMatchObject({ exitCode: 0, stdout: 'verified\n' })
+      expect(existsSync(join(root, 'handoff.json'))).toBe(false)
+    } finally { client.close() }
+  })
   it("lists the hand-in tools and records a submit as the session's exit", async () => {
     const repo = await makeRepo()
     const ctx = new RunContext({
@@ -174,6 +192,9 @@ describe("mikka MCP server", () => {
         kind: "context",
         question: "Which existing API should I use?",
       })
+      ctx.clearHandoff()
+      await client.request("tools/call", { name: "request_help", arguments: { question: "Reply with the exact verification command only.", purpose: "verification_command" } })
+      expect(ctx.readHandoff()?.report?.question).toMatchObject({ kind: "decision", purpose: "verification_command" })
       const unknown = await client.request("tools/call", { name: "rm_rf" })
       expect(unknown).toHaveProperty("error")
     } finally {
