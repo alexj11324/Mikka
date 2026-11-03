@@ -36,6 +36,22 @@ export async function queueFactoryTask(pool: Pool, userId: string, input: {
       sourceEventId = factoryEventId('dispatch-source', `${userId}:${key}`)
       await tx.query(`INSERT INTO coordinator_events (id,"userId","botId","issueId",kind,"dedupeKey",payload) VALUES ($1,$2,$3,$4,'user_message',$5,$6) ON CONFLICT DO NOTHING`, [sourceEventId, userId, input.botId, input.issueId, `factory-dispatch:${key}`, JSON.stringify({ text: input.note?.trim() || 'Run this task.', source: 'host_dispatch' })])
     }
+    // A direct owner follow-up is a new request epoch. Automatic repairs
+    // reuse the task/source and must never replace their acceptance target.
+    if (input.previousRunId && input.sourceEventId && task?.sourceEventId !== input.sourceEventId) {
+      const { rows: [source] } = await tx.query(`SELECT e."userId",e."botId",e."issueId",e.kind,e.payload,
+        EXISTS(SELECT 1 FROM agent_runs r WHERE r.id::text=$2 AND r."userId"=$3 AND r."issueId"=$4) AS "parentOwned"
+        FROM coordinator_events e WHERE e.id=$1`, [input.sourceEventId, input.previousRunId, userId, input.issueId])
+      if (source?.payload?.source === 'thread_continuation') {
+        if (source.userId !== userId || source.botId !== input.botId || source.issueId !== input.issueId || source.kind !== 'user_message' ||
+          source.payload.previousRunId !== input.previousRunId || !source.parentOwned) throw new FactoryError('factorySourceMismatch')
+        if (task && task.sourceEventId !== input.sourceEventId) {
+          if (!['passed','cancelled','revoked'].includes(task.status))
+            await runtime.store.apply(userId, factoryBinding(task), factoryEventId('owner-followup', key), { action: 'cancel', reason: 'The owner continued this thread with a new request.' }, tx)
+          task = undefined
+        }
+      }
+    }
     if (task && !input.previousRunId && !['cancelled','revoked'].includes(task.status)) {
       await runtime.store.apply(userId, factoryBinding(task), factoryEventId('replace-thread', key), { action: 'cancel', reason: 'The person requested a new thread.' }, tx)
       task = undefined
