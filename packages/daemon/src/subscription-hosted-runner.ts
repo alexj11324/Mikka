@@ -357,7 +357,7 @@ export async function createHostedBotRunner(host: {
       let brokerStarting: Promise<Broker> | undefined;
       // This run's process groups: the bootstrap leads each, the CLI and its children follow.
       const children = new Set<ReturnType<typeof spawn>>();
-      let timer: ReturnType<typeof setInterval> | undefined;
+      let offMonitor = () => {};
       let offRevoke = () => {};
       const assertOpen = () => {
         if (closed || gate.revoked || lifetime.signal.aborted) throw unavailable();
@@ -374,7 +374,7 @@ export async function createHostedBotRunner(host: {
         if (closing) return closing;
         // Fence new work before awaiting anything.
         closed = true;
-        clearInterval(timer);
+        offMonitor();
         // Publish the shared close promise before abort emits synchronous child
         // callbacks; those callbacks can re-enter close through adapter teardown.
         closing = Promise.resolve().then(async () => {
@@ -407,12 +407,13 @@ export async function createHostedBotRunner(host: {
       try {
         await live();
         const subscription = selected ? await (async () => {
-          const context = async () => {
+          const context = async (checkAuthority = true) => {
             // A failed infrastructure query is inconclusive, not revocation.
             // Admit no work until a fresh context succeeds, and stop after
             // three attempts. Authoritative refusals are never retried.
             for (let attempt = 0; ; attempt++) {
-              await live();
+              if (checkAuthority) await live();
+              else assertOpen();
               try {
                 return await host.link.nativeContext!(assignment.deviceId, assignment.runId, lifetime.signal);
               } catch (error) {
@@ -429,11 +430,12 @@ export async function createHostedBotRunner(host: {
             throw unavailable();
           startup.contextReady = true;
           const revision = first.revision;
-          const check = async (phase: StartupPhase = "context_check") => {
+          const check = async (phase: StartupPhase = "context_check", checkAuthority = true) => {
             startup.phase = phase;
             try {
-              const current = await context();
-              await live();
+              const current = await context(checkAuthority);
+              if (checkAuthority) await live();
+              else assertOpen();
               startup.sameRevision = current.revision === revision;
               startup.sameAccount = current.accountId === first.accountId;
               startup.sameRoute = current.route === first.route;
@@ -455,7 +457,9 @@ export async function createHostedBotRunner(host: {
               throw error;
             }
           };
-          return { first, revision, check };
+          // Only the shared background monitor has just checked authority.
+          // Every actual provider/tool operation keeps the fresh checks above.
+          return { first, revision, check, background: () => check("context_check", false) };
         })() : undefined;
         // An API-key run is live while its gate is; withdrawing the key stops the run from the server.
         const check: () => Promise<unknown> = subscription?.check ?? live;
@@ -753,24 +757,9 @@ export async function createHostedBotRunner(host: {
           // A quick, successful adapter may already have ended and revoked its
           // gate here. Preserve its terminal events; sends/spawns/provider work
           // remain fenced by close, and do not install a new monitor after it.
-          let checking = false;
-          if (!closed) timer = setInterval(() => {
-            if (checking || closed) return;
-            checking = true;
-            void check()
-              .catch(async (error) => {
-                reportFailure(error);
-                try { await session.cancel(); }
-                finally { await close(); }
-              })
-              .finally(() => {
-                checking = false;
-              })
-              .catch(() => undefined);
-          }, 1000);
-          timer?.unref();
+          if (!closed) offMonitor = gate.monitor(subscription?.background);
           const finish = async () => {
-            clearInterval(timer);
+            offMonitor();
             await close();
           };
           return {
