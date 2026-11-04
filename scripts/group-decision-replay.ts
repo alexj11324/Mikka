@@ -1,7 +1,7 @@
 import { writeFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 import { GROUP_BASELINE_VERSION, GROUP_POLICY_VERSION } from '../lib/coordinator/group-decision-policy'
-import { GROUP_REPLAY_CASE_IDS, GROUP_REPLAY_DATASET, GROUP_REPLAY_DATASET_DIGEST, summarizeGroupDecisionReplay, type GroupDecisionReplay } from '../lib/coordinator/group-decision-replay'
+import { GROUP_REPLAY_CASE_IDS, GROUP_REPLAY_COMPARISON_VERSION, GROUP_REPLAY_DATASET, GROUP_REPLAY_DATASET_DIGEST, groupReplayAbstained, summarizeGroupDecisionReplay, type GroupDecisionReplay } from '../lib/coordinator/group-decision-replay'
 import { GROUP_DECISION_PROTOCOL, GROUP_MAX_ROUTING_DECISIONS, groupDecisionFailures, groupDecisionTotals } from '../lib/coordinator/group-decision-chain'
 import { groupDecisionReceipt, groupDecisionSteps } from '../lib/coordinator/group-decision-trace'
 
@@ -27,7 +27,7 @@ export async function runGroupDecisionReplay({env=process.env,fetchImpl=fetch}:{
     const {response,data}=await request('/api/version')
     if(!response.ok || (data as {build?:unknown}|null)?.build!==deployment)throw Error('replay_deployment_changed')
   }
-  const report={schemaVersion:1,evidenceKind:'actual-decision-inference' as const,dataset:GROUP_REPLAY_DATASET,datasetDigest:GROUP_REPLAY_DATASET_DIGEST,
+  const report={schemaVersion:1,comparisonVersion:GROUP_REPLAY_COMPARISON_VERSION,evidenceKind:'actual-decision-inference' as const,dataset:GROUP_REPLAY_DATASET,datasetDigest:GROUP_REPLAY_DATASET_DIGEST,
     deploymentId:deployment,revision,conversationId,startedAt:new Date().toISOString(),finishedAt:'',status:'running',error:null as string|null,
     baseline:[] as GroupDecisionReplay[],candidate:[] as GroupDecisionReplay[],collectionComplete:false,
     scope:'Actual Decision inference: 24 logical case replays, each with its bounded provider-request chain. Execution projected/not performed. Cost covers routing requests only, not correction, contribution, chat, tools or Factory.',
@@ -75,9 +75,15 @@ export async function runGroupDecisionReplay({env=process.env,fetchImpl=fetch}:{
   }catch(error){report.status='failed';report.error=error instanceof Error && /^replay_[a-z0-9_]+$/.test(error.message)?error.message:'replay_request_failed'}
   report.finishedAt=new Date().toISOString()
   const baseline=summarizeGroupDecisionReplay(report.baseline),candidate=summarizeGroupDecisionReplay(report.candidate)
-  const decisionReviewReady=report.collectionComplete && report.status==='complete' && baseline.coverage===1 && candidate.coverage===1 && candidate.failures.length===0
+  // The baseline is fixed, including its observed semantic failures. Requiring
+  // it to succeed on every case hides exactly the defects a candidate must fix.
+  // Transport, receipt and malformed-response failures are not comparable.
+  const baselineClassifiable=report.baseline.length===GROUP_REPLAY_CASE_IDS.length
+    && report.baseline.every(row=>row.status==='complete' || groupReplayAbstained(row))
+  const decisionReviewReady=report.collectionComplete && baselineClassifiable && candidate.coverage===1 && candidate.failures.length===0
     && candidate.falseIntervention<=baseline.falseIntervention && candidate.missedIntervention<=baseline.missedIntervention
-  return {...report,qualityAccepted:decisionReviewReady,comparison:{baseline,candidate,decisionReviewReady,requiresHumanReview:true,executionAcceptanceRequired:true}}
+  if(decisionReviewReady){report.status='comparison_ready';report.error=null}
+  return {...report,qualityAccepted:decisionReviewReady,comparison:{baseline,candidate,baselineClassifiable,decisionReviewReady,requiresHumanReview:true,executionAcceptanceRequired:true}}
 }
 
 async function main() {
