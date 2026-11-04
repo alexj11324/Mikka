@@ -8,6 +8,7 @@ import {
 } from "./approval-contract";
 import type { FactoryCandidate, FactoryTask } from "./approval-dependencies";
 import { maskCredentials } from "../secrets/mask";
+import { factoryEventId } from './event-id';
 
 /** What a screenshot or recording entry shown to the reviewer carries. */
 export interface FactoryCaptureEvidence {
@@ -200,10 +201,43 @@ export async function runCaptureEvidence(
   }));
 }
 
+/** An owner-consumed completion has its own immutable receipt. The old blocked
+ * attempt stays blocked; only its canonical completed-run evidence is projected. */
+async function recoveredExecutionEvidence(tx: PoolClient, task: FactoryTask, candidate: FactoryCandidate & { runId: string }) {
+  const { rows } = await tx.query(`SELECT a.id,a.stage,a.status,r.id AS "runId",r."sessionId",
+      completion.request->'change'->'evidence' AS evidence,receipt."eventId" AS "completionRecoveryEventId",completion."eventId" AS "completionEventId",
+      receipt.request->'input'->'binding'->'revision' AS "ownerRevision",completion.request->'binding'->'revision' AS "completionRevision"
+    FROM factory_tasks t JOIN factory_candidates c ON c."taskId"=t.id AND c.id=t."candidateId"
+    JOIN agent_runs r ON r.id=c."runId" AND r."userId"=t."userId" AND r."issueId"=t."issueId"
+    JOIN factory_attempts a ON a."taskId"=t.id AND a."runId"=r.id AND a.stage='execute'
+    JOIN factory_events receipt ON receipt."taskId"=t.id AND receipt.request->>'kind'='owner_completion_recovery'
+    JOIN factory_events completion ON completion."taskId"=t.id AND completion."eventId"=$4
+    WHERE t.id=$1 AND t."userId"=$2 AND t."issueId"=$3 AND c.id=$5 AND r.id=$6
+      AND a.status='blocked' AND a."candidateId" IS NULL AND a.output->'watchdog'->>'reasonCode'='recovery_exhausted'
+      AND COALESCE(a.output->>'requestEpoch',t."sourceEventId"::text)=t."sourceEventId"::text
+      AND a.output->'watchdog'->>'requestEpoch'=t."sourceEventId"::text
+      AND r.status='succeeded' AND r."stopReason"='submitted' AND r."stopRequestedAt" IS NULL AND r."sessionId" IS NOT NULL
+      AND receipt.request->>'sourceEventId'=t."sourceEventId"::text AND receipt.request->>'attemptId'=a.id::text AND receipt.request->>'runId'=r.id::text
+      AND receipt.request#>>'{input,binding,taskId}'=t.id::text AND receipt.request#>>'{input,change,action}'='retry'
+      AND receipt.result#>>'{task,id}'=t.id::text AND receipt.result#>>'{task,userId}'=t."userId" AND receipt.result#>>'{task,issueId}'=t."issueId"::text
+      AND receipt.result#>>'{task,sourceEventId}'=t."sourceEventId"::text AND receipt.result#>>'{task,candidateId}'=c.id::text
+      AND receipt.result#>>'{task,stage}'='review' AND receipt.result#>>'{task,status}' IN ('pending','running')
+      AND completion.request#>>'{binding,taskId}'=t.id::text AND completion.request#>>'{change,action}'='finish'
+      AND completion.request#>>'{change,status}'='passed' AND completion.request#>>'{change,output,runId}'=r.id::text
+      AND completion.result#>>'{task,id}'=t.id::text AND completion.result#>>'{task,userId}'=t."userId" AND completion.result#>>'{task,issueId}'=t."issueId"::text
+      AND completion.result#>>'{task,sourceEventId}'=t."sourceEventId"::text AND completion.result#>>'{task,candidateId}'=c.id::text
+      AND completion.result#>>'{task,attemptId}'=a.id::text AND completion.result#>>'{task,stage}'='execute' AND completion.result#>>'{task,status}'='passed'`,
+    [task.id, task.userId, task.issueId, factoryEventId('run-completion', candidate.runId), candidate.id, candidate.runId]);
+  const row = rows[0];
+  if (rows.length !== 1 || !Number.isInteger(row.ownerRevision) || row.ownerRevision < 1 ||
+    row.completionRevision !== row.ownerRevision + 1 || !Array.isArray(row.evidence)) return null;
+  return row;
+}
+
 export async function approvalEvidence(tx: PoolClient, task: FactoryTask) {
   const {
     rows: [candidate],
-  } = await tx.query<FactoryCandidate>(
+  } = await tx.query<FactoryCandidate & { runId: string }>(
     'SELECT * FROM factory_candidates WHERE id=$1 AND "taskId"=$2',
     [task.candidateId, task.id],
   );
@@ -215,9 +249,11 @@ export async function approvalEvidence(tx: PoolClient, task: FactoryTask) {
   const latest = ["execute", "review", "verify"].map((stage) =>
     rows.filter((a) => a.stage === stage).at(-1),
   );
+  const recovered = latest[0] ? null : await recoveredExecutionEvidence(tx, task, candidate);
+  if (recovered) latest[0] = recovered;
   if (
     latest.some(
-      (a) => !a || a.status !== "passed" || !a.runId || !a.sessionId,
+      (a) => !a || (a.status !== "passed" && a !== recovered) || !a.runId || !a.sessionId,
     ) ||
     new Set(latest.map((a) => a?.runId)).size !== 3 ||
     new Set(latest.map((a) => a?.sessionId)).size !== 3
@@ -269,6 +305,7 @@ export async function approvalEvidence(tx: PoolClient, task: FactoryTask) {
       const entry = {
         stage: attempt.stage,
         attemptId: attempt.id,
+        ...(attempt === recovered ? { completionRecoveryEventId: recovered.completionRecoveryEventId, completionEventId: recovered.completionEventId } : {}),
         ...ref,
         ...timestamps,
         sha256: digest(raw),

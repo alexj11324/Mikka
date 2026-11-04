@@ -2,7 +2,7 @@
 // Real migrations, store, dispatch and reconciler over a disposable *_e2e PG.
 import assert from "node:assert/strict";
 import test from "node:test";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
 import { Pool, type PoolClient } from "pg";
 import { orderMigrations } from "../../scripts/migration-order.mjs";
@@ -11,6 +11,10 @@ import { createFactoryDispatch, defaultFactoryDispatchAdapters, factoryBinding, 
 import { createFactoryHumanStore } from './human-store';
 import { handleFactory } from './http';
 import { sweepFactoryWatchdog } from './watchdog';
+import { currentFactoryRequest, factoryCheckGates } from './checks';
+import { approvalEvidence } from './evidence';
+import { factoryEventId } from './event-id';
+import { questionFingerprint, humanQuestionAnswerSchema } from './questions/contract';
 import { createFactoryQuestions } from "./questions/store";
 import { createFactoryReconciler } from "./reconcile";
 import { factoryCheckIndependent } from "./check-independence";
@@ -198,6 +202,101 @@ test("run completion enters review without the Coordinator; replays do not advan
       assert.equal((await handleFactory(human, f.request)).status, 200);
       assert.equal((await store.read('owner', f.task.id)).task.stage, 'review');
       assert.deepEqual(await history(f.task.id, f.runId, f.task.attemptId), before);
+    });
+
+    await t.test('recovered completion carries the consumed Owner answer through real independent checks and approval without rewriting blocked history', async () => {
+      const f = await exhaustedCompletion();
+      const originId = randomUUID(), originAttemptId = randomUUID(), questionId = randomUUID(), questionEventId = randomUUID();
+      const deliverableRepo = randomUUID(), answerId = randomUUID();
+      const oldTarget = 'Original issue target: exactly 56 bytes.';
+      const expectedHash = createHash('sha256').update('x'.repeat(84) + '\n').digest('hex');
+      const ownerText = `The answered target is exactly 85 bytes, SHA256 ${expectedHash}. Keep all other requirements. token=fixture-private`;
+      await pool.query(`INSERT INTO device_repos(id,"deviceId","userId","repoPath") VALUES($1,$2,'owner','/home/user/.mikka/bot-workspaces/answered-fixture')`, [deliverableRepo, deviceId]);
+      await pool.query(`UPDATE agent_runs SET "deviceRepoId"=$2,report=$3,"questionContinuation"=$4 WHERE id=$1`, [f.runId, deliverableRepo,
+        JSON.stringify({ sourceCommit: 'a'.repeat(40), deliverableCommit: 'b'.repeat(40), verify: { status: 'not_run' }, summary: 'Producer observation: 56 bytes; this report is not a new owner requirement.' }),
+        JSON.stringify({ questionId, originRunId: originId, originSessionId: 's1', requireSessionResume: true })]);
+      await pool.query(`INSERT INTO agent_runs(id,"userId","issueId","agentId","deviceId","deviceRepoId",status,"stopReason","sessionId","agentDefinition",prompt)
+        SELECT $2,"userId","issueId","agentId","deviceId","deviceRepoId",'stopped','asked_human','s1',"agentDefinition",'Original owner task' FROM agent_runs WHERE id=$1`, [f.runId, originId]);
+      await pool.query(`UPDATE factory_attempts SET position=2,ordinal=2,output=output-'requestEpoch' WHERE id=$1`, [f.task.attemptId]);
+      await pool.query(`INSERT INTO factory_attempts(id,"taskId",stage,ordinal,position,status,"runId","sessionId",reason)
+        VALUES($1,$2,'execute',1,1,'waiting',$3,'s1','Owner answer required')`, [originAttemptId, f.task.id, originId]);
+      await pool.query(`INSERT INTO coordinator_events(id,"userId",kind,"dedupeKey",payload) VALUES($1,'owner','run_question',$1::text,'{}')`, [questionEventId]);
+      const waiting = { taskId: f.task.id, issueId: f.task.issueId, attemptId: originAttemptId, candidateId: null, revision: 2 };
+      const input = humanQuestionAnswerSchema.parse({ answerId, text: ownerText, reference: { questionId, questionRevision: 1, binding: waiting, originRunId: originId, originSessionId: 's1' } });
+      const answer = { source: 'human', userId: 'owner', input };
+      await pool.query(`INSERT INTO factory_questions(id,"userId","issueId","taskId","attemptId",stage,"originRunId","originSessionId","originRevision","waitingBinding",kind,question,context,request,status,revision,reason,"sourceEventId","answerId","answerSource",answer,"answerFingerprint","answeredAt","continuationRunId",result)
+        VALUES($1,'owner',$2,$3,$4,'execute',$5,'s1',1,$6,'external','Which target?','UNRELATED PRIVATE RFI CONTEXT','{}','resolved',3,'Answered',$7,$8,'human',$9,$10,now(),$11,$12)`,
+        [questionId, f.task.issueId, f.task.id, originAttemptId, originId, JSON.stringify(waiting), questionEventId, answerId, JSON.stringify(answer), questionFingerprint(answer), f.runId,
+          JSON.stringify({ questionId, continuationRunId: randomUUID(), task: { ...f.task, attemptId: randomUUID() } })]);
+      const before = await history(f.task.id, f.runId, f.task.attemptId);
+      const originalQuestion = (await pool.query('SELECT to_jsonb(q) AS value FROM factory_questions q WHERE id=$1', [questionId])).rows[0].value;
+      const checkedStore = createFactoryStore(pool, authorize, factoryCheckGates);
+      const checkDispatch = createFactoryDispatch(pool, checkedStore, async (...args) => {
+        const queued = await queue(...args);
+        await args[0].query('UPDATE agent_runs SET prompt=$2 WHERE id=$1', [queued.runId, oldTarget]);
+        return queued;
+      }, defaultFactoryDispatchAdapters);
+      const human = createFactoryHumanStore(pool, () => checkedStore, async (tx, _store, current) => {
+        await checkDispatch('owner', { binding: factoryBinding(current), agentId, deviceRepoId: deliverableRepo }, tx);
+      });
+      assert.equal((await handleFactory(human, f.request)).status, 200);
+      const candidate = (await checkedStore.read('owner', f.task.id)).candidates[0];
+      for (const stage of ['review', 'verify'] as const) {
+        const current = (await checkedStore.read('owner', f.task.id)).task;
+        assert.equal(current.stage, stage);
+        const run = (await pool.query('SELECT r.* FROM agent_runs r JOIN factory_attempts a ON a."runId"=r.id WHERE a.id=$1', [current.attemptId])).rows[0];
+        assert.match(run.prompt, /Saved Owner answer already consumed by this candidate/);
+        assert.ok(run.prompt.includes(`exactly 85 bytes, SHA256 ${expectedHash}`));
+        assert.ok(run.prompt.includes(oldTarget), 'the conflicting original text remains historical, not rewritten');
+        assert.ok(run.prompt.indexOf('exactly 85 bytes') < run.prompt.indexOf(oldTarget));
+        assert.match(run.prompt, /supersedes conflicting original issue wording/);
+        assert.doesNotMatch(run.prompt, /fixture-private|UNRELATED PRIVATE RFI CONTEXT/);
+        const sessionId = `independent-${stage}`;
+        await pool.query(`UPDATE agent_runs SET status='succeeded',"stopReason"='submitted',"sessionId"=$2,"startedAt"=now()-interval '1 minute',"finishedAt"=clock_timestamp(),report=$3 WHERE id=$1`,
+          [run.id, sessionId, JSON.stringify({ check: { sha: 'b'.repeat(40), readOnly: true }, verify: { status: 'not_run' }, filesChanged: [], criteria: [{ text: 'Saved 85-byte owner target', passed: true, evidence: 'Synthetic isolated DB observation' }] })]);
+        const finished = (await pool.query('SELECT "finishedAt" FROM agent_runs WHERE id=$1', [run.id])).rows[0].finishedAt;
+        const passed = await checkedStore.apply('owner', factoryBinding(current), randomUUID(), { action: 'finish', status: 'passed', reason: 'Independent fixture check', output: {},
+          evidence: [{ artifact: `run-report:${run.id}`, kind: 'report', runId: run.id, sessionId, candidateId: candidate.id, sha: null, environment: candidate.environment, recordedAt: finished.toISOString() }] });
+        const next = await checkedStore.apply('owner', factoryBinding(passed.task), randomUUID(), { action: 'advance', stage: stage === 'review' ? 'verify' : 'approval', reason: 'Independent fixture evidence complete' });
+        if (stage === 'review') await checkDispatch('owner', { binding: factoryBinding(next.task), agentId, deviceRepoId: deliverableRepo });
+      }
+      const ready = (await checkedStore.read('owner', f.task.id)).task;
+      const tx = await pool.connect();
+      try {
+        const evidence = await approvalEvidence(tx, ready);
+        assert.deepEqual(evidence.manifest.artifacts.map(x => x.stage), ['execute', 'review', 'verify']);
+        assert.equal(evidence.manifest.artifacts[0].runId, f.runId);
+        assert.equal(evidence.manifest.artifacts[0].completionRecoveryEventId, f.request.body.eventId);
+        assert.equal(evidence.manifest.artifacts[0].completionEventId, factoryEventId('run-completion', f.runId));
+        assert.equal(new Set(evidence.manifest.artifacts.map(x => x.sessionId)).size, 3);
+        assert.deepEqual(await history(f.task.id, f.runId, f.task.attemptId), before);
+        assert.deepEqual((await pool.query('SELECT to_jsonb(q) AS value FROM factory_questions q WHERE id=$1', [questionId])).rows[0].value, originalQuestion);
+        const corruptions: [string, unknown[]][] = [
+          ['DELETE FROM factory_events WHERE "taskId"=$1 AND "eventId"=$2', [f.task.id, f.request.body.eventId]],
+          ['DELETE FROM factory_events WHERE "taskId"=$1 AND "eventId"=$2', [f.task.id, factoryEventId('run-completion', f.runId)]],
+          [`UPDATE factory_events SET request=jsonb_set(request,'{sourceEventId}',to_jsonb($3::text)) WHERE "taskId"=$1 AND "eventId"=$2`, [f.task.id, f.request.body.eventId, randomUUID()]],
+          [`UPDATE factory_events SET result=jsonb_set(result,'{task,candidateId}',to_jsonb($3::text)) WHERE "taskId"=$1 AND "eventId"=$2`, [f.task.id, f.request.body.eventId, randomUUID()]],
+          [`UPDATE factory_events SET request=jsonb_set(request,'{change,status}','"failed"') WHERE "taskId"=$1 AND "eventId"=$2`, [f.task.id, factoryEventId('run-completion', f.runId)]],
+          [`UPDATE factory_attempts SET "sessionId"='s1' WHERE "taskId"=$1 AND stage='verify'`, [f.task.id]],
+        ];
+        for (const [sql, values] of corruptions) {
+          await tx.query('BEGIN');
+          try { await tx.query(sql, values); await assert.rejects(approvalEvidence(tx, ready), /factoryIndependentEvidenceRequired|factoryEvidenceMismatch/); }
+          finally { await tx.query('ROLLBACK'); }
+        }
+        const invalidAnswers: [string, unknown[]][] = [
+          [`UPDATE factory_questions SET "answerFingerprint"='wrong' WHERE id=$1`, [questionId]],
+          [`UPDATE factory_questions SET "userId"='foreign' WHERE id=$1`, [questionId]],
+          [`UPDATE factory_attempts SET output=jsonb_set(output,'{requestEpoch}',to_jsonb($2::text)) WHERE id=$1`, [f.task.attemptId, randomUUID()]],
+          [`UPDATE agent_runs SET "questionContinuation"=jsonb_set("questionContinuation",'{originSessionId}','"different-session"') WHERE id=$1`, [f.runId]],
+          [`UPDATE agent_runs SET "questionContinuation"=NULL WHERE id=$1`, [f.runId]],
+        ];
+        for (const [sql, values] of invalidAnswers) {
+          await tx.query('BEGIN');
+          try { await tx.query(sql, values); await assert.rejects(currentFactoryRequest(tx, ready), /factorySourceMismatch/); }
+          finally { await tx.query('ROLLBACK'); }
+        }
+      } finally { tx.release(); }
     });
 
     await t.test("completed run moves execute → review via the completion hook alone", async () => {

@@ -12,16 +12,66 @@ import { FactoryError } from "./contract";
 import type { FactoryGate, FactoryTask } from "./store";
 import { maskCredentials } from "../secrets/mask";
 import { redactArtifact } from "./evidence";
+import { humanQuestionAnswerSchema, questionFingerprint } from './questions/contract';
+
+/** Only the saved Owner answer consumed by this exact native producer is a
+ * requirement. Question context and producer reports cannot supply one. */
+async function consumedFactoryAnswer(tx: Pick<PoolClient, 'query'>, task: FactoryTask): Promise<string> {
+  if (!task.candidateId) return '';
+  const { rows: [row] } = await tx.query(`SELECT producer.id AS "runId",producer."sessionId",producer."questionContinuation",
+      producer.status='succeeded' AND producer."stopReason"='submitted' AND producer."stopRequestedAt" IS NULL AS "producerComplete",
+      COALESCE(a.output->>'requestEpoch',t."sourceEventId"::text)=t."sourceEventId"::text AS "epochMatches",
+      q.id,q.status,q.stage,q."attemptId",q."candidateId",q."originRunId",q."originSessionId",q."waitingBinding",
+      q."answerId",q."answerSource",q."answerSourceEventId",q.answer,q."answerFingerprint",q."answeredAt",
+      EXISTS(SELECT 1 FROM agent_runs origin JOIN factory_attempts previous ON previous."runId"=origin.id
+        WHERE previous.id=q."attemptId" AND previous."taskId"=t.id AND previous.stage='execute'
+          AND origin.id=q."originRunId" AND origin."userId"=t."userId" AND origin."issueId"=t."issueId"
+          AND origin.status='stopped' AND origin."stopRequestedAt" IS NULL AND origin."sessionId"=q."originSessionId") AS "originMatches",
+      EXISTS(SELECT 1 FROM coordinator_events e WHERE e.id=q."answerSourceEventId" AND e."userId"=t."userId"
+        AND e.kind='user_message' AND (e."issueId" IS NULL OR e."issueId"=t."issueId") AND e."botId" IS NOT DISTINCT FROM t."botId"
+        AND e.payload->>'humanSessionId' IS NOT NULL AND e.payload->>'text'=q.answer->'input'->>'text'
+        AND e."createdAt">=q."createdAt" AND (e.payload->>'questionId' IS NULL OR e.payload->>'questionId'=q.id::text)) AS "ownerEventMatches"
+    FROM factory_tasks t JOIN factory_candidates c ON c.id=t."candidateId" AND c."taskId"=t.id
+    JOIN agent_runs producer ON producer.id=c."runId" AND producer."userId"=t."userId" AND producer."issueId"=t."issueId"
+    JOIN factory_attempts a ON a."taskId"=t.id AND a."runId"=producer.id AND a.stage='execute'
+    LEFT JOIN factory_questions q ON q."continuationRunId"=producer.id AND q."userId"=t."userId" AND q."taskId"=t.id AND q."issueId"=t."issueId"
+    WHERE t.id=$1 AND t."userId"=$2 AND t."issueId"=$3 AND c.id=$4 AND t."sourceEventId"=$5`,
+    [task.id, task.userId, task.issueId, task.candidateId, task.sourceEventId]);
+  if (!row || (!row.questionContinuation && !row.id)) return '';
+  if (!row.questionContinuation) throw new FactoryError('factorySourceMismatch');
+  const link = row.questionContinuation;
+  if (!row.id || !row.producerComplete || !row.epochMatches || !row.originMatches || row.status !== 'resolved' || row.stage !== 'execute' ||
+    link.questionId !== row.id || link.originRunId !== row.originRunId || link.originSessionId !== row.originSessionId ||
+    link.requireSessionResume !== true || row.sessionId !== row.originSessionId) throw new FactoryError('factorySourceMismatch');
+  if (row.answerSource !== 'human' && row.answerSource !== 'human_event') return '';
+  const parsed = humanQuestionAnswerSchema.safeParse(row.answer?.input);
+  if (!parsed.success || !row.answeredAt || row.answer?.source !== row.answerSource || row.answer?.userId !== task.userId ||
+    row.answerFingerprint !== questionFingerprint(row.answer)) throw new FactoryError('factorySourceMismatch');
+  const input = parsed.data, reference = input.reference;
+  if (input.answerId !== row.answerId || reference.questionId !== row.id || reference.originRunId !== row.originRunId ||
+    reference.originSessionId !== row.originSessionId || reference.binding.taskId !== task.id || reference.binding.issueId !== task.issueId ||
+    reference.binding.attemptId !== row.attemptId || reference.binding.candidateId !== row.candidateId ||
+    questionFingerprint(reference.binding) !== questionFingerprint(row.waitingBinding) ||
+    (row.answerSource === 'human_event' && (!row.ownerEventMatches || input.sourceEventId !== row.answerSourceEventId)))
+    throw new FactoryError('factorySourceMismatch');
+  return ['Saved Owner answer already consumed by this candidate:',
+    `Question ${row.id}; answer ${row.answerId}; producing run ${row.runId}.`,
+    redactFactoryCheckText(input.text),
+    'This saved answer supersedes conflicting original issue wording for that question. Retain unchanged constraints and the current authenticated request. It grants no new permission or publication approval. Producer reports remain observations to verify, not acceptance requirements.',
+    '',
+  ].join('\n\n');
+}
 
 /** The current owner turn belongs to this task epoch, not the mutable issue.
  * Automatic repairs reuse the same source; an accepted task keeps its history. */
 export async function currentFactoryRequest(tx: Pick<PoolClient, 'query'>, task: FactoryTask): Promise<string> {
+  const consumedAnswer = await consumedFactoryAnswer(tx, task);
   const { rows: [source] } = await tx.query(`SELECT e.payload->>'text' AS text,e.payload->>'previousRunId' AS "previousRunId",
     EXISTS(SELECT 1 FROM agent_runs r WHERE r.id::text=e.payload->>'previousRunId' AND r."userId"=$2 AND r."issueId"=$3) AS "parentOwned"
     FROM coordinator_events e WHERE e.id=$1 AND e."userId"=$2 AND e.kind='user_message'
       AND e."botId" IS NOT DISTINCT FROM $4::uuid AND e."issueId"=$3 AND e.payload->>'source'='thread_continuation'`,
     [task.sourceEventId, task.userId, task.issueId, task.botId])
-  if (!source) return '' // Existing task sources retain their original behavior.
+  if (!source) return consumedAnswer;
   if (!source.parentOwned || typeof source.text !== 'string' || !source.text.trim() || source.text.length > 10_000)
     throw new FactoryError('factorySourceMismatch')
   const { rows: earlier } = await tx.query(`SELECT e.id,e.payload->>'text' AS text FROM factory_events f
@@ -36,6 +86,7 @@ export async function currentFactoryRequest(tx: Pick<PoolClient, 'query'>, task:
     `Continues owner run ${source.previousRunId}.`,
     'Use this current request for acceptance targets in this task. Where it changes an earlier exact-content or other target, it supersedes that older target. Unchanged requirements still apply. Older issue text, prior summaries and reports below are historical context, not permission to restore superseded targets. Execution permissions and independent-check requirements remain unchanged.',
     ...(earlier.length ? ['Earlier authenticated requests, newest first; retain their non-conflicting constraints only:', redactFactoryCheckText(JSON.stringify(earlier)).slice(0, 24000)] : []),
+    consumedAnswer,
     '',
   ].join('\n\n')
 }
