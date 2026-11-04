@@ -1,0 +1,267 @@
+{
+  "commit": "56bffda106d9a521eb7f8d36e1da57c104dff1b2",
+  "environmentId": "local-aa2816bc-9773-4f1f-813e-d8feee0eb517",
+  "origin": "http://localhost:3300",
+  "startedAt": "2026-11-04T17:44:58.145Z",
+  "captures": [
+    {
+      "name": "zh-create-1440-light.png",
+      "locale": "zh-CN",
+      "width": 1440,
+      "height": 960,
+      "scheme": "light",
+      "state": "ready",
+      "at": "2026-11-04T17:45:03.476Z",
+      "sha256": "27e29bafa8e21ca7df8d64549d6cb7ed2bc95df5e432c62feeb148129b437ba5"
+    },
+    {
+      "name": "zh-create-1440-dark.png",
+      "locale": "zh-CN",
+      "width": 1440,
+      "height": 960,
+      "scheme": "dark",
+      "state": "ready",
+      "at": "2026-11-04T17:45:05.309Z",
+      "sha256": "6f676641bcdd088e30c851a98606ff879f8526352437a0e28549d60b6a266f66"
+    },
+    {
+      "name": "zh-create-390-light.png",
+      "locale": "zh-CN",
+      "width": 390,
+      "height": 844,
+      "scheme": "light",
+      "state": "ready",
+      "at": "2026-11-04T17:45:07.087Z",
+      "sha256": "b908d97ceeda285eabf9725e6b8d84d2650ebabf734423403f228f27b016b197"
+    },
+    {
+      "name": "zh-create-390-dark.png",
+      "locale": "zh-CN",
+      "width": 390,
+      "height": 844,
+      "scheme": "dark",
+      "state": "ready",
+      "at": "2026-11-04T17:45:08.690Z",
+      "sha256": "9eb37448cfb3914efcaf168aa51c269c3d432abeb68e6abc8852b6ca2ef2bea5"
+    },
+    {
+      "name": "en-create-1440-light.png",
+      "locale": "en",
+      "width": 1440,
+      "height": 960,
+      "scheme": "light",
+      "state": "ready",
+      "at": "2026-11-04T17:45:10.525Z",
+      "sha256": "ba124c68c3542c6e12a76bbed5a128acedfe74e5d1cb921c7c24d0e49032ecfd"
+    },
+    {
+      "name": "en-create-1440-dark.png",
+      "locale": "en",
+      "width": 1440,
+      "height": 960,
+      "scheme": "dark",
+      "state": "ready",
+      "at": "2026-11-04T17:45:12.356Z",
+      "sha256": "682bfa794a3eedde0ed6090e9397b93abecd72759c618f5ce5e40b2c05025060"
+    },
+    {
+      "name": "en-create-390-light.png",
+      "locale": "en",
+      "width": 390,
+      "height": 844,
+      "scheme": "light",
+      "state": "ready",
+      "at": "2026-11-04T17:45:14.094Z",
+      "sha256": "425d9e8110f099076cb6b131fdbca7c32c09adbfbd7417d85010c61038538033"
+    },
+    {
+      "name": "en-create-390-dark.png",
+      "locale": "en",
+      "width": 390,
+      "height": 844,
+      "scheme": "dark",
+      "state": "ready",
+      "at": "2026-11-04T17:45:15.704Z",
+      "sha256": "02bdcabc6f5426587df76b7ba2981b4c1abbf745491cc440fc2e297c3856df40"
+    },
+    {
+      "name": "zh-created-1440-light.png",
+      "locale": "zh-CN",
+      "width": 1440,
+      "height": 960,
+      "scheme": "light",
+      "state": "created",
+      "at": "2026-11-04T17:45:17.489Z",
+      "sha256": "abfa5a7d00c60dfe7f652876497e99b44476b209ed614ab2e5ba5b8636c23298"
+    },
+    {
+      "name": "zh-created-390-light.png",
+      "locale": "zh-CN",
+      "width": 390,
+      "height": 844,
+      "scheme": "light",
+      "state": "created",
+      "at": "2026-11-04T17:45:17.725Z",
+      "sha256": "48d7191da78cc0ee0825fbcd51d0ae413c452317b52fcc72fbf77476fd6223ac"
+    }
+  ],
+  "checks": [
+    {
+      "name": "foreign-owner",
+      "status": 404
+    },
+    {
+      "name": "different-workspace",
+      "status": 404
+    },
+    {
+      "name": "cancel-focus",
+      "locale": "zh-CN",
+      "width": 1440,
+      "scheme": "light",
+      "focused": {
+        "tag": "BUTTON",
+        "label": "新建",
+        "connected": true
+      }
+    },
+    {
+      "name": "cancel-focus",
+      "locale": "zh-CN",
+      "width": 1440,
+      "scheme": "dark",
+      "focused": {
+        "tag": "BUTTON",
+        "label": "新建",
+        "connected": true
+      }
+    },
+    {
+      "name": "cancel-focus",
+      "locale": "zh-CN",
+      "width": 390,
+      "scheme": "light",
+      "focused": {
+        "tag": "BUTTON",
+        "label": "展开或收起侧栏",
+        "connected": true
+      }
+    },
+    {
+      "name": "cancel-focus",
+      "locale": "zh-CN",
+      "width": 390,
+      "scheme": "dark",
+      "focused": {
+        "tag": "BUTTON",
+        "label": "展开或收起侧栏",
+        "connected": true
+      }
+    },
+    {
+      "name": "cancel-focus",
+      "locale": "en",
+      "width": 1440,
+      "scheme": "light",
+      "focused": {
+        "tag": "BUTTON",
+        "label": "New",
+        "connected": true
+      }
+    },
+    {
+      "name": "cancel-focus",
+      "locale": "en",
+      "width": 1440,
+      "scheme": "dark",
+      "focused": {
+        "tag": "BUTTON",
+        "label": "New",
+        "connected": true
+      }
+    },
+    {
+      "name": "cancel-focus",
+      "locale": "en",
+      "width": 390,
+      "scheme": "light",
+      "focused": {
+        "tag": "BUTTON",
+        "label": "Expand or collapse the sidebar",
+        "connected": true
+      }
+    },
+    {
+      "name": "cancel-focus",
+      "locale": "en",
+      "width": 390,
+      "scheme": "dark",
+      "focused": {
+        "tag": "BUTTON",
+        "label": "Expand or collapse the sidebar",
+        "connected": true
+      }
+    }
+  ],
+  "requests": [
+    {
+      "at": "2026-11-04T17:45:17.099Z",
+      "method": "POST",
+      "status": 201,
+      "input": {
+        "workspaceId": "1a17b01b-8913-4644-aa2f-a5bbeb343ca9",
+        "title": "Design review / 设计评审",
+        "members": [
+          {
+            "memberType": "bot",
+            "memberId": "7cc5af40-007b-40c5-ab5c-3bddeab262ce"
+          },
+          {
+            "memberType": "bot",
+            "memberId": "3ecf4ada-e486-4aa4-a620-315ecc755761"
+          }
+        ]
+      },
+      "result": {
+        "id": "d5a0e693-18bd-4ff0-9ef5-ad2812fc4abb",
+        "title": "Design review / 设计评审"
+      }
+    }
+  ],
+  "limits": [
+    "Local production build and isolated PostgreSQL only; no model calls, interception, browser suite, or production acceptance."
+  ],
+  "fixture": {
+    "workspaceId": "1a17b01b-8913-4644-aa2f-a5bbeb343ca9",
+    "ownerId": "s1Z6CegfWp1qsTfCfhmYLnCL8dzRIXGt",
+    "ownBots": [
+      "7cc5af40-007b-40c5-ab5c-3bddeab262ce",
+      "3ecf4ada-e486-4aa4-a620-315ecc755761",
+      "9e807c4b-6a99-4186-a83b-3977b5bab21c"
+    ],
+    "foreignBot": "d8443add-b947-41ec-939b-603fe40b97ee",
+    "otherWorkspaceBot": "af3f735e-0e60-4dc3-9d4d-e251db78941d"
+  },
+  "created": {
+    "id": "d5a0e693-18bd-4ff0-9ef5-ad2812fc4abb",
+    "status": 201,
+    "members": [
+      {
+        "memberType": "bot",
+        "memberId": "3ecf4ada-e486-4aa4-a620-315ecc755761"
+      },
+      {
+        "memberType": "bot",
+        "memberId": "7cc5af40-007b-40c5-ab5c-3bddeab262ce"
+      },
+      {
+        "memberType": "user",
+        "memberId": "s1Z6CegfWp1qsTfCfhmYLnCL8dzRIXGt"
+      }
+    ],
+    "readStatus": 200,
+    "peerReadStatus": 404,
+    "groupTurnCount": 0
+  },
+  "finishedAt": "2026-11-04T17:45:17.725Z"
+}
