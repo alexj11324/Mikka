@@ -23,7 +23,7 @@ mock.module('swr', {
   },
   namedExports: { unstable_serialize },
 })
-mock.module(new URL('./use-live-key.tsx', import.meta.url).href, {
+mock.module(new URL('../hooks/use-live-key.tsx', import.meta.url).href, {
   namedExports: { useLiveKey: (...args: unknown[]) => { live.push(args) } },
 })
 mock.module(new URL('../lib/computer/client.ts', import.meta.url).href, { namedExports: {
@@ -38,8 +38,8 @@ mock.module(new URL('../lib/computer/client.ts', import.meta.url).href, { namedE
     return () => { cleanups++; if (listener === receive) listener = undefined }
   },
 } })
-let useComputer: typeof import('./use-computer')['useComputer']
-let useViewerGrant: typeof import('./use-computer')['useViewerGrant']
+let useComputer: typeof import('../hooks/use-computer')['useComputer']
+let useViewerGrant: typeof import('../hooks/use-computer')['useViewerGrant']
 function Probe({ botId }: { botId?: string | null }) { useComputer(botId); return null }
 function Viewer({ enabled = true }: { enabled?: boolean }) { useViewerGrant('fixture-bot', 'control', enabled); return null }
 
@@ -51,7 +51,7 @@ before(async () => {
   Object.defineProperty(globalThis, 'document', { configurable: true, value: browser.document })
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   ;({ createRoot } = await import('react-dom/client'))
-  ;({ useComputer, useViewerGrant } = await import('./use-computer'))
+  ;({ useComputer, useViewerGrant } = await import('../hooks/use-computer'))
 })
 beforeEach(() => {
   state = { machine: 'sleeping', control: 'idle' }; listener = undefined; subscriptions = 0; cleanups = 0

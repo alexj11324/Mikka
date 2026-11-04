@@ -14,8 +14,8 @@ const originalFetch = globalThis.fetch, originalSocket = globalThis.WebSocket
 const originalMock = process.env.NEXT_PUBLIC_COMPUTER_MOCK
 let createRoot: typeof import('react-dom/client')['createRoot']
 let SWRConfig: typeof import('swr')['SWRConfig']
-let LiveProvider: typeof import('./use-live-key')['LiveProvider']
-let useComputer: typeof import('./use-computer')['useComputer']
+let LiveProvider: typeof import('../hooks/use-live-key')['LiveProvider']
+let useComputer: typeof import('../hooks/use-computer')['useComputer']
 let root: Root, container: HTMLDivElement
 let states: Map<string, ComputerState>, reads: string[], tickets: string[]
 let held: { botId: string; promise: Promise<void> } | null
@@ -61,8 +61,8 @@ before(async () => {
   // revalidation lifecycle runs; importing it in server mode would hide a bug.
   ;({ createRoot } = await import('react-dom/client'))
   ;({ SWRConfig } = await import('swr'))
-  ;({ LiveProvider } = await import('./use-live-key'))
-  ;({ useComputer } = await import('./use-computer'))
+  ;({ LiveProvider } = await import('../hooks/use-live-key'))
+  ;({ useComputer } = await import('../hooks/use-computer'))
 })
 
 beforeEach(() => {
