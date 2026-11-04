@@ -11,6 +11,9 @@ import type { DecisionExecution, invokeDecision } from './decide'
 import { handleGroupDecisionReplay } from './group-decision-replay-api'
 import { hostedBillingScope } from '@/lib/abuse/context'
 import { GROUP_BASELINE_VERSION, GROUP_POLICY_VERSION } from './group-decision-policy'
+import { createGroupJudgment } from './group-judgment'
+import { GroupJudgmentPendingError } from './group-correction'
+import { overrideDeploymentSwitch } from '../deployment-switches'
 
 const target = disposableDatabase() ? process.env.E2E_DATABASE_URL : undefined
 test('PG: scoped decision traces, exact event counting, human feedback, revoked memberships and privacy', { skip: !target }, async t => {
@@ -113,6 +116,59 @@ test('PG: scoped decision traces, exact event counting, human feedback, revoked 
   assert.equal(bounded.decisions.length,64);assert.equal(bounded.decisionsOmitted,7)
   const limited=((await handleGroupDecisionQuality(pool,directory,req)).body as any).turns.find((turn:any)=>turn.messageId===failedMessage)
   assert.equal(limited.decisionCost.omittedCalls,7);assert.equal(limited.decisionCostUsd,null)
+  await t.test('live rollback freezes each routing attempt and retains failed candidate receipts across a baseline retry',async()=>{
+    const policyMessage=randomUUID()
+    await pool.query(`INSERT INTO conversation_messages (id,"conversationId",position,"authorType","authorId",body) VALUES ($1,$2,101,'user','owner','private policy fixture')`,[policyMessage,group])
+    await pool.query(`INSERT INTO group_turns ("messageId","conversationId","userId") VALUES ($1,$2,'owner')`,[policyMessage,group])
+    const policyMembers=[{id:member,name:'UI',description:'private role fixture'}]
+    const readTrace=async()=>(await pool.query('SELECT trace FROM group_turns WHERE "messageId"=$1',[policyMessage])).rows[0].trace
+    let calls=0
+    const fakeProvider:typeof invokeDecision=async(_purpose,input,questions)=>{
+      calls++
+      assert.ok(typeof input!=='string');assert.equal(questions.length,1)
+      const expected=calls<=2?GROUP_POLICY_VERSION:GROUP_BASELINE_VERSION
+      assert.equal(JSON.parse(input.text).policyVersion,expected)
+      assert.equal((await readTrace()).policyVersion,expected,'the chosen version is persisted before the provider boundary')
+      if(calls===1)overrideDeploymentSwitch('groupContribution',false)
+      if(calls===3)overrideDeploymentSwitch('groupContribution',true)
+      const name=questions[0].name
+      const value=calls===1?'reply_useful_answer':calls===2?'uncertain':member
+      return {answers:new Map([[name,{name,type:'choice' as const,choice:value}]]),execution:{...receipt,executionId:randomUUID(),providerGenerationId:`policy-fixture-${calls}`}}
+    }
+    const judgment=createGroupJudgment(fakeProvider)
+    const retain=async(steps:Parameters<typeof recordGroupDecisionSteps>[2],version?:typeof GROUP_POLICY_VERSION|typeof GROUP_BASELINE_VERSION)=>{
+      await recordGroupDecisionSteps(pool,policyMessage,steps,undefined,version)
+    }
+    try {
+      overrideDeploymentSwitch('groupContribution',false)
+      await initializeGroupDecisionTrace(pool,policyMessage,policyMembers,[])
+      assert.equal((await readTrace()).policyVersion,GROUP_BASELINE_VERSION)
+      overrideDeploymentSwitch('groupContribution',true)
+      let failedJudgment:GroupJudgmentPendingError|undefined
+      await assert.rejects(judgment.route({text:'private policy fixture',mentions:[]},policyMembers,null,[],retain),(error:unknown)=>{
+        assert.ok(error instanceof GroupJudgmentPendingError)
+        failedJudgment=error
+        assert.equal(error.decisionFailure,'uncertain')
+        return true
+      })
+      assert.ok(failedJudgment)
+      await recordGroupDecisionSteps(pool,policyMessage,failedJudgment.decisions,failedJudgment.decisionFailure)
+      const failed=await readTrace()
+      assert.equal(failed.policyVersion,GROUP_POLICY_VERSION)
+      assert.deepEqual(failed.decisions.map((step:any)=>step.policyVersion),[GROUP_POLICY_VERSION,GROUP_POLICY_VERSION])
+      assert.equal(failed.decisions[1].status,'invalid_decision')
+      await initializeGroupDecisionTrace(pool,policyMessage,policyMembers,[])
+      const baseline=await judgment.route({text:'private retry fixture',mentions:[]},policyMembers,null,[],retain)
+      await recordGroupDecisionRoute(pool,policyMessage,baseline)
+      const recovered=await readTrace()
+      assert.equal(calls,3);assert.equal(recovered.policyVersion,GROUP_BASELINE_VERSION)
+      assert.deepEqual(recovered.decisions.map((step:any)=>step.policyVersion),[GROUP_POLICY_VERSION,GROUP_POLICY_VERSION,GROUP_BASELINE_VERSION])
+      assert.equal(new Set(recovered.decisions.map((step:any)=>step.receipt.providerGenerationId)).size,3)
+      assert.equal(recovered.execution.providerGenerationId,'policy-fixture-3')
+      assert.ok(!JSON.stringify(recovered).includes('private policy fixture'))
+      assert.ok(!JSON.stringify(recovered).includes('private role fixture'))
+    } finally { overrideDeploymentSwitch('groupContribution',undefined) }
+  })
   const body = JSON.stringify({ messageId: message, kind: 'wrong_member', targetId: member })
   for (let attempt = 0; attempt < 2; attempt++) assert.equal((await handleGroupDecisionQuality(pool, directory, { ...req, method: 'POST', body })).status, 201)
   assert.equal((await pool.query('SELECT count(*)::int n FROM group_decision_feedback')).rows[0].n, 1)

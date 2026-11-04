@@ -1,12 +1,16 @@
+import { deploymentSwitch } from '../deployment-switches'
+
 /** Versioned prompts, changed by reviewed code releases only. Feedback never
- * rewrites these. The explicit legacy selection is an incident rollback. */
+ * rewrites these. The deployment kill flag selects the incident baseline;
+ * explicit host-selected replay versions bypass live deployment settings. */
 export const GROUP_POLICY_VERSION = 'group-contribution-v1' as const
 export const GROUP_BASELINE_VERSION = 'group-route-v0' as const
 export type GroupPolicyVersion = typeof GROUP_POLICY_VERSION | typeof GROUP_BASELINE_VERSION
 
-export function getGroupDecisionPolicy(value = process.env.MIKKA_GROUP_DECISION_POLICY) {
+export function getGroupDecisionPolicy(value?: string) {
   if (value && value !== GROUP_POLICY_VERSION && value !== GROUP_BASELINE_VERSION) throw new Error('unknown_group_decision_policy')
-  const version: GroupPolicyVersion = value === GROUP_BASELINE_VERSION ? GROUP_BASELINE_VERSION : GROUP_POLICY_VERSION
+  const version: GroupPolicyVersion = value === GROUP_BASELINE_VERSION ? GROUP_BASELINE_VERSION : value === GROUP_POLICY_VERSION ? GROUP_POLICY_VERSION
+    : deploymentSwitch('groupContribution') ? GROUP_POLICY_VERSION : GROUP_BASELINE_VERSION
   return {
     version,
     instructions: version === GROUP_BASELINE_VERSION
