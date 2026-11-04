@@ -4,8 +4,8 @@ import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 export const TARGET = Object.freeze({
-  revision: '5f85c458893868b721e6ab5a3a4f60a91a5905d1',
-  deployment: 'dpl_A5g2M3b3yGTXgc7i1d4nGGmhbj2g',
+  revision: 'aa50444a0b5012d2d35ca730c3ca722c0057d596',
+  deployment: 'dpl_3w4SnCqaoFhayN8QCU6UGc4vuARw',
 })
 const ORIGIN = 'https://app.aspectlylabs.com'
 const REPOSITORY = 'alexj11324/Mikka'

@@ -1,54 +1,45 @@
-name: Temporary group policy preflight
+name: Temporary read-only runtime capabilities
 on:
   push:
     branches: [acceptance/proactive-1157-1163]
     paths:
       - '.github/workflows/proactive-acceptance.yml'
-      - 'scripts/ops/group-policy-preflight.mjs'
-      - 'scripts/ops/group-policy-preflight.test.mjs'
-      - 'scripts/ops/run-proactive-acceptance.mjs'
-      - 'scripts/ops/owner-mcp-boundaries.mjs'
+      - 'scripts/ops/subscription-inventory.mjs'
+      - 'scripts/ops/subscription-inventory.test.mjs'
+      - 'scripts/ops/runtime-capabilities.mjs'
+      - 'scripts/ops/runtime-capabilities.test.mjs'
 permissions:
   contents: read
 concurrency:
   group: proactive-production-acceptance-once
   cancel-in-progress: false
 jobs:
-  candidate-preflight:
-    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/acceptance/proactive-1157-1163'
+  inventory:
+    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/acceptance/proactive-1157-1163' && github.event_name == 'push'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 6
     permissions:
       contents: read
       id-token: write
-    defaults:
-      run:
-        working-directory: source
-    env:
-      GROUP_REPLAY_ORIGIN: https://app.aspectlylabs.com
-      GROUP_REPLAY_DEPLOYMENT: dpl_4hjwCkNCz8TNMYsmK3zbgKHCXAFe
-      GROUP_REPLAY_REVISION: aee3b8d23fc1431b4c0f6c98d9852d1402bc723e
-      GROUP_POLICY_PREFLIGHT_OUTPUT: ${{ github.workspace }}/group-policy-preflight-sanitized/results.json
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           path: driver
           persist-credentials: false
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: ${{ env.GROUP_REPLAY_REVISION }}
+          ref: aa50444a0b5012d2d35ca730c3ca722c0057d596
           path: source
           persist-credentials: false
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24
-      - name: Verify the reviewed runner without credentials
-        working-directory: driver/scripts/ops
-        run: node --test group-policy-preflight.test.mjs
-      - name: Install fixed source dependencies before receiving credentials
-        run: npm exec --yes --package pnpm@10.34.3 -- pnpm install --frozen-lockfile --filter '!@mikka/mobile' --ignore-scripts
+      - name: Run offline capability contracts before receiving credentials
+        run: node --test driver/scripts/ops/subscription-inventory.test.mjs driver/scripts/ops/runtime-capabilities.test.mjs
+      - name: Verify immutable source and execution scope before receiving credentials
+        run: node --experimental-strip-types driver/scripts/ops/subscription-inventory.mjs --verify-source
       - name: Read the existing Smoke email only
-        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
         with:
           method: oidc
           identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
@@ -60,7 +51,7 @@ jobs:
           recursive: false
           include-imports: false
       - name: Read the existing Smoke password only
-        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
         with:
           method: oidc
           identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
@@ -71,13 +62,13 @@ jobs:
           secret-name: SMOKE_OWNER_PASSWORD
           recursive: false
           include-imports: false
-      - name: Compare fixed baseline and candidate through the normal owner API once
-        run: node --import tsx ../driver/scripts/ops/group-policy-preflight.mjs
-      - name: Upload sanitized evidence only
+      - name: Read existing GitHub and device capabilities, then sign out
+        run: node --experimental-strip-types driver/scripts/ops/runtime-capabilities.mjs
+      - name: Upload sanitized capability inventory only
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: group-policy-preflight-${{ github.run_id }}
-          path: group-policy-preflight-sanitized/results.json
+          name: runtime-capabilities-${{ github.run_id }}
+          path: runtime-capabilities-sanitized/results.json
           if-no-files-found: error
           retention-days: 7
