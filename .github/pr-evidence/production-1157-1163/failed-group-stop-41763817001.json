@@ -1,0 +1,196 @@
+{
+  "schemaVersion": 1,
+  "status": "passed",
+  "scope": "stop-one-known-failed-core-group",
+  "revision": "7b212367026f090907f724b618743ae63f7fa68a",
+  "deploymentId": "dpl_6ECwt2WNzdho8NLMJMZvLCb2eZVw",
+  "conversationId": "61da4558-76da-4d87-b02b-1bba6748bf34",
+  "messageId": "35f1590d-f8b0-4696-801b-6773734c7d2b",
+  "failedCore": {
+    "workflowRunId": "41762211922",
+    "revision": "8c94364458632edb2964e54f0a478bb70fedbbd5",
+    "deploymentId": "dpl_EoqgaeT54ZVwBTLgstoR7JrGamgC"
+  },
+  "workspaceId": "0f877068-66a0-4893-8801-9a14eb3116b3",
+  "requesterId": "cL1NXe1mr7WuIS8xWhU37v0p7kNoUMY3",
+  "botIds": [
+    "1cf52051-c7a4-4777-8eac-b16e6cbae050",
+    "0d65493b-0d2d-402c-8509-d0582a697082",
+    "d6304047-f1aa-49b6-b7ea-55a98a9c5ba0"
+  ],
+  "versions": [
+    {
+      "phase": "before",
+      "matched": true,
+      "build": "dpl_6ECwt2WNzdho8NLMJMZvLCb2eZVw"
+    },
+    {
+      "phase": "before-stop",
+      "matched": true,
+      "build": "dpl_6ECwt2WNzdho8NLMJMZvLCb2eZVw"
+    },
+    {
+      "phase": "after",
+      "matched": true,
+      "build": "dpl_6ECwt2WNzdho8NLMJMZvLCb2eZVw"
+    }
+  ],
+  "before": {
+    "turnCount": 1,
+    "feedbackIsGroundTruth": false,
+    "costScope": "primary-routing-decision-api",
+    "turns": [
+      {
+        "messageId": "35f1590d-f8b0-4696-801b-6773734c7d2b",
+        "status": "failed",
+        "errorType": "string",
+        "errorCode": "group_judgment_pending",
+        "decisionCostUsd": null,
+        "feedbackCount": 0,
+        "trace": {
+          "type": "object",
+          "fields": {
+            "schemaVersion": "number",
+            "policyVersion": "string",
+            "contextMessageIds": "array",
+            "memberVersion": "string",
+            "members": "array",
+            "purpose": "string",
+            "action": "null",
+            "reason": "null",
+            "responders": "array",
+            "execution": "null",
+            "decisionLatencyMs": "null",
+            "startedAt": "string",
+            "finishedAt": "string",
+            "taskFinishedAt": "null",
+            "events": "array",
+            "status": "string"
+          },
+          "unknownFieldCount": 0,
+          "schemaVersion": 1,
+          "policyVersion": "group-contribution-v1",
+          "status": "blocked",
+          "action": null,
+          "responderIds": [],
+          "unknownResponderCount": 0,
+          "memberCount": 3,
+          "contextMessageCount": 0,
+          "eventCount": 0,
+          "eventCounts": {
+            "wake": 0,
+            "generate": 0,
+            "silent": 0,
+            "publish": 0,
+            "private_publish": 0,
+            "delegate": 0,
+            "task_result": 0
+          },
+          "unknownEventCount": 0,
+          "executionType": "null",
+          "receipt": null,
+          "decisionLatencyMs": null
+        }
+      }
+    ]
+  },
+  "after": {
+    "turnCount": 1,
+    "feedbackIsGroundTruth": false,
+    "costScope": "primary-routing-decision-api",
+    "turns": [
+      {
+        "messageId": "35f1590d-f8b0-4696-801b-6773734c7d2b",
+        "status": "failed",
+        "errorType": "string",
+        "errorCode": "stopped",
+        "decisionCostUsd": null,
+        "feedbackCount": 1,
+        "trace": {
+          "type": "object",
+          "fields": {
+            "schemaVersion": "number",
+            "policyVersion": "string",
+            "contextMessageIds": "array",
+            "memberVersion": "string",
+            "members": "array",
+            "purpose": "string",
+            "action": "null",
+            "reason": "null",
+            "responders": "array",
+            "execution": "null",
+            "decisionLatencyMs": "null",
+            "startedAt": "string",
+            "finishedAt": "string",
+            "taskFinishedAt": "null",
+            "events": "array",
+            "status": "string"
+          },
+          "unknownFieldCount": 0,
+          "schemaVersion": 1,
+          "policyVersion": "group-contribution-v1",
+          "status": "stopped",
+          "action": null,
+          "responderIds": [],
+          "unknownResponderCount": 0,
+          "memberCount": 3,
+          "contextMessageCount": 0,
+          "eventCount": 0,
+          "eventCounts": {
+            "wake": 0,
+            "generate": 0,
+            "silent": 0,
+            "publish": 0,
+            "private_publish": 0,
+            "delegate": 0,
+            "task_result": 0
+          },
+          "unknownEventCount": 0,
+          "executionType": "null",
+          "receipt": null,
+          "decisionLatencyMs": null
+        }
+      }
+    ]
+  },
+  "errors": [],
+  "http": {
+    "login": 200,
+    "stop": 200,
+    "logout": 200
+  },
+  "checks": {
+    "normalOwnerSession": true,
+    "exactFixtureMetadata": true,
+    "exactMembers": true,
+    "onlyExpectedTurn": true
+  },
+  "stop": {
+    "attempted": true,
+    "acknowledged": true,
+    "reportedStoppedTurns": 1,
+    "recorded": true,
+    "noPendingRetry": true,
+    "executionStopConfirmed": false
+  },
+  "cleanup": {
+    "logoutAttempted": true,
+    "logoutAcknowledged": true
+  },
+  "counts": {
+    "get": 9,
+    "post": 3
+  },
+  "limitations": {
+    "rawProviderAnswersAvailable": false,
+    "absentReceiptDoesNotProveNoInvocation": true,
+    "settledCostMayBeUnavailable": true,
+    "executionStopNotIndependentlyConfirmed": true
+  },
+  "generationRequestsSent": 0,
+  "replayRequestsSent": 0,
+  "messageHistoryRequestsSent": 0,
+  "providerCredentialsRead": false,
+  "requiresAdditionalTaskCleanup": false,
+  "elapsedMs": 3295
+}

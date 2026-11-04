@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "workflowRunId": 41763817001,
+  "workflowJobId": 126357392120,
+  "workflowHead": "99a33b5a503454b4d706b39e59826d7e57d7f8e3",
+  "artifactId": 13290868331,
+  "artifactZipSha256": "4ef38c453a50211446f0d1e3e1c963635aab94d507fb24a8f5f4e9540f9e7e55",
+  "jsonSha256": "e708d6d8eb496ebd81dc91ce053b635c3297b145470b6b0e6439f90d6dae821c",
+  "jsonCharacters": 5513,
+  "sourceRevision": "7b212367026f090907f724b618743ae63f7fa68a",
+  "deploymentId": "dpl_6ECwt2WNzdho8NLMJMZvLCb2eZVw",
+  "validation": {
+    "zipDigestMatched": true,
+    "oneJsonEntry": true,
+    "exactJsonBytesPreserved": true
+  },
+  "scope": "Normal owner stop of one synthetic group left pending by failed production run 41762211922",
+  "limitations": [
+    "No group-message generation or replay requested by the stop diagnostic.",
+    "Original missing receipts do not prove zero previous provider invocations.",
+    "Stopping a turn is not independent proof that an already-running provider execution stopped.",
+    "No delegated task was present in the exact original turn."
+  ]
+}
