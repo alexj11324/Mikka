@@ -52,22 +52,28 @@ agents).
 
 ## The acceptance page
 
-Acceptance is no longer a card inside the task page. It is a **dedicated
-acceptance page** that opens on its own, from the task's 交给你 comment, the
-inbox or the board.
+Acceptance is no longer a card or a tab inside the task. It opens the existing
+**Artifact window** (R-56, `components/artifacts/artifact-window.tsx`), the same
+one other Artifacts already use: the acceptance report on the left and the
+thread that did the work on the right.
 
-- It is a **rendered report document**, HTML or Markdown, written by the
-  implementing agent and checked by review, in the spirit of a PR
-  description's `## Verification` section.
-- **Everything is on the one page, inline:** each acceptance criterion with its
-  evidence directly below it (screenshots shown as images, recordings playable
-  in place, test and check output as text blocks). There are no buttons or chips
-  that must be clicked to see evidence.
-- 未验证 items are listed first, with their reasons.
-- The review findings and how each was resolved, plus the change summary
-  (files, +/−) with a link to the PR diff.
-- One primary action, 查看 PR 并合并, plus 要求修改 (with a field for what to
-  change, optionally per criterion).
+- **Left: the acceptance report, an Artifact.** It is an HTML or Markdown
+  document that the implementing agent writes and review checks, in the spirit
+  of a PR description's `## Verification` section. Everything is inline on that
+  one page: each acceptance criterion with its evidence directly below it
+  (screenshots shown as images, recordings playable in place, test and check
+  output as text blocks). No button or chip has to be clicked to see evidence.
+  未验证 items come first, with their reasons; then the review findings and how
+  each was resolved, and the change summary (files, +/−) linking to the PR diff.
+- **Right: the thread's conversation.** To ask for a change, the person just
+  says it there, to the agent session that did the work. The change lands on the
+  same PR and the report updates.
+- **Top: the decision bar.** 查看 PR 并合并 is the one primary action; 要求修改
+  focuses the conversation on the right.
+- **Entry points.** The task page has a 验收 button (in the header and on the
+  交给你 comment, whose body is a one-line summary such as 「4 项已验证，1 项未验证」).
+  The inbox's PR 待审 item and the board open the same window.
 
-The task page's 交给你 comment shows only a one-line summary (「4 项已验证，1 项未验证」)
-and 打开验收页.
+This replaces the rule in R-56 that Factory acceptance is the 「验收」 tab of the
+thread (decisions.md, 2026-10-30; Figma `358:8511`). Factory acceptance now
+works the way every other Artifact's acceptance already does.
