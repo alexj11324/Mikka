@@ -135,7 +135,7 @@ test('real PG: question receipts preserve one execution without opening a repair
         ['question', `UPDATE factory_events SET result=jsonb_set(result,'{questionId}',to_jsonb($3::text)) WHERE "taskId"=$1 AND "eventId"=$2`, [child.task.id, child.eventId, randomUUID()]],
         ['epoch', `UPDATE factory_attempts SET output=jsonb_set(output,'{requestEpoch}',to_jsonb($2::text)) WHERE id=$1`, [child.task.attemptId, randomUUID()]],
         ['adjacency', `UPDATE factory_attempts SET position=position+10 WHERE id=$1`, [child.task.attemptId]],
-        ['parent', `UPDATE agent_runs SET "continuesRunId"=NULL WHERE id=$1`, [child.runId]],
+        ['conflicting parent', `UPDATE agent_runs SET "continuesRunId"=$2 WHERE id=$1`, [child.runId, child.runId]],
         ['workspace', `UPDATE computer_run_bindings SET "workspaceId"=$2,"botId"=$3 WHERE "runId"=$1`, [child.runId, otherWorkspace, otherBot]],
         ['missing cloud binding', `DELETE FROM computer_run_bindings WHERE "runId"=$1`, [child.runId]],
         ['definition', `UPDATE agent_runs SET "agentDefinition"=jsonb_set("agentDefinition",'{definitionDigest}','"changed"') WHERE id=$1`, [child.runId]],
@@ -175,6 +175,7 @@ test('real PG: question receipts preserve one execution without opening a repair
       assert.equal(edge?.sourceRunId, first.runId, 'command attribution remains the direct predecessor, never recursive origin')
       await transaction(tx => checkFactoryRepairBudget(tx, recovered.task))
       for (const [sql, args] of [
+        ['UPDATE agent_runs SET "continuesRunId"=NULL WHERE id=$1', [recovered.runId]],
         [`DELETE FROM factory_events WHERE "taskId"=$1 AND "eventId"=$2`, [recovered.task.id, recovered.eventId]],
         [`UPDATE factory_events SET request=jsonb_set(request,'{input,expectedFailedRunId}',to_jsonb($3::text)) WHERE "taskId"=$1 AND "eventId"=$2`, [recovered.task.id, recovered.eventId, f.originRunId]],
         [`UPDATE agent_runs SET "questionContinuation"=jsonb_set("questionContinuation",'{originSessionId}','"wrong"') WHERE id=$1`, [first.runId]],
