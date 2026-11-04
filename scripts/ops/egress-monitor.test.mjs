@@ -99,3 +99,50 @@ test('real collector contract combines closed daily usage and current-day hourly
   const aged=await run({vercelToken:'v',neonToken:'n',now:now+4*3600000,fetchImpl})
   assert.ok(aged.reasons.includes('neon_usage_stale'))
 })
+
+test('delayed equal-value hourly samples retain their provider boundaries in PostHog', async () => {
+  const raw = usage(79932425)
+  const buckets = raw.projects[0].periods[0].consumption
+  // The latest bucket is not the last array item, and equal bytes cannot identify it.
+  buckets.push({ ...buckets[0], timeframe_start: '2026-11-03T10:56:54Z', timeframe_end: '2026-11-03T11:00:00Z' })
+  const capturedAt = now + 3600000
+  const report = await run({ now: capturedAt, providerOnly: true, neonToken: 'fixture-private-key',
+    fetchImpl: async () => Response.json(raw) })
+  assert.equal(report.observedAt, '2026-11-03T13:15:00.000Z')
+  assert.equal(report.neon.reportedThrough, '2026-11-03T12:00:00.000Z')
+  assert.equal(report.neon.latestBucketStart, '2026-11-03T11:00:00.000Z')
+  assert.equal(report.neon.latestBucketEnd, '2026-11-03T12:00:00.000Z')
+  let payload
+  await publish(report, 'public-ingestion-token', async (_url, options) => {
+    payload = JSON.parse(options.body); return Response.json({})
+  })
+  const event = payload.batch[0], properties = event.properties
+  assert.equal(event.timestamp, report.observedAt, 'capture time remains a separate fact')
+  assert.equal(properties.latest_hour_bytes, 79932425)
+  assert.equal(properties.latest_hour_start, '2026-11-03T11:00:00.000Z')
+  assert.equal(properties.latest_hour_end, '2026-11-03T12:00:00.000Z')
+  assert.equal(properties.provider_healthy, 1)
+  assert.equal(properties.period_bytes, report.neon.periodBytes)
+  assert.equal(properties.daily_budget_ratio, report.neon.todayBytes / report.neon.dailyBudgetBytes)
+  assert.ok(!JSON.stringify(payload).includes('fixture-private-key'))
+})
+
+test('missing or stale provider data does not acquire a fabricated current-hour label', async () => {
+  const reports = [
+    await run({ now, providerOnly: true }),
+    await run({ now: now + 4 * 3600000, providerOnly: true, neonToken: 'fixture-private-key',
+      fetchImpl: async () => Response.json(usage()) }),
+  ]
+  for (const [index, report] of reports.entries()) {
+    let payload
+    await publish(report, 'public-ingestion-token', async (_url, options) => {
+      payload = JSON.parse(options.body); return Response.json({})
+    })
+    const properties = payload.batch[0].properties
+    assert.equal(properties.collection_healthy, 0)
+    assert.equal(properties.provider_healthy, 0)
+    assert.equal(properties.latest_hour_start, index ? '2026-11-03T11:00:00.000Z' : undefined)
+    assert.equal(properties.latest_hour_end, index ? '2026-11-03T12:00:00.000Z' : undefined)
+    assert.equal(properties.latest_hour_bytes, index ? 1000 : undefined)
+  }
+})
