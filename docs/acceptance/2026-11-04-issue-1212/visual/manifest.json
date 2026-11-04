@@ -1,0 +1,92 @@
+{
+  "commit": "a4f64527970e124b9e4d597fd528baa3c6c34c78",
+  "environmentId": "local-8c536fe1-4576-42e5-b764-960bc89ad599",
+  "origin": "http://localhost:3000",
+  "fixture": {
+    "issueId": "5f43fadd-9e5e-4237-92cf-6522f4137b61",
+    "sourceId": "4173114e-db52-4071-ae3b-d2ba72f434fd",
+    "taskId": "56e0ebf7-8e67-43f6-bc37-354de9dac4c8",
+    "attemptId": "0ecf4efb-1717-4ce2-8f38-d9a37a1fdd0b",
+    "candidateId": "d580b71b-7b6e-4131-8a6a-45ade5dbe3e1",
+    "producerId": "5c28c412-702d-46ec-bf00-dcf2583da4e7",
+    "versionId": "6281b3da-2a1d-4eb9-af12-0b2e848500c9"
+  },
+  "liveWorkspaceId": "5fd7c331-a348-4682-8b2e-b4aa0a120258",
+  "startedAt": "2026-11-04T14:01:42.748Z",
+  "purpose": "Screenshot-only UI inspection; no browser test suite or model execution",
+  "captures": [
+    {
+      "name": "zh-factory-live-1440-light.png",
+      "locale": "zh-CN",
+      "width": 1440,
+      "height": 960,
+      "scheme": "light",
+      "sha256": "e200364c4f016f2f4ede786f8bd0861ec6be95d7f81a801709a8a199aca7bf24",
+      "visibleText": "搜索 Bot、对话、群聊、任务、线程和项目\nCtrl\nK\nT\nTest owner的工作区\nMikka\nCoordinator\nToggle Sidebar\n看板\nTEST-1220\nFactory live · 实时验收通知\n已自动保存\n已自动保存\n任务标题\n\nLocal visual fixture / 本地视觉检查：Factory live subscriptions, owner/workspace scope, one refresh per key.\n\n添加子任务\nFactory 验收\nFactory 验收\n\nIndependent review failed · 独立审查失败\n\n审阅未通过\n活动\n创建了任务\n11/4 14:01\n评论内容\n线程\n审阅未通过\n对话\n验收\n提交\n8f41808\nalexj11324/Mikka\n环境\nlocal-visual-fixture\n独立结果\n审阅\n需要修改\n独立审阅\n8f41808\n重新审阅"
+    },
+    {
+      "name": "zh-factory-live-1440-dark.png",
+      "locale": "zh-CN",
+      "width": 1440,
+      "height": 960,
+      "scheme": "dark",
+      "sha256": "cc1e9b7de8ed14fb2fa340b4637d5d57f0015e08cc7f42e51354c7bc61fd8234",
+      "visibleText": "搜索 Bot、对话、群聊、任务、线程和项目\nCtrl\nK\nT\nTest owner的工作区\nMikka\nCoordinator\nToggle Sidebar\n看板\nTEST-1220\nFactory live · 实时验收通知\n已自动保存\n已自动保存\n任务标题\n\nLocal visual fixture / 本地视觉检查：Factory live subscriptions, owner/workspace scope, one refresh per key.\n\n添加子任务\nFactory 验收\nFactory 验收\n\nIndependent review failed · 独立审查失败\n\n审阅未通过\n活动\n创建了任务\n11/4 14:01\n评论内容\n线程\n审阅未通过\n对话\n验收\n提交\n8f41808\nalexj11324/Mikka\n环境\nlocal-visual-fixture\n独立结果\n审阅\n需要修改\n独立审阅\n8f41808\n重新审阅"
+    },
+    {
+      "name": "zh-factory-live-390-light.png",
+      "locale": "zh-CN",
+      "width": 390,
+      "height": 844,
+      "scheme": "light",
+      "sha256": "2ba79a3a438e980c3ad4007b584b600742637a556c41b8676a8f41d3c9127922",
+      "visibleText": "Toggle Sidebar\nMore\nTEST-1220\n已自动保存\n已自动保存\n属性与任务关系\n任务标题\n\nLocal visual fixture / 本地视觉检查：Factory live subscriptions, owner/workspace scope, one refresh per key.\n\n添加子任务\nFactory 验收\nFactory 验收\n\nIndependent review failed · 独立审查失败\n\n审阅未通过\n活动\n创建了任务\n11/4 14:01\n评论内容\n线程\n审阅未通过\n对话\n验收\n提交\n8f41808\nalexj11324/Mikka\n环境\nlocal-visual-fixture\n独立结果\n审阅\n需要修改\n独立审阅\n8f41808\n重新审阅"
+    },
+    {
+      "name": "zh-factory-live-390-dark.png",
+      "locale": "zh-CN",
+      "width": 390,
+      "height": 844,
+      "scheme": "dark",
+      "sha256": "bc79a5ce7a3df8dd6c8bfcf1a97a4df2908a55f4b4fb406c29a6e12b71bad858",
+      "visibleText": "Toggle Sidebar\nMore\nTEST-1220\n已自动保存\n已自动保存\n属性与任务关系\n任务标题\n\nLocal visual fixture / 本地视觉检查：Factory live subscriptions, owner/workspace scope, one refresh per key.\n\n添加子任务\nFactory 验收\nFactory 验收\n\nIndependent review failed · 独立审查失败\n\n审阅未通过\n活动\n创建了任务\n11/4 14:01\n评论内容\n线程\n审阅未通过\n对话\n验收\n提交\n8f41808\nalexj11324/Mikka\n环境\nlocal-visual-fixture\n独立结果\n审阅\n需要修改\n独立审阅\n8f41808\n重新审阅"
+    },
+    {
+      "name": "en-factory-live-1440-light.png",
+      "locale": "en",
+      "width": 1440,
+      "height": 960,
+      "scheme": "light",
+      "sha256": "b4cf5a4313e4d8ff6f75a9e2b3256c9351865707e640c78499931565431d2539",
+      "visibleText": "Search bots, chats, groups, tasks, threads and projects\nCtrl\nK\nT\nTest owner的工作区\nMikka\nCoordinator\nToggle Sidebar\nBoard\nTEST-1220\nFactory live · 实时验收通知\nAutosaved\nAutosaved\nTask title\n\nLocal visual fixture / 本地视觉检查：Factory live subscriptions, owner/workspace scope, one refresh per key.\n\nAdd subtask\nFactory acceptance\nFactory acceptance\n\nIndependent review failed · 独立审查失败\n\nReview not passed\nActivity\nCreated the task\n11/4, 02:01 PM\nComment\nThreads\nReview not passed\nChat\nAcceptance\nCommit\n8f41808\nalexj11324/Mikka\nEnvironment\nlocal-visual-fixture\nIndependent results\nReview\nChanges needed\nIndependent review\n8f41808\nRetry review"
+    },
+    {
+      "name": "en-factory-live-1440-dark.png",
+      "locale": "en",
+      "width": 1440,
+      "height": 960,
+      "scheme": "dark",
+      "sha256": "f4034dd3e465e6788d6ca53fca0905ea84925fe83eb358a404207b83c1dadb01",
+      "visibleText": "Search bots, chats, groups, tasks, threads and projects\nCtrl\nK\nT\nTest owner的工作区\nMikka\nCoordinator\nToggle Sidebar\nBoard\nTEST-1220\nFactory live · 实时验收通知\nAutosaved\nAutosaved\nTask title\n\nLocal visual fixture / 本地视觉检查：Factory live subscriptions, owner/workspace scope, one refresh per key.\n\nAdd subtask\nFactory acceptance\nFactory acceptance\n\nIndependent review failed · 独立审查失败\n\nReview not passed\nActivity\nCreated the task\n11/4, 02:01 PM\nComment\nThreads\nReview not passed\nChat\nAcceptance\nCommit\n8f41808\nalexj11324/Mikka\nEnvironment\nlocal-visual-fixture\nIndependent results\nReview\nChanges needed\nIndependent review\n8f41808\nRetry review"
+    },
+    {
+      "name": "en-factory-live-390-light.png",
+      "locale": "en",
+      "width": 390,
+      "height": 844,
+      "scheme": "light",
+      "sha256": "bdc9d31151e44d322712f58366e55f415d16eba3acf5a1a44eb4e7039dea1fd4",
+      "visibleText": "Toggle Sidebar\nMore\nTEST-1220\nAutosaved\nAutosaved\nProperties and relations\nTask title\n\nLocal visual fixture / 本地视觉检查：Factory live subscriptions, owner/workspace scope, one refresh per key.\n\nAdd subtask\nFactory acceptance\nFactory acceptance\n\nIndependent review failed · 独立审查失败\n\nReview not passed\nActivity\nCreated the task\n11/4, 02:01 PM\nComment\nThreads\nReview not passed\nChat\nAcceptance\nCommit\n8f41808\nalexj11324/Mikka\nEnvironment\nlocal-visual-fixture\nIndependent results\nReview\nChanges needed\nIndependent review\n8f41808\nRetry review"
+    },
+    {
+      "name": "en-factory-live-390-dark.png",
+      "locale": "en",
+      "width": 390,
+      "height": 844,
+      "scheme": "dark",
+      "sha256": "294b03e6fa0ecd7a3b6b9d0e3e0fff14e4ae770d5516b4223f6cc0e51d3013ad",
+      "visibleText": "Toggle Sidebar\nMore\nTEST-1220\nAutosaved\nAutosaved\nProperties and relations\nTask title\n\nLocal visual fixture / 本地视觉检查：Factory live subscriptions, owner/workspace scope, one refresh per key.\n\nAdd subtask\nFactory acceptance\nFactory acceptance\n\nIndependent review failed · 独立审查失败\n\nReview not passed\nActivity\nCreated the task\n11/4, 02:01 PM\nComment\nThreads\nReview not passed\nChat\nAcceptance\nCommit\n8f41808\nalexj11324/Mikka\nEnvironment\nlocal-visual-fixture\nIndependent results\nReview\nChanges needed\nIndependent review\n8f41808\nRetry review"
+    }
+  ],
+  "finishedAt": "2026-11-04T14:01:47.205Z"
+}
