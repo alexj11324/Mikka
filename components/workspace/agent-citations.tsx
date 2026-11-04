@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useState, type ComponentProps } from 'react'
+import { createContext, useContext, useState, type ComponentProps, type ReactNode } from 'react'
 import useSWR from 'swr'
 import { Globe } from 'lucide-react'
 import { GitHubIcon } from '@/components/icons/brand-icons'
@@ -56,8 +56,16 @@ export function useAgentCitations() {
   return useContext(AgentCitationsContext)
 }
 
-/** A word joiner between a chip's icon and its title: a wrapping chip never leaves its icon alone at a line's end (R-15). */
-const CHIP_JOINER = '\u2060'
+/**
+ * A chip's icon and title. The icon and the title's first character are held together, so a chip that wraps with the
+ * sentence never leaves its icon alone at a line's end (R-15); the rest of the title wraps like words.
+ */
+function ChipHead({ icon, title }: { icon: ReactNode; title: string }) {
+  const [first = '', ...rest] = Array.from(title)
+  return <InlineCitationLabel>
+    <span data-slot="chip-head" className="whitespace-nowrap [&>[role=img]]:mr-1 [&>[role=img]]:inline-flex [&>[role=img]]:align-[-0.125em] [&>svg]:mr-1 [&>svg]:inline [&>svg]:align-[-0.125em]">{icon}{first}</span>{rest.join('')}
+  </InlineCitationLabel>
+}
 
 /** One empty value, so a chat with no web links keeps the same citations across renders. */
 const NO_PREVIEWS: LinkPreviews = {}
@@ -120,8 +128,7 @@ export function IssueCitation({ issue, onOpen }: { issue: IssueSource; onOpen: (
   const identifier = issue.identifier
   return <InlineCitation>
     <InlineCitationTrigger variant="object" aria-label={t('openIssue', { title: issue.title })} data-focus-id={issue.id} onClick={() => onOpen(issue.id)}>
-      <status.icon aria-hidden="true" className={cn('size-3.5 shrink-0', statusIconTints[status.tone])} />
-      <InlineCitationLabel>{CHIP_JOINER}{issue.title}</InlineCitationLabel>
+      <ChipHead icon={<status.icon aria-hidden="true" className={cn('size-3.5 shrink-0', statusIconTints[status.tone])} />} title={issue.title} />
     </InlineCitationTrigger>
     <InlineCitationContent>
       <InlineCitationBody>
@@ -172,10 +179,9 @@ export function RunCitation({ run }: { run: RunSource }) {
       aria-label={issue ? t('openThread', { name }) : t('runOf', { bot: run.agentName })}
       onClick={issue ? () => openThread(run.id) : undefined}
     >
-      <ThreadStatusIcon status={run.status} outcome={run.outcome} small accent dot={attention} />
-      <InlineCitationLabel>{CHIP_JOINER}{name}</InlineCitationLabel>
+      <ChipHead icon={<ThreadStatusIcon status={run.status} outcome={run.outcome} small accent dot={attention} />} title={name} />
       {/* Waiting for you or blocked: the dot, its colour and its word together (R-87); other states are in the hover card. */}
-      {attention && <span data-thread-attention={group} className={cn('ml-1 rounded-sm px-1 text-xs font-medium', group === 'blocked' ? 'bg-destructive/10 text-destructive' : 'bg-warning/15 text-warning-foreground')}>{tState(group)}</span>}
+      {attention && <span data-thread-attention={group} className={cn('ml-1 whitespace-nowrap rounded-sm px-1 text-xs font-medium', group === 'blocked' ? 'bg-destructive/10 text-destructive' : 'bg-warning/15 text-warning-foreground')}>{tState(group)}</span>}
     </InlineCitationTrigger>
     <InlineCitationContent>
       <InlineCitationBody>
