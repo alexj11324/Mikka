@@ -1,0 +1,123 @@
+
+> next-app@0.0.1 test:approved-writes /vercel/sandbox/mikka-pending-live
+> node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/operations/calendar-conditional.test.ts lib/operations/slack-conversation-read.test.ts lib/operations/write-planning-model.test.ts lib/operations/write-planning-ingress.test.ts lib/operations/model-write-tools.test.ts lib/operations/model-write-registry.test.ts lib/operations/ledger-run.test.ts lib/operations/write-feature.test.ts lib/operations/write-policy.test.ts lib/operations/write-judgment.test.ts lib/operations/write-policy-store.test.ts lib/operations/policy-authorization.test.ts lib/operations/write-policy-settings.test.ts lib/operations/write-preparation.test.ts lib/operations/write-discovery.test.ts lib/operations/write-http.test.ts lib/operations/write-provider.test.ts lib/operations/write-route.test.ts lib/operations/write-view.test.ts lib/operations/write-client.test.ts scripts/approved-write-actions.test.tsx lib/operations/slack-delivery.test.ts lib/operations/write-notice.test.ts lib/live/approval-cache.test.ts scripts/approved-write-actions.live.test.tsx
+
+✔ approval scope uses only the matching authenticated account personal workspace, never a team or another account (1.43059ms)
+✔ the actual infinite-cache key includes owner and session and retains pagination boundaries (1.950159ms)
+✔ single-result invalidation cannot alias another session, action or proposal (0.423036ms)
+✔ server read time keeps an expiry fixed across renders and a slow client clock (0.639246ms)
+✔ conditional calendar transport pins account and ETag and fences immediately before send (3.801618ms)
+✔ Calendar provider uses conditional proxy transport and never sends after revoked fence (281.046563ms)
+✔ ledger claims only the bound host run and keeps its attempt token distinct (5.929463ms)
+✔ tampered claimed run fails before invocation or provider execution (1.27542ms)
+(node:10421) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:10421) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ registered model tool binds host owner, bot, execution and native call scope (690.164497ms)
+✔ the default text-only route is not given effectful model tools (5.054976ms)
+✔ model selects content, host receives call identity and chooses authorization (3.779046ms)
+✔ disabled catalog exposes nothing and invalid or duplicate names fail closed (0.471984ms)
+✔ allow needs no review; ask checks existing approval; deny never approves (8.414536ms)
+✔ revocation, changed binding and wrong run cannot pass invocation (0.632125ms)
+✔ failed-run readback is explicit and cannot reserve, claim, invoke or settle another effect (1.519686ms)
+✔ Slack adapter fixes the documented endpoint and account; malformed and foreign responses fail closed (3.87554ms)
+✔ provider binds local Slack read contract and lets model-selected direct conversation pass (1.575187ms)
+✔ Slack provider executes the selected text once and rejects changed target before sending (8.392182ms)
+✔ Slack sends one account-pinned request with correlation metadata after the final authority fence (3.804383ms)
+✔ readback requires exact operation and approved payload metadata, follows the provider cursor, and never posts (0.753783ms)
+✔ missing metadata, unreadable history and old uncorrelated writes stay unknown (0.338049ms)
+✔ the product provider pins its proxy contract and checks the current owner connection before readback (4.497127ms)
+✔ availability uses only a no-store GET and rejects failed or malformed responses (23.396608ms)
+✔ disabled discovery is empty; another cookie owner response is never accepted under the current viewer (1.388906ms)
+✔ reads and decisions use the new endpoint with exact durable action identity and no caller-selected authority (1.801739ms)
+✔ a lost decision response is uncertain and is never retried by the client (1.460923ms)
+✔ microsecond keyset pages cover all three actions without overlap or status-filter loss (21.880438ms)
+✔ bad bindings and ambiguous intents become redacted attention items without poisoning the page (1.501763ms)
+✔ unresolved discovery reaches older pending actions without completed history and binds cursors to the filter (8.486653ms)
+✔ cursors cannot replace actor/session, escape shape limits or survive session expiry (7.357065ms)
+✔ registered HTTP list wiring authenticates, rejects authority fields and never constructs write services (63.54933ms)
+✔ personal writes ship on in every deployment scope without a Preview opt-in (1.09731ms)
+✔ only the kill switch closes admission; the old variable no longer decides (0.286821ms)
+✔ malformed requests fail before constructing an operation service (30.601207ms)
+✔ browser authority is checked before operation creation (0.987321ms)
+✔ session and infrastructure failures are sanitized unavailable outcomes, conflicts retain their code (5.092498ms)
+✔ session identity and durable IDs reach service; unknown stays unresolved on repeat (2.179272ms)
+✔ real HTTP envelope passes request signal/actor and preserves unconfirmed vs committed without diagnostics (1.018572ms)
+Write judgment fallback: allowed without a Decisions answer { action: 'send_email', tool: 'GMAIL_SEND_EMAIL' }
+✔ only a call the Decisions API judges destructive asks (0.991871ms)
+✔ an unavailable, refused or failed judgment shows no card: the agent's own call goes ahead, logged as a fallback (1.315417ms)
+✔ the one predicate sees the action, tool, MCP annotations and concrete arguments (1.256962ms)
+✔ a read-only hint is evidence for the Decisions API, never a rule that skips it (0.33957ms)
+✔ an approved-write result routes to the originating Bot with the actual provider object receipt (4.345721ms)
+✔ an early uncertain notice cannot deduplicate away a later verified result (0.474593ms)
+(node:10679) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:10679) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ authenticated HTTP submission reaches actual planner prompt through stored event projection (1885.987041ms)
+✔ anonymous or client-provided authority is rejected before storing images (2.238074ms)
+✔ text-only HTTP submission stays text in actual planner prompt (5.704176ms)
+✔ host-signed compaction retains original pixels after a text followup (2.706317ms)
+✔ actual preparePrompt compacts original HTTP image using the frozen planner model (69.584006ms)
+✔ write planning uses only the documented image and tool capable Gateway route (2.832642ms)
+✔ a synthetic prebuilt image message retains its image part in prompt projection (388.354039ms)
+✔ new write-enabled gateway runs select the documented planner without replacing subscriptions or unrelated runs (0.203553ms)
+✔ real text event reaches the prompt without requiring an image (2.799785ms)
+✔ settings are scoped, versioned, and acquire membership before commit (5.110408ms)
+✔ browser actions have no ask: the settings schema rejects it, allow and deny stay valid (0.878409ms)
+✔ policy is scoped to the host run and locks its head and execution (6.826943ms)
+✔ foreign scope, inactive run, revoked tool and corrupt policy fail closed (2.032409ms)
+✔ without the tool's metadata an unnamed action asks, denies take precedence, and allow requires every layer (2.420267ms)
+✔ workspace choice narrows the agent decision; absent workspace choice inherits (0.385931ms)
+✔ an unnamed action follows the tool's own default; explicit ask and deny still narrow (decision 2026-10-31) (0.200581ms)
+✔ browser metadata has no open APP transaction and same-intent replay reads original proposal (15.441986ms)
+✔ lost insert COMMIT reply is unknown; explicit same-intent recovery performs no new metadata or insert (2.686271ms)
+✔ session revocation or request abort during metadata never commits the proposal (3.541135ms)
+✔ concurrent identical intents share one inserted proposal; changed payload cannot replace it (5.637314ms)
+✔ append_notion_paragraph pins owner/account/target/version and rechecks before write (3.834524ms)
+✔ send_slack_message pins owner/account/target/version and rechecks before write (10.662361ms)
+✔ cancel_calendar_event pins owner/account/target/version and rechecks before write (2.563435ms)
+✔ Slack snapshots preserve supported conversation facts without deciding their meaning (0.636613ms)
+✔ Calendar snapshots pin ID and ETag while retaining event facts (0.485742ms)
+✔ native cancellation and Slack metadata read default closed without verified transports/contracts (0.738352ms)
+✔ Notion rechecks the approved target and owner connection at the SDK send boundary (0.886082ms)
+✔ public availability reports only the server gate as 200 no-store without runtime services (23.989212ms)
+✔ the explicit incident switch closes product POST without initializing runtime (1.863466ms)
+✔ production rollout delegates browser authority and durable IDs to the existing HTTP service (28.939298ms)
+✔ runtime load failure returns an unavailable response without diagnostics (0.860109ms)
+✔ owned approval view returns exact stored snapshot without approving, invoking or exposing ledger tokens (29.335921ms)
+✔ view rejects owner/session/action mismatch, ambiguous intents, tampering and mid-read expiry (12.512017ms)
+✔ HTTP view uses authenticated actor only and preserves strict browser envelope (25.625194ms)
+(node:10866) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:10866) DeprecationWarning: mock.module(): options.defaultExport is deprecated. Use options.exports.default instead.
+(node:10866) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ a healthy mounted approval UI makes no ten-second availability, list or result poll (11063.469381ms)
+✔ the real infinite cache invalidates all loaded pages, and proposal events refresh capability hints (501.770712ms)
+✔ only a changed PostHog hint invalidates server capability; repeated callbacks make no reads (649.367907ms)
+✔ an exact result push reconciles an uncertain card without resending its decision (655.447742ms)
+✔ a server-derived expiry performs one authoritative read and disables approval even when the client clock is behind (1619.287614ms)
+✔ a slow initial approval read followed by a fast same-expiry read still observes the real server expiry (2779.677763ms)
+(node:10867) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:10867) DeprecationWarning: mock.module(): options.defaultExport is deprecated. Use options.exports.default instead.
+(node:10867) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ all new ask proposals display their frozen content/account; new and legacy buttons retain separate deciders (442.640594ms)
+✔ disabled new service preserves legacy approvals without an error or new action (21.910245ms)
+✔ failed availability leaves legacy approvals usable and never starts new service POSTs (19.85017ms)
+✔ closing availability removes retained uncertain cards and stops their list/view POSTs (91.954715ms)
+✔ a lost decision response keeps the same card unconfirmed and reads only view instead of resending (74.33556ms)
+✔ an authenticated pending view permits explicit recovery without sending a decision, then requires a separate approval click (87.91512ms)
+✔ an expired pending view cannot restore approval controls after a lost response (45.106806ms)
+✔ a stale recovery control cannot restore or mutate another account proposal (105.409494ms)
+✔ a response from a switched cookie cannot expose another owner under the old session key (21.526821ms)
+✔ older unresolved pages are reachable and expired approvals can only be declined (58.572216ms)
+✔ redacted attention proposals expose decline without an approval control or invented target (38.647678ms)
+✔ an in-flight decision from an old session cannot disable or settle the next account cards (101.256549ms)
+ℹ tests 96
+ℹ suites 0
+ℹ pass 96
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 19810.678531

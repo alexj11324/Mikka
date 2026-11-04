@@ -1,0 +1,38 @@
+
+> next-app@0.0.1 test:pending-actions-live /vercel/sandbox/mikka-pending-live
+> node --import tsx --test lib/live/pending-action-cache.test.ts && node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test scripts/pending-actions.live.test.tsx app/api/pending-actions/route.test.ts
+
+✔ a pending list has an owner and session key; unresolved identity subscribes to nothing (2.579322ms)
+✔ browser and credential cards retain five minutes; account/app cards retain seven days (0.579732ms)
+✔ the compatible array read retains its server observation and pre-request monotonic time (30.249635ms)
+✔ a changed cookie cannot cache another owner under the old session key (1.70684ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 320.221557
+(node:10325) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:10325) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ unauthenticated list still fails before its database read (72.510028ms)
+✔ normal and token callers retain the filtered array contract with private owner/read-time headers (2.630405ms)
+(node:10326) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:10326) DeprecationWarning: mock.module(): options.defaultExport is deprecated. Use options.exports.default instead.
+(node:10326) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ the healthy actual pending list remains idle beyond its previous ten-second poll (10951.112757ms)
+✔ a committed same-owner list event removes the card without resending a decision; another key does not read (490.989615ms)
+✔ a server five-minute deadline rechecks once despite a slow client clock, and does not extend approval (1618.624538ms)
+✔ a response belonging to another signed-in user is never rendered under the old key (167.443537ms)
+✔ a slow initial pending read does not swallow the final same-expiry authoritative read (2782.708704ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 16896.642081

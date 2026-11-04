@@ -1,0 +1,68 @@
+
+> next-app@0.0.1 test:live-db /vercel/sandbox/mikka-pending-live
+> node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/live/factory.db.test.ts lib/live/store.db.test.ts lib/live/ticket-session.db.test.ts lib/db/request-scope-live.db.test.ts lib/live/notification-context.db.test.ts lib/live/approved-writes.db.test.ts lib/live/pending-actions.db.test.ts
+
+▶ deferred post-commit reads retain their database and device authority after releasing the writer
+  ✔ live (17.176169ms)
+  ✔ revoked (10.661304ms)
+  ✔ closed (10.252547ms)
+✔ deferred post-commit reads retain their database and device authority after releasing the writer (674.364175ms)
+(node:10996) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:10996) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+▶ approved writes publish only committed owner-personal invalidations through the real service
+  ✔ an actual proposal is invisible and silent until its authorized COMMIT; replay and reads are silent (87.151162ms)
+  ✔ the actual authorization rollback discards the inserted proposal and its notification (6.136292ms)
+  ✔ decline and ledger completion wake the same proposal without resending an uncertain external operation (88.223683ms)
+  ✔ another owner receives only their own personal key; revoked membership is rechecked after scheduling (13.919195ms)
+  ✔ a delayed callback retains its request database even when the default DB has the same proposal ID for another owner (14.796345ms)
+✔ approved writes publish only committed owner-personal invalidations through the real service (3037.080506ms)
+▶ real PG: committed invalidations, savepoint rollback, and canonical owner/workspace targets
+  ✔ same-owner different-workspace and same-workspace different-owner targets stay separate (12.658283ms)
+  ✔ removed membership and a mismatched Bot owner cannot produce a target (10.884125ms)
+  ✔ personal issue lists and Bot task details keep their distinct canonical scopes when viewed from another workspace (7.238402ms)
+  ✔ outer COMMIT is visible to a separate connection before a queued effect runs (5.885383ms)
+  ✔ savepoint and failed-transaction rollback do not publish reverted state (3.043509ms)
+✔ real PG: committed invalidations, savepoint rollback, and canonical owner/workspace targets (162.534373ms)
+(node:11003) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:11003) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+▶ real Factory notifications retain their database across COMMIT and delayed Next after callbacks
+  ✔ a real store COMMIT in the request and later scheduler invocation outside it retain the originating database (95.526631ms)
+  ✔ registration in the request survives COMMIT and scheduling in a different context, after visibility to another connection (24.10072ms)
+  ✔ an already committed Factory update uses the same public scheduling boundary (19.759318ms)
+  ✔ permission is read after scheduling, so suspended membership suppresses delivery even while the other database is still active (15.048208ms)
+  ✔ actual outer and savepoint rollbacks schedule no notification (28.17694ms)
+✔ real Factory notifications retain their database across COMMIT and delayed Next after callbacks (3139.303085ms)
+(node:11004) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:11004) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+▶ legacy pending producers invalidate only their committed owner-personal list
+  ✔ actual Drizzle proposal waits for the held outer COMMIT and reads are silent (65.747492ms)
+  ✔ the actual Drizzle nested savepoint rollback discards only its notification; outer rollback discards all (12.500089ms)
+  ✔ actual account proposal and owner decline invalidate; repeated/foreign decisions execute nothing (16.52495ms)
+  ✔ another owner gets only its personal key and membership is rechecked after scheduling (7.540419ms)
+  ✔ delayed scheduling and COMMIT outside a request keep the source DB even for the same UUID (12.602192ms)
+  ✔ actual credential proposal commits once, replay is silent, and a later failed event rolls everything back (20.731043ms)
+  ✔ the historical browser pending sweep invalidates only rows that actually leave pending (6.485697ms)
+✔ legacy pending producers invalidate only their committed owner-personal list (3218.482676ms)
+(node:11015) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:11015) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+▶ the real Factory store schedules one invalidation only after its outer transaction commits
+  ✔ route waits for the caller COMMIT; reads and idempotent replay send nothing (45.546013ms)
+  ✔ a route rolled back by its caller never schedules work (6.03061ms)
+  ✔ a non-merge PR webhook refreshes the current Factory delivery after its update commits (481.585023ms)
+✔ the real Factory store schedules one invalidation only after its outer transaction commits (3132.999289ms)
+(node:11021) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:11021) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ a real revoked Better Auth session cannot renew a live ticket through its still-valid cache cookie (986.807832ms)
+ℹ tests 35
+ℹ suites 0
+ℹ pass 35
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 8513.327983

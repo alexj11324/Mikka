@@ -1,0 +1,317 @@
+{
+  "commit": "8da6a069de809b29f097c5eaf018fdeaa7032694",
+  "environmentId": "local-e6ff84ef-9074-45d9-a34f-3ca400720a4a",
+  "origin": "http://localhost:3352",
+  "startedAt": "2026-11-04T22:44:05.127Z",
+  "captures": [
+    {
+      "name": "zh-email-1440-light.png",
+      "locale": "zh-CN",
+      "width": 1440,
+      "height": 960,
+      "scheme": "light",
+      "state": "email",
+      "at": "2026-11-04T22:44:11.089Z",
+      "sha256": "e5d22ea02f6baea80d67fc16353cc82047ee7cc7628c06085f495a8b9548c775"
+    },
+    {
+      "name": "zh-email-1440-dark.png",
+      "locale": "zh-CN",
+      "width": 1440,
+      "height": 960,
+      "scheme": "dark",
+      "state": "email",
+      "at": "2026-11-04T22:44:11.805Z",
+      "sha256": "22ea165930f5bbaa05dfe389da3cdc0e689e270d4bfd7df802517dd14cad8571"
+    },
+    {
+      "name": "zh-email-390-light.png",
+      "locale": "zh-CN",
+      "width": 390,
+      "height": 844,
+      "scheme": "light",
+      "state": "email",
+      "at": "2026-11-04T22:44:12.496Z",
+      "sha256": "0a6bff0a7851381502f882376e1a91473b38b04d9233c18619b261d4aeb5dddd"
+    },
+    {
+      "name": "zh-email-390-dark.png",
+      "locale": "zh-CN",
+      "width": 390,
+      "height": 844,
+      "scheme": "dark",
+      "state": "email",
+      "at": "2026-11-04T22:44:13.064Z",
+      "sha256": "ba229ec2eaed383c655155fd7f2dd78577853f5246aff2955b308ba637786f88"
+    },
+    {
+      "name": "en-email-1440-light.png",
+      "locale": "en",
+      "width": 1440,
+      "height": 960,
+      "scheme": "light",
+      "state": "email",
+      "at": "2026-11-04T22:44:13.699Z",
+      "sha256": "fbccec9cc5e114634feff3f3d4aa397f89847afeb44dd2b7cba60b4ca5778704"
+    },
+    {
+      "name": "en-email-1440-dark.png",
+      "locale": "en",
+      "width": 1440,
+      "height": 960,
+      "scheme": "dark",
+      "state": "email",
+      "at": "2026-11-04T22:44:14.407Z",
+      "sha256": "5194afe2cb1b120e3df19b684b9e2821578c3325def3dcbfcc98245fe71c69a8"
+    },
+    {
+      "name": "en-email-390-light.png",
+      "locale": "en",
+      "width": 390,
+      "height": 844,
+      "scheme": "light",
+      "state": "email",
+      "at": "2026-11-04T22:44:15.052Z",
+      "sha256": "f1949ed8b8328591482a106f52424095170962d64d668e8bc65157a6f523398d"
+    },
+    {
+      "name": "en-email-390-dark.png",
+      "locale": "en",
+      "width": 390,
+      "height": 844,
+      "scheme": "dark",
+      "state": "email",
+      "at": "2026-11-04T22:44:15.629Z",
+      "sha256": "b574bae64cbd1ef51f9180812d7f01ccb5c47bf9eb18c69a144f8a0b947b6acd"
+    },
+    {
+      "name": "zh-app-1440-light.png",
+      "locale": "zh-CN",
+      "width": 1440,
+      "height": 960,
+      "scheme": "light",
+      "state": "app",
+      "at": "2026-11-04T22:44:16.301Z",
+      "sha256": "a2596d0b3e3ec5768989735e23cea5884f0041bbf4fee35b38324484bb2bab70"
+    },
+    {
+      "name": "zh-app-1440-dark.png",
+      "locale": "zh-CN",
+      "width": 1440,
+      "height": 960,
+      "scheme": "dark",
+      "state": "app",
+      "at": "2026-11-04T22:44:16.883Z",
+      "sha256": "7e9d18f24733cc2830348f42be4b11a3e6c9f6be9546c7ce6eaf8e10840e75ca"
+    },
+    {
+      "name": "zh-app-390-light.png",
+      "locale": "zh-CN",
+      "width": 390,
+      "height": 844,
+      "scheme": "light",
+      "state": "app",
+      "at": "2026-11-04T22:44:17.462Z",
+      "sha256": "8d47411d667ec89dff464c2a4f44f12ad53bc2f82116f34239c53a272dc21712"
+    },
+    {
+      "name": "zh-app-390-dark.png",
+      "locale": "zh-CN",
+      "width": 390,
+      "height": 844,
+      "scheme": "dark",
+      "state": "app",
+      "at": "2026-11-04T22:44:17.978Z",
+      "sha256": "40f1c086005b0461385fc1e97c42b0a9de03d6648bceeb4dd6afe857c31f13ef"
+    },
+    {
+      "name": "en-app-1440-light.png",
+      "locale": "en",
+      "width": 1440,
+      "height": 960,
+      "scheme": "light",
+      "state": "app",
+      "at": "2026-11-04T22:44:18.586Z",
+      "sha256": "d70e261010f0cb8c0ae8f470c13a85868063766379ef1645da75bca59c5e226c"
+    },
+    {
+      "name": "en-app-1440-dark.png",
+      "locale": "en",
+      "width": 1440,
+      "height": 960,
+      "scheme": "dark",
+      "state": "app",
+      "at": "2026-11-04T22:44:19.170Z",
+      "sha256": "1e86fa69efd91fa8b478907ddd55f8c4d9f159a3904c0f6616cbaa942835888c"
+    },
+    {
+      "name": "en-app-390-light.png",
+      "locale": "en",
+      "width": 390,
+      "height": 844,
+      "scheme": "light",
+      "state": "app",
+      "at": "2026-11-04T22:44:19.728Z",
+      "sha256": "2271bf62303288790f24c9a2b20a9d0d8bcc31aebc936a1b9099b0e3bb580f95"
+    },
+    {
+      "name": "en-app-390-dark.png",
+      "locale": "en",
+      "width": 390,
+      "height": 844,
+      "scheme": "dark",
+      "state": "app",
+      "at": "2026-11-04T22:44:20.229Z",
+      "sha256": "cc5ad305aaeac6fb0e41333621e675fd6454676280984f9289f3752c8be2e94c"
+    },
+    {
+      "name": "zh-browser-1440-light.png",
+      "locale": "zh-CN",
+      "width": 1440,
+      "height": 960,
+      "scheme": "light",
+      "state": "browser",
+      "at": "2026-11-04T22:44:20.857Z",
+      "sha256": "9a8331518ae895129b93df6c2ac1e660aa909b245058369e01979592a1487b4c"
+    },
+    {
+      "name": "zh-browser-1440-dark.png",
+      "locale": "zh-CN",
+      "width": 1440,
+      "height": 960,
+      "scheme": "dark",
+      "state": "browser",
+      "at": "2026-11-04T22:44:21.421Z",
+      "sha256": "f5ce911615d2a8e220c4fbbafe95de389e1bdfad829f292ef409e72bf5e5ff6d"
+    },
+    {
+      "name": "zh-browser-390-light.png",
+      "locale": "zh-CN",
+      "width": 390,
+      "height": 844,
+      "scheme": "light",
+      "state": "browser",
+      "at": "2026-11-04T22:44:21.945Z",
+      "sha256": "cd904407dbe66c2c80ba906b7ef831b3f5ac98d9fb87d2090251d0cf12bfa99e"
+    },
+    {
+      "name": "zh-browser-390-dark.png",
+      "locale": "zh-CN",
+      "width": 390,
+      "height": 844,
+      "scheme": "dark",
+      "state": "browser",
+      "at": "2026-11-04T22:44:22.478Z",
+      "sha256": "1c9ddbbeeddb584c23f0a42a43967e244e4fb7a032a1c879f3f38ce79f7a3190"
+    },
+    {
+      "name": "en-browser-1440-light.png",
+      "locale": "en",
+      "width": 1440,
+      "height": 960,
+      "scheme": "light",
+      "state": "browser",
+      "at": "2026-11-04T22:44:23.103Z",
+      "sha256": "4f72500602a893276a7358e63267bfde5749de0a1a86e9e672a2236d984af64a"
+    },
+    {
+      "name": "en-browser-1440-dark.png",
+      "locale": "en",
+      "width": 1440,
+      "height": 960,
+      "scheme": "dark",
+      "state": "browser",
+      "at": "2026-11-04T22:44:23.699Z",
+      "sha256": "ee50b66ddb18d2cd4954696c6b8eba8ad8b00b5321aa66b7cb7161c43c83308f"
+    },
+    {
+      "name": "en-browser-390-light.png",
+      "locale": "en",
+      "width": 390,
+      "height": 844,
+      "scheme": "light",
+      "state": "browser",
+      "at": "2026-11-04T22:44:24.294Z",
+      "sha256": "63c418de1a4dea3dbac239ada7a5eb9d3c9344cf3f6a017919c8984b7afa3af1"
+    },
+    {
+      "name": "en-browser-390-dark.png",
+      "locale": "en",
+      "width": 390,
+      "height": 844,
+      "scheme": "dark",
+      "state": "browser",
+      "at": "2026-11-04T22:44:24.812Z",
+      "sha256": "d515436d24c0a466878e31b82144ad3c71d815a9389c8e333dfaca91bb5edc6a"
+    }
+  ],
+  "fixture": {
+    "messageId": "e76ade0e-d107-4746-aeb0-31fcfb6a635c",
+    "proposals": [
+      {
+        "id": "6ca42ed7-37e5-4417-87e2-f1ffb04baf06",
+        "state": "email",
+        "action": "send_email",
+        "creation": "isolated_display_fixture"
+      },
+      {
+        "id": "9508d28e-a7df-4360-aadd-0fb2dbabc0d0",
+        "state": "app",
+        "action": "app_tool_call",
+        "creation": "actual_proposeAppToolCall"
+      },
+      {
+        "id": "52f1934e-9f81-4e5a-8724-8b2147f2be9f",
+        "state": "browser",
+        "action": "browser_operation",
+        "creation": "isolated_display_fixture"
+      }
+    ]
+  },
+  "limits": [
+    "Synthetic display cards, actual production build/HTTP/PostgreSQL, and normal TestPool sign-up/sign-in.",
+    "App card created by actual proposeAppToolCall; email/browser cards are explicit isolated database display fixtures, not execution-authorized browser operations.",
+    "No model/provider request, decision POST, request interception, browser test runner, production traffic or healthy WebSocket acceptance.",
+    "TestPool has no pending_actions resource adapter; exact local IDs are journaled, removed owner-scoped, and the test pair quarantined."
+  ],
+  "consoleErrors": [],
+  "httpFailures": [],
+  "apiReads": [
+    {
+      "state": "email",
+      "status": 200,
+      "exactOwnedRow": true,
+      "viewerVerified": true,
+      "observedAtPresent": true
+    },
+    {
+      "state": "app",
+      "status": 200,
+      "exactOwnedRow": true,
+      "viewerVerified": true,
+      "observedAtPresent": true
+    },
+    {
+      "state": "browser",
+      "status": 200,
+      "exactOwnedRow": true,
+      "viewerVerified": true,
+      "observedAtPresent": true
+    }
+  ],
+  "finishedAt": "2026-11-04T22:44:24.813Z",
+  "audit": {
+    "files": 25,
+    "archives": 0,
+    "archiveEntries": 0,
+    "decodedBytes": 0,
+    "result": "passed",
+    "checked": "known credentials and cookies in raw files and decoded Playwright reports; traces and recordings forbidden"
+  },
+  "cleanup": {
+    "fixtureResourcesRemoved": true,
+    "leaseState": "quarantined",
+    "reason": "Exact local display fixtures removed; test pair quarantined",
+    "at": "2026-11-04T22:44:24.899Z"
+  }
+}

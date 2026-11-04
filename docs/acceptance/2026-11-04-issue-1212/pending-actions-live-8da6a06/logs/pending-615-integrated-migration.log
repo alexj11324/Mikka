@@ -1,0 +1,2 @@
+migrate: applied 20261104213000_project_decisions.sql to MIKKA_DATABASE_URL
+独立 E2E 数据库已就绪；认证表使用 Better Auth 迁移，业务表来自现有 Drizzle schema。

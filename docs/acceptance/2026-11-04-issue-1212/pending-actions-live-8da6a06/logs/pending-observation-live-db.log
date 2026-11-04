@@ -1,0 +1,98 @@
+
+> next-app@0.0.1 test:live-db /vercel/sandbox/mikka-pending-live
+> node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/live/factory.db.test.ts lib/live/store.db.test.ts lib/live/ticket-session.db.test.ts lib/db/request-scope-live.db.test.ts lib/live/notification-context.db.test.ts lib/live/approved-writes.db.test.ts lib/live/pending-actions.db.test.ts
+
+▶ deferred post-commit reads retain their database and device authority after releasing the writer
+  ✔ live (19.714088ms)
+  ✔ revoked (40.959474ms)
+  ✔ closed (11.343599ms)
+✔ deferred post-commit reads retain their database and device authority after releasing the writer (772.174965ms)
+(node:5181) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:5181) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+▶ approved writes publish only committed owner-personal invalidations through the real service
+  ✔ an actual proposal is invisible and silent until its authorized COMMIT; replay and reads are silent (67.144167ms)
+  ✔ the actual authorization rollback discards the inserted proposal and its notification (6.207948ms)
+  ✔ decline and ledger completion wake the same proposal without resending an uncertain external operation (88.714728ms)
+  ✔ another owner receives only their own personal key; revoked membership is rechecked after scheduling (21.720429ms)
+  ✔ a delayed callback retains its request database even when the default DB has the same proposal ID for another owner (20.398602ms)
+✔ approved writes publish only committed owner-personal invalidations through the real service (3580.218996ms)
+▶ real PG: committed invalidations, savepoint rollback, and canonical owner/workspace targets
+  ✔ same-owner different-workspace and same-workspace different-owner targets stay separate (26.413714ms)
+  ✔ removed membership and a mismatched Bot owner cannot produce a target (13.029464ms)
+  ✔ personal issue lists and Bot task details keep their distinct canonical scopes when viewed from another workspace (10.222286ms)
+  ✔ outer COMMIT is visible to a separate connection before a queued effect runs (17.474052ms)
+  ✔ savepoint and failed-transaction rollback do not publish reverted state (10.961659ms)
+✔ real PG: committed invalidations, savepoint rollback, and canonical owner/workspace targets (199.770083ms)
+(node:5188) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:5188) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+▶ real Factory notifications retain their database across COMMIT and delayed Next after callbacks
+  ✔ a real store COMMIT in the request and later scheduler invocation outside it retain the originating database (70.457244ms)
+  ✔ registration in the request survives COMMIT and scheduling in a different context, after visibility to another connection (18.685218ms)
+  ✔ an already committed Factory update uses the same public scheduling boundary (20.933905ms)
+  ✔ permission is read after scheduling, so suspended membership suppresses delivery even while the other database is still active (14.639118ms)
+  ✔ actual outer and savepoint rollbacks schedule no notification (25.197733ms)
+✔ real Factory notifications retain their database across COMMIT and delayed Next after callbacks (3650.041573ms)
+(node:5189) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:5189) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+▶ legacy pending producers invalidate only their committed owner-personal list
+  ✔ actual Drizzle proposal waits for the held outer COMMIT and reads are silent (63.867342ms)
+  ✔ the actual Drizzle nested savepoint rollback discards only its notification; outer rollback discards all (14.213332ms)
+  ✔ actual account proposal and owner decline invalidate; repeated/foreign decisions execute nothing (19.474227ms)
+  ✔ another owner gets only its personal key and membership is rechecked after scheduling (9.480723ms)
+  ✔ delayed scheduling and COMMIT outside a request keep the source DB even for the same UUID (13.53929ms)
+  ✔ actual credential proposal commits once, replay is silent, and a later failed event rolls everything back (23.632066ms)
+  ✔ the historical browser pending sweep invalidates only rows that actually leave pending (4.980877ms)
+✔ legacy pending producers invalidate only their committed owner-personal list (3746.633831ms)
+(node:5200) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:5200) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+▶ the real Factory store schedules one invalidation only after its outer transaction commits
+  ✔ route waits for the caller COMMIT; reads and idempotent replay send nothing (45.511922ms)
+  ✔ a route rolled back by its caller never schedules work (8.226914ms)
+  ✔ a non-merge PR webhook refreshes the current Factory delivery after its update commits (502.84426ms)
+✔ the real Factory store schedules one invalidation only after its outer transaction commits (3644.466441ms)
+(node:5201) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:5201) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✖ a real revoked Better Auth session cannot renew a live ticket through its still-valid cache cookie (864.47478ms)
+ℹ tests 35
+ℹ suites 0
+ℹ pass 34
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 9124.995607
+
+✖ failing tests:
+
+test at lib/live/ticket-session.db.test.ts:1:584
+✖ a real revoked Better Auth session cannot renew a live ticket through its still-valid cache cookie (864.47478ms)
+  error: relation "mikka_workspace_members" does not exist
+      at /vercel/sandbox/mikka-pending-live/node_modules/.pnpm/pg-pool@3.14.0_pg@8.23.1/node_modules/pg-pool/index.js:45:11
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async TestContext.<anonymous> (/vercel/sandbox/mikka-pending-live/lib/live/ticket-session.db.test.ts:74:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    length: 122,
+    severity: 'ERROR',
+    code: '42P01',
+    detail: undefined,
+    hint: undefined,
+    position: '13',
+    internalPosition: undefined,
+    internalQuery: undefined,
+    where: undefined,
+    schema: undefined,
+    table: undefined,
+    column: undefined,
+    dataType: undefined,
+    constraint: undefined,
+    file: 'parse_relation.c',
+    line: '1449',
+    routine: 'parserOpenTable'
+  }
+ ELIFECYCLE  Command failed with exit code 1.

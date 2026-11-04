@@ -1,0 +1,25 @@
+(node:11176) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:11176) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ authorized browsing runs without a human decision and exact replay returns the stored receipt (614.928441ms)
+✔ #438 mutation lifecycle: kept only while executable; scrubbed on done, declined, failed and expired; never returned (35.234547ms)
+✔ default allow: with no workspace policy row every effect, payment and sending included, runs with no human approval (38.568029ms)
+✔ a legacy stored ask is not a human gate; concurrent replay produces one effect and other owners or payloads cannot reuse it (15.1239ms)
+✔ deny blocks: an explicit effect deny wins over agent allow, and a workspace computer deny blocks every effect (21.253189ms)
+✔ stale observations resume observation, unknown outcomes are not silently retried (16.303754ms)
+✔ a saved same-owner/site unattended grant reuses a login without an approval card (19.122418ms)
+✔ ambiguous, revoked, foreign and denied login grants cannot fill credentials (4.6529ms)
+✔ machine allocation does not hold a SQL connection while the provider is creating it (7.446096ms)
+✔ saved login covers guarded fill and one same-document submission, never two approval cards (30.14839ms)
+✔ two saved accounts require a concrete account choice instead of selecting a random login (2.825229ms)
+✔ a permanently failed queued start terminates durably without blocking later work (4.576322ms)
+Retained unattended DB schema: unattended_0ec301dfa7624b84846730ed0a4a2d6e
+✔ a denied queued web task ends before starting any browser runtime (2.483972ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1154.185425
