@@ -14,16 +14,17 @@ let ledger: unknown
 let taskDetail: unknown
 mock.module('swr', { defaultExport: (key: string) => String(key).includes('view=ledger')
   ? { data: ledger, mutate: () => {} }
-  : key === '/api/factory/tasks/t1' && taskDetail !== undefined ? { data: taskDetail, mutate: () => {} } : swr })
+  : key === '/api/factory/tasks/t1' && taskDetail !== undefined ? { data: taskDetail, mutate: () => {} } : swr, namedExports: { useSWRConfig: () => ({ mutate: async () => undefined }) } })
 mock.module('next-intl', { namedExports: { useTranslations: () => lookup, useFormatter: () => ({ dateTime: () => '' }) } })
 mock.module(new URL('./issue-thread-panel.tsx', import.meta.url).href, { namedExports: { IssueThreadPanel: () => null } })
 
 let FactoryAcceptance: typeof import('./factory-acceptance')['FactoryAcceptance']
 let FactoryAcceptancePanel: typeof import('./factory-acceptance')['FactoryAcceptancePanel']
 let FactoryListError: typeof import('./factory-acceptance')['FactoryListError']
+let useThreadAcceptance: typeof import('./factory-acceptance')['useThreadAcceptance']
 let ApprovalBar: typeof import('./factory-approval-bar')['ApprovalBar']
 before(async () => {
-  ({ FactoryAcceptance, FactoryAcceptancePanel, FactoryListError } = await import('./factory-acceptance'))
+  ({ FactoryAcceptance, FactoryAcceptancePanel, FactoryListError, useThreadAcceptance } = await import('./factory-acceptance'))
   ;({ ApprovalBar } = await import('./factory-approval-bar'))
 })
 beforeEach(() => { swr = { isLoading: false, mutate: () => {} }; ledger = { approvals: [], publications: [] }; taskDetail = undefined })
@@ -229,4 +230,28 @@ test('every sha shows 7 characters; the full sha is the copy target and the hove
   assert.match(html, new RegExp(`<button[^>]*data-sha="${full}"`))
   assert.match(html, new RegExp(`aria-label="复制完整 sha ${full}"`))
   assert.match(html, />ddddddd · 已失效</)
+})
+
+test('failed and active fixed-candidate checks remain in the list with their own state labels', () => {
+  const labels = { review: { failed: '审阅未通过', pending: '等待审阅', running: '审阅中' },
+    verify: { failed: '验证未通过', pending: '等待验证', running: '验证中' } }
+  for (const stage of ['review', 'verify'] as const) for (const status of ['failed', 'pending', 'running'] as const) {
+    swr.data = { tasks: [task({ stage, status, candidateRunId: 'producer' })] }
+    assert.match(list(), new RegExp('>' + labels[stage][status] + '<'))
+    assert.doesNotMatch(list(), /发布失败|待你确认|不可批准/)
+  }
+  swr.data = { tasks: [task({ stage: 'review', status: 'failed', candidateId: null })] }
+  assert.equal(list(), '')
+})
+
+test('the same producer thread keeps its acceptance tab through retry states', () => {
+  function Header({ runId }: { runId: string }) {
+    const acceptance = useThreadAcceptance('issue-1', runId)
+    return acceptance ? <span>{acceptance.id}</span> : null
+  }
+  for (const status of ['failed', 'pending', 'running']) {
+    swr.data = { tasks: [task({ stage: 'review', status, candidateRunId: 'producer' })] }
+    assert.equal(renderToStaticMarkup(<Header runId="producer" />), '<span>t1</span>')
+    assert.equal(renderToStaticMarkup(<Header runId="another-thread" />), '')
+  }
 })

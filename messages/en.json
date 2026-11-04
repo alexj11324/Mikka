@@ -4263,6 +4263,22 @@
     },
     "listError": "Couldn't load acceptance",
     "retry": "Retry",
+    "checkState": {
+      "review": {
+        "failed": "Review not passed",
+        "pending": "Review queued",
+        "running": "Reviewing"
+      },
+      "verify": {
+        "failed": "Verification not passed",
+        "pending": "Verification queued",
+        "running": "Verifying"
+      }
+    },
+    "retryReview": "Retry review",
+    "retryVerify": "Retry verification",
+    "checkRetryUnknown": "Retry unconfirmed",
+    "checkRetryFailed": "Retry did not complete",
     "reject": "Request changes",
     "rejectNote": "Note for changes",
     "rejectSubmit": "Send back",

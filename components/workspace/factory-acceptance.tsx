@@ -11,14 +11,12 @@ import { Item, ItemActions, ItemContent, ItemDescription, ItemMedia, ItemTitle }
 import { Skeleton } from '@/components/ui/skeleton'
 import { Spinner } from '@/components/ui/spinner'
 import { acceptanceStateKey, type AcceptanceState } from '@/lib/factory/acceptance-state'
+import { visibleAcceptance } from '@/lib/factory/acceptance-view'
 import { FactoryAcceptancePane, request, useAcceptance, type FactoryTask } from './factory-acceptance-pane'
 
 export type { FactoryTask } from './factory-acceptance-pane'
 
 const tone = (state: AcceptanceState) => state === 'live' || state === 'merged' ? 'success' : state === 'pending' ? 'warning' : state === 'failed' ? 'destructive' : state === 'revoked' || state === 'expired' || state === 'invalidated' ? 'neutral' : 'info'
-
-/** Owner actions: approval/publication, or host-confirmed completed execution recovery. */
-const accepting = (task: FactoryTask) => Boolean(task.completionRecovery) || (task.stage === 'approval' && ['pending', 'waiting', 'passed'].includes(task.status)) || task.stage === 'publish'
 
 const tasksKey = (issueId: string) => `/api/factory/tasks?issueId=${encodeURIComponent(issueId)}`
 
@@ -29,7 +27,7 @@ function useAcceptanceTasks(issueId: string | null, refreshInterval = 15000) {
   // A 200 body that is not `{ tasks: [...] }` (an HTML fallback parsed as `{}`,
   // or an API that omits `tasks`) must read as no tasks, not crash the page.
   const allTasks = Array.isArray(result.data?.tasks) ? result.data.tasks : []
-  return { ...result, tasks: allTasks.filter(accepting), allTasks }
+  return { ...result, tasks: allTasks.filter(visibleAcceptance), allTasks }
 }
 
 /** The acceptance task whose candidate this thread produced, if any: its header then offers 验收 (frame 06). */
@@ -40,7 +38,8 @@ export function useThreadAcceptance(issueId: string | null, runId: string) {
 /** The state chip next to a thread's name (等你验收, 已批准 …), from the same ledger as the pane. */
 export function AcceptanceStateBadge({ task }: { task: FactoryTask }) {
   const t = useTranslations('FactoryAcceptance')
-  const derived = useAcceptance(task).derived
+  const { derived, check } = useAcceptance(task)
+  if (check) return <Badge variant="outline" tone={check.status === 'failed' ? 'destructive' : check.status === 'pending' ? 'warning' : 'info'} className="shrink-0">{t(`checkState.${check.stage}.${check.status}`)}</Badge>
   return derived ? <Badge variant="outline" tone={tone(derived.state)} className="shrink-0">{derived.refusal ? t('cannotMerge') : t(acceptanceStateKey(derived.state, task.isSkillCandidate))}</Badge> : null
 }
 
@@ -55,7 +54,7 @@ export function FactoryListError({ retrying, onRetry }: { retrying: boolean; onR
 
 function FactoryAcceptanceRow({ task, onOpen }: { task: FactoryTask; onOpen: () => void }) {
   const t = useTranslations('FactoryAcceptance')
-  const derived = useAcceptance(task).derived
+  const { derived, check } = useAcceptance(task)
   const state = derived?.state
   return <div className="w-full max-w-[26.25rem]">
     <Item variant="muted">
@@ -65,7 +64,8 @@ function FactoryAcceptanceRow({ task, onOpen }: { task: FactoryTask; onOpen: () 
         <ItemDescription>{task.reason}</ItemDescription>
       </ItemContent>
       <ItemActions>
-        {state && <Badge variant="outline" tone={tone(state)}>{derived?.refusal ? t('cannotMerge') : t(acceptanceStateKey(state, task.isSkillCandidate))}</Badge>}
+        {check ? <Badge variant="outline" tone={check.status === 'failed' ? 'destructive' : check.status === 'pending' ? 'warning' : 'info'}>{t(`checkState.${check.stage}.${check.status}`)}</Badge>
+          : state && <Badge variant="outline" tone={tone(state)}>{derived?.refusal ? t('cannotMerge') : t(acceptanceStateKey(state, task.isSkillCandidate))}</Badge>}
         <Button variant="ghost" size="icon" aria-label={task.isSkillCandidate ? t('skillTitle') : t('title')} onClick={onOpen}><ChevronRight data-icon="inline-start" /></Button>
       </ItemActions>
     </Item>

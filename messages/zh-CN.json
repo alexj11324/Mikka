@@ -4263,6 +4263,22 @@
     },
     "listError": "无法加载验收",
     "retry": "重试",
+    "checkState": {
+      "review": {
+        "failed": "审阅未通过",
+        "pending": "等待审阅",
+        "running": "审阅中"
+      },
+      "verify": {
+        "failed": "验证未通过",
+        "pending": "等待验证",
+        "running": "验证中"
+      }
+    },
+    "retryReview": "重新审阅",
+    "retryVerify": "重新验证",
+    "checkRetryUnknown": "重试未确认",
+    "checkRetryFailed": "重试未完成",
     "reject": "退回修改",
     "rejectNote": "退回备注",
     "rejectSubmit": "退回",
