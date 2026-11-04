@@ -53,8 +53,9 @@ export async function runGroupRoutingBundle({ env = process.env, fetchImpl = fet
   const email = env.SMOKE_OWNER_EMAIL, password = env.SMOKE_OWNER_PASSWORD
   check(api.isSmokeAccountEmail(email) && password, 'normal_account_required')
   check(typeof api.runGroupRoutingBoundaries === 'function' && typeof api.withTemporaryFlashCredential === 'function'
-    && typeof api.assertFlashTestModel === 'function' && api.DECISION_MODEL === 'openai/gpt-6-luna-decisions', 'source_contract')
-  let cookie = '', cleanupReceipt
+    && typeof api.publicCredentialActions === 'function' && typeof api.assertFlashTestModel === 'function'
+    && api.DECISION_MODEL === 'openai/gpt-6-luna-decisions', 'source_contract')
+  let cookie = '', cleanupReceipt, credentialActions
   const transport = scope => {
     const record = report.sessionCleanup[scope] = { loginAttempted: false, loginStatus: null,
       logoutAttempted: false, logoutStatus: null, logoutAcknowledged: false }
@@ -81,6 +82,15 @@ export async function runGroupRoutingBundle({ env = process.env, fetchImpl = fet
     const response = await owner.request('/api/version', { method: 'GET', signal })
     check(response.status === 200 && (await response.json())?.build === deploymentId, 'deployment_changed')
   }
+  // The existing source helper resolves normal Settings action references.
+  // Resolve both allowed actions before create, not during finally: cleanup
+  // then has four bounded requests instead of an unbounded asset discovery.
+  const discover = async (fetcher, required) => {
+    check(Array.isArray(required) && required.every(name => ['createApiKey', 'deleteApiKey'].includes(name)), 'credential_action_scope')
+    credentialActions ??= await api.publicCredentialActions(fetcher, ['createApiKey', 'deleteApiKey'])
+    check(['createApiKey', 'deleteApiKey'].every(name => /^[a-f0-9]{40,64}$/.test(credentialActions?.[name] ?? '')), 'credential_action_reference')
+    return Object.fromEntries(required.map(name => [name, credentialActions[name]]))
+  }
   try {
     await verifyTarget()
     const login = await owner.request('/api/auth/sign-in/email', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email, password }) })
@@ -92,11 +102,11 @@ export async function runGroupRoutingBundle({ env = process.env, fetchImpl = fet
     await api.withTemporaryFlashCredential(async cleanup => {
       cleanupReceipt = cleanup
       await verifyTarget()
-      const budgetMs = Math.min(555_000, deadline - now() - 45_000)
+      const budgetMs = Math.min(535_000, deadline - now() - 65_000)
       check(budgetMs >= 1000, 'budget_exhausted')
       report.group = await api.runGroupRoutingBoundaries({ owner, verifyTarget, assertFlashTestModel: api.assertFlashTestModel,
         decisionModelId: api.DECISION_MODEL, fixture, allowFixtureFlashSelection: true, now, wait, budgetMs })
-    }, { env: { ...env, MIKKA_TEST_ACCOUNT_EMAIL: email, MIKKA_TEST_ACCOUNT_PASSWORD: password }, fetchImpl: credentialTransport, cloudExecution: false })
+    }, { env: { ...env, MIKKA_TEST_ACCOUNT_EMAIL: email, MIKKA_TEST_ACCOUNT_PASSWORD: password }, fetchImpl: credentialTransport, discover, cloudExecution: false })
     await verifyTarget()
   } catch (error) { report.error = safeError(error) }
   finally {
