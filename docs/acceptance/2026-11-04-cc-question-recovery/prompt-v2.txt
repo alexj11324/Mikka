@@ -1,0 +1,20 @@
+PolicyV3 CC Question Recovery 20261104-1237
+
+@PolicyV3 CC Coding 1104-1638 请通过正常 Factory 流程创建这一项全新的云端 Claude Code 小任务，只由你在群聊汇报。UI 和 Testing 无需回复或派发。旧 Factory 98c9ef53-e6bd-44a3-8f33-2cc8909550f2 已取消，保留其原契约和失败记录；不要恢复或复用旧任务、候选、文件、运行或 SID。
+
+本任务固定原官方 Claude Code 订阅 claude-haiku-5-5。工作区唯一优先项也必须是该原订阅模型。提问前执行、正常回答后的继续执行、独立 review 和独立 verify 都使用同一模型与原订阅；不可用则如实阻塞，不改用 API key、其它订阅或其它模型。
+
+本任务无外部 Git 仓库。在本任务独立工作目录创建一个新文件 mikka-question-recovery-cc-20261104-1237.txt，内容精确为 UTF-8、无 BOM 的三行，每行以 LF 结束：
+mikka-group-policy-v3
+path=claude-code
+status=ready
+
+验收标准：
+1. 仅新增并交付上述文件，内容恰好 52 字节，SHA-256 为 05767473d01dff511a6e38e59e8e3730f7e114283c2494c6b6ac48fadcb382a6，所有 LF（含最后一个）一致，无 BOM 或多余内容。
+2. execute 在向 Owner 提问之前实际用 Bash 创建文件，再实际读取文件、检查字节数和 SHA-256，并实际执行 Git 状态与改动范围检查，确认只有本任务目标文件新增或修改，保留真实命令输入、输出和退出状态。不能用叙述代替执行。
+3. 完成上述实际检查后，必须通过既有 ask_human 工具发出一次真实 decision 问题：“是否把当前已检查的 52 字节文件作为本次交付，提交独立审阅？” summary 如实记录已创建文件与已执行检查。发出问题后结束这一段执行，等待 Owner 在正常问题入口回答；不能自己回答、提前 submit 或另建任务。
+4. Owner 正常回答后，在原任务的继续执行中交付保留下来的同一文件。不要重跑文件创建、读取、字节或哈希命令；如恢复上下文或文件状态出现实际不一致，应如实阻塞，不得跳过不一致来宣称通过。通过现有 submit 结束，让 host 保存本轮候选快照。
+5. 独立 review 和独立 verify 分别在自己的固定候选中通过 inspect_artifact 实际读取新文件，并传入完整 expectedUtf8，核对 bytes、sha256、head、committedSha256、contentMatchesGit=true、matchesExpectedUtf8=true，保留各自真实新鲜的工具输入输出。它们是 reportOnly 的只读产物检查，不要求 Python、Bash 或未授予的 verify_command。
+6. 两个独立检查对执行命令的判断，使用 host 提供且有不可变提问恢复回执严格绑定的直接前驱记录，并引用实际提供的命令输出来源。明确这是同次执行在提问之前完成的检查，不冒称恢复后或审查阶段重新执行。不编造 run ID、SID、回执或引用；缺回执、记录不完整、候选或归属不符就如实报告缺失。
+
+本任务用于验收正常中途提问与恢复：必须保留真实等待回答、正常回答、同次执行继续交付、独立 review → verify 的完整状态。三个阶段完成后等待我正常 Owner 验收，你不能代替 Owner 通过。只允许本任务目录里的文件操作，不连接生产数据库，不改生产设置，不操作其它任务，不 push、不建 PR、不发送第三方消息，不使用不存在的通用文件上传工具。最终只汇报这一个新任务的候选与真实状态。
