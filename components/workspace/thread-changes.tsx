@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useId, useMemo, useRef, useState } from 'react'
-import { getSingularPatch } from '@pierre/diffs'
-import { FileDiff } from '@pierre/diffs/react'
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { getSingularPatch, Virtualizer } from '@pierre/diffs'
+import { FileDiff, VirtualizerContext } from '@pierre/diffs/react'
 import { useTranslations } from 'next-intl'
 import { ChevronDown, ChevronRight, ExternalLink } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -43,6 +43,13 @@ export function ThreadChangesView({ changes, wrap, onWrapChange, filesOpen, onFi
   const sections = useRef(new Map<string, HTMLElement>())
   const [closed, setClosed] = useViewState<string[]>(`${stateKey}:closed-files`, [])
   const scroll = useViewScroll<HTMLDivElement>(stateKey)
+  const [virtualizer] = useState(() => typeof window === 'undefined' ? undefined : new Virtualizer())
+  useLayoutEffect(() => {
+    const node = scroll.current
+    if (!node || !virtualizer) return
+    virtualizer.setup(node)
+    return () => virtualizer.cleanUp()
+  }, [scroll, virtualizer])
   return <div data-slot="thread-changes" data-wrap={wrap} className="flex min-h-0 flex-1 flex-col">
     <div className="flex shrink-0 items-center gap-2 px-3 py-2">
       <Button variant="ghost" size="sm" className="-ml-1.5 gap-1.5 px-1.5" aria-expanded={filesOpen} aria-controls={listId} onClick={() => onFilesOpenChange(!filesOpen)}>
@@ -66,14 +73,19 @@ export function ThreadChangesView({ changes, wrap, onWrapChange, filesOpen, onFi
         </Button>
       </li> })}
     </ul>}
-    <div ref={scroll} data-slot="thread-changes-scroll" className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
-      {changes.files.map(file => {
-        const open = !closed.includes(file.path)
-        return <FileSection key={file.path} file={file} open={open} wrap={wrap}
-          ref={node => { if (node) sections.current.set(file.path, node); else sections.current.delete(file.path) }}
-          onOpenChange={next => setClosed(current => next ? current.filter(path => path !== file.path) : [...current, file.path])} />
-      })}
-    </div>
+    {/* Only the lines in view are drawn: a change of thousands of lines opens at once. */}
+    <VirtualizerContext.Provider value={virtualizer}>
+      <div ref={scroll} data-slot="thread-changes-scroll" className="min-h-0 flex-1 overflow-y-auto p-3">
+        <div className="flex flex-col gap-3">
+          {changes.files.map(file => {
+            const open = !closed.includes(file.path)
+            return <FileSection key={file.path} file={file} open={open} wrap={wrap}
+              ref={node => { if (node) sections.current.set(file.path, node); else sections.current.delete(file.path) }}
+              onOpenChange={next => setClosed(current => next ? current.filter(path => path !== file.path) : [...current, file.path])} />
+          })}
+        </div>
+      </div>
+    </VirtualizerContext.Provider>
   </div>
 }
 
