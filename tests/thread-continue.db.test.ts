@@ -227,6 +227,82 @@ test('a message to an ended thread runs it again in the same thread; only its ow
       assert.equal(after.messages, before.messages + 1)
       assert.deepEqual(await sendThreadMessage(b.id, initial.runId, text, human, requestId), accepted)
       assert.deepEqual(await snapshot(), after, 'the exact submission replays its receipt without creating another answer or native continuation')
+
+      // Continue through the actual cloud adapter and question settlement. The
+      // CLI observations are synthetic; no provider or browser is contacted.
+      // Normal answer() deliberately leaves the persisted continuesRunId null.
+      assert.equal(next.continuesRunId, null)
+      const { factoryBinding } = await import('../lib/factory/dispatch')
+      const { factoryEventId } = await import('../lib/factory/event-id')
+      const { questionExecutionContinuation } = await import('../lib/factory/questions/execution-continuation')
+      const { producerCommandObservations } = await import('../lib/factory/checks')
+      const runtime = factoryRuntimeForBot(legacyNullScope ? null : b.botId)
+      const base = 'a'.repeat(40), head = 'b'.repeat(40), worktree = `/isolated/question-${initial.runId}`
+      const observedAt = new Date(Date.now() - 240_000).toISOString()
+      const inputId = randomUUID(), outputId = randomUUID()
+      await pool.query(`UPDATE agent_runs SET "startedAt"=clock_timestamp()-interval '5 minutes',
+        "finishedAt"=clock_timestamp()-interval '3 minutes',"worktreePath"=$2 WHERE id=$1`, [origin.id, worktree])
+      await pool.query(`INSERT INTO run_chunks(id,"runId",seq,chunk,"createdAt") VALUES($1,$2,1,$3,$4),($5,$2,2,$6,$4)`,
+        [inputId, origin.id, JSON.stringify({ type: 'tool-input-available', toolName: 'shell', toolCallId: 'before-question',
+          input: { command: 'wc -c REPORT.md && sha256sum REPORT.md' } }), observedAt, outputId,
+          JSON.stringify({ type: 'tool-output-available', toolCallId: 'before-question', output: { exitCode: 0, output: '52 REPORT.md' } })])
+      const claim = await questions.claimContinuation(b.id, childDevice, next.id, new Date(Date.now() + 60_000).toISOString())
+      assert.equal(claim.continuesRunId, origin.id, 'the host handoff resumes the question origin')
+      assert.equal((await pool.query('SELECT "continuesRunId" FROM agent_runs WHERE id=$1', [next.id])).rows[0].continuesRunId, null,
+        'claim does not invent a persisted predecessor to make the reader pass')
+      for (const id of [origin.id, next.id]) await pool.query('INSERT INTO byos_native_runs("runId","bindingId") VALUES($1,$2)',
+        [id, next.agentDefinition.subscription.bindingId])
+      await pool.query(`UPDATE agent_runs SET status='succeeded',"stopReason"='submitted',"sessionId"=$2,
+        "worktreePath"=$3,"finishedAt"=clock_timestamp(),report=$4 WHERE id=$1`,
+        [next.id, nativeSessionId, worktree, JSON.stringify({ summary: 'Synthetic resumed submission',
+          sourceCommit: base, deliverableCommit: head, verify: { status: 'not_run' } })])
+      assert.equal((await questions.settle(b.id, next.id))?.status, 'resolved')
+      let current = (await runtime.store.read(b.id, task.id)).task
+      current = (await runtime.store.apply(b.id, factoryBinding(current), randomUUID(), { action: 'candidate', runId: next.id,
+        candidate: { kind: 'deliverable', sha: null, repository: worktree, environment: `device:${childDevice}`, scope: 'Question artifact' } })).task
+      const candidate = { id: current.candidateId!, executionSha: head, producerExecution: { runId: next.id, sessionId: nativeSessionId } }
+      current = (await runtime.store.apply(b.id, factoryBinding(current), randomUUID(), { action: 'finish', status: 'passed',
+        reason: 'Synthetic producer submitted its artifact', output: { runId: next.id },
+        evidence: [{ artifact: `run-report:${next.id}`, kind: 'report', runId: next.id, sessionId: nativeSessionId,
+          candidateId: candidate.id, sha: null, environment: `device:${childDevice}`, recordedAt: new Date().toISOString() }] })).task
+      const producerAttemptId = current.attemptId
+      current = (await runtime.store.apply(b.id, factoryBinding(current), randomUUID(), {
+        action: 'advance', stage: 'review', reason: 'Independent review remains required' })).task
+      const result = JSON.parse(await producerCommandObservations(pool, current, candidate))
+      assert.deepEqual(result.records, [], 'the resumed segment has no new command observations')
+      assert.equal(result.inheritedRecordsOmitted, false)
+      assert.equal(result.inheritedRecords.length, 1, 'normal cloud answer/claim/settle preserves the pre-question command')
+      assert.deepEqual([result.inheritedRecords[0].sourceRunId, result.inheritedRecords[0].sourceSessionId,
+        result.inheritedRecords[0].sourceStatus, result.inheritedRecords[0].outputChunkId,
+        result.inheritedRecords[0].questionId, result.inheritedRecords[0].answerId,
+        result.inheritedRecords[0].recoveryEventId, result.inheritedRecords[0].candidateSha],
+        [origin.id, nativeSessionId, 'stopped', outputId, questionId, answered.answerId,
+          factoryEventId('question-resume', answered.answerId!), head])
+      assert.equal((await questionExecutionContinuation(pool, current, producerAttemptId))?.sourceRunId, origin.id)
+      const otherWorkspace = await seedWorkspace(pool, b.id, [{ userId: b.id, role: 'admin' }])
+      const otherBot = await chatBotId(b.id, null, otherWorkspace.id)
+      const corruptions: [string, string, unknown[]][] = [
+        ['explicit conflicting predecessor', 'UPDATE agent_runs SET "continuesRunId"=$2 WHERE id=$1', [next.id, first.runId]],
+        ['wrong origin payload', `UPDATE agent_runs SET "questionContinuation"=jsonb_set("questionContinuation",'{originRunId}',to_jsonb($2::text)) WHERE id=$1`, [next.id, randomUUID()]],
+        ['missing receipt', 'DELETE FROM factory_events WHERE "taskId"=$1 AND "eventId"=$2', [task.id, factoryEventId('question-resume', answered.answerId!)]],
+        ['wrong answer fingerprint', `UPDATE factory_questions SET "answerFingerprint"='changed' WHERE id=$1`, [questionId]],
+        ['different actual SID', 'UPDATE agent_runs SET "sessionId"=$2 WHERE id=$1', [next.id, 'different-native-session']],
+        ['changed definition', `UPDATE agent_runs SET "agentDefinition"=jsonb_set("agentDefinition",'{definitionDigest}','"changed"') WHERE id=$1`, [next.id]],
+        ['missing source native claim', 'DELETE FROM byos_native_runs WHERE "runId"=$1', [origin.id]],
+        ['different workspace', 'UPDATE computer_run_bindings SET "workspaceId"=$2,"botId"=$3 WHERE "runId"=$1', [next.id, otherWorkspace.id, otherBot]],
+        ['wrong request epoch', `UPDATE factory_attempts SET output=jsonb_set(output,'{requestEpoch}',to_jsonb($2::text)) WHERE id=$1`, [producerAttemptId, randomUUID()]],
+      ]
+      for (const [label, sql, args] of corruptions) {
+        const tx = await pool.connect()
+        try {
+          await tx.query('BEGIN')
+          await tx.query(sql, args)
+          assert.deepEqual(JSON.parse(await producerCommandObservations(tx, current, candidate)).inheritedRecords, [], label)
+        } finally { await tx.query('ROLLBACK'); tx.release() }
+      }
+      assert.deepEqual(JSON.parse(await producerCommandObservations(pool, { ...current, userId: a.id }, candidate)).inheritedRecords, [])
+      assert.deepEqual(JSON.parse(await producerCommandObservations(pool, current, { ...candidate, executionSha: 'c'.repeat(40) })).inheritedRecords, [])
+
     })
   })
 
