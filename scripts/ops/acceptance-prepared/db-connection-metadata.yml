@@ -1,0 +1,65 @@
+name: Temporary database connection metadata
+on:
+  push:
+    branches: [acceptance/proactive-1157-1163]
+    paths:
+      - '.github/workflows/proactive-acceptance.yml'
+      - 'scripts/ops/db-connection-metadata.mjs'
+permissions:
+  contents: read
+concurrency:
+  group: proactive-database-connection-metadata
+  cancel-in-progress: false
+jobs:
+  metadata:
+    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/acceptance/proactive-1157-1163'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        working-directory: source
+    env:
+      DB_METADATA_SOURCE_SHA: 5b81321dfd3bbc3413d71af258433e5e9ba73dfb
+      DB_METADATA_OUTPUT: ${{ github.workspace }}/db-connection-metadata/results.json
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          path: driver
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.DB_METADATA_SOURCE_SHA }}
+          path: source
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+      - name: Read exactly the existing named connection value
+        id: connection
+        continue-on-error: true
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /vercel
+          secret-name: MIKKA_DATABASE_URL
+          recursive: false
+          include-imports: false
+      - name: Parse metadata without any database connection
+        env:
+          DB_METADATA_SECRET_READ: ${{ steps.connection.outcome }}
+        run: node ../driver/scripts/ops/db-connection-metadata.mjs
+      - name: Upload metadata only
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: database-connection-metadata-${{ github.run_id }}
+          path: db-connection-metadata/results.json
+          if-no-files-found: error
+          retention-days: 7
