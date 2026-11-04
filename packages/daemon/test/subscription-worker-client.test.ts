@@ -108,3 +108,42 @@ console.error('secret_store_failure POST http_403');console.error('raw provider 
     expect(warn.mock.calls.map(call => String(call[0]))).toEqual([JSON.stringify({ level: 'warn', msg: 'subscription_worker', detail: 'secret_store_failure POST http_403' })])
   } finally { warn.mockRestore() }
 })
+
+it('accepts only fixed request-boundary diagnostics and preserves the refusal if logging throws', async () => {
+  const directory = tempDir('mikka-worker-request-stderr-')
+  const binary = join(directory, 'worker.mjs')
+  const allowed = [
+    'subscription_request_failure claude input payload_too_large 262145 262144',
+    'subscription_request_failure codex conversion payload_too_large 524289 524288',
+    'subscription_request_failure claude conversion json_invalid 37 524288',
+    'subscription_request_failure unknown stream stream_unavailable 0 0',
+    'subscription_request_failure claude stream chunk_too_large 65537 65536',
+  ]
+  const denied = [
+    'raw provider body fixture-private-token',
+    'subscription_request_failure fixture-private-provider input json_invalid 1 262144',
+    'subscription_request_failure claude input fixture_private_token 1 262144',
+    'subscription_request_failure claude stream json_invalid 1 262144',
+    'subscription_request_failure claude input payload_too_large -1 262144',
+    'subscription_request_failure claude input payload_too_large 1.5 262144',
+    'subscription_request_failure claude input payload_too_large 10000000000 262144',
+    'subscription_request_failure claude input payload_too_large 262145 999999',
+    'subscription_request_failure claude input payload_too_large 262145 262144 fixture-private-body',
+  ]
+  writeFileSync(binary, `#!/usr/bin/env node
+import {createInterface} from 'node:readline'
+let config;createInterface({input:process.stdin}).on('line',line=>{const value=JSON.parse(line);if(!config){config=value;return}
+for(const line of ${JSON.stringify([...allowed, ...denied])}) console.error(line)
+setTimeout(()=>console.log(JSON.stringify({id:value.id,error:'provider_operation_failed'})),50)})
+`)
+  chmodSync(binary, 0o700)
+  for (const loggingThrows of [false, true]) {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => { if (loggingThrows) throw new Error('fixture-private-log-failure') })
+    try {
+      const client = new SubscriptionWorkerClient({ binary }, { scope: { ownerId: 'o', workspaceId: 'w', connectionId: '20000000-0000-4000-8000-000000000001', provider: 'codex' }, databaseUrl: 'synthetic', infisicalOrigin: 'https://fixture.invalid', project: 'fixture', environment: 'test', path: '/grants', workloadToken: 'w' } as never)
+      await expect(client.call('oauthStart', { revision: 1 })).rejects.toMatchObject({ name: 'WorkerRefusal', code: 'provider_operation_failed' })
+      expect(warn.mock.calls.map(call => JSON.parse(String(call[0])).detail)).toEqual(allowed)
+      expect(JSON.stringify(warn.mock.calls)).not.toContain('fixture-private')
+    } finally { warn.mockRestore() }
+  }
+})

@@ -126,6 +126,83 @@ func TestUpstreamErrorTypeKeepsOnlyTheEnum(t *testing.T) {
 	}
 }
 
+func TestRequestDiagnosticsAcceptOnlyLocalEnumsAndByteCounts(t *testing.T) {
+	logged := captureStderr(t, func() {
+		requestFailure("fixture-private-provider", "input", "json_invalid", 12, 262144)
+		requestFailure("claude", "conversion", "fixture_private_reason", 12, 524288)
+		requestFailure("claude", "fixture_private_phase", "json_invalid", 12, 262144)
+		requestFailure("claude", "stream", "json_invalid", 12, 262144)
+		requestFailure("claude", "input", "json_invalid", -1, 262144)
+		requestFailure("claude", "input", "json_invalid", 12, 12345)
+	})
+	if logged != "subscription_request_failure unknown input json_invalid 12 262144\n" {
+		t.Fatalf("unexpected local diagnostic: %q", logged)
+	}
+}
+
+func TestPlainModelRequestBoundariesDoNotReachProviderOrExposeInput(t *testing.T) {
+	for _, provider := range []string{"claude", "codex"} {
+		t.Run(provider, func(t *testing.T) {
+			calls, sentBytes := 0, 0
+			model := CPAPlainModel{Provider: provider, Client: &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+				calls++
+				raw, err := io.ReadAll(r.Body)
+				if err != nil {
+					t.Fatal(err)
+				}
+				sentBytes = len(raw)
+				body := "data: {\"type\":\"message_stop\"}\n\n"
+				if provider == "codex" {
+					body = "data: {\"type\":\"response.completed\",\"response\":{\"id\":\"fixture\",\"model\":\"fixture-model\",\"output\":[],\"usage\":{\"input_tokens\":1,\"output_tokens\":1}}}\n\n"
+				}
+				return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": {"text/event-stream"}}, Body: io.NopCloser(strings.NewReader(body))}, nil
+			})}}
+			auth := &core.Auth{Metadata: map[string]any{"access_token": "fixture-private-access", "account_id": "fixture-account"}}
+			execute := func(text string) error {
+				payload, err := json.Marshal(map[string]any{"model": "fixture-model", "stream": true, "messages": []any{map[string]any{"role": "user", "content": text}}})
+				if err != nil {
+					t.Fatal(err)
+				}
+				result, err := model.ExecuteStream(context.Background(), auth, ex.Request{Model: "fixture-model", Payload: payload}, ex.Options{})
+				if err != nil {
+					return err
+				}
+				for chunk := range result.Chunks {
+					if chunk.Err != nil {
+						return chunk.Err
+					}
+				}
+				return nil
+			}
+			if err := execute("seed"); err != nil {
+				t.Fatal(err)
+			}
+			// Calibrate the real CPA conversion, rather than copying its format.
+			capacity := 524288 - sentBytes + len("seed")
+			calls = 0
+			if err := execute(strings.Repeat("x", capacity)); err != nil || calls != 1 || sentBytes != 524288 {
+				t.Fatalf("exact converted boundary failed: err=%v calls=%d bytes=%d", err, calls, sentBytes)
+			}
+			calls = 0
+			var err error
+			logged := captureStderr(t, func() { err = execute(strings.Repeat("x", capacity+1)) })
+			if err != ErrProvider || calls != 0 || logged != fmt.Sprintf("subscription_request_failure %s conversion payload_too_large 524289 524288\n", provider) {
+				t.Fatalf("converted overflow crossed boundary: err=%v calls=%d diagnostic=%q", err, calls, logged)
+			}
+			invalid := []byte(`{"fixture-private-body":`)
+			logged = captureStderr(t, func() {
+				_, err = model.ExecuteStream(context.Background(), auth, ex.Request{Model: "fixture-model", Payload: invalid}, ex.Options{})
+			})
+			if err != ErrProvider || calls != 0 || logged != fmt.Sprintf("subscription_request_failure %s input json_invalid %d 262144\n", provider, len(invalid)) {
+				t.Fatalf("invalid input crossed boundary: err=%v calls=%d diagnostic=%q", err, calls, logged)
+			}
+			if strings.Contains(logged, "fixture-private") {
+				t.Fatal("request diagnostic exposed input or credential")
+			}
+		})
+	}
+}
+
 func TestClaudeSubscriptionSystemPreservesHostBlocks(t *testing.T) {
 	prefix := map[string]any{"type": "text", "text": "You are Claude Code, Anthropic's official CLI for Claude."}
 	host := map[string]any{"type": "text", "text": "Mikka host instructions", "cache_control": map[string]any{"type": "ephemeral"}}

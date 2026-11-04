@@ -12,6 +12,9 @@ import { accountLabel, failedUsage, parseSubscriptionUsage, type SubscriptionUsa
 import { BACKEND_FAILURES, GENERATION_FAILURES, PRIVATE_FAILURES, generationFailureDetails } from './subscription-generation-diagnostics'
 import { stepIdentity } from './model-call-timing'
 
+// Matches Worker.Stream's existing UTF-8 payload limit.
+const MODEL_REQUEST_MAX_BYTES = 262144
+
 export interface SubscriptionCapabilities {
   /** Whether the route runs for this subscription owner (lib/subscription-routes.ts). */
   ready(route: SubscriptionRoute, ownerId: string): boolean | Promise<boolean>
@@ -73,7 +76,20 @@ export class SubscriptionService {
       model: async modelId => {
         const provider = createOpenAICompatible({ name: 'mikka-subscription', baseURL: 'https://mikka.invalid/v1', apiKey: 'private-worker-placeholder',
           fetch: async (_url, init) => {
-            if (typeof init?.body !== 'string' || init.body.length > 262144) throw new SubscriptionRefusal('backend_unavailable')
+            if (typeof init?.body !== 'string') {
+              await logRequestFailure('body_invalid', null)
+              throw new SubscriptionRefusal('backend_unavailable')
+            }
+            const bytes = Buffer.byteLength(init.body, 'utf8')
+            if (bytes > MODEL_REQUEST_MAX_BYTES) {
+              await logRequestFailure('payload_too_large', bytes)
+              // Preserve both existing public refusals. The old host guard
+              // rejected this many UTF-16 units; a multibyte-only overflow
+              // previously reached Go and became the generic stream failure.
+              throw init.body.length > MODEL_REQUEST_MAX_BYTES
+                ? new SubscriptionRefusal('backend_unavailable')
+                : new Error('subscription_generation_failed')
+            }
             const payload = JSON.parse(init.body)
             if (payload.model !== binding.modelId || payload.stream !== true) throw new SubscriptionRefusal('binding_mismatch')
             await this.check(use, signal)
@@ -273,5 +289,12 @@ async function logGenerationFailure(stage: 'start' | 'stream' | 'stream_part', e
   try {
     const identity = await stepIdentity()
     console.warn(JSON.stringify({ level: 'warn', msg: 'subscription_generation_failed', stage, code: generationFailureCode(error), ...generationFailureDetails(error), workflowRunId: identity.workflowRunId ?? null, stepId: identity.stepId ?? null, attempt: identity.attempt ?? null }))
+  } catch { /* diagnostics cannot change the model result */ }
+}
+
+async function logRequestFailure(reason: 'body_invalid' | 'payload_too_large', bytes: number | null) {
+  try {
+    const identity = await stepIdentity()
+    console.warn(JSON.stringify({ level: 'warn', msg: 'subscription_request_failure', phase: 'host_input', reason, bytes, limit: MODEL_REQUEST_MAX_BYTES, workflowRunId: identity.workflowRunId ?? null, stepId: identity.stepId ?? null, attempt: identity.attempt ?? null }))
   } catch { /* diagnostics cannot change the model result */ }
 }
