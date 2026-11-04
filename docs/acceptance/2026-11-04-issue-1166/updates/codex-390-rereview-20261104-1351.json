@@ -1,0 +1,440 @@
+{
+  "schemaVersion": 1,
+  "kind": "original-codex-390-same-candidate-review-failed",
+  "productionBuild": "7ba687a2508dc41ec54dacc09044e130947e719c",
+  "webDeployRun": 41831112166,
+  "ownerAction": {
+    "kind": "normal authenticated UI same-candidate retry",
+    "actualClicks": 1,
+    "eventId": "a3e07597-f993-41a2-8576-c4ace332179a",
+    "boundRevision": 24
+  },
+  "result": {
+    "reviewRunId": "485343a1-1086-4c06-8ce5-250219ea0bf6",
+    "taskVerdict": "failed",
+    "taskRevision": 27,
+    "runnerStatus": "succeeded",
+    "verifyPerformed": false,
+    "ownerAccepted": false,
+    "producerReexecuted": false,
+    "historicalFailuresPreserved": true
+  },
+  "nativeClaims": [
+    {
+      "runId": "390deeb4-5e5b-487a-acb9-c2e53dc3f8e9",
+      "bindingId": "ad6c44e2-3961-4518-8874-42b4c041e902",
+      "workspaceId": "de300000-154f-4875-832f-70e7ffc3b62b",
+      "connectionId": "ef66c1d8-2bbc-48e9-abf3-2ce3787ceef5",
+      "connectionRevision": "2",
+      "route": "codex_cli",
+      "modelId": "gpt-5.6-luna",
+      "createdAt": "2026-11-03T17:22:11.835Z",
+      "sessionId": "01a1a2a5-76f1-7881-b182-311eba17fa98",
+      "status": "succeeded",
+      "agentModel": "gpt-5.6-luna"
+    },
+    {
+      "runId": "e57a6d03-510e-496f-bd88-97375318cd9e",
+      "bindingId": "ad6c44e2-3961-4518-8874-42b4c041e902",
+      "workspaceId": "de300000-154f-4875-832f-70e7ffc3b62b",
+      "connectionId": "ef66c1d8-2bbc-48e9-abf3-2ce3787ceef5",
+      "connectionRevision": "2",
+      "route": "codex_cli",
+      "modelId": "gpt-5.6-luna",
+      "createdAt": "2026-11-03T17:22:11.835Z",
+      "sessionId": "01a1a2a5-76f1-7881-b182-311eba17fa98",
+      "status": "failed",
+      "agentModel": "gpt-5.6-luna"
+    },
+    {
+      "runId": "485343a1-1086-4c06-8ce5-250219ea0bf6",
+      "bindingId": "6baa0065-17c5-485f-8d40-3fdd1f58a13b",
+      "workspaceId": "de300000-154f-4875-832f-70e7ffc3b62b",
+      "connectionId": "ef66c1d8-2bbc-48e9-abf3-2ce3787ceef5",
+      "connectionRevision": "2",
+      "route": "codex_cli",
+      "modelId": "gpt-6-luna",
+      "createdAt": "2026-11-04T13:49:23.660Z",
+      "sessionId": "01a1a6d3-0900-7db0-a1f5-a45b1726290e",
+      "status": "succeeded",
+      "agentModel": "gpt-6-luna"
+    }
+  ],
+  "actualToolChunks": [
+    {
+      "id": "cbb9c59f-e45c-4b36-ae6e-b3e7bb42b70b",
+      "seq": 52,
+      "chunk": {
+        "type": "tool-input-available",
+        "input": {
+          "path": "factory-1146-codex-d8f3d3f2.txt",
+          "expectedUtf8": "factory-1146-codex-d8f3d3f2 resume-1146-recheck-6a265954\n7 - 4 = 3\nverified artifact\n"
+        },
+        "toolName": "mcp__mikka__inspect_artifact",
+        "toolCallId": "exec-fecd55aa-97df-494e-a276-ed1cf6590a0c"
+      },
+      "createdAt": "2026-11-04T13:50:44.548Z"
+    },
+    {
+      "id": "cf172e5d-ac3d-4922-9a92-c3c8b0937393",
+      "seq": 53,
+      "chunk": {
+        "type": "tool-output-available",
+        "output": [
+          {
+            "text": "{\"path\":\"factory-1146-codex-d8f3d3f2.txt\",\"bytes\":85,\"sha256\":\"4e80716f5de244c05cab6f9fdf3d93c90f35fc2cabcf4a07ae79772c48d35032\",\"head\":\"8f418086fff9bcd42d17e32de7b7f4a968fdfc0a\",\"committedSha256\":\"4e80716f5de244c05cab6f9fdf3d93c90f35fc2cabcf4a07ae79772c48d35032\",\"contentMatchesGit\":true,\"contentUtf8\":\"factory-1146-codex-d8f3d3f2 resume-1146-recheck-6a265954\\n7 - 4 = 3\\nverified artifact\\n\",\"textUnavailable\":null,\"matchesExpectedUtf8\":true}",
+            "type": "text"
+          }
+        ],
+        "toolCallId": "exec-fecd55aa-97df-494e-a276-ed1cf6590a0c"
+      },
+      "createdAt": "2026-11-04T13:50:44.880Z"
+    },
+    {
+      "id": "5f094422-2105-4e70-bcfd-870c30fa08cd",
+      "seq": 54,
+      "chunk": {
+        "type": "tool-input-available",
+        "input": {
+          "summary": "独立只读检查了固定候选 b251f0b5-3aa6-4e70-b57a-282161c969a1。inspect_artifact 实际返回的 contentUtf8 与本次 expectedUtf8 逐字符一致；85 bytes、SHA256、committedSha256、HEAD、contentMatchesGit 和 matchesExpectedUtf8 均符合目标。第二行实际内容为 7 - 4 = 3，算式语义正确。当前 producer 的 records 为空；唯一命令观察来自 sourceStatus=failed 的历史继承记录，不能当作本次成功 producer 的新鲜记录。当前 review 授权仅包含 inspect_artifact，无 verify_command 授权，因此未声称独立命令验证已完成。",
+          "criteria": [
+            {
+              "text": "目标文件正文按本次 expectedUtf8 逐字节匹配，并且 Git 快照与文件一致。",
+              "passed": true,
+              "evidence": "本次真实 mikka.inspect_artifact 返回：contentUtf8=\"factory-1146-codex-d8f3d3f2 resume-1146-recheck-6a265954\\n7 - 4 = 3\\nverified artifact\\n\"；matchesExpectedUtf8=true；bytes=85；sha256=4e80716f5de244c05cab6f9fdf3d93c90f35fc2cabcf4a07ae79772c48d35032；committedSha256 同值；head=8f418086fff9bcd42d17e32de7b7f4a968fdfc0a；contentMatchesGit=true。",
+              "exitCode": null
+            },
+            {
+              "text": "实际第二行算式语义正确。",
+              "passed": true,
+              "evidence": "同一真实 inspect_artifact 的完整 contentUtf8 第二行是“7 - 4 = 3”；直接计算 7 - 4 = 3，语义成立。",
+              "exitCode": null
+            },
+            {
+              "text": "Producer 必须真实写文件并运行算式语义、UTF-8 字节数、SHA256 和 Git 快照检查，保存命令及真实结果。",
+              "passed": false,
+              "evidence": "本次 host producer observations 中 records=[]。inheritedRecords 唯一记录来自 sourceRunId=e57a6d03-510e-496f-bd88-97375318cd9e，sourceStatus=failed、sourceStopReason=error，且属于历史恢复 predecessor；按任务说明不能满足本次新鲜执行要求。独立检查没有 verify_command 授权。",
+              "exitCode": null
+            }
+          ],
+          "nextStep": "由系统按固定候选继续处理独立 verify，并等待 owner 正常 UI 验收；不要把缺失命令证据视为通过。",
+          "openQuestions": [
+            "缺少本次成功 producer 的新鲜命令输入、输出和退出码记录；如冻结 criterion 要求独立命令执行，还缺少本阶段 verify_command 能力。"
+          ]
+        },
+        "toolName": "mcp__mikka__submit",
+        "toolCallId": "exec-9c5612e6-a8d0-4c93-b927-c6906c76f487"
+      },
+      "createdAt": "2026-11-04T13:51:13.498Z"
+    },
+    {
+      "id": "b39ebf5e-5053-4316-8a03-9f883a89ebce",
+      "seq": 55,
+      "chunk": {
+        "type": "tool-output-available",
+        "output": [
+          {
+            "text": "Handed in. End your turn now.",
+            "type": "text"
+          }
+        ],
+        "toolCallId": "exec-9c5612e6-a8d0-4c93-b927-c6906c76f487"
+      },
+      "createdAt": "2026-11-04T13:51:13.834Z"
+    }
+  ],
+  "events": [
+    {
+      "eventId": "a3e07597-f993-41a2-8576-c4ace332179a",
+      "createdAt": "2026-11-04T13:47:40.368Z",
+      "request": {
+        "binding": {
+          "taskId": "9ea956ce-a604-4c2e-a724-fb04fa5a3c9b",
+          "revision": 24
+        },
+        "action": "retry",
+        "reason": "重新审阅"
+      },
+      "state": {
+        "taskId": "9ea956ce-a604-4c2e-a724-fb04fa5a3c9b",
+        "candidateId": "b251f0b5-3aa6-4e70-b57a-282161c969a1",
+        "stage": "review",
+        "status": "pending",
+        "revision": 25,
+        "attemptId": "ce14d832-ec44-490b-84aa-ce05ce9a3b7f"
+      },
+      "attempt": {
+        "id": "ce14d832-ec44-490b-84aa-ce05ce9a3b7f",
+        "runId": null,
+        "stage": "review",
+        "output": {
+          "requestEpoch": "531dbd62-042c-4177-9e8a-16d25a46a452"
+        },
+        "reason": "重新审阅",
+        "status": "pending",
+        "taskId": "9ea956ce-a604-4c2e-a724-fb04fa5a3c9b",
+        "ordinal": 4,
+        "evidence": [],
+        "position": 8,
+        "createdAt": "2026-11-04T13:47:40.368Z",
+        "sessionId": null,
+        "finishedAt": null,
+        "candidateId": "b251f0b5-3aa6-4e70-b57a-282161c969a1"
+      }
+    },
+    {
+      "eventId": "ce14d832-ec44-490b-84aa-ce05ce9a3b7f",
+      "createdAt": "2026-11-04T13:49:21.287Z",
+      "request": {
+        "binding": {
+          "taskId": "9ea956ce-a604-4c2e-a724-fb04fa5a3c9b",
+          "revision": 25
+        },
+        "action": "bind_run",
+        "reason": null
+      },
+      "state": {
+        "taskId": "9ea956ce-a604-4c2e-a724-fb04fa5a3c9b",
+        "candidateId": "b251f0b5-3aa6-4e70-b57a-282161c969a1",
+        "stage": "review",
+        "status": "running",
+        "revision": 26,
+        "attemptId": "ce14d832-ec44-490b-84aa-ce05ce9a3b7f"
+      },
+      "attempt": {
+        "id": "ce14d832-ec44-490b-84aa-ce05ce9a3b7f",
+        "runId": "485343a1-1086-4c06-8ce5-250219ea0bf6",
+        "stage": "review",
+        "output": {
+          "check": {
+            "sha": "8f418086fff9bcd42d17e32de7b7f4a968fdfc0a",
+            "stage": "review",
+            "policy": {
+              "readOnly": true,
+              "permissions": {
+                "network": "allow",
+                "git_push": "deny",
+                "computer_use": "deny",
+                "install_dependency": "deny",
+                "write_outside_repo": "deny"
+              },
+              "networkAllow": [
+                "github.com",
+                "*.github.com",
+                "*.githubusercontent.com"
+              ]
+            },
+            "command": null,
+            "reportOnly": true,
+            "repository": "/home/user/.mikka/bot-workspaces/0c2865c3-7d69-49d2-a3fd-02c484621958",
+            "candidateId": "b251f0b5-3aa6-4e70-b57a-282161c969a1",
+            "environment": "device:b6090794-d5a6-467d-9c57-6e449775a020",
+            "deviceRepoId": "e5583b20-d4c7-4f23-afe0-0b017a4ab603",
+            "inferCommand": false,
+            "requestEpoch": "531dbd62-042c-4177-9e8a-16d25a46a452",
+            "candidateEnvironment": "device:e06a9cbf-86bf-4521-9473-dded71d7c1b8"
+          },
+          "handoff": {
+            "digest": "2bf24ac2adf8cfc06629ef34e63f87b0425fa86019435553d3052979d01876f7",
+            "eventId": "cedf2f18-1f45-5122-a95e-d8f1acf1fbe0",
+            "requestEpoch": "531dbd62-042c-4177-9e8a-16d25a46a452"
+          },
+          "requestEpoch": "531dbd62-042c-4177-9e8a-16d25a46a452"
+        },
+        "reason": "重新审阅",
+        "status": "running",
+        "taskId": "9ea956ce-a604-4c2e-a724-fb04fa5a3c9b",
+        "ordinal": 4,
+        "evidence": [],
+        "position": 8,
+        "createdAt": "2026-11-04T13:47:40.368Z",
+        "sessionId": null,
+        "finishedAt": null,
+        "candidateId": "b251f0b5-3aa6-4e70-b57a-282161c969a1"
+      }
+    },
+    {
+      "eventId": "77b112e4-7665-5b0c-9ce2-0e47d34e0f67",
+      "createdAt": "2026-11-04T13:49:21.287Z",
+      "request": {
+        "binding": {
+          "taskId": "9ea956ce-a604-4c2e-a724-fb04fa5a3c9b",
+          "issueId": "65e92e1e-4d75-4531-b1bd-a2a68d7689c7",
+          "revision": 25,
+          "attemptId": "ce14d832-ec44-490b-84aa-ce05ce9a3b7f",
+          "candidateId": "b251f0b5-3aa6-4e70-b57a-282161c969a1"
+        },
+        "action": null,
+        "reason": null
+      },
+      "state": {
+        "taskId": "9ea956ce-a604-4c2e-a724-fb04fa5a3c9b",
+        "candidateId": "b251f0b5-3aa6-4e70-b57a-282161c969a1",
+        "stage": "review",
+        "status": "running",
+        "revision": 26,
+        "attemptId": "ce14d832-ec44-490b-84aa-ce05ce9a3b7f"
+      },
+      "attempt": {
+        "id": "ce14d832-ec44-490b-84aa-ce05ce9a3b7f",
+        "runId": "485343a1-1086-4c06-8ce5-250219ea0bf6",
+        "stage": "review",
+        "output": {
+          "check": {
+            "sha": "8f418086fff9bcd42d17e32de7b7f4a968fdfc0a",
+            "stage": "review",
+            "policy": {
+              "readOnly": true,
+              "permissions": {
+                "network": "allow",
+                "git_push": "deny",
+                "computer_use": "deny",
+                "install_dependency": "deny",
+                "write_outside_repo": "deny"
+              },
+              "networkAllow": [
+                "github.com",
+                "*.github.com",
+                "*.githubusercontent.com"
+              ]
+            },
+            "command": null,
+            "reportOnly": true,
+            "repository": "/home/user/.mikka/bot-workspaces/0c2865c3-7d69-49d2-a3fd-02c484621958",
+            "candidateId": "b251f0b5-3aa6-4e70-b57a-282161c969a1",
+            "environment": "device:b6090794-d5a6-467d-9c57-6e449775a020",
+            "deviceRepoId": "e5583b20-d4c7-4f23-afe0-0b017a4ab603",
+            "inferCommand": false,
+            "requestEpoch": "531dbd62-042c-4177-9e8a-16d25a46a452",
+            "candidateEnvironment": "device:e06a9cbf-86bf-4521-9473-dded71d7c1b8"
+          },
+          "handoff": {
+            "digest": "2bf24ac2adf8cfc06629ef34e63f87b0425fa86019435553d3052979d01876f7",
+            "eventId": "cedf2f18-1f45-5122-a95e-d8f1acf1fbe0",
+            "requestEpoch": "531dbd62-042c-4177-9e8a-16d25a46a452"
+          },
+          "requestEpoch": "531dbd62-042c-4177-9e8a-16d25a46a452"
+        },
+        "reason": "重新审阅",
+        "status": "running",
+        "taskId": "9ea956ce-a604-4c2e-a724-fb04fa5a3c9b",
+        "ordinal": 4,
+        "evidence": [],
+        "position": 8,
+        "createdAt": "2026-11-04T13:47:40.368Z",
+        "sessionId": null,
+        "finishedAt": null,
+        "candidateId": "b251f0b5-3aa6-4e70-b57a-282161c969a1"
+      }
+    },
+    {
+      "eventId": "83403726-d1dd-5ffb-9745-6459d8113a3e",
+      "createdAt": "2026-11-04T13:51:28.422Z",
+      "request": {
+        "binding": {
+          "taskId": "9ea956ce-a604-4c2e-a724-fb04fa5a3c9b",
+          "revision": 26
+        },
+        "action": "finish",
+        "reason": "Independent review failed: Producer 必须真实写文件并运行算式语义、UTF-8 字节数、SHA256 和 Git 快照检查，保存命令及真实结果。"
+      },
+      "state": {
+        "taskId": "9ea956ce-a604-4c2e-a724-fb04fa5a3c9b",
+        "candidateId": "b251f0b5-3aa6-4e70-b57a-282161c969a1",
+        "stage": "review",
+        "status": "failed",
+        "revision": 27,
+        "attemptId": "ce14d832-ec44-490b-84aa-ce05ce9a3b7f"
+      },
+      "attempt": {
+        "id": "ce14d832-ec44-490b-84aa-ce05ce9a3b7f",
+        "runId": "485343a1-1086-4c06-8ce5-250219ea0bf6",
+        "stage": "review",
+        "output": {
+          "check": {
+            "sha": "8f418086fff9bcd42d17e32de7b7f4a968fdfc0a",
+            "stage": "review",
+            "policy": {
+              "readOnly": true,
+              "permissions": {
+                "network": "allow",
+                "git_push": "deny",
+                "computer_use": "deny",
+                "install_dependency": "deny",
+                "write_outside_repo": "deny"
+              },
+              "networkAllow": [
+                "github.com",
+                "*.github.com",
+                "*.githubusercontent.com"
+              ]
+            },
+            "command": null,
+            "reportOnly": true,
+            "repository": "/home/user/.mikka/bot-workspaces/0c2865c3-7d69-49d2-a3fd-02c484621958",
+            "candidateId": "b251f0b5-3aa6-4e70-b57a-282161c969a1",
+            "environment": "device:e06a9cbf-86bf-4521-9473-dded71d7c1b8",
+            "deviceRepoId": "590b5848-121b-40e1-b9de-c922343c823b",
+            "inferCommand": false,
+            "requestEpoch": "531dbd62-042c-4177-9e8a-16d25a46a452",
+            "candidateEnvironment": "device:e06a9cbf-86bf-4521-9473-dded71d7c1b8"
+          },
+          "handoff": {
+            "digest": "2bf24ac2adf8cfc06629ef34e63f87b0425fa86019435553d3052979d01876f7",
+            "eventId": "cedf2f18-1f45-5122-a95e-d8f1acf1fbe0",
+            "requestEpoch": "531dbd62-042c-4177-9e8a-16d25a46a452"
+          },
+          "completion": {
+            "check": {
+              "sha": "8f418086fff9bcd42d17e32de7b7f4a968fdfc0a",
+              "readOnly": true
+            },
+            "error": null,
+            "runId": "485343a1-1086-4c06-8ce5-250219ea0bf6",
+            "verify": {
+              "status": "not_run"
+            },
+            "summary": "独立只读检查了固定候选 b251f0b5-3aa6-4e70-b57a-282161c969a1。inspect_artifact 实际返回的 contentUtf8 与本次 expectedUtf8 逐字符一致；85 bytes、SHA256、committedSha256、HEAD、contentMatchesGit 和 matchesExpectedUtf8 均符合目标。第二行实际内容为 7 - 4 = 3，算式语义正确。当前 producer 的 records 为空；唯一命令观察来自 sourceStatus=failed 的历史继承记录，不能当作本次成功 producer 的新鲜记录。当前 review 授权仅包含 inspect_artifact，无 verify_command 授权，因此未声称独立命令验证已完成。",
+            "findings": [
+              {
+                "text": "Producer 必须真实写文件并运行算式语义、UTF-8 字节数、SHA256 和 Git 快照检查，保存命令及真实结果。",
+                "passed": false,
+                "evidence": "本次 host producer observations 中 records=[]。inheritedRecords 唯一记录来自 sourceRunId=e57a6d03-510e-496f-bd88-97375318cd9e，sourceStatus=failed、sourceStopReason=error，且属于历史恢复 predecessor；按任务说明不能满足本次新鲜执行要求。独立检查没有 verify_command 授权。"
+              }
+            ],
+            "stopReason": "submitted",
+            "trustedFailureProvenance": true
+          },
+          "requestEpoch": "531dbd62-042c-4177-9e8a-16d25a46a452"
+        },
+        "reason": "Independent review failed: Producer 必须真实写文件并运行算式语义、UTF-8 字节数、SHA256 和 Git 快照检查，保存命令及真实结果。",
+        "status": "failed",
+        "taskId": "9ea956ce-a604-4c2e-a724-fb04fa5a3c9b",
+        "ordinal": 4,
+        "evidence": [
+          {
+            "sha": null,
+            "kind": "report",
+            "runId": "485343a1-1086-4c06-8ce5-250219ea0bf6",
+            "artifact": "run-report:485343a1-1086-4c06-8ce5-250219ea0bf6",
+            "sessionId": "01a1a6d3-0900-7db0-a1f5-a45b1726290e",
+            "recordedAt": "2026-11-04T13:51:28.214Z",
+            "candidateId": "b251f0b5-3aa6-4e70-b57a-282161c969a1",
+            "environment": "device:e06a9cbf-86bf-4521-9473-dded71d7c1b8"
+          }
+        ],
+        "position": 8,
+        "createdAt": "2026-11-04T13:47:40.368Z",
+        "sessionId": "01a1a6d3-0900-7db0-a1f5-a45b1726290e",
+        "finishedAt": "2026-11-04T13:51:29.184Z",
+        "candidateId": "b251f0b5-3aa6-4e70-b57a-282161c969a1"
+      }
+    }
+  ],
+  "limits": [
+    "Runner success means the report was submitted; it does not mean Factory acceptance passed.",
+    "Current producer command records remain empty; E57 inherited observations retain failed/error attribution and cannot be counted as fresh producer execution.",
+    "No criteria, reports, budgets, source records, production database settings or shared tokens were modified.",
+    "Model for this new review was gpt-6-luna; the original producer and direct predecessor retain their historical frozen gpt-5.6-luna identities."
+  ]
+}
