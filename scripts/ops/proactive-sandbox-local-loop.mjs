@@ -83,7 +83,7 @@ try {
   lock = await open(resolve(root, '.cache/dev-local/acceptance-dispatch.lock'), 'wx', 0o600)
   await lock.writeFile(JSON.stringify({ sha, pid: process.pid, startedAt: new Date().toISOString() }))
   const portProbe = net.createServer()
-  await new Promise((yes, no) => { portProbe.once('error', no); portProbe.listen(3110, '127.0.0.1', yes) })
+  await new Promise((yes, no) => { portProbe.once('error', no); portProbe.listen(3112, '127.0.0.1', yes) })
   await new Promise((yes, no) => portProbe.close(error => error ? no(error) : yes()))
   const password = (await readFile('/var/lib/mikka-dev/e2e-password', 'utf8')).trim()
   assert.ok(password && !/[\r\n\0]/.test(password))
@@ -100,8 +100,8 @@ try {
     MIKKA_DATABASE_URL: db.href,
     LOCAL_LOOP_ITEMS: acceptancePlan.items.join(','),
     LOCAL_LOOP_EXPECTED_SOURCE_SHA: sha,
-    LOCAL_LOOP_ORIGIN: 'http://localhost:3110',
-    MIKKA_DEV_PORT: '3110',
+    LOCAL_LOOP_ORIGIN: 'http://localhost:3112',
+    MIKKA_DEV_PORT: '3112',
     MIKKA_DEV_SKIP_ENV_FILES: '1',
   }
   // Do not add --existing: the normal driver creates and migrates a new *_e2e

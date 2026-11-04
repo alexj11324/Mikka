@@ -55,4 +55,4 @@ jobs:
       run: node scripts/ops/proactive-sandbox-local-loop.mjs
       env:
         # Root replaces this with the final reviewed source commit before push.
-        MIKKA_ACCEPTANCE_SOURCE_SHA: 151c4d6bffb95d0d59c781c8f0b8970bfed82d38
+        MIKKA_ACCEPTANCE_SOURCE_SHA: bcca68da5c19597c88658806637ed1c0068adae3
