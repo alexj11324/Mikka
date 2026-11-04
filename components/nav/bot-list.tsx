@@ -4,7 +4,7 @@ import { useViewScroll } from '@/lib/hooks/view-state'
 import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
-import { PanelLeft, Plus, Users } from 'lucide-react'
+import { Bot, PanelLeft, Plus, Users } from 'lucide-react'
 import { botChatSummaries, getCoordinatorChat, type CoordinatorChat } from '@/app/actions/coordinator'
 import type { BotView } from '@/app/actions/bots'
 import type { Thread } from '@/app/actions/task-runs'
@@ -12,6 +12,8 @@ import type { listIssues } from '@/app/actions/issues'
 import { botAttention } from '@/lib/bot-mood'
 import { MikkaMark } from '@/components/brand/mikka-mark'
 import { Button } from '@/components/ui/button'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { NewGroupDialog } from './new-group-dialog'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from '@/components/ui/sidebar'
 import { WorkspaceMenu } from '@/components/workspace-menu'
@@ -122,7 +124,9 @@ function BotListBody({ bots, workspaceId, threads, issues, active, onOpen, onNew
   // Each bot's latest line gives its row the preview and its place in the list.
   const { data: chats = {} } = useSWR('bot-chats', () => botChatSummaries(), { refreshInterval: LIST_POLL_MS })
   // Group chats sit among the bots (R-01), ordered by their latest message.
-  const { data: groups = [] } = useSWR(workspaceId ? ['bot-list-groups', workspaceId] : null, ([, id]: [string, string]) => fetchGroups(id), { refreshInterval: LIST_POLL_MS })
+  const { data: groups = [], mutate: reloadGroups } = useSWR(workspaceId ? ['bot-list-groups', workspaceId] : null, ([, id]: [string, string]) => fetchGroups(id), { refreshInterval: LIST_POLL_MS })
+  const [creatingGroupIn, setCreatingGroupIn] = useState<string | null>(null)
+  useEffect(() => { setCreatingGroupIn(null) }, [workspaceId])
   // The Coordinator's bot row is the entry pinned on top; the rest are the person's other bots.
   const rows = [...bots.filter(bot => !bot.coordinator).map(bot => ({ kind: 'bot' as const, bot, at: chats[bot.id]?.at ?? '' })), ...groups.map(group => ({ kind: 'group' as const, group, at: group.lastMessage?.createdAt ?? group.createdAt }))]
     .sort((a, b) => b.at.localeCompare(a.at) || (a.kind === 'bot' ? a.bot.name : a.group.title).localeCompare(b.kind === 'bot' ? b.bot.name : b.group.title))
@@ -158,6 +162,11 @@ function BotListBody({ bots, workspaceId, threads, issues, active, onOpen, onNew
   // The desktop column mounts again after the window was phone-sized, so it takes the width again then too.
   useLayoutEffect(() => { listRef.current?.style.setProperty('--bot-list-width', `${width}px`) }, [width, isMobile])
   function choose(target: ChatTarget) { onOpen(target); setOpenMobile(false) }
+  const groupDialog = workspaceId && <NewGroupDialog key={workspaceId} workspaceId={workspaceId} bots={bots}
+    open={creatingGroupIn === workspaceId} onOpenChange={next => setCreatingGroupIn(next ? workspaceId : null)}
+    onCreated={group => { setCreatingGroupIn(null); void reloadGroups().catch(() => {}); choose({ kind: 'group', ...group }) }}
+    onNewBot={() => { setCreatingGroupIn(null); onNewBot() }}
+    onReviewGroups={() => { setCreatingGroupIn(null); void reloadGroups().catch(() => {}); if (isMobile) setOpenMobile(true) }} />
   const body = <>
     <SidebarHeader className="px-3 pt-3 pb-1">
       <div className="flex h-8 items-center gap-1 pl-1">
@@ -165,7 +174,13 @@ function BotListBody({ bots, workspaceId, threads, issues, active, onOpen, onNew
         <span className="sr-only">Mikka</span>
         <div className="ml-auto flex items-center gap-1">
           {!isMobile && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label={i18nText('Nav.collapseList')} aria-expanded={isMobile ? openMobile : open} onClick={toggleSidebar} />}><PanelLeft data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{i18nText('Nav.collapseList')}</TooltipContent></Tooltip>}
-          <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label={i18nText('Nav.newBot')} onClick={() => { setOpenMobile(false); onNewBot() }} />}><Plus data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{i18nText('Nav.newBot')}</TooltipContent></Tooltip>
+          <DropdownMenu>
+            <Tooltip><TooltipTrigger render={<DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label={i18nText('Nav.create')} />} />}><Plus data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{i18nText('Nav.create')}</TooltipContent></Tooltip>
+            <DropdownMenuContent align="end"><DropdownMenuGroup>
+              <DropdownMenuItem onClick={() => { setOpenMobile(false); onNewBot() }}><Bot aria-hidden="true" />{i18nText('Nav.newBot')}</DropdownMenuItem>
+              <DropdownMenuItem disabled={!workspaceId} onClick={() => { setOpenMobile(false); setCreatingGroupIn(workspaceId) }}><Users aria-hidden="true" />{i18nText('Nav.newGroup')}</DropdownMenuItem>
+            </DropdownMenuGroup></DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
     </SidebarHeader>
@@ -197,12 +212,12 @@ function BotListBody({ bots, workspaceId, threads, issues, active, onOpen, onNew
       <SidebarMenu><SidebarMenuItem><WorkspaceMenu user={user} onSettings={onSettings} onSignOut={onSignOut} signingOut={signingOut} onBeforeChange={onBeforeChange} /></SidebarMenuItem></SidebarMenu>
     </SidebarFooter>}
   </>
-  if (isMobile) return <Sidebar collapsible="offcanvas" mobileTitle={i18nText('Nav.sidebarTitle')} mobileDescription={i18nText('Nav.sidebarDescription')} mobileCloseLabel={i18nText('Common.close')}>{body}</Sidebar>
+  if (isMobile) return <><Sidebar collapsible="offcanvas" mobileTitle={i18nText('Nav.sidebarTitle')} mobileDescription={i18nText('Nav.sidebarDescription')} mobileCloseLabel={i18nText('Common.close')}>{body}</Sidebar>{groupDialog}</>
   // On desktop the list is the first column inside the card; it folds to nothing and the rail stays.
   // R-37: folding and unfolding are instant, no motion (decision 2026-11-01-2320); dragging the edge follows the pointer.
-  return <div ref={listRef} data-slot="bot-list" data-state={open ? 'expanded' : 'collapsed'} inert={!open} className={cn('relative hidden shrink-0 overflow-hidden md:block in-data-desktop-translucent:bg-shell-material', open ? 'w-(--bot-list-width) border-r' : 'w-0 border-r-0', dragging && 'select-none')}>
+  return <><div ref={listRef} data-slot="bot-list" data-state={open ? 'expanded' : 'collapsed'} inert={!open} className={cn('relative hidden shrink-0 overflow-hidden md:block in-data-desktop-translucent:bg-shell-material', open ? 'w-(--bot-list-width) border-r' : 'w-0 border-r-0', dragging && 'select-none')}>
     <Sidebar collapsible="none" className="w-[var(--bot-list-width,16rem)] bg-transparent">{body}</Sidebar>
     {/* Comma's edge strip with a hairline on hover: drag it or use the arrow keys to resize the list, double-click it to reset, click it to fold the list. */}
     <ResizeHandle resize={resize} label={i18nText('Nav.resizeList')} title={i18nText('Nav.collapseList')} edge="end" onClick={onEdgeClick} />
-  </div>
+  </div>{groupDialog}</>
 }
