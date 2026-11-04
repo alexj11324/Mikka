@@ -6,9 +6,11 @@
 // - copy comes from next-intl (`AiElements.tool`); labels are sentence case (R-32);
 // - status icon colors use our tokens (success, destructive, warning-foreground, info-foreground);
 // - open/closed selectors use base-ui's attributes (`data-open`, `data-closed`, `in-data-[panel-open]`) instead of Radix's `data-[state=…]`;
-// - ToolInput shows a string input as it is instead of JSON.stringify'ing it (our previews may be cut JSON).
+// - ToolInput shows a string input as it is instead of JSON.stringify'ing it (our previews may be cut JSON);
+// - a chat line, not a card: no border, the header is one muted line like ReasoningTrigger (status icon, title,
+//   chevron) with the state as its accessible text (visible only on error) instead of a Badge, and the open
+//   parameters and result share one borderless muted panel with xs code, no nested code-block frame.
 
-import { Badge } from "@/components/ui/badge";
 import {
   Collapsible,
   CollapsibleContent,
@@ -17,10 +19,9 @@ import {
 import { cn } from "@/lib/utils";
 import type { ToolUIPart } from "ai";
 import {
-  CheckCircleIcon,
   ChevronDownIcon,
   CircleIcon,
-  ClockIcon,
+  LoaderCircleIcon,
   WrenchIcon,
   XCircleIcon,
 } from "lucide-react";
@@ -33,7 +34,7 @@ export type ToolProps = ComponentProps<typeof Collapsible>;
 
 export const Tool = ({ className, ...props }: ToolProps) => (
   <Collapsible
-    className={cn("not-prose mb-4 w-full rounded-md border", className)}
+    className={cn("not-prose w-full min-w-0", className)}
     {...props}
   />
 );
@@ -45,7 +46,7 @@ export type ToolHeaderProps = {
   className?: string;
 };
 
-const getStatusBadge = (status: ToolUIPart["state"], t: ReturnType<typeof useTranslations<"AiElements.tool">>) => {
+const getStatus = (status: ToolUIPart["state"], t: ReturnType<typeof useTranslations<"AiElements.tool">>) => {
   const labels: Record<ToolUIPart["state"], string> = {
     "input-streaming": t("pending"),
     "input-available": t("running"),
@@ -57,21 +58,17 @@ const getStatusBadge = (status: ToolUIPart["state"], t: ReturnType<typeof useTra
   };
 
   const icons: Record<ToolUIPart["state"], ReactNode> = {
-    "input-streaming": <CircleIcon className="size-4" />,
-    "input-available": <ClockIcon className="size-4 animate-pulse" />,
-    "approval-requested": <ClockIcon className="size-4 text-warning-foreground" />,
-    "approval-responded": <CheckCircleIcon className="size-4 text-info-foreground" />,
-    "output-available": <CheckCircleIcon className="size-4 text-success" />,
-    "output-error": <XCircleIcon className="size-4 text-destructive" />,
-    "output-denied": <XCircleIcon className="size-4 text-warning-foreground" />,
+    "input-streaming": <CircleIcon className="size-3.5" />,
+    "input-available": <LoaderCircleIcon className="size-3.5 animate-spin motion-reduce:animate-none" />,
+    "approval-requested": <CircleIcon className="size-3.5 text-warning-foreground" />,
+    "approval-responded": <WrenchIcon className="size-3.5" />,
+    "output-available": <WrenchIcon className="size-3.5" />,
+    "output-error": <XCircleIcon className="size-3.5 text-destructive" />,
+    "output-denied": <XCircleIcon className="size-3.5 text-warning-foreground" />,
   };
 
-  return (
-    <Badge className="gap-1.5 rounded-full text-xs" variant="secondary">
-      {icons[status]}
-      {labels[status]}
-    </Badge>
-  );
+  const shown = status === "output-error" || status === "output-denied" || status === "approval-requested";
+  return { icon: icons[status], label: labels[status], shown };
 };
 
 export const ToolHeader = ({
@@ -82,37 +79,44 @@ export const ToolHeader = ({
   ...props
 }: ToolHeaderProps) => {
   const t = useTranslations("AiElements.tool");
+  const status = getStatus(state, t);
   return (
   <CollapsibleTrigger
     className={cn(
-      "flex w-full items-center justify-between gap-4 p-3",
+      "flex w-fit max-w-full items-center gap-2 text-muted-foreground text-xs transition-colors hover:text-foreground disabled:hover:text-muted-foreground [&:disabled>:last-child]:hidden",
       className
     )}
     {...props}
   >
-    <div className="flex items-center gap-2">
-      <WrenchIcon className="size-4 text-muted-foreground" />
-      <span className="font-medium text-sm">
-        {title ?? type.split("-").slice(1).join("-")}
-      </span>
-      {getStatusBadge(state, t)}
-    </div>
-    <ChevronDownIcon className="size-4 text-muted-foreground transition-transform in-data-[panel-open]:rotate-180" />
+    <span aria-hidden="true" className="flex shrink-0">{status.icon}</span>
+    <span className="truncate">
+      {title ?? type.split("-").slice(1).join("-")}
+    </span>
+    <span className={status.shown ? (state === "output-error" ? "text-destructive" : "text-warning-foreground") : "sr-only"}>
+      {status.label}
+    </span>
+    <ChevronDownIcon aria-hidden="true" className="size-3.5 shrink-0 transition-transform in-data-[panel-open]:rotate-180" />
   </CollapsibleTrigger>
   );
 };
 
 export type ToolContentProps = ComponentProps<typeof CollapsibleContent>;
 
-export const ToolContent = ({ className, ...props }: ToolContentProps) => (
+export const ToolContent = ({ className, children, ...props }: ToolContentProps) => (
   <CollapsibleContent
     className={cn(
       "data-closed:fade-out-0 data-closed:slide-out-to-top-2 data-open:slide-in-from-top-2 text-popover-foreground outline-none data-closed:animate-out data-open:animate-in",
       className
     )}
     {...props}
-  />
+  >
+    {/* One panel for parameters and result; the padding sits inside, so the panel still opens from zero height. */}
+    <div className="mt-1.5 flex flex-col gap-3 rounded-lg bg-muted/50 p-3">{children}</div>
+  </CollapsibleContent>
 );
+
+/** Code inside the panel: no frame or background of its own, xs mono, no padding (beats CodeBlock's `[&>pre]` classes). */
+const PLAIN_CODE = "rounded-none border-0 bg-transparent [&_div>pre]:bg-transparent! [&_div>pre]:p-0 [&_div>pre]:text-xs [&_pre>code]:text-xs";
 
 export type ToolInputProps = ComponentProps<"div"> & {
   input: ToolUIPart["input"];
@@ -121,13 +125,11 @@ export type ToolInputProps = ComponentProps<"div"> & {
 export const ToolInput = ({ className, input, ...props }: ToolInputProps) => {
   const t = useTranslations("AiElements.tool");
   return (
-  <div className={cn("space-y-2 overflow-hidden p-4", className)} {...props}>
-    <h4 className="font-medium text-muted-foreground text-xs">
+  <div className={cn("flex min-w-0 flex-col gap-1", className)} {...props}>
+    <h4 className="text-muted-foreground text-xs">
       {t("parameters")}
     </h4>
-    <div className="rounded-md bg-muted/50">
-      <CodeBlock code={typeof input === "string" ? input : JSON.stringify(input, null, 2)} language="json" />
-    </div>
+    <CodeBlock className={PLAIN_CODE} code={typeof input === "string" ? input : JSON.stringify(input, null, 2)} language="json" />
   </div>
   );
 };
@@ -152,23 +154,21 @@ export const ToolOutput = ({
 
   if (typeof output === "object" && !isValidElement(output)) {
     Output = (
-      <CodeBlock code={JSON.stringify(output, null, 2)} language="json" />
+      <CodeBlock className={PLAIN_CODE} code={JSON.stringify(output, null, 2)} language="json" />
     );
   } else if (typeof output === "string") {
-    Output = <CodeBlock code={output} language="json" />;
+    Output = <CodeBlock className={PLAIN_CODE} code={output} language="json" />;
   }
 
   return (
-    <div className={cn("space-y-2 p-4", className)} {...props}>
-      <h4 className="font-medium text-muted-foreground text-xs">
+    <div className={cn("flex min-w-0 flex-col gap-1", className)} {...props}>
+      <h4 className="text-muted-foreground text-xs">
         {errorText ? t("error") : t("result")}
       </h4>
       <div
         className={cn(
-          "overflow-x-auto rounded-md text-xs [&_table]:w-full",
-          errorText
-            ? "bg-destructive/10 text-destructive"
-            : "bg-muted/50 text-foreground"
+          "overflow-x-auto font-mono text-xs [&_table]:w-full",
+          errorText ? "whitespace-pre-wrap break-words text-destructive" : "text-foreground"
         )}
       >
         {errorText && <div>{errorText}</div>}
