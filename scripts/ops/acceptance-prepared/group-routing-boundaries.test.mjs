@@ -20,7 +20,8 @@ function harness(options = {}) {
       request: { workspaceId, title: 'Proactive acceptance ' + fixtureId.slice(0, 8), members: bots.map(b => ({ memberType: 'bot', memberId: b.id })) } } }
   const state = { requests: [], messages: [], turns: [], roles: { ...originalRoles },
     members: [{ id: ownerId, memberType: 'user', role: 'owner' }, ...bots.map(b => ({ id: b.id, memberType: 'bot', role: 'member' }))],
-    position: 0, submitted: 0, roleWrites: [], memberWrites: [], modelWrites: [], models: new Map(), cancelWrites: [], task: null, run: null, qReads: new Map() }
+    position: 0, submitted: 0, roleWrites: [], memberWrites: [], modelWrites: [], models: new Map(), cancelWrites: [], endWrites: [], stopWrites: 0,
+    task: null, run: null, qReads: new Map(), afterStopReads: 0 }
   const group = { id: conversationId, title: fixture.conversationReceipt.body.title, workspaceId, createdBy: ownerId,
     kind: 'group', createdAt: '2026-11-04T00:00:00.100Z', leadAgentId: null, leadBotId: null }
   const gid = '/api/conversations/' + conversationId
@@ -39,12 +40,25 @@ function harness(options = {}) {
     const messageId = id(sequence++), selected = normalReply(body)
     const root = { id: messageId, position: String(++state.position), body, authorType: 'user', authorId: ownerId, mentions, replyToId: replyToId ?? null }
     state.messages.push(root)
-    const trace = { status: options.pending ? 'pending' : 'complete', policyVersion: 'group-contribution-v1',
+    const pending = options.pending || options.recoverPending && state.submitted === 1
+    const trace = { status: pending ? 'pending' : 'complete', policyVersion: 'group-contribution-v1', decisionProtocol: 'group-sequential-v1',
       action: selected.length ? 'reply' : 'ignore', responders: selected.map(i => bots[i].id),
       members: bots.map((b, i) => ({ id: b.id, roleDigest: digest(JSON.stringify(state.roles[roles[i]])) })),
       execution: { executionId: 'decision-' + messageId, providerGenerationId: 'generation-' + messageId,
         modelId: 'openai/gpt-6-luna-decisions', requestDigest: digest(body), imageDigests: [],
         startedAt: new Date(clock).toISOString(), completedAt: new Date(clock + 1).toISOString() }, events: [] }
+    trace.decisions = [{ id: id(sequence++), index: 0, phase: 'intent', policyVersion: trace.policyVersion,
+      status: 'complete', failure: null, receipt: trace.execution, decisionCostUsd: 0.00001 }]
+    for (let index = 0; index < selected.length; index++) trace.decisions.push({ id: id(sequence++), index: index + 1,
+      phase: 'responder', policyVersion: trace.policyVersion, status: 'complete', failure: null,
+      receipt: { ...trace.execution, executionId: 'responder-' + messageId + '-' + index,
+        providerGenerationId: 'responder-generation-' + messageId + '-' + index }, decisionCostUsd: 0.00001 })
+    if (options.missingChain) delete trace.decisions
+    if (options.mixedChain) trace.decisions[0].policyVersion = 'group-route-v0'
+    if (options.invalidFirst && state.submitted === 1) {
+      trace.status = 'pending'; trace.decisions[0].status = 'invalid_decision'; trace.decisions[0].failure = 'uncertain'
+      if (options.unknownCost) trace.decisions[0].decisionCostUsd = null
+    }
     if (options.wakeOnQuiet && body.includes('今天午饭')) trace.events.push({ id: 'wake-quiet', type: 'wake', memberId: bots[0].id })
     if (options.delegateFirst && state.submitted === 1) {
       const taskId = id(700), runId = id(701), issueId = id(702), epoch = id(703), attemptId = id(704)
@@ -53,18 +67,23 @@ function harness(options = {}) {
       state.task = { id: taskId, userId: ownerId, botId: bots[1].id, issueId, sourceEventId: epoch, attemptId, candidateId: null, revision: 1, stage: 'execute', status: 'running' }
       state.attempt = { id: attemptId, runId, output: { requestEpoch: epoch } }
       state.run = { id: runId, issueId, botId: bots[1].id, status: 'running', executionIdentity: { requester: options.wrongDelegationOwner ? 'foreign-owner' : ownerId,
-        executionPrincipal: ownerId, outputOwner: ownerId, botOwner: ownerId, botId: bots[1].id, workspaceId } }
-    } else if (!options.pending) {
+        executionPrincipal: ownerId, outputOwner: ownerId, botOwner: ownerId, botId: bots[1].id, workspaceId,
+        billingAccount: { runtime: { kind: 'e2b', ownerId } } } }
+      if (options.lateDelegate) { state.deferredEvents = trace.events; trace.events = [] }
+    } else if (!pending) {
       for (const i of selected) {
         const text = i === 0 ? '提交按钮加载时禁用，防止重复点击。' : i === 2 ? '连续双击提交，断言只创建一次订单；空密码和错误密码都应验证失败。' : body.includes('代数题') ? '移项得到 3x = 15，相除得到 x = 5。' : 'Boolean(0) 是 false；可以用 value != null 只过滤空值。'
         const message = { id: id(sequence++), position: String(++state.position), replyToId: messageId, authorType: 'bot', authorId: bots[i].id, body: text }
         state.messages.push(message)
+        if (!options.missingWake) trace.events.push({ id: 'wake-' + message.id, type: 'wake', memberId: bots[i].id })
         trace.events.push({ id: 'generate-' + message.id, type: 'generate', memberId: bots[i].id },
           { id: 'publish-' + message.id, type: 'publish', memberId: bots[i].id, contentDigest: digest(text.trim()) })
       }
-      if (options.nonSequential && selected.length === 2) trace.events = [trace.events[0], trace.events[2], trace.events[1], trace.events[3]]
+      if (options.nonSequential && selected.length === 2) trace.events = [trace.events[0], trace.events[1], trace.events[3], trace.events[4], trace.events[2], trace.events[5]]
     }
-    const turn = { messageId, status: options.pending ? 'queued' : 'complete', trace }
+    const turn = { messageId, status: pending ? options.recoverPending ? 'failed' : 'queued' : 'complete',
+      error: options.recoverPending && pending ? 'group_judgment_pending' : null, trace }
+    if (options.invalidFirst && state.submitted === 1) { turn.status = 'failed'; turn.error = 'group_judgment_pending' }
     state.turns.push(turn)
     return root
   }
@@ -119,7 +138,20 @@ function harness(options = {}) {
     if (path === gid + '/messages?limit=100') return response({ messages: [...state.messages].reverse(), agentStatus: null })
     if (path === gid + '/decisions?limit=100') {
       for (const turn of state.turns) state.qReads.set(turn.messageId, (state.qReads.get(turn.messageId) ?? 0) + 1)
-      return response({ turns: [...state.turns].reverse(), feedbackIsGroundTruth: false })
+      if (state.stopWrites) state.afterStopReads++
+      if (options.lateDelegate && state.afterStopReads >= 4) state.turns[0].trace.events = state.deferredEvents
+      if (options.recoverPending) for (const turn of state.turns) if (state.qReads.get(turn.messageId) >= 4) {
+        turn.status = 'complete'; turn.error = null; turn.trace.status = 'complete'
+      }
+      return response({ turns: [...state.turns].reverse(), feedbackIsGroundTruth: false, costScope: 'routing-decision-chain' })
+    }
+    if (path === gid + '/stop') {
+      state.stopWrites++
+      for (const turn of state.turns) if (turn.status !== 'complete') {
+        turn.status = 'failed'; turn.error = 'stopped'; turn.trace.status = 'stopped'
+      }
+      if (options.unknownStop) throw Error('unconfirmed stop PRIVATE')
+      return response({ stoppedTurns: 0 })
     }
     if (path === gid + '/messages') {
       assert.equal(method, 'POST'); state.submitted++
@@ -134,11 +166,17 @@ function harness(options = {}) {
         state.cancelWrites.push(body)
         assert.equal(body.action, 'cancel')
         assert.equal(body.binding.taskId, state.task.id)
-        state.task.status = 'cancelled'; state.task.revision++
+        state.task.status = 'cancelled'; state.task.revision++; state.run.status = 'stopped'
+        if (options.unknownCancel) throw Error('unconfirmed cancel PRIVATE')
       }
+      if (options.epochDrift && state.cancelWrites.length) state.task.sourceEventId = id(999)
       return response({ task: state.task, attempts: [state.attempt], candidates: [] })
     }
     if (state.run && path === '/api/runs/' + state.run.id + '/evidence') return response({ run: state.run, artifacts: [], captures: [] })
+    if (state.run && path === '/api/threads/' + state.run.id + '/machine') {
+      state.endWrites.push(body); assert.equal(state.run.status, 'stopped'); assert.deepEqual(body, { action: 'end' })
+      return response({ runId: state.run.id, state: 'ended' }, options.unknownEnd ? 404 : 200)
+    }
     assert.fail('Unexpected endpoint ' + path)
   }
   const args = { owner: { request }, verifyTarget: async ({ signal }) => { assert.ok(signal instanceof AbortSignal); clock += 1; if (options.targetDrift) throw Error('private upstream drift detail') },
@@ -158,6 +196,11 @@ test('eight bounded messages use real protocol shapes, seven unique receipts, ex
   assert.equal(result.messageAttempts, 8)
   assert.equal(result.acceptedMessages, 7)
   assert.equal(result.observedDecisionReceipts, 7)
+  assert.equal(result.providerCalls.receipted, 12)
+  assert.equal(result.providerCalls.retainedSteps, 12)
+  assert.equal(result.providerCalls.complete, true)
+  assert.ok(Math.abs(result.completeCostUsd - 0.00012) < 1e-12)
+  assert.equal(result.costScope, 'routing-decision-chain')
   assert.equal(result.cases.length, 8)
   assert.equal(result.cases.at(-1).httpStatus, 422)
   assert.equal(result.cases.at(-1).noMessageOrTurnCreated, true)
@@ -255,13 +298,17 @@ test('unknown member writes are not retried and schema-400 cannot satisfy nonmem
   assert.equal(c.cleanup.membership.restored, true)
 })
 
-test('unexpected delegate cancels only its joined owner/message/Task/run/epoch receipt and does not claim execution stopped', async () => {
+test('unexpected delegate is cancelled and ended once only after its exact runs have been observed terminal', async () => {
   const h = harness({ delegateFirst: true }), result = await runGroupRoutingBoundaries(h.args)
   assert.equal(result.status, 'failed')
   assert.equal(h.state.submitted, 1)
   assert.equal(h.state.cancelWrites.length, 1)
-  assert.equal(result.cleanup.delegations[0].status, 'cancellation-recorded')
-  assert.equal(result.cleanup.delegations[0].executionStopConfirmed, false)
+  assert.equal(result.cleanup.delegations[0].status, 'ended')
+  assert.equal(result.cleanup.delegations[0].executionStopConfirmed, true)
+  assert.equal(result.cleanup.delegations[0].machineEndAcknowledged, true)
+  assert.equal(result.cleanup.delegations[0].independentProviderObservation, false)
+  assert.equal(h.state.endWrites.length, 1)
+  assert.equal(result.cleanup.delegations.length, 1)
   const foreign = harness({ delegateFirst: true, wrongDelegationOwner: true }), denied = await runGroupRoutingBoundaries(foreign.args)
   assert.equal(denied.status, 'failed')
   assert.equal(foreign.state.cancelWrites.length, 0)
@@ -293,5 +340,65 @@ test('expired core key needs explicit fixture-only same-Flash selection; missing
     const evidence = await runGroupRoutingBoundaries({ ...failed.args, fixture: failed.projection(), allowFixtureFlashSelection: true })
     assert.equal(evidence.status, 'failed'); assert.equal(failed.state.submitted, 0)
     assert.ok(failed.state.modelWrites.length <= 1)
+  }
+})
+
+test('recoverable pending remains inside the same120s turn budget without resubmission', async () => {
+  const h = harness({ recoverPending: true }), result = await runGroupRoutingBoundaries(h.args)
+  assert.equal(result.status, 'passed'); assert.equal(h.state.submitted, 8)
+  assert.equal(h.state.requests.filter(r => r.body?.body?.includes('今天午饭')).length, 1)
+  assert.equal(h.state.stopWrites, 1); assert.equal(result.cleanup.group.noPendingRetry, true)
+})
+
+test('a reply without its exact wake and a missing or mixed sequential chain cannot pass', async () => {
+  for (const options of [{ missingWake: true }, { missingChain: true }, { mixedChain: true }]) {
+    const h = harness(options), result = await runGroupRoutingBoundaries(h.args)
+    assert.equal(result.status, 'failed')
+  }
+})
+
+test('confirmed201 pending delegation is cleaned after timeout, including a host receipt that arrives after chat stop', async () => {
+  for (const lateDelegate of [false, true]) {
+    const h = harness({ pending: true, delegateFirst: true, lateDelegate }), result = await runGroupRoutingBoundaries(h.args)
+    assert.equal(result.status, 'failed'); assert.equal(h.state.submitted, 1); assert.equal(h.state.stopWrites, 1)
+    assert.equal(h.state.cancelWrites.length, 1); assert.equal(h.state.endWrites.length, 1)
+    assert.equal(result.cleanup.group.noPendingRetry, true); assert.equal(result.cleanup.knownDelegationsReviewed, true)
+    assert.equal(result.cleanup.delegations[0].executionStopConfirmed, true)
+    assert.equal(result.cleanup.delegations[0].machineEndAcknowledged, true)
+    assert.equal(result.cleanup.delegations[0].independentProviderObservation, false)
+    const stopped = h.state.requests.findIndex(r => r.path.endsWith('/stop'))
+    assert.equal(h.state.requests.slice(stopped + 1).some(r => r.path.endsWith('/messages?limit=100')), false)
+    assert.equal(result.failedTurns[0].knownCostUsd, 0.00001)
+  }
+})
+
+test('unknown201 is stopped at group scope but never authorizes guessing a Task or ending its VM', async () => {
+  const h = harness({ unknownMessage: true, delegateFirst: true }), result = await runGroupRoutingBoundaries(h.args)
+  assert.equal(result.status, 'failed'); assert.equal(h.state.submitted, 1); assert.equal(h.state.stopWrites, 1)
+  assert.equal(h.state.cancelWrites.length, 0); assert.equal(h.state.endWrites.length, 0)
+  assert.equal(result.cleanup.unboundDelegateObserved, true); assert.equal(result.requiresScopeCleanup, true)
+  assert.equal(result.completeCostUsd, null)
+})
+
+test('foreign identity, epoch drift and unknown cleanup outcomes cannot expand or repeat scoped mutations', async () => {
+  for (const [options, cancels, ends] of [[{ wrongDelegationOwner: true }, 0, 0], [{ epochDrift: true }, 1, 0],
+    [{ unknownCancel: true }, 1, 1], [{ unknownEnd: true }, 1, 1]]) {
+    const h = harness({ delegateFirst: true, ...options }), result = await runGroupRoutingBoundaries(h.args)
+    assert.equal(result.status, 'failed'); assert.equal(h.state.cancelWrites.length, cancels); assert.equal(h.state.endWrites.length, ends)
+    assert.equal(h.state.stopWrites, 1)
+  }
+  const h = harness({ unknownStop: true }), result = await runGroupRoutingBoundaries(h.args)
+  assert.equal(result.status, 'failed'); assert.equal(h.state.stopWrites, 1)
+  assert.equal(result.cleanup.group.acknowledged, false); assert.equal(result.cleanup.group.noPendingRetry, true)
+})
+
+test('a paid uncertain turn retains its actual chain and known or unknown amount after bounded pending failure', async () => {
+  for (const unknownCost of [false, true]) {
+    const h = harness({ invalidFirst: true, unknownCost }), result = await runGroupRoutingBoundaries(h.args)
+    assert.equal(result.status, 'failed'); assert.equal(h.state.submitted, 1); assert.equal(h.state.stopWrites, 1)
+    assert.equal(result.failedTurns.length, 1); assert.equal(result.failedTurns[0].decisions[0].failure, 'uncertain')
+    assert.equal(result.providerCalls.receipted, 1); assert.equal(result.providerCalls.complete, false)
+    assert.equal(result.knownCostUsd, unknownCost ? 0 : 0.00001)
+    assert.equal(result.unknownCostCalls, unknownCost ? 1 : 0); assert.equal(result.completeCostUsd, null)
   }
 })

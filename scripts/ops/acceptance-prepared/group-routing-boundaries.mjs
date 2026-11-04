@@ -4,6 +4,9 @@ import { setTimeout as delay } from 'node:timers/promises'
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i
 const TOKEN = /^[A-Za-z0-9_.:-]{1,180}$/
 const HASH = /^[a-f0-9]{64}$/
+const POLICIES = ['group-route-v0', 'group-contribution-v1']
+const ENDED = new Set(['succeeded', 'completed', 'failed', 'stopped', 'cancelled'])
+const FAILURES = new Set(['unavailable', 'missing_or_refused', 'wrong_answer_type', 'uncertain', 'choice_outside_contract', 'receipt_missing', 'duplicate_receipt', 'mention_requires_intervention', 'reporter_unavailable', 'call_budget_exhausted', 'invalid_response', 'members_unavailable'])
 const FLASH = new Set(['deepseek-flash', 'deepseek-v4.1-flash', 'deepseek/deepseek-flash', 'deepseek/deepseek-v4.1-flash'])
 const ROLES = ['UI', 'Coding', 'Testing']
 const PUBLIC_ROLES = { UI: '负责界面设计、用户交互与可用性。', Coding: '负责代码实现与修复软件缺陷。', Testing: '负责测试设计、回归测试与质量验证。' }
@@ -14,6 +17,7 @@ class RoutingError extends Error { constructor(code, fatal = true) { super('grou
 const check = (ok, code, fatal = true) => { if (!ok) throw new RoutingError(code, fatal) }
 const safeError = error => error instanceof RoutingError ? error.message : 'group_routing_unconfirmed'
 const memberKeys = members => members.map(m => m.memberType + ':' + m.id).sort()
+const pending = turn => ['queued', 'running'].includes(turn.status) || turn.status === 'failed' && turn.error === 'group_judgment_pending'
 
 /**
  * Prepared standalone addon. The caller owns normal session login/logout,
@@ -29,16 +33,20 @@ export async function runGroupRoutingBoundaries({ owner, verifyTarget, assertFla
   check(Number.isSafeInteger(budgetMs) && budgetMs >= 1000 && budgetMs <= 600_000, 'budget_invalid')
   check(typeof decisionModelId === 'string' && /^[a-z0-9_.:/-]{1,100}$/i.test(decisionModelId), 'decision_model_required')
   const started = now(), hardDeadline = started + budgetMs
-  const workDeadline = hardDeadline - Math.min(60_000, Math.floor(budgetMs / 10))
+  const workDeadline = hardDeadline - Math.min(180_000, Math.floor(budgetMs / 3))
   const report = { schemaVersion: 1, status: 'failed', scope: 'single-run-group-routing', conversationId: null,
-    messageAttempts: 0, acceptedMessages: 0, maxMessages: 8, budgetMs, cases: [], errors: [], fixtureModelSelections: [],
-    cleanup: { role: { attempted: false, restored: false }, membership: { attempted: false, restored: false }, delegations: [] },
+    messageAttempts: 0, acceptedMessages: 0, maxMessages: 8, budgetMs, cases: [], failedTurns: [], errors: [], fixtureModelSelections: [],
+    costScope: 'routing-decision-chain', callerSessionAndCredentialCleanupRequired: true,
+    cleanup: { role: { attempted: false, restored: false }, membership: { attempted: false, restored: false }, delegations: [],
+      group: { attempted: false, acknowledged: false, noPendingRetry: false }, knownDelegationsReviewed: false,
+      unobservedSubmission: false, unboundDelegateObserved: false },
     coverage: { naturalSilence: false, answeredClosure: false, unrelatedSilence: false, coding: false,
       testing: false, sequentialIncremental: false, immediateRoleRouting: false, nonmemberMention: false,
       factoryDispatchedByDriver: false, modelSelectionChanged: false, replayIncluded: false } }
   let f, bots, groupId, groupTitle, workspaceId, ownerId, initialKeys, basePosition = 0n, initialTurns = new Set()
   let roleAttempted = false, roleRestoreTried = false, previousRole, removedId = null, memberAttempted = false, memberRestoreTried = false
-  const roots = new Set(), observedRoots = new Set(), executionIds = new Set(), generationIds = new Set()
+  const roots = new Set(), observedRoots = new Set(), executionIds = new Set(), generationIds = new Set(), seenSteps = new Set(), cleanupAttempts = new Set()
+  let scopeReady = false, stopTried = false
   let lastTrace
   function remaining(cleanup = false) {
     const ms = (cleanup ? hardDeadline : workDeadline) - now()
@@ -131,10 +139,10 @@ export async function runGroupRoutingBoundaries({ owner, verifyTarget, assertFla
     check(ownerMember?.role === 'owner', 'group_owner_membership')
     return page.members
   }
-  async function quality(cleanup = false) {
+  async function quality(cleanup = false, allowUnbound = false) {
     const result = await get('/api/conversations/' + groupId + '/decisions?limit=100', cleanup)
-    check(Array.isArray(result?.turns) && result.feedbackIsGroundTruth === false, 'trace_contract')
-    for (const turn of result.turns) check(initialTurns.has(turn.messageId) || roots.has(turn.messageId), 'concurrent_group_turn')
+    check(Array.isArray(result?.turns) && result.feedbackIsGroundTruth === false && result.costScope === 'routing-decision-chain', 'trace_contract')
+    if (!allowUnbound) for (const turn of result.turns) check(initialTurns.has(turn.messageId) || roots.has(turn.messageId), 'concurrent_group_turn')
     return result
   }
   async function history(cleanup = false) {
@@ -155,7 +163,7 @@ export async function runGroupRoutingBoundaries({ owner, verifyTarget, assertFla
     check(same(memberKeys(await members()), initialKeys), 'member_set_changed')
     await history()
     const q = await quality()
-    check(q.turns.every(t => !['queued', 'running'].includes(t.status)), 'group_not_idle')
+    check(q.turns.every(t => !pending(t)), 'group_not_idle')
     for (const bot of bots.values()) {
       const menu = await get('/api/mobile/model?bot=' + bot.id)
       check(menu?.current?.available === true && menu.current.kind === 'apiKey' && menu.current.provider === 'deepseek'
@@ -186,7 +194,7 @@ export async function runGroupRoutingBoundaries({ owner, verifyTarget, assertFla
       assertFlashTestModel(option.modelId)
       await target(); await owned()
       check(same(memberKeys(await members()), initialKeys)
-        && (await quality()).turns.every(t => !['queued', 'running'].includes(t.status)), 'model_selection_group_changed')
+        && (await quality()).turns.every(t => !pending(t)), 'model_selection_group_changed')
       const row = { botId: bot.id, modelId: bot.modelId, attempted: true, httpStatus: null, availableReadback: false }
       report.fixtureModelSelections.push(row)
       let write
@@ -199,59 +207,199 @@ export async function runGroupRoutingBoundaries({ owner, verifyTarget, assertFla
       check(write?.status === 200 && row.availableReadback, 'fixture_flash_selection_unconfirmed')
     }
   }
+  function observation(turn) {
+    const trace = turn.trace
+    check(turn.status === 'complete' && trace?.status === 'complete' && POLICIES.includes(trace.policyVersion)
+      && trace.decisionProtocol === 'group-sequential-v1' && Array.isArray(trace.decisions) && trace.decisions.length > 0
+      && trace.decisions.length <= 64 && (trace.decisionsOmitted ?? 0) === 0, 'turn_not_complete')
+    const primary = receipt(trace.execution)
+    const start = trace.decisions.findIndex(step => step.receipt?.executionId === primary.executionId)
+    check(start >= 0 && trace.decisions[start].index === 0, 'current_attempt_missing')
+    const current = trace.decisions.slice(start)
+    check(current.length <= 4 && current.every((step, index) => step.index === index && step.status === 'complete'
+      && step.failure === null && step.policyVersion === trace.policyVersion)
+      && current[0].phase === (trace.policyVersion === POLICIES[0] ? 'responder' : 'intent'), 'mixed_policy_chain')
+    const steps = trace.decisions.map(step => {
+      check(UUID.test(step.id ?? '') && !seenSteps.has(step.id) && POLICIES.includes(step.policyVersion)
+        && ['intent', 'responder', 'delegation', 'report_timing'].includes(step.phase)
+        && Number.isSafeInteger(step.index) && step.index >= 0 && step.index < 4, 'chain_unbound')
+      seenSteps.add(step.id)
+      const paid = step.receipt ? receipt(step.receipt) : null
+      check(['complete', 'invalid_decision', 'unavailable'].includes(step.status)
+        && (step.status === 'complete' ? paid && step.failure === null : FAILURES.has(step.failure))
+        && (step.status === 'unavailable' ? !paid : paid), 'chain_status')
+      if (paid) {
+        check(!executionIds.has(paid.executionId) && !generationIds.has(paid.providerGenerationId), 'receipt_reused')
+        executionIds.add(paid.executionId); generationIds.add(paid.providerGenerationId)
+      }
+      const amount = paid && typeof step.decisionCostUsd === 'number' && Number.isFinite(step.decisionCostUsd) && step.decisionCostUsd >= 0 ? step.decisionCostUsd : null
+      return { id: step.id, phase: step.phase, index: step.index, policyVersion: step.policyVersion,
+        status: step.status, failure: step.failure, receipt: paid, decisionCostUsd: amount }
+    })
+    return { messageId: turn.messageId, policyVersion: trace.policyVersion, primaryReceipt: primary, decisions: steps,
+      providerCalls: { attempted: steps.length, receipted: steps.filter(step => step.receipt).length },
+      knownCostUsd: steps.reduce((sum, step) => sum + (step.decisionCostUsd ?? 0), 0),
+      unknownCostCalls: steps.filter(step => step.decisionCostUsd === null).length,
+      completeCostUsd: steps.every(step => step.decisionCostUsd !== null) ? steps.reduce((sum, step) => sum + step.decisionCostUsd, 0) : null }
+  }
+  function retainFailedTurn(turn) {
+    const trace = turn?.trace
+    const safeReceipt = value => { try { return receipt(value) } catch { return null } }
+    const steps = (Array.isArray(trace?.decisions) ? trace.decisions : []).slice(-64).map(step => {
+      const paid = safeReceipt(step?.receipt)
+      return { id: UUID.test(step?.id ?? '') ? step.id : null,
+        phase: ['intent', 'responder', 'delegation', 'report_timing'].includes(step?.phase) ? step.phase : null,
+        index: Number.isSafeInteger(step?.index) && step.index >= 0 && step.index < 4 ? step.index : null,
+        policyVersion: POLICIES.includes(step?.policyVersion) ? step.policyVersion : null,
+        status: ['complete', 'invalid_decision', 'unavailable'].includes(step?.status) ? step.status : null,
+        failure: FAILURES.has(step?.failure) ? step.failure : null, receipt: paid,
+        decisionCostUsd: paid && Number.isFinite(step?.decisionCostUsd) && step.decisionCostUsd >= 0 ? step.decisionCostUsd : null }
+    })
+    const uniquePaid = new Map(steps.filter(step => step.receipt).map(step => [step.receipt.providerGenerationId, step]))
+    const observed = { messageId: UUID.test(turn?.messageId ?? '') ? turn.messageId : null,
+      status: ['queued', 'running', 'failed', 'complete'].includes(turn?.status) ? turn.status : null,
+      policyVersion: POLICIES.includes(trace?.policyVersion) ? trace.policyVersion : null,
+      primaryReceipt: safeReceipt(trace?.execution), decisions: steps,
+      costScope: 'routing-decision-chain', completeCostUsd: null,
+      knownCostUsd: steps.length ? [...uniquePaid.values()].reduce((sum, step) => sum + (step.decisionCostUsd ?? 0), 0) : null,
+      retainedSteps: steps.length, providerCallsComplete: false }
+    const existing = report.failedTurns.findIndex(row => row.messageId === observed.messageId)
+    if (existing < 0) report.failedTurns.push(observed)
+    else report.failedTurns[existing] = observed
+  }
   async function terminal(messageId) {
-    const end = Math.min(workDeadline, now() + 75_000)
+    const end = Math.min(workDeadline, now() + 120_000)
     while (now() < end) {
+      await target()
       const q = await quality(), turn = q.turns.find(t => t.messageId === messageId)
       const page = await history()
-      if (turn && ['complete', 'failed', 'stopped'].includes(turn.status)) return { turn, page }
+      if (turn && !pending(turn)) return { turn, page }
       await wait(Math.min(1000, Math.max(1, end - now())))
     }
     throw new RoutingError('turn_timeout')
   }
-  async function cancelUnexpected(messageId, trace) {
-    const evidence = { messageId, taskId: null, runId: null, issueId: null, reporterId: null,
-      status: 'needs-scope-cleanup', cancelAttempted: false, cancellationRecorded: false, executionStopConfirmed: false }
-    report.cleanup.delegations.push(evidence)
+  async function cleanupOwner() {
+    await owned(true)
+    check(same(memberKeys(await members(true)), initialKeys), 'cleanup_member_set_changed')
+  }
+  async function stopGroup() {
+    if (!groupId || !scopeReady || report.messageAttempts === 0 || stopTried) return
+    stopTried = true
+    const cleanup = report.cleanup.group
     try {
-      check(roots.has(messageId), 'cancel_message_scope')
-      const events = trace.events?.filter(e => e.type === 'delegate' && e.outcome === 'succeeded') ?? []
-      check(events.length === 1, 'cancel_receipt_missing')
+      await target(true); await cleanupOwner()
+      const before = await quality(true, true)
+      check(report.cleanup.unobservedSubmission || before.turns.every(turn => initialTurns.has(turn.messageId) || roots.has(turn.messageId)), 'cleanup_concurrent_turn')
+      cleanup.attempted = true
+      try { const result = await request('/api/conversations/' + groupId + '/stop', 'POST', {}, true); cleanup.httpStatus = result.status; cleanup.acknowledged = result.status === 200 }
+      catch { cleanup.error = 'group_routing_stop_unconfirmed' }
+      const q = await quality(true, true)
+      cleanup.noPendingRetry = q.turns.every(turn => !pending(turn))
+      cleanup.turns = q.turns.map(turn => ({ messageId: UUID.test(turn.messageId ?? '') ? turn.messageId : null,
+        status: TOKEN.test(turn.status ?? '') ? turn.status : null, error: TOKEN.test(turn.error ?? '') ? turn.error : null }))
+    } catch (error) { cleanup.error = safeError(error) }
+  }
+  async function cancelUnexpected(messageId, trace) {
+    const result = { messageId, taskId: null, runId: null, status: 'unconfirmed', cancelAttempted: false,
+      executionStopConfirmed: false, machineEndAttempted: false, machineEndAcknowledged: false, independentProviderObservation: false }
+    report.cleanup.delegations.push(result)
+    try {
+      check(roots.has(messageId), 'cleanup_message_scope')
+      const events = trace.events?.filter(event => event.type === 'delegate' && event.outcome === 'succeeded') ?? []
+      check(events.length === 1, 'cleanup_delegate_receipt')
       const event = events[0]
-      check(UUID.test(event.taskId ?? '') && UUID.test(event.runId ?? '') && [...bots.values()].some(b => b.id === event.memberId)
-        && same(trace.responders, [event.memberId]), 'cancel_receipt_scope')
-      Object.assign(evidence, { taskId: event.taskId, runId: event.runId, reporterId: event.memberId })
-      await target(true); await owned(true)
-      const fresh = await quality(true), source = fresh.turns.find(t => t.messageId === messageId)
-      check(source?.trace?.events?.some(e => e.type === 'delegate' && e.outcome === 'succeeded'
-        && e.taskId === event.taskId && e.runId === event.runId && e.memberId === event.memberId), 'cancel_trace_changed')
-      const state = await get('/api/factory/tasks/' + event.taskId, true)
-      const task = state?.task, run = (await get('/api/runs/' + event.runId + '/evidence', true))?.run
+      check(UUID.test(event.taskId ?? '') && UUID.test(event.runId ?? '') && [...bots.values()].some(bot => bot.id === event.memberId)
+        && same(trace.responders, [event.memberId]), 'cleanup_delegate_scope')
+      const cleanupKey = event.taskId + ':' + event.runId
+      if (cleanupAttempts.has(cleanupKey)) { report.cleanup.delegations.pop(); return }
+      cleanupAttempts.add(cleanupKey)
+      Object.assign(result, { taskId: event.taskId, runId: event.runId })
+      await target(true); await cleanupOwner()
+      const fresh = (await quality(true)).turns.find(turn => turn.messageId === messageId)
+      check(fresh?.trace?.events?.some(row => row.type === 'delegate' && row.outcome === 'succeeded'
+        && row.taskId === event.taskId && row.runId === event.runId && row.memberId === event.memberId), 'cleanup_receipt_changed')
+      const state = await get('/api/factory/tasks/' + event.taskId, true), task = state?.task
       check(task?.id === event.taskId && task.userId === ownerId && task.botId === event.memberId && UUID.test(task.issueId ?? '')
-        && UUID.test(task.sourceEventId ?? '') && Number.isSafeInteger(task.revision) && task.revision >= 1
-        && UUID.test(task.attemptId ?? '') && (task.candidateId === null || UUID.test(task.candidateId ?? ''))
-        && state.attempts?.some(a => a.id === task.attemptId && a.runId === event.runId && a.output?.requestEpoch === task.sourceEventId),
-      'cancel_task_scope')
-      const identity = run?.executionIdentity
-      check(run?.id === event.runId && run.issueId === task.issueId && run.botId === event.memberId
-        && identity?.requester === ownerId && identity.executionPrincipal === ownerId && identity.outputOwner === ownerId
-        && identity.botOwner === ownerId && identity.botId === event.memberId && identity.workspaceId === workspaceId, 'cancel_run_scope')
-      evidence.issueId = task.issueId
-      if (['cancelled', 'revoked'].includes(task.status)) { evidence.status = 'cancellation-recorded'; evidence.cancellationRecorded = true; return }
-      if (task.status === 'passed' && ['approval', 'publish', 'monitor'].includes(task.stage)) { evidence.status = 'already-complete'; return }
-      const binding = { taskId: task.id, issueId: task.issueId, attemptId: task.attemptId, candidateId: task.candidateId, revision: task.revision }
-      evidence.cancelAttempted = true
-      let acknowledged = false
-      try { const r = await request('/api/factory/tasks/' + task.id, 'POST', { binding, eventId: randomUUID(), action: 'cancel',
-        reason: 'Stop the unexpected task produced by this synthetic routing-only acceptance message; retain its evidence.' }, true)
-        acknowledged = r.status === 200
-      } catch { /* Unknown write is observed once, never replayed. */ }
-      const after = (await get('/api/factory/tasks/' + task.id, true))?.task
-      check(after?.id === task.id && after.userId === ownerId && after.sourceEventId === task.sourceEventId
-        && ['cancelled', 'revoked'].includes(after.status), 'cancel_not_recorded')
-      evidence.cancellationRecorded = true
-      evidence.status = acknowledged ? 'cancellation-recorded' : 'cancellation-observed-write-unconfirmed'
-    } catch (error) { evidence.error = safeError(error) }
+        && UUID.test(task.sourceEventId ?? '') && UUID.test(task.attemptId ?? '') && Number.isSafeInteger(task.revision)
+        && Array.isArray(state.attempts) && state.attempts.some(row => row.runId === event.runId && row.output?.requestEpoch === task.sourceEventId), 'cleanup_task_scope')
+      const runIds = [...new Set(state.attempts.filter(row => row.output?.requestEpoch === task.sourceEventId && UUID.test(row.runId ?? '')).map(row => row.runId))].sort()
+      check(runIds.length > 0 && runIds.length <= 48, 'cleanup_run_scope')
+      const inspect = async () => {
+        await target(true); await cleanupOwner()
+        const latest = await get('/api/factory/tasks/' + task.id, true)
+        check(latest?.task?.id === task.id && latest.task.userId === ownerId && latest.task.botId === event.memberId
+          && latest.task.issueId === task.issueId && latest.task.sourceEventId === task.sourceEventId && Array.isArray(latest.attempts)
+          && same([...new Set(latest.attempts.filter(row => row.output?.requestEpoch === task.sourceEventId && UUID.test(row.runId ?? '')).map(row => row.runId))].sort(), runIds), 'cleanup_epoch_changed')
+        const runs = []
+        for (const runId of runIds) {
+          const run = (await get('/api/runs/' + runId + '/evidence', true))?.run, identity = run?.executionIdentity
+          check(run?.id === runId && run.issueId === task.issueId && run.botId === event.memberId
+            && identity?.requester === ownerId && identity.executionPrincipal === ownerId && identity.outputOwner === ownerId
+            && identity.botId === event.memberId && identity.botOwner === ownerId && identity.workspaceId === workspaceId
+            && identity.billingAccount?.runtime?.ownerId === ownerId && ['e2b', 'local_device'].includes(identity.billingAccount.runtime.kind), 'cleanup_identity_scope')
+          runs.push({ runId, status: run.status, runtime: identity.billingAccount.runtime.kind })
+        }
+        return { task: latest.task, runs }
+      }
+      let current = await inspect()
+      if (!['cancelled', 'revoked', 'failed'].includes(current.task.status)
+        && !(current.task.status === 'passed' && ['approval', 'publish', 'monitor'].includes(current.task.stage))) {
+        result.cancelAttempted = true
+        const binding = { taskId: task.id, issueId: task.issueId, attemptId: current.task.attemptId,
+          candidateId: current.task.candidateId, revision: current.task.revision }
+        try { result.cancelStatus = (await request('/api/factory/tasks/' + task.id, 'POST', { binding, eventId: randomUUID(), action: 'cancel', reason: 'Stop this routing-only acceptance fixture and retain its evidence.' }, true)).status }
+        catch { result.cancelStatus = null }
+      }
+      while (true) {
+        current = await inspect()
+        check(['cancelled', 'revoked', 'failed'].includes(current.task.status)
+          || current.task.status === 'passed' && ['approval', 'publish', 'monitor'].includes(current.task.stage), 'cleanup_task_active')
+        if (current.runs.every(run => ENDED.has(run.status))) break
+        await wait(Math.min(2000, remaining(true)))
+      }
+      result.executionStopConfirmed = true; result.runs = []
+      for (const run of current.runs) {
+        const checked = await inspect()
+        check(checked.runs.every(row => ENDED.has(row.status)) && (['cancelled', 'revoked', 'failed'].includes(checked.task.status)
+          || checked.task.status === 'passed' && ['approval', 'publish', 'monitor'].includes(checked.task.stage)), 'cleanup_runs_active')
+        const ended = { runId: run.runId, runtime: run.runtime, machineEndAttempted: false, machineEndAcknowledged: false }
+        result.runs.push(ended)
+        if (run.runtime === 'local_device') continue
+        result.machineEndAttempted = true; ended.machineEndAttempted = true
+        try {
+          const response = await request('/api/threads/' + run.runId + '/machine', 'POST', { action: 'end' }, true)
+          ended.httpStatus = response.status
+          ended.machineEndAcknowledged = response.status === 200 && response.data?.runId === run.runId && response.data.state === 'ended'
+        } catch { ended.error = 'group_routing_machine_end_unconfirmed' }
+      }
+      result.machineEndAcknowledged = result.runs.every(run => run.runtime === 'local_device' || run.machineEndAcknowledged)
+      result.status = result.machineEndAcknowledged ? 'ended' : 'unconfirmed'
+    } catch (error) { result.error = safeError(error) }
+  }
+  async function cleanupObservedDelegations() {
+    if (!groupId || !scopeReady || report.messageAttempts === 0) return
+    try {
+      while (true) {
+        await target(true); await cleanupOwner()
+        const q = await quality(true, true), waiting = []
+        for (const turn of q.turns) {
+          if (initialTurns.has(turn.messageId)) continue
+          const delegated = turn.trace?.events?.some(event => event.type === 'delegate' && event.outcome === 'succeeded')
+          // A lost POST response does not establish which message the caller
+          // created. Never guess a Task from a later group listing.
+          if (!roots.has(turn.messageId)) { if (delegated) report.cleanup.unboundDelegateObserved = true; continue }
+          if (!report.cases.some(row => row.messageId === turn.messageId && Array.isArray(row.decisions))) retainFailedTurn(turn)
+          if (delegated) await cancelUnexpected(turn.messageId, turn.trace)
+          // The host saves the route before delegation IO and its receipt
+          // afterwards. Chat stop may occur during that IO; only wait for a
+          // receipt here, within the existing cleanup deadline, never drain.
+          else if (turn.trace?.action === 'delegate' && turn.status !== 'complete') waiting.push(turn.messageId)
+        }
+        report.cleanup.pendingDelegateReceiptIds = waiting
+        if (!waiting.length) { report.cleanup.knownDelegationsReviewed = true; return }
+        await wait(Math.min(2000, remaining(true)))
+      }
+    } catch (error) { report.cleanup.delegationError = safeError(error) }
   }
   async function scenario(name, body, expected, replyToId) {
     const row = { name, status: 'failed', promptDigest: hash(body), messageId: null, action: null,
@@ -262,7 +410,8 @@ export async function runGroupRoutingBoundaries({ owner, verifyTarget, assertFla
       report.messageAttempts++
       let sent
       try { sent = await request('/api/conversations/' + groupId + '/messages', 'POST', { body, mentions: [], ...(replyToId ? { replyToId } : {}) }) }
-      catch { throw new RoutingError('message_submission_unconfirmed') }
+      catch { report.cleanup.unobservedSubmission = true; throw new RoutingError('message_submission_unconfirmed') }
+      if (sent.status === 201 && !UUID.test(sent.data?.id ?? '')) report.cleanup.unobservedSubmission = true
       check(sent.status === 201 && UUID.test(sent.data?.id ?? ''), 'message_submission_rejected')
       row.messageId = sent.data.id; roots.add(sent.data.id); report.acceptedMessages++
       const { turn, page } = await terminal(sent.data.id), trace = turn.trace
@@ -281,17 +430,17 @@ export async function runGroupRoutingBoundaries({ owner, verifyTarget, assertFla
       row.responseDigests = replies.map(m => ({ messageId: UUID.test(m.id ?? '') ? m.id : null,
         responderId: [...bots.values()].some(b => b.id === m.authorId) ? m.authorId : null, digest: hash(String(m.body).trim()) }))
       if (trace.action === 'delegate' || trace.events.some(e => e.type === 'delegate')) {
+        retainFailedTurn(turn)
         await cancelUnexpected(sent.data.id, trace)
         throw new RoutingError('unexpected_delegation')
       }
       check(turn.status === 'complete' && trace.status === 'complete' && trace.policyVersion === 'group-contribution-v1', 'turn_not_complete')
-      row.decision = receipt(trace.execution)
-      check(!executionIds.has(row.decision.executionId) && !generationIds.has(row.decision.providerGenerationId), 'decision_receipt_reused')
-      executionIds.add(row.decision.executionId); generationIds.add(row.decision.providerGenerationId)
+      const measured = observation(turn)
+      Object.assign(row, measured); row.decision = measured.primaryReceipt
       observedRoots.add(sent.data.id)
       lastTrace = trace
       check(expected.actions.includes(trace.action) && same(trace.responders, expected.ids), 'route_mismatch', false)
-      check(row.wakes <= expected.ids.length && new Set(wakeEvents.map(e => e.memberId)).size === row.wakes
+      check(row.wakes === expected.ids.length && new Set(wakeEvents.map(e => e.memberId)).size === row.wakes
         && wakeEvents.every(e => expected.ids.includes(e.memberId)), 'wake_scope_mismatch', false)
       check(row.generations === expected.ids.length && row.publications === expected.ids.length && replies.length === expected.ids.length
         && !trace.events.some(e => ['private_publish', 'task_result'].includes(e.type)), 'effect_count_mismatch', false)
@@ -364,8 +513,9 @@ export async function runGroupRoutingBoundaries({ owner, verifyTarget, assertFla
     check(same(memberKeys(initial), initialKeys) && group.leadAgentId == null, 'fixture_member_scope')
     check(/^[0-9]+$/.test(String(group.lastPosition)), 'position_shape'); basePosition = BigInt(group.lastPosition)
     const q = await get('/api/conversations/' + groupId + '/decisions?limit=100')
-    check(Array.isArray(q?.turns) && q.feedbackIsGroundTruth === false && q.turns.every(t => !['queued', 'running'].includes(t.status)), 'group_not_idle')
-    initialTurns = new Set(q.turns.map(t => t.messageId))
+    check(Array.isArray(q?.turns) && q.feedbackIsGroundTruth === false && q.costScope === 'routing-decision-chain'
+      && q.turns.every(t => !pending(t)), 'group_not_idle')
+    initialTurns = new Set(q.turns.map(t => t.messageId)); scopeReady = true
     for (const bot of bots.values()) {
       const profile = await get('/api/bots/' + bot.id)
       check(profile?.id === bot.id && profile.publicRole === PUBLIC_ROLES[bot.role], 'initial_role_changed')
@@ -411,7 +561,10 @@ export async function runGroupRoutingBoundaries({ owner, verifyTarget, assertFla
     const row = { name: 'owned-nonmember-mention', status: 'failed', promptDigest: hash(body), responderId: removedId,
       validShape: true, removedMembershipReadback: true, httpStatus: null, noMessageOrTurnCreated: false }
     report.cases.push(row); check(report.messageAttempts < 8, 'message_limit'); report.messageAttempts++
-    const rejected = await request('/api/conversations/' + groupId + '/messages', 'POST', { body, mentions })
+    let rejected
+    try { rejected = await request('/api/conversations/' + groupId + '/messages', 'POST', { body, mentions }) }
+    catch { report.cleanup.unobservedSubmission = true; throw new RoutingError('message_submission_unconfirmed') }
+    if (rejected.status === 201 && !UUID.test(rejected.data?.id ?? '')) report.cleanup.unobservedSubmission = true
     row.httpStatus = rejected.status
     if (rejected.status === 201 && UUID.test(rejected.data?.id ?? '')) {
       roots.add(rejected.data.id); report.acceptedMessages++; row.messageId = rejected.data.id
@@ -426,17 +579,35 @@ export async function runGroupRoutingBoundaries({ owner, verifyTarget, assertFla
     check(report.cleanup.membership.restored, 'membership_restore_failed')
     row.restoredMembershipReadback = true; row.status = 'passed'; report.coverage.nonmemberMention = true
   } catch (error) { report.errors.push(safeError(error)) }
-  finally { await restoreRole(); await restoreMember() }
+  finally {
+    await restoreRole(); await restoreMember()
+    await stopGroup(); await cleanupObservedDelegations()
+  }
   const required = ['naturalSilence', 'answeredClosure', 'unrelatedSilence', 'coding', 'testing', 'sequentialIncremental', 'immediateRoleRouting', 'nonmemberMention']
+  // Compatibility: this counts primary receipts/turns, not all provider requests.
   report.observedDecisionReceipts = observedRoots.size
+  const measurements = [...report.cases.filter(row => Array.isArray(row.decisions)), ...report.failedTurns]
+  const steps = [...new Map(measurements.flatMap(row => row.decisions).map((step, index) => [step.id ?? 'unknown-' + index, step])).values()]
+  const paid = [...new Map(steps.filter(step => step.receipt).map(step => [step.receipt.providerGenerationId, step])).values()]
+  const measuredRoots = new Set(measurements.map(row => row.messageId))
+  const unknownTurns = [...roots].filter(id => !measuredRoots.has(id)).length + Number(report.cleanup.unobservedSubmission)
+  report.providerCalls = { retainedSteps: steps.length, receipted: paid.length, unreceipted: steps.filter(step => !step.receipt).length,
+    complete: !unknownTurns && report.failedTurns.length === 0 && measuredRoots.size === roots.size && steps.every(step => step.receipt) }
+  report.knownCostUsd = paid.reduce((sum, step) => sum + (step.decisionCostUsd ?? 0), 0)
+  report.unknownCostCalls = steps.filter(step => step.decisionCostUsd === null).length
+  report.unobservedTurns = unknownTurns
+  report.completeCostUsd = report.providerCalls.complete && report.unknownCostCalls === 0 ? report.knownCostUsd : null
   report.requiresScopeCleanup = report.errors.some(code => /submission_unconfirmed|turn_timeout|trace_shape/.test(code))
-    || report.cleanup.delegations.some(d => d.status === 'needs-scope-cleanup')
+    || report.cleanup.unobservedSubmission || report.cleanup.unboundDelegateObserved
+    || report.cleanup.delegations.some(d => d.status !== 'ended')
+    || (report.messageAttempts > 0 && (!report.cleanup.group.acknowledged || !report.cleanup.group.noPendingRetry || !report.cleanup.knownDelegationsReviewed))
     || (roleAttempted && !report.cleanup.role.restored) || (memberAttempted && !report.cleanup.membership.restored)
   report.elapsedMs = Math.max(0, now() - started)
   if (report.cleanup.role.writeOutcome === 'unconfirmed' || report.cleanup.membership.writeOutcome === 'unconfirmed')
     report.errors.push('group_routing_cleanup_write_unconfirmed')
   report.status = required.every(k => report.coverage[k]) && report.errors.length === 0
     && report.cases.length === 8 && report.cases.every(c => c.status === 'passed')
-    && report.cleanup.role.restored && report.cleanup.membership.restored && report.elapsedMs <= budgetMs ? 'passed' : 'failed'
+    && report.cleanup.role.restored && report.cleanup.membership.restored && report.elapsedMs <= budgetMs
+    && !report.requiresScopeCleanup ? 'passed' : 'failed'
   return report
 }
