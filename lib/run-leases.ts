@@ -378,14 +378,55 @@ export async function startThreadMachine(actor: { userId: string; workspaceId: s
             AND old."deviceId"=m."deviceId" AND old."repoId"=m."repoId" AND old.state='ended' AND old."sandboxId" IS NULL
             AND previous.status IN ('succeeded','failed','stopped','cancelled'))`, [runId,actor.userId,actor.workspaceId])
     if (retained.rowCount) return { state: 'unavailable' as const, reason: 'retained_runtime' as const }
-    await (await import('@/lib/cloud-computer/thread-machines')).threadMachineAction(pool, actor, runId, 'end').catch(() => undefined)
-    const [run] = await db.update(agentRuns).set({ status: 'failed', stopReason: 'device_lost', error: DEVICE_STAYED_OFFLINE, updatedAt: new Date() })
-      .where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, actor.userId), inArray(agentRuns.status, ['queued', 'stopped']))).returning()
-    if (run) {
-      await recordCoordinatorEvent(db, { ...runFinishedEvent({ ...run, stopReason: 'device_lost', report: null }), payload: { status: 'failed', stopReason: 'device_lost', runKind: run.kind, summary: null, noMachine: await noMachineCard() } })
-      await wakeCoordinator(actor.userId).catch(() => undefined)
-    }
+    await failUnclaimedCloudStart(actor, runId, error)
   }
+}
+
+/** A startup error is an infrastructure failure, never an Owner stop. Commit
+ * that distinction before machine cleanup invokes the Factory end hook. */
+export async function failUnclaimedCloudStart(actor: { userId: string; workspaceId: string }, runId: string, error: unknown): Promise<boolean> {
+  const { RetainedTaskMachineUnavailable, threadMachineAction } = await import('@/lib/cloud-computer/thread-machines')
+  const { ComputerError } = await import('@/lib/computer/store')
+  if (error instanceof RetainedTaskMachineUnavailable ||
+    (error instanceof ComputerError && error.status === 409 && error.message === 'Thread provisioning in progress')) return false
+  const noMachine = await noMachineCard()
+  const failed = await db.transaction(async tx => {
+    const [run] = await tx.select().from(agentRuns).where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, actor.userId),
+      sql`EXISTS(SELECT 1 FROM computer_run_bindings b WHERE b."runId"=${agentRuns.id} AND b."ownerId"=${actor.userId} AND b."workspaceId"=${actor.workspaceId})`)).for('update')
+    // A worker claim or an explicit stop owns its outcome. A failed lifecycle
+    // enqueue must not turn either one into a new failure or clean its VM.
+    const now = new Date()
+    if (!run || run.status !== 'queued' || run.startedAt || run.sessionId || run.stopRequestedAt ||
+      (run.leaseExpiresAt && run.leaseExpiresAt > now) || run.questionContinuation?.requireSessionResume) return null
+    const { rows: [machine] } = await tx.execute(sql`SELECT "ownerId","workspaceId","workerLeaseUntil" FROM thread_machines WHERE "runId"=${runId} FOR UPDATE`)
+    if (machine && (machine.ownerId !== actor.userId || machine.workspaceId !== actor.workspaceId ||
+      (machine.workerLeaseUntil && new Date(String(machine.workerLeaseUntil)) > now))) return null
+    // The same retention fence also covers the synchronous Coordinator path
+    // and a lifecycle enqueue failure after an old task VM was adopted.
+    const retained = await tx.execute(sql`SELECT 1 FROM thread_machines m
+      WHERE m."runId"=${runId} AND m."ownerId"=${actor.userId} AND m."workspaceId"=${actor.workspaceId}
+        AND m."issueId"=${run.issueId} AND m.state<>'ended' AND m."sandboxId" IS NOT NULL
+        AND EXISTS(SELECT 1 FROM thread_machines old JOIN agent_runs previous ON previous.id=old."runId" AND previous."userId"=old."ownerId"
+          WHERE old."runId"<>m."runId" AND old."ownerId"=m."ownerId" AND old."workspaceId"=m."workspaceId" AND old."issueId"=m."issueId"
+            AND old."deviceId"=m."deviceId" AND old."repoId"=m."repoId" AND old.state='ended' AND old."sandboxId" IS NULL
+            AND previous.status IN ('succeeded','failed','stopped','cancelled'))`)
+    if (retained.rowCount) return null
+    const [ended] = await tx.update(agentRuns).set({ status: 'failed', pauseReason: null, resumeStatus: null,
+      stopReason: 'device_lost', error: run.error ?? DEVICE_STAYED_OFFLINE, finishedAt: now, updatedAt: now })
+      .where(eq(agentRuns.id, runId)).returning()
+    const event = runFinishedEvent({ ...ended, stopReason: 'device_lost', report: null })
+    await recordCoordinatorEvent(tx, { ...event, payload: { ...event.payload, noMachine } })
+    return ended
+  })
+  if (!failed) return false
+  // end() cannot overwrite this already-terminal failure. It still fences
+  // provisioning and revokes/cleans only the machine that this run owns.
+  await threadMachineAction(pool, actor, runId, 'end').catch(() => undefined)
+  // Admission may have failed before any machine row existed, so do not rely
+  // on cleanup to reconcile the committed failure. This hook is idempotent.
+  await afterRunEnded(actor.userId, runId)
+  await wakeCoordinator(actor.userId).catch(() => undefined)
+  return true
 }
 
 /** The card of what the person can do when no machine can continue a run. */
