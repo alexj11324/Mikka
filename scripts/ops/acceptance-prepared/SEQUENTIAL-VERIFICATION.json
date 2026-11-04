@@ -8,8 +8,8 @@
   ],
   "result": {
     "exitCode": 0,
-    "tests": 23,
-    "passed": 23,
+    "tests": 25,
+    "passed": 25,
     "failed": 0,
     "skipped": 0
   },
@@ -18,27 +18,39 @@
   "sourceFiles": [
     {
       "path": "run-proactive-acceptance.mjs",
-      "sha256": "8f3818005c7f667b9a84ae83010271956f985d53ff6190400fc19483d397058e"
+      "sha256": "ea74b46b15e791f4315e476143709b76acd1c1d3b5661984b2e6917b171f4f4a"
     },
     {
       "path": "run-proactive-acceptance.test.mjs",
-      "sha256": "67983d626ae6298a0c73ebf5fad04d00a4f824d4c6a2abc9c3849aecb548a6e2"
+      "sha256": "bc6d892b6445a230a939d0061f958de06f7b46c8b28fd1284fe1960c25faa9a1"
     },
     {
       "path": "README.md",
-      "sha256": "5c7fe12eea1eaae8601edaeb50452ee70efeb053b3673e7da2247338a6c9d3fd"
+      "sha256": "c9b9d3c1989e9f833024014d24902916884c8ab985d4bcc4afdb52c29607a747"
     }
   ],
-  "scope": [
-    "12 baseline plus 12 candidate logical cases, one to four actual provider requests each",
-    "four-phase delegation including report_timing",
-    "unique phase receipts, invalid/unknown costs retained",
-    "three independent session sign-out acknowledgements",
-    "scoped failed-group stop, no unknown-write retry",
-    "normal owner machine-end only for bound terminal fixture Task epochs before temporary E2B removal"
-  ],
+  "increment": {
+    "base": "53f9c62199bb21b83f9bb495581bd80a23d63a0d",
+    "purpose": "Await normal asynchronous termination within the existing 180-second budget before intentional fixture machine cleanup",
+    "redContract": {
+      "tests": 2,
+      "failed": 2
+    },
+    "greenContract": {
+      "tests": 25,
+      "failed": 0
+    },
+    "scope": [
+      "read-only polling of exact host-bound run set",
+      "each poll rechecks fixed deployment and Task identity, epoch and attempt bindings",
+      "frozen run identity validated on each read",
+      "HTTP request signal bounded by remaining wait budget",
+      "Task bindings rechecked before each single machine-end",
+      "no unknown-write retry; credential removal remains after cleanup"
+    ]
+  },
   "limitations": [
-    "not production acceptance",
+    "offline contracts are not production evidence",
     "host machine-end acknowledgement is not independent provider observation",
     "shared desktop GET cannot prove thread VM shutdown",
     "prepared workflow pins remain placeholders"

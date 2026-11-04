@@ -34,9 +34,10 @@ const replay = () => {
 function fixture({ groupFails = true, throwsAfterCreation = false, replayFails = false, withTask = false, wrongTaskOwner = false,
   mcpShareFails = false, mcpCleanupFails = false, mcpCreateThrows = false, driftAfterMcp = false,
   helperLogoutStatus = 200, groupLogoutStatus = 200, unknownStop = false, wrongGroupOwner = false, sourceStopUnknown = false,
-  mutateReplay = value => value, wrongRunOwner = false, runStatus = 'stopped', machineEndStatus = 200, unknownMachineEnd = false } = {}) {
+  mutateReplay = value => value, wrongRunOwner = false, runStatus = 'stopped', machineEndStatus = 200, unknownMachineEnd = false,
+  terminalAfterMs = null, taskEpochChangesAfterMs = null } = {}) {
   const calls = [], counters = { helper: 0, group: 0, replay: 0, signout: 0, cancel: 0, mcpCreate: 0, mcpDelete: 0, groupStop: 0, machineEnd: 0 }
-  let helperActive = false, mcpServer = null, createdGroup = null, stopped = false, taskCancelled = !groupFails
+  let helperActive = false, mcpServer = null, createdGroup = null, stopped = false, taskCancelled = !groupFails, elapsed = 0
   const createdBots = [], fixtureId = id(700), marker = fixtureId.slice(0, 8)
   const existingMcp = { id: id(90), name: 'PRIVATE existing MCP', url: 'https://private.invalid', ownerId: 'fixture-owner', mine: true,
     shared: false, enabled: true, transport: 'http', authKind: 'header', revision: 1 }
@@ -96,10 +97,12 @@ function fixture({ groupFails = true, throwsAfterCreation = false, replayFails =
     if (path.endsWith('/api/factory/tasks/' + id(3))) {
       if (init.method === 'POST') { counters.cancel++; taskCancelled = true; assert.equal(JSON.parse(init.body).action, 'cancel'); return Response.json({}) }
       return Response.json({ task: { id: id(3), botId: wrongTaskOwner ? id(99) : id(11), issueId: id(5), attemptId: id(6), candidateId: null,
-        sourceEventId: id(8), revision: 2, stage: 'execute', status: taskCancelled ? 'cancelled' : 'running' },
+        sourceEventId: taskEpochChangesAfterMs !== null && elapsed >= taskEpochChangesAfterMs ? id(9) : id(8),
+        revision: 2, stage: 'execute', status: taskCancelled ? 'cancelled' : 'running' },
         attempts: [{ id: id(6), runId: id(7), output: { requestEpoch: id(8) } }] })
     }
-    if (path.endsWith('/api/runs/' + id(7) + '/evidence')) return Response.json({ run: { id: id(7), botId: id(11), issueId: id(5), status: runStatus,
+    if (path.endsWith('/api/runs/' + id(7) + '/evidence')) return Response.json({ run: { id: id(7), botId: id(11), issueId: id(5),
+      status: terminalAfterMs !== null && elapsed >= terminalAfterMs ? 'stopped' : runStatus,
       executionIdentity: { requester: wrongRunOwner ? 'foreign-owner' : 'fixture-owner', executionPrincipal: 'fixture-owner', outputOwner: 'fixture-owner',
         botId: id(11), botOwner: 'fixture-owner', workspaceId: id(1), billingAccount: { runtime: { kind: 'e2b', ownerId: 'fixture-owner' } } } }, artifacts: [], rawSecret: 'PRIVATE_RUN' })
     if (path.endsWith('/api/threads/' + id(7) + '/machine')) {
@@ -152,7 +155,8 @@ function fixture({ groupFails = true, throwsAfterCreation = false, replayFails =
       return mutateReplay(replay())
     },
   }
-  return { calls, counters, run: () => runAcceptanceBundle({ env, fetchImpl, dependencies, verifySource: () => env.GROUP_ACCEPTANCE_REVISION }) }
+  return { calls, counters, elapsed: () => elapsed, run: () => runAcceptanceBundle({ env, fetchImpl, dependencies,
+    now: () => elapsed, wait: async ms => { elapsed += ms }, verifySource: () => env.GROUP_ACCEPTANCE_REVISION }) }
 }
 
 test('source, origin and deployment fail before any network or credential setup', async () => {
@@ -279,6 +283,27 @@ test('a foreign execution principal or an active run prevents any machine-end re
     assert.equal(report.machineCleanup.machineEndAcknowledged, false)
     assert.equal(report.credentialCleanup.removed, true)
   }
+})
+
+test('normal asynchronous run-stop acknowledgement is awaited within the existing 180s budget', async () => {
+  const f = fixture({ groupFails: false, withTask: true, runStatus: 'running', terminalAfterMs: 2000 }), report = await f.run()
+  assert.equal(report.status, 'pass'); assert.equal(f.counters.machineEnd, 1)
+  assert.equal(f.elapsed(), 2000)
+  assert.equal(report.machineCleanup.terminalWaitBudgetMs, 180000)
+  assert.equal(report.machineCleanup.terminalWaitElapsedMs, 2000)
+  assert.equal(report.machineCleanup.terminalPolls, 2)
+  assert.equal(report.credentialCleanup.cloudRemoved, true)
+})
+
+test('terminal wait expiry or a changed Task epoch never authorizes a machine end', async () => {
+  const expired = fixture({ groupFails: false, withTask: true, runStatus: 'running' }), timeout = await expired.run()
+  assert.equal(expired.elapsed(), 180000); assert.equal(expired.counters.machineEnd, 0)
+  assert.equal(timeout.machineCleanup.error, 'acceptance_machine_cleanup_runs_active')
+  assert.equal(timeout.machineCleanup.executionStopConfirmed, false); assert.equal(timeout.status, 'fail')
+  const changed = fixture({ groupFails: false, withTask: true, runStatus: 'running', terminalAfterMs: 2000, taskEpochChangesAfterMs: 2000 }), drift = await changed.run()
+  assert.equal(changed.elapsed(), 2000); assert.equal(changed.counters.machineEnd, 0)
+  assert.equal(drift.machineCleanup.error, 'acceptance_machine_cleanup_epoch_scope')
+  assert.equal(drift.status, 'fail'); assert.equal(drift.credentialCleanup.cloudRemoved, true)
 })
 
 test('404 and unknown machine-end acknowledgements never prove shutdown and are never repeated', async () => {

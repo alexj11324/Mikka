@@ -3,6 +3,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { appendFileSync, constants, mkdirSync, openSync, closeSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { setTimeout as delay } from 'node:timers/promises'
 import { runOwnerMcpBoundaries } from './owner-mcp-boundaries.mjs'
 
 const ORIGIN = 'https://app.aspectlylabs.com'
@@ -199,6 +200,7 @@ async function defaultDependencies(repo) {
 /** Does not run on import. The CLI requires the exact release checkout and
  * deployment. Tests pass local synthetic dependencies; no production call. */
 export async function runAcceptanceBundle({ env = process.env, fetchImpl = fetch, repo = process.cwd(), dependencies,
+  now = Date.now, wait = delay,
   verifySource = () => {
     if (execFileSync('git', ['status', '--porcelain', '--untracked-files=no'], { cwd: repo, encoding: 'utf8' }).trim()) throw Error('acceptance_source_dirty')
     return execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repo, encoding: 'utf8' }).trim()
@@ -207,6 +209,8 @@ export async function runAcceptanceBundle({ env = process.env, fetchImpl = fetch
   if (!/^[a-f0-9]{40}$/.test(revision ?? '') || !/^dpl_[A-Za-z0-9]+$/.test(deploymentId ?? '')) throw Error('acceptance_fixed_deployment_required')
   if (env.GROUP_ACCEPTANCE_ORIGIN && env.GROUP_ACCEPTANCE_ORIGIN !== ORIGIN) throw Error('acceptance_origin_rejected')
   if (verifySource() !== revision) throw Error('acceptance_source_revision_mismatch')
+  const terminalWaitBudgetMs = Number(env.GROUP_ACCEPTANCE_STOP_TIMEOUT_MS ?? 180000)
+  if (!Number.isSafeInteger(terminalWaitBudgetMs) || terminalWaitBudgetMs < 1000 || terminalWaitBudgetMs > 180000) throw Error('acceptance_stop_budget_invalid')
   const email = env.SMOKE_OWNER_EMAIL
   const password = env.SMOKE_OWNER_PASSWORD
   if (!email || !password) throw Error('acceptance_account_required')
@@ -257,14 +261,14 @@ export async function runAcceptanceBundle({ env = process.env, fetchImpl = fetch
   const ownerTransport = sessionTransport('ownerMcpAndReplay')
   const credentialTransport = sessionTransport('temporaryCredentials')
   const groupTransport = sessionTransport('groupRuntime')
-  const request = async (path, body) => {
-    const response = await ownerTransport(ORIGIN + '/mikka' + path, { method: body === undefined ? 'GET' : 'POST', signal: AbortSignal.timeout(30000),
+  const request = async (path, body, signal = AbortSignal.timeout(30000)) => {
+    const response = await ownerTransport(ORIGIN + '/mikka' + path, { method: body === undefined ? 'GET' : 'POST', signal,
       headers: { origin: ORIGIN, 'cache-control': 'no-store', ...(ownerCookie ? { cookie: ownerCookie } : {}), ...(body === undefined ? {} : { 'content-type': 'application/json' }) },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }) })
     if (!response.ok) throw Error(`acceptance_http_${response.status}`)
     return { response, data: await response.json().catch(() => null) }
   }
-  const version = async () => { if ((await request('/api/version')).data?.build !== deploymentId) throw Error('acceptance_deployment_changed') }
+  const version = async signal => { if ((await request('/api/version', undefined, signal)).data?.build !== deploymentId) throw Error('acceptance_deployment_changed') }
   async function stopCapturedGroup() {
     const cleanup = { source: 'runner-fallback', status: 'failed', conversationId: capturedGroup.id, attempted: false,
       acknowledged: false, stoppedTurns: null, noPendingRetry: false, executionStopConfirmed: false, delegatedTaskIds: [], before: [], after: [] }
@@ -309,7 +313,8 @@ export async function runAcceptanceBundle({ env = process.env, fetchImpl = fetch
   async function endFixtureMachines(fixture) {
     const cleanup = { status: 'failed', taskId: uuid(fixture.taskId), issueId: uuid(fixture.issueId), reporterId: uuid(fixture.reporterId),
       runs: [], artifactsReadbackConfirmed: false, executionStopConfirmed: false, machineEndAcknowledged: false,
-      independentProviderObservation: false, perRunExternalStatus: 'unknown', sharedDesktop: null }
+      independentProviderObservation: false, perRunExternalStatus: 'unknown', sharedDesktop: null,
+      terminalWaitBudgetMs, terminalWaitElapsedMs: 0, terminalPolls: 0 }
     report.machineCleanup = cleanup
     const check = (condition, code) => { if (!condition) throw Error(code) }
     const ended = new Set(['succeeded', 'completed', 'failed', 'stopped', 'cancelled'])
@@ -335,22 +340,49 @@ export async function runAcceptanceBundle({ env = process.env, fetchImpl = fetch
       check(epochs.size > 0 && [...epochs].every(value => uuid(value)) && epochs.has(state.task.sourceEventId), 'acceptance_machine_cleanup_epoch_scope')
       const runIds = [...new Set(state.attempts.filter(attempt => epochs.has(attempt.output?.requestEpoch) && uuid(attempt.runId)).map(attempt => attempt.runId))]
       check(runIds.length > 0 && runIds.length <= 48 && bindings.every(binding => runIds.includes(binding.runId)), 'acceptance_machine_cleanup_run_scope')
-      let artifactCount = 0
-      for (const runId of runIds) {
-        const evidence = (await request('/api/runs/' + runId + '/evidence')).data, run = evidence?.run
-        const identity = run?.executionIdentity
-        check(run?.id === runId && run.issueId === fixture.issueId && run.botId === fixture.reporterId
-          && identity?.requester === ownerId && identity.executionPrincipal === ownerId && identity.outputOwner === ownerId
-          && identity.botId === fixture.reporterId && identity.botOwner === ownerId && identity.workspaceId === capturedGroup.workspaceId
-          && identity.billingAccount?.runtime?.kind === 'e2b' && identity.billingAccount.runtime.ownerId === ownerId, 'acceptance_machine_cleanup_run_scope')
-        check(Array.isArray(evidence.artifacts), 'acceptance_machine_cleanup_artifact_inventory')
-        artifactCount += evidence.artifacts.length
-        cleanup.runs.push({ runId, requestEpoch: state.attempts.find(attempt => attempt.runId === runId).output.requestEpoch,
-          status: token(run.status), terminal: ended.has(run.status), machineEndAttempted: false,
-          machineEndAcknowledged: false, machineEndHttpStatus: null, independentProviderObservation: false })
+      const runBindings = attempts => attempts.filter(attempt => epochs.has(attempt.output?.requestEpoch) && uuid(attempt.runId))
+        .map(attempt => attempt.runId + ':' + attempt.output.requestEpoch).sort()
+      const originalBindings = JSON.stringify(runBindings(state.attempts))
+      const recheckTask = async signal => {
+        const current = (await request('/api/factory/tasks/' + fixture.taskId, undefined, signal)).data
+        check(current?.task?.id === fixture.taskId && current.task.botId === fixture.reporterId && current.task.issueId === fixture.issueId
+          && Array.isArray(current.attempts), 'acceptance_machine_cleanup_task_scope')
+        check(current.task.sourceEventId === state.task.sourceEventId && JSON.stringify(runBindings(current.attempts)) === originalBindings,
+          'acceptance_machine_cleanup_epoch_scope')
+        check(['failed', 'cancelled', 'revoked'].includes(current.task.status)
+          || current.task.status === 'passed' && ['approval', 'publish', 'monitor'].includes(current.task.stage), 'acceptance_machine_cleanup_task_active')
       }
-      cleanup.executionStopConfirmed = cleanup.runs.every(run => run.terminal)
-      check(cleanup.executionStopConfirmed, 'acceptance_machine_cleanup_runs_active')
+      let artifactCount = 0
+      const waitingSince = now(), deadline = waitingSince + terminalWaitBudgetMs
+      const remainingSignal = () => {
+        check(now() < deadline, 'acceptance_machine_cleanup_runs_active')
+        return AbortSignal.timeout(Math.max(1, Math.min(30000, deadline - now())))
+      }
+      try {
+        while (true) {
+          await version(remainingSignal())
+          await recheckTask(remainingSignal())
+          cleanup.terminalPolls++
+          artifactCount = 0; cleanup.runs = []
+          for (const runId of runIds) {
+            const evidence = (await request('/api/runs/' + runId + '/evidence', undefined, remainingSignal())).data, run = evidence?.run
+            const identity = run?.executionIdentity
+            check(run?.id === runId && run.issueId === fixture.issueId && run.botId === fixture.reporterId
+              && identity?.requester === ownerId && identity.executionPrincipal === ownerId && identity.outputOwner === ownerId
+              && identity.botId === fixture.reporterId && identity.botOwner === ownerId && identity.workspaceId === capturedGroup.workspaceId
+              && identity.billingAccount?.runtime?.kind === 'e2b' && identity.billingAccount.runtime.ownerId === ownerId, 'acceptance_machine_cleanup_run_scope')
+            check(Array.isArray(evidence.artifacts), 'acceptance_machine_cleanup_artifact_inventory')
+            artifactCount += evidence.artifacts.length
+            cleanup.runs.push({ runId, requestEpoch: state.attempts.find(attempt => attempt.runId === runId).output.requestEpoch,
+              status: token(run.status), terminal: ended.has(run.status), machineEndAttempted: false,
+              machineEndAcknowledged: false, machineEndHttpStatus: null, independentProviderObservation: false })
+          }
+          cleanup.executionStopConfirmed = cleanup.runs.every(run => run.terminal)
+          if (cleanup.executionStopConfirmed) break
+          check(now() < deadline, 'acceptance_machine_cleanup_runs_active')
+          await wait(Math.min(2000, deadline - now()))
+        }
+      } finally { cleanup.terminalWaitElapsedMs = Math.max(0, now() - waitingSince) }
       const artifacts = [fixture.artifact, fixture.continuation?.artifact].filter(Boolean)
       cleanup.artifactsReadbackConfirmed = artifactCount === 0 || artifacts.length > 0
         && artifacts.every(item => item.retainedAfterStop === true && uuid(item.artifactId) && digest(item.sha256) && integer(item.bytes) !== null)
@@ -360,6 +392,7 @@ export async function runAcceptanceBundle({ env = process.env, fetchImpl = fetch
       // a sandbox existed. Unknown/404 results never prove provider shutdown.
       for (const run of cleanup.runs) {
         await version()
+        await recheckTask()
         run.machineEndAttempted = true
         try {
           const response = await ownerTransport(ORIGIN + '/mikka/api/threads/' + run.runId + '/machine', {
