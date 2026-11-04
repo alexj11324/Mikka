@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "scope": "existing-identity-authorized-project-metadata-only",
+  "identityId": "2cf9fa19-b9db-4c08-8ca0-b31859f2cbac",
+  "targetName": "Mikka Test Account Vault",
+  "startedAt": "2026-11-04T03:09:54.240Z",
+  "status": "target_not_visible_to_existing_identity",
+  "http": {
+    "oidc_request": 200,
+    "identity_login": 200,
+    "project_list": 200
+  },
+  "targetProject": null,
+  "existingMikkaProjectVisible": true,
+  "secretValuesRead": false,
+  "credentialsExported": false,
+  "applicationCalls": 0,
+  "modelCalls": 0,
+  "identityOrPermissionChanges": 0,
+  "errors": [],
+  "finishedAt": "2026-11-04T03:09:55.227Z"
+}
