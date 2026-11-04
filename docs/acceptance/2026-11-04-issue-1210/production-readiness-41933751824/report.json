@@ -1,0 +1,97 @@
+{
+  "purpose": "production-readiness",
+  "applicationSha": "a410b292cc53cfef43992a91d7696023e3481567",
+  "driverRevision": "aea16ebeda8dd9fbaac119a18d04d265322b951e",
+  "mode": "readonly",
+  "status": "partial",
+  "startedAt": "2026-11-04T23:26:59.674Z",
+  "webDeployRunId": 41931192388,
+  "runtime": {
+    "status": "not_published",
+    "sourceCommit": null,
+    "workerSha": null,
+    "runId": 41931192389,
+    "code": "publish_skipped"
+  },
+  "taskState": "not_requested",
+  "taskCreationRequests": 0,
+  "preferenceMutationRequests": 0,
+  "modelCalls": 0,
+  "backendMaintenanceWritesMeasured": false,
+  "paidExecutionVerified": false,
+  "executionReady": false,
+  "cases": [
+    {
+      "case": "api_deepseek",
+      "model": "deepseek-flash",
+      "harness": "claude_code",
+      "credentialType": "api_key",
+      "taskState": "not_requested",
+      "status": "blocked",
+      "code": "source_missing"
+    },
+    {
+      "case": "official_claude",
+      "model": "claude-haiku-5-5",
+      "harness": "claude_code",
+      "credentialType": "subscription",
+      "taskState": "not_requested",
+      "status": "blocked",
+      "code": "source_missing"
+    },
+    {
+      "case": "official_codex",
+      "model": "gpt-6-luna",
+      "harness": "codex",
+      "credentialType": "subscription",
+      "taskState": "not_requested",
+      "status": "blocked",
+      "code": "source_missing"
+    }
+  ],
+  "normalSessionObserved": true,
+  "sessionClosed": true,
+  "scope": {
+    "ownerId": "cL1NXe1mr7WuIS8xWhU37v0p7kNoUMY3",
+    "workspaceId": "0f877068-66a0-4893-8801-9a14eb3116b3",
+    "normalSession": true,
+    "existingOwnerBots": 14
+  },
+  "order": {
+    "beforeSha256": "e92c7a6f5fb282a49f377f85e05d75964ef57f0133d7434d2a9f0a8fde1d8d16",
+    "entries": 0,
+    "customized": false,
+    "afterSha256": "e92c7a6f5fb282a49f377f85e05d75964ef57f0133d7434d2a9f0a8fde1d8d16",
+    "unchanged": true
+  },
+  "activity": {
+    "scope": "current_workspace_bot_runs_and_owner_mobile_thread_list",
+    "workspaceBots": 14,
+    "unfinishedWorkspaceBotRuns": 0,
+    "ownThreadsReturned": 6,
+    "activeOwnThreadsReturned": 0,
+    "allProjectIdleVerified": false,
+    "runtimeLeasesVerified": false,
+    "status": "idle"
+  },
+  "actionDiscovery": {
+    "required": [
+      "saveIssue",
+      "getIssueThread",
+      "changeModelOrder"
+    ],
+    "found": [
+      "saveIssue",
+      "getIssueThread",
+      "changeModelOrder"
+    ],
+    "missing": [],
+    "pagesRead": 2,
+    "pagesFailed": 0,
+    "chunksRead": 80,
+    "chunksFailed": 0,
+    "chunksRemaining": 2026
+  },
+  "metadataStatus": "partial",
+  "finishedAt": "2026-11-04T23:27:07.126Z"
+}

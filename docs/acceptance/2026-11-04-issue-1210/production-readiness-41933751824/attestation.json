@@ -1,0 +1,19 @@
+{
+  "purpose": "production-readiness",
+  "status": "partial",
+  "repository": "alexj11324/Mikka",
+  "applicationSha": "a410b292cc53cfef43992a91d7696023e3481567",
+  "driverRevision": "aea16ebeda8dd9fbaac119a18d04d265322b951e",
+  "mode": "readonly",
+  "metadataReadAuthorized": true,
+  "executionReady": false,
+  "webDeployRunId": 41931192388,
+  "runtime": {
+    "runId": 41931192389,
+    "sourceCommit": null,
+    "workerSha": null,
+    "status": "not_published",
+    "code": "publish_skipped"
+  },
+  "checkedAt": "2026-11-04T23:26:57.920Z"
+}

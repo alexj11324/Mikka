@@ -1,0 +1,49 @@
+{
+  "tree": "5674c9bd693618f772a265d971232c82c970dd1f",
+  "driver": "aea16ebeda8dd9fbaac119a18d04d265322b951e",
+  "parents": [
+    "6db3653caebb974f94982c3f58545242be4237d3",
+    "0199d7e4b75dfcb4ab3e32466ed82fdd533dccc4"
+  ],
+  "historicalPaidWorkflowPresent": false,
+  "workflowTriggerAudit": {
+    "timing": "completed before the observed trusted-ref update at 2026-11-04T23:26:38Z; exact audit-start timestamp was not recorded",
+    "files": [
+      ".github/workflows/analytics-ssr.yml",
+      ".github/workflows/browser-gate.yml",
+      ".github/workflows/cloud-computer.yml",
+      ".github/workflows/credential-vault.yml",
+      ".github/workflows/desktop-release.yml",
+      ".github/workflows/desktop.yml",
+      ".github/workflows/device-gateway.yml",
+      ".github/workflows/e2b-byos.yml",
+      ".github/workflows/e2b-official-runtime.yml",
+      ".github/workflows/e2b-template.yml",
+      ".github/workflows/mobile-update.yml",
+      ".github/workflows/model-provider-fallback-acceptance.yml",
+      ".github/workflows/production-readiness.yml",
+      ".github/workflows/production-smoke.yml",
+      ".github/workflows/project-decisions-acceptance.yml",
+      ".github/workflows/publish-daemon.yml",
+      ".github/workflows/site-search.yml",
+      ".github/workflows/ssh-device-backend.yml",
+      ".github/workflows/subagents.yml",
+      ".github/workflows/ui-policy.yml",
+      ".github/workflows/unattended-sandbox.yml",
+      ".github/workflows/web-deploy.yml"
+    ],
+    "allFetched": true,
+    "historicalPaidWorkflowPresent": false
+  },
+  "publicPin": {
+    "checkedAt": "2026-11-04T23:26:29.847Z",
+    "status": 200,
+    "build": "a410b292cc53cfef43992a91d7696023e3481567"
+  },
+  "artifact": {
+    "id": 13371374794,
+    "bytes": 1593,
+    "sha256": "0cbc881002d68020865951ed724012ba04a3690e3b49fc73d19e645001ad3dd3"
+  }
+}
+
