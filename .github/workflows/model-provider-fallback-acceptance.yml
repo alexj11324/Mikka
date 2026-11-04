@@ -19,7 +19,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: model-provider-fallback-1225
+  group: production-smoke-owner-acceptance
   cancel-in-progress: false
 jobs:
   acceptance:

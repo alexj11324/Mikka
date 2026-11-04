@@ -14,7 +14,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: project-decisions-production-acceptance
+  group: production-smoke-owner-acceptance
   cancel-in-progress: false
 jobs:
   acceptance:
