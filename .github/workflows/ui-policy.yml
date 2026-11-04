@@ -423,7 +423,7 @@ jobs:
           rm -rf "$HOME/native-debs" && mkdir -p "$HOME/native-debs"
           if compgen -G "/var/cache/apt/archives/*.deb" > /dev/null; then cp /var/cache/apt/archives/*.deb "$HOME/native-debs/"; fi
       - name: Save native dependency packages (main only)
-        if: ((github.event_name == 'push' && github.ref == 'refs/heads/main') || github.head_ref == 'ci/db-tests-parallel') && steps.native-debs.outputs.cache-hit != 'true'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.native-debs.outputs.cache-hit != 'true'
         uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: ~/native-debs
