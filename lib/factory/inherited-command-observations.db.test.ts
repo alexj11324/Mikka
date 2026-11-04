@@ -230,11 +230,20 @@ test('isolated PG: direct question recovery exposes historical native observatio
       ['wrong history run', `UPDATE factory_events SET result=jsonb_set(result,'{historyRunId}',to_jsonb($3::text)) WHERE "taskId"=$1 AND "eventId"=$2`, [f.task.id, f.recoveryEventId, f.originId]],
       ['wrong original execute attempt', `UPDATE factory_events SET result=jsonb_set(result,'{task,attemptId}',to_jsonb($3::text)) WHERE "taskId"=$1 AND "eventId"=$2`, [f.task.id, f.recoveryEventId, result.task.attemptId]],
       ['wrong explicit epoch', `UPDATE factory_events SET result=jsonb_set(result,'{task,sourceEventId}',to_jsonb($3::text)) WHERE "taskId"=$1 AND "eventId"=$2`, [f.task.id, f.recoveryEventId, randomUUID()]],
+      ['wrong source attempt stage', `UPDATE factory_attempts SET stage='spec' WHERE id=$1`, [f.historyAttemptId]],
+      ['wrong source attempt status', `UPDATE factory_attempts SET status='passed' WHERE id=$1`, [f.historyAttemptId]],
+      ['wrong source attempt session', 'UPDATE factory_attempts SET "sessionId"=$2 WHERE id=$1', [f.historyAttemptId, 'different-native-session']],
+      ['wrong producer attempt session', 'UPDATE factory_attempts SET "sessionId"=$2 WHERE id=$1', [f.producerAttemptId, 'different-native-session']],
+      ['wrong source run session', 'UPDATE agent_runs SET "sessionId"=$2 WHERE id=$1', [f.historyRunId, 'different-native-session']],
       ['wrong canonical answer', `UPDATE factory_questions SET answer=jsonb_set(answer,'{input,text}','"changed without an authenticated fingerprint"') WHERE id=$1`, [f.originalQuestionId]],
       ['missing source actual claim', 'DELETE FROM byos_native_runs WHERE "runId"=$1', [f.historyRunId]],
       ['missing producer actual claim', 'DELETE FROM byos_native_runs WHERE "runId"=$1', [f.producerRunId]],
       ['wrong actual source binding', 'UPDATE byos_native_runs SET "bindingId"=$2 WHERE "runId"=$1', [f.historyRunId, f.alternateBindingId]],
       ['wrong frozen source binding', `UPDATE agent_runs SET "agentDefinition"=jsonb_set("agentDefinition",'{subscription,bindingId}',to_jsonb($2::text)) WHERE id=$1`, [f.historyRunId, f.alternateBindingId]],
+      ['wrong execution binding owner', 'UPDATE byos_bindings SET "ownerId"=$2 WHERE id=$1', [f.bindingId, 'different-owner']],
+      ['wrong execution binding workspace', 'UPDATE byos_bindings SET "workspaceId"=$2 WHERE id=$1', [f.bindingId, randomUUID()]],
+      ['wrong execution binding consumer', 'UPDATE byos_bindings SET "consumerId"=$2 WHERE id=$1', [f.bindingId, randomUUID()]],
+      ['wrong actual bound model', 'UPDATE byos_bindings SET "modelId"=$2 WHERE id=$1', [f.bindingId, 'different-model']],
       ['wrong connection owner', 'UPDATE byos_connections SET "ownerId"=$2 WHERE id=$1', [f.connectionId, 'different-owner']],
       ['wrong connection revision', 'UPDATE byos_connections SET epoch=epoch+1 WHERE id=$1', [f.connectionId]],
       ['wrong source device', 'UPDATE agent_runs SET "deviceId"=NULL WHERE id=$1', [f.historyRunId]],
@@ -271,6 +280,32 @@ test('isolated PG: direct question recovery exposes historical native observatio
       } finally { await tx.query('ROLLBACK'); tx.release() }
     })
 
+    for (const budget of [
+      { name: 'more than 32 complete pairs', added: 32, outputCharacters: 0 },
+      { name: 'complete pairs whose aggregate exceeds 12k', added: 2, outputCharacters: 4000 },
+    ]) await t.test(budget.name + ' omit the entire inherited collection', async () => {
+      const tx = await pool.connect()
+      await tx.query('BEGIN')
+      try {
+        if (budget.outputCharacters) await tx.query(`UPDATE run_chunks SET chunk=jsonb_set(chunk,'{output,output}',to_jsonb($2::text)) WHERE id=$1`, [f.outputId, 'x'.repeat(budget.outputCharacters)])
+        for (let index = 0; index < budget.added; index++) {
+          for (const [id, offset] of [[f.inputId, 0], [f.outputId, 1]] as const) await tx.query(`INSERT INTO run_chunks(id,"runId",seq,chunk,"createdAt")
+            SELECT $2,"runId",$3,jsonb_set(chunk,'{toolCallId}',to_jsonb($4::text)),"createdAt" FROM run_chunks WHERE id=$1`,
+          [id, randomUUID(), 1000 + index * 2 + offset, 'historical-budget-' + index])
+        }
+        const { rows: [size] } = await tx.query(`SELECT count(*)::int AS pairs,
+            max(length((chunk->'output')::text))::int AS "largestOutput"
+          FROM run_chunks WHERE "runId"=$1 AND chunk->>'type'='tool-output-available'`, [f.historyRunId])
+        assert.equal(size.pairs, budget.added + 1)
+        assert.ok(size.largestOutput < 6000, 'every individual payload is complete and below the truncation limit')
+        if (budget.outputCharacters) assert.ok(size.pairs <= 32, 'the aggregate limit is exercised without reaching the pair-count limit')
+        const observed = await read(tx)
+        assert.deepEqual(observed.records, [])
+        assert.deepEqual(observed.inheritedRecords, [])
+        assert.equal(observed.inheritedRecordsOmitted, true)
+      } finally { await tx.query('ROLLBACK'); tx.release() }
+    })
+
     await t.test('a reported failed command stays failed data, never a synthesized pass', async () => {
       const tx = await pool.connect()
       await tx.query('BEGIN')
@@ -280,6 +315,15 @@ test('isolated PG: direct question recovery exposes historical native observatio
         assert.deepEqual(observed.records, [])
         assert.equal(observed.inheritedRecords[0].output.exitCode, 7)
         assert.equal(Object.hasOwn(observed.inheritedRecords[0], 'passed'), false)
+      } finally { await tx.query('ROLLBACK'); tx.release() }
+    })
+
+    await t.test('a changed original producer attempt status invalidates the canonical snapshot evidence', async () => {
+      const tx = await pool.connect()
+      await tx.query('BEGIN')
+      try {
+        await tx.query(`UPDATE factory_attempts SET status='passed' WHERE id=$1`, [f.producerAttemptId])
+        await assert.rejects(read(tx), /factoryDeliverableSnapshotUnavailable/)
       } finally { await tx.query('ROLLBACK'); tx.release() }
     })
 
