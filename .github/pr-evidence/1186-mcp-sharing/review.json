@@ -1,0 +1,130 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "commit": "5d85ee0a7f3382a6b8d5ba89fbcbb66e7f9b1795",
+    "tree": "1f7c0d07d7d5bd78311524feb889283a2601e632",
+    "remoteDirectory": "/vercel/Mikka-mcp-ui"
+  },
+  "environment": {
+    "kind": "isolated Cloud Linux production build",
+    "origin": "http://localhost:3110/mikka",
+    "database": "mikka_mcp_ui_5d85_e2e",
+    "node": "24.22.1",
+    "pnpm": "10.34.3",
+    "browser": "existing Chrome headless shell",
+    "normalTestAccountPool": true
+  },
+  "build": {
+    "commandId": "cmd_fd5a801025fe4cbdbca413c139fc",
+    "exitCode": 0
+  },
+  "capture": {
+    "commandId": "cmd_1ebd77a7b144498fb9096e240a60",
+    "exitCode": 1,
+    "error": "ACCOUNT_DIRTY",
+    "functionalAssertions": "completed before account release",
+    "screenshotCount": 5,
+    "record": "Reconstructed from the fixed capture code path, five produced screenshots, final release stack, normal cleanup results and read-only database verification; the original script threw before replacing its prior review.json."
+  },
+  "http": {
+    "normalSignupSigninAndSession": true,
+    "ownerCreatedWorkspace": true,
+    "invitationCreatedWithoutMail": true,
+    "peerAcceptedInvitation": true,
+    "personalSharingDisabled": true,
+    "beforeShareInvisible": true,
+    "shareReadback": true,
+    "peerEndpointHidden": true,
+    "nonOwnerRevokeStatus": 404,
+    "revokeReadback": true,
+    "reShareReadback": true,
+    "credentialsAbsentFromPeerResponse": true
+  },
+  "visual": {
+    "reviewed": true,
+    "result": "No clipping or horizontal overflow in MCP rows or confirmation. Owner controls, member attribution, disabled connection, English/Chinese and light/dark states visible. The existing Linear status banner reports the intentionally unconfigured integration and was not hidden.",
+    "layoutAssertions": "Capture asserted no horizontal overflow and one owner switch / zero member switches for all five layouts.",
+    "files": [
+      {
+        "file": "en-1440-owner-light.webp",
+        "width": 1440,
+        "height": 1000,
+        "bytes": 34862,
+        "sha256": "a2a8b606900e4fc3cb6b482f661856a1153642db9783bd48a63fbc3210e6f3c0"
+      },
+      {
+        "file": "en-390-confirmation-light.webp",
+        "width": 390,
+        "height": 844,
+        "bytes": 10916,
+        "sha256": "83094ea9dae6072439a6a0a8b41c051abc99d2dd8e6adea219c2712a5558510b"
+      },
+      {
+        "file": "en-390-member-dark.webp",
+        "width": 390,
+        "height": 844,
+        "bytes": 5582,
+        "sha256": "56c4e796a47ca448ebc6bd1d24765d9c1adfa67dca646700454c5861c14ae1ee"
+      },
+      {
+        "file": "zh-CN-1440-member-dark.webp",
+        "width": 1440,
+        "height": 1000,
+        "bytes": 23766,
+        "sha256": "28cdd4adb0a21e1aefb2e5202106a64b5a338de127491a25a9d8899a708164b1"
+      },
+      {
+        "file": "zh-CN-390-owner-light.webp",
+        "width": 390,
+        "height": 844,
+        "bytes": 7720,
+        "sha256": "d82c2145eebc6a80cb626792d406694154bc2bc7626e489c819d0951546f8eb8"
+      }
+    ],
+    "independentRootReview": "All five images independently reviewed by root: approved for visual evidence; no clipped controls, overflow, credentials or private user data."
+  },
+  "cleanup": {
+    "normalMcpDeletes": 2,
+    "normalWorkspaceDeletion": true,
+    "remainingFixtureConnections": 0,
+    "remainingFixtureWorkspaces": 0,
+    "activeLeases": 0,
+    "accountPool": "pair-004 quarantined with ACCOUNT_DIRTY; earlier failed harness attempts remain quarantined with RUN_DIRTY",
+    "guardsUnchanged": true,
+    "sqlCleanup": false,
+    "ownedNextStopped": true,
+    "ownedBrowserClosed": true,
+    "port3110Released": true,
+    "detailedPersistentDifference": {
+      "method": "Existing TestAccountPool read-only transaction; normal environment and database identity validation preserved. No row writes or quarantine changes.",
+      "finalPair": "pair-004",
+      "ownerFingerprintMatchesBaseline": false,
+      "peerFingerprintMatchesBaseline": true,
+      "currentOwnedRowsPerActor": {
+        "account": 1,
+        "bots": 1,
+        "coordinator_bots": 1,
+        "mikka_workspace_members": 1,
+        "mikka_workspaces": 1,
+        "signup_email_claims": 1,
+        "user": 1,
+        "user_onboarding": 1,
+        "workspace_subscription_shares": 1
+      },
+      "classification": "Only ordinary initialized-account rows remain in the current owned footprint. No custom MCP connections or temporary Research workspace remain. The owner checksum differs; the baseline contains only a hash, so the exact changed field cannot be reconstructed from this evidence.",
+      "limitations": "Do not classify the overall driver as passed or the owner lease as clean. Quarantine and retained audit/authentication records were left intact."
+    }
+  },
+  "scope": {
+    "modelCalls": 0,
+    "externalMcpCalls": 0,
+    "browserTestSuiteRun": false,
+    "applicationSourceModified": false,
+    "productionModified": false
+  },
+  "archive": {
+    "bytes": 80026,
+    "sha256": "44a10ae9db23a27e6ffbfb749a034b6223e7a59471ae665dac8a7170d0defdb4",
+    "base64Chunks": 134
+  }
+}
