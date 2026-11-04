@@ -1,6 +1,6 @@
 import type { Pool, PoolClient } from "pg";
-import { FactoryError, type FactoryBinding, type FactoryEvidence } from "./contract";
-import { runCaptureEvidence } from "./evidence";
+import { FactoryError, type FactoryBinding } from "./contract";
+import { completeFactoryExecution } from "./completed-execution";
 import { factoryEventId } from "./event-id";
 import type { FactoryTask, createFactoryStore } from "./store";
 import { MAX_RUN_ATTEMPTS } from "../run-retry";
@@ -280,92 +280,7 @@ export function createFactoryReconciler(
           else
             await failIntoRepairLoop(tx, store, userId, task, `run-completion:${run.id}`, `Run failed: ${String(run.error ?? run.stopReason ?? "unknown")}`, "run_failed", { runId: run.id });
         } else {
-          const sha = run.report?.publish?.commit ?? ((run.agentDefinition?.readOnly || !run.remoteUrl) ? run.report?.sourceCommit : undefined);
-          const repository = run.remoteUrl ?? run.repoPath;
-          const deliverable = !run.remoteUrl && typeof run.repoPath === 'string' && run.repoPath.startsWith('/home/user/.mikka/bot-workspaces/');
-          if (
-            !run.sessionId ||
-            !run.report ||
-            !run.deviceId ||
-            (task.stage === "execute" &&
-              (!repository ||
-                (!deliverable && (typeof sha !== 'string' || !/^[a-f0-9]{40}$/.test(sha)))))
-          ) {
-            await store.apply(
-              userId,
-              binding(task),
-              eventId,
-              {
-                action: "finish",
-                status: "blocked",
-                reason:
-                  "Run ended without a traceable session, report or exact repository candidate; trusted recovery required",
-                evidence: [],
-                output: { runId: run.id },
-              },
-              tx,
-            );
-          } else {
-            let current = task;
-            if (task.stage === "execute") {
-              const next = await store.apply(
-                userId,
-                binding(current),
-                factoryEventId("run-candidate", run.id),
-                {
-                  action: "candidate",
-                  runId: run.id,
-                  candidate: {
-                    sha: deliverable ? null : sha,
-                    ...(deliverable ? { kind: 'deliverable' as const } : run.agentDefinition?.readOnly || !run.remoteUrl ? { kind: 'report' as const } : {}),
-                    repository,
-                    environment: `device:${run.deviceId}`,
-                    scope: `issue:${task.issueId}`,
-                  },
-                },
-                tx,
-              );
-              current = next.task;
-            }
-            const report: FactoryEvidence = {
-              artifact: `run-report:${run.id}`,
-              kind: "report",
-              runId: run.id,
-              sessionId: run.sessionId,
-              candidateId: current.candidateId,
-              sha: task.stage === "execute" && !deliverable ? sha : null,
-              environment: `device:${run.deviceId}`,
-              recordedAt: (run.finishedAt ?? new Date()).toISOString(),
-            };
-            const next = await store.apply(
-              userId,
-              binding(current),
-              eventId,
-              {
-                action: "finish",
-                status: "passed",
-                reason: "Persisted completed Harness run and artifact matched",
-                // The report, then the screenshots and recordings the run took.
-                evidence: [report, ...(await runCaptureEvidence(tx, { id: run.id, userId }, report))],
-                output: { runId: run.id },
-              },
-              tx,
-            );
-            await store.apply(
-              userId,
-              binding(next.task),
-              factoryEventId("run-advance", run.id),
-              {
-                action: "advance",
-                stage: task.stage === "spec" ? "execute" : "review",
-                reason:
-                  task.stage === "spec"
-                    ? "Spec run complete; execution pending"
-                    : "Exact candidate awaits independent review",
-              },
-              tx,
-            );
-          }
+          await completeFactoryExecution(tx, store, task, run);
         }
         const start = await dispatchNext?.(tx, store, task, run);
         await tx.query("COMMIT");

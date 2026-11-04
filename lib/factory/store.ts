@@ -1,4 +1,7 @@
 import { repositoryExecutionMatches } from './execution-receipt'
+import { isDeepStrictEqual } from 'node:util'
+import { completeFactoryExecution } from './completed-execution'
+import { completedRunForRecovery } from './completion-recovery'
 import { apiKeyWorkerDefinition } from "../agent-kit/worker";
 import { factoryRunBotMatches } from './run-scope'
 import { randomUUID } from "node:crypto";
@@ -47,6 +50,8 @@ export type FactoryTaskSummary = Pick<FactoryTask, "id" | "issueId" | "stage" | 
   candidateSha: string | null;
   /** Latest publication for the current candidate, if any. */
   publication: FactoryPublicationSummary | null;
+  /** Host-confirmed completed execution that the owner can resume into checks. */
+  completionRecovery?: { binding: { taskId: string; revision: number } };
 };
 /** Same status union as #441's AcceptancePublication (lib/factory/acceptance-state.ts). */
 export type FactoryPublicationStatus = "reserved" | "uncertain" | "succeeded" | "failed";
@@ -100,6 +105,9 @@ export type FactoryAuthorize = (
   issueId: string,
   tx: PoolClient,
 ) => Promise<boolean>;
+const completionRecoveryAuthority = Symbol('owner-completion-recovery');
+type CompletionRecoveryAuthority = { [completionRecoveryAuthority]: true; tx: PoolClient; userId: string; taskId: string; attemptId: string; sourceEventId: string; runId: string };
+export type FactoryCompletionDispatch = (tx: PoolClient, store: ReturnType<typeof createFactoryStore>, task: FactoryTask, run: Record<string, any>) => Promise<(() => Promise<void>) | undefined>;
 export type FactoryGate = (
   tx: PoolClient,
   task: FactoryTask,
@@ -266,7 +274,7 @@ export function createFactoryStore(
     task.stage = stage;
     task.status = "pending";
   }
-  return {
+  const store = {
     lockTask: (tx: PoolClient, userId: string, taskId: string) => owned(tx, userId, taskId),
     /** Read-only GET paths: ownership/scope checked, nothing locked. */
     readTask: (tx: PoolClient, userId: string, taskId: string) => owned(tx, userId, taskId, false),
@@ -357,13 +365,50 @@ export function createFactoryStore(
       }, existing);
     },
     /** Task-detail GET: read-only, no row locks (BE-16). B8/B9 checks and the B11 header are computed, never stored. */
-    async read(userId: string, taskId: string): Promise<FactorySnapshot & Partial<FactoryTaskDetail>> {
+    async read(userId: string, taskId: string): Promise<FactorySnapshot & Partial<FactoryTaskDetail> & { completionRecovery?: { binding: { taskId: string; revision: number } } }> {
       return transaction(async (tx) => {
         const task = await owned(tx, userId, taskId, false);
         return {
           ...(await snapshot(tx, task)),
           ...(await factoryTaskDetail(tx, task)),
+          ...((await completedRunForRecovery(tx, task)) ? { completionRecovery: { binding: { taskId: task.id, revision: task.revision } } } : {}),
         };
+      });
+    },
+    /** Human Retry only: consume the current successful run without rewriting its blocked attempt.
+     * The run/attempt/epoch remain locked; provider work is returned for after COMMIT. */
+    async retryCompletion(userId: string, rawBinding: FactoryBindingInput, eventId: string, reason: string, dispatch?: FactoryCompletionDispatch): Promise<{ result: FactorySnapshot; start?: () => Promise<void> } | null> {
+      const binding = revisionBindingSchema.parse(rawBinding);
+      const change = changeSchema.parse({ action: 'retry', reason });
+      uuid(eventId);
+      return transaction(async tx => {
+        const task = await owned(tx, userId, binding.taskId);
+        if (terminal(task)) fail('factoryStopped');
+        const { rows: [receipt] } = await tx.query('SELECT request,result FROM factory_events WHERE "taskId"=$1 AND "eventId"=$2', [task.id,eventId]);
+        if (receipt) {
+          if (receipt.request.kind !== 'owner_completion_recovery') return null;
+          if (!isDeepStrictEqual(receipt.request.input, { binding, change })) fail('factoryReplayMismatch');
+          if (receipt.request.sourceEventId !== task.sourceEventId) fail('factoryStale');
+          return { result: receipt.result };
+        }
+        if (task.revision !== binding.revision) fail('factoryStale');
+        const run = await completedRunForRecovery(tx, task, true);
+        if (!run) {
+          // A denied completion recovery must not fall through to a fresh producer.
+          if (task.stage === 'execute' && task.status === 'blocked') {
+            const { rowCount } = await tx.query(`SELECT 1 FROM factory_attempts a JOIN agent_runs r ON r.id=a."runId"
+              WHERE a.id=$1 AND a."taskId"=$2 AND a.output->'watchdog'->>'reasonCode'='recovery_exhausted' AND r.status='succeeded'`, [task.attemptId,task.id]);
+            if (rowCount) fail('factoryCompletionRecoveryUnavailable');
+          }
+          return null;
+        }
+        await runFor(tx, task, run.id); // The canonical run/owner/Bot fence, with the run lock.
+        const authority: CompletionRecoveryAuthority = { [completionRecoveryAuthority]: true, tx, userId, taskId: task.id, attemptId: task.attemptId, sourceEventId: task.sourceEventId, runId: run.id };
+        const current = await completeFactoryExecution(tx, { apply: (owner, currentBinding, id, action, client) => store.apply(owner, currentBinding, id, action, client, authority) }, task, run);
+        const start = await dispatch?.(tx, store, current, run);
+        const final = await owned(tx, userId, task.id);
+        const result = await save(tx, final, eventId, { kind: 'owner_completion_recovery', input: { binding, change }, sourceEventId: task.sourceEventId, attemptId: authority.attemptId, runId: run.id });
+        return { result, start };
       });
     },
     async listForIssue(userId: string, issueId: string) {
@@ -379,7 +424,8 @@ export function createFactoryStore(
         for (const row of rows)
           if (factoryScopeAllows(row, issue) && await sourceAllowed(tx, userId, row.sourceEventId, issueId)) {
             const { id, issueId, stage, status, revision, attemptId, candidateId, reason, isSkillCandidate, candidateRunId, candidateSha, publication } = row;
-            tasks.push({id,issueId,stage,status,revision,attemptId,candidateId,reason:maskFactoryNote(reason),isSkillCandidate,candidateRunId,candidateSha:candidateSha ?? null,publication:publicationSummary(publication)});
+            const completionRecovery = await completedRunForRecovery(tx, row) ? { binding: { taskId: id, revision } } : undefined;
+            tasks.push({id,issueId,stage,status,revision,attemptId,candidateId,reason:maskFactoryNote(reason),isSkillCandidate,candidateRunId,candidateSha:candidateSha ?? null,publication:publicationSummary(publication),...(completionRecovery ? { completionRecovery } : {})});
             // Same minimal masker copy as #444 (lib/factory/note-mask.ts); switch to #438's once merged.
           }
         return { contractVersion: 1 as const, issueId, tasks };
@@ -429,6 +475,7 @@ export function createFactoryStore(
       eventId: string,
       rawChange: FactoryChange,
       existingTransaction?: PoolClient,
+      completion?: CompletionRecoveryAuthority,
     ) {
       const bp = revisionBindingSchema.safeParse(rawBinding),
         cp = changeSchema.safeParse(rawChange);
@@ -457,6 +504,10 @@ export function createFactoryStore(
           [task.attemptId, task.id],
         );
         if (!attempt) fail("factoryAttemptMissing");
+        const recovering = completion?.[completionRecoveryAuthority] === true && completion.tx === tx && completion.userId === userId &&
+          completion.taskId === task.id && completion.attemptId === attempt.id && completion.sourceEventId === task.sourceEventId &&
+          completion.runId === attempt.runId && task.stage === 'execute' && attempt.status === 'blocked';
+        if (completion && (!recovering || (change.action !== 'candidate' && change.action !== 'advance' && !(change.action === 'finish' && change.status === 'passed')))) fail('factoryTransition');
         if (!["cancel", "revoke"].includes(change.action) && attempt.output?.requestEpoch != null && attempt.output.requestEpoch !== task.sourceEventId)
           fail("factoryStale");
         if (!["resolve", "cancel", "revoke"].includes(change.action) && !lifecycle)
@@ -594,7 +645,7 @@ export function createFactoryStore(
           if (
             task.stage !== "execute" ||
             task.candidateId !== null || attempt.candidateId !== null ||
-            task.status !== "running" ||
+            (task.status !== "running" && !(recovering && task.status === 'blocked')) ||
             attempt.runId !== change.runId
           )
             fail("factoryTransition");
@@ -619,12 +670,12 @@ export function createFactoryStore(
             ],
           );
           task.candidateId = candidateId;
-          await tx.query(
+          if (!recovering) await tx.query(
             'UPDATE factory_attempts SET "candidateId"=$2 WHERE id=$1',
             [attempt.id, candidateId],
           );
         } else if (change.action === "finish") {
-          if (!["pending", "running", "waiting"].includes(task.status))
+          if (!["pending", "running", "waiting"].includes(task.status) && !(recovering && task.status === 'blocked'))
             fail("factoryTransition");
           if (attempt.runId) {
             const {
@@ -636,7 +687,7 @@ export function createFactoryStore(
             if (!provenance && change.status !== "blocked")
               fail("factoryRunMismatch");
             if (provenance) {
-              await tx.query(
+              if (!recovering) await tx.query(
                 'UPDATE factory_attempts SET "sessionId"=$2 WHERE id=$1',
                 [attempt.id, provenance.sessionId],
               );
@@ -734,7 +785,7 @@ export function createFactoryStore(
                 );
                 if (!rows.length) fail("factoryArtifactMissing");
               }
-              await tx.query(
+              if (!recovering) await tx.query(
                 'UPDATE factory_attempts SET "sessionId"=$2 WHERE id=$1',
                 [attempt.id, run.sessionId],
               );
@@ -742,7 +793,7 @@ export function createFactoryStore(
           }
           task.status = change.status;
           task.reason = change.reason;
-          await tx.query(
+          if (!recovering) await tx.query(
             "UPDATE factory_attempts SET output=$2,evidence=$3 WHERE id=$1",
             [
               attempt.id,
@@ -831,7 +882,7 @@ export function createFactoryStore(
         const stoppedFinishedAttempt =
           (change.action === "cancel" || change.action === "revoke") &&
           ["passed", "failed", "blocked"].includes(attempt.status);
-        if (task.attemptId === attempt.id && !stoppedFinishedAttempt) {
+        if (task.attemptId === attempt.id && !stoppedFinishedAttempt && !recovering) {
           await tx.query(
             "UPDATE factory_attempts SET status=$2,reason=$3,\"finishedAt\"=CASE WHEN $2 IN ('passed','failed','blocked','cancelled','revoked') THEN clock_timestamp() ELSE NULL END WHERE id=$1",
             [attempt.id, task.status, task.reason],
@@ -854,4 +905,5 @@ export function createFactoryStore(
       }, existingTransaction);
     },
   };
+  return store;
 }

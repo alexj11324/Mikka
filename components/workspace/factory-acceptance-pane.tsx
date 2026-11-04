@@ -1,9 +1,9 @@
 'use client'
 
-import { useCallback, useReducer, useState } from 'react'
+import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
-import { CircleCheck, CircleDashed, CircleX, Cloud, ExternalLink, Laptop, Server } from 'lucide-react'
+import { CircleCheck, CircleDashed, CircleX, Cloud, ExternalLink, Laptop, RefreshCw, Server } from 'lucide-react'
 import { Alert, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
@@ -22,7 +22,7 @@ import { ShortSha, shortSha } from './short-sha'
 import { FieldError } from '@/components/ui/field'
 
 type Candidate = { sha: string | null; kind?: 'repository' | 'report' | 'deliverable'; repository: string; environment: string; scope: string }
-export type FactoryTask = { id: string; issueId: string; stage: string; status: string; reason: string; candidateId: string | null; candidateRunId: string | null; isSkillCandidate: boolean }
+export type FactoryTask = { id: string; issueId: string; stage: string; status: string; reason: string; candidateId: string | null; candidateRunId: string | null; isSkillCandidate: boolean; revision?: number; completionRecovery?: AcceptanceDetail['completionRecovery'] }
 type Evidence = { binding: { taskId: string; issueId: string; attemptId: string; revision: number; candidateId: string | null }; manifest: { candidate: Candidate; artifacts: EvidenceEntry[] } }
 type Approval = { id: string; candidateId: string; candidate: Candidate; action: string; target: string; targetEnvironment: string; expiresAt: string; revokedAt: string | null; createdAt: string }
 type Publication = { id: string; approvalId: string; status: 'reserved' | 'uncertain' | 'succeeded' | 'failed'; request: Record<string, unknown>; receipt?: { verifiedTarget?: { reference?: string } } }
@@ -63,7 +63,10 @@ type Derived = { state: AcceptanceState; active?: unknown; publication?: unknown
 export function useAcceptance(task: FactoryTask) {
   const { data: ledger, mutate: reload, error: ledgerError } = useSWR<Ledger>(`/api/factory/tasks/${task.id}/approval?view=ledger`, request, { refreshInterval: 5000 })
   const { data: detail } = useSWR<AcceptanceDetail>(`/api/factory/tasks/${task.id}`, request)
-  const current = detail?.task && detail.task.candidateId === task.candidateId ? detail.task : task
+  // The list keeps polling while a recovered candidate passes its checks. An
+  // older cached detail with that same candidate must not hide newer approval.
+  const current = detail?.task && detail.task.candidateId === task.candidateId &&
+    (typeof task.revision !== 'number' || (typeof detail.task.revision === 'number' && detail.task.revision >= task.revision)) ? detail.task : task
   const derived: Derived | undefined = !ledger ? undefined : task.isSkillCandidate
     ? acceptanceState({ stage: task.stage, candidateId: task.candidateId, approvals: Array.isArray(ledger.approvals) ? ledger.approvals : [], publications: Array.isArray(ledger.publications) ? ledger.publications : [], now: Date.now() })
     : mergeAcceptance({ stage: current.stage, status: current.status, candidateId: current.candidateId, merges: Array.isArray(ledger.merges) ? ledger.merges : [] })
@@ -179,7 +182,14 @@ export function FactoryAcceptancePane({ task, onOpenThread }: { task: FactoryTas
   const { data: evidence, error: evidenceError } = useSWR<Evidence>(task.stage === 'approval' || acceptance?.superseded || acceptance?.state === 'merged' ? `/api/factory/tasks/${task.id}/approval` : null, request)
   // Checks and the delivery header (B8/B9/B11) are read-only extras; the pane works without them.
   const { data: detail, mutate: reloadDetail } = useSWR<AcceptanceDetail>(`/api/factory/tasks/${task.id}`, request)
+  const detailRevision = detail?.task?.revision
+  useEffect(() => {
+    if (typeof task.revision === 'number' && typeof detailRevision === 'number' && detailRevision < task.revision)
+      void reloadDetail().catch(() => {})
+  }, [task.revision, detailRevision, reloadDetail])
   const [busy, setBusy] = useState(false)
+  const retryingCompletion = useRef(false)
+  const completionRequest = useRef<{ revision: number; eventId: string } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [viewing, setViewing] = useState<{ group: number; index: number } | null>(null)
   const [reject, dispatchReject] = useReducer(rejectFlow, closedReject)
@@ -213,6 +223,20 @@ export function FactoryAcceptancePane({ task, onOpenThread }: { task: FactoryTas
       await reload().catch(() => {})
       return null
     } finally { setBusy(false) }
+  }
+
+  async function retryCompletion() {
+    const recovery = detail?.completionRecovery
+    if (!recovery || retryingCompletion.current) return
+    retryingCompletion.current = true; setBusy(true); setError(null)
+    if (completionRequest.current?.revision !== recovery.binding.revision) completionRequest.current = { revision: recovery.binding.revision, eventId: crypto.randomUUID() }
+    try {
+      await request(`/api/factory/tasks/${task.id}`, { binding: recovery.binding, eventId: completionRequest.current.eventId, action: 'retry', reason: 'Resume the completed execution' })
+    } catch (caught) { setError(caught instanceof RequestError ? caught.code : 'factoryUnavailable') }
+    finally {
+      await Promise.all([reload().catch(() => {}), reloadDetail().catch(() => {})])
+      retryingCompletion.current = false; setBusy(false)
+    }
   }
 
   /** 验收并合并 (#528): the server merges the PR as this person, bound to the candidate commit. */
@@ -299,7 +323,10 @@ export function FactoryAcceptancePane({ task, onOpenThread }: { task: FactoryTas
       {state === 'failed' && <div className="animate-in fade-in-0 slide-in-from-bottom-1 duration-150 motion-reduce:slide-in-from-bottom-0"><Alert variant="destructive"><AlertTitle>{t('publishFailed')}</AlertTitle></Alert></div>}
       {error && <FieldError className="text-xs">{t(ERROR_KEYS[error] ?? 'error')}</FieldError>}
     </div>
-    {state !== 'unavailable' && <footer className="shrink-0 px-4 pb-4 sm:px-5">
+    {detail?.completionRecovery && <footer className="shrink-0 px-4 pb-4 sm:px-5">
+      <Button size="sm" disabled={busy} aria-busy={busy} onClick={() => { void retryCompletion() }}>{busy ? <Spinner data-icon="inline-start" /> : <RefreshCw data-icon="inline-start" />}{t('retry')}</Button>
+    </footer>}
+    {!detail?.completionRecovery && state !== 'unavailable' && <footer className="shrink-0 px-4 pb-4 sm:px-5">
       <ApprovalBar state={state} isSkill={task.isSkillCandidate} isDeliverable={candidate?.kind === 'report' || candidate?.kind === 'deliverable'} busy={busy} canApprove={task.isSkillCandidate ? Boolean(evidence && environment) : Boolean(evidence && (pullRequestUrl || candidate?.kind === 'report' || candidate?.kind === 'deliverable'))}
         onAccept={task.isSkillCandidate ? undefined : () => { void accept() }} pullRequestUrl={pullRequestUrl ?? undefined} refusal={refusal ?? undefined} canPublish={Boolean(active && environmentOf(active.candidate) && active.target && active.targetEnvironment)}
         environment={envChip ?? undefined}

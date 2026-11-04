@@ -11,18 +11,22 @@ const lookup = (key: string, args?: Record<string, string>) => {
 }
 let swr: { data?: unknown; error?: unknown; isLoading: boolean; mutate: () => void }
 let ledger: unknown
-mock.module('swr', { defaultExport: (key: string) => String(key).includes('view=ledger') ? { data: ledger, mutate: () => {} } : swr })
+let taskDetail: unknown
+mock.module('swr', { defaultExport: (key: string) => String(key).includes('view=ledger')
+  ? { data: ledger, mutate: () => {} }
+  : key === '/api/factory/tasks/t1' && taskDetail !== undefined ? { data: taskDetail, mutate: () => {} } : swr })
 mock.module('next-intl', { namedExports: { useTranslations: () => lookup, useFormatter: () => ({ dateTime: () => '' }) } })
 mock.module(new URL('./issue-thread-panel.tsx', import.meta.url).href, { namedExports: { IssueThreadPanel: () => null } })
 
 let FactoryAcceptance: typeof import('./factory-acceptance')['FactoryAcceptance']
+let FactoryAcceptancePanel: typeof import('./factory-acceptance')['FactoryAcceptancePanel']
 let FactoryListError: typeof import('./factory-acceptance')['FactoryListError']
 let ApprovalBar: typeof import('./factory-approval-bar')['ApprovalBar']
 before(async () => {
-  ({ FactoryAcceptance, FactoryListError } = await import('./factory-acceptance'))
+  ({ FactoryAcceptance, FactoryAcceptancePanel, FactoryListError } = await import('./factory-acceptance'))
   ;({ ApprovalBar } = await import('./factory-approval-bar'))
 })
-beforeEach(() => { swr = { isLoading: false, mutate: () => {} }; ledger = { approvals: [], publications: [] } })
+beforeEach(() => { swr = { isLoading: false, mutate: () => {} }; ledger = { approvals: [], publications: [] }; taskDetail = undefined })
 const list = () => renderToStaticMarkup(<FactoryAcceptance issueId="issue-1" />)
 const task = (patch: Record<string, unknown> = {}) => ({ id: 't1', issueId: 'issue-1', stage: 'approval', status: 'pending', reason: '独立检查通过', candidateId: 'c1', candidateRunId: null, isSkillCandidate: false, ...patch })
 
@@ -89,6 +93,29 @@ test('an empty list renders nothing', () => {
 test('an accepted report remains reachable and reads 已验收', () => {
   swr.data = { tasks: [task({ status: 'passed' })] }
   assert.match(list(), />已验收</)
+})
+
+test('host-confirmed completion recovery is reachable without exposing ordinary blocked tasks', () => {
+  const blocked = task({ stage: 'execute', status: 'blocked', candidateId: null, candidateRunId: null, reason: '已完成执行等待独立检查' })
+  swr.data = { tasks: [blocked] }
+  assert.equal(list(), '')
+  swr.data = { tasks: [{ ...blocked, completionRecovery: { binding: { taskId: blocked.id, revision: 16 } } }, task({ id: 'accepted', status: 'passed' })] }
+  const html = list()
+  assert.match(html, /已完成执行等待独立检查/)
+  assert.match(html, /aria-label="Factory 验收"/)
+  assert.match(html, />已验收</)
+})
+
+test('an open completion recovery panel follows the same task to its accepted candidate', () => {
+  const initial = task({ stage: 'execute', status: 'blocked', candidateId: null, candidateRunId: null,
+    revision: 16, completionRecovery: { binding: { taskId: 't1', revision: 16 } } })
+  taskDetail = { task: { stage: 'review', status: 'running', candidateId: 'c1', revision: 18 } }
+  swr.data = { tasks: [task({ status: 'pending', candidateRunId: 'producer', revision: 23 })] }
+  assert.match(renderToStaticMarkup(<FactoryAcceptancePanel task={initial} onClose={() => {}} />), />待你确认</)
+  swr.data = { tasks: [task({ status: 'passed', candidateRunId: 'producer', revision: 24 })] }
+  const html = renderToStaticMarkup(<FactoryAcceptancePanel task={initial} onClose={() => {}} />)
+  assert.match(html, />已验收</)
+  assert.doesNotMatch(html, />重试</)
 })
 
 // The card must survive a 200 response that is not `{ tasks: [...] }`: an HTML

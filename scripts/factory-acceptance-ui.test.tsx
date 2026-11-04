@@ -87,6 +87,34 @@ test('the row opens acceptance for its task', async () => {
   assert.deepEqual(opened, [task()])
 })
 
+test('an exhausted completed run offers owner Retry with the exact host binding', async () => {
+  const binding = { taskId: 't1', revision: 16 }
+  detail = { completionRecovery: { binding }, checks: [] }
+  await pane({ stage: 'execute', status: 'blocked', candidateId: null })
+  const retry = button('重试')
+  assert.ok(retry, 'the completed producer needs a normal owner recovery control')
+  const sent: unknown[] = []
+  const original = globalThis.fetch
+  globalThis.fetch = (async (url, options) => {
+    assert.equal(String(url).endsWith('/api/factory/tasks/t1'), true)
+    sent.push(JSON.parse(String(options?.body)))
+    return new Response('{}', { status: 200 })
+  }) as typeof fetch
+  try { await act(async () => { retry.click(); retry.click() }) }
+  finally { globalThis.fetch = original }
+  assert.equal(sent.length, 1)
+  const body = sent[0] as { action: string; binding: unknown; eventId: string }
+  assert.equal(body.action, 'retry')
+  assert.deepEqual(body.binding, binding)
+  assert.ok(body.eventId)
+})
+
+test('a blocked label alone does not expose completion recovery', async () => {
+  detail = { checks: [] }
+  await pane({ stage: 'execute', status: 'blocked', candidateId: null })
+  assert.equal(Boolean(button('重试')), false)
+})
+
 test('验收并合并 needs the candidate PR, posts only the binding, and a refusal names GitHub\'s reason with 在 GitHub 打开', async () => {
   const pr = 'https://github.com/alexj11324/Mikka/pull/418'
   const delivery = (pullRequest: unknown) => ({ checks: [], delivery: { candidateSha: 'a'.repeat(40), pullRequest, repository: 'alexj11324/Mikka', environment: null, previewUrl: null, deploymentEnvironment: null } })
