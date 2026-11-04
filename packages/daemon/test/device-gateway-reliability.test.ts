@@ -43,6 +43,7 @@ const daemons: Daemon[] = []
 function polling(fetchCommands = vi.fn<ServerLink['fetchCommands']>().mockResolvedValue([]), options: {
   deviceGateway?: NonNullable<ServerLink['deviceGateway']>
   commandsWaitSeconds?: number
+  invalidateRunControls?: () => void
 } = {}) {
   const deviceGateway = vi.fn<NonNullable<ServerLink['deviceGateway']>>(options.deviceGateway ?? (async () => ({ url: 'wss://fixture.invalid', protocol: 'fixture-ticket' })))
   const ackCommands = vi.fn(async () => {})
@@ -50,7 +51,7 @@ function polling(fetchCommands = vi.fn<ServerLink['fetchCommands']>().mockResolv
   let active = false
   const daemon = new Daemon({
     dataDir: tempDir('mikka-gateway-'), flavor: 'dev', commandsWaitSeconds: options.commandsWaitSeconds ?? 1,
-    link: { ...new MemoryServer('device-1').link(), fetchCommands, deviceGateway, ackCommands },
+    link: { ...new MemoryServer('device-1').link(), fetchCommands, deviceGateway, ackCommands, invalidateRunControls: options.invalidateRunControls },
     log: createLogger({ level: 'silent' }),
   })
   Reflect.set(daemon, 'device', { deviceId: 'device-1', credential: 'fixture' })
@@ -279,6 +280,45 @@ it('coalesces a work burst into one additional serial read and rejects failed re
   expect(onWork).toHaveBeenCalledTimes(2)
   expect(socket.readyState).toBe(3)
   expect(vi.getTimerCount()).toBe(0)
+})
+
+it('invalidates run authority immediately even while the command drain is pending', async () => {
+  const socket = new Socket()
+  const abort = new AbortController()
+  let release = () => {}
+  const onWork = vi.fn().mockImplementationOnce(() => new Promise<void>(resolve => { release = resolve }))
+    .mockResolvedValue(undefined)
+  const onWorkAvailable = vi.fn()
+  const done = runDeviceGateway(socket, { signal: abort.signal, onWork, onWorkAvailable })
+  await vi.advanceTimersByTimeAsync(0)
+  expect(onWorkAvailable).toHaveBeenCalledTimes(1)
+  socket.emit('message', { data: 'work' })
+  expect(onWorkAvailable).toHaveBeenCalledTimes(2)
+  expect(onWork).toHaveBeenCalledTimes(1)
+  socket.emit('message', { data: 'pong' })
+  expect(onWorkAvailable).toHaveBeenCalledTimes(2)
+  release()
+  await vi.advanceTimersByTimeAsync(0)
+  expect(onWork).toHaveBeenCalledTimes(2)
+  abort.abort()
+  await done
+  socket.emit('message', { data: 'work' })
+  expect(onWorkAvailable).toHaveBeenCalledTimes(2)
+})
+
+it('wires reconnect, work and disconnect to fresh checks without treating pong as authority', async () => {
+  const invalidateRunControls = vi.fn()
+  polling(undefined, { invalidateRunControls })
+  await vi.advanceTimersByTimeAsync(0)
+  expect(invalidateRunControls).toHaveBeenCalledTimes(1)
+  Socket.instances[0]!.emit('message', { data: 'work' })
+  await vi.advanceTimersByTimeAsync(0)
+  expect(invalidateRunControls).toHaveBeenCalledTimes(2)
+  Socket.instances[0]!.emit('message', { data: 'pong' })
+  expect(invalidateRunControls).toHaveBeenCalledTimes(2)
+  Socket.instances[0]!.emit('close')
+  await vi.advanceTimersByTimeAsync(0)
+  expect(invalidateRunControls).toHaveBeenCalledTimes(3)
 })
 
 it('keeps the uninstall grace credential through gateway command rejection, heartbeat receipt and deferred stop', async () => {

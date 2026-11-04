@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { factoryChanged } from '../live/factory'
 import type { Pool, PoolClient } from 'pg'
 import { FactoryError } from './contract'
 import { ActionFailureError } from '../action-error'
@@ -192,6 +193,7 @@ export async function sweepFactoryWatchdog(pool: Pool, dependencies?: WatchdogDe
         JSON.stringify({ kind: 'task_watchdog', requestEpoch: task.sourceEventId, attemptId: task.attemptId }),
         JSON.stringify({ action, tries, recoveryTries, blocked, handoffDigest: handoff.digest, observedAt: now.toISOString(), progressAt: state.progressAt,
           recoveryLatencyMs: now.getTime() - new Date(state.progressAt).getTime(), nextAt: new Date(now.getTime() + Math.min(15, 2 ** tries) * 60_000).toISOString() })])
+      await factoryChanged(tx, task)
       await tx.query('COMMIT')
     } catch (error) {
       await tx.query('ROLLBACK')

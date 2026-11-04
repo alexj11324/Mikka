@@ -7,6 +7,20 @@ import { workspaceMembers } from '@/lib/db/workspace-schema'
 import { teams, teamMembers } from '@/lib/db/team-schema'
 import { WorkspaceError, type WorkspaceTransaction } from '@/lib/workspace-access'
 
+export type TeamScope = { id: string; workspaceId: string }
+
+/** Permission identity for reads that do not display team settings. */
+export async function accessibleTeamScopes(userId: string, workspaceId?: string): Promise<TeamScope[]> {
+  return workspaceDb.select({ id: teams.id, workspaceId: teams.workspaceId }).from(teams)
+    .innerJoin(workspaceMembers, and(
+      eq(workspaceMembers.workspaceId, teams.workspaceId),
+      eq(workspaceMembers.userId, userId),
+      eq(workspaceMembers.status, 'active'),
+    ))
+    .where(workspaceId ? eq(teams.workspaceId, workspaceId) : undefined)
+    .orderBy(teams.createdAt)
+}
+
 export async function accessibleTeams(userId: string, workspaceId?: string) {
   return workspaceDb.select({ id: teams.id, workspaceId: teams.workspaceId, name: teams.name, identifier: teams.identifier, description: teams.description, workspaceRole: workspaceMembers.role, role: teamMembers.role })
     .from(teams).innerJoin(workspaceMembers, and(eq(workspaceMembers.workspaceId, teams.workspaceId), eq(workspaceMembers.userId, userId), eq(workspaceMembers.status, 'active')))

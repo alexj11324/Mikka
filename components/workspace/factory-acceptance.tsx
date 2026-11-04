@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import useSWR from 'swr'
+import { useLiveKey } from '@/hooks/use-live-key'
 import { useTranslations } from 'next-intl'
 import { ChevronRight, ClipboardCheck, RefreshCw, X } from 'lucide-react'
 import { Alert, AlertAction, AlertTitle } from '@/components/ui/alert'
@@ -21,9 +22,10 @@ const tone = (state: AcceptanceState) => state === 'live' || state === 'merged' 
 const tasksKey = (issueId: string) => `/api/factory/tasks?issueId=${encodeURIComponent(issueId)}`
 
 /** The issue's acceptance tasks, shared by the issue page list and every thread header. */
-function useAcceptanceTasks(issueId: string | null, refreshInterval = 15000) {
+function useAcceptanceTasks(issueId: string | null) {
   // A thread with no task has no acceptance ledger.
-  const result = useSWR<{ tasks: FactoryTask[] }>(issueId ? tasksKey(issueId) : null, request, { refreshInterval })
+  const result = useSWR<{ tasks: FactoryTask[]; liveWorkspaceId?: string | null }>(issueId ? tasksKey(issueId) : null, request, { refreshInterval: 0 })
+  useLiveKey('factory_issue', issueId, issueId ? [tasksKey(issueId)] : [], result.data?.liveWorkspaceId ?? null)
   // A 200 body that is not `{ tasks: [...] }` (an HTML fallback parsed as `{}`,
   // or an API that omits `tasks`) must read as no tasks, not crash the page.
   const allTasks = Array.isArray(result.data?.tasks) ? result.data.tasks : []

@@ -1,5 +1,5 @@
 name: Issue 1225 model provider acceptance
-# A single merged PR's paid acceptance. No schedules, PR triggers or secret export.
+# Paid acceptance is authorized by these two merged issue PRs only.
 on:
   workflow_run:
     workflows: [Web deploy]
@@ -11,6 +11,11 @@ on:
         type: choice
         options: [preflight, active]
         default: preflight
+      guard_pr:
+        description: Merged issue 1225 PR authorizing this acceptance
+        type: choice
+        options: ['1249', '1232']
+        default: '1249'
 permissions:
   contents: read
 concurrency:
@@ -18,7 +23,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   acceptance:
-    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/main' && (github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.head_repository.full_name == 'alexj11324/Mikka' && (contains(github.event.workflow_run.head_commit.message, '(#1232)') || contains(github.event.workflow_run.pull_requests.*.number, 1232))))
+    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/main' && (github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.head_repository.full_name == 'alexj11324/Mikka' && (contains(github.event.workflow_run.head_commit.message, '(#1232)') || contains(github.event.workflow_run.pull_requests.*.number, 1232) || contains(github.event.workflow_run.head_commit.message, '(#1249)') || contains(github.event.workflow_run.pull_requests.*.number, 1249))))
     runs-on: ubuntu-latest
     timeout-minutes: 55
     permissions:
@@ -27,97 +32,139 @@ jobs:
       actions: read
       id-token: write
     steps:
-      # Resolve the one authorized merge before checking out any executable code.
-      - name: Resolve PR 1232's exact merge
+      # Authorize the issue and the reviewed driver before executing checkout code.
+      - name: Resolve the two authorized issue merges
         id: merge
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           node --input-type=module <<'JS'
           import { readFileSync, appendFileSync } from 'node:fs'
+          const repository = 'alexj11324/Mikka'
           const event = JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8'))
-          const response = await fetch('https://api.github.com/repos/alexj11324/Mikka/pulls/1232', {
-            headers: { authorization: `Bearer ${process.env.GH_TOKEN}`, accept: 'application/vnd.github+json' },
-            redirect: 'error', signal: AbortSignal.timeout(30000),
-          })
-          if (!response.ok) throw Error('acceptance_merge_read_failed')
-          const pr = await response.json(), sha = pr.merge_commit_sha
-          const valid = pr.number === 1232 && pr.merged === true && pr.base?.ref === 'main'
-            && pr.base?.repo?.full_name === 'alexj11324/Mikka' && /^[a-f0-9]{40}$/.test(sha ?? '')
+          const readPr = async number => {
+            const response = await fetch(`https://api.github.com/repos/${repository}/pulls/${number}`, {
+              headers: { authorization: `Bearer ${process.env.GH_TOKEN}`, accept: 'application/vnd.github+json' },
+              redirect: 'error', signal: AbortSignal.timeout(30000),
+            })
+            if (!response.ok) throw Error('acceptance_merge_read_failed')
+            return response.json()
+          }
+          const feature = await readPr(1232), acceptance = await readPr(1249)
+          const valid = (pr, number) => pr.number === number && pr.merged === true && pr.base?.ref === 'main'
+            && pr.base?.repo?.full_name === repository && /^[a-f0-9]{40}$/.test(pr.merge_commit_sha ?? '')
             && /(?:refs?|fix(?:es)?|clos(?:e[sd]?|ing)|resolv(?:e[sd]?|ing))\s+(?:https:\/\/github\.com\/alexj11324\/Mikka\/issues\/)?#?1225\b/i.test(pr.body ?? '')
           const run = event.workflow_run
+          const guard = process.env.GITHUB_EVENT_NAME === 'workflow_dispatch'
+            ? [feature, acceptance].find(pr => pr.number === Number(event.inputs?.guard_pr ?? 1249))
+            : [feature, acceptance].find(pr => pr.merge_commit_sha === run?.head_sha
+              && (run.head_commit?.message?.includes(`(#${pr.number})`) || run.pull_requests?.some(item => item.number === pr.number)))
           const trigger = process.env.GITHUB_EVENT_NAME === 'workflow_dispatch'
-            || (run?.name === 'Web deploy' && run.status === 'completed' && run.conclusion === 'success'
-              && run.head_branch === 'main' && run.head_sha === sha && run.head_repository?.full_name === 'alexj11324/Mikka'
-              && (run.head_commit?.message?.includes('(#1232)') || run.pull_requests?.some(item => item.number === 1232)))
-          if (!valid || !trigger) {
+            || (process.env.GITHUB_EVENT_NAME === 'workflow_run' && run?.name === 'Web deploy' && run.event === 'push'
+              && run.status === 'completed' && run.conclusion === 'success' && run.head_branch === 'main'
+              && run.head_repository?.full_name === repository)
+          if (!valid(feature, 1232) || !valid(acceptance, 1249) || !guard || !trigger) {
             appendFileSync(process.env.GITHUB_OUTPUT, 'eligible=false\n')
-            console.log('Not the authorized PR 1232 merge deployment; no acceptance or secret read.')
+            console.log('merge_scope_rejected: no authorized issue deployment; no acceptance or smoke secret read.')
           } else {
             const mode = process.env.GITHUB_EVENT_NAME === 'workflow_dispatch' ? event.inputs?.mode ?? 'preflight' : 'active'
             if (!['preflight', 'active'].includes(mode)) throw Error('acceptance_mode_rejected')
-            appendFileSync(process.env.GITHUB_OUTPUT, `eligible=true\nsha=${sha}\nmode=${mode}\n`)
+            appendFileSync(process.env.GITHUB_OUTPUT, `eligible=true\ndriver-sha=${acceptance.merge_commit_sha}\nmode=${mode}\n`)
           }
           JS
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         if: steps.merge.outputs.eligible == 'true'
         with:
-          ref: ${{ steps.merge.outputs.sha }}
+          ref: ${{ steps.merge.outputs.driver-sha }}
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         if: steps.merge.outputs.eligible == 'true'
         with:
           node-version: 24
-      - name: Verify the driver and the merge guard
+      - name: Verify the driver and the model policy
+        if: steps.merge.outputs.eligible == 'true'
+        run: |
+          node --test scripts/acceptance/model-provider-fallback.test.mjs
+          node scripts/assert-test-model.mjs deepseek-flash
+      - name: Bind the actual production descendant and its successful Web deploy
+        id: application
         if: steps.merge.outputs.eligible == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-          EXPECTED_SHA: ${{ steps.merge.outputs.sha }}
+          EXPECTED_DRIVER_SHA: ${{ steps.merge.outputs.driver-sha }}
         run: |
-          node --test scripts/acceptance/model-provider-fallback.test.mjs
           node --input-type=module <<'JS'
-          import { readFileSync } from 'node:fs'
-          import { mergeGuard } from './scripts/acceptance/model-provider-fallback.mjs'
-          const response = await fetch('https://api.github.com/repos/alexj11324/Mikka/pulls/1232', {
-            headers: { authorization: `Bearer ${process.env.GH_TOKEN}`, accept: 'application/vnd.github+json' },
-            redirect: 'error', signal: AbortSignal.timeout(30000),
-          })
-          if (!response.ok) throw Error('acceptance_merge_read_failed')
-          const result = mergeGuard({ repository: process.env.GITHUB_REPOSITORY, ref: process.env.GITHUB_REF,
-            eventName: process.env.GITHUB_EVENT_NAME, event: JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8')), pr: await response.json() })
-          if (result.sha !== process.env.EXPECTED_SHA) throw Error('acceptance_merge_changed')
+          import { readFileSync, appendFileSync, mkdirSync, writeFileSync } from 'node:fs'
+          import { AcceptanceError, mergeGuard, resolveAcceptanceDeployment, publicFailure } from './scripts/acceptance/model-provider-fallback.mjs'
+          mkdirSync('model-provider-fallback-report', { recursive: true })
+          try {
+            const readPr = async number => {
+              const response = await fetch(`https://api.github.com/repos/alexj11324/Mikka/pulls/${number}`, {
+                headers: { authorization: `Bearer ${process.env.GH_TOKEN}`, accept: 'application/vnd.github+json' },
+                redirect: 'error', signal: AbortSignal.timeout(30000),
+              })
+              if (!response.ok) throw new AcceptanceError('merge_read_failed')
+              return response.json()
+            }
+            const guard = mergeGuard({ repository: process.env.GITHUB_REPOSITORY, ref: process.env.GITHUB_REF,
+              eventName: process.env.GITHUB_EVENT_NAME, event: JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8')),
+              pr: await readPr(1232), acceptancePr: await readPr(1249) })
+            if (guard.driverRevision !== process.env.EXPECTED_DRIVER_SHA) throw new AcceptanceError('merge_changed')
+            const bound = await resolveAcceptanceDeployment({ guard, githubToken: process.env.GH_TOKEN })
+            writeFileSync('model-provider-fallback-report/attestation.json', JSON.stringify({ issue: 1225, ...bound, status: 'awaiting_runtime' }, null, 2) + '\n')
+            appendFileSync(process.env.GITHUB_OUTPUT, `sha=${bound.revision}\nfeature-sha=${bound.featureMergeSha}\nguard-pr=${bound.guardPullRequest}\nguard-sha=${bound.guardMergeSha}\nweb-run-id=${bound.webDeployRunId}\n`)
+            console.log(`Feature merge ${bound.featureMergeSha}; application ${bound.revision}; guard PR #${bound.guardPullRequest}; Web deploy ${bound.webDeployRunId}.`)
+          } catch (error) {
+            const failure = publicFailure(error)
+            writeFileSync('model-provider-fallback-report/attestation.json', JSON.stringify({ issue: 1225, ...failure }, null, 2) + '\n')
+            console.log(JSON.stringify(failure))
+            process.exitCode = 1
+          }
           JS
-          node scripts/assert-test-model.mjs deepseek-flash
-      - name: Confirm the same commit's official worker release
+      - name: Confirm the same application's official runtime release
         id: worker
         if: steps.merge.outputs.eligible == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-          EXPECTED_SHA: ${{ steps.merge.outputs.sha }}
+          EXPECTED_SHA: ${{ steps.application.outputs.sha }}
           ACCEPTANCE_MODE: ${{ steps.merge.outputs.mode }}
         run: |
           node --input-type=module <<'JS'
-          import { appendFileSync } from 'node:fs'
+          import { readFileSync, appendFileSync, writeFileSync } from 'node:fs'
           import { setTimeout } from 'node:timers/promises'
-          const sha = process.env.EXPECTED_SHA
-          const attempts = process.env.ACCEPTANCE_MODE === 'active' ? 30 : 1
-          let release
-          for (let attempt = 0; attempt < attempts; attempt++) {
-            const url = `https://api.github.com/repos/alexj11324/Mikka/actions/workflows/e2b-official-runtime.yml/runs?event=push&head_sha=${sha}&per_page=30`
-            const response = await fetch(url, { headers: { authorization: `Bearer ${process.env.GH_TOKEN}`, accept: 'application/vnd.github+json' },
-              redirect: 'error', signal: AbortSignal.timeout(30000) })
-            if (!response.ok) throw Error('acceptance_worker_release_read_failed')
-            const data = await response.json()
-            release = data.workflow_runs?.find(run => run.event === 'push' && run.head_branch === 'main' && run.head_sha === sha
-              && run.head_repository?.full_name === 'alexj11324/Mikka' && run.status === 'completed' && run.conclusion === 'success')
-            if (release) break
-            if (attempt + 1 < attempts) await setTimeout(30000)
+          import { AcceptanceError, ORIGIN, officialRuntimeProof, assertVersion, publicFailure } from './scripts/acceptance/model-provider-fallback.mjs'
+          const file = 'model-provider-fallback-report/attestation.json'
+          const attestation = JSON.parse(readFileSync(file, 'utf8'))
+          try {
+            const sha = process.env.EXPECTED_SHA
+            const attempts = process.env.ACCEPTANCE_MODE === 'active' ? 30 : 1
+            let proof
+            for (let attempt = 0; attempt < attempts; attempt++) {
+              const url = `https://api.github.com/repos/alexj11324/Mikka/actions/workflows/e2b-official-runtime.yml/runs?event=push&head_sha=${sha}&per_page=100`
+              const response = await fetch(url, { headers: { authorization: `Bearer ${process.env.GH_TOKEN}`, accept: 'application/vnd.github+json' },
+                redirect: 'error', signal: AbortSignal.timeout(30000) })
+              if (!response.ok) throw new AcceptanceError('worker_release')
+              proof = officialRuntimeProof(sha, (await response.json()).workflow_runs)
+              if (proof) break
+              if (attempt + 1 < attempts) await setTimeout(30000)
+            }
+            if (!proof) throw new AcceptanceError('worker_release')
+            const response = await fetch(`${ORIGIN}/mikka/api/version`, { redirect: 'error',
+              headers: { 'cache-control': 'no-store' }, signal: AbortSignal.timeout(30000) })
+            if (!response.ok) throw new AcceptanceError('deployment_proof')
+            assertVersion((await response.json()).build, sha)
+            writeFileSync(file, JSON.stringify({ ...attestation, status: 'ready', runtimeProof: proof }, null, 2) + '\n')
+            appendFileSync(process.env.GITHUB_OUTPUT, `sha=${sha}\nrun-id=${proof.runId}\nproof=${proof.kind}\n`)
+            console.log(`Runtime proof ${proof.kind}; application ${sha}; official runtime run ${proof.runId}.`)
+          } catch (error) {
+            const failure = publicFailure(error)
+            writeFileSync(file, JSON.stringify({ ...attestation, ...failure }, null, 2) + '\n')
+            console.log(JSON.stringify(failure))
+            process.exitCode = 1
           }
-          if (release && Number.isSafeInteger(release.id)) appendFileSync(process.env.GITHUB_OUTPUT, `sha=${sha}\nrun-id=${release.id}\n`)
-          else console.log('blocked_worker_release: this merge has no confirmed successful official-runtime push release yet; active paths remain blocked and may be rerun manually.')
           JS
-      - name: Read only the existing smoke account
-        if: steps.merge.outputs.eligible == 'true'
+      - name: Read only the existing smoke account after both deployment proofs
+        if: steps.merge.outputs.eligible == 'true' && steps.worker.outputs.proof == 'same_sha_official_runtime' && steps.worker.outputs.sha == steps.application.outputs.sha
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
         with:
           method: oidc
@@ -128,18 +175,24 @@ jobs:
           secret-path: /
           recursive: false
           include-imports: false
-      - name: Run the three independent paths
-        if: steps.merge.outputs.eligible == 'true'
+      - name: Run the three independent paths at the fixed application revision
+        if: steps.merge.outputs.eligible == 'true' && steps.worker.outputs.proof == 'same_sha_official_runtime' && steps.worker.outputs.sha == steps.application.outputs.sha
         run: node scripts/acceptance/model-provider-fallback.mjs
         env:
           MIKKA_PROVIDER_ACCEPTANCE_MODE: ${{ steps.merge.outputs.mode }}
-          MIKKA_EXPECTED_DEPLOYMENT_SHA: ${{ steps.merge.outputs.sha }}
+          MIKKA_EXPECTED_DEPLOYMENT_SHA: ${{ steps.application.outputs.sha }}
+          MIKKA_FEATURE_MERGE_SHA: ${{ steps.application.outputs.feature-sha }}
+          MIKKA_ACCEPTANCE_GUARD_PR: ${{ steps.application.outputs.guard-pr }}
+          MIKKA_ACCEPTANCE_GUARD_MERGE_SHA: ${{ steps.application.outputs.guard-sha }}
+          MIKKA_ACCEPTANCE_DRIVER_SHA: ${{ steps.merge.outputs.driver-sha }}
+          MIKKA_WEB_DEPLOY_RUN_ID: ${{ steps.application.outputs.web-run-id }}
+          MIKKA_WORKER_RELEASE_PROOF: ${{ steps.worker.outputs.proof }}
           MIKKA_WORKER_RELEASE_SHA: ${{ steps.worker.outputs.sha }}
           MIKKA_WORKER_RELEASE_RUN_ID: ${{ steps.worker.outputs.run-id }}
       - if: always() && steps.merge.outputs.eligible == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: model-provider-fallback-1225-${{ steps.merge.outputs.sha }}
+          name: model-provider-fallback-1225-${{ steps.application.outputs.sha || steps.merge.outputs.driver-sha }}
           path: model-provider-fallback-report
           if-no-files-found: ignore
           retention-days: 14

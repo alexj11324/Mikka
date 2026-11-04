@@ -47,7 +47,7 @@ export interface AcceptanceTaskView {
   revision?: number
   completionRecovery?: { binding: { taskId: string; revision: number } }
 }
-export interface AcceptanceDetail { task?: AcceptanceTaskView; checks?: AcceptanceCheck[]; delivery?: AcceptanceDelivery; completionRecovery?: AcceptanceTaskView['completionRecovery'] }
+export interface AcceptanceDetail { task?: AcceptanceTaskView; checks?: AcceptanceCheck[]; delivery?: AcceptanceDelivery; completionRecovery?: AcceptanceTaskView['completionRecovery']; liveWorkspaceId?: string | null }
 export interface AcceptanceBinding { taskId: string; issueId: string; attemptId: string; revision: number; candidateId: string | null }
 export type CandidateCheckState = { stage: 'review' | 'verify'; status: 'failed' | 'pending' | 'running' }
 

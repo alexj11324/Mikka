@@ -1,9 +1,11 @@
 import { DurableObject } from 'cloudflare:workers'
+import { liveInvalidations, type LiveInvalidation } from '../../../lib/live/events'
 
 const ONLINE_WINDOW_MS = 90_000
 
 interface ConnectionAttachment {
   connectedAt: number
+  liveExpiresAt?: number
 }
 
 /**
@@ -35,11 +37,16 @@ export class DeviceSession extends DurableObject<Record<string, unknown>> {
     const pair = new WebSocketPair()
     const client = pair[0]
     const server = pair[1]
-    // One live socket. A reconnect replaces the previous one so a device
-    // does not keep a second hibernating connection.
-    for (const existing of this.ctx.getWebSockets()) existing.close(4000, 'replaced')
+    const live = new URL(request.url).pathname.startsWith('/v1/live/')
+    // A daemon reconnect replaces its previous socket. Browser tabs share
+    // their owner/workspace channel until their individual tickets expire.
+    for (const existing of this.ctx.getWebSockets()) {
+      const expiry = (existing.deserializeAttachment() as ConnectionAttachment | null)?.liveExpiresAt
+      if (!live) existing.close(4000, 'replaced')
+      else if (expiry && expiry <= Date.now()) existing.close(4001, 'ticket expired')
+    }
     this.ctx.acceptWebSocket(server)
-    server.serializeAttachment({ connectedAt: Date.now() } satisfies ConnectionAttachment)
+    server.serializeAttachment({ connectedAt: Date.now(), ...(live ? { liveExpiresAt: Number(protocol.match(/^mikka-ticket-(\d+)-/)?.[1]) * 1000 } : {}) } satisfies ConnectionAttachment)
     // The edge authenticated this exact ticket. Node's built-in WebSocket
     // rejects the upgrade unless its offered protocol is selected here.
     return new Response(null, {
@@ -76,6 +83,18 @@ export class DeviceSession extends DurableObject<Record<string, unknown>> {
   async notify() {
     for (const socket of this.ctx.getWebSockets()) {
       try { socket.send('work') } catch { /* a closing socket is dropped by the runtime */ }
+    }
+  }
+
+  /** Browser tabs share a channel; an expired ticket never receives another key. */
+  async notifyLive(events: LiveInvalidation[]) {
+    const validated = liveInvalidations(events)
+    if (!validated) return
+    for (const socket of this.ctx.getWebSockets()) {
+      const expiry = (socket.deserializeAttachment() as ConnectionAttachment | null)?.liveExpiresAt
+      if (!expiry || expiry <= Date.now()) { socket.close(4001, 'ticket expired'); continue }
+      try { for (const event of validated) socket.send(JSON.stringify(event)) }
+      catch { /* a closing tab is dropped by the runtime */ }
     }
   }
 }

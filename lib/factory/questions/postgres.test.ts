@@ -11,6 +11,7 @@ import { factoryEventId } from "../event-id";
 import { questionFingerprint } from "./contract";
 import { ActionFailureError } from "../../action-error";
 import { createFactoryStore } from "../store";
+import { observePoolCommits } from "../../db/commit-effects";
 import { createFactoryDispatch } from "../dispatch";
 import { createFactoryClaim } from "../claim";
 import { advanceFactoryRequest } from "../request-epoch";
@@ -75,6 +76,7 @@ test(
     const evaluationRuns = new Map<string, string>();
     const originRuns = new Map<string, string>();
     const make = (p: Pool, withSkills = true) => {
+      observePoolCommits(p);
       const assignments = createSkillAssignments(
         p,
         authorize,

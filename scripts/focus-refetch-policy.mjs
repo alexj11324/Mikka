@@ -14,6 +14,7 @@ export const focusListenerAllowlist = {
   'components/nav/bot-avatar.tsx': 'resyncs avatar animation clocks; reads no data',
   'lib/hooks/use-unread-indicators.ts': 'flushes read receipts when the page hides; nothing runs on show',
   'lib/hooks/use-check-on-return.ts': 'checks armed only by a hand-off to the browser or Telegram (one, or each return until the link is done), never by plain focus',
+  'hooks/use-live-key.tsx': 'closes scoped live channels while hidden; on show reconnects and catches up changes missed while disconnected (#1212), with no plain focus listener',
   'apps/mobile/lib/push.ts': 'refreshes the push token registration; the screen is not re-read',
   'apps/mobile/lib/updates.ts': 'prefetches an OTA bundle in the background; the screen is not re-read',
   'lib/computer/event-stream.ts': 'closes the computer event stream while hidden; on show it resumes after the last event received, never re-reading what it has',

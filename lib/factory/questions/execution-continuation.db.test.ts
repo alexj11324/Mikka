@@ -7,6 +7,7 @@ import { Pool, type PoolClient } from 'pg'
 import { orderMigrations } from '../../../scripts/migration-order.mjs'
 import { dropTestDatabase } from '../../../tests/support/drop-test-database'
 import { createFactoryStore } from '../store'
+import { observePoolCommits } from '../../db/commit-effects'
 import { factoryBinding } from '../dispatch'
 import { factoryEventId } from '../event-id'
 import { questionFingerprint } from './contract'
@@ -27,6 +28,7 @@ test('real PG: question receipts preserve one execution without opening a repair
   await admin.query(`CREATE DATABASE "${database}" TEMPLATE template0`)
   const target = new URL(url!); target.pathname = '/' + database
   const pool = new Pool({ connectionString: target.toString(), max: 8 })
+  observePoolCommits(pool)
   try {
     const dir = new URL('../../../drizzle/', import.meta.url)
     for (const file of orderMigrations((await readdir(dir)).filter(file => file.endsWith('.sql')))) await pool.query(await readFile(new URL(file, dir), 'utf8'))

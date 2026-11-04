@@ -70,6 +70,7 @@ import type { WorkspaceSwitcher } from '@/lib/workspace-switcher'
 import type { AgentHistory, SavedAgentSession } from '@/lib/agent-history'
 import { useAgentHistory } from '@/hooks/use-agent-history'
 import { useWorkspace } from '@/hooks/use-workspace'
+import { LiveProvider } from '@/hooks/use-live-key'
 import { focusChatComposer } from '@/hooks/use-focus-return'
 import { usePresence } from '@/lib/use-presence'
 import { FieldError } from '@/components/ui/field'
@@ -103,7 +104,7 @@ const SettingsView = dynamic(() => import('@/components/settings/settings-view')
 
 export function IssueWorkspace(props: Parameters<typeof IssueWorkspaceContent>[0]) {
   const { data } = useWorkspace(props.user.email)
-  return <ViewStateProvider scope={`${props.user.id}:${data?.workspace.id ?? 'loading'}`}><IssueWorkspaceContent {...props} /></ViewStateProvider>
+  return <LiveProvider ownerId={props.user.id} workspaceId={data?.workspace.id}><ViewStateProvider scope={`${props.user.id}:${data?.workspace.id ?? 'loading'}`}><IssueWorkspaceContent {...props} /></ViewStateProvider></LiveProvider>
 }
 
 function IssueWorkspaceContent({ user, initialIssues, initialSelected = null, initialAgentHistory, initialSection = 'coordinator', initialSettingsSection, googleEnabled = false, onboarding }: { onboarding?: { computer: OnboardingComputer }; initialSelected?: string | null; user: { id: string; name: string; email: string; image?: string | null }; initialIssues?: Awaited<ReturnType<typeof listIssues>>; initialAgentHistory?: AgentHistory; initialSection?: WorkspaceSection; initialSettingsSection?: 'integrations' | 'account'; googleEnabled?: boolean }) {
