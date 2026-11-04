@@ -56,6 +56,9 @@ export function useAgentCitations() {
   return useContext(AgentCitationsContext)
 }
 
+/** A word joiner between a chip's icon and its title: a wrapping chip never leaves its icon alone at a line's end (R-15). */
+const CHIP_JOINER = '\u2060'
+
 /** One empty value, so a chat with no web links keeps the same citations across renders. */
 const NO_PREVIEWS: LinkPreviews = {}
 
@@ -118,7 +121,7 @@ export function IssueCitation({ issue, onOpen }: { issue: IssueSource; onOpen: (
   return <InlineCitation>
     <InlineCitationTrigger variant="object" aria-label={t('openIssue', { title: issue.title })} data-focus-id={issue.id} onClick={() => onOpen(issue.id)}>
       <status.icon aria-hidden="true" className={cn('size-3.5 shrink-0', statusIconTints[status.tone])} />
-      <InlineCitationLabel>{issue.title}</InlineCitationLabel>
+      <InlineCitationLabel>{CHIP_JOINER}{issue.title}</InlineCitationLabel>
     </InlineCitationTrigger>
     <InlineCitationContent>
       <InlineCitationBody>
@@ -170,7 +173,7 @@ export function RunCitation({ run }: { run: RunSource }) {
       onClick={issue ? () => openThread(run.id) : undefined}
     >
       <ThreadStatusIcon status={run.status} outcome={run.outcome} small accent dot={attention} />
-      <InlineCitationLabel>{name}</InlineCitationLabel>
+      <InlineCitationLabel>{CHIP_JOINER}{name}</InlineCitationLabel>
       {/* Waiting for you or blocked: the dot, its colour and its word together (R-87); other states are in the hover card. */}
       {attention && <span data-thread-attention={group} className={cn('ml-1 rounded-sm px-1 text-xs font-medium', group === 'blocked' ? 'bg-destructive/10 text-destructive' : 'bg-warning/15 text-warning-foreground')}>{tState(group)}</span>}
     </InlineCitationTrigger>
