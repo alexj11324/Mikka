@@ -4,7 +4,7 @@ import { createContext, memo, useCallback, useContext, useMemo, useState, type C
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
 import {
-  BellRing, BookOpen, Brain, CalendarDays, ChevronsDownUp, ChevronsUpDown, CircleAlert, CircleCheckIcon, CircleStop, Factory, FolderGit2, FolderOpen, Globe, ListChecks,
+  BellRing, BookOpen, Brain, CalendarDays, ChevronsDownUp, ChevronsUpDown, CircleAlert, CircleCheckIcon, CircleStop, Factory, FolderGit2, Power, FolderOpen, Globe, ListChecks,
   LoaderCircleIcon, Mail, MessageSquare, MessageSquareText, Pencil, Search, Send, SquarePlus, Wrench,
 } from 'lucide-react'
 import { coordinatorReasoning } from '@/app/actions/coordinator'
@@ -42,7 +42,7 @@ function useFollowedOpen(fallback: boolean) {
 }
 
 const ACTION_ICONS: Record<ToolAction, ComponentType<{ className?: string }>> = {
-  dispatch: Send, messageThread: MessageSquareText, stopThread: CircleStop, createIssue: SquarePlus, updateIssue: Pencil,
+  dispatch: Send, dispatchFactory: Factory, wake: Power, messageThread: MessageSquareText, stopThread: CircleStop, createIssue: SquarePlus, updateIssue: Pencil,
   sendMail: Mail, sendSlack: MessageSquare, writeNotion: Pencil, writeCalendar: CalendarDays, remember: Brain, forget: Brain,
   schedule: BellRing, factory: Factory, github: GitHubIcon, viewIssues: ListChecks, viewThreads: MessageSquareText,
   searchWeb: Search, readWeb: Globe, readMail: Mail, readSlack: MessageSquare, readNotion: BookOpen, viewCalendar: CalendarDays,
@@ -117,14 +117,14 @@ function ToolRow({ tool, live }: { tool: ChatTool; live: boolean }) {
   </TraceCollapsible>
 }
 
-/** 全部展开 / 全部收起, at the end of a group's summary; it opens or closes every group in the chat (R-83). */
+/** 全部展开 / 全部收起, always shown at the end of a group's summary; it opens or closes every group in the chat (R-83). */
 function ExpandAllButton() {
   const t = useTranslations('Coordinator.activity')
   const all = useContext(ActivityExpansionContext)
   if (!all) return null
   const label = all.open ? t('collapseAll') : t('expandAll')
   return <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-xs" aria-label={label} data-activity-expand-all={all.open ? 'open' : 'closed'}
-    className="text-muted-foreground opacity-0 transition-opacity group-hover/activity:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100 motion-reduce:transition-none" onClick={all.toggle} />}>
+    className="text-muted-foreground" onClick={all.toggle} />}>
     {all.open ? <ChevronsDownUp aria-hidden="true" /> : <ChevronsUpDown aria-hidden="true" />}
   </TooltipTrigger><TooltipContent>{label}</TooltipContent></Tooltip>
 }
@@ -139,13 +139,18 @@ function ToolGroup({ tools, live }: { tools: readonly ChatTool[]; live: boolean 
   const label = useToolLabel()
   const running = live && tools.some(tool => tool.state === 'running')
   const [open, setOpen] = useFollowedOpen(running)
-  const { parts, failed } = toolSummary(tools)
+  const { parts, failed, failedNames } = toolSummary(tools)
   const LeadIcon = ACTION_ICONS[parts[0]?.action ?? 'other']
+  // Calls left running when the reply ended never finished: they failed too.
+  const unfinished = live ? [] : tools.filter(tool => tool.state === 'running')
+  const failedLabels = [...new Set([...failedNames, ...unfinished.map(tool => tool.name)])].map(label)
   const current = running ? [...tools].reverse().find(tool => tool.state === 'running') : undefined
   const shown = parts.slice(0, 3).map(part => t(`summary.${part.action}` as never, { count: part.count } as never))
-  const summary = current ? t('running', { tool: label(current.name) }) : `${shown.join(t('separator'))}${parts.length > 3 ? t('more') : ''}`
+  // Only what succeeded is said as done; when nothing did, the line names the calls that failed (R-83).
+  const summary = current ? t('running', { tool: label(current.name) })
+    : shown.length ? `${shown.join(t('separator'))}${parts.length > 3 ? t('more') : ''}` : failedLabels.join(t('separator'))
   // Ended without finishing: a call left running counts as failed.
-  const failures = failed + (live ? 0 : tools.filter(tool => tool.state === 'running').length)
+  const failures = failed + unfinished.length
   return <TraceCollapsible data-activity-group={running ? 'running' : failures ? 'error' : 'done'} open={open} onOpenChange={setOpen}>
     <div className="group/activity flex min-w-0 items-center gap-1">
       <TraceCollapsibleTrigger>

@@ -171,10 +171,14 @@ test('a reply draws its thinking and its tools as shadcn Trace rows: several cal
     assert.equal(view.container.querySelector('[data-activity-tool="error"] [data-slot="code-block"]')?.getAttribute('data-variant'), 'destructive')
 
     // Stored: one summary line, closed, side effects first, with how many failed; a call that never returned failed too.
+    await view.render(<ReplyActivity tools={[tools[2], { ...tools[2], call: 'c9' }]} />)
+    assert.equal(group()?.querySelector('[data-slot="trace-title"]')?.textContent, 'Dispatch Factory task', 'nothing succeeded: the line names the failed call')
     await view.render(<ReplyActivity tools={[...tools, { call: 'c5', name: 'get_issue', state: 'done' as const }]} />)
     assert.equal(group()?.getAttribute('data-activity-group'), 'error')
     assert.ok(group()?.querySelector('svg.lucide-circle-alert'), 'a failure is an icon, a colour and a word together (R-87)')
-    assert.equal(group()?.querySelector('[data-slot="trace-title"]')?.textContent, 'Created 1 task · Dispatched 2 threads · Looked up tasks')
+    // Only what succeeded is said as done: the dispatch that never returned and the Factory call that answered an error
+    // are only in the failure count, never 「Dispatched」 (R-83).
+    assert.equal(group()?.querySelector('[data-slot="trace-title"]')?.textContent, 'Created 1 task · Looked up tasks')
     assert.equal(group()?.querySelector('[data-activity-failed]')?.textContent, '2 failed', 'the failure count sits outside the summary, so it never truncates')
     // Stored, a tool that never returned failed: the docs' row for a call that is not streaming.
     await view.render(<ReplyActivity tools={[tools[1]]} />)
@@ -239,4 +243,60 @@ test('readable reasoning opens under 「思考了 N 秒」, live and stored alik
       await plain.unmount()
     }
   } finally { try { await view.unmount() } catch { /* already unmounted */ } }
+})
+
+test('a task and its thread in one reply: only the thread is a chip, the task is its number or nothing (R-15)', async () => {
+  const view = await mount()
+  const chips = () => [...view.container.querySelectorAll('[data-slot="inline-citation-trigger"]')]
+  const text = () => view.container.textContent ?? ''
+  const ownThread: CitationSource = { ...thread, issue: { id: TASK, number: 1, identifier: 'MIK-1', title: 'Release checklist' } }
+  try {
+    await view.render(<CoordinatorReply text={`[[issue:${TASK}]] 的线程 [[run:${THREAD}]] 在等你。`} citations={{ ...base, sources: { ...known, [THREAD]: ownThread } }} />)
+    assert.equal(chips().length, 1, 'one chip: the thread')
+    assert.match(chips()[0].getAttribute('aria-label') ?? '', /thread/i)
+    assert.match(text(), /^MIK-1 的线程/, 'the task reads as its number')
+    assert.equal(text().match(/Release checklist/g)?.length, 1, 'the title is said once, in the thread chip')
+    // A task with no number is left out: the thread chip already carries its title.
+    const unnumbered = { [TASK]: { ...issue(TASK, 'Release checklist'), identifier: null }, [THREAD]: ownThread }
+    await view.render(<CoordinatorReply text={`[[issue:${TASK}]] 的线程 [[run:${THREAD}]] 在等你。`} citations={{ ...base, sources: unnumbered }} />)
+    assert.equal(chips().length, 1)
+    assert.equal(text().match(/Release checklist/g)?.length, 1)
+    assert.doesNotMatch(text(), MARKUP)
+  } finally { await view.unmount() }
+})
+
+test('a thread whose card sits under the same reply is named in the words without a chip (R-66)', async () => {
+  const view = await mount()
+  try {
+    const citations = { ...base, sources: { ...known, [THREAD]: thread } }
+    await view.render(<CoordinatorReply text={`已派出线程 [[run:${THREAD}]]。`} citations={citations} carded={THREAD} />)
+    assert.equal(view.container.querySelectorAll('[data-slot="inline-citation-trigger"]').length, 0)
+    assert.equal(view.container.querySelector('[data-citation-carded]')?.textContent, 'Fix sign-in redirect')
+    await view.render(<CoordinatorReply text={`已派出线程 [[run:${THREAD}]]。`} citations={citations} />)
+    assert.equal(view.container.querySelectorAll('[data-slot="inline-citation-trigger"]').length, 1, 'without its card here, it is a chip')
+  } finally { await view.unmount() }
+})
+
+test('全部展开 opens every tool group, a group clicked alone keeps its own state, 全部收起 closes them all (R-83)', async () => {
+  const { ActivityExpansionContext, ReplyActivity, useActivityExpansion } = await import('../components/coordinator/reply-activity')
+  const view = await mount()
+  const tools = (n: string) => [{ call: `${n}1`, name: 'get_issue', state: 'done' as const }, { call: `${n}2`, name: 'list_runs', state: 'done' as const }]
+  function Chat() {
+    const expansion = useActivityExpansion()
+    return <ActivityExpansionContext value={expansion}><ReplyActivity tools={tools('a')} /><ReplyActivity tools={tools('b')} /></ActivityExpansionContext>
+  }
+  const groups = () => [...view.container.querySelectorAll('[data-activity-group]')]
+  const opened = () => groups().map(group => group.querySelector('[data-slot="trace-collapsible-trigger"]')?.getAttribute('aria-expanded'))
+  const expandAll = () => view.container.querySelector('[data-activity-expand-all]') as HTMLButtonElement
+  try {
+    await view.render(<Chat />)
+    assert.deepEqual(opened(), ['false', 'false'], 'closed by default')
+    assert.equal(view.container.querySelectorAll('[data-activity-expand-all]').length, 2, 'the control is on every group, always shown')
+    await act(async () => { expandAll().click() })
+    assert.deepEqual(opened(), ['true', 'true'])
+    await act(async () => { (groups()[0].querySelector('[data-slot="trace-collapsible-trigger"]') as HTMLButtonElement).click() })
+    assert.deepEqual(opened(), ['false', 'true'], 'the reader\'s own click wins for that group')
+    await act(async () => { expandAll().click() })
+    assert.deepEqual(opened(), ['false', 'false'], '全部收起 closes every group, the one set alone included')
+  } finally { await view.unmount() }
 })

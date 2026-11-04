@@ -17,10 +17,12 @@ const ignoreAction = () => {}
  * While it streams, a citation still arriving is left out until its chip can show.
  * Memoised: a token for the reply that is streaming does not redraw the replies already finished.
  */
-export const CoordinatorReply = memo(function CoordinatorReply({ text, citations, isStreaming = false }: { text: string; citations: AgentCitations; isStreaming?: boolean }) {
+export const CoordinatorReply = memo(function CoordinatorReply({ text, citations, isStreaming = false, carded = '' }: { text: string; citations: AgentCitations; isStreaming?: boolean
+  /** Comma-joined ids of the threads whose card sits under this reply; a string, so the memo keeps holding. */
+  carded?: string }) {
   const shown = isStreaming ? withoutPartialCitation(text) : text
   // A task whose thread this reply also cites is its title, not a second chip (R-15).
-  const value = useMemo(() => ({ ...citations, covered: coveredIssues(shown, citations.sources) }), [citations, shown])
+  const value = useMemo(() => ({ ...citations, covered: coveredIssues(shown, citations.sources), carded: new Set(carded ? carded.split(',') : []) }), [citations, shown, carded])
   return <AgentCitationsContext value={value}>
     <div data-quote-source="" className="flex w-full min-w-0 flex-col gap-2 break-words">
       <ReplyBubbles value><AgentGenerativeUI response={shown} isStreaming={isStreaming} onAction={ignoreAction} showErrors={false} /></ReplyBubbles>

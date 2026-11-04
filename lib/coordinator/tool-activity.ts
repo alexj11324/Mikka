@@ -7,15 +7,15 @@ import type { ChatTool } from '@/lib/coordinator/context'
  * named first in a summary, so a collapsed group still says what it did (Codex and Cursor fold only reads).
  */
 export type ToolAction =
-  | 'dispatch' | 'messageThread' | 'stopThread' | 'createIssue' | 'updateIssue' | 'sendMail' | 'sendSlack' | 'writeNotion'
+  | 'dispatch' | 'dispatchFactory' | 'wake' | 'messageThread' | 'stopThread' | 'createIssue' | 'updateIssue' | 'sendMail' | 'sendSlack' | 'writeNotion'
   | 'writeCalendar' | 'remember' | 'forget' | 'schedule' | 'factory' | 'github'
   | 'viewIssues' | 'viewThreads' | 'searchWeb' | 'readWeb' | 'readMail' | 'readSlack' | 'readNotion' | 'viewCalendar'
   | 'viewDrive' | 'viewFactory' | 'findRepository' | 'other'
 
-const SIDE_EFFECTS = new Set<ToolAction>(['dispatch', 'messageThread', 'stopThread', 'createIssue', 'updateIssue', 'sendMail', 'sendSlack', 'writeNotion', 'writeCalendar', 'remember', 'forget', 'schedule', 'factory'])
+const SIDE_EFFECTS = new Set<ToolAction>(['dispatch', 'dispatchFactory', 'wake', 'messageThread', 'stopThread', 'createIssue', 'updateIssue', 'sendMail', 'sendSlack', 'writeNotion', 'writeCalendar', 'remember', 'forget', 'schedule', 'factory'])
 
 const EXACT: Record<string, ToolAction> = {
-  dispatch_run: 'dispatch', dispatch_bot_computer: 'dispatch', dispatch_factory_run: 'dispatch', dispatch_factory_task: 'dispatch', wake_bot_computer: 'dispatch',
+  dispatch_run: 'dispatch', dispatch_bot_computer: 'dispatch', dispatch_factory_run: 'dispatch', dispatch_factory_task: 'dispatchFactory', wake_bot_computer: 'wake',
   send_to_run: 'messageThread', stop_run: 'stopThread', stop_factory_task: 'stopThread',
   create_issue: 'createIssue', create_issue_from_request: 'createIssue', intake_factory_request: 'createIssue', update_issue: 'updateIssue',
   send_email: 'sendMail', mailbox_send: 'sendMail', send_slack_message: 'sendSlack', append_notion_paragraph: 'writeNotion',
@@ -72,27 +72,39 @@ export function toolObjectId(tool: Pick<ChatTool, 'input'>): string | null {
  * code or message when the output names one.
  */
 export function toolFailure(tool: Pick<ChatTool, 'state' | 'output'>): { failed: boolean; reason: string | null } {
-  const reason = field(tool.output, ['error', 'code', 'reason', 'message'])
-  if (tool.state === 'error') return { failed: true, reason: reason ?? (tool.output && !tool.output.trimStart().startsWith('{') ? tool.output.trim().slice(0, 80) : null) }
-  const output = tool.output?.trimStart() ?? ''
-  if (output.startsWith('{') && (/^\{\s*"error"\s*:/.test(output) || /"ok"\s*:\s*false/.test(output))) return { failed: true, reason }
-  return { failed: false, reason: null }
+  const output = tool.output?.trim() ?? ''
+  let top: Record<string, unknown> | null = null
+  try { const parsed: unknown = JSON.parse(output); if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) top = parsed as Record<string, unknown> } catch { /* a preview cut at 200 characters */ }
+  // Only the answer's own fields count: an `error` or `ok: false` nested in a listed item is that item's, not the call's.
+  const own = (key: string) => top ? (typeof top[key] === 'string' && top[key] ? top[key] as string : null) : field(output.match(new RegExp(`^\\{\\s*"${key}"\\s*:\\s*"[^"]*`))?.[0], [key])
+  const reason = own('error') ?? own('code') ?? own('reason') ?? own('message')
+  if (tool.state === 'error') return { failed: true, reason: reason ?? (output && !output.startsWith('{') ? output.slice(0, 80) : null) }
+  const failed = top ? ('error' in top && top.error !== null && top.error !== false) || top.ok === false : /^\{\s*"error"\s*:/.test(output) || /^\{\s*"ok"\s*:\s*false/.test(output)
+  return failed ? { failed: true, reason } : { failed: false, reason: null }
 }
 
 export interface ToolSummaryPart { action: ToolAction; count: number }
 
 /**
- * A group's summary: one part per action with how many calls it made, side effects first, then in the order they
- * happened; and how many failed. The chat writes each part as 「派发了 1 个线程」 and joins them.
+ * A group's summary: one part per action with how many calls of it succeeded, side effects first, then in the order
+ * they happened; how many failed; and the failed calls' tool names, in order, for a group in which nothing succeeded.
+ * A failed call never counts in a part, so a summary never says 「派发了 1 个线程」 for a dispatch that failed. A call
+ * still running counts in neither.
  */
-export function toolSummary(tools: readonly ChatTool[]): { parts: ToolSummaryPart[]; failed: number } {
+export function toolSummary(tools: readonly ChatTool[]): { parts: ToolSummaryPart[]; failed: number; failedNames: string[] } {
   const counts = new Map<ToolAction, number>()
+  const failedNames: string[] = []
   let failed = 0
   for (const tool of tools) {
+    if (tool.state === 'running') continue
+    if (toolFailure(tool).failed) {
+      failed++
+      if (!failedNames.includes(tool.name)) failedNames.push(tool.name)
+      continue
+    }
     const action = toolAction(tool.name)
     counts.set(action, (counts.get(action) ?? 0) + 1)
-    if (tool.state !== 'running' && toolFailure(tool).failed) failed++
   }
   const parts = [...counts].map(([action, count]) => ({ action, count }))
-  return { parts: [...parts.filter(part => isSideEffect(part.action)), ...parts.filter(part => !isSideEffect(part.action))], failed }
+  return { parts: [...parts.filter(part => isSideEffect(part.action)), ...parts.filter(part => !isSideEffect(part.action))], failed, failedNames }
 }

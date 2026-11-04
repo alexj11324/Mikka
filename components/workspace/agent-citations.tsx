@@ -34,9 +34,11 @@ export interface AgentCitations {
   pending?: boolean
   /**
    * Tasks whose thread the same reply cites: a task and its thread are one piece of work (R-81), so only the thread
-   * is a chip and the task is its number in the sentence (R-15).
+   * is a chip and the task is its number in the sentence, or nothing without one (R-15).
    */
   covered?: ReadonlySet<string>
+  /** Threads whose card sits under this same reply: the card is the object, so the words name it without a second chip (R-66). */
+  carded?: ReadonlySet<string>
 }
 
 /** The tasks in `text` whose thread `text` also cites, for AgentCitations.covered. */
@@ -88,8 +90,9 @@ export function CitationAnchor({ href, children, className: _className, ...props
     const source = citations.sources[id]
     if (!source && citations.pending) return <PendingCitation />
     if (!source || (kind !== 'any' && kind !== source.kind)) return <>{children}</>
-    // The thread chip already carries the task's title: the task is named by its number, or its title when it has none.
-    if (source.kind === 'issue' && citations.covered?.has(id)) return <>{source.identifier ?? source.title}</>
+    // The thread chip already carries the task's title: the task is its number, or nothing when it has none.
+    if (source.kind === 'issue' && citations.covered?.has(id)) return source.identifier ? <>{source.identifier}</> : null
+    if (source.kind === 'run' && citations.carded?.has(id)) return <span data-citation-carded="">{runThreadName(source)}</span>
     return <CitationChip id={id} kind={source.kind} />
   }
   if (citations && href && /^https?:\/\//i.test(href)) return <WebCitation url={href} label={typeof children === 'string' && children !== href ? children : null} />

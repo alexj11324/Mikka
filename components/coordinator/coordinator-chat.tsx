@@ -36,6 +36,7 @@ import { chatPollInterval } from '@/lib/coordinator/chat-poll-interval'
 import { useLiveCitations } from './use-live-citations'
 import type { CoordinatorLiveReply } from '@/lib/coordinator-stream-client'
 import { ThreadCard } from './thread-card'
+import { firstThreadCards, staleEventPositions, visibleDivider } from '@/lib/coordinator/chat-dedupe'
 import { ActivityExpansionContext, ReplyActivity, ReplyWaiting, useActivityExpansion } from './reply-activity'
 import { replySegments, type ReplySegment } from '@/lib/coordinator/reply-segments'
 import { MessageReactions, useMessageReactions } from '@/components/workspace/message-reactions'
@@ -231,22 +232,11 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   // A failed message sent again is retried in place: it goes at once, and the server leaves it out from then on.
   const items = useMemo(() => (data?.items ?? []).filter(item => !(item.from === 'person' && retrying.has(item.position))), [data, retrying])
   // One thread has one card in a chat (R-66): under the first reply that dispatched it; later replies name it in their words.
-  const firstThreadCard = useMemo(() => {
-    const first = new Map<string, number>()
-    for (const item of items) for (const id of item.threads) if (!first.has(id)) first.set(id, item.position)
-    return first
-  }, [items])
+  const firstThreadCard = useMemo(() => firstThreadCards(items), [items])
   // A thread's event line said again later (「… 在等你回答」 twice) shows only the latest one (R-66).
-  const staleEvents = useMemo(() => {
-    const stale = new Set<number>(), seen = new Set<string>()
-    for (const item of [...items].reverse()) {
-      if (item.from !== 'event' || !item.line?.runId) continue
-      const key = `${item.line.runId}:${item.line.kind}`
-      if (seen.has(key)) stale.add(item.position)
-      else seen.add(key)
-    }
-    return stale
-  }, [items])
+  const staleEvents = useMemo(() => staleEventPositions(items), [items])
+  /** The thread cards under `item`: those whose first reply it is; a live reply only threads no stored reply has carded. */
+  const cardsOf = (item: Chat['items'][number], live: boolean) => item.threads.filter(id => (live ? !firstThreadCard.has(id) : firstThreadCard.get(id) === item.position) && sources?.[id]?.kind === 'run')
   // A send whose result was unknown may have been stored after all: once it shows up in the chat, the failed bubble goes.
   useEffect(() => {
     if (failed && items.some(item => item.from === 'person' && item.position > failed.after && item.text === failed.text)) setFailed(null)
@@ -302,6 +292,8 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   // Reactions people gave on the phone (decision 2026-11-01-0030-mobile-reactions); a pending row has none yet.
   const reactions = useMessageReactions(items.map(item => item.pending || item.from === 'event' ? null : item.id))
   const unread = useUnreadIndicators({ conversationId: botId ? `bot:${botId}` : 'coordinator', items: unreadItems, rootRef })
+  // The divider stays when the row it marked is a hidden repeat: it moves to the next row shown.
+  const dividerAt = visibleDivider(unread.divider, items, staleEvents)
   const previews = useLinkPreviews(items.filter(item => item.from === 'coordinator').map(item => item.text))
   const sources = data?.sources
   const citations = useMemo<AgentCitations>(() => ({ sources: sources ?? {}, previews, onOpenIssue }), [sources, previews, onOpenIssue])
@@ -421,7 +413,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
                 storing it keeps its row, text and chips in place instead of mounting them again (the chat flashed). */}
             {[...items.filter(item => !staleEvents.has(item.position)).map(item => ({ item, live: undefined, key: item.pending ? `pending-${item.position}` : item.streamId ?? item.position })),
               ...stream.replies.map(reply => ({ item: streamedItem(reply), live: reply, key: reply.id }))].map(({ item, live, key }) => <Fragment key={key}>
-              {!live && unread.divider === item.position && <UnreadDivider />}
+              {!live && dividerAt === item.position && <UnreadDivider />}
               <MessageScrollerItem messageId={live ? live.id : String(item.position)} className={cn('[content-visibility:visible]', (live ? arriving(`stream-${live.id}`) : entering(item)) && ENTER)}
                 {...(live ? { 'data-coordinator-stream-id': live.id, 'data-streaming': live.committedThrough === undefined } : item.from === 'event' ? {} : { [MESSAGE_POSITION_ATTR]: item.position })}>
               {item.from === 'event'
@@ -436,14 +428,14 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
                     {item.from === 'coordinator'
                       ? <ReplyAnswer value={live ? null : answers.get(item.position) ?? null}>{replyRows(item, live).map((segment, index) => segment.kind === 'tools'
                         ? <AgentCitationsContext key={index} value={citations}><ReplyActivity tools={segment.tools} {...(index === 0 && item.activity ? { thinking: live ? liveThinking(live) : undefined, thought: item.activity.thought, reasoningAt: item.activity.reasoningAt } : {})} botId={botId} live={Boolean(live && live.committedThrough === undefined)} /></AgentCitationsContext>
-                        : <CoordinatorReply key={index} text={segment.text} citations={live ? live.committedThrough === undefined ? liveCitations.streaming : liveCitations.settled : citations} isStreaming={Boolean(live && live.committedThrough === undefined)} />)}</ReplyAnswer>
+                        : <CoordinatorReply key={index} text={segment.text} carded={cardsOf(item, Boolean(live)).join(',')} citations={live ? live.committedThrough === undefined ? liveCitations.streaming : liveCitations.settled : citations} isStreaming={Boolean(live && live.committedThrough === undefined)} />)}</ReplyAnswer>
                       : item.text && <Bubble variant="secondary" align="end" className={personBubble}><BubbleContent className="flex flex-col gap-1.5 rounded-2xl px-4 py-3 whitespace-pre-wrap"><PersonWords text={item.text} before={<>{item.quote && <ArtifactQuoteLine quote={item.quote} />}{item.notes?.map(note => <BrowserNoteLine key={note.n} note={note} />)}</>} /></BubbleContent></Bubble>}
                     {item.artifacts.length > 0 && <div className={cn('flex flex-col gap-2', embedded ? 'items-start gap-1.5' : 'w-full')}>
                       {item.artifacts.flatMap(id => { const artifact = data?.artifacts[id]; return artifact ? [embedded
                         ? <ArtifactChip key={id} artifact={artifact} active={id === embedded.activeArtifactId} onOpen={openArtifact} />
                         : <ArtifactCard key={id} artifact={artifact} onOpen={openArtifact} />] : [] })}
                     </div>}
-                    {item.threads.filter(id => live ? !firstThreadCard.has(id) : firstThreadCard.get(id) === item.position).map(id => {
+                    {cardsOf(item, Boolean(live)).map(id => {
                       const run = sources?.[id]
                       return run?.kind === 'run' ? <ThreadCard key={id} run={run} onOpen={showThread} /> : null
                     })}

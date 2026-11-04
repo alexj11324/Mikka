@@ -88,8 +88,9 @@ source wins in a conflict is in [`README.md`](README.md).
   number is in the hover card, not the chip. A thread chip opens the thread's own
   conversation, as a thread card does (R-66); only a task chip opens the task. A
   task and its thread are one piece of work (R-81): when a reply cites both, only
-  the thread is a chip and the task is its number in the sentence (its title when it
-  has none). Every mention of
+  the thread is a chip and the task is its number in the sentence (nothing when it
+  has none). A thread whose card sits under the same reply is named in the words
+  without a chip: the card is its one object there. Every mention of
   an object in the words is its chip; it is the cards and lists under a reply that
   never repeat it (R-66, R-83). Web sources and links keep the unboxed source chip
   (R-14). A thread the reply dispatches is different: it is a thread card under
@@ -424,14 +425,16 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
 - **R-83** A reply's tool calls say what they did, not that a tool was used
   ([decision](decisions/2026-11-04-2221-chat-tool-groups-and-citations.md),
   spec `chat-tool-calls.md`). Two or more calls with nothing said between them
-  are one line that sums them up, side effects first and failures counted in red
-  (「派发了 1 个线程，查看了 3 次任务 · 1 个失败」), closed by default; while the
+  are one line that sums up what succeeded, side effects first, and counts the
+  failures apart in red (「派发了 1 个线程，查看了 3 次任务 · 1 个失败」); a failed
+  call is never said as done, and a group where nothing succeeded names the calls
+  that failed. Closed by default; while the
   reply streams it shows the call running now. Opened, each call is a row: its
   kind's icon, then verb and object (「查看任务 ALEX-45」); never a bare
   「使用工具」 (`check-copy`). A call that failed, thrown or answered
   `{"error": …}`, is red and names its reason in words. Raw input and output
-  open only from that call's row. 全部展开 / 全部收起 beside any group opens or
-  closes every group in the chat. Under a reply, 复制 and 「N 个来源」 (web pages
+  open only from that call's row. 全部展开 / 全部收起, always shown beside every
+  group, opens or closes every group in the chat. Under a reply, 复制 and 「N 个来源」 (web pages
   only; tasks and threads are already chips) share one line that shows while the
   reply is hovered, focused or tapped; the latest reply keeps it on a touch screen.
 

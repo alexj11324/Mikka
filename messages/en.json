@@ -3261,6 +3261,8 @@
       },
       "summary": {
         "dispatch": "{count, plural, one {Dispatched # thread} other {Dispatched # threads}}",
+        "dispatchFactory": "{count, plural, one {Dispatched # Factory task} other {Dispatched # Factory tasks}}",
+        "wake": "{count, plural, one {Woke a computer} other {Woke computers # times}}",
         "messageThread": "{count, plural, one {Messaged a thread} other {Sent # thread messages}}",
         "stopThread": "{count, plural, one {Stopped # thread} other {Stopped # threads}}",
         "createIssue": "{count, plural, one {Created # task} other {Created # tasks}}",
