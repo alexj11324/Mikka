@@ -171,7 +171,7 @@ test('terminating an admitted write connection rolls back both the write and aut
   assert.equal((await raw.query('SELECT name FROM devices WHERE id=$1', [f.device])).rows[0].name, 'Revocation test device')
 })
 
-test('a long poll loses token authority within its one-second database polling interval', async () => {
+test('a long poll loses token authority within its five-second database polling interval', async () => {
   const f = await fixture()
   const started = Date.now()
   const poll = scope.run(() => commands(new Request(`http://127.0.0.1/mikka/v1/devices/${f.device}/commands?wait=20`, {
@@ -180,7 +180,7 @@ test('a long poll loses token authority within its one-second database polling i
   await delay(150)
   await revokeDeviceCredential(raw, f.owner, f.tokenId)
   assert.equal((await poll).status, 401)
-  assert.ok(Date.now() - started < 3000)
+  assert.ok(Date.now() - started < 6500)
 })
 
 test('existing device removal still refuses live work, then records revocation without deleting history', async () => {
