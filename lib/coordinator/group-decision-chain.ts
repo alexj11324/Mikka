@@ -1,4 +1,5 @@
 import type { DecisionExecution } from './decide'
+import type { GroupPolicyVersion } from './group-decision-policy'
 
 /** The API evaluates questions independently. Conditional routing therefore
  * uses separate requests, each with confirmed host state from earlier steps. */
@@ -14,12 +15,15 @@ export type GroupDecisionStep = {
   id: string
   phase: GroupDecisionPhase
   index: number
+  /** Frozen by the host for this routing attempt; absent for legacy receipts. */
+  policyVersion?: GroupPolicyVersion
   status: 'complete' | 'invalid_decision' | 'unavailable'
   failure: GroupDecisionFailure | null
   receipt: DecisionExecution | null
   /** Attached only by the host usage-ledger read, never a model answer. */
   decisionCostUsd?: number | null
 }
+export type GroupDecisionRetain = (steps: readonly GroupDecisionStep[], policyVersion?: GroupPolicyVersion) => Promise<void>
 
 export function groupDecisionTotals(steps: readonly GroupDecisionStep[], omittedCalls = 0) {
   const receipts = new Set<string>()

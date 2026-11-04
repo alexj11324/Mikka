@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import type { PoolClient } from 'pg'
 import type { DecisionExecution } from './decide'
 import type { GroupRoute, RoutingMember } from './group-routing'
-import { getGroupDecisionPolicy } from './group-decision-policy'
+import { getGroupDecisionPolicy, GROUP_BASELINE_VERSION, GROUP_POLICY_VERSION, type GroupPolicyVersion } from './group-decision-policy'
 import { DECISION_MODEL } from './decision'
 import { GROUP_DECISION_PROTOCOL, GROUP_MAX_ROUTING_DECISIONS, GROUP_RETAINED_DECISIONS, groupDecisionFailures, groupDecisionPhases, groupDecisionTotals, type GroupDecisionFailure, type GroupDecisionStep } from './group-decision-chain'
 
@@ -67,6 +67,7 @@ export function groupDecisionSteps(steps: readonly GroupDecisionStep[] | undefin
     if (!step || !token(step.id) || !groupDecisionPhases.includes(step.phase) || !Number.isSafeInteger(step.index) || step.index < 0 || step.index >= GROUP_MAX_ROUTING_DECISIONS || !['complete','invalid_decision','unavailable'].includes(step.status)) return []
     const receipt = groupDecisionReceipt(step.receipt ?? undefined)
     return [{id:step.id,phase:step.phase,index:step.index,status:receipt?step.status:'unavailable',failure:groupDecisionFailures.includes(step.failure!)?step.failure:null,receipt,
+      ...(step.policyVersion===GROUP_POLICY_VERSION || step.policyVersion===GROUP_BASELINE_VERSION ? {policyVersion:step.policyVersion}:{}),
       ...(step.decisionCostUsd === null || typeof step.decisionCostUsd === 'number' && Number.isFinite(step.decisionCostUsd) && step.decisionCostUsd >= 0 ? {decisionCostUsd:step.decisionCostUsd}:{})} as GroupDecisionStep]
   }).slice(-GROUP_RETAINED_DECISIONS)
 }
@@ -93,9 +94,10 @@ export async function priceGroupDecisions(client: Client, steps: readonly GroupD
 
 /** A retry appends its genuine chain instead of erasing paid failed attempts.
  * Diagnostics stay bounded; omitted calls make total cost explicitly partial. */
-export async function recordGroupDecisionSteps(client: Client, messageId: string, steps: readonly GroupDecisionStep[], failure?: GroupDecisionFailure) {
+export async function recordGroupDecisionSteps(client: Client, messageId: string, steps: readonly GroupDecisionStep[], failure?: GroupDecisionFailure, policyVersion?: GroupPolicyVersion) {
   const safe=groupDecisionSteps(steps)
-  if (!safe.length && !failure) return
+  const version=policyVersion===undefined?safe[0]?.policyVersion:getGroupDecisionPolicy(policyVersion).version
+  if (!safe.length && !failure && !version) return
   await client.query(`WITH merged AS (
     SELECT t."messageId",COALESCE(t.trace->'decisions','[]'::jsonb) || COALESCE((SELECT jsonb_agg(e)
       FROM jsonb_array_elements($2::jsonb) e WHERE NOT EXISTS (SELECT 1 FROM jsonb_array_elements(COALESCE(t.trace->'decisions','[]'::jsonb)) old WHERE old->>'id'=e->>'id')),'[]'::jsonb) AS entries
@@ -106,7 +108,7 @@ export async function recordGroupDecisionSteps(client: Client, messageId: string
     'decisionsOmitted',COALESCE((t.trace->>'decisionsOmitted')::integer,0)+GREATEST(0,jsonb_array_length(m.entries)-$3),
     'decisionFailure',$4::text) || $5::jsonb
     FROM merged m WHERE t."messageId"=m."messageId"`,[messageId,JSON.stringify(safe),GROUP_RETAINED_DECISIONS,failure??null,
-      JSON.stringify(safe[0]?.index===0?{execution:safe[0].receipt,executionPhase:safe[0].phase}:{}),
+      JSON.stringify({...(safe[0]?.index===0?{execution:safe[0].receipt,executionPhase:safe[0].phase}:{}),...(version?{policyVersion:version}:{})}),
   ])
 }
 
@@ -125,7 +127,7 @@ export function createGroupDecisionTrace(members: readonly TraceMember[], contex
 export async function initializeGroupDecisionTrace(client: Client, messageId: string, members: readonly RoutingMember[], contextMessageIds: string[]) {
   await client.query(`UPDATE group_turns SET trace=$2::jsonb || jsonb_build_object(
     'decisions',COALESCE(trace->'decisions',CASE WHEN trace->'execution' IS NOT NULL AND trace->'execution'<>'null'::jsonb
-      THEN jsonb_build_array(jsonb_build_object('id',trace->'execution'->>'executionId','phase','legacy_primary','index',0,'status','invalid_decision','failure',null,'receipt',trace->'execution')) ELSE '[]'::jsonb END),
+      THEN jsonb_build_array(jsonb_build_object('id',trace->'execution'->>'executionId','phase','legacy_primary','index',0,'policyVersion',trace->>'policyVersion','status','invalid_decision','failure',null,'receipt',trace->'execution')) ELSE '[]'::jsonb END),
     'decisionsOmitted',COALESCE(trace->'decisionsOmitted','0'::jsonb)) WHERE "messageId"=$1`, [messageId, JSON.stringify(createGroupDecisionTrace(members, contextMessageIds))])
 }
 
@@ -135,7 +137,7 @@ export async function recordGroupDecisionRoute(client: Client, messageId: string
   const reason = 'reason' in route && typeof route.reason === 'string' && /^[a-z0-9_-]{1,80}$/i.test(route.reason) ? route.reason : null
   const policyVersion = 'policyVersion' in route && typeof route.policyVersion === 'string' ? getGroupDecisionPolicy(route.policyVersion).version : getGroupDecisionPolicy().version
   const decisions=groupDecisionSteps(route.decisions)
-  if (!decisions.length && execution) decisions.push({id:execution.executionId,phase:'legacy_primary',index:0,status:'complete',failure:null,receipt:execution})
+  if (!decisions.length && execution) decisions.push({id:execution.executionId,phase:'legacy_primary',index:0,policyVersion,status:'complete',failure:null,receipt:execution})
   await recordGroupDecisionSteps(client,messageId,decisions)
   await client.query('UPDATE group_turns SET trace=trace || $2::jsonb WHERE "messageId"=$1', [messageId, JSON.stringify({
     purpose: route.by === 'mention' ? 'explicit-mention' : 'group-routing', action, reason, policyVersion, responders: [...route.responders], execution,

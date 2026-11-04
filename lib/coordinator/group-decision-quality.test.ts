@@ -6,6 +6,7 @@ import { compareGroupPolicies, evaluateGroupDecisions, groupTraceObservation, ty
 import { getGroupDecisionPolicy, GROUP_BASELINE_VERSION, GROUP_POLICY_VERSION } from './group-decision-policy'
 import { groupFeedbackInput } from './group-decision-feedback'
 import { DECISION_MODEL } from './decision'
+import { overrideDeploymentSwitch } from '../deployment-switches'
 
 const fixture = JSON.parse(readFileSync(new URL('../../tests/fixtures/group-decision-cases.json', import.meta.url), 'utf8')) as { cases: GroupEvalCase[] }
 const observed = (item: GroupEvalCase): GroupEvalObservation => ({ caseId: item.id, action: item.expected.actions[0], responders: item.expected.responders ?? ['primary'],
@@ -13,6 +14,16 @@ const observed = (item: GroupEvalCase): GroupEvalObservation => ({ caseId: item.
   published: item.expected.intervene && !item.expected.delegate ? 1 : 0, delegated: item.expected.delegate ? 1 : 0,
   delegationCompleted: item.expected.delegate || undefined, duplicatePublicMessages: 0, latencyMs: null, costUsd: null,
   status: item.expected.intervene === null ? 'blocked' : 'complete' })
+
+test('deployment rollback changes live policy while host-selected replay versions stay fixed',t=>{
+  t.after(()=>overrideDeploymentSwitch('groupContribution',undefined))
+  overrideDeploymentSwitch('groupContribution',false)
+  assert.equal(getGroupDecisionPolicy().version,GROUP_BASELINE_VERSION)
+  assert.equal(getGroupDecisionPolicy(GROUP_POLICY_VERSION).version,GROUP_POLICY_VERSION)
+  overrideDeploymentSwitch('groupContribution',true)
+  assert.equal(getGroupDecisionPolicy().version,GROUP_POLICY_VERSION)
+  assert.equal(getGroupDecisionPolicy(GROUP_BASELINE_VERSION).version,GROUP_BASELINE_VERSION)
+})
 
 test('trace snapshots detect duty/authorization changes without copying role instructions or extra fields', () => {
   const member = { id: 'member', name: 'Coding', description: 'private-shaped fixture text', capabilities: ['factory'], executionAvailable: true, token: 'never-copy-this' }
