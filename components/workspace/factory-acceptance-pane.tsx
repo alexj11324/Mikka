@@ -76,7 +76,7 @@ export function useAcceptance(task: FactoryTask) {
 }
 
 function Label({ children }: { children: string }) {
-  return <span className="w-14 shrink-0 text-xs text-muted-foreground">{children}</span>
+  return <span className="w-20 shrink-0 text-xs text-muted-foreground">{children}</span>
 }
 
 /** Frame 06 「候选」: the PR, the commit, the preview and where it runs. */
