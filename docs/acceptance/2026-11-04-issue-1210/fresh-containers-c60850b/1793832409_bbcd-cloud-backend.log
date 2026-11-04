@@ -1,0 +1,129 @@
+
+> next-app@0.0.1 test:cloud-backend-db /vercel/sandbox/mikka-fresh-task-containers-final
+> node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/cloud-computer/backend.db.test.ts lib/cloud-computer/unattended.db.test.ts lib/cloud-computer/thread-machine-task.db.test.ts
+
+✔ real DB: additive migration, subagent owner isolation and separate thread claims (145.221872ms)
+▶ a task's sandbox serves only that task's runs, parks between them and ends with the task
+  ✔ an exact question wake observes a running original worker without bootstrap or token rotation (31.869783ms)
+{"event":"thread_runtime_start_failed","runId":"70b865f4-38ac-41ba-953c-d224cd7197ec","phase":"connect","errorClass":"Error","errorCode":"unknown"}
+  ✔ retained original question VMs ignore replacement-template configuration (29.362623ms)
+{"event":"thread_runtime_start_failed","runId":"01a87f17-f3d2-44a4-9af2-9929e4d4fedf","phase":"connect","errorClass":"Error","errorCode":"unknown","status":409}
+  ✔ original VM provider loss never creates or adopts a replacement and releases only its own wake lease (13.191714ms)
+{"event":"thread_runtime_start_failed","runId":"ceb37c66-5489-4906-9bd9-e16ec26d7182","phase":"connect","errorClass":"Error","errorCode":"unknown"}
+  ✔ an exact paused wake uses only the original VM and performs provider I/O after commit (15.513616ms)
+  ✔ a failed question wake records its safe phase while retaining the original VM, SID and committed answer (14.365055ms)
+{"event":"thread_runtime_start_failed","runId":"484a6220-0d9d-4d9e-ba9a-c25d7e3efe10","phase":"connect","errorClass":"Error","errorCode":"unknown"}
+  ✔ a resumed provider VM with paused DB placement retries bootstrap instead of falsely returning ready (10.965842ms)
+  ✔ a worker that already claimed the continuation keeps its token and native process on replay (9.700571ms)
+  ✔ a paused question VM resumes and registers on the same device without replacing its native session (18.089278ms)
+{"event":"thread_runtime_start_failed","runId":"5b54ad9e-eefe-48ce-a6ca-872dd5d83753","phase":"provider_state","errorClass":"unknown","errorCode":"unknown","status":404}
+{"event":"thread_runtime_start_failed","runId":"fafd1d7f-f421-45f8-95d6-2b920e02a67f","phase":"provider_state","errorClass":"Error","errorCode":"unknown","status":409}
+  ✔ gone or unknown provider state never creates a replacement or claims readiness (24.392698ms)
+{"event":"thread_runtime_start_failed","runId":"8eb300e1-7db5-469c-b00b-8d21176fd0f5","phase":"question_source","errorClass":"Error","errorCode":"unknown","status":409}
+{"event":"thread_runtime_start_failed","runId":"5a53de68-9c6c-4c2e-8841-c97918d67b1f","phase":"question_source","errorClass":"Error","errorCode":"unknown","status":409}
+{"event":"thread_runtime_start_failed","runId":"f0e6cfc8-2d5e-43d2-a98e-cf3e1210f756","phase":"question_machine","errorClass":"Error","errorCode":"unknown","status":409}
+{"event":"thread_runtime_start_failed","runId":"a8118187-bdde-42cd-a0ab-18d7730e69e0","phase":"question_source","errorClass":"Error","errorCode":"unknown","status":409}
+  ✔ source SID, snapshot and transferred sandbox mismatches refuse before provider I/O (42.569572ms)
+2026-11-04T22:47:45.745Z WARN [Better Auth]: [better-auth] Base URL is not set. Set the baseURL option or BETTER_AUTH_URL env, or use a dynamic baseURL with allowedHosts for multi-host setups. Without it the origin is derived from the incoming request, and callbacks and redirects may not work correctly.
+{"event":"thread_runtime_start_failed","runId":"e61e9eb2-2d30-4beb-97c0-fa603ee066a3","phase":"question_source","errorClass":"Error","errorCode":"unknown","status":409}
+  ✔ the normal start wrapper retains an unavailable exact question run and its original VM (1925.708499ms)
+  ✔ durable question handoff retries an unavailable original VM instead of reporting false success (18.866608ms)
+  ✔ a replayed Factory handoff only resumes lifecycle for its current live owned worker (11.868939ms)
+{"event":"thread_runtime_start_failed","runId":"cc6ac1f1-5104-43f6-a6e1-43372c555b2c","phase":"question_machine","errorClass":"Error","errorCode":"unknown","status":409}
+  ✔ required question wake refuses a machine without authoritative question provenance (6.85338ms)
+{"event":"thread_runtime_start_failed","runId":"a8ee130b-5407-4d02-984d-5602d123d740","phase":"admission","errorClass":"Error","errorCode":"unknown","status":409}
+  ✔ a maintenance lease prevents adoption and replacement of the original VM (10.09259ms)
+{"event":"thread_runtime_refresh_failed","runId":"57b0fc1a-476b-4b81-be96-4dc7a871bcc1","phase":"admission","errorClass":"Error","errorCode":"unknown","status":409}
+  ✔ runtime refresh rejects active native work before any provider call (9.489671ms)
+  ✔ a queued stage upgrades its adopted official VM before bootstrap and preserves its completed producer (24.699772ms)
+{"event":"thread_runtime_start_failed","runId":"24d47b0d-671e-44b0-ab16-888c43cc6afa","phase":"connect","errorClass":"Error","errorCode":"unknown"}
+{"event":"thread_runtime_start_failed","runId":"24d47b0d-671e-44b0-ab16-888c43cc6afa","phase":"connect","errorClass":"Error","errorCode":"unknown","status":409}
+  ✔ adopted VM wake failures and durable replays preserve custody and never take the generic end path (41.006644ms)
+(node:14808) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:14808) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+  ✔ Factory starts the retained worker without spawning a second lifecycle workflow (30.937708ms)
+{"event":"thread_runtime_start_failed","runId":"ff6a453b-9691-484c-b0c9-a0617d68f4e8","phase":"admission","errorClass":"Error","errorCode":"unknown","status":409}
+  ✔ retained stage maintenance rejects another active run before touching its VM (10.791658ms)
+{"event":"thread_runtime_start_failed","runId":"0a743372-d26f-4242-8256-3f91e639afed","phase":"read_worker","errorClass":"TypeError","errorCode":"unknown"}
+  ✔ a queued running retained VM can upgrade without replacing its existing machine (26.29251ms)
+  ✔ a changed maintenance lease prevents switch and cleanup from affecting its new owner (15.061631ms)
+  ✔ a queued adopted stage cannot switch or bootstrap after its run starts elsewhere (14.826034ms)
+{"event":"thread_runtime_start_failed","runId":"7d8e4a19-3b33-442a-8711-68b9fadb4bbf","phase":"admission","errorClass":"Error","errorCode":"unknown","status":404}
+{"event":"thread_runtime_refresh_failed","runId":"022c44c2-8dcf-4600-bfe3-984031a2c139","phase":"admission","errorClass":"Error","errorCode":"unknown","status":409}
+  ✔ explicit runtime refresh updates the paused failed original VM without changing answer or recovery history (29.053633ms)
+{"event":"thread_runtime_start_failed","runId":"361c84b6-9535-4aaa-9039-cac23fa80739","phase":"admission","errorClass":"Error","errorCode":"unknown","status":404}
+{"event":"thread_runtime_refresh_failed","runId":"e5b3b11f-b4e8-4455-a507-25e695e2ad21","phase":"admission","errorClass":"Error","errorCode":"unknown","status":409}
+  ✔ explicit runtime refresh updates the running failed original VM without changing answer or recovery history (34.391153ms)
+{"event":"thread_runtime_refresh_failed","runId":"e17052f2-d26a-4cf3-a0b4-08e33d7f7e32","phase":"question_source","errorClass":"Error","errorCode":"unknown","status":409}
+{"event":"thread_runtime_refresh_failed","runId":"9682318a-6339-452e-992a-c63b5302465e","phase":"question_source","errorClass":"Error","errorCode":"unknown","status":409}
+{"event":"thread_runtime_refresh_failed","runId":"0709eb23-8b6d-4955-bf1b-de223b62c51e","phase":"question_source","errorClass":"Error","errorCode":"unknown","status":409}
+{"event":"thread_runtime_refresh_failed","runId":"0e0f124f-2fc2-43f4-a52d-737b9867eb18","phase":"question_machine","errorClass":"Error","errorCode":"unknown","status":409}
+{"event":"thread_runtime_refresh_failed","runId":"f49a83f6-9173-4985-ae57-96987a4395a6","phase":"question_machine","errorClass":"Error","errorCode":"unknown","status":409}
+{"event":"thread_runtime_refresh_failed","runId":"a513d89f-f13a-4722-a829-740f11f27a98","phase":"question_machine","errorClass":"Error","errorCode":"unknown","status":409}
+{"event":"thread_runtime_refresh_failed","runId":"8aeac441-ae2b-46a9-9d21-390706d3fdeb","phase":"admission","errorClass":"Error","errorCode":"unknown","status":409}
+  ✔ failed question refresh refuses stale custody, changed sessions and busy work before provider I/O (103.708688ms)
+{"event":"thread_runtime_refresh_failed","runId":"cf719ab2-4711-403c-8e53-c60f7b64df6b","phase":"question_machine","errorClass":"Error","errorCode":"unknown","status":409}
+  ✔ concurrent explicit refresh cannot take the held maintenance lease or touch question history (43.383492ms)
+{"event":"thread_runtime_refresh_failed","runId":"d88c4ebe-84a9-4ab2-8615-0367dfac9f37","phase":"read_refreshed_worker","errorClass":"Error","errorCode":"unknown","status":503}
+  ✔ an expired refresh rolls back with its own budget and leaves a retryable original VM (37.680981ms)
+  ✔ refresh registration failure keeps its log on the VM without rewriting the original failed run (531.186481ms)
+{"event":"thread_runtime_start_failed","runId":"bb7c95dd-f831-4359-be6c-debec888d521","phase":"publish_bootstrap","errorClass":"Error","errorCode":"unknown"}
+{"event":"thread_runtime_start_failed","runId":"00a607b5-ecb1-4a4e-8c1e-23c1839bd297","phase":"credential_bootstrap","errorClass":"Error","errorCode":"unknown","status":409}
+  ✔ moving a queued repository task binds its existing authority to the owned thread device (25.717875ms)
+  ✔ a preloaded worker authenticating on bootstrap publication is ready before explicit start (33.081416ms)
+{"event":"thread_runtime_start_failed","runId":"522d8792-4c43-48fc-b69c-b083a8a24f9f","phase":"publish_bootstrap","errorClass":"Error","errorCode":"unknown"}
+  ✔ a computer task starts display :1 and publishes its lease before the worker is handed a credential (14.713663ms)
+{"event":"thread_runtime_start_failed","runId":"c365ffca-f6f1-4467-8245-d672a20dc503","phase":"publish_bootstrap","errorClass":"Error","errorCode":"unknown"}
+  ✔ a fresh official instance initializes its registered private Bot workspace before worktree creation (276.172326ms)
+{"event":"thread_runtime_start_failed","runId":"43e389ef-5d3e-4cc2-b7e4-cdd7b0f3fcf2","phase":"runtime_configuration","errorClass":"TypeError","errorCode":"ERR_INVALID_URL"}
+  ✔ the task's next run resumes the paused sandbox: no snapshot, no new sandbox, same device (13.672483ms)
+{"event":"thread_runtime_start_failed","runId":"27b4e5c1-5700-459c-b97e-e827fa6af0fe","phase":"runtime_configuration","errorClass":"TypeError","errorCode":"ERR_INVALID_URL"}
+  ✔ another task never gets the task's sandbox: it starts its own from the ready template (10.152524ms)
+{"event":"thread_runtime_start_failed","runId":"10f51af4-2b31-4744-9692-de348746eeda","phase":"runtime_configuration","errorClass":"TypeError","errorCode":"ERR_INVALID_URL"}
+  ✔ another repository on the same task never gets the task's sandbox: it starts its own from the ready template (8.558696ms)
+{"event":"thread_runtime_start_failed","runId":"8107a6bd-773f-4b47-b050-6be42e38447b","phase":"runtime_configuration","errorClass":"TypeError","errorCode":"ERR_INVALID_URL"}
+  ✔ a run with no task never gets the task's sandbox: it starts its own from the ready template (8.084327ms)
+{"event":"thread_runtime_start_failed","runId":"6999efa7-425a-4f52-a2cc-f193557a1213","phase":"runtime_configuration","errorClass":"TypeError","errorCode":"ERR_INVALID_URL"}
+  ✔ the same task sent to another bot still resumes the task's sandbox (it belongs to the task, not the bot) (11.495062ms)
+{"event":"thread_runtime_start_failed","runId":"6834758c-cfd7-4ade-b3f0-8d28357107de","phase":"runtime_configuration","errorClass":"TypeError","errorCode":"ERR_INVALID_URL"}
+  ✔ a run on another harness never resumes the task's machine: it starts its own from that harness's template (10.620141ms)
+{"event":"thread_runtime_start_failed","runId":"7926a991-6b8a-42fb-962b-f1ef53e753f2","phase":"runtime_configuration","errorClass":"TypeError","errorCode":"ERR_INVALID_URL"}
+  ✔ a sandbox whose run has not ended is never taken over (11.56638ms)
+{"event":"thread_runtime_start_failed","runId":"3708db47-2ba8-4c11-b33e-b73446487e7d","phase":"runtime_configuration","errorClass":"TypeError","errorCode":"ERR_INVALID_URL"}
+  ✔ a non-repository computer task retains its explicit desktop filesystem path (10.536282ms)
+{"event":"thread_runtime_start_failed","runId":"d5edd9e6-5ff8-4cb6-a37b-9e507d4d3014","phase":"admission","errorClass":"Error","errorCode":"unknown","status":409}
+  ✔ a repository identity mismatch refuses before allocating any machine (5.842519ms)
+  ✔ a finished run parks its sandbox: paused, tokens revoked, device kept; a refused pause records nothing (9.803204ms)
+{"event":"thread_runtime_start_failed","runId":"ff6a4670-c02d-4b6d-8252-249e48599660","phase":"runtime_configuration","errorClass":"TypeError","errorCode":"ERR_INVALID_URL"}
+  ✔ concurrent lifecycle and Factory parking cannot suspend or revoke the next stage (25.934838ms)
+{"event":"thread_runtime_start_failed","runId":"f59025a6-7583-4158-ab41-41fd5aa731f8","phase":"runtime_configuration","errorClass":"TypeError","errorCode":"ERR_INVALID_URL"}
+  ✔ ending an adopted old stage cannot retire the next stage device or credentials (67.902254ms)
+  ✔ before a kill the worker's tail is kept; a failing read never blocks the kill (5.822685ms)
+  ✔ closed, duplicate and deleted tasks end their paused sandboxes; open ones keep them (24.18158ms)
+✔ a task's sandbox serves only that task's runs, parks between them and ends with the task (5203.290144ms)
+(node:14809) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:14809) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ authorized browsing runs without a human decision and exact replay returns the stored receipt (949.1008ms)
+✔ #438 mutation lifecycle: kept only while executable; scrubbed on done, declined, failed and expired; never returned (45.117864ms)
+✔ default allow: with no workspace policy row every effect, payment and sending included, runs with no human approval (63.191874ms)
+✔ a legacy stored ask is not a human gate; concurrent replay produces one effect and other owners or payloads cannot reuse it (20.279857ms)
+✔ deny blocks: an explicit effect deny wins over agent allow, and a workspace computer deny blocks every effect (22.616287ms)
+✔ stale observations resume observation, unknown outcomes are not silently retried (26.006185ms)
+✔ a saved same-owner/site unattended grant reuses a login without an approval card (24.16803ms)
+✔ ambiguous, revoked, foreign and denied login grants cannot fill credentials (6.633895ms)
+✔ machine allocation does not hold a SQL connection while the provider is creating it (9.991841ms)
+✔ saved login covers guarded fill and one same-document submission, never two approval cards (43.011856ms)
+✔ two saved accounts require a concrete account choice instead of selecting a random login (3.478546ms)
+✔ a permanently failed queued start terminates durably without blocking later work (5.513314ms)
+Retained unattended DB schema: unattended_6b0dce4f19fb43618360955519183258
+✔ a denied queued web task ends before starting any browser runtime (4.744305ms)
+ℹ tests 62
+ℹ suites 0
+ℹ pass 62
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 21321.449868

@@ -1,0 +1,21 @@
+2026-11-04T22:47:31.783Z WARN [Better Auth]: [better-auth] Base URL is not set. Set the baseURL option or BETTER_AUTH_URL env, or use a dynamic baseURL with allowedHosts for multi-host setups. Without it the origin is derived from the incoming request, and callbacks and redirects may not work correctly.
+(node:14736) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:14736) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+▶ cloud provider recovery preserves scope and uses fresh task machines without waking its parent
+  ✔ 402 crosses harnesses using a fresh task container while its sleeping parent stays unchanged (2261.297717ms)
+  ✔ device-fenced completion hands the retained VM to a host after its old token is revoked (342.129084ms)
+{"event":"thread_runtime_start_failed","runId":"fc787a38-32fd-4cc5-8cf7-fdc0cf02de5d","phase":"admission","errorClass":"Error","errorCode":"unknown","status":409}
+  ✔ concurrent durable handoffs preserve the first new VM provisioning lease (239.039743ms)
+  ✔ durable provider handoff rejects stopped, terminal, foreign and changed receipts before touching a VM (181.146717ms)
+  ✔ disabled cloud execution identity cannot move a frozen cloud task onto its available local device (162.182728ms)
+  ✔ a later cloud task skips the remembered 402 within its selected Agent and freezes the healthy source (190.801942ms)
+✔ cloud provider recovery preserves scope and uses fresh task machines without waking its parent (5854.967049ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 6334.247518

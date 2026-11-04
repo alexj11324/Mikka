@@ -1,0 +1,60 @@
+
+> next-app@0.0.1 test:cloud-limits /vercel/sandbox/mikka-fresh-task-containers-final
+> node --import ./scripts/server-test.mjs --import tsx --test lib/cloud-computer/snapshot-credentials.test.ts lib/cloud-computer/thread-worker-logs.test.ts lib/computer/runtime-install.test.ts lib/cloud-computer/retained-deliverable.test.ts && node --test lib/cloud-computer/retained-deliverable-probe.test.mjs
+
+✔ observes only the admitted retained VM, restores pause, and keeps its lease for the final task transaction (17.911175ms)
+✔ policy, full-scope drift, second-read drift and a lost lease CAS all refuse before provider I/O (5.767485ms)
+✔ custody lost before connect or after connect prevents the next effect and prevents pausing the new owner (22.197604ms)
+✔ scope changes with the same lease also invalidate provider authority (4.437458ms)
+✔ provider errors and malformed probe output restore this VM and release only its own lease without exposing raw text (25.243986ms)
+✔ an unexpected returned sandbox is never probed or paused through that object (2.137691ms)
+✔ a failed or genuinely late connect remains uncertain even after a paused read, so it retains error and lease (27.103619ms)
+✔ a pool connection acquired after the transaction deadline is destroyed without issuing a query (10.454148ms)
+✔ unconfirmed pause retains the lease and records error; it never reports a successful snapshot (5.990378ms)
+✔ an already-running provider VM is refused before connect and is not paused by an observation that did not resume it (1.043622ms)
+✔ post-pause custody loss cannot become a successful observation or clear a replacement lease (2.07761ms)
+✔ the success release callback cannot clear a lease or operation assigned after observation (5.026363ms)
+✔ exhausting the observation budget still leaves time to restore pause, without running the probe (1.715855ms)
+✔ invalid snapshot identity, digest, size, clean flag or observation date fails closed after restoration (20.334968ms)
+✔ only the fixed observation fields cross the provider boundary; oversized deployed scripts are refused (3.359488ms)
+✔ the probe finds and the scrub removes exactly the credential paths, in a real shell (15.822293ms)
+✔ the list covers coding-CLI logins, run GitHub tokens and live brokers, and refuses an unsafe path (0.80372ms)
+✔ worker output reaches the server log line by line, masked, bounded and split across chunks (2.391574ms)
+✔ a chatty worker is cut off after a bounded number of lines, with one notice (1.462138ms)
+✔ the worker command keeps streaming and appends to the sandbox log (0.182241ms)
+✔ the tail is read back bounded; a failing or hanging read gives null without throwing (50.823512ms)
+✔ the tail is saved masked with the machine; as an error only where the run has none (0.497567ms)
+✔ refresh diagnostics allow only fixed error identifiers and bounded numeric status/exit codes (0.439251ms)
+✔ runtime refresh failures name their actual phase without logging provider output or changing run history (847.963276ms)
+✔ question wake failures identify the rejecting boundary without exposing provider data or preventing lease cleanup (6.873133ms)
+✔ a template with current runtime files starts without transferring files (12.172051ms)
+✔ an older task snapshot updates guards without replacing its baked desktop (1.983799ms)
+✔ a partial installation cannot be marked ready (1.294417ms)
+✔ refresh bounds guard installation and desktop requests while leaving background desktop lifetime intact (1.639512ms)
+ℹ tests 29
+ℹ suites 0
+ℹ pass 29
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1122.282614
+✔ reads the real retained commit and compares live bytes with the daemon checkpoint without applying it or changing history (63.439474ms)
+✔ recognizes the historical submitted question journal without relabeling or rewriting it (49.650268ms)
+✔ legacy admission never grants a general stopped-run or question-binding exception (46.280862ms)
+✔ refuses the old empty baseline instead of calling it a delivered candidate (59.860127ms)
+✔ refuses a changed tracked file or new untracked file (49.039069ms)
+✔ does not trust a clean status hidden by assume-unchanged or skip-worktree index flags (51.546949ms)
+✔ never executes repository clean filters while inspecting retained files (35.578561ms)
+✔ refuses a wrong native session, active journal or changed host checkpoint (52.215608ms)
+✔ rejects path redirection and a journal belonging to another repository (32.654587ms)
+✔ refuses an active sibling journal and never returns arbitrary filesystem text (30.878297ms)
+✔ remote command encodes scope as data and has fixed safe error output (40.576366ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 11
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 583.288969

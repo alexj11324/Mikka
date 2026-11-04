@@ -1,0 +1,71 @@
+2026-11-04T22:48:14.300Z WARN [Better Auth]: [better-auth] Base URL is not set. Set the baseURL option or BETTER_AUTH_URL env, or use a dynamic baseURL with allowedHosts for multi-host setups. Without it the origin is derived from the incoming request, and callbacks and redirects may not work correctly.
+(node:15086) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:15086) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+(node:15086) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":151,"phases":[{"phase":"resolveRepository","ms":8},{"phase":"issueForUser","ms":7},{"phase":"executionWorkspace","ms":4},{"phase":"resolveModelDispatch","ms":20},{"phase":"runPlacement","ms":1}],"github":{"requests":3,"ms":4},"failed":false}
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":74,"phases":[{"phase":"resolveRepository","ms":3},{"phase":"issueForUser","ms":2},{"phase":"executionWorkspace","ms":2},{"phase":"resolveModelDispatch","ms":9},{"phase":"runPlacement","ms":1}],"github":{"requests":3,"ms":1},"failed":false}
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":74,"phases":[{"phase":"resolveRepository","ms":2},{"phase":"issueForUser","ms":2},{"phase":"executionWorkspace","ms":3},{"phase":"resolveModelDispatch","ms":11},{"phase":"runPlacement","ms":0}],"github":{"requests":3,"ms":1},"failed":false}
+▶ a message to an ended thread runs it again in the same thread; only its owner can send
+  ✔ a lost reply and concurrent retries reuse one owner submission, epoch, run and message (393.919334ms)
+  ✔ an intent without a host receipt remains unconfirmed and is not executed again (6.587966ms)
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":81,"phases":[{"phase":"resolveRepository","ms":3},{"phase":"issueForUser","ms":2},{"phase":"executionWorkspace","ms":2},{"phase":"resolveModelDispatch","ms":12},{"phase":"runPlacement","ms":1}],"github":{"requests":3,"ms":1},"failed":false}
+{"msg":"factory_question_wake_deferred","runId":"bf446fb9-6616-4a77-8810-355c7e6fe0f4"}
+{"msg":"factory_question_wake_deferred","runId":"bf446fb9-6616-4a77-8810-355c7e6fe0f4"}
+{"msg":"factory_question_wake_deferred","runId":"bf446fb9-6616-4a77-8810-355c7e6fe0f4"}
+{"msg":"factory_question_wake_deferred","runId":"bf446fb9-6616-4a77-8810-355c7e6fe0f4"}
+  ▶ an authenticated thread answer uses its Factory task Bot scope and resumes exactly once
+    ✔ Bot-owned task (1333.317578ms)
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":69,"phases":[{"phase":"resolveRepository","ms":2},{"phase":"issueForUser","ms":2},{"phase":"executionWorkspace","ms":3},{"phase":"resolveModelDispatch","ms":11},{"phase":"runPlacement","ms":1}],"github":{"requests":3,"ms":1},"failed":false}
+{"msg":"factory_question_wake_deferred","runId":"7ff9cafd-4c30-4f1c-a324-701f186e7e8c"}
+{"msg":"factory_question_wake_deferred","runId":"7ff9cafd-4c30-4f1c-a324-701f186e7e8c"}
+{"msg":"factory_question_wake_deferred","runId":"7ff9cafd-4c30-4f1c-a324-701f186e7e8c"}
+{"msg":"factory_question_wake_deferred","runId":"7ff9cafd-4c30-4f1c-a324-701f186e7e8c"}
+    ✔ legacy task without a Bot (1254.19337ms)
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":76,"phases":[{"phase":"resolveRepository","ms":2},{"phase":"issueForUser","ms":2},{"phase":"executionWorkspace","ms":3},{"phase":"resolveModelDispatch","ms":8},{"phase":"runPlacement","ms":1}],"github":{"requests":3,"ms":1},"failed":false}
+{"msg":"factory_question_wake_deferred","runId":"bc856921-eb2a-4895-b948-2db950c6d697"}
+{"msg":"factory_question_wake_deferred","runId":"bc856921-eb2a-4895-b948-2db950c6d697"}
+{"msg":"factory_question_wake_deferred","runId":"bc856921-eb2a-4895-b948-2db950c6d697"}
+{"msg":"factory_question_wake_deferred","runId":"bc856921-eb2a-4895-b948-2db950c6d697"}
+    ✔ Coordinator task on another Bot computer in the same workspace (1380.260453ms)
+  ✔ an authenticated thread answer uses its Factory task Bot scope and resumes exactly once (3971.192683ms)
+  ✔ an ordinary owned live message is acknowledged once even after its run ends (21.244852ms)
+  ✔ a working Factory thread records the new target and stops its stale executor (103.115238ms)
+  ✔ repeated owner text is a fresh request after an intervening target (279.563916ms)
+  ✔ done, failed, stopped and cancelled threads each run again in the same thread (318.181792ms)
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":64,"phases":[{"phase":"resolveRepository","ms":2},{"phase":"issueForUser","ms":2},{"phase":"executionWorkspace","ms":3},{"phase":"resolveModelDispatch","ms":9},{"phase":"runPlacement","ms":1}],"github":{"requests":3,"ms":1},"failed":false}
+  ✔ ordinary text cannot cancel a blocked original-session task or queue a fresh continuation (103.538859ms)
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":61,"phases":[{"phase":"resolveRepository","ms":1},{"phase":"issueForUser","ms":1},{"phase":"executionWorkspace","ms":3},{"phase":"resolveModelDispatch","ms":8},{"phase":"runPlacement","ms":1}],"github":{"requests":3,"ms":0},"failed":false}
+  ▶ generic thread dispatch cannot bypass the current Factory repair budget
+    ✔ exhausted failed review cannot be replaced by a generic thread continuation (108.377377ms)
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":74,"phases":[{"phase":"resolveRepository","ms":3},{"phase":"issueForUser","ms":2},{"phase":"executionWorkspace","ms":3},{"phase":"resolveModelDispatch","ms":9},{"phase":"runPlacement","ms":0}],"github":{"requests":3,"ms":0},"failed":false}
+    ✔ exhausted pending review cannot be replaced by a generic thread continuation (122.194627ms)
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":67,"phases":[{"phase":"resolveRepository","ms":2},{"phase":"issueForUser","ms":2},{"phase":"executionWorkspace","ms":3},{"phase":"resolveModelDispatch","ms":10},{"phase":"runPlacement","ms":1}],"github":{"requests":3,"ms":0},"failed":false}
+    ✔ exhausted failed execution cannot be retried by generic thread dispatch (108.77567ms)
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":74,"phases":[{"phase":"resolveRepository","ms":1},{"phase":"issueForUser","ms":1},{"phase":"executionWorkspace","ms":2},{"phase":"resolveModelDispatch","ms":8},{"phase":"runPlacement","ms":1}],"github":{"requests":3,"ms":0},"failed":false}
+    ✔ exhausted blocked execution cannot be retried by generic thread dispatch (111.960911ms)
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":71,"phases":[{"phase":"resolveRepository","ms":2},{"phase":"issueForUser","ms":1},{"phase":"executionWorkspace","ms":2},{"phase":"resolveModelDispatch","ms":9},{"phase":"runPlacement","ms":1}],"github":{"requests":3,"ms":0},"failed":false}
+    ✔ exhausted waiting execution cannot be retried by generic thread dispatch (110.144296ms)
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":75,"phases":[{"phase":"resolveRepository","ms":1},{"phase":"issueForUser","ms":1},{"phase":"executionWorkspace","ms":2},{"phase":"resolveModelDispatch","ms":12},{"phase":"runPlacement","ms":0}],"github":{"requests":3,"ms":0},"failed":false}
+    ✔ direct Owner repair cannot replace a pending review after the same-epoch cap (124.579667ms)
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":59,"phases":[{"phase":"resolveRepository","ms":2},{"phase":"issueForUser","ms":2},{"phase":"executionWorkspace","ms":2},{"phase":"resolveModelDispatch","ms":8},{"phase":"runPlacement","ms":0}],"github":{"requests":3,"ms":1},"failed":false}
+    ✔ direct Owner retry cannot create a fifth same-epoch execution (96.881084ms)
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":61,"phases":[{"phase":"resolveRepository","ms":2},{"phase":"issueForUser","ms":2},{"phase":"executionWorkspace","ms":3},{"phase":"resolveModelDispatch","ms":9},{"phase":"runPlacement","ms":0}],"github":{"requests":3,"ms":1},"failed":false}
+    ✔ same-epoch continuation within budget queues the fourth execution once (157.172999ms)
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":78,"phases":[{"phase":"resolveRepository","ms":2},{"phase":"issueForUser","ms":2},{"phase":"executionWorkspace","ms":2},{"phase":"resolveModelDispatch","ms":8},{"phase":"runPlacement","ms":1}],"github":{"requests":3,"ms":1},"failed":false}
+    ✔ an explicit Owner follow-up opens a new epoch after the old repair budget is exhausted (166.895047ms)
+  ✔ generic thread dispatch cannot bypass the current Factory repair budget (1110.497548ms)
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":82,"phases":[{"phase":"resolveRepository","ms":1},{"phase":"issueForUser","ms":1},{"phase":"executionWorkspace","ms":2},{"phase":"resolveModelDispatch","ms":10},{"phase":"runPlacement","ms":0}],"github":{"requests":3,"ms":0},"failed":false}
+  ✔ a new owner request freezes a new Factory epoch without changing accepted history or waking the Bot (312.358119ms)
+  ✔ nobody else can send: another person, a teammate in the same workspace, or an unknown run (25.841411ms)
+{"msg":"dispatch_timing","workflowRunId":null,"stepId":null,"attempt":null,"totalMs":78,"phases":[{"phase":"resolveRepository","ms":3},{"phase":"issueForUser","ms":2},{"phase":"executionWorkspace","ms":4},{"phase":"resolveModelDispatch","ms":13},{"phase":"runPlacement","ms":1}],"github":{"requests":3,"ms":1},"failed":false}
+  ✔ a thread another thread replaced cannot run again (113.308876ms)
+✔ a message to an ended thread runs it again in the same thread; only its owner can send (10846.158676ms)
+ℹ tests 25
+ℹ suites 0
+ℹ pass 25
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 11236.783472

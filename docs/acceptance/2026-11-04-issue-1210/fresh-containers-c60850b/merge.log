@@ -1,0 +1,11 @@
+Auto-merging lib/cloud-computer/thread-machine-task.db.test.ts
+Auto-merging lib/cloud-computer/thread-machines.ts
+CONFLICT (content): Merge conflict in lib/cloud-computer/thread-machines.ts
+Auto-merging lib/cloud-computer/thread-worker-logs.test.ts
+Auto-merging lib/factory/checks.db.test.ts
+CONFLICT (content): Merge conflict in lib/factory/checks.db.test.ts
+Auto-merging lib/factory/checks.ts
+Auto-merging package.json
+Auto-merging tests/run-provider-fallback-cloud.db.test.ts
+CONFLICT (content): Merge conflict in tests/run-provider-fallback-cloud.db.test.ts
+Automatic merge failed; fix conflicts and then commit the result.

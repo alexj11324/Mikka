@@ -1,0 +1,164 @@
+{
+  "head": "c60850bf3e44228869485e4157832865f160e9d0",
+  "tree": "5709b51c3f0c85feecef82202a3a23f248d7169f",
+  "parents": [
+    "f0f2d077613a2de21a6cefb2f314a6dc8d93c89b",
+    "2b25caad1608df6a2a54d5e18e798b3c9807ce89"
+  ],
+  "entries": [
+    {
+      "status": "M",
+      "path": "lib/cloud-computer/snapshot-credentials.test.ts",
+      "sha": "90dd95669d9c359bda29c0fa034b10dfc826f391",
+      "mode": "100644"
+    },
+    {
+      "status": "M",
+      "path": "lib/cloud-computer/thread-machine-stop.db.test.ts",
+      "sha": "9b79f187caec1d3ced410b14a3ddd372a3cc36b7",
+      "mode": "100644"
+    },
+    {
+      "status": "M",
+      "path": "lib/cloud-computer/thread-machine-task.db.test.ts",
+      "sha": "48a838502c7a153b7d38c305d7dca99bc596a715",
+      "mode": "100644"
+    },
+    {
+      "status": "M",
+      "path": "lib/cloud-computer/thread-machines.ts",
+      "sha": "b5b8c823166953b0053052f2936cbf51fa76ea37",
+      "mode": "100644"
+    },
+    {
+      "status": "M",
+      "path": "lib/cloud-computer/thread-worker-logs.test.ts",
+      "sha": "7ea719ead9cc182ed4bd3964c71e8da3ac9b98c0",
+      "mode": "100644"
+    },
+    {
+      "status": "M",
+      "path": "lib/computer/auto-runtime.ts",
+      "sha": "f0a8984692c2f423aa4f437fb0eab2ff1f4c34e8",
+      "mode": "100644"
+    },
+    {
+      "status": "M",
+      "path": "lib/computer/bot-runtime.ts",
+      "sha": "dbe004d83c0faf935139e8699e07939dd1d4391c",
+      "mode": "100644"
+    },
+    {
+      "status": "A",
+      "path": "lib/computer/cloud-task-target.ts",
+      "sha": "51a9e85e34009c14e773acd3ad7f06e70c9269fd",
+      "mode": "100644"
+    },
+    {
+      "status": "M",
+      "path": "lib/computer/queue-run.ts",
+      "sha": "5e0889fe9e21b3dc5f98723f8915ed31b066a09e",
+      "mode": "100644"
+    },
+    {
+      "status": "M",
+      "path": "lib/computer/store.db.test.ts",
+      "sha": "bafb4df827834292fd4c2ec4ee5f4ce69dd7321a",
+      "mode": "100644"
+    },
+    {
+      "status": "A",
+      "path": "lib/computer/task-runtime.db.test.ts",
+      "sha": "374d0357987dff50401014d9c7f8011c1ef69b12",
+      "mode": "100644"
+    },
+    {
+      "status": "A",
+      "path": "lib/computer/task-runtime.ts",
+      "sha": "c73c1dd8dc4bcbe5cd5940f289068422d7b4226a",
+      "mode": "100644"
+    },
+    {
+      "status": "M",
+      "path": "lib/factory/automatic-dispatch.ts",
+      "sha": "c405d648b4eaa0dd2069a38ad5bef81a9a90fced",
+      "mode": "100644"
+    },
+    {
+      "status": "M",
+      "path": "lib/factory/check-observations.test.ts",
+      "sha": "55b1b0a126aa59f516379ad2e73dd7ff0080959c",
+      "mode": "100644"
+    },
+    {
+      "status": "M",
+      "path": "lib/factory/checks.db.test.ts",
+      "sha": "4fd6999ecaadaf5c28a0ecc25d5c2e53e692d4f3",
+      "mode": "100644"
+    },
+    {
+      "status": "M",
+      "path": "lib/factory/checks.ts",
+      "sha": "46d95b640bfe93e2928c44202d7cc51ff352fa38",
+      "mode": "100644"
+    },
+    {
+      "status": "D",
+      "path": "lib/factory/cloud-stage-admission.ts"
+    },
+    {
+      "status": "M",
+      "path": "lib/factory/deliverable-recovery.db.test.ts",
+      "sha": "933833f5064cafa1bff99e5ac64fb651604bf423",
+      "mode": "100644"
+    },
+    {
+      "status": "M",
+      "path": "lib/factory/inherited-command-observations.db.test.ts",
+      "sha": "6258cd79b69db07813e3b2bf0a5ea4feebfcd7e1",
+      "mode": "100644"
+    },
+    {
+      "status": "M",
+      "path": "package.json",
+      "sha": "418e4572561aaf4a66adae7862cb1f9b1301c131",
+      "mode": "100644"
+    },
+    {
+      "status": "M",
+      "path": "tests/api-key-runs.db.test.ts",
+      "sha": "8cd785ffd344f46a2d695028d05c4f52928707fa",
+      "mode": "100644"
+    },
+    {
+      "status": "M",
+      "path": "tests/cloud-device-handoff.db.test.ts",
+      "sha": "52bb7279548ce8bb34187a618ef42cfd3517ff3b",
+      "mode": "100644"
+    },
+    {
+      "status": "M",
+      "path": "tests/cloud-runtime-auto.db.test.ts",
+      "sha": "a2ca2b6615fe5f6049bb0f4a0b751307d288b8c3",
+      "mode": "100644"
+    },
+    {
+      "status": "M",
+      "path": "tests/run-provider-fallback-cloud.db.test.ts",
+      "sha": "acb86e561fe5b038aabbf7082d3748da7741b118",
+      "mode": "100644"
+    },
+    {
+      "status": "M",
+      "path": "tests/shared-subscription-runs.db.test.ts",
+      "sha": "5ae49f7676cd813e524310b002017610ffc3c3ba",
+      "mode": "100644"
+    },
+    {
+      "status": "M",
+      "path": "tests/support/thread-machine-fake.ts",
+      "sha": "78df487ce8b8c106c0cb90c663a8c8817835c439",
+      "mode": "100644"
+    }
+  ]
+}
