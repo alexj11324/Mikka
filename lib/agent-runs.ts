@@ -252,6 +252,7 @@ export async function addRunMessage(
   userId: string,
   input: { runId: string; text: string },
   source:'user'|'peer'|{source:'human';sessionId:string}|{source:'orchestrator'}='user',
+  messageId?: string,
 ): Promise<void> {
   const parsed = z
     .object({ runId: z.uuid(), text: z.string().trim().min(1).max(10_000) })
@@ -260,7 +261,7 @@ export async function addRunMessage(
   // Ordinary user/peer traffic keeps main's single locked owner/state check.
   // Only a host-attested browser session may enter ended Factory questions.
   if (typeof source === 'string' || source.source === 'orchestrator')
-    return sendOwnedRunMessage(db,userId,parsed.data,typeof source === 'string' ? source : 'peer')
+    return sendOwnedRunMessage(db,userId,{...parsed.data,...(messageId ? {messageId} : {})},typeof source === 'string' ? source : 'peer')
   const [run] = await db
     .select({ id: agentRuns.id, status: agentRuns.status })
     .from(agentRuns)
@@ -293,6 +294,7 @@ export async function addRunMessage(
           userId,
           { runId: q.continuationRunId, text: parsed.data.text },
           source,
+          messageId,
         )
     }
     if (typeof source==='string' || source.source !== 'human')
@@ -321,7 +323,7 @@ export async function addRunMessage(
     )
     return
   }
-  await sendOwnedRunMessage(db,userId,parsed.data,typeof source==='string'?source:source.source==='human'?'user':'peer')
+  await sendOwnedRunMessage(db,userId,{...parsed.data,...(messageId ? {messageId} : {})},typeof source==='string'?source:source.source==='human'?'user':'peer')
 }
 /** Asks the daemon to stop the run; it repeats until the run has ended. */
 export async function requestRunStop(userId: string, runId: string): Promise<{ stoppedRunIds: string[] }> {
