@@ -106,6 +106,20 @@ test('host-confirmed completion recovery is reachable without exposing ordinary 
   assert.match(html, />已验收</)
 })
 
+test('a host-qualified retained delivery uses the existing retry control from a waiting review', () => {
+  const waiting = task({ stage: 'review', status: 'waiting', candidateRunId: 'original-producer', revision: 21,
+    reason: '交付快照等待恢复' })
+  swr.data = { tasks: [waiting] }
+  assert.equal(list(), '')
+  const completionRecovery = { binding: { taskId: waiting.id, revision: 21 } }
+  swr.data = { tasks: [{ ...waiting, completionRecovery }] }
+  assert.match(list(), /交付快照等待恢复/)
+  taskDetail = { task: waiting, completionRecovery, checks: [] }
+  const panel = renderToStaticMarkup(<FactoryAcceptancePanel task={{ ...waiting, completionRecovery }} onClose={() => {}} />)
+  assert.match(panel, />重试</)
+  assert.doesNotMatch(panel, />验收并合并</)
+})
+
 test('an open completion recovery panel follows the same task to its accepted candidate', () => {
   const initial = task({ stage: 'execute', status: 'blocked', candidateId: null, candidateRunId: null,
     revision: 16, completionRecovery: { binding: { taskId: 't1', revision: 16 } } })

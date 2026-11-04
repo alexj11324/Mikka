@@ -10,6 +10,7 @@ import { FactoryError } from "../contract";
 import { ActionFailureError } from "../../action-error";
 import { createFactoryStore } from "../store";
 import { createFactoryDispatch } from "../dispatch";
+import { createFactoryClaim } from "../claim";
 import { advanceFactoryRequest } from "../request-epoch";
 import { factoryDispatchDatabase } from "../transaction";
 import { insertRunOnce } from "../../run-dispatch";
@@ -234,15 +235,16 @@ test(
         ).rows[0].n;
 
       await t.test("cloud question answer keeps the exact task VM, frozen identity and original SID; replay dispatches once", async (t) => {
-        const cloudFixture = async (state = 'running', afterContinuation?: (owner:string,result:{continuationRunId:string})=>Promise<void>, withSkills = false, beforeRecovery?: Parameters<typeof createFactoryQuestions>[7]) => {
+        type CloudQuestionTarget = { repoPath: string; remoteUrl: string | null; readOnly?: boolean };
+        const cloudFixture = async (state = 'running', afterContinuation?: (owner:string,result:{continuationRunId:string})=>Promise<void>, withSkills = false, beforeRecovery?: Parameters<typeof createFactoryQuestions>[7], target: CloudQuestionTarget = { repoPath: '/isolated', remoteUrl: 'fixture/repo' }) => {
           const f = await fixture('context',true,async () => undefined);
           const workspaceId=randomUUID(),botId=randomUUID(),childDevice=randomUUID(),childRepo=randomUUID(),connectionId=randomUUID(),credentialId=randomUUID();
           await pool.query(`INSERT INTO bots(id,"workspaceId","ownerId",name) VALUES($1,$2,$3,'Cloud fixture')`,[botId,workspaceId,userId]);
           await pool.query(`INSERT INTO devices(id,"ownerId",name,kind,"lastSeenAt",harnesses) VALUES($1,$2,'Task VM','cloud',now(),'[{"harness":"codex","installed":true}]')`,[childDevice,userId]);
-          await pool.query(`INSERT INTO device_repos(id,"deviceId","userId","repoPath","remoteUrl","baseBranch") VALUES($1,$2,$3,'/isolated','fixture/repo','main')`,[childRepo,childDevice,userId]);
+          await pool.query(`INSERT INTO device_repos(id,"deviceId","userId","repoPath","remoteUrl","baseBranch") VALUES($1,$2,$3,$4,$5,'main')`,[childRepo,childDevice,userId,target.repoPath,target.remoteUrl]);
           await pool.query(`INSERT INTO byos_connections(id,"ownerId","workspaceId",state,epoch,provider,"secretName","providerSubject","secretDigest") VALUES($1,$2,$3,'connected',2,'codex','synthetic-secret-reference-' || $1::uuid::text,'synthetic-subject',repeat('a',64))`,[connectionId,userId,workspaceId]);
           await pool.query(`INSERT INTO byos_bindings(id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId") VALUES($1,$2,$3,$4,$5,2,'codex_cli','fixture-model')`,[credentialId,userId,workspaceId,agentId,connectionId]);
-          const definition=freezeWorkerDefinition({harness:'codex',instructions:'frozen original policy',prompt:'Original task',parent:null,executionId:null,model:'fixture-model',subscription:{id:credentialId,modelId:'fixture-model',route:'codex_cli'}});
+          const definition=freezeWorkerDefinition({harness:'codex',instructions:'frozen original policy',prompt:'Original task',parent:null,executionId:null,model:'fixture-model',subscription:{id:credentialId,modelId:'fixture-model',route:'codex_cli'},readOnly:target.readOnly});
           await pool.query(`UPDATE agent_runs SET "deviceId"=$2,"deviceRepoId"=$3,"agentDefinition"=$4,"baseBranch"='main' WHERE id=$1`,[f.runId,childDevice,childRepo,JSON.stringify(definition)]);
           await pool.query(`INSERT INTO computer_run_bindings("runId","botId","workspaceId","ownerId") VALUES($1,$2,$3,$4)`,[f.runId,botId,workspaceId,userId]);
           const sandboxId='same-vm-'+f.runId;
@@ -259,8 +261,8 @@ test(
           },continueQuestion:assignments.continueQuestion} : undefined,undefined,afterContinuation,beforeRecovery);
           return {...f,workspaceId,botId,childDevice,childRepo,connectionId,credentialId,definition,sandboxId,service,fallbackCalls:()=>fallbackCalls};
         };
-        const failedContinuation = async (beforeRecovery?: Parameters<typeof createFactoryQuestions>[7], afterContinuation?: (owner:string,result:{continuationRunId:string})=>Promise<void>) => {
-          const f=await cloudFixture('running',afterContinuation,true,beforeRecovery);
+        const failedContinuation = async (beforeRecovery?: Parameters<typeof createFactoryQuestions>[7], afterContinuation?: (owner:string,result:{continuationRunId:string})=>Promise<void>, target?: CloudQuestionTarget) => {
+          const f=await cloudFixture('running',afterContinuation,true,beforeRecovery,target);
           const answer={reference:questionReference(f.q),answerId:randomUUID(),text:'Continue once on original SID'};
           const first=await f.service.answer(human,answer);
           await pool.query(`UPDATE agent_runs SET status='failed',"stopReason"='error',"sessionId"=$2,"finishedAt"=now() WHERE id=$1`,[first.continuationRunId,f.q.originSessionId]);
@@ -273,6 +275,47 @@ test(
           (SELECT count(*)::int FROM factory_events WHERE "taskId"=t.id) AS events,
           (SELECT to_jsonb(m) FROM thread_machines m WHERE "runId"=q."continuationRunId") AS machine
           FROM factory_questions q JOIN factory_tasks t ON t.id=q."taskId" WHERE q.id=$1`,[f.q.id])).rows[0];
+        for (const [expectedKind, target] of [
+          ['deliverable', { repoPath: '/home/user/.mikka/bot-workspaces/question-delivery', remoteUrl: null }],
+          ['repository', { repoPath: '/isolated', remoteUrl: 'fixture/repo' }],
+          ['report', { repoPath: '/isolated', remoteUrl: 'fixture/repo', readOnly: true }],
+        ] as const) for (const recover of [false, true]) await t.test(`composed ${recover ? 'recovered' : 'answered'} question claim retains host ${expectedKind} execution purpose`, async () => {
+          let f: Awaited<ReturnType<typeof cloudFixture>>, runId: string, historyRunId: string;
+          if (recover) {
+            const failed = await failedContinuation(undefined, undefined, target);
+            f = failed;
+            runId = (await f.service.recover(human, failed.recovery)).continuationRunId;
+            historyRunId = failed.first.continuationRunId;
+          } else {
+            f = await cloudFixture('running', undefined, true, undefined, target);
+            runId = (await f.service.answer(human, { reference: questionReference(f.q), answerId: randomUUID(), text: 'Continue the original delivery in its original session' })).continuationRunId;
+            historyRunId = f.runId;
+          }
+          const historyIds = [...new Set([f.runId, historyRunId])];
+          const before = (await pool.query('SELECT to_jsonb(r) AS run FROM agent_runs r WHERE id=ANY($1::uuid[]) ORDER BY id', [historyIds])).rows;
+          const questionBefore = (await pool.query('SELECT to_jsonb(q) AS question FROM factory_questions q WHERE id=$1', [f.q.id])).rows;
+          const tx = await pool.connect();
+          try {
+            await tx.query('BEGIN');
+            // Exercise the outer claim composition used by device claims. Calling
+            // claimContinuation directly misses the execution-purpose regression.
+            const claimed = await createFactoryClaim(store, f.service)(tx, userId, f.childDevice, runId, new Date(Date.now() + 60000).toISOString());
+            assert.equal(claimed.factoryExecuteKind, expectedKind);
+            assert.equal(claimed.preserveQuestionWorktree, true);
+            assert.equal(claimed.continuesRunId, historyRunId);
+            assert.equal(claimed.resumeSessionId, f.q.originSessionId);
+            assert.equal(claimed.requireSessionResume, true);
+            assert.equal(claimed.questionId, f.q.id);
+            assert.equal(Object.hasOwn(claimed, 'factoryCheck'), false);
+            assert.deepEqual((await tx.query('SELECT to_jsonb(r) AS run FROM agent_runs r WHERE id=ANY($1::uuid[]) ORDER BY id', [historyIds])).rows, before);
+            assert.deepEqual((await tx.query('SELECT to_jsonb(q) AS question FROM factory_questions q WHERE id=$1', [f.q.id])).rows, questionBefore);
+          } finally { await tx.query('ROLLBACK'); tx.release(); }
+          const current = (await pool.query('SELECT status,"agentDefinition" FROM agent_runs WHERE id=$1', [runId])).rows[0];
+          assert.equal(current.status, 'queued');
+          assert.equal(current.agentDefinition.definitionDigest, f.definition.definitionDigest);
+          assert.deepEqual(current.agentDefinition.subscription, f.definition.subscription);
+          assert.equal(f.fallbackCalls(), 0);
+        });
         await t.test('owner Retry prepares outside transaction locks and receipt replay never maintains transferred custody',async()=>{
           const prepared: string[]=[],wakes: string[]=[];
           let f: Awaited<ReturnType<typeof failedContinuation>>;

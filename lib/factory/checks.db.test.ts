@@ -992,6 +992,7 @@ test(
                 assert.equal(extras.requireSessionResume, true);
                 assert.equal(extras.resumeSessionId, session);
                 assert.equal(extras.verifyCommand, command);
+                assert.equal(Object.hasOwn(extras, 'factoryExecuteKind'), false);
                 await tx.query("ROLLBACK");
               } finally {
                 await tx.query("ROLLBACK");
@@ -2034,6 +2035,7 @@ test('isolated PG: producer command records bind owner/session/candidate and ret
     await db.query(`CREATE TABLE agent_runs (id uuid PRIMARY KEY,"userId" text,"issueId" uuid,"sessionId" text,status text,"startedAt" timestamptz,"finishedAt" timestamptz,report jsonb);
       CREATE TABLE factory_tasks (id uuid PRIMARY KEY,"userId" text,"issueId" uuid);
       CREATE TABLE factory_candidates (id uuid PRIMARY KEY,"taskId" uuid,"runId" uuid,kind text,sha text);
+      CREATE TABLE factory_events ("taskId" uuid,"eventId" uuid,request jsonb,result jsonb,"createdAt" timestamptz DEFAULT now());
       CREATE TABLE run_chunks (id uuid PRIMARY KEY,"runId" uuid,seq int,chunk jsonb,"createdAt" timestamptz)`)
     const task = { id: randomUUID(), userId: 'fixture-owner', issueId: randomUUID() }
     const producer = { runId: randomUUID(), sessionId: 'native-fixture-session' }

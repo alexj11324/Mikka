@@ -4,6 +4,10 @@ import { handleFactory } from "@/lib/factory/http";
 import { factoryHumanStore } from "@/lib/factory/server";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+// A retained-delivery retry has a bounded provider inspection and pause step,
+// followed by the locked receipt transaction and durable review handoff.
+export const maxDuration = 120;
 async function respond(
   request: Request,
   context: { params: Promise<{ taskId: string }> },

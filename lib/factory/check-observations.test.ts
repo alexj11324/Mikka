@@ -16,8 +16,9 @@ test('independent delivery prompt carries host execution observations and usable
       producerExecution: { runId: 'producer', sessionId: 'native-session', status: 'succeeded', model: 'deepseek-flash', harness: 'claude_code', observedModel: null },
       producerDefinition: { apiKey: 'private-key-must-not-appear' }, producerReport: { summary: 'Produced the file.' },
     }] }
+    if (sql.startsWith('SELECT c.id,c.kind')) return { rows: [{ id: 'candidate', kind: 'deliverable', reportedSha: sha }] }
     if (sql.includes('FROM run_chunks i JOIN run_chunks o')) {
-      assert.deepEqual(args, ['producer', 'native-session', 'owner', 'issue', 'candidate', 'task', sha])
+      assert.deepEqual(args, ['producer', 'native-session', 'owner', 'issue', 'candidate', 'task'])
       return { rows: [{ inputChunkId: 'input-id', outputChunkId: 'output-id', seq: 1, toolName: 'bash', inputJson: JSON.stringify({ command: 'git diff --check && git status --short' }), outputType: 'tool-output-available', outputJson: JSON.stringify({ exitCode: 0, output: ' M DELIVERY.txt' }), inputTruncated: false, outputTruncated: false }] }
     }
     if (sql.includes("UPDATE agent_runs SET kind='acceptance'")) prompt = args[2] as string

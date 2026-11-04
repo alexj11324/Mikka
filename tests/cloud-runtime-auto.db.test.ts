@@ -397,7 +397,7 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     const client = await appPool.connect()
     try {
       await client.query('BEGIN')
-      await client.query(`UPDATE agent_runs SET status='succeeded',"stopReason"='submitted',"sessionId"='producer-session',report=$2,"finishedAt"=clock_timestamp() WHERE id=$1`, [producer.runId, JSON.stringify({ sourceCommit:'a'.repeat(40), verify:{status:'not_run'} })])
+      await client.query(`UPDATE agent_runs SET status='succeeded',"stopReason"='submitted',"sessionId"='producer-session',report=$2,"finishedAt"=clock_timestamp() WHERE id=$1`, [producer.runId, JSON.stringify({ sourceCommit:'a'.repeat(40), deliverableCommit:'b'.repeat(40), verify:{status:'not_run'} })])
       const candidate = await runtime.store.apply(personState.id, factoryBinding(task), randomUUID(), { action:'candidate',runId:producer.runId,
         candidate:{kind:'deliverable',sha:null,repository:source.repoPath,environment:`device:${source.deviceId}`,scope:`issue:${issueId}`} }, client)
       const finished = await runtime.store.apply(personState.id, factoryBinding(candidate.task), randomUUID(), { action:'finish',status:'passed',reason:'Synthetic completed delivery',output:{runId:producer.runId},
