@@ -638,8 +638,10 @@ the chat tool group (`chat-tool-calls.md`). Each check is pass or fail; a
 design that fails any of them is sent back before it reaches Alex.
 
 - **R-84** A thread's conversation always uses the existing thread view
-  (`IssueThreadPanel`: header, 消息 / 改动 / 终端 / 文件 / 预览, Trace rows, the
-  插话 composer), wherever it appears: the Artifact window, the session view,
+  (`IssueThreadPanel`, drawn as its code renders it: the person's prompt
+  first, collapsible `ThreadSteps`, the agent's grey bubbles and its composer;
+  in `bare` mode, as inside the Artifact window, no header and no tabs),
+  wherever it appears: the Artifact window, the session view,
   an inbox detail. A one-to-one bot chat uses the existing coordinator chat.
   No design draws a third chat style or adds a new chat component.
 - **R-85** Deliverables (PR, diff, recording, screenshot, test output) live
@@ -663,6 +665,18 @@ design that fails any of them is sent back before it reaches Alex.
   first sight without scrolling: one prominent block or button per screen
   (for example the task page's 验收 block under the description), not a small
   header button or a link inside a comment.
+- **R-90** Reuse before you draw or build. Before a screen or a part of one is
+  designed (Figma) or coded, look up the component for that job, in this
+  order: `components.md`; the product's own components already on the live
+  screen for the same job (thread view, coordinator chat, Artifact window,
+  board card, chips); then the libraries `components/reui/`,
+  `components/ui/` (shadcn, including ones nothing imports yet, such as
+  `Questionnaire`), `components/motion/` and the OpenUI catalog
+  (`lib/agent-ui-catalog.ts`). If one fits, the design draws it as its code
+  renders it and the code uses it; restyling or redrawing a near copy fails
+  this check. A new component is allowed only when none fits, and the same
+  PR adds it to `components.md` with the reason. The design hand-in lists,
+  for every part, the component it uses or why a new one was needed.
 
 How a design is reviewed:
 
@@ -672,7 +686,7 @@ How a design is reviewed:
    `ux-heuristics` and runs `cognitive-walkthrough` on the key tasks.
 2. The reviewer looks at full-size screenshots and compares them side by side
    with the live product's current screens, not thumbnails.
-3. The reviewer goes through R-84 to R-89 one by one and reports each as pass
+3. The reviewer goes through R-84 to R-90 one by one and reports each as pass
    or fail with the screen it checked.
 
 ## Copy
