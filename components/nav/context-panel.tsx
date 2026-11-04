@@ -21,6 +21,7 @@ import { useConversationThread } from '@/components/computer/computer-agents'
 import { BotAvatar, COORDINATOR_AVATAR } from './bot-avatar'
 import { BotLookEditor } from './bot-look-editor'
 import { BotNameEditor } from './bot-name-editor'
+import { BotPublicRoleEditor } from './bot-public-role-editor'
 import { GroupHeader } from './group-header'
 import { ThreadList, threadName, TWO_LINE_ROW } from './thread-list'
 import { PullRequestIcon } from '@/components/workspace/pull-request-icon'
@@ -147,7 +148,7 @@ export function ThreadResults({ threads, shown, ...props }: Omit<Parameters<type
 export type PanelConversation = { id?: string | null; name: string; color?: string; shape?: string; kind: 'coordinator' | 'bot' | 'agent'; updatedAt?: string }
 
 /**
- * The right column beside a chat, read-only (Figma 395:27702, 445:6126): 概览,
+ * The right column beside a chat (Figma 395:27702, 445:6126): 概览,
  * the bot (avatar and name) with 详情 / 线程 / PR / 电脑. 线程 lists the threads
  * this bot dispatched; the threads every bot dispatched are 全部线程, opened
  * from the window bar on any page (R-82), so this column has no tab for them.
@@ -240,6 +241,7 @@ export function ContextPanel({ issues, threads, threadsLoading = false, conversa
             </TabsList>
           </div>
           <TabsContent ref={detailsScroll} value="details" className="flex min-h-0 flex-col gap-3 overflow-y-auto px-4 pb-4">
+            {botId && <BotPublicRoleEditor key={botId} botId={botId} workspaceId={workspaceId} />}
             <DetailList title={t('routines')} empty={t('noRoutines')} items={NO_ITEMS} icon={Clock} />
             {/* A bot's or the Coordinator's own documents; an agent chat has no library. */}
             {botId || coordinator ? <LibraryList botId={botId} /> : <DetailList title={t('library')} empty={t('noLibrary')} items={NO_ITEMS} icon={FileText} />}

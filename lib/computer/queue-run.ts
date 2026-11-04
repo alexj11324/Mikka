@@ -34,6 +34,9 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
   subscriptionBindingId?: string
   /** An investigation that changes nothing: read-only policy and no task branch. */
   readOnly?: boolean
+  /** Internal host placement grant, never a model/tool argument. The current owner source can only narrow it. */
+  allowLocalRecovery?: true
+  sourceEventId?: string
 }, existing?: PoolClient, factoryStage?: FactoryCloudStageAdmission) {
   if (input.idempotencyKey !== undefined && (input.idempotencyKey.length < 1 || input.idempotencyKey.length > 256)) throw new ComputerError(400, 'Invalid task request')
   if (input.subscriptionBindingId !== undefined && (!z.uuid().safeParse(input.subscriptionBindingId).success || input.apiKeyId || input.apiKey)) throw new ComputerError(400, 'Invalid task request')
@@ -46,12 +49,17 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
     console.error(JSON.stringify({ msg: 'cloud_run_model_missing', runId, threadRunId: input.threadRunId ?? null, issueId: input.issueId, agentId: input.agentId }))
     throw error
   }
-  const selectionFingerprint = createHash('sha256').update(JSON.stringify([input.subscriptionBindingId ?? null, model, input.apiKeyId ?? null, input.apiKey ?? null])).digest('hex')
   const client = existing ?? await pool.connect()
   try {
     if (!existing) await client.query('BEGIN')
     await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`computer-policy:${actor.workspaceId}`])
     if (digest) await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`computer-task:${digest}`])
+    const request = input.allowLocalRecovery === true && input.sourceEventId ? (await client.query(`SELECT payload->'taskDestination' AS destination FROM coordinator_events
+      WHERE id=$1 AND "userId"=$2 AND kind='user_message' AND ("issueId"=$3 OR "issueId" IS NULL) FOR SHARE`, [input.sourceEventId, actor.userId, input.issueId])).rows[0] : undefined
+    const allowLocalRecovery = request && request.destination == null ? true as const : undefined
+    // Absent stays byte-compatible with historical fingerprints; a replay
+    // cannot upgrade an old cloud-only run to a newly inferred permission.
+    const selectionFingerprint = createHash('sha256').update(JSON.stringify([input.subscriptionBindingId ?? null, model, input.apiKeyId ?? null, input.apiKey ?? null, ...(allowLocalRecovery ? [{ allowLocalRecovery }] : [])])).digest('hex')
     let target = (await client.query(`SELECT m."deviceId",a.instructions,a.harness,repo."baseBranch" FROM bots b
       JOIN bot_desktops d ON d."botId"=b.id AND d."ownerId"=b."ownerId" AND d."workspaceId"=b."workspaceId"
       JOIN cloud_machines m ON m."workspaceId"=b."workspaceId" AND m."ownerId"=b."ownerId" AND m.state='running'
@@ -89,7 +97,7 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
     if (!subscription && !apiKey) throw new ComputerError(409,'Bot subscription unavailable')
     // The hosted runner starts a subscription run only on that subscription's own model: a different one is refused here, not at startup.
     if (subscription && subscription.modelId !== model) throw new ComputerError(409, 'Bot subscription unavailable')
-    const frozen = freezeWorkerDefinition({ harness:target.harness,instructions:target.instructions,prompt,parent:input.execution?.snapshot ?? null,executionId:input.execution?.id ?? null,subscription,apiKey,model,mailboxEnabled:personalMailboxEnabled(),mailboxScope:{botId:runBotId,workspaceId:actor.workspaceId},readOnly:input.readOnly })
+    const frozen = freezeWorkerDefinition({ harness:target.harness,instructions:target.instructions,prompt,parent:input.execution?.snapshot ?? null,executionId:input.execution?.id ?? null,subscription,apiKey,model,allowLocalRecovery,mailboxEnabled:personalMailboxEnabled(),mailboxScope:{botId:runBotId,workspaceId:actor.workspaceId},readOnly:input.readOnly })
     frozen.executionIdentity = await freezeExecutionIdentity(client, { userId: actor.userId, botId: runBotId, deviceId: target.deviceId, agentDefinition: frozen }, undefined, actor.workspaceId)
     // A writable github.com run gets its task branch here, like a local run's (decision 2026-11-02-1600).
     const github = input.readOnly ? false : (await client.query('SELECT 1 FROM device_repos WHERE id=$1 AND "userId"=$2 AND "repoPath" LIKE \'v2/github.com/%\'', [input.deviceRepoId, actor.userId])).rowCount === 1

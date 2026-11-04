@@ -5,6 +5,7 @@ import { ActionFailureError } from './action-error'
 import { ExecutionIdentityError, rebindExecutionDevice } from './execution-identity'
 import { acceptLocalRun, acceptedEventStillMatches, admittedRepositoryRetryMatches } from './run-admission-store'
 import { matchesRepositoryAdmission } from './repository-admission'
+import { taskDestinationSchema } from './task-destination'
 import { lockCliAgentPolicy, lockCliRunPolicy, lockCliTaskScope } from './agent-tool-approval/policy-store'
 import { retryWorkerDefinition } from './agent-kit/worker'
 import { recordCoordinatorEvent } from './coordinator-event-store'
@@ -18,11 +19,14 @@ import { LEASED_RUN_STATUSES, MAX_RUN_ATTEMPTS, retryPrompt } from './run-retry'
 
 type Run = typeof agentRuns.$inferSelect
 export type AdmittedTakeover = { deviceId: string; deviceRepoId: string; agentId: string }
+/** The host observed this physical generation before choosing B. It is never a tool argument. */
+export type CloudRecoverySource = { workspaceId: string; sandboxId: string | null; operationId: string | null; deviceId: string | null; repoId: string | null }
+class CloudPauseUnconfirmed extends Error {}
 
-/** A local repository receipt is device-bound. Recover through ordinary
+/** A repository receipt is device-bound. Recover through ordinary local
  * admission on B, after the original run/Factory epoch is locked and fenced.
  * No destination event, credential, model or grant is inferred from B. */
-export async function readmitLostLocalRun(original: Run, target: AdmittedTakeover, now: Date, queued = false): Promise<{ retried: boolean; blocked?: string }> {
+export async function readmitLostLocalRun(original: Run, target: AdmittedTakeover, now: Date, queued = false, cloudSource?: CloudRecoverySource): Promise<{ retried: boolean; blocked?: string }> {
   const tx = await pool.connect()
   try {
     await tx.query('BEGIN')
@@ -33,6 +37,7 @@ export async function readmitLostLocalRun(original: Run, target: AdmittedTakeove
         await lockCliAgentPolicy(tx, original.userId, agentId, original.botId, scope)
       const { factoryClaimTask } = await import('./factory/claim')
       const identity = await factoryClaimTask(tx, original.id)
+      let requestEpoch: string | undefined
       if (identity) {
         const { factoryRuntimeForBot } = await import('./factory/runtime')
         const task = await factoryRuntimeForBot(identity.botId).store.lockTask(tx, original.userId, identity.id)
@@ -40,6 +45,7 @@ export async function readmitLostLocalRun(original: Run, target: AdmittedTakeove
         if (task.status !== 'running' || attempt?.status !== 'running' || attempt.runId !== original.id) return { retried: false }
         if (attempt.output?.requestEpoch !== task.sourceEventId)
           return { retried: false, blocked: 'The execution has no matching current request epoch. Retry from the current task request before choosing another device.' }
+        requestEpoch = task.sourceEventId
       }
       const { rows: [run] } = await tx.query<Run>('SELECT * FROM agent_runs WHERE id=$1 AND "userId"=$2 FOR UPDATE', [original.id, original.userId])
       if (!run || run.stopRequestedAt || (queued ? run.status !== 'queued' : !LEASED_RUN_STATUSES.includes(run.status as typeof LEASED_RUN_STATUSES[number]) || !run.leaseExpiresAt || new Date(run.leaseExpiresAt) >= now)) return { retried: false }
@@ -52,17 +58,45 @@ export async function readmitLostLocalRun(original: Run, target: AdmittedTakeove
       if (!isNoLooserThan(originalPolicy.policy, targetPolicy.policy) || !networkDomainsWithin(targetPolicy.policy.networkAllow, originalPolicy.policy.networkAllow))
         return { retried: false, blocked: 'The available device has a broader execution policy than the original worker. Keep the original restrictions before retrying this task.' }
       const { rows: devices } = await tx.query(`SELECT id,kind,enabled,"removedAt","protocolVersion","lastSeenAt" FROM devices
-        WHERE id=ANY($1::uuid[]) AND "ownerId"=$2 ORDER BY id FOR SHARE`, [[target.deviceId, ...(queued && run.deviceId ? [run.deviceId] : [])], run.userId])
+        WHERE id=ANY($1::uuid[]) AND "ownerId"=$2 ORDER BY id FOR SHARE`, [[target.deviceId, ...(run.deviceId ? [run.deviceId] : [])], run.userId])
       const destination = devices.find(device => device.id === target.deviceId)
       if (!destination?.enabled || destination.removedAt || destination.kind !== 'local' || destination.protocolVersion < DAEMON_PROTOCOL_VERSION)
         return { retried: false, blocked: 'The selected recovery device is no longer authorized and available. Select an available device to retry this task.' }
       // Idle gateway daemons have no HTTP heartbeat. Presence has one bounded
       // lookup per device; ownership/scheduling authority remains the locked SQL.
       const presence = await deviceOnlineStates(devices, now.getTime())
-      const source = queued ? devices.find(device => device.id === run.deviceId) : undefined
-      if (source?.enabled && !source.removedAt && presence.get(source.id)) return { retried: false }
+      const source = devices.find(device => device.id === run.deviceId)
+      if (queued && source?.enabled && !source.removedAt && presence.get(source.id)) return { retried: false }
       if (!presence.get(target.deviceId))
         return { retried: false, blocked: 'The selected recovery device went offline before admission. Select an available device to retry this task.' }
+      const { rows: [cloudBinding] } = await tx.query(`SELECT "workspaceId","botId" FROM computer_run_bindings
+        WHERE "runId"=$1 AND "ownerId"=$2 FOR SHARE`, [run.id, run.userId])
+      let cloudMachine: { sandboxId: string; workspaceId: string; operationId: string } | undefined
+      if (source?.kind === 'cloud' || cloudBinding || run.agentDefinition?.executionIdentity?.billingAccount.runtime.kind === 'e2b') {
+        if (run.agentDefinition?.allowLocalRecovery !== true)
+          return { retried: false, blocked: 'The original cloud task has no automatic local recovery grant. Keep its cloud destination or choose a new destination before retrying.' }
+        const { rows: [request] } = await tx.query(`SELECT payload->'taskDestination' AS destination FROM coordinator_events
+          WHERE id=$1 AND "userId"=$2 AND kind='user_message' FOR SHARE`, [requestEpoch, run.userId])
+        const destination = request?.destination == null ? null : taskDestinationSchema.safeParse(request.destination)
+        if (!requestEpoch || !request || (destination && (!destination.success || destination.data.kind !== 'device' || destination.data.deviceId !== target.deviceId)))
+          return { retried: false, blocked: 'The current request does not authorize moving this cloud task to the selected device. Choose the new destination before retrying.' }
+        // A logical cloud binding alone is not proof that the old executor is
+        // stopped. Lock its exact physical owner before any local admission.
+        const { rows: [machine] } = await tx.query(`SELECT "sandboxId","workspaceId","operationId","botId","issueId","deviceId","repoId",state,"workerLeaseUntil"
+          FROM thread_machines WHERE "runId"=$1 AND "ownerId"=$2 FOR UPDATE`, [run.id, run.userId])
+        if (source?.kind !== 'cloud' || !cloudBinding || !cloudSource || !machine?.sandboxId ||
+          machine.workspaceId !== cloudBinding.workspaceId || machine.botId !== cloudBinding.botId ||
+          machine.workspaceId !== run.agentDefinition?.executionIdentity?.workspaceId ||
+          machine.issueId !== run.issueId || machine.deviceId !== run.deviceId || machine.repoId !== run.deviceRepoId ||
+          !['running', 'paused'].includes(machine.state) || (machine.workerLeaseUntil && new Date(machine.workerLeaseUntil) > now))
+          return { retried: false, blocked: 'The original cloud runtime cannot be safely identified or stopped. Reconnect or stop that runtime before retrying this task.' }
+        // A wake/adoption completed while target selection waited. This pass
+        // has no authority over the replacement generation; observe it anew.
+        if (machine.operationId !== cloudSource.operationId || machine.sandboxId !== cloudSource.sandboxId ||
+          machine.workspaceId !== cloudSource.workspaceId || machine.deviceId !== cloudSource.deviceId || machine.repoId !== cloudSource.repoId)
+          return { retried: false }
+        cloudMachine = machine
+      }
       const admission = run.agentDefinition?.repositoryAdmission
       const { rows: [publication] } = await tx.query(`SELECT p.*,repo."repoPath",repo."remoteUrl" AS "repositoryUrl",i."scopeVersion" AS "currentScopeVersion"
         FROM run_publications p JOIN device_repos repo ON repo.id=$2 AND repo."userId"=$3 AND repo."deviceId"=$4
@@ -92,6 +126,18 @@ export async function readmitLostLocalRun(original: Run, target: AdmittedTakeove
       const { rows: [retry] } = await tx.query<Run>(`UPDATE agent_runs SET "retryOf"=$2,attempt=$3,kind=$4,"baseBranch"=$5,cli_policy_hierarchy=$6 WHERE id=$1 RETURNING *`,
         [retryId, run.id, run.attempt + 1, run.kind, run.baseBranch, originalPolicy.hierarchy ?? null])
       if (!await admittedRepositoryRetryMatches(tx, run, retry)) throw new ActionFailureError('runInvalid', { reason: 'repositoryMismatch' })
+      if (cloudMachine) {
+        // Provider-confirmed pause and old device-token revocation happen
+        // before B is visible. A refused pause rolls back B's fresh receipt;
+        // an ended/missing machine was rejected above, not treated as proof.
+        try {
+          await (await import('./cloud-computer/thread-machines')).parkThreadMachine(pool, { userId: run.userId, workspaceId: cloudMachine.workspaceId }, run.id, undefined, undefined, tx)
+          const parked = await tx.query(`SELECT 1 FROM thread_machines WHERE "runId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3
+            AND "sandboxId"=$4 AND "deviceId"=$5 AND "operationId"=$6 AND "repoId"=$7 AND state='paused'`, [run.id, run.userId, cloudMachine.workspaceId, cloudMachine.sandboxId, run.deviceId, cloudMachine.operationId, run.deviceRepoId])
+          if (!parked.rowCount) throw new CloudPauseUnconfirmed()
+          await tx.query('UPDATE device_tokens SET "revokedAt"=COALESCE("revokedAt",now()) WHERE "boundDeviceId"=$1 AND "userId"=$2', [run.deviceId, run.userId])
+        } catch { throw new CloudPauseUnconfirmed() }
+      }
       await recordCoordinatorEvent(db, runRetriedEvent(run, { runId: retryId, attempt: retry.attempt, maxAttempts: MAX_RUN_ATTEMPTS,
         movedToDeviceId: target.deviceId, movedTo: { kind: 'device', deviceId: target.deviceId } }))
       return { retried: true }
@@ -100,6 +146,8 @@ export async function readmitLostLocalRun(original: Run, target: AdmittedTakeove
     return result
   } catch (error) {
     await tx.query('ROLLBACK')
+    if (error instanceof CloudPauseUnconfirmed)
+      return { retried: false, blocked: 'The cloud provider did not confirm that the original runtime is paused. Stop or reconnect that cloud machine before retrying this task.' }
     if (error instanceof Error && ['agentPolicyUnavailable', 'agentPolicyChanged'].includes(error.message))
       return { retried: false, blocked: 'The original execution policy or task hierarchy is no longer available. Review the current task scope before retrying.' }
     if (error instanceof ActionFailureError || error instanceof ExecutionIdentityError || error instanceof FactoryError)

@@ -14,9 +14,13 @@ import { freezeGroupBotModel, resolveGroupBotModel } from './group-bot-model'
 import { groupReplySystemPrompt } from './group-reply-prompt'
 import { splitChatFiles } from '@mikka/protocol/chat-attachments'
 import type { UserModelMessage } from 'ai'
+import { groupBotCatalog } from './group-member-catalog'
 
-/** Chat only: selected owner's public role description only, no private standing instructions, tools or agent sessions,
- * credentials or device/issue execution. Group messages are quoted untrusted data.
+const judgment = createGroupJudgment(invokeDecision)
+
+/** Group replies read only public duties and host capabilities. Actual work is
+ * delegated through Factory with requester-owned resources; chat generation
+ * never imports private standing instructions or another member's sessions.
  */
 export const groupRuntime: GroupRuntime = {
   async agents(ownerId, ids, client) {
@@ -24,20 +28,36 @@ export const groupRuntime: GroupRuntime = {
     // Reuse the execution connection: acquiring a second application-pool slot
     // while every group holds a session lock can exhaust the shared pool.
     const { rows } = await client.query<{ id: string; name: string; description: string }>('SELECT id,name,description FROM agents WHERE "userId"=$1 AND id=ANY($2::uuid[])', [ownerId, ids])
-    return ids.flatMap(id => { const row = rows.find(a => a.id === id); return row ? [row] : [] })
+    return ids.flatMap(id => { const row = rows.find(a => a.id === id); return row ? [{...row,role:row.description || null,capabilities:['answer'],executionAvailable:false,executionReason:'use_factory_bot_for_execution'}] : [] })
   },
   async bots(ownerId, workspaceId, ids, client) {
     if (!ids.length) return []
-    const { rows } = await client.query(`SELECT id,name,'' AS description,'bot' AS "memberType" FROM bots
-      WHERE "ownerId"=$1 AND "workspaceId"=$2 AND id=ANY($3::uuid[])`, [ownerId, workspaceId, ids])
-    return ids.flatMap(id => { const row = rows.find(b => b.id === id); return row ? [row] : [] })
+    const availability=new Map<string,{available:boolean;reason?:string}>()
+    return groupBotCatalog(client,ownerId,workspaceId,ids,async(bot)=>{
+      const { pool,withDatabaseClient }=await import('@/lib/db')
+      const { resolveModelDispatch }=await import('@/lib/model-dispatch')
+      return withDatabaseClient(client,async()=>{
+        const executionBotId=bot.ownerId===ownerId ? bot.id : await (await import('./coordinator-bot')).chatBotId(ownerId,null,workspaceId)
+        const key=JSON.stringify([executionBotId,bot.repository])
+        const cached=availability.get(key)
+        if (cached) return cached
+        if (bot.repository && !await (await import('@/lib/workspace-admin/bots')).repositoryAvailable(workspaceId,bot.repository)) return {available:false,reason:'repositoryNotFound'}
+        const target=await resolveModelDispatch(pool,{ownerId,workspaceId,botId:executionBotId},null,bot.repository?undefined:'cloud',undefined,{cloudPurpose:bot.repository?'task':'desktop'})
+        const result=target.kind==='none' ? {available:false,reason:target.reason} : {available:true}
+        availability.set(key,result)
+        return result
+      })
+    },userId=>groupRuntime.authorized(workspaceId,userId))
   },
   prepareBot: (actor, scope, client) => freezeGroupBotModel({ ...scope, botId: actor.id }, client),
   async authorized(workspaceId, userId) {
     const rows = await workspaceDb.select({ id: workspaceMembers.userId }).from(workspaceMembers).where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, userId), eq(workspaceMembers.status, 'active'))).limit(1)
     return rows.length === 1
   },
-  ...createGroupJudgment(invokeDecision),
+  ...judgment,
+  routeMention: judgment.route,
+  async tasks(scope,client) { return (await import('./group-factory')).groupTaskReferences(client,scope) },
+  async delegate(scope,client) { return (await import('./group-factory')).delegateGroupTask(client,scope) },
   async generate(agent, input) {
     const scope = hostedBillingScope.getStore()
     if (!scope) throw new Error('verification_required')

@@ -116,6 +116,7 @@ test('PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, ro
     const migration = await readFile(new URL('../../drizzle/20261029043634_group_turns.sql', import.meta.url),'utf8')
     await Promise.all([scoped.query(migration),scoped.query(migration)]); await scoped.query(migration)
     await scoped.query(await readFile(new URL('../../drizzle/20261031153511_group_bot_members.sql', import.meta.url), 'utf8'))
+    await scoped.query(await readFile(new URL('../../drizzle/20261103220300_group_decision_quality.sql', import.meta.url), 'utf8'))
     // Minimal real agent_runs columns used by the bridge; full tracked schema
     // bootstrap is an independent gate in the same ephemeral-PG17 CI job.
     await scoped.query(`CREATE TABLE agent_runs (id uuid PRIMARY KEY,"userId" text NOT NULL,"agentId" uuid NOT NULL,kind text NOT NULL,status text NOT NULL,"startedAt" timestamptz,"leaseExpiresAt" timestamptz,"finishedAt" timestamptz,"updatedAt" timestamptz DEFAULT now(), "createdAt" timestamptz DEFAULT now(), "issueId" uuid, "deviceId" uuid, "botId" uuid)`)
@@ -125,6 +126,7 @@ test('PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, ro
     await scoped.query(`CREATE TABLE bots (id uuid PRIMARY KEY,"ownerId" text NOT NULL,"workspaceId" uuid,name text NOT NULL,color text,shape text);
       CREATE TABLE computer_run_bindings ("runId" uuid PRIMARY KEY,"botId" uuid NOT NULL,"ownerId" text NOT NULL);
       CREATE TABLE bot_cloud_runtimes ("agentId" uuid,"botId" uuid,"ownerId" text)`)
+    await scoped.query(await readFile(new URL('../../drizzle/20261103220201_group_factory.sql', import.meta.url), 'utf8'))
     for (const member of members) await scoped.query('INSERT INTO agents (id,"userId",name) VALUES ($1,$2,$3)', [member.id, 'owner', member.name])
     const workspaceId = randomUUID()
     const base: GroupRequest = { userId: 'owner', method: 'POST', resource: 'conversations', origin: 'http://localhost:3100', host: 'localhost:3100' }
@@ -326,13 +328,14 @@ test('PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, ro
     let aborted = false
     assert.equal(await processGroupTurn(scoped,id,{...runtime,async generate(_agent,input) {
       const stop = await handleGroup(scoped,directory,{...base,userId:'member',resource:'stop',id},true)
-      assert.equal(stop.status,200); assert.deepEqual(stop.body,{stopped:1})
+      assert.equal(stop.status,200); assert.ok((stop.body as {stopped:number}).stopped>=1,'stop also cancels recoverable pending judgments')
       await new Promise<void>(resolve => input.signal?.addEventListener('abort',() => { aborted = true; resolve() },{once:true}))
       throw input.signal?.reason
     }}),true)
     assert.ok(aborted,'the reply in flight is aborted')
     assert.deepEqual((await scoped.query('SELECT status,error,"agentId" FROM group_turns WHERE "messageId"=$1',[stoppedRoot])).rows[0],{status:'failed',error:'stopped',agentId:null})
     assert.equal((await scoped.query('SELECT count(*)::int n FROM conversation_messages WHERE "replyToId"=$1',[stoppedRoot])).rows[0].n,0)
+    assert.deepEqual((await scoped.query('SELECT source,kind FROM group_decision_feedback WHERE "messageId"=$1', [stoppedRoot])).rows, [{ source: 'human_cancellation', kind: 'cancelled_turn' }])
     assert.equal((await scoped.query(`SELECT status FROM agent_runs WHERE kind='group_chat' ORDER BY "createdAt" DESC LIMIT 1`)).rows[0].status,'stopped')
     const page = await handleGroup(scoped,directory,{...base,method:'GET',resource:'messages',id},true)
     assert.equal((page.body as {stopped:boolean;agentStatus:unknown}).stopped,true); assert.equal((page.body as {agentStatus:unknown}).agentStatus,null)
@@ -347,6 +350,33 @@ test('PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, ro
     assert.equal((await scoped.query('SELECT status FROM group_turns WHERE "messageId"=$1',[afterStop])).rows[0].status,'complete')
     // Only members stop: someone outside the group gets the same 404 as an unknown group.
     assert.equal((await handleGroup(scoped,directory,{...base,userId:'stranger',resource:'stop',id},true)).status,404)
+    // Quiet routes are successful durable turns with no chat run and no public message.
+    let newGenerations=0
+    for (const action of ['ignore','observe'] as const) {
+      const quiet=await send(id,action==='ignore'?'随便聊聊':'已经有人给了完整答案')
+      const runsBefore=(await scoped.query('SELECT count(*)::int AS n FROM agent_runs')).rows[0].n
+      await processGroupTurn(scoped,id,{...runtime,async route(){return{by:'model',action,reason:'already_answered',responders:[]}},async generate(){newGenerations++;throw Error('quiet turn generated')}})
+      assert.equal((await scoped.query('SELECT status FROM group_turns WHERE "messageId"=$1',[quiet])).rows[0].status,'complete')
+      assert.equal((await scoped.query('SELECT count(*)::int AS n FROM conversation_messages WHERE "replyToId"=$1',[quiet])).rows[0].n,0)
+      assert.equal((await scoped.query('SELECT count(*)::int AS n FROM agent_runs')).rows[0].n,runsBefore)
+      const quietTrace=(await scoped.query('SELECT trace FROM group_turns WHERE "messageId"=$1',[quiet])).rows[0].trace
+      assert.equal(quietTrace.action,action);assert.equal(quietTrace.status,'complete');assert.deepEqual(quietTrace.events,[])
+    }
+    const useful=await send(id,'请分别给出实现与设计意见')
+    await processGroupTurn(scoped,id,{...runtime,async route(){return{by:'model',action:'reply',responders:[a,b]}},async contribution(){return{contribute:false}},async generate(){newGenerations++;return{text:'两部分均已完整说明',mentions:[]}}})
+    assert.equal(newGenerations,1)
+    assert.equal((await scoped.query('SELECT count(*)::int AS n FROM conversation_messages WHERE "replyToId"=$1',[useful])).rows[0].n,1)
+    const usefulEvents=(await scoped.query('SELECT trace FROM group_turns WHERE "messageId"=$1',[useful])).rows[0].trace.events as {type:string}[]
+    for(const type of ['wake','generate','publish']) assert.equal(usefulEvents.filter(event=>event.type===type).length,1)
+    // Only an unstarted judgment may retry; it stays visibly pending until then.
+    const pending=await send(id,'需要暂时不可用的决策')
+    await assert.rejects(processGroupTurn(scoped,id,{...runtime,async correction(){return{kind:'not_correction'}},async route(){throw new GroupJudgmentPendingError()}}),GroupJudgmentPendingError)
+    const pendingState=(await scoped.query('SELECT status,error,"nextDecisionAt" FROM group_turns WHERE "messageId"=$1',[pending])).rows[0]
+    assert.equal(pendingState.error,'group_judgment_pending');assert.ok(pendingState.nextDecisionAt)
+    await scoped.query('UPDATE group_turns SET "nextDecisionAt"=now()-interval \'1 second\' WHERE "messageId"=$1',[pending])
+    assert.ok((await groupsWithPendingTurns(scoped)).includes(id))
+    await processGroupTurn(scoped,id,{...runtime,async correction(){return{kind:'not_correction'}},async route(){return{by:'model',action:'observe',responders:[]}}})
+    assert.equal((await scoped.query('SELECT status FROM group_turns WHERE "messageId"=$1',[pending])).rows[0].status,'complete')
     assert.ok(generated.includes('first')); assert.ok(laterRoot)
   } finally { releasePending(); await scoped.end(); await pool.end() }
 })
@@ -405,8 +435,8 @@ test('decision adapter retains host receipt and refuses missing, inconsistent or
       ? [['responder_0',{type:'choice',name:'responder_0',choice:b}],['responder_1',{type:'choice',name:'responder_1',choice:'end'}]]
       : [['correction',{type:'choice',name:'correction',choice:'yes'}],['target',{type:'choice',name:'target',choice:b}]]
     return {answers:new Map(entries),execution:receipt}
-  })
-  assert.deepEqual(await judge.route(message,members,a,[]), {by:'model',responders:[b],execution:receipt})
+  },'group-route-v0')
+  assert.deepEqual(await judge.route(message,members,a,[]), {by:'model',action:'reply',reason:'useful_answer',policyVersion:'group-route-v0',responders:[b],execution:receipt})
   const input = {previous:{message:'earlier',responderId:a},current:message,members}
   assert.deepEqual(await judge.correction(input), {kind:'correction',rightId:b,execution:receipt})
   assert.match(seen[1].text, /untrusted data/); assert.deepEqual(seen[1].names,['correction','target'])

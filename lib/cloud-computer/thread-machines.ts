@@ -157,10 +157,11 @@ async function adoptTaskMachine(client: PoolClient, actor: Actor, runId: string,
  */
 export async function parkThreadMachine(pool: Pool, actor: Actor, runId: string,
   pause: (sandboxId: string) => Promise<unknown> = sandboxId => withE2BErrors(actor.userId, false, async () => Sandbox.pause(sandboxId, await options(actor.userId))),
-  readTail: (sandboxId: string) => Promise<string | null> = sandboxId => readWorkerTail(() => connectComputer(actor.workspaceId, sandboxId))) {
-  const client = await pool.connect()
+  readTail: (sandboxId: string) => Promise<string | null> = sandboxId => readWorkerTail(() => connectComputer(actor.workspaceId, sandboxId)),
+  existing?: PoolClient) {
+  const client = existing ?? await pool.connect()
   try {
-    await client.query('BEGIN')
+    if (!existing) await client.query('BEGIN')
     // Provision/end lock the parent run before its machine. Keep the machine
     // locked across provider I/O: a second lifecycle callback must observe the
     // completed park, and adoption must wait until pause/token revocation finish.
@@ -168,7 +169,7 @@ export async function parkThreadMachine(pool: Pool, actor: Actor, runId: string,
     const machine = (await client.query(`SELECT "sandboxId","deviceId",state FROM thread_machines
       WHERE "runId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 FOR UPDATE`, [runId, actor.userId, actor.workspaceId])).rows[0]
     if (!machine?.sandboxId || machine.state === 'ended' || machine.state === 'paused') {
-      await client.query('COMMIT')
+      if (!existing) await client.query('COMMIT')
       return
     }
     // Use this transaction for the tail update too; another connection would
@@ -178,8 +179,8 @@ export async function parkThreadMachine(pool: Pool, actor: Actor, runId: string,
     await client.query(`UPDATE thread_machines SET state='paused',"lastActiveAt"=now(),"computeSeconds"="computeSeconds"+COALESCE(GREATEST(0,EXTRACT(EPOCH FROM (clock_timestamp()-"runningSince")))::bigint,0),"runningSince"=NULL
       WHERE "runId"=$1 AND "sandboxId"=$2 AND state<>'ended'`, [runId, machine.sandboxId])
     await client.query('UPDATE device_tokens SET "revokedAt"=COALESCE("revokedAt",now()) WHERE "boundDeviceId"=$1', [machine.deviceId])
-    await client.query('COMMIT')
-  } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
+    if (!existing) await client.query('COMMIT')
+  } catch (error) { if (!existing) await client.query('ROLLBACK'); throw error } finally { if (!existing) client.release() }
 }
 
 /** The worker's last output, saved before a kill; never throws, never waits past readWorkerTail's timeout. */

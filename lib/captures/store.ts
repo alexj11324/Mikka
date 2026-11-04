@@ -6,9 +6,11 @@ import {
   type CaptureContentType, type CaptureSource, type CaptureUploadRequest, type CaptureUploadResponse, type CaptureView,
 } from '@mikka/protocol/capture'
 import { withAccountWrite } from '@/lib/account/write-guard'
-import { db } from '@/lib/db'
-import { agentRuns, artifacts, runCaptureShares, runCaptureSteps, runCaptures } from '@/lib/db/schema'
+import { db, pool } from '@/lib/db'
+import { agentRuns, runCaptureShares, runCaptureSteps, runCaptures } from '@/lib/db/schema'
 import { artifactStorage, deleteArtifactObject, getArtifactObjectBytes, presignArtifactPut, putArtifactObject } from '@/lib/artifacts/storage'
+import { runArtifactSubmissions } from '@/lib/artifacts/run-submissions'
+import { executionIdentitySchema } from '@/lib/execution-identity'
 
 // Screenshots and screen recordings in Neon (whose, which run, share links)
 // with their files in the artifacts bucket. Every read is scoped to the run's
@@ -288,18 +290,21 @@ export async function runEvidence(userId: string, runId: string) {
   const [run] = await db.select({ id: agentRuns.id, status: agentRuns.status, issueId: agentRuns.issueId, botId: agentRuns.botId,
     harness: sql<string | null>`${agentRuns.agentDefinition}->>'harness'`,
     model: sql<string | null>`${agentRuns.agentDefinition}->>'model'`,
+    executionIdentity: sql<unknown>`${agentRuns.agentDefinition}->'executionIdentity'`,
     credentialType: sql<'subscription' | 'api_key' | 'unknown'>`CASE WHEN ${agentRuns.agentDefinition}->'apiKey' IS NOT NULL AND ${agentRuns.agentDefinition}->'apiKey'<>'null'::jsonb THEN 'api_key' WHEN ${agentRuns.agentDefinition}->'subscription' IS NOT NULL AND ${agentRuns.agentDefinition}->'subscription'<>'null'::jsonb THEN 'subscription' ELSE 'unknown' END`,
     subscriptionRoute: sql<string | null>`${agentRuns.agentDefinition}->'subscription'->>'route'` })
     .from(agentRuns).where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, userId))).limit(1)
   if (!run) return null
+  // This is the frozen provenance of completed work, not a live resource
+  // authorization check. Schema projection strips private/unknown fields.
+  const identity = executionIdentitySchema.safeParse(run.executionIdentity)
   const captures = await db.select().from(runCaptures)
     .where(and(eq(runCaptures.runId, runId), eq(runCaptures.userId, userId), eq(runCaptures.status, 'ready'))).orderBy(asc(runCaptures.createdAt))
-  const documents = await db.select({ id: artifacts.id, kind: artifacts.kind, title: artifacts.title, latestVersion: artifacts.latestVersion, createdAt: artifacts.createdAt })
-    .from(artifacts).where(and(eq(artifacts.runId, runId), eq(artifacts.userId, userId))).orderBy(asc(artifacts.createdAt))
+  const documents = await runArtifactSubmissions(pool, userId, [runId])
   const recording = await db.select({ id: runCaptures.id }).from(runCaptures)
     .where(and(eq(runCaptures.runId, runId), eq(runCaptures.userId, userId), eq(runCaptures.status, 'recording'))).limit(1)
   return {
-    run,
+    run: { ...run, executionIdentity: identity.success ? identity.data : null },
     recording: recording.length > 0,
     captures: captures.map(captureView),
     artifacts: documents.map(document => ({ ...document, createdAt: document.createdAt.toISOString() })),

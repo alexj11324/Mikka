@@ -14,20 +14,33 @@ const CORRECTION_LIMIT = 10
 const TEXT_LIMIT = 2000
 
 /** An agent in the group, with its role description from the Agent settings page. */
-export interface RoutingMember { id: string; name: string; description: string; memberType?: 'agent' | 'bot' }
+export interface RoutingMember {
+  id: string; name: string; description: string; memberType?: 'agent' | 'bot'
+  /** Public configuration only. Never derived from private standing instructions. */
+  role?: string | null
+  capabilities?: string[]
+  executionAvailable?: boolean
+  executionReason?: string
+  /** A group participant cannot spend the Bot owner's private model credential. */
+  chatAvailable?: boolean
+}
 /** A message the router routed to the wrong member; `rightId` is who the person meant, when they said. */
 export interface RoutingCorrection { message: string; wrongId: string; rightId?: string }
-export interface GroupMessage { text: string; mentions: readonly string[]; recent?: readonly { author: string; text: string }[] }
+export interface GroupTaskReference { issueId: string; taskId: string | null; reporterId: string; title: string; status: string; runId: string | null; requestEpoch: string | null }
+export interface GroupMessage { text: string; mentions: readonly string[]; recent?: readonly { author: string; text: string }[]; tasks?: readonly GroupTaskReference[] }
+export type GroupAction = 'ignore' | 'observe' | 'reply' | 'delegate' | 'clarify'
+export type GroupDelegation = { operation: 'create' | 'continue' | 'status' | 'stop'; issueId: string | null; reportTiming?: 'now' | 'on_completion' }
+export type GroupContribution = { action?: GroupAction; reason?: string; policyVersion?: string; delegation?: GroupDelegation; execution?: DecisionExecution }
 
 /**
  * Who speaks, in order. Only `responders` are woken; the rest of the group
  * sees the message as context. `ask` is set when the Lead should ask whether
  * the person meant that member.
  */
-export type GroupRoute =
+export type GroupRoute = GroupContribution & (
   | { by: 'mention'; responders: string[] }
   | { by: 'model'; responders: string[]; confidence?: number; execution?: DecisionExecution }
-  | { by: 'lead'; responders: [string]; ask?: string }
+  | { by: 'lead'; responders: [string]; ask?: string })
 
 export class UnknownMentionError extends Error {
   constructor(readonly ids: string[]) {

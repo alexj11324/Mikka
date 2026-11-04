@@ -50,7 +50,7 @@ export async function createBot(input: { name: string; color: string; shape: str
  * Rename a bot or change its shape and colour, from the right panel. Same rules
  * as createBot. The Coordinator keeps its name and look (the left column draws it).
  */
-export async function updateBot(input: { botId: string; name?: string; color?: string; shape?: string }): Promise<ActionResult<BotView>> {
+export async function updateBot(input: { botId: string; name?: string; color?: string; shape?: string; publicRole?: string }): Promise<ActionResult<BotView>> {
   return workspaceAction(async () => updateOwnedBot(await getOwner(), input))
 }
 

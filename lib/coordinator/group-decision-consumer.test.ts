@@ -6,6 +6,7 @@ import { invokeDecision } from './decide'
 import { createGroupJudgment } from './group-judgment'
 import { GroupJudgmentPendingError } from './group-correction'
 import { MockLanguageModelV3 } from 'ai/test'
+import { replayGroupDecision, summarizeGroupDecisionReplay } from './group-decision-replay'
 // Explicit server/billing fixtures; the REST payload remains synthetic.
 let billingScope = { workspaceId: 'fixture-workspace', ownerId: 'fixture-owner' }
 mock.module(new URL('../abuse/context.ts',import.meta.url).href,{namedExports:{hostedBillingScope:{getStore:()=>billingScope}}})
@@ -43,7 +44,7 @@ test('group consumer uses actual host receipt from synthetic REST response, not 
     return Response.json({model:DECISION_MODEL,executionId:'forged-from-provider',provider_metadata:{gateway:{generationId:`synthetic-${calls}`}},answers})
   }
   try {
-    const judge = createGroupJudgment(invokeDecision)
+    const judge = createGroupJudgment(invokeDecision,'group-route-v0')
     const route = await judge.route({text:'hello',mentions:[]},members,null,[])
     assert.equal(route.by,'model')
     if (route.by !== 'model') throw Error('expected model route')
@@ -86,6 +87,29 @@ test('group consumer uses actual host receipt from synthetic REST response, not 
     if (oldKey === undefined) delete process.env.AI_GATEWAY_API_KEY
     else process.env.AI_GATEWAY_API_KEY = oldKey
   }
+})
+
+test('fixed replay uses invokeDecision host receipts and refuses a receipt-less REST response',async()=>{
+  const oldFetch=globalThis.fetch,oldKey=process.env.AI_GATEWAY_API_KEY
+  process.env.AI_GATEWAY_API_KEY='synthetic-test-only'
+  let requestBody='',omitReceipt=false
+  globalThis.fetch=async(_url,init)=>{
+    requestBody=String(init?.body)
+    const request=JSON.parse(requestBody)
+    assert.equal(request.model,DECISION_MODEL)
+    assert.ok(!JSON.stringify(request.input).includes('maxPublicMessages'))
+    const values:Record<string,string>={action:'ignore',reason:'ordinary_conversation',contributions:'single',task_operation:'none',task_target:'none',report_timing:'now',responder_0:'end',responder_1:'end',responder_2:'end'}
+    return Response.json({model:DECISION_MODEL,provider_metadata:omitReceipt?{}:{gateway:{generationId:'synthetic-replay-generation'}},answers:request.questions.map((q:{name:string})=>({type:'choice',name:q.name,choice:values[q.name]}))})
+  }
+  try {
+    const row=await replayGroupDecision('small-talk','group-contribution-v1',invokeDecision)
+    assert.equal(row.status,'complete');assert.equal(row.route?.action,'ignore');assert.equal(row.executionPerformed,false)
+    assert.equal(row.receipt?.providerGenerationId,'synthetic-replay-generation')
+    assert.equal(row.receipt?.requestDigest,createHash('sha256').update(requestBody).digest('hex'))
+    omitReceipt=true
+    const unavailable=await replayGroupDecision('small-talk','group-contribution-v1',invokeDecision)
+    assert.equal(unavailable.status,'unavailable');assert.equal(unavailable.route,null);assert.equal(summarizeGroupDecisionReplay([unavailable]).measured,0)
+  }finally{globalThis.fetch=oldFetch;if(oldKey===undefined)delete process.env.AI_GATEWAY_API_KEY;else process.env.AI_GATEWAY_API_KEY=oldKey}
 })
 
 test('actual structured generation distinguishes public/private output and validates the peer UUID', async () => {

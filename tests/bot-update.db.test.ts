@@ -21,8 +21,8 @@ test('update a bot', { skip: !dbUrl }, async t => {
   const me = { ownerId: owner, workspaceId: ws.id }
 
   await t.test('renames, trims, and changes shape and colour', async () => {
-    assert.deepEqual(await updateOwnedBot(me, { botId: bot, name: '  Release notes  ' }), { id: bot, name: 'Release notes', color: 'encre', shape: 'cercle' })
-    assert.deepEqual(await updateOwnedBot(me, { botId: bot, color: 'vert', shape: 'hexagone' }), { id: bot, name: 'Release notes', color: 'vert', shape: 'hexagone' })
+    assert.deepEqual(await updateOwnedBot(me, { botId: bot, name: '  Release notes  ' }), { id: bot, name: 'Release notes', color: 'encre', shape: 'cercle',publicRole:'' })
+    assert.deepEqual(await updateOwnedBot(me, { botId: bot, color: 'vert', shape: 'hexagone' }), { id: bot, name: 'Release notes', color: 'vert', shape: 'hexagone',publicRole:'' })
     assert.deepEqual(await nameOf(bot), { name: 'Release notes', color: 'vert', shape: 'hexagone' })
     // Its own name in another case is not a clash with itself.
     assert.equal((await updateOwnedBot(me, { botId: bot, name: 'RELEASE NOTES' })).name, 'RELEASE NOTES')
@@ -47,5 +47,13 @@ test('update a bot', { skip: !dbUrl }, async t => {
     await rejects(updateOwnedBot({ ownerId: outsider, workspaceId: other.id }, { botId: bot, name: 'Taken' }), 'botNotFound')
     await rejects(updateOwnedBot(me, { botId: 'not-a-uuid', name: 'Taken' }), 'botNotFound')
     assert.deepEqual(await nameOf(bot), before)
+  })
+  await t.test('public duties are explicit, editable, clearable and owner scoped',async()=>{
+    assert.equal((await updateOwnedBot(me,{botId:bot,publicRole:'  UI and interaction design  '})).publicRole,'UI and interaction design')
+    assert.equal((await pool.query('SELECT "publicRole" FROM bots WHERE id=$1',[bot])).rows[0].publicRole,'UI and interaction design')
+    await rejects(updateOwnedBot({ownerId:member,workspaceId:ws.id},{botId:bot,publicRole:'Take over duties'}),'botNotFound')
+    await rejects(updateOwnedBot({ownerId:owner,workspaceId:other.id},{botId:bot,publicRole:'Other workspace'}),'botNotFound')
+    await rejects(updateOwnedBot(me,{botId:bot,publicRole:'x'.repeat(2001)}),'validationGeneric')
+    assert.equal((await updateOwnedBot(me,{botId:bot,publicRole:''})).publicRole,'')
   })
 })
