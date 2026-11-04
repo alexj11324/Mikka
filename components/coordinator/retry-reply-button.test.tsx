@@ -59,13 +59,14 @@ mock.module(new URL('../ui/message-scroller.tsx', import.meta.url).href, { named
 ]) })
 mock.module(new URL('../workspace/agent-interaction.tsx', import.meta.url).href, { namedExports: { AgentInteractionContext: createContext({}) } })
 mock.module(new URL('../workspace/agent-theme.tsx', import.meta.url).href, { namedExports: { AgentThemeProvider: plain } })
-mock.module(new URL('../workspace/agent-citations.tsx', import.meta.url).href, { namedExports: { useLinkPreviews: () => ({}), LinkCitation: nothing } })
+mock.module(new URL('../workspace/agent-citations.tsx', import.meta.url).href, { namedExports: { useLinkPreviews: () => ({}), LinkCitation: nothing, CitationSources: nothing, AgentCitationsContext: createContext(null) } })
+mock.module(new URL('./reply-activity.tsx', import.meta.url).href, { namedExports: { ReplyActivity: nothing, ReplyWaiting: nothing, ActivityExpansionContext: createContext(null), useActivityExpansion: () => null } })
 mock.module(new URL('../workspace/agent-decision.tsx', import.meta.url).href, { namedExports: { ReplyAnswer: plain } })
 mock.module(new URL('../workspace/message-reactions.tsx', import.meta.url).href, { namedExports: { MessageReactions: nothing, useMessageReactions: () => ({}) } })
 mock.module(new URL('../../lib/hooks/use-unread-indicators.ts', import.meta.url).href, { namedExports: { MESSAGE_POSITION_ATTR: 'data-message-position', UNREAD_DIVIDER_ATTR: 'data-unread-divider', useUnreadIndicators: () => ({ showTop: false, showBottom: false }) } })
 mock.module(new URL('../browser/browser-notes.tsx', import.meta.url).href, { namedExports: { BrowserNoteChip: ({ note }: { note: { note: string } }) => <span>{note.note}</span>, BrowserNoteLine: nothing, useBrowserNotesComposer: () => ({ notes, remove: nothing, removeMany: () => { removedNotes++ } }) } })
 for (const [file, names] of [
-  ['./coordinator-reply.tsx', ['CoordinatorReply']], ['./chat-event-line.tsx', ['ChatEventLine']], ['./thread-card.tsx', ['ThreadCard']], ['./reply-activity.tsx', ['ReplyActivity', 'ReplyWaiting']],
+  ['./coordinator-reply.tsx', ['CoordinatorReply']], ['./chat-event-line.tsx', ['ChatEventLine']], ['./thread-card.tsx', ['ThreadCard']], 
   ['./pending-actions.tsx', ['PendingActions']], ['./subagent-login-needs.tsx', ['SubagentLoginNeeds']], ['./bot-model-picker.tsx', ['BotModelPicker', 'openModelPicker']],
   ['./hosted-unavailable-notice.tsx', ['HostedUnavailableNotice']], ['./quota-notice.tsx', ['QuotaNotice', 'QuotaSwitchLine']],
   ['../billing/hosted-refusal-notice.tsx', ['HostedRefusalNotice']], ['../nav/bot-avatar.tsx', ['BotAvatar', 'COORDINATOR_AVATAR']],

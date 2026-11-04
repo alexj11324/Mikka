@@ -1,8 +1,12 @@
 # Components: what to use, what not to bring back
 
 Pick the component from the "Use" table. If nothing fits, use reUI, then
-shadcn (`components/ui/`), then write a new one and add it here in the same
-PR. `pnpm lint:ui` blocks hand-built UI that a library component covers.
+shadcn (`components/ui/`, including components nothing imports yet), then
+`components/motion/` or the OpenUI catalog, and only then write a new one
+and add it here in the same PR. This applies to designs in Figma as much as
+to code: a frame draws the existing component as its code renders it, never
+a look-alike (R-90). `pnpm lint:ui` blocks hand-built UI that a library
+component covers.
 
 ## Use
 
@@ -34,6 +38,7 @@ PR. `pnpm lint:ui` blocks hand-built UI that a library component covers.
 | Thread state icon | `components/workspace/thread-status-icon.tsx` | Shared by thread card, thread list and open-thread header; Bot avatars remain for actual Bot actors only (R-62/R-66) |
 | Factory review and verification command source | `ResultLine` in `components/workspace/factory-acceptance-pane.tsx` | A check's host-validated `commandSources` appears below its existing result: 来自提问前的执行, localized observation time, and the existing thread-opening action for that source run. No source means no extra row; provenance does not change the verdict. SID and immutable recovery receipt remain in data, not screen copy (#1237) |
 | New task | `components/coordinator/new-task-dialog.tsx` | R-22, R-23 |
+| A question an agent asks the person (one or several, choices with descriptions, 其他 free text, submit or skip) | shadcn `Questionnaire` (`components/ui/questionnaire.tsx`: `QuestionnaireItem`, `QuestionnaireTitle`, `QuestionnaireDescription`, `QuestionnaireChoices` / `QuestionnaireChoice` / `QuestionnaireChoiceDescription`, `QuestionnaireInput`, `QuestionnaireProgress`, `QuestionnaireSubmit`, `QuestionnaireSkip`) | Shown in the bot's own chat (R-86); the title is the question, the description names the agent and task asking. No hand-made quick-reply chips (R-90) |
 | Search field on a page (filter a list) | `SearchInput` in `components/ui/search-input.tsx` | Borderless grey fill, icon left (R-31). Never an outlined `Input` with a magnifier |
 | Search | reUI `CommandDialog` (⌘K), centred | Local rows first, then `GET /api/search` hits per source (`hooks/use-site-search.ts`) |
 | New group chat | `NewGroupDialog` (`components/nav/new-group-dialog.tsx`), opened by the bot list’s `+` menu | Name and select the person’s Bots in the current workspace; reuses the mobile group-creation API and opens the existing group chat. Unknown create results lead to the group list, never an automatic POST retry |

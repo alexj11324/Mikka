@@ -86,6 +86,7 @@ for (const [file, lang] of [['messages/zh-CN.json', 'zh'], ['messages/en.json', 
     if (greetingKey.test(leaf) && greeting.test(value)) report(file, key, 'R-44 标题不写问候，写这里是什么', value)
     if (exclamation.test(value)) report(file, key, 'R-40 界面文字不用感叹号', value)
     if (workerTerm.test(withoutPlaceholders(value))) report(file, key, 'R-43 the worker is an Agent, not harness/执行器', value)
+    if (key.startsWith('Coordinator.activity.') && /^(?:使用工具|Use a tool)$/.test(value)) report(file, key, 'R-83 a tool call says what it did to what, never a bare 「使用工具」', value)
     if (lang === 'zh') {
       if (labelKey.test(leaf) && imperativeQing.test(value)) report(file, key, 'C-04 标签/按钮/占位符/标题里不写「请」', value)
       if (retryButtonKeys.has(key) && zhRetry.test(value)) report(file, key, 'C-04 旁边已有重试按钮，文字不写「请重试」', value)
@@ -103,4 +104,4 @@ if (problems.length) {
   for (const problem of problems) console.error(`- ${problem}`)
   process.exit(1)
 }
-console.log('Copy check passed: labels without 「请」, no retry text beside retry buttons, no colloquial or apologetic copy, Agent for the worker, no greeting titles or exclamation marks.')
+console.log('Copy check passed: labels without 「请」, no retry text beside retry buttons, no colloquial or apologetic copy, Agent for the worker, no greeting titles or exclamation marks, no bare 「使用工具」.')
