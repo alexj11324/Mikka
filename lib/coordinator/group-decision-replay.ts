@@ -2,7 +2,9 @@ import { createHash } from 'node:crypto'
 import dataset from '../../tests/fixtures/group-decision-cases.json'
 import type { DecisionExecution, invokeDecision } from './decide'
 import { createGroupJudgment } from './group-judgment'
-import { groupDecisionReceipt } from './group-decision-trace'
+import { groupDecisionReceipt, groupDecisionSteps } from './group-decision-trace'
+import { GROUP_DECISION_PROTOCOL, groupDecisionTotals, type GroupDecisionFailure, type GroupDecisionStep } from './group-decision-chain'
+import { GroupJudgmentPendingError } from './group-correction'
 import { getGroupDecisionPolicy, type GroupPolicyVersion } from './group-decision-policy'
 import { mentionRoute, type GroupMessage, type GroupRoute, type GroupTaskReference, type RoutingMember } from './group-routing'
 import type { GroupEvalCase } from './group-decision-eval'
@@ -25,10 +27,16 @@ export type GroupDecisionReplay = {
   evidenceKind: 'actual-decision-inference'
   status: 'complete' | 'invalid_decision' | 'unavailable'
   receipt: DecisionExecution | null
+  /** First routing receipt above; all conditional requests below. */
+  decisionProtocol: typeof GROUP_DECISION_PROTOCOL
+  decisions: GroupDecisionStep[]
+  failureReason: GroupDecisionFailure | null
+  decisionCalls: ReturnType<typeof groupDecisionTotals>['decisionCalls']
+  decisionCost: ReturnType<typeof groupDecisionTotals>['decisionCost']
   route: Pick<GroupRoute, 'by'|'action'|'reason'|'responders'|'delegation'> | null
   decisionLatencyMs: number | null
   decisionCostUsd: number | null
-  costScope: 'primary-routing-decision-api'
+  costScope: 'routing-decision-chain'
   executionPerformed: false
   policyChanged: false
   /** These are selected intentions only. No wake, chat, tool, task or publication ran. */
@@ -46,23 +54,22 @@ export async function replayGroupDecision(caseId: string, policyVersion: GroupPo
   const mentioned = mentionRoute(message,members)
   const selected = mentioned ? members.filter(member=>mentioned.responders.includes(member.id)) : members
   const inputDigest = createHash('sha256').update(JSON.stringify({message,members:selected,leadId:null,corrections:[]})).digest('hex')
-  const observed:{receipt:DecisionExecution|null}={receipt:null}
   let route: GroupRoute | null = null
-  const judgment = createGroupJudgment(async (...args)=>{
-    const result = await invoke(...args)
-    observed.receipt = groupDecisionReceipt(result?.execution)
-    return result
-  },policy.version)
-  try { route = await judgment.route(message,selected,null,[]) }
-  catch { /* Preserve a real invocation receipt even if route validation failed. */ }
+  let decisions: GroupDecisionStep[] = [], failureReason: GroupDecisionFailure | null = null
+  const judgment = createGroupJudgment(invoke,policy.version)
+  try { route = await judgment.route(message,selected,null,[]); decisions=groupDecisionSteps(route.decisions) }
+  catch (error) {
+    if (error instanceof GroupJudgmentPendingError) { decisions=groupDecisionSteps(error.decisions); failureReason=error.decisionFailure??'unavailable' }
+    else failureReason='unavailable'
+  }
   // Missing provider evidence must never become a model-measured route.
-  const verified=observed.receipt
+  const verified=decisions[0]?.receipt ?? null
   const safeRoute = verified && route ? { by:mentioned?'mention' as const:route.by, action:route.action, reason:route.reason,
     responders:[...route.responders], ...(route.delegation?{delegation:{...route.delegation}}:{}) } : null
   return { schemaVersion:1,caseId,dataset:GROUP_REPLAY_DATASET,datasetDigest:GROUP_REPLAY_DATASET_DIGEST,inputDigest,policyVersion:policy.version,
     evidenceKind:'actual-decision-inference',status:!verified?'unavailable':safeRoute?'complete':'invalid_decision',receipt:verified,route:safeRoute,
-    decisionLatencyMs:verified?Date.parse(verified.completedAt)-Date.parse(verified.startedAt):null,
-    decisionCostUsd:null,costScope:'primary-routing-decision-api',executionPerformed:false,policyChanged:false,
+    decisionProtocol:GROUP_DECISION_PROTOCOL,decisions,failureReason,...groupDecisionTotals(decisions),
+    costScope:'routing-decision-chain',executionPerformed:false,policyChanged:false,
     projection:safeRoute?{intervention:!['ignore','observe'].includes(safeRoute.action ?? ''),selectedResponderCount:safeRoute.responders.length,
       delegationOperation:safeRoute.delegation?.operation ?? null,reportTiming:safeRoute.delegation?.reportTiming ?? null}:null }
 }
@@ -72,12 +79,27 @@ export async function replayGroupDecision(caseId: string, policyVersion: GroupPo
 export function summarizeGroupDecisionReplay(results: readonly GroupDecisionReplay[]) {
   if (new Set(results.map(row=>row.caseId)).size!==results.length || results.some(row=>!GROUP_REPLAY_CASE_IDS.includes(row.caseId)
     || row.datasetDigest!==GROUP_REPLAY_DATASET_DIGEST || row.evidenceKind!=='actual-decision-inference' || row.executionPerformed!==false)) throw Error('invalid_group_replay_evidence')
-  let measured=0,actionCorrect=0,responderCorrect=0,falseIntervention=0,missedIntervention=0,knownCostUsd=0,knownCosts=0
+  let measured=0,actionCorrect=0,responderCorrect=0,falseIntervention=0,missedIntervention=0
   const latencies:number[]=[],failures:{caseId:string;reason:string}[]=[]
+  const allDecisions:GroupDecisionStep[]=[],generations=new Set<string>()
   for (const row of results) {
     const item=cases.find(entry=>entry.id===row.caseId)!
     const receipt=groupDecisionReceipt(row.receipt ?? undefined)
-    if (!receipt || row.status!=='complete' || !row.route) {failures.push({caseId:row.caseId,reason:receipt?'invalid_decision':'receipt_missing'});continue}
+    // Account for genuine paid/unknown attempts BEFORE route validity. Legacy
+    // single-call reports remain readable without inventing a sequential chain.
+    const decisions=Array.isArray(row.decisions)?groupDecisionSteps(row.decisions):[{id:`legacy-${row.caseId}`,phase:'legacy_primary' as const,index:0,status:row.status,failure:null,receipt,decisionCostUsd:row.decisionCostUsd}]
+    for (const step of decisions) {
+      const generation=step.receipt?.providerGenerationId
+      if (generation && generations.has(generation)) continue
+      if (generation) {generations.add(generation);latencies.push(Date.parse(step.receipt!.completedAt)-Date.parse(step.receipt!.startedAt))}
+      allDecisions.push(step)
+    }
+    const completeChain=!Array.isArray(row.decisions) || (decisions.length===row.decisions.length && decisions.length>0
+      && decisions.every((step,index)=>step.index===index && step.status==='complete' && step.receipt)
+      && new Set(decisions.map(step=>step.receipt?.providerGenerationId)).size===decisions.length
+      && new Set(decisions.map(step=>step.receipt?.executionId)).size===decisions.length
+      && decisions[0].receipt?.executionId===receipt?.executionId)
+    if (!receipt || row.status!=='complete' || !row.route || !completeChain) {failures.push({caseId:row.caseId,reason:receipt?'invalid_decision':'receipt_missing'});continue}
     measured++
     const actionMatches=item.expected.actions.includes(row.route.action ?? '')
     const roleMatches=item.expected.responders===undefined || (item.expected.responders.length===row.route.responders.length && item.expected.responders.every((id,index)=>id===row.route!.responders[index]))
@@ -87,13 +109,13 @@ export function summarizeGroupDecisionReplay(results: readonly GroupDecisionRepl
     const active=!['ignore','observe'].includes(row.route.action ?? '')
     if (active && item.expected.intervene===false) falseIntervention++
     if (!active && item.expected.intervene===true) missedIntervention++
-    latencies.push(Date.parse(receipt.completedAt)-Date.parse(receipt.startedAt))
-    if (row.decisionCostUsd!==null && Number.isFinite(row.decisionCostUsd) && row.decisionCostUsd>=0) {knownCostUsd+=row.decisionCostUsd;knownCosts++}
   }
   latencies.sort((a,b)=>a-b)
+  const totals=groupDecisionTotals(allDecisions)
   return { cases:GROUP_REPLAY_CASE_IDS.length,measured,coverage:measured/GROUP_REPLAY_CASE_IDS.length,actionAccuracy:measured?actionCorrect/measured:null,
     responderAccuracy:measured?responderCorrect/measured:null,falseIntervention,missedIntervention,failures,
-    decisionLatency:{samples:latencies.length,p50Ms:latencies.length?latencies[Math.floor((latencies.length-1)*0.5)]:null,p95Ms:latencies.length?latencies[Math.ceil((latencies.length-1)*0.95)]:null},
-    cost:{knownUsd:knownCostUsd,knownObservations:knownCosts,unknownObservations:results.length-knownCosts},
+    logicalReplays:results.length,decisionCalls:totals.decisionCalls,
+    decisionLatency:{scope:'provider-request' as const,samples:latencies.length,p50Ms:latencies.length?latencies[Math.floor((latencies.length-1)*0.5)]:null,p95Ms:latencies.length?latencies[Math.ceil((latencies.length-1)*0.95)]:null},
+    cost:{scope:'routing-decision-chain' as const,...totals.decisionCost,completeTotalUsd:totals.decisionCostUsd,knownObservations:totals.decisionCost.knownCalls,unknownObservations:totals.decisionCost.unknownCalls},
     runtimeCasesExcluded:[...GROUP_REPLAY_RUNTIME_CASE_IDS],executionMeasured:false as const,productionAccepted:false as const,policyChanged:false as const }
 }

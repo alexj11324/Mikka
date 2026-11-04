@@ -1,9 +1,10 @@
 import type { DecisionExecution } from './decide'
+import type { GroupDecisionStep } from './group-decision-chain'
 
 // Who answers a message in a group chat, decided once before any agent wakes,
 // so agents never each judge for themselves whether to speak. An @mention
-// goes straight to that agent. Otherwise one Decisions call picks the
-// responders from the members' role descriptions (lib/coordinator/route-group.ts).
+// restricts eligible responders. A bounded sequence of Decisions calls picks
+// the route; dependent questions never share a provider request.
 // The code fixes only the frame (who may be picked, the answer's shape); the
 // pick itself is the model's, so a new agent needs no code change. Corrections the person makes are fed
 // back as examples, not training.
@@ -30,7 +31,7 @@ export interface GroupTaskReference { issueId: string; taskId: string | null; re
 export interface GroupMessage { text: string; mentions: readonly string[]; recent?: readonly { author: string; text: string }[]; tasks?: readonly GroupTaskReference[] }
 export type GroupAction = 'ignore' | 'observe' | 'reply' | 'delegate' | 'clarify'
 export type GroupDelegation = { operation: 'create' | 'continue' | 'status' | 'stop'; issueId: string | null; reportTiming?: 'now' | 'on_completion' }
-export type GroupContribution = { action?: GroupAction; reason?: string; policyVersion?: string; delegation?: GroupDelegation; execution?: DecisionExecution }
+export type GroupContribution = { action?: GroupAction; reason?: string; policyVersion?: string; delegation?: GroupDelegation; execution?: DecisionExecution; decisions?: GroupDecisionStep[] }
 
 /**
  * Who speaks, in order. Only `responders` are woken; the rest of the group

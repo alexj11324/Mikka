@@ -5,9 +5,9 @@ import test from 'node:test'
 import { Pool } from 'pg'
 import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
 import { handleGroupDecisionQuality } from './group-decision-feedback'
-import { initializeGroupDecisionTrace, recordGroupDecisionRoute, recordGroupTraceEvent, finishGroupDecisionTrace } from './group-decision-trace'
+import { initializeGroupDecisionTrace, recordGroupDecisionRoute, recordGroupDecisionSteps, recordGroupTraceEvent, finishGroupDecisionTrace } from './group-decision-trace'
 import { DECISION_MODEL } from './decision'
-import type { DecisionExecution } from './decide'
+import type { DecisionExecution, invokeDecision } from './decide'
 import { handleGroupDecisionReplay } from './group-decision-replay-api'
 import { hostedBillingScope } from '@/lib/abuse/context'
 import { GROUP_BASELINE_VERSION, GROUP_POLICY_VERSION } from './group-decision-policy'
@@ -45,22 +45,25 @@ test('PG: scoped decision traces, exact event counting, human feedback, revoked 
   assert.ok(!JSON.stringify(read.body).includes('private fixture content'))
   const turns = (read.body as { turns: { trace: { events: unknown[] }; decisionCostUsd: number | null }[] }).turns
   assert.equal(turns[0].trace.events.length, 1); assert.equal(turns[0].decisionCostUsd, null)
-  assert.equal((read.body as {costScope:string}).costScope,'primary-routing-decision-api')
+  assert.equal((read.body as {costScope:string}).costScope,'routing-decision-chain')
   // Only the exact provider generation/model and settled ledger row count.
   // This is a synthetic receipt fixture, not evidence of a real provider call.
   const receipt:DecisionExecution={executionId:randomUUID(),modelId:DECISION_MODEL,providerGenerationId:'fixture-generation',startedAt:'2026-11-03T00:00:00.000Z',completedAt:'2026-11-03T00:00:00.100Z',requestDigest:'a'.repeat(64),imageDigests:[],vision:'no-image-input'}
   await recordGroupDecisionRoute(pool,message,{by:'model',action:'reply',responders:[member],execution:receipt})
-  await pool.query(`INSERT INTO hosted_usage VALUES ('fixture-generation',$1,'settled',1250),('fixture-generation','another-model','settled',99000),('fixture-generation',$1,'unknown',99000),('unrelated-generation',$1,'settled',99000)`,[DECISION_MODEL])
+  await pool.query(`INSERT INTO hosted_usage VALUES ('fixture-generation',$1,'settled',1250),('fixture-generation','another-model','settled',99000),('unsettled-generation',$1,'unknown',99000),('unrelated-generation',$1,'settled',99000)`,[DECISION_MODEL])
   const billed=await handleGroupDecisionQuality(pool,directory,req)
   assert.equal((billed.body as {turns:{decisionCostUsd:number|null}[]}).turns[0].decisionCostUsd,0.00125)
   let replayCalls=0
   const replayReq={...req,method:'POST',body:JSON.stringify({caseId:'small-talk',policyVersion:GROUP_BASELINE_VERSION})}
-  const invoke=async()=>{
-    replayCalls++;assert.deepEqual(hostedBillingScope.getStore(),{workspaceId:workspace,ownerId:'owner'})
-    return {execution:receipt,answers:new Map([['responder_0',{name:'responder_0',type:'choice' as const,choice:'00000000-0000-4000-8000-000000000001'}],['responder_1',{name:'responder_1',type:'choice' as const,choice:'end'}],['responder_2',{name:'responder_2',type:'choice' as const,choice:'end'}]])}
+  const invoke:typeof invokeDecision=async(_purpose,_input,questions)=>{
+    replayCalls++;assert.deepEqual(hostedBillingScope.getStore(),{workspaceId:workspace,ownerId:'owner'});assert.equal(questions.length,1)
+    const name=questions[0].name
+    const execution={...receipt,executionId:`replay-${replayCalls}`,providerGenerationId:`fixture-replay-${replayCalls}`}
+    await pool.query(`INSERT INTO hosted_usage VALUES ($1,$2,'settled',$3)`,[execution.providerGenerationId,DECISION_MODEL,replayCalls===1?500:750])
+    return {execution,answers:new Map([[name,{name,type:'choice' as const,choice:name==='responder_0'?'00000000-0000-4000-8000-000000000001':'end'}]])}
   }
   const replay=await handleGroupDecisionReplay(pool,directory,replayReq,invoke)
-  assert.equal(replay.status,200);assert.equal(replayCalls,1)
+  assert.equal(replay.status,200);assert.equal(replayCalls,2)
   assert.equal((replay.body as {decisionCostUsd:number}).decisionCostUsd,0.00125)
   assert.equal((replay.body as {executionPerformed:boolean}).executionPerformed,false)
   assert.ok(!JSON.stringify(replay.body).includes('private fixture content'))
@@ -71,12 +74,45 @@ test('PG: scoped decision traces, exact event counting, human feedback, revoked 
     [{body:JSON.stringify({caseId:'decision-outage',policyVersion:GROUP_POLICY_VERSION})},422]] as const) {
     assert.equal((await handleGroupDecisionReplay(pool,directory,{...replayReq,...overrides},invoke)).status,status)
   }
-  assert.equal(replayCalls,1,'denied requests must not incur provider calls')
+  assert.equal(replayCalls,2,'denied requests must not incur provider calls')
   authorized=false
   assert.equal((await handleGroupDecisionReplay(pool,directory,replayReq,invoke)).status,404)
   authorized=true
   const unavailable=await handleGroupDecisionReplay(pool,directory,replayReq,async()=>null)
   assert.equal(unavailable.status,503);assert.equal((unavailable.body as {receipt:unknown}).receipt,null)
+  // Failed, paid phases survive a retry; a NULL component never disappears
+  // inside SQL sum, and repeated trace persistence is idempotent.
+  const failedMessage=randomUUID()
+  await pool.query(`INSERT INTO conversation_messages (id,"conversationId",position,"authorType","authorId",body) VALUES ($1,$2,100,'user','owner','private retry fixture')`,[failedMessage,group])
+  await pool.query(`INSERT INTO group_turns ("messageId","conversationId","userId") VALUES ($1,$2,'owner')`,[failedMessage,group])
+  const first={id:randomUUID(),phase:'intent' as const,index:0,status:'complete' as const,failure:null,receipt:{...receipt,executionId:randomUUID(),providerGenerationId:'partial-first'}}
+  const second={id:randomUUID(),phase:'responder' as const,index:1,status:'invalid_decision' as const,failure:'uncertain' as const,receipt:{...receipt,executionId:randomUUID(),providerGenerationId:'partial-second'}}
+  await initializeGroupDecisionTrace(pool,failedMessage,[{id:member,name:'UI',description:'public'}],[])
+  await recordGroupDecisionSteps(pool,failedMessage,[first,second],'uncertain')
+  await recordGroupDecisionSteps(pool,failedMessage,[first,second],'uncertain')
+  await finishGroupDecisionTrace(pool,failedMessage,'blocked')
+  await pool.query(`INSERT INTO hosted_usage VALUES ('partial-first',$1,'settled',138),('partial-second',$1,'settled',20),('partial-second',$1,'settled',NULL)`,[DECISION_MODEL])
+  const partial=(await handleGroupDecisionQuality(pool,directory,req)).body as any
+  const partialTurn=partial.turns.find((turn:any)=>turn.messageId===failedMessage)
+  assert.equal(partialTurn.trace.decisions.length,2);assert.equal(partialTurn.decisionCost.knownUsd,0.000138)
+  assert.equal(partialTurn.decisionCost.knownCalls,1);assert.equal(partialTurn.decisionCost.unknownCalls,1);assert.equal(partialTurn.decisionCostUsd,null)
+  await initializeGroupDecisionTrace(pool,failedMessage,[{id:member,name:'UI',description:'public'}],[])
+  const recovery={...first,id:randomUUID(),receipt:{...receipt,executionId:randomUUID(),providerGenerationId:'partial-recovery'}}
+  await recordGroupDecisionRoute(pool,failedMessage,{by:'model',action:'observe',responders:[],execution:recovery.receipt,decisions:[recovery]})
+  await finishGroupDecisionTrace(pool,failedMessage,'complete')
+  await pool.query(`INSERT INTO hosted_usage VALUES ('partial-recovery',$1,'settled',100)`,[DECISION_MODEL])
+  const recovered=((await handleGroupDecisionQuality(pool,directory,req)).body as any).turns.find((turn:any)=>turn.messageId===failedMessage)
+  assert.equal(recovered.trace.decisions.length,3);assert.equal(recovered.trace.decisions[1].status,'invalid_decision')
+  assert.equal(recovered.decisionCost.knownCalls,2);assert.equal(recovered.decisionCost.unknownCalls,1);assert.equal(recovered.decisionCostUsd,null)
+  assert.equal(recovered.trace.execution.providerGenerationId,'partial-recovery')
+  for(let attempt=0;attempt<17;attempt++) {
+    const steps=Array.from({length:4},(_,index)=>({...first,id:randomUUID(),index,receipt:{...receipt,executionId:randomUUID(),providerGenerationId:`retained-${attempt}-${index}`}}))
+    await recordGroupDecisionSteps(pool,failedMessage,steps)
+  }
+  const bounded=(await pool.query('SELECT trace FROM group_turns WHERE "messageId"=$1',[failedMessage])).rows[0].trace
+  assert.equal(bounded.decisions.length,64);assert.equal(bounded.decisionsOmitted,7)
+  const limited=((await handleGroupDecisionQuality(pool,directory,req)).body as any).turns.find((turn:any)=>turn.messageId===failedMessage)
+  assert.equal(limited.decisionCost.omittedCalls,7);assert.equal(limited.decisionCostUsd,null)
   const body = JSON.stringify({ messageId: message, kind: 'wrong_member', targetId: member })
   for (let attempt = 0; attempt < 2; attempt++) assert.equal((await handleGroupDecisionQuality(pool, directory, { ...req, method: 'POST', body })).status, 201)
   assert.equal((await pool.query('SELECT count(*)::int n FROM group_decision_feedback')).rows[0].n, 1)
@@ -99,5 +135,5 @@ test('PG: scoped decision traces, exact event counting, human feedback, revoked 
   await pool.query('UPDATE conversation_members SET "leftAt"=now() WHERE "conversationId"=$1 AND "memberId"=\'owner\'', [group])
   assert.equal((await handleGroupDecisionQuality(pool, directory, { ...req, method: 'POST', body })).status, 404)
   assert.equal((await handleGroupDecisionReplay(pool,directory,replayReq,invoke)).status,404)
-  assert.equal(replayCalls,1)
+  assert.equal(replayCalls,2)
 })

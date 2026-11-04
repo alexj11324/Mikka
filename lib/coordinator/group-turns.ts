@@ -7,11 +7,12 @@ export { GroupJudgmentPendingError } from './group-correction'
 import { addsNothing, followUpInstructions, mentionRoute, UnknownMentionError, type GroupMessage, type GroupRoute, type RoutingCorrection, type RoutingMember } from './group-routing'
 import { appendGroupExchange } from './group-exchanges'
 import type { HostedRuntimeSnapshot } from '@/lib/subscription-model-snapshot'
-import { initializeGroupDecisionTrace, recordGroupDecisionRoute, recordGroupTraceEvent, finishGroupDecisionTrace } from './group-decision-trace'
+import { initializeGroupDecisionTrace, recordGroupDecisionRoute, recordGroupDecisionSteps, recordGroupTraceEvent, finishGroupDecisionTrace } from './group-decision-trace'
+import { GROUP_MAX_RESPONDERS } from './group-decision-chain'
 import { recordGroupFeedback } from './group-decision-feedback'
 import { groupCopy, readGroupLocale } from './group-copy'
 
-export const GROUP_MAX_ROUNDS = 3
+export const GROUP_MAX_ROUNDS = GROUP_MAX_RESPONDERS
 export type GroupAgent = RoutingMember
 export type GroupReply = { text: string; mentions: string[]; privateTo?: string | null;
   /** Host-only receipt from Factory, never accepted from chat model output. */
@@ -21,7 +22,7 @@ export type GroupRuntime = {
   bots?(ownerId: string, workspaceId: string, ids: string[], client: PoolClient): Promise<GroupAgent[]>
   prepareBot?(actor: GroupAgent, scope: { ownerId: string; workspaceId: string }, client: PoolClient): Promise<HostedRuntimeSnapshot>
   authorized(workspaceId: string, userId: string): Promise<boolean>
-  route(message: GroupMessage, members: GroupAgent[], leadId: string | null, corrections: RoutingCorrection[]): Promise<GroupRoute>
+  route(message: GroupMessage, members: GroupAgent[], leadId: string | null, corrections: RoutingCorrection[], retain?: (steps: readonly import('./group-decision-chain').GroupDecisionStep[])=>Promise<void>): Promise<GroupRoute>
   /** Production classifies the action even for an explicit @mention; member selection stays constrained. */
   routeMention?: GroupRuntime['route']
   contribution?(message: GroupMessage, member: GroupAgent, earlier: readonly { author: string; text: string }[]): Promise<{ contribute: boolean; execution?: import('./decide').DecisionExecution }>
@@ -155,7 +156,10 @@ export async function processGroupTurn(pool: Pool, conversationId: string, runti
       const leadId = root.leadBotId ?? root.leadAgentId
       const mentioned = mentionRoute(input, members)
       const contextCorrections = corrections.rows.reverse().map(c => ({ ...c, rightId: c.rightId ?? undefined }))
-      const judgment = mentioned && !runtime.routeMention ? mentioned : await modelScope(() => (mentioned ? runtime.routeMention! : runtime.route)(input, mentioned ? members.filter(m=>mentioned.responders.includes(m.id)) : members, members.some(m => m.id === leadId) ? leadId : null, contextCorrections))
+      const judgment = mentioned && !runtime.routeMention ? mentioned : await modelScope(() => (mentioned ? runtime.routeMention! : runtime.route)(input, mentioned ? members.filter(m=>mentioned.responders.includes(m.id)) : members, members.some(m => m.id === leadId) ? leadId : null, contextCorrections, async steps=>{
+        await recordGroupDecisionSteps(client,messageId!,steps)
+        if (await stopped()) throw new Error(GROUP_TURN_STOPPED)
+      }))
       const route:GroupRoute = mentioned ? {...judgment,by:'mention'} : judgment
       const unknown = route.responders.filter(id => !members.some(m => m.id === id))
       if (unknown.length) throw new UnknownMentionError(unknown)
@@ -259,6 +263,7 @@ export async function processGroupTurn(pool: Pool, conversationId: string, runti
     return true
   } catch (error) {
     if (!messageId) throw error
+    if (error instanceof GroupJudgmentPendingError) await recordGroupDecisionSteps(client,messageId,error.decisions,error.decisionFailure)
     // Stopped: the abort it caused is the stop, not a failure.
     if ((await client.query(`SELECT error FROM group_turns WHERE "messageId"=$1`, [messageId])).rows[0]?.error === GROUP_TURN_STOPPED) return true
     const reason = error instanceof GroupJudgmentPendingError ? 'group_judgment_pending' : error instanceof UnknownMentionError ? 'unknown_mention' : groupGenerationFailure(error)
@@ -267,7 +272,9 @@ export async function processGroupTurn(pool: Pool, conversationId: string, runti
       "nextDecisionAt"=CASE WHEN $2='group_judgment_pending' AND route IS NULL THEN now()+make_interval(secs=>LEAST(900,60*power(2,LEAST("decisionAttempts",4)))::double precision) ELSE NULL END
       WHERE "messageId"=$1 AND status='running'`, [messageId, reason])
     await finishGroupDecisionTrace(client, messageId, error instanceof GroupJudgmentPendingError ? 'blocked' : 'failed')
-    console.error(JSON.stringify({ event: 'group_generation_failed', reason, conversationId, messageId }))
+    console.error(JSON.stringify({ event: 'group_generation_failed', reason, conversationId, messageId,
+      ...(error instanceof GroupJudgmentPendingError && error.decisionFailure ? {decisionFailure:error.decisionFailure,decisionPhase:error.decisions.at(-1)?.phase}:{}),
+    }))
     throw error
   } finally {
     try { if (locked) await client.query(`SELECT pg_advisory_unlock(hashtextextended(current_database() || '.' || current_schema() || '.group-turn.' || $1,0))`, [conversationId]) }
@@ -330,7 +337,8 @@ export async function runGroupRounds(route: GroupRoute, message: GroupMessage, i
         continue
       }
       // Decide before paying for a second answer. The generation marker remains a final output guard.
-      if (earlier.length && io.contribution && !(await io.contribution(message, agent, earlier)).contribute) continue
+      const directTarget=round===0 && route.by==='mention' && message.mentions.includes(id)
+      if (earlier.length && !directTarget && io.contribution && !(await io.contribution(message, agent, earlier)).contribute) continue
       await io.status(id)
       let reply: GroupReply
       let outcome: 'succeeded' | 'failed' = 'failed'
