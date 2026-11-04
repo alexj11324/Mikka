@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { factoryChanged, factoryCommitted } from '../live/factory';
 import type { Pool, PoolClient } from "pg";
 import { z } from "zod";
 import { bindingSchema, FactoryError, type FactoryActor, type FactoryBinding } from "./approval-contract";
@@ -224,10 +225,11 @@ export function createFactoryMerges(
     pullRequestUrl: string,
   ): Promise<AcceptResult> {
     if (!outcome.merged) {
-      await pool.query(
-        `UPDATE factory_merges SET status='failed',code=$2,"finishedAt"=clock_timestamp() WHERE id=$1 AND status='merging'`,
+      const updated = await pool.query(
+        `UPDATE factory_merges SET status='failed',code=$2,"finishedAt"=clock_timestamp() WHERE id=$1 AND status='merging' RETURNING "taskId"`,
         [mergeId, outcome.code],
       );
+      if (updated.rows?.[0]?.taskId) await factoryCommitted(updated.rows[0].taskId);
       throw new FactoryMergeRefused(outcome.code, pullRequestUrl);
     }
     return transaction(async (tx) => {
@@ -244,6 +246,7 @@ export function createFactoryMerges(
         `UPDATE run_publications SET "pullRequest"=jsonb_set("pullRequest",'{state}','"merged"') WHERE lower("pullRequest"->>'url')=lower($1)`,
         [pullRequestUrl],
       );
+      await factoryChanged(tx, task);
       const done = await finalize(tx, task, mergeId);
       return { status: "merged", mergeId, pullRequestUrl, binding: bindingOf(done) };
     });
@@ -304,6 +307,7 @@ export function createFactoryMerges(
           `INSERT INTO factory_merges (id,"taskId","candidateId","userId","eventId","pullRequestUrl",sha,status,source) VALUES ($1,$2,$3,$4,$5,$6,$7,'merging','mikka')`,
           [id, task.id, task.candidateId, actor.userId, req.eventId, pull.url, pull.sha],
         );
+        await factoryChanged(tx, task);
         return { id, pull };
       });
 
@@ -396,6 +400,7 @@ export function createFactoryMerges(
               [mergeId, task.id, task.candidateId, task.userId, randomUUID(), pull.url, pull.sha, input.headSha, input.mergeCommitSha],
             );
           }
+          if (!active || active.status === 'merging') await factoryChanged(tx, task);
           await finalize(tx, task, mergeId);
           completed++;
         });

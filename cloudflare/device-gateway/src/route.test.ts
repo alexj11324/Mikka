@@ -9,6 +9,7 @@ const deviceId = '6f1c2b8e-2a8e-4c39-9d1a-3b5d7c9e1f20'
 function env(stub: Partial<DeviceSessionStub>): GatewayEnv {
   const session: DeviceSessionStub = {
     notify: async () => {},
+    notifyLive: async () => {},
     status: async () => ({ online: false, lastSeenAt: null }),
     fetch: async () => new Response(null),
     ...stub,

@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { factoryChanged, factoryCommitted } from '../live/factory';
 import type { Pool, PoolClient } from "pg";
 import { z } from "zod";
 import { FactoryError, type FactoryBinding } from "./approval-contract";
@@ -301,14 +302,15 @@ export async function deferPublication(
     error instanceof PublicationDeferred ? error.state : "uncertain";
   const checkpoint =
     error instanceof PublicationDeferred ? error.checkpoint : null;
-  await pool.query(
-    `UPDATE factory_publications SET status=$2,receipt=coalesce($3::jsonb,receipt),"finishedAt"=clock_timestamp() WHERE id=$1 AND status NOT IN ('succeeded','failed')`,
+  const updated = await pool.query(
+    `UPDATE factory_publications SET status=$2,receipt=coalesce($3::jsonb,receipt),"finishedAt"=clock_timestamp() WHERE id=$1 AND status NOT IN ('succeeded','failed') RETURNING "taskId"`,
     [
       publicationId,
       state === "pending" ? "reserved" : state,
       checkpoint == null ? null : JSON.stringify(checkpoint),
     ],
   );
+  if (updated.rows?.[0]?.taskId) await factoryCommitted(updated.rows[0].taskId);
   if (error instanceof PublicationDeferred)
     throw new PublicationDeferred(publicationId, state, checkpoint);
   if (error instanceof FactoryError && error.code.startsWith("factoryVercel"))
@@ -774,6 +776,7 @@ export function createFactoryApprovals(
           [req.approvalId, task.id, actor.userId],
         );
         if (!rowCount) fail("factoryApprovalInvalid");
+        await factoryChanged(tx, task);
         const result = { approvalId: req.approvalId, revoked: true };
         await tx.query(
           'INSERT INTO factory_approval_controls ("taskId","eventId","userId","principalId",request,result) VALUES ($1,$2,$3,$4,$5,$6)',
@@ -825,6 +828,7 @@ export function createFactoryApprovals(
           // Commit the effect claim BEFORE provider IO. A crash from here on
           // is reconciled, never interpreted as permission to POST again.
           await tx.query("UPDATE factory_publications SET status='uncertain' WHERE id=$1", [approvedPublication.id]);
+          await factoryChanged(tx, task);
           return { id: approvedPublication.id as string };
         }
         const {
@@ -888,6 +892,7 @@ export function createFactoryApprovals(
           request: req,
         });
         await tx.query("UPDATE factory_publications SET status='uncertain' WHERE id=$1", [id]);
+        await factoryChanged(tx, task);
         return { id };
       }).catch(error => error instanceof PublicationDeferred && error.state === 'failed' ? defer(error, error.publicationId) : Promise.reject(error));
       if ("result" in reservation) return reservation.result;

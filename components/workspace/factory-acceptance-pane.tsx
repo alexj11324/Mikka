@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import useSWR, { useSWRConfig } from 'swr'
+import { useLiveKey } from '@/hooks/use-live-key'
 import { useTranslations } from 'next-intl'
 import { CircleCheck, CircleDashed, CircleX, Cloud, ExternalLink, Laptop, RefreshCw, Server } from 'lucide-react'
 import { Alert, AlertTitle } from '@/components/ui/alert'
@@ -62,9 +63,12 @@ type Derived = { state: AcceptanceState; active?: unknown; publication?: unknown
 
 /** List, header and pane read the same ledger and the same state machine, so they always agree. A code candidate is accepted by merging its PR; a skill is enabled. */
 export function useAcceptance(task: FactoryTask) {
-  const { data: ledger, mutate: reload, error: ledgerError } = useSWR<Ledger>(`/api/factory/tasks/${task.id}/approval?view=ledger`, request, { refreshInterval: 5000 })
-  const { data: detail } = useSWR<AcceptanceDetail>(`/api/factory/tasks/${task.id}`, request)
-  // The list keeps polling while a recovered candidate passes its checks. An
+  const ledgerKey = `/api/factory/tasks/${task.id}/approval?view=ledger`
+  const detailKey = `/api/factory/tasks/${task.id}`
+  const { data: ledger, mutate: reload, error: ledgerError } = useSWR<Ledger>(ledgerKey, request, { refreshInterval: 0 })
+  const { data: detail } = useSWR<AcceptanceDetail>(detailKey, request, { refreshInterval: 0 })
+  useLiveKey('factory_task', task.id, [ledgerKey, detailKey], detail?.liveWorkspaceId ?? null)
+  // The list refreshes while a recovered candidate passes its checks. An
   // older cached detail with that same candidate must not hide newer approval.
   const current = detail?.task && detail.task.candidateId === task.candidateId &&
     (typeof task.revision !== 'number' || (typeof detail.task.revision === 'number' && detail.task.revision >= task.revision)) ? detail.task : task
@@ -122,7 +126,9 @@ function CandidateCard({ candidate, detail, environment, isSkill }: { candidate?
 
 /** Frame 06 header: the machine that produced the candidate. Reads the same task detail as the pane. */
 export function CandidateMachine({ taskId }: { taskId: string }) {
-  const { data } = useSWR<AcceptanceDetail>(`/api/factory/tasks/${taskId}`, request)
+  const key = `/api/factory/tasks/${taskId}`
+  const { data } = useSWR<AcceptanceDetail>(key, request, { refreshInterval: 0 })
+  useLiveKey('factory_task', taskId, [key], data?.liveWorkspaceId ?? null)
   const machine = data?.delivery?.machine
   if (!machine?.name) return null
   const Icon = machine.kind === 'cloud' ? Cloud : Laptop
@@ -185,6 +191,7 @@ export function FactoryAcceptancePane({ task, onOpenThread }: { task: FactoryTas
   const { data: evidence, error: evidenceError } = useSWR<Evidence>(task.stage === 'approval' || acceptance?.superseded || acceptance?.state === 'merged' ? `/api/factory/tasks/${task.id}/approval` : null, request)
   // Checks and the delivery header (B8/B9/B11) are read-only extras; the pane works without them.
   const { data: detail, mutate: reloadDetail } = useSWR<AcceptanceDetail>(`/api/factory/tasks/${task.id}`, request)
+  useLiveKey('factory_task', task.id, task.stage === 'approval' || acceptance?.superseded || acceptance?.state === 'merged' ? [`/api/factory/tasks/${task.id}/approval`] : [], detail?.liveWorkspaceId ?? null)
   const detailRevision = detail?.task?.revision
   useEffect(() => {
     if (typeof task.revision === 'number' && typeof detailRevision === 'number' && detailRevision < task.revision)
