@@ -4,7 +4,7 @@
 // revoked); a closed task's paused sandbox is ended for good.
 // Real migrations, fake provider; disposable *_e2e PG on loopback.
 import assert from "node:assert/strict";
-import test from "node:test";
+import test, { mock } from "node:test";
 import { createHash, randomUUID } from "node:crypto";
 import { readFile, readdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from 'node:os';
@@ -439,9 +439,13 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
         }) as typeof sandbox.commands.run;
         return sandbox;
       };
+      const warnings: string[] = [];
+      const warning = mock.method(console, 'warn', (line: string) => { warnings.push(line); });
       try {
         await assert.rejects(ensureThreadMachine(pool, actor, f.next, fixture.provider, undefined, true), /Thread worker did not register/);
-      } finally { Date.now = realNow; }
+      } finally { Date.now = realNow; warning.mock.restore(); }
+      assert.deepEqual(warnings.map(line => JSON.parse(line)), [{ event: 'thread_runtime_refresh_failed', runId: f.next,
+        phase: 'worker_register', errorClass: 'Error', errorCode: 'unknown' }]);
       assert.deepEqual(fixture.steps, ['stage', 'switch', 'rollback']);
       assert.deepEqual(await questionHistory(f), before);
       const current = (await pool.query('SELECT state,"sandboxId","deviceId","logTail","workerLeaseId" FROM thread_machines WHERE "runId"=$1', [f.next])).rows[0];

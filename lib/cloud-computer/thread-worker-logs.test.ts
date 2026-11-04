@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
-import test from 'node:test'
-import { readWorkerTail, saveWorkerTail, workerCommand, workerOutputForwarder, TAIL_MAX, WORKER_LOG } from './thread-worker-logs'
+import test, { mock } from 'node:test'
+import { logRuntimeRefreshFailure, readWorkerTail, saveWorkerTail, workerCommand, workerOutputForwarder, TAIL_MAX, WORKER_LOG } from './thread-worker-logs'
 
 const mask = (text: string) => text.replaceAll('sekret', '[secret:TOKEN]')
 
@@ -55,4 +55,101 @@ test('the tail is saved masked with the machine; as an error only where the run 
     ['UPDATE agent_runs SET error=$2', ['run-3', 'Thread worker did not register\nboom [secret:TOKEN]']],
   ])
   assert.match(calls[2][0], /error IS NULL/, 'an existing error is never overwritten')
+})
+
+test('refresh diagnostics allow only fixed error identifiers and bounded numeric status/exit codes', () => {
+  const lines: string[] = []
+  for (const error of [null, 'PRIVATE-CREDENTIAL', {
+    name: 'PRIVATE-CREDENTIAL', code: 'PRIVATE-CREDENTIAL', status: 9999, exitCode: -1,
+    message: 'PRIVATE-CREDENTIAL', stack: 'PRIVATE-CREDENTIAL', cause: { token: 'PRIVATE-CREDENTIAL' },
+  }]) logRuntimeRefreshFailure('run-4', 'connect', error, line => lines.push(line))
+  for (const line of lines) assert.deepEqual(JSON.parse(line), {
+    event: 'thread_runtime_refresh_failed', runId: 'run-4', phase: 'connect', errorClass: 'unknown', errorCode: 'unknown',
+  })
+  logRuntimeRefreshFailure('run-4', 'connect', { name: 'E2BKeyError', code: 'e2b_key_invalid', statusCode: 403, detail: 'PRIVATE-CREDENTIAL' }, line => lines.push(line))
+  assert.deepEqual(JSON.parse(lines.at(-1)!), {
+    event: 'thread_runtime_refresh_failed', runId: 'run-4', phase: 'connect', errorClass: 'E2BKeyError', errorCode: 'e2b_key_invalid', status: 403,
+  })
+  let reads = 0
+  logRuntimeRefreshFailure('run-4', 'connect', { get name() { return reads++ ? 'PRIVATE-CREDENTIAL' : 'Error' } }, line => lines.push(line))
+  assert.deepEqual(JSON.parse(lines.at(-1)!), {
+    event: 'thread_runtime_refresh_failed', runId: 'run-4', phase: 'connect', errorClass: 'Error', errorCode: 'unknown',
+  })
+  assert.doesNotMatch(lines.join('\n'), /PRIVATE-CREDENTIAL/)
+})
+
+// Real refresh orchestration with a synthetic admitted row and provider. This
+// checks its diagnostic boundary; ownership/custody use the real PG fixtures.
+test('runtime refresh failures name their actual phase without logging provider output or changing run history', async () => {
+  const { ensureThreadMachine } = await import('./thread-machines')
+  const id = (n: number) => `41400000-0000-4000-8000-${String(n).padStart(12, '0')}`
+  const actor = { userId: 'fixture-owner', workspaceId: id(2) }
+  const run = { id: id(1), userId: actor.userId, issueId: id(3), deviceId: id(4), deviceRepoId: id(5), runtimeBotId: id(6),
+    status: 'failed', sessionId: 'original-session', botSandboxId: 'fixture-parent', repoPath: '/fixture/workspace', remoteUrl: null,
+    questionContinuation: { requireSessionResume: true, requiredSandboxId: 'fixture-original', originSessionId: 'original-session', originRunId: id(7), questionId: id(8) } }
+  const machine = { runId: run.id, ownerId: actor.userId, workspaceId: actor.workspaceId, issueId: run.issueId,
+    deviceId: run.deviceId, repoId: run.deviceRepoId, botId: run.runtimeBotId, state: 'paused', sandboxId: 'fixture-original', snapshotId: 'desktop' }
+  const before = structuredClone(run)
+  const saved = { url: process.env.MIKKA_CLOUD_WORKER_URL, sha: process.env.MIKKA_CLOUD_WORKER_SHA, commit: process.env.MIKKA_CLOUD_WORKER_SOURCE_COMMIT }
+  process.env.MIKKA_CLOUD_WORKER_URL = 'https://fixture.invalid/mikka'
+  process.env.MIKKA_CLOUD_WORKER_SHA = 'b'.repeat(40)
+  process.env.MIKKA_CLOUD_WORKER_SOURCE_COMMIT = 'c'.repeat(40)
+  try {
+    for (const scenario of ['provider_state', 'connect', 'read_worker', 'install_computer', 'stage_release', 'diagnostic_getter', 'diagnostic_sink']) {
+      const phase = scenario.startsWith('diagnostic_') ? 'connect' : scenario
+      const fault = Object.assign(new Error('PRIVATE-CREDENTIAL fixture output'), {
+        name: phase === 'stage_release' ? 'CommandExitError' : 'Error', code: phase === 'read_worker' ? 'ENOENT' : 'untrusted-PRIVATE-CREDENTIAL',
+        ...(phase === 'stage_release' ? { exitCode: 73 } : {}), stderr: 'PRIVATE-CREDENTIAL stderr', command: 'PRIVATE-CREDENTIAL command',
+      })
+      if (scenario === 'diagnostic_getter') Object.defineProperty(fault, 'name', { get: () => { throw new Error('diagnostic getter failed') } })
+      const queries: string[] = [], warnings: unknown[][] = []
+      const warning = mock.method(console, 'warn', (...args: unknown[]) => {
+        if (scenario === 'diagnostic_sink') throw new Error('diagnostic sink failed')
+        warnings.push(args)
+      })
+      let released = false
+      const query = async (sql: string) => {
+        queries.push(sql)
+        if (sql.startsWith('SELECT r.*')) return { rows: [{ ...run }], rowCount: 1 }
+        if (sql.startsWith('SELECT * FROM thread_machines')) return { rows: [{ ...machine }], rowCount: 1 }
+        if (sql.startsWith('SELECT status,"stopRequestedAt"')) return { rows: [{ status: 'failed', stopRequestedAt: null }], rowCount: 1 }
+        if (/^SELECT 1 FROM (factory_questions|devices|thread_machines)/.test(sql)) return { rows: [{}], rowCount: 1 }
+        if (sql.startsWith('UPDATE thread_machines')) return { rows: [{ runId: run.id }], rowCount: 1 }
+        if (/^(BEGIN|COMMIT|ROLLBACK|SELECT set_config|SELECT pg_advisory_xact_lock)/.test(sql)) return { rows: [], rowCount: 0 }
+        assert.fail(`Unexpected diagnostic-fixture SQL: ${sql}`)
+      }
+      const pool = { query, connect: async () => ({ query, release: () => { released = true } }) } as never
+      const sandbox = { sandboxId: machine.sandboxId,
+        files: { read: async () => { if (phase === 'read_worker') throw fault; return 'a'.repeat(40) }, write: async () => assert.fail('no bootstrap credential may be published') },
+        commands: { run: async (command: string) => {
+          if (command.includes('MIKKA_RUNTIME_HASHES')) { if (phase === 'install_computer') throw fault; return { stdout: '' } }
+          if (command.includes('MIKKA_OFFICIAL_WORKER_STAGE')) throw fault
+          assert.fail('no runtime switch or worker command may run')
+        } },
+      }
+      const provider = {
+        state: async () => { if (phase === 'provider_state') throw fault; return 'paused' },
+        connect: async () => { if (phase === 'connect') throw fault; return sandbox },
+        create: async () => assert.fail('the original VM may not be replaced'),
+        snapshot: async () => assert.fail('no snapshot'), kill: async () => assert.fail('no kill'),
+      } as unknown as Parameters<typeof ensureThreadMachine>[3]
+      try {
+        await assert.rejects(ensureThreadMachine(pool, actor, run.id, provider, undefined, true), error => error === fault)
+        assert.deepEqual(warnings.map(args => JSON.parse(String(args[0]))), scenario.startsWith('diagnostic_') ? [] : [{
+          event: 'thread_runtime_refresh_failed', runId: run.id, phase,
+          errorClass: phase === 'stage_release' ? 'CommandExitError' : 'Error',
+          errorCode: phase === 'read_worker' ? 'ENOENT' : 'unknown', ...(phase === 'stage_release' ? { exitCode: 73 } : {}),
+        }])
+        assert.doesNotMatch(JSON.stringify(warnings), /PRIVATE-CREDENTIAL/)
+        assert.deepEqual(run, before)
+        assert.ok(queries.some(sql => sql.startsWith("UPDATE thread_machines SET state='error'")), 'the existing lease cleanup still runs')
+        assert.ok(queries.every(sql => !/^(INSERT|DELETE)|^UPDATE (agent_runs|factory_|device_tokens)/.test(sql)), 'diagnostics write no historical business state')
+        assert.equal(released, true)
+      } finally { warning.mock.restore() }
+    }
+  } finally {
+    for (const [name, value] of [['MIKKA_CLOUD_WORKER_URL', saved.url], ['MIKKA_CLOUD_WORKER_SHA', saved.sha], ['MIKKA_CLOUD_WORKER_SOURCE_COMMIT', saved.commit]]) {
+      if (value === undefined) delete process.env[name!]; else process.env[name!] = value
+    }
+  }
 })
