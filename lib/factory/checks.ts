@@ -17,13 +17,14 @@ import { maskCredentials } from "../secrets/mask";
 import { redactArtifact } from "./evidence";
 import { humanQuestionAnswerSchema, questionFingerprint } from './questions/contract';
 import { factoryEventId } from './event-id';
+import { reportedCandidateShaSql, resolveFactoryCandidateSha } from './deliverable-snapshot';
 
 /** A repair inherits requirements only across the recorded host transition and
  * the adjacent, independently verified failed check. Findings are not answers. */
 async function repairAnswerCandidate(tx: Pick<PoolClient, 'query'>, task: FactoryTask, attemptId: string, childRunId: string | null): Promise<string | null> {
   const { rows } = await tx.query(`SELECT a.*,e."eventId" AS "repairEventId",e.request,e.result AS repair,to_jsonb(f) AS previous,
       to_jsonb(c) AS candidate,r.id AS "checkRunId",r."botId",r.status AS "runStatus",r."stopReason",r."stopRequestedAt",r."retryOf",r."sessionId" AS "runSessionId",r.kind,r."baseBranch",r."deviceRepoId",r.report,r.error,
-      child."continuesRunId",COALESCE(c.sha,CASE WHEN c.kind='deliverable' THEN producer.report->>'deliverableCommit' END,producer.report->>'sourceCommit') AS sha
+      child."continuesRunId",${reportedCandidateShaSql()} AS sha
     FROM factory_tasks t JOIN factory_attempts a ON a."taskId"=t.id AND a.id=$6
     LEFT JOIN factory_events e ON e."taskId"=t.id AND e.request->'change'->>'action'='repair' AND e.result->'task'->>'attemptId'=a.id::text
     LEFT JOIN factory_attempts f ON f."taskId"=t.id AND f.position=a.position-1
@@ -46,6 +47,7 @@ async function repairAnswerCandidate(tx: Pick<PoolClient, 'query'>, task: Factor
   // A known check-repair edge with a missing receipt must never restore old targets.
   if (!checkRepair) return null;
   if (!repair || !failedCheck(previous)) throw new FactoryError('factorySourceMismatch');
+  if (candidate) row.sha = await resolveFactoryCandidateSha(tx, task, candidate, row.sha);
   const { rows: [finish] } = await tx.query('SELECT result FROM factory_events WHERE "taskId"=$1 AND "eventId"=$2',
     [task.id, factoryEventId('check-completion', previous.runId ?? '')]);
   const receipt = finish?.result?.task, check = previous.output?.check, completion = previous.output?.completion;
@@ -172,7 +174,13 @@ export async function currentFactoryRequest(tx: Pick<PoolClient, 'query'>, task:
 export async function producerCommandObservations(tx: Pick<PoolClient, 'query'>, task: Pick<FactoryTask, 'id' | 'userId' | 'issueId'>,
   candidate: { id: string; executionSha: string; producerExecution: { runId: string; sessionId: string } }) {
   const producer = candidate.producerExecution
-  const { rows } = await tx.query(`SELECT i.id AS "inputChunkId",o.id AS "outputChunkId",i.seq,i.chunk->>'toolName' AS "toolName",
+  const { rows: [bound] } = await tx.query(`SELECT c.id,c.kind,${reportedCandidateShaSql('c', 'r')} AS "reportedSha"
+    FROM factory_candidates c JOIN factory_tasks t ON t.id=c."taskId"
+    JOIN agent_runs r ON r.id=c."runId" AND r."userId"=t."userId" AND r."issueId"=t."issueId"
+    WHERE r.id=$1 AND r."sessionId"=$2 AND r.status='succeeded' AND t."userId"=$3 AND t."issueId"=$4 AND c.id=$5 AND t.id=$6`,
+  [producer.runId, producer.sessionId, task.userId, task.issueId, candidate.id, task.id])
+  const fixedSha = bound ? await resolveFactoryCandidateSha(tx, task, bound, bound.reportedSha) : null
+  const { rows } = fixedSha === candidate.executionSha ? await tx.query(`SELECT i.id AS "inputChunkId",o.id AS "outputChunkId",i.seq,i.chunk->>'toolName' AS "toolName",
       left((i.chunk->'input')::text,4000) AS "inputJson",length((i.chunk->'input')::text)>4000 AS "inputTruncated",
       o.chunk->>'type' AS "outputType",left(coalesce((o.chunk->'output')::text,to_jsonb(o.chunk->>'errorText')::text),6000) AS "outputJson",
       length(coalesce((o.chunk->'output')::text,to_jsonb(o.chunk->>'errorText')::text))>6000 AS "outputTruncated"
@@ -180,11 +188,10 @@ export async function producerCommandObservations(tx: Pick<PoolClient, 'query'>,
     JOIN agent_runs r ON r.id=i."runId" AND r.id=$1 AND r."sessionId"=$2 AND r."userId"=$3 AND r."issueId"=$4 AND r.status='succeeded'
     JOIN factory_candidates c ON c."runId"=r.id AND c.id=$5 AND c."taskId"=$6
     JOIN factory_tasks t ON t.id=c."taskId" AND t."userId"=$3 AND t."issueId"=$4
-    WHERE COALESCE(c.sha,CASE WHEN c.kind='deliverable' THEN r.report->>'deliverableCommit' END,r.report->>'sourceCommit')=$7
-      AND i.chunk->>'type'='tool-input-available' AND lower(i.chunk->>'toolName') IN ('bash','shell','mcp__mikka__verify_command')
+    WHERE i.chunk->>'type'='tool-input-available' AND lower(i.chunk->>'toolName') IN ('bash','shell','mcp__mikka__verify_command')
       AND o.chunk->>'type' IN ('tool-output-available','tool-output-error')
       AND i."createdAt">=r."startedAt" AND o."createdAt">=i."createdAt" AND o."createdAt"<=r."finishedAt"
-    ORDER BY i.seq DESC,o.seq DESC LIMIT 33`, [producer.runId, producer.sessionId, task.userId, task.issueId, candidate.id, task.id, candidate.executionSha])
+    ORDER BY i.seq DESC,o.seq DESC LIMIT 33`, [producer.runId, producer.sessionId, task.userId, task.issueId, candidate.id, task.id]) : { rows: [] }
   const records = rows.slice(0, 32).reverse().map(({ inputJson, outputJson, ...record }) => ({ ...record,
     input: record.inputTruncated ? null : redactArtifact(JSON.parse(inputJson ?? 'null')),
     output: record.outputTruncated ? null : redactArtifact(JSON.parse(outputJson ?? 'null')) }))
@@ -210,7 +217,7 @@ export async function configureFactoryCheck(
   const {
     rows: [row],
   } = await tx.query(
-    `SELECT c.*,producer.report AS "producerReport",(SELECT json_build_object('status',p.status,'pullRequest',p."pullRequest",'branch',p.branch,'baseBranch',p."baseBranch") FROM run_publications p WHERE p."runId"=producer.id AND p."userId"=$4) AS "publicationReceipt",COALESCE(c.sha,CASE WHEN c.kind='deliverable' THEN producer.report->>'deliverableCommit' END,producer.report->>'sourceCommit') AS "executionSha",r."deviceId",r."deviceRepoId",COALESCE((SELECT settings."verifyCommand" FROM repository_settings settings WHERE settings."userId"=$4 AND settings."remoteKey"=repo."repoPath"),repo."verifyCommand") AS "verifyCommand",repo."remoteUrl",repo."repoPath",d.enabled,d.kind AS "deviceKind",d."lastSeenAt",d.harnesses,a.harness,
+    `SELECT c.*,producer.report AS "producerReport",(SELECT json_build_object('status',p.status,'pullRequest',p."pullRequest",'branch',p.branch,'baseBranch',p."baseBranch") FROM run_publications p WHERE p."runId"=producer.id AND p."userId"=$4) AS "publicationReceipt",${reportedCandidateShaSql()} AS "executionSha",r."deviceId",r."deviceRepoId",COALESCE((SELECT settings."verifyCommand" FROM repository_settings settings WHERE settings."userId"=$4 AND settings."remoteKey"=repo."repoPath"),repo."verifyCommand") AS "verifyCommand",repo."remoteUrl",repo."repoPath",d.enabled,d.kind AS "deviceKind",d."lastSeenAt",d.harnesses,a.harness,
        json_build_object('runId',producer.id,'sessionId',producer."sessionId",'status',producer.status,
          'model',producer."agentDefinition"->>'model','harness',producer."agentDefinition"->>'harness',
          'observedModel',producer.report->'runtime'->>'observedModel') AS "producerExecution",
@@ -226,6 +233,7 @@ export async function configureFactoryCheck(
      AND repo."userId"=$4 AND repo."deviceId"=r."deviceId" FOR SHARE OF repo,d,a`,
     [task.candidateId, task.id, runId, task.userId, task.issueId],
   );
+  if (row) row.executionSha = await resolveFactoryCandidateSha(tx, task, row, row.executionSha);
   if (
     !row ||
     !/^[a-f0-9]{40}$/.test(row.executionSha) ||
@@ -315,7 +323,7 @@ export async function factoryCheckAssignment(
   const {
     rows: [row],
   } = await tx.query(
-    `SELECT t.stage,t.status,t."sourceEventId",t."candidateId",a.output,r."baseBranch",r.kind,r."deviceRepoId",r."deviceId",r."retryOf",r."stopRequestedAt",r."botId",t."botId" AS "taskBotId",a.status AS "attemptStatus",a."candidateId" AS "attemptCandidateId",c.repository,COALESCE(c.sha,CASE WHEN c.kind='deliverable' THEN producer.report->>'deliverableCommit' END,producer.report->>'sourceCommit') AS sha,c.environment,repo."remoteUrl",repo."repoPath"
+    `SELECT t.id AS "taskId",t."issueId",t.stage,t.status,t."sourceEventId",t."candidateId",a.output,r."baseBranch",r.kind,r."deviceRepoId",r."deviceId",r."retryOf",r."stopRequestedAt",r."botId",t."botId" AS "taskBotId",a.status AS "attemptStatus",a."candidateId" AS "attemptCandidateId",c.repository,c.kind AS "candidateKind",${reportedCandidateShaSql()} AS sha,c.environment,repo."remoteUrl",repo."repoPath"
      FROM factory_attempts a JOIN factory_tasks t ON t."attemptId"=a.id
      JOIN agent_runs r ON r.id=a."runId" JOIN factory_candidates c ON c.id=t."candidateId" AND c."taskId"=t.id
      JOIN agent_runs producer ON producer.id=c."runId" AND producer."userId"=$2
@@ -323,6 +331,7 @@ export async function factoryCheckAssignment(
      WHERE r.id=$1 AND t."userId"=$2 AND r."userId"=$2 AND r."issueId"=t."issueId"`,
     [runId, userId],
   );
+  if (row) row.sha = await resolveFactoryCandidateSha(tx, { id: row.taskId, userId, issueId: row.issueId }, { id: row.candidateId, kind: row.candidateKind }, row.sha);
   const check = row?.output?.check;
   const policy = runPolicySchema.safeParse(check?.policy);
   if (
@@ -452,8 +461,8 @@ export async function factoryRepairBrief(
         throw new FactoryError("factoryCheckBindingMismatch");
       const { rows: [context] } = await tx.query(
         `SELECT r.id,r."botId",r.prompt,COALESCE(repo."remoteUrl",repo."repoPath") AS repository,
-          c.repository AS "candidateRepository",producer.id AS "producerRunId",
-          COALESCE(c.sha,CASE WHEN c.kind='deliverable' THEN producer.report->>'deliverableCommit' END,producer.report->>'sourceCommit') AS "candidateSha"
+          c.repository AS "candidateRepository",producer.id AS "producerRunId",c.kind AS "candidateKind",
+          ${reportedCandidateShaSql()} AS "candidateSha"
         FROM factory_candidates c JOIN agent_runs producer ON producer.id=c."runId" AND producer."userId"=$4 AND producer."issueId"=$5
         JOIN agent_runs r ON r.id=$3 AND r."userId"=$4 AND r."issueId"=$5 AND r.status='queued' AND r."stopRequestedAt" IS NULL
         JOIN device_repos repo ON repo.id=r."deviceRepoId" AND repo."userId"=$4 AND repo."deviceId"=r."deviceId"
@@ -461,6 +470,7 @@ export async function factoryRepairBrief(
         WHERE c.id=$1 AND c."taskId"=$2`,
         [previousCheck.candidateId, task.id, runId, task.userId, task.issueId],
       );
+      if (context) context.candidateSha = await resolveFactoryCandidateSha(tx, task, { id: previousCheck.candidateId, kind: context.candidateKind }, context.candidateSha);
       if (!context || !/^[a-f0-9]{40}$/.test(context.candidateSha) ||
         context.repository !== context.candidateRepository || !(await factoryRunBotMatches(tx, task, context)))
         throw new FactoryError("factoryCheckBindingMismatch");

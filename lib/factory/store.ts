@@ -2,6 +2,8 @@ import { repositoryExecutionMatches } from './execution-receipt'
 import { isDeepStrictEqual } from 'node:util'
 import { completeFactoryExecution } from './completed-execution'
 import { completedRunForRecovery } from './completion-recovery'
+import { retainedDeliverableForRecovery, type ObserveRetainedDeliverable, type ObservedRetainedDeliverable } from './deliverable-recovery'
+import { snapshotMatchesScope } from './deliverable-snapshot'
 import { apiKeyWorkerDefinition } from "../agent-kit/worker";
 import { factoryRunBotMatches } from './run-scope'
 import { randomUUID } from "node:crypto";
@@ -50,7 +52,7 @@ export type FactoryTaskSummary = Pick<FactoryTask, "id" | "issueId" | "stage" | 
   candidateSha: string | null;
   /** Latest publication for the current candidate, if any. */
   publication: FactoryPublicationSummary | null;
-  /** Host-confirmed completed execution that the owner can resume into checks. */
+  /** Host-confirmed completed execution or retained delivery that can enter fresh checks. */
   completionRecovery?: { binding: { taskId: string; revision: number } };
 };
 /** Same status union as #441's AcceptancePublication (lib/factory/acceptance-state.ts). */
@@ -371,7 +373,7 @@ export function createFactoryStore(
         return {
           ...(await snapshot(tx, task)),
           ...(await factoryTaskDetail(tx, task)),
-          ...((await completedRunForRecovery(tx, task)) ? { completionRecovery: { binding: { taskId: task.id, revision: task.revision } } } : {}),
+          ...((await completedRunForRecovery(tx, task)) || (await retainedDeliverableForRecovery(tx, task)) ? { completionRecovery: { binding: { taskId: task.id, revision: task.revision } } } : {}),
         };
       });
     },
@@ -411,6 +413,96 @@ export function createFactoryStore(
         return { result, start };
       });
     },
+    /** Owner Retry can recover a legacy missing delivery snapshot from the
+     * original clean worktree. It creates no producer and rewrites no history. */
+    async retryDeliverableSnapshot(userId: string, rawBinding: FactoryBindingInput, eventId: string, reason: string,
+      observe: ObserveRetainedDeliverable, dispatch?: FactoryCompletionDispatch): Promise<{ result: FactorySnapshot; start?: () => Promise<void> } | null> {
+      const binding = revisionBindingSchema.parse(rawBinding);
+      const change = changeSchema.parse({ action: 'retry', reason });
+      uuid(eventId);
+      const input = { binding, change };
+      const receiptFor = async (tx: PoolClient, task: FactoryTask) => {
+        const { rows: [receipt] } = await tx.query('SELECT request,result FROM factory_events WHERE "taskId"=$1 AND "eventId"=$2', [task.id, eventId]);
+        if (!receipt || receipt.request.kind !== 'owner_deliverable_snapshot_recovery') return null;
+        if (!isDeepStrictEqual(receipt.request.input, input)) fail('factoryReplayMismatch');
+        if (receipt.request.scope?.sourceEventId !== task.sourceEventId) fail('factoryStale');
+        return receipt.result as FactorySnapshot;
+      };
+      const prepared = await transaction(async tx => {
+        const task = await owned(tx, userId, binding.taskId);
+        if (terminal(task)) fail('factoryStopped');
+        const replayed = await receiptFor(tx, task);
+        if (replayed) return { kind: 'replay' as const, result: replayed };
+        // Another recovery kind owns this key and handles its own immutable replay.
+        if ((await tx.query('SELECT 1 FROM factory_events WHERE "taskId"=$1 AND "eventId"=$2', [task.id, eventId])).rowCount) return null;
+        if (task.revision !== binding.revision) fail('factoryStale');
+        const eligible = await retainedDeliverableForRecovery(tx, task);
+        return eligible ? { kind: 'prepared' as const, ...eligible } : null;
+      });
+      if (!prepared) return null;
+      if (prepared.kind === 'replay') return { result: prepared.result };
+      let observed: ObservedRetainedDeliverable | undefined;
+      try {
+        // The host observer owns its short maintenance lease. No task/run locks
+        // are retained while E2B resumes, inspects and re-pauses that same VM.
+        observed = await observe(prepared.scope);
+        uuid(observed.leaseId);
+        if (!snapshotMatchesScope(prepared.scope, observed.snapshot) ||
+          Math.abs(Date.now() - Date.parse(observed.snapshot.observedAt)) > 5 * 60_000) fail('factoryDeliverableSnapshotUnavailable');
+        const observation = observed;
+        return await transaction(async tx => {
+          await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`computer-policy:${prepared.scope.workspaceId}`]);
+          const task = await owned(tx, userId, binding.taskId);
+          if (terminal(task)) fail('factoryStopped');
+          const replayed = await receiptFor(tx, task);
+          if (replayed) return { result: replayed };
+          if (task.revision !== binding.revision) fail('factoryStale');
+          await tx.query('SELECT id FROM agent_runs WHERE id=ANY($1::uuid[]) ORDER BY id FOR UPDATE', [[prepared.scope.producerRunId, prepared.scope.machineRunId]]);
+          await tx.query('SELECT id FROM factory_questions WHERE id=$1 FOR UPDATE', [prepared.scope.questionId]);
+          await tx.query('SELECT "runId" FROM run_checkpoints WHERE "runId"=$1 FOR SHARE', [prepared.scope.producerRunId]);
+          await tx.query('SELECT "runId" FROM thread_machines WHERE "runId"=$1 AND "ownerId"=$2 FOR UPDATE', [prepared.scope.machineRunId, userId]);
+          const checked = await retainedDeliverableForRecovery(tx, task, observation.leaseId);
+          if (!checked || !isDeepStrictEqual(checked.scope, prepared.scope)) fail('factoryDeliverableSnapshotUnavailable');
+          const candidateId = randomUUID();
+          const inserted = await tx.query(`INSERT INTO factory_candidates (id,"taskId",sha,repository,environment,scope,"runId","previewDatabaseBranch","machineName",kind)
+            SELECT $1,"taskId",sha,repository,environment,scope,"runId","previewDatabaseBranch","machineName",kind
+            FROM factory_candidates WHERE id=$2 AND "taskId"=$3 AND kind='deliverable' AND sha IS NULL RETURNING id`,
+          [candidateId, task.candidateId, task.id]);
+          if (inserted.rowCount !== 1) fail('factoryDeliverableSnapshotUnavailable');
+          task.candidateId = candidateId;
+          task.reason = reason;
+          await freshAttempt(tx, task, 'review', reason);
+          task.revision++;
+          await tx.query(`UPDATE factory_tasks SET stage='review',status='pending',revision=$2,"attemptId"=$3,"candidateId"=$4,reason=$5,"updatedAt"=now() WHERE id=$1`,
+          [task.id, task.revision, task.attemptId, candidateId, reason]);
+          // A changed candidate derives the old check question as superseded.
+          // Its row, its failed run, the producer and old receipts stay untouched.
+          const request = { kind: 'owner_deliverable_snapshot_recovery', input, scope: checked.scope };
+          const snapshotRecovery = { candidateId, snapshot: observation.snapshot };
+          const initial = { ...await snapshot(tx, task), snapshotRecovery };
+          await tx.query('INSERT INTO factory_events ("taskId","eventId",request,result) VALUES ($1,$2,$3,$4)',
+            [task.id, eventId, JSON.stringify(request), JSON.stringify(initial)]);
+          // The row lock prevents adoption until COMMIT. Clearing our lease in
+          // this transaction lets normal stage admission see a paused source.
+          const released = await tx.query(`UPDATE thread_machines SET "workerLeaseId"=NULL,"workerLeaseUntil"=NULL
+            WHERE "runId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND "sandboxId"=$4 AND "workerLeaseId"=$5 AND "workerLeaseUntil">now() AND state='paused'`,
+          [checked.scope.machineRunId, userId, checked.scope.workspaceId, checked.scope.sandboxId, observation.leaseId]);
+          if (released.rowCount !== 1) fail('factoryDeliverableSnapshotUnavailable');
+          const start = await dispatch?.(tx, store, task, checked.review);
+          const final = await owned(tx, userId, task.id);
+          const result = { ...await snapshot(tx, final), snapshotRecovery };
+          // Both versions are inside this uncommitted transaction. The one
+          // immutable receipt exposed to replays includes the queued review.
+          await tx.query('UPDATE factory_events SET result=$3 WHERE "taskId"=$1 AND "eventId"=$2', [task.id, eventId, JSON.stringify(result)]);
+          return { result, start };
+        });
+      } finally {
+        // The VM is already paused. A transient lease-release error must not
+        // suppress the durable handoff after the task transaction committed.
+        try { await observed?.release(); }
+        catch { console.error(JSON.stringify({ msg: 'factory_deliverable_snapshot_lease_release_failed', taskId: binding.taskId })); }
+      }
+    },
     async listForIssue(userId: string, issueId: string) {
       uuid(issueId);
       return transaction(async (tx) => {
@@ -424,7 +516,7 @@ export function createFactoryStore(
         for (const row of rows)
           if (factoryScopeAllows(row, issue) && await sourceAllowed(tx, userId, row.sourceEventId, issueId)) {
             const { id, issueId, stage, status, revision, attemptId, candidateId, reason, isSkillCandidate, candidateRunId, candidateSha, publication } = row;
-            const completionRecovery = await completedRunForRecovery(tx, row) ? { binding: { taskId: id, revision } } : undefined;
+            const completionRecovery = (await completedRunForRecovery(tx, row)) || (await retainedDeliverableForRecovery(tx, row)) ? { binding: { taskId: id, revision } } : undefined;
             tasks.push({id,issueId,stage,status,revision,attemptId,candidateId,reason:maskFactoryNote(reason),isSkillCandidate,candidateRunId,candidateSha:candidateSha ?? null,publication:publicationSummary(publication),...(completionRecovery ? { completionRecovery } : {})});
             // Same minimal masker copy as #444 (lib/factory/note-mask.ts); switch to #438's once merged.
           }

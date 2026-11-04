@@ -2,11 +2,12 @@ import type { Pool, PoolClient } from 'pg'
 import { z } from 'zod'
 import { FactoryError } from './contract'
 import type { createFactoryStore, FactoryCompletionDispatch } from './store'
+import type { ObserveRetainedDeliverable } from './deliverable-recovery'
 
 type Store = ReturnType<typeof createFactoryStore>
 
 /** Human APIs select the task's persisted Bot; model/runtime stores retain their fixed Bot scope. */
-export function createFactoryHumanStore(pool: Pool, forBot: (botId: string | null) => Store, dispatchCompleted?: FactoryCompletionDispatch): Store {
+export function createFactoryHumanStore(pool: Pool, forBot: (botId: string | null) => Store, dispatchCompleted?: FactoryCompletionDispatch, observeRetained?: ObserveRetainedDeliverable): Store {
   const base = forBot(null)
   async function taskStore(userId: string, taskId: string, tx: Pick<PoolClient, 'query'> = pool) {
     if (!z.uuid().safeParse(taskId).success) throw new FactoryError('factoryNotFound')
@@ -22,6 +23,10 @@ export function createFactoryHumanStore(pool: Pool, forBot: (botId: string | nul
     apply: async (userId, binding, eventId, change, tx) => {
       const store = await taskStore(userId, binding.taskId, tx ?? pool)
       if (!tx && change.action === 'retry') {
+        if (observeRetained) {
+          const recovered = await store.retryDeliverableSnapshot(userId, binding, eventId, change.reason, observeRetained, dispatchCompleted)
+          if (recovered) { await recovered.start?.(); return recovered.result }
+        }
         const completed = await store.retryCompletion(userId, binding, eventId, change.reason, dispatchCompleted)
         if (completed) { await completed.start?.(); return completed.result }
       }
