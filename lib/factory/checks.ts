@@ -20,6 +20,7 @@ import { humanQuestionAnswerSchema, questionFingerprint } from './questions/cont
 import { factoryEventId } from './event-id';
 import { reportedCandidateShaSql, resolveFactoryCandidateSha } from './deliverable-snapshot';
 import { inheritedCommandObservations } from './inherited-command-observations';
+import { intersectRunPolicy } from '../run-assignment-policy';
 
 /** A repair inherits requirements only across the recorded host transition and
  * the adjacent, independently verified failed check. Findings are not answers. */
@@ -230,7 +231,7 @@ export async function configureFactoryCheck(
        json_build_object('runId',producer.id,'sessionId',producer."sessionId",'status',producer.status,
          'model',producer."agentDefinition"->>'model','harness',producer."agentDefinition"->>'harness',
          'observedModel',producer.report->'runtime'->>'observedModel') AS "producerExecution",
-       r."agentId",b."botId" AS "runtimeBotId",b."workspaceId" AS "runtimeWorkspaceId",
+       r."agentId",r."agentDefinition"->'policyCeiling' AS "policyCeiling",b."botId" AS "runtimeBotId",b."workspaceId" AS "runtimeWorkspaceId",
        (EXISTS(SELECT 1 FROM thread_machines tm WHERE tm."deviceId"=d.id AND tm.state='running') OR EXISTS(SELECT 1 FROM cloud_machines cm WHERE cm."deviceId"=d.id AND cm.state='running')) AS "cloudOnline"
      FROM factory_candidates c JOIN agent_runs r ON r.id=$3
      JOIN agent_runs producer ON producer.id=c."runId" AND producer."userId"=$4
@@ -277,7 +278,7 @@ export async function configureFactoryCheck(
     inferCommand: row.kind === 'repository' && !row.verifyCommand?.trim(),
     reportOnly: row.kind === 'deliverable' || row.kind === 'report' || (task.stage === 'review' && !row.verifyCommand?.trim()),
     deviceRepoId: row.deviceRepoId,
-    policy: applyApprovalMode(hostPolicy, "read_only"),
+    policy: applyApprovalMode(intersectRunPolicy(hostPolicy, row.policyCeiling ?? undefined), "read_only"),
   };
   const currentRequest = await currentFactoryRequest(tx, task);
   const prompt = [

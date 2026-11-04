@@ -52,7 +52,8 @@ export function automaticFactoryDispatch(pool: Pool) {
       WHERE f."taskId"=$1 AND f.stage='execute' ORDER BY f.position DESC LIMIT 1`, [task.id])
     if (!source) throw new FactoryError('factoryRunMismatch')
     const check = task.stage !== 'execute'
-    let selection = check ? {} : threadRunModel(source.agentDefinition) ?? {}
+    const inheritedPolicy = source.agentDefinition?.policyCeiling ? { policyCeiling: source.agentDefinition.policyCeiling } : {}
+    let selection = check ? inheritedPolicy : threadRunModel(source.agentDefinition) ?? inheritedPolicy
     const { rows: [pending] } = await tx.query('SELECT output FROM factory_attempts WHERE id=$1 AND "taskId"=$2', [task.attemptId, task.id])
     const recovery = pending?.output?.watchdogRecovery
     let agentId = source.agentId, deviceId = source.deviceId, deviceRepoId = source.deviceRepoId
@@ -75,14 +76,15 @@ export function automaticFactoryDispatch(pool: Pool) {
         agentId = target.id
         deviceId = target.deviceId
         deviceRepoId = (await withDatabaseClient(tx, () => ensureDeviceRepository(task.userId, target.deviceId, source.remoteUrl))).id
-        selection = model
+        // This is a same-model recovery, not a new explicit model request.
+        selection = { ...model, modelDispatch: source.agentDefinition?.modelDispatch, ...inheritedPolicy }
         selected = true
         break
       }
       if (!selected) throw new FactoryError('factoryRecoveryExecutorUnavailable')
     }
     if (source.deviceKind !== 'cloud') {
-      const dispatch = createFactoryDispatch(pool, store, (client, userId, input, botId, context) => queueFactoryRun(client, userId, input, botId, context, undefined, { ...selection, readOnly: check || source.agentDefinition?.readOnly }))
+      const dispatch = createFactoryDispatch(pool, store, (client, userId, input, botId, context) => queueFactoryRun(client, userId, input, botId, context, undefined, { ...selection, pinnedDeviceId: source.agentDefinition?.pinnedDeviceId, readOnly: check || source.agentDefinition?.readOnly }))
       const result = await dispatch(task.userId, { binding: factoryBinding(task), agentId, deviceRepoId }, tx)
       if (!check) await tx.query('UPDATE agent_runs SET "continuesRunId"=$2 WHERE id=$1', [result.runId, source.id])
       if (recovery && !check) await tx.query('UPDATE agent_runs SET "retryOf"=$2,attempt=$3 WHERE id=$1', [result.runId, source.id, source.attempt + 1])
@@ -98,7 +100,7 @@ export function automaticFactoryDispatch(pool: Pool) {
     const actor = { userId: task.userId, workspaceId: source.workspaceId as string }
     const factoryStage = { binding: factoryBinding(task), sourceEventId: task.sourceEventId, sourceRunId: source.id as string }
     const dispatch = createFactoryDispatch(pool, store, (client, _owner, _input, _bot, context) => queueCloudRun(pool, actor, {
-      botId: source.runtimeBotId, issueId: task.issueId, agentId: runtime.agentId, deviceRepoId: repoId, title: issue.title, body: tiptapToText(issue.content), ...model, model: cloudModel,
+      botId: source.runtimeBotId, issueId: task.issueId, agentId: runtime.agentId, deviceRepoId: repoId, title: issue.title, body: tiptapToText(issue.content), ...model, model: cloudModel, ...inheritedPolicy,
       withoutBot: task.botId === null, readOnly: check || source.agentDefinition?.readOnly, idempotencyKey: `factory:${context.attemptId}`,
       allowLocalRecovery: source.agentDefinition?.allowLocalRecovery, sourceEventId: context.sourceEventId,
     }, client, factoryStage), { ...defaultFactoryDispatchAdapters, configure: {

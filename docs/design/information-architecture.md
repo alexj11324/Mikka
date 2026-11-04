@@ -64,7 +64,7 @@ referenced by id (DDD).
 | Team (团队) | A group inside a shared workspace | Team · workspace | `mikka_teams.workspaceId` (`lib/db/team-schema.ts:3-9`) | 设置 › 团队 › 创建团队 (`app/actions/teams.ts:47`) | 设置 › 团队 | 看板 (R-82); 设置 › 你的团队 |
 | Bot | Chats, dispatches threads | Bot · workspace, held by owner | `bots (ownerId, workspaceId, archivedAt)` (`schema.ts:95-115`) | 新建 Bot (`app/actions/bots.ts:45` → `lib/bot-create.ts:14`) | 概览 header (name, look; R-51); defaults in 设置 › Bot 与 Agents | Bot list (R-01); ⌘K |
 | Coordinator | The person's ordinary bot in a workspace (R-06) | Bot · workspace, one per person | `coordinator_bots (ownerId, workspaceId) → bots` (`schema.ts:117-122`; `lib/coordinator/coordinator-bot.ts:5-16`) | On first use | As any bot | Bot list, pinned |
-| Group chat | Chat with several bots and people | Conversation · workspace | `conversations.workspaceId`, `createdBy`; `conversation_members` (`schema.ts:822-836`) | Bot list 「+」 | Group panel | Bot list; ⌘K |
+| Group chat | Chat with several bots and people | Conversation · workspace | `conversations.workspaceId`, `createdBy`; `conversation_members` (`schema.ts:822-836`) | Bot list 「+」 › 新建群聊 | Group panel | Bot list; ⌘K |
 | Agent | Coding worker that runs a thread | Agent · account | `agents.userId`, `deviceId` (`schema.ts:321-328`); choice per person per workspace in `execution_rules (ownerId, workspaceId)` (`schema.ts:126-131`) | Detected on a device | 设置 › Bot 与 Agents | Its mark on 全部线程 rows (R-78) |
 | Thread (run chain) | Work a bot dispatched; a root run and the runs that resume, retry or continue it (`lib/run-chain.ts`) | Thread · workspace where it was dispatched (run by an Agent; the bot only dispatches it) | `agent_runs.userId`, `botId`, `issueId` (`schema.ts:338-398`); no `workspaceId`, reached through `bots.workspaceId` | Dispatched from chat | Its column: 对话, 验收 | 概览 › 线程; 全部线程; chat card; task's 线程 (R-82) |
 | Task (issue) | Work to be done (`MIK-xx`) | Task · workspace (team: its team) | `issues.userId`, `scope` (`schema.ts:30-45`); team tasks in `mikka_team_issues (teamId, workspaceId)` (`team-schema.ts:15-18`) | By a bot in chat, or 新建任务 (R-22) | Task page | 看板; ⌘K; chat chips (R-15) |
@@ -215,7 +215,7 @@ Icon rail (68px, icons only, R-35)
 ├── 重启以更新                   desktop app only
 └── avatar ─ account menu: accounts, workspaces, 创建工作区, 设置, 添加账户, 退出登录 (R-75)
 Card
-├── Bot list (left): bots, group chats; 新建 Bot (R-01)
+├── Bot list (left): bots, group chats; 「+」 › 新建 Bot / 新建群聊 (R-01)
 ├── Centre: chat, or a task page, or a rail page
 └── Right column (R-50, R-82), one of:
     ├── 概览: bot header, tabs 详情 / 线程 / PR / 电脑

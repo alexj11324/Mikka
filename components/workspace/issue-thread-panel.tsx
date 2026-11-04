@@ -14,6 +14,7 @@ import { mergeThreadChunks, runFailureText, runIsActive, runIsWorking, runStopTi
 import { ThreadSteps } from './thread-steps'
 import { ThreadExecutionIdentity } from './thread-execution-identity'
 import { threadQuestionView, type IssueThread } from '@/lib/issue-threads'
+import { threadComposerHarness } from '@/lib/run-model-fallback-view'
 import { ChatComposer } from '@/components/coordinator/chat-composer'
 import { QuoteChip, QuoteLine } from '@/components/artifacts/artifact-quote'
 import { MessageActions } from '@/components/ai-elements/message'
@@ -29,7 +30,7 @@ import { AgentMarkdown } from './agent-markdown'
 import { ComputerCard } from '@/components/computer/computer-card'
 import { harnessLabel } from './issue-threads'
 import { ThreadStatus } from './thread-status-icon'
-import { ThreadQuotaPausedCard, ThreadQuotaSwitchLine } from './thread-quota'
+import { ThreadModelFallbackNotice, ThreadQuotaPausedCard, ThreadQuotaSwitchLine } from './thread-quota'
 import { cn } from '@/lib/utils'
 import { listRunArtifacts } from '@/app/actions/artifacts'
 import { ArtifactIcon } from '@/components/icons/artifact-icon'
@@ -133,10 +134,12 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   const items = data ? threadItems(data.chunks, data.messages, runId) : []
   // A failed run says why under the stage that stopped, else at the end of the conversation.
   const failure = data && view ? runFailureText(view.status, data.thread.error) : null
+  const modelFallback = data?.thread.modelFallback?.filter(item => item.state === 'switched' || item.runId === liveRunId) ?? []
+  const providerExplained = data?.thread.modelFallbackPending || modelFallback.some(item => item.runId === liveRunId)
   const failedStagesId = failure ? [...items].reverse().find(item => item.kind === 'stages' && item.stages.some(stage => !stage.ok))?.id : undefined
   // A message to an ended thread runs it again in the same thread (R-81): 重试 is that message, one tap (N2).
   const canRetry = !!failure && !!data?.thread.detail && data.thread.ownedByCurrentUser && !runIsActive(view?.status ?? '')
-  const failureLine = failure && <div className="flex items-start gap-2" data-slot="thread-failure">
+  const failureLine = failure && !providerExplained && <div className="flex items-start gap-2" data-slot="thread-failure">
     <p className="line-clamp-2 min-w-0 flex-1 text-xs break-words text-destructive/80" title={failure}>{failure}</p>
     {canRetry && <Button variant="outline" size="xs" className="shrink-0 pointer-coarse:h-11" disabled={sending} onClick={() => { void send(t('retry'), true) }}>{t('retry')}</Button>}
   </div>
@@ -253,6 +256,8 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
           {!failedStagesId && failureLine}
           {/* The subscription ran out and the run went on on the person's key (lib/run-quota.ts). */}
           {data.thread.quota?.switched.map(item => <ThreadQuotaSwitchLine key={item.runId} switched={item} />)}
+          {modelFallback.map(item => <ThreadModelFallbackNotice key={item.runId} item={item}
+            retry={item.state !== 'switched' && canRetry ? () => { void send(t('retry'), true) } : undefined} retrying={sending} />)}
           {data.thread.feedbackEligible && <ThreadFeedback runId={runId} />}
         </>}
     </div>
@@ -263,7 +268,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
         again in the same thread (R-81); only a thread the viewer cannot see in full (no `detail`) has none. */}
     {detail && <div data-slot="thread-composer" className="flex shrink-0 flex-col gap-1 p-3">
       {/* Keep the draft editable while stop waits for the daemon; do not queue new work after stop. */}
-      <ChatComposer ref={inputRef} label={t('composer', { agent: harnessLabel(detail.harness) })} value={draft} onChange={setDraft} onSubmit={() => { void send() }} attachmentScope={{ kind: 'thread', id: liveRunId }}
+      <ChatComposer ref={inputRef} label={t('composer', { agent: harnessLabel(threadComposerHarness(detail.harness, liveRunId, modelFallback)) })} value={draft} onChange={setDraft} onSubmit={() => { void send() }} attachmentScope={{ kind: 'thread', id: liveRunId }}
         quote={replyQuote ? <QuoteChip slot="reply-quote-chip" text={replyQuote} onRemove={() => { setReplyQuote(null); inputRef.current?.focus() }} /> : undefined}
         sending={sending || stopPending} editableWhileSending submitDisabled={stopRequested || question === 'resuming'} running={working || question === 'resuming'} thread onStop={working && canStop ? () => { void stop() } : undefined} />
       {sendFailed && <FieldError className="px-3 text-xs">{sendFailed}</FieldError>}

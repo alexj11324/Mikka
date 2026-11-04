@@ -17,6 +17,10 @@ const secret = 'synthetic-stripe-webhook-secret'
 const calls: unknown[][] = []
 let auditRoute: typeof import('../app/api/workspaces/[workspaceId]/audit-log/route')
 let stripeRoute: typeof import('../app/api/billing/stripe/route')
+let settingsRoute: typeof import('../app/api/settings/[read]/route')
+const workspaceBotCalls: unknown[][] = []
+let workspaceBotResult: unknown = { bots: [] }
+let workspaceBotFailure: Error | null = null
 
 before(async () => {
   mock.module('@/lib/auth', { namedExports: { auth: { api: { getSession: async () => user ? { user } : null } } } })
@@ -37,8 +41,69 @@ before(async () => {
   } } })
   mock.module('@/lib/billing/stripe', { namedExports: { stripeConfig: () => ({ webhookSecret: secret }), verifyStripeSignature } })
   mock.module('@/lib/abuse/card', { namedExports: { applyCardSetup: async () => { cardSetupCalls++ }, applyCardCheckout: async () => { cardCheckoutCalls++ } } })
+  // Exercise the existing GET adapter without loading unrelated settings
+  // services. The Bot action retains its own auth/current-workspace checks.
+  for (const [module, names] of Object.entries({
+    '@/app/actions/account': ['getPasswordStatus', 'listSessions'],
+    '@/app/actions/preferences': ['getPreferences'],
+    '@/app/actions/settings-activity': ['listSavedLogins'],
+    '@/app/actions/workspace-settings': ['getWorkspaceDeletionImpact', 'getWorkspaceGeneral', 'getWorkspaceTransferTargets'],
+    '@/app/actions/app-policy': ['getAppPolicy'],
+    '@/app/actions/personal-policy': ['getSharePolicy'],
+    '@/app/actions/workspace-secrets': ['getE2BKeyCapability', 'listSecrets'],
+    '@/app/actions/usage': ['getUsage'],
+    '@/app/actions/billing': ['cardVerificationStatus', 'getBilling', 'getCreditBilling'],
+    '@/app/actions/audit-log': ['listAuditLog'],
+    '@/app/actions/model-order': ['getModelOrder'],
+    '@/app/actions/model-api-keys': ['getApiKeys'],
+  })) mock.module(module, { namedExports: Object.fromEntries(names.map(name => [name, () => { throw new Error('unexpected settings read') }])) })
+  mock.module('@/app/actions/bots', { namedExports: {
+    listBots: () => { throw new Error('owner-only Bot list cannot replace workspace activity') },
+    listWorkspaceBots: async (...args: unknown[]) => {
+      workspaceBotCalls.push(args)
+      if (workspaceBotFailure) throw workspaceBotFailure
+      return workspaceBotResult
+    },
+  } })
   auditRoute = await import('../app/api/workspaces/[workspaceId]/audit-log/route')
   stripeRoute = await import('../app/api/billing/stripe/route')
+  settingsRoute = await import('../app/api/settings/[read]/route')
+})
+
+test('workspace-bots GET preserves the full workspace activity result and delegates scope to the existing action', async () => {
+  workspaceBotCalls.length = 0
+  workspaceBotFailure = null
+  workspaceBotResult = { bots: [{ id: workspaceId, ownerId: 'another-member', status: 'running', runningThreads: 2 }] }
+  const response = await settingsRoute.GET(new Request('https://mikka.example/api/settings/workspace-bots?workspace=untrusted&userId=other'),
+    { params: Promise.resolve({ read: 'workspace-bots' }) })
+  assert.equal(response.status, 200)
+  assert.equal(response.headers.get('cache-control'), 'private, no-store')
+  assert.deepEqual(await response.json(), workspaceBotResult)
+  assert.deepEqual(workspaceBotCalls, [[]], 'no caller-supplied owner/workspace replaces the authenticated action context')
+})
+
+test('workspace-bots GET preserves auth and membership refusals and never substitutes an empty activity list', async () => {
+  workspaceBotCalls.length = 0
+  workspaceBotFailure = null
+  for (const error of ['authRequired', 'workspaceAccessDenied']) {
+    workspaceBotResult = { error }
+    const response = await settingsRoute.GET(new Request('https://mikka.example/api/settings/workspace-bots'),
+      { params: Promise.resolve({ read: 'workspace-bots' }) })
+    assert.equal(response.status, 200, 'Settings GET keeps the action result contract')
+    assert.deepEqual(await response.json(), { error })
+    assert.equal(response.headers.get('cache-control'), 'private, no-store')
+  }
+  assert.equal(workspaceBotCalls.length, 2)
+  workspaceBotFailure = new Error('private store failure')
+  await assert.rejects(settingsRoute.GET(new Request('https://mikka.example/api/settings/workspace-bots'),
+    { params: Promise.resolve({ read: 'workspace-bots' }) }), /private store failure/)
+  workspaceBotFailure = null
+  const callsBefore = workspaceBotCalls.length
+  const unknown = await settingsRoute.GET(new Request('https://mikka.example/api/settings/unknown'),
+    { params: Promise.resolve({ read: 'unknown' }) })
+  assert.equal(unknown.status, 404)
+  assert.deepEqual(await unknown.json(), { error: 'notFound' })
+  assert.equal(workspaceBotCalls.length, callsBefore)
 })
 
 test('audit JSON resumes the same snapshot and preserves explicit export failures', async () => {

@@ -28,7 +28,7 @@ test('a different authenticated identity is rejected and only the transient sess
   const paths = []
   const result = await runGroupProductionAcceptance({ env, fetchImpl: async url => {
     const path = new URL(url).pathname; paths.push(path)
-    if (path.endsWith('/version')) return Response.json({ build: env.GROUP_ACCEPTANCE_DEPLOYMENT })
+    if (path.endsWith('/version')) return Response.json({ build: env.GROUP_ACCEPTANCE_REVISION })
     if (path.endsWith('/sign-in/email')) return Response.json({}, { headers: { 'set-cookie': 'synthetic=session; Path=/' } })
     if (path.endsWith('/get-session')) return Response.json({ user: { email: 'someone-else@example.com' } })
     if (path.endsWith('/sign-out')) return Response.json({})
@@ -44,7 +44,7 @@ test('unavailable Flash stops before a prompt; hosted fallback is not selected a
   let role
   const result = await runGroupProductionAcceptance({ env, fetchImpl: async (url, init) => {
     const path = new URL(url).pathname; calls.push([path, init.method])
-    if (path.endsWith('/version')) return Response.json({ build: env.GROUP_ACCEPTANCE_DEPLOYMENT })
+    if (path.endsWith('/version')) return Response.json({ build: env.GROUP_ACCEPTANCE_REVISION })
     if (path.endsWith('/sign-in/email')) return Response.json({}, { headers: { 'set-cookie': 'synthetic=session; Path=/' } })
     if (path.endsWith('/get-session')) return Response.json({ user: { id: 'fixture-owner', email: env.MIKKA_TEST_ACCOUNT_EMAIL } })
     if (path === '/mikka/api/bots') return Response.json(init.method === 'GET' ? [{ id: 'existing', workspaceId: 'workspace' }] : { id: 'new-owned-bot', workspaceId: 'workspace' })
@@ -80,7 +80,7 @@ function pendingFixture({ recoverFirst = false, wrongCleanupOwner = false, unkno
   const fetchImpl = async (input, init) => {
     const url = new URL(input), path = url.pathname, body = init.body ? JSON.parse(init.body) : null
     calls.push({ path, method: init.method, afterStop: stopCalls > 0 })
-    if (path.endsWith('/version')) return Response.json({ build: env.GROUP_ACCEPTANCE_DEPLOYMENT })
+    if (path.endsWith('/version')) return Response.json({ build: env.GROUP_ACCEPTANCE_REVISION })
     if (path.endsWith('/sign-in/email')) return Response.json({}, { headers: { 'set-cookie': 'synthetic=session; Path=/' } })
     if (path.endsWith('/get-session')) return Response.json({ user: { id: group && wrongCleanupOwner ? 'foreign-owner' : ownerId, email: env.MIKKA_TEST_ACCOUNT_EMAIL } })
     if (path.endsWith('/sign-out')) return Response.json({})

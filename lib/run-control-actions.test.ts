@@ -163,7 +163,7 @@ before(async () => {
   mock.module('@/lib/device-link', { namedExports: { DEVICE_ONLINE_WINDOW_MS: 0, hashDeviceToken: () => { throw new Error('device credentials outside test') }, newDeviceToken: () => { throw new Error('device credentials outside test') }, issueDeviceToken: () => { throw new Error('device credentials outside test') } } })
   mock.module('@/lib/coordinator/store', { namedExports: { citationSources: () => { throw new Error('citations outside test') } } })
   // The thread's quota view (lib/run-quota-view.ts) is covered against real Postgres in tests/run-quota.db.test.ts.
-  mock.module('@/lib/run-quota-view', { namedExports: { threadQuotaView: async () => ({ switched: [], paused: null }) } })
+  mock.module('@/lib/run-quota-view', { namedExports: { threadQuotaView: async () => ({ switched: [], paused: null }), threadModelFallbackState: async () => ({ notices: [], pending: false }) } })
   mock.module('@/lib/thread-dispatch',{namedExports:{explicitNewThread:async()=>false,latestTaskRun:async()=>({id:current.continuation?.id ?? current.run.id}),dispatchToTask:async()=>{current.ordinaryDispatches++;return {thread:'continued',runId:'ordinary-next-run'}}}});
   mock.module('@/lib/factory/runtime',{namedExports:{factoryLifecycleEnabled:()=>true,guardFactoryClaim:async()=>({}),factoryAuthorize:async()=>true,factoryRuntimeForBot:(selectedBot:string|null)=>({questions:{recover:async(actor:unknown,input:unknown)=>{
     assert.equal(selectedBot,botId);current.recoveryCalls.push({actor,input});

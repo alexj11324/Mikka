@@ -41,6 +41,7 @@ import { removeRunCredentials } from "../run-scratch"
 import { createRunMasker, type RunMasker } from "../secret-mask"
 import { SKILLS_DIR, SKILL_BODY_FILE, skillSlug } from "@mikka/protocol/skill"
 import { runQuestion, runSkillMount, runExecution, runRuntime } from "@mikka/protocol/run"
+import { ProviderFailureError, providerFailureSchema, type ProviderFailure } from "@mikka/protocol/provider-failure"
 import { runPolicyDigestInput } from "@mikka/protocol/agent-policy"
 import { createHash, randomUUID } from "node:crypto"
 import { join, resolve } from "node:path"
@@ -105,6 +106,8 @@ import { assertMailboxRunAuthority, mailboxNoticeText, type RunMailbox } from '.
 
 export interface SupervisorDeps {
   downloadChatFile?(assignment: RunAssignment, id: string, signal: AbortSignal): Promise<ChatFileDownload>
+  /** Existing authenticated checkpoint route, before a provider completion releases the lease. */
+  saveCheckpoint?(runId: string, checkpoint: RunCheckpoint): Promise<void>
   journal: RunJournal
   /** Same adapter state root used by RunContext; never supplied by the model. */
   adapterStateDir?: string
@@ -205,7 +208,7 @@ interface ActiveRun {
   repoPath: string
   /** A tool call finished since the last checkpoint. */
   checkpointDue?: boolean
-  checkpointing?: boolean
+  checkpointing?: Promise<boolean>
   lastCheckpointAt?: number
   /** Tree of the last checkpoint taken; unchanged trees are not sent. */
   lastCheckpointTree?: string
@@ -304,25 +307,50 @@ export class RunSupervisor {
       if (run.forcedStop || run.cancelRequested) continue
       const since = run.lastCheckpointAt ?? run.lastProgressAt
       if (!run.checkpointDue && now - since < CHECKPOINT_EVERY_MS) continue
-      run.checkpointing = true
+      await this.saveCheckpoint(runId, run, save, now)
+    }
+  }
+
+  private async saveCheckpoint(runId: string, run: ActiveRun,
+    save: (runId: string, checkpoint: RunCheckpoint) => Promise<void>, now = Date.now(), force = false): Promise<boolean> {
+    // A heartbeat may already be uploading an older tree. Its upload must
+    // finish before the terminal one, so it cannot overwrite the final state.
+    if (run.checkpointing) await run.checkpointing
+    const entry = this.deps.journal.get(runId)
+    if (!entry?.worktree || !entry.baseCommit || run.forcedStop || run.cancelRequested || this.stopping) return false
+    const { worktree, baseCommit } = entry
+    const pending = (async () => {
       try {
         const taken = await takeCheckpoint({
           repoPath: run.repoPath,
-          worktree: entry.worktree,
-          baseCommit: entry.baseCommit,
-          lastTree: run.lastCheckpointTree,
+          worktree,
+          baseCommit,
+          // A terminal upload also refreshes an unchanged/empty snapshot. A
+          // much older identical tree would fail the server's freshness gate.
+          lastTree: force ? undefined : run.lastCheckpointTree,
         })
         const masker = this.maskers.get(runId)
-        if (taken?.checkpoint) await save(runId, masker ? masker.checkpoint(taken.checkpoint) : taken.checkpoint)
+        const checkpoint = taken?.checkpoint ? masker ? masker.checkpoint(taken.checkpoint) : taken.checkpoint : undefined
+        if (checkpoint) await save(runId, checkpoint)
         if (taken) run.lastCheckpointTree = taken.tree
         run.checkpointDue = false
         run.lastCheckpointAt = now
+        return checkpoint ? !checkpoint.unavailableReason : !force
       } catch (error) {
         this.deps.log.warn({ run_id: runId, err: error }, "checkpoint failed")
-      } finally {
-        run.checkpointing = false
+        return false
       }
-    }
+    })()
+    run.checkpointing = pending
+    try { return await pending }
+    finally { if (run.checkpointing === pending) run.checkpointing = undefined }
+  }
+
+  private async saveProviderCheckpoint(runId: string, run: ActiveRun): Promise<"ready" | "unavailable"> {
+    // Even an older uploaded snapshot cannot stand in for this final tree.
+    // The server may continue an unavailable one only in its original worktree.
+    return this.deps.saveCheckpoint && await this.saveCheckpoint(runId, run, this.deps.saveCheckpoint, Date.now(), true)
+      ? "ready" : "unavailable"
   }
 
   /** Lease and watchdog pass; the daemon calls it on every tick. */
@@ -807,6 +835,21 @@ export class RunSupervisor {
     report: HandoffReport = baseReport(error),
   ) {
     this.active.get(runId)?.toolApproval?.revoke()
+    // Report collection and capture uploads can await after the provider's
+    // terminal event. A stop received in that interval still owns completion.
+    const active = this.active.get(runId)
+    if ((stopReason === "provider_failure" || stopReason === "quota_exhausted") && (active?.cancelRequested || active?.forcedStop)) {
+      stopReason = active.forcedStop ?? "cancelled"
+      error = undefined
+    }
+    if (stopReason !== "provider_failure" && report.providerFailure) {
+      const { providerFailure: _failure, ...rest } = report
+      report = rest
+    }
+    if (stopReason !== "provider_failure" && stopReason !== "quota_exhausted" && report.providerCheckpoint) {
+      const { providerCheckpoint: _checkpoint, ...rest } = report
+      report = rest
+    }
     // The kind the orchestrator dispatched, not what the agent said: an
     // agent must not be able to make a run read as a planning one (ADR ORV-205).
     const entry = this.deps.journal.get(runId)
@@ -1157,12 +1200,19 @@ export class RunSupervisor {
     }
     this.active.set(runId, run)
     run.done = this.drive(runId, repo, run)
-      .catch((error: unknown) => {
+      .catch(async (error: unknown) => {
         const message = error instanceof Error ? error.message : String(error)
         this.deps.log.error({ run_id: runId, err: error }, "run failed")
         if (this.stopping) return
         try {
-          this.finish(runId, run.cancelRequested ? run.forcedStop ?? "cancelled" : error instanceof CheckpointRecoveryError ? 'blocked' : "error", run.cancelRequested ? undefined : message)
+          const providerFailure = run.cancelRequested ? undefined : startupProviderFailure(error)
+          const providerCheckpoint = providerFailure ? await this.saveProviderCheckpoint(runId, run) : undefined
+          if (this.stopping) return
+          this.finish(runId,
+            run.cancelRequested ? run.forcedStop ?? "cancelled" : providerFailure ? "provider_failure" : error instanceof CheckpointRecoveryError ? 'blocked' : "error",
+            run.cancelRequested ? undefined : message,
+            { ...baseReport(run.cancelRequested ? undefined : message), ...(providerFailure ? { providerFailure, providerCheckpoint } : {}) },
+          )
         } catch (finishError) {
           this.deps.log.error(
             { run_id: runId, err: finishError },
@@ -1577,6 +1627,10 @@ export class RunSupervisor {
         let report = stopReason === "quota_exhausted"
           ? { ...outcome.report, resetsAt: event.quota?.resetsAt ?? null }
           : outcome.report
+        if (stopReason === "provider_failure") {
+          report = { ...report, providerFailure: providerFailureSchema.parse(event.providerFailure),
+            ...(event.quota ? { resetsAt: event.quota.resetsAt } : {}) }
+        }
         const policy = runPolicy(assignment.policy)
         if (
           stopReason === "submitted" &&
@@ -1601,6 +1655,8 @@ export class RunSupervisor {
         }
         // Captures go up before the run reports its end; a stopping daemon does not wait for them.
         if (!this.stopping) await this.flushCaptures(runId)
+        if (stopReason === "provider_failure" || stopReason === "quota_exhausted") report = { ...report, providerCheckpoint: await this.saveProviderCheckpoint(runId, run) }
+        if (this.stopping) return
         this.finish(runId, stopReason, error ?? verifyError, report)
         log.info(
           { outcome: event.outcome, stop_reason: stopReason },
@@ -1733,12 +1789,21 @@ function pickAgentReport(agent: AgentReport | undefined): AgentReport {
  * other ended run, except a verified hand-in, is cleaned up when it left no
  * commit and no change.
  */
-const KEEP_WORKTREE: readonly StopReason[] = ["turn_ended", "asked_human", "quota_exhausted"]
+const KEEP_WORKTREE: readonly StopReason[] = ["turn_ended", "asked_human", "quota_exhausted", "provider_failure"]
+
+/** Only an adapter's explicit wrapper is trusted, including hosted startup wrappers. */
+function startupProviderFailure(error: unknown): ProviderFailure | undefined {
+  for (let depth = 0; depth < 5 && error instanceof Error; depth++, error = error.cause) {
+    if (error instanceof ProviderFailureError) return providerFailureSchema.parse(error.providerFailure)
+  }
+  return undefined
+}
 
 function stopReasonOf(event: ExitEvent, run: ActiveRun, assignment: RunAssignment): StopReason {
   if (run.forcedStop) return run.forcedStop
   if (event.outcome === "cancelled" || run.cancelRequested) return "cancelled"
-  if (event.stopReason) return event.stopReason
+  if (event.outcome === "failed" && providerFailureSchema.safeParse(event.providerFailure).success) return "provider_failure"
+  if (event.stopReason && event.stopReason !== "provider_failure") return event.stopReason
   // The continuation goes on in this worktree, on a key or after the reset.
   if (event.outcome === "failed" && event.quota && quotaStopApplies(assignment)) return "quota_exhausted"
   return event.outcome === "failed" ? "error" : "turn_ended"

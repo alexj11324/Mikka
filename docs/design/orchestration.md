@@ -189,6 +189,37 @@ not report the model ([1400](decisions/2026-11-02-1400-model-order-dispatch.md),
    rows that fix it: 打开模型与订阅, 连接电脑, 填入 E2B Key. Answering a row makes
    the bot dispatch again.
 
+**Runtime provider failure (#1225).** A thread dispatched from 优先使用的模型
+can discover an empty balance, refused credentials or a provider outage only
+after a real model request; a successful model-list request does not prove it
+can run. That run ends with its original model frozen. The host creates a new
+run from the latest allowed preferences, excluding entries already tried for
+this task and rechecking credential and machine authority. An explicitly
+selected model stays selected and gets the unavailable card. Older quota-only
+runs keep the quota recovery in §2.
+
+The sanitized failure in the run report also informs the chooser and later
+tasks, scoped to the requester, workspace and frozen credential. Only an
+explicit provider-failure stop without a stop request is failure evidence:
+
+- Balance and authentication failures block that credential until the person
+  refreshes or replaces the API key, reconnects the subscription with a new
+  revision, or a later run succeeds on the credential.
+- Temporary provider failures block only that credential's Agent/model entry
+  for two minutes; a later success on the same entry clears it sooner. A late
+  older completion cannot undo recovery. Missing authority and paused or
+  disconnected credentials always take precedence.
+
+The open thread names the failed model and reason, then 「已改用」 and the
+replacement only after the host commits the continuation. Pending recovery
+keeps polling without displaying an unconfirmed switch; a cancelled or obsolete
+recovery stops polling without claiming that no model is available. If no entry can run,
+the existing 「没有能跑这个任务的模型」 card lists the reasons and opens 模型与订阅.
+Independent review, verification and monitoring runs remain independent: their
+switch line requires the host adoption receipt, matching definition and both
+attempts on the same owned task. This read-only association does not extend
+the conversation's send or stop chain.
+
 **When a machine goes away during a thread:**
 
 - **The E2B sandbox is gone:** start a new one from the template and continue

@@ -31,6 +31,7 @@ test('real Factory admission preserves host scope, policy and transaction owners
   t.after(() => { if (priorByos === undefined) delete process.env.MIKKA_BYOS_ENABLED; else process.env.MIKKA_BYOS_ENABLED = priorByos })
   const { pool } = await import('../lib/db')
   const { workspacePool } = await import('../lib/workspace-db')
+  const { readOrder } = await import('../lib/model-order')
   const { queueRun, queueFactoryRun } = await import('../lib/agent-runs')
   const { acceptedEventStillMatches } = await import('../lib/run-admission-store')
   const { lockCliAgentPolicy, readCliAgentPolicy } = await import('../lib/agent-tool-approval/policy-store')
@@ -122,6 +123,12 @@ test('real Factory admission preserves host scope, policy and transaction owners
       const admitted = await dispatch(f)
       const run = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [admitted.runId])).rows[0]
       const publication = (await pool.query('SELECT * FROM run_publications WHERE "runId"=$1', [admitted.runId])).rows[0]
+      const defaultOrder = await readOrder(pool, { ownerId: f.userId, workspaceId: f.workspaceId })
+      assert.equal(defaultOrder.customized, false, 'ordinary Factory admission uses the untouched default order')
+      assert.equal(defaultOrder.entries[0].source.kind, 'subscription')
+      assert.ok(defaultOrder.entries[0].id.startsWith('default:'))
+      assert.ok(!defaultOrder.entries[0].id.includes('\u0000'), 'the default row id is safe to freeze in JSONB')
+      assert.deepEqual(run.agentDefinition.modelDispatch.entry, defaultOrder.entries[0], 'admission preserves the chosen model and credential identity')
       assert.equal(run.agentDefinition.repositoryAdmission.authority, 'owner_credential')
       assert.equal(run.agentDefinition.repositoryAdmission.approvedAt, undefined)
       assert.equal(run.agentDefinition.repositoryAdmission.remoteKey, f.remoteKey)

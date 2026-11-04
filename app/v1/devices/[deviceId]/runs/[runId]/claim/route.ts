@@ -26,8 +26,8 @@ import { issueRunToken } from '@/lib/mcp/worker'
 import { issueForUser } from '@/lib/issue-access'
 import { failRunForDaemonUpgrade, latestCheckpoint } from '@/lib/run-leases'
 import { continuationFollowUp } from '@/lib/thread-continuation'
-import { checkpointRecoveryError, quotaContinuationNote, retryNote } from '@/lib/run-retry'
-import { constrainedAssignmentPolicy } from '@/lib/run-assignment-policy'
+import { checkpointRecoveryError, providerContinuationNote, quotaContinuationNote, retryNote } from '@/lib/run-retry'
+import { constrainedAssignmentPolicy, intersectRunPolicy } from '@/lib/run-assignment-policy'
 import { localComputerAuthority } from '@/lib/computer/local-authority'
 import { SKILL_ARTIFACT_HEADER, TEAM_SKILL_HEADER } from '@mikka/protocol/skill'
 import { claimBenchmarkAssignment, skillAssignments } from '@/lib/self-improvement/server'
@@ -101,12 +101,17 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
   // Historical generic retries cannot turn an original-session answer into
   // a fresh execution, even when their Factory attempt is no longer present.
   if (run.retryOf && await blockQuestionRetry(pool, caller.userId, run.issueId, runId) && (await afterRunEnded(caller.userId, runId), true)) return NextResponse.json({ error: 'Generic retry cannot replay an original-session question answer; explicit recovery required.' }, { status: 409 })
-  const resumeFrom = run.retryOf ? await latestCheckpoint(run.retryOf) : null
   const [lost] = run.retryOf
-    ? await db.select({ sessionId: agentRuns.sessionId, deviceId: agentRuns.deviceId, stopReason: agentRuns.stopReason }).from(agentRuns).where(eq(agentRuns.id, run.retryOf)).limit(1)
+    ? await db.select({ sessionId: agentRuns.sessionId, deviceId: agentRuns.deviceId, agentId: agentRuns.agentId, stopReason: agentRuns.stopReason, agentDefinition: agentRuns.agentDefinition, report: agentRuns.report }).from(agentRuns)
+      .where(and(eq(agentRuns.id, run.retryOf), eq(agentRuns.userId, caller.userId), run.issueId === null ? isNull(agentRuns.issueId) : eq(agentRuns.issueId, run.issueId))).limit(1)
     : []
+  const providerCheckpointUnavailable = lost?.stopReason === 'provider_failure' && lost.report?.providerCheckpoint === 'unavailable'
+  // A failed final upload supersedes any older patch. Only the original
+  // worktree may continue; another device must never replay an older tree.
+  const resumeFrom = run.retryOf && !providerCheckpointUnavailable ? await latestCheckpoint(run.retryOf) : null
   const recoveryError = run.retryOf
-    ? checkpointRecoveryError(resumeFrom) ?? (!resumeFrom ? 'No uploaded recovery snapshot is available.' : null)
+    ? providerCheckpointUnavailable ? 'A usable final recovery snapshot is unavailable. Continue in the original worktree.'
+      : checkpointRecoveryError(resumeFrom) ?? (!resumeFrom ? 'No uploaded recovery snapshot is available.' : null)
     : null
   const requireWorktreeContinuation = Boolean(recoveryError && lost?.deviceId === deviceId && request.headers.get(RECOVERY_WORKTREE_HEADER) === '1')
   if (recoveryError && !requireWorktreeContinuation) {
@@ -290,11 +295,17 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
   // when the harness can, its session; the daemon falls back to `prompt`.
   // Another machine has no such worktree and starts from the latest
   // checkpoint instead.
+  // Historical runs have no frozen definition. Only the same owned Agent
+  // proves their harness; an unknown source on another Agent cannot resume.
+  const retryHarness = lost?.agentDefinition?.harness
+    ?? (lost?.agentDefinition == null && lost?.agentId === run.agentId ? agent.harness : undefined)
   const retry = run.retryOf
     ? {
       // A continuation after a used-up quota (lib/run-quota.ts) is told that, not a lost machine.
-      continuesRunId: run.retryOf, followUp: lost?.stopReason === 'quota_exhausted' ? quotaContinuationNote() : retryNote(run.attempt),
-      ...(lost?.sessionId && lost.deviceId === deviceId ? { resumeSessionId: lost.sessionId } : {}),
+      continuesRunId: run.retryOf, followUp: lost?.stopReason === 'provider_failure' ? providerContinuationNote() : lost?.stopReason === 'quota_exhausted' ? quotaContinuationNote() : retryNote(run.attempt),
+      // A fallback keeps the worktree across harnesses, but native session
+      // identifiers belong only to the harness that created them.
+      ...(lost?.sessionId && lost.deviceId === deviceId && retryHarness === harness ? { resumeSessionId: lost.sessionId } : {}),
       ...(resumeFrom && !requireWorktreeContinuation ? { resumeFrom } : {}),
       ...(requireWorktreeContinuation ? { requireWorktreeContinuation: true as const } : {}),
     }
@@ -324,7 +335,11 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ devi
     ? { ...executionPolicy, permissions: { ...executionPolicy.permissions, computer_use: executionPolicy.readOnly ? 'deny' as const : computerPermission } }
     : executionPolicy
   let assignmentPolicy: typeof policy
-  try { assignmentPolicy = constrainedAssignmentPolicy(policy, benchmarkAssignment?.policy ?? factoryClaim.policy) }
+  try {
+    // Publication/computer grants are composed above. They cannot restore a
+    // capability the original provider execution explicitly withheld.
+    assignmentPolicy = constrainedAssignmentPolicy(intersectRunPolicy(policy, run.agentDefinition?.policyCeiling), benchmarkAssignment?.policy ?? factoryClaim.policy)
+  }
   catch {
     const { persistRunCompletion } = await import('@/lib/run-publications')
     await persistRunCompletion(caller.userId, runId, { stopReason: 'error', report: { summary: 'Frozen execution policy no longer fits the current owner policy.', filesChanged: [], verify: { status: 'not_run' }, openQuestions: [], nextStep: null } }, caller.scopeDeviceId)

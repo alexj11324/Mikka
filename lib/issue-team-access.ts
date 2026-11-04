@@ -3,7 +3,7 @@ import { and, eq, inArray, or } from 'drizzle-orm'
 import { workspaceDb } from '@/lib/workspace-db'
 import { teamIssues } from '@/lib/db/team-schema'
 import { workspaceMembers } from '@/lib/db/workspace-schema'
-import { accessibleTeams } from '@/lib/team-access'
+import { accessibleTeamScopes, type TeamScope } from '@/lib/team-access'
 
 /**
  * Team links of `ids` and of every team the user can access. With
@@ -12,10 +12,14 @@ import { accessibleTeams } from '@/lib/team-access'
  * about (an empty list reads nothing). Without it every accessible team's
  * links are read, as list views need.
  */
-export async function issueTeamScope(userId: string, ids: string[] = [], options: { onlyIssueIds?: readonly string[] } = {}) {
+export async function issueTeamScope(userId: string, ids: string[] = [], options: {
+  onlyIssueIds?: readonly string[]
+  /** Membership read earlier in this same operation; never retain across requests. */
+  teams?: readonly TeamScope[]
+} = {}) {
   const only = options.onlyIssueIds
   if (only && !only.length) return []
-  const allowed = await accessibleTeams(userId)
+  const allowed = options.teams ?? await accessibleTeamScopes(userId)
   const teamIds = allowed.map(team => team.id)
   if (!ids.length && !teamIds.length) return []
   const links = await workspaceDb.select({ issueId: teamIssues.issueId, teamId: teamIssues.teamId, workspaceId: teamIssues.workspaceId }).from(teamIssues)
