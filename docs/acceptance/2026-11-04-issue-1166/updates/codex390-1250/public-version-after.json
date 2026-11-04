@@ -1,0 +1,10 @@
+{
+  "observedAt": "2026-11-04T19:21:27.431040+00:00",
+  "status": 200,
+  "version": {
+    "build": "56a499e9079e2b8d8964162658739c2848204ed9",
+    "minMobileBuild": 0,
+    "mobileUpdateUrl": "itms-beta://beta.itunes.apple.com/v1/app/6829300983",
+    "minDesktopVersion": null
+  }
+}

@@ -1,0 +1,179 @@
+{
+  "observedAt": "2026-11-04T19:19:07.792Z",
+  "id": "03e5559f-c67d-455b-813f-d64b085a7907",
+  "status": "succeeded",
+  "sessionId": "01a1a7fe-675c-7ac0-8159-563ca54fb6dc",
+  "finishedAt": "2026-11-04T19:18:38.455Z",
+  "stopReason": "submitted",
+  "report": {
+    "check": {
+      "sha": "8f418086fff9bcd42d17e32de7b7f4a968fdfc0a",
+      "readOnly": true
+    },
+    "verify": {
+      "status": "not_run"
+    },
+    "summary": "独立核验固定候选 b251f0b5-3aa6-4e70-b57a-282161c969a1：只读 inspect_artifact 返回完整正文，匹配本次 85 字节契约；当前文件及提交快照 SHA256 相同，Git 比较一致。实际第二行算式成立。另有本次凭证绑定的 producer 命令记录，可核对其真实输出与 exit 0。未修改候选或其他文件。",
+    "criteria": [
+      {
+        "text": "候选正文 contentUtf8 逐字节匹配本次 expectedUtf8，包括换行及末尾 LF。",
+        "passed": true,
+        "evidence": "本次独立 mikka.inspect_artifact 返回 contentUtf8=\"factory-1146-codex-d8f3d3f2 resume-1146-recheck-6a265954\\n7 - 4 = 3\\nverified artifact\\n\"；matchesExpectedUtf8=true。完整返回同时给出 path=factory-1146-codex-d8f3d3f2.txt。"
+      },
+      {
+        "text": "实际 UTF-8 字节数、SHA256 与本次契约一致，且候选内容与 Git 提交快照一致。",
+        "passed": true,
+        "evidence": "本次独立 mikka.inspect_artifact 返回 bytes=85，sha256=4e80716f5de244c05cab6f9fdf3d93c90f35fc2cabcf4a07ae79772c48d35032，committedSha256=4e80716f5de244c05cab6f9fdf3d93c90f35fc2cabcf4a07ae79772c48d35032，head=8f418086fff9bcd42d17e32de7b7f4a968fdfc0a，contentMatchesGit=true。"
+      },
+      {
+        "text": "实际第二行算式语义正确。",
+        "passed": true,
+        "evidence": "从本次 inspect 返回的 contentUtf8 读取第二行得到“7 - 4 = 3”；7 减 4 等于 3。"
+      },
+      {
+        "text": "Producer 对实际文件执行了算式语义、字节数、SHA256 和 Git 快照检查并留存真实命令结果。",
+        "passed": true,
+        "command": "/bin/bash -lc [producer supplied command recorded in inherited run chunk]",
+        "evidence": "凭证绑定的 inherited producer observation run-chunk:da925461-a884-428d-a024-62d647a50cb2（sourceRunId=e57a6d03-510e-496f-bd88-97375318cd9e，sourceSessionId=01a1a2a5-76f1-7881-b182-311eba17fa98，sourceStatus=failed）记录了命令及 exitCode=0。其实际输出为 wc -c=85；sha256=4e80716f5de244c05cab6f9fdf3d93c90f35fc2cabcf4a07ae79772c48d35032；matchesExpectedUtf8=true；“7 - 4 = 3: true”；HEAD=8f418086fff9bcd42d17e32de7b7f4a968fdfc0a；HEAD 文件 SHA256 相同；targetDiffExit=0；git status --short 为空且变更文件数为 0。该命令观察属于先前 producer 执行段，不是本检查者新运行。",
+        "exitCode": 0
+      }
+    ],
+    "nextStep": "等待本人通过正常 owner UI 验收。",
+    "filesChanged": [],
+    "sourceCommit": "8f418086fff9bcd42d17e32de7b7f4a968fdfc0a",
+    "openQuestions": []
+  },
+  "apiKeyClaims": "0",
+  "chunks": [
+    {
+      "id": "c9848be7-4997-442e-8e2b-c92496634943",
+      "seq": 62,
+      "chunk": {
+        "type": "tool-input-available",
+        "input": {
+          "path": "factory-1146-codex-d8f3d3f2.txt",
+          "expectedUtf8": "factory-1146-codex-d8f3d3f2 resume-1146-recheck-6a265954\n7 - 4 = 3\nverified artifact\n"
+        },
+        "toolName": "mcp__mikka__inspect_artifact",
+        "toolCallId": "exec-46282c33-4dde-43a0-937b-2e5cd6108d6a"
+      },
+      "createdAt": "2026-11-04T19:17:51.330112+00:00"
+    },
+    {
+      "id": "19fc2738-b55e-408a-8f25-3f52d463fa71",
+      "seq": 63,
+      "chunk": {
+        "type": "tool-output-available",
+        "output": [
+          {
+            "text": "{\"path\":\"factory-1146-codex-d8f3d3f2.txt\",\"bytes\":85,\"sha256\":\"4e80716f5de244c05cab6f9fdf3d93c90f35fc2cabcf4a07ae79772c48d35032\",\"head\":\"8f418086fff9bcd42d17e32de7b7f4a968fdfc0a\",\"committedSha256\":\"4e80716f5de244c05cab6f9fdf3d93c90f35fc2cabcf4a07ae79772c48d35032\",\"contentMatchesGit\":true,\"contentUtf8\":\"factory-1146-codex-d8f3d3f2 resume-1146-recheck-6a265954\\n7 - 4 = 3\\nverified artifact\\n\",\"textUnavailable\":null,\"matchesExpectedUtf8\":true}",
+            "type": "text"
+          }
+        ],
+        "toolCallId": "exec-46282c33-4dde-43a0-937b-2e5cd6108d6a"
+      },
+      "createdAt": "2026-11-04T19:17:51.772406+00:00"
+    },
+    {
+      "id": "06a5bac3-b8d8-4c90-951b-404514935ba1",
+      "seq": 186,
+      "chunk": {
+        "type": "tool-input-available",
+        "input": {
+          "summary": "独立核验固定候选 b251f0b5-3aa6-4e70-b57a-282161c969a1：只读 inspect_artifact 返回完整正文，匹配本次 85 字节契约；当前文件及提交快照 SHA256 相同，Git 比较一致。实际第二行算式成立。另有本次凭证绑定的 producer 命令记录，可核对其真实输出与 exit 0。未修改候选或其他文件。",
+          "criteria": [
+            {
+              "text": "候选正文 contentUtf8 逐字节匹配本次 expectedUtf8，包括换行及末尾 LF。",
+              "passed": true,
+              "evidence": "本次独立 mikka.inspect_artifact 返回 contentUtf8=\"factory-1146-codex-d8f3d3f2 resume-1146-recheck-6a265954\\n7 - 4 = 3\\nverified artifact\\n\"；matchesExpectedUtf8=true。完整返回同时给出 path=factory-1146-codex-d8f3d3f2.txt。"
+            },
+            {
+              "text": "实际 UTF-8 字节数、SHA256 与本次契约一致，且候选内容与 Git 提交快照一致。",
+              "passed": true,
+              "evidence": "本次独立 mikka.inspect_artifact 返回 bytes=85，sha256=4e80716f5de244c05cab6f9fdf3d93c90f35fc2cabcf4a07ae79772c48d35032，committedSha256=4e80716f5de244c05cab6f9fdf3d93c90f35fc2cabcf4a07ae79772c48d35032，head=8f418086fff9bcd42d17e32de7b7f4a968fdfc0a，contentMatchesGit=true。"
+            },
+            {
+              "text": "实际第二行算式语义正确。",
+              "passed": true,
+              "evidence": "从本次 inspect 返回的 contentUtf8 读取第二行得到“7 - 4 = 3”；7 减 4 等于 3。"
+            },
+            {
+              "text": "Producer 对实际文件执行了算式语义、字节数、SHA256 和 Git 快照检查并留存真实命令结果。",
+              "passed": true,
+              "command": "/bin/bash -lc [producer supplied command recorded in inherited run chunk]",
+              "evidence": "凭证绑定的 inherited producer observation run-chunk:da925461-a884-428d-a024-62d647a50cb2（sourceRunId=e57a6d03-510e-496f-bd88-97375318cd9e，sourceSessionId=01a1a2a5-76f1-7881-b182-311eba17fa98，sourceStatus=failed）记录了命令及 exitCode=0。其实际输出为 wc -c=85；sha256=4e80716f5de244c05cab6f9fdf3d93c90f35fc2cabcf4a07ae79772c48d35032；matchesExpectedUtf8=true；“7 - 4 = 3: true”；HEAD=8f418086fff9bcd42d17e32de7b7f4a968fdfc0a；HEAD 文件 SHA256 相同；targetDiffExit=0；git status --short 为空且变更文件数为 0。该命令观察属于先前 producer 执行段，不是本检查者新运行。",
+              "exitCode": 0
+            }
+          ],
+          "nextStep": "等待本人通过正常 owner UI 验收。"
+        },
+        "toolName": "mcp__mikka__submit",
+        "toolCallId": "exec-0d79b654-2844-4e34-905c-b41f9a8da224"
+      },
+      "createdAt": "2026-11-04T19:18:23.907524+00:00"
+    },
+    {
+      "id": "f2c79d09-3728-42fd-aa30-c40e46bd7278",
+      "seq": 187,
+      "chunk": {
+        "type": "tool-output-available",
+        "output": [
+          {
+            "text": "Handed in. End your turn now.",
+            "type": "text"
+          }
+        ],
+        "toolCallId": "exec-0d79b654-2844-4e34-905c-b41f9a8da224"
+      },
+      "createdAt": "2026-11-04T19:18:24.995412+00:00"
+    },
+    {
+      "id": "4e96f737-48f1-49fe-97cc-461feec12daa",
+      "seq": 252,
+      "chunk": {
+        "type": "finish"
+      },
+      "createdAt": "2026-11-04T19:18:36.591915+00:00"
+    }
+  ],
+  "nativeIdentity": {
+    "observedAt": "2026-11-04T19:17:57.520Z",
+    "id": "03e5559f-c67d-455b-813f-d64b085a7907",
+    "status": "running",
+    "sessionId": "01a1a7fe-675c-7ac0-8159-563ca54fb6dc",
+    "startedAt": "2026-11-04T19:16:47.839Z",
+    "finishedAt": null,
+    "harness": "codex",
+    "model": "gpt-6-luna",
+    "cliModelSelection": "explicit",
+    "modelDispatch": {
+      "mode": "preference",
+      "entry": {
+        "id": "50af81e9-88af-4c8c-8314-2649eb69f07e",
+        "model": "gpt-6-luna",
+        "source": {
+          "kind": "subscription",
+          "connectionId": "ef66c1d8-2bbc-48e9-abf3-2ce3787ceef5"
+        },
+        "harness": "codex"
+      },
+      "location": "cloud"
+    },
+    "subscription": {
+      "route": "codex_cli",
+      "modelId": "gpt-6-luna",
+      "bindingId": "6baa0065-17c5-485f-8d40-3fdd1f58a13b"
+    },
+    "nativeClaims": [
+      {
+        "route": "codex_cli",
+        "modelId": "gpt-6-luna",
+        "bindingId": "6baa0065-17c5-485f-8d40-3fdd1f58a13b",
+        "connectionId": "ef66c1d8-2bbc-48e9-abf3-2ce3787ceef5",
+        "connectionRevision": 2
+      }
+    ],
+    "apiKeyClaims": "0"
+  }
+}
+

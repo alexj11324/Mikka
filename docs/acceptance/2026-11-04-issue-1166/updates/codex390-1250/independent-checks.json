@@ -1,0 +1,176 @@
+[
+  {
+    "observedAt": "2026-11-04T19:19:09.559Z",
+    "id": "9ea956ce-a604-4c2e-a724-fb04fa5a3c9b",
+    "stage": "approval",
+    "status": "pending",
+    "revision": 34,
+    "candidateId": "b251f0b5-3aa6-4e70-b57a-282161c969a1",
+    "attemptId": "cf0b5533-72c6-43ec-90f4-ab1b713a3956",
+    "checks": [
+      {
+        "id": "f8520307-2202-4177-ae25-7199c4ebb166",
+        "runId": "4545fb6d-745f-4997-8785-5d263a67de96",
+        "stage": "review",
+        "output": {
+          "check": {
+            "sha": "8f418086fff9bcd42d17e32de7b7f4a968fdfc0a",
+            "stage": "review",
+            "policy": {
+              "readOnly": true,
+              "permissions": {
+                "network": "allow",
+                "git_push": "deny",
+                "computer_use": "deny",
+                "install_dependency": "deny",
+                "write_outside_repo": "deny"
+              },
+              "networkAllow": [
+                "github.com",
+                "*.github.com",
+                "*.githubusercontent.com"
+              ]
+            },
+            "command": null,
+            "reportOnly": true,
+            "repository": "/home/user/.mikka/bot-workspaces/0c2865c3-7d69-49d2-a3fd-02c484621958",
+            "candidateId": "b251f0b5-3aa6-4e70-b57a-282161c969a1",
+            "environment": "device:e06a9cbf-86bf-4521-9473-dded71d7c1b8",
+            "deviceRepoId": "590b5848-121b-40e1-b9de-c922343c823b",
+            "inferCommand": false,
+            "requestEpoch": "531dbd62-042c-4177-9e8a-16d25a46a452",
+            "candidateEnvironment": "device:e06a9cbf-86bf-4521-9473-dded71d7c1b8",
+            "questionCommandSources": [
+              {
+                "runId": "e57a6d03-510e-496f-bd88-97375318cd9e",
+                "status": "failed",
+                "sessionId": "01a1a2a5-76f1-7881-b182-311eba17fa98",
+                "observedAt": "2026-11-03T20:38:02.950Z",
+                "candidateSha": "8f418086fff9bcd42d17e32de7b7f4a968fdfc0a",
+                "outputChunkId": "da925461-a884-428d-a024-62d647a50cb2",
+                "recoveryEventId": "ec982956-3302-5588-bcac-2a209a5db623"
+              }
+            ]
+          },
+          "handoff": {
+            "digest": "cf8fb68364c9d3231ee9738e65775a914d557952aaabaa9c9afdba2bb4ad1526",
+            "eventId": "585fe01b-de00-53f2-b211-bdee937d3903",
+            "requestEpoch": "531dbd62-042c-4177-9e8a-16d25a46a452"
+          },
+          "completion": {
+            "check": {
+              "sha": "8f418086fff9bcd42d17e32de7b7f4a968fdfc0a",
+              "readOnly": true
+            },
+            "error": null,
+            "runId": "4545fb6d-745f-4997-8785-5d263a67de96",
+            "verify": {
+              "status": "not_run"
+            },
+            "summary": "独立 review 已对固定候选 b251f0b5-3aa6-4e70-b57a-282161c969a1 调用 mikka.inspect_artifact。返回的完整 contentUtf8 与本次 expectedUtf8 逐字相同；85 bytes、SHA256 与预期一致，matchesExpectedUtf8=true；HEAD 为 8f418086fff9bcd42d17e32de7b7f4a968fdfc0a，committedSha256 与工作文件相同且 contentMatchesGit=true。实际正文第二行 7 - 4 = 3，算术成立。Producer 命令观察来自继承记录 run-chunk:da925461-a884-428d-a024-62d647a50cb2（来源 run e57a6d03-510e-496f-bd88-97375318cd9e，状态 failed/error）；保留该来源状态，命令记录 exitCode=0 并含精确比较、字节数、SHA256、算式、HEAD/快照和目标 diff 检查。未执行 verify_command；本阶段仅为独立 review。",
+            "findings": [],
+            "stopReason": "submitted",
+            "trustedFailureProvenance": false
+          },
+          "requestEpoch": "531dbd62-042c-4177-9e8a-16d25a46a452"
+        },
+        "status": "passed",
+        "evidence": [
+          {
+            "sha": null,
+            "kind": "report",
+            "runId": "4545fb6d-745f-4997-8785-5d263a67de96",
+            "artifact": "run-report:4545fb6d-745f-4997-8785-5d263a67de96",
+            "sessionId": "01a1a7fc-b873-7af2-a269-8f52cedb90c4",
+            "recordedAt": "2026-11-04T19:16:35.589Z",
+            "candidateId": "b251f0b5-3aa6-4e70-b57a-282161c969a1",
+            "environment": "device:e06a9cbf-86bf-4521-9473-dded71d7c1b8"
+          }
+        ],
+        "finishedAt": "2026-11-04T19:16:36.558054+00:00"
+      },
+      {
+        "id": "8c41cb54-d5d0-4ac1-a572-e2b9a0ddddc7",
+        "runId": "03e5559f-c67d-455b-813f-d64b085a7907",
+        "stage": "verify",
+        "output": {
+          "check": {
+            "sha": "8f418086fff9bcd42d17e32de7b7f4a968fdfc0a",
+            "stage": "verify",
+            "policy": {
+              "readOnly": true,
+              "permissions": {
+                "network": "allow",
+                "git_push": "deny",
+                "computer_use": "deny",
+                "install_dependency": "deny",
+                "write_outside_repo": "deny"
+              },
+              "networkAllow": [
+                "github.com",
+                "*.github.com",
+                "*.githubusercontent.com"
+              ]
+            },
+            "command": null,
+            "reportOnly": true,
+            "repository": "/home/user/.mikka/bot-workspaces/0c2865c3-7d69-49d2-a3fd-02c484621958",
+            "candidateId": "b251f0b5-3aa6-4e70-b57a-282161c969a1",
+            "environment": "device:e06a9cbf-86bf-4521-9473-dded71d7c1b8",
+            "deviceRepoId": "590b5848-121b-40e1-b9de-c922343c823b",
+            "inferCommand": false,
+            "requestEpoch": "531dbd62-042c-4177-9e8a-16d25a46a452",
+            "candidateEnvironment": "device:e06a9cbf-86bf-4521-9473-dded71d7c1b8",
+            "questionCommandSources": [
+              {
+                "runId": "e57a6d03-510e-496f-bd88-97375318cd9e",
+                "status": "failed",
+                "sessionId": "01a1a2a5-76f1-7881-b182-311eba17fa98",
+                "observedAt": "2026-11-03T20:38:02.950Z",
+                "candidateSha": "8f418086fff9bcd42d17e32de7b7f4a968fdfc0a",
+                "outputChunkId": "da925461-a884-428d-a024-62d647a50cb2",
+                "recoveryEventId": "ec982956-3302-5588-bcac-2a209a5db623"
+              }
+            ]
+          },
+          "handoff": {
+            "digest": "b2cd58df179259c09ae0781b6dee36be919863f582a68a28cb28ac08dcfa3fb5",
+            "eventId": "99e2dedb-830d-53ba-a215-20dfe028ad3f",
+            "requestEpoch": "531dbd62-042c-4177-9e8a-16d25a46a452"
+          },
+          "completion": {
+            "check": {
+              "sha": "8f418086fff9bcd42d17e32de7b7f4a968fdfc0a",
+              "readOnly": true
+            },
+            "error": null,
+            "runId": "03e5559f-c67d-455b-813f-d64b085a7907",
+            "verify": {
+              "status": "not_run"
+            },
+            "summary": "独立核验固定候选 b251f0b5-3aa6-4e70-b57a-282161c969a1：只读 inspect_artifact 返回完整正文，匹配本次 85 字节契约；当前文件及提交快照 SHA256 相同，Git 比较一致。实际第二行算式成立。另有本次凭证绑定的 producer 命令记录，可核对其真实输出与 exit 0。未修改候选或其他文件。",
+            "findings": [],
+            "stopReason": "submitted",
+            "trustedFailureProvenance": false
+          },
+          "requestEpoch": "531dbd62-042c-4177-9e8a-16d25a46a452"
+        },
+        "status": "passed",
+        "evidence": [
+          {
+            "sha": null,
+            "kind": "report",
+            "runId": "03e5559f-c67d-455b-813f-d64b085a7907",
+            "artifact": "run-report:03e5559f-c67d-455b-813f-d64b085a7907",
+            "sessionId": "01a1a7fe-675c-7ac0-8159-563ca54fb6dc",
+            "recordedAt": "2026-11-04T19:18:38.455Z",
+            "candidateId": "b251f0b5-3aa6-4e70-b57a-282161c969a1",
+            "environment": "device:e06a9cbf-86bf-4521-9473-dded71d7c1b8"
+          }
+        ],
+        "finishedAt": "2026-11-04T19:18:39.402887+00:00"
+      }
+    ]
+  }
+]
+

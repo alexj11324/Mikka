@@ -1,0 +1,54 @@
+[
+  {
+    "observedAt": "2026-11-04T18:34:32.173Z",
+    "taskId": "9ea956ce-a604-4c2e-a724-fb04fa5a3c9b",
+    "userId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+    "botId": "0c2865c3-7d69-49d2-a3fd-02c484621958",
+    "workspaceId": "de300000-154f-4875-832f-70e7ffc3b62b",
+    "stage": "review",
+    "status": "failed",
+    "revision": 27,
+    "candidateId": "b251f0b5-3aa6-4e70-b57a-282161c969a1",
+    "activeRuns": "0",
+    "unexpiredLeases": "0",
+    "orderEntries": [
+      {
+        "id": "50af81e9-88af-4c8c-8314-2649eb69f07e",
+        "position": 0,
+        "harness": "codex",
+        "model": "gpt-6-luna",
+        "sourceKind": "subscription",
+        "sourceId": "ef66c1d8-2bbc-48e9-abf3-2ce3787ceef5"
+      },
+      {
+        "id": "3c483ffa-2126-4e47-b33d-c620ee8356ae",
+        "position": 1,
+        "harness": "claude_code",
+        "model": "claude-opus-5-5",
+        "sourceKind": "subscription",
+        "sourceId": "93b6ab23-900b-4e18-9ea0-baccf2d104ce"
+      },
+      {
+        "id": "4dd58437-519a-4420-8f95-e3ce2eec3608",
+        "position": 2,
+        "harness": "codex",
+        "model": "gpt-5.6-luna",
+        "sourceKind": "subscription",
+        "sourceId": "ef66c1d8-2bbc-48e9-abf3-2ce3787ceef5"
+      }
+    ],
+    "chatBinding": {
+      "botKey": "0c2865c3-7d69-49d2-a3fd-02c484621958",
+      "apiKeyId": null,
+      "apiKeyModel": null,
+      "modelId": "gpt-6-luna",
+      "route": "codex_cpa",
+      "connectionId": "ef66c1d8-2bbc-48e9-abf3-2ce3787ceef5",
+      "connectionRevision": 2,
+      "state": "connected",
+      "paused": false,
+      "epoch": 2
+    }
+  }
+]
+

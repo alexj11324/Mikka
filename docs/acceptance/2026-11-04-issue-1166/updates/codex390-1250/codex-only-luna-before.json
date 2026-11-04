@@ -1,0 +1,76 @@
+{
+  "observedAt": "2026-11-04T19:08:07.977Z",
+  "settings": [
+    {
+      "ownerId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+      "location": "cloud",
+      "updatedAt": "2026-11-04T12:52:07.445644+00:00",
+      "customized": true,
+      "workspaceId": "de300000-154f-4875-832f-70e7ffc3b62b",
+      "preferredHarness": "claude_code"
+    }
+  ],
+  "entries": [
+    {
+      "id": "50af81e9-88af-4c8c-8314-2649eb69f07e",
+      "model": "gpt-6-luna",
+      "harness": "codex",
+      "ownerId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+      "position": 0,
+      "sourceId": "ef66c1d8-2bbc-48e9-abf3-2ce3787ceef5",
+      "createdAt": "2026-11-04T12:52:07.445644+00:00",
+      "sourceKind": "subscription",
+      "workspaceId": "de300000-154f-4875-832f-70e7ffc3b62b"
+    },
+    {
+      "id": "3c483ffa-2126-4e47-b33d-c620ee8356ae",
+      "model": "claude-opus-5-5",
+      "harness": "claude_code",
+      "ownerId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+      "position": 1,
+      "sourceId": "93b6ab23-900b-4e18-9ea0-baccf2d104ce",
+      "createdAt": "2026-11-04T12:52:07.445644+00:00",
+      "sourceKind": "subscription",
+      "workspaceId": "de300000-154f-4875-832f-70e7ffc3b62b"
+    },
+    {
+      "id": "4dd58437-519a-4420-8f95-e3ce2eec3608",
+      "model": "gpt-5.6-luna",
+      "harness": "codex",
+      "ownerId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+      "position": 2,
+      "sourceId": "ef66c1d8-2bbc-48e9-abf3-2ce3787ceef5",
+      "createdAt": "2026-11-04T12:52:07.445644+00:00",
+      "sourceKind": "subscription",
+      "workspaceId": "de300000-154f-4875-832f-70e7ffc3b62b"
+    }
+  ],
+  "bindings": [
+    {
+      "epoch": 2,
+      "route": "codex_cpa",
+      "state": "connected",
+      "botKey": "0c2865c3-7d69-49d2-a3fd-02c484621958",
+      "paused": false,
+      "modelId": "gpt-6-luna",
+      "apiKeyId": null,
+      "bindingId": "387308a3-b04f-4051-8870-d15c044fb803",
+      "apiKeyModel": null,
+      "connectionId": "ef66c1d8-2bbc-48e9-abf3-2ce3787ceef5",
+      "connectionRevision": 2
+    }
+  ],
+  "task": {
+    "botId": "0c2865c3-7d69-49d2-a3fd-02c484621958",
+    "stage": "review",
+    "status": "failed",
+    "taskId": "9ea956ce-a604-4c2e-a724-fb04fa5a3c9b",
+    "userId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+    "issueId": "65e92e1e-4d75-4531-b1bd-a2a68d7689c7",
+    "revision": 27,
+    "candidateId": "b251f0b5-3aa6-4e70-b57a-282161c969a1"
+  },
+  "actualActiveRuns": "0",
+  "unexpiredOwnerLeases": "0",
+  "fingerprint": "3e7c7746ad2a1b1462adc9c64fffa41d753feab2faab8679588beae3241c565f"
+}

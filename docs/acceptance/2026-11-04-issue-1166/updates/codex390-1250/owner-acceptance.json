@@ -1,0 +1,109 @@
+{
+  "observedAt": "2026-11-04T19:19:58.902Z",
+  "id": "9ea956ce-a604-4c2e-a724-fb04fa5a3c9b",
+  "stage": "approval",
+  "status": "passed",
+  "revision": 35,
+  "candidateId": "b251f0b5-3aa6-4e70-b57a-282161c969a1",
+  "attemptId": "cf0b5533-72c6-43ec-90f4-ab1b713a3956",
+  "newEvents": [
+    {
+      "eventId": "cdb3ccbd-96c0-4090-ac10-e4975bf636a2",
+      "createdAt": "2026-11-04T19:19:39.832346+00:00",
+      "request": {
+        "change": {
+          "action": "finish",
+          "output": {
+            "deliverableAcceptanceId": "99cf0bd3-ba56-4b0f-9fa4-9ae366bc1663"
+          },
+          "reason": "The person accepted the report and its independently checked evidence.",
+          "status": "passed",
+          "evidence": [
+            {
+              "sha": null,
+              "kind": "report",
+              "runId": "390deeb4-5e5b-487a-acb9-c2e53dc3f8e9",
+              "artifact": "run-report:390deeb4-5e5b-487a-acb9-c2e53dc3f8e9",
+              "sessionId": "01a1a2a5-76f1-7881-b182-311eba17fa98",
+              "recordedAt": "2026-11-04T00:21:45.348Z",
+              "candidateId": "b251f0b5-3aa6-4e70-b57a-282161c969a1",
+              "environment": "device:e06a9cbf-86bf-4521-9473-dded71d7c1b8"
+            },
+            {
+              "sha": null,
+              "kind": "report",
+              "runId": "4545fb6d-745f-4997-8785-5d263a67de96",
+              "artifact": "run-report:4545fb6d-745f-4997-8785-5d263a67de96",
+              "sessionId": "01a1a7fc-b873-7af2-a269-8f52cedb90c4",
+              "recordedAt": "2026-11-04T19:16:35.589Z",
+              "candidateId": "b251f0b5-3aa6-4e70-b57a-282161c969a1",
+              "environment": "device:e06a9cbf-86bf-4521-9473-dded71d7c1b8"
+            },
+            {
+              "sha": null,
+              "kind": "report",
+              "runId": "03e5559f-c67d-455b-813f-d64b085a7907",
+              "artifact": "run-report:03e5559f-c67d-455b-813f-d64b085a7907",
+              "sessionId": "01a1a7fe-675c-7ac0-8159-563ca54fb6dc",
+              "recordedAt": "2026-11-04T19:18:38.455Z",
+              "candidateId": "b251f0b5-3aa6-4e70-b57a-282161c969a1",
+              "environment": "device:e06a9cbf-86bf-4521-9473-dded71d7c1b8"
+            }
+          ]
+        },
+        "binding": {
+          "taskId": "9ea956ce-a604-4c2e-a724-fb04fa5a3c9b",
+          "revision": 34
+        }
+      },
+      "resultTask": {
+        "id": "9ea956ce-a604-4c2e-a724-fb04fa5a3c9b",
+        "botId": "0c2865c3-7d69-49d2-a3fd-02c484621958",
+        "route": {
+          "eventId": "d5fc1142-4c0a-57f1-9eef-ec7ecedd984e",
+          "issueId": "65e92e1e-4d75-4531-b1bd-a2a68d7689c7",
+          "needsSpec": false,
+          "rationale": "Authenticated task dispatch; placement and model selected by the host.",
+          "sourceEventId": "531dbd62-042c-4177-9e8a-16d25a46a452",
+          "missingInformation": [],
+          "missingPermissions": []
+        },
+        "stage": "approval",
+        "reason": "The person accepted the report and its independently checked evidence.",
+        "status": "passed",
+        "userId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+        "issueId": "65e92e1e-4d75-4531-b1bd-a2a68d7689c7",
+        "revision": 35,
+        "attemptId": "cf0b5533-72c6-43ec-90f4-ab1b713a3956",
+        "createdAt": "2026-11-03T18:15:53.368Z",
+        "updatedAt": "2026-11-04T19:18:38.649Z",
+        "candidateId": "b251f0b5-3aa6-4e70-b57a-282161c969a1",
+        "scopeVersion": 2,
+        "sourceEventId": "531dbd62-042c-4177-9e8a-16d25a46a452"
+      }
+    }
+  ],
+  "approval": {
+    "id": "cf0b5533-72c6-43ec-90f4-ab1b713a3956",
+    "stage": "approval",
+    "output": {
+      "requestEpoch": "531dbd62-042c-4177-9e8a-16d25a46a452",
+      "deliverableAcceptanceId": "99cf0bd3-ba56-4b0f-9fa4-9ae366bc1663"
+    },
+    "reason": "The person accepted the report and its independently checked evidence.",
+    "status": "passed",
+    "finishedAt": "2026-11-04T19:19:40.643542+00:00"
+  },
+  "receipt": [
+    {
+      "id": "99cf0bd3-ba56-4b0f-9fa4-9ae366bc1663",
+      "taskId": "9ea956ce-a604-4c2e-a724-fb04fa5a3c9b",
+      "candidateId": "b251f0b5-3aa6-4e70-b57a-282161c969a1",
+      "userId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+      "eventId": "cdb3ccbd-96c0-4090-ac10-e4975bf636a2",
+      "createdAt": "2026-11-04T19:19:39.832Z",
+      "candidateAcceptanceCount": "1"
+    }
+  ]
+}
+

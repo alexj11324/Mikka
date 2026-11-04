@@ -1,0 +1,26 @@
+{
+  "applicationSha": "56a499e9079e2b8d8964162658739c2848204ed9",
+  "pullRequest": {
+    "number": 1250,
+    "merged": true,
+    "mergedAt": "2026-11-04T19:01:40Z",
+    "mergeCommit": "56a499e9079e2b8d8964162658739c2848204ed9"
+  },
+  "webDeploy": {
+    "id": 41892907715,
+    "headSha": "56a499e9079e2b8d8964162658739c2848204ed9",
+    "status": "completed",
+    "conclusion": "success"
+  },
+  "public": {
+    "observedAt": "2026-11-04T19:07:27.376621+00:00",
+    "status": 200,
+    "version": {
+      "build": "56a499e9079e2b8d8964162658739c2848204ed9",
+      "minMobileBuild": 0,
+      "mobileUpdateUrl": "itms-beta://beta.itunes.apple.com/v1/app/6829300983",
+      "minDesktopVersion": null
+    }
+  }
+}
+
