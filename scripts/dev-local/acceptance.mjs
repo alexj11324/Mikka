@@ -16,7 +16,7 @@ import { verifyWorkerMailbox } from './worker-mailbox-acceptance.mjs'
 import { assertHandoffConfiguration, verifyFactoryHandoff } from './factory-handoff-acceptance.mjs'
 import { verifyFactoryWatchdog } from './factory-watchdog-acceptance.mjs'
 import { assertFlashTestModel, assertTestModelRequest } from '../test-model-policy.mjs'
-import { cloudAcceptanceRelease } from '../e2b/cloud-acceptance-release.mjs'
+import { prepareCloudAcceptance } from '../e2b/cloud-acceptance-release.mjs'
 
 const root = resolve(import.meta.dirname, '../..')
 const selectedItems = process.env.LOCAL_LOOP_ITEMS?.split(',') ?? ['1', '2', '3', '4', '5', '6', '7']
@@ -29,7 +29,7 @@ const progressFile = resolve(root, '.cache/dev-local/progress.jsonl')
 const started = Date.now(), children = [], secrets = new Set(), expectedChildExits = new WeakSet()
 const completedItems = []
 const cleanupHooks = [], daemonDirectories = [join(directory, 'daemon')]
-let cloudRelease, pool, accounts, environment, runtime, localStackChild, secondDaemonPromise, activeStep, cleanupPromise, sourceFingerprint, serviceFailure, releaseHold, output = '', daemonCode, interrupted = false
+let cloudRelease, cloudApiKey, pool, accounts, environment, runtime, localStackChild, secondDaemonPromise, activeStep, cleanupPromise, sourceFingerprint, serviceFailure, releaseHold, output = '', daemonCode, interrupted = false
 async function fingerprint() {
   const paths = execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', 'app', 'lib', 'packages', 'scripts', 'agents', 'drizzle', 'package.json', 'pnpm-lock.yaml', 'next.config.mjs'], { cwd: root, encoding: 'utf8' }).split('\0').filter(Boolean).sort()
   const hash = createHash('sha256')
@@ -161,7 +161,12 @@ async function setup() {
   const origin = process.env.LOCAL_LOOP_ORIGIN ?? `http://localhost:${process.env.MIKKA_DEV_PORT ?? '3110'}`
   assert.ok(['localhost', '127.0.0.1'].includes(new URL(origin).hostname), 'Only loopback app targets are allowed')
   const driverRevision = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim()
-  if (selectedItems.includes('8')) cloudRelease = cloudAcceptanceRelease({ root })
+  const cloud = prepareCloudAcceptance({ root, items: selectedItems })
+  if (cloud) {
+    cloudRelease = cloud.release
+    cloudApiKey = cloud.apiKey
+    if (cloudApiKey) secrets.add(cloudApiKey)
+  }
   if (selectedItems.includes('9') || selectedItems.includes('10')) {
     assertHandoffConfiguration({ existing, platform: process.platform, revision: driverRevision, expectedSource: process.env.LOCAL_LOOP_EXPECTED_SOURCE_SHA })
   }
@@ -465,7 +470,7 @@ async function accept(device) {
     const passed = new Set([...completedItems, ...(previous?.passedItems ?? []), ...(reviewed?.passedItems ?? [])])
     assert.ok([1, 2, 3, 4, 5, 6, 7].every(item => passed.has(item)), 'Run and pass the local five items and native/worker mailbox before the paid cloud leg')
     const { verifyCloud } = await import('../e2b/cloud-local-acceptance.mjs')
-    await verifyCloud({ environment, progress, signal, ...cloudRelease, runtime, accounts, pool })
+    await verifyCloud({ environment, progress, signal, ...cloudRelease, apiKey: cloudApiKey, runtime, accounts, pool })
   })
   if (failures.length) throw new AggregateError(failures, `${failures.length} acceptance item(s) failed`)
 }

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { resolve } from 'node:path'
+import { assertDevLocal } from '../dev-local/guard.mjs'
 
 // Match the local acceptance source plus the committed worker install inputs.
 // Ignore generated caches and dependencies, but include untracked runtime code.
@@ -26,4 +27,16 @@ export function cloudAcceptanceRelease({ root = resolve(import.meta.dirname, '..
     if (supplied !== undefined) assert.equal(supplied, actual, 'The supplied worker digest is for different source code')
   }
   return Object.freeze({ sourceCommit: commit, workerHash: actual })
+}
+
+/** Only the explicitly selected cloud leg may consume this platform credential.
+ * Keep it out of the normal app, daemon and TestAccountPool environment. */
+export function prepareCloudAcceptance({ items, env = process.env, ...options } = {}) {
+  if (!items?.includes('8')) return null
+  assertDevLocal(env)
+  const release = cloudAcceptanceRelease({ ...options, env })
+  const apiKey = env.E2B_API_KEY
+  assert.ok(apiKey === undefined || typeof apiKey === 'string' && apiKey.trim() && !/[\r\n\0]/.test(apiKey), 'The cloud acceptance credential is invalid')
+  delete env.E2B_API_KEY
+  return { release, apiKey }
 }
