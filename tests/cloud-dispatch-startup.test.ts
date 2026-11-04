@@ -114,6 +114,14 @@ test('cloud startup succeeds only after both machine preparation and lifecycle l
   assert.deepEqual(calls, ['queue', 'machine', 'lifecycle'])
 })
 
+test('model arguments cannot grant local recovery; only the separate host placement argument can', async () => {
+  const input = { botId, issueId, harness: 'codex' as const, model, allowLocalRecovery: true }
+  assert.ok('runId' in await dispatch(owner, input, 'untrusted-placement'))
+  assert.equal(queued.get('coordinator:untrusted-placement')?.allowLocalRecovery, undefined)
+  assert.ok('runId' in await dispatch(owner, input, 'automatic-placement', undefined, undefined, true))
+  assert.equal(queued.get('coordinator:automatic-placement')?.allowLocalRecovery, true)
+})
+
 for (const stage of ['machine', 'lifecycle'] as const) test(`a ${stage} failure ends the queued cloud run before returning an unavailable result`, async () => {
   failure = stage
   assert.deepEqual(await dispatch(owner, { botId, issueId, harness: 'codex', model: 'synthetic-model' }, 'synthetic-call'), { error: 'cloudComputerUnavailable' })

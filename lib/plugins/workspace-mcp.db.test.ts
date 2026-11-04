@@ -116,7 +116,7 @@ test('explicit workspace MCP sharing keeps requester, resource grants, tokens an
     })
     const kit = new AgentKitStore(pool), scope = { ownerId: requester, botId: bot, workspaceId: workspace }
     const execution = await kit.beginExecution(scope, 'shared-mcp-execution', 'Requester instructions only', { harness: 'ai_sdk', model: 'fixture-no-model-call' }, DEFAULT_AGENT_DEFINITION, client => personal.snapshot(requester, client, workspace))
-    const definition = freezeWorkerDefinition({ harness: 'codex', instructions: 'Requester task', prompt: 'Read the authorized team resource', parent: execution.snapshot, executionId: execution.id })
+    const definition = freezeWorkerDefinition({ harness: 'codex', instructions: 'Requester task', prompt: 'Read the authorized team resource', parent: execution.snapshot, executionId: execution.id, allowLocalRecovery: true })
     definition.executionIdentity = await freezeExecutionIdentity(pool, { userId: requester, botId: bot, deviceId: device, agentDefinition: definition }, pool)
     const runId = randomUUID(), legacyId = randomUUID(), request = new Request('http://127.0.0.1/mikka/api/runs/mcp/custom_mcp')
     for (const [id, value] of [[runId, definition], [legacyId, null]]) await pool.query('INSERT INTO agent_runs(id,"userId","botId","deviceId","agentId","issueId",status,"agentDefinition") VALUES($1,$2,$3,$4,$5,$6,\'queued\',$7)', [id, requester, bot, device, agent, issue, value ? JSON.stringify(value) : null])
@@ -138,6 +138,7 @@ test('explicit workspace MCP sharing keeps requester, resource grants, tokens an
       artifactId = artifact.artifactId
       assert.ok(await readArtifact(requester, artifactId)); assert.equal(await readArtifact(owner, artifactId), null)
       assert.deepEqual(retryWorkerDefinition(definition, 'Retry current target')?.customMcp, definition.customMcp)
+      assert.equal(retryWorkerDefinition(definition, 'Retry current target')?.allowLocalRecovery, true)
     })
     await t.test('token withdrawal during the MCP handshake refuses the side effect', async () => {
       const before = calls

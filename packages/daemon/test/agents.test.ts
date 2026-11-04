@@ -10,6 +10,7 @@ import { execa } from "execa"
 import { afterEach, describe, expect, it } from "vitest"
 
 import { defaultRunPolicy, PACKAGE_REGISTRY_DOMAINS } from "@mikka/protocol/agent-policy"
+import { normalizeRepository } from "@mikka/protocol/repository"
 
 import { onLines } from "../src/agents/child"
 import { commitMessage, publishRun, snapshotTree } from "../src/agents/publish"
@@ -56,6 +57,72 @@ function mcpClient(handoff: string, extraArgs: string[] = [], env?: NodeJS.Proce
 }
 
 describe("mikka MCP server", () => {
+  it('continues in the already selected repository despite a CLI shadow clone with a local origin', async () => {
+    const repo = await makeRepo()
+    await execa('git', ['remote', 'add', 'origin', 'https://github.com/example/correct.git'], { cwd: repo })
+    const worktree = await worktreeOf(repo)
+    const shadow = join(tempDir(), 'shadow')
+    await execa('git', ['clone', '--no-hardlinks', worktree, shadow])
+    expect((await execa('git', ['remote', 'get-url', 'origin'], { cwd: shadow })).stdout).toBe(worktree)
+    writeFileSync(join(worktree, 'uncommitted.txt'), 'preserve this work\n')
+    const head = (await execa('git', ['rev-parse', 'HEAD'], { cwd: worktree })).stdout
+    const before = (await execa('git', ['status', '--porcelain'], { cwd: worktree })).stdout
+    const ctx = new RunContext({ harness: 'codex', kind: 'fix', worktree, runDir: tempDir(), privateDir: tempDir() })
+    const client = mcpClient(ctx.handoffFile, ctx.mcpServer().args.slice(3), {
+      ...process.env, GIT_DIR: join(shadow, '.git'), GIT_WORK_TREE: shadow,
+    })
+    try {
+      const result = await client.request('tools/call', { name: 'switch_repository', arguments: {
+        repository: 'example/correct', reason: 'The CLI origin is a local worktree path, but the task names this GitHub repository.',
+      } }) as { result: { content: { text: string }[] } }
+      expect(ctx.readHandoff()).toBeNull()
+      expect(JSON.parse(result.result.content[0].text)).toMatchObject({
+        status: 'already_active', selectionRecorded: false, action: 'continue_current_checkout',
+        currentRepository: 'example/correct', observedRemote: 'https://github.com/example/correct.git', observedHead: head,
+      })
+      expect((await execa('git', ['status', '--porcelain'], { cwd: worktree })).stdout).toBe(before)
+      expect((await execa('git', ['rev-parse', 'HEAD'], { cwd: worktree })).stdout).toBe(head)
+      await client.request('tools/call', { name: 'submit', arguments: { summary: 'Continued the current repair.' } })
+      expect(ctx.readHandoff()).toMatchObject({ outcome: 'succeeded', stopReason: 'submitted' })
+    } finally { client.close() }
+  })
+
+  it.each([
+    ['Example/CORRECT', true],
+    ['https://github.com:443/Example/correct.git/', true],
+    ['ssh://git@GITHUB.COM:22/Example/correct.git', true],
+    ['git@GITHUB.COM:Example/correct.git', true],
+    ['https://github.com:444/example/correct.git', false],
+    ['ssh://git@github.com:2222/example/correct.git', false],
+    ['ssh://other@github.com/example/correct.git', false],
+    ['git@github.com:other/correct.git', false],
+    ['https://fixture-user@github.com/example/correct.git', false],
+    ['https://github.com/example/correct%2Egit', false],
+    ['file:///tmp/example/correct', false],
+  ] as const)('only continues for the same canonical GitHub identity: %s', async (repository, same) => {
+    let key: string | null = null
+    try { key = normalizeRepository(repository).key } catch { /* Invalid inputs are never same-repository evidence. */ }
+    expect(key === 'v2/github.com/example/correct').toBe(same)
+    const repo = await makeRepo()
+    await execa('git', ['remote', 'add', 'origin', 'https://github.com/example/correct.git'], { cwd: repo })
+    const ctx = new RunContext({ harness: 'claude_code', kind: 'implement', worktree: await worktreeOf(repo), runDir: tempDir(), privateDir: tempDir() })
+    const client = mcpClient(ctx.handoffFile, ctx.mcpServer().args.slice(3))
+    try {
+      const result = await client.request('tools/call', { name: 'switch_repository', arguments: {
+        repository, reason: 'Inspect repository identity before deciding whether a new checkout is needed.',
+      } }) as { result: { content: { text: string }[] } }
+      if (same) {
+        expect(ctx.readHandoff()).toBeNull()
+        expect(JSON.parse(result.result.content[0].text)).toMatchObject({
+          status: 'already_active', selectionRecorded: false, action: 'continue_current_checkout', currentRepository: 'example/correct',
+        })
+      } else {
+        expect(ctx.readHandoff()).toMatchObject({ stopReason: 'blocked', report: { repositorySelection: { repository } } })
+        expect(result.result.content[0].text).toContain('Repository selection recorded')
+      }
+    } finally { client.close() }
+  })
+
   it('reads repository metadata from the bound root despite inherited Git selectors', async () => {
     const repo = await makeRepo(), other = await makeRepo()
     await execa('git', ['remote', 'add', 'origin', 'https://github.com/example/wrong.git'], { cwd: repo })

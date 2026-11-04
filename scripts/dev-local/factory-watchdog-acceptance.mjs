@@ -9,7 +9,7 @@ import { readFile, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { assertFlashTestModel } from '../test-model-policy.mjs'
-import { assertOnlineDaemonStatus, daemonStatus, waitForOnlineDaemonStatus } from './factory-handoff-acceptance.mjs'
+import { assertOnlineDaemonStatus, beginAutomaticHandoff, daemonStatus, waitForOnlineDaemonStatus } from './factory-handoff-acceptance.mjs'
 import { nativeRunIdentity, nativeTerminationState, ownedDaemonGroups, processTable, suspendNativeRun } from './daemon-fault.mjs'
 
 const EXECUTE_WINDOW_MS = 45 * 60_000
@@ -88,25 +88,15 @@ export async function verifyFactoryWatchdog(context) {
     const [cloud] = await query(`SELECT EXISTS(SELECT 1 FROM user_e2b_keys WHERE "userId"=$1)
       OR EXISTS(SELECT 1 FROM workspace_e2b_keys WHERE "createdBy"=$1) AS present`, [ownerId])
     assert.equal(cloud.present, false, 'Use a dedicated ordinary owner without a cloud-first recovery source')
-    const b = await startSecondDaemon()
-    const bStatus = await online(b.dataDir)
-    assertOnlineDaemonStatus(bStatus, { dataDir: b.dataDir })
-    assert.notEqual(bStatus.deviceId, device.id)
     const priorPrs = new Set((await observations()).pullRequests.map(pr => pr.number))
     const priorRefs = execFileSync('git', ['--git-dir', runtime.scenario.barePath, 'show-ref'], { encoding: 'utf8' })
-    await record('two-authorized-devices', { deviceA: device.id, deviceB: bStatus.deviceId })
-    const originalId = await dispatch('item10', `Create one new task on device ${device.name} (deviceId ${device.id}), harness Claude Code, repository https://github.com/mikka-e2e/core-loop.git, newThread:true, readOnly:false. Preserve this entire brief in the worker prompt and dispatch now.
-Owner acceptance marker ${marker}. The only intended repository change is ${filename} containing exactly ${marker} followed by a newline. First create this file in one tool call. Then run one finite Bash sleep 300 with timeout 600000, without loops, progress output or further edits during that wait. Do not ask for user input.
-This task exercises the host's existing stall recovery. Do not commit, push, create a PR, send messages or make any other external write before the finite wait finishes. If recovery is refused because a checkpoint is stale, preserve that blocker and the original workspace; do not start another task, refresh the checkpoint or weaken authorization. Do not repeatedly retry a refusal.`)
-    ownedRunId = originalId
-    const original = await until(async () => {
-      const value = await run(originalId)
-      assert.ok(!ended.has(value?.status), 'A ended before the real online-stall workload')
-      return value?.sessionId && value.status === 'running' ? value : null
-    })
-    assert.equal(original.deviceId, device.id)
-    assert.equal(original.agentDefinition?.harness, 'claude_code')
-    assertFlashTestModel(original.agentDefinition?.model)
+    const { original, b, bStatus } = await beginAutomaticHandoff({ name: 'item10', deviceId: device.id,
+      devices: async () => (await json('/api/mobile/threads')).devices ?? [], dispatch, run, until, startSecondDaemon, online,
+      brief: `Owner acceptance marker ${marker}. The only intended repository change is ${filename} containing exactly ${marker} followed by a newline. First create this file in one tool call. Then run one finite Bash sleep 300 with timeout 600000, without loops, progress output or further edits during that wait. Do not ask for user input.
+This task exercises the host's existing stall recovery. Do not commit, push, create a PR, send messages or make any other external write before the finite wait finishes. If recovery is refused because a checkpoint is stale, preserve that blocker and the original workspace; do not start another task, refresh the checkpoint or weaken authorization. Do not repeatedly retry a refusal.` })
+    ownedRunId = original.id
+    await record('two-authorized-devices', { deviceA: device.id, deviceB: bStatus.deviceId, placement: 'automatic',
+      originalStartedAt: original.startedAt, recoveryDeviceReadyAt: new Date().toISOString(), originalUnpinned: true })
     const [linked] = await query(`SELECT t.id FROM factory_tasks t JOIN factory_attempts a ON a."taskId"=t.id WHERE a."runId"=$1 AND t."userId"=$2`, [original.id, ownerId])
     assert.ok(linked)
     const task = (await json(`/api/factory/tasks/${linked.id}`)).task
