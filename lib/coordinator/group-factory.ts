@@ -198,16 +198,22 @@ async function readTask(client:Query,userId:string,issueId:string,botId:string):
   return {...task,artifacts:artifacts.slice(-10).reverse().map(({id})=>({id}))}
 }
 
+/** Current workspace and group membership are checked again at the execution boundary.
+ * Group identities are text (people need not have UUID IDs), while Bot IDs are UUIDs. */
+export async function authorizeGroupFactoryActor(client:Query,scope:Pick<Scope,'userId'|'workspaceId'|'conversationId'|'reporter'>,
+  authorizeWorkspace:(userId:string,workspaceId:string)=>Promise<unknown>=async(userId,workspaceId)=>{
+    return (await import('@/lib/subscription-runtime')).authorizeSubscriptionWorkspace(userId,workspaceId)
+  }):Promise<void> {
+  await authorizeWorkspace(scope.userId,scope.workspaceId)
+  const {rows:[member]}=await client.query(`SELECT b."ownerId" FROM conversations c JOIN conversation_members u ON u."conversationId"=c.id AND u."memberType"='user' AND u."memberId"=$2 AND u."leftAt" IS NULL JOIN conversation_members m ON m."conversationId"=c.id AND m."memberType"='bot' AND m."memberId"=$3 AND m."leftAt" IS NULL JOIN bots b ON b.id::text=m."memberId" AND b."workspaceId"=c."workspaceId" AND b."archivedAt" IS NULL WHERE c.id=$1 AND c."workspaceId"=$4`,[scope.conversationId,scope.userId,scope.reporter.id,scope.workspaceId])
+  if (!member?.ownerId) throw Error('group_task_not_authorized')
+  await authorizeWorkspace(member.ownerId,scope.workspaceId)
+}
+
 async function productionAdapters():Promise<GroupFactoryAdapters> {
   const {pool}=await import('@/lib/db')
   return {
-    async authorize(scope) {
-      const {authorizeSubscriptionWorkspace}=await import('@/lib/subscription-runtime')
-      await authorizeSubscriptionWorkspace(scope.userId,scope.workspaceId)
-      const {rows:[member]}=await pool.query(`SELECT b."ownerId" FROM conversations c JOIN conversation_members u ON u."conversationId"=c.id AND u."memberType"='user' AND u."memberId"=$2 AND u."leftAt" IS NULL JOIN conversation_members m ON m."conversationId"=c.id AND m."memberType"='bot' AND m."memberId"=$3 AND m."leftAt" IS NULL JOIN bots b ON b.id=m."memberId" AND b."workspaceId"=c."workspaceId" AND b."archivedAt" IS NULL WHERE c.id=$1 AND c."workspaceId"=$4`,[scope.conversationId,scope.userId,scope.reporter.id,scope.workspaceId])
-      if (!member?.ownerId) throw Error('group_task_not_authorized')
-      await authorizeSubscriptionWorkspace(member.ownerId,scope.workspaceId)
-    },
+    authorize:scope=>authorizeGroupFactoryActor(pool,scope),
     async executionBot(scope) {
       const {rows:[bot]}=await pool.query(`SELECT id,"ownerId",repository FROM bots WHERE id=$1 AND "workspaceId"=$2 AND "archivedAt" IS NULL`,[scope.reporter.id,scope.workspaceId])
       if (!bot) throw Error('group_task_not_authorized')

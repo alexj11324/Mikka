@@ -4,7 +4,7 @@ import { readFile, readdir } from 'node:fs/promises'
 import test from 'node:test'
 import { Pool } from 'pg'
 import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
-import { delegateGroupTask, groupExecutionRemedy, groupTaskReferences, groupTaskReport, groupsWithPendingTaskReports, reconcileGroupTaskReports, type GroupFactoryAdapters } from './group-factory'
+import { authorizeGroupFactoryActor, delegateGroupTask, groupExecutionRemedy, groupTaskReferences, groupTaskReport, groupsWithPendingTaskReports, reconcileGroupTaskReports, type GroupFactoryAdapters } from './group-factory'
 import { initializeGroupDecisionTrace, recordGroupDecisionRoute, type GroupDecisionTrace } from './group-decision-trace'
 import { groupTraceObservation } from './group-decision-eval'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
@@ -266,4 +266,53 @@ for(const kind of ['deliverable','repository'] as const)test(`PG: real Factory $
     assert.equal(trace.events.filter(event=>event.type==='publish').length,2)
     console.log(`Retained ${database}; real Factory store/acceptance/reconciliation, synthetic upstream execution and browser session`)
   } finally {await pool.end();await outer.end()}
+})
+
+test('PG: production group Factory authorization uses typed Bot membership and rechecks both current workspace owners', {skip:!url},async()=>{
+  const outer=new Pool({connectionString:url})
+  const schema=`group_factory_authorization_${randomUUID().replaceAll('-','')}`
+  await outer.query(`CREATE SCHEMA "${schema}"`)
+  const pool=new Pool({connectionString:url,options:`-c search_path=${schema}`})
+  try {
+    await pool.query(await readFile(new URL('../../drizzle/20261023213851_group_conversations.sql',import.meta.url),'utf8'))
+    await pool.query(await readFile(new URL('../../drizzle/20261029043634_group_turns.sql',import.meta.url),'utf8'))
+    await pool.query(await readFile(new URL('../../drizzle/20261031153511_group_bot_members.sql',import.meta.url),'utf8'))
+    await pool.query(`CREATE TABLE bots(id uuid PRIMARY KEY,"ownerId" text,"workspaceId" uuid,"archivedAt" timestamptz);
+      CREATE TABLE workspace_members("userId" text,"workspaceId" uuid,status text,PRIMARY KEY("userId","workspaceId"))`)
+    const workspaceId=randomUUID(),otherWorkspaceId=randomUUID(),conversationId=randomUUID(),botId=randomUUID()
+    const userId='requester-with-non-uuid-id',reporterOwner='reporter-owner-with-non-uuid-id'
+    await pool.query(`INSERT INTO conversations(id,"workspaceId",kind,title,"createdBy") VALUES($1,$2,'group','Authorization fixture',$3)`,[conversationId,workspaceId,userId])
+    await pool.query(`INSERT INTO bots VALUES($1,$2,$3,NULL)`,[botId,userId,workspaceId])
+    await pool.query(`INSERT INTO conversation_members("conversationId","memberType","memberId",role)
+      VALUES($1,'user',$2,'owner'),($1,'bot',$3,'member'),($1,'bot','non-uuid-member','member')`,[conversationId,userId,botId])
+    await pool.query(`INSERT INTO workspace_members VALUES($1,$2,'active'),($3,$2,'active'),($1,$4,'active')`,[userId,workspaceId,reporterOwner,otherWorkspaceId])
+    const scope={userId,workspaceId,conversationId,reporter:{id:botId,name:'Reporter',description:'',memberType:'bot' as const}}
+    const checks:string[]=[]
+    const authorizeWorkspace=async(owner:string,workspace:string)=>{
+      checks.push(owner)
+      if (!(await pool.query(`SELECT 1 FROM workspace_members WHERE "userId"=$1 AND "workspaceId"=$2 AND status='active'`,[owner,workspace])).rowCount) throw Error('workspaceAccessDenied')
+    }
+    await authorizeGroupFactoryActor(pool,scope,authorizeWorkspace)
+    assert.deepEqual(checks,[userId,userId],'production helper preserves both requester and actual Bot-owner checks')
+    await assert.rejects(authorizeGroupFactoryActor(pool,{...scope,reporter:{...scope.reporter,id:'non-uuid-member'}},authorizeWorkspace),/group_task_not_authorized/,'text group identities must not be cast to UUID')
+    await assert.rejects(authorizeGroupFactoryActor(pool,{...scope,workspaceId:otherWorkspaceId},authorizeWorkspace),/group_task_not_authorized/)
+    await pool.query(`UPDATE conversation_members SET "leftAt"=now() WHERE "memberId"=$1`,[botId])
+    await assert.rejects(authorizeGroupFactoryActor(pool,scope,authorizeWorkspace),/group_task_not_authorized/)
+    await pool.query(`UPDATE conversation_members SET "leftAt"=NULL WHERE "memberId"=$1`,[botId])
+    await pool.query(`UPDATE conversation_members SET "leftAt"=now() WHERE "memberId"=$1`,[userId])
+    await assert.rejects(authorizeGroupFactoryActor(pool,scope,authorizeWorkspace),/group_task_not_authorized/)
+    await pool.query(`UPDATE conversation_members SET "leftAt"=NULL WHERE "memberId"=$1`,[userId])
+    await pool.query(`UPDATE bots SET "archivedAt"=now() WHERE id=$1`,[botId])
+    await assert.rejects(authorizeGroupFactoryActor(pool,scope,authorizeWorkspace),/group_task_not_authorized/)
+    await pool.query(`UPDATE bots SET "archivedAt"=NULL,"ownerId"=$2 WHERE id=$1`,[botId,reporterOwner])
+    checks.length=0
+    await authorizeGroupFactoryActor(pool,scope,authorizeWorkspace)
+    assert.deepEqual(checks,[userId,reporterOwner])
+    await pool.query(`UPDATE workspace_members SET status='left' WHERE "userId"=$1`,[reporterOwner])
+    await assert.rejects(authorizeGroupFactoryActor(pool,scope,authorizeWorkspace),/workspaceAccessDenied/)
+    await pool.query(`UPDATE workspace_members SET status='left' WHERE "userId"=$1`,[userId])
+    checks.length=0
+    await assert.rejects(authorizeGroupFactoryActor(pool,scope,authorizeWorkspace),/workspaceAccessDenied/)
+    assert.deepEqual(checks,[userId])
+  } finally {await pool.end();await outer.query(`DROP SCHEMA "${schema}" CASCADE`);await outer.end()}
 })
