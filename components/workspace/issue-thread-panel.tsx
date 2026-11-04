@@ -156,12 +156,14 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   }, [issueId, view?.status, view?.stopping, question, mutateCache])
   async function send(retry?: string, retryOriginalSession?: true) {
     const text = retry ?? draft.trim()
-    if (!text || sending || stopRequested || question === 'resuming') return
+    const questionWake = retryOriginalSession ? data?.thread.questionWake : null
+    if (!text || sending || stopRequested || (question === 'resuming' && !questionWake)) return
     setSending(true); setSendFailed(false)
     try {
       if (!await checkPageBuildBeforeAction()) return
       const words = retry === undefined ? withReplyQuote(text, replyQuote) : text
-      const request = retryOriginalSession ? { runId: liveRunId, text: words, retryOriginalSession } : prepareThreadReply(submission, liveRunId, words)
+      const request = retryOriginalSession ? { runId: liveRunId, text: words, retryOriginalSession,
+        ...(questionWake ? { questionWakeGeneration: questionWake.generation } : {}) } : prepareThreadReply(submission, liveRunId, words)
       if ('requestId' in request) setSubmission(request)
       const result = await sendIssueThreadReply({ issueId, ...request })
       if (result.error) { setSendFailed(actionError(result.error)); if ('requestId' in request) setSubmission(null); return }
@@ -270,7 +272,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
       {/* Keep the draft editable while stop waits for the daemon; do not queue new work after stop. */}
       <ChatComposer ref={inputRef} label={t('composer', { agent: harnessLabel(threadComposerHarness(detail.harness, liveRunId, modelFallback)) })} value={draft} onChange={setDraft} onSubmit={() => { void send() }} attachmentScope={{ kind: 'thread', id: liveRunId }}
         quote={replyQuote ? <QuoteChip slot="reply-quote-chip" text={replyQuote} onRemove={() => { setReplyQuote(null); inputRef.current?.focus() }} /> : undefined}
-        sending={sending || stopPending} editableWhileSending submitDisabled={stopRequested || question === 'resuming'} running={working || question === 'resuming'} thread onStop={working && canStop ? () => { void stop() } : undefined} />
+        sending={sending || stopPending} editableWhileSending submitDisabled={stopRequested || question === 'resuming'} running={working || (question === 'resuming' && !data?.thread.questionWake)} thread onStop={working && canStop ? () => { void stop() } : undefined} />
       {sendFailed && <FieldError className="px-3 text-xs">{sendFailed}</FieldError>}
       {stopFailed && <div role="alert" className="flex items-center gap-2 px-3 text-xs"><span className="text-destructive">{t('stopFailed')}</span><Button variant="ghost" size="sm" className="min-w-22 max-sm:h-11" onClick={() => { void stop() }}>{t('retryStop')}</Button></div>}
     </div>}

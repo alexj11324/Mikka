@@ -124,6 +124,161 @@ test('real PG: question receipts preserve one execution without opening a repair
         }, true)
       })
 
+    await t.test('watchdog recovers the same unclaimed native question instead of leaving it queued until the generic stop window', async () => {
+      const f = await fixture({ native: true, separateChat: true }), child = await f.createContinuation()
+      const { sweepFactoryWatchdog } = await import('../watchdog')
+      const wakes: string[] = []
+      const result = await sweepFactoryWatchdog(pool, {
+        runtime: () => ({ store: f.store, reconcile: { run: async () => assert.fail('no run completed') } }),
+        dispatch: async () => { assert.fail('must not create another run or attempt') }, wake: async () => undefined,
+        recoverQuestion: async (_userId: string, runId: string) => { wakes.push(runId); return { handled: true, launched: true } },
+      }, new Date(), Date.now() + 20_000, { userId: 'owner', runId: child.runId })
+      assert.deepEqual(wakes, [child.runId], 'the committed answer is an independent durable wake intent')
+      assert.equal(result.recovered, 1)
+      assert.equal((await pool.query('SELECT "stopRequestedAt" FROM agent_runs WHERE id=$1', [child.runId])).rows[0].stopRequestedAt, null)
+    })
+
+    await t.test('native question wake generations are bounded, single-winner and preserve the unclaimed child and original session', async () => {
+      const wake = await import('./wake')
+      const f = await fixture({ native: true, separateChat: true }), child = await f.createContinuation()
+      const sandboxId = `original-${child.runId}`
+      await pool.query(`UPDATE agent_runs SET "questionContinuation"="questionContinuation" || jsonb_build_object('requiredSandboxId',$2::text) WHERE id=$1`, [child.runId, sandboxId])
+      await pool.query(`INSERT INTO thread_machines("runId","workspaceId","ownerId","botId","issueId","sandboxId","snapshotId","operationId",state,"deviceId","repoId")
+        SELECT id,$2,'owner',$3,"issueId",$4,'synthetic-snapshot',$5,'paused',"deviceId","deviceRepoId" FROM agent_runs WHERE id=$1`,
+      [child.runId, f.workspaceId, f.runtimeBotId, sandboxId, randomUUID()])
+      const humanSession = randomUUID()
+      await pool.query(`INSERT INTO "session"(id,"userId",token,"expiresAt","createdAt","updatedAt") VALUES($1,'owner',$1,now()+interval '1 hour',now(),now())`, [humanSession])
+      const actor = { userId: 'owner', workspaceId: f.workspaceId }
+      const originals = { ...wake.questionWakeRuntime }
+      const enqueued: { runId: string; wake: import('./wake').QuestionWake; workflowRunId: string }[] = []
+      const statuses = new Map<string, string>()
+      wake.questionWakeRuntime.store = async () => f.store
+      wake.questionWakeRuntime.enqueue = async (_actor, runId, intent) => {
+        const workflowRunId = `workflow-${enqueued.length}`
+        enqueued.push({ runId, wake: intent, workflowRunId }); statuses.set(workflowRunId, 'pending')
+        return workflowRunId
+      }
+      wake.questionWakeRuntime.status = async id => statuses.get(id) ?? 'failed'
+      const snapshot = async () => (await pool.query(`SELECT to_jsonb(r) AS run,to_jsonb(q) AS question,to_jsonb(m) AS machine,
+        to_jsonb(t) AS task,to_jsonb(a) AS attempt FROM agent_runs r JOIN factory_questions q ON q."continuationRunId"=r.id
+        JOIN thread_machines m ON m."runId"=r.id JOIN factory_tasks t ON t.id=q."taskId" JOIN factory_attempts a ON a.id=t."attemptId" WHERE r.id=$1`, [child.runId])).rows[0]
+      const before = await snapshot(), clock = new Date()
+      try {
+        const attempts = await Promise.all([wake.wakeQueuedQuestionContinuation(pool, 'owner', child.runId, clock), wake.wakeQueuedQuestionContinuation(pool, 'owner', child.runId, clock)])
+        assert.equal(attempts.filter(a => a.launched).length, 1)
+        assert.equal(enqueued.length, 1)
+        const first = enqueued[0]
+        assert.equal(await wake.claimQuestionWake(pool, { ...actor, workspaceId: randomUUID() }, child.runId, first.wake, first.workflowRunId), false)
+        assert.equal(await wake.claimQuestionWake(pool, actor, child.runId, first.wake, first.workflowRunId), true)
+        assert.equal(await wake.claimQuestionWake(pool, actor, child.runId, first.wake, 'duplicate-workflow'), false)
+        await wake.finishQuestionWake(pool, actor, child.runId, first.wake, first.workflowRunId, true)
+        assert.equal((await wake.questionWakeFailure(pool, 'owner', child.runId))?.generation, first.wake.generation)
+        assert.equal((await snapshot()).run.sessionId, null, 'a launch failure is not an actual native SID claim')
+        assert.equal((await snapshot()).run.status, 'queued')
+        await assert.rejects(wake.retryQueuedQuestionWake(pool, { userId: 'owner', sessionId: humanSession }, child.runId, first.wake.generation), { code: 'factoryQuestionContinuationUnavailable' }, 'the original workflow must be terminal before replacement')
+        assert.equal((await wake.wakeQueuedQuestionContinuation(pool, 'owner', child.runId, new Date(clock.getTime() + 10 * 60_000))).launched, false)
+        statuses.set(first.workflowRunId, 'failed')
+        await pool.query(`UPDATE thread_machines SET "workerLeaseUntil"=now()+interval '1 minute' WHERE "runId"=$1`, [child.runId])
+        await assert.rejects(wake.retryQueuedQuestionWake(pool, { userId: 'owner', sessionId: humanSession }, child.runId, first.wake.generation), { code: 'factoryQuestionContinuationUnavailable' })
+        await pool.query('UPDATE thread_machines SET "workerLeaseUntil"=NULL WHERE "runId"=$1', [child.runId])
+        const retries = await Promise.all([1, 2].map(() => wake.retryQueuedQuestionWake(pool, { userId: 'owner', sessionId: humanSession }, child.runId, first.wake.generation)))
+        assert.deepEqual(retries, [{ runId: child.runId, continued: false }, { runId: child.runId, continued: false }])
+        assert.equal(enqueued.length, 2)
+        const second = enqueued[1]
+        assert.equal(await wake.claimQuestionWake(pool, actor, child.runId, first.wake, first.workflowRunId), false, 'the old winner cannot regain its machine')
+        await wake.finishQuestionWake(pool, actor, child.runId, first.wake, first.workflowRunId, true)
+        assert.equal(await wake.questionWakeFailure(pool, 'owner', child.runId), null, 'late failure cannot block the successor')
+        assert.equal(await wake.claimQuestionWake(pool, actor, child.runId, second.wake, second.workflowRunId), true)
+        await wake.finishQuestionWake(pool, actor, child.runId, second.wake, second.workflowRunId, true)
+        statuses.set(second.workflowRunId, 'failed')
+        assert.equal((await wake.wakeQueuedQuestionContinuation(pool, 'owner', child.runId, new Date(clock.getTime() + 20 * 60_000))).launched, true)
+        const third = enqueued[2]
+        assert.equal(await wake.claimQuestionWake(pool, actor, child.runId, third.wake, third.workflowRunId), true)
+        await wake.finishQuestionWake(pool, actor, child.runId, third.wake, third.workflowRunId, true)
+        statuses.set(third.workflowRunId, 'failed')
+        for (const minutes of [30, 40, 60]) assert.equal((await wake.wakeQueuedQuestionContinuation(pool, 'owner', child.runId, new Date(clock.getTime() + minutes * 60_000))).launched, false)
+        assert.equal(enqueued.length, wake.QUESTION_WAKE_MAX_TRIES)
+        assert.deepEqual(await snapshot(), before, 'wake attempts cannot rewrite the answer, run, attempt, task, VM or session')
+        await assert.rejects(wake.retryQueuedQuestionWake(pool, { userId: 'owner', sessionId: 'invalid' }, child.runId, third.wake.generation), { code: 'factoryHumanRequired' })
+        assert.equal(await wake.questionWakeFailure(pool, 'other', child.runId), null)
+        for (const [column, value] of [['stopRequestedAt', new Date()], ['startedAt', new Date()], ['sessionId', f.sessionId], ['status', 'failed']] as const) {
+          await pool.query(`UPDATE agent_runs SET "${column}"=$2 WHERE id=$1`, [child.runId, value])
+          assert.equal(await wake.questionWakeFailure(pool, 'owner', child.runId), null, column)
+          assert.equal((await wake.wakeQueuedQuestionContinuation(pool, 'owner', child.runId, new Date(clock.getTime() + 60 * 60_000))).launched, false)
+          await assert.rejects(wake.retryQueuedQuestionWake(pool, { userId: 'owner', sessionId: humanSession }, child.runId, third.wake.generation), { code: 'factoryQuestionContinuationUnavailable' }, column)
+          await pool.query(`UPDATE agent_runs SET "${column}"=$2 WHERE id=$1`, [child.runId, column === 'status' ? 'queued' : null])
+        }
+        for (const [column, path, replacement, original] of [
+          ['agentDefinition', 'definitionDigest', 'wrong-digest', f.definition.definitionDigest],
+          ['questionContinuation', 'originSessionId', 'wrong-session', f.sessionId],
+          ['questionContinuation', 'requiredSandboxId', 'different-machine', sandboxId],
+        ] as const) {
+          await pool.query(`UPDATE agent_runs SET "${column}"=jsonb_set("${column}",$2::text[],to_jsonb($3::text)) WHERE id=$1`, [child.runId, [path], replacement])
+          await assert.rejects(wake.retryQueuedQuestionWake(pool, { userId: 'owner', sessionId: humanSession }, child.runId, third.wake.generation), { code: 'factoryQuestionContinuationUnavailable' }, path)
+          await pool.query(`UPDATE agent_runs SET "${column}"=jsonb_set("${column}",$2::text[],to_jsonb($3::text)) WHERE id=$1`, [child.runId, [path], original])
+        }
+        const originalReceipt = (await pool.query('SELECT result FROM factory_events WHERE "taskId"=$1 AND "eventId"=$2', [child.task.id, child.eventId])).rows[0].result
+        await pool.query(`UPDATE factory_events SET result=jsonb_set(result,'{task,sourceEventId}',to_jsonb($3::text)) WHERE "taskId"=$1 AND "eventId"=$2`, [child.task.id, child.eventId, randomUUID()])
+        await assert.rejects(wake.retryQueuedQuestionWake(pool, { userId: 'owner', sessionId: humanSession }, child.runId, third.wake.generation), { code: 'factoryQuestionContinuationUnavailable' }, 'the original receipt must bind this current request epoch')
+        await pool.query('UPDATE factory_events SET result=$3 WHERE "taskId"=$1 AND "eventId"=$2', [child.task.id, child.eventId, originalReceipt])
+        await pool.query(`UPDATE factory_questions SET "expiresAt"=now()-interval '1 second' WHERE id=$1`, [f.questionId])
+        assert.equal(await wake.questionWakeFailure(pool, 'owner', child.runId), null)
+        await assert.rejects(wake.retryQueuedQuestionWake(pool, { userId: 'owner', sessionId: humanSession }, child.runId, third.wake.generation), { code: 'factoryQuestionContinuationUnavailable' })
+        await pool.query(`UPDATE factory_questions SET "expiresAt"=NULL WHERE id=$1`, [f.questionId])
+        wake.questionWakeRuntime.enqueue = async (_actor, runId, intent) => {
+          enqueued.push({ runId, wake: intent, workflowRunId: 'response-lost' })
+          throw new Error('synthetic enqueue acknowledgement lost')
+        }
+        await wake.retryQueuedQuestionWake(pool, { userId: 'owner', sessionId: humanSession }, child.runId, third.wake.generation)
+        const unknown = enqueued.at(-1)!
+        assert.equal((await wake.wakeQueuedQuestionContinuation(pool, 'owner', child.runId)).launched, false, 'an unknown enqueue keeps its deadline')
+        assert.equal(await wake.claimQuestionWake(pool, actor, child.runId, unknown.wake, unknown.workflowRunId), true, 'a late callback can claim the same still-current generation')
+        assert.equal(await wake.claimQuestionWake(pool, actor, child.runId, unknown.wake, 'duplicate-late-callback'), false)
+        assert.equal(await wake.questionWakeClaimed(pool, actor, child.runId, unknown.wake, unknown.workflowRunId), false)
+        // The worker can finish before the workflow persists successful wake.
+        // Its lifecycle must still park this exact run after Factory advances.
+        await pool.query(`UPDATE agent_runs SET status='succeeded',"sessionId"=$2,"startedAt"=now(),"finishedAt"=now() WHERE id=$1`, [child.runId, f.sessionId])
+        await pool.query(`UPDATE factory_tasks SET status='passed' WHERE id=$1`, [child.task.id])
+        await pool.query(`UPDATE factory_attempts SET status='passed',"finishedAt"=now() WHERE id=$1`, [child.task.attemptId])
+        assert.equal(await wake.questionWakeClaimed(pool, actor, child.runId, unknown.wake, unknown.workflowRunId), true, 'lost handoff responses re-enter maintenance after actual claim, even after completion')
+        assert.equal(await wake.questionWakeClaimed(pool, actor, child.runId, first.wake, first.workflowRunId), false)
+        await wake.finishQuestionWake(pool, actor, child.runId, unknown.wake, unknown.workflowRunId, false)
+        assert.equal(await wake.questionWakeOwnsWorkflow(pool, actor, child.runId, unknown.wake, unknown.workflowRunId), true)
+        assert.equal(await wake.questionWakeOwnsWorkflow(pool, actor, child.runId, first.wake, first.workflowRunId), false)
+        await wake.finishQuestionWake(pool, actor, child.runId, unknown.wake, unknown.workflowRunId, true)
+        assert.equal(await wake.questionWakeOwnsWorkflow(pool, actor, child.runId, unknown.wake, unknown.workflowRunId), true, 'late failure cannot rewrite already completed work')
+        await pool.query(`UPDATE factory_tasks SET status='cancelled' WHERE id=$1`, [child.task.id])
+        assert.equal((await wake.wakeQueuedQuestionContinuation(pool, 'owner', child.runId)).launched, false)
+      } finally { Object.assign(wake.questionWakeRuntime, originals) }
+    })
+
+    await t.test('missing or ended original machines and expired scope remain in the normal watchdog failure path', async () => {
+      const wake = await import('./wake'), { sweepFactoryWatchdog } = await import('../watchdog')
+      const originals = { ...wake.questionWakeRuntime }
+      try {
+        for (const fault of ['missing', 'ended', 'expired'] as const) {
+          const f = await fixture({ native: true }), child = await f.createContinuation(), sandboxId = `lost-${child.runId}`
+          wake.questionWakeRuntime.store = async () => f.store
+          wake.questionWakeRuntime.enqueue = async () => assert.fail('invalid custody must never enqueue')
+          await pool.query(`UPDATE agent_runs SET "questionContinuation"="questionContinuation" || jsonb_build_object('requiredSandboxId',$2::text) WHERE id=$1`, [child.runId, sandboxId])
+          if (fault !== 'missing') await pool.query(`INSERT INTO thread_machines("runId","workspaceId","ownerId","botId","issueId","sandboxId","snapshotId","operationId",state,"deviceId","repoId")
+            SELECT id,$2,'owner',$3,"issueId",$4,'synthetic-snapshot',$5,$6,"deviceId","deviceRepoId" FROM agent_runs WHERE id=$1`,
+          [child.runId, f.workspaceId, f.runtimeBotId, sandboxId, randomUUID(), fault === 'ended' ? 'ended' : 'paused'])
+          if (fault === 'expired') await pool.query(`UPDATE factory_questions SET "expiresAt"=now()-interval '1 second' WHERE id=$1`, [f.questionId])
+          assert.equal((await wake.wakeQueuedQuestionContinuation(pool, 'owner', child.runId)).handled, false, fault)
+          const result = await sweepFactoryWatchdog(pool, {
+            runtime: () => ({ store: f.store, reconcile: { run: async () => assert.fail('no run completed') } }),
+            dispatch: async () => { assert.fail('no new execution') }, wake: async () => undefined,
+            recoverQuestion: (userId, runId, now) => wake.wakeQueuedQuestionContinuation(pool, userId, runId, now),
+          }, new Date(Date.now() + 60 * 60_000), Date.now() + 20_000, { userId: 'owner', runId: child.runId })
+          assert.equal(result.blocked, 1, fault)
+          assert.equal((await pool.query('SELECT status FROM factory_tasks WHERE id=$1', [child.task.id])).rows[0].status, 'blocked', fault)
+          assert.ok((await pool.query('SELECT "stopRequestedAt" FROM agent_runs WHERE id=$1', [child.runId])).rows[0].stopRequestedAt, fault)
+          assert.equal(await wake.questionWakeFailure(pool, 'owner', child.runId), null, 'no fake recoverable wake receipt')
+        }
+      } finally { Object.assign(wake.questionWakeRuntime, originals) }
+    })
+
     await t.test('receipt, task, owner, answer, epoch, adjacency and cloud scope mutations fail closed', async () => {
       const f = await fixture({ native: true }), child = await f.createContinuation()
       const otherWorkspace = randomUUID(), otherBot = randomUUID()
