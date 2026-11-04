@@ -7,7 +7,7 @@ import { z } from 'zod'
 import { ActionFailureError, runAction } from '@/lib/action-error'
 import type { ActionErrorCode, ActionResult } from '@/lib/action-result'
 import { currentUser } from '@/lib/acting-user'
-import { accessibleTeams } from '@/lib/team-access'
+import { accessibleTeamScopes } from '@/lib/team-access'
 import { loadWorkspaceContext } from '@/lib/workspace-access'
 import { issueVisibility } from '@/lib/issue-visibility'
 import { issueTeamScope } from '@/lib/issue-team-access'
@@ -87,8 +87,16 @@ async function readIssues(workspaceId?: string, known?: string) {
 async function readIssueSnapshot(workspaceId?: string, known?: string) {
   const userId = await getUserId()
   const context = await loadWorkspaceContext(workspaceId)
-  const teams = await accessibleTeams(userId, context.workspace.id)
-  const visibility = await issueVisibility(userId)
+  // Membership is fresh for each poll. Reuse only this operation's narrow
+  // identity rows for visibility, workspace filtering and remaining links.
+  const allTeams = await accessibleTeamScopes(userId)
+  const teams = allTeams.filter(team => team.workspaceId === context.workspace.id)
+  // Fingerprint before reading links that will be reused below. A relation
+  // moved during this read must invalidate the next poll, never be acknowledged
+  // with a newer fingerprint while returning its older team.
+  const linksVersion = await queryVersion(workspaceDb.select({ issueId: teamIssues.issueId, teamId: teamIssues.teamId, workspaceId: teamIssues.workspaceId }).from(teamIssues)
+    .where(or(eq(teamIssues.userId, userId), teams.length ? inArray(teamIssues.teamId, teams.map(team => team.id)) : undefined)), workspaceDb)
+  const visibility = await issueVisibility(userId, false, undefined, db, { teams: allTeams })
   const candidates = db.select({ id: issues.id, ownerId: issues.userId, ownerName: users.name, ownerImage: users.image, title: issues.title, content: issueAttrsContent.as('content'), checklistTotal: issueChecklistTotal.as('checklistTotal'), checklistChecked: issueChecklistChecked.as('checklistChecked'), status: issues.status, priority: issues.priority, scope: issues.scope, revision: issues.revision, createdAt: issues.createdAt, updatedAt: issues.updatedAt }).from(issues).leftJoin(users, eq(users.id, issues.userId)).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId))).where(and(visibility.predicate, sql`coalesce(${issues.content}->'attrs'->'mikka', ${issues.content}->'attrs'->'orvilo')->>'deletedAt' is null`)).orderBy(desc(issues.updatedAt), desc(issues.id)).limit(100).as('task_list')
   // Include identifier dependencies: a prefix, profile or Linear rename can change a list without editing a task.
   const signature = db.select({ item: sql`to_jsonb(task_list)`.as('item'), identifiers: sql`jsonb_build_array(
@@ -97,16 +105,19 @@ async function readIssueSnapshot(workspaceId?: string, known?: string) {
     (select jsonb_agg(${linearTeamSyncs.linearTeamKey} order by ${linearTeamSyncs.linearTeamKey}) from ${linearTeamSyncs} where ${linearTeamSyncs.ownerId}=${candidates.ownerId}),
     (select jsonb_agg(${linearIssueLinks.linearIdentifier} order by ${linearIssueLinks.linearIdentifier}) from ${linearIssueLinks} where ${linearIssueLinks.issueId}=${candidates.id})
   )`.as('identifiers') }).from(candidates)
-  const [tasksVersion, linksVersion] = await Promise.all([
-    queryVersion(signature),
-    queryVersion(workspaceDb.select({ issueId: teamIssues.issueId, teamId: teamIssues.teamId, workspaceId: teamIssues.workspaceId }).from(teamIssues)
-      .where(or(eq(teamIssues.userId, userId), teams.length ? inArray(teamIssues.teamId, teams.map(team => team.id)) : undefined)), workspaceDb),
-  ])
+  const tasksVersion = await queryVersion(signature)
   const version = createHash('sha256').update(JSON.stringify([userId, context.workspace.id, teams.map(team => team.id).sort(), tasksVersion, linksVersion])).digest('hex').slice(0, 32)
   if (known === version) return { unchanged: true, version } as const
   // Read the version first: a concurrent change is picked up on the next poll, never acknowledged unseen.
   const rows = await db.select().from(candidates).orderBy(desc(candidates.updatedAt), desc(candidates.id))
-  const links = await issueTeamScope(userId, rows.map(row => row.id), { onlyIssueIds: rows.map(row => row.id) })
+  const knownLinks = new Map(visibility.links.map(link => [link.issueId, link]))
+  const missingIds = rows.filter(row => !knownLinks.has(row.id)).map(row => row.id)
+  // Visibility already read every accessible team's links. Only owned or
+  // unlinked candidates can still need a lookup (including a revoked team).
+  const links = [
+    ...rows.flatMap(row => { const link = knownLinks.get(row.id); return link ? [link] : [] }),
+    ...await issueTeamScope(userId, missingIds, { onlyIssueIds: missingIds, teams: allTeams }),
+  ]
   const visibleRows = rows.filter(row => { const link = links.find(item => item.issueId === row.id); return row.scope === 'personal' || !link || teams.some(team => team.id === link.teamId) })
   const liveRows = visibleRows.filter(row => !readIssueMetadata(row.content).deletedAt)
   const identifiers = await taskIdentifiers(liveRows.map(row => ({ id: row.id, ownerId: row.ownerId, scope: row.scope, number: readIssueMetadata(row.content).number })))

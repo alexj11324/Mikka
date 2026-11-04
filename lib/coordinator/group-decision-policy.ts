@@ -8,8 +8,8 @@ export const GROUP_POLICY_VERSION = 'group-contribution-v3' as const
 export const GROUP_PREVIOUS_POLICY_VERSION = 'group-contribution-v1' as const
 /** The staged v2 candidate remains available for historical request replay. */
 export const GROUP_V2_POLICY_VERSION = 'group-contribution-v2' as const
-/** Stage candidate inference first; live promotion requires its reviewed fixed-case comparison. */
-export const GROUP_LIVE_POLICY_VERSION = GROUP_PREVIOUS_POLICY_VERSION
+/** The live policy is promoted by a reviewed release after its fixed-case comparison. */
+export const GROUP_LIVE_POLICY_VERSION = GROUP_POLICY_VERSION
 export const GROUP_BASELINE_VERSION = 'group-route-v0' as const
 export const GROUP_POLICY_VERSIONS = [GROUP_BASELINE_VERSION,GROUP_PREVIOUS_POLICY_VERSION,GROUP_V2_POLICY_VERSION,GROUP_POLICY_VERSION] as const
 export type GroupPolicyVersion = typeof GROUP_POLICY_VERSIONS[number]

@@ -54,6 +54,7 @@ import { carryHistory, ownDir, wipeRunCredentials } from "../agents/harness-home
 import { claudeCredentialEnv, credentialDomain } from "../agents/run-credential"
 import { buildChildEnv } from "../env"
 import { mailboxInputs } from '@mikka/protocol/mailbox'
+import { classifyProviderFailure, ProviderFailureError, providerFailureMessage, type ProviderFailure } from "@mikka/protocol/provider-failure"
 import { mailboxToolResult, type RunMailbox } from '../run-mailbox'
 import { NATIVE_AUTH_PLACEHOLDER } from '../subscription-native-broker'
 import type { RunChunk } from "../chunks"
@@ -223,6 +224,59 @@ function resultError(message: SDKResultMessage): string {
   return text || message.subtype
 }
 
+/** Only the CLI's terminal API result is provider evidence, never tool/model text. */
+export function claudeProviderFailure(result: SDKResultMessage, assistantError: unknown): ProviderFailure | undefined {
+  if (!result.is_error || !["success", "error_during_execution"].includes(result.subtype)) return undefined
+  const fields = result as unknown as Record<string, unknown>
+  if (typeof fields.terminal_reason === "string" && [
+    "prompt_too_long", "image_error", "model_error", "malformed_tool_use_exhausted",
+    "aborted_tools", "stop_hook_prevented", "hook_stopped", "max_turns", "budget_exhausted",
+    "structured_output_retry_exhausted", "tool_deferred_unavailable",
+  ].includes(fields.terminal_reason)) return undefined
+  const diagnostic = result.subtype === "success" ? result.result : result.errors.join("\n")
+  const apiDiagnostic = typeof diagnostic === "string" && /^API Error:\s*/i.test(diagnostic)
+  // Older CLI API results have only the fixed prefix. This is already a
+  // terminal is_error result; ordinary assistant/tool messages never enter.
+  const providerResult = fields.api_error_status != null || typeof assistantError === "string" ||
+    fields.terminal_reason === "api_error" || apiDiagnostic
+  if (!providerResult) return undefined
+  const prefixStatus = apiDiagnostic ? /^API Error:\s*([1-5]\d{2})\b/i.exec(diagnostic)?.[1] : undefined
+  const bodyStart = apiDiagnostic ? diagnostic.indexOf("{") : -1
+  const bodyEnd = apiDiagnostic ? diagnostic.lastIndexOf("}") : -1
+  const failure = classifyProviderFailure({
+    status: fields.api_error_status ?? (prefixStatus ? Number(prefixStatus) : undefined),
+    code: assistantError,
+    ...(bodyStart >= 0 && bodyEnd >= bodyStart ? { responseBody: diagnostic.slice(bodyStart, bodyEnd + 1) } : {}),
+  })
+  if (failure) return failure
+  if (typeof fields.api_error_status === "number" || prefixStatus) return undefined
+  // These are the CLI's documented terminal transport messages. The provider
+  // boundary above is required; a tool saying "Request timed out" is not one.
+  // https://code.claude.com/docs/en/errors#unable-to-connect-to-api
+  const transport = diagnostic.replace(/^API Error:\s*/i, "").trim()
+  if (/^(?:Request timed out\.?|Connection timed out\.?)(?: Check your internet connection and proxy settings\.?)?$/i.test(transport) ||
+    /^No response from API(?:\s*\(|\.|$)/i.test(transport) ||
+    /^Stream idle timeout - no chunks received\b/i.test(transport) ||
+    /^Unable to connect to API \(ETIMEDOUT\)$/i.test(transport))
+    return { kind: "unavailable", retryable: true, code: "timeout" }
+  if (/^Connection error\.?$/i.test(transport) ||
+    /^Unable to connect to API(?:\. Check your internet connection| \((?:ECONNREFUSED|ConnectionRefused|ECONNRESET|ENOTFOUND|FailedToOpenSocket|EAI_AGAIN|EHOSTUNREACH|ERR_PROXY_TUNNEL)\))?$/i.test(transport) ||
+    /^Connection refused — a firewall or proxy may be blocking it \((?:ConnectionRefused|ECONNREFUSED)\)$/.test(transport) ||
+    /^Can't reach the API server — check your internet or DNS \((?:ENOTFOUND|FailedToOpenSocket)\)$/.test(transport) ||
+    /^Connection dropped \(ECONNRESET\)$/.test(transport))
+    return { kind: "unavailable", retryable: true, code: "connection_error" }
+  return undefined
+}
+
+/** The iterator can also throw an API SDK exception instead of a result. */
+function claudeProviderException(error: unknown): ProviderFailure | undefined {
+  if (!(error instanceof Error) || ![
+    "APIError", "AuthenticationError", "RateLimitError", "InternalServerError",
+    "PermissionDeniedError", "APIConnectionError", "APIConnectionTimeoutError", "APITimeoutError",
+  ].includes(error.name)) return undefined
+  return classifyProviderFailure(error)
+}
+
 function toolResultText(content: unknown): string {
   if (typeof content === "string") return content.slice(-4000)
   if (Array.isArray(content)) {
@@ -249,6 +303,10 @@ const CLAUDE_RUN_ENV = {
   CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: "1",
   CLAUDE_CODE_DISABLE_CRON: "1",
   CLAUDE_CODE_DISABLE_AUTO_MEMORY: "1",
+  // The CLI owns exponential backoff within the existing session. Do not
+  // multiply those retries by restarting a run or its cloud machine.
+  CLAUDE_CODE_MAX_RETRIES: "2",
+  CLAUDE_CODE_RETRY_WATCHDOG: "0",
 }
 
 /** After a result, how long to wait for queued messages to start a turn. */
@@ -496,6 +554,7 @@ export class ClaudeAdapter implements AgentAdapter {
     let runtimeModel: string | null = null
     let ending = false
     let lastError: string | undefined
+    let providerFailure: ProviderFailure | undefined
     /** The API error the current turn's assistant message carried, if any. */
     let assistantError: unknown
     /** The CLI's quota or rate-limit failure seen this turn, if any. */
@@ -595,7 +654,7 @@ export class ClaudeAdapter implements AgentAdapter {
       if (handoff) return void end(handoff)
       void end(
         lastError
-          ? { outcome: "failed", error: lastError, ...(quota ? { quota } : {}) }
+          ? { outcome: "failed", error: lastError, ...(quota ? { quota } : {}), ...(providerFailure ? { providerFailure } : {}) }
           : { outcome: "succeeded" },
       )
     }
@@ -614,16 +673,18 @@ export class ClaudeAdapter implements AgentAdapter {
       } catch { /* The run's own failure still ends it. */ }
       return `${SUBSCRIPTION_EXECUTION_ERROR} (${category})`
     }
-    const diedEarly = (error: string) => {
+    const diedEarly = (error: string, failure?: ProviderFailure) => {
       ending = true
+      providerFailure = failure ?? providerFailure ?? classifyProviderFailure({ code: assistantError })
       const handoff = ctx.readHandoff(log)
       queue.exit(
         handoff ?? {
           outcome: "failed",
           error: externalAuth
             ? subscriptionFailure(CLI_EXITED_EARLY, { detail: redactDiagnostic(error, secrets, 500) })
-            : `claude exited before the turn ended: ${error}`,
+            : providerFailure ? providerFailureMessage(providerFailure) : `claude exited before the turn ended: ${error}`,
           ...(quota ? { quota } : {}),
+          ...(providerFailure ? { providerFailure } : {}),
         }
       )
     }
@@ -649,16 +710,17 @@ export class ClaudeAdapter implements AgentAdapter {
           // A new turn (the queued message) produces its own result.
           if (message.type === "assistant" || message.type === "user")
             clearTimeout(graceTimer)
-          if (message.type === "assistant" && message.error) assistantError = message.error
+          if (message.type === "assistant" && message.parent_tool_use_id == null && message.error) assistantError = message.error
           if (ending) continue
           quota = mergeQuota(quota, claudeQuotaSignal(message))
           if (message.type === 'tool_progress' && message.session_id === sessionId) queue.progress()
-          // Authentication errors can contain provider diagnostics. Do not
-          // turn those diagnostics into model/UI text in external-auth mode.
-          if (!(externalAuth && message.type === "assistant" && message.error))
+          // CLI API errors can contain provider diagnostics or credentials;
+          // they are not assistant output, on either API keys or subscriptions.
+          if (!(message.type === "assistant" && message.error))
             for (const chunk of claudeChunks(message)) queue.chunk(chunk)
           if (message.type !== "result") continue
           results++
+          providerFailure = claudeProviderFailure(message, assistantError)
           if (!message.is_error) quota = undefined
           // stdout and stderr are separate pipes. A result can be delivered
           // before an earlier diagnostic's data callback, so briefly drain
@@ -671,10 +733,10 @@ export class ClaudeAdapter implements AgentAdapter {
           lastError = message.is_error
             ? externalAuth
               ? subscriptionFailure(subscriptionFailureCategory(message, assistantError), resultDiagnostics(message, secrets))
-              : `Claude Code: ${resultError(message)}`
+              : providerFailure ? providerFailureMessage(providerFailure) : `Claude Code: ${resultError(message)}`
             : undefined
           assistantError = undefined
-          if (results >= written) {
+          if (providerFailure || results >= written) {
             turnEnded()
             continue
           }
@@ -687,7 +749,7 @@ export class ClaudeAdapter implements AgentAdapter {
         }
         if (!ending) diedEarly(stderrTail())
       } catch (error) {
-        if (!ending) diedEarly(errorMessage(error))
+        if (!ending) diedEarly(errorMessage(error), claudeProviderException(error))
       } finally {
         clearTimeout(authTimer)
         spoke(false)
@@ -764,6 +826,10 @@ export class ClaudeAdapter implements AgentAdapter {
     prompts.push(firstMessage)
     written++
     if (mode === "continue" && !(await untilSpoken(spoken))) {
+      if (providerFailure) {
+        await end(null)
+        throw new ProviderFailureError(providerFailure)
+      }
       if (options.requireSessionResume || externalAuth) {
         await end(null)
         throw new Error(externalAuth ? SUBSCRIPTION_ERROR : 'Original Claude question session is unavailable; refusing a fresh session')

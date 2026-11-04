@@ -5,7 +5,7 @@ import type { Pool } from 'pg'
 import { defaultAgentCopy } from './agent-copy'
 import { cloudReady } from './rule-dispatch'
 import { credentialStates, orderCandidates, poolDevices, readOrder, type OrderScope, type RefreshOrderQuota } from './model-order'
-import { deviceSupport, planDispatch, whyNoDevice, type NoDeviceWhy, type NothingReason, type OrderEntry, type RunLocation } from './model-order-plan'
+import { deviceSupport, entryKey, planDispatch, whyNoDevice, type NoDeviceWhy, type NothingReason, type OrderEntry, type RunLocation, type SkippedEntry } from './model-order-plan'
 
 /**
  * Where a new run goes and on which model (decision 2026-11-02-1400): the
@@ -26,7 +26,7 @@ export type DispatchNothingReason = NothingReason | 'cloudTemporarilyUnavailable
 export type ModelDispatch =
   | { kind: 'device'; deviceId: string; agentId: string; model: string; entry: OrderEntry; subscriptionBindingId?: string }
   | { kind: 'cloud'; harness: OrderEntry['harness']; model: string; entry: OrderEntry; apiKey: boolean }
-  | { kind: 'none'; reason: DispatchNothingReason; card: ReturnType<typeof modelUnavailableCard> }
+  | { kind: 'none'; reason: DispatchNothingReason; card: ReturnType<typeof modelUnavailableCard>; skipped?: SkippedEntry[] }
 
 /**
  * The Agent or model a Bot passed for a new thread must be one of 优先使用的模型: the same list its prompt shows
@@ -41,7 +41,7 @@ export async function modelNotAllowed(pool: Pool, scope: OrderScope, asked?: { h
   return { error: 'modelNotAllowed', asked, allowed: entries.map(entry => ({ harness: entry.harness, model: entry.model })) }
 }
 
-export async function resolveModelDispatch(pool: Pool, scope: OrderScope & { botId: string | null }, asked?: { harness: OrderEntry['harness']; model?: string } | null, location?: RunLocation, deviceId?: string, dependencies: { cloudPurpose?: 'task' | 'desktop'; refreshQuota?: RefreshOrderQuota; /** The cloud already failed to start this run: a server or a computer only. */ withoutCloud?: boolean } = {}): Promise<ModelDispatch> {
+export async function resolveModelDispatch(pool: Pool, scope: OrderScope & { botId: string | null }, asked?: { harness: OrderEntry['harness']; model?: string } | null, location?: RunLocation, deviceId?: string, dependencies: { cloudPurpose?: 'task' | 'desktop'; refreshQuota?: RefreshOrderQuota; /** Host-only continuation fence: a task never cycles through failed entries again. */ excludeEntryKeys?: readonly string[]; /** The cloud already failed to start this run: a server or a computer only. */ withoutCloud?: boolean } = {}): Promise<ModelDispatch> {
   // A subscription never asked for its models offers none yet: ask it first (once per revision).
   await new (await import('./execution-settings')).ExecutionSettings(pool).ensureCatalogues(scope)
   const candidates = await orderCandidates(pool, scope)
@@ -52,7 +52,8 @@ export async function resolveModelDispatch(pool: Pool, scope: OrderScope & { bot
   const explicit = asked ? { harness: asked.harness, model: asked.model || agentModel! } : null
   // A named computer, or a run the person put in the cloud, goes only there.
   const places = deviceId || dependencies.withoutCloud ? 'local' as const : location === 'cloud' ? 'cloudOnly' as const : location ?? stored.location
-  const order = { ...stored, location: places }
+  const excluded = new Set(dependencies.excludeEntryKeys)
+  const order = { ...stored, entries: stored.entries.filter(entry => !excluded.has(entryKey(entry))), location: places }
   // A model the thread named: the first credential that offers it on that Agent (its own entry if it is listed).
   const picked = explicit ? order.entries.find(entry => entry.harness === explicit.harness && entry.model === explicit.model)
     ?? candidates.filter(candidate => candidate.harness === explicit.harness && candidate.model === explicit.model)
@@ -85,7 +86,7 @@ export async function resolveModelDispatch(pool: Pool, scope: OrderScope & { bot
     const reason = plan.reason === 'noDevice' ? 'pickedNoDevice' : 'pickedUnavailable'
     return { kind: 'none', reason, card: modelUnavailableCard(reason, named) }
   }
-  if (plan.kind === 'none') return { kind: 'none', reason: plan.reason, card: modelUnavailableCard(plan.reason) }
+  if (plan.kind === 'none') return { kind: 'none', reason: plan.reason, card: modelUnavailableCard(plan.reason), skipped: plan.skipped }
   if (plan.kind === 'cloud') return { kind: 'cloud', harness: plan.entry.harness, model: plan.model, entry: plan.entry, apiKey: plan.entry.source.kind === 'api_key' }
   const { rows: [agent] } = await pool.query<{ id: string }>('SELECT id FROM agents WHERE "userId"=$1 AND "deviceId"=$2 AND harness=$3 ORDER BY "createdAt",id LIMIT 1',
     [scope.ownerId, plan.deviceId, plan.entry.harness])

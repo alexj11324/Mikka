@@ -28,6 +28,8 @@ export interface DeviceGatewaySocket {
 export function runDeviceGateway(socket: DeviceGatewaySocket, options: {
   signal: AbortSignal
   onOpen?: () => void
+  /** Synchronous invalidation is independent of a slow command drain. */
+  onWorkAvailable?: () => void
   onWork: () => Promise<void>
   pingMs?: number
 }): Promise<void> {
@@ -69,6 +71,11 @@ export function runDeviceGateway(socket: DeviceGatewaySocket, options: {
         })
     }
     const abort = () => finish()
+    const signalWork = () => {
+      if (settled) return
+      try { options.onWorkAvailable?.(); work() }
+      catch (error) { finish(error instanceof Error ? error : new Error(String(error))) }
+    }
     const listeners: [SocketEventType, (event: SocketEvent) => void][] = [
       ["open", () => {
         if (settled || opened) return
@@ -84,12 +91,12 @@ export function runDeviceGateway(socket: DeviceGatewaySocket, options: {
           try { if (socket.readyState === 1) socket.send(DEVICE_GATEWAY_PING) }
           catch (error) { finish(error instanceof Error ? error : new Error(String(error))) }
         }, pingMs)
-        work()
+        signalWork()
       }],
       ["message", event => {
         if (!opened || settled) return
         if (event.data === "pong") lastPong = performance.now()
-        if (event.data === "work") work()
+        if (event.data === "work") signalWork()
       }],
       ["close", event => finish(new DeviceGatewayClosedError(event.code))],
       ["error", () => finish(new Error("device gateway failed"))],

@@ -1,8 +1,8 @@
-// New remote repository task on a ready E2B template + real DeepSeek + local API.
+// New remote repository task on official E2B instances + real DeepSeek + local API.
 // Run only after local acceptance, with the isolated server's database env:
 // NODE_USE_ENV_PROXY=1 node --import ./tests/support/server-only.mjs --import tsx \
 //   scripts/e2b/cloud-local-acceptance.mjs <environment.json>
-// E2B_API_KEY, E2B_ACCEPTANCE_TEMPLATE and E2B_WORKER_SHA stay in process memory.
+// E2B_API_KEY stays in process memory; worker source and digest are fixed to this checkout.
 import assert from 'node:assert/strict'
 import { randomBytes, randomUUID } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
@@ -22,15 +22,18 @@ import { ensureBotRuntime } from '../../lib/computer/bot-runtime.ts'
 import { ensureThreadMachine } from '../../lib/cloud-computer/thread-machines.ts'
 import { localGitOrigin } from '../../packages/daemon/src/agents/local-git-origin.ts'
 import { startLocalRelay } from './local-api-relay.mjs'
+import { cloudAcceptanceRelease } from './cloud-acceptance-release.mjs'
+import { bootstrapOfficialInstance } from '../../lib/computer/official-runtime.ts'
+import { computerTemplate, taskTemplate } from '../../lib/secrets/e2b-runtime.ts'
 
-const id = randomUUID(), directory = resolve('.cache/dev-local', `cloud-${id}`), sandboxIds = new Set(), snapshotIds = new Set()
+const id = randomUUID(), directory = resolve('.cache/dev-local', `cloud-${id}`), sandboxIds = new Set()
 const localAgent = new Agent(), remoteAgent = new EnvHttpProxyAgent()
 const abort = new AbortController()
-let options = {}, timeout, heartbeat, started = false
+let options = {}, timeout, heartbeat, started = false, release
 const send = (url, options) => proxyFetch(url, { ...options, dispatcher: ['localhost', '127.0.0.1', '[::1]'].includes(new URL(url).hostname) ? localAgent : remoteAgent })
 let pool, accounts, relay, actor, botId, sourceDevice, sourceSandboxId, runId, taskDevice, stage = 'guard'
 let ownsPool = false, ownsAccounts = false
-const observed = [], metric = { id, scope: 'new remote repository task on a ready E2B template, isolated local API/DB, real DeepSeek, run-bound MCP' }
+const observed = [], metric = { id, scope: 'new remote repository task on official E2B instances, isolated local API/DB, real DeepSeek, run-bound MCP' }
 const connection = { apiKey: process.env.E2B_API_KEY, proxy: process.env.HTTPS_PROXY ?? process.env.https_proxy }
 const quote = value => `'${value.replaceAll("'", "'\\''")}'`
 async function wait(check, limit = 120_000) {
@@ -46,7 +49,11 @@ async function api(path, body, method = body ? 'POST' : 'GET') {
 async function main() {
   assert.ok(disposableDatabase(process.env), 'All application databases must be disposable loopback _e2e targets')
   assertE2eTarget(process.env.E2E_DATABASE_URL)
-  assert.ok(connection.apiKey && /^[A-Za-z0-9_-]+$/.test(process.env.E2B_ACCEPTANCE_TEMPLATE ?? '') && /^[a-f0-9]{40}$/.test(process.env.E2B_WORKER_SHA ?? ''), 'Private E2B test template credentials required')
+  assert.ok(connection.apiKey, 'The test-team E2B key is required')
+  const parentTemplate = computerTemplate(), codingTemplate = taskTemplate('claude_code')
+  metric.officialTemplates = { parent: parentTemplate, task: codingTemplate }
+  metric.workerSourceCommit = release.sourceCommit
+  metric.workerHash = release.workerHash
   for (const name of ['CI', 'GITHUB_ACTIONS', 'RUNNER_ENVIRONMENT', 'GITHUB_RUN_ID']) assert.ok(!process.env[name], 'No CI impersonation')
   const environment = options.environment ?? await loadEnvironment({ ...process.env, MIKKA_TEST_ENVIRONMENT_FILE: process.argv[2] ?? process.env.MIKKA_TEST_ENVIRONMENT_FILE })
   const localOrigin = environment.origin
@@ -67,10 +74,13 @@ async function main() {
   actor = { userId: accounts.owner.userId, workspaceId: (await api('/api/workspace')).workspace.id }
   botId = (await api('/api/mobile/bots', { name: `Cloud acceptance ${id.slice(0, 8)}`, color: 'bleu', shape: 'cercle' })).id
   stage = 'source-sandbox'
-  const source = await Sandbox.create(process.env.E2B_ACCEPTANCE_TEMPLATE, { ...connection, timeoutMs: 900_000, metadata: { purpose: 'isolated-cloud-source', acceptance: id } })
+  const source = await Sandbox.create(parentTemplate, { ...connection, timeoutMs: 900_000, metadata: { purpose: 'isolated-cloud-source', acceptance: id } })
   sourceSandboxId = source.sandboxId
   sandboxIds.add(source.sandboxId)
-  assert.equal((await source.files.read('/opt/mikka/worker-source-sha', { user: 'root' })).trim(), process.env.E2B_WORKER_SHA)
+  const sourceBootstrap = performance.now()
+  await bootstrapOfficialInstance(source, parentTemplate)
+  metric.sourceInstanceBootstrapMs = Math.round(performance.now() - sourceBootstrap)
+  assert.equal((await source.files.read('/opt/mikka/worker-source-sha', { user: 'root' })).trim(), release.workerHash)
   sourceDevice = randomUUID()
   // Disposable account-owned machine metadata. The source holds software and
   // a fixture repository only; no device credential is installed or snapshotted.
@@ -86,6 +96,7 @@ async function main() {
     metric.model = preferredModel(key.models)
     return Boolean(metric.model)
   })
+  execFileSync(process.execPath, [resolve('scripts/assert-test-model.mjs'), metric.model], { stdio: 'ignore' })
   const marker = `cloud-acceptance-${id}`
   await api('/api/coordinator/messages', { text: `请只创建一个个人任务，标题“${marker}”，描述“在当前仓库写入文件 cloud-acceptance.txt，内容为 ${marker}。完成后用 submit 工具提交报告，不推送、不创建PR。”。不要派发，不启动线程，不调用电脑。`, submissionId: randomUUID() })
   const issue = await wait(async () => (await pool.query('SELECT id FROM issues WHERE "userId"=$1 AND title=$2', [actor.userId, marker])).rows[0])
@@ -113,8 +124,6 @@ async function main() {
   relay = await startLocalRelay({ localOrigin, relayOrigin, deviceToken: initialDevice, controlToken, signal: abort.signal, barePath, send, observe: value => { observed.push({ at: new Date().toISOString(), ...value }); if (value.type === 'claim') metric.policyIssuer = value.issuer } })
   void relay.done.catch(error => abort.abort(error))
   process.env.MIKKA_CLOUD_WORKER_URL = `${relayOrigin}/mikka`
-  process.env.MIKKA_CLOUD_WORKER_SHA = process.env.E2B_WORKER_SHA
-  process.env.E2B_BYO_COMPUTER_TEMPLATE = process.env.E2B_ACCEPTANCE_TEMPLATE
 
   stage = 'signed-route-warmup'
   // next dev compiles routes lazily. Warm the unchanged authorization paths
@@ -135,16 +144,18 @@ async function main() {
   assert.equal(frozen.agentDefinition.modelSource, 'api_key')
   assert.equal(frozen.agentDefinition.model, metric.model)
   const provider = {
-    snapshot: async () => { assert.fail('A new repository task must never clone the bot filesystem') },
-    create: async (snapshot, operationId, metadata) => {
-      assert.equal(snapshot, process.env.E2B_ACCEPTANCE_TEMPLATE, 'The actual E2B create must use the ready template')
-      metric.machineSource = 'ready-template'
+    create: async (template, operationId, metadata) => {
+      assert.equal(template, codingTemplate, 'The actual E2B create must use the official coding template')
+      metric.machineSource = 'official-template'
       metric.workspaceSnapshotsUsed = 0
       metric.createRequestedAt = new Date().toISOString()
       const began = performance.now()
-      const sandbox = await Sandbox.create(snapshot, { ...connection, idempotencyKey: operationId, timeoutMs: 900_000, metadata: { ...metadata, purpose: 'isolated-cloud-task', acceptance: id } })
+      const sandbox = await Sandbox.create(template, { ...connection, idempotencyKey: operationId, timeoutMs: 900_000, metadata: { ...metadata, purpose: 'isolated-cloud-task', acceptance: id } })
       sandboxIds.add(sandbox.sandboxId)
       metric.e2bCreateMs = Math.round(performance.now() - began)
+      const taskBootstrap = performance.now()
+      await bootstrapOfficialInstance(sandbox, template)
+      metric.taskInstanceBootstrapMs = Math.round(performance.now() - taskBootstrap)
       const fixtureStarted = performance.now()
       // This transport credential is a separate read-only capability for the
       // disposable fixture, never a device token. It stays under the daemon's
@@ -153,8 +164,8 @@ async function main() {
       // install sets ownership only on named directories, not implicit parents.
       await sandbox.commands.run('install -d -o user -g user -m 700 /home/user/.mikka/worker /home/user/.mikka/worker/adapters /home/user/.mikka/worker/adapters/pids', { user: 'root' })
       await sandbox.files.write(gitConfig, `[http "${repository}"]\n\textraHeader =\n\textraHeader = Authorization: Bearer ${repoToken}\n`, { user: 'root' })
-      await sandbox.files.write('/usr/local/bin/git', `#!/bin/sh\nif test -r ${gitConfig}; then exec /usr/bin/git -c include.path=${gitConfig} "$@"; fi\nexec /usr/bin/git "$@"\n`, { user: 'root' })
-      await sandbox.commands.run(`chown user:user ${gitConfig}; chmod 600 ${gitConfig}; chown root:root /usr/local/bin/git; chmod 755 /usr/local/bin/git`, { user: 'root' })
+      await sandbox.files.write('/opt/mikka/runtime/harness-bin/git', `#!/bin/sh\nif test -r ${gitConfig}; then exec /usr/bin/git -c include.path=${gitConfig} "$@"; fi\nexec /usr/bin/git "$@"\n`, { user: 'root' })
+      await sandbox.commands.run(`chown user:user ${gitConfig}; chmod 600 ${gitConfig}; chown root:root /opt/mikka/runtime/harness-bin/git; chmod 755 /opt/mikka/runtime/harness-bin/git`, { user: 'root' })
       metric.fixtureTransportSetupMs = Math.round(performance.now() - fixtureStarted)
       const files = new Proxy(sandbox.files, { get(target, name) {
         if (name === 'write') return async (path, contents, options) => {
@@ -215,13 +226,16 @@ export async function verifyCloud(input = {}) {
   assert.equal(started, false, 'Use a fresh process for another cloud acceptance run')
   started = true
   options = input
-  if (input.templateId) process.env.E2B_ACCEPTANCE_TEMPLATE = input.templateId
-  if (input.workerHash) process.env.E2B_WORKER_SHA = input.workerHash
   if (input.apiKey) connection.apiKey = input.apiKey
   assert.ok(disposableDatabase(process.env), 'Cloud acceptance requires the owning isolated database environment')
   let failure
   try {
   input.signal?.throwIfAborted()
+  release = cloudAcceptanceRelease({ sourceCommit: input.sourceCommit, workerHash: input.workerHash })
+  process.env.MIKKA_CLOUD_WORKER_SOURCE_COMMIT = release.sourceCommit
+  process.env.MIKKA_CLOUD_WORKER_SHA = release.workerHash
+  // Validate the normal official-template policy before allocating anything.
+  computerTemplate(); taskTemplate('claude_code')
   if (!connection.apiKey) {
     // Reuse the configured existing Infisical identity. These response values
     // remain in memory; no key is printed, written to an env file or sent to a task.
@@ -266,10 +280,6 @@ export async function verifyCloud(input = {}) {
     catch { try { await Sandbox.kill(sandboxId, connection) } catch { cleanupFailures.push({ resource: 'sandbox', id: sandboxId }) } }
   }
   if (relay) await relay.stop()
-  for (const snapshotId of snapshotIds) {
-    try { await Sandbox.deleteSnapshot(snapshotId, connection) }
-    catch { cleanupFailures.push({ resource: 'snapshot', id: snapshotId }) }
-  }
   if (pool && actor) {
     // Remove only this invocation's resources, including when the owning
     // driver lends its lease and database pool for the cloud leg.

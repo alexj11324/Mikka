@@ -1,11 +1,13 @@
 import { writeFileSync } from 'node:fs'
+import { DECISION_MODEL } from '../lib/coordinator/decision'
 import { pathToFileURL } from 'node:url'
 import { GROUP_BASELINE_VERSION, GROUP_POLICY_VERSION } from '../lib/coordinator/group-decision-policy'
 import { GROUP_REPLAY_CASE_IDS, GROUP_REPLAY_COMPARISON_VERSION, GROUP_REPLAY_DATASET, GROUP_REPLAY_DATASET_DIGEST, groupReplayAbstained, groupReplayCompleted, summarizeGroupDecisionReplay, type GroupDecisionReplay } from '../lib/coordinator/group-decision-replay'
 import { GROUP_DECISION_PROTOCOL, GROUP_MAX_ROUTING_DECISIONS, groupDecisionFailures, groupDecisionTotals } from '../lib/coordinator/group-decision-chain'
 import { groupDecisionReceipt, groupDecisionSteps } from '../lib/coordinator/group-decision-trace'
 
-/** Normal cookie/PAT authentication, fixed production deployment, fixed cases.
+/** Normal cookie/PAT authentication, fixed source build, fixed cases.
+ * The release owner verifies the actual Vercel deployment/alias separately.
  * Evidence contains no input prompts, group history, token or cookies. */
 export async function runGroupDecisionReplay({env=process.env,fetchImpl=fetch}:{env?:Record<string,string|undefined>;fetchImpl?:typeof fetch}={}) {
   const origin=env.GROUP_REPLAY_ORIGIN ?? 'https://app.aspectlylabs.com'
@@ -25,12 +27,13 @@ export async function runGroupDecisionReplay({env=process.env,fetchImpl=fetch}:{
   }
   const version=async()=>{
     const {response,data}=await request('/api/version')
-    if(!response.ok || (data as {build?:unknown}|null)?.build!==deployment)throw Error('replay_deployment_changed')
+    if(!response.ok || (data as {build?:unknown}|null)?.build!==revision)throw Error('replay_deployment_changed')
   }
   const report={schemaVersion:1,comparisonVersion:GROUP_REPLAY_COMPARISON_VERSION,evidenceKind:'actual-decision-inference' as const,dataset:GROUP_REPLAY_DATASET,datasetDigest:GROUP_REPLAY_DATASET_DIGEST,
     deploymentId:deployment,revision,conversationId,startedAt:new Date().toISOString(),finishedAt:'',status:'running',error:null as string|null,
     baseline:[] as GroupDecisionReplay[],candidate:[] as GroupDecisionReplay[],collectionComplete:false,
     scope:'Actual Decision inference: 24 logical case replays, each with its bounded provider-request chain. Execution projected/not performed. Cost covers routing requests only, not correction, contribution, chat, tools or Factory.',
+    modelScope:{expectedDecisionModel:DECISION_MODEL,observedDecisionModels:[] as string[],workerModel:null,workerExecutionPerformed:false},
     productionAccepted:false,policyChanged:false}
   const executions=new Set<string>(),generations=new Set<string>(),stepIds=new Set<string>()
   try {
@@ -65,7 +68,8 @@ export async function runGroupDecisionReplay({env=process.env,fetchImpl=fetch}:{
         for(const step of chain){
           if(stepIds.has(step.id) || step.receipt && (executions.has(step.receipt.executionId) || generations.has(step.receipt.providerGenerationId)))throw Error('replay_chain_unbound')
           stepIds.add(step.id)
-          if(step.receipt){executions.add(step.receipt.executionId);generations.add(step.receipt.providerGenerationId)}
+          if(step.receipt){executions.add(step.receipt.executionId);generations.add(step.receipt.providerGenerationId)
+            if(!report.modelScope.observedDecisionModels.includes(step.receipt.modelId))report.modelScope.observedDecisionModels.push(step.receipt.modelId)}
         }
       }
     }

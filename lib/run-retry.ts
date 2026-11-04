@@ -62,6 +62,23 @@ export function quotaContinuationPrompt(prompt: string): string {
   return `${base.slice(0, 100_000 - note.length - 2)}\n\n${note}`
 }
 
+const PROVIDER_HEADING = '## This run continues on the next preferred model'
+
+/** A provider outage changes the executor, not the task or its permissions. */
+export function providerContinuationNote(): string {
+  return [PROVIDER_HEADING,
+    'The previous model stopped because its provider could not serve the request. The host selected the next available entry in the owner\'s preferred model order.',
+    'Continue the same task. Inspect the existing files and git status before changing anything. Do not repeat an external action, push, pull request or message that already happened.',
+    'A different harness starts a new session. On another device only the uploaded repository checkpoint is restored; verify the restored state and missing context before acting.',
+  ].join('\n\n')
+}
+
+export function providerContinuationPrompt(prompt: string): string {
+  const base = prompt.split(`\n\n${PROVIDER_HEADING}`)[0].split(`\n\n${RETRY_HEADING}`)[0].split(`\n\n${QUOTA_HEADING}`)[0]
+  const note = providerContinuationNote()
+  return `${base.slice(0, 100_000 - note.length - 2)}\n\n${note}`
+}
+
 export type LostRunOutcome =
   | { kind: 'retry'; attempt: number }
   | { kind: 'stopped' }

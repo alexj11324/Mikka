@@ -70,6 +70,23 @@ async function runTurn(text) {
     threadId,
     turn: { id: open, status: "inProgress", error: null },
   })
+  if (text.startsWith('PROVIDER_DIAGNOSTIC ')) {
+    const scenario = JSON.parse(text.slice('PROVIDER_DIAGNOSTIC '.length))
+    writeFileSync(join(process.env.CODEX_HOME, 'provider-prompts.json'), JSON.stringify({ prompts: turn }))
+    if (scenario.retry) notify('error', { threadId, turnId: open, willRetry: true, error: { message: 'private retry diagnostic', codexErrorInfo: 'serverOverloaded' } })
+    if (scenario.inspectRetries) item('completed', { type: 'agentMessage', id: 'retry-config', text: JSON.stringify({
+      request: argv.find(arg => arg.startsWith('model_providers.mikka.request_max_retries=')),
+      stream: argv.find(arg => arg.startsWith('model_providers.mikka.stream_max_retries=')),
+    }) })
+    if (scenario.modelText) item('completed', { type: 'agentMessage', id: 'model-text', text: scenario.modelText })
+    if (scenario.toolError) item('completed', { type: 'mcpToolCall', id: 'fixture-tool', server: 'fixture', tool: 'fetch', arguments: {}, result: null, error: { message: scenario.toolError } })
+    if (scenario.failure) {
+      notify('error', { threadId, turnId: open, willRetry: false, error: scenario.failure })
+      notify('turn/completed', { threadId, turn: { id: open, status: 'failed', error: scenario.failure } })
+      open = null
+    } else complete()
+    return
+  }
   if (text === 'TOOL_PROGRESS_TEST') {
     notify('item/commandExecution/outputDelta', { threadId: 'foreign-thread', turnId: open, delta: 'ignored' })
     notify('item/commandExecution/outputDelta', { threadId, turnId: 'stale-turn', delta: 'ignored' })
@@ -253,6 +270,14 @@ createInterface({ input: process.stdin }).on("line", async (line) => {
       return send({ id, result: { thread: { id: threadId },
         ...(model === "protocol-omits-model" ? {} : { model: model ? `observed:${model}` : "observed-default" }) } })
     case "turn/start":
+      if (params.input[0].text.startsWith('PROVIDER_DIAGNOSTIC ')) {
+        const scenario = JSON.parse(params.input[0].text.slice('PROVIDER_DIAGNOSTIC '.length))
+        if (scenario.rpcError) {
+          turn++
+          writeFileSync(join(process.env.CODEX_HOME, 'provider-prompts.json'), JSON.stringify({ prompts: turn }))
+          return send({ id, error: scenario.rpcError })
+        }
+      }
       send({
         id,
         result: {

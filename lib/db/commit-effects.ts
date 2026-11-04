@@ -1,4 +1,5 @@
 import type { Pool, PoolClient, QueryResult } from 'pg'
+import { AsyncLocalStorage } from 'node:async_hooks'
 
 type Effect = () => void | Promise<void>
 type State = { active: boolean; effects: Map<string, Effect>; savepoints: { name: string; effects: Map<string, Effect> }[] }
@@ -84,6 +85,8 @@ export function hasCommitEffect(client: PoolClient, key: string) {
 export function afterCommit(client: PoolClient, key: string, effect: Effect) {
   const state = (client as ObservedClient)[STATE]
   if (!state) throw new Error('Commit effects require an observed database client')
-  if (state.active) state.effects.set(key, effect)
-  else run(effect) // An autocommitted write has already succeeded.
+  // COMMIT can be issued after the originating request context has exited.
+  const committed = AsyncLocalStorage.bind(effect)
+  if (state.active) state.effects.set(key, committed)
+  else run(committed) // An autocommitted write has already succeeded.
 }

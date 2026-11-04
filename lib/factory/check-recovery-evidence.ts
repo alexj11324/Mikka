@@ -140,7 +140,10 @@ export async function checkFactoryRepairBudget(tx: PoolClient, task: Pick<Factor
     rows: [count],
   } = await tx.query(
     `SELECT count(*)::int AS count FROM factory_attempts a JOIN factory_tasks t ON t.id=a."taskId"
-      WHERE a."taskId"=$1 AND a.stage='execute' AND COALESCE(a.output->>'requestEpoch',t."sourceEventId"::text)=t."sourceEventId"::text`,
+      WHERE a."taskId"=$1 AND a.stage='execute' AND COALESCE(a.output->>'requestEpoch',t."sourceEventId"::text)=t."sourceEventId"::text
+        AND NOT (COALESCE(a.output->>'recovery','')='provider_failure' AND EXISTS (
+          SELECT 1 FROM agent_runs r WHERE r.id=a."runId" AND r."userId"=t."userId" AND r."issueId"=t."issueId"
+            AND r.status='failed' AND r."stopReason"='provider_failure' AND r."stopRequestedAt" IS NULL))`,
     [task.id],
   );
   if (count.count > orchestratorSettings({}).maxFixAttempts)

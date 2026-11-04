@@ -8,6 +8,7 @@ import type { HarnessInfo } from '@mikka/protocol/harness'
 import { ActionFailureError } from './action-error'
 import { apiKeyHarnesses } from './model-api-key-providers'
 import { subscriptionAvailability } from './subscription-quota'
+import { providerHealthStates, providerSourceKey } from './model-provider-health'
 import {
   agentsByOffer, defaultOrder, deviceModel, entryKey, offerKey, planDispatch, whyNoDevice,
   type CredentialState, type NoDeviceWhy, type OrderCandidate, type OrderEntry, type OrderHarness, type PoolDevice, type RunLocation,
@@ -33,7 +34,7 @@ export interface OrderRow extends OrderEntry {
   agents: OrderHarness[]
   /** Why it cannot run now, or null when it can. noDevice when no place of 运行位置 runs it, with what the closest computer lacks. */
   block: null
-    | { reason: 'checking' | 'quota' | 'expired' | 'paused' | 'missing' | 'keyRefused'; resetsAt?: string | null }
+    | { reason: 'checking' | 'quota' | 'expired' | 'paused' | 'missing' | 'keyRefused' | 'balance' | 'providerUnavailable'; resetsAt?: string | null }
     | { reason: 'noDevice'; device: NoDeviceWhy }
 }
 
@@ -116,7 +117,9 @@ export async function readOrder(query: Query, scope: OrderScope, candidates?: (O
   const settings = await settingsRow(query, scope)
   if (!settings.customized) {
     const list = defaultOrder(candidates ?? await orderCandidates(query, scope), settings.preferredHarness)
-    return { ...settings, entries: list.map(item => ({ id: `default:${entryKey(item)}`, harness: item.harness, model: item.model, source: item.source })) }
+    // The entry is also frozen in a run's JSONB definition. Keep the NUL-separated
+    // identity key in memory, but give its opaque row id a stable JSONB-safe form.
+    return { ...settings, entries: list.map(item => ({ id: `default:${encodeURIComponent(entryKey(item))}`, harness: item.harness, model: item.model, source: item.source })) }
   }
   const { rows } = await query.query<EntryRow>(
     'SELECT id,harness,model,"sourceKind","sourceId"::text AS "sourceId" FROM model_order_entries WHERE "ownerId"=$1 AND "workspaceId"=$2 ORDER BY position,id',
@@ -139,12 +142,15 @@ const refreshOrderQuota = (query: Query): RefreshOrderQuota => async (scope, con
 export async function credentialStates(query: Query, scope: OrderScope, entries: readonly OrderEntry[], candidates: readonly (OrderCandidate & { provider: string; credentialOwnerId?: string })[], now?: number, options: { probe?: boolean; refresh?: RefreshOrderQuota } = {}) {
   let checkedAt = now ?? Date.now()
   const available = new Set(candidates.map(entryKey))
+  const wanted = new Set(entries.map(entryKey))
+  const authorizedCandidates = candidates.filter(candidate => wanted.has(entryKey(candidate)))
   const connectionIds = [...new Set(entries.flatMap(entry => entry.source.kind === 'subscription' ? [entry.source.connectionId] : []))]
   // Owners come only from the server's authorized candidates, never the
   // browser's stored order/source. The database verifies each (id, owner) pair.
   const owners = new Map(connectionIds.map(id => [id, scope.ownerId]))
   for (const candidate of candidates) if (candidate.source.kind === 'subscription' && connectionIds.includes(candidate.source.connectionId)) owners.set(candidate.source.connectionId, candidate.credentialOwnerId ?? scope.ownerId)
-  const keyIds = [...new Set(entries.flatMap(entry => entry.source.kind === 'api_key' ? [entry.source.keyId] : []))]
+  const keyOwners = new Map(authorizedCandidates.flatMap(candidate => candidate.source.kind === 'api_key'
+    ? [[candidate.source.keyId, candidate.credentialOwnerId ?? scope.ownerId] as const] : []))
   const readConnections = async () => {
     const authorized = [] as [string, string][]
     for (const [id, owner] of owners) if (owner === scope.ownerId || await (await import('./personal-policy')).othersMayUse(query, owner, scope.workspaceId)) authorized.push([id, owner])
@@ -170,8 +176,13 @@ export async function credentialStates(query: Query, scope: OrderScope, entries:
     connections = await readConnections()
     checkedAt = now ?? Date.now()
   }
-  const keys = new Map((keyIds.length ? (await query.query<{ id: string; modelsError: string | null; provider: string }>(
-    'SELECT id::text AS id,"modelsError",provider FROM model_api_keys WHERE id::text=ANY($1::text[])', [keyIds])).rows : []).map(row => [row.id, row]))
+  const keys = new Map((keyOwners.size ? (await query.query<{ id: string; modelsError: string | null; provider: string }>(
+    `SELECT k.id::text AS id,k."modelsError",k.provider FROM model_api_keys k
+      JOIN unnest($1::text[],$2::text[]) AS authorized(id,owner) ON k.id::text=authorized.id AND k."ownerId"=authorized.owner
+      WHERE k."ownerId"=$3 OR (EXISTS (SELECT 1 FROM model_api_key_shares sh WHERE sh."keyId"=k.id AND sh."workspaceId"::text=$4)
+        AND NOT EXISTS (SELECT 1 FROM workspace_personal_policies p WHERE p."workspaceId"::text=$4 AND NOT p.subscriptions))`,
+    [[...keyOwners.keys()], [...keyOwners.values()], scope.ownerId, scope.workspaceId])).rows : []).map(row => [row.id, row]))
+  const health = await providerHealthStates(query, scope, authorizedCandidates, checkedAt)
   const states = new Map<string, { credential: CredentialState; provider: string }>()
   for (const entry of entries) {
     if (entry.source.kind === 'subscription') {
@@ -182,14 +193,16 @@ export async function credentialStates(query: Query, scope: OrderScope, entries:
         : row.state === 'reconnect_required' ? { usable: false, reason: 'expired' }
           : row.paused ? { usable: false, reason: 'paused' }
             : row.state !== 'connected' || !available.has(entryKey(entry)) ? { usable: false, reason: 'missing' }
-              : availability.status === 'exhausted' ? { usable: false, reason: 'quota', resetsAt: availability.resetsAt }
+              : health.get(providerSourceKey(entry.source)) ?? health.get(entryKey(entry)) ?? (
+                availability.status === 'exhausted' ? { usable: false, reason: 'quota', resetsAt: availability.resetsAt }
                 : availability.status === 'checking' ? { usable: false, reason: 'checking' }
-                : { usable: true }
+                : { usable: true })
       states.set(entry.id, { credential, provider })
     } else {
       const row = keys.get(entry.source.keyId)
-      const credential: CredentialState = row?.modelsError === 'invalid' ? { usable: false, reason: 'keyRefused' }
-        : !row || !available.has(entryKey(entry)) ? { usable: false, reason: 'missing' } : { usable: true }
+      const credential: CredentialState = !row || !available.has(entryKey(entry)) ? { usable: false, reason: 'missing' }
+        : row.modelsError === 'invalid' ? { usable: false, reason: 'keyRefused' }
+          : health.get(providerSourceKey(entry.source)) ?? health.get(entryKey(entry)) ?? { usable: true }
       states.set(entry.id, { credential, provider: row?.provider ?? 'custom' })
     }
   }

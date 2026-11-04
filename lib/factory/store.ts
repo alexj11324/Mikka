@@ -5,6 +5,8 @@ import { completedRunForRecovery } from './completion-recovery'
 import { retainedDeliverableForRecovery, type ObserveRetainedDeliverable, type ObservedRetainedDeliverable } from './deliverable-recovery'
 import { snapshotMatchesScope } from './deliverable-snapshot'
 import { apiKeyWorkerDefinition } from "../agent-kit/worker";
+import { runPolicySchema } from '@mikka/protocol/agent-policy';
+import { intersectRunPolicy } from '../run-assignment-policy';
 import { factoryRunBotMatches } from './run-scope'
 import { randomUUID } from "node:crypto";
 import { factoryChanged } from '../live/factory';
@@ -15,6 +17,7 @@ import { factoryScopeAllows, type FactoryIssueScope } from "./scope";
 import { captureIdOf } from "./evidence";
 import type { Pool, PoolClient } from "pg";
 import { z } from "zod";
+import { daemonTestMode, normalizeRepository, repositoryBindingMatches } from '@mikka/protocol/repository'
 import {
   revisionBindingSchema,
   factoryCandidateSchema,
@@ -29,6 +32,34 @@ import {
   type FactoryStage,
   type FactoryStatus,
 } from "./contract";
+
+type ProviderRun = Parameters<typeof import('../run-provider-fallback').providerContinuationMatches>[0]
+
+/** Model changes are authorized by the host receipt. Repository authority
+ * remains independently checked, including read-only and no-repository runs
+ * which intentionally have no writable publication admission. */
+async function providerRepositoryRetryMatches(tx: PoolClient, prior: ProviderRun, retry: ProviderRun) {
+  if (prior.agentDefinition?.repositoryAdmission || retry.agentDefinition?.repositoryAdmission)
+    return (await import('../run-admission-store')).admittedRepositoryRetryMatches(tx, prior, retry)
+  const { rows } = await tx.query(`SELECT r.id,repo."repoPath",repo."remoteUrl",d.kind,b."workspaceId",b."botId"
+    FROM agent_runs r JOIN device_repos repo ON repo.id=r."deviceRepoId" AND repo."userId"=r."userId" AND repo."deviceId"=r."deviceId"
+    JOIN devices d ON d.id=r."deviceId" AND d."ownerId"=r."userId"
+    JOIN agents a ON a.id=r."agentId" AND a."userId"=r."userId" AND (a."deviceId"=d.id OR d.kind='cloud')
+    LEFT JOIN computer_run_bindings b ON b."runId"=r.id AND b."ownerId"=r."userId"
+    WHERE r.id=ANY($1::uuid[]) AND r."userId"=$2 AND r."issueId"=$3`, [[prior.id, retry.id], prior.userId, prior.issueId])
+  const before = rows.find(row => row.id === prior.id), after = rows.find(row => row.id === retry.id)
+  if (!before || !after) return false
+  if (!before.remoteUrl && !after.remoteUrl)
+    return before.kind === 'cloud' && after.kind === 'cloud' && before.repoPath === after.repoPath &&
+      Boolean(before.workspaceId && before.botId) && before.workspaceId === after.workspaceId && before.botId === after.botId &&
+      before.workspaceId === prior.agentDefinition?.executionIdentity?.workspaceId && after.workspaceId === retry.agentDefinition?.executionIdentity?.workspaceId
+  if (prior.agentDefinition?.readOnly !== true || retry.agentDefinition?.readOnly !== true || !before.remoteUrl || !after.remoteUrl) return false
+  try {
+    const options = { allowFile: daemonTestMode(process.env) }
+    return repositoryBindingMatches(before.repoPath, before.remoteUrl, options) && repositoryBindingMatches(after.repoPath, after.remoteUrl, options) &&
+      normalizeRepository(before.remoteUrl, options).key === normalizeRepository(after.remoteUrl, options).key
+  } catch { return false }
+}
 
 export interface FactoryTask {
   id: string;
@@ -45,6 +76,33 @@ export interface FactoryTask {
   candidateId: string | null;
   reason: string;
 }
+
+/** Bind a host-created provider continuation before its queue transaction is
+ * committed. Otherwise a polling daemon could claim it as a non-Factory run
+ * between queue publication and completion reconciliation. */
+export async function adoptProviderContinuation(tx: PoolClient, userId: string, sourceRunId: string, retryRunId: string,
+  storeFor?: (botId: string | null) => ReturnType<typeof createFactoryStore>) {
+  const { rows: bindings } = await tx.query<FactoryTask & { sourceAttemptId: string; requestEpoch: string }>(`SELECT t.*,a.id AS "sourceAttemptId",
+    COALESCE(a.output->>'requestEpoch',t."sourceEventId"::text) AS "requestEpoch"
+    FROM factory_attempts a JOIN factory_tasks t ON t.id=a."taskId"
+    WHERE a."runId"=$1 AND t."userId"=$2 ORDER BY t.id FOR UPDATE OF t`, [sourceRunId, userId])
+  if (!bindings.length) return 0
+  const runtime = storeFor ? null : await import('./runtime')
+  const stores = storeFor ?? ((botId: string | null) => runtime!.factoryRuntimeForBot(botId).store)
+  const { factoryEventId } = await import('./event-id')
+  for (const bound of bindings) {
+    if (bound.status !== 'running' || bound.attemptId !== bound.sourceAttemptId || bound.requestEpoch !== bound.sourceEventId)
+      throw new FactoryError('factoryStale')
+    const store = stores(bound.botId)
+    const task = await store.lockTask(tx, userId, bound.id)
+    if (task.status !== 'running' || task.attemptId !== bound.sourceAttemptId || task.sourceEventId !== bound.sourceEventId)
+      throw new FactoryError('factoryStale')
+    await store.apply(userId, { taskId: task.id, issueId: task.issueId, attemptId: task.attemptId, revision: task.revision, candidateId: task.candidateId },
+      factoryEventId('adopt-retry', retryRunId), { action: 'adopt_retry', runId: retryRunId, reason: 'Continue with the next preferred model after the provider failed' }, tx)
+  }
+  return bindings.length
+}
+
 export type FactoryTaskSummary = Pick<FactoryTask, "id" | "issueId" | "stage" | "status" | "revision" | "attemptId" | "candidateId" | "reason"> & {
   isSkillCandidate: boolean;
   /** The run that produced the candidate, so acceptance can sit beside its thread. */
@@ -667,30 +725,35 @@ export function createFactoryStore(
           }
         } else if (change.action === "adopt_retry") {
           if (
-            !["spec", "execute", "review", "verify"].includes(task.stage) ||
+            !["spec", "execute", "review", "verify", "monitor"].includes(task.stage) ||
             !attempt.runId ||
             !["running", "failed"].includes(task.status)
           )
             fail("factoryTransition");
           const prior = await runFor(tx, task, attempt.runId);
           const retry = await runFor(tx, task, change.runId);
+          const providerRetry = prior.stopReason === "provider_failure" && prior.status === "failed";
           const quotaRetry = prior.stopReason === "quota_exhausted" && ["failed","paused"].includes(prior.status);
           const expected = quotaRetry && retry.agentDefinition?.apiKey && prior.agentDefinition
             ? apiKeyWorkerDefinition(prior.agentDefinition, retry.prompt, retry.agentDefinition.apiKey)
             : prior.agentDefinition;
           if (
-            (!quotaRetry && (prior.stopReason !== "device_lost" || prior.status !== "failed")) ||
-            retry.retryOf !== prior.id || (retry.agentId !== prior.agentId && !(await (await import('../run-admission-store')).admittedRepositoryRetryMatches(tx, prior, retry))) ||
+            (!providerRetry && !quotaRetry && (prior.stopReason !== "device_lost" || prior.status !== "failed")) ||
+            (task.stage === "monitor" && (!providerRetry || retry.deviceId !== prior.deviceId || retry.deviceRepoId !== prior.deviceRepoId)) ||
+            retry.retryOf !== prior.id ||
+            (providerRetry ? !(await (await import('../run-provider-fallback')).providerContinuationMatches(prior, retry)) || !(await providerRepositoryRetryMatches(tx, prior, retry))
+              : retry.agentId !== prior.agentId && !(await (await import('../run-admission-store')).admittedRepositoryRetryMatches(tx, prior, retry))) ||
             retry.kind !== prior.kind || retry.baseBranch !== prior.baseBranch ||
-            retry.agentDefinition?.definitionDigest !== expected?.definitionDigest
+            (!providerRetry && retry.agentDefinition?.definitionDigest !== expected?.definitionDigest)
           )
             fail("factoryRunMismatch");
           await tx.query(
-            'UPDATE factory_attempts SET status=\'failed\',reason=$2,"sessionId"=$3,"finishedAt"=clock_timestamp() WHERE id=$1',
+            'UPDATE factory_attempts SET status=\'failed\',reason=$2,"sessionId"=$3,output=output || $4::jsonb,"finishedAt"=clock_timestamp() WHERE id=$1',
             [
               attempt.id,
-              String(prior.error ?? "Device lost").slice(0, 4000),
+              String(prior.error ?? (providerRetry ? "Model provider failed" : "Device lost")).slice(0, 4000),
               prior.sessionId,
+              JSON.stringify(providerRetry ? { recovery: "provider_failure" } : {}),
             ],
           );
           task.reason = change.reason;
@@ -700,12 +763,20 @@ export function createFactoryStore(
             'UPDATE factory_attempts SET status=\'running\',"runId"=$2,"sessionId"=$3 WHERE id=$1',
             [task.attemptId, retry.id, retry.sessionId],
           );
-          if (["review","verify"].includes(task.stage)) {
+          if (["review","verify"].includes(task.stage) || (providerRetry && task.stage === "monitor")) {
             // Checks restart independently on the same candidate; they never
             // resume the failed/paused CLI session or acquire its observations.
+            const monitor = attempt.output.monitorDispatch;
+            if (providerRetry && task.stage === "monitor" && (!monitor || typeof monitor !== "object" || Array.isArray(monitor) ||
+              (monitor as Record<string, unknown>).deviceRepoId !== prior.deviceRepoId)) fail("factoryRunMismatch");
             await tx.query(`UPDATE agent_runs SET "retryOf"=NULL,"sessionId"=NULL,prompt=$2,"agentDefinition"=jsonb_set("agentDefinition",'{promptDigest}',to_jsonb($3::text)) WHERE id=$1`, [retry.id, prior.prompt, (await import('../agent-kit/worker')).retryWorkerDefinition(retry.agentDefinition, prior.prompt)!.promptDigest]);
-            await tx.query('UPDATE factory_attempts SET output=$2 WHERE id=$1', [task.attemptId, JSON.stringify({ check: attempt.output.check })]);
-            await tx.query('INSERT INTO factory_events ("taskId","eventId",request,result) VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING', [task.id, (await import('./event-id')).factoryEventId('quota-check-continuation',prior.id), JSON.stringify({ priorRunId: prior.id }), JSON.stringify({ runId: retry.id })]);
+            const check = attempt.output.check;
+            if (providerRetry && task.stage !== "monitor" && (!check || typeof check !== "object" || Array.isArray(check))) fail("factoryRunMismatch");
+            const assignment = task.stage === "monitor" ? { monitorDispatch: monitor }
+              : { check: providerRetry ? { ...(check as Record<string, unknown>), deviceRepoId: retry.deviceRepoId, environment: `device:${retry.deviceId}`,
+                ...(retry.agentDefinition?.policyCeiling ? { policy: intersectRunPolicy(runPolicySchema.parse((check as Record<string, unknown>).policy), retry.agentDefinition.policyCeiling) } : {}) } : check };
+            await tx.query('UPDATE factory_attempts SET "sessionId"=NULL,output=output || $2::jsonb WHERE id=$1', [task.attemptId, JSON.stringify(assignment)]);
+            await tx.query('INSERT INTO factory_events ("taskId","eventId",request,result) VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING', [task.id, (await import('./event-id')).factoryEventId(providerRetry ? 'provider-check-continuation' : 'quota-check-continuation',prior.id), JSON.stringify({ priorRunId: prior.id }), JSON.stringify({ runId: retry.id })]);
           }
           task.status = "running";
         } else if (change.action === "bind_run") {

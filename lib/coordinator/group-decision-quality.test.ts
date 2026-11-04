@@ -23,8 +23,8 @@ test('deployment rollback changes live policy while host-selected replay version
   assert.equal(getGroupDecisionPolicy().version,GROUP_BASELINE_VERSION)
   assert.equal(getGroupDecisionPolicy(GROUP_POLICY_VERSION).version,GROUP_POLICY_VERSION)
   overrideDeploymentSwitch('groupContribution',true)
-  assert.equal(GROUP_LIVE_POLICY_VERSION,GROUP_PREVIOUS_POLICY_VERSION,'candidate inference must pass before live promotion')
-  assert.notEqual(GROUP_LIVE_POLICY_VERSION,GROUP_POLICY_VERSION)
+  assert.equal(GROUP_LIVE_POLICY_VERSION,GROUP_POLICY_VERSION,'the reviewed v3 candidate is promoted to live')
+  assert.equal(getGroupDecisionPolicy(GROUP_PREVIOUS_POLICY_VERSION).version,GROUP_PREVIOUS_POLICY_VERSION,'historical v1 remains explicitly readable')
   assert.equal(getGroupDecisionPolicy().version,GROUP_LIVE_POLICY_VERSION)
   assert.equal(getGroupDecisionPolicy(GROUP_BASELINE_VERSION).version,GROUP_BASELINE_VERSION)
 })
@@ -99,7 +99,7 @@ test('feedback provenance cannot be client-selected and policy rollback is expli
   assert.throws(() => getGroupDecisionPolicy('unknown'), /unknown_group_decision_policy/)
 })
 
-test('v3 is staged while historical v1 and v2 receipts keep their original versions', () => {
+test('v3 is live while historical v1 and v2 receipts keep their original versions', () => {
   const receipt = { executionId: 'execution', modelId: DECISION_MODEL as typeof DECISION_MODEL, providerGenerationId: 'provider', startedAt: '2026-11-03T00:00:00Z', completedAt: '2026-11-03T00:00:01Z', requestDigest: 'a'.repeat(64), imageDigests: [], vision: 'no-image-input' as const }
   const versions = [GROUP_BASELINE_VERSION, GROUP_PREVIOUS_POLICY_VERSION, GROUP_V2_POLICY_VERSION, GROUP_POLICY_VERSION]
   const steps = versions.map((policyVersion,index)=>({id:`version-${index}`,phase:'responder' as const,index:0,status:'complete' as const,failure:null,receipt,policyVersion}))
