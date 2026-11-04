@@ -1,0 +1,58 @@
+# TEMPORARY WORKFLOW: install only .github/workflows/watchdog-acceptance.yml
+# on acceptance/watchdog-stop-1195 only. Do not add it to mainline.
+# Frozen runtime source in /vercel/Mikka-watchdog-acceptance; independent of this temporary branch.
+name: Temporary Watchdog stop cause acceptance
+on:
+  push:
+    branches: [acceptance/watchdog-stop-1195]
+permissions:
+  contents: read
+concurrency:
+  group: mikka-acceptance-existing-sandbox-612
+  cancel-in-progress: false
+jobs:
+ watchdog-local-loop:
+  if: github.event_name == 'push' && github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/acceptance/watchdog-stop-1195'
+  runs-on: ubuntu-latest
+  timeout-minutes: 100
+  permissions:
+    contents: read
+    id-token: write
+  steps:
+    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      with:
+        persist-credentials: false
+    - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+      with:
+        node-version: 24
+    - name: Check dispatcher contract without network access
+      run: node --test scripts/ops/proactive-sandbox-local-loop.test.mjs
+    - name: Read existing sandbox team token
+      uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+      with:
+        method: oidc
+        identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+        oidc-audience: mikka-infisical
+        project-id: 89850d6a-f020-4936-863e-df77380dfe40
+        env-slug: prod
+        secret-path: /platform
+        recursive: false
+        include-imports: false
+        secret-name: VERCEL_TEAM_TOKEN
+    - name: Read permitted Flash credential
+      uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+      with:
+        method: oidc
+        identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+        oidc-audience: mikka-infisical
+        project-id: 89850d6a-f020-4936-863e-df77380dfe40
+        env-slug: dev
+        secret-path: /vercel
+        recursive: false
+        include-imports: false
+        secret-name: DEEPSEEK_API_KEY
+    - name: Dispatch bounded real Flash local loop in the existing sandbox
+      run: node scripts/ops/proactive-sandbox-local-loop.mjs
+      env:
+        # Reviewed source pin; the checkout in the existing sandbox must match.
+        MIKKA_ACCEPTANCE_SOURCE_SHA: 020b3957e8fc9609528c69499609adef08150cdf
