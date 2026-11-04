@@ -1,0 +1,200 @@
+{
+  "deployment": "e9564639cd40f1433840c47662d8d548efc79144",
+  "rows": [
+    {
+      "observedAt": "2026-11-04T17:59:43.778Z",
+      "messageId": "3dcebb88-ae1e-4ffd-8dbd-3839e1eb7444",
+      "status": "complete",
+      "route": {
+        "by": "model",
+        "action": "reply",
+        "reason": "useful_answer",
+        "decisions": [
+          {
+            "id": "db4ff315-41d9-465b-8bea-29ac764a2b91",
+            "index": 0,
+            "phase": "intent",
+            "status": "complete",
+            "failure": null,
+            "receipt": {
+              "vision": "no-image-input",
+              "modelId": "openai/gpt-6-luna-decisions",
+              "startedAt": "2026-11-04T17:59:33.416Z",
+              "completedAt": "2026-11-04T17:59:33.854Z",
+              "executionId": "c7153000-0efa-41ec-9f4e-f5b265f78250",
+              "imageDigests": [],
+              "requestDigest": "704bfc1f31c490a804427a69cd77e119e907ed976b6aae0d292dc392adfcc122",
+              "providerGenerationId": "gen_01M6KVEPAQWM2D2S41V8NXN3YA"
+            },
+            "policyVersion": "group-contribution-v3"
+          },
+          {
+            "id": "f89ef5c7-808a-45dd-a14e-a21f5410ecfd",
+            "index": 1,
+            "phase": "responder",
+            "status": "complete",
+            "failure": null,
+            "receipt": {
+              "vision": "no-image-input",
+              "modelId": "openai/gpt-6-luna-decisions",
+              "startedAt": "2026-11-04T17:59:34.331Z",
+              "completedAt": "2026-11-04T17:59:34.974Z",
+              "executionId": "06f4b652-4dfd-450a-b235-e1f0d1b9442b",
+              "imageDigests": [],
+              "requestDigest": "8d79686d48f1720d1da138b686022d9f3e23ef224764286cfb7de6fdec3ee6f7",
+              "providerGenerationId": "gen_01M6KVEQ7MSB1XKB0ZJV5QQC0D"
+            },
+            "policyVersion": "group-contribution-v3"
+          }
+        ],
+        "execution": {
+          "vision": "no-image-input",
+          "modelId": "openai/gpt-6-luna-decisions",
+          "startedAt": "2026-11-04T17:59:33.416Z",
+          "completedAt": "2026-11-04T17:59:33.854Z",
+          "executionId": "c7153000-0efa-41ec-9f4e-f5b265f78250",
+          "imageDigests": [],
+          "requestDigest": "704bfc1f31c490a804427a69cd77e119e907ed976b6aae0d292dc392adfcc122",
+          "providerGenerationId": "gen_01M6KVEPAQWM2D2S41V8NXN3YA"
+        },
+        "confidence": 0.85,
+        "responders": [
+          "ab5e41f9-36e8-4ee4-8e56-badd704bad6b"
+        ],
+        "policyVersion": "group-contribution-v3"
+      },
+      "error": null,
+      "modelSelections": {
+        "ab5e41f9-36e8-4ee4-8e56-badd704bad6b": {
+          "model": "claude-haiku-5-5",
+          "harness": "ai_sdk",
+          "modelSelection": {
+            "type": "subscription",
+            "route": "claude_cpa",
+            "modelId": "claude-haiku-5-5",
+            "ownerId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+            "bindingId": "a6a7b42a-2b9a-423c-8615-690403060ad3",
+            "consumerId": "ab5e41f9-36e8-4ee4-8e56-badd704bad6b",
+            "workspaceId": "887238ef-410c-4c65-bb08-cfa15e1f8ec9",
+            "connectionId": "93b6ab23-900b-4e18-9ea0-baccf2d104ce",
+            "connectionRevision": 2
+          }
+        }
+      },
+      "trace": {
+        "action": "reply",
+        "events": [
+          {
+            "id": "wake:1",
+            "type": "wake",
+            "memberId": "ab5e41f9-36e8-4ee4-8e56-badd704bad6b"
+          },
+          {
+            "id": "generate:1",
+            "type": "generate",
+            "memberId": "ab5e41f9-36e8-4ee4-8e56-badd704bad6b"
+          },
+          {
+            "id": "publish:3",
+            "type": "publish",
+            "memberId": "ab5e41f9-36e8-4ee4-8e56-badd704bad6b",
+            "contentDigest": "8c851f13665f8667990f23c766707f4487f26824478948246102a63930210a53"
+          }
+        ],
+        "reason": "useful_answer",
+        "status": "complete",
+        "members": [
+          {
+            "id": "279c373e-2a6b-415d-a430-ac64f4c33b16",
+            "memberType": "bot",
+            "roleDigest": "58476f4d92304ee72dff2ecb807f66841c0472beb8c7a6e7e5d6fa793cc56dbe",
+            "capabilityDigest": "7395a6754b7f45498c13fa916ba67693ddf52ebcb72e1e5234d0f111a6009a52",
+            "executionAvailable": true
+          },
+          {
+            "id": "72837f9c-2723-48fd-ae77-8e42ac77b9fd",
+            "memberType": "bot",
+            "roleDigest": "b9de198717eec9f9176d2b9d06ac82039099bbf34c30839bb0cf4bd12abec6df",
+            "capabilityDigest": "7395a6754b7f45498c13fa916ba67693ddf52ebcb72e1e5234d0f111a6009a52",
+            "executionAvailable": true
+          },
+          {
+            "id": "ab5e41f9-36e8-4ee4-8e56-badd704bad6b",
+            "memberType": "bot",
+            "roleDigest": "296b3474422d6c340ff6f12018b54dfb46ddc4041c7b321b0c6a39f39d803cc0",
+            "capabilityDigest": "7395a6754b7f45498c13fa916ba67693ddf52ebcb72e1e5234d0f111a6009a52",
+            "executionAvailable": true
+          }
+        ],
+        "purpose": "group-routing",
+        "decisions": [
+          {
+            "id": "db4ff315-41d9-465b-8bea-29ac764a2b91",
+            "index": 0,
+            "phase": "intent",
+            "status": "complete",
+            "failure": null,
+            "receipt": {
+              "vision": "no-image-input",
+              "modelId": "openai/gpt-6-luna-decisions",
+              "startedAt": "2026-11-04T17:59:33.416Z",
+              "completedAt": "2026-11-04T17:59:33.854Z",
+              "executionId": "c7153000-0efa-41ec-9f4e-f5b265f78250",
+              "imageDigests": [],
+              "requestDigest": "704bfc1f31c490a804427a69cd77e119e907ed976b6aae0d292dc392adfcc122",
+              "providerGenerationId": "gen_01M6KVEPAQWM2D2S41V8NXN3YA"
+            },
+            "policyVersion": "group-contribution-v3"
+          },
+          {
+            "id": "f89ef5c7-808a-45dd-a14e-a21f5410ecfd",
+            "index": 1,
+            "phase": "responder",
+            "status": "complete",
+            "failure": null,
+            "receipt": {
+              "vision": "no-image-input",
+              "modelId": "openai/gpt-6-luna-decisions",
+              "startedAt": "2026-11-04T17:59:34.331Z",
+              "completedAt": "2026-11-04T17:59:34.974Z",
+              "executionId": "06f4b652-4dfd-450a-b235-e1f0d1b9442b",
+              "imageDigests": [],
+              "requestDigest": "8d79686d48f1720d1da138b686022d9f3e23ef224764286cfb7de6fdec3ee6f7",
+              "providerGenerationId": "gen_01M6KVEQ7MSB1XKB0ZJV5QQC0D"
+            },
+            "policyVersion": "group-contribution-v3"
+          }
+        ],
+        "execution": {
+          "vision": "no-image-input",
+          "modelId": "openai/gpt-6-luna-decisions",
+          "startedAt": "2026-11-04T17:59:33.416Z",
+          "completedAt": "2026-11-04T17:59:33.854Z",
+          "executionId": "c7153000-0efa-41ec-9f4e-f5b265f78250",
+          "imageDigests": [],
+          "requestDigest": "704bfc1f31c490a804427a69cd77e119e907ed976b6aae0d292dc392adfcc122",
+          "providerGenerationId": "gen_01M6KVEPAQWM2D2S41V8NXN3YA"
+        },
+        "startedAt": "2026-11-04T17:59:32.887Z",
+        "finishedAt": "2026-11-04T17:59:42.070877+00:00",
+        "responders": [
+          "ab5e41f9-36e8-4ee4-8e56-badd704bad6b"
+        ],
+        "memberVersion": "df86f41be661efa2d04c1880ad88319e4670023cf8f2878d0ffbedafb2c72dbc",
+        "policyVersion": "group-contribution-v3",
+        "schemaVersion": 1,
+        "executionPhase": "intent",
+        "taskFinishedAt": null,
+        "decisionFailure": null,
+        "decisionProtocol": "group-sequential-v1",
+        "decisionsOmitted": 0,
+        "contextMessageIds": [
+          "04d63dc2-481b-4b6d-8544-491b94d25734"
+        ],
+        "decisionLatencyMs": 1081
+      },
+      "createdAt": "2026-11-04T17:59:31.740Z",
+      "updatedAt": "2026-11-04T17:59:42.057Z"
+    }
+  ]
+}

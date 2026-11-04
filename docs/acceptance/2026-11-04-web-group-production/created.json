@@ -1,0 +1,37 @@
+{
+  "observedAt": "2026-11-04T17:58:10.189Z",
+  "id": "0e4617b2-a68b-4187-9a3f-8c5584e0da62",
+  "title": "PolicyV3 CC 20261104-1757",
+  "workspaceId": "887238ef-410c-4c65-bb08-cfa15e1f8ec9",
+  "createdBy": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+  "createdAt": "2026-11-04T17:58:04.226Z",
+  "kind": "group",
+  "lastPosition": "0",
+  "members": [
+    {
+      "role": "member",
+      "leftAt": null,
+      "memberId": "279c373e-2a6b-415d-a430-ac64f4c33b16",
+      "memberType": "bot"
+    },
+    {
+      "role": "member",
+      "leftAt": null,
+      "memberId": "72837f9c-2723-48fd-ae77-8e42ac77b9fd",
+      "memberType": "bot"
+    },
+    {
+      "role": "member",
+      "leftAt": null,
+      "memberId": "ab5e41f9-36e8-4ee4-8e56-badd704bad6b",
+      "memberType": "bot"
+    },
+    {
+      "role": "owner",
+      "leftAt": null,
+      "memberId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+      "memberType": "user"
+    }
+  ],
+  "groupTurns": "0"
+}

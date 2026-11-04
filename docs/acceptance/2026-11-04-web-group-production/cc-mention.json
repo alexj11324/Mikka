@@ -1,0 +1,165 @@
+{
+  "deploymentAtRelease": "e9564639cd40f1433840c47662d8d548efc79144",
+  "rows": [
+    {
+      "observedAt": "2026-11-04T18:02:30.308Z",
+      "messageId": "e809b439-e8bf-41f3-8ec2-fa2416a5c8f5",
+      "status": "complete",
+      "route": {
+        "by": "mention",
+        "action": "reply",
+        "reason": "useful_answer",
+        "decisions": [
+          {
+            "id": "dbee29e5-fe3a-4ace-9e47-10ec932cf905",
+            "index": 0,
+            "phase": "intent",
+            "status": "complete",
+            "failure": null,
+            "receipt": {
+              "vision": "no-image-input",
+              "modelId": "openai/gpt-6-luna-decisions",
+              "startedAt": "2026-11-04T18:02:08.340Z",
+              "completedAt": "2026-11-04T18:02:09.122Z",
+              "executionId": "595adf46-5ed3-44ae-b91c-39f1c538fde6",
+              "imageDigests": [],
+              "requestDigest": "9ec8bfe5beeac82c97b238fa5d2cb9561f65c5fe6a4b1e95db2ef6f252f530c9",
+              "providerGenerationId": "gen_01M6KVKDM0RXYPBWH9YFSXYJ0R"
+            },
+            "policyVersion": "group-contribution-v3"
+          }
+        ],
+        "execution": {
+          "vision": "no-image-input",
+          "modelId": "openai/gpt-6-luna-decisions",
+          "startedAt": "2026-11-04T18:02:08.340Z",
+          "completedAt": "2026-11-04T18:02:09.122Z",
+          "executionId": "595adf46-5ed3-44ae-b91c-39f1c538fde6",
+          "imageDigests": [],
+          "requestDigest": "9ec8bfe5beeac82c97b238fa5d2cb9561f65c5fe6a4b1e95db2ef6f252f530c9",
+          "providerGenerationId": "gen_01M6KVKDM0RXYPBWH9YFSXYJ0R"
+        },
+        "responders": [
+          "72837f9c-2723-48fd-ae77-8e42ac77b9fd"
+        ],
+        "policyVersion": "group-contribution-v3"
+      },
+      "error": null,
+      "modelSelections": {
+        "72837f9c-2723-48fd-ae77-8e42ac77b9fd": {
+          "model": "claude-haiku-5-5",
+          "harness": "ai_sdk",
+          "modelSelection": {
+            "type": "subscription",
+            "route": "claude_cpa",
+            "modelId": "claude-haiku-5-5",
+            "ownerId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+            "bindingId": "a75b79b2-30b0-45a0-8dd4-0f4d3c16b8a0",
+            "consumerId": "72837f9c-2723-48fd-ae77-8e42ac77b9fd",
+            "workspaceId": "887238ef-410c-4c65-bb08-cfa15e1f8ec9",
+            "connectionId": "93b6ab23-900b-4e18-9ea0-baccf2d104ce",
+            "connectionRevision": 2
+          }
+        }
+      },
+      "trace": {
+        "action": "reply",
+        "events": [
+          {
+            "id": "wake:1",
+            "type": "wake",
+            "memberId": "72837f9c-2723-48fd-ae77-8e42ac77b9fd"
+          },
+          {
+            "id": "generate:1",
+            "type": "generate",
+            "memberId": "72837f9c-2723-48fd-ae77-8e42ac77b9fd"
+          },
+          {
+            "id": "publish:5",
+            "type": "publish",
+            "memberId": "72837f9c-2723-48fd-ae77-8e42ac77b9fd",
+            "contentDigest": "dc807e5236bc2a84b2d4a1d03051f3ad387dc93a221bf7cc0747a502c5aa41c8"
+          }
+        ],
+        "reason": "useful_answer",
+        "status": "complete",
+        "members": [
+          {
+            "id": "279c373e-2a6b-415d-a430-ac64f4c33b16",
+            "memberType": "bot",
+            "roleDigest": "58476f4d92304ee72dff2ecb807f66841c0472beb8c7a6e7e5d6fa793cc56dbe",
+            "capabilityDigest": "7395a6754b7f45498c13fa916ba67693ddf52ebcb72e1e5234d0f111a6009a52",
+            "executionAvailable": true
+          },
+          {
+            "id": "72837f9c-2723-48fd-ae77-8e42ac77b9fd",
+            "memberType": "bot",
+            "roleDigest": "b9de198717eec9f9176d2b9d06ac82039099bbf34c30839bb0cf4bd12abec6df",
+            "capabilityDigest": "7395a6754b7f45498c13fa916ba67693ddf52ebcb72e1e5234d0f111a6009a52",
+            "executionAvailable": true
+          },
+          {
+            "id": "ab5e41f9-36e8-4ee4-8e56-badd704bad6b",
+            "memberType": "bot",
+            "roleDigest": "296b3474422d6c340ff6f12018b54dfb46ddc4041c7b321b0c6a39f39d803cc0",
+            "capabilityDigest": "7395a6754b7f45498c13fa916ba67693ddf52ebcb72e1e5234d0f111a6009a52",
+            "executionAvailable": true
+          }
+        ],
+        "purpose": "explicit-mention",
+        "decisions": [
+          {
+            "id": "dbee29e5-fe3a-4ace-9e47-10ec932cf905",
+            "index": 0,
+            "phase": "intent",
+            "status": "complete",
+            "failure": null,
+            "receipt": {
+              "vision": "no-image-input",
+              "modelId": "openai/gpt-6-luna-decisions",
+              "startedAt": "2026-11-04T18:02:08.340Z",
+              "completedAt": "2026-11-04T18:02:09.122Z",
+              "executionId": "595adf46-5ed3-44ae-b91c-39f1c538fde6",
+              "imageDigests": [],
+              "requestDigest": "9ec8bfe5beeac82c97b238fa5d2cb9561f65c5fe6a4b1e95db2ef6f252f530c9",
+              "providerGenerationId": "gen_01M6KVKDM0RXYPBWH9YFSXYJ0R"
+            },
+            "policyVersion": "group-contribution-v3"
+          }
+        ],
+        "execution": {
+          "vision": "no-image-input",
+          "modelId": "openai/gpt-6-luna-decisions",
+          "startedAt": "2026-11-04T18:02:08.340Z",
+          "completedAt": "2026-11-04T18:02:09.122Z",
+          "executionId": "595adf46-5ed3-44ae-b91c-39f1c538fde6",
+          "imageDigests": [],
+          "requestDigest": "9ec8bfe5beeac82c97b238fa5d2cb9561f65c5fe6a4b1e95db2ef6f252f530c9",
+          "providerGenerationId": "gen_01M6KVKDM0RXYPBWH9YFSXYJ0R"
+        },
+        "startedAt": "2026-11-04T18:02:06.686Z",
+        "finishedAt": "2026-11-04T18:02:17.192662+00:00",
+        "responders": [
+          "72837f9c-2723-48fd-ae77-8e42ac77b9fd"
+        ],
+        "memberVersion": "df86f41be661efa2d04c1880ad88319e4670023cf8f2878d0ffbedafb2c72dbc",
+        "policyVersion": "group-contribution-v3",
+        "schemaVersion": 1,
+        "executionPhase": "intent",
+        "taskFinishedAt": null,
+        "decisionFailure": null,
+        "decisionProtocol": "group-sequential-v1",
+        "decisionsOmitted": 0,
+        "contextMessageIds": [
+          "04d63dc2-481b-4b6d-8544-491b94d25734",
+          "3dcebb88-ae1e-4ffd-8dbd-3839e1eb7444",
+          "fda56461-c2f8-4dc5-a5f0-7206ceb89029"
+        ],
+        "decisionLatencyMs": 782
+      },
+      "createdAt": "2026-11-04T18:02:03.827Z",
+      "updatedAt": "2026-11-04T18:02:17.178Z"
+    }
+  ]
+}
