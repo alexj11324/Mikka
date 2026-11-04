@@ -247,13 +247,14 @@ test('historical v0/v1/v2 offline request compatibility matches 63 archived synt
   ] as const
   for(const sample of samples){
     let ordinal=0
+    const actualDigests:string[]=[]
     const invoke:typeof invokeDecision=async(_purpose,input,questions)=>{
       const index=ordinal++
       assert.ok(index<sample.answers.length,'no extra historical request')
       assert.equal(questions.length,1)
       const name=questions[0].name
       const requestDigest=createHash('sha256').update(JSON.stringify({model:DECISION_MODEL,input:decisionRequestInput(input),questions})).digest('hex')
-      assert.equal(requestDigest,sample.digests[index],`historical request changed: ${sample.policy}/${sample.caseId}/${name}`)
+      actualDigests.push(requestDigest)
       const execution:DecisionExecution={executionId:`recorded-${ordinal}`,modelId:DECISION_MODEL,providerGenerationId:`recorded-generation-${ordinal}`,startedAt:'2026-11-04T00:00:00Z',completedAt:'2026-11-04T00:00:01Z',requestDigest,imageDigests:[],vision:'no-image-input'}
       return {answers:new Map([[name,{type:'choice',name,choice:sample.answers[index]}]]),execution}
     }
@@ -262,6 +263,7 @@ test('historical v0/v1/v2 offline request compatibility matches 63 archived synt
     const run=createGroupJudgment(invoke,sample.policy).route(message,structuredClone(dataset.members) as typeof members,null,[])
     if(sample.failed)await assert.rejects(run,GroupJudgmentPendingError)
     else await run
+    assert.deepEqual(actualDigests,[...sample.digests],`historical request changed: ${sample.policy}/${sample.caseId}`)
     assert.equal(ordinal,sample.answers.length)
   }
 })
