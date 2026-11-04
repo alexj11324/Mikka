@@ -1,0 +1,29 @@
+{
+  "observedAt": "2026-11-04T03:08:42.545949+00:00",
+  "knownPids": [
+    42259,
+    43185,
+    42327
+  ],
+  "knownPidsPresent": [],
+  "matchingOwnedProcesses": [],
+  "port3112Listening": false,
+  "dispatch": [
+    {
+      "sourceFile": "/vercel/Mikka/.cache/dev-local/dispatch-3362fb03ef8d-45c5de14-3185-4d98-a5b1-3ecc7a8aa129/dispatch-result.json",
+      "value": {
+        "sourceSha": "3362fb03ef8d5f963d55b9eacc36a51d58ad0686",
+        "items": [
+          9,
+          10
+        ],
+        "status": "failed",
+        "exitCode": 1,
+        "interrupted": false,
+        "completedAt": "2026-11-04T03:06:19.871Z"
+      }
+    }
+  ],
+  "passedItemsManifestExists": false,
+  "sourceEvidenceManifestExists": false
+}

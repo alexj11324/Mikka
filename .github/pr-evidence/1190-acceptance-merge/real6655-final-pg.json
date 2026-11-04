@@ -1,0 +1,82 @@
+{
+  "source": {
+    "observedAt": "2026-11-04T03:11:44.687935+00:00",
+    "head": "3362fb03ef8d5f963d55b9eacc36a51d58ad0686",
+    "tree": "7d5da89896e9d1726301d0dca66c6af3b72e1cdc",
+    "trackedClean": true,
+    "dispatchResultSha256": "306008f9b896fad5360557e73b3320966aa88b999b9ab1132bf648700e95e1f3"
+  },
+  "runObservation": {
+    "at": "2026-11-04T03:07:20.304Z",
+    "runs": [
+      {
+        "id": "00a80708-dc92-40e0-b34c-712ba108bec8",
+        "status": "failed",
+        "stopReason": "error",
+        "stopRequestedAt": "2026-11-04T03:06:00.198Z",
+        "retryOf": null,
+        "deviceId": "20635c47-ad64-4274-9310-5f5ea285068b",
+        "startedAt": "2026-11-04T02:19:39.321Z",
+        "finishedAt": "2026-11-04T03:06:02.845Z",
+        "summary": "claude exited before the turn ended: Claude Code process exited with code 143",
+        "error": null,
+        "reportStopReason": null,
+        "reportStage": null
+      },
+      {
+        "id": "d4e86a62-f770-4074-9e16-19db411760ee",
+        "status": "stopped",
+        "stopReason": "blocked",
+        "stopRequestedAt": null,
+        "retryOf": "00a80708-dc92-40e0-b34c-712ba108bec8",
+        "deviceId": "38c31111-87a5-4008-9136-c07e6c65642b",
+        "startedAt": null,
+        "finishedAt": "2026-11-04T03:06:08.628Z",
+        "summary": "Checkpoint is older than the thirty-minute recovery window.",
+        "error": null,
+        "reportStopReason": null,
+        "reportStage": null
+      }
+    ],
+    "task": [
+      {
+        "id": "0338f390-bb82-4173-a945-718db36de0a1",
+        "stage": "execute",
+        "status": "blocked",
+        "revision": 6,
+        "sourceEventId": "4267cf96-3d95-403d-834e-d2722c2aefbe"
+      }
+    ]
+  },
+  "stageObservation": {
+    "observedAt": "2026-11-04T03:10:46.458Z",
+    "database": "mikka_loop_6655d16bce7e_e2e",
+    "transaction": "READ ONLY",
+    "task": [
+      {
+        "id": "0338f390-bb82-4173-a945-718db36de0a1",
+        "stage": "execute",
+        "status": "blocked",
+        "revision": 6,
+        "sourceEventId": "4267cf96-3d95-403d-834e-d2722c2aefbe"
+      }
+    ],
+    "attempts": [
+      {
+        "stage": "execute",
+        "status": "blocked",
+        "runId": "00a80708-dc92-40e0-b34c-712ba108bec8",
+        "epoch": "4267cf96-3d95-403d-834e-d2722c2aefbe",
+        "finishedAt": "2026-11-04T03:06:00.224Z"
+      },
+      {
+        "stage": "execute",
+        "status": "blocked",
+        "runId": "d4e86a62-f770-4074-9e16-19db411760ee",
+        "epoch": "4267cf96-3d95-403d-834e-d2722c2aefbe",
+        "finishedAt": "2026-11-04T03:06:08.739Z"
+      }
+    ],
+    "publications": 0
+  }
+}

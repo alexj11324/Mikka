@@ -1,0 +1,424 @@
+{
+  "version": 1,
+  "marker": "watchdog-a51a7d89-4c36-48a2-9e22-d5b2313b0818",
+  "status": "failed",
+  "startedAt": "2026-11-04T02:18:34.871Z",
+  "scenario": "online-server-watchdog-with-stale-checkpoint-block",
+  "daemonDefaultStallMinutes": 10,
+  "daemonStallMinutes": 60,
+  "factoryExecuteWindowMs": 2700000,
+  "checkpointRecoveryWindowMinutes": 30,
+  "boundaries": [
+    "Normal owner APIs and real DeepSeek Flash initial execution",
+    "Existing independent minute cron; no private sweep calls or SQL writes",
+    "Native executor only is suspended; daemon heartbeat and lease remain live",
+    "Server watchdog isolation, not default-daemon latency, a before/after benchmark, or cloud-device acceptance",
+    "A stale checkpoint must block B before native/model execution; no recovery success is inferred"
+  ],
+  "samples": [
+    {
+      "at": "2026-11-04T02:20:11.580Z",
+      "lastSeenAt": "2026-11-04T02:20:04.233Z",
+      "leaseExpiresAt": "2026-11-04T02:21:34.237Z",
+      "progressAt": "2026-11-04T02:20:04.608Z",
+      "checkpointAt": "2026-11-04T02:20:04.608Z",
+      "toolOutputAt": null
+    },
+    {
+      "at": "2026-11-04T02:21:12.588Z",
+      "lastSeenAt": "2026-11-04T02:21:09.117Z",
+      "leaseExpiresAt": "2026-11-04T02:22:39.125Z",
+      "progressAt": "2026-11-04T02:20:04.608Z",
+      "checkpointAt": "2026-11-04T02:20:04.608Z",
+      "toolOutputAt": null
+    },
+    {
+      "at": "2026-11-04T02:22:13.669Z",
+      "lastSeenAt": "2026-11-04T02:22:13.353Z",
+      "leaseExpiresAt": "2026-11-04T02:23:43.356Z",
+      "progressAt": "2026-11-04T02:20:04.608Z",
+      "checkpointAt": "2026-11-04T02:20:04.608Z",
+      "toolOutputAt": null
+    },
+    {
+      "at": "2026-11-04T02:23:14.740Z",
+      "lastSeenAt": "2026-11-04T02:23:01.281Z",
+      "leaseExpiresAt": "2026-11-04T02:24:31.284Z",
+      "progressAt": "2026-11-04T02:20:04.608Z",
+      "checkpointAt": "2026-11-04T02:20:04.608Z",
+      "toolOutputAt": null
+    },
+    {
+      "at": "2026-11-04T02:24:15.714Z",
+      "lastSeenAt": "2026-11-04T02:24:05.246Z",
+      "leaseExpiresAt": "2026-11-04T02:25:35.255Z",
+      "progressAt": "2026-11-04T02:20:04.608Z",
+      "checkpointAt": "2026-11-04T02:20:04.608Z",
+      "toolOutputAt": null
+    },
+    {
+      "at": "2026-11-04T02:25:16.716Z",
+      "lastSeenAt": "2026-11-04T02:25:09.204Z",
+      "leaseExpiresAt": "2026-11-04T02:26:39.211Z",
+      "progressAt": "2026-11-04T02:20:04.608Z",
+      "checkpointAt": "2026-11-04T02:20:04.608Z",
+      "toolOutputAt": null
+    },
+    {
+      "at": "2026-11-04T02:26:17.739Z",
+      "lastSeenAt": "2026-11-04T02:26:13.196Z",
+      "leaseExpiresAt": "2026-11-04T02:27:43.204Z",
+      "progressAt": "2026-11-04T02:20:04.608Z",
+      "checkpointAt": "2026-11-04T02:20:04.608Z",
+      "toolOutputAt": null
+    },
+    {
+      "at": "2026-11-04T02:27:18.744Z",
+      "lastSeenAt": "2026-11-04T02:27:17.086Z",
+      "leaseExpiresAt": "2026-11-04T02:28:47.089Z",
+      "progressAt": "2026-11-04T02:20:04.608Z",
+      "checkpointAt": "2026-11-04T02:20:04.608Z",
+      "toolOutputAt": null
+    },
+    {
+      "at": "2026-11-04T02:28:19.787Z",
+      "lastSeenAt": "2026-11-04T02:28:05.060Z",
+      "leaseExpiresAt": "2026-11-04T02:29:35.064Z",
+      "progressAt": "2026-11-04T02:20:04.608Z",
+      "checkpointAt": "2026-11-04T02:20:04.608Z",
+      "toolOutputAt": null
+    },
+    {
+      "at": "2026-11-04T02:29:20.748Z",
+      "lastSeenAt": "2026-11-04T02:29:09.085Z",
+      "leaseExpiresAt": "2026-11-04T02:30:39.093Z",
+      "progressAt": "2026-11-04T02:20:04.608Z",
+      "checkpointAt": "2026-11-04T02:20:04.608Z",
+      "toolOutputAt": null
+    },
+    {
+      "at": "2026-11-04T02:30:21.883Z",
+      "lastSeenAt": "2026-11-04T02:30:13.077Z",
+      "leaseExpiresAt": "2026-11-04T02:31:43.080Z",
+      "progressAt": "2026-11-04T02:20:04.608Z",
+      "checkpointAt": "2026-11-04T02:20:04.608Z",
+      "toolOutputAt": null
+    },
+    {
+      "at": "2026-11-04T02:31:22.900Z",
+      "lastSeenAt": "2026-11-04T02:31:17.905Z",
+      "leaseExpiresAt": "2026-11-04T02:32:47.909Z",
+      "progressAt": "2026-11-04T02:20:04.608Z",
+      "checkpointAt": "2026-11-04T02:20:04.608Z",
+      "toolOutputAt": null
+    },
+    {
+      "at": "2026-11-04T02:32:23.910Z",
+      "lastSeenAt": "2026-11-04T02:32:22.371Z",
+      "leaseExpiresAt": "2026-11-04T02:33:52.376Z",
+      "progressAt": "2026-11-04T02:20:04.608Z",
+      "checkpointAt": "2026-11-04T02:20:04.608Z",
+      "toolOutputAt": null
+    },
+    {
+      "at": "2026-11-04T02:33:24.909Z",
+      "lastSeenAt": "2026-11-04T02:33:10.571Z",
+      "leaseExpiresAt": "2026-11-04T02:34:40.575Z",
+      "progressAt": "2026-11-04T02:20:04.608Z",
+      "checkpointAt": "2026-11-04T02:20:04.608Z",
+      "toolOutputAt": null
+    },
+    {
+      "at": "2026-11-04T02:34:25.903Z",
+      "lastSeenAt": "2026-11-04T02:34:14.921Z",
+      "leaseExpiresAt": "2026-11-04T02:35:44.925Z",
+      "progressAt": "2026-11-04T02:20:04.608Z",
+      "checkpointAt": "2026-11-04T02:20:04.608Z",
+      "toolOutputAt": null
+    },
+    {
+      "at": "2026-11-04T02:35:27.008Z",
+      "lastSeenAt": "2026-11-04T02:35:19.410Z",
+      "leaseExpiresAt": "2026-11-04T02:36:49.414Z",
+      "progressAt": "2026-11-04T02:20:04.608Z",
+      "checkpointAt": "2026-11-04T02:20:04.608Z",
+      "toolOutputAt": null
+    },
+    {
+      "at": "2026-11-04T02:36:28.083Z",
+      "lastSeenAt": "2026-11-04T02:36:23.541Z",
+      "leaseExpiresAt": "2026-11-04T02:37:53.545Z",
+      "progressAt": "2026-11-04T02:20:04.608Z",
+      "checkpointAt": "2026-11-04T02:20:04.608Z",
+      "toolOutputAt": null
+    },
+    {
+      "at": "2026-11-04T02:37:29.139Z",
+      "lastSeenAt": "2026-11-04T02:37:27.681Z",
+      "leaseExpiresAt": "2026-11-04T02:38:57.690Z",
+      "progressAt": "2026-11-04T02:20:04.608Z",
+      "checkpointAt": "2026-11-04T02:20:04.608Z",
+      "toolOutputAt": null
+    },
+    {
+      "at": "2026-11-04T02:38:30.251Z",
+      "lastSeenAt": "2026-11-04T02:38:17.032Z",
+      "leaseExpiresAt": "2026-11-04T02:39:47.036Z",
+      "progressAt": "2026-11-04T02:20:04.608Z",
+      "checkpointAt": "2026-11-04T02:20:04.608Z",
+      "toolOutputAt": null
+    },
+    {
+      "at": "2026-11-04T02:39:31.298Z",
+      "lastSeenAt": "2026-11-04T02:39:22.164Z",
+      "leaseExpiresAt": "2026-11-04T02:40:52.169Z",
+      "progressAt": "2026-11-04T02:20:04.608Z",
+      "checkpointAt": "2026-11-04T02:20:04.608Z",
+      "toolOutputAt": null
+    },
+    {
+      "at": "2026-11-04T02:40:32.319Z",
+      "lastSeenAt": "2026-11-04T02:40:26.938Z",
+      "leaseExpiresAt": "2026-11-04T02:41:56.941Z",
+      "progressAt": "2026-11-04T02:20:04.608Z",
+      "checkpointAt": "2026-11-04T02:20:04.608Z",
+      "toolOutputAt": null
+    },
+    {
+      "at": "2026-11-04T02:41:33.328Z",
+      "lastSeenAt": "2026-11-04T02:41:31.294Z",
+      "leaseExpiresAt": "2026-11-04T02:43:01.301Z",
+      "progressAt": "2026-11-04T02:20:04.608Z",
+      "checkpointAt": "2026-11-04T02:20:04.608Z",
+      "toolOutputAt": null
+    },
+    {
+      "at": "2026-11-04T02:42:34.389Z",
+      "lastSeenAt": "2026-11-04T02:42:19.244Z",
+      "leaseExpiresAt": "2026-11-04T02:43:49.247Z",
+      "progressAt": "2026-11-04T02:20:04.608Z",
+      "checkpointAt": "2026-11-04T02:20:04.608Z",
+      "toolOutputAt": null
+    },
+    {
+      "at": "2026-11-04T02:43:35.338Z",
+      "lastSeenAt": "2026-11-04T02:43:23.119Z",
+      "leaseExpiresAt": "2026-11-04T02:44:53.123Z",
+      "progressAt": "2026-11-04T02:20:04.608Z",
+      "checkpointAt": "2026-11-04T02:20:04.608Z",
+      "toolOutputAt": null
+    },
+    {
+      "at": "2026-11-04T02:44:36.387Z",
+      "lastSeenAt": "2026-11-04T02:44:27.110Z",
+      "leaseExpiresAt": "2026-11-04T02:45:57.114Z",
+      "progressAt": "2026-11-04T02:20:04.608Z",
+      "checkpointAt": "2026-11-04T02:20:04.608Z",
+      "toolOutputAt": null
+    },
+    {
+      "at": "2026-11-04T02:45:37.340Z",
+      "lastSeenAt": "2026-11-04T02:45:30.947Z",
+      "leaseExpiresAt": "2026-11-04T02:47:00.950Z",
+      "progressAt": "2026-11-04T02:20:04.608Z",
+      "checkpointAt": "2026-11-04T02:20:04.608Z",
+      "toolOutputAt": null
+    },
+    {
+      "at": "2026-11-04T02:46:38.319Z",
+      "lastSeenAt": "2026-11-04T02:46:35.426Z",
+      "leaseExpiresAt": "2026-11-04T02:48:05.433Z",
+      "progressAt": "2026-11-04T02:20:04.608Z",
+      "checkpointAt": "2026-11-04T02:20:04.608Z",
+      "toolOutputAt": null
+    },
+    {
+      "at": "2026-11-04T02:47:39.260Z",
+      "lastSeenAt": "2026-11-04T02:47:23.428Z",
+      "leaseExpiresAt": "2026-11-04T02:48:53.435Z",
+      "progressAt": "2026-11-04T02:20:04.608Z",
+      "checkpointAt": "2026-11-04T02:20:04.608Z",
+      "toolOutputAt": null
+    },
+    {
+      "at": "2026-11-04T02:48:40.264Z",
+      "lastSeenAt": "2026-11-04T02:48:27.369Z",
+      "leaseExpiresAt": "2026-11-04T02:49:57.372Z",
+      "progressAt": "2026-11-04T02:20:04.608Z",
+      "checkpointAt": "2026-11-04T02:20:04.608Z",
+      "toolOutputAt": null
+    },
+    {
+      "at": "2026-11-04T02:49:41.206Z",
+      "lastSeenAt": "2026-11-04T02:49:31.169Z",
+      "leaseExpiresAt": "2026-11-04T02:51:01.174Z",
+      "progressAt": "2026-11-04T02:20:04.608Z",
+      "checkpointAt": "2026-11-04T02:20:04.608Z",
+      "toolOutputAt": null
+    },
+    {
+      "at": "2026-11-04T02:50:42.387Z",
+      "lastSeenAt": "2026-11-04T02:50:35.686Z",
+      "leaseExpiresAt": "2026-11-04T02:52:05.694Z",
+      "progressAt": "2026-11-04T02:20:04.608Z",
+      "checkpointAt": "2026-11-04T02:20:04.608Z",
+      "toolOutputAt": null
+    },
+    {
+      "at": "2026-11-04T02:51:43.489Z",
+      "lastSeenAt": "2026-11-04T02:51:40.929Z",
+      "leaseExpiresAt": "2026-11-04T02:53:10.932Z",
+      "progressAt": "2026-11-04T02:20:04.608Z",
+      "checkpointAt": "2026-11-04T02:20:04.608Z",
+      "toolOutputAt": null
+    },
+    {
+      "at": "2026-11-04T02:52:44.486Z",
+      "lastSeenAt": "2026-11-04T02:52:29.015Z",
+      "leaseExpiresAt": "2026-11-04T02:53:59.018Z",
+      "progressAt": "2026-11-04T02:20:04.608Z",
+      "checkpointAt": "2026-11-04T02:20:04.608Z",
+      "toolOutputAt": null
+    },
+    {
+      "at": "2026-11-04T02:53:45.616Z",
+      "lastSeenAt": "2026-11-04T02:53:32.905Z",
+      "leaseExpiresAt": "2026-11-04T02:55:02.908Z",
+      "progressAt": "2026-11-04T02:20:04.608Z",
+      "checkpointAt": "2026-11-04T02:20:04.608Z",
+      "toolOutputAt": null
+    },
+    {
+      "at": "2026-11-04T02:54:46.589Z",
+      "lastSeenAt": "2026-11-04T02:54:37.520Z",
+      "leaseExpiresAt": "2026-11-04T02:56:07.527Z",
+      "progressAt": "2026-11-04T02:20:04.608Z",
+      "checkpointAt": "2026-11-04T02:20:04.608Z",
+      "toolOutputAt": null
+    },
+    {
+      "at": "2026-11-04T02:55:47.681Z",
+      "lastSeenAt": "2026-11-04T02:55:42.129Z",
+      "leaseExpiresAt": "2026-11-04T02:57:12.132Z",
+      "progressAt": "2026-11-04T02:20:04.608Z",
+      "checkpointAt": "2026-11-04T02:20:04.608Z",
+      "toolOutputAt": null
+    },
+    {
+      "at": "2026-11-04T02:56:48.715Z",
+      "lastSeenAt": "2026-11-04T02:56:45.916Z",
+      "leaseExpiresAt": "2026-11-04T02:58:15.921Z",
+      "progressAt": "2026-11-04T02:20:04.608Z",
+      "checkpointAt": "2026-11-04T02:20:04.608Z",
+      "toolOutputAt": null
+    },
+    {
+      "at": "2026-11-04T02:57:49.701Z",
+      "lastSeenAt": "2026-11-04T02:57:33.895Z",
+      "leaseExpiresAt": "2026-11-04T02:59:03.899Z",
+      "progressAt": "2026-11-04T02:20:04.608Z",
+      "checkpointAt": "2026-11-04T02:20:04.608Z",
+      "toolOutputAt": null
+    },
+    {
+      "at": "2026-11-04T02:58:50.847Z",
+      "lastSeenAt": "2026-11-04T02:58:38.002Z",
+      "leaseExpiresAt": "2026-11-04T03:00:08.007Z",
+      "progressAt": "2026-11-04T02:20:04.608Z",
+      "checkpointAt": "2026-11-04T02:20:04.608Z",
+      "toolOutputAt": null
+    },
+    {
+      "at": "2026-11-04T02:59:51.920Z",
+      "lastSeenAt": "2026-11-04T02:59:43.430Z",
+      "leaseExpiresAt": "2026-11-04T03:01:13.434Z",
+      "progressAt": "2026-11-04T02:20:04.608Z",
+      "checkpointAt": "2026-11-04T02:20:04.608Z",
+      "toolOutputAt": null
+    },
+    {
+      "at": "2026-11-04T03:00:52.954Z",
+      "lastSeenAt": "2026-11-04T03:00:48.554Z",
+      "leaseExpiresAt": "2026-11-04T03:02:18.558Z",
+      "progressAt": "2026-11-04T02:20:04.608Z",
+      "checkpointAt": "2026-11-04T02:20:04.608Z",
+      "toolOutputAt": null
+    },
+    {
+      "at": "2026-11-04T03:01:54.032Z",
+      "lastSeenAt": "2026-11-04T03:01:53.558Z",
+      "leaseExpiresAt": "2026-11-04T03:03:23.562Z",
+      "progressAt": "2026-11-04T02:20:04.608Z",
+      "checkpointAt": "2026-11-04T02:20:04.608Z",
+      "toolOutputAt": null
+    },
+    {
+      "at": "2026-11-04T03:02:55.427Z",
+      "lastSeenAt": "2026-11-04T03:02:42.626Z",
+      "leaseExpiresAt": "2026-11-04T03:04:12.633Z",
+      "progressAt": "2026-11-04T02:20:04.608Z",
+      "checkpointAt": "2026-11-04T02:20:04.608Z",
+      "toolOutputAt": null
+    },
+    {
+      "at": "2026-11-04T03:03:56.496Z",
+      "lastSeenAt": "2026-11-04T03:03:47.071Z",
+      "leaseExpiresAt": "2026-11-04T03:05:17.075Z",
+      "progressAt": "2026-11-04T02:20:04.608Z",
+      "checkpointAt": "2026-11-04T02:20:04.608Z",
+      "toolOutputAt": null
+    },
+    {
+      "at": "2026-11-04T03:04:56.764Z",
+      "lastSeenAt": "2026-11-04T03:04:51.611Z",
+      "leaseExpiresAt": "2026-11-04T03:06:21.615Z",
+      "progressAt": "2026-11-04T02:20:04.608Z",
+      "checkpointAt": "2026-11-04T02:20:04.608Z",
+      "toolOutputAt": null
+    },
+    {
+      "at": "2026-11-04T03:05:57.125Z",
+      "lastSeenAt": "2026-11-04T03:05:56.220Z",
+      "leaseExpiresAt": "2026-11-04T03:07:26.224Z",
+      "progressAt": "2026-11-04T02:20:04.608Z",
+      "checkpointAt": "2026-11-04T02:20:04.608Z",
+      "toolOutputAt": null
+    }
+  ],
+  "deviceA": "20635c47-ad64-4274-9310-5f5ea285068b",
+  "deviceB": "38c31111-87a5-4008-9136-c07e6c65642b",
+  "placement": "automatic",
+  "originalStartedAt": "2026-11-04T02:19:39.321Z",
+  "recoveryDeviceReadyAt": "2026-11-04T02:19:45.855Z",
+  "originalUnpinned": true,
+  "phase": "cleanup-cancellation",
+  "updatedAt": "2026-11-04T03:06:10.369Z",
+  "taskId": "0338f390-bb82-4173-a945-718db36de0a1",
+  "requestEpoch": "4267cf96-3d95-403d-834e-d2722c2aefbe",
+  "originalRunId": "00a80708-dc92-40e0-b34c-712ba108bec8",
+  "originalAttemptId": "c50f8a4c-cd8b-4bde-9ffe-648324c10946",
+  "nativePid": 48050,
+  "nativeProcesses": 4,
+  "nativeSharesDaemonProcessGroup": true,
+  "signalMode": "individual-owned-pids",
+  "suspendedAt": "2026-11-04T02:20:06.574Z",
+  "progressAt": "2026-11-04T02:20:04.608Z",
+  "checkpointAt": "2026-11-04T02:20:04.608Z",
+  "files": 1,
+  "toolOutputAt": null,
+  "quietMs": 2752517,
+  "maxHeartbeatAgeMs": 16212,
+  "minimumLeaseRemainingMs": 73649,
+  "serverStoppedAt": "2026-11-04T03:06:00.196Z",
+  "stopRequestedAt": "2026-11-04T03:06:00.198Z",
+  "detectionLatencyMs": 2755588,
+  "error": {
+    "name": "AssertionError",
+    "code": "ERR_ASSERTION"
+  },
+  "finishedAt": "2026-11-04T03:06:03.103Z",
+  "cleanup": {
+    "method": "owned-process-termination",
+    "countedAsWatchdogEvidence": false
+  }
+}
