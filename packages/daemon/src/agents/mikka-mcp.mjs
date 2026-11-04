@@ -19,6 +19,48 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { closeSync, fstatSync, openSync, readSync, readFileSync, readdirSync, realpathSync, renameSync, writeFileSync, constants } from "node:fs"
 import { isAbsolute, join, resolve, sep } from "node:path"
+// Decisions travel directly to the bound Mikka worker endpoint. No decision,
+// conversation or credential is ever written to the handoff or worktree.
+const decisionMcpUrl = process.env.MIKKA_DECISION_MCP_URL
+const decisionMcpToken = process.env.MIKKA_DECISION_MCP_TOKEN
+const decisionMcpAvailable = Boolean(decisionMcpUrl && /^mkw_[A-Za-z0-9_-]{43}$/.test(decisionMcpToken ?? ''))
+let decisionRpcId = 0
+async function decisionRpc(method, params) {
+  if (!decisionMcpAvailable) throw new Error('decision_unavailable')
+  const id = ++decisionRpcId
+  const response = await fetch(decisionMcpUrl, {
+    method: 'POST', redirect: 'error', signal: AbortSignal.timeout(20_000),
+    headers: { authorization: 'Bearer ' + decisionMcpToken, 'content-type': 'application/json', accept: 'application/json, text/event-stream', 'mcp-protocol-version': '2025-06-18' },
+    body: JSON.stringify({ jsonrpc: '2.0', id, method, params }),
+  })
+  if (!response.ok) throw new Error('decision_http_' + response.status)
+  const text = await response.text()
+  if (text.length > 1_000_000) throw new Error('decision_response_size')
+  const envelope = response.headers.get('content-type')?.includes('application/json')
+    ? JSON.parse(text)
+    : text.split(/\r?\n/).filter(line => line.startsWith('data:')).map(line => JSON.parse(line.slice(5).trim())).find(value => value.id === id)
+  if (!envelope || envelope.id !== id || envelope.error || !envelope.result) throw new Error('decision_response')
+  return envelope.result
+}
+let decisionToolPromise
+async function decisionTools() {
+  if (!decisionMcpAvailable) return []
+  // Use the server's canonical schema rather than a separately maintained copy.
+  decisionToolPromise ??= decisionRpc('tools/list', {}).then(result =>
+    Array.isArray(result.tools) ? result.tools.filter(tool => tool.name === 'record_decision' && tool.inputSchema?.type === 'object') : [])
+  try { return await decisionToolPromise } catch { decisionToolPromise = undefined; return [] }
+}
+async function recordDecision(args) {
+  try {
+    const result = await decisionRpc('tools/call', { name: 'record_decision', arguments: args })
+    if (!Array.isArray(result.content)) throw new Error('decision_response')
+    return result
+  } catch {
+    // Do not relay arbitrary transport text or authorization headers.
+    return { isError: true, content: [{ type: 'text', text: 'Decision could not be recorded in Mikka. Check task authority and retry with the same idempotencyKey; do not save it in the repository.' }] }
+  }
+}
+
 const verifyIndex = process.argv.indexOf('--factory-verify')
 const factoryVerify = verifyIndex > 0 ? JSON.parse(process.argv[verifyIndex + 1]) : null
 const VERIFY_TOOL = { name: 'verify_command', description: 'Run this Factory check’s frozen command, or the command inferred from repository scripts when the host explicitly enabled inference. Use this tool for real command observations when native shell is unavailable. It does not submit or accept the task.', inputSchema: { type: 'object', properties: { command: { type: 'string' }, basis: { type: 'string' } }, required: ['command'] } }
@@ -471,7 +513,7 @@ function fail(id, code, message) {
   )
 }
 
-function handle(message) {
+async function handle(message) {
   const { id, method, params } = message
   if (id === undefined || id === null) return // notifications
   switch (method) {
@@ -484,8 +526,9 @@ function handle(message) {
     case "ping":
       return reply(id, {})
     case "tools/list":
-      return reply(id, { tools: [...TOOLS, ...(repositoryRoot ? [REPOSITORY_TOOL] : []), ...(capturesDir ? [CAPTURE_TOOL] : []), ...(factoryVerify ? [VERIFY_TOOL] : []), ...(artifactRoot ? [ARTIFACT_TOOL] : [])] })
+      return reply(id, { tools: [...TOOLS, ...await decisionTools(), ...(repositoryRoot ? [REPOSITORY_TOOL] : []), ...(capturesDir ? [CAPTURE_TOOL] : []), ...(factoryVerify ? [VERIFY_TOOL] : []), ...(artifactRoot ? [ARTIFACT_TOOL] : [])] })
     case "tools/call": {
+      if (decisionMcpAvailable && params?.name === 'record_decision') return reply(id, await recordDecision(params.arguments ?? {}))
       if (repositoryRoot && params?.name === REPOSITORY_TOOL.name) {
         try { return reply(id, selectRepository(params.arguments ?? {})) }
         catch { return reply(id, { isError: true, content: [{ type: 'text', text: 'Repository selection could not be recorded.' }] }) }
@@ -538,5 +581,5 @@ createInterface({ input: process.stdin }).on("line", (line) => {
   } catch {
     return fail(null, -32700, "Parse error")
   }
-  handle(message)
+  void handle(message).catch(() => fail(message.id ?? null, -32603, "Mikka tool unavailable"))
 })

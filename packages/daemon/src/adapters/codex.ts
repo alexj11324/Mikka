@@ -377,6 +377,7 @@ export class CodexAdapter implements AgentAdapter {
     const ctx = new RunContext({
       harnessDomains: providerDomain ? [providerDomain] : undefined,
       github: options.github,
+      mcp: options.mcp,
       apps: options.apps,
       githubRuntime: options.githubRuntime,
       childPath,
@@ -408,7 +409,8 @@ export class CodexAdapter implements AgentAdapter {
       `mcp_servers.${MCP_SERVER_NAME}.command=${toml(mcp.command)}`,
       "-c",
       `mcp_servers.${MCP_SERVER_NAME}.args=${toml(mcp.args)}`,
-      ...Object.entries(mcp.env).flatMap(([key, value]) => [
+      ...(options.mcp ? ["-c", `mcp_servers.${MCP_SERVER_NAME}.env_vars=${toml(Object.keys(ctx.decisionMcpEnv()))}`] : []),
+      ...Object.entries(mcp.env).filter(([key]) => !key.startsWith("MIKKA_DECISION_MCP_")).flatMap(([key, value]) => [
         "-c",
         `mcp_servers.${MCP_SERVER_NAME}.env.${key}=${toml(value)}`,
       ]),
@@ -438,7 +440,7 @@ export class CodexAdapter implements AgentAdapter {
     ]
     const spawnOptions = {
       cwd: ctx.worktree,
-      env: { ...options.env, ...(childPath ? { PATH: childPath } : {}), ...ctx.tempEnv(), ...credential.env, CODEX_HOME: codexHome.home },
+      env: { ...options.env, ...(childPath ? { PATH: childPath } : {}), ...ctx.tempEnv(), ...ctx.decisionMcpEnv(), ...credential.env, CODEX_HOME: codexHome.home },
       policy: ctx.policy(),
       pidFile: paths.pidFile,
       marker: ctx.runDir,
