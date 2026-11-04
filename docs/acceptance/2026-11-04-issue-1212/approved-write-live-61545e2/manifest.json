@@ -1,0 +1,290 @@
+{
+  "commit": "61545e2cfc9cd90e445a442c2762cb5ccfe6b4f1",
+  "environmentId": "local-73a41155-8fb2-4ac8-a08f-df97d7964d2f",
+  "origin": "http://localhost:3351",
+  "startedAt": "2026-11-04T22:29:17.609Z",
+  "captures": [
+    {
+      "name": "zh-pending-1440-light.png",
+      "locale": "zh-CN",
+      "width": 1440,
+      "height": 960,
+      "scheme": "light",
+      "state": "pending",
+      "at": "2026-11-04T22:29:23.906Z",
+      "sha256": "a0ceb68f8f4c31909a8a66e41903b3d89bb5af45d92eb48a5ec4cb5e22554588"
+    },
+    {
+      "name": "zh-pending-1440-dark.png",
+      "locale": "zh-CN",
+      "width": 1440,
+      "height": 960,
+      "scheme": "dark",
+      "state": "pending",
+      "at": "2026-11-04T22:29:24.757Z",
+      "sha256": "82f6891a9c4bda21a8b3f4fe6c14b36aa7a50ecfd5ddbaf99ec8cb9391d085dc"
+    },
+    {
+      "name": "zh-pending-390-light.png",
+      "locale": "zh-CN",
+      "width": 390,
+      "height": 844,
+      "scheme": "light",
+      "state": "pending",
+      "at": "2026-11-04T22:29:25.971Z",
+      "sha256": "aca9cab0ced7c3ddb30f7687c47cfd6dac8003f2c4f773523ea29ccb1e02fe5d"
+    },
+    {
+      "name": "zh-pending-390-dark.png",
+      "locale": "zh-CN",
+      "width": 390,
+      "height": 844,
+      "scheme": "dark",
+      "state": "pending",
+      "at": "2026-11-04T22:29:26.604Z",
+      "sha256": "e36e354c785b033a331c759ce48b930dd9c7ea7443b626b92378a3c6977d61e6"
+    },
+    {
+      "name": "en-pending-1440-light.png",
+      "locale": "en",
+      "width": 1440,
+      "height": 960,
+      "scheme": "light",
+      "state": "pending",
+      "at": "2026-11-04T22:29:27.372Z",
+      "sha256": "808eed3a822cd583f4221afc1b2ac4eed50ee6e1cab87bc76451cd5aa18790e1"
+    },
+    {
+      "name": "en-pending-1440-dark.png",
+      "locale": "en",
+      "width": 1440,
+      "height": 960,
+      "scheme": "dark",
+      "state": "pending",
+      "at": "2026-11-04T22:29:28.052Z",
+      "sha256": "5d185058e59c94520a1a3274bc86a4f1bf2cccf4e99c5e2904a91d73505843b2"
+    },
+    {
+      "name": "en-pending-390-light.png",
+      "locale": "en",
+      "width": 390,
+      "height": 844,
+      "scheme": "light",
+      "state": "pending",
+      "at": "2026-11-04T22:29:29.198Z",
+      "sha256": "b038a0af4251a19839b29130cb843c50eafbe234222ad1200e415141db501eac"
+    },
+    {
+      "name": "en-pending-390-dark.png",
+      "locale": "en",
+      "width": 390,
+      "height": 844,
+      "scheme": "dark",
+      "state": "pending",
+      "at": "2026-11-04T22:29:29.806Z",
+      "sha256": "5a2763e2f1d0126ab6eb245c3a6ffb24e39758587b807f91f992dc6257e0c759"
+    },
+    {
+      "name": "zh-uncertain-1440-light.png",
+      "locale": "zh-CN",
+      "width": 1440,
+      "height": 960,
+      "scheme": "light",
+      "state": "uncertain",
+      "at": "2026-11-04T22:29:30.601Z",
+      "sha256": "d08002b26a1115a28a51781f053c369e6c13856f5b8b54d6fbee1ad9defbaa86"
+    },
+    {
+      "name": "zh-uncertain-1440-dark.png",
+      "locale": "zh-CN",
+      "width": 1440,
+      "height": 960,
+      "scheme": "dark",
+      "state": "uncertain",
+      "at": "2026-11-04T22:29:31.254Z",
+      "sha256": "40766569ce82172cc4e239664df1e691fd60c69451e6da5db10e2d73d815e1a6"
+    },
+    {
+      "name": "zh-uncertain-390-light.png",
+      "locale": "zh-CN",
+      "width": 390,
+      "height": 844,
+      "scheme": "light",
+      "state": "uncertain",
+      "at": "2026-11-04T22:29:32.417Z",
+      "sha256": "e174ddfdb6254d15020605cb75f40ccd5e9047c33b54bcc74ce68d9aa006148d"
+    },
+    {
+      "name": "zh-uncertain-390-dark.png",
+      "locale": "zh-CN",
+      "width": 390,
+      "height": 844,
+      "scheme": "dark",
+      "state": "uncertain",
+      "at": "2026-11-04T22:29:33.035Z",
+      "sha256": "e9f8051500f6695c79612faeed993f3cd145e60ffc469e69b704dfec772aa01d"
+    },
+    {
+      "name": "en-uncertain-1440-light.png",
+      "locale": "en",
+      "width": 1440,
+      "height": 960,
+      "scheme": "light",
+      "state": "uncertain",
+      "at": "2026-11-04T22:29:33.706Z",
+      "sha256": "d8d6692c2a187a257d7d8ba095203053f24a074b3140b17925b89c004372f7db"
+    },
+    {
+      "name": "en-uncertain-1440-dark.png",
+      "locale": "en",
+      "width": 1440,
+      "height": 960,
+      "scheme": "dark",
+      "state": "uncertain",
+      "at": "2026-11-04T22:29:34.337Z",
+      "sha256": "fb42bad11619b6854bacd11eb21160aa436c3088414c1527f86f11b18c652cdf"
+    },
+    {
+      "name": "en-uncertain-390-light.png",
+      "locale": "en",
+      "width": 390,
+      "height": 844,
+      "scheme": "light",
+      "state": "uncertain",
+      "at": "2026-11-04T22:29:34.954Z",
+      "sha256": "7fe084f0643e2cd8699a31135ad882c0df1ed03945c751d98ae5f0fc5d50f32f"
+    },
+    {
+      "name": "en-uncertain-390-dark.png",
+      "locale": "en",
+      "width": 390,
+      "height": 844,
+      "scheme": "dark",
+      "state": "uncertain",
+      "at": "2026-11-04T22:29:35.517Z",
+      "sha256": "2f7e1a1b6f872111cccf7778a8a5803fa8edc3446819a194cff612a7408b1765"
+    },
+    {
+      "name": "zh-expired-1440-light.png",
+      "locale": "zh-CN",
+      "width": 1440,
+      "height": 960,
+      "scheme": "light",
+      "state": "expired",
+      "at": "2026-11-04T22:29:36.279Z",
+      "sha256": "1005b76b691e80fecb9596fa4695a42f297d6433a78fd6f2d92fca20f9b0a2a3"
+    },
+    {
+      "name": "zh-expired-1440-dark.png",
+      "locale": "zh-CN",
+      "width": 1440,
+      "height": 960,
+      "scheme": "dark",
+      "state": "expired",
+      "at": "2026-11-04T22:29:36.971Z",
+      "sha256": "babd78f841ba84f7206455aee685e71ffd1402d1876f30a20e9dc484fbed4bd9"
+    },
+    {
+      "name": "zh-expired-390-light.png",
+      "locale": "zh-CN",
+      "width": 390,
+      "height": 844,
+      "scheme": "light",
+      "state": "expired",
+      "at": "2026-11-04T22:29:37.583Z",
+      "sha256": "2adccf914760df74b1e08d34f88cb95412278f10bd20f93cb09a82b032bd07e7"
+    },
+    {
+      "name": "zh-expired-390-dark.png",
+      "locale": "zh-CN",
+      "width": 390,
+      "height": 844,
+      "scheme": "dark",
+      "state": "expired",
+      "at": "2026-11-04T22:29:38.364Z",
+      "sha256": "8712f1a5bdbe46c93b55832851f65b2190cd6897427ee5a37de4f9bfbe166874"
+    },
+    {
+      "name": "en-expired-1440-light.png",
+      "locale": "en",
+      "width": 1440,
+      "height": 960,
+      "scheme": "light",
+      "state": "expired",
+      "at": "2026-11-04T22:29:39.010Z",
+      "sha256": "09a67cac2ac6924c05c4d75f2e5a188b51c48a463b1e8d4930406cfb9cfe63ae"
+    },
+    {
+      "name": "en-expired-1440-dark.png",
+      "locale": "en",
+      "width": 1440,
+      "height": 960,
+      "scheme": "dark",
+      "state": "expired",
+      "at": "2026-11-04T22:29:39.654Z",
+      "sha256": "21f892b3768eed8a60a5d76e3a53877eb44ea889e4be4c3c6d4718f8303965b5"
+    },
+    {
+      "name": "en-expired-390-light.png",
+      "locale": "en",
+      "width": 390,
+      "height": 844,
+      "scheme": "light",
+      "state": "expired",
+      "at": "2026-11-04T22:29:40.245Z",
+      "sha256": "e6d256299dbc867ed6b048fd92c87023a370e002b6767de24931ec403421dfc8"
+    },
+    {
+      "name": "en-expired-390-dark.png",
+      "locale": "en",
+      "width": 390,
+      "height": 844,
+      "scheme": "dark",
+      "state": "expired",
+      "at": "2026-11-04T22:29:40.822Z",
+      "sha256": "72a7c8840b4c6fc8b3234b72d0969ce75ff9c4998b1d7966c676bd480a5752ce"
+    }
+  ],
+  "fixture": {
+    "messageId": "694335f2-46b9-4673-932f-dbc1ff429723",
+    "proposals": [
+      {
+        "id": "70bac17d-9f28-4e9d-bca0-cc1dc800ef21",
+        "intentId": "b872b97e-91a7-44a6-82f4-ac67c9b2d0f8",
+        "state": "pending"
+      },
+      {
+        "id": "88e319d3-6c8a-4f9c-aae3-cd41b49f0259",
+        "intentId": "d0b4a863-d786-4d2e-89e1-53aeb7372dec",
+        "state": "uncertain"
+      },
+      {
+        "id": "17fc2a05-4f6d-408f-9089-09d647adf5e4",
+        "intentId": "90d7d2fe-f0a5-434b-a49a-ad5526ebe19c",
+        "state": "expired"
+      }
+    ]
+  },
+  "limits": [
+    "Synthetic display cards created by actual approval service with a local provider, real production build/HTTP/PostgreSQL and normal TestPool sign-up/sign-in.",
+    "No model/provider request, browser test runner, interception, production traffic or healthy WebSocket acceptance.",
+    "TestPool has no pending_actions/operation_ledger resource adapter; exact locally created IDs are journaled separately and removed owner-scoped, and the test account pair is quarantined."
+  ],
+  "consoleErrors": [],
+  "httpFailures": [],
+  "finishedAt": "2026-11-04T22:29:40.824Z",
+  "audit": {
+    "files": 25,
+    "archives": 0,
+    "archiveEntries": 0,
+    "decodedBytes": 0,
+    "result": "passed",
+    "checked": "known credentials and cookies in raw files and decoded Playwright reports; traces and recordings forbidden"
+  },
+  "cleanup": {
+    "fixtureResourcesRemoved": true,
+    "leaseState": "quarantined",
+    "reason": "TestPool account pair quarantined; exact local display cards removed",
+    "at": "2026-11-04T22:29:40.907Z"
+  }
+}

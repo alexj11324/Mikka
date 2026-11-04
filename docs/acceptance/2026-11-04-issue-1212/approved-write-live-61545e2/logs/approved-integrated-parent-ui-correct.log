@@ -1,0 +1,31 @@
+(node:7776) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:7776) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+(node:7776) DeprecationWarning: mock.module(): options.defaultExport is deprecated. Use options.exports.default instead.
+✔ existing window drafts migrate once and survive a chat remount in the scoped store (1282.403434ms)
+✔ retrying a historical failure keeps the original bubble when stale (34.531338ms)
+✔ retrying a historical failure keeps retryOf in the submission (24.990167ms)
+✔ parallel sends during a pending version probe are serialized (current) (27.584669ms)
+✔ parallel sends during a pending version probe are serialized (stale) (21.538714ms)
+✔ a stale send leaves the composer draft, attached text and browser notes intact (14.760474ms)
+✔ a stale send does not clear an artifact quote (12.397794ms)
+✔ switching only the Bot search parameter checks the page version and requires a refresh (5.944674ms)
+✔ a stale page does not retry the old action or claim it queued a reply (4.017131ms)
+✔ a returned action error is visible and does not claim the reply was queued (3.253748ms)
+✔ queued:false reports working instead of silent success (3.191213ms)
+✔ queued:false reports nothingToRetry instead of silent success (3.63901ms)
+✔ queued:false reports unavailable instead of silent success (3.867037ms)
+✔ a transport rejection reports an unconfirmed retry without exposing its message (2.861394ms)
+✔ a confirmed enqueue survives a refresh error and cannot be submitted twice while pending (3.256045ms)
+✔ words quoted from a reply wait above the draft, head the sent message as quote lines and then leave (19.555078ms)
+✔ a removed quote is not sent (26.421955ms)
+✔ a sent message that quotes a reply shows the quote above its words, and every message has 复制 (20.402936ms)
+✔ an idle page detects the new build on its minute probe and keeps the draft mounted (5.749962ms)
+ℹ tests 19
+ℹ suites 0
+ℹ pass 19
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2172.805312
