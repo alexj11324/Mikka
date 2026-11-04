@@ -12,23 +12,50 @@ const env = { GROUP_ACCEPTANCE_DEPLOYMENT: 'dpl_fixture', GROUP_ACCEPTANCE_REVIS
 const receipt = { executionId: 'synthetic-execution', providerGenerationId: 'synthetic-generation', modelId: 'openai/gpt-6-luna-decisions',
   requestDigest: 'a'.repeat(64), startedAt: '2026-11-03T00:00:00Z', completedAt: '2026-11-03T00:00:00.100Z', imageDigests: [], vision: 'no-image-input' }
 const replayContract = { caseIds: Array.from({ length: 12 }, (_, i) => `case-${i}`), datasetDigest: 'b'.repeat(64),
-  baselinePolicy: 'group-route-v0', candidatePolicy: 'group-contribution-v1' }
+  baselinePolicy: 'group-route-v0', candidatePolicy: 'group-contribution-v2', comparisonVersion: 'group-decision-comparison-v2' }
 const replay = () => {
   let serial = 100
   const rows = (policyVersion, count) => replayContract.caseIds.map(caseId => {
     const decisions = Array.from({ length: count }, (_, index) => {
       serial++
-      return { id: id(serial), phase: count === 2 && index === 0 ? 'intent' : 'responder', index, status: 'complete', failure: null,
+      return { id: id(serial), policyVersion, phase: count === 2 && index === 0 ? 'intent' : 'responder', index, status: 'complete', failure: null,
         receipt: { ...receipt, executionId: `execution-${serial}`, providerGenerationId: `generation-${serial}` }, decisionCostUsd: null }
     })
     return { schemaVersion: 1, caseId, policyVersion, datasetDigest: replayContract.datasetDigest, inputDigest: 'c'.repeat(64),
-      evidenceKind: 'actual-decision-inference', status: 'complete', receipt: decisions[0].receipt, decisionProtocol: 'group-sequential-v1',
+      evidenceKind: 'actual-decision-inference', status: 'complete', receipt: decisions[0].receipt,
+      route: { by: 'model', action: 'reply', reason: 'useful_answer', responders: [id(10)] },
+      projection: { intervention: true, selectedResponderCount: 1, delegationOperation: null, reportTiming: null }, decisionProtocol: 'group-sequential-v1',
       decisions, failureReason: null, decisionCalls: { attempted: count, receipted: count, unreceipted: 0 },
       decisionCost: { knownUsd: 0, knownCalls: 0, unknownCalls: count, omittedCalls: 0 }, decisionCostUsd: null,
       costScope: 'routing-decision-chain', executionPerformed: false, policyChanged: false }
   })
-  return { status: 'complete', collectionComplete: true, qualityAccepted: true, baseline: rows(replayContract.baselinePolicy, 1), candidate: rows(replayContract.candidatePolicy, 2),
-    comparison: { decisionReviewReady: true } }
+  return refreshReplaySummaries({ status: 'comparison_ready', comparisonVersion: replayContract.comparisonVersion, collectionComplete: true, qualityAccepted: true,
+    baseline: rows(replayContract.baselinePolicy, 1), candidate: rows(replayContract.candidatePolicy, 2),
+    comparison: { baselineClassifiable: true, decisionReviewReady: true, requiresHumanReview: true, executionAcceptanceRequired: true } })
+}
+
+function refreshReplaySummaries(value) {
+  for (const label of ['baseline', 'candidate']) {
+    const rows = value[label], measured = rows.filter(row => row.status === 'complete').length
+    const abstentions = rows.filter(row => row.status === 'invalid_decision' && row.failureReason === 'uncertain').length
+    const steps = rows.flatMap(row => row.decisions), receipted = steps.filter(step => step.receipt).length
+    const known = steps.filter(step => step.receipt && typeof step.decisionCostUsd === 'number')
+    const knownUsd = known.reduce((total, step) => total + step.decisionCostUsd, 0), unknownCalls = steps.length - known.length
+    value.comparison[label] = { cases: 12, logicalReplays: rows.length, observed: rows.length, observationCoverage: rows.length / 12,
+      measured, coverage: measured / 12, accuracyDenominator: 12, actionAccuracy: measured / 12, responderAccuracy: measured / 12,
+      abstentions, unresolvedPositive: 0, unresolvedNegative: abstentions, intentionalNonIntervention: 0, missingCaseIds: [],
+      falseIntervention: 0, missedIntervention: 0, failures: rows.filter(row => row.status !== 'complete').map(row => ({ caseId: row.caseId, reason: 'invalid_decision' })),
+      decisionCalls: { attempted: steps.length, receipted, unreceipted: steps.length - receipted },
+      cost: { scope: 'routing-decision-chain', knownUsd, knownCalls: known.length, unknownCalls, omittedCalls: 0,
+        completeTotalUsd: unknownCalls ? null : knownUsd, knownObservations: known.length, unknownObservations: unknownCalls },
+      decisionLatency: { scope: 'provider-request', samples: receipted, p50Ms: 100, p95Ms: 100 }, runtimeCasesExcluded: [] }
+  }
+  return value
+}
+function abstain(row, reason = 'uncertain') {
+  row.status = 'invalid_decision'; row.failureReason = reason; row.route = null; row.projection = null
+  row.decisions.at(-1).status = 'invalid_decision'; row.decisions.at(-1).failure = reason
+  return row
 }
 
 function fixture({ groupFails = true, throwsAfterCreation = false, replayFails = false, withTask = false, wrongTaskOwner = false,
@@ -169,7 +196,7 @@ test('source, origin and deployment fail before any network or credential setup'
 
 test('Factory failure preserves its group and independently executes all 24 receipted replay fixtures', async () => {
   const f = fixture({ withTask: true }), report = await f.run()
-  assert.equal(report.status, 'fail'); assert.equal(report.group.status, 'fail'); assert.equal(report.replay.status, 'complete')
+  assert.equal(report.status, 'fail'); assert.equal(report.group.status, 'fail'); assert.equal(report.replay.status, 'comparison_ready')
   assert.equal(report.ownerMcp.status, 'passed'); assert.equal(report.ownerMcp.cleanup.absentReadback, true)
   assert.equal(report.actualReceiptedDecisionReplays, 24); assert.equal(report.fixtureConversationId, id(2))
   assert.equal(report.runtime.order.entries[0].cloudModelState, 'ready')
@@ -224,7 +251,7 @@ test('24 collected observations including a priced uncertain result remain a qua
     value.status = 'failed'; value.error = 'replay_decision_unavailable'; value.qualityAccepted = false
     value.comparison.decisionReviewReady = false
     const row = value.baseline[0]
-    row.status = 'invalid_decision'; row.failureReason = 'uncertain'
+    row.status = 'invalid_decision'; row.failureReason = 'uncertain'; row.route = null; row.projection = null
     row.decisions[0].status = 'invalid_decision'; row.decisions[0].failure = 'uncertain'
     row.decisions[0].decisionCostUsd = 0.000061
     row.decisionCost = { knownUsd: 0.000061, knownCalls: 1, unknownCalls: 0, omittedCalls: 0 }; row.decisionCostUsd = 0.000061
@@ -248,7 +275,7 @@ test('a bounded partial invalid chain preserves its unreceipted cost without cla
     value.status = 'failed'; value.error = 'replay_decision_unavailable'; value.qualityAccepted = false
     value.comparison.decisionReviewReady = false
     const row = value.candidate[0]
-    row.status = 'invalid_decision'; row.failureReason = 'unavailable'
+    row.status = 'invalid_decision'; row.failureReason = 'unavailable'; row.route = null; row.projection = null
     row.decisions[1].status = 'unavailable'; row.decisions[1].failure = 'unavailable'; row.decisions[1].receipt = null
     row.decisionCalls = { attempted: 2, receipted: 1, unreceipted: 1 }
     return value
@@ -266,14 +293,16 @@ test('a complete four-phase delegation chain includes its actual report-timing r
   const f = fixture({ groupFails: false, mutateReplay: value => {
     const row = value.candidate[0]
     row.decisions = ['intent', 'delegation', 'responder', 'report_timing'].map((phase, index) => ({
-      id: id(910 + index), phase, index, status: 'complete', failure: null,
+      id: id(910 + index), phase, index, policyVersion: row.policyVersion, status: 'complete', failure: null,
       receipt: { ...receipt, executionId: `delegation-execution-${index}`, providerGenerationId: `delegation-generation-${index}` },
       decisionCostUsd: null,
     }))
     row.receipt = row.decisions[0].receipt
     row.decisionCalls = { attempted: 4, receipted: 4, unreceipted: 0 }
     row.decisionCost = { knownUsd: 0, knownCalls: 0, unknownCalls: 4, omittedCalls: 0 }
-    return value
+    row.route = { by: 'model', action: 'delegate', reason: 'task_requested', responders: [id(10)], delegation: { operation: 'create', issueId: null, reportTiming: 'on_completion' } }
+    row.projection = { intervention: true, selectedResponderCount: 1, delegationOperation: 'create', reportTiming: 'on_completion' }
+    return refreshReplaySummaries(value)
   } })
   const report = await f.run()
   assert.equal(report.status, 'pass'); assert.equal(report.completedLogicalDecisionReplays, 24)
@@ -389,7 +418,7 @@ test('owner MCP boundary failure remains independent while group and all replay 
   const f = fixture({ groupFails: false, mcpShareFails: true }), report = await f.run()
   assert.equal(report.ownerMcp.status, 'failed'); assert.equal(report.ownerMcp.http.share, 400)
   assert.equal(report.ownerMcp.checks.personalShareRejected, false); assert.equal(report.ownerMcp.cleanup.absentReadback, true)
-  assert.equal(report.group.status, 'pass'); assert.equal(report.replay.status, 'complete'); assert.equal(report.actualReceiptedDecisionReplays, 24)
+  assert.equal(report.group.status, 'pass'); assert.equal(report.replay.status, 'comparison_ready'); assert.equal(report.actualReceiptedDecisionReplays, 24)
   assert.equal(f.counters.group, 1); assert.equal(f.counters.replay, 1); assert.equal(report.status, 'fail')
   assert.equal(report.replaySessionEnded, true); assert.equal(report.credentialCleanup.removed, true)
 })
@@ -433,15 +462,84 @@ test('reports retain only allowlisted metadata and refuse credential-bearing out
   assert.throws(() => writeSanitizedReport({ cookie: 'short' }, join(directory, 'rejected-field.json'), env), /private_field_detected/)
 })
 
-test('step policy provenance retains only the two host policies and never upgrades a legacy receipt', () => {
+test('step policy provenance retains v0, historical v1 and v2 without upgrading a missing receipt version', () => {
   const source = replay()
   source.baseline[0].decisions[0].policyVersion = 'group-route-v0'
   source.candidate[0].decisions[0].policyVersion = 'group-contribution-v1'
   source.candidate[1].decisions[0].policyVersion = 'PRIVATE_ARBITRARY_POLICY'
+  delete source.baseline[1].decisions[0].policyVersion
   const projected = sanitizeReplayReport(source)
   assert.equal(projected.baseline[0].decisions[0].policyVersion, 'group-route-v0')
   assert.equal(projected.candidate[0].decisions[0].policyVersion, 'group-contribution-v1')
   assert.equal(projected.candidate[1].decisions[0].policyVersion, null)
+  assert.equal(projected.candidate[2].decisions[0].policyVersion, 'group-contribution-v2')
   assert.equal(projected.baseline[1].decisions[0].policyVersion, null)
   assert.doesNotMatch(JSON.stringify(projected), /PRIVATE_ARBITRARY_POLICY/)
+})
+
+test('v2 comparison keeps four real baseline abstentions and all unknown costs while accepting a complete candidate', async () => {
+  const f = fixture({ groupFails: false, mutateReplay: value => {
+    value.baseline.slice(0, 4).forEach(row => abstain(row))
+    return refreshReplaySummaries(value)
+  } })
+  const report = await f.run()
+  assert.equal(report.status, 'pass')
+  assert.equal(report.replay.status, 'comparison_ready')
+  assert.equal(report.replay.comparisonVersion, 'group-decision-comparison-v2')
+  assert.equal(report.actualReceiptedDecisionReplays, 24)
+  assert.equal(report.completedLogicalDecisionReplays, 20, 'no abstention becomes a completed route')
+  assert.equal(report.replayAccounting.baselineCompleted, 8)
+  assert.equal(report.replayAccounting.baselineAbstentions, 4)
+  assert.equal(report.replayAccounting.candidateCompleted, 12)
+  assert.equal(report.replayAccounting.qualityAccepted, true)
+  assert.equal(report.replayAccounting.decisionCostUsd, null, 'unknown pricing does not erase valid inference')
+  assert.equal(report.replay.comparison.baseline.accuracyDenominator, 12)
+  assert.equal(report.replay.comparison.baseline.actionAccuracy, 8 / 12)
+  assert.equal(report.replay.comparison.baseline.observed, 12)
+  assert.equal(report.replay.comparison.baseline.abstentions, 4)
+  assert.equal(report.replay.comparison.baseline.unresolvedNegative, 4)
+  assert.equal(report.replay.baseline[0].route, null)
+  assert.equal(report.replay.baseline[0].projection, null)
+})
+
+test('a receipted candidate uncertainty cannot pass even when the report claims comparison readiness', async () => {
+  const report = await fixture({ groupFails: false, mutateReplay: value => {
+    abstain(value.candidate[0])
+    return refreshReplaySummaries(value)
+  } }).run()
+  assert.equal(report.status, 'fail')
+  assert.equal(report.replayAccounting.collectionComplete, true)
+  assert.equal(report.replayAccounting.candidateCompleted, 11)
+  assert.equal(report.completedLogicalDecisionReplays, 23)
+  assert.equal(report.replayAccounting.qualityAccepted, false)
+})
+
+test('old or forged comparison versions and cross-policy step receipts never authorize v2 quality', async () => {
+  for (const mutateReplay of [
+    value => { delete value.comparisonVersion; return value },
+    value => { value.comparisonVersion = 'group-decision-comparison-v1'; return value },
+    value => { value.comparisonVersion = 'forged-comparison-v2'; return value },
+    value => { value.candidate[0].decisions[0].policyVersion = 'group-contribution-v1'; return value },
+    value => { value.comparison.candidate.accuracyDenominator = 11; return value },
+    value => { value.comparison.candidate.failures = [{ caseId: 'case-0', reason: 'action' }]; return value },
+  ]) {
+    const report = await fixture({ groupFails: false, mutateReplay }).run()
+    assert.equal(report.status, 'fail'); assert.equal(report.replayAccounting.qualityAccepted, false)
+    assert.equal(report.actualReceiptedDecisionReplays, 24)
+  }
+})
+
+test('baseline malformed routes, projections, terminal answers and missing receipts stay incomparable', async () => {
+  for (const mutateReplay of [
+    value => { value.baseline[0].route = null; return value },
+    value => { value.baseline[0].projection = null; return value },
+    value => { value.baseline[0].projection.selectedResponderCount = 2; return value },
+    value => { abstain(value.baseline[0], 'invalid_response'); return refreshReplaySummaries(value) },
+    value => { abstain(value.baseline[0]); value.baseline[0].route = value.baseline[1].route; return refreshReplaySummaries(value) },
+    value => { abstain(value.baseline[0]); value.baseline[0].decisions[0].receipt = null; return refreshReplaySummaries(value) },
+  ]) {
+    const report = await fixture({ groupFails: false, mutateReplay }).run()
+    assert.equal(report.status, 'fail'); assert.equal(report.replayAccounting.qualityAccepted, false)
+    assert.equal(report.replayAccounting.baselineClassifiable, false)
+  }
 })

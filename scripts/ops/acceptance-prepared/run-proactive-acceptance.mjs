@@ -27,7 +27,7 @@ const decisionFailure = oneOf(['unavailable', 'missing_or_refused', 'wrong_answe
   'receipt_missing', 'duplicate_receipt', 'mention_requires_intervention', 'reporter_unavailable', 'call_budget_exhausted', 'invalid_response', 'members_unavailable'])
 const decisionCalls = value => shape(value, { attempted: integer, receipted: integer, unreceipted: integer })
 const decisionCost = value => shape(value, { knownUsd: finite, knownCalls: integer, unknownCalls: integer, omittedCalls: integer })
-const decisionStep = value => shape(value, { id: token, phase, index: integer, policyVersion: oneOf(['group-route-v0', 'group-contribution-v1']),
+const decisionStep = value => shape(value, { id: token, phase, index: integer, policyVersion: oneOf(['group-route-v0', 'group-contribution-v1', 'group-contribution-v2']),
   status: oneOf(['complete', 'invalid_decision', 'unavailable']), failure: decisionFailure, receipt, decisionCostUsd: finite })
 const decisionFields = { decisionProtocol: protocol, decisions: list(decisionStep), decisionsOmitted: integer,
   failureReason: decisionFailure, decisionCalls, decisionCost, decisionCostUsd: finite, decisionLatencyMs: finite,
@@ -60,11 +60,51 @@ const sameCost = (left, right) => ['knownCalls', 'unknownCalls', 'omittedCalls']
 /** Count logical replay cases separately from paid/unknown provider requests.
  * Failed rows retain their receipts and unknown costs; duplicate evidence never
  * makes the fixed 12 x 2 logical suite pass. */
+function completeReplayProjection(row) {
+  const route = row.route, projected = row.projection
+  if (!route || !projected || !['model', 'mention'].includes(route.by)
+    || !['ignore', 'observe', 'reply', 'clarify', 'delegate'].includes(route.action)
+    || !Array.isArray(route.responders) || route.responders.some(id => !uuid(id))
+    || new Set(route.responders).size !== route.responders.length) return false
+  const intervention = !['ignore', 'observe'].includes(route.action), delegation = route.delegation
+  if (intervention ? route.responders.length < 1 || route.responders.length > 3 : route.responders.length !== 0) return false
+  if (route.action === 'delegate') {
+    if (route.responders.length !== 1 || !delegation || !['create', 'continue', 'status', 'stop'].includes(delegation.operation)
+      || (delegation.operation === 'create' ? delegation.issueId !== null : !uuid(delegation.issueId))
+      || !['now', 'on_completion'].includes(delegation.reportTiming)
+      || ['status', 'stop'].includes(delegation.operation) && delegation.reportTiming !== 'now') return false
+  } else if (delegation != null) return false
+  return projected.intervention === intervention && projected.selectedResponderCount === route.responders.length
+    && projected.delegationOperation === (delegation?.operation ?? null)
+    && projected.reportTiming === (delegation?.reportTiming ?? null)
+}
+function boundReplaySummary(value, stats, expected) {
+  const totals = measureDecisions(stats.steps)
+  return Boolean(value && value.cases === 12 && value.logicalReplays === 12 && value.observed === 12
+    && value.observationCoverage === 1 && value.accuracyDenominator === 12
+    && value.measured === stats.complete && value.coverage === stats.complete / 12 && value.abstentions === stats.abstentions
+    && integer(value.unresolvedPositive) !== null && integer(value.unresolvedNegative) !== null
+    && value.unresolvedPositive + value.unresolvedNegative === stats.abstentions
+    && integer(value.intentionalNonIntervention) !== null && value.intentionalNonIntervention <= stats.complete
+    && finite(value.actionAccuracy) !== null && value.actionAccuracy <= 1
+    && finite(value.responderAccuracy) !== null && value.responderAccuracy <= 1
+    && Array.isArray(value.missingCaseIds) && value.missingCaseIds.length === 0
+    && Array.isArray(value.failures) && value.failures.every(item => expected.caseIds.includes(item?.caseId)
+      && ['invalid_decision', 'receipt_missing', 'action', 'responder', 'report_timing'].includes(item?.reason))
+    && stats.failedCaseIds.every(caseId => value.failures.some(item => item.caseId === caseId && item.reason === 'invalid_decision'))
+    && sameCount(value.decisionCalls, totals.decisionCalls) && value.cost?.scope === 'routing-decision-chain'
+    && sameCost(value.cost, totals.decisionCost)
+    && (totals.decisionCostUsd === null ? value.cost.completeTotalUsd === null
+      : finite(value.cost.completeTotalUsd) !== null && Math.abs(value.cost.completeTotalUsd - totals.decisionCostUsd) < 1e-9))
+}
 export function measureReplayEvidence(value, expected) {
   const allSteps = [], generations = new Set(), executions = new Set(), logical = new Set(), stepIds = new Set()
+  const stats = { baseline: { complete: 0, abstentions: 0, steps: [], failedCaseIds: [] },
+    candidate: { complete: 0, abstentions: 0, steps: [], failedCaseIds: [] } }
   let logicalReplays = 0, receiptedLogicalReplays = 0, completedLogicalReplays = 0, unobservedLogicalReplays = 0, evidenceValid = true
   const configured = Array.isArray(expected.caseIds) && expected.caseIds.length === 12 && new Set(expected.caseIds).size === 12
-    && digest(expected.datasetDigest) && token(expected.baselinePolicy) && token(expected.candidatePolicy)
+    && digest(expected.datasetDigest) && expected.baselinePolicy === 'group-route-v0' && expected.candidatePolicy === 'group-contribution-v2'
+    && expected.comparisonVersion === 'group-decision-comparison-v2' && value?.comparisonVersion === expected.comparisonVersion
   for (const [label, policy] of [['baseline', expected.baselinePolicy], ['candidate', expected.candidatePolicy]]) {
     const rows = Array.isArray(value?.[label]) ? value[label] : []
     if (rows.length !== 12) evidenceValid = false
@@ -75,12 +115,14 @@ export function measureReplayEvidence(value, expected) {
       if (!steps.length) unobservedLogicalReplays++
       const totals = measureDecisions(steps)
       let rowBound = configured && !logical.has(key) && expected.caseIds.includes(row.caseId)
-        && row.policyVersion === policy && row.datasetDigest === expected.datasetDigest && row.schemaVersion === 1
+        && row.policyVersion === policy && row.datasetDigest === expected.datasetDigest && digest(row.inputDigest) && row.schemaVersion === 1
         && row.evidenceKind === 'actual-decision-inference' && row.executionPerformed === false && row.policyChanged === false
         && row.decisionProtocol === 'group-sequential-v1' && ['complete', 'invalid_decision'].includes(row.status)
-        && (row.status === 'complete' ? row.failureReason === null : decisionFailure(row.failureReason) !== null)
+        && (row.status === 'complete' ? row.failureReason === null && completeReplayProjection(row)
+          : decisionFailure(row.failureReason) !== null && row.route === null && row.projection === null)
         && row.costScope === 'routing-decision-chain' && steps.length > 0 && steps.length <= 4
-        && validReceipt(row.receipt) && steps[0]?.receipt?.executionId === row.receipt?.executionId
+        && validReceipt(row.receipt) && row.receipt.modelId === 'openai/gpt-6-luna-decisions'
+        && steps[0]?.receipt?.executionId === row.receipt?.executionId
         && steps[0]?.receipt?.providerGenerationId === row.receipt?.providerGenerationId
         && steps[0]?.receipt?.requestDigest === row.receipt?.requestDigest
         && sameCount(row.decisionCalls, totals.decisionCalls) && sameCost(row.decisionCost, totals.decisionCost)
@@ -89,21 +131,26 @@ export function measureReplayEvidence(value, expected) {
       logical.add(key)
       for (const [index, item] of steps.entries()) {
         const step = item && typeof item === 'object' ? item : {}
-        allSteps.push(step)
+        allSteps.push(step); stats[label].steps.push(step)
         const evidence = validReceipt(step.receipt)
         const failedLast = row.status === 'invalid_decision' && index === steps.length - 1
         const stepBound = failedLast
           ? step.failure === row.failureReason && (evidence ? step.status === 'invalid_decision' : step.status === 'unavailable' && step.receipt === null)
           : step.status === 'complete' && step.failure === null && evidence
         if (!uuid(step.id) || stepIds.has(step.id) || !['intent', 'responder', 'delegation', 'report_timing'].includes(step.phase) || step.index !== index
-          || !stepBound) rowBound = false
+          || step.policyVersion !== policy || !stepBound) rowBound = false
         stepIds.add(step.id)
         if (evidence) {
-          if (generations.has(step.receipt.providerGenerationId) || executions.has(step.receipt.executionId)) rowBound = false
+          if (step.receipt.modelId !== 'openai/gpt-6-luna-decisions' || generations.has(step.receipt.providerGenerationId)
+            || executions.has(step.receipt.executionId)) rowBound = false
           generations.add(step.receipt.providerGenerationId); executions.add(step.receipt.executionId)
         }
       }
-      if (rowBound && row.status === 'complete') completedLogicalReplays++
+      if (rowBound && row.status === 'complete') { completedLogicalReplays++; stats[label].complete++ }
+      if (rowBound && row.status === 'invalid_decision') {
+        stats[label].failedCaseIds.push(row.caseId)
+        if (row.failureReason === 'uncertain' && steps.every(step => validReceipt(step.receipt))) stats[label].abstentions++
+      }
       if (!rowBound) evidenceValid = false
     }
   }
@@ -111,10 +158,21 @@ export function measureReplayEvidence(value, expected) {
   if (unobservedLogicalReplays) totals.decisionCostUsd = null
   evidenceValid = Boolean(evidenceValid && configured && logicalReplays === 24 && totals.decisionCalls.attempted <= 96)
   const collectionComplete = evidenceValid && value?.collectionComplete === true
-  const valid = evidenceValid && completedLogicalReplays === 24
-  const qualityAccepted = collectionComplete && valid && value?.status === 'complete' && value?.qualityAccepted === true
-    && value?.comparison?.decisionReviewReady === true
-  return { scope: 'routing-decision-chain', logicalReplays, receiptedLogicalReplays, completedLogicalReplays, unobservedLogicalReplays,
+  const baselineClassifiable = evidenceValid && stats.baseline.complete + stats.baseline.abstentions === 12
+  const summariesBound = boundReplaySummary(value?.comparison?.baseline, stats.baseline, expected)
+    && boundReplaySummary(value?.comparison?.candidate, stats.candidate, expected)
+  const valid = Boolean(collectionComplete && baselineClassifiable && stats.candidate.complete === 12 && summariesBound)
+  const baseline = value?.comparison?.baseline, candidate = value?.comparison?.candidate
+  const qualityAccepted = valid && value?.status === 'comparison_ready' && value?.qualityAccepted === true
+    && value?.comparison?.baselineClassifiable === true && value?.comparison?.decisionReviewReady === true
+    && value?.comparison?.requiresHumanReview === true && value?.comparison?.executionAcceptanceRequired === true
+    && candidate.failures.length === 0 && candidate.actionAccuracy === 1 && candidate.responderAccuracy === 1
+    && integer(candidate.falseIntervention) !== null && integer(baseline.falseIntervention) !== null
+    && integer(candidate.missedIntervention) !== null && integer(baseline.missedIntervention) !== null
+    && candidate.falseIntervention <= baseline.falseIntervention && candidate.missedIntervention <= baseline.missedIntervention
+  return { scope: 'routing-decision-chain', comparisonVersion: configured ? expected.comparisonVersion : null,
+    logicalReplays, receiptedLogicalReplays, completedLogicalReplays, unobservedLogicalReplays,
+    baselineClassifiable, baselineCompleted: stats.baseline.complete, baselineAbstentions: stats.baseline.abstentions, candidateCompleted: stats.candidate.complete,
     evidenceValid, collectionComplete, qualityAccepted, valid,
     ...totals, maximumProviderCalls: 96 }
 }
@@ -179,18 +237,21 @@ export function sanitizeReplayReport(value) {
     inputDigest: digest, policyVersion: token, evidenceKind: token, status: token, receipt, ...decisionFields }),
     executionPerformed: typeof row.executionPerformed === 'boolean' ? row.executionPerformed : null,
     policyChanged: typeof row.policyChanged === 'boolean' ? row.policyChanged : null,
+    projection: row.projection ? shape(row.projection, { intervention: bool, selectedResponderCount: integer, delegationOperation: token, reportTiming: token }) : null,
     route: row.route ? shape(row.route, { by: token, action: token, reason: token, responders: list(uuid), delegation: input => input ? shape(input, { operation: token, issueId: uuid, reportTiming: token }) : null }) : null,
   }))
-  const summary = input => input ? shape(input, { cases: finite, logicalReplays: integer, measured: finite, coverage: finite, actionAccuracy: finite, responderAccuracy: finite,
+  const summary = input => input ? shape(input, { cases: finite, logicalReplays: integer, observed: integer, observationCoverage: finite, measured: finite, coverage: finite, accuracyDenominator: integer,
+    abstentions: integer, unresolvedPositive: integer, unresolvedNegative: integer, intentionalNonIntervention: integer, missingCaseIds: list(token),
+    actionAccuracy: finite, responderAccuracy: finite,
     falseIntervention: finite, missedIntervention: finite, failures: list(row => shape(row, { caseId: token, reason: token })),
     decisionCalls, cost: row => shape(row, { scope: oneOf(['routing-decision-chain']), knownUsd: finite,
       knownCalls: integer, unknownCalls: integer, omittedCalls: integer, completeTotalUsd: finite,
       knownObservations: integer, unknownObservations: integer }),
     decisionLatency: row => shape(row, { scope: oneOf(['provider-request']), samples: finite, p50Ms: finite, p95Ms: finite }), runtimeCasesExcluded: list(token) }) : null
-  return { ...shape(value, { status: token, error: token, collectionComplete: bool, qualityAccepted: bool, dataset: token, datasetDigest: digest, deploymentId: token, revision: token,
+  return { ...shape(value, { status: token, error: token, comparisonVersion: token, collectionComplete: bool, qualityAccepted: bool, dataset: token, datasetDigest: digest, deploymentId: token, revision: token,
     conversationId: uuid, startedAt: date, finishedAt: date, baseline: rows, candidate: rows }),
     comparison: { baseline: summary(value.comparison?.baseline), candidate: summary(value.comparison?.candidate),
-      decisionReviewReady: value.comparison?.decisionReviewReady === true, requiresHumanReview: true, executionAcceptanceRequired: true },
+      baselineClassifiable: value.comparison?.baselineClassifiable === true, decisionReviewReady: value.comparison?.decisionReviewReady === true, requiresHumanReview: true, executionAcceptanceRequired: true },
     executionPerformed: false, productionAccepted: false, policyChanged: false }
 }
 
@@ -203,8 +264,10 @@ async function defaultDependencies(repo) {
   ])
   models.assertFlashTestModel('deepseek-flash')
   if (cases.GROUP_REPLAY_CASE_IDS.length !== 12) throw Error('acceptance_replay_case_count_changed')
+  if (cases.GROUP_REPLAY_COMPARISON_VERSION !== 'group-decision-comparison-v2' || policy.GROUP_BASELINE_VERSION !== 'group-route-v0'
+    || policy.GROUP_POLICY_VERSION !== 'group-contribution-v2') throw Error('acceptance_replay_comparison_contract')
   return { ...credentials, ...group, ...replay, ...accounts, replayContract: { caseIds: cases.GROUP_REPLAY_CASE_IDS,
-    datasetDigest: cases.GROUP_REPLAY_DATASET_DIGEST, baselinePolicy: policy.GROUP_BASELINE_VERSION, candidatePolicy: policy.GROUP_POLICY_VERSION } }
+    datasetDigest: cases.GROUP_REPLAY_DATASET_DIGEST, comparisonVersion: cases.GROUP_REPLAY_COMPARISON_VERSION, baselinePolicy: policy.GROUP_BASELINE_VERSION, candidatePolicy: policy.GROUP_POLICY_VERSION } }
 }
 
 /** Does not run on import. The CLI requires the exact release checkout and
@@ -517,7 +580,7 @@ export async function runAcceptanceBundle({ env = process.env, fetchImpl = fetch
     && session.loginStatus === 200 && session.logoutAttempted && session.logoutAcknowledged && session.logoutStatus === 200)
   const machinesCleaned = !groupRaw?.cases?.some(row => uuid(row.taskId)) || report.machineCleanup?.status === 'ended'
   report.status = !report.error && cleaned && machinesCleaned && sessionsEnded && report.replaySessionEnded && report.group?.sessionEnded
-    && report.ownerMcp?.status === 'passed' && report.group?.status === 'pass' && report.replay?.status === 'complete'
+    && report.ownerMcp?.status === 'passed' && report.group?.status === 'pass' && report.replay?.status === 'comparison_ready'
     && report.replayAccounting?.qualityAccepted && report.replay?.comparison?.decisionReviewReady === true ? 'pass' : 'fail'
   return report
 }
