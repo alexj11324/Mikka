@@ -1,0 +1,186 @@
+[
+  {
+    "seq": 1,
+    "chunk": {
+      "data": {
+        "state": "preparing"
+      },
+      "type": "data-run-state",
+      "transient": true
+    },
+    "createdAt": "2026-11-04T16:50:17.989Z"
+  },
+  {
+    "seq": 2,
+    "chunk": {
+      "type": "start",
+      "messageId": "7e4e96bd-a31f-4fe0-bf99-31d89b28c432"
+    },
+    "createdAt": "2026-11-04T16:50:41.877Z"
+  },
+  {
+    "seq": 3,
+    "chunk": {
+      "data": {
+        "ms": 23936,
+        "ok": true,
+        "stage": "repository"
+      },
+      "type": "data-run-stage"
+    },
+    "createdAt": "2026-11-04T16:50:41.877Z"
+  },
+  {
+    "seq": 4,
+    "chunk": {
+      "data": {
+        "ms": 321,
+        "ok": true,
+        "stage": "worktree"
+      },
+      "type": "data-run-stage"
+    },
+    "createdAt": "2026-11-04T16:50:42.301Z"
+  },
+  {
+    "seq": 5,
+    "chunk": {
+      "data": {
+        "ms": 19681,
+        "ok": true,
+        "stage": "agent_start"
+      },
+      "type": "data-run-stage"
+    },
+    "createdAt": "2026-11-04T16:51:05.502Z"
+  },
+  {
+    "seq": 6,
+    "chunk": {
+      "data": {
+        "state": "running"
+      },
+      "type": "data-run-state",
+      "transient": true
+    },
+    "createdAt": "2026-11-04T16:51:05.844Z"
+  },
+  {
+    "seq": 7,
+    "chunk": {
+      "id": "msg_08842fea1f34af3c016aeb628413e887d29376a38d644e6fb1",
+      "type": "text-start"
+    },
+    "createdAt": "2026-11-04T16:51:16.532Z"
+  },
+  {
+    "seq": 43,
+    "chunk": {
+      "id": "msg_08842fea1f34af3c016aeb628413e887d29376a38d644e6fb1",
+      "type": "text-end"
+    },
+    "createdAt": "2026-11-04T16:51:17.523Z"
+  },
+  {
+    "seq": 44,
+    "chunk": {
+      "type": "tool-input-available",
+      "input": {
+        "path": "package.json"
+      },
+      "toolName": "mcp__mikka__inspect_artifact",
+      "toolCallId": "exec-dea907e6-2db9-4c44-a71e-3cd12664e5da"
+    },
+    "createdAt": "2026-11-04T16:51:49.509Z"
+  },
+  {
+    "seq": 45,
+    "chunk": {
+      "type": "tool-output-available",
+      "output": [
+        {
+          "text": "{\"path\":\"package.json\",\"bytes\":60743,\"sha256\":\"c5cd8605b8ca8af09294741b8847c229b7a96ad04031b523c4f8cff5314dab1a\",\"head\":\"66327f8400a0f0d930a0124340db02062df13671\",\"committedSha256\":\"c5cd8605b8ca8af09294741b8847c229b7a96ad04031b523c4f8cff5314dab1a\",\"contentMatchesGit\":true,\"textUnavailable\":null}",
+          "type": "text"
+        }
+      ],
+      "toolCallId": "exec-dea907e6-2db9-4c44-a71e-3cd12664e5da"
+    },
+    "createdAt": "2026-11-04T16:51:50.314Z"
+  },
+  {
+    "seq": 46,
+    "chunk": {
+      "type": "tool-input-available",
+      "input": {
+        "summary": "At 2026-11-04T16:52:13Z, before the audit window begins, the only available repository inspection tool reports HEAD 66327f8400a0f0d930a0124340db02062df13671, while the required frozen source is 2a0e398762d35a94ac673d04ce3683d9de1568d7. Native shell execution is unavailable, so I cannot verify git origin, test whether the frozen commit exists/read its ls-tree manifest, inspect source files, or run approved tests. Per the task, I stop immediately without switching repositories or substituting another checkout. No audit items reviewed and no tests run.",
+        "blockedOn": "native_shell_unavailable_and_fixed_source_mismatch"
+      },
+      "toolName": "mcp__mikka__report_blocked",
+      "toolCallId": "exec-997c9620-e3ce-4d1a-ad5a-9c0f03613f10"
+    },
+    "createdAt": "2026-11-04T16:52:26.926Z"
+  },
+  {
+    "seq": 47,
+    "chunk": {
+      "type": "tool-output-available",
+      "output": [
+        {
+          "text": "Recorded. End your turn now.",
+          "type": "text"
+        }
+      ],
+      "toolCallId": "exec-997c9620-e3ce-4d1a-ad5a-9c0f03613f10"
+    },
+    "createdAt": "2026-11-04T16:52:27.828Z"
+  },
+  {
+    "seq": 48,
+    "chunk": {
+      "id": "msg_08842fea1f34af3c016aeb62d374fc87d2ad9045dcd05b82ec",
+      "type": "text-start"
+    },
+    "createdAt": "2026-11-04T16:52:36.074Z"
+  },
+  {
+    "seq": 361,
+    "chunk": {
+      "id": "msg_08842fea1f34af3c016aeb62d374fc87d2ad9045dcd05b82ec",
+      "type": "text-end"
+    },
+    "createdAt": "2026-11-04T16:52:41.612Z"
+  },
+  {
+    "seq": 362,
+    "chunk": {
+      "data": {
+        "source": "codex app-server thread/tokenUsage",
+        "costUsd": null,
+        "inputTokens": 253780,
+        "outputTokens": 1171
+      },
+      "type": "data-usage"
+    },
+    "createdAt": "2026-11-04T16:52:42.003Z"
+  },
+  {
+    "seq": 363,
+    "chunk": {
+      "type": "finish"
+    },
+    "createdAt": "2026-11-04T16:52:42.003Z"
+  },
+  {
+    "seq": 364,
+    "chunk": {
+      "data": {
+        "error": "Blocked on native_shell_unavailable_and_fixed_source_mismatch",
+        "state": "stopped",
+        "stopReason": "blocked"
+      },
+      "type": "data-run-state",
+      "transient": true
+    },
+    "createdAt": "2026-11-04T16:52:42.003Z"
+  }
+]

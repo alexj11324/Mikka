@@ -1,0 +1,21 @@
+{
+  "status": "invalid_before_window",
+  "windowStart": "2026-11-04T17:00:00.000Z",
+  "windowEnd": "2026-11-04T18:00:00.000Z",
+  "build": "66327f8400a0f0d930a0124340db02062df13671",
+  "deploymentId": "dpl_CCCPtfy9kHKJwJMVuDCoT99AVN5u",
+  "runId": "bacfa72c-7178-4c5a-84cf-f972f07b17f0",
+  "issueId": "ecba5151-9532-44f7-8c41-7aa7cc97a018",
+  "taskId": "b3272a84-0313-438f-aadf-a4df2747302d",
+  "startedAt": "2026-11-04T16:50:15.180Z",
+  "stoppedAt": "2026-11-04T16:52:42.003Z",
+  "stopReason": "blocked",
+  "reason": "native_shell_unavailable_and_fixed_source_mismatch",
+  "reviewedItems": 0,
+  "executedTests": 0,
+  "versionCheckCount": 0,
+  "scheduledNeonSampleCount": 0,
+  "observerExitCode": 143,
+  "workloadDigest": "29ced87c9f94c51c49a8d81d0f1eedc4f4cf7f1b49d5d19702532765dc29ad09",
+  "cause": "The v3 test contract required readOnly:true and native shell commands simultaneously; production intentionally disables native shell for read-only runs. Preserve the guard. No accepted baseline exists."
+}

@@ -1,0 +1,19 @@
+[
+  {
+    "observedAt": "2026-11-04T17:11:38.857Z",
+    "taskId": "b3272a84-0313-438f-aadf-a4df2747302d",
+    "stage": "execute",
+    "factoryStatus": "cancelled",
+    "revision": 4,
+    "candidateId": null,
+    "attemptId": "ae4753e4-0454-4917-b54f-79e11166654a",
+    "attemptStatus": "cancelled",
+    "runId": "bacfa72c-7178-4c5a-84cf-f972f07b17f0",
+    "runStatus": "stopped",
+    "runStopReason": "blocked",
+    "nativeSessionId": "01a1a778-9742-7ef2-98c0-7bd2a842b0d7",
+    "startedAt": "2026-11-04T16:50:15.180Z",
+    "leaseExpiresAt": "2026-11-04T16:54:11.607Z",
+    "attemptCount": "1"
+  }
+]

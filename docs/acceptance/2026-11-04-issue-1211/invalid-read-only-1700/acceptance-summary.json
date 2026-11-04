@@ -1,0 +1,127 @@
+{
+  "schemaVersion": 1,
+  "windowStart": "2026-11-04T17:00:00.000Z",
+  "windowEnd": "2026-11-04T18:00:00.000Z",
+  "validBaseline": false,
+  "conclusion": "INVALID: readOnly audit contract required shell commands that the existing readOnly native policy intentionally disables. No fixed-source audit or tests began.",
+  "build": "66327f8400a0f0d930a0124340db02062df13671",
+  "deploymentId": "dpl_CCCPtfy9kHKJwJMVuDCoT99AVN5u",
+  "botId": "d8e8da7b-56d1-4d03-8c47-62e48647c0d6",
+  "issueId": "ecba5151-9532-44f7-8c41-7aa7cc97a018",
+  "issueKey": "ALEX-41",
+  "factoryTaskId": "b3272a84-0313-438f-aadf-a4df2747302d",
+  "runId": "bacfa72c-7178-4c5a-84cf-f972f07b17f0",
+  "attemptId": "ae4753e4-0454-4917-b54f-79e11166654a",
+  "nativeSessionId": "01a1a778-9742-7ef2-98c0-7bd2a842b0d7",
+  "model": "gpt-6-luna",
+  "harness": "codex",
+  "providerRoute": "subscription/codex_cli",
+  "cliModelSelection": "explicit",
+  "readOnly": true,
+  "apiKeyUsed": false,
+  "subscriptionConnectionId": "ef66c1d8-2bbc-48e9-abf3-2ce3787ceef5",
+  "subscriptionConnectionRevision": 2,
+  "nativeBindingId": "71572c48-4d87-420b-85b1-108e8004f679",
+  "taskRunCount": 1,
+  "nativeClaimCount": 1,
+  "successorRunCount": 0,
+  "ownerDispatch": {
+    "uiSubmittedAt": "2026-11-04T16:48:30.294Z",
+    "eventId": "0383dad7-ae6c-4105-a9dc-b4b5ee4b6659",
+    "startedAt": "2026-11-04T16:50:15.180Z",
+    "stoppedAt": "2026-11-04T16:52:42.003Z"
+  },
+  "actualRepository": "https://github.com/alexj11324/Mikka.git",
+  "sourceSha": "2a0e398762d35a94ac673d04ce3683d9de1568d7",
+  "fileCount": 297,
+  "manifestSha256": "490d52e0b13f43223a82f715688a3257bb091592bef9748d8130497dce80c8d1",
+  "workloadDigest": "29ced87c9f94c51c49a8d81d0f1eedc4f4cf7f1b49d5d19702532765dc29ad09",
+  "corePromptSha256": "ef0dbd64465499fe5f67d3903dec24a60e07ea6c52f023b501bf768aae0fcc8e",
+  "ownerPromptSha256": "cc5d7c30e8e52af3326f0e108f1ac0a75860cb2678fc9d64b28201839cd9c3b3",
+  "promptVerification": {
+    "actualOwnerEventExact": true,
+    "allNineCoreParagraphsPresentInRunPrompt": true,
+    "preparedHandoffGoalExactOwnerPrompt": true,
+    "preparedHandoffGoalContainsExactCore": true,
+    "runPromptFormatting": "Added blank paragraph separators; no lossy normalization asserted."
+  },
+  "reviewedFileCount": 0,
+  "executedTestCount": 0,
+  "remainingFileCount": 297,
+  "observedTools": [
+    {
+      "seq": 44,
+      "name": "mcp__mikka__inspect_artifact",
+      "input": {
+        "path": "package.json"
+      },
+      "outputSeq": 45,
+      "observedCommit": "66327f8400a0f0d930a0124340db02062df13671",
+      "sha256": "c5cd8605b8ca8af09294741b8847c229b7a96ad04031b523c4f8cff5314dab1a",
+      "bytes": 60743,
+      "contentMatchesGit": true
+    },
+    {
+      "seq": 46,
+      "name": "mcp__mikka__report_blocked",
+      "blockedOn": "native_shell_unavailable_and_fixed_source_mismatch",
+      "createdAt": "2026-11-04T16:52:26.926Z"
+    }
+  ],
+  "runTerminal": {
+    "status": "stopped",
+    "stopReason": "blocked",
+    "preservedByCleanup": true
+  },
+  "cleanup": [
+    {
+      "action": "normal UI issue cancellation",
+      "at": "2026-11-04T16:54Z",
+      "result": "Issue cancelled; Factory still execute/waiting revision 3."
+    },
+    {
+      "action": "normal Owner UI Factory cleanup",
+      "uiSubmittedAt": "2026-11-04T16:58:23.817Z",
+      "eventId": "dd18326b-2480-4d83-ba39-65ef92730bd0",
+      "workflowRunId": "wrun_41M6KQYQX60GQ8M4GNG6C9V94R",
+      "toolCallId": "call_76c02bf5ac7e40a8a0c6773048ad7c67",
+      "mutationEventId": "fff00eb0-e859-5298-ab6c-cffe4000b8f5",
+      "result": "factoryReplayMismatch: model reused existing route eventId. No mutation, task still waiting/revision 3."
+    },
+    {
+      "action": "explicit normal Owner UI correction",
+      "uiSubmittedAt": "2026-11-04T17:02:03.385Z",
+      "eventId": "e8ea486a-0f2b-4fc2-88cd-0bb38847c86f",
+      "workflowRunId": "wrun_41M6KR5EK20GPJG6E2MMX10YRJ",
+      "toolCallId": "call_3c6c9738742b438a860997e49015ead3",
+      "mutationEventId": "ed998429-ff4c-4b14-84b7-f8f883a75fa0",
+      "result": "get -> one stop(cancel) -> get. Factory cancelled/revision 4; attempt cancelled; original run remains stopped/blocked, original SID unchanged, no candidate or successor."
+    }
+  ],
+  "finalFactoryStatus": "cancelled",
+  "finalFactoryRevision": 4,
+  "finalAttemptStatus": "cancelled",
+  "cleanupReplyQualification": "The Coordinator final prose called the original run cancelled; the actual tool receipt refers to its Factory attempt. Independent SELECT confirms agent_runs stayed stopped/blocked.",
+  "settings": {
+    "beforeFingerprint": "f1b8cf3462b9825f3530aa3603c2749fdb4a144a24eb3faccf56e24c294c2898",
+    "temporaryPostFingerprint": "8ff623c6e8799d2e879cdbf910d88ab66f4a81f185916362a836cf1d0bdc3bdd",
+    "preRestoreEqualsPost": true,
+    "restoredAt": "2026-11-04T16:56:34.041Z",
+    "originalFourEntriesPreserved": true,
+    "eightChatChoicesUnchanged": true,
+    "cleanupUsedExistingAuditBotExplicitCodexLunaBinding": true,
+    "original390SettingsUntouched": true
+  },
+  "classification": {
+    "modelQuotaFailure": false,
+    "modelSubstitution": false,
+    "ownerStoppedExecution": false,
+    "cleanupCallsAreAcceptanceSamples": false
+  },
+  "evidenceFiles": [
+    "non-delta-evidence.json",
+    "cleanup-messages.json",
+    "cleanup-correction-messages.json",
+    "cleanup-final-state.json"
+  ]
+}
