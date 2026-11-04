@@ -284,15 +284,20 @@ execute window. Evidence states this isolation explicitly. When 9 and 10 run
 together, they share the already approved second daemon; item 10 starts only
 after item 9 passes. The 60-minute daemon setting is recorded for both cases.
 
-After the real Flash run creates a file and uploads a checkpoint, item 10 reads
-only its daemon-owned numeric `adapters/pids/<runId>.pgid` process metadata.
-It verifies ancestry, isolated group, PID start time and the current worktree's
-inode, then pauses that native tree alone. A's daemon, real heartbeat/lease and
+After the real Flash run creates a file and uploads a checkpoint, item 10 binds
+its observed native session to the unique direct child of the real daemon RPC
+PID whose cwd matches that worktree's inode. It verifies ancestry and PID start
+time, then pauses that native tree by individual PID. Claude's SDK transport
+shares its parent's process group, so the fault injector never signals that
+group or relies on the different legacy `spawnCli` PID-file path. A's daemon, real heartbeat/lease and
 the independent minute cron keep running. Once per minute, evidence records
 that no tool result or new checkpoint has reset persisted progress. It does not
 alter database times, production defaults or the server sweep schedule. At the
-real watchdog stop request, it resumes native processes so the ordinary
-stop/ack path runs, then observes one automatic admission on authorized B.
+real watchdog stop request, it waits for pending TERM/INT on the original PID
+(local cancellation has reached the CLI), or actual native exit plus host
+acknowledgement, before resuming any native processes. The normal revoked-lease
+stop/ack must report failure with `device_lost`, never a resumed success. It
+then observes one automatic admission on authorized B.
 
 This case deliberately preserves the original checkpoint. After 45 minutes it
 is outside the existing 30-minute recovery window, so the expected result is
@@ -303,7 +308,9 @@ event/inbox delivery, and no publication or repeated admission across two
 further minute schedules. It does not call that outcome successful recovery.
 `item10-watchdog.json` retains timing, heartbeat/lease samples, Handoff identity,
 retry and notification counts, the public blocker and failure status. Timeout
-or interruption restores every paused native group before ordinary cleanup.
+or interruption separately requests the owner's normal stop before restoration;
+if cancellation cannot be confirmed, it terminates only the captured native PIDs
+whose start times still match. Cleanup is never counted as watchdog evidence.
 The item budget is 60 minutes; allow setup and selected item 9 in addition.
 This is not a default-daemon latency measurement, a before/after benchmark or
 cloud-device acceptance. Its offline guards make no model calls.

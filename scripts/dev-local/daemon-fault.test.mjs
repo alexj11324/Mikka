@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { once } from 'node:events'
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
-import { nativeRunIdentity, ownedDaemonGroups, processTable, suspendOwnedDaemon } from './daemon-fault.mjs'
+import { nativeRunIdentity, nativeTerminationState, ownedDaemonGroups, processTable, suspendNativeRun, suspendOwnedDaemon } from './daemon-fault.mjs'
 
 const rows = [
   { pid: 10, ppid: 1, pgid: 10, start: '1' },
@@ -37,9 +37,7 @@ test('real isolated process trees pause and resume without suspending the indepe
     process.on('SIGTERM',()=>{try{process.kill(-worker.pid,'SIGTERM')}catch{};process.exit(0)});`
   const a = spawn(process.execPath, ['-e', source], { detached: true, stdio: ['ignore', 'pipe', 'pipe'] })
   const b = spawn(process.execPath, ['-e', 'setInterval(()=>{},1000)'], { detached: true, stdio: 'ignore' })
-  const dataDir = await mkdtemp(join(tmpdir(), 'mikka-native-fault-'))
-  const runId = '11111111-1111-4111-8111-111111111111'
-  let nativePid, fault, nativeFault
+  let nativePid, fault
   try {
     nativePid = Number(String((await once(a.stdout, 'data'))[0]).trim())
     assert.ok(nativePid > 1)
@@ -53,27 +51,53 @@ test('real isolated process trees pause and resume without suspending the indepe
     const resumed = await processTable()
     assert.notEqual(resumed.find(row => row.pid === a.pid).state, 'T')
     assert.notEqual(resumed.find(row => row.pid === nativePid).state, 'T')
-    const owner = { pid: a.pid, parentPid: process.pid, daemonPid: a.pid, forbiddenPids: [process.pid, b.pid] }
-    await mkdir(join(dataDir, 'adapters/pids'), { recursive: true })
-    const pidFile = join(dataDir, 'adapters/pids', `${runId}.pgid`)
-    await writeFile(pidFile, String(b.pid))
-    await assert.rejects(() => nativeRunIdentity(owner, { dataDir, runId, worktree: process.cwd() }), /isolated descendant/)
-    await writeFile(pidFile, String(nativePid))
-    await assert.rejects(() => nativeRunIdentity(owner, { dataDir, runId, worktree: dataDir }), /cwd/)
-    const native = await nativeRunIdentity(owner, { dataDir, runId, worktree: process.cwd() })
-    await assert.rejects(() => suspendOwnedDaemon({ ...native, start: 'reused-pid' }), /reused/)
-    nativeFault = await suspendOwnedDaemon(native)
-    const nativePaused = await processTable()
-    assert.equal(nativePaused.find(row => row.pid === nativePid).state, 'T')
-    assert.notEqual(nativePaused.find(row => row.pid === a.pid).state, 'T', 'The daemon must keep its heartbeat/lease loop')
-    assert.notEqual(nativePaused.find(row => row.pid === b.pid).state, 'T')
-    await nativeFault.resume()
   } finally {
-    await nativeFault?.resume()
     await fault?.resume()
     for (const pid of [a.pid, b.pid, nativePid]) if (pid) {
       try { process.kill(-pid, 'SIGCONT'); process.kill(-pid, 'SIGTERM') } catch { /* Already ended. */ }
     }
-    await rm(dataDir, { recursive: true, force: true })
+  }
+})
+
+test('Claude-style shared-PGID native child pauses alone and resumes only after real TERM is pending', { timeout: 15_000, skip: process.platform !== 'linux' }, async () => {
+  const worktree = await mkdtemp(join(tmpdir(), 'mikka-native-fault-'))
+  const sessionId = '11111111-1111-4111-8111-111111111111'
+  const nativeSource = `const {spawn}=require('node:child_process');
+    const leaf=spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{detached:true,stdio:'ignore'});
+    console.log(leaf.pid);setInterval(()=>{},1000);
+    process.on('SIGTERM',()=>{try{process.kill(leaf.pid,'SIGTERM')}catch{};process.exit(0)});`
+  const source = `const {spawn}=require('node:child_process');
+    const worker=spawn(process.execPath,['-e',${JSON.stringify(nativeSource)},'--','--session-id',${JSON.stringify(sessionId)}],{cwd:${JSON.stringify(worktree)},stdio:['ignore','pipe','pipe']});
+    worker.stdout.once('data',data=>console.log(JSON.stringify({nativePid:worker.pid,leafPid:Number(String(data).trim())})));
+    setInterval(()=>{},1000);process.on('SIGTERM',()=>{try{worker.kill('SIGTERM')}catch{};process.exit(0)});`
+  const a = spawn(process.execPath, ['-e', source], { detached: true, stdio: ['ignore', 'pipe', 'pipe'] })
+  const b = spawn(process.execPath, ['-e', 'setInterval(()=>{},1000)'], { detached: true, stdio: 'ignore' })
+  let fault, nativePid, leafPid
+  try {
+    ;({ nativePid, leafPid } = JSON.parse(String((await once(a.stdout, 'data'))[0])))
+    const owner = { pid: a.pid, parentPid: process.pid, daemonPid: a.pid, forbiddenPids: [process.pid, b.pid] }
+    await assert.rejects(() => nativeRunIdentity(owner, { worktree: tmpdir(), sessionId }), /exactly one/)
+    const native = await nativeRunIdentity(owner, { worktree, sessionId })
+    assert.equal(native.pid, nativePid)
+    assert.equal(native.processGroupId, native.daemonProcessGroupId, 'Exercise the real Claude shared-group transport')
+    await assert.rejects(() => suspendNativeRun({ ...native, start: 'reused-pid' }), /identity changed/)
+    fault = await suspendNativeRun(native)
+    const paused = await processTable()
+    assert.equal(paused.find(row => row.pid === nativePid).state, 'T')
+    assert.equal(paused.find(row => row.pid === leafPid).state, 'T')
+    assert.notEqual(paused.find(row => row.pid === a.pid).state, 'T')
+    assert.notEqual(paused.find(row => row.pid === b.pid).state, 'T')
+    assert.equal(await nativeTerminationState(native), null, 'A DB stop flag alone cannot authorize CONT')
+    // Simulate the daemon's actual child.kill(SIGTERM), not a group signal.
+    process.kill(native.pid, 'SIGTERM')
+    assert.equal(await nativeTerminationState(native), 'SIGTERM')
+    await fault.resume()
+    assert.notEqual((await processTable()).find(row => row.pid === a.pid).state, 'T')
+    assert.notEqual((await processTable()).find(row => row.pid === b.pid).state, 'T')
+  } finally {
+    await fault?.terminate()
+    for (const pid of [nativePid, leafPid]) if (pid) { try { process.kill(pid, 'SIGKILL') } catch { /* Already ended. */ } }
+    for (const child of [a, b]) { try { process.kill(-child.pid, 'SIGCONT'); process.kill(-child.pid, 'SIGTERM') } catch { /* Already ended. */ } }
+    await rm(worktree, { recursive: true, force: true })
   }
 })

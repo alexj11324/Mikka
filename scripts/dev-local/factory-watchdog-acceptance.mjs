@@ -10,7 +10,7 @@ import { join, resolve } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { assertFlashTestModel } from '../test-model-policy.mjs'
 import { assertOnlineDaemonStatus, daemonStatus } from './factory-handoff-acceptance.mjs'
-import { nativeRunIdentity, ownedDaemonGroups, processTable, suspendOwnedDaemon } from './daemon-fault.mjs'
+import { nativeRunIdentity, nativeTerminationState, ownedDaemonGroups, processTable, suspendNativeRun } from './daemon-fault.mjs'
 
 const EXECUTE_WINDOW_MS = 45 * 60_000
 const STALE_CHECKPOINT = 'Checkpoint is older than the thirty-minute recovery window.'
@@ -51,8 +51,30 @@ export async function verifyFactoryWatchdog(context) {
     await writeFile(join(directory, 'item10-watchdog.json'), JSON.stringify(evidence, null, 2), { mode: 0o600 })
     await progress('item10-online-watchdog', phase)
   }
-  let fault
-  registerCleanup(() => fault?.resume())
+  let fault, nativeIdentity, ownedRunId, cleanupPromise
+  const cleanupNative = () => cleanupPromise ??= (async () => {
+    if (!fault) return
+    if (evidence.status === 'passed') { await fault.resume(); return }
+    // Failure/interrupt cleanup is explicitly separate from observed watchdog
+    // behavior. Never release a paused executor merely because the test failed.
+    let method = 'owned-process-termination'
+    try {
+      if (ownedRunId) await Promise.race([json(`/api/mobile/threads/${ownedRunId}/stop`, {}),
+        delay(10_000).then(() => { throw new Error('Normal cleanup stop timed out') })])
+      const deadline = Date.now() + 30_000
+      while (Date.now() < deadline) {
+        const cancellation = await nativeTerminationState(nativeIdentity)
+        if (cancellation === 'SIGTERM' || cancellation === 'SIGINT') {
+          await fault.resume(); method = 'normal-owner-stop-then-resume'; break
+        }
+        if (cancellation === 'exited') break
+        await delay(250)
+      }
+    } catch { /* Terminate only the captured owned PIDs below; no unsafe CONT. */ }
+    if (method === 'owned-process-termination') await fault.terminate()
+    await record('cleanup-cancellation', { cleanup: { method, countedAsWatchdogEvidence: false } })
+  })()
+  registerCleanup(cleanupNative)
   try {
     const owned = JSON.parse(await readFile(join(root, '.cache/dev-local/owned-daemon.json'), 'utf8'))
     assert.equal(owned.parentPid, stackPid)
@@ -81,12 +103,14 @@ export async function verifyFactoryWatchdog(context) {
     const originalId = await dispatch('item10', `Create one new task on device ${device.name} (deviceId ${device.id}), harness Claude Code, repository https://github.com/mikka-e2e/core-loop.git, newThread:true, readOnly:false. Preserve this entire brief in the worker prompt and dispatch now.
 Owner acceptance marker ${marker}. The only intended repository change is ${filename} containing exactly ${marker} followed by a newline. First create this file in one tool call. Then run one finite Bash sleep 300 with timeout 600000, without loops, progress output or further edits during that wait. Do not ask for user input.
 This task exercises the host's existing stall recovery. Do not commit, push, create a PR, send messages or make any other external write before the finite wait finishes. If recovery is refused because a checkpoint is stale, preserve that blocker and the original workspace; do not start another task, refresh the checkpoint or weaken authorization. Do not repeatedly retry a refusal.`)
+    ownedRunId = originalId
     const original = await until(async () => {
       const value = await run(originalId)
       assert.ok(!ended.has(value?.status), 'A ended before the real online-stall workload')
       return value?.sessionId && value.status === 'running' ? value : null
     })
     assert.equal(original.deviceId, device.id)
+    assert.equal(original.agentDefinition?.harness, 'claude_code')
     assertFlashTestModel(original.agentDefinition?.model)
     const [linked] = await query(`SELECT t.id FROM factory_tasks t JOIN factory_attempts a ON a."taskId"=t.id WHERE a."runId"=$1 AND t."userId"=$2`, [original.id, ownerId])
     assert.ok(linked)
@@ -111,9 +135,14 @@ This task exercises the host's existing stall recovery. Do not commit, push, cre
       const bytes = await readFile(join(active.worktree, filename)).catch(() => null)
       return bytes?.equals(expected) ? active : null
     })
-    const identity = await nativeRunIdentity({ ...owned, daemonPid: aStatus.pid, forbiddenPids: [process.pid, stackPid, b.pid, bStatus.pid] },
-      { dataDir: runtime.daemonDataDir, runId: original.id, worktree: local.worktree })
-    fault = await suspendOwnedDaemon(identity)
+    assert.equal(local.sessionId, original.sessionId, 'The observed native session must belong to the real host run')
+    nativeIdentity = await until(async () => {
+      assert.equal((await run(original.id)).status, 'running')
+      try { return await nativeRunIdentity({ ...owned, daemonPid: aStatus.pid, forbiddenPids: [process.pid, stackPid, b.pid, bStatus.pid] },
+        { worktree: local.worktree, sessionId: local.sessionId }) }
+      catch (error) { if (error.code === 'nativeCandidateNotUnique') return null; throw error }
+    })
+    fault = await suspendNativeRun(nativeIdentity)
     // Let already-buffered output drain normally. Establish the observation
     // baseline only after that bounded drain; never change stored timestamps.
     await delay(5_000, undefined, { signal })
@@ -122,7 +151,8 @@ This task exercises the host's existing stall recovery. Do not commit, push, cre
     const baselineAt = time(baseline.progressAt)
     assert.ok(Number.isFinite(baselineAt) && Date.now() - baselineAt < 5 * 60_000)
     await record('native-suspended-daemon-online', { taskId: task.id, requestEpoch: task.sourceEventId, originalRunId: original.id,
-      originalAttemptId: task.attemptId, nativePgid: identity.pid, nativeGroups: fault.groups, nativeProcesses: fault.processes,
+      originalAttemptId: task.attemptId, nativePid: nativeIdentity.pid, nativeProcesses: fault.processes,
+      nativeSharesDaemonProcessGroup: nativeIdentity.processGroupId === nativeIdentity.daemonProcessGroupId, signalMode: 'individual-owned-pids',
       suspendedAt: fault.suspendedAt, progressAt: baseline.progressAt, checkpointAt: baseline.checkpointAt, files: baseline.files,
       toolOutputAt: baseline.toolOutputAt })
     let stopped, nextSampleAt = 0, maxHeartbeatAgeMs = 0, minimumLeaseRemainingMs = Infinity
@@ -136,25 +166,32 @@ This task exercises the host's existing stall recovery. Do not commit, push, cre
       if (now >= nextSampleAt) {
         const a = daemonStatus(root, runtime.daemonDataDir)
         assertOnlineDaemonStatus(a, { dataDir: runtime.daemonDataDir, deviceId: device.id })
-        const native = ownedDaemonGroups(await processTable(), identity)
-        assert.ok(native.members.every(row => ['T', 't', 'Z', 'X'].includes(row.state)), 'Native work resumed before the server stop')
+        await fault.assertSuspended()
         evidence.samples.push({ at: new Date(now).toISOString(), lastSeenAt: current.lastSeenAt, leaseExpiresAt: current.leaseExpiresAt,
           progressAt: current.progressAt, checkpointAt: current.checkpointAt, toolOutputAt: current.toolOutputAt })
         await record('online-without-progress', { quietMs: now - baselineAt, maxHeartbeatAgeMs, minimumLeaseRemainingMs })
         nextSampleAt = now + 60_000
       }
-      // Near the real server window, observe frequently enough to SIGCONT
-      // within spawnCli's normal TERM grace; do not postpone its stop/ack.
+      // Observe the server window closely, but never resume until the real
+      // daemon cancellation reached this native process and closed its gate.
       await delay(now - baselineAt >= 44 * 60_000 ? 500 : 5_000, undefined, { signal })
     }
-    await fault.resume()
     const latencyMs = assertServerWatchdogStop(stopped, baseline, task.sourceEventId)
     assert.ok(Date.now() - time(stopped.lastSeenAt) < 60_000, 'The server stop was actually an offline recovery')
     await record('server-stop-observed', { serverStoppedAt: stopped.watchdog.stoppedAt, stopRequestedAt: stopped.stopRequestedAt,
       detectionLatencyMs: latencyMs, maxHeartbeatAgeMs, minimumLeaseRemainingMs })
+    const localCancellation = await until(async () => {
+      const cancellation = await nativeTerminationState(nativeIdentity)
+      if (cancellation === 'SIGTERM' || cancellation === 'SIGINT') return cancellation
+      if (cancellation === 'exited' && ended.has((await run(original.id)).status)) return 'native-exited-and-host-acknowledged'
+      return null
+    })
+    await fault.resume()
     const acknowledged = await until(async () => { const value = await run(original.id); return ended.has(value.status) ? value : null })
+    assert.equal(acknowledged.stopReason, 'device_lost', 'The real daemon must acknowledge its server-revoked lease')
+    assert.equal(acknowledged.status, 'failed', 'A resumed successful execution is not a stop acknowledgement')
     assert.ok(time(acknowledged.finishedAt) >= time(stopped.stopRequestedAt))
-    await record('native-stop-acknowledged', { acknowledgedAt: acknowledged.finishedAt, stopReason: acknowledged.stopReason,
+    await record('native-stop-acknowledged', { acknowledgedAt: acknowledged.finishedAt, stopReason: acknowledged.stopReason, localCancellation,
       stopAcknowledgementMs: time(acknowledged.finishedAt) - time(stopped.stopRequestedAt) })
     const retry = await until(async () => {
       const children = await query('SELECT * FROM agent_runs WHERE "retryOf"=$1 AND "userId"=$2 ORDER BY "createdAt"', [original.id, ownerId])
@@ -209,5 +246,5 @@ This task exercises the host's existing stall recovery. Do not commit, push, cre
   } catch (error) {
     await record('failed', { status: 'failed', error: { name: error.name, code: error.code ?? null }, finishedAt: new Date().toISOString() })
     throw error
-  } finally { await fault?.resume() }
+  } finally { await cleanupNative() }
 }

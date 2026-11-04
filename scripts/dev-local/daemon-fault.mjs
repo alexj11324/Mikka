@@ -2,7 +2,6 @@
 // terminating the watched service or stopping Next/the independent cron.
 import assert from 'node:assert/strict'
 import { readFile, readdir, stat } from 'node:fs/promises'
-import { join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 
 export async function processTable() {
@@ -68,21 +67,110 @@ export async function suspendOwnedDaemon(identity) {
   } catch (error) { await resume(); throw error }
 }
 
-/** spawnCli records this numeric PGID under adapters/pids, outside the agent's
- * sandbox. Read only that run's process metadata, never its credential journal. */
-export async function nativeRunIdentity(daemonIdentity, { dataDir, runId, worktree }) {
-  assert.match(runId, /^[a-f0-9-]{36}$/)
-  const value = (await readFile(join(dataDir, 'adapters', 'pids', `${runId}.pgid`), 'utf8')).trim()
-  assert.match(value, /^[1-9][0-9]*$/, 'The owned native run needs its recorded process group')
+/** ClaudeAdapter.spawnBinary starts one CLI as a direct child, in the run's
+ * cwd, without a separate process group. Never read a credential journal or
+ * infer that the legacy spawnCli PID-file path applies to this SDK transport. */
+export async function nativeRunIdentity(daemonIdentity, { worktree, sessionId }) {
+  assert.ok(typeof sessionId === 'string' && sessionId.length, 'The actual run must already have a native session')
   const rows = await processTable()
   const owned = ownedDaemonGroups(rows, daemonIdentity)
-  const pid = Number(value), leader = owned.members.find(row => row.pid === pid)
-  assert.ok(leader && leader.pgid === pid && pid !== daemonIdentity.pid && pid !== daemonIdentity.daemonPid, 'Native PGID must be an isolated descendant of this daemon')
-  const [cwd, target] = await Promise.all([stat(`/proc/${pid}/cwd`), stat(worktree)])
-  assert.equal(cwd.dev, target.dev, 'Native process cwd is outside the current run worktree')
-  assert.equal(cwd.ino, target.ino, 'Native process cwd is outside the current run worktree')
-  const result = { pid, parentPid: leader.ppid, daemonPid: pid, start: leader.start,
+  const target = await stat(worktree)
+  const matches = (await Promise.all(owned.members.filter(row => row.ppid === daemonIdentity.daemonPid).map(async row => {
+    try { const cwd = await stat(`/proc/${row.pid}/cwd`); return cwd.dev === target.dev && cwd.ino === target.ino ? row : null }
+    catch { return null }
+  }))).filter(Boolean)
+  if (matches.length !== 1) throw Object.assign(new Error('The run must have exactly one live native child in its worktree'), { code: 'nativeCandidateNotUnique' })
+  const leader = matches[0]
+  return { pid: leader.pid, parentPid: leader.ppid, start: leader.start, processGroupId: leader.pgid, daemonProcessGroupId: owned.root.pgid,
     forbiddenPids: [...(daemonIdentity.forbiddenPids ?? []), daemonIdentity.pid, daemonIdentity.daemonPid] }
-  ownedDaemonGroups(rows, result)
-  return result
+}
+
+function descendantRows(rows, rootPid) {
+  const ids = new Set([rootPid])
+  for (let changed = true; changed;) {
+    changed = false
+    for (const row of rows) if (ids.has(row.ppid) && !ids.has(row.pid)) { ids.add(row.pid); changed = true }
+  }
+  return rows.filter(row => ids.has(row.pid))
+}
+
+/** Suspend individual verified PIDs: a Claude CLI may share the daemon PGID.
+ * Retain identities across reparenting and restore all remaining owned PIDs,
+ * even when an earlier child exited or a PID was reused. No negative PID signal. */
+export async function suspendNativeRun(identity) {
+  const initial = await processTable(), root = initial.find(row => row.pid === identity.pid)
+  assert.ok(root && root.ppid === identity.parentPid && root.start === identity.start, 'Native process identity changed before suspension')
+  const tracked = new Map()
+  const remember = rows => {
+    for (const row of rows) {
+      assert.ok(!identity.forbiddenPids.includes(row.pid), 'Refusing to suspend the daemon, server, runner or B')
+      if (tracked.has(row.pid)) assert.equal(tracked.get(row.pid).start, row.start, 'Native PID was reused')
+      tracked.set(row.pid, row)
+    }
+  }
+  remember(descendantRows(initial, identity.pid))
+  const currentOwned = async () => {
+    const current = await processTable(), result = [], reused = []
+    for (const saved of tracked.values()) {
+      const row = current.find(value => value.pid === saved.pid)
+      if (!row) continue
+      if (row.start !== saved.start) { reused.push(row.pid); continue }
+      result.push(row)
+    }
+    return { result, reused }
+  }
+  let restorePromise
+  const resume = () => restorePromise ??= (async () => {
+    const { result, reused } = await currentOwned(), errors = []
+    for (const row of result.sort((a, b) => Number(b.pid === identity.pid) - Number(a.pid === identity.pid))) {
+      try { process.kill(row.pid, 'SIGCONT') } catch (error) { if (error.code !== 'ESRCH') errors.push(error) }
+      if (row.pid === identity.pid) await delay(100)
+    }
+    if (reused.length || errors.length) throw new AggregateError(errors, 'Some native PIDs changed identity; all other owned processes were resumed')
+  })()
+  const terminate = async () => {
+    const { result, reused } = await currentOwned(), errors = []
+    for (const row of result.reverse()) {
+      try { process.kill(row.pid, 'SIGKILL') } catch (error) { if (error.code !== 'ESRCH') errors.push(error) }
+    }
+    if (reused.length || errors.length) throw new AggregateError(errors, 'Some native PIDs changed identity; all other owned processes were terminated')
+  }
+  try {
+    // Freeze the root first, then catch descendants that were already forking.
+    process.kill(identity.pid, 'SIGSTOP')
+    for (let round = 0; round < 8; round++) {
+      remember(descendantRows(await processTable(), identity.pid))
+      const { result, reused } = await currentOwned()
+      assert.equal(reused.length, 0)
+      for (const row of result) process.kill(row.pid, 'SIGSTOP')
+      await delay(20)
+      remember(descendantRows(await processTable(), identity.pid))
+      const stopped = await currentOwned()
+      if (stopped.result.some(row => row.pid === identity.pid) && stopped.result.every(row => ['T', 't', 'Z', 'X'].includes(row.state))) {
+        return { resume, terminate, processes: stopped.result.length, suspendedAt: new Date().toISOString(),
+          async assertSuspended() {
+            const check = await currentOwned()
+            assert.equal(check.reused.length, 0, 'A captured native PID was reused')
+            assert.ok(check.result.some(row => row.pid === identity.pid), 'Native root exited before the observed server stop')
+            assert.ok(check.result.every(row => ['T', 't', 'Z', 'X'].includes(row.state)), 'Native execution resumed before local cancellation')
+          } }
+      }
+    }
+    throw new Error('Native process tree did not reach a fully suspended state')
+  } catch (error) { await terminate(); throw error }
+}
+
+/** A pending TERM/INT proves the normal daemon cancellation reached this exact
+ * suspended CLI. A server DB stop flag alone is not proof its local gate closed. */
+export async function nativeTerminationState(identity) {
+  const row = (await processTable()).find(value => value.pid === identity.pid)
+  if (!row || ['Z', 'X'].includes(row.state)) return 'exited'
+  assert.equal(row.start, identity.start, 'Native PID was reused while awaiting cancellation')
+  const status = await readFile(`/proc/${identity.pid}/status`, 'utf8').catch(error => {
+    if (error.code === 'ENOENT') return null
+    throw error
+  })
+  if (status === null) return 'exited'
+  const pending = [...status.matchAll(/^(?:SigPnd|ShdPnd):\s+([a-f0-9]+)$/gmi)].reduce((mask, match) => mask | BigInt(`0x${match[1]}`), 0n)
+  return pending & (1n << 14n) ? 'SIGTERM' : pending & (1n << 1n) ? 'SIGINT' : null
 }
