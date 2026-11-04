@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
 import { z } from 'zod'
-import { DECISION_MODEL, decisionRequestInput, validatedAnswers, type DecisionContext, type DecisionQuestion } from '../coordinator/decision'
+import { validatedAnswers, type DecisionContext, type DecisionQuestion } from '../coordinator/decision'
+import { decisionModelIdentity, decisionRequestDigest } from '../coordinator/decision-wire'
 import type { DecisionExecution, invokeDecision } from '../coordinator/decide'
 
 const hash=(value:string|Buffer)=>createHash('sha256').update(value).digest('hex')
@@ -29,13 +30,13 @@ export async function judgeSkillEffect(pending:SkillEffectAssessment,input:Decis
   const unknown=(reason:string,execution:DecisionExecution|null=null)=>({...pending,scorer:EFFECT_SCORER,status:'pending' as const,outcome:'unknown' as const,
     improved:null,noRegression:null,reason,execution})
   try {
-    const request=JSON.stringify({model:DECISION_MODEL,input:decisionRequestInput(input),questions:EFFECT_QUESTIONS})
-    const result=await invoke('skill-effect-comparison',input,EFFECT_QUESTIONS)
+    const snapshot=structuredClone(input)
+    const result=await invoke('skill-effect-comparison',structuredClone(snapshot),structuredClone(EFFECT_QUESTIONS))
     if(!result)return unknown('decision_model_unavailable')
-    const execution=result.execution,images=input.images??[]
+    const execution=result.execution,images=snapshot.images??[]
     const imageDigests=images.map(image=>hash(Buffer.from(image.dataUrl.slice(image.dataUrl.indexOf(',')+1),'base64')))
-    if(!execution||!z.uuid().safeParse(execution.executionId).success||execution.modelId!==DECISION_MODEL||
-      !/^[a-zA-Z0-9_-]{1,200}$/.test(execution.providerGenerationId)||execution.requestDigest!==hash(request)||
+    if(!execution||!z.uuid().safeParse(execution.executionId).success||!decisionModelIdentity(execution)||
+      !/^[a-zA-Z0-9_-]{1,200}$/.test(execution.providerGenerationId)||execution.requestDigest!==decisionRequestDigest(execution,snapshot,EFFECT_QUESTIONS)||
       JSON.stringify(execution.imageDigests)!==JSON.stringify(imageDigests)||
       execution.vision!==(images.length?'image-input-submitted':'no-image-input')||
       !Number.isFinite(Date.parse(execution.startedAt))||!Number.isFinite(Date.parse(execution.completedAt))||

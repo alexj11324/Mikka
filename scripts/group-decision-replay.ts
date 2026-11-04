@@ -1,4 +1,5 @@
 import { writeFileSync } from 'node:fs'
+import { assertFlashTestModel } from './test-model-policy.mjs'
 import { pathToFileURL } from 'node:url'
 import { GROUP_BASELINE_VERSION, GROUP_POLICY_VERSION } from '../lib/coordinator/group-decision-policy'
 import { GROUP_REPLAY_CASE_IDS, GROUP_REPLAY_COMPARISON_VERSION, GROUP_REPLAY_DATASET, GROUP_REPLAY_DATASET_DIGEST, groupReplayAbstained, groupReplayCompleted, summarizeGroupDecisionReplay, type GroupDecisionReplay } from '../lib/coordinator/group-decision-replay'
@@ -25,7 +26,7 @@ export async function runGroupDecisionReplay({env=process.env,fetchImpl=fetch}:{
   }
   const version=async()=>{
     const {response,data}=await request('/api/version')
-    if(!response.ok || (data as {build?:unknown}|null)?.build!==deployment)throw Error('replay_deployment_changed')
+    if(!response.ok || (data as {build?:unknown}|null)?.build!==revision || (data as {deploymentId?:unknown}|null)?.deploymentId!==deployment)throw Error('replay_deployment_changed')
   }
   const report={schemaVersion:1,comparisonVersion:GROUP_REPLAY_COMPARISON_VERSION,evidenceKind:'actual-decision-inference' as const,dataset:GROUP_REPLAY_DATASET,datasetDigest:GROUP_REPLAY_DATASET_DIGEST,
     deploymentId:deployment,revision,conversationId,startedAt:new Date().toISOString(),finishedAt:'',status:'running',error:null as string|null,
@@ -46,6 +47,7 @@ export async function runGroupDecisionReplay({env=process.env,fetchImpl=fetch}:{
         // to the next fixed case once; never retry it or select another provider.
         // A service/auth failure or missing primary evidence still stops work.
         const primary=groupDecisionReceipt(row.receipt ?? undefined)
+        if(primary)assertFlashTestModel(primary.modelId,'group-decision-replay')
         if(!response.ok || row.status==='unavailable' || !primary)throw Error('replay_decision_unavailable')
         const chain=groupDecisionSteps(row.decisions)
         if(row.decisionProtocol!==GROUP_DECISION_PROTOCOL || !Array.isArray(row.decisions) || !chain.length || chain.length!==row.decisions.length || chain.length>GROUP_MAX_ROUTING_DECISIONS
@@ -63,6 +65,7 @@ export async function runGroupDecisionReplay({env=process.env,fetchImpl=fetch}:{
           || !Number.isFinite(row.decisionCost?.knownUsd) || Math.abs(row.decisionCost.knownUsd-totals.decisionCost.knownUsd)>1e-9
           || (totals.decisionCostUsd===null?row.decisionCostUsd!==null:!Number.isFinite(row.decisionCostUsd) || Math.abs(row.decisionCostUsd!-totals.decisionCostUsd)>1e-9))throw Error('replay_chain_unbound')
         for(const step of chain){
+          if(step.receipt)assertFlashTestModel(step.receipt.modelId,'group-decision-replay')
           if(stepIds.has(step.id) || step.receipt && (executions.has(step.receipt.executionId) || generations.has(step.receipt.providerGenerationId)))throw Error('replay_chain_unbound')
           stepIds.add(step.id)
           if(step.receipt){executions.add(step.receipt.executionId);generations.add(step.receipt.providerGenerationId)}

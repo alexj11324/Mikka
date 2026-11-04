@@ -2,7 +2,8 @@ import { createHash } from 'node:crypto'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { compareGroupPolicies, type GroupEvalCase, type GroupEvalObservation } from '../lib/coordinator/group-decision-eval'
 import { GROUP_BASELINE_VERSION, GROUP_POLICY_VERSION } from '../lib/coordinator/group-decision-policy'
-import { DECISION_MODEL } from '../lib/coordinator/decision'
+import { LEGACY_DECISION_MODEL } from '../lib/coordinator/decision'
+import { assertFlashTestModel } from './test-model-policy.mjs'
 
 const args = process.argv.slice(2)
 const value = (flag: string) => { const index = args.indexOf(flag); return index >= 0 ? args[index + 1] : undefined }
@@ -14,7 +15,10 @@ const dataset = JSON.parse(bytes.toString()) as { version: string; cases: GroupE
 type Evidence = { policyVersion: string; datasetDigest: string; revision: string; evidenceKind: 'synthetic' | 'live' | 'historical'; modelId: string; observations: GroupEvalObservation[] }
 const read = (path: string): Evidence => {
   const evidence = JSON.parse(readFileSync(path, 'utf8')) as Evidence
-  if (evidence.datasetDigest !== datasetDigest || !['synthetic','live','historical'].includes(evidence.evidenceKind) || !evidence.policyVersion || !/^[a-f0-9]{40}$/.test(evidence.revision) || evidence.modelId !== DECISION_MODEL || !Array.isArray(evidence.observations)) throw new Error('Unbound or invalid evaluation evidence')
+  if (evidence.datasetDigest !== datasetDigest || !['synthetic','live','historical'].includes(evidence.evidenceKind) || !evidence.policyVersion || !/^[a-f0-9]{40}$/.test(evidence.revision) || !Array.isArray(evidence.observations)) throw new Error('Unbound or invalid evaluation evidence')
+  if(evidence.evidenceKind==='historical') {
+    if(evidence.modelId!==LEGACY_DECISION_MODEL)assertFlashTestModel(evidence.modelId,'group-decision-eval')
+  } else assertFlashTestModel(evidence.modelId,'group-decision-eval')
   return evidence
 }
 const baseline = read(baselinePath), candidate = read(candidatePath)

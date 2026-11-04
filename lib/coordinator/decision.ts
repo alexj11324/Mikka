@@ -1,6 +1,10 @@
-/** Existing vision-capable decision model and existing budgeted Gateway route. */
-export const DECISION_MODEL = 'openai/gpt-6-luna-decisions'
-export const DECISIONS_URL = 'https://ai-gateway.vercel.sh/v1/decisions'
+import { COORDINATOR_MODEL } from './model'
+
+/** The existing project default; explicit owner API preferences are resolved by the host. */
+export const DECISION_MODEL = COORDINATOR_MODEL
+/** Historical receipts keep their real model and wire protocol. Never sent by new calls. */
+export const LEGACY_DECISION_MODEL = 'openai/gpt-6-luna-decisions'
+export const DECISIONS_URL = 'https://ai-gateway.vercel.sh/v1/chat/completions'
 
 export type DecisionQuestion =
   | { type: 'predicate'; name: string; instructions: string }

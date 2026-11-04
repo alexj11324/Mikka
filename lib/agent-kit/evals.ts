@@ -2,7 +2,8 @@ import { z } from 'zod'
 import { createHash } from 'node:crypto'
 import { digest, type AgentDefinition } from './definition'
 import { AGENT_TOOL_IDS } from './registry'
-import { DECISION_MODEL, type DecisionImage } from '../coordinator/decision'
+import { type DecisionImage } from '../coordinator/decision'
+import { decisionModelIdentity } from '../coordinator/decision-wire'
 import type { DecisionExecution } from '../coordinator/decide'
 
 export const EVAL_RUNNER_VERSION = 'mikka.eval.v4'
@@ -31,7 +32,7 @@ export interface SemanticEvidence extends SemanticVerdict {
 export interface EvalResult { caseId: string; passed: boolean; failures: string[]; semantic?: SemanticEvidence }
 const hashPattern = /^[a-f0-9]{64}$/
 const validExecution = (execution: DecisionExecution | undefined) => Boolean(execution &&
-  /^[a-f0-9-]{36}$/.test(execution.executionId) && execution.modelId === DECISION_MODEL &&
+  /^[a-f0-9-]{36}$/.test(execution.executionId) && decisionModelIdentity(execution) &&
   /^[a-zA-Z0-9_-]{1,200}$/.test(execution.providerGenerationId) && hashPattern.test(execution.requestDigest) &&
   Number.isFinite(Date.parse(execution.startedAt)) && Date.parse(execution.completedAt) >= Date.parse(execution.startedAt) &&
   Array.isArray(execution.imageDigests) && execution.imageDigests.every(value => hashPattern.test(value)) &&

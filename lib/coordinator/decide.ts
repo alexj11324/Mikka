@@ -1,8 +1,9 @@
-import { gatewayCost,gatewayGenerationId } from '@/lib/abuse/policy'
+import { gatewayCost } from '@/lib/abuse/policy'
 import 'server-only'
-import { gatewayAuth } from '@/lib/ai-gateway-auth'
 import { createHash, randomUUID } from 'node:crypto'
-import { validatedAnswers, decisionRequestInput, DECISION_MODEL, DECISIONS_URL, type DecisionInput, type DecisionQuestion, type DecisionAnswer } from './decision'
+import { validatedAnswers, decisionRequestInput, DECISION_MODEL, type DecisionInput, type DecisionQuestion, type DecisionAnswer } from './decision'
+import { decisionRequestBody, decisionResponseEnvelope, type DecisionTransport } from './decision-wire'
+import { selectDecisionRoute } from './decision-model'
 
 const DECISION_TIMEOUT_MS = 5000
 const hash = (value: string) => createHash('sha256').update(value).digest('hex')
@@ -11,7 +12,10 @@ const hash = (value: string) => createHash('sha256').update(value).digest('hex')
  * Submitted pixels and a provider receipt do not prove visual understanding. */
 export interface DecisionExecution {
   executionId: string
-  modelId: typeof DECISION_MODEL
+  /** Actual provider envelope model, required to equal the outgoing model. */
+  modelId: string
+  /** Absent only on genuine historical Decisions receipts. */
+  transport?: DecisionTransport
   providerGenerationId: string
   startedAt: string
   completedAt: string
@@ -19,82 +23,92 @@ export interface DecisionExecution {
   imageDigests: string[]
   vision: 'image-input-submitted' | 'no-image-input'
 }
-/** Existing gateway/budget only. No alternate provider, program judgment or human-approval fallback. */
-export async function invokeDecision(purpose: string, input: DecisionInput, questions: DecisionQuestion[], signal?: AbortSignal, diagnostics?: {retainInvalidReceipt:true}) {
+export interface DecisionDiagnostics {
+  retainInvalidReceipt?: true
+  /** A host-owned acceptance constraint, never supplied by the HTTP client. */
+  requireFlash?: true
+}
+/** One frozen, authorized transport. No model fallback or retry. */
+export async function invokeDecision(purpose: string, input: DecisionInput, questions: DecisionQuestion[], signal?: AbortSignal, diagnostics?: DecisionDiagnostics) {
   'use step'
   if (signal?.aborted) return null
-  // The app's one gateway credential (lib/ai-gateway-auth.ts), the same the Coordinator's model uses.
-  const key = (await gatewayAuth())?.token
-  if (!key) { console.error('Decision unavailable', { purpose: 'no-gateway-auth' }); return null }
   const { hostedBillingScope } = await import('@/lib/abuse/context')
   const scope = hostedBillingScope.getStore()
   if (!scope) return null
+  let route: Awaited<ReturnType<typeof selectDecisionRoute>>
+  try { route = await selectDecisionRoute(scope) } catch { return null }
+  if (!route) { console.error('Decision unavailable', { purpose: 'no-gateway-auth' }); return null }
+  if (diagnostics?.requireFlash) {
+    const { assertFlashTestModel } = await import('../../scripts/test-model-policy.mjs')
+    assertFlashTestModel(route.modelId, 'group-decision-replay')
+  }
+  const identity = { modelId: route.modelId, transport: route.transport }
   const { assertUnmanagedModelTransport } = await import('@/lib/model-admission/runtime')
-  await assertUnmanagedModelTransport(scope, DECISION_MODEL, signal)
-  const usage = await import('@/lib/abuse/runtime')
+  await assertUnmanagedModelTransport(scope, route.modelId, signal)
+  const hosted = route.transport === 'gateway-chat-completions'
+  const usage = hosted ? await import('@/lib/abuse/runtime') : null
   const callId = randomUUID()
-  // Like every hosted call (lib/abuse/model.ts): the workspace's own balance first, then shared credits.
-  const { withSharedCredits } = await import('@/lib/credit-shares')
-  await withSharedCredits(scope.workspaceId, usage.canUseMikkaPaid)
-  await withSharedCredits(scope.workspaceId, payer => usage.hostedUsage.reserve(payer, DECISION_MODEL, callId))
-  let requestStarted = false
+  if (usage) {
+    const { withSharedCredits } = await import('@/lib/credit-shares')
+    await withSharedCredits(scope.workspaceId, usage.canUseMikkaPaid)
+    await withSharedCredits(scope.workspaceId, payer => usage.hostedUsage.reserve(payer, route!.modelId, callId))
+  }
+  let requestStarted = false, settled = false
   try {
-    const requestInput = decisionRequestInput(input)
-    const requestedQuestions = structuredClone(questions)
-    const body = JSON.stringify({ model: DECISION_MODEL, input: requestInput, questions: requestedQuestions })
-    // Snapshot the same normalized bytes as body before yielding to I/O. The
-    // caller may mutate its image objects while this request is in flight.
-    const imageDigests = typeof requestInput === 'string' ? [] : requestInput.flatMap(message => message.content.flatMap(part => part.type === 'input_image'
+    const requestedInput = structuredClone(input), requestedQuestions = structuredClone(questions)
+    const normalized = decisionRequestInput(requestedInput)
+    const body = decisionRequestBody(identity, requestedInput, requestedQuestions)
+    // Same snapshot as the serialized request; mutations during IO cannot
+    // replace questions, pixels or the requested model in the receipt.
+    const imageDigests = typeof normalized === 'string' ? [] : normalized.flatMap(message => message.content.flatMap(part => part.type === 'input_image'
       ? [createHash('sha256').update(Buffer.from(part.image_url.slice(part.image_url.indexOf(',') + 1), 'base64')).digest('hex')]
       : []))
-    const executionId = randomUUID(), startedAt = new Date().toISOString()
-    await assertUnmanagedModelTransport(scope, DECISION_MODEL, signal)
+    const credential = await route.authorize()
+    await assertUnmanagedModelTransport(scope, route.modelId, signal)
     if (signal?.aborted) throw new DOMException('Model request cancelled', 'AbortError')
+    const executionId = randomUUID(), startedAt = new Date().toISOString()
     requestStarted = true
-    const response = await fetch(DECISIONS_URL, {
-      method: 'POST',
-      redirect: 'error',
-      headers: { Authorization: 'Bearer ' + key, 'Content-Type': 'application/json' },
+    const response = await fetch(credential.url, {
+      method: 'POST', redirect: 'error',
+      headers: { Authorization: 'Bearer ' + credential.token, 'Content-Type': 'application/json' },
       body,
       signal: AbortSignal.any([AbortSignal.timeout(DECISION_TIMEOUT_MS), ...(signal ? [signal] : [])]),
     })
     if (!response.ok) { await response.body?.cancel(); throw Error('decisionProviderUnavailable') }
     const payload: unknown = await response.json()
-    {
-      const receipt = payload as {provider_metadata?:unknown}
-      await usage.hostedUsage.settle(callId,gatewayCost(receipt.provider_metadata),0,0,gatewayGenerationId(receipt.provider_metadata))
+    const envelope = decisionResponseEnvelope(payload, identity)
+    if (usage) {
+      const receipt = payload as { provider_metadata?: unknown; id?: unknown }
+      // Chat Completions returns the Gateway generation as the real response
+      // id. Missing cost is unknown and can be reconciled by that id later.
+      const generation = typeof receipt.id === 'string' && /^[a-zA-Z0-9_-]{1,200}$/.test(receipt.id) ? receipt.id : undefined
+      await usage.hostedUsage.settle(callId, gatewayCost(receipt.provider_metadata), 0, 0, generation)
+      settled = true
       await (await import('@/lib/abuse/alerts')).checkAbuseAlerts()
     }
-    const answers = validatedAnswers(payload, requestedQuestions)
-    // These fields come from the response envelope, not an answer or input.
-    const metadata = payload as { model?: unknown; provider_metadata?: { gateway?: { generationId?: unknown } } }
-    const generation = metadata?.provider_metadata?.gateway?.generationId
-    if (signal?.aborted || metadata.model !== DECISION_MODEL || typeof generation !== 'string' || !/^[a-zA-Z0-9_-]{1,200}$/.test(generation)) return null
+    if (signal?.aborted || !envelope) return null
+    const answers = validatedAnswers(envelope.answers, requestedQuestions)
     if (!answers && !diagnostics?.retainInvalidReceipt) return null
     const execution: DecisionExecution = {
-      executionId, modelId: DECISION_MODEL, providerGenerationId: generation,
+      executionId, modelId: envelope.modelId, transport: route.transport, providerGenerationId: envelope.generationId,
       startedAt, completedAt: new Date().toISOString(), requestDigest: hash(body),
       imageDigests, vision: imageDigests.length ? 'image-input-submitted' : 'no-image-input',
     }
-    // Host-only group diagnostics opt in to retaining a paid invalid response.
-    // No usable answer is exposed; the default contract of all other callers
-    // (including decide/callDecisionRequest) remains null for invalid answers.
     return { answers: answers ?? new Map<string,Exclude<DecisionAnswer,{type:'refusal'}>>(), execution, ...(answers ? {} : {validationFailure:'invalid_response' as const}) }
   } catch {
-    await usage.hostedUsage.settle(callId,requestStarted ? null : 0)
-    // No upstream text, credentials, image bytes or untrusted purpose in logs.
+    // BYOK has no Mikka reservation or charge; its external cost stays unknown.
+    if (usage && !settled) await usage.hostedUsage.settle(callId, requestStarted ? null : 0)
     console.error('Decision unavailable', { purpose: purpose.replace(/[^a-z0-9_-]/gi, '').slice(0, 80) })
     return null
   }
 }
-/** Compatibility for callers that need answers only. Use invokeDecision when
- * binding a downstream operation/evaluation to the actual model invocation. */
+/** Compatibility for callers that need answers only. */
 export async function decide(purpose: string, input: DecisionInput, questions: DecisionQuestion[], signal?: AbortSignal) {
   return (await invokeDecision(purpose, input, questions, signal))?.answers ?? null
 }
 
-/** Structural adapter for existing server-owned consumers (for example the
- * monitor owner). This is not an HTTP/client approval or permission endpoint. */
+/** A server-owned logical request. The host resolves the actual authorized
+ * API preference; this is not an HTTP/client model override. */
 export interface DecisionTransportRequest {
   model: typeof DECISION_MODEL
   input: Array<{ type: 'input_text'; text: string } | { type: 'input_image'; image_url: string }>

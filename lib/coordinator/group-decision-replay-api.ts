@@ -30,7 +30,7 @@ export async function handleGroupDecisionReplay(pool:Pool,directory:Directory,re
     const {rows:[group]}=await client.query(`SELECT c."workspaceId" FROM conversations c JOIN conversation_members m ON m."conversationId"=c.id
       WHERE c.id=$1 AND c.kind='group' AND m."memberType"='user' AND m."memberId"=$2 AND m."leftAt" IS NULL FOR SHARE OF c`,[req.conversationId,req.userId])
     if(!group || !await directory(group.workspaceId,req.userId,[]))return finish(404,{error:'not_found'})
-    const result=await hostedBillingScope.run({workspaceId:group.workspaceId,ownerId:req.userId},()=>replayGroupDecision(parsed.data.caseId,parsed.data.policyVersion,(purpose,input,questions,_signal,diagnostics)=>invoke(purpose,input,questions,req.signal,diagnostics)))
+    const result=await hostedBillingScope.run({workspaceId:group.workspaceId,ownerId:req.userId},()=>replayGroupDecision(parsed.data.caseId,parsed.data.policyVersion,(purpose,input,questions,_signal,diagnostics)=>invoke(purpose,input,questions,req.signal,{...diagnostics,requireFlash:true})))
     result.decisions=await priceGroupDecisions(client,result.decisions)
     Object.assign(result,groupDecisionTotals(result.decisions))
     if(!await directory(group.workspaceId,req.userId,[]))return finish(404,{error:'not_found'})

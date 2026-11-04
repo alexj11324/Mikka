@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic'
  */
 export function GET() {
   return NextResponse.json(
-    { build: APP_BUILD, minMobileBuild: MIN_MOBILE_BUILD, mobileUpdateUrl: MOBILE_UPDATE_URL, minDesktopVersion: minDesktopVersion(process.env.MIN_CLIENT_VERSION) },
+    { build: APP_BUILD, deploymentId: process.env.VERCEL_DEPLOYMENT_ID ?? null, minMobileBuild: MIN_MOBILE_BUILD, mobileUpdateUrl: MOBILE_UPDATE_URL, minDesktopVersion: minDesktopVersion(process.env.MIN_CLIENT_VERSION) },
     { headers: { 'Cache-Control': 'no-store, max-age=0' } },
   )
 }

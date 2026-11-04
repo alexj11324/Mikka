@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { DECISION_MODEL } from '../coordinator/decision'
+import { decisionModelIdentity } from '../coordinator/decision-wire'
 import { digest, ImprovementError } from './contract'
 import { EFFECT_SCORER, type SkillEffectAssessment } from './semantic-assessment'
 import type { RegisteredAssessment, RegisteredSkillEvaluator } from './registered-evaluation'
@@ -31,7 +31,7 @@ export function isModelEvaluationResult(value:unknown):value is ModelEvaluationR
     s.improved===(s.outcome==='improved')&&s.noRegression===(s.outcome!=='regressed')&&
     r.passed===(s.improved===true&&s.noRegression===true)&&sha(s.evidenceDigest)&&
     sha(s.artifactBaselineSha256)&&sha(s.artifactCandidateSha256)&&sha(r.comparisonSnapshotDigest)&&
-    !!e&&z.uuid().safeParse(e.executionId).success&&e.modelId===DECISION_MODEL&&
+    !!e&&z.uuid().safeParse(e.executionId).success&&decisionModelIdentity(e)&&
     typeof e.providerGenerationId==='string'&&/^[a-zA-Z0-9_-]{1,200}$/.test(e.providerGenerationId)&&sha(e.requestDigest)&&
     Number.isFinite(Date.parse(e.startedAt))&&Number.isFinite(Date.parse(e.completedAt))&&
     Date.parse(e.startedAt)<=Date.parse(e.completedAt)&&Array.isArray(e.imageDigests)&&

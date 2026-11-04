@@ -41,15 +41,16 @@ export async function runGroupProductionAcceptance({ env = process.env, fetchImp
   }
   async function version() {
     const data = await json('/api/version')
-    check(data?.build === report.deploymentId, 'acceptance_deployment_changed')
+    check(data?.build === report.revision && data?.deploymentId === report.deploymentId, 'acceptance_deployment_changed')
   }
   function observeDecisions(turn, quality) {
     const token = value => typeof value === 'string' && /^[A-Za-z0-9_.:-]{1,180}$/.test(value) ? value : null
+    const flashModel = model => { try { assertFlashTestModel(model, 'group-production-decision'); return true } catch { return false } }
     const receipt = value => value && token(value.executionId) && token(value.providerGenerationId)
-      && value.modelId === 'openai/gpt-6-luna-decisions' && /^[a-f0-9]{64}$/.test(value.requestDigest ?? '')
+      && ['gateway-chat-completions','api-responses'].includes(value.transport) && flashModel(value.modelId) && /^[a-f0-9]{64}$/.test(value.requestDigest ?? '')
       && Number.isFinite(Date.parse(value.startedAt)) && Number.isFinite(Date.parse(value.completedAt))
       && Date.parse(value.completedAt) >= Date.parse(value.startedAt)
-      ? { executionId: value.executionId, providerGenerationId: value.providerGenerationId, modelId: value.modelId,
+      ? { executionId: value.executionId, providerGenerationId: value.providerGenerationId, modelId: value.modelId, transport: value.transport,
         requestDigest: value.requestDigest, startedAt: value.startedAt, completedAt: value.completedAt,
         imageDigests: (Array.isArray(value.imageDigests) ? value.imageDigests : []).filter(item => typeof item === 'string' && /^[a-f0-9]{64}$/.test(item)).slice(0,8),
         vision: value.vision === 'image-input-submitted' ? value.vision : 'no-image-input' } : null

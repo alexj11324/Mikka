@@ -3,10 +3,9 @@ import { createHash, randomUUID } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
 import { z } from "zod";
 import { orchestratorSettings } from "@mikka/protocol/orchestrator";
-import { gatewayAuth } from "../ai-gateway-auth";
+import { decisionModelIdentity, decisionRequestDigest } from "../coordinator/decision-wire";
 import { invokeDecision, type DecisionExecution } from "../coordinator/decide";
 import {
-  DECISION_MODEL,
   decisionRequestInput,
   type DecisionContext,
   type DecisionImage,
@@ -87,17 +86,17 @@ function imageSource({artifact,runId,sessionId,candidateId,sha,observedAt}:Facto
 }
 function receiptMatches(
   execution: DecisionExecution,
-  digest: string,
+  context: DecisionContext,
   images: string[],
   startedAfter: number,
 ) {
   return (
     execution &&
     z.uuid().safeParse(execution.executionId).success &&
-    execution.modelId === DECISION_MODEL &&
+    decisionModelIdentity(execution) &&
     typeof execution.providerGenerationId === "string" &&
     /^[a-zA-Z0-9_-]{1,200}$/.test(execution.providerGenerationId) &&
-    execution.requestDigest === digest &&
+    execution.requestDigest === decisionRequestDigest(execution, context, questions) &&
     isDeepStrictEqual(execution.imageDigests, images) &&
     execution.vision ===
       (images.length ? "image-input-submitted" : "no-image-input") &&
@@ -250,11 +249,10 @@ export function createFactoryCheckRecovery(
         images: collected.images.map(({ image }) => ({ ...image })),
         requiresVisual: collected.requiresVisual,
       };
-      let requestDigest: string, imageDigests: string[];
+      let inputDigest: string, imageDigests: string[];
       try {
-        requestDigest = hash(
+        inputDigest = hash(
           JSON.stringify({
-            model: DECISION_MODEL,
             input: decisionRequestInput(context),
             questions,
           }),
@@ -282,7 +280,7 @@ export function createFactoryCheckRecovery(
         token,
         tries,
         expiresAt: new Date(startedAfter + 10000).toISOString(),
-        requestDigest,
+        inputDigest,
         imageDigests,
         imageSources,
         observationDigest,
@@ -304,7 +302,7 @@ export function createFactoryCheckRecovery(
         kind: "invoke",
         botId: task.botId,
         context,
-        requestDigest,
+        inputDigest,
         imageDigests,
         imageSources,
         token,
@@ -315,8 +313,8 @@ export function createFactoryCheckRecovery(
     if (prepared.kind === "done") return prepared.done;
     let result: Awaited<ReturnType<typeof invokeDecision>> = null;
     try {
-      const call = () => invoke("factory-check-recovery", prepared.context, questions, signal);
-      if (invoke !== invokeDecision || !(await gatewayAuth())) result = await call();
+      const call = () => invoke("factory-check-recovery", structuredClone(prepared.context), structuredClone(questions), signal);
+      if (invoke !== invokeDecision) result = await call();
       else {
         const [{ hostedBillingScope }, { executionWorkspace }, { lockCliTaskScope }] = await Promise.all([
           import('../abuse/context'), import('../execution-settings'), import('../agent-tool-approval/policy-store'),
@@ -346,7 +344,7 @@ export function createFactoryCheckRecovery(
       result &&
       receiptMatches(
         result.execution,
-        prepared.requestDigest,
+        prepared.context,
         prepared.imageDigests,
         prepared.startedAfter,
       ) &&
@@ -452,7 +450,8 @@ export function createFactoryCheckRecovery(
             input: { binding, choice },
             execution,
             answer,
-            requestDigest: prepared.requestDigest,
+            inputDigest: prepared.inputDigest,
+            requestDigest: execution.requestDigest,
             imageDigests: prepared.imageDigests,
             imageSources: prepared.imageSources,
             ...(sdkToolCallId ? { sdkToolCallId } : {}),
@@ -469,4 +468,4 @@ export function createFactoryCheckRecovery(
   };
 }
 export const FACTORY_CHECK_RECOVERY_INSTRUCTIONS = `
-Use recover_factory_check with only the current binding. The host invokes the existing vision-capable Decisions model over original persisted evidence. It chooses retry_check, repair_code or defer. No fixed error classifier or universal new-commit/human-confirmation rule applies. Visual judgments require actual collected pixels. Missing/refused/mismatched results keep the observation pending. Existing grants, ask/deny, identity, cancellation, budgets and sandbox remain authoritative. No model answer grants permission or publication authority.`;
+Use recover_factory_check with only the current binding. The host invokes the configured Decision model over original persisted evidence. It chooses retry_check, repair_code or defer. No fixed error classifier or universal new-commit/human-confirmation rule applies. Visual judgments require actual collected pixels. Missing/refused/mismatched results keep the observation pending. Existing grants, ask/deny, identity, cancellation, budgets and sandbox remain authoritative. No model answer grants permission or publication authority.`;
