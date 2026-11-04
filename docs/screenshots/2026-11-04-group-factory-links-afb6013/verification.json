@@ -1,0 +1,157 @@
+{
+  "sourceCommit": "afb60130270ab08a740a4fdcc4c1f0a885ed5fe1",
+  "sourceTree": "a7e46d48e307706463766b8e4362467ab2367bbd",
+  "manifestSha256": "4e1449aaa706c4a84c50af583c7847b3bc838a44fe1b50cde926175be4c2bc42",
+  "images": [
+    {
+      "name": "zh-group-1440-light.png",
+      "bytes": 60036,
+      "width": 1440,
+      "height": 960,
+      "sha256": "9c81a7d6b8582a420459a202ba458efb79ea912cd507690a3834d8331a320446",
+      "visuallyReviewed": true
+    },
+    {
+      "name": "zh-group-1440-dark.png",
+      "bytes": 68796,
+      "width": 1440,
+      "height": 960,
+      "sha256": "a51cc95e82d3cc937332a5c968928ffd736040be41a29fbf45e84b59ce1a82bb",
+      "visuallyReviewed": true
+    },
+    {
+      "name": "zh-group-390-light.png",
+      "bytes": 28274,
+      "width": 390,
+      "height": 844,
+      "sha256": "04429e8696887ee2621eda2408d229c10bc672875527f476b53d523713b3225f",
+      "visuallyReviewed": true
+    },
+    {
+      "name": "zh-group-390-dark.png",
+      "bytes": 29194,
+      "width": 390,
+      "height": 844,
+      "sha256": "7bd54e967c08c3ff5f4c4d8e499d96760f45551eaaee0a764f9a29c7561b015c",
+      "visuallyReviewed": true
+    },
+    {
+      "name": "en-group-1440-light.png",
+      "bytes": 66100,
+      "width": 1440,
+      "height": 960,
+      "sha256": "84e3ed1b66ccb17f5a2a9b31a1fa38d416fba64cf8f333866949f66985527055",
+      "visuallyReviewed": true
+    },
+    {
+      "name": "en-group-1440-dark.png",
+      "bytes": 66453,
+      "width": 1440,
+      "height": 960,
+      "sha256": "3d7d9acb7c16fff65a2e51b7cba3c40a03d8c1fcb349a5f598185058aaa8d0b6",
+      "visuallyReviewed": true
+    },
+    {
+      "name": "en-group-390-light.png",
+      "bytes": 27416,
+      "width": 390,
+      "height": 844,
+      "sha256": "06f733c7e430cb539ecabaeb5e49482642a0f3b1db24079486ce9bc33a2701e1",
+      "visuallyReviewed": true
+    },
+    {
+      "name": "en-group-390-dark.png",
+      "bytes": 28276,
+      "width": 390,
+      "height": 844,
+      "sha256": "68d1ccfc439b110f64d3752531a2e6da5cd7a054a141c432acd5fe7dda2744b0",
+      "visuallyReviewed": true
+    },
+    {
+      "name": "en-opened-task-1440-light.png",
+      "bytes": 91204,
+      "width": 1440,
+      "height": 960,
+      "sha256": "09fa9063e138fbb59a52a4591f60dbc6514961353656f4a019dfa44259bd08ed",
+      "visuallyReviewed": true
+    },
+    {
+      "name": "en-opened-thread-1440-light.png",
+      "bytes": 102918,
+      "width": 1440,
+      "height": 960,
+      "sha256": "502e85473a78c0f4677f4275a709475590ddc971be8dbb96f36da44c8d494ec3",
+      "visuallyReviewed": true
+    }
+  ],
+  "checks": [
+    {
+      "name": "normal-group-owner-and-peer",
+      "owner": 200,
+      "peer": 404,
+      "groupTurns": 0
+    },
+    {
+      "name": "click-task",
+      "issueId": "0e432505-d086-4fff-9323-0c22bff24e10"
+    },
+    {
+      "name": "click-thread",
+      "issueId": "0e432505-d086-4fff-9323-0c22bff24e10",
+      "runId": "87e918aa-78ed-4d36-8ee2-13820850008f"
+    }
+  ],
+  "cleanup": {
+    "resourcesRemoved": true,
+    "leaseState": "quarantined",
+    "reason": "Browser reads and view state keep the account pair quarantined.",
+    "at": "2026-11-04T19:15:30.457Z"
+  },
+  "consoleErrors": [],
+  "httpFailures": [],
+  "buildResult": {
+    "code": 0,
+    "sha": "afb60130270ab08a740a4fdcc4c1f0a885ed5fe1"
+  },
+  "logDigests": [
+    {
+      "name": "mikka-group-links-build.log",
+      "bytes": 9689,
+      "sha256": "92cad4058e83f0021f7f5f0699092032727f995bfddc2853b3874cd35c24d976"
+    },
+    {
+      "name": "mikka-group-links-build.result.json",
+      "bytes": 60,
+      "sha256": "83126e9cf1e84816924438b5200cb7ff6c158bcac7e737ca3b301120312aff9d"
+    },
+    {
+      "name": "mikka-group-links-green.log",
+      "bytes": 4505,
+      "sha256": "9738b1bd7178a6a74a5c49328d9f87bfcbd62ca9110074560921c2e899e1e41b"
+    },
+    {
+      "name": "mikka-group-links-lint.log",
+      "bytes": 6269,
+      "sha256": "d21377cdff95e25e2eef3bee7230cf4900c28170bc87fe0e36420f8b6ed01246"
+    },
+    {
+      "name": "mikka-group-links-red.log",
+      "bytes": 3460,
+      "sha256": "c15acb7ee8605ab16b167a9c9b4186e1085f61a8271135c4a9f6480271be0aee"
+    },
+    {
+      "name": "mikka-group-links-typecheck.log",
+      "bytes": 81,
+      "sha256": "5c4396132729e5d9ff280a1b652c597586b63ebb9d34b2b4a2771e835cbbcdc8"
+    },
+    {
+      "name": "mikka-group-links-typegen.log",
+      "bytes": 115,
+      "sha256": "c3f59a4447b6ef8873b335dacd18ec1c3d5c5b114b5c9c4b06fb933caba13bf3"
+    }
+  ],
+  "limits": [
+    "Synthetic display records in isolated local PostgreSQL; actual production build, normal TestPool sessions and real links. No model/worker execution, browser test runner, route interception or production acceptance."
+  ],
+  "captureCorrection": "First landing screenshots preceded full content readiness and had incorrect zh filename metadata; final captures wait for actual content and record html.lang. Product source did not change."
+}

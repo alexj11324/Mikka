@@ -1,0 +1,153 @@
+{
+  "commit": "afb60130270ab08a740a4fdcc4c1f0a885ed5fe1",
+  "environmentId": "local-0d5ed208-9119-449f-b350-f23ef4bfe58a",
+  "origin": "http://localhost:3332",
+  "startedAt": "2026-11-04T18:57:28.769Z",
+  "captures": [
+    {
+      "name": "zh-group-1440-light.png",
+      "locale": "zh-CN",
+      "width": 1440,
+      "height": 960,
+      "scheme": "light",
+      "state": "group-links",
+      "at": "2026-11-04T18:57:33.632Z",
+      "sha256": "07830ab7f7a049639feefae51bbb07ced018324a655c625038a4d5894cd8b73f"
+    },
+    {
+      "name": "zh-group-1440-dark.png",
+      "locale": "zh-CN",
+      "width": 1440,
+      "height": 960,
+      "scheme": "dark",
+      "state": "group-links",
+      "at": "2026-11-04T18:57:34.331Z",
+      "sha256": "9647f9d6a855a277d76eafc14b4cfe58b6ac05e52504c340edb14ca312e72e33"
+    },
+    {
+      "name": "zh-group-390-light.png",
+      "locale": "zh-CN",
+      "width": 390,
+      "height": 844,
+      "scheme": "light",
+      "state": "group-links",
+      "at": "2026-11-04T18:57:34.928Z",
+      "sha256": "0008b31bbfa913967a96f9c131f86f5db871c807928dcd25e88957fdc369185a"
+    },
+    {
+      "name": "zh-group-390-dark.png",
+      "locale": "zh-CN",
+      "width": 390,
+      "height": 844,
+      "scheme": "dark",
+      "state": "group-links",
+      "at": "2026-11-04T18:57:36.031Z",
+      "sha256": "b29742506ec6cec3220fbdcf92ba959c0e8e8ad3489273b9b5800eaedf508cd5"
+    },
+    {
+      "name": "en-group-1440-light.png",
+      "locale": "en",
+      "width": 1440,
+      "height": 960,
+      "scheme": "light",
+      "state": "group-links",
+      "at": "2026-11-04T18:57:37.209Z",
+      "sha256": "c94b6fbe99030feee6e02f831401e4893eaaf177c0df2057aa7132dca5a1977b"
+    },
+    {
+      "name": "en-group-1440-dark.png",
+      "locale": "en",
+      "width": 1440,
+      "height": 960,
+      "scheme": "dark",
+      "state": "group-links",
+      "at": "2026-11-04T18:57:37.803Z",
+      "sha256": "2fae844b3995af4808fd2dbb9649c4d3d39760c0cb624c0503643539fe728ca6"
+    },
+    {
+      "name": "en-group-390-light.png",
+      "locale": "en",
+      "width": 390,
+      "height": 844,
+      "scheme": "light",
+      "state": "group-links",
+      "at": "2026-11-04T18:57:38.880Z",
+      "sha256": "06f733c7e430cb539ecabaeb5e49482642a0f3b1db24079486ce9bc33a2701e1"
+    },
+    {
+      "name": "en-group-390-dark.png",
+      "locale": "en",
+      "width": 390,
+      "height": 844,
+      "scheme": "dark",
+      "state": "group-links",
+      "at": "2026-11-04T18:57:39.395Z",
+      "sha256": "1ed34aff271c6c4b119617c53e6cb46a8910b38753c33c6bb64e44d83250dbe3"
+    },
+    {
+      "name": "zh-opened-task-1440-light.png",
+      "locale": "zh-CN",
+      "width": 1440,
+      "height": 960,
+      "scheme": "light",
+      "state": "opened-task",
+      "at": "2026-11-04T18:57:40.620Z",
+      "sha256": "e7656804835219806e9eb1a236c361b5242b386fccd6429cd4968a356d1975e1"
+    },
+    {
+      "name": "zh-opened-thread-1440-light.png",
+      "locale": "zh-CN",
+      "width": 1440,
+      "height": 960,
+      "scheme": "light",
+      "state": "opened-thread",
+      "at": "2026-11-04T18:57:41.766Z",
+      "sha256": "4d7e72eead072a1fdb618221ebe9e4a5392362125f15e33029771748d5b3b012"
+    }
+  ],
+  "checks": [
+    {
+      "name": "normal-group-owner-and-peer",
+      "owner": 200,
+      "peer": 404,
+      "groupTurns": 0
+    },
+    {
+      "name": "click-task",
+      "issueId": "8c7df73f-9f63-4c3d-a55f-54e7078bb8a7"
+    },
+    {
+      "name": "click-thread",
+      "issueId": "8c7df73f-9f63-4c3d-a55f-54e7078bb8a7",
+      "runId": "b1ca651a-5fb1-4fa9-aa50-8ffb72dcb136"
+    }
+  ],
+  "consoleErrors": [],
+  "httpFailures": [],
+  "fixture": {
+    "botId": "f1710e80-7ab0-4b77-94d3-70a9a81901ce",
+    "agentId": "04b64ecb-bdfd-41cb-a545-9847932768d1",
+    "issueId": "8c7df73f-9f63-4c3d-a55f-54e7078bb8a7",
+    "runId": "b1ca651a-5fb1-4fa9-aa50-8ffb72dcb136",
+    "replyId": "e8163052-1ef4-4eee-be48-528751ed859c",
+    "groupId": "afc59af3-497e-443c-8e6a-992dda7eec89"
+  },
+  "limits": [
+    "Synthetic display records in isolated local PostgreSQL; actual production build, normal TestPool sessions and real links. No model/worker execution, browser test runner, route interception or production acceptance."
+  ],
+  "finishedAt": "2026-11-04T18:57:41.772Z",
+  "audit": {
+    "files": 11,
+    "archives": 0,
+    "archiveEntries": 0,
+    "decodedBytes": 0,
+    "result": "passed",
+    "checked": "known credentials and cookies in raw files and decoded Playwright reports; traces and recordings forbidden"
+  },
+  "cleanup": {
+    "resourcesRemoved": true,
+    "leaseState": "quarantined",
+    "reason": "Browser reads and view state keep the account pair quarantined.",
+    "at": "2026-11-04T18:57:41.849Z"
+  }
+}
