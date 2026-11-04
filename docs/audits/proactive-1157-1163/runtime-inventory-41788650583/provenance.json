@@ -1,0 +1,138 @@
+{
+  "schemaVersion": 1,
+  "kind": "original-sanitized-runtime-inventory",
+  "workflow": {
+    "runId": 41788650583,
+    "jobId": 126436571109,
+    "headSha": "dc9e5e624485c8930ad439e7bdda18733a9e1c46",
+    "event": "push",
+    "runAttempt": 1,
+    "status": "completed",
+    "conclusion": "success",
+    "url": "https://github.com/alexj11324/Mikka/actions/runs/41788650583"
+  },
+  "artifact": {
+    "id": 13301488872,
+    "name": "runtime-capabilities-41788650583",
+    "createdAt": "2026-11-04T06:55:05Z",
+    "expiresAt": "2026-11-11T06:55:04Z",
+    "bytes": 760,
+    "sha256": "3ed49b70f2baaae5bfc542cdd2c3cd4d984890a99e4482f46c98240f40f7695e",
+    "gitBlob": "ce6bb7a3305611b508c67c2b301e7c9f7e266d2e",
+    "apiDigestMatched": true,
+    "originalEntry": "results.json"
+  },
+  "report": {
+    "path": "results.json",
+    "bytes": 1626,
+    "sha256": "27972b274cce59a704e3dbe662ada4b8bcee256a47f0aa645262565ce3d4521a",
+    "gitBlob": "0cb5c2d7af51a1db01f00435e788011f5c39aca1",
+    "rawBytesPreserved": true
+  },
+  "observed": {
+    "sourceRevision": "aa50444a0b5012d2d35ca730c3ca722c0057d596",
+    "deployment": "dpl_3w4SnCqaoFhayN8QCU6UGc4vuARw",
+    "versionBefore": "dpl_3w4SnCqaoFhayN8QCU6UGc4vuARw",
+    "versionAfter": "dpl_3w4SnCqaoFhayN8QCU6UGc4vuARw",
+    "startedAt": "2026-11-04T06:54:59.706Z",
+    "completedAt": "2026-11-04T06:55:04.025Z",
+    "getRequests": 6,
+    "normalSessionVerified": true,
+    "normalLogoutStatus": 200,
+    "sessionEnded": true
+  },
+  "driver": {
+    "originalHead": "7864751e77fd13a7d4ed791f20e412d6e54dd4a8",
+    "currentHead": "dc9e5e624485c8930ad439e7bdda18733a9e1c46",
+    "files": [
+      {
+        "ref": "7864751e77fd13a7d4ed791f20e412d6e54dd4a8",
+        "files": [
+          {
+            "path": "scripts/ops/runtime-capabilities.mjs",
+            "sha": "4d5ed4f98568d187862d9d491e159f7f18e543d6",
+            "size": 10546
+          },
+          {
+            "path": "scripts/ops/runtime-capabilities.test.mjs",
+            "sha": "97dc28964bb473b47587cfec0ed7e838b5f93a5f",
+            "size": 6333
+          },
+          {
+            "path": "scripts/ops/subscription-inventory.mjs",
+            "sha": "ab182c5cc9f3ebb22bb3c398d108bad77bfca4ae",
+            "size": 13523
+          },
+          {
+            "path": "scripts/ops/subscription-inventory.test.mjs",
+            "sha": "9e60b1cf9f085a25168cadeec6816dc31d867104",
+            "size": 8562
+          }
+        ]
+      },
+      {
+        "ref": "dc9e5e624485c8930ad439e7bdda18733a9e1c46",
+        "files": [
+          {
+            "path": "scripts/ops/runtime-capabilities.mjs",
+            "sha": "4d5ed4f98568d187862d9d491e159f7f18e543d6",
+            "size": 10546
+          },
+          {
+            "path": "scripts/ops/runtime-capabilities.test.mjs",
+            "sha": "97dc28964bb473b47587cfec0ed7e838b5f93a5f",
+            "size": 6333
+          },
+          {
+            "path": "scripts/ops/subscription-inventory.mjs",
+            "sha": "a349cf5be42d387a4aa69a99d6f11cbb0e48c4a1",
+            "size": 13523
+          },
+          {
+            "path": "scripts/ops/subscription-inventory.test.mjs",
+            "sha": "9e60b1cf9f085a25168cadeec6816dc31d867104",
+            "size": 8562
+          }
+        ]
+      }
+    ],
+    "sharedHelperChanges": [
+      {
+        "line": 7,
+        "before": "  revision: '5f85c458893868b721e6ab5a3a4f60a91a5905d1',",
+        "after": "  revision: 'aa50444a0b5012d2d35ca730c3ca722c0057d596',"
+      },
+      {
+        "line": 8,
+        "before": "  deployment: 'dpl_A5g2M3b3yGTXgc7i1d4nGGmhbj2g',",
+        "after": "  deployment: 'dpl_3w4SnCqaoFhayN8QCU6UGc4vuARw',"
+      }
+    ],
+    "logicUnchanged": true,
+    "offlineContracts": {
+      "passedReportedByRoot": 10,
+      "workflowStep": "success",
+      "rerunDuringArchival": false
+    }
+  },
+  "verification": {
+    "downloadMethod": "GitHub workflow-artifact download tool; reusable file reference read in existing owned sandbox",
+    "byteVerificationCommand": "cmd_ea4c6bf911f04a269c8fcf61f67f",
+    "independentGitBlobHashCommand": "cmd_3fc4a297b990456f8a0551cc95e8",
+    "zipApiDigestMatched": true,
+    "noNewProductionRequestsDuringArchival": true
+  },
+  "interpretation": {
+    "inventoryPassed": true,
+    "existingGithubRepositoryAuthorizationObserved": false,
+    "repositoryWritePermissionProven": false,
+    "cloudToDeviceAccepted": false,
+    "deviceToCloudAccepted": false,
+    "productionFaultPerformed": false,
+    "modelCalls": 0,
+    "newCloudCreated": false,
+    "newDevicePaired": false,
+    "newGithubGrant": false,
+    "scope": "One normal Smoke owner session and its visible existing resources at the recorded observation time."
+  }
+}

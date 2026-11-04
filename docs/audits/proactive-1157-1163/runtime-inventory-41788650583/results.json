@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "status": "passed",
+  "sourceRevision": "aa50444a0b5012d2d35ca730c3ca722c0057d596",
+  "expectedDeployment": "dpl_3w4SnCqaoFhayN8QCU6UGc4vuARw",
+  "startedAt": "2026-11-04T06:54:59.706Z",
+  "completedAt": "2026-11-04T06:55:04.025Z",
+  "versionBefore": "dpl_3w4SnCqaoFhayN8QCU6UGc4vuARw",
+  "versionAfter": "dpl_3w4SnCqaoFhayN8QCU6UGc4vuARw",
+  "getRequests": 6,
+  "authentication": {
+    "loginStatus": 200,
+    "sessionVerified": true,
+    "signOutStatus": 200,
+    "sessionEnded": true
+  },
+  "github": {
+    "httpStatus": 200,
+    "observed": true,
+    "ownerVerified": true,
+    "configured": true,
+    "connected": false,
+    "installed": false,
+    "repositoryCount": 0,
+    "repositories": [],
+    "truncated": false,
+    "isolatedRepositoryVerified": false,
+    "writePermissionVerified": false
+  },
+  "permissions": {
+    "httpStatus": 200,
+    "observed": true,
+    "ownerVerified": true,
+    "storedPush": "allow",
+    "storedPullRequest": "allow",
+    "legacyStoredPermissionsOnly": true
+  },
+  "devices": {
+    "httpStatus": 200,
+    "observed": true,
+    "ownerScope": "authenticated-owner",
+    "count": 1,
+    "devices": [
+      {
+        "id": "814133fe-f795-44e5-a076-30f150ebd5d3",
+        "kind": "cloud",
+        "online": false
+      }
+    ],
+    "truncated": false,
+    "onlineCount": 0,
+    "registrationOrHarnessReadinessVerified": false
+  },
+  "errors": [],
+  "boundaries": {
+    "scope": "single-normal-Smoke-session",
+    "modelCalls": 0,
+    "authorizationChanges": 0,
+    "providerRefreshRequested": false,
+    "repositoryCreated": false,
+    "cloudCreated": false
+  }
+}
