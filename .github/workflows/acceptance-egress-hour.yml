@@ -1,0 +1,62 @@
+name: Fixed-hour egress acceptance collection
+on:
+  push:
+    branches: [acceptance/1211-fixed-hour-egress]
+    paths:
+      - '.github/workflows/acceptance-egress-hour.yml'
+      - 'scripts/ops/acceptance-egress-hour.mjs'
+      - 'scripts/ops/acceptance-egress-hour.test.mjs'
+      - 'scripts/ops/acceptance-egress-hour.input.json'
+permissions:
+  contents: read
+concurrency:
+  group: acceptance-egress-hour
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/acceptance/1211-fixed-hour-egress'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+      - name: Verify bounded read-only collection contract
+        run: node --test scripts/ops/acceptance-egress-hour.test.mjs
+      - name: Read existing platform token through existing workload identity
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /platform
+          recursive: false
+          include-imports: false
+      - name: Read existing provider reporting token through existing workload identity
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /vercel
+          recursive: false
+          include-imports: false
+      - name: Collect the explicitly configured completed hour
+        run: node scripts/ops/acceptance-egress-hour.mjs --config scripts/ops/acceptance-egress-hour.input.json
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: fixed-hour-egress-report
+          path: fixed-hour-egress-report
+          retention-days: 7
