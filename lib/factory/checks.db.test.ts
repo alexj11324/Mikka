@@ -1474,7 +1474,7 @@ test(
           const sourceEventId = randomUUID(), nextRepoId = randomUUID();
           const currentRequest = 'Use /fixture/new-repo for this new request, with an exact 44 byte target.';
           await db.query(`INSERT INTO coordinator_events(id,"userId","botId","issueId",kind,"dedupeKey",payload)
-            VALUES($1,'owner',$2,$3,'user_message',$1::text,$4)`, [sourceEventId, coordinatorBot, failed.task.issueId, JSON.stringify({ source: 'thread_continuation', previousRunId: check.runId, text: currentRequest })]);
+            VALUES($1::uuid,'owner',$2,$3,'user_message',$1::text,$4)`, [sourceEventId, coordinatorBot, failed.task.issueId, JSON.stringify({ source: 'thread_continuation', previousRunId: check.runId, text: currentRequest })]);
           await db.query(`INSERT INTO device_repos(id,"deviceId","userId","repoPath","verifyCommand") VALUES($1,$2,'owner','/fixture/new-repo',$3)`, [nextRepoId, deviceId, command]);
           const tx = await db.connect();
           let current: FactoryTask;
