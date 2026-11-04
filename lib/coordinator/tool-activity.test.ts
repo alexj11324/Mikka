@@ -17,6 +17,9 @@ test('a result that only mentions an error further in is not a failure, and an e
   assert.deepEqual(toolFailure(tool('list_runs', { output: '{"runs": [{"id": "r1", "ok": false, "reason": "stale"' })), { failed: false, reason: null }, 'nor in a cut preview')
   assert.deepEqual(toolFailure(tool('get_run', { output: '{"error": "notFound", "detail": "' + 'x'.repeat(300) })), { failed: true, reason: 'notFound' }, 'a cut preview that opens with an error failed')
   assert.deepEqual(toolFailure(tool('list_issues', { output: '[]' })), { failed: false, reason: null })
+  for (const output of ['{"error": "", "items": []}', '{"error": null}', '{"error": false, "ok": true}', '{"error": "", "items": [' + '"x",'.repeat(60)]) {
+    assert.deepEqual(toolFailure(tool('list_issues', { output })), { failed: false, reason: null }, `an empty error is no error: ${output.slice(0, 30)}`)
+  }
 })
 
 test('a call names its object from its input, cut short, even from a truncated preview', () => {

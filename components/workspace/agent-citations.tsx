@@ -34,7 +34,7 @@ export interface AgentCitations {
   pending?: boolean
   /**
    * Tasks whose thread the same reply cites: a task and its thread are one piece of work (R-81), so only the thread
-   * is a chip and the task is its number in the sentence, or nothing without one (R-15).
+   * is a chip and the task is its number in the sentence, or 「这个任务」 without one (R-15).
    */
   covered?: ReadonlySet<string>
   /** Threads whose card sits under this same reply: the card is the object, so the words name it without a second chip (R-66). */
@@ -85,13 +85,15 @@ export function useLinkPreviews(texts: readonly string[]): LinkPreviews {
 /** Markdown `a`: a citation or web link as a source chip when the conversation provides citations. */
 export function CitationAnchor({ href, children, className: _className, ...props }: ComponentProps<'a'>) {
   const citations = useAgentCitations()
+  const t = useTranslations('Coordinator.citation')
   if (citations && href?.startsWith(CITATION_HREF)) {
     const [kind, id] = href.slice(CITATION_HREF.length).split('/') as [CitationKind | 'any', string]
     const source = citations.sources[id]
     if (!source && citations.pending) return <PendingCitation />
     if (!source || (kind !== 'any' && kind !== source.kind)) return <>{children}</>
-    // The thread chip already carries the task's title: the task is its number, or nothing when it has none.
-    if (source.kind === 'issue' && citations.covered?.has(id)) return source.identifier ? <>{source.identifier}</> : null
+    // The thread chip already carries the task's title: the task is its number, or 「这个任务」 when it has none, so the
+    // sentence still reads (「这个任务的线程 …」, never 「的线程 …」).
+    if (source.kind === 'issue' && citations.covered?.has(id)) return <span data-citation-covered="">{source.identifier ?? t('thisTask')}</span>
     if (source.kind === 'run' && citations.carded?.has(id)) return <span data-citation-carded="">{runThreadName(source)}</span>
     return <CitationChip id={id} kind={source.kind} />
   }

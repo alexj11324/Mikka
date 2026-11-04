@@ -3117,6 +3117,7 @@
       "issue": "Task",
       "run": "Thread",
       "runOf": "Thread {bot} dispatched",
+      "thisTask": "the task",
       "openIssue": "Open task: {title}",
       "openThread": "Open thread: {name}",
       "noIssue": "No linked task",

@@ -79,7 +79,11 @@ export function toolFailure(tool: Pick<ChatTool, 'state' | 'output'>): { failed:
   const own = (key: string) => top ? (typeof top[key] === 'string' && top[key] ? top[key] as string : null) : field(output.match(new RegExp(`^\\{\\s*"${key}"\\s*:\\s*"[^"]*`))?.[0], [key])
   const reason = own('error') ?? own('code') ?? own('reason') ?? own('message')
   if (tool.state === 'error') return { failed: true, reason: reason ?? (output && !output.startsWith('{') ? output.slice(0, 80) : null) }
-  const failed = top ? ('error' in top && top.error !== null && top.error !== false) || top.ok === false : /^\{\s*"error"\s*:/.test(output) || /^\{\s*"ok"\s*:\s*false/.test(output)
+  // An empty error (`"error": ""`, null or false) is no error. A preview cut at 200 characters is read only at its start:
+  // a cut answer whose `error` or `ok: false` is not its first field is not recognised (known limit; the stored step's
+  // own `error` state from spec §6 will cover it).
+  const failed = top ? (top.error !== undefined && top.error !== null && top.error !== false && top.error !== '') || top.ok === false
+    : /^\{\s*"error"\s*:(?!\s*(?:""|null\b|false\b))/.test(output) || /^\{\s*"ok"\s*:\s*false/.test(output)
   return failed ? { failed: true, reason } : { failed: false, reason: null }
 }
 

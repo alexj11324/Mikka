@@ -256,11 +256,13 @@ test('a task and its thread in one reply: only the thread is a chip, the task is
     assert.match(chips()[0].getAttribute('aria-label') ?? '', /thread/i)
     assert.match(text(), /^MIK-1 的线程/, 'the task reads as its number')
     assert.equal(text().match(/Release checklist/g)?.length, 1, 'the title is said once, in the thread chip')
-    // A task with no number is left out: the thread chip already carries its title.
+    // A task with no number reads as 「the task」: the thread chip carries its title, and the sentence never starts at 「的线程」.
     const unnumbered = { [TASK]: { ...issue(TASK, 'Release checklist'), identifier: null }, [THREAD]: ownThread }
-    await view.render(<CoordinatorReply text={`[[issue:${TASK}]] 的线程 [[run:${THREAD}]] 在等你。`} citations={{ ...base, sources: unnumbered }} />)
+    await view.render(<CoordinatorReply text={`[[issue:${TASK}]]的线程 [[run:${THREAD}]] 在等你。`} citations={{ ...base, sources: unnumbered }} />)
     assert.equal(chips().length, 1)
     assert.equal(text().match(/Release checklist/g)?.length, 1)
+    assert.doesNotMatch(text(), /^\s*的线程/, 'the sentence keeps its subject')
+    assert.match(text(), /^the task的线程/)
     assert.doesNotMatch(text(), MARKUP)
   } finally { await view.unmount() }
 })
