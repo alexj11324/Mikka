@@ -7,7 +7,10 @@ import { readFile, readdir } from "node:fs/promises";
 import { Pool, type PoolClient } from "pg";
 import { orderMigrations } from "../../scripts/migration-order.mjs";
 import { createFactoryStore } from "./store";
-import { createFactoryDispatch, factoryBinding, type FactoryQueue } from "./dispatch";
+import { createFactoryDispatch, defaultFactoryDispatchAdapters, factoryBinding, type FactoryQueue } from "./dispatch";
+import { createFactoryHumanStore } from './human-store';
+import { handleFactory } from './http';
+import { sweepFactoryWatchdog } from './watchdog';
 import { createFactoryQuestions } from "./questions/store";
 import { createFactoryReconciler } from "./reconcile";
 import { factoryCheckIndependent } from "./check-independence";
@@ -64,6 +67,30 @@ test("run completion enters review without the Coordinator; replays do not advan
       return { task: r.task, runId: run.runId };
     };
     const succeed = (runId: string) => pool.query(`UPDATE agent_runs SET status='succeeded',"stopReason"='submitted',"sessionId"='s1',report=$2,"startedAt"=now()-interval '1 minute',"finishedAt"=clock_timestamp() WHERE id=$1`, [runId, JSON.stringify({ publish: { commit: "b".repeat(40) }, verify: { status: "passed" }, summary: "done" })]);
+    const exhaustedCompletion = async () => {
+      const created = await runningTask();
+      await succeed(created.runId);
+      const clock = Date.now();
+      for (const minutes of [0, 3, 8, 17]) await sweepFactoryWatchdog(pool, {
+        runtime: () => ({ store, reconcile: { run: async () => { throw new Error('Fixture completion dispatch unavailable'); } } }),
+        dispatch: async () => { throw new Error('A successful producer must not be dispatched again'); },
+        wake: async () => {},
+      }, new Date(clock + minutes * 60_000), Date.now() + 20_000, { userId: 'owner', runId: created.runId });
+      const task = (await store.read('owner', created.task.id)).task;
+      assert.equal(task.status, 'blocked');
+      const { rows: [watchdog] } = await pool.query(`SELECT request,result FROM factory_events WHERE "taskId"=$1 AND request->>'kind'='task_watchdog'`, [task.id]);
+      assert.equal(watchdog.result.tries, 4);
+      assert.equal(watchdog.result.blocked, true);
+      assert.equal(watchdog.result.action, 'reconcile');
+      const request = { userId: 'owner', method: 'POST', taskId: task.id, origin: 'https://fixture.invalid', url: `https://fixture.invalid/api/factory/tasks/${task.id}`,
+        body: { binding: { taskId: task.id, revision: task.revision }, eventId: randomUUID(), action: 'retry', reason: 'Resume completed execution' } };
+      return { task, runId: created.runId, request, watchdog };
+    };
+    const history = async (taskId: string, runId: string, attemptId: string) => ({
+      run: (await pool.query('SELECT to_jsonb(r) AS value FROM agent_runs r WHERE id=$1', [runId])).rows[0].value,
+      attempt: (await pool.query('SELECT to_jsonb(a) AS value FROM factory_attempts a WHERE id=$1', [attemptId])).rows[0].value,
+      watchdog: (await pool.query(`SELECT request,result FROM factory_events WHERE "taskId"=$1 AND request->>'kind'='task_watchdog'`, [taskId])).rows,
+    });
     await pool.query(`INSERT INTO coordinator_events (id,"userId",kind,"dedupeKey",payload) VALUES ($1,'owner','user_message',$2,'{"text":"synthetic"}')`, [sourceEventId, sourceEventId]);
     const routed = await store.route("owner", { issueId, sourceEventId, eventId: randomUUID(), rationale: "Task requested", missingInformation: [], missingPermissions: [], needsSpec: false });
     const d = await dispatch("owner", { binding: factoryBinding(routed.task), agentId, deviceRepoId: repoId });
@@ -79,6 +106,99 @@ test("run completion enters review without the Coordinator; replays do not advan
       assert.equal(queried, 0);
     });
     process.env.MIKKA_FACTORY_ROUTING_ENABLED = "1"; process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED = "1";
+
+    await t.test('Owner Retry consumes exhausted successful completion once, keeps history and queues only fresh independent review', async () => {
+      const f = await exhaustedCompletion();
+      const before = await history(f.task.id, f.runId, f.task.attemptId);
+      await sweep.run('owner', f.runId);
+      assert.equal((await store.read('owner', f.task.id)).task.status, 'blocked', 'ordinary completion replay has no owner authority');
+      assert.ok((await store.read('owner', f.task.id)).completionRecovery);
+      let starts = 0, queued = 0;
+      const reviewDispatch = createFactoryDispatch(pool, store, async (...args) => { queued++; return queue(...args); }, defaultFactoryDispatchAdapters);
+      const human = createFactoryHumanStore(pool, () => store, async (tx, _store, current, run) => {
+        assert.equal(current.stage, 'review');
+        assert.equal(run.id, f.runId);
+        await reviewDispatch('owner', { binding: factoryBinding(current), agentId, deviceRepoId: repoId }, tx);
+        return async () => { starts++; };
+      });
+      const [a, b] = await Promise.all([handleFactory(human, f.request), handleFactory(human, f.request)]);
+      assert.equal(a.status, 200);
+      assert.deepEqual(b, a, 'concurrent receipt replay returns the identical result');
+      assert.deepEqual({ starts, queued }, { starts: 1, queued: 1 });
+      assert.deepEqual(await history(f.task.id, f.runId, f.task.attemptId), before, 'the producer, blocked attempt and exhausted watchdog receipt stay byte-for-byte equal');
+      const current = (await store.read('owner', f.task.id)).task;
+      assert.deepEqual({ stage: current.stage, status: current.status }, { stage: 'review', status: 'running' });
+      const { rows: runs } = await pool.query(`SELECT r.* FROM agent_runs r JOIN factory_attempts a ON a."runId"=r.id WHERE a."taskId"=$1 ORDER BY a.position`, [f.task.id]);
+      assert.equal(runs.length, 2);
+      assert.equal(runs[0].id, f.runId);
+      assert.equal(runs[1].kind, 'acceptance');
+      assert.equal(runs[1].sessionId, null);
+      assert.equal(runs[1].retryOf, null);
+      assert.equal(runs[1].agentDefinition.readOnly, true);
+      const candidate = (await pool.query('SELECT * FROM factory_candidates WHERE "taskId"=$1', [f.task.id])).rows[0];
+      assert.equal(candidate.runId, f.runId);
+      assert.equal(candidate.sha, 'b'.repeat(40));
+      assert.equal((await pool.query(`SELECT count(*)::int AS n FROM factory_attempts WHERE "taskId"=$1 AND stage='execute'`, [f.task.id])).rows[0].n, 1);
+      assert.equal((await pool.query(`SELECT count(*)::int AS n FROM factory_events WHERE "taskId"=$1 AND request->>'kind'='owner_completion_recovery'`, [f.task.id])).rows[0].n, 1);
+      assert.deepEqual(await handleFactory(human, f.request), a);
+      assert.equal(starts, 1);
+      assert.equal((await handleFactory(human, { ...f.request, body: { ...f.request.body, reason: 'different intent' } })).status, 409);
+    });
+
+    await t.test('completion recovery rejects stale/foreign/forged epoch authority and does not fall through to a producer retry', async () => {
+      for (const fault of ['owner', 'revision', 'epoch', 'receipt', 'candidate', 'publication']) {
+        const f = await exhaustedCompletion();
+        if (fault === 'epoch') await pool.query(`UPDATE factory_attempts SET output=jsonb_set(output,'{requestEpoch}',to_jsonb($2::text)) WHERE id=$1`, [f.task.attemptId, randomUUID()]);
+        if (fault === 'receipt') await pool.query(`DELETE FROM factory_events WHERE "taskId"=$1 AND request->>'kind'='task_watchdog'`, [f.task.id]);
+        if (fault === 'candidate') await pool.query(`UPDATE agent_runs SET report=jsonb_set(report,'{verify,status}','"failed"') WHERE id=$1`, [f.runId]);
+        if (fault === 'publication') await pool.query(`INSERT INTO run_publications("runId","userId","issueId","remoteUrl","remoteKey",status)
+          VALUES($1,'owner',$2,'https://github.com/acme/fixture.git','github:acme/fixture','processing')`, [f.runId,f.task.issueId]);
+        const before = await history(f.task.id, f.runId, f.task.attemptId);
+        const human = createFactoryHumanStore(pool, () => store, async () => { throw new Error('must not dispatch'); });
+        const response = await handleFactory(human, { ...f.request, userId: fault === 'owner' ? 'foreign' : 'owner',
+          body: fault === 'revision' ? { ...f.request.body, binding: { ...f.request.body.binding, revision: f.task.revision - 1 } } : f.request.body });
+        assert.equal(response.status, fault === 'owner' ? 404 : 409, fault);
+        assert.deepEqual(await history(f.task.id, f.runId, f.task.attemptId), before, fault);
+        assert.equal((await pool.query('SELECT count(*)::int AS n FROM factory_candidates WHERE "taskId"=$1', [f.task.id])).rows[0].n, 0, fault);
+        assert.equal((await pool.query('SELECT count(*)::int AS n FROM factory_attempts WHERE "taskId"=$1', [f.task.id])).rows[0].n, 1, fault);
+      }
+    });
+
+    await t.test('owner completion recovery retains the exact no-repository deliverable candidate and original session', async () => {
+      const f = await exhaustedCompletion();
+      const deliverableRepo = randomUUID();
+      await pool.query(`INSERT INTO device_repos(id,"deviceId","userId","repoPath") VALUES($1,$2,'owner','/home/user/.mikka/bot-workspaces/completion-fixture')`, [deliverableRepo,deviceId]);
+      await pool.query(`UPDATE agent_runs SET "deviceRepoId"=$2,report=$3 WHERE id=$1`, [f.runId,deliverableRepo,JSON.stringify({ sourceCommit: 'a'.repeat(40), deliverableCommit: 'b'.repeat(40), verify: { status: 'not_run' }, summary: 'Exact retained deliverable' })]);
+      const before = await history(f.task.id, f.runId, f.task.attemptId);
+      const response = await handleFactory(createFactoryHumanStore(pool, () => store), f.request);
+      assert.equal(response.status, 200);
+      const state = await store.read('owner', f.task.id);
+      assert.deepEqual({ stage: state.task.stage, status: state.task.status }, { stage: 'review', status: 'pending' });
+      assert.equal(state.candidates.length, 1);
+      assert.equal(state.candidates[0].kind, 'deliverable');
+      assert.equal(state.candidates[0].sha, null);
+      assert.equal(state.candidates[0].runId, f.runId);
+      assert.equal(state.candidates[0].repository, '/home/user/.mikka/bot-workspaces/completion-fixture');
+      assert.deepEqual(await history(f.task.id, f.runId, f.task.attemptId), before);
+      assert.equal((await pool.query('SELECT count(*)::int AS n FROM agent_runs WHERE "issueId"=$1', [f.task.issueId])).rows[0].n, 1, 'completion consumption never replays the producer');
+    });
+
+    await t.test('failed next-stage admission rolls completion recovery back; a later owner retry consumes the same successful producer', async () => {
+      const f = await exhaustedCompletion();
+      const before = await history(f.task.id, f.runId, f.task.attemptId);
+      let unavailable = true;
+      const human = createFactoryHumanStore(pool, () => store, async () => {
+        if (unavailable) throw new Error('Fixture admission unavailable');
+      });
+      await assert.rejects(handleFactory(human, f.request), /Fixture admission unavailable/);
+      assert.deepEqual(await history(f.task.id, f.runId, f.task.attemptId), before);
+      assert.equal((await pool.query('SELECT count(*)::int AS n FROM factory_candidates WHERE "taskId"=$1', [f.task.id])).rows[0].n, 0);
+      assert.equal((await pool.query(`SELECT count(*)::int AS n FROM factory_events WHERE "taskId"=$1 AND request->>'kind'='owner_completion_recovery'`, [f.task.id])).rows[0].n, 0);
+      unavailable = false;
+      assert.equal((await handleFactory(human, f.request)).status, 200);
+      assert.equal((await store.read('owner', f.task.id)).task.stage, 'review');
+      assert.deepEqual(await history(f.task.id, f.runId, f.task.attemptId), before);
+    });
 
     await t.test("completed run moves execute → review via the completion hook alone", async () => {
       const report = { publish: { commit: "b".repeat(40) }, verify: { status: "passed" }, summary: "done" };

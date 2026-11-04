@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import test from "node:test";
-import { bindingSchema, revisionBindingSchema, routeSchema, routeStage } from "./contract";
+import { bindingSchema, revisionBindingSchema, routeSchema, routeStage, FactoryError } from "./contract";
 import { factoryScopeAllows } from "./scope";
 import { handleFactory } from "./http";
 import type { FactoryStore } from "./http";
+import { createFactoryHumanStore } from "./human-store";
 
 test("mutation requests need only the owned task id and revision", () => {
   const binding = { taskId: randomUUID(), revision: 1 };
@@ -75,6 +76,42 @@ const req = {
   url: "https://preview.invalid/api/factory/tasks/id",
   body: {},
 };
+test("Owner Retry consumes an admitted completed run before ordinary execution retry", async () => {
+  let retried = 0, recovered = 0, started = 0;
+  const result = { task: { id: req.taskId, stage: "review", status: "running" } };
+  const store = { apply: async () => { retried++; return {}; }, retryCompletion: async () => {
+    recovered++; return { result, start: async () => { started++; } };
+  } } as unknown as FactoryStore;
+  const pool = { query: async () => ({ rows: [{ botId: null }] }) };
+  const human = createFactoryHumanStore(pool as never, () => store);
+  const response = await handleFactory(human, { ...req, body: {
+    binding: { taskId: req.taskId, revision: 16 }, eventId: randomUUID(), action: "retry", reason: "Retry",
+  } });
+  assert.equal(response.status, 200);
+  assert.deepEqual(response.body, result);
+  assert.deepEqual({ recovered, retried, started }, { recovered: 1, retried: 0, started: 1 });
+});
+test("an unavailable completion recovery cannot fall through to ordinary Retry", async () => {
+  let retries = 0;
+  const store = { apply: async () => { retries++; }, retryCompletion: async () => { throw new FactoryError('factoryCompletionRecoveryUnavailable'); } } as unknown as FactoryStore;
+  const human = createFactoryHumanStore({ query: async () => ({ rows: [{ botId: null }] }) } as never, () => store);
+  const response = await handleFactory(human, { ...req, body: {
+    binding: { taskId: req.taskId, revision: 16 }, eventId: randomUUID(), action: 'retry', reason: 'Retry',
+  } });
+  assert.equal(response.status, 409);
+  assert.equal(retries, 0);
+});
+test("ordinary failed-run Retry keeps its existing store path", async () => {
+  let retries = 0;
+  const store = { apply: async () => { retries++; return { normalRetry: true }; }, retryCompletion: async () => null } as unknown as FactoryStore;
+  const human = createFactoryHumanStore({ query: async () => ({ rows: [{ botId: null }] }) } as never, () => store);
+  const response = await handleFactory(human, { ...req, body: {
+    binding: { taskId: req.taskId, revision: 16 }, eventId: randomUUID(), action: 'retry', reason: 'Retry',
+  } });
+  assert.equal(response.status, 200);
+  assert.deepEqual(response.body, { normalRetry: true });
+  assert.equal(retries, 1);
+});
 test("API rejects missing session, invalid ids, cross origin, missing origin and unsupported methods before DB", async () => {
   assert.equal(
     (await handleFactory(noDatabase, { ...req, userId: null })).status,

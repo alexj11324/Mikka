@@ -10,6 +10,7 @@ import { issueForUser } from "@/lib/issue-access";
 import { lockCliAgentPolicy, lockCliRunPolicy } from "@/lib/agent-tool-approval/policy-store";
 import { createFactoryStore } from "./store";
 import { createFactoryHumanStore } from './human-store';
+import { automaticFactoryDispatch } from './automatic-dispatch';
 import { factoryCheckIndependent } from './check-independence';
 import { approvalGate, publishGate, createFactoryApprovals } from "./approval";
 import { createFactoryMerges, githubMergeApi } from "./merge";
@@ -40,7 +41,7 @@ const humanGates = {
   monitor: monitorGate,
 };
 export const factoryStore = createFactoryStore(pool, authorize, humanGates);
-export const factoryHumanStore = createFactoryHumanStore(pool, botId => createFactoryStore(pool, authorize, botId, { independent: factoryCheckIndependent, gates: humanGates }));
+export const factoryHumanStore = createFactoryHumanStore(pool, botId => createFactoryStore(pool, authorize, botId, { independent: factoryCheckIndependent, gates: humanGates }), automaticFactoryDispatch(pool));
 // #528: a code candidate is accepted by the person's merge of its PR
 // (factoryMerges); deploy_preview/deploy_production are not Factory steps. Only a
 // skill candidate, which has no PR, is still approved and activated here.

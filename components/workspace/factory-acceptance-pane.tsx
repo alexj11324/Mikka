@@ -1,9 +1,9 @@
 'use client'
 
-import { useCallback, useReducer, useState } from 'react'
+import { useCallback, useReducer, useRef, useState } from 'react'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
-import { CircleCheck, CircleDashed, CircleX, Cloud, ExternalLink, Laptop, Server } from 'lucide-react'
+import { CircleCheck, CircleDashed, CircleX, Cloud, ExternalLink, Laptop, RefreshCw, Server } from 'lucide-react'
 import { Alert, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
@@ -180,6 +180,8 @@ export function FactoryAcceptancePane({ task, onOpenThread }: { task: FactoryTas
   // Checks and the delivery header (B8/B9/B11) are read-only extras; the pane works without them.
   const { data: detail, mutate: reloadDetail } = useSWR<AcceptanceDetail>(`/api/factory/tasks/${task.id}`, request)
   const [busy, setBusy] = useState(false)
+  const retryingCompletion = useRef(false)
+  const completionRequest = useRef<{ revision: number; eventId: string } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [viewing, setViewing] = useState<{ group: number; index: number } | null>(null)
   const [reject, dispatchReject] = useReducer(rejectFlow, closedReject)
@@ -213,6 +215,20 @@ export function FactoryAcceptancePane({ task, onOpenThread }: { task: FactoryTas
       await reload().catch(() => {})
       return null
     } finally { setBusy(false) }
+  }
+
+  async function retryCompletion() {
+    const recovery = detail?.completionRecovery
+    if (!recovery || retryingCompletion.current) return
+    retryingCompletion.current = true; setBusy(true); setError(null)
+    if (completionRequest.current?.revision !== recovery.binding.revision) completionRequest.current = { revision: recovery.binding.revision, eventId: crypto.randomUUID() }
+    try {
+      await request(`/api/factory/tasks/${task.id}`, { binding: recovery.binding, eventId: completionRequest.current.eventId, action: 'retry', reason: 'Resume the completed execution' })
+    } catch (caught) { setError(caught instanceof RequestError ? caught.code : 'factoryUnavailable') }
+    finally {
+      await Promise.all([reload().catch(() => {}), reloadDetail().catch(() => {})])
+      retryingCompletion.current = false; setBusy(false)
+    }
   }
 
   /** 验收并合并 (#528): the server merges the PR as this person, bound to the candidate commit. */
@@ -299,7 +315,10 @@ export function FactoryAcceptancePane({ task, onOpenThread }: { task: FactoryTas
       {state === 'failed' && <div className="animate-in fade-in-0 slide-in-from-bottom-1 duration-150 motion-reduce:slide-in-from-bottom-0"><Alert variant="destructive"><AlertTitle>{t('publishFailed')}</AlertTitle></Alert></div>}
       {error && <FieldError className="text-xs">{t(ERROR_KEYS[error] ?? 'error')}</FieldError>}
     </div>
-    {state !== 'unavailable' && <footer className="shrink-0 px-4 pb-4 sm:px-5">
+    {detail?.completionRecovery && <footer className="shrink-0 px-4 pb-4 sm:px-5">
+      <Button size="sm" disabled={busy} aria-busy={busy} onClick={() => { void retryCompletion() }}>{busy ? <Spinner data-icon="inline-start" /> : <RefreshCw data-icon="inline-start" />}{t('retry')}</Button>
+    </footer>}
+    {!detail?.completionRecovery && state !== 'unavailable' && <footer className="shrink-0 px-4 pb-4 sm:px-5">
       <ApprovalBar state={state} isSkill={task.isSkillCandidate} isDeliverable={candidate?.kind === 'report' || candidate?.kind === 'deliverable'} busy={busy} canApprove={task.isSkillCandidate ? Boolean(evidence && environment) : Boolean(evidence && (pullRequestUrl || candidate?.kind === 'report' || candidate?.kind === 'deliverable'))}
         onAccept={task.isSkillCandidate ? undefined : () => { void accept() }} pullRequestUrl={pullRequestUrl ?? undefined} refusal={refusal ?? undefined} canPublish={Boolean(active && environmentOf(active.candidate) && active.target && active.targetEnvironment)}
         environment={envChip ?? undefined}
