@@ -18,7 +18,9 @@ import type { FactoryTask, createFactoryStore } from './store'
 /** Provider I/O boundary; no model input selects these callbacks. */
 export const factoryAutomaticRuntime = {
   park: async (pool: Pool, actor: { userId: string; workspaceId: string }, runId: string) => (await import('@/lib/cloud-computer/thread-machines')).parkThreadMachine(pool, actor, runId),
-  start: async (actor: { userId: string; workspaceId: string }, runId: string) => (await import('@/lib/run-leases')).startThreadMachine(actor, runId),
+  // The durable Factory workflow owns its lifecycle; do not spawn a second,
+  // non-idempotent child workflow from its retried handoff step.
+  start: async (actor: { userId: string; workspaceId: string }, runId: string) => (await import('@/lib/run-leases')).startThreadMachine(actor, runId, false),
   enqueue: async (_pool: Pool, actor: { userId: string; workspaceId: string }, previousRunId: string | null, runId: string) => {
     const [{ start }, { factoryCloudStageHandoff }] = await Promise.all([import('workflow/api'), import('@/workflows/factory-stage/workflow')])
     await start(factoryCloudStageHandoff, [actor, previousRunId, runId])

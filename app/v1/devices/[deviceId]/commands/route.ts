@@ -9,13 +9,15 @@ import { noteLogOutcome, withRequestLog } from '@/lib/request-log'
 export const dynamic = 'force-dynamic'
 
 /**
- * How often a waiting long-poll looks for new work. This is the fallback for
- * an old daemon or a gateway that is down. It stays at 2s so a revoked
- * credential still fails the next check inside the bound in
- * lib/device-revocation.db.test.ts. A daemon on the push socket does not
- * call this route while it is idle.
+ * How often a waiting long-poll looks for new work. This is only the fallback
+ * for an old daemon or a gateway that is down: a daemon on the push socket
+ * does not call this route while it is idle. Each check is a Neon query, so
+ * the fallback is throttled to one every 5s (it was 2s, about 30 queries a
+ * minute per idle device). New work reaches a fallback daemon within 5s, and
+ * a revoked credential fails the next check inside the bound in
+ * lib/device-revocation.db.test.ts.
  */
-const IDLE_CHECK_MS = 2_000
+const IDLE_CHECK_MS = 5_000
 
 /**
  * `GET /v1/devices/:deviceId/commands?wait=<seconds>`: messages people sent

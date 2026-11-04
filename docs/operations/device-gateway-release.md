@@ -29,6 +29,15 @@ credential. Wrangler is the existing dependency from `pnpm-lock.yaml`.
 The production job has a single concurrency group and does not cancel a running
 upload in favor of a later release.
 
+Daemons connect through the Worker custom domain `mikka-gateway.aspectlylabs.com`
+(attached in Cloudflare, not declared in `wrangler.jsonc`, so a Wrangler deploy
+leaves it untouched). Production `DEVICE_GATEWAY_URL` is
+`https://mikka-gateway.aspectlylabs.com`, because `*.workers.dev` is unreachable
+from some regions. `workers_dev` stays enabled so the old
+`https://mikka-device-gateway.orvilo-preview.workers.dev` keeps working as the
+rollback value. `device-gateway.aspectlylabs.com` belongs to another service;
+do not reuse it.
+
 ## Release checks
 
 `scripts/device-gateway/deploy.mjs`:

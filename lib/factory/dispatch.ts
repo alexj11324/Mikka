@@ -17,7 +17,7 @@ export type FactoryQueue = (tx: PoolClient, userId: string, input: {
 /** Installed by the owning consumer; no model may select a callback or gate. */
 export interface FactoryDispatchAdapters {
   lockAdmission?: (tx: PoolClient, userId: string, input: FactoryDispatchInput) => Promise<void>;
-  configure: Partial<Record<FactoryStage, (tx: PoolClient, task: FactoryTask, runId: string) => Promise<void>>>;
+  configure: Partial<Record<FactoryStage, (tx: PoolClient, task: FactoryTask, runId: string) => Promise<void | { preservePrompt: true }>>>;
   replay?: Partial<Record<FactoryStage, (tx: PoolClient, task: FactoryTask, runId: string) => Promise<void>>>;
   freeze: (tx: PoolClient, task: FactoryTask, runId: string) => Promise<void>;
 }
@@ -83,10 +83,18 @@ export function createFactoryDispatch(pool: Pool, store: ReturnType<typeof creat
       if (!configure) fail('factoryDispatchAdapterRequired');
       const queued = await queue(tx,userId,{issueId:task.issueId,agentId:input.agentId,deviceRepoId:input.deviceRepoId,note:input.note},task.botId,{sourceEventId:task.sourceEventId,attemptId:task.attemptId,...(questionOriginRunId ? {questionOriginRunId} : {}),...(questionHistoryRunId ? {questionHistoryRunId} : {})});
       await tx.query('UPDATE factory_attempts SET output=output || $2::jsonb WHERE id=$1', [task.attemptId, JSON.stringify({ requestEpoch: task.sourceEventId })]);
-      await configure(tx,task,queued.runId);
+      const configured = await configure(tx,task,queued.runId);
       const handoff = await persistFactoryHandoff(tx, task);
       const handoffText = factoryHandoffPrompt(handoff);
-      await tx.query('UPDATE agent_runs SET prompt=left(prompt,$2) || $3 WHERE id=$1', [queued.runId, 100000 - handoffText.length, handoffText]);
+      if (configured?.preservePrompt) {
+        // Automatic repair keeps the entire admitted request. A later handoff
+        // must not silently remove its final criteria before the definition freezes.
+        const { rows: [configuredRun] } = await tx.query('SELECT prompt FROM agent_runs WHERE id=$1', [queued.runId]);
+        if (!configuredRun || configuredRun.prompt.length + handoffText.length > 100000) fail('factoryCheckBindingMismatch');
+        await tx.query('UPDATE agent_runs SET prompt=prompt || $2 WHERE id=$1', [queued.runId, handoffText]);
+      } else {
+        await tx.query('UPDATE agent_runs SET prompt=left(prompt,$2) || $3 WHERE id=$1', [queued.runId, 100000 - handoffText.length, handoffText]);
+      }
       await tx.query('UPDATE factory_attempts SET output=output || $2::jsonb WHERE id=$1', [task.attemptId, JSON.stringify({ handoff: { eventId: handoff.eventId, digest: handoff.digest, requestEpoch: task.sourceEventId } })]);
       await adapters.freeze(tx,task,queued.runId);
       const { rows: [run] } = await tx.query('SELECT * FROM agent_runs WHERE id=$1 FOR UPDATE',[queued.runId]);
