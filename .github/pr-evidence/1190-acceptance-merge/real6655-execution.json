@@ -1,0 +1,57 @@
+{
+  "source": {
+    "observedAt": "2026-11-04T02:23:25.052595+00:00",
+    "head": "3362fb03ef8d5f963d55b9eacc36a51d58ad0686",
+    "tree": "7d5da89896e9d1726301d0dca66c6af3b72e1cdc",
+    "trackedClean": true
+  },
+  "runSnapshot": {
+    "observedAt": "2026-11-04T02:22:43.040Z",
+    "transaction": "READ ONLY",
+    "runs": [
+      {
+        "id": "045b91a1-29fb-44e6-99c9-f8bd003fd697",
+        "status": "failed",
+        "stopReason": "device_lost",
+        "retryOf": null,
+        "deviceId": "20635c47-ad64-4274-9310-5f5ea285068b",
+        "startedAt": "2026-11-04T02:12:59.657Z",
+        "finishedAt": "2026-11-04T02:15:00.183Z",
+        "model": "deepseek-flash",
+        "publication": "skipped"
+      },
+      {
+        "id": "e858ce9d-b031-439b-9a77-27c29eaad15f",
+        "status": "succeeded",
+        "stopReason": "submitted",
+        "retryOf": "045b91a1-29fb-44e6-99c9-f8bd003fd697",
+        "deviceId": "38c31111-87a5-4008-9136-c07e6c65642b",
+        "startedAt": "2026-11-04T02:15:03.334Z",
+        "finishedAt": "2026-11-04T02:15:50.664Z",
+        "model": "deepseek-flash",
+        "publication": "published"
+      }
+    ],
+    "publicationCount": 1
+  },
+  "gitAndFixtureSnapshot": {
+    "observedAt": "2026-11-04T02:22:42.391319+00:00",
+    "artifact": {
+      "commit": "9cb56d43df4c843e5238b7d3cb84676443c790e7",
+      "filename": "handoff-2e4b10aa-b397-4eb0-a5f7-40ee1e4b7cf1.txt",
+      "bytes": 45,
+      "sha256": "dcc826551c9932a1a67d6cc518c35857b07cfc3581858be79de0f7402430c155",
+      "matchesRequestedBytes": true,
+      "mergedCommit": "0781d93a5e80f6bb1f0c050da4734bc29fc4d7ee",
+      "mergedArtifactMatches": true,
+      "mergeParents": [
+        "b41385c17e70872804f389356efabc7c7b578a08",
+        "9cb56d43df4c843e5238b7d3cb84676443c790e7"
+      ]
+    },
+    "fixturePullRequestUrls": [
+      "https://github.com/mikka-e2e/core-loop/pull/41"
+    ],
+    "fixtureErrorsCount": 1
+  }
+}

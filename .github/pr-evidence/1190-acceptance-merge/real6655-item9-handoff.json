@@ -1,0 +1,86 @@
+{
+  "version": 1,
+  "marker": "handoff-2e4b10aa-b397-4eb0-a5f7-40ee1e4b7cf1",
+  "status": "passed",
+  "startedAt": "2026-11-04T02:12:36.346Z",
+  "daemonStallMinutes": 60,
+  "boundaries": [
+    "Real DeepSeek Flash via normal account authorization",
+    "Real daemons and unchanged 90s leases/minute cron",
+    "Disposable local database; SELECT evidence only",
+    "Local fixture GitHub and real bare Git publication",
+    "Offline handoff only; not the 45-minute online-stall watchdog or production acceptance"
+  ],
+  "deviceA": "20635c47-ad64-4274-9310-5f5ea285068b",
+  "deviceB": "38c31111-87a5-4008-9136-c07e6c65642b",
+  "placement": "automatic",
+  "originalStartedAt": "2026-11-04T02:12:59.657Z",
+  "recoveryDeviceReadyAt": "2026-11-04T02:13:18.146Z",
+  "originalUnpinned": true,
+  "phase": "passed",
+  "updatedAt": "2026-11-04T02:18:34.833Z",
+  "taskId": "6a267d61-6023-4315-8a2a-4a639d3e619b",
+  "requestEpoch": "81bc9406-bbb3-4079-80c0-fa1e8408ab3d",
+  "originalRunId": "045b91a1-29fb-44e6-99c9-f8bd003fd697",
+  "sessionA": {
+    "recorded": true,
+    "sha256": "e306832560cc6d59daa6922dd4158e27043fd497cad8310b118efcde58b96c69"
+  },
+  "checkpoint": {
+    "baseCommit": "b41385c17e70872804f389356efabc7c7b578a08",
+    "files": 1,
+    "capturedAt": "2026-11-04T02:13:30.266Z"
+  },
+  "leaseExpiresAt": "2026-11-04T02:14:59.796Z",
+  "fault": {
+    "kind": "SIGSTOP owned daemon tree",
+    "at": "2026-11-04T02:13:30.725Z",
+    "groups": 2,
+    "processes": 6
+  },
+  "retryRunId": "e858ce9d-b031-439b-9a77-27c29eaad15f",
+  "sessionB": {
+    "recorded": true,
+    "sha256": "ec98933237022b8e744c31cfd0074869e80a88ee1aa97336bdfb7432b6ac16dd"
+  },
+  "handoff": {
+    "digest": "bf2a5075c9105020232c56a6a1b386b5de9d1be966f0668ea336f9b12f723775",
+    "goalSha256": "49cb9b35d0fc23116081af499ff810f4fa945e37093f194865798dfc541f3285",
+    "checkpoint": {
+      "files": 1,
+      "runId": "045b91a1-29fb-44e6-99c9-f8bd003fd697",
+      "storedAt": "2026-11-04T02:13:30.266Z",
+      "baseCommit": "b41385c17e70872804f389356efabc7c7b578a08",
+      "unavailableReason": null
+    },
+    "pending": {
+      "stage": "execute",
+      "reason": "Authenticated task dispatch; placement and model selected by the host.",
+      "status": "running"
+    },
+    "externalEffects": {
+      "effects": [],
+      "operations": [],
+      "publications": [
+        {
+          "status": "assigned",
+          "runId": "045b91a1-29fb-44e6-99c9-f8bd003fd697"
+        }
+      ]
+    }
+  },
+  "artifact": {
+    "filename": "handoff-2e4b10aa-b397-4eb0-a5f7-40ee1e4b7cf1.txt",
+    "bytes": 45,
+    "sha256": "dcc826551c9932a1a67d6cc518c35857b07cfc3581858be79de0f7402430c155",
+    "commit": "9cb56d43df4c843e5238b7d3cb84676443c790e7"
+  },
+  "pullRequest": "https://github.com/mikka-e2e/core-loop/pull/41",
+  "mergeId": "397495b0-f3f3-4b6e-8f64-2693b028fada",
+  "effects": {
+    "publications": 1,
+    "pullRequests": 1,
+    "retries": 1
+  },
+  "finishedAt": "2026-11-04T02:18:34.833Z"
+}

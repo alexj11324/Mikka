@@ -1,0 +1,58 @@
+{
+  "version": 1,
+  "runId": "6655d16b-ce7e-44b7-8ef1-e9d6114f09e5",
+  "workflowRunId": 41759046100,
+  "jobId": 126342049054,
+  "source": {
+    "observedAt": "2026-11-04T02:23:25.052595+00:00",
+    "head": "3362fb03ef8d5f963d55b9eacc36a51d58ad0686",
+    "tree": "7d5da89896e9d1726301d0dca66c6af3b72e1cdc",
+    "trackedClean": true
+  },
+  "overall": "in_progress",
+  "item9": "passed",
+  "item9FinishedAt": "2026-11-04T02:18:34.833Z",
+  "item10": "pending",
+  "item10ObservedPhase": "online-without-progress",
+  "sourceRecords": {
+    "item9": {
+      "sourceFile": "/vercel/Mikka/.cache/dev-local/acceptance-6655d16bce7e44b7/item9-handoff.json",
+      "sourceSha256": "235904b9b5f6d883b3fbd40f89709d8c93d8a610e2a1a662d2a9f41b9722c26c"
+    },
+    "item10Snapshot": {
+      "sourceSha256": "7abf4e09aab3f84958674da09310b5329e8eddfcd8176a1c4813ab0adc803422",
+      "observedAt": "2026-11-04T02:22:43.595751+00:00"
+    }
+  },
+  "redactions": [
+    "Native execution session identifiers replaced by SHA256; no authentication files or private prompts read/exported."
+  ],
+  "files": [
+    {
+      "path": ".github/pr-evidence/1190-acceptance-merge/real6655-item9-handoff.json",
+      "gitBlobSha": "75b0fd12b53a1fae6c142d2bf3038a94a18599ed"
+    },
+    {
+      "path": ".github/pr-evidence/1190-acceptance-merge/real6655-factory-ledger.json",
+      "gitBlobSha": "e12d9129ef4b9505ca7dabe70ba90106d496c18d"
+    },
+    {
+      "path": ".github/pr-evidence/1190-acceptance-merge/real6655-execution.json",
+      "gitBlobSha": "b724dda8941e358a43e52237dbec7a03fe2fb623"
+    },
+    {
+      "path": ".github/pr-evidence/1190-acceptance-merge/real6655-item10-start.json",
+      "gitBlobSha": "711e195fc6f8ac8f9ce280b3fd2919652064c82d"
+    },
+    {
+      "path": ".github/pr-evidence/1190-acceptance-merge/real6655-review.md",
+      "gitBlobSha": "3f6de7a99d3c23d521b70c4708b99945c8f6d19e"
+    }
+  ],
+  "boundaries": [
+    "Disposable local database and real local daemons",
+    "Real DeepSeek Flash with local synthetic GitHub and real bare Git",
+    "Not production, official subscription, or Cloud-device acceptance",
+    "No completed item10/whole-run result claimed"
+  ]
+}

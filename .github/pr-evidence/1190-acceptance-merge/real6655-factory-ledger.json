@@ -1,0 +1,75 @@
+{
+  "source": {
+    "observedAt": "2026-11-04T02:23:25.052595+00:00",
+    "head": "3362fb03ef8d5f963d55b9eacc36a51d58ad0686",
+    "tree": "7d5da89896e9d1726301d0dca66c6af3b72e1cdc",
+    "trackedClean": true
+  },
+  "taskAndMerge": {
+    "observedAt": "2026-11-04T02:20:12.613Z",
+    "transaction": "READ ONLY",
+    "rows": [
+      {
+        "id": "6a267d61-6023-4315-8a2a-4a639d3e619b",
+        "stage": "publish",
+        "status": "passed",
+        "sourceEventId": "81bc9406-bbb3-4079-80c0-fa1e8408ab3d",
+        "mergeId": "397495b0-f3f3-4b6e-8f64-2693b028fada",
+        "mergeStatus": "merged",
+        "sha": "9cb56d43df4c843e5238b7d3cb84676443c790e7",
+        "headSha": "9cb56d43df4c843e5238b7d3cb84676443c790e7",
+        "mergeCommitSha": "0781d93a5e80f6bb1f0c050da4734bc29fc4d7ee",
+        "finishedAt": "2026-11-04T02:17:29.361Z"
+      }
+    ]
+  },
+  "stageSnapshot": {
+    "observedAt": "2026-11-04T02:22:09.183Z",
+    "transaction": "READ ONLY",
+    "database": "mikka_loop_6655d16bce7e_e2e",
+    "attempts": [
+      {
+        "stage": "execute",
+        "status": "failed",
+        "runId": "045b91a1-29fb-44e6-99c9-f8bd003fd697",
+        "epoch": "81bc9406-bbb3-4079-80c0-fa1e8408ab3d",
+        "finishedAt": "2026-11-04T02:15:00.449Z"
+      },
+      {
+        "stage": "execute",
+        "status": "passed",
+        "runId": "e858ce9d-b031-439b-9a77-27c29eaad15f",
+        "epoch": "81bc9406-bbb3-4079-80c0-fa1e8408ab3d",
+        "finishedAt": "2026-11-04T02:15:50.711Z"
+      },
+      {
+        "stage": "review",
+        "status": "passed",
+        "runId": "52e037dc-f457-446f-8c1b-e6d83747dded",
+        "epoch": "81bc9406-bbb3-4079-80c0-fa1e8408ab3d",
+        "finishedAt": "2026-11-04T02:16:33.431Z"
+      },
+      {
+        "stage": "verify",
+        "status": "passed",
+        "runId": "fdafc0dd-1c98-4a61-aa8a-e948486ab37f",
+        "epoch": "81bc9406-bbb3-4079-80c0-fa1e8408ab3d",
+        "finishedAt": "2026-11-04T02:17:21.201Z"
+      },
+      {
+        "stage": "approval",
+        "status": "passed",
+        "runId": null,
+        "epoch": "81bc9406-bbb3-4079-80c0-fa1e8408ab3d",
+        "finishedAt": "2026-11-04T02:17:29.375Z"
+      },
+      {
+        "stage": "publish",
+        "status": "passed",
+        "runId": null,
+        "epoch": "81bc9406-bbb3-4079-80c0-fa1e8408ab3d",
+        "finishedAt": "2026-11-04T02:17:29.390Z"
+      }
+    ]
+  }
+}
