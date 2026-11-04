@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "files": [
+    {
+      "name": "runtime-capabilities-41756726830.json",
+      "workflowRun": 41756726830,
+      "artifactId": 13288317670,
+      "zipSha256": "c33fb25e1e32eb16adb1b08b1f5b898bc30895eea91ab7aed1a2a6d54568df87",
+      "jsonSha256": "a698ccbc81447080037d2eaf64158cc6d002c2bfbcacc4f9d15f2a684b9bd20e"
+    },
+    {
+      "name": "subscription-inventory-41755879996.json",
+      "workflowRun": 41755879996,
+      "artifactId": 13287782486,
+      "zipSha256": "69931c6204ca412d16b50caa81c537b9fe81420433e77ec8759776ba1204cdc5",
+      "jsonSha256": "d5e78d2fe02103c304378c6febcee29358c96bcdac474e5b0726f86e99b10724"
+    }
+  ],
+  "restoration": "Downloaded original workflow artifacts; verified archive digests and preserved exact JSON bytes."
+}

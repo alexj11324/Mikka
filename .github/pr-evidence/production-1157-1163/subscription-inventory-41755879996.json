@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "status": "passed",
+  "sourceRevision": "5f85c458893868b721e6ab5a3a4f60a91a5905d1",
+  "expectedDeployment": "dpl_A5g2M3b3yGTXgc7i1d4nGGmhbj2g",
+  "startedAt": "2026-11-04T01:42:39.182Z",
+  "completedAt": "2026-11-04T01:42:41.407Z",
+  "versionBefore": "dpl_A5g2M3b3yGTXgc7i1d4nGGmhbj2g",
+  "versionAfter": "dpl_A5g2M3b3yGTXgc7i1d4nGGmhbj2g",
+  "authentication": {
+    "loginAttempted": true,
+    "loginStatus": 200,
+    "sessionVerified": true,
+    "signOutAttempted": true,
+    "signOutStatus": 200,
+    "sessionEnded": true
+  },
+  "coverage": {
+    "scopeBoundary": "current-session-visible-owned-bots",
+    "scopesSeen": 1,
+    "scopesRead": 1,
+    "limit": 10,
+    "truncated": false
+  },
+  "scopes": [
+    {
+      "workspaceId": "0f877068-66a0-4893-8801-9a14eb3116b3",
+      "botId": "64282ab7-54d9-407f-9229-e1b56572d628",
+      "subscriptionOptions": [],
+      "current": {
+        "kind": "hosted",
+        "provider": "mikka",
+        "modelId": "",
+        "available": true,
+        "availability": "available"
+      }
+    }
+  ],
+  "errors": [],
+  "interpretation": {
+    "ownOptionsMayBeEmptyWithPooledCurrent": true,
+    "menuWasNotRefreshed": true,
+    "modelExecutionPerformed": false
+  }
+}

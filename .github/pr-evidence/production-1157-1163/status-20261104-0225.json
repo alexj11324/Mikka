@@ -1,0 +1,140 @@
+{
+  "schemaVersion": 1,
+  "observedAt": "2026-11-04T02:25:36.714295+00:00",
+  "issues": [
+    {
+      "number": 1157,
+      "state": "open",
+      "acceptanceComplete": false
+    },
+    {
+      "number": 1158,
+      "state": "open",
+      "acceptanceComplete": false
+    },
+    {
+      "number": 1159,
+      "state": "open",
+      "acceptanceComplete": false
+    },
+    {
+      "number": 1160,
+      "state": "open",
+      "acceptanceComplete": false
+    },
+    {
+      "number": 1161,
+      "state": "open",
+      "acceptanceComplete": false
+    },
+    {
+      "number": 1162,
+      "state": "open",
+      "acceptanceComplete": false
+    },
+    {
+      "number": 1163,
+      "state": "open",
+      "acceptanceComplete": false
+    }
+  ],
+  "merged": [
+    {
+      "pr": 1168,
+      "sha": "02e37b27fcbdce0e5db8ea7249f4f4cf39b4cd79",
+      "scope": "execution identity"
+    },
+    {
+      "pr": 1169,
+      "sha": "6b0e7367b896addd99bedab200ea1dfd6a6ba67a",
+      "scope": "request epochs and watchdog"
+    },
+    {
+      "pr": 1183,
+      "sha": "dec1710e9addef5921722c47e8c5d3f24c8ee341",
+      "tree": "01ab4f9a49ccd9c1d87dcec5bc8634623d12a916",
+      "scope": "authorized automatic local handoff"
+    },
+    {
+      "pr": 1189,
+      "sha": "6b7754a679a39dd5f6a9de63260ae8254f334006",
+      "tree": "e57e73af420e638f82a6ccd84f6832764e2c45fa",
+      "scope": "frozen Cloud recovery permission"
+    },
+    {
+      "pr": 1170,
+      "sha": "e97fc9ecddee26aeccc62bcda71f6d547351c5e7",
+      "tree": "8324ed07fa41af59f96054824abb816b14736d10",
+      "scope": "group routing, Factory delegation, traces and replay"
+    }
+  ],
+  "pendingPulls": [
+    {
+      "pr": 1186,
+      "head": "5aa0bed626b6a29721b3841579c8b7e10d06a68f",
+      "tree": "beccfe23a74b05449050e0d598988f7fe575b317",
+      "status": "latest-head CI in progress; exact prior tested product tree"
+    },
+    {
+      "pr": 1190,
+      "head": "3362fb03ef8d5f963d55b9eacc36a51d58ad0686",
+      "tree": "7d5da89896e9d1726301d0dca66c6af3b72e1cdc",
+      "status": "CI passed; waits for parent merge and final ancestry gate"
+    }
+  ],
+  "production": {
+    "deployment": "dpl_CaWbfZQ8cTqWFPrarRZCwzQgwrhF",
+    "status": "READY",
+    "source": "e97fc9ecddee26aeccc62bcda71f6d547351c5e7",
+    "canonicalVersion": {
+      "at": "2026-11-04T02:25:36.714295+00:00",
+      "status": 200,
+      "build": "dpl_CaWbfZQ8cTqWFPrarRZCwzQgwrhF",
+      "sourceSha": "e97fc9ecddee26aeccc62bcda71f6d547351c5e7"
+    },
+    "migrations": [
+      {
+        "name": "20261103220201_group_factory.sql",
+        "target": "MIKKA_DATABASE_URL",
+        "appliedAtMs": 1793758926682
+      },
+      {
+        "name": "20261103220300_group_decision_quality.sql",
+        "target": "MIKKA_DATABASE_URL",
+        "appliedAtMs": 1793758926717
+      }
+    ],
+    "realBundle": "not yet run on final deployment"
+  },
+  "localAcceptance": {
+    "workflow": 41759046100,
+    "source": "3362fb03ef8d5f963d55b9eacc36a51d58ad0686",
+    "item9": "passed, real native handoff and Git-fixture human merge",
+    "item10": "running; native suspended with daemon online",
+    "stallAt": "2026-11-04T02:20:11.578Z",
+    "progressAt": "2026-11-04T02:20:04.608Z",
+    "earliestServerWindow": "2026-11-04T03:05:04.608Z",
+    "overall": "in_progress",
+    "limitations": [
+      "isolated database",
+      "local GitHub fixture",
+      "not production or Cloud-to-device acceptance"
+    ]
+  },
+  "preparedRunner": {
+    "commit": "c1aec83242b5afc227fdef72550d425ab2a8b4e4",
+    "tree": "d30663bd78bb6e45c7e869432c986f56025768a9",
+    "checks": "15/15 offline; exact original five file hashes restored",
+    "productionPins": "placeholders; not dispatched"
+  },
+  "accessLimits": {
+    "inventoryScope": "current-session-visible-owned-bots",
+    "officialSubscriptionOptions": 0,
+    "githubConnected": false,
+    "repositoryCount": 0,
+    "onlineDevices": 0,
+    "mainAccountVaultBinding": "not available",
+    "twoMemberGmailAndMcp": "not executed"
+  },
+  "note": "Intermediate status only; source/CI/READY do not substitute for the specified real production/provider acceptance."
+}
