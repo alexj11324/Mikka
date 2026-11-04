@@ -8,7 +8,8 @@ const ORIGIN = 'https://app.aspectlylabs.com'
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i
 const TOKEN = /^[A-Za-z0-9_.:-]{1,200}$/
 const HASH = /^[a-f0-9]{64}$/
-const POLICIES = ['group-route-v0', 'group-contribution-v1']
+const POLICIES = ['group-route-v0', 'group-contribution-v2']
+const HISTORICAL_POLICIES = [...POLICIES, 'group-contribution-v1']
 const FLASH = new Set(['deepseek-flash', 'deepseek-v4.1-flash', 'deepseek/deepseek-flash', 'deepseek/deepseek-v4.1-flash'])
 const ROLES = [['UI', '负责界面设计、用户交互与可用性。'], ['Coding', '负责代码实现与修复软件缺陷。'], ['Testing', '负责测试设计、回归测试与质量验证。']]
 const ENDED = new Set(['succeeded', 'completed', 'failed', 'stopped', 'cancelled'])
@@ -24,7 +25,7 @@ const pending = turn => ['queued', 'running'].includes(turn.status) || turn.stat
  * The caller owns normal login and temporary Flash-key cleanup. This module
  * creates its own fixture through normal APIs and reports only routing scope. */
 export async function runGroupPolicyRollback({ owner, verifyTarget, assertFlashTestModel, decisionModelId,
-  onCheckpoint, now = Date.now, wait = delay, budgetMs = 555_000 } = {}) {
+  onCheckpoint, now = Date.now, wait = delay, budgetMs = 535_000 } = {}) {
   check(typeof owner?.request === 'function' && typeof verifyTarget === 'function'
     && typeof assertFlashTestModel === 'function', 'normal_transport_required')
   check(typeof onCheckpoint === 'function', 'operator_checkpoint_required')
@@ -127,7 +128,7 @@ export async function runGroupPolicyRollback({ owner, verifyTarget, assertFlashT
       && step.failure === null && step.policyVersion === trace.policyVersion)
       && current[0].phase === (trace.policyVersion === POLICIES[0] ? 'responder' : 'intent'), 'mixed_policy_chain')
     const steps = trace.decisions.map(step => {
-      check(UUID.test(step.id ?? '') && !seenSteps.has(step.id) && POLICIES.includes(step.policyVersion)
+      check(UUID.test(step.id ?? '') && !seenSteps.has(step.id) && HISTORICAL_POLICIES.includes(step.policyVersion)
         && ['intent', 'responder', 'delegation', 'report_timing'].includes(step.phase)
         && Number.isSafeInteger(step.index) && step.index >= 0 && step.index < 4, 'chain_unbound')
       seenSteps.add(step.id)
@@ -157,7 +158,7 @@ export async function runGroupPolicyRollback({ owner, verifyTarget, assertFlashT
       return { id: UUID.test(step?.id ?? '') ? step.id : null,
         phase: ['intent', 'responder', 'delegation', 'report_timing'].includes(step?.phase) ? step.phase : null,
         index: Number.isSafeInteger(step?.index) && step.index >= 0 && step.index < 4 ? step.index : null,
-        policyVersion: POLICIES.includes(step?.policyVersion) ? step.policyVersion : null,
+        policyVersion: HISTORICAL_POLICIES.includes(step?.policyVersion) ? step.policyVersion : null,
         status: ['complete', 'invalid_decision', 'unavailable'].includes(step?.status) ? step.status : null,
         failure: FAILURES.has(step?.failure) ? step.failure : null, receipt: paid,
         decisionCostUsd: paid && Number.isFinite(step?.decisionCostUsd) && step.decisionCostUsd >= 0 ? step.decisionCostUsd : null }
@@ -165,7 +166,7 @@ export async function runGroupPolicyRollback({ owner, verifyTarget, assertFlashT
     const uniquePaid = new Map(steps.filter(step => step.receipt).map(step => [step.receipt.providerGenerationId, step]))
     report.failedTurns.push({ messageId: UUID.test(turn?.messageId ?? '') ? turn.messageId : null,
       status: ['queued', 'running', 'failed', 'complete'].includes(turn?.status) ? turn.status : null,
-      policyVersion: POLICIES.includes(trace?.policyVersion) ? trace.policyVersion : null,
+      policyVersion: HISTORICAL_POLICIES.includes(trace?.policyVersion) ? trace.policyVersion : null,
       primaryReceipt: safeReceipt(trace?.execution), decisions: steps,
       costScope: 'routing-decision-chain', completeCostUsd: null,
       knownCostUsd: steps.length ? [...uniquePaid.values()].reduce((sum, step) => sum + (step.decisionCostUsd ?? 0), 0) : null,
@@ -404,10 +405,11 @@ export async function runGroupPolicyRollbackBundle({ env = process.env, fetchImp
     group: null, error: null, credentialCleanup: null, sessionCleanup: {}, policyChangedByRunner: false,
     manualFlagControlVerified: false, cloudCredentialCreated: false }
   const module = path => import(pathToFileURL(resolve(repo, path)).href)
-  const api = dependencies ?? Object.assign({}, ...await Promise.all([module('scripts/ops/proactive-test-credentials.mjs'), module('scripts/test-model-policy.mjs'), module('lib/smoke-account.ts'), module('lib/coordinator/decision.ts')]))
+  const api = dependencies ?? Object.assign({ runGroupPolicyRollback }, ...await Promise.all([module('scripts/ops/proactive-test-credentials.mjs'), module('scripts/test-model-policy.mjs'), module('lib/smoke-account.ts'), module('lib/coordinator/decision.ts')]))
   const email = env.SMOKE_OWNER_EMAIL, password = env.SMOKE_OWNER_PASSWORD
   check(api.isSmokeAccountEmail(email) && password, 'normal_account_required')
-  let cookie = '', cleanupReceipt
+  check(typeof api.publicCredentialActions === 'function' && typeof api.withTemporaryFlashCredential === 'function', 'source_contract')
+  let cookie = '', cleanupReceipt, credentialActions
   const transport = scope => {
     const record = report.sessionCleanup[scope] = { loginStatus: null, logoutStatus: null }
     return async (input, init = {}) => {
@@ -429,6 +431,15 @@ export async function runGroupPolicyRollbackBundle({ env = process.env, fetchImp
     const response = await owner.request('/api/version', { method: 'GET', signal })
     check(response.status === 200 && (await response.json())?.build === deploymentId, 'deployment_changed')
   }
+  // Resolve the pinned source's two normal Settings references before create.
+  // Finally reuses that bounded result; a stale/unknown delete is not rediscovered
+  // or replayed and therefore cannot be reported as successful cleanup.
+  const discover = async (fetcher, required) => {
+    check(Array.isArray(required) && required.every(name => ['createApiKey', 'deleteApiKey'].includes(name)), 'credential_action_scope')
+    credentialActions ??= await api.publicCredentialActions(fetcher, ['createApiKey', 'deleteApiKey'])
+    check(['createApiKey', 'deleteApiKey'].every(name => /^[a-f0-9]{40,64}$/.test(credentialActions?.[name] ?? '')), 'credential_action_reference')
+    return Object.fromEntries(required.map(name => [name, credentialActions[name]]))
+  }
   try {
     await verifyTarget()
     await api.withTemporaryFlashCredential(async cleanup => {
@@ -440,21 +451,22 @@ export async function runGroupPolicyRollbackBundle({ env = process.env, fetchImp
         cookie = login.headers.getSetCookie().map(value => value.split(';', 1)[0]).join('; ')
         const response = await owner.request('/api/auth/get-session', { method: 'GET' }), session = await response.json()
         check(cookie && response.status === 200 && session?.user?.email?.toLowerCase() === email.toLowerCase(), 'session_identity')
-        const budgetMs = Math.min(555_000, deadline - now() - 45_000)
+        const budgetMs = Math.min(535_000, deadline - now() - 65_000)
         check(budgetMs >= 1000, 'budget_exhausted')
-        report.group = await runGroupPolicyRollback({ owner, verifyTarget, assertFlashTestModel: api.assertFlashTestModel,
+        report.group = await (api.runGroupPolicyRollback ?? runGroupPolicyRollback)({ owner, verifyTarget, assertFlashTestModel: api.assertFlashTestModel,
           decisionModelId: api.DECISION_MODEL, onCheckpoint, now, wait, budgetMs })
       } finally {
         if (cookie) { try { await owner.request('/api/auth/sign-out', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }) } catch {} }
         cookie = ''
       }
-    }, { env: { ...env, MIKKA_TEST_ACCOUNT_EMAIL: email, MIKKA_TEST_ACCOUNT_PASSWORD: password }, fetchImpl: credentialTransport, cloudExecution: false })
+    }, { env: { ...env, MIKKA_TEST_ACCOUNT_EMAIL: email, MIKKA_TEST_ACCOUNT_PASSWORD: password }, fetchImpl: credentialTransport, discover, cloudExecution: false })
     await verifyTarget()
   } catch (error) { report.error = safeError(error) }
   finally {
     cookie = ''
     report.credentialCleanup = cleanupReceipt ? { created: cleanupReceipt.created === true, removed: cleanupReceipt.removed === true } : null
-    report.status = !report.error && report.group?.status === 'passed' && cleanupReceipt && (!cleanupReceipt.created || cleanupReceipt.removed)
+    report.elapsedMs = Math.max(0, now() - started)
+    report.status = !report.error && report.group?.status === 'passed' && report.elapsedMs <= 600_000 && cleanupReceipt && (!cleanupReceipt.created || cleanupReceipt.removed)
       && Object.values(report.sessionCleanup).every(session => session.loginStatus === 200 && session.logoutStatus === 200) ? 'passed' : 'failed'
   }
   return report

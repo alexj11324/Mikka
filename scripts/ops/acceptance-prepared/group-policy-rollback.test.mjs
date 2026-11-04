@@ -5,7 +5,7 @@ import { runGroupPolicyRollback, runGroupPolicyRollbackBundle } from './group-po
 
 const id = n => '00000000-0000-4000-8000-' + String(n).padStart(12, '0')
 const hash = text => createHash('sha256').update(text).digest('hex')
-const BASE = 'group-route-v0', CANDIDATE = 'group-contribution-v1'
+const BASE = 'group-route-v0', CANDIDATE = 'group-contribution-v2'
 const ownerId = 'synthetic-owner', email = 'synthetic-smoke@example.invalid', source = 'a'.repeat(40), build = 'dpl_SyntheticPolicyOnly'
 const response = (value, status = 200, headers = {}) => new Response(JSON.stringify(value), { status, headers: { 'content-type': 'application/json', ...headers } })
 
@@ -232,6 +232,7 @@ function bundle(options = {}) {
     GROUP_ACCEPTANCE_REVISION: source, GROUP_ACCEPTANCE_DEPLOYMENT: build }
   const dependencies = { isSmokeAccountEmail: value => value === email, assertFlashTestModel: h.args.assertFlashTestModel,
     DECISION_MODEL: 'openai/gpt-6-luna-decisions',
+    publicCredentialActions: async () => ({ createApiKey: hash('create'), deleteApiKey: hash('delete') }),
     withTemporaryFlashCredential: async (run, config) => {
       assert.equal(config.cloudExecution, false)
       const cleanup = { created: true, removed: false }
@@ -265,4 +266,98 @@ test('fixed source and deployment are checked before login or fixture/model work
   const deploymentWrong = bundle({ wrongBuild: true }), failed = await runGroupPolicyRollbackBundle(deploymentWrong.args)
   assert.equal(failed.status, 'failed'); assert.equal(deploymentWrong.h.state.calls.length, 1)
   assert.equal(deploymentWrong.h.state.bots.length, 0)
+})
+
+function budgetBundle(options = {}) {
+  let clock = 0, groupReturned = false
+  const state = { discoveries: 0, moduleCalls: 0, logouts: 0, deleteCalls: 0, segments: [], cleanup: { created: !options.existingKey, removed: false } }
+  const origin = 'https://app.aspectlylabs.com'
+  const env = { SMOKE_OWNER_EMAIL: email, SMOKE_OWNER_PASSWORD: 'PRIVATE_PASSWORD', GROUP_ACCEPTANCE_REVISION: source, GROUP_ACCEPTANCE_DEPLOYMENT: build }
+  const fetchImpl = async (url, init) => {
+    assert.equal(url.origin, origin); assert.equal(init.redirect, 'error'); assert.ok(init.signal instanceof AbortSignal)
+    clock++
+    const path = url.pathname.replace(/^\/mikka/, '')
+    if (path === '/api/version') {
+      if (groupReturned) { clock += 15_000; state.segments.push('final-version') }
+      return response({ build })
+    }
+    if (path === '/api/auth/sign-in/email') return response({}, 200, { 'set-cookie': 'session=PRIVATE_COOKIE; HttpOnly' })
+    if (path === '/api/auth/get-session') return response({ user: { id: ownerId, email } })
+    if (path === '/api/auth/sign-out') {
+      state.logouts++
+      if (groupReturned) { clock += 15_000; state.segments.push(state.logouts === 1 ? 'owner-logout' : 'helper-logout') }
+      return response({})
+    }
+    if (path === '/en' && init.method === 'GET' || path === '/_next/static/chunks/credentials.js') return response({ public: true })
+    if (path === '/en' && init.method === 'POST') {
+      const action = new Headers(init.headers).get('next-action')
+      if (action === hash('create')) return response({ id: id(90) })
+      assert.equal(action, hash('delete')); state.deleteCalls++
+      if (groupReturned) { clock += 15_000; state.segments.push('delete-key') }
+      if (options.unknownDelete) throw Error('PRIVATE_UNKNOWN_DELETE')
+      return response({}, options.staleDelete ? 404 : 200)
+    }
+    assert.fail('unexpected budget fixture endpoint')
+  }
+  const dependencies = { isSmokeAccountEmail: value => value === email, assertFlashTestModel: value => assert.equal(value, 'deepseek-flash'),
+    DECISION_MODEL: 'openai/gpt-6-luna-decisions',
+    publicCredentialActions: async (fetcher, required) => {
+      state.discoveries++; assert.deepEqual(required, ['createApiKey', 'deleteApiKey'])
+      assert.equal(state.moduleCalls, 0, 'Both references must resolve before fixture/model work')
+      await fetcher(origin + '/mikka/en', { method: 'GET' })
+      await fetcher(origin + '/mikka/_next/static/chunks/credentials.js', { method: 'GET' })
+      return { createApiKey: hash('create'), deleteApiKey: hash('delete') }
+    },
+    withTemporaryFlashCredential: async (work, config) => {
+      assert.equal(config.cloudExecution, false)
+      const init = { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }
+      await config.fetchImpl(origin + '/mikka/api/auth/sign-in/email', init)
+      try {
+        if (!options.existingKey) {
+          const actions = await config.discover(config.fetchImpl, ['createApiKey'])
+          await config.fetchImpl(origin + '/mikka/en', { ...init, headers: { 'next-action': actions.createApiKey } })
+        }
+        return await work(state.cleanup)
+      } finally {
+        try {
+          if (!options.existingKey) {
+            const actions = await config.discover(config.fetchImpl, ['deleteApiKey'])
+            const deleted = await config.fetchImpl(origin + '/mikka/en', { ...init, headers: { 'next-action': actions.deleteApiKey } })
+            state.cleanup.removed = deleted.status === 200
+            if (!state.cleanup.removed) throw Error('PRIVATE_STALE_DELETE_REFERENCE')
+          }
+        } finally { await config.fetchImpl(origin + '/mikka/api/auth/sign-out', init).catch(() => {}) }
+      }
+    },
+    runGroupPolicyRollback: async input => {
+      state.moduleCalls++; state.moduleBudget = input.budgetMs; clock += input.budgetMs; groupReturned = true
+      return { status: 'passed', policyChangedByRunner: false, manualFlagControlVerified: false }
+    } }
+  return { state, run: () => runGroupPolicyRollbackBundle({ env, dependencies, fetchImpl, verifySource: () => source,
+    onCheckpoint: async () => {}, now: () => clock, wait: async ms => { clock += ms } }) }
+}
+
+test('ten-minute rollback wrapper reserves65s for owner logout, cached key deletion, helper logout and final version', async () => {
+  const h = budgetBundle(), report = await h.run()
+  assert.equal(report.status, 'passed'); assert.ok(h.state.moduleBudget <= 535_000)
+  assert.ok(report.elapsedMs >= 595_000 && report.elapsedMs < 600_000)
+  assert.deepEqual(h.state.segments, ['owner-logout', 'delete-key', 'helper-logout', 'final-version'])
+  assert.equal(h.state.discoveries, 1); assert.equal(h.state.deleteCalls, 1); assert.equal(h.state.logouts, 2)
+  assert.deepEqual(report.credentialCleanup, { created: true, removed: true })
+})
+
+test('rollback cached deletion stale or unknown outcome fails without rediscovery or retry while both logouts finish', async () => {
+  for (const options of [{ staleDelete: true }, { unknownDelete: true }]) {
+    const h = budgetBundle(options), report = await h.run()
+    assert.equal(report.status, 'failed'); assert.equal(h.state.discoveries, 1); assert.equal(h.state.deleteCalls, 1)
+    assert.equal(h.state.logouts, 2); assert.equal(report.credentialCleanup.removed, false)
+    assert.ok(Object.values(report.sessionCleanup).every(session => session.logoutStatus === 200))
+    assert.doesNotMatch(JSON.stringify(report), /PRIVATE/)
+  }
+})
+
+test('rollback preserves an existing key without discovering or writing credential actions', async () => {
+  const h = budgetBundle({ existingKey: true }), report = await h.run()
+  assert.equal(report.status, 'passed'); assert.equal(h.state.discoveries, 0); assert.equal(h.state.deleteCalls, 0)
+  assert.equal(h.state.logouts, 2); assert.deepEqual(report.credentialCleanup, { created: false, removed: false })
 })
