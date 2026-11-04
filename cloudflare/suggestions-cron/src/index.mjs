@@ -6,7 +6,7 @@ export const SCHEDULES = {
   '30 * * * *': '/api/cron/user-facts',
 }
 
-export const MINUTE_ENDPOINTS = ['/api/cron/coordinator-wakes', '/api/cron/schedules', '/api/cron/run-recovery', '/api/cron/account-deletions', '/api/cron/audit-retention', '/api/cron/ops-monitor']
+export const MINUTE_ENDPOINTS = ['/api/cron/coordinator-wakes', '/api/cron/schedules', '/api/cron/run-recovery']
 
 /** @typedef {{ MIKKA_URL?: string, CRON_SECRET?: string }} Env */
 
@@ -25,6 +25,8 @@ export async function runSchedule(cron, env, fetcher = fetch, scheduledTime = Da
     // Cloudflare supplies the scheduled timestamp, so a delayed invocation
     // still runs the original UTC quarter-hour/hour/half-hour work.
     const minute = new Date(scheduledTime).getUTCMinutes()
+    if (minute === 0) endpoints.push('/api/cron/account-deletions', '/api/cron/audit-retention')
+    if (minute % 15 === 0) endpoints.push('/api/cron/ops-monitor')
     if (minute % 15 === 0) endpoints.push(SCHEDULES['*/15 * * * *'])
     if (minute === 0) endpoints.push(SCHEDULES['0 * * * *'])
     if (minute === 30) endpoints.push(SCHEDULES['30 * * * *'])
