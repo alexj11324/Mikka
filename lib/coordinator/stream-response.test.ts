@@ -122,6 +122,12 @@ test('each tool streams its name, state and short previews; thinking streams as 
   assert.ok(events.findIndex(event => event.type === 'thinking' && event.state === 'delta') < events.findIndex(event => event.type === 'thinking' && event.state === 'end'))
 })
 
+test('a tool call names how much of the reply was said before it, held back or not, so it shows after those words', async () => {
+  const events = await project([start(), delta('I will make the task first.'), call('c1', 'create_issue', {}), result('c1', 'create_issue', {}), delta('Done.'), committed()])
+  const tools = events.filter((event): event is Extract<CoordinatorStreamEvent, { type: 'tool' }> => event.type === 'tool')
+  assert.deepEqual(tools.map(tool => tool.at), ['I will make the task first.'.length, undefined], 'the call carries it; its result keeps the call\'s place')
+})
+
 const reasoningDelta = (text: string) => ({ type: 'reasoning-delta', id: 'r', text }) as unknown as CoordinatorWorkflowStreamPart
 
 test('reasoning streams masked as it goes: no credential or saved secret, whole or in part, ever leaves; encrypted or empty reasoning streams no text', async () => {

@@ -306,7 +306,8 @@ export function instructionsWithPersonal(instructions: string, personal: string)
 
 /** One entry in the chat the person sees. */
 /** A tool a reply used, as the chat shows it: `running` until its result is stored. */
-export interface ChatTool { call: string; name: string; state: 'running' | 'done' | 'error'; input?: string; output?: string }
+/** `at`: how much of the reply's text came before this tool ran, so the chat draws it after those words. */
+export interface ChatTool { call: string; name: string; state: 'running' | 'done' | 'error'; input?: string; output?: string; at?: number }
 /** `reasoningAt`: the stored rows whose reasoning is readable text, fetched only when the person opens it (chat-projection.ts keeps its length). */
 export interface ChatActivity { tools: ChatTool[]; thought: boolean; reasoningAt?: number[] }
 
@@ -477,7 +478,11 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
       const stream = (message as { mikkaStreamId?: unknown }).mikkaStreamId
       const streamId = typeof stream === 'string' ? stream : undefined
       const shows = Boolean(cited.text || steps.length || thought)
-      if (last?.from === 'coordinator' && !waiting.ids.length && !briefingBoundary) {
+      const merges = last?.from === 'coordinator' && !waiting.ids.length && !briefingBoundary
+      // A step's tools run after its words: they sit after the reply's text so far, this step's included.
+      const at = (merges ? [last.text, cited.text].filter(Boolean).join('\n\n') : cited.text).length
+      for (const step of steps) step.at = at
+      if (last && merges) {
         if (!last.streamId && shows && streamId) last.streamId = streamId
         if (steps.length || thought) last.activity = { tools: [...last.activity?.tools ?? [], ...steps], thought: Boolean(last.activity?.thought || thought),
           ...(last.activity?.reasoningAt || readable ? { reasoningAt: [...last.activity?.reasoningAt ?? [], ...(readable ? [position] : [])] } : {}) }

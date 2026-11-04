@@ -1,7 +1,7 @@
 import type { CoordinatorStreamEvent } from './coordinator/stream'
 
 /** A tool a live reply is using, as the stream reports it. */
-export type CoordinatorLiveTool = { call: string; name: string; state: 'running' | 'done' | 'error'; input?: string; output?: string }
+export type CoordinatorLiveTool = { call: string; name: string; state: 'running' | 'done' | 'error'; input?: string; output?: string; at?: number }
 
 export type CoordinatorLiveReply = {
   id: string
@@ -67,7 +67,8 @@ function parseEvent(line: string): CoordinatorStreamEvent {
       }
       if (event.type === 'tool' && typeof event.call === 'string' && typeof event.name === 'string' && ['running', 'done', 'error'].includes(event.state)) {
         return { type: 'tool', id: event.id, call: event.call, name: event.name, state: event.state,
-          ...(typeof event.input === 'string' ? { input: event.input } : {}), ...(typeof event.output === 'string' ? { output: event.output } : {}) }
+          ...(typeof event.input === 'string' ? { input: event.input } : {}), ...(typeof event.output === 'string' ? { output: event.output } : {}),
+          ...(Number.isSafeInteger(event.at) && event.at >= 0 ? { at: event.at } : {}) }
       }
       if (event.type === 'thinking' && (event.state === 'start' || event.state === 'end')) return { type: 'thinking', id: event.id, state: event.state }
       if (event.type === 'thinking' && (event.state === 'delta' || event.state === 'reset') && typeof event.text === 'string') return { type: 'thinking', id: event.id, state: event.state, text: event.text }
