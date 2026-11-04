@@ -1,0 +1,87 @@
+{
+  "scope": "Isolated real Flash/native local-loop item 10 only; no production failure injection and no Cloud-to-device run",
+  "source": {
+    "sha": "55840a4f186c86b5c776629a8d075d654dd5c16f",
+    "tree": "e2f4733a52611b4b9fb19476d9ab8f7eeb64bc44",
+    "parent": "59ecb8cde452b2688a4b22a8c01b6baa40710fce"
+  },
+  "dispatch": {
+    "branch": "acceptance/watchdog-stop-1195",
+    "sha": "02824f390d411e95a20be55c4dc4ce6dda20fd83",
+    "workflowRun": 41777015753,
+    "job": 126399623993,
+    "command": "cmd_bb50816f7e284657845b0dea846a",
+    "startedAt": "2026-11-04T05:05:06.453Z",
+    "softMinutes": 85,
+    "killMinutes": 88,
+    "hardMinutes": 90,
+    "workflowConclusion": "success"
+  },
+  "run": {
+    "id": "a673713c-4421-48ee-8713-8530bbc73a4a",
+    "database": "mikka_loop_a673713c4421_e2e",
+    "taskId": "ddb1d247-fcdb-47e0-ae3d-89dc6e01cd4a",
+    "requestEpoch": "4dc82748-43f0-4646-8178-bf922dc3a087",
+    "originalRunId": "9435e482-0518-4131-ac08-b973c0ef6daf",
+    "originalAttemptId": "912ca132-b7d3-4f58-8fa8-2bfd14b42f54",
+    "deviceA": "0206f246-d879-47fd-915f-ee6c55a74ee3",
+    "deviceB": "24c7f4f2-4115-4dd2-bdb0-7d8fe11ae660",
+    "suspendedAt": "2026-11-04T05:07:33.967Z",
+    "progressAt": "2026-11-04T05:07:32.172Z",
+    "naturalFortyFiveMinuteBoundary": "2026-11-04T05:52:32.172Z"
+  },
+  "boundary": {
+    "factoryWatchdogMinutes": 45,
+    "checkpointRecoveryMinutes": 30,
+    "daemonDefaultStallMinutes": 10,
+    "isolatedDaemonExplicitStallMinutes": 60,
+    "observerSqlTimeoutSeconds": 10,
+    "first57014RetryLimit": 1,
+    "second57014Fails": true
+  },
+  "productEquivalence": {
+    "refs": [
+      "020b3957e8fc9609528c69499609adef08150cdf",
+      "7b6c1ee1b4a53563b2d6d9885ad992858514cd7a"
+    ],
+    "method": "Exact immutable Git blob identities",
+    "files": [
+      {
+        "path": "lib/agent-tool-approval/store.ts",
+        "sha": "804327663416cff874e48b9c01806c6f9bfa325a",
+        "identical": true
+      },
+      {
+        "path": "app/v1/runs/[runId]/tool-approval/route.ts",
+        "sha": "24938c59691474f4ad96c8864171bdd94b489881",
+        "identical": true
+      },
+      {
+        "path": "packages/daemon/src/agents/tool-approval.ts",
+        "sha": "2cfe7d8b09442150d1c36639af46c83da77171a6",
+        "identical": true
+      },
+      {
+        "path": "packages/daemon/src/server-link-http.ts",
+        "sha": "b4d24f0ed45db37aac879d222db9e012aa13a418",
+        "identical": true
+      },
+      {
+        "path": "packages/daemon/src/runs/supervisor.ts",
+        "sha": "103712e191f2f8e2b038912cec24cd2bf783b47a",
+        "identical": true
+      }
+    ]
+  },
+  "status": "passed",
+  "cleanupVerified": true,
+  "completedAt": "2026-11-04T05:56:08.200Z",
+  "commandResult": {
+    "id": "cmd_bb50816f7e284657845b0dea846a",
+    "exitCode": 0,
+    "durationMs": 3072682
+  },
+  "outcome": "bounded_checkpoint_block",
+  "productionAcceptance": false,
+  "cloudDeviceAcceptance": false
+}

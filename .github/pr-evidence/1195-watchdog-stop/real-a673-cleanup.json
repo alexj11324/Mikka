@@ -1,0 +1,35 @@
+{
+  "at": "2026-11-04T05:57:54.041522+00:00",
+  "ownedProcesses": [],
+  "ports": {
+    "3114": false,
+    "3191": false
+  },
+  "credentialsPresent": {
+    "daemon/device.json": false,
+    "daemon/daemon.secret": false,
+    "daemon-b/device.json": false,
+    "daemon-b/daemon.secret": false
+  },
+  "wrapperAlive": false,
+  "telemetryCleanup": {
+    "action": "SIGTERM owned completed-run Next telemetry helper only",
+    "signalled": [
+      152636,
+      152603
+    ],
+    "remaining": []
+  },
+  "deviceAuthority": {
+    "deviceTokenRows": 2,
+    "unrevokedDeviceTokenRows": 0,
+    "expiredDeviceTokenRows": 0
+  },
+  "poolLease": {
+    "state": "quarantined",
+    "releasedAt": "2026-11-04T05:56:15.225169+00:00",
+    "expired": true
+  },
+  "poolReusable": false,
+  "databaseRetained": true
+}

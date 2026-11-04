@@ -1,0 +1,32 @@
+[
+  {
+    "taskId": "ddb1d247-fcdb-47e0-ae3d-89dc6e01cd4a",
+    "requestEpoch": "4dc82748-43f0-4646-8178-bf922dc3a087",
+    "stage": "execute",
+    "revision": 6
+  },
+  {
+    "id": "9435e482-0518-4131-ac08-b973c0ef6daf",
+    "deviceId": "0206f246-d879-47fd-915f-ee6c55a74ee3",
+    "status": "failed",
+    "stopReason": "device_lost",
+    "createdAt": "2026-11-04T05:06:55.033148+00:00",
+    "startedAt": "2026-11-04T05:06:56.68589+00:00",
+    "finishedAt": "2026-11-04T05:53:03.407206+00:00",
+    "stopRequestedAt": "2026-11-04T05:53:00.324525+00:00",
+    "retryOf": null,
+    "error": "Run lease expired; the server could not be reached"
+  },
+  {
+    "id": "ceaea2b6-8290-4534-a401-9ba14e673a82",
+    "deviceId": "24c7f4f2-4115-4dd2-bdb0-7d8fe11ae660",
+    "status": "stopped",
+    "stopReason": "blocked",
+    "createdAt": "2026-11-04T05:53:03.52731+00:00",
+    "startedAt": null,
+    "finishedAt": "2026-11-04T05:53:09.817496+00:00",
+    "stopRequestedAt": null,
+    "retryOf": "9435e482-0518-4131-ac08-b973c0ef6daf",
+    "error": null
+  }
+]

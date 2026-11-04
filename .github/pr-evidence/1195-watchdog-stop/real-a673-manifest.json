@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "scope": "isolated item 10; passed bounded_checkpoint_block, not production or Cloud handoff",
+  "files": [
+    {
+      "path": "real-a673-cleanup.json",
+      "bytes": 793,
+      "sha256": "d353298a38798db9378ecb5d28dfa7dda95bf03dafbaae6759a813b97f1ef815",
+      "gitBlobSha": "01acb999bced044faf4db332b9e26c23f4877244"
+    },
+    {
+      "path": "real-a673-dispatch.json",
+      "bytes": 195,
+      "sha256": "d7d557a7a53addf00006ee82af7cf625d2798d843cc0dfff97be1f6c811de98c",
+      "gitBlobSha": "ffb9815a4358c107624a64715562171b4ba11dd1"
+    },
+    {
+      "path": "real-a673-item10.json",
+      "bytes": 15327,
+      "sha256": "981903260e8d6b60a7971e61b3ee29d8f8af42d7a4047a95891d3c62e7b797b0",
+      "gitBlobSha": "816d0ccddd02b05645ff34481abc79697f837a35"
+    },
+    {
+      "path": "real-a673-passed-items.json",
+      "bytes": 278,
+      "sha256": "0c7fa7a22e383b7aed57cdbb3d38995b29d0d6930d10e5893f34fc403b5d688c",
+      "gitBlobSha": "d06ea00ae542dacb8424d9f643e3e6a3089ad220"
+    },
+    {
+      "path": "real-a673-pg.json",
+      "bytes": 1045,
+      "sha256": "60ab70452371b26de7f6ec2c50ad045f74d74dc3c761840ca8e10ac7d09e8b8e",
+      "gitBlobSha": "bff8e5c27d1ce0784c6f7f4169f7722f5d4fd4d0"
+    },
+    {
+      "path": "real-a673-review.md",
+      "bytes": 5728,
+      "sha256": "cecafa1080de9b92bc65b33bdc2972d3e0b83439cac6ca63e1b0fc8673c2ffe0",
+      "gitBlobSha": "014d1ac7a280183ce07f9ed0356ba4ea7f0a8fb7"
+    },
+    {
+      "path": "real-a673-scope.json",
+      "bytes": 2936,
+      "sha256": "2ff197758bfaab4721d866ead2b0f8e2f44fff31c02fabb2ce67527705228757",
+      "gitBlobSha": "2b747f0e2569420f52ec1d8f8a44930fadccb1a5"
+    },
+    {
+      "path": "real-a673-source.json",
+      "bytes": 211,
+      "sha256": "b96142e2e7a36f3a51a4de2d25386ab634f0e565b709ddc7f237a529b863e4ec",
+      "gitBlobSha": "e766f11e2370e30559eacde4f0793c8b252faa6c"
+    }
+  ]
+}
