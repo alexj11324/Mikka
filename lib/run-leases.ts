@@ -280,19 +280,33 @@ async function moveToCloud(run: Run, cloud: CloudTarget, attempt: number, now: D
 }
 
 /** Provisions a queued cloud run; exact native continuation failures retain its original VM. */
-export async function startThreadMachine(actor: { userId: string; workspaceId: string }, runId: string) {
+export async function startThreadMachine(actor: { userId: string; workspaceId: string }, runId: string, startLifecycle = true) {
   try {
     await (await import('@/lib/cloud-computer/thread-machines')).ensureThreadMachine(pool, actor, runId)
-    const { start } = await import('workflow/api')
-    const { threadMachineLifecycle } = await import('@/workflows/thread-machine/workflow')
-    await start(threadMachineLifecycle, [actor, runId])
+    if (startLifecycle) {
+      const { start } = await import('workflow/api')
+      const { threadMachineLifecycle } = await import('@/workflows/thread-machine/workflow')
+      await start(threadMachineLifecycle, [actor, runId])
+    }
     return { state: 'running' as const }
-  } catch {
+  } catch (error) {
+    const { RetainedTaskMachineUnavailable } = await import('@/lib/cloud-computer/thread-machines')
+    if (error instanceof RetainedTaskMachineUnavailable) return { state: 'unavailable' as const, reason: 'retained_runtime' as const }
     // A question continuation cannot replace its original native session VM.
     // Keep the committed answer/run and placement for the same answer's retry.
     const [continuation] = await db.select({ question: agentRuns.questionContinuation }).from(agentRuns)
       .where(and(eq(agentRuns.id,runId),eq(agentRuns.userId,actor.userId))).limit(1)
     if (continuation?.question?.requireSessionResume) return { state: 'unavailable' as const }
+    // A lifecycle enqueue may fail after provisioning succeeded. Re-read the
+    // committed adoption, so even that failure cannot end the task's old VM.
+    const retained = await pool.query(`SELECT 1 FROM thread_machines m
+      JOIN agent_runs current ON current.id=m."runId" AND current."userId"=m."ownerId" AND current."issueId"=m."issueId"
+      WHERE m."runId"=$1 AND m."ownerId"=$2 AND m."workspaceId"=$3 AND m.state<>'ended' AND m."sandboxId" IS NOT NULL
+        AND EXISTS(SELECT 1 FROM thread_machines old JOIN agent_runs previous ON previous.id=old."runId" AND previous."userId"=old."ownerId"
+          WHERE old."runId"<>m."runId" AND old."ownerId"=m."ownerId" AND old."workspaceId"=m."workspaceId" AND old."issueId"=m."issueId"
+            AND old."deviceId"=m."deviceId" AND old."repoId"=m."repoId" AND old.state='ended' AND old."sandboxId" IS NULL
+            AND previous.status IN ('succeeded','failed','stopped','cancelled'))`, [runId,actor.userId,actor.workspaceId])
+    if (retained.rowCount) return { state: 'unavailable' as const, reason: 'retained_runtime' as const }
     await (await import('@/lib/cloud-computer/thread-machines')).threadMachineAction(pool, actor, runId, 'end').catch(() => undefined)
     const [run] = await db.update(agentRuns).set({ status: 'failed', stopReason: 'device_lost', error: DEVICE_STAYED_OFFLINE, updatedAt: new Date() })
       .where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, actor.userId), inArray(agentRuns.status, ['queued', 'stopped']))).returning()
