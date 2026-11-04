@@ -11,7 +11,7 @@ import { createFactoryDispatch, defaultFactoryDispatchAdapters, factoryBinding, 
 import { createFactoryHumanStore } from './human-store';
 import { handleFactory } from './http';
 import { sweepFactoryWatchdog } from './watchdog';
-import { currentFactoryRequest, factoryCheckGates } from './checks';
+import { currentFactoryRequest, factoryCheckAssignment, factoryCheckGates } from './checks';
 import { approvalEvidence } from './evidence';
 import { factoryEventId } from './event-id';
 import { questionFingerprint, humanQuestionAnswerSchema } from './questions/contract';
@@ -117,6 +117,8 @@ test("run completion enters review without the Coordinator; replays do not advan
       await sweep.run('owner', f.runId);
       assert.equal((await store.read('owner', f.task.id)).task.status, 'blocked', 'ordinary completion replay has no owner authority');
       assert.ok((await store.read('owner', f.task.id)).completionRecovery);
+      assert.deepEqual((await store.listForIssue('owner', f.task.issueId)).tasks.find(task => task.id === f.task.id)?.completionRecovery,
+        { binding: { taskId: f.task.id, revision: f.task.revision } }, 'the normal issue list exposes only the eligible host binding');
       let starts = 0, queued = 0;
       const reviewDispatch = createFactoryDispatch(pool, store, async (...args) => { queued++; return queue(...args); }, defaultFactoryDispatchAdapters);
       const human = createFactoryHumanStore(pool, () => store, async (tx, _store, current, run) => {
@@ -132,13 +134,18 @@ test("run completion enters review without the Coordinator; replays do not advan
       assert.deepEqual(await history(f.task.id, f.runId, f.task.attemptId), before, 'the producer, blocked attempt and exhausted watchdog receipt stay byte-for-byte equal');
       const current = (await store.read('owner', f.task.id)).task;
       assert.deepEqual({ stage: current.stage, status: current.status }, { stage: 'review', status: 'running' });
+      assert.equal((await store.listForIssue('owner', f.task.issueId)).tasks.find(task => task.id === f.task.id)?.completionRecovery, undefined);
       const { rows: runs } = await pool.query(`SELECT r.* FROM agent_runs r JOIN factory_attempts a ON a."runId"=r.id WHERE a."taskId"=$1 ORDER BY a.position`, [f.task.id]);
       assert.equal(runs.length, 2);
       assert.equal(runs[0].id, f.runId);
       assert.equal(runs[1].kind, 'acceptance');
       assert.equal(runs[1].sessionId, null);
       assert.equal(runs[1].retryOf, null);
-      assert.equal(runs[1].agentDefinition.readOnly, true);
+      const assignment = await factoryCheckAssignment(pool, 'owner', runs[1].id);
+      assert.equal(assignment.policy.readOnly, true, 'the actual claim assignment enforces the frozen independent read-only policy');
+      const frozenCheck = (await store.read('owner', f.task.id)).attempts.find(a => a.id === current.attemptId)!.output.check as { candidateId: string; sha: string };
+      assert.equal(frozenCheck.candidateId, current.candidateId);
+      assert.equal(frozenCheck.sha, 'b'.repeat(40));
       const candidate = (await pool.query('SELECT * FROM factory_candidates WHERE "taskId"=$1', [f.task.id])).rows[0];
       assert.equal(candidate.runId, f.runId);
       assert.equal(candidate.sha, 'b'.repeat(40));
@@ -220,7 +227,7 @@ test("run completion enters review without the Coordinator; replays do not advan
       await pool.query(`UPDATE factory_attempts SET position=2,ordinal=2,output=output-'requestEpoch' WHERE id=$1`, [f.task.attemptId]);
       await pool.query(`INSERT INTO factory_attempts(id,"taskId",stage,ordinal,position,status,"runId","sessionId",reason)
         VALUES($1,$2,'execute',1,1,'waiting',$3,'s1','Owner answer required')`, [originAttemptId, f.task.id, originId]);
-      await pool.query(`INSERT INTO coordinator_events(id,"userId",kind,"dedupeKey",payload) VALUES($1,'owner','run_question',$1::text,'{}')`, [questionEventId]);
+      await pool.query(`INSERT INTO coordinator_events(id,"userId",kind,"dedupeKey",payload) VALUES($1::uuid,'owner','run_question',$1::text,'{}')`, [questionEventId]);
       const waiting = { taskId: f.task.id, issueId: f.task.issueId, attemptId: originAttemptId, candidateId: null, revision: 2 };
       const input = humanQuestionAnswerSchema.parse({ answerId, text: ownerText, reference: { questionId, questionRevision: 1, binding: waiting, originRunId: originId, originSessionId: 's1' } });
       const answer = { source: 'human', userId: 'owner', input };

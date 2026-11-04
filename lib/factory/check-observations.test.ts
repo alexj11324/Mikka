@@ -58,6 +58,7 @@ function repairBriefFixture(options: { stage?: 'review' | 'verify'; previous?: b
   let writes = 0
   const tx = { query: async (sql: string, args: unknown[]) => {
     if (sql.startsWith('SELECT output')) return { rows: [pending] }
+    if (sql.includes('FROM factory_tasks t JOIN factory_attempts a')) return { rows: [] }
     if (sql.includes('FROM coordinator_events')) return { rows: [] }
     if (sql.includes('FROM factory_attempts')) {
       assert.deepEqual(args, [task.id, pending.position, task.sourceEventId])

@@ -22,7 +22,7 @@ import { ShortSha, shortSha } from './short-sha'
 import { FieldError } from '@/components/ui/field'
 
 type Candidate = { sha: string | null; kind?: 'repository' | 'report' | 'deliverable'; repository: string; environment: string; scope: string }
-export type FactoryTask = { id: string; issueId: string; stage: string; status: string; reason: string; candidateId: string | null; candidateRunId: string | null; isSkillCandidate: boolean }
+export type FactoryTask = { id: string; issueId: string; stage: string; status: string; reason: string; candidateId: string | null; candidateRunId: string | null; isSkillCandidate: boolean; completionRecovery?: AcceptanceDetail['completionRecovery'] }
 type Evidence = { binding: { taskId: string; issueId: string; attemptId: string; revision: number; candidateId: string | null }; manifest: { candidate: Candidate; artifacts: EvidenceEntry[] } }
 type Approval = { id: string; candidateId: string; candidate: Candidate; action: string; target: string; targetEnvironment: string; expiresAt: string; revokedAt: string | null; createdAt: string }
 type Publication = { id: string; approvalId: string; status: 'reserved' | 'uncertain' | 'succeeded' | 'failed'; request: Record<string, unknown>; receipt?: { verifiedTarget?: { reference?: string } } }

@@ -33,6 +33,8 @@ import {
 } from "./dispatch";
 import { createFactoryClaim } from "./claim";
 import { createFactoryQuestions, questionReference } from "./questions/store";
+import { humanQuestionAnswerSchema, questionFingerprint } from './questions/contract';
+import { factoryEventId } from './event-id';
 import { handleFactoryQuestion } from "./questions/http";
 import { createFactoryReconciler } from "./reconcile";
 import { factoryCheckIndependent } from "./check-independence";
@@ -43,6 +45,7 @@ import {
   factoryCheckAssignment,
   factoryCheckGates,
   factoryRepairBrief,
+  currentFactoryRequest,
 } from "./checks";
 import { reconcileFactoryCheck } from "./reconcile-check";
 import {
@@ -1338,6 +1341,15 @@ test(
             (await state(r.task.id)).attempts.find((a) => a.id === original.id),
             original,
           );
+          const repairedRun = (await db.query('SELECT "continuesRunId" FROM agent_runs WHERE id=$1', [repair.runId])).rows[0];
+          assert.equal(repairedRun.continuesRunId, failed.candidates.find(c => c.id === failed.task.candidateId)!.runId);
+          await terminal(repair.runId, `model-repair-${r.task.id}`, false, report => { report.publish = { commit: sha }; report.sourceCommit = sha; });
+          await reconcile.run('owner', repair.runId);
+          const next = (await state(r.task.id)).task;
+          assert.equal(next.stage, 'review');
+          assert.equal(next.status, 'pending');
+          assert.notEqual(next.candidateId, failed.task.candidateId);
+          assert.ok((await start(next)).runId, 'ordinary model-selected repair still reaches the next independent check');
         },
       );
 
@@ -1355,6 +1367,113 @@ test(
       } });
       try {
         const { automaticFactoryDispatch } = await import("./automatic-dispatch");
+        await t.test('saved Owner answer survives automatic repair and the new candidate checks through canonical same-epoch ancestry', async () => {
+          const pending = await pendingReview();
+          const candidate = pending.candidates.find(c => c.id === pending.task.candidateId)!;
+          const producerAttempt = pending.attempts.find(a => a.runId === candidate.runId)!;
+          const originId = randomUUID(), originAttemptId = randomUUID(), questionId = randomUUID(), questionEventId = randomUUID(), answerId = randomUUID();
+          const originalTarget = 'Original issue target: exactly 56 bytes.';
+          const expectedHash = createHash('sha256').update('x'.repeat(84) + '\n').digest('hex');
+          const ownerText = `The answered target is exactly 85 bytes, SHA256 ${expectedHash}. Keep all other requirements. token=fixture-private`;
+          const nativeSession = `execute-${pending.task.issueId}`;
+          await db.query('UPDATE factory_attempts SET position=3 WHERE id=$1', [pending.task.attemptId]);
+          await db.query(`UPDATE factory_attempts SET position=2,ordinal=2,output=output-'requestEpoch' WHERE id=$1`, [producerAttempt.id]);
+          await db.query(`INSERT INTO agent_runs(id,"userId","issueId","agentId","deviceId","deviceRepoId","botId",status,"stopReason","sessionId","agentDefinition",prompt)
+            SELECT $2,"userId","issueId","agentId","deviceId","deviceRepoId","botId",'stopped','asked_human',"sessionId","agentDefinition",'Original owner task' FROM agent_runs WHERE id=$1`, [candidate.runId, originId]);
+          await db.query(`INSERT INTO factory_attempts(id,"taskId",stage,ordinal,position,status,"runId","sessionId",reason)
+            VALUES($1,$2,'execute',1,1,'waiting',$3,$4,'Owner answer required')`, [originAttemptId, pending.task.id, originId, nativeSession]);
+          await db.query(`INSERT INTO coordinator_events(id,"userId","botId",kind,"dedupeKey",payload) VALUES($1::uuid,'owner',$2,'run_question',$1::text,'{}')`, [questionEventId, coordinatorBot]);
+          const waiting = { taskId: pending.task.id, issueId: pending.task.issueId, attemptId: originAttemptId, candidateId: null, revision: 2 };
+          const input = humanQuestionAnswerSchema.parse({ answerId, text: ownerText, reference: { questionId, questionRevision: 1, binding: waiting, originRunId: originId, originSessionId: nativeSession } });
+          const answer = { source: 'human', userId: 'owner', input };
+          await db.query(`INSERT INTO factory_questions(id,"userId","issueId","taskId","attemptId",stage,"originRunId","originSessionId","originRevision","waitingBinding",kind,question,context,request,status,revision,reason,"sourceEventId","answerId","answerSource",answer,"answerFingerprint","answeredAt","continuationRunId",result)
+            VALUES($1,'owner',$2,$3,$4,'execute',$5,$6,1,$7,'external','Which target?','UNRELATED PRIVATE RFI CONTEXT','{}','resolved',3,'Answered',$8,$9,'human',$10,$11,now(),$12,$13)`,
+            [questionId, pending.task.issueId, pending.task.id, originAttemptId, originId, nativeSession, JSON.stringify(waiting), questionEventId, answerId, JSON.stringify(answer), questionFingerprint(answer), candidate.runId, JSON.stringify({ continuationRunId: randomUUID() })]);
+          await db.query('UPDATE agent_runs SET "questionContinuation"=$2 WHERE id=$1', [candidate.runId, JSON.stringify({ questionId, originRunId: originId, originSessionId: nativeSession, requireSessionResume: true })]);
+          const originalHistory = async () => (await db.query(`SELECT jsonb_build_object(
+            'producer',(SELECT to_jsonb(r) FROM agent_runs r WHERE id=$1),
+            'attempt',(SELECT to_jsonb(a) FROM factory_attempts a WHERE id=$2),
+            'question',(SELECT to_jsonb(q) FROM factory_questions q WHERE id=$3)) AS value`, [candidate.runId, producerAttempt.id, questionId])).rows[0].value;
+          const before = await originalHistory();
+          const check = await start(pending.task);
+          await terminal(check.runId, `failed-owner-answer-${pending.task.id}`, false, report => {
+            report.criteria = [{ text: 'Expected 56 bytes; observed 85 bytes.', passed: false, evidence: 'Synthetic mismatched old target, not a new Owner instruction' }];
+          });
+          await toolChunks(check.runId);
+          await reconcile.run('owner', check.runId);
+          const failed = await state(pending.task.id);
+          assert.equal(failed.task.status, 'failed');
+          const failedAttempt = failed.attempts.find(a => a.id === failed.task.attemptId)!;
+          const failedRun = (await db.query('SELECT * FROM agent_runs WHERE id=$1', [check.runId])).rows[0];
+          const finishId = factoryEventId('check-completion', check.runId);
+          assert.equal((await db.query('SELECT result FROM factory_events WHERE "taskId"=$1 AND "eventId"=$2', [pending.task.id, finishId])).rows[0].result.task.status, 'failed');
+          queuedRepairPrompt = originalTarget;
+          const tx = await db.connect();
+          try {
+            await tx.query('BEGIN');
+            const afterCommit = await automaticFactoryDispatch(db)(tx, store, failed.task, failedRun);
+            assert.equal(typeof afterCommit, 'function');
+            await tx.query('COMMIT');
+          } catch (error) { await tx.query('ROLLBACK'); throw error } finally { tx.release(); queuedRepairPrompt = originalRepairRequest; }
+          const repairing = await state(pending.task.id);
+          assert.equal(repairing.task.candidateId, null, 'the normal repair transition clears the current candidate');
+          const repairAttempt = repairing.attempts.find(a => a.id === repairing.task.attemptId)!;
+          const repairRun = (await db.query('SELECT * FROM agent_runs WHERE id=$1', [repairAttempt.runId])).rows[0];
+          const assertAnswer = (prompt: string) => {
+            assert.match(prompt, /Saved Owner answer consumed by the earlier native execution and inherited through verified repair/);
+            assert.ok(prompt.includes(`exactly 85 bytes, SHA256 ${expectedHash}`));
+            assert.match(prompt, /supersedes conflicting original issue wording/);
+            assert.doesNotMatch(prompt, /fixture-private|UNRELATED PRIVATE RFI CONTEXT/);
+          };
+          assertAnswer(repairRun.prompt);
+          assert.ok(repairRun.prompt.indexOf('exactly 85 bytes') < repairRun.prompt.indexOf(originalTarget));
+          assert.ok(repairRun.prompt.includes('Expected 56 bytes; observed 85 bytes.'), 'the incorrect finding remains failure evidence, not the target');
+          assert.equal(repairRun.continuesRunId, candidate.runId);
+          assert.equal(repairRun.questionContinuation, null, 'a new repair session does not impersonate the original native answer consumer');
+          assert.equal(repairRun.agentDefinition.promptDigest, (await import('../agent-kit/definition')).digest(repairRun.prompt));
+          await terminal(repairRun.id, `new-repair-session-${pending.task.id}`, false, report => { report.publish = { commit: sha }; report.sourceCommit = sha; });
+          await reconcile.run('owner', repairRun.id);
+          const repaired = await state(pending.task.id);
+          assert.equal(repaired.task.stage, 'review');
+          assert.equal(repaired.task.status, 'pending');
+          assert.notEqual(repaired.task.candidateId, candidate.id);
+          assert.equal(repaired.candidates.find(c => c.id === repaired.task.candidateId)!.runId, repairRun.id);
+          for (const [label, sql, args] of [
+            ['missing continuation', 'UPDATE agent_runs SET "continuesRunId"=NULL WHERE id=$1', [repairRun.id]],
+            ['non-adjacent repair', 'UPDATE factory_attempts SET position=position+20 WHERE id=$1', [repairAttempt.id]],
+            ['different failed candidate', 'UPDATE factory_attempts SET "candidateId"=$2 WHERE id=$1', [failedAttempt.id, repaired.task.candidateId]],
+            ['old failed epoch', `UPDATE factory_attempts SET output=jsonb_set(output,'{requestEpoch}',to_jsonb($2::text)) WHERE id=$1`, [failedAttempt.id, randomUUID()]],
+            ['missing repair receipt', 'DELETE FROM factory_events WHERE "taskId"=$1 AND "eventId"=$2', [pending.task.id, factoryEventId('check-repair', failedAttempt.id)]],
+            ['corrupt repair result', `UPDATE factory_events SET result=jsonb_set(result,'{task}','{}') WHERE "taskId"=$1 AND "eventId"=$2`, [pending.task.id, factoryEventId('check-repair', failedAttempt.id)]],
+            ['changed failed status', `UPDATE factory_attempts SET status='passed' WHERE id=$1`, [failedAttempt.id]],
+            ['missing canonical finish', 'DELETE FROM factory_events WHERE "taskId"=$1 AND "eventId"=$2', [pending.task.id, finishId]],
+            ['corrupt canonical attempts', `UPDATE factory_events SET result=jsonb_set(result,'{attempts}','{}') WHERE "taskId"=$1 AND "eventId"=$2`, [pending.task.id, finishId]],
+            ['invalid original answer', 'UPDATE factory_questions SET "answerFingerprint"=$2 WHERE id=$1', [questionId, 'wrong-fingerprint']],
+            ['foreign original owner', 'UPDATE factory_questions SET "userId"=$2 WHERE id=$1', [questionId, 'other']],
+            ['broken new native link', 'UPDATE agent_runs SET "questionContinuation"=$2 WHERE id=$1', [repairRun.id, JSON.stringify({ questionId: randomUUID(), originRunId: originId, originSessionId: nativeSession, requireSessionResume: true })]],
+          ] as const) {
+            const guard = await db.connect();
+            try {
+              await guard.query('BEGIN');
+              await guard.query(sql, [...args]);
+              await assert.rejects(currentFactoryRequest(guard, repaired.task), (error: unknown) => error instanceof FactoryError && error.code === 'factorySourceMismatch', label);
+            } finally { await guard.query('ROLLBACK'); guard.release(); }
+          }
+          for (const stage of ['review', 'verify'] as const) {
+            const current = (await state(pending.task.id)).task;
+            assert.equal(current.stage, stage);
+            const independent = await start(current);
+            const run = (await db.query('SELECT * FROM agent_runs WHERE id=$1', [independent.runId])).rows[0];
+            assertAnswer(run.prompt);
+            assert.equal(run.agentDefinition.promptDigest, (await import('../agent-kit/definition')).digest(run.prompt));
+            await terminal(run.id, `after-repair-${stage}-${pending.task.id}`, false, report => { report.verify = { status: 'not_run' }; });
+            await reconcile.run('owner', run.id);
+          }
+          assert.equal((await state(pending.task.id)).task.stage, 'approval');
+          assert.deepEqual(await originalHistory(), before, 'the native producer, original execute attempt and saved Owner answer are immutable');
+          assert.deepEqual((await state(pending.task.id)).attempts.find(a => a.id === failedAttempt.id), failedAttempt);
+          assert.deepEqual((await db.query('SELECT * FROM agent_runs WHERE id=$1', [check.runId])).rows[0], failedRun);
+        });
         for (const stage of ["review", "verify"] as const) await t.test(
           `automatic ${stage} repair keeps original criteria separate from false findings and preserves immutable history`,
           async () => {

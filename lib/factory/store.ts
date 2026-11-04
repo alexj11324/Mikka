@@ -50,6 +50,8 @@ export type FactoryTaskSummary = Pick<FactoryTask, "id" | "issueId" | "stage" | 
   candidateSha: string | null;
   /** Latest publication for the current candidate, if any. */
   publication: FactoryPublicationSummary | null;
+  /** Host-confirmed completed execution that the owner can resume into checks. */
+  completionRecovery?: { binding: { taskId: string; revision: number } };
 };
 /** Same status union as #441's AcceptancePublication (lib/factory/acceptance-state.ts). */
 export type FactoryPublicationStatus = "reserved" | "uncertain" | "succeeded" | "failed";
@@ -422,7 +424,8 @@ export function createFactoryStore(
         for (const row of rows)
           if (factoryScopeAllows(row, issue) && await sourceAllowed(tx, userId, row.sourceEventId, issueId)) {
             const { id, issueId, stage, status, revision, attemptId, candidateId, reason, isSkillCandidate, candidateRunId, candidateSha, publication } = row;
-            tasks.push({id,issueId,stage,status,revision,attemptId,candidateId,reason:maskFactoryNote(reason),isSkillCandidate,candidateRunId,candidateSha:candidateSha ?? null,publication:publicationSummary(publication)});
+            const completionRecovery = await completedRunForRecovery(tx, row) ? { binding: { taskId: id, revision } } : undefined;
+            tasks.push({id,issueId,stage,status,revision,attemptId,candidateId,reason:maskFactoryNote(reason),isSkillCandidate,candidateRunId,candidateSha:candidateSha ?? null,publication:publicationSummary(publication),...(completionRecovery ? { completionRecovery } : {})});
             // Same minimal masker copy as #444 (lib/factory/note-mask.ts); switch to #438's once merged.
           }
         return { contractVersion: 1 as const, issueId, tasks };
