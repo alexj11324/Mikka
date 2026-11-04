@@ -1,0 +1,39 @@
+{
+  "applicationSha": "d2a3c158a4a3730a60408d59ec7ae53ccceb79cb",
+  "webDeployRun": 41896778512,
+  "publicObservedAt": "2026-11-04T19:30:44.383245Z",
+  "publicStatus": 200,
+  "sourceGroup": "0e4617b2-a68b-4187-9a3f-8c5584e0da62",
+  "originalReplyId": "aa9584db-12d7-47be-bb86-9808d47d5a08",
+  "taskClick": {
+    "count": 1,
+    "newTab": true,
+    "actualUrl": "https://app.aspectlylabs.com/mikka/en?issue=036b1450-662a-435b-befa-f8f1d579bb3a",
+    "loadedIssue": "036b1450-662a-435b-befa-f8f1d579bb3a"
+  },
+  "threadClick": {
+    "count": 1,
+    "newTab": true,
+    "actualUrl": "https://app.aspectlylabs.com/mikka/en?issue=036b1450-662a-435b-befa-f8f1d579bb3a&thread=4d87420b-d376-4690-8410-fd89314f903b",
+    "loadedRun": "4d87420b-d376-4690-8410-fd89314f903b"
+  },
+  "temporaryReadOnlyTabsClosed": true,
+  "modelDispatchesFromLinkCheck": 0,
+  "files": [
+    {
+      "path": "group-links.png",
+      "sha256": "f2973bfbe48ce4817c24048b8a6035e7281237e38806f4f2db4434358d7f64cd",
+      "bytes": 152055
+    },
+    {
+      "path": "task-click.png",
+      "sha256": "85f20accf94ae8a9736158cab61fb78470de937b6eeaf96f823b167f115249cf",
+      "bytes": 199159
+    },
+    {
+      "path": "thread-click.png",
+      "sha256": "e50facdee013c82bc23997b4fe08c81d8068763b65a2b7123e3440a752b55916",
+      "bytes": 250451
+    }
+  ]
+}
