@@ -6,9 +6,9 @@ The Worker has one trigger, `* * * * *` (`wrangler.jsonc`). On each run it reads
 
 | When (UTC) | Endpoints |
 | --- | --- |
-| Every minute | `/api/cron/coordinator-wakes`, `/api/cron/schedules`, `/api/cron/run-recovery`, `/api/cron/account-deletions`, `/api/cron/audit-retention`, `/api/cron/ops-monitor` (`MINUTE_ENDPOINTS`) |
-| Minutes 0, 15, 30 and 45 | `/api/cron/briefings` |
-| Minute 0 | `/api/cron/suggestions-reconcile` |
+| Every minute | `/api/cron/coordinator-wakes`, `/api/cron/schedules`, `/api/cron/run-recovery` (`MINUTE_ENDPOINTS`) |
+| Minutes 0, 15, 30 and 45 | `/api/cron/ops-monitor`, `/api/cron/briefings` |
+| Minute 0 | `/api/cron/account-deletions`, `/api/cron/audit-retention`, `/api/cron/suggestions-reconcile` |
 | Minute 30 | `/api/cron/user-facts` |
 
 Because it uses `scheduledTime`, a late run still does the work of the minute it was scheduled for. Each endpoint gets its call even when another fails (`Promise.allSettled`); any failure then fails the run. `runSchedule` still accepts the older single cron strings (`*/15 * * * *`, `0 * * * *`, `30 * * * *`) and then calls only that endpoint. Deployment steps: [`operations/minute-worker-deployment.md`](operations/minute-worker-deployment.md).
@@ -86,14 +86,19 @@ People are those in `suggestion_trigger_checks` (opened the list or connected an
 
 ## Deployment and credentials
 
-The existing minute `/api/cron/ops-monitor` tick also provides supplier-egress
+The existing quarter-hour `/api/cron/ops-monitor` tick also provides supplier-egress
 collection independently of GitHub Actions schedules. It uses only the app's
 existing `NEON_API_KEY` and PostHog ingestion key. A dedicated
 `state.__providerEgressCollector` key in the latest operational observation
 claims work in a short transaction; Neon reads and PostHog delivery run outside
-the lock, followed by a short completion transaction. Successful collection is
-due again after 15 minutes, failures retry after one minute, and abandoned claims
-expire after two minutes. The ordinary operational collector persists separately
+the lock, followed by a short completion transaction. Successful collection next
+becomes eligible at the next UTC quarter-hour after its claim started, so nonzero
+request latency does not skip that tick. This is one successful collection per
+fixed UTC quarter, not a rolling 15-minute gap; old minute callers still receive
+`not_due` for the rest of the same quarter. Failures remain eligible one minute
+after completion and abandoned claims after two minutes. The current Worker
+attempts them at its next eligible quarter-hour tick; these internal deadlines
+do not create extra scheduled requests. The ordinary operational collector persists separately
 even if supplier collection fails. No supplier bytes or credentials are returned
 by the cron endpoint.
 

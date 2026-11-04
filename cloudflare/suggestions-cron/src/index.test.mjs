@@ -124,10 +124,10 @@ test('one minute trigger retains every UTC cadence without duplicate endpoints',
   t.mock.method(console, 'log', () => {})
   for (const [minute, extra] of [
     [1, []],
-    [15, ['/api/cron/briefings']],
-    [30, ['/api/cron/briefings', '/api/cron/user-facts']],
-    [45, ['/api/cron/briefings']],
-    [0, ['/api/cron/briefings', '/api/cron/suggestions-reconcile']],
+    [15, ['/api/cron/ops-monitor', '/api/cron/briefings']],
+    [30, ['/api/cron/ops-monitor', '/api/cron/briefings', '/api/cron/user-facts']],
+    [45, ['/api/cron/ops-monitor', '/api/cron/briefings']],
+    [0, ['/api/cron/account-deletions', '/api/cron/audit-retention', '/api/cron/ops-monitor', '/api/cron/briefings', '/api/cron/suggestions-reconcile']],
   ]) {
     const { calls, fetcher } = recorder()
     await runSchedule('* * * * *', env, fetcher, Date.UTC(2026, 0, 1, 0, minute))
@@ -146,5 +146,57 @@ test('scheduled dispatch uses the event timestamp even when wall time has advanc
   worker.scheduled({ cron: '* * * * *', scheduledTime: Date.UTC(2026, 0, 1, 0, 0) }, env, { waitUntil: promise => pending.push(promise) })
   await Promise.all(pending)
   assert.deepEqual(calls.map(call => new URL(call.url).pathname.replace('/mikka', '')),
-    [...MINUTE_ENDPOINTS, '/api/cron/briefings', '/api/cron/suggestions-reconcile'])
+    [...MINUTE_ENDPOINTS, '/api/cron/account-deletions', '/api/cron/audit-retention', '/api/cron/ops-monitor', '/api/cron/briefings', '/api/cron/suggestions-reconcile'])
+})
+
+test('a complete UTC hour keeps event sweeps per minute and maintenance at its requested cadence', async t => {
+  t.mock.method(console, 'log', () => {})
+  const { calls, fetcher } = recorder()
+  for (let minute = 0; minute < 60; minute++) {
+    await runSchedule('* * * * *', env, fetcher, Date.UTC(2026, 0, 1, 8, minute))
+  }
+  const counts = {}
+  for (const call of calls) {
+    const path = new URL(call.url).pathname.replace('/mikka', '')
+    counts[path] = (counts[path] ?? 0) + 1
+    assert.deepEqual(call.headers, { authorization: `Bearer ${env.CRON_SECRET}` })
+    assert.equal(call.redirect, 'manual')
+    assert.ok(call.signal instanceof AbortSignal)
+  }
+  assert.deepEqual(counts, {
+    '/api/cron/coordinator-wakes': 60,
+    '/api/cron/schedules': 60,
+    '/api/cron/run-recovery': 60,
+    '/api/cron/account-deletions': 1,
+    '/api/cron/audit-retention': 1,
+    '/api/cron/ops-monitor': 4,
+    '/api/cron/briefings': 4,
+    '/api/cron/suggestions-reconcile': 1,
+    '/api/cron/user-facts': 1,
+  })
+})
+
+test('maintenance failures still wait for every selected endpoint without leaking response content', async t => {
+  t.mock.method(console, 'log', () => {})
+  for (const [minute, failedPath] of [[0, '/api/cron/account-deletions'], [0, '/api/cron/audit-retention'], [15, '/api/cron/ops-monitor']]) {
+    const paths = []
+    let finishSchedules
+    const held = new Promise(resolve => { finishSchedules = resolve })
+    let settled = false
+    const tick = runSchedule('* * * * *', env, async url => {
+      const path = new URL(url).pathname.replace('/mikka', '')
+      paths.push(path)
+      if (path === '/api/cron/schedules') await held
+      if (path === failedPath) return new Response(env.CRON_SECRET, { status: 503 })
+      return Response.json({})
+    }, Date.UTC(2026, 0, 1, 8, minute)).finally(() => { settled = true })
+    const failure = assert.rejects(tick, { message: `${failedPath} answered 503` })
+    await new Promise(resolve => setImmediate(resolve))
+    const maintenance = minute === 0 ? ['/api/cron/account-deletions', '/api/cron/audit-retention'] : []
+    const reconcile = minute === 0 ? ['/api/cron/suggestions-reconcile'] : []
+    assert.deepEqual(paths, [...MINUTE_ENDPOINTS, ...maintenance, '/api/cron/ops-monitor', '/api/cron/briefings', ...reconcile])
+    assert.equal(settled, false)
+    finishSchedules()
+    await failure
+  }
 })
