@@ -43,6 +43,7 @@ test('the real AI SDK stream retains the fixed worker refusal without exposing u
   const repository = { binding: async () => binding, connection: async () => connection, scope: () => ({}) } as unknown as SubscriptionService['repository']
   const sdkError = new APICallError({ message: 'fixture-private-provider-text', url: 'https://fixture.invalid/private', requestBodyValues: { secret: 'fixture-private-input' }, responseBody: 'fixture-private-body', responseHeaders: { authorization: 'fixture-private-header' }, statusCode: 503, cause: Object.assign(new Error('fixture-private-cause'), { code: 'ECONNRESET' }) })
   for (const [source, expected] of [[new WorkerRefusal('subscription_rate_limited'), 'subscription_rate_limited'], [new Error('fixture-private-provider-text'), 'subscription_generation_failed'], [sdkError, 'subscription_generation_failed']] as const) {
+    const logStart = logs.length
     const worker = { forUse() { return this }, stream: () => new ReadableStream({ start(controller) { controller.error(source) } }) } as unknown as ReturnType<SubscriptionService['worker']>
     const service = new SubscriptionService(repository, () => worker, { ready: () => true, nativeIsolation: 'none' }, undefined, async () => {}, async () => {})
     const model = await service.model(use)
@@ -53,11 +54,18 @@ test('the real AI SDK stream retains the fixed worker refusal without exposing u
     for await (const part of response.stream) if (part.type === 'error') errors.push(part.error)
     assert.equal(errors.length, 1)
     assert.equal((errors[0] as Error).message, expected)
+    if (source === sdkError) {
+      const diagnostic = logs.slice(logStart).map(line => JSON.parse(line)).find(line => line.stage === 'stream')
+      assert.ok(diagnostic, 'the actual SDK error must retain a stream diagnostic')
+      assert.equal(diagnostic.code, 'AI_APICallError')
+      // The SDK wraps the failed response body with the bridge's HTTP 200;
+      // the injected provider status remains on the original error in cause.
+      assert.equal(diagnostic.statusCode, 200)
+      assert.deepEqual(diagnostic.causes, [
+        { errorClass: 'AI_APICallError', errorCode: null, statusCode: 503 },
+        { errorClass: 'Error', errorCode: 'ECONNRESET', statusCode: null },
+      ])
+    }
   }
-  const diagnostic = logs.map(line => JSON.parse(line)).find(line => line.code === 'AI_APICallError')
-  assert.ok(diagnostic, 'the actual SDK error must not collapse to unknown')
-  assert.equal(diagnostic.stage, 'stream')
-  assert.equal(diagnostic.statusCode, 503)
-  assert.deepEqual(diagnostic.causes, [{ errorClass: 'Error', errorCode: 'ECONNRESET', statusCode: null }])
   assert.ok(!logs.join('\n').includes('fixture-private'))
 })
