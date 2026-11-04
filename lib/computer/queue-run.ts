@@ -10,6 +10,7 @@ import type { AgentExecution } from '@/lib/agent-kit/store'
 import { ComputerError } from './store'
 import { RunModelMissingError } from './run-model'
 import { runCredentialSource, type RunApiKey } from '@/lib/run-credential-source'
+import { sleepingFactoryCloudTarget, type FactoryCloudStageAdmission } from '@/lib/factory/cloud-stage-admission'
 
 /** Issue access is checked by the caller. Queue and Bot binding are committed
  * together so the cloud worker never observes an unbound queued run. The
@@ -33,7 +34,7 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
   subscriptionBindingId?: string
   /** An investigation that changes nothing: read-only policy and no task branch. */
   readOnly?: boolean
-}, existing?: PoolClient) {
+}, existing?: PoolClient, factoryStage?: FactoryCloudStageAdmission) {
   if (input.idempotencyKey !== undefined && (input.idempotencyKey.length < 1 || input.idempotencyKey.length > 256)) throw new ComputerError(400, 'Invalid task request')
   if (input.subscriptionBindingId !== undefined && (!z.uuid().safeParse(input.subscriptionBindingId).success || input.apiKeyId || input.apiKey)) throw new ComputerError(400, 'Invalid task request')
   const digest = input.idempotencyKey === undefined ? undefined : createHash('sha256').update(JSON.stringify([actor.userId, input.idempotencyKey])).digest('hex')
@@ -51,7 +52,7 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
     if (!existing) await client.query('BEGIN')
     await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`computer-policy:${actor.workspaceId}`])
     if (digest) await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`computer-task:${digest}`])
-    const target = (await client.query(`SELECT m."deviceId",a.instructions,a.harness,repo."baseBranch" FROM bots b
+    let target = (await client.query(`SELECT m."deviceId",a.instructions,a.harness,repo."baseBranch" FROM bots b
       JOIN bot_desktops d ON d."botId"=b.id AND d."ownerId"=b."ownerId" AND d."workspaceId"=b."workspaceId"
       JOIN cloud_machines m ON m."workspaceId"=b."workspaceId" AND m."ownerId"=b."ownerId" AND m.state='running'
       JOIN devices dev ON dev.id=m."deviceId" AND dev."ownerId"=b."ownerId" AND dev.kind='cloud' AND dev.enabled=true
@@ -60,6 +61,8 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
       WHERE b.id=$1 AND b."ownerId"=$2 AND b."workspaceId"=$3
         AND (repo."remoteUrl" IS NOT NULL OR NOT EXISTS (SELECT 1 FROM workspace_computer_policies p WHERE p."workspaceId"=b."workspaceId" AND p.permission='deny'))`,
     [input.botId, actor.userId, actor.workspaceId, input.agentId, input.deviceRepoId])).rows[0]
+    if (!target && existing && factoryStage && input.idempotencyKey === `factory:${factoryStage.binding.attemptId}`)
+      target = await sleepingFactoryCloudTarget(client, actor, input, factoryStage)
     if (!target) throw new ComputerError(409, 'Bot computer task is unavailable')
     const prompt = runPrompt(input.title, input.body, target.instructions, input.note)
     if (digest) {
