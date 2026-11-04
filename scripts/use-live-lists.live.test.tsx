@@ -116,10 +116,10 @@ async function settled() { await wait(); await wait() }
 function emit(scope: string, kind: string) { for (const socket of sockets) if (socket.url.endsWith(scope)) socket.message({ kind, id: scope }) }
 const deferred = <T,>() => { let resolve!: (value: T) => void; return { promise: new Promise<T>(done => { resolve = done }), resolve: (value: T) => resolve(value) } }
 
-test('healthy real list hooks stay quiet beyond the old interval, and an owner-home event refreshes only its list', { timeout: 12_000 }, async () => {
+test('healthy real list hooks stay quiet beyond the old sixty-second interval, and an owner-home event refreshes only its list', { timeout: 80_000 }, async () => {
   await render(['threads', 'tasks', 'bots']); await settled()
   assert.deepEqual(new Set(tickets), new Set([home]), 'the selected team is not the owner-wide transport')
-  const before = [...reads]; await wait(2_300); assert.deepEqual(reads, before)
+  const before = [...reads]; await wait(61_100); assert.deepEqual(reads, before)
   replies.set('tasks', async () => ({ ...snapshot('tasks'), items: [{ id: 'tasks', title: 'committed task result' }] }))
   await act(async () => emit(team, 'task_run_list')); await wait(); assert.deepEqual(reads, before)
   await act(async () => emit(home, 'task_run_list')); await wait(350)
