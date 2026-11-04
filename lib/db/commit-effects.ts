@@ -1,8 +1,12 @@
-import type { Pool, PoolClient, QueryResult } from 'pg'
+import { Pool, type PoolClient, type QueryResult } from 'pg'
+import { AsyncLocalStorage } from 'node:async_hooks'
 
 type Effect = () => void | Promise<void>
-type State = { active: boolean; effects: Map<string, Effect>; savepoints: { name: string; effects: Map<string, Effect> }[] }
+type State = { active: boolean; effects: Map<string, Effect>; savepoints: { name: string; effects: Map<string, Effect> }[]; scope: object }
 const STATE = Symbol.for('mikka.database.commitEffects')
+/** Request proxies expose only the executor used for commit observation. */
+export const COMMIT_EXECUTOR = Symbol.for('mikka.database.commitExecutor')
+const COMMIT_CONTEXT = Symbol.for('mikka.database.commitContext')
 type ObservedClient = PoolClient & { [STATE]?: State }
 const pools = new WeakSet<Pool>()
 
@@ -14,10 +18,10 @@ const run = (effect: Effect) => {
 }
 
 /** Attach before BEGIN, below the existing device-authority wrapper. No SQL is added. */
-export function observeCommitEffects(client: PoolClient) {
+export function observeCommitEffects(client: PoolClient, scope: object = client) {
   const observed = client as ObservedClient
-  if (observed[STATE]) return
-  const state: State = { active: false, effects: new Map(), savepoints: [] }
+  if (observed[STATE]) { observed[STATE].scope = scope; return }
+  const state: State = { active: false, effects: new Map(), savepoints: [], scope }
   observed[STATE] = state
   const query = client.query.bind(client) as (...args: unknown[]) => unknown
   const settled = (text: string, result: unknown) => {
@@ -71,8 +75,8 @@ export function observeCommitEffects(client: PoolClient) {
 export function observePoolCommits(pool: Pool) {
   if (pools.has(pool)) return
   pools.add(pool)
-  pool.on('connect', observeCommitEffects)
-  pool.on('acquire', observeCommitEffects)
+  pool.on('connect', client => observeCommitEffects(client, pool))
+  pool.on('acquire', client => observeCommitEffects(client, pool))
   pool.on('release', (_error, client) => { const state = (client as ObservedClient)[STATE]; if (state) reset(state) })
 }
 
@@ -86,4 +90,38 @@ export function afterCommit(client: PoolClient, key: string, effect: Effect) {
   if (!state) throw new Error('Commit effects require an observed database client')
   if (state.active) state.effects.set(key, effect)
   else run(effect) // An autocommitted write has already succeeded.
+}
+
+/** The pinned node-postgres Drizzle transaction holds the same observed client
+ * for every nested savepoint. Register below Drizzle, not after a nested
+ * transaction callback, which can return before the outer COMMIT. */
+export function afterDatabaseCommit(executor: object, key: string, effect: Effect) {
+  const client = commitExecutor(executor)
+  const context = (executor as { [COMMIT_CONTEXT]?: ReturnType<typeof AsyncLocalStorage.snapshot> })[COMMIT_CONTEXT] ?? AsyncLocalStorage.snapshot()
+  const committed = () => context(effect)
+  if ((client as ObservedClient)[STATE]) afterCommit(client as PoolClient, key, committed)
+  else if (client instanceof Pool) run(committed) // The caller has awaited its autocommitted statement.
+  else throw new Error('Commit effects require an observed node-postgres executor')
+}
+
+/** A service retaining a bound query must retain its executor and request
+ * context at the same instant. Later callbacks cannot guess its transaction,
+ * database or device authority from the query function. */
+export function captureDatabaseQuery(executor: Pick<Pool | PoolClient, 'query'>) {
+  return { query: AsyncLocalStorage.bind(executor.query.bind(executor)),
+    [COMMIT_EXECUTOR]: commitExecutor(executor), [COMMIT_CONTEXT]: AsyncLocalStorage.snapshot() }
+}
+
+/** Opaque identity only: batching cannot mix requests to separate databases. */
+export function databaseCommitScope(executor: object): object {
+  const client = commitExecutor(executor)
+  const scope = (client as ObservedClient)[STATE]?.scope
+  if (scope) return scope
+  if (client instanceof Pool) return client
+  throw new Error('Commit effects require an observed node-postgres executor')
+}
+
+function commitExecutor(executor: object): ObservedClient | Pool {
+  const client = ((executor as { session?: { client?: unknown } }).session?.client ?? executor) as ObservedClient | Pool
+  return (client as { [COMMIT_EXECUTOR]?: ObservedClient | Pool })[COMMIT_EXECUTOR] ?? client
 }

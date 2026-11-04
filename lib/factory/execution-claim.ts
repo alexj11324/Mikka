@@ -1,3 +1,4 @@
+import { runChanged } from '../live/panels';
 import { executionIdentityForRun } from '../execution-identity';
 import type { Pool, PoolClient } from "pg";
 import { FactoryError } from "./contract";
@@ -23,6 +24,7 @@ export function createExecutionClaim(pool: Pool, authorize: FactoryAuthorize) {
          WHERE id=$1 AND "userId"=$2 AND "deviceId"=$3 AND status='queued' AND "stopRequestedAt" IS NULL RETURNING id`,
         [runId, userId, deviceId, leaseExpiresAt],
       );
+      if (rows.length) await runChanged(tx, runId);
       await tx.query("COMMIT");
       return rows;
     } catch (error) {

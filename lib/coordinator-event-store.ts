@@ -3,6 +3,7 @@ import { db } from '@/lib/db'
 import { coordinatorEvents } from '@/lib/db/schema'
 import type { CoordinatorEventInput } from '@/lib/coordinator-events'
 import { assertCredentialSafeChat } from '@/lib/credentials/chat-guard'
+import { runChanged } from '@/lib/live/panels'
 
 type Executor = Pick<typeof db, 'insert' | 'execute'>
 
@@ -15,6 +16,6 @@ type Executor = Pick<typeof db, 'insert' | 'execute'>
 export async function recordCoordinatorEvent(executor: Executor, event: CoordinatorEventInput) {
   // Read through the same executor: inside a transaction this keeps to its one connection.
   await assertCredentialSafeChat(event.userId, event.payload, executor)
-  await executor.insert(coordinatorEvents).values({ id: crypto.randomUUID(), ...event }).onConflictDoNothing({ target: coordinatorEvents.dedupeKey })
+  const inserted = await executor.insert(coordinatorEvents).values({ id: crypto.randomUUID(), ...event }).onConflictDoNothing({ target: coordinatorEvents.dedupeKey }).returning({ id: coordinatorEvents.id })
+  if (inserted.length && event.runId) await runChanged(executor, event.runId)
 }
-

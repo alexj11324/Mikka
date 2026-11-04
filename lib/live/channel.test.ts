@@ -213,3 +213,105 @@ test('a hung renewal still reconciles a lost invalidation after one offline fall
   finishRenew(null); await settle()
   assert.equal(f.sockets.length, 1)
 })
+
+test('stream bursts retain the last change without reading more often than the old two-second cadence', async () => {
+  const f = fixture(), observed: number[] = []
+  let revision = 0
+  f.channel.subscribe('thread', task, ['transcript'], () => { observed.push(revision) }, { minIntervalMs: 2_000 })
+  await f.open(); observed.length = 0
+  for (let i = 1; i <= 20; i++) {
+    revision = i
+    f.sockets[0].message(JSON.stringify({ kind: 'thread', id: task }))
+    await f.advance(100)
+  }
+  assert.deepEqual(observed, [20])
+  revision = 21
+  f.sockets[0].message(JSON.stringify({ kind: 'thread', id: task }))
+  await f.advance(1_999); assert.deepEqual(observed, [20])
+  await f.advance(1); assert.deepEqual(observed, [20, 21])
+  await f.advance(10_000); assert.deepEqual(observed, [20, 21], 'an idle stream never keeps polling')
+  f.channel.dispose()
+})
+
+test('semantic changes bypass a pending stream delay and deduplicate the same SWR key', async () => {
+  const f = fixture()
+  f.channel.subscribe('thread', task, ['transcript'], key => { f.reads.push(key) }, { minIntervalMs: 2_000 })
+  f.channel.subscribe('run', task, ['transcript'], key => { f.reads.push(key) })
+  await f.open(); f.reads.length = 0
+  f.sockets[0].message(JSON.stringify({ kind: 'thread', id: task }))
+  await f.advance(100); assert.deepEqual(f.reads, [])
+  f.sockets[0].message(JSON.stringify({ kind: 'run', id: task }))
+  await f.advance(100); assert.deepEqual(f.reads, ['transcript'])
+  await f.advance(2_000); assert.deepEqual(f.reads, ['transcript'])
+  f.channel.dispose()
+})
+
+test('a change during an in-flight read gets one trailing read after it settles', async () => {
+  const f = fixture()
+  let finish!: () => void
+  f.channel.subscribe('thread', task, ['transcript'], key => {
+    f.reads.push(key)
+    if (f.reads.length === 1) return new Promise<void>(resolve => { finish = resolve })
+  }, { minIntervalMs: 2_000 })
+  await f.open()
+  for (let i = 0; i < 10; i++) f.sockets[0].message(JSON.stringify({ kind: 'thread', id: task }))
+  await f.advance(5_000); assert.deepEqual(f.reads, ['transcript'])
+  finish(); await settle(); await f.advance(100)
+  assert.deepEqual(f.reads, ['transcript', 'transcript'])
+  f.channel.dispose()
+})
+
+test('hidden documents discard delayed reads and reconcile the current document on visibility return', async () => {
+  const f = fixture()
+  f.channel.subscribe('issue_document', task, ['document'], key => { f.reads.push(key) }, { minIntervalMs: 1_500 })
+  await f.open(); f.reads.length = 0
+  f.sockets[0].message(JSON.stringify({ kind: 'issue_document', id: task }))
+  f.visibility(false); await f.advance(60_000)
+  assert.deepEqual(f.reads, [])
+  f.visibility(true); await f.open()
+  assert.deepEqual(f.reads, ['document'])
+  f.channel.dispose()
+})
+
+test('teardown during a read cannot schedule an old owner or workspace trailing read', async () => {
+  const f = fixture()
+  let finish!: () => void
+  f.channel.subscribe('thread', task, ['transcript'], key => {
+    f.reads.push(key)
+    return new Promise<void>(resolve => { finish = resolve })
+  }, { minIntervalMs: 2_000 })
+  await f.open()
+  f.sockets[0].message(JSON.stringify({ kind: 'thread', id: task }))
+  f.channel.dispose(); finish(); await settle(); await f.advance(60_000)
+  assert.deepEqual(f.reads, ['transcript'])
+})
+
+test('a server question deadline performs one catch-up read and never becomes a poll', async () => {
+  const f = fixture()
+  f.channel.subscribe('factory_issue', task, ['thread'], key => { f.reads.push(key) },
+    { minIntervalMs: 30_000, deadline: { at: 'server-expiry', afterMs: 2_000 } })
+  await f.open(); f.reads.length = 0
+  await f.advance(1_899)
+  assert.deepEqual(f.reads, [])
+  await f.advance(101)
+  assert.deepEqual(f.reads, ['thread'], 'the deadline bypasses stream cadence once')
+  f.reads.length = 0
+  await f.advance(180_000)
+  assert.deepEqual(f.reads, [])
+  f.channel.dispose()
+})
+
+test('hidden question deadlines make no reads; visibility and teardown reconcile or discard them', async () => {
+  const f = fixture()
+  const stop = f.channel.subscribe('factory_issue', task, ['thread'], key => { f.reads.push(key) },
+    { deadline: { at: 'server-expiry', afterMs: 2_000 } })
+  await f.open(); f.reads.length = 0
+  f.visibility(false)
+  await f.advance(5_000)
+  assert.deepEqual(f.reads, [])
+  f.visibility(true); await f.open()
+  assert.deepEqual(f.reads, ['thread'])
+  f.reads.length = 0
+  stop(); await f.advance(60_000)
+  assert.deepEqual(f.reads, [])
+})

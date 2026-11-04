@@ -1,3 +1,4 @@
+import { runChanged } from '../live/panels'
 import 'server-only'
 import { randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
@@ -56,11 +57,12 @@ export class ComputerStore {
         // Previously delivered approvals cannot be rebound to a later policy
         // generation. Stop these threads so they cannot appear to resume with
         // stale authority after an administrator re-enables computer use.
-        await client.query(`UPDATE agent_runs r SET "stopRequestedAt"=coalesce(r."stopRequestedAt",now()),"updatedAt"=now(),
+        const stopped = await client.query<{ id: string }>(`UPDATE agent_runs r SET "stopRequestedAt"=coalesce(r."stopRequestedAt",now()),"updatedAt"=now(),
           "finishedAt"=CASE WHEN r.status='queued' THEN now() ELSE r."finishedAt" END,
           status=CASE WHEN r.status='queued' THEN 'stopped' ELSE r.status END
           FROM computer_run_bindings b WHERE b."runId"=r.id AND b."workspaceId"=$1
-            AND r.status=ANY($2::text[])`, [workspaceId, ['queued', 'preparing', 'running', 'paused', 'waiting_input', 'finishing']])
+            AND r.status=ANY($2::text[]) RETURNING r.id`, [workspaceId, ['queued', 'preparing', 'running', 'paused', 'waiting_input', 'finishing']])
+        for (const { id } of stopped.rows) await runChanged(client, id)
       }
       const sync = async () => {
         for (const machine of machines) {
@@ -168,9 +170,10 @@ export class ComputerStore {
       // run is claimed on its own thread machine (decision 0251), so a takeover pauses no run.
       // Handback still resumes a run that an earlier takeover paused.
       if (action === 'handback') {
-        await client.query(`UPDATE agent_runs r SET status=COALESCE(r."resumeStatus",'running'),"resumeStatus"=NULL,"pauseReason"=NULL,"updatedAt"=now()
+        const resumed = await client.query<{ id: string }>(`UPDATE agent_runs r SET status=COALESCE(r."resumeStatus",'running'),"resumeStatus"=NULL,"pauseReason"=NULL,"updatedAt"=now()
           FROM computer_run_bindings b WHERE b."runId"=r.id AND b."botId"=$1 AND b."workspaceId"=$2 AND b."ownerId"=$3
-          AND r."userId"=$3 AND r.status='paused' AND r."pauseReason"='human_control'`, [botId, actor.workspaceId, actor.userId])
+          AND r."userId"=$3 AND r.status='paused' AND r."pauseReason"='human_control' RETURNING r.id`, [botId, actor.workspaceId, actor.userId])
+        for (const { id } of resumed.rows) await runChanged(client, id)
       }
       persistProgress = true
       await this.runtime.syncDesktopLease(sandbox, lease)

@@ -8,6 +8,7 @@ import { agentRuns, runChunks } from '@/lib/db/schema'
 import { freshChunks, nextReply } from '@/lib/thread-groups'
 import { identityMasker, type Masker } from './mask'
 import { maskStreamedChunks } from './stream-mask'
+import { threadChanged } from '../live/panels'
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0]
 
@@ -46,5 +47,6 @@ export async function persistRunEventBatch(runId: string, fromSeq: number, input
       .returning({ seq: runChunks.seq })
     // Only chunks stored now count, so a re-sent batch never appends its text twice.
     await recordLastReply(tx, runId, freshChunks(chunks, fromSeq, inserted.map(row => row.seq)), mask)
+    if (inserted.length) await threadChanged(tx, runId)
   })
 }

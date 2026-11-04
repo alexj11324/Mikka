@@ -1,3 +1,4 @@
+import { runChanged } from './live/panels'
 import 'server-only'
 import { isCurrentFactoryDeliverable } from './factory/execution-kind'
 import { and, asc, eq, isNull, lte, ne, or, sql } from 'drizzle-orm'
@@ -192,6 +193,7 @@ async function completionTransaction(userId: string, runId: string, completion: 
       ;[run] = await tx.update(agentRuns).set({ status, pauseReason: paused ? 'quota_exhausted' : null, resumeStatus: null, stopReason: completion.stopReason, report: report ?? null,
         ...(quota ? { quotaResetsAt: resetsAt ? new Date(resetsAt) : null } : {}),
         ...(paused ? { leaseExpiresAt: null, finishedAt: null } : { finishedAt: sql`clock_timestamp()` }), updatedAt: new Date() }).where(eq(agentRuns.id, runId)).returning()
+      await runChanged(tx, runId)
       await tx.update(runTokens).set({ revokedAt: new Date() }).where(and(eq(runTokens.runId, runId), isNull(runTokens.revokedAt)))
       await settleRunCompletionEffects(client, run, completion.stopReason, factoryBound, completion.report)
       if (quota) {

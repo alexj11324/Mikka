@@ -1,3 +1,4 @@
+import { runChanged } from '../live/panels'
 // What a cloud thread worker printed, visible while it runs and kept after.
 //
 // The worker starts as an E2B background command. Its output is streamed to
@@ -102,5 +103,8 @@ export async function saveWorkerTail(query: Pick<Pool, 'query'>, runId: string, 
   if (!tail) return
   const masked = mask(tail).slice(-TAIL_MAX)
   await query.query('UPDATE thread_machines SET "logTail"=$2 WHERE "runId"=$1', [runId, masked])
-  if (asError) await query.query('UPDATE agent_runs SET error=$2 WHERE id=$1 AND error IS NULL', [runId, `${asError}\n${masked}`.slice(-TAIL_MAX)])
+  if (asError) {
+    const updated = await query.query('UPDATE agent_runs SET error=$2 WHERE id=$1 AND error IS NULL RETURNING id', [runId, `${asError}\n${masked}`.slice(-TAIL_MAX)])
+    if (updated.rowCount) await runChanged(query, runId)
+  }
 }

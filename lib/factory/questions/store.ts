@@ -1,4 +1,6 @@
 import { remoteKey } from "@mikka/protocol/repository";
+import { factoryChanged } from "../../live/factory";
+import { runChanged } from "../../live/panels";
 import { notifyQueuedLocalRun } from '../../device-gateway-notify';
 import { factoryCheckAssignment } from "../checks";
 import { factoryMonitorDispatchAssignment } from "../monitor-dispatch";
@@ -248,6 +250,7 @@ export function createFactoryQuestions(
         [q.id, status, `Question ${status}; continuation is not authorized`],
       );
       q = updated;
+      await factoryChanged(tx, task);
     }
     return { ...view(q), recoverReference:
       q.status === 'blocked' && task.status === 'blocked' && q.answerId && q.continuationRunId && task.candidateId === q.candidateId
@@ -484,6 +487,7 @@ export function createFactoryQuestions(
           'UPDATE factory_questions SET status=\'waiting_user\',reason=$2,"escalationEventId"=$3,"escalationRequest"=$4,revision=revision+1,"updatedAt"=now() WHERE id=$1 RETURNING *',
           [q.id, input.reason, input.eventId, JSON.stringify(input)],
         );
+        await factoryChanged(tx, task);
         return view(updated);
       });
     },
@@ -877,6 +881,7 @@ export function createFactoryQuestions(
             : {};
         if (!existing) {
           await tx.query('UPDATE agent_runs SET status=\'preparing\',"startedAt"=now(),"leaseExpiresAt"=$2,"updatedAt"=now() WHERE id=$1',[runId,leaseExpiresAt]);
+          await runChanged(tx, runId);
           if (typeof existingOrClaim === "function") await existingOrClaim(tx);
         }
         return {
@@ -939,6 +944,7 @@ export function createFactoryQuestions(
           'UPDATE factory_questions SET status=$2,reason=$3,revision=revision+1,"updatedAt"=now() WHERE id=$1 RETURNING *',
           [q.id, status, reason],
         );
+        await factoryChanged(tx, task);
         if (status === "blocked" && task.status === "running") {
           const {
             rows: [attempt],

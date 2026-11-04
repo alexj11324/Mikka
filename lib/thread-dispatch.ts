@@ -141,6 +141,7 @@ export async function dispatchToTask<R extends { runId: string }, E extends { er
       const result = await input.start(null, input.note, previous)
       if (!queued(result)) return result
       await db.execute((await import('drizzle-orm')).sql`UPDATE agent_runs SET "threadReplacedBy"=${result.runId}::uuid,"updatedAt"=now() WHERE id=${threadId}::uuid AND "userId"=${userId}`)
+      await runChanged(db, threadId)
       return { ...result, thread: 'new' as const, threadId: result.runId, replacedThreadId: threadId }
     }
     if (working) {
@@ -154,6 +155,9 @@ export async function dispatchToTask<R extends { runId: string }, E extends { er
     const result = await input.start(previous, continuationNote(input.note, previous))
     if (!queued(result)) return result
     await db.execute((await import('drizzle-orm')).sql`UPDATE agent_runs SET "continuesRunId"=${previous.id}::uuid,"updatedAt"=now() WHERE id=${result.runId}::uuid AND "userId"=${userId} AND id<>${previous.id}::uuid`)
+    await runChanged(db, result.runId)
     return { ...result, thread: 'continued' as const, threadId, continuesRunId: previous.id }
   })
 }
+
+import { runChanged } from './live/panels'

@@ -1,4 +1,5 @@
 import type { Pool, PoolClient } from 'pg'
+import { runChanged } from './live/panels'
 
 type Query = Pick<Pool | PoolClient, 'query'>
 
@@ -14,12 +15,13 @@ type Query = Pick<Pool | PoolClient, 'query'>
  */
 export async function stopRunsUsingApiKeys(query: Query, scope: { keyId?: string; ownerId?: string; workspaceId?: string; othersOnly?: boolean }) {
   if (!scope.keyId && !scope.workspaceId) throw new Error('stopRunsUsingApiKeys needs a key or a workspace')
-  const { rowCount } = await query.query(`UPDATE agent_runs r SET "stopRequestedAt"=clock_timestamp(),
+  const { rowCount, rows } = await query.query<{ id: string }>(`UPDATE agent_runs r SET "stopRequestedAt"=clock_timestamp(),
       "leaseExpiresAt"=LEAST(r."leaseExpiresAt",clock_timestamp()),"updatedAt"=clock_timestamp()
     FROM model_api_key_runs m JOIN model_api_keys k ON k.id=m."keyId"
     WHERE m."runId"=r.id AND r."stopRequestedAt" IS NULL AND r.status IN ('queued','preparing','running','waiting_input','finishing')
       AND ($1::uuid IS NULL OR k.id=$1) AND ($2::text IS NULL OR k."ownerId"=$2) AND ($3::text IS NULL OR m."workspaceId"::text=$3)
-      AND (NOT $4::boolean OR r."userId"<>k."ownerId")`,
+      AND (NOT $4::boolean OR r."userId"<>k."ownerId") RETURNING r.id`,
   [scope.keyId ?? null, scope.ownerId ?? null, scope.workspaceId ?? null, scope.othersOnly ?? false])
+  for (const { id } of rows) await runChanged(query, id)
   return rowCount ?? 0
 }

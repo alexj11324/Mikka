@@ -1,3 +1,4 @@
+import { runChanged } from './live/panels'
 import 'server-only'
 import { rebindExecutionDevice, revalidateExecutionIdentity, ExecutionIdentityError } from './execution-identity'
 import { cloudComputerRunsEnabled } from '@/lib/cloud-computer-flag'
@@ -67,7 +68,8 @@ export async function renewRunLeases(deviceId: string, runIds: readonly string[]
     catch (error) {
       if (!(error instanceof ExecutionIdentityError)) throw error
       // The daemon receives revoked on this heartbeat and removes injected credentials.
-      await db.update(agentRuns).set({ stopRequestedAt: now, leaseExpiresAt: now, updatedAt: now }).where(and(eq(agentRuns.id, run.id), eq(agentRuns.deviceId, deviceId), inArray(agentRuns.status, [...LEASED_RUN_STATUSES])))
+      const stopped = await db.update(agentRuns).set({ stopRequestedAt: now, leaseExpiresAt: now, updatedAt: now }).where(and(eq(agentRuns.id, run.id), eq(agentRuns.deviceId, deviceId), inArray(agentRuns.status, [...LEASED_RUN_STATUSES]))).returning({ id: agentRuns.id })
+      if (stopped.length && !run.stopRequestedAt) await runChanged(db, run.id)
     }
   }
   const renewed = authorized.length ? await db.update(agentRuns)
@@ -229,6 +231,7 @@ async function reclaimLostRun(run: Run, now: Date) {
       .where(and(eq(agentRuns.id, run.id), inArray(agentRuns.status, [...LEASED_RUN_STATUSES]), lt(agentRuns.leaseExpiresAt, now), isNull(agentRuns.stopRequestedAt)))
       .returning({ id: agentRuns.id })
     if (!ended) return false
+    await runChanged(tx, run.id)
     if (cloud) return true
     await tx.insert(agentRuns).values({
       id: retryId, userId: run.userId, issueId: run.issueId, agentId: run.agentId, botId: run.botId, source: run.source,
