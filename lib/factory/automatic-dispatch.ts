@@ -8,7 +8,8 @@ import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
 import { ensureDeviceRepository } from '@/lib/device-repositories'
 import { withDatabaseClient } from '@/lib/db'
 import { tiptapToText } from '@/lib/tiptap-text'
-import { createFactoryDispatch, factoryBinding } from './dispatch'
+import { createFactoryDispatch, defaultFactoryDispatchAdapters, factoryBinding } from './dispatch'
+import { configureFactoryCheck } from './checks'
 import { checkFactoryRepairBudget } from './check-recovery-evidence'
 import { FactoryError } from './contract'
 import { notifyDeviceWork } from '../device-gateway-notify'
@@ -93,10 +94,15 @@ export function automaticFactoryDispatch(pool: Pool) {
     const repoId = source.remoteUrl ? (await withDatabaseClient(tx, () => ensureDeviceRepository(task.userId, runtime.deviceId, source.remoteUrl))).id : runtime.repoId
     const { rows: [issue] } = await tx.query('SELECT title,content FROM issues WHERE id=$1', [task.issueId])
     const actor = { userId: task.userId, workspaceId: source.workspaceId as string }
+    const factoryStage = { binding: factoryBinding(task), sourceEventId: task.sourceEventId, sourceRunId: source.id as string }
     const dispatch = createFactoryDispatch(pool, store, (client, _owner, _input, _bot, context) => queueCloudRun(pool, actor, {
       botId: source.runtimeBotId, issueId: task.issueId, agentId: runtime.agentId, deviceRepoId: repoId, title: issue.title, body: tiptapToText(issue.content), ...model, model: cloudModel,
       withoutBot: task.botId === null, readOnly: check || source.agentDefinition?.readOnly, idempotencyKey: `factory:${context.attemptId}`,
-    }, client))
+    }, client, factoryStage), { ...defaultFactoryDispatchAdapters, configure: {
+      ...defaultFactoryDispatchAdapters.configure,
+      review: (client, current, id) => configureFactoryCheck(client, current, id, undefined, factoryStage),
+      verify: (client, current, id) => configureFactoryCheck(client, current, id, undefined, factoryStage),
+    } })
     const result = await dispatch(task.userId, { binding: factoryBinding(task), agentId: runtime.agentId, deviceRepoId: repoId }, tx)
     if (!check) await tx.query('UPDATE agent_runs SET "continuesRunId"=$2 WHERE id=$1', [result.runId, source.id])
     return async () => {

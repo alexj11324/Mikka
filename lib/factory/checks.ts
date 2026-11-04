@@ -1,4 +1,5 @@
 import { factoryRunBotMatches } from './run-scope'
+import { sleepingFactoryCloudTarget, type FactoryCloudStageAdmission } from './cloud-stage-admission'
 import type { Pool, PoolClient } from "pg";
 import { z } from "zod";
 import { deviceIsOnline } from "../device-presence";
@@ -72,6 +73,7 @@ export async function configureFactoryCheck(
   task: FactoryTask,
   runId: string,
   hostPolicy: RunPolicy = defaultRunPolicy(),
+  factoryStage?: FactoryCloudStageAdmission,
 ) {
   if (
     !["review", "verify"].includes(task.stage) ||
@@ -86,12 +88,14 @@ export async function configureFactoryCheck(
        json_build_object('runId',producer.id,'sessionId',producer."sessionId",'status',producer.status,
          'model',producer."agentDefinition"->>'model','harness',producer."agentDefinition"->>'harness',
          'observedModel',producer.report->'runtime'->>'observedModel') AS "producerExecution",
+       r."agentId",b."botId" AS "runtimeBotId",b."workspaceId" AS "runtimeWorkspaceId",
        (EXISTS(SELECT 1 FROM thread_machines tm WHERE tm."deviceId"=d.id AND tm.state='running') OR EXISTS(SELECT 1 FROM cloud_machines cm WHERE cm."deviceId"=d.id AND cm.state='running')) AS "cloudOnline"
      FROM factory_candidates c JOIN agent_runs r ON r.id=$3
      JOIN agent_runs producer ON producer.id=c."runId" AND producer."userId"=$4
      JOIN device_repos repo ON repo.id=r."deviceRepoId"
      JOIN devices d ON d.id=r."deviceId" AND d."ownerId"=$4
      JOIN agents a ON a.id=r."agentId" AND a."userId"=$4 AND (a."deviceId"=d.id OR d.kind='cloud')
+     LEFT JOIN computer_run_bindings b ON b."runId"=r.id AND b."ownerId"=r."userId"
      WHERE c.id=$1 AND c."taskId"=$2 AND r."userId"=$4 AND r."issueId"=$5
      AND repo."userId"=$4 AND repo."deviceId"=r."deviceId" FOR SHARE OF repo,d,a`,
     [task.candidateId, task.id, runId, task.userId, task.issueId],
@@ -103,9 +107,13 @@ export async function configureFactoryCheck(
     row.repository !== (row.remoteUrl ?? row.repoPath)
   )
     throw new FactoryError("factoryEvidenceMismatch");
+  const staged = !row.cloudOnline && row.deviceKind === 'cloud' && factoryStage && row.runtimeBotId && row.runtimeWorkspaceId
+    ? await sleepingFactoryCloudTarget(tx, { userId: task.userId, workspaceId: row.runtimeWorkspaceId },
+      { botId: row.runtimeBotId, issueId: task.issueId, agentId: row.agentId, deviceRepoId: row.deviceRepoId, withoutBot: task.botId === null }, factoryStage, runId)
+    : null
   if (
     !row.enabled ||
-    (row.deviceKind === 'cloud' ? !row.cloudOnline : !await deviceIsOnline({ id: row.deviceId, lastSeenAt: row.lastSeenAt })) ||
+    (row.deviceKind === 'cloud' ? !row.cloudOnline && !staged : !await deviceIsOnline({ id: row.deviceId, lastSeenAt: row.lastSeenAt })) ||
     !row.harnesses?.some(
       (h: { harness: string; installed: boolean }) =>
         h.harness === row.harness && h.installed,
