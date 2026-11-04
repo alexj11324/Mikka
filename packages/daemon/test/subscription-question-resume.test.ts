@@ -13,7 +13,7 @@ import { ToolApprovalGate } from '../src/agents/tool-approval'
 import { CodexAdapter } from '../src/adapters/codex'
 import { NoSandbox } from '../src/agents/sandbox'
 import { takeCheckpoint } from '../src/agents/checkpoint'
-import { snapshotTree } from '../src/agents/publish'
+import { retainDeliverable, snapshotTree } from '../src/agents/publish'
 import { buildChildEnv } from '../src/env'
 import { createLogger } from '../src/log'
 import { RunJournal } from '../src/runs/journal'
@@ -140,7 +140,7 @@ for (const harness of ['codex', 'claude_code'] as const) {
   }, 45000)
 }
 
-it('codex: the real legacy submitted question journal passes the retained-delivery probe without rewriting history', async () => {
+it('codex: a real legacy submitted journal accepts an explicitly retained fixture worktree without rewriting history', async () => {
   const root = tempDir('question-journal-')
   const roots = { botWorkspaces: join(root, 'bot-workspaces'), worker: join(root, 'worker') }
   const repoPath = join(roots.botWorkspaces, randomUUID()), stateDir = join(roots.worker, 'adapters')
@@ -151,13 +151,11 @@ it('codex: the real legacy submitted question journal passes the retained-delive
   const source = readFileSync(resolve(import.meta.dirname, 'fakes/fake-codex-subscription.mjs'), 'utf8')
   const marker = "    if (prompt === 'ORIGINAL_QUESTION') {"
   expect(source.split(marker)).toHaveLength(2)
-  // Extend only this disposable CLI process. It changes and commits the file,
-  // then calls the real MCP submit tool; no test code writes a journal state.
+  // Extend only this disposable CLI process. It writes the file and calls the
+  // real MCP submit tool; no test code writes a journal state.
   writeFileSync(binary, source.replace(marker, `
     if (prompt === 'LEGACY_OWNER_ANSWER') {
       writeFileSync('artifact.txt', ${JSON.stringify(artifact)})
-      execFileSync('git', ['add', 'artifact.txt'], { stdio: ['ignore', 'pipe', 'pipe'] })
-      execFileSync('git', ['-c', 'user.name=Fixture', '-c', 'user.email=fixture@mikka.invalid', 'commit', '-m', 'Answered delivery'], { stdio: ['ignore', 'pipe', 'pipe'] })
       const args = JSON.parse(process.argv.find(value => value.startsWith('mcp_servers.mikka.args=')).slice('mcp_servers.mikka.args='.length))
       execFileSync(process.execPath, args, { input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'submit', arguments: { summary: 'Synthetic answered delivery' } } }) + '\\n', stdio: ['pipe', 'pipe', 'pipe'] })
     }
@@ -228,7 +226,18 @@ ${marker}`))
     const historyBefore = readFileSync(historyPath)
     expect(JSON.parse(historyBefore.toString()).messages).toEqual(['ORIGINAL_QUESTION', 'LEGACY_OWNER_ANSWER'])
     const worktreePath = resumed.worktree!, git = (...args: string[]) => execFileSync('git', args, { cwd: worktreePath })
-    const head = git('rev-parse', 'HEAD').toString().trim()
+    // The hosted CLI's private Git context does not advance the bound worktree.
+    // The real legacy run above produces the journal and artifact, not a retained
+    // commit. Prepare that separate physical precondition explicitly with the
+    // existing host function; this is not a replay of an old production history.
+    expect(git('rev-parse', 'HEAD').toString().trim()).toBe(resumed.baseCommit)
+    expect(readFileSync(join(worktreePath, 'artifact.txt'), 'utf8')).toBe(artifact)
+    const journalBefore = readFileSync(journalPath), completionBefore = structuredClone(completion)
+    const head = await retainDeliverable(repoPath, worktreePath, answer.runId)
+    expect(readFileSync(journalPath)).toEqual(journalBefore)
+    expect(server.runs.get(answer.runId)!.completion).toEqual(completionBefore)
+    expect(readFileSync(historyPath)).toEqual(historyBefore)
+    expect(git('rev-parse', 'HEAD').toString().trim()).toBe(head)
     expect(head).not.toBe(resumed.baseCommit)
     expect(git('status', '--porcelain').toString()).toBe('')
     expect(readFileSync(join(worktreePath, 'artifact.txt'), 'utf8')).toBe(artifact)
@@ -238,7 +247,6 @@ ${marker}`))
       repoPath, worktreePath, sourceCommit: resumed.baseCommit!,
       checkpoint: { patchSha256: createHash('sha256').update(patch).digest('hex'), patchBytes: patch.length, files: taken.checkpoint.files },
       legacyQuestionSubmission: { questionId, continuesRunId: firstInput.runId } }
-    const journalBefore = readFileSync(journalPath)
     const indexPath = join(git('rev-parse', '--git-dir').toString().trim(), 'index'), indexBefore = readFileSync(indexPath)
     // Import the unchanged standalone production probe, including its path,
     // journal, Git and checkpoint checks, over the Supervisor's actual files.
