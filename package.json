@@ -38,7 +38,7 @@
     "test:chat-attachments-api": "node --import tsx scripts/chat-attachments-acceptance.mjs",
     "test:chat-attachments-db": "node --test-force-exit --import ./scripts/server-test.mjs --import tsx --test lib/chat-attachments/store.db.test.ts",
     "test:user-message-text": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test components/workspace/user-message-text.test.tsx",
-    "test:run-info": "node --import tsx --test lib/run-info-view.test.ts",
+    "test:run-info": "node --import tsx --test lib/run-info-view.test.ts lib/thread-execution-identity-view.test.ts && node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test components/workspace/thread-execution-identity.test.tsx",
     "test:thread-changes": "node --import tsx --test lib/thread-changes.test.ts && node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test components/workspace/thread-changes.test.tsx",
     "test:motion": "node --import tsx --test lib/message-navigation.test.ts lib/hooks/use-arrivals.test.ts",
     "test:unread": "node --import tsx --test lib/unread.test.ts",

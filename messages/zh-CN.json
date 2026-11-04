@@ -3565,7 +3565,65 @@
       "paidBy": "{owner} 的 {plan}",
       "movedTo": "已换到 {machine} 继续"
     },
-    "back": "返回"
+    "back": "返回",
+    "executionIdentity": {
+      "title": "执行身份与费用归属",
+      "loading": "正在读取执行记录",
+      "unavailable": "执行记录不可读取",
+      "unknown": "未知",
+      "notRecorded": "未记录",
+      "runId": "执行 ID",
+      "copyRunId": "复制执行 ID",
+      "copied": "执行 ID 已复制",
+      "copyFailed": "执行 ID 复制失败",
+      "harness": "Agent",
+      "model": "模型",
+      "credential": "凭证类型",
+      "subscriptionRoute": "订阅执行路由",
+      "snapshotMissing": "未记录身份快照",
+      "participants": "执行身份",
+      "requester": "任务发起者",
+      "botOwner": "Bot 所有者",
+      "executionPrincipal": "执行主体",
+      "outputOwner": "产物归属",
+      "resources": "已授权资源",
+      "resourceOwner": "资源持有人",
+      "resourceReference": "资源引用",
+      "resourceRevision": "资源版本",
+      "billing": "费用归属",
+      "modelBilling": "模型账户",
+      "runtimeBilling": "运行资源账户",
+      "payer": "付款主体",
+      "amount": "计费口径",
+      "credentialKinds": {
+        "subscription": "官方订阅",
+        "api_key": "API Key",
+        "unknown": "未知"
+      },
+      "resourceKinds": {
+        "device": "电脑",
+        "api_key": "API Key",
+        "subscription": "订阅",
+        "e2b": "E2B",
+        "mcp": "MCP"
+      },
+      "access": {
+        "owner": "本人资源",
+        "workspace_share": "工作区分享"
+      },
+      "accountKinds": {
+        "api_key": "API Key",
+        "subscription": "订阅",
+        "native_login": "本机登录",
+        "local_device": "本地电脑",
+        "e2b": "E2B"
+      },
+      "amounts": {
+        "provider_unknown": "外部费用未知",
+        "metered": "Mikka 按量计费",
+        "not_applicable": "不适用"
+      }
+    }
   },
   "Computer": {
     "status": {

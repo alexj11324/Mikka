@@ -3565,7 +3565,65 @@
       "paidBy": "{owner}'s {plan}",
       "movedTo": "Moved to {machine} to continue"
     },
-    "back": "Back"
+    "back": "Back",
+    "executionIdentity": {
+      "title": "Execution identity and billing",
+      "loading": "Loading execution record",
+      "unavailable": "Execution record unavailable",
+      "unknown": "Unknown",
+      "notRecorded": "Not recorded",
+      "runId": "Run ID",
+      "copyRunId": "Copy run ID",
+      "copied": "Run ID copied",
+      "copyFailed": "Run ID could not be copied",
+      "harness": "Agent",
+      "model": "Model",
+      "credential": "Credential type",
+      "subscriptionRoute": "Subscription route",
+      "snapshotMissing": "No recorded identity snapshot",
+      "participants": "Execution identity",
+      "requester": "Requester",
+      "botOwner": "Bot owner",
+      "executionPrincipal": "Execution principal",
+      "outputOwner": "Output owner",
+      "resources": "Authorized resources",
+      "resourceOwner": "Resource holder",
+      "resourceReference": "Resource reference",
+      "resourceRevision": "Resource revision",
+      "billing": "Billing responsibility",
+      "modelBilling": "Model account",
+      "runtimeBilling": "Runtime account",
+      "payer": "Payer",
+      "amount": "Billing",
+      "credentialKinds": {
+        "subscription": "Official subscription",
+        "api_key": "API Key",
+        "unknown": "Unknown"
+      },
+      "resourceKinds": {
+        "device": "Device",
+        "api_key": "API Key",
+        "subscription": "Subscription",
+        "e2b": "E2B",
+        "mcp": "MCP"
+      },
+      "access": {
+        "owner": "Own resource",
+        "workspace_share": "Workspace share"
+      },
+      "accountKinds": {
+        "api_key": "API Key",
+        "subscription": "Subscription",
+        "native_login": "Native login",
+        "local_device": "Local device",
+        "e2b": "E2B"
+      },
+      "amounts": {
+        "provider_unknown": "External cost unknown",
+        "metered": "Mikka metered usage",
+        "not_applicable": "Not applicable"
+      }
+    }
   },
   "Computer": {
     "status": {
