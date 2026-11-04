@@ -1,0 +1,162 @@
+{
+  "schemaVersion": 1,
+  "kind": "normal-owner-ui-factory-continuation-observation",
+  "recordedFrom": "root agent direct normal browser UI observations; no new provider call or privileged query by this recorder",
+  "observedAt": {
+    "claudeAccepted": "2026-11-04T05:28:00Z",
+    "codexAccepted": "2026-11-04T05:34:00Z",
+    "timesApproximate": true
+  },
+  "scope": {
+    "workspaceId": "887238ef-410c-4c65-bb08-cfa15e1f8ec9",
+    "ownerId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+    "credentialValuesCaptured": false,
+    "providerBillingObserved": false
+  },
+  "claudeCode": {
+    "taskId": "586be5be-e65d-4cc5-a5e9-5804b535544b",
+    "issueId": "586eb600-8027-4439-8ac8-b17fd5d3037f",
+    "requestEpoch": "a1801fa3-7a19-49a6-8e05-4028c4c3f091",
+    "requestRecordedAt": "2026-11-04T05:13:08.896Z",
+    "runs": [
+      {
+        "stage": "execute",
+        "runId": "d4cd1bd8-8566-4803-8a39-e2aefb7bac3e",
+        "nativeSessionId": "5d51b306-0c32-4d3b-acae-4c53e26f0910"
+      },
+      {
+        "stage": "review",
+        "runId": "b4297ed8-a8f9-4f8e-8a4e-9633f152b63e",
+        "nativeSessionId": "96600085-3d31-486f-8df0-957f5072a104"
+      },
+      {
+        "stage": "verify",
+        "runId": "187412ce-65b8-47b2-81e9-b34d5fe7837b"
+      }
+    ],
+    "credentialObservation": {
+      "harness": "claude_code",
+      "model": "claude-opus-5-5",
+      "credentialType": "subscription",
+      "subscriptionRoute": "claude_code_cli",
+      "continuationExecuteSnapshotMatchesInitial": true,
+      "deviceId": "0832fedc-3a69-4607-8a96-4c6b02007873",
+      "subscriptionBindingId": "dabd9bd4-2a79-40a8-85dc-1b3db772db19",
+      "subscriptionRevision": 2
+    },
+    "candidateId": "3226bfc5-fa01-49de-80d2-9cd0d2efb914",
+    "candidateSha": "a38870c9cf564df32e924d7f8f263c57845d87c3",
+    "artifact": {
+      "previousBytes": 53,
+      "currentBytes": 74,
+      "sha256": "c076465aebb42bc34c51a12020e3924bb0ca8efcbc1dfc67ba3957033b2d470a"
+    },
+    "independentChecks": {
+      "passed": 4,
+      "total": 4,
+      "artifactSemanticChecksPassed": true,
+      "verifyCommandStatus": "not_run",
+      "shellExecutionAuthorized": false
+    },
+    "acceptance": {
+      "normalOwnerAction": true,
+      "hostUiReadback": "accepted"
+    },
+    "unknownSendObservation": {
+      "failedUiResponseDidNotMeanNoMutation": true,
+      "uniqueSubmittedMessageAndActualNewRunVisible": true,
+      "automaticReplayPerformed": false
+    }
+  },
+  "codex": {
+    "taskId": "b253a7b5-6d44-42b4-b42a-0681e012f006",
+    "issueId": "7eb69f9e-95c0-416e-99ab-ab4ecb084344",
+    "requestEpoch": "034cf65a-cbfe-4657-bbbd-34de64b97d65",
+    "requestRecordedAt": "2026-11-04T05:19:35.126Z",
+    "runs": [
+      {
+        "stage": "execute",
+        "runId": "27d71fc1-dfef-4de1-8c84-fbda489cb7fc",
+        "attemptId": "6c873292-d86e-43ce-b5ab-41cce02f485f",
+        "nativeSessionId": "01a1a500-2be3-78a0-a43e-e11e9f15b5a3"
+      },
+      {
+        "stage": "review",
+        "runId": "172c9235-398a-4ea6-8c47-79bfb894a684",
+        "attemptId": "4b5d00dd-2065-4f5b-a1f7-f513b9988427",
+        "nativeSessionId": "01a1a502-69c1-7ec0-a788-b1c8d7c38a6c"
+      },
+      {
+        "stage": "verify",
+        "runId": "6c1b4385-e539-452d-8f82-036440635871",
+        "attemptId": "5aa425c4-2e3b-4f94-bd2f-83a0e2ec238c"
+      }
+    ],
+    "credentialObservation": {
+      "allThreeFrozenSnapshotsReadInUi": true,
+      "harness": "codex",
+      "model": "gpt-5.6-luna",
+      "credentialType": "subscription",
+      "subscriptionRoute": "codex_cli",
+      "deviceId": "e7bdb4f7-88e7-4f4e-a66d-2a78ead110cb",
+      "subscriptionBindingId": "f9b001ce-1e64-41b0-874e-821cd5cba522",
+      "subscriptionRevision": 2,
+      "allActorsOwnersPayersRemainPrimary": true,
+      "runtime": "e2b",
+      "externalCharges": "unknown"
+    },
+    "candidateId": "c00a4f0b-8c52-4639-bc50-a37520658198",
+    "candidateSha": "2c15e58a9a63c57d98ccd0f8ee6be60d50eea719",
+    "artifact": {
+      "previousBytes": 56,
+      "currentBytes": 77,
+      "sha256Prefix": "3c888",
+      "fullSha256Included": false,
+      "lines": 4,
+      "matchesExpectedUtf8": true,
+      "contentMatchesGit": true,
+      "exactLf": true,
+      "onlyFourthLineAdded": true,
+      "gitDiffCheckExitCode": 0,
+      "noChangedFilesAtVerification": true
+    },
+    "independentChecks": {
+      "passed": 3,
+      "total": 3,
+      "reviewAndVerifyNativeTool": "mcp__mikka__inspect_artifact",
+      "artifactInspectionPassed": true,
+      "verifyCommandStatus": "not_run",
+      "shellExecutionAuthorized": false
+    },
+    "handoff": {
+      "revision": 20,
+      "digest": "8ee780a9d48e770fef06e1ad4a8171fb0de9f4bdc2ff8b737004cb006e4c405f",
+      "oldEpochHistoryPreserved": true,
+      "externalEffects": []
+    },
+    "acceptance": {
+      "normalOwnerAction": true,
+      "hostUiReadback": "accepted"
+    },
+    "sendHistory": {
+      "firstResponseUnknown": true,
+      "readOnlyUiReconciliationBeforeAnotherOwnerSubmit": true,
+      "secondSubmitTimeApproximate": "2026-11-04T05:20:00Z",
+      "hostRecordedTimeIsAuthoritative": true,
+      "firstRequestNonSubmissionNotIndependentlyProven": true
+    }
+  },
+  "limits": {
+    "perPhaseDeploymentIdsNotRecorded": true,
+    "testsOccurredAcrossNormalProductionDeploymentChanges": true,
+    "notASinglePinnedRunnerPass": true,
+    "notGmailOrTwoMemberMcpEvidence": true,
+    "noCloudToLocalHandoffClaim": true
+  },
+  "screenshot": {
+    "nativePathReportedByRoot": "/workspace/scratch/mikka-codex-continuation-accepted-20261104-0534.jpg",
+    "bytesReportedByRoot": 148688,
+    "published": false,
+    "reason": "Contains sidebar information from other test threads; retained internally only."
+  }
+}
