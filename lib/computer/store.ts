@@ -1,4 +1,5 @@
 import 'server-only'
+import { botListChanged, runListChanged } from '../live/lists'
 import { randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
 import type { ComputerState } from '@mikka/protocol/computer'
@@ -20,6 +21,7 @@ export class ComputerStore {
 
   async createBot(actor: Actor, name: string) {
     const { rows } = await this.pool.query<Bot>('INSERT INTO bots (id,"workspaceId","ownerId",name) VALUES ($1,$2,$3,$4) RETURNING id,name,"workspaceId","ownerId"', [randomUUID(), actor.workspaceId, actor.userId, name])
+    if (rows[0]) await botListChanged(this.pool, rows[0].id)
     return rows[0]
   }
   async listBots(actor: Actor) {
@@ -56,11 +58,12 @@ export class ComputerStore {
         // Previously delivered approvals cannot be rebound to a later policy
         // generation. Stop these threads so they cannot appear to resume with
         // stale authority after an administrator re-enables computer use.
-        await client.query(`UPDATE agent_runs r SET "stopRequestedAt"=coalesce(r."stopRequestedAt",now()),"updatedAt"=now(),
+        const stopped = await client.query<{ id: string }>(`UPDATE agent_runs r SET "stopRequestedAt"=coalesce(r."stopRequestedAt",now()),"updatedAt"=now(),
           "finishedAt"=CASE WHEN r.status='queued' THEN now() ELSE r."finishedAt" END,
           status=CASE WHEN r.status='queued' THEN 'stopped' ELSE r.status END
           FROM computer_run_bindings b WHERE b."runId"=r.id AND b."workspaceId"=$1
-            AND r.status=ANY($2::text[])`, [workspaceId, ['queued', 'preparing', 'running', 'paused', 'waiting_input', 'finishing']])
+            AND r.status=ANY($2::text[]) RETURNING r.id`, [workspaceId, ['queued', 'preparing', 'running', 'paused', 'waiting_input', 'finishing']])
+        for (const { id } of stopped.rows) await runListChanged(client, id)
       }
       const sync = async () => {
         for (const machine of machines) {
@@ -168,9 +171,10 @@ export class ComputerStore {
       // run is claimed on its own thread machine (decision 0251), so a takeover pauses no run.
       // Handback still resumes a run that an earlier takeover paused.
       if (action === 'handback') {
-        await client.query(`UPDATE agent_runs r SET status=COALESCE(r."resumeStatus",'running'),"resumeStatus"=NULL,"pauseReason"=NULL,"updatedAt"=now()
+        const resumed = await client.query<{ id: string }>(`UPDATE agent_runs r SET status=COALESCE(r."resumeStatus",'running'),"resumeStatus"=NULL,"pauseReason"=NULL,"updatedAt"=now()
           FROM computer_run_bindings b WHERE b."runId"=r.id AND b."botId"=$1 AND b."workspaceId"=$2 AND b."ownerId"=$3
-          AND r."userId"=$3 AND r.status='paused' AND r."pauseReason"='human_control'`, [botId, actor.workspaceId, actor.userId])
+          AND r."userId"=$3 AND r.status='paused' AND r."pauseReason"='human_control' RETURNING r.id`, [botId, actor.workspaceId, actor.userId])
+        for (const { id } of resumed.rows) await runListChanged(client, id)
       }
       persistProgress = true
       await this.runtime.syncDesktopLease(sandbox, lease)

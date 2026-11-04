@@ -33,6 +33,7 @@ import type { TriageJudgment } from './triage-batch'
 import type { DecisionExecution } from './decide'
 import type { ScheduledRead } from '@/lib/schedules/contract'
 import { scheduledInbox, type Occurrence } from '@/lib/schedules/store'
+import { ownerListChanged } from '../live/lists'
 
 // The Coordinator's conversation in Neon. A turn takes the lease, moves the
 // inbox into the conversation, answers, and lets go; a wake that finds the
@@ -107,11 +108,16 @@ export async function takeInbox(userId: string, holder: string, botId: string): 
   return db.transaction(async tx => {
     const now = new Date()
     await tx.insert(coordinatorSessions).values({ userId, botId }).onConflictDoNothing()
+    const [previousLease] = await tx.select({ leaseHolder: coordinatorSessions.leaseHolder, leaseUntil: coordinatorSessions.leaseUntil })
+      .from(coordinatorSessions).where(sessionOf(userId, botId)).for('update')
     const [taken] = await tx.update(coordinatorSessions)
       .set({ leaseHolder: holder, leaseUntil: new Date(now.getTime() + LEASE_MS), updatedAt: now })
       .where(and(sessionOf(userId, botId), or(isNull(coordinatorSessions.leaseUntil), lt(coordinatorSessions.leaseUntil, now), eq(coordinatorSessions.leaseHolder, holder))))
       .returning({ userId: coordinatorSessions.userId })
     if (!taken) return { held: false, ...NO_TAKE }
+    // Ordinary renewal is not a broad list update. Only a new/changed turn
+    // or actual message delivery changes the summary that the sidebar shows.
+    if (!coordinatorLeaseActive(previousLease, now) || previousLease?.leaseHolder !== holder) await ownerListChanged(tx, userId, ['bot_chat_list'])
     const candidates = await tx.select().from(coordinatorEvents).where(waking(userId, botId))
       .orderBy(asc(coordinatorEvents.createdAt)).limit(INBOX_BATCH)
     // A schedule is a separate read-only turn. Hydrate its authority through
@@ -157,6 +163,7 @@ export async function takeInbox(userId: string, holder: string, botId: string): 
       // A GitHub or other token in an event (a run's summary, a tool's text) never reaches the chat.
       message: maskDeep(sourcedEventMessage({ ...event, deliveredAt: now }, scheduledRead ? `[Scheduled read-only task] The person requested this stored task for now: ${scheduledRead.prompt}\nUse only the available allowed read tools. Do not create or change anything, request approval, schedule more work, or claim an external write. Return the result for this original chat.` : eventPrompt(event, event.runId ? completionObservations.get(event.runId) : undefined)), credentialMasker),
     })))
+    if (chatEvents.length) await ownerListChanged(tx, userId, ['bot_chat_list'])
     await tx.update(coordinatorEvents).set({ deliveredAt: now }).where(inArray(coordinatorEvents.id, events.map(event => event.id)))
     for (const event of events) {
       const payload = markTelegramPending(event)
@@ -194,8 +201,9 @@ function carriesCode(event: { payload: Record<string, unknown> }): boolean {
 
 /** Lets go of the lease. Returns whether events that need a turn arrived meanwhile, so the caller can take them. */
 export async function releaseLease(userId: string, holder: string, botId: string): Promise<boolean> {
-  await db.update(coordinatorSessions).set({ leaseHolder: null, leaseUntil: null, updatedAt: new Date() })
-    .where(and(sessionOf(userId, botId), eq(coordinatorSessions.leaseHolder, holder)))
+  const released = await db.update(coordinatorSessions).set({ leaseHolder: null, leaseUntil: null, updatedAt: new Date() })
+    .where(and(sessionOf(userId, botId), eq(coordinatorSessions.leaseHolder, holder))).returning({ userId: coordinatorSessions.userId })
+  if (released.length) await ownerListChanged(db, userId, ['bot_chat_list'])
   return hasWakingEvents(userId, botId)
 }
 
@@ -217,6 +225,7 @@ export async function untriagedEvents(userId: string, botId: string) {
 
 export async function setEventTier(id: string, tier: CoordinatorEventTier, scope: { userId: string; botId: string }): Promise<boolean> {
   const applied = await db.update(coordinatorEvents).set({ tier }).where(and(eq(coordinatorEvents.id, id), isNull(coordinatorEvents.deliveredAt), isNull(coordinatorEvents.tier), eventsOf(scope.userId, scope.botId))).returning({ id: coordinatorEvents.id })
+  if (applied.length) await ownerListChanged(db, scope.userId, ['bot_chat_list'])
   return applied.length === 1
 }
 
@@ -248,6 +257,7 @@ export async function completeTriageAttempt(event: TriageEventRecord & { observe
       eq(coordinatorEvents.payload, event.payload), eq(coordinatorEvents.lastTriageAttemptAt, attemptedAt),
       isNull(coordinatorEvents.deliveredAt), isNull(coordinatorEvents.tier)))
     .returning({ id: coordinatorEvents.id })
+  if (applied.length) await ownerListChanged(db, scope.userId, ['bot_chat_list'])
   return applied.length === 1
 }
 
@@ -278,6 +288,7 @@ export async function appendMessages(userId: string, holder: string, unmasked: M
         return { id: crypto.randomUUID(), userId, botId, position: first + index,
           message: { ...plain, ...(message.role === 'assistant' && streamId ? { mikkaStreamId: streamId } : {}), ...(stop ? { mikkaStopped: true } : {}) } }
       }))
+      await ownerListChanged(tx, userId, ['bot_chat_list'])
     }
     const now = new Date()
     await tx.update(coordinatorSessions).set({ leaseUntil: new Date(now.getTime() + LEASE_MS), lastError: warning && maskCredentials(warning), lastErrorAt: warning ? now : null, updatedAt: now })
@@ -314,6 +325,7 @@ export async function retryFailedTurn(userId: string, botId: string): Promise<bo
       dedupeKey: `turn_retry:${userId}:${botId}:${failure}`,
       payload: { text: '', postedToChat: true, retry: true },
     }).onConflictDoNothing({ target: coordinatorEvents.dedupeKey }).returning({ id: coordinatorEvents.id })
+    if (inserted.length) await ownerListChanged(tx, userId, ['bot_chat_list'])
     return inserted.length === 1
   })
 }
@@ -329,6 +341,7 @@ export async function failTurn(userId: string, holder: string, error: string, bo
     const released = await tx.update(coordinatorSessions).set({ leaseHolder: null, leaseUntil: null, lastError: reason, lastErrorAt: new Date(), updatedAt: new Date() })
       .where(and(sessionOf(userId, botId), eq(coordinatorSessions.leaseHolder, holder))).returning({ userId: coordinatorSessions.userId })
     if (!released.length) return
+    await ownerListChanged(tx, userId, ['bot_chat_list'])
     await tx.execute(sql`UPDATE coordinator_messages SET message = message || jsonb_build_object('mikkaFailure', ${reason}::text)
       WHERE "userId"=${userId} AND "botId"=${botId}::uuid AND message->>'role'='user'
         AND position=(SELECT max(position) FROM coordinator_messages WHERE "userId"=${userId} AND "botId"=${botId}::uuid)`)
@@ -573,19 +586,30 @@ export interface BotChatSummary {
 
 /** Each of the person's own bots' latest line and state, for the bot list (the Coordinator's comes with its chat). */
 export async function botChats(userId: string): Promise<Record<string, BotChatSummary>> {
+  return (await botChatSnapshot(userId)).items
+}
+
+/** The same summaries plus actual lease expiries that can change working
+ * without another persistent write. This never renews a turn or wake lease. */
+export async function botChatSnapshot(userId: string) {
   const latest = await db.selectDistinctOn([coordinatorMessages.botId], { botId: coordinatorMessages.botId, message: compactChatMessage, createdAt: coordinatorMessages.createdAt })
     .from(coordinatorMessages).where(and(eq(coordinatorMessages.userId, userId), isNotNull(coordinatorMessages.botId), sql`${coordinatorMessages.message}->>'role' <> 'tool'`))
     .orderBy(coordinatorMessages.botId, desc(coordinatorMessages.position))
   const sessions = await db.select({ botId: coordinatorSessions.botId, leaseHolder: coordinatorSessions.leaseHolder, leaseUntil: coordinatorSessions.leaseUntil, lastError: coordinatorSessions.lastError }).from(coordinatorSessions).where(and(eq(coordinatorSessions.userId, userId), isNotNull(coordinatorSessions.botId)))
   const waiting = await db.select({ botId: coordinatorEvents.botId, kind: coordinatorEvents.kind, tier: coordinatorEvents.tier, wakeAttempts: coordinatorEvents.wakeAttempts, wakeLeaseUntil: coordinatorEvents.wakeLeaseUntil, wakeLastError: coordinatorEvents.wakeLastError })
     .from(coordinatorEvents).where(and(eq(coordinatorEvents.userId, userId), isNotNull(coordinatorEvents.botId), isNull(coordinatorEvents.deliveredAt)))
+  const now = new Date()
+  const expiries = [
+    ...sessions.flatMap(session => coordinatorLeaseActive(session, now) && session.leaseUntil ? [session.leaseUntil] : []),
+    ...waiting.flatMap(event => event.tier !== 'background' && event.kind !== 'matter_handoff' && event.wakeAttempts === 1 && event.wakeLeaseUntil && event.wakeLeaseUntil > now ? [event.wakeLeaseUntil] : []),
+  ]
   const result: Record<string, BotChatSummary> = {}
   for (const event of waiting) {
-    if (event.botId && !result[event.botId]) result[event.botId] = { line: null, at: null, working: coordinatorChatState(undefined, waiting.filter(row => row.botId === event.botId)).working }
+    if (event.botId && !result[event.botId]) result[event.botId] = { line: null, at: null, working: coordinatorChatState(undefined, waiting.filter(row => row.botId === event.botId), now).working }
   }
   for (const session of sessions) {
     if (!session.botId) continue
-    result[session.botId] = { line: null, at: null, working: coordinatorChatState(session, waiting.filter(event => event.botId === session.botId)).working }
+    result[session.botId] = { line: null, at: null, working: coordinatorChatState(session, waiting.filter(event => event.botId === session.botId), now).working }
   }
   const lines = latest.flatMap(row => {
     if (!row.botId) return []
@@ -599,7 +623,7 @@ export async function botChats(userId: string): Promise<Record<string, BotChatSu
     const text = line.text && line.from === 'coordinator' ? namedCitations(line.text, sources) : line.text
     result[line.botId] = { ...(result[line.botId] ?? { working: false }), line: text || null, at: line.at }
   }
-  return result
+  return { items: result, expiries, observedAt: now.getTime() }
 }
 
 /** The whole conversation for display, newest last. */

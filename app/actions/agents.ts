@@ -1,5 +1,6 @@
 'use server'
 import { deploymentSwitch } from '@/lib/deployment-switches'
+import { ownerListChanged } from '@/lib/live/lists'
 
 import { createHash } from 'node:crypto'
 import { gunzipSync } from 'node:zlib'
@@ -123,9 +124,10 @@ export async function setDeviceEnabled(input: { deviceId: string; enabled: boole
     const userId = await getUserId()
     const parsed = z.object({ deviceId: z.uuid(), enabled: z.boolean() }).safeParse(input)
     if (!parsed.success) return { error: 'deviceNotFound' }
-    await db.update(devices)
+    const changed = await db.update(devices)
       .set({ enabled: parsed.data.enabled, updatedAt: new Date() })
-      .where(and(eq(devices.id, parsed.data.deviceId), eq(devices.ownerId, userId), isNull(devices.removedAt)))
+      .where(and(eq(devices.id, parsed.data.deviceId), eq(devices.ownerId, userId), isNull(devices.removedAt))).returning({ id: devices.id })
+    if (changed.length) await ownerListChanged(db, userId, ['thread_list'])
     return { success: true }
   })
 }

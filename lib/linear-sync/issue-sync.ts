@@ -1,4 +1,5 @@
 import 'server-only'
+import { issueListChanged } from '../live/lists'
 import { and, eq, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { z } from 'zod'
@@ -61,6 +62,7 @@ async function syncLink(snapshot: Publication, identifier: string, linearUpdated
     const [link] = await tx.insert(linearIssueLinks).values({ id: crypto.randomUUID(), issueId: issue.id, ownerId: issue.userId, ...values })
       .onConflictDoUpdate({ target: linearIssueLinks.issueId, set: values }).returning()
     await tx.update(linearIssuePublications).set({ writePending: false }).where(eq(linearIssuePublications.id, publication.id))
+    if (snapshot.link?.linearIdentifier !== identifier) await issueListChanged(tx, issue.id)
     return link
   })
 }
@@ -141,6 +143,7 @@ export async function applyLinearIssueToApp(team: TeamRow, remote: LinearIssueSn
     }
 
     if (fieldsChanged) await tx.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: saved.id, userId: saved.userId, revision: saved.revision, title: saved.title, content: saved.content, status: saved.status, priority: saved.priority, ...systemActor('linear') })
+    await issueListChanged(tx, saved.id, latest.title !== saved.title)
     await tx.update(linearIssueLinks).set({ appSyncedAt: saved.updatedAt, linearUpdatedAt: new Date(remote.updatedAt), linearDescriptionHash: hashValue(remote.description ?? ''), syncStatus: 'synced', lastError: null, updatedAt: new Date() }).where(eq(linearIssueLinks.id, link.link.id))
     return saved
   })
@@ -186,6 +189,7 @@ export async function createAppIssueFromLinear(team: TeamRow, remote: LinearIssu
         linearIssueId: remote.id, linearIdentifier: remote.identifier, linearDescriptionHash: syncRemote ? null : hashValue(remote.description ?? ''), syncStatus: 'synced',
         appSyncedAt: sameId.updatedAt, linearUpdatedAt: syncRemote ? null : new Date(remote.updatedAt), updatedAt: new Date(),
       })
+      if (!existingLink) await issueListChanged(tx, sameId.id)
       return { issue: sameId, syncRemote }
     }
     const [collision] = await tx.select({ id: issues.id }).from(issues).where(eq(issues.id, linearId.data)).limit(1)
@@ -218,6 +222,7 @@ export async function createAppIssueFromLinear(team: TeamRow, remote: LinearIssu
       linearIssueId: remote.id, linearIdentifier: remote.identifier, linearDescriptionHash: hashValue(remote.description ?? ''), syncStatus: 'synced',
       appSyncedAt: now, linearUpdatedAt: new Date(remote.updatedAt), updatedAt: now,
     })
+    await issueListChanged(tx, id)
     return { issue, syncRemote: false }
   })
   if (!created) return null

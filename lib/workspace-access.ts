@@ -8,10 +8,12 @@ import { db } from '@/lib/db'
 import { users } from '@/lib/db/schema'
 import { z } from 'zod'
 import { requireUser } from '@/lib/issue-access'
-import { workspaceDb } from '@/lib/workspace-db'
+import { workspaceDb, workspacePool } from '@/lib/workspace-db'
 import { workspaces, workspaceMembers, workspaceInvitations } from '@/lib/db/workspace-schema'
 import { renameGeneratedWorkspace, type WorkspaceLocale } from '@/lib/workspace-name'
 import { ensurePersonalShare, ensurePersonalWorkspace } from '@/lib/personal-workspace'
+import type { ListLiveRead } from '@/lib/live/list-read'
+import { ownerLiveScope } from '@/lib/live/owner-scope'
 
 function workspaceLocale(value: string): WorkspaceLocale {
   return value === 'en' ? 'en' : 'zh-CN'
@@ -86,6 +88,7 @@ const readWorkspaceContext = cache(async (userId: string, email: string, name: s
 })
 
 export async function loadWorkspaceSettings(requestedId?: string, authenticatedUser?: AuthenticatedUser) {
+  const observedAt = Date.now()
   const context = await loadWorkspaceContext(requestedId, authenticatedUser)
   const workspaceId = context.workspace.id
   const [members, invitations] = await Promise.all([
@@ -101,8 +104,14 @@ export async function loadWorkspaceSettings(requestedId?: string, authenticatedU
     .where(inArray(users.id, members.map(member => member.userId))) : []
   const images = new Map(profiles.map(profile => [profile.id, profile.image]))
   images.set(context.currentUserId, context.currentUser.image)
+  const nextExpiry = invitations.map(invite => invite.expiresAt.getTime()).filter(at => at > observedAt).sort((a, b) => a - b)[0]
+  const home = await ownerLiveScope(workspacePool, context.currentUserId)
+  const live: { live?: ListLiveRead & { homeWorkspaceId: string | null } } = { live: { ownerId: context.currentUserId, workspaceId, homeWorkspaceId: home?.workspaceId ?? null,
+    ...(nextExpiry === undefined ? {} : { deadline: { at: new Date(nextExpiry).toISOString(), afterMs: nextExpiry - observedAt } }),
+  } }
   return {
     ...context,
+    ...live,
     members: members.map(member => ({ ...member, image: images.get(member.userId) ?? null, createdAt: member.createdAt.toISOString() })),
     invitations: invitations.map(invite => ({ ...invite, createdAt: invite.createdAt.toISOString(), expiresAt: invite.expiresAt.toISOString() })),
   }

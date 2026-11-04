@@ -3,6 +3,8 @@ import { randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
 import { commandSchema, definitionSchema, ScheduleError, type Actor, type Definition, type ScheduledRead } from './contract'
 import { nextTime, timezone } from './time'
+import { ownerListChanged } from '../live/lists'
+import { observePoolCommits } from '../db/commit-effects'
 
 export type WorkspaceGuard = <T>(ownerId: string, workspaceId: string | null, work: () => Promise<T>) => Promise<T>
 export type MessageGuard = (tx: PoolClient, ownerId: string, value: unknown) => Promise<void>
@@ -24,6 +26,7 @@ export function scheduledInbox(row: Occurrence | undefined, now: Date): { eventI
 export class ScheduleStore {
   constructor(private pool: Pool, private workspace: WorkspaceGuard, private issue: IssueReader, private safeMessage: MessageGuard, private agentAvailable: () => boolean, private clock: () => Date = () => new Date()) {}
   private async transaction<T>(work: (tx: PoolClient) => Promise<T>): Promise<T> {
+    observePoolCommits(this.pool)
     const tx = await this.pool.connect()
     try { await tx.query('BEGIN'); await tx.query("SET LOCAL lock_timeout='5s'"); const value = await work(tx); await tx.query('COMMIT'); return value }
     catch (error) { await tx.query('ROLLBACK'); throw error }
@@ -98,7 +101,8 @@ export class ScheduleStore {
     const text=`[Schedule ${row.id}; occurrence ${o.id}; operation ${o.operation_id}] ${o.definition.title}: ${status}\n${result===null?error??'':typeof result==='object'&&result&&'text' in result?String(result.text):JSON.stringify(result)}`
     await this.safeMessage(tx,row.owner_id,text)
     await this.lockChat(tx,row)
-    await tx.query(`INSERT INTO coordinator_messages(id,"userId","botId",position,message) SELECT $1,$2,$3,COALESCE(MAX(position),0)+1,$4 FROM coordinator_messages WHERE "userId"=$2 AND "botId" IS NOT DISTINCT FROM $3::uuid ON CONFLICT(id) DO NOTHING`,[o.operation_id,row.owner_id,row.bot_id,{role:'assistant',content:text,...(streamId?{mikkaStreamId:streamId}:{})}])
+    const inserted = await tx.query(`INSERT INTO coordinator_messages(id,"userId","botId",position,message) SELECT $1,$2,$3,COALESCE(MAX(position),0)+1,$4 FROM coordinator_messages WHERE "userId"=$2 AND "botId" IS NOT DISTINCT FROM $3::uuid ON CONFLICT(id) DO NOTHING`,[o.operation_id,row.owner_id,row.bot_id,{role:'assistant',content:text,...(streamId?{mikkaStreamId:streamId}:{})}])
+    if (inserted.rowCount) await ownerListChanged(tx, row.owner_id, ['bot_chat_list'])
     // A result is already in the chat. Whether it also needs the person (a failure, a skipped or cancelled run, a result they would want flagged)
     // is triage's call on the Decisions API, not a fixed background tier: the event is left untriaged and undelivered.
     await tx.query(`INSERT INTO coordinator_events(id,"userId","botId",kind,"dedupeKey",payload) VALUES($1,$2,$3,'run_report',$4,$5) ON CONFLICT("dedupeKey") DO NOTHING`,[o.id,row.owner_id,row.bot_id,`schedule_result:${o.id}`,{source:'schedule_result',scheduleId:row.id,occurrenceId:o.id,operationId:o.operation_id,status,error}])
@@ -123,6 +127,7 @@ export class ScheduleStore {
       if(!skipped&&task.kind==='agent_read'){
         const eventId=randomUUID()
         await tx.query(`INSERT INTO coordinator_events(id,"userId","botId",kind,"dedupeKey",payload,tier) VALUES($1,$2,$3,'run_report',$4,$5,'attention')`,[eventId,row.owner_id,row.bot_id,`schedule_due:${o.id}:${o.attempts}`,{source:'schedule_due',scheduleId:row.id,occurrenceId:o.id,text:task.prompt}])
+        await ownerListChanged(tx, row.owner_id, ['bot_chat_list'])
         await tx.query('UPDATE schedule_occurrences SET event_id=$2 WHERE id=$1',[o.id,eventId])
         return row.owner_id
       }

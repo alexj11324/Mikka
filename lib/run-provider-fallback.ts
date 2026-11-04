@@ -1,4 +1,5 @@
 import 'server-only'
+import { runListChanged } from './live/lists'
 import { isDeepStrictEqual } from 'node:util'
 import type { Pool, PoolClient } from 'pg'
 import { drizzle } from 'drizzle-orm/node-postgres'
@@ -217,6 +218,7 @@ async function settle(pool: Pool, original: Run, receipt: ModelFallbackRecord, t
       // longer be authorized, and do not emit a model-setup request for it.
       await client.query(`UPDATE agent_runs SET report=report||jsonb_build_object('modelFallback',$3::jsonb),"updatedAt"=now()
         WHERE id=$1 AND "userId"=$2`, [source.id, source.userId, JSON.stringify({ ...prior, state: 'stopped' })])
+      await runListChanged(client, source.id)
       await client.query('COMMIT')
       return null
     }
@@ -262,6 +264,7 @@ async function settle(pool: Pool, original: Run, receipt: ModelFallbackRecord, t
         continuation = { runId, previousRunId: source.id, deviceId: target.deviceId, cloud: target.cloud, workspaceId: target.workspaceId }
       }
       await client.query(`UPDATE agent_runs SET report=COALESCE(report,'{}'::jsonb)||jsonb_build_object('modelFallback',$3::jsonb),"updatedAt"=now() WHERE id=$1 AND "userId"=$2`, [source.id, source.userId, JSON.stringify(receipt)])
+      await runListChanged(client, source.id)
       if (receipt.state === 'switched' && receipt.retryRunId)
         await (await import('./factory/store')).adoptProviderContinuation(client, source.userId, source.id, receipt.retryRunId)
       const event = receipt.state === 'switched' ? {
