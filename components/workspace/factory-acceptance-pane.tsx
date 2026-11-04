@@ -67,7 +67,7 @@ export function useAcceptance(task: FactoryTask) {
   const detailKey = `/api/factory/tasks/${task.id}`
   const { data: ledger, mutate: reload, error: ledgerError } = useSWR<Ledger>(ledgerKey, request, { refreshInterval: 0 })
   const { data: detail } = useSWR<AcceptanceDetail>(detailKey, request, { refreshInterval: 0 })
-  useLiveKey('factory_task', task.id, [ledgerKey, detailKey])
+  useLiveKey('factory_task', task.id, [ledgerKey, detailKey], detail?.liveWorkspaceId ?? null)
   // The list refreshes while a recovered candidate passes its checks. An
   // older cached detail with that same candidate must not hide newer approval.
   const current = detail?.task && detail.task.candidateId === task.candidateId &&
@@ -128,7 +128,7 @@ function CandidateCard({ candidate, detail, environment, isSkill }: { candidate?
 export function CandidateMachine({ taskId }: { taskId: string }) {
   const key = `/api/factory/tasks/${taskId}`
   const { data } = useSWR<AcceptanceDetail>(key, request, { refreshInterval: 0 })
-  useLiveKey('factory_task', taskId, [key])
+  useLiveKey('factory_task', taskId, [key], data?.liveWorkspaceId ?? null)
   const machine = data?.delivery?.machine
   if (!machine?.name) return null
   const Icon = machine.kind === 'cloud' ? Cloud : Laptop
@@ -191,7 +191,7 @@ export function FactoryAcceptancePane({ task, onOpenThread }: { task: FactoryTas
   const { data: evidence, error: evidenceError } = useSWR<Evidence>(task.stage === 'approval' || acceptance?.superseded || acceptance?.state === 'merged' ? `/api/factory/tasks/${task.id}/approval` : null, request)
   // Checks and the delivery header (B8/B9/B11) are read-only extras; the pane works without them.
   const { data: detail, mutate: reloadDetail } = useSWR<AcceptanceDetail>(`/api/factory/tasks/${task.id}`, request)
-  useLiveKey('factory_task', task.id, task.stage === 'approval' || acceptance?.superseded || acceptance?.state === 'merged' ? [`/api/factory/tasks/${task.id}/approval`] : [])
+  useLiveKey('factory_task', task.id, task.stage === 'approval' || acceptance?.superseded || acceptance?.state === 'merged' ? [`/api/factory/tasks/${task.id}/approval`] : [], detail?.liveWorkspaceId ?? null)
   const detailRevision = detail?.task?.revision
   useEffect(() => {
     if (typeof task.revision === 'number' && typeof detailRevision === 'number' && detailRevision < task.revision)

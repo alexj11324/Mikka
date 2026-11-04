@@ -5,7 +5,7 @@ import { Pool } from 'pg'
 import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
 import { isolatedPostgresURL } from '../../tests/helpers/isolated-postgres.mjs'
 import { afterCommit, observePoolCommits } from '../db/commit-effects'
-import { factoryLiveTarget } from './factory'
+import { factoryLiveScopes, factoryLiveTargets, factoryIssueLiveScope } from './factory'
 import { liveChannelId } from './scope'
 
 const url = process.env.E2E_DATABASE_URL
@@ -42,27 +42,47 @@ test('real PG: committed invalidations, savepoint rollback, and canonical owner/
     await pool.query('INSERT INTO mikka_team_issues VALUES ($1,$2)', [team.issueId, a])
 
     await t.test('same-owner different-workspace and same-workspace different-owner targets stay separate', async () => {
-      const first = await factoryLiveTarget(pool, pool, one.id, 'owner')
-      const second = await factoryLiveTarget(pool, pool, two.id, 'owner')
-      const third = await factoryLiveTarget(pool, pool, peer.id, 'peer')
-      assert.deepEqual(first?.scope, { ownerId: 'owner', workspaceId: a })
-      assert.deepEqual(second?.scope, { ownerId: 'owner', workspaceId: b })
-      assert.deepEqual(third?.scope, { ownerId: 'peer', workspaceId: a })
-      assert.equal(new Set([first!, second!, third!].map(target => liveChannelId(target.scope))).size, 3)
-      assert.equal(await factoryLiveTarget(pool, pool, peer.id, 'owner'), undefined)
-      assert.deepEqual(first?.events, [{ kind: 'factory_task', id: one.id }, { kind: 'thread', id: one.issueId }])
-      assert.equal((await factoryLiveTarget(pool, pool, legacy.id, 'owner'))?.scope.workspaceId, personal)
-      assert.equal((await factoryLiveTarget(pool, pool, team.id, 'owner'))?.scope.workspaceId, a)
+      const first = await factoryLiveScopes(pool, pool, one.id, 'owner')
+      const second = await factoryLiveScopes(pool, pool, two.id, 'owner')
+      const third = await factoryLiveScopes(pool, pool, peer.id, 'peer')
+      assert.deepEqual(first?.task, { ownerId: 'owner', workspaceId: a })
+      assert.deepEqual(second?.task, { ownerId: 'owner', workspaceId: b })
+      assert.deepEqual(third?.task, { ownerId: 'peer', workspaceId: a })
+      assert.equal(new Set([first!, second!, third!].map(target => liveChannelId(target.task))).size, 3)
+      assert.equal(await factoryLiveScopes(pool, pool, peer.id, 'owner'), null)
+      assert.deepEqual((await factoryLiveTargets(pool, pool, one.id, 'owner'))[0].events, [{ kind: 'factory_task', id: one.id }])
+      assert.equal((await factoryLiveScopes(pool, pool, legacy.id, 'owner'))?.task.workspaceId, personal)
+      assert.equal((await factoryLiveScopes(pool, pool, team.id, 'owner'))?.task.workspaceId, a)
     })
 
     await t.test('removed membership and a mismatched Bot owner cannot produce a target', async () => {
       await pool.query(`UPDATE mikka_workspace_members SET status='suspended' WHERE "workspaceId"=$1 AND "userId"='owner'`, [a])
-      assert.equal(await factoryLiveTarget(pool, pool, one.id, 'owner'), undefined)
-      assert.equal((await factoryLiveTarget(pool, pool, two.id, 'owner'))?.scope.workspaceId, b)
+      assert.equal(await factoryLiveScopes(pool, pool, one.id, 'owner'), null)
+      assert.equal((await factoryLiveScopes(pool, pool, two.id, 'owner'))?.task.workspaceId, b)
       await pool.query(`UPDATE mikka_workspace_members SET status='active' WHERE "workspaceId"=$1 AND "userId"='owner'`, [a])
       await pool.query(`UPDATE bots SET "ownerId"='peer' WHERE id=$1`, [one.botId])
-      assert.equal(await factoryLiveTarget(pool, pool, one.id, 'owner'), undefined)
+      assert.equal(await factoryLiveScopes(pool, pool, one.id, 'owner'), null)
       await pool.query(`UPDATE bots SET "ownerId"='owner' WHERE id=$1`, [one.botId])
+    })
+
+    await t.test('personal issue lists and Bot task details keep their distinct canonical scopes when viewed from another workspace', async () => {
+      const emptyIssue = randomUUID()
+      await pool.query(`INSERT INTO issues VALUES ($1,'personal')`, [emptyIssue])
+      assert.deepEqual(await factoryIssueLiveScope(pool, pool, emptyIssue, 'owner'), { ownerId: 'owner', workspaceId: personal }, 'the list can subscribe before its first Factory task exists')
+      const task = await fixture('owner', a, 'personal')
+      const scopes = await factoryLiveScopes(pool, pool, task.id, 'owner')
+      assert.deepEqual(scopes?.task, { ownerId: 'owner', workspaceId: a })
+      assert.deepEqual(scopes?.issue, { ownerId: 'owner', workspaceId: personal })
+      const targets = await factoryLiveTargets(pool, pool, task.id, 'owner')
+      assert.deepEqual(targets, [
+        { scope: { ownerId: 'owner', workspaceId: a }, events: [{ kind: 'factory_task', id: task.id }] },
+        { scope: { ownerId: 'owner', workspaceId: personal }, events: [{ kind: 'factory_issue', id: task.issueId }] },
+      ])
+      assert.equal(targets.some(target => target.scope.workspaceId === b), false, 'the currently selected unrelated workspace is not a publish target')
+      assert.deepEqual(await factoryLiveTargets(pool, pool, team.id, 'owner'), [{
+        scope: { ownerId: 'owner', workspaceId: a },
+        events: [{ kind: 'factory_task', id: team.id }, { kind: 'factory_issue', id: team.issueId }],
+      }], 'a shared canonical scope needs one push')
     })
 
     await t.test('outer COMMIT is visible to a separate connection before a queued effect runs', async () => {

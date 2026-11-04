@@ -14,8 +14,9 @@ if (url) assert.ok(disposableDatabase(process.env, url), 'loopback *_e2e only')
 
 test('the real Factory store schedules one invalidation only after its outer transaction commits', { skip: !url, timeout: 180_000 }, async t => {
   const pending: (() => Promise<void>)[] = []
+  let onSchedule = () => {}
   const notification = mock.module('./notify', { namedExports: {
-    scheduleLive: (work: () => Promise<void>) => { pending.push(work) },
+    scheduleLive: (work: () => Promise<void>) => { pending.push(work); onSchedule() },
     sendLiveInvalidations: async () => {},
   } })
   const previous = { url: process.env.DEVICE_GATEWAY_URL, secret: process.env.DEVICE_GATEWAY_PUSH_SECRET }
@@ -63,6 +64,42 @@ test('the real Factory store schedules one invalidation only after its outer tra
         assert.equal(pending.length, before)
         assert.equal((await pool.query('SELECT id FROM factory_tasks WHERE "issueId"=$1', [request.issueId])).rowCount, 0)
       } finally { tx.release() }
+    })
+    await t.test('a non-merge PR webhook refreshes the current Factory delivery after its update commits', async () => {
+      const request = await input()
+      const { task } = await store.route('owner', request)
+      const [agentId, runId, candidateId] = Array.from({ length: 3 }, () => randomUUID())
+      await pool.query(`INSERT INTO agents(id,"userId",name,harness) VALUES ($1,'owner','Fixture','codex')`, [agentId])
+      await pool.query(`INSERT INTO agent_runs(id,"userId","issueId","agentId",status,prompt) VALUES ($1,'owner',$2,$3,'succeeded','Fixture')`, [runId, task.issueId, agentId])
+      const url = 'https://github.com/fixture/repo/pull/7'
+      await pool.query(`INSERT INTO run_publications("runId","userId","issueId","remoteUrl","remoteKey",status,"pullRequest") VALUES ($1,'owner',$2,'https://github.com/fixture/repo','fixture/repo','published',$3)`,
+        [runId, task.issueId, JSON.stringify({ url, state: 'open', title: 'Before' })])
+      await pool.query(`INSERT INTO factory_candidates(id,"taskId",sha,repository,environment,scope,"runId") VALUES ($1,$2,$3,'fixture/repo','fixture','fixture',$4)`, [candidateId, task.id, 'a'.repeat(40), runId])
+      await pool.query(`UPDATE factory_tasks SET "candidateId"=$2 WHERE id=$1`, [task.id, candidateId])
+      const { refreshPublishedPullRequest } = await import('../github/publication-webhook')
+      const { factoryTaskDetail } = await import('../factory/task-detail')
+      const reader = await pool.connect()
+      let visible: Promise<unknown> = Promise.resolve()
+      const before = pending.length
+      try {
+        for (const [index, state] of ['closed', 'draft', 'open'].entries()) {
+          const title = `Updated ${state}`
+          onSchedule = () => {
+            visible = factoryTaskDetail(reader, { ...task, candidateId }).then(detail => {
+              assert.deepEqual(detail.delivery.pullRequest, { url, state, title })
+            })
+          }
+          await refreshPublishedPullRequest('pull_request', { repository: { full_name: 'fixture/repo' }, pull_request: {
+            number: 7, html_url: url, title, state: state === 'closed' ? 'closed' : 'open', draft: state === 'draft', merged_at: null,
+          } }, pool)
+          assert.equal(pending.length, before + index + 1, 'each committed PR edit invalidates its current Factory task')
+          await visible
+        }
+        await refreshPublishedPullRequest('pull_request', { repository: { full_name: 'other/repo' }, pull_request: {
+          number: 7, html_url: url, title: 'Mismatched repository', state: 'closed', draft: false, merged_at: null,
+        } }, pool)
+        assert.equal(pending.length, before + 3, 'an invalid webhook target sends nothing')
+      } finally { onSchedule = () => {}; reader.release() }
     })
   } finally {
     notification.restore()

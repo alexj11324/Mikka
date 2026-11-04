@@ -11,7 +11,8 @@ const headers = { 'cache-control': 'private, no-store' }
 async function ticket(request: Request) {
   // This is a browser subscription. API tokens do not grant an ambient owner channel.
   if (request.headers.has('authorization')) return NextResponse.json({ error: 'authRequired' }, { status: 401, headers })
-  const session = await auth.api.getSession({ headers: request.headers })
+  // A new capability must not extend a revoked session through its cached cookie.
+  const session = await auth.api.getSession({ headers: request.headers, query: { disableCookieCache: true } })
   if (!session?.user) return NextResponse.json({ error: 'authRequired' }, { status: 401, headers })
   const workspaceId = new URL(request.url).searchParams.get('workspace') ?? ''
   if (!LIVE_ID.test(workspaceId)) return NextResponse.json({ error: 'workspaceAccessDenied' }, { status: 403, headers })
