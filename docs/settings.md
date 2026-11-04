@@ -35,13 +35,15 @@ the sheet behind the header's sidebar button, with the rail items at its foot.
 
 ## Sections
 
-- **Personal (account):** Preferences, Profile, profile memory (个人资料类记忆; bot and team memory stay in their workspace), Account (账户), Integrations, Devices (设备), API 与订阅. The same in every workspace.
-- **Personal workspace:** every setting of the workspace itself: 常规 (no 转让; it cannot be deleted), Bot 与 Agents, 密钥与环境 (the person's own secrets for their runs), 用量 and 计费 (without 付款).
-- **Team workspace (administration):** the same, plus what is between people: Members, Teams, 团队权限, 审计日志, 转让, 离开成员的 Bot, 付款 and 分享给团队成员 ([decision 2026-11-02-0216](design/decisions/2026-11-02-0216-personal-workspace-has-workspace-settings.md), with the full table).
+The section list is `SETTINGS_SECTIONS` in `lib/settings-sections.ts`; the
+sidebar, URL parsing and page body all read it.
 
-Account holds how the person signs in: linking Google to the Mikka account.
-Integrations holds connected apps (Gmail, Calendar, Notion, Slack, Linear,
-Telegram), even when the app is a Google one.
+- **Personal (account):** Account, Security, Preferences, Notifications, Memory, Connections, 模型与订阅 (subscriptions, API keys, 运行位置 and 优先使用的模型; it replaced API 与订阅 and Bot 与 Agents), Secrets and logins, Data and privacy, Devices. The same in every workspace. Personal access tokens are built but hidden (`unbuilt`).
+- **Workspace:** General, Members, Teams, Team permissions (admins), Secrets and environment, Audit log (admins), Usage, Billing. A personal workspace has its own workspace settings ([decision 2026-11-02-0216](design/decisions/2026-11-02-0216-personal-workspace-has-workspace-settings.md), with the full table).
+
+Account and Security hold how the person signs in, including linking Google
+to the Mikka account. Connections holds connected apps (Gmail, Calendar,
+Notion, Slack, Linear, Telegram), even when the app is a Google one.
 
 ## Why
 

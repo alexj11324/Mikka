@@ -118,5 +118,5 @@ backdates a successful start to make the recovery notification green.
 Each timing report retains its original source SHA. The latest isolated
 restore measurements, the historical backdating defect and the corrected
 real PostgreSQL fault matrix are recorded in
-[old-ops-completion-211-214.md](old-ops-completion-211-214.md). Component evidence
+old-ops-completion-211-214.md. Component evidence
 does not replace the original authenticated application end-to-end acceptance.

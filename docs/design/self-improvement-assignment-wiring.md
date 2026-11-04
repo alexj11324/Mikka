@@ -11,7 +11,7 @@
 
 ## Implemented boundary
 
-Additive migration: `20261025083303_improvement_skill_assignments.sql`; no existing
+Additive migration: `20261029044008_improvement_skill_assignments.sql`; no existing
 migration file is renamed or edited. The tables store builtin versions,
 selections, claim receipts and links to the existing Factory task/attempt/run.
 

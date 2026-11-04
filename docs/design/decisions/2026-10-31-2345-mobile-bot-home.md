@@ -8,6 +8,7 @@
   是有图标的…点了之后，就会进入到这个界面」, 「从左往右滑动卡片，触发的是
   引用功能；只有从屏幕边缘滑动，才会退出」, 「这些回答我没有办法进行复制」
 - Rule: —
+- Superseded in part by: [2026-11-01-0045](2026-11-01-0045-mobile-home-bar.md) (对话 has no large title or top search field; the avatar at the top left opens the drawer again)
 - Replaces: the side drawer and the Coordinator chat as the home screen
   (mobile.md "Where it lives", decisions 2026-10-27, 2026-10-31-2200's drawer)
 

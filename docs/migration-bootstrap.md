@@ -8,11 +8,11 @@ The numbered migrations originally assumed that issue/editor/agent-session table
 
 On an existing database the baseline does not alter columns, rewrite rows or rebuild existing tables' indexes. Missing tables are created with their indexes; no table or column is dropped. A five-second transaction-local lock timeout bounds lock waiting. This is not a drift repair tool: an existing table with an incompatible shape still requires a separately reviewed migration. The transaction can be retried if lock acquisition times out. The baseline is idempotent even if its transaction commits before the runner records its filename.
 
-Workspace/project/team migrations still target `DATABASE_URL`; optional group-chat migrations are not baseline prerequisites. This does not incorporate PR #84's no-transaction executor or PR #86's build gate. If those PRs land first, preserve their executor/gate and keep the explicit baseline ordering when resolving the small runner/package/workflow overlap.
+Workspace/project/team migrations still target `DATABASE_URL`; optional group-chat migrations are not baseline prerequisites. A file can declare `-- migrate: no-transaction` for one standalone statement (`scripts/migration-steps.mjs`).
 
 ## CI proof
 
-The production/browser job in `.github/workflows/ui-policy.yml` runs `tests/migrate-empty-db.test.mjs` before the existing E2E schema setup. The test requires `CI=true`, an explicit `MIGRATION_BOOTSTRAP_CI=1`, loopback host, the exact `mikka_e2e` database name and PostgreSQL 17. It never falls back to another database URL.
+The database check jobs (`Database checks (n/4)`) in `.github/workflows/ui-policy.yml` run `tests/migrate-empty-db.test.mjs` before the existing E2E schema setup. The test requires `CI=true`, an explicit `MIGRATION_BOOTSTRAP_CI=1`, loopback host, the exact `mikka_e2e` database name and PostgreSQL 17. It never falls back to another database URL.
 
 It creates empty disposable schemas inside that service database and invokes `pnpm migrate` with migration opt-in. It covers both shared and separate application/workspace schemas, checks every current Drizzle table/column and nullability, auth/chat-state prerequisites and every tracked migration record. It reruns the command and verifies that schema/index definitions and ledger timestamps stay unchanged, then directly replays the baseline twice against populated user/issue tables and verifies schema/history/data preservation. The test retains its isolated database and schemas for inspection during the CI job; it closes connections without deleting fixtures. No `setup-e2e-db`, schema push or Better Auth migrator is used to satisfy this test.
 

@@ -274,7 +274,7 @@ task-flow and architecture diagrams, with Linear bidirectional sync excepted.
 Preserve Linear's existing state. Availability follows the existing owner,
 workspace and allow/ask/deny checks; it does not create provider or publication
 authority. Track the concrete rollout prerequisites and verification in
-[the rollout record](../integration/non-linear-rollout-20261029.md).
+the rollout record.
 
 ## 2026-10-30 — First-run onboarding spec
 

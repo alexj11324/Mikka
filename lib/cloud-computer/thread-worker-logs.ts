@@ -17,6 +17,35 @@ const LINE_MAX = 500
 const LINES_PER_INVOCATION = 500
 export const TAIL_MAX = 8000
 
+export type RuntimeRefreshPhase = 'admission' | 'provider_state' | 'connect' | 'record_sandbox' | 'post_connect_admission' |
+  'runtime_configuration' | 'read_worker' | 'install_computer' | 'stage_admission' | 'stage_release' | 'switch_release' |
+  'read_refreshed_worker' | 'start_desktop' | 'credential_bootstrap' | 'publish_bootstrap' | 'start_worker' | 'worker_register' |
+  'verify_runtime' | 'finish' | 'rollback'
+const REFRESH_ERROR_CLASSES = new Set(['Error', 'TypeError', 'SyntaxError', 'AbortError', 'TimeoutError', 'SandboxError',
+  'InvalidArgumentError', 'NotEnoughSpaceError', 'NotFoundError', 'FileNotFoundError', 'SandboxNotFoundError',
+  'SandboxNotRunningError', 'SandboxUnreachableError', 'AuthenticationError', 'RateLimitError', 'ServiceBusyError',
+  'CommandExitError', 'E2BKeyError'])
+const REFRESH_ERROR_CODES = new Set(['ENOENT', 'EACCES', 'EINVAL', 'ETIMEDOUT', 'ECONNRESET', 'ECONNREFUSED', 'ENOTFOUND',
+  'EAI_AGAIN', 'EPIPE', 'ABORT_ERR', 'ERR_INVALID_URL', '57014', '55P03', 'e2b_key_missing', 'e2b_key_invalid',
+  'e2b_limit_reached', 'e2b_template_unavailable', 'e2b_unavailable'])
+
+/** Maintenance failures must be diagnosable before a worker can register. Only
+ * fixed classifications and bounded numbers leave this boundary, never the
+ * provider's message, stack, command, output, URL or credential-bearing cause. */
+export function logRuntimeRefreshFailure(runId: string, phase: RuntimeRefreshPhase, error: unknown, log: (line: string) => void = line => console.warn(line)) {
+  try {
+    const value = error && typeof error === 'object' ? error as { name?: unknown; code?: unknown; exitCode?: unknown; status?: unknown; statusCode?: unknown } : {}
+    const name = value.name, code = value.code
+    const errorClass = typeof name === 'string' && REFRESH_ERROR_CLASSES.has(name) ? name : 'unknown'
+    const errorCode = typeof code === 'string' && REFRESH_ERROR_CODES.has(code) ? code : 'unknown'
+    const status = value.status ?? value.statusCode, exitCode = value.exitCode
+    log(JSON.stringify({ event: 'thread_runtime_refresh_failed', runId, phase, errorClass, errorCode,
+      ...(typeof status === 'number' && Number.isInteger(status) && status >= 100 && status <= 599 ? { status } : {}),
+      ...(typeof exitCode === 'number' && Number.isInteger(exitCode) && exitCode >= 0 && exitCode <= 255 ? { exitCode } : {}),
+    }))
+  } catch { /* Diagnostics cannot replace the original error or prevent lease cleanup/rollback. */ }
+}
+
 /** onStdout/onStderr for the worker command: one structured log line per output line, masked and bounded. */
 export function workerOutputForwarder(runId: string, mask: Mask, log: (line: string) => void = line => console.info(line)) {
   let sent = 0

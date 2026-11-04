@@ -72,7 +72,7 @@ interface TimeZoneSetting {
 
 ### `getAttentionToday(): Promise<ActionResult<{ notified: number; limit: number }>>`
 
-- **Returns:** how many `notify` spends (`attention_log.action = 'notify'`, `spends = true`) the person has in the notify budget's window, and `BUDGETS.notify.limit` (5). The window is the last 24 hours, the same rolling window and count `budgetState` uses. It comes from `notifiedToday` in `lib/attention/store.ts`.
+- **Returns:** how many `notify` spends (`attention_log.action = 'notify'`, `spends = true`) the person has in the notify budget's window, and `BUDGETS.notify.limit` (24, `lib/attention/budget.ts`). The window is the last 24 hours, the same rolling window and count `budgetState` uses. It comes from `notifiedToday` in `lib/attention/store.ts`.
 - **Errors:** `authRequired`.
 - **Side effects:** none.
 

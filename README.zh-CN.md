@@ -146,13 +146,13 @@ Claude Code 会打开浏览器完成登录。登录后，agent 可以读取和�
 
 Web 应用、桌面和 iOS 应用、Telegram、Slack 和 MCP 客户端均接入部署在 Vercel 上的同一个 Next.js 应用。运行结束、worker 提问、已评级的通知等事件会发送给 Coordinator。Coordinator 是一个持久化 workflow，负责对每个事件进行分诊并决定下一步操作。所有 bot 都运行在同一个 workflow 上，各自拥有独立的对话、记忆和收件箱。
 
-运行在你的设备上执行。Daemon 注册设备后，通过设备 API 领取运行，并在独立的 git worktree 中启动对应的 Agent CLI。执行规则决定任务在哪里运行、使用哪个 Agent 和模型，以及设备离线或额度用尽时如何处理。基于检查点的交接已有实现和测试；真实双机交接仍待验收。Agent 通过 Mikka 的 MCP worker 工具汇报进度、提出问题或报告阻塞。
+运行在你的设备上执行。Daemon 注册设备后，通过设备 API 领取运行，并在独立的 git worktree 中启动对应的 Agent CLI。新线程的模型、Agent 和机器由每个人在 设置 › 模型与订阅 中的「优先使用的模型」列表（按顺序）和 运行位置（云端 / 本地）决定；每台电脑在 设置 › 设备 中有一个 参与调度 开关（[执行设置](docs/execution-rules.md)）。基于检查点的交接已有实现和测试；真实双机交接仍待验收。Agent 通过 Mikka 的 MCP worker 工具汇报进度、提出问题或报告阻塞。
 
 Bot 的 Mikka Cloud 电脑是一个使用工作区自己 E2B key 的 E2B sandbox，运行同一个 daemon，并提供可通过 noVNC 查看的桌面。[`packages/subscription-worker`](packages/subscription-worker) 中的 Go 订阅 worker 保管你所连接订阅的登录凭据，密钥存放在 Infisical 中。[`services/credential-broker`](services/credential-broker) 中独立的凭据 broker 是唯一能解密已保存登录的组件，使用 AWS KMS。
 
 托管模型通过 Vercel AI Gateway 运行并按次计量；验卡和充值通过 Stripe Checkout 及其 webhook 完成。
 
-一个 Cloudflare Worker 每分钟触发一次，调用应用的 cron 路由：到期的 Coordinator 唤醒、定时任务、运行恢复和监控，每 15 分钟的简报，以及每小时的通知对账。Linear 同步运行在另一个 Worker 上，通过持久化的 inbox 和 outbox 与 Postgres 交换变更；它由 PostHog flag 关闭。
+一个 Cloudflare Worker 每分钟触发一次，调用应用的 cron 路由：每分钟处理到期的 Coordinator 唤醒、定时任务、运行恢复、账号删除、审计保留和运行监控，每 15 分钟写简报，每小时做通知对账和个人画像合并（[建议定时任务](docs/suggestions-cron.md)）。Linear 同步运行在另一个 Worker 上，通过持久化的 inbox 和 outbox 与 Postgres 交换变更；它由 PostHog flag 关闭。
 
 虚线框和虚线表示已关闭或仍待端到端验收的部分：Linear 同步、在 Mikka Cloud 上运行的 Agent 和凭据保管库。
 
@@ -230,8 +230,7 @@ pnpm desktop:dev
 - [`docs/design/README.md`](docs/design/README.md)：进行任何设计、spec 或 UI 工作前必读。
 - [`docs/design/glossary.md`](docs/design/glossary.md)：bot、线程与对话的定义。
 - [`docs/acceptance.md`](docs/acceptance.md)：变更的验收流程。
-- [`docs/acceptance-mvp-cli-2026-11-01.md`](docs/acceptance-mvp-cli-2026-11-01.md)：MVP 的 API/CLI 验收记录。
-- [`docs/dev-workflow.md`](docs/dev-workflow.md)：本地优先、主干合并和模块负责人。
+- [`docs/dev-workflow.md`](docs/dev-workflow.md)：本地优先、按 issue 归属与合并，以及合并后的生产验收。
 - [`docs/review-checklist.md`](docs/review-checklist.md)：向他人展示 UI 前须完成的检查项。
 - [`apps/desktop/README.md`](apps/desktop/README.md)：桌面应用的运行与打包。
 
