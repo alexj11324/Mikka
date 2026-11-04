@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
+import { existsSync, readFileSync } from 'node:fs'
 import test, { after } from 'node:test'
-import { requirePinnedSource, run, sandboxProgram, target } from './proactive-sandbox-local-loop.mjs'
+import { acceptancePlan, requirePinnedSource, run, sandboxProgram, target } from './proactive-sandbox-local-loop.mjs'
 
 // All transport responses and credentials below are synthetic. The embedded
 // sandbox program is never executed, and accidental global fetches fail closed.
@@ -91,6 +92,58 @@ test('project, team, session and lifetime mismatches stop before submission', as
     assert.equal((await f.execute()).status, 'sandbox_lifetime_insufficient')
     assert.equal(f.calls.filter(call => call.method === 'POST').length, 0)
   }
+})
+
+test('the existing sandbox must have the full 90-minute budget plus cleanup grace remaining', async () => {
+  const requiredLifetime = 91 * 60_000
+  assert.equal(target.hardTimeout + acceptancePlan.cleanupGrace, requiredLifetime)
+  const tooShort = fixture({ session: { timeout: requiredLifetime - 1 } })
+  assert.equal((await tooShort.execute()).status, 'sandbox_lifetime_insufficient')
+  assert.equal(tooShort.calls.filter(call => call.method === 'POST').length, 0)
+  const enough = fixture({ session: { timeout: requiredLifetime } })
+  assert.equal((await enough.execute()).status, 'passed')
+  assert.equal(enough.calls.filter(call => call.method === 'POST').length, 1)
+  assert.equal(enough.calls.find(call => call.method === 'POST').url.pathname, sessionPath + '/cmd')
+  assert.equal(target.sessionId, 'sbx_i0JVU4ryiQnowZ6IWX9zrkOdWbHR')
+})
+
+test('the fixed 9/10 plan retains bounded shutdown, fresh setup and exclusive local ownership', async () => {
+  assert.deepEqual(acceptancePlan, {
+    items: [9, 10], softTimeout: 85 * 60_000, killTimeout: 88 * 60_000,
+    hardTimeout: 90 * 60_000, cleanupGrace: 60_000,
+  })
+  assert.ok(Object.isFrozen(acceptancePlan) && Object.isFrozen(acceptancePlan.items))
+  const f = fixture({ env: { LOCAL_LOOP_ITEMS: '1,2,3,7', LOCAL_LOOP_HOLD: '1' } })
+  assert.equal((await f.execute()).status, 'passed')
+  const post = f.calls.find(call => call.method === 'POST')
+  assert.equal(post.body.timeout, 90 * 60_000)
+  assert.deepEqual(post.body.env, { DEEPSEEK_API_KEY: syntheticKey })
+  assert.ok(sandboxProgram.includes('const acceptancePlan = ' + JSON.stringify(acceptancePlan)))
+  assert.ok(sandboxProgram.includes("LOCAL_LOOP_ITEMS: acceptancePlan.items.join(',')"))
+  assert.ok(sandboxProgram.includes('setTimeout(stopChild, acceptancePlan.softTimeout)'))
+  assert.ok(sandboxProgram.includes('}, acceptancePlan.killTimeout)'))
+  assert.ok(sandboxProgram.includes("process.kill(-child.pid, 'SIGTERM')"))
+  assert.ok(sandboxProgram.includes("process.kill(-child.pid, 'SIGKILL')"))
+  assert.ok(sandboxProgram.includes('items: acceptancePlan.items'))
+  assert.ok(sandboxProgram.includes("acceptance-dispatch.lock'), 'wx', 0o600"))
+  assert.ok(sandboxProgram.includes("assert.ok(!process.env.MIKKA_TEST_ENVIRONMENT_FILE"))
+  const spawnLine = sandboxProgram.split('\n').find(line => line.includes('child = spawn('))
+  assert.ok(spawnLine?.includes('scripts/dev-local/acceptance.mjs'))
+  assert.equal(spawnLine.includes('--existing'), false)
+})
+
+test('the workflow budgets 100 minutes and requires an explicit source pin before any dispatch', async () => {
+  // Support both this scratch draft and its exact installed acceptance-branch layout.
+  const draft = new URL('./proactive-sandbox-local-loop.workflow.yml', import.meta.url)
+  const workflow = readFileSync(existsSync(draft) ? draft : new URL('../../.github/workflows/proactive-acceptance.yml', import.meta.url), 'utf8')
+  assert.match(workflow, /^  timeout-minutes: 100$/m)
+  assert.match(workflow, /^  cancel-in-progress: false$/m)
+  assert.match(workflow, /^    branches: \[acceptance\/proactive-1157-1163\]$/m)
+  const sourcePin = workflow.match(/^        MIKKA_ACCEPTANCE_SOURCE_SHA: (\S+)$/m)?.[1]
+  assert.ok(sourcePin === 'REPLACE_WITH_FINAL_REVIEWED_40_CHARACTER_SOURCE_SHA' || /^[a-f0-9]{40}$/.test(sourcePin ?? ''))
+  const f = fixture({ env: { MIKKA_ACCEPTANCE_SOURCE_SHA: 'REPLACE_WITH_FINAL_REVIEWED_40_CHARACTER_SOURCE_SHA' } })
+  assert.equal((await f.execute()).status, 'source_sha_required')
+  assert.equal(f.calls.length, 0)
 })
 
 test('only DeepSeek enters the command environment; wait:false has no logs property', async () => {

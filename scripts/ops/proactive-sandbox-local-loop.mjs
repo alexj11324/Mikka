@@ -3,6 +3,16 @@ import { fileURLToPath } from 'node:url'
 import { resolve } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 
+// This rerun covers only the two unfinished recovery scenarios. The plan is
+// host-selected and is embedded in the remote program, never read from input.
+export const acceptancePlan = Object.freeze({
+  items: Object.freeze([9, 10]),
+  softTimeout: 85 * 60_000,
+  killTimeout: 88 * 60_000,
+  hardTimeout: 90 * 60_000,
+  cleanupGrace: 60_000,
+})
+
 export const target = Object.freeze({
   api: 'https://api.vercel.com',
   teamId: 'team_C7lwxVVvnUicFli6112mvxpv',
@@ -10,7 +20,7 @@ export const target = Object.freeze({
   projectName: 'mikka',
   sessionId: 'sbx_i0JVU4ryiQnowZ6IWX9zrkOdWbHR',
   cwd: '/vercel/Mikka',
-  hardTimeout: 60 * 60_000,
+  hardTimeout: acceptancePlan.hardTimeout,
 })
 
 export function requirePinnedSource(git, sha, root) {
@@ -34,6 +44,7 @@ import { resolve } from 'node:path'
 
 const root = '/vercel/Mikka'
 const sha = process.argv[1]
+const acceptancePlan = ${JSON.stringify(acceptancePlan)}
 let child
 let log
 let lock
@@ -87,7 +98,7 @@ try {
     E2E_DATABASE_URL: db.href,
     DATABASE_URL: db.href,
     MIKKA_DATABASE_URL: db.href,
-    LOCAL_LOOP_ITEMS: '1,2,3,7,9',
+    LOCAL_LOOP_ITEMS: acceptancePlan.items.join(','),
     LOCAL_LOOP_EXPECTED_SOURCE_SHA: sha,
     LOCAL_LOOP_ORIGIN: 'http://localhost:3110',
     MIKKA_DEV_PORT: '3110',
@@ -98,8 +109,8 @@ try {
   child = spawn(process.execPath, ['--import', './tests/support/server-only.mjs', '--import', 'tsx', 'scripts/dev-local/acceptance.mjs'], {
     cwd: root, env, detached: true, stdio: ['ignore', log.fd, log.fd],
   })
-  const softTimer = setTimeout(stopChild, 57 * 60_000)
-  const killTimer = setTimeout(() => { if (child?.pid) { try { process.kill(-child.pid, 'SIGKILL') } catch {} } }, 59 * 60_000)
+  const softTimer = setTimeout(stopChild, acceptancePlan.softTimeout)
+  const killTimer = setTimeout(() => { if (child?.pid) { try { process.kill(-child.pid, 'SIGKILL') } catch {} } }, acceptancePlan.killTimeout)
   process.once('SIGTERM', stopChild)
   process.once('SIGINT', stopChild)
   const result = await new Promise((yes, no) => {
@@ -110,7 +121,7 @@ try {
   requireSource()
   const passed = result.code === 0 && !result.signal && !stopped
   await writeFile(resolve(evidenceDir, 'dispatch-result.json'), JSON.stringify({
-    sourceSha: sha, items: [1, 2, 3, 7, 9], status: passed ? 'passed' : 'failed',
+    sourceSha: sha, items: acceptancePlan.items, status: passed ? 'passed' : 'failed',
     exitCode: result.code, interrupted: stopped, completedAt: new Date().toISOString(),
   }, null, 2), { mode: 0o600 })
   process.exitCode = passed ? 0 : 1
@@ -170,7 +181,7 @@ export async function run({ env = process.env, fetchImpl = fetch, report = value
     const { session } = await request('/v2/sandboxes/sessions/' + target.sessionId)
     if (session?.id !== target.sessionId || session.projectId !== target.projectId || session.status !== 'running') fail('sandbox_boundary_rejected')
     if (!Number.isFinite(session.startedAt) || !Number.isFinite(session.timeout)
-      || session.startedAt + session.timeout - now() < target.hardTimeout + 60_000) fail('sandbox_lifetime_insufficient')
+      || session.startedAt + session.timeout - now() < target.hardTimeout + acceptancePlan.cleanupGrace) fail('sandbox_lifetime_insufficient')
     // No retries: a lost submission response must never duplicate a paid loop.
     const { command } = await request('/v2/sandboxes/sessions/' + target.sessionId + '/cmd', {
       command: 'node', args: ['--input-type=module', '--eval', sandboxProgram, sha],
@@ -181,7 +192,7 @@ export async function run({ env = process.env, fetchImpl = fetch, report = value
     if (!commandId(command?.id) || command.sessionId !== target.sessionId) fail('submission_unknown_no_retry')
     cmdId = command.id
     report({ cmdId, status: 'submitted' })
-    const deadline = now() + target.hardTimeout + 60_000
+    const deadline = now() + target.hardTimeout + acceptancePlan.cleanupGrace
     let latest = command
     while (latest.exitCode === null || latest.exitCode === undefined) {
       if (now() >= deadline) fail('command_wait_timeout')
