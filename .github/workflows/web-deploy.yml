@@ -98,3 +98,6 @@ jobs:
           echo "$url (commit $GITHUB_SHA)" >> "$GITHUB_STEP_SUMMARY"
         env:
           VERCEL_TOKEN: ${{ env.VERCEL_DEPLOY_TOKEN }}
+      - name: Verify the public production version before releasing the deployment queue
+        if: steps.skip.outputs.skip != 'true'
+        run: node scripts/release/web-deploy.mjs verify
