@@ -1,0 +1,158 @@
+{
+  "commit": "7486013ae8c0cb2570e348db380cec46102a6271",
+  "environmentId": "local-530f4b3a-690c-4e30-9a69-5d656ca4d242",
+  "origin": "http://localhost:3400",
+  "startedAt": "2026-11-04T18:18:29.075Z",
+  "fixture": {
+    "issueId": "f0b702fd-4125-4d72-987f-d502bdd4372c",
+    "versionId": "32542c9a-593b-43c3-b18b-78ecfc6ad9c3",
+    "eventId": "9730827f-2a6a-4fb6-91bb-b4c34e62b42b",
+    "taskId": "3fc9ca36-8dde-44f9-a334-46beaa48cf52",
+    "candidateId": "cfb6f885-4128-4448-992a-2e9eeb30b73f",
+    "agentId": "97fb2b0c-d4fd-41ed-bbc9-ffd16ac44a89",
+    "sourceRunId": "8e9d049a-0a01-4957-a57d-f7dd09e21603",
+    "producerRunId": "258efe7a-4d7e-4ee3-a995-66391fcce7be",
+    "reviewRunId": "2111e91b-f10d-4600-99ad-a0672395138f",
+    "verifyRunId": "e7db1e41-42c0-4443-94ed-6827b82c5f83",
+    "executeAttemptId": "f0a0b090-b30c-4097-abeb-b12512d2c128",
+    "reviewAttemptId": "94ac5028-33a1-4cdc-974c-55782886e605",
+    "verifyAttemptId": "fcf45f6f-2a27-49c9-b3d8-08d691c0f6c1",
+    "recoveryEventId": "e95e56aa-bbca-4067-9c79-d69dad6223b5",
+    "outputChunkId": "cc741506-c1ef-4631-97f4-20b316f4057d",
+    "reviewCriterionId": "bbd0eb3c-617a-4a5c-9b66-9c8e65f312b0",
+    "verifyCriterionId": "201a585d-8f7b-491a-bc9b-294f6f632c9b"
+  },
+  "captures": [
+    {
+      "name": "zh-source-1440-light.png",
+      "locale": "zh-CN",
+      "width": 1440,
+      "height": 960,
+      "scheme": "light",
+      "state": "attributed-failed-review",
+      "at": "2026-11-04T18:18:35.081Z",
+      "sha256": "939b781e069379baa6cb55eb2d602578528a13a32f1f389f0c8d8002ea5162ba"
+    },
+    {
+      "name": "zh-source-1440-dark.png",
+      "locale": "zh-CN",
+      "width": 1440,
+      "height": 960,
+      "scheme": "dark",
+      "state": "attributed-failed-review",
+      "at": "2026-11-04T18:18:36.597Z",
+      "sha256": "f09e19690d34f323c2ea8fc70eed9322087501e3774dac7e309a21d2e19650a8"
+    },
+    {
+      "name": "zh-source-390-light.png",
+      "locale": "zh-CN",
+      "width": 390,
+      "height": 844,
+      "scheme": "light",
+      "state": "attributed-failed-review",
+      "at": "2026-11-04T18:18:38.064Z",
+      "sha256": "c3ec33f52748284885590a74685cc13f7340f2b6144b8f3678100434af925c49"
+    },
+    {
+      "name": "zh-source-390-dark.png",
+      "locale": "zh-CN",
+      "width": 390,
+      "height": 844,
+      "scheme": "dark",
+      "state": "attributed-failed-review",
+      "at": "2026-11-04T18:18:38.997Z",
+      "sha256": "66ac1f2e115939ec307920dfd8f25bbb22e1863afa15786c255944c20450400d"
+    },
+    {
+      "name": "en-source-1440-light.png",
+      "locale": "en",
+      "width": 1440,
+      "height": 960,
+      "scheme": "light",
+      "state": "attributed-failed-review",
+      "at": "2026-11-04T18:18:40.619Z",
+      "sha256": "45bef02551a56aae3010cd16f4a4480881719db0244b72cea99dbfbab2805671"
+    },
+    {
+      "name": "en-source-1440-dark.png",
+      "locale": "en",
+      "width": 1440,
+      "height": 960,
+      "scheme": "dark",
+      "state": "attributed-failed-review",
+      "at": "2026-11-04T18:18:42.150Z",
+      "sha256": "a86df0d535940317683fbc97a931b2bf835ab580611d1cd5f5062c72cc5953f6"
+    },
+    {
+      "name": "en-source-390-light.png",
+      "locale": "en",
+      "width": 390,
+      "height": 844,
+      "scheme": "light",
+      "state": "attributed-failed-review",
+      "at": "2026-11-04T18:18:43.596Z",
+      "sha256": "5df432a55cf400019de25c337d6b8bae026f7e1d3b4390c7278c5f0d1cf2ddae"
+    },
+    {
+      "name": "en-source-390-dark.png",
+      "locale": "en",
+      "width": 390,
+      "height": 844,
+      "scheme": "dark",
+      "state": "attributed-failed-review",
+      "at": "2026-11-04T18:18:44.515Z",
+      "sha256": "566819bc22c3dc718e7e46741ed47c1131fa9e60564c91df9e41014656057c93"
+    },
+    {
+      "name": "en-source-thread-390-dark.png",
+      "locale": "en",
+      "width": 390,
+      "height": 844,
+      "scheme": "dark",
+      "state": "source-thread",
+      "at": "2026-11-04T18:18:44.832Z",
+      "sha256": "1074f2b7dd83319e4776da40b38ef076a6e73944ca07b562f5b6b984dba8b406"
+    }
+  ],
+  "checks": [
+    {
+      "name": "actual-task-detail",
+      "status": 200,
+      "peerStatus": 404,
+      "commandSources": [
+        [
+          {
+            "runId": "8e9d049a-0a01-4957-a57d-f7dd09e21603",
+            "sessionId": "local-before-question-session",
+            "status": "stopped",
+            "recoveryEventId": "e95e56aa-bbca-4067-9c79-d69dad6223b5",
+            "observedAt": "2026-11-04T12:03:04.000Z"
+          }
+        ],
+        [
+          {
+            "runId": "8e9d049a-0a01-4957-a57d-f7dd09e21603",
+            "sessionId": "local-before-question-session",
+            "status": "stopped",
+            "recoveryEventId": "e95e56aa-bbca-4067-9c79-d69dad6223b5",
+            "observedAt": "2026-11-04T12:03:04.000Z"
+          }
+        ]
+      ],
+      "verdicts": [
+        "failed",
+        "passed"
+      ]
+    },
+    {
+      "name": "source-execution-navigation",
+      "runId": "8e9d049a-0a01-4957-a57d-f7dd09e21603",
+      "visibleMarker": "Local pre-question execution / 本地提问前执行记录"
+    }
+  ],
+  "limits": [
+    "Synthetic persisted local fixture only; no production data, model calls, native execution, browser test suite, or API interception.",
+    "These images validate the server read and UI representation of host metadata; actual provenance admission is covered by the separate real PostgreSQL regression."
+  ],
+  "finishedAt": "2026-11-04T18:18:44.833Z"
+}
