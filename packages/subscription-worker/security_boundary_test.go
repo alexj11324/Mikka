@@ -87,7 +87,7 @@ func TestStreamRequestByteBoundaryPrecedesCredentialReadAndInference(t *testing.
 		}
 		return payload
 	}
-	capacity := 262144 - len(payloadFor(""))
+	capacity := 1048576 - len(payloadFor(""))
 	multibyte := strings.Repeat("汉", capacity/3) + strings.Repeat("x", capacity%3)
 	for _, test := range []struct {
 		name string
@@ -108,7 +108,7 @@ func TestStreamRequestByteBoundaryPrecedesCredentialReadAndInference(t *testing.
 				if err != ErrProvider || executor.calls != 0 || access.reads != beforeReads {
 					t.Fatal("oversized stream reached credentials or inference")
 				}
-				if logged != "subscription_request_failure claude input payload_too_large 262145 262144\n" {
+				if logged != "subscription_request_failure claude input payload_too_large 1048577 1048576\n" {
 					t.Fatalf("unexpected boundary diagnostic: %q", logged)
 				}
 			} else if err != nil || executor.calls != 1 || logged != "" {

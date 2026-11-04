@@ -70,7 +70,7 @@ test('the real AI SDK stream retains the fixed worker refusal without exposing u
   assert.ok(!logs.join('\n').includes('fixture-private'))
 })
 
-test('the real SDK enforces the existing worker byte limit before inference or admission writes', async t => {
+test('the real SDK enforces the bounded hosted-model budget before inference or admission writes', async t => {
   const logs: string[] = []
   let loggingFails = false
   t.mock.method(console, 'warn', (line: string) => {
@@ -107,14 +107,19 @@ test('the real SDK enforces the existing worker byte limit before inference or a
   await invoke('')
   const baseline = JSON.stringify(capturedPayload)
   assert.equal(typeof baseline, 'string')
-  const capacity = 262144 - Buffer.byteLength(baseline, 'utf8')
+  const limit = 1_048_576
+  const envelopeBytes = Buffer.byteLength(baseline, 'utf8')
+  const capacity = limit - envelopeBytes
   const multibyteBoundary = '汉'.repeat(Math.floor(capacity / 3)) + 'x'.repeat(capacity % 3)
+  const observedCapacity = 266742 - envelopeBytes
+  const observedRequest = '汉'.repeat(Math.floor(observedCapacity / 3)) + 'x'.repeat(observedCapacity % 3)
   for (const scenario of [
-    { name: 'ASCII exact byte boundary', text: 'x'.repeat(capacity), error: null },
-    { name: 'UTF-8 exact byte boundary', text: multibyteBoundary, error: null },
-    { name: 'existing ASCII refusal', text: 'x'.repeat(capacity + 1), error: 'backend_unavailable' },
-    { name: 'UTF-16 fits but UTF-8 exceeds', text: multibyteBoundary + 'x', error: 'subscription_generation_failed' },
-    { name: 'logging cannot replace the refusal', text: multibyteBoundary + 'x', error: 'subscription_generation_failed', loggingFails: true },
+    { name: 'observed production-size UTF-8 request', text: observedRequest, bytes: 266742, error: null },
+    { name: 'ASCII exact byte boundary', text: 'x'.repeat(capacity), bytes: limit, error: null },
+    { name: 'UTF-8 exact byte boundary', text: multibyteBoundary, bytes: limit, error: null },
+    { name: 'ASCII one byte over keeps its previous refusal', text: 'x'.repeat(capacity + 1), bytes: limit + 1, error: 'backend_unavailable' },
+    { name: 'UTF-16 fits the new budget but UTF-8 exceeds', text: multibyteBoundary + 'x', bytes: limit + 1, error: 'backend_unavailable' },
+    { name: 'logging cannot replace the refusal', text: multibyteBoundary + 'x', bytes: limit + 1, error: 'backend_unavailable', loggingFails: true },
   ]) {
     await t.test(scenario.name, async () => {
       workerStarts = 0; admissions = 0; logs.length = 0; loggingFails = scenario.loggingFails ?? false
@@ -127,15 +132,15 @@ test('the real SDK enforces the existing worker byte limit before inference or a
           assert.ok(boundary)
           assert.equal(boundary.phase, 'host_input')
           assert.equal(boundary.reason, 'payload_too_large')
-          assert.equal(boundary.bytes, 262145)
-          assert.equal(boundary.limit, 262144)
+          assert.equal(boundary.bytes, scenario.bytes)
+          assert.equal(boundary.limit, limit)
           assert.ok(!logs.join('\n').includes('汉'))
         }
       } else {
         await invoke(scenario.text)
         assert.equal(workerStarts, 1)
         assert.equal(admissions, 1)
-        assert.equal(Buffer.byteLength(JSON.stringify(capturedPayload), 'utf8'), 262144)
+        assert.equal(Buffer.byteLength(JSON.stringify(capturedPayload), 'utf8'), scenario.bytes)
       }
       assert.equal(writes, 0, 'no credential or quota mutation is needed')
     })

@@ -17,11 +17,11 @@ func (w *Worker) Stream(ctx context.Context, epoch int64, model string, payload 
 		return ErrUnsupported
 	}
 	if !modelPattern.MatchString(model) {
-		requestFailure(w.Scope.Provider, "input", "model_invalid", len(payload), 262144)
+		requestFailure(w.Scope.Provider, "input", "model_invalid", len(payload), modelRequestMaxBytes)
 		return ErrProvider
 	}
-	if len(payload) > 262144 {
-		requestFailure(w.Scope.Provider, "input", "payload_too_large", len(payload), 262144)
+	if len(payload) > modelRequestMaxBytes {
+		requestFailure(w.Scope.Provider, "input", "payload_too_large", len(payload), modelRequestMaxBytes)
 		return ErrProvider
 	}
 	r, a, err := w.readyAuth(ctx, epoch)

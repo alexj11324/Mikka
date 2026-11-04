@@ -58,6 +58,14 @@ func requestFailure(provider, phase, reason string, size, limit int) {
 		return
 	}
 	switch limit {
+	case modelRequestMaxBytes:
+		if phase != "input" {
+			return
+		}
+	case modelConvertedRequestMaxBytes:
+		if phase != "conversion" {
+			return
+		}
 	case 0, 65536, 262144, 524288:
 	default:
 		return
@@ -110,7 +118,7 @@ func (e CPAPlainModel) ExecuteStream(ctx context.Context, a *core.Auth, request 
 	}
 	var original map[string]any
 	if json.Unmarshal(request.Payload, &original) != nil {
-		requestFailure(e.Provider, "input", "json_invalid", len(request.Payload), 262144)
+		requestFailure(e.Provider, "input", "json_invalid", len(request.Payload), modelRequestMaxBytes)
 		return nil, ErrProvider
 	}
 	var converted []byte
@@ -136,7 +144,7 @@ func (e CPAPlainModel) ExecuteStream(ctx context.Context, a *core.Auth, request 
 	}
 	var body map[string]any
 	if json.Unmarshal(converted, &body) != nil {
-		requestFailure(e.Provider, "conversion", "json_invalid", len(converted), 524288)
+		requestFailure(e.Provider, "conversion", "json_invalid", len(converted), modelConvertedRequestMaxBytes)
 		return nil, ErrProvider
 	}
 	allowed := " model messages system max_tokens stream tools tool_choice temperature top_p stop_sequences thinking output_config service_tier "
@@ -160,13 +168,13 @@ func (e CPAPlainModel) ExecuteStream(ctx context.Context, a *core.Auth, request 
 		requestFailure(e.Provider, "conversion", "encode_failed", 0, 0)
 		return nil, ErrProvider
 	}
-	if len(converted) > 524288 {
-		requestFailure(e.Provider, "conversion", "payload_too_large", len(converted), 524288)
+	if len(converted) > modelConvertedRequestMaxBytes {
+		requestFailure(e.Provider, "conversion", "payload_too_large", len(converted), modelConvertedRequestMaxBytes)
 		return nil, ErrProvider
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(converted))
 	if err != nil {
-		requestFailure(e.Provider, "conversion", "request_invalid", len(converted), 524288)
+		requestFailure(e.Provider, "conversion", "request_invalid", len(converted), modelConvertedRequestMaxBytes)
 		return nil, ErrProvider
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
