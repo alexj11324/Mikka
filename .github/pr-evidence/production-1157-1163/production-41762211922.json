@@ -1,0 +1,254 @@
+{
+  "schemaVersion": 1,
+  "status": "fail",
+  "origin": "https://app.aspectlylabs.com",
+  "revision": "8c94364458632edb2964e54f0a478bb70fedbbd5",
+  "deploymentId": "dpl_EoqgaeT54ZVwBTLgstoR7JrGamgC",
+  "startedAt": "2026-11-04T02:40:35.391Z",
+  "finishedAt": "2026-11-04T02:41:04.358Z",
+  "fixtureConversationId": "61da4558-76da-4d87-b02b-1bba6748bf34",
+  "runtime": {
+    "workspaceId": "0f877068-66a0-4893-8801-9a14eb3116b3",
+    "cloud": {
+      "configured": true,
+      "byoEnabled": true,
+      "canEdit": true,
+      "lastErrorCode": null
+    },
+    "order": {
+      "location": "cloud",
+      "customized": false,
+      "preferredHarness": "claude_code",
+      "cloudReady": true,
+      "entries": [
+        {
+          "model": "deepseek-flash",
+          "provider": "deepseek",
+          "harness": "claude_code",
+          "credentialType": "api_key",
+          "blockReason": null,
+          "cloudModelState": "ready"
+        }
+      ]
+    }
+  },
+  "ownerMcp": {
+    "schemaVersion": 1,
+    "status": "passed",
+    "workspaceId": "0f877068-66a0-4893-8801-9a14eb3116b3",
+    "connectionId": "e806923a-ad44-4dc6-8f9d-7e1e55f58ca9",
+    "counts": {
+      "ownedBots": 5,
+      "before": 0,
+      "withFixture": 1,
+      "after": 0
+    },
+    "checks": {
+      "normalOwnerSession": true,
+      "personalWorkspace": true,
+      "existingBotsOwned": true,
+      "created": true,
+      "ownerMetadataReadback": true,
+      "personalShareRejected": true
+    },
+    "http": {
+      "create": 201,
+      "share": 403,
+      "delete": 200
+    },
+    "cleanup": {
+      "deleteAttempted": true,
+      "deleteAcknowledged": true,
+      "absentReadback": true
+    },
+    "errors": [],
+    "coverage": {
+      "scope": "single-owner-MCP-management",
+      "modelCalls": 0,
+      "providerCalls": 0,
+      "secretCreated": false,
+      "teamCreated": false,
+      "twoMemberSharing": false,
+      "gmail": false,
+      "frozenRunToken": false
+    }
+  },
+  "group": {
+    "status": "fail",
+    "error": "acceptance_turn_group_judgment_pending",
+    "revision": "8c94364458632edb2964e54f0a478bb70fedbbd5",
+    "deploymentId": "dpl_EoqgaeT54ZVwBTLgstoR7JrGamgC",
+    "startedAt": "2026-11-04T02:40:49.867Z",
+    "finishedAt": "2026-11-04T02:40:59.468Z",
+    "fixtureId": "269bc008-c8e9-4e91-971f-d3ca31435050",
+    "workspaceId": "0f877068-66a0-4893-8801-9a14eb3116b3",
+    "conversationId": "61da4558-76da-4d87-b02b-1bba6748bf34",
+    "requesterId": "cL1NXe1mr7WuIS8xWhU37v0p7kNoUMY3",
+    "bots": [
+      {
+        "id": "1cf52051-c7a4-4777-8eac-b16e6cbae050",
+        "role": "UI",
+        "modelId": "deepseek-flash"
+      },
+      {
+        "id": "0d65493b-0d2d-402c-8509-d0582a697082",
+        "role": "Coding",
+        "modelId": "deepseek-flash"
+      },
+      {
+        "id": "d6304047-f1aa-49b6-b7ea-55a98a9c5ba0",
+        "role": "Testing",
+        "modelId": "deepseek-flash"
+      }
+    ],
+    "subscriptionOptions": [],
+    "cases": [
+      {
+        "name": "useful-silence",
+        "status": "fail",
+        "phase": null,
+        "messageId": "35f1590d-f8b0-4696-801b-6773734c7d2b",
+        "action": null,
+        "responders": [],
+        "generations": null,
+        "publications": null,
+        "decision": null,
+        "decisionCostUsd": null,
+        "decisionLatencyMs": null,
+        "taskId": null,
+        "issueId": null,
+        "requestEpoch": null,
+        "reporterId": null,
+        "expectedArtifact": null,
+        "executionModels": [],
+        "messages": [],
+        "runs": [],
+        "checks": [],
+        "artifact": null,
+        "acceptance": null,
+        "finalReport": null,
+        "continuation": null,
+        "stopContinuation": null,
+        "createReplay": null,
+        "statusReplay": null,
+        "stopReplay": null,
+        "lastTask": null,
+        "observations": []
+      }
+    ]
+  },
+  "replay": {
+    "status": "failed",
+    "error": "replay_decision_unavailable",
+    "dataset": "group-decision-cases-v2",
+    "datasetDigest": "0685779c239e70b04d2b4316c38c1dc7d2b744417fbb358020e97dc50a3644d3",
+    "deploymentId": "dpl_EoqgaeT54ZVwBTLgstoR7JrGamgC",
+    "revision": "8c94364458632edb2964e54f0a478bb70fedbbd5",
+    "conversationId": "61da4558-76da-4d87-b02b-1bba6748bf34",
+    "startedAt": "2026-11-04T02:40:59.751Z",
+    "finishedAt": "2026-11-04T02:41:01.467Z",
+    "baseline": [
+      {
+        "schemaVersion": 1,
+        "caseId": "small-talk",
+        "dataset": "group-decision-cases-v2",
+        "datasetDigest": "0685779c239e70b04d2b4316c38c1dc7d2b744417fbb358020e97dc50a3644d3",
+        "inputDigest": "6b60a12303913192748499cd614f24cf57275fc6593faff91a0dbeaee2082229",
+        "policyVersion": "group-route-v0",
+        "evidenceKind": "actual-decision-inference",
+        "status": "invalid_decision",
+        "receipt": {
+          "executionId": "5ccc30db-fd20-4ae2-a735-59826ab7d7f7",
+          "modelId": "openai/gpt-6-luna-decisions",
+          "providerGenerationId": "gen_01M6J6WSJ05C95F5HQKZ92ET40",
+          "requestDigest": "1c46bc599140deae6ca20abfa760aac9cfdd122d5183c20f94bec77c1e0c1ede",
+          "startedAt": "2026-11-04T02:41:00.913Z",
+          "completedAt": "2026-11-04T02:41:01.380Z",
+          "imageDigests": [],
+          "vision": "no-image-input"
+        },
+        "decisionLatencyMs": 467,
+        "decisionCostUsd": 0.000138,
+        "costScope": "primary-routing-decision-api",
+        "executionPerformed": false,
+        "policyChanged": false,
+        "route": null
+      }
+    ],
+    "candidate": [],
+    "comparison": {
+      "baseline": {
+        "cases": 12,
+        "measured": 0,
+        "coverage": 0,
+        "actionAccuracy": null,
+        "responderAccuracy": null,
+        "falseIntervention": 0,
+        "missedIntervention": 0,
+        "failures": [
+          {
+            "caseId": "small-talk",
+            "reason": "invalid_decision"
+          }
+        ],
+        "cost": {
+          "knownUsd": 0,
+          "knownObservations": 0,
+          "unknownObservations": 1
+        },
+        "decisionLatency": {
+          "samples": 0,
+          "p50Ms": null,
+          "p95Ms": null
+        },
+        "runtimeCasesExcluded": [
+          "decision-outage",
+          "duplicate-delivery"
+        ]
+      },
+      "candidate": {
+        "cases": 12,
+        "measured": 0,
+        "coverage": 0,
+        "actionAccuracy": null,
+        "responderAccuracy": null,
+        "falseIntervention": 0,
+        "missedIntervention": 0,
+        "failures": [],
+        "cost": {
+          "knownUsd": 0,
+          "knownObservations": 0,
+          "unknownObservations": 0
+        },
+        "decisionLatency": {
+          "samples": 0,
+          "p50Ms": null,
+          "p95Ms": null
+        },
+        "runtimeCasesExcluded": [
+          "decision-outage",
+          "duplicate-delivery"
+        ]
+      },
+      "decisionReviewReady": false,
+      "requiresHumanReview": true,
+      "executionAcceptanceRequired": true
+    },
+    "executionPerformed": false,
+    "productionAccepted": false,
+    "policyChanged": false
+  },
+  "expectedDecisionReplays": 24,
+  "actualReceiptedDecisionReplays": 1,
+  "credentialCleanup": {
+    "created": true,
+    "removed": true,
+    "cloudCreated": true,
+    "cloudRemoved": true
+  },
+  "taskCleanup": null,
+  "replaySessionEnded": true,
+  "scope": "Actual production owner MCP management, group runtime and fixed-case Decision inference. Owner MCP does not exercise sharing, Gmail or a provider. Replay does not perform projected execution. No official-subscription acceptance.",
+  "error": null,
+  "runnerDigest": "4ebdff00616a450b8dddb1640a507207f84d9a93ef21d8b5751e8943664f76e0"
+}
