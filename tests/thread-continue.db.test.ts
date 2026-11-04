@@ -132,6 +132,104 @@ test('a message to an ended thread runs it again in the same thread; only its ow
     assert.equal(deliveries, 1)
   })
 
+
+  await t.test('an authenticated thread answer uses its Factory task Bot scope and resumes exactly once', async t => {
+    const { factoryRuntimeForBot } = await import('../lib/factory/runtime')
+    const { questionReference } = await import('../lib/factory/questions/store')
+    const { freezeWorkerDefinition } = await import('../lib/agent-kit/worker')
+    const { factoryAutomaticRuntime } = await import('../lib/factory/automatic-dispatch')
+    const wake = mock.method(factoryAutomaticRuntime, 'enqueue', async (..._args: Parameters<typeof factoryAutomaticRuntime.enqueue>) => undefined)
+    t.after(() => wake.mock.restore())
+    for (const legacyNullScope of [false, true]) await t.test(legacyNullScope ? 'legacy task without a Bot' : 'Bot-owned task', async () => {
+      const b = await person()
+      const initial = await steps.dispatchRun(b.id, { issueId: b.issueId, repo: 'octo/repo', requestKey: `question:${randomUUID()}` }, undefined, b.botId) as unknown as { runId: string }
+      assert.ok(initial.runId, JSON.stringify(initial))
+      const task = (await pool.query('SELECT t.* FROM factory_tasks t JOIN factory_attempts a ON a."taskId"=t.id WHERE a."runId"=$1', [initial.runId])).rows[0]
+      // Preserve the historical personal task path with its null Bot scope.
+      if (legacyNullScope) {
+        await pool.query('UPDATE factory_tasks SET "botId"=NULL WHERE id=$1', [task.id])
+        await pool.query('UPDATE agent_runs SET "botId"=NULL WHERE id=$1', [initial.runId])
+        await pool.query('UPDATE coordinator_events SET "botId"=NULL WHERE id=$1', [task.sourceEventId])
+      }
+      // The CLI handoff and VM are synthetic; all task, question, credential,
+      // answer, continuation and idempotency services use the real database.
+      // Only the external VM wake is intercepted, after the transaction commits.
+      const originRun = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [initial.runId])).rows[0]
+      const childDevice = randomUUID(), childRepo = randomUUID(), sandboxId = `fixture-vm-${initial.runId}`
+      const definition = freezeWorkerDefinition({
+        harness: 'codex', instructions: originRun.agentDefinition.instructions, prompt: originRun.prompt,
+        parent: null, executionId: null, model: originRun.agentDefinition.model,
+        modelDispatch: { mode: 'picked', location: 'cloud' },
+        subscription: { id: originRun.agentDefinition.subscription.bindingId,
+          modelId: originRun.agentDefinition.subscription.modelId, route: originRun.agentDefinition.subscription.route },
+      })
+      await pool.query(`INSERT INTO devices(id,"ownerId",name,kind,enabled,"lastSeenAt",harnesses)
+        VALUES ($1,$2,'Question task VM','cloud',true,now(),$3)`, [childDevice, b.id, JSON.stringify(mac)])
+      await pool.query(`INSERT INTO device_repos(id,"deviceId","userId","repoPath","remoteUrl","baseBranch")
+        VALUES ($1,$2,$3,$4,NULL,'main')`, [childRepo, childDevice, b.id, `/isolated/question-${initial.runId}`])
+      await pool.query('UPDATE agent_runs SET "deviceId"=$2,"deviceRepoId"=$3,"agentDefinition"=$4,"baseBranch"=\'main\' WHERE id=$1',
+        [initial.runId, childDevice, childRepo, JSON.stringify(definition)])
+      await pool.query('INSERT INTO computer_run_bindings("runId","botId","workspaceId","ownerId") VALUES ($1,$2,$3,$4)',
+        [initial.runId, b.botId, b.ws.id, b.id])
+      await pool.query(`INSERT INTO thread_machines("runId","workspaceId","ownerId","botId","issueId","sandboxId","snapshotId","operationId",state,"deviceId","repoId")
+        VALUES ($1,$2,$3,$4,$5,$6,'codex',$7,'running',$8,$9)`,
+        [initial.runId, b.ws.id, b.id, b.botId, b.issueId, sandboxId, randomUUID(), childDevice, childRepo])
+      const questions = factoryRuntimeForBot(legacyNullScope ? null : b.botId).questions
+      const questionId = randomUUID(), sessionId = randomUUID(), nativeSessionId = `native:${initial.runId}`
+      await pool.query(`INSERT INTO "session" (id,"userId",token,"expiresAt","createdAt","updatedAt")
+        VALUES ($1,$2,$3,now()+interval '1 hour',now(),now())`, [sessionId, b.id, `fixture-${randomUUID()}`])
+      await pool.query(`UPDATE agent_runs SET status='stopped',"stopReason"='asked_human',"sessionId"=$2,"finishedAt"=now(),report=$3 WHERE id=$1`,
+        [initial.runId, nativeSessionId, JSON.stringify({ summary: 'Synthetic CLI handoff', question: { questionId, kind: 'decision', question: 'Continue the original task?', options: [] } })])
+      const recorded = await questions.record(b.id, initial.runId)
+      await questions.escalate(b.id, { reference: questionReference(recorded), eventId: randomUUID(), reason: 'Only the owner can decide.' })
+      const snapshot = async () => (await pool.query(`SELECT to_jsonb(q) AS question,to_jsonb(t) AS task,
+        (SELECT count(*)::int FROM agent_runs WHERE "userId"=$1) AS runs,
+        (SELECT count(*)::int FROM run_messages WHERE "userId"=$1) AS messages
+        FROM factory_questions q JOIN factory_tasks t ON t.id=q."taskId" WHERE q.id=$2`, [b.id, questionId])).rows[0]
+      const before = await snapshot()
+      const text = 'Continue once with the original constraints and original native session.'
+      const human = { source: 'human' as const, sessionId }
+      for (const source of ['user', 'peer', { source: 'orchestrator' }] as const)
+        await assert.rejects(sendThreadMessage(b.id, initial.runId, text, source), { code: 'runNotFound' })
+      await assert.rejects(sendThreadMessage(a.id, initial.runId, text, { source: 'human', sessionId }), { code: 'runNotFound' })
+      await assert.rejects(sendThreadMessage(b.id, initial.runId, text, { source: 'human', sessionId: randomUUID() }), { code: 'factoryHumanRequired' })
+      assert.deepEqual(await snapshot(), before, 'denied callers cannot answer, advance the task or create a continuation')
+
+      // Even an owned thread cannot borrow another Bot\'s source event.
+      await pool.query('UPDATE coordinator_events SET "botId"=$2 WHERE id=$1', [task.sourceEventId, a.botId])
+      await assert.rejects(sendThreadMessage(b.id, initial.runId, text, human), { code: 'factoryNotFound' })
+      await pool.query('UPDATE coordinator_events SET "botId"=$2 WHERE id=$1', [task.sourceEventId, legacyNullScope ? null : b.botId])
+      assert.deepEqual(await snapshot(), before, 'source ownership and Bot authorization remain enforced')
+
+      const requestId = randomUUID()
+      const accepted = await sendThreadMessage(b.id, initial.runId, text, human, requestId)
+      assert.deepEqual(accepted, { runId: initial.runId, continued: false })
+      const answered = await questions.read(b.id, questionId)
+      assert.equal(answered.status, 'resuming')
+      assert.equal(answered.answerSource, 'human')
+      assert.ok(answered.answerId)
+      assert.ok(answered.continuationRunId)
+      const origin = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [initial.runId])).rows[0]
+      const next = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [answered.continuationRunId])).rows[0]
+      assert.equal(next.status, 'queued')
+      for (const field of ['agentId', 'deviceId', 'deviceRepoId', 'baseBranch']) assert.equal(next[field], origin[field], field)
+      assert.equal(next.agentDefinition.definitionDigest, origin.agentDefinition.definitionDigest)
+      assert.equal(next.questionContinuation.questionId, questionId)
+      assert.equal(next.questionContinuation.originRunId, initial.runId)
+      assert.equal(next.questionContinuation.originSessionId, nativeSessionId)
+      assert.equal(next.questionContinuation.requireSessionResume, true)
+      assert.equal(next.questionContinuation.requiredSandboxId, sandboxId)
+      assert.equal((await pool.query('SELECT "sandboxId" FROM thread_machines WHERE "runId"=$1', [next.id])).rows[0].sandboxId, sandboxId)
+      assert.equal(wake.mock.calls.filter(call => call.arguments[3] === next.id).length, 1)
+      assert.equal((await pool.query('SELECT "botId" FROM factory_tasks WHERE id=$1', [task.id])).rows[0].botId, legacyNullScope ? null : b.botId)
+      const after = await snapshot()
+      assert.equal(after.runs, before.runs + 1)
+      assert.equal(after.messages, before.messages + 1)
+      assert.deepEqual(await sendThreadMessage(b.id, initial.runId, text, human, requestId), accepted)
+      assert.deepEqual(await snapshot(), after, 'the exact submission replays its receipt without creating another answer or native continuation')
+    })
+  })
+
   await t.test('an ordinary owned live message is acknowledged once even after its run ends', async () => {
     const runId = randomUUID(), requestId = randomUUID(), text = 'One ordinary owner message.'
     await pool.query(`INSERT INTO agent_runs(id,"userId","agentId","deviceId",status,prompt,"botId")
