@@ -27,7 +27,7 @@ const decisionFailure = oneOf(['unavailable', 'missing_or_refused', 'wrong_answe
   'receipt_missing', 'duplicate_receipt', 'mention_requires_intervention', 'reporter_unavailable', 'call_budget_exhausted', 'invalid_response', 'members_unavailable'])
 const decisionCalls = value => shape(value, { attempted: integer, receipted: integer, unreceipted: integer })
 const decisionCost = value => shape(value, { knownUsd: finite, knownCalls: integer, unknownCalls: integer, omittedCalls: integer })
-const decisionStep = value => shape(value, { id: token, phase, index: integer, policyVersion: oneOf(['group-route-v0', 'group-contribution-v1', 'group-contribution-v2']),
+const decisionStep = value => shape(value, { id: token, phase, index: integer, policyVersion: oneOf(['group-route-v0', 'group-contribution-v1', 'group-contribution-v2', 'group-contribution-v3']),
   status: oneOf(['complete', 'invalid_decision', 'unavailable']), failure: decisionFailure, receipt, decisionCostUsd: finite })
 const decisionFields = { decisionProtocol: protocol, decisions: list(decisionStep), decisionsOmitted: integer,
   failureReason: decisionFailure, decisionCalls, decisionCost, decisionCostUsd: finite, decisionLatencyMs: finite,
@@ -103,7 +103,7 @@ export function measureReplayEvidence(value, expected) {
     candidate: { complete: 0, abstentions: 0, steps: [], failedCaseIds: [] } }
   let logicalReplays = 0, receiptedLogicalReplays = 0, completedLogicalReplays = 0, unobservedLogicalReplays = 0, evidenceValid = true
   const configured = Array.isArray(expected.caseIds) && expected.caseIds.length === 12 && new Set(expected.caseIds).size === 12
-    && digest(expected.datasetDigest) && expected.baselinePolicy === 'group-route-v0' && expected.candidatePolicy === 'group-contribution-v2'
+    && digest(expected.datasetDigest) && expected.baselinePolicy === 'group-route-v0' && expected.candidatePolicy === 'group-contribution-v3'
     && expected.comparisonVersion === 'group-decision-comparison-v2' && value?.comparisonVersion === expected.comparisonVersion
   for (const [label, policy] of [['baseline', expected.baselinePolicy], ['candidate', expected.candidatePolicy]]) {
     const rows = Array.isArray(value?.[label]) ? value[label] : []
@@ -265,7 +265,7 @@ async function defaultDependencies(repo) {
   models.assertFlashTestModel('deepseek-flash')
   if (cases.GROUP_REPLAY_CASE_IDS.length !== 12) throw Error('acceptance_replay_case_count_changed')
   if (cases.GROUP_REPLAY_COMPARISON_VERSION !== 'group-decision-comparison-v2' || policy.GROUP_BASELINE_VERSION !== 'group-route-v0'
-    || policy.GROUP_POLICY_VERSION !== 'group-contribution-v2') throw Error('acceptance_replay_comparison_contract')
+    || policy.GROUP_POLICY_VERSION !== 'group-contribution-v3') throw Error('acceptance_replay_comparison_contract')
   return { ...credentials, ...group, ...replay, ...accounts, replayContract: { caseIds: cases.GROUP_REPLAY_CASE_IDS,
     datasetDigest: cases.GROUP_REPLAY_DATASET_DIGEST, comparisonVersion: cases.GROUP_REPLAY_COMPARISON_VERSION, baselinePolicy: policy.GROUP_BASELINE_VERSION, candidatePolicy: policy.GROUP_POLICY_VERSION } }
 }
