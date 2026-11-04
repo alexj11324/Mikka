@@ -1,0 +1,87 @@
+{
+  "kind": "prepared-policy-v3-offline-verification",
+  "testedAt": "2026-11-04",
+  "baselinePreparedCommit": "e21bcd2871bb2e12812f517133992d3a4d6cfd95",
+  "baselinePreflightCommit": "94deff1ef640ad405e4ae0a5555aa1123ca7658a",
+  "contract": {
+    "baseline": "group-route-v0",
+    "candidate": "group-contribution-v3",
+    "preflightLive": "group-contribution-v1",
+    "dataset": "group-decision-cases-v2",
+    "comparison": "group-decision-comparison-v2",
+    "protocol": "group-sequential-v1",
+    "historicalCandidateRetained": "group-contribution-v2"
+  },
+  "normalizationAudit": [
+    {
+      "file": "run-proactive-acceptance.mjs",
+      "onlyCandidateAndHistoricalAllowlist": true
+    },
+    {
+      "file": "group-policy-rollback.mjs",
+      "onlyCandidateAndHistoricalAllowlist": true
+    },
+    {
+      "file": "group-routing-boundaries.mjs",
+      "onlyCandidateAndHistoricalAllowlist": true
+    },
+    {
+      "file": "group-routing-bundle.mjs",
+      "onlyCandidateAndHistoricalAllowlist": true
+    },
+    {
+      "file": "group-policy-preflight.mjs",
+      "onlyCandidate": true
+    }
+  ],
+  "unchangedWorkflowTemplates": [
+    "proactive-acceptance-once.yml",
+    "group-routing-once.yml",
+    "group-policy-preflight.yml"
+  ],
+  "red": {
+    "commandId": "cmd_13bfcd26497b4426aea82132309a",
+    "cwd": "/vercel/Mikka-prepared-v3-e21/red",
+    "command": [
+      "node",
+      "--test",
+      "--test-name-pattern=v3 comparison accepts current receipts",
+      "run-proactive-acceptance.test.mjs"
+    ],
+    "testExitCode": 1,
+    "tests": 1,
+    "passed": 0,
+    "failed": 1,
+    "skipped": 0,
+    "reason": "Historical v2 runtime rejects the new v3 positive receipt contract; false !== true."
+  },
+  "green": {
+    "commandId": "cmd_ecb6e5f364404d36bf6a6fb9bc7b",
+    "cwd": "/vercel/Mikka-prepared-v3-e21/candidate",
+    "command": [
+      "node",
+      "--test",
+      "--test-reporter=tap",
+      "group-policy-preflight.test.mjs",
+      "group-policy-rollback.test.mjs",
+      "group-routing-boundaries.test.mjs",
+      "group-routing-bundle.test.mjs",
+      "group-routing-once.test.mjs",
+      "owner-mcp-boundaries.test.mjs",
+      "run-proactive-acceptance.test.mjs"
+    ],
+    "exitCode": 0,
+    "tests": 92,
+    "passed": 92,
+    "failed": 0,
+    "skipped": 0,
+    "syntaxFiles": 14
+  },
+  "providerRequests": 0,
+  "productionRequests": 0,
+  "workflowActivated": false,
+  "livePolicyChanged": false,
+  "productionAcceptance": false,
+  "priorFailedPreflightRun": 41785533094,
+  "priorResultChanged": false
+}

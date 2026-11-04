@@ -18,7 +18,7 @@ function coreReplay() {
       decisions: [{ index: 0, policyVersion, status: 'complete', failure: null, receipt }] }
   })
   return { status: 'comparison_ready', comparisonVersion: 'group-decision-comparison-v2',
-    baseline: rows('group-route-v0'), candidate: rows('group-contribution-v2'),
+    baseline: rows('group-route-v0'), candidate: rows('group-contribution-v3'),
     comparison: { baselineClassifiable: true, decisionReviewReady: true,
       baseline: { observed: 12, accuracyDenominator: 12, measured: 12, abstentions: 0 },
       candidate: { observed: 12, accuracyDenominator: 12, measured: 12, coverage: 1, failures: [] } } }
@@ -130,7 +130,8 @@ test('archive bytes, JSON bytes, paths and symlinks must match the fixed single-
 test('a successful workflow with a failed or partial actual core report cannot authorize credentials', async t => {
   for (const changeCore of [core => { core.status = 'fail' }, core => { core.replayAccounting.qualityAccepted = false },
     core => { core.completedLogicalDecisionReplays = 23 }, core => { core.group.deploymentId = 'dpl_Other' },
-    core => { delete core.replay.comparisonVersion }, core => { core.replay.status = 'complete' }, core => { core.replay.candidate[0].status = 'invalid_decision' }]) {
+    core => { delete core.replay.comparisonVersion }, core => { core.replay.status = 'complete' }, core => { core.replay.candidate[0].status = 'invalid_decision' },
+    core => { core.replay.candidate[0].policyVersion = 'group-contribution-v2' }]) {
     const h = fixture(t, { changeCore })
     await assert.rejects(prepareCoreEvidence(h.args), /routing_entry_(?:core_not_accepted|report_source_binding)/)
     assert.equal(h.state.bundleCalls, 0); assert.equal(existsSync(join(h.directory, 'group-routing-input')), false)

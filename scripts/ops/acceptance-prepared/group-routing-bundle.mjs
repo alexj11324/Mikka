@@ -46,7 +46,7 @@ export function coreComparisonReady(core) {
     && Array.isArray(comparison.candidate.failures) && comparison.candidate.failures.length === 0
     && comparison.baseline?.observed === 12 && comparison.baseline.accuracyDenominator === 12
     && comparison.baseline.measured === account.baselineCompleted && comparison.baseline.abstentions === account.baselineAbstentions
-    && Array.isArray(replay.candidate) && replay.candidate.length === 12 && replay.candidate.every(row => rowBound(row, 'group-contribution-v2', false))
+    && Array.isArray(replay.candidate) && replay.candidate.length === 12 && replay.candidate.every(row => rowBound(row, 'group-contribution-v3', false))
     && Array.isArray(replay.baseline) && replay.baseline.length === 12 && replay.baseline.every(row => rowBound(row, 'group-route-v0', true)))
 }
 

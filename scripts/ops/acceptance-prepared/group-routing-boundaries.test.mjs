@@ -41,7 +41,7 @@ function harness(options = {}) {
     const root = { id: messageId, position: String(++state.position), body, authorType: 'user', authorId: ownerId, mentions, replyToId: replyToId ?? null }
     state.messages.push(root)
     const pending = options.pending || options.recoverPending && state.submitted === 1
-    const trace = { status: pending ? 'pending' : 'complete', policyVersion: 'group-contribution-v2', decisionProtocol: 'group-sequential-v1',
+    const trace = { status: pending ? 'pending' : 'complete', policyVersion: 'group-contribution-v3', decisionProtocol: 'group-sequential-v1',
       action: selected.length ? 'reply' : 'ignore', responders: selected.map(i => bots[i].id),
       members: bots.map((b, i) => ({ id: b.id, roleDigest: digest(JSON.stringify(state.roles[roles[i]])) })),
       execution: { executionId: 'decision-' + messageId, providerGenerationId: 'generation-' + messageId,

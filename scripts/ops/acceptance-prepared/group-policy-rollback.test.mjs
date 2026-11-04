@@ -5,7 +5,7 @@ import { runGroupPolicyRollback, runGroupPolicyRollbackBundle } from './group-po
 
 const id = n => '00000000-0000-4000-8000-' + String(n).padStart(12, '0')
 const hash = text => createHash('sha256').update(text).digest('hex')
-const BASE = 'group-route-v0', CANDIDATE = 'group-contribution-v2'
+const BASE = 'group-route-v0', CANDIDATE = 'group-contribution-v3'
 const ownerId = 'synthetic-owner', email = 'synthetic-smoke@example.invalid', source = 'a'.repeat(40), build = 'dpl_SyntheticPolicyOnly'
 const response = (value, status = 200, headers = {}) => new Response(JSON.stringify(value), { status, headers: { 'content-type': 'application/json', ...headers } })
 

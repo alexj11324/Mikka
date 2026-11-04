@@ -2,7 +2,7 @@
 
 This independent module does not alter the reviewed core bundle. Its latest sixteen offline transport contracts pass. The reviewed standalone session adapter still needs a trusted passing core artifact and exact source/deployment binding before activation. No real model or provider invocation was performed for these contracts.
 
-The earlier core production runs, including 41778455749, failed their overall acceptance. This addon must not run against those failed reports or relabel them as success. It now requires the explicit group-decision-comparison-v2/comparison_ready contract and live group-contribution-v2 traces. The projected-report interface rejects a failed core or group before any network request. Root owns any future activation after a separately verified passing core report and a matching production source/deployment.
+The earlier core production runs, including 41778455749, failed their overall acceptance. This addon must not run against those failed reports or relabel them as success. It now requires the explicit group-decision-comparison-v2/comparison_ready contract and live group-contribution-v3 traces. The projected-report interface rejects a failed core or group before any network request. Root owns any future activation after a separately verified passing core report and a matching production source/deployment.
 
 ## Scope and evidence
 
@@ -58,3 +58,5 @@ The output contains IDs, counts, safe status codes, hashes, and receipt projecti
     node --check group-routing-boundaries.mjs
 
 Current result: sixteen tests passed, zero skipped, using injected transport only. The earlier quiet-wake regression remains. Five new contract cases failed against the previous module, demonstrating recoverable pending early exit, missing reply wake/chain false passes, missed timeout/late-delegation cleanup, unknown-POST scope cleanup and missing terminal-machine checks; they pass after this bounded update. The suite also preserves owner/model/role/member and malformed422-contract negatives, and retains known/unknown cost for a paid uncertain failure. Final independent review and the normal standalone session adapter are still required before execution.
+
+The current candidate is `group-contribution-v3`. Dataset `group-decision-cases-v2`, comparison `group-decision-comparison-v2`, and protocol `group-sequential-v1` keep their existing identifiers. Historical v2 receipts remain historical; neither a v2 core artifact nor a v2 live trace proves current v3 acceptance. Existing cleanup and time budgets are unchanged.

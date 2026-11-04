@@ -16,7 +16,7 @@ function coreReplay() {
       decisions: [{ index: 0, policyVersion, status: 'complete', failure: null, receipt }] }
   })
   return { status: 'comparison_ready', comparisonVersion: 'group-decision-comparison-v2',
-    baseline: rows('group-route-v0'), candidate: rows('group-contribution-v2'),
+    baseline: rows('group-route-v0'), candidate: rows('group-contribution-v3'),
     comparison: { baselineClassifiable: true, decisionReviewReady: true,
       baseline: { observed: 12, accuracyDenominator: 12, measured: 12, abstentions: 0 },
       candidate: { observed: 12, accuracyDenominator: 12, measured: 12, coverage: 1, failures: [] } } }
@@ -151,7 +151,8 @@ test('failed, partial, wrong-source or mismatched-byte core reports stop before 
     core => { core.revision = 'b'.repeat(40) }, core => { core.group.deploymentId = 'dpl_Old' },
     core => { core.fixtureConversationId = id(90) }, core => { core.replay.status = 'complete' },
     core => { delete core.replay.comparisonVersion }, core => { core.replayAccounting.candidateCompleted = 11 },
-    core => { core.replay.candidate[0].status = 'invalid_decision' }, core => { core.replay.baseline[0].projection = null }]
+    core => { core.replay.candidate[0].status = 'invalid_decision' },
+    core => { core.replay.candidate[0].policyVersion = 'group-contribution-v2' }, core => { core.replay.baseline[0].projection = null }]
   for (const change of changes) {
     const h = fixture(); change(h.core)
     await assert.rejects(runGroupRoutingBundle(h.input()), /routing_bundle_/)

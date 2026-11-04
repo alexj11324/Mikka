@@ -12,7 +12,7 @@ const env = { GROUP_ACCEPTANCE_DEPLOYMENT: 'dpl_fixture', GROUP_ACCEPTANCE_REVIS
 const receipt = { executionId: 'synthetic-execution', providerGenerationId: 'synthetic-generation', modelId: 'openai/gpt-6-luna-decisions',
   requestDigest: 'a'.repeat(64), startedAt: '2026-11-03T00:00:00Z', completedAt: '2026-11-03T00:00:00.100Z', imageDigests: [], vision: 'no-image-input' }
 const replayContract = { caseIds: Array.from({ length: 12 }, (_, i) => `case-${i}`), datasetDigest: 'b'.repeat(64),
-  baselinePolicy: 'group-route-v0', candidatePolicy: 'group-contribution-v2', comparisonVersion: 'group-decision-comparison-v2' }
+  baselinePolicy: 'group-route-v0', candidatePolicy: 'group-contribution-v3', comparisonVersion: 'group-decision-comparison-v2' }
 const replay = () => {
   let serial = 100
   const rows = (policyVersion, count) => replayContract.caseIds.map(caseId => {
@@ -462,17 +462,19 @@ test('reports retain only allowlisted metadata and refuse credential-bearing out
   assert.throws(() => writeSanitizedReport({ cookie: 'short' }, join(directory, 'rejected-field.json'), env), /private_field_detected/)
 })
 
-test('step policy provenance retains v0, historical v1 and v2 without upgrading a missing receipt version', () => {
+test('step policy provenance retains v0, historical v1 and v2, and current v3 without upgrading a missing receipt version', () => {
   const source = replay()
   source.baseline[0].decisions[0].policyVersion = 'group-route-v0'
   source.candidate[0].decisions[0].policyVersion = 'group-contribution-v1'
   source.candidate[1].decisions[0].policyVersion = 'PRIVATE_ARBITRARY_POLICY'
+  source.candidate[3].decisions[0].policyVersion = 'group-contribution-v2'
   delete source.baseline[1].decisions[0].policyVersion
   const projected = sanitizeReplayReport(source)
   assert.equal(projected.baseline[0].decisions[0].policyVersion, 'group-route-v0')
   assert.equal(projected.candidate[0].decisions[0].policyVersion, 'group-contribution-v1')
   assert.equal(projected.candidate[1].decisions[0].policyVersion, null)
-  assert.equal(projected.candidate[2].decisions[0].policyVersion, 'group-contribution-v2')
+  assert.equal(projected.candidate[2].decisions[0].policyVersion, 'group-contribution-v3')
+  assert.equal(projected.candidate[3].decisions[0].policyVersion, 'group-contribution-v2')
   assert.equal(projected.baseline[1].decisions[0].policyVersion, null)
   assert.doesNotMatch(JSON.stringify(projected), /PRIVATE_ARBITRARY_POLICY/)
 })
@@ -520,6 +522,7 @@ test('old or forged comparison versions and cross-policy step receipts never aut
     value => { value.comparisonVersion = 'group-decision-comparison-v1'; return value },
     value => { value.comparisonVersion = 'forged-comparison-v2'; return value },
     value => { value.candidate[0].decisions[0].policyVersion = 'group-contribution-v1'; return value },
+    value => { value.candidate[0].decisions[0].policyVersion = 'group-contribution-v2'; return value },
     value => { value.comparison.candidate.accuracyDenominator = 11; return value },
     value => { value.comparison.candidate.failures = [{ caseId: 'case-0', reason: 'action' }]; return value },
   ]) {
@@ -542,4 +545,20 @@ test('baseline malformed routes, projections, terminal answers and missing recei
     assert.equal(report.status, 'fail'); assert.equal(report.replayAccounting.qualityAccepted, false)
     assert.equal(report.replayAccounting.baselineClassifiable, false)
   }
+})
+
+test('v3 comparison accepts current receipts and never relabels historical v2 as current', () => {
+  const current = replay()
+  assert.equal(measureReplayEvidence(current, replayContract).qualityAccepted, true)
+  const historical = structuredClone(current)
+  for (const row of historical.candidate) {
+    row.policyVersion = 'group-contribution-v2'
+    for (const step of row.decisions) step.policyVersion = 'group-contribution-v2'
+  }
+  const retained = sanitizeReplayReport(historical)
+  assert.equal(retained.candidate[0].policyVersion, 'group-contribution-v2')
+  assert.equal(retained.candidate[0].decisions[0].policyVersion, 'group-contribution-v2')
+  const accounting = measureReplayEvidence(historical, replayContract)
+  assert.equal(accounting.valid, false)
+  assert.equal(accounting.qualityAccepted, false)
 })
