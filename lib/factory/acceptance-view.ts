@@ -34,7 +34,52 @@ export interface AcceptanceDelivery {
   environment?: string | null
 }
 export interface CandidateMachine { name: string; kind: 'device' | 'cloud' }
-export interface AcceptanceDetail { task?: { stage: string; status: string; candidateId: string | null; revision?: number }; checks?: AcceptanceCheck[]; delivery?: AcceptanceDelivery; completionRecovery?: { binding: { taskId: string; revision: number } } }
+export interface AcceptanceTaskView {
+  id?: string
+  issueId?: string
+  attemptId?: string
+  stage: string
+  status: string
+  candidateId: string | null
+  revision?: number
+  completionRecovery?: { binding: { taskId: string; revision: number } }
+}
+export interface AcceptanceDetail { task?: AcceptanceTaskView; checks?: AcceptanceCheck[]; delivery?: AcceptanceDelivery; completionRecovery?: AcceptanceTaskView['completionRecovery'] }
+export interface AcceptanceBinding { taskId: string; issueId: string; attemptId: string; revision: number; candidateId: string | null }
+export type CandidateCheckState = { stage: 'review' | 'verify'; status: 'failed' | 'pending' | 'running' }
+
+/** A fixed candidate remains reachable while its independent checks need attention. */
+export function candidateCheckState(task: AcceptanceTaskView): CandidateCheckState | null {
+  if (task.completionRecovery || !task.candidateId || (task.stage !== 'review' && task.stage !== 'verify')) return null
+  if (task.status !== 'failed' && task.status !== 'pending' && task.status !== 'running') return null
+  return { stage: task.stage, status: task.status }
+}
+
+export function visibleAcceptance(task: AcceptanceTaskView): boolean {
+  return Boolean(task.completionRecovery) || (task.stage === 'approval' && ['pending', 'waiting', 'passed'].includes(task.status)) ||
+    task.stage === 'publish' || candidateCheckState(task) !== null
+}
+
+/** Show a retry only when list, detail, ledger and latest check name one failed attempt. */
+export function candidateCheckRetry(task: AcceptanceTaskView, detail: AcceptanceDetail | undefined, ledger: AcceptanceBinding | undefined) {
+  const state = candidateCheckState(task)
+  const current = detail?.task
+  if (!state || state.status !== 'failed' || !detail || detail.completionRecovery || !current || !ledger ||
+    !task.id || !task.issueId || !task.attemptId || typeof task.revision !== 'number' ||
+    !Number.isSafeInteger(task.revision) || task.revision < 0) return null
+  if (current.id !== task.id || current.issueId !== task.issueId || current.attemptId !== task.attemptId ||
+    current.candidateId !== task.candidateId || current.revision !== task.revision ||
+    current.stage !== task.stage || current.status !== task.status) return null
+  if (ledger.taskId !== task.id || ledger.issueId !== task.issueId || ledger.attemptId !== task.attemptId ||
+    ledger.candidateId !== task.candidateId || ledger.revision !== task.revision) return null
+  const latest = latestCheck(Array.isArray(detail.checks) ? detail.checks : [], state.stage, task.candidateId)
+  if (!latest || latest.attemptId !== task.attemptId || latest.status !== 'failed') return null
+  return {
+    stage: state.stage,
+    key: JSON.stringify([task.id, task.issueId, task.attemptId, task.candidateId, task.revision]),
+    binding: { taskId: task.id, revision: task.revision },
+  }
+}
 
 /** One piece of evidence plus, for text from a verify run, the command it ran. */
 export interface AcceptanceItem { entry: EvidenceEntry; command: { text: string; exitCode: number | null } | null }

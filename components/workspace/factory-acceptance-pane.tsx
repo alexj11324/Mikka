@@ -8,12 +8,13 @@ import { Alert, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import { withBasePath } from '@/lib/base-path'
+import { useViewState } from '@/lib/hooks/view-state'
 import { cn } from '@/lib/utils'
 import type { PublicationEnvironment } from '@/lib/factory/vercel-target'
 import { acceptanceState, mergeAcceptance, type AcceptanceMerge, type AcceptanceState } from '@/lib/factory/acceptance-state'
 import { canReject, closedReject, rejectFlow } from '@/lib/factory/reject-flow'
 import { evidenceEntries, orderEvidence, type EvidenceEntry } from '@/lib/factory/evidence-view'
-import { bareUrl, criterionGroups, pullNumber, resultRows, type AcceptanceDetail, type CriterionGroup, type ResultRow } from '@/lib/factory/acceptance-view'
+import { bareUrl, candidateCheckRetry, candidateCheckState, criterionGroups, pullNumber, resultRows, type AcceptanceDetail, type CriterionGroup, type ResultRow } from '@/lib/factory/acceptance-view'
 import { CriterionEvidence, EvidenceViewer } from './factory-evidence'
 import { ApprovalBar } from './factory-approval-bar'
 import { RejectNote } from './factory-reject-note'
@@ -22,7 +23,7 @@ import { ShortSha, shortSha } from './short-sha'
 import { FieldError } from '@/components/ui/field'
 
 type Candidate = { sha: string | null; kind?: 'repository' | 'report' | 'deliverable'; repository: string; environment: string; scope: string }
-export type FactoryTask = { id: string; issueId: string; stage: string; status: string; reason: string; candidateId: string | null; candidateRunId: string | null; isSkillCandidate: boolean; revision?: number; completionRecovery?: AcceptanceDetail['completionRecovery'] }
+export type FactoryTask = { id: string; issueId: string; stage: string; status: string; reason: string; candidateId: string | null; candidateRunId: string | null; isSkillCandidate: boolean; revision?: number; attemptId?: string; completionRecovery?: AcceptanceDetail['completionRecovery'] }
 type Evidence = { binding: { taskId: string; issueId: string; attemptId: string; revision: number; candidateId: string | null }; manifest: { candidate: Candidate; artifacts: EvidenceEntry[] } }
 type Approval = { id: string; candidateId: string; candidate: Candidate; action: string; target: string; targetEnvironment: string; expiresAt: string; revokedAt: string | null; createdAt: string }
 type Publication = { id: string; approvalId: string; status: 'reserved' | 'uncertain' | 'succeeded' | 'failed'; request: Record<string, unknown>; receipt?: { verifiedTarget?: { reference?: string } } }
@@ -70,7 +71,8 @@ export function useAcceptance(task: FactoryTask) {
   const derived: Derived | undefined = !ledger ? undefined : task.isSkillCandidate
     ? acceptanceState({ stage: task.stage, candidateId: task.candidateId, approvals: Array.isArray(ledger.approvals) ? ledger.approvals : [], publications: Array.isArray(ledger.publications) ? ledger.publications : [], now: Date.now() })
     : mergeAcceptance({ stage: current.stage, status: current.status, candidateId: current.candidateId, merges: Array.isArray(ledger.merges) ? ledger.merges : [] })
-  return { ledger, reload, ledgerError, derived }
+  const check = task.completionRecovery || detail?.completionRecovery ? null : candidateCheckState(current)
+  return { ledger, reload, ledgerError, derived, check }
 }
 
 function Label({ children }: { children: string }) {
@@ -177,7 +179,7 @@ function ResultLine({ row, onOpenThread }: { row: ResultRow; onOpenThread?: (run
  */
 export function FactoryAcceptancePane({ task, onOpenThread }: { task: FactoryTask; onOpenThread?: (runId: string) => void }) {
   const t = useTranslations('FactoryAcceptance')
-  const { ledger, reload, ledgerError, derived: acceptance } = useAcceptance(task)
+  const { ledger, reload, ledgerError, derived: acceptance, check } = useAcceptance(task)
   // A voided approval puts the task back to pending, so the current candidate's evidence is needed to enable it again.
   const { data: evidence, error: evidenceError } = useSWR<Evidence>(task.stage === 'approval' || acceptance?.superseded || acceptance?.state === 'merged' ? `/api/factory/tasks/${task.id}/approval` : null, request)
   // Checks and the delivery header (B8/B9/B11) are read-only extras; the pane works without them.
@@ -188,8 +190,10 @@ export function FactoryAcceptancePane({ task, onOpenThread }: { task: FactoryTas
       void reloadDetail().catch(() => {})
   }, [task.revision, detailRevision, reloadDetail])
   const [busy, setBusy] = useState(false)
-  const retryingCompletion = useRef(false)
+  const retrying = useRef(false)
   const completionRequest = useRef<{ revision: number; eventId: string } | null>(null)
+  const [checkRequest, setCheckRequest] = useViewState<{ key: string; eventId: string; reason: string } | null>(`factory:${task.id}:check-retry`, null)
+  const [checkError, setCheckError] = useState<{ key: string; unknown: boolean } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [viewing, setViewing] = useState<{ group: number; index: number } | null>(null)
   const [reject, dispatchReject] = useReducer(rejectFlow, closedReject)
@@ -211,6 +215,7 @@ export function FactoryAcceptancePane({ task, onOpenThread }: { task: FactoryTas
   const checks = Array.isArray(detail?.checks) ? detail.checks : []
   const pullRequestUrl = detail?.delivery?.pullRequest?.url ?? null
   const refusal = state === 'pending' ? refused ?? derived.refusal ?? null : null
+  const retryCheck = candidateCheckRetry(task, detail, ledger?.binding)
 
   async function run(operation: 'approve' | 'publish' | 'reconcile' | 'revoke', input: Record<string, unknown>) {
     setBusy(true); setError(null)
@@ -227,15 +232,34 @@ export function FactoryAcceptancePane({ task, onOpenThread }: { task: FactoryTas
 
   async function retryCompletion() {
     const recovery = detail?.completionRecovery
-    if (!recovery || retryingCompletion.current) return
-    retryingCompletion.current = true; setBusy(true); setError(null)
+    if (!recovery || retrying.current) return
+    retrying.current = true; setBusy(true); setError(null)
     if (completionRequest.current?.revision !== recovery.binding.revision) completionRequest.current = { revision: recovery.binding.revision, eventId: crypto.randomUUID() }
     try {
       await request(`/api/factory/tasks/${task.id}`, { binding: recovery.binding, eventId: completionRequest.current.eventId, action: 'retry', reason: 'Resume the completed execution' })
     } catch (caught) { setError(caught instanceof RequestError ? caught.code : 'factoryUnavailable') }
     finally {
       await Promise.all([reload().catch(() => {}), reloadDetail().catch(() => {})])
-      retryingCompletion.current = false; setBusy(false)
+      retrying.current = false; setBusy(false)
+    }
+  }
+
+  async function retryCandidateCheck() {
+    if (!retryCheck || retrying.current || busy) return
+    retrying.current = true; setBusy(true); setError(null); setCheckError(null)
+    // A lost response keeps this event id. Only a later explicit click on a
+    // newly bound attempt can create another request; refresh never sends one.
+    const submission = checkRequest?.key === retryCheck.key ? checkRequest
+      : { key: retryCheck.key, eventId: crypto.randomUUID(), reason: t(retryCheck.stage === 'review' ? 'retryReview' : 'retryVerify') }
+    setCheckRequest(submission)
+    try {
+      await request(`/api/factory/tasks/${task.id}`, { binding: retryCheck.binding, eventId: submission.eventId,
+        action: 'retry', reason: submission.reason })
+    } catch (caught) {
+      setCheckError({ key: retryCheck.key, unknown: !(caught instanceof RequestError) || caught.status >= 500 })
+    } finally {
+      await Promise.all([reload().catch(() => {}), reloadDetail().catch(() => {})])
+      retrying.current = false; setBusy(false)
     }
   }
 
@@ -320,13 +344,17 @@ export function FactoryAcceptancePane({ task, onOpenThread }: { task: FactoryTas
         <h4 className="pl-3 text-xs font-medium text-muted-foreground">{t('results')}</h4>
         <ul className="flex flex-col gap-1">{results.map(row => <ResultLine key={row.stage} row={row} onOpenThread={onOpenThread} />)}</ul>
       </section>}
-      {state === 'failed' && <div className="animate-in fade-in-0 slide-in-from-bottom-1 duration-150 motion-reduce:slide-in-from-bottom-0"><Alert variant="destructive"><AlertTitle>{t('publishFailed')}</AlertTitle></Alert></div>}
+      {!check && state === 'failed' && <div className="animate-in fade-in-0 slide-in-from-bottom-1 duration-150 motion-reduce:slide-in-from-bottom-0"><Alert variant="destructive"><AlertTitle>{t('publishFailed')}</AlertTitle></Alert></div>}
       {error && <FieldError className="text-xs">{t(ERROR_KEYS[error] ?? 'error')}</FieldError>}
+      {retryCheck && checkError?.key === retryCheck.key && <FieldError className="text-xs">{t(checkError.unknown ? 'checkRetryUnknown' : 'checkRetryFailed')}</FieldError>}
     </div>
     {detail?.completionRecovery && <footer className="shrink-0 px-4 pb-4 sm:px-5">
       <Button size="sm" disabled={busy} aria-busy={busy} onClick={() => { void retryCompletion() }}>{busy ? <Spinner data-icon="inline-start" /> : <RefreshCw data-icon="inline-start" />}{t('retry')}</Button>
     </footer>}
-    {!detail?.completionRecovery && state !== 'unavailable' && <footer className="shrink-0 px-4 pb-4 sm:px-5">
+    {retryCheck && <footer className="shrink-0 px-4 pb-4 sm:px-5">
+      <Button size="sm" disabled={busy} aria-busy={busy} onClick={() => { void retryCandidateCheck() }}>{busy ? <Spinner data-icon="inline-start" /> : <RefreshCw data-icon="inline-start" />}{t(retryCheck.stage === 'review' ? 'retryReview' : 'retryVerify')}</Button>
+    </footer>}
+    {!detail?.completionRecovery && !check && state !== 'unavailable' && <footer className="shrink-0 px-4 pb-4 sm:px-5">
       <ApprovalBar state={state} isSkill={task.isSkillCandidate} isDeliverable={candidate?.kind === 'report' || candidate?.kind === 'deliverable'} busy={busy} canApprove={task.isSkillCandidate ? Boolean(evidence && environment) : Boolean(evidence && (pullRequestUrl || candidate?.kind === 'report' || candidate?.kind === 'deliverable'))}
         onAccept={task.isSkillCandidate ? undefined : () => { void accept() }} pullRequestUrl={pullRequestUrl ?? undefined} refusal={refusal ?? undefined} canPublish={Boolean(active && environmentOf(active.candidate) && active.target && active.targetEnvironment)}
         environment={envChip ?? undefined}
