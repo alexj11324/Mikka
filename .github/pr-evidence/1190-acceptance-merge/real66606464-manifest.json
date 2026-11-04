@@ -1,0 +1,44 @@
+{
+  "runId": "66606464-2183-4c2f-9a00-5ec983f6f513",
+  "sourceSha": "f8cbd5456be4301946f73711370d0a15271502bb",
+  "overall": "failed",
+  "item9": "failed_at_human_acceptance",
+  "item10": "not_run_prerequisite_failed",
+  "files": [
+    {
+      "name": "real66606464-item9-handoff.json",
+      "bytes": 2584,
+      "sha256": "997df79660e1d186e27a0f38db5dc37e8007bbaba89d22f185b888a83f8cb08b"
+    },
+    {
+      "name": "real66606464-dispatch-result.json",
+      "bytes": 202,
+      "sha256": "4a7a31687b6e5d2e172ecf5d91bfc930bb7771f6c94866ea96b0c85723f78a12"
+    },
+    {
+      "name": "real66606464-source-records.json",
+      "bytes": 2837,
+      "sha256": "b2e13e38d35f29bcfd3d0759b6d79689d52cc120e0dc1f93e73d8979cd229eab"
+    },
+    {
+      "name": "real66606464-pg-stages.json",
+      "bytes": 2590,
+      "sha256": "8275d9145b5f3302cea7adf7333b58b6a4ea099aabbf92104798012c1be7b37f"
+    },
+    {
+      "name": "real66606464-execution.json",
+      "bytes": 1336,
+      "sha256": "25c1e904ade848fca296bb88a63cbba281a511bfb6f94ef4b77a343b993345e5"
+    },
+    {
+      "name": "real66606464-cleanup.json",
+      "bytes": 314,
+      "sha256": "6992d71755255e08e327dacf31705535c6f30fb5f57f14c386e68eefbf10807b"
+    },
+    {
+      "name": "real66606464-review.md",
+      "bytes": 5452,
+      "sha256": "401343b4a35e252e3123f082f5a7c2f8d00f997d7a52657fab3f58add82991cb"
+    }
+  ]
+}

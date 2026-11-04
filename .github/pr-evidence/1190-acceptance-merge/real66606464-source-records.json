@@ -1,0 +1,69 @@
+{
+  "item9": {
+    "sourceFile": "/vercel/Mikka/.cache/dev-local/acceptance-6660646421834c2f/item9-handoff.json",
+    "sourceSha256": "66282cf946973c3d8dd0cc79d385e5019445ab0578b68beffcf5af575a2cadd3"
+  },
+  "dispatch": {
+    "sourceFile": "/vercel/Mikka/.cache/dev-local/dispatch-f8cbd5456be4-991540aa-763a-4e7e-b2cc-4103a52786bb/dispatch-result.json",
+    "sourceSha256": "2ea11565a8814173f442d822c241182286f9c4aa9221b0e18fff96ac70cf3e6a"
+  },
+  "progress": {
+    "sourceFile": "/vercel/Mikka/.cache/dev-local/progress.jsonl",
+    "events": [
+      {
+        "at": "2026-11-04T01:49:10.045Z",
+        "runId": "66606464-2183-4c2f-9a00-5ec983f6f513",
+        "step": "item9-factory-handoff",
+        "status": "b-claimed",
+        "elapsedMs": 260170,
+        "sourceLineSha256": "9b113f94453909b3ffb4f680de380c37ccada3eb704c0d2ff62150043ba44bff"
+      },
+      {
+        "at": "2026-11-04T01:53:16.391Z",
+        "runId": "66606464-2183-4c2f-9a00-5ec983f6f513",
+        "step": "item9-factory-handoff",
+        "status": "failed",
+        "elapsedMs": 506516,
+        "sourceLineSha256": "bb09b71ac09d5e15fe8707893e33e4a42c7e1885a0a6a349cd9a4cdb786299e2"
+      },
+      {
+        "at": "2026-11-04T01:53:16.430Z",
+        "runId": "66606464-2183-4c2f-9a00-5ec983f6f513",
+        "step": "item9-factory-handoff",
+        "status": "fail",
+        "elapsedMs": 506555,
+        "detail": "POST /api/factory/tasks/280ca225-3bdb-4e1f-a803-3e3fd0abe07d/approval: HTTP 409",
+        "sourceLineSha256": "808c8a7f8ad26f6a0082c087ba4f264591f612d76c44da0f6ecc43c2a2568b28"
+      },
+      {
+        "at": "2026-11-04T01:53:16.430Z",
+        "runId": "66606464-2183-4c2f-9a00-5ec983f6f513",
+        "step": "item10-online-watchdog",
+        "status": "start",
+        "elapsedMs": 506555,
+        "sourceLineSha256": "7ccd91bcce7ed53661cb89efb4ad02f576e2b68c7946b22cbac838dd6bf71a46"
+      },
+      {
+        "at": "2026-11-04T01:53:16.431Z",
+        "runId": "66606464-2183-4c2f-9a00-5ec983f6f513",
+        "step": "item10-online-watchdog",
+        "status": "fail",
+        "elapsedMs": 506556,
+        "detail": "Complete the selected offline handoff case before reusing its devices for the hour-long watchdog case",
+        "sourceLineSha256": "297f171a26f35b2e66ca3d7171a21eb97cb465e4a55fe2dacd38840437f830cf"
+      },
+      {
+        "at": "2026-11-04T01:53:16.431Z",
+        "runId": "66606464-2183-4c2f-9a00-5ec983f6f513",
+        "step": "acceptance",
+        "status": "fail",
+        "elapsedMs": 506556,
+        "detail": "2 acceptance item(s) failed",
+        "sourceLineSha256": "3245eb8c0f69141f95b7089b96249965e3a72d65bde972a1e66306e8560aee4a"
+      }
+    ]
+  },
+  "redactions": [
+    "Native execution session identifiers sessionA/sessionB replaced by recorded flag and SHA256; no authentication material read or exported."
+  ]
+}

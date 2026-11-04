@@ -1,0 +1,77 @@
+{
+  "version": 1,
+  "marker": "handoff-91a05468-2053-4484-a4d2-1d8bd1d6ba6a",
+  "status": "failed",
+  "startedAt": "2026-11-04T01:46:15.992Z",
+  "daemonStallMinutes": 60,
+  "boundaries": [
+    "Real DeepSeek Flash via normal account authorization",
+    "Real daemons and unchanged 90s leases/minute cron",
+    "Disposable local database; SELECT evidence only",
+    "Local fixture GitHub and real bare Git publication",
+    "Offline handoff only; not the 45-minute online-stall watchdog or production acceptance"
+  ],
+  "deviceA": "153a1873-d86a-455b-a708-0026f20919aa",
+  "deviceB": "e540419f-85b3-4bcc-9e6b-7012574ad3ff",
+  "placement": "automatic",
+  "originalStartedAt": "2026-11-04T01:46:39.970Z",
+  "recoveryDeviceReadyAt": "2026-11-04T01:46:56.567Z",
+  "originalUnpinned": true,
+  "phase": "failed",
+  "updatedAt": "2026-11-04T01:53:16.390Z",
+  "taskId": "280ca225-3bdb-4e1f-a803-3e3fd0abe07d",
+  "requestEpoch": "3dfdbff2-e776-4670-92cf-843f3948f1a5",
+  "originalRunId": "99c6a649-4b4b-4478-8c4e-ef0df8c808a1",
+  "sessionA": {
+    "recorded": true,
+    "sha256": "073fc00f52bc3846fe1d71d1895248a19e52186afb57a887a57a22be6a12e3ef"
+  },
+  "checkpoint": {
+    "baseCommit": "9c32b1aa9fdfdfc2d0c14cf7199cda39e0811728",
+    "files": 1,
+    "capturedAt": "2026-11-04T01:47:07.277Z"
+  },
+  "leaseExpiresAt": "2026-11-04T01:48:36.678Z",
+  "fault": {
+    "kind": "SIGSTOP owned daemon tree",
+    "at": "2026-11-04T01:47:08.028Z",
+    "groups": 2,
+    "processes": 6
+  },
+  "retryRunId": "fcb498d0-f4fe-46c0-8da5-b5e5f63e2223",
+  "sessionB": {
+    "recorded": true,
+    "sha256": "0ae1032ff480d74e8a0b4f52f64f1d569d7dc1ec11d401de32706864ba324f7f"
+  },
+  "handoff": {
+    "digest": "95af968b33868a55ce80115fab229c8a4119f3c50f900cfdf42297341a4a3acd",
+    "goalSha256": "a5f607e7aa2eac67c5ebe17936ded34c26490805371b7c619583a25bd4d735b9",
+    "checkpoint": {
+      "files": 1,
+      "runId": "99c6a649-4b4b-4478-8c4e-ef0df8c808a1",
+      "storedAt": "2026-11-04T01:47:07.277Z",
+      "baseCommit": "9c32b1aa9fdfdfc2d0c14cf7199cda39e0811728",
+      "unavailableReason": null
+    },
+    "pending": {
+      "stage": "execute",
+      "reason": "Authenticated task dispatch; placement and model selected by the host.",
+      "status": "running"
+    },
+    "externalEffects": {
+      "effects": [],
+      "operations": [],
+      "publications": [
+        {
+          "status": "assigned",
+          "runId": "99c6a649-4b4b-4478-8c4e-ef0df8c808a1"
+        }
+      ]
+    }
+  },
+  "error": {
+    "name": "AssertionError",
+    "code": "ERR_ASSERTION"
+  },
+  "finishedAt": "2026-11-04T01:53:16.390Z"
+}

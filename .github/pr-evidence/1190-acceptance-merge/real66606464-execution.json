@@ -1,0 +1,39 @@
+{
+  "observedAt": "2026-11-04T02:14:35.517Z",
+  "transaction": "READ ONLY",
+  "runs": [
+    {
+      "id": "99c6a649-4b4b-4478-8c4e-ef0df8c808a1",
+      "status": "failed",
+      "stopReason": "device_lost",
+      "retryOf": null,
+      "deviceId": "153a1873-d86a-455b-a708-0026f20919aa",
+      "startedAt": "2026-11-04T01:46:39.970Z",
+      "finishedAt": "2026-11-04T01:49:00.177Z",
+      "model": "deepseek-flash",
+      "publication": "skipped",
+      "pullRequestUrl": null
+    },
+    {
+      "id": "fcb498d0-f4fe-46c0-8da5-b5e5f63e2223",
+      "status": "succeeded",
+      "stopReason": "submitted",
+      "retryOf": "99c6a649-4b4b-4478-8c4e-ef0df8c808a1",
+      "deviceId": "e540419f-85b3-4bcc-9e6b-7012574ad3ff",
+      "startedAt": "2026-11-04T01:49:01.297Z",
+      "finishedAt": "2026-11-04T01:49:39.428Z",
+      "model": "deepseek-flash",
+      "publication": "published",
+      "pullRequestUrl": "https://github.com/mikka-e2e/core-loop/pull/41"
+    }
+  ],
+  "publicationCount": 1,
+  "artifact": {
+    "commit": "fa4a10cb1f4e561d65dc108f92e5c4bb465ba971",
+    "filename": "handoff-91a05468-2053-4484-a4d2-1d8bd1d6ba6a.txt",
+    "bytes": 45,
+    "sha256": "7d64e0a65652e156843765f8a06b7f2b2eb55c2b3a24a7d779200bea73b5fb21",
+    "matchesExpected": true,
+    "defaultBranchCommit": "9c32b1aa9fdfdfc2d0c14cf7199cda39e0811728"
+  }
+}

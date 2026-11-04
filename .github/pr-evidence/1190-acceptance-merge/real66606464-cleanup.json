@@ -1,0 +1,12 @@
+{
+  "observedAt": "2026-11-04T02:09:36.925402+00:00",
+  "knownPreviousPids": [
+    34423,
+    34528,
+    35396
+  ],
+  "knownPreviousPidsPresent": [],
+  "processesMatchingExactOwnedDirectory": [],
+  "port3112Listening": false,
+  "scope": "Process names/IDs/start ticks only; no arguments or environment exported"
+}

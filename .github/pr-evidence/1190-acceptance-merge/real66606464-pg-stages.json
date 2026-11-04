@@ -1,0 +1,79 @@
+{
+  "observedAt": "2026-11-04T02:11:39.398Z",
+  "database": "mikka_loop_666064642183_e2e",
+  "transaction": "READ ONLY",
+  "sourceSha": "f8cbd5456be4301946f73711370d0a15271502bb",
+  "task": [
+    {
+      "id": "280ca225-3bdb-4e1f-a803-3e3fd0abe07d",
+      "issueId": "84ceaab9-7bdb-49bc-a7dc-a66573470025",
+      "sourceEventId": "3dfdbff2-e776-4670-92cf-843f3948f1a5",
+      "stage": "approval",
+      "status": "pending",
+      "revision": 12,
+      "candidateId": "5783dfbb-7f4a-49b5-a1f7-e8137c2d395d",
+      "createdAt": "2026-11-04T01:46:33.895Z",
+      "updatedAt": "2026-11-04T01:53:06.432Z"
+    }
+  ],
+  "attempts": [
+    {
+      "id": "61dc21c2-7eab-487e-81eb-64fd9d87cf7f",
+      "stage": "execute",
+      "status": "failed",
+      "runId": "99c6a649-4b4b-4478-8c4e-ef0df8c808a1",
+      "epoch": "3dfdbff2-e776-4670-92cf-843f3948f1a5",
+      "createdAt": "2026-11-04T01:46:33.895Z",
+      "finishedAt": "2026-11-04T01:49:00.333Z"
+    },
+    {
+      "id": "0a442312-fcc1-43a7-b0b8-3a68a85e6aa7",
+      "stage": "execute",
+      "status": "passed",
+      "runId": "fcb498d0-f4fe-46c0-8da5-b5e5f63e2223",
+      "epoch": "3dfdbff2-e776-4670-92cf-843f3948f1a5",
+      "createdAt": "2026-11-04T01:49:00.316Z",
+      "finishedAt": "2026-11-04T01:49:39.480Z"
+    },
+    {
+      "id": "8529c93a-696d-4255-97f1-7fa39dc1093d",
+      "stage": "review",
+      "status": "passed",
+      "runId": "596fa965-01c8-4fa7-84bb-f33c0cd1f96d",
+      "epoch": "3dfdbff2-e776-4670-92cf-843f3948f1a5",
+      "createdAt": "2026-11-04T01:49:39.435Z",
+      "finishedAt": "2026-11-04T01:50:38.318Z"
+    },
+    {
+      "id": "7c1677a3-0992-4660-909a-b23c6c35a23d",
+      "stage": "verify",
+      "status": "passed",
+      "runId": "2050effe-3bab-4138-8c32-3e70ff3e2c3f",
+      "epoch": "3dfdbff2-e776-4670-92cf-843f3948f1a5",
+      "createdAt": "2026-11-04T01:50:38.269Z",
+      "finishedAt": "2026-11-04T01:53:06.480Z"
+    },
+    {
+      "id": "cb796190-3c22-49be-88c5-2be25eb998ad",
+      "stage": "approval",
+      "status": "pending",
+      "runId": null,
+      "epoch": "3dfdbff2-e776-4670-92cf-843f3948f1a5",
+      "createdAt": "2026-11-04T01:53:06.432Z",
+      "finishedAt": null
+    }
+  ],
+  "merges": [
+    {
+      "id": "4d9ee549-be2b-4974-a25e-aa28418fcf95",
+      "status": "failed",
+      "code": "githubUnavailable",
+      "candidateId": "5783dfbb-7f4a-49b5-a1f7-e8137c2d395d",
+      "sha": "fa4a10cb1f4e561d65dc108f92e5c4bb465ba971",
+      "headSha": null,
+      "mergeCommitSha": null,
+      "createdAt": "2026-11-04T01:53:16.338Z",
+      "finishedAt": "2026-11-04T01:53:16.382Z"
+    }
+  ]
+}
