@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { watchPageVisibility } from './use-live-key'
 
 /** Repaint an age-filtered list once at its next local display boundary. This
  * does not fetch data, and hidden pages have no active display timer. */
@@ -24,7 +25,7 @@ export function useListExpiry(deadlines: readonly number[]) {
       schedule()
     }
     schedule()
-    document.addEventListener('visibilitychange', visible)
-    return () => { clearTimeout(timer); document.removeEventListener('visibilitychange', visible) }
+    const unwatch = watchPageVisibility(visible)
+    return () => { clearTimeout(timer); unwatch() }
   }, [serialized])
 }
