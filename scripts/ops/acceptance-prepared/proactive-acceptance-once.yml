@@ -98,7 +98,7 @@ jobs:
           secret-name: E2B_API_KEY
           recursive: false
           include-imports: false
-      - name: Run owner MCP management, real group runtime and 24 fixed-case Decision replays
+      - name: Run owner MCP management, real group runtime and 24 logical Decision replays
         run: node --import tsx ../driver/scripts/ops/proactive-acceptance-once.mjs
       - name: Upload sanitized evidence only
         if: always()

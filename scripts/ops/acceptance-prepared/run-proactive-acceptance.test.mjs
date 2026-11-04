@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, statSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
-import { runAcceptanceBundle, sanitizeGroupReport, sanitizeReplayReport, sanitizeOwnerMcpReport, writeSanitizedReport } from './run-proactive-acceptance.mjs'
+import { runAcceptanceBundle, sanitizeGroupReport, sanitizeReplayReport, sanitizeOwnerMcpReport, measureReplayEvidence, writeSanitizedReport } from './run-proactive-acceptance.mjs'
 
 const id = suffix => `00000000-0000-4000-8000-${String(suffix).padStart(12, '0')}`
 const env = { GROUP_ACCEPTANCE_DEPLOYMENT: 'dpl_fixture', GROUP_ACCEPTANCE_REVISION: 'a'.repeat(40),
@@ -11,13 +11,33 @@ const env = { GROUP_ACCEPTANCE_DEPLOYMENT: 'dpl_fixture', GROUP_ACCEPTANCE_REVIS
   DEEPSEEK_API_KEY: 'synthetic-deepseek-only', E2B_API_KEY: 'synthetic-cloud-only' }
 const receipt = { executionId: 'synthetic-execution', providerGenerationId: 'synthetic-generation', modelId: 'openai/gpt-6-luna-decisions',
   requestDigest: 'a'.repeat(64), startedAt: '2026-11-03T00:00:00Z', completedAt: '2026-11-03T00:00:00.100Z', imageDigests: [], vision: 'no-image-input' }
-const replay = () => ({ status: 'complete', baseline: Array.from({ length: 12 }, (_, i) => ({ caseId: `case-${i}`, receipt })),
-  candidate: Array.from({ length: 12 }, (_, i) => ({ caseId: `case-${i}`, receipt })), comparison: { decisionReviewReady: true } })
+const replayContract = { caseIds: Array.from({ length: 12 }, (_, i) => `case-${i}`), datasetDigest: 'b'.repeat(64),
+  baselinePolicy: 'group-route-v0', candidatePolicy: 'group-contribution-v1' }
+const replay = () => {
+  let serial = 100
+  const rows = (policyVersion, count) => replayContract.caseIds.map(caseId => {
+    const decisions = Array.from({ length: count }, (_, index) => {
+      serial++
+      return { id: id(serial), phase: count === 2 && index === 0 ? 'intent' : 'responder', index, status: 'complete', failure: null,
+        receipt: { ...receipt, executionId: `execution-${serial}`, providerGenerationId: `generation-${serial}` }, decisionCostUsd: null }
+    })
+    return { schemaVersion: 1, caseId, policyVersion, datasetDigest: replayContract.datasetDigest, inputDigest: 'c'.repeat(64),
+      evidenceKind: 'actual-decision-inference', status: 'complete', receipt: decisions[0].receipt, decisionProtocol: 'group-sequential-v1',
+      decisions, failureReason: null, decisionCalls: { attempted: count, receipted: count, unreceipted: 0 },
+      decisionCost: { knownUsd: 0, knownCalls: 0, unknownCalls: count, omittedCalls: 0 }, decisionCostUsd: null,
+      costScope: 'routing-decision-chain', executionPerformed: false, policyChanged: false }
+  })
+  return { status: 'complete', baseline: rows(replayContract.baselinePolicy, 1), candidate: rows(replayContract.candidatePolicy, 2),
+    comparison: { decisionReviewReady: true } }
+}
 
 function fixture({ groupFails = true, throwsAfterCreation = false, replayFails = false, withTask = false, wrongTaskOwner = false,
-  mcpShareFails = false, mcpCleanupFails = false, mcpCreateThrows = false, driftAfterMcp = false } = {}) {
-  const calls = [], counters = { helper: 0, group: 0, replay: 0, signout: 0, cancel: 0, mcpCreate: 0, mcpDelete: 0 }
-  let helperActive = false, mcpServer = null
+  mcpShareFails = false, mcpCleanupFails = false, mcpCreateThrows = false, driftAfterMcp = false,
+  helperLogoutStatus = 200, groupLogoutStatus = 200, unknownStop = false, wrongGroupOwner = false, sourceStopUnknown = false,
+  mutateReplay = value => value } = {}) {
+  const calls = [], counters = { helper: 0, group: 0, replay: 0, signout: 0, cancel: 0, mcpCreate: 0, mcpDelete: 0, groupStop: 0 }
+  let helperActive = false, mcpServer = null, createdGroup = null, stopped = false
+  const createdBots = [], fixtureId = id(700), marker = fixtureId.slice(0, 8)
   const existingMcp = { id: id(90), name: 'PRIVATE existing MCP', url: 'https://private.invalid', ownerId: 'fixture-owner', mine: true,
     shared: false, enabled: true, transport: 'http', authKind: 'header', revision: 1 }
   const mcpPage = () => ({ workspaceId: id(1), workspaceKind: 'personal', canShare: false,
@@ -29,7 +49,11 @@ function fixture({ groupFails = true, throwsAfterCreation = false, replayFails =
     if (path.endsWith('/api/version')) return Response.json({ build: driftAfterMcp && counters.mcpDelete ? 'dpl_changed' : env.GROUP_ACCEPTANCE_DEPLOYMENT })
     if (path.endsWith('/sign-in/email')) return Response.json({}, { headers: { 'set-cookie': 'synthetic-test-session=value; HttpOnly' } })
     if (path.endsWith('/get-session')) return Response.json({ user: { id: 'fixture-owner', email: env.SMOKE_OWNER_EMAIL }, session: { userId: 'fixture-owner', token: 'PRIVATE_SESSION_TOKEN' } })
-    if (path.endsWith('/api/bots')) return Response.json([{ id: id(91), workspaceId: id(1), ownerId: 'fixture-owner' }])
+    if (path.endsWith('/api/bots')) {
+      if (init.method !== 'POST') return Response.json([{ id: id(91), workspaceId: id(1), ownerId: 'fixture-owner' }, ...createdBots])
+      const bot = { ...JSON.parse(init.body), id: id(10 + createdBots.length), ownerId: 'fixture-owner', workspaceId: id(1) }
+      createdBots.push(bot); return Response.json(bot, { status: 201 })
+    }
     if (path.endsWith('/api/workspace')) return Response.json({ currentUserId: 'fixture-owner', workspace: { id: id(1), kind: 'personal' }, role: 'admin', members: [{ userId: 'fixture-owner', status: 'active' }] })
     if (path.endsWith('/api/integrations/mcp/shares')) {
       assert.equal(init.method, 'PATCH'); assert.deepEqual(JSON.parse(init.body), { serverId: id(92), workspaceId: id(1), shared: true })
@@ -52,8 +76,23 @@ function fixture({ groupFails = true, throwsAfterCreation = false, replayFails =
     }
     if (path.includes('/e2b-key')) return Response.json({ configured: true, byoEnabled: true, canEdit: true, secret: env.E2B_API_KEY })
     if (path.includes('/model-order')) return Response.json({ location: 'cloud', cloudReady: true, entries: [{ id: 'entry', model: 'deepseek-flash', provider: 'deepseek', harness: 'claude_code', source: { kind: 'api_key', keyId: 'PRIVATE-ID' } }], cloudModels: { entry: 'ready' } })
-    if (path.endsWith('/api/conversations')) return Response.json({ id: id(2), rawPrivateBody: env.SMOKE_OWNER_PASSWORD })
-    if (path.endsWith('/sign-out')) { counters.signout++; return Response.json({ success: true }) }
+    if (path.endsWith('/api/conversations')) {
+      if (init.method !== 'POST') return Response.json({ conversations: createdGroup ? [{ ...createdGroup,
+        createdBy: wrongGroupOwner ? 'other-owner' : 'fixture-owner' }] : [] })
+      createdGroup = { ...JSON.parse(init.body), id: id(2), createdBy: 'fixture-owner', kind: 'group', createdAt: new Date().toISOString() }
+      return Response.json({ ...createdGroup, rawPrivateBody: env.SMOKE_OWNER_PASSWORD }, { status: 201 })
+    }
+    if (path.endsWith('/members')) return Response.json({ members: [{ id: 'fixture-owner', memberType: 'user', role: 'owner' },
+      ...createdBots.map(bot => ({ id: bot.id, memberType: 'bot', role: 'member' }))] })
+    if (path.endsWith('/decisions')) return Response.json({ turns: [{ messageId: id(40), status: 'failed', error: stopped ? 'stopped' : 'group_judgment_pending',
+      trace: { status: stopped ? 'stopped' : 'pending', events: [] } }] })
+    if (path.endsWith('/stop')) {
+      assert.equal(init.method, 'POST'); assert.deepEqual(JSON.parse(init.body), {}); counters.groupStop++; stopped = true
+      if (unknownStop) throw Error('PRIVATE unknown stop response')
+      return Response.json({ stopped: 1 })
+    }
+    if (path.endsWith('/sign-out')) { counters.signout++; return Response.json({ success: true }, {
+      status: init.headers?.['x-fixture-session'] === 'helper' ? helperLogoutStatus : init.headers?.['x-fixture-session'] === 'group' ? groupLogoutStatus : 200 }) }
     if (path.endsWith('/api/factory/tasks/' + id(3))) {
       if (init.method === 'POST') { counters.cancel++; assert.equal(JSON.parse(init.body).action, 'cancel'); return Response.json({}) }
       return Response.json({ task: { id: id(3), botId: wrongTaskOwner ? id(99) : id(4), issueId: id(5), attemptId: id(6), candidateId: null, revision: 2, stage: 'execute', status: 'running' } })
@@ -62,21 +101,31 @@ function fixture({ groupFails = true, throwsAfterCreation = false, replayFails =
   }
   const dependencies = {
     isSmokeAccountEmail: email => email === env.SMOKE_OWNER_EMAIL,
+    replayContract,
     async withTemporaryFlashCredential(run, options) {
       counters.helper++; assert.equal(options.cloudExecution, true)
       const cleanup = { created: true, removed: false, cloudCreated: true, cloudRemoved: false }
       helperActive = true
+      await options.fetchImpl('https://app.aspectlylabs.com/mikka/api/auth/sign-in/email', { method: 'POST', body: '{}' })
       try { return await run(cleanup) }
-      finally { cleanup.removed = true; cleanup.cloudRemoved = true; helperActive = false }
+      finally { cleanup.removed = true; cleanup.cloudRemoved = true; helperActive = false
+        await options.fetchImpl('https://app.aspectlylabs.com/mikka/api/auth/sign-out', { method: 'POST', body: '{}', headers: { 'x-fixture-session': 'helper' } }).catch(() => {}) }
     },
     async runGroupProductionAcceptance({ fetchImpl: fetch }) {
       counters.group++; assert.equal(helperActive, true)
       assert.equal(counters.mcpCreate, 1)
       assert.equal(counters.mcpDelete, mcpCreateThrows ? 0 : 1, 'owner fixture cleanup is attempted before group execution')
-      await fetch('https://app.aspectlylabs.com/mikka/api/conversations', { method: 'POST', body: '{}' })
-      if (throwsAfterCreation) throw Error('PRIVATE upstream body')
-      return { status: groupFails ? 'fail' : 'pass', conversationId: id(2), workspaceId: id(1), rawSecret: env.DEEPSEEK_API_KEY,
-        cases: withTask ? [{ name: 'group-factory-artifact-continuation-stop', status: 'fail', taskId: id(3), reporterId: id(4), issueId: id(5) }] : [] }
+      await fetch('https://app.aspectlylabs.com/mikka/api/auth/sign-in/email', { method: 'POST', body: '{}' })
+      try {
+        for (const role of ['UI', 'Coding', 'Testing']) await fetch('https://app.aspectlylabs.com/mikka/api/bots', { method: 'POST', body: JSON.stringify({ name: `Acceptance ${role} ${marker}` }) })
+        await fetch('https://app.aspectlylabs.com/mikka/api/conversations', { method: 'POST', body: JSON.stringify({ workspaceId: id(1), title: `Proactive acceptance ${marker}`,
+          members: createdBots.map(bot => ({ memberType: 'bot', memberId: bot.id })) }) })
+        if (throwsAfterCreation) throw Error('PRIVATE upstream body')
+        return { status: groupFails ? 'fail' : 'pass', conversationId: id(2), workspaceId: id(1), sessionEnded: groupLogoutStatus === 200, rawSecret: env.DEEPSEEK_API_KEY,
+          groupCleanup: groupFails ? { status: sourceStopUnknown ? 'failed' : 'stopped', conversationId: id(2), attempted: true,
+            acknowledged: !sourceStopUnknown, noPendingRetry: !sourceStopUnknown, executionStopConfirmed: false, delegatedTaskIds: [] } : null,
+          cases: withTask ? [{ name: 'group-factory-artifact-continuation-stop', status: 'fail', taskId: id(3), reporterId: id(4), issueId: id(5) }] : [] }
+      } finally { await fetch('https://app.aspectlylabs.com/mikka/api/auth/sign-out', { method: 'POST', body: '{}', headers: { 'x-fixture-session': 'group' } }) }
     },
     async runGroupDecisionReplay({ env: supplied }) {
       counters.replay++; assert.equal(helperActive, true)
@@ -85,7 +134,7 @@ function fixture({ groupFails = true, throwsAfterCreation = false, replayFails =
       assert.equal(supplied.GROUP_REPLAY_REVISION, env.GROUP_ACCEPTANCE_REVISION)
       assert.equal(supplied.GROUP_REPLAY_COOKIE, 'synthetic-test-session=value'); assert.equal(supplied.GROUP_REPLAY_TOKEN, undefined)
       if (replayFails) throw Error('PRIVATE upstream failure')
-      return replay()
+      return mutateReplay(replay())
     },
   }
   return { calls, counters, run: () => runAcceptanceBundle({ env, fetchImpl, dependencies, verifySource: () => env.GROUP_ACCEPTANCE_REVISION }) }
@@ -106,8 +155,10 @@ test('Factory failure preserves its group and independently executes all 24 rece
   assert.equal(report.actualReceiptedDecisionReplays, 24); assert.equal(report.fixtureConversationId, id(2))
   assert.equal(report.runtime.order.entries[0].cloudModelState, 'ready')
   assert.equal(report.taskCleanup.status, 'cancellation-recorded'); assert.equal(f.counters.cancel, 1)
-  assert.deepEqual(report.credentialCleanup, { created: true, removed: true, cloudCreated: true, cloudRemoved: true })
-  assert.equal(report.replaySessionEnded, true); assert.equal(f.counters.signout, 1)
+  assert.deepEqual(report.credentialCleanup, { created: true, removed: true, cloudCreated: true, cloudRemoved: true,
+    credentialSessionLogoutAttempted: true, credentialSessionLogoutAcknowledged: true, credentialSessionLogoutStatus: 200 })
+  assert.equal(report.replaySessionEnded, true); assert.equal(f.counters.signout, 3)
+  assert.equal(report.taskCleanup.executionStopConfirmed, false); assert.equal(report.taskCleanup.cloudStopConfirmed, false)
   assert.doesNotMatch(JSON.stringify(report), /synthetic-password-only|synthetic-deepseek-only|synthetic-cloud-only|PRIVATE-ID|synthetic-test-session/)
 })
 
@@ -116,15 +167,73 @@ test('an interrupted group driver still leaves a captured creation receipt for r
   assert.equal(report.fixtureConversationId, id(2)); assert.equal(f.counters.replay, 1)
   assert.equal(report.group.error, 'acceptance_runner_failed')
   assert.equal(report.actualReceiptedDecisionReplays, 24)
+  assert.equal(f.counters.groupStop, 1); assert.equal(report.groupCleanup.noPendingRetry, true)
+  assert.equal(report.groupCleanup.executionStopConfirmed, false)
+  assert.ok(!f.calls.some(call => call.path.endsWith('/messages')))
 })
 
-test('only complete owner MCP, group runtime, 24 receipts, reviewed replay and cleanup pass', async () => {
+test('24 logical replay cases with 36 distinct provider receipts pass with separate unknown cost accounting', async () => {
   const f = fixture({ groupFails: false }), report = await f.run()
   assert.equal(report.status, 'pass'); assert.equal(report.actualReceiptedDecisionReplays, 24)
   assert.equal(report.ownerMcp.status, 'passed'); assert.equal(report.ownerMcp.http.share, 403)
   assert.equal(report.ownerMcp.cleanup.deleteAcknowledged, true); assert.equal(report.ownerMcp.cleanup.absentReadback, true)
   assert.equal(f.counters.mcpCreate, 1); assert.equal(f.counters.mcpDelete, 1)
   assert.equal(report.replay.baseline[0].receipt.modelId, 'openai/gpt-6-luna-decisions')
+  assert.equal(report.completedLogicalDecisionReplays, 24)
+  assert.deepEqual(report.replayAccounting.decisionCalls, { attempted: 36, receipted: 36, unreceipted: 0 })
+  assert.equal(report.replayAccounting.decisionCost.unknownCalls, 36)
+  assert.equal(report.replayAccounting.decisionCostUsd, null)
+  assert.equal(report.replay.candidate[0].decisions.length, 2)
+  for (const session of Object.values(report.sessionCleanup)) assert.equal(session.logoutStatus, 200)
+})
+
+test('duplicate provider evidence, duplicate cases and reordered chains cannot pass', async () => {
+  for (const mutateReplay of [
+    value => { value.candidate[0].decisions[1].receipt = value.baseline[0].receipt; return value },
+    value => { value.candidate[1].caseId = value.candidate[0].caseId; return value },
+    value => { value.candidate[0].decisions.reverse(); return value },
+  ]) {
+    const report = await fixture({ groupFails: false, mutateReplay }).run()
+    assert.equal(report.status, 'fail'); assert.equal(report.replayAccounting.valid, false)
+    assert.equal(report.credentialCleanup.credentialSessionLogoutAcknowledged, true)
+  }
+})
+
+test('an invalid charged chain and an unreceipted request retain their evidence and unknown costs', () => {
+  const value = replay(), row = value.baseline[0]
+  row.status = 'invalid_decision'; row.failureReason = 'invalid_response'
+  row.decisions[0].status = 'invalid_decision'; row.decisions[0].failure = 'invalid_response'
+  row.decisions.push({ id: id(901), phase: 'responder', index: 1, status: 'unavailable', failure: 'unavailable', receipt: null, decisionCostUsd: null })
+  value.baseline = [row]; value.candidate = []; value.status = 'failed'
+  const account = measureReplayEvidence(value, replayContract), projected = sanitizeReplayReport(value)
+  assert.equal(account.valid, false); assert.equal(account.receiptedLogicalReplays, 1)
+  assert.deepEqual(account.decisionCalls, { attempted: 2, receipted: 1, unreceipted: 1 })
+  assert.equal(account.decisionCost.unknownCalls, 2); assert.equal(account.decisionCostUsd, null)
+  assert.equal(projected.baseline[0].failureReason, 'invalid_response')
+  assert.equal(projected.baseline[0].decisions[0].receipt.providerGenerationId, row.receipt.providerGenerationId)
+})
+
+test('the temporary credential session must acknowledge its own logout even when the helper swallows HTTP failure', async () => {
+  const report = await fixture({ groupFails: false, helperLogoutStatus: 503 }).run()
+  assert.equal(report.status, 'fail'); assert.equal(report.replaySessionEnded, true)
+  assert.equal(report.credentialCleanup.removed, true)
+  assert.equal(report.credentialCleanup.credentialSessionLogoutAttempted, true)
+  assert.equal(report.credentialCleanup.credentialSessionLogoutAcknowledged, false)
+  assert.equal(report.credentialCleanup.credentialSessionLogoutStatus, 503)
+  assert.equal(report.sessionCleanup.groupRuntime.logoutAcknowledged, true)
+})
+
+test('fallback stop checks current owner, reads unknown writes once, and never replays a source stop', async () => {
+  const foreign = fixture({ throwsAfterCreation: true, wrongGroupOwner: true }), denied = await foreign.run()
+  assert.equal(foreign.counters.groupStop, 0); assert.equal(foreign.counters.replay, 0)
+  assert.equal(denied.groupCleanup.error, 'acceptance_group_cleanup_scope')
+  const unknown = fixture({ throwsAfterCreation: true, unknownStop: true }), observed = await unknown.run()
+  assert.equal(unknown.counters.groupStop, 1); assert.equal(unknown.counters.replay, 1)
+  assert.equal(observed.groupCleanup.acknowledged, false); assert.equal(observed.groupCleanup.noPendingRetry, true)
+  assert.equal(observed.status, 'fail')
+  const returned = fixture({ sourceStopUnknown: true }), notRepeated = await returned.run()
+  assert.equal(returned.counters.groupStop, 0); assert.equal(returned.counters.replay, 0)
+  assert.equal(notRepeated.groupCleanup.source, 'source-driver')
 })
 
 test('replay failure still signs out and cleans credentials; no upstream text is emitted', async () => {

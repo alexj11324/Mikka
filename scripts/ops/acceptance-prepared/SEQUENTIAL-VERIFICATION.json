@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "kind": "offline-contract-verification",
+  "sourceProtocol": "group-sequential-v1",
+  "commands": [
+    "node --test run-proactive-acceptance.test.mjs owner-mcp-boundaries.test.mjs",
+    "node --check run-proactive-acceptance.mjs"
+  ],
+  "result": {
+    "exitCode": 0,
+    "tests": 19,
+    "passed": 19,
+    "failed": 0,
+    "skipped": 0
+  },
+  "providerCalls": 0,
+  "productionCalls": 0,
+  "sourceFiles": [
+    {
+      "path": "run-proactive-acceptance.mjs",
+      "sha256": "cd9071be2f849e46aee70ec8e16299762e7b5baa714f8d8fd22481955a58214b"
+    },
+    {
+      "path": "run-proactive-acceptance.test.mjs",
+      "sha256": "37d359b8b6e7228e76802c0be63f92190db136ae84cbe0986811893ce95028fe"
+    },
+    {
+      "path": "README.md",
+      "sha256": "1c9ff70343893fde441510ab06cbb8dd5b2e57eb24414e89fec1f4f598817eda"
+    },
+    {
+      "path": "proactive-acceptance-once.yml",
+      "sha256": "c481e06352029ae5fbaad4df0c86a30980167aefe7471f41cbb7a91faf5f537b"
+    }
+  ],
+  "scope": [
+    "24 fixed logical replays counted separately from provider calls",
+    "all phase receipts unique, failed/unknown costs retained",
+    "three sessions have independent sign-out acknowledgement",
+    "failed fresh group scope-stop with unknown-write readback"
+  ],
+  "limitations": [
+    "does not establish production success",
+    "Task cancellation-recorded does not prove runtime or cloud VM stop",
+    "prepared workflow pins remain placeholders"
+  ]
+}
