@@ -62,7 +62,8 @@ test('Neon retains exact returned bucket boundaries and never invents zero for d
   assert.throws(() => neonHour(invalid, window), /neon_bucket_invalid/)
 })
 
-function provider({ changeAlias = false, excluded = false, error = false, incomplete = false, countOnly = false, legacy = false } = {}) {
+function provider({ changeAlias = false, excluded = false, error = false, incomplete = false, countOnly = false, legacy = false,
+  observation = false, truncated = false, duplicate = false, missingDeployment = false, empty = false, cpuMismatch = false } = {}) {
   const calls = []
   let aliases = 0
   const fetchImpl = async (url, init = {}) => {
@@ -82,11 +83,11 @@ function provider({ changeAlias = false, excluded = false, error = false, incomp
     assert.equal(init.headers.authorization, 'Bearer synthetic-vercel-secret'); assert.equal(init.redirect, 'error')
     if (parsed.pathname.startsWith('/v4/aliases/')) {
       assert.equal(init.method, 'GET'); aliases++
-      return Response.json({ ...alias, updatedAt: alias.updatedAt + (changeAlias && aliases > 1 ? 1 : 0) })
+      return Response.json({ ...alias, ...(observation && changeAlias && aliases > 1 ? { deploymentId: 'dpl_syntheticChanged' } : {}), updatedAt: alias.updatedAt + (changeAlias && aliases > 1 ? 1 : 0) })
     }
     if (parsed.pathname.startsWith('/v13/deployments/')) {
       assert.equal(init.method, 'GET')
-      return Response.json({ ...metadata, env: ['synthetic-secret-never-exported'], private_unknown: 'synthetic-secret-never-exported' })
+      return Response.json({ ...metadata, ...(observation ? { id: parsed.pathname.split('/').at(-1), ready: now - 60000 } : {}), env: ['synthetic-secret-never-exported'], private_unknown: 'synthetic-secret-never-exported' })
     }
     assert.equal(parsed.pathname, '/metrics/v1')
     if (init.method === 'GET') {
@@ -98,15 +99,24 @@ function provider({ changeAlias = false, excluded = false, error = false, incomp
     assert.equal(init.method, 'POST')
     const body = JSON.parse(init.body)
     assert.deepEqual(body.scope, { ownerId: TEAM, projectIds: [PROJECT] })
-    assert.deepEqual(body.groupBy, ['route', legacy ? 'http_status' : 'httpStatus'])
-    assert.equal(body.filter, 'environment:production AND ' + (legacy ? 'deployment_id' : 'deploymentId') + ':"' + input.deploymentId + '"')
+    assert.deepEqual(body.groupBy, ['route', legacy ? 'http_status' : 'httpStatus', ...(observation ? [legacy ? 'deployment_id' : 'deploymentId'] : [])])
+    assert.equal(body.filter, observation ? 'environment:production' : 'environment:production AND ' + (legacy ? 'deployment_id' : 'deploymentId') + ':"' + input.deploymentId + '"')
     assert.deepEqual(body.timeRange, { start: window.from, end: window.to })
     assert.equal(body.seriesSelection.mode, 'exact')
     if (error) return new Response('synthetic-secret-never-exported', { status: 403 })
     const count = body.metrics.value.metric === COUNT
     assert.ok(count ? (countOnly ? ['count'] : ['sum', 'count']).includes(body.metrics.value.aggregation) : body.metrics.value.aggregation === 'sum')
     const countValue = countOnly || body.metrics.value.aggregation === 'sum' ? 60 : 6
-    const summary = [point('/[locale]', '200', count ? countValue : 600), point('/api/factory/tasks', '200', count ? countValue : 300)]
+    let summary = [point('/[locale]', '200', count ? countValue : 600), point('/api/factory/tasks', '200', count ? countValue : 300)]
+    if (observation) {
+      summary = [point('/[locale]', '200', count ? countValue : 600), point('/[locale]', '200', count ? countValue / 2 : 300), point('/api/factory/tasks', '503', count ? 5 : 20)]
+      for (const [index, row] of summary.entries()) row.dimensions[legacy ? 'deployment_id' : 'deploymentId'] = index ? 'dpl_windowSecond' : 'dpl_windowFirst'
+      if (missingDeployment) delete summary[0].dimensions[legacy ? 'deployment_id' : 'deploymentId']
+      if (duplicate) summary.push(structuredClone(summary[0]))
+      if (cpuMismatch && !count) summary.pop()
+      if (truncated) summary = Array.from({ length: 100 }, (_, index) => ({ ...summary[0], dimensions: { ...summary[0].dimensions, [legacy ? 'deployment_id' : 'deploymentId']: 'dpl_' + index } }))
+      if (empty) summary = []
+    }
     if (legacy) for (const row of summary) { row.dimensions.http_status = row.dimensions.httpStatus; delete row.dimensions.httpStatus }
     return Response.json({ summary,
       ...(excluded ? { meta: { excludedIntervals: [{ start: input.from, end: input.to }] } } : {}),
@@ -159,4 +169,79 @@ test('deployment verification rejects another project and mismatched expected bu
   assert.throws(() => selectedDeployment({ ...metadata, projectId: 'other' }, window), /deployment_scope_invalid/)
   assert.throws(() => selectedDeployment(metadata, { ...window, expectedBuild: 'b'.repeat(40) }), /deployment_build_mismatch/)
   assert.throws(() => selectedDeployment({ ...metadata, ready: window.start + 1 }, { ...window, role: 'before' }), /deployment_not_ready/)
+})
+
+const observationInput = { role: 'observation', scope: 'project-production', from: input.from, to: input.to }
+const observe = async options => {
+  const source = provider({ observation: true, ...options })
+  const report = await collectHour({ input: observationInput, now, fetchImpl: source.fetchImpl, vercelToken: 'synthetic-vercel-secret', neonToken: 'synthetic-neon-secret' })
+  return { report, calls: source.calls }
+}
+
+test('project observation has a separate explicit scope and cannot bypass fixed-task identity checks', async () => {
+  assert.deepEqual(fixedHour(observationInput, now), { ...observationInput, start: window.start, end: window.end, from: window.from, to: window.to })
+  for (const patch of [{ scope: 'other' }, { deploymentId: input.deploymentId }, { expectedBuild: sha },
+    { workloadDigest: 'b'.repeat(64) }, { concurrentTasks: 1 }, { projectId: 'other' }]) {
+    let requests = 0
+    const report = await collectHour({ input: { ...observationInput, ...patch }, now, fetchImpl: async () => { requests++; throw Error('unexpected') } })
+    assert.equal(report.status, 'insufficient'); assert.equal(requests, 0)
+  }
+  for (const role of ['before', 'after', 'idle', 'connectivity-smoke']) {
+    const validFixed = { ...input, role, expectedBuild: sha, workloadDigest: 'b'.repeat(64), concurrentTasks: role === 'idle' ? 0 : 1 }
+    assert.throws(() => fixedHour({ ...validFixed, scope: 'project-production' }, now), /fixed_window_scope_invalid/)
+    if (role === 'before' || role === 'after') {
+      assert.throws(() => fixedHour({ ...validFixed, workloadDigest: undefined }, now), /workload_identity_required/)
+      assert.throws(() => fixedHour({ ...validFixed, deploymentId: undefined }, now), /deployment_id_invalid/)
+      assert.throws(() => fixedHour({ ...validFixed, expectedBuild: undefined }, now), /expected_build_required/)
+    }
+  }
+})
+
+test('project production retains multiple deployments per route and rolls up only their returned invocation counts', async () => {
+  const { report, calls } = await observe()
+  assert.equal(report.status, 'collected'); assert.equal(report.productionAcceptance, false)
+  assert.equal(report.vercel.scope, 'project-production'); assert.equal(report.vercel.requests, 95)
+  assert.equal(report.vercel.cpuMs, 920); assert.equal(report.vercel.errors, 5)
+  assert.deepEqual(report.vercel.deploymentIds, ['dpl_windowFirst', 'dpl_windowSecond'])
+  assert.equal(report.vercel.groups.length, 3)
+  assert.deepEqual(report.vercel.groups.slice(0, 2).map(row => [row.deploymentId, row.route, row.requests]),
+    [['dpl_windowFirst', '/[locale]', 60], ['dpl_windowSecond', '/[locale]', 30]])
+  assert.equal(report.vercel.routes[0].route, '/[locale]'); assert.equal(report.vercel.routes[0].requests, 90)
+  assert.equal(report.vercel.routes[1].httpStatus, '503')
+  assert.equal(report.vercel.groupLimit, 100); assert.equal(report.vercel.coverage, 'returned_groups_below_query_limit')
+  assert.equal(calls.length, 9)
+  assert.ok(!JSON.stringify(report).includes('synthetic-secret')); assert.ok(!markdown(report).includes('synthetic-secret'))
+  assert.ok(markdown(report).includes('all production deployments')); assert.ok(markdown(report).includes('dpl_windowSecond'))
+  assert.ok(report.limitations.some(text => text.includes('never a fixed-task')))
+})
+
+test('an alias/build change is recorded as collection context without narrowing the completed production hour', async () => {
+  const { report } = await observe({ changeAlias: true, countOnly: true, legacy: true })
+  assert.equal(report.status, 'collected'); assert.equal(report.vercel.requests, 95)
+  assert.equal(report.vercel.metricContract.count.aggregation, 'count')
+  assert.equal(report.vercel.contextAtCollection.aliasChanged, true)
+  assert.equal(report.vercel.contextAtCollection.before.alias.deploymentId, 'dpl_syntheticCurrent')
+  assert.equal(report.vercel.contextAtCollection.after.alias.deploymentId, 'dpl_syntheticChanged')
+  assert.ok(Date.parse(report.vercel.contextAtCollection.before.deployment.readyAt) > window.end)
+  assert.deepEqual(report.vercel.deploymentIds, ['dpl_windowFirst', 'dpl_windowSecond'])
+})
+
+test('project observations preserve insufficient coverage, truncation, duplicates and denied reads instead of claiming zero or complete totals', async () => {
+  for (const [options, reason] of [
+    [{ truncated: true }, 'metric_groups_missing_or_truncated'],
+    [{ empty: true }, 'vercel_no_groups_reported'],
+    [{ missingDeployment: true }, 'metric_deployment_dimension_invalid'],
+    [{ duplicate: true }, 'metric_duplicate_group'],
+    [{ cpuMismatch: true }, 'cpu_request_scope_mismatch'],
+    [{ excluded: true }, 'vercel_metric_intervals_excluded'],
+    [{ error: true }, 'vercel_api_http_403'],
+  ]) {
+    const { report } = await observe(options)
+    assert.equal(report.status, 'insufficient'); assert.ok(report.reasons.includes(reason), reason)
+    assert.equal(report.vercel, undefined); assert.equal(report.productionAcceptance, false)
+    assert.ok(!JSON.stringify(report).includes('synthetic-secret'))
+  }
+  const { report } = await observe({ incomplete: true })
+  assert.equal(report.status, 'insufficient'); assert.ok(report.reasons.includes('neon_requested_hour_not_reported'))
+  assert.equal(report.vercel.requests, 95); assert.equal(report.neon.bytes, null)
 })

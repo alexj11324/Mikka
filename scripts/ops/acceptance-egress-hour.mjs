@@ -9,16 +9,23 @@ const CPU = 'vercel.function_invocation.function_cpu_time_ms'
 const fail = code => { throw Error(code) }
 const iso = value => new Date(value).toISOString()
 const safeCode = error => /^[a-z][a-z0-9_]{0,100}$/.test(error?.message ?? '') ? error.message : 'collection_failed'
-const keys = ['role', 'from', 'to', 'deploymentId', 'expectedBuild', 'workloadDigest', 'concurrentTasks']
+const keys = ['role', 'scope', 'from', 'to', 'deploymentId', 'expectedBuild', 'workloadDigest', 'concurrentTasks']
+const OBSERVATION_GROUP_LIMIT = 100
 
 /** Inputs describe one completed UTC hour, never a rolling or inferred window. */
 export function fixedHour(raw, now = Date.now()) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw) || Object.keys(raw).some(key => !keys.includes(key))) fail('window_input_invalid')
-  if (!['connectivity-smoke', 'before', 'after', 'idle'].includes(raw.role)) fail('window_role_invalid')
+  if (!['connectivity-smoke', 'before', 'after', 'idle', 'observation'].includes(raw.role)) fail('window_role_invalid')
   if (![raw.from, raw.to].every(value => typeof value === 'string' && /^\d{4}-\d\d-\d\dT\d\d:00:00(?:\.000)?Z$/.test(value))) fail('window_utc_hour_required')
   const start = Date.parse(raw.from), end = Date.parse(raw.to)
   if (!Number.isFinite(start) || !Number.isFinite(end) || end - start !== HOUR || start % HOUR || end > now || start < now - 168 * HOUR) fail('window_range_invalid')
   if (iso(start).replace('.000Z', 'Z') !== raw.from.replace('.000Z', 'Z') || iso(end).replace('.000Z', 'Z') !== raw.to.replace('.000Z', 'Z')) fail('window_calendar_invalid')
+  if (raw.role === 'observation') {
+    if (raw.scope !== 'project-production' || ['deploymentId', 'expectedBuild', 'workloadDigest', 'concurrentTasks'].some(key => Object.hasOwn(raw, key)))
+      fail('observation_scope_invalid')
+    return { role: raw.role, scope: raw.scope, start, end, from: iso(start), to: iso(end) }
+  }
+  if (Object.hasOwn(raw, 'scope')) fail('fixed_window_scope_invalid')
   if (!/^dpl_[A-Za-z0-9]{1,100}$/.test(raw.deploymentId ?? '')) fail('deployment_id_invalid')
   if (raw.expectedBuild != null && !/^[a-f0-9]{40}$/.test(raw.expectedBuild)) fail('build_sha_invalid')
   if (raw.workloadDigest != null && !/^[a-f0-9]{64}$/.test(raw.workloadDigest)) fail('workload_digest_invalid')
@@ -107,6 +114,72 @@ function checkedMetrics(raw, metric, dimensions) {
     dimensions: { route: point.dimensions?.route, httpStatus: point.dimensions?.[dimensions.httpStatus] } })) }, metric)
 }
 
+
+/** Project observation deliberately includes every production deployment. It
+ * does not certify a fixed task, a stable build, idle traffic or a comparison. */
+function projectMetricQuery(metric, aggregation, window, dimensions) {
+  return { scope: { ownerId: TEAM, projectIds: [PROJECT] }, timeRange: { start: window.from, end: window.to }, bucketSeconds: 300,
+    groupBy: ['route', dimensions.httpStatus, dimensions.deploymentId], filter: 'environment:production',
+    metrics: { value: { metric, aggregation } }, outputs: ['value'],
+    seriesSelection: { limit: OBSERVATION_GROUP_LIMIT, mode: 'exact', rankBy: [{ metric: 'value', direction: 'desc' }] } }
+}
+
+function observationRows(raw, metric, dimensions) {
+  if (raw?.meta?.excludedIntervals?.length) fail('vercel_metric_intervals_excluded')
+  if (!Array.isArray(raw?.summary) || raw.summary.length >= OBSERVATION_GROUP_LIMIT) fail('metric_groups_missing_or_truncated')
+  if (!raw.summary.length) fail('vercel_no_groups_reported')
+  const rows = new Map()
+  for (const point of raw.summary) {
+    const deploymentId = point.dimensions?.[dimensions.deploymentId]
+    if (!/^dpl_[A-Za-z0-9]{1,100}$/.test(deploymentId ?? '')) fail('metric_deployment_dimension_invalid')
+    const one = metricRows({ summary: [{ dimensions: { route: point.dimensions?.route,
+      httpStatus: point.dimensions?.[dimensions.httpStatus] }, values: point.values }] }, metric)
+    const row = one.values().next().value
+    const key = JSON.stringify([deploymentId, row.route, row.httpStatus])
+    if (rows.has(key)) fail('metric_duplicate_group')
+    rows.set(key, { ...row, deploymentId })
+  }
+  return rows
+}
+
+async function projectObservation(read, window) {
+  const context = async () => {
+    const alias = activeAlias(await read('/v4/aliases/' + PRODUCTION_ALIAS))
+    const deployment = selectedDeployment(await read('/v13/deployments/' + alias.deploymentId),
+      { ...window, role: 'connectivity-smoke', deploymentId: alias.deploymentId })
+    return { alias, deployment }
+  }
+  const before = await context()
+  const [countContract, cpuContract] = await Promise.all([COUNT, CPU].map(async metric => metricContract(await read('/metrics/v1?' +
+    new URLSearchParams({ kind: 'system', limit: '250', search: metric, activeSince: window.from })), metric)))
+  const dimensions = metricDimensions(countContract, cpuContract)
+  const [countsRaw, cpuRaw] = await Promise.all([
+    read('/metrics/v1', projectMetricQuery(COUNT, countContract.aggregation, window, dimensions)),
+    read('/metrics/v1', projectMetricQuery(CPU, cpuContract.aggregation, window, dimensions)),
+  ])
+  const after = await context()
+  const counts = observationRows(countsRaw, COUNT, dimensions), cpu = observationRows(cpuRaw, CPU, dimensions)
+  const totals = aggregate(cpu, counts)
+  if (!Number.isSafeInteger(totals.requests) || !Number.isSafeInteger(totals.errors)) fail('metric_value_invalid')
+  const groups = [...counts].map(([key, row]) => ({ deploymentId: row.deploymentId, route: row.route, httpStatus: row.httpStatus,
+    requests: row.value, cpuMs: cpu.get(key).value, cpuPerRequestMs: row.value ? cpu.get(key).value / row.value : null }))
+  const routeCounts = new Map(), routeCpu = new Map()
+  for (const row of groups) {
+    const key = JSON.stringify([row.route, row.httpStatus])
+    for (const [map, value] of [[routeCounts, row.requests], [routeCpu, row.cpuMs]]) {
+      const previous = map.get(key)
+      map.set(key, { route: row.route, httpStatus: row.httpStatus, value: (previous?.value ?? 0) + value })
+    }
+  }
+  return { scope: 'project-production', measurement: 'function_invocation_observability_aggregates',
+    coverage: 'returned_groups_below_query_limit', groupLimit: OBSERVATION_GROUP_LIMIT,
+    contextAtCollection: { before, after, aliasChanged: JSON.stringify(before) !== JSON.stringify(after) },
+    metricContract: { count: countContract, cpu: cpuContract, dimensions,
+      selectionBasis: 'current_vercel_cli_catalog_default_for_count_unit' },
+    ...totals, groups, routes: aggregate(routeCpu, routeCounts).groups.sort((a, b) => b.requests - a.requests),
+    deploymentIds: [...new Set(groups.map(row => row.deploymentId))].sort() }
+}
+
 export async function collectHour({ input, vercelToken, neonToken, now = Date.now(), fetchImpl = fetch }) {
   let window
   const report = { version: 1, observedAt: iso(now), status: 'insufficient', productionAcceptance: false, reasons: [],
@@ -117,10 +190,17 @@ export async function collectHour({ input, vercelToken, neonToken, now = Date.no
       'Neon project totals include every branch and other traffic; Vercel groups cover only the selected production deployment.',
       'Historical connectivity smoke is never a before, after or idle acceptance window.'] }
   try { window = fixedHour(input, now); report.window = window } catch (error) { report.reasons.push(safeCode(error)); return report }
+  if (window.role === 'observation') report.limitations = [
+    'This is a project-wide production observation, never a fixed-task before, after or idle acceptance window.',
+    'The completed hour can include multiple deployments, concurrent work and interrupted tasks; alias/build reads are collection context only.',
+    'Vercel values are function-invocation observability aggregates, not an independent complete billing receipt.',
+    'Neon project bytes include all branches; PostHog bucket alignment requires its own matching provider-hour evidence.',
+  ]
   const read = (path, body) => api(path, { token: vercelToken, body, fetchImpl })
   const values = await Promise.allSettled([
     (async () => {
       if (!vercelToken) fail('vercel_token_unavailable')
+      if (window.role === 'observation') return projectObservation(read, window)
       const [before, selected] = await Promise.all([
         read('/v4/aliases/' + PRODUCTION_ALIAS).then(activeAlias),
         read('/v13/deployments/' + window.deploymentId).then(raw => selectedDeployment(raw, window)),
@@ -177,13 +257,19 @@ export async function collectHour({ input, vercelToken, neonToken, now = Date.no
 export function markdown(report) {
   const lines = ['## Fixed-hour egress collection: ' + report.status, '', 'Production acceptance: not established by this collector.',
     '', 'Reasons: ' + (report.reasons.join(', ') || 'none') + '.']
-  if (report.window) lines.push('', 'Role: ' + report.window.role + '.', 'UTC window (end exclusive): ' + report.window.from + ' → ' + report.window.to + '.',
-    'Selected deployment: ' + report.window.deploymentId + '.', 'Expected build: ' + (report.window.expectedBuild ?? 'not supplied for connectivity smoke') + '.')
+  if (report.window) {
+    lines.push('', 'Role: ' + report.window.role + '.', 'UTC window (end exclusive): ' + report.window.from + ' → ' + report.window.to + '.')
+    if (report.window.role === 'observation') lines.push('Scope: all production deployments in the fixed Mikka project; no fixed-task comparison is established.')
+    else lines.push('Selected deployment: ' + report.window.deploymentId + '.', 'Expected build: ' + (report.window.expectedBuild ?? 'not supplied for connectivity smoke') + '.')
+  }
   if (report.vercel) {
     lines.push('', 'Vercel invocations: ' + report.vercel.requests + '; CPU ms: ' + report.vercel.cpuMs + '; HTTP 5xx: ' + report.vercel.errors + '.',
       'Invocation aggregation: ' + report.vercel.metricContract.count.aggregation + '; provider status dimension: ' + report.vercel.metricContract.dimensions.httpStatus + '.',
-      '', '| Route template | HTTP status | Invocations | CPU ms |', '| --- | ---: | ---: | ---: |')
-    for (const row of report.vercel.groups) lines.push('| ' + row.route + ' | ' + row.httpStatus + ' | ' + row.requests + ' | ' + row.cpuMs + ' |')
+      '', ...(report.window?.role === 'observation'
+        ? ['| Deployment | Route template | HTTP status | Invocations | CPU ms |', '| --- | --- | ---: | ---: | ---: |']
+        : ['| Route template | HTTP status | Invocations | CPU ms |', '| --- | ---: | ---: | ---: |']))
+    for (const row of report.vercel.groups) lines.push('| ' + (row.deploymentId ? row.deploymentId + ' | ' : '') + row.route + ' | ' + row.httpStatus + ' | ' + row.requests + ' | ' + row.cpuMs + ' |')
+    if (report.window?.role === 'observation') lines.push('', 'Alias/build context changed during collection: ' + report.vercel.contextAtCollection.aliasChanged + '. This does not narrow the historical project scope.')
     if (report.vercel.aggregationCheck) lines.push('', 'Connectivity diagnostic only: ' + JSON.stringify(report.vercel.aggregationCheck) + '.')
   }
   if (report.neon) lines.push('', 'Neon hour bytes: ' + (report.neon.bytes ?? 'not reported') + '. Reported through: ' + (report.neon.reportedThrough ?? 'unavailable') + '.',
