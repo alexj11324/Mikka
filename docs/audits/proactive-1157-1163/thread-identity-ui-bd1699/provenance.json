@@ -1,0 +1,85 @@
+{
+  "source": "bd1699ed88eb35006328ce8edae94bbbb2985c47",
+  "tree": "82beb11639f095263916dc105bd78bead3df9deb",
+  "pr": 1199,
+  "environment": {
+    "kind": "isolated Vercel Sandbox local production build",
+    "directory": "/vercel/Mikka-thread-identity",
+    "database": "mikka_thread_identity_ui_e2e",
+    "origin": "http://localhost:3124"
+  },
+  "build": {
+    "commandId": "cmd_015033caebf44d129f12055dfd2a",
+    "command": "pnpm build",
+    "exitCode": 0,
+    "durationMs": 219774,
+    "log": "/tmp/mikka-thread-identity-build.log"
+  },
+  "capture": {
+    "commandId": "cmd_cf96d74dd309404ea7c94fa4e79f",
+    "exitCode": 0,
+    "durationMs": 22290,
+    "log": "/tmp/mikka-thread-identity-capture.log",
+    "ownerServerStopped": true,
+    "normalPoolRelease": true,
+    "registeredSyntheticFixturesRemoved": 3
+  },
+  "initialAttempt": {
+    "commandId": "cmd_f7463ad8a861406d9000d90147ef",
+    "exitCode": 1,
+    "phase": "normal account initialization landing",
+    "reason": "Next hostname 127.0.0.1 differed from localhost origin and yielded 307 self redirect",
+    "productCodeChanged": false,
+    "accountGuardChanged": false,
+    "failedLeaseUnquarantined": false,
+    "syntheticFixturesCreated": 0
+  },
+  "correction": {
+    "scope": "temporary server startup only",
+    "hostname": "localhost",
+    "sameBuild": true,
+    "ordinaryPublicLandingReadback": 200
+  },
+  "scope": {
+    "syntheticVisualFixtures": true,
+    "normalOwnerPeerAuth": true,
+    "noActualSubscriptionExecution": true,
+    "modelCalls": 0,
+    "externalProviderCalls": 0
+  },
+  "rawReview": {
+    "file": "review.json",
+    "sha256": "fadf03e1a19edb194998523595d6cd747c1fd767fb28556e957d704cfd9d45ba"
+  },
+  "imageEncoding": {
+    "input": "original PNG screenshots referenced by review.json",
+    "output": "WebP quality 90 via existing sharp library; no layout/content edits",
+    "files": [
+      {
+        "name": "en-1440-billing-light.webp",
+        "bytes": 61956,
+        "sha256": "ab708b0f7f4cf27ef514f1370a577bfe550086af144c9d87d2acfdf2d3c630db"
+      },
+      {
+        "name": "en-1440-top-light.webp",
+        "bytes": 61884,
+        "sha256": "246f34439ecb88b6e8c6b02e3f0b1a76a7519fe10baf8e1eefc8bef99978fe3e"
+      },
+      {
+        "name": "en-390-billing-dark.webp",
+        "bytes": 31546,
+        "sha256": "4f78463d6ba60a05aafb87bc385208147593e11f080ce6a8db4c8eed63a054a6"
+      },
+      {
+        "name": "zh-CN-1440-legacy-dark.webp",
+        "bytes": 17228,
+        "sha256": "60bbc796a925dca37eaacf5c9350917cd7f3502c299056b8b56a6f763fe0f731"
+      },
+      {
+        "name": "zh-CN-390-top-light.webp",
+        "bytes": 27402,
+        "sha256": "1e49d9b12096a49d614d8d18c0e9bf249f83331caf9dbd790febea82bff82db5"
+      }
+    ]
+  }
+}
