@@ -4,7 +4,7 @@ import { setTimeout as delay } from 'node:timers/promises'
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i
 const TOKEN = /^[A-Za-z0-9_.:-]{1,180}$/
 const HASH = /^[a-f0-9]{64}$/
-const POLICIES = ['group-route-v0', 'group-contribution-v1']
+const POLICIES = ['group-route-v0', 'group-contribution-v1', 'group-contribution-v2']
 const ENDED = new Set(['succeeded', 'completed', 'failed', 'stopped', 'cancelled'])
 const FAILURES = new Set(['unavailable', 'missing_or_refused', 'wrong_answer_type', 'uncertain', 'choice_outside_contract', 'receipt_missing', 'duplicate_receipt', 'mention_requires_intervention', 'reporter_unavailable', 'call_budget_exhausted', 'invalid_response', 'members_unavailable'])
 const FLASH = new Set(['deepseek-flash', 'deepseek-v4.1-flash', 'deepseek/deepseek-flash', 'deepseek/deepseek-v4.1-flash'])
@@ -434,7 +434,7 @@ export async function runGroupRoutingBoundaries({ owner, verifyTarget, assertFla
         await cancelUnexpected(sent.data.id, trace)
         throw new RoutingError('unexpected_delegation')
       }
-      check(turn.status === 'complete' && trace.status === 'complete' && trace.policyVersion === 'group-contribution-v1', 'turn_not_complete')
+      check(turn.status === 'complete' && trace.status === 'complete' && trace.policyVersion === 'group-contribution-v2', 'turn_not_complete')
       const measured = observation(turn)
       Object.assign(row, measured); row.decision = measured.primaryReceipt
       observedRoots.add(sent.data.id)

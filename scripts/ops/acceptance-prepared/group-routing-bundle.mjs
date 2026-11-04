@@ -14,6 +14,42 @@ class BundleError extends Error { constructor(code) { super('routing_bundle_' + 
 const check = (ok, code) => { if (!ok) throw new BundleError(code) }
 const safeError = error => error instanceof BundleError ? error.message : 'routing_bundle_unconfirmed'
 
+export function coreComparisonReady(core) {
+  const replay = core.replay, account = core.replayAccounting, comparison = replay?.comparison
+  const paid = value => value?.modelId === 'openai/gpt-6-luna-decisions' && TOKEN.test(value.executionId ?? '')
+    && TOKEN.test(value.providerGenerationId ?? '') && HASH.test(value.requestDigest ?? '')
+  const rowBound = (row, policy, baseline) => {
+    const steps = row?.decisions, complete = row?.status === 'complete'
+    const abstained = baseline && row?.status === 'invalid_decision' && row.failureReason === 'uncertain'
+      && row.route === null && row.projection === null
+    return Boolean(row?.policyVersion === policy && (complete || abstained) && paid(row.receipt)
+      && (complete ? row.failureReason === null && row.route && row.projection : true)
+      && Array.isArray(steps) && steps.length > 0 && steps.length <= 4
+      && steps[0]?.receipt?.executionId === row.receipt.executionId
+      && steps[0]?.receipt?.providerGenerationId === row.receipt.providerGenerationId
+      && steps[0]?.receipt?.requestDigest === row.receipt.requestDigest
+      && steps.every((step, index) => step.index === index && step.policyVersion === policy && paid(step.receipt)
+        && (abstained && index === steps.length - 1 ? step.status === 'invalid_decision' && step.failure === 'uncertain'
+          : step.status === 'complete' && step.failure === null)))
+  }
+  return Boolean(replay?.status === 'comparison_ready' && replay.comparisonVersion === 'group-decision-comparison-v2'
+    && account?.comparisonVersion === replay.comparisonVersion && account.evidenceValid === true && account.valid === true
+    && account.qualityAccepted === true && account.collectionComplete === true && account.baselineClassifiable === true
+    && account.logicalReplays === 24 && account.receiptedLogicalReplays === 24 && account.candidateCompleted === 12
+    && Number.isSafeInteger(account.baselineCompleted) && account.baselineCompleted >= 0 && account.baselineCompleted <= 12
+    && Number.isSafeInteger(account.baselineAbstentions) && account.baselineCompleted + account.baselineAbstentions === 12
+    && core.completedLogicalDecisionReplays === account.baselineCompleted + 12
+    && account.completedLogicalReplays === core.completedLogicalDecisionReplays
+    && comparison?.baselineClassifiable === true && comparison.decisionReviewReady === true
+    && comparison.candidate?.observed === 12 && comparison.candidate.accuracyDenominator === 12
+    && comparison.candidate.measured === 12 && comparison.candidate.coverage === 1
+    && Array.isArray(comparison.candidate.failures) && comparison.candidate.failures.length === 0
+    && comparison.baseline?.observed === 12 && comparison.baseline.accuracyDenominator === 12
+    && comparison.baseline.measured === account.baselineCompleted && comparison.baseline.abstentions === account.baselineAbstentions
+    && Array.isArray(replay.candidate) && replay.candidate.length === 12 && replay.candidate.every(row => rowBound(row, 'group-contribution-v2', false))
+    && Array.isArray(replay.baseline) && replay.baseline.length === 12 && replay.baseline.every(row => rowBound(row, 'group-route-v0', true)))
+}
+
 /** Prepared export only: importing this file never logs in or calls a model.
  * The caller supplies bytes from a verified, complete core artifact and its
  * expected SHA256. This adapter checks those bytes and live scope; it does not
@@ -29,10 +65,8 @@ export async function runGroupRoutingBundle({ env = process.env, fetchImpl = fet
     && HASH.test(coreReportSha256 ?? '') && digest(coreReportJson) === coreReportSha256, 'core_artifact_digest')
   let core
   try { core = JSON.parse(coreReportJson) } catch { throw new BundleError('core_artifact_shape') }
-  check(core?.status === 'pass' && core.group?.status === 'pass' && core.replay?.status === 'complete'
-    && core.replayAccounting?.qualityAccepted === true && core.replayAccounting.collectionComplete === true
-    && core.expectedDecisionReplays === 24 && core.actualReceiptedDecisionReplays === 24
-    && core.completedLogicalDecisionReplays === 24, 'core_acceptance_required')
+  check(core?.status === 'pass' && core.group?.status === 'pass' && coreComparisonReady(core)
+    && core.expectedDecisionReplays === 24 && core.actualReceiptedDecisionReplays === 24, 'core_acceptance_required')
   check(core.origin === ORIGIN && core.revision === revision && core.deploymentId === deploymentId
     && core.group.revision === revision && core.group.deploymentId === deploymentId, 'core_source_binding')
   check(UUID.test(core.group.conversationId ?? '') && core.fixtureConversationId === core.group.conversationId

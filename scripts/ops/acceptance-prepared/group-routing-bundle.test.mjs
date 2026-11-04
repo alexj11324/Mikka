@@ -8,6 +8,20 @@ const digest = text => createHash('sha256').update(text).digest('hex')
 const revision = 'a'.repeat(40), deploymentId = 'dpl_SyntheticOnly', origin = 'https://app.aspectlylabs.com'
 const ownerId = 'synthetic-owner', email = 'synthetic-smoke@example.invalid'
 const response = (data, status = 200, headers = {}) => new Response(JSON.stringify(data), { status, headers })
+function coreReplay() {
+  const rows = policyVersion => Array.from({ length: 12 }, (_, index) => {
+    const receipt = { executionId: policyVersion + '-execution-' + index, providerGenerationId: policyVersion + '-generation-' + index,
+      requestDigest: digest(policyVersion + index), modelId: 'openai/gpt-6-luna-decisions' }
+    return { policyVersion, status: 'complete', failureReason: null, receipt, route: { action: 'reply' }, projection: { intervention: true },
+      decisions: [{ index: 0, policyVersion, status: 'complete', failure: null, receipt }] }
+  })
+  return { status: 'comparison_ready', comparisonVersion: 'group-decision-comparison-v2',
+    baseline: rows('group-route-v0'), candidate: rows('group-contribution-v2'),
+    comparison: { baselineClassifiable: true, decisionReviewReady: true,
+      baseline: { observed: 12, accuracyDenominator: 12, measured: 12, abstentions: 0 },
+      candidate: { observed: 12, accuracyDenominator: 12, measured: 12, coverage: 1, failures: [] } } }
+}
+
 function fixture(options = {}) {
   let clock = Date.parse('2026-11-04T00:00:00Z')
   const state = { requests: [], helperCalls: 0, groupCalls: 0, logouts: 0, discoveries: 0, cleanupSegments: [], sequence: [],
@@ -15,7 +29,8 @@ function fixture(options = {}) {
   const group = { status: 'pass', revision, deploymentId, conversationId: id(1), fixtureId: id(2), workspaceId: id(3), requesterId: ownerId,
     startedAt: new Date(clock).toISOString(), bots: ['UI', 'Coding', 'Testing'].map((role, i) => ({ id: id(i + 4), role, modelId: 'deepseek-flash' })) }
   const core = { status: 'pass', group, origin, revision, deploymentId, fixtureConversationId: group.conversationId,
-    replay: { status: 'complete' }, replayAccounting: { qualityAccepted: true, collectionComplete: true },
+    replay: coreReplay(), replayAccounting: { comparisonVersion: 'group-decision-comparison-v2', evidenceValid: true, valid: true, qualityAccepted: true, collectionComplete: true,
+      baselineClassifiable: true, logicalReplays: 24, receiptedLogicalReplays: 24, completedLogicalReplays: 24, baselineCompleted: 12, baselineAbstentions: 0, candidateCompleted: 12 },
     expectedDecisionReplays: 24, actualReceiptedDecisionReplays: 24, completedLogicalDecisionReplays: 24,
     notProjected: 'PRIVATE_CORE_SENTINEL' }
   const env = { GROUP_ACCEPTANCE_REVISION: revision, GROUP_ACCEPTANCE_DEPLOYMENT: deploymentId,
@@ -134,7 +149,9 @@ test('failed, partial, wrong-source or mismatched-byte core reports stop before 
     core => { core.replayAccounting.qualityAccepted = false }, core => { core.replayAccounting.collectionComplete = false },
     core => { core.actualReceiptedDecisionReplays = 1 }, core => { core.completedLogicalDecisionReplays = 23 },
     core => { core.revision = 'b'.repeat(40) }, core => { core.group.deploymentId = 'dpl_Old' },
-    core => { core.fixtureConversationId = id(90) }]
+    core => { core.fixtureConversationId = id(90) }, core => { core.replay.status = 'complete' },
+    core => { delete core.replay.comparisonVersion }, core => { core.replayAccounting.candidateCompleted = 11 },
+    core => { core.replay.candidate[0].status = 'invalid_decision' }, core => { core.replay.baseline[0].projection = null }]
   for (const change of changes) {
     const h = fixture(); change(h.core)
     await assert.rejects(runGroupRoutingBundle(h.input()), /routing_bundle_/)
@@ -203,4 +220,21 @@ test('credential transport cannot send the session or secret inputs to another o
   const h = fixture({ foreignTransport: true }), report = await runGroupRoutingBundle(h.input())
   assert.equal(report.status, 'failed'); assert.equal(report.error, 'routing_bundle_transport_origin_rejected')
   assert.equal(h.state.groupCalls, 0); assert.equal(h.state.logouts, 1)
+})
+
+test('a passing v2 core keeps baseline uncertainty separate from actual completed judgments', async () => {
+  const h = fixture()
+  for (const row of h.core.replay.baseline.slice(0, 4)) {
+    row.status = 'invalid_decision'; row.failureReason = 'uncertain'; row.route = null; row.projection = null
+    row.decisions[0].status = 'invalid_decision'; row.decisions[0].failure = 'uncertain'
+  }
+  h.core.completedLogicalDecisionReplays = 20
+  Object.assign(h.core.replayAccounting, { baselineCompleted: 8, baselineAbstentions: 4, completedLogicalReplays: 20 })
+  Object.assign(h.core.replay.comparison.baseline, { measured: 8, abstentions: 4 })
+  const report = await runGroupRoutingBundle(h.input())
+  assert.equal(report.status, 'passed'); assert.equal(h.state.groupCalls, 1)
+  h.core.replay.baseline[0].failureReason = 'invalid_response'
+  const before = h.state.requests.length
+  await assert.rejects(runGroupRoutingBundle(h.input()), /core_acceptance_required/)
+  assert.equal(h.state.requests.length, before)
 })

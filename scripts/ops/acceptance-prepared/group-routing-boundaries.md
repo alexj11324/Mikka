@@ -1,8 +1,8 @@
 # Group routing addon — prepared draft, not executed
 
-This independent module does not alter the reviewed core bundle. Its latest sixteen offline transport contracts pass. This compatibility/cleanup increment still needs independent review, and a standalone login/workflow adapter must be bound separately before activation. No real model or provider invocation was performed for these contracts.
+This independent module does not alter the reviewed core bundle. Its latest sixteen offline transport contracts pass. The reviewed standalone session adapter still needs a trusted passing core artifact and exact source/deployment binding before activation. No real model or provider invocation was performed for these contracts.
 
-The real core production run 41762211922 failed its Decision checks. This addon must not run against that failed report or claim it met routing acceptance. The projected-report interface rejects a failed core or group before any network request. Root owns any future activation after a separately verified passing core report and a matching production source/deployment.
+The earlier core production runs, including 41778455749, failed their overall acceptance. This addon must not run against those failed reports or relabel them as success. It now requires the explicit group-decision-comparison-v2/comparison_ready contract and live group-contribution-v2 traces. The projected-report interface rejects a failed core or group before any network request. Root owns any future activation after a separately verified passing core report and a matching production source/deployment.
 
 ## Scope and evidence
 
@@ -30,7 +30,7 @@ The preferred later-run fixture is:
       sourcePin: { revision: expectedCommit, deploymentId: expectedDeployment }
     }
 
-Both the actual core status and group status must be pass. The caller must verify the actual artifact provenance and whole-core status. This is explicitly named fixed-core-group-report-projection, not an invented raw HTTP 201 response. The module checks its hash and source pair, then rechecks live owner, marker names, group creation time, exactly three fixture Bots plus the sole owner, public roles, and model menus.
+Both the actual core status and group status must be pass. The wrapper also checks comparisonVersion, all 12 complete candidate cases, and 12 baseline cases consisting only of complete routes or fully receipted terminal uncertainty. The actual completed count may be below 24; uncertainty is not rewritten into a successful route. The caller must verify the actual artifact provenance and whole-core status. This is explicitly named fixed-core-group-report-projection, not an invented raw HTTP 201 response. The module checks its hash and source pair, then rechecks live owner, marker names, group creation time, exactly three fixture Bots plus the sole owner, public roles, and model menus.
 
 The alternative same-process fixture accepts actual 201 Bot and conversation receipts from that process, with fixtureId, ownerId, workspaceId, startedAt, and role/model mapping. It is not a way to synthesize a successful receipt from a failed core.
 
