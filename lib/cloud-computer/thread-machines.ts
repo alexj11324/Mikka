@@ -258,7 +258,11 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
       LEFT JOIN device_repos source_repo ON source_repo.id=runtime."repoId" AND source_repo."userId"=r."userId"
       WHERE r.id=$1 AND r."userId"=$2 AND b."workspaceId"=$3 FOR UPDATE OF r`, [runId, actor.userId, actor.workspaceId])).rows[0]
     if (!run || !run.botSandboxId || !(refreshRuntime ? ['succeeded','failed','stopped','cancelled'] : ['queued', 'preparing', 'running', 'waiting_input']).includes(run.status)) throw new ComputerError(404, 'Thread unavailable')
-    if (!refreshRuntime) await revalidateExecutionIdentity(client, run)
+    if (!refreshRuntime) {
+      refreshPhase = 'execution_identity'
+      await revalidateExecutionIdentity(client, run)
+      refreshPhase = 'admission'
+    }
     exactQuestionMachine = run.questionContinuation?.requireSessionResume === true
     const repositoryTask = Boolean(run.remoteUrl)
     let machine = (await client.query('SELECT * FROM thread_machines WHERE "runId"=$1 FOR UPDATE', [runId])).rows[0]
@@ -276,6 +280,7 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
     }
     if (repositoryTask && !repositoryBindingMatches(run.repoPath, run.remoteUrl)) throw new ComputerError(409, 'Repository identity unavailable')
     if (exactQuestionMachine) {
+      refreshPhase = 'question_machine'
       const continuation = run.questionContinuation
       if (!continuation?.requireSessionResume || typeof continuation.requiredSandboxId !== 'string' ||
         !machine?.sandboxId || machine.sandboxId !== continuation.requiredSandboxId ||
@@ -283,6 +288,7 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
         machine.deviceId !== run.deviceId || machine.repoId !== run.deviceRepoId || machine.issueId !== run.issueId ||
         machine.botId !== run.runtimeBotId) throw new ComputerError(409, 'Original question machine unavailable')
       if (refreshRuntime && (run.status !== 'failed' || run.sessionId !== continuation.originSessionId)) throw new ComputerError(409, 'Original question machine unavailable')
+      refreshPhase = 'question_source'
       const source = await client.query(`SELECT 1 FROM factory_questions q
         JOIN agent_runs origin ON origin.id=q."originRunId" AND origin."userId"=q."userId" AND origin."issueId"=q."issueId"
         JOIN computer_run_bindings b ON b."runId"=origin.id AND b."ownerId"=origin."userId"
@@ -300,6 +306,7 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
         FOR SHARE OF q,origin,b,m`, [continuation.questionId,actor.userId,runId,continuation.originRunId,continuation.originSessionId,
         run.agentId,run.deviceId,run.deviceRepoId,actor.workspaceId,run.runtimeBotId,run.issueId,machine.snapshotId,refreshRuntime])
       if (!source.rowCount) throw new ComputerError(409, 'Original question machine unavailable')
+      refreshPhase = 'question_machine'
       // A live worker may have claimed between answer commit and this wake.
       // Its lease, credentials and native process must remain untouched.
       if (['preparing','running','waiting_input'].includes(run.status) && run.leaseExpiresAt && new Date(run.leaseExpiresAt).getTime()>Date.now()) {
@@ -307,6 +314,7 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
       }
       if (machine.workerLeaseUntil && new Date(machine.workerLeaseUntil).getTime()>Date.now()) throw new ComputerError(409,'Thread provisioning in progress')
     }
+    refreshPhase = 'admission'
     if (refreshRuntime && (!machine?.sandboxId || !machine.deviceId || !isOfficialE2BTemplate(machine.snapshotId))) throw new ComputerError(409, 'Existing official task runtime required')
     if (refreshRuntime) {
       if (machine.ownerId!==actor.userId || machine.workspaceId!==actor.workspaceId || machine.deviceId!==run.deviceId) throw new ComputerError(404,'Thread unavailable')
@@ -582,10 +590,12 @@ export async function ensureThreadMachine(pool: Pool, actor: Actor, runId: strin
     if (!finished.rowCount) throw new ComputerError(409, 'Thread provisioning cancelled')
     return { runId, state: 'running' }
   } catch (error) {
-    // Capture the rejecting branch before cleanup awaits: the parallel guard
-    // install and worker read can fail independently. No historical run error
-    // or report is changed by this maintenance diagnostic.
-    if (refreshRuntime || upgradeRetainedRuntime) logRuntimeRefreshFailure(runId, parallelFailurePhase ?? refreshPhase, error)
+    // Capture the rejecting branch before cleanup and the start wrapper hide
+    // it. Admission can fail before the exact-question flag is available.
+    // Only the existing bounded classifications are logged; no run history or
+    // original VM/session is changed by these diagnostics.
+    logRuntimeRefreshFailure(runId, parallelFailurePhase ?? refreshPhase, error, undefined,
+      refreshRuntime || upgradeRetainedRuntime ? 'refresh' : 'start')
     await client.query('ROLLBACK')
     if (runtimeRollback) {
       try { await runtimeRollback() } catch (rollbackError) { logRuntimeRefreshFailure(runId, 'rollback', rollbackError) }
