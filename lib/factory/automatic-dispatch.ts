@@ -100,6 +100,7 @@ export function automaticFactoryDispatch(pool: Pool) {
     const dispatch = createFactoryDispatch(pool, store, (client, _owner, _input, _bot, context) => queueCloudRun(pool, actor, {
       botId: source.runtimeBotId, issueId: task.issueId, agentId: runtime.agentId, deviceRepoId: repoId, title: issue.title, body: tiptapToText(issue.content), ...model, model: cloudModel,
       withoutBot: task.botId === null, readOnly: check || source.agentDefinition?.readOnly, idempotencyKey: `factory:${context.attemptId}`,
+      allowLocalRecovery: source.agentDefinition?.allowLocalRecovery, sourceEventId: context.sourceEventId,
     }, client, factoryStage), { ...defaultFactoryDispatchAdapters, configure: {
       ...defaultFactoryDispatchAdapters.configure,
       review: (client, current, id) => configureFactoryCheck(client, current, id, undefined, factoryStage),

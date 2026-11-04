@@ -35,6 +35,7 @@ export type ThreadDispatch<R extends { runId: string }> =
 export type TaskThreadRun = {
   id: string; status: string; stopRequestedAt: Date | null; agentId: string; deviceRepoId: string | null
   botId: string | null; remoteUrl: string | null; harness: string | null; readOnly: boolean
+  allowLocalRecovery?: boolean
   cloud: { workspaceId: string; botId: string } | null
   stopReason: string | null; error: string | null; summary: string | null; lastReply: string | null
 }
@@ -46,6 +47,7 @@ export async function latestTaskRun(query: Query, userId: string, issueId: strin
   const { rows: [run] } = await query.query(`SELECT r.id,r.status,r."stopRequestedAt",r."agentId",r."deviceRepoId",r."botId",r."stopReason",r.error,
       r.report->>'summary' AS summary,r."lastReply",d."remoteUrl",
       coalesce(r."agentDefinition"->>'harness',a.harness) AS harness,coalesce((r."agentDefinition"->>'readOnly')::boolean,false) AS "readOnly",
+      (r."agentDefinition"->>'allowLocalRecovery')='true' AS "allowLocalRecovery",
       b."workspaceId" AS "cloudWorkspaceId",b."botId" AS "cloudBotId"
     FROM agent_runs r JOIN agents a ON a.id=r."agentId"
     LEFT JOIN device_repos d ON d.id=r."deviceRepoId"

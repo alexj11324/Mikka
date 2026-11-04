@@ -8,6 +8,7 @@ import { notifyDeviceWork } from '@/lib/device-gateway-notify'
 import { db, pool, withDatabaseClient } from '@/lib/db'
 import { agentRuns, issues } from '@/lib/db/schema'
 import { apiKeyWorkerDefinition, retryWorkerDefinition, type WorkerDefinitionSnapshot } from '@/lib/agent-kit/worker'
+import { workerDefinitionDigest } from '@/lib/agent-kit/worker-digest'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { runCredentialSwitchedEvent, runQuotaPausedEvent, type QuotaApiKey, type QuotaSubscription } from '@/lib/coordinator-events'
 import { quotaContinuationNote, quotaContinuationPrompt } from '@/lib/run-retry'
@@ -91,6 +92,10 @@ async function continuationDefinition(run: Run, prompt: string, key: RunApiKey |
     if (queued) {
       delete definition.repositoryAdmission
       if (queued.agentDefinition?.repositoryAdmission) definition.repositoryAdmission = structuredClone(queued.agentDefinition.repositoryAdmission)
+      if (definition.allowLocalRecovery && !queued.agentDefinition?.allowLocalRecovery) {
+        delete definition.allowLocalRecovery
+        definition.definitionDigest = workerDefinitionDigest(definition)
+      }
     }
     definition.executionIdentity = await freezeExecutionIdentity(pool, { ...(queued ?? run), agentDefinition: definition }, undefined, snapshot.executionIdentity?.workspaceId ?? queued?.agentDefinition?.executionIdentity?.workspaceId)
     const current = definition.executionIdentity
@@ -127,7 +132,10 @@ export async function queueCloudQuotaContinuation(run: Run, cloud: CloudBinding,
         WHERE runtime."botId"=$1 AND runtime."ownerId"=$2 AND runtime.harness=$3`, [cloud.botId, run.userId, run.agentDefinition!.harness, run.deviceRepoId]);
       if (!target) throw new ActionFailureError('runInvalid');
       const repoId = target.remoteUrl ? (await (await import('@/lib/device-repositories')).ensureDeviceRepository(run.userId, target.deviceId, target.remoteUrl)).id : target.repoId;
+      const request = run.agentDefinition?.allowLocalRecovery ? (await client.query(`SELECT t."sourceEventId" FROM factory_tasks t
+        JOIN factory_attempts a ON a.id=t."attemptId" WHERE t."userId"=$1 AND a."runId"=$2 FOR UPDATE OF t`, [run.userId, run.id])).rows[0] : undefined
       const { runId } = await queueCloudRun(pool, actor, { botId: cloud.botId, issueId: run.issueId, agentId: target.agentId, deviceRepoId: repoId, readOnly: run.agentDefinition?.readOnly, title: issue.title, body: tiptapToText(issue.content),
+        allowLocalRecovery: run.agentDefinition?.allowLocalRecovery, sourceEventId: request?.sourceEventId,
         note: quotaContinuationNote(), withoutBot: run.botId === null, idempotencyKey: `quota:${run.id}:${key ? 'api_key' : 'original'}`, threadRunId: run.id,
         // On the person's API key the key's model; else the paused run's own model and account (a missing one fails in queueCloudRun).
         ...(key ? { apiKey: key, model: key.model } : { ...threadRunModel(run.agentDefinition), model: run.agentDefinition?.model ?? '' }) }, client)
