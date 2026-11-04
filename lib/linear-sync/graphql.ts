@@ -14,6 +14,11 @@ export function sanitizeLinearError(value: string) {
   }).join('').slice(0, 300)
 }
 
+/** How long one Linear request may take. Production never changes it;
+ * tests/issue-scope-detachment.db.test.ts shortens it where a held request
+ * has to time out, instead of waiting the full 12 s. */
+export const linearRequestTimeout = { ms: 12_000 }
+
 export async function linearGraphQL<T>(accessToken: string, query: string, variables: Record<string, unknown> = {}): Promise<T> {
   let response: Response
   try {
@@ -21,7 +26,7 @@ export async function linearGraphQL<T>(accessToken: string, query: string, varia
       method: 'POST',
       headers: { authorization: `Bearer ${accessToken}`, 'content-type': 'application/json' },
       body: JSON.stringify({ query, variables }),
-      signal: AbortSignal.timeout(12_000),
+      signal: AbortSignal.timeout(linearRequestTimeout.ms),
     })
   } catch {
     throw new LinearApiError('Linear could not be reached', true)

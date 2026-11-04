@@ -4,7 +4,8 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { spawnSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { BOOTSTRAP, BROWSER_SUITES, REQUIRED_SUITES, SELF_MANAGED, checkSummary, inventory, scriptSteps, shardScripts, main, parseSummary, readTree, validateTarget } from './run-db-tests.mjs'
+import { BOOTSTRAP, BROWSER_SUITES, REQUIRED_SUITES, SELF_MANAGED, TEMPLATE_BOUND, checkSummary, cloneDatabaseName, concurrency, inventory, runScript, scriptSteps, shardScripts, suiteEnv, main, parseSummary, readTree, validateTarget } from './run-db-tests.mjs'
+import { isE2eTarget } from '../tests/helpers/e2e-target.mjs'
 
 const target = 'postgresql://e2e:local@127.0.0.1:5432/mikka_e2e'
 const env = { CI: 'true', GITHUB_ACTIONS: 'true', E2E_DATABASE_URL: target, MIKKA_DATABASE_URL: target, DATABASE_URL: target }
@@ -12,11 +13,13 @@ const sample = REQUIRED_SUITES[0]
 const files = { [sample.marker]: '', [sample.file]: "import { Pool } from 'pg'" }
 const scripts = { [sample.script]: `node --test ${sample.file}` }
 
-function runnerFixture(t) {
+const noClone = async () => { throw new Error('no clone expected') }
+const cloneAll = async (_template, names, ready) => { for (const name of names) ready(name) }
+function runnerFixture(t, names = ['a', 'b', 'c']) {
   const root = mkdtempSync(join(tmpdir(), 'mikka-db-runner-'))
   t.after(() => rmSync(root, { recursive: true, force: true }))
   mkdirSync(join(root, 'tests'))
-  const commands = Object.fromEntries(['a', 'b', 'c'].map(name => {
+  const commands = Object.fromEntries(names.map(name => {
     const file = `tests/${name}.db.test.mjs`
     writeFileSync(join(root, file), '')
     return [`test:${name}-db`, `node --test ${file}`]
@@ -46,34 +49,135 @@ test('DB shard configuration rejects malformed, unsafe, out-of-range and empty s
   assert.throws(() => shardScripts(['test:a'], '2/2'), /selects no database suites/)
 })
 
-test('runner invokes only the selected scripts and retains full inventory and required environment', t => {
+test('runner invokes only the selected scripts, each on its own clone, and retains full inventory and required environment', async t => {
   const fixture = runnerFixture(t)
   const logs = []
   t.mock.method(console, 'log', message => logs.push(message))
-  const calls = []
+  t.mock.method(process.stdout, 'write', () => true)
+  const calls = [], clones = []
   const run = (command, args, options) => {
     calls.push({ command, args, options })
     return { status: 0, stdout: '# tests 1\n# pass 1\n', stderr: '' }
   }
-  const fullEnv = { ...env, DB_TEST_EXPECTED: fixture.scripts.join(',') }
-  assert.equal(main({ root: fixture.root, env: { ...fullEnv, DB_TEST_SHARD: '1/2' }, run }), 0)
+  const clone = async (template, names, ready) => { clones.push({ template, names }); for (const name of names) ready(name) }
+  const fullEnv = { ...env, FACTORY_MONITOR_TEST_URL: target, UNRELATED_URL: 'postgresql://e2e:local@127.0.0.1:5432/other_e2e', DB_TEST_EXPECTED: fixture.scripts.join(',') }
+  assert.equal(await main({ root: fixture.root, env: { ...fullEnv, DB_TEST_SHARD: '1/2' }, run, clone }), 0)
   assert.deepEqual(calls.map(call => call.args), [['-s', 'test:a-db'], ['-s', 'test:c-db']])
+  assert.deepEqual(clones, [{ template: target, names: ['mikka_s00_a_e2e', 'mikka_s02_c_e2e'] }], 'clones are named by inventory position, so shards never collide')
   assert.ok(logs.some(line => line.startsWith('Required DB inventory: ') && line.includes('test:b-db')))
   assert.ok(logs.includes('Required DB selection: {"shard":"1/2","total":3,"scripts":["test:a-db","test:c-db"]}'))
-  for (const call of calls) {
+  for (const [index, call] of calls.entries()) {
+    const clone = `postgresql://e2e:local@127.0.0.1:5432/${clones[0].names[index]}`
     assert.equal(call.command, 'pnpm')
     assert.equal(call.options.cwd, fixture.root)
     assert.equal(call.options.env.REQUIRE_DB, '1')
     assert.equal(call.options.env.CONVERSATION_READS_REQUIRE_DB, '1')
     assert.equal(call.options.env.MIKKA_TEST_DB_PORT, '5432')
-    assert.equal(call.options.env.DATABASE_URL, target)
+    for (const name of ['E2E_DATABASE_URL', 'MIKKA_DATABASE_URL', 'DATABASE_URL', 'FACTORY_MONITOR_TEST_URL']) assert.equal(call.options.env[name], clone, name)
+    assert.equal(call.options.env.UNRELATED_URL, fullEnv.UNRELATED_URL)
+    assert.doesNotThrow(() => validateTarget(call.options.env))
   }
+  assert.ok(logs.some(line => /^::group::pnpm test:a-db \(mikka_s00_a_e2e, [\d.]+s\)$/.test(line)))
+  assert.ok(logs.some(line => line.startsWith('Required DB timings: ')))
   calls.length = 0
-  assert.equal(main({ root: fixture.root, env: fullEnv, run }), 0)
-  assert.deepEqual(calls.map(call => call.args[1]), fixture.scripts)
+  assert.equal(await main({ root: fixture.root, env: fullEnv, run, clone }), 0)
+  assert.deepEqual(calls.map(call => call.args[1]).sort(), fixture.scripts)
 })
 
-test('runner validates all expected and discovered suites before sharding and before subprocesses', t => {
+test('runner keeps suites bound to the bootstrapped database on it, one at a time, after cloning the rest', async t => {
+  const bound = TEMPLATE_BOUND.slice(0, 2).map(entry => entry.script.replace(/^test:/, '').replace(/-db$/, ''))
+  const fixture = runnerFixture(t, ['a', 'b', ...bound])
+  t.mock.method(console, 'log', () => {})
+  t.mock.method(process.stdout, 'write', () => true)
+  const events = []
+  let running = 0, peak = 0, boundRunning = 0
+  const run = async (command, args, options) => {
+    const script = args[1], onTemplate = options.env.E2E_DATABASE_URL === target
+    events.push(`start ${script}`)
+    running++; peak = Math.max(peak, running)
+    if (onTemplate) { boundRunning++; assert.equal(boundRunning, 1, 'template-bound suites never overlap') }
+    await new Promise(resolve => setTimeout(resolve, 20))
+    if (onTemplate) boundRunning--
+    running--
+    return { status: 0, stdout: '# tests 1\n# pass 1\n', stderr: '' }
+  }
+  const clone = async (_template, names, ready) => {
+    for (const name of names) { await new Promise(resolve => setTimeout(resolve, 5)); events.push(`clone ${name}`); ready(name) }
+    events.push('cloned')
+  }
+  assert.equal(await main({ root: fixture.root, env: { ...env, DB_TEST_CONCURRENCY: '3', DB_TEST_EXPECTED: fixture.scripts.join(',') }, run, clone }), 0)
+  assert.ok(events.indexOf('start test:a-db') > events.indexOf('clone mikka_s00_a_e2e'), 'a suite starts once its own clone exists')
+  for (const script of TEMPLATE_BOUND.slice(0, 2).map(entry => entry.script)) assert.ok(events.indexOf(`start ${script}`) > events.indexOf('cloned'), 'nothing connects to the template until every clone is taken')
+  assert.deepEqual(events.filter(event => event.startsWith('start ')).map(event => event.slice(6)).sort(), fixture.scripts)
+  assert.equal(peak, 3)
+  for (const script of TEMPLATE_BOUND.slice(0, 2).map(entry => entry.script)) assert.ok(fixture.scripts.includes(script))
+})
+
+test('runner bounds concurrency and still reports every suite when one fails', async t => {
+  const fixture = runnerFixture(t, ['a', 'b', 'c', 'd', 'e'])
+  const errors = []
+  t.mock.method(console, 'log', () => {})
+  t.mock.method(console, 'error', message => errors.push(message))
+  t.mock.method(process.stdout, 'write', () => true)
+  t.mock.method(process.stderr, 'write', () => true)
+  let running = 0, peak = 0
+  const ran = []
+  const run = async (command, args) => {
+    running++; peak = Math.max(peak, running)
+    await new Promise(resolve => setTimeout(resolve, 10))
+    running--; ran.push(args[1])
+    return args[1] === 'test:b-db' ? { status: 1, stdout: '# tests 1\n# fail 1\n', stderr: '' } : { status: 0, stdout: '# tests 1\n# pass 1\n', stderr: '' }
+  }
+  assert.equal(await main({ root: fixture.root, env: { ...env, DB_TEST_CONCURRENCY: '2' }, run, clone: cloneAll }), 1)
+  assert.equal(peak, 2)
+  assert.deepEqual(ran.sort(), fixture.scripts)
+  assert.ok(errors.some(error => /test:b-db exited with 1/.test(error)))
+  for (const value of ['0', '-1', '1.5', 'x', '100']) {
+    assert.throws(() => concurrency(value), /DB_TEST_CONCURRENCY/)
+    let called = false
+    assert.equal(await main({ root: fixture.root, env: { ...env, DB_TEST_CONCURRENCY: value }, run() { called = true }, clone: noClone }), 1)
+    assert.equal(called, false)
+  }
+  assert.equal(concurrency(undefined, 4), 4)
+  assert.equal(concurrency('1'), 1)
+})
+
+test('a suite whose clone failed or is missing never runs, and the gate fails', async t => {
+  const fixture = runnerFixture(t)
+  const errors = []
+  t.mock.method(console, 'log', () => {})
+  t.mock.method(console, 'error', message => errors.push(message))
+  let called = false
+  assert.equal(await main({ root: fixture.root, env, run() { called = true }, clone: async () => { throw new Error('source database "mikka_e2e" is being accessed by other users') } }), 1)
+  assert.equal(called, false)
+  assert.ok(errors.some(error => /being accessed by other users/.test(error)))
+  const ran = []
+  t.mock.method(process.stdout, 'write', () => true)
+  const partial = async (_template, names, ready) => { ready(names[0]) }
+  assert.equal(await main({ root: fixture.root, env, run(command, args) { ran.push(args[1]); return { status: 0, stdout: '# tests 1\n# pass 1\n', stderr: '' } }, clone: partial }), 1)
+  assert.deepEqual(ran, ['test:a-db'])
+  assert.ok(errors.some(error => /test:b-db: clone mikka_s01_b_e2e was not created/.test(error)))
+})
+
+test('clone names stay loopback *_e2e databases within the identifier limit', () => {
+  for (const script of ['test:a', 'test:personal-mailbox-default-off-db', `test:${'x'.repeat(120)}`, 'test:weird/$name']) {
+    const name = cloneDatabaseName(target, 7, script)
+    assert.ok(Buffer.byteLength(name) <= 63, name)
+    assert.match(name, /^mikka_s07_[A-Za-z0-9_]+_e2e$/)
+    assert.ok(isE2eTarget(`postgresql://e2e:local@127.0.0.1:5432/${name}`))
+  }
+  assert.equal(suiteEnv(env, undefined).E2E_DATABASE_URL, target)
+  assert.throws(() => suiteEnv(env, 'production'), /_e2e/)
+})
+
+test('the default runner buffers a suite\'s output and reports its exit status', async () => {
+  const result = await runScript(process.execPath, ['-e', "process.stdout.write('out'); process.stderr.write('err'); process.exit(3)"], { cwd: '.', env: process.env })
+  assert.deepEqual(result, { status: 3, stdout: 'out', stderr: 'err' })
+  const missing = await runScript('/nonexistent/command', [], { cwd: '.', env: process.env })
+  assert.equal(missing.status, null)
+})
+
+test('runner validates all expected and discovered suites before sharding and before subprocesses', async t => {
   const fixture = runnerFixture(t)
   const errors = []
   t.mock.method(console, 'log', () => {})
@@ -82,23 +186,25 @@ test('runner validates all expected and discovered suites before sharding and be
   const run = () => { called = true }
   const shardEnv = { ...env, DB_TEST_SHARD: '1/2', DB_TEST_EXPECTED: fixture.scripts.join(',') }
   rmSync(join(fixture.root, 'tests/b.db.test.mjs'))
-  assert.equal(main({ root: fixture.root, env: shardEnv, run }), 1)
+  assert.equal(await main({ root: fixture.root, env: shardEnv, run, clone: noClone }), 1)
   assert.ok(errors.some(error => /Expected DB script not enrolled: test:b-db/.test(error)))
   writeFileSync(join(fixture.root, 'tests/b.db.test.mjs'), '')
   writeFileSync(join(fixture.root, 'tests/unregistered.db.test.mjs'), '')
-  assert.equal(main({ root: fixture.root, env: shardEnv, run }), 1)
+  assert.equal(await main({ root: fixture.root, env: shardEnv, run, clone: noClone }), 1)
   assert.ok(errors.some(error => /unregistered.db.test.mjs needs one explicit/.test(error)))
   assert.equal(called, false)
 })
 
-test('runner rejects invalid shards before execution and preserves per-shard summary failures', t => {
+test('runner rejects invalid shards before execution and preserves per-shard summary failures', async t => {
   const fixture = runnerFixture(t)
   const errors = []
   t.mock.method(console, 'log', () => {})
   t.mock.method(console, 'error', message => errors.push(message))
+  t.mock.method(process.stdout, 'write', () => true)
+  t.mock.method(process.stderr, 'write', () => true)
   for (const shard of ['', '0/2', '3/2', '4/4']) {
     let called = false
-    assert.equal(main({ root: fixture.root, env: { ...env, DB_TEST_SHARD: shard }, run() { called = true } }), 1)
+    assert.equal(await main({ root: fixture.root, env: { ...env, DB_TEST_SHARD: shard }, run() { called = true }, clone: noClone }), 1)
     assert.equal(called, false)
   }
   for (const result of [
@@ -108,7 +214,7 @@ test('runner rejects invalid shards before execution and preserves per-shard sum
     { status: 0, stdout: '# tests 1\n# pass 0\n# skipped 1\n' },
   ]) {
     const calls = []
-    assert.equal(main({ root: fixture.root, env: { ...env, DB_TEST_SHARD: '2/2' }, run(command, args) { calls.push(args[1]); return { ...result, stderr: '' } } }), 1)
+    assert.equal(await main({ root: fixture.root, env: { ...env, DB_TEST_SHARD: '2/2' }, run(command, args) { calls.push(args[1]); return { ...result, stderr: '' } }, clone: cloneAll }), 1)
     assert.deepEqual(calls, ['test:b-db'])
   }
   assert.ok(errors.some(error => /test:b-db exited with 1/.test(error)))
@@ -128,7 +234,7 @@ test('parses TAP/spec and rejects missing, zero, skipped, todo, cancelled or fai
   assert.match(checkSummary('s', 1, { tests: 3, pass: 3 }), /exited/)
   assert.match(checkSummary('s', null, { tests: 3, pass: 3 }), /exited/)
 })
-test('only matching ephemeral Actions URLs are permitted; missing DB fails before subprocess', () => {
+test('only matching ephemeral Actions URLs are permitted; missing DB fails before subprocess', async () => {
   assert.doesNotThrow(() => validateTarget(env))
   // CI is no longer required; any loopback *_e2e database on any port is allowed.
   assert.doesNotThrow(() => validateTarget({ ...env, CI: '', GITHUB_ACTIONS: '' }))
@@ -136,7 +242,7 @@ test('only matching ephemeral Actions URLs are permitted; missing DB fails befor
   assert.doesNotThrow(() => validateTarget({ E2E_DATABASE_URL: local, MIKKA_DATABASE_URL: local, DATABASE_URL: local }))
   for (const changes of [{ E2E_DATABASE_URL: '' }, { E2E_DATABASE_URL: target.replace('mikka_e2e', 'mikka') }, { E2E_DATABASE_URL: target.replace('127.0.0.1', 'db.internal') }, { E2E_DATABASE_URL: 'postgres://business/db' }, { DATABASE_URL: 'postgres://business/db' }, { ORVILO_DATABASE_URL: 'postgres://business/db' }, { E2E_DATABASE_URL: target + '?options=x' }]) assert.throws(() => validateTarget({ ...env, ...changes }))
   let called = false
-  assert.equal(main({ env: {}, run() { called = true } }), 1)
+  assert.equal(await main({ env: {}, run() { called = true }, clone: noClone }), 1)
   assert.equal(called, false)
 })
 test('feature inventory fails on deleted suite, removed script or zero enrollment', () => {
