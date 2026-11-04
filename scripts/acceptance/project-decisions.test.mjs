@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises'
 import { test } from 'node:test'
 import {
   AcceptanceError, CASES, MARKER, ORIGIN, REPOSITORY, actionResult, attestDeployment, buildTaskPrompt,
-  decisionProof, discoverActions, publicFailure, runProjectDecisionsAcceptance, smallArtifactBytes, successfulRelease, triggerGuard,
+  decisionProof, discoverActions, publicFailure, readChatState, runProjectDecisionsAcceptance, smallArtifactBytes, successfulRelease, triggerGuard,
 } from './project-decisions.mjs'
 
 const SHA = 'a'.repeat(40)
@@ -120,9 +120,9 @@ test('errors project provider 402 without raw error details', () => {
   assert.deepEqual(publicFailure(new Error('private-password')), { status: 'failed', code: 'acceptance_failed' })
 })
 
-const names = ['saveProject', 'listProjects', 'saveIssue', 'setProjectIssues', 'getIssue', 'getIssueThread', 'changeModelOrder']
+const names = ['saveProject', 'listProjects', 'saveIssue', 'setProjectIssues', 'getIssueThread', 'changeModelOrder']
 const refs = Object.fromEntries(names.map((name, i) => [name, String(i + 1).repeat(40)]))
-const bundle = names.map(name => 'createServerReference)("' + refs[name] + '",x,"' + name + '")').join(';')
+const bundle = names.map(name => '(0,r.createServerReference)("' + refs[name] + '",r.callServer,void 0,r.findSourceMapURL,"' + name + '")').join(';')
 const flight = result => new Response('0:{"a":"$@1"}\n1:' + JSON.stringify(result) + '\n')
 
 test('only published allowlisted UI actions are discovered; Flight references are resolved', async () => {
@@ -136,6 +136,85 @@ test('only published allowlisted UI actions are discovered; Flight references ar
   assert.deepEqual(actionResult('0:{"a":"$@1"}\n1:{"project":{"id":"ok"}}\n', 'saveProject'), { project: { id: 'ok' } })
   assert.throws(() => actionResult('0:{"a":{}}\n', 'deleteWorkspace'), /action_not_allowed/)
   assert.throws(() => actionResult('0:{"a":{"error":"secret-body"}}\n', 'saveProject'), /action_refused/)
+})
+
+
+test('Next-generated direct, member and long bracket references require five arguments', async () => {
+  // Next 16.4.1 compiler output and the existing Turbopack public dev chunks.
+  const namespace = '__TURBOPACK__imported__module__$5b$project$5d$' + 'module$'.repeat(40)
+  const source = [
+    'createServerReference("' + refs.saveProject + '",callServer,void 0,findSourceMapURL,"saveProject")',
+    '(0,r.createServerReference)("' + refs.listProjects + '",r.callServer,void 0,r.findSourceMapURL,"listProjects")',
+    '(0,' + namespace + '["createServerReference"])("' + refs.saveIssue + '",' + namespace + '["callServer"],void 0,' + namespace + '["findSourceMapURL"],"saveIssue")',
+    "(0,r['createServerReference'])('" + refs.setProjectIssues + "',r['callServer'],undefined,r['findSourceMapURL'],'setProjectIssues')",
+    'createServerReference (\n"' + refs.getIssueThread + '", callServer, undefined, findSourceMapURL,\n"getIssueThread"\n)',
+    'r.createServerReference("' + refs.changeModelOrder + '",r.callServer,void 0,r.findSourceMapURL,"changeModelOrder")',
+    '(0,r.createServerReference)("' + 'f'.repeat(40) + '",r.callServer,"getIssueThread")',
+    'otherFactory("' + 'f'.repeat(40) + '",callServer,void 0,findSourceMapURL,"saveProject")',
+    'createServerReference("' + 'f'.repeat(40) + '",callServer,void 0,findSourceMapURL,"getIssue")',
+  ].join(';\n')
+  const result = await discoverActions(async path => new Response(path.includes('.js') ? source
+    : '<script src="/mikka/_next/static/chunks/generated.js"></script>'))
+  assert.deepEqual(result, refs)
+})
+
+test('discovery visits real UI routes and bounded same-origin nested public chunks', async () => {
+  const paths = [], diagnostics = {}
+  const reference = name => 'createServerReference("' + refs[name] + '",callServer,void 0,findSourceMapURL,"' + name + '")'
+  const pages = new Map([
+    ['/en', '<script src="/mikka/_next/static/chunks/root.js"></script><script src="https://evil.invalid/secret.js"></script>'],
+    ['/en?section=projects', '<script src="/mikka/_next/static/chunks/projects.js"></script>'],
+    ['/en/settings?section=models', '<link href="/mikka/_next/static/chunks/settings.js" rel="modulepreload">'],
+  ])
+  const chunks = new Map([
+    ['/mikka/_next/static/chunks/root.js', reference('listProjects') + ';' + reference('saveIssue') + ';"static/chunks/thread.js";"static/chunks/../secret.js";"https://evil.invalid/static/chunks/foreign.js"'],
+    ['/mikka/_next/static/chunks/projects.js', reference('saveProject') + ';"static/chunks/project/detail.js?dpl=public-suffix"'],
+    ['/mikka/_next/static/chunks/settings.js', reference('changeModelOrder')],
+    ['/mikka/_next/static/chunks/thread.js', reference('getIssueThread')],
+    ['/mikka/_next/static/chunks/project/detail.js?dpl=public-suffix', reference('setProjectIssues')],
+  ])
+  const result = await discoverActions(async path => {
+    paths.push(path)
+    const source = pages.get(path) ?? chunks.get(path)
+    return new Response(source ?? '', { status: source === undefined ? 404 : 200 })
+  }, diagnostics)
+  assert.deepEqual(result, refs)
+  assert.deepEqual(paths.filter(path => !path.includes('/_next/')), [...pages.keys()])
+  assert.ok(paths.includes('/mikka/_next/static/chunks/project/detail.js?dpl=public-suffix'))
+  assert.ok(!paths.some(path => /secret|foreign|evil|manifest/.test(path)))
+  assert.deepEqual(diagnostics, { required: names, found: names, missing: [],
+    pagesRead: 3, pagesFailed: 0, chunksRead: 5, chunksFailed: 0, chunksRemaining: 0 })
+})
+
+test('missing actions are reported as fixed names and counts before any case mutation', async () => {
+  const f = fixture()
+  const incomplete = names.filter(name => name !== 'getIssueThread')
+    .map(name => '(0,r.createServerReference)("' + refs[name] + '",r.callServer,void 0,r.findSourceMapURL,"' + name + '")').join(';')
+  const fetchImpl = async (input, init) => new URL(input).pathname.includes('/_next/')
+    ? new Response(incomplete + '/* private-source-sentinel */') : f.fetchImpl(input, init)
+  const report = await runProjectDecisionsAcceptance({ env: env(), event: event(), attestation: attestation(), fetchImpl, now: f.now, wait: f.wait })
+  assert.equal(report.status, 'partial')
+  assert.deepEqual(report.actionDiscovery.missing, ['getIssueThread'])
+  assert.deepEqual(report.actionDiscovery.found, names.filter(name => name !== 'getIssueThread'))
+  assert.equal(report.actionDiscovery.chunksRead, 1)
+  assert.ok(report.cases.every(item => item.status === 'blocked' && item.code === 'action_missing' && item.cleanup.state === 'not_created'))
+  assert.ok(f.calls.filter(call => call.method !== 'GET').every(call => ['/api/auth/sign-in/email', '/api/auth/sign-out'].includes(call.path)))
+  const serialized = JSON.stringify(report)
+  for (const forbidden of ['private-source-sentinel', 'private-password-sentinel', 'private-cookie-sentinel', ...Object.values(refs)])
+    assert.ok(!serialized.includes(forbidden))
+})
+
+test('discovery reports its remaining public chunks when the scan bound is reached', async () => {
+  const diagnostics = {}
+  const result = await discoverActions(async path => {
+    if (!path.includes('/_next/')) return new Response('<script src="/mikka/_next/static/chunks/0.js"></script>')
+    const index = Number(/\/(\d+)\.js$/.exec(path)?.[1])
+    return new Response('"static/chunks/' + (index + 1) + '.js"')
+  }, diagnostics)
+  assert.deepEqual(result, {})
+  assert.equal(diagnostics.chunksRead, 200)
+  assert.equal(diagnostics.chunksRemaining, 1)
+  assert.deepEqual(diagnostics.missing, names)
 })
 
 test('invalid attestation and foreign origins fail before reading or sending account values', async () => {
@@ -172,7 +251,7 @@ test('workflow attests before OIDC and uploads only two explicit sanitized repor
   assert.ok(!workflow.includes('path: .cache'))
 })
 
-function fixture({ active = false, noWorking = false } = {}) {
+function fixture({ active = false, noWorking = false, providerFailureAtChat = false } = {}) {
   let tick = EPOCH, counter = 100, orderCounter = 500
   const ids = () => id(counter++)
   const sources = CASES.map((item, index) => ({
@@ -182,7 +261,7 @@ function fixture({ active = false, noWorking = false } = {}) {
   let entries = sources.map(value => ({ ...value }))
   const projects = [], issues = [], bots = [], calls = [], sequence = []
   const order = () => ({ location: 'cloud', cloudReady: true, customized: true, entries: entries.map(entry => ({
-    ...entry, ...(entry.model === 'deepseek-flash' ? { block: { reason: 'balance' } } : {}),
+    ...entry, ...(entry.model === 'deepseek-flash' && !providerFailureAtChat ? { block: { reason: 'balance' } } : {}),
   })), candidates: sources, cloudModels: Object.fromEntries(entries.map(entry => [entry.id, 'ready'])) })
   const menu = bot => ({
     groups: [
@@ -217,7 +296,7 @@ function fixture({ active = false, noWorking = false } = {}) {
       url: '/mikka/api/artifacts/' + bot.artifactId + '/versions/1/download' }] : [] }
   }
   const records = bot => {
-    if (!bot?.sent) return []
+    if (!bot?.sent || (providerFailureAtChat && bot.item.kind === 'api_key')) return []
     const base = { projectId: bot.projectId, workspaceId: WS, issueId: bot.issueId, ownerId: OWNER,
       captureMode: 'live', provenance: 'recorded', recordStatus: 'active', reason: 'private-reason', summary: 'private-summary',
       runId: bot.runId, recordedBy: { kind: 'agent', id: bot.runId, userId: OWNER, botId: bot.id, runId: bot.runId,
@@ -247,10 +326,10 @@ function fixture({ active = false, noWorking = false } = {}) {
     if (path === '/api/auth/get-session') return Response.json({ user: { id: OWNER, email: env().SMOKE_OWNER_EMAIL } })
     if (path === '/api/auth/sign-out') return Response.json({ success: true })
     if (path.startsWith('/_next/')) return new Response(bundle)
-    if (path === '/en/projects' || (path === '/en' && method === 'GET')) return new Response('<script src="/mikka/_next/static/chunks/known.js"></script>')
+    if ((path === '/en' || path === '/en/settings') && method === 'GET') return new Response('<script src="/mikka/_next/static/chunks/known.js"></script>')
     if (path === '/en' && method === 'POST') {
       const name = names.find(name => refs[name] === init.headers['next-action'])
-      assert.ok(active || ['listProjects', 'getIssue', 'getIssueThread'].includes(name), 'preflight must not mutate')
+      assert.ok(active || ['listProjects', 'getIssueThread'].includes(name), 'preflight must not mutate')
       const value = body[0]
       if (name === 'listProjects') return flight(projects)
       if (name === 'saveProject') {
@@ -264,7 +343,6 @@ function fixture({ active = false, noWorking = false } = {}) {
         const project = projects.find(project => project.id === value.id)
         Object.assign(project, { issueIds: value.issueIds, revision: 2 }); return flight({ project })
       }
-      if (name === 'getIssue') return flight({ issue: issues.find(issue => issue.id === value) })
       if (name === 'getIssueThread') return flight({ thread: { rootRunId: body[1], modelFallback: [] }, chunks: [] })
       if (name === 'changeModelOrder') {
         if (value.kind === 'remove') entries = entries.filter(entry => entry.id !== value.id)
@@ -295,7 +373,14 @@ function fixture({ active = false, noWorking = false } = {}) {
       return Response.json(menu(bot))
     }
     if (path === '/api/mobile/chat/stop') return Response.json({ stopped: true })
-    if (path === '/api/mobile/chat' && method === 'GET') return Response.json({ working: false, streamRunId: null, failure: null, items: [] })
+    if (path === '/api/mobile/chat' && method === 'GET') {
+      const bot = bots.find(bot => bot.id === url.searchParams.get('bot'))
+      const failed = providerFailureAtChat && bot?.sent && bot.item.kind === 'api_key'
+      // stopChatTurn leaves a failed turn's lastError in the normal ChatView.
+      return Response.json({ botId: bot?.id, enabled: true, working: false, error: failed ? 'private-provider-error-sentinel' : null,
+        failure: failed ? { kind: 'failed' } : null, items: failed ? [{ from: 'person', text: 'private-user-message-sentinel' }] : [],
+        sources: {}, artifacts: {}, reactions: {} })
+    }
     if (path === '/api/mobile/chat' && method === 'POST') {
       const bot = bots.find(bot => bot.id === body.botId)
       bot.sent = true; bot.botRecord = body.text.includes('"title":"' + bot.name + ' bot"')
@@ -304,7 +389,7 @@ function fixture({ active = false, noWorking = false } = {}) {
     }
     if (path === '/api/factory/tasks') {
       const bot = bots.find(bot => bot.issueId === url.searchParams.get('issueId'))
-      return Response.json({ issueId: url.searchParams.get('issueId'), tasks: bot?.sent ? [{ id: bot.taskId }] : [] })
+      return Response.json({ issueId: url.searchParams.get('issueId'), tasks: bot?.sent && !(providerFailureAtChat && bot.item.kind === 'api_key') ? [{ id: bot.taskId }] : [] })
     }
     if (/^\/api\/factory\/tasks\/[^/]+$/.test(path)) {
       const bot = bots.find(bot => bot.taskId === path.split('/').at(-1))
@@ -321,7 +406,7 @@ function fixture({ active = false, noWorking = false } = {}) {
     }
     if (path.startsWith('/api/mobile/bots/')) {
       const bot = bots.find(bot => bot.id === path.split('/').at(-1))
-      return Response.json({ threads: bot.sent ? [{ id: bot.runId }] : [] })
+      return Response.json({ threads: bot.sent && !(providerFailureAtChat && bot.item.kind === 'api_key') ? [{ id: bot.runId }] : [] })
     }
     if (/^\/api\/mobile\/threads\/[^/]+\/stop$/.test(path)) {
       botForRun(path.split('/')[4]).stopped = true
@@ -381,6 +466,46 @@ test('active subscriptions need working-time steering, same-run decisions, one B
   for (const text of ['private-reason', 'private-summary', 'private-option', 'private-direction', DIRECTION, env().SMOKE_OWNER_PASSWORD])
     assert.ok(!JSON.stringify(report).includes(text))
   assert.equal(report.sessionClosed, true)
+})
+
+
+
+test('chat reader accepts only its normal route and shape while preserving live control state', async () => {
+  const view = { items: [{ text: 'private-chat-body' }], working: false, error: 'private-chat-error', failure: { kind: 'failed' },
+    streamRunId: 'wrun_live_workflow' }
+  const request = async path => {
+    assert.equal(path, '/api/mobile/chat?bot=' + BOT)
+    return Response.json(view)
+  }
+  assert.deepEqual(await readChatState(request, BOT), { working: false, streamRunId: 'wrun_live_workflow', failed: true })
+  assert.deepEqual(await readChatState(async () => Response.json({ ...view, working: true, failure: null }), BOT),
+    { working: true, streamRunId: 'wrun_live_workflow', failed: false })
+  await assert.rejects(readChatState(async () => { throw Error('must not request another path') }, '../other'), /bot_scope/)
+  for (const status of [401, 403, 500])
+    await assert.rejects(readChatState(async () => Response.json(view, { status }), BOT),
+      error => error.message === 'http_refused' && publicFailure(error).httpStatus === status)
+  for (const value of [{ error: 'private-envelope' }, { ...view, items: null }, { ...view, working: 'false' },
+    { ...view, error: {} }, { ...view, streamRunId: 123 }, { ...view, failure: { kind: 'unexpected' } }])
+    await assert.rejects(readChatState(async () => Response.json(value), BOT), /response_invalid/)
+  for (const failure of [{ kind: 'hosted', code: 'points_exhausted' }, { kind: 'subscription', notice: 'quota' },
+    { kind: 'wake', code: 'wake_exhausted' }, { kind: 'failed' }])
+    assert.equal((await readChatState(async () => Response.json({ ...view, failure }), BOT)).failed, true)
+})
+
+
+test('historical provider errors in a normal ChatView do not block cleanup or later subscriptions', async () => {
+  const f = fixture({ active: true, providerFailureAtChat: true })
+  const report = await runProjectDecisionsAcceptance({ env: env('active'), event: event('active'), attestation: attestation('active'),
+    ...f, newId: () => DIRECTION })
+  assert.deepEqual(report.cases.map(item => [item.status, item.code]), [['blocked', 'provider_refused'], ['pass', undefined], ['pass', undefined]])
+  assert.equal(report.cases[0].providerStatus, undefined, 'a chat failure cannot prove an upstream HTTP status')
+  assert.equal(report.cases[0].cleanup.state, 'stopped_evidence_retained')
+  assert.equal(report.cases[0].cleanup.orderRestored, true)
+  assert.equal(report.cases[0].cleanup.failure, undefined)
+  assert.deepEqual(f.sequence.filter(item => item.startsWith('sent:')), ['sent:api_deepseek', 'sent:official_claude', 'sent:official_codex'])
+  assert.equal(report.sessionClosed, true)
+  for (const forbidden of ['private-provider-error-sentinel', 'private-user-message-sentinel'])
+    assert.ok(!JSON.stringify(report).includes(forbidden))
 })
 
 test('an ended thread cannot pass as mid-run steering and does not stop the other subscription', async () => {
