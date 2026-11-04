@@ -27,5 +27,5 @@ export async function openGroupTurnSession(database: Pool) {
       client.off('error', invalidate); client.off('end', invalidate)
     }
   })()
-  return { client, assertHeld, close }
+  return { client, assertHeld, isLost: () => lost, close }
 }

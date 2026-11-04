@@ -503,6 +503,70 @@ test('PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, ro
     assert.equal(pooledFinished.status,'complete');assert.equal(pooledFinished.error,null)
     assert.equal(pooledFinished.trace.decisions[0].receipt.providerGenerationId,'pooled-generation')
     assert.deepEqual(pooledFinished.trace.events,[],'quiet routing does not wake or generate')
+
+    // Terminate only this fixture worker's owned backend while its Decision
+    // is in flight. It cannot start the dependent responder request or post.
+    const lostDecisionGroup=await create(),lostDecisionMessage=await send(lostDecisionGroup,'lost Decision fixture')
+    let decisionPid=0, releaseLostDecision!:()=>void, enterLostDecision!:()=>void, lostCalls=0
+    let decisionEnded:Promise<void>=Promise.resolve()
+    const lostDecisionReady=new Promise<void>(resolve=>{enterLostDecision=resolve})
+    const lostDecisionRelease=new Promise<void>(resolve=>{releaseLostDecision=resolve})
+    const lostJudge=createGroupJudgment(async()=>{
+      lostCalls++;enterLostDecision();await lostDecisionRelease
+      return {answers:new Map([['intent',{type:'choice' as const,name:'intent',choice:'reply_useful_answer'}]]),execution:{...receipt,executionId:'lost-decision',providerGenerationId:'lost-generation'}}
+    })
+    const lostDecisionWork=processGroupTurn(scoped,lostDecisionGroup,{...runtime,route:lostJudge.route,
+      async agents(owner,ids,client){
+        decisionPid=(await client.query('SELECT pg_backend_pid() AS pid')).rows[0].pid
+        decisionEnded=new Promise<void>(resolve=>client.once('end',()=>resolve()))
+        return runtime.agents(owner,ids,client)
+      },async generate(){assert.fail('a lost Decision worker cannot generate')},
+    })
+    const lostDecisionRejected=assert.rejects(lostDecisionWork)
+    try {
+      await lostDecisionReady
+      assert.equal((await scoped.query('SELECT pg_terminate_backend($1) AS terminated',[decisionPid])).rows[0].terminated,true)
+      await decisionEnded
+    } finally {releaseLostDecision();await lostDecisionRejected}
+    assert.equal(lostCalls,1,'a lost session never starts the dependent paid phase')
+    assert.equal(await processGroupTurn(scoped,lostDecisionGroup,runtime),false)
+    const lostDecisionState=(await scoped.query('SELECT error,trace FROM group_turns WHERE "messageId"=$1',[lostDecisionMessage])).rows[0]
+    assert.equal(lostDecisionState.error,'interrupted_generation_not_replayed')
+    assert.deepEqual(lostDecisionState.trace.events,[])
+
+    // A running generator receives cancellation after its physical session
+    // disappears. This is worker loss, not a fabricated user stop/feedback.
+    const lostGenerationGroup=await create(),lostGenerationMessage=await send(lostGenerationGroup,'lost generation fixture',[a])
+    let generationPid=0, enterLostGeneration!:()=>void, releaseLostGeneration!:()=>void, generationAborted=false
+    let generationEnded:Promise<void>=Promise.resolve()
+    const lostGenerationReady=new Promise<void>(resolve=>{enterLostGeneration=resolve})
+    const lostGenerationWork=processGroupTurn(scoped,lostGenerationGroup,{...runtime,
+      async agents(owner,ids,client){
+        generationPid=(await client.query('SELECT pg_backend_pid() AS pid')).rows[0].pid
+        generationEnded=new Promise<void>(resolve=>client.once('end',()=>resolve()))
+        return runtime.agents(owner,ids,client)
+      },async generate(_agent,input){
+        enterLostGeneration()
+        return new Promise((resolve,reject)=>{
+          releaseLostGeneration=()=>resolve({text:'must not publish after session loss',mentions:[]})
+          input.signal!.addEventListener('abort',()=>{generationAborted=true;reject(input.signal!.reason)},{once:true})
+        })
+      },
+    })
+    const lostGenerationRejected=assert.rejects(lostGenerationWork)
+    try {
+      await lostGenerationReady
+      assert.equal((await scoped.query('SELECT pg_terminate_backend($1) AS terminated',[generationPid])).rows[0].terminated,true)
+      await generationEnded
+      const until=Date.now()+2500
+      while(!generationAborted && Date.now()<until) await new Promise(resolve=>setTimeout(resolve,20))
+      assert.equal(generationAborted,true,'physical session loss must abort the active generator')
+    } finally {releaseLostGeneration();await lostGenerationRejected}
+    assert.equal(await processGroupTurn(scoped,lostGenerationGroup,runtime),false)
+    const lostGenerationState=(await scoped.query('SELECT error,trace FROM group_turns WHERE "messageId"=$1',[lostGenerationMessage])).rows[0]
+    assert.equal(lostGenerationState.error,'interrupted_generation_not_replayed')
+    assert.equal(lostGenerationState.trace.events.filter((event:{type:string})=>event.type==='publish').length,0)
+    assert.equal((await scoped.query('SELECT count(*)::int n FROM conversation_messages WHERE "replyToId"=$1',[lostGenerationMessage])).rows[0].n,0)
     assert.ok(generated.includes('first')); assert.ok(laterRoot)
   } finally { releasePending(); await scoped.end(); await pool.end() }
 })

@@ -107,8 +107,20 @@ export async function processGroupTurn(pool: Pool, conversationId: string, runti
     const root = rows[0]
     if (!root) return false
     // 停止 (stopGroupTurns) moves the turn off 'running'; the worker checks before each step and while a reply generates.
-    const stopped = async () => (await client.query(`SELECT status FROM group_turns WHERE "messageId"=$1`, [root.messageId])).rows[0]?.status !== 'running'
-    const modelScope = <T>(work: () => Promise<T>) => hostedBillingScope.run({ workspaceId: root.workspaceId, ownerId: root.userId }, work)
+    const stopped = async () => {
+      if (session.isLost()) return true
+      try { return (await client.query(`SELECT status FROM group_turns WHERE "messageId"=$1`, [root.messageId])).rows[0]?.status !== 'running' }
+      catch (error) {
+        // A known socket loss releases this worker's lock. Other SQL errors
+        // are not evidence that the person pressed stop.
+        if (session.isLost()) return true
+        throw error
+      }
+    }
+    const modelScope = <T>(work: () => Promise<T>) => {
+      session.assertHeld()
+      return hostedBillingScope.run({ workspaceId: root.workspaceId, ownerId: root.userId }, work)
+    }
     messageId = root.messageId
     await client.query(`UPDATE group_turns SET status='running',"updatedAt"=now() WHERE "messageId"=$1`, [messageId])
     const authorized = async () => {
@@ -174,8 +186,12 @@ export async function processGroupTurn(pool: Pool, conversationId: string, runti
         stopped,
         chatUnavailableText:async()=>groupCopy(await readGroupLocale(client,root.userId)).chatUnavailable,
         contribution: runtime.contribution ? (message, member, earlier) => modelScope(()=>runtime.contribution!(message, member, earlier)) : undefined,
-        delegate: runtime.delegate ? (reporter, delegation) => runtime.delegate!({ userId:root.userId, workspaceId:root.workspaceId, conversationId, messageId:messageId!, reporter, text:input.text, delegation },client) : undefined,
+        delegate: runtime.delegate ? (reporter, delegation) => {
+          session.assertHeld()
+          return runtime.delegate!({ userId:root.userId, workspaceId:root.workspaceId, conversationId, messageId:messageId!, reporter, text:input.text, delegation },client)
+        } : undefined,
         generate: (agent, input) => untilStopped(stopped, async signal => {
+          session.assertHeld()
           input = { ...input, signal, attachmentContext: { userId: root.userId, conversationId } }
           const generate = async (value: typeof input) => {
             const eventId = `generate:${++generationCount}`
