@@ -3,7 +3,7 @@ import type { DecisionExecution, invokeDecision } from './decide'
 import type { DecisionQuestion } from './decision'
 import { GroupJudgmentPendingError, type CorrectionInput, type CorrectionJudgment } from './group-correction'
 import type { GroupAction, GroupDelegation, GroupMessage, GroupRoute, RoutingCorrection, RoutingMember } from './group-routing'
-import { getGroupDecisionPolicy, GROUP_BASELINE_VERSION, GROUP_POLICY_VERSION, type GroupPolicyVersion } from './group-decision-policy'
+import { getGroupDecisionPolicy, GROUP_BASELINE_VERSION, GROUP_POLICY_VERSION, GROUP_V2_POLICY_VERSION, type GroupPolicyVersion } from './group-decision-policy'
 import { GROUP_DECISION_PROTOCOL, GROUP_MAX_RESPONDERS, GROUP_MAX_ROUTING_DECISIONS, type GroupDecisionFailure, type GroupDecisionPhase, type GroupDecisionStep, type GroupDecisionRetain } from './group-decision-chain'
 import { groupDecisionReceipt } from './group-decision-trace'
 
@@ -36,6 +36,7 @@ export function createGroupJudgment(invoke: Invoke, policyVersion?: GroupPolicyV
     async route(message: GroupMessage, members: RoutingMember[], leadId: string | null, corrections: RoutingCorrection[], retain?: GroupDecisionRetain): Promise<GroupRoute> {
       const policy = getGroupDecisionPolicy(policyVersion)
       const baseline = policy.version === GROUP_BASELINE_VERSION
+      const revisedPrimary = policy.version === GROUP_V2_POLICY_VERSION || policy.version === GROUP_POLICY_VERSION
       const decisions: GroupDecisionStep[] = []
       const responders: string[] = []
       let action: GroupAction = 'reply', reason = 'useful_answer', independent = baseline
@@ -81,10 +82,13 @@ export function createGroupJudgment(invoke: Invoke, policyVersion?: GroupPolicyV
       const chooseResponder = async (optional: boolean) => {
         const remaining = allowedMembers.filter(member=>!responders.includes(member.id))
         const selected = await ask('responder',choice(`responder_${responders.length}`,
-          optional ? (baseline ? 'Select the next appropriate responder, using the confirmed earlier selections; choose end when the list is complete.' : 'Select another member only for a separate requested contribution that the confirmed responders cannot cover. Otherwise choose end.')
-            : policy.version===GROUP_POLICY_VERSION && action==='clarify'
+          optional ? (baseline ? 'Select the next appropriate responder, using the confirmed earlier selections; choose end when the list is complete.'
+            : policy.version === GROUP_POLICY_VERSION
+              ? 'Select another authorized member for explicitly requested roles or perspectives that are not yet represented by the confirmed responders. A confirmed responder’s broad skills do not replace a separately requested role or perspective even when capabilities overlap. Choose end when all requested roles or perspectives are represented, or no remaining member can add a requested distinct contribution. Do not invite an extra member just because they could also comment. Choose uncertain when it is not possible to judge what requested contribution remains.'
+              : 'Select another member only for a separate requested contribution that the confirmed responders cannot cover. Otherwise choose end.')
+            : revisedPrimary && action==='clarify'
               ? 'The confirmed action is clarification. Select one authorized member whose public duties make it suitable to ask the necessary question. Missing task details are why clarification was selected; they do not by themselves prevent selecting a questioner. If several members can ask, choose a suitable primary without requiring a uniquely best member. Choose uncertain only if no suitable authorized questioner can be identified.'
-              : policy.version===GROUP_POLICY_VERSION && independent
+              : revisedPrimary && independent
                 ? 'The confirmed intent requests independent contributions. Select a suitable first contributor using the requested roles and real capabilities. This selects speaking order, not the only competent member. When several requested contributors are suitable, choose one to start; later requests select the remaining independent contributors. Choose uncertain only if no suitable authorized contributor can be identified.'
                 : 'Select the single most suitable primary responder for the confirmed intent using public roles and real capabilities. Choose uncertain if this cannot be decided.',
           [...memberChoices(remaining),...(optional?[{value:stop,description:'No further responder is needed.'}]:[]),{value:uncertain}]))
