@@ -16,13 +16,19 @@ let evidence: unknown
 let detail: unknown
 let detailReloads = 0
 let ledgerReloads = 0
+let listReloadKeys: string[] = []
+let refreshFails = false
 mock.module('swr', { defaultExport: (key: string | null) => {
   if (key === null) return { data: undefined }
-  if (key === '/api/factory/tasks/t1') return { data: detail, mutate: async () => { detailReloads++; return detail } }
-  if (key.includes('view=ledger')) return { data: ledger, mutate: async () => { ledgerReloads++; return ledger } }
+  if (key === '/api/factory/tasks/t1') return { data: detail, mutate: async () => { detailReloads++; if (refreshFails) throw new Error('detail unavailable'); return detail } }
+  if (key.includes('view=ledger')) return { data: ledger, mutate: async () => { ledgerReloads++; if (refreshFails) throw new Error('ledger unavailable'); return ledger } }
   if (key.includes('/approval')) return { data: evidence }
   return list
-} })
+}, namedExports: { useSWRConfig: () => ({ mutate: async (key: string) => {
+  listReloadKeys.push(key)
+  if (refreshFails) throw new Error('list unavailable')
+  return list?.data
+} }) } })
 mock.module('next-intl', { namedExports: { useTranslations: () => lookup, useFormatter: () => ({ dateTime: () => '' }) } })
 mock.module(new URL('../components/workspace/issue-thread-panel.tsx', import.meta.url).href, { namedExports: { IssueThreadPanel: () => null } })
 const Pass = ({ children }: { children?: ReactNode }) => <div>{children}</div>
@@ -48,7 +54,7 @@ before(async () => {
 })
 beforeEach(() => {
   ledger = { binding: {}, approvals: [], publications: [], merges: [] }; evidence = undefined; detail = undefined
-  detailReloads = 0; ledgerReloads = 0
+  detailReloads = 0; ledgerReloads = 0; listReloadKeys = []; refreshFails = false
   container = document.createElement('div') as unknown as HTMLDivElement
   document.body.append(container as unknown as Node)
   root = createRoot(container)
@@ -244,6 +250,13 @@ function failedCandidate(stage: 'review' | 'verify' = 'review', revision = 24) {
   return current
 }
 
+function retryReceipt(current: ReturnType<typeof failedCandidate>) {
+  const pending = { ...current, status: 'pending', revision: current.revision + 1, attemptId: `check-${current.revision + 1}` }
+  return { contractVersion: 1, task: pending,
+    attempts: [{ id: pending.attemptId, taskId: pending.id, candidateId: pending.candidateId, stage: pending.stage, status: pending.status }],
+    candidates: [{ id: pending.candidateId, taskId: pending.id }] }
+}
+
 test('same-candidate review retry posts once while busy and refreshes to the new pending attempt', async () => {
   const current = failedCandidate()
   await pane(current)
@@ -266,12 +279,14 @@ test('same-candidate review retry posts once while busy and refreshes to the new
     assert.deepEqual(Object.keys(sent[0]).sort(), ['action', 'binding', 'eventId', 'reason'])
     assert.deepEqual(sent[0].binding, { taskId: 't1', revision: 24 })
     assert.equal(sent[0].action, 'retry')
-    const pending = { ...current, status: 'pending', revision: 25, attemptId: 'check-25' }
+    const receipt = retryReceipt(current)
+    const pending = receipt.task
     detail = { task: pending, checks: [{ stage: 'review', status: 'pending', attemptId: 'check-25',
       candidateId: 'c1', candidateSha: 'a'.repeat(40), runId: null, criteria: [], verify: null }] }
-    await act(async () => { finish(new Response('{}', { status: 200 })) })
+    await act(async () => { finish(new Response(JSON.stringify(receipt), { status: 200 })) })
     assert.equal(detailReloads, 1)
     assert.equal(ledgerReloads, 1)
+    assert.deepEqual(listReloadKeys, ['/api/factory/tasks?issueId=issue-1'])
     assert.equal(button('重新审阅'), undefined)
     assert.equal(button('验收并合并'), undefined)
     assert.doesNotMatch(container.textContent ?? '', /发布失败/)
@@ -291,7 +306,7 @@ test('an unknown verification retry keeps its complete request across pane remou
   globalThis.fetch = (async (_url, options) => {
     sent.push(JSON.parse(String(options?.body)))
     if (sent.length === 1) throw new TypeError('connection lost')
-    return new Response('{}', { status: 200 })
+    return new Response(JSON.stringify(retryReceipt(current)), { status: 200 })
   }) as typeof fetch
   try {
     await act(async () => { button('重新验证')!.click() })
@@ -305,7 +320,55 @@ test('an unknown verification retry keeps its complete request across pane remou
     assert.equal(sent[0].action, 'retry')
     assert.deepEqual(sent[0].binding, { taskId: 't1', revision: 24 })
     assert.ok(sent[0].eventId)
+    assert.equal(detailReloads, 2)
+    assert.equal(ledgerReloads, 2)
+    assert.deepEqual(listReloadKeys, Array(2).fill('/api/factory/tasks?issueId=issue-1'))
+    assert.doesNotMatch(container.textContent ?? '', /重试未确认|发布失败|已验收/)
+  } finally { globalThis.fetch = original }
+})
+
+test('malformed successful retry responses stay unconfirmed when all refreshes fail', async () => {
+  const current = failedCandidate('verify')
+  await pane(current)
+  refreshFails = true
+  const sent: unknown[] = []
+  const bodies = ['{}', '<html>unavailable</html>']
+  const original = globalThis.fetch
+  globalThis.fetch = (async (_url, options) => {
+    sent.push(JSON.parse(String(options?.body)))
+    return new Response(bodies[sent.length - 1], { status: 200 })
+  }) as typeof fetch
+  try {
+    for (let index = 0; index < bodies.length; index++) {
+      await act(async () => { button('重新验证')!.click() })
+      assert.match(container.textContent ?? '', /重试未确认/)
+      assert.equal(button('重新验证')?.disabled, false)
+      assert.equal(sent.length, index + 1)
+    }
+    assert.deepEqual(sent[1], sent[0], 'an explicit replay keeps the full request after an invalid 200')
+    assert.equal(detailReloads, 2)
+    assert.equal(ledgerReloads, 2)
+    assert.deepEqual(listReloadKeys, Array(2).fill('/api/factory/tasks?issueId=issue-1'))
     assert.doesNotMatch(container.textContent ?? '', /发布失败|已验收/)
+  } finally { globalThis.fetch = original }
+})
+
+test('a retry conflict refreshes list, detail and ledger without dispatching again', async () => {
+  await pane(failedCandidate())
+  let calls = 0
+  const original = globalThis.fetch
+  globalThis.fetch = (async () => {
+    calls++
+    return new Response(JSON.stringify({ error: 'factoryStale' }), { status: 409 })
+  }) as typeof fetch
+  try {
+    await act(async () => { button('重新审阅')!.click() })
+    assert.equal(calls, 1)
+    assert.equal(detailReloads, 1)
+    assert.equal(ledgerReloads, 1)
+    assert.deepEqual(listReloadKeys, ['/api/factory/tasks?issueId=issue-1'])
+    assert.match(container.textContent ?? '', /重试未完成/)
+    assert.doesNotMatch(container.textContent ?? '', /重试未确认|发布失败|已验收/)
   } finally { globalThis.fetch = original }
 })
 

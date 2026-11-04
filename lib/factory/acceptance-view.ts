@@ -81,6 +81,23 @@ export function candidateCheckRetry(task: AcceptanceTaskView, detail: Acceptance
   }
 }
 
+/** A retry receipt confirms the same candidate entered a fresh pending check. */
+export function candidateCheckRetryConfirmed(task: AcceptanceTaskView, value: unknown): boolean {
+  if (candidateCheckState(task)?.status !== 'failed' || !task.id || !task.issueId || !task.attemptId ||
+    typeof task.revision !== 'number' || !Number.isSafeInteger(task.revision)) return false
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const receipt = value as Record<string, unknown>
+  if (receipt.contractVersion !== 1 || !Array.isArray(receipt.attempts) || !Array.isArray(receipt.candidates) ||
+    !receipt.task || typeof receipt.task !== 'object' || Array.isArray(receipt.task)) return false
+  const next = receipt.task as Record<string, unknown>
+  return next.id === task.id && next.issueId === task.issueId && next.candidateId === task.candidateId &&
+    next.stage === task.stage && next.status === 'pending' && typeof next.revision === 'number' && Number.isSafeInteger(next.revision) &&
+    next.revision === task.revision + 1 && typeof next.attemptId === 'string' && next.attemptId.length > 0 &&
+    next.attemptId !== task.attemptId && receipt.attempts.some(attempt => attempt && typeof attempt === 'object' &&
+      attempt.id === next.attemptId && attempt.taskId === task.id && attempt.candidateId === task.candidateId &&
+      attempt.stage === task.stage && attempt.status === 'pending')
+}
+
 /** One piece of evidence plus, for text from a verify run, the command it ran. */
 export interface AcceptanceItem { entry: EvidenceEntry; command: { text: string; exitCode: number | null } | null }
 export interface CriterionGroup { key: string; title: string | null; passed: boolean | null; items: AcceptanceItem[] }

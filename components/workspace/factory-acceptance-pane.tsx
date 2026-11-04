@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
-import useSWR from 'swr'
+import useSWR, { useSWRConfig } from 'swr'
 import { useTranslations } from 'next-intl'
 import { CircleCheck, CircleDashed, CircleX, Cloud, ExternalLink, Laptop, RefreshCw, Server } from 'lucide-react'
 import { Alert, AlertTitle } from '@/components/ui/alert'
@@ -14,7 +14,7 @@ import type { PublicationEnvironment } from '@/lib/factory/vercel-target'
 import { acceptanceState, mergeAcceptance, type AcceptanceMerge, type AcceptanceState } from '@/lib/factory/acceptance-state'
 import { canReject, closedReject, rejectFlow } from '@/lib/factory/reject-flow'
 import { evidenceEntries, orderEvidence, type EvidenceEntry } from '@/lib/factory/evidence-view'
-import { bareUrl, candidateCheckRetry, candidateCheckState, criterionGroups, pullNumber, resultRows, type AcceptanceDetail, type CriterionGroup, type ResultRow } from '@/lib/factory/acceptance-view'
+import { bareUrl, candidateCheckRetry, candidateCheckRetryConfirmed, candidateCheckState, criterionGroups, pullNumber, resultRows, type AcceptanceDetail, type CriterionGroup, type ResultRow } from '@/lib/factory/acceptance-view'
 import { CriterionEvidence, EvidenceViewer } from './factory-evidence'
 import { ApprovalBar } from './factory-approval-bar'
 import { RejectNote } from './factory-reject-note'
@@ -179,6 +179,7 @@ function ResultLine({ row, onOpenThread }: { row: ResultRow; onOpenThread?: (run
  */
 export function FactoryAcceptancePane({ task, onOpenThread }: { task: FactoryTask; onOpenThread?: (runId: string) => void }) {
   const t = useTranslations('FactoryAcceptance')
+  const { mutate: mutateCache } = useSWRConfig()
   const { ledger, reload, ledgerError, derived: acceptance, check } = useAcceptance(task)
   // A voided approval puts the task back to pending, so the current candidate's evidence is needed to enable it again.
   const { data: evidence, error: evidenceError } = useSWR<Evidence>(task.stage === 'approval' || acceptance?.superseded || acceptance?.state === 'merged' ? `/api/factory/tasks/${task.id}/approval` : null, request)
@@ -253,12 +254,14 @@ export function FactoryAcceptancePane({ task, onOpenThread }: { task: FactoryTas
       : { key: retryCheck.key, eventId: crypto.randomUUID(), reason: t(retryCheck.stage === 'review' ? 'retryReview' : 'retryVerify') }
     setCheckRequest(submission)
     try {
-      await request(`/api/factory/tasks/${task.id}`, { binding: retryCheck.binding, eventId: submission.eventId,
+      const result = await request(`/api/factory/tasks/${task.id}`, { binding: retryCheck.binding, eventId: submission.eventId,
         action: 'retry', reason: submission.reason })
+      if (!candidateCheckRetryConfirmed(task, result)) setCheckError({ key: retryCheck.key, unknown: true })
     } catch (caught) {
       setCheckError({ key: retryCheck.key, unknown: !(caught instanceof RequestError) || caught.status >= 500 })
     } finally {
-      await Promise.all([reload().catch(() => {}), reloadDetail().catch(() => {})])
+      await Promise.all([reload().catch(() => {}), reloadDetail().catch(() => {}),
+        mutateCache(`/api/factory/tasks?issueId=${encodeURIComponent(task.issueId)}`).catch(() => {})])
       retrying.current = false; setBusy(false)
     }
   }

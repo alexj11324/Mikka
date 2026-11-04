@@ -14,7 +14,7 @@ let ledger: unknown
 let taskDetail: unknown
 mock.module('swr', { defaultExport: (key: string) => String(key).includes('view=ledger')
   ? { data: ledger, mutate: () => {} }
-  : key === '/api/factory/tasks/t1' && taskDetail !== undefined ? { data: taskDetail, mutate: () => {} } : swr })
+  : key === '/api/factory/tasks/t1' && taskDetail !== undefined ? { data: taskDetail, mutate: () => {} } : swr, namedExports: { useSWRConfig: () => ({ mutate: async () => undefined }) } })
 mock.module('next-intl', { namedExports: { useTranslations: () => lookup, useFormatter: () => ({ dateTime: () => '' }) } })
 mock.module(new URL('./issue-thread-panel.tsx', import.meta.url).href, { namedExports: { IssueThreadPanel: () => null } })
 
