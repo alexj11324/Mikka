@@ -22,9 +22,15 @@ async function abortable<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
 export class ToolApprovalGate {
   private readonly stop = new AbortController()
   private checking?: Promise<boolean>
+  private reason?: 'device_lost'
   constructor(readonly runId: string, private readonly host: ToolApprovalHost) {}
-  revoke() { this.stop.abort() }
+  revoke(reason?: 'device_lost') {
+    if (this.revoked) return
+    this.reason = reason
+    this.stop.abort()
+  }
   get revoked(): boolean { return this.stop.signal.aborted }
+  get revokeReason(): 'device_lost' | undefined { return this.reason }
   onRevoke(callback: () => void): () => void {
     if (this.revoked) { callback(); return () => {} }
     this.stop.signal.addEventListener('abort', callback, { once: true })

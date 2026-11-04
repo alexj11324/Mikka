@@ -130,9 +130,10 @@ test('real HTTP claim carries policy, and its run gate creates no approvals (dec
   assert.equal((await pool.query('SELECT count(*)::int n FROM run_tokens WHERE "runId"=$1',[runId])).rows[0].n,0)
   await pool.query('UPDATE devices SET harnesses=$2 WHERE id=$1',[deviceId,harnesses(true)])
   const claim = await fetch(`${origin}/v1/devices/${deviceId}/runs/${runId}/claim`, { method:'POST', headers:{ 'x-mikka-client-version':'0.0.375', authorization:'Bearer synthetic',[REPO_ORIGIN_HEADER]:'1',[POLICY_SNAPSHOT_HEADER]:POLICY_SNAPSHOT_VERSION } })
-  assert.equal(claim.status,200,'the real authenticated claim must pass its scope and lease fences')
+  const claimBody = await claim.json()
+  assert.equal(claim.status,200,`the real authenticated claim must pass its scope and lease fences: ${claim.status === 200 ? 'accepted' : JSON.stringify(claimBody)}`)
   assert.equal((await pool.query('SELECT status FROM agent_runs WHERE id=$1',[runId])).rows[0].status,'preparing')
-  const assignment = await claim.json() as import('@mikka/protocol/device').RunAssignment
+  const assignment = claimBody as import('@mikka/protocol/device').RunAssignment
   assert.equal(assignment.prompt,'APPROVAL_TEST')
   assert.equal(assignment.expectedRepoRemote,remoteUrl)
   assert.equal(assignment.pushBranch,'mikka/appr-1')
@@ -194,4 +195,21 @@ test('a changed run policy answers live:false, revokes the real daemon gate, and
   } finally { gate.revoke(); for (const undo of restore) undo() }
 })
 
-
+test('real authenticated HTTP retains a lease-loss cause but never invents it for manual Stop', async () => {
+  assert.ok(claimed)
+  const {readCliRunPolicy} = await import('./policy-store')
+  const revision = (await readCliRunPolicy(pool,runId,owner)).revision
+  const check = (extra: object = {}) => fetch(`${origin}/v1/runs/${runId}/tool-approval`, {
+    method:'POST', headers:{'x-mikka-client-version':'0.0.375',authorization:'Bearer synthetic','content-type':'application/json'},
+    body:JSON.stringify({operation:'check',deviceId,policyRevision:revision,...extra}),
+  })
+  await pool.query(`UPDATE agent_runs SET "leaseExpiresAt"=now()-interval '1 second' WHERE id=$1`, [runId])
+  const expired = await check()
+  assert.equal(expired.status,200)
+  assert.deepEqual(await expired.json(),{live:false,revokeReason:'device_lost'})
+  await pool.query(`UPDATE agent_runs SET "stopRequestedAt"=now(),"leaseExpiresAt"=now()+interval '5 minutes' WHERE id=$1`, [runId])
+  const stopped = await check()
+  assert.equal(stopped.status,409)
+  assert.deepEqual(await stopped.json(),{error:'approvalUnavailable'})
+  assert.equal((await check({revokeReason:'device_lost'})).status,400,'the caller cannot supply a host cause')
+})

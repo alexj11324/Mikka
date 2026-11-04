@@ -1302,6 +1302,15 @@ export class RunSupervisor {
     if (mailbox) checkMailbox()
     const toolApproval = await this.deps.prepareRunToolApproval?.(assignment, run.abort.signal, checkMailbox, worktree)
     run.toolApproval = toolApproval
+    // Register before an adapter can attach its cancellation callback. The
+    // 1s live gate may learn of a host revocation before the next heartbeat;
+    // preserve that cause before SIGTERM/SDK close races an exit event.
+    toolApproval?.onRevoke(() => {
+      if (!this.stopping && this.active.get(runId) === run && !run.forcedStop
+        && this.leases.has(runId) && toolApproval.revokeReason === 'device_lost') {
+        this.forceStop(runId, run, 'device_lost')
+      }
+    })
     if (mailbox && toolApproval) {
       const original = mailbox
       mailbox = { tools: original.tools, close: () => original.close(), request: async (body, signal) => {

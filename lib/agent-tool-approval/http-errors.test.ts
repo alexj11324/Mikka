@@ -5,7 +5,7 @@ import { DeviceAuthorityRevoked, DeviceFenceUnavailable } from '../db/device-sco
 const runId = '11111111-1111-4111-8111-111111111111'
 const deviceId = '22222222-2222-4222-8222-222222222222'
 let failure: Error | null = null
-class ApprovalUnavailable extends Error {}
+class ApprovalUnavailable extends Error { constructor(readonly revokeReason?: 'device_lost') { super('approvalUnavailable') } }
 mock.module(new URL('../db/index.ts', import.meta.url).href, { namedExports: { pool: {} } })
 mock.module(new URL('../device-link.ts', import.meta.url).href, { namedExports: {
   authenticateDevice: async () => ({ userId: 'owner', tokenId: 'token', scopeDeviceId: deviceId }),
@@ -47,6 +47,17 @@ test('unavailable runs and changed policies remain immediate refusals', async ()
     assert.equal(response.status, 409)
     assert.deepEqual(await response.json(), { error: 'approvalUnavailable' })
   }
+})
+
+test('only a typed host lease refusal returns a cause and it never grants liveness', async () => {
+  failure = new ApprovalUnavailable('device_lost')
+  const response = await check()
+  assert.equal(response.status, 200)
+  assert.deepEqual(await response.json(), {live:false,revokeReason:'device_lost'})
+  failure = Object.assign(new Error('untrusted-error'), {revokeReason:'device_lost'})
+  const untrusted = await check()
+  assert.equal(untrusted.status, 409)
+  assert.deepEqual(await untrusted.json(), {error:'approvalUnavailable'})
 })
 
 test('a transient database failure stays unavailable and logs only an allowlisted SQL state', async t => {
