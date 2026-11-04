@@ -1,58 +1,74 @@
-# TEMPORARY WORKFLOW: replace .github/workflows/proactive-acceptance.yml
-# on acceptance/proactive-1157-1163 only. Do not add it to mainline.
-# Frozen runtime source in /vercel/Mikka; independent of this temporary branch.
-name: Temporary sandbox Flash local-loop acceptance
+name: Temporary read-only runtime capabilities
 on:
   push:
     branches: [acceptance/proactive-1157-1163]
+    paths:
+      - '.github/workflows/proactive-acceptance.yml'
+      - 'scripts/ops/subscription-inventory.mjs'
+      - 'scripts/ops/subscription-inventory.test.mjs'
+      - 'scripts/ops/runtime-capabilities.mjs'
+      - 'scripts/ops/runtime-capabilities.test.mjs'
 permissions:
   contents: read
 concurrency:
-  group: mikka-acceptance-existing-sandbox-612
+  group: proactive-runtime-capabilities-once
   cancel-in-progress: false
 jobs:
- sandbox-local-loop:
-  if: github.event_name == 'push' && github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/acceptance/proactive-1157-1163'
-  runs-on: ubuntu-latest
-  timeout-minutes: 100
-  permissions:
-    contents: read
-    id-token: write
-  steps:
-    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-      with:
-        persist-credentials: false
-    - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
-      with:
-        node-version: 24
-    - name: Check dispatcher contract without network access
-      run: node --test scripts/ops/proactive-sandbox-local-loop.test.mjs
-    - name: Read existing sandbox team token
-      uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
-      with:
-        method: oidc
-        identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
-        oidc-audience: mikka-infisical
-        project-id: 89850d6a-f020-4936-863e-df77380dfe40
-        env-slug: prod
-        secret-path: /platform
-        recursive: false
-        include-imports: false
-        secret-name: VERCEL_TEAM_TOKEN
-    - name: Read permitted Flash credential
-      uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
-      with:
-        method: oidc
-        identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
-        oidc-audience: mikka-infisical
-        project-id: 89850d6a-f020-4936-863e-df77380dfe40
-        env-slug: dev
-        secret-path: /vercel
-        recursive: false
-        include-imports: false
-        secret-name: DEEPSEEK_API_KEY
-    - name: Dispatch bounded real Flash local loop in the existing sandbox
-      run: node scripts/ops/proactive-sandbox-local-loop.mjs
-      env:
-        # Root replaces this with the final reviewed source commit before push.
-        MIKKA_ACCEPTANCE_SOURCE_SHA: f8cbd5456be4301946f73711370d0a15271502bb
+  inventory:
+    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/acceptance/proactive-1157-1163' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          path: driver
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: 5f85c458893868b721e6ab5a3a4f60a91a5905d1
+          path: source
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      - name: Run offline capability contracts before receiving credentials
+        run: node --test driver/scripts/ops/subscription-inventory.test.mjs driver/scripts/ops/runtime-capabilities.test.mjs
+      - name: Verify immutable source and execution scope before receiving credentials
+        run: node --experimental-strip-types driver/scripts/ops/subscription-inventory.mjs --verify-source
+      - name: Read the existing Smoke email only
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /
+          secret-name: SMOKE_OWNER_EMAIL
+          recursive: false
+          include-imports: false
+      - name: Read the existing Smoke password only
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /
+          secret-name: SMOKE_OWNER_PASSWORD
+          recursive: false
+          include-imports: false
+      - name: Read existing GitHub and device capabilities, then sign out
+        run: node --experimental-strip-types driver/scripts/ops/runtime-capabilities.mjs
+      - name: Upload sanitized capability inventory only
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: runtime-capabilities-${{ github.run_id }}
+          path: runtime-capabilities-sanitized/results.json
+          if-no-files-found: error
+          retention-days: 7
