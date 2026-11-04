@@ -352,9 +352,11 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   has an 「Artifact · N」 entry. Opening an Artifact shows a window with the
   acceptance content on the left (PR, checks, screenshots and recordings),
   the thread's chat on the right, and 打回 / 通过 at the top.
-  Factory acceptance is different: it is the 「验收」 tab of the thread that
-  produced the candidate (header 对话 | 验收; Figma `358:8511`), with the
-  decision bar pinned at its bottom (`decisions.md`, 2026-10-30).
+  Factory acceptance uses the same window: its left side is the acceptance
+  report Artifact (HTML or Markdown, evidence inline), its right side the
+  thread that did the work, and the task page has a 验收 button that opens it
+  (decision `2026-11-04-2200-factory-flow-like-warp.md`; it replaces the 「验收」
+  tab of 2026-10-30).
 - **R-57** The local 浏览器 is an icon-only globe toggle at the right of the
   top bar, with no 「浏览器」 label. Turned on, it opens a right column with
   the browser (URL bar and page). Selecting an element and annotating it puts
@@ -626,6 +628,52 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   what it holds. A list row's hover and selected fill cover the whole row edge
   to edge; buttons and switches inside it stay separately clickable.
   `pnpm lint:ui` fails a frame inside a frame as `style/nested-frame`.
+
+## Design review
+
+Hard checks for every design handed in (Figma or code), added after Alex's
+review of the Factory redesign on 2026-11-04
+(`decisions/2026-11-04-2230-design-review-checks.md`). R-83 is reserved for
+the chat tool group (`chat-tool-calls.md`). Each check is pass or fail; a
+design that fails any of them is sent back before it reaches Alex.
+
+- **R-84** A thread's conversation always uses the existing thread view
+  (`IssueThreadPanel`: header, 消息 / 改动 / 终端 / 文件 / 预览, Trace rows, the
+  插话 composer), wherever it appears: the Artifact window, the session view,
+  an inbox detail. A one-to-one bot chat uses the existing coordinator chat.
+  No design draws a third chat style or adds a new chat component.
+- **R-85** Deliverables (PR, diff, recording, screenshot, test output) live
+  only on the acceptance page (the Artifact window, R-56). The task's
+  activity timeline and the bot's comments carry one plain sentence about
+  progress and at most an 「打开会话」 link, never deliverable chips.
+- **R-86** A bot asks the person its questions in its own chat with them. The
+  task page shows only that a question is waiting (stage 「在问你」 and a
+  「去回答」 button that jumps to the message); after the answer, the activity
+  records one line 「你回答了：…」. No question-and-answer box on the task page.
+- **R-87** Every status, verdict and severity is shown with an icon, a colour
+  and a word together, at body size, on a tinted background where it needs
+  attention (for example 高 red with `CircleAlert`, 中 amber with
+  `TriangleAlert`, 低 grey with `Info`). Never colour alone, never pale small
+  text.
+- **R-88** At 1440 wide, no screen leaves an empty area larger than about a
+  third of the viewport. A list with a detail pane keeps the list narrow
+  (about 320px) and fills the detail with the thing to act on (for example
+  the acceptance page itself), not a summary and a button.
+- **R-89** The primary entry for what the person must do next is visible on
+  first sight without scrolling: one prominent block or button per screen
+  (for example the task page's 验收 block under the description), not a small
+  header button or a link inside a comment.
+
+How a design is reviewed:
+
+1. The author's self-score is a reference only. An independent reviewer that
+   did not author the design (a fresh agent given only the screenshots, the
+   live product for comparison and these checks) scores it with
+   `ux-heuristics` and runs `cognitive-walkthrough` on the key tasks.
+2. The reviewer looks at full-size screenshots and compares them side by side
+   with the live product's current screens, not thumbnails.
+3. The reviewer goes through R-84 to R-89 one by one and reports each as pass
+   or fail with the screen it checked.
 
 ## Copy
 

@@ -11,6 +11,7 @@
   (`dispatchRun`) take today; the exemption in 8196fae1 (a new Factory task is
   admitted with no model).
 - Status: direction and the six open questions decided by the coordinator session (2026-11-03 04:15 UTC); see Decisions.
+- Superseded by (in part): `2026-11-04-2200-factory-flow-like-warp.md`, which drops the fixed four stages "none of them may be skipped", rule 2, rule 3 and Decisions 5. Everything else here still holds.
 
 ## Where things stand
 

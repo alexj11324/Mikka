@@ -4,6 +4,7 @@ import type { agentRuns } from '../../db/schema';
 import { retryWorkerDefinition } from '../../agent-kit/worker';
 import { FactoryError } from '../contract';
 import type { FactoryQueue } from '../dispatch';
+import { factoryRunBotMatches } from '../run-scope';
 
 /** A question resumes its server-bound executor, not the Bot's local queue.
  * The answer holds computer policy -> task -> origin locks. No provider call,
@@ -39,7 +40,7 @@ export async function admitCloudQuestionContinuation(
       AND c.epoch=credential."connectionRevision" AND c.state='connected' AND c.paused=false
       AND c.provider=CASE a.harness WHEN 'codex' THEN 'codex' WHEN 'claude_code' THEN 'claude' END
     WHERE r.id=$1 AND r."userId"=$2 AND r."issueId"=$3 AND r."agentId"=$4 AND r."deviceRepoId"=$5
-      AND r."botId" IS NOT DISTINCT FROM $6::uuid AND b."workspaceId"=$7
+      AND b."workspaceId"=$7
       AND r.status=CASE WHEN $10::uuid IS NULL THEN 'stopped' ELSE 'failed' END AND r."stopRequestedAt" IS NULL AND r."sessionId" IS NOT NULL
       AND (r."agentDefinition"->'apiKey' IS NULL OR r."agentDefinition"->'apiKey'='null'::jsonb)
       AND (m.state IN ('running','paused') OR ($12='blocked' AND m.state='error')) AND m."sandboxId" IS NOT NULL
@@ -49,9 +50,9 @@ export async function admitCloudQuestionContinuation(
       AND NOT EXISTS(SELECT 1 FROM agent_runs active WHERE active."deviceId"=r."deviceId" AND active.status NOT IN ('succeeded','completed','failed','stopped','cancelled'))
       AND EXISTS(SELECT 1 FROM factory_questions q JOIN factory_tasks t ON t.id=q."taskId" AND t."userId"=q."userId"
         WHERE q."originRunId"=$11 AND (CASE WHEN $10::uuid IS NULL THEN q."originRunId" ELSE q."continuationRunId" END)=r.id AND q."originSessionId"=r."sessionId" AND q."userId"=r."userId" AND q.status=$12
-          AND t."issueId"=r."issueId" AND t."attemptId"=$8 AND t."sourceEventId"=$9 AND t."botId" IS NOT DISTINCT FROM r."botId")
+          AND t."issueId"=r."issueId" AND t."attemptId"=$8 AND t."sourceEventId"=$9 AND t."botId" IS NOT DISTINCT FROM $6::uuid)
     FOR UPDATE OF r,m FOR SHARE OF b,bot,a,d,repo,credential,c`, [originId,userId,input.issueId,input.agentId,input.deviceRepoId,botId,binding.workspaceId,context.attemptId,context.sourceEventId,context.questionHistoryRunId ?? null,questionOriginId,questionStatus]);
-  if (!origin?.agentDefinition || !origin.sessionId) return fail();
+  if (!origin?.agentDefinition || !origin.sessionId || !(await factoryRunBotMatches(tx, { userId, botId }, origin))) return fail();
   return { origin, binding };
 }
 

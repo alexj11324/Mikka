@@ -166,6 +166,25 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
       assert.deepEqual(fixture.calls,['state',`connect:${f.prior.sandboxId}`]);
       assert.equal((await machine(f.next)).sandboxId,f.prior.sandboxId);
     });
+    await t.test('a failed question wake records its safe phase while retaining the original VM, SID and committed answer', async () => {
+      const f = await questionMachine(), fixture = exactFake();
+      const history = async () => ({
+        runs: (await pool.query('SELECT * FROM agent_runs WHERE id=ANY($1::uuid[]) ORDER BY id', [[f.prior.runId, f.next]])).rows,
+        question: (await pool.query('SELECT * FROM factory_questions WHERE id=$1', [f.q])).rows,
+        machines: (await pool.query('SELECT * FROM thread_machines WHERE "runId"=ANY($1::uuid[]) ORDER BY "runId"', [[f.prior.runId, f.next]])).rows,
+      });
+      const before = await history(), warnings: string[] = [];
+      const fault = Object.assign(new Error('PRIVATE-CREDENTIAL provider response'), { statusCode: 503, code: 'PRIVATE-CREDENTIAL', cause: { token: 'PRIVATE-CREDENTIAL' } });
+      fixture.provider.connect = async id => { fixture.calls.push(`connect:${id}`); throw fault; };
+      const warning = mock.method(console, 'warn', (line: string) => { warnings.push(line); });
+      try { await assert.rejects(ensureThreadMachine(pool, actor, f.next, fixture.provider), error => error === fault); }
+      finally { warning.mock.restore(); }
+      assert.deepEqual(warnings.map(line => JSON.parse(line)), [{ event: 'thread_runtime_start_failed', runId: f.next,
+        phase: 'connect', errorClass: 'Error', errorCode: 'unknown', status: 503 }]);
+      assert.doesNotMatch(warnings.join('\n'), /PRIVATE-CREDENTIAL|original-native-session/);
+      assert.deepEqual(await history(), before, 'only the temporary wake lease is acquired and released; no answer, VM or native session changes');
+      assert.deepEqual(fixture.calls, ['state', `connect:${f.prior.sandboxId}`]);
+    });
     await t.test('a resumed provider VM with paused DB placement retries bootstrap instead of falsely returning ready', async () => {
       const f=await questionMachine(),fixture=exactFake('running');
       fixture.provider.connect=async id=>{fixture.calls.push(`connect:${id}`);throw new Error('fixture retry original bootstrap');};

@@ -239,7 +239,7 @@ export async function configureFactoryCheck(
   const {
     rows: [row],
   } = await tx.query(
-    `SELECT c.*,producer.report AS "producerReport",(SELECT json_build_object('status',p.status,'pullRequest',p."pullRequest",'branch',p.branch,'baseBranch',p."baseBranch") FROM run_publications p WHERE p."runId"=producer.id AND p."userId"=$4) AS "publicationReceipt",${reportedCandidateShaSql()} AS "executionSha",r."deviceId",r."deviceRepoId",COALESCE((SELECT settings."verifyCommand" FROM repository_settings settings WHERE settings."userId"=$4 AND settings."remoteKey"=repo."repoPath"),repo."verifyCommand") AS "verifyCommand",repo."remoteUrl",repo."repoPath",d.enabled,d.kind AS "deviceKind",d."lastSeenAt",d.harnesses,a.harness,
+    `SELECT c.*,EXISTS(SELECT 1 FROM project_decisions pd WHERE (pd."runId"=producer.id OR pd."factoryTaskId"=c."taskId") AND pd."recordStatus"='active' AND NOT EXISTS(SELECT 1 FROM project_decisions replacement WHERE replacement."supersedesId"=pd.id)) AS "hasProjectDecision",producer.report AS "producerReport",(SELECT json_build_object('status',p.status,'pullRequest',p."pullRequest",'branch',p.branch,'baseBranch',p."baseBranch") FROM run_publications p WHERE p."runId"=producer.id AND p."userId"=$4) AS "publicationReceipt",${reportedCandidateShaSql()} AS "executionSha",r."deviceId",r."deviceRepoId",COALESCE((SELECT settings."verifyCommand" FROM repository_settings settings WHERE settings."userId"=$4 AND settings."remoteKey"=repo."repoPath"),repo."verifyCommand") AS "verifyCommand",repo."remoteUrl",repo."repoPath",d.enabled,d.kind AS "deviceKind",d."lastSeenAt",d.harnesses,a.harness,
        json_build_object('runId',producer.id,'sessionId',producer."sessionId",'status',producer.status,
          'model',producer."agentDefinition"->>'model','harness',producer."agentDefinition"->>'harness',
          'observedModel',producer.report->'runtime'->>'observedModel') AS "producerExecution",
@@ -304,6 +304,9 @@ export async function configureFactoryCheck(
   const prompt = [
     ...(currentRequest ? [currentRequest] : []),
     `Factory stage: ${task.stage}. Independent read-only check of candidate ${row.id}, fixed worktree ${row.executionSha}.`,
+    ...(task.stage === 'review' && !row.hasProjectDecision ? [
+      'No active project decision is recorded for this producing run or task. If the actual Mikka evidence shows a meaningful choice between routes, a change of direction or an abandoned route, include a non-blocking reminder in your report summary to record its alternatives, reasons and stopping point in Mikka. Emit that reminder as an exact standalone line starting with "possible_unrecorded_decision: " followed by one explanation of at most 500 characters; the host binds its sources to this fixed review and candidate. A missing decision record is not a failed correctness criterion and must not block review or delivery. Do not invent a choice, human approval or missing history, and never write conversations or decision logs into the code repository.',
+    ] : []),
     "A vision-capable model makes semantic judgments. For visual criteria inspect actual images through the existing granted tools; text descriptions alone cannot establish a visual pass. Record missing observations instead of inventing evidence.",
     task.stage === "review"
       ? "Review the fixed candidate for correctness and regressions. Record each material finding as a failed criterion; explicitly pass a criterion only with concrete evidence."
@@ -346,10 +349,29 @@ export async function configureFactoryCheck(
 }
 
 /** Frozen assignment for a bound check. Called before claiming; fails closed after a stop/repair. */
-export async function factoryCheckAssignment(
+export function factoryCheckAssignment(
   tx: Pick<PoolClient, "query">,
   userId: string,
   runId: string,
+) {
+  return readFactoryCheckAssignment(tx, userId, runId, "running");
+}
+
+/** An Owner answer may resume a waiting artifact check, but cannot grant it a
+ * repository command. This entry never admits a normal claim or repository check. */
+export function factoryReportQuestionAssignment(
+  tx: Pick<PoolClient, "query">,
+  userId: string,
+  runId: string,
+) {
+  return readFactoryCheckAssignment(tx, userId, runId, "waiting");
+}
+
+async function readFactoryCheckAssignment(
+  tx: Pick<PoolClient, "query">,
+  userId: string,
+  runId: string,
+  status: "running" | "waiting",
 ) {
   const {
     rows: [row],
@@ -368,12 +390,12 @@ export async function factoryCheckAssignment(
   if (
     !row ||
     !["review", "verify"].includes(row.stage) ||
-    row.status !== "running" ||
+    row.status !== status ||
     row.kind !== "acceptance" ||
     row.retryOf ||
     row.stopRequestedAt ||
     !(await factoryRunBotMatches(tx, { userId, botId: row.taskBotId }, { id: runId, botId: row.botId })) ||
-    row.attemptStatus !== "running" ||
+    row.attemptStatus !== status ||
     row.attemptCandidateId !== row.candidateId ||
     check?.stage !== row.stage ||
     (check?.requestEpoch != null && check.requestEpoch !== row.sourceEventId) ||
@@ -388,7 +410,9 @@ export async function factoryCheckAssignment(
     (check?.candidateEnvironment ?? check?.environment) !== row.environment ||
     !policy.success ||
     policy.data.readOnly !== true ||
-    (!check?.command && check?.inferCommand !== true && check?.reportOnly !== true)
+    (!check?.command && check?.inferCommand !== true && check?.reportOnly !== true) ||
+    (status === "waiting" && (!["deliverable", "report"].includes(row.candidateKind) ||
+      check?.reportOnly !== true || check?.inferCommand !== false || check?.command !== null))
   )
     throw new FactoryError("factoryCheckBindingMismatch");
   return {

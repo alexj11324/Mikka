@@ -11,12 +11,11 @@ import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 
-export function IssueActivity({ author, threads, anchors, events, runs, onComment, onReply, onResolve, onSelect }: {
+export function IssueActivity({ author, threads, anchors, events, onComment, onReply, onResolve, onSelect }: {
   author: string
   threads: ThreadRecord[]
   anchors: CommentAnchor[]
   events?: ReactNode
-  runs?: ReactNode
   onComment: (body: string) => void
   onReply: (id: string, body: string) => void
   onResolve: (id: string, resolved: boolean) => void
@@ -43,7 +42,7 @@ export function IssueActivity({ author, threads, anchors, events, runs, onCommen
   }
   return <section aria-label={t('label')} className="flex flex-col gap-4">
     <h2 className="text-sm font-medium">{t('title')}</h2>
-    {(events || runs) && <div className="flex flex-col gap-3">{events}{runs}</div>}
+    {events && <div className="flex flex-col gap-3">{events}</div>}
     {[...threads].sort((a, b) => a.createdAt.localeCompare(b.createdAt)).map(thread => <article key={thread.id} aria-label={t('comment', { author: thread.author })} className={card}>
       {thread.messages.map((message, index) => <div key={message.id} className={cn('flex flex-col gap-1.5 px-4 py-3', index > 0 && 'border-t border-rule')}>
         <div className="flex min-w-0 items-center gap-2">

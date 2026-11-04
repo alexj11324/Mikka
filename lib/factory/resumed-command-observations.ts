@@ -32,12 +32,13 @@ export async function resumedCommandObservations(tx: Query, task: Task, candidat
       q."answeredAt",e."createdAt" AS "recoveryCreatedAt",
       p."agentDefinition"->'subscription' AS subscription,
       pn."bindingId" AS "producerBindingId",sn."bindingId" AS "sourceBindingId"
-    FROM agent_runs p JOIN agent_runs s ON s.id=p."continuesRunId"
+    FROM agent_runs p JOIN agent_runs s ON s.id=$2
       AND s."userId"=p."userId" AND s."issueId"=p."issueId"
     JOIN factory_questions q ON q.id=$7 AND q."userId"=p."userId" AND q."issueId"=p."issueId" AND q."taskId"=$6
     JOIN factory_events e ON e."taskId"=q."taskId" AND e."eventId"=$8
     LEFT JOIN byos_native_runs pn ON pn."runId"=p.id LEFT JOIN byos_native_runs sn ON sn."runId"=s.id
-    WHERE p.id=$1 AND s.id=$2 AND p."userId"=$3 AND p."issueId"=$4
+    WHERE p.id=$1 AND p."userId"=$3 AND p."issueId"=$4
+      AND (p."continuesRunId"=s.id OR (p."continuesRunId" IS NULL AND e.request->>'kind'='question_resume' AND q."originRunId"=s.id))
       AND p."sessionId"=$5 AND s."sessionId"=$5
       AND p.status='succeeded' AND p."stopReason"='submitted' AND p."stopRequestedAt" IS NULL
       AND s."stopRequestedAt" IS NULL AND p."retryOf" IS NULL AND s."retryOf" IS NULL
