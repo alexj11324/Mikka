@@ -70,6 +70,8 @@ export async function readFactoryCheckFailure(
     attempt.output?.completion?.trustedFailureProvenance !== true ||
     attempt.output.completion.runId !== run.id ||
     check?.stage !== task.stage ||
+    (check?.requestEpoch != null && check.requestEpoch !== task.sourceEventId) ||
+    (attempt.output?.requestEpoch != null && attempt.output.requestEpoch !== task.sourceEventId) ||
     check.candidateId !== candidate.id ||
     run.kind !== "acceptance" ||
     run.baseBranch !== candidate.sha ||
@@ -132,12 +134,13 @@ export async function checkFactoryRecoveryBudget(
   if (choice === "repair_code") await checkFactoryRepairBudget(tx, task);
 }
 /** The repair cap shared by check recovery and human reject: at most
- * maxFixAttempts execute attempts beyond the first per task. */
+ * maxFixAttempts execute attempts beyond the first per authenticated request. */
 export async function checkFactoryRepairBudget(tx: PoolClient, task: Pick<FactoryTask, "id">) {
   const {
     rows: [count],
   } = await tx.query(
-    `SELECT count(*)::int AS count FROM factory_attempts WHERE "taskId"=$1 AND stage='execute'`,
+    `SELECT count(*)::int AS count FROM factory_attempts a JOIN factory_tasks t ON t.id=a."taskId"
+      WHERE a."taskId"=$1 AND a.stage='execute' AND COALESCE(a.output->>'requestEpoch',t."sourceEventId"::text)=t."sourceEventId"::text`,
     [task.id],
   );
   if (count.count > orchestratorSettings({}).maxFixAttempts)

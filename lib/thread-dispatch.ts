@@ -101,6 +101,8 @@ export async function explicitNewThread(userId: string, botId: string | null, so
  */
 export async function dispatchToTask<R extends { runId: string }, E extends { error: string } = never>(userId: string, issueId: string, input: {
   note?: string
+  /** Host-bound raw owner turn, never a model-generated dispatch note. */
+  sourceEventId?: string
   /** The caller asked for a new thread; it is granted only when `explicit()` says the person asked for it. */
   newThread?: boolean
   /** The dispatch names another place than where the thread ran: moving a thread is a new thread, granted the same way. */
@@ -125,7 +127,12 @@ export async function dispatchToTask<R extends { runId: string }, E extends { er
     const wantsNew = input.newThread || moves
     if (wantsNew && await (input.explicit?.() ?? Promise.resolve(false))) {
       // The old thread stops; one thread works on a task at a time.
-      if (working && !previous.stopRequestedAt) await (await import('@/lib/agent-runs')).requestRunStop(userId, previous.id).catch(() => undefined)
+      if (working) {
+        // A previous epoch may already have requested this stop. Queued runs
+        // still need the canonical stop to finish; a flag alone is not an ack.
+        try { await (await import('@/lib/agent-runs')).requestRunStop(userId, previous.id) }
+        catch (error) { if (!(error instanceof ActionFailureError && error.code === 'runChainEnded')) throw error }
+      }
       const result = await input.start(null, input.note, previous)
       if (!queued(result)) return result
       await db.execute((await import('drizzle-orm')).sql`UPDATE agent_runs SET "threadReplacedBy"=${result.runId}::uuid,"updatedAt"=now() WHERE id=${threadId}::uuid AND "userId"=${userId}`)
@@ -136,6 +143,7 @@ export async function dispatchToTask<R extends { runId: string }, E extends { er
       if (previous.stopRequestedAt) throw new ActionFailureError('threadStopping')
       if (!input.note?.trim()) return { thread: 'message' as const, runId: previous.id, threadId, status: 'alreadyWorking' as const }
       await sendOwnedRunMessage(db, userId, { runId: previous.id, text: input.note.trim() })
+      if (input.sourceEventId) await (await import('@/lib/factory/request-epoch')).continueActiveFactoryRequest(pool, userId, previous.id, input.note.trim(), input.sourceEventId)
       return { thread: 'message' as const, runId: previous.id, threadId, status: 'messageSent' as const }
     }
     const result = await input.start(previous, continuationNote(input.note, previous))

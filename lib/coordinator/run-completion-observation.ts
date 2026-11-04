@@ -10,8 +10,8 @@ export interface RunCompletionObservation {
   runId: string
   postRunVerify: HostVerification | null
   factory: {
-    taskId: string; stage: string; status: string; revision: number; attemptId: string
-    runAttempt: { id: string; stage: string; status: string }
+    taskId: string; stage: string; status: string; revision: number; attemptId: string; requestEpoch: string
+    runAttempt: { id: string; stage: string; status: string; requestEpoch: string | null }
     candidate: { id: string; sha: string | null } | null
   }
   checks: Array<{ stage: string; status: string; runId: string | null; sessionId: string | null; reportOnly: boolean; postRunVerify: HostVerification | null }>
@@ -32,8 +32,8 @@ export async function runCompletionObservations(executor: Pick<typeof db, 'execu
       'postRunVerify',CASE WHEN r.report ? 'verify' THEN jsonb_build_object(
         'status',r.report#>'{verify,status}','command',left(r.report#>>'{verify,command}',4000),
         'exitCode',r.report#>'{verify,exitCode}','signal',r.report#>'{verify,signal}','timedOut',r.report#>'{verify,timedOut}') END,
-      'factory',jsonb_build_object('taskId',t.id,'stage',t.stage,'status',t.status,'revision',t.revision,'attemptId',t."attemptId",
-        'runAttempt',jsonb_build_object('id',ended.id,'stage',ended.stage,'status',ended.status),
+      'factory',jsonb_build_object('taskId',t.id,'stage',t.stage,'status',t.status,'revision',t.revision,'attemptId',t."attemptId",'requestEpoch',t."sourceEventId",
+        'runAttempt',jsonb_build_object('id',ended.id,'stage',ended.stage,'status',ended.status,'requestEpoch',ended.output->>'requestEpoch'),
         'candidate',CASE WHEN producer.id IS NOT NULL THEN jsonb_build_object('id',c.id,'sha',c.sha) END),
       'checks',COALESCE((SELECT jsonb_agg(jsonb_build_object(
         'stage',a.stage,'status',a.status,'runId',cr.id,'sessionId',cr."sessionId",'reportOnly',COALESCE(a.output#>'{check,reportOnly}'='true'::jsonb,false),
@@ -74,7 +74,12 @@ export async function runCompletionObservations(executor: Pick<typeof db, 'execu
         WHERE binding."runId"=r.id AND binding."ownerId"=r."userId" AND binding."botId"=r."botId"))
     LEFT JOIN factory_candidates c ON c.id=t."candidateId" AND c."taskId"=t.id
     LEFT JOIN agent_runs producer ON producer.id=c."runId" AND producer."userId"=r."userId" AND producer."botId"=r."botId" AND producer."issueId"=r."issueId"
-    LEFT JOIN run_publications p ON p."runId"=COALESCE(producer.id,r.id) AND p."userId"=r."userId" AND p."issueId"=r."issueId"
+    -- advanceFactoryRequest stamps every older attempt before replacing the
+    -- source and clearing the candidate. An unstamped attempt is legacy; a
+    -- stamped predecessor can never supply a new request's current PR.
+    LEFT JOIN run_publications p ON p."runId"=COALESCE(producer.id,
+      CASE WHEN COALESCE(ended.output->>'requestEpoch',t."sourceEventId"::text)=t."sourceEventId"::text THEN r.id END)
+      AND p."userId"=r."userId" AND p."issueId"=r."issueId"
   `)
   return new Map((result.rows as Array<{ runId: string; observation: RunCompletionObservation }>).map(row => [row.runId, row.observation]))
 }

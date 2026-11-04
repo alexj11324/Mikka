@@ -25,6 +25,10 @@ mock.module(new URL('../../../../lib/cloud-computer/workspace-teardown.ts', impo
 } })
 mock.module(new URL('../../../../lib/db/index.ts', import.meta.url).href, { namedExports: { pool: {}, db: {} } })
 let swept: number[] = []
+let taskSweeps = 0
+mock.module(new URL('../../../../lib/factory/watchdog.ts', import.meta.url).href, { namedExports: {
+  sweepFactoryWatchdog: async () => { taskSweeps++; return { scanned: 3, recovered: 1, blocked: 1, deferred: 1, failed: 0 } },
+} })
 mock.module(new URL('../../../../lib/group-conversations-route.ts', import.meta.url).href, { namedExports: {
   resumePendingGroupTurns: async (deadline: number) => { swept.push(deadline); return { groups: 1 } },
 } })
@@ -42,6 +46,7 @@ test('independent recovery requires the existing cron bearer before scanning own
   delete process.env.CRON_SECRET
   assert.equal((await call()).status, 503)
   assert.equal(calls, 0)
+  assert.equal(taskSweeps, 0)
 })
 
 test('recovery returns bounded counts and no private database error or cached result', async () => {
@@ -49,7 +54,8 @@ test('recovery returns bounded counts and no private database error or cached re
   assert.equal(response.status, 200)
   assert.equal(response.headers.get('cache-control'), 'no-store')
   // Stale Bot computers are reconciled, ended runs judged (R-52), closed tasks' sandboxes ended and deleted workspaces' unfinished kills retried, in the same pass.
-  assert.deepEqual(await response.json(), { owners: 3, failed: 1, machines: 2, outcomes: 4, taskMachines: { ended: 5, pending: 0 }, sandboxKills: { killed: 1, pending: 1 } })
+  assert.deepEqual(await response.json(), { owners: 3, failed: 1, machines: 2, outcomes: 4, taskMachines: { ended: 5, pending: 0 }, sandboxKills: { killed: 1, pending: 1 }, tasks: { scanned: 3, recovered: 1, blocked: 1, deferred: 1, failed: 0 } })
+  assert.equal(taskSweeps, 1)
   assert.equal(reconciled, 1)
   assert.equal(judged, 1)
   assert.equal(ended, 1)

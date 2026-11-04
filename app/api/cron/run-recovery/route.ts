@@ -26,10 +26,12 @@ export async function GET(request: Request) {
     const taskMachines = await endClosedTaskMachines(pool).catch(() => null)
     // Sandboxes of deleted workspaces whose kill did not go through are killed again.
     const sandboxKills = await retrySandboxKills(pool).catch(() => null)
+    // Durable task progress, independent of heartbeat or an open client.
+    const tasks = await (await import('@/lib/factory/watchdog')).sweepFactoryWatchdog(pool).catch(() => null)
     // Group turns left queued when their request ended: they no longer wait for someone to read the group.
     const started = Date.now()
     after(() => resumePendingGroupTurns(started + 220000).catch(() => console.error('Group turn sweep failed')))
-    return Response.json({ ...runs, machines, outcomes, taskMachines, sandboxKills }, { headers })
+    return Response.json({ ...runs, machines, outcomes, taskMachines, sandboxKills, tasks }, { headers })
   }
   catch { return Response.json({ error: 'runRecoverySweepFailed' }, { status: 502, headers }) }
 }

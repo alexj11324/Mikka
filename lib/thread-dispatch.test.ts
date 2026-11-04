@@ -98,3 +98,10 @@ test('asking for a new thread is honoured only when the person said so; otherwis
   assert.deepEqual(stops, ['thread-1'], 'the old thread stops: one thread works on a task at a time')
   assert.deepEqual(executed, ['replaced'])
 })
+
+test('an explicit replacement finishes the old stop even when an epoch already set the stop flag', async () => {
+  latest = { ...run('queued'), stopRequestedAt: new Date() }; starts.length = 0
+  const result = await dispatchToTask('owner', 'task', { newThread: true, explicit: async () => true, start })
+  assert.deepEqual(result, { runId: 'run-2', thread: 'new', threadId: 'run-2', replacedThreadId: 'thread-1' })
+  assert.deepEqual(stops, ['thread-1'])
+})

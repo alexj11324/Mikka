@@ -15,7 +15,7 @@ import { redactArtifact } from "./evidence";
 
 /** The current owner turn belongs to this task epoch, not the mutable issue.
  * Automatic repairs reuse the same source; an accepted task keeps its history. */
-async function currentFactoryRequest(tx: Pick<PoolClient, 'query'>, task: FactoryTask): Promise<string> {
+export async function currentFactoryRequest(tx: Pick<PoolClient, 'query'>, task: FactoryTask): Promise<string> {
   const { rows: [source] } = await tx.query(`SELECT e.payload->>'text' AS text,e.payload->>'previousRunId' AS "previousRunId",
     EXISTS(SELECT 1 FROM agent_runs r WHERE r.id::text=e.payload->>'previousRunId' AND r."userId"=$2 AND r."issueId"=$3) AS "parentOwned"
     FROM coordinator_events e WHERE e.id=$1 AND e."userId"=$2 AND e.kind='user_message'
@@ -24,11 +24,18 @@ async function currentFactoryRequest(tx: Pick<PoolClient, 'query'>, task: Factor
   if (!source) return '' // Existing task sources retain their original behavior.
   if (!source.parentOwned || typeof source.text !== 'string' || !source.text.trim() || source.text.length > 10_000)
     throw new FactoryError('factorySourceMismatch')
+  const { rows: earlier } = await tx.query(`SELECT e.id,e.payload->>'text' AS text FROM factory_events f
+    JOIN coordinator_events e ON e.id::text=f.request->>'previousEpoch'
+    WHERE f."taskId"=$1 AND f.request->>'kind'='request_epoch' AND e."userId"=$2
+      AND e."botId" IS NOT DISTINCT FROM $3::uuid AND e.kind='user_message'
+    ORDER BY f."createdAt" DESC LIMIT 12`, [task.id, task.userId, task.botId])
   return [
     'Current owner request for this Factory task:',
+    `Request epoch: ${task.sourceEventId}.`,
     redactFactoryCheckText(source.text),
     `Continues owner run ${source.previousRunId}.`,
     'Use this current request for acceptance targets in this task. Where it changes an earlier exact-content or other target, it supersedes that older target. Unchanged requirements still apply. Older issue text, prior summaries and reports below are historical context, not permission to restore superseded targets. Execution permissions and independent-check requirements remain unchanged.',
+    ...(earlier.length ? ['Earlier authenticated requests, newest first; retain their non-conflicting constraints only:', redactFactoryCheckText(JSON.stringify(earlier)).slice(0, 24000)] : []),
     '',
   ].join('\n\n')
 }
@@ -108,6 +115,7 @@ export async function configureFactoryCheck(
   if (row.verifyCommand?.length > 2000)
     throw new FactoryError("factoryCheckCommandRequired");
   const check = {
+    requestEpoch: task.sourceEventId,
     stage: task.stage,
     candidateId: row.id,
     sha: row.executionSha,
@@ -173,7 +181,7 @@ export async function factoryCheckAssignment(
   const {
     rows: [row],
   } = await tx.query(
-    `SELECT t.stage,t.status,t."candidateId",a.output,r."baseBranch",r.kind,r."deviceRepoId",r."deviceId",r."retryOf",r."stopRequestedAt",r."botId",t."botId" AS "taskBotId",a.status AS "attemptStatus",a."candidateId" AS "attemptCandidateId",c.repository,COALESCE(c.sha,CASE WHEN c.kind='deliverable' THEN producer.report->>'deliverableCommit' END,producer.report->>'sourceCommit') AS sha,c.environment,repo."remoteUrl",repo."repoPath"
+    `SELECT t.stage,t.status,t."sourceEventId",t."candidateId",a.output,r."baseBranch",r.kind,r."deviceRepoId",r."deviceId",r."retryOf",r."stopRequestedAt",r."botId",t."botId" AS "taskBotId",a.status AS "attemptStatus",a."candidateId" AS "attemptCandidateId",c.repository,COALESCE(c.sha,CASE WHEN c.kind='deliverable' THEN producer.report->>'deliverableCommit' END,producer.report->>'sourceCommit') AS sha,c.environment,repo."remoteUrl",repo."repoPath"
      FROM factory_attempts a JOIN factory_tasks t ON t."attemptId"=a.id
      JOIN agent_runs r ON r.id=a."runId" JOIN factory_candidates c ON c.id=t."candidateId" AND c."taskId"=t.id
      JOIN agent_runs producer ON producer.id=c."runId" AND producer."userId"=$2
@@ -194,6 +202,8 @@ export async function factoryCheckAssignment(
     row.attemptStatus !== "running" ||
     row.attemptCandidateId !== row.candidateId ||
     check?.stage !== row.stage ||
+    (check?.requestEpoch != null && check.requestEpoch !== row.sourceEventId) ||
+    (row.output?.requestEpoch != null && row.output.requestEpoch !== row.sourceEventId) ||
     check?.candidateId !== row.candidateId ||
     check?.sha !== row.sha ||
     check?.repository !== row.repository ||

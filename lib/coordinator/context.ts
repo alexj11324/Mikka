@@ -129,7 +129,7 @@ export function eventPrompt(event: { kind: CoordinatorEventKind; issueId: string
         payload.verification === 'not_run' ? "This run's host post-run verifier was not run. This does not describe commands called by the Agent or separate Factory checks. Do not claim verification passed from this field alone. Mention a draft PR only when the server-confirmed publication includes one." : null,
         payload.daemonUpgradeRequired ? 'Mikka on its device is too old to run it. Tell the person that Mikka on that device needs an update, then dispatch the issue again. Nothing is wrong with their GitHub or other connections.' : null,
         payload.noMachine ? `Its machine went offline and no other machine can continue it. Draw this card and dispatch the issue again after the person answers: ${JSON.stringify(payload.noMachine)}` : null,
-        observation ? `Current host observation: ${JSON.stringify(observation)}\nUse this for the task's current state; the ended run above remains its history. Repository handoffs link the preserved predecessor to its authorized successor. Do not redispatch while a successor or Factory stage is queued or running. Review, this run's post-run verifier and the separate Factory verify stage have distinct results. These facts do not replace owner approval.` : null,
+        observation ? `Current host observation: ${JSON.stringify(observation)}\nUse this for the task's current state; the ended run above remains its history. factory.requestEpoch identifies the current owner request; factory.runAttempt.requestEpoch identifies the ended run's request, or null for legacy history. An ended run from a different request epoch cannot prove the current request's result: its summary, postRunVerify and repository handoffs remain historical. Current publication and checks belong to the current request. Repository handoffs link the preserved predecessor to its authorized successor. Do not redispatch while a successor or Factory stage is queued or running. Review, this run's post-run verifier and the separate Factory verify stage have distinct results. These facts do not replace owner approval.` : null,
         note,
       ].filter(Boolean).join('\n')
     case 'run_retried':
@@ -171,6 +171,12 @@ export function eventPrompt(event: { kind: CoordinatorEventKind; issueId: string
     case 'issue_status_changed':
       return [`[Event] Issue ${event.issueId} "${payload.title}" moved from ${payload.previousStatus} to ${payload.status}.`, note].filter(Boolean).join('\n')
     case 'run_report':
+      if (payload.source === 'task_watchdog') return [
+        `[Event] Task ${payload.taskId} cannot safely continue its current request epoch ${payload.requestEpoch}: ${payload.reason}`,
+        `Structured host handoff: ${payload.handoffEventId}, digest ${payload.handoffDigest}.`,
+        'The host already attempted bounded recovery through authorized executors. Inspect the current task and blockers. Do not replay uncertain external actions; use the Decision API to decide whether an actionable owner notification is needed.',
+        event.issueId ? `Issue: ${event.issueId}.` : null, note,
+      ].filter(Boolean).join('\n')
       return [event.runId ? `[Event] The agent in run ${event.runId} reports progress: ${payload.text}` : `[Event] An Agent reports coordination data: ${payload.text}`, event.issueId ? `Issue: ${event.issueId}.` : null, note].filter(Boolean).join('\n')
     case 'run_question':
       if (typeof payload.taskId === 'string' && typeof payload.questionId === 'string') return [

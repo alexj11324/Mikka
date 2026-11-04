@@ -11,7 +11,7 @@ export async function queueTaskRun(userId: string, input: Parameters<typeof queu
   if (!agent?.deviceId) throw new ActionFailureError('agentNoDevice')
   const repo = await ensureDeviceRepository(userId, agent.deviceId, input.repo)
   const previous = input.threadRunId ? (await pool.query(`SELECT t."botId",t.status FROM factory_attempts a JOIN factory_tasks t ON t.id=a."taskId" WHERE a."runId"=$1 AND t."userId"=$2 ORDER BY a.position DESC LIMIT 1`, [input.threadRunId, userId])).rows[0] : undefined
-  if (previous && !['passed','cancelled','revoked'].includes(previous.status)) botId = previous.botId
+  if (previous && !['cancelled','revoked'].includes(previous.status)) botId = previous.botId
   return queueFactoryTask(pool, userId, {
     issueId: input.issueId, botId, agentId: input.agentId, deviceRepoId: repo.id, note: input.note,
     key: input.requestKey, sourceEventId, previousRunId: input.threadRunId,

@@ -514,7 +514,7 @@ export async function dispatchRun(userId: string, input: { issueId: string; agen
   }
   const { withDispatchTiming } = await import('@/lib/dispatch-timing')
   return asToolResult(() => withDispatchTiming(async () => placed(await dispatchToTask(userId, request.issueId, {
-    note: request.note, newThread,
+    note: request.note, newThread, sourceEventId: requestEventId,
     // A named place other than the thread's own is a move, which only the person's explicit request grants. So is a
     // repository the person named that is not the thread's ("It's in the mikka-web repo"): the work goes there, in a new thread.
     moves: async previous => movesThread(target, await runPlacement(pool, userId, previous.id)) || await movesRepository(previous),
@@ -693,7 +693,7 @@ export async function dispatchComputerThread(userId: string, input: { botId: str
   }
   const { dispatchToTask, explicitNewThread } = await import('@/lib/thread-dispatch')
   return asToolResult(() => dispatchToTask(userId, request.issueId, {
-    note: request.note, newThread,
+    note: request.note, newThread, sourceEventId,
     explicit: () => explicitNewThread(userId, chatBotId ?? request.botId, sourceEventId),
     // Read-only sticks across the thread's runs, as on a computer.
     start: async (previous, note) => {
