@@ -2,6 +2,7 @@ import { bearerMatches, deviceGatewayTicketValid } from '../../../lib/device-gat
 
 export interface DeviceSessionStub {
   notify(): Promise<void>
+  status(): Promise<{ online: boolean; lastSeenAt: string | null }>
   fetch(request: Request): Promise<Response>
 }
 
@@ -19,11 +20,18 @@ const DEVICE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
  */
 export async function handleRequest(request: Request, env: GatewayEnv): Promise<Response> {
   const url = new URL(request.url)
-  const match = url.pathname.match(/^\/v1\/devices\/([^/]+)\/(socket|push)$/)
+  const match = url.pathname.match(/^\/v1\/devices\/([^/]+)\/(socket|push|status)$/)
   if (!match) return new Response(null, { status: 404 })
   const deviceId = decodeURIComponent(match[1] ?? '')
   if (!DEVICE.test(deviceId)) return new Response(null, { status: 400 })
   const secret = env.GATEWAY_PUSH_SECRET ?? ''
+  if (match[2] === 'status') {
+    if (request.method !== 'GET' || !bearerMatches(request.headers.get('authorization'), secret))
+      return new Response(null, { status: 401 })
+    return Response.json(await env.DEVICE_SESSION.getByName(deviceId).status(), {
+      headers: { 'cache-control': 'no-store' },
+    })
+  }
   if (match[2] === 'push') {
     if (request.method !== 'POST' || !bearerMatches(request.headers.get('authorization'), secret))
       return new Response(null, { status: 401 })
@@ -31,7 +39,14 @@ export async function handleRequest(request: Request, env: GatewayEnv): Promise<
     return new Response(null, { status: 204 })
   }
   if (request.headers.get('upgrade')?.toLowerCase() !== 'websocket') return new Response(null, { status: 426 })
-  if (!deviceGatewayTicketValid(deviceId, request.headers.get('sec-websocket-protocol') ?? '', secret))
+  const offered = request.headers.get('sec-websocket-protocol') ?? ''
+  if (!deviceGatewayTicketValid(deviceId, offered, secret))
     return new Response(null, { status: 401 })
-  return env.DEVICE_SESSION.getByName(deviceId).fetch(request)
+  // The validator checks the first ticket in the offered protocol list. Pass
+  // only that authenticated token to the DO: a 101 must select one protocol,
+  // not echo a comma-separated list supplied by the client.
+  const protocol = offered.split(',').map(item => item.trim()).find(item => item.startsWith('mikka-ticket-'))!
+  const upgrade = new Request(request)
+  upgrade.headers.set('sec-websocket-protocol', protocol)
+  return env.DEVICE_SESSION.getByName(deviceId).fetch(upgrade)
 }

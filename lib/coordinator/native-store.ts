@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
 import { coordinatorRuntimeSchema, nativeCoordinatorJobSchema, type CoordinatorRuntime, type NativeCoordinatorCommand, type NativeCoordinatorJob } from '@mikka/protocol/coordinator'
+import { deviceIsOnline } from '../device-presence'
 
 export class NativeCoordinatorError extends Error {
   constructor(readonly status: number, message: string) { super(message) }
@@ -28,9 +29,9 @@ export class NativeCoordinatorStore {
       // One row per chat (the Coordinator's and each bot's); the runtime serves them all.
       if (rows.some(row => row.busy)) throw new NativeCoordinatorError(409, 'coordinatorBusy')
       if (runtime.harness !== 'ai_sdk') {
-        const found = await client.query(`SELECT id FROM devices WHERE id=$1 AND "ownerId"=$2 AND enabled=true
-          AND "lastSeenAt" > now() - interval '2 minutes' AND harnesses @> $3::jsonb`, [runtime.deviceId, userId, JSON.stringify([{ harness: runtime.harness, installed: true, coordinator: true }])])
-        if (!found.rows.length) throw new NativeCoordinatorError(409, 'coordinatorDeviceUnavailable')
+        const found = await client.query(`SELECT id,"lastSeenAt" FROM devices WHERE id=$1 AND "ownerId"=$2 AND enabled=true AND "removedAt" IS NULL
+          AND harnesses @> $3::jsonb`, [runtime.deviceId, userId, JSON.stringify([{ harness: runtime.harness, installed: true, coordinator: true }])])
+        if (!found.rows.length || !await deviceIsOnline(found.rows[0])) throw new NativeCoordinatorError(409, 'coordinatorDeviceUnavailable')
       }
       await client.query(`INSERT INTO coordinator_runtime_settings ("userId",runtime) VALUES ($1,$2)
         ON CONFLICT ("userId") DO UPDATE SET runtime=excluded.runtime,"updatedAt"=now()`, [userId, JSON.stringify(runtime)])

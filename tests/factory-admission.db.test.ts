@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
+import { createServer } from 'node:http'
+import { once } from 'node:events'
 import test from 'node:test'
 import type { PoolClient } from 'pg'
 import { remoteKey } from '@mikka/protocol/repository'
@@ -159,6 +161,73 @@ test('real Factory admission preserves host scope, policy and transaction owners
       const admission = (await pool.query('SELECT "agentDefinition" FROM agent_runs WHERE id=$1', [committed.runId])).rows[0].agentDefinition.repositoryAdmission
       assert.equal(admission.requestEventId, f.eventId)
       assert.equal(await acceptedEventStillMatches(admission, null), true, 'the claim path retains the NULL-issue Factory host binding')
+    })
+
+    await t.test('gateway wake belongs to the outer commit, including a host that starts lifecycle work immediately', async () => {
+      const f = await fixture({ destination: 'selected' })
+      const pending: Promise<unknown>[] = []
+      const received: string[] = []
+      const contextKey = Symbol.for('@vercel/request-context')
+      const globals = globalThis as unknown as Record<symbol, unknown>
+      const previousContext = globals[contextKey]
+      const previous = { url: process.env.DEVICE_GATEWAY_URL, secret: process.env.DEVICE_GATEWAY_PUSH_SECRET }
+      const server = createServer(async (request, response) => {
+        try {
+          assert.equal(request.headers.authorization, 'Bearer isolated-factory-wake-secret')
+          if (request.method === 'GET') {
+            response.end(JSON.stringify({ online: true, lastSeenAt: new Date().toISOString() }))
+            return
+          }
+          assert.equal(request.url, `/v1/devices/${f.deviceId}/push`)
+          // This separate connection cannot see the admission transaction until
+          // its run, publication, Factory binding and receipt have all committed.
+          const { rows } = await pool.query(`SELECT r.id FROM agent_runs r
+            JOIN run_publications p ON p."runId"=r.id
+            JOIN factory_attempts a ON a."runId"=r.id
+            JOIN factory_events e ON e."taskId"=a."taskId" AND e.result->>'runId'=r.id::text
+            WHERE r."deviceId"=$1 AND r."userId"=$2 AND r.status='queued'`, [f.deviceId, f.userId])
+          assert.equal(rows.length, 1, 'the signal cannot outrun the complete Factory commit')
+          received.push(rows[0].id)
+          response.writeHead(204).end()
+        } catch (error) {
+          received.push(`invalid:${error instanceof Error ? error.message : 'unknown'}`)
+          response.writeHead(400).end()
+        }
+      })
+      server.listen(0, '127.0.0.1')
+      await once(server, 'listening')
+      const address = server.address()
+      assert.ok(address && typeof address !== 'string')
+      process.env.DEVICE_GATEWAY_URL = `http://127.0.0.1:${address.port}`
+      process.env.DEVICE_GATEWAY_PUSH_SECRET = 'isolated-factory-wake-secret'
+      // Plain Node has no Next request scope; the actual Vercel helper starts
+      // each supplied promise now, as nested after callbacks may do in production.
+      globals[contextKey] = { get: () => ({ waitUntil: (promise: Promise<unknown>) => pending.push(promise) }) }
+      const tx = await pool.connect()
+      try {
+        await tx.query('BEGIN')
+        await dispatch(f, tx)
+        assert.equal(pending.length, 0, 'joining admission must not schedule a premature wake')
+        assert.equal((await rowsFor(f)).runs, 0)
+        await tx.query('ROLLBACK')
+        assert.equal(pending.length, 0, 'rolled-back work produces no wake')
+        const result = await dispatch(f)
+        assert.equal(pending.length, 1, 'the transaction owner sends exactly once after commit')
+        await Promise.all(pending)
+        assert.deepEqual(received, [result.runId])
+        await dispatch(f)
+        assert.equal(pending.length, 1, 'strict dispatch replay does not duplicate the wake')
+      } finally {
+        await tx.query('ROLLBACK'); tx.release()
+        await Promise.allSettled(pending)
+        globals[contextKey] = previousContext
+        if (previous.url === undefined) delete process.env.DEVICE_GATEWAY_URL
+        else process.env.DEVICE_GATEWAY_URL = previous.url
+        if (previous.secret === undefined) delete process.env.DEVICE_GATEWAY_PUSH_SECRET
+        else process.env.DEVICE_GATEWAY_PUSH_SECRET = previous.secret
+        server.closeAllConnections()
+        await new Promise<void>(resolve => server.close(() => resolve()))
+      }
     })
 
     await t.test('destination, delivery and source identity cannot be discarded by an internal dispatch', async () => {

@@ -1,6 +1,6 @@
 import 'server-only'
 import type { Pool } from 'pg'
-import { isDeviceOnline } from '@mikka/protocol/device'
+import { deviceIsOnline } from './device-presence'
 import type { HarnessInfo } from '@mikka/protocol/harness'
 
 // Where a dispatch runs when the person named the place (decision
@@ -29,7 +29,7 @@ export async function targetDevice(query: Query, userId: string, deviceId: strin
   const { rows: [device] } = await query.query<{ id: string; name: string; enabled: boolean; lastSeenAt: Date | null; harnesses: HarnessInfo[] | null }>(
     `SELECT id,name,enabled,"lastSeenAt",harnesses FROM devices WHERE id=$1 AND "ownerId"=$2 AND kind='local' AND "removedAt" IS NULL`, [deviceId, userId])
   if (!device) return { error: 'notFound' }
-  if (!device.enabled || !isDeviceOnline(device.lastSeenAt)) return { error: 'unavailable' }
+  if (!device.enabled || !await deviceIsOnline(device)) return { error: 'unavailable' }
   for (const info of (device.harnesses ?? []).filter(item => item.installed)) {
     const { rows: [agent] } = await query.query<{ id: string }>('SELECT id FROM agents WHERE "userId"=$1 AND "deviceId"=$2 AND harness=$3 ORDER BY "createdAt",id LIMIT 1', [userId, device.id, info.harness])
     if (agent) return { deviceId: device.id, name: device.name, agentId: agent.id, harness: info.harness, ...(info.defaultModelSlot ?? info.models?.[0] ? { model: info.defaultModelSlot ?? info.models?.[0] } : {}) }

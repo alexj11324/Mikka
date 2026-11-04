@@ -86,7 +86,7 @@ import {
   RunSupervisor,
   type SupervisorDeps,
 } from "./runs/supervisor"
-import { openDeviceGateway, runDeviceGateway } from "./device-gateway"
+import { DeviceGatewayClosedError, openDeviceGateway, runDeviceGateway } from "./device-gateway"
 import type { DeviceRepo, MemoryServer, ServerLink } from "./server-link"
 import { SessionRejectedError } from "./server-link-http"
 import { WorktreeManager } from "./worktrees"
@@ -253,6 +253,10 @@ export class Daemon {
   private gatewayLive = false
   /** The server said it has no gateway. Do not ask again on every long-poll. */
   private gatewayUnavailable = false
+  private gatewayFailures = 0
+  private gatewayRetryAt = 0
+  private deviceReceiptsVersion = 0
+  private deviceReceiptsAcknowledged = 0
   private commandsLoop: Promise<void> = Promise.resolve()
   private fsLoop: Promise<void> = Promise.resolve()
   private reviewAbort: AbortController | null = null
@@ -651,6 +655,11 @@ export class Daemon {
           backoff = 1_000
           continue
         }
+        if (this.stopped || signal.aborted) return
+        // An uninstall heartbeat queues stop on the next event-loop turn.
+        // Do not send another unauthorized command request in that gap and
+        // erase the grace credential before the service receives its receipt.
+        if (this.draining && this.supervisor.heartbeatRuns().length === 0) return
         // Runs being stopped or already ended would come back on every
         // answer; leaving them out lets the poll wait for new commands.
         // So are queued runs this daemon refused or failed to claim: the
@@ -734,40 +743,77 @@ export class Daemon {
     if (this.stopped || signal.aborted) return
     await this.applyCommands(commands)
     if (queued.length > 0) this.claimQueued(queued)
+    // A held socket never returns to pollCommands' ACK step. Confirm delivery
+    // here, retaining IDs on failure so the fallback retries without redelivery.
+    while (this.unacked.size > 0 && !signal.aborted) {
+      const ids = [...this.unacked].slice(0, 500)
+      await this.options.link.ackCommands(deviceId, ids)
+      for (const id of ids) this.unacked.delete(id)
+    }
   }
 
   /**
-   * Stay on the device's push socket until it drops. True when a session
-   * existed (reconnect it). False when there is no gateway, so the caller
-   * long-polls.
+   * Stay on the device's push socket until it drops. Failed and short-lived
+   * sessions cool down independently of the responsive long-poll fallback.
    */
   private async holdGateway(deviceId: string, signal: AbortSignal) {
     const mint = this.options.link.deviceGateway
-    if (!mint || this.gatewayUnavailable) return false
-    let ticket: { url: string | null; protocol: string | null }
-    try { ticket = await mint.call(this.options.link, deviceId, signal) } catch { return false }
-    if (!ticket.url || !ticket.protocol) { this.gatewayUnavailable = true; return false }
-    if (signal.aborted) return false
-    let opened = false
-    const socket = openDeviceGateway(ticket.url, ticket.protocol)
+    if (!mint || this.gatewayUnavailable || performance.now() < this.gatewayRetryAt) return false
+    let openedAt: number | undefined
+    let failure: unknown
+    const connection = new AbortController()
+    const abort = () => connection.abort()
+    signal.addEventListener("abort", abort, { once: true })
+    if (signal.aborted) connection.abort()
     try {
+      const ticket = await mint.call(this.options.link, deviceId, connection.signal)
+      if (!ticket.url || !ticket.protocol) { this.gatewayUnavailable = true; return false }
+      if (signal.aborted) return false
+      const socket = openDeviceGateway(ticket.url, ticket.protocol)
       await runDeviceGateway(socket, {
-        signal,
-        onWork: async () => {
-          opened = true
+        signal: connection.signal,
+        onOpen: () => {
+          openedAt = performance.now()
           this.gatewayLive = true
-          await this.pullSignaledWork(deviceId, signal)
-          void this.syncWithServer().catch(() => undefined)
+        },
+        onWork: async () => {
+          await this.pullSignaledWork(deviceId, connection.signal)
+          if (connection.signal.aborted || this.stopped) return
+          await this.syncWithServer()
+          // Idle push mode removed the timer. Work can create a run, so it
+          // must restore recurring lease renewals, not only heartbeat once.
+          if (!connection.signal.aborted && !this.stopped)
+            this.schedule(this.gatewayIdle() ? null : (this.options.heartbeatMs ?? 15_000))
         },
       })
-      return true
     } catch (error) {
-      if (!this.stopped && !signal.aborted && opened) this.log.warn({ err: error }, "device gateway disconnected")
-      return opened
+      failure = error
+      if (!this.stopped && !signal.aborted) {
+        this.log.warn({ err: error }, "device gateway disconnected; using long-poll fallback")
+        // Removed devices may still heartbeat once to receive uninstall.
+        // Let that path handle auth before a command 401 clears credentials.
+        if (error instanceof SessionRejectedError) await this.syncWithServer().catch(() => undefined)
+      }
     } finally {
+      connection.abort()
+      signal.removeEventListener("abort", abort)
       this.gatewayLive = false
-      if (!this.stopped) this.schedule(this.options.heartbeatMs ?? 15_000)
+      if (!this.stopped && !signal.aborted && !this.gatewayUnavailable) {
+        // Merely opening is not recovery: a flapping server must not reset
+        // backoff. Stable sessions start again at the shortest retry delay.
+        if (openedAt !== undefined && performance.now() - openedAt >= 60_000) this.gatewayFailures = 0
+        this.gatewayFailures = Math.min(this.gatewayFailures + 1, 5)
+        const ceiling = Math.min(60_000, 5_000 * 2 ** (this.gatewayFailures - 1))
+        const delay = failure instanceof DeviceGatewayClosedError && failure.code === 4000
+          ? 60_000 : ceiling * (0.8 + Math.random() * 0.2)
+        this.gatewayRetryAt = performance.now() + delay
+        // Idle push mode clears the timer. Resume it once after disconnect,
+        // preserving a pending or in-flight heartbeat during fallback/active
+        // work: repeated gateway failures must not postpone lease renewals.
+        if (this.timer === null) this.schedule(this.options.heartbeatMs ?? 15_000)
+      }
     }
+    return false
   }
 
   /**
@@ -1153,6 +1199,7 @@ export class Daemon {
   }
 
   private saveDevice(patch: Partial<DeviceFile>) {
+    if (patch.completedDeviceCommands || patch.failedDeviceCommands) this.deviceReceiptsVersion++
     this.device = { ...this.device, ...patch }
     writeJsonAtomic(this.paths.device, this.device)
   }
@@ -1160,7 +1207,8 @@ export class Daemon {
   /** Idle on the push socket: no runs, nothing waiting to upload. The database can sleep. */
   private gatewayIdle() {
     return this.gatewayLive && this.server === "online" && this.supervisor.heartbeatRuns().length === 0
-      && this.queuedClaims.size === 0 && this.outbox.pending() === 0 && !this.draining && !this.updating
+      && this.queuedClaims.size === 0 && this.unacked.size === 0 && this.outbox.pending() === 0 && !this.draining && !this.updating
+      && this.deviceReceiptsVersion === this.deviceReceiptsAcknowledged
   }
 
   private schedule(delay: number | null) {
@@ -1245,6 +1293,7 @@ export class Daemon {
       const deviceId = this.device.deviceId as string
       // Heartbeat first: lease renewal must not wait on anything else.
       const quotas = this.quota?.snapshot().quotas
+      const receiptsVersion = this.deviceReceiptsVersion
       const heartbeat = {
         completedDeviceCommands: this.device.completedDeviceCommands,
         failedDeviceCommands: this.device.failedDeviceCommands,
@@ -1257,6 +1306,7 @@ export class Daemon {
         ...(this.options.autoUpdate ? { updateFailure: reportedUpdateFailure(this.updateStateFile, DAEMON_VERSION) } : {}),
       }
       const { leases, revoked, cloudCredential, deviceCommands, daemonVersions } = await link.heartbeat(deviceId, heartbeat)
+      this.deviceReceiptsAcknowledged = receiptsVersion
       this.learnRelease(daemonVersions?.latest)
       this.supervisor.renewLeases(leases)
       if (revoked) this.supervisor.revokeLeases(revoked)
