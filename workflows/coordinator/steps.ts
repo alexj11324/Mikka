@@ -598,7 +598,9 @@ async function dispatchByRules(userId: string, input: { threadRunId?: string; is
       return { error: 'machineUnavailable' as const, issueId: input.issueId, reason: target.reason, card: target.card }
     }
     const onDevice = async (device: Extract<typeof target, { kind: 'device' }>) => {
-      const result = await queueTaskRun(userId, { ...input, agentId: device.agentId, model: device.model, pinnedDeviceId: device.deviceId, ...(device.subscriptionBindingId ? { subscriptionBindingId: device.subscriptionBindingId } : {}), ...(device.entry.source.kind === 'api_key' ? { apiKeyId: device.entry.source.keyId } : {}) }, botId, execution, requestEventId)
+      // Automatic placement selects the initial worker, not an owner-pinned
+      // destination. Only the named-device branch above freezes that constraint.
+      const result = await queueTaskRun(userId, { ...input, agentId: device.agentId, model: device.model, ...(device.subscriptionBindingId ? { subscriptionBindingId: device.subscriptionBindingId } : {}), ...(device.entry.source.kind === 'api_key' ? { apiKeyId: device.entry.source.keyId } : {}) }, botId, execution, requestEventId)
       return { ...result, status: 'queued' as const }
     }
     if (target.kind === 'device') return onDevice(target)
