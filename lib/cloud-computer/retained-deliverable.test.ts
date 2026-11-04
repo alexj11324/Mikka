@@ -17,7 +17,10 @@ async function fixture() {
   const task: FactoryTask = { id: id(1), userId: 'fixture-owner', issueId: id(2), botId: id(3), scopeVersion: 1,
     sourceEventId: id(4), revision: 18, stage: 'review', status: 'waiting', attemptId: id(5), candidateId: id(6), reason: '',
     route: { issueId: id(2), eventId: id(4), sourceEventId: id(4), rationale: 'fixture', missingInformation: [], missingPermissions: [], needsSpec: false } }
-  const producer = { id: id(7), botId: task.botId, sessionId: 'original-native-session', report: { sourceCommit: 'a'.repeat(40) },
+  const producer = { id: id(7), botId: task.botId, sessionId: 'original-native-session', kind: 'implement',
+    agentDefinition: { readOnly: false }, continuesRunId: id(17),
+    questionContinuation: { questionId: id(18), originSessionId: 'original-native-session', requireSessionResume: true },
+    report: { sourceCommit: 'a'.repeat(40), verify: { status: 'not_run' } },
     deviceId: id(8), deviceRepoId: id(9), worktreePath: `/home/user/.mikka/worker/worktrees/${id(10)}` }
   const review = { id: id(11), botId: task.botId }, candidate = { id: task.candidateId, runId: producer.id }
   const question = { id: id(12), revision: 1, status: 'open', answer: null, answerId: null,
@@ -127,6 +130,7 @@ async function fixture() {
 
 test('observes only the admitted retained VM, restores pause, and keeps its lease for the final task transaction', async () => {
   const f = await fixture(), observed = await f.observe()
+  assert.deepEqual(f.scope.legacyQuestionSubmission, { questionId: id(18), continuesRunId: id(17) })
   assert.deepEqual(observed.snapshot, { ...f.value, sandboxId: f.scope.sandboxId, machineRunId: f.scope.machineRunId })
   assert.equal(observed.leaseId, f.machine.workerLeaseId)
   assert.equal(f.machine.workerLeaseUntil, instant + 180_000)
@@ -140,6 +144,9 @@ test('observes only the admitted retained VM, restores pause, and keeps its leas
   assert.match(command, /\/usr\/bin\/env -i/)
   assert.match(command, /\/opt\/mikka\/runtime\/node\/bin\/node/)
   assert.match(command, /the deployed standalone probe/)
+  const encodedInput = command.match(/--mikka-retained-delivery-probe '([A-Za-z0-9_-]+)'$/)?.[1]
+  assert.ok(encodedInput)
+  assert.deepEqual(JSON.parse(Buffer.from(encodedInput, 'base64url').toString('utf8')).legacyQuestionSubmission, f.scope.legacyQuestionSubmission)
   assert.equal(options.user, 'user'); assert.equal(options.timeoutMs, options.requestTimeoutMs)
   assert.ok(options.timeoutMs <= 25_000 && options.signal instanceof AbortSignal)
   assert.deepEqual(f.logs, []); f.unchanged()
@@ -148,13 +155,14 @@ test('observes only the admitted retained VM, restores pause, and keeps its leas
 })
 
 test('policy, full-scope drift, second-read drift and a lost lease CAS all refuse before provider I/O', async () => {
-  for (const fault of ['deny', 'unknown_policy', 'owner', 'question', 'checkpoint', 'second_read', 'lease_cas']) {
+  for (const fault of ['deny', 'unknown_policy', 'owner', 'question', 'checkpoint', 'producer_predecessor', 'second_read', 'lease_cas']) {
     const f = await fixture()
     if (fault === 'deny') f.state.permission = 'deny'
     if (fault === 'unknown_policy') f.state.permission = 'unexpected'
     if (fault === 'owner') f.scope.ownerId = 'another-owner'
     if (fault === 'question') f.scope.questionIdentityDigest = 'd'.repeat(64)
     if (fault === 'checkpoint') f.scope.checkpoint.patchSha256 = 'd'.repeat(64)
+    if (fault === 'producer_predecessor') f.scope.legacyQuestionSubmission!.continuesRunId = id(90)
     if (fault === 'second_read') f.state.beforeSecondRead = () => { f.row.question.revision++ }
     if (fault === 'lease_cas') f.state.failLease = true
     await assert.rejects(f.observe(), refused, fault)
@@ -197,7 +205,7 @@ test('scope changes with the same lease also invalidate provider authority', asy
 })
 
 test('provider errors and malformed probe output restore this VM and release only its own lease without exposing raw text', async () => {
-  for (const fault of ['script', 'probe', 'json', 'large', 'exit', 'unknown_code', 'safe_code']) {
+  for (const fault of ['script', 'probe', 'json', 'large', 'exit', 'unknown_code', 'safe_code', 'journal_state', 'journal_binding']) {
     const f = await fixture()
     if (fault === 'script' || fault === 'probe') f.hooks[fault] = () => { throw new Error('PRIVATE-CREDENTIAL raw provider output') }
     if (fault === 'json') f.output.stdout = 'PRIVATE-CREDENTIAL invalid json'
@@ -205,12 +213,14 @@ test('provider errors and malformed probe output restore this VM and release onl
     if (fault === 'exit') { f.output.exitCode = 9; f.output.stdout = 'PRIVATE-CREDENTIAL stderr' }
     if (fault === 'unknown_code') f.output.stdout = JSON.stringify({ ok: false, code: 'PRIVATE-CREDENTIAL' })
     if (fault === 'safe_code') f.output.stdout = JSON.stringify({ ok: false, code: 'retained_delivery_git_filter', message: 'PRIVATE-CREDENTIAL' })
+    if (fault === 'journal_state' || fault === 'journal_binding') f.output.stdout = JSON.stringify({ ok: false, code: `retained_delivery_${fault}_mismatch`, message: 'PRIVATE-CREDENTIAL' })
     await assert.rejects(f.observe(), refused, fault)
     assert.equal(f.calls.filter(call => call.phase === 'pause').length, 1, fault)
     assert.equal(f.machine.workerLeaseId, null, fault)
     assert.equal(f.machine.state, 'paused', fault)
     assert.doesNotMatch(f.logs.join('\n'), /PRIVATE-CREDENTIAL/)
-    assert.equal(JSON.parse(f.logs[0]).code, fault === 'safe_code' ? 'retained_delivery_git_filter' : undefined)
+    assert.equal(JSON.parse(f.logs[0]).code, fault === 'safe_code' ? 'retained_delivery_git_filter' :
+      fault === 'journal_state' || fault === 'journal_binding' ? `retained_delivery_${fault}_mismatch` : undefined)
     f.unchanged()
   }
 })
