@@ -14,9 +14,27 @@ import (
 // Serve starts; requests cannot replace them or import credentials/endpoints.
 func (w *Worker) Serve(ctx context.Context, input io.Reader, output io.Writer) error {
 	scanner := bufio.NewScanner(input)
-	scanner.Buffer(make([]byte, 4096), 524288)
+	// The maximum model frame is inclusive; Scanner also needs room for LF.
+	scanner.Buffer(make([]byte, 4096), modelRPCFrameMaxBytes+1)
+	// Count raw bytes before LF. ScanLines strips CR, which would silently
+	// admit an extra byte for a legacy-method frame ending in CRLF.
+	scanner.Split(func(data []byte, atEOF bool) (int, []byte, error) {
+		if end := bytes.IndexByte(data, '\n'); end >= 0 {
+			return end + 1, data[:end], nil
+		}
+		if atEOF && len(data) > 0 {
+			return len(data), data, nil
+		}
+		return 0, nil, nil
+	})
 	encoder := json.NewEncoder(output)
 	for scanner.Scan() {
+		frame := scanner.Bytes()
+		// A Reader may return final bytes together with io.EOF. In that case
+		// Scanner can return its entire buffer, including our spare LF byte.
+		if len(frame) > modelRPCFrameMaxBytes {
+			return ErrUnsupported
+		}
 		var request struct {
 			ID          string          `json:"id"`
 			Method      string          `json:"method"`
@@ -28,11 +46,17 @@ func (w *Worker) Serve(ctx context.Context, input io.Reader, output io.Writer) e
 			CallbackURL string          `json:"callbackUrl,omitempty"`
 			Code        string          `json:"code,omitempty"`
 		}
-		decoder := json.NewDecoder(bytes.NewReader(scanner.Bytes()))
+		decoder := json.NewDecoder(bytes.NewReader(frame))
 		decoder.DisallowUnknownFields()
 		var result any
 		var err error
-		if decoder.Decode(&request) != nil || decoder.Decode(new(any)) != io.EOF || request.ID == "" || len(request.ID) > 64 {
+		invalid := decoder.Decode(&request) != nil || decoder.Decode(new(any)) != io.EOF || request.ID == "" || len(request.ID) > 64
+		// Raising the model frame budget must not expand execute, nativeStream,
+		// credential operations or any other method's previous transport limit.
+		if len(frame) > legacyRPCFrameMaxBytes && (invalid || request.Method != "executeStream") {
+			return ErrUnsupported
+		}
+		if invalid {
 			request.ID = ""
 			err = ErrUnsupported
 		} else {

@@ -134,8 +134,15 @@ func TestRequestDiagnosticsAcceptOnlyLocalEnumsAndByteCounts(t *testing.T) {
 		requestFailure("claude", "stream", "json_invalid", 12, 262144)
 		requestFailure("claude", "input", "json_invalid", -1, 262144)
 		requestFailure("claude", "input", "json_invalid", 12, 12345)
+		requestFailure("claude", "input", "payload_too_large", 1048577, 1048576)
+		requestFailure("codex", "conversion", "payload_too_large", 2097153, 2097152)
+		requestFailure("claude", "input", "json_invalid", 12, 2097152)
+		requestFailure("codex", "conversion", "json_invalid", 12, 1048576)
+		requestFailure("claude", "stream", "chunk_too_large", 1048577, 1048576)
 	})
-	if logged != "subscription_request_failure unknown input json_invalid 12 262144\n" {
+	if logged != "subscription_request_failure unknown input json_invalid 12 262144\n"+
+		"subscription_request_failure claude input payload_too_large 1048577 1048576\n"+
+		"subscription_request_failure codex conversion payload_too_large 2097153 2097152\n" {
 		t.Fatalf("unexpected local diagnostic: %q", logged)
 	}
 }
@@ -143,7 +150,7 @@ func TestRequestDiagnosticsAcceptOnlyLocalEnumsAndByteCounts(t *testing.T) {
 func TestPlainModelRequestBoundariesDoNotReachProviderOrExposeInput(t *testing.T) {
 	for _, provider := range []string{"claude", "codex"} {
 		t.Run(provider, func(t *testing.T) {
-			calls, sentBytes := 0, 0
+			calls, sentBytes, inputBytes := 0, 0, 0
 			model := CPAPlainModel{Provider: provider, Client: &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
 				calls++
 				raw, err := io.ReadAll(r.Body)
@@ -159,10 +166,16 @@ func TestPlainModelRequestBoundariesDoNotReachProviderOrExposeInput(t *testing.T
 			})}}
 			auth := &core.Auth{Metadata: map[string]any{"access_token": "fixture-private-access", "account_id": "fixture-account"}}
 			execute := func(text string) error {
-				payload, err := json.Marshal(map[string]any{"model": "fixture-model", "stream": true, "messages": []any{map[string]any{"role": "user", "content": text}}})
-				if err != nil {
+				var input bytes.Buffer
+				encoder := json.NewEncoder(&input)
+				// Match JSON.stringify: HTML characters arrive unescaped. Real
+				// conversion can expand them while the input stays under 1 MiB.
+				encoder.SetEscapeHTML(false)
+				if err := encoder.Encode(map[string]any{"model": "fixture-model", "stream": true, "messages": []any{map[string]any{"role": "user", "content": text}}}); err != nil {
 					t.Fatal(err)
 				}
+				payload := bytes.TrimSuffix(input.Bytes(), []byte("\n"))
+				inputBytes = len(payload)
 				result, err := model.ExecuteStream(context.Background(), auth, ex.Request{Model: "fixture-model", Payload: payload}, ex.Options{})
 				if err != nil {
 					return err
@@ -178,22 +191,23 @@ func TestPlainModelRequestBoundariesDoNotReachProviderOrExposeInput(t *testing.T
 				t.Fatal(err)
 			}
 			// Calibrate the real CPA conversion, rather than copying its format.
-			capacity := 524288 - sentBytes + len("seed")
+			capacity := 2097152 - sentBytes + len("seed")
+			boundary := strings.Repeat("<", capacity/6) + strings.Repeat("x", capacity%6)
 			calls = 0
-			if err := execute(strings.Repeat("x", capacity)); err != nil || calls != 1 || sentBytes != 524288 {
-				t.Fatalf("exact converted boundary failed: err=%v calls=%d bytes=%d", err, calls, sentBytes)
+			if err := execute(boundary); err != nil || calls != 1 || sentBytes != 2097152 || inputBytes > 1048576 {
+				t.Fatalf("exact converted boundary failed: err=%v calls=%d input=%d output=%d", err, calls, inputBytes, sentBytes)
 			}
 			calls = 0
 			var err error
-			logged := captureStderr(t, func() { err = execute(strings.Repeat("x", capacity+1)) })
-			if err != ErrProvider || calls != 0 || logged != fmt.Sprintf("subscription_request_failure %s conversion payload_too_large 524289 524288\n", provider) {
+			logged := captureStderr(t, func() { err = execute(boundary + "x") })
+			if err != ErrProvider || calls != 0 || inputBytes > 1048576 || logged != fmt.Sprintf("subscription_request_failure %s conversion payload_too_large 2097153 2097152\n", provider) {
 				t.Fatalf("converted overflow crossed boundary: err=%v calls=%d diagnostic=%q", err, calls, logged)
 			}
 			invalid := []byte(`{"fixture-private-body":`)
 			logged = captureStderr(t, func() {
 				_, err = model.ExecuteStream(context.Background(), auth, ex.Request{Model: "fixture-model", Payload: invalid}, ex.Options{})
 			})
-			if err != ErrProvider || calls != 0 || logged != fmt.Sprintf("subscription_request_failure %s input json_invalid %d 262144\n", provider, len(invalid)) {
+			if err != ErrProvider || calls != 0 || logged != fmt.Sprintf("subscription_request_failure %s input json_invalid %d 1048576\n", provider, len(invalid)) {
 				t.Fatalf("invalid input crossed boundary: err=%v calls=%d diagnostic=%q", err, calls, logged)
 			}
 			if strings.Contains(logged, "fixture-private") {

@@ -43,7 +43,11 @@ export class WorkerRefusal extends Error {
   constructor(readonly code: string = "subscription_worker_unavailable") { super(code); this.name = "WorkerRefusal" }
 }
 const STORE_FAILURE = /^(secret_store_failure (GET|POST|DELETE) (no_token|network|http_\d{3})|subscription_upstream_failure (claude|codex) (transport|response|event|incomplete|convert) \d{1,3} [a-z_]{1,40})$/
-const REQUEST_FAILURE = /^subscription_request_failure (claude|codex|unknown) (input (model_invalid|payload_too_large|json_invalid)|conversion (conversion_failed|json_invalid|encode_failed|payload_too_large|request_invalid)|stream (stream_unavailable|chunk_too_large)) (0|[1-9]\d{0,9}) (0|65536|262144|524288)$/
+const REQUEST_BYTES = '(0|[1-9]\\d{0,9})'
+const REQUEST_FAILURE = new RegExp('^subscription_request_failure (claude|codex|unknown) (' +
+  `input (model_invalid|payload_too_large|json_invalid) ${REQUEST_BYTES} (0|262144|1048576)|` +
+  `conversion (conversion_failed|json_invalid|encode_failed|payload_too_large|request_invalid) ${REQUEST_BYTES} (0|524288|2097152)|` +
+  `stream (stream_unavailable|chunk_too_large) ${REQUEST_BYTES} (0|65536))$`)
 const safeCode = (value: unknown) => typeof value === "string" && /^[a-z_]{1,64}$/.test(value) ? value : "subscription_worker_unavailable"
 
 export class SubscriptionWorkerClient {

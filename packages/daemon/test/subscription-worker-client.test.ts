@@ -114,7 +114,9 @@ it('accepts only fixed request-boundary diagnostics and preserves the refusal if
   const binary = join(directory, 'worker.mjs')
   const allowed = [
     'subscription_request_failure claude input payload_too_large 262145 262144',
+    'subscription_request_failure claude input payload_too_large 1048577 1048576',
     'subscription_request_failure codex conversion payload_too_large 524289 524288',
+    'subscription_request_failure codex conversion payload_too_large 2097153 2097152',
     'subscription_request_failure claude conversion json_invalid 37 524288',
     'subscription_request_failure unknown stream stream_unavailable 0 0',
     'subscription_request_failure claude stream chunk_too_large 65537 65536',
@@ -128,6 +130,9 @@ it('accepts only fixed request-boundary diagnostics and preserves the refusal if
     'subscription_request_failure claude input payload_too_large 1.5 262144',
     'subscription_request_failure claude input payload_too_large 10000000000 262144',
     'subscription_request_failure claude input payload_too_large 262145 999999',
+    'subscription_request_failure claude input payload_too_large 2097153 2097152',
+    'subscription_request_failure codex conversion payload_too_large 1048577 1048576',
+    'subscription_request_failure claude stream chunk_too_large 1048577 1048576',
     'subscription_request_failure claude input payload_too_large 262145 262144 fixture-private-body',
   ]
   writeFileSync(binary, `#!/usr/bin/env node

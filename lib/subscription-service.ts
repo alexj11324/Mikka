@@ -12,8 +12,11 @@ import { accountLabel, failedUsage, parseSubscriptionUsage, type SubscriptionUsa
 import { BACKEND_FAILURES, GENERATION_FAILURES, PRIVATE_FAILURES, generationFailureDetails } from './subscription-generation-diagnostics'
 import { stepIdentity } from './model-call-timing'
 
-// Matches Worker.Stream's existing UTF-8 payload limit.
-const MODEL_REQUEST_MAX_BYTES = 262144
+// Matches modelRequestMaxBytes in the Go worker. The conversation's 100k
+// compaction estimate excludes the system prompt and tool schemas.
+const MODEL_REQUEST_MAX_BYTES = 1_048_576
+// Used only to preserve the public refusal of inputs still over budget.
+const LEGACY_HOST_CODE_UNIT_LIMIT = 262144
 
 export interface SubscriptionCapabilities {
   /** Whether the route runs for this subscription owner (lib/subscription-routes.ts). */
@@ -83,10 +86,9 @@ export class SubscriptionService {
             const bytes = Buffer.byteLength(init.body, 'utf8')
             if (bytes > MODEL_REQUEST_MAX_BYTES) {
               await logRequestFailure('payload_too_large', bytes)
-              // Preserve both existing public refusals. The old host guard
-              // rejected this many UTF-16 units; a multibyte-only overflow
-              // previously reached Go and became the generic stream failure.
-              throw init.body.length > MODEL_REQUEST_MAX_BYTES
+              // Keep the old public mapping; the UTF-16 threshold is not the
+              // new transport budget and does not decide whether to admit it.
+              throw init.body.length > LEGACY_HOST_CODE_UNIT_LIMIT
                 ? new SubscriptionRefusal('backend_unavailable')
                 : new Error('subscription_generation_failed')
             }
