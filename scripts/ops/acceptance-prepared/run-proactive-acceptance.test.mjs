@@ -34,9 +34,9 @@ const replay = () => {
 function fixture({ groupFails = true, throwsAfterCreation = false, replayFails = false, withTask = false, wrongTaskOwner = false,
   mcpShareFails = false, mcpCleanupFails = false, mcpCreateThrows = false, driftAfterMcp = false,
   helperLogoutStatus = 200, groupLogoutStatus = 200, unknownStop = false, wrongGroupOwner = false, sourceStopUnknown = false,
-  mutateReplay = value => value } = {}) {
-  const calls = [], counters = { helper: 0, group: 0, replay: 0, signout: 0, cancel: 0, mcpCreate: 0, mcpDelete: 0, groupStop: 0 }
-  let helperActive = false, mcpServer = null, createdGroup = null, stopped = false
+  mutateReplay = value => value, wrongRunOwner = false, runStatus = 'stopped', machineEndStatus = 200, unknownMachineEnd = false } = {}) {
+  const calls = [], counters = { helper: 0, group: 0, replay: 0, signout: 0, cancel: 0, mcpCreate: 0, mcpDelete: 0, groupStop: 0, machineEnd: 0 }
+  let helperActive = false, mcpServer = null, createdGroup = null, stopped = false, taskCancelled = !groupFails
   const createdBots = [], fixtureId = id(700), marker = fixtureId.slice(0, 8)
   const existingMcp = { id: id(90), name: 'PRIVATE existing MCP', url: 'https://private.invalid', ownerId: 'fixture-owner', mine: true,
     shared: false, enabled: true, transport: 'http', authKind: 'header', revision: 1 }
@@ -85,7 +85,7 @@ function fixture({ groupFails = true, throwsAfterCreation = false, replayFails =
     if (path.endsWith('/members')) return Response.json({ members: [{ id: 'fixture-owner', memberType: 'user', role: 'owner' },
       ...createdBots.map(bot => ({ id: bot.id, memberType: 'bot', role: 'member' }))] })
     if (path.endsWith('/decisions')) return Response.json({ turns: [{ messageId: id(40), status: 'failed', error: stopped ? 'stopped' : 'group_judgment_pending',
-      trace: { status: stopped ? 'stopped' : 'pending', events: [] } }] })
+      trace: { status: stopped ? 'stopped' : 'pending', events: withTask ? [{ type: 'delegate', outcome: 'succeeded', memberId: id(11), taskId: id(3), runId: id(7) }] : [] } }] })
     if (path.endsWith('/stop')) {
       assert.equal(init.method, 'POST'); assert.deepEqual(JSON.parse(init.body), {}); counters.groupStop++; stopped = true
       if (unknownStop) throw Error('PRIVATE unknown stop response')
@@ -94,8 +94,22 @@ function fixture({ groupFails = true, throwsAfterCreation = false, replayFails =
     if (path.endsWith('/sign-out')) { counters.signout++; return Response.json({ success: true }, {
       status: init.headers?.['x-fixture-session'] === 'helper' ? helperLogoutStatus : init.headers?.['x-fixture-session'] === 'group' ? groupLogoutStatus : 200 }) }
     if (path.endsWith('/api/factory/tasks/' + id(3))) {
-      if (init.method === 'POST') { counters.cancel++; assert.equal(JSON.parse(init.body).action, 'cancel'); return Response.json({}) }
-      return Response.json({ task: { id: id(3), botId: wrongTaskOwner ? id(99) : id(4), issueId: id(5), attemptId: id(6), candidateId: null, revision: 2, stage: 'execute', status: 'running' } })
+      if (init.method === 'POST') { counters.cancel++; taskCancelled = true; assert.equal(JSON.parse(init.body).action, 'cancel'); return Response.json({}) }
+      return Response.json({ task: { id: id(3), botId: wrongTaskOwner ? id(99) : id(11), issueId: id(5), attemptId: id(6), candidateId: null,
+        sourceEventId: id(8), revision: 2, stage: 'execute', status: taskCancelled ? 'cancelled' : 'running' },
+        attempts: [{ id: id(6), runId: id(7), output: { requestEpoch: id(8) } }] })
+    }
+    if (path.endsWith('/api/runs/' + id(7) + '/evidence')) return Response.json({ run: { id: id(7), botId: id(11), issueId: id(5), status: runStatus,
+      executionIdentity: { requester: wrongRunOwner ? 'foreign-owner' : 'fixture-owner', executionPrincipal: 'fixture-owner', outputOwner: 'fixture-owner',
+        botId: id(11), botOwner: 'fixture-owner', workspaceId: id(1), billingAccount: { runtime: { kind: 'e2b', ownerId: 'fixture-owner' } } } }, artifacts: [], rawSecret: 'PRIVATE_RUN' })
+    if (path.endsWith('/api/threads/' + id(7) + '/machine')) {
+      assert.equal(helperActive, true); assert.equal(init.method, 'POST'); assert.deepEqual(JSON.parse(init.body), { action: 'end' })
+      counters.machineEnd++
+      if (unknownMachineEnd) throw Error('PRIVATE unknown machine-end response')
+      return Response.json(machineEndStatus === 200 ? { runId: id(7), state: 'ended' } : { error: 'unavailable' }, { status: machineEndStatus })
+    }
+    if (path.endsWith('/api/bots/' + id(11) + '/computer')) {
+      assert.equal(init.method, 'GET'); return Response.json({ machine: 'running', control: 'idle', pendingApproval: { text: 'PRIVATE_PROMPT' }, lastAction: 'PRIVATE_ACTION' })
     }
     throw Error('unexpected_fixture_url')
   }
@@ -121,10 +135,11 @@ function fixture({ groupFails = true, throwsAfterCreation = false, replayFails =
         await fetch('https://app.aspectlylabs.com/mikka/api/conversations', { method: 'POST', body: JSON.stringify({ workspaceId: id(1), title: `Proactive acceptance ${marker}`,
           members: createdBots.map(bot => ({ memberType: 'bot', memberId: bot.id })) }) })
         if (throwsAfterCreation) throw Error('PRIVATE upstream body')
-        return { status: groupFails ? 'fail' : 'pass', conversationId: id(2), workspaceId: id(1), sessionEnded: groupLogoutStatus === 200, rawSecret: env.DEEPSEEK_API_KEY,
+        return { status: groupFails ? 'fail' : 'pass', conversationId: id(2), workspaceId: id(1), requesterId: 'fixture-owner', sessionEnded: groupLogoutStatus === 200, rawSecret: env.DEEPSEEK_API_KEY,
           groupCleanup: groupFails ? { status: sourceStopUnknown ? 'failed' : 'stopped', conversationId: id(2), attempted: true,
             acknowledged: !sourceStopUnknown, noPendingRetry: !sourceStopUnknown, executionStopConfirmed: false, delegatedTaskIds: [] } : null,
-          cases: withTask ? [{ name: 'group-factory-artifact-continuation-stop', status: 'fail', taskId: id(3), reporterId: id(4), issueId: id(5) }] : [] }
+          cases: withTask ? [{ name: 'group-factory-artifact-continuation-stop', status: groupFails ? 'fail' : 'pass', taskId: id(3), reporterId: id(11), issueId: id(5),
+            messages: [{ operation: 'create', messageId: id(40), taskId: id(3), runId: id(7) }] }] : [] }
       } finally { await fetch('https://app.aspectlylabs.com/mikka/api/auth/sign-out', { method: 'POST', body: '{}', headers: { 'x-fixture-session': 'group' } }) }
     },
     async runGroupDecisionReplay({ env: supplied }) {
@@ -199,6 +214,26 @@ test('duplicate provider evidence, duplicate cases and reordered chains cannot p
   }
 })
 
+test('a complete four-phase delegation chain includes its actual report-timing receipt', async () => {
+  const f = fixture({ groupFails: false, mutateReplay: value => {
+    const row = value.candidate[0]
+    row.decisions = ['intent', 'delegation', 'responder', 'report_timing'].map((phase, index) => ({
+      id: id(910 + index), phase, index, status: 'complete', failure: null,
+      receipt: { ...receipt, executionId: `delegation-execution-${index}`, providerGenerationId: `delegation-generation-${index}` },
+      decisionCostUsd: null,
+    }))
+    row.receipt = row.decisions[0].receipt
+    row.decisionCalls = { attempted: 4, receipted: 4, unreceipted: 0 }
+    row.decisionCost = { knownUsd: 0, knownCalls: 0, unknownCalls: 4, omittedCalls: 0 }
+    return value
+  } })
+  const report = await f.run()
+  assert.equal(report.status, 'pass'); assert.equal(report.completedLogicalDecisionReplays, 24)
+  assert.equal(report.replayAccounting.decisionCalls.receipted, 38)
+  assert.equal(report.replay.candidate[0].decisions[3].phase, 'report_timing')
+  assert.equal(report.replayAccounting.decisionCostUsd, null)
+})
+
 test('an invalid charged chain and an unreceipted request retain their evidence and unknown costs', () => {
   const value = replay(), row = value.baseline[0]
   row.status = 'invalid_decision'; row.failureReason = 'invalid_response'
@@ -221,6 +256,39 @@ test('the temporary credential session must acknowledge its own logout even when
   assert.equal(report.credentialCleanup.credentialSessionLogoutAcknowledged, false)
   assert.equal(report.credentialCleanup.credentialSessionLogoutStatus, 503)
   assert.equal(report.sessionCleanup.groupRuntime.logoutAcknowledged, true)
+})
+
+test('only the bound terminal fixture run receives one intentional machine-end before credentials are removed', async () => {
+  const f = fixture({ groupFails: false, withTask: true }), report = await f.run()
+  assert.equal(report.status, 'pass'); assert.equal(f.counters.machineEnd, 1)
+  assert.equal(report.machineCleanup.machineEndAcknowledged, true)
+  assert.equal(report.machineCleanup.executionStopConfirmed, true)
+  assert.equal(report.machineCleanup.runs[0].runId, id(7))
+  assert.equal(report.machineCleanup.runs[0].machineEndHttpStatus, 200)
+  assert.equal(report.machineCleanup.independentProviderObservation, false)
+  assert.equal(report.machineCleanup.perRunExternalStatus, 'unknown')
+  assert.equal(report.machineCleanup.sharedDesktop.machine, 'running')
+  assert.equal(report.machineCleanup.sharedDesktop.provesThreadMachineStop, false)
+  assert.doesNotMatch(JSON.stringify(report), /PRIVATE/)
+})
+
+test('a foreign execution principal or an active run prevents any machine-end request', async () => {
+  for (const option of [{ wrongRunOwner: true }, { runStatus: 'running' }]) {
+    const f = fixture({ groupFails: false, withTask: true, ...option }), report = await f.run()
+    assert.equal(report.status, 'fail'); assert.equal(f.counters.machineEnd, 0)
+    assert.equal(report.machineCleanup.machineEndAcknowledged, false)
+    assert.equal(report.credentialCleanup.removed, true)
+  }
+})
+
+test('404 and unknown machine-end acknowledgements never prove shutdown and are never repeated', async () => {
+  for (const option of [{ machineEndStatus: 404 }, { unknownMachineEnd: true }]) {
+    const f = fixture({ groupFails: false, withTask: true, ...option }), report = await f.run()
+    assert.equal(report.status, 'fail'); assert.equal(f.counters.machineEnd, 1)
+    assert.equal(report.machineCleanup.machineEndAcknowledged, false)
+    assert.equal(report.machineCleanup.independentProviderObservation, false)
+    assert.equal(report.credentialCleanup.cloudRemoved, true)
+  }
 })
 
 test('fallback stop checks current owner, reads unknown writes once, and never replays a source stop', async () => {

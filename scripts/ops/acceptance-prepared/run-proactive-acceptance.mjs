@@ -89,7 +89,7 @@ export function measureReplayEvidence(value, expected) {
         const step = item && typeof item === 'object' ? item : {}
         allSteps.push(step)
         const evidence = validReceipt(step.receipt)
-        if (!uuid(step.id) || stepIds.has(step.id) || !['intent', 'responder', 'delegation'].includes(step.phase) || step.index !== index
+        if (!uuid(step.id) || stepIds.has(step.id) || !['intent', 'responder', 'delegation', 'report_timing'].includes(step.phase) || step.index !== index
           || step.status !== 'complete' || step.failure !== null || !evidence) rowValid = false
         stepIds.add(step.id)
         if (evidence) {
@@ -214,7 +214,7 @@ export async function runAcceptanceBundle({ env = process.env, fetchImpl = fetch
   const report = { schemaVersion: 1, status: 'running', origin: ORIGIN, revision, deploymentId, startedAt: new Date().toISOString(),
     finishedAt: null, fixtureConversationId: null, runtime: null, ownerMcp: null, group: null, replay: null, expectedDecisionReplays: 24,
     actualReceiptedDecisionReplays: 0, completedLogicalDecisionReplays: 0, replayAccounting: null,
-    credentialCleanup: null, taskCleanup: null, groupCleanup: null, replaySessionEnded: false,
+    credentialCleanup: null, taskCleanup: null, groupCleanup: null, machineCleanup: null, replaySessionEnded: false,
     sessionCleanup: {},
     scope: 'Actual production owner MCP management, group runtime and fixed-case Decision inference. Owner MCP does not exercise sharing, Gmail or a provider. Replay does not perform projected execution. No official-subscription acceptance.', error: null }
   let ownerCookie = '', cleanupReceipt = null, groupRaw = null, capturedGroup = null, ownerId = null
@@ -306,6 +306,78 @@ export async function runAcceptanceBundle({ env = process.env, fetchImpl = fetch
       cleanup.status = cleanup.acknowledged && cleanup.noPendingRetry ? 'stopped' : cleanup.noPendingRetry ? 'stop-observed-unconfirmed' : 'failed'
     } catch (error) { cleanup.error = failure(error, 'acceptance_group_cleanup_failed') }
   }
+  async function endFixtureMachines(fixture) {
+    const cleanup = { status: 'failed', taskId: uuid(fixture.taskId), issueId: uuid(fixture.issueId), reporterId: uuid(fixture.reporterId),
+      runs: [], artifactsReadbackConfirmed: false, executionStopConfirmed: false, machineEndAcknowledged: false,
+      independentProviderObservation: false, perRunExternalStatus: 'unknown', sharedDesktop: null }
+    report.machineCleanup = cleanup
+    const check = (condition, code) => { if (!condition) throw Error(code) }
+    const ended = new Set(['succeeded', 'completed', 'failed', 'stopped', 'cancelled'])
+    try {
+      await version()
+      check(capturedGroup && groupRaw?.requesterId === ownerId && groupRaw.workspaceId === capturedGroup.workspaceId
+        && capturedGroup.botIds.includes(fixture.reporterId) && uuid(fixture.taskId) && uuid(fixture.issueId), 'acceptance_machine_cleanup_fixture')
+      const quality = (await request('/api/conversations/' + capturedGroup.id + '/decisions?limit=100')).data
+      const bindings = (fixture.messages ?? []).filter(row => ['create', 'continue'].includes(row.operation)
+        && row.taskId === fixture.taskId && uuid(row.messageId) && uuid(row.runId))
+      check(bindings.some(row => row.operation === 'create') && Array.isArray(quality?.turns), 'acceptance_machine_cleanup_receipt')
+      for (const binding of bindings) {
+        const events = quality.turns.find(row => row.messageId === binding.messageId)?.trace?.events
+        check(Array.isArray(events) && events.some(event => event.type === 'delegate' && event.outcome === 'succeeded'
+          && event.memberId === fixture.reporterId && event.taskId === fixture.taskId && event.runId === binding.runId), 'acceptance_machine_cleanup_receipt')
+      }
+      const state = (await request('/api/factory/tasks/' + fixture.taskId)).data
+      check(state?.task?.id === fixture.taskId && state.task.botId === fixture.reporterId && state.task.issueId === fixture.issueId
+        && Array.isArray(state.attempts), 'acceptance_machine_cleanup_task_scope')
+      check(['failed', 'cancelled', 'revoked'].includes(state.task.status)
+        || state.task.status === 'passed' && ['approval', 'publish', 'monitor'].includes(state.task.stage), 'acceptance_machine_cleanup_task_active')
+      const epochs = new Set(bindings.map(binding => state.attempts.find(attempt => attempt.runId === binding.runId)?.output?.requestEpoch))
+      check(epochs.size > 0 && [...epochs].every(value => uuid(value)) && epochs.has(state.task.sourceEventId), 'acceptance_machine_cleanup_epoch_scope')
+      const runIds = [...new Set(state.attempts.filter(attempt => epochs.has(attempt.output?.requestEpoch) && uuid(attempt.runId)).map(attempt => attempt.runId))]
+      check(runIds.length > 0 && runIds.length <= 48 && bindings.every(binding => runIds.includes(binding.runId)), 'acceptance_machine_cleanup_run_scope')
+      let artifactCount = 0
+      for (const runId of runIds) {
+        const evidence = (await request('/api/runs/' + runId + '/evidence')).data, run = evidence?.run
+        const identity = run?.executionIdentity
+        check(run?.id === runId && run.issueId === fixture.issueId && run.botId === fixture.reporterId
+          && identity?.requester === ownerId && identity.executionPrincipal === ownerId && identity.outputOwner === ownerId
+          && identity.botId === fixture.reporterId && identity.botOwner === ownerId && identity.workspaceId === capturedGroup.workspaceId
+          && identity.billingAccount?.runtime?.kind === 'e2b' && identity.billingAccount.runtime.ownerId === ownerId, 'acceptance_machine_cleanup_run_scope')
+        check(Array.isArray(evidence.artifacts), 'acceptance_machine_cleanup_artifact_inventory')
+        artifactCount += evidence.artifacts.length
+        cleanup.runs.push({ runId, requestEpoch: state.attempts.find(attempt => attempt.runId === runId).output.requestEpoch,
+          status: token(run.status), terminal: ended.has(run.status), machineEndAttempted: false,
+          machineEndAcknowledged: false, machineEndHttpStatus: null, independentProviderObservation: false })
+      }
+      cleanup.executionStopConfirmed = cleanup.runs.every(run => run.terminal)
+      check(cleanup.executionStopConfirmed, 'acceptance_machine_cleanup_runs_active')
+      const artifacts = [fixture.artifact, fixture.continuation?.artifact].filter(Boolean)
+      cleanup.artifactsReadbackConfirmed = artifactCount === 0 || artifacts.length > 0
+        && artifacts.every(item => item.retainedAfterStop === true && uuid(item.artifactId) && digest(item.sha256) && integer(item.bytes) !== null)
+      check(cleanup.artifactsReadbackConfirmed, 'acceptance_machine_cleanup_artifacts_unconfirmed')
+      // This is an intentional owner cleanup action, not a GET substitute.
+      // A 200 ended response follows the product's fence and awaited kill when
+      // a sandbox existed. Unknown/404 results never prove provider shutdown.
+      for (const run of cleanup.runs) {
+        await version()
+        run.machineEndAttempted = true
+        try {
+          const response = await ownerTransport(ORIGIN + '/mikka/api/threads/' + run.runId + '/machine', {
+            method: 'POST', signal: AbortSignal.timeout(30000), headers: { origin: ORIGIN, cookie: ownerCookie, 'content-type': 'application/json' },
+            body: JSON.stringify({ action: 'end' }) })
+          run.machineEndHttpStatus = response.status
+          const result = await response.json().catch(() => null)
+          run.machineEndAcknowledged = response.status === 200 && result?.runId === run.runId && result.state === 'ended'
+        } catch { run.error = 'acceptance_machine_end_unconfirmed' }
+      }
+      cleanup.machineEndAcknowledged = cleanup.runs.every(run => run.machineEndAcknowledged)
+      const desktop = (await request('/api/bots/' + fixture.reporterId + '/computer')).data
+      cleanup.sharedDesktop = { scope: 'shared-owner-workspace-desktop', botId: fixture.reporterId,
+        machine: oneOf(['sleeping', 'waking', 'running', 'error'])(desktop?.machine), control: oneOf(['agent', 'user', 'idle'])(desktop?.control),
+        mayBeSynthesized: true, provesThreadMachineStop: false }
+      cleanup.status = cleanup.machineEndAcknowledged ? 'ended' : 'unconfirmed'
+    } catch (error) { cleanup.error = failure(error, 'acceptance_machine_cleanup_failed') }
+  }
   try {
     await version()
     const api = dependencies ?? await defaultDependencies(repo)
@@ -382,6 +454,8 @@ export async function runAcceptanceBundle({ env = process.env, fetchImpl = fetch
         } else report.replay = { status: 'blocked', error: report.fixtureConversationId ? 'replay_pending_group_cleanup_unconfirmed' : 'replay_fixture_group_missing' }
         await version()
       } finally {
+        const fixture = groupRaw?.cases?.find(row => row.name === 'group-factory-artifact-continuation-stop')
+        if (ownerCookie && uuid(fixture?.taskId)) await endFixtureMachines(fixture)
         if (ownerCookie) { try { report.replaySessionEnded = (await request('/api/auth/sign-out', {})).response.status === 200 } catch { report.replaySessionEnded = false } }
         ownerCookie = ''
       }
@@ -398,7 +472,8 @@ export async function runAcceptanceBundle({ env = process.env, fetchImpl = fetch
   const cleaned = cleanupReceipt && (!cleanupReceipt.created || cleanupReceipt.removed) && (!cleanupReceipt.cloudCreated || cleanupReceipt.cloudRemoved)
   const sessionsEnded = Object.values(report.sessionCleanup).every(session => session.loginAttempted
     && session.loginStatus === 200 && session.logoutAttempted && session.logoutAcknowledged && session.logoutStatus === 200)
-  report.status = !report.error && cleaned && sessionsEnded && report.replaySessionEnded && report.group?.sessionEnded
+  const machinesCleaned = !groupRaw?.cases?.some(row => uuid(row.taskId)) || report.machineCleanup?.status === 'ended'
+  report.status = !report.error && cleaned && machinesCleaned && sessionsEnded && report.replaySessionEnded && report.group?.sessionEnded
     && report.ownerMcp?.status === 'passed' && report.group?.status === 'pass' && report.replay?.status === 'complete'
     && report.replayAccounting?.valid && report.replay?.comparison?.decisionReviewReady === true ? 'pass' : 'fail'
   return report

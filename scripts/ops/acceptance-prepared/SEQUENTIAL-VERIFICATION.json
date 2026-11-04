@@ -8,8 +8,8 @@
   ],
   "result": {
     "exitCode": 0,
-    "tests": 19,
-    "passed": 19,
+    "tests": 23,
+    "passed": 23,
     "failed": 0,
     "skipped": 0
   },
@@ -18,30 +18,29 @@
   "sourceFiles": [
     {
       "path": "run-proactive-acceptance.mjs",
-      "sha256": "cd9071be2f849e46aee70ec8e16299762e7b5baa714f8d8fd22481955a58214b"
+      "sha256": "8f3818005c7f667b9a84ae83010271956f985d53ff6190400fc19483d397058e"
     },
     {
       "path": "run-proactive-acceptance.test.mjs",
-      "sha256": "37d359b8b6e7228e76802c0be63f92190db136ae84cbe0986811893ce95028fe"
+      "sha256": "67983d626ae6298a0c73ebf5fad04d00a4f824d4c6a2abc9c3849aecb548a6e2"
     },
     {
       "path": "README.md",
-      "sha256": "1c9ff70343893fde441510ab06cbb8dd5b2e57eb24414e89fec1f4f598817eda"
-    },
-    {
-      "path": "proactive-acceptance-once.yml",
-      "sha256": "c481e06352029ae5fbaad4df0c86a30980167aefe7471f41cbb7a91faf5f537b"
+      "sha256": "5c7fe12eea1eaae8601edaeb50452ee70efeb053b3673e7da2247338a6c9d3fd"
     }
   ],
   "scope": [
-    "24 fixed logical replays counted separately from provider calls",
-    "all phase receipts unique, failed/unknown costs retained",
-    "three sessions have independent sign-out acknowledgement",
-    "failed fresh group scope-stop with unknown-write readback"
+    "12 baseline plus 12 candidate logical cases, one to four actual provider requests each",
+    "four-phase delegation including report_timing",
+    "unique phase receipts, invalid/unknown costs retained",
+    "three independent session sign-out acknowledgements",
+    "scoped failed-group stop, no unknown-write retry",
+    "normal owner machine-end only for bound terminal fixture Task epochs before temporary E2B removal"
   ],
   "limitations": [
-    "does not establish production success",
-    "Task cancellation-recorded does not prove runtime or cloud VM stop",
+    "not production acceptance",
+    "host machine-end acknowledgement is not independent provider observation",
+    "shared desktop GET cannot prove thread VM shutdown",
     "prepared workflow pins remain placeholders"
   ]
 }
