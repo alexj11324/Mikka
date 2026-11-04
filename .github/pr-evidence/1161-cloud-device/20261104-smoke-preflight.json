@@ -1,0 +1,86 @@
+{
+  "schemaVersion": 1,
+  "assessmentAt": "2026-11-04T06:44:16Z",
+  "issue": 1161,
+  "scenario": "Same Smoke owner: product E2B Cloud A to an independent normally paired GitHub Actions local device B",
+  "status": "blocked_preflight_not_executed",
+  "source": {
+    "reviewedCommit": "b8397cc55d4e0d14c4ba3e5566476a703d6fd731",
+    "comparedThroughCommit": "aee3b8d23fc1431b4c0f6c98d9852d1402bc723e",
+    "relevantSourceFilesChanged": false
+  },
+  "inventory": {
+    "evidenceCommit": "c91704bee984829b9d736679cd078bf470a6260a",
+    "path": ".github/pr-evidence/production-1157-1163/runtime-capabilities-41756726830.json",
+    "completedAt": "2026-11-04T01:50:21.987Z",
+    "scope": "single-normal-Smoke-session",
+    "github": {
+      "connected": false,
+      "installed": false,
+      "repositoryCount": 0
+    },
+    "currentStateRequeried": false
+  },
+  "findings": [
+    {
+      "code": "normal_github_dispatch_requires_owner_authorization",
+      "paths": [
+        "workflows/coordinator/steps.ts",
+        "lib/coordinator/repository-resolution.ts",
+        "lib/github/user-access.ts"
+      ],
+      "detail": "New ordinary dispatch resolves GitHub owner/repo or URL against the owner's current GitHub user-token and Mikka App repository intersection. Public GitHub repositories have no anonymous exception."
+    },
+    {
+      "code": "other_remote_is_not_cloud_recovery_admission",
+      "paths": [
+        "lib/computer/queue-run.ts",
+        "lib/computer/cloud-push.ts",
+        "lib/run-leases.ts"
+      ],
+      "detail": "A non-GitHub remote can be parsed but does not receive the writable GitHub repositoryAdmission required by the Cloud-to-local recovery path."
+    },
+    {
+      "code": "normal_pairing_exists_but_does_not_grant_repository_access",
+      "paths": [
+        "packages/daemon/src/login.ts",
+        "app/v1/devices/register/route.ts"
+      ],
+      "detail": "The ordinary RFC 8628 device authorization and normal registration paths can bind an independent runner to its approving owner. They cannot supply missing GitHub repository authorization."
+    },
+    {
+      "code": "disposable_local_driver_not_production_runner",
+      "paths": [
+        "scripts/dev-local/acceptance.mjs"
+      ],
+      "detail": "The existing local acceptance driver rejects CI and assumes an expendable account when revoking device tokens. A later production runner would require its own bounded driver and exact newly created device/token cleanup, without removing CI guards."
+    }
+  ],
+  "missingBeforeAnyExecution": [
+    "Normal owner evidence of an already authorized exact GitHub repository; no new GitHub/OAuth grant or share is authorized for this substitute."
+  ],
+  "permittedFutureEvidenceBoundary": "Only after normal owner GET confirms a newly authorized task, current epoch and run may an already reviewed single-task READ ONLY diagnostic inspect the host recovery grant/checkpoint/machine binding. No SQL mutation can create acceptance state.",
+  "operationsPerformed": {
+    "productionRequests": 0,
+    "productionLogins": 0,
+    "newDevices": 0,
+    "newTasks": 0,
+    "modelCalls": 0,
+    "providerOperations": 0,
+    "authorizationChanges": 0,
+    "sqlWrites": 0
+  },
+  "acceptanceClaims": {
+    "cloudToDevicePassed": false,
+    "deviceToCloudPassed": false,
+    "productionFaultTested": false,
+    "allIssue1161AcceptanceComplete": false
+  },
+  "preparedHelpers": {
+    "commit": "cae49588c9a641ac14bf0d61591bb108845178d6",
+    "activated": false,
+    "hostProofComplete": false,
+    "faultArmed": false
+  },
+  "interpretation": "This is a source-backed feasibility assessment using an existing historical inventory, not a failed paid run or a current production authorization query. Keep the real Cloud/device acceptance item open."
+}
