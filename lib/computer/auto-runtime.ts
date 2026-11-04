@@ -1,7 +1,6 @@
 import 'server-only'
 import { createHash, randomUUID } from 'node:crypto'
 import type { Pool } from 'pg'
-import { deviceIsOnline } from '../device-presence'
 
 type Actor = { userId: string; workspaceId: string }
 export type BotCloudRuntime = { botId: string; harness: 'codex' | 'claude_code'; agentId: string }
@@ -45,17 +44,15 @@ export async function ensureCoordinatorBot(pool: Pool, actor: Actor) {
 }
 
 async function findRuntime(pool: Pool, actor: Actor, botId: string, harness: string) {
-  const rows = (await pool.query<BotCloudRuntime & { deviceId: string; lastSeenAt: Date | null }>(`SELECT r."botId",r.harness,r."agentId",d.id AS "deviceId",d."lastSeenAt" FROM bot_cloud_runtimes r
-    JOIN agents a ON a.id=r."agentId" AND a."userId"=r."ownerId"
-    JOIN cloud_machines m ON m."deviceId"=a."deviceId" AND m."ownerId"=r."ownerId" AND m."workspaceId"=r."workspaceId" AND m.state='running'
+  const rows = (await pool.query<BotCloudRuntime>(`SELECT r."botId",r.harness,r."agentId" FROM bot_cloud_runtimes r
+    JOIN bots b ON b.id=r."botId" AND b."ownerId"=r."ownerId" AND b."workspaceId"=r."workspaceId" AND b."archivedAt" IS NULL
+    JOIN bot_desktops desktop ON desktop."botId"=b.id AND desktop."ownerId"=b."ownerId" AND desktop."workspaceId"=b."workspaceId"
+    JOIN agents a ON a.id=r."agentId" AND a."userId"=r."ownerId" AND a.harness=r.harness
+    JOIN cloud_machines m ON m."deviceId"=a."deviceId" AND m."ownerId"=r."ownerId" AND m."workspaceId"=r."workspaceId"
     JOIN devices d ON d.id=m."deviceId" AND d."ownerId"=r."ownerId" AND d.kind='cloud' AND d.enabled=true
     WHERE r."botId"=$1 AND r."ownerId"=$2 AND r."workspaceId"=$3 AND ($4='auto' OR r.harness=$4) ORDER BY r.harness`,
   [botId, actor.userId, actor.workspaceId, harness])).rows
-  for (const row of rows) {
-    if (await deviceIsOnline({ id: row.deviceId, lastSeenAt: row.lastSeenAt }))
-      return { botId: row.botId, harness: row.harness, agentId: row.agentId }
-  }
-  return null
+  return rows[0] ?? null
 }
 
 /** The runtime's Agent uses the owner's own connected subscription for its
@@ -77,12 +74,17 @@ async function bindOwnSubscription(pool: Pool, actor: Actor, runtime: BotCloudRu
 /**
  * The bot's own cloud runtime for a run, created on first use with no manual
  * step: its cloud computer is woken and its runtime recorded. Idempotent; a
- * second dispatch reuses the runtime. Returns null when the cloud refuses, so
+ * second dispatch reuses its metadata without waking a sleeping parent or
+ * requiring a live parent heartbeat. Returns null when the cloud refuses, so
  * the run takes the next machine (decision 2026-10-31-2200-run-machine-fallback).
  */
 export async function ensureBotCloudRuntime(pool: Pool, actor: Actor, botId: string, target: { harness: string; model?: string }, provisioner = botRuntimeProvisioner) {
   let runtime = await findRuntime(pool, actor, botId, target.harness)
   if (!runtime) {
+    // An invalid or missing runtime must not wake an existing sleeping parent.
+    // First-use provisioning remains available when there is no sleeping parent.
+    if ((await pool.query(`SELECT 1 FROM cloud_machines WHERE "ownerId"=$1 AND "workspaceId"=$2 AND state='sleeping'`,
+      [actor.userId, actor.workspaceId])).rowCount) return null
     try { await provisioner.provision(pool, actor, botId) } catch { return null }
     runtime = await findRuntime(pool, actor, botId, target.harness)
     if (!runtime) return null

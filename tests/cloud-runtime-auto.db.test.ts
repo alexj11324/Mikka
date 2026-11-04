@@ -175,24 +175,27 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     } finally { httpOwner=null; }
   });
 
-  await t.test('an existing sleeping or disconnected worker is woken before dispatch', async () => {
+  await t.test('ordinary tasks use existing metadata without waking a sleeping or disconnected parent', async () => {
     const a = await person('sleeping-runtime')
     await dispatch(a.id, a.issueId, a.botId)
     const { ensureBotCloudRuntime } = await import('../lib/computer/auto-runtime')
-    let wakes = 0
-    const wake = { provision: async () => {
-      wakes++
-      await pool.query(`UPDATE cloud_machines SET state='running' WHERE "ownerId"=$1`, [a.id])
-      await pool.query('UPDATE devices SET "lastSeenAt"=now() WHERE "ownerId"=$1', [a.id])
-    } }
-    for (const state of ['sleeping', 'running']) {
+    const parent = (await pool.query('SELECT "deviceId" FROM cloud_machines WHERE "ownerId"=$1 AND "workspaceId"=$2', [a.id, a.workspaceId])).rows[0]
+    const wake = { provision: async () => assert.fail('an existing parent must not be woken') }
+    const beforeProvisioned = provisioned
+    for (const [index, state] of ['sleeping', 'running'].entries()) {
       await pool.query('UPDATE cloud_machines SET state=$2 WHERE "ownerId"=$1', [a.id, state])
-      await pool.query(`UPDATE devices SET "lastSeenAt"=now()-interval '2 minutes' WHERE "ownerId"=$1`, [a.id])
+      await pool.query(`UPDATE devices SET "lastSeenAt"=now()-interval '2 minutes' WHERE id=$1`, [parent.deviceId])
+      const parentState = async () => (await pool.query(`SELECT row_to_json(m) AS machine,row_to_json(d) AS device FROM cloud_machines m JOIN devices d ON d.id=m."deviceId" WHERE m."ownerId"=$1 AND m."workspaceId"=$2`, [a.id, a.workspaceId])).rows[0]
+      const before = await parentState()
       assert.ok(await ensureBotCloudRuntime(pool, { userId: a.id, workspaceId: a.workspaceId }, a.botId, { harness: 'codex' }, wake))
+      const result = await dispatch(a.id, await anotherTask(a.id, 80 + index), a.botId) as unknown as { status: string }
+      assert.equal(result.status, 'queued')
+      assert.deepEqual(await parentState(), before, 'ordinary dispatch leaves the parent machine and device unchanged')
+      assert.equal(provisioned, beforeProvisioned)
     }
-    assert.equal(wakes, 2)
-    const result = await dispatch(a.id, await anotherTask(a.id, 8), a.botId) as unknown as { status: string }
-    assert.equal(result.status, 'queued')
+    await pool.query(`UPDATE cloud_machines SET state='sleeping' WHERE "ownerId"=$1`, [a.id])
+    await pool.query('UPDATE devices SET enabled=false WHERE id=$1', [parent.deviceId])
+    assert.equal(await ensureBotCloudRuntime(pool, { userId: a.id, workspaceId: a.workspaceId }, a.botId, { harness: 'codex' }, wake), null, 'invalid metadata refuses without waking the parent')
   })
 
   await t.test('concurrent dispatches of one task create only one thread', async () => {
@@ -380,9 +383,9 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     assert.equal(run.kind, 'cloud')
     assert.ok(run.remoteUrl, 'the queued run is a repository task')
   })
-  await t.test('sleeping parent staging requires the current owned Factory stage and a prepared idle parent', async () => {
+  for (const parentState of ['running', 'sleeping']) await t.test(`ordinary queues and Factory checks share owned metadata admission with a ${parentState} parent`, async () => {
     const personState = await person('factory-stage-admission')
-    const unrelated = await dispatch(personState.id, personState.issueId, personState.botId) as { runId: string }
+    await dispatch(personState.id, personState.issueId, personState.botId)
     const issueId = await seedIssue(pool, personState.id)
     const producer = await steps.dispatchComputerThread(personState.id, { botId: personState.botId, issueId, harness: 'codex' }, `admission:${randomUUID()}`) as { runId: string }
     const [{ factoryRuntimeForBot }, { factoryBinding }, { queueCloudRun }, { configureFactoryCheck }] = await Promise.all([
@@ -403,32 +406,38 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
       const finished = await runtime.store.apply(personState.id, factoryBinding(candidate.task), randomUUID(), { action:'finish',status:'passed',reason:'Synthetic completed delivery',output:{runId:producer.runId},
         evidence:[{artifact:`run-report:${producer.runId}`,kind:'report',runId:producer.runId,sessionId:'producer-session',candidateId:candidate.task.candidateId,sha:null,environment:`device:${source.deviceId}`,recordedAt:new Date().toISOString()}] }, client)
       const pending = await runtime.store.apply(personState.id, factoryBinding(finished.task), randomUUID(), {action:'advance',stage:'review',reason:'Independent inspection'}, client)
-      const admission = { binding:factoryBinding(pending.task),sourceEventId:pending.task.sourceEventId,sourceRunId:producer.runId }
       const input = { botId:personState.botId,issueId,agentId:parent.agentId,deviceRepoId:parent.repoId,title:'Inspect delivery',body:'Read the existing result.',
         model:source.agentDefinition.model,subscriptionBindingId:source.agentDefinition.subscription.bindingId,readOnly:true,idempotencyKey:`factory:${pending.task.attemptId}` }
-      await client.query(`UPDATE cloud_machines SET state='sleeping' WHERE "workspaceId"=$1 AND "ownerId"=$2`, [actor.workspaceId, actor.userId])
+      await client.query(`UPDATE cloud_machines SET state=$3 WHERE "workspaceId"=$1 AND "ownerId"=$2`, [actor.workspaceId, actor.userId, parentState])
+      const otherBot = randomUUID(), otherDevice = randomUUID()
+      await client.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled) VALUES ($1,$2,'Other device','cloud',true)`, [otherDevice,actor.userId])
+      await client.query('INSERT INTO bots (id,"workspaceId","ownerId",name) VALUES ($1,$2,$3,$4)', [otherBot,actor.workspaceId,actor.userId,'Another Bot'])
+      await client.query('INSERT INTO bot_desktops ("botId","workspaceId","ownerId",display) VALUES ($1,$2,$3,2)', [otherBot,actor.workspaceId,actor.userId])
       const before = (await client.query(`SELECT (SELECT count(*) FROM agent_runs WHERE "userId"=$1)::int AS runs,(SELECT count(*) FROM thread_machines WHERE "ownerId"=$1)::int AS machines`, [actor.userId])).rows[0]
-      await assert.rejects(queueCloudRun(appPool, actor, input, client), { status:409 }, 'ordinary queue admission remains running-only')
-      await assert.rejects(queueCloudRun(appPool, {...actor,userId:'foreign-owner'}, input, client, admission), {status:409})
-      await assert.rejects(queueCloudRun(appPool, {...actor,workspaceId:randomUUID()}, input, client, admission), {status:409})
-      await assert.rejects(queueCloudRun(appPool, actor, input, client, {...admission,sourceEventId:randomUUID()}), {status:409})
-      await assert.rejects(queueCloudRun(appPool, actor, input, client, {...admission,sourceRunId:unrelated.runId}), {status:409}, 'another task cannot lend its source')
-      await assert.rejects(queueCloudRun(appPool, actor, input, client, {...admission,binding:{...admission.binding,revision:admission.binding.revision+1}}), {status:409})
-      for (const [label, update] of [
-        ['not prepared', '"runtimeReady"=false'],
-        ['being provisioned', '"provisionLeaseId"=gen_random_uuid(),"provisionLeaseUntil"=now()+interval \'1 minute\''],
-        ['worker being provisioned', '"workerLeaseId"=gen_random_uuid(),"workerLeaseUntil"=now()+interval \'1 minute\''],
-        ['missing parent sandbox', '"sandboxId"=NULL'],
-      ]) {
-        await client.query('SAVEPOINT unavailable_parent')
-        await client.query(`UPDATE cloud_machines SET ${update} WHERE "workspaceId"=$1 AND "ownerId"=$2`, [actor.workspaceId, actor.userId])
-        await assert.rejects(queueCloudRun(appPool, actor, input, client, admission), {status:409}, label)
-        await client.query('ROLLBACK TO SAVEPOINT unavailable_parent')
+      await assert.rejects(queueCloudRun(appPool, {...actor,userId:'foreign-owner'}, input, client), {status:409})
+      await assert.rejects(queueCloudRun(appPool, {...actor,workspaceId:randomUUID()}, input, client), {status:409})
+      await assert.rejects(queueCloudRun(appPool, actor, {...input,botId:otherBot}, client), {status:409}, 'a different Bot cannot borrow this runtime')
+      for (const [label, sql, values] of [
+        ['disabled device', 'UPDATE devices SET enabled=false WHERE id=(SELECT "deviceId" FROM agents WHERE id=$1)', [parent.agentId]],
+        ['different repository device', 'UPDATE device_repos SET "deviceId"=$2 WHERE id=$1', [parent.repoId, otherDevice]],
+        ['archived Bot', 'UPDATE bots SET "archivedAt"=now() WHERE id=$1', [personState.botId]],
+        ['computer policy', `INSERT INTO workspace_computer_policies ("workspaceId",permission,version) VALUES ($1,'deny',1) ON CONFLICT ("workspaceId") DO UPDATE SET permission='deny'`, [actor.workspaceId]],
+      ] as const) {
+        await client.query('SAVEPOINT unavailable_target')
+        await client.query(sql, [...values])
+        await assert.rejects(queueCloudRun(appPool, actor, input, client), {status:409}, label)
+        await client.query('ROLLBACK TO SAVEPOINT unavailable_target')
       }
       assert.deepEqual((await client.query(`SELECT (SELECT count(*) FROM agent_runs WHERE "userId"=$1)::int AS runs,(SELECT count(*) FROM thread_machines WHERE "ownerId"=$1)::int AS machines`, [actor.userId])).rows[0], before)
       const parentBefore = (await client.query('SELECT row_to_json(m) AS value FROM cloud_machines m WHERE "workspaceId"=$1 AND "ownerId"=$2', [actor.workspaceId,actor.userId])).rows[0].value
-      const queued = await queueCloudRun(appPool, actor, input, client, admission)
-      await configureFactoryCheck(client, pending.task, queued.runId, undefined, admission)
+      const ordinary = await queueCloudRun(appPool, actor, {...input,idempotencyKey:`ordinary:${randomUUID()}`}, client)
+      assert.equal((await client.query('SELECT status FROM agent_runs WHERE id=$1',[ordinary.runId])).rows[0].status,'queued')
+      const queued = await queueCloudRun(appPool, actor, input, client)
+      await client.query('SAVEPOINT mismatched_check')
+      await client.query('UPDATE computer_run_bindings SET "botId"=$2 WHERE "runId"=$1', [queued.runId,otherBot])
+      await assert.rejects(configureFactoryCheck(client, pending.task, queued.runId), /factoryCheckHarnessUnavailable/, 'Factory checks cannot borrow another Bot runtime')
+      await client.query('ROLLBACK TO SAVEPOINT mismatched_check')
+      await configureFactoryCheck(client, pending.task, queued.runId)
       const check = (await client.query('SELECT kind,"agentDefinition","sessionId" FROM agent_runs WHERE id=$1',[queued.runId])).rows[0]
       assert.equal(check.kind,'acceptance')
       assert.equal(check.sessionId,null,'the checker receives an independent native session')
@@ -446,8 +455,13 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     const personState = await person(`factory-desktop-${parentState}`)
     await dispatch(personState.id, personState.issueId, personState.botId)
     const issueId = await seedIssue(pool, personState.id)
+    await pool.query('UPDATE cloud_machines SET state=$3 WHERE "workspaceId"=$1 AND "ownerId"=$2', [personState.workspaceId,personState.id,parentState])
+    const executeParentBefore = (await pool.query('SELECT row_to_json(m) AS value FROM cloud_machines m WHERE "workspaceId"=$1 AND "ownerId"=$2', [personState.workspaceId,personState.id])).rows[0].value
+    const beforeExecuteProvisioned = provisioned
     const result = await steps.dispatchComputerThread(personState.id, { botId: personState.botId, issueId, harness: 'codex' }, `desktop:${randomUUID()}`) as { runId?: string; error?: string }
     assert.ok(result.runId, JSON.stringify(result))
+    assert.deepEqual((await pool.query('SELECT row_to_json(m) AS value FROM cloud_machines m WHERE "workspaceId"=$1 AND "ownerId"=$2', [personState.workspaceId,personState.id])).rows[0].value,executeParentBefore,'execute leaves the parent unchanged')
+    assert.equal(provisioned,beforeExecuteProvisioned)
     const { factoryRuntimeForBot } = await import('../lib/factory/runtime')
     const { factoryCheckAssignment } = await import('../lib/factory/checks')
     const { factoryBinding } = await import('../lib/factory/dispatch')

@@ -77,7 +77,6 @@ test("a task's sandbox serves only that task's runs, parks between them and ends
       const calls: string[] = [];
       const sources: string[] = [];
       const provider: typeof threadMachineProvider = {
-        snapshot: async () => { calls.push("snapshot"); return "snapshot-fixture"; },
         // The fake sandbox has no runtime: provisioning stops right after the provider step.
         connect: async (id) => { calls.push(`connect:${id}`); return { sandboxId: id } as never; },
         create: async (source, op) => { calls.push("create"); sources.push(source); return { sandboxId: `sandbox-${op}` } as never; },

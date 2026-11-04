@@ -131,7 +131,7 @@ test('runtime refresh failures name their actual phase without logging provider 
         state: async () => { if (phase === 'provider_state') throw fault; return 'paused' },
         connect: async () => { if (phase === 'connect') throw fault; return sandbox },
         create: async () => assert.fail('the original VM may not be replaced'),
-        snapshot: async () => assert.fail('no snapshot'), kill: async () => assert.fail('no kill'),
+        kill: async () => assert.fail('no kill'),
       } as unknown as Parameters<typeof ensureThreadMachine>[3]
       try {
         await assert.rejects(ensureThreadMachine(pool, actor, run.id, provider, undefined, true), error => error === fault)
