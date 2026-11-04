@@ -158,6 +158,8 @@
     "resizeList": "调整 Bot 列表宽度",
     "bots": "Bot",
     "newBot": "新建 Bot",
+    "create": "新建",
+    "newGroup": "新建群聊",
     "writingWelcome": "正在写欢迎语…",
     "answerBot": "输入你的回答，或聊点别的",
     "messageBot": "给 {name} 发消息",
@@ -3754,6 +3756,17 @@
       },
       "create": "创建",
       "creating": "正在创建…"
+    },
+    "newGroup": {
+      "title": "新建群聊",
+      "name": "群名",
+      "bots": "Bot",
+      "noBots": "没有可选的 Bot",
+      "newBot": "新建 Bot",
+      "create": "创建",
+      "failed": "群聊创建失败",
+      "unconfirmed": "群聊创建状态未确认",
+      "reviewGroups": "查看群聊"
     },
     "searchPlaceholder": "搜索 Bot、对话、群聊、任务、线程和项目",
     "searchLabel": "全局搜索",

@@ -158,6 +158,8 @@
     "resizeList": "Resize bot list",
     "bots": "Bots",
     "newBot": "New bot",
+    "create": "New",
+    "newGroup": "New group chat",
     "writingWelcome": "Writing a welcome…",
     "answerBot": "Type your answer, or ask anything",
     "messageBot": "Message {name}",
@@ -3754,6 +3756,17 @@
       },
       "create": "Create",
       "creating": "Creating…"
+    },
+    "newGroup": {
+      "title": "New group chat",
+      "name": "Group name",
+      "bots": "Bots",
+      "noBots": "No bots available",
+      "newBot": "New bot",
+      "create": "Create",
+      "failed": "Group creation failed",
+      "unconfirmed": "Group creation not confirmed",
+      "reviewGroups": "View group chats"
     },
     "searchPlaceholder": "Search bots, chats, groups, tasks, threads and projects",
     "searchLabel": "Search everything",
