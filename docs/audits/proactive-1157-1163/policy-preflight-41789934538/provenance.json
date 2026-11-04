@@ -1,0 +1,117 @@
+{
+  "schemaVersion": 1,
+  "kind": "actual-policy-preflight",
+  "status": "failed",
+  "workflow": {
+    "repository": "alexj11324/Mikka",
+    "branch": "acceptance/proactive-1157-1163",
+    "headSha": "9829404f83610d52a994b42c96289a67e9424337",
+    "name": "Temporary group policy preflight",
+    "runId": 41789934538,
+    "attempt": 1,
+    "jobId": 126440686359,
+    "conclusion": "failure"
+  },
+  "release": {
+    "sourceRevision": "eca0201f8c3ffbb1533a0acbec32c3a0eba91b24",
+    "deploymentId": "dpl_5csuJ6ooM6y8PjGaVsWUUkVRUKnE",
+    "sourceAndCanonicalPinnedByDriver": true
+  },
+  "contract": {
+    "baseline": "group-route-v0",
+    "candidate": "group-contribution-v3",
+    "live": "group-contribution-v1",
+    "dataset": "group-decision-cases-v2",
+    "comparison": "group-decision-comparison-v2",
+    "protocol": "group-sequential-v1"
+  },
+  "observedWindow": {
+    "startedAt": "2026-11-04T07:06:45.645Z",
+    "finishedAt": "2026-11-04T07:07:29.081Z"
+  },
+  "result": {
+    "reportStatus": "failed",
+    "error": "preflight_candidate_rejected",
+    "replayStatus": "failed",
+    "logicalCases": 24,
+    "receiptedLogicalCases": 24,
+    "completedLogicalCases": 19,
+    "baselineCompleted": 7,
+    "baselineClassifiable": false,
+    "baselineAbstentions": 4,
+    "candidateCompleted": 12,
+    "candidateActionAccuracy": 1,
+    "candidateResponderAccuracy": 1,
+    "candidateFailures": [],
+    "evidenceValid": true,
+    "collectionComplete": true,
+    "qualityAccepted": false,
+    "baselineUnavailableCase": "new-member",
+    "unavailableStepId": "b0ce5704-9baf-43b1-b18c-11d314926a0c",
+    "unavailablePhase": "responder",
+    "unavailableIndex": 1,
+    "unavailableReceipt": null
+  },
+  "decisionCost": {
+    "scope": "routing-decision-chain",
+    "attempted": 43,
+    "receipted": 42,
+    "unreceipted": 1,
+    "knownCalls": 42,
+    "unknownCalls": 1,
+    "omittedCalls": 0,
+    "knownUsd": 0.002879,
+    "completeTotalUsd": null,
+    "candidate": {
+      "attempted": 23,
+      "receipted": 23,
+      "unreceipted": 0,
+      "knownUsd": 0.001687,
+      "completeTotalUsd": 0.001687
+    },
+    "baseline": {
+      "attempted": 20,
+      "receipted": 19,
+      "unreceipted": 1,
+      "knownUsd": 0.001192,
+      "completeTotalUsd": null
+    }
+  },
+  "session": {
+    "loginAttempted": true,
+    "loginStatus": 200,
+    "identityConfirmed": true,
+    "logoutAttempted": true,
+    "logoutStatus": 200,
+    "logoutAcknowledged": true
+  },
+  "scopeConfirmed": true,
+  "policyChanged": false,
+  "executionPerformed": false,
+  "productionAccepted": false,
+  "artifact": {
+    "id": 13302807382,
+    "name": "group-policy-preflight-41789934538",
+    "zip": {
+      "file": "artifact.zip",
+      "bytes": 10700,
+      "sha256": "598bfaf9715c67a6a9042411dbcf216882f9c8419ac0938f904c38c5015b1920",
+      "gitBlob": "f3ff9907fd91e6b62e6844c06cae62e2c85647ec",
+      "githubDigestMatched": true
+    },
+    "json": {
+      "file": "results.json",
+      "bytes": 86308,
+      "sha256": "77a027c08d837e2c6a1222c94e80cd148ad2d49f75976c713e04c7321903f4d7",
+      "gitBlob": "a8fbfbd4eb37600af5da64addad57c8fe0b36e91",
+      "preservedOriginalBytes": true
+    }
+  },
+  "review": {
+    "rootIndependentlyReadFullReport": true,
+    "noUnderlyingHttpOrNetworkCauseEstablished": true,
+    "noPolicyPromotion": true,
+    "noRerunByArchivingAgent": true,
+    "priorFailedReportsUnchanged": true
+  }
+}
