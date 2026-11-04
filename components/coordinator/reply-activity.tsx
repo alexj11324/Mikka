@@ -10,6 +10,7 @@ import {
 import { coordinatorReasoning } from '@/app/actions/coordinator'
 import { CodeBlock, CodeBlockContent } from '@/components/ui/code-block'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/reui/badge'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { GitHubIcon } from '@/components/icons/brand-icons'
 import { Trace, TraceCollapsible, TraceCollapsibleContent, TraceCollapsibleTrigger, TraceIcon, TraceLine, TraceTitle } from '@/components/ui/trace'
@@ -158,7 +159,7 @@ function ToolGroup({ tools, live }: { tools: readonly ChatTool[]; live: boolean 
           <TraceIcon>{running ? <LoaderCircleIcon className="animate-spin" /> : failures ? <CircleAlert className="text-destructive" /> : <LeadIcon />}</TraceIcon>
           <TraceTitle>{summary}</TraceTitle>
           {/* The failure count never truncates with the summary: it is what the line must say (R-83, R-87). */}
-          {failures > 0 && !running && <span data-activity-failed="" className="shrink-0 rounded-sm bg-destructive/10 px-1 text-destructive">{t('failedCount', { count: failures })}</span>}
+          {failures > 0 && !running && <Badge data-activity-failed="" variant="destructive-light" size="sm" className="shrink-0">{t('failedCount', { count: failures })}</Badge>}
         </TraceLine>
       </TraceCollapsibleTrigger>
       <ExpandAllButton />

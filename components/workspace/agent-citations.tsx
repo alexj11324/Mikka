@@ -173,7 +173,6 @@ export function RunCitation({ run }: { run: RunSource }) {
   const HarnessIcon = run.harness === 'claude_code' ? Claude : OpenAI
   const harness = run.harness === 'claude_code' ? 'Claude Code' : 'Codex'
   // A thread is a bubble in the chip's accent, its state a dot on it, as on the thread card and the Threads list; the coding agent's mark is in the hover card (R-78).
-  const tState = useTranslations('Shell.threads.state')
   const issue = run.issue
   const name = runThreadName(run)
   const group = threadGroupOfRun(run.status, run.outcome)
@@ -186,7 +185,8 @@ export function RunCitation({ run }: { run: RunSource }) {
     >
       <ChipHead icon={<ThreadStatusIcon status={run.status} outcome={run.outcome} small accent dot={attention} />} title={name} />
       {/* Waiting for you or blocked: the dot, its colour and its word together (R-87); other states are in the hover card. */}
-      {attention && <span data-thread-attention={group} className={cn('ml-1 whitespace-nowrap rounded-sm px-1 text-xs font-medium', group === 'blocked' ? 'bg-destructive/10 text-destructive' : 'bg-warning/15 text-warning-foreground')}>{tState(group)}</span>}
+      {/* The same state badge as the thread card and an open thread (R-90), its word on its tint. */}
+      {attention && <span data-thread-attention={group} className="ml-1 inline-flex align-[-0.125em] whitespace-nowrap"><ThreadStatus status={run.status} outcome={run.outcome} icon={false} /></span>}
     </InlineCitationTrigger>
     <InlineCitationContent>
       <InlineCitationBody>
