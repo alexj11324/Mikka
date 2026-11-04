@@ -3,7 +3,7 @@ import type { DecisionExecution, invokeDecision } from './decide'
 import type { DecisionQuestion } from './decision'
 import { GroupJudgmentPendingError, type CorrectionInput, type CorrectionJudgment } from './group-correction'
 import type { GroupAction, GroupDelegation, GroupMessage, GroupRoute, RoutingCorrection, RoutingMember } from './group-routing'
-import { getGroupDecisionPolicy, GROUP_BASELINE_VERSION, type GroupPolicyVersion } from './group-decision-policy'
+import { getGroupDecisionPolicy, GROUP_BASELINE_VERSION, GROUP_POLICY_VERSION, type GroupPolicyVersion } from './group-decision-policy'
 import { GROUP_DECISION_PROTOCOL, GROUP_MAX_RESPONDERS, GROUP_MAX_ROUTING_DECISIONS, type GroupDecisionFailure, type GroupDecisionPhase, type GroupDecisionStep, type GroupDecisionRetain } from './group-decision-chain'
 import { groupDecisionReceipt } from './group-decision-trace'
 
@@ -82,7 +82,11 @@ export function createGroupJudgment(invoke: Invoke, policyVersion?: GroupPolicyV
         const remaining = allowedMembers.filter(member=>!responders.includes(member.id))
         const selected = await ask('responder',choice(`responder_${responders.length}`,
           optional ? (baseline ? 'Select the next appropriate responder, using the confirmed earlier selections; choose end when the list is complete.' : 'Select another member only for a separate requested contribution that the confirmed responders cannot cover. Otherwise choose end.')
-            : 'Select the single most suitable primary responder for the confirmed intent using public roles and real capabilities. Choose uncertain if this cannot be decided.',
+            : policy.version===GROUP_POLICY_VERSION && action==='clarify'
+              ? 'The confirmed action is clarification. Select one authorized member whose public duties make it suitable to ask the necessary question. Missing task details are why clarification was selected; they do not by themselves prevent selecting a questioner. If several members can ask, choose a suitable primary without requiring a uniquely best member. Choose uncertain only if no suitable authorized questioner can be identified.'
+              : policy.version===GROUP_POLICY_VERSION && independent
+                ? 'The confirmed intent requests independent contributions. Select a suitable first contributor using the requested roles and real capabilities. This selects speaking order, not the only competent member. When several requested contributors are suitable, choose one to start; later requests select the remaining independent contributors. Choose uncertain only if no suitable authorized contributor can be identified.'
+                : 'Select the single most suitable primary responder for the confirmed intent using public roles and real capabilities. Choose uncertain if this cannot be decided.',
           [...memberChoices(remaining),...(optional?[{value:stop,description:'No further responder is needed.'}]:[]),{value:uncertain}]))
         if (selected.choice === stop) return false
         if (!responders.length) confidence=selected.confidence

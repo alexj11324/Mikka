@@ -1,12 +1,13 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { GROUP_BASELINE_VERSION, GROUP_POLICY_VERSION } from './group-decision-policy'
-import { GROUP_REPLAY_CASE_IDS, replayGroupDecision, summarizeGroupDecisionReplay } from './group-decision-replay'
+import { GROUP_REPLAY_CASE_IDS, replayGroupDecision, summarizeGroupDecisionReplay, type GroupDecisionReplay } from './group-decision-replay'
 import { groupDecisionReplayInput } from './group-decision-replay-api'
 import { DECISION_MODEL, type DecisionAnswer } from './decision'
 import type { DecisionExecution, invokeDecision } from './decide'
 import { runGroupDecisionReplay } from '../../scripts/group-decision-replay'
 import { groupDecisionTotals } from './group-decision-chain'
+import dataset from '../../tests/fixtures/group-decision-cases.json'
 
 const ui='00000000-0000-4000-8000-000000000001',coding='00000000-0000-4000-8000-000000000002'
 // Synthetic transport fixtures test the gate, not live model quality.
@@ -59,7 +60,7 @@ test('baseline and candidate share fixed inputs but use distinct prompts; mentio
   })
   assert.equal(delegated.route?.delegation?.reportTiming,'on_completion');assert.equal(delegated.executionPerformed,false)
   assert.equal(delegated.decisions.length,3);assert.equal(summarizeGroupDecisionReplay([delegated]).failures.length,0)
-  const noisy={...delegated,route:{...delegated.route!,delegation:{...delegated.route!.delegation!,reportTiming:'now' as const}}}
+  const noisy={...delegated,route:{...delegated.route!,delegation:{...delegated.route!.delegation!,reportTiming:'now' as const}},projection:{...delegated.projection!,reportTiming:'now'}}
   assert.deepEqual(summarizeGroupDecisionReplay([noisy]).failures,[{caseId:'silent-delegation',reason:'report_timing'}])
 })
 
@@ -166,4 +167,99 @@ test('a changed deployment after an invalid observation prevents the next fixed 
   assert.equal(posts,1);assert.equal(result.baseline.length,1)
   assert.equal(result.collectionComplete,false);assert.equal(result.qualityAccepted,false)
   assert.equal(result.error,'replay_deployment_changed')
+})
+
+
+test('full-dataset accuracy retains uncertain and missing cases in its denominator',async()=>{
+  const valid=await replayGroupDecision('ui-help',GROUP_POLICY_VERSION,response('reply',ui))
+  const abstained=await replayGroupDecision('small-talk',GROUP_BASELINE_VERSION,async(_purpose,_input,questions)=>answer({[questions[0].name]:'uncertain'}))
+  const summary=summarizeGroupDecisionReplay([valid,abstained])
+  assert.equal(summary.actionAccuracy,1/12)
+  assert.equal(summary.responderAccuracy,1/12)
+  assert.equal(summary.measured,1)
+  assert.equal(summary.abstentions,1)
+  assert.equal(summary.unresolvedNegative,1)
+  assert.equal(summary.falseIntervention,0)
+  assert.equal(summary.intentionalNonIntervention,0,'uncertain is never a successful quiet outcome')
+  assert.equal(summary.observed,2)
+  const positive=await replayGroupDecision('ui-help',GROUP_POLICY_VERSION,async(_purpose,_input,questions)=>answer({[questions[0].name]:'uncertain'}))
+  assert.equal(summarizeGroupDecisionReplay([positive]).missedIntervention,1)
+})
+
+// Synthetic transport fixtures exercise comparison semantics, not model quality.
+// Actual replay inputs still exclude these expected labels.
+async function comparisonFixture({baselineFailure='uncertain',candidateFailure=false,mutate}:{baselineFailure?:string;candidateFailure?:boolean;mutate?:(row:GroupDecisionReplay)=>GroupDecisionReplay}={}) {
+  const env={GROUP_REPLAY_CONVERSATION:ui,GROUP_REPLAY_DEPLOYMENT:'dpl_fixture',GROUP_REPLAY_REVISION:'b'.repeat(40),GROUP_REPLAY_COOKIE:'fixture-session'}
+  const requested:string[]=[]
+  const report=await runGroupDecisionReplay({env,fetchImpl:async(url,options)=>{
+    if(String(url).endsWith('/api/version'))return Response.json({build:'dpl_fixture'})
+    const body=JSON.parse(options?.body as string)
+    requested.push([body.policyVersion,body.caseId].join(':'))
+    const item=dataset.cases.find(item=>item.id===body.caseId)!
+    const baseline=body.policyVersion===GROUP_BASELINE_VERSION
+    const failed=baseline&&body.caseId==='small-talk' || !baseline&&candidateFailure&&body.caseId==='ui-help'
+    const target=item.expected.actions[0]
+    const responders=item.expected.responders?.length?item.expected.responders:[coding]
+    const invoke:typeof invokeDecision=async(_purpose,_input,questions)=>{
+      const name=questions[0].name
+      if(failed)return baselineFailure==='unavailable'&&baseline?null:answer({[name]:baseline?baselineFailure:'uncertain'})
+      const values:Record<string,string>={
+        intent:target==='ignore'?'ignore_ordinary_conversation':target==='clarify'?'clarify_missing_information':target==='delegate'?'delegate_task_followup':responders.length>1?'reply_independent_contributions':'reply_useful_answer',
+        responder_0:responders[0],responder_1:responders[1]??'end',responder_2:responders[2]??'end',
+        task_plan:'continue_0',report_timing:item.expected.reportTiming??'now',
+      }
+      return answer({[name]:values[name]})
+    }
+    const row=await replayGroupDecision(body.caseId,body.policyVersion,invoke)
+    return Response.json(mutate?mutate(row):row)
+  }})
+  return {report,requested}
+}
+
+test('a fixed baseline abstention remains a failure while a fully correct candidate becomes reviewable',async()=>{
+  const {report,requested}=await comparisonFixture()
+  assert.equal(requested.length,24);assert.equal(new Set(requested).size,24)
+  assert.equal(report.comparisonVersion,'group-decision-comparison-v2')
+  assert.equal(report.status,'comparison_ready');assert.equal(report.collectionComplete,true)
+  assert.equal(report.qualityAccepted,true)
+  assert.equal(report.comparison.baseline.abstentions,1)
+  assert.equal(report.comparison.baseline.measured,11)
+  assert.equal(report.baseline[0].status,'invalid_decision');assert.equal(report.baseline[0].route,null)
+  assert.equal(report.baseline[0].projection,null);assert.equal(report.baseline[0].failureReason,'uncertain')
+  assert.equal(report.comparison.candidate.measured,12);assert.equal(report.comparison.candidate.actionAccuracy,1)
+  assert.equal(report.comparison.candidate.failures.length,0)
+  assert.equal(report.productionAccepted,false);assert.equal(report.policyChanged,false)
+})
+
+test('new comparison rejects candidate uncertainty and non-semantic baseline failures',async()=>{
+  for(const options of [{candidateFailure:true},{baselineFailure:'foreign'},{baselineFailure:'unavailable'}]){
+    const {report,requested}=await comparisonFixture(options)
+    assert.equal(report.qualityAccepted,false);assert.equal(report.comparison.decisionReviewReady,false)
+    assert.equal(new Set(requested).size,requested.length,'no failed observation is retried')
+  }
+})
+
+
+test('a complete baseline requires an intact typed route and matching projection before comparison',async()=>{
+  const mutations:((row:GroupDecisionReplay)=>void)[]=[
+    row=>{row.route=null},
+    row=>{row.projection=null},
+    row=>{row.projection!.selectedResponderCount++},
+    row=>{row.route!.responders=['00000000-0000-4000-8000-000000000099']},
+  ]
+  for(const mutate of mutations){
+    let changed=false
+    const {report,requested}=await comparisonFixture({mutate:row=>{
+      if(!changed && row.policyVersion===GROUP_BASELINE_VERSION && row.status==='complete'){changed=true;mutate(row)}
+      return row
+    }})
+    assert.equal(changed,true)
+    assert.equal(report.collectionComplete,false)
+    assert.equal(report.qualityAccepted,false)
+    assert.equal(report.error,'replay_unbound_evidence')
+    assert.equal(report.comparison.baselineClassifiable,false)
+    assert.equal(report.candidate.length,0)
+    assert.equal(new Set(requested).size,requested.length)
+    assert.ok(report.baseline.at(-1)?.receipt,'malformed observation retains its real receipt')
+  }
 })
