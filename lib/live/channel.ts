@@ -20,7 +20,8 @@ export type LiveSubscriptionOptions = {
   /** Minimum spacing for changes, never for reconnect/visibility catch-up. */ minIntervalMs?: number
   /** One read at a server-derived deadline, independent of the browser's clock. */ deadline?: { at: string; afterMs: number } | null
 }
-type Subscription = { kind: LiveKind; id: string; keys: readonly string[]; refresh: (key: string) => unknown; minIntervalMs: number; deadlineAt: number | null; timer: string }
+export type LiveSubscription = (() => void) & { update(options: LiveSubscriptionOptions): void }
+type Subscription = { kind: LiveKind; id: string; keys: readonly string[]; refresh: (key: string) => unknown; minIntervalMs: number; deadlineAt: number | null; deadlineKey: string | null; timer: string }
 type PendingRead = { refresh: Subscription['refresh']; at: number }
 
 /** One connection per mounted owner/workspace; repeated badges share each SWR read. */
@@ -43,11 +44,11 @@ export class LiveChannel {
 
   constructor(private runtime: LiveRuntime) {}
 
-  subscribe(kind: LiveKind, id: string, keys: readonly string[], refresh: Subscription['refresh'], options: LiveSubscriptionOptions = {}) {
-    if (!LIVE_ID.test(id)) return () => {}
+  subscribe(kind: LiveKind, id: string, keys: readonly string[], refresh: Subscription['refresh'], options: LiveSubscriptionOptions = {}): LiveSubscription {
+    if (!LIVE_ID.test(id)) return Object.assign(() => {}, { update() {} })
     const subscription: Subscription = { kind, id, keys, refresh, minIntervalMs: Math.max(0, options.minIntervalMs ?? 0),
       deadlineAt: options.deadline && Number.isFinite(options.deadline.afterMs) ? this.localNow() + Math.max(0, options.deadline.afterMs) : null,
-      timer: `deadline:${++this.nextDeadline}` }
+      deadlineKey: options.deadline?.at ?? null, timer: `deadline:${++this.nextDeadline}` }
     this.subscriptions.add(subscription)
     if (this.subscriptions.size === 1) {
       this.unwatch = this.runtime.watchVisibility(() => this.visibilityChanged())
@@ -56,7 +57,7 @@ export class LiveChannel {
     if (this.connected && this.runtime.visible()) this.invalidate(kind, id, true)
     this.fallback()
     this.scheduleDeadline(subscription)
-    return () => {
+    const stop = () => {
       this.subscriptions.delete(subscription)
       this.clear(subscription.timer)
       if (this.allSupported()) this.clear('fallback')
@@ -66,6 +67,17 @@ export class LiveChannel {
         this.pending.delete(key); this.lastRead.delete(key); this.inFlight.delete(key)
       }
     }
+    return Object.assign(stop, { update: (next: LiveSubscriptionOptions) => {
+      if (!this.subscriptions.has(subscription)) return
+      subscription.minIntervalMs = Math.max(0, next.minIntervalMs ?? 0)
+      const key = next.deadline?.at ?? null
+      if (key === subscription.deadlineKey) return // A render/read cannot restart the same expiry.
+      subscription.deadlineKey = key
+      subscription.deadlineAt = next.deadline && Number.isFinite(next.deadline.afterMs)
+        ? this.localNow() + Math.max(0, next.deadline.afterMs) : null
+      this.clear(subscription.timer)
+      this.scheduleDeadline(subscription)
+    } })
   }
 
   dispose() {

@@ -25,6 +25,7 @@ let SWRConfig: typeof import('swr')['SWRConfig']
 let ApprovedWriteActions: typeof import('../components/coordinator/approved-write-actions')['ApprovedWriteActions']
 let LiveProvider: typeof import('../hooks/use-live-key')['LiveProvider']
 let items: ApprovedWriteItem[], records: Map<string, ApprovedWriteItem>, calls: { op: string; cursor?: string; id?: string }[]
+let ticketReads = 0
 let availability: number, paginated: boolean, loseDecision: boolean, serverNow: string | null
 const sockets: FakeSocket[] = []
 
@@ -55,12 +56,13 @@ before(async () => {
   ;({ LiveProvider } = await import('../hooks/use-live-key'))
 })
 beforeEach(() => {
-  items = []; records = new Map(); calls = []; availability = 0; paginated = false; loseDecision = false; serverNow = null; sockets.length = 0; flag = undefined
+  items = []; records = new Map(); calls = []; availability = 0; paginated = false; loseDecision = false; serverNow = null; sockets.length = 0; flag = undefined; ticketReads = 0
   container = document.createElement('div'); document.body.append(container); root = createRoot(container)
   globalThis.fetch = async (url, options) => {
     const path = String(url)
     if (path.endsWith('/api/workspace/switcher')) return Response.json({ accounts: [{ id: 'owner', choices: [{ id: home, kind: 'personal' }] }] })
     if (path.includes('/api/live/ticket?workspace=')) {
+      ticketReads++
       assert.equal(new URL(path, 'https://mikka.example').searchParams.get('workspace'), home)
       return Response.json({ url: 'wss://fixture.invalid/socket', protocol: 'fixture', expiresAt: Date.now() + 600_000 })
     }
@@ -149,11 +151,12 @@ test('a server-derived expiry performs one authoritative read and disables appro
   await render()
   const approve = () => [...container.querySelectorAll('button')].find(node => node.textContent === 'approveSend')
   assert.equal(approve()?.disabled, false)
-  const before = calls.length
+  const before = calls.length, socketCount = sockets.length, tickets = ticketReads
   serverNow = '2099-01-01T00:00:01.001Z'
   await wait(1_150)
   assert.equal(approve()?.disabled, true)
-  assert.ok(calls.slice(before).some(call => call.op === 'list'))
+  assert.equal(calls.slice(before).filter(call => call.op === 'list').length, 1)
+  assert.equal(sockets.length, socketCount); assert.equal(ticketReads, tickets)
   const settled = calls.length; await wait(300)
   assert.equal(calls.length, settled, 'expiry does not become a recurring read')
   assert.equal(calls.filter(call => call.op === 'decide').length, 0)

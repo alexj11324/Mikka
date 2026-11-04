@@ -405,3 +405,47 @@ test('a backward wall-clock correction cannot postpone a pushed key beyond its e
   await f.advance(1); assert.deepEqual(f.reads, ['approvals'])
   f.channel.dispose()
 })
+
+test('updating or clearing a deadline retains the same subscription and cannot restart the same expiry', async () => {
+  const f = fixture()
+  const stop = f.channel.subscribe('approved_writes', task, ['approvals'], key => { f.reads.push(key) }, { deadline: { at: 'first', afterMs: 2_000 } })
+  await f.open(); f.reads.length = 0
+  await f.advance(500)
+  stop.update({ deadline: { at: 'first', afterMs: 20_000 } })
+  await f.advance(1_500); assert.deepEqual(f.reads, ['approvals'])
+  stop.update({ deadline: null }); await f.advance(100)
+  assert.deepEqual(f.reads, ['approvals'])
+  assert.equal(f.ticketCalls(), 1); assert.equal(f.sockets.length, 1)
+  stop.update({ deadline: { at: 'second', afterMs: 500 } })
+  await f.advance(200); stop.update({ deadline: null }); await f.advance(1_000)
+  assert.deepEqual(f.reads, ['approvals'], 'clearing a new deadline cancels its timer')
+  stop.update({ deadline: { at: 'third', afterMs: 500 } })
+  await f.advance(600); assert.deepEqual(f.reads, ['approvals', 'approvals'])
+  assert.equal(f.ticketCalls(), 1); assert.equal(f.sockets.length, 1)
+  stop()
+})
+
+test('timing updates while hidden do not read, and updates after teardown cannot revive a subscription', async () => {
+  const f = fixture()
+  const stop = f.channel.subscribe('approved_writes', task, ['approvals'], key => { f.reads.push(key) })
+  await f.open(); f.reads.length = 0; f.visibility(false)
+  stop.update({ deadline: { at: 'hidden', afterMs: 500 } })
+  await f.advance(2_000); assert.deepEqual(f.reads, [])
+  f.visibility(true); await f.open(); assert.deepEqual(f.reads, ['approvals'])
+  f.reads.length = 0
+  stop(); const tickets = f.ticketCalls()
+  stop.update({ deadline: { at: 'closed', afterMs: 100 } })
+  await f.advance(60_000); assert.deepEqual(f.reads, []); assert.equal(f.ticketCalls(), tickets)
+})
+
+test('updating read pacing retains the connection and applies the new spacing to subsequent pushes', async () => {
+  const f = fixture()
+  const stop = f.channel.subscribe('approved_writes', task, ['approvals'], key => { f.reads.push(key) })
+  await f.open(); f.reads.length = 0
+  stop.update({ minIntervalMs: 1_000 })
+  f.sockets[0].message(JSON.stringify({ kind: 'approved_writes', id: task }))
+  await f.advance(999); assert.deepEqual(f.reads, [])
+  await f.advance(1); assert.deepEqual(f.reads, ['approvals'])
+  assert.equal(f.ticketCalls(), 1); assert.equal(f.sockets.length, 1)
+  stop()
+})
