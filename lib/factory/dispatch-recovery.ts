@@ -1,15 +1,16 @@
 import type { Pool, PoolClient } from 'pg';
 import { isDeviceOnline } from '@mikka/protocol/device';
+import { deviceIsOnline } from '../device-presence';
 
 /** Why a Factory run cannot start on its assigned device. Frontend (#453) keys copy on these codes. */
 export const FACTORY_DISPATCH_FAILURE_REASONS = ['deviceOffline', 'deviceDisabled', 'harnessUnavailable', 'e2bKeyNotConfigured'] as const;
 export type FactoryDispatchFailureReason = (typeof FACTORY_DISPATCH_FAILURE_REASONS)[number];
 
-export interface FactoryDispatchDevice { id: string; name: string; enabled: boolean; lastSeenAt: Date | null; harnesses: unknown }
+export interface FactoryDispatchDevice { id: string; name: string; enabled: boolean; lastSeenAt: Date | null; harnesses: unknown; online?: boolean }
 
 /** Same rule as lib/mcp/actions.ts deviceOnline: enabled and seen within DEVICE_ONLINE_WINDOW_MS. */
-export function factoryDeviceOnline(device: Pick<FactoryDispatchDevice, 'enabled' | 'lastSeenAt'>, now = Date.now()) {
-  return device.enabled && isDeviceOnline(device.lastSeenAt, now);
+export function factoryDeviceOnline(device: Pick<FactoryDispatchDevice, 'enabled' | 'lastSeenAt' | 'online'>, now = Date.now()) {
+  return device.enabled && (device.online ?? isDeviceOnline(device.lastSeenAt, now));
 }
 
 function harnessInstalled(harnesses: unknown, harness: string) {
@@ -93,7 +94,8 @@ export async function recordFactoryDispatchFailure(tx: PoolClient, userId: strin
     JOIN devices d ON d.id=r."deviceId" AND d."ownerId"=r."userId"
     WHERE r.id=$1 AND r."userId"=$2`, [runId, userId, attemptId]);
   if (!row || row.status !== 'queued') return null;
-  const reason = factoryDispatchFailureReason({ id: row.dId, name: row.name, enabled: row.enabled, lastSeenAt: row.lastSeenAt, harnesses: row.harnesses }, row.harness, at);
+  const online = row.enabled && await deviceIsOnline({ id: row.dId, lastSeenAt: row.lastSeenAt }, at);
+  const reason = factoryDispatchFailureReason({ id: row.dId, name: row.name, enabled: row.enabled, lastSeenAt: row.lastSeenAt, harnesses: row.harnesses, online }, row.harness, at);
   if (reason) await insertEvent(tx, { userId, botId: row.botId, kind: 'run_dispatch_failed', dedupeKey: `run_dispatch_failed:${runId}:${reason}`, issueId: row.issueId, runId,
     payload: { taskId: row.taskId ?? null, deviceId: row.dId, reasonCode: reason } });
   return reason;
@@ -106,6 +108,7 @@ export function createFactoryDispatchRecovery(pool: Pool, cloudKeyConfigured: Cl
     if (!row) return null;
     const device = row.dId ? { id: row.dId, name: row.name, enabled: row.enabled, lastSeenAt: row.lastSeenAt, harnesses: row.harnesses } as FactoryDispatchDevice : null;
     const at = now();
+    if (device) device.online = device.enabled && await deviceIsOnline(device, at);
     const reason = device && row.runStatus === 'queued' ? factoryDispatchFailureReason(device, row.harness, at) : null;
     const client = reason ? await pool.connect() : null;
     try {

@@ -97,7 +97,7 @@ function eventPayload() {
   return JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8'))
 }
 
-function changedFiles(base, head) {
+export function changedFiles(base, head) {
   const options = { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }
   const files = execFileSync('git', ['diff', '--no-renames', '-z', '--name-only', `${base}...${head}`], options)
     .split('\0').filter(Boolean)

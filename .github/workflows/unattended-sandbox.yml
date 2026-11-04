@@ -1,7 +1,7 @@
 name: Unattended sandbox acceptance
+# Pull requests only: the same suite already passed on the PR, and main's
+# CI workflow (ui-policy.yml) still verifies every merged commit.
 on:
-  push:
-    branches: [main, 'fix/unattended-sandbox-404']
   pull_request:
     paths:
       - '.github/workflows/unattended-sandbox.yml'

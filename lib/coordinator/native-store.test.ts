@@ -20,7 +20,7 @@ const check = (name: string, fn: () => Promise<void>) => test(name,{ skip: !url 
 before(async () => {
   if (!admin || !pool) return
   await admin.query(`CREATE SCHEMA ${schema}`)
-  await pool.query(`CREATE TABLE devices (id uuid PRIMARY KEY,"ownerId" text,enabled boolean DEFAULT true,"lastSeenAt" timestamptz DEFAULT now(),harnesses jsonb);
+  await pool.query(`CREATE TABLE devices (id uuid PRIMARY KEY,"ownerId" text,enabled boolean DEFAULT true,"removedAt" timestamptz,"lastSeenAt" timestamptz DEFAULT now(),harnesses jsonb);
     CREATE TABLE coordinator_sessions ("userId" text PRIMARY KEY,"leaseHolder" text,"leaseUntil" timestamptz);`)
   await pool.query(await readFile(new URL('../../drizzle/20261026170000_native_coordinator.sql',import.meta.url),'utf8'))
 })

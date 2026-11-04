@@ -5,6 +5,7 @@ import { FactoryError } from './contract'
 import { factoryBinding, createFactoryDispatch, type FactoryQueue } from './dispatch'
 import { factoryEventId } from './event-id'
 import { factoryLifecycleEnabled, factoryRuntimeForBot } from './runtime'
+import { notifyQueuedLocalRun } from '../device-gateway-notify'
 import { advanceFactoryRequest, factoryContinuationSource } from './request-epoch'
 
 /** Placement is already decided. Route, attempt, queue and receipt share one commit. */
@@ -78,6 +79,7 @@ export async function queueFactoryTask(pool: Pool, userId: string, input: {
     if (input.previousRunId) await tx.query('UPDATE agent_runs SET "continuesRunId"=$2 WHERE id=$1 AND "userId"=$3', [result.runId, input.previousRunId, userId])
     await tx.query('INSERT INTO factory_events ("taskId","eventId",request,result) VALUES ($1,$2,$3,$4)', [task.id, receiptId, JSON.stringify({ key, digest }), JSON.stringify({ runId: result.runId })])
     await tx.query('COMMIT')
+    await notifyQueuedLocalRun(tx, userId, result.runId)
     return { runId: result.runId }
   } catch (error) { await tx.query('ROLLBACK'); throw error } finally { tx.release() }
 }

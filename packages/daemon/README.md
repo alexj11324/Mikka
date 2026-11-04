@@ -77,9 +77,10 @@ index for inspection. The test daemon still performs its normal lifecycle
 cleanup inside the new dedicated fixture; previously retained resources are
 not part of that fixture.
 
-No global `tsx` or separate `@mikka/protocol` package is needed. Every push to
-`main` publishes through `.github/workflows/publish-daemon.yml` after daemon
-checks and the installed-package runtime test pass. The workflow uses npm
+No global `tsx` or separate `@mikka/protocol` package is needed. A push to `main`
+that changes the daemon, the protocol, shared config, the lockfile or the
+release scripts publishes through `.github/workflows/publish-daemon.yml` after
+daemon checks and the installed-package runtime test pass. The workflow uses npm
 trusted publishing and provenance; its npm trust configuration must authorize
 this exact repository and workflow filename.
 

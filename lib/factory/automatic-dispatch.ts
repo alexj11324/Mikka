@@ -3,7 +3,7 @@ import type { Pool, PoolClient } from 'pg'
 import { queueFactoryRun } from '@/lib/agent-runs'
 import { queueCloudRun } from '@/lib/computer/queue-run'
 import { chooseCloudRunModel, chooseLocalRunModel, threadRunModel } from '@/lib/computer/run-model'
-import { DEVICE_ONLINE_WINDOW_MS } from '@mikka/protocol/device'
+import { deviceOnlineStates } from '@/lib/device-presence'
 import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
 import { ensureDeviceRepository } from '@/lib/device-repositories'
 import { withDatabaseClient } from '@/lib/db'
@@ -11,6 +11,7 @@ import { tiptapToText } from '@/lib/tiptap-text'
 import { createFactoryDispatch, factoryBinding } from './dispatch'
 import { checkFactoryRepairBudget } from './check-recovery-evidence'
 import { FactoryError } from './contract'
+import { notifyDeviceWork } from '../device-gateway-notify'
 import type { FactoryTask, createFactoryStore } from './store'
 
 /** Provider I/O boundary; no model input selects these callbacks. */
@@ -51,21 +52,25 @@ export function automaticFactoryDispatch(pool: Pool) {
     let selection = check ? {} : threadRunModel(source.agentDefinition) ?? {}
     const { rows: [pending] } = await tx.query('SELECT output FROM factory_attempts WHERE id=$1 AND "taskId"=$2', [task.attemptId, task.id])
     const recovery = pending?.output?.watchdogRecovery
-    let agentId = source.agentId, deviceRepoId = source.deviceRepoId
+    let agentId = source.agentId, deviceId = source.deviceId, deviceRepoId = source.deviceRepoId
     if (recovery && !check && source.deviceKind !== 'cloud') {
       if (recovery.requestEpoch !== task.sourceEventId || recovery.previousRunId !== source.id || !source.remoteUrl)
         throw new FactoryError('factoryRecoveryExecutorUnavailable')
-      const { rows: targets } = await tx.query(`SELECT a.id,d.id AS "deviceId",a.harness FROM agents a JOIN devices d ON d.id=a."deviceId" AND d."ownerId"=a."userId"
+      // An idle gateway daemon stops HTTP heartbeats, so lastSeenAt alone would miss it: ask presence.
+      const { rows: candidates } = await tx.query(`SELECT a.id,d.id AS "deviceId",d."lastSeenAt",a.harness FROM agents a JOIN devices d ON d.id=a."deviceId" AND d."ownerId"=a."userId"
         WHERE a."userId"=$1 AND d.enabled=true AND d.kind='local' AND d.id<>$2 AND a.harness=$3
-          AND d."lastSeenAt">$4 AND d."protocolVersion">=$5
-        ORDER BY (d."deviceType"='server') DESC,d."lastSeenAt" DESC,a.id LIMIT 5`,
-      [task.userId, source.deviceId, source.harness, new Date(Date.now() - DEVICE_ONLINE_WINDOW_MS), DAEMON_PROTOCOL_VERSION])
+          AND d."protocolVersion">=$4
+        ORDER BY (d."deviceType"='server') DESC,d."lastSeenAt" DESC NULLS LAST,a.id LIMIT 20`,
+      [task.userId, source.deviceId, source.harness, DAEMON_PROTOCOL_VERSION])
+      const online = await deviceOnlineStates(candidates.map(c => ({ id: c.deviceId, lastSeenAt: c.lastSeenAt })))
+      const targets = candidates.filter(c => online.get(c.deviceId)).slice(0, 5)
       const workspaceId = await (await import('@/lib/execution-settings')).executionWorkspace(task.userId, task.botId)
       let selected = false
       for (const target of targets) {
         const model = await chooseLocalRunModel(pool, { ownerId: task.userId, workspaceId, botId: task.botId }, target, source.agentDefinition?.model)
         if ('error' in model) continue
         agentId = target.id
+        deviceId = target.deviceId
         deviceRepoId = (await withDatabaseClient(tx, () => ensureDeviceRepository(task.userId, target.deviceId, source.remoteUrl))).id
         selection = model
         selected = true
@@ -78,7 +83,7 @@ export function automaticFactoryDispatch(pool: Pool) {
       const result = await dispatch(task.userId, { binding: factoryBinding(task), agentId, deviceRepoId }, tx)
       if (!check) await tx.query('UPDATE agent_runs SET "continuesRunId"=$2 WHERE id=$1', [result.runId, source.id])
       if (recovery && !check) await tx.query('UPDATE agent_runs SET "retryOf"=$2,attempt=$3 WHERE id=$1', [result.runId, source.id, source.attempt + 1])
-      return
+      return async () => { notifyDeviceWork(deviceId) }
     }
     const { rows: [runtime] } = await tx.query(`SELECT r."agentId",a."deviceId",r."repoId" FROM bot_cloud_runtimes r JOIN agents a ON a.id=r."agentId" WHERE r."botId"=$1 AND r."ownerId"=$2 AND r.harness=$3`, [source.runtimeBotId, task.userId, source.harness])
     if (!runtime) throw new FactoryError('factoryRunMismatch')

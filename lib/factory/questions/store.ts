@@ -1,10 +1,11 @@
 import { remoteKey } from "@mikka/protocol/repository";
+import { notifyQueuedLocalRun } from '../../device-gateway-notify';
 import { factoryCheckAssignment } from "../checks";
 import { factoryMonitorDispatchAssignment } from "../monitor-dispatch";
 import { personalRunMessageText } from "../../personal-run-message";
 import type { Pool, PoolClient } from "pg";
 import { z } from "zod";
-import { DEVICE_ONLINE_WINDOW_MS } from "@mikka/protocol/device";
+import { deviceIsOnline } from "../../device-presence";
 import { FactoryError, type FactoryBinding } from "../contract";
 import { factoryEventId } from "../event-id";
 import { admitCloudQuestionContinuation } from "./queue-continuation";
@@ -704,6 +705,7 @@ export function createFactoryQuestions(
       });
       // The answer and its exact continuation are durable before waking a
       // paused machine. Replaying the same answer may retry this same wake.
+      await notifyQueuedLocalRun(pool, actor.userId, result.continuationRunId);
       try { await afterContinuation?.(actor.userId,result); }
       catch { console.error(JSON.stringify({msg:'factory_question_wake_deferred',runId:result.continuationRunId})); }
       return result;
@@ -833,8 +835,7 @@ export function createFactoryQuestions(
           run.originRepoId !== run.deviceRepoId ||
           run.originSessionId !== q.originSessionId ||
           !run.enabled ||
-          !run.lastSeenAt ||
-          Date.now() - run.lastSeenAt.getTime() > DEVICE_ONLINE_WINDOW_MS ||
+          !await deviceIsOnline({ id: run.deviceId, lastSeenAt: run.lastSeenAt }) ||
           !run.harnesses?.some(
             (h: { harness: string; installed: boolean }) =>
               h.harness === run.harness && h.installed,

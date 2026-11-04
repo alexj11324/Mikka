@@ -382,7 +382,7 @@ export async function personalMcp(userId: string, botId: string, executionId: st
 personalMcp.maxRetries = 0
 
 /** GitHub's hosted MCP server as the caller, with the caller's own token only (decision 2026-11-02-1730). */
-export async function githubMcp(userId: string, input: import('@/lib/plugins/mcp').McpCommand, scope?: NativeToolScope) {
+export async function githubMcp(userId: string, input: import('@/lib/github/mcp').GitHubMcpCommand, scope?: NativeToolScope) {
   'use step'
   await assertNativeToolScope(userId, scope)
   if (scope?.scheduledRead) return { error: 'mcpNotAllowedForScheduledRead' }
