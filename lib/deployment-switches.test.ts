@@ -81,6 +81,16 @@ test('a kill flag created inactive never turns a shipped feature off', async () 
   assert.equal(deploymentSwitch('cloudComputerTasks', { MIKKA_CLOUD_COMPUTER_TASKS: '0' }), true, 'PostHog answered; the old variable no longer decides')
 })
 
+test('group contribution kill flag restores baseline and the recognized environment policy is only a fallback',async()=>{
+  assert.equal(deploymentSwitch('groupContribution',{}),true)
+  assert.equal(deploymentSwitch('groupContribution',{MIKKA_GROUP_DECISION_POLICY:'group-route-v0'}),false)
+  assert.equal(deploymentSwitch('groupContribution',{MIKKA_GROUP_DECISION_POLICY:'group-contribution-v1'}),true)
+  await refreshDeploymentSwitches('phc_test',posthog({'mikka-group-contribution-off':flag(true)}).fetcher)
+  assert.equal(deploymentSwitch('groupContribution',{MIKKA_GROUP_DECISION_POLICY:'group-contribution-v1'}),false)
+  await refreshDeploymentSwitches('phc_test',posthog({'mikka-group-contribution-off':flag(false)}).fetcher)
+  assert.equal(deploymentSwitch('groupContribution',{MIKKA_GROUP_DECISION_POLICY:'group-route-v0'}),true,'inactive flag restores the shipped candidate')
+})
+
 test('an outage, a partial evaluation or a multivariate flag keeps what was known', async () => {
   await refreshDeploymentSwitches('phc_test', posthog({ 'mikka-agent-kit-off': flag(true) }).fetcher)
   assert.equal(deploymentSwitch('agentKit', {}), false)

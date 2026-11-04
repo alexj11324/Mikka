@@ -23,7 +23,7 @@ export type GroupRuntime = {
   bots?(ownerId: string, workspaceId: string, ids: string[], client: PoolClient): Promise<GroupAgent[]>
   prepareBot?(actor: GroupAgent, scope: { ownerId: string; workspaceId: string }, client: PoolClient): Promise<HostedRuntimeSnapshot>
   authorized(workspaceId: string, userId: string): Promise<boolean>
-  route(message: GroupMessage, members: GroupAgent[], leadId: string | null, corrections: RoutingCorrection[], retain?: (steps: readonly import('./group-decision-chain').GroupDecisionStep[])=>Promise<void>): Promise<GroupRoute>
+  route(message: GroupMessage, members: GroupAgent[], leadId: string | null, corrections: RoutingCorrection[], retain?: import('./group-decision-chain').GroupDecisionRetain): Promise<GroupRoute>
   /** Production classifies the action even for an explicit @mention; member selection stays constrained. */
   routeMention?: GroupRuntime['route']
   contribution?(message: GroupMessage, member: GroupAgent, earlier: readonly { author: string; text: string }[]): Promise<{ contribute: boolean; execution?: import('./decide').DecisionExecution }>
@@ -170,8 +170,8 @@ export async function processGroupTurn(pool: Pool, conversationId: string, runti
       const leadId = root.leadBotId ?? root.leadAgentId
       const mentioned = mentionRoute(input, members)
       const contextCorrections = corrections.rows.reverse().map(c => ({ ...c, rightId: c.rightId ?? undefined }))
-      const judgment = mentioned && !runtime.routeMention ? mentioned : await modelScope(() => (mentioned ? runtime.routeMention! : runtime.route)(input, mentioned ? members.filter(m=>mentioned.responders.includes(m.id)) : members, members.some(m => m.id === leadId) ? leadId : null, contextCorrections, async steps=>{
-        await recordGroupDecisionSteps(client,messageId!,steps)
+      const judgment = mentioned && !runtime.routeMention ? mentioned : await modelScope(() => (mentioned ? runtime.routeMention! : runtime.route)(input, mentioned ? members.filter(m=>mentioned.responders.includes(m.id)) : members, members.some(m => m.id === leadId) ? leadId : null, contextCorrections, async (steps,policyVersion)=>{
+        await recordGroupDecisionSteps(client,messageId!,steps,undefined,policyVersion)
         if (await stopped()) throw new Error(GROUP_TURN_STOPPED)
       }))
       const route:GroupRoute = mentioned ? {...judgment,by:'mention'} : judgment

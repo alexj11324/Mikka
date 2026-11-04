@@ -4,7 +4,7 @@ import type { DecisionQuestion } from './decision'
 import { GroupJudgmentPendingError, type CorrectionInput, type CorrectionJudgment } from './group-correction'
 import type { GroupAction, GroupDelegation, GroupMessage, GroupRoute, RoutingCorrection, RoutingMember } from './group-routing'
 import { getGroupDecisionPolicy, GROUP_BASELINE_VERSION, type GroupPolicyVersion } from './group-decision-policy'
-import { GROUP_DECISION_PROTOCOL, GROUP_MAX_RESPONDERS, GROUP_MAX_ROUTING_DECISIONS, type GroupDecisionFailure, type GroupDecisionPhase, type GroupDecisionStep } from './group-decision-chain'
+import { GROUP_DECISION_PROTOCOL, GROUP_MAX_RESPONDERS, GROUP_MAX_ROUTING_DECISIONS, type GroupDecisionFailure, type GroupDecisionPhase, type GroupDecisionStep, type GroupDecisionRetain } from './group-decision-chain'
 import { groupDecisionReceipt } from './group-decision-trace'
 
 type Invoke = typeof invokeDecision
@@ -33,7 +33,7 @@ const intents: {value:string; action:GroupAction; reason:string; independent?:bo
  * The full decisions chain includes a receipted failure before rejecting it. */
 export function createGroupJudgment(invoke: Invoke, policyVersion?: GroupPolicyVersion) {
   return {
-    async route(message: GroupMessage, members: RoutingMember[], leadId: string | null, corrections: RoutingCorrection[], retain?: (steps: readonly GroupDecisionStep[])=>Promise<void>): Promise<GroupRoute> {
+    async route(message: GroupMessage, members: RoutingMember[], leadId: string | null, corrections: RoutingCorrection[], retain?: GroupDecisionRetain): Promise<GroupRoute> {
       const policy = getGroupDecisionPolicy(policyVersion)
       const baseline = policy.version === GROUP_BASELINE_VERSION
       const decisions: GroupDecisionStep[] = []
@@ -53,8 +53,8 @@ export function createGroupJudgment(invoke: Invoke, policyVersion?: GroupPolicyV
         if (decisions.length >= GROUP_MAX_ROUTING_DECISIONS) fail('call_budget_exhausted')
         // Persist earlier charged requests before the next provider boundary.
         // The host callback is not part of the model input or Decision payload.
-        await retain?.(decisions)
-        const step: GroupDecisionStep = {id:randomUUID(),phase,index:decisions.length,status:'unavailable',failure:null,receipt:null}
+        await retain?.(decisions,policy.version)
+        const step: GroupDecisionStep = {id:randomUUID(),phase,index:decisions.length,policyVersion:policy.version,status:'unavailable',failure:null,receipt:null}
         decisions.push(step)
         let result: Awaited<ReturnType<Invoke>>
         try {

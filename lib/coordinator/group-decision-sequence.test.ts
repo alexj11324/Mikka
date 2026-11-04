@@ -4,6 +4,8 @@ import { createGroupJudgment } from './group-judgment'
 import { GroupJudgmentPendingError } from './group-correction'
 import { DECISION_MODEL, type DecisionQuestion } from './decision'
 import type { DecisionExecution, invokeDecision } from './decide'
+import { overrideDeploymentSwitch } from '../deployment-switches'
+import { GROUP_BASELINE_VERSION, GROUP_POLICY_VERSION } from './group-decision-policy'
 
 const ids=['00000000-0000-4000-8000-000000000001','00000000-0000-4000-8000-000000000002','00000000-0000-4000-8000-000000000003']
 const members=ids.map((id,index)=>({id,name:`Member ${index}`,description:'Public role',memberType:'bot' as const,executionAvailable:true}))
@@ -78,4 +80,25 @@ test('baseline preserves forced reply with multiple responders while automatic s
   const many=[...members,...Array.from({length:5},(_,index)=>({id:`extra-${index}`,name:'Extra',description:'public'}))]
   const route=await createGroupJudgment(t.invoke,'group-route-v0').route({text:'casual input still requires a baseline reply',mentions:[]},many,null,[])
   assert.equal(route.action,'reply');assert.deepEqual(route.responders,ids);assert.equal(t.calls(),3)
+})
+
+test('a live policy change applies to the next routing attempt and cannot mix phases inside the current attempt',async t=>{
+  t.after(()=>overrideDeploymentSwitch('groupContribution',undefined))
+  overrideDeploymentSwitch('groupContribution',true)
+  const current=transport([
+    {name:'intent',value:'reply_useful_answer',inspect:input=>{
+      assert.equal(input.policyVersion,GROUP_POLICY_VERSION)
+      overrideDeploymentSwitch('groupContribution',false)
+    }},
+    {name:'responder_0',value:ids[0],inspect:input=>assert.equal(input.policyVersion,GROUP_POLICY_VERSION)},
+  ])
+  const retained:string[]=[]
+  const route=await createGroupJudgment(current.invoke).route({text:'help',mentions:[]},members,null,[],async(_steps,version)=>{retained.push(version!)})
+  assert.equal(route.policyVersion,GROUP_POLICY_VERSION)
+  assert.deepEqual(retained,[GROUP_POLICY_VERSION,GROUP_POLICY_VERSION])
+  assert.ok(route.decisions?.every(step=>step.policyVersion===GROUP_POLICY_VERSION))
+  const next=transport([{name:'responder_0',value:ids[0],inspect:input=>assert.equal(input.policyVersion,GROUP_BASELINE_VERSION)},{name:'responder_1',value:'end'}])
+  const nextRoute=await createGroupJudgment(next.invoke).route({text:'next request',mentions:[]},members,null,[])
+  assert.equal(nextRoute.policyVersion,GROUP_BASELINE_VERSION)
+  assert.ok(nextRoute.decisions?.every(step=>step.policyVersion===GROUP_BASELINE_VERSION))
 })

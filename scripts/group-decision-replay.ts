@@ -2,8 +2,8 @@ import { writeFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 import { GROUP_BASELINE_VERSION, GROUP_POLICY_VERSION } from '../lib/coordinator/group-decision-policy'
 import { GROUP_REPLAY_CASE_IDS, GROUP_REPLAY_DATASET, GROUP_REPLAY_DATASET_DIGEST, summarizeGroupDecisionReplay, type GroupDecisionReplay } from '../lib/coordinator/group-decision-replay'
-import { GROUP_DECISION_PROTOCOL, GROUP_MAX_ROUTING_DECISIONS } from '../lib/coordinator/group-decision-chain'
-import { groupDecisionSteps } from '../lib/coordinator/group-decision-trace'
+import { GROUP_DECISION_PROTOCOL, GROUP_MAX_ROUTING_DECISIONS, groupDecisionFailures, groupDecisionTotals } from '../lib/coordinator/group-decision-chain'
+import { groupDecisionReceipt, groupDecisionSteps } from '../lib/coordinator/group-decision-trace'
 
 /** Normal cookie/PAT authentication, fixed production deployment, fixed cases.
  * Evidence contains no input prompts, group history, token or cookies. */
@@ -29,9 +29,10 @@ export async function runGroupDecisionReplay({env=process.env,fetchImpl=fetch}:{
   }
   const report={schemaVersion:1,evidenceKind:'actual-decision-inference' as const,dataset:GROUP_REPLAY_DATASET,datasetDigest:GROUP_REPLAY_DATASET_DIGEST,
     deploymentId:deployment,revision,conversationId,startedAt:new Date().toISOString(),finishedAt:'',status:'running',error:null as string|null,
-    baseline:[] as GroupDecisionReplay[],candidate:[] as GroupDecisionReplay[],
+    baseline:[] as GroupDecisionReplay[],candidate:[] as GroupDecisionReplay[],collectionComplete:false,
     scope:'Actual Decision inference: 24 logical case replays, each with its bounded provider-request chain. Execution projected/not performed. Cost covers routing requests only, not correction, contribution, chat, tools or Factory.',
     productionAccepted:false,policyChanged:false}
+  const executions=new Set<string>(),generations=new Set<string>(),stepIds=new Set<string>()
   try {
     for(const [policyVersion,rows] of [[GROUP_BASELINE_VERSION,report.baseline],[GROUP_POLICY_VERSION,report.candidate]] as const) {
       for(const caseId of GROUP_REPLAY_CASE_IDS) {
@@ -40,23 +41,43 @@ export async function runGroupDecisionReplay({env=process.env,fetchImpl=fetch}:{
         const row=data as GroupDecisionReplay|null
         if(!row || row.schemaVersion!==1 || row.caseId!==caseId || row.policyVersion!==policyVersion || row.datasetDigest!==GROUP_REPLAY_DATASET_DIGEST || row.executionPerformed!==false || row.policyChanged!==false || row.evidenceKind!=='actual-decision-inference')throw Error('replay_unbound_evidence')
         rows.push(row)
-        // Do not retry or select another provider after a charged/unknown failure.
-        if(!response.ok || row.status!=='complete' || !row.receipt)throw Error('replay_decision_unavailable')
+        // A receipted invalid judgment is still an observation. Keep it and move
+        // to the next fixed case once; never retry it or select another provider.
+        // A service/auth failure or missing primary evidence still stops work.
+        const primary=groupDecisionReceipt(row.receipt ?? undefined)
+        if(!response.ok || row.status==='unavailable' || !primary)throw Error('replay_decision_unavailable')
         const chain=groupDecisionSteps(row.decisions)
         if(row.decisionProtocol!==GROUP_DECISION_PROTOCOL || !Array.isArray(row.decisions) || !chain.length || chain.length!==row.decisions.length || chain.length>GROUP_MAX_ROUTING_DECISIONS
-          || chain.some((step,index)=>step.index!==index || step.status!=='complete' || !step.receipt)
-          || new Set(chain.map(step=>step.receipt!.executionId)).size!==chain.length || new Set(chain.map(step=>step.receipt!.providerGenerationId)).size!==chain.length
-          || chain[0].receipt!.executionId!==row.receipt.executionId || chain[0].receipt!.providerGenerationId!==row.receipt.providerGenerationId)throw Error('replay_chain_unbound')
+          || !['complete','invalid_decision'].includes(row.status)
+          || (row.status==='complete'?row.failureReason!==null:!groupDecisionFailures.includes(row.failureReason!))
+          || chain.some((step,index)=>step.index!==index || step.phase==='legacy_primary' || step.status!==row.decisions[index].status
+            || (row.status==='invalid_decision' && index===chain.length-1
+              ?step.status==='complete' || step.failure!==row.failureReason || (!step.receipt && step.status!=='unavailable')
+              :step.status!=='complete' || step.failure!==null || !step.receipt))
+          || chain[0].receipt?.executionId!==primary.executionId || chain[0].receipt?.providerGenerationId!==primary.providerGenerationId
+          || chain[0].receipt?.requestDigest!==primary.requestDigest)throw Error('replay_chain_unbound')
+        const totals=groupDecisionTotals(chain)
+        if(['attempted','receipted','unreceipted'].some(key=>row.decisionCalls?.[key as keyof typeof totals.decisionCalls]!==totals.decisionCalls[key as keyof typeof totals.decisionCalls])
+          || ['knownCalls','unknownCalls','omittedCalls'].some(key=>row.decisionCost?.[key as keyof typeof totals.decisionCost]!==totals.decisionCost[key as keyof typeof totals.decisionCost])
+          || !Number.isFinite(row.decisionCost?.knownUsd) || Math.abs(row.decisionCost.knownUsd-totals.decisionCost.knownUsd)>1e-9
+          || (totals.decisionCostUsd===null?row.decisionCostUsd!==null:!Number.isFinite(row.decisionCostUsd) || Math.abs(row.decisionCostUsd!-totals.decisionCostUsd)>1e-9))throw Error('replay_chain_unbound')
+        for(const step of chain){
+          if(stepIds.has(step.id) || step.receipt && (executions.has(step.receipt.executionId) || generations.has(step.receipt.providerGenerationId)))throw Error('replay_chain_unbound')
+          stepIds.add(step.id)
+          if(step.receipt){executions.add(step.receipt.executionId);generations.add(step.receipt.providerGenerationId)}
+        }
       }
     }
     await version()
-    report.status='complete'
+    report.collectionComplete=true
+    report.status=[...report.baseline,...report.candidate].every(row=>row.status==='complete')?'complete':'failed'
+    if(report.status==='failed')report.error='replay_decision_unavailable'
   }catch(error){report.status='failed';report.error=error instanceof Error && /^replay_[a-z0-9_]+$/.test(error.message)?error.message:'replay_request_failed'}
   report.finishedAt=new Date().toISOString()
   const baseline=summarizeGroupDecisionReplay(report.baseline),candidate=summarizeGroupDecisionReplay(report.candidate)
-  const decisionReviewReady=report.status==='complete' && baseline.coverage===1 && candidate.coverage===1 && candidate.failures.length===0
+  const decisionReviewReady=report.collectionComplete && report.status==='complete' && baseline.coverage===1 && candidate.coverage===1 && candidate.failures.length===0
     && candidate.falseIntervention<=baseline.falseIntervention && candidate.missedIntervention<=baseline.missedIntervention
-  return {...report,comparison:{baseline,candidate,decisionReviewReady,requiresHumanReview:true,executionAcceptanceRequired:true}}
+  return {...report,qualityAccepted:decisionReviewReady,comparison:{baseline,candidate,decisionReviewReady,requiresHumanReview:true,executionAcceptanceRequired:true}}
 }
 
 async function main() {
@@ -64,7 +85,7 @@ async function main() {
   if(!process.argv.includes('--output') || !output)throw Error('Usage: set GROUP_REPLAY_* environment variables, then --output report.json')
   const report=await runGroupDecisionReplay()
   writeFileSync(output,`${JSON.stringify(report,null,2)}\n`,{mode:0o600})
-  console.log(JSON.stringify({output,status:report.status,decisionReviewReady:report.comparison.decisionReviewReady,productionAccepted:false}))
+  console.log(JSON.stringify({output,status:report.status,collectionComplete:report.collectionComplete,qualityAccepted:report.qualityAccepted,decisionReviewReady:report.comparison.decisionReviewReady,productionAccepted:false}))
   if(!report.comparison.decisionReviewReady)process.exitCode=1
 }
 
