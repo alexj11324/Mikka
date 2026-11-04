@@ -1,4 +1,5 @@
 import 'server-only'
+import { lockSubagentEvents, notifySubagentEvents } from '@/lib/computer/event-log'
 import { createHash, randomUUID } from 'node:crypto'
 import type { Pool } from 'pg'
 import { z } from 'zod'
@@ -52,8 +53,10 @@ export async function browserAction(pool:Pool,actor:Actor,botId:string,id:string
     const body={version:2 as const,actionId:randomUUID(),workspaceId:actor.workspaceId,botId,subagentId:id,epoch:current.row.epoch,loaderId:observation.loaderId,origin:observation.origin,observationId:observation.observationId,observedAt:observation.observedAt,mutation:browserMutationSchema.parse(mutation),summary:summary.slice(0,500),effect:judgment.effect,policyRevision:current.revision,judgment:{executionId:judgment.execution.executionId,requestDigest:judgment.execution.requestDigest,imageDigest:observationMetadata(observation).imageDigest}}
     input=approvedSchema.parse({...body,digest:hash([actor.userId,body])})
     await client.query(`INSERT INTO pending_actions(id,"userId","botId",action,input,status) VALUES($1,$2,$4,'browser_operation',$3,'running')`,[input.actionId,actor.userId,input,botId])
+    await lockSubagentEvents(client, { ownerId: actor.userId, workspaceId: actor.workspaceId })
     await client.query(`WITH changed AS (UPDATE bot_subagents SET status='running',needs=NULL,step='Executing authorized action',"activeActionId"=$2 WHERE id=$1 RETURNING *) INSERT INTO subagent_events("ownerId","workspaceId","botId","subagentId",event) SELECT "ownerId","workspaceId","botId",id,jsonb_build_object('type','data-subagent','data',jsonb_build_object('botId',"botId",'subagentId',id,'task',task,'state',status,'step',step,'needs',needs)) FROM changed`,[id,input.actionId])
     await client.query('COMMIT')
+    notifySubagentEvents({ ownerId: actor.userId, workspaceId: actor.workspaceId })
   } catch(error) {await client.query('ROLLBACK');throw error} finally {client.release()}
   const result=await executeApprovedBrowserAction(pool,actor.userId,input,true)
   if ('error' in result) throw new ComputerError(409,result.error)

@@ -41,6 +41,8 @@ export function LiveProvider({ ownerId, workspaceId, children }: { ownerId: stri
   return <LiveContext value={value}>{children}</LiveContext>
 }
 
+export function useLiveScope() { return useContext(LiveContext) }
+
 /** Register the SWR keys invalidated by a committed entity change. */
 export function useLiveKey(kind: LiveKind, id: string | null | undefined, keys: readonly string[], workspaceId?: string | null) {
   const context = useContext(LiveContext)
