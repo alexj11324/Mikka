@@ -1,0 +1,88 @@
+name: Issue 1225 read-only model source preflight
+# A one-issue diagnostic branch, not a model acceptance trigger. This workflow
+# signs in and reads inventories; it never creates a task or calls a model.
+on:
+  push:
+    branches: [fix/1225-source-preflight]
+    paths:
+      - '.github/workflows/issue-1225-source-preflight.yml'
+      - 'scripts/acceptance/model-provider-source-preflight.mjs'
+      - 'scripts/acceptance/model-provider-source-preflight.test.mjs'
+      - 'scripts/acceptance/model-provider-source-credentials.mjs'
+      - 'scripts/acceptance/model-provider-source-credentials.test.mjs'
+permissions:
+  contents: read
+concurrency:
+  group: issue-1225-read-only-source-preflight
+  cancel-in-progress: false
+jobs:
+  preflight:
+    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/fix/1225-source-preflight' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      - name: Verify the read-only diagnostic guards
+        run: node --test scripts/acceptance/model-provider-source-preflight.test.mjs scripts/acceptance/model-provider-source-credentials.test.mjs
+      - name: Bind the currently deployed issue revision before credential reads
+        id: application
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --input-type=module <<'JS'
+          import { mkdirSync, writeFileSync, appendFileSync } from 'node:fs'
+          import { AcceptanceError, resolveAcceptanceDeployment, publicFailure } from './scripts/acceptance/model-provider-fallback.mjs'
+          const directory = 'model-provider-source-report'
+          mkdirSync(directory, { recursive: true })
+          try {
+            const read = async number => {
+              const response = await fetch(`https://api.github.com/repos/alexj11324/Mikka/pulls/${number}`, {
+                redirect: 'error', signal: AbortSignal.timeout(30000),
+                headers: { authorization: `Bearer ${process.env.GH_TOKEN}`, accept: 'application/vnd.github+json' },
+              })
+              if (!response.ok) throw new AcceptanceError('deployment_proof', 'blocked', { httpStatus: response.status })
+              const pr = await response.json()
+              if (pr.number !== number || !pr.merged || pr.base?.ref !== 'main'
+                || pr.base?.repo?.full_name !== 'alexj11324/Mikka' || !/^[a-f0-9]{40}$/.test(pr.merge_commit_sha ?? '')
+                || !/Refs #1225\b/i.test(pr.body ?? '')) throw new AcceptanceError('merge_scope_rejected')
+              return pr.merge_commit_sha
+            }
+            const featureMergeSha = await read(1232), driverRevision = await read(1249)
+            const proof = await resolveAcceptanceDeployment({ githubToken: process.env.GH_TOKEN,
+              guard: { featureMergeSha, guardPullRequest: 1249, guardMergeSha: driverRevision,
+                driverRevision, mode: 'preflight' } })
+            writeFileSync(`${directory}/deployment.json`, JSON.stringify({ issue: 1225,
+              mode: 'read_only_source_diagnostic', modelCalls: false, fixtureWrites: false,
+              diagnosticRevision: process.env.GITHUB_SHA, ...proof }, null, 2) + '\n')
+            appendFileSync(process.env.GITHUB_OUTPUT, `sha=${proof.revision}\n`)
+            console.log(`Read-only source diagnostic pinned to application ${proof.revision}; Web deploy ${proof.webDeployRunId}.`)
+          } catch (error) {
+            const result = { issue: 1225, mode: 'read_only_source_diagnostic', modelCalls: false,
+              fixtureWrites: false, ...publicFailure(error) }
+            writeFileSync(`${directory}/deployment.json`, JSON.stringify(result, null, 2) + '\n')
+            console.log(JSON.stringify(result))
+            process.exitCode = 1
+          }
+          JS
+      - name: Inspect the existing authorized identity paths without model work
+        if: steps.application.outputs.sha != ''
+        run: node scripts/acceptance/model-provider-source-credentials.mjs
+        env:
+          MIKKA_EXPECTED_DEPLOYMENT_SHA: ${{ steps.application.outputs.sha }}
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: model-provider-source-1225-${{ github.sha }}
+          path: model-provider-source-report
+          if-no-files-found: ignore
+          retention-days: 7
