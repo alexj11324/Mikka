@@ -1,0 +1,10 @@
+{
+  "environment": "production",
+  "build": "7ba687a2508dc41ec54dacc09044e130947e719c",
+  "taskId": "9ea956ce-a604-4c2e-a724-fb04fa5a3c9b",
+  "candidateId": "b251f0b5-3aa6-4e70-b57a-282161c969a1",
+  "producerRunId": "390deeb4-5e5b-487a-acb9-c2e53dc3f8e9",
+  "sha256": "bc7842e94d8f830bd9307b80f7074ec3053ab97b4a6b945f10a6bb1bedbcab1a",
+  "bytes": 106514,
+  "savedAt": "2026-11-04T12:57:23.283036+00:00"
+}
