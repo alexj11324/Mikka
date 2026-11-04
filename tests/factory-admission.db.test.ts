@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { createServer } from 'node:http'
 import { once } from 'node:events'
+import { gzipSync } from 'node:zlib'
 import test from 'node:test'
 import type { PoolClient } from 'pg'
 import { remoteKey } from '@mikka/protocol/repository'
@@ -132,6 +133,164 @@ test('real Factory admission preserves host scope, policy and transaction owners
       assert.deepEqual(await rowsFor(f), before)
       await assert.rejects(queueRun(f.userId, publicInput(f, `another:${randomUUID()}`)), /runAlreadyActive/, 'an internal Factory run still participates in the ordinary active-task gate')
       assert.equal((await pool.query('SELECT count(*)::int AS n FROM pending_actions WHERE "userId"=$1', [f.userId])).rows[0].n, 0, 'no approval card')
+    })
+
+    async function lostAdmission(options: { destination?: 'selected'; revoke?: boolean; legacyEpoch?: boolean; workerPolicy?: unknown } = {}) {
+      const f = await fixture(options)
+      const admitted = await dispatch(f)
+      const deviceB = randomUUID(), agentB = randomUUID()
+      await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,harnesses,"protocolVersion",enabled,"lastSeenAt")
+        SELECT $1,"ownerId",'Admission recovery B','local',harnesses,"protocolVersion",true,now() FROM devices WHERE id=$2`, [deviceB, f.deviceId])
+      await pool.query(`INSERT INTO agents(id,"userId","deviceId",harness,name) VALUES($1,$2,$3,'codex','Admission recovery B')`, [agentB, f.userId, deviceB])
+      const now = new Date()
+      await pool.query(`UPDATE devices SET "lastSeenAt"=$2 WHERE id=$1`, [f.deviceId, new Date(now.getTime() - 120_000)])
+      await pool.query(`UPDATE agent_runs SET status='running',"startedAt"=$2,"leaseExpiresAt"=$3,"sessionId"='admission-recovery-A' WHERE id=$1`, [admitted.runId, new Date(now.getTime() - 180_000), new Date(now.getTime() - 1_000)])
+      await pool.query(`INSERT INTO run_checkpoints("runId","baseCommit",patch,files,"updatedAt","userId","takenAt") VALUES($1,$2,$3,1,$4,$5,$4)`, [admitted.runId, 'a'.repeat(40), gzipSync('diff --git a/target.txt b/target.txt\n'), now, f.userId])
+      const before = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [admitted.runId])).rows[0]
+      if (options.revoke) await pool.query(`UPDATE byos_connections SET paused=true WHERE "ownerId"=$1`, [f.userId])
+      if (options.legacyEpoch) await pool.query(`UPDATE factory_attempts SET output=output-'requestEpoch' WHERE id=$1`, [f.task.attemptId])
+      if (options.workerPolicy) {
+        const current = await readCliAgentPolicy(pool, f.userId, f.agentId, null)
+        await setCliAgentPolicy(pool, f.userId, f.agentId, null, 'worker', current.revision, options.workerPolicy)
+      }
+      return { f, admitted, deviceB, agentB, now, before }
+    }
+    const reclaim = async (userId: string, now: Date) => {
+      const { reclaimLostRuns } = await import('../lib/run-leases')
+      try { await reclaimLostRuns(userId, now) }
+      catch (error) {
+        // The real ending/reconciler ran; this Node test has no Next response to
+        // schedule the optional Coordinator wake after. No authority is mocked.
+        if (!(error instanceof Error) || !error.message.includes('`after` was called outside a request scope')) throw error
+      }
+    }
+
+    await t.test('a real repository admission transfers once to B through fresh admission, publication and current Factory claim', async () => {
+      const { f, admitted, deviceB, agentB, now, before } = await lostAdmission()
+      await Promise.all(Array.from({ length: 3 }, () => reclaim(f.userId, now)))
+      const { rows: children } = await pool.query('SELECT * FROM agent_runs WHERE "retryOf"=$1', [admitted.runId])
+      assert.equal(children.length, 1, 'an admitted native run must have one actual B retry, not an auto-repair queued on offline A')
+      const child = children[0]
+      assert.equal(child.deviceId, deviceB)
+      assert.equal(child.agentId, agentB)
+      assert.equal(child.attempt, 2)
+      assert.equal(child.agentDefinition.model, before.agentDefinition.model)
+      assert.equal(child.agentDefinition.definitionDigest, before.agentDefinition.definitionDigest)
+      assert.deepEqual(child.agentDefinition.subscription, before.agentDefinition.subscription)
+      assert.deepEqual(child.agentDefinition.executionIdentity.billingAccount.model, before.agentDefinition.executionIdentity.billingAccount.model)
+      assert.deepEqual(child.agentDefinition.executionIdentity.resourceBindings.filter((r: { kind: string }) => r.kind !== 'device'), before.agentDefinition.executionIdentity.resourceBindings.filter((r: { kind: string }) => r.kind !== 'device'))
+      assert.equal(child.agentDefinition.repositoryAdmission.deviceId, deviceB)
+      assert.equal(child.agentDefinition.repositoryAdmission.agentId, agentB)
+      assert.equal(child.agentDefinition.repositoryAdmission.authority, 'owner_credential')
+      assert.equal(child.agentDefinition.repositoryAdmission.remoteKey, f.remoteKey)
+      assert.equal(child.agentDefinition.repositoryAdmission.targetBranch, before.agentDefinition.repositoryAdmission.targetBranch)
+      assert.notEqual(child.agentDefinition.repositoryAdmission.acceptedAt, before.agentDefinition.repositoryAdmission.acceptedAt)
+      const publication = (await pool.query('SELECT * FROM run_publications WHERE "runId"=$1', [child.id])).rows[0]
+      assert.equal(publication.branch, before.agentDefinition.repositoryAdmission.targetBranch)
+      assert.equal(publication.remoteKey, f.remoteKey)
+      assert.equal(publication.scopeVersion, 1)
+      const current = (await pool.query(`SELECT t.*,a."runId",a.output FROM factory_tasks t JOIN factory_attempts a ON a.id=t."attemptId" WHERE t.id=$1`, [f.task.id])).rows[0]
+      assert.equal(current.sourceEventId, f.eventId)
+      assert.equal(current.output.requestEpoch, f.eventId)
+      assert.equal(current.runId, child.id, 'the real completion consumer must adopt the re-admitted Agent')
+      const { rows: handoffs } = await pool.query(`SELECT result FROM factory_events WHERE "taskId"=$1 AND request->>'kind'='task_handoff' AND result->'checkpoint'->>'runId'=$2`, [f.task.id, admitted.runId])
+      assert.ok(handoffs.some(h => h.result.requestEpoch === f.eventId && h.result.checkpoint.files === 1))
+      const { claimExecutionRun } = await import('../lib/factory/server')
+      assert.equal((await claimExecutionRun(f.userId, deviceB, child.id, new Date(now.getTime() + 90_000).toISOString())).length, 1)
+      await reclaim(f.userId, now)
+      assert.equal((await pool.query('SELECT count(*)::int AS n FROM agent_runs WHERE "issueId"=$1', [f.issueId])).rows[0].n, 2)
+    })
+
+    await t.test('an idle gateway B receives fresh admission and its still-online queued retry stays on B', async () => {
+      const { f, admitted, deviceB, now } = await lostAdmission()
+      const previous = { url: process.env.DEVICE_GATEWAY_URL, secret: process.env.DEVICE_GATEWAY_PUSH_SECRET }
+      let recheckingQueued = false, queuedPresenceReads = 0
+      const server = createServer((request, response) => {
+        const device = request.url?.split('/')[3]
+        if (request.url?.endsWith('/status')) {
+          // The first queued scan misses B; its socket is back by admission's
+          // locked recheck. This exercises the inner fence as well as selection.
+          const online = device === deviceB && (!recheckingQueued || ++queuedPresenceReads > 1)
+          response.setHeader('content-type', 'application/json')
+          response.end(JSON.stringify({ online, lastSeenAt: online ? now.toISOString() : null }))
+        } else { response.writeHead(204); response.end() }
+      })
+      server.listen(0, '127.0.0.1')
+      await once(server, 'listening')
+      const address = server.address()
+      assert.ok(address && typeof address === 'object')
+      process.env.DEVICE_GATEWAY_URL = `http://127.0.0.1:${address.port}`
+      process.env.DEVICE_GATEWAY_PUSH_SECRET = 'isolated-handoff-presence-secret'
+      try {
+        await pool.query('UPDATE devices SET "lastSeenAt"=$2 WHERE id=$1', [deviceB, new Date(now.getTime() - 600_000)])
+        await reclaim(f.userId, now)
+        const { rows: retries } = await pool.query('SELECT * FROM agent_runs WHERE "retryOf"=$1', [admitted.runId])
+        assert.equal(retries.length, 1, 'a real gateway status must admit B despite its intentionally idle HTTP heartbeat')
+        assert.equal(retries[0].deviceId, deviceB)
+        assert.equal(retries[0].agentDefinition.repositoryAdmission.deviceId, deviceB)
+        await pool.query('UPDATE devices SET "lastSeenAt"=$2 WHERE id=$1', [f.deviceId, now])
+        recheckingQueued = true
+        await reclaim(f.userId, now)
+        assert.ok(queuedPresenceReads >= 3, 'availability is rechecked after the queued scan and target selection')
+        const current = (await pool.query('SELECT status,"deviceId" FROM agent_runs WHERE id=$1', [retries[0].id])).rows[0]
+        assert.deepEqual(current, { status: 'queued', deviceId: deviceB }, 'a queued gateway-online B is not stranded when A returns')
+        assert.equal((await pool.query('SELECT count(*)::int AS n FROM agent_runs WHERE "issueId"=$1', [f.issueId])).rows[0].n, 2)
+      } finally {
+        if (previous.url === undefined) delete process.env.DEVICE_GATEWAY_URL
+        else process.env.DEVICE_GATEWAY_URL = previous.url
+        if (previous.secret === undefined) delete process.env.DEVICE_GATEWAY_PUSH_SECRET
+        else process.env.DEVICE_GATEWAY_PUSH_SECRET = previous.secret
+        server.closeAllConnections()
+        await new Promise<void>(resolve => server.close(() => resolve()))
+      }
+    })
+
+    await t.test('an admitted queued retry losing B creates a bounded fresh receipt instead of rewriting B placement', async () => {
+      const { f, admitted, deviceB, now } = await lostAdmission()
+      await reclaim(f.userId, now)
+      const first = (await pool.query('SELECT * FROM agent_runs WHERE "retryOf"=$1', [admitted.runId])).rows[0]
+      assert.ok(first, 'B retry must exist through real admission')
+      assert.equal(first.status, 'queued')
+      await pool.query('UPDATE devices SET "lastSeenAt"=$2 WHERE id=$1', [deviceB, new Date(now.getTime() - 120_000)])
+      await pool.query('UPDATE devices SET "lastSeenAt"=$2 WHERE id=$1', [f.deviceId, now])
+      await Promise.all(Array.from({ length: 3 }, () => reclaim(f.userId, now)))
+      const { rows: descendants } = await pool.query('SELECT * FROM agent_runs WHERE "retryOf"=$1', [first.id])
+      assert.equal(descendants.length, 1)
+      const third = descendants[0]
+      assert.equal(third.attempt, 3)
+      assert.equal(third.deviceId, f.deviceId)
+      assert.equal(third.agentId, f.agentId)
+      assert.equal(third.agentDefinition.repositoryAdmission.deviceId, f.deviceId)
+      assert.equal(third.agentDefinition.repositoryAdmission.targetBranch, first.agentDefinition.repositoryAdmission.targetBranch)
+      const unchanged = (await pool.query('SELECT "deviceId","agentDefinition",status FROM agent_runs WHERE id=$1', [first.id])).rows[0]
+      assert.equal(unchanged.deviceId, deviceB)
+      assert.deepEqual(unchanged.agentDefinition, first.agentDefinition, 'B immutable receipt cannot be patched to pretend it authorized A')
+      assert.equal(unchanged.status, 'failed')
+      const current = (await pool.query('SELECT t."sourceEventId",a."runId" FROM factory_tasks t JOIN factory_attempts a ON a.id=t."attemptId" WHERE t.id=$1', [f.task.id])).rows[0]
+      assert.deepEqual(current, { sourceEventId: f.eventId, runId: third.id })
+      await pool.query(`UPDATE agent_runs SET status='running',"leaseExpiresAt"=$2 WHERE id=$1`, [third.id, new Date(now.getTime() - 1_000)])
+      await reclaim(f.userId, now)
+      assert.equal((await pool.query('SELECT count(*)::int AS n FROM agent_runs WHERE "issueId"=$1', [f.issueId])).rows[0].n, 3)
+      assert.equal((await pool.query('SELECT status FROM factory_tasks WHERE id=$1', [f.task.id])).rows[0].status, 'blocked')
+    })
+
+    for (const options of [
+      { label: 'owner pinned A', destination: 'selected' as const },
+      { label: 'the frozen model grant was revoked', revoke: true },
+      { label: 'a legacy attempt has no epoch', legacyEpoch: true },
+      { label: 'B would drop an A worker deny', workerPolicy: { permissions: { install_dependency: 'deny' } } },
+      { label: 'B would drop A read-only mode', workerPolicy: { approvalMode: 'read_only' } },
+      { label: 'B would widen A network ceiling', workerPolicy: { networkAllow: ['allowed.example.com'] } },
+    ]) await t.test(`admitted recovery blocks without replaying offline A when ${options.label}`, async () => {
+      const { f, admitted, now } = await lostAdmission(options)
+      await reclaim(f.userId, now)
+      await reclaim(f.userId, now)
+      assert.equal((await pool.query('SELECT count(*)::int AS n FROM agent_runs WHERE "issueId"=$1', [f.issueId])).rows[0].n, 1, 'no child and no generic Factory auto-repair on A')
+      const run = (await pool.query('SELECT status,"stopReason" FROM agent_runs WHERE id=$1', [admitted.runId])).rows[0]
+      assert.deepEqual(run, { status: 'failed', stopReason: 'device_lost' })
+      const task = (await pool.query('SELECT status,"sourceEventId" FROM factory_tasks WHERE id=$1', [f.task.id])).rows[0]
+      assert.deepEqual(task, { status: 'blocked', sourceEventId: f.eventId })
+      assert.equal((await pool.query('SELECT payload FROM coordinator_events WHERE id=$1', [f.eventId])).rows[0].payload.taskDestination?.deviceId, options.destination ? f.deviceId : undefined)
     })
 
     await t.test('no recorded GitHub App grant is needed to admit', async () => {
