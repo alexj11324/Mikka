@@ -1,6 +1,6 @@
 {
-  "role": "connectivity-smoke",
-  "from": "2026-11-04T11:00:00Z",
-  "to": "2026-11-04T12:00:00Z",
-  "deploymentId": "dpl_HJAzT6r92rhVyhxfphBrjcDLCgnv"
+  "role": "observation",
+  "scope": "project-production",
+  "from": "2026-11-04T18:00:00Z",
+  "to": "2026-11-04T19:00:00Z"
 }
