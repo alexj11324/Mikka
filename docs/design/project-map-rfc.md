@@ -39,7 +39,7 @@
 | 过程与插话 | `run_chunks(runId, seq)`、`run_messages`、bot/group chat 原始消息 | 详情按来源权限读取；地图列表不携带完整 chunk 或提示词 |
 | Factory 工作 | `factory_tasks`、`factory_attempts(taskId, position)`、`factory_candidates(taskId, id)`、`factory_events(taskId, eventId)` | 候选、执行阶段、检查和状态改变分别引用；review/verify 只关联到它实际检查的 candidate |
 | Owner 验收 | `factory_deliverable_acceptances`、Factory 的已提交事件 | 只在有确实的验收事实时标记通过；不能用某个旧候选的验收证明新候选通过 |
-| 问题和回答 | 现有问题存储、`runQuestionEvent`、`questionContinuation` | 回答与 origin run、后续 run 显式关联；必要时成为决定证据 |
+| 问题和回答 | `lib/factory/questions/store.ts` 的 `factory_questions`（含 answerId/answerSource/answer/answeredAt）、`agent_runs.questionContinuation` | 回答与 questionId、originRunId、continuationRunId 显式关联；没有另造 answers 表；必要时成为决定证据 |
 | Artifact 与代码发布 | `artifacts`、`artifact_versions`、`run_publications`、候选 SHA、任务 PR 元数据 | 指向精确版本和候选；PR URL 或最新 Artifact 不能替代当时的版本 |
 | 已有恢复 checkpoint | `run_checkpoints`、`lib/secrets/checkpoint.ts` | 这是故障恢复用的 diff，**不等于 Entire checkpoint**，两套 ID、生命周期和用途分开 |
 | MCP 调用 | `app/api/mcp/route.ts`、`lib/mcp/{auth,worker,tools,actions,artifacts}.ts` | OAuth 和 worker 分别注册工具，共用服务层；仅改 `tools.ts` 不会让所有入口获得新工具 |
@@ -71,7 +71,7 @@
 | --- | --- | --- |
 | `id` | UUID，PK | 永久决定 ID |
 | `workspaceId, projectId` | UUID，必填，写入时检查 | 精确归属；跨库的项目/workspace 不建立伪外键 |
-| `ownerId` | text，必填 | 此内容的 owner；服务端从真实来源/项目授权推导，不信任请求字段 |
+| `ownerId` | text，必填 | 此内容的 owner；取认证用户或冻结执行身份的 owner，不把项目 owner 当成任意调用者的代名词，不信任请求字段 |
 | `issueId, factoryTaskId, runId` | UUID，可空 | 至少 project 有效；提供的任务、Factory、run 必须互相匹配且当前可写 |
 | `kind` | `choose / redirect / abandon / merge / confirm` | 选择、改向、放弃、合流、确认一个重要决定 |
 | `title` | varchar(200)，必填 | 决定是什么 |
@@ -133,14 +133,14 @@ type DecisionOption = {
 | `issue` | issue UUID + revision | `issueForUser/issueVisibility`，项目任务集合内 |
 | `run` | run UUID | owner、issue、冻结执行身份和 workspace 一致 |
 | `run_chunk` | run UUID + seq | 同上，按 `(runId,seq)` 取，不传整段 stream |
-| `run_message` | message UUID + run UUID | 中途插话必须属于此 run；保留真实作者 |
+| `run_message` | message UUID + run UUID（可空） | 有 run 时必须匹配；无 run 的 mailbox 输入按其真实 owner/地址作用域读取，不能伪造为执行输出；保留真实作者 |
 | `bot_message` | bot UUID + message position | 沿用 bot 私有 chat 的读取权限 |
 | `group_message` | conversation UUID + message ID/position | 沿用群成员和消息范围检查 |
-| `question / answer` | 原问题 ID + 对应回答定位器 | 绑定 origin run、回答者及 continuation；没有独立 answers 表时引用原存储，不另造一份回答 |
+| `question / answer` | factory questionId + revision / answerId | 读取 factory_questions 的真实 answerSource/answerSourceEventId 与回答，核对 waitingBinding、origin run、continuation；agent 的补充 context 不算人类授权，不另存一份回答 |
 | `factory_task / attempt / candidate` | 各自 UUID + task UUID | task/issue、candidate、run 三者同时匹配 |
 | `factory_event` | task UUID + event UUID | 用复合 key；不按 eventId 全库猜测 |
 | `acceptance` | deliverable acceptance ID，或既有批准 event key | 必须是同 task/candidate 的 Owner 事实 |
-| `artifact_version` | Artifact UUID + version UUID | 用原有 Artifact ACL，显示精确版本 |
+| `artifact_version` | Artifact UUID + version UUID；校验 version integer / sha256 | 用原有 Artifact ACL，显示精确版本；不引用可变 latestVersion |
 | `pull_request / commit` | 已验证 remoteKey + PR number / 完整 commit SHA | 用已有仓库绑定；禁止任意 URL 抓取和含凭证 remote URL |
 | `entire_checkpoint` | repository binding ID + backend + checkpoint ID + metadata commit SHA | 见 §5；读到 Git 数据并不自动证明发言者或 run 身份 |
 
@@ -185,7 +185,7 @@ type DecisionOption = {
 
 OAuth grant 没有固定 workspace 时，必须由 project binding 解析并逐次确认当前成员/任务权限，不依靠不存在的 grant 字段。已有个人 Coordinator 工具仍保持个人 workspace 行为。worker token 不能通过这个入口扩张到兄弟任务或另一个项目。
 
-Bot 的 AI SDK 工具、`app/api/mcp/route.ts` 的 OAuth handler 和 worker handler 必须都注册；并纳入现有 Agent definition/tool catalog 与系统提示生成检查。补充 `lib/run-app-mcp.ts` 和 daemon 的真实注入入口，不能只在某个提示词里提到一个 Agent 实际拿不到的工具。
+Bot 的 AI SDK 工具、`app/api/mcp/route.ts` 的 OAuth handler 和 worker handler 必须都注册；并纳入现有 Agent definition/tool catalog 与系统提示生成检查。补充 `lib/run-app-mcp.ts`、`lib/run-prompt.ts`、`workflows/coordinator/tools.ts` 的冻结工具目录，以及 daemon 的 `packages/daemon/src/agents/mikka-mcp.mjs` stdio 注册/launcher 注入。现有 verify_command 只在 stdio 的 factoryVerify 配置存在时提供；不能把它或任意日志当成 record_decision 已可用的证明。#1245 以各真实调用入口的 tools/list 与实际调用验证接线。
 
 ### 4.2 调用条件
 
@@ -204,7 +204,7 @@ Bot 的 AI SDK 工具、`app/api/mcp/route.ts` 的 OAuth handler 和 worker hand
 ### 4.3 输入、幂等、来源和安全
 
 - 不接收 `ownerId, recordedBy, recordedAt, hostVerified` 等可伪造字段。一次写入决定+来源在应用库事务内完成。
-- 从 run 自动绑定 run、issue、Factory candidate；显式提供了冲突的 ID 就拒绝，不悄悄改成另一个对象。
+- 从 run 自动绑定 run、issue、Factory candidate；显式提供了冲突的 ID 就拒绝，不悄悄改成另一个对象。应用库写事务沿 `requireLockedIssueScope` 在锁后复核 scope/version，并重新检查 token/run 状态；不能把写入前的一次慢授权查询当成永久许可。
 - host 的工具 call ID/消息操作 ID 作为幂等键；外部 MCP/HTTP 客户端提供稳定键。mask/规范化后计算 payloadHash，同键不同内容为 `IDEMPOTENCY_CONFLICT`。
 - 已知 run 的文本经过 `maskForRun`；非 run 来源使用现有 owner secret masker 和通用模式脱敏。没有身份/secret scope 时拒绝复制原始敏感内容，不退回 identity masker。
 - 限制字符串、options、source 数量；参数和 cursor 使用 schema 校验；任意 URL、repo path 和 Git 对象名不能进入 shell 拼接。
@@ -223,7 +223,7 @@ Bot 的 AI SDK 工具、`app/api/mcp/route.ts` 的 OAuth handler 和 worker hand
 
 ### 4.5 漏记检查
 
-在现有 Factory review 输入组装和普通 run 结束检查中，比较这次工作的事实与已有决定引用。已有 review 调用内补一项检查，不为每个 chunk 额外调用模型。
+在现有 Factory review 输入组装和普通 run 结束检查中，比较这次工作的事实与已有决定引用。Factory 结果沿 `lib/factory/reconcile-check.ts` 的冻结 task/attempt/candidate/run binding 处理，提示须经 `lib/factory/task-detail.ts` 暴露给调用方；不能只埋在内部 JSON。已有 review 调用内补一项检查，不为每个 chunk 额外调用模型。
 
 1. 确定性信号：同 task 替换 thread、Owner 驳回后改变 candidate、明确 abandon/pivot 的问题回答、选项被废弃却没有关联决定。
 2. 把新旧 candidate、任务范围变更、可见的相关消息，以及已有决定列表交给本来就运行的 review；语义判断可能报告 `possible_unrecorded_decision`。
@@ -414,6 +414,7 @@ type MapPage = {
   nodes: MapNode[];
   edges: MapEdge[];
   branches: MapBranch[];
+  mainlineBranchIds: string[]; // 已选路线的有序链/集合，不是单个 branchId
   boundaryNodes: { id: string; order: number; lane: number | null }[];
   laneState: {
     before: { branchId: string; lane: number }[];
@@ -449,8 +450,8 @@ type MapPage = {
 
 ### 6.4 lane、折叠、放弃和跨页连接
 
-- lane 0 保留为主线。selected option 继承父路线的语义 branchId 和当前 lane；该 optionRef 解析到继承路线，其余 option 产生 `option:<decisionId>:<optionId>` 新 branchId。后续决定仍用 contextOptionRef 指向当时的选择，不能用 lane 猜路线。其余 option 依稳定 option ID 顺序，分配**父 lane 右侧最小的空闲 lane**。
-- 同时有 active 路线时不复用其 lane。只有明确完成、合流或放弃后的行之后才能释放；失败但仍等待处理的 run 不释放整条路线。
+- lane 0 保留为主线。**每个 option 都有独立的 `option:<decisionId>:<optionId>` 语义 branchId**；selected option 只继承父路线当前 lane，由 continues 边连接，不能复用父 branchId。mainlineBranchIds 是明确选择构成的历史路线链/集合。后续 abandon(context=D1.A)、redirect 选择 C 分别作用于 A、C，能够同时返回 A 已放弃而 C 活跃，项目根和共用历史不被一并改成 abandoned。其余 option 依稳定 option ID 顺序，分配**父 lane 右侧最小的空闲 lane**。
+- laneState 记录当前可见的末端路线占用；selected 子路线接管父路线的同一 lane，是路径延续而非并行占用。并行 active 路线之间不复用 lane；只有明确完成、合流或放弃后的行之后才能把 lane 释放给另一条并行路线。失败但仍等待处理的 run 不释放整条路线。
 - 显示预算由 `laneLimit` 指定：桌面 3、手机 2。没有右侧空 lane 的路线作为 fold 返回，不能挤进父 lane、删掉或按页截断。
 - 超预算的路线在该 snapshot 中整条折叠，不在后面的某页突然冒到另一条 lane。fold 的 ID 由父路线、被折叠路线集合和 layoutVersion 决定，anchor 位于可见父路线内；多条隐藏路线的聚合 fold 列出 branchIds，用户选择其中一条再用 expand 请求。带 `branchId` 请求独立子图时选中路线成为局部 lane 0，返回 focus.breadcrumbs 供定位原分叉。语义节点 ID 不变。
 - 放弃路线返回真实 `stoppedAtNodeId` 和理由来源；若只有“未采用”，终止点是决定节点；无法知道停在哪则 null，不猜最后一个失败 run。
@@ -462,7 +463,7 @@ type MapPage = {
 
 `q` 最多 200 字符，只搜索已获授权的标题、结果、决定理由、Artifact 名称和安全文件路径，不搜索原始 transcript、private prompt 或凭证。首版对几百/一千个投影节点做内存规范化子串匹配，覆盖中英文；不引入外部搜索服务或 pg_trgm 扩展。
 
-`mainline` 取当前选择路线；`abandoned` 取明确放弃/未采用的路线及其分叉定位；`with_artifacts` 只计实际可见的 Artifact。筛选后的 nodes 只包含命中项，但保留其原始 order/lane，并以 boundary/fold 定位到全图。筛选不重新分配 lanes，也不会让路径接口丢掉被筛掉的祖先。互斥 filter 用单一枚举，避免前端组合出含义不明确的条件。
+`mainline` 取 mainlineBranchIds 指定的已选路线链/集合及其共同前驱；`abandoned` 取明确放弃/未采用的路线及其分叉定位；`with_artifacts` 只计实际可见的 Artifact。筛选后的 nodes 只包含命中项，但保留其原始 order/lane，并以 boundary/fold 定位到全图。筛选不重新分配 lanes，也不会让路径接口丢掉被筛掉的祖先。互斥 filter 用单一枚举，避免前端组合出含义不明确的条件。
 
 **游标方案：**
 
@@ -523,11 +524,14 @@ type MapOverview = {
   range: null | { fromOrder: number; toOrder: number; fromTime: string; toTime: string };
   bins: { fromOrder: number; toOrder: number; nodeCount: number; branchIds: string[]; hasAbandoned: boolean; hasArtifact: boolean }[];
   branches: MapBranch[];
-  branchLinks: { fromBranchId: string; toBranchId: string; atOrder: number; kind: "fork" | "merge" }[];
+  mainlineBranchIds: string[];
+  branchLinks: { fromBranchId: string; toBranchId: string; atOrder: number; kind: "continues" | "fork" | "merge" }[];
+  laneSegments: { branchId: string; fromOrder: number; toOrder: number; lane: number | null; foldId: string | null }[];
+  folds: { id: string; anchor: { nodeId: string; order: number; lane: number }; orderStart: number; orderEnd: number; branchIds: string[] }[];
 };
 ```
 
-overview 按全局 order/time 范围聚合最多 100 个 bin；它不是另一次未授权的 COUNT。筛选保留全图范围与布局坐标，bin.nodeCount 只计命中；请求过滤条件必须与 snapshot 相同。path 返回目标的全部因果祖先并集，父子通过实际 edge 关联；primaryPathNodeIds 只在明确选择关系可确定时给出，不能用最近时间替多父合流任选一条。全图规模在首版几百/一千节点范围内；不得截断祖先链并声称完整。
+overview 的 laneSegments/folds/branchLinks 是同 snapshot、laneLimit、focus 的完整安全布局骨架，数量受可见节点规模约束；不含正文，无需前端加载全量分页或重写布局算法。overview 按全局 order/time 范围聚合最多 100 个 bin；它不是另一次未授权的 COUNT。筛选保留全图范围与布局坐标，bin.nodeCount 只计命中；请求过滤条件必须与 snapshot 相同。path 返回目标的全部因果祖先并集，父子通过实际 edge 关联；primaryPathNodeIds 只在明确选择关系可确定时给出，不能用最近时间替多父合流任选一条。全图规模在首版几百/一千节点范围内；不得截断祖先链并声称完整。
 
 ### 6.7 权限、性能和刷新
 
@@ -567,7 +571,7 @@ HTTP 适配复用现有 API 的 session/token 解析、日志与 `Cache-Control:
 | 放弃路线保留、停在哪、为什么 | branch status、stoppedAtNodeId、reason、sourceRefs；样式由前端处理 |
 | 选节点高亮从起点到它的路径 | path 返回 primaryPathNodeIds 及全部路线祖先，跨分页/折叠 |
 | 右侧/手机抽屉详情的六个区域 | 固定 tasks → decisions → artifacts → checks → conversation_summary → threads |
-| 缩略图 | overview 有界 bins、branch skeleton、相同 snapshot |
+| 缩略图 | overview 有界 bins、laneSegments/folds/branchLinks 完整布局骨架、相同 snapshot/laneLimit/focus |
 | 搜索、只看主线/放弃/有产出 | q 与 filter、scope 内搜索计数；过滤不重排 lane |
 | 理由、当场/推断区分、原始来源链接 | decision.provenance、reason、validated sourceRefs；人工标记保留独立入口来源 |
 | 产出、PR、检查、执行、Entire | 列表 badges + 详情 references + 精确 candidate/version/source IDs |
@@ -689,6 +693,21 @@ GET /mikka/api/projects/00000000-0000-4000-8000-000000000001/map?workspaceId=000
       "sourceRefs": []
     },
     {
+      "id": "option:00000000-0000-4000-8000-000000000101:record-now",
+      "parentBranchId": "main:00000000-0000-4000-8000-000000000001",
+      "forkNodeId": "decision:00000000-0000-4000-8000-000000000101",
+      "optionRef": {
+        "decisionId": "00000000-0000-4000-8000-000000000101",
+        "optionId": "record-now"
+      },
+      "status": "active",
+      "stoppedAtNodeId": null,
+      "reason": null,
+      "sourceRefs": [
+        "source:00000000-0000-4000-8000-000000000201"
+      ]
+    },
+    {
       "id": "option:00000000-0000-4000-8000-000000000101:reconstruct-later",
       "parentBranchId": "main:00000000-0000-4000-8000-000000000001",
       "forkNodeId": "decision:00000000-0000-4000-8000-000000000101",
@@ -720,7 +739,7 @@ GET /mikka/api/projects/00000000-0000-4000-8000-000000000001/map?workspaceId=000
     ],
     "after": [
       {
-        "branchId": "main:00000000-0000-4000-8000-000000000001",
+        "branchId": "option:00000000-0000-4000-8000-000000000101:record-now",
         "lane": 0
       },
       {
@@ -735,7 +754,11 @@ GET /mikka/api/projects/00000000-0000-4000-8000-000000000001/map?workspaceId=000
     "hasMore": true,
     "matchedCount": 8
   },
-  "focus": null
+  "focus": null,
+  "mainlineBranchIds": [
+    "main:00000000-0000-4000-8000-000000000001",
+    "option:00000000-0000-4000-8000-000000000101:record-now"
+  ]
 }
 ```
 
@@ -752,7 +775,7 @@ GET /mikka/api/projects/00000000-0000-4000-8000-000000000001/map?workspaceId=000
 | 6 | 选择 B3 的历史节点 | path 保留 D1/D2/D3 及对应来源 | 自动提供要展开的 fold 定位 |
 | 7 | 新外部 checkpoint，无 run | external checkpoint，runId=null | 相同语义 ID |
 
-每个分页位置都切一遍，验证相邻页边界、lane 释放和路径一致；不把这一 fixture 当作生产真实任务。
+另测 D1 选 A → A 明确放弃 → D2 redirect 选 C：A/C 语义 branchId 不同但可沿同一 lane，A 的停止理由和 C 的 active 状态同时保留，不污染项目根。每个分页位置都切一遍，验证相邻页边界、lane 释放和路径一致；不把这一 fixture 当作生产真实任务。
 
 ## 8. 分步上线、验收和交接
 
