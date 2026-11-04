@@ -1,5 +1,6 @@
 import { modelMessage, summaryMessage, type SwitchNotice, type SourcedMessage, type SummaryTrust } from './message-safety'
 import { pruneMessages, type ModelMessage } from 'ai'
+import type { RunCompletionObservation } from './run-completion-observation'
 import { HANDOFF_PREFIX, handoffPrompt, QUIET_REPLY, type HandoffPayload } from '@/lib/attention/handoff'
 import { COORDINATOR_WELCOME_MARK } from '@/lib/agent-welcome'
 import type { CoordinatorEventKind, CoordinatorEventTier } from '@/lib/db/schema'
@@ -113,7 +114,7 @@ function movedToText(payload: Record<string, unknown>) {
 }
 
 /** The text the Coordinator receives for one inbox event. */
-export function eventPrompt(event: { kind: CoordinatorEventKind; issueId: string | null; runId: string | null; payload: Record<string, unknown>; tier?: CoordinatorEventTier | null }): string {
+export function eventPrompt(event: { kind: CoordinatorEventKind; issueId: string | null; runId: string | null; payload: Record<string, unknown>; tier?: CoordinatorEventTier | null }, observation?: RunCompletionObservation): string {
   const payload = event.payload
   const note = event.tier === 'attention' ? 'Triage: this needs the person; tell them.' : event.tier === 'background' ? 'Triage: background; mention it only if it matters to what you are doing.' : null
   switch (event.kind) {
@@ -124,10 +125,11 @@ export function eventPrompt(event: { kind: CoordinatorEventKind; issueId: string
         `[Event] Run ${event.runId} ended with status ${payload.status} (${payload.stopReason}).`,
         event.issueId ? `Issue: ${event.issueId}.` : null,
         payload.summary ? `The agent's summary: ${payload.summary}` : null,
-        ...publicationPrompt(payload.publication),
-        payload.verification === 'not_run' ? 'Verification was not run: no verification command is configured. Never say the changes passed verification. Mention a draft PR only when the server-confirmed publication includes one.' : null,
+        ...publicationPrompt(observation ? observation.publication : payload.publication),
+        payload.verification === 'not_run' ? "This run's host post-run verifier was not run. This does not describe commands called by the Agent or separate Factory checks. Do not claim verification passed from this field alone. Mention a draft PR only when the server-confirmed publication includes one." : null,
         payload.daemonUpgradeRequired ? 'Mikka on its device is too old to run it. Tell the person that Mikka on that device needs an update, then dispatch the issue again. Nothing is wrong with their GitHub or other connections.' : null,
         payload.noMachine ? `Its machine went offline and no other machine can continue it. Draw this card and dispatch the issue again after the person answers: ${JSON.stringify(payload.noMachine)}` : null,
+        observation ? `Current host observation: ${JSON.stringify(observation)}\nUse this for the task's current state; the ended run above remains its history. Repository handoffs link the preserved predecessor to its authorized successor. Do not redispatch while a successor or Factory stage is queued or running. Review, this run's post-run verifier and the separate Factory verify stage have distinct results. These facts do not replace owner approval.` : null,
         note,
       ].filter(Boolean).join('\n')
     case 'run_retried':

@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import { sourcedEventMessage } from './message-safety'
+import { runCompletionObservations } from './run-completion-observation'
 import { visibleRuns } from '@/lib/agent-runs'
 import { assertCredentialSafeChat } from '@/lib/credentials/chat-guard'
 import { credentialMasker, maskCredentials, maskDeep } from '@/lib/secrets/mask'
@@ -149,11 +150,12 @@ export async function takeInbox(userId: string, holder: string, botId: string): 
     const events = eventsForInbox(due, background, INBOX_BATCH)
     if (!events.length) return { held: true, ...NO_TAKE }
     const chatEvents = events.filter(event => !(event.kind === 'user_message' && event.payload.postedToChat === true))
+    const completionObservations = await runCompletionObservations(tx, { userId, botId }, chatEvents)
     const first = await nextPosition(tx, userId, botId)
     if (chatEvents.length) await tx.insert(coordinatorMessages).values(chatEvents.map((event, index) => ({
       id: crypto.randomUUID(), userId, botId, position: first + index,
       // A GitHub or other token in an event (a run's summary, a tool's text) never reaches the chat.
-      message: maskDeep(sourcedEventMessage({ ...event, deliveredAt: now }, scheduledRead ? `[Scheduled read-only task] The person requested this stored task for now: ${scheduledRead.prompt}\nUse only the available allowed read tools. Do not create or change anything, request approval, schedule more work, or claim an external write. Return the result for this original chat.` : eventPrompt(event)), credentialMasker),
+      message: maskDeep(sourcedEventMessage({ ...event, deliveredAt: now }, scheduledRead ? `[Scheduled read-only task] The person requested this stored task for now: ${scheduledRead.prompt}\nUse only the available allowed read tools. Do not create or change anything, request approval, schedule more work, or claim an external write. Return the result for this original chat.` : eventPrompt(event, event.runId ? completionObservations.get(event.runId) : undefined)), credentialMasker),
     })))
     await tx.update(coordinatorEvents).set({ deliveredAt: now }).where(inArray(coordinatorEvents.id, events.map(event => event.id)))
     for (const event of events) {
