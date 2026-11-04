@@ -13,6 +13,7 @@ after(() => { globalThis.fetch = originalFetch })
 const sha = 'a'.repeat(40)
 const syntheticToken = 'synthetic-vercel-contract-token'
 const syntheticKey = 'synthetic-deepseek-contract-key'
+const syntheticCloudKey = 'synthetic-e2b-contract-key'
 const projectPath = '/v9/projects/' + target.projectId
 const sessionPath = '/v2/sandboxes/sessions/' + target.sessionId
 const cmdId = 'cmd_offline123'
@@ -27,7 +28,7 @@ function fixture(options = {}) {
     GITHUB_REF: 'refs/heads/acceptance/proactive-1157-1163',
     GITHUB_ACTIONS: 'true', CI: 'true', GITHUB_EVENT_NAME: 'push',
     MIKKA_ACCEPTANCE_SOURCE_SHA: sha,
-    VERCEL_TEAM_TOKEN: syntheticToken, DEEPSEEK_API_KEY: syntheticKey,
+    VERCEL_TEAM_TOKEN: syntheticToken, DEEPSEEK_API_KEY: syntheticKey, E2B_API_KEY: syntheticCloudKey,
     ...options.env,
   }
   const fetchImpl = async (url, init) => {
@@ -63,7 +64,7 @@ test('missing credentials and incorrect runner or credential scope never submit 
     assert.equal((await f.execute()).status, 'runner_boundary_rejected')
     assert.equal(f.calls.length, 0)
   }
-  for (const name of ['VERCEL_TEAM_TOKEN', 'DEEPSEEK_API_KEY']) {
+  for (const name of ['VERCEL_TEAM_TOKEN', 'DEEPSEEK_API_KEY', 'E2B_API_KEY']) {
     for (const value of [undefined, '', ' ', 'invalid\ncredential']) {
       const f = fixture({ env: { [name]: value } })
       assert.equal((await f.execute()).status, 'credential_missing')
@@ -104,12 +105,12 @@ test('the existing sandbox must have the full 90-minute budget plus cleanup grac
   assert.equal((await enough.execute()).status, 'passed')
   assert.equal(enough.calls.filter(call => call.method === 'POST').length, 1)
   assert.equal(enough.calls.find(call => call.method === 'POST').url.pathname, sessionPath + '/cmd')
-  assert.equal(target.sessionId, 'sbx_i0JVU4ryiQnowZ6IWX9zrkOdWbHR')
+  assert.equal(target.sessionId, 'sbx_qjiHsJWkPvJAC8afDreaZn5T4CFV')
 })
 
-test('the fixed 9/10 plan retains bounded shutdown, fresh setup and exclusive local ownership', async () => {
+test('the fixed 1–8 plan retains bounded shutdown, fresh setup and exclusive local ownership', async () => {
   assert.deepEqual(acceptancePlan, {
-    items: [9, 10], softTimeout: 85 * 60_000, killTimeout: 88 * 60_000,
+    items: [1, 2, 3, 4, 5, 6, 7, 8], softTimeout: 85 * 60_000, killTimeout: 88 * 60_000,
     hardTimeout: 90 * 60_000, cleanupGrace: 60_000,
   })
   assert.ok(Object.isFrozen(acceptancePlan) && Object.isFrozen(acceptancePlan.items))
@@ -117,7 +118,7 @@ test('the fixed 9/10 plan retains bounded shutdown, fresh setup and exclusive lo
   assert.equal((await f.execute()).status, 'passed')
   const post = f.calls.find(call => call.method === 'POST')
   assert.equal(post.body.timeout, 90 * 60_000)
-  assert.deepEqual(post.body.env, { DEEPSEEK_API_KEY: syntheticKey })
+  assert.deepEqual(post.body.env, { DEEPSEEK_API_KEY: syntheticKey, E2B_API_KEY: syntheticCloudKey })
   assert.ok(sandboxProgram.includes('const acceptancePlan = ' + JSON.stringify(acceptancePlan)))
   assert.ok(sandboxProgram.includes("LOCAL_LOOP_ITEMS: acceptancePlan.items.join(',')"))
   assert.ok(sandboxProgram.includes('setTimeout(stopChild, acceptancePlan.softTimeout)'))
@@ -146,21 +147,21 @@ test('the workflow budgets 100 minutes and requires an explicit source pin befor
   assert.equal(f.calls.length, 0)
 })
 
-test('only DeepSeek enters the command environment; wait:false has no logs property', async () => {
+test('only the coding and cloud credentials enter the command environment; wait:false has no logs property', async () => {
   const f = fixture({ env: { BETTER_AUTH_SECRET: 'synthetic-private-auth', DATABASE_URL: 'synthetic-private-db', NODE_OPTIONS: 'synthetic-private-options' } })
   assert.equal((await f.execute()).status, 'passed')
   const post = f.calls.find(call => call.method === 'POST')
   assert.equal(post.url.pathname, sessionPath + '/cmd')
   assert.equal(post.headers.Authorization, 'Bearer ' + syntheticToken)
   assert.equal(post.redirect, 'error')
-  assert.deepEqual(post.body.env, { DEEPSEEK_API_KEY: syntheticKey })
+  assert.deepEqual(post.body.env, { DEEPSEEK_API_KEY: syntheticKey, E2B_API_KEY: syntheticCloudKey })
   assert.equal(post.body.cwd, target.cwd)
   assert.equal(post.body.sudo, false)
   assert.equal(post.body.wait, false)
   assert.equal(Object.hasOwn(post.body, 'logs'), false)
   assert.equal(post.body.timeout, target.hardTimeout)
   const bodyWithoutEnv = JSON.stringify({ ...post.body, env: undefined })
-  for (const secret of [syntheticToken, syntheticKey, 'synthetic-private-auth', 'synthetic-private-db', 'synthetic-private-options']) {
+  for (const secret of [syntheticToken, syntheticKey, syntheticCloudKey, 'synthetic-private-auth', 'synthetic-private-db', 'synthetic-private-options']) {
     assert.equal(bodyWithoutEnv.includes(secret), false)
     assert.equal(JSON.stringify(f.reports).includes(secret), false)
     assert.equal(post.url.href.includes(secret), false)

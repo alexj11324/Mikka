@@ -3,10 +3,10 @@ import { fileURLToPath } from 'node:url'
 import { resolve } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 
-// This rerun covers only the two unfinished recovery scenarios. The plan is
-// host-selected and is embedded in the remote program, never read from input.
+// This fixed run covers the existing local prerequisites and the official
+// cloud task leg. The plan is embedded in the remote program, not caller input.
 export const acceptancePlan = Object.freeze({
-  items: Object.freeze([9, 10]),
+  items: Object.freeze([1, 2, 3, 4, 5, 6, 7, 8]),
   softTimeout: 85 * 60_000,
   killTimeout: 88 * 60_000,
   hardTimeout: 90 * 60_000,
@@ -18,8 +18,8 @@ export const target = Object.freeze({
   teamId: 'team_C7lwxVVvnUicFli6112mvxpv',
   projectId: 'prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH',
   projectName: 'mikka',
-  sessionId: 'sbx_i0JVU4ryiQnowZ6IWX9zrkOdWbHR',
-  cwd: '/vercel/Mikka',
+  sessionId: 'sbx_qjiHsJWkPvJAC8afDreaZn5T4CFV',
+  cwd: '/vercel/mikka-local-loop',
   hardTimeout: acceptancePlan.hardTimeout,
 })
 
@@ -42,7 +42,7 @@ import { mkdir, open, readFile, realpath, writeFile } from 'node:fs/promises'
 import net from 'node:net'
 import { resolve } from 'node:path'
 
-const root = '/vercel/Mikka'
+const root = '/vercel/mikka-local-loop'
 const sha = process.argv[1]
 const acceptancePlan = ${JSON.stringify(acceptancePlan)}
 let child
@@ -70,6 +70,7 @@ try {
   assert.notEqual(process.env.MIKKA_DEV_SKIP_DAEMON, '1')
   assert.ok(!process.env.MIKKA_TEST_ENVIRONMENT_FILE, 'A fresh attestation is required')
   assert.ok(process.env.DEEPSEEK_API_KEY?.trim())
+  assert.ok(process.env.E2B_API_KEY?.trim())
   if (process.getuid?.() === 0) {
     assert.match(process.env.MIKKA_DEV_DAEMON_USER ?? '', /^[a-z_][a-z0-9_-]{0,31}$/)
     assert.notEqual(execFileSync('id', ['-u', process.env.MIKKA_DEV_DAEMON_USER], { encoding: 'utf8' }).trim(), '0')
@@ -87,7 +88,7 @@ try {
   await new Promise((yes, no) => portProbe.close(error => error ? no(error) : yes()))
   const password = (await readFile('/var/lib/mikka-dev/e2e-password', 'utf8')).trim()
   assert.ok(password && !/[\r\n\0]/.test(password))
-  const db = new URL('postgresql://e2e@127.0.0.1:5432/mikka_integrated_e2e')
+  const db = new URL('postgresql://e2e@127.0.0.1:5432/mikka_e2e')
   db.password = password
   evidenceDir = resolve(root, '.cache/dev-local', 'dispatch-' + sha.slice(0, 12) + '-' + randomUUID())
   await mkdir(evidenceDir, { mode: 0o700 })
@@ -151,7 +152,7 @@ export async function run({ env = process.env, fetchImpl = fetch, report = value
       || env.GITHUB_ACTIONS !== 'true' || env.CI !== 'true' || env.GITHUB_EVENT_NAME !== 'push') fail('runner_boundary_rejected')
     const sha = env.MIKKA_ACCEPTANCE_SOURCE_SHA
     if (!/^[a-f0-9]{40}$/.test(sha ?? '')) fail('source_sha_required')
-    if (!hasSecret(env.VERCEL_TEAM_TOKEN) || !hasSecret(env.DEEPSEEK_API_KEY)) fail('credential_missing')
+    if (!hasSecret(env.VERCEL_TEAM_TOKEN) || !hasSecret(env.DEEPSEEK_API_KEY) || !hasSecret(env.E2B_API_KEY)) fail('credential_missing')
     const waitPending = Symbol('wait_pending')
     const request = async (path, body, waitForExit = false) => {
       const url = new URL(path, target.api)
@@ -185,7 +186,7 @@ export async function run({ env = process.env, fetchImpl = fetch, report = value
     // No retries: a lost submission response must never duplicate a paid loop.
     const { command } = await request('/v2/sandboxes/sessions/' + target.sessionId + '/cmd', {
       command: 'node', args: ['--input-type=module', '--eval', sandboxProgram, sha],
-      cwd: target.cwd, env: { DEEPSEEK_API_KEY: env.DEEPSEEK_API_KEY },
+      cwd: target.cwd, env: { DEEPSEEK_API_KEY: env.DEEPSEEK_API_KEY, E2B_API_KEY: env.E2B_API_KEY },
       // The API rejects any logs field when wait is false, including logs:false.
       timeout: target.hardTimeout, wait: false, sudo: false,
     })
