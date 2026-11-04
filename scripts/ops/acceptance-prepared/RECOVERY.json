@@ -1,0 +1,98 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-11-04 02:23:32 UTC",
+  "repository": "alexj11324/Mikka",
+  "preparedBranch": "prepared/proactive-runner-1157-1163",
+  "baseCommit": "f6649f3d6e6892a6c7086fb85a0cf67180056420",
+  "baseTree": "7104101273ff47739d76d8f9d976dc4e085dae99",
+  "recoverySource": "Complete untruncated prior tool stdout, retained by independent reviewing agent; not reconstructed from a summary.",
+  "files": [
+    {
+      "path": "run-proactive-acceptance.mjs",
+      "sha256": "4ebdff00616a450b8dddb1640a507207f84d9a93ef21d8b5751e8943664f76e0",
+      "blobSha": "64240f7c535ebbaae30ec33311139b6026ba519b",
+      "originalSha256Matched": true,
+      "nativeReadbackMatched": true
+    },
+    {
+      "path": "owner-mcp-boundaries.mjs",
+      "sha256": "cdc0adac4b99fe1c4aa2bb3d4a97142e6e8fbb43ba5d55c39d864410c53986c0",
+      "blobSha": "ad51661257cd4139e88fbbe21566133ffa5847ef",
+      "originalSha256Matched": true,
+      "nativeReadbackMatched": true
+    },
+    {
+      "path": "owner-mcp-boundaries.test.mjs",
+      "sha256": "80e615b9b34d0e7c28571d3d91a829e3864d06f7537de2fc10b997696a4010aa",
+      "blobSha": "6374e9773b44efdc1510689bcef693b7fcb73310",
+      "originalSha256Matched": true,
+      "nativeReadbackMatched": true
+    },
+    {
+      "path": "proactive-acceptance-once.yml",
+      "sha256": "e9b11d94d726814e69fd1a9b7b1c1e8eebbcaaa549993416d61352fdc6f79fb3",
+      "blobSha": "c4e6bb8bdf27503a8e2e6583212a0e87d51c11cb",
+      "originalSha256Matched": true,
+      "nativeReadbackMatched": true
+    },
+    {
+      "path": "run-proactive-acceptance.test.mjs",
+      "sha256": "05136d717a9c95f60df73bd66f229d73ae47d148cd281d6c7fb51fbc2488f63c",
+      "blobSha": "eae06a95d2b1746cbd403d4ef1a52d7c033c654b",
+      "originalSha256Matched": true,
+      "nativeReadbackMatched": true
+    }
+  ],
+  "newDocumentation": [
+    {
+      "path": "README.md",
+      "sha256": "d56c771f8a6ee939fc16b68223dc9c4448b48224d41fbb0cee00ed29c9a27ebe",
+      "blobSha": "9582c13c38849634fae02d3dd31280a2aedc0f7b",
+      "originalByteRecoveryClaimed": false
+    },
+    {
+      "path": "RECOVERY.json",
+      "originalByteRecoveryClaimed": false
+    }
+  ],
+  "verification": {
+    "nodeVersion": "v24.22.1",
+    "commands": [
+      {
+        "command": "node --test run-proactive-acceptance.test.mjs owner-mcp-boundaries.test.mjs",
+        "exitCode": 0,
+        "tests": 15,
+        "passed": 15,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "command": "node --check run-proactive-acceptance.mjs",
+        "exitCode": 0
+      },
+      {
+        "command": "node --check owner-mcp-boundaries.mjs",
+        "exitCode": 0
+      }
+    ],
+    "mode": "Offline tests with injected transport and helper dependencies.",
+    "productionRequests": 0,
+    "providerInvocations": 0
+  },
+  "publicationScope": {
+    "directory": "scripts/ops/acceptance-prepared/",
+    "workflowActivated": false,
+    "productionPinsRemainPlaceholders": true,
+    "productionResultClaimed": false
+  },
+  "notRecovered": [
+    "Original README.md bytes",
+    "owner-mcp-boundaries.md",
+    "shared-mcp-boundaries.mjs",
+    "shared-mcp-boundaries.test.mjs",
+    "shared-mcp-boundaries.md"
+  ],
+  "pausedWork": [
+    "group-routing-boundaries.mjs has not been created or integrated."
+  ]
+}

@@ -1,0 +1,110 @@
+name: Temporary proactive production acceptance
+on:
+  push:
+    branches: [acceptance/proactive-1157-1163]
+    paths:
+      - '.github/workflows/proactive-acceptance.yml'
+      - 'scripts/ops/proactive-acceptance-once.mjs'
+      - 'scripts/ops/owner-mcp-boundaries.mjs'
+permissions:
+  contents: read
+concurrency:
+  group: proactive-production-acceptance-once
+  cancel-in-progress: false
+jobs:
+  acceptance:
+    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/acceptance/proactive-1157-1163'
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        working-directory: source
+    env:
+      GROUP_ACCEPTANCE_ORIGIN: https://app.aspectlylabs.com
+      GROUP_ACCEPTANCE_DEPLOYMENT: REPLACE_WITH_FINAL_PRODUCTION_DEPLOYMENT_ID
+      GROUP_ACCEPTANCE_REVISION: REPLACE_WITH_FINAL_DEPLOYED_40_CHARACTER_GIT_SHA
+      GROUP_ACCEPTANCE_TASK_TIMEOUT_MS: '1200000'
+      GROUP_ACCEPTANCE_STOP_TIMEOUT_MS: '180000'
+      GROUP_ACCEPTANCE_OUTPUT: ${{ github.workspace }}/proactive-acceptance-sanitized/results.json
+    steps:
+      # This temporary branch supplies only the driver. Application code is
+      # checked out separately at the exact deployed revision.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          path: driver
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ env.GROUP_ACCEPTANCE_REVISION }}
+          path: source
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      - name: Install pinned dependencies before receiving credentials
+        run: npm exec --yes --package pnpm@10.34.3 -- pnpm install --frozen-lockfile --filter '!@mikka/mobile' --ignore-scripts
+      - name: Verify the fixed source and allowed execution model
+        run: |
+          node --input-type=module -e 'import {execFileSync} from "node:child_process"; const r=process.env.GROUP_ACCEPTANCE_REVISION,d=process.env.GROUP_ACCEPTANCE_DEPLOYMENT; if(!/^[a-f0-9]{40}$/.test(r??"")||!/^dpl_[A-Za-z0-9]+$/.test(d??"")||execFileSync("git",["rev-parse","HEAD"],{encoding:"utf8"}).trim()!==r)process.exit(1)'
+          node scripts/assert-test-model.mjs deepseek-flash
+      - name: Read the existing Smoke email only
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /
+          secret-name: SMOKE_OWNER_EMAIL
+          recursive: false
+          include-imports: false
+      - name: Read the existing Smoke password only
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /
+          secret-name: SMOKE_OWNER_PASSWORD
+          recursive: false
+          include-imports: false
+      - name: Read the existing Flash key from dev only
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: dev
+          secret-path: /vercel
+          secret-name: DEEPSEEK_API_KEY
+          recursive: false
+          include-imports: false
+      - name: Read the existing E2B key from prod only
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /vercel
+          secret-name: E2B_API_KEY
+          recursive: false
+          include-imports: false
+      - name: Run owner MCP management, real group runtime and 24 fixed-case Decision replays
+        run: node --import tsx ../driver/scripts/ops/proactive-acceptance-once.mjs
+      - name: Upload sanitized evidence only
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: proactive-acceptance-${{ github.run_id }}
+          path: proactive-acceptance-sanitized/results.json
+          if-no-files-found: error
+          retention-days: 7
