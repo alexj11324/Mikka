@@ -1,0 +1,14 @@
+{
+  "rawSha256": "b9888a926b35672f2ae928763baebb522772c1f70825e2880eb516a51edec44e",
+  "report": {
+    "sourceSha": "020b3957e8fc9609528c69499609adef08150cdf",
+    "items": [
+      9,
+      10
+    ],
+    "status": "failed",
+    "exitCode": 1,
+    "interrupted": false,
+    "completedAt": "2026-11-04T04:41:24.398Z"
+  }
+}

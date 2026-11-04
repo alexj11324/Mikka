@@ -1,0 +1,53 @@
+{
+  "runId": "6f284f6a-1dcc-4727-a61d-f6cb32c3426f",
+  "scope": "Only the failed isolated local fixture. Original database and reports retained.",
+  "finalRead": {
+    "at": "2026-11-04T04:53:56.559967+00:00",
+    "ownedProcesses": [],
+    "ports": {
+      "3114": false,
+      "3191": false
+    },
+    "credentialsPresent": {
+      "daemon/device.json": false,
+      "daemon/daemon.secret": false,
+      "daemon-b/device.json": false,
+      "daemon-b/daemon.secret": false
+    }
+  },
+  "ownerTokenRecords": {
+    "at": "2026-11-04T04:57:04.897Z",
+    "ownerDeviceTokens": [
+      {
+        "bound_device_id": null,
+        "revokedAt": null,
+        "expiresAt": null
+      },
+      {
+        "bound_device_id": null,
+        "revokedAt": null,
+        "expiresAt": null
+      }
+    ],
+    "deviceAuthorityColumns": []
+  },
+  "poolLease": [
+    {
+      "state": "active",
+      "expires_at": "2026-11-04T04:41:06.892Z",
+      "released_at": null
+    }
+  ],
+  "actions": [
+    "Verified two leftover detached Next telemetry processes by PID/starttime/parent/cwd/module identity, then sent positive-PID SIGTERM only to those processes.",
+    "Removed only the owned A/B daemon/device.json and daemon/daemon.secret files without reading contents.",
+    "No application/daemon/native processes or ports3114/3191 remained at the final read.",
+    "Two owner device-token records remain unrevoked in the private retained database; bearer files were removed. No claim of server-side revocation.",
+    "The TestAccountPool lease expired and its normal release/revoke checks refuse the stale authority. No lease, revokedAt, Task, or Run rows were fabricated or force-updated."
+  ],
+  "commandIds": {
+    "telemetry": "cmd_be69950ae8634b32acdc77c4ca98",
+    "credentialFiles": "cmd_1ff65b6bf59d46458a7f68518d94",
+    "finalRead": "cmd_00cd81014c474aff9b1433bff2a9"
+  }
+}

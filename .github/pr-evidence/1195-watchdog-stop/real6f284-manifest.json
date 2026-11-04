@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "overall": "failed",
+  "item9": "passed",
+  "item10": "failed_before_watchdog_window",
+  "sourceSha": "020b3957e8fc9609528c69499609adef08150cdf",
+  "sourceTree": "934e0d6c169d3ba43f269eed01f93e08dbe89eb4",
+  "originalHashes": {
+    "item9": "81e9d364e685adfeadb3a653d3405e98e4e52fdfd64970ef948c4c2c5f733c7f",
+    "item10": "d0adb5db0a801a061009d17294a89e7bae361974765cbf38e708c915ca669489",
+    "dispatch": "b9888a926b35672f2ae928763baebb522772c1f70825e2880eb516a51edec44e"
+  },
+  "redactedHashes": {
+    "item9": "778f24529441bfa34c810f126039067cb055c5b51cd237b2a53943b9ac2fb1c6",
+    "item10": "4c7a1e4bf084cd86c76aee0feb1e1b69a361be70fa6e517ad2f66cbf06a910c1"
+  },
+  "files": [
+    {
+      "path": ".github/pr-evidence/1195-watchdog-stop/real6f284-item9.json",
+      "gitBlobSha": "0ca72e570303013d44ca95bb44ccc804656cf488"
+    },
+    {
+      "path": ".github/pr-evidence/1195-watchdog-stop/real6f284-item10.json",
+      "gitBlobSha": "5790019d12c85b3d91943a089acaf319c7815659"
+    },
+    {
+      "path": ".github/pr-evidence/1195-watchdog-stop/real6f284-dispatch.json",
+      "gitBlobSha": "43f62f79ebf55981d8f9a149e035f1dce07697a2"
+    },
+    {
+      "path": ".github/pr-evidence/1195-watchdog-stop/real6f284-query-diagnosis.json",
+      "gitBlobSha": "b52c3a28e531ff5578dd8d3c2d060155c22f906a"
+    },
+    {
+      "path": ".github/pr-evidence/1195-watchdog-stop/real6f284-cleanup.json",
+      "gitBlobSha": "895b52061bf38afe19793e8eba9637c9a39ea051"
+    },
+    {
+      "path": ".github/pr-evidence/1195-watchdog-stop/real6f284-review.md",
+      "gitBlobSha": "4902f2c9723f83a3255f923f0508c7282b476aa3"
+    }
+  ]
+}

@@ -1,0 +1,197 @@
+{
+  "scenario": "real6f284 item10 observer failure; historical contention cause unknown",
+  "queryError": {
+    "pid": 92386,
+    "sqlSha256": "660148acebd0d4c1a1f1dd39864ae465723653e911b7a01393a7fac4c5027f28",
+    "sqlStructure": "2026-11-04 04:40:05.639 UTC [92386] STATEMENT:  SELECT t.\"sourceEventId\",t.status AS \"taskStatus\",t.stage,r.status AS \"runStatus\",\n\t      r.\"stopRequestedAt\",r.\"finishedAt\",r.\"leaseExpiresAt\",r.\"stopReason\",d.\"lastSeenAt\",\n\t      a.output->'<literal>' AS watchdog,cp.\"updatedAt\" AS \"checkpointAt\",cp.files,cp.\"unavailableReason\",\n\t      (SELECT max(ch.\"createdAt\") FROM run_chunks ch WHERE ch.\"runId\"=r.id AND ch.chunk->>'<literal>'='<literal>') AS \"toolOutputAt\",\n\t      GREATEST(t.\"updatedAt\",a.\"createdAt\",a.\"finishedAt\",c.\"createdAt\",cp.\"updatedAt\",\n\t        (SELECT max(ch.\"createdAt\") FROM run_chunks ch WHERE ch.\"runId\"=r.id AND ch.chunk->>'<literal>'='<literal>')) AS \"progressAt\"\n\t      FROM factory_tasks t JOIN factory_attempts a ON a.id=$2 AND a.\"taskId\"=t.id\n\t      JOIN agent_runs r ON r.id=$3 AND r.\"userId\"=t.\"userId\" JOIN devices d ON d.id=r.\"deviceId\" AND d.\"ownerId\"=t.\"userId\"\n\t      LEFT JOIN factory_candidates c ON c.id=t.\"candidateId\" AND c.\"taskId\"=t.id\n\t      LEFT JOIN run_checkpoints cp ON cp.\"runId\"=r.id AND cp.\"userId\"=t.\"userId\"\n\t      WHERE t.id=$1 AND t.\"userId\"=$4"
+  },
+  "surroundingDatabaseEvents": {
+    "databaseEvents": [
+      {
+        "at": "2026-11-04 04:40:05.639",
+        "pid": "92386",
+        "severity": "ERROR",
+        "message": " canceling statement due to statement timeout"
+      },
+      {
+        "at": "2026-11-04 04:40:43.986",
+        "pid": "696",
+        "severity": "LOG",
+        "message": " checkpoint starting: time"
+      }
+    ],
+    "kernelOom": []
+  },
+  "retainedDatabaseReadOnlyExplain": {
+    "at": "2026-11-04T04:54:53.868Z",
+    "elapsedMs": 7.541860999999997,
+    "planningMs": 2.023,
+    "executionMs": 0.677,
+    "plan": {
+      "node": "Nested Loop",
+      "rows": 1,
+      "loops": 1,
+      "ms": 0.399,
+      "hits": 81,
+      "reads": 0,
+      "children": [
+        {
+          "node": "Nested Loop",
+          "rows": 1,
+          "loops": 1,
+          "ms": 0.057,
+          "hits": 14,
+          "reads": 0,
+          "children": [
+            {
+              "node": "Nested Loop",
+              "rows": 1,
+              "loops": 1,
+              "ms": 0.045,
+              "hits": 13,
+              "reads": 0,
+              "children": [
+                {
+                  "node": "Nested Loop",
+                  "rows": 1,
+                  "loops": 1,
+                  "ms": 0.041,
+                  "hits": 12,
+                  "reads": 0,
+                  "children": [
+                    {
+                      "node": "Nested Loop",
+                      "rows": 1,
+                      "loops": 1,
+                      "ms": 0.028,
+                      "hits": 4,
+                      "reads": 0,
+                      "children": [
+                        {
+                          "node": "Index Scan",
+                          "relation": "factory_tasks",
+                          "index": "factory_tasks_owner_issue_idx",
+                          "rows": 1,
+                          "loops": 1,
+                          "ms": 0.018,
+                          "hits": 2,
+                          "reads": 0
+                        },
+                        {
+                          "node": "Index Scan",
+                          "relation": "factory_attempts",
+                          "index": "factory_attempts_taskId_id_key",
+                          "rows": 1,
+                          "loops": 1,
+                          "ms": 0.007,
+                          "hits": 2,
+                          "reads": 0
+                        }
+                      ]
+                    },
+                    {
+                      "node": "Seq Scan",
+                      "relation": "agent_runs",
+                      "rows": 1,
+                      "loops": 1,
+                      "ms": 0.011,
+                      "hits": 8,
+                      "reads": 0
+                    }
+                  ]
+                },
+                {
+                  "node": "Seq Scan",
+                  "relation": "devices",
+                  "rows": 1,
+                  "loops": 1,
+                  "ms": 0.002,
+                  "hits": 1,
+                  "reads": 0
+                }
+              ]
+            },
+            {
+              "node": "Index Scan",
+              "relation": "factory_candidates",
+              "index": "factory_candidates_taskId_id_key",
+              "rows": 0,
+              "loops": 1,
+              "ms": 0.011,
+              "hits": 1,
+              "reads": 0
+            }
+          ]
+        },
+        {
+          "node": "Index Scan",
+          "relation": "run_checkpoints",
+          "index": "run_checkpoints_pkey",
+          "rows": 1,
+          "loops": 1,
+          "ms": 0.014,
+          "hits": 2,
+          "reads": 0
+        },
+        {
+          "node": "Aggregate",
+          "rows": 1,
+          "loops": 1,
+          "ms": 0.24,
+          "hits": 45,
+          "reads": 0,
+          "children": [
+            {
+              "node": "Seq Scan",
+              "relation": "run_chunks",
+              "rows": 0,
+              "loops": 1,
+              "ms": 0.235,
+              "hits": 45,
+              "reads": 0
+            }
+          ]
+        },
+        {
+          "node": "Aggregate",
+          "rows": 1,
+          "loops": 1,
+          "ms": 0.059,
+          "hits": 20,
+          "reads": 0,
+          "children": [
+            {
+              "node": "Seq Scan",
+              "relation": "run_chunks",
+              "rows": 0,
+              "loops": 1,
+              "ms": 0.058,
+              "hits": 20,
+              "reads": 0
+            }
+          ]
+        }
+      ]
+    },
+    "size": {
+      "chunks": "36",
+      "checkpointbytes": 4
+    },
+    "state": {
+      "task_status": "running",
+      "stage": "execute",
+      "status": "running",
+      "stopReason": null,
+      "stopRequestedAt": null,
+      "finishedAt": null,
+      "leaseExpiresAt": "2026-11-04T04:41:09.437Z"
+    }
+  },
+  "interpretation": [
+    "PostgreSQL canceled the acceptance observer SELECT with SQLSTATE 57014 under the existing 10000ms statement_timeout.",
+    "The timeout occurred before the unchanged 45-minute Factory watchdog threshold; it does not verify or falsify the daemon stop-cause fix.",
+    "The same SELECT later completed in 0.677ms with 81 cache hits and no disk reads; the original run had 36 chunks.",
+    "No historical lock/wait-event sample exists. No kernel OOM line was found. The underlying historical delay is not attributed to a specific lock, build, provider, or product.",
+    "No SQL timestamp/state changes, private sweep, approval retry, or additional model request were used during diagnosis."
+  ]
+}
