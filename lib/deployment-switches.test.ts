@@ -85,6 +85,7 @@ test('group contribution kill flag restores baseline and the recognized environm
   assert.equal(deploymentSwitch('groupContribution',{}),true)
   assert.equal(deploymentSwitch('groupContribution',{MIKKA_GROUP_DECISION_POLICY:'group-route-v0'}),false)
   assert.equal(deploymentSwitch('groupContribution',{MIKKA_GROUP_DECISION_POLICY:'group-contribution-v1'}),true)
+  assert.equal(deploymentSwitch('groupContribution',{MIKKA_GROUP_DECISION_POLICY:'group-contribution-v2'}),true)
   await refreshDeploymentSwitches('phc_test',posthog({'mikka-group-contribution-off':flag(true)}).fetcher)
   assert.equal(deploymentSwitch('groupContribution',{MIKKA_GROUP_DECISION_POLICY:'group-contribution-v1'}),false)
   await refreshDeploymentSwitches('phc_test',posthog({'mikka-group-contribution-off':flag(false)}).fetcher)
