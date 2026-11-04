@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/api-auth";
 import { handleFactory } from "@/lib/factory/http";
 import { factoryHumanStore } from "@/lib/factory/server";
+import { pool } from '@/lib/db';
+import { workspacePool } from '@/lib/workspace-db';
+import { factoryLiveScopes } from '@/lib/live/factory';
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -25,7 +28,12 @@ async function respond(
         ? await request.json().catch(() => null)
         : undefined,
   });
-  return NextResponse.json(result.body, {
+  let liveWorkspaceId: string | null = null;
+  if (result.status === 200 && session?.user) {
+    try { liveWorkspaceId = (await factoryLiveScopes(pool, workspacePool, taskId, session.user.id))?.task.workspaceId ?? null; }
+    catch { console.warn('[live] Factory task scope unavailable'); }
+  }
+  return NextResponse.json(result.status === 200 ? { ...(result.body as Record<string, unknown>), liveWorkspaceId } : result.body, {
     status: result.status,
     headers: { "Cache-Control": "private, no-store" },
   });

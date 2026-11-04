@@ -5,6 +5,7 @@ import { act, type ReactNode } from 'react'
 import type { Root } from 'react-dom/client'
 import { Window } from 'happy-dom'
 import { ViewStateProvider } from '../lib/hooks/view-state'
+import type { LiveSocket } from '../lib/live/channel'
 
 // Interactive checks: retry re-entry, focus after retry, and the 验收 pane's decision gate.
 const zh = JSON.parse(readFileSync(new URL('../messages/zh-CN.json', import.meta.url), 'utf8')).FactoryAcceptance
@@ -14,13 +15,14 @@ let list: Swr
 let ledger: unknown
 let evidence: unknown
 let detail: unknown
+let detailTaskId = 't1'
 let detailReloads = 0
 let ledgerReloads = 0
 let listReloadKeys: string[] = []
 let refreshFails = false
 mock.module('swr', { defaultExport: (key: string | null) => {
   if (key === null) return { data: undefined }
-  if (key === '/api/factory/tasks/t1') return { data: detail, mutate: async () => { detailReloads++; if (refreshFails) throw new Error('detail unavailable'); return detail } }
+  if (key === `/api/factory/tasks/${detailTaskId}`) return { data: detail, mutate: async () => { detailReloads++; if (refreshFails) throw new Error('detail unavailable'); return detail } }
   if (key.includes('view=ledger')) return { data: ledger, mutate: async () => { ledgerReloads++; if (refreshFails) throw new Error('ledger unavailable'); return ledger } }
   if (key.includes('/approval')) return { data: evidence }
   return list
@@ -29,7 +31,9 @@ mock.module('swr', { defaultExport: (key: string | null) => {
   if (refreshFails) throw new Error('list unavailable')
   return list?.data
 } }) } })
-mock.module('next-intl', { namedExports: { useTranslations: () => lookup, useFormatter: () => ({ dateTime: () => '' }) } })
+mock.module('next-intl', { namedExports: { useTranslations: () => lookup, useFormatter: () => ({
+  dateTime: (value: Date, options: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat('zh-CN', { timeZone: 'Asia/Shanghai', ...options }).format(value),
+}) } })
 mock.module(new URL('../components/workspace/issue-thread-panel.tsx', import.meta.url).href, { namedExports: { IssueThreadPanel: () => null } })
 const Pass = ({ children }: { children?: ReactNode }) => <div>{children}</div>
 mock.module(new URL('../components/ui/dialog.tsx', import.meta.url).href, { namedExports: { Dialog: Pass, DialogContent: Pass, DialogHeader: Pass, DialogTitle: Pass, DialogFooter: Pass } })
@@ -39,6 +43,7 @@ const browser = new Window({ url: 'https://mikka.example/zh-CN' })
 let container: HTMLDivElement
 let root: Root
 let createRoot: typeof import('react-dom/client')['createRoot']
+let LiveProvider: typeof import('../hooks/use-live-key')['LiveProvider']
 let FactoryAcceptance: typeof import('../components/workspace/factory-acceptance')['FactoryAcceptance']
 let FactoryAcceptancePane: typeof import('../components/workspace/factory-acceptance-pane')['FactoryAcceptancePane']
 let CandidateMachine: typeof import('../components/workspace/factory-acceptance-pane')['CandidateMachine']
@@ -49,10 +54,12 @@ before(async () => {
   Object.defineProperty(globalThis, 'navigator', { configurable: true, value: browser.navigator })
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true, HTMLElement: browser.HTMLElement, Element: browser.Element })
   ;({ createRoot } = await import('react-dom/client'))
+  ;({ LiveProvider } = await import('../hooks/use-live-key'))
   ;({ FactoryAcceptance } = await import('../components/workspace/factory-acceptance'))
   ;({ FactoryAcceptancePane, CandidateMachine } = await import('../components/workspace/factory-acceptance-pane'))
 })
 beforeEach(() => {
+  detailTaskId = 't1'
   ledger = { binding: {}, approvals: [], publications: [], merges: [] }; evidence = undefined; detail = undefined
   detailReloads = 0; ledgerReloads = 0; listReloadKeys = []; refreshFails = false
   container = document.createElement('div') as unknown as HTMLDivElement
@@ -66,6 +73,63 @@ const task = (patch: Record<string, unknown> = {}) => ({ id: 't1', issueId: 'iss
 const render = async () => { await act(async () => root.render(<FactoryAcceptance issueId="issue-1" />)) }
 const pane = async (patch: Record<string, unknown> = {}) => { await act(async () => root.render(<FactoryAcceptancePane task={task(patch)} />)) }
 const button = (name: string) => [...document.querySelectorAll('button')].find(item => item.textContent?.trim() === name) as unknown as HTMLButtonElement | undefined
+
+test('Factory list and duplicate task headers subscribe to their server scopes while another workspace is selected', async t => {
+  const selected = '11111111-1111-4111-8111-111111111111'
+  const personal = '22222222-2222-4222-8222-222222222222'
+  const taskWorkspace = '33333333-3333-4333-8333-333333333333'
+  const issueId = '44444444-4444-4444-8444-444444444444'
+  detailTaskId = '55555555-5555-4555-8555-555555555555'
+  const tickets: string[] = [], sockets: Socket[] = []
+  class Socket implements LiveSocket {
+    onopen: LiveSocket['onopen'] = null
+    onmessage: LiveSocket['onmessage'] = null
+    onclose: LiveSocket['onclose'] = null
+    onerror: LiveSocket['onerror'] = null
+    readyState: 0 | 1 | 2 | 3 = 0
+    constructor(readonly url: string) { sockets.push(this) }
+    open() { this.readyState = 1; if (this.onopen) Reflect.apply(this.onopen, this, [new Event('open')]) }
+    message(value: unknown) { if (this.onmessage) Reflect.apply(this.onmessage, this, [{ data: JSON.stringify(value) }]) }
+    send() {}
+    close() { this.readyState = 3 }
+  }
+  const previousFetch = globalThis.fetch, previousSocket = globalThis.WebSocket
+  const visibility = Object.getOwnPropertyDescriptor(browser.document, 'visibilityState')
+  Object.defineProperty(browser.document, 'visibilityState', { configurable: true, value: 'visible' })
+  globalThis.fetch = (async (input: RequestInfo | URL) => {
+    const workspace = new URL(String(input), 'https://mikka.example').searchParams.get('workspace')!
+    tickets.push(workspace)
+    return Response.json({ url: `wss://gateway.example/live/${workspace}`, protocol: 'fixture-ticket', expiresAt: Date.now() + 300_000 })
+  }) as typeof fetch
+  Object.defineProperty(globalThis, 'WebSocket', { configurable: true, writable: true, value: Socket })
+  t.after(() => {
+    globalThis.fetch = previousFetch
+    Object.defineProperty(globalThis, 'WebSocket', { configurable: true, writable: true, value: previousSocket })
+    if (visibility) Object.defineProperty(browser.document, 'visibilityState', visibility)
+    else Reflect.deleteProperty(browser.document, 'visibilityState')
+  })
+  list = { data: { tasks: [], liveWorkspaceId: personal }, isLoading: false, mutate: async () => list.data }
+  detail = { liveWorkspaceId: taskWorkspace, delivery: { machine: { name: 'Fixture', kind: 'cloud' } } }
+  await act(async () => root.render(<LiveProvider ownerId="owner" workspaceId={selected}>
+    <FactoryAcceptance issueId={issueId} />
+    <CandidateMachine taskId={detailTaskId} /><CandidateMachine taskId={detailTaskId} />
+  </LiveProvider>))
+  assert.deepEqual(tickets.sort(), [personal, taskWorkspace].sort(), 'the navigation workspace must not select these channels')
+  assert.equal(sockets.length, 2, 'duplicate task headers share their scope connection')
+  await act(async () => { for (const socket of sockets) socket.open(); await new Promise(resolve => setTimeout(resolve, 120)) })
+  listReloadKeys = []
+  const taskSocket = sockets.find(socket => socket.url.endsWith(taskWorkspace))!
+  const listSocket = sockets.find(socket => socket.url.endsWith(personal))!
+  await act(async () => { taskSocket.message({ kind: 'factory_task', id: detailTaskId }); await new Promise(resolve => setTimeout(resolve, 120)) })
+  assert.deepEqual(listReloadKeys, [`/api/factory/tasks/${detailTaskId}`])
+  listReloadKeys = []
+  await act(async () => {
+    listSocket.message({ kind: 'factory_task', id: detailTaskId })
+    listSocket.message({ kind: 'factory_issue', id: issueId })
+    await new Promise(resolve => setTimeout(resolve, 120))
+  })
+  assert.deepEqual(listReloadKeys, [`/api/factory/tasks?issueId=${issueId}`], 'a task event on the issue scope cannot refresh another scope')
+})
 
 test('retry fires once while a refetch is in flight', async () => {
   let calls = 0
@@ -420,4 +484,33 @@ test('host completion recovery keeps its existing control ahead of same-candidat
   assert.ok(button('重试'))
   assert.equal(button('重新审阅'), undefined)
   assert.equal(button('重新验证'), undefined)
+})
+
+test('a cited pre-question command source shows its localized time and opens that source thread without changing the result', async () => {
+  const current = failedCandidate()
+  const source = { runId: 'pre-question-run', sessionId: 'native-session-kept-in-data', status: 'stopped',
+    recoveryEventId: 'answer-receipt', observedAt: '2026-11-04T09:12:34.000Z' }
+  const sourceCheck = { stage: 'review', status: 'failed', attemptId: current.attemptId, candidateId: current.candidateId,
+    candidateSha: 'a'.repeat(40), runId: 'review-run', criteria: [], verify: null, commandSources: [source] }
+  detail = { task: current, checks: [sourceCheck] }
+  const opened: string[] = []
+  await act(async () => root.render(<FactoryAcceptancePane task={current} onOpenThread={runId => opened.push(runId)} />))
+  assert.match(container.textContent ?? '', /来自提问前的执行/)
+  assert.match(container.textContent ?? '', /需要修改/)
+  const time = container.querySelector('time')
+  assert.equal(time?.getAttribute('datetime'), source.observedAt)
+  assert.equal(time?.textContent, new Intl.DateTimeFormat('zh-CN', { timeZone: 'Asia/Shanghai', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(source.observedAt)))
+  assert.doesNotMatch(container.textContent ?? '', /native-session-kept-in-data|answer-receipt/)
+  await act(async () => { button('查看执行')!.click() })
+  await act(async () => { button('独立审阅')!.click() })
+  assert.deepEqual(opened, ['pre-question-run', 'review-run'])
+  assert.ok(button('重新审阅'), 'source provenance does not turn a failed check into a pass')
+
+  for (const commandSources of [undefined, []]) {
+    detail = { task: current, checks: [{ ...sourceCheck, commandSources }] }
+    await pane(current)
+    assert.doesNotMatch(container.textContent ?? '', /来自提问前的执行|查看执行/)
+    assert.equal(container.querySelector('time'), null)
+    assert.match(container.textContent ?? '', /需要修改/)
+  }
 })

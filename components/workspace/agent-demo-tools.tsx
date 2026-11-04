@@ -9,9 +9,9 @@ import { withBasePath } from '@/lib/base-path'
 export function AgentDemoTools() {
   return <div className="flex min-w-0 flex-col gap-4">
     <p className="text-sm text-muted-foreground">以下全部为虚构工具记录，只展示组件效果；不会运行命令、修改文件或生成图片。</p>
-    <FileDiff file="demo.ts（演示差异）" defaultOpen collapseOnComplete={false} lines={[
-      { id: 'old', type: 'removed', oldLine: 1, content: 'const title = "旧标题"' },
-      { id: 'new', type: 'added', newLine: 1, content: 'const title = "演示标题"' },
+    <FileDiff file="demo.ts（演示差异）" status="complete" lines={[
+      { type: 'removed', content: 'const title = "旧标题"' },
+      { type: 'added', content: 'const title = "演示标题"' },
     ]} />
     <ToolResult tool="本地演示" title="示例工具输出（未执行）" status="success" defaultOpen collapseOnComplete={false}>
       <ToolResultOutput language="json">{'{"demo": true, "executed": false}'}</ToolResultOutput>

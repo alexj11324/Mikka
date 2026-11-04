@@ -11,7 +11,7 @@ import { getUsage } from '@/app/actions/usage'
 import { cardVerificationStatus, getBilling, getCreditBilling } from '@/app/actions/billing'
 import { listAuditLog } from '@/app/actions/audit-log'
 import { getModelOrder } from '@/app/actions/model-order'
-import { listBots } from '@/app/actions/bots'
+import { listBots, listWorkspaceBots } from '@/app/actions/bots'
 import { getApiKeys } from '@/app/actions/model-api-keys'
 import type { AuditFilter } from '@/lib/audit/cursor'
 import type { SettingsRead } from '@/lib/settings-read'
@@ -43,6 +43,7 @@ const READS: Record<SettingsRead, (query: URLSearchParams) => Promise<unknown>> 
   // 模型与订阅: the allowed models in order and 运行位置 (decision 2026-11-02-1400).
   'model-order': query => getModelOrder(workspace(query)),
   bots: () => listBots(),
+  'workspace-bots': () => listWorkspaceBots(),
   'api-keys': query => getApiKeys(workspace(query)),
   audit: query => listAuditLog({ filter: (query.get('filter') ?? undefined) as AuditFilter | undefined, cursor: query.get('cursor') }, workspace(query)),
 }

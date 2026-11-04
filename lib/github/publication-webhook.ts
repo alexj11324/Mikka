@@ -2,6 +2,7 @@ import 'server-only'
 import type { Pool } from 'pg'
 import { z } from 'zod'
 import { pool } from '@/lib/db'
+import { factoryCommitted } from '@/lib/live/factory'
 
 const pullRequestEvent = z.object({
   repository: z.object({ full_name: z.string().regex(/^[\w.-]+\/[\w.-]+$/) }),
@@ -52,7 +53,18 @@ export async function refreshPublishedPullRequest(event: string, payload: unknow
   if (pr.html_url !== url) return
   const state = pr.merged_at ? 'merged' : pr.state === 'closed' ? 'closed' : pr.draft ? 'draft' : 'open'
   const lines = pr.additions !== undefined && pr.deletions !== undefined ? { additions: pr.additions, deletions: pr.deletions } : null
-  await database.query(`UPDATE run_publications SET "pullRequest"="pullRequest" || $2::jsonb,"updatedAt"=now()
-    WHERE "pullRequest"->>'url'=$1`, [url, JSON.stringify({ title: pr.title, state, ...lines })])
-  if (lines) await database.query(RECORD_LINE_COUNTS, [url, JSON.stringify(lines)])
+  const { rows: tasks } = await database.query<{ id: string }>(`WITH saved AS (
+      UPDATE run_publications SET "pullRequest"="pullRequest" || $2::jsonb,"updatedAt"=now()
+      WHERE "pullRequest"->>'url'=$1 RETURNING "runId","userId"
+    ) SELECT DISTINCT t.id FROM saved p
+      JOIN factory_candidates c ON c."runId"=p."runId"
+      JOIN factory_tasks t ON t.id=c."taskId" AND t."candidateId"=c.id AND t."userId"=p."userId"`,
+    [url, JSON.stringify({ title: pr.title, state, ...lines })])
+  try {
+    if (lines) await database.query(RECORD_LINE_COUNTS, [url, JSON.stringify(lines)])
+  } finally {
+    // This webhook writer uses autocommitted queries. Even if the optional line-count
+    // sync fails, the delivery's title/state is committed and its open view must refresh.
+    await Promise.all(tasks.map(task => factoryCommitted(task.id)))
+  }
 }

@@ -26,7 +26,7 @@ function fixture() {
     publication: {pushBranch:'synthetic-claim-branch',policy:defaultRunPolicy()},
     checkpoint: null as RunCheckpoint | null,
     strictRecovery: false,
-    lost: undefined as {deviceId:string;sessionId:string}|undefined,
+    lost: undefined as {deviceId:string;sessionId:string;agentId:string;agentDefinition?:{harness?:'codex'|'claude_code'}|null}|undefined,
     preparation:[] as string[],
     modelAdmissionCalls:[] as {scope:{workspaceId:string;ownerId:string};model:string}[],
     subscriptionAdmissionCalls:[] as {scope:{workspaceId:string;ownerId:string};model:string;route:string}[],
@@ -128,7 +128,7 @@ test('an owner without a GitHub connection gets no credential endpoint', async (
 test('known unavailable or stale recovery blocks before leases, worker credentials or an old-client assignment', async () => {
   for (const unavailable of [true, false]) {
     const probe=fixture();probe.run.retryOf='lost-parent'
-    probe.lost={deviceId:'device',sessionId:'old-machine-session'}
+    probe.lost={deviceId:'device',sessionId:'old-machine-session',agentId:'agent',agentDefinition:null}
     probe.checkpoint={baseCommit:'a'.repeat(40),patch:'synthetic-empty-snapshot',files:1,
       takenAt:new Date(Date.now()-(unavailable ? 0 : 31*60_000)).toISOString(),
       ...(unavailable ? {unavailableReason:'too_large' as const} : {})}
@@ -142,11 +142,11 @@ test('known unavailable or stale recovery blocks before leases, worker credentia
   }
 })
 
-test('same-device retries retain their session while a different device starts a new session', async () => {
+test('legacy retries of the same Agent retain their session only on the same device', async () => {
   for(const sameDevice of [true,false]) {
     const probe=fixture();probe.run.retryOf='lost-parent'
     probe.checkpoint=validCheckpoint()
-    probe.lost={deviceId:sameDevice ? 'device' : 'old-device',sessionId:'old-machine-session'}
+    probe.lost={deviceId:sameDevice ? 'device' : 'old-device',sessionId:'old-machine-session',agentId:'agent',agentDefinition:null}
     const response=await claim(probe,['question-retry','checkpoint','skill-preflight','policy','publication','claim','skill-claim','benchmark-claim','token','settings'])
     assert.equal(response.status,200)
     const body=await response.json()
@@ -157,10 +157,10 @@ test('same-device retries retain their session while a different device starts a
   }
 })
 
-test('strict same-device continuation can use its original worktree without a usable snapshot',async()=>{
+test('strict legacy same-Agent continuation can use its original worktree without a usable snapshot',async()=>{
   for(const snapshot of ['missing','stale','unavailable'] as const) {
     const probe=fixture();probe.run.retryOf='lost-parent';probe.strictRecovery=true
-    probe.lost={deviceId:'device',sessionId:'original-session'}
+    probe.lost={deviceId:'device',sessionId:'original-session',agentId:'agent',agentDefinition:null}
     if(snapshot!=='missing')probe.checkpoint={...validCheckpoint(),...(snapshot==='stale' ? {takenAt:new Date(Date.now()-31*60_000).toISOString()} : {unavailableReason:'too_large' as const})}
     const response=await claim(probe,['question-retry','checkpoint','skill-preflight','policy','publication','claim','skill-claim','benchmark-claim','token','settings'])
     assert.equal(response.status,200)
@@ -172,10 +172,30 @@ test('strict same-device continuation can use its original worktree without a us
   }
 })
 
+test('frozen retry harnesses take precedence and an unrecorded different Agent cannot supply a native session',async()=>{
+  for(const source of [
+    {agentId:'agent',agentDefinition:{harness:'codex' as const},resumes:true},
+    {agentId:'agent',agentDefinition:{harness:'claude_code' as const},resumes:false},
+    {agentId:'other-agent',agentDefinition:{harness:'codex' as const},resumes:true},
+    {agentId:'other-agent',agentDefinition:null,resumes:false},
+    {agentId:'agent',agentDefinition:{},resumes:false},
+  ]) {
+    const probe=fixture();probe.run.retryOf='lost-parent';probe.checkpoint=validCheckpoint()
+    probe.lost={deviceId:'device',sessionId:'source-session',agentId:source.agentId,agentDefinition:source.agentDefinition}
+    const response=await claim(probe,['question-retry','checkpoint','skill-preflight','policy','publication','claim','skill-claim','benchmark-claim','token','settings'])
+    assert.equal(response.status,200)
+    const body=await response.json()
+    assert.equal(body.harness,'codex')
+    assert.equal(body.resumeSessionId,source.resumes ? 'source-session' : undefined,JSON.stringify(source))
+    assert.equal(body.continuesRunId,'lost-parent')
+    assert.deepEqual(body.resumeFrom,probe.checkpoint,'a different harness can continue from the worktree snapshot without reusing the native session')
+  }
+})
+
 test('a missing snapshot blocks cross-device recovery and legacy clients before issuing a lease or token',async()=>{
   for(const [sameDevice,strictRecovery] of [[false,true],[false,false],[true,false]]) {
     const probe=fixture();probe.run.retryOf='lost-parent';probe.strictRecovery=strictRecovery
-    probe.lost={deviceId:sameDevice ? 'device' : 'old-device',sessionId:'original-session'}
+    probe.lost={deviceId:sameDevice ? 'device' : 'old-device',sessionId:'original-session',agentId:'agent',agentDefinition:null}
     const response=await claim(probe,['question-retry','checkpoint','blocked-recovery'])
     assert.equal(response.status,409)
     assert.equal(probe.run.leaseExpiresAt,null)

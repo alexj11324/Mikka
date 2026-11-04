@@ -4,9 +4,11 @@ import { queueFactoryRun, type queueRun } from '@/lib/agent-runs'
 import { ensureDeviceRepository } from '@/lib/device-repositories'
 import { ActionFailureError } from '@/lib/action-error'
 import { queueFactoryTask } from './task-dispatch'
+import { continuedRunPolicyCeiling } from '@/lib/computer/run-model'
 
 export async function queueTaskRun(userId: string, input: Parameters<typeof queueRun>[1], botId: string | null = null,
   execution?: Parameters<typeof queueRun>[3], sourceEventId?: string, source: 'mcp' | null = null) {
+  input = { ...input, policyCeiling: await continuedRunPolicyCeiling(pool, userId, input.issueId, input.threadRunId, input.policyCeiling) }
   const { rows: [agent] } = await pool.query('SELECT "deviceId" FROM agents WHERE id=$1 AND "userId"=$2', [input.agentId, userId])
   if (!agent?.deviceId) throw new ActionFailureError('agentNoDevice')
   const repo = await ensureDeviceRepository(userId, agent.deviceId, input.repo)
@@ -15,10 +17,10 @@ export async function queueTaskRun(userId: string, input: Parameters<typeof queu
   return queueFactoryTask(pool, userId, {
     issueId: input.issueId, botId, agentId: input.agentId, deviceRepoId: repo.id, note: input.note,
     key: input.requestKey, sourceEventId, previousRunId: input.threadRunId,
-    selection: [input.model, input.apiKeyId, input.subscriptionBindingId, input.pinnedDeviceId, Boolean(input.readOnly), execution?.id, source],
+    selection: [input.model, input.apiKeyId, input.subscriptionBindingId, input.pinnedDeviceId, Boolean(input.readOnly), execution?.id, source, ...(input.modelDispatch ? [{ modelDispatch: input.modelDispatch }] : []), ...(input.policyCeiling ? [{ policyCeiling: input.policyCeiling }] : [])],
     queue: async (tx, owner, request, scopeBot, context) => {
       const result = await queueFactoryRun(tx, owner, request, scopeBot, context, undefined, { model: input.model, apiKeyId: input.apiKeyId,
-        subscriptionBindingId: input.subscriptionBindingId, pinnedDeviceId: input.pinnedDeviceId, readOnly: input.readOnly, execution })
+        subscriptionBindingId: input.subscriptionBindingId, modelDispatch: input.modelDispatch, policyCeiling: input.policyCeiling, pinnedDeviceId: input.pinnedDeviceId, readOnly: input.readOnly, execution })
       if (source) await tx.query('UPDATE agent_runs SET source=$2 WHERE id=$1', [result.runId, source])
       return result
     },

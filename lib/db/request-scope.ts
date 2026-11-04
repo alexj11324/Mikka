@@ -7,11 +7,13 @@ import { deviceScopedPool, readUnderAuthority } from './device-scope'
 import { sampleClient } from './egress-sample'
 import { samplePoolTransport } from './transport-sample'
 import { manageDatabasePool } from './pool-lifecycle'
+import { observePoolCommits } from './commit-effects'
 
 const defaultConnectionString = mikkaDatabaseURL(process.env)
 
 function createPool(connectionString = defaultConnectionString, scope: 'default' | 'request' = 'default') {
   const pool = manageDatabasePool(new Pool({ connectionString, max: 5, connectionTimeoutMillis: 10000, idleTimeoutMillis: 20000 }))
+  observePoolCommits(pool)
   pool.on('connect', client => sampleClient(client))
   samplePoolTransport(pool, scope)
   return pool
@@ -23,6 +25,7 @@ function createDatabase(client: Pool) {
 
 const globalDb = globalThis as unknown as { mikkaPool?: Pool }
 const defaultPool = process.env.VERCEL_ENV === 'preview' ? createPool() : globalDb.mikkaPool ?? createPool()
+observePoolCommits(defaultPool)
 if (process.env.NODE_ENV !== 'production' && process.env.VERCEL_ENV !== 'preview') globalDb.mikkaPool = defaultPool
 const defaultDatabase = createDatabase(defaultPool)
 const requestDatabase = new AsyncLocalStorage<{ pool: Pool; db: typeof defaultDatabase }>()
@@ -65,6 +68,11 @@ export function withDatabaseTransaction<T>(transaction: Transaction, callback: (
 /** Reuse an already-open SQL transaction without acquiring another pool connection. */
 export function withDatabaseClient<T>(client: PoolClient, callback: () => T): T {
   return heldClient.run(client, () => transactionDatabase.run(drizzle(client, { schema }), callback))
+}
+
+/** After-commit work must not retain a client that its owner has returned to the pool. */
+export function withoutDatabaseClient<T>(callback: () => T): T {
+  return heldClient.exit(() => transactionDatabase.exit(callback))
 }
 
 /** A single read whose statement checks the daemon's credential itself (device-scope.ts `readUnderAuthority`). */

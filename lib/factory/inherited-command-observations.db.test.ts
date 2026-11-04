@@ -199,6 +199,15 @@ test('isolated PG: direct question recovery exposes historical native observatio
     assert.ok(await readDeliverableSnapshotReceipt(pool, result.task, candidate.id))
     assert.equal((await pool.query('SELECT count(*)::int AS n FROM factory_attempts WHERE "taskId"=$1 AND stage=\'execute\' AND output->>\'requestEpoch\' IS NULL', [f.task.id])).rows[0].n, 3, 'legacy attempts really have no epoch field; the host recovery receipt is the explicit proof')
 
+    await t.test('an independent check may use the receipt-bound predecessor as the same execution, with frozen source provenance', async () => {
+      const { rows: [attempt] } = await pool.query('SELECT output,"runId" FROM factory_attempts WHERE id=$1', [result.task.attemptId]);
+      const { rows: [review] } = await pool.query('SELECT prompt FROM agent_runs WHERE id=$1', [attempt.runId]);
+      assert.match(review.prompt, /earlier segment of this same execution/);
+      assert.doesNotMatch(review.prompt, /cannot satisfy a requirement for fresh execution/);
+      assert.deepEqual(attempt.output.check.questionCommandSources.map((source: { runId: string; outputChunkId: string }) =>
+        [source.runId, source.outputChunkId]), [[f.historyRunId, f.outputId]]);
+    });
+
     await t.test('a real migrated legacy graph exposes only the direct inherited pair with explicit failed-source attribution', async () => {
       const before = await history(), observed = await read()
       assert.deepEqual(observed.records, [], '390 has no new persisted command; inherited observations never fill that array')
@@ -266,6 +275,20 @@ test('isolated PG: direct question recovery exposes historical native observatio
         const before = (await tx.query('SELECT to_jsonb(t) AS row FROM factory_tasks t WHERE id=$1', [f.task.id])).rows
         assert.deepEqual((await read(tx)).inheritedRecords, [])
         assert.deepEqual((await tx.query('SELECT to_jsonb(t) AS row FROM factory_tasks t WHERE id=$1', [f.task.id])).rows, before, 'the refusal is read-only before rollback')
+      } finally { await tx.query('ROLLBACK'); tx.release() }
+    })
+
+    for (const malformed of ['missing output', 'duplicate output']) await t.test(malformed + ' makes the whole predecessor command collection incomplete', async () => {
+      const tx = await pool.connect()
+      await tx.query('BEGIN')
+      try {
+        const id = malformed === 'missing output' ? f.inputId : f.outputId
+        await tx.query(`INSERT INTO run_chunks(id,"runId",seq,chunk,"createdAt")
+          SELECT $2,"runId",1000,CASE WHEN $3 THEN jsonb_set(chunk,'{toolCallId}','"unfinished-command"') ELSE chunk END,"createdAt"
+          FROM run_chunks WHERE id=$1`, [id, randomUUID(), malformed === 'missing output'])
+        const observed = await read(tx)
+        assert.deepEqual(observed.inheritedRecords, [])
+        assert.equal(observed.inheritedRecordsOmitted, true, 'a remaining complete command cannot disguise an incomplete set')
       } finally { await tx.query('ROLLBACK'); tx.release() }
     })
 

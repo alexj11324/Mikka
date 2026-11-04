@@ -2,8 +2,9 @@ import { createHash } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
 import type { JSONContent } from '@tiptap/core'
 import { z } from 'zod'
-import { approvalModeSchema, intersectNetworkDomains, CONFIGURABLE_ACTIONS, networkAllowSchema, storedPermissionsSchema, type ConfigurableAction, type PermissionDecision } from '@mikka/protocol/agent-policy'
+import { applyApprovalMode, approvalModeSchema, intersectNetworkDomains, CONFIGURABLE_ACTIONS, networkAllowSchema, runPolicySchema, storedPermissionsSchema, type ConfigurableAction, type PermissionDecision, type RunPolicy } from '@mikka/protocol/agent-policy'
 import { resolveTrustedRunPolicy } from './policy-snapshot'
+import { intersectRunPolicy } from '../run-assignment-policy'
 import type { MailboxTransactionLease, MailboxTransactionGuard } from '@/lib/mailbox-transaction-guard'
 import { writeTransaction } from '@/lib/operations/write-transaction'
 import { readIssueMetadata } from '@/lib/issue-metadata'
@@ -171,12 +172,43 @@ export async function lockCliAgentPolicy(tx: PoolClient, userId: string, agentId
 
 /** Resolve a run's exact owner, Bot and worker; then use the same policy layer. */
 export async function lockCliRunPolicy(tx: PoolClient, runId: string, userId: string) {
-  const result = await tx.query<{ botId: string | null; agentId: string; issueId: string | null }>('SELECT "botId","agentId","issueId" FROM agent_runs WHERE id=$1 AND "userId"=$2', [runId,userId])
+  const result = await tx.query<{ botId: string | null; agentId: string; issueId: string | null; policyCeiling: unknown }>('SELECT "botId","agentId","issueId","agentDefinition"->\'policyCeiling\' AS "policyCeiling" FROM agent_runs WHERE id=$1 AND "userId"=$2', [runId,userId])
   const run = result.rows[0]
   if (!run) throw new Error('agentPolicyUnavailable')
   const task = run.issueId ? await lockCliTaskScope(tx,userId,run.issueId) : undefined
   if (task) { const hierarchy = await lockCliHierarchy(tx,userId,runId,task); if (hierarchy) task.hierarchy = hierarchy }
-  return lockCliAgentPolicy(tx,userId,run.agentId,run.botId,task)
+  const current = await lockCliAgentPolicy(tx,userId,run.agentId,run.botId,task)
+  if (run.policyCeiling == null) return current
+  const ceiling = runPolicySchema.safeParse(run.policyCeiling)
+  if (!ceiling.success) throw new Error('agentPolicyUnavailable')
+  return { ...current, policy: intersectRunPolicy(current.policy, ceiling.data),
+    revision: createHash('sha256').update(JSON.stringify(['provider-policy-ceiling-v1', current.revision, ceiling.data])).digest('hex') }
+}
+
+/** Capture the source's effective policy while the caller holds policy locks
+ * before Factory/issue/run locks. New credentials and harnesses do not inherit
+ * a broader worker default, including after later target settings edits. */
+export async function providerContinuationPolicy(tx: PoolClient, userId: string, sourceRunId: string): Promise<RunPolicy> {
+  const { rows: [source] } = await tx.query<{ readOnly: boolean | null; computerUse: PermissionDecision | null }>(`SELECT "agentDefinition"->>'readOnly'='true' AS "readOnly",
+    "agentDefinition"#>>'{policyCeiling,permissions,computer_use}' AS "computerUse"
+    FROM agent_runs WHERE id=$1 AND "userId"=$2`, [sourceRunId, userId])
+  if (!source) throw new Error('agentPolicyUnavailable')
+  const current = await lockCliRunPolicy(tx, sourceRunId, userId)
+  let policy = structuredClone(current.policy)
+  // The generic CLI default is not an independent computer grant. The broker
+  // reauthorizes it, but an existing host ceiling (especially deny) survives.
+  if (source.computerUse) policy.permissions.computer_use = source.computerUse
+  else delete policy.permissions.computer_use
+  if (source.readOnly || policy.readOnly) policy = applyApprovalMode(policy, 'read_only')
+  const { rows: assignments } = await tx.query<{ stage: string; policy: unknown }>(`SELECT a.stage,a.output->'check'->'policy' AS policy
+    FROM factory_attempts a JOIN factory_tasks t ON t.id=a."taskId" AND t."attemptId"=a.id
+    JOIN agent_runs r ON r.id=a."runId" AND r."issueId"=t."issueId" AND r."userId"=t."userId"
+    WHERE r.id=$1 AND r."userId"=$2 AND a.stage IN ('review','verify','monitor')`, [sourceRunId, userId])
+  for (const assignment of assignments) {
+    if (assignment.stage !== 'monitor') policy = intersectRunPolicy(policy, runPolicySchema.parse(assignment.policy))
+    policy = applyApprovalMode(policy, 'read_only')
+  }
+  return policy
 }
 
 async function policyMemberships(current: Awaited<ReturnType<typeof lockCliAgentPolicy>>, userId: string, signal: AbortSignal, membership: CliMembershipGuard): Promise<MailboxTransactionLease> {

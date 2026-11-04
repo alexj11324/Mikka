@@ -1,7 +1,10 @@
 import { bearerMatches, deviceGatewayTicketValid } from '../../../lib/device-gateway-ticket'
+import type { LiveInvalidation } from '../../../lib/live/events'
+import { handleLiveRequest } from './live-route'
 
 export interface DeviceSessionStub {
   notify(): Promise<void>
+  notifyLive(events: LiveInvalidation[]): Promise<void>
   status(): Promise<{ online: boolean; lastSeenAt: string | null }>
   fetch(request: Request): Promise<Response>
 }
@@ -20,6 +23,7 @@ const DEVICE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
  */
 export async function handleRequest(request: Request, env: GatewayEnv): Promise<Response> {
   const url = new URL(request.url)
+  if (url.pathname.startsWith('/v1/live/')) return handleLiveRequest(request, env)
   const match = url.pathname.match(/^\/v1\/devices\/([^/]+)\/(socket|push|status)$/)
   if (!match) return new Response(null, { status: 404 })
   const deviceId = decodeURIComponent(match[1] ?? '')
