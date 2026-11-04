@@ -19,7 +19,7 @@ import { factoryCheckGates, producerCommandObservations } from './checks'
 import { factoryCheckIndependent } from './check-independence'
 import { sweepFactoryWatchdog } from './watchdog'
 import { factoryEventId } from './event-id'
-import { retainedDeliverableForRecovery, type ObserveRetainedDeliverable, type RetainedDeliverableScope, type RetainedDeliverableSnapshot } from './deliverable-recovery'
+import { type ObserveRetainedDeliverable, type RetainedDeliverableScope, type RetainedDeliverableSnapshot } from './deliverable-recovery'
 import { readDeliverableSnapshotReceipt } from './deliverable-snapshot'
 
 const url = process.env.E2E_DATABASE_URL
@@ -64,7 +64,7 @@ test('isolated PG: direct question recovery exposes historical native observatio
       const bindingId = randomUUID(), connectionId = randomUUID(), alternateBindingId = randomUUID()
       // A person's connection custody workspace can differ from the execution
       // workspace; both actual native claims must pin the same execution binding.
-      await pool.query(`INSERT INTO byos_connections(id,"ownerId","workspaceId",provider,state,epoch) VALUES($1,'owner',$2,'codex','connected',2)`, [connectionId, randomUUID()])
+      await pool.query(`INSERT INTO byos_connections(id,"ownerId","workspaceId",provider,state,epoch,"credentialVersion","secretName","secretDigest","providerSubject") VALUES($1,'owner',$2,'codex','connected',2,1,$3,$4,'synthetic-subject')`, [connectionId, randomUUID(), `synthetic-credential-name-${connectionId}`, 'a'.repeat(64)])
       for (const id of [bindingId, alternateBindingId]) await pool.query(`INSERT INTO byos_bindings(id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId") VALUES($1,'owner',$2,$3,$4,2,'codex_cli','gpt-5.6-luna')`, [id, workspaceId, agentId, connectionId])
       const store = createFactoryStore(pool, authorize, botId, { independent: factoryCheckIndependent, gates: factoryCheckGates })
       const queue: FactoryQueue = async (tx, userId, input, runtimeBot) => {
