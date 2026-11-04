@@ -49,7 +49,7 @@ export async function intakeRequest(
 export const stopInput = z
   .object({
     binding: bindingSchema,
-    eventId: z.uuid(),
+    eventId: z.uuid().describe("A new UUID for this cancel or revoke request. Do not use the task route eventId or an ID from a different action. Reuse this UUID only when retrying this exact request with the same binding, action, and reason."),
     action: z.enum(["cancel", "revoke"]),
     reason: z.string().trim().min(1).max(4000),
   })
