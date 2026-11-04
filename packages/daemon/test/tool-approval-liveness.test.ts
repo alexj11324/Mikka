@@ -2,7 +2,7 @@
 // gate against a scripted tool-approval route, driving a fake Claude Code run.
 // The server half (a changed policy revision answers live:false) runs against
 // real Postgres in lib/agent-tool-approval/http.db.test.mts.
-import { chmodSync } from "node:fs"
+import { chmodSync, existsSync, readFileSync } from "node:fs"
 import { join, resolve } from "node:path"
 
 import { resolveAgentSettings } from "@mikka/protocol/agent-policy"
@@ -26,8 +26,8 @@ afterEach(async () => {
 })
 
 /** `answer` is the tool-approval route's reply to each check. */
-async function boot(answer: (body: { policyRevision: string }) => Response | Promise<Response>) {
-  const server = new MemoryServer(DEVICE)
+async function boot(answer: (body: { policyRevision: string }) => Response | Promise<Response>, prompt = "HANG") {
+  const server = new MemoryServer(DEVICE, { leaseMs: 90_000 })
   server.addRepo(DEVICE, { repoId: "repo", name: "sandbox", path: await makeRepo() })
   const checks: string[] = []
   const http = new HttpServerLink("http://server.test", (async (url: URL | string, init?: RequestInit) => {
@@ -47,7 +47,7 @@ async function boot(answer: (body: { policyRevision: string }) => Response | Pro
   }).start()
   daemons.push(daemon)
   await daemon.syncWithServer()
-  const runId = server.queueRun(DEVICE, { issueId: "issue-1", repoId: "repo", baseBranch: "main", harness: "claude_code", prompt: "HANG", policy: resolveAgentSettings({}).policy })
+  const runId = server.queueRun(DEVICE, { issueId: "issue-1", repoId: "repo", baseBranch: "main", harness: "claude_code", prompt, policy: resolveAgentSettings({}).policy })
   await daemon.syncWithServer()
   await waitFor(() => daemon.supervisor.get(runId).state === "running")
   return { daemon, runId, checks }
@@ -124,6 +124,59 @@ it("ends a running run when the server says its policy revision is no longer liv
   expect(daemon.supervisor.get(runId).error).toMatch(/SIGTERM/)
   expect(checks.every(revision => revision === REVISION)).toBe(true)
 }, 20_000)
+
+it("records host lease revocation before Claude exits 143, even before the heartbeat learns it", async () => {
+  const exited = join(tempDir(), 'sigterm-exit')
+  let revoked = false
+  const { daemon, runId } = await boot(() => json(revoked
+    ? { live: false, revokeReason: 'device_lost' }
+    : { live: true, paused: false }), `HANG SIGTERM_EXIT_143:${exited}`)
+  await waitFor(() => existsSync(`${exited}.ready`))
+  revoked = true
+  await daemon.supervisor.idle()
+  expect(readFileSync(exited, 'utf8')).toBe('143\n')
+  expect(daemon.supervisor.get(runId)).toMatchObject({ state: 'failed', stopReason: 'device_lost' })
+}, 20_000)
+
+it("keeps an unclassified SIGTERM 143 as error instead of inventing lease revocation", async () => {
+  const exited = join(tempDir(), 'sigterm-exit')
+  let live = true
+  const { daemon, runId } = await boot(() => json({ live, paused: false }), `HANG SIGTERM_EXIT_143:${exited}`)
+  await waitFor(() => existsSync(`${exited}.ready`))
+  live = false
+  await daemon.supervisor.idle()
+  expect(readFileSync(exited, 'utf8')).toBe('143\n')
+  expect(daemon.supervisor.get(runId)).toMatchObject({ state: 'failed', stopReason: 'error' })
+}, 20_000)
+
+it("a pending host response cannot replace the person's earlier cancellation", async () => {
+  const pending = deferred<Response>()
+  let wait = false, requested = false
+  const { daemon, runId } = await boot(() => {
+    if (!wait) return json({ live: true, paused: false })
+    requested = true
+    return pending.promise
+  })
+  wait = true
+  await waitFor(() => requested)
+  const cancelled = daemon.supervisor.cancel(runId)
+  pending.resolve(json({ live: false, revokeReason: 'device_lost' }))
+  await cancelled
+  expect(daemon.supervisor.get(runId)).toMatchObject({ state: 'cancelled', stopReason: 'cancelled' })
+}, 20_000)
+
+it("a gate keeps its first host cause through synchronous abort callbacks", () => {
+  const gate = new ToolApprovalGate('run-cause', { isLive: () => true })
+  const abort = new AbortController()
+  abort.signal.addEventListener('abort', () => gate.revoke())
+  gate.onRevoke(() => abort.abort())
+  gate.revoke('device_lost')
+  expect(gate.revokeReason).toBe('device_lost')
+  const cancelled = new ToolApprovalGate('run-cancelled', { isLive: () => true })
+  cancelled.revoke()
+  cancelled.revoke('device_lost')
+  expect(cancelled.revokeReason).toBeUndefined()
+})
 
 it("keeps a running run through a slow cold start of the liveness route", async () => {
   let slow = false, failed = 0

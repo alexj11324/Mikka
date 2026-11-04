@@ -4,17 +4,50 @@ import { writeTransaction } from '@/lib/operations/write-transaction'
 
 /** No caller identity, policy, decision, or scope comes from the CLI. */
 export type DeviceActor = { userId: string; deviceId: string }
-export class ApprovalUnavailable extends Error { constructor() { super('approvalUnavailable') } }
+export class ApprovalUnavailable extends Error { constructor(readonly revokeReason?: 'device_lost') { super('approvalUnavailable') } }
 
 export class AgentToolApprovalStore {
   constructor(private readonly pool: Pick<Pool, 'connect' | 'query'>, private readonly membership: CliMembershipGuard = realCliMembershipGuard) {}
   /** Locks the run before every state mutation so stop, lease and ownership are checked. */
-  private async transaction<T>(runId: string, userId: string, work: (client: PoolClient) => Promise<T>, allowPaused = false): Promise<T> {
-    return writeTransaction(this.pool, async client => {
+  private async transaction<T>(runId: string, userId: string, work: (client: PoolClient) => Promise<T>, allowPaused = false, deviceId?: string): Promise<T> {
+    const result = await writeTransaction<{ unavailable: ApprovalUnavailable } | { value: T }>(this.pool, async client => {
       const run = await client.query(`SELECT id FROM agent_runs WHERE id=$1 AND "userId"=$2 AND status=ANY($3::text[]) AND "stopRequestedAt" IS NULL AND "leaseExpiresAt">now() FOR UPDATE`, [runId, userId, ['preparing','running','waiting_input', ...(allowPaused ? ['paused'] : [])]])
-      if (!run.rowCount) throw new ApprovalUnavailable()
-      return work(client)
+      if (!run.rowCount) {
+        const reason = deviceId ? await this.revocationReason(client, runId, userId, deviceId) : undefined
+        if (!reason) throw new ApprovalUnavailable()
+        // A typed refusal still passes the existing policy/member guard before
+        // it leaves the transaction. Throwing here would skip that guard.
+        return { unavailable: new ApprovalUnavailable(reason) }
+      }
+      return { value: await work(client) }
     }, { guard: cliPolicyGuard(runId,userId,this.membership) })
+    if ('unavailable' in result) throw result.unavailable
+    return result.value
+  }
+  /** Classification only: this never makes an unavailable run live. */
+  private async revocationReason(client: PoolClient, runId: string, userId: string, deviceId: string): Promise<'device_lost' | undefined> {
+    // Lock the exact owned device/run before reading host records, including
+    // after a lock wait. transaction() then checks the policy/member fence.
+    const { rows: [run] } = await client.query(`SELECT "stopRequestedAt", "leaseExpiresAt"<=now() AS expired
+      FROM agent_runs WHERE id=$1 AND "userId"=$2 AND "deviceId"=$3
+        AND status=ANY($4::text[]) FOR UPDATE`, [runId,userId,deviceId,['preparing','running','waiting_input','paused']])
+    if (!run) return
+    if (!run.stopRequestedAt) return run.expired ? 'device_lost' : undefined
+    // A stop flag alone also covers the person's Stop. Only the current
+    // epoch's host watchdog receipt proves this server-initiated revocation.
+    const proof = await client.query(`SELECT 1 FROM factory_attempts a
+      JOIN factory_tasks t ON t.id=a."taskId" AND t."userId"=$2
+      JOIN factory_events e ON e."taskId"=t.id
+      WHERE a."runId"=$1 AND t.status NOT IN ('cancelled','revoked')
+        AND a.output->>'requestEpoch'=t."sourceEventId"::text
+        AND a.output#>>'{watchdog,requestEpoch}'=t."sourceEventId"::text
+        AND a.output#>>'{watchdog,reasonCode}'='task_stalled'
+        AND e.request->>'kind'='task_watchdog'
+        AND e.request->>'attemptId'=a.id::text
+        AND e.request->>'requestEpoch'=t."sourceEventId"::text
+        AND e.result->>'action'='stalled' AND e.result->>'blocked'='true'
+      LIMIT 1`, [runId,userId])
+    return proof.rowCount ? 'device_lost' : undefined
   }
   /** Authenticated distribution only; snapshots never replace live tool authorization. */
   async policyDistribution(actor: DeviceActor, runId: string, revision?: string) {
@@ -44,6 +77,6 @@ export class AgentToolApprovalStore {
         : current
       if (!row.rowCount) throw new ApprovalUnavailable()
       return { live: (await lockCliRunPolicy(client, runId, actor.userId)).revision === revision, paused: row.rows[0].status === 'paused' }
-    }, true)
+    }, true, actor.deviceId)
   }
 }

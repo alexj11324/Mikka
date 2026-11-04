@@ -208,10 +208,10 @@ export class HttpServerLink implements ServerLink {
               if (!context) return false
               verifyPolicySnapshot(assignment.policySnapshot,context,{runId:assignment.runId,deviceId:assignment.deviceId,revision:policyRevision,policy:assignment.policy})
             }
-            let current: { live: boolean; paused?: boolean }
+            let current: { live: boolean; paused?: boolean; revokeReason?: 'device_lost' }
             try {
               phase = 'server_check'
-              current = await this.call('POST', path, { body: { operation: 'check', deviceId: assignment.deviceId, policyRevision }, schema: z.object({ live: z.boolean(), paused: z.boolean().optional() }), signal:liveness.signal, timeoutMs:5000 })
+              current = await this.call('POST', path, { body: { operation: 'check', deviceId: assignment.deviceId, policyRevision }, schema: z.object({ live: z.boolean(), paused: z.boolean().optional(), revokeReason: z.literal('device_lost').optional() }), signal:liveness.signal, timeoutMs:5000 })
             } catch (error) {
               // A timeout, network failure, 5xx or 429 (a cold deployment) is no
               // answer about the run. Ask again for a bounded time; nothing passes
@@ -226,6 +226,7 @@ export class HttpServerLink implements ServerLink {
             phase = 'local_authority'
             check()
             if (!current.live) refusal('server_check', 'run_not_live')
+            if (!current.live && current.revokeReason) gate.revoke(current.revokeReason)
             if (!current.live || !current.paused) return current.live
             await pause()
           }

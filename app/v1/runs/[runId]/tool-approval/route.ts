@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic'
 const payload = z.object({ operation: z.literal('check'), deviceId: z.uuid(), policyRevision: z.string().regex(/^[a-f0-9]{64}$/) }).strict()
 
 /** Why a check answered as it did. Never the revisions, policy, token or body. */
-type Reason = 'ok' | 'paused' | 'policy_revision_mismatch' | 'run_unavailable' | 'policy_changed' | 'policy_unavailable' | 'invalid_request' | 'unauthorized' | 'authority_unavailable' | 'database_unavailable' | 'error'
+type Reason = 'ok' | 'paused' | 'policy_revision_mismatch' | 'run_unavailable' | 'lease_revoked' | 'policy_changed' | 'policy_unavailable' | 'invalid_request' | 'unauthorized' | 'authority_unavailable' | 'database_unavailable' | 'error'
 type Note = { reason?: Reason; live?: boolean; databaseCode?: string }
 const DATABASE_CODES = new Set(['40001', '40P01', '55P03', '57014', '08001', '08006', '53300', '57P01'])
 /** Bounded SQL-state diagnosis only: never error text, stack or a getter. */
@@ -40,6 +40,11 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ runI
     note.reason = !state.live ? 'policy_revision_mismatch' : state.paused ? 'paused' : 'ok'
     return Response.json(state)
   } catch (error) {
+    if (error instanceof ApprovalUnavailable && error.revokeReason === 'device_lost') {
+      note.live = false
+      note.reason = 'lease_revoked'
+      return Response.json({ live: false, revokeReason: error.revokeReason })
+    }
     // Preserve the device wrapper's immediate 401 for revocation and its
     // retryable 503 for an unavailable fence. Neither grants liveness.
     if (isDeviceAuthorityError(error)) {

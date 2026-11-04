@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
 import { Pool, type PoolClient } from 'pg'
-import { AgentToolApprovalStore } from './store'
+import { AgentToolApprovalStore, ApprovalUnavailable } from './store'
 import { readCliRunPolicy, readCliAgentPolicy } from './policy-store'
 import { acquireWorkspaceMembership } from '../workspace-membership-guard'
 import { setCliPolicy } from './policy-settings'
@@ -19,6 +19,9 @@ let initialRevision = ''
 before(async () => {
   await pool.query(`CREATE TABLE agent_runs (id uuid PRIMARY KEY, "userId" text NOT NULL, "deviceId" uuid NOT NULL, status text NOT NULL, "stopRequestedAt" timestamptz, "leaseExpiresAt" timestamptz, "agentId" uuid NOT NULL, "agentDefinition" jsonb, "botId" uuid)`)
   await pool.query(`ALTER TABLE agent_runs ADD COLUMN "issueId" uuid`)
+  await pool.query(`CREATE TABLE factory_tasks (id uuid PRIMARY KEY,"userId" text NOT NULL,"sourceEventId" uuid NOT NULL,status text NOT NULL);
+    CREATE TABLE factory_attempts (id uuid PRIMARY KEY,"taskId" uuid NOT NULL,"runId" uuid NOT NULL,output jsonb NOT NULL);
+    CREATE TABLE factory_events (id uuid PRIMARY KEY,"taskId" uuid NOT NULL,request jsonb NOT NULL,result jsonb NOT NULL)`)
   await pool.query(`CREATE TABLE agents (id uuid PRIMARY KEY, "userId" text NOT NULL, harness text NOT NULL, "deviceId" uuid); CREATE TABLE devices (id uuid PRIMARY KEY, "ownerId" text NOT NULL, enabled boolean NOT NULL, kind text NOT NULL DEFAULT 'local'); CREATE TABLE bots (id uuid PRIMARY KEY, "workspaceId" uuid, "ownerId" text NOT NULL); CREATE TABLE mikka_workspace_members ("workspaceId" uuid, "userId" text, status text, role text, PRIMARY KEY ("workspaceId", "userId")); CREATE TABLE agent_kit_heads (owner_id text, bot_key text, bot_id uuid, workspace_id uuid, PRIMARY KEY (owner_id, bot_key)); CREATE TABLE workspace_computer_policies ("workspaceId" uuid PRIMARY KEY, permission text NOT NULL DEFAULT 'ask')` )
   await pool.query(await readFile('drizzle/20261029011700_agent_tool_approvals.sql', 'utf8'))
   await pool.query(await readFile('drizzle/20261029011701_cli_run_policy.sql', 'utf8'))
@@ -38,7 +41,49 @@ test('checkState rejects another device', async () => {
 
 test('a stopped run is never live', async () => {
   await pool.query('UPDATE agent_runs SET "stopRequestedAt"=now() WHERE id=$1', [runId])
-  await assert.rejects(store.checkState(actor, runId, initialRevision))
+  await assert.rejects(store.checkState(actor, runId, initialRevision), error => error instanceof ApprovalUnavailable && error.revokeReason === undefined)
+})
+
+async function watchdogFixture(receipt = true) {
+  const stoppedRun = randomUUID(), taskId = randomUUID(), attemptId = randomUUID(), epoch = randomUUID()
+  await pool.query(`INSERT INTO agent_runs (id,"userId","deviceId",status,"stopRequestedAt","leaseExpiresAt","agentId")
+    SELECT $1,"userId","deviceId",'running',now(),now()+interval '5 minutes',"agentId" FROM agent_runs WHERE id=$2`, [stoppedRun,runId])
+  const revision = (await readCliRunPolicy(pool,stoppedRun,actor.userId)).revision
+  await pool.query(`INSERT INTO factory_tasks VALUES($1,$2,$3,'blocked')`, [taskId,actor.userId,epoch])
+  await pool.query('INSERT INTO factory_attempts VALUES($1,$2,$3,$4)', [attemptId,taskId,stoppedRun,{
+    requestEpoch:epoch, watchdog:{reasonCode:'task_stalled',requestEpoch:epoch,stoppedAt:new Date().toISOString()},
+  }])
+  if (receipt) await pool.query('INSERT INTO factory_events VALUES($1,$2,$3,$4)', [randomUUID(),taskId,
+    {kind:'task_watchdog',attemptId,requestEpoch:epoch},{action:'stalled',blocked:true}])
+  return { runId:stoppedRun,taskId,epoch,check:() => store.checkState(actor,stoppedRun,revision),revision }
+}
+
+test('only the current epoch host watchdog receipt classifies a stopped run as lease-revoked', async () => {
+  const current = await watchdogFixture()
+  await assert.rejects(current.check(), error => error instanceof ApprovalUnavailable && error.revokeReason === 'device_lost')
+  await pool.query('UPDATE factory_tasks SET "sourceEventId"=$2 WHERE id=$1', [current.taskId,randomUUID()])
+  await assert.rejects(current.check(), error => error instanceof ApprovalUnavailable && error.revokeReason === undefined)
+  const noReceipt = await watchdogFixture(false)
+  await assert.rejects(noReceipt.check(), error => error instanceof ApprovalUnavailable && error.revokeReason === undefined)
+})
+
+test('watchdog cause does not escape owner, device or cancelled-task boundaries', async () => {
+  const current = await watchdogFixture()
+  for (const foreign of [{...actor,deviceId:randomUUID()},{...actor,userId:'another-owner'}]) {
+    await assert.rejects(store.checkState(foreign,current.runId,current.revision), error => !(error instanceof ApprovalUnavailable) || error.revokeReason === undefined)
+  }
+  await pool.query(`UPDATE factory_tasks SET status='cancelled' WHERE id=$1`, [current.taskId])
+  await assert.rejects(current.check(), error => error instanceof ApprovalUnavailable && error.revokeReason === undefined)
+})
+
+test('an actually expired lease carries its cause, while a manual stop and terminal run do not', async () => {
+  const current = await watchdogFixture(false)
+  await pool.query(`UPDATE agent_runs SET "stopRequestedAt"=NULL,"leaseExpiresAt"=now()-interval '1 second' WHERE id=$1`, [current.runId])
+  await assert.rejects(current.check(), error => error instanceof ApprovalUnavailable && error.revokeReason === 'device_lost')
+  await pool.query('UPDATE agent_runs SET "stopRequestedAt"=now() WHERE id=$1', [current.runId])
+  await assert.rejects(current.check(), error => error instanceof ApprovalUnavailable && error.revokeReason === undefined)
+  await pool.query(`UPDATE agent_runs SET "stopRequestedAt"=NULL,status='failed' WHERE id=$1`, [current.runId])
+  await assert.rejects(current.check(), error => error instanceof ApprovalUnavailable && error.revokeReason === undefined)
 })
 
 test('a changed worker policy ends the live check for the old revision', async () => {
@@ -80,7 +125,8 @@ test('workspace may narrow agent policy, rejects forged generations, and invalid
   await assert.rejects(setCliPolicy(pool,actor.userId,scopedRun,'workspace',recreated.revision,{},guard))
   const scopedStore = new AgentToolApprovalStore(pool, guard)
   await pool.query(`UPDATE mikka_workspace_members SET status='removed' WHERE "workspaceId"=$1 AND "userId"=$2`, [wid,actor.userId])
-  await assert.rejects(scopedStore.checkState(actor,scopedRun,recreated.revision))
+  await pool.query(`UPDATE agent_runs SET "leaseExpiresAt"=now()-interval '1 second' WHERE id=$1`, [scopedRun])
+  await assert.rejects(scopedStore.checkState(actor,scopedRun,recreated.revision), error => !(error instanceof ApprovalUnavailable) || error.revokeReason === undefined)
 })
 
 test('legacy local runs materialize stable sandbox defaults without changing explicit choices', async () => {
