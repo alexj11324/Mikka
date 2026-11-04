@@ -25,6 +25,7 @@ import { useShortcutLabel } from '@/components/shortcut-keys'
 import { usePresence } from '@/lib/use-presence'
 import { useViewState } from '@/lib/hooks/view-state'
 import { ResizablePane } from '@/components/ui/resizable-pane'
+import { ProjectMap } from './project-map'
 
 export function ProjectDetail({ project, projects, issues, userName, onBack, onOpenIssue, onCreateIssue, onUpdated }: { project: Project; projects: Project[]; issues: Awaited<ReturnType<typeof listIssues>>; userName: string; onBack: () => void; onOpenTeam: () => void; onOpenIssue: (id: string) => boolean; onCreateIssue: () => void; onUpdated: () => void }) {
   const i18nText = useTranslations();
@@ -60,8 +61,8 @@ export function ProjectDetail({ project, projects, issues, userName, onBack, onO
   return <div className="flex min-w-0 flex-1 flex-col">
     <div className="flex items-center justify-between gap-2 px-4 py-2"><div className="flex min-w-0 items-center gap-2"><Button variant="ghost" size="icon-sm" aria-label={i18nText("Projects.detail.backToList")} onClick={() => { void afterSave(onBack) }}><ArrowLeft data-icon="inline-start" /></Button><Box className={cn('size-4 shrink-0', PROJECT_ICON_TINTS[project.properties.color])} /><span className="truncate text-sm">{project.name}</span></div><Button variant="ghost" size="sm" onClick={() => { void afterSave(() => setEditing(true)) }}><Pencil data-icon="inline-start" />{i18nText("Projects.form.editTitle")}</Button></div>
     <Tabs value={tab} onValueChange={value => { void afterSave(() => setTab(String(value))) }} className="min-w-0 flex-1 gap-0">
-      <div className="flex items-center justify-between gap-3 px-4 py-3"><TabsList><TabsTrigger value="overview">{i18nText("Projects.detail.overview")}</TabsTrigger><TabsTrigger value="activity">{i18nText("Projects.detail.activity")}</TabsTrigger><TabsTrigger value="issues">{i18nText("Projects.detail.issues")}<Badge variant="secondary">{linked.length}</Badge></TabsTrigger></TabsList><Button variant="ghost" size="icon-sm" aria-label={i18nText("Projects.detail.toggleDetails")} aria-pressed={showDetails} title={detailsShortcut} onClick={() => setShowDetails(value => !value)}><PanelRight data-icon="inline-start" /></Button></div>
-      <div className="flex min-w-0 flex-1 flex-col lg:flex-row">
+      <div className="flex items-center justify-between gap-3 px-4 py-3"><TabsList><TabsTrigger value="overview">{i18nText("Projects.detail.overview")}</TabsTrigger><TabsTrigger value="map">{i18nText("Projects.detail.map")}</TabsTrigger><TabsTrigger value="activity">{i18nText("Projects.detail.activity")}</TabsTrigger><TabsTrigger value="issues">{i18nText("Projects.detail.issues")}<Badge variant="secondary">{linked.length}</Badge></TabsTrigger></TabsList>{tab !== 'map' && <Button variant="ghost" size="icon-sm" aria-label={i18nText("Projects.detail.toggleDetails")} aria-pressed={showDetails} title={detailsShortcut} onClick={() => setShowDetails(value => !value)}><PanelRight data-icon="inline-start" /></Button>}</div>
+      {tab === 'map' ? <TabsContent value="map" className="flex min-h-[34rem] min-w-0 flex-1 flex-col"><ProjectMap project={project} onOpenIssue={onOpenIssue} onCreateIssue={onCreateIssue} /></TabsContent> : <div className="flex min-w-0 flex-1 flex-col lg:flex-row">
         <div className="min-w-0 flex-1">
           <TabsContent value="overview" className="mx-auto flex w-full max-w-4xl flex-col gap-8 px-6 py-8 sm:px-12 lg:py-16">
             <div className="flex flex-col items-start gap-4"><Button variant="ghost" size="icon-lg" aria-label={i18nText("Projects.detail.editIconName")} onClick={() => { void afterSave(() => setEditing(true)) }} className={PROJECT_ICON_COLORS[project.properties.color]}><Box data-icon="inline-start" /></Button><ProjectTextEditor key={`${project.id}-name`} field="name" value={project.name} onSave={name => update(project, { name })} onRegisterFlush={flush => registerFlush('name', flush)} /></div>
@@ -80,7 +81,7 @@ export function ProjectDetail({ project, projects, issues, userName, onBack, onO
           <section className="flex flex-col gap-4"><h2 className="text-sm font-medium">{i18nText("Projects.detail.progress")}</h2><div className="flex justify-between text-sm"><span className="text-muted-foreground">{i18nText("Projects.status.completed")} {complete} / {linked.length}</span><span>{progress}%</span></div><Progress value={progress} aria-label={i18nText("Projects.detail.progressAria")} /></section>
           <section className="flex flex-col gap-3"><h2 className="text-sm font-medium">{i18nText("Projects.detail.activity")}</h2><p className="text-xs text-muted-foreground">{i18nText("Issue.createdAt")} {new Date(project.createdAt).toLocaleDateString('zh-CN')}</p><Button variant="ghost" size="sm" onClick={() => { void afterSave(() => setTab('activity')) }}>{i18nText("Projects.detail.viewAllActivity")}</Button></section>
         </ResizablePane>}
-      </div>
+      </div>}
     </Tabs>
     {editDialog.value && <ProjectForm open={editDialog.open} onOpenChangeComplete={editDialog.onOpenChangeComplete} project={project} projects={projects} userName={userName} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); onUpdated() }} />}
     {linking && <ProjectIssuePicker project={project} projects={projects} issues={issues} onClose={() => setLinking(false)} onSaved={() => { setLinking(false); onUpdated() }} />}

@@ -406,6 +406,20 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   badge under it says the state. Source: Alex,
   2026-11-01 ([decision](decisions/2026-11-01-1320-navigation-model.md)), 2026-11-02
   ([decision](decisions/2026-11-02-0310-all-threads-from-the-window-bar.md)).
+- **R-83** A project's 「地图」 tab draws its route as a vertical timeline,
+  computed from existing records (issues, their relations and statuses,
+  threads, Factory checks, Artifacts, PRs; no stored map, no model call). The
+  main line is lane 0; a fork is a diamond with one decision line and its
+  reason; a branch opens one lane to the right of the lane it forks from, the
+  continuing option keeps its lane, and a finished branch frees its lane
+  (`git log --graph`). Abandoned branches (canceled or duplicate) stay,
+  dashed and muted, and say where they stopped. Desktop draws three lanes, a
+  phone two; deeper branches fold into one row that opens on its own. Picking
+  a node opens its detail (desktop right side, phone bottom sheet) in the
+  order 任务, 决定, 停在, Artifact, PR, 检查, 对话摘要, 线程. Teammates see only
+  what the task page shows them (R-62). Spec:
+  [`project-map.md`](project-map.md), decision
+  [2026-11-04-1726](decisions/2026-11-04-1726-project-map.md).
 
 ## Settings
 
