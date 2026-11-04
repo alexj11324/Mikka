@@ -1,0 +1,10 @@
+{
+  "checkedAt": "2026-11-04T23:45:39.101Z",
+  "modelAssertion": "deepseek-flash",
+  "modelCalls": 0,
+  "httpStatus": 200,
+  "available": false,
+  "scope": "configured private test API credential; balance check only",
+  "credentialMaterialIncluded": false,
+  "balanceAmountsIncluded": false
+}
