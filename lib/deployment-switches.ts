@@ -72,7 +72,7 @@ export const DEPLOYMENT_SWITCHES = {
   /** Proactive profile building for the whole deployment; each person also needs mikka-proactive-profile. */
   proactiveProfile: { flag: 'mikka-proactive-profile-deployment', kind: 'gate', legacy: truthy('PROACTIVE_PROFILE_ENABLED'), fallback: false },
   /** Value-based group routing; off selects the reviewed forced-reply baseline. */
-  groupContribution: { flag: 'mikka-group-contribution-off', kind: 'kill', legacy: env => env.MIKKA_GROUP_DECISION_POLICY === 'group-route-v0' ? false : ['group-contribution-v1','group-contribution-v2'].includes(env.MIKKA_GROUP_DECISION_POLICY ?? '') ? true : undefined, fallback: true },
+  groupContribution: { flag: 'mikka-group-contribution-off', kind: 'kill', legacy: env => env.MIKKA_GROUP_DECISION_POLICY === 'group-route-v0' ? false : ['group-contribution-v1','group-contribution-v2','group-contribution-v3'].includes(env.MIKKA_GROUP_DECISION_POLICY ?? '') ? true : undefined, fallback: true },
   /** The subscription (BYOS) backend. */
   byos: { flag: 'mikka-byos', kind: 'gate', legacy: exact('MIKKA_BYOS_ENABLED'), fallback: false },
   /** Connecting a Claude subscription through OAuth. */

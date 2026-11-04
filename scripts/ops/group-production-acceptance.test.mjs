@@ -68,14 +68,14 @@ function pendingFixture({ recoverFirst = false, wrongCleanupOwner = false, unkno
   const receipt = { executionId: 'execution-synthetic', providerGenerationId: 'generation-synthetic',
     modelId: 'openai/gpt-6-luna-decisions', requestDigest: 'a'.repeat(64), imageDigests: [],
     startedAt: new Date().toISOString(), completedAt: new Date().toISOString() }
-  const step = { id: randomUUID(), phase: 'intent', index: 0, policyVersion: 'group-contribution-v2', status: 'complete', failure: null, receipt, decisionCostUsd: null }
+  const step = { id: randomUUID(), phase: 'intent', index: 0, policyVersion: 'group-contribution-v3', status: 'complete', failure: null, receipt, decisionCostUsd: null }
   function turn(message, index) {
     if (stops.has(message.id)) return { messageId: message.id, status: 'failed', error: 'stopped', trace: { status: 'stopped', events: [] } }
     if (index === 0 && recoverFirst && (polls.get(message.id) ?? 0) >= 2) return { messageId: message.id, status: 'complete', error: null,
-      trace: { status: 'complete', action: 'ignore', responders: [], events: [], execution: receipt, policyVersion: 'group-contribution-v2',
+      trace: { status: 'complete', action: 'ignore', responders: [], events: [], execution: receipt, policyVersion: 'group-contribution-v3',
         decisionProtocol: 'group-sequential-v1', decisions: [step], decisionsOmitted: 0 } }
     return { messageId: message.id, status: 'failed', error: index === 0 ? 'group_judgment_pending' : 'generation_failed_not_replayed',
-      trace: { status: index === 0 ? 'pending' : 'failed', action: null, responders: [], events: [], execution: null, policyVersion: 'group-contribution-v2' } }
+      trace: { status: index === 0 ? 'pending' : 'failed', action: null, responders: [], events: [], execution: null, policyVersion: 'group-contribution-v3' } }
   }
   const fetchImpl = async (input, init) => {
     const url = new URL(input), path = url.pathname, body = init.body ? JSON.parse(init.body) : null
@@ -135,7 +135,7 @@ test('pending judgment can finish within the original budget but never passes as
   assert.equal(report.cases[0].wakes, 0)
   assert.equal(report.cases[0].decision.providerGenerationId, 'generation-synthetic')
   assert.equal(report.cases[0].decisions.length, 1)
-  assert.equal(report.cases[0].decisions[0].policyVersion, 'group-contribution-v2')
+  assert.equal(report.cases[0].decisions[0].policyVersion, 'group-contribution-v3')
   assert.deepEqual(report.cases[0].decisionCalls, { attempted: 1, receipted: 1, unreceipted: 0 })
   assert.equal(report.cases[0].decisionCostUsd, null)
   assert.equal(report.decisionObservations[0].decisionCostUsd, null)
