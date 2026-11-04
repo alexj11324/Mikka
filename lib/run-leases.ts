@@ -385,10 +385,12 @@ export async function startThreadMachine(actor: { userId: string; workspaceId: s
 /** A startup error is an infrastructure failure, never an Owner stop. Commit
  * that distinction before machine cleanup invokes the Factory end hook. */
 export async function failUnclaimedCloudStart(actor: { userId: string; workspaceId: string }, runId: string, error: unknown): Promise<boolean> {
-  const { RetainedTaskMachineUnavailable, threadMachineAction } = await import('@/lib/cloud-computer/thread-machines')
+  const { RetainedTaskMachineUnavailable, threadMachineAction, threadMachineStartFailure } = await import('@/lib/cloud-computer/thread-machines')
   const { ComputerError } = await import('@/lib/computer/store')
   if (error instanceof RetainedTaskMachineUnavailable ||
     (error instanceof ComputerError && error.status === 409 && error.message === 'Thread provisioning in progress')) return false
+  const provisionFailure = threadMachineStartFailure(error)
+  if (provisionFailure && (provisionFailure.userId !== actor.userId || provisionFailure.workspaceId !== actor.workspaceId || provisionFailure.runId !== runId)) return false
   const noMachine = await noMachineCard()
   const failed = await db.transaction(async tx => {
     const [run] = await tx.select().from(agentRuns).where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, actor.userId),
@@ -398,9 +400,13 @@ export async function failUnclaimedCloudStart(actor: { userId: string; workspace
     const now = new Date()
     if (!run || run.status !== 'queued' || run.startedAt || run.sessionId || run.stopRequestedAt ||
       (run.leaseExpiresAt && run.leaseExpiresAt > now) || run.questionContinuation?.requireSessionResume) return null
-    const { rows: [machine] } = await tx.execute(sql`SELECT "ownerId","workspaceId","workerLeaseUntil" FROM thread_machines WHERE "runId"=${runId} FOR UPDATE`)
+    const { rows: [machine] } = await tx.execute(sql`SELECT "ownerId","workspaceId","workerLeaseId","workerLeaseUntil" FROM thread_machines WHERE "runId"=${runId} FOR UPDATE`)
+    // An error from our own committed provision may settle that lease, but a
+    // newer lease or a completed provision wins even after its lease cleared.
+    // Keep the old lease until end() records unknown-create cleanup custody.
+    if (provisionFailure && machine?.workerLeaseId !== provisionFailure.leaseId) return null
     if (machine && (machine.ownerId !== actor.userId || machine.workspaceId !== actor.workspaceId ||
-      (machine.workerLeaseUntil && new Date(String(machine.workerLeaseUntil)) > now))) return null
+      (!provisionFailure && machine.workerLeaseUntil && new Date(String(machine.workerLeaseUntil)) > now))) return null
     // The same retention fence also covers the synchronous Coordinator path
     // and a lifecycle enqueue failure after an old task VM was adopted.
     const retained = await tx.execute(sql`SELECT 1 FROM thread_machines m

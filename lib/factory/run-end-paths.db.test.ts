@@ -36,11 +36,12 @@ test("cancel and thread end reach a terminal run, then afterRunEnded finalizes t
     appPool = db.pool;
     const { requestRunStop } = await import("../agent-runs");
     const { persistRunCompletion } = await import("../run-publications");
-    const { threadMachineAction } = await import("../cloud-computer/thread-machines");
+    const { ensureThreadMachine, threadMachineAction, threadMachineProvider } = await import("../cloud-computer/thread-machines");
+    const { ComputerError } = await import("../computer/store");
     const { createFactoryStore } = await import("./store");
     const { createFactoryDispatch, factoryBinding } = await import("./dispatch");
     const { factoryCheckIndependent } = await import("./check-independence");
-    const { startThreadMachine } = await import("../run-leases");
+    const { startThreadMachine, failUnclaimedCloudStart } = await import("../run-leases");
 
     await pool.query(`INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES ('owner','Fixture','runend@example.invalid',true,now(),now())`);
     const deviceId = randomUUID(), agentId = randomUUID(), repoId = randomUUID(), workspaceId = randomUUID();
@@ -186,6 +187,69 @@ test("cancel and thread end reach a terminal run, then afterRunEnded finalizes t
       await startThreadMachine({ userId: 'owner', workspaceId }, f.runId, false);
       assert.deepEqual(await startupState(f.runId), stopped);
       assert.deepEqual(await task(f.taskId), { stage: 'execute', status: 'cancelled' });
+    });
+
+    // Exercise the real provisioning transaction too: a provider rejection
+    // happens after the host has committed its own 15-minute machine lease.
+    // The provider is the only substituted boundary; no model call is made.
+    const cloudDevice = randomUUID();
+    await pool.query(`INSERT INTO devices(id,"ownerId",name,kind) VALUES($1,'owner','Startup provider fixture','cloud')`, [cloudDevice]);
+    await pool.query(`INSERT INTO cloud_machines("workspaceId","ownerId","sandboxId","operationId",state,"deviceId","runtimeReady") VALUES($1,'owner','fixture-parent-sandbox',$2,'running',$3,true)`, [workspaceId, randomUUID(), cloudDevice]);
+    const machineState = async (runId: string) => (await pool.query('SELECT * FROM thread_machines WHERE "runId"=$1', [runId])).rows[0];
+    const rejectedProvision = async () => {
+      const f = await queuedCloudTask();
+      const error = Object.freeze(new ComputerError(503, 'Fixture provider refused startup'));
+      let calls = 0;
+      const provider: typeof threadMachineProvider = {
+        snapshot: async () => assert.fail('the existing fixture snapshot is used'),
+        connect: async () => assert.fail('no sandbox has been recorded'),
+        create: async () => { calls++; throw error; },
+        kill: async () => assert.fail('an unknown create response has no sandbox to kill'),
+      };
+      await assert.rejects(ensureThreadMachine(pool, { userId: 'owner', workspaceId }, f.runId, provider), caught => caught === error);
+      assert.equal(calls, 1);
+      const machine = await machineState(f.runId);
+      assert.ok(machine.workerLeaseId && machine.workerLeaseUntil > new Date(), 'the failed provision still owns its committed lease');
+      return { ...f, error, machine };
+    };
+
+    await t.test('a real provider-start failure can settle only its own committed provisioning lease', async () => {
+      const f = await rejectedProvision(), before = await startupState(f.runId);
+      assert.equal(await failUnclaimedCloudStart({ userId: 'owner', workspaceId }, f.runId, new ComputerError(503, f.error.message)), false,
+        'copying the public error fields does not authorize cleanup of an active lease');
+      assert.deepEqual(await startupState(f.runId), before);
+      const another = await queuedCloudTask();
+      const anotherBefore = await startupState(another.runId);
+      assert.equal(await failUnclaimedCloudStart({ userId: 'owner', workspaceId }, another.runId, f.error), false,
+        'the exact failure cannot authorize a different unclaimed run');
+      assert.deepEqual(await startupState(another.runId), anotherBefore);
+      assert.equal(await failUnclaimedCloudStart({ userId: 'owner', workspaceId }, f.runId, f.error), true);
+      const failed = await startupState(f.runId), machine = await machineState(f.runId);
+      assert.equal(failed.status, 'failed'); assert.equal(failed.stopReason, 'device_lost');
+      assert.equal(failed.stopRequestedAt, null); assert.equal(failed.startedAt, null); assert.equal(failed.sessionId, null);
+      assert.deepEqual(failed.agentDefinition, before.agentDefinition);
+      assert.deepEqual(await task(f.taskId), { stage: 'execute', status: 'blocked' });
+      assert.equal(machine.state, 'ended'); assert.equal(machine.workerLeaseId, null);
+      assert.deepEqual(machine.workerLeaseUntil, f.machine.workerLeaseUntil,
+        'unknown provider acknowledgement keeps the existing creation-cleanup deadline');
+      assert.equal((await pool.query(`SELECT count(*)::int AS n FROM coordinator_events WHERE "runId"=$1 AND kind='run_finished'`, [f.runId])).rows[0].n, 1);
+      assert.equal(await failUnclaimedCloudStart({ userId: 'owner', workspaceId }, f.runId, f.error), false);
+      assert.deepEqual(await startupState(f.runId), failed);
+    });
+
+    await t.test('a captured startup failure cannot overtake a replaced lease, successful provisioning, claim or Owner stop', async () => {
+      for (const winner of ['new-lease', 'released-lease', 'claimed', 'stop'] as const) {
+        const f = await rejectedProvision();
+        if (winner === 'new-lease') await pool.query(`UPDATE thread_machines SET "workerLeaseId"=$2,"workerLeaseUntil"=now()+interval '15 minutes' WHERE "runId"=$1`, [f.runId, randomUUID()]);
+        if (winner === 'released-lease') await pool.query(`UPDATE thread_machines SET state='running',"workerLeaseId"=NULL,"workerLeaseUntil"=NULL WHERE "runId"=$1`, [f.runId]);
+        if (winner === 'claimed') await pool.query(`UPDATE agent_runs SET status='running',"startedAt"=now(),"sessionId"='new-worker-session',"leaseExpiresAt"=now()+interval '1 minute' WHERE id=$1`, [f.runId]);
+        if (winner === 'stop') await requestRunStop('owner', f.runId);
+        const before = await startupState(f.runId), machine = await machineState(f.runId), currentTask = await task(f.taskId);
+        assert.equal(await failUnclaimedCloudStart({ userId: 'owner', workspaceId }, f.runId, f.error), false, winner);
+        assert.deepEqual(await startupState(f.runId), before, winner);
+        assert.deepEqual(await machineState(f.runId), machine, winner);
+        assert.deepEqual(await task(f.taskId), currentTask, winner);
+      }
     });
   } finally {
     for (const [k, v] of [["MIKKA_DATABASE_URL", saved.m], ["DATABASE_URL", saved.d], ["MIKKA_FACTORY_ROUTING_ENABLED", saved.r], ["MIKKA_FACTORY_LIFECYCLE_ENABLED", saved.l]] as const)
