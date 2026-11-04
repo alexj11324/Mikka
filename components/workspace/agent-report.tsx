@@ -76,19 +76,18 @@ export function AgentFileTree({ paths = [] }: { paths?: string[] }) {
   return <FileTree ariaLabel={agentCopy.files} defaultExpandedIds={folders}>{nodes}</FileTree>
 }
 
-/** A suggested change as a beUI FileDiff: lines start with "+", "-" or a space. */
+/** A suggested change as a Pierre diff: lines start with "+", "-" or a space. */
 export function AgentFileDiff({ file, diff = '', language }: { file?: string; diff?: string; language?: 'bash' | 'diff' | 'json' | 'text' | 'tsx' }) {
-  const lines = useMemo(() => {
-    let oldLine = 0, newLine = 0
-    return diff.replace(/\n$/, '').split('\n').map((line, index): FileDiffLine => {
-      if (line.startsWith('+')) return { id: String(index), type: 'added', newLine: ++newLine, content: line.slice(1) }
-      if (line.startsWith('-')) return { id: String(index), type: 'removed', oldLine: ++oldLine, content: line.slice(1) }
-      return { id: String(index), type: 'context', oldLine: ++oldLine, newLine: ++newLine, content: line.startsWith(' ') ? line.slice(1) : line }
-    })
-  }, [diff])
+  const agentCopy = useAgentCopy()
+  const lines = useMemo(() => diff.replace(/\n$/, '').split('\n').map((line): FileDiffLine => {
+    if (line.startsWith('+')) return { type: 'added', content: line.slice(1) }
+    if (line.startsWith('-')) return { type: 'removed', content: line.slice(1) }
+    return { type: 'context', content: line.startsWith(' ') ? line.slice(1) : line }
+  }), [diff])
   // Only a reply still streaming is applying its changes; a saved one shows ✓ (FileDiff defaults to streaming).
   const streaming = useIsStreaming()
-  return <FileDiff file={file} lines={lines} language={language} status={streaming ? 'streaming' : 'complete'} defaultOpen collapseOnComplete={false} />
+  // 'diff' names the format, not the code; the file name says which language to highlight.
+  return <FileDiff file={file ?? 'diff'} lines={lines} language={language === 'diff' ? undefined : language} status={streaming ? 'streaming' : 'complete'} copyLabel={agentCopy.copyCode} copiedLabel={agentCopy.copied} />
 }
 
 /** Sources actually read, as beUI Citations. */
