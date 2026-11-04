@@ -1,0 +1,196 @@
+{
+  "source": "c2faa3843aae62411b03da505027a1f094bee223",
+  "tree": "dac5bee6e7d747c0db8471d350a684707678deab",
+  "environment": "isolated local production build",
+  "database": "mikka_thread_submission_ui_e2e",
+  "syntheticVisualFixtures": true,
+  "presentationState": "explicit synthetic session-window pending submission",
+  "actualSubmissionSent": false,
+  "modelCalls": 0,
+  "thirdPartyCalls": 0,
+  "functionalEvidence": "41 source and real PostgreSQL contract tests, separate from these screenshots",
+  "api": {
+    "ownerReadStatus": 200,
+    "peerReadStatus": 404,
+    "runId": "7dd73433-3782-4a8c-b79d-550aa77a8bd3",
+    "registeredSyntheticFixture": true
+  },
+  "images": [
+    {
+      "file": "en-1440-unconfirmed-light.png",
+      "locale": "en",
+      "width": 1440,
+      "theme": "light",
+      "pendingStatusVisible": true,
+      "draftRetained": true,
+      "draftEditable": true,
+      "syntheticWindowState": true,
+      "viewport": 1440,
+      "pageWidth": 1430,
+      "left": 1075,
+      "right": 1410,
+      "top": 962,
+      "bottom": 980,
+      "dark": false
+    },
+    {
+      "file": "zh-CN-390-unconfirmed-light.png",
+      "locale": "zh-CN",
+      "width": 390,
+      "theme": "light",
+      "pendingStatusVisible": true,
+      "draftRetained": true,
+      "draftEditable": true,
+      "syntheticWindowState": true,
+      "viewport": 390,
+      "pageWidth": 390,
+      "left": 12,
+      "right": 378,
+      "top": 814,
+      "bottom": 832,
+      "dark": false
+    },
+    {
+      "file": "en-390-unconfirmed-dark.png",
+      "locale": "en",
+      "width": 390,
+      "theme": "dark",
+      "pendingStatusVisible": true,
+      "draftRetained": true,
+      "draftEditable": true,
+      "syntheticWindowState": true,
+      "viewport": 390,
+      "pageWidth": 390,
+      "left": 12,
+      "right": 378,
+      "top": 814,
+      "bottom": 832,
+      "dark": true
+    }
+  ],
+  "cleanup": {
+    "registeredSyntheticFixtures": 2,
+    "registeredFixturesRemoved": true,
+    "scopeReleased": false,
+    "scopeError": "ACCOUNT_DIRTY",
+    "classification": {
+      "leaseState": "quarantined",
+      "pairState": "quarantined",
+      "blockedReason": "ACCOUNT_DIRTY",
+      "activeSessions": 0,
+      "activeLeases": 0,
+      "resources": [
+        {
+          "type": "agent_runs",
+          "state": "cleaned",
+          "count": 1
+        },
+        {
+          "type": "agents",
+          "state": "cleaned",
+          "count": 1
+        },
+        {
+          "type": "session",
+          "state": "retained",
+          "count": 2
+        },
+        {
+          "type": "user",
+          "state": "retained",
+          "count": 2
+        }
+      ],
+      "accounts": [
+        {
+          "role": "owner",
+          "baselineMatches": false,
+          "footprint": [
+            {
+              "table": "account",
+              "count": 1
+            },
+            {
+              "table": "bots",
+              "count": 1
+            },
+            {
+              "table": "coordinator_bots",
+              "count": 1
+            },
+            {
+              "table": "mikka_workspace_members",
+              "count": 1
+            },
+            {
+              "table": "mikka_workspaces",
+              "count": 1
+            },
+            {
+              "table": "signup_email_claims",
+              "count": 1
+            },
+            {
+              "table": "user",
+              "count": 1
+            },
+            {
+              "table": "user_onboarding",
+              "count": 1
+            },
+            {
+              "table": "workspace_subscription_shares",
+              "count": 1
+            }
+          ]
+        },
+        {
+          "role": "peer",
+          "baselineMatches": true,
+          "footprint": [
+            {
+              "table": "account",
+              "count": 1
+            },
+            {
+              "table": "bots",
+              "count": 1
+            },
+            {
+              "table": "coordinator_bots",
+              "count": 1
+            },
+            {
+              "table": "mikka_workspace_members",
+              "count": 1
+            },
+            {
+              "table": "mikka_workspaces",
+              "count": 1
+            },
+            {
+              "table": "signup_email_claims",
+              "count": 1
+            },
+            {
+              "table": "user",
+              "count": 1
+            },
+            {
+              "table": "user_onboarding",
+              "count": 1
+            },
+            {
+              "table": "workspace_subscription_shares",
+              "count": 1
+            }
+          ]
+        }
+      ],
+      "exactDeltaKnown": false,
+      "reason": "Baseline persists only a whole-account hash, not a row snapshot; original delta cannot be reconstructed.",
+      "cleanupAction": "Kept quarantine; no row deletion or pool override after release."
+    }
+  },
+  "status": "failed"
+}

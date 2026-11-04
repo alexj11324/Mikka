@@ -1,0 +1,108 @@
+{
+  "schemaVersion": 1,
+  "kind": "isolated-local-production-ui-review",
+  "recordedAt": "2026-11-04 06:08:11 UTC",
+  "source": "c2faa3843aae62411b03da505027a1f094bee223",
+  "tree": "dac5bee6e7d747c0db8471d350a684707678deab",
+  "pullRequest": 1202,
+  "build": {
+    "commandId": "cmd_4f2f565e06b342149f06a78b8d7f",
+    "command": "pnpm build",
+    "exitCode": 0,
+    "durationMs": 101364,
+    "log": "/tmp/mikka-thread-submission-ui-build.log",
+    "environment": "existing owned Linux Sandbox; isolated worktree and database; no external provider credentials"
+  },
+  "capture": {
+    "commandId": "cmd_e796e739e9334e4fa374942a379f",
+    "exitCode": 1,
+    "durationMs": 15093,
+    "reviewSha256": "979ba94005d563fff5408360c20e620a2ffbbaad30aad833a619166b6c4f4138",
+    "reviewGitBlob": "c0d5b889ab6bd73a55ce8bda760ddf7f788fb9d0",
+    "images": [
+      {
+        "file": "en-1440-unconfirmed-light.webp",
+        "bytes": 27474,
+        "sha256": "4494c096ad250c31e25890ab8171cf2350ee503271f88c5abd79ee16b3e2386e",
+        "gitBlob": "3d8a060c7382dd5ba387f6983cbd5074607a3103",
+        "base64Chars": 36632
+      },
+      {
+        "file": "en-390-unconfirmed-dark.webp",
+        "bytes": 15960,
+        "sha256": "90d4bdeafda02438b83b283f3a277bba72336f6c35afbbf6c1adb2a85b669a1f",
+        "gitBlob": "a21fd09ff7209bc703b5b4a21fbb765857511ab9",
+        "base64Chars": 21280
+      },
+      {
+        "file": "zh-CN-390-unconfirmed-light.webp",
+        "bytes": 15800,
+        "sha256": "a1fc3ebd13372a5d52b3e4a31781a083dba302f7e38fbb9f874b65552b8f767d",
+        "gitBlob": "eb85003f386dd41bce25001e30df76ec07e5b329",
+        "base64Chars": 21068
+      }
+    ],
+    "originalPngImages": [
+      {
+        "file": "en-1440-unconfirmed-light.png",
+        "bytes": 53116,
+        "sha256": "680db6c7d4349113465505fde41ba81dc3d647eaacc868dc0746faec93faf661"
+      },
+      {
+        "file": "zh-CN-390-unconfirmed-light.png",
+        "bytes": 27685,
+        "sha256": "1bb3286848a31a749aa319114889a2dfc4d09b9262f1b4be0997cbfc5a59a6dd"
+      },
+      {
+        "file": "en-390-unconfirmed-dark.png",
+        "bytes": 23650,
+        "sha256": "7c982ac4a201da7b7a45610e0bc6c26d759cd24a170155720e48631eef18ed75"
+      }
+    ],
+    "export": "Sharp WebP quality 88/effort 6; no recapture or content editing"
+  },
+  "verification": {
+    "normalTestAccountPoolLogin": true,
+    "ownerEvidenceStatus": 200,
+    "peerEvidenceStatus": 404,
+    "modelCalls": 0,
+    "thirdPartyCalls": 0,
+    "actualContinuationSubmitted": false,
+    "browserTestSuiteRun": false,
+    "syntheticStoppedRunAndWindowState": true,
+    "layoutChecksPassed": true,
+    "implementationAgentVisualReview": "passed",
+    "rootIndependentRenderedImageReview": "passed",
+    "sourceAndRealPostgresTests": 41,
+    "sourceAndRealPostgresSkipped": 0,
+    "sourceTestCommandId": "cmd_1f5554f5cc6d409e8eea5b2bc889",
+    "ci": {
+      "head": "c2faa3843aae62411b03da505027a1f094bee223",
+      "checks": 22,
+      "success": 18,
+      "scopedSkips": 4
+    }
+  },
+  "cleanup": {
+    "registeredFixturesRemoved": true,
+    "registeredFixtureCount": 2,
+    "activeSessions": 0,
+    "activeLeases": 0,
+    "ownedServerStopped": true,
+    "port3124Closed": true,
+    "scopeReleased": false,
+    "leaseState": "quarantined",
+    "pairState": "quarantined",
+    "reason": "ACCOUNT_DIRTY",
+    "exactAccountDeltaKnown": false,
+    "guardBypassed": false,
+    "subsequentApplicationRowDeletion": false
+  },
+  "limitations": [
+    "The capture driver remains exit 1; the pool cleanup gate did not pass.",
+    "The baseline contains only a whole-account hash; an exact before/after row delta cannot be reconstructed.",
+    "Screenshots depict synthetic presentation state, not a provider execution or a browser replay of the production deployment race.",
+    "Functional unknown-response and concurrency behavior is separately covered by 41 focused source and real PostgreSQL tests.",
+    "This review does not upgrade any failed production core acceptance run."
+  ]
+}
