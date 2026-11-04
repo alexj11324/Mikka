@@ -1,0 +1,476 @@
+{
+  "schemaVersion": 1,
+  "status": "fail",
+  "origin": "https://app.aspectlylabs.com",
+  "revision": "5b81321dfd3bbc3413d71af258433e5e9ba73dfb",
+  "deploymentId": "dpl_6iYpxckan3cxSfxcYg7Zs46cnVKW",
+  "startedAt": "2026-11-04T03:50:48.280Z",
+  "finishedAt": "2026-11-04T03:51:05.283Z",
+  "fixtureConversationId": "1eda9418-3969-41fe-934f-7bad0de6f031",
+  "runtime": {
+    "workspaceId": "0f877068-66a0-4893-8801-9a14eb3116b3",
+    "cloud": {
+      "configured": true,
+      "byoEnabled": true,
+      "canEdit": true,
+      "lastErrorCode": null
+    },
+    "order": {
+      "location": "cloud",
+      "customized": false,
+      "preferredHarness": "claude_code",
+      "cloudReady": true,
+      "entries": [
+        {
+          "model": "deepseek-flash",
+          "provider": "deepseek",
+          "harness": "claude_code",
+          "credentialType": "api_key",
+          "blockReason": null,
+          "cloudModelState": "ready"
+        }
+      ]
+    }
+  },
+  "ownerMcp": {
+    "schemaVersion": 1,
+    "status": "passed",
+    "workspaceId": "0f877068-66a0-4893-8801-9a14eb3116b3",
+    "connectionId": "f3d93e11-3eb9-4884-a38d-29de49163cbd",
+    "counts": {
+      "ownedBots": 8,
+      "before": 0,
+      "withFixture": 1,
+      "after": 0
+    },
+    "checks": {
+      "normalOwnerSession": true,
+      "personalWorkspace": true,
+      "existingBotsOwned": true,
+      "created": true,
+      "ownerMetadataReadback": true,
+      "personalShareRejected": true
+    },
+    "http": {
+      "create": 201,
+      "share": 403,
+      "delete": 200
+    },
+    "cleanup": {
+      "deleteAttempted": true,
+      "deleteAcknowledged": true,
+      "absentReadback": true
+    },
+    "errors": [],
+    "coverage": {
+      "scope": "single-owner-MCP-management",
+      "modelCalls": 0,
+      "providerCalls": 0,
+      "secretCreated": false,
+      "teamCreated": false,
+      "twoMemberSharing": false,
+      "gmail": false,
+      "frozenRunToken": false
+    }
+  },
+  "group": {
+    "status": "fail",
+    "error": "acceptance_turn_interrupted_generation_not_replayed",
+    "revision": "5b81321dfd3bbc3413d71af258433e5e9ba73dfb",
+    "deploymentId": "dpl_6iYpxckan3cxSfxcYg7Zs46cnVKW",
+    "startedAt": "2026-11-04T03:50:55.079Z",
+    "finishedAt": "2026-11-04T03:51:01.568Z",
+    "fixtureId": "3cc39f5b-3314-4415-b2d2-918bd82fcecc",
+    "workspaceId": "0f877068-66a0-4893-8801-9a14eb3116b3",
+    "conversationId": "1eda9418-3969-41fe-934f-7bad0de6f031",
+    "requesterId": "cL1NXe1mr7WuIS8xWhU37v0p7kNoUMY3",
+    "sessionEnded": true,
+    "groupCleanup": {
+      "source": null,
+      "status": "stopped",
+      "conversationId": "1eda9418-3969-41fe-934f-7bad0de6f031",
+      "attempted": true,
+      "acknowledged": true,
+      "stoppedTurns": 0,
+      "noPendingRetry": true,
+      "executionStopConfirmed": false,
+      "delegatedTaskIds": [],
+      "before": [
+        {
+          "messageId": "56b841c7-baff-4078-9d82-76b1b51c668a",
+          "status": "failed",
+          "error": "other",
+          "traceStatus": "failed"
+        }
+      ],
+      "after": [
+        {
+          "messageId": "56b841c7-baff-4078-9d82-76b1b51c668a",
+          "status": "failed",
+          "error": "other",
+          "traceStatus": "failed"
+        }
+      ],
+      "error": null
+    },
+    "decisionObservations": [
+      {
+        "messageId": "56b841c7-baff-4078-9d82-76b1b51c668a",
+        "primaryReceipt": null,
+        "decisionProtocol": "group-sequential-v1",
+        "decisions": [],
+        "decisionsOmitted": 0,
+        "failureReason": null,
+        "decisionCalls": {
+          "attempted": 0,
+          "receipted": 0,
+          "unreceipted": 0
+        },
+        "decisionCost": {
+          "knownUsd": 0,
+          "knownCalls": 0,
+          "unknownCalls": 0,
+          "omittedCalls": 0
+        },
+        "decisionCostUsd": null,
+        "decisionLatencyMs": 0,
+        "costScope": "routing-decision-chain"
+      }
+    ],
+    "decisionAccounting": {
+      "scope": "routing-decision-chain",
+      "decisionCalls": {
+        "attempted": 0,
+        "receipted": 0,
+        "unreceipted": 0
+      },
+      "decisionCost": {
+        "knownUsd": 0,
+        "knownCalls": 0,
+        "unknownCalls": 0,
+        "omittedCalls": 0
+      },
+      "decisionCostUsd": null,
+      "decisionLatencyMs": 0,
+      "unobservedTurns": 1
+    },
+    "bots": [
+      {
+        "id": "b2417884-7c0c-44a9-a0b2-ea33c109c179",
+        "role": "UI",
+        "modelId": "deepseek-flash"
+      },
+      {
+        "id": "7852e654-4ed4-4c3f-83b8-f551ba97f49d",
+        "role": "Coding",
+        "modelId": "deepseek-flash"
+      },
+      {
+        "id": "e492e36b-9a02-4e27-959f-34ae1ffe29ca",
+        "role": "Testing",
+        "modelId": "deepseek-flash"
+      }
+    ],
+    "subscriptionOptions": [],
+    "cases": [
+      {
+        "name": "useful-silence",
+        "status": "fail",
+        "phase": null,
+        "messageId": "56b841c7-baff-4078-9d82-76b1b51c668a",
+        "action": null,
+        "responders": [],
+        "wakes": null,
+        "generations": null,
+        "publications": null,
+        "decision": null,
+        "decisionProtocol": null,
+        "decisions": [],
+        "decisionsOmitted": null,
+        "failureReason": null,
+        "decisionCalls": {
+          "attempted": null,
+          "receipted": null,
+          "unreceipted": null
+        },
+        "decisionCost": {
+          "knownUsd": null,
+          "knownCalls": null,
+          "unknownCalls": null,
+          "omittedCalls": null
+        },
+        "decisionCostUsd": null,
+        "decisionLatencyMs": null,
+        "costScope": null,
+        "taskId": null,
+        "issueId": null,
+        "requestEpoch": null,
+        "reporterId": null,
+        "expectedArtifact": null,
+        "executionModels": [],
+        "messages": [],
+        "runs": [],
+        "checks": [],
+        "artifact": null,
+        "acceptance": null,
+        "finalReport": null,
+        "continuation": null,
+        "stopContinuation": null,
+        "createReplay": null,
+        "statusReplay": null,
+        "stopReplay": null,
+        "lastTask": null,
+        "observations": []
+      }
+    ]
+  },
+  "replay": {
+    "status": "failed",
+    "error": "replay_decision_unavailable",
+    "dataset": "group-decision-cases-v2",
+    "datasetDigest": "0685779c239e70b04d2b4316c38c1dc7d2b744417fbb358020e97dc50a3644d3",
+    "deploymentId": "dpl_6iYpxckan3cxSfxcYg7Zs46cnVKW",
+    "revision": "5b81321dfd3bbc3413d71af258433e5e9ba73dfb",
+    "conversationId": "1eda9418-3969-41fe-934f-7bad0de6f031",
+    "startedAt": "2026-11-04T03:51:01.774Z",
+    "finishedAt": "2026-11-04T03:51:03.289Z",
+    "baseline": [
+      {
+        "schemaVersion": 1,
+        "caseId": "small-talk",
+        "dataset": "group-decision-cases-v2",
+        "datasetDigest": "0685779c239e70b04d2b4316c38c1dc7d2b744417fbb358020e97dc50a3644d3",
+        "inputDigest": "6b60a12303913192748499cd614f24cf57275fc6593faff91a0dbeaee2082229",
+        "policyVersion": "group-route-v0",
+        "evidenceKind": "actual-decision-inference",
+        "status": "invalid_decision",
+        "receipt": {
+          "executionId": "32da2a35-9bc1-4117-99fa-9b278d2acc64",
+          "modelId": "openai/gpt-6-luna-decisions",
+          "providerGenerationId": "gen_01M6JAX0QAJEAGG7FYTW9M4EWZ",
+          "requestDigest": "270faaf10fd1d7a00f8396821c3220df29d4a437387a28b1e7d4564fa3e410ad",
+          "startedAt": "2026-11-04T03:51:02.578Z",
+          "completedAt": "2026-11-04T03:51:03.242Z",
+          "imageDigests": [],
+          "vision": "no-image-input"
+        },
+        "decisionProtocol": "group-sequential-v1",
+        "decisions": [
+          {
+            "id": "df20a592-a68a-473b-8034-8278990f5387",
+            "phase": "responder",
+            "index": 0,
+            "status": "invalid_decision",
+            "failure": "uncertain",
+            "receipt": {
+              "executionId": "32da2a35-9bc1-4117-99fa-9b278d2acc64",
+              "modelId": "openai/gpt-6-luna-decisions",
+              "providerGenerationId": "gen_01M6JAX0QAJEAGG7FYTW9M4EWZ",
+              "requestDigest": "270faaf10fd1d7a00f8396821c3220df29d4a437387a28b1e7d4564fa3e410ad",
+              "startedAt": "2026-11-04T03:51:02.578Z",
+              "completedAt": "2026-11-04T03:51:03.242Z",
+              "imageDigests": [],
+              "vision": "no-image-input"
+            },
+            "decisionCostUsd": 0.000061
+          }
+        ],
+        "decisionsOmitted": null,
+        "failureReason": "uncertain",
+        "decisionCalls": {
+          "attempted": 1,
+          "receipted": 1,
+          "unreceipted": 0
+        },
+        "decisionCost": {
+          "knownUsd": 0.000061,
+          "knownCalls": 1,
+          "unknownCalls": 0,
+          "omittedCalls": 0
+        },
+        "decisionCostUsd": 0.000061,
+        "decisionLatencyMs": 664,
+        "costScope": "routing-decision-chain",
+        "executionPerformed": false,
+        "policyChanged": false,
+        "route": null
+      }
+    ],
+    "candidate": [],
+    "comparison": {
+      "baseline": {
+        "cases": 12,
+        "logicalReplays": 1,
+        "measured": 0,
+        "coverage": 0,
+        "actionAccuracy": null,
+        "responderAccuracy": null,
+        "falseIntervention": 0,
+        "missedIntervention": 0,
+        "failures": [
+          {
+            "caseId": "small-talk",
+            "reason": "invalid_decision"
+          }
+        ],
+        "decisionCalls": {
+          "attempted": 1,
+          "receipted": 1,
+          "unreceipted": 0
+        },
+        "cost": {
+          "scope": "routing-decision-chain",
+          "knownUsd": 0.000061,
+          "knownCalls": 1,
+          "unknownCalls": 0,
+          "omittedCalls": 0,
+          "completeTotalUsd": 0.000061,
+          "knownObservations": 1,
+          "unknownObservations": 0
+        },
+        "decisionLatency": {
+          "scope": "provider-request",
+          "samples": 1,
+          "p50Ms": 664,
+          "p95Ms": 664
+        },
+        "runtimeCasesExcluded": [
+          "decision-outage",
+          "duplicate-delivery"
+        ]
+      },
+      "candidate": {
+        "cases": 12,
+        "logicalReplays": 0,
+        "measured": 0,
+        "coverage": 0,
+        "actionAccuracy": null,
+        "responderAccuracy": null,
+        "falseIntervention": 0,
+        "missedIntervention": 0,
+        "failures": [],
+        "decisionCalls": {
+          "attempted": 0,
+          "receipted": 0,
+          "unreceipted": 0
+        },
+        "cost": {
+          "scope": "routing-decision-chain",
+          "knownUsd": 0,
+          "knownCalls": 0,
+          "unknownCalls": 0,
+          "omittedCalls": 0,
+          "completeTotalUsd": 0,
+          "knownObservations": 0,
+          "unknownObservations": 0
+        },
+        "decisionLatency": {
+          "scope": "provider-request",
+          "samples": 0,
+          "p50Ms": null,
+          "p95Ms": null
+        },
+        "runtimeCasesExcluded": [
+          "decision-outage",
+          "duplicate-delivery"
+        ]
+      },
+      "decisionReviewReady": false,
+      "requiresHumanReview": true,
+      "executionAcceptanceRequired": true
+    },
+    "executionPerformed": false,
+    "productionAccepted": false,
+    "policyChanged": false
+  },
+  "expectedDecisionReplays": 24,
+  "actualReceiptedDecisionReplays": 1,
+  "completedLogicalDecisionReplays": 0,
+  "replayAccounting": {
+    "scope": "routing-decision-chain",
+    "logicalReplays": 1,
+    "receiptedLogicalReplays": 1,
+    "completedLogicalReplays": 0,
+    "unobservedLogicalReplays": 0,
+    "valid": false,
+    "decisionCalls": {
+      "attempted": 1,
+      "receipted": 1,
+      "unreceipted": 0
+    },
+    "decisionCost": {
+      "knownUsd": 0.000061,
+      "knownCalls": 1,
+      "unknownCalls": 0,
+      "omittedCalls": 0
+    },
+    "decisionCostUsd": 0.000061,
+    "maximumProviderCalls": 96
+  },
+  "credentialCleanup": {
+    "created": true,
+    "removed": true,
+    "cloudCreated": true,
+    "cloudRemoved": true,
+    "credentialSessionLogoutAttempted": true,
+    "credentialSessionLogoutAcknowledged": true,
+    "credentialSessionLogoutStatus": 200
+  },
+  "taskCleanup": null,
+  "groupCleanup": {
+    "source": "source-driver",
+    "status": "stopped",
+    "conversationId": "1eda9418-3969-41fe-934f-7bad0de6f031",
+    "attempted": true,
+    "acknowledged": true,
+    "stoppedTurns": 0,
+    "noPendingRetry": true,
+    "executionStopConfirmed": false,
+    "delegatedTaskIds": [],
+    "before": [
+      {
+        "messageId": "56b841c7-baff-4078-9d82-76b1b51c668a",
+        "status": "failed",
+        "error": "other",
+        "traceStatus": "failed"
+      }
+    ],
+    "after": [
+      {
+        "messageId": "56b841c7-baff-4078-9d82-76b1b51c668a",
+        "status": "failed",
+        "error": "other",
+        "traceStatus": "failed"
+      }
+    ],
+    "error": null
+  },
+  "machineCleanup": null,
+  "replaySessionEnded": true,
+  "sessionCleanup": {
+    "ownerMcpAndReplay": {
+      "loginAttempted": true,
+      "loginStatus": 200,
+      "logoutAttempted": true,
+      "logoutAcknowledged": true,
+      "logoutStatus": 200
+    },
+    "temporaryCredentials": {
+      "loginAttempted": true,
+      "loginStatus": 200,
+      "logoutAttempted": true,
+      "logoutAcknowledged": true,
+      "logoutStatus": 200
+    },
+    "groupRuntime": {
+      "loginAttempted": true,
+      "loginStatus": 200,
+      "logoutAttempted": true,
+      "logoutAcknowledged": true,
+      "logoutStatus": 200
+    }
+  },
+  "scope": "Actual production owner MCP management, group runtime and fixed-case Decision inference. Owner MCP does not exercise sharing, Gmail or a provider. Replay does not perform projected execution. No official-subscription acceptance.",
+  "error": null,
+  "runnerDigest": "ea74b46b15e791f4315e476143709b76acd1c1d3b5661984b2e6917b171f4f4a"
+}

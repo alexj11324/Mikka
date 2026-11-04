@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "kind": "actual-production-acceptance-failure",
+  "runId": 41769516026,
+  "jobId": 126375666514,
+  "workflowHead": "ff6b770f004a52747c65f68aa10f8856d4afba94",
+  "preparedRunner": "875d86d6f28da4ad417298aaa90dde321b434a70",
+  "source": "5b81321dfd3bbc3413d71af258433e5e9ba73dfb",
+  "deploymentId": "dpl_6iYpxckan3cxSfxcYg7Zs46cnVKW",
+  "artifact": {
+    "id": 13294397226,
+    "name": "proactive-acceptance-41769516026",
+    "archiveSha256": "a70803b0bb1fee868a17a698c2c54eb117fe3481264ad8222dc83ac006f8a7bd",
+    "jsonSha256": "f17778936c844410a7603522750496835391f2bf18778f0c18b20a3c796d96ff",
+    "jsonBytes": 13824
+  },
+  "runnerDigest": "ea74b46b15e791f4315e476143709b76acd1c1d3b5661984b2e6917b171f4f4a",
+  "startedAt": "2026-11-04T03:50:48.280Z",
+  "finishedAt": "2026-11-04T03:51:05.283Z",
+  "status": "fail",
+  "sourceReportModified": false,
+  "scope": "One actual production bundle; no rerun, no repeated write; actual failure preserved separately from prior evidence"
+}
