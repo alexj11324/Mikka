@@ -3,13 +3,16 @@ import { deploymentSwitch } from '../deployment-switches'
 /** Versioned prompts, changed by reviewed code releases only. Feedback never
  * rewrites these. The deployment kill flag selects the incident baseline;
  * explicit host-selected replay versions bypass live deployment settings. */
-export const GROUP_POLICY_VERSION = 'group-contribution-v1' as const
+export const GROUP_POLICY_VERSION = 'group-contribution-v2' as const
+/** Historical candidate receipts and explicitly selected offline replays stay interpretable. */
+export const GROUP_PREVIOUS_POLICY_VERSION = 'group-contribution-v1' as const
 export const GROUP_BASELINE_VERSION = 'group-route-v0' as const
-export type GroupPolicyVersion = typeof GROUP_POLICY_VERSION | typeof GROUP_BASELINE_VERSION
+export const GROUP_POLICY_VERSIONS = [GROUP_BASELINE_VERSION,GROUP_PREVIOUS_POLICY_VERSION,GROUP_POLICY_VERSION] as const
+export type GroupPolicyVersion = typeof GROUP_POLICY_VERSIONS[number]
 
 export function getGroupDecisionPolicy(value?: string) {
-  if (value && value !== GROUP_POLICY_VERSION && value !== GROUP_BASELINE_VERSION) throw new Error('unknown_group_decision_policy')
-  const version: GroupPolicyVersion = value === GROUP_BASELINE_VERSION ? GROUP_BASELINE_VERSION : value === GROUP_POLICY_VERSION ? GROUP_POLICY_VERSION
+  if (value && !GROUP_POLICY_VERSIONS.includes(value as GroupPolicyVersion)) throw new Error('unknown_group_decision_policy')
+  const version: GroupPolicyVersion = value ? value as GroupPolicyVersion
     : deploymentSwitch('groupContribution') ? GROUP_POLICY_VERSION : GROUP_BASELINE_VERSION
   return {
     version,

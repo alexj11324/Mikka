@@ -10,7 +10,7 @@ import { DECISION_MODEL } from './decision'
 import type { DecisionExecution, invokeDecision } from './decide'
 import { handleGroupDecisionReplay } from './group-decision-replay-api'
 import { hostedBillingScope } from '@/lib/abuse/context'
-import { GROUP_BASELINE_VERSION, GROUP_POLICY_VERSION } from './group-decision-policy'
+import { GROUP_BASELINE_VERSION, GROUP_POLICY_VERSION, GROUP_PREVIOUS_POLICY_VERSION, type GroupPolicyVersion } from './group-decision-policy'
 import { createGroupJudgment } from './group-judgment'
 import { GroupJudgmentPendingError } from './group-correction'
 import { overrideDeploymentSwitch } from '../deployment-switches'
@@ -88,8 +88,8 @@ test('PG: scoped decision traces, exact event counting, human feedback, revoked 
   const failedMessage=randomUUID()
   await pool.query(`INSERT INTO conversation_messages (id,"conversationId",position,"authorType","authorId",body) VALUES ($1,$2,100,'user','owner','private retry fixture')`,[failedMessage,group])
   await pool.query(`INSERT INTO group_turns ("messageId","conversationId","userId") VALUES ($1,$2,'owner')`,[failedMessage,group])
-  const first={id:randomUUID(),phase:'intent' as const,index:0,status:'complete' as const,failure:null,receipt:{...receipt,executionId:randomUUID(),providerGenerationId:'partial-first'}}
-  const second={id:randomUUID(),phase:'responder' as const,index:1,status:'invalid_decision' as const,failure:'uncertain' as const,receipt:{...receipt,executionId:randomUUID(),providerGenerationId:'partial-second'}}
+  const first={policyVersion:GROUP_PREVIOUS_POLICY_VERSION,id:randomUUID(),phase:'intent' as const,index:0,status:'complete' as const,failure:null,receipt:{...receipt,executionId:randomUUID(),providerGenerationId:'partial-first'}}
+  const second={policyVersion:GROUP_PREVIOUS_POLICY_VERSION,id:randomUUID(),phase:'responder' as const,index:1,status:'invalid_decision' as const,failure:'uncertain' as const,receipt:{...receipt,executionId:randomUUID(),providerGenerationId:'partial-second'}}
   await initializeGroupDecisionTrace(pool,failedMessage,[{id:member,name:'UI',description:'public'}],[])
   await recordGroupDecisionSteps(pool,failedMessage,[first,second],'uncertain')
   await recordGroupDecisionSteps(pool,failedMessage,[first,second],'uncertain')
@@ -100,12 +100,13 @@ test('PG: scoped decision traces, exact event counting, human feedback, revoked 
   assert.equal(partialTurn.trace.decisions.length,2);assert.equal(partialTurn.decisionCost.knownUsd,0.000138)
   assert.equal(partialTurn.decisionCost.knownCalls,1);assert.equal(partialTurn.decisionCost.unknownCalls,1);assert.equal(partialTurn.decisionCostUsd,null)
   await initializeGroupDecisionTrace(pool,failedMessage,[{id:member,name:'UI',description:'public'}],[])
-  const recovery={...first,id:randomUUID(),receipt:{...receipt,executionId:randomUUID(),providerGenerationId:'partial-recovery'}}
+  const recovery={...first,policyVersion:GROUP_POLICY_VERSION,id:randomUUID(),receipt:{...receipt,executionId:randomUUID(),providerGenerationId:'partial-recovery'}}
   await recordGroupDecisionRoute(pool,failedMessage,{by:'model',action:'observe',responders:[],execution:recovery.receipt,decisions:[recovery]})
   await finishGroupDecisionTrace(pool,failedMessage,'complete')
   await pool.query(`INSERT INTO hosted_usage VALUES ('partial-recovery',$1,'settled',100)`,[DECISION_MODEL])
   const recovered=((await handleGroupDecisionQuality(pool,directory,req)).body as any).turns.find((turn:any)=>turn.messageId===failedMessage)
   assert.equal(recovered.trace.decisions.length,3);assert.equal(recovered.trace.decisions[1].status,'invalid_decision')
+  assert.deepEqual(recovered.trace.decisions.map((step:any)=>step.policyVersion),[GROUP_PREVIOUS_POLICY_VERSION,GROUP_PREVIOUS_POLICY_VERSION,GROUP_POLICY_VERSION])
   assert.equal(recovered.decisionCost.knownCalls,2);assert.equal(recovered.decisionCost.unknownCalls,1);assert.equal(recovered.decisionCostUsd,null)
   assert.equal(recovered.trace.execution.providerGenerationId,'partial-recovery')
   for(let attempt=0;attempt<17;attempt++) {
@@ -136,7 +137,7 @@ test('PG: scoped decision traces, exact event counting, human feedback, revoked 
       return {answers:new Map([[name,{name,type:'choice' as const,choice:value}]]),execution:{...receipt,executionId:randomUUID(),providerGenerationId:`policy-fixture-${calls}`}}
     }
     const judgment=createGroupJudgment(fakeProvider)
-    const retain=async(steps:Parameters<typeof recordGroupDecisionSteps>[2],version?:typeof GROUP_POLICY_VERSION|typeof GROUP_BASELINE_VERSION)=>{
+    const retain=async(steps:Parameters<typeof recordGroupDecisionSteps>[2],version?:GroupPolicyVersion)=>{
       await recordGroupDecisionSteps(pool,policyMessage,steps,undefined,version)
     }
     try {

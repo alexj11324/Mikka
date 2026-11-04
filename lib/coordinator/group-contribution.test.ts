@@ -26,7 +26,7 @@ test('Decision ignore/observe are completed zero-wake actions, distinct from una
     const message={text,mentions:[]}
     const route=await judge.route(message,members,null,[])
     assert.equal(route.action,action);assert.equal(route.reason,action==='ignore'?'ordinary_conversation':'already_answered')
-    assert.equal(route.policyVersion,'group-contribution-v1');assert.deepEqual(route.responders,[])
+    assert.equal(route.policyVersion,'group-contribution-v2');assert.deepEqual(route.responders,[])
     await runGroupRounds(route,message,{eligible:async()=>members,status:async()=>assert.fail('zero wake'),generate:async()=>assert.fail('zero generation'),publish:async()=>assert.fail('zero publish')})
   }
   for (const invoke of [async()=>null,async()=>{throw new DOMException('upstream private detail','TimeoutError')},async()=>answers({intent:'uncertain'}),async()=>answers({intent:'foreign'}),routeAnswers('reply',[])]) {

@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
-import { createGroupDecisionTrace, groupDecisionReceipt } from './group-decision-trace'
+import { createGroupDecisionTrace, groupDecisionReceipt, groupDecisionSteps } from './group-decision-trace'
 import { compareGroupPolicies, evaluateGroupDecisions, groupTraceObservation, type GroupEvalCase, type GroupEvalObservation } from './group-decision-eval'
-import { getGroupDecisionPolicy, GROUP_BASELINE_VERSION, GROUP_POLICY_VERSION } from './group-decision-policy'
+import { getGroupDecisionPolicy, GROUP_BASELINE_VERSION, GROUP_POLICY_VERSION, GROUP_PREVIOUS_POLICY_VERSION } from './group-decision-policy'
 import { groupFeedbackInput } from './group-decision-feedback'
+import { groupDecisionReplayInput } from './group-decision-replay-api'
+import type { GroupDecisionStep } from './group-decision-chain'
 import { DECISION_MODEL } from './decision'
 import { overrideDeploymentSwitch } from '../deployment-switches'
 
@@ -93,4 +95,18 @@ test('feedback provenance cannot be client-selected and policy rollback is expli
   assert.equal(getGroupDecisionPolicy(GROUP_BASELINE_VERSION).version, GROUP_BASELINE_VERSION)
   assert.equal(getGroupDecisionPolicy(GROUP_POLICY_VERSION).version, GROUP_POLICY_VERSION)
   assert.throws(() => getGroupDecisionPolicy('unknown'), /unknown_group_decision_policy/)
+})
+
+test('v2 is the current replay candidate while historical v1 receipts keep their original version', () => {
+  const receipt = { executionId: 'execution', modelId: DECISION_MODEL as typeof DECISION_MODEL, providerGenerationId: 'provider', startedAt: '2026-11-03T00:00:00Z', completedAt: '2026-11-03T00:00:01Z', requestDigest: 'a'.repeat(64), imageDigests: [], vision: 'no-image-input' as const }
+  const versions = [GROUP_BASELINE_VERSION, GROUP_PREVIOUS_POLICY_VERSION, GROUP_POLICY_VERSION]
+  const steps = versions.map((policyVersion,index)=>({id:`version-${index}`,phase:'responder' as const,index:0,status:'complete' as const,failure:null,receipt,policyVersion}))
+  assert.deepEqual(groupDecisionSteps(steps).map(step=>step.policyVersion),versions)
+  const unknown = {...steps[0],policyVersion:'group-contribution-unknown'} as unknown as GroupDecisionStep
+  assert.equal(groupDecisionSteps([unknown])[0].policyVersion,undefined)
+  assert.equal(getGroupDecisionPolicy(GROUP_PREVIOUS_POLICY_VERSION).version,GROUP_PREVIOUS_POLICY_VERSION)
+  for(const policyVersion of [GROUP_BASELINE_VERSION,GROUP_POLICY_VERSION]){
+    assert.equal(groupDecisionReplayInput.safeParse({caseId:'small-talk',policyVersion}).success,true)
+  }
+  assert.equal(groupDecisionReplayInput.safeParse({caseId:'small-talk',policyVersion:GROUP_PREVIOUS_POLICY_VERSION}).success,false)
 })
