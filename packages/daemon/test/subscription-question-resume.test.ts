@@ -189,14 +189,21 @@ ${marker}`))
       workspaceId: randomUUID(), consumerId: randomUUID(), route: 'codex_cli' } })
   const finish = async (assignment: RunAssignment) => {
     server.queueRun(deviceId, assignment)
-    supervisor.start(assignment)
+    // The real daemon claims before starting. Its tool gate requires the live
+    // server lease; queueing alone supplies no authority to launch the CLI.
+    const claimed = runAssignmentSchema.parse(await link.claimRun(deviceId, assignment.runId))
+    supervisor.start(claimed)
     await supervisor.idle()
     await outbox.flushAll()
     return new RunJournal(journalPath).get(assignment.runId)!
   }
   try {
     const original = await finish(firstInput)
-    const questionId = server.runs.get(firstInput.runId)!.completion!.report.question!.questionId
+    const originalCompletion = server.runs.get(firstInput.runId)!.completion!
+    expect({ state: original.state, error: original.error, completion: originalCompletion },
+      `Synthetic question startup: ${JSON.stringify({ original, completion: originalCompletion })}`)
+      .toMatchObject({ state: 'stopped', completion: { stopReason: 'asked_human', report: { question: { questionId: expect.any(String) } } } })
+    const questionId = originalCompletion.report.question!.questionId
     expect(original).toMatchObject({ state: 'stopped', stopReason: 'asked_human', waitingQuestionId: questionId })
     expect(original.sessionId).toBeTruthy()
     // Reproduce the old claim's omission, without using the newer deliverable
