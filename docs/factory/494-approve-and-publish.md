@@ -1,5 +1,10 @@
 # Approve and publish (#494)
 
+> Update: since #528 a code candidate is not approved or published here. The
+> production composition refuses `approve` for it (`factoryAcceptanceIsMerge`);
+> 验收并合并 merges its PR instead (`warp-aligned-factory.md`). This flow now
+> applies only to a skill candidate (`activate_skill`).
+
 The browser's existing `approve` operation now approves and starts the selected
 publication. A live, provider-linked human session still supplies the approval;
 request JSON cannot supply that identity.

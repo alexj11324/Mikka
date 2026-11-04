@@ -7,6 +7,7 @@ UI 接线参考。所有 server action 都在 `app/actions/account.ts`，返回 
 - **权限**：每个 action 都先从 cookie 会话读当前用户（`auth.api.getSession`），不接受客户端传的 userId。没有会话一律返回 `authRequired`，且不做任何改动。
 - **非预期错误**（数据库挂了、Better Auth 返回未知错误）不转成错误码，直接抛出，按页面现有的通用失败处理。
 - 时间字段都是 ISO 8601 字符串（UTC）。
+- **新鲜会话**：改密码、设密码、退出设备、导出和删除账户包在 `withFreshSession`（`lib/fresh-session.ts`）里，会话直接从数据库读，不用 5 分钟的 cookie 缓存。
 
 ## 头像「更换」
 
@@ -95,7 +96,8 @@ requestDataExport(): Promise<ActionResult<{ email: string; expiresAt: string }>>
   - `authRequired`。
 - 导出内容（`lib/account/export.ts`，每个查询显式列字段）：账户资料（id、名称、邮箱、头像、创建时间）、登录方式（provider 名）、偏好（推送、记忆开关、时区）、所在工作区（名称、角色）、Bot、Agent、线程（运行 + 用户追加消息）、Bot 聊天消息、任务（本人拥有的 issues）、记忆（user_facts，不含已删除）、Artifact 列表（元数据，不含正文）、已保存的登录（站点、用户名，不含密码/TOTP）、连接（Composio 应用、Linear 组织名、Telegram 用户名、GitHub 仓库、设备、模型订阅的 provider/账户标签）。
   - **不包含**：密码哈希、OAuth access/refresh/id token、会话 token、API key、BYOS 密钥名与摘要、已保存登录的密钥、推送 token。数据库测试断言导出里不含这些值。
-  - 未包含：运行的原始输出流（`run_chunks`）、Artifact 正文与截图文件（体积大，可在 Artifact 页单独下载）。
+  - 文件（`lib/account/export-files.ts`）：本人的 Artifact 各版本正文、运行截图、运行检查点补丁、聊天附件，按 base64 一个一个流式写进同一个 JSON。下载过程中会重新检查会话和链接。
+  - 未包含：运行的原始输出流（`run_chunks`）。
 
 ## 已共享的链接
 
@@ -123,15 +125,18 @@ interface SharedArtifactLink {
 ## 删除账户
 
 ```ts
-deleteAccount(input: { email: string }): Promise<ActionResult<{ deleted: true }>>
+deleteAccount(input: { email: string }): Promise<ActionResult<{ deleted: true; receipt?: { id: string; warnings: string[] } }>>
 ```
 
 - 入参：确认弹窗里用户输入的邮箱。服务端去首尾空格、忽略大小写，与会话账户邮箱比对。
-- 成功后：数据已删除、会话已全部失效，并清掉当前浏览器的会话 cookie（`signOut`，同浏览器其他账户也会退出）。UI 应跳转到登录页。弹窗里提示先「导出我的数据」由 UI 负责。
+- 成功后：数据已删除、会话已全部失效，并清掉当前浏览器的会话 cookie（`signOut`，同浏览器其他账户也会退出）。UI 应跳转到登录页。弹窗里提示先「导出我的数据」由 UI 负责。有警告时（例如 Composio 那边的吊销可能稍后才完成）返回 `receipt`。
+- 删除是一个持久任务（`account_deletion_jobs`，`lib/account/deletion-jobs.ts`）。action 先登记任务，再当场往下跑：先清外部资源（`lib/account/external-cleanup.ts`：断开 Composio 账户、通过订阅 worker 清理模型订阅的密钥、结束线程机器、关掉本人的云电脑、重试待 kill 的沙箱），再删主库、工作区库，最后删 R2 文件。当场没跑完就返回 `accountDeletionPending`；每分钟的 `/api/cron/account-deletions` 会接着跑。
+- HTTP 入口 `/api/account/deletion`（同源、新鲜会话）：`POST {email, requestId}` 登记任务并返回 202 和回执；`GET` 带 `x-mikka-deletion-receipt` 头读回执（账户删掉后也能读）；`DELETE` 在外部步骤开始前取消。
 - 错误码：
   - `accountEmailMismatch`：输入的邮箱与账户不一致（或为空）。
   - `accountSoleAdmin`，`params: { workspaces, count }`：本人是某个**有其他成员**的工作区唯一的活跃管理员。`workspaces` 是逗号分隔的工作区名。什么都不删，UI 提示先在成员设置里把管理员转给别人。
-  - `authRequired`。
+  - `accountDeletionPending`：任务已登记，但还没删完（外部清理被挡住，或文件还不能删）。
+  - `authRequired`；会话不新鲜时 `SESSION_NOT_FRESH`。
 - 删除范围（`lib/account/delete.ts`）：
   - **主库**：在一个事务里，按所有表的拥有者列（`userId` / `ownerId` / `owner_id` / `user_id`）删除本人的行——运行时从 `information_schema` 发现，以后新增的表自动覆盖。包括个人工作区（及其他只有本人的工作区）里的 Bot 及其线程、本人的 Coordinator、Bot 聊天、Agent、设备、任务、记忆、偏好、已保存的登录、模型订阅（BYOS）、Composio/Linear/Telegram/GitHub 连接、Artifact 及分享、截图、导出链接、头像、Factory 记录等。最后删除 `user` 行，外键 CASCADE 带走会话、登录账户、OAuth 授权等。
   - 外键顺序：先删「别处指向本人行、且没有 ON DELETE CASCADE」的行（如 `byos_native_runs → byos_bindings`），然后逐条删除；某条因外键被挡就留到下一轮（savepoint 回滚），直到全部完成。如果某一轮一条也删不掉（被不属于本人的数据引用），整个删除回滚并抛错（非预期错误，不是错误码）。
@@ -141,11 +146,11 @@ deleteAccount(input: { email: string }): Promise<ActionResult<{ deleted: true }>
     - 本人的项目（`workspace_projects`）删除，但挂在共享工作区团队下的项目保留。
   - **共享工作区里的 Bot**（决定 `2026-11-02-0231`，与成员离开时 `releaseDepartingMember` 相同）：本人在共享工作区的 Bot（不含 Coordinator）保留并暂停（`archivedAt`），`bots.ownerId` 置为 NULL（「待接管」，不匹配任何人；外键改为 `ON DELETE SET NULL`，`drizzle/20261102031000_bots_outlive_owner.sql`、`20261102031001_bots_owner_fkey_validate.sql`），出现在管理员的「已暂停的 Bot」里，接管（`takeOverBot`）时写入新的拥有者。置空前先删掉绑定在原拥有者上的行（云桌面、云运行时、运行绑定、agent kit、后台任务），与转交时相同。用量「按成员」里这些 Bot 归在「待接管」下。这些 Bot 的线程（`agent_runs`）连同其消息、检查点、截图、Artifact、工具审批和事件，以及线程所用的 Agent 行一起保留；未结束的线程标为 `stopped`；这些文件不从 R2 删除。线程上属于本人的凭据和机器（`run_tokens`、电脑绑定、线程机器）仍删除；本人创建的 Artifact / 截图公开链接删除。
   - **共享工作区里留给团队的内容**：团队任务（`mikka_team_issues` 里的 issue，含正文、版本、成员）保留，`issues.userId` 仍是原 id（指向已不存在的用户）；本人创建的群聊（共享工作区、还有其他成员时）保留，本人的成员身份删除，**本人发过的群聊消息保留**在群聊历史里。本人对他人任务的成员身份（`issue_members.memberId`）删除。
-  - **一致性**：工作区库的事务先加锁并检查，主库事务提交后工作区库再提交。主库失败 → 工作区改动一起回滚；工作区库在主库提交后才失败（极少见）会留下孤立的成员行，需要人工清理。
-  - R2 文件（Artifact 版本、截图、头像）在主库提交后尽力删除，失败只记数量日志；保留线程的文件除外。
+  - **一致性**：每一步单独提交，任务记下当前阶段（`requested` → `external_pending` → `main_deleted` → `workspace_deleted` → `storage_pending` → `completed`），失败后从这一步重来。删主库前先给只有本人的工作区写 `account_deletion_workspace_guards`，之后的成员写入会被拒。
+  - R2 文件（Artifact 版本、截图、头像）在两个库都删完后删除；删失败或上传授权还没过期时停在 `storage_pending`，下一次再删。保留线程的文件除外。
 - **已知未处理**（需要产品/运维决定）：
   - `improvement_*` 自我改进账本表有触发器禁止 DELETE（append-only 评估证据），不删除；里面可能有该用户 id。
-  - 远端资源没有主动销毁：云电脑/云桌面实例、Composio 远端连接、Linear OAuth 授权、Telegram 绑定只删了本地记录，没有调用对方 API 吊销。
+  - Linear OAuth 授权、Telegram 绑定只删了本地记录，没有调用对方 API 吊销。
   - 头像 URL 有 1 天浏览器缓存，删除后最长 1 天内仍可能从缓存显示。
 
 ## 数据库变更
@@ -161,5 +166,5 @@ deleteAccount(input: { email: string }): Promise<ActionResult<{ deleted: true }>
 
 ## 测试
 
-- `pnpm test:account`：`lib/account/account.test.ts`（UA 解析、头像校验/路径）、`lib/account/mail.test.ts`（邮件只在 provider 接受时算成功）、`tests/account-actions.test.ts`（每个 action 的会话要求、校验、错误码映射）。
-- `pnpm test:account-db`：`lib/account/store.db.test.ts`（设备列表、分享列表、导出频率/归属/过期、导出不含密钥、头像替换、删除账户的范围、共享工作区的 Bot 暂停后可接管且线程保留、个人工作区的 Bot 删除、唯一管理员拒绝、外键 fixpoint）。CI 通过 `pnpm test:db` 在 `mikka_e2e` 上跑；本地把三个数据库 URL 指向同一个回环的 `*_e2e` 库即可。
+- `pnpm test:account`：`lib/account/account.test.ts`（UA 解析、头像校验/路径）、`lib/account/mail.test.ts`（邮件只在 provider 接受时算成功）、`tests/account-actions.test.ts`（每个 action 的会话要求、校验、错误码映射）、`app/api/account/deletion/route.test.ts`、`tests/account-export-route.test.ts`、`lib/account/fresh-session.test.ts`。
+- `pnpm test:account-db`：删除任务、锁、恢复回放、外部清理、云电脑清理和导出文件各有 `*.db.test.ts`（见 `package.json`）；`lib/account/store.db.test.ts`（设备列表、分享列表、导出频率/归属/过期、导出不含密钥、头像替换、删除账户的范围、共享工作区的 Bot 暂停后可接管且线程保留、个人工作区的 Bot 删除、唯一管理员拒绝、外键 fixpoint）。CI 通过 `pnpm test:db` 在 `mikka_e2e` 上跑；本地把三个数据库 URL 指向同一个回环的 `*_e2e` 库即可。

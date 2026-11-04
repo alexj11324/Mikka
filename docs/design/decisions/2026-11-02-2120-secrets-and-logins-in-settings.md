@@ -28,4 +28,4 @@
 
 Design: Figma `kVQC1aa6P0tPI1SQ0PjC6V`, page 「密钥与登录 v3」 (v1 and v2 are 已废弃) (proposal, not yet
 accepted as a layout source). Research:
-[`../research/2026-11-02-devin-secrets.md`](../research/2026-11-02-devin-secrets.md).
+`../research/2026-11-02-devin-secrets.md`.

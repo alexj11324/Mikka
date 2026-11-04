@@ -22,7 +22,7 @@ runs on:
 ~~A chosen subscription whose binding is missing or revoked still refuses and
 never falls back to a paid default~~ (superseded: it now moves to another bound
 subscription or the hosted default)
-([coordinator-model-judgment](../../coordinator-model-judgment.md), Frozen
+(coordinator-model-judgment, Frozen
 subscription).
 
 A subscription refusal fails the turn once, without step retries, and shows one

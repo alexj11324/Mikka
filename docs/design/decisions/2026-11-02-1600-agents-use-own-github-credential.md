@@ -7,7 +7,7 @@
   model's own judgment. You set it too tight, give it the credential.")
 - Rule: R-77 (every GitHub ability is listed with no control)
 - Replaces: [2026-11-01-1215-push-by-github-app](2026-11-01-1215-push-by-github-app.md),
-  [2026-11-01-0500-push-needs-repository-approval](2026-11-01-0500-push-needs-repository-approval.md),
+  2026-11-01-0500-push-needs-repository-approval,
   the GitHub part of [2026-11-01-1310-no-ask-for-app-granted-abilities](2026-11-01-1310-no-ask-for-app-granted-abilities.md),
   and the 能力 section of [2026-11-01-0338-github-plugin-page](2026-11-01-0338-github-plugin-page.md)
 - Superseded by: [2026-11-02-1730-coordinator-github-mcp](2026-11-02-1730-coordinator-github-mcp.md),
@@ -44,3 +44,5 @@ What follows:
 The safety floor, and the only limits: a credential never appears in chat,
 logs, error messages or memory; and a run, or the Coordinator, only ever gets
 its own person's credential, never someone else's. Nothing else is added.
+
+Earlier rule, from 2026-11-01-0500 (now removed): a push needed both the repository approval and `git_push`; 1215 then let the GitHub App grant decide. Alex dropped both gates because a gate cannot stop a model that holds the credential.

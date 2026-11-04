@@ -1,6 +1,6 @@
 # Telegram integration
 
-The Telegram bot accepts private messages only. Users connect it from **Settings → Integrations** with a one-time link. Ordinary messages go to the user's persistent Coordinator chat and its replies return to Telegram. While a `/new` draft is active, ordinary messages add draft details.
+The Telegram bot accepts private messages only. Users connect it from **Settings → Connections** with a one-time link. Ordinary messages go to the user's persistent Coordinator chat and its replies return to Telegram. While a `/new` draft is active, ordinary messages add draft details.
 
 ## Production configuration
 

@@ -5,11 +5,12 @@ observation and gate validation. The old V1 reader remains unchanged and rejects
 production. No stages, migrations, publication ledger or orchestration workers
 are added. #193's two frozen question-ancestry fixes are included unchanged.
 
-The finished GET-only monitor registers by default when
-`FACTORY_VERCEL_PUBLICATION=1` and the existing secret-managed `VERCEL_TOKEN`
-configure publication. There is no second required rollout opt-in. The existing
+The finished GET-only monitor registers by default when the
+`mikka-factory-vercel-publication` switch (legacy `FACTORY_VERCEL_PUBLICATION=1`)
+is on and the existing secret-managed `VERCEL_TOKEN` is set. There is no second required rollout opt-in. The existing
 explicit `FACTORY_VERCEL_MONITOR=0` operator stop remains effective;
-`FACTORY_VERCEL_PRODUCTION=1` additionally selects production. Publication's
+`mikka-factory-vercel-production` (legacy `FACTORY_VERCEL_PRODUCTION=1`)
+additionally selects production. Publication's
 resource/cost choice remains explicit, and monitoring never enables publication.
 An explicit monitor opt-in without publication or a configured publication
 without credential delivery fails closed. Registration creates no token, IAM

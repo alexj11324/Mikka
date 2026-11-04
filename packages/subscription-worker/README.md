@@ -1,6 +1,5 @@
 # CPA subscription worker
 
-Current source-level integration: [BYOS flow and activation gates](../../docs/design/byos-integration.md).
 The feature is disabled by default. Synthetic acceptance is not real-provider acceptance.
 
 Run on the Agent's cloud Linux machine:
@@ -17,7 +16,7 @@ inference or E2B sandbox is used. Docker images and Go module sums are pinned.
 
 ## Implemented path
 
-The independent [server enrollment receiver](../../docs/design/byos-server-enrollment.md)
+The independent server enrollment receiver
 can receive consent before SQL/reader/native setup. Its private bind route then
 requires actual Mikka session/workspace authorization plus source operator
 authority, publishes through the same Store lifecycle and fences one-time source
@@ -147,7 +146,7 @@ Infisical workload setup, and verified E2B owner isolation are not established.
 Codex now uses CPA device authorization with its provider-owned callback. Claude
 preserves CPA loopback redirect with explicit owner/session/state/PKCE-bound URL
 handoff in the Mikka form. Arbitrary Mikka HTTPS redirects are not supported.
-See docs/design/byos-oauth-transport.md for exact protocol and remaining live gates.
+The protocol is defined by the source in this package.
 
 Config directories are not a security boundary against a same-user shell.
 The web runtime never attests native isolation. Real E2B wiring must keep the
