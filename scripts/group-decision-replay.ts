@@ -2,6 +2,8 @@ import { writeFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 import { GROUP_BASELINE_VERSION, GROUP_POLICY_VERSION } from '../lib/coordinator/group-decision-policy'
 import { GROUP_REPLAY_CASE_IDS, GROUP_REPLAY_DATASET, GROUP_REPLAY_DATASET_DIGEST, summarizeGroupDecisionReplay, type GroupDecisionReplay } from '../lib/coordinator/group-decision-replay'
+import { GROUP_DECISION_PROTOCOL, GROUP_MAX_ROUTING_DECISIONS } from '../lib/coordinator/group-decision-chain'
+import { groupDecisionSteps } from '../lib/coordinator/group-decision-trace'
 
 /** Normal cookie/PAT authentication, fixed production deployment, fixed cases.
  * Evidence contains no input prompts, group history, token or cookies. */
@@ -28,7 +30,7 @@ export async function runGroupDecisionReplay({env=process.env,fetchImpl=fetch}:{
   const report={schemaVersion:1,evidenceKind:'actual-decision-inference' as const,dataset:GROUP_REPLAY_DATASET,datasetDigest:GROUP_REPLAY_DATASET_DIGEST,
     deploymentId:deployment,revision,conversationId,startedAt:new Date().toISOString(),finishedAt:'',status:'running',error:null as string|null,
     baseline:[] as GroupDecisionReplay[],candidate:[] as GroupDecisionReplay[],
-    scope:'Actual Decision inference; execution projected/not performed. No chat generation, tools, task execution or group publication.',
+    scope:'Actual Decision inference: 24 logical case replays, each with its bounded provider-request chain. Execution projected/not performed. Cost covers routing requests only, not correction, contribution, chat, tools or Factory.',
     productionAccepted:false,policyChanged:false}
   try {
     for(const [policyVersion,rows] of [[GROUP_BASELINE_VERSION,report.baseline],[GROUP_POLICY_VERSION,report.candidate]] as const) {
@@ -40,6 +42,11 @@ export async function runGroupDecisionReplay({env=process.env,fetchImpl=fetch}:{
         rows.push(row)
         // Do not retry or select another provider after a charged/unknown failure.
         if(!response.ok || row.status!=='complete' || !row.receipt)throw Error('replay_decision_unavailable')
+        const chain=groupDecisionSteps(row.decisions)
+        if(row.decisionProtocol!==GROUP_DECISION_PROTOCOL || !Array.isArray(row.decisions) || !chain.length || chain.length!==row.decisions.length || chain.length>GROUP_MAX_ROUTING_DECISIONS
+          || chain.some((step,index)=>step.index!==index || step.status!=='complete' || !step.receipt)
+          || new Set(chain.map(step=>step.receipt!.executionId)).size!==chain.length || new Set(chain.map(step=>step.receipt!.providerGenerationId)).size!==chain.length
+          || chain[0].receipt!.executionId!==row.receipt.executionId || chain[0].receipt!.providerGenerationId!==row.receipt.providerGenerationId)throw Error('replay_chain_unbound')
       }
     }
     await version()

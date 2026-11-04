@@ -298,12 +298,12 @@ test('group read routes advance actual group history without opening private DMs
       assert.ok(selected.length)
       assert.deepEqual(context.members.map(actor => actor.id).sort(), [...selected].sort())
       mentionedRoutes.push(selected)
-      const choices: Record<string, string> = { action: 'reply', reason: selected.length > 1 ? 'independent_contributions' : 'useful_answer', contributions: selected.length > 1 ? 'independent' : 'single', task_operation: 'none', task_target: 'none', report_timing: 'now' }
+      const choices: Record<string, string> = { intent: 'reply_useful_answer' }
       for (let index = 0; index < selected.length; index++) choices[`responder_${index}`] = selected[index]
       const answers = validatedAnswers({ answers: questions.map(question => ({ type: 'choice', name: question.name, choice: choices[question.name] })) }, questions)
       assert.ok(answers)
       const time = new Date().toISOString()
-      return { answers, execution: { executionId: randomUUID(), modelId: DECISION_MODEL, providerGenerationId: 'synthetic-group-read-fixture', startedAt: time, completedAt: time, requestDigest: createHash('sha256').update(text).digest('hex'), imageDigests: [], vision: 'no-image-input' } }
+      return { answers, execution: { executionId: randomUUID(), modelId: DECISION_MODEL, providerGenerationId: `synthetic-group-read-${randomUUID()}`, startedAt: time, completedAt: time, requestDigest: createHash('sha256').update(text).digest('hex'), imageDigests: [], vision: 'no-image-input' } }
     })
     let version = 1, entered!: () => void, release!: () => void
     const waiting = new Promise<void>(resolve => { entered = resolve }), blocked = new Promise<void>(resolve => { release = resolve })

@@ -15,7 +15,7 @@ import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
 const a = randomUUID(), b = randomUUID(), outsider = randomUUID()
 const members: GroupAgent[] = [a,b].map((id,i) => ({ id, name: `Agent ${i}`, description: `role ${i}` }))
 const message = { text: 'everyone', mentions: [] }
-const receipt: DecisionExecution = {executionId:'synthetic-execution',modelId:DECISION_MODEL,providerGenerationId:'synthetic-generation',startedAt:'2026-01-01T00:00:00.000Z',completedAt:'2026-01-01T00:00:01.000Z',requestDigest:'synthetic',imageDigests:[],vision:'no-image-input'}
+const receipt: DecisionExecution = {executionId:'synthetic-execution',modelId:DECISION_MODEL,providerGenerationId:'synthetic-generation',startedAt:'2026-01-01T00:00:00.000Z',completedAt:'2026-01-01T00:00:01.000Z',requestDigest:'a'.repeat(64),imageDigests:[],vision:'no-image-input'}
 test('group failure diagnostics preserve finite underlying causes and never private provider text', () => {
   const wrapped = (cause:unknown) => Object.assign(new Error('private prompt and credential'), { name:'AI_NoOutputGeneratedError',cause })
   assert.equal(groupGenerationFailure(wrapped(new DOMException('private upstream URL','TimeoutError'))),'generation_timeout')
@@ -51,6 +51,22 @@ test('nothing-to-add is not posted; removed members never generate; unknown peer
   assert.equal(posted, 0); assert.equal(called, 1)
   await assert.rejects(runGroupRounds({ by: 'mention', responders: [a] }, message, { ...io, async generate() { return { text: 'bad', mentions: [outsider] } } }), UnknownMentionError)
   assert.equal(posted, 0)
+})
+test('root explicit mentions all receive direct delivery; autonomous followups still need contribution and revoked targets cannot run',async()=>{
+  const generated:string[]=[],judged:string[]=[]
+  await runGroupRounds({by:'mention',action:'reply',responders:[a,b]}, {...message,mentions:[a,b]}, {
+    eligible:async()=>members,status:async()=>{},
+    contribution:async(_message,member)=>{judged.push(member.id);return{contribute:false}},
+    generate:async member=>{generated.push(member.id);return{text:member.id===b?'[nothing to add]':'first answer',mentions:member.id===a?[b]:[]}},
+    publish:async()=>true,
+  })
+  assert.deepEqual(generated,[a,b]);assert.deepEqual(judged,[b],'only the followup is subject to autonomous screening')
+  const revokedGenerated:string[]=[]
+  await runGroupRounds({by:'mention',responders:[a,b]}, {...message,mentions:[a,b]}, {
+    eligible:async()=>revokedGenerated.length?[members[0]]:members,status:async()=>{},
+    generate:async member=>{revokedGenerated.push(member.id);return{text:'answer',mentions:[]}},publish:async()=>true,
+  })
+  assert.deepEqual(revokedGenerated,[a],'membership removal still takes effect before direct generation')
 })
 test('failure clears generating status and does not synthesize a response', async () => {
   const statuses: (string|null)[] = [], outcomes: (string|undefined)[] = []
@@ -377,6 +393,38 @@ test('PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, ro
     assert.ok((await groupsWithPendingTurns(scoped)).includes(id))
     await processGroupTurn(scoped,id,{...runtime,async correction(){return{kind:'not_correction'}},async route(){return{by:'model',action:'observe',responders:[]}}})
     assert.equal((await scoped.query('SELECT status FROM group_turns WHERE "messageId"=$1',[pending])).rows[0].status,'complete')
+    // Real route consumer + real durable turn: a paid later-phase failure is
+    // pending, and a successful retry keeps both attempts without waking a Bot.
+    const sequential=await send(id,'sequential pending fixture')
+    let decisionCalls=0,retrying=false
+    const sequentialJudge=createGroupJudgment(async(_purpose,_input,questions)=>{
+      decisionCalls++;assert.equal(questions.length,1)
+      const name=questions[0].name,value=retrying?'observe_already_answered':name==='intent'?'reply_useful_answer':'uncertain'
+      return {answers:new Map([[name,{type:'choice' as const,name,choice:value}]]),execution:{...receipt,executionId:`durable-${decisionCalls}`,providerGenerationId:`durable-generation-${decisionCalls}`}}
+    })
+    const sequentialRuntime:GroupRuntime={...runtime,route:sequentialJudge.route,correction:async()=>({kind:'not_correction'}),generate:async()=>assert.fail('invalid/quiet chain cannot generate')}
+    await assert.rejects(processGroupTurn(scoped,id,sequentialRuntime),GroupJudgmentPendingError)
+    const failedChain=(await scoped.query('SELECT trace,error FROM group_turns WHERE "messageId"=$1',[sequential])).rows[0]
+    assert.equal(failedChain.error,'group_judgment_pending');assert.equal(failedChain.trace.decisionFailure,'uncertain')
+    assert.equal(failedChain.trace.decisions.length,2);assert.equal(failedChain.trace.decisions[1].status,'invalid_decision')
+    retrying=true
+    await scoped.query('UPDATE group_turns SET "nextDecisionAt"=now()-interval \'1 second\' WHERE "messageId"=$1',[sequential])
+    await processGroupTurn(scoped,id,sequentialRuntime)
+    const recovered=(await scoped.query('SELECT status,trace FROM group_turns WHERE "messageId"=$1',[sequential])).rows[0]
+    assert.equal(recovered.status,'complete');assert.equal(recovered.trace.action,'observe');assert.equal(decisionCalls,3)
+    assert.equal(recovered.trace.decisions.length,3);assert.equal(recovered.trace.execution.providerGenerationId,'durable-generation-3')
+    assert.equal(recovered.trace.decisions[1].status,'invalid_decision');assert.deepEqual(recovered.trace.events,[])
+    const stoppedDecision=await send(id,'stop between routing phases')
+    let stoppedDecisionCalls=0
+    const stopJudge=createGroupJudgment(async(_purpose,_input,questions)=>{
+      stoppedDecisionCalls++
+      assert.equal(questions[0].name,'intent')
+      assert.equal((await handleGroup(scoped,directory,{...base,resource:'stop',id},true)).status,200)
+      return {answers:new Map([['intent',{type:'choice' as const,name:'intent',choice:'reply_useful_answer'}]]),execution:{...receipt,executionId:'stop-phase',providerGenerationId:'stop-phase-generation'}}
+    })
+    await processGroupTurn(scoped,id,{...sequentialRuntime,route:stopJudge.route})
+    const stoppedChain=(await scoped.query('SELECT error,trace FROM group_turns WHERE "messageId"=$1',[stoppedDecision])).rows[0]
+    assert.equal(stoppedDecisionCalls,1);assert.equal(stoppedChain.error,'stopped');assert.equal(stoppedChain.trace.decisions.length,1)
     assert.ok(generated.includes('first')); assert.ok(laterRoot)
   } finally { releasePending(); await scoped.end(); await pool.end() }
 })
@@ -427,28 +475,29 @@ test('model route preserves its choice and rejects uncertain or non-member outpu
 })
 
 
-test('decision adapter retains host receipt and refuses missing, inconsistent or invalid answers', async () => {
+test('decision adapter retains each sequential host receipt and refuses missing, inconsistent or invalid answers', async () => {
   const seen: { purpose: string; text: string; names: string[] }[] = []
-  const judge = createGroupJudgment(async (purpose, input, questions) => {
+  let calls=0
+  const invoke=async (purpose:string,input:import('./decision').DecisionInput,questions:import('./decision').DecisionQuestion[]) => {
     seen.push({purpose,text:typeof input === 'string' ? input : input.text,names:questions.map(q=>q.name)})
-    const entries: [string, Exclude<DecisionAnswer,{type:'refusal'}>][] = purpose === 'group-routing'
-      ? [['responder_0',{type:'choice',name:'responder_0',choice:b}],['responder_1',{type:'choice',name:'responder_1',choice:'end'}]]
-      : [['correction',{type:'choice',name:'correction',choice:'yes'}],['target',{type:'choice',name:'target',choice:b}]]
-    return {answers:new Map(entries),execution:receipt}
-  },'group-route-v0')
-  assert.deepEqual(await judge.route(message,members,a,[]), {by:'model',action:'reply',reason:'useful_answer',policyVersion:'group-route-v0',responders:[b],execution:receipt})
+    const values:Record<string,string>={responder_0:b,responder_1:'end',correction:'yes',target:b}
+    const entries=questions.map(q=>[q.name,{type:'choice' as const,name:q.name,choice:values[q.name]}] as const)
+    return {answers:new Map(entries),execution:{...receipt,executionId:`adapter-${++calls}`,providerGenerationId:`adapter-generation-${calls}`}}
+  }
+  const judge = createGroupJudgment(invoke,'group-route-v0')
+  const route=await judge.route(message,members,a,[])
+  assert.equal(route.action,'reply');assert.equal(route.policyVersion,'group-route-v0');assert.deepEqual(route.responders,[b])
+  assert.equal(route.decisions?.length,2);assert.equal(route.execution?.executionId,'adapter-1')
+  assert.deepEqual(seen.slice(0,2).map(call=>call.names),[['responder_0'],['responder_1']])
   const input = {previous:{message:'earlier',responderId:a},current:message,members}
-  assert.deepEqual(await judge.correction(input), {kind:'correction',rightId:b,execution:receipt})
-  assert.match(seen[1].text, /untrusted data/); assert.deepEqual(seen[1].names,['correction','target'])
-  const invalid = createGroupJudgment(async () => ({answers:new Map([['responder_0',{type:'choice',name:'responder_0',choice:outsider}]]),execution:receipt}))
+  const correction=await judge.correction(input)
+  assert.equal(correction.kind,'correction');if(correction.kind==='correction')assert.equal(correction.rightId,b)
+  assert.match(seen[2].text, /untrusted data/); assert.deepEqual(seen[2].names,['correction','target'])
+  const invalid = createGroupJudgment(async () => ({answers:new Map([['responder_0',{type:'choice',name:'responder_0',choice:outsider}]]),execution:receipt}),'group-route-v0')
   await assert.rejects(invalid.route(message,members,a,[]),GroupJudgmentPendingError)
   assert.deepEqual(await invalid.correction(input), {kind:'uncertain'})
-  // An uncertain later slot cannot silently become a completed partial route.
-  const uncertain = createGroupJudgment(async () => ({answers:new Map<string, Exclude<DecisionAnswer,{type:'refusal'}>>([
-    ['responder_0',{type:'choice',name:'responder_0',choice:b}],
-    ['responder_1',{type:'choice',name:'responder_1',choice:'uncertain'}],
-  ]),execution:receipt}))
-  await assert.rejects(uncertain.route(message,members,a,[]),GroupJudgmentPendingError)
+  const uncertain = createGroupJudgment(async (_purpose,_input,questions) => ({answers:new Map(questions.map(q=>[q.name,{type:'choice' as const,name:q.name,choice:q.name==='responder_0'?b:'uncertain'}])),execution:{...receipt,executionId:`uncertain-${++calls}`,providerGenerationId:`uncertain-generation-${calls}`}}),'group-route-v0')
+  await assert.rejects(uncertain.route(message,members,a,[]),(error:unknown)=>error instanceof GroupJudgmentPendingError && error.decisionFailure==='uncertain' && error.decisions.length===2)
   const unavailable = createGroupJudgment(async () => null)
   await assert.rejects(unavailable.route(message,members,a,[]),GroupJudgmentPendingError)
   assert.deepEqual(await unavailable.correction(input), {kind:'uncertain'})
