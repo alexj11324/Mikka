@@ -61,6 +61,11 @@ export function toolTarget(tool: Pick<ChatTool, 'input'>): string | null {
   return value.length > 60 ? `${value.slice(0, 59)}…` : value
 }
 
+/** The task or thread a call names by id (`runId`, `issueId`), for the chat to show by its name. */
+export function toolObjectId(tool: Pick<ChatTool, 'input'>): string | null {
+  return field(tool.input, ['runId', 'issueId', 'threadId', 'taskId'])
+}
+
 /**
  * Whether a call failed, and why. A tool that throws is stored as `error`; a tool that answers `{"error": …}` or
  * `{"ok": false}` is stored as done (lib/coordinator/context.ts), but it failed all the same. `reason` is the error

@@ -174,7 +174,8 @@ test('a reply draws its thinking and its tools as shadcn Trace rows: several cal
     await view.render(<ReplyActivity tools={[...tools, { call: 'c5', name: 'get_issue', state: 'done' as const }]} />)
     assert.equal(group()?.getAttribute('data-activity-group'), 'error')
     assert.ok(group()?.querySelector('svg.lucide-circle-alert'), 'a failure is an icon, a colour and a word together (R-87)')
-    assert.equal(group()?.querySelector('[data-slot="trace-title"]')?.textContent, 'Created 1 task · Dispatched 2 threads · Looked up tasks2 failed')
+    assert.equal(group()?.querySelector('[data-slot="trace-title"]')?.textContent, 'Created 1 task · Dispatched 2 threads · Looked up tasks')
+    assert.equal(group()?.querySelector('[data-activity-failed]')?.textContent, '2 failed', 'the failure count sits outside the summary, so it never truncates')
     // Stored, a tool that never returned failed: the docs' row for a call that is not streaming.
     await view.render(<ReplyActivity tools={[tools[1]]} />)
     assert.deepEqual(rows(), [['error', 'Start thread', 'error']])

@@ -13,7 +13,9 @@ import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { GitHubIcon } from '@/components/icons/brand-icons'
 import { Trace, TraceCollapsible, TraceCollapsibleContent, TraceCollapsibleTrigger, TraceIcon, TraceLine, TraceTitle } from '@/components/ui/trace'
-import { toolAction, toolFailure, toolSummary, toolTarget, type ToolAction } from '@/lib/coordinator/tool-activity'
+import { toolAction, toolFailure, toolObjectId, toolSummary, toolTarget, type ToolAction } from '@/lib/coordinator/tool-activity'
+import { useAgentCitations } from '@/components/workspace/agent-citations'
+import { runThreadName } from '@/lib/coordinator/citations'
 import type { ChatTool } from '@/lib/coordinator/context'
 import { cn } from '@/lib/utils'
 
@@ -87,7 +89,10 @@ function ToolRow({ tool, live }: { tool: ChatTool; live: boolean }) {
   const t = useTranslations('Coordinator.activity')
   const label = useToolLabel()(tool.name)
   const reasonText = useFailureReason()
-  const target = toolTarget(tool)
+  const sources = useAgentCitations()?.sources
+  // A task or thread named by id reads as its number or name, as the chips in the words do.
+  const object = sources?.[toolObjectId(tool) ?? '']
+  const target = object ? object.kind === 'run' ? runThreadName(object) : object.identifier ?? object.title : toolTarget(tool)
   const Icon = ACTION_ICONS[toolAction(tool.name)]
   const running = tool.state === 'running' && live
   // A call still running when its reply ended never finished.
@@ -146,7 +151,9 @@ function ToolGroup({ tools, live }: { tools: readonly ChatTool[]; live: boolean 
       <TraceCollapsibleTrigger>
         <TraceLine status={running ? 'running' : undefined}>
           <TraceIcon>{running ? <LoaderCircleIcon className="animate-spin" /> : failures ? <CircleAlert className="text-destructive" /> : <LeadIcon />}</TraceIcon>
-          <TraceTitle>{summary}{failures > 0 && !running && <span className="ml-1.5 rounded-sm bg-destructive/10 px-1 text-destructive">{t('failedCount', { count: failures })}</span>}</TraceTitle>
+          <TraceTitle>{summary}</TraceTitle>
+          {/* The failure count never truncates with the summary: it is what the line must say (R-83, R-87). */}
+          {failures > 0 && !running && <span data-activity-failed="" className="shrink-0 rounded-sm bg-destructive/10 px-1 text-destructive">{t('failedCount', { count: failures })}</span>}
         </TraceLine>
       </TraceCollapsibleTrigger>
       <ExpandAllButton />

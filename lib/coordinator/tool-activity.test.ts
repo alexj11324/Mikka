@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { ChatTool } from './context'
-import { toolAction, toolFailure, toolSummary, toolTarget } from './tool-activity'
+import { toolAction, toolFailure, toolObjectId, toolSummary, toolTarget } from './tool-activity'
 
 const tool = (name: string, extra: Partial<ChatTool> = {}): ChatTool => ({ call: name, name, state: 'done', ...extra })
 
@@ -40,4 +40,10 @@ test('a summary names side effects first and counts failures', () => {
   ])
   assert.deepEqual(summary.parts, [{ action: 'dispatch', count: 2 }, { action: 'viewIssues', count: 2 }, { action: 'viewThreads', count: 2 }])
   assert.equal(summary.failed, 1)
+})
+
+test('a call that names a task or thread by id gives that id, for the chat to show its name', () => {
+  assert.equal(toolObjectId(tool('get_run', { input: '{"runId": "r1"}' })), 'r1')
+  assert.equal(toolObjectId(tool('list_runs', { input: '{"issueId": "i1", "limit": 5}' })), 'i1')
+  assert.equal(toolObjectId(tool('web_search', { input: '{"query": "x"}' })), null)
 })
