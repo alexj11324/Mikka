@@ -74,7 +74,7 @@ const handler = createMcpHandler(server => {
       limit: z.number().int().min(1).max(100).optional().describe('At most this many of the newest messages. Default 20.'),
       waitSeconds: z.number().int().min(0).max(90).optional().describe('Wait up to this long for a Coordinator reply after `after`.'),
     }),
-  }, async (input, ctx) => json(await tools.readCoordinatorMessages(mcpUserId(ctx.http?.authInfo), input)))
+  }, async (input, ctx) => json(await tools.readCoordinatorMessages(mcpUserId(ctx.http?.authInfo), input, ctx.mcpReq.signal)))
 
   server.registerTool('submit_artifact', SUBMIT_ARTIFACT, async (input, ctx) => {
     const userId = mcpUserId(ctx.http?.authInfo)

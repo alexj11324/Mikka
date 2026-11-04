@@ -8,7 +8,11 @@ import { readRun, visibleRuns } from '@/lib/agent-runs'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { peerCoordinatorMessageEvent } from '@/lib/coordinator-events'
 import { coordinatorEnabled, wakeCoordinator } from '@/lib/coordinator/wake'
-import { db } from '@/lib/db'
+import { db, pool } from '@/lib/db'
+import { workspacePool } from '@/lib/workspace-db'
+import { coordinatorSessionScope } from '@/lib/live/coordinator-session'
+import { subscribeToCoordinatorReplies } from './reply-live'
+import { waitForReply } from './reply-wait'
 import { coordinatorMessages, coordinatorSessions, issueMembers, issues } from '@/lib/db/schema'
 import { issueForUser } from '@/lib/issue-access'
 import { readIssueMetadata } from '@/lib/issue-metadata'
@@ -18,9 +22,6 @@ import { issueAttrsContent } from '@/lib/issue-summary-columns'
 
 // What the MCP tools read and write, scoped to one person. The Coordinator's
 // own tools (workflows/coordinator/steps.ts) read the same tables.
-
-/** How often a waiting read checks for the Coordinator's reply. */
-const REPLY_POLL_MS = 2000
 
 /** The person's Coordinator chat: its bot row (lib/coordinator/coordinator-bot.ts). An MCP client's OAuth grant names
  * no workspace, so it is the personal workspace's Coordinator. */
@@ -56,16 +57,16 @@ function displayMessage(message: ModelMessage): { role: 'user' | 'assistant'; te
 }
 
 /** Whether an assistant reply is past `after`. Only the position comes back; the wait does not transfer message bodies. */
-async function hasAssistantAfter(userId: string, after: number) {
+async function hasAssistantAfter(userId: string, botId: string, after: number) {
   const [row] = await db.select({ position: coordinatorMessages.position })
-    .from(coordinatorMessages).where(and(eq(coordinatorMessages.userId, userId), eq(coordinatorMessages.botId, await coordinatorChat(userId)), gt(coordinatorMessages.position, after), sql`${coordinatorMessages.message}->>'role' = 'assistant'`))
+    .from(coordinatorMessages).where(and(eq(coordinatorMessages.userId, userId), eq(coordinatorMessages.botId, botId), gt(coordinatorMessages.position, after), sql`${coordinatorMessages.message}->>'role' = 'assistant'`))
     .limit(1)
   return Boolean(row)
 }
 
-async function messagesAfter(userId: string, after: number, limit: number) {
+async function messagesAfter(userId: string, botId: string, after: number, limit: number) {
   const rows = await db.select({ position: coordinatorMessages.position, message: coordinatorMessages.message, createdAt: coordinatorMessages.createdAt })
-    .from(coordinatorMessages).where(and(eq(coordinatorMessages.userId, userId), eq(coordinatorMessages.botId, await coordinatorChat(userId)), gt(coordinatorMessages.position, after)))
+    .from(coordinatorMessages).where(and(eq(coordinatorMessages.userId, userId), eq(coordinatorMessages.botId, botId), gt(coordinatorMessages.position, after)))
     .orderBy(desc(coordinatorMessages.position)).limit(limit)
   return rows.reverse().flatMap(row => {
     const shown = displayMessage(row.message as unknown as ModelMessage)
@@ -74,9 +75,9 @@ async function messagesAfter(userId: string, after: number, limit: number) {
 }
 
 /** Whether a turn is running, and why the last one failed (cleared when a turn succeeds). */
-async function turnState(userId: string) {
+async function turnState(userId: string, botId: string) {
   const [session] = await db.select({ leaseHolder: coordinatorSessions.leaseHolder, leaseUntil: coordinatorSessions.leaseUntil, lastError: coordinatorSessions.lastError, lastErrorAt: coordinatorSessions.lastErrorAt })
-    .from(coordinatorSessions).where(and(eq(coordinatorSessions.userId, userId), eq(coordinatorSessions.botId, await coordinatorChat(userId)))).limit(1)
+    .from(coordinatorSessions).where(and(eq(coordinatorSessions.userId, userId), eq(coordinatorSessions.botId, botId))).limit(1)
   return {
     working: coordinatorLeaseActive(session),
     error: session?.lastError ?? null, errorAt: session?.lastErrorAt ?? null,
@@ -88,24 +89,36 @@ async function turnState(userId: string) {
  * `waitSeconds`, waits until the Coordinator has replied after `after`, a turn
  * fails, or the time runs out.
  */
-export async function readCoordinatorMessages(userId: string, input: { after?: number; limit?: number; waitSeconds?: number }) {
+type CoordinatorReply = {
+  messages: Awaited<ReturnType<typeof messagesAfter>>
+  replied: boolean
+  last: number
+  working: boolean
+  lastError: string | null
+  coordinatorRunning: boolean
+}
+
+export async function readCoordinatorMessages(userId: string, input: { after?: number; limit?: number; waitSeconds?: number }, signal?: AbortSignal) {
+  signal?.throwIfAborted()
   const after = input.after ?? 0
   const limit = input.limit ?? 20
   const started = new Date()
   const deadline = started.getTime() + (input.waitSeconds ?? 0) * 1000
-  const waiting = (input.waitSeconds ?? 0) > 0
-  for (;;) {
-    const turn = await turnState(userId)
-    const due = !waiting || Date.now() + REPLY_POLL_MS > deadline
+  const botId = await coordinatorChat(userId)
+  const scope = await coordinatorSessionScope(pool, workspacePool, userId, botId)
+  if (!scope) throw new Error('workspaceAccessDenied')
+  return waitForReply<CoordinatorReply>(async final => {
+    // A channel key never authorizes the data read. Recheck the persisted scope,
+    // including on a deadline or lost-notification reconciliation.
+    const current = await coordinatorSessionScope(pool, workspacePool, userId, botId)
+    if (!current || current.workspaceId !== scope.workspaceId) throw new Error('workspaceAccessDenied')
+    const turn = await turnState(userId, botId)
     const failed = Boolean(turn.errorAt && turn.errorAt >= started)
-    const arrived = !waiting || due || failed || await hasAssistantAfter(userId, after)
-    if (arrived) {
-      const messages = await messagesAfter(userId, after, limit)
-      const replied = messages.some(message => message.role === 'assistant')
-      return { messages, replied, last: messages.at(-1)?.position ?? after, working: turn.working, lastError: turn.error, coordinatorRunning: coordinatorEnabled() }
-    }
-    await new Promise(resolve => { setTimeout(resolve, REPLY_POLL_MS) })
-  }
+    if (!final && !failed && !await hasAssistantAfter(userId, botId, after)) return { done: false }
+    const messages = await messagesAfter(userId, botId, after, limit)
+    const replied = messages.some(message => message.role === 'assistant')
+    return { done: true, value: { messages, replied, last: messages.at(-1)?.position ?? after, working: turn.working, lastError: turn.error, coordinatorRunning: coordinatorEnabled() } }
+  }, { deadline, signal, subscribe: changed => subscribeToCoordinatorReplies(scope, botId, changed) })
 }
 
 export async function listIssues(userId: string, input: { status?: string }) {

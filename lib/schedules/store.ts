@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
 import { commandSchema, definitionSchema, ScheduleError, type Actor, type Definition, type ScheduledRead } from './contract'
 import { nextTime, timezone } from './time'
+import { coordinatorSessionChanged } from '../live/coordinator-session'
 
 export type WorkspaceGuard = <T>(ownerId: string, workspaceId: string | null, work: () => Promise<T>) => Promise<T>
 export type MessageGuard = (tx: PoolClient, ownerId: string, value: unknown) => Promise<void>
@@ -98,7 +99,8 @@ export class ScheduleStore {
     const text=`[Schedule ${row.id}; occurrence ${o.id}; operation ${o.operation_id}] ${o.definition.title}: ${status}\n${result===null?error??'':typeof result==='object'&&result&&'text' in result?String(result.text):JSON.stringify(result)}`
     await this.safeMessage(tx,row.owner_id,text)
     await this.lockChat(tx,row)
-    await tx.query(`INSERT INTO coordinator_messages(id,"userId","botId",position,message) SELECT $1,$2,$3,COALESCE(MAX(position),0)+1,$4 FROM coordinator_messages WHERE "userId"=$2 AND "botId" IS NOT DISTINCT FROM $3::uuid ON CONFLICT(id) DO NOTHING`,[o.operation_id,row.owner_id,row.bot_id,{role:'assistant',content:text,...(streamId?{mikkaStreamId:streamId}:{})}])
+    const inserted = await tx.query(`INSERT INTO coordinator_messages(id,"userId","botId",position,message) SELECT $1,$2,$3,COALESCE(MAX(position),0)+1,$4 FROM coordinator_messages WHERE "userId"=$2 AND "botId" IS NOT DISTINCT FROM $3::uuid ON CONFLICT(id) DO NOTHING`,[o.operation_id,row.owner_id,row.bot_id,{role:'assistant',content:text,...(streamId?{mikkaStreamId:streamId}:{})}])
+    if (inserted.rowCount) await coordinatorSessionChanged(tx, row.owner_id, row.bot_id)
     // A result is already in the chat. Whether it also needs the person (a failure, a skipped or cancelled run, a result they would want flagged)
     // is triage's call on the Decisions API, not a fixed background tier: the event is left untriaged and undelivered.
     await tx.query(`INSERT INTO coordinator_events(id,"userId","botId",kind,"dedupeKey",payload) VALUES($1,$2,$3,'run_report',$4,$5) ON CONFLICT("dedupeKey") DO NOTHING`,[o.id,row.owner_id,row.bot_id,`schedule_result:${o.id}`,{source:'schedule_result',scheduleId:row.id,occurrenceId:o.id,operationId:o.operation_id,status,error}])
