@@ -6,6 +6,15 @@ fails, fix it first; do not show work with known failures.
 
 ## Before showing UI
 
+### Reuse (R-90)
+
+- [ ] Every part of the screen names the existing component it uses
+      (`docs/design/components.md`, the live screen for the same job, or a
+      library in `components/reui/`, `components/ui/`, `components/motion/`,
+      the OpenUI catalog), drawn or coded as that component renders it.
+- [ ] Any new component says why none of those fit and is added to
+      `components.md` in the same PR.
+
 ### Usability (first, before anything visual)
 
 Looks and rules are not enough: a screen passes only if people can get done

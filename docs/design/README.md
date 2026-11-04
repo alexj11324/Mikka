@@ -9,7 +9,9 @@ says which source wins when two disagree, and where each kind of rule lives.
 2. [`rules.md`](rules.md): the product and visual rules. Every rule has an id
    (`R-12`) so reviews can cite it.
 3. [`components.md`](components.md): which component to use for each job, and
-   the old components that must not come back.
+   the old components that must not come back. Look up the existing
+   component before you draw or build anything (R-90); a design or PR that
+   redraws one fails review.
 4. [`copy.md`](copy.md): how every visible string is written (C-01…C-08), and
    which products set the precedent.
 5. [`orchestration.md`](orchestration.md): models, Agents, machines,
