@@ -793,8 +793,9 @@ export async function dispatchComputerTask(userId: string, input: { sourceEventI
     const { ComputerError } = await import('@/lib/computer/store')
     console.warn('cloud task dispatch refused', { error: error instanceof Error ? error.constructor.name : typeof error, code: error instanceof ComputerError ? error.status : undefined })
     if (input.threadRunId && error instanceof ComputerError && error.message === 'Bot subscription unavailable') return { error: 'threadModelUnavailable' as const, threadRunId: input.threadRunId }
-    // E2B refused the thread machine: end the queued run so it is not left waiting on a machine that never starts.
-    if (queuedRunId) await (await import('@/lib/cloud-computer/thread-machines')).threadMachineAction(pool, { userId, workspaceId: target.workspaceId }, queuedRunId, 'end').catch(() => undefined)
+    // A machine startup failure is not an Owner stop. Finalize only a still
+    // unclaimed run, before cleanup can reconcile it as a cancelled task.
+    if (queuedRunId) await (await import('@/lib/run-leases')).failUnclaimedCloudStart({ userId, workspaceId: target.workspaceId }, queuedRunId, error)
     return { error: 'cloudComputerUnavailable' }
   }
 }
