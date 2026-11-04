@@ -61,6 +61,10 @@ test('a thread chip shows its status and opens the thread beside the chat (?thre
     assert.deepEqual(opened.issues, [], 'a thread chip never opens the task')
     await act(async () => { taskChip.click() })
     assert.deepEqual(opened.issues, [TASK])
+    // An object chip is an inline span so a long title wraps (R-15); Enter still opens it, as a button's would.
+    assert.equal(taskChip.getAttribute('role'), 'button')
+    await act(async () => { taskChip.dispatchEvent(new browser.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }) as unknown as Event) })
+    assert.deepEqual(opened.issues, [TASK, TASK])
     assert.equal(opened.moves, 1)
   } finally {
     browser.removeEventListener('mikka:navigate', counted)

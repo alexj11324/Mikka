@@ -88,7 +88,8 @@ source wins in a conflict is in [`README.md`](README.md).
   number is in the hover card, not the chip. A thread chip opens the thread's own
   conversation, as a thread card does (R-66); only a task chip opens the task. A
   task and its thread are one piece of work (R-81): when a reply cites both, only
-  the thread is a chip and the task is its title in the sentence. Every mention of
+  the thread is a chip and the task is its number in the sentence (its title when it
+  has none). Every mention of
   an object in the words is its chip; it is the cards and lists under a reply that
   never repeat it (R-66, R-83). Web sources and links keep the unboxed source chip
   (R-14). A thread the reply dispatches is different: it is a thread card under

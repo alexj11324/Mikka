@@ -34,7 +34,7 @@ export interface AgentCitations {
   pending?: boolean
   /**
    * Tasks whose thread the same reply cites: a task and its thread are one piece of work (R-81), so only the thread
-   * is a chip and the task is its title in the sentence (R-15).
+   * is a chip and the task is its number in the sentence (R-15).
    */
   covered?: ReadonlySet<string>
 }
@@ -77,7 +77,8 @@ export function CitationAnchor({ href, children, className: _className, ...props
     const source = citations.sources[id]
     if (!source && citations.pending) return <PendingCitation />
     if (!source || (kind !== 'any' && kind !== source.kind)) return <>{children}</>
-    if (source.kind === 'issue' && citations.covered?.has(id)) return <>{source.title}</>
+    // The thread chip already carries the task's title: the task is named by its number, or its title when it has none.
+    if (source.kind === 'issue' && citations.covered?.has(id)) return <>{source.identifier ?? source.title}</>
     return <CitationChip id={id} kind={source.kind} />
   }
   if (citations && href && /^https?:\/\//i.test(href)) return <WebCitation url={href} label={typeof children === 'string' && children !== href ? children : null} />
