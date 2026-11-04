@@ -2,6 +2,7 @@ import type { PoolClient } from "pg";
 import { VERIFY_STATUSES, type VerifyStatus } from "@mikka/protocol/run";
 import { redactFactoryCheckText } from "./checks";
 import { FACTORY_STATUSES, type FactoryStatus } from "./contract";
+import { citedQuestionCommandSources, type QuestionCommandOrigin } from "./question-command-sources";
 
 /** B8/B9 (Figma 357:4750): one row per review/verify/monitor attempt. Read-only. */
 export interface FactoryCheckCriterion {
@@ -23,6 +24,7 @@ export interface FactoryCheckResult {
   candidateSha: string | null;
   runId: string | null;
   criteria: FactoryCheckCriterion[];
+  commandSources?: QuestionCommandOrigin[];
   /** null when the run has no report, or report.verify.status is not one of VERIFY_STATUSES. command is null when the report has none. */
   verify: { status: VerifyStatus; command: string | null; exitCode: number | null } | null;
 }
@@ -90,8 +92,8 @@ export async function factoryTaskDetail(
   tx: PoolClient,
   task: Task,
 ): Promise<FactoryTaskDetail> {
-  const { rows } = await tx.query<{ id: string; stage: FactoryCheckResult["stage"]; status: string; candidateId: string | null; candidateSha: string | null; runId: string | null; report: unknown }>(
-    `SELECT a.id,a.stage,a.status,a."candidateId",c.sha AS "candidateSha",a."runId",r.report FROM factory_attempts a
+  const { rows } = await tx.query<{ id: string; stage: FactoryCheckResult["stage"]; status: string; candidateId: string | null; candidateSha: string | null; runId: string | null; report: unknown; check: unknown }>(
+    `SELECT a.id,a.stage,a.status,a."candidateId",c.sha AS "candidateSha",a."runId",r.report,a.output->'check' AS check FROM factory_attempts a
        LEFT JOIN factory_candidates c ON c.id=a."candidateId" AND c."taskId"=a."taskId"
        LEFT JOIN agent_runs r ON r.id=a."runId" AND r."userId"=$2
       WHERE a."taskId"=$1 AND a.stage IN ('review','verify','monitor') ORDER BY a.position`,
@@ -100,6 +102,8 @@ export async function factoryTaskDetail(
   const checks: FactoryCheckResult[] = [];
   for (const row of rows) {
     if (!(FACTORY_STATUSES as readonly string[]).includes(row.status)) continue;
+    const criteria = factoryCriteria(row.report);
+    const commandSources = citedQuestionCommandSources(row.check, criteria, row.candidateId, row.candidateSha);
     checks.push({
       attemptId: row.id,
       stage: row.stage,
@@ -107,7 +111,8 @@ export async function factoryTaskDetail(
       candidateId: row.candidateId,
       candidateSha: row.candidateId ? row.candidateSha : null,
       runId: row.runId,
-      criteria: factoryCriteria(row.report),
+      criteria,
+      ...(commandSources.length ? { commandSources } : {}),
       verify: verifyOf(row.report),
     });
   }

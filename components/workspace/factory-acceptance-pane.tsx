@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import useSWR, { useSWRConfig } from 'swr'
-import { useTranslations } from 'next-intl'
+import { useFormatter, useTranslations } from 'next-intl'
 import { CircleCheck, CircleDashed, CircleX, Cloud, ExternalLink, Laptop, RefreshCw, Server } from 'lucide-react'
 import { Alert, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
@@ -154,6 +154,7 @@ const RESULT_WORD = { review: { passed: 'reviewPassed', failed: 'reviewFailed' }
 /** Figma `Factory/ResultRow`: the independent review or verify, its verdict and its thread. */
 function ResultLine({ row, onOpenThread }: { row: ResultRow; onOpenThread?: (runId: string) => void }) {
   const t = useTranslations('FactoryAcceptance')
+  const format = useFormatter()
   const done = row.status === 'passed' || row.status === 'failed'
   const word = row.status === 'passed' || row.status === 'failed' ? t(RESULT_WORD[row.stage][row.status]) : t('inProgress')
   const meta = row.stage === 'verify' ? (row.total ? `${row.passed}/${row.total}` : null) : row.total - row.passed > 0 ? t('opinions', { count: String(row.total - row.passed) }) : null
@@ -168,6 +169,11 @@ function ResultLine({ row, onOpenThread }: { row: ResultRow; onOpenThread?: (run
       ? <Button variant="secondary" size="xs" onClick={() => onOpenThread(row.runId!)}><Verdict passed={done ? row.status === 'passed' : null} />{thread}</Button>
       : <span className="text-xs text-muted-foreground">{thread}</span>}
     {row.sha && <span className="font-mono text-xs text-muted-foreground">{shortSha(row.sha)}</span>}
+    {row.commandSources?.map(source => <div key={`${source.runId}:${source.recoveryEventId}`} className="flex w-full min-w-0 flex-wrap items-center gap-2 pl-6 text-xs text-muted-foreground">
+      <span>{t('questionCommandSource')}</span>
+      <time dateTime={source.observedAt}>{format.dateTime(new Date(source.observedAt), { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</time>
+      {onOpenThread && <Button variant="secondary" size="xs" onClick={() => onOpenThread(source.runId)}>{t('sourceExecution')}</Button>}
+    </div>)}
   </li>
 }
 

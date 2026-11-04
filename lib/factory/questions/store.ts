@@ -635,16 +635,16 @@ export function createFactoryQuestions(
             fingerprint,
           ],
         );
-        const next = await store.apply(
-          actor.userId,
-          binding(task),
-          factoryEventId("question-next-attempt", q.id),
-          {
-            action: "retry",
-            reason: `Answer received for question ${q.id}; continue original session`,
-          },
-          tx,
-        );
+        const next = task.stage === 'execute'
+          ? await store.retryQuestion(actor.userId, binding(task), factoryEventId("question-next-attempt", q.id),
+            `Answer received for question ${q.id}; continue original session`, q.id, tx)
+          : await store.apply(
+            actor.userId,
+            binding(task),
+            factoryEventId("question-next-attempt", q.id),
+            { action: "retry", reason: `Answer received for question ${q.id}; continue original session` },
+            tx,
+          );
         const run = await dispatch(
           actor.userId,
           {
@@ -695,6 +695,16 @@ export function createFactoryQuestions(
           `UPDATE factory_questions SET status='resuming',"continuationRunId"=$2,result=$3,"updatedAt"=now() WHERE id=$1`,
           [q.id, run.runId, JSON.stringify(result)],
         );
+        // This host receipt binds a question answer to one direct execution
+        // continuation. It commits with the answer and cannot be reconstructed
+        // later from a shared SID or the mutable question status.
+        await tx.query('INSERT INTO factory_events ("taskId","eventId",request,result) VALUES($1,$2,$3,$4)', [
+          task.id, factoryEventId('question-resume', input.answerId),
+          JSON.stringify({ kind: 'question_resume', ...request }),
+          JSON.stringify({ questionId: q.id, answerId: input.answerId, answerFingerprint: fingerprint,
+            originRunId: q.originRunId, originSessionId: q.originSessionId, originAttemptId: q.attemptId,
+            continuationRunId: run.runId, task: run.task }),
+        ]);
         await skills?.continueQuestion(actor.userId, run.runId, tx);
         // A task-thread answer is retained in the addressed run, not stranded in its old inbox.
         await tx.query(
@@ -764,7 +774,11 @@ export function createFactoryQuestions(
         // Transient answered state reuses the existing dispatch and retry transaction.
         // On any admission/custody failure this entire transition rolls back.
         await tx.query("UPDATE factory_questions SET status='answered' WHERE id=$1",[q.id]);
-        const next=await store.apply(actor.userId,binding(task),factoryEventId('question-recover-attempt',input.requestId),{action:'retry',reason:'The owner requested recovery of the failed original-session continuation.'},tx);
+        const next = task.stage === 'execute'
+          ? await store.retryQuestion(actor.userId, binding(task), factoryEventId('question-recover-attempt', input.requestId),
+            'The owner requested recovery of the failed original-session continuation.', q.id, tx)
+          : await store.apply(actor.userId, binding(task), factoryEventId('question-recover-attempt', input.requestId),
+            { action: 'retry', reason: 'The owner requested recovery of the failed original-session continuation.' }, tx);
         const followUp='Recover the failed continuation of the original task. Preserve all existing constraints. Freshly inspect the retained artifact and actual current repository state before continuing; record these current observations for independent review and verification. Keep completed side effects, and do not repeat the original answer or completed external writes or publication. The answer is already in the original session history. This message only requests explicit recovery of that task and grants no new permission.';
         const queued=await dispatch(actor.userId,{binding:binding(next.task),agentId:failed.agentId,deviceRepoId:failed.deviceRepoId,note:followUp},tx,q.originRunId,failed.id);
         const {rows:[run]}=await tx.query('SELECT * FROM agent_runs WHERE id=$1 AND "userId"=$2 FOR UPDATE',[queued.runId,actor.userId]);

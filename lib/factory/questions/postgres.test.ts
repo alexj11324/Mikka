@@ -7,6 +7,8 @@ import test from "node:test";
 import { Pool, type PoolClient } from "pg";
 import { orderMigrations } from "../../../scripts/migration-order.mjs";
 import { FactoryError } from "../contract";
+import { factoryEventId } from "../event-id";
+import { questionFingerprint } from "./contract";
 import { ActionFailureError } from "../../action-error";
 import { createFactoryStore } from "../store";
 import { createFactoryDispatch } from "../dispatch";
@@ -485,6 +487,13 @@ test(
           await pool.query(`INSERT INTO run_publications("runId","userId","issueId","remoteUrl","remoteKey",branch,"baseBranch","pushApproved") VALUES($1,$2,$3,'fixture/repo','/isolated','frozen-branch','main',false)`,[f.runId,userId,f.issueId]);
           const result=await f.service.answer(human,answer);
           const replay=await f.service.answer(human,answer);assert.equal(replay.continuationRunId,result.continuationRunId);assert.equal(replay.replayed,true);
+          const { rows: receipts } = await pool.query('SELECT request,result FROM factory_events WHERE "taskId"=$1 AND "eventId"=$2', [result.task.id, factoryEventId('question-resume', answer.answerId)]);
+          assert.equal(receipts.length, 1, 'the committed answer has one immutable resume receipt after replay');
+          assert.deepEqual(receipts[0].request, { kind: 'question_resume', source: human.source, userId, input: answer });
+          assert.deepEqual(receipts[0].result, { questionId: f.q.id, answerId: answer.answerId,
+            answerFingerprint: questionFingerprint({ source: human.source, userId, input: answer }),
+            originRunId: f.runId, originSessionId: f.q.originSessionId, originAttemptId: f.q.attemptId,
+            continuationRunId: result.continuationRunId, task: result.task });
           const {rows:[child]}=await pool.query('SELECT * FROM agent_runs WHERE id=$1',[result.continuationRunId]);
           assert.equal(child.agentId,agentId);assert.equal(child.deviceId,f.childDevice);assert.equal(child.deviceRepoId,f.childRepo);assert.equal(child.agentDefinition.definitionDigest,f.definition.definitionDigest);assert.deepEqual(child.agentDefinition.subscription,f.definition.subscription);assert.equal(child.questionContinuation.originSessionId,f.q.originSessionId);assert.equal(child.questionContinuation.requireSessionResume,true);
           const {rows:machines}=await pool.query('SELECT * FROM thread_machines WHERE "runId"=ANY($1::uuid[])',[[f.runId,child.id]]);

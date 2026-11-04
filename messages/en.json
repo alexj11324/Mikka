@@ -4360,7 +4360,9 @@
       "githubMergeClosed": "PR closed",
       "githubUnavailable": "GitHub unavailable"
     },
-    "steps": "Steps {count}"
+    "steps": "Steps {count}",
+    "questionCommandSource": "From the execution before the question",
+    "sourceExecution": "View execution"
   },
   "AccountEmail": {
     "exportSubject": "Your Mikka data export",

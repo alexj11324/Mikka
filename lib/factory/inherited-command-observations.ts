@@ -4,18 +4,19 @@ import { factoryEventId } from './event-id'
 import { readDeliverableSnapshotReceipt } from './deliverable-snapshot'
 import { humanQuestionAnswerSchema, questionFingerprint, questionRecoverySchema } from './questions/contract'
 import { redactArtifact } from './evidence'
+import { resumedCommandObservations } from './resumed-command-observations'
 
 type Query = Pick<PoolClient, 'query'>
 type Task = Pick<FactoryTask, 'id' | 'userId' | 'issueId'>
 type Candidate = { id: string; executionSha: string; producerExecution: { runId: string; sessionId: string } }
-type Observation = {
+export type InheritedCommandObservation = {
   inherited: true
   sourceRunId: string
   sourceSessionId: string
-  sourceStatus: 'failed'
+  sourceStatus: 'failed' | 'stopped'
   sourceStopReason: string | null
   recoveryEventId: string
-  snapshotRecoveryEventId: string
+  snapshotRecoveryEventId: string | null
   questionId: string
   answerId: string
   requestEpoch: string
@@ -30,14 +31,21 @@ type Observation = {
   input: unknown
   output: unknown
 }
-const empty = () => ({ records: [] as Observation[], omitted: false })
+const empty = () => ({ records: [] as InheritedCommandObservation[], omitted: false })
 const time = (value: unknown) => value instanceof Date ? value.getTime() : typeof value === 'string' ? Date.parse(value) : NaN
 
-/** A direct host-recorded question recovery may expose its prior turn's tool
- * observations. This never turns them into the current producer's commands or
- * a pass, and never follows recursive, repair or same-SID-only ancestry.
- * The internal recovery followUp is not an owner answer or an acceptance rule. */
-export async function inheritedCommandObservations(tx: Query, task: Task, candidate: Candidate): Promise<{ records: Observation[]; omitted: boolean }> {
+/** The direct predecessor is part of the same receipt-bound execution.
+ * Keep its original status and observations; no read synthesizes a pass or
+ * follows recursive, repair or same-SID-only ancestry. */
+export async function inheritedCommandObservations(tx: Query, task: Task, candidate: Candidate) {
+  const receipt = await readDeliverableSnapshotReceipt(tx, task, candidate.id)
+  return receipt?.scope.legacyQuestionSubmission
+    ? legacyInheritedCommandObservations(tx, task, candidate)
+    : resumedCommandObservations(tx, task, candidate)
+}
+
+/** Retained legacy delivery snapshots keep their additional recovery fences. */
+async function legacyInheritedCommandObservations(tx: Query, task: Task, candidate: Candidate): Promise<{ records: InheritedCommandObservation[]; omitted: boolean }> {
   const receipt = await readDeliverableSnapshotReceipt(tx, task, candidate.id)
   const legacy = receipt?.scope.legacyQuestionSubmission
   const producer = candidate.producerExecution
@@ -139,21 +147,23 @@ export async function inheritedCommandObservations(tx: Query, task: Task, candid
   if (![answeredAt, sourceStartedAt, sourceFinishedAt, recoveredAt, producerStartedAt].every(Number.isFinite) ||
     answeredAt > sourceStartedAt || sourceStartedAt > sourceFinishedAt || sourceFinishedAt > recoveredAt || recoveredAt > producerStartedAt) return empty()
 
-  // These times are persisted source chunk observations, never a fresh command.
+  // These times identify the earlier execution segment, not this independent check.
   const { rows: chunks } = await tx.query(`SELECT i.id AS "inputChunkId",o.id AS "outputChunkId",i.seq,i.chunk->>'toolName' AS "toolName",
       i."createdAt" AS "inputObservedAt",o."createdAt" AS "observedAt",
       left((i.chunk->'input')::text,4000) AS "inputJson",length((i.chunk->'input')::text)>4000 AS "inputTruncated",
       o.chunk->>'type' AS "outputType",left(coalesce((o.chunk->'output')::text,to_jsonb(o.chunk->>'errorText')::text),6000) AS "outputJson",
       length(coalesce((o.chunk->'output')::text,to_jsonb(o.chunk->>'errorText')::text))>6000 AS "outputTruncated"
-    FROM run_chunks i JOIN run_chunks o ON o."runId"=i."runId" AND o.seq>i.seq AND o.chunk->>'toolCallId'=i.chunk->>'toolCallId'
+    FROM run_chunks i LEFT JOIN run_chunks o ON o."runId"=i."runId" AND o.seq>i.seq AND o.chunk->>'toolCallId'=i.chunk->>'toolCallId'
+      AND o.chunk->>'type' IN ('tool-output-available','tool-output-error')
+      AND o."createdAt">=i."createdAt" AND o."createdAt"<=$4
     WHERE i."runId"=$1 AND i.chunk->>'type'='tool-input-available'
       AND lower(i.chunk->>'toolName') IN ('bash','shell','mcp__mikka__verify_command')
-      AND o.chunk->>'type' IN ('tool-output-available','tool-output-error')
-      AND i."createdAt">=$2 AND i."createdAt">=$3 AND o."createdAt">=i."createdAt" AND o."createdAt"<=$4
+      AND i."createdAt">=$2 AND i."createdAt">=$3 AND i."createdAt"<=$4
     ORDER BY i.seq DESC,o.seq DESC LIMIT 33`, [row.sourceRunId, row.answeredAt, row.sourceStartedAt, row.sourceFinishedAt])
   // No partial or oversized historical set can look like complete evidence.
-  if (chunks.length > 32 || chunks.some(chunk => chunk.inputTruncated || chunk.outputTruncated)) return { records: [], omitted: true }
-  const records: Observation[] = chunks.reverse().map(chunk => ({
+  if (chunks.length > 32 || chunks.some(chunk => !chunk.outputChunkId || chunk.inputTruncated || chunk.outputTruncated) ||
+    new Set(chunks.map(chunk => chunk.inputChunkId)).size !== chunks.length) return { records: [], omitted: true }
+  const records: InheritedCommandObservation[] = chunks.reverse().map(chunk => ({
     inherited: true,
     sourceRunId: row.sourceRunId, sourceSessionId: row.sourceSessionId, sourceStatus: 'failed', sourceStopReason: row.sourceStopReason,
     recoveryEventId: row.recoveryEventId, snapshotRecoveryEventId: receipt.eventId,

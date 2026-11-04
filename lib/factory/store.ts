@@ -1,3 +1,5 @@
+import { checkFactoryRepairBudget } from './check-recovery-evidence'
+import { assertQuestionExecutionRetry } from './questions/execution-continuation'
 import { repositoryExecutionMatches } from './execution-receipt'
 import { isDeepStrictEqual } from 'node:util'
 import { completeFactoryExecution } from './completed-execution'
@@ -167,6 +169,8 @@ export type FactoryAuthorize = (
 ) => Promise<boolean>;
 const completionRecoveryAuthority = Symbol('owner-completion-recovery');
 type CompletionRecoveryAuthority = { [completionRecoveryAuthority]: true; tx: PoolClient; userId: string; taskId: string; attemptId: string; sourceEventId: string; runId: string };
+const questionRetryAuthority = Symbol('question-execution-retry');
+type QuestionRetryAuthority = { [questionRetryAuthority]: true; tx: PoolClient; userId: string; taskId: string; attemptId: string; sourceEventId: string; runId: string };
 export type FactoryCompletionDispatch = (tx: PoolClient, store: ReturnType<typeof createFactoryStore>, task: FactoryTask, run: Record<string, any>) => Promise<(() => Promise<void>) | undefined>;
 export type FactoryGate = (
   tx: PoolClient,
@@ -618,6 +622,17 @@ export function createFactoryStore(
         fail("factoryTransition");
       return task;
     },
+    /** Internal answer/recover entry: the existing transaction must already
+     * contain a verified answer. Client mutations never receive this authority. */
+    async retryQuestion(userId: string, rawBinding: FactoryBindingInput, eventId: string, reason: string, questionId: string, tx: PoolClient): Promise<FactorySnapshot> {
+      const binding = revisionBindingSchema.parse(rawBinding);
+      uuid(questionId);
+      const task = await owned(tx, userId, binding.taskId);
+      if (task.revision !== binding.revision) fail('factoryStale');
+      const runId = await assertQuestionExecutionRetry(tx, task, questionId);
+      const authority: QuestionRetryAuthority = { [questionRetryAuthority]: true, tx, userId, taskId: task.id, attemptId: task.attemptId, sourceEventId: task.sourceEventId, runId };
+      return store.apply(userId, binding, eventId, { action: 'retry', reason }, tx, undefined, authority);
+    },
     /** Trusted backend lifecycle actions require installed consumer gates. */
     async apply(
       userId: string,
@@ -626,6 +641,7 @@ export function createFactoryStore(
       rawChange: FactoryChange,
       existingTransaction?: PoolClient,
       completion?: CompletionRecoveryAuthority,
+      questionRetry?: QuestionRetryAuthority,
     ) {
       const bp = revisionBindingSchema.safeParse(rawBinding),
         cp = changeSchema.safeParse(rawChange);
@@ -1032,6 +1048,15 @@ export function createFactoryStore(
             )
               fail("factoryRunStillActive");
           }
+          const continuingQuestion = questionRetry?.[questionRetryAuthority] === true && questionRetry.tx === tx &&
+            questionRetry.userId === userId && questionRetry.taskId === task.id && questionRetry.attemptId === attempt.id &&
+            questionRetry.sourceEventId === task.sourceEventId && questionRetry.runId === attempt.runId && change.action === 'retry';
+          if (questionRetry && !continuingQuestion) fail('factoryQuestionContinuationUnavailable');
+          // Every new repair execution, including Owner HTTP and generic retry,
+          // shares this locked cap. A validated question continuation is one
+          // execution and cannot be requested by the public change schema.
+          if ((change.action === 'repair' || task.stage === 'execute') && !continuingQuestion)
+            await checkFactoryRepairBudget(tx, task);
           task.reason = change.reason;
           if (change.action === "repair") task.candidateId = null;
           await freshAttempt(
