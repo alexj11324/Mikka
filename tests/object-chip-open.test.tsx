@@ -47,11 +47,10 @@ test('a thread chip shows its status and opens the thread beside the chat (?thre
     const chips = [...container.querySelectorAll('[data-slot="inline-citation-trigger"]')] as HTMLElement[]
     assert.equal(chips.length, 4)
     const [taskChip, ...threadChips] = chips
-    // Each thread chip leads with the thread's group (R-52), the same marks as the thread card and the list.
+    // Each thread chip leads with a bubble, its group a dot on it (R-52), the same marks as the thread card and the list.
     assert.deepEqual(threadChips.map(chip => chip.querySelector('[role="img"]')?.getAttribute('aria-label')), ['Running', 'Blocked', 'Resolved'])
-    assert.ok(threadChips[0].querySelector('svg')?.getAttribute('class')?.includes('animate-spin'))
-    assert.ok(threadChips[1].querySelector('svg')?.getAttribute('class')?.includes('text-destructive'))
-    assert.ok(threadChips[2].querySelector('svg')?.getAttribute('class')?.includes('text-success'))
+    assert.deepEqual(threadChips.map(chip => chip.querySelector('[data-thread-dot]')?.getAttribute('data-thread-dot')), ['running', 'blocked', 'resolved'])
+    for (const chip of threadChips) assert.ok(chip.querySelector('svg')?.getAttribute('class')?.includes('lucide-message-circle'), 'a thread is a bubble, never a task\'s circle')
     assert.equal(threadChips[0].getAttribute('aria-label'), 'Open thread: ZHIX-4 Rebuild the shell')
     await act(async () => { threadChips[1].click() })
     // The thread's address, written through the navigation module; the workspace shows it in the right column (R-80).

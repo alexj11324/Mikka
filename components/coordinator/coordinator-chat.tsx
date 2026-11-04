@@ -21,7 +21,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
 import { CircleAlert } from 'lucide-react'
 import { toast } from 'sonner'
-import { useLinkPreviews, type AgentCitations } from '@/components/workspace/agent-citations'
+import { AgentCitationsContext, CitationSources, useLinkPreviews, type AgentCitations } from '@/components/workspace/agent-citations'
 import { UserMessageText } from '@/components/workspace/user-message-text'
 import { AgentInteractionContext } from '@/components/workspace/agent-interaction'
 import { ReplyAnswer } from '@/components/workspace/agent-decision'
@@ -36,7 +36,7 @@ import { chatPollInterval } from '@/lib/coordinator/chat-poll-interval'
 import { useLiveCitations } from './use-live-citations'
 import type { CoordinatorLiveReply } from '@/lib/coordinator-stream-client'
 import { ThreadCard } from './thread-card'
-import { ReplyActivity, ReplyWaiting } from './reply-activity'
+import { ActivityExpansionContext, ReplyActivity, ReplyWaiting, useActivityExpansion } from './reply-activity'
 import { replySegments, type ReplySegment } from '@/lib/coordinator/reply-segments'
 import { MessageReactions, useMessageReactions } from '@/components/workspace/message-reactions'
 import { PendingActions } from './pending-actions'
@@ -49,7 +49,7 @@ import { openArtifact as openArtifactWindow } from '@/components/workspace/works
 import { ArtifactCard, ArtifactChip } from '@/components/artifacts/artifact-card'
 import { ArtifactQuoteChip, ArtifactQuoteLine, QuoteChip, QuoteLine } from '@/components/artifacts/artifact-quote'
 import { MessageActions } from '@/components/ai-elements/message'
-import { CopyAction, HOVER_ACTIONS } from '@/components/chat/copy-action'
+import { CopyAction, REPLY_ACTIONS } from '@/components/chat/copy-action'
 import { SelectionQuote } from '@/components/chat/selection-quote'
 import { splitReplyQuote, withReplyQuote } from '@/lib/chat-quote'
 import { replyCopyText } from '@/lib/chat-copy'
@@ -230,6 +230,23 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   }, [prefill])
   // A failed message sent again is retried in place: it goes at once, and the server leaves it out from then on.
   const items = useMemo(() => (data?.items ?? []).filter(item => !(item.from === 'person' && retrying.has(item.position))), [data, retrying])
+  // One thread has one card in a chat (R-66): under the first reply that dispatched it; later replies name it in their words.
+  const firstThreadCard = useMemo(() => {
+    const first = new Map<string, number>()
+    for (const item of items) for (const id of item.threads) if (!first.has(id)) first.set(id, item.position)
+    return first
+  }, [items])
+  // A thread's event line said again later (「… 在等你回答」 twice) shows only the latest one (R-66).
+  const staleEvents = useMemo(() => {
+    const stale = new Set<number>(), seen = new Set<string>()
+    for (const item of [...items].reverse()) {
+      if (item.from !== 'event' || !item.line?.runId) continue
+      const key = `${item.line.runId}:${item.line.kind}`
+      if (seen.has(key)) stale.add(item.position)
+      else seen.add(key)
+    }
+    return stale
+  }, [items])
   // A send whose result was unknown may have been stored after all: once it shows up in the chat, the failed bubble goes.
   useEffect(() => {
     if (failed && items.some(item => item.from === 'person' && item.position > failed.after && item.text === failed.text)) setFailed(null)
@@ -369,6 +386,9 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
     }
   }
 
+  // 全部展开 / 全部收起 for the chat's tool groups (R-83).
+  const expansion = useActivityExpansion()
+
   const personBubble = cn('*:data-[slot=bubble-content]:bg-sidebar-primary *:data-[slot=bubble-content]:text-sidebar-primary-foreground', compact ? 'max-w-[90%]' : 'max-w-[min(26rem,80%)]')
 
   return <AgentThemeProvider><AgentInteractionContext value={{ busy: sending || Boolean(data?.working), continueFromAnswer: prompt => post(prompt.trim()) }}>
@@ -385,6 +405,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
             running under it, so the top reads as a solid band in either theme and in the translucent desktop window (R-35). */}
         <MessageScrollerViewport ref={transcript} onScroll={event => { const node = event.currentTarget; const next = node.scrollHeight - node.scrollTop - node.clientHeight < 56; if (next !== following) setFollowing(next) }} aria-label={bot ? t('conversationWith', { name: bot.name }) : t('conversation')} className={cn(!compact && HEADER_FADE)}>
           <MessageScrollerContent className={cn('flex w-full min-w-0 max-w-full flex-col gap-5 pb-6', compact ? 'px-3 pt-4' : 'px-4 pt-24 sm:px-6')}>
+            <ActivityExpansionContext value={expansion}>
             {data?.historyBefore && <Button variant="ghost" size="sm" disabled={loadingHistory} onClick={() => void loadHistory()}>{tCommon('loadMore')}</Button>}
             {/* A slow first load shows the shape of a conversation, not an empty page (state completeness). */}
             {!data && !loadError && <div role="status" aria-label={tCommon('loading')} className="flex flex-col gap-5">
@@ -398,7 +419,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
               : <p className="m-auto text-sm text-muted-foreground">{t('empty', { name })}</p>)}
             {/* Stored and streamed replies are one list: a stored reply takes the key of the stream it was shown from, so
                 storing it keeps its row, text and chips in place instead of mounting them again (the chat flashed). */}
-            {[...items.map(item => ({ item, live: undefined, key: item.pending ? `pending-${item.position}` : item.streamId ?? item.position })),
+            {[...items.filter(item => !staleEvents.has(item.position)).map(item => ({ item, live: undefined, key: item.pending ? `pending-${item.position}` : item.streamId ?? item.position })),
               ...stream.replies.map(reply => ({ item: streamedItem(reply), live: reply, key: reply.id }))].map(({ item, live, key }) => <Fragment key={key}>
               {!live && unread.divider === item.position && <UnreadDivider />}
               <MessageScrollerItem messageId={live ? live.id : String(item.position)} className={cn('[content-visibility:visible]', (live ? arriving(`stream-${live.id}`) : entering(item)) && ENTER)}
@@ -407,7 +428,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
                 ? item.notice
                   ? <QuotaSwitchLine notice={item.notice} botId={botId} />
                   : item.line ? <ChatEventLine line={item.line} citations={citations} /> : null
-                : <Message align={item.from === 'person' ? 'end' : 'start'}><MessageContent>
+                : <Message align={item.from === 'person' ? 'end' : 'start'} tabIndex={-1} className="outline-none"><MessageContent>
                     {/* A tapped 建议 card: the same card, then only what it adds (R-21, R-40). */}
                     {item.suggestion && <SentSuggestion card={item.suggestion} compact={compact} />}
                     {/* Top to bottom as it happened: thinking, then the words and each tool after the words said before it.
@@ -422,12 +443,14 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
                         ? <ArtifactChip key={id} artifact={artifact} active={id === embedded.activeArtifactId} onOpen={openArtifact} />
                         : <ArtifactCard key={id} artifact={artifact} onOpen={openArtifact} />] : [] })}
                     </div>}
-                    {item.threads.map(id => {
+                    {item.threads.filter(id => live ? !firstThreadCard.has(id) : firstThreadCard.get(id) === item.position).map(id => {
                       const run = sources?.[id]
                       return run?.kind === 'run' ? <ThreadCard key={id} run={run} onOpen={showThread} /> : null
                     })}
-                    {item.text && !(live && live.committedThrough === undefined) && <MessageActions className={cn('-mt-1.5', item.position !== lastReplyAt && HOVER_ACTIONS)}>
+                    {/* Copy and the pages it cites, on one line under the reply, only while it is hovered or tapped (R-83). */}
+                    {item.text && !(live && live.committedThrough === undefined) && <MessageActions className={cn('-mt-1 items-start', REPLY_ACTIONS, item.position === lastReplyAt && 'pointer-coarse:opacity-100')}>
                       <CopyAction text={item.from === 'coordinator' ? replyCopyText(item.text) : splitReplyQuote(item.text).text} />
+                      {item.from === 'coordinator' && <AgentCitationsContext value={citations}><CitationSources text={item.text} /></AgentCitationsContext>}
                     </MessageActions>}
                     {item.id && <MessageReactions reactions={reactions[item.id]} align={item.from === 'person' ? 'end' : 'start'} />}
                     {item.stopped && <MessageFooter><p role="status">{t('stopped')}</p></MessageFooter>}
@@ -453,6 +476,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
                 over. It fades in (R-37: opacity on a duration) and leaves at once: an exit would keep its height after the
                 reply lands and pull the scroll position back (coordinator-scroll.spec). */}
             {data?.working && items.length > 0 && !stream.replies.length && !(lastSaid?.from === 'coordinator' && lastSaid.text) && <div className={cn('flex', workingEnter && ENTER)}><ReplyWaiting /></div>}
+            </ActivityExpansionContext>
           </MessageScrollerContent>
         </MessageScrollerViewport>
         <AnimatePresence initial={false}>

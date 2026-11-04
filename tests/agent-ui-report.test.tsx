@@ -204,10 +204,11 @@ test('A task or run chip is boxed with no underline and only its title; a source
     const className = chip.match(/class="([^"]*)"/)?.[1] ?? ''
     assert.match(chip, /data-variant="object"/)
     assert.ok(className.split(' ').includes('bg-object-chip'), 'object chip has a fill')
-    assert.ok(className.split(' ').includes('rounded-[5px]'), 'object chip is rounded')
+    assert.ok(className.split(' ').includes('rounded-md'), 'object chip is rounded')
     assert.ok(className.split(' ').includes('no-underline'), 'object chip title is not underlined')
     assert.ok(!className.split(' ').includes('underline'), 'object chip has no underline')
-    assert.ok(className.split(' ').includes('whitespace-nowrap'), 'object chip does not break across lines')
+    assert.ok(className.split(' ').includes('inline') && className.split(' ').includes('box-decoration-clone'), 'object chip wraps like a word, each line keeping its fill (R-15)')
+    assert.ok(!className.split(' ').some(name => /^h-\d/.test(name)), 'object chip takes the text\'s own height')
     assert.ok(className.split(' ').includes('text-object-chip-foreground'), 'object chip title is in the accent')
   }
   assert.match(taskChip, />Move the chat to OpenUI</)

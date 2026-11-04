@@ -1,4 +1,4 @@
-# Chat 工具调用与引用 · 改法规格（草案，待 Coordinator 审）
+# Chat 工具调用与引用 · 改法规格（Coordinator 2026-11-04 审过）
 
 调研：[`research/chat-tool-calls-and-citations.md`](research/chat-tool-calls-and-citations.md)
 
@@ -15,7 +15,7 @@
 | 线程卡片反复出现 | `coordinator-chat.tsx` `item.threads.map(ThreadCard)` + `ChatEventLine` | 每条回复都把它提到的线程画成卡片；R-66 说「一个线程在一段 chat 里只一张卡」，但只在单条回复内去重 |
 | 「N 个来源」+ 复制 | `CoordinatorReply` → `CitationSources`；`MessageActions` | 来源行每条回复都常驻；复制在最后一条回复常驻，其余 hover |
 
-## 1. 工具调用分组（新 R 条目，编号请 Coordinator 分配，暂记 R-TOOL）
+## 1. 工具调用分组（R-83）
 
 1. **一组 = 两段文字之间的连续工具调用**（沿用 decision 2105 的切分）。思考行留在组外、组的上方。
 2. **组标题是一句摘要**，按「动作类别」计数，用「 · 」连接，失败数放最后、红色：
@@ -33,7 +33,7 @@
    - 原因：已知错误码映射成中文（`factoryNotFound` → 没有找到 Factory，`notFound`、`forbidden`、`rateLimited`、`timeout`…，表放 `messages/*.json` `Coordinator.activity.errors`）；未知码显示码本身（等宽字体），不显示整段 JSON。
 7. **原始 JSON 只在单条展开后显示**：单条行可再点开，显示输入/输出 `CodeBlock`（现有组件，失败用 destructive 变体）。组展开 ≠ 单条展开。
 8. **全部展开 / 全部收起**：
-   - 在**有任何工具组**的对话里，chat 头部右侧（header pill 同一行，电脑；手机放进 header 的 ⋯ 菜单）放一个图标按钮 `ChevronsUpDown`，tooltip「全部展开」/「全部收起」。
+   - 放在每个工具组摘要行的末尾（Coordinator 允许「对话顶部或这组旁边」，选了组旁边，这样不用改 shell 的 header）：图标按钮 `ChevronsUpDown`，tooltip 是「全部展开」/「全部收起」。电脑上鼠标悬停在组上时出现，触屏上一直显示。
    - 作用于当前已加载的所有组（展开组，不展开单条 JSON）。读者对单个组的操作之后仍可覆盖。
    - 状态不持久（刷新回到默认折叠）。
 
@@ -90,6 +90,7 @@
 1. **工具结果的失败标记**：工具返回 `{error}` 时把 `ChatTool.state` 记为 `error`，并给 `errorCode`。前端先靠解析预览兜底。
 2. **工具调用的对象标签**：`ChatTool.target`（如 `ALEX-45`、搜索词、仓库名），由服务端从完整 input 取，避免前端从 200 字截断的预览里猜。
 3. 未知工具的展示名：服务端在工具注册处给 `displayName`（含 MCP / GitHub 动态工具）。
+4. **不要在回复末尾单独列一行引用**。前端渲染时 chip 留在模型写的位置，`CitationAnchor` 不会把它挪到气泡底部。所以截图里挂在气泡底部、单独成行的两个 chip，是模型在正文末尾专门写了一行引用。要改的是 Coordinator 的 prompt（`lib/coordinator/instructions.ts`，第 37 行附近）：引用写在提到对象的那句话里，不在末尾汇总；任务已经有线程时，只引线程。前端这边，任务和线程同时出现时只画线程 chip，作为兜底。
 
 ## 7. 验收
 

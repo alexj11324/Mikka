@@ -136,19 +136,20 @@ test('the streaming reply keeps its earlier chips mounted as new tokens arrive',
   } finally { await view.unmount() }
 })
 
-test('a reply draws its thinking and each tool as shadcn Trace rows: running, done or failed; outputs open on demand', async () => {
+test('a reply draws its thinking and its tools as shadcn Trace rows: several calls are one summary line that opens to a row each (R-83)', async () => {
   const { ReplyActivity, ReplyWaiting } = await import('../components/coordinator/reply-activity')
   const view = await mount()
   const text = () => view.container.textContent ?? ''
   const rows = () => [...view.container.querySelectorAll('[data-activity-tool]')].map(row => [row.getAttribute('data-activity-tool'), row.querySelector('[data-slot="trace-title"]')?.textContent, row.querySelector('[data-slot="trace-line"]')?.getAttribute('data-status') ?? null])
+  const group = () => view.container.querySelector('[data-activity-group]')
   const settle = async (done: () => boolean) => { for (let tries = 0; tries < 100 && !done(); tries++) await act(() => new Promise(resolve => setTimeout(resolve, 20))) }
   try {
     const tools = [
       { call: 'c1', name: 'create_issue', state: 'done' as const, input: '{"title":"Fix login"}', output: '{"id":"i1"}' },
       { call: 'c2', name: 'dispatch_run', state: 'running' as const },
-      { call: 'c3', name: 'some_internal_tool', state: 'error' as const, output: 'no device' },
+      { call: 'c3', name: 'dispatch_factory_task', state: 'done' as const, output: '{"error":"factoryNotFound"}' },
     ]
-    // Live: thinking runs and is open as its words stream in; the running tool shimmers; outputs start closed.
+    // Live: thinking runs and is open as its words stream in; the group is open on the call running now.
     await view.render(<ReplyActivity live tools={tools} thinking={{ active: true, seconds: 1, text: 'Check the login' }} />)
     const thinking = view.container.querySelector('[data-activity-thinking]')
     assert.equal(thinking?.getAttribute('data-activity-thinking'), 'active')
@@ -157,18 +158,25 @@ test('a reply draws its thinking and each tool as shadcn Trace rows: running, do
     assert.ok(thinking?.querySelector('svg.lucide-loader-circle.animate-spin'), 'a spinner while it thinks')
     await settle(() => /Check the login/.test(text()))
     assert.match(text(), /Check the login/, 'the running row is open, so its words show as they stream')
-    assert.deepEqual(rows(), [['done', 'Create task', null], ['running', 'Start thread', 'running'], ['error', 'Use a tool failed', 'error']], 'our labels; internal names never show')
-    assert.doesNotMatch(text(), /some_internal_tool|Fix login|i1|no device/, 'outputs start closed and inputs never show')
+    assert.equal(group()?.getAttribute('data-activity-group'), 'running')
+    await settle(() => rows().length === 3)
+    assert.deepEqual(rows(), [['done', 'Create taskFix login', null], ['running', 'Start thread', 'running'], ['error', 'Dispatch Factory task· Factory task not found', 'error']],
+      'verb and object; an answered error is a failure with its reason')
+    assert.doesNotMatch(text(), /dispatch_factory_task|i1|factoryNotFound/, 'raw input and output start closed')
     await act(async () => { (view.container.querySelector('[data-activity-tool="done"] button') as HTMLButtonElement).click() })
     await settle(() => /i1/.test(text()))
-    assert.equal(view.container.querySelector('[data-activity-tool="done"] [data-slot="code-block"]')?.textContent, '{"id":"i1"}', 'the output in a code block')
+    assert.equal(view.container.querySelectorAll('[data-activity-tool="done"] [data-slot="code-block"]')[1]?.textContent, '{"id":"i1"}', 'the output in a code block, after the input')
     await act(async () => { (view.container.querySelector('[data-activity-tool="error"] button') as HTMLButtonElement).click() })
-    await settle(() => /no device/.test(text()))
+    await settle(() => /factoryNotFound/.test(text()))
     assert.equal(view.container.querySelector('[data-activity-tool="error"] [data-slot="code-block"]')?.getAttribute('data-variant'), 'destructive')
 
+    // Stored: one summary line, closed, side effects first, with how many failed; a call that never returned failed too.
+    await view.render(<ReplyActivity tools={[...tools, { call: 'c5', name: 'get_issue', state: 'done' as const }]} />)
+    assert.equal(group()?.getAttribute('data-activity-group'), 'error')
+    assert.equal(group()?.querySelector('[data-slot="trace-title"]')?.textContent, 'Created 1 task · Dispatched 2 threads · Looked up tasks · 2 failed')
     // Stored, a tool that never returned failed: the docs' row for a call that is not streaming.
     await view.render(<ReplyActivity tools={[tools[1]]} />)
-    assert.deepEqual(rows(), [['error', 'Start thread failed', 'error']])
+    assert.deepEqual(rows(), [['error', 'Start thread', 'error']])
     // A tool with nothing to show is a line that does not open.
     await view.render(<ReplyActivity tools={[{ call: 'c4', name: 'create_issue', state: 'done' }]} />)
     assert.equal(view.container.querySelector('[data-activity-tool] button'), null)
