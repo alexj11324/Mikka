@@ -70,13 +70,20 @@ test('a live reply keeps each tool in call order with its latest state, and adds
     { call: 'c2', name: 'web_search', state: 'error' },
   ])
   assert.deepEqual(replies[0].thinking, { ms: 3_400 }, 'a repeated start does not restart the clock')
-  // Readable blocks keep their text, in order; a block without text adds none.
+  // What it thinks arrives as it thinks, while the clock runs; a block without text adds none.
   let thought: CoordinatorLiveReply[] = [{ id, text: '' }]
-  for (const [event, at] of [[{ type: 'thinking', id, state: 'start' }, 0], [{ type: 'thinking', id, state: 'end', text: 'first' }, 1_000],
-    [{ type: 'thinking', id, state: 'start' }, 2_000], [{ type: 'thinking', id, state: 'end' }, 2_500], [{ type: 'thinking', id, state: 'start' }, 3_000], [{ type: 'thinking', id, state: 'end', text: 'second' }, 3_500]] as [CoordinatorStreamEvent, number][]) {
+  const seen: (string | undefined)[] = []
+  for (const [event, at] of [[{ type: 'thinking', id, state: 'start' }, 0], [{ type: 'thinking', id, state: 'delta', text: 'fir' }, 400], [{ type: 'thinking', id, state: 'delta', text: 'st' }, 800], [{ type: 'thinking', id, state: 'end' }, 1_000],
+    [{ type: 'thinking', id, state: 'start' }, 2_000], [{ type: 'thinking', id, state: 'end' }, 2_500], [{ type: 'thinking', id, state: 'start' }, 3_000], [{ type: 'thinking', id, state: 'delta', text: '\n\nsecond' }, 3_200], [{ type: 'thinking', id, state: 'end' }, 3_500]] as [CoordinatorStreamEvent, number][]) {
     thought = coordinatorStreamReply(thought, event, at)
+    seen.push(thought[0].thinking?.text)
   }
+  assert.deepEqual(seen.slice(0, 3), [undefined, 'fir', 'first'], 'the words show before the block ends')
+  assert.equal(thought[0].thinking?.since, undefined)
   assert.deepEqual(thought[0].thinking, { ms: 2_000, text: 'first\n\nsecond' })
+  // A retried model step drops its part: the server sends what remains.
+  assert.deepEqual(coordinatorStreamReply(thought, { type: 'thinking', id, state: 'reset', text: 'first' })[0].thinking, { ms: 2_000, text: 'first' })
+  assert.deepEqual(coordinatorStreamReply(thought, { type: 'thinking', id, state: 'reset', text: '' })[0].thinking, { ms: 2_000 })
   // Before any words, a reply with only steps already shows; one with nothing does not.
   assert.equal(visibleCoordinatorReplies(replies, 0, 'run').length, 1)
   assert.equal(visibleCoordinatorReplies([{ id, text: '' }], 0, 'run').length, 0)

@@ -36,8 +36,7 @@ import { chatPollInterval } from '@/lib/coordinator/chat-poll-interval'
 import { useLiveCitations } from './use-live-citations'
 import type { CoordinatorLiveReply } from '@/lib/coordinator-stream-client'
 import { ThreadCard } from './thread-card'
-import { ReplyActivity } from './reply-activity'
-import { Shimmer } from '@/components/ai-elements/shimmer'
+import { ReplyActivity, ReplyWaiting } from './reply-activity'
 import { MessageReactions, useMessageReactions } from '@/components/workspace/message-reactions'
 import { PendingActions } from './pending-actions'
 import { SubagentLoginNeeds } from './subagent-login-needs'
@@ -400,7 +399,7 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
                     {/* A tapped 建议 card: the same card, then only what it adds (R-21, R-40). */}
                     {item.suggestion && <SentSuggestion card={item.suggestion} compact={compact} />}
                     {/* Before the words, as they happened: thinking, then each tool. The same slot live and stored, so storing keeps it. */}
-                    {item.activity && <ReplyActivity tools={item.activity.tools} thinking={live ? liveThinking(live) : undefined} thought={item.activity.thought} reasoningAt={item.activity.reasoningAt} botId={botId} />}
+                    {item.activity && <ReplyActivity tools={item.activity.tools} thinking={live ? liveThinking(live) : undefined} thought={item.activity.thought} reasoningAt={item.activity.reasoningAt} botId={botId} live={Boolean(live && live.committedThrough === undefined)} />}
                     {item.text && (item.from === 'coordinator'
                       ? <ReplyAnswer value={live ? null : answers.get(item.position) ?? null}><CoordinatorReply text={item.text} citations={live ? live.committedThrough === undefined ? liveCitations.streaming : liveCitations.settled : citations} isStreaming={Boolean(live && live.committedThrough === undefined)} /></ReplyAnswer>
                       : <Bubble variant="secondary" align="end" className={personBubble}><BubbleContent className="flex flex-col gap-1.5 rounded-2xl px-4 py-3 whitespace-pre-wrap"><PersonWords text={item.text} before={<>{item.quote && <ArtifactQuoteLine quote={item.quote} />}{item.notes?.map(note => <BrowserNoteLine key={note.n} note={note} />)}</>} /></BubbleContent></Bubble>)}
@@ -436,9 +435,10 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
                 </span>
               </MessageContent></Message>
             </MessageScrollerItem>}
-            {/* The working line fades in (R-37: opacity on a duration). It leaves at once: an exit would keep its height
-                after the reply lands and pull the scroll position back (coordinator-scroll.spec). */}
-            {data?.working && items.length > 0 && <p role="status" className={cn('flex items-center gap-2 text-sm text-muted-foreground', workingEnter && ENTER)}><Shimmer as="span">{t('working')}</Shimmer></p>}
+            {/* Before the reply has anything to show: the Trace's Thinking row. Once the reply streams, its own Trace takes
+                over. It fades in (R-37: opacity on a duration) and leaves at once: an exit would keep its height after the
+                reply lands and pull the scroll position back (coordinator-scroll.spec). */}
+            {data?.working && items.length > 0 && !stream.replies.length && !(lastSaid?.from === 'coordinator' && lastSaid.text) && <div className={cn('flex', workingEnter && ENTER)}><ReplyWaiting /></div>}
           </MessageScrollerContent>
         </MessageScrollerViewport>
         <AnimatePresence initial={false}>
