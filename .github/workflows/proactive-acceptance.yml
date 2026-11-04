@@ -39,18 +39,6 @@ jobs:
         recursive: false
         include-imports: false
         secret-name: VERCEL_TEAM_TOKEN
-    - name: Read permitted Flash credential
-      uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
-      with:
-        method: oidc
-        identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
-        oidc-audience: mikka-infisical
-        project-id: 89850d6a-f020-4936-863e-df77380dfe40
-        env-slug: dev
-        secret-path: /vercel
-        recursive: false
-        include-imports: false
-        secret-name: DEEPSEEK_API_KEY
     - name: Read the existing E2B cloud acceptance credential
       uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
       with:

@@ -28,7 +28,7 @@ function fixture(options = {}) {
     GITHUB_REF: 'refs/heads/acceptance/proactive-1157-1163',
     GITHUB_ACTIONS: 'true', CI: 'true', GITHUB_EVENT_NAME: 'push',
     MIKKA_ACCEPTANCE_SOURCE_SHA: sha,
-    VERCEL_TEAM_TOKEN: syntheticToken, DEEPSEEK_API_KEY: syntheticKey, E2B_API_KEY: syntheticCloudKey,
+    VERCEL_TEAM_TOKEN: syntheticToken, E2B_API_KEY: syntheticCloudKey,
     ...options.env,
   }
   const fetchImpl = async (url, init) => {
@@ -64,7 +64,7 @@ test('missing credentials and incorrect runner or credential scope never submit 
     assert.equal((await f.execute()).status, 'runner_boundary_rejected')
     assert.equal(f.calls.length, 0)
   }
-  for (const name of ['VERCEL_TEAM_TOKEN', 'DEEPSEEK_API_KEY', 'E2B_API_KEY']) {
+  for (const name of ['VERCEL_TEAM_TOKEN', 'E2B_API_KEY']) {
     for (const value of [undefined, '', ' ', 'invalid\ncredential']) {
       const f = fixture({ env: { [name]: value } })
       assert.equal((await f.execute()).status, 'credential_missing')
@@ -105,7 +105,7 @@ test('the existing sandbox must have the full 90-minute budget plus cleanup grac
   assert.equal((await enough.execute()).status, 'passed')
   assert.equal(enough.calls.filter(call => call.method === 'POST').length, 1)
   assert.equal(enough.calls.find(call => call.method === 'POST').url.pathname, sessionPath + '/cmd')
-  assert.equal(target.sessionId, 'sbx_qjiHsJWkPvJAC8afDreaZn5T4CFV')
+  assert.equal(target.sessionId, 'sbx_B8OfCLVT4sP7dTN9dUZX2Mf81dmd')
 })
 
 test('the fixed 1–8 plan retains bounded shutdown, fresh setup and exclusive local ownership', async () => {
@@ -118,7 +118,7 @@ test('the fixed 1–8 plan retains bounded shutdown, fresh setup and exclusive l
   assert.equal((await f.execute()).status, 'passed')
   const post = f.calls.find(call => call.method === 'POST')
   assert.equal(post.body.timeout, 90 * 60_000)
-  assert.deepEqual(post.body.env, { DEEPSEEK_API_KEY: syntheticKey, E2B_API_KEY: syntheticCloudKey })
+  assert.deepEqual(post.body.env, { E2B_API_KEY: syntheticCloudKey })
   assert.ok(sandboxProgram.includes('const acceptancePlan = ' + JSON.stringify(acceptancePlan)))
   assert.ok(sandboxProgram.includes("LOCAL_LOOP_ITEMS: acceptancePlan.items.join(',')"))
   assert.ok(sandboxProgram.includes('setTimeout(stopChild, acceptancePlan.softTimeout)'))
@@ -138,6 +138,7 @@ test('the workflow budgets 100 minutes and requires an explicit source pin befor
   const draft = new URL('./proactive-sandbox-local-loop.workflow.yml', import.meta.url)
   const workflow = readFileSync(existsSync(draft) ? draft : new URL('../../.github/workflows/proactive-acceptance.yml', import.meta.url), 'utf8')
   assert.match(workflow, /^  timeout-minutes: 100$/m)
+  assert.equal(workflow.includes('secret-name: DEEPSEEK_API_KEY'), false)
   assert.match(workflow, /^  cancel-in-progress: false$/m)
   assert.match(workflow, /^    branches: \[acceptance\/proactive-1157-1163\]$/m)
   const sourcePin = workflow.match(/^        MIKKA_ACCEPTANCE_SOURCE_SHA: (\S+)$/m)?.[1]
@@ -147,14 +148,16 @@ test('the workflow budgets 100 minutes and requires an explicit source pin befor
   assert.equal(f.calls.length, 0)
 })
 
-test('only the coding and cloud credentials enter the command environment; wait:false has no logs property', async () => {
-  const f = fixture({ env: { BETTER_AUTH_SECRET: 'synthetic-private-auth', DATABASE_URL: 'synthetic-private-db', NODE_OPTIONS: 'synthetic-private-options' } })
+test('only the cloud credential enters command env; the sandbox keeps its own coding credential', async () => {
+  const f = fixture({ env: { DEEPSEEK_API_KEY: syntheticKey, BETTER_AUTH_SECRET: 'synthetic-private-auth', DATABASE_URL: 'synthetic-private-db', NODE_OPTIONS: 'synthetic-private-options' } })
   assert.equal((await f.execute()).status, 'passed')
   const post = f.calls.find(call => call.method === 'POST')
   assert.equal(post.url.pathname, sessionPath + '/cmd')
   assert.equal(post.headers.Authorization, 'Bearer ' + syntheticToken)
   assert.equal(post.redirect, 'error')
-  assert.deepEqual(post.body.env, { DEEPSEEK_API_KEY: syntheticKey, E2B_API_KEY: syntheticCloudKey })
+  assert.deepEqual(post.body.env, { E2B_API_KEY: syntheticCloudKey })
+  assert.equal(Object.hasOwn(post.body.env, 'DEEPSEEK_API_KEY'), false)
+  assert.ok(sandboxProgram.includes("assert.ok(process.env.DEEPSEEK_API_KEY?.trim())"))
   assert.equal(post.body.cwd, target.cwd)
   assert.equal(post.body.sudo, false)
   assert.equal(post.body.wait, false)

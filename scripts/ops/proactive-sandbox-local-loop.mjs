@@ -18,7 +18,7 @@ export const target = Object.freeze({
   teamId: 'team_C7lwxVVvnUicFli6112mvxpv',
   projectId: 'prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH',
   projectName: 'mikka',
-  sessionId: 'sbx_qjiHsJWkPvJAC8afDreaZn5T4CFV',
+  sessionId: 'sbx_B8OfCLVT4sP7dTN9dUZX2Mf81dmd',
   cwd: '/vercel/mikka-local-loop',
   hardTimeout: acceptancePlan.hardTimeout,
 })
@@ -152,7 +152,7 @@ export async function run({ env = process.env, fetchImpl = fetch, report = value
       || env.GITHUB_ACTIONS !== 'true' || env.CI !== 'true' || env.GITHUB_EVENT_NAME !== 'push') fail('runner_boundary_rejected')
     const sha = env.MIKKA_ACCEPTANCE_SOURCE_SHA
     if (!/^[a-f0-9]{40}$/.test(sha ?? '')) fail('source_sha_required')
-    if (!hasSecret(env.VERCEL_TEAM_TOKEN) || !hasSecret(env.DEEPSEEK_API_KEY) || !hasSecret(env.E2B_API_KEY)) fail('credential_missing')
+    if (!hasSecret(env.VERCEL_TEAM_TOKEN) || !hasSecret(env.E2B_API_KEY)) fail('credential_missing')
     const waitPending = Symbol('wait_pending')
     const request = async (path, body, waitForExit = false) => {
       const url = new URL(path, target.api)
@@ -186,7 +186,9 @@ export async function run({ env = process.env, fetchImpl = fetch, report = value
     // No retries: a lost submission response must never duplicate a paid loop.
     const { command } = await request('/v2/sandboxes/sessions/' + target.sessionId + '/cmd', {
       command: 'node', args: ['--input-type=module', '--eval', sandboxProgram, sha],
-      cwd: target.cwd, env: { DEEPSEEK_API_KEY: env.DEEPSEEK_API_KEY, E2B_API_KEY: env.E2B_API_KEY },
+      // The dedicated sandbox already owns the user-provided Flash credential.
+      // Never copy it from CI, another process, or a credential file.
+      cwd: target.cwd, env: { E2B_API_KEY: env.E2B_API_KEY },
       // The API rejects any logs field when wait is false, including logs:false.
       timeout: target.hardTimeout, wait: false, sudo: false,
     })
