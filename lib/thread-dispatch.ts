@@ -105,6 +105,8 @@ export async function dispatchToTask<R extends { runId: string }, E extends { er
   note?: string
   /** Host-bound raw owner turn, never a model-generated dispatch note. */
   sourceEventId?: string
+  /** A browser submission already bound its original target before taking the task lock. */
+  expectedRunId?: string
   /** The caller asked for a new thread; it is granted only when `explicit()` says the person asked for it. */
   newThread?: boolean
   /** The dispatch names another place than where the thread ran: moving a thread is a new thread, granted the same way. */
@@ -117,6 +119,7 @@ export async function dispatchToTask<R extends { runId: string }, E extends { er
   const queued = (result: R | E): result is R => 'runId' in result && typeof result.runId === 'string'
   return withTaskLock(userId, issueId, async () => {
     const previous = await latestTaskRun(pool, userId, issueId)
+    if (input.expectedRunId && previous?.id !== input.expectedRunId) throw new ActionFailureError('threadReplaced')
     if (!previous) {
       const result = await input.start(null, input.note)
       return queued(result) ? { ...result, thread: 'new' as const, threadId: result.runId } : result

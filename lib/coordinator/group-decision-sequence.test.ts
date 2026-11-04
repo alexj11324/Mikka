@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { createHash } from 'node:crypto'
+import dataset from '../../tests/fixtures/group-decision-cases.json'
 import { createGroupJudgment } from './group-judgment'
 import { GroupJudgmentPendingError } from './group-correction'
-import { DECISION_MODEL, type DecisionQuestion } from './decision'
+import { DECISION_MODEL, decisionRequestInput, type DecisionQuestion } from './decision'
 import type { DecisionExecution, invokeDecision } from './decide'
 import { overrideDeploymentSwitch } from '../deployment-switches'
-import { GROUP_BASELINE_VERSION, GROUP_POLICY_VERSION } from './group-decision-policy'
+import { GROUP_BASELINE_VERSION, GROUP_POLICY_VERSION, GROUP_LIVE_POLICY_VERSION, GROUP_PREVIOUS_POLICY_VERSION } from './group-decision-policy'
 
 const ids=['00000000-0000-4000-8000-000000000001','00000000-0000-4000-8000-000000000002','00000000-0000-4000-8000-000000000003']
 const members=ids.map((id,index)=>({id,name:`Member ${index}`,description:'Public role',memberType:'bot' as const,executionAvailable:true}))
@@ -87,18 +89,81 @@ test('a live policy change applies to the next routing attempt and cannot mix ph
   overrideDeploymentSwitch('groupContribution',true)
   const current=transport([
     {name:'intent',value:'reply_useful_answer',inspect:input=>{
-      assert.equal(input.policyVersion,GROUP_POLICY_VERSION)
+      assert.equal(input.policyVersion,GROUP_LIVE_POLICY_VERSION)
       overrideDeploymentSwitch('groupContribution',false)
     }},
-    {name:'responder_0',value:ids[0],inspect:input=>assert.equal(input.policyVersion,GROUP_POLICY_VERSION)},
+    {name:'responder_0',value:ids[0],inspect:input=>assert.equal(input.policyVersion,GROUP_LIVE_POLICY_VERSION)},
   ])
   const retained:string[]=[]
   const route=await createGroupJudgment(current.invoke).route({text:'help',mentions:[]},members,null,[],async(_steps,version)=>{retained.push(version!)})
-  assert.equal(route.policyVersion,GROUP_POLICY_VERSION)
-  assert.deepEqual(retained,[GROUP_POLICY_VERSION,GROUP_POLICY_VERSION])
-  assert.ok(route.decisions?.every(step=>step.policyVersion===GROUP_POLICY_VERSION))
+  assert.equal(route.policyVersion,GROUP_LIVE_POLICY_VERSION)
+  assert.deepEqual(retained,[GROUP_LIVE_POLICY_VERSION,GROUP_LIVE_POLICY_VERSION])
+  assert.ok(route.decisions?.every(step=>step.policyVersion===GROUP_LIVE_POLICY_VERSION))
   const next=transport([{name:'responder_0',value:ids[0],inspect:input=>assert.equal(input.policyVersion,GROUP_BASELINE_VERSION)},{name:'responder_1',value:'end'}])
   const nextRoute=await createGroupJudgment(next.invoke).route({text:'next request',mentions:[]},members,null,[])
   assert.equal(nextRoute.policyVersion,GROUP_BASELINE_VERSION)
   assert.ok(nextRoute.decisions?.every(step=>step.policyVersion===GROUP_BASELINE_VERSION))
+})
+
+test('v2 clarification selects a questioner without treating the missing task details as a missing responder',async()=>{
+  const t=transport([
+    {name:'intent',value:'clarify_missing_information'},
+    {name:'responder_0',value:ids[1],inspect:(input,q)=>{
+      assert.equal(input.policyVersion,'group-contribution-v2')
+      assert.equal(input.confirmed.action,'clarify')
+      assert.match(q.instructions,/Missing task details are why clarification was selected/)
+      assert.match(q.instructions,/without requiring a uniquely best member/)
+      assert.equal(q.type,'choice');if(q.type==='choice')assert.ok(q.choices.some(choice=>choice.value==='uncertain'))
+    }},
+  ])
+  const route=await createGroupJudgment(t.invoke,GROUP_POLICY_VERSION).route({text:'Which problem needs clarification?',mentions:[]},members,null,[])
+  assert.equal(route.action,'clarify');assert.deepEqual(route.responders,[ids[1]]);assert.equal(t.calls(),2)
+  assert.ok(route.decisions?.every(step=>step.policyVersion==='group-contribution-v2'))
+})
+
+test('v2 independent contributions select speaking order, then still require a separate bounded responder decision',async()=>{
+  const t=transport([
+    {name:'intent',value:'reply_independent_contributions'},
+    {name:'responder_0',value:ids[0],inspect:(input,q)=>{
+      assert.equal(input.confirmed.reason,'independent_contributions')
+      assert.match(q.instructions,/speaking order, not the only competent member/)
+    }},
+    {name:'responder_1',value:ids[2]},
+    {name:'responder_2',value:'end'},
+  ])
+  const route=await createGroupJudgment(t.invoke,GROUP_POLICY_VERSION).route({text:'Give the two requested perspectives',mentions:[]},members,null,[])
+  assert.deepEqual(route.responders,[ids[0],ids[2]]);assert.equal(t.calls(),4)
+  const uncertain=transport([{name:'intent',value:'clarify_missing_information'},{name:'responder_0',value:'uncertain'}])
+  await assert.rejects(createGroupJudgment(uncertain.invoke,GROUP_POLICY_VERSION).route({text:'Cannot select a questioner',mentions:[]},members,null,[]),(error:unknown)=>{
+    assert.ok(error instanceof GroupJudgmentPendingError);assert.equal(error.decisionFailure,'uncertain')
+    assert.equal(error.decisions.length,2);assert.ok(error.decisions.every(step=>step.receipt && step.policyVersion==='group-contribution-v2'))
+    return true
+  })
+})
+
+test('v0 baseline and historical v1 request bytes match the six recorded synthetic production request digests',async()=>{
+  const samples=[
+    {caseId:'small-talk',policy:GROUP_BASELINE_VERSION,digest:'270faaf10fd1d7a00f8396821c3220df29d4a437387a28b1e7d4564fa3e410ad'},
+    {caseId:'already-answered',policy:GROUP_BASELINE_VERSION,digest:'53d3657c3cfc042e966730e1f0f48d2d8f9ab6a471e7ae1f97ae25f9e8fc12df'},
+    {caseId:'unrelated',policy:GROUP_BASELINE_VERSION,digest:'3f8e9b0412eef45b0ffd83de333ec15dc2c2a1a5702ecc45ec201a992aa9601e'},
+    {caseId:'prompt-injection',policy:GROUP_BASELINE_VERSION,digest:'1800b67f59c91d71ad05d4515f46ed3b22c443a96fd0e3e2d3dae9585ff9f5c9'},
+    {caseId:'ambiguous-task',policy:GROUP_PREVIOUS_POLICY_VERSION,intent:'clarify_missing_information',digest:'664dd77878e4239fd01730f6e16d75174d8736e9b6343ece02f470d454092585'},
+    {caseId:'independent-views',policy:GROUP_PREVIOUS_POLICY_VERSION,intent:'reply_independent_contributions',digest:'f4f73924c0cb6939f64b21c0dde0fe28a3866dc743ef1256c4bfbe350b09fa77'},
+  ]
+  for(const sample of samples){
+    let ordinal=0
+    const invoke:typeof invokeDecision=async(_purpose,input,questions)=>{
+      ordinal++
+      const name=questions[0].name
+      const value=name==='intent'?sample.intent!:'uncertain'
+      const requestDigest=createHash('sha256').update(JSON.stringify({model:DECISION_MODEL,input:decisionRequestInput(input),questions})).digest('hex')
+      if(name==='responder_0')assert.equal(requestDigest,sample.digest,`historical prompt changed: ${sample.caseId}`)
+      const execution:DecisionExecution={executionId:`historical-${ordinal}`,modelId:DECISION_MODEL,providerGenerationId:`historical-generation-${ordinal}`,startedAt:'2026-11-04T00:00:00Z',completedAt:'2026-11-04T00:00:01Z',requestDigest,imageDigests:[],vision:'no-image-input'}
+      return {answers:new Map([[name,{type:'choice',name,choice:value}]]),execution}
+    }
+    const item=dataset.cases.find(item=>item.id===sample.caseId)!
+    await assert.rejects(createGroupJudgment(invoke,sample.policy).route({text:item.message,mentions:[],recent:'context' in item?item.context:[],tasks:[]},
+      structuredClone(dataset.members) as typeof members,null,[]),GroupJudgmentPendingError)
+    assert.equal(ordinal,sample.policy===GROUP_BASELINE_VERSION?1:2)
+  }
 })

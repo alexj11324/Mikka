@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import type { PoolClient } from 'pg'
 import type { DecisionExecution } from './decide'
 import type { GroupRoute, RoutingMember } from './group-routing'
-import { getGroupDecisionPolicy, GROUP_BASELINE_VERSION, GROUP_POLICY_VERSION, type GroupPolicyVersion } from './group-decision-policy'
+import { getGroupDecisionPolicy, GROUP_POLICY_VERSIONS, type GroupPolicyVersion } from './group-decision-policy'
 import { DECISION_MODEL } from './decision'
 import { GROUP_DECISION_PROTOCOL, GROUP_MAX_ROUTING_DECISIONS, GROUP_RETAINED_DECISIONS, groupDecisionFailures, groupDecisionPhases, groupDecisionTotals, type GroupDecisionFailure, type GroupDecisionStep } from './group-decision-chain'
 
@@ -67,7 +67,7 @@ export function groupDecisionSteps(steps: readonly GroupDecisionStep[] | undefin
     if (!step || !token(step.id) || !groupDecisionPhases.includes(step.phase) || !Number.isSafeInteger(step.index) || step.index < 0 || step.index >= GROUP_MAX_ROUTING_DECISIONS || !['complete','invalid_decision','unavailable'].includes(step.status)) return []
     const receipt = groupDecisionReceipt(step.receipt ?? undefined)
     return [{id:step.id,phase:step.phase,index:step.index,status:receipt?step.status:'unavailable',failure:groupDecisionFailures.includes(step.failure!)?step.failure:null,receipt,
-      ...(step.policyVersion===GROUP_POLICY_VERSION || step.policyVersion===GROUP_BASELINE_VERSION ? {policyVersion:step.policyVersion}:{}),
+      ...(step.policyVersion && GROUP_POLICY_VERSIONS.includes(step.policyVersion) ? {policyVersion:step.policyVersion}:{}),
       ...(step.decisionCostUsd === null || typeof step.decisionCostUsd === 'number' && Number.isFinite(step.decisionCostUsd) && step.decisionCostUsd >= 0 ? {decisionCostUsd:step.decisionCostUsd}:{})} as GroupDecisionStep]
   }).slice(-GROUP_RETAINED_DECISIONS)
 }
