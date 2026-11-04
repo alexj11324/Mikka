@@ -1,0 +1,39 @@
+# Manual group-policy roundtrip — prepared, not executed
+
+This independent addon observes the deployed routing policy on fresh synthetic group messages. It does not install a workflow, run on import, read a PostHog credential, change a flag, retry an uncertain model judgment, or reuse a failed acceptance fixture. Its fourteen offline transport contracts and syntax check pass; there has been no real invocation of this addon.
+
+## Reused owners and activation boundary
+
+`runGroupPolicyRollbackBundle` imports the pinned source's existing `withTemporaryFlashCredential`, `assertFlashTestModel`, normal Smoke-account allowlist and Decision model constant. It uses the same canonical origin, normal email session, `GET /api/version` build guard, and clean exact source checkout as the reviewed core bundle. The temporary credential helper runs with `cloudExecution: false`; it does not create an E2B key. Both the helper session and the separate fixture session must report normal HTTP 200 logout, and any newly created Flash key must be removed, before the wrapper can pass.
+
+The adapter must supply the final `GROUP_ACCEPTANCE_REVISION` and `GROUP_ACCEPTANCE_DEPLOYMENT`, normal named Smoke credentials and existing authorized Flash secret source. Placeholder pins are rejected. The current production core workflow and its files are unchanged. This prepared module has no CLI or automatically triggered workflow; selecting an active workflow, final source/build and manual operator window remains a separate review step.
+
+## Operator procedure
+
+1. Confirm the final canonical build contains the merged policy implementation and is READY. Use the existing Mikka PostHog project 670821, flag 1028528, key `mikka-group-contribution-off`. Record the original flag state and version.
+2. The operator manually sets this existing Boolean kill flag active/true for the already configured production condition. Record the acknowledged flag version and update time. The runner receives no PostHog token.
+3. Invoke the reviewed bundle once with an `onCheckpoint` callback that prints only its safe checkpoint object. It creates three new owned Bots, selects their available Flash option through normal APIs, and creates one new group from actual HTTP 201 receipts.
+4. Each probe is a unique message explicitly addressed to the new UI Bot. The question requests one UI-design sentence and does not request execution. The baseline phase accepts only an actual completed trace with `group-route-v0`; the candidate phase accepts only an actual completed trace with `group-contribution-v1`. It verifies the primary phase, every current-attempt step's frozen version, receipt identities, exactly one wake/generation/publication by the addressed Bot, and stable publication events on readback.
+5. On the safe `baseline_observed` checkpoint, the operator manually makes the same flag inactive/false and records the new version and update time. The runner waits at least 61 seconds between probes, but only an actual trace can establish the observed policy. Cold processes may use the existing environment/default fallback before the background refresh.
+6. Review the operator's two actual PostHog mutation/readback records together with the provider receipt timestamps. In particular, the accepted candidate receipt must start **after** the acknowledged inactive/false operation. The runner deliberately records `manualFlagControlVerified: false`: actual baseline→candidate observations by themselves cannot prove that a console operation caused them. A cold-process default must not be misreported as verified flag restoration.
+
+No prompt, reply body, private role text, cookie, key or arbitrary provider error is emitted. Reports contain fixture references, safe receipts, per-step policy versions, known/unknown routing costs, publication digests, bounded failure categories and cleanup acknowledgments. Failed or malformed observations do not become silence or a successful roundtrip. A missing trace does not imply zero calls or zero cost.
+
+## Bounds and cleanup
+
+The total wrapper deadline is ten minutes. The module reserves up to 180 seconds of its budget for scoped cleanup, and the wrapper reserves a further 45 seconds within the same deadline for its logout and credential helper. The absolute message limit is eight, at most four probes per desired policy. A probe is never resent; pending recovery only polls the existing turn for up to 120 seconds inside the work deadline. A deployment/source change, unavailable judgment, invalid chain, wrong owner/membership, non-Flash selection, or unknown message outcome stops the attempt.
+
+Finally, the new group alone is stopped through its normal owner API and decisions are read back without another message drain. Group stop fences chat turns; it does not cancel Factory Tasks or end their machines. The final read therefore scans successful delegate receipts for this run's confirmed HTTP 201 message IDs even when normal turn polling timed out. Cleanup first binds the trusted group trace to the new Bots, Task, current request epoch, exact attempt run set and frozen owner/workspace/runtime payer. It cancels that Task once when needed, waits for the exact runs to end, and calls normal per-run machine `end` once for an owned E2B run. A task/run pair is attempted only once, including when the normal path already saw it. Unknown stop/cancel/end outcomes are not replayed or called acknowledged. Foreign identity, epoch/run-set drift, or unknown end results remain unresolved failures. A lost message POST response cannot authorize guessing a Task from a later listing; such a receipt is reported as unbound and requires scoped follow-up. HTTP 200 `ended` is the product's acknowledgment, not an independent provider observation.
+
+The new Bots and group history remain as evidence. Their temporary Flash selection is not described as restored after the temporary key has been deleted. No previous Bot, group, session or resource is modified by the fixture setup.
+
+If a confirmed root has an unfinished delegate route but its host receipt has not yet appeared, final cleanup only polls `GET decisions` within the same cleanup budget. This covers a receipt committed after the chat-stop response. It does not trigger another drain, cron, or model call. If the bounded read never finds that receipt, cleanup remains unconfirmed; it never guesses an execution identifier.
+
+## Offline verification
+
+```sh
+node --test group-policy-rollback.test.mjs
+node --check group-policy-rollback.mjs
+```
+
+Fourteen contracts cover cache-period observations and the actual ordered roundtrip; no flag change; frozen-step mismatch and membership drift; unknown submissions and stops; recoverable pending; properly bound unexpected-task cancellation and machine cleanup; pending-delegation timeout, late host receipt and unbound unknown-POST cleanup; foreign identity/epoch drift/unknown end; total budget and a stalled checkpoint emitter; normal two-session/key cleanup; and exact source/deployment preflight. All transports and Decision receipts in these contracts are synthetic. They are not production evidence. The late-receipt regression failed against the prior single-read cleanup (zero cancels instead of one), then passed after bounded read-only waiting was added.
