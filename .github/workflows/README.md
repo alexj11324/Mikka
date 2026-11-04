@@ -24,9 +24,19 @@ its existing protected status names and real acceptance coverage.
 
 ## Main pushes: postmerge checks
 
-- A push to `main` triggers `ui-policy.yml` again. No browser run follows a
-  main push or runs nightly; expensive desktop/release workflows stay
-  independent.
+- A push to `main` triggers `ui-policy.yml` again. It is the only test
+  workflow that reruns on `main`: the daemon and desktop releases wait for it
+  on the exact commit (`scripts/release/ci-gate.mjs`).
+- The special suites (`analytics-ssr`, `cloud-computer`, `desktop`,
+  `e2b-byos`, `site-search`, `ssh-device-backend`, `unattended-sandbox`) run on
+  pull requests only, and only when their paths change; each can still be run
+  by hand (`workflow_dispatch`). Vercel's production build is the build check
+  for `main`.
+- `publish-daemon.yml` and `desktop-release.yml` run only when a path that goes
+  into their package changes. Every daemon release makes installed daemons
+  upgrade and restart, so a web-only change publishes neither.
+- The run-dispatch and Controlled Skill improvement suites run in the CI
+  database shards (`pnpm test:db`); they no longer have workflows of their own.
 - The `ui-policy.yml` concurrency key includes `github.run_id` only on `main`.
   This prevents GitHub from evicting an older *pending* main verification,
   in addition to not cancelling a running main job. Superseded PR checks may

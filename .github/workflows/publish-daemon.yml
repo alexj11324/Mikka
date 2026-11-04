@@ -4,6 +4,20 @@ name: Publish daemon
 on:
   push:
     branches: [main]
+    # Publish only when something that goes into the npm package changed.
+    # Every published version makes installed daemons upgrade and restart.
+    paths:
+      - 'packages/daemon/**'
+      - 'packages/protocol/**'
+      - 'packages/config/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'patches/**'
+      - 'LICENSE'
+      - 'scripts/release/**'
+      - 'config/release-security.json'
+      - '.github/workflows/publish-daemon.yml'
   workflow_dispatch:
 
 concurrency:
