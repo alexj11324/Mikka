@@ -26,12 +26,14 @@ export function useDiffThemeType(): "light" | "dark" | "system" {
 
 /**
  * The options every Mikka diff shares: the library's themes, stacked lines (a
- * side-by-side view has no room in a chat or a side panel), and a plain
- * separator between hunks, since the library's "N unmodified lines" is English only.
+ * side-by-side view has no room in a chat or a side panel), a plain separator
+ * between hunks (the library's "N unmodified lines" is English only), and
+ * Pierre's own WebAssembly highlighter, which colours a 3,000-line change about
+ * five times faster than the default Shiki engine.
  */
 export function useDiffOptions({ overflow = "wrap", collapsed = false, stickyHeader = false }: Pick<FileDiffOptions<undefined, undefined>, "overflow" | "collapsed" | "stickyHeader"> = {}): FileDiffOptions<undefined, undefined> {
   const themeType = useDiffThemeType();
-  return useMemo(() => ({ themeType, diffStyle: "unified", hunkSeparators: "simple", overflow, collapsed, stickyHeader }), [collapsed, overflow, stickyHeader, themeType]);
+  return useMemo(() => ({ themeType, diffStyle: "unified", hunkSeparators: "simple", preferredHighlighter: "highlights", overflow, collapsed, stickyHeader }), [collapsed, overflow, stickyHeader, themeType]);
 }
 
 /** One hunk from lines that start at line 1 on both sides, as a unified patch. */

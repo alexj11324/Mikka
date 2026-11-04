@@ -64,6 +64,8 @@ test('each file is drawn by the library with its own look: stacked lines, the th
     assert.equal(options.diffStyle, 'unified')
     assert.equal(options.themeType, 'dark')
     assert.equal(options.stickyHeader, true)
+    // Pierre's WebAssembly highlighter: the default Shiki engine takes ~4 s on a 3,000-line change.
+    assert.equal(options.preferredHighlighter, 'highlights')
     assert.equal(options.collapsed, false)
     // Pierre's default themes: nothing of Mikka's old diff styling is passed in.
     assert.equal(options.theme, undefined)
