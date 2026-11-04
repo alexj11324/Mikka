@@ -1,0 +1,40 @@
+name: Temporary subscription authorization metadata
+on:
+  push:
+    branches: [diagnostics/1217-subscription-auth-20261104]
+    paths:
+      - '.github/workflows/subscription-auth-metadata.yml'
+      - 'scripts/ops/subscription-auth-metadata.mjs'
+      - 'scripts/ops/subscription-auth-metadata.test.mjs'
+permissions:
+  contents: read
+concurrency:
+  group: subscription-auth-metadata-1217
+  cancel-in-progress: false
+jobs:
+  metadata:
+    if: github.repository == 'alexj11324/Mikka' && github.repository_id == '1427517699' && github.repository_owner_id == '183887963' && github.ref == 'refs/heads/diagnostics/1217-subscription-auth-20261104' && github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+      - name: Verify read-only transport and redaction without credentials
+        run: node --test scripts/ops/subscription-auth-metadata.test.mjs
+      - name: Read the existing project configuration metadata once
+        run: node scripts/ops/subscription-auth-metadata.mjs
+      - name: Preserve only the allowlisted metadata report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: subscription-auth-metadata-${{ github.run_id }}
+          path: subscription-auth-metadata.json
+          if-no-files-found: error
+          retention-days: 7
