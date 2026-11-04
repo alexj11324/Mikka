@@ -38,7 +38,17 @@ test('independent run recovery: concurrency, STOP, renewed leases and attempt fe
     await pool.query('INSERT INTO device_repos (id,"deviceId","userId","repoPath","remoteUrl") VALUES ($1,$2,$3,$4,$5)', [repoId, deviceId, userId, remoteKey(remote), remote])
     await pool.query('INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId",status,prompt,attempt,"leaseExpiresAt","agentDefinition") VALUES ($1,$2,$3,$4,$5,$6,\'running\',\'Controlled recovery fixture\',$7,$8,$9)',
       [id, userId, issueId, agentId, deviceId, repoId, attempt, new Date(now.getTime() - 1000), definition])
-    return { id, userId, deviceId, otherDeviceId }
+    return { id, userId, deviceId, otherDeviceId, issueId, agentId, repoId }
+  }
+  async function checkpointRetry(previousId: string, stopReason = 'provider_failure') {
+    const id = randomUUID()
+    await pool.query(`INSERT INTO agent_runs (id,"userId","issueId","agentId","botId","deviceId","deviceRepoId",status,"stopReason","retryOf")
+      SELECT $2,"userId","issueId","agentId","botId","deviceId","deviceRepoId",'failed',$3,id FROM agent_runs WHERE id=$1`, [previousId, id, stopReason])
+    return id
+  }
+  async function saveCheckpoint(runId: string, content = 'checkpoint fixture') {
+    await pool.query(`INSERT INTO run_checkpoints ("runId","userId","baseCommit",patch,files,"takenAt","updatedAt")
+      SELECT id,"userId",$2,$3,1,now(),now() FROM agent_runs WHERE id=$1`, [runId, 'a'.repeat(40), gzipSync(Buffer.from(content))])
   }
   async function waitForLock(fragment: string) {
     const end = Date.now() + 5000
@@ -182,7 +192,7 @@ test('independent run recovery: concurrency, STOP, renewed leases and attempt fe
     const run = await fixture()
     await pool.query('UPDATE agent_runs SET status=\'failed\' WHERE id=$1', [run.id])
     const retryId = randomUUID()
-    await pool.query('INSERT INTO agent_runs (id,"userId","agentId",status,"retryOf") SELECT $2,"userId","agentId",\'failed\',id FROM agent_runs WHERE id=$1', [run.id, retryId])
+    await pool.query('INSERT INTO agent_runs (id,"userId","issueId","agentId","botId","deviceId","deviceRepoId",status,"retryOf") SELECT $2,"userId","issueId","agentId","botId","deviceId","deviceRepoId",\'failed\',id FROM agent_runs WHERE id=$1', [run.id, retryId])
     const empty = gzipSync(Buffer.alloc(0))
     await pool.query('INSERT INTO run_checkpoints ("runId","userId","baseCommit",patch,files,"takenAt","updatedAt","unavailableReason") VALUES ($1,$3,$4,$5,1,\'2099-01-01\',now(),NULL),($2,$3,$4,$6,1,now(),now(),\'too_large\')',
       [run.id, retryId, run.userId, 'a'.repeat(40), gzipSync(Buffer.from('ancestor fixture')), empty])
@@ -196,6 +206,77 @@ test('independent run recovery: concurrency, STOP, renewed leases and attempt fe
     assert.equal(gunzipSync(Buffer.from(clean!.patch, 'base64')).length, 0)
     await pool.query('UPDATE run_checkpoints SET "updatedAt"=$2 WHERE "runId"=$1', [retryId, new Date(Date.now() - 31 * 60_000)])
     assert.match(checkpointRecoveryError(await latestCheckpoint(retryId)) ?? '', /thirty-minute/)
+  })
+
+  await t.test('provider continuations can find a snapshot beyond three attempts without extending infrastructure retries', async () => {
+    const provider = await fixture(), infrastructure = await fixture()
+    await pool.query('UPDATE agent_runs SET status=\'failed\',"stopReason"=\'provider_failure\' WHERE id=$1', [provider.id])
+    await saveCheckpoint(provider.id, 'provider ancestor')
+    await saveCheckpoint(infrastructure.id, 'infrastructure ancestor')
+    let providerHead = provider.id, infrastructureHead = infrastructure.id
+    for (let index = 0; index < 5; index++) providerHead = await checkpointRetry(providerHead)
+    for (let index = 0; index < 3; index++) infrastructureHead = await checkpointRetry(infrastructureHead, 'device_lost')
+    const recovered = await latestCheckpoint(providerHead)
+    assert.ok(recovered)
+    assert.equal(gunzipSync(Buffer.from(recovered.patch, 'base64')).toString(), 'provider ancestor')
+    assert.equal(await latestCheckpoint(infrastructureHead), null, 'a fourth infrastructure attempt remains outside the recovery cap')
+  })
+
+  await t.test('provider traversal is bounded independently and terminates cyclic history', async () => {
+    const run = await fixture()
+    await pool.query('UPDATE agent_runs SET status=\'failed\',"stopReason"=\'provider_failure\' WHERE id=$1', [run.id])
+    await saveCheckpoint(run.id)
+    const ids = Array.from({ length: 128 }, () => randomUUID())
+    await pool.query(`INSERT INTO agent_runs (id,"userId","issueId","agentId","botId","deviceId","deviceRepoId",status,"stopReason","retryOf")
+      SELECT seq.id,r."userId",r."issueId",r."agentId",r."botId",r."deviceId",r."deviceRepoId",'failed','provider_failure',
+        CASE WHEN seq.position=1 THEN r.id ELSE ($2::uuid[])[seq.position::int-1] END
+      FROM agent_runs r CROSS JOIN unnest($2::uuid[]) WITH ORDINALITY AS seq(id,position) WHERE r.id=$1`, [run.id, ids])
+    assert.equal(await latestCheckpoint(ids.at(-1)!), null, 'a 129th provider node cannot extend the bounded walk')
+    const cycle = await fixture(), next = await checkpointRetry(cycle.id)
+    await pool.query('UPDATE agent_runs SET "retryOf"=$2,"stopReason"=\'provider_failure\' WHERE id=$1', [cycle.id, next])
+    assert.equal(await latestCheckpoint(next), null)
+  })
+
+  await t.test('an unavailable final provider upload bars stale snapshots through a later machine retry', async () => {
+    const run = await fixture()
+    await pool.query('UPDATE agent_runs SET status=\'failed\',"stopReason"=\'provider_failure\',report=$2 WHERE id=$1',
+      [run.id, { providerCheckpoint: 'unavailable' }])
+    await saveCheckpoint(run.id, 'stale before the final provider error')
+    const retryId = await checkpointRetry(run.id, 'device_lost')
+    assert.equal(await latestCheckpoint(run.id), null)
+    assert.equal(await latestCheckpoint(retryId), null)
+    await saveCheckpoint(retryId, 'confirmed newer worktree')
+    assert.equal(gunzipSync(Buffer.from((await latestCheckpoint(retryId))!.patch, 'base64')).toString(), 'confirmed newer worktree')
+  })
+
+  await t.test('checkpoint ancestry cannot cross owner, task or repository boundaries', async () => {
+    const run = await fixture(), foreign = await fixture()
+    await saveCheckpoint(run.id)
+    await saveCheckpoint(foreign.id)
+    const retryId = await checkpointRetry(run.id)
+    await pool.query('UPDATE agent_runs SET "retryOf"=$2 WHERE id=$1', [retryId, foreign.id])
+    assert.equal(await latestCheckpoint(retryId), null, 'a foreign owner cannot supply the patch')
+    const otherIssueId = randomUUID()
+    await pool.query('INSERT INTO issues (id,"userId",title,content,status,priority) VALUES ($1,$2,\'Other recovery task\',\'{}\',\'todo\',\'normal\')', [otherIssueId, run.userId])
+    await pool.query('UPDATE agent_runs SET "retryOf"=$2,"issueId"=$3 WHERE id=$1', [retryId, run.id, otherIssueId])
+    assert.equal(await latestCheckpoint(retryId), null, 'a different task cannot supply the patch')
+    const otherRepoId = randomUUID(), otherRemote = 'https://github.com/isolated/other-recovery-repo.git'
+    await pool.query('INSERT INTO device_repos (id,"deviceId","userId","repoPath","remoteUrl") VALUES ($1,$2,$3,$4,$5)',
+      [otherRepoId, run.deviceId, run.userId, remoteKey(otherRemote), otherRemote])
+    await pool.query('UPDATE agent_runs SET "issueId"=$2,"deviceRepoId"=$3 WHERE id=$1', [retryId, run.issueId, otherRepoId])
+    assert.equal(await latestCheckpoint(retryId), null, 'a different repository cannot supply the patch')
+  })
+
+  await t.test('the same confirmed repository on another device retains its checkpoint ancestry', async () => {
+    const run = await fixture(), repoId = randomUUID()
+    const remote = 'git@github.com:isolated/recovery-fixture.git'
+    await saveCheckpoint(run.id, 'same repository work')
+    await pool.query('INSERT INTO device_repos (id,"deviceId","userId","repoPath","remoteUrl") VALUES ($1,$2,$3,$4,$5)',
+      [repoId, run.otherDeviceId, run.userId, remoteKey(remote), remote])
+    const retryId = await checkpointRetry(run.id)
+    await pool.query('UPDATE agent_runs SET "deviceId"=$2,"deviceRepoId"=$3 WHERE id=$1', [retryId, run.otherDeviceId, repoId])
+    const recovered = await latestCheckpoint(retryId)
+    assert.equal(gunzipSync(Buffer.from(recovered!.patch, 'base64')).toString(), 'same repository work')
   })
 
   await t.test('post-commit cleanup failure cannot lose the terminal event needed after a worker restart', async () => {

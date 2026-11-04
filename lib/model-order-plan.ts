@@ -34,7 +34,7 @@ export interface OrderEntry {
 /** Why a credential cannot run now; `resetsAt` when it comes back on its own. */
 export type CredentialState =
   | { usable: true }
-  | { usable: false; reason: 'checking' | 'quota' | 'expired' | 'paused' | 'missing' | 'keyRefused'; resetsAt?: string | null }
+  | { usable: false; reason: 'checking' | 'quota' | 'expired' | 'paused' | 'missing' | 'keyRefused' | 'balance' | 'providerUnavailable'; resetsAt?: string | null }
 
 export interface PoolDevice {
   id: string

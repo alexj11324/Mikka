@@ -6,6 +6,7 @@ import type { FactoryTask, createFactoryStore } from "./store";
 import { MAX_RUN_ATTEMPTS } from "../run-retry";
 import type { createFactoryQuestions } from "./questions/store";
 import { checkFactoryRepairBudget } from "./check-recovery-evidence";
+import { modelFallbackRecordSchema } from "../run-model-fallback-view";
 
 /** A failed run or a failed verify gate is a visible failed attempt that
  * re-enters the existing repair loop (retry at execute, repair from
@@ -128,20 +129,23 @@ export function createFactoryReconciler(
           recovered++;
           continue;
         }
-        // Consume the existing bounded run-retry chain; never create a retry here.
-        for (
-          let retry = 1;
-          ["spec", "execute", "review", "verify"].includes(task.stage) &&
-          ["device_lost","quota_exhausted"].includes(run?.stopReason) &&
-          !run.stopRequestedAt &&
-          retry < MAX_RUN_ATTEMPTS;
-          retry++
-        ) {
+        // The provider's ordered continuation has its own finite model list.
+        // Consuming it must not exhaust the unrelated device retry budget.
+        const seen = new Set<string>();
+        let transportRetries = 1;
+        while (["spec", "execute", "review", "verify", "monitor"].includes(task.stage) && run && !run.stopRequestedAt && !seen.has(run.id)) {
+          const provider = run.stopReason === "provider_failure";
+          if (task.stage === "monitor" && !provider) break;
+          const fallback = modelFallbackRecordSchema.safeParse(run.report?.modelFallback);
+          if (provider ? !fallback.success || fallback.data.state !== "switched" || !fallback.data.retryRunId
+            : !["device_lost", "quota_exhausted"].includes(run.stopReason) || transportRetries >= MAX_RUN_ATTEMPTS) break;
+          seen.add(run.id);
           const {
             rows: [child],
           } = await tx.query(
-            `SELECT r.*,repo."remoteUrl",repo."repoPath" FROM agent_runs r LEFT JOIN device_repos repo ON repo.id=r."deviceRepoId" WHERE r."retryOf"=$1 AND r."userId"=$2 AND r."issueId"=$3 ORDER BY r."createdAt" LIMIT 1 FOR UPDATE OF r`,
-            [run.id, userId, task.issueId],
+            `SELECT r.*,repo."remoteUrl",repo."repoPath" FROM agent_runs r LEFT JOIN device_repos repo ON repo.id=r."deviceRepoId" WHERE r."retryOf"=$1 AND r."userId"=$2 AND r."issueId"=$3
+              AND ($4::text IS NULL OR r.id::text=$4) ORDER BY r."createdAt" LIMIT 1 FOR UPDATE OF r`,
+            [run.id, userId, task.issueId, provider && fallback.success ? fallback.data.retryRunId : null],
           );
           if (!child) break;
           const adopted = await store.apply(
@@ -151,12 +155,13 @@ export function createFactoryReconciler(
             {
               action: "adopt_retry",
               runId: child.id,
-              reason: "Resumed the existing device-loss or quota continuation; no new dispatch",
+              reason: provider ? "Continue with the next preferred model after the provider failed" : "Resumed the existing device-loss or quota continuation; no new dispatch",
             },
             tx,
           );
           task = adopted.task;
           run = child;
+          if (!provider) transportRetries++;
         }
         if (task.status === "failed") {
           await tx.query("COMMIT");
@@ -167,6 +172,34 @@ export function createFactoryReconciler(
           !["succeeded", "failed", "stopped", "cancelled"].includes(run.status)
         ) {
           await tx.query("COMMIT");
+          continue;
+        }
+        if (run.status === "failed" && run.stopReason === "provider_failure") {
+          const parsed = modelFallbackRecordSchema.safeParse(run.report?.modelFallback);
+          const fallback = parsed.success ? parsed.data : undefined;
+          if (run.stopRequestedAt || fallback?.state === "stopped") {
+            await store.apply(userId, binding(task), factoryEventId("provider-stopped", run.id), {
+              action: "cancel", reason: "The original request ended before model recovery could continue.",
+            }, tx);
+            await tx.query("COMMIT");
+            recovered++;
+            continue;
+          }
+          if (fallback?.state === "pending") {
+            // Recovery owns this durable intent. A completion replay or the
+            // recovery sweep will settle it before checks or repair can run.
+            await tx.query("COMMIT");
+            continue;
+          }
+          await store.apply(userId, binding(task), factoryEventId("provider-blocked", run.id), {
+            action: "finish", status: "blocked",
+            reason: (fallback?.card?.description ?? (fallback?.state === "picked"
+              ? "The selected model is unavailable. Choose another model or restore its credential."
+              : "No authorized preferred model can continue this task. Restore a model or update the preferred order.")).slice(0, 4000),
+            evidence: [], output: { runId: run.id, recovery: "provider_failure", reasonCode: fallback?.state === "picked" ? "model_picked_unavailable" : "model_unavailable", ...(fallback ? { modelFallback: fallback } : {}) },
+          }, tx);
+          await tx.query("COMMIT");
+          recovered++;
           continue;
         }
         if (run.report?.repositorySelection && !run.stopRequestedAt && run.stopReason === 'blocked') {

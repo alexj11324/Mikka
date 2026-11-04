@@ -21,6 +21,7 @@ import { matchesRepositoryAdmission } from './repository-admission'
 import { mayCompleteIssue } from './run-completion'
 import type { QuotaPlan } from './run-quota'
 import { lockFactoryCompletionTasks, lockCompletionSkillScopes, prepareRunCompletionEffects, reconcileFactoryAfterCompletion, settleRunCompletionEffects } from './run-completion-effects'
+import { launchProviderContinuation, pendingProviderFallback, providerCompletion, recoverProviderFailure } from './run-provider-fallback'
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
 type Run = typeof agentRuns.$inferSelect
@@ -114,7 +115,7 @@ async function finishResult(tx: Transaction, run: Run, publication?: { pullReque
     } else if (attachPullRequest && publication?.pullRequest) throw new PublicationError('issue_unavailable')
   }
   // A used-up quota has its own event (lib/run-quota.ts): switched to a key, or paused.
-  if (run.stopReason !== 'quota_exhausted') await recordCoordinatorEvent(tx, runFinishedEvent({ ...run, stopReason: run.stopReason ?? 'error', report, publication }))
+  if (run.stopReason !== 'quota_exhausted' && run.stopReason !== 'provider_failure') await recordCoordinatorEvent(tx, runFinishedEvent({ ...run, stopReason: run.stopReason ?? 'error', report, publication }))
   return review
 }
 
@@ -128,8 +129,13 @@ export async function persistRunCompletion(userId: string, runId: string, comple
       const result = await completionTransaction(userId, runId, completion, scopeDeviceId)
       // After commit: a paused cloud run goes on with its key through the cloud queue.
       if (result?.quotaCloud) await (await import('./run-quota')).continueCloudQuotaRun(result.quotaCloud.run, result.quotaCloud.plan, result.quotaCloud.resetsAt)
+      // A committed provider failure changes models before Factory evaluates
+      // the result, so it never spends the task's code repair budget. Replays
+      // resume this idempotent step after a process interruption.
+      const continuation = result?.providerRunId ? await recoverProviderFailure(pool, userId, result.providerRunId) : null
       // After commit: hand the completed run to Factory review (BE-9).
       if (result) await reconcileFactoryAfterCompletion(pool, userId, runId)
+      await launchProviderContinuation(userId, continuation)
       return result
     }
     catch (error) {
@@ -168,13 +174,20 @@ async function completionTransaction(userId: string, runId: string, completion: 
     const [publication] = await tx.select().from(runPublications).where(and(eq(runPublications.runId, runId), eq(runPublications.userId, userId))).for('update')
     let quotaCloud: { run: Run; plan: QuotaPlan; resetsAt: string | null } | undefined
     if (firstCompletion) {
+      completion = providerCompletion(run, completion)
       // A used-up subscription quota goes on with the person's key or pauses (lib/run-quota.ts);
       // a run that was not on a subscription has no quota to switch from, so it is an error.
       const quota = completion.stopReason === 'quota_exhausted' ? await (await import('./run-quota')).planQuotaExhausted(client, run) : undefined
       if (quota === null) completion = { ...completion, stopReason: 'error' }
       const paused = Boolean(quota && (!quota.key || quota.cloud))
       const resetsAt = completion.report?.resetsAt ?? null
-      const report = await prepareRunCompletionEffects(client, run, completion, factoryBound)
+      const prepared = await prepareRunCompletionEffects(client, run, completion, factoryBound)
+      // runReport strips unknown worker fields. The recovery receipt belongs
+      // exclusively to the host, even if an internal caller bypassed parsing.
+      const report = prepared ? { ...prepared } : undefined
+      if (report) delete (report as Record<string, unknown>).modelFallback
+      const persistedReport = report?.providerFailure && completion.stopReason === 'provider_failure'
+        ? { ...report, modelFallback: pendingProviderFallback(run, report.providerFailure) } : report
       let status: RunStatus = paused ? 'paused' : runStateForStop(completion.stopReason)
       // A read-only run reports; it has nothing to publish, like a plan.
       if (completion.stopReason === 'submitted' && run.kind !== 'plan' && !run.agentDefinition?.readOnly) {
@@ -189,7 +202,7 @@ async function completionTransaction(userId: string, runId: string, completion: 
         }
       }
       // A paused run holds no lease, so it is never reclaimed as lost; it is not finished yet.
-      ;[run] = await tx.update(agentRuns).set({ status, pauseReason: paused ? 'quota_exhausted' : null, resumeStatus: null, stopReason: completion.stopReason, report: report ?? null,
+      ;[run] = await tx.update(agentRuns).set({ status, pauseReason: paused ? 'quota_exhausted' : null, resumeStatus: null, stopReason: completion.stopReason, report: persistedReport ?? null,
         ...(quota ? { quotaResetsAt: resetsAt ? new Date(resetsAt) : null } : {}),
         ...(paused ? { leaseExpiresAt: null, finishedAt: null } : { finishedAt: sql`clock_timestamp()` }), updatedAt: new Date() }).where(eq(agentRuns.id, runId)).returning()
       await tx.update(runTokens).set({ revokedAt: new Date() }).where(and(eq(runTokens.runId, runId), isNull(runTokens.revokedAt)))
@@ -200,18 +213,19 @@ async function completionTransaction(userId: string, runId: string, completion: 
         if (settled.deviceId) wakeDevice = settled.deviceId
       }
     }
+    const providerRunId = run.stopReason === 'provider_failure' ? run.id : undefined
     // A lease-expired/explicitly stopped run cannot be resurrected by a late completion.
     if (!publication) {
       const review = firstCompletion ? await finishResult(tx, run) : null
-      return { userId, issueId: run.issueId, publicationPending: false, review, quotaCloud }
+      return { userId, issueId: run.issueId, publicationPending: false, review, quotaCloud, providerRunId }
     }
     if (publication.status === 'assigned') {
       const gate = publicationGate({ stopReason: run.stopReason, kind: run.kind, report: reportOf(run), assignment: publication })
       await tx.update(runPublications).set({ status: gate.state, errorCode: gate.state === 'blocked' ? gate.error : null, updatedAt: new Date() }).where(eq(runPublications.runId, runId))
       const review = gate.state !== 'pending' ? await finishResult(tx, run, { errorCode: gate.state === 'blocked' ? gate.error : null, branch: publication.branch }, true, publication.scopeVersion) : null
-      return { userId, issueId: run.issueId, publicationPending: gate.state === 'pending', review, quotaCloud }
+      return { userId, issueId: run.issueId, publicationPending: gate.state === 'pending', review, quotaCloud, providerRunId }
     }
-    return { userId, issueId: run.issueId, publicationPending: !TERMINAL_PUBLICATIONS.includes(publication.status), review: null }
+    return { userId, issueId: run.issueId, publicationPending: !TERMINAL_PUBLICATIONS.includes(publication.status), review: null, providerRunId }
   })))
     committed = true
     return result

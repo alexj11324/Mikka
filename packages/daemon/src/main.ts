@@ -448,6 +448,7 @@ export class Daemon {
       journal: this.journal,
       adapterStateDir: this.paths.adapterState,
       downloadChatFile: this.options.link.downloadChatFile?.bind(this.options.link),
+      saveCheckpoint: this.options.link.checkpointRun?.bind(this.options.link),
       outbox: this.outbox,
       worktrees: this.worktrees,
       adapters,

@@ -8,13 +8,17 @@ import { z } from 'zod'
 import test from 'node:test'
 import { assertE2eTarget } from '../../tests/helpers/e2e-target.mjs'
 import { Pool } from 'pg'
-import { readCliRunPolicy, readCliAgentPolicy, lockCliTaskScope } from './policy-store'
+import { readCliRunPolicy, readCliAgentPolicy, lockCliTaskScope, providerContinuationPolicy } from './policy-store'
 import { readIssueMetadata } from '../issue-metadata'
 import { setCliPolicy, setCliAgentPolicy } from './policy-settings'
 import { AgentToolApprovalStore } from './store'
 import { issuePolicySnapshot, policyDistributionContext } from './policy-distribution'
 import { verifyPolicySnapshot } from '@mikka/protocol/node-policy-snapshot'
 import { POLICY_SNAPSHOT_TTL_MS } from '@mikka/protocol/policy-snapshot'
+import { defaultRunPolicy, type RunPolicy } from '@mikka/protocol/agent-policy'
+import { freezeWorkerDefinition } from '../agent-kit/worker'
+import { intersectRunPolicy } from '../run-assignment-policy'
+import { continuedRunPolicyCeiling } from '../computer/run-model'
 
 const target = process.env.E2E_DATABASE_URL
 if (target) {
@@ -143,6 +147,68 @@ test('task workspace policy applies to Coordinator and cross-workspace Bot runs'
     await pool.query(`UPDATE agent_runs SET status='stopped' WHERE id=$1`,[a.run])
     assert.equal((await fetch(`${url}?deviceId=${device}`,{headers:auth})).status,409)
     await pool.query(`UPDATE agent_runs SET status='running' WHERE id=$1`,[a.run])
+  })
+  await t.test('cross-harness provider policy survives live settings, broker grants and signed HTTP renewal', async () => {
+    const sourceAgent = randomUUID(), nextAgent = randomUUID()
+    await pool.query(`INSERT INTO agents(id,"userId",harness,name,"deviceId") VALUES($1,$2,'codex','Provider source fixture',$3),($4,$2,'claude_code','Provider target fixture',$3)`, [sourceAgent, owner, device, nextAgent])
+    const source = await fixture(null), child = await fixture(null), unrelated = await fixture(null)
+    await pool.query('UPDATE agent_runs SET "agentId"=$2 WHERE id=$1', [source.run, sourceAgent])
+    await pool.query('UPDATE agent_runs SET "agentId"=$2,"issueId"=$3 WHERE id=$1', [child.run, nextAgent, source.issue])
+    await pool.query('UPDATE agent_runs SET "agentId"=$2 WHERE id=$1', [unrelated.run, nextAgent])
+    await setCliPolicy(pool, owner, source.run, 'worker', (await read(source.run)).revision,
+      { approvalMode: 'read_only', permissions: { git_push: 'deny' }, networkAllow: ['*.example.invalid'] })
+    const capture = async (runId: string, userId = owner) => {
+      const tx = await pool.connect()
+      try { await tx.query('BEGIN'); const value = await providerContinuationPolicy(tx, userId, runId); await tx.query('COMMIT'); return value }
+      catch (error) { await tx.query('ROLLBACK'); throw error }
+      finally { tx.release() }
+    }
+    const ceiling = await capture(source.run)
+    const definition = freezeWorkerDefinition({ harness: 'claude_code', instructions: '', prompt: 'Same task', parent: null, executionId: null, model: 'fixture-model', policyCeiling: ceiling })
+    await pool.query('UPDATE agent_runs SET "agentDefinition"=$2,"retryOf"=$3 WHERE id=$1', [child.run, JSON.stringify(definition), source.run])
+    const current = await read(child.run)
+    assert.equal(current.policy.readOnly, true)
+    assert.equal(current.policy.permissions.git_push, 'deny')
+    assert.equal(current.policy.permissions.install_dependency, 'deny')
+    assert.equal(current.policy.permissions.computer_use, 'deny')
+    assert.deepEqual(current.policy.networkCeiling, ['*.example.invalid'])
+    assert.equal((await read(unrelated.run)).policy.readOnly, undefined, 'the target worker and unrelated task are not rewritten')
+    assert.deepEqual(await continuedRunPolicyCeiling(pool, owner, source.issue, child.run, undefined), ceiling)
+    assert.equal(await continuedRunPolicyCeiling(pool, owner, unrelated.issue, child.run, undefined), undefined)
+    assert.equal(await continuedRunPolicyCeiling(pool, 'foreign-owner', source.issue, child.run, undefined), undefined)
+    await assert.rejects(capture(source.run, 'foreign-owner'), /agentPolicyUnavailable/)
+    const finalPolicy = intersectRunPolicy({ ...current.policy, permissions: { ...current.policy.permissions, git_push: 'allow', computer_use: 'allow' } }, ceiling)
+    const issuer = `http://127.0.0.1:${address.port}`, url = `${issuer}/v1/runs/${child.run}/policy-snapshot`
+    const auth = { 'x-mikka-client-version': '0.0.375', authorization: `Bearer ${token}`, 'content-type': 'application/json' }
+    const context = policyDistributionContext(issuer, owner, device, child.run, current)
+    const expired = issuePolicySnapshot(context, finalPolicy, Date.now() - POLICY_SNAPSHOT_TTL_MS - 1000)
+    const renew = () => fetch(url, { method: 'POST', headers: auth, body: JSON.stringify({ deviceId: device, snapshot: expired }) })
+    const response = await renew()
+    assert.equal(response.status, 200)
+    const renewed = verifyPolicySnapshot(await response.json(), context, { runId: child.run, deviceId: device, revision: current.revision, policy: finalPolicy })
+    assert.equal(renewed.payload.policy.readOnly, true)
+    assert.equal(renewed.payload.policy.permissions.git_push, 'deny')
+    assert.equal(renewed.payload.policy.permissions.computer_use, 'deny')
+    assert.deepEqual(renewed.payload.policy.networkCeiling, ['*.example.invalid'])
+    assert.deepEqual(await (await checkHTTP(current.revision, child.run)).json(), { live: true, paused: false })
+    const relaxed = await setCliPolicy(pool, owner, child.run, 'worker', current.revision,
+      { permissions: { install_dependency: 'allow', git_push: 'allow', network: 'allow' } })
+    assert.equal(relaxed.policy.readOnly, true)
+    assert.equal(relaxed.policy.permissions.git_push, 'deny')
+    assert.deepEqual(relaxed.policy.networkCeiling, ['*.example.invalid'])
+    assert.notEqual(relaxed.revision, current.revision)
+    assert.deepEqual(await (await checkHTTP(current.revision, child.run)).json(), { live: false, paused: false })
+    assert.equal((await renew()).status, 409, 'settings changes revoke the old signed policy revision')
+    const narrowed = await setCliPolicy(pool, owner, child.run, 'worker', relaxed.revision, { permissions: { network: 'deny' } })
+    assert.equal(narrowed.policy.permissions.network, 'deny')
+    assert.deepEqual(await (await checkHTTP(narrowed.revision, child.run)).json(), { live: true, paused: false })
+    await setCliPolicy(pool, owner, source.run, 'worker', (await read(source.run)).revision, {})
+    assert.equal((await read(child.run)).policy.readOnly, true, 'later source changes cannot remove the captured ceiling')
+    const computerOnly: RunPolicy = { ...defaultRunPolicy(), permissions: { ...defaultRunPolicy().permissions, computer_use: 'deny' } }
+    await pool.query('UPDATE agent_runs SET "agentDefinition"=$2 WHERE id=$1', [unrelated.run, JSON.stringify(freezeWorkerDefinition({ harness: 'claude_code', instructions: '', prompt: '', parent: null, executionId: null, model: 'fixture-model', policyCeiling: computerOnly }))])
+    const inherited = await capture(unrelated.run)
+    assert.equal(inherited.readOnly, undefined)
+    assert.equal(inherited.permissions.computer_use, 'deny', 'a subsequent fallback retains an explicit broker ceiling even without readOnly')
   })
   await t.test('Coordinator tasks inherit their own workspace ceiling without changing the global head', async () => {
     const policyA = await read(a.run), policyB = await read(b.run), privatePolicy = await read(personal.run)

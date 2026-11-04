@@ -29,7 +29,7 @@ import { AgentMarkdown } from './agent-markdown'
 import { ComputerCard } from '@/components/computer/computer-card'
 import { harnessLabel } from './issue-threads'
 import { ThreadStatus } from './thread-status-icon'
-import { ThreadQuotaPausedCard, ThreadQuotaSwitchLine } from './thread-quota'
+import { ThreadModelFallbackNotice, ThreadQuotaPausedCard, ThreadQuotaSwitchLine } from './thread-quota'
 import { cn } from '@/lib/utils'
 import { listRunArtifacts } from '@/app/actions/artifacts'
 import { ArtifactIcon } from '@/components/icons/artifact-icon'
@@ -78,7 +78,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   const t = useTranslations('IssueThreads')
   const format = useFormatter()
   const { mutate: mutateCache, cache } = useSWRConfig()
-  const questionPolls = useRef(0)
+  const waitingPolls = useRef(0)
   const key = ['issue-thread', issueId, runId]
   // A live run polls every 2 s: pass where the held chunks end, so only later chunks are read and sent.
   const { data, error, mutate } = useSWR(key, async () => {
@@ -86,9 +86,10 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
     const previous = held?.chunkCursor ? held : undefined
     return mergeThreadChunks(previous, await getIssueThread(issueId, runId, previous?.chunkCursor))
   }, {
-    // A question changes only when it is answered or its continuation starts: back off, capped.
-    refreshInterval: detail => !detail ? 0 : runIsActive(threadQuestionView(detail.thread).status) ? 2000 : threadQuestionView(detail.thread).question ? Math.min(2000 * 2 ** questionPolls.current, 30_000) : 0,
-    onSuccess: detail => { questionPolls.current = threadQuestionView(detail.thread).question ? questionPolls.current + 1 : 0 },
+    // Ended runs can still await an answer or a host-prepared model change.
+    // Back off, capped, until the continuation or refusal has committed.
+    refreshInterval: detail => !detail ? 0 : runIsActive(threadQuestionView(detail.thread).status) ? 2000 : threadQuestionView(detail.thread).question || detail.thread.modelFallbackPending ? Math.min(2000 * 2 ** waitingPolls.current, 30_000) : 0,
+    onSuccess: detail => { waitingPolls.current = threadQuestionView(detail.thread).question || detail.thread.modelFallbackPending ? waitingPolls.current + 1 : 0 },
   })
   // Frame 06: a thread whose candidate waits for acceptance has 对话 | 验收 in its header.
   const acceptance = useThreadAcceptance(issueId, runId)
@@ -132,10 +133,12 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   const items = data ? threadItems(data.chunks, data.messages, runId) : []
   // A failed run says why under the stage that stopped, else at the end of the conversation.
   const failure = data && view ? runFailureText(view.status, data.thread.error) : null
+  const modelFallback = data?.thread.modelFallback?.filter(item => item.state === 'switched' || item.runId === liveRunId) ?? []
+  const providerExplained = data?.thread.modelFallbackPending || modelFallback.some(item => item.runId === liveRunId)
   const failedStagesId = failure ? [...items].reverse().find(item => item.kind === 'stages' && item.stages.some(stage => !stage.ok))?.id : undefined
   // A message to an ended thread runs it again in the same thread (R-81): 重试 is that message, one tap (N2).
   const canRetry = !!failure && !!data?.thread.detail && data.thread.ownedByCurrentUser && !runIsActive(view?.status ?? '')
-  const failureLine = failure && <div className="flex items-start gap-2" data-slot="thread-failure">
+  const failureLine = failure && !providerExplained && <div className="flex items-start gap-2" data-slot="thread-failure">
     <p className="line-clamp-2 min-w-0 flex-1 text-xs break-words text-destructive/80" title={failure}>{failure}</p>
     {canRetry && <Button variant="outline" size="xs" className="shrink-0 pointer-coarse:h-11" disabled={sending} onClick={() => { void send(t('retry'), true) }}>{t('retry')}</Button>}
   </div>
@@ -252,6 +255,8 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
           {!failedStagesId && failureLine}
           {/* The subscription ran out and the run went on on the person's key (lib/run-quota.ts). */}
           {data.thread.quota?.switched.map(item => <ThreadQuotaSwitchLine key={item.runId} switched={item} />)}
+          {modelFallback.map(item => <ThreadModelFallbackNotice key={item.runId} item={item}
+            retry={item.state !== 'switched' && canRetry ? () => { void send(t('retry'), true) } : undefined} retrying={sending} />)}
           {data.thread.feedbackEligible && <ThreadFeedback runId={runId} />}
         </>}
     </div>
