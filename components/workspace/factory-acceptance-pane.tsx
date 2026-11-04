@@ -139,7 +139,7 @@ export function CandidateMachine({ taskId }: { taskId: string }) {
 
 function Verdict({ passed }: { passed: boolean | null }) {
   if (passed === null) return <CircleDashed aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
-  return passed ? <CircleCheck aria-hidden="true" className="size-4 shrink-0 text-success" /> : <CircleX aria-hidden="true" className="size-4 shrink-0 text-destructive" />
+  return passed ? <CircleCheck aria-hidden="true" className="size-4 shrink-0 text-success-foreground" /> : <CircleX aria-hidden="true" className="size-4 shrink-0 text-destructive" />
 }
 
 /** Figma `Factory/CriterionRow`: the criterion, its result, and the evidence that shows it. */
@@ -149,7 +149,7 @@ function CriterionRow({ taskId, group, onOpen }: { taskId: string; group: Criter
     <div className="flex min-w-0 items-center gap-2">
       {group.title !== null && <Verdict passed={group.passed} />}
       <h5 className={cn('min-w-0 flex-1 text-sm', group.title === null ? 'text-xs text-muted-foreground' : 'font-medium')}>{group.title ?? t('otherEvidence')}</h5>
-      {group.title !== null && group.passed !== null && <span className={cn('shrink-0 text-xs', group.passed ? 'text-success' : 'text-destructive')}>{t(group.passed ? 'passed' : 'notPassed')}</span>}
+      {group.title !== null && group.passed !== null && <span className={cn('shrink-0 text-xs', group.passed ? 'text-success-foreground' : 'text-destructive')}>{t(group.passed ? 'passed' : 'notPassed')}</span>}
     </div>
     {group.items.length > 0 && <div className={cn(group.title !== null && 'pl-6')}><CriterionEvidence taskId={taskId} items={group.items} onOpen={onOpen} /></div>}
   </li>
@@ -168,7 +168,7 @@ function ResultLine({ row, onOpenThread }: { row: ResultRow; onOpenThread?: (run
   return <li className="flex min-h-10 min-w-0 flex-wrap items-center gap-2 rounded-xl px-3 py-2.5">
     {done ? <Verdict passed={row.status === 'passed'} /> : <Spinner className="size-4 shrink-0 text-muted-foreground" />}
     <span className="text-sm font-medium">{t(row.stage === 'review' ? 'review' : 'verify')}</span>
-    <span className={cn('text-sm', row.status === 'passed' ? 'text-success' : row.status === 'failed' ? 'text-destructive' : 'text-muted-foreground')}>{word}</span>
+    <span className={cn('text-sm', row.status === 'passed' ? 'text-success-foreground' : row.status === 'failed' ? 'text-destructive' : 'text-muted-foreground')}>{word}</span>
     {meta && <span className="text-xs text-muted-foreground">{meta}</span>}
     <span className="flex-1" />
     {row.runId && onOpenThread

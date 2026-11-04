@@ -297,7 +297,7 @@ export function SubscriptionSettings({ workspaceId, workspaceName, heading }: { 
             {mine && !catching && <SignInPanel attempt={mine} callback={callback} pending={pending} onCallback={setCallback} onFinish={() => { void finishCallback() }} onCancel={cancel} />}
           </div>
           {failure && <div role="alert" className="flex items-center gap-2 px-5 py-3 text-sm text-warning-foreground">
-            <TriangleAlert aria-hidden="true" className="size-4 shrink-0 text-warning" />
+            <TriangleAlert aria-hidden="true" className="size-4 shrink-0 text-warning-foreground" />
             <span className="min-w-0 flex-1">{failure.message}</span>
             {failure.again && available && <Button type="button" variant="secondary" size="sm" disabled={pending || !!attempt} onClick={() => startAgain(failure)}>{t('retry')}</Button>}
           </div>}

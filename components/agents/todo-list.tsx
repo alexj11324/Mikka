@@ -73,7 +73,7 @@ function TodoHeaderIcon({ complete }: { complete: boolean }) {
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0 }}
             transition={reduce ? { duration: 0 } : SPRING_SWAP}
-            className="absolute size-5.5 overflow-visible text-success"
+            className="absolute size-5.5 overflow-visible text-success-foreground"
           >
             <circle cx="12" cy="12" r="9" fill="currentColor" />
             <motion.path

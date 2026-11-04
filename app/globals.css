@@ -192,7 +192,8 @@
   --hover-2: color-mix(in oklch, var(--foreground) 9%, var(--background));
   --ink: var(--foreground);
   --ink-2: var(--muted-foreground);
-  --ink-3: color-mix(in oklch, var(--muted-foreground) 65%, var(--background));
+  /* Tertiary text (times, 「派出」, 「查看了…」): 85% keeps 4.5:1 on the page and cards in both themes, still a step below --ink-2. */
+  --ink-3: color-mix(in oklch, var(--muted-foreground) 85%, var(--background));
   --line: var(--border);
   --line-strong: color-mix(in oklch, var(--border) 80%, var(--foreground));
 --project-action: var(--sidebar-primary);
@@ -338,13 +339,15 @@
 --sidebar-accent-foreground: oklch(0.985 0 0);
 --sidebar-border: oklch(1 0 0 / 10%);
 --sidebar-ring: oklch(0.708 0 0);
---destructive-foreground: var(--color-red-600);
+/* Status words and icons on a status tint read at 4.5:1 or more on the dark page and cards (2026-11-04):
+   400 for amber, green and violet; red needs 300, as 400 on a card tint is 4.39. */
+--destructive-foreground: var(--color-red-300);
 --success: var(--color-emerald-500);
---success-foreground: var(--color-emerald-600);
+--success-foreground: var(--color-emerald-400);
 --info: var(--color-violet-500);
---info-foreground: var(--color-violet-600);
+--info-foreground: var(--color-violet-400);
 --warning: var(--color-yellow-500);
---warning-foreground: var(--color-yellow-600);
+--warning-foreground: var(--color-yellow-400);
 --invert: var(--color-zinc-700);
 --invert-foreground: var(--color-zinc-50);
 --attention: var(--color-orange-500);

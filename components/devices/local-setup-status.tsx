@@ -46,7 +46,7 @@ export function LocalSetupStatus({ onOnline }: { onOnline: () => void }) {
   const current = STEPS.find(step => steps[step] === 'running' || steps[step] === 'failed')
   return <Item variant="outline" role="status" aria-live="polite" className="rounded-xl bg-card px-3.5 py-3">
     <ItemMedia>
-      {state.status === 'online' ? <Check aria-hidden="true" className="text-success" />
+      {state.status === 'online' ? <Check aria-hidden="true" className="text-success-foreground" />
         : state.status === 'failed' ? <X aria-hidden="true" className="text-destructive" />
           : <Loader2 aria-hidden="true" className="animate-spin text-muted-foreground motion-reduce:animate-none" />}
     </ItemMedia>

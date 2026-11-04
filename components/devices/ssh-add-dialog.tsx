@@ -17,7 +17,7 @@ import { AgentMarks, installedAgents } from './agent-marks'
 import { DaemonCommandList } from './connect-device-dialog'
 
 function StepIcon({ state }: { state: StepState }) {
-  if (state === 'done') return <Check aria-hidden="true" className="size-4 text-success" />
+  if (state === 'done') return <Check aria-hidden="true" className="size-4 text-success-foreground" />
   if (state === 'failed') return <X aria-hidden="true" className="size-4 text-destructive" />
   if (state === 'running') return <Loader2 aria-hidden="true" className="size-4 animate-spin text-muted-foreground" />
   return <Circle aria-hidden="true" className="size-4 text-muted-foreground/60" />

@@ -40,7 +40,7 @@ export type ApprovalBarProps = {
 }
 
 function StateIcon({ state, refused }: { state: AcceptanceState; refused: boolean }) {
-  if (state === 'pending' && refused) return <TriangleAlert aria-hidden="true" className="text-warning" />
+  if (state === 'pending' && refused) return <TriangleAlert aria-hidden="true" className="text-warning-foreground" />
   if (state === 'publishing' || state === 'checking' || state === 'merging') return <Spinner />
   // A merged PR reads as GitHub draws it, the same mark as the candidate card's PR.
   if (state === 'merged') return <PullRequestIcon state="merged" />
